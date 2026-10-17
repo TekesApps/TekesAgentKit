@@ -154,6 +154,11 @@ impl Context {
             .materialize(id, array(&item["message"], "content")?)
             .await?;
         // Receipt is already persisted as dispatching. A timeout is never converted back into queued.
+        rpc.control(
+            "input.prepare",
+            json!({"id":item["rpcId"],"text":message,"hasImages":!images.is_empty()}),
+        )
+        .await?;
         let result = rpc
             .request("prompt", json!({"message":message,"images":images}))
             .await?;

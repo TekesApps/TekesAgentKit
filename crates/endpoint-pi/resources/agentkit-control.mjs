@@ -1,6 +1,35 @@
 import { Type } from '@sinclair/typebox';
+import { createHash, randomUUID } from 'node:crypto';
 // Host control over Pi's public extension API; never adds private RPC commands or parses logs.
 export default function (pi) {
+  const digest = text => createHash('sha256').update(text).digest('hex');
+  const prepared = [], admitted = [];
+  let runID;
+  pi.on('input', async event => {
+    if (event.source !== 'rpc') return;
+    const index = prepared.findIndex(item => item.hash === digest(event.text));
+    if (index >= 0) admitted.push({ ...prepared.splice(index, 1)[0], mode: event.streamingBehavior ?? 'started' });
+  });
+  pi.on('message_end', async event => {
+    if (event.message.role !== 'user') return;
+    const content = event.message.content;
+    const text = typeof content === 'string' ? content : content.filter(block => block.type === 'text').map(block => block.text).join('\n');
+    const hash = digest(text);
+    let index = admitted.findIndex(item => item.hash === hash);
+    if (index < 0) index = admitted.findIndex(item => item.hasImages && text.startsWith(item.text + '\n\n'));
+    if (index >= 0) {
+      const item = admitted.splice(index, 1)[0];
+      pi.appendEntry('agentkit.inputReceipt.v1', { timestamp: event.message.timestamp, hash, rpcId: item.id, mode: item.mode });
+    }
+  });
+  pi.on('agent_start', async () => {
+    runID = randomUUID();
+    pi.appendEntry('agentkit.run.v1', { id: runID, phase: 'started', timestamp: Date.now() });
+  });
+  pi.on('agent_settled', async event => {
+    if (runID) pi.appendEntry('agentkit.run.v1', { id: runID, phase: 'settled', aborted: event.aborted, timestamp: Date.now() });
+    runID = undefined;
+  });
   pi.registerTool({
     name: 'agentkit_goal', label: 'Goal state',
     description: 'Record completion or a concrete blocker for the active user goal.',
@@ -34,6 +63,16 @@ export default function (pi) {
             });
             if (replied) return;
             break;
+          }
+          case 'input.cancel': {
+            for (const queue of [prepared, admitted]) { const index = queue.findIndex(item => item.id === request.params.id); if (index >= 0) queue.splice(index, 1); }
+            data = null; break;
+          }
+          case 'input.prepare': {
+            if (prepared.length + admitted.length >= 256) throw new Error('Input receipt limit');
+            const { id, text, hasImages } = request.params;
+            if (typeof id !== 'string' || !id || typeof text !== 'string') throw new Error('Invalid input receipt');
+            prepared.push({ id, text, hash: digest(text), hasImages: hasImages === true }); data = null; break;
           }
           case 'settings.get': data = pi.getSettings(); break;
           case 'tools.list': data = pi.getAllTools(); break;

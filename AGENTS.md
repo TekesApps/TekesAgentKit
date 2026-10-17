@@ -26,6 +26,8 @@ intended ClientKit root and the shared Swift package/host/second-consumer checks
 does not make that Swift checker a Rust ownership test; add a suitable Rust dependency boundary check.
 
 Report static, replay, integration, native UI, IME/accessibility and performance evidence separately.
-Native/Pi/DSH implement independent headless paths; presentation/components remain scaffolding.
+Native/Pi/DSH implement independent headless paths. Run/Transcript/Composer/connection presentation
+is implemented without a renderer; components remain scaffolding. Preserve submission identity,
+destination isolation, stale-read fencing and no-automatic-retry semantics when adding hosts.
 Keep the capability matrix in docs/session-endpoints.md accurate. Do not claim full ClientKit or UI
 parity from headless builds and tests.

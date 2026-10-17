@@ -71,6 +71,20 @@ def run(config):
         else:users=[e for e in state['entries'].values() if e['event']['type']=='user/message' and (e['event']['data'].get('source') or {}).get('kind') in (None,'user')]
         if users:assert len(users)==1,'duplicate accepted input: '+json.dumps(users)[-3500:]
     print(config['kind'].upper()+'_SESSION_ENDPOINT_LIVE_OK history+prompt+idempotency+locator+files+reconnect')
+    # Independent no-UI presentation consumer: compile draft, immediate echo, dispatch, settle, reconcile.
+    selected_model=next(command['args'] for command in config['commands'] if command.get('method')=='session.selectModel')
+    proof_commands=[{'op':'create','cwd':str(Path(next(iter(stat))['absolutePath']).parent),'saveAs':'presented'},
+        {'op':'call','sessionId':'presented','method':'session.selectModel','args':selected_model},
+        {'op':'open','sessionId':'presented'},{'op':'compose','sessionId':'presented','text':'Presentation layer proof'},
+        {'op':'waitSettled','sessionId':'presented'},{'op':'presentation','sessionId':'presented'},
+        {'op':'reconnect'},{'op':'open','sessionId':'presented'},{'op':'presentation','sessionId':'presented'}]
+    proof=execute(dict(config,commands=proof_commands))
+    for row in (row for row in proof if row.get('op')=='presentation'):
+        view=row['result']
+        assert view['connection']['phase']=='connected' and view['canSubmit'],view
+        assert any(item['text']=='ENDPOINT_REPLY_OK' and item['isFinal'] for item in view['transcript']['items']),view
+        assert not any(item['id'].startswith('echo-item:') for item in view['transcript']['items']),view
+    print(config['kind'].upper()+'_PRESENTATION_LIVE_OK composer+immediate-echo+identity-reconciliation+final-answer+reconnect')
     return outputs
 try:
     with tempfile.TemporaryDirectory(prefix='agentkit-three-endpoints-') as tmp:
