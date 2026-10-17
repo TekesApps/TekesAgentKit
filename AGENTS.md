@@ -22,4 +22,5 @@ intended ClientKit root and the shared Swift package/host/second-consumer checks
 does not make that Swift checker a Rust ownership test; add a suitable Rust dependency boundary check.
 
 Report static, replay, integration, native UI, IME/accessibility and performance evidence separately.
-The current crates are scaffolding, not implementations. Do not claim parity from successful builds.
+Kernel/contract/session implement the initial headless path; Pi/DSH/presentation/components remain
+scaffolding. Do not claim full ClientKit or UI parity from headless builds and tests.

@@ -1,3 +1,5 @@
-//! 连接生命周期、事件投影、分页、恢复与可选缓存策略。
-//!
-//! 评估阶段骨架；尚无公开 API 或运行时实现。
+//! Headless session runtime and in-memory projection; no database or UI dependencies.
+mod projection;
+mod runtime;
+pub use projection::*;
+pub use runtime::*;
