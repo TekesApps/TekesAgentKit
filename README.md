@@ -9,7 +9,7 @@
 
 ## 当前阶段
 
-`v0.1.0` 保存三个 SEP 与无 UI presentation 的阶段成果；`v0.1.1` 增加公开仓库的 MIT 授权、包元数据和使用文档。API 仍处于早期阶段，crate 尚未发布到 crates.io（`publish = false`）。宿主应固定 tag/完整 commit，升级前检查变更。
+`v0.1.0` 保存三个 SEP 与无 UI presentation 的阶段成果；`v0.1.1` 增加公开仓库的 MIT 授权、包元数据和使用文档；当前 `v0.2.0` 冻结任务、子代理、SideChat 与 Summary 的无 UI 状态层。API 仍处于早期阶段，crate 尚未发布到 crates.io（`publish = false`）。宿主应固定 tag/完整 commit，升级前检查变更。
 
 | Endpoint | 验证版本 | 权威数据路径 |
 |---|---|---|
@@ -36,10 +36,10 @@ Git 消费示例（多个包位于同一 workspace）：
 
 ```toml
 [dependencies]
-tekes-agent-contract = { git = "https://github.com/TekesApps/TekesAgentKit", tag = "v0.1.1" }
-tekes-agent-session = { git = "https://github.com/TekesApps/TekesAgentKit", tag = "v0.1.1" }
-tekes-agent-presentation = { git = "https://github.com/TekesApps/TekesAgentKit", tag = "v0.1.1" }
-tekes-agent-endpoint-kernel = { git = "https://github.com/TekesApps/TekesAgentKit", tag = "v0.1.1" }
+tekes-agent-contract = { git = "https://github.com/TekesApps/TekesAgentKit", tag = "v0.2.0" }
+tekes-agent-session = { git = "https://github.com/TekesApps/TekesAgentKit", tag = "v0.2.0" }
+tekes-agent-presentation = { git = "https://github.com/TekesApps/TekesAgentKit", tag = "v0.2.0" }
+tekes-agent-endpoint-kernel = { git = "https://github.com/TekesApps/TekesAgentKit", tag = "v0.2.0" }
 ```
 
 本项目的已推送版本 tag 不移动；对审计要求严格的构建可改用 tag 对应的完整 `rev` 并提交 Cargo.lock。开发期 `path` override 应显式配置，不依赖隐式 sibling checkout。
