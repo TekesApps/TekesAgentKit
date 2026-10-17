@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.0 — 2026-10-18
+
+- Headless task pointer state, parent-owned subagent catalog/control, consumer-owned child history leases.
+- Ephemeral SideChat lifecycle with uncertain-mutation reconciliation and confirmed-discard draft cleanup.
+- Scoped Summary facts/providers, authoritative todo/usage recovery and typed host navigation actions.
+- DSH catalog projection routing and child delivery/admission normalization for the released protocol.
+- No UI/TekesUI or Kernel implementation changes.
+- Validation: 72 Rust tests, strict Clippy, format/dependency boundaries and Linux CI; real isolated Kernel 0.9.0 / Pi 1.3.0 / DSH 0.2.1-rc.2 and 0.2.0-rc.2 integration with synthetic providers.
+- Scope: a headless milestone, not full harness feature parity. Pi native subagents require explicit host services; Native bounded child history requires a public child-line projection source; DSH has no ephemeral SideChat. UI, durable client cache and large-history performance acceptance remain future work.
+
 ## 0.1.1 — 2026-10-18
 
 - Public repository with MIT License and inherited license metadata for every workspace package.

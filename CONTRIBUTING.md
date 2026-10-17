@@ -30,6 +30,6 @@ Current source provenance and known limits are documented under `docs/`. Update 
 
 ## Versions and licensing
 
-This is an early `0.1.x` library, not yet published to crates.io. Public APIs can evolve; document material changes in `CHANGELOG.md`. Milestone tags are annotated and never moved. License and public distribution documentation first appear in `v0.1.1`; `v0.1.0` remains the earlier immutable headless milestone.
+This is an early `0.x` library, not yet published to crates.io. Public APIs can evolve; document material changes in `CHANGELOG.md`. Milestone tags are annotated and never moved. License and public distribution documentation first appear in `v0.1.1`; `v0.1.0` remains the earlier immutable headless milestone.
 
 Contributions are provided under the repository's [MIT License](LICENSE). Third-party code must retain its required attribution and compatible license terms.

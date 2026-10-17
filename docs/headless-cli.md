@@ -99,3 +99,12 @@ A command's top-level `sessionId` resolves a saved alias such as `s`; literal ID
 ```
 
 This CLI cannot stage arbitrary user files or configure product settings by implication. Use explicit upload calls or the public Rust APIs and host preparation callback. Harness-specific optional methods and error behavior are listed in [session-endpoints.md](session-endpoints.md).
+
+## 无 UI Agent panels
+
+`presentation` 返回当前 session 的 `summary`。`childCatalog` 以 sessionId 为 parent；
+`childPrompt` / `childCancel` 另收 childSessionId，前者还需 content 数组。
+`sideChatCreate` 收 parent sessionId、可选 title/saveAs；`sideChatClose` 收创建返回的
+sessionId 或 saveAs 变量；`sideChats` 返回生命周期快照。`sideChatCreateError` 断言不支持
+等预期失败。这些操作的能力、unknown/reconcile 与宿主输入约束见
+[headless-agent-panels](headless-agent-panels.md)。

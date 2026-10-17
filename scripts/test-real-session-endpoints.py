@@ -26,6 +26,8 @@ class Provider(http.server.BaseHTTPRequestHandler):
             change=re.search(r'ENDPOINT_CHANGE_DIRECTORY=([^\s"\\]+)',transcript)
             if change and not any(message.get('role')=='tool' for message in body.get('messages',[])):
                 frames=[dict(common,choices=[{'index':0,'delta':{'role':'assistant','tool_calls':[{'index':0,'id':'directory-call','type':'function','function':{'name':'working_directory','arguments':json.dumps({'cd':change.group(1)})}}]},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{},'finish_reason':'tool_calls'}])]
+            if 'ENDPOINT_SUBAGENT_CATALOG' in transcript and not any(message.get('role')=='tool' for message in body.get('messages',[])):
+                frames=[dict(common,choices=[{'index':0,'delta':{'role':'assistant','tool_calls':[{'index':0,'id':'child-call','type':'function','function':{'name':'subagent','arguments':json.dumps({'description':'Catalog proof child','prompt':'CHILD_INITIAL_PROOF'})}}]},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{},'finish_reason':'tool_calls'}])]
             if 'ENDPOINT_GOAL_COMPLETE' in transcript and not any(message.get('role')=='tool' for message in body.get('messages',[])):
                 frames=[dict(common,choices=[{'index':0,'delta':{'role':'assistant','tool_calls':[{'index':0,'id':'goal-call','type':'function','function':{'name':'agentkit_goal','arguments':json.dumps({'phase':'complete'})}}]},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{},'finish_reason':'tool_calls'}])]
         try:
@@ -78,12 +80,29 @@ def run(config):
         {'op':'open','sessionId':'presented'},{'op':'compose','sessionId':'presented','text':'Presentation layer proof'},
         {'op':'waitSettled','sessionId':'presented'},{'op':'presentation','sessionId':'presented'},
         {'op':'reconnect'},{'op':'open','sessionId':'presented'},{'op':'presentation','sessionId':'presented'}]
+    if config['kind'] in ('native','pi'):
+        proof_commands += [
+            {'op':'sideChatCreate','sessionId':'presented','title':'Proof parent','saveAs':'side'},
+            {'op':'open','sessionId':'side'},{'op':'compose','sessionId':'side','text':'SideChat isolated turn'},
+            {'op':'waitSettled','sessionId':'side','minimumTurn':2},{'op':'presentation','sessionId':'side'},
+            {'op':'sideChatClose','sessionId':'side'},{'op':'sideChats'}]
+    else:
+        proof_commands += [{'op':'sideChatCreateError','sessionId':'presented'},{'op':'childCatalog','sessionId':'presented'}]
     proof=execute(dict(config,commands=proof_commands))
     for row in (row for row in proof if row.get('op')=='presentation'):
         view=row['result']
         assert view['connection']['phase']=='connected' and view['canSubmit'],view
+        assert view['summary']['scope']['sessionId']==view['run']['scope']['sessionId'],view
         assert any(item['text']=='ENDPOINT_REPLY_OK' and item['isFinal'] for item in view['transcript']['items']),view
         assert not any(item['id'].startswith('echo-item:') for item in view['transcript']['items']),view
+    if config['kind'] in ('native','pi'):
+        assert next(row['result'] for row in proof if row.get('op')=='sideChats')['chats']=={}, 'SideChat survived confirmed discard'
+        chat=next(row['result'] for row in proof if row.get('op')=='sideChatCreate')
+        assert chat['parent']['sessionId']!=chat['scope']['sessionId'] and chat['title']=='SideChat · Proof parent',chat
+    else:
+        catalog=next(row['result'] for row in proof if row.get('op')=='childCatalog')
+        assert isinstance(catalog['parentAvailable'],bool) and isinstance(catalog['entries'],list),catalog
+    print(config['kind'].upper()+'_PANELS_LIVE_OK summary-scope+sidechat-capability+lifecycle-or-catalog')
     print(config['kind'].upper()+'_PRESENTATION_LIVE_OK composer+immediate-echo+identity-reconciliation+final-answer+reconnect')
     return outputs
 try:
@@ -268,6 +287,22 @@ try:
                 assert upload['file']['name']=='a+b.txt','upload query encoding lost plus'
                 assert any(workspace['title']=='DSH workspace proof' for workspace in extended[-1]['result']['workspaces']),'workspace sync lost'
                 print('DSH_EXTENSIONS_LIVE_OK models+commands+skills+settings+providers+policy+upload+workspace-sync')
+                child_proof=[{'op':'create','cwd':str(cwd),'saveAs':'parent'},
+                    {'op':'call','sessionId':'parent','method':'session.selectModel','args':{'provider':'endpoint-test','model':'endpoint-test'}},
+                    {'op':'open','sessionId':'parent'},{'op':'compose','sessionId':'parent','text':'ENDPOINT_SUBAGENT_CATALOG'},
+                    {'op':'waitSettled','sessionId':'parent'},
+                    {'op':'childCatalog','sessionId':'parent','saveAs':'child'},
+                    {'op':'open','sessionId':'child'},
+                    {'op':'childPrompt','sessionId':'parent','childSessionId':'child','content':[{'type':'text','text':'CHILD_CONTINUATION_PROOF'}]},
+                    {'op':'waitSettled','sessionId':'child','minimumTurn':2},
+                    {'op':'reconnect'},{'op':'open','sessionId':'child'},
+                    {'op':'presentation','sessionId':'child'},
+                    {'op':'childCancel','sessionId':'parent','childSessionId':'child'}]
+                child_result=execute(dict(config,commands=child_proof))
+                child_view=next(row['result'] for row in child_result if row.get('op')=='presentation')
+                assert any(item['text']=='CHILD_CONTINUATION_PROOF' for item in child_view['transcript']['items']), 'child input missing'
+                assert any(item['text']=='ENDPOINT_REPLY_OK' and item['isFinal'] for item in child_view['transcript']['items']), 'child output missing'
+                print('DSH_CHILD_CONTROL_LIVE_OK catalog+owned-prompt+independent-history+receipt+cancel')
                 # Public lifecycle calls, with the original session and its fork independently addressable.
                 lifecycle=[{'op':'call','sessionId':session_id,'method':'session.rename','args':{'title':'Endpoint lifecycle proof'}},
                     {'op':'call','sessionId':session_id,'method':'session.fork','args':{'allowMigration':False},'saveAs':'fork'},

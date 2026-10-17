@@ -111,3 +111,60 @@ impl SessionRuntime {
         )?)
     }
 }
+
+impl SessionRuntime {
+    pub async fn subagent_catalog(&self, parent: &str) -> Result<SubagentCatalog> {
+        require(!parent.is_empty(), "empty parent session")?;
+        Ok(serde_json::from_value(
+            self.call_optional(
+                "subagents.list",
+                json!({"parentSessionId":parent}),
+                "subagent-catalog",
+            )
+            .await?,
+        )?)
+    }
+    /// Re-read ownership immediately before control. Never infer permission from a cached panel.
+    pub async fn prompt_child(
+        &self,
+        parent: &str,
+        child: &str,
+        mode: PromptMode,
+        content: Vec<Value>,
+        rpc_id: &str,
+    ) -> Result<Value> {
+        require(
+            parent != child && !child.is_empty(),
+            "invalid child identity",
+        )?;
+        require(
+            !content.iter().any(|v| v["type"] == "file"),
+            "SUBAGENT_FILE_UNSUPPORTED",
+        )?;
+        self.subagent_catalog(parent)
+            .await?
+            .require_continuable(child)?;
+        self.call_optional(
+            "subagents.prompt",
+            json!({"parentSessionId":parent,"childSessionId":child,"mode":mode,"content":content}),
+            rpc_id,
+        )
+        .await
+    }
+    pub async fn cancel_child(&self, parent: &str, child: &str, rpc_id: &str) -> Result<()> {
+        require(
+            parent != child && !child.is_empty(),
+            "invalid child identity",
+        )?;
+        self.subagent_catalog(parent)
+            .await?
+            .require_continuable(child)?;
+        self.call_optional(
+            "subagents.cancel",
+            json!({"parentSessionId":parent,"childSessionId":child}),
+            rpc_id,
+        )
+        .await?;
+        Ok(())
+    }
+}

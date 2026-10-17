@@ -5,7 +5,9 @@ use tekes_agent_contract::*;
 use tekes_agent_endpoint_dsh::{DshConfiguration, DshConnector};
 use tekes_agent_endpoint_kernel::KernelConnector;
 use tekes_agent_endpoint_pi::{PiConfiguration, PiConnector};
-use tekes_agent_presentation::{ComposerDestination, ComposerDraft, RunController, RunScope};
+use tekes_agent_presentation::{
+    ComposerDestination, ComposerDraft, RunController, RunScope, SideChatController,
+};
 use tekes_agent_session::SessionRuntime;
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -58,6 +60,7 @@ async fn main() -> Result<()> {
         json!({"ready":true,"kind":kind,"version":runtime.snapshot().host.as_ref().map(|h|h.product.version.clone())})
     );
     let presentation = RunController::new(runtime.clone())?;
+    let side_chats = SideChatController::new(runtime.clone());
     let mut variables = BTreeMap::<String, Value>::new();
     for command in array(&config, "commands")? {
         let operation = string(command, "op")?;
@@ -65,6 +68,82 @@ async fn main() -> Result<()> {
             .as_str()
             .map(|id| variables.get(id).and_then(Value::as_str).unwrap_or(id));
         let output = match operation {
+            "sideChatCreate" | "sideChatCreateError" => {
+                let parent = RunScope::main(
+                    identity,
+                    id.ok_or_else(|| unsupported("sessionId required"))?,
+                );
+                let result = side_chats
+                    .create(
+                        parent,
+                        command["title"].as_str(),
+                        &uuid::Uuid::new_v4().to_string(),
+                    )
+                    .await;
+                if operation == "sideChatCreateError" {
+                    json!({"error":result.err().ok_or_else(|| Error::Protocol("expected SideChat failure".into()))?.to_string()})
+                } else {
+                    let chat = result?;
+                    if let Some(name) = command["saveAs"].as_str() {
+                        variables.insert(name.into(), json!(chat.scope.session_id));
+                    }
+                    serde_json::to_value(chat)?
+                }
+            }
+            "sideChatClose" => {
+                let id = id.ok_or_else(|| unsupported("sessionId required"))?;
+                side_chats
+                    .close(id, &uuid::Uuid::new_v4().to_string())
+                    .await?;
+                presentation
+                    .forget_destination(&ComposerDestination::run(RunScope::main(identity, id)));
+                json!({"discarded":true})
+            }
+            "sideChats" => serde_json::to_value(side_chats.snapshot())?,
+            "childCatalog" => {
+                let value = serde_json::to_value(
+                    runtime
+                        .subagent_catalog(id.ok_or_else(|| unsupported("sessionId required"))?)
+                        .await?,
+                )?;
+                if let Some(name) = command["saveAs"].as_str() {
+                    variables.insert(
+                        name.into(),
+                        value
+                            .pointer(command["savePointer"].as_str().unwrap_or("/entries/0/id"))
+                            .cloned()
+                            .ok_or_else(|| Error::Protocol("child pointer missing".into()))?,
+                    );
+                }
+                value
+            }
+            "childPrompt" => {
+                runtime
+                    .prompt_child(
+                        id.ok_or_else(|| unsupported("sessionId required"))?,
+                        command["childSessionId"]
+                            .as_str()
+                            .map(|id| variables.get(id).and_then(Value::as_str).unwrap_or(id))
+                            .ok_or_else(|| unsupported("childSessionId required"))?,
+                        PromptMode::Queue,
+                        serde_json::from_value(command["content"].clone())?,
+                        &uuid::Uuid::new_v4().to_string(),
+                    )
+                    .await?
+            }
+            "childCancel" => {
+                runtime
+                    .cancel_child(
+                        id.ok_or_else(|| unsupported("sessionId required"))?,
+                        command["childSessionId"]
+                            .as_str()
+                            .map(|id| variables.get(id).and_then(Value::as_str).unwrap_or(id))
+                            .ok_or_else(|| unsupported("childSessionId required"))?,
+                        &uuid::Uuid::new_v4().to_string(),
+                    )
+                    .await?;
+                json!({"cancelled":true})
+            }
             "presentation" => {
                 presentation.select(ComposerDestination::run(RunScope::main(
                     identity,

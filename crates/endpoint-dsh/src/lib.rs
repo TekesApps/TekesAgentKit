@@ -69,6 +69,7 @@ pub struct DshSessionEndpoint {
     generation: String,
     actionables: Arc<Mutex<BTreeMap<String, Correlation>>>,
     resolved: broadcast::Sender<Value>,
+    child_addresses: Mutex<BTreeMap<String, Value>>,
 }
 #[async_trait]
 impl EndpointConnector for DshConnector {
@@ -120,6 +121,7 @@ impl EndpointConnector for DshConnector {
             generation: uuid::Uuid::new_v4().to_string(),
             actionables: Arc::new(Mutex::new(BTreeMap::new())),
             resolved,
+            child_addresses: Mutex::new(BTreeMap::new()),
         }))
     }
 }
@@ -451,7 +453,7 @@ impl SessionEndpoint for DshSessionEndpoint {
                 max_messages,
             } => (
                 "session/follow",
-                json!({"request":{"address":address(&session.session_id),"maxMessages":max_messages,"assistantStream":true}}),
+                json!({"request":{"address":self.history_address(&session.session_id).await?,"maxMessages":max_messages,"assistantStream":true}}),
             ),
             StreamTarget::SessionConversation { .. } => {
                 return Err(unsupported("DSH native conversation"));
@@ -495,7 +497,7 @@ impl SessionEndpoint for DshSessionEndpoint {
                 has_more_before: false,
             });
         }
-        let mut query = json!({"address":address(&request.session_id),"throughSeq":request.through_sequence,"maxMessages":request.max_messages});
+        let mut query = json!({"address":self.history_address(&request.session_id).await?,"throughSeq":request.through_sequence,"maxMessages":request.max_messages});
         if let Some(before) = request.before_sequence {
             query["beforeSeq"] = json!(before);
         }
@@ -628,13 +630,15 @@ impl SessionEndpoint for DshSessionEndpoint {
         Ok(serde_json::from_value(self.remote.call("workspaceFiles/read",json!({"workspaceFileScopeId":id,"path":path,"range":{"offset":offset,"limit":limit}}),&rpc()).await?)?)
     }
     async fn call(&self, method: &str, mut payload: Value, rpc_id: &str) -> Result<Value> {
+        if method == "subagents.list" || method == "subagents/list" {
+            return self
+                .child_catalog(string(&payload, "parentSessionId")?, rpc_id)
+                .await;
+        }
         if matches!(method, "subagents.prompt" | "subagents.cancel") {
             let parent = string(&payload, "parentSessionId")?;
             let child = string(&payload, "childSessionId")?;
-            let catalog = self
-                .remote
-                .call("subagents/list", json!({"parentSessionId":parent}), rpc_id)
-                .await?;
+            let catalog = self.child_catalog(parent, rpc_id).await?;
             require(
                 catalog["parentAvailable"] == true
                     && array(&catalog, "entries")?.iter().any(|row| {
@@ -651,12 +655,20 @@ impl SessionEndpoint for DshSessionEndpoint {
                     .any(|part| part["type"] == "file"),
                 "child continuation does not support files",
             )?;
+            payload["delivery"] = payload.get("mode").cloned().unwrap_or(json!("queue"));
             payload["requestId"] = json!(rpc_id);
             payload["mode"] = json!("continuable");
-            return self
+            let receipt = self
                 .remote
                 .call("subagents/prompt", json!({"request":payload}), rpc_id)
-                .await;
+                .await?;
+            require(
+                receipt["messageId"]
+                    .as_str()
+                    .is_some_and(|id| !id.is_empty()),
+                "invalid child admission receipt",
+            )?;
+            return Ok(json!({"accepted":true,"rpcId":rpc_id,"messageId":receipt["messageId"]}));
         }
         if let Some((endpoint, args)) = extensions::route(method, &payload)? {
             return self.remote.call(&endpoint, args, rpc_id).await;
@@ -727,6 +739,7 @@ impl SessionEndpoint for DshSessionEndpoint {
                 return Err(unsupported("DSH runtime has no session/discard route"));
             }
             "session.prompt" => {
+                payload["delivery"] = payload.get("mode").cloned().unwrap_or(json!("queue"));
                 payload["requestId"] = json!(rpc_id);
                 "session/prompt"
             }
@@ -830,6 +843,89 @@ impl DshSessionEndpoint {
             }
         }
         Ok(())
+    }
+}
+impl DshSessionEndpoint {
+    async fn history_address(&self, id: &str) -> Result<Value> {
+        if let Some(address) = self.child_addresses.lock().await.get(id).cloned() {
+            return Ok(address);
+        }
+        let mut cursor: Option<String> = None;
+        let mut seen = BTreeSet::new();
+        loop {
+            let page = self.remote.call("session/list", json!({"_request":cursor.as_ref().map(|c|json!({"cursor":c})).unwrap_or(json!({}))}), &rpc()).await?;
+            if let Some(row) = array(&page, "items")?.iter().find(|r| r["sessionId"] == id) {
+                if let Some(parent) = row["parentSessionId"]
+                    .as_str()
+                    .filter(|_| row["origin"] == "subagent")
+                {
+                    self.child_catalog(parent, &rpc()).await?;
+                    return self
+                        .child_addresses
+                        .lock()
+                        .await
+                        .get(id)
+                        .cloned()
+                        .ok_or_else(|| unsupported("child is missing from parent catalog"));
+                }
+                return Ok(address(id));
+            }
+            cursor = page["nextCursor"].as_str().map(str::to_owned);
+            let Some(next) = &cursor else {
+                return Ok(address(id));
+            };
+            require(seen.insert(next.clone()), "DSH inventory cursor cycle")?;
+        }
+    }
+    async fn child_catalog(&self, parent: &str, rpc_id: &str) -> Result<Value> {
+        require(!parent.is_empty(), "empty parent session")?;
+        let projection = self
+            .remote
+            .call(
+                "session/projections",
+                json!({"request":{"sessionId":parent}}),
+                rpc_id,
+            )
+            .await?;
+        require(
+            projection["kind"] == "sequenced"
+                || (self.host.product.version == "0.2.0-rc.2"
+                    && projection.get("kind").is_none()
+                    && projection["asOfSeq"].as_i64().is_some_and(|seq| seq >= -1)),
+            "subagent catalog projection unavailable",
+        )?;
+        let entries = array(&projection["values"], "subagentCatalog")?;
+        let mut normalized = Vec::new();
+        for entry in entries {
+            string(entry, "id")?;
+            let mut entry = entry.clone();
+            entry["kind"] = json!("child");
+            if matches!(
+                entry["mode"].as_str(),
+                Some("continuable" | "one-shot" | "unknown")
+            ) {
+                self.child_addresses.lock().await.insert(string(&entry, "id")?.into(), json!({"kind":"subagent","parentSessionId":parent,"childSessionId":entry["id"],"mode":entry["mode"]}));
+            }
+            normalized.push(entry);
+        }
+        // Availability is a live Agent fact, independent of running and durable catalog presence.
+        let mut cursor: Option<String> = None;
+        let mut seen = BTreeSet::new();
+        let available = loop {
+            let page = self.remote.call("session/list", json!({"_request":cursor.as_ref().map(|c|json!({"cursor":c})).unwrap_or(json!({}))}), rpc_id).await?;
+            if let Some(row) = array(&page, "items")?
+                .iter()
+                .find(|r| r["sessionId"] == parent)
+            {
+                break row["agentAvailable"].as_bool().unwrap_or(false);
+            }
+            cursor = page["nextCursor"].as_str().map(str::to_owned);
+            let Some(next) = &cursor else {
+                break false;
+            };
+            require(seen.insert(next.clone()), "DSH inventory cursor cycle")?;
+        };
+        Ok(json!({"entries":normalized,"parentAvailable":available}))
     }
 }
 fn pending_inbox_ids(projections: &Value) -> Result<Vec<String>> {

@@ -23,6 +23,8 @@ fn rpc_id() -> String {
     )
 }
 
+type HistoryOwners =
+    std::sync::Mutex<std::collections::BTreeMap<String, Arc<tokio::sync::Mutex<BTreeSet<String>>>>>;
 type Reply<T> = oneshot::Sender<Result<T>>;
 type OperationResult = Option<(Option<String>, Reply<Value>, Result<Value>)>;
 enum Command {
@@ -51,6 +53,7 @@ pub struct SessionRuntime {
     shared: Arc<SharedProjection>,
     revision: watch::Receiver<u64>,
     abort: tokio::task::AbortHandle,
+    history_owners: HistoryOwners,
 }
 impl Drop for SessionRuntime {
     fn drop(&mut self) {
@@ -72,6 +75,7 @@ impl SessionRuntime {
             shared,
             revision,
             abort: task.abort_handle(),
+            history_owners: std::sync::Mutex::new(Default::default()),
         }
     }
     /// Explicit immutable copy. Use inspect for bounded reads without copying history.
@@ -130,7 +134,24 @@ impl SessionRuntime {
             .map_err(|_| Error::Disconnected)?;
         result.await.map_err(|_| Error::Disconnected)?
     }
+    fn history_owners_for(&self, id: &str) -> Arc<tokio::sync::Mutex<BTreeSet<String>>> {
+        // Keep the per-session lock identity stable across empty→open transitions. A failed
+        // pointer can wait for its own baseline without blocking a healthy session's lease.
+        self.history_owners
+            .lock()
+            .expect("history owners lock")
+            .entry(id.into())
+            .or_default()
+            .clone()
+    }
     pub async fn open_session(&self, id: &str) -> Result<()> {
+        let owners = self.history_owners_for(id);
+        let mut owners = owners.lock().await;
+        self.open_history(id).await?;
+        owners.insert("legacy".into());
+        Ok(())
+    }
+    async fn open_history(&self, id: &str) -> Result<()> {
         let (reply, result) = oneshot::channel();
         self.send(Command::Open(id.into(), reply), result).await?;
         self.wait_for(Duration::from_secs(30), |s| {
@@ -159,8 +180,31 @@ impl SessionRuntime {
             .await
     }
     pub async fn close_session(&self, id: &str) -> Result<()> {
+        self.release_history(id, "legacy").await
+    }
+    async fn release_history(&self, id: &str, owner: &str) -> Result<()> {
+        let owners = self.history_owners_for(id);
+        let mut owners = owners.lock().await;
+        if !owners.remove(owner) || !owners.is_empty() {
+            return Ok(());
+        }
         let (reply, result) = oneshot::channel();
         self.send(Command::Close(id.into(), reply), result).await
+    }
+    /// Each mounted consumer owns a distinct lease; releasing one never closes another's stream.
+    pub async fn acquire_history(self: &Arc<Self>, id: &str) -> Result<SessionHistoryLease> {
+        require(!id.is_empty(), "empty history session")?;
+        let owner = rpc_id();
+        let lease = SessionHistoryLease {
+            runtime: self.clone(),
+            id: id.into(),
+            owner: owner.clone(),
+        };
+        let owners = self.history_owners_for(id);
+        let mut owners = owners.lock().await;
+        owners.insert(owner);
+        self.open_history(id).await?;
+        Ok(lease)
     }
     pub async fn load_earlier(&self, id: &str) -> Result<bool> {
         let previous_native_count = self.inspect(|s| {
@@ -754,5 +798,32 @@ async fn invoke(
                 .await?,
         )?),
         _ => endpoint.call(method, payload, rpc_id).await,
+    }
+}
+
+/// Drop releases only this consumer. Runtime shutdown does not require a live executor.
+pub struct SessionHistoryLease {
+    runtime: Arc<SessionRuntime>,
+    id: String,
+    owner: String,
+}
+impl SessionHistoryLease {
+    pub fn session_id(&self) -> &str {
+        &self.id
+    }
+    pub async fn release(self) -> Result<()> {
+        self.runtime.release_history(&self.id, &self.owner).await
+    }
+}
+impl Drop for SessionHistoryLease {
+    fn drop(&mut self) {
+        if let Ok(handle) = tokio::runtime::Handle::try_current() {
+            let runtime = self.runtime.clone();
+            let id = self.id.clone();
+            let owner = self.owner.clone();
+            handle.spawn(async move {
+                let _ = runtime.release_history(&id, &owner).await;
+            });
+        }
     }
 }

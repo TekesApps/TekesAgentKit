@@ -228,6 +228,7 @@ fn preview_key(event: &SessionEvent) -> String {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct MemoryProjectionStore {
     pub endpoint_id: String,
+    pub connection_epoch: u64,
     pub connection: ConnectionState,
     pub host: Option<HostDescription>,
     pub last_error: Option<String>,
@@ -258,6 +259,7 @@ impl MemoryProjectionStore {
         self.connection = ConnectionState::Connecting;
     }
     pub fn disconnect(&mut self) {
+        self.connection_epoch = self.connection_epoch.wrapping_add(1);
         self.validators.clear();
         self.actionables.clear();
         self.endpoint_events.clear();

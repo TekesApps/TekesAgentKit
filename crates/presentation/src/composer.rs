@@ -281,6 +281,8 @@ pub struct PresentationStore {
     pub(crate) events: VecDeque<SubmissionState>,
     was_connected: bool,
     aliases: BTreeMap<ComposerDestination, ComposerDestination>,
+    connection_epoch: u64,
+    child_catalog: Option<(SelectionToken, tekes_agent_contract::SubagentCatalog)>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -289,6 +291,7 @@ pub struct RunSnapshot {
     pub connection: ConnectionPresentation,
     pub run: Option<RunPresentation>,
     pub transcript: TranscriptSnapshot,
+    pub summary: Option<SummaryFacts>,
     pub draft: ComposerDraft,
     pub can_submit: bool,
     pub submissions: Vec<SubmissionState>,
@@ -382,7 +385,16 @@ impl PresentationStore {
         )?;
         let allowed = match &destination {
             ComposerDestination::Run { scope } => {
-                RunPresentation::read(authority, scope, self.was_connected).can_submit
+                let child_allowed = scope.thread_id == scope.session_id
+                    || (self.connection_epoch == authority.connection_epoch
+                        && authority.endpoint_capabilities.supports("subagents.prompt")
+                        && self.child_catalog.as_ref().is_some_and(|(token, catalog)| {
+                            self.selection().as_ref() == Some(token)
+                                && token.destination == destination
+                                && catalog.require_continuable(&scope.session_id).is_ok()
+                        }));
+                child_allowed
+                    && RunPresentation::read(authority, scope, self.was_connected).can_submit
             }
             ComposerDestination::NewThread { .. } => {
                 ConnectionPresentation::read(authority, None, self.was_connected).can_submit
@@ -561,6 +573,42 @@ impl PresentationStore {
             .reconciled = true;
         Ok(())
     }
+    pub fn commit_child_catalog(
+        &mut self,
+        token: &SelectionToken,
+        connection_epoch: u64,
+        result: std::result::Result<tekes_agent_contract::SubagentCatalog, String>,
+    ) -> bool {
+        if self.selection().as_ref() != Some(token) || self.connection_epoch != connection_epoch {
+            return false;
+        }
+        self.child_catalog = result.ok().map(|catalog| (token.clone(), catalog));
+        true
+    }
+    /// Call only after authoritative discard/absence. Late completions cannot resurrect a draft.
+    pub fn forget_destination(&mut self, destination: &ComposerDestination) {
+        let destination = self.resolve(destination);
+        self.drafts.remove(&destination);
+        let ids: Vec<_> = self
+            .submissions
+            .iter()
+            .filter(|(_, r)| self.owner(r) == destination)
+            .map(|(id, _)| id.clone())
+            .collect();
+        for id in ids {
+            let record = self.submissions.get_mut(&id).expect("owned record");
+            record.state.reconciled = true;
+            if record.state.phase == SubmissionPhase::Prepared {
+                record.state.phase = SubmissionPhase::Failed;
+            }
+        }
+        self.aliases
+            .retain(|key, value| key != &destination && value != &destination);
+        if self.selected.as_ref() == Some(&destination) {
+            self.selected = None;
+            self.generation += 1;
+        }
+    }
     pub fn refresh(&mut self, authority: &MemoryProjectionStore) -> Result<RunSnapshot> {
         if let Some(destination) = &self.selected {
             require(
@@ -576,7 +624,32 @@ impl PresentationStore {
                 None
             }
         });
-        let run = scope.map(|s| RunPresentation::read(authority, s, self.was_connected));
+        if self.connection_epoch != authority.connection_epoch {
+            self.child_catalog = None;
+            self.connection_epoch = authority.connection_epoch;
+        }
+        if !matches!(
+            authority.connection,
+            tekes_agent_session::ConnectionState::Ready
+        ) {
+            self.child_catalog = None;
+        }
+        let mut run = scope.map(|s| RunPresentation::read(authority, s, self.was_connected));
+        if let Some(run) = &mut run
+            && run.scope.thread_id != run.scope.session_id
+        {
+            let catalog = self
+                .child_catalog
+                .as_ref()
+                .filter(|(token, _)| Some(token.clone()) == self.selection())
+                .map(|(_, catalog)| catalog);
+            let available = ChildComposerAvailability::resolve(catalog, &run.scope.session_id)
+                == ChildComposerAvailability::Available;
+            run.can_submit &=
+                available && authority.endpoint_capabilities.supports("subagents.prompt");
+            run.can_cancel &=
+                available && authority.endpoint_capabilities.supports("subagents.cancel");
+        }
         let mut transcript = scope
             .and_then(|s| {
                 authority
@@ -682,11 +755,29 @@ impl PresentationStore {
                         | SubmissionPhase::Unknown
                 )
         });
+        let summary = match scope
+            .and_then(|scope| {
+                authority
+                    .sessions
+                    .get(&scope.session_id)
+                    .map(|session| SummaryFacts::read(scope, session, &transcript))
+            })
+            .transpose()
+        {
+            Ok(summary) => summary,
+            Err(error) => {
+                transcript
+                    .diagnostics
+                    .push(format!("Summary unavailable: {error}"));
+                None
+            }
+        };
         Ok(RunSnapshot {
             selection: self.selection(),
             connection: connection.clone(),
             run: run.clone(),
             transcript,
+            summary,
             draft: selected.as_ref().map(|d| self.draft(d)).unwrap_or_default(),
             can_submit: selected.is_some()
                 && run
