@@ -1,6 +1,6 @@
 # TekesAgentKit 初步架构评估
 
-> 历史评估。后续实现发现当前 ClientKit Native 已要求 Kernel v4 并移除 workspace RPC；本文的旧 Kernel v3/workspace 记录不能作为当前实现基准。见 headless-kernel.md。
+> 历史评估。仓库后续已公开并采用 MIT License（v0.1.1）；本文的私有/许可证待定描述仅记录评估当时状态。后续实现发现当前 ClientKit Native 已要求 Kernel v4 并移除 workspace RPC；本文的旧 Kernel v3/workspace 记录不能作为当前实现基准。见 headless-kernel.md。
 
 评估日期：2026-10-17。以下为源码核对与设计建议；没有进行 harness 连接、性能基准或原生 UI 验收。
 

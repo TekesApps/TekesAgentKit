@@ -21,3 +21,5 @@ P1 首先证明本地无客户端磁盘 Mirror 的可行性。P2 验证缓存可
 DSH 已升级并隔离验证 0.2.1-rc.2（保留 0.2.0-rc.2），补齐普通 fork、归档恢复、冷客户端冻结分页、新工作目录和 job 事件兼容。详见 session-endpoints.md 的升级验收。
 
 2026-10-18：补齐 P4 非 UI presentation 和独立公开 consumer；不包含 P5 控件与完整 P6 产品面。
+
+2026-10-18：v0.1.0 保存 headless 阶段；v0.1.1 增加 public/MIT 与公开接入、CLI、贡献和版本文档，crate 继续 publish=false。
