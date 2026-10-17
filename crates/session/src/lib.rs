@@ -3,3 +3,6 @@ mod projection;
 mod runtime;
 pub use projection::*;
 pub use runtime::*;
+
+mod registry;
+pub use registry::SessionEndpointRegistry;

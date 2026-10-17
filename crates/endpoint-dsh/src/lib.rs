@@ -1,3 +1,552 @@
-//! DSH 协议与 SessionEndpoint 语义适配器。
-//!
-//! 评估阶段骨架；尚无公开 API 或运行时实现。
+//! Independent DSH SessionEndpoint adapter for the authenticated Remote HTTP/mux protocol.
+mod history;
+mod multipart;
+mod remote;
+use async_trait::async_trait;
+use futures_util::{StreamExt, stream};
+pub use history::decode_records;
+use remote::Remote;
+use serde_json::{Value, json};
+use std::{
+    collections::{BTreeMap, BTreeSet, VecDeque},
+    sync::Arc,
+    time::Duration,
+};
+use tekes_agent_contract::*;
+use tokio::sync::{Mutex, broadcast};
+#[derive(Clone)]
+pub struct DshConfiguration {
+    pub identity: String,
+    pub base_url: reqwest::Url,
+    pub authorization: Option<(String, String)>,
+    pub supported_versions: BTreeSet<String>,
+    pub timeout: Duration,
+}
+impl DshConfiguration {
+    pub fn new(identity: impl Into<String>, url: &str) -> Result<Self> {
+        let mut url =
+            reqwest::Url::parse(url).map_err(|_| Error::Protocol("invalid DSH URL".into()))?;
+        require(
+            matches!(url.scheme(), "http" | "https")
+                && url.host_str().is_some()
+                && url.username().is_empty()
+                && url.password().is_none()
+                && url.query().is_none()
+                && url.fragment().is_none(),
+            "invalid DSH origin",
+        )?;
+        if !url.path().ends_with('/') {
+            url.set_path(&format!("{}/", url.path()));
+        }
+        Ok(Self {
+            identity: identity.into(),
+            base_url: url,
+            authorization: None,
+            supported_versions: ["0.2.0-rc.2".into()].into(),
+            timeout: Duration::from_secs(30),
+        })
+    }
+}
+#[derive(Clone)]
+pub struct DshConnector {
+    config: DshConfiguration,
+}
+impl DshConnector {
+    pub fn new(config: DshConfiguration) -> Self {
+        Self { config }
+    }
+}
+#[derive(Clone)]
+struct Correlation {
+    client: String,
+    event: String,
+}
+pub struct DshSessionEndpoint {
+    identity: String,
+    host: HostDescription,
+    remote: Arc<Remote>,
+    generation: String,
+    actionables: Arc<Mutex<BTreeMap<String, Correlation>>>,
+    resolved: broadcast::Sender<Value>,
+}
+#[async_trait]
+impl EndpointConnector for DshConnector {
+    async fn connect(&self) -> Result<Arc<dyn SessionEndpoint>> {
+        require(
+            !self.config.identity.is_empty(),
+            "empty DSH endpoint identity",
+        )?;
+        let remote = Arc::new(Remote::connect(self.config.clone()).await?);
+        let version = remote.probe_version().await?;
+        let mut events = remote.open("$events", json!({})).await?;
+        let ready = tokio::time::timeout(self.config.timeout, events.next())
+            .await
+            .map_err(|_| Error::Timeout)?
+            .ok_or(Error::Disconnected)??;
+        require(ready["type"] == "ready", "DSH events did not begin ready")?;
+        string(&ready, "clientId")?;
+        let home = string(&ready["host"], "home")?.to_owned();
+        drop(events);
+        let (resolved, _) = broadcast::channel(256);
+        let host = HostDescription {
+            protocol_version: 3,
+            product: Product {
+                name: "DeepSeek Harness".into(),
+                version,
+            },
+            capabilities: [
+                "session-inventory-sync",
+                "session-control-sync",
+                "actionable-sync",
+                "session-journal",
+                "models",
+                "management",
+            ]
+            .map(String::from)
+            .into(),
+            cwd: home.clone(),
+            home,
+            provider: None,
+            model: None,
+            attached_sessions: 0,
+            can_open_path: false,
+        };
+        Ok(Arc::new(DshSessionEndpoint {
+            identity: self.config.identity.clone(),
+            host,
+            remote,
+            generation: uuid::Uuid::new_v4().to_string(),
+            actionables: Arc::new(Mutex::new(BTreeMap::new())),
+            resolved,
+        }))
+    }
+}
+fn rpc() -> String {
+    uuid::Uuid::new_v4().to_string()
+}
+fn address(id: &str) -> Value {
+    json!({"kind":"session","sessionId":id})
+}
+struct FollowState {
+    remote: Arc<Remote>,
+    raw: FrameStream,
+    target: StreamTarget,
+    generation: String,
+    client: Option<String>,
+    began: bool,
+    pending: VecDeque<Value>,
+    actionables: Arc<Mutex<BTreeMap<String, Correlation>>>,
+    assistant: history::AssistantStream,
+    resolved: broadcast::Receiver<Value>,
+}
+impl FollowState {
+    async fn normalize(&mut self, value: Value) -> Result<()> {
+        let generation = &self.generation;
+        match &self.target {
+            StreamTarget::SessionJournal {
+                address,
+                max_messages,
+            } => {
+                let id = &address.session_id;
+                match string(&value, "type")? {
+                    "snapshot" => {
+                        require(!self.began, "duplicate DSH journal snapshot")?;
+                        self.began = true;
+                        let entries = decode_records(array(&value, "records")?)?;
+                        let snapshot = JournalSnapshot {
+                            session_id: id.clone(),
+                            generation: generation.clone(),
+                            through_sequence: integer(&value, "cursor")?,
+                            window_limit: *max_messages,
+                            entries,
+                            has_more_before: boolean(&value, "hasMore")?,
+                            projections: value
+                                .get("projections")
+                                .filter(|v| !v.is_null())
+                                .map(|v| serde_json::from_value(v.clone()))
+                                .transpose()?,
+                            history_revision: None,
+                        };
+                        snapshot.validate()?;
+                        self.pending
+                            .push_back(json!({"type":"snapshot","snapshot":snapshot}));
+                        if let Some(opening) = value.get("assistantStream") {
+                            for event in self.assistant.open(opening)? {
+                                self.pending.push_back(json!({"type":"transient","generation":generation,"sessionId":id,"event":event}));
+                            }
+                        }
+                    }
+                    "event" => {
+                        require(self.began, "DSH event before snapshot")?;
+                        for entry in decode_records(&[value])? {
+                            self.pending.push_back(json!({"type":"event","generation":generation,"sessionId":id,"entry":entry}));
+                        }
+                    }
+                    "projection" => {
+                        require(self.began, "DSH projection before snapshot")?;
+                        self.pending.push_back(json!({"type":"projection","generation":generation,"frame":{"sessionId":id,"key":value["key"],"value":value["value"],"seq":value["seq"]}}));
+                    }
+                    "assistant-stream" => {
+                        require(self.began, "assistant stream before snapshot")?;
+                        for event in self.assistant.receive(&value["frame"])? {
+                            self.pending.push_back(json!({"type":"transient","generation":generation,"sessionId":id,"event":event}));
+                        }
+                    }
+                    _ => return Err(Error::Protocol("unknown DSH follow frame".into())),
+                }
+            }
+            StreamTarget::SessionControl => match string(&value, "type")? {
+                "baseline" => {
+                    require(!self.began, "duplicate DSH control baseline")?;
+                    self.began = true;
+                    let baseline = &value["value"];
+                    let states = |key: &str, field: &str| -> Result<Vec<Value>> {
+                        let Some(values) = baseline.get(key) else {
+                            return Ok(Vec::new());
+                        };
+                        let map = values
+                            .as_object()
+                            .ok_or_else(|| Error::Protocol("invalid DSH control map".into()))?;
+                        Ok(map
+                            .iter()
+                            .map(|(id, value)| json!({"sessionId":id,field:value}))
+                            .collect())
+                    };
+                    self.pending.push_back(json!({"type":"baseline","generation":generation,"snapshot":{"queues":states("queues","items")?,"jobs":states("jobs","jobs")?,"projections":states("projections","projections")?}}));
+                }
+                "queue" | "jobs" => {
+                    require(self.began, "control delta before baseline")?;
+                    let kind = string(&value, "type")?;
+                    let field = if kind == "queue" { "items" } else { "jobs" };
+                    self.pending.push_back(json!({"type":kind,"generation":generation,"state":{"sessionId":value["sessionId"],field:value[field]}}));
+                }
+                "projection" => {
+                    require(self.began, "projection before baseline")?;
+                    self.pending.push_back(json!({"type":"projection","generation":generation,"state":{"sessionId":value["sessionId"],"projections":{"asOfSeq":value["seq"],"values":{string(&value,"key")?:value["value"]}}}}));
+                }
+                _ => return Err(Error::Protocol("unknown DSH control frame".into())),
+            },
+            StreamTarget::SessionInventory | StreamTarget::Actionables => {
+                match string(&value, "type")? {
+                    "ready" => {
+                        require(!self.began, "duplicate DSH event readiness")?;
+                        self.began = true;
+                        self.client = Some(string(&value, "clientId")?.into());
+                        if self.target == StreamTarget::SessionInventory {
+                            let mut snapshot = self
+                                .remote
+                                .call("session/list", json!({"_request":{}}), &rpc())
+                                .await?;
+                            let mut cursor = snapshot
+                                .get("nextCursor")
+                                .and_then(Value::as_str)
+                                .map(String::from);
+                            let mut seen = BTreeSet::new();
+                            while let Some(next) = cursor {
+                                require(seen.insert(next.clone()), "DSH inventory cursor cycle")?;
+                                let page = self
+                                    .remote
+                                    .call(
+                                        "session/list",
+                                        json!({"_request":{"cursor":next}}),
+                                        &rpc(),
+                                    )
+                                    .await?;
+                                snapshot["items"]
+                                    .as_array_mut()
+                                    .ok_or_else(|| Error::Protocol("invalid inventory".into()))?
+                                    .extend(array(&page, "items")?.clone());
+                                cursor = page
+                                    .get("nextCursor")
+                                    .and_then(Value::as_str)
+                                    .map(String::from);
+                            }
+                            self.pending.push_back(json!({"type":"baseline","generation":generation,"snapshot":snapshot}));
+                        } else {
+                            self.pending
+                                .push_back(json!({"type":"reset","generation":generation}));
+                        }
+                    }
+                    "emit" => {
+                        require(self.began, "DSH emit before ready")?;
+                        if self.target == StreamTarget::SessionInventory {
+                            let args = array(&value, "args")?;
+                            let event = string(&value, "event")?;
+                            let frame = match (event, args.as_slice()) {
+                                ("api-session/added", [session]) => Some(
+                                    json!({"type":"upsert","generation":generation,"session":session}),
+                                ),
+                                ("api-session/removed", [id]) => Some(
+                                    json!({"type":"remove","generation":generation,"sessionId":id}),
+                                ),
+                                ("api-session/status", [id, running]) => Some(
+                                    json!({"type":"status","generation":generation,"sessionId":id,"running":running}),
+                                ),
+                                ("api-session/plane", [id, time]) => Some(
+                                    json!({"type":"plane","generation":generation,"sessionId":id,"updatedAt":time}),
+                                ),
+                                ("api-session/error", [id, message]) => Some(
+                                    json!({"type":"agent-error","generation":generation,"sessionId":id,"message":message}),
+                                ),
+                                _ => None,
+                            };
+                            if let Some(frame) = frame {
+                                self.pending.push_back(frame);
+                            }
+                        }
+                    }
+                    "waterfall" => {
+                        let client = self
+                            .client
+                            .as_ref()
+                            .ok_or_else(|| Error::Protocol("waterfall before ready".into()))?;
+                        let event = string(&value, "event")?;
+                        let event_id = string(&value, "eventId")?;
+                        if matches!(event, "approval/request" | "user-questions/request") {
+                            if self.target == StreamTarget::Actionables {
+                                let agent = string(&value, "agentId")?;
+                                self.actionables.lock().await.insert(
+                                    event_id.into(),
+                                    Correlation {
+                                        client: client.clone(),
+                                        event: event_id.into(),
+                                    },
+                                );
+                                let mut payload = value["request"].clone();
+                                payload["sessionId"] = json!(agent);
+                                self.pending.push_back(json!({"type":"upsert","generation":generation,"actionable":{"id":event_id,"sessionId":agent,"revision":0,"kind":if event=="approval/request"{"approval"}else{"question"},"payload":payload}}));
+                            }
+                        } else {
+                            self.remote.call("$events/result",json!({"clientId":client,"eventId":event_id,"outcome":{"kind":"next"}}),&rpc()).await?;
+                        }
+                    }
+                    "cancel" => {
+                        if self.target == StreamTarget::Actionables {
+                            let id = string(&value, "eventId")?;
+                            self.actionables.lock().await.remove(id);
+                            self.pending.push_back(json!({"type":"resolved","generation":generation,"actionableId":id,"revision":0}));
+                        }
+                    }
+                    _ => return Err(Error::Protocol("unknown DSH remote event".into())),
+                }
+            }
+            StreamTarget::SessionConversation { .. } => {
+                return Err(unsupported("DSH native conversation"));
+            }
+        }
+        Ok(())
+    }
+}
+#[async_trait]
+impl SessionEndpoint for DshSessionEndpoint {
+    fn identity(&self) -> &str {
+        &self.identity
+    }
+    fn host(&self) -> &HostDescription {
+        &self.host
+    }
+    async fn follow(&self, target: StreamTarget) -> Result<FrameStream> {
+        let (endpoint, args) = match &target {
+            StreamTarget::SessionInventory | StreamTarget::Actionables => ("$events", json!({})),
+            StreamTarget::SessionControl => ("session/control", json!({})),
+            StreamTarget::SessionJournal {
+                address: session,
+                max_messages,
+            } => (
+                "session/follow",
+                json!({"request":{"address":address(&session.session_id),"maxMessages":max_messages,"assistantStream":true}}),
+            ),
+            StreamTarget::SessionConversation { .. } => {
+                return Err(unsupported("DSH native conversation"));
+            }
+        };
+        let raw = self.remote.open(endpoint, args).await?;
+        let state = FollowState {
+            remote: self.remote.clone(),
+            raw,
+            target,
+            generation: self.generation.clone(),
+            client: None,
+            began: false,
+            pending: VecDeque::new(),
+            actionables: self.actionables.clone(),
+            assistant: history::AssistantStream::default(),
+            resolved: self.resolved.subscribe(),
+        };
+        Ok(Box::pin(stream::try_unfold(
+            state,
+            |mut state| async move {
+                loop {
+                    if let Some(value) = state.pending.pop_front() {
+                        return Ok(Some((value, state)));
+                    }
+                    tokio::select! {
+                        value=state.raw.next()=>{let value=value.ok_or(Error::Disconnected)??;state.normalize(value).await?;}
+                        value=state.resolved.recv(),if state.target==StreamTarget::Actionables=>{let mut value=value.map_err(|_|Error::Disconnected)?;value["generation"]=json!(state.generation);return Ok(Some((value,state)));}
+                    }
+                }
+            },
+        )))
+    }
+    async fn history_page(&self, request: HistoryRequest) -> Result<HistoryPage> {
+        request.validate()?;
+        if request.before_sequence == Some(-1) {
+            return Ok(HistoryPage {
+                session_id: request.session_id,
+                through_sequence: request.through_sequence,
+                entries: Vec::new(),
+                has_more_before: false,
+            });
+        }
+        let mut query = json!({"address":address(&request.session_id),"throughSeq":request.through_sequence,"maxMessages":request.max_messages});
+        if let Some(before) = request.before_sequence {
+            query["beforeSeq"] = json!(before);
+        }
+        let result = self
+            .remote
+            .call("session/page", json!({"request":query}), &rpc())
+            .await?;
+        let page = HistoryPage {
+            session_id: request.session_id.clone(),
+            through_sequence: request.through_sequence,
+            entries: decode_records(array(&result, "records")?)?,
+            has_more_before: boolean(&result, "hasMore")?,
+        };
+        page.validate(&request)?;
+        Ok(page)
+    }
+    async fn respond(&self, id: &str, revision: i64, outcome: Value) -> Result<()> {
+        require(revision == 0, "stale DSH actionable revision")?;
+        let correlation = self
+            .actionables
+            .lock()
+            .await
+            .get(id)
+            .cloned()
+            .ok_or_else(|| unsupported("actionable is no longer pending"))?;
+        self.remote.call("$events/result",json!({"clientId":correlation.client,"eventId":correlation.event,"outcome":{"kind":"result","value":outcome}}),&rpc()).await?;
+        self.actionables.lock().await.remove(id);
+        let _ = self
+            .resolved
+            .send(json!({"type":"resolved","actionableId":id,"revision":0}));
+        Ok(())
+    }
+    async fn locator(&self, id: &str) -> Result<SessionLocator> {
+        let mut cursor: Option<String> = None;
+        let mut seen = BTreeSet::new();
+        let row = loop {
+            let result=self.remote.call("session/list",json!({"_request":cursor.as_ref().map(|c|json!({"cursor":c})).unwrap_or(json!({}))}),&rpc()).await?;
+            if let Some(row) = array(&result, "items")?
+                .iter()
+                .find(|row| row["sessionId"] == id)
+            {
+                break row.clone();
+            }
+            cursor = result["nextCursor"].as_str().map(String::from);
+            let Some(next) = &cursor else {
+                return Err(unsupported("session is absent from inventory"));
+            };
+            require(seen.insert(next.clone()), "DSH inventory cursor cycle")?;
+        };
+        Ok(SessionLocator {
+            address: SessionAddress {
+                endpoint_id: self.identity.clone(),
+                session_id: id.into(),
+            },
+            harness: "dsh".into(),
+            cwd: row["cwd"].as_str().map(String::from),
+            native_session_file: None,
+            native_session_id: Some(id.into()),
+            history_source: "DSH session/follow + session/page".into(),
+        })
+    }
+    async fn file_stat(&self, id: &str, path: &str) -> Result<SessionFileStat> {
+        Ok(serde_json::from_value(
+            self.remote
+                .call(
+                    "workspaceFiles/stat",
+                    json!({"workspaceFileScopeId":id,"path":path}),
+                    &rpc(),
+                )
+                .await?,
+        )?)
+    }
+    async fn file_read_bytes(
+        &self,
+        id: &str,
+        path: &str,
+        offset: u64,
+        length: usize,
+    ) -> Result<SessionFileBytePage> {
+        require(length > 0 && length <= 4194304, "invalid byte page")?;
+        Ok(serde_json::from_value(self.remote.call("workspaceFiles/readBytes",json!({"workspaceFileScopeId":id,"path":path,"options":{"range":{"offset":offset,"length":length}}}),&rpc()).await?)?)
+    }
+    async fn file_read_text(
+        &self,
+        id: &str,
+        path: &str,
+        offset: u64,
+        limit: usize,
+    ) -> Result<SessionFileTextPage> {
+        require(
+            offset >= 1 && limit > 0 && limit <= 10000,
+            "invalid text page",
+        )?;
+        Ok(serde_json::from_value(self.remote.call("workspaceFiles/read",json!({"workspaceFileScopeId":id,"path":path,"range":{"offset":offset,"limit":limit}}),&rpc()).await?)?)
+    }
+    async fn call(&self, method: &str, mut payload: Value, rpc_id: &str) -> Result<Value> {
+        let endpoint = match method {
+            "session.create" => {
+                require(
+                    payload.get("execution").is_none(),
+                    "Kernel execution configuration cannot authorize a DSH session",
+                )?;
+                "session/create"
+            }
+            "session.rename" => "session/rename",
+            "session.fork" => "session/fork",
+            "session.discard" => "session/discard",
+            "session.prompt" => {
+                payload["requestId"] = json!(rpc_id);
+                "session/prompt"
+            }
+            "session.cancel" => "session/cancel",
+            "session.updateQueue" => "session/updateQueue",
+            "session.selectModel" => "session/selectModel",
+            "models.list" | "session.models" => {
+                return self
+                    .remote
+                    .call("session/modelCatalog", json!({}), rpc_id)
+                    .await;
+            }
+            "session.archive" => {
+                return self
+                    .remote
+                    .call(
+                        "workspace/archiveSession",
+                        json!({"request":payload}),
+                        rpc_id,
+                    )
+                    .await;
+            }
+            "dsh.call" => {
+                return self
+                    .remote
+                    .call(
+                        string(&payload, "endpoint")?,
+                        payload["args"].clone(),
+                        rpc_id,
+                    )
+                    .await;
+            }
+            _ => return Err(unsupported(&format!("DSH method {method}"))),
+        };
+        self.remote
+            .call(endpoint, json!({"request":payload}), rpc_id)
+            .await
+    }
+    async fn close(&self) {
+        self.remote.close();
+        self.actionables.lock().await.clear();
+    }
+}

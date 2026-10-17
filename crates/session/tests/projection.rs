@@ -225,3 +225,34 @@ fn endpoint_identity_and_wrong_stream_are_rejected() {
     assert!(s.apply("journal:s",json!({"type":"event","generation":"g","sessionId":"other","entry":event(1,"turn/start")})).is_err());
     assert!(s.apply("control", inventory()).is_err());
 }
+
+#[test]
+fn native_conversation_has_its_own_identity_and_never_advances_journal_cursor() {
+    let mut store = store();
+    let snapshot = json!({"sessionId":"s","generation":"g","leafId":"a","entries":[{"id":"a","type":"message","message":{"role":"user"}}],"hasMoreBefore":false,"isStreaming":false,"state":{}});
+    store
+        .apply(
+            "journal:s",
+            json!({"type":"conversation","generation":"g","snapshot":snapshot}),
+        )
+        .unwrap();
+    assert_eq!(store.sessions["s"].tail_sequence, -1);
+    assert!(store.sessions["s"].entries.is_empty());
+    for index in 0..300 {
+        store.apply("journal:s",json!({"type":"native-event","generation":"g","sessionId":"s","event":{"index":index}})).unwrap();
+    }
+    assert_eq!(store.sessions["s"].native_events.len(), 256);
+    let mut bad = snapshot;
+    bad["generation"] = json!("other");
+    assert!(
+        store
+            .apply(
+                "journal:s",
+                json!({"type":"conversation-update","generation":"g","snapshot":bad})
+            )
+            .is_err()
+    );
+    store.disconnect();
+    assert!(store.sessions["s"].native_events.is_empty());
+    assert!(!store.sessions["s"].journal_ready);
+}

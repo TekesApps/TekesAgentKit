@@ -9,7 +9,7 @@ swift_sources=[name for name in tracked if name.endswith('.swift') and (root/nam
 assert not swift_sources, f'Swift sources are not allowed in AgentKit: {swift_sources}'
 metadata=json.loads(subprocess.check_output(['cargo','metadata','--locked','--no-deps','--format-version','1'],cwd=root))
 for package in metadata['packages']:
-    if package['name'] not in {'tekes-agent-contract','tekes-agent-session','tekes-agent-endpoint-kernel'}: continue
+    if package['name'] not in {'tekes-agent-contract','tekes-agent-session','tekes-agent-endpoint-kernel','tekes-agent-endpoint-pi','tekes-agent-endpoint-dsh','tekes-agent-headless'}: continue
     for dependency in package['dependencies']:
         if dependency['kind']=='dev': continue
         name=dependency['name']

@@ -18,7 +18,7 @@ ActionablesV3、Execution、Event/Registry、NativeSessionEndpoint 及其 Execut
 
 ```text
 Kernel HTTP / WebSocket
-  → KernelEndpoint (authentication, mux streams, unary envelope)
+  → NativeSessionEndpoint (authentication, mux streams, unary envelope)
   → SessionRuntime (reader ownership, retries, command receipts)
   → MemoryProjectionStore (inventory, control, actionables, journal window, previews)
   → revision notification / inspect / explicit immutable snapshot
@@ -30,7 +30,7 @@ Kernel HTTP / WebSocket
 `SessionRuntime::spawn` 后用 `wait_ready` 等待 inventory/control/actionables 基线及 recovery 调用。
 `open_session` 打开 journal 并等待 snapshot；`load_earlier` 保持初始 throughSequence；`close_session` 关闭该逻辑流并保留已读历史。
 `call` 保留原 ClientKit unary 信封及显式 rpcId，支持首批外的 Kernel 方法而不伪造已实现的强类型 API。
-`create_session` 提供只含 cwd、无环境授权的最小 execution；更完整授权由 host 用 `call` 显式提供。
+`create_session` 提供 cwd，由 Native adapter 转换为无环境授权的最小 execution；更完整授权由 host 用 `call` 显式提供。
 `prompt` 是 queue/text 便利方法，`cancel`、`respond` 分别对应取消与 actionable 回复。
 
 ## 行为对齐与保留项
@@ -65,18 +65,17 @@ Kernel HTTP / WebSocket
 - 真实 Kernel 0.9：临时 HOME/状态目录、私有 bootstrap、随机 endpoint token、本地合成 provider。
   connect → empty inventory → create(execution) → selectModel → follow → prompt → durable assistant/turn end → same-rpcId retry → reconnect/reopen → frozen history page → cancel → second turn end → stop。
   首个 prompt 重试后仍只有一条 durable user/message。取消可在 provider dispatch 前生效；本次仅首个 prompt 到达合成 provider。
-- headless 依赖检查：三个生产 crate 不依赖 UI、SQLite、Kernel server 内部 crate 或隐式 sibling path。
+- headless 依赖检查：contract/session/三个 adapter/headless 不依赖 UI、SQLite、Kernel server 内部 crate 或隐式 sibling path。
 - fmt、Clippy `-D warnings`、workspace tests 均作为本地验收；新增 CI 配置不等于云 CI 已通过。
 
 复现命令见 README。真实 Kernel 依赖 host 已构建的明确 root；脚本不修改/重编译该源码工作树。
 
 ## 当前限制
 
-- 没有 UI、Pi/DSH、durable cache、模型发现/附件等完整强类型客户端 API，也没有生产 launcher。
+- 没有 UI、durable cache、附件等完整强类型客户端 API，也没有生产 launcher。Pi/DSH 已有独立实现，见 session-endpoints.md。
 - 流缓冲为每流 256 帧，溢出关闭连接并重建基线；不同调用方的背压/吞吐还需实际数据验证。
 - 连续失败预算是有限的保护，尚未实现完整的重试策略配置与错误分类 UI；连接健康 30 秒后重置累计连接失败预算。
-- 单一 runtime command owner 串行执行网络 mutations/paging；网络等待期间底层 transport 仍读取并有限缓冲，控制/消息投影随后处理。
-  这保证命令顺序，但慢调用可能推迟投影更新；需要后续压力测试后决定哪些只读调用并行化。
+- runtime 的 unary/回答并发运行，不阻塞事件投影；分页仍由 command owner 串行执行，底层 transport 保持有界缓冲。
 - 已加载历史保存在内存，无自动淘汰；完整 snapshot 复制与显式历史重折叠仍有成本。未测大历史、RSS、真实 provider 或性能收益。
 - 不支持仅提供 projected-stream 而没有 session-journal 的 Native host。
 - 当前验收是 macOS 本地测试；Linux CI、TLS 远端、真机和生产均未验证。

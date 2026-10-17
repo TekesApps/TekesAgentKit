@@ -49,6 +49,7 @@ impl SessionEndpoint for Endpoint {
                 json!({"type":"baseline","generation":"g","snapshot":{"queues":[],"jobs":[],"projections":[]}})
             }
             StreamTarget::Actionables => json!({"type":"reset","generation":"g"}),
+            StreamTarget::SessionConversation { .. } => unreachable!(),
             StreamTarget::SessionJournal { address, .. } => {
                 let snapshot = json!({"type":"snapshot","snapshot":{"sessionId":address.session_id,"generation":"g","throughSequence":0,"windowLimit":50,"entries":[{"event":{"type":"user/message","seq":0,"time":1,"data":{"text":"same identity"}}}],"hasMoreBefore":false}});
                 if self.attempt == 0 {
@@ -143,4 +144,123 @@ async fn recovery_is_bounded_and_stop_still_works_after_failure() {
     ));
     runtime.stop().await.unwrap();
     assert_eq!(runtime.snapshot().connection, ConnectionState::Stopped);
+}
+
+struct InteractiveConnector(Arc<tokio::sync::Notify>);
+struct InteractiveEndpoint {
+    endpoint: Endpoint,
+    answer: Arc<tokio::sync::Notify>,
+}
+#[async_trait]
+impl EndpointConnector for InteractiveConnector {
+    async fn connect(&self) -> Result<Arc<dyn SessionEndpoint>> {
+        let base = Connector {
+            connects: Arc::new(AtomicUsize::new(1)),
+            prompts: Arc::new(AtomicUsize::new(0)),
+        };
+        let host = base.connect().await?.host().clone();
+        Ok(Arc::new(InteractiveEndpoint {
+            endpoint: Endpoint {
+                attempt: 1,
+                host,
+                prompts: base.prompts,
+            },
+            answer: self.0.clone(),
+        }))
+    }
+}
+#[async_trait]
+impl SessionEndpoint for InteractiveEndpoint {
+    fn identity(&self) -> &str {
+        "k"
+    }
+    fn host(&self) -> &HostDescription {
+        &self.endpoint.host
+    }
+    async fn follow(&self, target: StreamTarget) -> Result<FrameStream> {
+        if target == StreamTarget::Actionables {
+            Ok(Box::pin(stream::iter(vec![Ok(json!({"type":"reset","generation":"g"})),Ok(json!({"type":"upsert","generation":"g","actionable":{"id":"q","sessionId":"s","revision":0,"kind":"question","payload":{}}}))]).chain(stream::pending())))
+        } else {
+            self.endpoint.follow(target).await
+        }
+    }
+    async fn history_page(&self, _: HistoryRequest) -> Result<HistoryPage> {
+        unreachable!()
+    }
+    async fn call(&self, _: &str, _: Value, _: &str) -> Result<Value> {
+        self.answer.notified().await;
+        Ok(json!({"accepted":true}))
+    }
+    async fn respond(&self, _: &str, _: i64, _: Value) -> Result<()> {
+        self.answer.notify_one();
+        Ok(())
+    }
+    async fn close(&self) {}
+}
+#[tokio::test]
+async fn pending_mutation_does_not_block_actionable_response() {
+    let runtime = SessionRuntime::spawn(
+        "k",
+        Arc::new(InteractiveConnector(Arc::new(tokio::sync::Notify::new()))),
+    );
+    runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
+    let mut changes = runtime.subscribe();
+    while !changes.inspect(|s| s.actionables.contains_key("q")) {
+        changes.changed().await.unwrap();
+    }
+    tokio::time::timeout(Duration::from_secs(2), async {
+        tokio::try_join!(runtime.prompt("s", "/question", "q1"), async {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            runtime.respond("q", 0, json!({"value":"yes"})).await
+        })
+    })
+    .await
+    .unwrap()
+    .unwrap();
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn registry_routes_same_session_id_only_with_explicit_endpoint_identity() {
+    let mut registry = SessionEndpointRegistry::new();
+    for name in ["native", "pi", "dsh"] {
+        registry
+            .register(
+                name,
+                Arc::new(FailingConnector {
+                    attempts: Arc::new(AtomicUsize::new(0)),
+                }),
+            )
+            .unwrap();
+        let address = SessionAddress {
+            endpoint_id: name.into(),
+            session_id: "same-id".into(),
+        };
+        assert_eq!(
+            registry
+                .session(&address)
+                .unwrap()
+                .inspect(|s| s.endpoint_id.clone()),
+            name
+        );
+    }
+    assert!(
+        registry
+            .register(
+                "pi",
+                Arc::new(FailingConnector {
+                    attempts: Arc::new(AtomicUsize::new(0))
+                })
+            )
+            .is_err()
+    );
+    assert!(
+        registry
+            .session(&SessionAddress {
+                endpoint_id: "missing".into(),
+                session_id: "same-id".into()
+            })
+            .is_err()
+    );
+    registry.stop().await.unwrap();
 }

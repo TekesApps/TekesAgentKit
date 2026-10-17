@@ -1,0 +1,73 @@
+# 三个独立 SessionEndpoint 的无 UI 闭环
+
+日期：2026-10-17。改动只在 TekesAgentKit；ClientKit、Tekes、Kernel、Pi、DSH 作为只读来源和运行时。
+
+## 契约与路由
+
+`NativeSessionEndpoint`、`PiSessionEndpoint`、`DshSessionEndpoint` 分别实现 `SessionEndpoint`。
+Native 要求 Kernel 0.9 的 v4 wire；Pi/DSH 的标准化 HostDescription 保留 ClientKit v3 描述，**不表示它们使用 Kernel v3 wire**。
+连接身份、transport locality、harness、cache policy 相互独立。
+
+`SessionEndpointRegistry` 注册显式 connector。`SessionAddress { endpoint_id, session_id }` 是跨 harness 的稳定路由键。
+`SessionLocator` 给出该地址、cwd、nativeSessionId、可用时的 nativeSessionFile，以及 historySource。
+原生文件指针是定位证据；历史读取仍通过对应 harness 的公开协议，不解析私有数据库或把远端路径当成本机路径。
+
+`SessionRuntime` 合并 inventory/control/actionables，按需打开会话窗口，提供订阅、snapshot、前页、定位和只读文件 API。
+慢 unary / prompt / actionable 响应以最多 64 个在途操作运行，流仍能投影；重连会中止旧连接操作，不自动重发 mutation。
+`Earlier` 的网络取页仍串行，底层 transport 保持有界读取。主连接与单会话流均有有限恢复预算。
+
+## 能力矩阵
+
+| 能力 | Native | Pi | DSH |
+|---|---|---|---|
+| 生命周期 | 显式 URL / bearer，host 启动 Kernel | 显式可执行文件/参数/env，每会话一个 stdio 子进程 | 显式 URL / cookie 或 header，host 启动 DSH |
+| 版本证据 | v4 host description | CLI `--version`，只接受配置允许版本 | `/api/tekes/harness-version` 官方 runtime version probe |
+| 会话 inventory/control | 权威原生流 | 宿主指针 inventory；原生 state 保存在 conversation；共享 control 基线为空 | `$events` + 分页 list；session/control |
+| 创建与模型 | 原生 unary | 显式 cwd；原生 model catalog / set_model | session/create；session/modelCatalog、模型选择 |
+| Prompt/取消 | 原生 unary / rpcId | text prompt、queue/steer、abort | session/prompt、cancel |
+| Prompt 重复提交 | 服务端 rpcId | 磁盘 receipt：pending 先落盘、ACK 后 accepted；不确定结果拒绝自动重发 | 服务端 requestId |
+| 历史 | journal / frozen cut | get_entries，按 leafId/parentId 重建当前分支 | follow/page，展开 packed chunk row，保留 seq/time/tool view |
+| 前页 | 固定 throughSequence 的页 | 扩大原生 ancestry 窗口并刷新 | 固定 throughSeq 的页 |
+| 实时数据 | durable event + transient preview | native-event 有界队列 + 关键事件刷新原生 conversation | durable event + assistant-stream revision/index 校验 |
+| Actionables | 权威 sync/revision | 原生 confirm/select/input/editor 转换，回答绑定原进程 | waterfall clientId/eventId 关联及取消；inventory 流不抢答 |
+| Rename/archive | 原生调用 | 原生 rename；宿主 archive/unarchive 指针 | 原生调用 |
+| 既有 session | 服务端 inventory | 显式 `session.adopt`，原生 RPC 验证文件；不全盘扫描 | 服务端 inventory |
+| Session 工作区文件 | session.files.* | cwd 内 capability 限定只读文件 | workspaceFiles，二进制 multipart |
+| 可选扩展 | raw `call` 透传服务端能力 | 未映射方法返回 Unsupported | 显式 `dsh.call` 和已映射方法，未映射返回 Unsupported |
+
+Pi `session.fork`、discard、附件、完整 settings/goals/plugins 等强类型扩展尚未移植。
+Pi 不提供虚构 journal、durable cursor、task/job 或 queue 列表；原生 `get_state` 保留 pendingMessageCount 等状态。
+Archive 前由调用者关闭打开的会话流；archive 只隐藏指针，不删除原生文件。
+DSH version probe 需要宿主提供和 ClientKit 相同的版本桥接；测试用临时 JS plugin 调用官方 `getDshRuntimeVersion`，不信任自填版本。
+
+## Session 指针与文件
+
+Pi 数据根由宿主显式配置，注册表 `agentkit-sessions.json` 保存稳定地址到原生文件的映射与提交 receipt。
+注册表用私有文件权限、临时文件、fsync + rename 持久化。它只保存指针/提交意图，不复制 transcript。
+`session.adopt { cwd, sessionFile, sessionId? }` 只接受 `PiConfiguration.session_roots` 显式授权目录下的现存文件；
+通过 `get_state` 验证实际恢复的文件，后续历史仍使用 `get_entries`。注册表重启时也校验授权根。
+
+Native/DSH 的会话存储格式和物理日志路径由服务端拥有；不直接读取内部 ledger/JSONL。
+Pi 可通过 locator 返回实际原生文件路径，并通过 `session.history.export` 返回原生 entry tree；它们不混同于 cwd 文件资源。
+
+文件 API 提供 stat、按行 UTF-8 预览、按字节分页及 `file_read_all(maximum)`。
+完整文件获取逐页校验路径、版本、总长、offset、base64、eof 和进度；文件改变就失败，避免把不同版本拼起来。
+Pi 用目录 capability 打开文件，拒绝 cwd 外路径和 symlink 逃逸；文本预览限 4 MiB，单字节页限 4 MiB。
+Native/DSH 的授权和文件版本由服务端决定；DSH multipart 校验部件、重复 slot、codec 和边界。
+
+## 验收证据
+
+三个真实运行时在临时 HOME / 独立数据目录及本地合成 provider 上均通过：
+connect → list → create → select model → open → prompt → assistant 回传 / settle → 同 rpcId 重试 → locator → stat / text / bytes → reconnect / reopen → 历史保持。
+检查实际用户输入只有一条；DSH runtime-context 的 user/message 按 source 区分。
+
+Pi 额外通过原生 extension command 等待 select、在 prompt 尚未完成时回答、答案写入 native entry，
+再复制该临时测试 session 到显式授权目录，用新的指针注册表恢复并读取原历史。
+Kernel 另有 frozen-cut 分页和取消后的第二次 turn/end 验收脚本。
+
+Rust 回归覆盖契约 fixtures、原生分支/坏树、文件路径与分页、DSH packed chunks / assistant gap / multipart，
+共享 native conversation 与 journal 隔离、重连不重试 mutation，以及 pending prompt 不阻塞 actionable response。
+依赖边界检查覆盖 contract/session/三个 adapter/headless，拒绝 UI、SQLite、服务端内部与隐式 sibling 依赖，并禁止 Swift 源码。
+
+这些证据不代表真实付费 provider、TLS 远端部署、生产 launcher、大历史/RSS/吞吐、Linux 或 UI 的验收。
+远端 durable cache 和完整 ClientKit 可选 API 仍在后续范围。

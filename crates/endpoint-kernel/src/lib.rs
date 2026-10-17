@@ -70,7 +70,7 @@ impl KernelConnector {
         self.timeout = timeout;
         self
     }
-    pub async fn connect_kernel(&self) -> Result<KernelEndpoint> {
+    pub async fn connect_kernel(&self) -> Result<NativeSessionEndpoint> {
         let mut url = self.url.clone();
         url.set_scheme(if self.url.scheme() == "https" {
             "wss"
@@ -195,7 +195,7 @@ impl KernelConnector {
                 let _ = reply.send(Err(Error::Disconnected));
             }
         });
-        Ok(KernelEndpoint {
+        Ok(NativeSessionEndpoint {
             config: self.clone(),
             host,
             http,
@@ -227,14 +227,14 @@ enum Command {
     Forget(String),
     Shutdown,
 }
-pub struct KernelEndpoint {
+pub struct NativeSessionEndpoint {
     config: KernelConnector,
     host: HostDescription,
     http: Client,
     commands: mpsc::UnboundedSender<Command>,
     task: tokio::task::JoinHandle<()>,
 }
-impl Drop for KernelEndpoint {
+impl Drop for NativeSessionEndpoint {
     fn drop(&mut self) {
         self.task.abort();
     }
@@ -264,7 +264,7 @@ impl Drop for PendingRequest {
         let _ = self.commands.send(Command::Forget(self.id.clone()));
     }
 }
-impl KernelEndpoint {
+impl NativeSessionEndpoint {
     async fn mux_request(&self, value: Value) -> Result<Value> {
         let id = id();
         let (reply, result) = oneshot::channel();
@@ -286,14 +286,70 @@ impl KernelEndpoint {
     }
 }
 #[async_trait]
-impl SessionEndpoint for KernelEndpoint {
+impl SessionEndpoint for NativeSessionEndpoint {
     fn identity(&self) -> &str {
         &self.config.identity
     }
     fn host(&self) -> &HostDescription {
         &self.host
     }
+    fn supports_recovery(&self) -> bool {
+        true
+    }
+    async fn file_stat(&self, session_id: &str, path: &str) -> Result<SessionFileStat> {
+        serde_json::from_value(
+            self.call(
+                "session.files.stat",
+                json!({"sessionId":session_id,"path":path}),
+                &id(),
+            )
+            .await?,
+        )
+        .map_err(Error::from)
+    }
+    async fn file_read_bytes(
+        &self,
+        session_id: &str,
+        path: &str,
+        offset: u64,
+        length: usize,
+    ) -> Result<SessionFileBytePage> {
+        require(length > 0 && length <= 4194304, "invalid byte page length")?;
+        serde_json::from_value(
+            self.call(
+                "session.files.readBytes",
+                json!({"sessionId":session_id,"path":path,"offset":offset,"limit":length}),
+                &id(),
+            )
+            .await?,
+        )
+        .map_err(Error::from)
+    }
+    async fn file_read_text(
+        &self,
+        session_id: &str,
+        path: &str,
+        offset: u64,
+        limit: usize,
+    ) -> Result<SessionFileTextPage> {
+        require(
+            offset >= 1 && limit > 0 && limit <= 10000,
+            "invalid text page",
+        )?;
+        serde_json::from_value(
+            self.call(
+                "session.files.read",
+                json!({"sessionId":session_id,"path":path,"offset":offset,"limit":limit}),
+                &id(),
+            )
+            .await?,
+        )
+        .map_err(Error::from)
+    }
     async fn follow(&self, target: StreamTarget) -> Result<FrameStream> {
+        if matches!(target, StreamTarget::SessionConversation { .. }) {
+            return Err(unsupported("Kernel native conversation stream"));
+        }
         if let StreamTarget::SessionJournal { max_messages, .. } = &target {
             require(
                 *max_messages > 0 && *max_messages <= 500,
@@ -345,7 +401,7 @@ impl SessionEndpoint for KernelEndpoint {
         self.mux_request(json!({"type":"actionable-respond","actionableId":actionable_id,"expectedRevision":expected_revision,"outcome":outcome})).await?;
         Ok(())
     }
-    async fn call(&self, method: &str, payload: Value, rpc_id: &str) -> Result<Value> {
+    async fn call(&self, method: &str, mut payload: Value, rpc_id: &str) -> Result<Value> {
         require(
             !rpc_id.is_empty()
                 && !method.is_empty()
@@ -354,6 +410,14 @@ impl SessionEndpoint for KernelEndpoint {
             "invalid unary request",
         )?;
         require(payload.is_object(), "unary payload must be object")?;
+        if method == "session.create" && payload.get("execution").is_none() {
+            let cwd = string(&payload, "cwd")?.to_owned();
+            payload
+                .as_object_mut()
+                .expect("payload object")
+                .remove("cwd");
+            payload["execution"] = json!({"cwd":cwd,"read_roots":[],"writable_roots":[],"toolchain_roots":[],"network":false,"allowed_tools":[],"mcp":[]});
+        }
         if method.starts_with("workspace.") {
             return Err(Error::Unsupported("Kernel v4 has no workspace RPC".into()));
         }

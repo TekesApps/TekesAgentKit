@@ -25,6 +25,8 @@ pub struct LivePreview {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SessionProjection {
     pub summary: Option<Value>,
+    pub native_conversation: Option<NativeConversationSnapshot>,
+    pub native_events: std::collections::VecDeque<Value>,
     pub agent_error: Option<String>,
     pub entries: BTreeMap<i64, HistoryEntry>,
     pub previews: BTreeMap<String, LivePreview>,
@@ -44,6 +46,8 @@ impl Default for SessionProjection {
     fn default() -> Self {
         Self {
             summary: None,
+            native_conversation: None,
+            native_events: std::collections::VecDeque::new(),
             agent_error: None,
             entries: BTreeMap::new(),
             previews: BTreeMap::new(),
@@ -249,6 +253,7 @@ impl MemoryProjectionStore {
         for session in self.sessions.values_mut() {
             session.journal_ready = false;
             session.previews.clear();
+            session.native_events.clear();
         }
         self.connection = ConnectionState::Connecting;
     }
@@ -257,6 +262,7 @@ impl MemoryProjectionStore {
         if let Some(s) = self.sessions.get_mut(session_id) {
             s.journal_ready = false;
             s.previews.clear();
+            s.native_events.clear();
         }
     }
     pub fn ready(&self) -> bool {
@@ -272,12 +278,15 @@ impl MemoryProjectionStore {
             normalize_title(&mut frame);
         }
         let kind = string(&frame, "type")?.to_owned();
-        let generation = if kind == "snapshot" {
+        let generation = if kind == "snapshot" || kind == "conversation" {
             string(&frame["snapshot"], "generation")?
         } else {
             string(&frame, "generation")?
         };
-        let baseline = matches!(kind.as_str(), "baseline" | "reset" | "snapshot");
+        let baseline = matches!(
+            kind.as_str(),
+            "baseline" | "reset" | "snapshot" | "conversation"
+        );
         let mut validator = self.validators.get(stream).cloned().unwrap_or_default();
         validator.accept(generation, baseline)?;
         match stream {
@@ -464,6 +473,54 @@ impl MemoryProjectionStore {
     }
     fn journal(&mut self, id: &str, kind: &str, frame: Value) -> Result<()> {
         match kind {
+            "conversation" => {
+                let snapshot: NativeConversationSnapshot =
+                    serde_json::from_value(frame["snapshot"].clone())?;
+                snapshot.validate()?;
+                require(snapshot.session_id == id, "conversation session mismatch")?;
+                if let Some(generation) = frame.get("generation").and_then(Value::as_str) {
+                    require(
+                        snapshot.generation == generation,
+                        "conversation generation mismatch",
+                    )?;
+                }
+                let session = self.sessions.entry(id.into()).or_default();
+                session.run_open = snapshot.is_streaming;
+                session.native_conversation = Some(snapshot);
+                session.journal_ready = true;
+                session.journal_error = None;
+                session.native_events.clear();
+            }
+            "conversation-update" => {
+                let snapshot: NativeConversationSnapshot =
+                    serde_json::from_value(frame["snapshot"].clone())?;
+                snapshot.validate()?;
+                require(snapshot.session_id == id, "conversation session mismatch")?;
+                if let Some(generation) = frame.get("generation").and_then(Value::as_str) {
+                    require(
+                        snapshot.generation == generation,
+                        "conversation generation mismatch",
+                    )?;
+                }
+                let session = self.sessions.entry(id.into()).or_default();
+                session.run_open = snapshot.is_streaming;
+                session.native_conversation = Some(snapshot);
+            }
+            "native-event" => {
+                require(
+                    string(&frame, "sessionId")? == id,
+                    "native event session mismatch",
+                )?;
+                let event = frame
+                    .get("event")
+                    .ok_or_else(|| Error::Protocol("missing native event".into()))?
+                    .clone();
+                let session = self.sessions.entry(id.into()).or_default();
+                if session.native_events.len() >= 256 {
+                    session.native_events.pop_front();
+                }
+                session.native_events.push_back(event);
+            }
             "snapshot" => {
                 let snapshot: JournalSnapshot = serde_json::from_value(frame["snapshot"].clone())?;
                 require(snapshot.session_id == id, "snapshot session mismatch")?;

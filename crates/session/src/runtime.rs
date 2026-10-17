@@ -141,8 +141,131 @@ impl SessionRuntime {
         self.send(Command::Close(id.into(), reply), result).await
     }
     pub async fn load_earlier(&self, id: &str) -> Result<bool> {
+        let previous_native_count = self.inspect(|s| {
+            s.sessions
+                .get(id)
+                .and_then(|s| s.native_conversation.as_ref())
+                .map(|s| s.entries.len())
+        });
         let (reply, result) = oneshot::channel();
-        self.send(Command::Earlier(id.into(), reply), result).await
+        let loaded = self
+            .send(Command::Earlier(id.into(), reply), result)
+            .await?;
+        if loaded && let Some(previous) = previous_native_count {
+            self.wait_for(Duration::from_secs(30), |s| {
+                s.sessions
+                    .get(id)
+                    .and_then(|s| s.native_conversation.as_ref())
+                    .is_some_and(|s| s.entries.len() > previous || !s.has_more_before)
+            })
+            .await?;
+        }
+        Ok(loaded)
+    }
+    pub async fn locator(&self, id: &str) -> Result<SessionLocator> {
+        let mut locator: SessionLocator = serde_json::from_value(
+            self.call("session.locator", json!({"sessionId":id}), &rpc_id())
+                .await?,
+        )?;
+        require(
+            locator.address.endpoint_id == self.inspect(|s| s.endpoint_id.clone())
+                && locator.address.session_id == id,
+            "session locator address mismatch",
+        )?;
+        if locator.cwd.is_none() {
+            locator.cwd = self.inspect(|s| {
+                s.sessions
+                    .get(id)
+                    .and_then(|s| s.summary.as_ref())
+                    .and_then(|s| s["cwd"].as_str())
+                    .map(String::from)
+            });
+        }
+        Ok(locator)
+    }
+    pub async fn file_stat(&self, id: &str, path: &str) -> Result<SessionFileStat> {
+        Ok(serde_json::from_value(
+            self.call(
+                "session.files.stat",
+                json!({"sessionId":id,"path":path}),
+                &rpc_id(),
+            )
+            .await?,
+        )?)
+    }
+    pub async fn file_read_bytes(
+        &self,
+        id: &str,
+        path: &str,
+        offset: u64,
+        length: usize,
+    ) -> Result<SessionFileBytePage> {
+        require(length > 0 && length <= 4194304, "invalid byte page length")?;
+        let page: SessionFileBytePage = serde_json::from_value(
+            self.call(
+                "session.files.readBytes",
+                json!({"sessionId":id,"path":path,"offset":offset,"limit":length}),
+                &rpc_id(),
+            )
+            .await?,
+        )?;
+        page.validate(offset, length)?;
+        Ok(page)
+    }
+    pub async fn file_read_text(
+        &self,
+        id: &str,
+        path: &str,
+        offset: u64,
+        limit: usize,
+    ) -> Result<SessionFileTextPage> {
+        require(
+            offset >= 1 && limit > 0 && limit <= 10000,
+            "invalid text page",
+        )?;
+        let page: SessionFileTextPage = serde_json::from_value(
+            self.call(
+                "session.files.read",
+                json!({"sessionId":id,"path":path,"offset":offset,"limit":limit}),
+                &rpc_id(),
+            )
+            .await?,
+        )?;
+        page.validate(offset, limit)?;
+        Ok(page)
+    }
+    /// Acquire a consistent, bounded file through the endpoint; never interpret a remote path locally.
+    pub async fn file_read_all(&self, id: &str, path: &str, maximum: usize) -> Result<Vec<u8>> {
+        use base64::Engine;
+        require(maximum > 0, "file byte bound required")?;
+        let mut data = Vec::new();
+        let mut first: Option<SessionFileBytePage> = None;
+        loop {
+            let page = self
+                .file_read_bytes(id, path, data.len() as u64, 262144)
+                .await?;
+            if let Some(previous) = &first {
+                require(
+                    page.version == previous.version
+                        && page.absolute_path == previous.absolute_path
+                        && page.bytes == previous.bytes,
+                    "file changed between pages",
+                )?;
+            } else {
+                first = Some(page.clone());
+            }
+            let bytes = base64::engine::general_purpose::STANDARD
+                .decode(&page.data)
+                .map_err(|_| Error::Protocol("invalid file byte encoding".into()))?;
+            require(
+                bytes.len() <= maximum.saturating_sub(data.len()),
+                "file exceeds byte bound",
+            )?;
+            data.extend_from_slice(&bytes);
+            if page.eof {
+                return Ok(data);
+            }
+        }
     }
     pub async fn call(&self, method: &str, payload: Value, rpc_id: &str) -> Result<Value> {
         let (reply, result) = oneshot::channel();
@@ -162,7 +285,9 @@ impl SessionRuntime {
             cwd.starts_with('/') && !cwd.contains('\0'),
             "execution cwd must be absolute",
         )?;
-        let result = self.call("session.create", json!({"execution":{"cwd":cwd,"read_roots":[],"writable_roots":[],"toolchain_roots":[],"network":false,"allowed_tools":[],"mcp":[]}}), rpc_id).await?;
+        let result = self
+            .call("session.create", json!({"cwd":cwd}), rpc_id)
+            .await?;
         Ok(string(&result, "sessionId")?.into())
     }
     /// Caller retains this rpc_id on an uncertain outcome; the runtime never retries a mutation.
@@ -283,7 +408,8 @@ async fn run(
                     epoch += 1;
                     store.update(|s| s.begin_connection(endpoint.host().clone()));
                     let result =
-                        connected(&*endpoint, &mut commands, &store, &mut wanted, epoch).await;
+                        connected(endpoint.clone(), &mut commands, &store, &mut wanted, epoch)
+                            .await;
                     endpoint.close().await;
                     result
                 }
@@ -345,12 +471,13 @@ fn reject(command: Command) {
     }
 }
 async fn connected(
-    endpoint: &dyn SessionEndpoint,
+    endpoint: Arc<dyn SessionEndpoint>,
     commands: &mut mpsc::Receiver<Command>,
     store: &SharedProjection,
     wanted: &mut BTreeSet<String>,
     epoch: u64,
 ) -> Result<bool> {
+    let mut operations = tokio::task::JoinSet::new();
     let mut streams = SelectAll::new();
     for (name, target) in [
         ("inventory", StreamTarget::SessionInventory),
@@ -364,7 +491,8 @@ async fn connected(
     let mut next_journal_epoch = epoch * 1_000_000;
     for id in wanted.iter() {
         next_journal_epoch += 1;
-        let cancellation = add_journal(endpoint, &mut streams, id, next_journal_epoch).await?;
+        let cancellation =
+            add_journal(endpoint.as_ref(), &mut streams, id, next_journal_epoch).await?;
         journal_cancellations.insert(id.clone(), cancellation);
         journal_epochs.insert(id.clone(), next_journal_epoch);
     }
@@ -374,6 +502,7 @@ async fn connected(
     tokio::pin!(baseline_deadline);
     loop {
         tokio::select! {
+            _ = operations.join_next(), if !operations.is_empty() => {},
             _ = &mut baseline_deadline, if !recovered => return Err(Error::Timeout),
             frame = streams.next() => {
                 let Some((name, frame_epoch, frame)) = frame else { return Err(Error::Disconnected); };
@@ -397,7 +526,7 @@ async fn connected(
                                 if let Some(session) = s.sessions.get_mut(id) { session.journal_error = Some(error.to_string()); }
                             });
                             next_journal_epoch += 1;
-                            let cancellation = add_journal(endpoint, &mut streams, id, next_journal_epoch).await?;
+                            let cancellation = add_journal(endpoint.as_ref(), &mut streams, id, next_journal_epoch).await?;
                             journal_cancellations.insert(id.to_owned(), cancellation);
                             journal_epochs.insert(id.to_owned(), next_journal_epoch);
                             continue;
@@ -408,7 +537,7 @@ async fn connected(
                 if is_live && let Some(id) = name.strip_prefix("journal:") { journal_retries.remove(id); }
                 if store.read(MemoryProjectionStore::ready) && !recovered {
                     let ids: Vec<_> = store.read(|s| s.sessions.iter().filter(|(_, s)| s.summary.is_some()).map(|(id, _)| id.clone()).collect());
-                    if !ids.is_empty() { endpoint.call("sessions.recover", json!({"sessionIds":ids}), &rpc_id()).await?; }
+                    if !ids.is_empty() && endpoint.supports_recovery() { endpoint.call("sessions.recover", json!({"sessionIds":ids}), &rpc_id()).await?; }
                     recovered = true;
                     store.update(|s| { s.connection = ConnectionState::Ready; s.last_error = None; });
                 }
@@ -422,7 +551,7 @@ async fn connected(
                         if !store.read(MemoryProjectionStore::ready) { let _ = reply.send(Err(Error::Disconnected)); continue; }
                         let result = if wanted.contains(&id) { Ok(()) } else {
                             next_journal_epoch += 1;
-                            match add_journal(endpoint, &mut streams, &id, next_journal_epoch).await {
+                            match add_journal(endpoint.as_ref(), &mut streams, &id, next_journal_epoch).await {
                                 Ok(cancellation) => { store.update(|s| s.reset_journal(&id)); wanted.insert(id.clone()); journal_cancellations.insert(id.clone(), cancellation); journal_epochs.insert(id, next_journal_epoch); Ok(()) }
                                 Err(e) => Err(e),
                             }
@@ -434,15 +563,17 @@ async fn connected(
                         if let Some(cancellation) = journal_cancellations.remove(&id) { cancellation.abort(); }
                         let _ = reply.send(Ok(()));
                     }
-                    Command::Earlier(id, reply) => { let result = load_earlier(endpoint, store, &id).await; let _ = reply.send(result); }
+                    Command::Earlier(id, reply) => { let result = load_earlier(endpoint.as_ref(), store, &id).await; let _ = reply.send(result); }
                     Command::Call { method, payload, rpc_id, reply } => {
-                        let result = if store.read(MemoryProjectionStore::ready) { endpoint.call(&method, payload, &rpc_id).await } else { Err(Error::Disconnected) };
-                        let _ = reply.send(result);
+                        if !store.read(MemoryProjectionStore::ready) || operations.len() >= 64 { let _ = reply.send(Err(Error::Disconnected)); continue; }
+                        let endpoint = endpoint.clone();
+                        operations.spawn(async move { let result = invoke(endpoint.as_ref(), &method, payload, &rpc_id).await; let _ = reply.send(result); });
                     }
                     Command::Respond { id, revision, outcome, reply } => {
                         let valid = store.read(|s| s.ready() && s.actionables.get(&id).is_some_and(|a| integer(a, "revision").ok() == Some(revision)));
-                        let result = if valid { endpoint.respond(&id, revision, outcome).await } else { Err(Error::Protocol("stale or missing actionable revision".into())) };
-                        let _ = reply.send(result);
+                        if !valid || operations.len() >= 64 { let _ = reply.send(Err(Error::Protocol("stale or missing actionable revision".into()))); continue; }
+                        let endpoint = endpoint.clone();
+                        operations.spawn(async move { let result = endpoint.respond(&id, revision, outcome).await; let _ = reply.send(result); });
                     }
                 }
             }
@@ -455,14 +586,20 @@ async fn add_journal(
     id: &str,
     epoch: u64,
 ) -> Result<futures_util::future::AbortHandle> {
-    let frames = endpoint
-        .follow(StreamTarget::SessionJournal {
-            address: JournalAddress {
-                session_id: id.into(),
-            },
+    let address = JournalAddress {
+        session_id: id.into(),
+    };
+    let target = match endpoint.content_kind() {
+        SessionContentKind::Journal => StreamTarget::SessionJournal {
+            address,
             max_messages: 50,
-        })
-        .await?;
+        },
+        SessionContentKind::NativeConversation => StreamTarget::SessionConversation {
+            address,
+            max_messages: 50,
+        },
+    };
+    let frames = endpoint.follow(target).await?;
     let (handle, registration) = futures_util::future::AbortHandle::new_pair();
     let frames = futures_util::stream::Abortable::new(frames, registration);
     streams.push(tagged(format!("journal:{id}"), epoch, Box::pin(frames)));
@@ -473,6 +610,9 @@ async fn load_earlier(
     store: &SharedProjection,
     id: &str,
 ) -> Result<bool> {
+    if endpoint.content_kind() == SessionContentKind::NativeConversation {
+        return endpoint.load_earlier_conversation(id, 50).await;
+    }
     let request = store.read(|s| -> Result<Option<HistoryRequest>> {
         require(s.ready(), "endpoint not ready")?;
         let session = s
@@ -500,4 +640,43 @@ async fn load_earlier(
             .expect("session exists")
             .apply_page(page, &request)
     })
+}
+
+async fn invoke(
+    endpoint: &dyn SessionEndpoint,
+    method: &str,
+    payload: Value,
+    rpc_id: &str,
+) -> Result<Value> {
+    match method {
+        "session.locator" => Ok(serde_json::to_value(
+            endpoint.locator(string(&payload, "sessionId")?).await?,
+        )?),
+        "session.files.stat" => Ok(serde_json::to_value(
+            endpoint
+                .file_stat(string(&payload, "sessionId")?, string(&payload, "path")?)
+                .await?,
+        )?),
+        "session.files.readBytes" => Ok(serde_json::to_value(
+            endpoint
+                .file_read_bytes(
+                    string(&payload, "sessionId")?,
+                    string(&payload, "path")?,
+                    payload["offset"].as_u64().unwrap_or(0),
+                    payload["limit"].as_u64().unwrap_or(262144) as usize,
+                )
+                .await?,
+        )?),
+        "session.files.read" => Ok(serde_json::to_value(
+            endpoint
+                .file_read_text(
+                    string(&payload, "sessionId")?,
+                    string(&payload, "path")?,
+                    payload["offset"].as_u64().unwrap_or(1),
+                    payload["limit"].as_u64().unwrap_or(200) as usize,
+                )
+                .await?,
+        )?),
+        _ => endpoint.call(method, payload, rpc_id).await,
+    }
 }

@@ -1,10 +1,12 @@
 //! ClientKit-aligned headless SessionEndpoint contract. Extension payloads stay lossless JSON.
 mod registry;
+mod session;
 use async_trait::async_trait;
 use futures_util::stream::BoxStream;
 pub use registry::{REQUIRED_EVENTS, SURFACE_EVENTS};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+pub use session::*;
 use std::collections::{BTreeMap, BTreeSet};
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -380,6 +382,11 @@ pub enum StreamTarget {
     SessionInventory,
     SessionControl,
     Actionables,
+    SessionConversation {
+        address: JournalAddress,
+        #[serde(rename = "maxMessages")]
+        max_messages: usize,
+    },
     SessionJournal {
         address: JournalAddress,
         #[serde(rename = "maxMessages")]
@@ -414,6 +421,49 @@ impl GenerationValidator {
 pub trait SessionEndpoint: Send + Sync {
     fn identity(&self) -> &str;
     fn host(&self) -> &HostDescription;
+    fn content_kind(&self) -> SessionContentKind {
+        SessionContentKind::Journal
+    }
+    fn supports_recovery(&self) -> bool {
+        false
+    }
+    async fn load_earlier_conversation(&self, _session_id: &str, _count: usize) -> Result<bool> {
+        Err(unsupported("native conversation pagination"))
+    }
+    async fn locator(&self, session_id: &str) -> Result<SessionLocator> {
+        Ok(SessionLocator {
+            address: SessionAddress {
+                endpoint_id: self.identity().into(),
+                session_id: session_id.into(),
+            },
+            harness: self.host().product.name.clone(),
+            cwd: None,
+            native_session_file: None,
+            native_session_id: Some(session_id.into()),
+            history_source: "session-journal".into(),
+        })
+    }
+    async fn file_stat(&self, _session_id: &str, _path: &str) -> Result<SessionFileStat> {
+        Err(unsupported("session file stat"))
+    }
+    async fn file_read_bytes(
+        &self,
+        _session_id: &str,
+        _path: &str,
+        _offset: u64,
+        _length: usize,
+    ) -> Result<SessionFileBytePage> {
+        Err(unsupported("session file bytes"))
+    }
+    async fn file_read_text(
+        &self,
+        _session_id: &str,
+        _path: &str,
+        _offset: u64,
+        _limit: usize,
+    ) -> Result<SessionFileTextPage> {
+        Err(unsupported("session file text"))
+    }
     async fn follow(&self, target: StreamTarget) -> Result<FrameStream>;
     async fn history_page(&self, request: HistoryRequest) -> Result<HistoryPage>;
     async fn respond(

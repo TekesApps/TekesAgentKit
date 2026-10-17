@@ -1,0 +1,21 @@
+[package]
+name = "tekes-agent-headless"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+repository.workspace = true
+
+[dependencies]
+tekes-agent-contract = { path = "../contract" }
+tekes-agent-session = { path = "../session" }
+tekes-agent-endpoint-kernel = { path = "../endpoint-kernel" }
+tekes-agent-endpoint-pi = { path = "../endpoint-pi" }
+tekes-agent-endpoint-dsh = { path = "../endpoint-dsh" }
+serde_json.workspace = true
+tokio.workspace = true
+base64.workspace = true
+uuid.workspace = true
+
+[lints]
+workspace = true
