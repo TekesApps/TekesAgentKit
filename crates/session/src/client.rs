@@ -168,3 +168,60 @@ impl SessionRuntime {
         Ok(())
     }
 }
+
+impl SessionRuntime {
+    pub async fn create_child(
+        &self,
+        parent: &str,
+        label: Option<&str>,
+        request_key: &str,
+    ) -> Result<SessionCreated> {
+        let value = self
+            .call_optional(
+                "subagents.create",
+                json!({"parentSessionId":parent,"label":label,"requestKey":request_key}),
+                request_key,
+            )
+            .await?;
+        let id = string(&value, "childSessionId")?;
+        require(
+            !id.is_empty() && id != parent,
+            "invalid child creation receipt",
+        )?;
+        Ok(SessionCreated {
+            session_id: id.into(),
+        })
+    }
+    pub async fn read_child(&self, parent: &str, child: &str) -> Result<Value> {
+        self.subagent_catalog(parent)
+            .await?
+            .require_continuable(child)?;
+        self.call_optional(
+            "subagents.read",
+            json!({"parentSessionId":parent,"childSessionId":child}),
+            "child-read",
+        )
+        .await
+    }
+    pub async fn bounded_child_history(
+        &self,
+        request: BoundedChildHistoryRequest,
+    ) -> Result<BoundedChildHistoryPage> {
+        request.validate()?;
+        let epoch = self.inspect(|s| s.connection_epoch);
+        let value = self
+            .call_optional(
+                "subagents.history",
+                serde_json::to_value(&request)?,
+                "bounded-child-history",
+            )
+            .await?;
+        let page: BoundedChildHistoryPage = serde_json::from_value(value)?;
+        page.validate(&request)?;
+        require(
+            self.inspect(|s| s.connection_epoch == epoch),
+            "bounded history connection changed during read",
+        )?;
+        Ok(page)
+    }
+}

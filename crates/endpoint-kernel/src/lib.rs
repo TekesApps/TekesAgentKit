@@ -118,6 +118,28 @@ impl KernelConnector {
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .map_err(transport)?;
+        // Non-activating feature probe against a guaranteed absent UUID. Older 0.9 hosts return
+        // 404; supported hosts return the method's structured session-not-found error.
+        let child_history = if host.capabilities.contains("management") {
+            let mut probe_url = self.url.clone();
+            probe_url.set_path("/api/subagents.history");
+            let probe_id = id();
+            let probe = http.post(probe_url).bearer_auth(&self.bearer).json(&json!({"type":"client-request","rpcId":probe_id,"method":"subagents.history","payload":{"parentSessionId":"00000000-0000-0000-0000-000000000000","childSessionId":"00000000-0000-0000-0000-000000000001","maxMessages":1}})).send().await.map_err(transport)?;
+            if probe.status() == reqwest::StatusCode::NOT_FOUND {
+                false
+            } else {
+                let value: Value = probe.json().await.map_err(transport)?;
+                require(
+                    value["type"] == "server-response"
+                        && value["rpcId"] == probe_id
+                        && value["result"]["error"]["code"] == "session-not-found",
+                    "bounded history capability probe failed",
+                )?;
+                true
+            }
+        } else {
+            false
+        };
         let (commands, mut receiver) = mpsc::unbounded_channel();
         let task = tokio::spawn(async move {
             let mut streams: HashMap<String, mpsc::Sender<Result<Value>>> = HashMap::new();
@@ -199,6 +221,7 @@ impl KernelConnector {
             config: self.clone(),
             host,
             http,
+            child_history,
             commands,
             task,
             lifetime: tokio::sync::watch::channel(false).0,
@@ -232,6 +255,7 @@ pub struct NativeSessionEndpoint {
     config: KernelConnector,
     host: HostDescription,
     http: Client,
+    child_history: bool,
     commands: mpsc::UnboundedSender<Command>,
     task: tokio::task::JoinHandle<()>,
     lifetime: tokio::sync::watch::Sender<bool>,
@@ -341,6 +365,9 @@ impl SessionEndpoint for NativeSessionEndpoint {
             "goals.resume",
             "subagents.list",
         ]);
+        if self.child_history {
+            caps.methods.insert("subagents.history".into());
+        }
         caps.supports_archive_session = true;
         caps.supports_unarchive_session = true;
         caps.supports_ephemeral_fork = true;

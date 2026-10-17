@@ -56,7 +56,7 @@ impl PiSessionEndpoint {
         Ok(json!({"selected":selection(&state)}))
     }
 }
-fn selection(state: &Value) -> Value {
+pub(crate) fn selection(state: &Value) -> Value {
     let mut value = json!({"provider":state["model"]["provider"],"model":state["model"]["id"]});
     if state["model"]["reasoning"] == true {
         value["reasoningEffort"] = state["thinkingLevel"].clone();

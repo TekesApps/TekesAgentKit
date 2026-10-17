@@ -39,7 +39,7 @@ Native 要求 Kernel 0.9 的 v4 wire；Pi/DSH 的标准化 HostDescription 保�
 | 附件 | 原生策略/上传/读取 | 限额校验、图片/文件上传、会话隔离及历史附件读取 | 原生策略、raw binary 上传和读取 |
 | 文件观察 | 认证 WS changes | 有界轮询 ready/change/absent | workspaceFiles/changes |
 | 扩展 | 服务端公开方法 | 模型/命令/skills/tools/settings 读取、Goal/反馈 CAS | ClientKit 对应公开服务路由及规范化参数 |
-| 子代理 | 原生 catalog；bounded child 控制不可用 | 默认 Unsupported；可显式 HostServices | projection catalog + 父拥有的 prompt/cancel；child 地址历史与重连 |
+| 子代理 | 原生 catalog；扩展只读子历史；bounded child 控制不可用 | create/list/prompt/read/cancel，官方扩展模型工具 | projection catalog + 父拥有的 prompt/cancel；child 地址历史与重连 |
 | 产品服务 | 服务端或显式宿主能力 | 显式 HostServices | 服务端部署或显式 HostServices |
 
 公开类型化 API 提供 create/submit/fork/discard/rename/archive/unarchive/queue/upload/goal；其他公开扩展经能力检查后调用。`EndpointCapabilities` 区分方法、归档、临时 fork 和文件观察；不支持的方法明确失败。

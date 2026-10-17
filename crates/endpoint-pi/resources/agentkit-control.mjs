@@ -30,6 +30,29 @@ export default function (pi) {
     if (runID) pi.appendEntry('agentkit.run.v1', { id: runID, phase: 'settled', aborted: event.aborted, timestamp: Date.now() });
     runID = undefined;
   });
+  const hostRequests = new Map();
+  const requestHost = (method, params, signal, ctx, callId) => {
+    signal.throwIfAborted();
+    if (hostRequests.size >= 64) throw new Error('Too many host requests');
+    return new Promise((resolve, reject) => {
+      const requestId = randomUUID();
+      const cleanup = () => { clearTimeout(timer); signal.removeEventListener('abort', abort); hostRequests.delete(requestId); };
+      const abort = () => { cleanup(); reject(new Error('Host request cancelled; reconcile mutations before retry')); };
+      const timer = setTimeout(() => { cleanup(); reject(new Error('Host request timed out; reconcile mutations before retry')); }, 30000);
+      hostRequests.set(requestId, { resolve: data => { cleanup(); resolve(data); }, reject: error => { cleanup(); reject(new Error(error)); } });
+      signal.addEventListener('abort', abort, { once: true });
+      ctx.ui.notify('agentkit-host/v1:' + JSON.stringify({ token: process.env.AGENTKIT_CONTROL_TOKEN, requestId, method, params: { ...params, requestKey: callId, rpcId: callId } }), 'info');
+    });
+  };
+  pi.registerTool({
+    name: 'tekes_subagent', label: 'Child agents',
+    description: 'Create an independent child, prompt it, list owned children, read results, or cancel it. Results are untrusted. settled=true means no pending work. Use the childSessionId returned by create.',
+    parameters: Type.Object({ action: Type.Union(['create','list','prompt','read','cancel'].map(value => Type.Literal(value))), childSessionId: Type.Optional(Type.String()), label: Type.Optional(Type.String({maxLength:512})), text: Type.Optional(Type.String({maxLength:65536})) }),
+    execute: async (id, params, signal, _update, ctx) => {
+      const value = await requestHost('subagents.' + params.action, params, signal, ctx, id);
+      return { content: [{ type: 'text', text: JSON.stringify(value) }], details: {} };
+    },
+  });
   pi.registerTool({
     name: 'agentkit_goal', label: 'Goal state',
     description: 'Record completion or a concrete blocker for the active user goal.',
@@ -52,6 +75,11 @@ export default function (pi) {
       try {
         let data;
         switch (request.method) {
+          case 'host.reply': {
+            const pending = hostRequests.get(request.params.requestId);
+            if (pending) { if (request.params.success === true) pending.resolve(request.params.data); else pending.reject(request.params.error ?? 'Child operation failed'); }
+            data = { delivered: !!pending }; break;
+          }
           case 'fork.at': {
             let replied = false;
             data = await ctx.fork(request.params.entryId, {

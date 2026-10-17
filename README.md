@@ -9,7 +9,7 @@
 
 ## 当前阶段
 
-`v0.1.0` 保存三个 SEP 与无 UI presentation 的阶段成果；`v0.1.1` 增加公开仓库的 MIT 授权、包元数据和使用文档；当前 `v0.2.0` 冻结任务、子代理、SideChat 与 Summary 的无 UI 状态层。API 仍处于早期阶段，crate 尚未发布到 crates.io（`publish = false`）。宿主应固定 tag/完整 commit，升级前检查变更。
+`v0.1.0` 保存三个 SEP 与无 UI presentation 的阶段成果；`v0.1.1` 增加公开仓库的 MIT 授权、包元数据和使用文档；`v0.2.0` 冻结任务、子代理、SideChat 与 Summary 的无 UI 状态层；当前开发分支补齐 Pi 子代理与 Native 有界子历史，见 [说明](docs/child-history.md)。API 仍处于早期阶段，crate 尚未发布到 crates.io（`publish = false`）。宿主应固定 tag/完整 commit，升级前检查变更。
 
 | Endpoint | 验证版本 | 权威数据路径 |
 |---|---|---|
@@ -72,7 +72,7 @@ cargo test --workspace --locked
 python3 scripts/check-headless-boundaries.py
 ```
 
-当前有 **59 项测试**。真实运行时验收使用临时 HOME、独立状态目录和本地合成 provider，不调用付费模型；任选已经安装好的 runtime：
+Rust 回归覆盖协议、投影和状态层。真实运行时验收使用临时 HOME、独立状态目录和本地合成 provider，不调用付费模型；任选已经安装好的 runtime：
 
 ```sh
 python3 scripts/test-real-session-endpoints.py \

@@ -239,6 +239,8 @@ impl PiSessionEndpoint {
             title: source.title,
             archived: false,
             parent: Some(id.into()),
+            subagent_parent: None,
+            model_selection: None,
             ephemeral,
             receipts: BTreeMap::new(),
             materialized: true,

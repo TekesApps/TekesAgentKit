@@ -22,7 +22,7 @@
 | Submission | prepare 时捕获目标并清空已提交草稿；即时 echo；新线程创建后迁移目标和草稿；切换选区不重定向完成；新输入优先，失败附件先恢复；unknown 阻止再次提交直到明确 reconciliation | ComposerFailedSubmissionRecovery、ComposerSubmissionLifecycle、InstantInputEchoTests |
 | Reconciliation | 只按 source.rpcId/receipt 或权威 queue rpcId 去重；相同文本不构成 acknowledgement；晚到失败不恢复已被权威确认的输入；取消已派发 future 归 unknown，未派发归 failed | TranscriptOptimisticEchoIdentity、submission lifecycle tests |
 
-纯状态用例对照的是以上非 UI 行为，不声称完整 Swift projector 的逐字段移植。todo/task/subagent catalog/SideChat/Summary、上下文工具分类、视觉工具词汇、UI layout/scroll/disclosure/IME/a11y 不在本轮。RunScope 路由完整的原生 session；同-session 的 bounded child history 仍须未来的 task/catalog presentation，不能靠给父 session 换个 thread ID 取得子任务 authority。
+纯状态用例对照的是以上非 UI 行为，不声称完整 Swift projector 的逐字段移植。后续 todo/task/subagent catalog/SideChat/Summary 与有界子历史见 [headless-agent-panels](headless-agent-panels.md)。UI layout/scroll/disclosure/IME/a11y 尚未实现，不能靠给父 session 换个 thread ID 取得子任务 authority。
 
 ## 提交和观察
 

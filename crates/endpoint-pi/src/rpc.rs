@@ -181,6 +181,21 @@ impl Rpc {
         .await
         .map_err(|_| Error::Timeout)?
     }
+    pub(crate) fn host_request(&self, event: &Value) -> Option<Value> {
+        let text = event["message"]
+            .as_str()?
+            .strip_prefix("agentkit-host/v1:")?;
+        if text.len() > 128 * 1024 {
+            return None;
+        }
+        let value: Value = serde_json::from_str(text).ok()?;
+        (value["token"] == self.control_token
+            && value["requestId"].as_str().is_some_and(|s| !s.is_empty())
+            && value["method"]
+                .as_str()
+                .is_some_and(|s| s.starts_with("subagents.")))
+        .then_some(value)
+    }
     pub(crate) fn alive(&self) -> bool {
         self.alive.load(Ordering::Acquire)
     }

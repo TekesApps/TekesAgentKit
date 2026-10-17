@@ -6,7 +6,8 @@ use tekes_agent_endpoint_dsh::{DshConfiguration, DshConnector};
 use tekes_agent_endpoint_kernel::KernelConnector;
 use tekes_agent_endpoint_pi::{PiConfiguration, PiConnector};
 use tekes_agent_presentation::{
-    ComposerDestination, ComposerDraft, RunController, RunScope, SideChatController,
+    ChildHistoryLayout, ChildRun, ComposerDestination, ComposerDraft, RunController, RunScope,
+    SideChatController,
 };
 use tekes_agent_session::SessionRuntime;
 #[tokio::main]
@@ -61,6 +62,7 @@ async fn main() -> Result<()> {
     );
     let presentation = RunController::new(runtime.clone())?;
     let side_chats = SideChatController::new(runtime.clone());
+    let mut child_runs = BTreeMap::<(String, String), ChildRun>::new();
     let mut variables = BTreeMap::<String, Value>::new();
     for command in array(&config, "commands")? {
         let operation = string(command, "op")?;
@@ -100,6 +102,68 @@ async fn main() -> Result<()> {
                 json!({"discarded":true})
             }
             "sideChats" => serde_json::to_value(side_chats.snapshot())?,
+            "childCreate" => {
+                let child = runtime
+                    .create_child(
+                        id.ok_or_else(|| unsupported("parent sessionId required"))?,
+                        command["label"].as_str(),
+                        command["rpcId"]
+                            .as_str()
+                            .unwrap_or(&uuid::Uuid::new_v4().to_string()),
+                    )
+                    .await?;
+                if let Some(name) = command["saveAs"].as_str() {
+                    variables.insert(name.into(), json!(child.session_id));
+                }
+                serde_json::to_value(child)?
+            }
+            "childRead" => {
+                let child = string(command, "childSessionId")?;
+                let child = variables
+                    .get(child)
+                    .and_then(Value::as_str)
+                    .unwrap_or(child);
+                runtime
+                    .read_child(
+                        id.ok_or_else(|| unsupported("parent sessionId required"))?,
+                        child,
+                    )
+                    .await?
+            }
+            "childHistory" | "childEarlier" => {
+                let parent = id
+                    .ok_or_else(|| unsupported("parent sessionId required"))?
+                    .to_owned();
+                let child = string(command, "childSessionId")?;
+                let child = variables
+                    .get(child)
+                    .and_then(Value::as_str)
+                    .unwrap_or(child)
+                    .to_owned();
+                let key = (parent.clone(), child.clone());
+                if !child_runs.contains_key(&key) {
+                    let layout = if kind == "native" {
+                        ChildHistoryLayout::SameSession
+                    } else {
+                        ChildHistoryLayout::IndependentSessions
+                    };
+                    let run = ChildRun::open(
+                        runtime.clone(),
+                        RunScope::main(identity, parent),
+                        child,
+                        layout,
+                        None,
+                    )
+                    .await?;
+                    child_runs.insert(key.clone(), run);
+                }
+                let run = &child_runs[&key];
+                if operation == "childEarlier" {
+                    json!({"loaded":run.load_earlier().await?})
+                } else {
+                    serde_json::to_value(run.transcript().await?)?
+                }
+            }
             "childCatalog" => {
                 let value = serde_json::to_value(
                     runtime
@@ -125,9 +189,15 @@ async fn main() -> Result<()> {
                             .as_str()
                             .map(|id| variables.get(id).and_then(Value::as_str).unwrap_or(id))
                             .ok_or_else(|| unsupported("childSessionId required"))?,
-                        PromptMode::Queue,
+                        if command["mode"] == "steer" {
+                            PromptMode::Steer
+                        } else {
+                            PromptMode::Queue
+                        },
                         serde_json::from_value(command["content"].clone())?,
-                        &uuid::Uuid::new_v4().to_string(),
+                        command["rpcId"]
+                            .as_str()
+                            .unwrap_or(&uuid::Uuid::new_v4().to_string()),
                     )
                     .await?
             }
@@ -149,7 +219,17 @@ async fn main() -> Result<()> {
                     identity,
                     id.ok_or_else(|| unsupported("sessionId required"))?,
                 )))?;
-                serde_json::to_value(presentation.snapshot().as_ref())?
+                let value = serde_json::to_value(presentation.snapshot().as_ref())?;
+                if let Some(name) = command["saveAs"].as_str() {
+                    variables.insert(
+                        name.into(),
+                        value
+                            .pointer(string(command, "savePointer")?)
+                            .cloned()
+                            .ok_or_else(|| unsupported("presentation save pointer missing"))?,
+                    );
+                }
+                value
             }
             "compose" => {
                 let scope = RunScope::main(

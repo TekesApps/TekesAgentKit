@@ -19,3 +19,5 @@ pub use child::*;
 pub use sidechat::*;
 pub use summary::*;
 pub use task::*;
+
+mod bounded_history;

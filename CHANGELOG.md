@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Pi independent child creation, parent-owned list/prompt/read/cancel, durable request-key replay,
+  official extension model tool, child history/reconnect and Summary creation semantics.
+- Native bounded child history through an additive Kernel read-only API, frozen paging/revision,
+  effective task-source projection and explicit unsupported behavior on older Kernel hosts.
+- No UI, Swift, durable transcript Mirror or Kernel mutation API changes.
+
 ## 0.2.0 — 2026-10-18
 
 - Headless task pointer state, parent-owned subagent catalog/control, consumer-owned child history leases.

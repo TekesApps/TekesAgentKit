@@ -7,6 +7,7 @@ mod management;
 mod models;
 mod queue;
 mod rpc;
+mod subagents;
 use async_trait::async_trait;
 use futures_util::{StreamExt, stream};
 use rpc::Rpc;
@@ -68,6 +69,10 @@ struct Row {
     title: Option<String>,
     archived: bool,
     parent: Option<String>,
+    #[serde(default)]
+    subagent_parent: Option<String>,
+    #[serde(default)]
+    model_selection: Option<Value>,
     ephemeral: bool,
     receipts: BTreeMap<String, Receipt>,
     #[serde(default)]
@@ -87,9 +92,11 @@ struct Row {
     #[serde(default)]
     feedback: BTreeMap<String, Value>,
 }
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 struct Manifest {
     sessions: BTreeMap<String, Row>,
+    #[serde(default)]
+    child_admissions: BTreeMap<String, subagents::ChildAdmission>,
     #[serde(default)]
     workspaces: BTreeMap<String, Value>,
 }
@@ -273,118 +280,152 @@ impl Context {
                     && row.parent.is_none()
                     && row.goal_revision == 0
                     && row.feedback.is_empty()
-                    && row.title.is_none()
-                    && row.receipts.is_empty()
+                    && (row.title.is_none() || row.subagent_parent.is_some())
+                    && (row.receipts.is_empty() || row.subagent_parent.is_some())
                     && row.file.starts_with(self.config.data_root.join("sessions")),
                 "native session file is missing; refusing to create replacement history",
             ),
             Err(error) => Err(io_error(error)),
         }
     }
-    async fn process(self: &Arc<Self>, id: &str) -> Result<Arc<Rpc>> {
-        let row = self.row(id).await?;
-        require(!row.archived, "session is archived")?;
-        let mut processes = self.processes.lock().await;
-        if let Some(rpc) = processes.get(id).filter(|rpc| rpc.alive()) {
-            return Ok(rpc.clone());
-        }
-        self.validate_pointer(&row).await?;
-        let rpc = Rpc::start(&self.config, &row.cwd, Some(&row.file)).await?;
-        let mut events = rpc.events();
-        let readiness = async {
-            let state = rpc.request("get_state", json!({})).await?;
-            let actual = PathBuf::from(string(&state, "sessionFile")?);
-            require(
-                actual == row.file,
-                "Pi resumed a different native session file",
-            )?;
-            let native_id = string(&state, "sessionId")?;
-            require(!native_id.is_empty(), "missing native session identity")?;
-            if let Some(expected) = &row.native_session_id {
-                require(expected == native_id, "Pi native session identity changed")?;
+    fn process<'a>(
+        self: &'a Arc<Self>,
+        id: &'a str,
+    ) -> futures_util::future::BoxFuture<'a, Result<Arc<Rpc>>> {
+        Box::pin(async move {
+            let row = self.row(id).await?;
+            require(!row.archived, "session is archived")?;
+            let mut processes = self.processes.lock().await;
+            if let Some(rpc) = processes.get(id).filter(|rpc| rpc.alive()) {
+                return Ok(rpc.clone());
             }
-            // Blank sessions may not have a native file until their first persisted entry.
-            if row.file.is_file() {
-                let mut manifest = self.manifest.lock().await;
-                let current = manifest
-                    .sessions
-                    .get_mut(id)
-                    .ok_or_else(|| unsupported("session removed"))?;
-                current.materialized = true;
-                current.native_session_id = Some(native_id.into());
-                self.save(&manifest).await?;
-            }
-            Ok::<_, Error>(())
-        }
-        .await;
-        if let Err(error) = readiness {
-            rpc.close();
-            return Err(error);
-        }
-        let sender = self.notifications.clone();
-        let id_owned = id.to_owned();
-        let weak_context = Arc::downgrade(self);
-        let pending_actionables = self.actionables.clone();
-        let weak_rpc = Arc::downgrade(&rpc);
-        tokio::spawn(async move {
-            while let Ok(event) = events.recv().await {
-                if event["type"] == "extension_ui_request"
-                    && matches!(
-                        event["method"].as_str(),
-                        Some("confirm" | "select" | "input" | "editor")
-                    )
-                    && let Some(native_id) = event["id"].as_str()
-                {
-                    let key = format!("{id_owned}:{native_id}");
-                    let value = actionable(&event, &id_owned);
-                    pending_actionables.lock().await.insert(
-                        key,
-                        PendingActionable {
-                            session: id_owned.clone(),
-                            native_id: native_id.into(),
-                            request: event.clone(),
-                            value: value.clone(),
-                            rpc: weak_rpc.clone(),
-                        },
-                    );
-                    let _ = sender.send(json!({"actionable": value}));
-                }
-                let _ = sender.send(json!({"sessionId":id_owned,"event":event}));
-                if event["type"] == "agent_settled"
-                    && let Some(context) = weak_context.upgrade()
-                {
-                    let id = id_owned.clone();
-                    let expected = weak_rpc.upgrade();
-                    tokio::spawn(async move {
-                        if let Some(expected) = expected {
-                            let _ = context
-                                .dispatch_next_if_current(&id, Some(expected.clone()))
-                                .await;
-                            context.schedule_goal(id, expected);
-                        }
-                    });
-                }
-                if event["type"] == "agentkit/transport-closed" {
-                    let mut pending = pending_actionables.lock().await;
-                    let ids: Vec<_> = pending
-                        .iter()
-                        .filter(|(_, item)| {
-                            item.session == id_owned
-                                && std::sync::Weak::ptr_eq(&item.rpc, &weak_rpc)
-                        })
-                        .map(|(id, _)| id.clone())
-                        .collect();
-                    for id in ids {
-                        pending.remove(&id);
-                        let _ = sender.send(json!({"resolved":id}));
+            self.validate_pointer(&row).await?;
+            let rpc = Rpc::start(&self.config, &row.cwd, Some(&row.file)).await?;
+            let mut events = rpc.events();
+            let readiness = async {
+                if !row.materialized && row.subagent_parent.is_some() {
+                    if let Some(title) = &row.title {
+                        rpc.request("set_session_name", json!({"name":title}))
+                            .await?;
                     }
-                    break;
+                    if let Some(selection) = &row.model_selection {
+                        rpc.request(
+                            "set_model",
+                            json!({"provider":selection["provider"],"modelId":selection["model"]}),
+                        )
+                        .await?;
+                        if let Some(effort) = selection["reasoningEffort"].as_str() {
+                            rpc.request("set_thinking_level", json!({"level":effort}))
+                                .await?;
+                        }
+                    }
                 }
+                let state = rpc.request("get_state", json!({})).await?;
+                let actual = PathBuf::from(string(&state, "sessionFile")?);
+                require(
+                    actual == row.file,
+                    "Pi resumed a different native session file",
+                )?;
+                let native_id = string(&state, "sessionId")?;
+                require(!native_id.is_empty(), "missing native session identity")?;
+                if let Some(expected) = &row.native_session_id {
+                    require(expected == native_id, "Pi native session identity changed")?;
+                }
+                // Blank sessions may not have a native file until their first persisted entry.
+                if row.file.is_file() {
+                    let mut manifest = self.manifest.lock().await;
+                    let current = manifest
+                        .sessions
+                        .get_mut(id)
+                        .ok_or_else(|| unsupported("session removed"))?;
+                    current.materialized = true;
+                    current.native_session_id = Some(native_id.into());
+                    self.save(&manifest).await?;
+                }
+                Ok::<_, Error>(())
             }
-        });
-        // The native file and session identity have been verified before exposing this process.
-        processes.insert(id.into(), rpc.clone());
-        Ok(rpc)
+            .await;
+            if let Err(error) = readiness {
+                rpc.close();
+                return Err(error);
+            }
+            let sender = self.notifications.clone();
+            let id_owned = id.to_owned();
+            let weak_context = Arc::downgrade(self);
+            let pending_actionables = self.actionables.clone();
+            let weak_rpc = Arc::downgrade(&rpc);
+            tokio::spawn(async move {
+                while let Ok(event) = events.recv().await {
+                    if let Some(rpc) = weak_rpc.upgrade()
+                        && let Some(request) = rpc.host_request(&event)
+                    {
+                        if let Some(context) = weak_context.upgrade() {
+                            tokio::spawn(context.handle_host_request(
+                                id_owned.clone(),
+                                rpc,
+                                request,
+                            ));
+                        }
+                        continue;
+                    }
+                    if event["type"] == "extension_ui_request"
+                        && matches!(
+                            event["method"].as_str(),
+                            Some("confirm" | "select" | "input" | "editor")
+                        )
+                        && let Some(native_id) = event["id"].as_str()
+                    {
+                        let key = format!("{id_owned}:{native_id}");
+                        let value = actionable(&event, &id_owned);
+                        pending_actionables.lock().await.insert(
+                            key,
+                            PendingActionable {
+                                session: id_owned.clone(),
+                                native_id: native_id.into(),
+                                request: event.clone(),
+                                value: value.clone(),
+                                rpc: weak_rpc.clone(),
+                            },
+                        );
+                        let _ = sender.send(json!({"actionable": value}));
+                    }
+                    let _ = sender.send(json!({"sessionId":id_owned,"event":event}));
+                    if event["type"] == "agent_settled"
+                        && let Some(context) = weak_context.upgrade()
+                    {
+                        let id = id_owned.clone();
+                        let expected = weak_rpc.upgrade();
+                        tokio::spawn(async move {
+                            if let Some(expected) = expected {
+                                let _ = context
+                                    .dispatch_next_if_current(&id, Some(expected.clone()))
+                                    .await;
+                                context.schedule_goal(id, expected);
+                            }
+                        });
+                    }
+                    if event["type"] == "agentkit/transport-closed" {
+                        let mut pending = pending_actionables.lock().await;
+                        let ids: Vec<_> = pending
+                            .iter()
+                            .filter(|(_, item)| {
+                                item.session == id_owned
+                                    && std::sync::Weak::ptr_eq(&item.rpc, &weak_rpc)
+                            })
+                            .map(|(id, _)| id.clone())
+                            .collect();
+                        for id in ids {
+                            pending.remove(&id);
+                            let _ = sender.send(json!({"resolved":id}));
+                        }
+                        break;
+                    }
+                }
+            });
+            // The native file and session identity have been verified before exposing this process.
+            processes.insert(id.into(), rpc.clone());
+            Ok(rpc)
+        })
     }
     async fn summaries(&self) -> Vec<Value> {
         self.manifest
@@ -410,7 +451,7 @@ fn summary(row: &Row) -> Value {
         .unwrap_or_default()
         .as_secs_f64()
         * 1000.0;
-    json!({"sessionId":row.id,"updatedAt":updated,"running":false,"blank":!row.file.exists(),"cwd":row.cwd,"parentSessionId":row.parent,"workspaceId":row.workspace_id,"ephemeral":row.ephemeral,"projections":{"asOfSeq":row.control_revision,"values":{"title":row.title}}})
+    json!({"sessionId":row.id,"updatedAt":updated,"running":false,"blank":!row.file.exists(),"cwd":row.cwd,"parentSessionId":row.subagent_parent.as_ref().or(row.parent.as_ref()),"origin":row.subagent_parent.as_ref().map(|_|"subagent"),"workspaceId":row.workspace_id,"ephemeral":row.ephemeral,"projections":{"asOfSeq":row.control_revision,"values":{"title":row.title}}})
 }
 #[async_trait]
 impl EndpointConnector for PiConnector {
@@ -618,6 +659,11 @@ impl SessionEndpoint for PiSessionEndpoint {
             "session.search",
             "sessions.recover",
             "session.initialPresets",
+            "subagents.create",
+            "subagents.list",
+            "subagents.prompt",
+            "subagents.cancel",
+            "subagents.read",
         ]);
         caps.supports_archive_session = true;
         caps.supports_unarchive_session = true;
@@ -654,10 +700,10 @@ impl SessionEndpoint for PiSessionEndpoint {
                     {
                         continue;
                     }
-                    if event["event"]["message"]
-                        .as_str()
-                        .is_some_and(|text| text.starts_with("agentkit-control/v1:"))
-                    {
+                    if event["event"]["message"].as_str().is_some_and(|text| {
+                        text.starts_with("agentkit-control/v1:")
+                            || text.starts_with("agentkit-host/v1:")
+                    }) {
                         continue;
                     }
                     return Ok(Some((
@@ -692,13 +738,23 @@ impl SessionEndpoint for PiSessionEndpoint {
                 let updates = stream::unfold(
                     (events, rpc, id, generation, windows),
                     |(mut events, rpc, id, generation, windows)| async move {
-                        let event = match events.recv().await {
-                            Ok(v) => v,
-                            Err(_) => {
-                                return Some((
-                                    Err(Error::Disconnected),
-                                    (events, rpc, id, generation, windows),
-                                ));
+                        let event = loop {
+                            match events.recv().await {
+                                Ok(v)
+                                    if v["message"].as_str().is_some_and(|text| {
+                                        text.starts_with("agentkit-control/v1:")
+                                            || text.starts_with("agentkit-host/v1:")
+                                    }) =>
+                                {
+                                    continue;
+                                }
+                                Ok(v) => break v,
+                                Err(_) => {
+                                    return Some((
+                                        Err(Error::Disconnected),
+                                        (events, rpc, id, generation, windows),
+                                    ));
+                                }
                             }
                         };
                         let kind = event["type"].as_str().unwrap_or("");
@@ -946,6 +1002,9 @@ impl SessionEndpoint for PiSessionEndpoint {
         if !self.capabilities().supports(method) {
             return Err(unsupported(&format!("Pi method {method}")));
         }
+        if method.starts_with("subagents.") {
+            return self.context.subagent_call(method, &payload, rpc_id).await;
+        }
         let _guard = if matches!(
             method,
             "session.prompt"
@@ -1029,6 +1088,8 @@ impl SessionEndpoint for PiSessionEndpoint {
                         title: None,
                         archived: false,
                         parent: None,
+                        subagent_parent: None,
+                        model_selection: None,
                         ephemeral: false,
                         receipts: BTreeMap::new(),
                         materialized: false,
@@ -1098,6 +1159,8 @@ impl SessionEndpoint for PiSessionEndpoint {
                         title: state["sessionName"].as_str().map(String::from),
                         archived: false,
                         parent: None,
+                        subagent_parent: None,
+                        model_selection: None,
                         ephemeral: false,
                         receipts: BTreeMap::new(),
                         materialized: true,
@@ -1167,7 +1230,17 @@ impl SessionEndpoint for PiSessionEndpoint {
                 let rpc = self.context.process(id).await?;
                 match method {
                     "session.models" => self.model_catalog(&rpc).await,
-                    "session.selectModel" => self.select_model(&rpc, &payload).await,
+                    "session.selectModel" => {
+                        let result = self.select_model(&rpc, &payload).await?;
+                        let mut manifest = self.context.manifest.lock().await;
+                        manifest
+                            .sessions
+                            .get_mut(id)
+                            .expect("owned row")
+                            .model_selection = Some(result["selected"].clone());
+                        self.context.save(&manifest).await?;
+                        Ok(result)
+                    }
                     "session.cancel" => rpc.request("abort", json!({})).await,
                     "session.rename" => {
                         let title = string(&payload, "title")?;
@@ -1185,73 +1258,7 @@ impl SessionEndpoint for PiSessionEndpoint {
                             .await?;
                         Ok(json!({"title":title,"seq":seq}))
                     }
-                    "session.prompt" => {
-                        require(!rpc_id.is_empty(), "prompt rpcId required")?;
-                        let (message, images) = self
-                            .context
-                            .materialize(id, array(&payload, "content")?)
-                            .await?;
-                        if payload["mode"] != "steer"
-                            && rpc.request("get_state", json!({})).await?["isStreaming"] == true
-                        {
-                            return self.context.enqueue(&payload, rpc_id).await;
-                        }
-                        let digest =
-                            format!("{:x}", Sha256::digest(payload.to_string().as_bytes()));
-                        let mut manifest = self.context.manifest.lock().await;
-                        let row = manifest.sessions.get_mut(id).expect("owned row");
-                        if let Some(receipt) = row.receipts.get(rpc_id) {
-                            require(receipt.digest == digest, "prompt identity content conflict")?;
-                            require(!receipt.cancelled, "prompt was cancelled; use a new rpcId")?;
-                            return if receipt.accepted {
-                                Ok(
-                                    json!({"accepted":true,"duplicate":true,"queued":receipt.queued}),
-                                )
-                            } else {
-                                Err(unsupported(
-                                    "uncertain Pi prompt; reconcile native history before retry",
-                                ))
-                            };
-                        }
-                        row.receipts.insert(
-                            rpc_id.into(),
-                            Receipt {
-                                digest,
-                                accepted: false,
-                                queued: false,
-                                cancelled: false,
-                            },
-                        );
-                        self.context.save(&manifest).await?;
-                        drop(manifest);
-                        rpc.control(
-                            "input.prepare",
-                            json!({"id":rpc_id,"text":message,"hasImages":!images.is_empty()}),
-                        )
-                        .await?;
-                        let result=rpc.request("prompt",json!({
-                            "message":message,"images":images,
-                            "streamingBehavior":if payload["mode"]=="steer" {"steer"} else {"followUp"}
-                        })).await?;
-                        let disposition = result["disposition"].as_str().unwrap_or("");
-                        require(
-                            matches!(disposition, "started" | "queued" | "handled"),
-                            "Pi did not admit prompt",
-                        )?;
-                        if disposition == "handled" {
-                            rpc.control("input.cancel", json!({"id":rpc_id})).await?;
-                        }
-                        let state = rpc.request("get_state", json!({})).await?;
-                        let mut manifest = self.context.manifest.lock().await;
-                        let row = manifest.sessions.get_mut(id).expect("owned row");
-                        if row.file.is_file() || matches!(disposition, "started" | "queued") {
-                            row.materialized = true;
-                            row.native_session_id = Some(string(&state, "sessionId")?.to_owned());
-                        }
-                        row.receipts.get_mut(rpc_id).expect("receipt").accepted = true;
-                        self.context.save(&manifest).await?;
-                        Ok(json!({"accepted":true,"native":result}))
-                    }
+                    "session.prompt" => self.context.direct_prompt(&rpc, &payload, rpc_id).await,
                     "session.history.export" => rpc.request("get_entries", json!({})).await,
                     "pi.getState" => rpc.request("get_state", json!({})).await,
                     "pi.getTree" => rpc.request("get_tree", json!({})).await,

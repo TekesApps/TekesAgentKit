@@ -19,6 +19,8 @@ struct Connector {
     requests: Arc<std::sync::Mutex<Vec<(String, Value)>>>,
     reject_discard: Arc<AtomicBool>,
     hold_fork: Arc<AtomicBool>,
+    bounded: Arc<AtomicBool>,
+    pages: Arc<std::sync::Mutex<std::collections::VecDeque<Value>>>,
 }
 struct Endpoint {
     connector: Connector,
@@ -57,6 +59,9 @@ impl SessionEndpoint for Endpoint {
             "subagents.prompt",
             "subagents.cancel",
         ]);
+        if self.connector.bounded.load(Ordering::SeqCst) {
+            caps.methods.insert("subagents.history".into());
+        }
         caps.supports_ephemeral_fork = true;
         caps
     }
@@ -91,6 +96,20 @@ impl SessionEndpoint for Endpoint {
             .lock()
             .unwrap()
             .push((method.into(), payload.clone()));
+        if method == "subagents.history" {
+            let page = self
+                .connector
+                .pages
+                .lock()
+                .unwrap()
+                .pop_front()
+                .expect("unexpected bounded read");
+            return if page["error"] == true {
+                Err(Error::Remote(json!({"code":"history-stale"})))
+            } else {
+                Ok(page)
+            };
+        }
         if method == "subagents.list" {
             return Ok(
                 json!({"parentAvailable":payload["parentSessionId"] == "a","entries":[{"kind":"child","id":"child","mode":"continuable"},{"kind":"child","id":"bounded","mode":"one-shot"}]}),
@@ -404,6 +423,74 @@ async fn bounded_history_requires_child_projection_and_independent_history_has_o
     .await
     .unwrap();
     assert!(!child.transcript().await.unwrap().is_stale);
+    drop(child);
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn bounded_child_pages_preserve_verified_prefix_and_reset_changed_history() {
+    fn page(cut: i64, rev: &str, entries: Vec<Value>, more: bool) -> Value {
+        json!({"parentSessionId":"a","childSessionId":"bounded","throughSequence":cut,
+            "historyRevision":rev.repeat(64),"entries":entries,"hasMoreBefore":more,"runOpen":false,
+            "sourceCall":{"callId":"task","name":"task","arguments":{"task_name":"audit"},"phase":"done"}})
+    }
+    fn message(seq: i64, text: &str) -> Value {
+        json!({"event":{"seq":seq,"time":100,"type":"assistant/message","data":{
+            "turn":1,"step":seq+1,"message":{"id":format!("m{seq}"),"content":[{"type":"text","text":text}]}}}})
+    }
+    let (connector, runtime, _) = setup().await;
+    connector.bounded.store(true, Ordering::SeqCst);
+    let head = page(5, "a", vec![message(5, "new")], true);
+    connector.pages.lock().unwrap().extend([
+        head.clone(),
+        head.clone(),
+        page(5, "a", vec![message(1, "old")], false),
+        page(8, "b", vec![message(6, "newest")], true),
+        head,
+        page(8, "c", vec![message(8, "rewritten")], false),
+        page(20, "d", vec![message(20, "far ahead")], true),
+        page(8, "c", vec![message(8, "rewritten")], false),
+    ]);
+    let child = ChildRun::open(
+        runtime.clone(),
+        RunScope::main("test", "a"),
+        "bounded",
+        ChildHistoryLayout::SameSession,
+        None,
+    )
+    .await
+    .unwrap();
+    assert!(child.transcript().await.unwrap().has_more_before);
+    assert!(child.load_earlier().await.unwrap());
+    let grown = child.transcript().await.unwrap();
+    assert_eq!(
+        grown
+            .items
+            .iter()
+            .map(|i| i.text.as_str())
+            .collect::<Vec<_>>(),
+        ["old", "new", "newest"]
+    );
+    assert!(!grown.has_more_before);
+    assert_eq!(grown.tools[0].arguments["task_name"], "audit");
+    let replaced = child.transcript().await.unwrap();
+    assert_eq!(replaced.items.len(), 1);
+    assert_eq!(replaced.items[0].text, "rewritten");
+    assert!(!child.load_earlier().await.unwrap());
+    let gap = child.transcript().await.unwrap();
+    assert_eq!(gap.items.len(), 1);
+    assert_eq!(gap.items[0].text, "far ahead");
+    assert!(gap.has_more_before);
+    let requests = connector.requests.lock().unwrap().clone();
+    let earlier = &requests
+        .iter()
+        .find(|(m, p)| m == "subagents.history" && p["beforeSequence"] == 5)
+        .unwrap()
+        .1;
+    assert_eq!(earlier["throughSequence"], 5);
+    assert_eq!(earlier["historyRevision"], "a".repeat(64));
+    // Child bounded reads never mount a child journal or consume its parent's transcript.
+    assert!(!runtime.inspect(|s| s.sessions.contains_key("bounded")));
     drop(child);
     runtime.stop().await.unwrap();
 }

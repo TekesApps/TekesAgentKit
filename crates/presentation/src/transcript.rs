@@ -529,7 +529,8 @@ fn admit_tool(
         if view.is_some() {
             tool.call_view = view;
         }
-        if !name.is_empty() && name != id {
+        if !name.is_empty() && name != id && !(tool.name == "subagent" && name == "tekes_subagent")
+        {
             tool.name = name.into();
         }
     } else {
@@ -681,13 +682,17 @@ fn native(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSna
                 turn.usage.output_tokens = turn.usage.output_tokens.saturating_add(u.output_tokens);
                 if let Some(blocks) = message["content"].as_array() {
                     for block in blocks.iter().filter(|b| b["type"] == "toolCall") {
+                        let (name, arguments) = native_tool_semantic(
+                            block["name"].as_str().unwrap_or(""),
+                            block["arguments"].clone(),
+                        );
                         admit_tool(
                             &mut out,
                             scope,
                             &current,
                             block["id"].as_str().unwrap_or(""),
-                            block["name"].as_str().unwrap_or(""),
-                            block["arguments"].clone(),
+                            &name,
+                            arguments,
                             None,
                         );
                     }
@@ -775,4 +780,15 @@ fn native(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSna
         }
     }
     Ok(out)
+}
+
+fn native_tool_semantic(name: &str, mut arguments: Value) -> (String, Value) {
+    if name == "tekes_subagent" && arguments["action"] == "create" {
+        if let Some(label) = arguments["label"].as_str().map(str::to_owned) {
+            arguments["description"] = Value::String(label);
+        }
+        ("subagent".into(), arguments)
+    } else {
+        (name.into(), arguments)
+    }
 }

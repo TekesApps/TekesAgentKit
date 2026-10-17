@@ -78,7 +78,7 @@ impl ChildCatalogState {
     }
 }
 /// Explicit adapter input, independent of control capability. Bounded history cannot be opened
-/// as an ordinary session: a host must supply a child-line projection through ChildHistorySource.
+/// as an ordinary session: use the endpoint bounded API or an explicit ChildHistorySource.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum ChildHistoryLayout {
@@ -95,13 +95,14 @@ pub trait ChildHistorySource: Send + Sync {
 }
 
 /// One mounted child run owns a history lease. Same-session lines require an explicit projection
-/// source; opening the parent session as if it were the child is deliberately impossible.
+/// source when the endpoint lacks built-in bounded history; parent history is never a child fallback.
 pub struct ChildRun {
     parent: RunScope,
     child: String,
     runtime: std::sync::Arc<tekes_agent_session::SessionRuntime>,
     source: Option<std::sync::Arc<dyn ChildHistorySource>>,
-    _lease: tekes_agent_session::SessionHistoryLease,
+    _lease: Option<tekes_agent_session::SessionHistoryLease>,
+    bounded: Option<tokio::sync::Mutex<crate::bounded_history::BoundedHistory>>,
 }
 impl ChildRun {
     pub async fn open(
@@ -122,9 +123,20 @@ impl ChildRun {
             "child endpoint mismatch",
         )?;
         if layout == ChildHistoryLayout::SameSession && source.is_none() {
-            return Err(tekes_agent_contract::unsupported(
-                "bounded child history needs a child-line projection source",
-            ));
+            let bounded = crate::bounded_history::BoundedHistory::open(
+                runtime.clone(),
+                parent.clone(),
+                child.clone(),
+            )
+            .await?;
+            return Ok(Self {
+                parent,
+                child,
+                runtime,
+                source: None,
+                _lease: None,
+                bounded: Some(tokio::sync::Mutex::new(bounded)),
+            });
         }
         let session = if layout == ChildHistoryLayout::SameSession {
             &parent.session_id
@@ -137,10 +149,14 @@ impl ChildRun {
             child,
             runtime,
             source,
-            _lease: lease,
+            _lease: Some(lease),
+            bounded: None,
         })
     }
     pub async fn transcript(&self) -> tekes_agent_contract::Result<crate::TranscriptSnapshot> {
+        if let Some(bounded) = &self.bounded {
+            return bounded.lock().await.refresh().await;
+        }
         if let Some(source) = &self.source {
             return source.read(&self.parent, &self.child).await;
         }
@@ -159,6 +175,17 @@ impl ChildRun {
                 crate::ConnectionPresentation::read(s, Some(&self.child), false).history_is_stale;
             Ok(snapshot)
         })
+    }
+    pub async fn load_earlier(&self) -> tekes_agent_contract::Result<bool> {
+        if let Some(bounded) = &self.bounded {
+            return bounded.lock().await.load_earlier().await;
+        }
+        if self.source.is_some() {
+            return Err(tekes_agent_contract::unsupported(
+                "custom child history source owns its pagination",
+            ));
+        }
+        self.runtime.load_earlier(&self.child).await
     }
     pub async fn catalog(&self) -> tekes_agent_contract::Result<SubagentCatalog> {
         self.runtime.subagent_catalog(&self.parent.session_id).await

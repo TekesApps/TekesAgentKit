@@ -8,7 +8,7 @@ impl Context {
             .or_insert_with(|| Arc::new(tokio::sync::Semaphore::new(1)))
             .clone()
     }
-    async fn notify_queue(&self, id: &str) {
+    pub(crate) async fn notify_queue(&self, id: &str) {
         if let Ok(row) = self.row(id).await {
             let _ = self
                 .notifications
@@ -166,11 +166,16 @@ impl Context {
             matches!(result["disposition"].as_str(), Some("started" | "handled")),
             "unexpected queue dispatch",
         )?;
+        let state = rpc.request("get_state", json!({})).await?;
         let mut manifest = self.manifest.lock().await;
         let row = manifest
             .sessions
             .get_mut(id)
             .ok_or_else(|| unsupported("unknown session"))?;
+        if row.file.is_file() || result["disposition"] == "started" {
+            row.materialized = true;
+            row.native_session_id = Some(string(&state, "sessionId")?.into());
+        }
         row.queue.retain(|current| current["id"] != item["id"]);
         if let Some(receipt) = row.receipts.get_mut(string(&item, "rpcId")?) {
             receipt.queued = false;
@@ -199,6 +204,8 @@ mod tests {
             title: None,
             archived: false,
             parent: None,
+            subagent_parent: None,
+            model_selection: None,
             ephemeral: false,
             receipts: BTreeMap::new(),
             materialized: false,
