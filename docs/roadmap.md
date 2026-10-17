@@ -4,7 +4,7 @@ P0/P1 已完成首批 headless 子集，验收见 headless-kernel.md；不代表
 
 | 阶段 | 交付 | 必须有的证据 |
 |---|---|---|
-| P0 契约冻结 | 与 ClientKit 对齐的 DTO、核心 endpoint trait、可选能力及来源版本 | Swift/Rust 共用 wire fixtures；错误、缺失/null、序列与能力语义对照 |
+| P0 契约冻结 | 与 ClientKit 对齐的 DTO、核心 endpoint trait、可选能力及来源版本 | 语言无关 wire fixtures 与 Rust 回归；错误、缺失/null、序列与能力语义对照 |
 | P1 Kernel headless | Kernel adapter、MemoryProjectionStore、Runtime 与回放 CLI | 真实 Kernel connect/list/open/prompt/cancel；当前 v4 的 inventory/control/actionables + journal、分页固定切点、gap/reconnect、actionable 和重复提交恢复 |
 | P2 缓存 | 可切换 MemoryOnly / DurableCache，持久化不阻塞流式展示 | 同一回放最终投影一致；重启、stale、缓存损坏/写失败、身份隔离；性能对照 |
 | P3 Pi / DSH | 独立 adapter，各自最小能力集与扩展矩阵 | 捕获回放加真实对应版本连接；unsupported 明确失败；进程退出和恢复 |

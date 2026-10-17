@@ -1,5 +1,9 @@
 # AgentKit ownership and scope
 
+This is a Rust repository. Do not add Swift source, embedded Swift code, Swift package targets,
+or build/test steps requiring a Swift toolchain. ClientKit is an external behavior/contract reference;
+keep protocol fixtures and verification inside this repository language-neutral or Rust-native.
+
 TekesAgentKit owns reusable Rust Agent components and presentation state. TekesClientKit remains
 the owner of Swift Agent UI. Align behavior with ClientKit; compare the ClientKit implementation
 and the Tekes host before changing cross-repo behavior. Preserve unrelated WIP in all checkouts.

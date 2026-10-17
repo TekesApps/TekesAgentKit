@@ -59,8 +59,9 @@ Kernel HTTP / WebSocket
 ## 验证
 
 - Rust：contract fixture、投影、runtime 与真实 HTTP/WS 协议对端测试；包括断线自动恢复、重开、错误关联、旧流迟到帧、gap/冲突、分页、transient 与 stale actionable。
-- Swift/Rust：同一组 **22 个 JSON 用例**由当前、未修改的 ClientKit Swift 源码直接编译验证，再由 Rust 验证。
-  用例是本轮依据当前契约合成，非宣称覆盖全部官方 fixture。还核对了 Swift Int 接受 `1.0` 这类整数拼写的行为。
+- Rust 契约回归：保留 **22 个 JSON 用例**。实现阶段曾与外部 ClientKit 校验过相同用例，作为本次基准证据；
+  AgentKit 仓库已移除 Swift 校验源码及其编译脚本，后续构建/测试只运行 Rust 用例。外部 ClientKit 改动不会自动刷新这些用例，需重新核对来源。
+  用例是本轮依据当前契约合成，非宣称覆盖全部官方 fixture；包含整数数值拼写、缺失/null 与未知事件等边界。
 - 真实 Kernel 0.9：临时 HOME/状态目录、私有 bootstrap、随机 endpoint token、本地合成 provider。
   connect → empty inventory → create(execution) → selectModel → follow → prompt → durable assistant/turn end → same-rpcId retry → reconnect/reopen → frozen history page → cancel → second turn end → stop。
   首个 prompt 重试后仍只有一条 durable user/message。取消可在 provider dispatch 前生效；本次仅首个 prompt 到达合成 provider。

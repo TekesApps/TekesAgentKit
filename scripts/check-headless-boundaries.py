@@ -4,6 +4,9 @@ import json
 from pathlib import Path
 import subprocess
 root=Path(__file__).resolve().parent.parent
+tracked=subprocess.check_output(['git','ls-files','--cached','--others','--exclude-standard','-z'],cwd=root).decode().split('\0')
+swift_sources=[name for name in tracked if name.endswith('.swift') and (root/name).is_file()]
+assert not swift_sources, f'Swift sources are not allowed in AgentKit: {swift_sources}'
 metadata=json.loads(subprocess.check_output(['cargo','metadata','--locked','--no-deps','--format-version','1'],cwd=root))
 for package in metadata['packages']:
     if package['name'] not in {'tekes-agent-contract','tekes-agent-session','tekes-agent-endpoint-kernel'}: continue

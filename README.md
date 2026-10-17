@@ -1,6 +1,6 @@
 # TekesAgentKit
 
-与 TekesClientKit 对齐的 Rust Agent 客户端套件。
+与 TekesClientKit 对齐的 Rust Agent 客户端套件。仓库不包含 Swift 源码，构建和测试不依赖 Swift 工具链。
 
 **当前：Kernel protocol v4 + 内存投影的首个无 UI 闭环。** Pi、DSH、Presentation 和 Components 仍是骨架；没有接入 TekesUI，没有客户端 SQLite/Mirror 持久化。
 
@@ -18,10 +18,9 @@ cargo test --workspace --locked
 python3 scripts/check-headless-boundaries.py
 ```
 
-当前 Swift ClientKit 的同用例校验、隔离真实 Kernel 验证：
+隔离真实 Kernel 验证：
 
 ```sh
-python3 scripts/check-clientkit-parity.py --clientkit-root /absolute/TekesClientKit
 python3 scripts/test-real-kernel.py --kernel-root /absolute/compatible-kernel-worktree
 ```
 
