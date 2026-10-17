@@ -1224,6 +1224,11 @@ impl SessionEndpoint for PiSessionEndpoint {
                         );
                         self.context.save(&manifest).await?;
                         drop(manifest);
+                        rpc.control(
+                            "input.prepare",
+                            json!({"id":rpc_id,"text":message,"hasImages":!images.is_empty()}),
+                        )
+                        .await?;
                         let result=rpc.request("prompt",json!({
                             "message":message,"images":images,
                             "streamingBehavior":if payload["mode"]=="steer" {"steer"} else {"followUp"}
@@ -1233,6 +1238,9 @@ impl SessionEndpoint for PiSessionEndpoint {
                             matches!(disposition, "started" | "queued" | "handled"),
                             "Pi did not admit prompt",
                         )?;
+                        if disposition == "handled" {
+                            rpc.control("input.cancel", json!({"id":rpc_id})).await?;
+                        }
                         let state = rpc.request("get_state", json!({})).await?;
                         let mut manifest = self.context.manifest.lock().await;
                         let row = manifest.sessions.get_mut(id).expect("owned row");

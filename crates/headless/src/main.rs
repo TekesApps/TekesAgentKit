@@ -5,6 +5,7 @@ use tekes_agent_contract::*;
 use tekes_agent_endpoint_dsh::{DshConfiguration, DshConnector};
 use tekes_agent_endpoint_kernel::KernelConnector;
 use tekes_agent_endpoint_pi::{PiConfiguration, PiConnector};
+use tekes_agent_presentation::{ComposerDestination, ComposerDraft, RunController, RunScope};
 use tekes_agent_session::SessionRuntime;
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -50,12 +51,13 @@ async fn main() -> Result<()> {
         }
         _ => return Err(unsupported("unknown endpoint kind")),
     };
-    let runtime = SessionRuntime::spawn(identity, connector);
+    let runtime = Arc::new(SessionRuntime::spawn(identity, connector));
     runtime.wait_ready(Duration::from_secs(30)).await?;
     println!(
         "{}",
         json!({"ready":true,"kind":kind,"version":runtime.snapshot().host.as_ref().map(|h|h.product.version.clone())})
     );
+    let presentation = RunController::new(runtime.clone())?;
     let mut variables = BTreeMap::<String, Value>::new();
     for command in array(&config, "commands")? {
         let operation = string(command, "op")?;
@@ -63,6 +65,38 @@ async fn main() -> Result<()> {
             .as_str()
             .map(|id| variables.get(id).and_then(Value::as_str).unwrap_or(id));
         let output = match operation {
+            "presentation" => {
+                presentation.select(ComposerDestination::run(RunScope::main(
+                    identity,
+                    id.ok_or_else(|| unsupported("sessionId required"))?,
+                )))?;
+                serde_json::to_value(presentation.snapshot().as_ref())?
+            }
+            "compose" => {
+                let scope = RunScope::main(
+                    identity,
+                    id.ok_or_else(|| unsupported("sessionId required"))?,
+                );
+                presentation.open(scope.clone()).await?;
+                let destination = ComposerDestination::run(scope);
+                presentation.edit(
+                    &destination,
+                    ComposerDraft {
+                        text: string(command, "text")?.into(),
+                        ..Default::default()
+                    },
+                )?;
+                let ticket = presentation.prepare(&destination, PromptMode::Queue)?;
+                let echo = presentation.snapshot();
+                require(
+                    echo.transcript
+                        .items
+                        .iter()
+                        .any(|i| i.id.starts_with("echo-item:")),
+                    "missing optimistic echo",
+                )?;
+                presentation.dispatch(ticket, None).await?
+            }
             "list" => runtime.inspect(|s| {
                 json!(
                     s.sessions

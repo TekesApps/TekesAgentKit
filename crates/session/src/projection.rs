@@ -20,6 +20,8 @@ pub struct VersionedValue {
 pub struct LivePreview {
     pub text: String,
     pub reasoning: String,
+    #[serde(default)]
+    pub reasoning_ended: bool,
 }
 /// A headless read model; journal entries remain lossless. UI surface folding is out of scope.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -148,6 +150,11 @@ impl SessionProjection {
                 } else {
                     let chunk = &event.data["chunk"];
                     let kind = chunk["type"].as_str().unwrap_or("");
+                    if kind == "reasoning-end" || kind.starts_with("text") {
+                        p.reasoning_ended = true;
+                    } else if kind.starts_with("reasoning") {
+                        p.reasoning_ended = false;
+                    }
                     let delta = chunk["text"]
                         .as_str()
                         .or_else(|| chunk["delta"].as_str())

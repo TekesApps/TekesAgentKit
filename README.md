@@ -16,7 +16,7 @@
 
 本地可以直接使用 `MemoryProjectionStore`，**不需要客户端 Mirror**。当前三个 endpoint 都走内存投影；远端 durable cache 尚未实现。
 Pi 的宿主持久化指针注册表和保守的提交 receipt 用于恢复及避免重复提交，并不是历史 Mirror。
-Presentation / Components 仍是骨架，没有接 TekesUI。三个 SEP 的非 UI 会话闭环已实现；产品服务通过显式 `HostServices` 注入，能力按端声明，不等同于全部 ClientKit UI/产品能力。
+Run / Transcript / Composer / 连接状态已实现于独立 presentation 层，Components 尚未接 TekesUI。三个 SEP 的非 UI 会话闭环已实现；产品服务通过显式 `HostServices` 注入，能力按端声明，不等同于全部 ClientKit UI/产品能力。
 
 ```sh
 cargo fmt --all --check
@@ -51,6 +51,8 @@ python3 scripts/test-real-session-endpoints.py \
 公开类型化 API 包括 create/submit/fork/discard/rename/archive/queue/upload/goal；文件观察和端点事件同样通过 runtime 暴露。
 公共 API 示例：[kernel_headless](crates/endpoint-kernel/examples/kernel_headless.rs)、[replay](crates/session/examples/replay.rs)。
 常规读取使用 `inspect` 和 revision subscription，显式 `snapshot()` 才复制完整读模型。慢 unary 不阻塞事件投影；不自动重试不确定 mutation。
+
+无 UI 状态层的公开 API、行为对照和边界见 [headless presentation](docs/headless-presentation.md)。
 
 详见 [三个 Endpoint 的能力与验收](docs/session-endpoints.md)、[Kernel 同步契约](docs/headless-kernel.md)、[路线](docs/roadmap.md)、[源码与运行时基准](docs/headless-source-baseline.json)。
 最初的 [架构评估](docs/assessment.md) 保留为历史记录，旧 Kernel v3/workspace 描述已由 v4 基准纠正。

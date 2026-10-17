@@ -1466,6 +1466,7 @@ dependencies = [
  "tekes-agent-endpoint-dsh",
  "tekes-agent-endpoint-kernel",
  "tekes-agent-endpoint-pi",
+ "tekes-agent-presentation",
  "tekes-agent-session",
  "tokio",
  "uuid",
@@ -1475,7 +1476,15 @@ dependencies = [
 name = "tekes-agent-presentation"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
+ "futures-util",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tekes-agent-contract",
  "tekes-agent-session",
+ "tokio",
+ "uuid",
 ]
 
 [[package]]

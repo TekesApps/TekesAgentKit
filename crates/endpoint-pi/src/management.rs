@@ -59,8 +59,17 @@ impl PiSessionEndpoint {
                         "invalid command name",
                     )?;
                     let arguments = payload["arguments"].as_str().unwrap_or("");
+                    let mut content =
+                        vec![json!({"type":"text","text":format!("/{name} {arguments}")})];
+                    if let Some(attachments) = payload["attachments"].as_array() {
+                        content.extend(attachments.iter().cloned());
+                    }
+                    let (message, images) = self
+                        .context
+                        .materialize(string(payload, "sessionId")?, &content)
+                        .await?;
                     let result = rpc
-                        .request("prompt", json!({"message":format!("/{name} {arguments}")}))
+                        .request("prompt", json!({"message":message,"images":images}))
                         .await?;
                     require(
                         result["disposition"] == "handled",
@@ -311,7 +320,10 @@ fn completed_fork_entry(history: &Value, sequence: &Value) -> Result<String> {
         "fork sequence is outside active branch",
     )?;
     require(
-        target["customType"] == "tekes.run.v1" && target["data"]["phase"] == "settled",
+        matches!(
+            target["customType"].as_str(),
+            Some("tekes.run.v1" | "agentkit.run.v1")
+        ) && target["data"]["phase"] == "settled",
         "fork sequence must identify a completed turn; use entryId for a native entry boundary",
     )?;
     Ok(id.to_owned())

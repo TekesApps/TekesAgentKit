@@ -9,11 +9,12 @@ swift_sources=[name for name in tracked if name.endswith('.swift') and (root/nam
 assert not swift_sources, f'Swift sources are not allowed in AgentKit: {swift_sources}'
 metadata=json.loads(subprocess.check_output(['cargo','metadata','--locked','--no-deps','--format-version','1'],cwd=root))
 for package in metadata['packages']:
-    if package['name'] not in {'tekes-agent-contract','tekes-agent-session','tekes-agent-endpoint-kernel','tekes-agent-endpoint-pi','tekes-agent-endpoint-dsh','tekes-agent-headless'}: continue
+    if package['name'] not in {'tekes-agent-contract','tekes-agent-session','tekes-agent-endpoint-kernel','tekes-agent-endpoint-pi','tekes-agent-endpoint-dsh','tekes-agent-headless','tekes-agent-presentation'}: continue
     for dependency in package['dependencies']:
         if dependency['kind']=='dev': continue
         name=dependency['name']
         assert not any(part in name for part in ('tekes-ui','rusqlite','sqlite','sqlx')), (package['name'],name)
-        assert name not in {'schema','endpoint','engine','store','tekes-agent-components','tekes-agent-presentation'}, (package['name'],name)
+        assert name not in {'schema','endpoint','engine','store','tekes-agent-components'}, (package['name'],name)
+        if package['name'] not in {'tekes-agent-headless','tekes-agent-presentation'}: assert name != 'tekes-agent-presentation', 'presentation must stay above session/adapter authority'
         assert not dependency.get('path') or Path(dependency['path']).resolve().is_relative_to(root), 'implicit sibling path dependency'
 print('HEADLESS_DEPENDENCY_BOUNDARIES_OK')

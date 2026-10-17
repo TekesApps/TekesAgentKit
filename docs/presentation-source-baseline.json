@@ -1,0 +1,74 @@
+{
+  "date": "2026-10-18",
+  "clientkitHead": "c289bc9d33edcd83a782ac17927a8c65a027eccd",
+  "files": {
+    "Sources/Session/AppServer/RunScope.swift": {
+      "sha256": "0e81f56c8fc9a49c5cff6785de1f193c3f422e7f9b66099a70c04611124258c2",
+      "workingTreeReference": false
+    },
+    "Sources/Session/SessionEndpoint/Client/SessionEventProjector.swift": {
+      "sha256": "e7a2ccc9e211f04f819e0a1866388420b7b15f0a25ea80a7777a3408414dd515",
+      "workingTreeReference": false
+    },
+    "Sources/Session/SessionEndpoint/Client/SessionEndpointRuntime.swift": {
+      "sha256": "c58136a14874ddd1ab01991efa4cc01f45540b42d9a6d2b2cc271aec1ae7151b",
+      "workingTreeReference": false
+    },
+    "Sources/Session/SessionEndpoint/PI/PITranscriptProjection.swift": {
+      "sha256": "59d54b14cdbf8a9aaebd75fad95cc526ba1fad98839d4b874e8bf98d1473b001",
+      "workingTreeReference": false
+    },
+    "Sources/Session/SessionEndpoint/PI/Resources/tekes-host.ts": {
+      "sha256": "92f205d9bd8c972e7e3cc9a3e2ae0c17e2103f01f39f4871013ea9e9c596c161",
+      "workingTreeReference": false
+    },
+    "Sources/Session/Sync/TranscriptOptimisticEchoIdentity.swift": {
+      "sha256": "6c5767aafa0b5836546cf694de39d9d86b51ffd5da90f36c476aa74c40c2d844",
+      "workingTreeReference": false
+    },
+    "Sources/Composer/ComposerSurfaceContext.swift": {
+      "sha256": "2133b0c468cd5d63d72c53174b719f92ab08f8a6c65803371959a903fe523f12",
+      "workingTreeReference": false
+    },
+    "Sources/Composer/AsyncStateCommitPolicy.swift": {
+      "sha256": "32cfff54086d2108de5a0eff3ea7be29017678d59865c6981409738a943eb626",
+      "workingTreeReference": false
+    },
+    "Sources/Composer/ComposerSubmissionCompiler.swift": {
+      "sha256": "3bca0972ce3234fa92425c7e0ae02c38a3b9e1a4e74074b7b8043978a80859e0",
+      "workingTreeReference": false
+    },
+    "Sources/Composer/ComposerFailedSubmissionRecovery.swift": {
+      "sha256": "4ef0827d80855fc7f57eb4a57411b66fdb39c4a39f465824cb19ca90701c2c04",
+      "workingTreeReference": false
+    },
+    "Sources/Composer/ComposerSubmissionLifecycle.swift": {
+      "sha256": "fb460fda9a2fc2f3591a136c8e85efde9f84f98f194f161352acbf7ef5b856e7",
+      "workingTreeReference": true
+    },
+    "Sources/Composer/ThreadComposerToolbarView.swift": {
+      "sha256": "38f9036c621cbc8b399786cc4fdebce9037bd2e497da7e2101ebe23db1dc1668",
+      "workingTreeReference": true
+    },
+    "Sources/Composer/RunUserControlsGraph.swift": {
+      "sha256": "aecc2c5012d25a1e4c0072d1bfef013d99bdf6d48961a2c5d8dca186120d1227",
+      "workingTreeReference": false
+    },
+    "Sources/TranscriptRendering/ThreadStatusPolicy.swift": {
+      "sha256": "20257f99a496f0c84711ddf0a401b1095afe2c3ea61ac3fdb1510f1d9f13b417",
+      "workingTreeReference": false
+    },
+    "Sources/TranscriptRendering/TranscriptReasoningLifecycle.swift": {
+      "sha256": "e022abd853e92c4a34b74b085df6faa22c4ac98319a62b59b92e4a07ddefa480",
+      "workingTreeReference": false
+    },
+    "Tests/SessionTests/InstantInputEchoTests.swift": {
+      "sha256": "90855047b5ae0011cd777c6908f16e62a39060eb3277c231fc996929c5eb7d22",
+      "workingTreeReference": false
+    },
+    "Tests/ComposerTests/ComposerSubmissionLifecycleTests.swift": {
+      "sha256": "0b4824c2cf1eb6f0b460b8e8d89943958e3c80b239dbb843ab6d15cefa7e8900",
+      "workingTreeReference": true
+    }
+  }
+}
