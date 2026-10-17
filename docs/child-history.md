@@ -2,7 +2,7 @@
 
 本轮对齐 ClientKit 的无 UI 行为。ClientKit、Tekes host、Pi/DSH 安装目录保持只读。
 Kernel 变更仅为用户批准的只读 `subagents.history` 扩展，不能由版本号 0.9.0 推断能力。
-部署时须固定包含该扩展的 Kernel commit；原 v0.9.0 与 AgentKit v0.2.0 tag 保持不变。
+部署固定使用 [Kernel v0.9.1](https://github.com/TekesApps/TekesKernel/tree/v0.9.1) 或其完整 commit；原 v0.9.0 与 AgentKit v0.2.0 tag 保持不变。
 本轮扩展固定于 [Kernel 4599331](https://github.com/TekesApps/TekesKernel/commit/4599331f29cb4452b6540131eaee122fc5ca4d6a)，
 对应 [Kernel PR #82](https://github.com/TekesApps/TekesKernel/pull/82)。参考来源哈希见
 [child-source-baseline.json](child-source-baseline.json)。

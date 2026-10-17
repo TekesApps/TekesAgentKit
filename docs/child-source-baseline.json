@@ -8,5 +8,6 @@
   },
   "kernelBase": "768ed1622d7a7065d593c7d77963b7dd31216748",
   "kernelChildHistoryCommit": "4599331f29cb4452b6540131eaee122fc5ca4d6a",
-  "scope": "Rust headless parity. User authorized additive Kernel read-only API. External ClientKit, Tekes host and harness sources unchanged."
+  "scope": "Rust headless parity. User authorized additive Kernel read-only API. External ClientKit, Tekes host and harness sources unchanged.",
+  "kernelReleaseTag": "v0.9.1"
 }

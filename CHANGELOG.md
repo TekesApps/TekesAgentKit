@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 — 2026-10-18
 
 - Pi independent child creation, parent-owned list/prompt/read/cancel, durable request-key replay,
   official extension model tool, child history/reconnect and Summary creation semantics.
