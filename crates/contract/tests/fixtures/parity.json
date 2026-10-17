@@ -1,0 +1,492 @@
+[
+  {
+    "name": "kernel-v4",
+    "kind": "host",
+    "value": {
+      "protocolVersion": 4,
+      "product": {
+        "name": "TekesKernel",
+        "version": "0.9.0"
+      },
+      "capabilities": [
+        "session-inventory-sync",
+        "session-control-sync",
+        "actionable-sync",
+        "session-journal"
+      ],
+      "cwd": "/work",
+      "home": "/home",
+      "attachedSessions": 0,
+      "canOpenPath": false
+    },
+    "valid": true
+  },
+  {
+    "name": "old-native-version",
+    "kind": "host",
+    "value": {
+      "protocolVersion": 3,
+      "product": {
+        "name": "TekesKernel",
+        "version": "0.9.0"
+      },
+      "capabilities": [
+        "session-inventory-sync",
+        "session-control-sync",
+        "actionable-sync",
+        "session-journal"
+      ],
+      "cwd": "/work",
+      "home": "/home",
+      "attachedSessions": 0,
+      "canOpenPath": false
+    },
+    "valid": false
+  },
+  {
+    "name": "missing-required-capability",
+    "kind": "host",
+    "value": {
+      "protocolVersion": 4,
+      "product": {
+        "name": "TekesKernel",
+        "version": "0.9.0"
+      },
+      "capabilities": [
+        "session-inventory-sync",
+        "session-control-sync",
+        "session-journal"
+      ],
+      "cwd": "/work",
+      "home": "/home",
+      "attachedSessions": 0,
+      "canOpenPath": false
+    },
+    "valid": false
+  },
+  {
+    "name": "known-event",
+    "kind": "event",
+    "value": {
+      "type": "user/message",
+      "seq": 1,
+      "time": 1,
+      "data": {
+        "turn": 1,
+        "text": "hello"
+      }
+    },
+    "valid": true
+  },
+  {
+    "name": "opaque-ignorable-event",
+    "kind": "event",
+    "value": {
+      "type": "future/extension",
+      "seq": 1,
+      "time": 1,
+      "data": {
+        "turn": 1,
+        "text": "hello"
+      },
+      "ignorable": true,
+      "surfaceOp": {
+        "future": "opaque"
+      }
+    },
+    "valid": true
+  },
+  {
+    "name": "unknown-required-event",
+    "kind": "event",
+    "value": {
+      "type": "future/required",
+      "seq": 1,
+      "time": 1,
+      "data": {
+        "turn": 1,
+        "text": "hello"
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "negative-event-sequence",
+    "kind": "event",
+    "value": {
+      "type": "user/message",
+      "seq": -1,
+      "time": 1,
+      "data": {
+        "turn": 1,
+        "text": "hello"
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "false-ignorable",
+    "kind": "event",
+    "value": {
+      "type": "user/message",
+      "seq": 1,
+      "time": 1,
+      "data": {
+        "turn": 1,
+        "text": "hello"
+      },
+      "ignorable": false
+    },
+    "valid": false
+  },
+  {
+    "name": "duplicate-source-sequences",
+    "kind": "event",
+    "value": {
+      "type": "user/message",
+      "seq": 1,
+      "time": 1,
+      "data": {
+        "turn": 1,
+        "text": "hello"
+      },
+      "sourceEventSeqs": [
+        0,
+        0
+      ]
+    },
+    "valid": false
+  },
+  {
+    "name": "mixed-replacement-bounds",
+    "kind": "event",
+    "value": {
+      "type": "user/message",
+      "seq": 1,
+      "time": 1,
+      "data": {
+        "turn": 1,
+        "text": "hello"
+      },
+      "surfaceOp": {
+        "op": "replace",
+        "startSeq": 0,
+        "endSeq": 0,
+        "start": 0
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "snapshot",
+    "kind": "snapshot",
+    "value": {
+      "sessionId": "s",
+      "generation": "g",
+      "throughSequence": 1,
+      "windowLimit": 1,
+      "entries": [
+        {
+          "event": {
+            "type": "user/message",
+            "seq": 1,
+            "time": 1,
+            "data": {
+              "turn": 1,
+              "text": "hello"
+            }
+          }
+        }
+      ],
+      "hasMoreBefore": false
+    },
+    "valid": true
+  },
+  {
+    "name": "snapshot-beyond-cut",
+    "kind": "snapshot",
+    "value": {
+      "sessionId": "s",
+      "generation": "g",
+      "throughSequence": 0,
+      "windowLimit": 1,
+      "entries": [
+        {
+          "event": {
+            "type": "user/message",
+            "seq": 1,
+            "time": 1,
+            "data": {
+              "turn": 1,
+              "text": "hello"
+            }
+          }
+        }
+      ],
+      "hasMoreBefore": false
+    },
+    "valid": false
+  },
+  {
+    "name": "snapshot-duplicate-sequence",
+    "kind": "snapshot",
+    "value": {
+      "sessionId": "s",
+      "generation": "g",
+      "throughSequence": 1,
+      "windowLimit": 1,
+      "entries": [
+        {
+          "event": {
+            "type": "user/message",
+            "seq": 1,
+            "time": 1,
+            "data": {
+              "turn": 1,
+              "text": "hello"
+            }
+          }
+        },
+        {
+          "event": {
+            "type": "user/message",
+            "seq": 1,
+            "time": 1,
+            "data": {
+              "turn": 1,
+              "text": "hello"
+            }
+          }
+        }
+      ],
+      "hasMoreBefore": false
+    },
+    "valid": false
+  },
+  {
+    "name": "projection-beyond-cut",
+    "kind": "snapshot",
+    "value": {
+      "sessionId": "s",
+      "generation": "g",
+      "throughSequence": 1,
+      "windowLimit": 1,
+      "entries": [
+        {
+          "event": {
+            "type": "user/message",
+            "seq": 1,
+            "time": 1,
+            "data": {
+              "turn": 1,
+              "text": "hello"
+            }
+          }
+        }
+      ],
+      "hasMoreBefore": false,
+      "projections": {
+        "asOfSeq": 2,
+        "values": {
+          "title": null
+        }
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "zero-window",
+    "kind": "snapshot",
+    "value": {
+      "sessionId": "s",
+      "generation": "g",
+      "throughSequence": 1,
+      "windowLimit": 0,
+      "entries": [
+        {
+          "event": {
+            "type": "user/message",
+            "seq": 1,
+            "time": 1,
+            "data": {
+              "turn": 1,
+              "text": "hello"
+            }
+          }
+        }
+      ],
+      "hasMoreBefore": false
+    },
+    "valid": false
+  },
+  {
+    "name": "frozen-page",
+    "kind": "page",
+    "value": {
+      "sessionId": "s",
+      "throughSequence": 3,
+      "entries": [
+        {
+          "event": {
+            "type": "user/message",
+            "seq": 1,
+            "time": 1,
+            "data": {
+              "turn": 1,
+              "text": "hello"
+            }
+          }
+        }
+      ],
+      "hasMoreBefore": false
+    },
+    "valid": true,
+    "request": {
+      "sessionId": "s",
+      "throughSequence": 3,
+      "beforeSequence": 2,
+      "maxMessages": 50
+    }
+  },
+  {
+    "name": "changed-page-cut",
+    "kind": "page",
+    "value": {
+      "sessionId": "s",
+      "throughSequence": 4,
+      "entries": [
+        {
+          "event": {
+            "type": "user/message",
+            "seq": 1,
+            "time": 1,
+            "data": {
+              "turn": 1,
+              "text": "hello"
+            }
+          }
+        }
+      ],
+      "hasMoreBefore": false
+    },
+    "valid": false,
+    "request": {
+      "sessionId": "s",
+      "throughSequence": 3,
+      "beforeSequence": 2,
+      "maxMessages": 50
+    }
+  },
+  {
+    "name": "wrong-page-session",
+    "kind": "page",
+    "value": {
+      "sessionId": "other",
+      "throughSequence": 3,
+      "entries": [
+        {
+          "event": {
+            "type": "user/message",
+            "seq": 1,
+            "time": 1,
+            "data": {
+              "turn": 1,
+              "text": "hello"
+            }
+          }
+        }
+      ],
+      "hasMoreBefore": false
+    },
+    "valid": false,
+    "request": {
+      "sessionId": "s",
+      "throughSequence": 3,
+      "beforeSequence": 2,
+      "maxMessages": 50
+    }
+  },
+  {
+    "name": "page-overlaps-cursor",
+    "kind": "page",
+    "value": {
+      "sessionId": "s",
+      "throughSequence": 3,
+      "entries": [
+        {
+          "event": {
+            "type": "user/message",
+            "seq": 2,
+            "time": 1,
+            "data": {
+              "turn": 1,
+              "text": "hello"
+            }
+          }
+        }
+      ],
+      "hasMoreBefore": false
+    },
+    "valid": false,
+    "request": {
+      "sessionId": "s",
+      "throughSequence": 3,
+      "beforeSequence": 2,
+      "maxMessages": 50
+    }
+  },
+  {
+    "name": "empty-page",
+    "kind": "page",
+    "value": {
+      "sessionId": "s",
+      "throughSequence": 3,
+      "entries": [],
+      "hasMoreBefore": false
+    },
+    "valid": true,
+    "request": {
+      "sessionId": "s",
+      "throughSequence": 3,
+      "beforeSequence": 2,
+      "maxMessages": 50
+    }
+  },
+  {
+    "name": "unknown-closed-capability",
+    "kind": "host",
+    "value": {
+      "protocolVersion": 4,
+      "product": {
+        "name": "TekesKernel",
+        "version": "0.9.0"
+      },
+      "capabilities": [
+        "session-inventory-sync",
+        "session-control-sync",
+        "actionable-sync",
+        "session-journal",
+        "future-capability"
+      ],
+      "cwd": "/work",
+      "home": "/home",
+      "attachedSessions": 0,
+      "canOpenPath": false
+    },
+    "valid": false
+  },
+  {
+    "name": "integral-json-number",
+    "kind": "event",
+    "value": {
+      "type": "user/message",
+      "seq": 1.0,
+      "time": 1,
+      "data": {
+        "turn": 1,
+        "text": "hello"
+      }
+    },
+    "valid": true
+  }
+]

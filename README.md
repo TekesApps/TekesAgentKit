@@ -1,21 +1,58 @@
 # TekesAgentKit
 
-与 TekesClientKit 语义对齐的 Rust Agent 客户端套件。
+与 TekesClientKit 对齐的 Rust Agent 客户端套件。仓库没有 Swift 源码，构建与测试不依赖 Swift 工具链。
 
-**状态：架构评估与仓库骨架。尚未实现连接、Mirror、展示状态或 UI；当前编译成功不代表功能可用。**
+当前实现三个独立的 SessionEndpoint，加共享的内存投影和无 UI runtime：
 
-- SessionEndpoint 为统一语义边界，Kernel / Pi / DSH 为独立适配 crate。
-- 本地默认内存投影，远端默认内存投影加持久缓存；缓存策略与部署位置解耦。
-- Presentation 拥有 Agent 展示状态，Components 未来以 TekesUI 组成业务界面。
-- Host 拥有窗口、导航、产品主题/文案、场景参数、安装、凭证与系统权限适配。
+| Endpoint | 当前支持版本 | 权威数据路径 |
+|---|---|---|
+| `NativeSessionEndpoint` | Kernel **0.9.0** / SessionEndpoint **v4** | bearer HTTP unary、WebSocket mux、journal / frozen-cut history |
+| `PiSessionEndpoint` | Pi **1.3.0** | 原生 stdio RPC、native session tree 当前分支 |
+| `DshSessionEndpoint` | DSH **0.2.1-rc.2**（兼容 0.2.0-rc.2） | 认证 Remote HTTP / WebSocket mux、journal / page、multipart 文件 |
 
-参见 [架构评估](docs/assessment.md)、[开发阶段](docs/roadmap.md)、[核对来源](docs/source-baseline.json)。
+三个 adapter 分别拥有协议、生命周期和历史读取方式；共享层不会把 Pi 原生 entry ID 伪造成 journal sequence。
+`SessionEndpointRegistry` 使用 `endpointId + sessionId` 路由；`SessionRuntime` 处理 inventory、control、actionables、按需会话窗口、重连和显式 rpcId。
+`SessionLocator` 返回宿主位置、原生 session ID / 文件指针及历史读取来源。远端路径不会回退为本机读盘。
+
+本地可以直接使用 `MemoryProjectionStore`，**不需要客户端 Mirror**。当前三个 endpoint 都走内存投影；远端 durable cache 尚未实现。
+Pi 的宿主持久化指针注册表和保守的提交 receipt 用于恢复及避免重复提交，并不是历史 Mirror。
+Presentation / Components 仍是骨架，没有接 TekesUI。三个 SEP 的非 UI 会话闭环已实现；产品服务通过显式 `HostServices` 注入，能力按端声明，不等同于全部 ClientKit UI/产品能力。
 
 ```sh
 cargo fmt --all --check
-cargo check --workspace --all-targets
-cargo clippy --workspace --all-targets -- -D warnings
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
+python3 scripts/check-headless-boundaries.py
 ```
 
-本轮无运行行为，因此未添加功能测试。所有 crate 暂不发布；尚未选定开源许可证。
-开发使用 TekesUI 时必须显式指定路径覆盖；发布前必须改为已发布精确版本或不可变 Git revision。
+DSH 已固定升级到 `0.2.1-rc.2`，可用宿主现有的 Node 安装到独立目录：
+
+```sh
+python3 scripts/install-dsh-runtime.py \
+  --node-root /absolute/node-24-runtime \
+  --destination /absolute/new-dsh-0.2.1-rc.2-runtime
+```
+
+安装器要求新目录，精确指定 npm 包版本，记录 npm integrity、Node 版本和安装 lockfile 哈希；不切换其他产品的运行时。
+
+三个真实运行时的隔离验收，可任选一个或多个 root：
+
+```sh
+python3 scripts/test-real-session-endpoints.py \
+  --kernel-root /absolute/compatible-kernel-0.9-worktree \
+  --pi-root /absolute/pi-1.3.0-installation \
+  --dsh-root /absolute/dsh-0.2.1-rc.2-installation
+```
+
+脚本使用临时 HOME、状态目录和本地合成 provider，不请求真实模型服务，不修改运行时源码。Kernel root 须已有 supervisor/worker/helper/workspace-service；Pi/DSH root 须有安装好的 Node 和对应 CLI。
+另有 `scripts/test-real-kernel.py` 验证 Kernel 的 frozen-cut 分页和取消结算。
+
+`tekes-agent-headless` 从 stdin JSON 接收连接配置和批处理命令；凭证不放在 argv。覆盖建会话、选模型、提交、回传、交互回答、重连、定位、历史和文件读取。
+公开类型化 API 包括 create/submit/fork/discard/rename/archive/queue/upload/goal；文件观察和端点事件同样通过 runtime 暴露。
+公共 API 示例：[kernel_headless](crates/endpoint-kernel/examples/kernel_headless.rs)、[replay](crates/session/examples/replay.rs)。
+常规读取使用 `inspect` 和 revision subscription，显式 `snapshot()` 才复制完整读模型。慢 unary 不阻塞事件投影；不自动重试不确定 mutation。
+
+详见 [三个 Endpoint 的能力与验收](docs/session-endpoints.md)、[Kernel 同步契约](docs/headless-kernel.md)、[路线](docs/roadmap.md)、[源码与运行时基准](docs/headless-source-baseline.json)。
+最初的 [架构评估](docs/assessment.md) 保留为历史记录，旧 Kernel v3/workspace 描述已由 v4 基准纠正。
+
+Rust 工具链固定 1.95.0，crate 暂不发布，尚未选定开源许可证。开发覆盖须显式指定，发布依赖须使用已发布精确版本或不可变 Git revision。
