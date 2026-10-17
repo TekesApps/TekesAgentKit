@@ -42,7 +42,7 @@ impl DshConfiguration {
             identity: identity.into(),
             base_url: url,
             authorization: None,
-            supported_versions: ["0.2.0-rc.2".into()].into(),
+            supported_versions: ["0.2.0-rc.2".into(), "0.2.1-rc.2".into()].into(),
             timeout: Duration::from_secs(30),
         })
     }
@@ -448,6 +448,15 @@ impl SessionEndpoint for DshSessionEndpoint {
             };
             require(seen.insert(next.clone()), "DSH inventory cursor cycle")?;
         };
+        let projections = self
+            .remote
+            .call(
+                "session/projections",
+                json!({"request":{"sessionId":id}}),
+                &rpc(),
+            )
+            .await?;
+        let working_directory = sequenced_working_directory(&projections)?;
         Ok(SessionLocator {
             address: SessionAddress {
                 endpoint_id: self.identity.clone(),
@@ -455,6 +464,7 @@ impl SessionEndpoint for DshSessionEndpoint {
             },
             harness: "dsh".into(),
             cwd: row["cwd"].as_str().map(String::from),
+            working_directory,
             native_session_file: None,
             native_session_id: Some(id.into()),
             history_source: "DSH session/follow + session/page".into(),
@@ -504,8 +514,26 @@ impl SessionEndpoint for DshSessionEndpoint {
                 "session/create"
             }
             "session.rename" => "session/rename",
-            "session.fork" => "session/fork",
-            "session.discard" => "session/discard",
+            "session.fork" => {
+                require(
+                    payload["ephemeral"] != true,
+                    "DSH does not support disposable forks without session/discard",
+                )?;
+                let mut fork = self
+                    .remote
+                    .call("session/fork", json!({"request":payload}), rpc_id)
+                    .await?;
+                let child = string(&fork, "sessionId")?.to_owned();
+                // Like ClientKit: a completed-turn fork may inherit unconsumed inbox entries.
+                // Preserve the created pointer even if best-effort cleanup fails; never retry the fork.
+                if let Err(error) = self.clear_inherited_queue(&child).await {
+                    fork["queueCleanupWarning"] = json!(error.to_string());
+                }
+                return Ok(fork);
+            }
+            "session.discard" => {
+                return Err(unsupported("DSH runtime has no session/discard route"));
+            }
             "session.prompt" => {
                 payload["requestId"] = json!(rpc_id);
                 "session/prompt"
@@ -519,11 +547,15 @@ impl SessionEndpoint for DshSessionEndpoint {
                     .call("session/modelCatalog", json!({}), rpc_id)
                     .await;
             }
-            "session.archive" => {
+            "session.archive" | "session.unarchive" => {
                 return self
                     .remote
                     .call(
-                        "workspace/archiveSession",
+                        if method == "session.archive" {
+                            "workspace/archiveSession"
+                        } else {
+                            "workspace/unarchiveSession"
+                        },
                         json!({"request":payload}),
                         rpc_id,
                     )
@@ -548,5 +580,121 @@ impl SessionEndpoint for DshSessionEndpoint {
     async fn close(&self) {
         self.remote.close();
         self.actionables.lock().await.clear();
+    }
+}
+
+impl DshSessionEndpoint {
+    async fn clear_inherited_queue(&self, id: &str) -> Result<()> {
+        let mut stream = self
+            .remote
+            .open(
+                "session/follow",
+                json!({"request":{"address":address(id),"maxMessages":1}}),
+            )
+            .await?;
+        let snapshot = tokio::time::timeout(Duration::from_secs(30), stream.next())
+            .await
+            .map_err(|_| Error::Timeout)?
+            .ok_or(Error::Disconnected)??;
+        drop(stream);
+        require(
+            snapshot["type"] == "snapshot",
+            "fork queue needs opening snapshot",
+        )?;
+        for item_id in pending_inbox_ids(&snapshot["projections"])? {
+            match self
+                .remote
+                .call(
+                    "session/updateQueue",
+                    json!({"request":{"sessionId":id,"itemId":item_id,"action":{"kind":"remove"}}}),
+                    &rpc(),
+                )
+                .await
+            {
+                Ok(_) => {}
+                Err(Error::Remote(error)) if error["code"] == "session/queue-item-not-found" => {}
+                Err(error) => return Err(error),
+            }
+        }
+        Ok(())
+    }
+}
+fn pending_inbox_ids(projections: &Value) -> Result<Vec<String>> {
+    let mut ids = Vec::new();
+    let mut seen = BTreeSet::new();
+    let inbox = &projections["values"]["inbox"];
+    for key in ["next-turn", "next-step"] {
+        if let Some(items) = inbox.get(key) {
+            for item in items
+                .as_array()
+                .ok_or_else(|| Error::Protocol("invalid fork inbox".into()))?
+            {
+                let id = string(item, "id")?;
+                require(
+                    !id.is_empty() && seen.insert(id.to_owned()),
+                    "invalid or duplicate fork inbox id",
+                )?;
+                ids.push(id.to_owned());
+            }
+        }
+    }
+    Ok(ids)
+}
+
+/// Migration cache hints are not sequenced authority and must not drive current directory state.
+fn sequenced_working_directory(projections: &Value) -> Result<Option<String>> {
+    if projections.is_null() || projections["kind"] == "migration-required" {
+        return Ok(None);
+    }
+    if let Some(kind) = projections.get("kind") {
+        require(kind == "sequenced", "unknown DSH projection authority")?;
+    }
+    require(
+        integer(projections, "asOfSeq")? >= -1,
+        "invalid DSH projection cut",
+    )?;
+    match projections["values"].get("workingDirectory") {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::String(path)) if !path.is_empty() => Ok(Some(path.clone())),
+        _ => Err(Error::Protocol(
+            "invalid working-directory projection".into(),
+        )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn inherited_inbox_keeps_order_and_rejects_bad_ids() {
+        assert_eq!(pending_inbox_ids(&json!({"values":{"inbox":{"next-turn":[{"id":"first"}],"next-step":[{"id":"second"}]}}})).unwrap(),["first","second"]);
+        assert!(pending_inbox_ids(&json!({"values":{"inbox":{"next-turn":[{}]}}})).is_err());
+        assert!(pending_inbox_ids(&json!({"values":{"inbox":{"next-turn":[{"id":"same"}],"next-step":[{"id":"same"}]}}})).is_err());
+    }
+    #[test]
+    fn directory_uses_sequenced_authority_never_migration_hints() {
+        assert_eq!(
+            sequenced_working_directory(
+                &json!({"kind":"sequenced","asOfSeq":10,"values":{"workingDirectory":"/next"}})
+            )
+            .unwrap(),
+            Some("/next".into())
+        );
+        assert_eq!(
+            sequenced_working_directory(
+                &json!({"asOfSeq":0,"values":{"workingDirectory":"/legacy"}})
+            )
+            .unwrap(),
+            Some("/legacy".into())
+        );
+        assert_eq!(
+            sequenced_working_directory(
+                &json!({"kind":"migration-required","values":{"workingDirectory":"/stale"}})
+            )
+            .unwrap(),
+            None
+        );
+        assert!(sequenced_working_directory(&json!({"kind":"unknown","asOfSeq":0})).is_err());
+        assert!(sequenced_working_directory(&json!({"kind":"sequenced","values":{}})).is_err());
     }
 }

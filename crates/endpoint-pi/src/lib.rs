@@ -586,6 +586,7 @@ impl SessionEndpoint for PiSessionEndpoint {
             },
             harness: "pi".into(),
             cwd: Some(row.cwd.to_string_lossy().into()),
+            working_directory: Some(row.cwd.to_string_lossy().into()),
             native_session_file: state["sessionFile"]
                 .as_str()
                 .map(String::from)

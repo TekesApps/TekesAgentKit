@@ -3,7 +3,7 @@ mod registry;
 mod session;
 use async_trait::async_trait;
 use futures_util::stream::BoxStream;
-pub use registry::{REQUIRED_EVENTS, SURFACE_EVENTS};
+pub use registry::{HARNESS_EXTENSION_EVENTS, REQUIRED_EVENTS, SURFACE_EVENTS};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 pub use session::*;
@@ -226,7 +226,8 @@ impl SessionEvent {
             self.ignorable != Some(false),
             "ignorable must be true or absent",
         )?;
-        let known = REQUIRED_EVENTS.contains(&self.kind.as_str());
+        let known = REQUIRED_EVENTS.contains(&self.kind.as_str())
+            || HARNESS_EXTENSION_EVENTS.contains(&self.kind.as_str());
         require(
             known || self.ignorable == Some(true),
             "unknown required event",
@@ -438,6 +439,7 @@ pub trait SessionEndpoint: Send + Sync {
             },
             harness: self.host().product.name.clone(),
             cwd: None,
+            working_directory: None,
             native_session_file: None,
             native_session_id: Some(session_id.into()),
             history_source: "session-journal".into(),

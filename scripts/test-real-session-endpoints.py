@@ -21,6 +21,10 @@ class Provider(http.server.BaseHTTPRequestHandler):
         else:
             common={'id':'synthetic-chat','object':'chat.completion.chunk','created':1,'model':'endpoint-test'}
             frames=[dict(common,choices=[{'index':0,'delta':{'role':'assistant','content':'ENDPOINT_'},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{'content':'REPLY_OK'},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{},'finish_reason':'stop'}],usage={'prompt_tokens':10,'completion_tokens':4,'total_tokens':14})]
+            transcript=json.dumps(body.get('messages',[]))
+            change=re.search(r'ENDPOINT_CHANGE_DIRECTORY=([^\s"\\]+)',transcript)
+            if change and not any(message.get('role')=='tool' for message in body.get('messages',[])):
+                frames=[dict(common,choices=[{'index':0,'delta':{'role':'assistant','tool_calls':[{'index':0,'id':'directory-call','type':'function','function':{'name':'working_directory','arguments':json.dumps({'cd':change.group(1)})}}]},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{},'finish_reason':'tool_calls'}])]
         try:
             for frame in frames:self.wfile.write(('data: '+json.dumps(frame)+'\n\n').encode());self.wfile.flush()
             if not self.path.endswith('/responses'):self.wfile.write(b'data: [DONE]\n\n')
@@ -42,11 +46,15 @@ def commands(cwd,provider,model):
         {'op':'call','sessionId':'s','method':'session.files.readBytes','args':{'path':'proof.txt','offset':0,'limit':5}},
         {'op':'reconnect'},{'op':'open','sessionId':'s'},{'op':'snapshot'},
     ]
-def run(config):
+def execute(config):
     result=subprocess.run([str(ROOT/'target/debug/tekes-agent-headless')],input=json.dumps(config),text=True,capture_output=True,timeout=120)
     if result.returncode:
         print(result.stdout[-3000:]);print(result.stderr[-3000:]);raise AssertionError(config['kind']+' endpoint failed')
     outputs=[json.loads(line) for line in result.stdout.splitlines()]
+    if 'expectedVersion' in config:assert outputs[0]['version']==config['expectedVersion'],outputs[0]
+    return outputs
+def run(config):
+    outputs=execute(config)
     snapshot=next(row['result'] for row in reversed(outputs) if row.get('op')=='snapshot')
     serialized=json.dumps(snapshot)
     assert 'ENDPOINT_REPLY_OK' in serialized, config['kind']+' lost assistant result'
@@ -57,7 +65,7 @@ def run(config):
     for state in snapshot['sessions'].values():
         if state.get('native_conversation'):
             users=[e for e in state['native_conversation']['entries'] if e.get('message',{}).get('role')=='user']
-        else:users=[e for e in state['entries'].values() if e['event']['type']=='user/message' and (e['event']['data'].get('source') or {}).get('kind')!='runtime-context']
+        else:users=[e for e in state['entries'].values() if e['event']['type']=='user/message' and (e['event']['data'].get('source') or {}).get('kind') in (None,'user')]
         if users:assert len(users)==1,'duplicate accepted input: '+json.dumps(users)[-3500:]
     print(config['kind'].upper()+'_SESSION_ENDPOINT_LIVE_OK history+prompt+idempotency+locator+files+reconnect')
     return outputs
@@ -118,7 +126,48 @@ try:
                 except urllib.error.HTTPError as error:response=error
                 cookie=response.headers.get('Set-Cookie','').split(';',1)[0];assert cookie,'DSH launch cookie missing'
                 parsed=urllib.parse.urlsplit(launch);url=urllib.parse.urlunsplit((parsed.scheme,parsed.netloc,'/','',''))
-                run({'kind':'dsh','url':url,'cookie':cookie,'commands':commands(cwd,'endpoint-test','endpoint-test')})
+                version=json.loads((dsh/'node_modules/@deepseek-ai/dsh/package.json').read_text())['version']
+                config={'kind':'dsh','url':url,'cookie':cookie,'expectedVersion':version,'commands':commands(cwd,'endpoint-test','endpoint-test')}
+                outputs=run(config)
+                session_id=next(row['result']['sessionId'] for row in outputs if row.get('op')=='create')
+                # Public lifecycle calls, with the original session and its fork independently addressable.
+                lifecycle=[{'op':'call','sessionId':session_id,'method':'session.rename','args':{'title':'Endpoint lifecycle proof'}},
+                    {'op':'call','sessionId':session_id,'method':'session.fork','args':{'allowMigration':False},'saveAs':'fork'},
+                    {'op':'open','sessionId':'fork'},{'op':'snapshot'},
+                    {'op':'close','sessionId':'fork'},
+                    {'op':'call','sessionId':'fork','method':'session.cancel'},
+                    {'op':'call','sessionId':'fork','method':'session.archive'},
+                    {'op':'call','sessionId':'fork','method':'session.unarchive'},
+                    {'op':'open','sessionId':'fork'},{'op':'snapshot'}]
+                result=execute(dict(config,commands=lifecycle))
+                assert not any('queueCleanupWarning' in json.dumps(row) for row in result),'fork inbox cleanup failed'
+                fork_id=next(row['result']['sessionId'] for row in result if row.get('op')=='call' and isinstance(row.get('result'),dict) and 'sessionId' in row['result'] and row['result']['sessionId']!=session_id)
+                assert 'ENDPOINT_REPLY_OK' in json.dumps(result[-1]['result']['sessions'][fork_id]),'fork history missing'
+                print('DSH_LIFECYCLE_LIVE_OK version='+version+' rename+fork+cancel+archive+unarchive')
+                # Build enough history to force an initial clipped window, then load its frozen previous page.
+                history=[{'op':'create','cwd':str(cwd),'saveAs':'h'},{'op':'call','sessionId':'h','method':'session.selectModel','args':{'provider':'endpoint-test','model':'endpoint-test'}},{'op':'open','sessionId':'h'}]
+                for turn in range(1,29):
+                    history += [{'op':'call','sessionId':'h','method':'session.prompt','rpcId':'page-'+str(turn),'args':{'mode':'queue','content':[{'type':'text','text':'History proof '+str(turn)}]}},{'op':'waitSettled','sessionId':'h','minimumTurn':turn}]
+                history += [{'op':'snapshot'}]
+                result=execute(dict(config,commands=history))
+                history_id=next(row['result']['sessionId'] for row in result if row.get('op')=='create')
+                # A fresh client has no retained early coverage from the live stream.
+                result=execute(dict(config,commands=[{'op':'open','sessionId':history_id},{'op':'snapshot'},{'op':'earlier','sessionId':history_id},{'op':'snapshot'}]))
+                snapshots=[row['result'] for row in result if row.get('op')=='snapshot']
+                before,after=[snapshot['sessions'][history_id] for snapshot in snapshots]
+                assert before['has_more_before'] and len(after['entries'])>len(before['entries']),'history page did not extend window'
+                assert after['history_through_sequence']==before['history_through_sequence'],'history cut moved during paging'
+                print('DSH_FROZEN_HISTORY_LIVE_OK version='+version)
+                if version=='0.2.1-rc.2':
+                    child=cwd/'child';child.mkdir()
+                    directory=[{'op':'create','cwd':str(cwd),'saveAs':'directory'},{'op':'call','sessionId':'directory','method':'session.selectModel','args':{'provider':'endpoint-test','model':'endpoint-test'}},{'op':'open','sessionId':'directory'},
+                        {'op':'call','sessionId':'directory','method':'session.prompt','rpcId':'directory-1','args':{'mode':'queue','content':[{'type':'text','text':'ENDPOINT_CHANGE_DIRECTORY='+str(child)}]}},
+                        {'op':'waitSettled','sessionId':'directory'},{'op':'call','sessionId':'directory','method':'session.locator'},{'op':'reconnect'},{'op':'snapshot'}]
+                    result=execute(dict(config,commands=directory))
+                    locator=next(row['result'] for row in result if row.get('op')=='call' and isinstance(row.get('result'),dict) and 'historySource' in row['result'])
+                    assert Path(locator['cwd']).resolve()==cwd.resolve() and Path(locator['workingDirectory']).resolve()==child.resolve(),locator
+                    assert 'working-directory/change' in json.dumps(result[-1]),'new required event lost'
+                    print('DSH_WORKING_DIRECTORY_LIVE_OK original root + current directory + reconnect')
             finally:
                 if process.poll() is None:os.killpg(process.pid,signal.SIGTERM)
                 try:process.wait(timeout=15)

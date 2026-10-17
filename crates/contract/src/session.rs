@@ -15,7 +15,10 @@ pub enum SessionContentKind {
 pub struct SessionLocator {
     pub address: SessionAddress,
     pub harness: String,
+    /// Original project / session workspace root.
     pub cwd: Option<String>,
+    /// Current execution directory when the harness publishes an authoritative projection.
+    pub working_directory: Option<String>,
     pub native_session_file: Option<String>,
     pub native_session_id: Option<String>,
     pub history_source: String,

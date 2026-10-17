@@ -104,6 +104,7 @@ async fn main() -> Result<()> {
             "snapshot" => serde_json::to_value(&*runtime.snapshot())?,
             "waitSettled" => {
                 let id = id.ok_or_else(|| unsupported("sessionId required"))?;
+                let minimum_turn = command["minimumTurn"].as_i64().unwrap_or(1);
                 let mut changes = runtime.subscribe();
                 tokio::time::timeout(Duration::from_secs(30), async {
                     loop {
@@ -117,7 +118,12 @@ async fn main() -> Result<()> {
                                             .iter()
                                             .any(|e| e["message"]["role"] == "assistant")
                                     } else {
-                                        s.entries.values().any(|e| e.event.kind == "turn/end")
+                                        s.entries.values().any(|e| {
+                                            e.event.kind == "turn/end"
+                                                && e.event.data["turn"]
+                                                    .as_i64()
+                                                    .is_some_and(|turn| turn >= minimum_turn)
+                                        })
                                     }
                             })
                         });
@@ -171,7 +177,7 @@ async fn main() -> Result<()> {
                 if let Some(id) = id {
                     args["sessionId"] = json!(id);
                 }
-                runtime
+                let result = runtime
                     .call(
                         string(command, "method")?,
                         args,
@@ -179,7 +185,11 @@ async fn main() -> Result<()> {
                             .as_str()
                             .unwrap_or(&uuid::Uuid::new_v4().to_string()),
                     )
-                    .await?
+                    .await?;
+                if let Some(name) = command["saveAs"].as_str() {
+                    variables.insert(name.into(), string(&result, "sessionId")?.into());
+                }
+                result
             }
             _ => return Err(unsupported(&format!("headless operation {operation}"))),
         };

@@ -245,6 +245,22 @@ impl AssistantStream {
 mod tests {
     use super::*;
     #[test]
+    fn new_log_only_events_and_plugin_records_survive_without_fake_surface_changes() {
+        for kind in ["working-directory/change", "job/registered", "job/settled"] {
+            let raw = json!({"type":"event","event":{"type":kind,"seq":2,"time":1,"data":{"opaque":"preserved"}}});
+            let entries = decode_records(&[raw]).unwrap();
+            assert_eq!(entries[0].event.kind, kind);
+            assert_eq!(entries[0].event.data["opaque"], "preserved");
+            assert_eq!(entries[0].event.ignorable, None);
+        }
+        let plugin = json!({"type":"event","event":{"type":"plugin:sample/state","seq":3,"time":1,"ignorable":true,"data":{"counter":4}}});
+        assert_eq!(
+            decode_records(&[plugin]).unwrap()[0].event.data["counter"],
+            4
+        );
+        assert!(decode_records(&[json!({"type":"event","event":{"type":"unknown/required","seq":3,"time":1,"data":{}}})]).is_err());
+    }
+    #[test]
     fn packed_chunks_preserve_sequences_times_and_tool_identity() {
         let row = json!({"type":"chunks","event":{"type":"chunkrow/tool-call-chunks","seq":5,"time":100,"data":{"turn":1,"step":0,"index":2,"id":"tool","name":"read","args":["{","}"],"dt":[7]}}});
         let entries = decode_records(std::slice::from_ref(&row)).unwrap();

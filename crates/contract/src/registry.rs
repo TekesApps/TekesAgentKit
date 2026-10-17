@@ -74,3 +74,8 @@ pub const SURFACE_EVENTS: &[&str] = &[
     "tool/result",
     "user/message",
 ];
+
+// Additional log-only events verified against DSH 0.2.1-rc.2's persistence catalog.
+// Retain payloads losslessly; these do not create transcript surface replacements.
+pub const HARNESS_EXTENSION_EVENTS: &[&str] =
+    &["job/registered", "job/settled", "working-directory/change"];

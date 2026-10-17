@@ -10,6 +10,7 @@ Native 要求 Kernel 0.9 的 v4 wire；Pi/DSH 的标准化 HostDescription 保�
 
 `SessionEndpointRegistry` 注册显式 connector。`SessionAddress { endpoint_id, session_id }` 是跨 harness 的稳定路由键。
 `SessionLocator` 给出该地址、cwd、nativeSessionId、可用时的 nativeSessionFile，以及 historySource。
+`cwd` 保留原始工作区根，`workingDirectory` 是有权威投影时的当前执行目录；两者可以不同，文件相对路径仍遵循各服务端的 scope。
 原生文件指针是定位证据；历史读取仍通过对应 harness 的公开协议，不解析私有数据库或把远端路径当成本机路径。
 
 `SessionRuntime` 合并 inventory/control/actionables，按需打开会话窗口，提供订阅、snapshot、前页、定位和只读文件 API。
@@ -30,7 +31,7 @@ Native 要求 Kernel 0.9 的 v4 wire；Pi/DSH 的标准化 HostDescription 保�
 | 前页 | 固定 throughSequence 的页 | 扩大原生 ancestry 窗口并刷新 | 固定 throughSeq 的页 |
 | 实时数据 | durable event + transient preview | native-event 有界队列 + 关键事件刷新原生 conversation | durable event + assistant-stream revision/index 校验 |
 | Actionables | 权威 sync/revision | 原生 confirm/select/input/editor 转换，回答绑定原进程 | waterfall clientId/eventId 关联及取消；inventory 流不抢答 |
-| Rename/archive | 原生调用 | 原生 rename；宿主 archive/unarchive 指针 | 原生调用 |
+| Rename/archive | 原生调用 | 原生 rename；宿主 archive/unarchive 指针 | 原生 rename/fork/archive/unarchive；fork 清理继承的未消费 inbox |
 | 既有 session | 服务端 inventory | 显式 `session.adopt`，原生 RPC 验证文件；不全盘扫描 | 服务端 inventory |
 | Session 工作区文件 | session.files.* | cwd 内 capability 限定只读文件 | workspaceFiles，二进制 multipart |
 | 可选扩展 | raw `call` 透传服务端能力 | 未映射方法返回 Unsupported | 显式 `dsh.call` 和已映射方法，未映射返回 Unsupported |
@@ -59,7 +60,7 @@ Native/DSH 的授权和文件版本由服务端决定；DSH multipart 校验部�
 
 三个真实运行时在临时 HOME / 独立数据目录及本地合成 provider 上均通过：
 connect → list → create → select model → open → prompt → assistant 回传 / settle → 同 rpcId 重试 → locator → stat / text / bytes → reconnect / reopen → 历史保持。
-检查实际用户输入只有一条；DSH runtime-context 的 user/message 按 source 区分。
+检查实际用户输入只有一条；DSH runtime-context、time-context 和 working-directory 的 user/message 按 source 区分，只有 source.kind=user 计为用户提交。
 
 Pi 额外通过原生 extension command 等待 select、在 prompt 尚未完成时回答、答案写入 native entry，
 再复制该临时测试 session 到显式授权目录，用新的指针注册表恢复并读取原历史。
@@ -71,3 +72,18 @@ Rust 回归覆盖契约 fixtures、原生分支/坏树、文件路径与分页�
 
 这些证据不代表真实付费 provider、TLS 远端部署、生产 launcher、大历史/RSS/吞吐、Linux 或 UI 的验收。
 远端 durable cache 和完整 ClientKit 可选 API 仍在后续范围。
+
+## DSH 0.2.1 升级验收
+
+当前固定版本为 **0.2.1-rc.2**（官方 tag `dsh-v0.2.1-rc.2` / `687f282e8625c6b8d11ff58211a90524be2e4317`），同时保留 0.2.0-rc.2 兼容。
+版本 allowlist 不接受未验证的后续版本；读取到官方 runtime 证据才允许连接。安装器、source archive、npm integrity、runtime/lockfile 哈希见源码基准文件。
+
+- 新增 log-only `job/registered`、`job/settled`、`working-directory/change` 被明确登记并无损保留。它们是从 DSH 新目录核对出的契约扩展，不伪称已在当前 ClientKit 的旧事件表中。
+- 未知必需事件仍拒绝；实验性 `plugin:` ignorable 记录保持原始载荷。
+- `session/projections` 的 `kind=sequenced` 才是带切点的权威值；`migration-required` 的缓存提示不用于当前工作目录。inventory 的 formatStatus 仍保留。
+- session/discard 在两个官方验证版本均未提供，明确 Unsupported。ephemeral fork 会被拒绝，避免留下无法丢弃的耐久会话。
+- 普通 fork 与 ClientKit 一样尝试移除继承 inbox；失败时返回已创建的 sessionId 和 queueCleanupWarning，不隐藏新指针、不自动重试 fork。
+
+**两个版本均已真实验证**：基础回传/重连/文件链路，rename、普通 fork 及子会话历史、cancel、archive/unarchive；28 次合成 turn 后以新客户端打开裁剪窗口，再取前页且冻结切点不变。
+**0.2.1-rc.2 额外真实验证**：合成 provider 触发官方 working_directory 工具，把 cwd 切到测试子目录，观察新事件、独立的原始根/当前目录，并重连保持。
+Pi 1.3.0 和 Native Kernel 0.9.0 的原验收也重新通过。上述模型输出均来自本地合成 provider，没有请求 DeepSeek 或其他真实付费模型。

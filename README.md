@@ -8,7 +8,7 @@
 |---|---|---|
 | `NativeSessionEndpoint` | Kernel **0.9.0** / SessionEndpoint **v4** | bearer HTTP unary、WebSocket mux、journal / frozen-cut history |
 | `PiSessionEndpoint` | Pi **1.3.0** | 原生 stdio RPC、native session tree 当前分支 |
-| `DshSessionEndpoint` | DSH **0.2.0-rc.2** | 认证 Remote HTTP / WebSocket mux、journal / page、multipart 文件 |
+| `DshSessionEndpoint` | DSH **0.2.1-rc.2**（兼容 0.2.0-rc.2） | 认证 Remote HTTP / WebSocket mux、journal / page、multipart 文件 |
 
 三个 adapter 分别拥有协议、生命周期和历史读取方式；共享层不会把 Pi 原生 entry ID 伪造成 journal sequence。
 `SessionEndpointRegistry` 使用 `endpointId + sessionId` 路由；`SessionRuntime` 处理 inventory、control、actionables、按需会话窗口、重连和显式 rpcId。
@@ -24,6 +24,16 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
 python3 scripts/check-headless-boundaries.py
 ```
+
+DSH 已固定升级到 `0.2.1-rc.2`，可用宿主现有的 Node 安装到独立目录：
+
+```sh
+python3 scripts/install-dsh-runtime.py \
+  --node-root /absolute/node-24-runtime \
+  --destination /absolute/new-dsh-0.2.1-rc.2-runtime
+```
+
+安装器要求新目录，精确指定 npm 包版本，记录 npm integrity、Node 版本和安装 lockfile 哈希；不切换其他产品的运行时。
 
 三个真实运行时的隔离验收，可任选一个或多个 root：
 

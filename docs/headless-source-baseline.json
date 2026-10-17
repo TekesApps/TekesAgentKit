@@ -204,6 +204,32 @@
     }
   },
   "dsh": {
+    "version": "0.2.1-rc.2",
+    "root": "/Users/frankqin/Library/Caches/TekesAgentKit/runtimes/dsh-0.2.1-rc.2",
+    "source_root": "/Users/frankqin/Library/Caches/TekesAgentKit/sources/dsh-0.2.1-rc.2",
+    "source_tag": "dsh-v0.2.1-rc.2",
+    "source_head": "687f282e8625c6b8d11ff58211a90524be2e4317",
+    "source_archive_sha256": "98d9342331b9b7ef94da401ad26e1a6d1efc6e3afe7967446c8bc1584dc9463d",
+    "release": "https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.2.1-rc.2",
+    "npm_integrity": "sha512-tvY+yhfKRifthbqPe/OK0AYxM5ZkvqfYq/jMYgJcEUxiRRL1Vwra3Ti5TB6AXgSWQdiPHYh/Vp6SJa9yHwMNuw==",
+    "package_lock_sha256": "2232b0230fba5da47a522ddc514345bdd7de2f63dc5bfbdaee2655e39439ac51",
+    "node_version": "v24.20.0",
+    "protocol": "authenticated Remote HTTP/mux; official host version probe",
+    "source_files": {
+      "packages/api/session-controller/src/types.ts": "72a35c7df913a2a2d0548b40aa8a7abbbbc7807e55f4f9f5fb236a9a2550a042",
+      "packages/api/session-controller/src/history.ts": "20a2b002816817b04d7bae25e429034f79dbfa445ec2f7d90e4525a9c1652db8",
+      "packages/api/workspace-files/src/index.ts": "3c6fd2b5b7d7e1dac70780f23199efd76d99f98d07cf8f82a89969628adcf05d",
+      "packages/core/session/src/known-event-types.ts": "862acc917dc2dd5e185640640c0747735e8b84c3fa65939738bac9a1d45e106b",
+      "packages/session/working-directory/src/index.ts": "5d8b57ba56fe96f73713f66805342ca5690df50fb530b41846abc7d3d4447fbd",
+      "packages/jobs/jobs/src/types.ts": "d7f89fd44ef3e6fc1871d457e6980e84ce1b24a2d3dea146e4442dd11d4a8af5"
+    },
+    "runtime_files": {
+      "node_modules/@deepseek-ai/dsh/package.json": "bea4288aa88eb54efe829686553100a75fdf09d11c5e3bf6b329badb9a0368dd",
+      "node_modules/@deepseek-ai/dsh/lib/bin.js": "80112efe368efb1a39720c7ada0af00442e5131fb2744edaaff8a3e8bb499e6f",
+      "node_modules/@deepseek-ai/dsh-app-boot/lib/index.js": "5135179ac810e4f626f32ec3bdc3293dc7d2028e8aa92e5e0c006f1a33b78e76"
+    }
+  },
+  "dsh_compatibility_runtime": {
     "version": "0.2.0-rc.2",
     "root": "/Users/frankqin/Library/Application Support/Tekes/BuiltIn/dsh-0.2.0-rc.2-node-24.20.0-pnpm-11.7.0",
     "source_root": "/Users/frankqin/dev/dsh",

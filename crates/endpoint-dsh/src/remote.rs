@@ -232,18 +232,9 @@ impl Remote {
             "DSH official version probe unavailable",
         )?;
         let value = self.decode(response).await?;
-        require(
-            value["product"] == "@deepseek-ai/dsh"
-                && value["source"] == "@deepseek-ai/dsh-app-boot#getDshRuntimeVersion",
-            "invalid DSH version evidence",
-        )?;
-        let version = string(&value, "version")?.to_owned();
-        require(
-            self.config.supported_versions.contains(&version),
-            "unsupported DSH runtime version",
-        )?;
-        Ok(version)
+        version_evidence(&value, &self.config.supported_versions)
     }
+
     async fn decode(&self, mut response: reqwest::Response) -> Result<Value> {
         let content_type = response
             .headers()
@@ -263,5 +254,52 @@ impl Remote {
     }
     pub(crate) fn close(&self) {
         let _ = self.commands.send(Command::Close);
+    }
+}
+
+fn version_evidence(
+    value: &Value,
+    supported: &std::collections::BTreeSet<String>,
+) -> Result<String> {
+    require(
+        value["product"] == "@deepseek-ai/dsh"
+            && value["source"] == "@deepseek-ai/dsh-app-boot#getDshRuntimeVersion",
+        "invalid DSH version evidence",
+    )?;
+    let version = string(value, "version")?.to_owned();
+    require(
+        supported.contains(&version),
+        "unsupported DSH runtime version",
+    )?;
+    Ok(version)
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn exact_versions_require_official_evidence() {
+        let config = DshConfiguration::new("dsh", "http://localhost:1/").unwrap();
+        for version in ["0.2.0-rc.2", "0.2.1-rc.2"] {
+            let evidence = json!({"product":"@deepseek-ai/dsh","source":"@deepseek-ai/dsh-app-boot#getDshRuntimeVersion","version":version});
+            assert_eq!(
+                version_evidence(&evidence, &config.supported_versions).unwrap(),
+                version
+            );
+        }
+        for (version, source) in [
+            (
+                "0.2.1-rc.3",
+                "@deepseek-ai/dsh-app-boot#getDshRuntimeVersion",
+            ),
+            ("0.2.1-rc.2", "caller supplied"),
+        ] {
+            assert!(
+                version_evidence(
+                    &json!({"product":"@deepseek-ai/dsh","source":source,"version":version}),
+                    &config.supported_versions
+                )
+                .is_err()
+            );
+        }
     }
 }
