@@ -104,6 +104,9 @@ This CLI cannot stage arbitrary user files or configure product settings by impl
 
 `presentation` 返回当前 session 的 `summary`。`childCatalog` 以 sessionId 为 parent；
 `childPrompt` / `childCancel` 另收 childSessionId，前者还需 content 数组。
+`childCreate` 收 label、稳定 rpcId（创建 request key）、saveAs；`childRead` 读取 owned child 的原生结果。
+`childHistory` / `childEarlier` 收 parent sessionId、childSessionId，复用 mounted ChildRun；
+Native 自动选择只读 bounded API，Pi/DSH 使用各自独立 child 地址。
 `sideChatCreate` 收 parent sessionId、可选 title/saveAs；`sideChatClose` 收创建返回的
 sessionId 或 saveAs 变量；`sideChats` 返回生命周期快照。`sideChatCreateError` 断言不支持
 等预期失败。这些操作的能力、unknown/reconcile 与宿主输入约束见

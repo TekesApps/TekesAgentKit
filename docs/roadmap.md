@@ -18,6 +18,9 @@ P1 首先证明本地无客户端磁盘 Mirror 的可行性。P2 验证缓存可
 
 2026-10-17 后续授权：接入 Native / Pi / DSH 三个独立 SessionEndpoint，完成无 UI 的回传、历史、定位和文件读取。当前按公开协议对接，真实运行时使用隔离状态和合成 provider 验证。
 
+2026-10-18 本轮授权：补齐 Pi 子代理和 Native 有界子历史，允许增加 Kernel 只读接口完成闭环。
+Kernel 变更限制为子历史读取与复用 projector，不增加写入或子代理控制；仍不接 UI。
+
 DSH 已升级并隔离验证 0.2.1-rc.2（保留 0.2.0-rc.2），补齐普通 fork、归档恢复、冷客户端冻结分页、新工作目录和 job 事件兼容。详见 session-endpoints.md 的升级验收。
 
 2026-10-18：补齐 P4 非 UI presentation 和独立公开 consumer；不包含 P5 控件与完整 P6 产品面。

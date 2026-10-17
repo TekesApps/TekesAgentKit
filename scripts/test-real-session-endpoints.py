@@ -7,6 +7,7 @@ parser=argparse.ArgumentParser()
 parser.add_argument('--pi-root',type=Path)
 parser.add_argument('--dsh-root',type=Path)
 parser.add_argument('--kernel-root',type=Path)
+parser.add_argument('--kernel-target-dir',type=Path)
 args=parser.parse_args()
 if not any((args.pi_root,args.dsh_root,args.kernel_root)):parser.error("supply at least one runtime root")
 subprocess.run(['cargo','build','--locked','-p','tekes-agent-headless'],cwd=ROOT,check=True)
@@ -19,6 +20,14 @@ class Provider(http.server.BaseHTTPRequestHandler):
         self.send_response(200);self.send_header('Content-Type','text/event-stream');self.end_headers()
         if self.path.endswith('/responses'):
             frames=[{'type':'response.completed','response':{'id':'synthetic-response','status':'completed','output':[{'type':'message','role':'assistant','phase':'final_answer','status':'completed','content':[{'type':'output_text','text':'ENDPOINT_REPLY_OK'}]}],'usage':{'input_tokens':10,'output_tokens':4,'total_tokens':14}}}]
+            if 'ENDPOINT_NATIVE_CHILD' in json.dumps(body) and not any(item.get('type')=='function_call_output' for item in body.get('input',[]) if isinstance(item,dict)):
+                task={'task_name':'Bounded child proof','goal':'Return a short proof','instructions':'CHILD_NATIVE_PROOF. Reply ENDPOINT_REPLY_OK.','input_sources':[],'output':{'mode':'inline','format':'text','name':'result','path':'','contract':'short result'}}
+                frames=[
+                    {'type':'response.output_item.added','output_index':0,'item':{'type':'function_call','call_id':'native-child-proof','name':'task','arguments':''}},
+                    {'type':'response.function_call_arguments.delta','output_index':0,'delta':''},
+                    {'type':'response.function_call_arguments.done','output_index':0,'arguments':json.dumps(task)},
+                    {'type':'response.completed','response':{'id':'native-child-call','status':'completed','usage':{'input_tokens':10,'output_tokens':4,'total_tokens':14}}},
+                ]
         else:
             common={'id':'synthetic-chat','object':'chat.completion.chunk','created':1,'model':'endpoint-test'}
             frames=[dict(common,choices=[{'index':0,'delta':{'role':'assistant','content':'ENDPOINT_'},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{'content':'REPLY_OK'},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{},'finish_reason':'stop'}],usage={'prompt_tokens':10,'completion_tokens':4,'total_tokens':14})]
@@ -28,6 +37,20 @@ class Provider(http.server.BaseHTTPRequestHandler):
                 frames=[dict(common,choices=[{'index':0,'delta':{'role':'assistant','tool_calls':[{'index':0,'id':'directory-call','type':'function','function':{'name':'working_directory','arguments':json.dumps({'cd':change.group(1)})}}]},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{},'finish_reason':'tool_calls'}])]
             if 'ENDPOINT_SUBAGENT_CATALOG' in transcript and not any(message.get('role')=='tool' for message in body.get('messages',[])):
                 frames=[dict(common,choices=[{'index':0,'delta':{'role':'assistant','tool_calls':[{'index':0,'id':'child-call','type':'function','function':{'name':'subagent','arguments':json.dumps({'description':'Catalog proof child','prompt':'CHILD_INITIAL_PROOF'})}}]},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{},'finish_reason':'tool_calls'}])]
+            if 'ENDPOINT_PI_CHILD' in transcript:
+                values=[]
+                for message in body.get('messages',[]):
+                    if message.get('role')=='tool':
+                        try: values.append(json.loads(message.get('content','')))
+                        except (ValueError,TypeError): pass
+                child=next((value.get('childSessionId') for value in values if isinstance(value,dict) and value.get('childSessionId')),None)
+                action=None
+                if child is None: action={'action':'create','label':'Model child'}
+                elif not any(value.get('accepted') for value in values if isinstance(value,dict)): action={'action':'prompt','childSessionId':child,'text':'CHILD_PI_TOOL_PROOF'}
+                elif not any(value.get('settled') and 'entries' in value for value in values if isinstance(value,dict)):
+                    action={'action':'read','childSessionId':child};time.sleep(0.05)
+                if action:
+                    frames=[dict(common,choices=[{'index':0,'delta':{'role':'assistant','tool_calls':[{'index':0,'id':'pi-child-'+str(len(values)),'type':'function','function':{'name':'tekes_subagent','arguments':json.dumps(action)}}]},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{},'finish_reason':'tool_calls'}])]
             if 'ENDPOINT_GOAL_COMPLETE' in transcript and not any(message.get('role')=='tool' for message in body.get('messages',[])):
                 frames=[dict(common,choices=[{'index':0,'delta':{'role':'assistant','tool_calls':[{'index':0,'id':'goal-call','type':'function','function':{'name':'agentkit_goal','arguments':json.dumps({'phase':'complete'})}}]},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{},'finish_reason':'tool_calls'}])]
         try:
@@ -54,7 +77,12 @@ def commands(cwd,provider,model):
 def execute(config):
     result=subprocess.run([str(ROOT/'target/debug/tekes-agent-headless')],input=json.dumps(config),text=True,capture_output=True,timeout=120)
     if result.returncode:
-        print(result.stdout[-3000:]);print(result.stderr[-3000:]);raise AssertionError(config['kind']+' endpoint failed')
+        print(result.stdout[-12000:]);print(result.stderr[-3000:])
+        if config['kind']=='native':
+            for path in (base/'kernel').rglob('*.jsonl'):
+                print('KERNEL_FIXTURE_DIAGNOSTIC',path.name,path.read_text()[-20000:])
+            print('KERNEL_STDERR',b''.join(kernel_errors).decode(errors='replace')[-16000:])
+        raise AssertionError(config['kind']+' endpoint failed')
     outputs=[json.loads(line) for line in result.stdout.splitlines()]
     if 'expectedVersion' in config:assert outputs[0]['version']==config['expectedVersion'],outputs[0]
     return outputs
@@ -120,6 +148,35 @@ try:
             outputs=run(config)
             assert 'endpoint-answer' in json.dumps(outputs) and 'yes' in json.dumps(outputs),'native question result missing'
             print('PI_NATIVE_ACTIONABLE_LIVE_OK pending prompt + answer + persisted native entry')
+            children=[{'op':'create','cwd':str(cwd),'saveAs':'parent'},
+                {'op':'call','sessionId':'parent','method':'session.selectModel','args':{'provider':'endpoint-test','model':'endpoint-test'}},
+                {'op':'childCreate','sessionId':'parent','label':'SDK child','rpcId':'stable-create','saveAs':'sdk-child'},
+                {'op':'childCreate','sessionId':'parent','label':'SDK child','rpcId':'stable-create'},
+                {'op':'childPrompt','sessionId':'parent','childSessionId':'sdk-child','rpcId':'child-input','content':[{'type':'text','text':'CHILD_PI_SDK_PROOF'}]},
+                {'op':'open','sessionId':'sdk-child'},{'op':'waitSettled','sessionId':'sdk-child'},
+                {'op':'childRead','sessionId':'parent','childSessionId':'sdk-child'},
+                {'op':'childPrompt','sessionId':'parent','childSessionId':'sdk-child','rpcId':'child-steer','mode':'steer','content':[{'type':'text','text':'CHILD_PI_STEER_PROOF'}]},
+                {'op':'waitSettled','sessionId':'sdk-child','minimumTurn':2},
+                {'op':'open','sessionId':'parent'},{'op':'compose','sessionId':'parent','text':'ENDPOINT_PI_CHILD'},
+                {'op':'waitSettled','sessionId':'parent'},{'op':'presentation','sessionId':'parent','saveAs':'model-child','savePointer':'/summary/subagents/0/sessionId'},
+                {'op':'childCatalog','sessionId':'parent'},
+                {'op':'childHistory','sessionId':'parent','childSessionId':'model-child'},
+                {'op':'reconnect'},{'op':'childRead','sessionId':'parent','childSessionId':'sdk-child'},
+                {'op':'childCancel','sessionId':'parent','childSessionId':'sdk-child'},
+                {'op':'create','cwd':str(cwd),'saveAs':'other'},
+                {'op':'callError','method':'subagents.cancel','args':{'parentSessionId':'@other','childSessionId':'@sdk-child'}}]
+            child_outputs=execute(dict(config,commands=children))
+            creates=[row['result']['sessionId'] for row in child_outputs if row.get('op')=='childCreate'];assert creates[0]==creates[1],'child create replay duplicated pointer'
+            parent_view=next(row['result'] for row in child_outputs if row.get('op')=='presentation')
+            assert len(parent_view['summary']['subagents'])==1 and parent_view['summary']['subagents'][0]['title']=='Model child',parent_view['summary']
+            child_view=next(row['result'] for row in child_outputs if row.get('op')=='childHistory')
+            assert 'CHILD_PI_TOOL_PROOF' in json.dumps(child_view),'model child input missing'
+            assert 'CHILD_PI_SDK_PROOF' not in json.dumps(child_view) and 'ENDPOINT_PI_CHILD' not in json.dumps(child_view),'parent/sibling history leaked into child'
+            assert not any('agentkit-host/v1:' in json.dumps(row['result']) for row in child_outputs if row.get('op') in ('presentation','childHistory')),'host control token leaked to projection'
+            parent_id=next(row['result']['sessionId'] for row in child_outputs if row.get('op')=='create')
+            replay=execute(dict(config,commands=[{'op':'childCatalog','sessionId':parent_id},{'op':'childCreate','sessionId':parent_id,'label':'SDK child','rpcId':'stable-create'}]))
+            assert replay[-1]['result']['sessionId']==creates[0],'child pointer did not survive process restart'
+            print('PI_SUBAGENTS_LIVE_OK API+model-tool+ownership+queue+steer+summary+history+reconnect+restart')
             # Resume a native session from an explicitly authorized host root, with a new pointer registry.
             locator=next(row['result'] for row in outputs if row.get('op')=='call' and isinstance(row.get('result'),dict) and 'nativeSessionFile' in row['result'])
             adopted=base/'adopted';adopted.mkdir();source=adopted/'existing.jsonl';shutil.copyfile(locator['nativeSessionFile'],source)
@@ -346,14 +403,20 @@ try:
                 try:process.wait(timeout=15)
                 except subprocess.TimeoutExpired:os.killpg(process.pid,signal.SIGKILL);process.wait(timeout=5)
         if args.kernel_root:
-            kernel=args.kernel_root.resolve();home=base/'kernel-home';home.mkdir()
+            kernel=args.kernel_root.resolve();kernel_target=args.kernel_target_dir.resolve() if args.kernel_target_dir else kernel/'target';home=base/'kernel-home';home.mkdir()
             providers=json.loads((kernel/'fixtures/config/providers.canonical.json').read_text());providers['providers'][0]['endpoint']=base_url
-            launch=base/'kernel-launch.json';launch.write_text(json.dumps({'format':1,'bootstrap_version':1,'root':str(base/'kernel'),'worker':str(kernel/'target/debug/tekes-worker'),'listen':'127.0.0.1:0','providers':providers,'credential_bindings':{'openai-main':'AGENTKIT_SYNTHETIC_KEY'}}))
+            (base/'kernel').mkdir(mode=0o700)
+            (base/'kernel/config').mkdir(mode=0o700)
+            (base/'kernel/config/settings.json').write_text(json.dumps({'format':1,'revision':1,'limits':{'max_workers':8,'max_provider_leases':8}},sort_keys=True,separators=(',',':'))+'\n')
+            (base/'kernel/config/settings.json').chmod(0o600)
+            launch=base/'kernel-launch.json';launch.write_text(json.dumps({'format':1,'bootstrap_version':1,'root':str(base/'kernel'),'worker':str(kernel_target/'debug/tekes-worker'),'listen':'127.0.0.1:0','providers':providers,'credential_bindings':{'openai-main':'AGENTKIT_SYNTHETIC_KEY'}}))
             env=dict(os.environ,HOME=str(home));env.pop('TEKES_KERNEL_ENDPOINT_TOKEN',None);env.pop('AGENTKIT_SYNTHETIC_KEY',None)
-            process=subprocess.Popen([str(kernel/'target/debug/tekes-supervisor'),'--built-in',str(launch)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=env)
+            process=subprocess.Popen([str(kernel_target/'debug/tekes-supervisor'),'--built-in',str(launch)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=env)
+            kernel_errors=[]
+            threading.Thread(target=lambda:kernel_errors.extend(iter(process.stderr.readline,b'')),daemon=True).start()
             try:
                 token=os.urandom(32);payload=json.dumps({'endpointToken':token.hex(),'credentials':{'openai-main':'synthetic-key'}}).encode();process.stdin.write(b'TEKES-KERNEL-BOOTSTRAP/1\n'+struct.pack('!I',len(payload))+payload);process.stdin.flush()
-                assert select.select([process.stdout],[],[],15)[0],'Kernel readiness timeout';ready=json.loads(process.stdout.readline())
+                assert select.select([process.stdout],[],[],15)[0],'Kernel readiness timeout';readiness=process.stdout.readline();assert readiness,b''.join(kernel_errors).decode(errors='replace');ready=json.loads(readiness)
                 config={'kind':'native','url':ready['url'],'bearer':base64.urlsafe_b64encode(token).decode().rstrip('='),'commands':commands(cwd,providers['providers'][0]['id'],providers['providers'][0]['models'][0]['id'])}
                 outputs=run(config);native_id=next(row['result']['sessionId'] for row in outputs if row.get('op')=='create')
                 native=[{'op':'call','method':'endpoint.capabilities'},
@@ -374,6 +437,24 @@ try:
                     {'op':'open','sessionId':native_id},{'op':'snapshot'}]
                 result=execute(dict(config,commands=native))
                 assert any(row.get('op')=='call' and isinstance(row.get('result'),dict) and row['result'].get('data')==base64.b64encode(b'Native upload proof').decode() for row in result),'native upload round trip lost'
+                caps=next(row['result'] for row in result if row.get('op')=='call' and isinstance(row.get('result'),dict) and 'methods' in row['result'])
+                if 'subagents.history' in caps['methods']:
+                    parent=str(uuid.uuid4())
+                    native_children=[{'op':'call','method':'session.create','args':{'sessionId':parent,'execution':{'cwd':str(cwd),'read_roots':[],'writable_roots':[],'toolchain_roots':[],'network':False,'allowed_tools':['task'],'mcp':[]}},'saveAs':'parent'},
+                        {'op':'call','sessionId':'parent','method':'session.selectModel','args':{'provider':providers['providers'][0]['id'],'model':providers['providers'][0]['models'][0]['id']}},
+                        {'op':'call','sessionId':'parent','method':'approvals.select','args':{'mode':'danger-full-access'}},
+                        {'op':'open','sessionId':'parent'},{'op':'compose','sessionId':'parent','text':'ENDPOINT_NATIVE_CHILD'},
+                        {'op':'waitSettled','sessionId':'parent'},{'op':'presentation','sessionId':'parent'},
+                        {'op':'childCatalog','sessionId':'parent','saveAs':'bounded','savePointer':'/entries/1/id'},
+                        {'op':'childHistory','sessionId':'parent','childSessionId':'bounded'},
+                        {'op':'childEarlier','sessionId':'parent','childSessionId':'bounded'},
+                        {'op':'reconnect'},{'op':'childHistory','sessionId':'parent','childSessionId':'bounded'},
+                        {'op':'callError','method':'subagents.history','args':{'parentSessionId':native_id,'childSessionId':'@bounded','maxMessages':50}}]
+                    child_result=execute(dict(config,commands=native_children))
+                    histories=[row['result'] for row in child_result if row.get('op')=='childHistory']
+                    assert len(histories)==2 and all(any(item['text']=='ENDPOINT_REPLY_OK' and item['isFinal'] for item in h['items']) for h in histories),histories
+                    assert all(h['tools'][0]['arguments']['task_name']=='Bounded child proof' for h in histories),'missing parent source-call projection'
+                    print('NATIVE_BOUNDED_CHILD_LIVE_OK real-task+source-call+read-only-history+reconnect+ownership')
                 print('NATIVE_COMPLETE_LIFECYCLE_LIVE_OK models+commands+skills+settings+presets+upload+scratch-discard+rename+archive')
             finally:
                 process.stdin.close()

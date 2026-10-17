@@ -1,7 +1,7 @@
 # Tasks、Subagents、SideChat、Summary（无 UI）
 
 本层位于 `tekes-agent-presentation`，继续沿用 `SessionRuntime` 和内存投影。
-不依赖 TekesUI，不增加 Swift，不引入持久化 Mirror，也不修改 Kernel。
+不依赖 TekesUI，不增加 Swift，不引入持久化 Mirror。Native 子历史使用经授权新增的 Kernel 只读接口。
 参考当前 ClientKit 源码及 Tekes 的 Summary/SideChat host adapter；来源校验见
 `panel-source-baseline.json`。这些 API 提供状态、操作和宿主输入；不创建窗口或 tab。
 
@@ -31,8 +31,8 @@ loading、continuable、one-shot、parent unavailable、missing、read failure �
 仍须遵守其公开方法契约。
 
 `ChildRun::open` 区分 SameSession 与 IndependentSessions：独立子会话持有自己的 pointer；
-同 session 有界子线路必须提供 `ChildHistorySource`，否则明确 Unsupported，绝不展示父
-transcript 来冒充子线路。该 source 是宿主提供的公开投影接口，不允许读取私有数据库。
+同 session 有界子线路默认使用公开 `subagents.history`，也可显式提供 `ChildHistorySource`。
+服务端未提供方法时明确 Unsupported，绝不展示父 transcript 来冒充子线路。
 `SessionHistoryLease` 按 mounted consumer 持有；Drop/release 只释放自身，保留其他 lease
 以及普通 open_session 的 owner。没有 active Tokio executor 时由 runtime shutdown 回收。RunController 的 child Run 只有在新 catalog 验证后才允许输入；重连后调用 refresh_child_catalog，连接 epoch 防止 watch 合并通知后复用旧权限。
 
@@ -40,8 +40,8 @@ transcript 来冒充子线路。该 source 是宿主提供的公开投影接口�
 
 | endpoint | 子代理目录/控制 | 子历史 | SideChat |
 |---|---|---|---|
-| Native Kernel 0.9.0 | 原生目录；有界 child 不可续写/单独取消 | 同 session 子线路需要宿主公开投影 source | ephemeral fork/discard |
-| Pi 1.3.0 | 默认未提供原生子代理目录；可显式 HostServices 扩展 | 已知独立 pointer 可用；普通 fork 不等于 subagent | ephemeral fork/discard |
+| Native Kernel 0.9 + 子历史扩展 | 原生目录；有界 child 不可续写/单独取消 | 内置只读子历史、冻结分页、source-call、重连 | ephemeral fork/discard |
+| Pi 1.3.0 | create/list/prompt/read/cancel；官方扩展模型工具 | 独立原生 session pointer、恢复、重连 | ephemeral fork/discard |
 | DSH 0.2.1-rc.2 | 从公开 subagentCatalog projection 规范化；continuable 控制 | 独立 session | 明确 Unsupported |
 
 DSH 当前发布版已移除旧 `subagents/list` remote。adapter 通过 `session/projections`
@@ -100,7 +100,9 @@ todo 历史 cut、usage、provider 顺序、draft retirement、lease 多消费�
 summary 的 presentation。真实 runtime 验证使用临时数据和本地合成 provider；不代表
 生产模型、UI/native 体验或所有 harness 的 task/subagent 能力已实现。
 
-本轮本地验证：workspace 72 项 Rust 测试、strict Clippy、fmt 和依赖边界通过。真实隔离
+v0.2.0 基线验证：workspace 72 项 Rust 测试、strict Clippy、fmt 和依赖边界通过。真实隔离
 集成覆盖 Native Kernel 0.9.0、Pi 1.3.0 的 SideChat submit→return→discard，以及
 DSH 0.2.1-rc.2 / 0.2.0-rc.2 的实际 continuable child catalog→prompt→history→reconnect→cancel。
 DSH SideChat Unsupported 单独断言。不是付费模型或 UI 验收。
+
+后续 Pi 子代理和 Native 有界子历史的 API、能力边界与验证见 [child-history](child-history.md)。

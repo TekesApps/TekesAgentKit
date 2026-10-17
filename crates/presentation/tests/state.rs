@@ -479,3 +479,24 @@ fn workspace_can_start_another_new_thread_after_first_materializes() {
     );
     assert!(!RunPresentation::read(&authority, &scope("missing"), false).can_submit);
 }
+
+#[test]
+fn pi_only_child_creation_is_a_summary_subagent() {
+    let child = "b437cf34-5661-45e2-a674-113b27c92f89";
+    let entries = vec![
+        json!({"id":"u","type":"message","message":{"role":"user","content":"delegate","timestamp":1}}),
+        json!({"id":"a","type":"message","message":{"role":"assistant","timestamp":2,"content":[
+            {"type":"toolCall","id":"create","name":"tekes_subagent","arguments":{"action":"create","label":"Review"}},
+            {"type":"toolCall","id":"read","name":"tekes_subagent","arguments":{"action":"read","childSessionId":child}}
+        ]}}),
+        json!({"id":"r","type":"message","message":{"role":"toolResult","toolCallId":"create","toolName":"tekes_subagent","content":[{"type":"text","text":json!({"childSessionId":child}).to_string()}]}}),
+    ];
+    let projection = native(entries, vec![], false);
+    let transcript = TranscriptSnapshot::read(&scope("a"), &projection).unwrap();
+    assert_eq!(transcript.tools[0].name, "subagent");
+    assert_eq!(transcript.tools[0].arguments["description"], "Review");
+    assert_eq!(transcript.tools[1].name, "tekes_subagent");
+    let facts = SummaryFacts::read(&scope("a"), &projection, &transcript).unwrap();
+    assert_eq!(facts.subagents.len(), 1);
+    assert_eq!(facts.subagents[0].session_id.as_deref(), Some(child));
+}
