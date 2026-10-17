@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Headless task pointer state, parent-owned subagent catalog/control, consumer-owned child history leases.
+- Ephemeral SideChat lifecycle with uncertain-mutation reconciliation and confirmed-discard draft cleanup.
+- Scoped Summary facts/providers, authoritative todo/usage recovery and typed host navigation actions.
+- DSH catalog projection routing and child delivery/admission normalization for the released protocol.
+- No UI/TekesUI or Kernel implementation changes.
+
 ## 0.1.1 — 2026-10-18
 
 - Public repository with MIT License and inherited license metadata for every workspace package.

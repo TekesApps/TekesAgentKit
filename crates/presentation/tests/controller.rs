@@ -3,7 +3,7 @@ use serde_json::{Value, json};
 use std::{
     sync::{
         Arc,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     time::Duration,
 };
@@ -16,6 +16,9 @@ struct Connector {
     sent: Arc<Notify>,
     release: Arc<Notify>,
     calls: Arc<AtomicUsize>,
+    requests: Arc<std::sync::Mutex<Vec<(String, Value)>>>,
+    reject_discard: Arc<AtomicBool>,
+    hold_fork: Arc<AtomicBool>,
 }
 struct Endpoint {
     connector: Connector,
@@ -42,7 +45,20 @@ impl SessionEndpoint for Endpoint {
         &self.host
     }
     fn capabilities(&self) -> EndpointCapabilities {
-        EndpointCapabilities::methods(&["session.prompt", "session.create", "commands/run"])
+        let mut caps = EndpointCapabilities::methods(&[
+            "session.prompt",
+            "session.create",
+            "commands/run",
+            "session.fork",
+            "session.discard",
+            "session.cancel",
+            "session.rename",
+            "subagents.list",
+            "subagents.prompt",
+            "subagents.cancel",
+        ]);
+        caps.supports_ephemeral_fork = true;
+        caps
     }
     async fn follow(&self, target: StreamTarget) -> Result<FrameStream> {
         use futures_util::{StreamExt, stream};
@@ -69,7 +85,27 @@ impl SessionEndpoint for Endpoint {
     async fn respond(&self, _: &str, _: i64, _: Value) -> Result<()> {
         Ok(())
     }
-    async fn call(&self, method: &str, _: Value, _: &str) -> Result<Value> {
+    async fn call(&self, method: &str, payload: Value, _: &str) -> Result<Value> {
+        self.connector
+            .requests
+            .lock()
+            .unwrap()
+            .push((method.into(), payload.clone()));
+        if method == "subagents.list" {
+            return Ok(
+                json!({"parentAvailable":payload["parentSessionId"] == "a","entries":[{"kind":"child","id":"child","mode":"continuable"},{"kind":"child","id":"bounded","mode":"one-shot"}]}),
+            );
+        }
+        if method == "session.fork" {
+            if self.connector.hold_fork.load(Ordering::SeqCst) {
+                self.connector.sent.notify_one();
+                self.connector.release.notified().await;
+            }
+            return Ok(json!({"sessionId":"scratch"}));
+        }
+        if method == "session.discard" && self.connector.reject_discard.load(Ordering::SeqCst) {
+            return Err(Error::Remote(json!({"code":"still-running"})));
+        }
         if method == "session.prompt" {
             self.connector.calls.fetch_add(1, Ordering::SeqCst);
             self.connector.sent.notify_one();
@@ -213,5 +249,161 @@ async fn pre_dispatch_host_failure_restores_draft_without_transport_or_unknown_l
     assert_eq!(controller.snapshot().draft.text, "input");
     assert!(controller.snapshot().can_submit);
     assert_eq!(connector.calls.load(Ordering::SeqCst), 0);
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn child_control_checks_fresh_parent_ownership_and_never_routes_to_session_prompt() {
+    let (connector, runtime, _) = setup().await;
+    assert!(
+        runtime
+            .prompt_child("a", "bounded", PromptMode::Queue, vec![], "one")
+            .await
+            .is_err()
+    );
+    assert!(runtime.cancel_child("a", "a", "self").await.is_err());
+    assert!(
+        runtime
+            .cancel_child("other", "child", "lost-parent")
+            .await
+            .is_err()
+    );
+    assert!(
+        runtime
+            .prompt_child(
+                "a",
+                "child",
+                PromptMode::Queue,
+                vec![json!({"type":"file"})],
+                "file"
+            )
+            .await
+            .is_err()
+    );
+    runtime
+        .prompt_child(
+            "a",
+            "child",
+            PromptMode::Queue,
+            vec![json!({"type":"text","text":"hello"})],
+            "good",
+        )
+        .await
+        .unwrap();
+    runtime.cancel_child("a", "child", "cancel").await.unwrap();
+    let requests = connector.requests.lock().unwrap().clone();
+    assert!(
+        !requests
+            .iter()
+            .any(|(m, _)| m == "session.prompt" || m == "session.cancel")
+    );
+    assert_eq!(
+        requests
+            .iter()
+            .filter(|(m, _)| m == "subagents.prompt")
+            .count(),
+        1
+    );
+    assert_eq!(
+        requests
+            .iter()
+            .filter(|(m, _)| m == "subagents.cancel")
+            .count(),
+        1
+    );
+    runtime.stop().await.unwrap();
+}
+#[tokio::test]
+async fn history_lease_release_preserves_other_consumers_and_legacy_owner() {
+    let (_, runtime, _) = setup().await;
+    let first = runtime.acquire_history("child").await.unwrap();
+    let second = runtime.acquire_history("child").await.unwrap();
+    first.release().await.unwrap();
+    assert!(runtime.inspect(|s| s.sessions["child"].journal_ready));
+    second.release().await.unwrap();
+    assert!(!runtime.inspect(|s| s.sessions["child"].journal_ready));
+    let lease = runtime.acquire_history("a").await.unwrap();
+    runtime.close_session("a").await.unwrap();
+    assert!(runtime.inspect(|s| s.sessions["a"].journal_ready));
+    lease.release().await.unwrap();
+    assert!(!runtime.inspect(|s| s.sessions["a"].journal_ready));
+    runtime.stop().await.unwrap();
+}
+#[tokio::test]
+async fn side_chat_failed_discard_and_failed_query_preserve_pointer_until_confirmed_absence() {
+    let (connector, runtime, _) = setup().await;
+    let side = SideChatController::new(runtime.clone());
+    let chat = side
+        .create(RunScope::main("test", "a"), Some("Parent"), "fork")
+        .await
+        .unwrap();
+    assert_eq!(chat.title, "SideChat · Parent");
+    let requests = connector.requests.lock().unwrap().clone();
+    assert!(
+        requests
+            .iter()
+            .any(|(m, v)| m == "session.fork" && v["ephemeral"] == true && v["sessionId"] == "a")
+    );
+    connector.reject_discard.store(true, Ordering::SeqCst);
+    assert!(side.close("scratch", "discard").await.is_err());
+    let failed = side.snapshot().chats["scratch"].clone();
+    assert_eq!(failed.phase, SideChatPhase::Ready);
+    assert!(!side.reconcile(&failed, Err("query failed".into())));
+    assert!(side.snapshot().chats.contains_key("scratch"));
+    assert!(side.reconcile(&failed, Ok(false)));
+    assert!(side.snapshot().chats.is_empty());
+    runtime.stop().await.unwrap();
+}
+#[tokio::test]
+async fn cancelled_fork_is_unknown_blocks_duplicate_and_retains_originating_parent() {
+    let (connector, runtime, _) = setup().await;
+    connector.hold_fork.store(true, Ordering::SeqCst);
+    let side = Arc::new(SideChatController::new(runtime.clone()));
+    let worker = side.clone();
+    let task = tokio::spawn(async move {
+        worker
+            .create(RunScope::main("test", "a"), None, "fork")
+            .await
+    });
+    connector.sent.notified().await;
+    task.abort();
+    let _ = task.await;
+    assert_eq!(side.snapshot().unknown_creations.len(), 1);
+    assert!(
+        side.create(RunScope::main("test", "a"), None, "duplicate")
+            .await
+            .is_err()
+    );
+    connector.release.notify_one();
+    side.reconcile_creation(&RunScope::main("test", "a"), None)
+        .unwrap();
+    assert!(side.snapshot().unknown_creations.is_empty());
+    runtime.stop().await.unwrap();
+}
+#[tokio::test]
+async fn bounded_history_requires_child_projection_and_independent_history_has_own_pointer() {
+    let (_, runtime, _) = setup().await;
+    assert!(
+        ChildRun::open(
+            runtime.clone(),
+            RunScope::main("test", "a"),
+            "bounded",
+            ChildHistoryLayout::SameSession,
+            None
+        )
+        .await
+        .is_err()
+    );
+    let child = ChildRun::open(
+        runtime.clone(),
+        RunScope::main("test", "a"),
+        "child",
+        ChildHistoryLayout::IndependentSessions,
+        None,
+    )
+    .await
+    .unwrap();
+    assert!(!child.transcript().await.unwrap().is_stale);
+    drop(child);
     runtime.stop().await.unwrap();
 }

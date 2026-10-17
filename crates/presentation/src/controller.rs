@@ -46,6 +46,7 @@ impl Shared {
                 let mut old = (**self.snapshots.borrow()).clone();
                 if old.selection != core.selection() {
                     old.transcript = TranscriptSnapshot::default();
+                    old.summary = None;
                     old.run = None;
                 }
                 old.selection = core.selection();
@@ -135,7 +136,43 @@ impl RunController {
     }
     pub async fn open(&self, scope: RunScope) -> Result<()> {
         self.select(ComposerDestination::run(scope.clone()))?;
-        self.shared.runtime.open_session(&scope.session_id).await
+        self.shared.runtime.open_session(&scope.session_id).await?;
+        if scope.thread_id != scope.session_id {
+            self.refresh_child_catalog(&scope).await?;
+        }
+        Ok(())
+    }
+    pub async fn refresh_child_catalog(&self, scope: &RunScope) -> Result<()> {
+        let token = self
+            .snapshot()
+            .selection
+            .clone()
+            .ok_or_else(|| unsupported("no selected child"))?;
+        require(
+            token.destination == ComposerDestination::run(scope.clone())
+                && scope.thread_id != scope.session_id,
+            "child catalog scope mismatch",
+        )?;
+        let epoch = self.shared.runtime.inspect(|s| s.connection_epoch);
+        let result = self.shared.runtime.subagent_catalog(&scope.thread_id).await;
+        if epoch != self.shared.runtime.inspect(|s| s.connection_epoch) {
+            return Err(Error::Disconnected);
+        }
+        self.shared.refresh();
+        self.shared
+            .core
+            .lock()
+            .expect("presentation lock poisoned")
+            .commit_child_catalog(
+                &token,
+                epoch,
+                result
+                    .as_ref()
+                    .map(Clone::clone)
+                    .map_err(ToString::to_string),
+            );
+        self.shared.refresh();
+        result.map(|_| ())
     }
     pub fn edit(&self, destination: &ComposerDestination, draft: ComposerDraft) -> Result<()> {
         self.shared
@@ -193,6 +230,15 @@ impl RunController {
         self.shared.refresh();
         Ok(())
     }
+    /// The caller has confirmed discard or pointer absence, including any uncertain mutation.
+    pub fn forget_destination(&self, destination: &ComposerDestination) {
+        self.shared
+            .core
+            .lock()
+            .expect("presentation lock poisoned")
+            .forget_destination(destination);
+        self.shared.refresh();
+    }
     pub async fn dispatch(
         &self,
         ticket: PreparedSubmission,
@@ -233,8 +279,13 @@ impl RunController {
             self.shared.refresh();
             host.prepare(&self.shared.runtime,&ticket,&scope).await?;
             self.shared.runtime.open_session(&scope.session_id).await?;
+            if scope.thread_id != scope.session_id {
+                require(matches!(ticket.plan, SubmissionPlan::Prompt { .. }), "child commands unavailable")?;
+                self.shared.runtime.subagent_catalog(&scope.thread_id).await?.require_continuable(&scope.session_id)?;
+            }
             self.shared.core.lock().expect("presentation lock poisoned").mark_dispatched(&ticket)?;
             let value=match &ticket.plan {
+                SubmissionPlan::Prompt{content,..} if scope.thread_id != scope.session_id => self.shared.runtime.prompt_child(&scope.thread_id, &scope.session_id, ticket.mode, content.clone(), &ticket.id).await?,
                 SubmissionPlan::Prompt{content,..}=>self.shared.runtime.submit(PromptRequest{session_id:scope.session_id.clone(),mode:ticket.mode,content:content.clone(),client_time_zone:None},&ticket.id).await?,
                 SubmissionPlan::Command{name,arguments,attachments}=>self.shared.runtime.call_optional("commands/run",json!({"sessionId":scope.session_id,"name":name,"arguments":arguments,"attachments":attachments}),&ticket.id).await?,
             };
@@ -261,10 +312,21 @@ impl RunController {
             .runtime
             .inspect(|s| RunPresentation::read(s, scope, true).can_cancel);
         require(valid, "Run is not cancellable")?;
-        self.shared
-            .runtime
-            .cancel(&scope.session_id, &uuid::Uuid::new_v4().to_string())
-            .await
+        if scope.thread_id != scope.session_id {
+            self.shared
+                .runtime
+                .cancel_child(
+                    &scope.thread_id,
+                    &scope.session_id,
+                    &uuid::Uuid::new_v4().to_string(),
+                )
+                .await
+        } else {
+            self.shared
+                .runtime
+                .cancel(&scope.session_id, &uuid::Uuid::new_v4().to_string())
+                .await
+        }
     }
     pub async fn respond(
         &self,

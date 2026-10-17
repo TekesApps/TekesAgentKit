@@ -107,3 +107,5 @@ python3 scripts/install-dsh-runtime.py \
 ## License
 
 [MIT](LICENSE)，Copyright © 2026 TekesApps。Kernel、Pi、DSH、ClientKit 参考实现和第三方依赖分别保留各自的许可证；本仓库的 MIT License 不替代它们的授权。
+
+Tasks、Subagents、SideChat 与 Summary 的无 UI 状态、宿主输入及能力边界见 [headless-agent-panels](docs/headless-agent-panels.md)。

@@ -1,6 +1,6 @@
 # 分阶段开发与完成门槛
 
-P0/P1/P3 已完成本轮三个 SEP 的非 UI 会话闭环，验收见 session-endpoints.md 和 headless-kernel.md；不代表完整 ClientKit API 或 UI projector 对齐。缓存和 UI 尚未开始；P4 的 Run/Transcript/Composer/连接状态已在无 UI presentation 层实现，边界见 headless-presentation.md。
+P0/P1/P3 已完成本轮三个 SEP 的非 UI 会话闭环，验收见 session-endpoints.md 和 headless-kernel.md；不代表完整 ClientKit API 或 UI projector 对齐。缓存和 UI 尚未开始；P4 的 Run/Transcript/Composer/连接状态已在无 UI presentation 层实现，边界见 headless-presentation.md。Tasks/Subagents/SideChat/Summary 的无 UI 状态已补充，原生能力及尚需宿主输入的部分见 headless-agent-panels.md。
 
 | 阶段 | 交付 | 必须有的证据 |
 |---|---|---|

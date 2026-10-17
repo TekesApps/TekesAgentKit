@@ -499,3 +499,6 @@ pub trait SessionEndpoint: Send + Sync {
 pub trait EndpointConnector: Send + Sync {
     async fn connect(&self) -> Result<std::sync::Arc<dyn SessionEndpoint>>;
 }
+
+mod subagents;
+pub use subagents::*;
