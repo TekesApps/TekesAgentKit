@@ -201,6 +201,7 @@ impl KernelConnector {
             http,
             commands,
             task,
+            lifetime: tokio::sync::watch::channel(false).0,
         })
     }
 }
@@ -233,6 +234,7 @@ pub struct NativeSessionEndpoint {
     http: Client,
     commands: mpsc::UnboundedSender<Command>,
     task: tokio::task::JoinHandle<()>,
+    lifetime: tokio::sync::watch::Sender<bool>,
 }
 impl Drop for NativeSessionEndpoint {
     fn drop(&mut self) {
@@ -293,8 +295,114 @@ impl SessionEndpoint for NativeSessionEndpoint {
     fn host(&self) -> &HostDescription {
         &self.host
     }
+    fn capabilities(&self) -> EndpointCapabilities {
+        let mut caps = EndpointCapabilities::methods(&[
+            "session.create",
+            "session.rename",
+            "session.fork",
+            "session.discard",
+            "session.archive",
+            "session.unarchive",
+            "session.prompt",
+            "session.updateQueue",
+            "session.cancel",
+            "session.attachment",
+            "session.uploadFile",
+            "session.fileAttachment",
+            "session.models",
+            "models.list",
+            "session.selectModel",
+            "session.initialPresets",
+            "session.presets.describe",
+            "session.presets.resolve",
+            "skills/list",
+            "commands/list",
+            "commands/run",
+            "sessions.recover",
+            "attachments.policy",
+            "approvals.policy",
+            "approvals.mode",
+            "approvals.select",
+            "session.search",
+            "session.files.stat",
+            "session.files.read",
+            "session.files.readBytes",
+            "feedback.list",
+            "feedback.put",
+            "feedback.delete",
+            "settings.describe",
+            "settings.mutate",
+            "settings.update",
+            "settings.document",
+            "goals.get",
+            "goals.edit",
+            "goals.clear",
+            "goals.pause",
+            "goals.resume",
+            "subagents.list",
+        ]);
+        caps.supports_archive_session = true;
+        caps.supports_unarchive_session = true;
+        caps.supports_ephemeral_fork = true;
+        caps.can_fork_completed_turn = true;
+        caps.supports_file_observation = true;
+        caps
+    }
     fn supports_recovery(&self) -> bool {
         true
+    }
+    async fn observe_files(&self, id: &str, _path: &str) -> Result<FrameStream> {
+        let mut url = self.config.url.clone();
+        url.set_scheme(if self.config.url.scheme() == "https" {
+            "wss"
+        } else {
+            "ws"
+        })
+        .map_err(|_| Error::Protocol("invalid file watch URL".into()))?;
+        url.set_path("/api/session.files.changes");
+        url.query_pairs_mut().append_pair("sessionId", id);
+        let mut request = url
+            .as_str()
+            .into_client_request()
+            .map_err(|_| Error::Protocol("invalid file watch request".into()))?;
+        request.headers_mut().insert(
+            "Authorization",
+            format!("Bearer {}", self.config.bearer)
+                .parse()
+                .map_err(|_| Error::Protocol("invalid authorization".into()))?,
+        );
+        let (socket, _) = tokio::time::timeout(
+            self.config.timeout,
+            connect_async_with_config(
+                request,
+                Some(WebSocketConfig::default().max_message_size(Some(1024 * 1024))),
+                false,
+            ),
+        )
+        .await
+        .map_err(|_| Error::Timeout)?
+        .map_err(|_| Error::Transport("file observation handshake failed".into()))?;
+        let close = self.lifetime.subscribe();
+        Ok(Box::pin(futures_util::stream::try_unfold(
+            (socket, close, false),
+            |(mut socket, mut close, mut ready)| async move {
+                loop {
+                    tokio::select! {
+                        _=close.changed()=>{let _=socket.close(None).await;return Ok(None);},
+                        message=socket.next()=>{
+                            let value=match message {
+                                Some(Ok(Message::Text(text)))=>serde_json::from_str::<Value>(&text)?,
+                                Some(Ok(Message::Ping(data)))=>{socket.send(Message::Pong(data)).await.map_err(|_|Error::Disconnected)?;continue;},
+                                _=>return Err(Error::Disconnected),
+                            };
+                            validate_file_watch(&value)?;
+                        if !ready {require(value["kind"]=="ready","file observation must start ready")?;ready=true;} else {require(value["kind"]=="change","unexpected file observation frame")?;}
+                            return Ok(Some((value,(socket,close,ready))));
+                        }
+                    }
+                }
+            },
+        )))
     }
     async fn file_stat(&self, session_id: &str, path: &str) -> Result<SessionFileStat> {
         serde_json::from_value(
@@ -347,7 +455,11 @@ impl SessionEndpoint for NativeSessionEndpoint {
         .map_err(Error::from)
     }
     async fn follow(&self, target: StreamTarget) -> Result<FrameStream> {
-        if matches!(target, StreamTarget::SessionConversation { .. }) {
+        require(!*self.lifetime.borrow(), "endpoint is closed")?;
+        if matches!(
+            target,
+            StreamTarget::SessionConversation { .. } | StreamTarget::WorkspaceInventory
+        ) {
             return Err(unsupported("Kernel native conversation stream"));
         }
         if let StreamTarget::SessionJournal { max_messages, .. } = &target {
@@ -402,6 +514,7 @@ impl SessionEndpoint for NativeSessionEndpoint {
         Ok(())
     }
     async fn call(&self, method: &str, mut payload: Value, rpc_id: &str) -> Result<Value> {
+        require(!*self.lifetime.borrow(), "endpoint is closed")?;
         require(
             !rpc_id.is_empty()
                 && !method.is_empty()
@@ -417,6 +530,28 @@ impl SessionEndpoint for NativeSessionEndpoint {
                 .expect("payload object")
                 .remove("cwd");
             payload["execution"] = json!({"cwd":cwd,"read_roots":[],"writable_roots":[],"toolchain_roots":[],"network":false,"allowed_tools":[],"mcp":[]});
+        }
+        if method == "session.create"
+            && let Some(preset) = payload
+                .as_object_mut()
+                .and_then(|object| object.remove("agentPreset"))
+        {
+            require(
+                payload.get("identityProfile").is_none(),
+                "conflicting identity profile",
+            )?;
+            payload["identityProfile"] = preset;
+        }
+        if method == "commands/run" {
+            if let Some(id) = payload
+                .as_object_mut()
+                .and_then(|map| map.remove("sessionId"))
+            {
+                payload["session_id"] = id;
+            }
+            if payload.get("key").is_none() {
+                payload["key"] = json!(rpc_id);
+            }
         }
         if method.starts_with("workspace.") {
             return Err(Error::Unsupported("Kernel v4 has no workspace RPC".into()));
@@ -462,6 +597,7 @@ impl SessionEndpoint for NativeSessionEndpoint {
         }
     }
     async fn close(&self) {
+        let _ = self.lifetime.send(true);
         let _ = self.commands.send(Command::Shutdown);
     }
 }

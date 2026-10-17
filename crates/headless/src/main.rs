@@ -56,12 +56,12 @@ async fn main() -> Result<()> {
         "{}",
         json!({"ready":true,"kind":kind,"version":runtime.snapshot().host.as_ref().map(|h|h.product.version.clone())})
     );
-    let mut variables = BTreeMap::<String, String>::new();
+    let mut variables = BTreeMap::<String, Value>::new();
     for command in array(&config, "commands")? {
         let operation = string(command, "op")?;
         let id = command["sessionId"]
             .as_str()
-            .map(|id| variables.get(id).map(String::as_str).unwrap_or(id));
+            .map(|id| variables.get(id).and_then(Value::as_str).unwrap_or(id));
         let output = match operation {
             "list" => runtime.inspect(|s| {
                 json!(
@@ -76,7 +76,7 @@ async fn main() -> Result<()> {
                     .create_session(string(command, "cwd")?, &uuid::Uuid::new_v4().to_string())
                     .await?;
                 if let Some(name) = command["saveAs"].as_str() {
-                    variables.insert(name.into(), id.clone());
+                    variables.insert(name.into(), json!(id));
                 }
                 json!({"sessionId":id})
             }
@@ -116,7 +116,9 @@ async fn main() -> Result<()> {
                                         native
                                             .entries
                                             .iter()
-                                            .any(|e| e["message"]["role"] == "assistant")
+                                            .filter(|e| e["message"]["role"] == "assistant")
+                                            .count()
+                                            >= minimum_turn as usize
                                     } else {
                                         s.entries.values().any(|e| {
                                             e.event.kind == "turn/end"
@@ -137,6 +139,35 @@ async fn main() -> Result<()> {
                 .await
                 .map_err(|_| Error::Timeout)??;
                 Value::Null
+            }
+            "observeReady" => {
+                use futures_util::StreamExt;
+                let mut stream = runtime
+                    .observe_files(
+                        id.ok_or_else(|| unsupported("sessionId required"))?,
+                        command["path"].as_str().unwrap_or("."),
+                    )
+                    .await?;
+                tokio::time::timeout(Duration::from_secs(10), stream.next())
+                    .await
+                    .map_err(|_| Error::Timeout)?
+                    .ok_or(Error::Disconnected)??
+            }
+            "waitGoal" => {
+                let id = id.ok_or_else(|| unsupported("sessionId required"))?;
+                let phase = string(command, "phase")?;
+                tokio::time::timeout(Duration::from_secs(30), async {
+                    loop {
+                        if let Some(goal) = runtime.goal(id).await?
+                            && goal.phase == phase
+                        {
+                            return serde_json::to_value(goal).map_err(Error::from);
+                        }
+                        tokio::time::sleep(Duration::from_millis(50)).await;
+                    }
+                })
+                .await
+                .map_err(|_| Error::Timeout)??
             }
             "promptAndAnswer" => {
                 let id = id.ok_or_else(|| unsupported("sessionId required"))?;
@@ -172,8 +203,11 @@ async fn main() -> Result<()> {
                 .map_err(|_| Error::Timeout)??;
                 response
             }
-            "call" => {
-                let mut args = command.get("args").cloned().unwrap_or(json!({}));
+            "call" | "callError" => {
+                let mut args = resolve_variables(
+                    command.get("args").cloned().unwrap_or(json!({})),
+                    &variables,
+                )?;
                 if let Some(id) = id {
                     args["sessionId"] = json!(id);
                 }
@@ -185,11 +219,26 @@ async fn main() -> Result<()> {
                             .as_str()
                             .unwrap_or(&uuid::Uuid::new_v4().to_string()),
                     )
-                    .await?;
-                if let Some(name) = command["saveAs"].as_str() {
-                    variables.insert(name.into(), string(&result, "sessionId")?.into());
+                    .await;
+                if operation == "callError" {
+                    let error = result
+                        .err()
+                        .ok_or_else(|| Error::Protocol("expected call failure".into()))?;
+                    json!({"error":error.to_string()})
+                } else {
+                    let result = result?;
+                    if let Some(name) = command["saveAs"].as_str() {
+                        let pointer = command["savePointer"].as_str().unwrap_or("/sessionId");
+                        variables.insert(
+                            name.into(),
+                            result
+                                .pointer(pointer)
+                                .cloned()
+                                .ok_or_else(|| Error::Protocol("save pointer missing".into()))?,
+                        );
+                    }
+                    result
                 }
-                result
             }
             _ => return Err(unsupported(&format!("headless operation {operation}"))),
         };
@@ -197,4 +246,27 @@ async fn main() -> Result<()> {
     }
     runtime.stop().await?;
     Ok(())
+}
+
+fn resolve_variables(mut value: Value, variables: &BTreeMap<String, Value>) -> Result<Value> {
+    match &mut value {
+        Value::String(text) if text.starts_with('@') => {
+            return variables
+                .get(&text[1..])
+                .cloned()
+                .ok_or_else(|| Error::Protocol("unknown command variable".into()));
+        }
+        Value::Array(items) => {
+            for item in items {
+                *item = resolve_variables(item.take(), variables)?;
+            }
+        }
+        Value::Object(fields) => {
+            for item in fields.values_mut() {
+                *item = resolve_variables(item.take(), variables)?;
+            }
+        }
+        _ => {}
+    }
+    Ok(value)
 }

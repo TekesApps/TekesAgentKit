@@ -29,7 +29,7 @@ Kernel HTTP / WebSocket
 
 `SessionRuntime::spawn` 后用 `wait_ready` 等待 inventory/control/actionables 基线及 recovery 调用。
 `open_session` 打开 journal 并等待 snapshot；`load_earlier` 保持初始 throughSequence；`close_session` 关闭该逻辑流并保留已读历史。
-`call` 保留原 ClientKit unary 信封及显式 rpcId，支持首批外的 Kernel 方法而不伪造已实现的强类型 API。
+`call` 保留原 ClientKit unary 信封及显式 rpcId；共享层另提供 create/submit/fork/discard/rename/archive/queue/upload/goal 类型化 API、能力快照与文件观察。
 `create_session` 提供 cwd，由 Native adapter 转换为无环境授权的最小 execution；更完整授权由 host 用 `call` 显式提供。
 `prompt` 是 queue/text 便利方法，`cancel`、`respond` 分别对应取消与 actionable 回复。
 
@@ -72,7 +72,7 @@ Kernel HTTP / WebSocket
 
 ## 当前限制
 
-- 没有 UI、durable cache、附件等完整强类型客户端 API，也没有生产 launcher。Pi/DSH 已有独立实现，见 session-endpoints.md。
+- 没有 UI、durable cache 或生产 launcher；附件策略、上传和读取已接入。Pi/DSH 已有独立实现，见 session-endpoints.md。
 - 流缓冲为每流 256 帧，溢出关闭连接并重建基线；不同调用方的背压/吞吐还需实际数据验证。
 - 连续失败预算是有限的保护，尚未实现完整的重试策略配置与错误分类 UI；连接健康 30 秒后重置累计连接失败预算。
 - runtime 的 unary/回答并发运行，不阻塞事件投影；分页仍由 command owner 串行执行，底层 transport 保持有界缓冲。

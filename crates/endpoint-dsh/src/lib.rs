@@ -1,4 +1,5 @@
 //! Independent DSH SessionEndpoint adapter for the authenticated Remote HTTP/mux protocol.
+mod extensions;
 mod history;
 mod multipart;
 mod remote;
@@ -95,6 +96,7 @@ impl EndpointConnector for DshConnector {
                 version,
             },
             capabilities: [
+                "workspace-sync",
                 "session-inventory-sync",
                 "session-control-sync",
                 "actionable-sync",
@@ -143,6 +145,40 @@ impl FollowState {
     async fn normalize(&mut self, value: Value) -> Result<()> {
         let generation = &self.generation;
         match &self.target {
+            StreamTarget::WorkspaceInventory => {
+                let kind = string(&value, "type")?;
+                require(
+                    self.began || kind == "baseline",
+                    "workspace delta before baseline",
+                )?;
+                require(
+                    !self.began || kind != "baseline",
+                    "duplicate workspace baseline",
+                )?;
+                self.began = true;
+                let frame = match kind {
+                    "baseline" | "replace" => {
+                        json!({"type":kind,"generation":generation,"snapshot":value["value"]})
+                    }
+                    "order" => {
+                        json!({"type":"reorder","generation":generation,"workspaceIds":value["workspaceIds"]})
+                    }
+                    "archived" => {
+                        json!({"type":"archived","generation":generation,"sessionIds":value["archivedSessionIds"]})
+                    }
+                    "pinned" => {
+                        json!({"type":"pinned","generation":generation,"sessionIds":value["pinnedSessionIds"]})
+                    }
+                    "upsert" | "remove" => {
+                        let mut frame = value;
+                        frame["generation"] = json!(generation);
+                        frame
+                    }
+                    _ => return Err(Error::Protocol("unknown workspace frame".into())),
+                };
+                self.pending.push_back(frame);
+            }
+
             StreamTarget::SessionJournal {
                 address,
                 max_messages,
@@ -345,8 +381,69 @@ impl SessionEndpoint for DshSessionEndpoint {
     fn host(&self) -> &HostDescription {
         &self.host
     }
+    fn capabilities(&self) -> EndpointCapabilities {
+        let mut caps = EndpointCapabilities::methods(&[
+            "session.create",
+            "session.rename",
+            "session.fork",
+            "session.archive",
+            "session.unarchive",
+            "session.prompt",
+            "session.cancel",
+            "session.updateQueue",
+            "session.models",
+            "models.list",
+            "session.selectModel",
+            "session.locator",
+            "session.files.stat",
+            "session.files.read",
+            "session.files.readBytes",
+            "session.uploadFile",
+            "attachments.policy",
+            "subagents.prompt",
+            "subagents.cancel",
+        ]);
+        caps.methods.extend(
+            extensions::ALIASES
+                .iter()
+                .chain(extensions::DIRECT_ROUTES)
+                .map(|s| (*s).into()),
+        );
+        caps.supports_archive_session = true;
+        caps.supports_unarchive_session = true;
+        caps.can_fork_completed_turn = true;
+        caps.supports_file_observation = true;
+        caps
+    }
+    fn supports_events(&self) -> bool {
+        true
+    }
+    async fn events(&self) -> Result<FrameStream> {
+        let raw = self.remote.open("$events", json!({})).await?;
+        let generation = self.generation.clone();
+        let remote = self.remote.clone();
+        Ok(Box::pin(stream::try_unfold(
+            (raw, None::<String>, generation, remote),
+            |(mut raw, mut client, generation, remote)| async move {
+                let value = raw.next().await.ok_or(Error::Disconnected)??;
+                let frame = if client.is_none() {
+                    require(value["type"] == "ready", "endpoint events need readiness")?;
+                    client = Some(string(&value, "clientId")?.into());
+                    json!({"type":"baseline","generation":generation,"snapshot":value})
+                } else {
+                    // Observation never owns a waterfall. Explicitly continue so this peer cannot stall it.
+                    if value["type"] == "waterfall" {
+                        remote.call("$events/result",json!({"clientId":client,"eventId":value["eventId"],"outcome":{"kind":"next"}}),&rpc()).await?;
+                    }
+                    json!({"type":"event","generation":generation,"event":value})
+                };
+                Ok(Some((frame, (raw, client, generation, remote))))
+            },
+        )))
+    }
     async fn follow(&self, target: StreamTarget) -> Result<FrameStream> {
         let (endpoint, args) = match &target {
+            StreamTarget::WorkspaceInventory => ("workspace/follow", json!({})),
             StreamTarget::SessionInventory | StreamTarget::Actionables => ("$events", json!({})),
             StreamTarget::SessionControl => ("session/control", json!({})),
             StreamTarget::SessionJournal {
@@ -470,6 +567,32 @@ impl SessionEndpoint for DshSessionEndpoint {
             history_source: "DSH session/follow + session/page".into(),
         })
     }
+    async fn observe_files(&self, id: &str, path: &str) -> Result<FrameStream> {
+        let raw = self
+            .remote
+            .open(
+                "workspaceFiles/changes",
+                json!({"workspaceFileScopeId":id,"path":path}),
+            )
+            .await?;
+        Ok(Box::pin(stream::try_unfold(
+            (raw, false),
+            |(mut raw, mut ready)| async move {
+                let frame = raw.next().await.ok_or(Error::Disconnected)??;
+                validate_file_watch(&frame)?;
+                require(
+                    ready || frame["kind"] == "ready",
+                    "file changes before ready",
+                )?;
+                require(
+                    !ready || frame["kind"] != "ready",
+                    "duplicate file readiness",
+                )?;
+                ready = true;
+                Ok(Some((frame, (raw, ready))))
+            },
+        )))
+    }
     async fn file_stat(&self, id: &str, path: &str) -> Result<SessionFileStat> {
         Ok(serde_json::from_value(
             self.remote
@@ -505,7 +628,76 @@ impl SessionEndpoint for DshSessionEndpoint {
         Ok(serde_json::from_value(self.remote.call("workspaceFiles/read",json!({"workspaceFileScopeId":id,"path":path,"range":{"offset":offset,"limit":limit}}),&rpc()).await?)?)
     }
     async fn call(&self, method: &str, mut payload: Value, rpc_id: &str) -> Result<Value> {
+        if matches!(method, "subagents.prompt" | "subagents.cancel") {
+            let parent = string(&payload, "parentSessionId")?;
+            let child = string(&payload, "childSessionId")?;
+            let catalog = self
+                .remote
+                .call("subagents/list", json!({"parentSessionId":parent}), rpc_id)
+                .await?;
+            require(
+                catalog["parentAvailable"] == true
+                    && array(&catalog, "entries")?.iter().any(|row| {
+                        row["id"] == child && row["kind"] == "child" && row["mode"] == "continuable"
+                    }),
+                "child is not continuable under this parent",
+            )?;
+            if method == "subagents.cancel" {
+                return self.remote.call("subagents/interruptByParent",json!({"parentSessionId":parent,"childSessionId":child,"mode":"continuable"}),rpc_id).await;
+            }
+            require(
+                !array(&payload, "content")?
+                    .iter()
+                    .any(|part| part["type"] == "file"),
+                "child continuation does not support files",
+            )?;
+            payload["requestId"] = json!(rpc_id);
+            payload["mode"] = json!("continuable");
+            return self
+                .remote
+                .call("subagents/prompt", json!({"request":payload}), rpc_id)
+                .await;
+        }
+        if let Some((endpoint, args)) = extensions::route(method, &payload)? {
+            return self.remote.call(&endpoint, args, rpc_id).await;
+        }
         let endpoint = match method {
+            "session.uploadFile" => {
+                use base64::Engine;
+                let data = base64::engine::general_purpose::STANDARD
+                    .decode(string(&payload, "data")?)
+                    .map_err(|_| Error::Protocol("invalid upload base64".into()))?;
+                require(
+                    !data.is_empty() && data.len() <= 8 * 1024 * 1024,
+                    "upload limit exceeded",
+                )?;
+                return self
+                    .remote
+                    .upload(
+                        string(&payload, "sessionId")?,
+                        string(&payload, "name")?,
+                        data,
+                    )
+                    .await;
+            }
+            "attachments.policy" => {
+                let mut policy = json!({"inlineMediaTypes":["image/png","image/jpeg","image/webp","image/gif"],"maxAttachmentBytes":5242880,"maxAttachmentsPerMessage":20,"maxMessageAttachmentBytes":104857600,"maxImagePixels":40000000,"maxImageDimension":2000});
+                if let Some(id) = payload["sessionId"].as_str() {
+                    let value = self
+                        .remote
+                        .call(
+                            "session/projections",
+                            json!({"request":{"sessionId":id}}),
+                            rpc_id,
+                        )
+                        .await?;
+                    let limits = &value["values"]["imageLimits"];
+                    if value["kind"] != "migration-required" && limits.is_object() {
+                        policy = json!({"inlineMediaTypes":limits["mediaTypes"],"maxAttachmentBytes":limits["maxImageBytes"],"maxAttachmentsPerMessage":limits["maxImagesPerMessage"],"maxMessageAttachmentBytes":limits["maxMessageImageBytes"],"maxImagePixels":limits["maxImagePixels"],"maxImageDimension":limits["maxImageDimension"]});
+                    }
+                }
+                return Ok(policy);
+            }
             "session.create" => {
                 require(
                     payload.get("execution").is_none(),
@@ -542,10 +734,31 @@ impl SessionEndpoint for DshSessionEndpoint {
             "session.updateQueue" => "session/updateQueue",
             "session.selectModel" => "session/selectModel",
             "models.list" | "session.models" => {
-                return self
+                let catalog = self
                     .remote
                     .call("session/modelCatalog", json!({}), rpc_id)
-                    .await;
+                    .await?;
+                let mut current = catalog["default"].clone();
+                if method == "session.models" {
+                    let projections = self
+                        .remote
+                        .call(
+                            "session/projections",
+                            json!({"request":{"sessionId":string(&payload,"sessionId")?}}),
+                            rpc_id,
+                        )
+                        .await?;
+                    let next = &projections["values"]["modelSelection"]["next"];
+                    if projections["kind"] != "migration-required" && next.is_object() {
+                        current = next.clone();
+                    }
+                }
+                let routable = array(&catalog, "routableProviders")?
+                    .iter()
+                    .any(|provider| *provider == current["provider"]);
+                return Ok(
+                    json!({"current":current,"routable":routable,"groups":catalog["groups"],"failures":catalog["failures"],"defaultSelection":catalog["default"],"routableProviders":catalog["routableProviders"]}),
+                );
             }
             "session.archive" | "session.unarchive" => {
                 return self

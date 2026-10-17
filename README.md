@@ -16,7 +16,7 @@
 
 本地可以直接使用 `MemoryProjectionStore`，**不需要客户端 Mirror**。当前三个 endpoint 都走内存投影；远端 durable cache 尚未实现。
 Pi 的宿主持久化指针注册表和保守的提交 receipt 用于恢复及避免重复提交，并不是历史 Mirror。
-Presentation / Components 仍是骨架，没有接 TekesUI。当前是 headless 核心闭环，尚未覆盖 ClientKit 的全部可选 API。
+Presentation / Components 仍是骨架，没有接 TekesUI。三个 SEP 的非 UI 会话闭环已实现；产品服务通过显式 `HostServices` 注入，能力按端声明，不等同于全部 ClientKit UI/产品能力。
 
 ```sh
 cargo fmt --all --check
@@ -41,13 +41,14 @@ python3 scripts/install-dsh-runtime.py \
 python3 scripts/test-real-session-endpoints.py \
   --kernel-root /absolute/compatible-kernel-0.9-worktree \
   --pi-root /absolute/pi-1.3.0-installation \
-  --dsh-root /absolute/dsh-0.2.0-rc.2-installation
+  --dsh-root /absolute/dsh-0.2.1-rc.2-installation
 ```
 
 脚本使用临时 HOME、状态目录和本地合成 provider，不请求真实模型服务，不修改运行时源码。Kernel root 须已有 supervisor/worker/helper/workspace-service；Pi/DSH root 须有安装好的 Node 和对应 CLI。
 另有 `scripts/test-real-kernel.py` 验证 Kernel 的 frozen-cut 分页和取消结算。
 
 `tekes-agent-headless` 从 stdin JSON 接收连接配置和批处理命令；凭证不放在 argv。覆盖建会话、选模型、提交、回传、交互回答、重连、定位、历史和文件读取。
+公开类型化 API 包括 create/submit/fork/discard/rename/archive/queue/upload/goal；文件观察和端点事件同样通过 runtime 暴露。
 公共 API 示例：[kernel_headless](crates/endpoint-kernel/examples/kernel_headless.rs)、[replay](crates/session/examples/replay.rs)。
 常规读取使用 `inspect` 和 revision subscription，显式 `snapshot()` 才复制完整读模型。慢 unary 不阻塞事件投影；不自动重试不确定 mutation。
 

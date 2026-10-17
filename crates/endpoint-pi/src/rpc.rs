@@ -28,6 +28,7 @@ pub(crate) struct Rpc {
     commands: mpsc::UnboundedSender<Request>,
     events: broadcast::Sender<Value>,
     alive: Arc<AtomicBool>,
+    control_token: String,
     task: tokio::task::JoinHandle<()>,
 }
 impl Drop for Rpc {
@@ -41,10 +42,17 @@ impl Rpc {
         cwd: &Path,
         session: Option<&Path>,
     ) -> Result<Arc<Self>> {
+        let control_token = uuid::Uuid::new_v4().to_string();
         let mut command = Command::new(&config.executable);
         command
             .args(&config.arguments)
             .args(["--mode", "rpc", "--no-extensions"]);
+        command
+            .arg("-e")
+            .arg(config.data_root.join("agentkit-control.mjs"));
+        command
+            .arg("--session-dir")
+            .arg(config.data_root.join("sessions"));
         for extension in &config.extensions {
             command.arg("-e").arg(extension);
         }
@@ -58,6 +66,7 @@ impl Rpc {
             .env_clear()
             .envs(&config.environment)
             .env("PI_CODING_AGENT_DIR", config.data_root.join("agent"))
+            .env("AGENTKIT_CONTROL_TOKEN", &control_token)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
@@ -127,8 +136,50 @@ impl Rpc {
             commands,
             events,
             alive,
+            control_token,
             task,
         }))
+    }
+    pub(crate) async fn control(&self, method: &str, params: Value) -> Result<Value> {
+        use base64::Engine;
+        let id = uuid::Uuid::new_v4().to_string();
+        let encoded = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(serde_json::to_vec(
+            &json!({"id":id,"token":self.control_token,"method":method,"params":params}),
+        )?);
+        let mut events = self.events();
+        let response = self
+            .request(
+                "prompt",
+                json!({"message":format!("/agentkit-control {encoded}")}),
+            )
+            .await?;
+        require(
+            response["disposition"] == "handled",
+            "host control not handled",
+        )?;
+        tokio::time::timeout(Duration::from_secs(30), async {
+            loop {
+                let event = events.recv().await.map_err(|_| Error::Disconnected)?;
+                if let Some(message) = event["message"]
+                    .as_str()
+                    .and_then(|s| s.strip_prefix("agentkit-control/v1:"))
+                {
+                    let value: Value = serde_json::from_str(message)?;
+                    if value["id"] != id {
+                        continue;
+                    }
+                    return if value["success"] == true {
+                        Ok(value.get("data").cloned().unwrap_or(Value::Null))
+                    } else {
+                        Err(Error::Remote(
+                            json!({"code":"pi/host-control","message":value["error"]}),
+                        ))
+                    };
+                }
+            }
+        })
+        .await
+        .map_err(|_| Error::Timeout)?
     }
     pub(crate) fn alive(&self) -> bool {
         self.alive.load(Ordering::Acquire)

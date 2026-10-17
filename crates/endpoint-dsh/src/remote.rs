@@ -29,6 +29,7 @@ pub(crate) struct Remote {
     client: reqwest::Client,
     commands: mpsc::UnboundedSender<Command>,
     task: tokio::task::JoinHandle<()>,
+    closed: std::sync::Arc<std::sync::atomic::AtomicBool>,
 }
 impl Drop for Remote {
     fn drop(&mut self) {
@@ -97,6 +98,8 @@ impl Remote {
         .map_err(|_| Error::Timeout)?
         .map_err(|_| Error::Transport("DSH websocket handshake failed".into()))?;
         let (commands, mut receiver) = mpsc::unbounded_channel();
+        let closed = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let task_closed = closed.clone();
         let task = tokio::spawn(async move {
             let mut streams = HashMap::<String, mpsc::Sender<Result<Value>>>::new();
             loop {
@@ -140,6 +143,7 @@ impl Remote {
                     }
                 }
             }
+            task_closed.store(true, std::sync::atomic::Ordering::Release);
             for (_, output) in streams {
                 let _ = output.try_send(Err(Error::Disconnected));
             }
@@ -149,6 +153,7 @@ impl Remote {
             client,
             commands,
             task,
+            closed,
         })
     }
     pub(crate) async fn open(&self, endpoint: &str, args: Value) -> Result<FrameStream> {
@@ -176,6 +181,10 @@ impl Remote {
         Ok(Box::pin(stream))
     }
     pub(crate) async fn call(&self, endpoint: &str, args: Value, rpc_id: &str) -> Result<Value> {
+        require(
+            !self.closed.load(std::sync::atomic::Ordering::Acquire),
+            "DSH endpoint is closed",
+        )?;
         require(
             !rpc_id.is_empty()
                 && !endpoint.is_empty()
@@ -252,7 +261,42 @@ impl Remote {
         }
         multipart::decode(&bytes, &content_type)
     }
+    pub(crate) async fn upload(&self, id: &str, name: &str, data: Vec<u8>) -> Result<Value> {
+        require(
+            !self.closed.load(std::sync::atomic::Ordering::Acquire),
+            "DSH endpoint is closed",
+        )?;
+        let mut url = self
+            .config
+            .base_url
+            .join("api/session/uploadFileBinary")
+            .map_err(|_| Error::Protocol("invalid upload URL".into()))?;
+        url.query_pairs_mut()
+            .append_pair("sessionId", id)
+            .append_pair("name", name);
+        let mut request = self
+            .client
+            .post(url)
+            .header("Content-Type", "application/octet-stream")
+            .body(data);
+        if let Some((name, value)) = &self.config.authorization {
+            request = request.header(name, value);
+        }
+        let response = request.send().await.map_err(|_| Error::Disconnected)?;
+        require(
+            response.status() == reqwest::StatusCode::OK,
+            "DSH upload HTTP status",
+        )?;
+        let result = self.decode(response).await?;
+        if result["ok"] == true {
+            Ok(result["value"].clone())
+        } else {
+            Err(Error::Remote(result["error"].clone()))
+        }
+    }
     pub(crate) fn close(&self) {
+        self.closed
+            .store(true, std::sync::atomic::Ordering::Release);
         let _ = self.commands.send(Command::Close);
     }
 }

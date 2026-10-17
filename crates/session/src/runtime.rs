@@ -24,10 +24,12 @@ fn rpc_id() -> String {
 }
 
 type Reply<T> = oneshot::Sender<Result<T>>;
+type OperationResult = Option<(Option<String>, Reply<Value>, Result<Value>)>;
 enum Command {
     Open(String, Reply<()>),
     Close(String, Reply<()>),
     Earlier(String, Reply<bool>),
+    Observe(String, String, Reply<FrameStream>),
     Call {
         method: String,
         payload: Value,
@@ -135,6 +137,11 @@ impl SessionRuntime {
             s.sessions.get(id).is_some_and(|s| s.journal_ready)
         })
         .await
+    }
+    pub async fn observe_files(&self, id: &str, path: &str) -> Result<FrameStream> {
+        let (reply, result) = oneshot::channel();
+        self.send(Command::Observe(id.into(), path.into(), reply), result)
+            .await
     }
     pub async fn close_session(&self, id: &str) -> Result<()> {
         let (reply, result) = oneshot::channel();
@@ -406,7 +413,10 @@ async fn run(
                     ))
                 } else {
                     epoch += 1;
-                    store.update(|s| s.begin_connection(endpoint.host().clone()));
+                    store.update(|s| {
+                        s.begin_connection(endpoint.host().clone());
+                        s.endpoint_capabilities = endpoint.capabilities();
+                    });
                     let result =
                         connected(endpoint.clone(), &mut commands, &store, &mut wanted, epoch)
                             .await;
@@ -459,6 +469,9 @@ fn reject(command: Command) {
         Command::Open(_, reply) | Command::Close(_, reply) | Command::Respond { reply, .. } => {
             let _ = reply.send(Err(Error::Disconnected));
         }
+        Command::Observe(_, _, reply) => {
+            let _ = reply.send(Err(Error::Disconnected));
+        }
         Command::Earlier(_, reply) => {
             let _ = reply.send(Err(Error::Disconnected));
         }
@@ -477,7 +490,7 @@ async fn connected(
     wanted: &mut BTreeSet<String>,
     epoch: u64,
 ) -> Result<bool> {
-    let mut operations = tokio::task::JoinSet::new();
+    let mut operations: tokio::task::JoinSet<OperationResult> = tokio::task::JoinSet::new();
     let mut streams = SelectAll::new();
     for (name, target) in [
         ("inventory", StreamTarget::SessionInventory),
@@ -485,6 +498,16 @@ async fn connected(
         ("actionables", StreamTarget::Actionables),
     ] {
         streams.push(tagged(name.into(), epoch, endpoint.follow(target).await?));
+    }
+    if endpoint.supports_events() {
+        streams.push(tagged("events".into(), epoch, endpoint.events().await?));
+    }
+    if endpoint.host().capabilities.contains("workspace-sync") {
+        streams.push(tagged(
+            "workspace".into(),
+            epoch,
+            endpoint.follow(StreamTarget::WorkspaceInventory).await?,
+        ));
     }
     let mut journal_epochs = std::collections::BTreeMap::new();
     let mut journal_cancellations = std::collections::BTreeMap::new();
@@ -502,7 +525,17 @@ async fn connected(
     tokio::pin!(baseline_deadline);
     loop {
         tokio::select! {
-            _ = operations.join_next(), if !operations.is_empty() => {},
+            completed = operations.join_next(), if !operations.is_empty() => {
+                if let Some(Ok(Some((removed,reply,result))))=completed {
+                    if result.is_err() && let Some(id)=removed {
+                        next_journal_epoch+=1;
+                        if let Ok(cancellation)=add_journal(endpoint.as_ref(),&mut streams,&id,next_journal_epoch).await {
+                            wanted.insert(id.clone());journal_epochs.insert(id.clone(),next_journal_epoch);journal_cancellations.insert(id,cancellation);
+                        }
+                    }
+                    let _=reply.send(result);
+                }
+            },
             _ = &mut baseline_deadline, if !recovered => return Err(Error::Timeout),
             frame = streams.next() => {
                 let Some((name, frame_epoch, frame)) = frame else { return Err(Error::Disconnected); };
@@ -563,17 +596,28 @@ async fn connected(
                         if let Some(cancellation) = journal_cancellations.remove(&id) { cancellation.abort(); }
                         let _ = reply.send(Ok(()));
                     }
+                    Command::Observe(id,path,reply)=>{
+                        let endpoint=endpoint.clone();
+                        operations.spawn(async move {let result=endpoint.observe_files(&id,&path).await;let _=reply.send(result);None});
+                    }
                     Command::Earlier(id, reply) => { let result = load_earlier(endpoint.as_ref(), store, &id).await; let _ = reply.send(result); }
                     Command::Call { method, payload, rpc_id, reply } => {
                         if !store.read(MemoryProjectionStore::ready) || operations.len() >= 64 { let _ = reply.send(Err(Error::Disconnected)); continue; }
                         let endpoint = endpoint.clone();
-                        operations.spawn(async move { let result = invoke(endpoint.as_ref(), &method, payload, &rpc_id).await; let _ = reply.send(result); });
+                        let removed=if matches!(method.as_str(),"session.discard"|"session.archive") {
+                            let id=payload["sessionId"].as_str().unwrap_or("").to_owned();
+                            if wanted.remove(&id) {
+                                journal_epochs.remove(&id);if let Some(cancellation)=journal_cancellations.remove(&id) {cancellation.abort();}
+                                store.update(|s|s.reset_journal(&id));Some(id)
+                            } else {None}
+                        } else {None};
+                        operations.spawn(async move { let result = invoke(endpoint.as_ref(), &method, payload, &rpc_id).await; Some((removed,reply,result)) });
                     }
                     Command::Respond { id, revision, outcome, reply } => {
                         let valid = store.read(|s| s.ready() && s.actionables.get(&id).is_some_and(|a| integer(a, "revision").ok() == Some(revision)));
                         if !valid || operations.len() >= 64 { let _ = reply.send(Err(Error::Protocol("stale or missing actionable revision".into()))); continue; }
                         let endpoint = endpoint.clone();
-                        operations.spawn(async move { let result = endpoint.respond(&id, revision, outcome).await; let _ = reply.send(result); });
+                        operations.spawn(async move { let result = endpoint.respond(&id, revision, outcome).await; let _ = reply.send(result); None });
                     }
                 }
             }
@@ -649,6 +693,7 @@ async fn invoke(
     rpc_id: &str,
 ) -> Result<Value> {
     match method {
+        "endpoint.capabilities" => Ok(serde_json::to_value(endpoint.capabilities())?),
         "session.locator" => Ok(serde_json::to_value(
             endpoint.locator(string(&payload, "sessionId")?).await?,
         )?),

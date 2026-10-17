@@ -1,5 +1,11 @@
 //! Pi 1.3 native stdio RPC adapter. Native session-tree records never masquerade as journal events.
+mod attachments;
+mod extensions;
 mod files;
+mod goal_driver;
+mod management;
+mod models;
+mod queue;
 mod rpc;
 use async_trait::async_trait;
 use futures_util::{StreamExt, stream};
@@ -49,6 +55,10 @@ impl PiConfiguration {
 struct Receipt {
     digest: String,
     accepted: bool,
+    #[serde(default)]
+    queued: bool,
+    #[serde(default)]
+    cancelled: bool,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct Row {
@@ -60,10 +70,24 @@ struct Row {
     parent: Option<String>,
     ephemeral: bool,
     receipts: BTreeMap<String, Receipt>,
+    #[serde(default)]
+    workspace_id: Option<String>,
+    #[serde(default)]
+    queue: Vec<Value>,
+    #[serde(default)]
+    control_revision: i64,
+    #[serde(default)]
+    goal_revision: i64,
+    #[serde(default)]
+    goal: Option<Value>,
+    #[serde(default)]
+    feedback: BTreeMap<String, Value>,
 }
 #[derive(Default, Serialize, Deserialize)]
 struct Manifest {
     sessions: BTreeMap<String, Row>,
+    #[serde(default)]
+    workspaces: BTreeMap<String, Value>,
 }
 #[derive(Clone)]
 struct PendingActionable {
@@ -75,10 +99,13 @@ struct PendingActionable {
 }
 struct Context {
     config: PiConfiguration,
+    _root_lock: std::fs::File,
     manifest: Mutex<Manifest>,
     processes: Mutex<BTreeMap<String, Arc<Rpc>>>,
     actionables: Arc<Mutex<BTreeMap<String, PendingActionable>>>,
     notifications: broadcast::Sender<Value>,
+    gates: Mutex<BTreeMap<String, Arc<tokio::sync::Semaphore>>>,
+    armed_goals: Mutex<BTreeSet<String>>,
 }
 #[derive(Clone)]
 pub struct PiConnector {
@@ -97,13 +124,29 @@ impl PiConnector {
             .await
             .map_err(io_error)?;
         config.data_root = config.data_root.canonicalize().map_err(io_error)?;
+        let root_lock = std::fs::OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .read(true)
+            .write(true)
+            .open(config.data_root.join(".agentkit.lock"))
+            .map_err(io_error)?;
+        root_lock
+            .try_lock()
+            .map_err(|_| Error::Protocol("Pi data root is owned by another connector".into()))?;
         for root in &mut config.session_roots {
             require(root.is_absolute(), "Pi session roots must be absolute")?;
             *root = root.canonicalize().map_err(io_error)?;
             require(root.is_dir(), "Pi session root must be directory")?;
         }
         let file = config.data_root.join("agentkit-sessions.json");
-        let manifest: Manifest = match tokio::fs::read(&file).await {
+        tokio::fs::write(
+            config.data_root.join("agentkit-control.mjs"),
+            include_str!("../resources/agentkit-control.mjs"),
+        )
+        .await
+        .map_err(io_error)?;
+        let mut manifest: Manifest = match tokio::fs::read(&file).await {
             Ok(bytes) => {
                 require(bytes.len() <= 16 * 1024 * 1024, "Pi registry exceeds limit")?;
                 serde_json::from_slice(&bytes)?
@@ -111,6 +154,29 @@ impl PiConnector {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Manifest::default(),
             Err(e) => return Err(io_error(e)),
         };
+        let scratch: Vec<_> = manifest
+            .sessions
+            .values()
+            .filter(|row| row.ephemeral)
+            .cloned()
+            .collect();
+        for row in scratch {
+            require(
+                row.file.starts_with(config.data_root.join("sessions")),
+                "scratch outside owned storage",
+            )?;
+            if row.file.exists() {
+                tokio::fs::remove_file(&row.file).await.map_err(io_error)?;
+            }
+            let uploads = config
+                .data_root
+                .join("uploads")
+                .join(format!("{:x}", Sha256::digest(row.id.as_bytes())));
+            if uploads.exists() {
+                tokio::fs::remove_dir_all(uploads).await.map_err(io_error)?;
+            }
+            manifest.sessions.remove(&row.id);
+        }
         for (id, row) in &manifest.sessions {
             require(
                 id == &row.id
@@ -133,9 +199,12 @@ impl PiConnector {
         Ok(Self {
             context: Arc::new(Context {
                 config,
+                _root_lock: root_lock,
                 manifest: Mutex::new(manifest),
                 processes: Mutex::new(BTreeMap::new()),
                 notifications,
+                gates: Mutex::new(BTreeMap::new()),
+                armed_goals: Mutex::new(BTreeSet::new()),
                 actionables: Arc::new(Mutex::new(BTreeMap::new())),
             }),
         })
@@ -195,6 +264,7 @@ impl Context {
         let mut events = rpc.events();
         let sender = self.notifications.clone();
         let id_owned = id.to_owned();
+        let weak_context = Arc::downgrade(self);
         let pending_actionables = self.actionables.clone();
         let weak_rpc = Arc::downgrade(&rpc);
         tokio::spawn(async move {
@@ -221,11 +291,28 @@ impl Context {
                     let _ = sender.send(json!({"actionable": value}));
                 }
                 let _ = sender.send(json!({"sessionId":id_owned,"event":event}));
+                if event["type"] == "agent_settled"
+                    && let Some(context) = weak_context.upgrade()
+                {
+                    let id = id_owned.clone();
+                    let expected = weak_rpc.upgrade();
+                    tokio::spawn(async move {
+                        if let Some(expected) = expected {
+                            let _ = context
+                                .dispatch_next_if_current(&id, Some(expected.clone()))
+                                .await;
+                            context.schedule_goal(id, expected);
+                        }
+                    });
+                }
                 if event["type"] == "agentkit/transport-closed" {
                     let mut pending = pending_actionables.lock().await;
                     let ids: Vec<_> = pending
                         .iter()
-                        .filter(|(_, item)| item.session == id_owned)
+                        .filter(|(_, item)| {
+                            item.session == id_owned
+                                && std::sync::Weak::ptr_eq(&item.rpc, &weak_rpc)
+                        })
                         .map(|(id, _)| id.clone())
                         .collect();
                     for id in ids {
@@ -265,7 +352,7 @@ fn summary(row: &Row) -> Value {
         .unwrap_or_default()
         .as_secs_f64()
         * 1000.0;
-    json!({"sessionId":row.id,"updatedAt":updated,"running":false,"blank":!row.file.exists(),"cwd":row.cwd,"parentSessionId":row.parent,"ephemeral":row.ephemeral,"projections":{"asOfSeq":0,"values":{"title":row.title}}})
+    json!({"sessionId":row.id,"updatedAt":updated,"running":false,"blank":!row.file.exists(),"cwd":row.cwd,"parentSessionId":row.parent,"workspaceId":row.workspace_id,"ephemeral":row.ephemeral,"projections":{"asOfSeq":row.control_revision,"values":{"title":row.title}}})
 }
 #[async_trait]
 impl EndpointConnector for PiConnector {
@@ -301,6 +388,7 @@ impl EndpointConnector for PiConnector {
                 version,
             },
             capabilities: [
+                "workspace-sync",
                 "session-inventory-sync",
                 "projected-stream",
                 "session-control-sync",
@@ -322,6 +410,7 @@ impl EndpointConnector for PiConnector {
             generation: uuid::Uuid::new_v4().to_string(),
             host,
             windows: Arc::new(Mutex::new(BTreeMap::new())),
+            lifetime: tokio::sync::watch::channel(false).0,
         }))
     }
 }
@@ -330,6 +419,7 @@ pub struct PiSessionEndpoint {
     generation: String,
     host: HostDescription,
     windows: Arc<Mutex<BTreeMap<String, usize>>>,
+    lifetime: tokio::sync::watch::Sender<bool>,
 }
 impl PiSessionEndpoint {
     async fn conversation(&self, id: &str, initial: bool) -> Result<Value> {
@@ -413,10 +503,118 @@ impl SessionEndpoint for PiSessionEndpoint {
     fn host(&self) -> &HostDescription {
         &self.host
     }
+    fn capabilities(&self) -> EndpointCapabilities {
+        let mut caps = EndpointCapabilities::methods(&[
+            "workspace.create",
+            "workspace.rename",
+            "workspace.relocate",
+            "session.create",
+            "session.adopt",
+            "session.rename",
+            "session.fork",
+            "session.discard",
+            "session.archive",
+            "session.unarchive",
+            "session.listArchived",
+            "session.prompt",
+            "session.updateQueue",
+            "session.cancel",
+            "session.history.export",
+            "session.locator",
+            "session.files.stat",
+            "session.files.read",
+            "session.files.readBytes",
+            "pi.getState",
+            "pi.getTree",
+            "pi.getMessages",
+            "commands.list",
+            "commands.execute",
+            "skills.list",
+            "settings.get",
+            "models.list",
+            "models/list",
+            "session.models",
+            "session.selectModel",
+            "commands/list",
+            "commands/run",
+            "commands/execute",
+            "settings.describe",
+            "tools.list",
+            "skills/list",
+            "questions.cancel",
+            "attachments.policy",
+            "session.uploadFile",
+            "session.fileAttachment",
+            "session.attachment",
+            "goals.get",
+            "goals.create",
+            "goals.edit",
+            "goals.clear",
+            "goals.pause",
+            "goals.resume",
+            "feedback.list",
+            "feedback.put",
+            "feedback.delete",
+            "references.sessions",
+            "references.files",
+            "session.search",
+            "sessions.recover",
+            "session.initialPresets",
+        ]);
+        caps.supports_archive_session = true;
+        caps.supports_unarchive_session = true;
+        caps.supports_ephemeral_fork = true;
+        caps.can_fork_completed_turn = true;
+        caps.supports_file_observation = true;
+        caps
+    }
     fn content_kind(&self) -> SessionContentKind {
         SessionContentKind::NativeConversation
     }
+    fn supports_events(&self) -> bool {
+        true
+    }
+    async fn events(&self) -> Result<FrameStream> {
+        let events = self.context.notifications.subscribe();
+        let generation = self.generation.clone();
+        let baseline = json!({"type":"baseline","generation":generation,"snapshot":{}});
+        let updates = stream::try_unfold(
+            (events, generation),
+            |(mut events, generation)| async move {
+                loop {
+                    let event = events.recv().await.map_err(|_| Error::Disconnected)?;
+                    if event.get("event").is_some()
+                        && !matches!(
+                            event["event"]["type"].as_str(),
+                            Some(
+                                "extension_ui_request"
+                                    | "agent_start"
+                                    | "agent_settled"
+                                    | "agentkit/transport-closed"
+                            )
+                        )
+                    {
+                        continue;
+                    }
+                    if event["event"]["message"]
+                        .as_str()
+                        .is_some_and(|text| text.starts_with("agentkit-control/v1:"))
+                    {
+                        continue;
+                    }
+                    return Ok(Some((
+                        json!({"type":"event","generation":generation,"event":event}),
+                        (events, generation),
+                    )));
+                }
+            },
+        );
+        Ok(Box::pin(
+            stream::once(async { Ok(baseline) }).chain(updates),
+        ))
+    }
     async fn follow(&self, target: StreamTarget) -> Result<FrameStream> {
+        require(!*self.lifetime.borrow(), "endpoint is closed")?;
         let generation = self.generation.clone();
         match target {
             StreamTarget::SessionJournal { .. } => {
@@ -476,11 +674,15 @@ impl SessionEndpoint for PiSessionEndpoint {
                 let events = self.context.notifications.subscribe();
                 let context = self.context.clone();
                 let baseline = match &target {
+                    StreamTarget::WorkspaceInventory => {
+                        json!({"type":"baseline","generation":generation,"snapshot":context.workspace_snapshot().await})
+                    }
                     StreamTarget::SessionInventory => {
                         json!({"type":"baseline","generation":generation,"snapshot":{"items":context.summaries().await}})
                     }
                     StreamTarget::SessionControl => {
-                        json!({"type":"baseline","generation":generation,"snapshot":{"queues":[],"jobs":[],"projections":[]}})
+                        let manifest = context.manifest.lock().await;
+                        json!({"type":"baseline","generation":generation,"snapshot":{"queues":manifest.sessions.values().map(|row|json!({"sessionId":row.id,"items":row.queue})).collect::<Vec<_>>(),"jobs":[],"projections":manifest.sessions.values().map(|row|json!({"sessionId":row.id,"projections":{"asOfSeq":row.control_revision,"values":{"title":row.title,"goal":row.goal}}})).collect::<Vec<_>>()}})
                     }
                     StreamTarget::Actionables => json!({"type":"reset","generation":generation}),
                     _ => unreachable!(),
@@ -503,6 +705,25 @@ impl SessionEndpoint for PiSessionEndpoint {
                                 }
                             };
                             let frame = match &target {
+                                StreamTarget::SessionControl if event.get("queue").is_some() => {
+                                    Some(
+                                        json!({"type":"queue","generation":generation,"state":event["queue"]}),
+                                    )
+                                }
+                                StreamTarget::SessionControl
+                                    if event.get("projection").is_some() =>
+                                {
+                                    Some(
+                                        json!({"type":"projection","generation":generation,"state":event["projection"]}),
+                                    )
+                                }
+                                StreamTarget::WorkspaceInventory
+                                    if event.get("workspaces").is_some() =>
+                                {
+                                    Some(
+                                        json!({"type":"replace","generation":generation,"snapshot":event["workspaces"]}),
+                                    )
+                                }
                                 StreamTarget::SessionInventory
                                     if event.get("removed").is_some() =>
                                 {
@@ -595,6 +816,10 @@ impl SessionEndpoint for PiSessionEndpoint {
             history_source: "Pi get_entries active ancestry".into(),
         })
     }
+    async fn observe_files(&self, id: &str, path: &str) -> Result<FrameStream> {
+        let row = self.context.row(id).await?;
+        files::observe(row.cwd, path, self.lifetime.subscribe()).await
+    }
     async fn file_stat(&self, id: &str, path: &str) -> Result<SessionFileStat> {
         let row = self.context.row(id).await?;
         let path = path.to_owned();
@@ -659,16 +884,65 @@ impl SessionEndpoint for PiSessionEndpoint {
         Ok(())
     }
     async fn call(&self, method: &str, payload: Value, rpc_id: &str) -> Result<Value> {
+        require(!*self.lifetime.borrow(), "endpoint is closed")?;
+        if !self.capabilities().supports(method) {
+            return Err(unsupported(&format!("Pi method {method}")));
+        }
+        let _guard = if matches!(
+            method,
+            "session.prompt"
+                | "session.fork"
+                | "session.discard"
+                | "session.archive"
+                | "session.rename"
+                | "session.selectModel"
+                | "session.updateQueue"
+        ) {
+            let id = string(&payload, "sessionId")?;
+            Some(
+                self.context
+                    .gate(id)
+                    .await
+                    .acquire_owned()
+                    .await
+                    .map_err(|_| Error::Disconnected)?,
+            )
+        } else {
+            None
+        };
+        if let Some(result) = self.extension_call(method, &payload).await {
+            return result;
+        }
+        if let Some(result) = self.attachment_call(method, &payload).await {
+            return result;
+        }
+        if method == "session.updateQueue" {
+            return self.context.update_queue(&payload).await;
+        }
+        if let Some(result) = self.management(method, &payload).await {
+            return result;
+        }
         match method {
             "session.create" => {
+                require(
+                    payload["agentPreset"].is_null() || payload["agentPreset"] == "default",
+                    "Pi preset must be supplied by an explicit host backend",
+                )?;
                 require(
                     payload.get("execution").is_none(),
                     "Kernel execution configuration cannot authorize a Pi session",
                 )?;
-                let cwd = payload["cwd"]
-                    .as_str()
-                    .ok_or_else(|| unsupported("explicit Pi cwd required"))?;
-                let cwd = Path::new(cwd).canonicalize().map_err(io_error)?;
+                let cwd = if let Some(workspace_id) = payload["workspaceId"].as_str() {
+                    let manifest = self.context.manifest.lock().await;
+                    let workspace = manifest
+                        .workspaces
+                        .get(workspace_id)
+                        .ok_or_else(|| unsupported("unknown workspace"))?;
+                    PathBuf::from(string(workspace, "path")?)
+                } else {
+                    PathBuf::from(string(&payload, "cwd")?)
+                };
+                let cwd = cwd.canonicalize().map_err(io_error)?;
                 require(cwd.is_dir(), "cwd must be directory")?;
                 let id = payload["sessionId"]
                     .as_str()
@@ -699,11 +973,18 @@ impl SessionEndpoint for PiSessionEndpoint {
                         parent: None,
                         ephemeral: false,
                         receipts: BTreeMap::new(),
+                        workspace_id: payload["workspaceId"].as_str().map(String::from),
+                        queue: Vec::new(),
+                        control_revision: 0,
+                        goal_revision: 0,
+                        goal: None,
+                        feedback: BTreeMap::new(),
                     },
                 );
                 self.context.save(&manifest).await?;
                 drop(manifest);
                 self.context.notify_row(&id).await;
+                self.context.notify_workspaces().await;
                 Ok(json!({"sessionId":id,"created":true}))
             }
             "session.adopt" => {
@@ -740,8 +1021,10 @@ impl SessionEndpoint for PiSessionEndpoint {
                 // Native RPC validates the file. AgentKit never decodes a private session log to create history.
                 let rpc = Rpc::start(&self.context.config, &cwd, Some(&file)).await?;
                 let state = rpc.request("get_state", json!({})).await;
+                let metadata = rpc.request("get_entries", json!({})).await;
                 rpc.close();
                 let state = state?;
+                let (goal_revision, goal, feedback) = extensions::recover_metadata(&metadata?)?;
                 let actual = Path::new(string(&state, "sessionFile")?)
                     .canonicalize()
                     .map_err(io_error)?;
@@ -757,17 +1040,24 @@ impl SessionEndpoint for PiSessionEndpoint {
                         parent: None,
                         ephemeral: false,
                         receipts: BTreeMap::new(),
+                        workspace_id: payload["workspaceId"].as_str().map(String::from),
+                        queue: Vec::new(),
+                        control_revision: 0,
+                        goal_revision,
+                        goal,
+                        feedback,
                     },
                 );
                 self.context.save(&manifest).await?;
                 drop(manifest);
                 self.context.notify_row(&id).await;
+                self.context.notify_workspaces().await;
                 Ok(json!({"sessionId":id,"created":true}))
             }
-            "models.list" => {
+            "models.list" | "models/list" => {
                 let rpc =
                     Rpc::start(&self.context.config, &self.context.config.data_root, None).await?;
-                let result = rpc.request("get_available_models", json!({})).await;
+                let result = self.model_catalog(&rpc).await;
                 rpc.close();
                 result
             }
@@ -777,7 +1067,18 @@ impl SessionEndpoint for PiSessionEndpoint {
             "session.archive" | "session.unarchive" => {
                 let id = string(&payload, "sessionId")?;
                 self.context.row(id).await?;
+                let row = self.context.row(id).await?;
+                require(!row.ephemeral, "scratch sessions cannot be archived")?;
                 let archived = method == "session.archive";
+                if archived {
+                    let active = self.context.processes.lock().await.get(id).cloned();
+                    if let Some(rpc) = active.filter(|rpc| rpc.alive()) {
+                        require(
+                            rpc.request("get_state", json!({})).await?["isStreaming"] == false,
+                            "cannot archive a running session",
+                        )?;
+                    }
+                }
                 if archived && let Some(rpc) = self.context.processes.lock().await.remove(id) {
                     rpc.close();
                 }
@@ -790,23 +1091,21 @@ impl SessionEndpoint for PiSessionEndpoint {
                 } else {
                     self.context.notify_row(id).await;
                 }
-                Ok(json!({"sessionId":id,"archived":archived}))
+                self.context.notify_workspaces().await;
+                if archived {
+                    Ok(
+                        json!({"archivedSessionIds":self.context.manifest.lock().await.sessions.values().filter(|r|r.archived).map(|r|r.id.clone()).collect::<Vec<_>>()}),
+                    )
+                } else {
+                    Ok(json!({"sessionId":id}))
+                }
             }
             _ => {
                 let id = string(&payload, "sessionId")?;
                 let rpc = self.context.process(id).await?;
                 match method {
-                    "session.models" => rpc.request("get_available_models", json!({})).await,
-                    "session.selectModel" => {
-                        rpc.request(
-                            "set_model",
-                            json!({
-                                "provider":string(&payload,"provider")?,
-                                "modelId":string(&payload,"model")?
-                            }),
-                        )
-                        .await
-                    }
+                    "session.models" => self.model_catalog(&rpc).await,
+                    "session.selectModel" => self.select_model(&rpc, &payload).await,
                     "session.cancel" => rpc.request("abort", json!({})).await,
                     "session.rename" => {
                         let title = string(&payload, "title")?;
@@ -818,27 +1117,34 @@ impl SessionEndpoint for PiSessionEndpoint {
                         self.context.save(&manifest).await?;
                         drop(manifest);
                         self.context.notify_row(id).await;
-                        Ok(json!({"sessionId":id,"title":title}))
+                        let seq = self
+                            .context
+                            .publish_projection(id, "title", json!(title))
+                            .await?;
+                        Ok(json!({"title":title,"seq":seq}))
                     }
                     "session.prompt" => {
                         require(!rpc_id.is_empty(), "prompt rpcId required")?;
-                        let mut text = Vec::new();
-                        for item in array(&payload, "content")? {
-                            require(
-                                item["type"] == "text",
-                                "Pi prompt currently requires text content",
-                            )?;
-                            text.push(string(item, "text")?);
+                        let (message, images) = self
+                            .context
+                            .materialize(id, array(&payload, "content")?)
+                            .await?;
+                        if payload["mode"] != "steer"
+                            && rpc.request("get_state", json!({})).await?["isStreaming"] == true
+                        {
+                            return self.context.enqueue(&payload, rpc_id).await;
                         }
-                        let message = text.join("\n");
                         let digest =
                             format!("{:x}", Sha256::digest(payload.to_string().as_bytes()));
                         let mut manifest = self.context.manifest.lock().await;
                         let row = manifest.sessions.get_mut(id).expect("owned row");
                         if let Some(receipt) = row.receipts.get(rpc_id) {
                             require(receipt.digest == digest, "prompt identity content conflict")?;
+                            require(!receipt.cancelled, "prompt was cancelled; use a new rpcId")?;
                             return if receipt.accepted {
-                                Ok(json!({"accepted":true,"duplicate":true}))
+                                Ok(
+                                    json!({"accepted":true,"duplicate":true,"queued":receipt.queued}),
+                                )
                             } else {
                                 Err(unsupported(
                                     "uncertain Pi prompt; reconcile native history before retry",
@@ -850,12 +1156,14 @@ impl SessionEndpoint for PiSessionEndpoint {
                             Receipt {
                                 digest,
                                 accepted: false,
+                                queued: false,
+                                cancelled: false,
                             },
                         );
                         self.context.save(&manifest).await?;
                         drop(manifest);
                         let result=rpc.request("prompt",json!({
-                            "message":message,
+                            "message":message,"images":images,
                             "streamingBehavior":if payload["mode"]=="steer" {"steer"} else {"followUp"}
                         })).await?;
                         let disposition = result["disposition"].as_str().unwrap_or("");
@@ -885,12 +1193,14 @@ impl SessionEndpoint for PiSessionEndpoint {
         }
     }
     async fn close(&self) {
+        let _ = self.lifetime.send(true);
         let mut processes = self.context.processes.lock().await;
         for rpc in processes.values() {
             rpc.close();
         }
         processes.clear();
         self.context.actionables.lock().await.clear();
+        self.context.armed_goals.lock().await.clear();
     }
 }
 

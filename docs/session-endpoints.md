@@ -13,7 +13,7 @@ Native 要求 Kernel 0.9 的 v4 wire；Pi/DSH 的标准化 HostDescription 保�
 `cwd` 保留原始工作区根，`workingDirectory` 是有权威投影时的当前执行目录；两者可以不同，文件相对路径仍遵循各服务端的 scope。
 原生文件指针是定位证据；历史读取仍通过对应 harness 的公开协议，不解析私有数据库或把远端路径当成本机路径。
 
-`SessionRuntime` 合并 inventory/control/actionables，按需打开会话窗口，提供订阅、snapshot、前页、定位和只读文件 API。
+`SessionRuntime` 合并 inventory/control/actionables/workspaces 和只观察的 endpoint events，按需打开会话窗口，提供订阅、snapshot、前页、定位和只读文件 API。
 慢 unary / prompt / actionable 响应以最多 64 个在途操作运行，流仍能投影；重连会中止旧连接操作，不自动重发 mutation。
 `Earlier` 的网络取页仍串行，底层 transport 保持有界读取。主连接与单会话流均有有限恢复预算。
 
@@ -25,7 +25,7 @@ Native 要求 Kernel 0.9 的 v4 wire；Pi/DSH 的标准化 HostDescription 保�
 | 版本证据 | v4 host description | CLI `--version`，只接受配置允许版本 | `/api/tekes/harness-version` 官方 runtime version probe |
 | 会话 inventory/control | 权威原生流 | 宿主指针 inventory；原生 state 保存在 conversation；共享 control 基线为空 | `$events` + 分页 list；session/control |
 | 创建与模型 | 原生 unary | 显式 cwd；原生 model catalog / set_model | session/create；session/modelCatalog、模型选择 |
-| Prompt/取消 | 原生 unary / rpcId | text prompt、queue/steer、abort | session/prompt、cancel |
+| Prompt/取消 | 原生 unary / rpcId | text/image/file、持久化 queue/steer、abort | session/prompt、cancel |
 | Prompt 重复提交 | 服务端 rpcId | 磁盘 receipt：pending 先落盘、ACK 后 accepted；不确定结果拒绝自动重发 | 服务端 requestId |
 | 历史 | journal / frozen cut | get_entries，按 leafId/parentId 重建当前分支 | follow/page，展开 packed chunk row，保留 seq/time/tool view |
 | 前页 | 固定 throughSequence 的页 | 扩大原生 ancestry 窗口并刷新 | 固定 throughSeq 的页 |
@@ -34,17 +34,25 @@ Native 要求 Kernel 0.9 的 v4 wire；Pi/DSH 的标准化 HostDescription 保�
 | Rename/archive | 原生调用 | 原生 rename；宿主 archive/unarchive 指针 | 原生 rename/fork/archive/unarchive；fork 清理继承的未消费 inbox |
 | 既有 session | 服务端 inventory | 显式 `session.adopt`，原生 RPC 验证文件；不全盘扫描 | 服务端 inventory |
 | Session 工作区文件 | session.files.* | cwd 内 capability 限定只读文件 | workspaceFiles，二进制 multipart |
-| 可选扩展 | raw `call` 透传服务端能力 | 未映射方法返回 Unsupported | 显式 `dsh.call` 和已映射方法，未映射返回 Unsupported |
+| fork / discard | 原生普通/临时 fork、临时 discard | 原生克隆/精确 entry fork；临时分支及 discard | 普通 fork；临时 fork/discard 明确 Unsupported |
+| 工作区 | v4 未声明 workspace-sync | 宿主工作区与移动/重命名、会话关联 | 原生 workspace/follow，replace/reorder/archive/pin |
+| 附件 | 原生策略/上传/读取 | 限额校验、图片/文件上传、会话隔离及历史附件读取 | 原生策略、raw binary 上传和读取 |
+| 文件观察 | 认证 WS changes | 有界轮询 ready/change/absent | workspaceFiles/changes |
+| 扩展 | 服务端公开方法 | 模型/命令/skills/tools/settings 读取、Goal/反馈 CAS | ClientKit 对应公开服务路由及规范化参数 |
+| 产品服务 | 服务端或显式宿主能力 | 显式 HostServices | 服务端部署或显式 HostServices |
 
-Pi `session.fork`、discard、附件、完整 settings/goals/plugins 等强类型扩展尚未移植。
-Pi 不提供虚构 journal、durable cursor、task/job 或 queue 列表；原生 `get_state` 保留 pendingMessageCount 等状态。
-Archive 前由调用者关闭打开的会话流；archive 只隐藏指针，不删除原生文件。
+公开类型化 API 提供 create/submit/fork/discard/rename/archive/unarchive/queue/upload/goal；其他公开扩展经能力检查后调用。`EndpointCapabilities` 区分方法、归档、临时 fork 和文件观察；不支持的方法明确失败。
+Pi 不提供虚构 journal、durable cursor 或 task/job。队列是宿主持久化的提交意图，支持编辑/移除和结算后自动派发；超时不重试不确定的派发。旧进程事件不能驱动新进程。
+Runtime 在 archive/discard 前退订对应会话内容流，失败则恢复；其他会话保持连接。archive 只隐藏指针，不删除原生文件。
+Pi Goal 支持 CAS、暂停/恢复、原生工具记录完成/阻塞及有界自动执行；每轮先持久化预算，达到上限后停止。激活只存在于当前连接，重连不会自动继续。反馈以原生 entry ID 和版本进行 CAS。
+Pi 使用小型 JavaScript companion 调用 Pi 官方 extension API（fork、设置/工具读取、自定义元数据），没有 Swift、私有 RPC 或日志解析。凭证、安装、Git、系统权限及产品插件后端由 `HostServices` 显式注入；只增加宿主声明的方法，不伪造产品实现。默认 Pi preset 明确限定，未知 preset 被拒绝。
+Endpoint events 是有界观察数据，不会变成 actionable authority；DSH 观察 waterfall 显式 next，不抢占交互处理。
 DSH version probe 需要宿主提供和 ClientKit 相同的版本桥接；测试用临时 JS plugin 调用官方 `getDshRuntimeVersion`，不信任自填版本。
 
 ## Session 指针与文件
 
 Pi 数据根由宿主显式配置，注册表 `agentkit-sessions.json` 保存稳定地址到原生文件的映射与提交 receipt。
-注册表用私有文件权限、临时文件、fsync + rename 持久化。它只保存指针/提交意图，不复制 transcript。
+注册表用私有文件权限、临时文件、fsync + rename 持久化。它只保存指针、工作区、队列提交意图和 Goal/反馈元数据，不复制 transcript。数据根独占锁防止双连接覆盖；重启清理宿主拥有的临时分支与附件。
 `session.adopt { cwd, sessionFile, sessionId? }` 只接受 `PiConfiguration.session_roots` 显式授权目录下的现存文件；
 通过 `get_state` 验证实际恢复的文件，后续历史仍使用 `get_entries`。注册表重启时也校验授权根。
 
@@ -71,7 +79,7 @@ Rust 回归覆盖契约 fixtures、原生分支/坏树、文件路径与分页�
 依赖边界检查覆盖 contract/session/三个 adapter/headless，拒绝 UI、SQLite、服务端内部与隐式 sibling 依赖，并禁止 Swift 源码。
 
 这些证据不代表真实付费 provider、TLS 远端部署、生产 launcher、大历史/RSS/吞吐、Linux 或 UI 的验收。
-远端 durable cache 和完整 ClientKit 可选 API 仍在后续范围。
+远端 durable cache、完整 UI projector 和产品专属后端不属于本轮非 UI SEP 交付。
 
 ## DSH 0.2.1 升级验收
 
@@ -87,3 +95,9 @@ Rust 回归覆盖契约 fixtures、原生分支/坏树、文件路径与分页�
 **两个版本均已真实验证**：基础回传/重连/文件链路，rename、普通 fork 及子会话历史、cancel、archive/unarchive；28 次合成 turn 后以新客户端打开裁剪窗口，再取前页且冻结切点不变。
 **0.2.1-rc.2 额外真实验证**：合成 provider 触发官方 working_directory 工具，把 cwd 切到测试子目录，观察新事件、独立的原始根/当前目录，并重连保持。
 Pi 1.3.0 和 Native Kernel 0.9.0 的原验收也重新通过。上述模型输出均来自本地合成 provider，没有请求 DeepSeek 或其他真实付费模型。
+
+## 本轮新增验收
+
+三个真实版本均通过模型/命令/skills/设置读取、附件上传与文件观察的 ready 握手。Native 验证临时 fork/discard、归档恢复；Pi 额外验证精确原生 entry fork、临时分支实际删除、工作区同步、队列编辑/移除/自动派发、附件隔离、Goal/反馈 CAS，以及模型完成、轮数预算耗尽、重连不激活。DSH 验证服务端扩展、含加号文件名上传和工作区同步。
+
+39 项 Rust 回归通过 fmt、Clippy -D warnings 和依赖边界检查；回归另外覆盖能力和显式宿主服务边界、文件观察变化/删除/关闭、工作区基线替换/排序、观察事件有界与非权威、活动内容流的 discard。`tekes-agent-headless` 是独立的公开 API consumer，与 adapter 一同构建并执行上述联调。合成 provider 证明协议闭环，不代表真实模型质量或生产部署验收。

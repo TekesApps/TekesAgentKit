@@ -1,5 +1,9 @@
 //! ClientKit-aligned headless SessionEndpoint contract. Extension payloads stay lossless JSON.
+mod commands;
+pub use commands::*;
+mod capabilities;
 mod registry;
+pub use capabilities::*;
 mod session;
 use async_trait::async_trait;
 use futures_util::stream::BoxStream;
@@ -380,6 +384,7 @@ pub fn normalize_title(value: &mut Value) {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum StreamTarget {
+    WorkspaceInventory,
     SessionInventory,
     SessionControl,
     Actionables,
@@ -422,6 +427,9 @@ impl GenerationValidator {
 pub trait SessionEndpoint: Send + Sync {
     fn identity(&self) -> &str;
     fn host(&self) -> &HostDescription;
+    fn capabilities(&self) -> EndpointCapabilities {
+        EndpointCapabilities::default()
+    }
     fn content_kind(&self) -> SessionContentKind {
         SessionContentKind::Journal
     }
@@ -445,6 +453,9 @@ pub trait SessionEndpoint: Send + Sync {
             history_source: "session-journal".into(),
         })
     }
+    async fn observe_files(&self, _session_id: &str, _path: &str) -> Result<FrameStream> {
+        Err(unsupported("file observation"))
+    }
     async fn file_stat(&self, _session_id: &str, _path: &str) -> Result<SessionFileStat> {
         Err(unsupported("session file stat"))
     }
@@ -465,6 +476,12 @@ pub trait SessionEndpoint: Send + Sync {
         _limit: usize,
     ) -> Result<SessionFileTextPage> {
         Err(unsupported("session file text"))
+    }
+    fn supports_events(&self) -> bool {
+        false
+    }
+    async fn events(&self) -> Result<FrameStream> {
+        Err(unsupported("endpoint events"))
     }
     async fn follow(&self, target: StreamTarget) -> Result<FrameStream>;
     async fn history_page(&self, request: HistoryRequest) -> Result<HistoryPage>;

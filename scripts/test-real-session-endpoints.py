@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Exercise the three separate endpoints with owned temporary state and synthetic local providers."""
-import argparse, base64, shutil, uuid, http.server, json, os, re, select, signal, struct, subprocess, tempfile, threading, time, urllib.request, urllib.parse
+import argparse, base64, zlib, shutil, uuid, http.server, json, os, re, select, signal, struct, subprocess, tempfile, threading, time, urllib.request, urllib.parse
 from pathlib import Path
 ROOT=Path(__file__).resolve().parent.parent
 parser=argparse.ArgumentParser()
@@ -15,6 +15,7 @@ class Provider(http.server.BaseHTTPRequestHandler):
     def log_message(self,*_):pass
     def do_POST(self):
         body=json.loads(self.rfile.read(int(self.headers['Content-Length'])));requests.append(self.path)
+        if 'ENDPOINT_QUEUE_HOLD' in json.dumps(body):time.sleep(0.6)
         self.send_response(200);self.send_header('Content-Type','text/event-stream');self.end_headers()
         if self.path.endswith('/responses'):
             frames=[{'type':'response.completed','response':{'id':'synthetic-response','status':'completed','output':[{'type':'message','role':'assistant','phase':'final_answer','status':'completed','content':[{'type':'output_text','text':'ENDPOINT_REPLY_OK'}]}],'usage':{'input_tokens':10,'output_tokens':4,'total_tokens':14}}}]
@@ -25,6 +26,8 @@ class Provider(http.server.BaseHTTPRequestHandler):
             change=re.search(r'ENDPOINT_CHANGE_DIRECTORY=([^\s"\\]+)',transcript)
             if change and not any(message.get('role')=='tool' for message in body.get('messages',[])):
                 frames=[dict(common,choices=[{'index':0,'delta':{'role':'assistant','tool_calls':[{'index':0,'id':'directory-call','type':'function','function':{'name':'working_directory','arguments':json.dumps({'cd':change.group(1)})}}]},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{},'finish_reason':'tool_calls'}])]
+            if 'ENDPOINT_GOAL_COMPLETE' in transcript and not any(message.get('role')=='tool' for message in body.get('messages',[])):
+                frames=[dict(common,choices=[{'index':0,'delta':{'role':'assistant','tool_calls':[{'index':0,'id':'goal-call','type':'function','function':{'name':'agentkit_goal','arguments':json.dumps({'phase':'complete'})}}]},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{},'finish_reason':'tool_calls'}])]
         try:
             for frame in frames:self.wfile.write(('data: '+json.dumps(frame)+'\n\n').encode());self.wfile.flush()
             if not self.path.endswith('/responses'):self.wfile.write(b'data: [DONE]\n\n')
@@ -74,7 +77,7 @@ try:
         base=Path(tmp);cwd=base/'project';cwd.mkdir();(cwd/'proof.txt').write_text('proof line one\nline two\n')
         if args.pi_root:
             pi=args.pi_root.resolve();data=base/'pi';(data/'agent').mkdir(parents=True)
-            (data/'agent/models.json').write_text(json.dumps({'providers':{'endpoint-test':{'baseUrl':base_url,'api':'openai-completions','apiKey':'synthetic-key','models':[{'id':'endpoint-test','name':'Endpoint test','contextWindow':32768,'maxTokens':1024}]}}}))
+            (data/'agent/models.json').write_text(json.dumps({'providers':{'endpoint-test':{'baseUrl':base_url,'api':'openai-completions','apiKey':'synthetic-key','models':[{'id':'endpoint-test','name':'Endpoint test','contextWindow':32768,'maxTokens':1024,'input':['text','image']}]}}}))
             config={'kind':'pi','executable':str(pi/'node/bin/node'),'arguments':[str(pi/'node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js')],'dataRoot':str(data),'environment':{'HOME':str(base/'pi-home'),'PATH':os.environ.get('PATH','/usr/bin:/bin')},'commands':commands(cwd,'endpoint-test','endpoint-test')}
             Path(config['environment']['HOME']).mkdir()
             extension=base/'question.mjs'
@@ -93,6 +96,86 @@ try:
             assert result.returncode==0,result.stderr
             assert 'ENDPOINT_REPLY_OK' in result.stdout and 'endpoint-answer' in result.stdout,'resumed native history missing'
             print('PI_NATIVE_POINTER_RESUME_LIVE_OK explicit root + native RPC history')
+            source_id=next(row['result']['sessionId'] for row in outputs if row.get('op')=='create')
+            state=next(row['result'] for row in reversed(outputs) if row.get('op')=='snapshot')['sessions'][source_id]
+            boundary=next(entry['id'] for entry in state['native_conversation']['entries'] if entry.get('message',{}).get('role')=='assistant')
+            lifecycle=[
+                {'op':'call','method':'endpoint.capabilities'},
+                {'op':'call','method':'workspace.create','args':{'path':str(cwd)},'saveAs':'workspace','savePointer':'/workspace/workspaceId'},
+                {'op':'call','method':'workspace.rename','args':{'workspaceId':'@workspace','title':'Rust workspace'}},
+                {'op':'call','method':'session.create','args':{'workspaceId':'@workspace'},'saveAs':'workspace-session'},
+                {'op':'call','sessionId':source_id,'method':'session.fork','args':{'entryId':boundary},'saveAs':'fork'},
+                {'op':'open','sessionId':'fork'}, {'op':'snapshot'},
+                {'op':'call','sessionId':source_id,'method':'session.fork','args':{'ephemeral':True},'saveAs':'scratch'},
+                {'op':'open','sessionId':'scratch'},
+                {'op':'call','sessionId':'scratch','method':'session.locator'},
+                {'op':'call','sessionId':'scratch','method':'session.discard'},
+                {'op':'call','sessionId':source_id,'method':'session.rename','args':{'title':'Renamed source'}},
+                {'op':'call','sessionId':source_id,'method':'session.archive'},
+                {'op':'call','sessionId':source_id,'method':'session.unarchive'},
+                {'op':'open','sessionId':source_id},
+                {'op':'call','sessionId':source_id,'method':'commands/list'},
+                {'op':'call','sessionId':source_id,'method':'session.models'},
+                {'op':'call','method':'models.list'},
+                {'op':'observeReady','sessionId':source_id},
+                {'op':'call','sessionId':source_id,'method':'settings.describe'},
+                {'op':'call','sessionId':source_id,'method':'skills/list'},
+                {'op':'call','sessionId':source_id,'method':'goals.create','args':{'objective':'Test goal','maxGoalRounds':2},'saveAs':'goal','savePointer':''},
+                {'op':'call','sessionId':source_id,'method':'goals.edit','args':{'ref':'@goal','objective':'ENDPOINT_GOAL_COMPLETE'},'saveAs':'edited-goal','savePointer':''},
+                {'op':'callError','sessionId':source_id,'method':'goals.pause','args':{'ref':'@goal'}},
+                {'op':'call','sessionId':source_id,'method':'goals.pause','args':{'ref':'@edited-goal'},'saveAs':'paused-goal','savePointer':''},
+                {'op':'call','sessionId':source_id,'method':'goals.resume','args':{'ref':'@paused-goal'},'saveAs':'resumed-goal','savePointer':''},
+                {'op':'waitSettled','sessionId':source_id,'minimumTurn':2},
+                {'op':'waitGoal','sessionId':source_id,'phase':'complete'},
+                {'op':'call','sessionId':source_id,'method':'goals.get','saveAs':'settled-goal','savePointer':''},
+                {'op':'call','sessionId':source_id,'method':'goals.clear','args':{'ref':'@settled-goal'}},
+                {'op':'call','sessionId':source_id,'method':'feedback.put','args':{'messageId':boundary,'rating':'positive','ifVersion':None},'saveAs':'feedback-version','savePointer':'/version'},
+                {'op':'callError','sessionId':source_id,'method':'feedback.delete','args':{'messageId':boundary,'ifVersion':'stale'}},
+                {'op':'call','sessionId':source_id,'method':'feedback.delete','args':{'messageId':boundary,'ifVersion':'@feedback-version'}},
+                {'op':'reconnect'},{'op':'snapshot'},
+            ]
+            result=execute(dict(config,commands=lifecycle))
+            scratch_locator=next(row['result'] for row in result if row.get('op')=='call' and isinstance(row.get('result'),dict) and 'nativeSessionFile' in row['result'])
+            assert not Path(scratch_locator['nativeSessionFile']).exists(),'discard left scratch native file'
+            fork_states=next(row['result'] for row in result if row.get('op')=='snapshot')['sessions']
+            fork_id=next(key for key,state in fork_states.items() if state.get('native_conversation'))
+            fork_snapshot=fork_states[fork_id]
+            assert 'ENDPOINT_REPLY_OK' in json.dumps(fork_snapshot) and 'endpoint-answer' not in json.dumps(fork_snapshot),'exact native fork boundary lost'
+            assert result[-1]['result']['workspaces'][0]['title']=='Rust workspace','workspace sync lost'
+            print('PI_COMPLETE_LIFECYCLE_LIVE_OK workspace+exact-fork+scratch-discard+rename+archive+commands+settings+skills+goal-CAS+feedback-CAS')
+            assert any(row.get('op')=='waitGoal' and row['result']['phase']=='complete' and row['result']['activation']=='disarmed' for row in result),'goal completion did not disarm'
+            bounded=[{'op':'create','cwd':str(cwd),'saveAs':'bounded'},{'op':'call','sessionId':'bounded','method':'session.selectModel','args':{'provider':'endpoint-test','model':'endpoint-test'}},{'op':'open','sessionId':'bounded'},
+                {'op':'call','sessionId':'bounded','method':'goals.create','args':{'objective':'A goal the synthetic provider will not complete','maxGoalRounds':1},'saveAs':'bounded-goal','savePointer':''},
+                {'op':'call','sessionId':'bounded','method':'goals.resume','args':{'ref':'@bounded-goal'}},
+                {'op':'waitGoal','sessionId':'bounded','phase':'blocked'}, {'op':'reconnect'},{'op':'call','sessionId':'bounded','method':'goals.get'}]
+            bounded_result=execute(dict(config,commands=bounded))
+            assert bounded_result[-1]['result']['roundsStarted']==1 and bounded_result[-1]['result']['activation']=='disarmed','goal bound/reconnect fence failed'
+            print('PI_GOAL_DRIVER_LIVE_OK model-completion+round-budget+disarm-on-reconnect')
+            def png_chunk(kind,data):return struct.pack('!I',len(data))+kind+data+struct.pack('!I',zlib.crc32(kind+data))
+            png=base64.b64encode(b'\x89PNG\r\n\x1a\n'+png_chunk(b'IHDR',struct.pack('!IIBBBBB',1,1,8,6,0,0,0))+png_chunk(b'IDAT',zlib.compress(b'\x00\xff\x00\x00\xff'))+png_chunk(b'IEND',b'')).decode()
+            attachments=[{'op':'create','cwd':str(cwd),'saveAs':'image'}, {'op':'call','sessionId':'image','method':'session.selectModel','args':{'provider':'endpoint-test','model':'endpoint-test'}}, {'op':'open','sessionId':'image'},
+                {'op':'call','sessionId':'image','method':'session.uploadFile','args':{'name':'a+b.txt','mediaType':'text/plain','data':base64.b64encode(b'attachment proof').decode()},'saveAs':'upload','savePointer':'/receiptId'},
+                {'op':'call','sessionId':'image','method':'session.fileAttachment','args':{'attachmentId':'@upload'}},
+                {'op':'callError','sessionId':source_id,'method':'session.fileAttachment','args':{'attachmentId':'@upload'}},
+                {'op':'call','sessionId':'image','method':'session.prompt','args':{'mode':'queue','content':[{'type':'text','text':'Image and file proof'},{'type':'image','mediaType':'image/png','data':png},{'type':'file','receiptId':'@upload'}]}},
+                {'op':'waitSettled','sessionId':'image'},{'op':'snapshot'}]
+            result=execute(dict(config,commands=attachments))
+            assert 'attachment proof'==base64.b64decode(next(row['result']['data'] for row in result if row.get('op')=='call' and isinstance(row.get('result'),dict) and 'data' in row['result'])).decode()
+            assert any(part.get('type')=='image' for session in result[-1]['result']['sessions'].values() if session.get('native_conversation') for entry in session['native_conversation']['entries'] for part in (entry.get('message',{}).get('content',[]) if isinstance(entry.get('message',{}).get('content',[]),list) else [])),'native image missing: '+json.dumps([session['native_conversation'] for session in result[-1]['result']['sessions'].values() if session.get('native_conversation')])[-3000:]
+            print('PI_ATTACHMENTS_LIVE_OK image+file+historical-read+session-isolation')
+            queue=[{'op':'create','cwd':str(cwd),'saveAs':'queue'}, {'op':'call','sessionId':'queue','method':'session.selectModel','args':{'provider':'endpoint-test','model':'endpoint-test'}}, {'op':'open','sessionId':'queue'},
+                {'op':'call','sessionId':'queue','method':'session.prompt','rpcId':'queue-first','args':{'mode':'queue','content':[{'type':'text','text':'ENDPOINT_QUEUE_HOLD'}]}},
+                {'op':'call','sessionId':'queue','method':'session.prompt','rpcId':'queue-second','args':{'mode':'queue','content':[{'type':'text','text':'QUEUED_BEFORE_EDIT'}]},'saveAs':'queued','savePointer':'/itemId'},
+                {'op':'call','sessionId':'queue','method':'session.updateQueue','args':{'itemId':'@queued','action':{'kind':'edit','content':[{'type':'text','text':'QUEUED_EDIT_OK'}]}}},
+                {'op':'call','sessionId':'queue','method':'session.prompt','rpcId':'queue-third','args':{'mode':'queue','content':[{'type':'text','text':'QUEUED_TO_REMOVE'}]},'saveAs':'removed','savePointer':'/itemId'},
+                {'op':'call','sessionId':'queue','method':'session.updateQueue','args':{'itemId':'@removed','action':{'kind':'remove'}}},
+                {'op':'waitSettled','sessionId':'queue','minimumTurn':2},{'op':'snapshot'}]
+            result=execute(dict(config,commands=queue));queue_id=next(row['result']['sessionId'] for row in result if row.get('op')=='create')
+            conversation=json.dumps(result[-1]['result']['sessions'][queue_id]['native_conversation'])
+            assert 'QUEUED_EDIT_OK' in conversation and 'QUEUED_BEFORE_EDIT' not in conversation and 'QUEUED_TO_REMOVE' not in conversation,'queue edit/remove/drain lost'
+            assert not result[-1]['result']['sessions'][queue_id]['queue'],'queue did not settle'
+            print('PI_QUEUE_LIVE_OK durable-admission+edit+remove+automatic-drain')
+
         if args.dsh_root:
             dsh=args.dsh_root.resolve();node=dsh/'node/bin/node';entry=dsh/'node_modules/@deepseek-ai/dsh/lib/bin.js';home=base/'dsh';home.mkdir()
             # This read-only host plugin exposes official runtime version evidence, like the ClientKit host adapter.
@@ -130,6 +213,25 @@ try:
                 config={'kind':'dsh','url':url,'cookie':cookie,'expectedVersion':version,'commands':commands(cwd,'endpoint-test','endpoint-test')}
                 outputs=run(config)
                 session_id=next(row['result']['sessionId'] for row in outputs if row.get('op')=='create')
+                extensions=[{'op':'call','method':'endpoint.capabilities'},
+                    {'op':'call','sessionId':session_id,'method':'session.models'},
+                    {'op':'call','sessionId':session_id,'method':'commands/list'},
+                    {'op':'call','sessionId':session_id,'method':'skills/list'},
+                    {'op':'call','method':'settings.describe'},
+                    {'op':'call','method':'providers.list'},
+                    {'op':'call','sessionId':session_id,'method':'attachments.policy'},
+                    {'op':'observeReady','sessionId':session_id},
+                    {'op':'call','sessionId':session_id,'method':'session.uploadFile','args':{'name':'a+b.txt','mediaType':'text/plain','data':base64.b64encode(b'DSH upload proof').decode()}},
+                    {'op':'call','method':'workspace.create','args':{'path':str(cwd)},'saveAs':'dsh-workspace','savePointer':'/workspace/workspaceId'},
+                    {'op':'call','method':'workspace.rename','args':{'workspaceId':'@dsh-workspace','title':'DSH workspace proof'}},
+                    {'op':'reconnect'},{'op':'snapshot'}]
+                extended=execute(dict(config,commands=extensions))
+                model_catalog=next(row['result'] for row in extended if row.get('op')=='call' and isinstance(row.get('result'),dict) and 'groups' in row['result'])
+                assert model_catalog['current']['model']=='endpoint-test' and model_catalog['groups'],'model catalog normalization lost'
+                upload=next(row['result'] for row in extended if row.get('op')=='call' and isinstance(row.get('result'),dict) and 'receiptId' in row['result'])
+                assert upload['file']['name']=='a+b.txt','upload query encoding lost plus'
+                assert any(workspace['title']=='DSH workspace proof' for workspace in extended[-1]['result']['workspaces']),'workspace sync lost'
+                print('DSH_EXTENSIONS_LIVE_OK models+commands+skills+settings+providers+policy+upload+workspace-sync')
                 # Public lifecycle calls, with the original session and its fork independently addressable.
                 lifecycle=[{'op':'call','sessionId':session_id,'method':'session.rename','args':{'title':'Endpoint lifecycle proof'}},
                     {'op':'call','sessionId':session_id,'method':'session.fork','args':{'allowMigration':False},'saveAs':'fork'},
@@ -181,7 +283,27 @@ try:
             try:
                 token=os.urandom(32);payload=json.dumps({'endpointToken':token.hex(),'credentials':{'openai-main':'synthetic-key'}}).encode();process.stdin.write(b'TEKES-KERNEL-BOOTSTRAP/1\n'+struct.pack('!I',len(payload))+payload);process.stdin.flush()
                 assert select.select([process.stdout],[],[],15)[0],'Kernel readiness timeout';ready=json.loads(process.stdout.readline())
-                run({'kind':'native','url':ready['url'],'bearer':base64.urlsafe_b64encode(token).decode().rstrip('='),'commands':commands(cwd,providers['providers'][0]['id'],providers['providers'][0]['models'][0]['id'])})
+                config={'kind':'native','url':ready['url'],'bearer':base64.urlsafe_b64encode(token).decode().rstrip('='),'commands':commands(cwd,providers['providers'][0]['id'],providers['providers'][0]['models'][0]['id'])}
+                outputs=run(config);native_id=next(row['result']['sessionId'] for row in outputs if row.get('op')=='create')
+                native=[{'op':'call','method':'endpoint.capabilities'},
+                    {'op':'call','sessionId':native_id,'method':'session.models'},
+                    {'op':'call','sessionId':native_id,'method':'commands/list'},
+                    {'op':'call','sessionId':native_id,'method':'skills/list'},
+                    {'op':'call','sessionId':native_id,'method':'attachments.policy'},
+                    {'op':'observeReady','sessionId':native_id},
+                    {'op':'call','method':'settings.describe'},
+                    {'op':'call','method':'session.initialPresets'},
+                    {'op':'call','sessionId':native_id,'method':'session.uploadFile','args':{'name':'native-proof.txt','mediaType':'text/plain','data':base64.b64encode(b'Native upload proof').decode()},'saveAs':'native-upload','savePointer':'/file/attachmentId'},
+                    {'op':'call','sessionId':native_id,'method':'session.fileAttachment','args':{'attachmentId':'@native-upload'}},
+                    {'op':'call','sessionId':native_id,'method':'session.fork','args':{'ephemeral':True},'saveAs':'scratch'},
+                    {'op':'open','sessionId':'scratch'}, {'op':'call','sessionId':'scratch','method':'session.discard'},
+                    {'op':'call','sessionId':native_id,'method':'session.rename','args':{'title':'Native lifecycle proof'}},
+                    {'op':'call','sessionId':native_id,'method':'session.archive'},
+                    {'op':'call','sessionId':native_id,'method':'session.unarchive'},
+                    {'op':'open','sessionId':native_id},{'op':'snapshot'}]
+                result=execute(dict(config,commands=native))
+                assert any(row.get('op')=='call' and isinstance(row.get('result'),dict) and row['result'].get('data')==base64.b64encode(b'Native upload proof').decode() for row in result),'native upload round trip lost'
+                print('NATIVE_COMPLETE_LIFECYCLE_LIVE_OK models+commands+skills+settings+presets+upload+scratch-discard+rename+archive')
             finally:
                 process.stdin.close()
                 try:process.wait(timeout=15)

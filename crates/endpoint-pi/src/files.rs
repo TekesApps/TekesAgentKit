@@ -129,9 +129,171 @@ pub(crate) fn text(
     })
 }
 
+fn fingerprints(root: &Path, path: &Path) -> Result<std::collections::BTreeMap<PathBuf, String>> {
+    let mut pending = vec![(path.to_owned(), 0)];
+    let mut values = std::collections::BTreeMap::new();
+    while let Some((path, depth)) = pending.pop() {
+        require(
+            values.len() < 4096 && depth <= 16,
+            "file observation coverage exceeds bound",
+        )?;
+        let metadata = match path.symlink_metadata() {
+            Ok(m) => m,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(_) => return Err(unsupported("file observation stat")),
+        };
+        if metadata.file_type().is_symlink() {
+            continue;
+        }
+        require(path.starts_with(root), "observation escapes root")?;
+        values.insert(
+            path.clone(),
+            format!("poll:{}:{:?}", metadata.len(), metadata.modified().ok()),
+        );
+        if metadata.is_dir() {
+            for entry in
+                std::fs::read_dir(&path).map_err(|_| unsupported("file observation list"))?
+            {
+                let entry = entry.map_err(|_| unsupported("file observation entry"))?;
+                if entry.file_name() == ".git" {
+                    continue;
+                }
+                pending.push((entry.path(), depth + 1));
+            }
+        }
+    }
+    Ok(values)
+}
+pub(crate) async fn observe(
+    root: PathBuf,
+    path: &str,
+    close: tokio::sync::watch::Receiver<bool>,
+) -> Result<FrameStream> {
+    use serde_json::json;
+    let target = resolve(&root, path)?;
+    let root = root.canonicalize().map_err(|_| unsupported("read root"))?;
+    let r = root.clone();
+    let p = target.clone();
+    let initial = tokio::task::spawn_blocking(move || fingerprints(&r, &p))
+        .await
+        .map_err(|_| Error::Disconnected)??;
+    let updates = futures_util::stream::try_unfold(
+        (
+            root,
+            target,
+            close,
+            initial,
+            std::collections::VecDeque::new(),
+        ),
+        |(root, target, mut close, mut previous, mut pending)| async move {
+            loop {
+                if let Some(frame) = pending.pop_front() {
+                    return Ok(Some((frame, (root, target, close, previous, pending))));
+                }
+                tokio::select! {_=close.changed()=>return Ok(None),_=tokio::time::sleep(std::time::Duration::from_millis(250))=>{}}
+                let r = root.clone();
+                let p = target.clone();
+                let current = tokio::task::spawn_blocking(move || fingerprints(&r, &p))
+                    .await
+                    .map_err(|_| Error::Disconnected)??;
+                for (path, version) in &current {
+                    if previous.get(path) != Some(version) {
+                        pending.push_back(json!({"kind":"change","change":{"absolutePath":path,"version":version}}));
+                    }
+                }
+                for path in previous.keys() {
+                    if !current.contains_key(path) {
+                        pending.push_back(
+                            json!({"kind":"change","change":{"absolutePath":path,"absent":true}}),
+                        );
+                    }
+                }
+                previous = current;
+            }
+        },
+    );
+    use futures_util::StreamExt;
+    Ok(Box::pin(
+        futures_util::stream::once(async { Ok(json!({"kind":"ready"})) }).chain(updates),
+    ))
+}
+
+pub(crate) fn candidates(root: &Path, query: &str) -> Result<serde_json::Value> {
+    use serde_json::json;
+    let root = root
+        .canonicalize()
+        .map_err(|_| unsupported("workspace unavailable"))?;
+    let mut paths = vec![(root.clone(), 0)];
+    let mut result = Vec::new();
+    let mut inspected = 0;
+    while let Some((directory, depth)) = paths.pop() {
+        if depth > 16 {
+            continue;
+        }
+        for entry in std::fs::read_dir(directory).map_err(|_| unsupported("file reference list"))? {
+            inspected += 1;
+            if inspected > 10000 || result.len() >= 100 {
+                return Ok(json!(result));
+            }
+            let entry = entry.map_err(|_| unsupported("file reference entry"))?;
+            let kind = entry
+                .file_type()
+                .map_err(|_| unsupported("file reference type"))?;
+            if kind.is_symlink() {
+                continue;
+            }
+            let path = entry.path();
+            let relative = path
+                .strip_prefix(&root)
+                .map_err(|_| unsupported("reference outside root"))?
+                .to_string_lossy()
+                .to_string();
+            if kind.is_dir() {
+                if ![".git", "node_modules", "target"]
+                    .contains(&entry.file_name().to_string_lossy().as_ref())
+                {
+                    paths.push((path, depth + 1));
+                }
+                continue;
+            }
+            if relative.to_lowercase().contains(&query.to_lowercase()) {
+                result.push(json!({"path":path,"relativePath":relative,"label":relative,"name":entry.file_name(),"isDirectory":false}));
+            }
+        }
+    }
+    Ok(json!(result))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn observation_reports_external_change_absence_and_close() {
+        use futures_util::StreamExt;
+        let root = std::env::temp_dir().join(format!("agentkit-watch-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&root).unwrap();
+        std::fs::write(root.join("proof"), "before").unwrap();
+        let (close, receiver) = tokio::sync::watch::channel(false);
+        let mut changes = observe(root.clone(), "proof", receiver).await.unwrap();
+        assert_eq!(changes.next().await.unwrap().unwrap()["kind"], "ready");
+        std::fs::write(root.join("proof"), "changed contents").unwrap();
+        let frame = tokio::time::timeout(std::time::Duration::from_secs(2), changes.next())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert!(frame["change"]["version"].is_string());
+        std::fs::remove_file(root.join("proof")).unwrap();
+        let frame = tokio::time::timeout(std::time::Duration::from_secs(2), changes.next())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert_eq!(frame["change"]["absent"], true);
+        close.send(true).unwrap();
+        assert!(changes.next().await.is_none());
+        std::fs::remove_dir_all(root).unwrap();
+    }
     #[test]
     fn file_pages_keep_versions_and_reject_escape() {
         let root = std::env::temp_dir().join(format!("agentkit-files-{}", uuid::Uuid::new_v4()));

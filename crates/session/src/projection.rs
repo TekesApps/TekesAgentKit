@@ -226,7 +226,13 @@ pub struct MemoryProjectionStore {
     pub last_error: Option<String>,
     pub sessions: BTreeMap<String, SessionProjection>,
     pub actionables: BTreeMap<String, Value>,
+    pub endpoint_capabilities: EndpointCapabilities,
+    pub endpoint_events: std::collections::VecDeque<Value>,
     pub inventory_ready: bool,
+    pub workspaces: Vec<Value>,
+    pub archived_session_ids: Vec<String>,
+    pub pinned_session_ids: Vec<String>,
+    pub workspace_ready: bool,
     pub control_ready: bool,
     pub actionables_ready: bool,
     #[serde(skip)]
@@ -247,7 +253,9 @@ impl MemoryProjectionStore {
     pub fn disconnect(&mut self) {
         self.validators.clear();
         self.actionables.clear();
+        self.endpoint_events.clear();
         self.inventory_ready = false;
+        self.workspace_ready = false;
         self.control_ready = false;
         self.actionables_ready = false;
         for session in self.sessions.values_mut() {
@@ -266,7 +274,14 @@ impl MemoryProjectionStore {
         }
     }
     pub fn ready(&self) -> bool {
-        self.inventory_ready && self.control_ready && self.actionables_ready
+        self.inventory_ready
+            && self.control_ready
+            && self.actionables_ready
+            && (self.workspace_ready
+                || !self
+                    .host
+                    .as_ref()
+                    .is_some_and(|h| h.capabilities.contains("workspace-sync")))
     }
     pub fn session(&self, address: &SessionAddress) -> Option<&SessionProjection> {
         (address.endpoint_id == self.endpoint_id)
@@ -290,6 +305,21 @@ impl MemoryProjectionStore {
         let mut validator = self.validators.get(stream).cloned().unwrap_or_default();
         validator.accept(generation, baseline)?;
         match stream {
+            "events" => match kind.as_str() {
+                "baseline" => self.endpoint_events.clear(),
+                "event" => {
+                    let event = frame
+                        .get("event")
+                        .ok_or_else(|| Error::Protocol("missing endpoint event".into()))?
+                        .clone();
+                    if self.endpoint_events.len() >= 256 {
+                        self.endpoint_events.pop_front();
+                    }
+                    self.endpoint_events.push_back(event);
+                }
+                _ => return Err(Error::Protocol("unexpected endpoint event frame".into())),
+            },
+            "workspace" => self.workspace(&kind, &frame)?,
             "inventory" => self.inventory(&kind, &frame)?,
             "control" => self.control(&kind, &frame)?,
             "actionables" => self.actionable(&kind, &frame)?,
@@ -299,6 +329,80 @@ impl MemoryProjectionStore {
         self.validators.insert(stream.into(), validator);
         if self.ready() {
             self.connection = ConnectionState::Ready;
+        }
+        Ok(())
+    }
+    fn workspace(&mut self, kind: &str, frame: &Value) -> Result<()> {
+        let ids = |value: &Value| -> Result<Vec<String>> {
+            let mut seen = std::collections::BTreeSet::new();
+            value
+                .as_array()
+                .ok_or_else(|| Error::Protocol("invalid workspace identity list".into()))?
+                .iter()
+                .map(|v| {
+                    let id = v
+                        .as_str()
+                        .filter(|s| !s.is_empty())
+                        .ok_or_else(|| Error::Protocol("invalid workspace identity".into()))?;
+                    require(seen.insert(id), "duplicate workspace identity")?;
+                    Ok(id.into())
+                })
+                .collect()
+        };
+        match kind {
+            "baseline" | "replace" => {
+                let snapshot = &frame["snapshot"];
+                let items = array(snapshot, "items")?.clone();
+                let mut seen = std::collections::BTreeSet::new();
+                for item in &items {
+                    require(
+                        seen.insert(string(item, "workspaceId")?),
+                        "duplicate workspace",
+                    )?;
+                    string(item, "path")?;
+                }
+                let archived = ids(&snapshot["archivedSessionIds"])?;
+                let pinned = match snapshot.get("pinnedSessionIds") {
+                    Some(v) => ids(v)?,
+                    None => Vec::new(),
+                };
+                self.workspaces = items;
+                self.archived_session_ids = archived;
+                self.pinned_session_ids = pinned;
+                self.workspace_ready = true;
+            }
+            "upsert" => {
+                let value = frame["workspace"].clone();
+                let id = string(&value, "workspaceId")?;
+                if let Some(old) = self
+                    .workspaces
+                    .iter_mut()
+                    .find(|old| old["workspaceId"] == id)
+                {
+                    *old = value;
+                } else {
+                    self.workspaces.push(value);
+                }
+            }
+            "remove" => {
+                let id = string(frame, "workspaceId")?;
+                self.workspaces.retain(|w| w["workspaceId"] != id);
+            }
+            "reorder" => {
+                let order = ids(&frame["workspaceIds"])?;
+                require(
+                    order.len() == self.workspaces.len()
+                        && order
+                            .iter()
+                            .all(|id| self.workspaces.iter().any(|w| w["workspaceId"] == *id)),
+                    "workspace reorder must be complete",
+                )?;
+                self.workspaces
+                    .sort_by_key(|w| order.iter().position(|id| w["workspaceId"] == *id).unwrap());
+            }
+            "archived" => self.archived_session_ids = ids(&frame["sessionIds"])?,
+            "pinned" => self.pinned_session_ids = ids(&frame["sessionIds"])?,
+            _ => return Err(Error::Protocol("unknown workspace frame".into())),
         }
         Ok(())
     }

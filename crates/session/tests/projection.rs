@@ -256,3 +256,40 @@ fn native_conversation_has_its_own_identity_and_never_advances_journal_cursor() 
     assert!(store.sessions["s"].native_events.is_empty());
     assert!(!store.sessions["s"].journal_ready);
 }
+
+#[test]
+fn workspace_replacement_and_events_preserve_generation_and_authority() {
+    let mut store = store();
+    store.apply("workspace",json!({"type":"baseline","generation":"g","snapshot":{"items":[{"workspaceId":"w","path":"/work","title":"old"}],"archivedSessionIds":[],"pinnedSessionIds":[]}})).unwrap();
+    store.apply("workspace",json!({"type":"replace","generation":"g","snapshot":{"items":[{"workspaceId":"w","path":"/new","title":"new"}],"archivedSessionIds":["s"],"pinnedSessionIds":["s"]}})).unwrap();
+    assert_eq!(store.workspaces[0]["path"], "/new");
+    assert_eq!(store.archived_session_ids, ["s"]);
+    assert!(
+        store
+            .apply(
+                "workspace",
+                json!({"type":"reorder","generation":"g","workspaceIds":["absent"]})
+            )
+            .is_err()
+    );
+    assert_eq!(store.workspaces[0]["path"], "/new");
+    store
+        .apply(
+            "events",
+            json!({"type":"baseline","generation":"g","snapshot":{}}),
+        )
+        .unwrap();
+    for index in 0..300 {
+        store
+            .apply(
+                "events",
+                json!({"type":"event","generation":"g","event":{"index":index,"type":"waterfall"}}),
+            )
+            .unwrap();
+    }
+    assert_eq!(store.endpoint_events.len(), 256);
+    assert!(store.actionables.is_empty());
+    store.disconnect();
+    assert!(store.endpoint_events.is_empty());
+    assert!(!store.workspace_ready);
+}

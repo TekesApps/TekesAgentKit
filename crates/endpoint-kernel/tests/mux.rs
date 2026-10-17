@@ -192,3 +192,58 @@ async fn physical_generation_mismatch_terminates_stream() {
     assert!(frames.next().await.unwrap().is_err());
     task.await.unwrap();
 }
+
+#[tokio::test]
+#[allow(clippy::result_large_err)] // tungstenite fixes the callback error type.
+async fn file_observation_is_authenticated_and_closes_with_endpoint() {
+    use tokio_tungstenite::tungstenite::handshake::server::{Request, Response};
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("http://{}", listener.local_addr().unwrap());
+    let task = tokio::spawn(async move {
+        let (socket, _) = listener.accept().await.unwrap();
+        let mut main = accept_async(socket).await.unwrap();
+        send(&mut main, host(4)).await;
+        let (socket, _) = listener.accept().await.unwrap();
+        let mut files =
+            tokio_tungstenite::accept_hdr_async(socket, |request: &Request, response: Response| {
+                assert_eq!(request.uri().path(), "/api/session.files.changes");
+                assert_eq!(request.uri().query(), Some("sessionId=s"));
+                assert_eq!(request.headers()["Authorization"], "Bearer synthetic");
+                Ok(response)
+            })
+            .await
+            .unwrap();
+        send(&mut files, json!({"kind":"ready"})).await;
+        send(
+            &mut files,
+            json!({"kind":"change","change":{"absolutePath":"/work/file","version":"v"}}),
+        )
+        .await;
+        let _ = main.next().await;
+    });
+    let endpoint = KernelConnector::new("k", &url, "synthetic".into())
+        .unwrap()
+        .connect_kernel()
+        .await
+        .unwrap();
+    let mut changes = endpoint.observe_files("s", ".").await.unwrap();
+    assert_eq!(changes.next().await.unwrap().unwrap()["kind"], "ready");
+    assert_eq!(
+        changes.next().await.unwrap().unwrap()["change"]["version"],
+        "v"
+    );
+    endpoint.close().await;
+    assert!(
+        tokio::time::timeout(Duration::from_secs(1), changes.next())
+            .await
+            .unwrap()
+            .is_none()
+    );
+    task.await.unwrap();
+    assert!(
+        endpoint
+            .call("session.prompt", json!({}), "after-close")
+            .await
+            .is_err()
+    );
+}

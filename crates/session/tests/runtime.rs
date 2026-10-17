@@ -42,6 +42,7 @@ impl SessionEndpoint for Endpoint {
     }
     async fn follow(&self, target: StreamTarget) -> Result<FrameStream> {
         let value = match target {
+            StreamTarget::WorkspaceInventory => unreachable!(),
             StreamTarget::SessionInventory => {
                 json!({"type":"baseline","generation":"g","snapshot":{"items":[]}})
             }
@@ -263,4 +264,64 @@ async fn registry_routes_same_session_id_only_with_explicit_endpoint_identity() 
             .is_err()
     );
     registry.stop().await.unwrap();
+}
+
+struct Services;
+#[async_trait]
+impl HostServices for Services {
+    fn methods(&self) -> std::collections::BTreeSet<String> {
+        ["host.probe".to_owned()].into()
+    }
+    async fn call(&self, id: &str, method: &str, payload: Value, key: &str) -> Result<Value> {
+        Ok(json!({"endpoint":id,"method":method,"payload":payload,"rpcId":key}))
+    }
+}
+#[tokio::test]
+async fn explicit_host_services_add_only_their_declared_authority() {
+    let connector = Connector {
+        connects: Arc::new(AtomicUsize::new(1)),
+        prompts: Arc::new(AtomicUsize::new(0)),
+    };
+    let runtime = SessionRuntime::spawn(
+        "k",
+        Arc::new(HostedConnector {
+            endpoint: Arc::new(connector),
+            services: Arc::new(Services),
+        }),
+    );
+    runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
+    assert!(runtime.capabilities().await.unwrap().supports("host.probe"));
+    let result = runtime
+        .call_optional("host.probe", json!({"input":7}), "stable")
+        .await
+        .unwrap();
+    assert_eq!(
+        result,
+        json!({"endpoint":"k","method":"host.probe","payload":{"input":7},"rpcId":"stable"})
+    );
+    assert!(
+        runtime
+            .call_optional("host.not-advertised", json!({}), "no")
+            .await
+            .is_err()
+    );
+    runtime.stop().await.unwrap();
+}
+#[tokio::test]
+async fn discarded_open_session_retires_its_stream_without_reconnecting_other_sessions() {
+    let connector = Connector {
+        connects: Arc::new(AtomicUsize::new(1)),
+        prompts: Arc::new(AtomicUsize::new(0)),
+    };
+    let runtime = SessionRuntime::spawn("k", Arc::new(connector.clone()));
+    runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
+    runtime.open_session("scratch").await.unwrap();
+    runtime
+        .call("session.discard", json!({"sessionId":"scratch"}), "discard")
+        .await
+        .unwrap();
+    assert!(!runtime.snapshot().sessions["scratch"].journal_ready);
+    assert_eq!(runtime.snapshot().connection, ConnectionState::Ready);
+    assert_eq!(connector.connects.load(Ordering::SeqCst), 2);
+    runtime.stop().await.unwrap();
 }

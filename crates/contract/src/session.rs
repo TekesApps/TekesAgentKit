@@ -126,6 +126,32 @@ impl SessionFileTextPage {
     }
 }
 
+pub fn validate_file_watch(frame: &Value) -> Result<()> {
+    match crate::string(frame, "kind")? {
+        "ready" => Ok(()),
+        "change" => {
+            let change = &frame["change"];
+            require(
+                !crate::string(change, "absolutePath")?.is_empty(),
+                "missing file change path",
+            )?;
+            if let Some(absent) = change.get("absent") {
+                require(absent.is_boolean(), "invalid absence marker")?;
+            }
+            if change["absent"] != true {
+                require(
+                    !crate::string(change, "version")?.is_empty(),
+                    "missing file change version",
+                )?;
+            }
+            Ok(())
+        }
+        _ => Err(crate::Error::Protocol(
+            "unknown file observation frame".into(),
+        )),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

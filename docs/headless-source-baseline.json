@@ -173,7 +173,18 @@
       "Sources/Session/SessionEndpoint/DSH/DSHWebBootGraph.swift": "6182ca655212d1af5b5a85a3c3d156fbfeb02e144c703bb7abb94bd8e64bd7a3",
       "Sources/Session/SessionEndpoint/DSH/DSHWebClientResource.swift": "f90b7f5ff32d91835d3e7d82bc49b01a03d43260a92cba712b70c596813b43da",
       "Sources/Session/SessionEndpoint/DSH/DSHWebPluginPage.swift": "a7b20e0e7320fae6aa3ebc79538014f63f5ef7bf569c90b2f4898205bd08ff01",
-      "Sources/Session/SessionEndpoint/DSH/DSHWebResourceSchemeHandler.swift": "1c3f37b499ba1e7ac5357d85d4c0ce3820ada74faf8e96f19c0f8c4f0340e366"
+      "Sources/Session/SessionEndpoint/DSH/DSHWebResourceSchemeHandler.swift": "1c3f37b499ba1e7ac5357d85d4c0ce3820ada74faf8e96f19c0f8c4f0340e366",
+      "Sources/Session/SessionEndpoint/Native/KernelMCPProcessHost.swift": "88f99020f0ffa6034e96348fda5384283d885dcd1b22225ee98f998dfe899519",
+      "Sources/Session/SessionEndpoint/Native/KernelManagedServer.swift": "5fd6cfbd4d2378b20faa365ed5f101f59929a5d25450fa11984d2edff8f05d47",
+      "Sources/Session/SessionEndpoint/Native/KernelPrivateBootstrap.swift": "c5764d8e50e853c2ba67721423833fdb84fa330b6be5685c37eae7772e0d1763",
+      "Sources/Session/SessionEndpoint/Native/NativeSessionEndpoint+Attachments.swift": "ec38ca1a8b3cce6f27857f5f8bb383ceeaf1b198872efb1059a60d4b4d89b02c",
+      "Sources/Session/SessionEndpoint/Native/NativeSessionEndpoint+Controls.swift": "2cdde5163960c20ae6e6c23662a29543aed3b06718c30d4db426945d8355a1f5",
+      "Sources/Session/SessionEndpoint/Native/NativeSessionEndpoint+Presets.swift": "c33e0c4d99ecc976328380f4ba111df9644444b6f831ef9bd5d6d7e533c2277f",
+      "Sources/Session/SessionEndpoint/Native/NativeSessionEndpoint+ProviderSettings.swift": "dfadd4eab8d832a8112e43c2d4894762e2afacb7e46c49a82f100bad8ad744a6",
+      "Sources/Session/SessionEndpoint/Native/NativeSessionEndpoint+UserDocuments.swift": "807371c2cf56ac2d7d582b89f18dd3308509208dc146f573be435e4a2c046e84",
+      "Sources/Session/SessionEndpoint/Native/NativeSessionEndpoint+WorkspaceFolders.swift": "0fae50a571a4a87209df02f866b25af1b2939c5d0b15a10157b595b22ccfad9b",
+      "Sources/Session/SessionEndpoint/Native/NativeSessionEndpoint+WorkspacePolicy.swift": "d0b87053c8c2f8c2dd677f9118b3f4142618167d3686dbe570d515d8fce77638",
+      "Sources/Session/SessionEndpoint/Native/TekesKernelProviderSettingsBackend.swift": "e8f101ac1a2794418e9b74e6457138f6199b646ff9b7aa5957026da2dfb087bb"
     }
   },
   "kernel": {
