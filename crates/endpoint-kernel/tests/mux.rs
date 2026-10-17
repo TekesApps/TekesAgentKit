@@ -166,6 +166,11 @@ async fn unary_envelope_authentication_errors_and_no_mutation_retry() {
         Err(Error::Unsupported(_))
     ));
     endpoint.close().await;
+    let closed = endpoint
+        .call("session.prompt", json!({"sessionId":"s"}), "after-close")
+        .await
+        .unwrap_err();
+    assert!(closed.to_string().contains("closed"));
     tokio::time::timeout(Duration::from_secs(3), task)
         .await
         .unwrap()

@@ -597,7 +597,7 @@ impl SessionEndpoint for NativeSessionEndpoint {
         }
     }
     async fn close(&self) {
-        let _ = self.lifetime.send(true);
+        self.lifetime.send_replace(true);
         let _ = self.commands.send(Command::Shutdown);
     }
 }

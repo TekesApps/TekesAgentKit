@@ -81,7 +81,7 @@ try:
             config={'kind':'pi','executable':str(pi/'node/bin/node'),'arguments':[str(pi/'node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js')],'dataRoot':str(data),'environment':{'HOME':str(base/'pi-home'),'PATH':os.environ.get('PATH','/usr/bin:/bin')},'commands':commands(cwd,'endpoint-test','endpoint-test')}
             Path(config['environment']['HOME']).mkdir()
             extension=base/'question.mjs'
-            extension.write_text("export default function(pi){pi.registerCommand('endpoint-question',{handler:async(args,ctx)=>{const value=await ctx.ui.select('Endpoint question',['yes','no']);pi.appendEntry('endpoint-answer',{value});}});}")
+            extension.write_text("export default function(pi){pi.registerCommand('endpoint-question',{handler:async(args,ctx)=>{const value=await ctx.ui.select('Endpoint question',['yes','no']);pi.appendEntry('endpoint-answer',{value});}});pi.registerCommand('endpoint-settled',{handler:async()=>{pi.appendEntry('tekes.run.v1',{id:'endpoint-settled-turn',phase:'settled'});}});}")
             config['extensions']=[str(extension)]
             config['commands'].insert(-3,{'op':'promptAndAnswer','sessionId':'s','text':'/endpoint-question','outcome':{'value':'yes'}})
             outputs=run(config)
@@ -143,6 +143,28 @@ try:
             assert 'ENDPOINT_REPLY_OK' in json.dumps(fork_snapshot) and 'endpoint-answer' not in json.dumps(fork_snapshot),'exact native fork boundary lost'
             assert result[-1]['result']['workspaces'][0]['title']=='Rust workspace','workspace sync lost'
             print('PI_COMPLETE_LIFECYCLE_LIVE_OK workspace+exact-fork+scratch-discard+rename+archive+commands+settings+skills+goal-CAS+feedback-CAS')
+            # A previously adopted pointer must not accept a different native identity at the same path.
+            fork_file=fork_snapshot['native_conversation']['state']['sessionFile']
+            shutil.copyfile(fork_file,source)
+            guard=execute(dict(resumed,commands=[{'op':'callError','sessionId':imported_id,'method':'pi.getState'}]))
+            assert 'identity changed' in json.dumps(guard),'replacement native identity was accepted'
+            source.unlink()
+            guard=execute(dict(resumed,commands=[{'op':'callError','sessionId':imported_id,'method':'pi.getState'}]))
+            assert 'missing' in json.dumps(guard) and not source.exists(),'missing pointer silently recreated history'
+            print('PI_POINTER_GUARDS_LIVE_OK native-identity-replacement+missing-file-no-recreation')
+            marked=execute(dict(config,commands=[{'op':'call','sessionId':fork_id,'method':'commands.execute','args':{'name':'endpoint-settled'}},
+                {'op':'call','sessionId':fork_id,'method':'session.history.export'}]))
+            mark_entries=marked[-1]['result']['entries']
+            cut=next(index+1 for index,entry in enumerate(mark_entries) if entry.get('customType')=='tekes.run.v1' and entry['data']['id']=='endpoint-settled-turn')
+            precise=execute(dict(config,commands=[{'op':'open','sessionId':fork_id},
+                {'op':'call','sessionId':fork_id,'method':'session.selectModel','args':{'provider':'endpoint-test','model':'endpoint-test'}},
+                {'op':'call','sessionId':fork_id,'method':'session.prompt','args':{'mode':'queue','content':[{'type':'text','text':'AFTER_COMPLETED_BOUNDARY'}]}},
+                {'op':'waitSettled','sessionId':fork_id,'minimumTurn':2},
+                {'op':'call','sessionId':fork_id,'method':'session.fork','args':{'atSeq':cut},'saveAs':'precise'},
+                {'op':'open','sessionId':'precise'},{'op':'snapshot'}]))
+            precise_state=next(state for key,state in precise[-1]['result']['sessions'].items() if key!=fork_id and state.get('native_conversation'))
+            assert 'endpoint-settled-turn' in json.dumps(precise_state) and 'AFTER_COMPLETED_BOUNDARY' not in json.dumps(precise_state),'completed-turn fork included later history'
+            print('PI_COMPLETED_FORK_LIVE_OK ClientKit-sequence+exact-settled-boundary')
             assert any(row.get('op')=='waitGoal' and row['result']['phase']=='complete' and row['result']['activation']=='disarmed' for row in result),'goal completion did not disarm'
             bounded=[{'op':'create','cwd':str(cwd),'saveAs':'bounded'},{'op':'call','sessionId':'bounded','method':'session.selectModel','args':{'provider':'endpoint-test','model':'endpoint-test'}},{'op':'open','sessionId':'bounded'},
                 {'op':'call','sessionId':'bounded','method':'goals.create','args':{'objective':'A goal the synthetic provider will not complete','maxGoalRounds':1},'saveAs':'bounded-goal','savePointer':''},

@@ -187,12 +187,8 @@ impl PiSessionEndpoint {
                 "fork entry is not in active branch",
             )?;
             Some(entry.to_owned())
-        } else if let Some(seq) = payload["atSeq"].as_u64() {
-            require(
-                seq > 0 && seq <= branch.len() as u64,
-                "invalid native fork entry ordinal",
-            )?;
-            Some(string(&branch[seq as usize - 1], "id")?.to_owned())
+        } else if !payload["atSeq"].is_null() {
+            Some(completed_fork_entry(&history, &payload["atSeq"])?)
         } else {
             None
         };
@@ -236,6 +232,8 @@ impl PiSessionEndpoint {
             parent: Some(id.into()),
             ephemeral,
             receipts: BTreeMap::new(),
+            materialized: true,
+            native_session_id: Some(string(&state, "sessionId")?.to_owned()),
             queue: Vec::new(),
             control_revision: 0,
             goal_revision,
@@ -293,5 +291,45 @@ impl PiSessionEndpoint {
         let _ = self.context.notifications.send(json!({"removed":id}));
         self.context.notify_workspaces().await;
         Ok(json!({"sessionId":id}))
+    }
+}
+
+// ClientKit sequences address get_entries order, including inactive branches, not ancestry ordinals.
+fn completed_fork_entry(history: &Value, sequence: &Value) -> Result<String> {
+    let sequence = sequence
+        .as_u64()
+        .filter(|n| *n > 0)
+        .ok_or_else(|| unsupported("invalid fork sequence"))?;
+    let entries = array(history, "entries")?;
+    let target = entries
+        .get(usize::try_from(sequence - 1).map_err(|_| unsupported("invalid fork sequence"))?)
+        .ok_or_else(|| unsupported("invalid fork sequence"))?;
+    let id = string(target, "id")?;
+    let (branch, _) = active_branch(history, usize::MAX)?;
+    require(
+        branch.iter().any(|entry| entry["id"] == id),
+        "fork sequence is outside active branch",
+    )?;
+    require(
+        target["customType"] == "tekes.run.v1" && target["data"]["phase"] == "settled",
+        "fork sequence must identify a completed turn; use entryId for a native entry boundary",
+    )?;
+    Ok(id.to_owned())
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn completed_fork_uses_full_native_order_and_rejects_nonsettled_or_inactive_entries() {
+        let history = json!({"leafId":"tail","entries":[
+            {"id":"root","parentId":null,"type":"message"},
+            {"id":"other","parentId":"root","customType":"tekes.run.v1","data":{"phase":"settled"}},
+            {"id":"cut","parentId":"root","customType":"tekes.run.v1","data":{"phase":"settled"}},
+            {"id":"tail","parentId":"cut","type":"message"}
+        ]});
+        assert_eq!(completed_fork_entry(&history, &json!(3)).unwrap(), "cut");
+        for invalid in [json!(0), json!(-1), json!(1), json!(2), json!(4), json!(5)] {
+            assert!(completed_fork_entry(&history, &invalid).is_err());
+        }
     }
 }

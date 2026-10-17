@@ -44,7 +44,16 @@ impl SessionEndpoint for Endpoint {
         let value = match target {
             StreamTarget::WorkspaceInventory => unreachable!(),
             StreamTarget::SessionInventory => {
-                json!({"type":"baseline","generation":"g","snapshot":{"items":[]}})
+                let baseline = json!({"type":"baseline","generation":"g","snapshot":{"items":[]}});
+                if self.attempt == 0 {
+                    return Ok(Box::pin(stream::once(async { Ok(baseline) }).chain(
+                        stream::once(async {
+                            tokio::time::sleep(Duration::from_millis(100)).await;
+                            Err(Error::Disconnected)
+                        }),
+                    )));
+                }
+                baseline
             }
             StreamTarget::SessionControl => {
                 json!({"type":"baseline","generation":"g","snapshot":{"queues":[],"jobs":[],"projections":[]}})
@@ -53,11 +62,13 @@ impl SessionEndpoint for Endpoint {
             StreamTarget::SessionConversation { .. } => unreachable!(),
             StreamTarget::SessionJournal { address, .. } => {
                 let snapshot = json!({"type":"snapshot","snapshot":{"sessionId":address.session_id,"generation":"g","throughSequence":0,"windowLimit":50,"entries":[{"event":{"type":"user/message","seq":0,"time":1,"data":{"text":"same identity"}}}],"hasMoreBefore":false}});
-                if self.attempt == 0 {
+                if address.session_id == "lost" && self.attempt > 0 {
+                    return Err(unsupported("session file missing"));
+                }
+                if address.session_id == "broken" {
                     return Ok(Box::pin(stream::once(async { Ok(snapshot) }).chain(
                         stream::once(async {
-                            tokio::time::sleep(Duration::from_millis(30)).await;
-                            Err(Error::Disconnected)
+                            Err(Error::Protocol("invalid session delta".into()))
                         }),
                     )));
                 }
@@ -323,5 +334,59 @@ async fn discarded_open_session_retires_its_stream_without_reconnecting_other_se
     assert!(!runtime.snapshot().sessions["scratch"].journal_ready);
     assert_eq!(runtime.snapshot().connection, ConnectionState::Ready);
     assert_eq!(connector.connects.load(Ordering::SeqCst), 2);
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn missing_pointer_and_exhausted_session_stream_do_not_reconnect_healthy_sessions() {
+    let connector = Connector {
+        connects: Arc::new(AtomicUsize::new(0)),
+        prompts: Arc::new(AtomicUsize::new(0)),
+    };
+    let runtime = SessionRuntime::spawn("k", Arc::new(connector.clone()));
+    runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
+    runtime.open_session("lost").await.unwrap();
+    runtime.open_session("healthy").await.unwrap();
+    let mut changes = runtime.subscribe();
+    tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            if runtime.inspect(|s| {
+                s.connection == ConnectionState::Ready
+                    && s.sessions
+                        .get("lost")
+                        .is_some_and(|s| s.journal_error.is_some())
+                    && s.sessions.get("healthy").is_some_and(|s| s.journal_ready)
+            }) {
+                break;
+            }
+            changes.changed().await.unwrap();
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(connector.connects.load(Ordering::SeqCst), 2);
+    let _ = runtime.open_session("broken").await;
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if runtime.inspect(|s| {
+                s.sessions
+                    .get("broken")
+                    .is_some_and(|s| s.journal_error.is_some() && !s.journal_ready)
+            }) {
+                break;
+            }
+            changes.changed().await.unwrap();
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(connector.connects.load(Ordering::SeqCst), 2);
+    assert!(
+        runtime.inspect(
+            |s| s.connection == ConnectionState::Ready && s.sessions["healthy"].journal_ready
+        )
+    );
+    // Explicit retry still reaches the failed pointer rather than treating it as already open.
+    assert!(runtime.open_session("lost").await.is_err());
     runtime.stop().await.unwrap();
 }

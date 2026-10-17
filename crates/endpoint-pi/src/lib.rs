@@ -71,6 +71,10 @@ struct Row {
     ephemeral: bool,
     receipts: BTreeMap<String, Receipt>,
     #[serde(default)]
+    materialized: bool,
+    #[serde(default)]
+    native_session_id: Option<String>,
+    #[serde(default)]
     workspace_id: Option<String>,
     #[serde(default)]
     queue: Vec<Value>,
@@ -253,6 +257,30 @@ impl Context {
             .map_err(|_| Error::Disconnected)?
             .map_err(io_error)
     }
+    async fn validate_pointer(&self, row: &Row) -> Result<()> {
+        match tokio::fs::symlink_metadata(&row.file).await {
+            Ok(metadata) => {
+                require(
+                    metadata.is_file() && !metadata.file_type().is_symlink(),
+                    "invalid native session file",
+                )?;
+                let actual = row.file.canonicalize().map_err(io_error)?;
+                require(actual == row.file, "native session pointer was redirected")
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => require(
+                !row.materialized
+                    && row.native_session_id.is_none()
+                    && row.parent.is_none()
+                    && row.goal_revision == 0
+                    && row.feedback.is_empty()
+                    && row.title.is_none()
+                    && row.receipts.is_empty()
+                    && row.file.starts_with(self.config.data_root.join("sessions")),
+                "native session file is missing; refusing to create replacement history",
+            ),
+            Err(error) => Err(io_error(error)),
+        }
+    }
     async fn process(self: &Arc<Self>, id: &str) -> Result<Arc<Rpc>> {
         let row = self.row(id).await?;
         require(!row.archived, "session is archived")?;
@@ -260,8 +288,39 @@ impl Context {
         if let Some(rpc) = processes.get(id).filter(|rpc| rpc.alive()) {
             return Ok(rpc.clone());
         }
+        self.validate_pointer(&row).await?;
         let rpc = Rpc::start(&self.config, &row.cwd, Some(&row.file)).await?;
         let mut events = rpc.events();
+        let readiness = async {
+            let state = rpc.request("get_state", json!({})).await?;
+            let actual = PathBuf::from(string(&state, "sessionFile")?);
+            require(
+                actual == row.file,
+                "Pi resumed a different native session file",
+            )?;
+            let native_id = string(&state, "sessionId")?;
+            require(!native_id.is_empty(), "missing native session identity")?;
+            if let Some(expected) = &row.native_session_id {
+                require(expected == native_id, "Pi native session identity changed")?;
+            }
+            // Blank sessions may not have a native file until their first persisted entry.
+            if row.file.is_file() {
+                let mut manifest = self.manifest.lock().await;
+                let current = manifest
+                    .sessions
+                    .get_mut(id)
+                    .ok_or_else(|| unsupported("session removed"))?;
+                current.materialized = true;
+                current.native_session_id = Some(native_id.into());
+                self.save(&manifest).await?;
+            }
+            Ok::<_, Error>(())
+        }
+        .await;
+        if let Err(error) = readiness {
+            rpc.close();
+            return Err(error);
+        }
         let sender = self.notifications.clone();
         let id_owned = id.to_owned();
         let weak_context = Arc::downgrade(self);
@@ -323,8 +382,7 @@ impl Context {
                 }
             }
         });
-        // Formal RPC readiness, rather than assuming the spawned process is usable.
-        rpc.request("get_state", json!({})).await?;
+        // The native file and session identity have been verified before exposing this process.
         processes.insert(id.into(), rpc.clone());
         Ok(rpc)
     }
@@ -973,6 +1031,8 @@ impl SessionEndpoint for PiSessionEndpoint {
                         parent: None,
                         ephemeral: false,
                         receipts: BTreeMap::new(),
+                        materialized: false,
+                        native_session_id: None,
                         workspace_id: payload["workspaceId"].as_str().map(String::from),
                         queue: Vec::new(),
                         control_revision: 0,
@@ -1040,6 +1100,8 @@ impl SessionEndpoint for PiSessionEndpoint {
                         parent: None,
                         ephemeral: false,
                         receipts: BTreeMap::new(),
+                        materialized: true,
+                        native_session_id: Some(string(&state, "sessionId")?.to_owned()),
                         workspace_id: payload["workspaceId"].as_str().map(String::from),
                         queue: Vec::new(),
                         control_revision: 0,
@@ -1171,15 +1233,14 @@ impl SessionEndpoint for PiSessionEndpoint {
                             matches!(disposition, "started" | "queued" | "handled"),
                             "Pi did not admit prompt",
                         )?;
+                        let state = rpc.request("get_state", json!({})).await?;
                         let mut manifest = self.context.manifest.lock().await;
-                        manifest
-                            .sessions
-                            .get_mut(id)
-                            .expect("owned row")
-                            .receipts
-                            .get_mut(rpc_id)
-                            .expect("receipt")
-                            .accepted = true;
+                        let row = manifest.sessions.get_mut(id).expect("owned row");
+                        if row.file.is_file() || matches!(disposition, "started" | "queued") {
+                            row.materialized = true;
+                            row.native_session_id = Some(string(&state, "sessionId")?.to_owned());
+                        }
+                        row.receipts.get_mut(rpc_id).expect("receipt").accepted = true;
                         self.context.save(&manifest).await?;
                         Ok(json!({"accepted":true,"native":result}))
                     }
@@ -1193,7 +1254,7 @@ impl SessionEndpoint for PiSessionEndpoint {
         }
     }
     async fn close(&self) {
-        let _ = self.lifetime.send(true);
+        self.lifetime.send_replace(true);
         let mut processes = self.context.processes.lock().await;
         for rpc in processes.values() {
             rpc.close();
@@ -1297,6 +1358,57 @@ mod tests {
         ] {
             assert!(active_branch(&bad, 50).is_err());
         }
+    }
+    #[tokio::test]
+    async fn materialized_pointer_cannot_silently_become_a_new_or_redirected_session() {
+        let root = std::env::temp_dir().join(format!("agentkit-pointer-{}", uuid::Uuid::new_v4()));
+        let connector = PiConnector::new(PiConfiguration::new(
+            PathBuf::from("/bin/false"),
+            root.clone(),
+        ))
+        .await
+        .unwrap();
+        let root = connector.context.config.data_root.clone();
+        let mut row: Row = serde_json::from_value(json!({"id":uuid::Uuid::new_v4().to_string(),"cwd":root,
+            "file":root.join("sessions/native.jsonl"),"archived":false,"ephemeral":false,"receipts":{}})).unwrap();
+        connector.context.validate_pointer(&row).await.unwrap();
+        row.materialized = true;
+        assert!(connector.context.validate_pointer(&row).await.is_err());
+        assert!(!row.file.exists());
+        tokio::fs::write(&row.file, b"owned native bytes")
+            .await
+            .unwrap();
+        connector.context.validate_pointer(&row).await.unwrap();
+        #[cfg(unix)]
+        {
+            tokio::fs::remove_file(&row.file).await.unwrap();
+            let redirected = root.join("redirected.jsonl");
+            tokio::fs::write(&redirected, b"different native bytes")
+                .await
+                .unwrap();
+            std::os::unix::fs::symlink(&redirected, &row.file).unwrap();
+            assert!(connector.context.validate_pointer(&row).await.is_err());
+        }
+        let endpoint = PiSessionEndpoint {
+            context: connector.context.clone(),
+            generation: "test".into(),
+            host: serde_json::from_value(
+                json!({"protocolVersion":3,"product":{"name":"Pi","version":"1.3.0"},
+                "capabilities":[],"cwd":root,"home":root,"attachedSessions":0,"canOpenPath":false}),
+            )
+            .unwrap(),
+            windows: Arc::new(Mutex::new(BTreeMap::new())),
+            lifetime: tokio::sync::watch::channel(false).0,
+        };
+        endpoint.close().await;
+        let error = endpoint
+            .call("session.create", json!({"cwd":root}), "closed")
+            .await
+            .unwrap_err();
+        assert!(error.to_string().contains("closed"));
+        drop(endpoint);
+        drop(connector);
+        tokio::fs::remove_dir_all(root).await.unwrap();
     }
     #[test]
     fn native_question_responses_validate_selection_and_confirmation() {

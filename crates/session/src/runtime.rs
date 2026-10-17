@@ -134,9 +134,24 @@ impl SessionRuntime {
         let (reply, result) = oneshot::channel();
         self.send(Command::Open(id.into(), reply), result).await?;
         self.wait_for(Duration::from_secs(30), |s| {
-            s.sessions.get(id).is_some_and(|s| s.journal_ready)
+            s.sessions
+                .get(id)
+                .is_some_and(|s| s.journal_ready || s.journal_error.is_some())
         })
-        .await
+        .await?;
+        self.inspect(|s| {
+            let session = s.sessions.get(id).ok_or(Error::Disconnected)?;
+            if session.journal_ready {
+                Ok(())
+            } else {
+                Err(Error::Transport(
+                    session
+                        .journal_error
+                        .clone()
+                        .unwrap_or_else(|| "session unavailable".into()),
+                ))
+            }
+        })
     }
     pub async fn observe_files(&self, id: &str, path: &str) -> Result<FrameStream> {
         let (reply, result) = oneshot::channel();
@@ -514,10 +529,13 @@ async fn connected(
     let mut next_journal_epoch = epoch * 1_000_000;
     for id in wanted.iter() {
         next_journal_epoch += 1;
-        let cancellation =
-            add_journal(endpoint.as_ref(), &mut streams, id, next_journal_epoch).await?;
-        journal_cancellations.insert(id.clone(), cancellation);
-        journal_epochs.insert(id.clone(), next_journal_epoch);
+        match add_journal(endpoint.as_ref(), &mut streams, id, next_journal_epoch).await {
+            Ok(cancellation) => {
+                journal_cancellations.insert(id.clone(), cancellation);
+                journal_epochs.insert(id.clone(), next_journal_epoch);
+            }
+            Err(error) => record_session_error(store, id, &error),
+        }
     }
     let mut journal_retries = std::collections::BTreeMap::<String, usize>::new();
     let mut recovered = false;
@@ -559,11 +577,18 @@ async fn connected(
                                 if let Some(session) = s.sessions.get_mut(id) { session.journal_error = Some(error.to_string()); }
                             });
                             next_journal_epoch += 1;
-                            let cancellation = add_journal(endpoint.as_ref(), &mut streams, id, next_journal_epoch).await?;
-                            journal_cancellations.insert(id.to_owned(), cancellation);
-                            journal_epochs.insert(id.to_owned(), next_journal_epoch);
-                            continue;
-                        }
+                            match add_journal(endpoint.as_ref(), &mut streams, id, next_journal_epoch).await {
+                                Ok(cancellation) => {
+                                    journal_cancellations.insert(id.to_owned(), cancellation);
+                                    journal_epochs.insert(id.to_owned(), next_journal_epoch);
+                                    continue;
+                                }
+                                Err(error) => record_session_error(store, id, &error),
+                            }
+                        } else { record_session_error(store, id, &error); }
+                        if let Some(cancellation) = journal_cancellations.remove(id) { cancellation.abort(); }
+                        journal_epochs.remove(id);
+                        continue;
                     }
                     return Err(error);
                 }
@@ -582,13 +607,13 @@ async fn connected(
                     Command::Reconnect(reply) => { store.update(MemoryProjectionStore::disconnect); let _ = reply.send(Ok(())); return Ok(false); }
                     Command::Open(id, reply) => {
                         if !store.read(MemoryProjectionStore::ready) { let _ = reply.send(Err(Error::Disconnected)); continue; }
-                        let result = if wanted.contains(&id) { Ok(()) } else {
+                        let result = if let std::collections::btree_map::Entry::Vacant(entry) = journal_epochs.entry(id.clone()) {
                             next_journal_epoch += 1;
                             match add_journal(endpoint.as_ref(), &mut streams, &id, next_journal_epoch).await {
-                                Ok(cancellation) => { store.update(|s| s.reset_journal(&id)); wanted.insert(id.clone()); journal_cancellations.insert(id.clone(), cancellation); journal_epochs.insert(id, next_journal_epoch); Ok(()) }
+                                Ok(cancellation) => { store.update(|s| {s.reset_journal(&id); if let Some(session)=s.sessions.get_mut(&id) {session.journal_error=None;}}); wanted.insert(id.clone()); journal_cancellations.insert(id.clone(), cancellation); entry.insert(next_journal_epoch); Ok(()) }
                                 Err(e) => Err(e),
                             }
-                        };
+                        } else { Ok(()) };
                         let _ = reply.send(result);
                     }
                     Command::Close(id, reply) => {
@@ -623,6 +648,12 @@ async fn connected(
             }
         }
     }
+}
+fn record_session_error(store: &SharedProjection, id: &str, error: &Error) {
+    store.update(|s| {
+        s.reset_journal(id);
+        s.sessions.entry(id.into()).or_default().journal_error = Some(error.to_string());
+    });
 }
 async fn add_journal(
     endpoint: &dyn SessionEndpoint,

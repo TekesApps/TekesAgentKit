@@ -100,4 +100,9 @@ Pi 1.3.0 和 Native Kernel 0.9.0 的原验收也重新通过。上述模型输�
 
 三个真实版本均通过模型/命令/skills/设置读取、附件上传与文件观察的 ready 握手。Native 验证临时 fork/discard、归档恢复；Pi 额外验证精确原生 entry fork、临时分支实际删除、工作区同步、队列编辑/移除/自动派发、附件隔离、Goal/反馈 CAS，以及模型完成、轮数预算耗尽、重连不激活。DSH 验证服务端扩展、含加号文件名上传和工作区同步。
 
-39 项 Rust 回归通过 fmt、Clippy -D warnings 和依赖边界检查；回归另外覆盖能力和显式宿主服务边界、文件观察变化/删除/关闭、工作区基线替换/排序、观察事件有界与非权威、活动内容流的 discard。`tekes-agent-headless` 是独立的公开 API consumer，与 adapter 一同构建并执行上述联调。合成 provider 证明协议闭环，不代表真实模型质量或生产部署验收。
+42 项 Rust 回归通过 fmt、Clippy -D warnings 和依赖边界检查；回归另外覆盖能力和显式宿主服务边界、文件观察变化/删除/关闭、工作区基线替换/排序、观察事件有界与非权威、活动内容流的 discard。`tekes-agent-headless` 是独立的公开 API consumer，与 adapter 一同构建并执行上述联调。合成 provider 证明协议闭环，不代表真实模型质量或生产部署验收。
+
+
+## 2026-10-18 对照复查
+
+当前 ClientKit 的 SEP 参考文件哈希均与基准一致（HEAD `c289bc9`）。复查修复了 Pi 原生文件缺失/替换后的恢复保护、ClientKit `atSeq` 完整 entry 顺序及已完成 turn 校验、失效 pointer 的单会话隔离，以及 Native/Pi 在无文件观察者时的 close 状态持久化。详情及验证边界见 [复查记录](sep-review-2026-10-18.md)。

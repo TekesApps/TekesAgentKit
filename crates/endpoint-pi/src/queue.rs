@@ -196,6 +196,8 @@ mod tests {
             parent: None,
             ephemeral: false,
             receipts: BTreeMap::new(),
+            materialized: false,
+            native_session_id: None,
             workspace_id: None,
             queue: Vec::new(),
             control_revision: 0,
