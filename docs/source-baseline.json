@@ -1,0 +1,170 @@
+{
+  "assessment_date": "2026-10-17",
+  "note": "Read-only source snapshot. Dirty trees include unrelated WIP. File hashes identify inspected contents; no dependency pins are established.",
+  "repositories": {
+    "Tekes": {
+      "path": "/Users/frankqin/dev/Tekes",
+      "head": "9bf98cf3e2dece9a909f783fc4a6e1ce1e38e2e9",
+      "status_porcelain": [
+        "?? docs/design/tekesui-icons-tokens-SEND.md"
+      ],
+      "inspected_files": {
+        "Tekes/ClientAgentHostAdapters.swift": "7d907c654ec3df76c7a8b492e32bbc68f1bd4d0b46044cae615aa712b9f67c71",
+        "Tekes/ClientAgentPanelHostAdapters.swift": "44b2b5ee2d3292bfe31527de9c8f9bb21cdab32fc41546155774b5cbcc7d1b52"
+      }
+    },
+    "TekesClientKit": {
+      "path": "/Users/frankqin/dev/TekesClientKit",
+      "head": "c289bc9d33edcd83a782ac17927a8c65a027eccd",
+      "status_porcelain": [
+        " M Sources/Composer/ComposerAnnotation.swift",
+        " M Sources/Composer/ComposerCardView.swift",
+        " M Sources/Composer/ComposerEnvironment.swift",
+        " M Sources/Composer/ThreadComposerToolbarView.swift",
+        " M Sources/Composer/UserControlsView.swift",
+        "?? Sources/Composer/ClientStandaloneComposerController.swift",
+        "?? Sources/Composer/ComposerArtifactSelectionReference.swift",
+        "?? Sources/Composer/ComposerSubmissionLifecycle.swift",
+        "?? Tests/ComposerTests/ComposerArtifactSelectionReferenceTests.swift",
+        "?? Tests/ComposerTests/ComposerDetachedSubmissionTests.swift",
+        "?? Tests/ComposerTests/ComposerSubmissionLifecycleTests.swift",
+        "?? Tests/ComposerTests/StandaloneComposerPublicAPITests.swift",
+        "?? Tests/SessionTests/Fixtures/__pycache__/",
+        "?? docs/standalone-composer.md",
+        "?? scripts/__pycache__/"
+      ],
+      "inspected_files": {
+        "Package.swift": "1064d4cea79c18c5ccaa2ff7d5940b0252bf46ee7d5904c5e1143ea6fc274699",
+        "Sources/Contract/SessionEndpoint/SessionEndpoint.swift": "50c5e93c2ae18129e414085d2818b8c2d3e3b94ef2b1295a3b8557568ac1e589",
+        "Sources/Session/SessionEndpoint/Native/NativeSessionEndpoint.swift": "21d4a577ae4f9155e7ffa8b50be482639135b2539a4440f9d31f2334a1ca2f30",
+        "Sources/Session/SessionEndpoint/PI/PIHostEndpoint.swift": "603937299831b1635b8352f9dd59d396dab3d97741649cbb47442ec41b946ceb",
+        "Sources/Session/SessionEndpoint/DSH/DSHHostEndpoint.swift": "2610775859483a486ea1755ebe266c09a75e19a1391bc81a588cf6c9657f5290",
+        "Sources/Session/SessionEndpoint/Client/SessionEndpointRuntime.swift": "c58136a14874ddd1ab01991efa4cc01f45540b42d9a6d2b2cc271aec1ae7151b",
+        "Sources/Session/SessionEndpoint/Client/SessionWindowCoordinator.swift": "368ecfa359e022d0bdd993455211eca5e2bf19bfad3d71468984eb1a8491e52d",
+        "Sources/Session/SessionEndpoint/Client/SessionEventProjector.swift": "e7a2ccc9e211f04f819e0a1866388420b7b15f0a25ea80a7777a3408414dd515",
+        "Sources/Session/SessionEndpoint/Client/SessionEndpointStoreContract.swift": "95155c7ac4ac6f8ab4d8dffc90b98952b0217233c24a8b6da8351a9f6ef8b812",
+        "Sources/Composer/Agent/ClientEmbeddedRunView.swift": "15cfb89a05c307470940c47401c1bc5c453efcd461d1ed8f95a3411de5629958",
+        "Sources/Composer/ClientStandaloneComposerController.swift": "2c91b302f937b81c0faa376a71f987735246f6f196fefea2b626f9114b45c352"
+      }
+    },
+    "TekesKernel": {
+      "path": "/Users/frankqin/dev/TekesKernel",
+      "head": "860bc8075c63054d7ab4f81ccedc3921f135d6ec",
+      "status_porcelain": [],
+      "inspected_files": {
+        "Cargo.toml": "8dccde5d614960ed5164e12cc1204889786fe290076d01fe96017fe6f1cc3c48",
+        "spec/session-endpoint.md": "19cc605d26c0bcff21b415d00ed4818af383d5f5cfff2b636681d70b236969c1",
+        "crates/endpoint/Cargo.toml": "9b38c46baf8d1f02e779f9ac613c996ccb77f0ac3e86b40180fabe602e16c11e",
+        "crates/schema/Cargo.toml": "0cdc37eda0ebed00f6a3abdbc9577bb5b2c2f8b00c47d41a9efaac1d804cb4f7"
+      }
+    },
+    "TekesUI-primary": {
+      "path": "/Users/frankqin/dev/TekesUI",
+      "head": "a3bdf046891db2b216ef3640a2ca7f56c1893514",
+      "status_porcelain": [
+        " M README.md",
+        " M design/README.md",
+        " M docs/charter.md",
+        " M docs/roadmap.md",
+        "?? .DS_Store",
+        "?? .gitignore",
+        "?? Cargo.lock",
+        "?? Cargo.toml",
+        "?? crates/",
+        "?? docs/.DS_Store",
+        "?? docs/design/motion-foundation.md",
+        "?? docs/design/plugin-host-architecture.md"
+      ],
+      "inspected_files": {
+        "Cargo.toml": "c6e30563fe6f0abf1c1dc00bc4eb240a6ff65e75de7dab2333e46690a7c13243"
+      }
+    },
+    "TekesUI-gallery": {
+      "path": "/Users/frankqin/.codex/worktrees/gallery-design-baseline/TekesUI",
+      "head": "bc3de79466834e99062a1b4ef0872323e2860001",
+      "status_porcelain": [
+        " M .github/workflows/ci.yml",
+        " M Cargo.lock",
+        " M Cargo.toml",
+        " M crates/tekes-ui-controls/src/collections_view.rs",
+        " M crates/tekes-ui-controls/src/composite.rs",
+        " M crates/tekes-ui-controls/src/control_motion.rs",
+        " M crates/tekes-ui-controls/src/extended.rs",
+        " M crates/tekes-ui-controls/src/feedback_view.rs",
+        " M crates/tekes-ui-controls/src/layout_view.rs",
+        " M crates/tekes-ui-controls/src/lib.rs",
+        " M crates/tekes-ui-controls/src/paint.rs",
+        " M crates/tekes-ui-controls/src/selection.rs",
+        " M crates/tekes-ui-controls/src/text_surface.rs",
+        " M crates/tekes-ui-controls/src/widgets.rs",
+        " M crates/tekes-ui-design-export/src/effects.rs",
+        " M crates/tekes-ui-design-export/src/freshness.rs",
+        " M crates/tekes-ui-design-export/src/lib.rs",
+        " M crates/tekes-ui-gallery/Cargo.toml",
+        " M crates/tekes-ui-gallery/src/gallery/chrome.rs",
+        " M crates/tekes-ui-gallery/src/gallery/mod.rs",
+        " M crates/tekes-ui-gallery/src/gallery/navigation.rs",
+        " M crates/tekes-ui-gallery/src/gallery/pages/motion.rs",
+        " M crates/tekes-ui-gallery/src/gallery/pages/showcase.rs",
+        " M crates/tekes-ui-gallery/src/gallery/quality_effects.rs",
+        " M crates/tekes-ui-gallery/src/gallery/text.rs",
+        " M crates/tekes-ui-gallery/src/gallery/text_demo.rs",
+        " M crates/tekes-ui-gallery/src/gallery/workbench.rs",
+        " M crates/tekes-ui-gallery/src/gallery/workbench/brand_preview.rs",
+        " M crates/tekes-ui-gallery/src/gallery/workbench/extended.rs",
+        " M crates/tekes-ui-gallery/src/gallery/workbench/extended/collections_adapter.rs",
+        " M crates/tekes-ui-gallery/src/gallery/workbench/extended/feedback_adapter.rs",
+        " M crates/tekes-ui-gallery/src/perf.rs",
+        " M crates/tekes-ui-platform-macos/Cargo.toml",
+        " M crates/tekes-ui-platform-macos/src/event.rs",
+        " M crates/tekes-ui-platform-macos/src/lib.rs",
+        " M crates/tekes-ui-platform-macos/src/selftest.rs",
+        " M crates/tekes-ui-platform-macos/src/shared.rs",
+        " M crates/tekes-ui-platform-macos/src/view.rs",
+        " M crates/tekes-ui-tokens/build.rs",
+        " M design/behavior/gold7-alignment.json",
+        " M design/integration.json",
+        " M design/source/layout.json",
+        " M design/source/motion.json",
+        " M design/system.json",
+        " M design/system.schema.json",
+        " M design/tokens.json",
+        " M docs/design/component-motion-integration.md",
+        " M docs/design/gold7.md",
+        " M scripts/check-reference-alignment.py",
+        " M scripts/merge-design-system.py",
+        " M scripts/test-merge-design-system.py",
+        "?? crates/tekes-ui-controls/src/composition.rs",
+        "?? crates/tekes-ui-controls/src/composition/",
+        "?? crates/tekes-ui-controls/tests/",
+        "?? crates/tekes-ui-design-export/src/gallery_brands.rs",
+        "?? crates/tekes-ui-gallery/src/gallery/composition_acceptance.rs",
+        "?? crates/tekes-ui-gallery/src/gallery/workbench/basic_states.rs",
+        "?? crates/tekes-ui-gallery/src/gallery/workbench/durable_draft.rs",
+        "?? crates/tekes-ui-gallery/src/gallery/workbench/extended/navigation_states.rs",
+        "?? crates/tekes-ui-gallery/src/gallery/workbench/focus.rs",
+        "?? crates/tekes-ui-gallery/src/gallery/workbench/state_capture.rs",
+        "?? crates/tekes-ui-platform-macos/src/accessibility.rs",
+        "?? design/gallery/capabilities.json",
+        "?? design/reviews/composition-20261017/",
+        "?? design/reviews/composition-list-dialog-20261017/",
+        "?? design/reviews/gold7-20261017/alignment-pass3/",
+        "?? design/reviews/gold7-20261017/alignment-pass4/",
+        "?? design/reviews/gold7-20261017/alignment-pass5/",
+        "?? design/reviews/gold7-20261017/alignment-pass6/",
+        "?? design/reviews/issues-20261017/",
+        "?? docs/design/composition-list-dialog-20261017.md",
+        "?? docs/design/composition-minimum-protocol-20261017.md",
+        "?? docs/design/container-composition-audit-20261017.md",
+        "?? docs/design/issue-remediation-20261017.md",
+        "?? examples/",
+        "?? scripts/generate-component-capabilities.py",
+        "?? scripts/test-component-capabilities.py"
+      ],
+      "inspected_files": {
+        "Cargo.toml": "8bf3aac48349a5ae8a65fbccd97bd3daf061e650d52386a7ab07920f40a28614",
+        "crates/tekes-ui-controls/src/lib.rs": "a507c9c5402ab5824d643bca978a1881d3dcbd5efef979419d910f2450207e9c"
+      }
+    }
+  }
+}
