@@ -1,6 +1,6 @@
 # 分阶段开发与完成门槛
 
-P0/P1/P3 已完成本轮三个 SEP 的非 UI 会话闭环，验收见 session-endpoints.md 和 headless-kernel.md；不代表完整 ClientKit API 或 UI projector 对齐。缓存和 UI 尚未开始；P4 的 Run/Transcript/Composer/连接状态已在无 UI presentation 层实现，边界见 headless-presentation.md。Tasks/Subagents/SideChat/Summary 的无 UI 状态已补充，原生能力及尚需宿主输入的部分见 headless-agent-panels.md。
+P0/P1/P3 已完成本轮三个 SEP 的非 UI 会话闭环，验收见 session-endpoints.md 和 headless-kernel.md；不代表完整 ClientKit API 或 UI projector 对齐。缓存尚未开始；P5 已开始独立开发试点，见 [接入契约](tekesui-integration-contract.md)，发布门槛尚未满足；P4 的 Run/Transcript/Composer/连接状态已在无 UI presentation 层实现，边界见 headless-presentation.md。Tasks/Subagents/SideChat/Summary 的无 UI 状态已补充，原生能力及尚需宿主输入的部分见 headless-agent-panels.md。
 
 | 阶段 | 交付 | 必须有的证据 |
 |---|---|---|
@@ -26,3 +26,5 @@ DSH 已升级并隔离验证 0.2.1-rc.2（保留 0.2.0-rc.2），补齐普通 fo
 2026-10-18：补齐 P4 非 UI presentation 和独立公开 consumer；不包含 P5 控件与完整 P6 产品面。
 
 2026-10-18：v0.1.0 保存 headless 阶段；v0.1.1 增加 public/MIT 与公开接入、CLI、贡献和版本文档，crate 继续 publish=false。
+
+2026-10-18：本轮授权消费 TekesUI 构建基础 Rust Run demo，复用现有 presentation。独立 ui workspace 不修改 TekesUI；焦点/文本服务/阅读的缺口列入 tekesui-gaps.md。任务、子代理、SideChat、Summary 本轮不扩展 UI。

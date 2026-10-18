@@ -1,0 +1,8 @@
+[package]
+name = "tekes-agent-ui-consumer-check"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+[dependencies]
+tekes-agent-components-ui.workspace = true
