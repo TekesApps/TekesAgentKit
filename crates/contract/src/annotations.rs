@@ -10,6 +10,7 @@ macro_rules! binding {
         pub const $typescript: &str = concat!("export interface ", stringify!($name), " {\n", $("  ", $json, ": ", $ts, ";\n",)* "}\n");
     }
 }
+pub(crate) use binding;
 binding!(TranscriptAnnotationSource, SOURCE_TYPESCRIPT, {
     endpoint: String => "endpoint": "string",
     session_id: String => "sessionId": "string",
@@ -97,7 +98,11 @@ mod tests {
     #[test]
     fn published_typescript_matches_rust_contract() {
         assert_eq!(
-            super::annotation_typescript(),
+            format!(
+                "{}{}",
+                super::annotation_typescript(),
+                crate::thread_actions_typescript()
+            ),
             include_str!("../../../web-contract/index.d.ts")
         );
     }

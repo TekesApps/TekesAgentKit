@@ -3,6 +3,8 @@
 mod composer;
 mod annotations;
 pub use annotations::*;
+mod thread_actions;
+pub use thread_actions::*;
 mod controller;
 mod run;
 mod scope;

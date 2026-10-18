@@ -29,3 +29,34 @@ export interface AnnotationInputPresentation {
 export interface AnnotationCompilation {
   text: string;
 }
+export interface ThreadActionDefinition {
+  id: string;
+  label: string;
+  icon: string;
+  interaction: 'execute' | 'rename' | 'copy';
+  enabled: boolean;
+  disabledReason?: string;
+  copyText?: string;
+}
+export interface ThreadActionsPresentation {
+  endpoint: string;
+  sessionId: string;
+  label: string;
+  items: ThreadActionDefinition[];
+}
+export interface ThreadActionRequest {
+  sessionId: string;
+  actionId: string;
+  title?: string;
+}
+export interface ThreadActionNavigation {
+  endpoint: string;
+  sessionId: string;
+}
+export interface ThreadActionOutcome {
+  navigation?: ThreadActionNavigation;
+  clearSelection: boolean;
+  renamedTitle?: string;
+  renameSeq?: number;
+  warning?: string;
+}

@@ -62,6 +62,7 @@ async fn main() -> Result<()> {
     });
     let config: Value = serde_json::from_str(&receiver.recv().await.ok_or(Error::Disconnected)?)?;
     let mut agent = SharedAgent::default();
+    if let Some(scheme) = config["sessionURLScheme"].as_str() { agent.set_session_url_scheme(scheme)?; }
     for endpoint in array(&config, "endpoints")? {
         let id = string(endpoint, "id")?;
         let kind = string(endpoint, "kind")?;

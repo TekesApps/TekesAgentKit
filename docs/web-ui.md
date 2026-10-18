@@ -9,6 +9,6 @@ Hosts own authentication, listener, credentials, permissions and process lifetim
 Swift reusable Agent views remain in ClientKit.
 
 The shared annotation DTOs and TypeScript bindings are exported by the public
-`@tekesagentkit/annotations` package. `composer.compileAnnotations` compiles input
+`@tekesagentkit/client-contract` package. `composer.compileAnnotations` compiles input
 inside AgentKit; `follow(view)` projects `inputPresentation` for history rendering.
 See [the service contract](../crates/web/README.md#annotation-interface).

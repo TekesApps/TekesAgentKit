@@ -140,6 +140,8 @@ impl SharedEndpoint {
             "capabilities":self.connected().ok().map(|e| e.capabilities())});
         if let Some(methods) = description["capabilities"]["methods"].as_array_mut() {
             methods.push(json!("composer.compileAnnotations"));
+            methods.push(json!("thread.actions"));
+            methods.push(json!("thread.performAction"));
         }
         description
     }
@@ -147,8 +149,173 @@ impl SharedEndpoint {
 #[derive(Default)]
 pub struct SharedAgent {
     endpoints: BTreeMap<String, Arc<SharedEndpoint>>,
+    thread_action_host: Option<Arc<dyn ThreadActionHost>>,
+    session_url_scheme: Option<String>,
 }
 impl SharedAgent {
+    pub fn set_session_url_scheme(&mut self, scheme: &str) -> Result<()> {
+        require(
+            !scheme.is_empty()
+                && scheme
+                    .chars()
+                    .next()
+                    .is_some_and(|c| c.is_ascii_alphabetic())
+                && scheme
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.')),
+            "invalid host session URL scheme",
+        )?;
+        self.session_url_scheme = Some(scheme.into());
+        Ok(())
+    }
+    pub fn install_thread_action_host(&mut self, host: Arc<dyn ThreadActionHost>) {
+        self.thread_action_host = Some(host);
+    }
+    pub fn thread_actions(
+        &self,
+        shared: &SharedEndpoint,
+        id: &str,
+    ) -> Result<ThreadActionsPresentation> {
+        let state = shared.runtime.snapshot();
+        let session = state
+            .sessions
+            .get(id)
+            .ok_or_else(|| unsupported("unknown thread"))?;
+        let endpoint = shared.connected().ok();
+        let capabilities = endpoint
+            .as_ref()
+            .map(|e| e.capabilities())
+            .unwrap_or_default();
+        let host_methods = self
+            .thread_action_host
+            .as_ref()
+            .map(|h| h.methods())
+            .unwrap_or_default();
+        let pin = self
+            .thread_action_host
+            .as_ref()
+            .and_then(|h| h.pin_position(&state.endpoint_id, id));
+        let summary = session.summary.as_ref();
+        let archived = state.archived_session_ids.iter().any(|s| s == id)
+            || summary.is_some_and(|s| s["status"] == "archived");
+        let running = session.run_open
+            || !session.queue.is_empty()
+            || summary.is_some_and(|s| {
+                s["running"] == true
+                    || matches!(
+                        s["status"].as_str(),
+                        Some("running" | "waitingForInput" | "cancelling")
+                    )
+            });
+        Ok(tekes_agent_presentation::thread_actions(
+            &tekes_agent_presentation::ThreadActionContext {
+                endpoint: &state.endpoint_id,
+                session_id: id,
+                kind: &shared.kind,
+                url_scheme: self.session_url_scheme.as_deref().unwrap_or("agent"),
+                capabilities: &capabilities,
+                ready: state.connection == ConnectionState::Ready && endpoint.is_some(),
+                running,
+                archived,
+                pin: pin.as_ref(),
+                host_methods: &host_methods,
+            },
+        ))
+    }
+    async fn perform_thread_action(
+        &self,
+        shared: &SharedEndpoint,
+        request: ThreadActionRequest,
+        rpc_id: &str,
+    ) -> Result<ThreadActionOutcome> {
+        use tekes_agent_presentation::{ThreadActionCommand, thread_action_command};
+        let presentation = self.thread_actions(shared, &request.session_id)?;
+        let command = thread_action_command(&presentation, &request)?;
+        let mut outcome = ThreadActionOutcome::default();
+        match command {
+            ThreadActionCommand::Rename(title) => {
+                let result = shared
+                    .runtime
+                    .call(
+                        "session.rename",
+                        json!({"sessionId":request.session_id,"title":title}),
+                        rpc_id,
+                    )
+                    .await?;
+                outcome.renamed_title = Some(result["title"].as_str().unwrap_or(&title).into());
+                outcome.rename_seq = result["seq"].as_i64();
+            }
+            ThreadActionCommand::Fork => {
+                let can_rename = shared
+                    .connected()?
+                    .capabilities()
+                    .supports("session.rename");
+                let state = shared.runtime.snapshot();
+                let summary = state
+                    .sessions
+                    .get(&request.session_id)
+                    .and_then(|s| s.summary.as_ref());
+                let title = summary
+                    .and_then(|s| s["title"].as_str().or_else(|| s["name"].as_str()))
+                    .unwrap_or("会话");
+                let title = tekes_agent_presentation::increased_fork_title(title);
+                let result = shared
+                    .runtime
+                    .call(
+                        "session.fork",
+                        json!({"sessionId":request.session_id,"ephemeral":false}),
+                        rpc_id,
+                    )
+                    .await?;
+                let child = string(&result, "sessionId")?.to_owned();
+                outcome.navigation = Some(ThreadActionNavigation {
+                    endpoint: presentation.endpoint,
+                    session_id: child.clone(),
+                });
+                if result.get("queueCleanupWarning").is_some() {
+                    outcome.warning = Some("分叉已创建，继承队列清理未完成，请检查新会话。".into());
+                }
+                if can_rename
+                    && shared
+                        .runtime
+                        .call(
+                            "session.rename",
+                            json!({"sessionId":child,"title":title}),
+                            &format!("{rpc_id}:title"),
+                        )
+                        .await
+                        .is_err()
+                {
+                    outcome.warning = Some("分叉已创建，但新会话命名未完成。".into());
+                }
+            }
+            ThreadActionCommand::Archive | ThreadActionCommand::Unarchive => {
+                let archive = matches!(command, ThreadActionCommand::Archive);
+                shared
+                    .runtime
+                    .call(
+                        if archive {
+                            "session.archive"
+                        } else {
+                            "session.unarchive"
+                        },
+                        json!({"sessionId":request.session_id}),
+                        rpc_id,
+                    )
+                    .await?;
+                outcome.clear_selection = archive;
+            }
+            ThreadActionCommand::Host => {
+                return self
+                    .thread_action_host
+                    .as_ref()
+                    .ok_or_else(|| unsupported("thread action host unavailable"))?
+                    .perform(&presentation.endpoint, &request, rpc_id)
+                    .await;
+            }
+        }
+        Ok(outcome)
+    }
     pub fn register(
         &mut self,
         id: String,
@@ -216,6 +383,22 @@ impl SharedAgent {
             "describe" => Ok(shared.description()),
             "snapshot" => Ok(serde_json::to_value(runtime.snapshot().as_ref())?),
             "call" => {
+                if request["method"] == "thread.actions" {
+                    return Ok(serde_json::to_value(self.thread_actions(
+                        &shared,
+                        string(&request["payload"], "sessionId")?,
+                    )?)?);
+                }
+                if request["method"] == "thread.performAction" {
+                    return Ok(serde_json::to_value(
+                        self.perform_thread_action(
+                            &shared,
+                            serde_json::from_value(request["payload"].clone())?,
+                            string(request, "rpcId")?,
+                        )
+                        .await?,
+                    )?);
+                }
                 if request["method"] == "composer.compileAnnotations" {
                     let input: AnnotationInput =
                         serde_json::from_value(request["payload"].clone())?;

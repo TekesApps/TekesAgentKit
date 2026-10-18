@@ -2,6 +2,8 @@
 mod commands;
 mod annotations;
 pub use annotations::*;
+mod thread_actions;
+pub use thread_actions::*;
 pub use commands::*;
 mod capabilities;
 mod registry;

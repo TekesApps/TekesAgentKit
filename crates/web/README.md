@@ -45,10 +45,39 @@ is never interpreted as a user annotation envelope.
 `ComposerAnnotation`, `TranscriptAnnotationSource`, `AnnotationInput`,
 `AnnotationCompilation`, and `AnnotationInputPresentation` live in
 `tekes-agent-contract`. Rust's `ComposerDraft` reuses this type and compiler.
-The public TypeScript package `@tekesagentkit/annotations` exports generated
+The public TypeScript package `@tekesagentkit/client-contract` exports generated
 bindings, not a second implementation of the compiler. Regenerate with
 `cargo run -p tekes-agent-contract --example export_annotations`; a contract test
 checks the generated declarations. Public consumers must pin an immutable commit.
 
 Old Web-only persisted input is decoded here as a compatibility read path. New
 clients must not construct or parse annotation prompt envelopes themselves.
+
+## Thread action definitions
+
+`call(thread.actions, {sessionId})` returns `ThreadActionsPresentation`, scoped to
+an exact endpoint/session. The shared presentation module owns item IDs, labels,
+ordering, semantic icon roles, interactions and disabled reasons. The baseline is
+ClientKit's Mac sidebar: pin/unpin, optional rename, fork, copy session ID,
+conditional pin-order actions, then archive or supported unarchive.
+
+UI consumers render the definition. `interaction: rename` requests authored text;
+`copy` carries an authoritative `copyText` for a user-initiated clipboard gesture;
+`execute` invokes `call(thread.performAction, ThreadActionRequest)`. The command
+is resolved against a **fresh** definition; arbitrary Harness method names cannot
+be dispatched through this API. The caller retains its RPC identity after an
+uncertain result and never retries automatically. Outcomes carry navigation,
+selection clearing, rename receipts and optional partial-success warnings.
+
+`ThreadActionHost` explicitly supplies shared pin state, ordering capability and
+mutation callbacks. Without it pin is visible but disabled; clients must not
+substitute local storage. The embedding host also supplies `sessionURLScheme`
+(default `agent`). Tekes supplies `tekes`; DSH prefix stripping and Pi backend
+identity match the Mac copy-session-ID behavior.
+
+The generated public TypeScript package is now `@tekesagentkit/client-contract`;
+it includes both annotations and thread-action DTOs. Existing immutable annotation
+package pins remain valid at their original commits. Rust consumers use the same
+`thread_actions` policy directly; see the presentation crate's `thread_actions`
+example. The existing Swift sidebar still has its original native integration;
+this service change does not claim that its entry point has been migrated.
