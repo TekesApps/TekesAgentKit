@@ -1,1 +1,13 @@
-{"name":"@tekesagentkit/annotations","version":"0.3.0","type":"module","license":"MIT","types":"./index.d.ts","exports":{".":{"types":"./index.d.ts","default":"./index.js"}}}
+{
+  "name": "@tekesagentkit/annotations",
+  "version": "0.3.1",
+  "type": "module",
+  "license": "MIT",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    }
+  }
+}
