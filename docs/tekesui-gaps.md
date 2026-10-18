@@ -1,5 +1,7 @@
 # TekesUI 消费侧缺口
 
+可直接交给 TekesUI 开发的优先级、接口需求和验收标准见 [七项开发任务](tekesui-development-tasks.md)。
+
 只列需求与证据，不修改 TekesUI，不在 AgentKit 内补通用实现。基准是 ui/tekesui-source.json 的冻结开发快照。
 
 | ID | 当前公开 API / 缺口 | 需要的事件或属性 | 对本轮影响 |

@@ -4,7 +4,8 @@
 组件层不实现另一套 Run 状态机。默认 headless workspace 和发布 API 保持独立。
 
 [短接入契约](../docs/tekesui-integration-contract.md) 定义所有权、输入、回调、焦点、IME 和阅读责任；
-[TekesUI 缺口](../docs/tekesui-gaps.md) 列出所需上游事件/属性。
+[TekesUI 缺口](../docs/tekesui-gaps.md) 列出所需上游事件/属性，
+[七项开发任务](../docs/tekesui-development-tasks.md) 给出优先级与逐项验收标准。
 
 ![基础 Run 离屏渲染，非原生窗口截图](docs/run-offscreen.png)
 
