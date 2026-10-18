@@ -10,6 +10,20 @@
 
 接口名称以下均为建议，最终名称由 TekesUI 决定；事件信息、行为约束和验收要求是交付契约。源码路径均相对 TekesUI 根目录。历史缺口摘要见 [tekesui-gaps.md](tekesui-gaps.md)，消费边界见 [接入契约](tekesui-integration-contract.md)。
 
+## GitHub 跟踪
+
+七项已提交至 TekesApps/TekesUI；下列链接为实施与验收入口，相关的既有审计 issue 已在正文关联。
+
+| ID | 优先级 | Issue |
+|---|---|---|
+| TKUI-001 | P0 | [#15 · 后台事件唤醒与窗口生命周期](https://github.com/TekesApps/TekesUI/issues/15) |
+| TKUI-002 | P0 | [#16 · 历史前插阅读锚点](https://github.com/TekesApps/TekesUI/issues/16) |
+| TKUI-003 | P1 | [#17 · 文本命令、修饰键与 IME 消费语义](https://github.com/TekesApps/TekesUI/issues/17) |
+| TKUI-005 | P1 | [#18 · 受控编辑值同步事务](https://github.com/TekesApps/TekesUI/issues/18) |
+| TKUI-006 | P1 | [#19 · 指针选择元数据透传](https://github.com/TekesApps/TekesUI/issues/19) |
+| TKUI-007 | P1 | [#20 · 可配置文本视口与多行尺寸约束](https://github.com/TekesApps/TekesUI/issues/20) |
+| TKUI-004 | P2 | [#21 · 带目标与来源的控件动作](https://github.com/TekesApps/TekesUI/issues/21) |
+
 ## 优先级与实施顺序
 
 | 顺序 | ID | 优先级 | 交付结果 | 消费侧解除的限制 |
