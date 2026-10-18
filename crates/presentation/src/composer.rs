@@ -47,14 +47,7 @@ impl ComposerArtifact {
         matches!(self, Self::Attachment { .. })
     }
 }
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct ComposerAnnotation {
-    pub id: String,
-    pub source: String,
-    pub excerpt: String,
-    pub comment: String,
-}
+pub use tekes_agent_contract::ComposerAnnotation;
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ComposerDraft {
@@ -172,17 +165,8 @@ impl ComposerDraft {
                 references.join("\n")
             ));
         }
-        if !self.text.trim().is_empty() {
-            blocks.push(self.text.trim().into());
-        }
-        for annotation in &self.annotations {
-            blocks.push(format!(
-                "<annotation source={}>\n{}\n{}\n</annotation>",
-                serde_json::to_string(&annotation.source)?,
-                annotation.excerpt,
-                annotation.comment
-            ));
-        }
+        let annotated = crate::compile_annotation_input(self.text.trim(), &self.annotations)?;
+        if !annotated.is_empty() { blocks.push(annotated); }
         require(
             !blocks.is_empty() || !attachments.is_empty(),
             "empty submission",

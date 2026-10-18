@@ -1,0 +1,22 @@
+[package]
+name = "tekes-agent-web"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+tekes-agent-contract = { path = "../contract" }
+tekes-agent-session = { path = "../session" }
+tekes-agent-presentation = { path = "../presentation" }
+tekes-agent-endpoint-kernel = { path = "../endpoint-kernel" }
+tekes-agent-endpoint-pi = { path = "../endpoint-pi" }
+tekes-agent-endpoint-dsh = { path = "../endpoint-dsh" }
+async-trait.workspace = true
+futures-util.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

@@ -1501,6 +1501,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "tekes-agent-web"
+version = "0.3.0"
+dependencies = [
+ "async-trait",
+ "futures-util",
+ "serde_json",
+ "tekes-agent-contract",
+ "tekes-agent-endpoint-dsh",
+ "tekes-agent-endpoint-kernel",
+ "tekes-agent-endpoint-pi",
+ "tekes-agent-presentation",
+ "tekes-agent-session",
+ "tokio",
+]
+
+[[package]]
 name = "thiserror"
 version = "2.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"

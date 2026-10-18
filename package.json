@@ -1,0 +1,1 @@
+{"name":"@tekesagentkit/annotations","version":"0.3.0","type":"module","license":"MIT","types":"./web-contract/index.d.ts","exports":{".":{"types":"./web-contract/index.d.ts","default":"./web-contract/index.js"}}}

@@ -1,6 +1,8 @@
 //! Renderer-independent Run, Transcript, Composer and connection state.
 //! Harness facts come exclusively from the public session projection; local intent never gains authority.
 mod composer;
+mod annotations;
+pub use annotations::*;
 mod controller;
 mod run;
 mod scope;
