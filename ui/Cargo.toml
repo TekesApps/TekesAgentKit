@@ -1,0 +1,23 @@
+[workspace]
+resolver = "3"
+members = ["components", "demo", "consumer"]
+exclude = [".deps/tekesui"]
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "MIT"
+[workspace.dependencies]
+tekes-agent-endpoint-kernel = { path = "../crates/endpoint-kernel" }
+tekes-agent-contract = { path = "../crates/contract" }
+tekes-agent-session = { path = "../crates/session" }
+tekes-agent-presentation = { path = "../crates/presentation" }
+tekes-agent-components-ui = { path = "components" }
+tekes-ui-controls = { path = ".deps/tekesui/crates/tekes-ui-controls" }
+tekes-ui-scene = { path = ".deps/tekesui/crates/tekes-ui-scene" }
+tekes-ui-tokens = { path = ".deps/tekesui/crates/tekes-ui-tokens" }
+tekes-ui-text = { path = ".deps/tekesui/crates/tekes-ui-text" }
+tekes-ui-render = { path = ".deps/tekesui/crates/tekes-ui-render" }
+tekes-ui-platform-macos = { path = ".deps/tekesui/crates/tekes-ui-platform-macos" }
+tokio = { version = "1", features = ["rt-multi-thread", "time", "sync", "macros"] }
+serde_json = "1"

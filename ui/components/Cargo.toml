@@ -1,0 +1,11 @@
+[package]
+name = "tekes-agent-components-ui"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+[dependencies]
+tekes-agent-presentation.workspace = true
+tekes-ui-controls.workspace = true
+tekes-ui-scene.workspace = true
+tekes-ui-tokens.workspace = true

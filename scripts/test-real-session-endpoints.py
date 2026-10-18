@@ -8,7 +8,13 @@ parser.add_argument('--pi-root',type=Path)
 parser.add_argument('--dsh-root',type=Path)
 parser.add_argument('--kernel-root',type=Path)
 parser.add_argument('--kernel-target-dir',type=Path)
+parser.add_argument('--ui-demo',type=Path,help='Optional already-built AgentKit UI consumer for Native history-to-GPU acceptance')
+parser.add_argument('--ui-output',type=Path)
 args=parser.parse_args()
+if args.ui_demo and not args.kernel_root:
+    parser.error("--ui-demo requires --kernel-root")
+if args.ui_output and not args.ui_demo:
+    parser.error("--ui-output requires --ui-demo")
 if not any((args.pi_root,args.dsh_root,args.kernel_root)):parser.error("supply at least one runtime root")
 subprocess.run(['cargo','build','--locked','-p','tekes-agent-headless'],cwd=ROOT,check=True)
 requests=[]
@@ -456,6 +462,17 @@ try:
                     assert all(h['tools'][0]['arguments']['task_name']=='Bounded child proof' for h in histories),'missing parent source-call projection'
                     print('NATIVE_BOUNDED_CHILD_LIVE_OK real-task+source-call+read-only-history+reconnect+ownership')
                 print('NATIVE_COMPLETE_LIFECYCLE_LIVE_OK models+commands+skills+settings+presets+upload+scratch-discard+rename+archive')
+                if args.ui_demo:
+                    second=next(row['result']['sessionId'] for row in execute(dict(config,commands=[{'op':'create','cwd':str(cwd)}])) if row.get('op')=='create')
+                    ui_config=base/'ui-native.json'
+                    ui_config.write_text(json.dumps({'endpointId':'native-ui','url':ready['url'],'bearerEnv':'AGENTKIT_UI_FIXTURE_BEARER','sessions':[native_id,second]}))
+                    output=args.ui_output.resolve() if args.ui_output else base/'ui-native.png'
+                    ui_env=dict(os.environ,AGENTKIT_UI_FIXTURE_BEARER=config['bearer'])
+                    ui=subprocess.run([str(args.ui_demo.resolve()),'--endpoint-config',str(ui_config),'--offscreen',str(output)],env=ui_env,text=True,capture_output=True,timeout=30)
+                    assert ui.returncode==0,ui.stderr[-3000:]
+                    assert output.read_bytes().startswith(b'\x89PNG\r\n\x1a\n'),'Native UI image missing'
+                    print('NATIVE_UI_CONSUMER_LIVE_OK authenticated-SEP+RunController+TekesUI-offscreen; native-interaction=false')
+
             finally:
                 process.stdin.close()
                 try:process.wait(timeout=15)

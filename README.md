@@ -19,7 +19,7 @@
 
 已实现会话地址/指针、历史恢复、文件读取/观察、附件、交互回传和显式能力检查；独立 presentation 层提供 Run、Transcript、Composer 和连接状态。Pi 保留原生 entry ID，不伪造 journal sequence。DSH 官方未提供的 ephemeral fork/discard 明确返回 Unsupported。
 
-历史投影在内存中。Pi 的宿主指针、receipt、队列及 Goal 元数据用于会话恢复和提交去重，不是 transcript Mirror。可选远端 durable cache、UI 控件、生产 launcher 和大历史性能验收尚未交付。
+历史投影在内存中。Pi 的宿主指针、receipt、队列及 Goal 元数据用于会话恢复和提交去重，不是 transcript Mirror。可选远端 durable cache、正式 UI 控件、生产 launcher 和大历史性能验收尚未交付。独立 [UI 试点 workspace](ui/README.md) 已接入 TekesUI 开发快照，复用现有 presentation；不属于 v0.3.0 发布 API，也不影响默认 headless 构建。
 
 ## 开始使用
 
@@ -93,6 +93,7 @@ python3 scripts/install-dsh-runtime.py \
 
 ## 文档
 
+- [TekesUI 短接入契约](docs/tekesui-integration-contract.md) · [消费侧缺口](docs/tekesui-gaps.md) · [Rust UI demo](ui/README.md)
 - [快速入门与 Rust API](docs/getting-started.md)
 - [Headless JSON 配置与命令](docs/headless-cli.md)
 - [三端能力、session pointer 与验收](docs/session-endpoints.md)
