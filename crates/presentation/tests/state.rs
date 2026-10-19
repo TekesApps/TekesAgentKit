@@ -780,3 +780,44 @@ fn a_settled_attempt_is_counted_without_blocking_the_next_attempt_in_the_same_st
         5
     );
 }
+
+#[test]
+fn worker_launch_notice_recovers_only_after_later_durable_turn_start() {
+    let notice = |seq, class| {
+        event(
+            seq,
+            "session/notice",
+            json!({
+                "severity":"error", "classification":class,"operation":"prompt",
+                "message":"The worker could not be started: worker hello timed out"
+            }),
+        )
+    };
+    let mut state = session(vec![notice(0, "worker_launch"), notice(1, "other")]);
+    let failed = TranscriptSnapshot::read(&scope("a"), &state).unwrap();
+    assert_eq!(failed.items[0].metadata["status"], "error");
+    let original = failed.items[0].clone();
+    state
+        .apply_live(event(2, "user/message", json!({"message":{"content":[]}})))
+        .unwrap();
+    assert_eq!(
+        TranscriptSnapshot::read(&scope("a"), &state).unwrap().items[0].metadata["status"],
+        "error"
+    );
+    state
+        .apply_live(event(3, "turn/start", json!({"turn":1})))
+        .unwrap();
+    let recovered = TranscriptSnapshot::read(&scope("a"), &state).unwrap();
+    assert_eq!(recovered.items[0].id, original.id);
+    assert_eq!(recovered.items[0].text, original.text);
+    assert_eq!(recovered.items[0].metadata["status"], "recovered");
+    assert_eq!(recovered.items[0].metadata["recoveredAtSequence"], 3);
+    assert_eq!(recovered.items[1].metadata["status"], "error");
+    // A second failure remains active until its own later turn starts.
+    state.apply_live(notice(4, "worker_launch")).unwrap();
+    let out = TranscriptSnapshot::read(&scope("a"), &state).unwrap();
+    assert_eq!(out.items.last().unwrap().metadata["status"], "error");
+    let serialized = serde_json::to_value(&state).unwrap();
+    let replay = serde_json::from_value(serialized).unwrap();
+    assert_eq!(out, TranscriptSnapshot::read(&scope("a"), &replay).unwrap());
+}
