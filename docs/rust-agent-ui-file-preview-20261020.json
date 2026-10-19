@@ -87,5 +87,14 @@
     "toolTests": 18,
     "uiClippyAllTargets": true,
     "tekesUIReviewedFiles": 188
+  },
+  "authorityReview": {
+    "canonicalArtifactCheck": true,
+    "previewTests": 10,
+    "secondConsumerTests": 9,
+    "regressionTests": 20,
+    "strictUIClippy": true,
+    "nativeRetest": false,
+    "threeHarnessRetest": false
   }
 }

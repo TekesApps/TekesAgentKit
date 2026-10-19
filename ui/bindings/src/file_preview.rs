@@ -100,6 +100,20 @@ impl RunBinding {
                     == 1,
             "file artifact changed or ambiguous",
         )?;
+        // The public baseline carries a revision, but callers can construct it.
+        // Resolve the presented item against canonical content, not just that
+        // caller-owned baseline; revision equality alone does not prove facts.
+        require(
+            snapshot.draft.artifacts.contains(artifact)
+                && snapshot
+                    .draft
+                    .artifacts
+                    .iter()
+                    .filter(|a| a.id() == artifact.id())
+                    .count()
+                    == 1,
+            "file artifact differs from current draft",
+        )?;
         let ComposerArtifact::Attachment {
             id,
             name,

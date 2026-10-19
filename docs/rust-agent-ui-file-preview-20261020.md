@@ -20,3 +20,5 @@ ComposerContext 按文件能力提供“预览附件”，不连带启用 refere
 当前仅接草稿通用文件预览。历史附件入口仍需正式 Transcript；图片预览、来源定位/高亮、失败对账与完整物理 IME/三端 pane 原生验收仍未完成。正式 Transcript/RunView 的 TekesUI #22/#23 公共能力阻塞保持不变。
 
 本地最终 gates：UI workspace 149 tests（含第二 consumer）、7 项预览专项、presentation 测试、18 项工具测试、UI all-targets strict Clippy、root/UI fmt、静态依赖边界与 188 个固定输入校验通过。原生内容视觉验收边界见上，不因这些自动化结果提升。
+
+增量复查：公开 baseline 在 context revision 非零时允许按版本匹配，因此预览捕获还必须将完整附件值和唯一 ID 与当前 canonical draft 核对。现已拒绝修改 baseline/item 后冒用当前 revision 的请求，且在 RPC 前失败。新增 3 项测试分别覆盖伪造读取 ID、重连期间读回包和 SideChat 关闭期间读回包；后两项各仅发起一次 RPC、不返回预览字节、不污染父草稿。该增量以 ClientKit 当前 thread/session-scoped 文件 loader 为只读对照，不修改上游。

@@ -219,3 +219,106 @@ async fn actual_preview_button_routes_through_composer_intent_to_one_read_comman
     assert!(view.complete_file_preview(&request, None).unwrap());
     runtime.stop().await.unwrap();
 }
+
+#[tokio::test]
+async fn forged_baseline_with_current_revision_cannot_replace_attachment_read_identity() {
+    let fixture = Fixture::default().with_uploads();
+    let (runtime, [a, _]) = setup(fixture.clone()).await;
+    let real = intent(&a);
+    assert!(real.baseline.context_revision > 0);
+    let mut forged = real.baseline.as_ref().clone();
+    if let tekes_agent_presentation::ComposerArtifact::Attachment {
+        facts: Some(facts), ..
+    } = &mut forged.artifacts[0]
+    {
+        facts.attachment_id = Some("another-file-in-the-same-session".into());
+    }
+    let forged = ComposerContextIntent {
+        item: ComposerContextItem::Artifact(forged.artifacts[0].clone()),
+        baseline: Arc::new(forged),
+        action: ComposerContextAction::Open,
+    };
+    assert!(a.begin_file_preview(&forged).is_err());
+    assert_eq!(fixture.file_read_calls(), 0);
+    assert_eq!(
+        a.begin_file_preview(&real)
+            .unwrap()
+            .read()
+            .await
+            .unwrap()
+            .bytes(),
+        b"private bytes"
+    );
+    runtime.stop().await.unwrap();
+}
+
+async fn wait_read(fixture: &Fixture) {
+    tokio::time::timeout(Duration::from_secs(3), async {
+        while fixture.file_read_calls() == 0 {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+}
+#[tokio::test]
+async fn reconnect_rejects_inflight_read_and_old_capture_without_an_automatic_second_rpc() {
+    let gate = Arc::new(tokio::sync::Semaphore::new(0));
+    let fixture = Fixture::default()
+        .with_uploads()
+        .with_file_read_gate(gate.clone());
+    let (runtime, [a, _]) = setup(fixture.clone()).await;
+    let request = Arc::new(a.begin_file_preview(&intent(&a)).unwrap());
+    let task = {
+        let request = request.clone();
+        tokio::spawn(async move { request.read().await })
+    };
+    wait_read(&fixture).await;
+    runtime.reconnect().await.unwrap();
+    gate.add_permits(1);
+    assert!(task.await.unwrap().is_err());
+    assert!(!request.is_current());
+    assert!(request.read().await.is_err());
+    assert_eq!(fixture.file_read_calls(), 1);
+    runtime.stop().await.unwrap();
+}
+#[tokio::test]
+async fn closed_sidechat_rejects_inflight_preview_without_reading_or_mutating_parent() {
+    use tekes_agent_ui_bindings::{PaneAccess, SideChatBinding};
+    let gate = Arc::new(tokio::sync::Semaphore::new(0));
+    let fixture = Fixture::default()
+        .with_uploads()
+        .with_side_chats()
+        .with_file_read_gate(gate.clone());
+    let (runtime, [parent, _]) = setup(fixture.clone()).await;
+    let parent_before = parent.current_run().unwrap().draft.clone();
+    let owner = SideChatBinding::new(runtime.clone());
+    let chat = owner
+        .create(parent.scope().clone(), Some("preview"), "preview-chat")
+        .await
+        .unwrap();
+    let run = owner.open(&chat).await.unwrap();
+    let binding = run.binding().clone();
+    let file = AttachmentFile::new(
+        "侧会话.txt".into(),
+        "text/plain".into(),
+        Arc::from(&b"child bytes"[..]),
+    )
+    .unwrap();
+    binding
+        .begin_attachments(&ComposerDestination::run(binding.scope().clone()))
+        .unwrap()
+        .upload(&[file])
+        .await
+        .unwrap();
+    let request = binding.begin_file_preview(&intent(&binding)).unwrap();
+    let task = tokio::spawn(async move { request.read().await });
+    wait_read(&fixture).await;
+    owner.close(&chat, "close-during-preview").await.unwrap();
+    assert_eq!(binding.access(), PaneAccess::Missing);
+    gate.add_permits(1);
+    assert!(task.await.unwrap().is_err());
+    assert_eq!(fixture.file_read_calls(), 1);
+    assert_eq!(parent.current_run().unwrap().draft, parent_before);
+    runtime.stop().await.unwrap();
+}
