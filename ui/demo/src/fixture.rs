@@ -690,7 +690,7 @@ impl SessionEndpoint for Endpoint {
             .ok_or_else(|| unsupported("fixture session"))?;
         if method == "session.models" && self.fixture.models {
             return Ok(
-                json!({"current":line.model_selection,"routable":true,"routableProviders":["fixture"],"groups":[{"id":"fixture","name":"Fixture provider","models":[{"id":"initial","name":"初始模型"},{"id":"chosen","name":"显式选择模型"}]},{"id":"unroutable","name":"不可路由","models":[{"id":"disabled","name":"不可用模型"}]}],"failures":[]}),
+                json!({"current":line.model_selection,"routable":true,"routableProviders":["fixture"],"groups":[{"id":"fixture","name":"Fixture provider","models":[{"id":"initial","name":"初始模型","reasoning":{"efforts":[{"id":"low","name":"低"},{"id":"high","name":"高"}],"defaultEffort":"low"}},{"id":"chosen","name":"显式选择模型","reasoning":{"efforts":[{"id":"low","name":"低"},{"id":"high","name":"高"}],"defaultEffort":"low"}}]},{"id":"unroutable","name":"不可路由","models":[{"id":"disabled","name":"不可用模型"}]}],"failures":[]}),
             );
         }
         if method == "session.selectModel" && self.fixture.models {

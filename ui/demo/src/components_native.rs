@@ -2341,6 +2341,17 @@ pub fn run() {
                 .expect("explicit synthetic model choice")
                 .id
                 .clone();
+            let effort = options
+                .reasoning_choices(&chosen, None)
+                .expect("public reasoning metadata")
+                .and_then(|choices| {
+                    choices
+                        .catalog
+                        .choices
+                        .iter()
+                        .find(|row| row.enabled)
+                        .map(|row| row.id.clone())
+                });
             let count = options.catalog.choices.len();
             host.view
                 .complete_model_catalog(&request, Ok(options))
@@ -2349,6 +2360,41 @@ pub fn run() {
             host.view
                 .accessibility_action(target, None, AccessibilityAction::Press)
                 .unwrap();
+            if let Some(effort) = &effort {
+                let commands = host
+                    .view
+                    .accessibility_action(host.view.ids().model, None, AccessibilityAction::Press)
+                    .unwrap();
+                let DemoCommand::ReadModels {
+                    binding: source,
+                    request,
+                } = commands
+                    .into_iter()
+                    .next()
+                    .expect("reasoning catalog intent")
+                else {
+                    panic!("model read")
+                };
+                let options = host
+                    .executor
+                    .block_on(source.model_choices(1, "offscreen-reasoning-read"))
+                    .expect("fresh reasoning catalog");
+                host.view
+                    .complete_model_catalog(&request, Ok(options))
+                    .unwrap();
+                let target = host
+                    .view
+                    .reasoning_choice_id(effort)
+                    .expect("public reasoning button");
+                host.view
+                    .accessibility_action(target, None, AccessibilityAction::Press)
+                    .unwrap();
+                assert_eq!(
+                    source.current_run().unwrap().draft.settings
+                        [tekes_agent_ui_bindings::MODEL_SELECTION_SETTING]["reasoningEffort"],
+                    *effort
+                );
+            }
             let destination =
                 tekes_agent_presentation::ComposerDestination::run(binding.scope().clone());
             let previous = binding
@@ -2399,7 +2445,7 @@ pub fn run() {
                 .expect("model-choice assistant settlement");
             });
             host.view.sync().unwrap();
-            model_proof = serde_json::json!({"catalogChoices":count,"selected":chosen,"explicitSelection":true,"configurationReceipt":true,"promptSettled":true,"nativeInteraction":false});
+            model_proof = serde_json::json!({"catalogChoices":count,"selected":chosen,"explicitSelection":true,"configurationReceipt":true,"promptSettled":true,"reasoningAvailable":effort.is_some(),"reasoningSelected":effort,"nativeInteraction":false});
         }
         if args.iter().any(|arg| arg == "--context-proof") {
             use tekes_agent_components_ui::{Composer, ComposerContextAction, ComposerContextItem};

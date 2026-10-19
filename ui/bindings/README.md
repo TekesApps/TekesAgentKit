@@ -565,3 +565,25 @@ a viewer, stage bytes privately if needed, and retain owned files while their
 viewer may read them. The demo uses system Quick Look via direct arguments;
 `ui/consumer::read_file_preview` illustrates a second public-API host. DSH has no
 generic file-read method and does not gain preview through its image API.
+
+## Reasoning levels inside model content
+
+`ModelChoices::reasoning_choices(model_id, requested_effort)` returns the exact
+model's advertised levels as `Option<ReasoningChoices>`. Missing metadata stays
+unavailable (Pi may publish levels only for the current model); no conventional
+list or first option is inferred. The catalog preserves order, explicit unknown
+selection, configured default and model/provider disabled reasons. Duplicate IDs,
+invalid defaults and malformed metadata fail explicitly.
+
+Mount the catalog in `ComposerChoices` using `ComposerChoiceKind::Reasoning`.
+Resolve a callback through `ReasoningChoices::selection` to obtain
+`{provider, model, reasoningEffort}`, then commit with the original
+`ComposerSettingsRequest`. Keep navigation, IME and draft-model fences; a
+reasoning callback must not switch a newer draft back to its old model. The demo
+mounts model and reasoning content together and closes both on selection/dismiss.
+The second public consumer exposes `reasoning_panel` with the same component.
+
+`ModelSelectionPreparation` rereads `session.models` at Send and verifies an
+explicit effort is still advertised and enabled **before** session.selectModel
+or prompt dispatch. A failure uses the existing submission/draft recovery path,
+with no automatic retry. Choosing UI content alone does not mutate endpoint state.

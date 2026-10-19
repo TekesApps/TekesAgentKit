@@ -49,6 +49,7 @@ const RENAME_NAMESPACE: u32 = 42;
 const CHOICES_NAMESPACE: u32 = 43;
 const CREATE_NAMESPACE: u32 = 44;
 const ANNOTATION_NAMESPACE: u32 = 45;
+const REASONING_NAMESPACE: u32 = 46;
 pub const SELECT_A: ComponentId = ComponentId(100);
 pub const SELECT_B: ComponentId = ComponentId(101);
 pub const RECONNECT: ComponentId = ComponentId(102);
@@ -184,6 +185,10 @@ struct ModelGesture {
     settings: Option<ComposerSettingsRequest>,
     binding: Arc<RunBinding>,
     source: Option<ModelChoices>,
+    reasoning: Option<(
+        ComposerChoiceRequest,
+        tekes_agent_ui_bindings::ReasoningChoices,
+    )>,
     navigation: u64,
     panel_navigation: u64,
 }
@@ -274,6 +279,7 @@ impl ComponentDemo {
         let pair = Self::new_pair(0);
         let rename = ThreadRename::new(RENAME_NAMESPACE, RenameLabels::default());
         let choices = ComposerChoices::new(CHOICES_NAMESPACE, Default::default());
+        let reasoning = ComposerChoices::new(REASONING_NAMESPACE, Default::default());
         let annotation = AnnotationEditor::new(ANNOTATION_NAMESPACE, Default::default());
         let annotation_panel = Content::new(annotation.ids().root, annotation);
         let creation_choices = ComposerChoices::new(CREATE_NAMESPACE, Default::default());
@@ -329,6 +335,7 @@ impl ComponentDemo {
                     ),
                     Content::new(rename.ids().root, rename),
                     Content::new(choices.id(), choices),
+                    Content::new(reasoning.id(), reasoning),
                     pair,
                 ],
             },
@@ -549,6 +556,7 @@ impl ComponentDemo {
                     DIAGNOSTIC,
                     RenameIds::new(RENAME_NAMESPACE).root,
                     Self::choices_id(),
+                    Self::reasoning_id(),
                     Self::annotation_root(),
                     Self::pair_id(self.selected),
                 ],
@@ -720,6 +728,7 @@ impl ComponentDemo {
                     DIAGNOSTIC,
                     RenameIds::new(RENAME_NAMESPACE).root,
                     Self::choices_id(),
+                    Self::reasoning_id(),
                     CREATE_PANEL,
                     tail,
                 ],
@@ -888,6 +897,33 @@ impl ComponentDemo {
             }
         }
     }
+    fn reasoning_id() -> ComponentId {
+        ComponentId((REASONING_NAMESPACE as u64) << 32)
+    }
+    pub fn reasoning_choice_id(&self, effort: &str) -> Option<ComponentId> {
+        self.tree
+            .get(Self::reasoning_id())?
+            .component::<ComposerChoices>()?
+            .choice_id(effort)
+    }
+    fn dismiss_model_gesture(&mut self, gesture: &ModelGesture) {
+        for (root, request) in [
+            (Self::choices_id(), Some(&gesture.request)),
+            (
+                Self::reasoning_id(),
+                gesture.reasoning.as_ref().map(|(request, _)| request),
+            ),
+        ] {
+            if let Some(request) = request {
+                self.tree
+                    .get_mut(root)
+                    .unwrap()
+                    .component_mut::<ComposerChoices>()
+                    .unwrap()
+                    .dismiss(request);
+            }
+        }
+    }
     fn choices_id() -> ComponentId {
         ComponentId((CHOICES_NAMESPACE as u64) << 32)
     }
@@ -905,12 +941,7 @@ impl ComponentDemo {
     }
     fn cancel_model_choices(&mut self) {
         if let Some(gesture) = self.model_gesture.take() {
-            self.tree
-                .get_mut(Self::choices_id())
-                .unwrap()
-                .component_mut::<ComposerChoices>()
-                .unwrap()
-                .dismiss(&gesture.request);
+            self.dismiss_model_gesture(&gesture);
         }
     }
     fn model_gesture_current(&self, gesture: &ModelGesture) -> bool {
@@ -950,6 +981,7 @@ impl ComponentDemo {
             settings: Some(settings),
             binding: binding.clone(),
             source: None,
+            reasoning: None,
             navigation: self.navigation_revision,
             panel_navigation: self.panel_navigation_revision,
         });
@@ -1014,72 +1046,134 @@ impl ComponentDemo {
             {
                 self.set_notice(format!("部分供应商目录读取失败（{} 项）", failures.len()));
             }
+            let reasoning = if let Some(source) = &source {
+                if let Some(model_id) = &source.catalog.selected
+                    && source.catalog.choices.iter().any(|row| &row.id == model_id)
+                {
+                    match source.reasoning_choices(model_id, None) {
+                        Ok(reasoning) => reasoning,
+                        Err(error) => {
+                            self.set_notice(format!("推理档位不可用：{error}"));
+                            None
+                        }
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+            let old = self.model_gesture.as_mut().unwrap().reasoning.take();
+            let panel = self
+                .tree
+                .get_mut(Self::reasoning_id())
+                .unwrap()
+                .component_mut::<ComposerChoices>()
+                .unwrap();
+            if let Some((request, _)) = old {
+                panel.dismiss(&request);
+            }
+            if let Some(reasoning) = reasoning {
+                let reasoning_request = panel
+                    .open(request.destination.clone(), ComposerChoiceKind::Reasoning)
+                    .map_err(unsupported)?;
+                panel
+                    .update(&reasoning_request, reasoning.catalog.clone())
+                    .map_err(unsupported)?;
+                self.model_gesture.as_mut().unwrap().reasoning =
+                    Some((reasoning_request, reasoning));
+            }
             self.model_gesture.as_mut().unwrap().source = source;
         }
         Ok(accepted)
     }
     fn drain_model_choices(&mut self, actions: &[ContentAction]) -> Result<()> {
-        let intents = self
-            .tree
-            .get_mut(Self::choices_id())
-            .unwrap()
-            .component_mut::<ComposerChoices>()
-            .unwrap()
-            .take_intents(actions);
-        for intent in intents {
-            match intent {
-                ComposerChoiceIntent::Dismiss(_) => {
-                    self.model_gesture = None;
-                }
-                ComposerChoiceIntent::Select(selection) => {
-                    let Some(mut gesture) = self.model_gesture.take() else {
-                        continue;
-                    };
-                    if gesture.request != selection.request || !self.model_gesture_current(&gesture)
-                    {
+        for root in [Self::choices_id(), Self::reasoning_id()] {
+            let intents = self
+                .tree
+                .get_mut(root)
+                .unwrap()
+                .component_mut::<ComposerChoices>()
+                .unwrap()
+                .take_intents(actions);
+            for intent in intents {
+                match intent {
+                    ComposerChoiceIntent::Dismiss(_) => self.cancel_model_choices(),
+                    ComposerChoiceIntent::Select(selection) => {
+                        let Some(mut gesture) = self.model_gesture.take() else {
+                            continue;
+                        };
+                        let reasoning = root == Self::reasoning_id();
+                        let expected = if reasoning {
+                            gesture.reasoning.as_ref().map(|(request, _)| request)
+                        } else {
+                            Some(&gesture.request)
+                        };
+                        if expected != Some(&selection.request)
+                            || !self.model_gesture_current(&gesture)
+                        {
+                            self.dismiss_model_gesture(&gesture);
+                            continue;
+                        }
+                        let result = (|| {
+                            let payload = if reasoning {
+                                let (_, source) = gesture
+                                    .reasoning
+                                    .as_ref()
+                                    .ok_or_else(|| unsupported("reasoning catalog missing"))?;
+                                require(
+                                    source.catalog.revision == selection.catalog_revision,
+                                    "reasoning catalog revision changed",
+                                )?;
+                                source.selection(&selection.choice.id)?
+                            } else {
+                                let source = gesture
+                                    .source
+                                    .as_ref()
+                                    .ok_or_else(|| unsupported("model catalog missing"))?;
+                                require(
+                                    source.catalog.revision == selection.catalog_revision,
+                                    "model catalog revision changed",
+                                )?;
+                                source.selection(&selection.choice.id)?
+                            };
+                            let mut settings = gesture
+                                .binding
+                                .current_run()
+                                .ok_or_else(|| unsupported("model source missing"))?
+                                .draft
+                                .settings
+                                .clone();
+                            if reasoning
+                                && let Some(current) = settings.get(MODEL_SELECTION_SETTING)
+                            {
+                                require(
+                                    current["provider"] == payload["provider"]
+                                        && current["model"] == payload["model"],
+                                    "reasoning target changed with draft model",
+                                )?;
+                            }
+                            settings.insert(MODEL_SELECTION_SETTING.into(), payload);
+                            let request = match gesture.settings.take() {
+                                Some(request) => request,
+                                None => gesture
+                                    .binding
+                                    .begin_settings(&selection.request.destination)?,
+                            };
+                            require(request.commit(settings)?, "model settings request obsolete")
+                        })();
+                        let failed = result.is_err();
                         self.tree
-                            .get_mut(Self::choices_id())
+                            .get_mut(root)
                             .unwrap()
                             .component_mut::<ComposerChoices>()
                             .unwrap()
-                            .dismiss(&gesture.request);
-                        continue;
-                    }
-                    let result = (|| {
-                        let source = gesture
-                            .source
-                            .as_ref()
-                            .ok_or_else(|| unsupported("model catalog missing"))?;
-                        require(
-                            source.catalog.revision == selection.catalog_revision,
-                            "model catalog revision changed",
-                        )?;
-                        let payload = source.selection(&selection.choice.id)?;
-                        let mut settings = gesture
-                            .binding
-                            .current_run()
-                            .ok_or_else(|| unsupported("model source missing"))?
-                            .draft
-                            .settings
-                            .clone();
-                        settings.insert(MODEL_SELECTION_SETTING.into(), payload);
-                        let request = match gesture.settings.take() {
-                            Some(request) => request,
-                            None => gesture
-                                .binding
-                                .begin_settings(&selection.request.destination)?,
-                        };
-                        require(request.commit(settings)?, "model settings request obsolete")
-                    })();
-                    let failed = result.is_err();
-                    self.tree
-                        .get_mut(Self::choices_id())
-                        .unwrap()
-                        .component_mut::<ComposerChoices>()
-                        .unwrap()
-                        .complete(&selection, result.map_err(|e| e.to_string()));
-                    if failed {
-                        self.model_gesture = Some(gesture);
+                            .complete(&selection, result.map_err(|e| e.to_string()));
+                        if failed {
+                            self.model_gesture = Some(gesture);
+                        } else {
+                            self.dismiss_model_gesture(&gesture);
+                        }
                     }
                 }
             }
@@ -2235,6 +2329,7 @@ impl ComponentDemo {
                     DIAGNOSTIC,
                     RenameIds::new(RENAME_NAMESPACE).root,
                     Self::choices_id(),
+                    Self::reasoning_id(),
                     Self::pair_id(index),
                 ],
             )

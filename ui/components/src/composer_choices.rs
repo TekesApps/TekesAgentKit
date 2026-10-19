@@ -14,6 +14,7 @@ use tekes_ui_tokens::Spacing;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ComposerChoiceKind {
     Model,
+    Reasoning,
     Preset,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -58,6 +59,7 @@ pub enum ComposerChoiceIntent {
 pub struct ComposerChoiceLabels {
     pub group: String,
     pub model: String,
+    pub reasoning: String,
     pub preset: String,
     pub loading: String,
     pub empty: String,
@@ -71,6 +73,7 @@ impl Default for ComposerChoiceLabels {
         Self {
             group: "Composer 选项".into(),
             model: "选择模型".into(),
+            reasoning: "推理强度".into(),
             preset: "选择预设".into(),
             loading: "正在读取选项".into(),
             empty: "没有可用选项".into(),
@@ -309,6 +312,7 @@ impl ComposerChoices {
         let Some(request) = &self.request else { return };
         let title = match request.kind {
             ComposerChoiceKind::Model => &self.labels.model,
+            ComposerChoiceKind::Reasoning => &self.labels.reasoning,
             ComposerChoiceKind::Preset => &self.labels.preset,
         };
         self.body.children.push(Content::new(

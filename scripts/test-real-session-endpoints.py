@@ -223,7 +223,7 @@ try:
         base=Path(tmp);cwd=base/'project';cwd.mkdir();(cwd/'proof.txt').write_text('proof line one\nline two\n')
         if args.pi_root:
             pi=args.pi_root.resolve();data=base/'pi';(data/'agent').mkdir(parents=True)
-            (data/'agent/models.json').write_text(json.dumps({'providers':{'endpoint-test':{'baseUrl':base_url,'api':'openai-completions','apiKey':'synthetic-key','models':[{'id':'endpoint-test','name':'Endpoint test','contextWindow':32768,'maxTokens':1024,'input':['text','image']}]}}}))
+            (data/'agent/models.json').write_text(json.dumps({'providers':{'endpoint-test':{'baseUrl':base_url,'api':'openai-completions','apiKey':'synthetic-key','models':[{'id':'endpoint-test','name':'Endpoint test','contextWindow':32768,'maxTokens':1024,'input':['text','image'],**({'reasoning':True} if args.ui_model_choices else {})}]}}}))
             config={'kind':'pi','executable':str(pi/'node/bin/node'),'arguments':[str(pi/'node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js')],'dataRoot':str(data),'environment':{'HOME':str(base/'pi-home'),'PATH':os.environ.get('PATH','/usr/bin:/bin')},'commands':commands(cwd,'endpoint-test','endpoint-test')}
             Path(config['environment']['HOME']).mkdir()
             extension=base/'question.mjs'

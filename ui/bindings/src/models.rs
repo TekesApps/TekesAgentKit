@@ -17,6 +17,28 @@ pub struct ModelChoices {
     pub selections: BTreeMap<String, Value>,
     pub raw: Value,
 }
+/// A selected model's advertised reasoning levels, using the same public
+/// choice component contract. No synthetic levels or implicit first choice.
+#[derive(Clone, Debug)]
+pub struct ReasoningChoices {
+    pub catalog: ComposerChoiceCatalog,
+    selections: BTreeMap<String, Value>,
+}
+impl ReasoningChoices {
+    pub fn selection(&self, effort: &str) -> Result<Value> {
+        require(
+            self.catalog
+                .choices
+                .iter()
+                .any(|row| row.id == effort && row.enabled),
+            "reasoning choice unavailable",
+        )?;
+        self.selections
+            .get(effort)
+            .cloned()
+            .ok_or_else(|| tekes_agent_contract::unsupported("unknown reasoning effort"))
+    }
+}
 fn identity(provider: &str, model: &str) -> String {
     json!([provider, model]).to_string()
 }
@@ -133,6 +155,87 @@ impl ModelChoices {
             raw,
         })
     }
+    /// Read only the metadata advertised for this exact provider/model. Pi may
+    /// expose levels only for its current model; absence is not an empty list
+    /// to fill with guessed defaults. An unknown explicit selection stays visible.
+    pub fn reasoning_choices(
+        &self,
+        model_id: &str,
+        requested_effort: Option<&str>,
+    ) -> Result<Option<ReasoningChoices>> {
+        let model_choice = self
+            .catalog
+            .choices
+            .iter()
+            .find(|row| row.id == model_id)
+            .ok_or_else(|| tekes_agent_contract::unsupported("unknown reasoning model"))?;
+        let payload = self
+            .selections
+            .get(model_id)
+            .ok_or_else(|| tekes_agent_contract::unsupported("missing reasoning model payload"))?;
+        let mut metadata = None;
+        for group in array(&self.raw, "groups")? {
+            for model in array(group, "models")? {
+                if identity(string(group, "id")?, string(model, "id")?) == model_id {
+                    metadata = model.get("reasoning").filter(|value| !value.is_null());
+                }
+            }
+        }
+        let Some(metadata) = metadata else {
+            return Ok(None);
+        };
+        let efforts = array(metadata, "efforts")?;
+        let mut selections = BTreeMap::new();
+        let mut choices = vec![];
+        for effort in efforts {
+            let id = string(effort, "id")?;
+            require(
+                !id.trim().is_empty() && !id.chars().any(char::is_control),
+                "invalid reasoning effort identity",
+            )?;
+            require(!selections.contains_key(id), "duplicate reasoning effort")?;
+            let mut selection = payload.clone();
+            selection["reasoningEffort"] = json!(id);
+            selections.insert(id.to_owned(), selection);
+            choices.push(ComposerChoice {
+                id: id.into(),
+                title: effort
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .unwrap_or(id)
+                    .into(),
+                detail: model_choice.title.clone(),
+                enabled: model_choice.enabled,
+                disabled_reason: model_choice.disabled_reason.clone(),
+            });
+        }
+        let default = metadata
+            .get("defaultEffort")
+            .filter(|value| !value.is_null())
+            .map(|value| {
+                value.as_str().ok_or_else(|| {
+                    tekes_agent_contract::unsupported("invalid default reasoning effort")
+                })
+            })
+            .transpose()?;
+        require(
+            default.is_none_or(|id| selections.contains_key(id)),
+            "default reasoning effort not advertised",
+        )?;
+        let selected = requested_effort
+            .or_else(|| payload["reasoningEffort"].as_str())
+            .or(default)
+            .map(str::to_owned);
+        Ok(Some(ReasoningChoices {
+            catalog: ComposerChoiceCatalog {
+                revision: self.catalog.revision,
+                phase: ComposerCatalogPhase::Ready,
+                choices,
+                selected,
+            },
+            selections,
+        }))
+    }
     /// Resolve against the most recently read source, not a callback's display text.
     pub fn selection(&self, id: &str) -> Result<Value> {
         require(
@@ -226,7 +329,16 @@ impl SubmissionPreparation for ModelSelectionPreparation {
             )
             .await?;
         let options = ModelChoices::read(raw, 1, can_select)?;
-        options.selection(&identity(provider, model))?;
+        let model_id = identity(provider, model);
+        options.selection(&model_id)?;
+        if let Some(effort) = effort {
+            options
+                .reasoning_choices(&model_id, Some(effort))?
+                .ok_or_else(|| {
+                    tekes_agent_contract::unsupported("reasoning levels not advertised")
+                })?
+                .selection(effort)?;
+        }
         let mut payload = selection.clone();
         payload["sessionId"] = json!(scope.session_id);
         let receipt = runtime

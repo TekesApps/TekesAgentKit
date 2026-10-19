@@ -325,3 +325,43 @@ pub async fn read_file_preview(
 ) -> Result<tekes_agent_ui_bindings::FilePreview, String> {
     request.read().await.map_err(|error| error.to_string())
 }
+
+/// A second host can mount reasoning content without importing a demo or any
+/// platform control. Its selected model and current draft effort are explicit.
+pub fn reasoning_panel(
+    namespace: u32,
+    destination: tekes_agent_components_ui::ComposerDestination,
+    source: &tekes_agent_ui_bindings::ReasoningChoices,
+) -> Result<tekes_agent_components_ui::ComposerChoices, String> {
+    let mut panel = tekes_agent_components_ui::ComposerChoices::new(namespace, Default::default());
+    let request = panel
+        .open(
+            destination,
+            tekes_agent_components_ui::ComposerChoiceKind::Reasoning,
+        )
+        .map_err(str::to_owned)?;
+    panel
+        .update(&request, source.catalog.clone())
+        .map_err(str::to_owned)?;
+    Ok(panel)
+}
+#[test]
+fn second_host_mounts_reasoning_component_with_explicit_choice_kind() {
+    use tekes_agent_components_ui::*;
+    let mut panel = ComposerChoices::new(89, Default::default());
+    let destination = ComposerDestination::run(tekes_agent_components_ui::RunScope::main(
+        "consumer", "session",
+    ));
+    let request = panel
+        .open(destination, ComposerChoiceKind::Reasoning)
+        .unwrap();
+    assert_eq!(request.kind, ComposerChoiceKind::Reasoning);
+    let root = panel.id();
+    let host = panel.into_host().unwrap();
+    assert!(
+        host.get(root)
+            .unwrap()
+            .component::<ComposerChoices>()
+            .is_some()
+    );
+}

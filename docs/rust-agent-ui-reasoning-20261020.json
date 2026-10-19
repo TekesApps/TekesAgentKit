@@ -1,0 +1,47 @@
+{
+  "baseAgentKit": "v0.3.8",
+  "tekesUI": "431093786de47b48cd566d0d9c0eafa088b10d68",
+  "harnessProofs": {
+    "PI": {
+      "catalogChoices": 1,
+      "configurationReceipt": true,
+      "explicitSelection": true,
+      "nativeInteraction": false,
+      "promptSettled": true,
+      "reasoningAvailable": true,
+      "reasoningSelected": "off",
+      "selected": "[\"endpoint-test\",\"endpoint-test\"]"
+    },
+    "DSH": {
+      "catalogChoices": 1,
+      "configurationReceipt": true,
+      "explicitSelection": true,
+      "nativeInteraction": false,
+      "promptSettled": true,
+      "reasoningAvailable": false,
+      "reasoningSelected": null,
+      "selected": "[\"endpoint-test\",\"endpoint-test\"]"
+    },
+    "NATIVE": {
+      "catalogChoices": 1,
+      "configurationReceipt": true,
+      "explicitSelection": true,
+      "nativeInteraction": false,
+      "promptSettled": true,
+      "reasoningAvailable": true,
+      "reasoningSelected": "low",
+      "selected": "[\"openai\",\"gpt-5\"]"
+    }
+  },
+  "uiTests": 158,
+  "secondConsumerTests": 10,
+  "toolsTests": 18,
+  "nativeFixture": {
+    "modelAndReasoningVisible": true,
+    "highSelectedAndRestored": true,
+    "otherDraftIsolated": true,
+    "physicalIME": false,
+    "voiceOver": false
+  },
+  "binarySha256": "cea5c419fa039eacbd610b9d2bbb5562167f7a30594a227db22f24ea0a6f0511"
+}
