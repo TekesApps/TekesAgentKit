@@ -63,6 +63,11 @@ mod uploads;
 use file_preview::FilePreviewGesture;
 use uploads::UploadGesture;
 pub enum DemoCommand {
+    RespondActionable {
+        request: Arc<tekes_agent_ui_bindings::ActionableResponseRequest>,
+        ids: ComposerIds,
+        intent: tekes_agent_components_ui::ActionableResponseIntent,
+    },
     ReadFilePreview {
         request: Arc<tekes_agent_ui_bindings::FilePreviewRequest>,
     },
@@ -457,10 +462,65 @@ impl ComponentDemo {
                 flexible_child: None,
                 children: vec![
                     Content::new(ComponentId(ids.root.0 + 17), Indicators::default()),
+                    Content::new(
+                        Self::actionable_id(ids),
+                        tekes_agent_components_ui::ActionableCard::new(
+                            3_000_000 + (ids.root.0 >> 32) as u32,
+                            Default::default(),
+                        ),
+                    ),
                     Content::new(ids.root, composer),
                 ],
             },
         )
+    }
+    fn actionable_id(ids: ComposerIds) -> ComponentId {
+        ComponentId((3_000_000 + (ids.root.0 >> 32)) << 32)
+    }
+    fn sync_actionable(&mut self, ids: ComposerIds, binding: &Arc<RunBinding>) -> Result<()> {
+        let snapshot = binding
+            .current_run()
+            .ok_or_else(|| unsupported("actionable run missing"))?;
+        let prompt = snapshot
+            .run
+            .as_ref()
+            .and_then(|run| run.actionables.first())
+            .map(|value| {
+                tekes_agent_presentation::ActionablePrompt::read(
+                    binding.scope().clone(),
+                    value.clone(),
+                )
+                .map(Arc::new)
+            })
+            .transpose()?;
+        let epoch = binding
+            .subscribe_runtime()
+            .inspect(|store| store.connection_epoch);
+        let controls = !self.composing() && binding.access() == PaneAccess::Ready;
+        self.tree
+            .get_mut(Self::actionable_id(ids))
+            .expect("actionable card")
+            .component_mut::<tekes_agent_components_ui::ActionableCard>()
+            .unwrap()
+            .update(snapshot.revision, epoch, prompt, controls)
+            .map_err(unsupported)?;
+        Ok(())
+    }
+    pub fn actionable_choice_id(&self, ids: ComposerIds, choice: &str) -> Option<ComponentId> {
+        self.tree
+            .get(Self::actionable_id(ids))?
+            .component::<tekes_agent_components_ui::ActionableCard>()?
+            .choice_id(choice)
+    }
+    pub fn complete_actionable(
+        &mut self,
+        _ids: ComposerIds,
+        intent: &tekes_agent_components_ui::ActionableResponseIntent,
+        result: std::result::Result<(), String>,
+    ) -> Result<bool> {
+        let accepted = intent.complete(result);
+        self.sync()?;
+        Ok(accepted)
     }
     fn pair_id(index: usize) -> ComponentId {
         ComponentId(Self::ids_for(index).root.0 + 16)
@@ -1880,6 +1940,7 @@ impl ComponentDemo {
             .expect("Indicators")
             .update(&snapshot)
             .map_err(unsupported)?;
+        self.sync_actionable(ids, &binding)?;
         for (index, id) in [SELECT_A, SELECT_B].into_iter().enumerate() {
             let composing = self.composing();
             let button = &mut self
@@ -2265,6 +2326,7 @@ impl ComponentDemo {
             .expect("Indicators")
             .update(&snapshot)
             .map_err(unsupported)?;
+        self.sync_actionable(ids, &binding)?;
         Ok(())
     }
     fn composer_labels(snapshot: &tekes_agent_presentation::RunSnapshot) -> ComposerLabels {
@@ -2457,6 +2519,7 @@ impl ComponentDemo {
         {
             composers.push((ids, run.binding.clone()));
         }
+        let actionable_sources = composers.clone();
         let intents: Vec<_> = composers
             .into_iter()
             .flat_map(|(ids, binding)| {
@@ -2471,6 +2534,29 @@ impl ComponentDemo {
             })
             .collect();
         let mut commands = vec![];
+        if !self.composing() {
+            for (ids, binding) in actionable_sources {
+                let intents = self
+                    .tree
+                    .get_mut(Self::actionable_id(ids))
+                    .unwrap()
+                    .component_mut::<tekes_agent_components_ui::ActionableCard>()
+                    .unwrap()
+                    .take_intents(&actions);
+                for intent in intents {
+                    match binding.begin_actionable_response(&intent) {
+                        Ok(request) => commands.push(DemoCommand::RespondActionable {
+                            request: Arc::new(request),
+                            ids,
+                            intent,
+                        }),
+                        Err(error) => {
+                            self.complete_actionable(ids, &intent, Err(error.to_string()))?;
+                        }
+                    }
+                }
+            }
+        }
         self.drain_uploads(&actions)?;
         self.drain_annotation(&actions)?;
         self.drain_model_choices(&actions)?;

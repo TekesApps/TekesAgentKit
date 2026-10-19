@@ -91,6 +91,11 @@ struct Host {
     annotation_stage: u8,
 }
 enum HostResult {
+    Actionable {
+        ids: tekes_agent_components_ui::ComposerIds,
+        intent: tekes_agent_components_ui::ActionableResponseIntent,
+        result: std::result::Result<(), String>,
+    },
     FilePreview {
         request: Arc<tekes_agent_ui_bindings::FilePreviewRequest>,
         result:
@@ -259,6 +264,15 @@ impl Host {
             };
             self.executor.spawn(async move {
                 let special = match command {
+                    DemoCommand::RespondActionable {
+                        request,
+                        ids,
+                        intent,
+                    } => HostResult::Actionable {
+                        ids,
+                        intent,
+                        result: request.respond().await.map_err(|error| error.to_string()),
+                    },
                     DemoCommand::ReadFilePreview { request } => {
                         let result = match request.read().await {
                             Ok(preview) => tokio::task::spawn_blocking(move || {
@@ -552,7 +566,8 @@ impl Host {
                                     "no preview or source reveal host adapter",
                                 ))
                             }
-                            DemoCommand::ReadFilePreview { .. }
+                            DemoCommand::RespondActionable { .. }
+                            | DemoCommand::ReadFilePreview { .. }
                             | DemoCommand::SelectFiles { .. }
                             | DemoCommand::Sidebar(_)
                             | DemoCommand::ReadInitialPresets { .. }
@@ -594,6 +609,15 @@ impl Host {
         }
         while let Ok(result) = self.results.try_recv() {
             match result {
+                HostResult::Actionable {
+                    ids,
+                    intent,
+                    result,
+                } => {
+                    if let Err(error) = self.view.complete_actionable(ids, &intent, result) {
+                        self.failure(error.to_string());
+                    }
+                }
                 HostResult::FilePreview { request, result } => {
                     let error = result.as_ref().err().map(String::as_str);
                     match self.view.complete_file_preview(&request, error) {
@@ -2034,6 +2058,10 @@ pub fn run() {
                     .with_lifecycle()
                     .with_presets(false)
                     .with_models();
+                if args.iter().any(|arg| arg == "--actionable-fixture") {
+                    fixture.publish_actionable(serde_json::json!({"id":"fixture-approval","sessionId":"a","revision":0,"kind":"approval","payload":{"sessionId":"a","approvalId":"synthetic-only","toolName":"本地测试审批","reason":"仅验证回调，不执行系统操作"}}));
+                    fixture.publish_actionable(serde_json::json!({"id":"fixture-question","sessionId":"a","revision":0,"kind":"question","payload":{"sessionId":"a","questions":[{"id":"q","question":"选择测试回答","options":[{"label":"继续测试"},{"label":"稍后"}],"multiSelect":false,"allowCustom":false}]}}));
+                }
                 if args.iter().any(|arg| arg == "--file-attachments") {
                     fixture.with_uploads()
                 } else {

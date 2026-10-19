@@ -1,4 +1,6 @@
 //! Agent-owned composition of public TekesUI controls. No endpoint or Run state machine.
+mod actionable;
+pub use actionable::*;
 mod annotation_editor;
 mod composer;
 mod composer_uploads;

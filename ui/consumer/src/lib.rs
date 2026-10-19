@@ -365,3 +365,25 @@ fn second_host_mounts_reasoning_component_with_explicit_choice_kind() {
             .is_some()
     );
 }
+
+/// Agent-owned waiting content is independently mountable by another host.
+pub fn actionable_card(namespace: u32) -> tekes_agent_components_ui::ActionableCard {
+    tekes_agent_components_ui::ActionableCard::new(namespace, Default::default())
+}
+pub async fn respond_actionable(
+    request: &tekes_agent_ui_bindings::ActionableResponseRequest,
+) -> Result<(), String> {
+    request.respond().await.map_err(|error| error.to_string())
+}
+#[test]
+fn second_host_mounts_actionable_content_without_a_demo_or_private_control() {
+    let card = actionable_card(92);
+    let root = card.id();
+    let host = card.into_host().unwrap();
+    assert!(
+        host.get(root)
+            .unwrap()
+            .component::<tekes_agent_components_ui::ActionableCard>()
+            .is_some()
+    );
+}

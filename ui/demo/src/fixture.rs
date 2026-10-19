@@ -56,6 +56,12 @@ pub struct Fixture {
     parent_available: Arc<AtomicBool>,
     catalog_fails: Arc<AtomicBool>,
     lifecycle: bool,
+    pending_actionables: Arc<Mutex<BTreeMap<String, Value>>>,
+    actionable_sender: broadcast::Sender<Value>,
+    responses: Arc<Mutex<Vec<Value>>>,
+    response_calls: Arc<AtomicUsize>,
+    response_gate: Option<Arc<tokio::sync::Semaphore>>,
+    response_fails: Arc<AtomicBool>,
     models: bool,
     model_read_gate: Option<Arc<tokio::sync::Semaphore>>,
     model_read_calls: Arc<AtomicUsize>,
@@ -160,6 +166,12 @@ impl Default for Fixture {
             parent_available: Arc::new(AtomicBool::new(true)),
             catalog_fails: Arc::new(AtomicBool::new(false)),
             lifecycle: false,
+            pending_actionables: Arc::new(Mutex::new(BTreeMap::new())),
+            actionable_sender: broadcast::channel(256).0,
+            responses: Arc::new(Mutex::new(vec![])),
+            response_calls: Arc::new(AtomicUsize::new(0)),
+            response_gate: None,
+            response_fails: Arc::new(AtomicBool::new(false)),
             models: false,
             model_read_gate: None,
             model_read_calls: Arc::new(AtomicUsize::new(0)),
@@ -216,6 +228,34 @@ impl Fixture {
             .filter(|(method, _, _)| method == "session.create")
             .map(|(_, payload, _)| payload.clone())
             .collect()
+    }
+    pub fn publish_actionable(&self, value: Value) {
+        self.pending_actionables
+            .lock()
+            .unwrap()
+            .insert(value["id"].as_str().unwrap().into(), value.clone());
+        let _ = self
+            .actionable_sender
+            .send(json!({"type":"upsert","actionable":value}));
+    }
+    pub fn resolve_actionable(&self, id: &str, revision: i64) {
+        self.pending_actionables.lock().unwrap().remove(id);
+        let _ = self
+            .actionable_sender
+            .send(json!({"type":"resolved","actionableId":id,"revision":revision}));
+    }
+    pub fn with_response_gate(mut self, gate: Arc<tokio::sync::Semaphore>) -> Self {
+        self.response_gate = Some(gate);
+        self
+    }
+    pub fn set_response_fails(&self, value: bool) {
+        self.response_fails.store(value, Ordering::SeqCst);
+    }
+    pub fn response_calls(&self) -> usize {
+        self.response_calls.load(Ordering::SeqCst)
+    }
+    pub fn responses(&self) -> Vec<Value> {
+        self.responses.lock().unwrap().clone()
     }
     pub fn with_model_read_gate(mut self, gate: Arc<tokio::sync::Semaphore>) -> Self {
         self.model_read_gate = Some(gate);
@@ -427,7 +467,19 @@ impl SessionEndpoint for Endpoint {
             StreamTarget::SessionControl => {
                 json!({"type":"baseline","generation":g,"snapshot":{"queues":[],"jobs":[],"projections":[]}})
             }
-            StreamTarget::Actionables => json!({"type":"reset","generation":g}),
+            StreamTarget::Actionables => {
+                let pending = self.fixture.pending_actionables.lock().unwrap();
+                let receiver = self.fixture.actionable_sender.subscribe();
+                let mut frames = vec![Ok(json!({"type":"reset","generation":g}))];
+                frames.extend(
+                    pending.values().map(|value| {
+                        Ok(json!({"type":"upsert","generation":g,"actionable":value}))
+                    }),
+                );
+                return Ok(Box::pin(stream::iter(frames).chain(
+                    inventory_stream(Value::Null, receiver, g.clone()).skip(1),
+                )));
+            }
             StreamTarget::SessionJournal { address, .. } => {
                 let sessions = self.fixture.sessions.lock().unwrap();
                 let line = sessions
@@ -480,8 +532,37 @@ impl SessionEndpoint for Endpoint {
             has_more_before: start > 0,
         })
     }
-    async fn respond(&self, _: &str, _: i64, _: Value) -> Result<()> {
-        Err(unsupported("fixture actionable"))
+    async fn respond(&self, id: &str, revision: i64, outcome: Value) -> Result<()> {
+        self.fixture.response_calls.fetch_add(1, Ordering::SeqCst);
+        if let Some(gate) = &self.fixture.response_gate {
+            gate.acquire()
+                .await
+                .map_err(|_| unsupported("response gate closed"))?
+                .forget();
+        }
+        self.fixture
+            .responses
+            .lock()
+            .unwrap()
+            .push(json!({"id":id,"revision":revision,"outcome":outcome}));
+        if self.fixture.response_fails.load(Ordering::SeqCst) {
+            return Err(Error::Transport("fixture response outcome unknown".into()));
+        }
+        {
+            let mut pending = self.fixture.pending_actionables.lock().unwrap();
+            require(
+                pending
+                    .get(id)
+                    .is_some_and(|value| value["revision"] == revision),
+                "fixture actionable revision changed",
+            )?;
+            pending.remove(id);
+        }
+        let _ = self
+            .fixture
+            .actionable_sender
+            .send(json!({"type":"resolved","actionableId":id,"revision":revision}));
+        Ok(())
     }
     async fn call(&self, method: &str, p: Value, rpc: &str) -> Result<Value> {
         if self.fixture.models && method == "session.models" {

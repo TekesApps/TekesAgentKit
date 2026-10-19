@@ -591,3 +591,34 @@ The second public consumer exposes `reasoning_panel` with the same component.
 explicit effort is still advertised and enabled **before** session.selectModel
 or prompt dispatch. A failure uses the existing submission/draft recovery path,
 with no automatic retry. Choosing UI content alone does not mutate endpoint state.
+
+## Waiting interactions (initial actionable content)
+
+`ActionablePrompt::read(scope, source)` projects shared actionable frames without
+transport or a new Run state machine. This first slice supports one-shot
+approval allow/deny and one question with named single-choice options. It emits
+the shared session envelope; adapters own harness-specific conversion. Unknown,
+secret, multi-select, multi-question and free-text-only forms expose no invented
+response. Rich forms and custom/notes input remain outstanding.
+
+`ActionableCard` mounts like other public components. One instance belongs to
+one original Run binding. Feed a monotonic publication, captured connection
+epoch, canonical prompt (or None), and a host interaction gate that is false
+while any Composer is composing. Unchanged publications retain button instances
+and pointer tracking. Prompt/epoch changes retire old action IDs. Do not modify
+the captured presentation choices before dispatch.
+
+Drain `ActionableResponseIntent`, then capture the original binding's
+`begin_actionable_response`. It verifies canonical source, scope, epoch and exact
+response vocabulary. `respond` attempts at most once per captured request and
+calls the existing RunController/runtime. Never rebuild/replay a request on error.
+The component's pending barrier prevents repeated clicks; hosts must retain the
+same request rather than creating duplicate captures for one gesture.
+
+Complete with `intent.complete(result)` even if its card is retained offscreen,
+then schedule the host's normal sync. Its local receipt belongs to that operation;
+it cannot navigate, resolve shared actionables, clear a newer prompt or report an
+error in another pane. Unknown errors retain a disabled inline status for explicit
+reconciliation; no optimistic removal. Shared resolution drives removal.
+`ActionableCard::complete` is the equivalent helper for a directly mounted card.
+The second public consumer mounts the card and consumes the response request.
