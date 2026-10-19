@@ -21,6 +21,8 @@ pub struct TranscriptTurn {
     pub started_at: Option<f64>,
     pub ended_at: Option<f64>,
     pub usage: TokenUsage,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub live_usage: Option<tekes_agent_contract::TranscriptLiveUsage>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -159,6 +161,7 @@ fn turn<'a>(
             started_at: time,
             ended_at: None,
             usage: TokenUsage::default(),
+            live_usage: None,
         });
     }
     out.turns
@@ -274,6 +277,7 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
     let mut current = 0;
     let mut message_usage = BTreeMap::<(String, String), TokenUsage>::new();
     let mut total_usage = BTreeMap::new();
+    let mut reported_output = BTreeMap::new();
     let mut opening_inputs = std::collections::BTreeSet::new();
     for entry in session.entries.values() {
         let event = &entry.event;
@@ -335,6 +339,13 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
                             .as_str()
                             .map(String::from)
                             .unwrap_or_else(|| format!("assistant-{}", event.seq)),
+                    );
+                    reported_output.insert(
+                        (turn_id.clone(), row.record_id.clone().unwrap()),
+                        data["usage"]["outputTokens"]
+                            .as_u64()
+                            .or_else(|| data["usage"]["output"].as_u64())
+                            .is_some(),
                     );
                     message_usage.insert(
                         (turn_id.clone(), row.record_id.clone().unwrap()),
@@ -490,11 +501,43 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
                 })
         });
     }
+    let output_known = |id: &str| {
+        reported_output
+            .iter()
+            .filter(|((turn, _), _)| turn == id)
+            .all(|(_, reported)| *reported)
+    };
+    if session.run_open && session.journal_ready {
+        for turn in &mut out.turns {
+            if turn.status == "running"
+                && output_known(&turn.id)
+                && message_usage.keys().any(|(id, _)| id == &turn.id)
+            {
+                turn.live_usage = Some(tekes_agent_contract::TranscriptLiveUsage {
+                    output_tokens: turn.usage.output_tokens,
+                });
+            }
+        }
+    }
     for (key, preview) in &session.previews {
         let Some((number, step)) = key.split_once(':') else {
             continue;
         };
         let turn_id = scoped(scope, &format!("turn:{number}"));
+        if session.run_open
+            && session.journal_ready
+            && let Some(count) = preview.output_tokens
+        {
+            let turn = turn(&mut out, &turn_id, None);
+            if turn.status == "running" && output_known(&turn_id) {
+                let live =
+                    turn.live_usage
+                        .get_or_insert(tekes_agent_contract::TranscriptLiveUsage {
+                            output_tokens: turn.usage.output_tokens,
+                        });
+                live.output_tokens = live.output_tokens.saturating_add(count);
+            }
+        }
         let mut row = item(
             scope,
             &format!("response:{number}:{step}"),

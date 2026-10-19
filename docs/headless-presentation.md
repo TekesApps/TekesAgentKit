@@ -51,3 +51,27 @@ Pi companion 只通过官方 `input` / `message_end` / `agent_start` / `agent_se
 真实 Kernel 0.9.0、Pi 1.3.0、DSH 0.2.1-rc.2 的隔离合成 provider 验收增加了 Composer → echo → admission → settled Transcript → identity reconciliation → reconnect 的断言。运行步骤沿用 `scripts/test-real-session-endpoints.py`。
 
 这是内存状态实现：重建 controller 会丢失其本地草稿/echo；宿主应保持 controller/store 稳定。完整已加载历史按选中 session 重折叠，尚未做增量投影优化、大历史/RSS/120Hz 性能验收。watch 丢过渡通知时仍读最新状态，submission events 仅保留最近 256 项；本地 draft/submission registry 未自动淘汰。没有 UI、生产 launcher、付费模型、TLS 远端或 Linux 运行验收。源码基准在 `presentation-source-baseline.json`，其中明确区分当前 ClientKit 已提交源码和本地 WIP 参考。
+
+
+## Live output usage (v0.3.5)
+
+`TranscriptTurn.liveUsage?: TranscriptLiveUsage` exposes a real provider-reported
+`outputTokens` cumulative turn count. Kernel already emits `assistant/chunk`
+with `chunk.type=usage` and `chunk.usage.outputTokens`; no Kernel change is needed.
+Per-step reports replace previous values (including zero), and partial input-only
+reports preserve the last known output count. Sealed assistant usage replaces its
+live step instead of double-counting it. Turn settlement, a new turn, journal
+reset and stale authority prevent live values from leaking into another view.
+No text length, tokenizer estimate, elapsed-time counter or synthetic increment
+is used. Missing values are omitted. A provider which reports only at the end
+cannot supply per-token ticking; actual report cadence remains authoritative.
+Pi's conversation adapter currently has no live usage report. DSH usage chunks
+pass through unchanged when reported by its assistant stream; neither path
+fabricates availability.
+
+Validation includes cumulative/duplicate/partial/invalid usage, sealed-step
+replacement, multi-step totals, late reports after settlement, transient cursor
+isolation, reset, a Web service subscription test, and the independent public API
+consumer `cargo run -p tekes-agent-presentation --example live_output_usage`.
+Existing formatting and Clippy findings in thread actions/annotations were also
+resolved so the standard workspace gates run cleanly; policy behavior is unchanged.

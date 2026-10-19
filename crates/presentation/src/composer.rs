@@ -166,7 +166,9 @@ impl ComposerDraft {
             ));
         }
         let annotated = crate::compile_annotation_input(self.text.trim(), &self.annotations)?;
-        if !annotated.is_empty() { blocks.push(annotated); }
+        if !annotated.is_empty() {
+            blocks.push(annotated);
+        }
         require(
             !blocks.is_empty() || !attachments.is_empty(),
             "empty submission",
@@ -698,6 +700,7 @@ impl PresentationStore {
                     started_at: None,
                     ended_at: None,
                     usage: TokenUsage::default(),
+                    live_usage: None,
                 });
                 transcript.items.push(TranscriptItem {
                     id: format!("echo-item:{}", record.state.id),

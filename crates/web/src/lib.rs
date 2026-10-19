@@ -30,14 +30,13 @@ fn active_inventory(state: &MemoryProjectionStore) -> Vec<Value> {
 pub fn present_annotations(transcript: &mut Value) {
     if let Some(items) = transcript.get_mut("items").and_then(Value::as_array_mut) {
         for item in items {
-            if item["kind"] == "user" {
-                if let Some(presentation) = item["text"]
+            if item["kind"] == "user"
+                && let Some(presentation) = item["text"]
                     .as_str()
                     .and_then(tekes_agent_presentation::annotation_input_presentation)
-                {
-                    item["inputPresentation"] =
-                        serde_json::to_value(presentation).expect("annotation presentation");
-                }
+            {
+                item["inputPresentation"] =
+                    serde_json::to_value(presentation).expect("annotation presentation");
             }
         }
     }
@@ -170,21 +169,35 @@ impl SharedAgent {
         Ok(())
     }
     pub fn open_thread_preferences(&mut self, path: &std::path::Path, scope: &str) -> Result<()> {
-        let store = Arc::new(tekes_agent_presentation::ThreadPreferences::open(path, scope)?);
+        let store = Arc::new(tekes_agent_presentation::ThreadPreferences::open(
+            path, scope,
+        )?);
         self.thread_action_host = Some(store.clone());
         self.thread_preferences = Some(store);
         Ok(())
     }
     fn inventory(&self, shared: &SharedEndpoint, state: &MemoryProjectionStore) -> Value {
-        let pins = self.thread_preferences.as_ref().map(|p| p.pins()).unwrap_or_default();
-        let sessions: Vec<Value> = active_inventory(state).into_iter().map(|mut row| {
-            if pins.iter().any(|p| p.endpoint == state.endpoint_id && row["sessionId"] == p.session_id) {
-                row["pin"] = json!(ThreadPinPresentation {pinned:true});
-            }
-            let id = row["sessionId"].as_str().expect("inventory identity");
-            row["activity"] = serde_json::to_value(tekes_agent_presentation::thread_activity(state, id)).expect("thread activity");
-            row
-        }).collect();
+        let pins = self
+            .thread_preferences
+            .as_ref()
+            .map(|p| p.pins())
+            .unwrap_or_default();
+        let sessions: Vec<Value> = active_inventory(state)
+            .into_iter()
+            .map(|mut row| {
+                if pins
+                    .iter()
+                    .any(|p| p.endpoint == state.endpoint_id && row["sessionId"] == p.session_id)
+                {
+                    row["pin"] = json!(ThreadPinPresentation { pinned: true });
+                }
+                let id = row["sessionId"].as_str().expect("inventory identity");
+                row["activity"] =
+                    serde_json::to_value(tekes_agent_presentation::thread_activity(state, id))
+                        .expect("thread activity");
+                row
+            })
+            .collect();
         json!({"description":shared.description(),"sessions":sessions})
     }
     pub fn install_thread_action_host(&mut self, host: Arc<dyn ThreadActionHost>) {
@@ -248,12 +261,11 @@ impl SharedAgent {
         rpc_id: &str,
     ) -> Result<ThreadActionOutcome> {
         use tekes_agent_presentation::{ThreadActionCommand, thread_action_command};
-        if matches!(request.action_id.as_str(), "pin" | "unpin") {
-            if let Some(store) = &self.thread_preferences {
-                if store.replay(&shared.runtime.snapshot().endpoint_id, &request, rpc_id)? {
-                    return Ok(ThreadActionOutcome::default());
-                }
-            }
+        if matches!(request.action_id.as_str(), "pin" | "unpin")
+            && let Some(store) = &self.thread_preferences
+            && store.replay(&shared.runtime.snapshot().endpoint_id, &request, rpc_id)?
+        {
+            return Ok(ThreadActionOutcome::default());
         }
         let presentation = self.thread_actions(shared, &request.session_id)?;
         let command = thread_action_command(&presentation, &request)?;
@@ -477,7 +489,9 @@ impl SharedAgent {
             };
             let mut observer = runtime.subscribe();
             let (_preferences_sender, mut preferences) = tokio::sync::watch::channel(0_u64);
-            if let Some(store) = &self.thread_preferences { preferences = store.subscribe(); }
+            if let Some(store) = &self.thread_preferences {
+                preferences = store.subscribe();
+            }
             loop {
                 let state = runtime.snapshot();
                 let value = if let Some(id) = session {

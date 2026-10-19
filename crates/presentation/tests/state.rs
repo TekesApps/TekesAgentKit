@@ -500,3 +500,103 @@ fn pi_only_child_creation_is_a_summary_subagent() {
     assert_eq!(facts.subagents.len(), 1);
     assert_eq!(facts.subagents[0].session_id.as_deref(), Some(child));
 }
+
+#[test]
+fn provider_output_usage_is_cumulative_partial_and_never_inferred() {
+    let mut s = session(vec![event(0, "turn/start", json!({"turn":1}))]);
+    let output = |s: &SessionProjection| {
+        TranscriptSnapshot::read(&scope("a"), s).unwrap().turns[0]
+            .live_usage
+            .as_ref()
+            .map(|u| u.output_tokens)
+    };
+    assert_eq!(output(&s), None);
+    let reports = [
+        json!({"outputTokens":0}),
+        json!({"outputTokens":7}),
+        json!({"outputTokens":7}),
+        json!({"inputTokens":19}),
+        json!({"outputTokens":-1}),
+        json!({"outputTokens":1.5}),
+    ];
+    for (i, report) in reports.into_iter().enumerate() {
+        s.apply_live(event(
+            i as i64 + 1,
+            "assistant/chunk",
+            json!({"turn":1,"step":1,"chunk":{"type":"usage","usage":report}}),
+        ))
+        .unwrap();
+        assert_eq!(output(&s), Some(if i == 0 { 0 } else { 7 }));
+    }
+    s.apply_live(event(7,"assistant/chunk",json!({"turn":1,"step":1,"chunk":{"type":"text-delta","text":"many characters do not change usage"}}))).unwrap();
+    assert_eq!(output(&s), Some(7));
+    s.apply_live(assistant(8, "answer")).unwrap();
+    assert_eq!(output(&s), Some(3)); // sealed usage replaces, never adds the same step twice
+    s.apply_live(event(
+        9,
+        "assistant/chunk",
+        json!({"turn":1,"step":1,"chunk":{"type":"usage","usage":{"outputTokens":999}}}),
+    ))
+    .unwrap();
+    assert_eq!(output(&s), Some(3));
+    s.apply_live(event(
+        10,
+        "assistant/chunk",
+        json!({"turn":1,"step":2,"chunk":{"type":"usage","usage":{"outputTokens":11}}}),
+    ))
+    .unwrap();
+    assert_eq!(output(&s), Some(14));
+    s.apply_live(event(
+        11,
+        "turn/end",
+        json!({"turn":1,"reason":"completed","usage":{"inputTokens":10,"outputTokens":15}}),
+    ))
+    .unwrap();
+    assert_eq!(output(&s), None);
+    s.apply_live(event(
+        12,
+        "assistant/chunk",
+        json!({"turn":1,"step":2,"chunk":{"type":"usage","usage":{"outputTokens":999}}}),
+    ))
+    .unwrap();
+    assert_eq!(output(&s), None);
+    assert_eq!(
+        TranscriptSnapshot::read(&scope("a"), &s).unwrap().turns[0]
+            .usage
+            .output_tokens,
+        15
+    );
+    s.apply_live(event(13, "turn/start", json!({"turn":2})))
+        .unwrap();
+    s.apply_live(event(
+        14,
+        "assistant/chunk",
+        json!({"turn":1,"step":3,"chunk":{"type":"usage","usage":{"outputTokens":999}}}),
+    ))
+    .unwrap();
+    let snapshot = TranscriptSnapshot::read(&scope("a"), &s).unwrap();
+    assert!(snapshot.turns.iter().all(|t| t.live_usage.is_none()));
+}
+
+#[test]
+fn missing_durable_usage_does_not_become_a_real_zero_or_partial_turn_total() {
+    let mut missing = assistant(1, "unreported");
+    missing.event.data.as_object_mut().unwrap().remove("usage");
+    let mut s = session(vec![event(0, "turn/start", json!({"turn":1})), missing]);
+    assert!(
+        TranscriptSnapshot::read(&scope("a"), &s).unwrap().turns[0]
+            .live_usage
+            .is_none()
+    );
+    s.apply_live(event(
+        2,
+        "assistant/chunk",
+        json!({"turn":1,"step":2,"chunk":{"type":"usage","usage":{"outputTokens":8}}}),
+    ))
+    .unwrap();
+    assert!(
+        TranscriptSnapshot::read(&scope("a"), &s).unwrap().turns[0]
+            .live_usage
+            .is_none()
+    );
+}

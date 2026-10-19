@@ -3,9 +3,10 @@ fn main() {
     std::fs::write(
         root.join("index.d.ts"),
         format!(
-            "{}{}",
+            "{}{}{}",
             tekes_agent_contract::annotation_typescript(),
-            tekes_agent_contract::thread_actions_typescript()
+            tekes_agent_contract::thread_actions_typescript(),
+            tekes_agent_contract::live_usage_typescript()
         ),
     )
     .unwrap();

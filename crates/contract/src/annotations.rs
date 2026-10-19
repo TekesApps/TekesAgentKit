@@ -3,7 +3,8 @@ use crate::{Result, require};
 use serde::{Deserialize, Serialize};
 
 macro_rules! binding {
-    ($name:ident, $typescript:ident, {$($(#[$attr:meta])* $field:ident: $rust:ty => $json:literal: $ts:literal),* $(,)?}) => {
+    ($(#[$struct_attr:meta])* $name:ident, $typescript:ident, {$($(#[$attr:meta])* $field:ident: $rust:ty => $json:literal: $ts:literal),* $(,)?}) => {
+        $(#[$struct_attr])*
         #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
         #[serde(rename_all = "camelCase")]
         pub struct $name { $($(#[$attr])* pub $field: $rust),* }
@@ -99,9 +100,10 @@ mod tests {
     fn published_typescript_matches_rust_contract() {
         assert_eq!(
             format!(
-                "{}{}",
+                "{}{}{}",
                 super::annotation_typescript(),
-                crate::thread_actions_typescript()
+                crate::thread_actions_typescript(),
+                crate::live_usage_typescript()
             ),
             include_str!("../../../web-contract/index.d.ts")
         );
