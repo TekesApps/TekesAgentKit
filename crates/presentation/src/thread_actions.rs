@@ -45,10 +45,10 @@ pub fn thread_actions(context: &ThreadActionContext<'_>) -> ThreadActionsPresent
     let idle_capability = |method: &str| {
         capability(method).or_else(|| c.running.then_some("会话仍有运行或排队中的任务"))
     };
-    let pin_support = unavailable.or_else(|| {
+    let pin_support = {
         (c.pin.is_none() || !c.host_methods.contains("thread.setPinned"))
             .then_some("当前连接暂不支持置顶")
-    });
+    };
     let pinned = c.pin.is_some_and(|p| p.pinned);
     let mut items = vec![action(
         if pinned { "unpin" } else { "pin" },
@@ -83,9 +83,9 @@ pub fn thread_actions(context: &ThreadActionContext<'_>) -> ThreadActionsPresent
     copy.copy_text = Some(format!("{}://{backend}/{raw}", c.url_scheme));
     items.push(copy);
     if let Some(pin) = c.pin.filter(|p| p.pinned) {
-        let support = unavailable.or_else(|| {
+        let support = {
             (!c.host_methods.contains("thread.movePin")).then_some("当前连接暂不支持置顶排序")
-        });
+        };
         items.push(action(
             "movePinUp",
             "上移置顶",

@@ -205,3 +205,49 @@ async fn pin_authority_is_an_explicit_shared_host_callback() {
     );
     assert!(connector.calls.lock().unwrap().is_empty());
 }
+
+#[tokio::test]
+async fn owned_pins_broadcast_to_multiple_observers_and_replay_survives_restart() {
+    let directory = std::env::temp_dir().join(format!("agentkit-web-pins-{}", std::process::id()));
+    std::fs::create_dir_all(&directory).unwrap();
+    let path = directory.join("preferences.json");
+    let _ = std::fs::remove_file(&path);
+    let (mut agent, connector) = setup().await;
+    agent.open_thread_preferences(&path, "user/workspace").unwrap();
+    let agent = Arc::new(agent);
+    let mut observers = Vec::new();
+    let mut tasks = Vec::new();
+    for _ in 0..2 {
+        let (tx, mut rx) = tokio::sync::mpsc::channel(8);
+        let owner = agent.clone();
+        tasks.push(tokio::spawn(async move { owner.follow(&json!({"endpoint":"test","target":"state"}), tx).await }));
+        let baseline = rx.recv().await.unwrap();
+        assert!(baseline["sessions"][0].get("pin").is_none());
+        observers.push(rx);
+    }
+    agent.request(&request("pin")).await.unwrap();
+    for rx in &mut observers {
+        tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                let inventory = rx.recv().await.unwrap();
+                if inventory["sessions"][0]["pin"]["order"] == 0 { break; }
+            }
+        }).await.unwrap();
+    }
+    // A retry reconciles successfully even though "pin" is no longer today's menu ID.
+    agent.request(&request("pin")).await.unwrap();
+    assert_eq!(agent.thread_actions(&agent.endpoint("test").unwrap(), "source").unwrap().items[0].id, "unpin");
+    assert!(connector.calls.lock().unwrap().is_empty());
+    for task in tasks { task.abort(); let _ = task.await; }
+    drop(observers);
+    drop(agent);
+    let (mut restarted, _) = setup().await;
+    restarted.open_thread_preferences(&path, "user/workspace").unwrap();
+    restarted.request(&request("pin")).await.unwrap();
+    assert_eq!(restarted.thread_actions(&restarted.endpoint("test").unwrap(), "source").unwrap().items[0].id, "unpin");
+    let mut unpin = request("unpin");
+    unpin["rpcId"] = json!("unpin-once");
+    restarted.request(&unpin).await.unwrap();
+    drop(restarted);
+    std::fs::remove_dir_all(directory).unwrap();
+}

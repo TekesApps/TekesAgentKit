@@ -49,6 +49,9 @@ export interface ThreadActionRequest {
   actionId: string;
   title?: string;
 }
+export interface ThreadPinPresentation {
+  order: number;
+}
 export interface ThreadActionNavigation {
   endpoint: string;
   sessionId: string;

@@ -21,6 +21,9 @@ binding!(ThreadActionsPresentation, ACTIONS_TYPESCRIPT, {
     label: String => "label": "string",
     items: Vec<ThreadActionDefinition> => "items": "ThreadActionDefinition[]",
 });
+binding!(ThreadPinPresentation, PIN_TYPESCRIPT, {
+    order: u64 => "order": "number",
+});
 binding!(ThreadActionRequest, ACTION_REQUEST_TYPESCRIPT, {
     session_id: String => "sessionId": "string",
     action_id: String => "actionId": "string",
@@ -61,7 +64,7 @@ pub struct ThreadPinPosition {
     pub can_move_down: bool,
 }
 
-/// Host-owned shared pin authority. A consumer must not create an independent pin database.
+/// Shared local-action authority. AgentKit supplies durable pin storage; hosts may adapt it. A consumer must not create an independent pin database.
 #[async_trait]
 pub trait ThreadActionHost: Send + Sync {
     fn methods(&self) -> BTreeSet<String>;
@@ -78,6 +81,7 @@ pub fn thread_actions_typescript() -> String {
         ACTION_TYPESCRIPT,
         ACTIONS_TYPESCRIPT,
         ACTION_REQUEST_TYPESCRIPT,
+        PIN_TYPESCRIPT,
         NAVIGATION_TYPESCRIPT,
         OUTCOME_TYPESCRIPT,
     ]

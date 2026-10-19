@@ -151,6 +151,7 @@ pub struct SharedAgent {
     endpoints: BTreeMap<String, Arc<SharedEndpoint>>,
     thread_action_host: Option<Arc<dyn ThreadActionHost>>,
     session_url_scheme: Option<String>,
+    thread_preferences: Option<Arc<tekes_agent_presentation::ThreadPreferences>>,
 }
 impl SharedAgent {
     pub fn set_session_url_scheme(&mut self, scheme: &str) -> Result<()> {
@@ -167,6 +168,22 @@ impl SharedAgent {
         )?;
         self.session_url_scheme = Some(scheme.into());
         Ok(())
+    }
+    pub fn open_thread_preferences(&mut self, path: &std::path::Path, scope: &str) -> Result<()> {
+        let store = Arc::new(tekes_agent_presentation::ThreadPreferences::open(path, scope)?);
+        self.thread_action_host = Some(store.clone());
+        self.thread_preferences = Some(store);
+        Ok(())
+    }
+    fn inventory(&self, shared: &SharedEndpoint, state: &MemoryProjectionStore) -> Value {
+        let pins = self.thread_preferences.as_ref().map(|p| p.pins()).unwrap_or_default();
+        let sessions: Vec<Value> = active_inventory(state).into_iter().map(|mut row| {
+            if let Some(order) = pins.iter().position(|p| p.endpoint == state.endpoint_id && row["sessionId"] == p.session_id) {
+                row["pin"] = json!(ThreadPinPresentation {order:order as u64});
+            }
+            row
+        }).collect();
+        json!({"description":shared.description(),"sessions":sessions})
     }
     pub fn install_thread_action_host(&mut self, host: Arc<dyn ThreadActionHost>) {
         self.thread_action_host = Some(host);
@@ -229,6 +246,13 @@ impl SharedAgent {
         rpc_id: &str,
     ) -> Result<ThreadActionOutcome> {
         use tekes_agent_presentation::{ThreadActionCommand, thread_action_command};
+        if matches!(request.action_id.as_str(), "pin" | "unpin" | "movePinUp" | "movePinDown") {
+            if let Some(store) = &self.thread_preferences {
+                if store.replay(&shared.runtime.snapshot().endpoint_id, &request, rpc_id)? {
+                    return Ok(ThreadActionOutcome::default());
+                }
+            }
+        }
         let presentation = self.thread_actions(shared, &request.session_id)?;
         let command = thread_action_command(&presentation, &request)?;
         let mut outcome = ThreadActionOutcome::default();
@@ -450,6 +474,8 @@ impl SharedAgent {
                 None
             };
             let mut observer = runtime.subscribe();
+            let (_preferences_sender, mut preferences) = tokio::sync::watch::channel(0_u64);
+            if let Some(store) = &self.thread_preferences { preferences = store.subscribe(); }
             loop {
                 let state = runtime.snapshot();
                 let value = if let Some(id) = session {
@@ -463,12 +489,12 @@ impl SharedAgent {
                     present_annotations(&mut transcript);
                     json!({"endpoint":state.endpoint_id,"sessionId":id,"run":RunPresentation::read(&state,&scope,true),"transcript":transcript})
                 } else {
-                    json!({"description":shared.description(),"sessions":active_inventory(&state)})
+                    self.inventory(&shared, &state)
                 };
                 if output.send(value).await.is_err() {
                     break;
                 }
-                tokio::select! { result = observer.changed() => {if result.is_err(){break}}, _ = output.closed() => break }
+                tokio::select! { result = preferences.changed() => {if result.is_err(){break}}, result = observer.changed() => {if result.is_err(){break}}, _ = output.closed() => break }
             }
         } else {
             let mut stream = shared

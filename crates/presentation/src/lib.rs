@@ -25,3 +25,6 @@ pub use summary::*;
 pub use task::*;
 
 mod bounded_history;
+
+mod thread_preferences;
+pub use thread_preferences::*;
