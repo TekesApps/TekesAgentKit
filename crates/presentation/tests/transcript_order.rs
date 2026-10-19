@@ -217,3 +217,119 @@ fn old_json_and_inconsistent_positions_never_acquire_guessed_order() {
             .is_err()
     );
 }
+
+#[test]
+fn message_blocks_reference_only_their_own_section_tool_without_reordering_text() {
+    let snapshot = journal();
+    let doc = TranscriptDocument::read(&snapshot).unwrap();
+    let section = &doc.sections[0];
+    let blocks = section.outputs[0].item.content_blocks.as_ref().unwrap();
+    assert_eq!(
+        blocks[0].content,
+        TranscriptBlockContent::Text {
+            text: "before".into()
+        }
+    );
+    assert!(std::ptr::eq(
+        section.tool_for_block(&blocks[1]).unwrap(),
+        &snapshot.tools[0]
+    ));
+    let foreign = TranscriptContentBlock {
+        index: 1,
+        content: TranscriptBlockContent::ToolCall {
+            tool_id: "foreign-scope-call".into(),
+        },
+    };
+    assert!(section.tool_for_block(&foreign).is_none());
+    let mut legacy = serde_json::to_value(&snapshot).unwrap();
+    for item in legacy["items"].as_array_mut().unwrap() {
+        item.as_object_mut().unwrap().remove("contentBlocks");
+    }
+    let legacy: TranscriptSnapshot = serde_json::from_value(legacy).unwrap();
+    assert!(
+        legacy
+            .items
+            .iter()
+            .all(|item| item.content_blocks.is_none())
+    );
+}
+#[test]
+fn native_stream_has_ordered_content_but_no_fabricated_tool_or_durable_position() {
+    let snapshot = native(
+        native_entries()[..1].to_vec(),
+        Some(
+            json!({"type":"message_update","message":{"role":"assistant","timestamp":2,"content":[
+                {"type":"thinking","thinking":"分析"},{"type":"text","text":"前文"},{"type":"toolCall","id":"stream-only-call","name":"read","arguments":{}},{"type":"text","text":"后文"}
+            ]}}),
+        ),
+    );
+    let doc = TranscriptDocument::read(&snapshot).unwrap();
+    let section = &doc.sections[0];
+    let item = section.outputs[0].item;
+    let blocks = item.content_blocks.as_ref().unwrap();
+    assert_eq!(blocks.len(), 4);
+    assert!(item.is_provisional && item.source_position.is_none());
+    assert_eq!(
+        blocks[0].content,
+        TranscriptBlockContent::Reasoning {
+            text: "分析".into()
+        }
+    );
+    assert_eq!(
+        blocks[1].content,
+        TranscriptBlockContent::Text {
+            text: "前文".into()
+        }
+    );
+    assert!(section.tool_for_block(&blocks[2]).is_none());
+    assert_eq!(
+        blocks[3].content,
+        TranscriptBlockContent::Text {
+            text: "后文".into()
+        }
+    );
+    assert_eq!(item.text, "前文后文"); // Legacy display summary stays compatible.
+    assert!(snapshot.tools.is_empty());
+}
+
+#[test]
+fn pure_attachment_input_is_structured_and_conflicting_legacy_text_stays_unordered() {
+    fn read(text: Option<&str>, content: Value) -> TranscriptSnapshot {
+        let mut data = json!({"turn":1,"id":"u","content":content});
+        if let Some(text) = text {
+            data["text"] = json!(text);
+        }
+        let event: HistoryEntry = serde_json::from_value(
+            json!({"event":{"seq":0,"type":"user/message","time":1,"data":data}}),
+        )
+        .unwrap();
+        let mut session = SessionProjection::default();
+        session
+            .apply_snapshot(JournalSnapshot {
+                session_id: "a".into(),
+                generation: "g".into(),
+                through_sequence: 0,
+                window_limit: 50,
+                entries: vec![event],
+                has_more_before: false,
+                projections: None,
+                history_revision: None,
+            })
+            .unwrap();
+        TranscriptSnapshot::read(&RunScope::main("e", "a"), &session).unwrap()
+    }
+    let source = read(None, json!([{"type":"file","id":"f","name":"file.txt"}]));
+    let doc = TranscriptDocument::read(&source).unwrap();
+    assert_eq!(doc.sections[0].inputs.len(), 1);
+    assert!(source.items[0].text.is_empty());
+    assert!(matches!(
+        source.items[0].content_blocks.as_ref().unwrap()[0].content,
+        TranscriptBlockContent::Attachment { .. }
+    ));
+    let conflict = read(
+        Some("legacy different"),
+        json!([{"type":"text","text":"structured"}]),
+    );
+    assert_eq!(conflict.items[0].text, "legacy different");
+    assert!(conflict.items[0].content_blocks.is_none());
+}

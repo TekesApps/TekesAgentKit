@@ -1,4 +1,5 @@
-use crate::{RunScope, TranscriptSourcePosition};
+use crate::transcript_content::{ContentDialect, content_blocks};
+use crate::{RunScope, TranscriptContentBlock, TranscriptSourcePosition};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -51,6 +52,9 @@ pub struct TranscriptItem {
     pub text: String,
     pub reasoning: String,
     pub attachments: Vec<Value>,
+    /// None means this source exposes only aggregate/legacy content, not proven block order.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_blocks: Option<Vec<TranscriptContentBlock>>,
     pub is_visible: bool,
     pub is_final: bool,
     pub is_provisional: bool,
@@ -87,7 +91,7 @@ pub struct TranscriptSnapshot {
     pub is_stale: bool,
     pub diagnostics: Vec<String>,
 }
-fn scoped(scope: &RunScope, suffix: &str) -> String {
+pub(crate) fn scoped(scope: &RunScope, suffix: &str) -> String {
     json!([scope.endpoint_id, scope.session_id, suffix]).to_string()
 }
 fn text_blocks(value: &Value, kind: &str) -> String {
@@ -222,6 +226,7 @@ fn item(
         text: String::new(),
         reasoning: String::new(),
         attachments: Vec::new(),
+        content_blocks: None,
         is_visible: true,
         is_final: false,
         is_provisional: false,
@@ -406,6 +411,8 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
                     row.text = body(&data["message"]["content"]);
                     row.reasoning = text_blocks(&data["message"]["content"], "reasoning");
                     row.attachments = attachments(&data["message"]["content"]);
+                    row.content_blocks =
+                        content_blocks(scope, &data["message"]["content"], ContentDialect::Journal);
                     row.record_id = Some(
                         data["message"]["id"]
                             .as_str()
@@ -449,6 +456,17 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
                         .or_else(|| data["submission"]["rpcId"].as_str())
                         .map(String::from);
                     row.attachments = attachments(&data["content"]);
+                    let source = if data["content"].is_null() {
+                        &data["text"]
+                    } else {
+                        &data["content"]
+                    };
+                    // Conflicting legacy display text and structured content cannot prove one order.
+                    if data["text"].as_str().is_none_or(|text| {
+                        data["content"].is_null() || text == body(&data["content"])
+                    }) {
+                        row.content_blocks = content_blocks(scope, source, ContentDialect::Journal);
+                    }
                     if !authored {
                         row.metadata["hidden"] = json!(true);
                         row.is_visible = false;
@@ -461,8 +479,12 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
                     }
                 } else if event.kind == "response/error" {
                     row.text = data["message"].as_str().unwrap_or("").into();
+                    row.content_blocks =
+                        content_blocks(scope, &data["message"], ContentDialect::Journal);
                 } else {
                     row.text = body(&data["message"]["content"]);
+                    row.content_blocks =
+                        content_blocks(scope, &data["message"]["content"], ContentDialect::Journal);
                     row.metadata["hidden"] = json!(true);
                     row.is_visible = false;
                 }
@@ -577,6 +599,8 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
                     time,
                 );
                 row.text = data["message"].as_str().unwrap_or("").into();
+                row.content_blocks =
+                    content_blocks(scope, &data["message"], ContentDialect::Journal);
                 row.metadata = json!({"classification":data["classification"],
                     "operation":data["operation"], "status":data["severity"]});
                 out.items.push(row);
@@ -804,6 +828,8 @@ fn native(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSna
                 row.source_position = native_position(entry, entry_ordinal, None);
                 row.text = body(&message["content"]);
                 row.attachments = attachments(&message["content"]);
+                row.content_blocks =
+                    content_blocks(scope, &message["content"], ContentDialect::Native);
                 let key = format!(
                     "{:x}:{:x}",
                     message["timestamp"].as_f64().unwrap_or(0.0).to_bits(),
@@ -852,6 +878,8 @@ fn native(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSna
                 row.text = body(&message["content"]);
                 row.reasoning = text_blocks(&message["content"], "thinking");
                 row.attachments = attachments(&message["content"]);
+                row.content_blocks =
+                    content_blocks(scope, &message["content"], ContentDialect::Native);
                 row.metadata = json!({"stopReason":message["stopReason"]});
                 let u = usage(&message["usage"]);
                 let turn = turn(&mut out, &current, time);
@@ -958,6 +986,7 @@ fn native(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSna
                 message["timestamp"].as_f64(),
             );
             row.text = body(&message["content"]);
+            row.content_blocks = content_blocks(scope, &message["content"], ContentDialect::Native);
             row.reasoning = text_blocks(&message["content"], "thinking");
             row.is_provisional = true;
             row.reasoning_ended = event["assistantMessageEvent"]["type"] == "thinking_end";

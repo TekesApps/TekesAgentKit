@@ -41,3 +41,6 @@ pub use transcript_document::*;
 
 mod transcript_order;
 pub use transcript_order::*;
+
+mod transcript_content;
+pub use transcript_content::{TranscriptBlockContent, TranscriptContentBlock};

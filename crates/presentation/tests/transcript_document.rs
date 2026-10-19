@@ -10,6 +10,7 @@ fn item(id: &str, turn: &str, kind: TranscriptItemKind) -> TranscriptItem {
         text: String::new(),
         reasoning: String::new(),
         attachments: vec![],
+        content_blocks: None,
         is_visible: true,
         is_final: false,
         is_provisional: false,

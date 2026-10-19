@@ -2906,6 +2906,40 @@ pub fn run() {
                 .count()
         );
         assert_eq!(document_tools, snapshot.transcript.tools.len());
+        let mut structured_messages = 0usize;
+        let mut aggregate_messages = 0usize;
+        let mut content_block_count = 0usize;
+        let mut unresolved_tool_blocks = 0usize;
+        let mut unknown_blocks = 0usize;
+        for item in snapshot
+            .transcript
+            .items
+            .iter()
+            .filter(|item| item.is_visible)
+        {
+            if let Some(blocks) = &item.content_blocks {
+                structured_messages += 1;
+                content_block_count += blocks.len();
+                for block in blocks {
+                    use tekes_agent_presentation::TranscriptBlockContent as Block;
+                    match &block.content {
+                        Block::ToolCall { .. }
+                            if !document.sections.iter().any(|section| {
+                                section.id == item.turn_id
+                                    && section.tool_for_block(block).is_some()
+                            }) =>
+                        {
+                            unresolved_tool_blocks += 1;
+                        }
+                        Block::Unknown { .. } => unknown_blocks += 1,
+                        _ => {}
+                    }
+                }
+            } else {
+                aggregate_messages += 1;
+            }
+        }
+        assert_eq!(structured_messages + aggregate_messages, document_messages);
         let mut positioned_events = 0usize;
         let mut unplaced_events = 0usize;
         let mut unplaced_facts = Vec::new();
@@ -2930,7 +2964,7 @@ pub fn run() {
                 "offscreen": true, "components": true, "nativeInteraction": false,
                 "transcriptView": false, "isStale": snapshot.transcript.is_stale,
                 "transcriptItems": snapshot.transcript.items.len(),
-                "documentProjection": {"sections":document.sections.len(),"visibleMessages":document_messages,"sessionNotices":document.session_notices.len(),"toolCalls":document_tools,"hasMoreBefore":document.has_more_before,"isStale":document.is_stale,"renderer":false,"positionedEvents":positioned_events,"unplacedEvents":unplaced_events,"unplacedFacts":unplaced_facts},
+                "documentProjection": {"sections":document.sections.len(),"visibleMessages":document_messages,"sessionNotices":document.session_notices.len(),"toolCalls":document_tools,"hasMoreBefore":document.has_more_before,"isStale":document.is_stale,"renderer":false,"structuredMessages":structured_messages,"aggregateMessages":aggregate_messages,"contentBlocks":content_block_count,"unresolvedToolBlocks":unresolved_tool_blocks,"unknownBlocks":unknown_blocks,"positionedEvents":positioned_events,"unplacedEvents":unplaced_events,"unplacedFacts":unplaced_facts},
                 "finalAssistantItems": snapshot.transcript.items.iter().filter(|item| item.kind == tekes_agent_presentation::TranscriptItemKind::Assistant && item.is_final).count(),
             "inventoryRows": host.sidebar.snapshot().rows.len(),
             "sharedRuntime": Arc::ptr_eq(host.sidebar.runtime(), &host.runtime),

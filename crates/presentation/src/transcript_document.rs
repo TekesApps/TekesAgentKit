@@ -165,3 +165,16 @@ fn section<'a, 's>(
     });
     Ok(&mut sections[index])
 }
+
+impl<'a> TranscriptSection<'a> {
+    /// Resolve only within this section, never by current selection or a different turn.
+    pub fn tool_for_block(
+        &self,
+        block: &crate::TranscriptContentBlock,
+    ) -> Option<&'a TranscriptToolCall> {
+        let crate::TranscriptBlockContent::ToolCall { tool_id } = &block.content else {
+            return None;
+        };
+        self.tools.iter().copied().find(|tool| &tool.id == tool_id)
+    }
+}

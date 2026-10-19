@@ -27,3 +27,5 @@
 真实 Pi 问答扩展命令保留了一条本地 provisional echo，没有 canonical entry ID；本轮把它明确保留为 unplaced，不用假序号把覆盖状态变成完整。真实脚本逐条核对未定位记录必须是无 recordId/sourceSequence 的 provisional message，普通历史和工具未知位置仍使验证失败。此命令 echo 的 canonical 对账未完成，不宣称所有历史节点都有来源位置。
 
 本地根工作区 118、UI workspace 173（含第二 consumer）、工具 18 tests 和两处严格 Clippy、fmt、边界/实际输入检查通过。实际 Kernel 0.9.1、Pi 1.3.0、DSH 0.2.1-rc.2：已定位事件分别 7/9/14；Pi 有 1 个显式未定位的命令 echo，另两端为 0。三端问答回传、B 草稿隔离、后续提交及新 epoch 历史恢复继续通过。使用本地合成 provider；这是公共数据到组件宿主的离屏验证，不是原生消息布局/IME/阅读验收。见 [机器收据](rust-agent-ui-transcript-order-20261020.json)。
+
+后续 [规范化内容块增量](rust-agent-ui-transcript-content-20261020.md) 为有完整公开内容的消息保留内部块顺序；只有旧聚合字段的预览仍未知。这里的 event_order 仍只是事件/容器顺序，正式视图与阅读事务的状态不变。

@@ -45,6 +45,8 @@ AgentKit 定义业务结构、展示语义、组件组合、组件输入及回�
 
 ## Transcript 结构与视觉契约
 
+统一方向规则（与当前 Tekes App 对齐）：机器产生的正文、推理、工具、附件、会话提示及对应 footnote 全部靠左；用户输入、用户附件和用户 footnote 全部靠右。用户 footnote 在气泡外，与气泡尾端对齐；机器 footnote 与正文阅读列左边缘对齐。方向按所属消息 lane 判断，用户的送达/失败状态仍随用户 footnote 靠右，独立机器提示靠左。该规则统一用于主会话、任务、子代理和 SideChat，不能在 pane 中另设一套消息方向。这里约束正式视图；现有只读模型与测试宿主不构成视觉验收。
+
 已有 [只读消息分层](rust-agent-ui-transcript-document-20261020.md)：公共 TranscriptDocument 从既有 snapshot 组织 input/output/activity/footnote、保留身份和覆盖事实。它不是渲染组件，正式 Transcript / RunView 的上游门禁与验收范围不变。
 
 当前 Tekes App/ClientKit 的事实依据（只读对照，未改 Swift）：
@@ -62,9 +64,9 @@ AgentKit 定义业务结构、展示语义、组件组合、组件输入及回�
 | input footnote | 气泡下方独立、尾端对齐、次级文字与通用轻量按钮 | pending/真实时间、复制等显式回调；pending 不显示虚构时间 |
 | output activity | 靠左，与 output 正文在同一列；推理/工具单独内容层，可折叠 | 既有 reasoning/tool DTO，展开仅为 UI 本地状态 |
 | output | 靠左、正文阅读列，不套 input 气泡 | 历史/流式文本使用相同稳定身份和 renderer，不能结算后另起重复 output |
-| output footnote | 正文下方独立的次级信息与动作 | 真实用量、时间和共享 footnote action definitions；disabled reason/identity 原样保留，点击时共享层再核对能力 |
+| output footnote | 靠左，与正文阅读列左边缘对齐；正文下方独立的次级信息与动作 | 真实用量、时间和共享 footnote action definitions；disabled reason/identity 原样保留，点击时共享层再核对能力 |
 
-圆角、间距、字体层级、前景/背景、选中/hover/focus 使用 TekesUI 既有语义 tokens。AgentKit 只增加 Agent 角色的组合/布局约束；不复制 AppKit/Metal 自有渲染器、不引入另一套配色、硬编码视觉算法或手动像素滚动补偿。窄窗口按同一结构收缩和换行；焦点、选区和阅读位置不随流式/计时更新被抢走。
+视觉样式以 TekesUI 的组件默认值、当前主题与语义 tokens 为统一来源，AgentKit 只保留消息对齐、气泡归属和内容层级等业务排版约束。未来 UI 库整体调整时，通过显式升级固定依赖版本统一体现，不为 AgentKit 再维护一份配色、字体或控件样式数值表；现有控件渲染继续接收当前主题输入。圆角、间距、字体层级、前景/背景、选中/hover/focus 使用 TekesUI 既有语义 tokens。AgentKit 只增加 Agent 角色的组合/布局约束；不复制 AppKit/Metal 自有渲染器、不引入另一套配色、硬编码视觉算法或手动像素滚动补偿。窄窗口按同一结构收缩和换行；焦点、选区和阅读位置不随流式/计时更新被抢走。
 
 实现时以现有 Tekes App 的内容层级、对齐和布局为参考，以 TekesUI 的基础组件与语义样式为基础：input 指 Transcript 中的用户消息，不是 Composer 编辑框；不将表单输入框外观带入消息正文。优先通过组件组合、公开布局属性和 token 输入实现右对齐、最大宽度、内边距与圆角；产品主题经 host 输入传入，不覆盖基础控件的交互状态。若需要基础组件尚未公开的属性或事件，先记录到 TekesUI Issue，不在 AgentKit 内复制基础控件。
 
@@ -185,3 +187,5 @@ Task tab 以 task ID 为稳定身份，scope 是可更新的内容输入。TaskP
 三端公开问答卡片的 Composer → 卡片 → 原 scope 回传 → 后续发送 → 新 epoch 历史恢复已完成局部联调，见 [三端问答记录](rust-agent-ui-actionables-live-20261020.md)。该证据不扩展为正式 Transcript、物理 IME 或真实审批验收。
 
 Transcript 现已保留公开来源位置并提供 [事件顺序输入](rust-agent-ui-transcript-order-20261020.md)：已知事件与未定位预览分开，结果不反推调用位置。它不是完整块级内容布局；正式 Transcript/RunView、阅读/分页与原生验收仍未完成。
+
+新增 [规范化内容块](rust-agent-ui-transcript-content-20261020.md) 保留公开消息内的正文/推理/工具/附件/未知块及覆盖状态，工具只引用既有 DTO。正式组件尚未实现；该模型不替代 TekesUI 文本、混合内容锚点或真实排版验收。

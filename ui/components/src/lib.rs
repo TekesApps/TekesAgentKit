@@ -398,7 +398,8 @@ impl RunSurface {
 }
 
 pub use tekes_agent_presentation::{
-    TranscriptDelivery, TranscriptDocument, TranscriptEventOrder, TranscriptInput, TranscriptItem,
-    TranscriptItemKind, TranscriptMessageKey, TranscriptOrderedEvent, TranscriptOutput,
-    TranscriptSection, TranscriptSnapshot, TranscriptSourcePosition,
+    TranscriptBlockContent, TranscriptContentBlock, TranscriptDelivery, TranscriptDocument,
+    TranscriptEventOrder, TranscriptInput, TranscriptItem, TranscriptItemKind,
+    TranscriptMessageKey, TranscriptOrderedEvent, TranscriptOutput, TranscriptSection,
+    TranscriptSnapshot, TranscriptSourcePosition,
 };

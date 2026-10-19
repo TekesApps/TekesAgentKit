@@ -858,6 +858,7 @@ impl PresentationStore {
                     is_visible: true,
                     is_final: false,
                     is_provisional: true,
+                    content_blocks: None,
                     reasoning_ended: true,
                     source_sequence: None,
                     source_position: None,

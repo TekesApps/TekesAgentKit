@@ -214,6 +214,8 @@ def ui_smoke(config, first):
         document=receipt['documentProjection']
         assert document['sections']>=1 and document['visibleMessages']>=1 and not document['isStale'] and not document['renderer'],document
         assert document['positionedEvents']>=1,document
+        assert document['structuredMessages']>=1 and document['structuredMessages']+document['aggregateMessages']==document['visibleMessages'],document
+        assert document['unresolvedToolBlocks']==0,document
         unplaced=document['unplacedFacts']
         assert document['unplacedEvents']==len(unplaced),document
         # Pi extension commands can retain a local echo with no native user entry.

@@ -425,6 +425,7 @@ fn independent_host_keeps_session_notice_outside_turns_and_footnotes() {
             text: "Worker unavailable".into(),
             reasoning: String::new(),
             attachments: vec![],
+            content_blocks: None,
             is_visible: true,
             is_final: false,
             is_provisional: false,
@@ -456,7 +457,29 @@ fn independent_host_keeps_session_notice_outside_turns_and_footnotes() {
             content_index: None,
         },
     );
+    output.content_blocks = Some(vec![tekes_agent_components_ui::TranscriptContentBlock {
+        index: 0,
+        content: tekes_agent_components_ui::TranscriptBlockContent::Text {
+            text: "正文".into(),
+        },
+    }]);
     with_message.items.push(output);
+    assert_eq!(
+        transcript_content_coverage(&transcript_document(&with_message).unwrap()),
+        (1, 1, 0)
+    );
+    with_message.items[1].content_blocks.as_mut().unwrap().push(
+        tekes_agent_components_ui::TranscriptContentBlock {
+            index: 1,
+            content: tekes_agent_components_ui::TranscriptBlockContent::ToolCall {
+                tool_id: "not-yet-committed".into(),
+            },
+        },
+    );
+    assert_eq!(
+        transcript_content_coverage(&transcript_document(&with_message).unwrap()),
+        (2, 1, 1)
+    );
     assert_eq!(
         transcript_event_counts(&transcript_document(&with_message).unwrap()).unwrap(),
         (1, 0)
@@ -480,4 +503,46 @@ pub fn transcript_event_counts(
         counts.1 += order.unplaced.len();
     }
     Ok(counts)
+}
+
+/// A host can report legacy/aggregate coverage and unresolved stream tool links
+/// without parsing harness JSON or manufacturing a tool DTO.
+pub fn transcript_content_coverage(
+    document: &tekes_agent_components_ui::TranscriptDocument<'_>,
+) -> (usize, usize, usize) {
+    use tekes_agent_components_ui::TranscriptBlockContent;
+    let mut counts = (0, 0, 0);
+    for section in &document.sections {
+        for item in section
+            .inputs
+            .iter()
+            .map(|row| row.item)
+            .chain(section.outputs.iter().map(|row| row.item))
+        {
+            if let Some(blocks) = &item.content_blocks {
+                counts.0 += blocks.len();
+                counts.2 += blocks
+                    .iter()
+                    .filter(|block| {
+                        matches!(block.content, TranscriptBlockContent::ToolCall { .. })
+                            && section.tool_for_block(block).is_none()
+                    })
+                    .count();
+            } else {
+                counts.1 += 1;
+            }
+        }
+    }
+    for row in &document.session_notices {
+        if let Some(blocks) = &row.item.content_blocks {
+            counts.0 += blocks.len();
+            counts.2 += blocks
+                .iter()
+                .filter(|block| matches!(block.content, TranscriptBlockContent::ToolCall { .. }))
+                .count();
+        } else {
+            counts.1 += 1;
+        }
+    }
+    (counts.0, counts.1, counts.2)
 }
