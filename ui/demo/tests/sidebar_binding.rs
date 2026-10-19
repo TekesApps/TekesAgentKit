@@ -44,6 +44,258 @@ async fn until(binding: &SidebarBinding, predicate: impl Fn(&SidebarPublication)
     .await
     .unwrap();
 }
+#[tokio::test]
+async fn rename_fork_archive_flow_uses_shared_results_preserves_drafts_and_clears_only_its_selection()
+ {
+    use tekes_agent_presentation::ComposerDestination;
+    let mut agent = SharedAgent::default();
+    agent
+        .register(
+            "fixture".into(),
+            "native".into(),
+            "Fixture".into(),
+            Arc::new(
+                Fixture::default()
+                    .with_side_chats()
+                    .with_lifecycle()
+                    .with_children(),
+            ),
+        )
+        .unwrap();
+    let agent = Arc::new(agent);
+    let runtime = agent.endpoint("fixture").unwrap().runtime.clone();
+    runtime.wait_ready(Duration::from_secs(3)).await.unwrap();
+    let a = Arc::new(
+        RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "a"))
+            .await
+            .unwrap(),
+    );
+    let b = Arc::new(
+        RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "b"))
+            .await
+            .unwrap(),
+    );
+    a.edit_text(
+        &ComposerDestination::run(a.scope().clone()),
+        "A 原草稿".into(),
+    )
+    .unwrap();
+    let source = SidebarBinding::new(agent, "fixture").unwrap();
+    until(&source, |state| state.loaded).await;
+    let mut view = ComponentDemo::new([a.clone(), b.clone()]).unwrap();
+    view.set_sidebar_source(source.snapshot()).unwrap();
+    view.sync().unwrap();
+    let action_id = |view: &ComponentDemo, id: &str| {
+        view.tree
+            .get(view.sidebar_id())
+            .unwrap()
+            .component::<Sidebar>()
+            .unwrap()
+            .action_id(&address("a"), id)
+            .unwrap()
+    };
+    let rename = action_id(&view, "rename");
+    assert!(
+        view.accessibility_action(rename, None, AccessibilityAction::Press)
+            .unwrap()
+            .is_empty()
+    );
+    let ids = view.rename_ids().unwrap();
+    assert!(
+        view.accessibility_action(
+            ids.editor,
+            None,
+            AccessibilityAction::SetValue(" 服务端新名称 ".into())
+        )
+        .unwrap()
+        .is_empty()
+    );
+    let mut commands = view
+        .accessibility_action(ids.submit, None, AccessibilityAction::Press)
+        .unwrap();
+    let DemoCommand::Rename(ticket) = commands.remove(0) else {
+        panic!("rename ticket")
+    };
+    assert_eq!(
+        source
+            .snapshot()
+            .rows
+            .iter()
+            .find(|row| row.address == address("a"))
+            .unwrap()
+            .title,
+        "会话 a",
+        "no optimistic local rename"
+    );
+    let result = source
+        .perform(
+            &ticket.address,
+            &ticket.definition,
+            Some(ticket.title.clone()),
+            "rename-one",
+        )
+        .await
+        .unwrap();
+    assert!(
+        matches!(result,SidebarActionOutcome::Mutation {outcome,..} if outcome.renamed_title.as_deref()==Some("服务端新名称"))
+    );
+    view.complete_rename(&ticket, Ok(())).unwrap();
+    until(&source, |state| {
+        state.rows.iter().any(|row| row.title == "服务端新名称")
+    })
+    .await;
+    view.set_sidebar_source(source.snapshot()).unwrap();
+    view.sync().unwrap();
+    let fork = action_id(&view, "fork");
+    let mut commands = view
+        .accessibility_action(fork, None, AccessibilityAction::Press)
+        .unwrap();
+    assert!(
+        view.accessibility_action(fork, None, AccessibilityAction::Press)
+            .unwrap()
+            .is_empty(),
+        "fork admission is single-flight"
+    );
+    let DemoCommand::Sidebar(SidebarIntent::Action {
+        address: origin,
+        definition,
+    }) = commands.remove(0)
+    else {
+        panic!("fork")
+    };
+    let token = view.begin_sidebar_action(origin.clone(), definition.id.clone());
+    let SidebarActionOutcome::Mutation { outcome, .. } = source
+        .perform(&origin, &definition, None, "fork-one")
+        .await
+        .unwrap()
+    else {
+        panic!("fork result")
+    };
+    view.finish_sidebar_action(&token);
+    let request = view
+        .apply_sidebar_outcome(&token, &outcome)
+        .unwrap()
+        .unwrap();
+    let forked = request.address().clone();
+    let run = Arc::new(
+        RunBinding::open_main(
+            runtime.clone(),
+            RunScope::main("fixture", &forked.session_id),
+        )
+        .await
+        .unwrap(),
+    );
+    assert!(view.complete_navigation(request, run).unwrap());
+    assert_eq!(
+        view.current_binding().unwrap().scope().session_id,
+        forked.session_id
+    );
+    until(&source, |state| {
+        state.rows.iter().any(|row| row.address == forked)
+    })
+    .await;
+    view.set_sidebar_source(source.snapshot()).unwrap();
+    view.sync().unwrap();
+    let archive = view
+        .tree
+        .get(view.sidebar_id())
+        .unwrap()
+        .component::<Sidebar>()
+        .unwrap()
+        .action_id(&forked, "archive")
+        .unwrap();
+    let mut commands = view
+        .accessibility_action(archive, None, AccessibilityAction::Press)
+        .unwrap();
+    let DemoCommand::Sidebar(SidebarIntent::Action {
+        address: archive_address,
+        definition,
+    }) = commands.remove(0)
+    else {
+        panic!("archive")
+    };
+    let token = view.begin_sidebar_action(archive_address.clone(), definition.id.clone());
+    let SidebarActionOutcome::Mutation { outcome, .. } = source
+        .perform(&archive_address, &definition, None, "archive-one")
+        .await
+        .unwrap()
+    else {
+        panic!("archive outcome")
+    };
+    view.finish_sidebar_action(&token);
+    view.apply_sidebar_outcome(&token, &outcome).unwrap();
+    assert!(view.current_binding().is_none());
+    assert!(view.tree.get(view.ids().root).is_none());
+    assert!(
+        view.tree.get(view.panel_id()).is_none(),
+        "an archived selection is not a blank new conversation"
+    );
+    view.select(0).unwrap();
+    assert_eq!(view.current_binding().unwrap().scope().session_id, "a");
+    assert_eq!(a.current_run().unwrap().draft.text, "A 原草稿");
+    assert_eq!(view.editor().input.text, "A 原草稿");
+    let token = view.begin_sidebar_action(address("a"), "fork".into());
+    view.select(1).unwrap();
+    assert!(
+        view.apply_sidebar_outcome(
+            &token,
+            &ThreadActionOutcome {
+                navigation: Some(ThreadActionNavigation {
+                    endpoint: "fixture".into(),
+                    session_id: forked.session_id
+                }),
+                ..Default::default()
+            }
+        )
+        .unwrap()
+        .is_none(),
+        "late fork cannot steal a newer selection"
+    );
+    let token = view.begin_sidebar_action(address("a"), "archive".into());
+    view.apply_sidebar_outcome(
+        &token,
+        &ThreadActionOutcome {
+            clear_selection: true,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(view.current_binding().unwrap().scope().session_id, "b");
+    let child = tekes_agent_ui_bindings::ChildPaneBinding::for_run(
+        &a,
+        "child-a",
+        tekes_agent_presentation::ChildHistoryLayout::IndependentSessions,
+        None,
+    )
+    .await
+    .unwrap();
+    child.refresh_controls().await.unwrap();
+    assert!(!child.refresh_key().unwrap().owner_archived);
+    let definition = source
+        .snapshot()
+        .rows
+        .iter()
+        .find(|row| row.address == address("a"))
+        .unwrap()
+        .actions
+        .items
+        .iter()
+        .find(|action| action.id == "archive")
+        .unwrap()
+        .clone();
+    source
+        .perform(&address("a"), &definition, None, "archive-parent")
+        .await
+        .unwrap();
+    until(&source, |state| {
+        !state.rows.iter().any(|row| row.address == address("a"))
+    })
+    .await;
+    assert!(child.refresh_key().unwrap().owner_archived);
+    child.refresh_controls().await.unwrap();
+    assert!(!child.binding().current_run().unwrap().can_submit);
+    runtime.stop().await.unwrap();
+}
 fn address(id: &str) -> SessionAddress {
     SessionAddress {
         endpoint_id: "fixture".into(),

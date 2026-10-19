@@ -3,11 +3,14 @@
 use std::{collections::BTreeMap, sync::Arc};
 use tekes_agent_components_ui::{
     Composer, ComposerAffordances, ComposerEntry, ComposerIds, ComposerIntent, Indicators,
-    SidePanel, SidePanelInput, SidePanelIntent, SidePanelLabels, SidePanelTab, SidePanelTabKind,
-    Sidebar, SidebarInput, SidebarIntent, SidebarLabels, SummaryInput, SummaryIntent,
-    SummaryLabels, SummaryView,
+    RenameFailure, RenameIds, RenameIntent, RenameLabels, RenameSubmission, SidePanel,
+    SidePanelInput, SidePanelIntent, SidePanelLabels, SidePanelTab, SidePanelTabKind, Sidebar,
+    SidebarInput, SidebarIntent, SidebarLabels, SummaryInput, SummaryIntent, SummaryLabels,
+    SummaryView, ThreadRename,
 };
-use tekes_agent_contract::{PromptMode, Result, SessionAddress, require, unsupported};
+use tekes_agent_contract::{
+    PromptMode, Result, SessionAddress, ThreadActionOutcome, require, unsupported,
+};
 use tekes_agent_presentation::{
     ChildHistoryLayout, ComposerDestination, PreparedSubmission, RunScope, SideChat,
     SideChatSnapshot, SummaryAction, TaskLoadToken,
@@ -33,13 +36,16 @@ const MAIN: ComponentId = ComponentId(5);
 const SIDEBAR_COLUMN: ComponentId = ComponentId(6);
 const PANEL_COLUMN: ComponentId = ComponentId(7);
 const MAIN_COLUMN: ComponentId = ComponentId(8);
+const EMPTY_MAIN: ComponentId = ComponentId(9);
 const SIDEBAR_NAMESPACE: u32 = 40;
 const PANEL_NAMESPACE: u32 = 41;
+const RENAME_NAMESPACE: u32 = 42;
 pub const SELECT_A: ComponentId = ComponentId(100);
 pub const SELECT_B: ComponentId = ComponentId(101);
 pub const RECONNECT: ComponentId = ComponentId(102);
 
 pub enum DemoCommand {
+    Rename(RenameSubmission),
     OpenChild {
         request: PanelRequest,
         direct_parent: RunScope,
@@ -85,6 +91,8 @@ pub struct ComponentDemo {
     pub tree: ContentHost,
     bindings: Vec<Arc<RunBinding>>,
     selected: usize,
+    selection_cleared: bool,
+    cleared_panel: Option<Content>,
     retained: Vec<Option<Content>>,
     navigation_revision: u64,
     sidebar_source: Option<Arc<SidebarPublication>>,
@@ -114,7 +122,7 @@ struct ChildPane {
     controls: PanelRun,
     title: String,
     snapshot: PaneSnapshot,
-    refresh_key: Option<(u64, bool)>,
+    refresh_key: Option<tekes_agent_ui_bindings::ChildRefreshKey>,
     reading: bool,
     read_error: Option<String>,
 }
@@ -132,6 +140,13 @@ impl PanelRequest {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NavigationRequest {
     address: SessionAddress,
+    revision: u64,
+    created: bool,
+}
+#[derive(Clone, Debug)]
+pub struct SidebarActionToken {
+    address: SessionAddress,
+    action: String,
     revision: u64,
 }
 impl NavigationRequest {
@@ -155,11 +170,15 @@ impl Component for DemoColumn {
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
         let width = self.width.unwrap_or(available.width).min(available.width);
-        self.children[0].measure(text, Size::new(width, available.height));
+        if let Some(child) = self.children.first_mut() {
+            child.measure(text, Size::new(width, available.height));
+        }
         MeasuredChild::new(Size::new(width, available.height))
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
-        self.children[0].arrange(text, frame, clip);
+        if let Some(child) = self.children.first_mut() {
+            child.arrange(text, frame, clip);
+        }
     }
 }
 impl ComponentDemo {
@@ -175,6 +194,7 @@ impl ComponentDemo {
             "demo needs distinct run sources",
         )?;
         let pair = Self::new_pair(0);
+        let rename = ThreadRename::new(RENAME_NAMESPACE, RenameLabels::default());
         let main = Content::new(
             MAIN,
             StackContent {
@@ -210,6 +230,7 @@ impl ComponentDemo {
                         DIAGNOSTIC,
                         TextContent::new("Transcript 待 TekesUI #22 / #23；此处不是消息视图。"),
                     ),
+                    Content::new(rename.ids().root, rename),
                     pair,
                 ],
             },
@@ -256,6 +277,8 @@ impl ComponentDemo {
             tree,
             bindings,
             selected: 0,
+            selection_cleared: false,
+            cleared_panel: None,
             retained,
             navigation_revision: 0,
             sidebar_source: None,
@@ -317,6 +340,121 @@ impl ComponentDemo {
     pub fn binding(&self) -> &Arc<RunBinding> {
         &self.bindings[self.selected]
     }
+    pub fn current_binding(&self) -> Option<&Arc<RunBinding>> {
+        (!self.selection_cleared).then(|| self.binding())
+    }
+    pub fn rename_ids(&self) -> Option<RenameIds> {
+        let rename = self
+            .tree
+            .get(RenameIds::new(RENAME_NAMESPACE).root)?
+            .component::<ThreadRename>()?;
+        rename.is_open().then(|| rename.ids())
+    }
+    pub fn complete_rename(
+        &mut self,
+        ticket: &RenameSubmission,
+        result: std::result::Result<(), RenameFailure>,
+    ) -> Result<bool> {
+        let root = RenameIds::new(RENAME_NAMESPACE).root;
+        let current = self
+            .tree
+            .get(root)
+            .unwrap()
+            .component::<ThreadRename>()
+            .unwrap()
+            .is_current(ticket);
+        if current && result.is_ok() {
+            self.tree.focus(None, false);
+        }
+        let applied = self
+            .tree
+            .get_mut(root)
+            .unwrap()
+            .component_mut::<ThreadRename>()
+            .unwrap()
+            .complete(ticket, result);
+        self.sync()?;
+        Ok(applied)
+    }
+    pub fn begin_sidebar_action(
+        &mut self,
+        address: SessionAddress,
+        action: String,
+    ) -> SidebarActionToken {
+        if action == "fork" {
+            self.navigation_revision += 1;
+        }
+        SidebarActionToken {
+            address,
+            action,
+            revision: self.navigation_revision,
+        }
+    }
+    pub fn finish_sidebar_action(&mut self, token: &SidebarActionToken) {
+        let id = self.sidebar_id();
+        self.tree
+            .get_mut(id)
+            .unwrap()
+            .component_mut::<Sidebar>()
+            .unwrap()
+            .set_pending(&token.address, &token.action, false);
+    }
+    pub fn apply_sidebar_outcome(
+        &mut self,
+        token: &SidebarActionToken,
+        outcome: &ThreadActionOutcome,
+    ) -> Result<Option<NavigationRequest>> {
+        if let Some(warning) = &outcome.warning {
+            self.set_notice(warning);
+        }
+        if token.revision != self.navigation_revision || self.composing() {
+            return Ok(None);
+        }
+        if outcome.clear_selection
+            && self.current_binding().is_some_and(|binding| {
+                binding.scope().endpoint_id == token.address.endpoint_id
+                    && binding.scope().session_id == token.address.session_id
+            })
+        {
+            self.clear_selection()?;
+        }
+        if let Some(navigation) = &outcome.navigation {
+            return Ok(Some(NavigationRequest {
+                address: SessionAddress {
+                    endpoint_id: navigation.endpoint.clone(),
+                    session_id: navigation.session_id.clone(),
+                },
+                revision: token.revision,
+                created: true,
+            }));
+        }
+        Ok(None)
+    }
+    fn clear_selection(&mut self) -> Result<()> {
+        if self.selection_cleared {
+            return Ok(());
+        }
+        self.tree.focus(None, false);
+        self.retained[self.selected] = Some(
+            self.tree
+                .remove(Self::pair_id(self.selected))
+                .map_err(|_| unsupported("detach selected run"))?,
+        );
+        self.cleared_panel = Some(
+            self.tree
+                .remove(self.panel_id())
+                .map_err(|_| unsupported("detach selected panel"))?,
+        );
+        self.tree
+            .insert(
+                MAIN,
+                Content::new(EMPTY_MAIN, TextContent::new("选择会话以继续")),
+            )
+            .map_err(|_| unsupported("mount empty selection"))?;
+        self.selection_cleared = true;
+        self.navigation_revision += 1;
+        self.sync()
+    }
     pub fn sidebar_id(&self) -> ComponentId {
         ComponentId((SIDEBAR_NAMESPACE as u64) << 32)
     }
@@ -346,6 +484,20 @@ impl ComponentDemo {
         self.active_panel_run()
             .map(|run| run.ids)
             .filter(|ids| self.tree.get(ids.root).is_some())
+    }
+    pub fn panel_child_controls_ready(&self) -> bool {
+        let Some(binding) = self.current_binding() else {
+            return false;
+        };
+        let parent = binding.scope();
+        let Some(SidePanelTabKind::Subagent { child_id }) = self.panel_selections.get(parent)
+        else {
+            return false;
+        };
+        self.child_panes
+            .get(&(parent.clone(), child_id.clone()))
+            .is_some_and(|pane| !pane.reading && pane.read_error.is_none())
+            && self.panel_composer_ids().is_some()
     }
     pub fn bounded_child_buttons(&self) -> Option<(ComponentId, ComponentId)> {
         let parent = self.binding().scope();
@@ -388,13 +540,15 @@ impl ComponentDemo {
         Ok(self.panel_request(panel_parent.clone()))
     }
     pub fn child_request_current(&self, request: &PanelRequest) -> bool {
-        self.binding().scope() == &request.parent
+        !self.selection_cleared
+            && self.binding().scope() == &request.parent
             && self.navigation_revision == request.main_revision
             && self.panel_navigation_revision == request.panel_revision
             && !self.composing()
     }
     pub fn child_pane_active(&self, panel_parent: &RunScope, child: &str) -> bool {
-        self.binding().scope() == panel_parent
+        !self.selection_cleared
+            && self.binding().scope() == panel_parent
             && self.panel_selections.get(panel_parent)
                 == Some(&SidePanelTabKind::Subagent {
                     child_id: child.into(),
@@ -632,6 +786,13 @@ impl ComponentDemo {
         Ok(ComposerIds::new((namespace as u64) << 32))
     }
     fn composing_editor(&self) -> Option<ComponentId> {
+        let rename = self
+            .tree
+            .get(RenameIds::new(RENAME_NAMESPACE).root)?
+            .component::<ThreadRename>()?;
+        if rename.is_composing() {
+            return Some(rename.ids().editor);
+        }
         std::iter::once(self.ids())
             .chain(self.panel_composer_ids())
             .find_map(|ids| {
@@ -719,7 +880,61 @@ impl ComponentDemo {
             .expect("text")
             .text = text.into();
     }
+    fn sync_sidebar(&mut self) -> Result<()> {
+        if let Some(source) = &self.sidebar_source {
+            let selected = self.current_binding().map(|binding| SessionAddress {
+                endpoint_id: binding.scope().endpoint_id.clone(),
+                session_id: binding.scope().session_id.clone(),
+            });
+            let next = SidebarInput {
+                revision: self
+                    .sidebar_presented
+                    .as_ref()
+                    .map_or(1, |old| old.revision + 1),
+                rows: source.rows.clone(),
+                selected,
+            };
+            if self
+                .sidebar_presented
+                .as_ref()
+                .is_none_or(|old| old.rows != next.rows || old.selected != next.selected)
+            {
+                let id = self.sidebar_id();
+                self.tree
+                    .get_mut(id)
+                    .expect("sidebar")
+                    .component_mut::<Sidebar>()
+                    .expect("Sidebar")
+                    .update(&next)
+                    .map_err(unsupported)?;
+                self.sidebar_presented = Some(next);
+            }
+        }
+        Ok(())
+    }
     pub fn sync(&mut self) -> Result<()> {
+        if self.selection_cleared {
+            self.sync_sidebar()?;
+            for id in [SELECT_A, SELECT_B] {
+                let disabled = self.composing();
+                let button = &mut self
+                    .tree
+                    .get_mut(id)
+                    .unwrap()
+                    .component_mut::<ButtonContent>()
+                    .unwrap()
+                    .button;
+                button.state.selected = false;
+                button.state.disabled = disabled;
+            }
+            self.tree
+                .get_mut(DIAGNOSTIC)
+                .unwrap()
+                .component_mut::<TextContent>()
+                .unwrap()
+                .text = "未选择会话".into();
+            return Ok(());
+        }
         let binding = self.binding().clone();
         let snapshot = binding
             .current_run()
@@ -772,35 +987,7 @@ impl ComponentDemo {
                 "已"
             }
         );
-        if let Some(source) = &self.sidebar_source {
-            let selected = Some(SessionAddress {
-                endpoint_id: binding.scope().endpoint_id.clone(),
-                session_id: binding.scope().session_id.clone(),
-            });
-            let next = SidebarInput {
-                revision: self
-                    .sidebar_presented
-                    .as_ref()
-                    .map_or(1, |old| old.revision + 1),
-                rows: source.rows.clone(),
-                selected,
-            };
-            if self
-                .sidebar_presented
-                .as_ref()
-                .is_none_or(|old| old.rows != next.rows || old.selected != next.selected)
-            {
-                let id = self.sidebar_id();
-                self.tree
-                    .get_mut(id)
-                    .expect("sidebar")
-                    .component_mut::<Sidebar>()
-                    .expect("Sidebar")
-                    .update(&next)
-                    .map_err(unsupported)?;
-                self.sidebar_presented = Some(next);
-            }
-        }
+        self.sync_sidebar()?;
         let panel_id = self.panel_id();
         let parent = binding.scope().clone();
         // Resolve task rows from each original parent's canonical SummaryFacts,
@@ -971,8 +1158,21 @@ impl ComponentDemo {
                             self.sync_pane_controls(
                                 SidePanelTabKind::Subagent { child_id },
                                 ids,
-                                binding,
+                                binding.clone(),
                             )?;
+                            if reading && let Some(snapshot) = binding.current_run() {
+                                self.tree
+                                    .get_mut(ids.root)
+                                    .unwrap()
+                                    .component_mut::<Composer>()
+                                    .unwrap()
+                                    .update_gated(
+                                        &snapshot,
+                                        ComposerAffordances::default(),
+                                        tekes_agent_components_ui::ComposerControlGate::CLOSED,
+                                    )
+                                    .map_err(unsupported)?;
+                            }
                             if self.tree.get(ComponentId(ids.root.0 + 19)).is_none() {
                                 self.tree
                                     .get_mut(ComponentId(ids.root.0 + 16))
@@ -1128,11 +1328,30 @@ impl ComponentDemo {
             !self.composing(),
             "finish or cancel composition before switching sessions",
         )?;
+        if self.selection_cleared {
+            self.tree
+                .remove(EMPTY_MAIN)
+                .map_err(|_| unsupported("remove empty selection"))?;
+            let pair = self.retained[self.selected]
+                .take()
+                .expect("retained archived run");
+            self.tree
+                .insert(MAIN, pair)
+                .map_err(|_| unsupported("restore selected controls"))?;
+            self.tree
+                .insert(
+                    PANEL_COLUMN,
+                    self.cleared_panel.take().expect("retained panel"),
+                )
+                .map_err(|_| unsupported("restore selected panel"))?;
+            self.selection_cleared = false;
+        }
         self.navigation_revision = self
             .navigation_revision
             .checked_add(1)
             .ok_or_else(|| unsupported("navigation revision exhausted"))?;
         if index == self.selected {
+            self.sync()?;
             self.tree.focus(Some(self.ids().editor), true);
             return Ok(());
         }
@@ -1150,7 +1369,16 @@ impl ComponentDemo {
             .map_err(|_| unsupported("restore component pair"))?;
         self.selected = index;
         self.tree
-            .reorder(MAIN, &[NAV, NOTICE, DIAGNOSTIC, Self::pair_id(index)])
+            .reorder(
+                MAIN,
+                &[
+                    NAV,
+                    NOTICE,
+                    DIAGNOSTIC,
+                    RenameIds::new(RENAME_NAMESPACE).root,
+                    Self::pair_id(index),
+                ],
+            )
             .map_err(|_| unsupported("demo layout order"))?;
         self.sync()?;
         self.tree.focus(Some(self.ids().editor), true);
@@ -1174,7 +1402,7 @@ impl ComponentDemo {
         if request.revision != self.navigation_revision {
             return Ok(false);
         }
-        if self.composing() || disappeared {
+        if self.composing() || (disappeared && !request.created) {
             self.navigation_revision = self
                 .navigation_revision
                 .checked_add(1)
@@ -1256,7 +1484,11 @@ impl ComponentDemo {
         let actions = self.tree.drain_actions();
         let binding = self.binding().clone();
         let ids = self.ids();
-        let mut composers = vec![(ids, binding.clone())];
+        let mut composers = if self.selection_cleared {
+            vec![]
+        } else {
+            vec![(ids, binding.clone())]
+        };
         if let Some(ids) = self.panel_composer_ids()
             && let Some(run) = self.active_panel_run()
         {
@@ -1276,6 +1508,22 @@ impl ComponentDemo {
             })
             .collect();
         let mut commands = vec![];
+        let rename_root = RenameIds::new(RENAME_NAMESPACE).root;
+        let rename_intents = self
+            .tree
+            .get_mut(rename_root)
+            .unwrap()
+            .component_mut::<ThreadRename>()
+            .unwrap()
+            .take_intents(&actions);
+        for intent in rename_intents {
+            match intent {
+                RenameIntent::Submit(ticket) => commands.push(DemoCommand::Rename(*ticket)),
+                RenameIntent::Dismiss => {
+                    self.tree.focus(None, false);
+                }
+            }
+        }
         let sidebar_intents = self
             .tree
             .get(self.sidebar_id())
@@ -1292,10 +1540,9 @@ impl ComponentDemo {
         let panel_intents = self
             .tree
             .get(self.panel_id())
-            .expect("panel")
-            .component::<SidePanel>()
-            .expect("SidePanel")
-            .take_intents(&actions);
+            .and_then(|node| node.component::<SidePanel>())
+            .map(|panel| panel.take_intents(&actions))
+            .unwrap_or_default();
         for intent in sidebar_intents {
             if let SidebarIntent::Select { address } = intent {
                 if let Some(index) = self.bindings.iter().position(|binding| {
@@ -1311,9 +1558,54 @@ impl ComponentDemo {
                     commands.push(DemoCommand::OpenSession(NavigationRequest {
                         address,
                         revision: self.navigation_revision,
+                        created: false,
                     }));
                 }
             } else {
+                if let SidebarIntent::Action {
+                    address,
+                    definition,
+                } = &intent
+                {
+                    if self
+                        .tree
+                        .get(self.sidebar_id())
+                        .unwrap()
+                        .component::<Sidebar>()
+                        .unwrap()
+                        .is_pending(address, &definition.id)
+                    {
+                        continue;
+                    }
+                    if definition.interaction == "rename" {
+                        let title = self
+                            .sidebar_source
+                            .as_ref()
+                            .and_then(|source| {
+                                source.rows.iter().find(|row| &row.address == address)
+                            })
+                            .map(|row| row.title.clone())
+                            .unwrap_or_default();
+                        self.tree.focus(None, false);
+                        self.tree
+                            .get_mut(rename_root)
+                            .unwrap()
+                            .component_mut::<ThreadRename>()
+                            .unwrap()
+                            .open(address.clone(), definition.clone(), &title)
+                            .map_err(unsupported)?;
+                        let editor = self.rename_ids().unwrap().editor;
+                        self.tree.focus(Some(editor), true);
+                        continue;
+                    }
+                    let sidebar_id = self.sidebar_id();
+                    self.tree
+                        .get_mut(sidebar_id)
+                        .unwrap()
+                        .component_mut::<Sidebar>()
+                        .unwrap()
+                        .set_pending(address, &definition.id, true);
+                }
                 commands.push(DemoCommand::Sidebar(intent));
             }
         }

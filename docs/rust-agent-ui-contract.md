@@ -2,7 +2,7 @@
 
 本文件是正式业务组件的实现契约与进度入口，不是完成声明。完整交付目标保持 Composer、Transcript、Indicators、RunView、SidePanel、Sidebar，加 Native/Pi/DSH 能力验证、第二公开 consumer、原生窗口验收、review/CI/合并与阶段 tag。
 
-源码基线：AgentKit 已发布 v0.3.7 / `a8610a420bad72eaedcf706b30df87153a0f3e16`；TekesUI 固定公开 `431093786de47b48cd566d0d9c0eafa088b10d68`，188 输入 SHA `03721866a362b1d31261ebbbc86140eb07e9e23320871c325234a5212591213d`。以下新增 API 尚是当前分支 WIP。RunSurface 明确保留为协议/控件测试宿主，不改名充当 RunView，也不是正式组件树的包装层。
+源码基线：AgentKit 已发布 v0.3.8 / `f1daa0ffcf6ced41e21f351e22845455ca78006c`；TekesUI 固定公开 `431093786de47b48cd566d0d9c0eafa088b10d68`，188 输入 SHA `03721866a362b1d31261ebbbc86140eb07e9e23320871c325234a5212591213d`。以下新增 API 尚是当前分支 WIP。RunSurface 明确保留为协议/控件测试宿主，不改名充当 RunView，也不是正式组件树的包装层。
 
 ## 所有权
 
@@ -40,7 +40,7 @@ AgentKit 定义业务结构、展示语义、组件组合、组件输入及回�
 - `TekesMetalTextKit/Engine/MetalNativeTurnView.swift` 的 inputLane 将 inputBubble 约束到 trailing；气泡使用 transcriptInput 颜色和 panel 圆角，inputAside 另排在气泡之下。
 - `MetalVirtualLayout.swift` 的 inputTextMaximumWidth 使用 bubble 最大宽度与列宽约束；水平/垂直 padding 来自 Spacing，而不是固定百分比宽度强行撑满。
 - `TekesClientKit/TranscriptRendering/TranscriptTurnFootnote.swift` 区分 input 与 output lanes。`TranscriptMetalAppBridges.swift::inputFootnoteInformation` 对 optimistic echo 使用 pending 信息，不显示伪造的服务端时间。
-- 最新 AgentKit v0.3.7 的完成回合 Fork 只使用 durable settlement 边界和共享定义；不移植旧 App 中当前共享契约未支持的“回退/编辑重跑”。
+- 最新 AgentKit v0.3.8 的完成回合 Fork 只使用 durable settlement 边界和共享定义；不移植旧 App 中当前共享契约未支持的“回退/编辑重跑”。
 
 正式结构为一个由稳定 turn/item 身份组织的多块文档：
 
@@ -60,6 +60,7 @@ AgentKit 定义业务结构、展示语义、组件组合、组件输入及回�
 
 正式 Transcript 的验收至少覆盖：
 
+- 视觉对照使用同一组内容，分别检查现有 Tekes 与 Rust consumer 的宽/窄窗口、浅/深色主题：短输入、长中文、含列表/代码的单条输入、附件、流式输出、推理/工具展开及两类 footnote。核对内容层级、左右对齐、气泡宽度和留白；具体颜色、圆角与交互反馈遵循 TekesUI 语义 tokens，不为逐像素复刻覆盖基础样式。截图仅作视觉证据，阅读锚点和输入行为须另行交互验证。
 - 同一条用户消息在历史恢复、optimistic echo 和服务端确认后保持同一布局，短文本不被拉成整行，长中文自然换行，input footnote 保持在气泡之外并尾端对齐。
 - 历史输出与流式输出使用同一阅读列；推理、工具调用及结果有独立层级，展开收起不重建整条消息；output footnote 不混入正文或推理内容。
 - 页首加载更早历史、流式追加、工具展开及宽度变化后，向上阅读的位置仍绑定原消息与局部阅读位置；只有处于跟随底部状态时追加才继续跟随。
@@ -73,6 +74,8 @@ AgentKit 定义业务结构、展示语义、组件组合、组件输入及回�
 - [TekesUI #23](https://github.com/TekesApps/TekesUI/issues/23)：无表单装饰的可选中文本 Component/presentation 模式，保留现有 TextSurface/AX/选择/复制/受控更新。当前 TextFieldContent 固定 form 的 label/message/边框布局；TextContent 不提供等价文本选择服务。
 
 两个 Issue 均有精确源码、所需事件/属性、独立 consumer 和验收条件。上游若给出等价公共 API，则用它并补消费证据，不重复开发。新输入必须显式升级 pin 后复验；不能跟随活跃 WIP。
+
+#23 的未发布归档候选 `2f0902d9f90fb069696c52edc38d9b7e7f8f0d0c4a3f0141e21fe1ac3f3183d0` 已独立校验 991 个文件，并复验公开 API、控件核心和第二 consumer；详见 [候选技术评估](tekesui-plain-candidate-review-20261019.md)。这不改变正式 pin 或 #22/#23 的交付状态。
 
 ## RunView 的后续实施
 
@@ -128,12 +131,14 @@ Task tab 以 task ID 为稳定身份，scope 是可更新的内容输入。TaskP
 
 最新 [SideChat 接入记录](rust-agent-ui-sidechat-20261019.md) 与 [机器收据](rust-agent-ui-sidechat-20261019.json) 覆盖共享 pointer 绑定、独立 Composer/Indicators、创建/发送/取消关闭、Unknown 保留与父草稿隔离。本地 root 104、UI 74、工具 18 tests 通过，三端协议与组件到 GPU 路径复验通过；正式 Transcript 与完整原生交互仍不在这些通过项内。
 
+最新 [Sidebar 操作接入记录](rust-agent-ui-thread-actions-20261019.md) 覆盖 ThreadRename、分叉导航、归档空选择与子代理 owner 归档刷新。基线 v0.3.8；root 105、UI 88、工具 18 tests 和局部原生回归通过，正式 Transcript/RunView 仍未完成。
+
 | 要求 | 当前状态 | 还需要的证据 |
 |---|---|---|
 | Composer 独立输入/草稿/发送/取消及入口 | 首批组件实现与 4 个实际 controller 测试；尚非完整 Composer UI | 完整能力弹层/卡片、原生挂载、视觉、真实三端操作 |
 | Indicators | 首批事实组件与 unknown/0/partial/error 测试 | 原生 RunView 呈现、主题/语义验收 |
 | Transcript / RunView | 布局契约已核实，正式组件未交付 | #22/#23 等价公共 API、结构化实现、阅读/分页/流式/原生验收 |
-| Sidebar | 共享服务绑定、选择/置顶/复制与局部原生验证；三端数据到 GPU 通过 | 重命名/分叉/归档交互与完整宿主验收 |
+| Sidebar | 共享服务绑定、选择/置顶/复制；重命名/分叉/归档已接入，局部原生 fixture 验证 | 真实三端操作与完整宿主验收 |
 | SidePanel / Summary | Summary 原生挂载；任务、SideChat、独立子代理控制与绑定已接入；有界子历史只读加载诊断/分页已验证 | 各类 pane 正式 Transcript、真实三端子 pane 原生操作与完整联调 |
 | 第二公开 API consumer | Composer、Indicators、Sidebar、SidePanel 公共组合，Summary 独立挂载；不依赖 RunSurface | 正式 RunView/Transcript 与完整原生宿主组合验证 |
 | 原生窗口验收 | Composer/Indicators、Sidebar、Summary + 共享绑定的局部窗口验证已通过（合成文本服务） | 物理中文输入法、正式 RunView/Transcript/其余 SidePanel 内容和阅读/分页锚点验收 |

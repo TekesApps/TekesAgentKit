@@ -4,7 +4,7 @@
 
 ## 依赖与构建
 
-- AgentKit 当前基线 v0.3.7 / a8610a420bad72eaedcf706b30df87153a0f3e16，Rust 1.95.0。已合入 WebUI 使用的批注、线程操作/置顶、用量与完成回合 Fork 契约；本 UI 的挂载范围仍为首段 Run 闭环，不把这些共享能力等同于控件已接入。
+- AgentKit 当前基线 v0.3.8 / f1daa0ffcf6ced41e21f351e22845455ca78006c，Rust 1.95.0。已合入 WebUI 使用的批注、线程操作/置顶、用量与完成回合 Fork 契约；本 UI 的挂载范围仍为首段 Run 闭环，不把这些共享能力等同于控件已接入。
 - WebUI 对照版本 v0.1.17 / 8b9b11c；仅保留既有 Fork，不加入已撤回的回退/编辑重跑实验。Native/Pi/DSH 显式配置与分层验收见 [三端记录](tekesui-three-endpoint-demo-20261019.md)。
 - TekesUI composition仍为实验API；源码固定为公开 `https://github.com/TekesApps/TekesUI.git` 的完整rev `431093786de47b48cd566d0d9c0eafa088b10d68`，Cargo.lock固定同一来源。188个输入与已验收037相同，清单见 `ui/tekesui-source.json`。
 - 默认由Cargo取得公开Git输入，不读取活跃兄弟工作树或旧 `.deps`。开发快照准备/capture在公开pin模式禁用；旧e4依赖和回滚文件保留。UI workspace与headless默认构建隔离。

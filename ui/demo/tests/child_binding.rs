@@ -359,10 +359,29 @@ async fn late_child_open_caches_original_parent_without_stealing_selection_and_o
         source.snapshot().await.unwrap(),
     )
     .unwrap();
+    assert!(
+        !view.panel_child_controls_ready(),
+        "catalog read is pending"
+    );
     source.refresh_controls().await.unwrap();
     view.update_child_snapshot(a.scope(), &source, source.snapshot().await.unwrap())
         .unwrap();
+    assert!(
+        view.panel_child_controls_ready(),
+        "empty draft can accept input"
+    );
     let ids = view.panel_composer_ids().unwrap();
+    assert!(
+        view.tree
+            .get(ids.send)
+            .unwrap()
+            .component::<tekes_ui_controls::composition::ButtonContent>()
+            .unwrap()
+            .button
+            .state
+            .disabled,
+        "input readiness must not require an empty draft to be sendable"
+    );
     let request = view.begin_child_open(a.scope()).unwrap();
     view.tree.focus(Some(ids.editor), true);
     view.event(&ContentEvent::Preedit {

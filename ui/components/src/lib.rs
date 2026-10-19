@@ -7,6 +7,8 @@ mod indicators;
 mod side_panel;
 mod sidebar;
 mod summary;
+mod thread_rename;
+pub use thread_rename::*;
 mod transcript;
 pub use composer::*;
 pub use indicators::*;

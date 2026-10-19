@@ -97,6 +97,7 @@ pub struct Sidebar {
     end: u64,
     revision: u64,
     bindings: BTreeMap<ComponentId, SidebarIntent>,
+    pending: BTreeSet<(SessionAddress, String)>,
 }
 impl Sidebar {
     pub fn new(namespace: u32, labels: SidebarLabels) -> Self {
@@ -137,10 +138,46 @@ impl Sidebar {
             end: base | u32::MAX as u64,
             revision: 0,
             bindings: BTreeMap::new(),
+            pending: BTreeSet::new(),
         }
     }
     pub fn id(&self) -> ComponentId {
         self.root
+    }
+    /// Local gesture admission only; it can restrict, never enable, a shared action.
+    pub fn set_pending(&mut self, address: &SessionAddress, action: &str, pending: bool) {
+        let key = (address.clone(), action.to_owned());
+        if pending {
+            self.pending.insert(key);
+        } else {
+            self.pending.remove(&key);
+        }
+        for (id, intent) in &self.bindings {
+            if let SidebarIntent::Action {
+                address: target,
+                definition,
+            } = intent
+                && target == address
+                && definition.id == action
+                && let Some(content) = self.body.children[1]
+                    .component_mut::<ListContent>()
+                    .unwrap()
+                    .rows
+                    .children
+                    .iter_mut()
+                    .find(|content| content.id() == *id)
+            {
+                content
+                    .component_mut::<ButtonContent>()
+                    .unwrap()
+                    .button
+                    .state
+                    .disabled = pending || !definition.enabled;
+            }
+        }
+    }
+    pub fn is_pending(&self, address: &SessionAddress, action: &str) -> bool {
+        self.pending.contains(&(address.clone(), action.into()))
     }
     pub fn into_host(self) -> Result<ContentHost, CompositionError> {
         let mut host = ContentHost::new(Content::new(self.root, self))?;
@@ -277,6 +314,7 @@ impl Sidebar {
         let actions = self.body.children[1]
             .component_mut::<ListContent>()
             .expect("shared action panel");
+        let pending = self.pending.clone();
         let old = std::mem::take(&mut actions.rows.children);
         let mut old: BTreeMap<_, _> = old
             .into_iter()
@@ -301,7 +339,8 @@ impl Sidebar {
                     }
                     _ => definition.label.clone(),
                 };
-                button.button.state.disabled = !definition.enabled;
+                button.button.state.disabled = !definition.enabled
+                    || pending.contains(&(row.address.clone(), definition.id.clone()));
                 if definition.enabled {
                     bindings.insert(
                         id,
@@ -327,6 +366,15 @@ impl Sidebar {
             .iter()
             .filter(|action| action.kind == ContentActionKind::Activate)
             .filter_map(|action| self.bindings.get(&action.target).cloned())
+            .filter(|intent| match intent {
+                SidebarIntent::Action {
+                    address,
+                    definition,
+                } => !self
+                    .pending
+                    .contains(&(address.clone(), definition.id.clone())),
+                _ => true,
+            })
             .collect()
     }
 }

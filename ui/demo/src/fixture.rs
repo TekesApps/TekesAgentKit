@@ -14,6 +14,7 @@ use tekes_agent_contract::*;
 use tekes_agent_presentation::{RunController, RunScope};
 use tekes_agent_session::SessionRuntime;
 use tokio::sync::broadcast;
+type MutationReceipts = BTreeMap<String, (String, Value, Value)>;
 #[derive(Clone)]
 pub struct Fixture {
     sessions: Arc<Mutex<BTreeMap<String, Line>>>,
@@ -23,6 +24,10 @@ pub struct Fixture {
     children: Arc<Mutex<BTreeMap<String, (String, String)>>>,
     parent_available: Arc<AtomicBool>,
     catalog_fails: Arc<AtomicBool>,
+    lifecycle: bool,
+    inventory_sender: broadcast::Sender<Value>,
+    workspace_sender: broadcast::Sender<Value>,
+    mutations: Arc<Mutex<MutationReceipts>>,
 }
 struct Line {
     rows: Vec<HistoryEntry>,
@@ -31,6 +36,8 @@ struct Line {
     busy: bool,
     turn: i64,
     ephemeral: bool,
+    title: String,
+    archived: bool,
 }
 fn entry(seq: i64, kind: &str, data: Value) -> HistoryEntry {
     serde_json::from_value(json!({"event":{"seq":seq,"time":seq+1,"type":kind,"data":data}}))
@@ -40,6 +47,30 @@ fn append(line: &mut Line, kind: &str, data: Value) {
     let row = entry(line.rows.len() as i64, kind, data);
     line.rows.push(row.clone());
     let _ = line.sender.send(json!({"type":"event","entry":row}));
+}
+fn summary(id: &str, line: &Line) -> Value {
+    json!({"sessionId":id,"title":line.title,"status":if line.archived {"archived"} else {"active"},"running":line.busy,"blank":line.rows.is_empty(),"updatedAt":line.rows.len()})
+}
+fn inventory_stream(
+    baseline: Value,
+    receiver: broadcast::Receiver<Value>,
+    generation: String,
+) -> FrameStream {
+    let updates = stream::unfold(receiver, move |mut receiver| {
+        let generation = generation.clone();
+        async move {
+            let result = receiver
+                .recv()
+                .await
+                .map(|mut value| {
+                    value["generation"] = json!(generation);
+                    value
+                })
+                .map_err(|_| Error::Disconnected);
+            Some((result, receiver))
+        }
+    });
+    Box::pin(stream::once(async { Ok(baseline) }).chain(updates))
 }
 impl Default for Fixture {
     fn default() -> Self {
@@ -53,6 +84,8 @@ impl Default for Fixture {
                 busy: false,
                 turn: 30,
                 ephemeral: false,
+                title: format!("会话 {id}"),
+                archived: false,
             };
             for n in 1..=30 {
                 append(&mut line, "turn/start", json!({"turn":n}));
@@ -82,10 +115,25 @@ impl Default for Fixture {
             children: Arc::new(Mutex::new(BTreeMap::new())),
             parent_available: Arc::new(AtomicBool::new(true)),
             catalog_fails: Arc::new(AtomicBool::new(false)),
+            lifecycle: false,
+            inventory_sender: broadcast::channel(256).0,
+            workspace_sender: broadcast::channel(256).0,
+            mutations: Arc::new(Mutex::new(BTreeMap::new())),
         }
     }
 }
 impl Fixture {
+    pub fn with_lifecycle(mut self) -> Self {
+        self.lifecycle = true;
+        self
+    }
+    fn record(&self, method: &str, payload: &Value, rpc: &str, value: Value) -> Value {
+        self.mutations
+            .lock()
+            .unwrap()
+            .insert(rpc.into(), (method.into(), payload.clone(), value.clone()));
+        value
+    }
     pub fn with_children(self) -> Self {
         let mut children = self.children.lock().unwrap();
         let mut sessions = self.sessions.lock().unwrap();
@@ -102,6 +150,8 @@ impl Fixture {
                 busy: false,
                 turn: 30,
                 ephemeral: false,
+                title: format!("会话 {id}"),
+                archived: false,
             };
             for turn in 1..=30 {
                 append(&mut line, "turn/start", json!({"turn":turn}));
@@ -173,13 +223,17 @@ struct Endpoint {
 impl EndpointConnector for Fixture {
     async fn connect(&self) -> Result<Arc<dyn SessionEndpoint>> {
         tokio::time::sleep(Duration::from_millis(100)).await;
-        Ok(Arc::new(Endpoint {
+        let mut endpoint = Endpoint {
             fixture: self.clone(),
             generation: format!("fixture-{}", self.connects.fetch_add(1, Ordering::SeqCst)),
             host: serde_json::from_value(
                 json!({"protocolVersion":4,"product":{"name":"Local SEP fixture","version":"1"},"capabilities":["session-journal","session-inventory-sync","session-control-sync","actionable-sync"],"cwd":"/fixture","home":"/fixture","attachedSessions":0,"canOpenPath":false}),
             )?,
-        }))
+        };
+        if self.lifecycle {
+            endpoint.host.capabilities.insert("workspace-sync".into());
+        }
+        Ok(Arc::new(endpoint))
     }
 }
 #[async_trait]
@@ -205,6 +259,16 @@ impl SessionEndpoint for Endpoint {
                 "subagents.history".into(),
             ]);
         }
+        if self.fixture.lifecycle {
+            caps.supports_archive_session = true;
+            caps.supports_unarchive_session = true;
+            caps.methods.extend([
+                "session.rename".into(),
+                "session.fork".into(),
+                "session.archive".into(),
+                "session.unarchive".into(),
+            ]);
+        }
         caps
     }
     async fn follow(&self, target: StreamTarget) -> Result<FrameStream> {
@@ -212,8 +276,25 @@ impl SessionEndpoint for Endpoint {
         let baseline = match target {
             StreamTarget::SessionInventory => {
                 let sessions = self.fixture.sessions.lock().unwrap();
-                let items: Vec<_> = sessions.iter().filter(|(_, line)| !line.ephemeral).map(|(id,line)| json!({"sessionId":id,"title":format!("会话 {id}"),"running":line.busy,"blank":line.rows.is_empty(),"updatedAt":line.rows.len()})).collect();
-                json!({"type":"baseline","generation":g,"snapshot":{"items":items}})
+                let receiver = self.fixture.inventory_sender.subscribe();
+                let items: Vec<_> = sessions
+                    .iter()
+                    .filter(|(_, line)| !line.ephemeral)
+                    .map(|(id, line)| summary(id, line))
+                    .collect();
+                let baseline = json!({"type":"baseline","generation":g,"snapshot":{"items":items}});
+                return Ok(inventory_stream(baseline, receiver, g.clone()));
+            }
+            StreamTarget::WorkspaceInventory if self.fixture.lifecycle => {
+                let sessions = self.fixture.sessions.lock().unwrap();
+                let receiver = self.fixture.workspace_sender.subscribe();
+                let ids: Vec<_> = sessions
+                    .iter()
+                    .filter(|(_, line)| line.archived)
+                    .map(|(id, _)| id)
+                    .collect();
+                let baseline = json!({"type":"baseline","generation":g,"snapshot":{"items":[],"archivedSessionIds":ids}});
+                return Ok(inventory_stream(baseline, receiver, g.clone()));
             }
             StreamTarget::SessionControl => {
                 json!({"type":"baseline","generation":g,"snapshot":{"queues":[],"jobs":[],"projections":[]}})
@@ -289,9 +370,15 @@ impl SessionEndpoint for Endpoint {
                 .filter(|(_, (owner, _))| owner == parent)
                 .map(|(id, (_, mode))| json!({"kind":"child","id":id,"mode":mode}))
                 .collect();
-            return Ok(
-                json!({"entries":entries,"parentAvailable":self.fixture.parent_available.load(Ordering::SeqCst)}),
-            );
+            let available = self.fixture.parent_available.load(Ordering::SeqCst)
+                && self
+                    .fixture
+                    .sessions
+                    .lock()
+                    .unwrap()
+                    .get(parent)
+                    .is_some_and(|line| !line.archived);
+            return Ok(json!({"entries":entries,"parentAvailable":available}));
         }
         if method == "subagents.history" {
             let request: BoundedChildHistoryRequest = serde_json::from_value(p)?;
@@ -365,10 +452,54 @@ impl SessionEndpoint for Endpoint {
         };
         let id = string(&p, "sessionId")?.to_owned();
         let mut sessions = self.fixture.sessions.lock().unwrap();
+        if self.fixture.lifecycle
+            && matches!(
+                method,
+                "session.rename" | "session.fork" | "session.archive" | "session.unarchive"
+            )
+            && let Some((old_method, old_payload, result)) =
+                self.fixture.mutations.lock().unwrap().get(rpc)
+        {
+            require(
+                old_method == method && old_payload == &p,
+                "fixture RPC identity payload changed",
+            )?;
+            return Ok(result.clone());
+        }
         let line = sessions
             .get_mut(&id)
             .ok_or_else(|| unsupported("fixture session"))?;
-        if method == "session.fork" && self.fixture.side_chats {
+        if method == "session.rename" && self.fixture.lifecycle {
+            let title = string(&p, "title")?.trim();
+            require(!title.is_empty(), "empty fixture title")?;
+            line.title = title.into();
+            if !line.ephemeral {
+                let _ = self
+                    .fixture
+                    .inventory_sender
+                    .send(json!({"type":"upsert","session":summary(&id,line)}));
+            }
+            return Ok(self.fixture.record(method, &p, rpc, json!({"title":title})));
+        }
+        if matches!(method, "session.archive" | "session.unarchive") && self.fixture.lifecycle {
+            require(!line.busy, "fixture archive requires settled run")?;
+            line.archived = method == "session.archive";
+            let _ = self
+                .fixture
+                .inventory_sender
+                .send(json!({"type":"upsert","session":summary(&id,line)}));
+            let ids: Vec<_> = sessions
+                .iter()
+                .filter(|(_, line)| line.archived)
+                .map(|(id, _)| id)
+                .collect();
+            let _ = self
+                .fixture
+                .workspace_sender
+                .send(json!({"type":"archived","sessionIds":ids}));
+            return Ok(self.fixture.record(method, &p, rpc, json!({"ok":true})));
+        }
+        if method == "session.fork" && (self.fixture.side_chats || self.fixture.lifecycle) {
             let ephemeral = p["ephemeral"].as_bool().unwrap_or(false);
             let end = if let Some(sequence) = p["atSeq"].as_u64() {
                 (sequence as usize + 1).min(line.rows.len())
@@ -382,6 +513,7 @@ impl SessionEndpoint for Endpoint {
             };
             let rows = line.rows[..end].to_vec();
             let turn = line.turn;
+            let title = line.title.clone();
             let next = self.fixture.forks.fetch_add(1, Ordering::SeqCst) + 1;
             let child = format!("{}-{next}", if ephemeral { "scratch" } else { "fork" });
             require(
@@ -397,9 +529,22 @@ impl SessionEndpoint for Endpoint {
                     busy: false,
                     turn,
                     ephemeral,
+                    title,
+                    archived: false,
                 },
             );
-            return Ok(json!({"sessionId":child}));
+            if !ephemeral {
+                let _ = self
+                    .fixture
+                    .inventory_sender
+                    .send(json!({"type":"upsert","session":summary(&child,&sessions[&child])}));
+            }
+            let result = json!({"sessionId":child});
+            return Ok(if self.fixture.lifecycle {
+                self.fixture.record(method, &p, rpc, result)
+            } else {
+                result
+            });
         }
         if method == "session.discard" && self.fixture.side_chats {
             require(line.ephemeral, "fixture only discards ephemeral sessions")?;

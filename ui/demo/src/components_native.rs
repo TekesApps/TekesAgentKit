@@ -5,7 +5,9 @@ use std::{
     sync::{Arc, mpsc},
     time::{Duration, Instant},
 };
-use tekes_agent_components_ui::{SidePanel, Sidebar, SidebarIntent};
+use tekes_agent_components_ui::{
+    RenameFailure, RenameSubmission, SidePanel, Sidebar, SidebarIntent,
+};
 use tekes_agent_contract::{Result, require};
 use tekes_agent_presentation::{
     ChildHistoryLayout, PreparedSubmission, RunScope, SubmissionPreparation,
@@ -16,7 +18,7 @@ use tekes_agent_ui_bindings::{
     SidebarActionOutcome, SidebarBinding,
 };
 use tekes_agent_ui_demo::component_demo::{
-    ComponentDemo, DemoCommand, NavigationRequest, PanelRequest, RECONNECT,
+    ComponentDemo, DemoCommand, NavigationRequest, PanelRequest, RECONNECT, SidebarActionToken,
 };
 use tekes_agent_web::SharedAgent;
 use tekes_ui_controls::composition::{AccessibilityAction, ComponentId, ContentEvent};
@@ -75,6 +77,13 @@ struct Host {
     test_bounded_source: Option<Arc<ChildPaneBinding>>,
     bounded_initial_items: usize,
     bounded_max_items: usize,
+    rename_rpc_prefix: String,
+    actions_selftest: bool,
+    rename_test_started: bool,
+    fork_test_started: bool,
+    archive_test_started: bool,
+    empty_selection_seen: bool,
+    fork_test_session: Option<String>,
 }
 enum HostResult {
     ChildOpened {
@@ -98,7 +107,14 @@ enum HostResult {
         result: std::result::Result<BoundSideChatRun, String>,
     },
     Operation(std::result::Result<(), String>),
-    Sidebar(std::result::Result<SidebarActionOutcome, String>),
+    Sidebar {
+        token: SidebarActionToken,
+        result: std::result::Result<SidebarActionOutcome, String>,
+    },
+    Renamed {
+        ticket: RenameSubmission,
+        result: std::result::Result<SidebarActionOutcome, RenameFailure>,
+    },
     Opened {
         request: NavigationRequest,
         binding: std::result::Result<Arc<RunBinding>, String>,
@@ -175,8 +191,35 @@ impl Host {
                 ),
                 _ => None,
             };
+            let sidebar_token = match &command {
+                DemoCommand::Sidebar(SidebarIntent::Action {
+                    address,
+                    definition,
+                }) => Some(
+                    self.view
+                        .begin_sidebar_action(address.clone(), definition.id.clone()),
+                ),
+                _ => None,
+            };
+            let rename_rpc_prefix = self.rename_rpc_prefix.clone();
             self.executor.spawn(async move {
                 let special = match command {
+                    DemoCommand::Rename(ticket) => {
+                        let rpc_id = format!(
+                            "{rename_rpc_prefix}:{}:{}",
+                            ticket.generation, ticket.attempt
+                        );
+                        let result = sidebar
+                            .perform(
+                                &ticket.address,
+                                &ticket.definition,
+                                Some(ticket.title.clone()),
+                                &rpc_id,
+                            )
+                            .await
+                            .map_err(|error| RenameFailure::from_error(&error));
+                        HostResult::Renamed { ticket, result }
+                    }
                     DemoCommand::OpenChild {
                         request,
                         direct_parent,
@@ -319,28 +362,21 @@ impl Host {
                         address,
                         definition,
                     }) => {
-                        // Mutation entry UIs beyond local pins are still explicit
-                        // host callbacks in this integration window.
-                        if !matches!(definition.id.as_str(), "pin" | "unpin" | "copySessionId") {
-                            HostResult::Operation(Err(
-                                "此验证宿主尚未接入该会话操作的交互；未执行请求".into(),
-                            ))
-                        } else {
-                            let rpc_id = format!(
-                                "demo:{}:{}:{}",
-                                std::process::id(),
-                                std::time::SystemTime::now()
-                                    .duration_since(std::time::UNIX_EPOCH)
-                                    .unwrap()
-                                    .as_nanos(),
-                                definition.id
-                            );
-                            HostResult::Sidebar(
-                                sidebar
-                                    .perform(&address, &definition, None, &rpc_id)
-                                    .await
-                                    .map_err(|error| error.to_string()),
-                            )
+                        let rpc_id = format!(
+                            "demo:{}:{}:{}",
+                            std::process::id(),
+                            std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap()
+                                .as_nanos(),
+                            definition.id
+                        );
+                        HostResult::Sidebar {
+                            token: sidebar_token.expect("captured sidebar gesture"),
+                            result: sidebar
+                                .perform(&address, &definition, None, &rpc_id)
+                                .await
+                                .map_err(|error| error.to_string()),
                         }
                     }
                     DemoCommand::Sidebar(SidebarIntent::Select { .. }) => {
@@ -368,6 +404,7 @@ impl Host {
                                 ))
                             }
                             DemoCommand::Sidebar(_)
+                            | DemoCommand::Rename(_)
                             | DemoCommand::OpenChild { .. }
                             | DemoCommand::ReadChild { .. }
                             | DemoCommand::OpenTask { .. }
@@ -396,6 +433,29 @@ impl Host {
     fn draw(&mut self, window: &Window) {
         while let Ok(result) = self.results.try_recv() {
             match result {
+                HostResult::Renamed { ticket, result } => {
+                    if let Err(error) = self.view.complete_rename(&ticket, result.map(|_| ())) {
+                        self.failure(error.to_string());
+                    }
+                }
+                HostResult::Sidebar { token, result } => {
+                    self.view.finish_sidebar_action(&token);
+                    match result {
+                        Err(error) => self.failure(error),
+                        Ok(SidebarActionOutcome::Copy { text, .. }) => {
+                            window.set_clipboard_text(&text);
+                        }
+                        Ok(SidebarActionOutcome::Mutation { outcome, .. }) => {
+                            match self.view.apply_sidebar_outcome(&token, &outcome) {
+                                Ok(Some(request)) => {
+                                    self.commands(Ok(vec![DemoCommand::OpenSession(request)]))
+                                }
+                                Ok(None) => {}
+                                Err(error) => self.failure(error.to_string()),
+                            }
+                        }
+                    }
+                }
                 HostResult::ChildOpened {
                     request,
                     title,
@@ -512,19 +572,10 @@ impl Host {
                     result: Err(error), ..
                 } => self.failure(error),
                 HostResult::Operation(Err(error))
-                | HostResult::Sidebar(Err(error))
                 | HostResult::Opened {
                     binding: Err(error),
                     ..
                 } => self.failure(error),
-                HostResult::Sidebar(Ok(SidebarActionOutcome::Copy { text, .. })) => {
-                    window.set_clipboard_text(&text);
-                }
-                HostResult::Sidebar(Ok(SidebarActionOutcome::Mutation { outcome, .. })) => {
-                    if let Some(warning) = outcome.warning {
-                        self.view.set_notice(warning);
-                    }
-                }
                 HostResult::Opened {
                     request,
                     binding: Ok(binding),
@@ -588,6 +639,46 @@ impl Host {
                 .expect("component frame");
         }
         window.set_animating(self.text.frame_requested);
+        if self.actions_selftest {
+            if !self.rename_test_started && self.view.rename_ids().is_some() {
+                self.rename_test_started = true;
+                rename_actions_script(&self.view);
+            }
+            if self.rename_test_started
+                && !self.fork_test_started
+                && self.view.rename_ids().is_none()
+                && self
+                    .sidebar
+                    .snapshot()
+                    .rows
+                    .iter()
+                    .any(|row| row.address.session_id == "a" && row.title == "原生重命名")
+            {
+                self.fork_test_started = true;
+                click_thread_action_script(&self.view, "fork");
+            }
+            if self.fork_test_started
+                && !self.archive_test_started
+                && self
+                    .view
+                    .current_binding()
+                    .is_some_and(|binding| binding.scope().session_id.starts_with("fork-"))
+            {
+                self.archive_test_started = true;
+                self.fork_test_session = self
+                    .view
+                    .current_binding()
+                    .map(|binding| binding.scope().session_id.clone());
+                click_thread_action_script(&self.view, "archive");
+            }
+            if self.archive_test_started
+                && !self.empty_selection_seen
+                && self.view.current_binding().is_none()
+            {
+                self.empty_selection_seen = true;
+                restore_selection_script(&self.view);
+            }
+        }
         if self.selftest && !self.side_chat_test_started && self.view.panel_composer_ids().is_some()
         {
             self.side_chat_test_started = true;
@@ -654,7 +745,7 @@ impl Host {
                     .current_run()
                     .is_some_and(|run| run.can_submit)
             })
-            && self.view.panel_composer_ids().is_some()
+            && self.view.panel_child_controls_ready()
         {
             self.child_test_started = true;
             child_script(&self.view);
@@ -710,6 +801,60 @@ impl Host {
         );
     }
     fn close(&mut self, window: &Window) {
+        if self.actions_selftest {
+            assert!(
+                self.failures.is_empty(),
+                "thread action failures: {:?}",
+                self.failures
+            );
+            assert!(
+                self.rename_test_started
+                    && self.fork_test_started
+                    && self.archive_test_started
+                    && self.empty_selection_seen
+            );
+            assert_eq!(self.view.current_binding().unwrap().scope().session_id, "b");
+            let state = self.runtime.snapshot();
+            let fork = self.fork_test_session.as_ref().unwrap();
+            assert!(state.archived_session_ids.contains(fork));
+            assert_eq!(
+                state
+                    .sessions
+                    .keys()
+                    .filter(|id| id.starts_with("fork-"))
+                    .count(),
+                1
+            );
+            assert!(
+                self.sidebar
+                    .snapshot()
+                    .rows
+                    .iter()
+                    .any(|row| row.address.session_id == "a" && row.title == "原生重命名")
+            );
+            assert!(
+                !self
+                    .sidebar
+                    .snapshot()
+                    .rows
+                    .iter()
+                    .any(|row| &row.address.session_id == fork)
+            );
+            assert_eq!(
+                self.view.bindings()[0].current_run().unwrap().draft.text,
+                "保留原会话草稿"
+            );
+            assert!(
+                !state.sessions["a"]
+                    .entries
+                    .values()
+                    .any(|entry| entry.event.kind == "user/message"
+                        && entry.event.data.to_string().contains("原生重命名"))
+            );
+            println!(
+                "NATIVE_AGENT_THREAD_ACTIONS_SELFTEST_OK rename-ime-barrier+shared-inventory+fork-navigation+archive-clear+restored-selection+draft-isolation; physical-ime=false; formal-run-view=false"
+            );
+        }
         if self.selftest {
             assert!(self.child_test_started && self.bounded_test_started);
             assert!(
@@ -958,6 +1103,13 @@ impl WindowHandler for Host {
                 if self.selftest {
                     native_script(&self.view);
                 }
+                if self.actions_selftest {
+                    click_thread_action_script(&self.view, "rename");
+                    tekes_ui_platform_macos::selftest::run_script(vec![(
+                        30000,
+                        tekes_ui_platform_macos::selftest::Action::Close,
+                    )]);
+                }
             }
             Event::Resized {
                 drawable_size,
@@ -1071,6 +1223,11 @@ impl WindowHandler for Host {
 pub fn run() {
     let args: Vec<_> = std::env::args().collect();
     let selftest = args.iter().any(|arg| arg == "--native-selftest");
+    let actions_selftest = args.iter().any(|arg| arg == "--thread-actions-selftest");
+    assert!(
+        !(selftest && actions_selftest),
+        "choose one native fixture selftest mode"
+    );
     let executor = tokio::runtime::Runtime::new().unwrap();
     let (connector, kind, scopes, fixture): (
         Arc<dyn tekes_agent_contract::EndpointConnector>,
@@ -1078,7 +1235,10 @@ pub fn run() {
         _,
         _,
     ) = if let Some(index) = args.iter().position(|arg| arg == "--endpoint-config") {
-        assert!(!selftest, "native selftest uses isolated fixture only");
+        assert!(
+            !selftest && !actions_selftest,
+            "native selftest uses isolated fixture only"
+        );
         let value = serde_json::from_slice(
             &std::fs::read(args.get(index + 1).expect("config path")).expect("explicit config"),
         )
@@ -1098,7 +1258,8 @@ pub fn run() {
                 tekes_agent_ui_demo::fixture::Fixture::default()
                     .with_demo_summary()
                     .with_side_chats()
-                    .with_children(),
+                    .with_children()
+                    .with_lifecycle(),
             ),
             "native",
             [
@@ -1171,6 +1332,15 @@ pub fn run() {
         ([a, b], sidebar)
     });
     let mut view = ComponentDemo::new(bindings).unwrap();
+    if actions_selftest {
+        let binding = view.binding();
+        binding
+            .edit_text(
+                &tekes_agent_presentation::ComposerDestination::run(binding.scope().clone()),
+                "保留原会话草稿".into(),
+            )
+            .unwrap();
+    }
     let side_chats = Arc::new(SideChatBinding::new(runtime.clone()));
     view.set_side_chat_binding(side_chats.clone());
     view.set_sidebar_source(sidebar.snapshot()).unwrap();
@@ -1200,6 +1370,20 @@ pub fn run() {
         test_bounded_source: None,
         bounded_initial_items: 0,
         bounded_max_items: 0,
+        rename_rpc_prefix: format!(
+            "demo-rename:{}:{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ),
+        actions_selftest,
+        rename_test_started: false,
+        fork_test_started: false,
+        archive_test_started: false,
+        empty_selection_seen: false,
+        fork_test_session: None,
         text: TextBackend {
             shaper: CoreTextShaper::new(fonts.clone()),
             rasterizer: CoreTextRasterizer::new(fonts),
@@ -1492,5 +1676,96 @@ fn bounded_script(view: &ComponentDemo) {
     }
     script.push((1500, click(close)));
     script.push((2200, Action::Close));
+    run_script(script);
+}
+fn click_thread_action_script(view: &ComponentDemo, action: &str) {
+    use tekes_ui_platform_macos::selftest::{Action, run_script};
+    let binding = view.current_binding().expect("selected action target");
+    let address = tekes_agent_contract::SessionAddress {
+        endpoint_id: binding.scope().endpoint_id.clone(),
+        session_id: binding.scope().session_id.clone(),
+    };
+    let id = view
+        .tree
+        .get(view.sidebar_id())
+        .unwrap()
+        .component::<Sidebar>()
+        .unwrap()
+        .action_id(&address, action)
+        .expect("supported fixture action");
+    let point = view.tree.get(id).unwrap().frame().center();
+    run_script(vec![(
+        100,
+        Action::Click {
+            x: point.x as f64,
+            y: point.y as f64,
+        },
+    )]);
+}
+fn rename_actions_script(view: &ComponentDemo) {
+    use tekes_ui_platform_macos::selftest::{Action, run_script};
+    let ids = view.rename_ids().unwrap();
+    let field = view
+        .tree
+        .get(ids.editor)
+        .unwrap()
+        .component::<tekes_ui_controls::composition::TextFieldContent>()
+        .unwrap();
+    let original = field.surface.input.text.encode_utf16().count();
+    let point = view.tree.get(ids.submit).unwrap().frame().center();
+    run_script(vec![
+        (
+            200,
+            Action::PreeditRange {
+                text: "重命名组字".into(),
+                selection: 5..5,
+                replacement: Some(0..original),
+            },
+        ),
+        (
+            400,
+            Action::Click {
+                x: point.x as f64,
+                y: point.y as f64,
+            },
+        ),
+        (
+            600,
+            Action::ExpectText {
+                text: "重命名组字".into(),
+                marked: true,
+            },
+        ),
+        (800, Action::Text("原生重命名".into())),
+        (
+            1000,
+            Action::Click {
+                x: point.x as f64,
+                y: point.y as f64,
+            },
+        ),
+    ]);
+}
+fn restore_selection_script(view: &ComponentDemo) {
+    use tekes_ui_platform_macos::selftest::{Action, run_script};
+    assert!(view.current_binding().is_none());
+    let point = view
+        .tree
+        .get(tekes_agent_ui_demo::component_demo::SELECT_B)
+        .unwrap()
+        .frame()
+        .center();
+    let mut script = vec![];
+    if let Ok(path) = std::env::var("AGENT_THREAD_ACTIONS_CAPTURE") {
+        script.push((100, Action::Capture { path }));
+    }
+    script.push((
+        500,
+        Action::Click {
+            x: point.x as f64,
+            y: point.y as f64,
+        },
+    ));
+    script.push((1200, Action::Close));
     run_script(script);
 }

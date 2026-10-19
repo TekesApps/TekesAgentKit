@@ -167,7 +167,7 @@ Summary OpenSubagent callbacks go through the host's registered layout. The host
 maps Native to bounded history and Pi/DSH to independent history at connector
 registration; components do not infer this from endpoint identity. Runtime/run
 subscriptions schedule updates via public window wake. `refresh_key` coalesces
-initial, reconnect and observed direct-parent execution-state reads; it grants no
+initial, reconnect, observed direct-parent execution-state and owner archive changes; it grants no
 control authority and does not replace a producer-specific change notification.
 Explicit refresh remains available. There is no per-frame query timer.
 
@@ -215,3 +215,23 @@ Newer selections, an in-progress composition or confirmed pointer disappearance
 retire late open results. Reappearing pointers get fresh row IDs, and retired
 callbacks cannot reactivate them. Each cached run retains its original controller,
 Composer and Summary pane; async opens do not replace that revision authority.
+
+`ThreadRename` is a separately mountable transient title editor built from the
+public TekesUI TextFieldContent and buttons. Call `open` with the captured address,
+enabled rename definition and canonical title. Drain `take_intents` after every
+input event, before applying updates or opening a new target. It blocks empty,
+composing and pending submissions; it never owns inventory titles. Dispatch a
+`RenameIntent::Submit` through `SidebarBinding::perform` with its captured title.
+Generate a host-unique RPC prefix and key it by ticket generation/attempt. An exact
+explicit retry after an uncertain result retains that ticket/RPC identity; known
+rejection or edited payload creates a new attempt. There is no automatic retry.
+Return `RenameFailure::from_error` or success through `complete`; stale completions
+cannot close another target. Dismissal does not cancel a remote mutation.
+
+Use `Sidebar::set_pending` to restrict repeated local actions while dispatch is
+pending; release it on completion. It cannot override disabled shared definitions.
+The demo captures a navigation revision before fork/archive dispatch. A returned
+fork pointer is opened through a fresh history lease even if its inventory update
+has not arrived. Late completion never steals a newer selection or composition.
+Archive clears only its still-current source selection, leaving an explicit empty
+state and preserving retained drafts. Neither action creates a blank fallback run.

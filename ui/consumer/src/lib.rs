@@ -17,6 +17,20 @@ pub fn child_tab(
 ) -> tekes_agent_components_ui::SidePanelTab {
     source.tab("Subagent")
 }
+#[test]
+fn independent_consumer_mounts_reusable_thread_rename_without_a_run_or_harness() {
+    let view = tekes_agent_components_ui::ThreadRename::new(84, Default::default());
+    let root = view.ids().root;
+    let host = view.into_host().unwrap();
+    assert!(
+        !host
+            .get(root)
+            .unwrap()
+            .component::<tekes_agent_components_ui::ThreadRename>()
+            .unwrap()
+            .is_open()
+    );
+}
 /// A second host composes the canonical scratch tab inventory without importing
 /// presentation internals or manufacturing pointers from session-list rows.
 pub fn sync_scratch_tabs(

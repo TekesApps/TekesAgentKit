@@ -20,6 +20,12 @@ pub struct ChildPaneBinding {
     alive: Arc<AtomicBool>,
     paging: bool,
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ChildRefreshKey {
+    pub connection_epoch: u64,
+    pub parent_running: bool,
+    pub owner_archived: bool,
+}
 impl ChildPaneBinding {
     pub async fn open(
         runtime: Arc<SessionRuntime>,
@@ -113,19 +119,29 @@ impl ChildPaneBinding {
     }
     /// Host read scheduling only; this does not grant continuation authority.
     /// Consumers observe runtime notifications and coalesce unchanged keys.
-    pub fn refresh_key(&self) -> Option<(u64, bool)> {
+    pub fn refresh_key(&self) -> Option<ChildRefreshKey> {
         if self.run.access() == crate::PaneAccess::Missing {
             return None;
         }
         self.run.runtime.inspect(|state| {
             (state.connection == tekes_agent_session::ConnectionState::Ready).then(|| {
-                (
-                    state.connection_epoch,
-                    state
+                ChildRefreshKey {
+                    connection_epoch: state.connection_epoch,
+                    parent_running: state
                         .sessions
                         .get(&self.parent.session_id)
                         .is_some_and(|parent| parent.run_open),
-                )
+                    owner_archived: [&self.parent.session_id, &self.parent.thread_id]
+                        .iter()
+                        .any(|id| {
+                            state.archived_session_ids.contains(id)
+                                || state
+                                    .sessions
+                                    .get(*id)
+                                    .and_then(|session| session.summary.as_ref())
+                                    .is_some_and(|summary| summary["status"] == "archived")
+                        }),
+                }
             })
         })
     }
