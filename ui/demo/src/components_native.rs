@@ -2228,6 +2228,16 @@ pub fn run() {
             "annotation proof requires context proof"
         );
         let mut preset_proof = serde_json::Value::Null;
+        let mut upload_proof = serde_json::Value::Null;
+        if args.iter().any(|arg| arg == "--upload-proof") {
+            upload_proof = host
+                .executor
+                .block_on(tekes_agent_ui_demo::upload_proof::run(
+                    &mut host.view,
+                    &host.runtime,
+                ))
+                .expect("public upload proof");
+        }
         if args.iter().any(|arg| arg == "--model-choice-proof") {
             let commands = host
                 .view
@@ -2713,6 +2723,7 @@ pub fn run() {
             "contextProof":context_proof,
             "annotationProof":annotation_proof,
             "initialPresetProof":preset_proof,
+            "uploadProof":upload_proof,
             })
         );
         host.executor.block_on(host.runtime.stop()).unwrap();

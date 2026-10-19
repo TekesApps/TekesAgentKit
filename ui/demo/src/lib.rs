@@ -4,3 +4,4 @@ pub mod fixture;
 pub mod attachment_files;
 pub mod component_demo;
 pub mod notifications;
+pub mod upload_proof;

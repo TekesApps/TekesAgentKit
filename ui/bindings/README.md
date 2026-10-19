@@ -469,8 +469,8 @@ host imports. Deterministic tests exercise real public SEP calls against the
 isolated fixture; they are not three-harness or native-system-picker acceptance.
 The first binding-only milestone left the demo affordance disabled. The host
 picker/status integration below supersedes that limitation; preview, durable
-reconciliation, inline images and actual Native/Pi/DSH attachment-to-send
-validation remain required.
+reconciliation, inline images and complete Native/Pi/DSH native-window
+validation remain required. Shared three-harness data-path acceptance is recorded below.
 
 ### Upload progress and host picker integration
 
@@ -512,6 +512,7 @@ For the isolated fixture run the native demo with `--components
 --file-attachments`; actual endpoint configs expose the entry only when their
 public methods support it. This enables a real system picker against a local
 synthetic SEP, not a paid provider. Full preview/reconciliation UI, SidePanel
-picker adapters, inline images and actual three-harness attachment-to-send
-acceptance remain unfinished. See
+picker adapters, inline images and three-harness native-window acceptance remain
+unfinished. The actual three-harness shared upload/Send/history/reconnect path is
+now covered by [public binding acceptance](../../docs/rust-agent-ui-upload-three-20261020.md); Native/Pi byte reads pass, while DSH generic file download is unsupported. See
 [host/picker evidence](../../docs/rust-agent-ui-upload-host-20261020.md).

@@ -15,6 +15,7 @@ parser.add_argument('--ui-model-choices',action='store_true',help='Exercise publ
 parser.add_argument('--ui-context',action='store_true',help='Exercise draft context cards, explicit removal and annotation/reference return in isolated component sessions')
 parser.add_argument('--ui-initial-presets',action='store_true',help='Exercise public initial preset selection through shared create and prompt in isolated component sessions')
 parser.add_argument('--ui-annotation-editor',action='store_true',help='Exercise public annotation editing and shared context compilation; implies the context proof')
+parser.add_argument('--ui-attachments',action='store_true',help='Exercise public upload entry, original draft, Send, history and capability-specific file reads')
 args=parser.parse_args()
 if args.ui_model_choices and not args.ui_components:
     parser.error('--ui-model-choices requires --ui-components')
@@ -22,6 +23,8 @@ if args.ui_context and not args.ui_components:
     parser.error('--ui-context requires --ui-components')
 if args.ui_annotation_editor and not args.ui_components:
     parser.error('--ui-annotation-editor requires --ui-components')
+if args.ui_attachments and not args.ui_components:
+    parser.error('--ui-attachments requires --ui-components')
 if args.ui_initial_presets and not args.ui_components:
     parser.error('--ui-initial-presets requires --ui-components')
 if args.ui_output and not args.ui_demo:
@@ -176,6 +179,7 @@ def ui_smoke(config, first):
     if args.ui_model_choices:mode+=['--model-choice-proof']
     if args.ui_context or args.ui_annotation_editor:mode+=['--context-proof']
     if args.ui_annotation_editor:mode+=['--annotation-proof']
+    if args.ui_attachments:mode+=['--upload-proof']
     if args.ui_initial_presets:mode+=['--initial-preset-proof','--initial-preset-cwd',str(cwd)]
     ui=subprocess.run([str(args.ui_demo.resolve()),*mode,'--endpoint-config',str(path),'--offscreen',str(output)],env=ui_env,text=True,capture_output=True,timeout=60)
     assert ui.returncode==0,ui.stderr[-3000:]
@@ -201,6 +205,14 @@ def ui_smoke(config, first):
             assert proof['catalogChoices']>=1 and proof['explicitSelection'] and proof['createdSession'] and proof['singleInput'] and proof['promptSettled'] and proof['originalDraftPreserved'],proof
             if kind!='pi': assert proof['presetIdentityReturned'],proof
             assert not proof['nativeInteraction'] and proof['componentCreationEntry'],proof
+        if args.ui_attachments:
+            proof=receipt['uploadProof']
+            assert all(proof[key] for key in ('publicEntry','hostBoundedFileRead','receiptValidated','originalDraft','otherDraftPreserved','oneShotUpload','componentSend','promptSettled','reconnectNoDuplicate')),proof
+            assert proof['durableInputCount']==1 and (proof['historyFileMetadata'] or proof['historyFileReference']),proof
+            assert proof['attachmentOnlySend'] and proof['attachmentOnlyVisible'] and proof['attachmentOnlyInputCount']==1 and proof['freshJournalAfterReconnect'],proof
+            assert not proof['nativeInteraction'] and not proof['inlineImage'],proof
+            if kind in ('native','pi'): assert proof['publicByteRead'] and proof['foreignSessionReadRejected'],proof
+            else: assert proof['readUnavailable'] and not proof['publicByteRead'],proof
         print(kind.upper()+'_UI_COMPONENTS_RECEIPT '+json.dumps(receipt,sort_keys=True))
         print(kind.upper()+'_UI_COMPONENTS_LIVE_OK explicit-SEP+shared-runtime+restored-data+Composer+Indicators+Sidebar+Summary+GPU; transcript-view=false; native-interaction=false')
     else:

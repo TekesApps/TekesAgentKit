@@ -38,7 +38,7 @@ Native 要求 Kernel 0.9 的 v4 wire；Pi/DSH 的标准化 HostDescription 保�
 | Session 工作区文件 | session.files.* | cwd 内 capability 限定只读文件 | workspaceFiles，二进制 multipart |
 | fork / discard | 原生普通/临时 fork、临时 discard | 原生克隆/精确 entry fork；临时分支及 discard | 普通 fork；临时 fork/discard 明确 Unsupported |
 | 工作区 | v4 未声明 workspace-sync | 宿主工作区与移动/重命名、会话关联 | 原生 workspace/follow，replace/reorder/archive/pin |
-| 附件 | 原生策略/上传/读取 | 限额校验、图片/文件上传、会话隔离及历史附件读取 | 原生策略、raw binary 上传和读取 |
+| 附件 | 原生策略、文件上传及会话内字节读取 | 限额校验、图片/文件上传、会话隔离及历史附件读取；普通文件在 prompt 中转为路径引用 | 原生策略和 raw binary 文件上传；历史保留文件元数据；公开 attachment 只读图片，无通用文件下载 |
 | 文件观察 | 认证 WS changes | 有界轮询 ready/change/absent | workspaceFiles/changes |
 | 扩展 | 服务端公开方法 | 模型/命令/skills/tools/settings 读取、Goal/反馈 CAS | ClientKit 对应公开服务路由及规范化参数 |
 | 子代理 | 原生 catalog；扩展只读子历史；bounded child 控制不可用 | create/list/prompt/read/cancel，官方扩展模型工具 | projection catalog + 父拥有的 prompt/cancel；child 地址历史与重连 |
@@ -109,3 +109,5 @@ Pi 1.3.0 和 Native Kernel 0.9.0 的原验收也重新通过。上述模型输�
 ## 2026-10-18 对照复查
 
 当前 ClientKit 的 SEP 参考文件哈希均与基准一致（HEAD `c289bc9`）。复查修复了 Pi 原生文件缺失/替换后的恢复保护、ClientKit `atSeq` 完整 entry 顺序及已完成 turn 校验、失效 pointer 的单会话隔离，以及 Native/Pi 在无文件观察者时的 close 状态持久化。详情及验证边界见 [复查记录](sep-review-2026-10-18.md)。
+
+附件组件的三端闭环收据见 [上传绑定验收](rust-agent-ui-upload-three-20261020.md)。Native/Pi 的通用文件字节回读及跨会话拒绝已验证；DSH 普通文件只验证上传、历史元数据与发送回传，不将图片接口或 workspace 文件 API 冒充任意上传附件下载。

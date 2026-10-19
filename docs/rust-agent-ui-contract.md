@@ -70,8 +70,8 @@ AgentKit 定义业务结构、展示语义、组件组合、组件输入及回�
 
 正式 Transcript 的验收至少覆盖：
 
-- 视觉对照使用同一组内容，分别检查现有 Tekes 与 Rust consumer 的宽/窄窗口、浅/深色主题：短输入、长中文、含列表/代码的单条输入、附件、流式输出、推理/工具展开及两类 footnote。核对内容层级、左右对齐、气泡宽度和留白；具体颜色、圆角与交互反馈遵循 TekesUI 语义 tokens，不为逐像素复刻覆盖基础样式。截图仅作视觉证据，阅读锚点和输入行为须另行交互验证。
-- 同一条用户消息在历史恢复、optimistic echo 和服务端确认后保持同一布局，短文本不被拉成整行，长中文自然换行，input footnote 保持在气泡之外并尾端对齐。
+- 视觉对照使用同一组内容，分别检查现有 Tekes 与 Rust consumer 的宽/窄窗口、浅/深色主题：短输入、长中文、含列表/代码的单条输入、附件及无正文的纯附件输入、流式输出、推理/工具展开及两类 footnote。核对内容层级、左右对齐、气泡宽度和留白；具体颜色、圆角与交互反馈遵循 TekesUI 语义 tokens，不为逐像素复刻覆盖基础样式。截图仅作视觉证据，阅读锚点和输入行为须另行交互验证。
+- 同一条用户消息在历史恢复、optimistic echo 和服务端确认后保持同一布局，短文本不被拉成整行，长中文自然换行，input footnote 保持在气泡之外并尾端对齐。纯附件输入保持可见，不能因正文为空而丢弃附件或对应 footnote。
 - 历史输出与流式输出使用同一阅读列；推理、工具调用及结果有独立层级，展开收起不重建整条消息；output footnote 不混入正文或推理内容。
 - 页首加载更早历史、流式追加、工具展开及宽度变化后，向上阅读的位置仍绑定原消息与局部阅读位置；只有处于跟随底部状态时追加才继续跟随。
 - 会话切换分别恢复各自阅读位置；重连与历史回补不重复显示已有消息，不抢焦点或清除选区。分页的 loading/error/retry 使用共享状态，重试由用户显式触发。
@@ -165,3 +165,5 @@ Task tab 以 task ID 为稳定身份，scope 是可更新的内容输入。TaskP
 本轮 SidePanel/Sidebar/Summary gate（2026-10-19）：UI workspace 56 tests（新增 Sidebar 4、SidePanel 5、Summary 3、独立 consumer 2），主 workspace 103 tests、Python 工具 18 tests；root/UI strict all-targets Clippy、fmt 与边界检查通过。新的 macOS UI consumer CI job 已声明，会构建 demo、运行组件/第二 consumer 测试，并校验 Cargo 实际解析的 8 个 UI package / 188 个文件。工作流尚未提交触发，不能称远程 CI 已绿。实际解析输入检查还拒绝错误 Git 来源、路径逃逸、变动/新增文件和 symlink。机器证据见 [本轮收据](rust-agent-ui-panels-20261019.json)。
 
 最新 [附件宿主接入记录](rust-agent-ui-upload-host-20261020.md) 补齐 Main 的真实 macOS 选择器、受限文件读取、公共 ComposerUploads、原来源 pending gates 与窗口 wake；保留 callback/request/destination 校验和终态缓冲。真实选择器经独立本地 SEP fixture 走完选择、A/B 草稿恢复、发送/流式结算与取消，附最终 binary/AX/screenshot 证据；这不提升真实三端附件、物理 IME 或正式 Transcript 的验收状态。
+
+最新 [附件三端验收](rust-agent-ui-upload-three-20261020.md) 通过原 Composer 入口和绑定分别验证正文＋附件、纯附件发送、单条持久化输入和重连无重复；Native/Pi 公开字节回读与会话隔离通过。Pi 历史保留路径引用，Native/DSH 保留文件元数据；DSH 通用文件下载不支持，不借用图片接口或读取私有文件。此为数据/离屏证据，真实系统选择器证据仍单列，正式 Transcript 与阅读/分页未完成。
