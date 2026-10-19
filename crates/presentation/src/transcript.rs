@@ -23,6 +23,8 @@ pub struct TranscriptTurn {
     pub usage: TokenUsage,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub live_usage: Option<tekes_agent_contract::TranscriptLiveUsage>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reported_usage: Option<tekes_agent_contract::TranscriptReportedUsage>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -125,6 +127,26 @@ fn usage(value: &Value) -> TokenUsage {
             .unwrap_or(0),
     }
 }
+fn output_count(value: &Value) -> Option<u64> {
+    value["outputTokens"]
+        .as_u64()
+        .or_else(|| value["output"].as_u64())
+}
+/// DSH exposes the same authoritative usage in completed assistant streams and messages.
+fn response_usage(data: &Value) -> &Value {
+    if data["usage"].is_object() {
+        return &data["usage"];
+    }
+    data["stream"]
+        .as_array()
+        .and_then(|records| {
+            records.iter().rev().find_map(|record| {
+                (record["type"] == "chunk" && record["chunk"]["type"] == "usage")
+                    .then_some(&record["chunk"]["usage"])
+            })
+        })
+        .unwrap_or(&Value::Null)
+}
 impl TranscriptSnapshot {
     /// Replay already validated authority. Rebuilds only this selected session; never advances a cursor.
     pub fn read(scope: &RunScope, session: &SessionProjection) -> Result<Self> {
@@ -162,6 +184,7 @@ fn turn<'a>(
             ended_at: None,
             usage: TokenUsage::default(),
             live_usage: None,
+            reported_usage: None,
         });
     }
     out.turns
@@ -278,6 +301,8 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
     let mut message_usage = BTreeMap::<(String, String), TokenUsage>::new();
     let mut total_usage = BTreeMap::new();
     let mut reported_output = BTreeMap::new();
+    let mut opened_turns = std::collections::BTreeSet::new();
+    let mut authoritative_output = BTreeMap::new();
     let mut opening_inputs = std::collections::BTreeSet::new();
     for entry in session.entries.values() {
         let event = &entry.event;
@@ -287,9 +312,27 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
         let step = data["step"].as_i64().unwrap_or(0);
         let seq = Some(event.seq);
         let time = Some(event.time);
+        // Account independently of surface visibility: model-only messages still consumed tokens.
+        if matches!(
+            event.kind.as_str(),
+            "assistant/message" | "assistant/attempt"
+        ) {
+            let key = (
+                turn_id.clone(),
+                data["message"]["id"]
+                    .as_str()
+                    .map(String::from)
+                    .unwrap_or_else(|| format!("{}:{}", event.kind, event.seq)),
+            );
+            let value = response_usage(data);
+            reported_output.insert(key.clone(), output_count(value).is_some());
+            message_usage.insert(key, usage(value));
+            turn(&mut out, &turn_id, time);
+        }
         match event.kind.as_str() {
             "turn/start" => {
                 current = number;
+                opened_turns.insert(turn_id.clone());
                 turn(&mut out, &turn_id, time);
             }
             "user/message" | "assistant/message" | "system/message" | "developer/message"
@@ -339,17 +382,6 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
                             .as_str()
                             .map(String::from)
                             .unwrap_or_else(|| format!("assistant-{}", event.seq)),
-                    );
-                    reported_output.insert(
-                        (turn_id.clone(), row.record_id.clone().unwrap()),
-                        data["usage"]["outputTokens"]
-                            .as_u64()
-                            .or_else(|| data["usage"]["output"].as_u64())
-                            .is_some(),
-                    );
-                    message_usage.insert(
-                        (turn_id.clone(), row.record_id.clone().unwrap()),
-                        usage(&data["usage"]),
                     );
                     if let Some(blocks) = data["message"]["content"].as_array() {
                         for block in blocks.iter().filter(|b| b["type"] == "tool-call") {
@@ -438,6 +470,9 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
                 .into();
             }
             "turn/end" => {
+                if let Some(count) = output_count(&data["usage"]) {
+                    authoritative_output.insert(turn_id.clone(), count);
+                }
                 let reason = data["reason"]
                     .as_str()
                     .or_else(|| data["reason"]["kind"].as_str())
@@ -507,6 +542,28 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
             .filter(|((turn, _), _)| turn == id)
             .all(|(_, reported)| *reported)
     };
+    for turn in &mut out.turns {
+        if let Some(count) = authoritative_output.get(&turn.id) {
+            turn.reported_usage = Some(tekes_agent_contract::TranscriptReportedUsage {
+                output_tokens: *count,
+                is_complete: true,
+            });
+        } else {
+            let known = message_usage.iter().filter(|((id, record), _)| {
+                id == &turn.id && reported_output.get(&(id.clone(), record.clone())) == Some(&true)
+            });
+            let mut reports = known.peekable();
+            if reports.peek().is_some() {
+                let count = reports.fold(0u64, |total, (_, usage)| {
+                    total.saturating_add(usage.output_tokens)
+                });
+                turn.reported_usage = Some(tekes_agent_contract::TranscriptReportedUsage {
+                    output_tokens: count,
+                    is_complete: opened_turns.contains(&turn.id) && output_known(&turn.id),
+                });
+            }
+        }
+    }
     if session.run_open && session.journal_ready {
         for turn in &mut out.turns {
             if turn.status == "running"

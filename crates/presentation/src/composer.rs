@@ -701,6 +701,7 @@ impl PresentationStore {
                     ended_at: None,
                     usage: TokenUsage::default(),
                     live_usage: None,
+                    reported_usage: None,
                 });
                 transcript.items.push(TranscriptItem {
                     id: format!("echo-item:{}", record.state.id),

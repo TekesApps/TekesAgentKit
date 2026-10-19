@@ -358,5 +358,35 @@ async fn web_view_forwards_provider_usage_transients_without_advancing_history()
             0
         );
     }
+    for (seq, kind, data) in [
+        (
+            1,
+            "assistant/message",
+            json!({"turn":1,"step":1,"message":{"id":"reply","content":[{"type":"text","text":"done"}]},"usage":{"outputTokens":27}}),
+        ),
+        (
+            2,
+            "turn/end",
+            json!({"turn":1,"reason":{"kind":"completed"}}),
+        ),
+    ] {
+        sender.send(json!({"type":"event","generation":"g","sessionId":"source","entry":{"event":{"seq":seq,"type":kind,"time":3,"data":data}}})).unwrap();
+        tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                let value = rx.recv().await.unwrap();
+                if value["transcript"]["turns"][0]["reportedUsage"]["outputTokens"] == 27
+                    && (kind != "turn/end" || value["run"]["phase"] == "idle")
+                {
+                    assert_eq!(
+                        value["transcript"]["turns"][0]["reportedUsage"]["isComplete"],
+                        true
+                    );
+                    break;
+                }
+            }
+        })
+        .await
+        .unwrap();
+    }
     follow.abort();
 }

@@ -31,6 +31,7 @@ Native 要求 Kernel 0.9 的 v4 wire；Pi/DSH 的标准化 HostDescription 保�
 | 前页 | 固定 throughSequence 的页 | 扩大原生 ancestry 窗口并刷新 | 固定 throughSeq 的页 |
 | 实时数据 | durable event + transient preview | native-event 有界队列 + 关键事件刷新原生 conversation | durable event + assistant-stream revision/index 校验 |
 | 实时 output tokens | 透传 provider 的 `assistant/chunk` usage 累计报告 | 当前 conversation 路径无实时 usage，保持缺省 | assistant-stream 原样透传 usage chunk；仅上游报告时可用 |
+| 每步结算与历史 output tokens | 真实消息 / 回合 usage 投影 | 未提供时保持缺省 | 公开 follow/page 的消息与完成 stream usage；统一 reportedUsage，支持恢复和分页覆盖标记 |
 | Actionables | 权威 sync/revision | 原生 confirm/select/input/editor 转换，回答绑定原进程 | waterfall clientId/eventId 关联及取消；inventory 流不抢答 |
 | Rename/archive | 原生调用 | 原生 rename；宿主 archive/unarchive 指针 | 原生 rename/fork/archive/unarchive；fork 清理继承的未消费 inbox |
 | 既有 session | 服务端 inventory | 显式 `session.adopt`，原生 RPC 验证文件；不全盘扫描 | 服务端 inventory |

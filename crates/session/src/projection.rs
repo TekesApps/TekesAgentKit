@@ -142,7 +142,7 @@ impl SessionProjection {
                 self.run_open = false;
                 self.previews.clear();
             }
-            "assistant/message" | "step/end" => {
+            "assistant/message" | "assistant/attempt" | "step/end" => {
                 self.previews.remove(&preview_key(event));
             }
             "assistant/chunk" => {

@@ -600,3 +600,183 @@ fn missing_durable_usage_does_not_become_a_real_zero_or_partial_turn_total() {
             .is_none()
     );
 }
+
+#[test]
+fn durable_response_reports_accumulate_replace_and_survive_settlement_and_restore() {
+    let mut s = session(vec![event(0, "turn/start", json!({"turn":1}))]);
+    let reported = |s: &SessionProjection| {
+        TranscriptSnapshot::read(&scope("a"), s).unwrap().turns[0]
+            .reported_usage
+            .clone()
+    };
+    assert_eq!(reported(&s), None);
+    s.apply_live(assistant(1, "first")).unwrap();
+    assert_eq!(
+        reported(&s).unwrap(),
+        TranscriptReportedUsage {
+            output_tokens: 3,
+            is_complete: true
+        }
+    );
+    // Corrected copies of the same durable response replace rather than add.
+    let mut corrected = assistant(2, "first");
+    corrected.event.data["usage"]["outputTokens"] = json!(5);
+    s.apply_live(corrected).unwrap();
+    assert_eq!(reported(&s).unwrap().output_tokens, 5);
+    // DSH keeps usage inside the compact stream when there is no top-level usage.
+    s.apply_live(event(3,"assistant/message",json!({"turn":1,"step":2,"message":{"id":"second","content":[]},"stream":[{"type":"chunk","time":1,"chunk":{"type":"usage","usage":{"outputTokens":7}}}]}))).unwrap();
+    assert_eq!(reported(&s).unwrap().output_tokens, 12);
+    s.apply_live(event(4,"assistant/attempt",json!({"turn":1,"step":3,"stream":[{"type":"chunk","time":1,"chunk":{"type":"usage","usage":{"outputTokens":2}}}]}))).unwrap();
+    assert_eq!(reported(&s).unwrap().output_tokens, 14);
+    s.apply_live(event(
+        5,
+        "turn/end",
+        json!({"turn":1,"reason":{"kind":"completed"}}),
+    ))
+    .unwrap();
+    assert_eq!(
+        reported(&s).unwrap(),
+        TranscriptReportedUsage {
+            output_tokens: 14,
+            is_complete: true
+        }
+    );
+    let mut restored: SessionProjection =
+        serde_json::from_value(serde_json::to_value(&s).unwrap()).unwrap();
+    assert_eq!(reported(&restored), reported(&s));
+    restored.journal_ready = false;
+    assert_eq!(reported(&restored), reported(&s)); // cached durable facts remain historical facts
+    restored.journal_ready = true;
+    restored
+        .apply_live(event(6, "turn/start", json!({"turn":2})))
+        .unwrap();
+    let snapshot = TranscriptSnapshot::read(&scope("a"), &restored).unwrap();
+    assert_eq!(
+        snapshot.turns[0]
+            .reported_usage
+            .as_ref()
+            .unwrap()
+            .output_tokens,
+        14
+    );
+    assert!(snapshot.turns[1].reported_usage.is_none());
+}
+
+#[test]
+fn durable_usage_missing_zero_partial_history_and_authoritative_totals_are_distinct() {
+    let mut missing = assistant(1, "missing");
+    missing.event.data.as_object_mut().unwrap().remove("usage");
+    let mut s = session(vec![event(0, "turn/start", json!({"turn":1})), missing]);
+    assert!(
+        TranscriptSnapshot::read(&scope("a"), &s).unwrap().turns[0]
+            .reported_usage
+            .is_none()
+    );
+    s.apply_live(event(
+        2,
+        "assistant/message",
+        json!({"turn":1,"step":2,"message":{"id":"zero","content":[]},"usage":{"outputTokens":0}}),
+    ))
+    .unwrap();
+    let reported = TranscriptSnapshot::read(&scope("a"), &s).unwrap().turns[0]
+        .reported_usage
+        .clone()
+        .unwrap();
+    assert_eq!(
+        reported,
+        TranscriptReportedUsage {
+            output_tokens: 0,
+            is_complete: false
+        }
+    );
+    s.apply_live(event(
+        3,
+        "turn/end",
+        json!({"turn":1,"reason":"completed","usage":{"outputTokens":19}}),
+    ))
+    .unwrap();
+    assert_eq!(
+        TranscriptSnapshot::read(&scope("a"), &s).unwrap().turns[0]
+            .reported_usage
+            .clone()
+            .unwrap(),
+        TranscriptReportedUsage {
+            output_tokens: 19,
+            is_complete: true
+        }
+    );
+    // A frozen history page may begin in the middle of a turn. Never label it a complete sum.
+    let mut limited = session(vec![
+        event(
+            2,
+            "assistant/message",
+            json!({"turn":1,"step":2,"message":{"id":"last","content":[]},"usage":{"outputTokens":7}}),
+        ),
+        event(3, "turn/end", json!({"turn":1,"reason":"completed"})),
+    ]);
+    assert!(
+        !TranscriptSnapshot::read(&scope("a"), &limited)
+            .unwrap()
+            .turns[0]
+            .reported_usage
+            .as_ref()
+            .unwrap()
+            .is_complete
+    );
+    limited
+        .apply_page(
+            HistoryPage {
+                session_id: "a".into(),
+                through_sequence: 3,
+                entries: vec![
+                    event(0, "turn/start", json!({"turn":1})),
+                    assistant(1, "first"),
+                ],
+                has_more_before: false,
+            },
+            &HistoryRequest {
+                session_id: "a".into(),
+                through_sequence: 3,
+                before_sequence: Some(2),
+                max_messages: 50,
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        TranscriptSnapshot::read(&scope("a"), &limited)
+            .unwrap()
+            .turns[0]
+            .reported_usage
+            .clone()
+            .unwrap(),
+        TranscriptReportedUsage {
+            output_tokens: 10,
+            is_complete: true
+        }
+    );
+}
+
+#[test]
+fn a_settled_attempt_is_counted_without_blocking_the_next_attempt_in_the_same_step() {
+    let mut s = session(vec![event(0, "turn/start", json!({"turn":1}))]);
+    s.apply_live(event(1,"assistant/attempt",json!({"turn":1,"step":1,"stream":[{"type":"chunk","time":1,"chunk":{"type":"usage","usage":{"outputTokens":2}}}]}))).unwrap();
+    s.apply_live(event(
+        2,
+        "assistant/chunk",
+        json!({"turn":1,"step":1,"chunk":{"type":"usage","usage":{"outputTokens":3}}}),
+    ))
+    .unwrap();
+    let snapshot = TranscriptSnapshot::read(&scope("a"), &s).unwrap();
+    assert_eq!(
+        snapshot.turns[0]
+            .reported_usage
+            .as_ref()
+            .unwrap()
+            .output_tokens,
+        2
+    );
+    assert_eq!(
+        snapshot.turns[0].live_usage.as_ref().unwrap().output_tokens,
+        5
+    );
+}
