@@ -117,6 +117,22 @@ impl SubmissionPreparation for ScopedPreparation<'_> {
     }
 }
 impl RunBinding {
+    pub fn supports_creation(&self) -> bool {
+        self.access() == PaneAccess::Ready
+            && self.runtime.inspect(|s| {
+                s.connection == tekes_agent_session::ConnectionState::Ready
+                    && s.endpoint_capabilities.supports("session.create")
+            })
+    }
+    /// Explicit host creation on this endpoint. Navigation remains host-owned;
+    /// the captured action carries stable session/RPC identities.
+    pub async fn create_initial_session(
+        &self,
+        creation: &InitialSessionCreation,
+    ) -> Result<tekes_agent_contract::SessionCreated> {
+        require(self.supports_creation(), "session creation unavailable")?;
+        creation.execute(&self.runtime).await
+    }
     fn require_destination(&self, destination: &ComposerDestination) -> Result<()> {
         require(
             destination == &ComposerDestination::run(self.scope.clone()),

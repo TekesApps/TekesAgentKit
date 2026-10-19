@@ -1,4 +1,16 @@
 //! Second consumer: depends only on AgentKit's public UI packages.
+/// A second host can create through its original endpoint binding without
+/// importing runtime internals or a demo host. It decides whether to navigate.
+pub async fn create_initial_session(
+    binding: &tekes_agent_ui_bindings::RunBinding,
+    creation: &tekes_agent_ui_bindings::InitialSessionCreation,
+) -> Result<String, String> {
+    binding
+        .create_initial_session(creation)
+        .await
+        .map(|created| created.session_id)
+        .map_err(|error| error.to_string())
+}
 /// Initial preset content is mounted before creation. Hosts retain navigation,
 /// the source/request lifetime and explicit controller create inputs.
 pub fn initial_preset_panel(

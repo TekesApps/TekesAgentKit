@@ -387,5 +387,14 @@ SubmissionPreparation may still configure the created model before one prompt.
 The second public consumer exposes initial_preset_panel without RunSurface. The
 demo's `--initial-preset-proof --initial-preset-cwd ABSOLUTE_PATH --offscreen PNG`
 script exercises public selection and shared creation with synthetic providers.
-This is not the interactive NewThread creation entry or native preset acceptance;
-those still need to be wired in the component demo. Physical IME remains unverified.
+ComponentDemo now also wires the interactive New Session entry. Configure an explicit
+CreateSessionRequest and host-unique RPC prefix. The current Composer keeps its original
+destination until creation is confirmed; then the host mounts a normal RunBinding.
+InitialSessionCreation captures stable session/RPC IDs, supports explicit automatic
+creation without a preset, revalidates a selected preset, and verifies the receipt.
+RunBinding.create_initial_session offers the same public path to a second consumer.
+A lost/failed result retains the captured action and pending barrier; no replacement
+creation or automatic retry is generated. The host still owns reconciliation UI.
+Native --creation-selftest validates this entry with synthetic text services; physical
+IME remains unverified. The real-SEP script now uses the same ComponentDemo entry
+and normal Composer Send, rather than a separate scripted picker.

@@ -1,0 +1,70 @@
+{
+  "date": "2026-10-20",
+  "candidate": "61ddf7c68fccd819e20a01ba3104a8a0f8d7e64f",
+  "publicBase": "431093786de47b48cd566d0d9c0eafa088b10d68",
+  "changedFiles": [
+    ".github/workflows/ci.yml",
+    "crates/tekes-ui-controls/src/composition.rs",
+    "crates/tekes-ui-controls/src/composition/adapters.rs",
+    "crates/tekes-ui-controls/src/lib.rs",
+    "crates/tekes-ui-controls/src/text_surface.rs",
+    "crates/tekes-ui-controls/tests/plain_text_content.rs",
+    "design/gallery/public-api-surface.json",
+    "docs/agentkit/issue23-candidate.md",
+    "docs/agentkit/public-source-issue23.json",
+    "examples/composition-consumer/examples/native.rs",
+    "examples/composition-consumer/src/lib.rs",
+    "examples/composition-consumer/src/plain_text.rs",
+    "examples/composition-consumer/tests/plain_text.rs",
+    "scripts/verify-agentkit-public-pin.py"
+  ],
+  "reviewedInput": {
+    "packages": 8,
+    "files": 198,
+    "sha256": "31c66c8d033f75acb2c3745fd20a5b53e9bfc320e290a1959179f355b934324c",
+    "actualCargoSourcesVerified": true
+  },
+  "tests": {
+    "publicAPI": 3,
+    "core": 233,
+    "upstreamConsumer": 134,
+    "isolatedAgentUI": 110
+  },
+  "probe": {
+    "path": "scripts/probes/tekesui-issue23-public.rs",
+    "sha256": "b781c42da430e85491d67799bd56863a622a3afc4f6c7dce53352ac9e8d8006f",
+    "scope": "shared fixture history and actual transient stream into read_only_content; selected UTF16 range retained across controlled append; not a formal Transcript"
+  },
+  "isolatedSource": {
+    "directory": "/tmp/agentkit-issue23-consumer-61ddf7c",
+    "sourceManifestSha256": "381f8191bcd6017a80f577016039319a8aa3c3863e4ebc37c840eaf8c4ba47fb",
+    "baseline": "b1cf98e plus creation WIP snapshot before final wrapper/proof rewrite",
+    "override": "only temporary UI Git rev; product Cargo inputs unchanged"
+  },
+  "failedGate": {
+    "test": "component_registry_api::every_classified_public_type_is_accessible_to_a_library_consumer",
+    "localExitCode": 101,
+    "mismatchedTypes": [
+      "tekes_ui_controls::TextSurfacePresentation"
+    ],
+    "message": "public type surface changed; regenerate bindings",
+    "remoteCI": "https://github.com/TekesApps/TekesUI/actions/runs/39288833653",
+    "remoteConclusion": "failure"
+  },
+  "logSha256": {
+    "/tmp/agentkit-public-61dd-api.log": "c3762bdf2850348dd1999cbe70f5d38d3aea8a68dfb73fd6f515ed80cf159eb0",
+    "/tmp/agentkit-public-61dd-core.log": "cb267bcc96a1dde40bc01b408ac72396289e74d41fbf9d0ee312afdf0feb6325",
+    "/tmp/agentkit-public-61dd-consumer.log": "efeb465f3902a4e5f9c7a6a362976edf43292fe3b72a1c49783337012776f877",
+    "/tmp/agentkit-public-agent-61dd-ui.log": "d3bf9bea6132098eecee4ad8e5a121171ef04bcc3020d31ca6ade78a0b28210a",
+    "/tmp/agentkit-public-61dd-registry.log": "35c6ed352ba71f734eb21baf7d3ff69daa945652f9ccd6dc27011c4faae1866d",
+    "/tmp/agentkit-public-61dd-ci.json": "c4fca89cec385394a26f31403056bfb11385e78c2b69d61d099b481087800067"
+  },
+  "consumerNative": false,
+  "consumerGPU": false,
+  "physicalIME": false,
+  "voiceOver": false,
+  "performance": false,
+  "issue22": "still independently open",
+  "recommendation": "do not promote this SHA; repair published public-type binding gate and review successor delta",
+  "productPinChanged": false
+}

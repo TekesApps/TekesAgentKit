@@ -5,7 +5,7 @@ use tekes_agent_components_ui::{
     ComposerCatalogPhase, ComposerChoice, ComposerChoiceCatalog, ComposerChoiceKind,
     ComposerChoiceSelection,
 };
-use tekes_agent_contract::{CreateSessionRequest, Result, array, require, string};
+use tekes_agent_contract::{CreateSessionRequest, Result, SessionCreated, array, require, string};
 use tekes_agent_presentation::ComposerDestination;
 use tekes_agent_session::SessionRuntime;
 
@@ -18,6 +18,94 @@ pub struct InitialPresetChoices {
     pub raw: Value,
     source_endpoint: Option<String>,
 }
+/// Immutable creation intent. Keep this exact value for explicit reconciliation
+/// after an uncertain result; execution never generates another session/RPC ID.
+#[derive(Clone, Debug)]
+pub struct InitialSessionCreation {
+    endpoint_id: String,
+    selection: Option<ComposerChoiceSelection>,
+    input: CreateSessionRequest,
+    rpc_id: String,
+}
+impl InitialSessionCreation {
+    fn capture(
+        endpoint_id: String,
+        selection: Option<ComposerChoiceSelection>,
+        mut input: CreateSessionRequest,
+        rpc_id: String,
+    ) -> Result<Self> {
+        require(
+            !endpoint_id.is_empty() && !rpc_id.is_empty(),
+            "empty creation identity",
+        )?;
+        if let Some(cwd) = &input.cwd {
+            require(
+                cwd.starts_with('/') && !cwd.contains('\0'),
+                "creation cwd must be absolute",
+            )?;
+        }
+        if input.session_id.is_none() {
+            input.session_id = Some(uuid::Uuid::new_v4().to_string());
+        }
+        require(
+            input.session_id.as_ref().is_some_and(|id| !id.is_empty()),
+            "empty creation session",
+        )?;
+        Ok(Self {
+            endpoint_id,
+            selection,
+            input,
+            rpc_id,
+        })
+    }
+    pub fn automatic(
+        endpoint_id: impl Into<String>,
+        input: CreateSessionRequest,
+        rpc_id: impl Into<String>,
+    ) -> Result<Self> {
+        require(
+            input.agent_preset.is_none(),
+            "automatic creation cannot carry a preset",
+        )?;
+        Self::capture(endpoint_id.into(), None, input, rpc_id.into())
+    }
+    pub fn session_id(&self) -> &str {
+        self.input
+            .session_id
+            .as_deref()
+            .expect("captured session identity")
+    }
+    pub fn endpoint_id(&self) -> &str {
+        &self.endpoint_id
+    }
+    pub fn rpc_id(&self) -> &str {
+        &self.rpc_id
+    }
+    pub async fn execute(&self, runtime: &SessionRuntime) -> Result<SessionCreated> {
+        require(
+            runtime.inspect(|s| s.endpoint_id == self.endpoint_id),
+            "creation endpoint mismatch",
+        )?;
+        let input = match &self.selection {
+            Some(selection) => {
+                InitialPresetChoices::revalidate_create(
+                    runtime,
+                    selection,
+                    self.input.clone(),
+                    &format!("{}:catalog", self.rpc_id),
+                )
+                .await?
+            }
+            None => self.input.clone(),
+        };
+        let result = runtime.create(input, &self.rpc_id).await?;
+        require(
+            result.session_id == self.session_id(),
+            "creation receipt session mismatch",
+        )?;
+        Ok(result)
+    }
+}
 fn optional_text<'a>(value: &'a Value, key: &str) -> Result<Option<&'a str>> {
     match value.get(key) {
         None | Some(Value::Null) => Ok(None),
@@ -28,6 +116,20 @@ fn optional_text<'a>(value: &'a Value, key: &str) -> Result<Option<&'a str>> {
     }
 }
 impl InitialPresetChoices {
+    pub fn capture_creation(
+        &self,
+        selection: &ComposerChoiceSelection,
+        input: CreateSessionRequest,
+        rpc_id: impl Into<String>,
+    ) -> Result<InitialSessionCreation> {
+        let input = self.create_request(selection, input)?;
+        InitialSessionCreation::capture(
+            selection.request.destination.endpoint_id().into(),
+            Some(selection.clone()),
+            input,
+            rpc_id.into(),
+        )
+    }
     /// Accepts session.initialPresets and DSH presets.list roster vocabulary.
     pub fn read(raw: Value, revision: u64, can_create: bool) -> Result<Self> {
         require(revision > 0, "zero preset catalog revision")?;

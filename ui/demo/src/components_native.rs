@@ -12,11 +12,13 @@ use tekes_agent_contract::Result;
 use tekes_agent_presentation::{ChildHistoryLayout, RunScope};
 use tekes_agent_session::SessionRuntime;
 use tekes_agent_ui_bindings::{
-    BoundSideChatRun, ChildPaneBinding, ModelChoices, ModelSelectionPreparation, PaneAccess,
-    PaneSnapshot, RunBinding, SideChatBinding, SidebarActionOutcome, SidebarBinding,
+    BoundSideChatRun, ChildPaneBinding, InitialPresetChoices, ModelChoices,
+    ModelSelectionPreparation, PaneAccess, PaneSnapshot, RunBinding, SideChatBinding,
+    SidebarActionOutcome, SidebarBinding,
 };
 use tekes_agent_ui_demo::component_demo::{
-    ComponentDemo, DemoCommand, NavigationRequest, PanelRequest, RECONNECT, SidebarActionToken,
+    ComponentDemo, CreateSessionCommand, DemoCommand, NavigationRequest, PanelRequest, RECONNECT,
+    SidebarActionToken,
 };
 use tekes_agent_web::SharedAgent;
 use tekes_ui_controls::composition::{AccessibilityAction, ComponentId, ContentEvent};
@@ -71,8 +73,19 @@ struct Host {
     model_test_stage: u8,
     context_selftest: bool,
     context_stage: u8,
+    creation_selftest: bool,
+    creation_stage: u8,
+    creation_scope: Option<RunScope>,
 }
 enum HostResult {
+    InitialPresets {
+        request: tekes_agent_components_ui::ComposerChoiceRequest,
+        result: std::result::Result<InitialPresetChoices, String>,
+    },
+    Created {
+        request: CreateSessionCommand,
+        result: std::result::Result<Arc<RunBinding>, String>,
+    },
     ModelCatalog {
         request: tekes_agent_components_ui::ComposerChoiceRequest,
         result: std::result::Result<ModelChoices, String>,
@@ -195,6 +208,31 @@ impl Host {
             let rename_rpc_prefix = self.rename_rpc_prefix.clone();
             self.executor.spawn(async move {
                 let special = match command {
+                    DemoCommand::ReadInitialPresets { request } => {
+                        let rpc =
+                            format!("{rename_rpc_prefix}:initial-presets:{}", request.generation);
+                        let result = InitialPresetChoices::load(&runtime, 1, &rpc)
+                            .await
+                            .map_err(|e| e.to_string());
+                        HostResult::InitialPresets { request, result }
+                    }
+                    DemoCommand::CreateSession(request) => {
+                        let result = async {
+                            let created = request.creation().execute(&runtime).await?;
+                            RunBinding::open_main(
+                                runtime.clone(),
+                                RunScope::main(
+                                    request.creation().endpoint_id(),
+                                    created.session_id,
+                                ),
+                            )
+                            .await
+                            .map(Arc::new)
+                        }
+                        .await
+                        .map_err(|e: tekes_agent_contract::Error| e.to_string());
+                        HostResult::Created { request, result }
+                    }
                     DemoCommand::ReadModels { binding, request } => {
                         let rpc = format!("{rename_rpc_prefix}:models:{}", request.generation);
                         let result = binding
@@ -410,6 +448,8 @@ impl Host {
                                 ))
                             }
                             DemoCommand::Sidebar(_)
+                            | DemoCommand::ReadInitialPresets { .. }
+                            | DemoCommand::CreateSession(_)
                             | DemoCommand::ReadModels { .. }
                             | DemoCommand::Rename(_)
                             | DemoCommand::OpenChild { .. }
@@ -440,6 +480,23 @@ impl Host {
     fn draw(&mut self, window: &Window) {
         while let Ok(result) = self.results.try_recv() {
             match result {
+                HostResult::InitialPresets { request, result } => {
+                    if let Err(error) = self.view.complete_initial_presets(&request, result) {
+                        self.failure(error.to_string());
+                    }
+                }
+                HostResult::Created { request, result } => {
+                    let binding = result.as_ref().ok().cloned();
+                    match self.view.complete_creation(&request, result) {
+                        Ok(true) => {
+                            if let Some(binding) = binding {
+                                self.observe(&binding, window);
+                            }
+                        }
+                        Ok(false) => {}
+                        Err(error) => self.failure(error.to_string()),
+                    }
+                }
                 HostResult::ModelCatalog { request, result } => {
                     if let Err(error) = self.view.complete_model_catalog(&request, result) {
                         self.failure(error.to_string());
@@ -651,6 +708,92 @@ impl Host {
                 .expect("component frame");
         }
         window.set_animating(self.text.frame_requested);
+        if self.creation_selftest {
+            use tekes_ui_platform_macos::selftest::{Action, run_script};
+            if self.creation_stage == 0 && self.view.initial_preset_choice_id("coding").is_some() {
+                self.creation_stage = 1;
+                let p = self
+                    .view
+                    .tree
+                    .get(self.view.initial_preset_choice_id("coding").unwrap())
+                    .unwrap()
+                    .frame()
+                    .center();
+                let mut script = vec![];
+                if let Ok(path) = std::env::var("AGENT_CREATION_CAPTURE") {
+                    script.push((100, Action::Capture { path }));
+                }
+                script.push((
+                    300,
+                    Action::Click {
+                        x: p.x as f64,
+                        y: p.y as f64,
+                    },
+                ));
+                run_script(script);
+            } else if self.creation_stage == 1
+                && self.view.bindings().len() == 3
+                && self.view.selected() == 2
+            {
+                self.creation_stage = 2;
+                self.creation_scope = Some(self.view.binding().scope().clone());
+                let ids = self.view.ids();
+                let click = |id| {
+                    let p = self.view.tree.get(id).unwrap().frame().center();
+                    Action::Click {
+                        x: p.x as f64,
+                        y: p.y as f64,
+                    }
+                };
+                run_script(vec![
+                    (100, click(ids.editor)),
+                    (200, Action::TextCommand("selectAll:")),
+                    (300, Action::Text(String::new())),
+                    (
+                        400,
+                        Action::ExpectText {
+                            text: String::new(),
+                            marked: false,
+                        },
+                    ),
+                    (
+                        600,
+                        Action::PreeditRange {
+                            text: "新会话组字".into(),
+                            selection: 5..5,
+                            replacement: None,
+                        },
+                    ),
+                    (800, click(ids.send)),
+                    (
+                        1000,
+                        Action::ExpectText {
+                            text: "新会话组字".into(),
+                            marked: true,
+                        },
+                    ),
+                    (1200, Action::Text("新会话中文消息".into())),
+                    (1500, click(ids.send)),
+                    (1700, click(tekes_agent_ui_demo::component_demo::SELECT_A)),
+                ]);
+            } else if self.creation_stage == 2
+                && self.view.selected() == 0
+                && self.creation_scope.as_ref().is_some_and(|scope| {
+                    self.runtime.inspect(|s| {
+                        s.sessions.get(&scope.session_id).is_some_and(|s| {
+                            !s.run_open
+                                && s.entries.values().any(|e| {
+                                    e.event.kind == "user/message"
+                                        && e.event.data.to_string().contains("新会话中文消息")
+                                })
+                        })
+                    })
+                })
+            {
+                self.creation_stage = 3;
+                run_script(vec![(200, Action::Close)]);
+            }
+        }
         if self.context_selftest {
             if self.context_stage == 1
                 && self.view.bindings()[0]
@@ -942,6 +1085,39 @@ impl Host {
         );
     }
     fn close(&mut self, window: &Window) {
+        if self.creation_selftest {
+            assert!(
+                self.failures.is_empty(),
+                "creation errors: {:?}",
+                self.failures
+            );
+            assert_eq!(self.creation_stage, 3);
+            assert_eq!(
+                self.view.bindings()[0].current_run().unwrap().draft.text,
+                "A 原草稿"
+            );
+            let scope = self.creation_scope.as_ref().unwrap();
+            let state = self.runtime.snapshot();
+            let session = &state.sessions[&scope.session_id];
+            assert_eq!(
+                session
+                    .entries
+                    .values()
+                    .filter(|e| e.event.kind == "user/message"
+                        && e.event.data.to_string().contains("新会话中文消息"))
+                    .count(),
+                1
+            );
+            assert!(
+                session
+                    .entries
+                    .values()
+                    .any(|e| e.event.kind == "assistant/message")
+            );
+            println!(
+                "NATIVE_AGENT_CREATION_SELFTEST_OK public-preset-panel+captured-session-rpc+shared-create+normal-composer+synthetic-ime-barrier+single-admission+stream+original-draft; physical-ime=false; formal-transcript=false"
+            );
+        }
         if self.context_selftest {
             assert!(
                 self.failures.is_empty(),
@@ -1337,6 +1513,25 @@ impl WindowHandler for Host {
                         (15000, tekes_ui_platform_macos::selftest::Action::Close),
                     ]);
                 }
+                if self.creation_selftest {
+                    let p = self
+                        .view
+                        .tree
+                        .get(tekes_agent_ui_demo::component_demo::NEW_SESSION)
+                        .unwrap()
+                        .frame()
+                        .center();
+                    tekes_ui_platform_macos::selftest::run_script(vec![
+                        (
+                            100,
+                            tekes_ui_platform_macos::selftest::Action::Click {
+                                x: p.x as f64,
+                                y: p.y as f64,
+                            },
+                        ),
+                        (20000, tekes_ui_platform_macos::selftest::Action::Close),
+                    ]);
+                }
                 if self.context_selftest {
                     self.context_stage = 1;
                     context_script(&self.view);
@@ -1457,12 +1652,14 @@ pub fn run() {
     let actions_selftest = args.iter().any(|arg| arg == "--thread-actions-selftest");
     let models_selftest = args.iter().any(|arg| arg == "--model-choices-selftest");
     let context_selftest = args.iter().any(|arg| arg == "--context-selftest");
+    let creation_selftest = args.iter().any(|arg| arg == "--creation-selftest");
     assert!(
         [
             selftest,
             actions_selftest,
             models_selftest,
-            context_selftest
+            context_selftest,
+            creation_selftest
         ]
         .into_iter()
         .filter(|v| *v)
@@ -1478,7 +1675,11 @@ pub fn run() {
         _,
     ) = if let Some(index) = args.iter().position(|arg| arg == "--endpoint-config") {
         assert!(
-            !selftest && !actions_selftest && !models_selftest && !context_selftest,
+            !selftest
+                && !actions_selftest
+                && !models_selftest
+                && !context_selftest
+                && !creation_selftest,
             "native selftest uses isolated fixture only"
         );
         let value = serde_json::from_slice(
@@ -1502,6 +1703,7 @@ pub fn run() {
                     .with_side_chats()
                     .with_children()
                     .with_lifecycle()
+                    .with_presets(false)
                     .with_models(),
             ),
             "native",
@@ -1575,6 +1777,39 @@ pub fn run() {
         ([a, b], sidebar)
     });
     let mut view = ComponentDemo::new(bindings).unwrap();
+    if creation_selftest {
+        let binding = view.binding();
+        binding
+            .edit_text(
+                &tekes_agent_presentation::ComposerDestination::run(binding.scope().clone()),
+                "A 原草稿".into(),
+            )
+            .unwrap();
+    }
+    let create_cwd = args
+        .iter()
+        .position(|arg| arg == "--create-cwd")
+        .map(|index| args.get(index + 1).expect("explicit creation cwd").clone())
+        .or_else(|| fixture.then(|| "/fixture".into()));
+    if let Some(cwd) = create_cwd {
+        view.configure_creation(
+            tekes_agent_contract::CreateSessionRequest {
+                cwd: Some(cwd),
+                workspace_id: None,
+                session_id: None,
+                agent_preset: None,
+            },
+            format!(
+                "demo-create:{}:{}",
+                std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos()
+            ),
+        )
+        .unwrap();
+    }
     if context_selftest {
         use tekes_agent_presentation::{
             ComposerArtifact, ComposerContextBaseline, ComposerDestination,
@@ -1665,6 +1900,9 @@ pub fn run() {
         model_test_stage: 0,
         context_selftest,
         context_stage: 0,
+        creation_selftest,
+        creation_stage: 0,
+        creation_scope: None,
         text: TextBackend {
             shaper: CoreTextShaper::new(fonts.clone()),
             rasterizer: CoreTextRasterizer::new(fonts),
@@ -1897,28 +2135,59 @@ pub fn run() {
             context_proof = serde_json::json!({"mountedCards":true,"explicitRemoval":true,"referenceReturned":true,"annotationReturned":true,"promptSettled":true,"clearedDraft":true,"fileUpload":false,"nativeInteraction":false,"structuredTranscript":false});
         }
         if args.iter().any(|arg| arg == "--initial-preset-proof") {
-            use tekes_agent_components_ui::{
-                ComposerChoiceIntent, ComposerChoiceKind, ComposerChoices,
-            };
-            use tekes_agent_presentation::{ComposerDestination, RunController};
-            use tekes_agent_ui_bindings::{InitialPresetChoices, MODEL_SELECTION_SETTING};
+            use tekes_agent_presentation::ComposerDestination;
+            use tekes_agent_ui_bindings::MODEL_SELECTION_SETTING;
             let cwd_index = args
                 .iter()
                 .position(|arg| arg == "--initial-preset-cwd")
                 .expect("explicit preset create cwd");
             let cwd = args.get(cwd_index + 1).expect("preset create cwd").clone();
-            assert!(std::path::Path::new(&cwd).is_absolute());
-            let binding = host.view.binding().clone();
-            let original_draft = binding.current_run().unwrap().draft.clone();
+            let original = host.view.binding().clone();
+            let original_draft = original.current_run().unwrap().draft.clone();
+            let models = host
+                .executor
+                .block_on(original.model_choices(1, "proof-creation-models"))
+                .unwrap();
+            let model = models
+                .selection(
+                    models
+                        .catalog
+                        .selected
+                        .as_ref()
+                        .expect("synthetic current model"),
+                )
+                .unwrap();
+            host.view
+                .configure_creation(
+                    tekes_agent_contract::CreateSessionRequest {
+                        cwd: Some(cwd),
+                        workspace_id: None,
+                        session_id: None,
+                        agent_preset: None,
+                    },
+                    "proof-component-create",
+                )
+                .unwrap();
+            let mut commands = host
+                .view
+                .accessibility_action(
+                    tekes_agent_ui_demo::component_demo::NEW_SESSION,
+                    None,
+                    AccessibilityAction::Press,
+                )
+                .unwrap();
+            let DemoCommand::ReadInitialPresets { request } = commands.remove(0) else {
+                panic!("new session catalog intent")
+            };
             let source = host
                 .executor
                 .block_on(InitialPresetChoices::load(
                     &host.runtime,
                     1,
-                    "proof-initial-presets",
+                    "proof-creation-presets",
                 ))
-                .expect("initial preset catalog");
-            // Scripted synthetic proof choice only. Production never auto-selects a row.
+                .unwrap();
+            // This synthetic proof explicitly chooses a row; production never auto-selects it.
             let chosen = source
                 .catalog
                 .choices
@@ -1927,98 +2196,89 @@ pub fn run() {
                 .expect("selectable initial preset")
                 .id
                 .clone();
-            let destination = ComposerDestination::NewThread {
-                endpoint_id: binding.scope().endpoint_id.clone(),
-                workspace_id: "explicit-preset-proof".into(),
-            };
-            let mut panel = ComposerChoices::new(98, Default::default());
-            let request = panel
-                .open(destination.clone(), ComposerChoiceKind::Preset)
+            let count = source.catalog.choices.len();
+            assert!(
+                host.view
+                    .complete_initial_presets(&request, Ok(source))
+                    .unwrap()
+            );
+            let target = host.view.initial_preset_choice_id(&chosen).unwrap();
+            let mut commands = host
+                .view
+                .accessibility_action(target, None, AccessibilityAction::Press)
                 .unwrap();
-            panel.update(&request, source.catalog.clone()).unwrap();
-            let root = panel.id();
-            let target = panel.choice_id(&chosen).unwrap();
-            let mut panel_host = panel.into_host().unwrap();
-            panel_host.accessibility_action(target, None, AccessibilityAction::Press);
-            let actions = panel_host.drain_actions();
-            let mut intents = panel_host
-                .get_mut(root)
-                .unwrap()
-                .component_mut::<ComposerChoices>()
-                .unwrap()
-                .take_intents(&actions);
-            assert_eq!(intents.len(), 1);
-            let ComposerChoiceIntent::Select(selection) = intents.remove(0) else {
-                panic!("explicit preset selection")
+            let DemoCommand::CreateSession(command) = commands.remove(0) else {
+                panic!("captured new session intent")
             };
-            let snapshot = host.executor.block_on(async {
-                let controller = RunController::new(host.runtime.clone()).unwrap();
-                let token = controller.select(destination.clone()).unwrap();
-                let models = binding
-                    .model_choices(1, "proof-preset-models")
+            let binding = host.executor.block_on(async {
+                let created = command.creation().execute(&host.runtime).await.unwrap();
+                Arc::new(
+                    RunBinding::open_main(
+                        host.runtime.clone(),
+                        RunScope::main(command.creation().endpoint_id(), created.session_id),
+                    )
                     .await
-                    .unwrap();
-                let current = models
-                    .catalog
-                    .selected
-                    .as_ref()
-                    .expect("synthetic current model");
-                let model = models.selection(current).unwrap();
-                assert!(controller.commit_settings(
-                    &token,
-                    std::collections::BTreeMap::from([(MODEL_SELECTION_SETTING.into(), model)]),
-                    false
-                ));
-                controller
-                    .edit_text(&destination, "AgentKit initial preset UI proof".into())
-                    .unwrap();
-                let create = InitialPresetChoices::revalidate_create(
-                    &host.runtime,
-                    &selection,
-                    tekes_agent_contract::CreateSessionRequest {
-                        cwd: Some(cwd),
-                        workspace_id: None,
-                        session_id: None,
-                        agent_preset: None,
-                    },
-                    "proof-preset-before-create",
+                    .unwrap(),
                 )
-                .await
+            });
+            assert!(
+                host.view
+                    .complete_creation(&command, Ok(binding.clone()))
+                    .unwrap()
+            );
+            assert_eq!(host.view.binding().scope(), binding.scope());
+            let destination = ComposerDestination::run(binding.scope().clone());
+            assert!(
+                binding
+                    .begin_settings(&destination)
+                    .unwrap()
+                    .commit(std::collections::BTreeMap::from([(
+                        MODEL_SELECTION_SETTING.into(),
+                        model
+                    )]))
+                    .unwrap()
+            );
+            binding
+                .edit_text(&destination, "AgentKit initial preset UI proof".into())
                 .unwrap();
-                let ticket = controller
-                    .prepare(&destination, tekes_agent_contract::PromptMode::Queue)
-                    .unwrap();
-                let mut changes = controller.subscribe();
-                controller
-                    .dispatch_with(ticket, Some(create), &ModelSelectionPreparation)
+            host.view.sync().unwrap();
+            let mut commands = host
+                .view
+                .accessibility_action(host.view.ids().send, None, AccessibilityAction::Press)
+                .unwrap();
+            let DemoCommand::Send {
+                binding: send_binding,
+                ticket,
+            } = commands.remove(0)
+            else {
+                panic!("normal created Composer send")
+            };
+            assert!(Arc::ptr_eq(&binding, &send_binding));
+            host.executor.block_on(async {
+                let mut changes = binding.subscribe_run().unwrap();
+                binding
+                    .dispatch_prepared_with(ticket, &ModelSelectionPreparation)
                     .await
                     .unwrap();
                 tokio::time::timeout(Duration::from_secs(30), async {
                     loop {
-                        let snapshot = controller.snapshot();
+                        let snapshot = binding.current_run().unwrap();
                         if snapshot.can_submit
                             && snapshot.transcript.items.iter().any(|i| {
                                 i.kind == tekes_agent_presentation::TranscriptItemKind::Assistant
                                     && i.is_final
                             })
                         {
-                            return snapshot;
+                            break;
                         }
                         changes.changed().await.unwrap();
                     }
                 })
                 .await
-                .expect("created preset prompt settlement")
+                .expect("created preset prompt settlement");
             });
-            let scope = snapshot
-                .selection
-                .as_ref()
-                .and_then(|token| match &token.destination {
-                    ComposerDestination::Run { scope } => Some(scope),
-                    _ => None,
-                })
-                .expect("materialized preset scope");
-            assert_ne!(scope.session_id, binding.scope().session_id);
+            let snapshot = binding.current_run().unwrap();
+            assert_ne!(binding.scope().session_id, original.scope().session_id);
             assert_eq!(
                 snapshot
                     .transcript
@@ -2031,15 +2291,15 @@ pub fn run() {
                     .count(),
                 1
             );
-            assert_eq!(binding.current_run().unwrap().draft, original_draft);
+            assert_eq!(original.current_run().unwrap().draft, original_draft);
             let returned = host
                 .runtime
                 .inspect(|s| {
                     s.sessions
-                        .get(&scope.session_id)
+                        .get(&binding.scope().session_id)
                         .and_then(|s| s.summary.clone())
                 })
-                .expect("created preset inventory");
+                .expect("created session inventory");
             let returned_preset = returned["initialPresetId"]
                 .as_str()
                 .or_else(|| returned["initialPresetID"].as_str())
@@ -2049,7 +2309,7 @@ pub fn run() {
                 .or_else(|| {
                     host.runtime.inspect(|s| {
                         s.sessions
-                            .get(&scope.session_id)
+                            .get(&binding.scope().session_id)
                             .and_then(|s| s.projections.get("agentPreset"))
                             .and_then(|value| value.value.as_str().map(str::to_owned))
                     })
@@ -2061,7 +2321,7 @@ pub fn run() {
                 assert!(returned_preset.is_some(), "preset identity not published");
             }
             host.view.sync().unwrap();
-            preset_proof = serde_json::json!({"catalogChoices":source.catalog.choices.len(),"explicitSelection":true,"createdSession":true,"selectedPreset":chosen,"presetIdentityReturned":returned_preset.is_some(),"singleInput":true,"promptSettled":true,"originalDraftPreserved":true,"nativeInteraction":false,"productionCreationEntry":false});
+            preset_proof = serde_json::json!({"catalogChoices":count,"explicitSelection":true,"createdSession":true,"selectedPreset":chosen,"presetIdentityReturned":returned_preset.is_some(),"singleInput":true,"promptSettled":true,"originalDraftPreserved":true,"nativeInteraction":false,"componentCreationEntry":true});
         }
         let clip = Rect::new(0., 0., 1000., 760.);
         host.text.atlas.begin_frame();

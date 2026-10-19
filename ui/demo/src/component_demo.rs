@@ -18,9 +18,9 @@ use tekes_agent_presentation::{
     SideChatSnapshot, SummaryAction, TaskLoadToken,
 };
 use tekes_agent_ui_bindings::{
-    BoundSideChatRun, ChildPaneBinding, ComposerSettingsRequest, MODEL_SELECTION_SETTING,
-    ModelChoices, PaneAccess, PaneSnapshot, RunBinding, SideChatBinding, SidebarPublication,
-    TaskPaneBinding,
+    BoundSideChatRun, ChildPaneBinding, ComposerSettingsRequest, InitialPresetChoices,
+    InitialSessionCreation, MODEL_SELECTION_SETTING, ModelChoices, PaneAccess, PaneSnapshot,
+    RunBinding, SideChatBinding, SidebarPublication, TaskPaneBinding,
 };
 use tekes_ui_controls::{
     ButtonTextRenderer, TextSurface,
@@ -40,15 +40,23 @@ const SIDEBAR_COLUMN: ComponentId = ComponentId(6);
 const PANEL_COLUMN: ComponentId = ComponentId(7);
 const MAIN_COLUMN: ComponentId = ComponentId(8);
 const EMPTY_MAIN: ComponentId = ComponentId(9);
+const CREATE_PANEL: ComponentId = ComponentId(10);
 const SIDEBAR_NAMESPACE: u32 = 40;
 const PANEL_NAMESPACE: u32 = 41;
 const RENAME_NAMESPACE: u32 = 42;
 const CHOICES_NAMESPACE: u32 = 43;
+const CREATE_NAMESPACE: u32 = 44;
 pub const SELECT_A: ComponentId = ComponentId(100);
 pub const SELECT_B: ComponentId = ComponentId(101);
 pub const RECONNECT: ComponentId = ComponentId(102);
+pub const NEW_SESSION: ComponentId = ComponentId(103);
+pub const CREATE_AUTOMATIC: ComponentId = ComponentId(104);
 
 pub enum DemoCommand {
+    ReadInitialPresets {
+        request: ComposerChoiceRequest,
+    },
+    CreateSession(CreateSessionCommand),
     OpenContext {
         binding: Arc<RunBinding>,
         intent: tekes_agent_components_ui::ComposerContextIntent,
@@ -121,6 +129,28 @@ pub struct ComponentDemo {
     next_panel_namespace: u32,
     panel_navigation_revision: u64,
     model_gesture: Option<ModelGesture>,
+    creation_inputs: Option<(tekes_agent_contract::CreateSessionRequest, String)>,
+    creation_gesture: Option<CreationGesture>,
+    creation_panel: Option<Content>,
+}
+struct CreationGesture {
+    request: ComposerChoiceRequest,
+    input: tekes_agent_contract::CreateSessionRequest,
+    source: Option<InitialPresetChoices>,
+    navigation: u64,
+    attempt: u64,
+    pending: Option<Arc<InitialSessionCreation>>,
+}
+#[derive(Clone)]
+pub struct CreateSessionCommand {
+    request: ComposerChoiceRequest,
+    navigation: NavigationRequest,
+    creation: Arc<InitialSessionCreation>,
+}
+impl CreateSessionCommand {
+    pub fn creation(&self) -> &Arc<InitialSessionCreation> {
+        &self.creation
+    }
 }
 struct ModelGesture {
     request: ComposerChoiceRequest,
@@ -217,6 +247,21 @@ impl ComponentDemo {
         let pair = Self::new_pair(0);
         let rename = ThreadRename::new(RENAME_NAMESPACE, RenameLabels::default());
         let choices = ComposerChoices::new(CHOICES_NAMESPACE, Default::default());
+        let creation_choices = ComposerChoices::new(CREATE_NAMESPACE, Default::default());
+        let creation_panel = Content::new(
+            CREATE_PANEL,
+            StackContent {
+                model: Stack {
+                    axis: Axis::Vertical,
+                    gap: Spacing::Tight.value(),
+                },
+                flexible_child: None,
+                children: vec![
+                    Content::new(creation_choices.id(), creation_choices),
+                    Content::new(CREATE_AUTOMATIC, ButtonContent::new("使用自动预设创建")),
+                ],
+            },
+        );
         let main = Content::new(
             MAIN,
             StackContent {
@@ -238,6 +283,7 @@ impl ComponentDemo {
                                 (SELECT_A, "会话 A"),
                                 (SELECT_B, "会话 B"),
                                 (RECONNECT, "重新连接"),
+                                (NEW_SESSION, "新会话"),
                             ]
                             .into_iter()
                             .map(|(id, label)| Content::new(id, ButtonContent::new(label)))
@@ -315,6 +361,9 @@ impl ComponentDemo {
             task_attempts: BTreeMap::new(),
             child_panes: BTreeMap::new(),
             model_gesture: None,
+            creation_inputs: None,
+            creation_gesture: None,
+            creation_panel: Some(creation_panel),
             background_commands: vec![],
             next_panel_namespace: 50_000,
             panel_navigation_revision: 0,
@@ -366,6 +415,283 @@ impl ComponentDemo {
     pub fn selected(&self) -> usize {
         self.selected
     }
+    pub fn configure_creation(
+        &mut self,
+        input: tekes_agent_contract::CreateSessionRequest,
+        rpc_prefix: impl Into<String>,
+    ) -> Result<()> {
+        require(
+            self.creation_gesture.is_none(),
+            "creation gesture already open",
+        )?;
+        require(
+            input.session_id.is_none() && input.agent_preset.is_none(),
+            "demo creation inputs must preserve generated session and automatic preset",
+        )?;
+        require(
+            input
+                .cwd
+                .as_ref()
+                .is_some_and(|cwd| cwd.starts_with('/') && !cwd.contains('\0')),
+            "demo needs explicit absolute creation cwd",
+        )?;
+        let prefix = rpc_prefix.into();
+        require(!prefix.is_empty(), "empty creation RPC prefix")?;
+        self.creation_inputs = Some((input, prefix));
+        self.sync()
+    }
+    fn creation_choices_id() -> ComponentId {
+        ComponentId((CREATE_NAMESPACE as u64) << 32)
+    }
+    pub fn initial_preset_choice_id(&self, choice: &str) -> Option<ComponentId> {
+        self.tree
+            .get(Self::creation_choices_id())?
+            .component::<ComposerChoices>()?
+            .choice_id(choice)
+    }
+    fn creation_current(&self, gesture: &CreationGesture) -> bool {
+        gesture.navigation == self.navigation_revision
+            && self.binding().supports_creation()
+            && !self.composing()
+    }
+    fn cancel_creation(&mut self) {
+        if let Some(gesture) = self.creation_gesture.take() {
+            self.tree
+                .get_mut(Self::creation_choices_id())
+                .unwrap()
+                .component_mut::<ComposerChoices>()
+                .unwrap()
+                .dismiss(&gesture.request);
+            self.creation_panel = Some(
+                self.tree
+                    .remove(CREATE_PANEL)
+                    .expect("mounted creation panel"),
+            );
+        }
+    }
+    fn begin_creation(&mut self) -> Result<DemoCommand> {
+        require(
+            !self.composing() && self.binding().supports_creation(),
+            "creation unavailable",
+        )?;
+        let (input, _) = self
+            .creation_inputs
+            .clone()
+            .ok_or_else(|| unsupported("host creation inputs missing"))?;
+        self.cancel_model_choices();
+        self.cancel_creation();
+        self.tree.focus(None, false);
+        self.tree
+            .insert(
+                MAIN,
+                self.creation_panel.take().expect("retained creation panel"),
+            )
+            .map_err(|_| unsupported("mount creation choices"))?;
+        let destination = ComposerDestination::NewThread {
+            endpoint_id: self.binding().scope().endpoint_id.clone(),
+            workspace_id: input
+                .workspace_id
+                .clone()
+                .unwrap_or_else(|| "demo-create".into()),
+        };
+        let request = self
+            .tree
+            .get_mut(Self::creation_choices_id())
+            .unwrap()
+            .component_mut::<ComposerChoices>()
+            .unwrap()
+            .open(destination, ComposerChoiceKind::Preset)
+            .map_err(unsupported)?;
+        self.creation_gesture = Some(CreationGesture {
+            request: request.clone(),
+            input,
+            source: None,
+            navigation: self.navigation_revision,
+            attempt: 0,
+            pending: None,
+        });
+        let tail = if self.selection_cleared {
+            EMPTY_MAIN
+        } else {
+            Self::pair_id(self.selected)
+        };
+        self.tree
+            .reorder(
+                MAIN,
+                &[
+                    NAV,
+                    NOTICE,
+                    DIAGNOSTIC,
+                    RenameIds::new(RENAME_NAMESPACE).root,
+                    Self::choices_id(),
+                    CREATE_PANEL,
+                    tail,
+                ],
+            )
+            .map_err(|_| unsupported("creation panel order"))?;
+        Ok(DemoCommand::ReadInitialPresets { request })
+    }
+    pub fn complete_initial_presets(
+        &mut self,
+        request: &ComposerChoiceRequest,
+        result: std::result::Result<InitialPresetChoices, String>,
+    ) -> Result<bool> {
+        let Some(gesture) = self.creation_gesture.as_ref() else {
+            return Ok(false);
+        };
+        if &gesture.request != request {
+            return Ok(false);
+        }
+        if !self.creation_current(gesture) {
+            self.cancel_creation();
+            return Ok(false);
+        }
+        let (catalog, source) = match result {
+            Ok(source) => (source.catalog.clone(), Some(source)),
+            Err(error) => (
+                ComposerChoiceCatalog {
+                    revision: 1,
+                    phase: ComposerCatalogPhase::Failed(error),
+                    choices: vec![],
+                    selected: None,
+                },
+                None,
+            ),
+        };
+        let accepted = self
+            .tree
+            .get_mut(Self::creation_choices_id())
+            .unwrap()
+            .component_mut::<ComposerChoices>()
+            .unwrap()
+            .update(request, catalog)
+            .map_err(unsupported)?;
+        if accepted {
+            self.creation_gesture.as_mut().unwrap().source = source;
+        }
+        Ok(accepted)
+    }
+    fn capture_creation(
+        &mut self,
+        selection: Option<&tekes_agent_components_ui::ComposerChoiceSelection>,
+    ) -> Result<Option<DemoCommand>> {
+        let Some(gesture) = self.creation_gesture.as_ref() else {
+            return Ok(None);
+        };
+        if !self.creation_current(gesture) || gesture.pending.is_some() {
+            return Ok(None);
+        }
+        if selection.is_some_and(|selection| selection.request != gesture.request) {
+            return Ok(None);
+        }
+        let gesture = self.creation_gesture.as_mut().unwrap();
+        gesture.attempt = gesture
+            .attempt
+            .checked_add(1)
+            .ok_or_else(|| unsupported("creation attempt exhausted"))?;
+        let rpc = format!(
+            "{}:{}:{}",
+            self.creation_inputs.as_ref().unwrap().1,
+            gesture.request.generation,
+            gesture.attempt
+        );
+        let creation = Arc::new(match selection {
+            Some(selection) => gesture
+                .source
+                .as_ref()
+                .ok_or_else(|| unsupported("initial preset source missing"))?
+                .capture_creation(selection, gesture.input.clone(), rpc)?,
+            None => InitialSessionCreation::automatic(
+                gesture.request.destination.endpoint_id(),
+                gesture.input.clone(),
+                rpc,
+            )?,
+        });
+        let navigation = NavigationRequest {
+            address: SessionAddress {
+                endpoint_id: creation.endpoint_id().into(),
+                session_id: creation.session_id().into(),
+            },
+            revision: gesture.navigation,
+            created: true,
+        };
+        gesture.pending = Some(creation.clone());
+        self.tree
+            .get_mut(Self::creation_choices_id())
+            .unwrap()
+            .component_mut::<ComposerChoices>()
+            .unwrap()
+            .set_host_pending(&gesture.request, true);
+        Ok(Some(DemoCommand::CreateSession(CreateSessionCommand {
+            request: gesture.request.clone(),
+            navigation,
+            creation,
+        })))
+    }
+    fn drain_creation(&mut self, actions: &[ContentAction]) -> Result<Vec<DemoCommand>> {
+        let Some(panel) = self.tree.get_mut(Self::creation_choices_id()) else {
+            return Ok(vec![]);
+        };
+        let intents = panel
+            .component_mut::<ComposerChoices>()
+            .unwrap()
+            .take_intents(actions);
+        let mut commands = vec![];
+        for intent in intents {
+            match intent {
+                ComposerChoiceIntent::Dismiss(_) => self.cancel_creation(),
+                ComposerChoiceIntent::Select(selection) => {
+                    if let Some(command) = self.capture_creation(Some(&selection))? {
+                        commands.push(command);
+                    }
+                }
+            }
+        }
+        Ok(commands)
+    }
+    pub fn complete_creation(
+        &mut self,
+        request: &CreateSessionCommand,
+        result: std::result::Result<Arc<RunBinding>, String>,
+    ) -> Result<bool> {
+        let Some(gesture) = self.creation_gesture.as_ref() else {
+            return Ok(false);
+        };
+        if gesture.request != request.request
+            || !gesture
+                .pending
+                .as_ref()
+                .is_some_and(|pending| Arc::ptr_eq(pending, &request.creation))
+        {
+            return Ok(false);
+        }
+        if !self.creation_current(gesture) {
+            self.cancel_creation();
+            return Ok(false);
+        }
+        match result {
+            Ok(binding) => {
+                require(
+                    binding.scope()
+                        == &RunScope::main(
+                            &request.navigation.address.endpoint_id,
+                            &request.navigation.address.session_id,
+                        ),
+                    "creation result target mismatch",
+                )?;
+                self.cancel_creation();
+                self.complete_navigation(request.navigation.clone(), binding)
+            }
+            Err(error) => {
+                // Retain the immutable IDs and pending barrier. No click creates
+                // a replacement session after an uncertain result.
+                self.set_notice(format!(
+                    "创建未完成或结果未确认，请先核对会话列表；不会自动重试。{error}"
+                ));
+                Ok(false)
+            }
+        }
+    }
     fn choices_id() -> ComponentId {
         ComponentId((CHOICES_NAMESPACE as u64) << 32)
     }
@@ -411,6 +737,7 @@ impl ComponentDemo {
             binding.supports_model_choices(),
             "model choices unavailable",
         )?;
+        self.cancel_creation();
         self.cancel_model_choices();
         let settings = binding.begin_settings(&destination)?;
         let request = self
@@ -1140,6 +1467,38 @@ impl ComponentDemo {
     }
     pub fn sync(&mut self) -> Result<()> {
         if self
+            .creation_gesture
+            .as_ref()
+            .is_some_and(|gesture| !self.creation_current(gesture))
+        {
+            self.cancel_creation();
+        }
+        let creation_disabled = self.creation_inputs.is_none()
+            || !self.binding().supports_creation()
+            || self.composing()
+            || self
+                .creation_gesture
+                .as_ref()
+                .is_some_and(|gesture| gesture.pending.is_some());
+        self.tree
+            .get_mut(NEW_SESSION)
+            .unwrap()
+            .component_mut::<ButtonContent>()
+            .unwrap()
+            .button
+            .state
+            .disabled = creation_disabled;
+        if self.creation_gesture.is_some() {
+            self.tree
+                .get_mut(CREATE_AUTOMATIC)
+                .unwrap()
+                .component_mut::<ButtonContent>()
+                .unwrap()
+                .button
+                .state
+                .disabled = creation_disabled;
+        }
+        if self
             .model_gesture
             .as_ref()
             .is_some_and(|gesture| !self.model_gesture_current(gesture))
@@ -1593,6 +1952,7 @@ impl ComponentDemo {
             "finish or cancel composition before switching sessions",
         )?;
         self.cancel_model_choices();
+        self.cancel_creation();
         if self.selection_cleared {
             self.tree
                 .remove(EMPTY_MAIN)
@@ -1775,6 +2135,7 @@ impl ComponentDemo {
             .collect();
         let mut commands = vec![];
         self.drain_model_choices(&actions)?;
+        commands.extend(self.drain_creation(&actions)?);
         let rename_root = RenameIds::new(RENAME_NAMESPACE).root;
         let rename_intents = self
             .tree
@@ -2030,6 +2391,21 @@ impl ComponentDemo {
                 });
             }
             match action.target {
+                NEW_SESSION
+                    if !self.composing()
+                        && self.creation_inputs.is_some()
+                        && self
+                            .creation_gesture
+                            .as_ref()
+                            .is_none_or(|gesture| gesture.pending.is_none()) =>
+                {
+                    commands.push(self.begin_creation()?)
+                }
+                CREATE_AUTOMATIC => {
+                    if let Some(command) = self.capture_creation(None)? {
+                        commands.push(command);
+                    }
+                }
                 SELECT_A => self.select(0)?,
                 SELECT_B => self.select(1)?,
                 RECONNECT if !self.composing() => commands.push(DemoCommand::Reconnect),

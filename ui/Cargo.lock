@@ -1972,6 +1972,7 @@ dependencies = [
  "tekes-agent-session",
  "tekes-agent-web",
  "tokio",
+ "uuid",
 ]
 
 [[package]]

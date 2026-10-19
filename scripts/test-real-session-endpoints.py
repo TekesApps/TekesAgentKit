@@ -192,7 +192,7 @@ def ui_smoke(config, first):
             proof=receipt['initialPresetProof']
             assert proof['catalogChoices']>=1 and proof['explicitSelection'] and proof['createdSession'] and proof['singleInput'] and proof['promptSettled'] and proof['originalDraftPreserved'],proof
             if kind!='pi': assert proof['presetIdentityReturned'],proof
-            assert not proof['nativeInteraction'] and not proof['productionCreationEntry'],proof
+            assert not proof['nativeInteraction'] and proof['componentCreationEntry'],proof
         print(kind.upper()+'_UI_COMPONENTS_RECEIPT '+json.dumps(receipt,sort_keys=True))
         print(kind.upper()+'_UI_COMPONENTS_LIVE_OK explicit-SEP+shared-runtime+restored-data+Composer+Indicators+Sidebar+Summary+GPU; transcript-view=false; native-interaction=false')
     else:

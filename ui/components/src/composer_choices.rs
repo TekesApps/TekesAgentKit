@@ -92,6 +92,7 @@ pub struct ComposerChoices {
     request: Option<ComposerChoiceRequest>,
     catalog: Option<ComposerChoiceCatalog>,
     pending: Option<ComposerChoiceSelection>,
+    host_pending: bool,
     error: Option<String>,
     rows: BTreeMap<ComponentId, ComposerChoice>,
     body: StackContent,
@@ -108,6 +109,7 @@ impl ComposerChoices {
             request: None,
             catalog: None,
             pending: None,
+            host_pending: false,
             error: None,
             rows: BTreeMap::new(),
             body: StackContent {
@@ -129,6 +131,16 @@ impl ComposerChoices {
     }
     pub fn request(&self) -> Option<&ComposerChoiceRequest> {
         self.request.as_ref()
+    }
+    /// A separate host action (for example automatic preset creation) may use
+    /// this panel without selecting a catalog row. Keep dismissal available.
+    pub fn set_host_pending(&mut self, request: &ComposerChoiceRequest, pending: bool) -> bool {
+        if self.request.as_ref() != Some(request) {
+            return false;
+        }
+        self.host_pending = pending;
+        self.rebuild();
+        true
     }
     /// Host navigation/cancellation retires only its captured gesture.
     pub fn dismiss(&mut self, request: &ComposerChoiceRequest) -> bool {
@@ -167,6 +179,7 @@ impl ComposerChoices {
             kind,
         };
         self.request = Some(request.clone());
+        self.host_pending = false;
         self.catalog = None;
         self.pending = None;
         self.error = None;
@@ -223,7 +236,7 @@ impl ComposerChoices {
                 result.push(ComposerChoiceIntent::Dismiss(request));
                 break;
             }
-            if self.pending.is_some() {
+            if self.pending.is_some() || self.host_pending {
                 continue;
             }
             let Some(catalog) = &self.catalog else {
@@ -286,6 +299,7 @@ impl ComposerChoices {
     fn close(&mut self) {
         self.request = None;
         self.pending = None;
+        self.host_pending = false;
         self.catalog = None;
         self.error = None;
         self.rows.clear();
@@ -305,7 +319,7 @@ impl ComposerChoices {
             .catalog
             .as_ref()
             .is_some_and(|catalog| catalog.phase == ComposerCatalogPhase::Ready);
-        let status = if self.pending.is_some() {
+        let status = if self.pending.is_some() || self.host_pending {
             self.labels.pending.clone()
         } else if let Some(error) = &self.error {
             error.clone()
@@ -358,7 +372,8 @@ impl ComposerChoices {
                 .as_ref()
                 .and_then(|catalog| catalog.selected.as_ref())
                 == Some(&choice.id);
-            button.button.state.disabled = !ready || !choice.enabled || self.pending.is_some();
+            button.button.state.disabled =
+                !ready || !choice.enabled || self.pending.is_some() || self.host_pending;
             self.body.children.push(Content::new(*id, button));
         }
         self.body.children.push(Content::new(

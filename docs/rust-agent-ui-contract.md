@@ -14,7 +14,7 @@ AgentKit 定义业务结构、展示语义、组件组合、组件输入及回�
 
 输入为现有 RunController 发布的 `RunSnapshot` 及显式 `ComposerAffordances`。`update` 接受同一 authority 的单调 revision；无版本和旧版本失败。整个组件生命周期绑定一个 RunController；更换 controller authority 时重新创建组件，不把另一个 controller 的局部 revision 冒充旧 authority 的后续版本。组件保留各 destination 的编辑器实例与本地撤销/选区；确认 discard 后可对非当前 destination 调用 `forget` 释放实例。
 
-`ComposerLabels` 允许宿主提供产品 copy/本地化；`ComposerAffordances` 显式提供附件、模型、预设入口，默认不显示。入口只产生 `OpenEntry {destination, entry}`，不扫描路径、安装 provider、读取凭证或推测 Harness 能力。附件上传、model/preset 等确认写入仍经共享 runtime/presentation；内容卡片已接入，实际附件适配器、批注编辑器、交互式初始预设入口和完整弹层仍未完成。
+`ComposerLabels` 允许宿主提供产品 copy/本地化；`ComposerAffordances` 显式提供附件、模型、预设入口，默认不显示。入口只产生 `OpenEntry {destination, entry}`，不扫描路径、安装 provider、读取凭证或推测 Harness 能力。附件上传、model/preset 等确认写入仍经共享 runtime/presentation；内容卡片已接入，实际附件适配器、批注编辑器、创建失败专用对账 UI 和完整弹层仍未完成。
 
 `ComposerContext` 可独立挂载，或通过 `Composer::with_context` 使用宿主明确保留的 namespace 放入编辑器上方；空内容不增加布局占位。输入为同一 authority 的 RunSnapshot，输出携带原 baseline/item 的移除/预览/编辑意图，编辑器组字期间禁用卡片操作。原子 context 更新及 `draft_context_revision` 由共享 presentation 拥有，保留最新正文/settings，并阻止 Send、内容 ABA 或旧来源回调覆盖新草稿。API/字段尚未发布；[内容接入记录](rust-agent-ui-context-20261020.md) 明确区分原生 fixture、三端规范化文本回传与未完成能力。
 
@@ -22,7 +22,7 @@ AgentKit 定义业务结构、展示语义、组件组合、组件输入及回�
 
 `RunBinding::begin_settings` 返回保留原 binding 的一次性 `ComposerSettingsRequest`，使用既有 selection generation 防止旧目录覆盖新选择；`commit` 仅更新现有 presentation 的 draft settings，不写入新控制器、不覆盖文字/附件/批注，也不直接调用模型 RPC。宿主仍要 fence 导航和能力、校验最新目录项，并为 Send 提供既有 `SubmissionPreparation`；保留的旧 pane 不会自行知道宿主已切换窗口。详见 [绑定说明](../ui/bindings/README.md#composer-model-and-preset-content)。
 
-`InitialPresetChoices` 读取公开 `session.initialPresets` 或 DSH `presets.list`，用于 NewThread 创建参数；已有会话保留初始预设，不开放切换。保留自动选择、损坏原因、原配置与目录身份，不把配置文本拼成 prompt；发送前重新读取目录，校验捕获 choice，再将 `agent_preset` 交给现有 controller 创建。第二公开 consumer 提供独立面板组合；目前完成目录/创建适配与脚本闭环，交互式 NewThread 入口和原生预设验收仍待接入。见 [预设接入记录](rust-agent-ui-initial-presets-20261020.md)。
+`InitialPresetChoices` 读取公开 `session.initialPresets` 或 DSH `presets.list`，用于 NewThread 创建参数；已有会话保留初始预设，不开放切换。保留自动选择、损坏原因、原配置与目录身份，不把配置文本拼成 prompt；创建前重新读取目录，校验捕获 choice，再将 `agent_preset` 交给共享 session.create。第二公开 consumer 提供独立面板组合；ComponentDemo 的交互式新会话入口、自动模式和原生 fixture 现已接通；固定 session/RPC 身份，晚结果不抢导航，创建期间原 Composer 仍属于原会话。真实三端通过同一入口的离屏验证，物理 IME 与专用失败对账 UI 仍未完成。见 [新会话接入记录](rust-agent-ui-creation-20261020.md)，此前 [预设适配记录](rust-agent-ui-initial-presets-20261020.md) 保留为阶段证据。
 
 事件流程：
 
@@ -80,6 +80,8 @@ AgentKit 定义业务结构、展示语义、组件组合、组件输入及回�
 
 - [TekesUI #22](https://github.com/TekesApps/TekesUI/issues/22)：混合 Content 文档的稳定子项锚点、历史前插/高度变化/重排事务。现有 ScrollContent 可滚动，ReadingController 已完成单 TextSurface；这不是重开 #16，也不能用拼成单一文本框替代多块 Transcript。
 - [TekesUI #23](https://github.com/TekesApps/TekesUI/issues/23)：无表单装饰的可选中文本 Component/presentation 模式，保留现有 TextSurface/AX/选择/复制/受控更新。当前 TextFieldContent 固定 form 的 label/message/边框布局；TextContent 不提供等价文本选择服务。
+
+新 #23 公开 `61ddf7c68fccd819e20a01ba3104a8a0f8d7e64f` 的独立消费复验通过正文 API/核心/consumer 和临时 AgentKit 历史/流式探针，但公共类型注册门禁失败，暂不提升正式 pin。见 [公开输入复验](tekesui-issue23-public-review-20261020.md)。
 
 两个 Issue 均有精确源码、所需事件/属性、独立 consumer 和验收条件。上游若给出等价公共 API，则用它并补消费证据，不重复开发。新输入必须显式升级 pin 后复验；不能跟随活跃 WIP。
 

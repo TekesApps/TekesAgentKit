@@ -24,7 +24,9 @@ for name, dependency in workspace['dependencies'].items():
 components = tomllib.loads((ui / 'components/Cargo.toml').read_text())['dependencies']
 assert set(components) == {'tekes-agent-contract', 'tekes-agent-presentation', 'tekes-ui-controls', 'tekes-ui-scene', 'tekes-ui-tokens'}
 bindings = tomllib.loads((ui / 'bindings/Cargo.toml').read_text())['dependencies']
-assert set(bindings) == {'tekes-agent-components-ui', 'tekes-agent-contract', 'tekes-agent-presentation', 'tekes-agent-session', 'tekes-agent-web', 'serde_json', 'tokio', 'async-trait'}
+# uuid only allocates an immutable session identity before an explicit create;
+# bindings still cannot import a renderer, platform backend or harness adapter.
+assert set(bindings) == {'tekes-agent-components-ui', 'tekes-agent-contract', 'tekes-agent-presentation', 'tekes-agent-session', 'tekes-agent-web', 'serde_json', 'tokio', 'async-trait', 'uuid'}
 consumer = tomllib.loads((ui / 'consumer/Cargo.toml').read_text())['dependencies']
 assert set(consumer) == {'tekes-agent-components-ui', 'tekes-agent-ui-bindings'}
 assert set(tomllib.loads((ui / 'consumer/Cargo.toml').read_text()).get('dev-dependencies', {})) == {'tekes-ui-controls'}
