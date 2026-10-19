@@ -81,3 +81,16 @@ package pins remain valid at their original commits. Rust consumers use the same
 `thread_actions` policy directly; see the presentation crate's `thread_actions`
 example. The existing Swift sidebar still has its original native integration;
 this service change does not claim that its entry point has been migrated.
+
+### Transcript footnotes
+
+Each turn may expose `footnoteActions` using the public `ThreadActionDefinition`
+contract. A consumer renders the supplied labels/icons/availability and dispatches
+its exact action ID through `thread.performAction`. Completed-turn Fork is distinct
+from the sidebar's whole-session Fork: AgentKit resolves its identity to the
+selected durable settlement boundary, never to the latest visible message or an
+estimated sequence. Canonical journals use `turn/end` sequence; native histories
+use the settled run marker's entry ID. Missing boundaries, stale journals, active
+work and unavailable capabilities prevent execution. Current authority is rechecked
+at click time. The existing outcome preserves navigation even if optional rename
+or queue cleanup reports a warning; mutations are never automatically retried.

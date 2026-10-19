@@ -254,13 +254,76 @@ impl SharedAgent {
             },
         ))
     }
+    fn present_turn_actions(
+        &self,
+        shared: &SharedEndpoint,
+        id: &str,
+        transcript: &mut TranscriptSnapshot,
+    ) -> Result<()> {
+        let caps = shared
+            .connected()
+            .ok()
+            .map(|e| e.capabilities())
+            .unwrap_or_default();
+        let fork = self
+            .thread_actions(shared, id)?
+            .items
+            .into_iter()
+            .find(|a| a.id == "fork");
+        for turn in &mut transcript.turns {
+            turn.footnote_actions.clear();
+            if caps.can_fork_completed_turn
+                && turn.fork_boundary.is_some()
+                && !transcript.is_stale
+                && !matches!(turn.status.as_str(), "running" | "waitingForInput")
+                && let Some(mut action) = fork.clone()
+            {
+                action.id = format!("forkTurn:{}", turn.id);
+                action.label = "从此回合分叉".into();
+                turn.footnote_actions.push(action);
+            }
+        }
+        Ok(())
+    }
     async fn perform_thread_action(
         &self,
         shared: &SharedEndpoint,
-        request: ThreadActionRequest,
+        mut request: ThreadActionRequest,
         rpc_id: &str,
     ) -> Result<ThreadActionOutcome> {
         use tekes_agent_presentation::{ThreadActionCommand, thread_action_command};
+        let fork_boundary = if let Some(id) = request.action_id.strip_prefix("forkTurn:") {
+            let state = shared.runtime.snapshot();
+            let session = state
+                .sessions
+                .get(&request.session_id)
+                .ok_or_else(|| unsupported("unknown thread"))?;
+            let mut transcript = TranscriptSnapshot::read(
+                &RunScope::main(&state.endpoint_id, &request.session_id),
+                session,
+            )?;
+            self.present_turn_actions(shared, &request.session_id, &mut transcript)?;
+            let turn = transcript
+                .turns
+                .iter()
+                .find(|t| t.id == id)
+                .ok_or_else(|| unsupported("unknown turn"))?;
+            require(
+                turn.footnote_actions
+                    .iter()
+                    .any(|a| a.id == request.action_id && a.enabled),
+                "turn fork is unavailable",
+            )?;
+            let boundary = turn
+                .fork_boundary
+                .clone()
+                .ok_or_else(|| unsupported("missing settled turn boundary"))?;
+            request.action_id = "fork".into();
+            Some(boundary)
+        } else {
+            None
+        };
+
         if matches!(request.action_id.as_str(), "pin" | "unpin")
             && let Some(store) = &self.thread_preferences
             && store.replay(&shared.runtime.snapshot().endpoint_id, &request, rpc_id)?
@@ -297,14 +360,10 @@ impl SharedAgent {
                     .and_then(|s| s["title"].as_str().or_else(|| s["name"].as_str()))
                     .unwrap_or("会话");
                 let title = tekes_agent_presentation::increased_fork_title(title);
-                let result = shared
-                    .runtime
-                    .call(
-                        "session.fork",
-                        json!({"sessionId":request.session_id,"ephemeral":false}),
-                        rpc_id,
-                    )
-                    .await?;
+                let mut payload = fork_boundary.unwrap_or_else(|| json!({}));
+                payload["sessionId"] = json!(request.session_id);
+                payload["ephemeral"] = json!(false);
+                let result = shared.runtime.call("session.fork", payload, rpc_id).await?;
                 let child = string(&result, "sessionId")?.to_owned();
                 outcome.navigation = Some(ThreadActionNavigation {
                     endpoint: presentation.endpoint,
@@ -496,11 +555,14 @@ impl SharedAgent {
                 let state = runtime.snapshot();
                 let value = if let Some(id) = session {
                     let scope = RunScope::main(&state.endpoint_id, id);
-                    let transcript = state
+                    let mut transcript = state
                         .sessions
                         .get(id)
                         .map(|s| TranscriptSnapshot::read(&scope, s))
                         .transpose()?;
+                    if let Some(transcript) = &mut transcript {
+                        self.present_turn_actions(&shared, id, transcript)?;
+                    }
                     let mut transcript = serde_json::to_value(transcript)?;
                     present_annotations(&mut transcript);
                     json!({"endpoint":state.endpoint_id,"sessionId":id,"run":RunPresentation::read(&state,&scope,true),"transcript":transcript})
