@@ -14,6 +14,36 @@ use tekes_agent_contract::*;
 use tekes_agent_presentation::{RunController, RunScope};
 use tekes_agent_session::SessionRuntime;
 use tokio::sync::broadcast;
+/// Display-only receipt is removed before prompt admission in the native proof.
+/// No filesystem/upload authority is implied by this isolated fixture.
+pub fn composer_context_fixture() -> (
+    Vec<tekes_agent_presentation::ComposerArtifact>,
+    Vec<tekes_agent_presentation::ComposerAnnotation>,
+) {
+    use tekes_agent_presentation::{ComposerAnnotation, ComposerArtifact};
+    (
+        vec![
+            ComposerArtifact::Attachment {
+                id: "fixture-file".into(),
+                name: "草稿附件.png".into(),
+                content: json!({"type":"file","receiptId":"DISPLAY_ONLY_NOT_UPLOADED"}),
+            },
+            ComposerArtifact::Reference {
+                id: "fixture-reference".into(),
+                mention: Some("上下文引用说明".into()),
+                path: None,
+                excerpt: Some("这段引用随草稿保留".into()),
+            },
+        ],
+        vec![ComposerAnnotation {
+            id: "fixture-annotation".into(),
+            source: "回答 · turn 1".into(),
+            excerpt: "中文引用 👩🏽‍💻".into(),
+            comment: "请解释这段内容".into(),
+            source_locator: None,
+        }],
+    )
+}
 type MutationReceipts = BTreeMap<String, (String, Value, Value)>;
 #[derive(Clone)]
 pub struct Fixture {

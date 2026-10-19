@@ -57,6 +57,40 @@ pub struct ComposerDraft {
     /// Model/preset/permission choices remain host-owned explicit inputs, never inferred from prose.
     pub settings: BTreeMap<String, Value>,
 }
+/// Canonical content identity, independent of stream/text/settings publications.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ComposerContextBaseline {
+    pub selection: SelectionToken,
+    pub artifacts: Vec<ComposerArtifact>,
+    pub annotations: Vec<ComposerAnnotation>,
+    pub context_revision: u64,
+}
+impl ComposerContextBaseline {
+    fn matches_selection(&self, selection: Option<&SelectionToken>) -> bool {
+        selection.is_some_and(|current| {
+            current.destination == self.selection.destination
+                && (!matches!(
+                    &self.selection.destination,
+                    ComposerDestination::NewThread { .. }
+                ) || current.generation == self.selection.generation)
+        })
+    }
+    pub fn matches_snapshot(&self, snapshot: &RunSnapshot) -> bool {
+        self.matches_selection(snapshot.selection.as_ref())
+            && snapshot.draft_context_revision == self.context_revision
+            && (self.context_revision > 0
+                || (snapshot.draft.artifacts == self.artifacts
+                    && snapshot.draft.annotations == self.annotations))
+    }
+    pub fn read(snapshot: &RunSnapshot) -> Option<Self> {
+        Some(Self {
+            selection: snapshot.selection.clone()?,
+            artifacts: snapshot.draft.artifacts.clone(),
+            annotations: snapshot.draft.annotations.clone(),
+            context_revision: snapshot.draft_context_revision,
+        })
+    }
+}
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(
     tag = "kind",
@@ -264,6 +298,8 @@ pub struct PresentationStore {
     generation: u64,
     snapshot_revision: u64,
     drafts: BTreeMap<ComposerDestination, ComposerDraft>,
+    context_clock: u64,
+    context_revisions: BTreeMap<ComposerDestination, u64>,
     submissions: BTreeMap<String, SubmissionRecord>,
     pub(crate) events: VecDeque<SubmissionState>,
     was_connected: bool,
@@ -284,6 +320,10 @@ pub struct RunSnapshot {
     pub transcript: TranscriptSnapshot,
     pub summary: Option<SummaryFacts>,
     pub draft: ComposerDraft,
+    /// Per-destination content mutation identity. Zero is a legacy/initial value.
+    /// Advances on Send/restoration even when the content collections are empty.
+    #[serde(default)]
+    pub draft_context_revision: u64,
     pub can_submit: bool,
     /// Derived from the same catalog authority that gates child controls. None
     /// for a main run; older serialized snapshots may omit this presentation.
@@ -346,10 +386,58 @@ impl PresentationStore {
             .cloned()
             .unwrap_or_default()
     }
+    pub(crate) fn context_revision(&self, destination: &ComposerDestination) -> u64 {
+        self.context_revisions
+            .get(&self.resolve(destination))
+            .copied()
+            .unwrap_or_default()
+    }
+    fn advance_context(&mut self, destination: &ComposerDestination) {
+        self.context_clock = self
+            .context_clock
+            .checked_add(1)
+            .expect("draft context revision exhausted");
+        self.context_revisions
+            .insert(destination.clone(), self.context_clock);
+    }
     pub fn edit(&mut self, destination: &ComposerDestination, draft: ComposerDraft) -> Result<()> {
         destination.validate()?;
-        self.drafts.insert(self.resolve(destination), draft);
+        let destination = self.resolve(destination);
+        let changed = self.drafts.get(&destination).map_or(
+            !draft.artifacts.is_empty() || !draft.annotations.is_empty(),
+            |old| old.artifacts != draft.artifacts || old.annotations != draft.annotations,
+        );
+        self.drafts.insert(destination.clone(), draft);
+        if changed {
+            self.advance_context(&destination);
+        }
         Ok(())
+    }
+    /// Atomically replace only context collections. A Send, selection change or
+    /// intervening content edit invalidates the capture; text/settings survive.
+    pub fn patch_context(
+        &mut self,
+        expected: &ComposerContextBaseline,
+        artifacts: Vec<ComposerArtifact>,
+        annotations: Vec<ComposerAnnotation>,
+    ) -> Result<bool> {
+        let destination = self.resolve(&expected.selection.destination);
+        destination.validate()?;
+        if !expected.matches_selection(self.selection().as_ref()) {
+            return Ok(false);
+        }
+        let current = self.draft(&destination);
+        if self.context_revision(&destination) != expected.context_revision
+            || current.artifacts != expected.artifacts
+            || current.annotations != expected.annotations
+        {
+            return Ok(false);
+        }
+        let draft = self.drafts.entry(destination.clone()).or_default();
+        draft.artifacts = artifacts;
+        draft.annotations = annotations;
+        self.advance_context(&destination);
+        Ok(true)
     }
     /// Apply only authored text. A delayed editor callback cannot erase newer host attachments,
     /// annotations or settings, and retains its captured destination across selection changes.
@@ -471,6 +559,7 @@ impl PresentationStore {
                 ..Default::default()
             },
         );
+        self.advance_context(&destination);
         self.event(state);
         Ok(PreparedSubmission {
             id,
@@ -522,16 +611,21 @@ impl PresentationStore {
             Err(_) if record.state.phase == SubmissionPhase::Dispatched => SubmissionPhase::Unknown,
             Err(_) => SubmissionPhase::Failed,
         };
+        let mut restored = false;
         if let Err(message) = outcome {
             record.state.message = Some(message);
             if !record.state.reconciled {
                 self.drafts
-                    .entry(destination)
+                    .entry(destination.clone())
                     .or_default()
                     .restore(&record.draft);
+                restored = true;
             }
         }
         let state = record.state.clone();
+        if restored {
+            self.advance_context(&destination);
+        }
         self.event(state);
         Ok(())
     }
@@ -566,8 +660,10 @@ impl PresentationStore {
                 .insert(ticket.destination.clone(), target.clone());
             if self.selected.as_ref() == Some(&ticket.destination) {
                 self.generation = self.generation.wrapping_add(1);
-                self.selected = Some(target);
+                self.selected = Some(target.clone());
             }
+            self.context_revisions.remove(&ticket.destination);
+            self.advance_context(&target);
         }
         self.submissions
             .get_mut(&ticket.id)
@@ -601,6 +697,7 @@ impl PresentationStore {
     pub fn forget_destination(&mut self, destination: &ComposerDestination) {
         let destination = self.resolve(destination);
         self.drafts.remove(&destination);
+        self.context_revisions.remove(&destination);
         let ids: Vec<_> = self
             .submissions
             .iter()
@@ -800,6 +897,10 @@ impl PresentationStore {
             summary,
             child_availability,
             draft: selected.as_ref().map(|d| self.draft(d)).unwrap_or_default(),
+            draft_context_revision: selected
+                .as_ref()
+                .map(|d| self.context_revision(d))
+                .unwrap_or_default(),
             can_submit: selected.is_some()
                 && run
                     .as_ref()

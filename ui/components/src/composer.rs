@@ -1,5 +1,8 @@
 //! Agent composer: canonical drafts arrive from presentation; editing belongs to TekesUI.
-use crate::AgentText;
+use crate::{
+    AgentText, ComposerContext, ComposerContextAffordances, ComposerContextIntent,
+    ComposerContextLabels,
+};
 use std::collections::BTreeMap;
 use tekes_agent_presentation::{ComposerDestination, ComposerDraft, RunScope, RunSnapshot};
 use tekes_ui_controls::{
@@ -115,6 +118,7 @@ pub enum ComposerIntent {
         destination: ComposerDestination,
         entry: ComposerEntry,
     },
+    Context(Box<ComposerContextIntent>),
 }
 
 /// Independently mountable component. Does not own a runtime or dispatch network operations.
@@ -133,6 +137,9 @@ pub struct Composer {
     affordances: ComposerAffordances,
     labels: ComposerLabels,
     pending: Vec<ComposerIntent>,
+    context_id: Option<ComponentId>,
+    retained_context: Option<Content>,
+    context_affordances: ComposerContextAffordances,
 }
 impl Composer {
     pub fn new(ids: ComposerIds) -> Self {
@@ -169,10 +176,64 @@ impl Composer {
             affordances: ComposerAffordances::default(),
             labels: ComposerLabels::default(),
             pending: Vec::new(),
+            context_id: None,
+            retained_context: None,
+            context_affordances: Default::default(),
         }
     }
     pub fn ids(&self) -> ComposerIds {
         self.ids
+    }
+    /// Optional draft cards use a separately reserved namespace. The original
+    /// eight Composer IDs and editor/undo instance remain unchanged.
+    pub fn with_context(
+        mut self,
+        namespace: u32,
+        labels: ComposerContextLabels,
+    ) -> Result<Self, &'static str> {
+        if self.context_id.is_some()
+            || ((self.ids.root.0 >> 32)..=(self.ids.preset.0 >> 32)).contains(&(namespace as u64))
+        {
+            return Err("composer context namespace overlaps");
+        }
+        let context = ComposerContext::new(namespace, labels);
+        self.context_id = Some(context.id());
+        self.retained_context = Some(Content::new(context.id(), context));
+        Ok(self)
+    }
+    pub fn context(&self) -> Option<&ComposerContext> {
+        self.body
+            .children
+            .iter()
+            .find(|node| Some(node.id()) == self.context_id)
+            .or(self.retained_context.as_ref())?
+            .component::<ComposerContext>()
+    }
+    fn context_mut(&mut self) -> Option<&mut ComposerContext> {
+        let id = self.context_id?;
+        if let Some(index) = self.body.children.iter().position(|node| node.id() == id) {
+            self.body.children[index].component_mut::<ComposerContext>()
+        } else {
+            self.retained_context
+                .as_mut()?
+                .component_mut::<ComposerContext>()
+        }
+    }
+    fn place_context(&mut self) {
+        let Some(id) = self.context_id else { return };
+        let visible = self
+            .context()
+            .is_some_and(|context| !context.children().is_empty());
+        if visible {
+            if let Some(context) = self.retained_context.take() {
+                self.body.children.insert(0, context);
+            }
+        } else if let Some(index) = self.body.children.iter().position(|node| node.id() == id) {
+            self.retained_context = Some(self.body.children.remove(index));
+        }
+    }
+    pub fn set_context_affordances(&mut self, affordances: ComposerContextAffordances) {
+        self.context_affordances = affordances;
     }
     pub fn set_labels(&mut self, labels: ComposerLabels) {
         self.text_mut().field.field.label = labels.editor.clone();
@@ -202,17 +263,29 @@ impl Composer {
         self.editor().input.marked.is_some()
     }
     fn text(&self) -> &AgentText {
-        self.body.children[0]
+        self.body
+            .children
+            .iter()
+            .find(|node| node.id() == self.ids.editor)
+            .unwrap()
             .component::<AgentText>()
             .expect("composer editor")
     }
     fn text_mut(&mut self) -> &mut AgentText {
-        self.body.children[0]
+        self.body
+            .children
+            .iter_mut()
+            .find(|node| node.id() == self.ids.editor)
+            .unwrap()
             .component_mut::<AgentText>()
             .expect("composer editor")
     }
     fn toolbar(&mut self) -> &mut StackContent {
-        self.body.children[1]
+        self.body
+            .children
+            .iter_mut()
+            .find(|node| node.id() == self.ids.toolbar)
+            .unwrap()
             .component_mut::<StackContent>()
             .expect("composer toolbar")
     }
@@ -261,7 +334,14 @@ impl Composer {
                 .retained
                 .remove(&key)
                 .unwrap_or_else(|| Content::new(self.ids.editor, AgentText::new(false)));
-            let mut previous = std::mem::replace(&mut self.body.children[0], editor);
+            let mut previous = std::mem::replace(
+                self.body
+                    .children
+                    .iter_mut()
+                    .find(|node| node.id() == self.ids.editor)
+                    .unwrap(),
+                editor,
+            );
             previous
                 .component_mut::<AgentText>()
                 .expect("composer editor")
@@ -288,6 +368,12 @@ impl Composer {
         }
         self.revision = snapshot.revision;
         self.draft = snapshot.draft.clone();
+        let context_editable = gate.entries && !self.is_composing();
+        let context_affordances = self.context_affordances;
+        if let Some(context) = self.context_mut() {
+            context.update(snapshot, context_editable, context_affordances)?;
+        }
+        self.place_context();
         self.affordances = if gate.entries {
             affordances
         } else {
@@ -308,6 +394,10 @@ impl Composer {
         Ok(())
     }
     fn rebuild_actions(&mut self) {
+        let blocked = self.is_composing();
+        if let Some(context) = self.context_mut() {
+            context.set_blocked(blocked);
+        }
         // Retain existing ButtonContent instances; painting/updates never synthesize activation.
         let ids = self.ids;
         let entries = [
@@ -366,6 +456,30 @@ impl Composer {
     }
     /// Typed intents retain the exact presented destination. Submit/Enter never sends.
     pub fn take_intents(&mut self, actions: &[ContentAction]) -> Vec<ComposerIntent> {
+        if !self.is_composing()
+            && let Some(context) = self.context()
+        {
+            let intents: Vec<_> = context
+                .take_intents(actions)
+                .into_iter()
+                .filter(|intent| match (&intent.item, intent.action) {
+                    (_, crate::ComposerContextAction::Remove) => true,
+                    (_, crate::ComposerContextAction::EditAnnotation) => {
+                        self.context_affordances.edit_annotations
+                    }
+                    (
+                        crate::ComposerContextItem::Artifact(_),
+                        crate::ComposerContextAction::Open,
+                    ) => self.context_affordances.preview_artifacts,
+                    (
+                        crate::ComposerContextItem::Annotation(_),
+                        crate::ComposerContextAction::Open,
+                    ) => self.context_affordances.reveal_annotations,
+                })
+                .map(|intent| ComposerIntent::Context(Box::new(intent)))
+                .collect();
+            self.pending.extend(intents);
+        }
         self.local_edit();
         for action in actions
             .iter()

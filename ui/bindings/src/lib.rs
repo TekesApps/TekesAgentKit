@@ -142,6 +142,48 @@ impl RunBinding {
             .ok_or_else(|| unsupported("read-only bounded child"))?
             .edit_text(destination, text)
     }
+    /// Commit a host's explicit content replacement against its original capture.
+    /// A text/settings edit or stream update is retained; changed context, scope,
+    /// Send or retired pointer rejects the capture. No retry/merge is inferred.
+    pub fn patch_context(
+        &self,
+        expected: &tekes_agent_presentation::ComposerContextBaseline,
+        artifacts: Vec<tekes_agent_presentation::ComposerArtifact>,
+        annotations: Vec<tekes_agent_presentation::ComposerAnnotation>,
+    ) -> Result<bool> {
+        self.require_controls(&expected.selection.destination)?;
+        self.controller
+            .as_ref()
+            .expect("validated controller")
+            .patch_context(expected, artifacts, annotations)
+    }
+    pub fn remove_context(
+        &self,
+        intent: &tekes_agent_components_ui::ComposerContextIntent,
+    ) -> Result<bool> {
+        use tekes_agent_components_ui::{ComposerContextAction, ComposerContextItem};
+        require(
+            intent.action == ComposerContextAction::Remove,
+            "not a context removal",
+        )?;
+        let mut artifacts = intent.baseline.artifacts.clone();
+        let mut annotations = intent.baseline.annotations.clone();
+        match &intent.item {
+            ComposerContextItem::Artifact(item) => {
+                if !artifacts.contains(item) {
+                    return Ok(false);
+                }
+                artifacts.retain(|a| a.id() != item.id());
+            }
+            ComposerContextItem::Annotation(item) => {
+                if !annotations.contains(item) {
+                    return Ok(false);
+                }
+                annotations.retain(|a| a.id != item.id);
+            }
+        }
+        self.patch_context(&intent.baseline, artifacts, annotations)
+    }
     /// Begin one settings gesture, invalidating an older catalog request through
     /// the existing presentation generation. Hosts must also fence navigation
     /// before presenting results and retain this exact request for completion.

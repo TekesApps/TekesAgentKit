@@ -12,9 +12,12 @@ parser.add_argument('--ui-demo',type=Path,help='Optional already-built AgentKit 
 parser.add_argument('--ui-output',type=Path)
 parser.add_argument('--ui-components',action='store_true',help='Mount formal Composer/Indicators with RunBinding; structured Transcript remains unavailable')
 parser.add_argument('--ui-model-choices',action='store_true',help='Exercise public model choices and explicit Send preparation in isolated offscreen component sessions')
+parser.add_argument('--ui-context',action='store_true',help='Exercise draft context cards, explicit removal and annotation/reference return in isolated component sessions')
 args=parser.parse_args()
 if args.ui_model_choices and not args.ui_components:
     parser.error('--ui-model-choices requires --ui-components')
+if args.ui_context and not args.ui_components:
+    parser.error('--ui-context requires --ui-components')
 if args.ui_output and not args.ui_demo:
     parser.error("--ui-output requires --ui-demo")
 if args.ui_components and not args.ui_demo:
@@ -165,6 +168,7 @@ def ui_smoke(config, first):
     if kind!='native':output=output.with_name(output.stem+'-'+kind+output.suffix)
     mode=['--components'] if args.ui_components else []
     if args.ui_model_choices:mode+=['--model-choice-proof']
+    if args.ui_context:mode+=['--context-proof']
     ui=subprocess.run([str(args.ui_demo.resolve()),*mode,'--endpoint-config',str(path),'--offscreen',str(output)],env=ui_env,text=True,capture_output=True,timeout=60)
     assert ui.returncode==0,ui.stderr[-3000:]
     receipt=next(json.loads(line) for line in ui.stdout.splitlines() if line.startswith('{') and json.loads(line).get('offscreen'))
@@ -176,6 +180,10 @@ def ui_smoke(config, first):
         if args.ui_model_choices:
             proof=receipt['modelChoiceProof']
             assert proof['catalogChoices']>=1 and proof['explicitSelection'] and proof['configurationReceipt'] and proof['promptSettled'] and not proof['nativeInteraction'],proof
+        if args.ui_context:
+            proof=receipt['contextProof']
+            assert proof['mountedCards'] and proof['explicitRemoval'] and proof['referenceReturned'] and proof['annotationReturned'] and proof['promptSettled'] and proof['clearedDraft'],proof
+            assert not proof['fileUpload'] and not proof['nativeInteraction'] and not proof['structuredTranscript'],proof
         print(kind.upper()+'_UI_COMPONENTS_RECEIPT '+json.dumps(receipt,sort_keys=True))
         print(kind.upper()+'_UI_COMPONENTS_LIVE_OK explicit-SEP+shared-runtime+restored-data+Composer+Indicators+Sidebar+Summary+GPU; transcript-view=false; native-interaction=false')
     else:

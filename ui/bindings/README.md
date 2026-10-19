@@ -297,3 +297,56 @@ The model path has native fixture and actual three-SEP offscreen integration
 receipts. These do not prove physical IME, a standard native menu, three-harness
 native UX, provider-specific reasoning switches or complete model/preset parity.
 See `docs/rust-agent-ui-model-integration-20261019.md` for exact scope.
+
+## Composer draft content
+
+`ComposerContext` renders attachment names, commands, skills, references and
+annotation DTOs from the existing RunSnapshot. It does not read a file, parse
+prompt syntax, upload media, resolve provenance or implement another editor.
+For embedding, opt in with `Composer::with_context(namespace, labels)` and reserve
+that entire namespace separately from other components. Empty content remains
+retained but unmounted, preserving the original editor and layout. The demo uses
+explicit namespaces above its main/pane ranges.
+
+`Composer::update_gated` updates embedded cards. A standalone context takes the
+same controller's monotonic snapshot plus an editable gate and explicit
+ComposerContextAffordances. Preview/reveal/edit default off. With an embedded
+Composer, marked text disables all card actions; the surrounding host must still
+retain its normal cross-component composition barrier. Apply affordance changes
+before the next snapshot update and drain actions before changing source inputs.
+
+Drain `ComposerIntent::Context` with the original binding. Its immutable Arc
+baseline, item and action belong to the displayed destination, not whichever
+session is visible after an await. Call `binding.remove_context(&intent)` for
+Remove. It delegates to shared atomic patch_context, preserving newer prose and
+settings. False means the capture became stale; refresh the UI and require an
+explicit new gesture. Never automatically replay against a newer capture.
+Open/EditAnnotation are captured host callbacks, not evidence that preview,
+source navigation or an annotation editor has been implemented. Verify source
+locator/revision/digest and permissions before revealing or editing.
+
+For an explicit host file-picker/upload/capture adapter, take
+`ComposerContextBaseline::read(&binding.current_run()?)` from the public
+tekes-agent-presentation package. Collect the host's valid artifact/annotation
+DTOs, then call `binding.patch_context(&baseline, artifacts, annotations)`.
+This atomically replaces only those two collections. Do not read a whole stale
+draft and write it back with new media: that would erase newer text/settings.
+Batch related uploads into one capture. If the capture is obsolete, retain the
+owned result for explicit user recovery; do not attach it to the newest session.
+
+The shared per-destination draft_context_revision changes on context edits,
+Send (including empty context), failure restoration and materialization. A
+remove/re-add of identical content therefore cannot revive a callback. It does
+not change for text, settings or stream updates. Older serialized snapshots
+default this field to zero; that does not authorize replacing a newer live
+context. Existing Run settings gestures do not invalidate independent context
+captures; NewThread captures still require the exact selection generation. Rust
+struct-literal callers must supply the new snapshot field. The original binding also rechecks missing/retired/read-only/unknown
+pane authority. Keep one controller authority for each component lifetime.
+
+The demo mounts cards and implements removal only. Native --context-selftest
+uses a display-only attachment receipt and removes it before Send; no file
+upload/preview is claimed. --ui-context in the real-SEP script proves reference
+and annotation text return with isolated local synthetic providers. It does not
+prove structured historical cards, content undo, a native file picker, an
+annotation editor, source highlights, physical IME or VoiceOver.

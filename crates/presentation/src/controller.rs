@@ -74,6 +74,11 @@ impl Shared {
                     .as_ref()
                     .map(|d| core.draft(d))
                     .unwrap_or_default();
+                old.draft_context_revision = core
+                    .selected
+                    .as_ref()
+                    .map(|d| core.context_revision(d))
+                    .unwrap_or_default();
                 old.can_submit = false;
                 old.connection.phase = ConnectionPhase::Degraded;
                 old.connection.can_submit = false;
@@ -249,6 +254,23 @@ impl RunController {
             .edit_text(destination, text)?;
         self.shared.refresh();
         Ok(())
+    }
+    pub fn patch_context(
+        &self,
+        expected: &ComposerContextBaseline,
+        artifacts: Vec<ComposerArtifact>,
+        annotations: Vec<ComposerAnnotation>,
+    ) -> Result<bool> {
+        self.shared
+            .validate_destination(&expected.selection.destination)?;
+        let result = self
+            .shared
+            .core
+            .lock()
+            .expect("presentation lock poisoned")
+            .patch_context(expected, artifacts, annotations)?;
+        self.shared.refresh();
+        Ok(result)
     }
     pub fn commit_settings(
         &self,

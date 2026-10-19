@@ -1,5 +1,35 @@
 //! Second consumer: depends only on AgentKit's public UI packages.
 #[test]
+fn independent_host_mounts_context_inside_composer_with_an_explicit_separate_namespace() {
+    use tekes_agent_components_ui::{Composer, ComposerIds};
+    let composer = Composer::new(ComposerIds::new(3000))
+        .with_context(86, Default::default())
+        .unwrap();
+    let context = composer.context().unwrap().id();
+    let editor = composer.ids().editor;
+    let host = composer.into_host().unwrap();
+    assert!(
+        host.get(context).is_none(),
+        "an empty context does not add a layout slot"
+    );
+    assert!(host.get(editor).is_some());
+}
+pub fn sync_context(
+    context: &mut tekes_agent_components_ui::ComposerContext,
+    source: &tekes_agent_ui_bindings::RunBinding,
+) -> Result<(), String> {
+    let snapshot = source
+        .current_run()
+        .ok_or_else(|| "missing or read-only run".to_owned())?;
+    context
+        .update(
+            &snapshot,
+            source.access() == tekes_agent_ui_bindings::PaneAccess::Ready,
+            Default::default(),
+        )
+        .map_err(str::to_owned)
+}
+#[test]
 fn independent_host_mounts_composer_choices_without_a_catalog_service_or_run_surface() {
     use tekes_agent_components_ui::{
         ComposerChoiceKind, ComposerChoices, ComposerDestination, RunScope,

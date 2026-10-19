@@ -17,6 +17,12 @@
 
 模型/预设新增独立 `ComposerChoices` 内容和 `ComposerSettingsRequest` 绑定；公开目录输入、回调与宿主责任见 [接入说明](bindings/README.md#composer-model-and-preset-content)。模型已接入 demo 的公开 `session.models` 目录与发送前配置，预设等入口仍待接入；见 [模型闭环记录](../docs/rust-agent-ui-model-integration-20261019.md)。
 
+`ComposerContext` 提供附件/引用/命令/技能/批注内容卡片与捕获目标的移除/预览/编辑意图。
+demo 已接入原子移除；文件选择、上传、预览、批注编辑和来源高亮仍需明确适配器。
+`--components --context-selftest` 使用隔离 fixture 验证组字屏障与提交；真实三端脚本可加
+`--ui-context --ui-components --ui-demo <binary>` 验证引用/批注的数据回传。
+公开责任和证据见 [草稿内容记录](../docs/rust-agent-ui-context-20261020.md)。
+
 新增实验 [runtime 绑定包](bindings/README.md)，连接组件回调、既有 RunController、历史 lease 与 SideChat 通知；不复制业务状态机。原生 demo 尚未迁移到正式 RunView。
 
 `--components` 启用实际 Composer/Indicators + RunBinding 的独立原生验证窗口，可与 `--native-selftest`、`--offscreen` 或显式 `--endpoint-config` 组合。已完成合成文本服务、发送/取消、草稿隔离和重连的窗口验证；真实三端离屏接入可加 `--ui-components`。截图与验收范围见 [原生组件接入记录](../docs/rust-agent-ui-native-controls-20261019.md)。它不包含正式 Transcript，也不是标准 RunView。

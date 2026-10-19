@@ -49,6 +49,10 @@ pub const SELECT_B: ComponentId = ComponentId(101);
 pub const RECONNECT: ComponentId = ComponentId(102);
 
 pub enum DemoCommand {
+    OpenContext {
+        binding: Arc<RunBinding>,
+        intent: tekes_agent_components_ui::ComposerContextIntent,
+    },
     ReadModels {
         binding: Arc<RunBinding>,
         request: ComposerChoiceRequest,
@@ -333,7 +337,12 @@ impl ComponentDemo {
                 flexible_child: None,
                 children: vec![
                     Content::new(ComponentId(ids.root.0 + 17), Indicators::default()),
-                    Content::new(ids.root, Composer::new(ids)),
+                    Content::new(
+                        ids.root,
+                        Composer::new(ids)
+                            .with_context(1_000_000 + (ids.root.0 >> 32) as u32, Default::default())
+                            .expect("separate draft context namespace"),
+                    ),
                 ],
             },
         )
@@ -1967,6 +1976,18 @@ impl ComponentDemo {
             match intent {
                 ComposerIntent::Edit { destination, text } => {
                     binding.edit_text(&destination, text)?
+                }
+                ComposerIntent::Context(intent) => {
+                    if intent.action == tekes_agent_components_ui::ComposerContextAction::Remove {
+                        if !binding.remove_context(&intent)? {
+                            self.set_notice("草稿内容已变化，请重新操作");
+                        }
+                    } else {
+                        commands.push(DemoCommand::OpenContext {
+                            binding: binding.clone(),
+                            intent: *intent,
+                        });
+                    }
                 }
                 ComposerIntent::Send { destination } => {
                     let ticket = binding.prepare_send(&destination, PromptMode::Queue)?;

@@ -69,6 +69,8 @@ struct Host {
     fork_test_session: Option<String>,
     models_selftest: bool,
     model_test_stage: u8,
+    context_selftest: bool,
+    context_stage: u8,
 }
 enum HostResult {
     ModelCatalog {
@@ -402,6 +404,11 @@ impl Host {
                                     "no component demo capability adapter",
                                 ))
                             }
+                            DemoCommand::OpenContext { .. } => {
+                                Err(tekes_agent_contract::unsupported(
+                                    "no preview or annotation editor host adapter",
+                                ))
+                            }
                             DemoCommand::Sidebar(_)
                             | DemoCommand::ReadModels { .. }
                             | DemoCommand::Rename(_)
@@ -644,6 +651,78 @@ impl Host {
                 .expect("component frame");
         }
         window.set_animating(self.text.frame_requested);
+        if self.context_selftest {
+            if self.context_stage == 1
+                && self.view.bindings()[0]
+                    .current_run()
+                    .unwrap()
+                    .draft
+                    .artifacts
+                    .len()
+                    == 1
+            {
+                self.context_stage = 2;
+                let send = self
+                    .view
+                    .tree
+                    .get(self.view.ids().send)
+                    .unwrap()
+                    .frame()
+                    .center();
+                let b = self
+                    .view
+                    .tree
+                    .get(tekes_agent_ui_demo::component_demo::SELECT_B)
+                    .unwrap()
+                    .frame()
+                    .center();
+                tekes_ui_platform_macos::selftest::run_script(vec![
+                    (
+                        100,
+                        tekes_ui_platform_macos::selftest::Action::Click {
+                            x: send.x as f64,
+                            y: send.y as f64,
+                        },
+                    ),
+                    (
+                        400,
+                        tekes_ui_platform_macos::selftest::Action::Click {
+                            x: b.x as f64,
+                            y: b.y as f64,
+                        },
+                    ),
+                ]);
+            } else if self.context_stage == 2
+                && self.runtime.inspect(|s| {
+                    s.sessions.get("a").is_some_and(|s| {
+                        !s.run_open
+                            && s.entries.values().any(|e| {
+                                e.event.kind == "user/message"
+                                    && e.event.data.to_string().contains("上下文消息")
+                            })
+                    })
+                })
+            {
+                self.context_stage = 3;
+                let a = self
+                    .view
+                    .tree
+                    .get(tekes_agent_ui_demo::component_demo::SELECT_A)
+                    .unwrap()
+                    .frame()
+                    .center();
+                tekes_ui_platform_macos::selftest::run_script(vec![
+                    (
+                        100,
+                        tekes_ui_platform_macos::selftest::Action::Click {
+                            x: a.x as f64,
+                            y: a.y as f64,
+                        },
+                    ),
+                    (500, tekes_ui_platform_macos::selftest::Action::Close),
+                ]);
+            }
+        }
         if self.models_selftest {
             let chosen = serde_json::json!(["fixture", "chosen"]).to_string();
             if self.model_test_stage == 0 && self.view.model_choice_id(&chosen).is_some() {
@@ -863,6 +942,40 @@ impl Host {
         );
     }
     fn close(&mut self, window: &Window) {
+        if self.context_selftest {
+            assert!(
+                self.failures.is_empty(),
+                "context failures: {:?}",
+                self.failures
+            );
+            assert_eq!(self.context_stage, 3);
+            let state = self.runtime.snapshot();
+            let users: Vec<_> = state.sessions["a"]
+                .entries
+                .values()
+                .filter(|e| {
+                    e.event.kind == "user/message"
+                        && e.event.data.to_string().contains("上下文消息")
+                })
+                .collect();
+            assert_eq!(users.len(), 1);
+            let input = users[0].event.data.to_string();
+            assert!(
+                input.contains("上下文引用说明")
+                    && input.contains("中文引用")
+                    && input.contains("请解释这段内容")
+            );
+            assert!(!input.contains("DISPLAY_ONLY_NOT_UPLOADED"));
+            let a = self.view.bindings()[0].current_run().unwrap();
+            assert!(a.draft.artifacts.is_empty() && a.draft.annotations.is_empty());
+            let b = self.view.bindings()[1].current_run().unwrap();
+            assert_eq!(b.draft.text, "B 内容草稿");
+            assert_eq!(b.draft.artifacts.len(), 1);
+            assert_eq!(self.view.current_binding().unwrap().scope().session_id, "a");
+            println!(
+                "NATIVE_AGENT_CONTEXT_SELFTEST_OK public-cards+ime-barrier+remove-before-send+shared-compilation+single-admission+stream+destination-isolation; file-upload=false; annotation-editor=false; physical-ime=false"
+            );
+        }
         if self.models_selftest {
             assert!(
                 self.failures.is_empty(),
@@ -1224,6 +1337,10 @@ impl WindowHandler for Host {
                         (15000, tekes_ui_platform_macos::selftest::Action::Close),
                     ]);
                 }
+                if self.context_selftest {
+                    self.context_stage = 1;
+                    context_script(&self.view);
+                }
             }
             Event::Resized {
                 drawable_size,
@@ -1246,7 +1363,7 @@ impl WindowHandler for Host {
                 self.draw(window);
             }
             Event::Focus(active) => {
-                if self.selftest {
+                if self.selftest || self.context_selftest {
                     eprintln!(
                         "COMPONENT_FOCUS active={active} id={:?}",
                         self.view.tree.focused()
@@ -1339,11 +1456,17 @@ pub fn run() {
     let selftest = args.iter().any(|arg| arg == "--native-selftest");
     let actions_selftest = args.iter().any(|arg| arg == "--thread-actions-selftest");
     let models_selftest = args.iter().any(|arg| arg == "--model-choices-selftest");
+    let context_selftest = args.iter().any(|arg| arg == "--context-selftest");
     assert!(
-        [selftest, actions_selftest, models_selftest]
-            .into_iter()
-            .filter(|v| *v)
-            .count()
+        [
+            selftest,
+            actions_selftest,
+            models_selftest,
+            context_selftest
+        ]
+        .into_iter()
+        .filter(|v| *v)
+        .count()
             <= 1,
         "choose one native fixture selftest mode"
     );
@@ -1355,7 +1478,7 @@ pub fn run() {
         _,
     ) = if let Some(index) = args.iter().position(|arg| arg == "--endpoint-config") {
         assert!(
-            !selftest && !actions_selftest && !models_selftest,
+            !selftest && !actions_selftest && !models_selftest && !context_selftest,
             "native selftest uses isolated fixture only"
         );
         let value = serde_json::from_slice(
@@ -1452,6 +1575,40 @@ pub fn run() {
         ([a, b], sidebar)
     });
     let mut view = ComponentDemo::new(bindings).unwrap();
+    if context_selftest {
+        use tekes_agent_presentation::{
+            ComposerArtifact, ComposerContextBaseline, ComposerDestination,
+        };
+        let a = &view.bindings()[0];
+        let (artifacts, annotations) = tekes_agent_ui_demo::fixture::composer_context_fixture();
+        assert!(
+            a.patch_context(
+                &ComposerContextBaseline::read(&a.current_run().unwrap()).unwrap(),
+                artifacts,
+                annotations
+            )
+            .unwrap()
+        );
+        let b = &view.bindings()[1];
+        b.edit_text(
+            &ComposerDestination::run(b.scope().clone()),
+            "B 内容草稿".into(),
+        )
+        .unwrap();
+        assert!(
+            b.patch_context(
+                &ComposerContextBaseline::read(&b.current_run().unwrap()).unwrap(),
+                vec![ComposerArtifact::Reference {
+                    id: "b-context".into(),
+                    mention: Some("B 资料".into()),
+                    path: None,
+                    excerpt: None
+                }],
+                vec![]
+            )
+            .unwrap()
+        );
+    }
     if actions_selftest {
         let binding = view.binding();
         binding
@@ -1506,6 +1663,8 @@ pub fn run() {
         fork_test_session: None,
         models_selftest,
         model_test_stage: 0,
+        context_selftest,
+        context_stage: 0,
         text: TextBackend {
             shaper: CoreTextShaper::new(fonts.clone()),
             rasterizer: CoreTextRasterizer::new(fonts),
@@ -1532,6 +1691,7 @@ pub fn run() {
     };
     if let Some(index) = args.iter().position(|arg| arg == "--offscreen") {
         let mut model_proof = serde_json::Value::Null;
+        let mut context_proof = serde_json::Value::Null;
         if args.iter().any(|arg| arg == "--model-choice-proof") {
             let commands = host
                 .view
@@ -1621,6 +1781,120 @@ pub fn run() {
             host.view.sync().unwrap();
             model_proof = serde_json::json!({"catalogChoices":count,"selected":chosen,"explicitSelection":true,"configurationReceipt":true,"promptSettled":true,"nativeInteraction":false});
         }
+        if args.iter().any(|arg| arg == "--context-proof") {
+            use tekes_agent_components_ui::{Composer, ComposerContextAction, ComposerContextItem};
+            use tekes_agent_presentation::{
+                ComposerArtifact, ComposerContextBaseline, ComposerDestination,
+            };
+            let binding = host.view.binding().clone();
+            let (_, annotations) = tekes_agent_ui_demo::fixture::composer_context_fixture();
+            let keep = ComposerArtifact::Reference {
+                id: "keep".into(),
+                mention: Some("上下文引用说明".into()),
+                path: None,
+                excerpt: None,
+            };
+            let remove = ComposerArtifact::Reference {
+                id: "discard".into(),
+                mention: Some("CONTEXT_NOT_SUBMITTED".into()),
+                path: None,
+                excerpt: None,
+            };
+            assert!(
+                binding
+                    .patch_context(
+                        &ComposerContextBaseline::read(&binding.current_run().unwrap()).unwrap(),
+                        vec![keep, remove.clone()],
+                        annotations
+                    )
+                    .unwrap()
+            );
+            host.view.sync().unwrap();
+            let target = host
+                .view
+                .tree
+                .get(host.view.ids().root)
+                .unwrap()
+                .component::<Composer>()
+                .unwrap()
+                .context()
+                .unwrap()
+                .action_id(
+                    &ComposerContextItem::Artifact(remove),
+                    ComposerContextAction::Remove,
+                )
+                .unwrap();
+            host.view
+                .accessibility_action(target, None, AccessibilityAction::Press)
+                .unwrap();
+            let destination = ComposerDestination::run(binding.scope().clone());
+            let previous = binding
+                .current_run()
+                .unwrap()
+                .transcript
+                .items
+                .iter()
+                .filter(|i| {
+                    i.kind == tekes_agent_presentation::TranscriptItemKind::Assistant && i.is_final
+                })
+                .count();
+            binding
+                .edit_text(&destination, "AgentKit context UI proof".into())
+                .unwrap();
+            host.executor.block_on(async {
+                let mut changes = binding.subscribe_run().unwrap();
+                binding
+                    .send_with(
+                        &destination,
+                        tekes_agent_contract::PromptMode::Queue,
+                        &ModelSelectionPreparation,
+                    )
+                    .await
+                    .unwrap();
+                tokio::time::timeout(Duration::from_secs(30), async {
+                    loop {
+                        let snapshot = changes.borrow_and_update().clone();
+                        if snapshot.can_submit
+                            && snapshot
+                                .transcript
+                                .items
+                                .iter()
+                                .filter(|i| {
+                                    i.kind
+                                        == tekes_agent_presentation::TranscriptItemKind::Assistant
+                                        && i.is_final
+                                })
+                                .count()
+                                > previous
+                        {
+                            break;
+                        }
+                        changes.changed().await.unwrap();
+                    }
+                })
+                .await
+                .expect("context assistant settlement");
+            });
+            let snapshot = binding.current_run().unwrap();
+            let input = snapshot
+                .transcript
+                .items
+                .iter()
+                .find(|i| {
+                    i.kind == tekes_agent_presentation::TranscriptItemKind::User
+                        && i.text.contains("AgentKit context UI proof")
+                })
+                .expect("restored context input");
+            assert!(
+                input.text.contains("上下文引用说明")
+                    && input.text.contains("中文引用")
+                    && input.text.contains("请解释这段内容")
+            );
+            assert!(!input.text.contains("CONTEXT_NOT_SUBMITTED"));
+            assert!(snapshot.draft.artifacts.is_empty() && snapshot.draft.annotations.is_empty());
+            host.view.sync().unwrap();
+            context_proof = serde_json::json!({"mountedCards":true,"explicitRemoval":true,"referenceReturned":true,"annotationReturned":true,"promptSettled":true,"clearedDraft":true,"fileUpload":false,"nativeInteraction":false,"structuredTranscript":false});
+        }
         let clip = Rect::new(0., 0., 1000., 760.);
         host.text.atlas.begin_frame();
         host.view
@@ -1667,6 +1941,7 @@ pub fn run() {
             "sidebarMounted": host.view.tree.get(host.view.sidebar_id()).is_some(),
             "summaryMounted": host.view.tree.get(host.view.summary_id()).is_some(),
             "modelChoiceProof":model_proof,
+            "contextProof":context_proof,
             })
         );
         host.executor.block_on(host.runtime.stop()).unwrap();
@@ -1696,6 +1971,68 @@ pub fn run() {
         MenuBar::default(),
         host,
     );
+}
+fn context_script(view: &ComponentDemo) {
+    use tekes_agent_components_ui::{Composer, ComposerContextAction, ComposerContextItem};
+    use tekes_ui_platform_macos::selftest::{Action, run_script};
+    let ids = view.ids();
+    let attachment = view.binding().current_run().unwrap().draft.artifacts[0].clone();
+    let remove = view
+        .tree
+        .get(ids.root)
+        .unwrap()
+        .component::<Composer>()
+        .unwrap()
+        .context()
+        .unwrap()
+        .action_id(
+            &ComposerContextItem::Artifact(attachment),
+            ComposerContextAction::Remove,
+        )
+        .unwrap();
+    let click = |id| {
+        let p = view.tree.get(id).unwrap().frame().center();
+        Action::Click {
+            x: p.x as f64,
+            y: p.y as f64,
+        }
+    };
+    let mut script = vec![];
+    if let Ok(path) = std::env::var("AGENT_CONTEXT_CAPTURE") {
+        script.push((100, Action::Capture { path }));
+    }
+    script.extend([
+        (200, click(ids.editor)),
+        (300, Action::TextCommand("selectAll:")),
+        (400, Action::Text(String::new())),
+        (
+            500,
+            Action::ExpectText {
+                text: String::new(),
+                marked: false,
+            },
+        ),
+        (
+            700,
+            Action::PreeditRange {
+                text: "上下文组字".into(),
+                selection: 5..5,
+                replacement: None,
+            },
+        ),
+        (900, click(remove)),
+        (
+            1100,
+            Action::ExpectText {
+                text: "上下文组字".into(),
+                marked: true,
+            },
+        ),
+        (1300, Action::Text("上下文消息".into())),
+        (1600, click(remove)),
+        (15000, Action::Close),
+    ]);
+    run_script(script);
 }
 fn native_script(view: &ComponentDemo) {
     use tekes_ui_platform_macos::selftest::{Action, run_script};
