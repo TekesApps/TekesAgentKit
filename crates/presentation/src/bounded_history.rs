@@ -173,6 +173,8 @@ impl BoundedHistory {
                     started_at: None,
                     ended_at: None,
                     usage: TokenUsage::default(),
+                    fork_boundary: None,
+                    footnote_actions: Vec::new(),
                     live_usage: None,
                     reported_usage: None,
                 },

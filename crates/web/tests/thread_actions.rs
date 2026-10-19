@@ -16,6 +16,8 @@ struct Connector {
     calls: Arc<Mutex<Vec<(String, Value, String)>>>,
     archive_disabled: Arc<AtomicBool>,
     rename_fails: Arc<AtomicBool>,
+    settled_journal: bool,
+    turn_fork_disabled: Arc<AtomicBool>,
     live_journal: Option<tokio::sync::broadcast::Sender<Value>>,
 }
 struct Endpoint {
@@ -44,6 +46,8 @@ impl SessionEndpoint for Endpoint {
     fn capabilities(&self) -> EndpointCapabilities {
         let mut caps =
             EndpointCapabilities::methods(&["session.rename", "session.fork", "session.archive"]);
+        caps.can_fork_completed_turn = self.connector.settled_journal
+            && !self.connector.turn_fork_disabled.load(Ordering::SeqCst);
         caps.supports_archive_session = !self.connector.archive_disabled.load(Ordering::SeqCst);
         caps
     }
@@ -65,6 +69,19 @@ impl SessionEndpoint for Endpoint {
                             rx.recv().await.ok().map(|value| (Ok(value), rx))
                         }),
                     )));
+                }
+                if self.connector.settled_journal {
+                    return Ok(Box::pin(stream::once(async move { Ok(json!({"type":"snapshot","snapshot":{
+                        "sessionId":address.session_id,"generation":"g","throughSequence":5,"windowLimit":50,
+                        "entries":[
+                            {"event":{"type":"turn/start","seq":0,"time":1,"data":{"turn":1}}},
+                            {"event":{"type":"user/message","seq":1,"time":1,"data":{"turn":1,"message":{"content":[{"type":"text","text":"one"}]}}}},
+                            {"event":{"type":"turn/end","seq":2,"time":2,"data":{"turn":1,"reason":"completed"}}},
+                            {"event":{"type":"turn/start","seq":3,"time":3,"data":{"turn":2}}},
+                            {"event":{"type":"user/message","seq":4,"time":3,"data":{"turn":2,"message":{"content":[{"type":"text","text":"two"}]}}}},
+                            {"event":{"type":"turn/end","seq":5,"time":4,"data":{"turn":2,"reason":"completed"}}}
+                        ],"hasMoreBefore":false
+                    }})) }).chain(stream::pending())));
                 }
                 json!({"type":"snapshot","snapshot":{"sessionId":address.session_id,"generation":"g","throughSequence":-1,"windowLimit":50,"entries":[],"hasMoreBefore":false}})
             }
@@ -389,4 +406,70 @@ async fn web_view_forwards_provider_usage_transients_without_advancing_history()
         .unwrap();
     }
     follow.abort();
+}
+
+#[tokio::test]
+async fn footnote_fork_uses_the_selected_settled_boundary_and_rejects_unknown_turns() {
+    let connector = Connector {
+        settled_journal: true,
+        ..Default::default()
+    };
+    let mut agent = SharedAgent::default();
+    agent
+        .register(
+            "test".into(),
+            "tekes".into(),
+            "Test".into(),
+            Arc::new(connector.clone()),
+        )
+        .unwrap();
+    agent
+        .endpoint("test")
+        .unwrap()
+        .runtime
+        .wait_ready(Duration::from_secs(2))
+        .await
+        .unwrap();
+    let agent = Arc::new(agent);
+    let (tx, mut rx) = tokio::sync::mpsc::channel(8);
+    let owner = agent.clone();
+    let task = tokio::spawn(async move {
+        owner
+            .follow(
+                &json!({"endpoint":"test","target":"view","sessionId":"source"}),
+                tx,
+            )
+            .await
+    });
+    let view = tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            let view = rx.recv().await.unwrap();
+            if view["transcript"]["turns"][0]["footnoteActions"][0]["enabled"] == true {
+                break view;
+            }
+        }
+    })
+    .await
+    .unwrap();
+    let first = &view["transcript"]["turns"][0];
+    assert_eq!(first["forkBoundary"]["atSeq"], 2);
+    assert_eq!(view["transcript"]["turns"][1]["forkBoundary"]["atSeq"], 5);
+    let action = first["footnoteActions"][0]["id"].as_str().unwrap();
+    assert_eq!(first["footnoteActions"][0]["label"], "从此回合分叉");
+    let result = agent.request(&request(action)).await.unwrap();
+    assert_eq!(result["navigation"]["sessionId"], "child");
+    let calls = connector.calls.lock().unwrap().clone();
+    assert_eq!(calls[0].0, "session.fork");
+    assert_eq!(
+        calls[0].1,
+        json!({"sessionId":"source","atSeq":2,"ephemeral":false})
+    );
+    assert_eq!(calls[0].2, "stable");
+    let before = calls.len();
+    assert!(agent.request(&request("forkTurn:unknown")).await.is_err());
+    assert_eq!(connector.calls.lock().unwrap().len(), before);
+    connector.turn_fork_disabled.store(true, Ordering::SeqCst);
+    assert!(agent.request(&request(action)).await.is_err());
+    assert_eq!(connector.calls.lock().unwrap().len(), before);
+    task.abort();
 }

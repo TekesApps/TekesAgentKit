@@ -21,6 +21,11 @@ pub struct TranscriptTurn {
     pub started_at: Option<f64>,
     pub ended_at: Option<f64>,
     pub usage: TokenUsage,
+    /// Exact public endpoint boundary, admitted only from a durable settlement record.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fork_boundary: Option<Value>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub footnote_actions: Vec<tekes_agent_contract::ThreadActionDefinition>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub live_usage: Option<tekes_agent_contract::TranscriptLiveUsage>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -183,6 +188,8 @@ fn turn<'a>(
             started_at: time,
             ended_at: None,
             usage: TokenUsage::default(),
+            fork_boundary: None,
+            footnote_actions: Vec::new(),
             live_usage: None,
             reported_usage: None,
         });
@@ -493,6 +500,7 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
                     time,
                     data["promotedMessageID"].as_str(),
                 )?;
+                turn(&mut out, &turn_id, time).fork_boundary = Some(json!({"atSeq":event.seq}));
                 if reason == "error"
                     && data["reason"]["error"]["code"] != "AUTH"
                     && let Some(error) = data["reason"]["error"]["message"].as_str()
@@ -700,6 +708,10 @@ fn native(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSna
                     "completed"
                 };
                 settle(&mut out, &current, reason, data["timestamp"].as_f64(), None)?;
+                if let Some(entry_id) = entry["id"].as_str() {
+                    turn(&mut out, &current, None).fork_boundary =
+                        Some(json!({"entryId":entry_id}));
+                }
                 running_marker = false;
             }
             continue;

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.7 — 2026-10-19
+
+- Expose completed-turn footnote actions through the shared session view and existing thread action contract.
+- Resolve turn forks to durable journal/native settlement boundaries, revalidate capabilities at execution, and preserve navigation on follow-up warnings.
+- Add selected-boundary, restored-history and capability-change regression coverage plus a second public-API consumer.
+- Validation: 103 workspace tests, strict workspace Clippy, format and dependency-boundary checks; real public-API history reads across Kernel/Pi/DSH. Browser acceptance remains with the consumer.
+
 ## 0.3.0 — 2026-10-18
 
 - Pi independent child creation, parent-owned list/prompt/read/cancel, durable request-key replay,
