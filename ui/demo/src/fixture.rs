@@ -57,6 +57,8 @@ pub struct Fixture {
     catalog_fails: Arc<AtomicBool>,
     lifecycle: bool,
     models: bool,
+    model_read_gate: Option<Arc<tokio::sync::Semaphore>>,
+    model_read_calls: Arc<AtomicUsize>,
     uploads: bool,
     upload_calls: Arc<AtomicUsize>,
     upload_gate: Option<Arc<tokio::sync::Semaphore>>,
@@ -159,6 +161,8 @@ impl Default for Fixture {
             catalog_fails: Arc::new(AtomicBool::new(false)),
             lifecycle: false,
             models: false,
+            model_read_gate: None,
+            model_read_calls: Arc::new(AtomicUsize::new(0)),
             uploads: false,
             upload_calls: Arc::new(AtomicUsize::new(0)),
             upload_gate: None,
@@ -212,6 +216,13 @@ impl Fixture {
             .filter(|(method, _, _)| method == "session.create")
             .map(|(_, payload, _)| payload.clone())
             .collect()
+    }
+    pub fn with_model_read_gate(mut self, gate: Arc<tokio::sync::Semaphore>) -> Self {
+        self.model_read_gate = Some(gate);
+        self
+    }
+    pub fn model_read_calls(&self) -> usize {
+        self.model_read_calls.load(Ordering::SeqCst)
     }
     pub fn with_models(mut self) -> Self {
         self.models = true;
@@ -473,6 +484,16 @@ impl SessionEndpoint for Endpoint {
         Err(unsupported("fixture actionable"))
     }
     async fn call(&self, method: &str, p: Value, rpc: &str) -> Result<Value> {
+        if self.fixture.models && method == "session.models" {
+            self.fixture.model_read_calls.fetch_add(1, Ordering::SeqCst);
+            if let Some(gate) = &self.fixture.model_read_gate {
+                gate.acquire()
+                    .await
+                    .map_err(|_| unsupported("model read gate closed"))?
+                    .forget();
+            }
+        }
+
         if self.fixture.uploads && method == "session.fileAttachment" {
             self.fixture.file_read_calls.fetch_add(1, Ordering::SeqCst);
             if let Some(gate) = &self.fixture.file_read_gate {

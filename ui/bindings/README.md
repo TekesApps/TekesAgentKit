@@ -276,7 +276,11 @@ navigation; this button-only component does not own an input context.
    the existing host SubmissionPreparation applies model/preset/auth before dispatch.
 
 `RunBinding::model_choices(revision, rpc_id)` now reads public `session.models`
-for the captured receiving session and rechecks pane ownership after the read.
+for the captured receiving session and rechecks pane ownership, Ready capability
+and connection epoch after the read. A reconnect invalidates the old response.
+Hosts also capture the epoch via `subscribe_runtime().inspect(...)` for the UI
+gesture: reject success/error after an epoch change and retire already visible
+model/reasoning controls. A completed read is not lifetime authority for a panel.
 `ModelChoices` retains raw catalog/extension/failure metadata and uses framed
 provider/model IDs. Explicit routableProviders governs newer catalogs. The basic
 Kernel 0.9 SessionModels contract instead provides configured enabled groups plus

@@ -189,6 +189,7 @@ struct ModelGesture {
         ComposerChoiceRequest,
         tekes_agent_ui_bindings::ReasoningChoices,
     )>,
+    connection_epoch: u64,
     navigation: u64,
     panel_navigation: u64,
 }
@@ -948,6 +949,11 @@ impl ComponentDemo {
         !self.selection_cleared
             && gesture.navigation == self.navigation_revision
             && gesture.panel_navigation == self.panel_navigation_revision
+            && gesture.binding.supports_model_choices()
+            && gesture
+                .binding
+                .subscribe_runtime()
+                .inspect(|state| state.connection_epoch == gesture.connection_epoch)
             && gesture.binding.access() == PaneAccess::Ready
             && !self.composing()
     }
@@ -982,6 +988,9 @@ impl ComponentDemo {
             binding: binding.clone(),
             source: None,
             reasoning: None,
+            connection_epoch: binding
+                .subscribe_runtime()
+                .inspect(|state| state.connection_epoch),
             navigation: self.navigation_revision,
             panel_navigation: self.panel_navigation_revision,
         });

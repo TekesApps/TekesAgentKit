@@ -261,6 +261,7 @@ impl RunBinding {
             })
     }
     pub async fn model_choices(&self, revision: u64, rpc_id: &str) -> Result<ModelChoices> {
+        let epoch = self.runtime.inspect(|state| state.connection_epoch);
         let destination = ComposerDestination::run(self.scope.clone());
         self.require_controls(&destination)?;
         require(self.supports_model_choices(), "model catalog unavailable")?;
@@ -273,6 +274,13 @@ impl RunBinding {
             )
             .await?;
         self.require_controls(&destination)?;
+        require(
+            self.supports_model_choices()
+                && self
+                    .runtime
+                    .inspect(|state| state.connection_epoch == epoch),
+            "model catalog connection changed",
+        )?;
         let can_select = self.runtime.inspect(|s| {
             s.endpoint_capabilities
                 .methods

@@ -20,3 +20,5 @@ ComponentDemo 的模型入口同时挂载模型及该模型的推理内容。选
 [机器收据](rust-agent-ui-reasoning-20261020.json)、[原生 AX](rust-agent-ui-reasoning-native-20261020.txt)、[组件截图](../ui/docs/reasoning-options-native.png)。
 
 仍未交付正式 Transcript/RunView；TekesUI #22/#23 的公共能力阻塞保持不变。来源选区/高亮、图片/历史附件预览、失败对账和完整 Agent 设置仍需继续完成，不能据此合并或打完成 tag。
+
+增量复查：模型目录现与初始预设读取一致，在公开读取前后核对连接 epoch 与 Ready 能力；宿主目录手势也捕获 epoch。重连后旧成功/错误不能重开面板或关闭较新的手势，已挂载的模型/推理按钮会退休。新增 3 项 `model_reconnect` 用例通过；同轮模型/推理回归 8 项、第二公开 consumer 10 项及 strict Clippy 通过。这里是针对连接失效的增量证据，未重跑三端/原生窗口，沿用前述独立证据及边界。
