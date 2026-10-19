@@ -1,0 +1,272 @@
+Capture: final-b-isolated.ax.txt
+Window: "AgentKit · Composer / Indicators 验证", App: AgentKitUploadProof.
+0 standard window AgentKit · Composer / Indicators 验证, Secondary Actions: Raise
+	1 container (settable)
+		2 container (settable) 会话
+			3 container (settable) 会话
+				4 container (settable)
+					5 button (settable) 会话 a
+					6 text (settable) 已完成
+				7 container (settable)
+					8 button (selected, settable) 会话 b
+					9 text (settable) 已完成
+				10 container (settable)
+					11 button (settable) 会话 bounded-b
+					12 text (settable) 空闲
+				13 container (settable)
+					14 button (settable) 会话 child-a
+					15 text (settable) 空闲
+				16 container (settable)
+					17 button (settable) 会话 child-b
+					18 text (settable) 空闲
+				19 container (settable)
+					20 button (settable) 会话 nested-a
+					21 text (settable) 空闲
+			22 container (settable) 会话操作
+				23 button (settable) 置顶
+				24 button (settable) 重命名
+				25 button (settable) 分叉会话
+				26 button (settable) 复制会话 ID
+				27 button (settable) 归档会话
+		28 container (settable)
+			29 button (settable) 会话 A
+			30 button (selected, settable) 会话 B
+			31 button (settable) 重新连接
+			32 button (settable) 新会话
+			33 text (settable) 正式 Composer / Indicators 组件验证
+			34 text (settable) Transcript 待 TekesUI #22 / #23；此处不是消息视图。
+回传诊断：20 条内容，0 条流式内容，历史已同步。
+			35 text (settable) 已连接 · 空闲
+			36 container (settable) 消息编辑与发送
+				37 text entry area (settable) 消息
+				38 container (settable)
+					39 button (settable) 添加附件
+					40 button (settable) 模型
+					41 button (disabled, settable) 停止
+					42 button (disabled, settable) 发送
+		43 container (settable) Agent 侧面板
+			44 button (selected, settable) Summary
+			45 container (settable)
+				46 button (settable) 关闭当前标签
+				47 button (settable) 新建 SideChat
+			48 container (settable) Summary
+				49 container (settable) Summary
+					50 text (settable) 任务
+					51 text (settable) 验证会话 b 的数据回传 · completed
+					52 text (settable) 接入正式 Transcript · pending
+	53 close button
+	54 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	55 minimize button
+	56 text AgentKit · Composer / Indicators 验证
+57 menu bar
+	58 AgentKitUploadProof
+	59 Window
+
+The focused UI element is 37 text entry area (settable) 消息
+
+Capture: final-restored-draft.ax.txt
+Window: "AgentKit · Composer / Indicators 验证", App: AgentKitUploadProof.
+0 standard window AgentKit · Composer / Indicators 验证, Secondary Actions: Raise
+	1 container (settable)
+		2 container (settable) 会话
+			3 container (settable) 会话
+				4 container (settable)
+					5 button (selected, settable) 会话 a
+					6 text (settable) 已完成
+				7 container (settable)
+					8 button (settable) 会话 b
+					9 text (settable) 已完成
+				10 container (settable)
+					11 button (settable) 会话 bounded-b
+					12 text (settable) 空闲
+				13 container (settable)
+					14 button (settable) 会话 child-a
+					15 text (settable) 空闲
+				16 container (settable)
+					17 button (settable) 会话 child-b
+					18 text (settable) 空闲
+				19 container (settable)
+					20 button (settable) 会话 nested-a
+					21 text (settable) 空闲
+			22 container (settable) 会话操作
+				23 button (settable) 置顶
+				24 button (settable) 重命名
+				25 button (settable) 分叉会话
+				26 button (settable) 复制会话 ID
+				27 button (settable) 归档会话
+		28 container (settable)
+			29 button (selected, settable) 会话 A
+			30 button (settable) 会话 B
+			31 button (settable) 重新连接
+			32 button (settable) 新会话
+			33 text (settable) 正式 Composer / Indicators 组件验证
+			34 text (settable) Transcript 待 TekesUI #22 / #23；此处不是消息视图。
+回传诊断：20 条内容，0 条流式内容，历史已同步。
+			35 text (settable) 已连接 · 空闲
+			36 container (settable) 消息编辑与发送
+				37 container (settable) 草稿内容
+					38 container (settable)
+						39 text (settable) 附件 · 中文附件.txt
+						40 text (settable) 54 B
+						41 button (settable) 移除
+				42 text entry area (settable) Description: 消息, Value: 中文附件发送验证
+				43 container (settable)
+					44 button (settable) 模型
+					45 button (disabled, settable) 停止
+					46 button (settable) 发送
+			47 container (settable) 附件上传
+				48 text (settable) 附件已加入原会话草稿 · 1
+				49 button (settable) 关闭附件状态
+		50 container (settable) Agent 侧面板
+			51 button (selected, settable) Summary
+			52 container (settable)
+				53 button (settable) 关闭当前标签
+				54 button (settable) 新建 SideChat
+			55 container (settable) Summary
+				56 container (settable) Summary
+					57 text (settable) 任务
+					58 text (settable) 验证会话 a 的数据回传 · completed
+					59 text (settable) 接入正式 Transcript · pending
+	60 close button
+	61 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	62 minimize button
+	63 text AgentKit · Composer / Indicators 验证
+64 menu bar
+	65 AgentKitUploadProof
+	66 Window
+
+The focused UI element is 42 text entry area (settable) Description: 消息, Value: 中文附件发送验证
+
+Capture: final-settled.ax.txt
+Window: "AgentKit · Composer / Indicators 验证", App: AgentKitUploadProof.
+0 standard window AgentKit · Composer / Indicators 验证, Secondary Actions: Raise
+	1 container (settable)
+		2 container (settable) 会话
+			3 container (settable) 会话
+				4 container (settable)
+					5 button (selected, settable) 会话 a
+					6 text (settable) 已完成
+				7 container (settable)
+					8 button (settable) 会话 b
+					9 text (settable) 已完成
+				10 container (settable)
+					11 button (settable) 会话 bounded-b
+					12 text (settable) 空闲
+				13 container (settable)
+					14 button (settable) 会话 child-a
+					15 text (settable) 空闲
+				16 container (settable)
+					17 button (settable) 会话 child-b
+					18 text (settable) 空闲
+				19 container (settable)
+					20 button (settable) 会话 nested-a
+					21 text (settable) 空闲
+			22 container (settable) 会话操作
+				23 button (settable) 置顶
+				24 button (settable) 重命名
+				25 button (settable) 分叉会话
+				26 button (settable) 复制会话 ID
+				27 button (settable) 归档会话
+		28 container (settable)
+			29 button (selected, settable) 会话 A
+			30 button (settable) 会话 B
+			31 button (settable) 重新连接
+			32 button (settable) 新会话
+			33 text (settable) 正式 Composer / Indicators 组件验证
+			34 text (settable) Transcript 待 TekesUI #22 / #23；此处不是消息视图。
+回传诊断：22 条内容，0 条流式内容，历史已同步。
+			35 text (settable) 已连接 · 空闲
+			36 container (settable) 消息编辑与发送
+				37 text entry area (settable) 消息
+				38 container (settable)
+					39 button (settable) 模型
+					40 button (disabled, settable) 停止
+					41 button (disabled, settable) 发送
+			42 container (settable) 附件上传
+				43 text (settable) 附件已加入原会话草稿 · 1
+				44 button (settable) 关闭附件状态
+		45 container (settable) Agent 侧面板
+			46 button (selected, settable) Summary
+			47 container (settable)
+				48 button (settable) 关闭当前标签
+				49 button (settable) 新建 SideChat
+			50 container (settable) Summary
+				51 container (settable) Summary
+					52 text (settable) 任务
+					53 text (settable) 验证会话 a 的数据回传 · completed
+					54 text (settable) 接入正式 Transcript · pending
+	55 close button
+	56 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	57 minimize button
+	58 text AgentKit · Composer / Indicators 验证
+59 menu bar
+	60 AgentKitUploadProof
+	61 Window
+
+
+Capture: final-cancelled.ax.txt
+Window: "AgentKit · Composer / Indicators 验证", App: AgentKitUploadProof.
+0 standard window AgentKit · Composer / Indicators 验证, Secondary Actions: Raise
+	1 container (settable)
+		2 container (settable) 会话
+			3 container (settable) 会话
+				4 container (settable)
+					5 button (selected, settable) 会话 a
+					6 text (settable) 已完成
+				7 container (settable)
+					8 button (settable) 会话 b
+					9 text (settable) 已完成
+				10 container (settable)
+					11 button (settable) 会话 bounded-b
+					12 text (settable) 空闲
+				13 container (settable)
+					14 button (settable) 会话 child-a
+					15 text (settable) 空闲
+				16 container (settable)
+					17 button (settable) 会话 child-b
+					18 text (settable) 空闲
+				19 container (settable)
+					20 button (settable) 会话 nested-a
+					21 text (settable) 空闲
+			22 container (settable) 会话操作
+				23 button (settable) 置顶
+				24 button (settable) 重命名
+				25 button (settable) 分叉会话
+				26 button (settable) 复制会话 ID
+				27 button (settable) 归档会话
+		28 container (settable)
+			29 button (selected, settable) 会话 A
+			30 button (settable) 会话 B
+			31 button (settable) 重新连接
+			32 button (settable) 新会话
+			33 text (settable) 正式 Composer / Indicators 组件验证
+			34 text (settable) Transcript 待 TekesUI #22 / #23；此处不是消息视图。
+回传诊断：22 条内容，0 条流式内容，历史已同步。
+			35 text (settable) 已连接 · 空闲
+			36 container (settable) 消息编辑与发送
+				37 text entry area (settable) 消息
+				38 container (settable)
+					39 button (settable) 模型
+					40 button (disabled, settable) 停止
+					41 button (disabled, settable) 发送
+			42 container (settable) 附件上传
+				43 text (settable) 已取消文件选择
+				44 button (settable) 关闭附件状态
+		45 container (settable) Agent 侧面板
+			46 button (selected, settable) Summary
+			47 container (settable)
+				48 button (settable) 关闭当前标签
+				49 button (settable) 新建 SideChat
+			50 container (settable) Summary
+				51 container (settable) Summary
+					52 text (settable) 任务
+					53 text (settable) 验证会话 a 的数据回传 · completed
+					54 text (settable) 接入正式 Transcript · pending
+	55 close button
+	56 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	57 minimize button
+	58 text AgentKit · Composer / Indicators 验证
+59 menu bar
+	60 AgentKitUploadProof
+	61 Window
+

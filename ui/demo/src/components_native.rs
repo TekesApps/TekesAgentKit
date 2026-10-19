@@ -80,6 +80,11 @@ struct Host {
     annotation_stage: u8,
 }
 enum HostResult {
+    Files {
+        request: Arc<tekes_agent_ui_bindings::AttachmentSelection>,
+        files: Vec<tekes_agent_ui_bindings::AttachmentFile>,
+        result: std::result::Result<Option<tekes_agent_ui_bindings::AttachmentReport>, String>,
+    },
     InitialPresets {
         request: tekes_agent_components_ui::ComposerChoiceRequest,
         result: std::result::Result<InitialPresetChoices, String>,
@@ -208,8 +213,71 @@ impl Host {
                 _ => None,
             };
             let rename_rpc_prefix = self.rename_rpc_prefix.clone();
+            // Construct the native dialog on the main UI thread; await it on
+            // the existing executor. RFD is a demo-only host system adapter.
+            let picker = if let DemoCommand::SelectFiles { request } = &command {
+                let mut updates = request.subscribe();
+                let progress_wake = self.wake.clone();
+                self.observers.push(self.executor.spawn(async move {
+                    while updates.borrow().phase.is_pending() {
+                        if updates.changed().await.is_err() {
+                            break;
+                        }
+                        if let Some(wake) = &progress_wake {
+                            wake.wake();
+                        }
+                    }
+                }));
+                Some(
+                    rfd::AsyncFileDialog::new()
+                        .set_title("选择附件文件")
+                        .pick_files(),
+                )
+            } else {
+                None
+            };
             self.executor.spawn(async move {
                 let special = match command {
+                    DemoCommand::SelectFiles { request } => {
+                        let selected = picker.expect("captured file picker").await;
+                        let (files, result) = if let Some(handles) = selected {
+                            let paths = handles
+                                .iter()
+                                .map(|file| file.path().to_path_buf())
+                                .collect::<Vec<_>>();
+                            match tokio::task::spawn_blocking(move || {
+                                tekes_agent_ui_demo::attachment_files::read_selected_files(&paths)
+                            })
+                            .await
+                            {
+                                Ok(Ok(files)) => {
+                                    let result = request
+                                        .upload(&files)
+                                        .await
+                                        .map(Some)
+                                        .map_err(|e| e.to_string());
+                                    (files, result)
+                                }
+                                result => {
+                                    let message = match result {
+                                        Ok(Err(error)) => error.to_string(),
+                                        Err(error) => error.to_string(),
+                                        _ => unreachable!(),
+                                    };
+                                    request.fail_selection(message.clone());
+                                    (vec![], Err(message))
+                                }
+                            }
+                        } else {
+                            request.cancel_selection();
+                            (vec![], Ok(None))
+                        };
+                        HostResult::Files {
+                            request,
+                            files,
+                            result,
+                        }
+                    }
                     DemoCommand::ReadInitialPresets { request } => {
                         let rpc =
                             format!("{rename_rpc_prefix}:initial-presets:{}", request.generation);
@@ -449,7 +517,8 @@ impl Host {
                                     "no preview or source reveal host adapter",
                                 ))
                             }
-                            DemoCommand::Sidebar(_)
+                            DemoCommand::SelectFiles { .. }
+                            | DemoCommand::Sidebar(_)
                             | DemoCommand::ReadInitialPresets { .. }
                             | DemoCommand::CreateSession(_)
                             | DemoCommand::ReadModels { .. }
@@ -482,6 +551,15 @@ impl Host {
     fn draw(&mut self, window: &Window) {
         while let Ok(result) = self.results.try_recv() {
             match result {
+                HostResult::Files {
+                    request,
+                    files,
+                    result,
+                } => {
+                    if let Err(error) = self.view.complete_file_selection(&request, files, result) {
+                        self.failure(error.to_string());
+                    }
+                }
                 HostResult::InitialPresets { request, result } => {
                     if let Err(error) = self.view.complete_initial_presets(&request, result) {
                         self.failure(error.to_string());
@@ -1876,15 +1954,20 @@ pub fn run() {
         (parts.connector, parts.kind, parts.scopes, false)
     } else {
         (
-            Arc::new(
-                tekes_agent_ui_demo::fixture::Fixture::default()
+            Arc::new({
+                let fixture = tekes_agent_ui_demo::fixture::Fixture::default()
                     .with_demo_summary()
                     .with_side_chats()
                     .with_children()
                     .with_lifecycle()
                     .with_presets(false)
-                    .with_models(),
-            ),
+                    .with_models();
+                if args.iter().any(|arg| arg == "--file-attachments") {
+                    fixture.with_uploads()
+                } else {
+                    fixture
+                }
+            }),
             "native",
             [
                 RunScope::main("fixture", "a"),
@@ -1956,6 +2039,7 @@ pub fn run() {
         ([a, b], sidebar)
     });
     let mut view = ComponentDemo::new(bindings).unwrap();
+    view.set_file_picker_available(true);
     if annotation_selftest {
         use tekes_agent_presentation::{ComposerContextBaseline, ComposerDestination};
         let binding = &view.bindings()[0];

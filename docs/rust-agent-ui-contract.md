@@ -14,11 +14,11 @@ AgentKit 定义业务结构、展示语义、组件组合、组件输入及回�
 
 输入为现有 RunController 发布的 `RunSnapshot` 及显式 `ComposerAffordances`。`update` 接受同一 authority 的单调 revision；无版本和旧版本失败。整个组件生命周期绑定一个 RunController；更换 controller authority 时重新创建组件，不把另一个 controller 的局部 revision 冒充旧 authority 的后续版本。组件保留各 destination 的编辑器实例与本地撤销/选区；确认 discard 后可对非当前 destination 调用 `forget` 释放实例。
 
-`ComposerLabels` 允许宿主提供产品 copy/本地化；`ComposerAffordances` 显式提供附件、模型、预设入口，默认不显示。入口只产生 `OpenEntry {destination, entry}`，不扫描路径、安装 provider、读取凭证或推测 Harness 能力。附件上传、model/preset 等确认写入仍经共享 runtime/presentation；内容卡片已接入，通用文件上传共享绑定已实现，见 [附件接入记录](rust-agent-ui-attachments-20261020.md)；系统选择器/上传状态/预览、来源定位/高亮、创建失败专用对账 UI 和完整弹层仍未完成。
+`ComposerLabels` 允许宿主提供产品 copy/本地化；`ComposerAffordances` 显式提供附件、模型、预设入口，默认不显示。入口只产生 `OpenEntry {destination, entry}`，不扫描路径、安装 provider、读取凭证或推测 Harness 能力。附件上传、model/preset 等确认写入仍经共享 runtime/presentation；内容卡片已接入，通用文件上传共享绑定已实现，见 [附件接入记录](rust-agent-ui-attachments-20261020.md)；主 Composer 的系统选择器/上传状态已接入，见 [宿主接入记录](rust-agent-ui-upload-host-20261020.md)；预览/失败对账、来源定位/高亮、创建失败专用对账 UI 和完整弹层仍未完成。
 
 `ComposerContext` 可独立挂载，或通过 `Composer::with_context` 使用宿主明确保留的 namespace 放入编辑器上方；空内容不增加布局占位。输入为同一 authority 的 RunSnapshot，输出携带原 baseline/item 的移除/预览/编辑意图，编辑器组字期间禁用卡片操作。原子 context 更新及 `draft_context_revision` 由共享 presentation 拥有，保留最新正文/settings，并阻止 Send、内容 ABA 或旧来源回调覆盖新草稿。API/字段尚未发布；[内容接入记录](rust-agent-ui-context-20261020.md) 明确区分原生 fixture、三端规范化文本回传与未完成能力。
 
-模型/预设新增可独立挂载的 `ComposerChoices` 内容组件，输入捕获的 destination/kind、版本化宿主 catalog、selected 值与 loading/ready/error；输出带 request、catalog revision 和原 choice 的选择/关闭回调。未知 selected 保持可见，不自动选择第一项；disabled reason 保留。控件复用 TekesUI Stack/Text/Button，不实现菜单、滚动、焦点或窗口。宿主决定面板/弹层挂载位置，并在 Composer 组字期间阻止打开/切换目标。模型入口已接入 demo 的真实目录适配器与原生内容面板；预设、附件/批注、provider-specific 开关和完整弹层仍待接入。模型选择只提交 draft settings，按钮明确标注发送时应用；[模型闭环记录](rust-agent-ui-model-integration-20261019.md) 区分原生 fixture 与三端离屏证据。
+模型/预设新增可独立挂载的 `ComposerChoices` 内容组件，输入捕获的 destination/kind、版本化宿主 catalog、selected 值与 loading/ready/error；输出带 request、catalog revision 和原 choice 的选择/关闭回调。未知 selected 保持可见，不自动选择第一项；disabled reason 保留。控件复用 TekesUI Stack/Text/Button，不实现菜单、滚动、焦点或窗口。宿主决定面板/弹层挂载位置，并在 Composer 组字期间阻止打开/切换目标。模型、新会话初始预设、Main 通用附件选择/上传状态及已有批注评论已接入；预览/来源选区捕获、provider-specific 开关和完整弹层仍待接入。模型选择只提交 draft settings，按钮明确标注发送时应用；[模型闭环记录](rust-agent-ui-model-integration-20261019.md) 区分原生 fixture 与三端离屏证据。
 
 `RunBinding::begin_settings` 返回保留原 binding 的一次性 `ComposerSettingsRequest`，使用既有 selection generation 防止旧目录覆盖新选择；`commit` 仅更新现有 presentation 的 draft settings，不写入新控制器、不覆盖文字/附件/批注，也不直接调用模型 RPC。宿主仍要 fence 导航和能力、校验最新目录项，并为 Send 提供既有 `SubmissionPreparation`；保留的旧 pane 不会自行知道宿主已切换窗口。详见 [绑定说明](../ui/bindings/README.md#composer-model-and-preset-content)。
 
@@ -147,7 +147,7 @@ Task tab 以 task ID 为稳定身份，scope 是可更新的内容输入。TaskP
 
 | 要求 | 当前状态 | 还需要的证据 |
 |---|---|---|
-| Composer 独立输入/草稿/发送/取消及入口 | 基础组件、模型/新会话闭环、内容卡片/原子移除/批注评论；UI 115 tests 与局部原生/三端离屏验证 | 实际附件适配器、选区捕获/来源高亮/内容 undo、推理等剩余入口、完整弹层/三端原生验收 |
+| Composer 独立输入/草稿/发送/取消及入口 | 基础组件、模型/新会话闭环、内容卡片/原子移除/批注评论、Main 附件选择/上传状态；局部原生与三端离屏证据分开记录 | 真实三端附件/SidePanel 适配、预览/失败对账、选区捕获/来源高亮/内容 undo、推理等剩余入口、完整弹层/三端原生验收 |
 | Indicators | 首批事实组件与 unknown/0/partial/error 测试 | 原生 RunView 呈现、主题/语义验收 |
 | Transcript / RunView | 布局契约已核实，正式组件未交付 | #22/#23 等价公共 API、结构化实现、阅读/分页/流式/原生验收 |
 | Sidebar | 共享服务绑定、选择/置顶/复制；重命名/分叉/归档已接入，局部原生 fixture 验证 | 真实三端操作与完整宿主验收 |
@@ -163,3 +163,5 @@ Task tab 以 task ID 为稳定身份，scope 是可更新的内容输入。TaskP
 首批本地 gate（2026-10-19）：主 workspace 103 tests、UI workspace 42 tests（其中新增 4 个正式 Composer controller 用例、1 个 Indicators 用例、1 个第二 consumer 挂载用例），root/UI strict all-targets Clippy、fmt 与依赖边界通过。旧测试宿主在共享 delegate 提取后仍可构建并生成 GPU PNG；该图不证明正式组件原生窗口已验收。当前代码仍未提交/发布，TekesUI 的固定 188 输入重查一致。
 
 本轮 SidePanel/Sidebar/Summary gate（2026-10-19）：UI workspace 56 tests（新增 Sidebar 4、SidePanel 5、Summary 3、独立 consumer 2），主 workspace 103 tests、Python 工具 18 tests；root/UI strict all-targets Clippy、fmt 与边界检查通过。新的 macOS UI consumer CI job 已声明，会构建 demo、运行组件/第二 consumer 测试，并校验 Cargo 实际解析的 8 个 UI package / 188 个文件。工作流尚未提交触发，不能称远程 CI 已绿。实际解析输入检查还拒绝错误 Git 来源、路径逃逸、变动/新增文件和 symlink。机器证据见 [本轮收据](rust-agent-ui-panels-20261019.json)。
+
+最新 [附件宿主接入记录](rust-agent-ui-upload-host-20261020.md) 补齐 Main 的真实 macOS 选择器、受限文件读取、公共 ComposerUploads、原来源 pending gates 与窗口 wake；保留 callback/request/destination 校验和终态缓冲。真实选择器经独立本地 SEP fixture 走完选择、A/B 草稿恢复、发送/流式结算与取消，附最终 binary/AX/screenshot 证据；这不提升真实三端附件、物理 IME 或正式 Transcript 的验收状态。

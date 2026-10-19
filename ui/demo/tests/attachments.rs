@@ -217,3 +217,41 @@ async fn retired_sidechat_cannot_upload_or_fall_back_to_parent() {
     assert!(parent.current_run().unwrap().draft.artifacts.is_empty());
     runtime.stop().await.unwrap();
 }
+
+#[tokio::test]
+async fn upload_watch_publishes_true_operation_stages_and_selection_cancel_never_cancels_network() {
+    use tekes_agent_presentation::AttachmentTransferPhase as Phase;
+    let gate = Arc::new(Semaphore::new(0));
+    let fixture = Fixture::default()
+        .with_uploads()
+        .with_upload_gate(gate.clone());
+    let (runtime, [a, _]) = setup(fixture.clone()).await;
+    let request = Arc::new(a.begin_attachments(&destination(&a)).unwrap());
+    let mut updates = request.subscribe();
+    assert_eq!(updates.borrow().phase, Phase::Selecting);
+    let task = {
+        let request = request.clone();
+        tokio::spawn(async move { request.upload(&[file()]).await.unwrap() })
+    };
+    wait_call(&fixture).await;
+    updates.changed().await.unwrap();
+    assert_eq!(
+        updates.borrow().phase,
+        Phase::Uploading { index: 1, total: 1 }
+    );
+    assert!(
+        !request.cancel_selection(),
+        "no fabricated network cancellation after upload starts"
+    );
+    gate.add_permits(1);
+    let report = task.await.unwrap();
+    assert_eq!(report.outcome, AttachmentOutcome::Attached);
+    assert_eq!(request.snapshot().phase, Phase::Attached { count: 1 });
+    let cancelled = a.begin_attachments(&destination(&a)).unwrap();
+    assert!(cancelled.cancel_selection());
+    assert!(!cancelled.cancel_selection());
+    assert!(cancelled.upload(&[file()]).await.is_err());
+    assert_eq!(cancelled.snapshot().phase, Phase::Cancelled);
+    assert_eq!(fixture.upload_calls(), 1);
+    runtime.stop().await.unwrap();
+}

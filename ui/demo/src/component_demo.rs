@@ -53,7 +53,13 @@ pub const RECONNECT: ComponentId = ComponentId(102);
 pub const NEW_SESSION: ComponentId = ComponentId(103);
 pub const CREATE_AUTOMATIC: ComponentId = ComponentId(104);
 
+#[path = "component_uploads.rs"]
+mod uploads;
+use uploads::UploadGesture;
 pub enum DemoCommand {
+    SelectFiles {
+        request: Arc<tekes_agent_ui_bindings::AttachmentSelection>,
+    },
     ReadInitialPresets {
         request: ComposerChoiceRequest,
     },
@@ -109,6 +115,9 @@ pub enum DemoCommand {
 }
 
 pub struct ComponentDemo {
+    file_picker_available: bool,
+    uploads: BTreeMap<RunScope, UploadGesture>,
+    next_upload_namespace: u32,
     pub tree: ContentHost,
     bindings: Vec<Arc<RunBinding>>,
     selected: usize,
@@ -353,6 +362,9 @@ impl ComponentDemo {
         tree.set_action_events(true);
         let retained = (0..bindings.len()).map(|_| None).collect();
         let mut view = Self {
+            file_picker_available: false,
+            uploads: BTreeMap::new(),
+            next_upload_namespace: 2_000_000,
             tree,
             bindings,
             selected: 0,
@@ -1627,6 +1639,7 @@ impl ComponentDemo {
         Ok(())
     }
     pub fn sync(&mut self) -> Result<()> {
+        self.sync_upload_status()?;
         self.sync_annotation()?;
         if self
             .creation_gesture
@@ -1700,17 +1713,25 @@ impl ComponentDemo {
             .component_mut::<Composer>()
             .unwrap()
             .set_labels(Self::composer_labels(&snapshot));
-        binding.sync_composer(
-            self.tree
-                .get_mut(ids.root)
-                .expect("composer")
-                .component_mut::<Composer>()
-                .expect("Composer"),
-            ComposerAffordances {
-                model: binding.supports_model_choices(),
-                ..Default::default()
-            },
-        )?;
+        let upload_gate = self.upload_gate(&binding);
+        let attachment_available = self.file_picker_available
+            && binding.supports_attachments()
+            && !self.uploads.contains_key(binding.scope());
+        self.tree
+            .get_mut(ids.root)
+            .expect("composer")
+            .component_mut::<Composer>()
+            .expect("Composer")
+            .update_gated(
+                &snapshot,
+                ComposerAffordances {
+                    attachment: attachment_available,
+                    model: binding.supports_model_choices(),
+                    ..Default::default()
+                },
+                upload_gate,
+            )
+            .map_err(unsupported)?;
         self.tree
             .get_mut(Self::indicator_id(self.selected))
             .expect("indicators")
@@ -2297,6 +2318,7 @@ impl ComponentDemo {
             })
             .collect();
         let mut commands = vec![];
+        self.drain_uploads(&actions)?;
         self.drain_annotation(&actions)?;
         self.drain_model_choices(&actions)?;
         commands.extend(self.drain_creation(&actions)?);
@@ -2523,6 +2545,9 @@ impl ComponentDemo {
                     }
                 }
                 ComposerIntent::Send { destination } => {
+                    if self.upload_pending(&binding) {
+                        continue;
+                    }
                     if self
                         .annotation_gesture
                         .as_ref()
@@ -2541,7 +2566,13 @@ impl ComponentDemo {
                     destination: ComposerDestination::run(scope),
                 }),
                 ComposerIntent::OpenEntry { destination, entry } => {
-                    if entry == ComposerEntry::Model {
+                    if self.upload_pending(&binding) {
+                        continue;
+                    }
+                    if entry == ComposerEntry::Attachment {
+                        let request = self.begin_file_selection(binding.clone(), destination)?;
+                        commands.push(DemoCommand::SelectFiles { request });
+                    } else if entry == ComposerEntry::Model {
                         commands.push(self.begin_model_choices(binding.clone(), destination)?);
                     } else {
                         commands.push(DemoCommand::OpenEntry { destination, entry })

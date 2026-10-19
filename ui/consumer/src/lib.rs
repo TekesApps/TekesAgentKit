@@ -300,3 +300,21 @@ pub async fn upload_selected_files(
         .await
         .map_err(|error| error.to_string())
 }
+
+/// An independent host mounts operation facts in its chosen layout. It can
+/// subscribe to AttachmentSelection without adding another Run state machine.
+pub fn upload_status(namespace: u32) -> tekes_agent_components_ui::ComposerUploads {
+    tekes_agent_components_ui::ComposerUploads::new(namespace, Default::default())
+}
+#[test]
+fn independent_host_mounts_upload_status_without_a_demo_or_platform_dependency() {
+    let status = upload_status(88);
+    let root = status.id();
+    let host = status.into_host().unwrap();
+    assert!(
+        host.get(root)
+            .unwrap()
+            .component::<tekes_agent_components_ui::ComposerUploads>()
+            .is_some()
+    );
+}

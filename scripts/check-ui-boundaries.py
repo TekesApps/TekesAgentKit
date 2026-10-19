@@ -34,6 +34,12 @@ assert set(tomllib.loads((ui / 'consumer/Cargo.toml').read_text()).get('dev-depe
 for path in ui.glob('*/Cargo.toml'):
     manifest = tomllib.loads(path.read_text())
     assert manifest['package']['publish']['workspace']
+    targets = manifest.get('target', {})
+    if path.parent.name == 'demo':
+        assert targets == {'cfg(target_os = "macos")': {'dependencies': {
+            'rfd': {'version': '=0.17.2', 'default-features': False}}}}
+    else:
+        assert not targets, 'system adapters must remain in the demo host'
     for dependency in [*manifest.get('dependencies', {}).values(), *manifest.get('dev-dependencies', {}).values()]:
         if isinstance(dependency, dict):
             assert not {'path', 'git'}.intersection(dependency), path

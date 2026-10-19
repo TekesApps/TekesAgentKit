@@ -8,7 +8,8 @@ use std::sync::{
 };
 use tekes_agent_contract::{AttachmentPolicy, MAX_UPLOAD_BYTES, Result, UploadReceipt, require};
 use tekes_agent_presentation::{
-    AttachmentFacts, ComposerArtifact, ComposerContextBaseline, ComposerDestination,
+    AttachmentFacts, AttachmentTransferPhase, AttachmentTransferSnapshot, ComposerArtifact,
+    ComposerContextBaseline, ComposerDestination,
 };
 
 /// Immutable host-selected generic file. Images require a separate inline-image
@@ -72,6 +73,7 @@ pub struct AttachmentSelection {
     epoch: u64,
     request_id: String,
     claimed: AtomicBool,
+    updates: tokio::sync::watch::Sender<Arc<AttachmentTransferSnapshot>>,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AttachmentOutcome {
@@ -126,16 +128,62 @@ impl RunBinding {
             self.runtime.inspect(|s| s.connection_epoch) == epoch,
             "attachment connection changed",
         )?;
+        let request_id = uuid::Uuid::new_v4().to_string();
+        let updates = tokio::sync::watch::channel(Arc::new(AttachmentTransferSnapshot {
+            revision: 1,
+            request_id: request_id.clone(),
+            destination: destination.clone(),
+            phase: AttachmentTransferPhase::Selecting,
+        }))
+        .0;
         Ok(AttachmentSelection {
             binding: self.clone(),
             baseline,
             epoch,
-            request_id: uuid::Uuid::new_v4().to_string(),
+            request_id,
             claimed: AtomicBool::new(false),
+            updates,
         })
     }
 }
 impl AttachmentSelection {
+    pub fn snapshot(&self) -> Arc<AttachmentTransferSnapshot> {
+        self.updates.borrow().clone()
+    }
+    pub fn subscribe(&self) -> tokio::sync::watch::Receiver<Arc<AttachmentTransferSnapshot>> {
+        self.updates.subscribe()
+    }
+    fn publish(&self, phase: AttachmentTransferPhase) {
+        self.updates.send_modify(|snapshot| {
+            let mut next = (**snapshot).clone();
+            next.revision = next
+                .revision
+                .checked_add(1)
+                .expect("attachment revision exhausted");
+            next.phase = phase;
+            *snapshot = Arc::new(next);
+        });
+    }
+    /// System picker cancellation, before any upload attempt. This does not
+    /// cancel network IO or discard remote receipts.
+    pub fn cancel_selection(&self) -> bool {
+        if self.claimed.swap(true, Ordering::AcqRel) {
+            return false;
+        }
+        self.publish(AttachmentTransferPhase::Cancelled);
+        true
+    }
+    pub fn fail_selection(&self, message: String) -> bool {
+        if self.claimed.swap(true, Ordering::AcqRel) {
+            return false;
+        }
+        self.publish(AttachmentTransferPhase::Failed {
+            completed: 0,
+            uncertain: false,
+            message,
+        });
+        true
+    }
     pub fn request_id(&self) -> &str {
         &self.request_id
     }
@@ -167,6 +215,33 @@ impl AttachmentSelection {
             !self.claimed.swap(true, Ordering::AcqRel),
             "attachment operation already attempted",
         )?;
+        let result = self.upload_once(files).await;
+        let phase = match &result {
+            Ok(report) => match &report.outcome {
+                AttachmentOutcome::Attached => AttachmentTransferPhase::Attached {
+                    count: report.receipts.len(),
+                },
+                AttachmentOutcome::Detached => AttachmentTransferPhase::Detached {
+                    completed: report.receipts.len(),
+                },
+                AttachmentOutcome::Failed { uncertain, message } => {
+                    AttachmentTransferPhase::Failed {
+                        completed: report.receipts.len(),
+                        uncertain: *uncertain,
+                        message: message.clone(),
+                    }
+                }
+            },
+            Err(error) => AttachmentTransferPhase::Failed {
+                completed: 0,
+                uncertain: true,
+                message: error.to_string(),
+            },
+        };
+        self.publish(phase);
+        result
+    }
+    async fn upload_once(&self, files: &[AttachmentFile]) -> Result<AttachmentReport> {
         let mut report = AttachmentReport {
             request_id: self.request_id.clone(),
             destination: self.destination().clone(),
@@ -206,6 +281,10 @@ impl AttachmentSelection {
             if !self.current() {
                 return Ok(report);
             }
+            self.publish(AttachmentTransferPhase::Uploading {
+                index: index + 1,
+                total: files.len(),
+            });
             let receipt = match self
                 .binding
                 .runtime

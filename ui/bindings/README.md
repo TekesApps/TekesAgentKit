@@ -467,6 +467,51 @@ This field is an unpublished API addition pending a future AgentKit release.
 The second public consumer exposes `upload_selected_files` without runtime or
 host imports. Deterministic tests exercise real public SEP calls against the
 isolated fixture; they are not three-harness or native-system-picker acceptance.
-The demo attachment affordance remains disabled: a host picker, upload status
-component, preview/reconciliation UI, inline-image handling and actual
-Native/Pi/DSH attachment-to-send validation are still required.
+The first binding-only milestone left the demo affordance disabled. The host
+picker/status integration below supersedes that limitation; preview, durable
+reconciliation, inline images and actual Native/Pi/DSH attachment-to-send
+validation remain required.
+
+### Upload progress and host picker integration
+
+`AttachmentSelection::snapshot/subscribe` publish versioned
+`AttachmentTransferSnapshot` facts outside RunSnapshot. Selecting includes
+preflight; Uploading reports file index/count, never invented byte percentages.
+Terminal Attached/Detached/Failed/Cancelled facts preserve the original request
+and destination. `cancel_selection` and `fail_selection` work only before an
+upload attempt; they cannot cancel network IO. Subscribe to wake the window;
+keep the original source alive without navigating/focusing it on completion.
+
+`ComposerUploads` is a public TekesUI Component consuming one operation's facts.
+Give each new operation an unused namespace. It rejects another request,
+old/conflicting revisions and terminal-to-pending changes. Its only intent is a
+terminal `ComposerUploadDismiss`; pending operations cannot be dismissed as if
+cancelled. The host supplies the IME interaction gate. Dismissal releases local
+operation buffers, never remotely deletes uploaded files.
+
+ComponentDemo now wires a macOS host file chooser and this public component.
+The demo-only macOS dependency is exact `rfd =0.17.2` (MIT), no default features;
+Kit packages import no OS dialog crate. The dialog future is constructed on the
+main thread and awaited on the existing executor, following
+[RFD's documented threading contract](https://docs.rs/rfd/0.17.2/rfd/#macos-non-windowed-applications-async-and-threading).
+The host reads regular files on a blocking worker with a per-file ceiling plus
+32-file/32-MiB selection bounds; it uses application/octet-stream for generic
+files. Endpoint policy still decides the stricter limits. No image decoder or
+extension-based inline-image claim is added.
+
+The main Composer's Send/entry gates are restricted only during its own pending
+operation; editing/cancellation and other sessions keep their original policy.
+SidePanel file pickers are not wired yet. Reports and bytes stay with their
+original request after navigation. Complete callbacks validate terminal facts,
+request and destination. File-read failures occur before uploads; upload failures
+retain known receipts/bytes for explicit reconciliation. The demo has no durable
+upload reconciliation across window/process shutdown; closing it during an
+upload must be treated as an uncertain operation, not server cancellation.
+
+For the isolated fixture run the native demo with `--components
+--file-attachments`; actual endpoint configs expose the entry only when their
+public methods support it. This enables a real system picker against a local
+synthetic SEP, not a paid provider. Full preview/reconciliation UI, SidePanel
+picker adapters, inline images and actual three-harness attachment-to-send
+acceptance remain unfinished. See
+[host/picker evidence](../../docs/rust-agent-ui-upload-host-20261020.md).
