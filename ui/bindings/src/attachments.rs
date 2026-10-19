@@ -96,7 +96,9 @@ pub struct AttachmentReport {
 impl RunBinding {
     pub fn supports_attachments(&self) -> bool {
         self.access() == crate::PaneAccess::Ready
-            && self.current_run().is_some()
+            && self
+                .current_run()
+                .is_some_and(|snapshot| snapshot.can_submit)
             && self.runtime.inspect(|s| {
                 s.connection == tekes_agent_session::ConnectionState::Ready
                     && s.endpoint_capabilities

@@ -147,7 +147,7 @@ Task tab 以 task ID 为稳定身份，scope 是可更新的内容输入。TaskP
 
 | 要求 | 当前状态 | 还需要的证据 |
 |---|---|---|
-| Composer 独立输入/草稿/发送/取消及入口 | 基础组件、模型/新会话闭环、内容卡片/原子移除/批注评论、Main 附件选择/上传状态；局部原生与三端离屏证据分开记录 | 真实三端附件/SidePanel 适配、预览/失败对账、选区捕获/来源高亮/内容 undo、推理等剩余入口、完整弹层/三端原生验收 |
+| Composer 独立输入/草稿/发送/取消及入口 | 基础组件、模型/新会话闭环、内容卡片/原子移除/批注评论、Main/任务/独立子代理/SideChat 附件选择/上传状态；局部原生与三端离屏证据分开记录 | 真实三端 pane 附件联调、预览/失败对账、选区捕获/来源高亮/内容 undo、推理等剩余入口、完整弹层/三端原生验收 |
 | Indicators | 首批事实组件与 unknown/0/partial/error 测试 | 原生 RunView 呈现、主题/语义验收 |
 | Transcript / RunView | 布局契约已核实，正式组件未交付 | #22/#23 等价公共 API、结构化实现、阅读/分页/流式/原生验收 |
 | Sidebar | 共享服务绑定、选择/置顶/复制；重命名/分叉/归档已接入，局部原生 fixture 验证 | 真实三端操作与完整宿主验收 |
@@ -167,3 +167,5 @@ Task tab 以 task ID 为稳定身份，scope 是可更新的内容输入。TaskP
 最新 [附件宿主接入记录](rust-agent-ui-upload-host-20261020.md) 补齐 Main 的真实 macOS 选择器、受限文件读取、公共 ComposerUploads、原来源 pending gates 与窗口 wake；保留 callback/request/destination 校验和终态缓冲。真实选择器经独立本地 SEP fixture 走完选择、A/B 草稿恢复、发送/流式结算与取消，附最终 binary/AX/screenshot 证据；这不提升真实三端附件、物理 IME 或正式 Transcript 的验收状态。
 
 最新 [附件三端验收](rust-agent-ui-upload-three-20261020.md) 通过原 Composer 入口和绑定分别验证正文＋附件、纯附件发送、单条持久化输入和重连无重复；Native/Pi 公开字节回读与会话隔离通过。Pi 历史保留路径引用，Native/DSH 保留文件元数据；DSH 通用文件下载不支持，不借用图片接口或读取私有文件。此为数据/离屏证据，真实系统选择器证据仍单列，正式 Transcript 与阅读/分页未完成。
+
+最新 [SidePanel 附件记录](rust-agent-ui-pane-uploads-20261020.md) 接入任务、独立子代理与 SideChat 的同一选择/上传/状态路径，按原 binding/request 保留状态，区别同地址的独立 authority；关闭/换源后显示单独保留区，不回落父草稿。7 项新增 fixture 用例及真实本地 fixture 原生窗口证明分层记录；有界历史与独立单次子代理不提供上传。三端 Main 数据路径已复验，不冒充三端 pane 全部验收；正式 Transcript/RunView、预览/对账等完整目标仍未完成。

@@ -39,6 +39,8 @@ const MAIN: ComponentId = ComponentId(5);
 const SIDEBAR_COLUMN: ComponentId = ComponentId(6);
 const PANEL_COLUMN: ComponentId = ComponentId(7);
 const MAIN_COLUMN: ComponentId = ComponentId(8);
+const MAIN_UPLOAD_HOST: ComponentId = ComponentId(12);
+const PANEL_UPLOAD_HOST: ComponentId = ComponentId(13);
 const EMPTY_MAIN: ComponentId = ComponentId(9);
 const CREATE_PANEL: ComponentId = ComponentId(10);
 const SIDEBAR_NAMESPACE: u32 = 40;
@@ -116,7 +118,7 @@ pub enum DemoCommand {
 
 pub struct ComponentDemo {
     file_picker_available: bool,
-    uploads: BTreeMap<RunScope, UploadGesture>,
+    uploads: BTreeMap<String, UploadGesture>,
     next_upload_namespace: u32,
     pub tree: ContentHost,
     bindings: Vec<Arc<RunBinding>>,
@@ -345,14 +347,34 @@ impl ComponentDemo {
                         MAIN_COLUMN,
                         DemoColumn {
                             width: None,
-                            children: vec![main],
+                            children: vec![Content::new(
+                                MAIN_UPLOAD_HOST,
+                                StackContent {
+                                    model: Stack {
+                                        axis: Axis::Vertical,
+                                        gap: Spacing::Regular.value(),
+                                    },
+                                    flexible_child: Some(MAIN),
+                                    children: vec![main],
+                                },
+                            )],
                         },
                     ),
                     Content::new(
                         PANEL_COLUMN,
                         DemoColumn {
                             width: Some(240.),
-                            children: vec![Content::new(panel.id(), panel)],
+                            children: vec![Content::new(
+                                PANEL_UPLOAD_HOST,
+                                StackContent {
+                                    model: Stack {
+                                        axis: Axis::Vertical,
+                                        gap: Spacing::Regular.value(),
+                                    },
+                                    flexible_child: Some(panel.id()),
+                                    children: vec![Content::new(panel.id(), panel)],
+                                },
+                            )],
                         },
                     ),
                 ],
@@ -1714,9 +1736,7 @@ impl ComponentDemo {
             .unwrap()
             .set_labels(Self::composer_labels(&snapshot));
         let upload_gate = self.upload_gate(&binding);
-        let attachment_available = self.file_picker_available
-            && binding.supports_attachments()
-            && !self.uploads.contains_key(binding.scope());
+        let attachment_available = self.attachment_affordance(&binding);
         self.tree
             .get_mut(ids.root)
             .expect("composer")
@@ -2060,6 +2080,7 @@ impl ComponentDemo {
                 }
             }
         }
+        self.sync_upload_status()?;
         Ok(())
     }
     fn sync_pane_controls(
@@ -2092,6 +2113,8 @@ impl ComponentDemo {
             .component_mut::<Composer>()
             .expect("Composer")
             .set_labels(Self::composer_labels(&snapshot));
+        let attachment = self.attachment_affordance(&binding);
+        let upload_gate = self.upload_gate(&binding);
         self.tree
             .get_mut(ids.root)
             .expect("pane composer")
@@ -2100,10 +2123,11 @@ impl ComponentDemo {
             .update_gated(
                 &snapshot,
                 ComposerAffordances {
+                    attachment,
                     model: binding.supports_model_choices(),
                     ..Default::default()
                 },
-                binding.access().composer_gate(),
+                upload_gate,
             )
             .map_err(unsupported)?;
         self.tree

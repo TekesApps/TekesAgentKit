@@ -430,7 +430,7 @@ docs/rust-agent-ui-annotation-editor-20261020.md for evidence and limits.
 ## Generic file attachment capture (experimental)
 
 Call `binding.begin_attachments(&destination)` **before** opening the host's
-system file picker. `supports_attachments()` requires a live writable source,
+system file picker. `supports_attachments()` requires canonical admission readiness, a live writable source,
 Ready connection, `attachments.policy` and `session.uploadFile`. The request
 retains that exact binding, draft context revision and connection epoch. The
 host supplies `AttachmentFile::new(basename, media_type, Arc<[u8]>)`; paths,
@@ -501,7 +501,7 @@ extension-based inline-image claim is added.
 
 The main Composer's Send/entry gates are restricted only during its own pending
 operation; editing/cancellation and other sessions keep their original policy.
-SidePanel file pickers are not wired yet. Reports and bytes stay with their
+SidePanel file pickers now share this path; see the scoped retention integration below. Reports and bytes stay with their
 original request after navigation. Complete callbacks validate terminal facts,
 request and destination. File-read failures occur before uploads; upload failures
 retain known receipts/bytes for explicit reconciliation. The demo has no durable
@@ -511,8 +511,37 @@ upload must be treated as an uncertain operation, not server cancellation.
 For the isolated fixture run the native demo with `--components
 --file-attachments`; actual endpoint configs expose the entry only when their
 public methods support it. This enables a real system picker against a local
-synthetic SEP, not a paid provider. Full preview/reconciliation UI, SidePanel
-picker adapters, inline images and three-harness native-window acceptance remain
+synthetic SEP, not a paid provider. Full preview/reconciliation UI, inline images and three-harness pane/native-window acceptance remain
 unfinished. The actual three-harness shared upload/Send/history/reconnect path is
 now covered by [public binding acceptance](../../docs/rust-agent-ui-upload-three-20261020.md); Native/Pi byte reads pass, while DSH generic file download is unsupported. See
 [host/picker evidence](../../docs/rust-agent-ui-upload-host-20261020.md).
+
+### SidePanel upload integration and retired sources
+
+Task, independent-child and SideChat Composers now use the same host picker,
+AttachmentSelection and ComposerUploads as the main run. The binding consumes
+canonical `RunSnapshot.can_submit` in addition to pointer/connection/method
+capabilities; a one-shot child or recovering source cannot acquire a new upload.
+The host also respects the existing child-read and global IME barriers. Bounded
+same-session history has no Composer or attachment entry.
+
+Operation retention is keyed by request ID and the original `Arc<RunBinding>`,
+not just RunScope/session address. Distinct controllers at the same address can
+hold independent drafts/operations; a task replacement never inherits its old
+request. Address-only `ComponentDemo.upload_report` returns None when ambiguous;
+`upload_report_for_request` selects an exact original operation.
+
+The demo retains each status Component outside cached pane bodies. Public Stack
+slots place active main/pane operation facts beside their controls. Tab switching
+retains the exact status instance without recreating its authority/IDs; closing
+or replacing the source moves the record to an explicitly labeled recovery area.
+It never falls back to the parent draft. Known receipts and immutable selected
+file buffers remain until terminal Dismiss; late callbacks do not navigate or
+focus the new source. Dismiss only releases local records, not remote uploads.
+This is host content retention and layout; upload state and canonical draft CAS
+remain in the original Kit binding/presentation.
+
+See [SidePanel attachment evidence](../../docs/rust-agent-ui-pane-uploads-20261020.md)
+for fixture source-replacement/close cases, actual native chooser paths, and the
+separate real-three-harness main-run regression. These layers are not equivalent
+to complete real-three-harness pane UX, physical IME or a formal Transcript.
