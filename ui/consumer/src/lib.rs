@@ -387,3 +387,25 @@ fn second_host_mounts_actionable_content_without_a_demo_or_private_control() {
             .is_some()
     );
 }
+
+/// Both hosts consume the same read-only message/footnote lanes, without using
+/// RunSurface or implementing another projection. This is not a text renderer.
+pub fn transcript_document(
+    source: &tekes_agent_components_ui::TranscriptSnapshot,
+) -> Result<tekes_agent_components_ui::TranscriptDocument<'_>, String> {
+    tekes_agent_components_ui::TranscriptDocument::read(source).map_err(|error| error.to_string())
+}
+#[test]
+fn independent_host_consumes_empty_and_stale_transcript_facts_without_a_view() {
+    use tekes_agent_components_ui::TranscriptSnapshot;
+    let source = TranscriptSnapshot {
+        has_more_before: true,
+        is_stale: true,
+        diagnostics: vec!["partial coverage".into()],
+        ..Default::default()
+    };
+    let document = transcript_document(&source).unwrap();
+    assert!(document.sections.is_empty());
+    assert!(document.has_more_before && document.is_stale);
+    assert_eq!(document.diagnostics, &["partial coverage"]);
+}

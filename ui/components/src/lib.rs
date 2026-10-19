@@ -396,3 +396,8 @@ impl RunSurface {
         self.tree.render(s, t, f, c, p)
     }
 }
+
+pub use tekes_agent_presentation::{
+    TranscriptDelivery, TranscriptDocument, TranscriptInput, TranscriptMessageKey,
+    TranscriptOutput, TranscriptSection, TranscriptSnapshot,
+};

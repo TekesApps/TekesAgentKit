@@ -45,6 +45,8 @@ AgentKit 定义业务结构、展示语义、组件组合、组件输入及回�
 
 ## Transcript 结构与视觉契约
 
+已有 [只读消息分层](rust-agent-ui-transcript-document-20261020.md)：公共 TranscriptDocument 从既有 snapshot 组织 input/output/activity/footnote、保留身份和覆盖事实。它不是渲染组件，正式 Transcript / RunView 的上游门禁与验收范围不变。
+
 当前 Tekes App/ClientKit 的事实依据（只读对照，未改 Swift）：
 
 - `TekesMetalTextKit/Engine/MetalNativeTurnView.swift` 的 inputLane 将 inputBubble 约束到 trailing；气泡使用 transcriptInput 颜色和 panel 圆角，inputAside 另排在气泡之下。

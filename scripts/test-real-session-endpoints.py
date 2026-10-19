@@ -211,6 +211,8 @@ def ui_smoke(config, first):
     if args.ui_components:
         assert receipt['components'] and not receipt['transcriptView'],receipt
         assert receipt['inventoryRows']>=1 and receipt['sharedRuntime'] and receipt['sidebarMounted'] and receipt['summaryMounted'],receipt
+        document=receipt['documentProjection']
+        assert document['sections']>=1 and document['visibleMessages']>=1 and not document['isStale'] and not document['renderer'],document
         if args.ui_actionables:
             proof=receipt['actionableProof']
             assert all(proof[key] for key in ('probeConfigured','publicComposer','publicCard','originalScope','oneAttempt','sharedResolved','canonicalAnswerRecord','otherDraftPreserved','freshHistoryAfterReconnect','reconnectNoDuplicateInput')),proof

@@ -35,3 +35,6 @@ mod thread_activity;
 pub use thread_activity::*;
 mod actionable;
 pub use actionable::*;
+
+mod transcript_document;
+pub use transcript_document::*;

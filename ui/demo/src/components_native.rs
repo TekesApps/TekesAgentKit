@@ -2867,12 +2867,35 @@ pub fn run() {
             .write_image_data(&bytes)
             .unwrap();
         let snapshot = host.view.binding().current_run().expect("main snapshot");
+        let document = tekes_agent_presentation::TranscriptDocument::read(&snapshot.transcript)
+            .expect("canonical Transcript lanes");
+        let document_messages: usize = document
+            .sections
+            .iter()
+            .map(|section| section.inputs.len() + section.outputs.len())
+            .sum();
+        let document_tools: usize = document
+            .sections
+            .iter()
+            .map(|section| section.tools.len())
+            .sum();
+        assert_eq!(
+            document_messages,
+            snapshot
+                .transcript
+                .items
+                .iter()
+                .filter(|item| item.is_visible)
+                .count()
+        );
+        assert_eq!(document_tools, snapshot.transcript.tools.len());
         println!(
             "{}",
             serde_json::json!({
                 "offscreen": true, "components": true, "nativeInteraction": false,
                 "transcriptView": false, "isStale": snapshot.transcript.is_stale,
                 "transcriptItems": snapshot.transcript.items.len(),
+                "documentProjection": {"sections":document.sections.len(),"visibleMessages":document_messages,"toolCalls":document_tools,"hasMoreBefore":document.has_more_before,"isStale":document.is_stale,"renderer":false},
                 "finalAssistantItems": snapshot.transcript.items.iter().filter(|item| item.kind == tekes_agent_presentation::TranscriptItemKind::Assistant && item.is_final).count(),
             "inventoryRows": host.sidebar.snapshot().rows.len(),
             "sharedRuntime": Arc::ptr_eq(host.sidebar.runtime(), &host.runtime),
