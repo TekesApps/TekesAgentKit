@@ -111,3 +111,21 @@ Pi 1.3.0 和 Native Kernel 0.9.0 的原验收也重新通过。上述模型输�
 当前 ClientKit 的 SEP 参考文件哈希均与基准一致（HEAD `c289bc9`）。复查修复了 Pi 原生文件缺失/替换后的恢复保护、ClientKit `atSeq` 完整 entry 顺序及已完成 turn 校验、失效 pointer 的单会话隔离，以及 Native/Pi 在无文件观察者时的 close 状态持久化。详情及验证边界见 [复查记录](sep-review-2026-10-18.md)。
 
 附件组件的三端闭环收据见 [上传绑定验收](rust-agent-ui-upload-three-20261020.md)。Native/Pi 的通用文件字节回读及跨会话拒绝已验证；DSH 普通文件只验证上传、历史元数据与发送回传，不将图片接口或 workspace 文件 API 冒充任意上传附件下载。
+
+## DSH actionable 回答信封对齐（2026-10-20）
+
+只读对照当前 ClientKit `DSHHostEndpoint.remoteOutcome` 与
+`TekesClientRuntime.respondWithReceipt`，修正 Rust DSH 将共享回答信封直接交给
+waterfall handler 的差异。Actionable correlation 保留注册 kind：question 的
+`{sessionId, answer}` 只提取 answer；approval 的 `{sessionId, approvalId, outcome}`
+只提取 outcome 词。已是原生 DSH 形状或未知 kind 的值保持原样，不按 UI 文案猜类型。
+
+独立 DSH 0.2.1-rc.2、本地合成 provider 和临时数据根验证：模型实际调用
+ask_user_question → public actionable sync → runtime 用共享 session envelope 回答 →
+答案进入无错误的 tool/result → settle、actionables 清空。脚本检查返回给模型的结果，
+不只检查 RPC 返回。DSH 其他生命周期/历史/文件/工作目录回归同轮通过。
+
+审批两种词及 native/unknown/wrong-kind 的无损行为有单元测试；本轮未触发真实审批、
+未做原生 actionable UI。后续 UI 必须消费共享回答契约，适配差异留在 SEP。
+
+本轮本地 gates：root workspace 108 tests、DSH 9 tests（包含在 root 总数）、18 项工具测试、DSH all-targets strict Clippy、fmt 与 headless 依赖边界通过。此为协议增量，不作为 UI/物理 IME 的新证据。

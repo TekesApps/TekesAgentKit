@@ -175,3 +175,5 @@ Task tab 以 task ID 为稳定身份，scope 是可更新的内容输入。TaskP
 最新 [推理强度接入记录](rust-agent-ui-reasoning-20261020.md) 复用模型目录、ComposerChoices 与 settings/Send 路径，补齐公开档位选择、未知/缺能力及发送前验证。158 项 UI tests、第二 consumer、Native/Pi 档位配置回执和本地 fixture 原生交互通过；DSH 按本轮目录保持无档位入口，完整原生/物理 IME 及正式 Transcript/RunView 仍未完成。
 
 真实中文 IME 验收步骤、证据要求及本轮未进入可确认组字的自动化尝试见 [原生 IME 验收](rust-agent-ui-ime-acceptance.md)。当前提交的 5 项原生窗口回归通过，但使用注入文本服务；不提升为真实输入法、正式 Transcript 或阅读锚点通过。
+
+等待交互审查发现并修正 DSH 共享 actionable 回答信封适配，见 [SEP 对齐记录](session-endpoints.md#dsh-actionable-回答信封对齐2026-10-20)。真实 DSH 问题→回答→tool result→settle 已通过；Indicators 当前仍只显示等待事实，公开 actionable 业务组件及其原生 UI 仍待实现，不能据此认为该交互已交付。

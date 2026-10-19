@@ -61,6 +61,7 @@ impl DshConnector {
 struct Correlation {
     client: String,
     event: String,
+    kind: &'static str,
 }
 pub struct DshSessionEndpoint {
     identity: String,
@@ -348,6 +349,11 @@ impl FollowState {
                                     Correlation {
                                         client: client.clone(),
                                         event: event_id.into(),
+                                        kind: if event == "approval/request" {
+                                            "approval"
+                                        } else {
+                                            "question"
+                                        },
                                     },
                                 );
                                 let mut payload = value["request"].clone();
@@ -523,6 +529,7 @@ impl SessionEndpoint for DshSessionEndpoint {
             .get(id)
             .cloned()
             .ok_or_else(|| unsupported("actionable is no longer pending"))?;
+        let outcome = remote_actionable_outcome(outcome, correlation.kind);
         self.remote.call("$events/result",json!({"clientId":correlation.client,"eventId":correlation.event,"outcome":{"kind":"result","value":outcome}}),&rpc()).await?;
         self.actionables.lock().await.remove(id);
         let _ = self
@@ -928,6 +935,25 @@ impl DshSessionEndpoint {
         Ok(json!({"entries":normalized,"parentAvailable":available}))
     }
 }
+/// Shared Kernel-style envelopes are addressed by session; DSH waterfall
+/// handlers consume the answer body or approval word, as ClientKit does.
+/// Native DSH shapes and unknown kinds remain lossless.
+fn remote_actionable_outcome(mut outcome: Value, kind: &str) -> Value {
+    let Some(object) = outcome.as_object_mut() else {
+        return outcome;
+    };
+    if kind == "question" && object.contains_key("answer") && !object.contains_key("answers") {
+        return object.remove("answer").expect("present answer");
+    }
+    if kind == "approval"
+        && object.contains_key("approvalId")
+        && object.get("outcome").is_some_and(Value::is_string)
+    {
+        return object.remove("outcome").expect("present outcome");
+    }
+    outcome
+}
+
 fn pending_inbox_ids(projections: &Value) -> Result<Vec<String>> {
     let mut ids = Vec::new();
     let mut seen = BTreeSet::new();
@@ -974,6 +1000,51 @@ fn sequenced_working_directory(projections: &Value) -> Result<Option<String>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn actionable_responses_unwrap_shared_envelopes_by_registered_kind() {
+        let answer = json!({"answers":[{"id":"q","selected":["继续"],"custom":""}]});
+        let envelope = json!({"sessionId":"s","answer":answer});
+        assert_eq!(
+            remote_actionable_outcome(envelope.clone(), "question"),
+            answer
+        );
+        assert_eq!(
+            remote_actionable_outcome(answer.clone(), "question"),
+            answer
+        );
+        for word in ["allowed-once", "rejected"] {
+            assert_eq!(
+                remote_actionable_outcome(
+                    json!({"sessionId":"s","approvalId":"p","outcome":word}),
+                    "approval"
+                ),
+                json!(word)
+            );
+            assert_eq!(
+                remote_actionable_outcome(json!(word), "approval"),
+                json!(word)
+            );
+        }
+        assert_eq!(
+            remote_actionable_outcome(envelope.clone(), "unknown"),
+            envelope
+        );
+        let native = json!({"answers":[],"answer":"not-an-envelope"});
+        assert_eq!(
+            remote_actionable_outcome(native.clone(), "question"),
+            native
+        );
+        let unrelated = json!({"outcome":"rejected"});
+        assert_eq!(
+            remote_actionable_outcome(unrelated.clone(), "approval"),
+            unrelated
+        );
+        let wrong_kind = json!({"approvalId":"p","outcome":"allowed-once"});
+        assert_eq!(
+            remote_actionable_outcome(wrong_kind.clone(), "question"),
+            wrong_kind
+        );
+    }
     #[test]
     fn inherited_inbox_keeps_order_and_rejects_bad_ids() {
         assert_eq!(pending_inbox_ids(&json!({"values":{"inbox":{"next-turn":[{"id":"first"}],"next-step":[{"id":"second"}]}}})).unwrap(),["first","second"]);

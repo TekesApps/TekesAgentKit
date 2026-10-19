@@ -57,6 +57,9 @@ class Provider(http.server.BaseHTTPRequestHandler):
             change=re.search(r'ENDPOINT_CHANGE_DIRECTORY=([^\s"\\]+)',transcript)
             if change and not any(message.get('role')=='tool' for message in body.get('messages',[])):
                 frames=[dict(common,choices=[{'index':0,'delta':{'role':'assistant','tool_calls':[{'index':0,'id':'directory-call','type':'function','function':{'name':'working_directory','arguments':json.dumps({'cd':change.group(1)})}}]},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{},'finish_reason':'tool_calls'}])]
+            if 'DSH_ACTIONABLE_PROOF' in transcript and not any(message.get('role')=='tool' for message in body.get('messages',[])):
+                question={'questions':[{'id':'dsh-question-proof','question':'DSH actionable round trip?','options':[{'label':'continue-proof'}],'multi_select':False}]}
+                frames=[dict(common,choices=[{'index':0,'delta':{'role':'assistant','tool_calls':[{'index':0,'id':'dsh-question-call','type':'function','function':{'name':'ask_user_question','arguments':json.dumps(question)}}]},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{},'finish_reason':'tool_calls'}])]
             if 'ENDPOINT_SUBAGENT_CATALOG' in transcript and not any(message.get('role')=='tool' for message in body.get('messages',[])):
                 frames=[dict(common,choices=[{'index':0,'delta':{'role':'assistant','tool_calls':[{'index':0,'id':'child-call','type':'function','function':{'name':'subagent','arguments':json.dumps({'description':'Catalog proof child','prompt':'CHILD_INITIAL_PROOF'})}}]},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{},'finish_reason':'tool_calls'}])]
             if 'ENDPOINT_PI_CHILD' in transcript:
@@ -411,6 +414,17 @@ try:
                 config={'kind':'dsh','url':url,'cookie':cookie,'expectedVersion':version,'commands':commands(cwd,'endpoint-test','endpoint-test')}
                 outputs=run(config)
                 session_id=next(row['result']['sessionId'] for row in outputs if row.get('op')=='create')
+                question_result=execute(dict(config,commands=[{'op':'open','sessionId':session_id},
+                    {'op':'promptAndAnswer','sessionId':session_id,'text':'DSH_ACTIONABLE_PROOF','outcome':{'sessionId':session_id,'answer':{'answers':[{'id':'dsh-question-proof','selected':['continue-proof']}]}}},
+                    {'op':'waitSettled','sessionId':session_id},{'op':'snapshot'}]))
+                assert not question_result[-1]['result']['actionables'],'DSH question remained pending after shared answer'
+
+                question_state=question_result[-1]['result']['sessions'][session_id]
+                question_tools=[entry['event']['data'] for entry in question_state['entries'].values() if entry['event']['type']=='tool/result' and 'continue-proof' in json.dumps(entry['event']['data'].get('message',{}))]
+                assert len(question_tools)==1 and not question_tools[0].get('error') and question_tools[0].get('message',{}).get('isError') is not True,'DSH did not return the accepted structured answer to the model'
+
+                print('DSH_ACTIONABLE_ENVELOPE_LIVE_OK public-question+shared-session-envelope+waterfall-result+settlement')
+
                 extensions=[{'op':'call','method':'endpoint.capabilities'},
                     {'op':'call','sessionId':session_id,'method':'session.models'},
                     {'op':'call','sessionId':session_id,'method':'commands/list'},
