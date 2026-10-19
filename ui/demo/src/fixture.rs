@@ -190,6 +190,18 @@ impl Default for Fixture {
     }
 }
 impl Fixture {
+    /// Public event fixture; a session notice deliberately has no turn.
+    pub fn with_session_notice(self) -> Self {
+        {
+            let mut sessions = self.sessions.lock().unwrap();
+            append(
+                sessions.get_mut("a").unwrap(),
+                "session/notice",
+                json!({"classification":"worker_launch","severity":"error","message":"Local worker launch notice fixture"}),
+            );
+        }
+        self
+    }
     pub fn with_uploads(mut self) -> Self {
         self.uploads = true;
         self

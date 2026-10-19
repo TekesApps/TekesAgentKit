@@ -51,6 +51,9 @@ impl TranscriptSection<'_> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct TranscriptDocument<'a> {
     pub sections: Vec<TranscriptSection<'a>>,
+    /// Session-wide notices have no turn. Keep them visible without inventing a
+    /// turn, settlement, input bubble or per-turn footnote. Source order is retained.
+    pub session_notices: Vec<TranscriptOutput<'a>>,
     pub has_more_before: bool,
     pub is_stale: bool,
     pub diagnostics: &'a [String],
@@ -61,6 +64,7 @@ impl<'a> TranscriptDocument<'a> {
     /// Stable keys are scoped to that authority, never global or row indexes.
     pub fn read(snapshot: &'a TranscriptSnapshot) -> Result<Self> {
         let mut sections = Vec::new();
+        let mut session_notices = Vec::new();
         let mut indices = BTreeMap::new();
         for turn in &snapshot.turns {
             require(!turn.id.is_empty(), "empty Transcript turn identity")?;
@@ -100,6 +104,10 @@ impl<'a> TranscriptDocument<'a> {
                 TranscriptMessageKey::Item(&item.id)
             };
             require(keys.insert(key), "ambiguous Transcript message identity")?;
+            if item.kind == TranscriptItemKind::Notice && item.turn_id.is_empty() {
+                session_notices.push(TranscriptOutput { key, item });
+                continue;
+            }
             let section = section(&mut sections, &mut indices, &item.turn_id)?;
             if item.kind == TranscriptItemKind::User {
                 section.inputs.push(TranscriptInput {
@@ -128,6 +136,7 @@ impl<'a> TranscriptDocument<'a> {
         }
         Ok(Self {
             sections,
+            session_notices,
             has_more_before: snapshot.has_more_before,
             is_stale: snapshot.is_stale,
             diagnostics: &snapshot.diagnostics,

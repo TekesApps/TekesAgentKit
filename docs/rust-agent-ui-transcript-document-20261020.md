@@ -29,3 +29,15 @@ Rust 视图仍须遵守接入契约：input 靠右且自然宽度，output 靠�
 ComponentDemo 离屏出口额外将当前真实 snapshot 投影成 document，逐项核对可见消息数和工具数，并输出 documentProjection；这只证明共享数据进入文档，不证明实际消息布局、文本选择、原生阅读位置或分页锚点。TekesUI #22/#23 的正式消费门槛仍保留，后续接入不会在 AgentKit 实现替代通用滚动/文本控件。
 
 本地验证：presentation 58 tests（新增 5 个）、UI workspace 172 tests（含第二 consumer）、工具 18 tests、两处 strict Clippy、fmt、边界与 Cargo 实际解析的 188 个 TekesUI 输入校验通过。三端真实 harness 的 documentProjection 回执见 [机器收据](rust-agent-ui-transcript-document-20261020.json)。这些检查没有证明消息气泡像素、真实输入法或阅读锚点。
+
+## 后续修正：无 turn 的 session notice
+
+初版 `2be0339` 将所有可见消息要求为非空 turn_id，遗漏了已有 journal 投影明确支持的 session/notice。新增公开事件回归先复现失败，再修正为独立 `TranscriptDocument.session_notices`；不创建空/虚构 turn，不添加 input bubble 或 turn footnote。后续 turn/start 把 worker_launch notice 标为 recovered 时，继续消费共享 metadata 且保留原 key。其他无 turn 的 user/tool 仍失败，不能借此绕过身份约束。
+
+对照 ClientKit `SessionEventProjector.swift` 的 session/notice 分支：这是会话卡片，跟在最新 turn 之后、用户 echo 下方。正式视图须使用独立会话提示布局；本轮只修复模型和 demo 数据出口，不宣称卡片视图已经渲染。第二公开 consumer 使用 components 重导出的 TranscriptItem/TranscriptItemKind 构造公开输入并验证无虚构 turn。
+
+复现局部宿主路径：构建 demo 后运行 `tekes-agent-ui-demo --components --session-notice-fixture --offscreen /tmp/agentkit-session-notice.png`。本地 SEP fixture 发送合法 session/notice，出口强制核对一个 sessionNotices、可见消息总数和原文字；截图仍是组件测试宿主，不是正式 Transcript。
+
+工具时序排查：journal 分支收到带 sequence 的 tool/call、tool/result，原生 Pi 分支读取有序 entry 及 assistant content 的 toolCall，但 admit_tool 的公开 DTO 没有保存足够的跨消息顺序/块位置。此缺口属于 AgentKit presentation 后续工作，不能仅依赖 TekesUI #22/#23，也不能在 UI 按工具 phase、正文文本或向量下标推测顺序。
+
+该修正独立验证：presentation 59 tests、第二 consumer 13 tests、两处 strict Clippy、fmt/边界/固定输入通过；demo 离屏出口确认 sessionNotices=1。此前完整 UI 与真实三端收据仍属于前一二进制，未归给本次 patch；[本次收据](rust-agent-ui-session-notice-20261020.json)。

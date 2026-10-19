@@ -409,3 +409,38 @@ fn independent_host_consumes_empty_and_stale_transcript_facts_without_a_view() {
     assert!(document.has_more_before && document.is_stale);
     assert_eq!(document.diagnostics, &["partial coverage"]);
 }
+
+#[test]
+fn independent_host_keeps_session_notice_outside_turns_and_footnotes() {
+    use tekes_agent_components_ui::{
+        TranscriptItem, TranscriptItemKind, TranscriptMessageKey, TranscriptSnapshot,
+    };
+    let source = TranscriptSnapshot {
+        items: vec![TranscriptItem {
+            id: "session-notice".into(),
+            record_id: None,
+            reconciliation_id: None,
+            turn_id: String::new(),
+            kind: TranscriptItemKind::Notice,
+            text: "Worker unavailable".into(),
+            reasoning: String::new(),
+            attachments: vec![],
+            is_visible: true,
+            is_final: false,
+            is_provisional: false,
+            reasoning_ended: true,
+            source_sequence: Some(4),
+            time: Some(123.0),
+            metadata: Default::default(),
+        }],
+        ..Default::default()
+    };
+    let document = transcript_document(&source).unwrap();
+    assert!(document.sections.is_empty());
+    assert_eq!(document.session_notices.len(), 1);
+    assert_eq!(
+        document.session_notices[0].key,
+        TranscriptMessageKey::Item("session-notice")
+    );
+    assert_eq!(document.session_notices[0].item.text, "Worker unavailable");
+}

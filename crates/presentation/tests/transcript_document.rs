@@ -191,3 +191,60 @@ fn ambiguous_or_empty_identities_fail_instead_of_rebinding_reading_targets() {
     snapshot.turns = vec![turn("same"), turn("same")];
     assert!(TranscriptDocument::read(&snapshot).is_err());
 }
+
+#[test]
+fn public_session_notices_are_not_rejected_or_assigned_to_a_fake_turn() {
+    use tekes_agent_contract::{HistoryEntry, JournalSnapshot};
+    use tekes_agent_session::SessionProjection;
+    let notice: HistoryEntry = serde_json::from_value(json!({"event":{
+        "type":"session/notice","seq":0,"time":100,
+        "data":{"classification":"worker_launch","severity":"error","message":"Worker unavailable"}
+    }}))
+    .unwrap();
+    let mut session = SessionProjection::default();
+    session
+        .apply_snapshot(JournalSnapshot {
+            session_id: "a".into(),
+            generation: "g".into(),
+            through_sequence: 0,
+            window_limit: 50,
+            entries: vec![notice],
+            has_more_before: false,
+            projections: None,
+            history_revision: None,
+        })
+        .unwrap();
+    let scope = RunScope::main("e", "a");
+    let source = TranscriptSnapshot::read(&scope, &session).unwrap();
+    assert!(source.items[0].turn_id.is_empty());
+    let document = TranscriptDocument::read(&source).expect("valid public session/notice");
+    assert!(document.sections.is_empty());
+    assert_eq!(document.session_notices.len(), 1);
+    assert!(std::ptr::eq(
+        document.session_notices[0].item,
+        &source.items[0]
+    ));
+    assert_eq!(document.session_notices[0].item.metadata["status"], "error");
+    session
+        .apply_live(
+            serde_json::from_value(
+                json!({"event":{"type":"turn/start","seq":1,"time":101,"data":{"turn":1}}}),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    let recovered = TranscriptSnapshot::read(&scope, &session).unwrap();
+    let next = TranscriptDocument::read(&recovered).unwrap();
+    assert_eq!(document.session_notices[0].key, next.session_notices[0].key);
+    assert_eq!(next.session_notices[0].item.metadata["status"], "recovered");
+    assert!(
+        next.sections
+            .iter()
+            .all(|section| section.inputs.is_empty() && section.outputs.is_empty())
+    );
+    let malformed = TranscriptSnapshot {
+        items: vec![item("user-without-turn", "", TranscriptItemKind::User)],
+        ..Default::default()
+    };
+    assert!(TranscriptDocument::read(&malformed).is_err());
+}

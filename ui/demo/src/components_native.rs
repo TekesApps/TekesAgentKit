@@ -2058,6 +2058,11 @@ pub fn run() {
                     .with_lifecycle()
                     .with_presets(false)
                     .with_models();
+                let fixture = if args.iter().any(|arg| arg == "--session-notice-fixture") {
+                    fixture.with_session_notice()
+                } else {
+                    fixture
+                };
                 if args.iter().any(|arg| arg == "--actionable-fixture") {
                     fixture.publish_actionable(serde_json::json!({"id":"fixture-approval","sessionId":"a","revision":0,"kind":"approval","payload":{"sessionId":"a","approvalId":"synthetic-only","toolName":"本地测试审批","reason":"仅验证回调，不执行系统操作"}}));
                     fixture.publish_actionable(serde_json::json!({"id":"fixture-question","sessionId":"a","revision":0,"kind":"question","payload":{"sessionId":"a","questions":[{"id":"q","question":"选择测试回答","options":[{"label":"继续测试"},{"label":"稍后"}],"multiSelect":false,"allowCustom":false}]}}));
@@ -2869,11 +2874,23 @@ pub fn run() {
         let snapshot = host.view.binding().current_run().expect("main snapshot");
         let document = tekes_agent_presentation::TranscriptDocument::read(&snapshot.transcript)
             .expect("canonical Transcript lanes");
-        let document_messages: usize = document
-            .sections
-            .iter()
-            .map(|section| section.inputs.len() + section.outputs.len())
-            .sum();
+        let document_messages: usize = document.session_notices.len()
+            + document
+                .sections
+                .iter()
+                .map(|section| section.inputs.len() + section.outputs.len())
+                .sum::<usize>();
+        if args.iter().any(|arg| arg == "--session-notice-fixture") {
+            assert!(
+                fixture,
+                "notice fixture requires the isolated fixture endpoint"
+            );
+            assert_eq!(document.session_notices.len(), 1);
+            assert_eq!(
+                document.session_notices[0].item.text,
+                "Local worker launch notice fixture"
+            );
+        }
         let document_tools: usize = document
             .sections
             .iter()
@@ -2895,7 +2912,7 @@ pub fn run() {
                 "offscreen": true, "components": true, "nativeInteraction": false,
                 "transcriptView": false, "isStale": snapshot.transcript.is_stale,
                 "transcriptItems": snapshot.transcript.items.len(),
-                "documentProjection": {"sections":document.sections.len(),"visibleMessages":document_messages,"toolCalls":document_tools,"hasMoreBefore":document.has_more_before,"isStale":document.is_stale,"renderer":false},
+                "documentProjection": {"sections":document.sections.len(),"visibleMessages":document_messages,"sessionNotices":document.session_notices.len(),"toolCalls":document_tools,"hasMoreBefore":document.has_more_before,"isStale":document.is_stale,"renderer":false},
                 "finalAssistantItems": snapshot.transcript.items.iter().filter(|item| item.kind == tekes_agent_presentation::TranscriptItemKind::Assistant && item.is_final).count(),
             "inventoryRows": host.sidebar.snapshot().rows.len(),
             "sharedRuntime": Arc::ptr_eq(host.sidebar.runtime(), &host.runtime),
