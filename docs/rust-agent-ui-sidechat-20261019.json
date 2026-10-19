@@ -1,0 +1,87 @@
+{
+  "date": "2026-10-19",
+  "publishedBaseline": "v0.3.7",
+  "tekesui": {
+    "commit": "431093786de47b48cd566d0d9c0eafa088b10d68",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 188,
+    "sha256": "03721866a362b1d31261ebbbc86140eb07e9e23320871c325234a5212591213d",
+    "ui_packages": 8
+  },
+  "tests": {
+    "root": 104,
+    "ui": 74,
+    "tools": 18
+  },
+  "rootAndUiStrictClippy": true,
+  "nativeFixture": {
+    "marker": "NATIVE_AGENT_SIDECHAT_SELFTEST_OK",
+    "physicalIme": false,
+    "formalTranscript": false,
+    "fullRunView": false,
+    "checks": [
+      "owned-create",
+      "independent-composer",
+      "single-scratch-admission",
+      "streamed-assistant",
+      "interrupted-turn",
+      "confirmed-discard",
+      "unsent-scratch-draft",
+      "unchanged-parent-drafts"
+    ]
+  },
+  "realEndpoints": {
+    "PI": {
+      "components": true,
+      "finalAssistantItems": 2,
+      "inventoryRows": 13,
+      "isStale": false,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 5,
+      "transcriptView": false
+    },
+    "DSH": {
+      "components": true,
+      "finalAssistantItems": 1,
+      "inventoryRows": 8,
+      "isStale": false,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 5,
+      "transcriptView": false
+    },
+    "NATIVE": {
+      "components": true,
+      "finalAssistantItems": 1,
+      "inventoryRows": 4,
+      "isStale": false,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 2,
+      "transcriptView": false
+    }
+  },
+  "screenshotSha256": "2cc459bde6d0c5937c5b11a505545bc440cce2ec672ac646010d4bd28c798d0f",
+  "upstreamOpenIssues": [
+    22,
+    23
+  ],
+  "remaining": [
+    "formal Transcript/RunView",
+    "task/subagent panes",
+    "remaining host interactions",
+    "physical IME and reading/paging acceptance",
+    "independent review/latest CI/merge/stage tag"
+  ]
+}

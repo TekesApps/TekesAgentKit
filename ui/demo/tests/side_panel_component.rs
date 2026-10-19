@@ -20,6 +20,57 @@ fn panel_mut(host: &mut ContentHost, id: ComponentId) -> &mut SidePanel {
         .component_mut::<SidePanel>()
         .unwrap()
 }
+#[test]
+fn confirmed_scratch_absence_retires_inactive_parent_content_and_install_tokens() {
+    let parent = RunScope::main("fixture", "a");
+    let chat = SideChat {
+        parent: parent.clone(),
+        scope: RunScope::main("fixture", "scratch"),
+        title: "Scratch".into(),
+        phase: SideChatPhase::Ready,
+        error: None,
+    };
+    let tab = SidePanelTab::side_chat(&chat);
+    let mut a = input(parent);
+    a.tabs.push(tab.clone());
+    a.selected = Some(tab.kind.clone());
+    a.side_chats
+        .chats
+        .insert(chat.scope.session_id.clone(), chat.clone());
+    let mut panel = SidePanel::new(72, SidePanelLabels::default(), 4);
+    panel.update(&a).unwrap();
+    let root = panel.id();
+    let token = panel.content_token(&tab.kind).unwrap();
+    panel
+        .install_content(
+            &token,
+            Content::new(ComponentId(4500), TextContent::new("retained scratch")),
+        )
+        .unwrap();
+    let mut host = panel.into_host().unwrap();
+    let mut b = input(RunScope::main("fixture", "b"));
+    b.revision = 2;
+    b.side_chats = a.side_chats.clone();
+    panel_mut(&mut host, root).update(&b).unwrap();
+    assert!(host.get(ComponentId(4500)).is_none());
+    // While a is offscreen an authoritative absence arrives in the global snapshot.
+    b.revision = 3;
+    b.side_chats.chats.clear();
+    panel_mut(&mut host, root).update(&b).unwrap();
+    a.revision = 4;
+    // Simulate a later new pointer with the same tab header. Its body must not
+    // resurrect content or accept a callback from the discarded incarnation.
+    panel_mut(&mut host, root).update(&a).unwrap();
+    assert!(host.get(ComponentId(4500)).is_none());
+    assert!(
+        panel_mut(&mut host, root)
+            .install_content(
+                &token,
+                Content::new(ComponentId(4501), TextContent::new("late old result"))
+            )
+            .is_err()
+    );
+}
 fn activate(host: &mut ContentHost, id: ComponentId, target: ComponentId) -> Vec<SidePanelIntent> {
     host.accessibility_action(target, None, AccessibilityAction::Press);
     let actions = host.drain_actions();

@@ -108,7 +108,8 @@ pub struct SidePanelInput {
     pub parent: RunScope,
     pub tabs: Vec<SidePanelTab>,
     pub selected: Option<SidePanelTabKind>,
-    /// From the existing SideChatController, including uncertain/pending operations.
+    /// Complete snapshot from the same SideChatController across retained parents,
+    /// including uncertain/pending operations. Absence retires scratch UI caches.
     pub side_chats: SideChatSnapshot,
     pub supports_side_chat: Option<bool>,
 }
@@ -466,10 +467,18 @@ impl SidePanel {
         if !same_content {
             self.stash();
         }
+        let live = |key: &Key| match &key.tab {
+            SidePanelTabKind::SideChat { session_id } => input
+                .side_chats
+                .chats
+                .get(session_id)
+                .is_some_and(|chat| chat.parent == key.parent),
+            _ => true,
+        };
         self.mounts
-            .retain(|key, _| key.parent != input.parent || keys.contains(key));
+            .retain(|key, _| live(key) && (key.parent != input.parent || keys.contains(key)));
         self.retained
-            .retain(|key, _| key.parent != input.parent || keys.contains(key));
+            .retain(|key, _| live(key) && (key.parent != input.parent || keys.contains(key)));
         for tab in &input.tabs {
             let key = Key {
                 parent: input.parent.clone(),

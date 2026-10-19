@@ -4,6 +4,24 @@
 pub fn pane_is_present(binding: &tekes_agent_ui_bindings::RunBinding) -> bool {
     binding.access() != tekes_agent_ui_bindings::PaneAccess::Missing
 }
+/// A second host composes the canonical scratch tab inventory without importing
+/// presentation internals or manufacturing pointers from session-list rows.
+pub fn sync_scratch_tabs(
+    panel: &mut tekes_agent_components_ui::SidePanel,
+    source: &tekes_agent_ui_bindings::SideChatBinding,
+    parent: &tekes_agent_ui_bindings::RunBinding,
+    revision: u64,
+) -> Result<(), String> {
+    let input = source
+        .input(
+            revision,
+            parent.scope(),
+            vec![tekes_agent_components_ui::SidePanelTab::summary("Summary")],
+            Some(tekes_agent_components_ui::SidePanelTabKind::Summary),
+        )
+        .map_err(|error| error.to_string())?;
+    panel.update(&input).map_err(str::to_owned)
+}
 /// Consume the observed shared inventory through public APIs only. Selection is
 /// a host input; this consumer doesn't create a thread model or a pin database.
 pub fn sync_observed_sidebar(

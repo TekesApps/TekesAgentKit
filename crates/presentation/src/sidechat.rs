@@ -5,8 +5,10 @@ use std::{
     sync::{Arc, Mutex},
     time::Duration,
 };
-use tekes_agent_contract::{Error, ForkRequest, Result, require, unsupported};
-use tekes_agent_session::SessionRuntime;
+use tekes_agent_contract::{
+    EndpointCapabilities, Error, ForkRequest, Result, require, unsupported,
+};
+use tekes_agent_session::{ConnectionState, SessionRuntime};
 use tokio::sync::watch;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -140,10 +142,21 @@ impl SideChatController {
     }
     pub async fn supports(&self) -> Result<bool> {
         let caps = self.runtime.capabilities().await?;
-        Ok(caps.supports_ephemeral_fork
+        Ok(Self::supports_capabilities(&caps))
+    }
+    fn supports_capabilities(caps: &EndpointCapabilities) -> bool {
+        caps.supports_ephemeral_fork
             && caps.supports("session.fork")
             && caps.supports("session.discard")
-            && caps.supports("session.cancel"))
+            && caps.supports("session.cancel")
+    }
+    /// Read-only UI input. Unknown during connection changes; no actor request,
+    /// polling timer or duplicate capability policy is needed to render controls.
+    pub fn support_snapshot(&self) -> Option<bool> {
+        self.runtime.inspect(|state| {
+            (state.connection == ConnectionState::Ready)
+                .then(|| Self::supports_capabilities(&state.endpoint_capabilities))
+        })
     }
     pub async fn create(
         &self,
@@ -237,12 +250,30 @@ impl SideChatController {
     }
     /// Settles a running child before discard. A timeout/error retains the pointer and draft.
     pub async fn close(&self, id: &str, rpc_id: &str) -> Result<()> {
+        self.close_guarded(id, None, rpc_id).await
+    }
+    /// Captured pane callbacks cannot close a pointer that now belongs to another
+    /// parent or mutation state. Validate in the same lock that admits Closing.
+    pub async fn close_owned(&self, expected: &SideChat, rpc_id: &str) -> Result<()> {
+        self.close_guarded(&expected.scope.session_id, Some(expected), rpc_id)
+            .await
+    }
+    async fn close_guarded(
+        &self,
+        id: &str,
+        expected: Option<&SideChat>,
+        rpc_id: &str,
+    ) -> Result<()> {
         {
             let mut state = self.state.lock().expect("side chat lock");
             let chat = state
                 .chats
                 .get_mut(id)
                 .ok_or_else(|| unsupported("unknown SideChat"))?;
+            require(
+                expected.is_none_or(|expected| expected == chat),
+                "SideChat pointer or parent changed",
+            )?;
             require(
                 chat.phase == SideChatPhase::Ready,
                 "SideChat close pending or unknown",

@@ -1,17 +1,17 @@
 //! Demo host layout for real Composer/Indicators, not a replacement RunView.
 //! The absent structured Transcript is explicit until upstream #22/#23 land.
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 use tekes_agent_components_ui::{
     Composer, ComposerAffordances, ComposerEntry, ComposerIds, ComposerIntent, Indicators,
-    SidePanel, SidePanelInput, SidePanelLabels, SidePanelTab, SidePanelTabKind, Sidebar,
-    SidebarInput, SidebarIntent, SidebarLabels, SummaryInput, SummaryIntent, SummaryLabels,
-    SummaryView,
+    SidePanel, SidePanelInput, SidePanelIntent, SidePanelLabels, SidePanelTab, SidePanelTabKind,
+    Sidebar, SidebarInput, SidebarIntent, SidebarLabels, SummaryInput, SummaryIntent,
+    SummaryLabels, SummaryView,
 };
 use tekes_agent_contract::{PromptMode, Result, SessionAddress, require, unsupported};
 use tekes_agent_presentation::{
-    ComposerDestination, PreparedSubmission, RunScope, SideChatSnapshot,
+    ComposerDestination, PreparedSubmission, RunScope, SideChat, SideChatSnapshot,
 };
-use tekes_agent_ui_bindings::{RunBinding, SidebarPublication};
+use tekes_agent_ui_bindings::{BoundSideChatRun, RunBinding, SideChatBinding, SidebarPublication};
 use tekes_ui_controls::{
     ButtonTextRenderer, TextSurface,
     composition::*,
@@ -36,6 +36,12 @@ pub const SELECT_B: ComponentId = ComponentId(101);
 pub const RECONNECT: ComponentId = ComponentId(102);
 
 pub enum DemoCommand {
+    CreateSideChat(PanelRequest),
+    OpenSideChat {
+        request: PanelRequest,
+        chat: SideChat,
+    },
+    CloseSideChat(SideChat),
     OpenSession(NavigationRequest),
     Sidebar(SidebarIntent),
     Summary(SummaryIntent),
@@ -62,8 +68,27 @@ pub struct ComponentDemo {
     navigation_revision: u64,
     sidebar_source: Option<Arc<SidebarPublication>>,
     sidebar_presented: Option<SidebarInput>,
-    panel_parent: Option<RunScope>,
     panel_revision: u64,
+    side_chats: Option<Arc<SideChatBinding>>,
+    panel_selections: BTreeMap<RunScope, SidePanelTabKind>,
+    panel_runs: BTreeMap<(RunScope, String), PanelRun>,
+    next_panel_namespace: u32,
+    panel_navigation_revision: u64,
+}
+struct PanelRun {
+    binding: Arc<RunBinding>,
+    ids: ComposerIds,
+}
+#[derive(Clone, Debug)]
+pub struct PanelRequest {
+    parent: RunScope,
+    main_revision: u64,
+    panel_revision: u64,
+}
+impl PanelRequest {
+    pub fn parent(&self) -> &RunScope {
+        &self.parent
+    }
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NavigationRequest {
@@ -196,16 +221,23 @@ impl ComponentDemo {
             navigation_revision: 0,
             sidebar_source: None,
             sidebar_presented: None,
-            panel_parent: None,
             panel_revision: 0,
+            side_chats: None,
+            panel_selections: BTreeMap::new(),
+            panel_runs: BTreeMap::new(),
+            next_panel_namespace: 50_000,
+            panel_navigation_revision: 0,
         };
         view.sync()?;
         Ok(view)
     }
     fn new_pair(index: usize) -> Content {
         let ids = Self::ids_for(index);
+        Self::run_controls(ids)
+    }
+    fn run_controls(ids: ComposerIds) -> Content {
         Content::new(
-            Self::pair_id(index),
+            ComponentId(ids.root.0 + 16),
             StackContent {
                 model: Stack {
                     axis: Axis::Vertical,
@@ -213,7 +245,7 @@ impl ComponentDemo {
                 },
                 flexible_child: None,
                 children: vec![
-                    Content::new(Self::indicator_id(index), Indicators::default()),
+                    Content::new(ComponentId(ids.root.0 + 17), Indicators::default()),
                     Content::new(ids.root, Composer::new(ids)),
                 ],
             },
@@ -227,7 +259,7 @@ impl ComponentDemo {
     }
     fn ids_for(index: usize) -> ComposerIds {
         assert!(
-            index <= (u32::MAX as usize - 101) / 2,
+            index < (50_000 - 101) / 2,
             "demo component namespaces exhausted"
         );
         ComposerIds::new((100 + index as u64 * 2) << 32)
@@ -263,6 +295,92 @@ impl ComponentDemo {
     pub fn bindings(&self) -> &[Arc<RunBinding>] {
         &self.bindings
     }
+    pub fn set_side_chat_binding(&mut self, binding: Arc<SideChatBinding>) {
+        self.side_chats = Some(binding);
+    }
+    pub fn panel_composer_ids(&self) -> Option<ComposerIds> {
+        let parent = self.binding().scope();
+        let SidePanelTabKind::SideChat { session_id } = self.panel_selections.get(parent)? else {
+            return None;
+        };
+        self.panel_runs
+            .get(&(parent.clone(), session_id.clone()))
+            .map(|run| run.ids)
+            .filter(|ids| self.tree.get(ids.root).is_some())
+    }
+    fn composing_editor(&self) -> Option<ComponentId> {
+        std::iter::once(self.ids())
+            .chain(self.panel_composer_ids())
+            .find_map(|ids| {
+                self.tree
+                    .get(ids.root)
+                    .and_then(|node| node.component::<Composer>())
+                    .filter(|composer| composer.is_composing())
+                    .map(|_| ids.editor)
+            })
+    }
+    fn panel_request(&mut self, parent: RunScope) -> PanelRequest {
+        self.panel_navigation_revision += 1;
+        PanelRequest {
+            parent,
+            main_revision: self.navigation_revision,
+            panel_revision: self.panel_navigation_revision,
+        }
+    }
+    pub fn has_side_chat_run(&self, chat: &SideChat) -> bool {
+        self.panel_runs
+            .contains_key(&(chat.parent.clone(), chat.scope.session_id.clone()))
+    }
+    pub fn install_side_chat_run(
+        &mut self,
+        request: PanelRequest,
+        run: BoundSideChatRun,
+    ) -> Result<bool> {
+        let owner = self
+            .side_chats
+            .as_ref()
+            .ok_or_else(|| unsupported("SideChat owner unavailable"))?;
+        let chat = run.chat();
+        require(
+            chat.parent == request.parent,
+            "SideChat result parent mismatch",
+        )?;
+        if owner.pointer(&chat.parent, &chat.scope.session_id).is_err() {
+            return Ok(false);
+        }
+        let key = (chat.parent.clone(), chat.scope.session_id.clone());
+        if !self.panel_runs.contains_key(&key) {
+            let namespace = self.next_panel_namespace;
+            self.next_panel_namespace = namespace
+                .checked_add(1)
+                .filter(|next| *next <= 65_535)
+                .ok_or_else(|| unsupported("demo pane namespaces exhausted"))?;
+            self.panel_runs.insert(
+                key,
+                PanelRun {
+                    binding: run.binding().clone(),
+                    ids: ComposerIds::new((namespace as u64) << 32),
+                },
+            );
+        }
+        let selected = self.binding().scope() == &request.parent
+            && self.navigation_revision == request.main_revision
+            && self.panel_navigation_revision == request.panel_revision
+            && !self.composing();
+        if selected {
+            self.panel_selections.insert(
+                request.parent,
+                SidePanelTabKind::SideChat {
+                    session_id: chat.scope.session_id.clone(),
+                },
+            );
+        }
+        self.sync()?;
+        if selected && let Some(ids) = self.panel_composer_ids() {
+            self.tree.focus(Some(ids.editor), true);
+        }
+        Ok(selected)
+    }
     pub fn editor(&self) -> &TextSurface {
         self.tree
             .get(self.ids().root)
@@ -272,7 +390,7 @@ impl ComponentDemo {
             .editor()
     }
     pub fn composing(&self) -> bool {
-        self.editor().input.marked.is_some()
+        self.composing_editor().is_some()
     }
     pub fn set_notice(&mut self, text: impl Into<String>) {
         self.tree
@@ -365,53 +483,123 @@ impl ComponentDemo {
             }
         }
         let panel_id = self.panel_id();
-        if self.panel_parent.as_ref() != Some(binding.scope()) {
-            self.panel_revision += 1;
-            self.tree
-                .get_mut(panel_id)
-                .expect("panel")
-                .component_mut::<SidePanel>()
-                .expect("SidePanel")
-                .update(&SidePanelInput {
-                    revision: self.panel_revision,
-                    parent: binding.scope().clone(),
-                    tabs: vec![SidePanelTab::summary("Summary")],
-                    selected: Some(SidePanelTabKind::Summary),
-                    side_chats: SideChatSnapshot::default(),
-                    supports_side_chat: None,
-                })
-                .map_err(unsupported)?;
-            self.panel_parent = Some(binding.scope().clone());
+        let parent = binding.scope().clone();
+        let wanted = self
+            .panel_selections
+            .entry(parent.clone())
+            .or_insert(SidePanelTabKind::Summary)
+            .clone();
+        self.panel_revision += 1;
+        let mut input = if let Some(owner) = &self.side_chats {
+            let snapshot = owner.snapshot();
+            self.panel_runs.retain(|(parent, id), _| {
+                snapshot
+                    .chats
+                    .get(id)
+                    .is_some_and(|chat| &chat.parent == parent)
+            });
+            owner.input(
+                self.panel_revision,
+                &parent,
+                vec![SidePanelTab::summary("Summary")],
+                Some(wanted),
+            )?
+        } else {
+            SidePanelInput {
+                revision: self.panel_revision,
+                parent: parent.clone(),
+                tabs: vec![SidePanelTab::summary("Summary")],
+                selected: Some(SidePanelTabKind::Summary),
+                side_chats: SideChatSnapshot::default(),
+                supports_side_chat: None,
+            }
+        };
+        if input.selected.is_none() {
+            // A confirmed lost scratch pointer never becomes a new conversation.
+            self.tree.focus(None, false);
+            input.selected = Some(SidePanelTabKind::Summary);
         }
-        let summary_id = self.summary_id();
-        if self.tree.get(summary_id).is_none() {
-            let summary =
-                SummaryView::new(101 + self.selected as u32 * 2, SummaryLabels::default());
-            let panel = self
-                .tree
-                .get_mut(panel_id)
-                .expect("panel")
-                .component_mut::<SidePanel>()
-                .expect("SidePanel");
-            let token = panel
-                .content_token(&SidePanelTabKind::Summary)
-                .expect("Summary token");
-            panel
-                .install_content(&token, Content::new(summary_id, summary))
-                .map_err(unsupported)?;
-        }
+        let selected = input.selected.clone().expect("Summary fallback");
+        self.panel_selections
+            .insert(parent.clone(), selected.clone());
         self.tree
-            .get_mut(summary_id)
-            .expect("summary")
-            .component_mut::<SummaryView>()
-            .expect("SummaryView")
-            .update(&SummaryInput {
-                revision: snapshot.revision,
-                scope: binding.scope().clone(),
-                facts: snapshot.summary.clone(),
-                host_sections: vec![],
-            })
+            .get_mut(panel_id)
+            .expect("panel")
+            .component_mut::<SidePanel>()
+            .expect("SidePanel")
+            .update(&input)
             .map_err(unsupported)?;
+        match selected {
+            SidePanelTabKind::Summary => {
+                let summary_id = self.summary_id();
+                if self.tree.get(summary_id).is_none() {
+                    let summary =
+                        SummaryView::new(101 + self.selected as u32 * 2, SummaryLabels::default());
+                    let panel = self
+                        .tree
+                        .get_mut(panel_id)
+                        .expect("panel")
+                        .component_mut::<SidePanel>()
+                        .expect("SidePanel");
+                    let token = panel
+                        .content_token(&SidePanelTabKind::Summary)
+                        .expect("Summary token");
+                    panel
+                        .install_content(&token, Content::new(summary_id, summary))
+                        .map_err(unsupported)?;
+                }
+                self.tree
+                    .get_mut(summary_id)
+                    .expect("summary")
+                    .component_mut::<SummaryView>()
+                    .expect("SummaryView")
+                    .update(&SummaryInput {
+                        revision: snapshot.revision,
+                        scope: parent,
+                        facts: snapshot.summary.clone(),
+                        host_sections: vec![],
+                    })
+                    .map_err(unsupported)?;
+            }
+            SidePanelTabKind::SideChat { session_id } => {
+                if let Some(run) = self.panel_runs.get(&(parent, session_id.clone())) {
+                    let ids = run.ids;
+                    let binding = run.binding.clone();
+                    if let Some(snapshot) = binding.current_run() {
+                        if self.tree.get(ids.root).is_none() {
+                            let panel = self
+                                .tree
+                                .get_mut(panel_id)
+                                .expect("panel")
+                                .component_mut::<SidePanel>()
+                                .expect("SidePanel");
+                            let token = panel
+                                .content_token(&SidePanelTabKind::SideChat { session_id })
+                                .expect("scratch token");
+                            panel
+                                .install_content(&token, Self::run_controls(ids))
+                                .map_err(unsupported)?;
+                        }
+                        let gate = binding.access().composer_gate();
+                        self.tree
+                            .get_mut(ids.root)
+                            .expect("scratch composer")
+                            .component_mut::<Composer>()
+                            .expect("Composer")
+                            .update_gated(&snapshot, ComposerAffordances::default(), gate)
+                            .map_err(unsupported)?;
+                        self.tree
+                            .get_mut(ComponentId(ids.root.0 + 17))
+                            .expect("scratch indicators")
+                            .component_mut::<Indicators>()
+                            .expect("Indicators")
+                            .update(&snapshot)
+                            .map_err(unsupported)?;
+                    }
+                }
+            }
+            _ => {}
+        }
         Ok(())
     }
     pub fn select(&mut self, index: usize) -> Result<()> {
@@ -503,7 +691,7 @@ impl ComponentDemo {
         position.is_some_and(|position| {
             !self
                 .tree
-                .get(self.ids().editor)
+                .get(self.composing_editor().expect("composing owner"))
                 .expect("editor")
                 .frame()
                 .contains(position)
@@ -535,7 +723,10 @@ impl ComponentDemo {
         part: Option<usize>,
         action: AccessibilityAction,
     ) -> Result<Vec<DemoCommand>> {
-        if self.composing() && target != self.ids().editor {
+        if self
+            .composing_editor()
+            .is_some_and(|editor| editor != target)
+        {
             return Ok(vec![]);
         }
         self.tree.accessibility_action(target, part, action);
@@ -545,13 +736,29 @@ impl ComponentDemo {
         let actions = self.tree.drain_actions();
         let binding = self.binding().clone();
         let ids = self.ids();
-        let intents = self
-            .tree
-            .get_mut(ids.root)
-            .expect("composer")
-            .component_mut::<Composer>()
-            .expect("Composer")
-            .take_intents(&actions);
+        let mut composers = vec![(ids, binding.clone())];
+        if let Some(ids) = self.panel_composer_ids()
+            && let Some(SidePanelTabKind::SideChat { session_id }) =
+                self.panel_selections.get(binding.scope())
+            && let Some(run) = self
+                .panel_runs
+                .get(&(binding.scope().clone(), session_id.clone()))
+        {
+            composers.push((ids, run.binding.clone()));
+        }
+        let intents: Vec<_> = composers
+            .into_iter()
+            .flat_map(|(ids, binding)| {
+                self.tree
+                    .get_mut(ids.root)
+                    .expect("mounted composer")
+                    .component_mut::<Composer>()
+                    .expect("Composer")
+                    .take_intents(&actions)
+                    .into_iter()
+                    .map(move |intent| (binding.clone(), intent))
+            })
+            .collect();
         let mut commands = vec![];
         let sidebar_intents = self
             .tree
@@ -563,9 +770,15 @@ impl ComponentDemo {
         let summary_intents = self
             .tree
             .get(self.summary_id())
-            .expect("summary")
-            .component::<SummaryView>()
-            .expect("SummaryView")
+            .and_then(|node| node.component::<SummaryView>())
+            .map(|summary| summary.take_intents(&actions))
+            .unwrap_or_default();
+        let panel_intents = self
+            .tree
+            .get(self.panel_id())
+            .expect("panel")
+            .component::<SidePanel>()
+            .expect("SidePanel")
             .take_intents(&actions);
         for intent in sidebar_intents {
             if let SidebarIntent::Select { address } = intent {
@@ -589,7 +802,40 @@ impl ComponentDemo {
             }
         }
         commands.extend(summary_intents.into_iter().map(DemoCommand::Summary));
-        for intent in intents {
+        for intent in panel_intents {
+            let Some(owner) = self.side_chats.clone() else {
+                continue;
+            };
+            match intent {
+                SidePanelIntent::CreateSideChat { parent } => {
+                    commands.push(DemoCommand::CreateSideChat(self.panel_request(parent)));
+                }
+                SidePanelIntent::Close {
+                    parent,
+                    tab: SidePanelTabKind::SideChat { session_id },
+                } => {
+                    self.panel_navigation_revision += 1;
+                    commands.push(DemoCommand::CloseSideChat(
+                        owner.pointer(&parent, &session_id)?,
+                    ));
+                }
+                SidePanelIntent::Select { parent, tab } if &parent == self.binding().scope() => {
+                    self.tree.focus(None, false);
+                    self.panel_selections
+                        .insert(parent.clone(), tab.kind.clone());
+                    let request = self.panel_request(parent.clone());
+                    if let SidePanelTabKind::SideChat { session_id } = tab.kind {
+                        let chat = owner.pointer(&parent, &session_id)?;
+                        if !self.has_side_chat_run(&chat) {
+                            commands.push(DemoCommand::OpenSideChat { request, chat });
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        for (binding, intent) in intents {
             match intent {
                 ComposerIntent::Edit { destination, text } => {
                     binding.edit_text(&destination, text)?

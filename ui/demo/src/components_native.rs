@@ -5,13 +5,15 @@ use std::{
     sync::{Arc, mpsc},
     time::{Duration, Instant},
 };
-use tekes_agent_components_ui::{Sidebar, SidebarIntent};
+use tekes_agent_components_ui::{SidePanel, Sidebar, SidebarIntent};
 use tekes_agent_contract::{Result, require};
 use tekes_agent_presentation::{PreparedSubmission, RunScope, SubmissionPreparation};
 use tekes_agent_session::SessionRuntime;
-use tekes_agent_ui_bindings::{RunBinding, SidebarActionOutcome, SidebarBinding};
+use tekes_agent_ui_bindings::{
+    BoundSideChatRun, RunBinding, SideChatBinding, SidebarActionOutcome, SidebarBinding,
+};
 use tekes_agent_ui_demo::component_demo::{
-    ComponentDemo, DemoCommand, NavigationRequest, RECONNECT,
+    ComponentDemo, DemoCommand, NavigationRequest, PanelRequest, RECONNECT,
 };
 use tekes_agent_web::SharedAgent;
 use tekes_ui_controls::composition::{AccessibilityAction, ComponentId, ContentEvent};
@@ -47,6 +49,7 @@ struct Host {
     executor: tokio::runtime::Runtime,
     runtime: Arc<SessionRuntime>,
     sidebar: Arc<SidebarBinding>,
+    side_chats: Arc<SideChatBinding>,
     sender: mpsc::Sender<HostResult>,
     results: mpsc::Receiver<HostResult>,
     wake: Option<tekes_ui_platform_macos::WindowWake>,
@@ -56,8 +59,14 @@ struct Host {
     focus_before_deactivate: Option<ComponentId>,
     _owned_preferences: Option<OwnedPreferencesDirectory>,
     sidebar_error: Option<String>,
+    side_chat_test_started: bool,
+    side_chat_test_session: Option<String>,
 }
 enum HostResult {
+    SideChatOpened {
+        request: PanelRequest,
+        result: std::result::Result<BoundSideChatRun, String>,
+    },
     Operation(std::result::Result<(), String>),
     Sidebar(std::result::Result<SidebarActionOutcome, String>),
     Opened {
@@ -99,8 +108,60 @@ impl Host {
             let wake = self.wake.clone();
             let runtime = self.runtime.clone();
             let sidebar = self.sidebar.clone();
+            let side_chats = self.side_chats.clone();
             self.executor.spawn(async move {
                 let special = match command {
+                    DemoCommand::CreateSideChat(request) => {
+                        let title = sidebar
+                            .snapshot()
+                            .rows
+                            .iter()
+                            .find(|row| {
+                                row.address.endpoint_id == request.parent().endpoint_id
+                                    && row.address.session_id == request.parent().session_id
+                            })
+                            .map(|row| row.title.clone());
+                        let rpc = format!(
+                            "sidechat-create:{}:{}",
+                            std::process::id(),
+                            std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap()
+                                .as_nanos()
+                        );
+                        let result = async {
+                            let chat = side_chats
+                                .create(request.parent().clone(), title.as_deref(), &rpc)
+                                .await?;
+                            side_chats.open(&chat).await
+                        }
+                        .await
+                        .map_err(|error| error.to_string());
+                        HostResult::SideChatOpened { request, result }
+                    }
+                    DemoCommand::OpenSideChat { request, chat } => HostResult::SideChatOpened {
+                        request,
+                        result: side_chats
+                            .open(&chat)
+                            .await
+                            .map_err(|error| error.to_string()),
+                    },
+                    DemoCommand::CloseSideChat(expected) => {
+                        let rpc = format!(
+                            "sidechat-close:{}:{}",
+                            std::process::id(),
+                            std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap()
+                                .as_nanos()
+                        );
+                        HostResult::Operation(
+                            side_chats
+                                .close(&expected, &rpc)
+                                .await
+                                .map_err(|error| error.to_string()),
+                        )
+                    }
                     DemoCommand::OpenSession(request) => {
                         let address = request.address();
                         let binding = RunBinding::open_main(
@@ -165,6 +226,9 @@ impl Host {
                                 ))
                             }
                             DemoCommand::Sidebar(_)
+                            | DemoCommand::CreateSideChat(_)
+                            | DemoCommand::OpenSideChat { .. }
+                            | DemoCommand::CloseSideChat(_)
                             | DemoCommand::OpenSession(_)
                             | DemoCommand::Summary(_) => unreachable!("handled above"),
                         }
@@ -187,6 +251,23 @@ impl Host {
     fn draw(&mut self, window: &Window) {
         while let Ok(result) = self.results.try_recv() {
             match result {
+                HostResult::SideChatOpened {
+                    request,
+                    result: Ok(run),
+                } => {
+                    let new = !self.view.has_side_chat_run(run.chat());
+                    let binding = run.binding().clone();
+                    match self.view.install_side_chat_run(request, run) {
+                        Ok(_) if new && binding.current_run().is_some() => {
+                            self.observe(&binding, window)
+                        }
+                        Ok(_) => {}
+                        Err(error) => self.failure(error.to_string()),
+                    }
+                }
+                HostResult::SideChatOpened {
+                    result: Err(error), ..
+                } => self.failure(error),
                 HostResult::Operation(Err(error))
                 | HostResult::Sidebar(Err(error))
                 | HostResult::Opened {
@@ -262,6 +343,18 @@ impl Host {
                 .expect("component frame");
         }
         window.set_animating(self.text.frame_requested);
+        if self.selftest && !self.side_chat_test_started && self.view.panel_composer_ids().is_some()
+        {
+            self.side_chat_test_started = true;
+            self.side_chat_test_session = self
+                .side_chats
+                .snapshot()
+                .chats
+                .values()
+                .find(|chat| &chat.parent == self.view.binding().scope())
+                .map(|chat| chat.scope.session_id.clone());
+            side_chat_script(&self.view);
+        }
     }
     fn observe(&mut self, binding: &RunBinding, window: &Window) {
         let wake = window.wake_proxy();
@@ -275,6 +368,10 @@ impl Host {
     }
     fn close(&mut self, window: &Window) {
         if self.selftest {
+            assert!(
+                self.side_chat_test_started && self.side_chats.snapshot().chats.is_empty(),
+                "scratch closed only after confirmed discard"
+            );
             assert!(
                 self.failures.is_empty(),
                 "component host failures: {:?}",
@@ -305,6 +402,40 @@ impl Host {
                     .all(|snapshot| !snapshot.transcript.is_stale)
             );
             let state = self.runtime.snapshot();
+            let scratch_id = self
+                .side_chat_test_session
+                .as_ref()
+                .expect("owned scratch identity");
+            let scratch = &state.sessions[scratch_id];
+            assert_eq!(
+                scratch
+                    .entries
+                    .values()
+                    .filter(|row| row.event.kind == "user/message"
+                        && row.event.data.to_string().contains("SideChat 独立输入"))
+                    .count(),
+                1
+            );
+            assert!(
+                !scratch
+                    .entries
+                    .values()
+                    .any(|row| row.event.kind == "user/message"
+                        && row.event.data.to_string().contains("SideChat 暂存草稿"))
+            );
+            assert!(
+                scratch
+                    .entries
+                    .values()
+                    .any(|row| row.event.kind == "assistant/message")
+            );
+            assert!(scratch.entries.values().any(
+                |row| row.event.kind == "turn/end" && row.event.data["reason"] == "interrupted"
+            ));
+            assert!(!scratch.run_open);
+            println!(
+                "NATIVE_AGENT_SIDECHAT_SELFTEST_OK owned-create+separate-composer+send+stream+draft+cancel-discard+parent-isolation; transcript=false; physical-ime=false"
+            );
             let entries = &state.sessions["a"].entries;
             for text in ["中文消息", "停止演示"] {
                 assert_eq!(
@@ -373,6 +504,12 @@ impl WindowHandler for Host {
                     tekes_agent_ui_demo::notifications::forward(
                         self.sidebar.subscribe(),
                         move || sidebar_wake.wake() != tekes_ui_platform_macos::WakeResult::Closed,
+                    ),
+                ));
+                self.observers.push(self.executor.spawn(
+                    tekes_agent_ui_demo::notifications::forward(
+                        self.side_chats.subscribe(),
+                        move || wake.wake() != tekes_ui_platform_macos::WakeResult::Closed,
                     ),
                 ));
                 self.draw(window);
@@ -518,7 +655,11 @@ pub fn run() {
         (parts.connector, parts.kind, parts.scopes, false)
     } else {
         (
-            Arc::new(tekes_agent_ui_demo::fixture::Fixture::default().with_demo_summary()),
+            Arc::new(
+                tekes_agent_ui_demo::fixture::Fixture::default()
+                    .with_demo_summary()
+                    .with_side_chats(),
+            ),
             "native",
             [
                 RunScope::main("fixture", "a"),
@@ -590,6 +731,8 @@ pub fn run() {
         ([a, b], sidebar)
     });
     let mut view = ComponentDemo::new(bindings).unwrap();
+    let side_chats = Arc::new(SideChatBinding::new(runtime.clone()));
+    view.set_side_chat_binding(side_chats.clone());
     view.set_sidebar_source(sidebar.snapshot()).unwrap();
     view.sync().unwrap();
     let fonts = CoreTextFonts::new();
@@ -597,8 +740,11 @@ pub fn run() {
     let mut host = Host {
         view,
         sidebar,
+        side_chats,
         _owned_preferences: owned_preferences,
         sidebar_error: None,
+        side_chat_test_started: false,
+        side_chat_test_session: None,
         text: TextBackend {
             shaper: CoreTextShaper::new(fonts.clone()),
             rasterizer: CoreTextRasterizer::new(fonts),
@@ -766,9 +912,44 @@ fn native_script(view: &ComponentDemo) {
         ),
         (5600, click(RECONNECT)),
     ];
+    let panel = view
+        .tree
+        .get(view.panel_id())
+        .unwrap()
+        .component::<SidePanel>()
+        .unwrap();
+    script.push((6100, click(panel.create_side_chat_id())));
+    // A bounded failure deadline also catches a missing creation/body notification.
+    script.push((20000, Action::Close));
+    run_script(script);
+}
+fn side_chat_script(view: &ComponentDemo) {
+    use tekes_ui_platform_macos::selftest::{Action, run_script};
+    let click = |id| {
+        let point = view.tree.get(id).unwrap().frame().center();
+        Action::Click {
+            x: point.x as f64,
+            y: point.y as f64,
+        }
+    };
+    let ids = view.panel_composer_ids().expect("mounted scratch composer");
+    let panel = view
+        .tree
+        .get(view.panel_id())
+        .unwrap()
+        .component::<SidePanel>()
+        .unwrap();
+    let mut script = vec![
+        (100, click(ids.editor)),
+        (200, Action::Text("SideChat 独立输入".into())),
+        (400, click(ids.send)),
+        (600, click(ids.editor)),
+        (700, Action::Text("SideChat 暂存草稿".into())),
+    ];
     if let Ok(path) = std::env::var("AGENT_COMPONENTS_CAPTURE") {
-        script.push((6500, Action::Capture { path }));
+        script.push((800, Action::Capture { path }));
     }
-    script.push((7500, Action::Close));
+    script.push((900, click(panel.close_id())));
+    script.push((2500, Action::Close));
     run_script(script);
 }

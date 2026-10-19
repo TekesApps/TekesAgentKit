@@ -56,6 +56,8 @@ AgentKit 定义业务结构、展示语义、组件组合、组件输入及回�
 
 实现时以现有 Tekes App 的内容层级、对齐和布局为参考，以 TekesUI 的基础组件与语义样式为基础：input 指 Transcript 中的用户消息，不是 Composer 编辑框；不将表单输入框外观带入消息正文。优先通过组件组合、公开布局属性和 token 输入实现右对齐、最大宽度、内边距与圆角；产品主题经 host 输入传入，不覆盖基础控件的交互状态。若需要基础组件尚未公开的属性或事件，先记录到 TekesUI Issue，不在 AgentKit 内复制基础控件。
 
+最小改动还包括保留消息分组：同一条 input 的连续正文块（段落、列表、代码等）排在同一个气泡内，附件另排；不把每个 Markdown 块拆成独立聊天气泡。对应现有 `MetalVirtualLayout.swift::appendInputSurface` 的一条消息一个正文气泡布局。历史恢复和流式回传共用正式 Transcript 的结构，不能为了演示分别实现两套视觉树。TekesUI 提供基础控件、语义样式与布局能力，AgentKit 负责上述消息角色与业务内容的组合。
+
 正式 Transcript 的验收至少覆盖：
 
 - 同一条用户消息在历史恢复、optimistic echo 和服务端确认后保持同一布局，短文本不被拉成整行，长中文自然换行，input footnote 保持在气泡之外并尾端对齐。
@@ -120,16 +122,18 @@ Task tab 以 task ID 为稳定身份，scope 是可更新的内容输入。TaskP
 
 ## 完成账本
 
+最新 [SideChat 接入记录](rust-agent-ui-sidechat-20261019.md) 与 [机器收据](rust-agent-ui-sidechat-20261019.json) 覆盖共享 pointer 绑定、独立 Composer/Indicators、创建/发送/取消关闭、Unknown 保留与父草稿隔离。本地 root 104、UI 74、工具 18 tests 通过，三端协议与组件到 GPU 路径复验通过；正式 Transcript 与完整原生交互仍不在这些通过项内。
+
 | 要求 | 当前状态 | 还需要的证据 |
 |---|---|---|
 | Composer 独立输入/草稿/发送/取消及入口 | 首批组件实现与 4 个实际 controller 测试；尚非完整 Composer UI | 完整能力弹层/卡片、原生挂载、视觉、真实三端操作 |
 | Indicators | 首批事实组件与 unknown/0/partial/error 测试 | 原生 RunView 呈现、主题/语义验收 |
 | Transcript / RunView | 布局契约已核实，正式组件未交付 | #22/#23 等价公共 API、结构化实现、阅读/分页/流式/原生验收 |
 | Sidebar | 共享服务绑定、选择/置顶/复制与局部原生验证；三端数据到 GPU 通过 | 重命名/分叉/归档交互与完整宿主验收 |
-| SidePanel / Summary | pane 生命周期与实际 Summary 内容已进入原生窗口，跟随父会话并保留实例 | 任务/子代理/SideChat 的正式 Run 内容与原生联调 |
+| SidePanel / Summary | Summary 原生挂载；SideChat 共享 pointer 绑定、独立 Composer/Indicators 与创建/发送/取消关闭已接入 | 任务/子代理内容、SideChat 正式 Transcript 与完整原生联调 |
 | 第二公开 API consumer | Composer、Indicators、Sidebar、SidePanel 公共组合，Summary 独立挂载；不依赖 RunSurface | 正式 RunView/Transcript 与完整原生宿主组合验证 |
 | 原生窗口验收 | Composer/Indicators、Sidebar、Summary + 共享绑定的局部窗口验证已通过（合成文本服务） | 物理中文输入法、正式 RunView/Transcript/其余 SidePanel 内容和阅读/分页锚点验收 |
-| review / CI / merge / tag | 尚未执行本阶段交付 | 完整要求审计通过后提交、独立 review、CI、合并与新阶段 tag |
+| review / CI / merge / tag | 草稿 PR #10 已提交；先前提交 CI 通过，后续增量仍需各自验证 | 完整要求审计、独立 review、最新 CI、合并与新阶段 tag |
 
 既有三端 test-harness 到 GPU 记录继续有效，但它不是正式业务组件树的原生窗口验收，也不是以上全部组件已完成的证据。目标保持 active，不因初步测试通过提前收口。
 

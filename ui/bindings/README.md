@@ -54,6 +54,42 @@ cover actual stream/cancel, lease coexistence, pagination, read-only child sourc
 SideChat cancellation-to-Unknown, pointer removal and host-preparation fencing.
 They do not prove physical IME, native window UX or real three-harness UI parity.
 
+## SideChat tab authority
+
+Keep one `SideChatBinding` per endpoint runtime and share it across retained
+parents. `input(revision, parent, non_scratch_tabs, selected)` appends scratch tabs
+from the existing controller, and supplies the **complete** controller snapshot
+to `SidePanel`. Do not filter that snapshot to the active parent: offscreen panes
+also need confirmed pointer removal to retire retained content. Support is
+`None` until the runtime is ready, then comes from the controller's capability
+policy. Unsupported endpoints must not show an enabled create control.
+
+Create with the captured parent and one explicit RPC ID. Open via `open(&chat)`;
+the returned `BoundSideChatRun` proves the binding's role and original pointer
+authority. Do not substitute a main-run cache entry with the same session ID.
+Keep the binding and its Composer instance with that pane, observe both its run
+and the shared owner, and use `binding.access().composer_gate()` when updating
+the Composer. Captured callbacks retain their original binding and destination.
+Late creation may add a tab to its original parent but must not change a newer
+navigation selection or interrupt composition.
+
+Close with `close(&expected_chat, rpc_id)`, not a session ID freshly looked up
+after an async callback. The controller checks the expected pointer under the
+same lock that admits Closing, cancels/settles the child, then discards it.
+Only confirmed discard/authoritative absence retires its body and local draft.
+Closing/Unknown retains readable content; its gate disables mutations. Failed
+reads keep the pointer. Reconciliation takes an explicit authoritative host read
+result; neither an absent inventory row (ephemeral sessions are hidden) nor a
+generic locator's success proves existence. The demo supplies no automatic
+Unknown resolver and never reads a harness's private database.
+
+The `--components` demo mounts a separate public Composer and Indicators for an
+owned scratch run. Transcript remains pending upstream #22/#23, so this is not
+a complete SideChat RunView. `ui/demo/tests/sidechat_binding.rs` covers parent
+isolation, late creation, streaming/cancel/discard, stale close callbacks, and
+interrupted discard with explicit reconciliation. The native fixture script
+exercises its own scratch transport and leaves both parent drafts unchanged.
+
 ## Shared inventory and thread actions
 
 Create `SidebarBinding::new(agent, endpoint_id)` inside the async runtime, using

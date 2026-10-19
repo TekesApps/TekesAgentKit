@@ -18,6 +18,8 @@ use tokio::sync::broadcast;
 pub struct Fixture {
     sessions: Arc<Mutex<BTreeMap<String, Line>>>,
     connects: Arc<AtomicUsize>,
+    forks: Arc<AtomicUsize>,
+    side_chats: bool,
 }
 struct Line {
     rows: Vec<HistoryEntry>,
@@ -25,6 +27,7 @@ struct Line {
     cancel: Arc<AtomicBool>,
     busy: bool,
     turn: i64,
+    ephemeral: bool,
 }
 fn entry(seq: i64, kind: &str, data: Value) -> HistoryEntry {
     serde_json::from_value(json!({"event":{"seq":seq,"time":seq+1,"type":kind,"data":data}}))
@@ -46,6 +49,7 @@ impl Default for Fixture {
                 cancel: Arc::new(AtomicBool::new(false)),
                 busy: false,
                 turn: 30,
+                ephemeral: false,
             };
             for n in 1..=30 {
                 append(&mut line, "turn/start", json!({"turn":n}));
@@ -70,10 +74,16 @@ impl Default for Fixture {
         Self {
             sessions: Arc::new(Mutex::new(sessions)),
             connects: Arc::new(AtomicUsize::new(0)),
+            forks: Arc::new(AtomicUsize::new(0)),
+            side_chats: false,
         }
     }
 }
 impl Fixture {
+    pub fn with_side_chats(mut self) -> Self {
+        self.side_chats = true;
+        self
+    }
     /// Explicit owned demo data, emitted through the same journal contract.
     pub fn with_demo_summary(self) -> Self {
         {
@@ -119,14 +129,20 @@ impl SessionEndpoint for Endpoint {
         &self.host
     }
     fn capabilities(&self) -> EndpointCapabilities {
-        EndpointCapabilities::methods(&["session.prompt", "session.cancel"])
+        let mut caps = EndpointCapabilities::methods(&["session.prompt", "session.cancel"]);
+        if self.fixture.side_chats {
+            caps.methods
+                .extend(["session.fork".into(), "session.discard".into()]);
+            caps.supports_ephemeral_fork = true;
+        }
+        caps
     }
     async fn follow(&self, target: StreamTarget) -> Result<FrameStream> {
         let g = &self.generation;
         let baseline = match target {
             StreamTarget::SessionInventory => {
                 let sessions = self.fixture.sessions.lock().unwrap();
-                let items: Vec<_> = sessions.iter().map(|(id,line)| json!({"sessionId":id,"title":format!("会话 {id}"),"running":line.busy,"blank":line.rows.is_empty(),"updatedAt":line.rows.len()})).collect();
+                let items: Vec<_> = sessions.iter().filter(|(_, line)| !line.ephemeral).map(|(id,line)| json!({"sessionId":id,"title":format!("会话 {id}"),"running":line.busy,"blank":line.rows.is_empty(),"updatedAt":line.rows.len()})).collect();
                 json!({"type":"baseline","generation":g,"snapshot":{"items":items}})
             }
             StreamTarget::SessionControl => {
@@ -194,6 +210,47 @@ impl SessionEndpoint for Endpoint {
         let line = sessions
             .get_mut(&id)
             .ok_or_else(|| unsupported("fixture session"))?;
+        if method == "session.fork" && self.fixture.side_chats {
+            let ephemeral = p["ephemeral"].as_bool().unwrap_or(false);
+            let end = if let Some(sequence) = p["atSeq"].as_u64() {
+                (sequence as usize + 1).min(line.rows.len())
+            } else if line.busy {
+                line.rows
+                    .iter()
+                    .rposition(|row| row.event.kind == "turn/end")
+                    .map_or(0, |index| index + 1)
+            } else {
+                line.rows.len()
+            };
+            let rows = line.rows[..end].to_vec();
+            let turn = line.turn;
+            let next = self.fixture.forks.fetch_add(1, Ordering::SeqCst) + 1;
+            let child = format!("{}-{next}", if ephemeral { "scratch" } else { "fork" });
+            require(
+                !sessions.contains_key(&child),
+                "fixture fork identity collision",
+            )?;
+            sessions.insert(
+                child.clone(),
+                Line {
+                    rows,
+                    sender: broadcast::channel(256).0,
+                    cancel: Arc::new(AtomicBool::new(false)),
+                    busy: false,
+                    turn,
+                    ephemeral,
+                },
+            );
+            return Ok(json!({"sessionId":child}));
+        }
+        if method == "session.discard" && self.fixture.side_chats {
+            require(line.ephemeral, "fixture only discards ephemeral sessions")?;
+            if line.busy {
+                return Err(Error::Remote(json!({"code":"session-running"})));
+            }
+            sessions.remove(&id);
+            return Ok(json!({"discarded":true}));
+        }
         if method == "session.cancel" {
             line.cancel.store(true, Ordering::SeqCst);
             return Ok(json!({"cancelled":true}));

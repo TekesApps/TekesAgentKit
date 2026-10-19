@@ -4,6 +4,8 @@
 //! it does not implement a Run state machine, renderer, or window event loop.
 mod sidebar;
 pub use sidebar::*;
+mod sidechat;
+pub use sidechat::*;
 use std::sync::Arc;
 use tekes_agent_components_ui::{Composer, ComposerAffordances, ComposerControlGate};
 use tekes_agent_contract::{PromptMode, Result, require, unsupported};

@@ -21,6 +21,8 @@
 
 最新窗口还接入了实际 Sidebar / SidePanel / SummaryView：共享列表和置顶、异步会话选择、当前父会话 Summary 已验证。共享服务的自定义 pin 回传/通知修正仍未发布；未接入的重命名/分叉/归档交互会在 RPC 前明确拒绝。运行方式与范围见 [Sidebar/Summary 记录](../docs/rust-agent-ui-sidebar-summary-20261019.md)。
 
+SideChat 增量使用同一 runtime 的 `SideChatBinding`：已可创建 owned scratch、挂载独立 Composer/Indicators、发送与流式状态回传、取消后确认丢弃，并隔离父会话草稿。关闭结果不确定时保留 pointer/草稿并禁用发送；无自动重试或私有数据库读取。完整 Transcript 尚未接入，仍不是正式 SideChat RunView。公共接入与 reconciliation 责任见 [绑定说明](bindings/README.md#sidechat-tab-authority)。
+
 ## 依赖
 
 - Rust 1.95.0、macOS + Metal（原生窗口/文本服务/GPU）；Python 3.11+（准备和边界检查）。
@@ -44,7 +46,7 @@ ui/target/debug/tekes-agent-ui-demo
 按钮提供发送、停止、历史分页、回到最新、重连、切换 A/B。候选 Composer 已消费公共多行 Grow 视口；Enter 换行，业务发送仍仅通过显式按钮。
 宿主订阅已有 `RunController::subscribe()`，通过公开 `WindowWake` 投递通知；异步操作结果入队后同样 wake。没有业务 frame pump；原控件的有限过渡仍按需请求动画帧。
 
-真实 Native、Pi、DSH 都通过 `--endpoint-config` 接收宿主显式 JSON。A/B 对应所选 endpoint 的两个已有 session，必须互不相同；宿主负责模型/执行参数。demo 不创建真实会话或修改模型：
+真实 Native、Pi、DSH 都通过 `--endpoint-config` 接收宿主显式 JSON。A/B 对应所选 endpoint 的两个已有 session，必须互不相同；宿主负责模型/执行参数。demo 启动不创建真实会话或修改模型；`--components` 中显式点击新建 SideChat 会在支持的 endpoint 创建临时 fork，关闭操作会取消并丢弃该临时会话：
 
 ```json
 {"endpointId":"native-ui","url":"http://127.0.0.1:PORT","bearerEnv":"MY_EXPLICIT_BEARER","sessions":["SESSION_A","SESSION_B"]}
