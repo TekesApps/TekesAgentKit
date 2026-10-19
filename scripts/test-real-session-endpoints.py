@@ -16,7 +16,10 @@ parser.add_argument('--ui-context',action='store_true',help='Exercise draft cont
 parser.add_argument('--ui-initial-presets',action='store_true',help='Exercise public initial preset selection through shared create and prompt in isolated component sessions')
 parser.add_argument('--ui-annotation-editor',action='store_true',help='Exercise public annotation editing and shared context compilation; implies the context proof')
 parser.add_argument('--ui-attachments',action='store_true',help='Exercise public upload entry, original draft, Send, history and capability-specific file reads')
+parser.add_argument('--ui-actionables',action='store_true',help='Exercise public actionable cards on configured Native/Pi/DSH question sources')
 args=parser.parse_args()
+if args.ui_actionables and not args.ui_components:
+    parser.error('--ui-actionables requires --ui-components')
 if args.ui_model_choices and not args.ui_components:
     parser.error('--ui-model-choices requires --ui-components')
 if args.ui_context and not args.ui_components:
@@ -50,6 +53,14 @@ class Provider(http.server.BaseHTTPRequestHandler):
                     {'type':'response.function_call_arguments.done','output_index':0,'arguments':json.dumps(task)},
                     {'type':'response.completed','response':{'id':'native-child-call','status':'completed','usage':{'input_tokens':10,'output_tokens':4,'total_tokens':14}}},
                 ]
+            if 'NATIVE_ACTIONABLE_UI_PROOF' in json.dumps(body) and not any(item.get('type')=='function_call_output' and item.get('call_id')=='native-ui-question' for item in body.get('input',[]) if isinstance(item,dict)):
+                question={'question':'Native UI actionable round trip?','options':['continue-proof']}
+                frames=[
+                    {'type':'response.output_item.added','output_index':0,'item':{'type':'function_call','call_id':'native-ui-question','name':'ask_user_questions','arguments':''}},
+                    {'type':'response.function_call_arguments.delta','output_index':0,'delta':''},
+                    {'type':'response.function_call_arguments.done','output_index':0,'arguments':json.dumps(question)},
+                    {'type':'response.completed','response':{'id':'native-ui-question-call','status':'completed','usage':{'input_tokens':10,'output_tokens':4,'total_tokens':14}}},
+                ]
         else:
             common={'id':'synthetic-chat','object':'chat.completion.chunk','created':1,'model':'endpoint-test'}
             frames=[dict(common,choices=[{'index':0,'delta':{'role':'assistant','content':'ENDPOINT_'},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{'content':'REPLY_OK'},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{},'finish_reason':'stop'}],usage={'prompt_tokens':10,'completion_tokens':4,'total_tokens':14})]
@@ -57,6 +68,9 @@ class Provider(http.server.BaseHTTPRequestHandler):
             change=re.search(r'ENDPOINT_CHANGE_DIRECTORY=([^\s"\\]+)',transcript)
             if change and not any(message.get('role')=='tool' for message in body.get('messages',[])):
                 frames=[dict(common,choices=[{'index':0,'delta':{'role':'assistant','tool_calls':[{'index':0,'id':'directory-call','type':'function','function':{'name':'working_directory','arguments':json.dumps({'cd':change.group(1)})}}]},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{},'finish_reason':'tool_calls'}])]
+            if 'DSH_ACTIONABLE_UI_PROOF' in transcript and not any(message.get('role')=='tool' and message.get('tool_call_id')=='dsh-ui-question-call' for message in body.get('messages',[])):
+                question={'questions':[{'id':'dsh-ui-question','question':'DSH UI actionable round trip?','options':[{'label':'continue-proof'}],'multi_select':False}]}
+                frames=[dict(common,choices=[{'index':0,'delta':{'role':'assistant','tool_calls':[{'index':0,'id':'dsh-ui-question-call','type':'function','function':{'name':'ask_user_question','arguments':json.dumps(question)}}]},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{},'finish_reason':'tool_calls'}])]
             if 'DSH_ACTIONABLE_PROOF' in transcript and not any(message.get('role')=='tool' for message in body.get('messages',[])):
                 question={'questions':[{'id':'dsh-question-proof','question':'DSH actionable round trip?','options':[{'label':'continue-proof'}],'multi_select':False}]}
                 frames=[dict(common,choices=[{'index':0,'delta':{'role':'assistant','tool_calls':[{'index':0,'id':'dsh-question-call','type':'function','function':{'name':'ask_user_question','arguments':json.dumps(question)}}]},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{},'finish_reason':'tool_calls'}])]
@@ -162,6 +176,10 @@ def ui_smoke(config, first):
     if not args.ui_demo:
         return
     kind=config['kind']
+    if kind=='native' and args.ui_actionables:
+        first=str(uuid.uuid4())
+        execute(dict(config,commands=[{'op':'call','method':'session.create','args':{'sessionId':first,'execution':{'cwd':str(cwd),'read_roots':[],'writable_roots':[],'toolchain_roots':[],'network':False,'allowed_tools':['ask_user_questions'],'mcp':[]}}},
+            {'op':'call','sessionId':first,'method':'session.selectModel','args':{'provider':providers['providers'][0]['id'],'model':providers['providers'][0]['models'][0]['id']}}]))
     second=next(row['result']['sessionId'] for row in execute(dict(config,commands=[{'op':'create','cwd':str(cwd)}])) if row.get('op')=='create')
     explicit={'kind':kind,'endpointId':kind+'-ui','sessions':[first,second]}
     ui_env=dict(os.environ)
@@ -183,6 +201,7 @@ def ui_smoke(config, first):
     if args.ui_context or args.ui_annotation_editor:mode+=['--context-proof']
     if args.ui_annotation_editor:mode+=['--annotation-proof']
     if args.ui_attachments:mode+=['--upload-proof']
+    if args.ui_actionables:mode+=['--actionable-proof']
     if args.ui_initial_presets:mode+=['--initial-preset-proof','--initial-preset-cwd',str(cwd)]
     ui=subprocess.run([str(args.ui_demo.resolve()),*mode,'--endpoint-config',str(path),'--offscreen',str(output)],env=ui_env,text=True,capture_output=True,timeout=60)
     assert ui.returncode==0,ui.stderr[-3000:]
@@ -192,6 +211,10 @@ def ui_smoke(config, first):
     if args.ui_components:
         assert receipt['components'] and not receipt['transcriptView'],receipt
         assert receipt['inventoryRows']>=1 and receipt['sharedRuntime'] and receipt['sidebarMounted'] and receipt['summaryMounted'],receipt
+        if args.ui_actionables:
+            proof=receipt['actionableProof']
+            assert all(proof[key] for key in ('probeConfigured','publicComposer','publicCard','originalScope','oneAttempt','sharedResolved','canonicalAnswerRecord','otherDraftPreserved','freshHistoryAfterReconnect','reconnectNoDuplicateInput')),proof
+            assert proof['followupInputCount']==1 and not proof['nativeInteraction'] and not proof['physicalIME'],proof
         if args.ui_model_choices:
             proof=receipt['modelChoiceProof']
             assert proof['catalogChoices']>=1 and proof['explicitSelection'] and proof['configurationReceipt'] and proof['promptSettled'] and not proof['nativeInteraction'],proof
@@ -230,7 +253,7 @@ try:
             config={'kind':'pi','executable':str(pi/'node/bin/node'),'arguments':[str(pi/'node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js')],'dataRoot':str(data),'environment':{'HOME':str(base/'pi-home'),'PATH':os.environ.get('PATH','/usr/bin:/bin')},'commands':commands(cwd,'endpoint-test','endpoint-test')}
             Path(config['environment']['HOME']).mkdir()
             extension=base/'question.mjs'
-            extension.write_text("export default function(pi){pi.registerCommand('endpoint-question',{handler:async(args,ctx)=>{const value=await ctx.ui.select('Endpoint question',['yes','no']);pi.appendEntry('endpoint-answer',{value});}});pi.registerCommand('endpoint-settled',{handler:async()=>{pi.appendEntry('tekes.run.v1',{id:'endpoint-settled-turn',phase:'settled'});}});}")
+            extension.write_text("export default function(pi){pi.registerCommand('endpoint-question',{handler:async(args,ctx)=>{const value=await ctx.ui.select('Endpoint question',['yes','no']);pi.appendEntry('endpoint-answer',{value});}});pi.registerCommand('endpoint-ui-question',{handler:async(args,ctx)=>{const value=await ctx.ui.select('AgentKit UI question',['yes','no']);pi.appendEntry('endpoint-ui-answer',{value});}});pi.registerCommand('endpoint-settled',{handler:async()=>{pi.appendEntry('tekes.run.v1',{id:'endpoint-settled-turn',phase:'settled'});}});}")
             config['extensions']=[str(extension)]
             config['commands'].insert(-3,{'op':'promptAndAnswer','sessionId':'s','text':'/endpoint-question','outcome':{'value':'yes'}})
             outputs=run(config)

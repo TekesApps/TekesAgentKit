@@ -179,3 +179,5 @@ Task tab 以 task ID 为稳定身份，scope 是可更新的内容输入。TaskP
 等待交互审查发现并修正 DSH 共享 actionable 回答信封适配，见 [SEP 对齐记录](session-endpoints.md#dsh-actionable-回答信封对齐2026-10-20)。真实 DSH 问题→回答→tool result→settle 已通过；Indicators 当前仍只显示等待事实，公开 actionable 业务组件及其原生 UI 仍待实现，不能据此认为该交互已交付。
 
 最新 [首批 actionable 接入](rust-agent-ui-actionables-20261020.md) 增加共享审批/单选问题的公共卡片、原来源一次响应绑定和宿主回调；原生 fixture 与 9 项新测试验证回应、失效、重复点击、组字和离屏晚失败。复杂表单、自定义/secret 输入、显式对账及三端各自的 actionable UI 仍未完成，不提升正式 RunView/Transcript 的交付状态。
+
+三端公开问答卡片的 Composer → 卡片 → 原 scope 回传 → 后续发送 → 新 epoch 历史恢复已完成局部联调，见 [三端问答记录](rust-agent-ui-actionables-live-20261020.md)。该证据不扩展为正式 Transcript、物理 IME 或真实审批验收。

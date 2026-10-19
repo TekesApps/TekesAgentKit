@@ -2321,6 +2321,17 @@ pub fn run() {
         focus_before_deactivate: None,
     };
     if let Some(index) = args.iter().position(|arg| arg == "--offscreen") {
+        let actionable_proof = if args.iter().any(|arg| arg == "--actionable-proof") {
+            host.executor
+                .block_on(tekes_agent_ui_demo::actionable_proof::run(
+                    &mut host.view,
+                    &host.runtime,
+                    kind,
+                ))
+                .expect("public actionable proof")
+        } else {
+            serde_json::Value::Null
+        };
         let mut model_proof = serde_json::Value::Null;
         let mut context_proof = serde_json::Value::Null;
         let mut annotation_proof = serde_json::Value::Null;
@@ -2872,6 +2883,7 @@ pub fn run() {
             "annotationProof":annotation_proof,
             "initialPresetProof":preset_proof,
             "uploadProof":upload_proof,
+            "actionableProof":actionable_proof,
             })
         );
         host.executor.block_on(host.runtime.stop()).unwrap();

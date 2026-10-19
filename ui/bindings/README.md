@@ -622,3 +622,5 @@ error in another pane. Unknown errors retain a disabled inline status for explic
 reconciliation; no optimistic removal. Shared resolution drives removal.
 `ActionableCard::complete` is the equivalent helper for a directly mounted card.
 The second public consumer mounts the card and consumes the response request.
+
+The real-runtime smoke script supports `--ui-components --ui-actionables` for Native, Pi and DSH. It drives public Send/card callbacks, answers the original source after navigating away, checks a durable successful answer, sends a followup and reconnects without duplicate input or cross-session draft changes. This is an offscreen consumer proof with a local synthetic provider, not physical IME/native interaction acceptance. See [the scoped receipt](../../docs/rust-agent-ui-actionables-live-20261020.md).

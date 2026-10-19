@@ -1,0 +1,149 @@
+{
+  "kind": "real-harness-public-actionable-consumer",
+  "baseCommit": "31f9df062744348ef2d0462295c02e96a6f4958e",
+  "testedSourceFiles": {
+    "ui/demo/src/actionable_proof.rs": "6d6f3892226d93a8490f3451df46963e847148fc8ea0727ba4e82860780c6408",
+    "ui/demo/src/components_native.rs": "28502b7abaa9fadd7c1be0879037accf2734c28a9997fb5ea11519c905e52b82",
+    "ui/demo/src/lib.rs": "ad01a35da40c588d55d82a679be38b8726e34f39aaa6e412da2f3516681737bb",
+    "scripts/test-real-session-endpoints.py": "ff9d3fa1a21766869eff2e165ba19740d5cb4f534f2813e89165ab8872216165"
+  },
+  "binarySha256": "199c71216ed61c89abd81b9ca337a9a0bfb76ba9b2cce441d962b98a937900d3",
+  "runtimeVersions": {
+    "kernel": "0.9.1",
+    "pi": "1.3.0",
+    "dsh": "0.2.1-rc.2"
+  },
+  "tekesUI": {
+    "commit": "431093786de47b48cd566d0d9c0eafa088b10d68",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 188,
+    "sha256": "03721866a362b1d31261ebbbc86140eb07e9e23320871c325234a5212591213d",
+    "ui_packages": 8
+  },
+  "receipts": {
+    "native": {
+      "actionableProof": {
+        "canonicalAnswerRecord": true,
+        "followupInputCount": 1,
+        "freshHistoryAfterReconnect": true,
+        "nativeInteraction": false,
+        "oneAttempt": true,
+        "originalScope": true,
+        "otherDraftPreserved": true,
+        "physicalIME": false,
+        "probeConfigured": true,
+        "publicCard": true,
+        "publicComposer": true,
+        "reconnectNoDuplicateInput": true,
+        "sharedResolved": true
+      },
+      "annotationProof": null,
+      "components": true,
+      "contextProof": null,
+      "finalAssistantItems": 2,
+      "initialPresetProof": null,
+      "inventoryRows": 5,
+      "isStale": false,
+      "modelChoiceProof": null,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 5,
+      "transcriptView": false,
+      "uploadProof": null
+    },
+    "pi": {
+      "actionableProof": {
+        "canonicalAnswerRecord": true,
+        "followupInputCount": 1,
+        "freshHistoryAfterReconnect": true,
+        "nativeInteraction": false,
+        "oneAttempt": true,
+        "originalScope": true,
+        "otherDraftPreserved": true,
+        "physicalIME": false,
+        "probeConfigured": true,
+        "publicCard": true,
+        "publicComposer": true,
+        "reconnectNoDuplicateInput": true,
+        "sharedResolved": true
+      },
+      "annotationProof": null,
+      "components": true,
+      "contextProof": null,
+      "finalAssistantItems": 3,
+      "initialPresetProof": null,
+      "inventoryRows": 13,
+      "isStale": false,
+      "modelChoiceProof": null,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 8,
+      "transcriptView": false,
+      "uploadProof": null
+    },
+    "dsh": {
+      "actionableProof": {
+        "canonicalAnswerRecord": true,
+        "followupInputCount": 1,
+        "freshHistoryAfterReconnect": true,
+        "nativeInteraction": false,
+        "oneAttempt": true,
+        "originalScope": true,
+        "otherDraftPreserved": true,
+        "physicalIME": false,
+        "probeConfigured": true,
+        "publicCard": true,
+        "publicComposer": true,
+        "reconnectNoDuplicateInput": true,
+        "sharedResolved": true
+      },
+      "annotationProof": null,
+      "components": true,
+      "contextProof": null,
+      "finalAssistantItems": 4,
+      "initialPresetProof": null,
+      "inventoryRows": 8,
+      "isStale": false,
+      "modelChoiceProof": null,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 13,
+      "transcriptView": false,
+      "uploadProof": null
+    }
+  },
+  "provider": "local synthetic; isolated HOME/dataRoot; no paid API",
+  "nativeInteraction": false,
+  "physicalIME": false,
+  "formalTranscript": false,
+  "review": "manual source inspection of original binding capture, one-attempt guard, fresh history and exact runtime success checks",
+  "upstreamIssues": {
+    "22": "OPEN",
+    "23": "OPEN"
+  },
+  "remaining": [
+    "formal Transcript and RunView",
+    "mixed-content reading/paging anchors",
+    "physical IME and native acceptance",
+    "complex actionable forms and real approval scenarios",
+    "full delivery review CI merge and stage tag"
+  ],
+  "localChecks": {
+    "uiWorkspaceTestsPassed": 171,
+    "toolsTestsPassed": 18,
+    "uiStrictClippy": true,
+    "uiFmt": true,
+    "uiBoundaries": true,
+    "resolvedInputsVerified": true
+  }
+}
