@@ -426,3 +426,47 @@ All active editors participate in the host composition barrier, including the
 main/pane Composers. Source reveal/highlights, selection-to-annotation capture and
 structured historical cards are separate unfinished capabilities. See
 docs/rust-agent-ui-annotation-editor-20261020.md for evidence and limits.
+
+## Generic file attachment capture (experimental)
+
+Call `binding.begin_attachments(&destination)` **before** opening the host's
+system file picker. `supports_attachments()` requires a live writable source,
+Ready connection, `attachments.policy` and `session.uploadFile`. The request
+retains that exact binding, draft context revision and connection epoch. The
+host supplies `AttachmentFile::new(basename, media_type, Arc<[u8]>)`; paths,
+permissions, MIME discovery and bounded file reading remain host capabilities.
+`MAX_UPLOAD_BYTES` is the shared transport ceiling; the endpoint policy may be
+stricter. Generic files are not gated by inline-image MIME support.
+
+Await `request.upload(&files)` once and retain the selected files, request and
+report until the host resolves/dismisses the operation. Each capture accepts one
+attempt, including a failed preflight. RPC IDs correlate the operation; they do
+**not** assert server upload idempotency. Do not abort/drop an in-flight future
+as a substitute for server cancellation, or automatically retry a failed or
+uncertain upload. If it is interrupted, the host must treat the result as
+unknown and explicitly reconcile before choosing another upload.
+
+The adapter preflights count, per-file and aggregate limits, then uploads
+sequentially. Legacy draft attachments with unknown byte counts cannot be
+assumed empty when an aggregate limit applies. Each successful receipt is
+validated; known receipts survive partial failure or a changed draft in
+`AttachmentReport`. An upload error is conservatively uncertain. The endpoint
+may have stored a file even if no usable receipt returned; the report cannot
+invent an identifier for that file or delete it implicitly.
+
+Only an entirely successful batch is appended through the existing atomic
+`patch_context`. New body/settings edits survive; Send, context ABA, reconnect,
+retired task/child/SideChat authority and source mismatch prevent attachment to
+a newer draft or parent run. `Detached` reports do not automatically rebase.
+`ComposerArtifact::Attachment.facts` contains optional canonical byte count/MIME
+for presentation/policy only; prompt compilation still emits the original
+`{type:"file", receiptId}` content without those facts. Old serialized drafts
+remain readable; Rust constructors must now set `facts: None` for unknown data.
+This field is an unpublished API addition pending a future AgentKit release.
+
+The second public consumer exposes `upload_selected_files` without runtime or
+host imports. Deterministic tests exercise real public SEP calls against the
+isolated fixture; they are not three-harness or native-system-picker acceptance.
+The demo attachment affordance remains disabled: a host picker, upload status
+component, preview/reconciliation UI, inline-image handling and actual
+Native/Pi/DSH attachment-to-send validation are still required.

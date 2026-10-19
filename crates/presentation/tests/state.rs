@@ -331,6 +331,7 @@ fn ambiguous_submission_locks_its_owner_and_new_typing_wins_failure_recovery() {
         id: "file".into(),
         name: "proof".into(),
         content: json!({"type":"file","receiptId":"file"}),
+        facts: None,
     };
     store
         .edit(
@@ -820,4 +821,31 @@ fn worker_launch_notice_recovers_only_after_later_durable_turn_start() {
     let serialized = serde_json::to_value(&state).unwrap();
     let replay = serde_json::from_value(serialized).unwrap();
     assert_eq!(out, TranscriptSnapshot::read(&scope("a"), &replay).unwrap());
+}
+
+#[test]
+fn attachment_facts_are_backward_compatible_and_never_enter_prompt() {
+    let value = json!({"kind":"attachment","id":"a","name":"中文.txt","content":{"type":"file","receiptId":"receipt"}});
+    let mut artifact: ComposerArtifact = serde_json::from_value(value.clone()).unwrap();
+    assert_eq!(serde_json::to_value(&artifact).unwrap(), value);
+    if let ComposerArtifact::Attachment { facts, .. } = &mut artifact {
+        *facts = Some(AttachmentFacts {
+            byte_count: 12,
+            media_type: Some("text/plain".into()),
+        });
+    }
+    let serialized = serde_json::to_value(&artifact).unwrap();
+    assert_eq!(serialized["facts"]["byteCount"], 12);
+    assert_eq!(
+        serde_json::from_value::<ComposerArtifact>(serialized).unwrap(),
+        artifact
+    );
+    let draft = ComposerDraft {
+        artifacts: vec![artifact],
+        ..Default::default()
+    };
+    let SubmissionPlan::Prompt { content, .. } = draft.compile(false).unwrap() else {
+        panic!()
+    };
+    assert_eq!(content, vec![json!({"type":"file","receiptId":"receipt"})]);
 }

@@ -236,9 +236,12 @@ impl ComposerContext {
     fn add_card(&mut self, item: ContextRow, baseline: &ComposerContextBaseline) {
         let (title, detail) = match item {
             ContextRow::Artifact(i) => match &baseline.artifacts[i] {
-                ComposerArtifact::Attachment { name, .. } => (
+                ComposerArtifact::Attachment { name, facts, .. } => (
                     format!("{} · {name}", self.labels.attachment),
-                    String::new(),
+                    facts
+                        .as_ref()
+                        .map(|facts| format!("{} B", facts.byte_count))
+                        .unwrap_or_default(),
                 ),
                 ComposerArtifact::Command { name, .. } => {
                     (format!("{} · /{name}", self.labels.command), String::new())

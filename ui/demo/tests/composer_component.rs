@@ -137,6 +137,7 @@ async fn send_readiness_uses_shared_compiler_for_empty_and_artifact_only_drafts(
                     id: "image".into(),
                     name: "fixture image".into(),
                     content: serde_json::json!({"type":"image","url":"fixture://image"}),
+                    facts: None,
                 }],
                 ..Default::default()
             },

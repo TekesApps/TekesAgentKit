@@ -581,3 +581,37 @@ async fn bounded_child_pages_preserve_verified_prefix_and_reset_changed_history(
     drop(child);
     runtime.stop().await.unwrap();
 }
+
+#[tokio::test]
+async fn attachment_context_commit_checks_epoch_with_authority_and_preserves_typing() {
+    let (_, runtime, controller) = setup().await;
+    let baseline = ComposerContextBaseline::read(&controller.snapshot()).unwrap();
+    let epoch = runtime.inspect(|s| s.connection_epoch);
+    runtime.reconnect().await.unwrap();
+    runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
+    let artifact = ComposerArtifact::Attachment {
+        id: "file".into(),
+        name: "file.txt".into(),
+        content: json!({"type":"file","receiptId":"r"}),
+        facts: Some(AttachmentFacts {
+            byte_count: 3,
+            media_type: None,
+        }),
+    };
+    assert!(
+        !controller
+            .patch_context_at_epoch(&baseline, vec![artifact.clone()], vec![], epoch)
+            .unwrap()
+    );
+    controller
+        .edit_text(&baseline.selection.destination, "新正文".into())
+        .unwrap();
+    let epoch = runtime.inspect(|s| s.connection_epoch);
+    assert!(
+        controller
+            .patch_context_at_epoch(&baseline, vec![artifact], vec![], epoch)
+            .unwrap()
+    );
+    assert_eq!(controller.snapshot().draft.text, "新正文");
+    runtime.stop().await.unwrap();
+}

@@ -287,3 +287,16 @@ fn public_summary_mounts_without_a_runtime_or_harness_dependency() {
             .is_some()
     );
 }
+
+/// A second host supplies bounded immutable bytes from its own system picker.
+/// It keeps the captured request through completion, including uncertain errors.
+/// This helper does not import runtime internals, paths or the demo host.
+pub async fn upload_selected_files(
+    request: &tekes_agent_ui_bindings::AttachmentSelection,
+    files: &[tekes_agent_ui_bindings::AttachmentFile],
+) -> Result<tekes_agent_ui_bindings::AttachmentReport, String> {
+    request
+        .upload(files)
+        .await
+        .map_err(|error| error.to_string())
+}

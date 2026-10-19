@@ -215,6 +215,10 @@ async fn embedded_context_keeps_payloads_private_uses_captured_items_and_obeys_i
         id: "file".into(),
         name: "设计.png".into(),
         content: json!({"type":"image","data":"PRIVATE_MEDIA_PAYLOAD"}),
+        facts: Some(tekes_agent_presentation::AttachmentFacts {
+            byte_count: 123,
+            media_type: Some("image/png".into()),
+        }),
     };
     a.patch_context(
         &capture(a),
@@ -234,6 +238,11 @@ async fn embedded_context_keeps_payloads_private_uses_captured_items_and_obeys_i
     view.update(&a.current_run().unwrap(), Default::default())
         .unwrap();
     let mut host = view.into_host().unwrap();
+    assert!(
+        host.semantics()
+            .iter()
+            .any(|n| n.semantics.name.contains("123 B"))
+    );
     assert!(
         host.semantics()
             .iter()

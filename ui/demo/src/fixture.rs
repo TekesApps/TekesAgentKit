@@ -27,6 +27,7 @@ pub fn composer_context_fixture() -> (
                 id: "fixture-file".into(),
                 name: "草稿附件.png".into(),
                 content: json!({"type":"file","receiptId":"DISPLAY_ONLY_NOT_UPLOADED"}),
+                facts: None,
             },
             ComposerArtifact::Reference {
                 id: "fixture-reference".into(),
@@ -56,6 +57,10 @@ pub struct Fixture {
     catalog_fails: Arc<AtomicBool>,
     lifecycle: bool,
     models: bool,
+    uploads: bool,
+    upload_calls: Arc<AtomicUsize>,
+    upload_gate: Option<Arc<tokio::sync::Semaphore>>,
+    upload_fail_at: Option<usize>,
     presets: Option<bool>,
     inventory_sender: broadcast::Sender<Value>,
     workspace_sender: broadcast::Sender<Value>,
@@ -151,6 +156,10 @@ impl Default for Fixture {
             catalog_fails: Arc::new(AtomicBool::new(false)),
             lifecycle: false,
             models: false,
+            uploads: false,
+            upload_calls: Arc::new(AtomicUsize::new(0)),
+            upload_gate: None,
+            upload_fail_at: None,
             presets: None,
             inventory_sender: broadcast::channel(256).0,
             workspace_sender: broadcast::channel(256).0,
@@ -159,6 +168,21 @@ impl Default for Fixture {
     }
 }
 impl Fixture {
+    pub fn with_uploads(mut self) -> Self {
+        self.uploads = true;
+        self
+    }
+    pub fn with_upload_gate(mut self, gate: Arc<tokio::sync::Semaphore>) -> Self {
+        self.upload_gate = Some(gate);
+        self
+    }
+    pub fn with_upload_failure(mut self, index: usize) -> Self {
+        self.upload_fail_at = Some(index);
+        self
+    }
+    pub fn upload_calls(&self) -> usize {
+        self.upload_calls.load(Ordering::SeqCst)
+    }
     pub fn with_presets(mut self, legacy_roster: bool) -> Self {
         self.presets = Some(legacy_roster);
         self
@@ -300,6 +324,10 @@ impl SessionEndpoint for Endpoint {
     }
     fn capabilities(&self) -> EndpointCapabilities {
         let mut caps = EndpointCapabilities::methods(&["session.prompt", "session.cancel"]);
+        if self.fixture.uploads {
+            caps.methods
+                .extend(["session.uploadFile".into(), "attachments.policy".into()]);
+        }
         if let Some(legacy) = self.fixture.presets {
             caps.methods.extend([
                 "session.create".into(),
@@ -425,6 +453,33 @@ impl SessionEndpoint for Endpoint {
         Err(unsupported("fixture actionable"))
     }
     async fn call(&self, method: &str, p: Value, rpc: &str) -> Result<Value> {
+        if self.fixture.uploads && method == "attachments.policy" {
+            return Ok(json!({"inlineMediaTypes":[],"maxAttachmentBytes":8388608,
+                "maxAttachmentsPerMessage":4,"maxMessageAttachmentBytes":16777216}));
+        }
+        if self.fixture.uploads && method == "session.uploadFile" {
+            let index = self.fixture.upload_calls.fetch_add(1, Ordering::SeqCst);
+            if let Some(gate) = &self.fixture.upload_gate {
+                gate.acquire()
+                    .await
+                    .map_err(|_| unsupported("upload gate closed"))?
+                    .forget();
+            }
+            if self.fixture.upload_fail_at == Some(index) {
+                return Err(unsupported("fixture upload outcome unknown"));
+            }
+            let data = string(&p, "data")?;
+            // Fixture computes decoded length of transport-produced base64 only.
+            let bytes = data.len() / 4 * 3 - data.bytes().rev().take_while(|c| *c == b'=').count();
+            return Ok(self.fixture.record(
+                method,
+                &p,
+                rpc,
+                json!({
+                "receiptId":format!("receipt-{index}"),"file":{
+                    "attachmentId":format!("file-{index}"),"name":p["name"],"bytes":bytes}}),
+            ));
+        }
         if let Some(legacy) = self.fixture.presets {
             if method
                 == if legacy {

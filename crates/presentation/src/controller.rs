@@ -272,6 +272,32 @@ impl RunController {
         self.shared.refresh();
         Ok(result)
     }
+    /// Commit an asynchronous upload's context only within its original
+    /// connection epoch. Lock order matches refresh: core, then authority.
+    /// The epoch check and context CAS share the same authority read guard.
+    pub fn patch_context_at_epoch(
+        &self,
+        expected: &ComposerContextBaseline,
+        artifacts: Vec<ComposerArtifact>,
+        annotations: Vec<ComposerAnnotation>,
+        connection_epoch: u64,
+    ) -> Result<bool> {
+        self.shared
+            .validate_destination(&expected.selection.destination)?;
+        let result = {
+            let mut core = self.shared.core.lock().expect("presentation lock poisoned");
+            self.shared.runtime.inspect(|authority| {
+                if authority.connection_epoch != connection_epoch
+                    || authority.connection != tekes_agent_session::ConnectionState::Ready
+                {
+                    return Ok(false);
+                }
+                core.patch_context(expected, artifacts, annotations)
+            })?
+        };
+        self.shared.refresh();
+        Ok(result)
+    }
     pub fn commit_settings(
         &self,
         token: &SelectionToken,

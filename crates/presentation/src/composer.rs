@@ -6,6 +6,13 @@ use tekes_agent_contract::{Error, PromptMode, Result, require};
 use tekes_agent_session::MemoryProjectionStore;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AttachmentFacts {
+    pub byte_count: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub media_type: Option<String>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(
     tag = "kind",
     rename_all = "camelCase",
@@ -16,6 +23,9 @@ pub enum ComposerArtifact {
         id: String,
         name: String,
         content: Value,
+        /// Client presentation/policy facts, never added to the prompt content.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        facts: Option<AttachmentFacts>,
     },
     Command {
         id: String,

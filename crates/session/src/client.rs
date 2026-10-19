@@ -81,7 +81,7 @@ impl SessionRuntime {
     ) -> Result<UploadReceipt> {
         use base64::Engine;
         require(
-            !data.is_empty() && data.len() <= 8 * 1024 * 1024,
+            !data.is_empty() && data.len() <= MAX_UPLOAD_BYTES,
             "upload limit",
         )?;
         let value=self.call_optional("session.uploadFile",json!({"sessionId":id,"name":name,"mediaType":media_type,"data":base64::engine::general_purpose::STANDARD.encode(data)}),rpc_id).await?;
