@@ -322,6 +322,7 @@ impl AttachmentSelection {
                 name: receipt.file.name,
                 content: json!({"type":"file","receiptId":receipt.receipt_id}),
                 facts: Some(AttachmentFacts {
+                    attachment_id: Some(receipt.file.attachment_id),
                     byte_count: file.byte_count(),
                     media_type: Some(file.media_type.clone()),
                 }),
@@ -440,6 +441,7 @@ mod tests {
         assert!(validate_policy(&policy(), &[artifact.clone()], &[file()]).is_err());
         if let ComposerArtifact::Attachment { facts, .. } = &mut artifact {
             *facts = Some(AttachmentFacts {
+                attachment_id: None,
                 byte_count: 3,
                 media_type: None,
             });

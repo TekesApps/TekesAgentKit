@@ -318,3 +318,10 @@ fn independent_host_mounts_upload_status_without_a_demo_or_platform_dependency()
             .is_some()
     );
 }
+
+/// Independent hosts receive immutable bytes and own their viewer capability.
+pub async fn read_file_preview(
+    request: &tekes_agent_ui_bindings::FilePreviewRequest,
+) -> Result<tekes_agent_ui_bindings::FilePreview, String> {
+    request.read().await.map_err(|error| error.to_string())
+}

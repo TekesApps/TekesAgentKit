@@ -30,7 +30,18 @@ use tekes_ui_scene::{GlyphAtlas, Rect, Scene};
 use tekes_ui_text::coretext::{CoreTextFonts, CoreTextRasterizer, CoreTextShaper};
 use tekes_ui_tokens::{Palette, Theme};
 
+struct OwnedFilePreview {
+    child: std::process::Child,
+    _staged: tekes_agent_ui_demo::file_preview_host::StagedFilePreview,
+}
+impl Drop for OwnedFilePreview {
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}
 struct Host {
+    file_viewer: Option<OwnedFilePreview>,
     view: ComponentDemo,
     text: TextBackend,
     scene: Scene,
@@ -80,6 +91,11 @@ struct Host {
     annotation_stage: u8,
 }
 enum HostResult {
+    FilePreview {
+        request: Arc<tekes_agent_ui_bindings::FilePreviewRequest>,
+        result:
+            std::result::Result<tekes_agent_ui_demo::file_preview_host::StagedFilePreview, String>,
+    },
     Files {
         request: Arc<tekes_agent_ui_bindings::AttachmentSelection>,
         files: Vec<tekes_agent_ui_bindings::AttachmentFile>,
@@ -215,6 +231,11 @@ impl Host {
             let rename_rpc_prefix = self.rename_rpc_prefix.clone();
             // Construct the native dialog on the main UI thread; await it on
             // the existing executor. RFD is a demo-only host system adapter.
+            if let DemoCommand::ReadFilePreview { request } = &command
+                && !self.view.file_preview_current(request)
+            {
+                continue;
+            }
             let picker = if let DemoCommand::SelectFiles { request } = &command {
                 let mut updates = request.subscribe();
                 let progress_wake = self.wake.clone();
@@ -238,6 +259,20 @@ impl Host {
             };
             self.executor.spawn(async move {
                 let special = match command {
+                    DemoCommand::ReadFilePreview { request } => {
+                        let result = match request.read().await {
+                            Ok(preview) => tokio::task::spawn_blocking(move || {
+                                tekes_agent_ui_demo::file_preview_host::StagedFilePreview::stage(
+                                    &preview,
+                                )
+                                .map_err(|e| e.to_string())
+                            })
+                            .await
+                            .unwrap_or_else(|e| Err(e.to_string())),
+                            Err(error) => Err(error.to_string()),
+                        };
+                        HostResult::FilePreview { request, result }
+                    }
                     DemoCommand::SelectFiles { request } => {
                         let selected = picker.expect("captured file picker").await;
                         let (files, result) = if let Some(handles) = selected {
@@ -517,7 +552,8 @@ impl Host {
                                     "no preview or source reveal host adapter",
                                 ))
                             }
-                            DemoCommand::SelectFiles { .. }
+                            DemoCommand::ReadFilePreview { .. }
+                            | DemoCommand::SelectFiles { .. }
                             | DemoCommand::Sidebar(_)
                             | DemoCommand::ReadInitialPresets { .. }
                             | DemoCommand::CreateSession(_)
@@ -549,8 +585,44 @@ impl Host {
         self.failures.push(error);
     }
     fn draw(&mut self, window: &Window) {
+        if self
+            .file_viewer
+            .as_mut()
+            .is_some_and(|viewer| viewer.child.try_wait().ok().flatten().is_some())
+        {
+            self.file_viewer = None;
+        }
         while let Ok(result) = self.results.try_recv() {
             match result {
+                HostResult::FilePreview { request, result } => {
+                    let error = result.as_ref().err().map(String::as_str);
+                    match self.view.complete_file_preview(&request, error) {
+                        Ok(true) => {
+                            if let Ok(staged) = result {
+                                match std::process::Command::new("/usr/bin/qlmanage")
+                                    .arg("-p")
+                                    .arg(staged.path())
+                                    .stdin(std::process::Stdio::null())
+                                    .stdout(std::process::Stdio::null())
+                                    .stderr(std::process::Stdio::null())
+                                    .spawn()
+                                {
+                                    Ok(child) => {
+                                        self.file_viewer = Some(OwnedFilePreview {
+                                            child,
+                                            _staged: staged,
+                                        })
+                                    }
+                                    Err(error) => {
+                                        self.view.set_notice(format!("系统预览无法打开：{error}"))
+                                    }
+                                }
+                            }
+                        }
+                        Ok(false) => {}
+                        Err(error) => self.failure(error.to_string()),
+                    }
+                }
                 HostResult::Files {
                     request,
                     files,
@@ -2040,6 +2112,7 @@ pub fn run() {
     });
     let mut view = ComponentDemo::new(bindings).unwrap();
     view.set_file_picker_available(true);
+    view.set_file_preview_available(std::path::Path::new("/usr/bin/qlmanage").is_file());
     if annotation_selftest {
         use tekes_agent_presentation::{ComposerContextBaseline, ComposerDestination};
         let binding = &view.bindings()[0];
@@ -2149,6 +2222,7 @@ pub fn run() {
     let fonts = CoreTextFonts::new();
     let (sender, results) = mpsc::channel();
     let mut host = Host {
+        file_viewer: None,
         view,
         sidebar,
         side_chats,

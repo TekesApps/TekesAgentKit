@@ -15,7 +15,6 @@ use tekes_agent_ui_bindings::{AttachmentOutcome, ModelSelectionPreparation, RunB
 use tekes_ui_controls::composition::AccessibilityAction;
 const MARKER: &str = "AgentKit attachment UI proof";
 const BYTES: &[u8] = b"AgentKit attachment UI proof\n";
-const ENCODED: &str = "QWdlbnRLaXQgYXR0YWNobWVudCBVSSBwcm9vZgo=";
 struct OwnedFile(PathBuf);
 impl OwnedFile {
     fn create() -> Result<Self> {
@@ -250,15 +249,31 @@ pub async fn run(view: &mut ComponentDemo, runtime: &Arc<SessionRuntime>) -> Res
             .methods
             .contains("session.fileAttachment")
     });
+    require(
+        a.supports_file_preview() == can_read,
+        "file preview capability drift",
+    )?;
     if can_read {
-        let value = runtime
-            .call(
-                "session.fileAttachment",
-                json!({"sessionId":a.scope().session_id,"attachmentId":receipt.file.attachment_id}),
-                "ui-upload-read-original",
-            )
-            .await?;
-        require(value["data"] == ENCODED, "public file read bytes mismatch")?;
+        let baseline = Arc::new(
+            tekes_agent_presentation::ComposerContextBaseline::read(&a.current_run().unwrap())
+                .unwrap(),
+        );
+        let intent = tekes_agent_components_ui::ComposerContextIntent {
+            item: tekes_agent_components_ui::ComposerContextItem::Artifact(
+                baseline.artifacts[0].clone(),
+            ),
+            baseline,
+            action: tekes_agent_components_ui::ComposerContextAction::Open,
+        };
+        let preview = a.begin_file_preview(&intent)?.read().await?;
+        require(
+            preview.bytes() == BYTES,
+            "public binding file bytes mismatch",
+        )?;
+        require(
+            preview.name() == "中文+a.txt",
+            "public binding filename mismatch",
+        )?;
         require(runtime.call("session.fileAttachment",json!({"sessionId":b.scope().session_id,"attachmentId":receipt.file.attachment_id}),"ui-upload-read-foreign").await.is_err(),"file read escaped original session")?;
     }
     send(view, &a).await?;

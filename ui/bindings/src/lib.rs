@@ -3,6 +3,8 @@
 //! This adapter retains history observations and projects existing presentation;
 //! it does not implement a Run state machine, renderer, or window event loop.
 mod attachments;
+mod file_preview;
+pub use file_preview::*;
 mod models;
 pub use attachments::*;
 mod presets;

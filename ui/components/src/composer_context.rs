@@ -32,8 +32,19 @@ pub struct ComposerContextIntent {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct ComposerContextAffordances {
     pub preview_artifacts: bool,
+    /// Only file cards with an explicit canonical read identity. Does not
+    /// enable source callbacks for commands, skills or references.
+    pub preview_file_attachments: bool,
     pub reveal_annotations: bool,
     pub edit_annotations: bool,
+}
+impl ComposerContextAffordances {
+    pub(crate) fn can_preview_file(&self, artifact: &ComposerArtifact) -> bool {
+        self.preview_file_attachments
+            && matches!(artifact,
+            ComposerArtifact::Attachment {content, facts: Some(facts), ..}
+            if content["type"] == "file" && facts.attachment_id.as_ref().is_some_and(|id| !id.trim().is_empty()))
+    }
 }
 #[derive(Clone, Debug)]
 pub struct ComposerContextLabels {
@@ -45,6 +56,7 @@ pub struct ComposerContextLabels {
     pub annotation: String,
     pub remove: String,
     pub open: String,
+    pub preview_file: String,
     pub edit: String,
 }
 impl Default for ComposerContextLabels {
@@ -58,6 +70,7 @@ impl Default for ComposerContextLabels {
             annotation: "批注".into(),
             remove: "移除".into(),
             open: "查看来源".into(),
+            preview_file: "预览附件".into(),
             edit: "编辑批注".into(),
         }
     }
@@ -285,10 +298,22 @@ impl ComposerContext {
         let mut controls = vec![];
         let mut kinds = vec![(ComposerContextAction::Remove, self.labels.remove.clone())];
         let annotation = matches!(item, ContextRow::Annotation(_));
+        let file_preview = match item {
+            ContextRow::Artifact(i) => self.affordances.can_preview_file(&baseline.artifacts[i]),
+            _ => false,
+        };
         if (annotation && self.affordances.reveal_annotations)
             || (!annotation && self.affordances.preview_artifacts)
+            || file_preview
         {
-            kinds.push((ComposerContextAction::Open, self.labels.open.clone()));
+            kinds.push((
+                ComposerContextAction::Open,
+                if file_preview {
+                    self.labels.preview_file.clone()
+                } else {
+                    self.labels.open.clone()
+                },
+            ));
         }
         if annotation && self.affordances.edit_annotations {
             kinds.push((

@@ -594,6 +594,7 @@ async fn attachment_context_commit_checks_epoch_with_authority_and_preserves_typ
         name: "file.txt".into(),
         content: json!({"type":"file","receiptId":"r"}),
         facts: Some(AttachmentFacts {
+            attachment_id: None,
             byte_count: 3,
             media_type: None,
         }),

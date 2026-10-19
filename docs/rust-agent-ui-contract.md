@@ -169,3 +169,5 @@ Task tab 以 task ID 为稳定身份，scope 是可更新的内容输入。TaskP
 最新 [附件三端验收](rust-agent-ui-upload-three-20261020.md) 通过原 Composer 入口和绑定分别验证正文＋附件、纯附件发送、单条持久化输入和重连无重复；Native/Pi 公开字节回读与会话隔离通过。Pi 历史保留路径引用，Native/DSH 保留文件元数据；DSH 通用文件下载不支持，不借用图片接口或读取私有文件。此为数据/离屏证据，真实系统选择器证据仍单列，正式 Transcript 与阅读/分页未完成。
 
 最新 [SidePanel 附件记录](rust-agent-ui-pane-uploads-20261020.md) 接入任务、独立子代理与 SideChat 的同一选择/上传/状态路径，按原 binding/request 保留状态，区别同地址的独立 authority；关闭/换源后显示单独保留区，不回落父草稿。7 项新增 fixture 用例及真实本地 fixture 原生窗口证明分层记录；有界历史与独立单次子代理不提供上传。三端 Main 数据路径已复验，不冒充三端 pane 全部验收；正式 Transcript/RunView、预览/对账等完整目标仍未完成。
+
+最新 [文件预览接入记录](rust-agent-ui-file-preview-20261020.md) 增加原会话公开读取绑定、逐文件 Composer 入口和宿主系统预览适配；Native/Pi 字节回读与 DSH 禁用已实测。原生宿主入口/读取/查看器进程启动已验证，Quick Look 内容视觉验收仍未完成；历史附件预览仍依赖正式 Transcript。

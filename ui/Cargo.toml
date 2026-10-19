@@ -25,5 +25,6 @@ tekes-ui-render = { git = "https://github.com/TekesApps/TekesUI.git", rev = "431
 tekes-ui-platform-macos = { git = "https://github.com/TekesApps/TekesUI.git", rev = "431093786de47b48cd566d0d9c0eafa088b10d68" }
 tokio = { version = "1", features = ["rt-multi-thread", "time", "sync", "macros"] }
 serde_json = "1"
+base64 = "0.22"
 async-trait = "0.1"
 uuid = { version = "1", features = ["v4"] }

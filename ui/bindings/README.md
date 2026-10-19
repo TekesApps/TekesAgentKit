@@ -545,3 +545,23 @@ See [SidePanel attachment evidence](../../docs/rust-agent-ui-pane-uploads-202610
 for fixture source-replacement/close cases, actual native chooser paths, and the
 separate real-three-harness main-run regression. These layers are not equivalent
 to complete real-three-harness pane UX, physical IME or a formal Transcript.
+
+## Explicit file preview
+
+`supports_file_preview` requires a ready original pane and the advertised public
+`session.fileAttachment` method. It is independent of Send admission. File cards
+need `AttachmentFacts.attachment_id`; an upload receipt ID is not a read ID.
+Legacy drafts without that metadata do not expose file preview.
+
+Capture `begin_file_preview(&intent)` from the original Composer context Open
+intent. `FilePreviewRequest::read` performs one session-scoped read, validates
+identity, name, bounded base64/decoded size and media type, then returns immutable
+`FilePreview` bytes. No paths, filesystem, viewer, private harness storage or
+automatic retry are part of the binding. A source/context/epoch change rejects
+late results; text-only draft edits remain valid.
+
+Hosts additionally fence navigation and IME, recheck immediately before opening
+a viewer, stage bytes privately if needed, and retain owned files while their
+viewer may read them. The demo uses system Quick Look via direct arguments;
+`ui/consumer::read_file_preview` illustrates a second public-API host. DSH has no
+generic file-read method and does not gain preview through its image API.

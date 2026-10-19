@@ -61,6 +61,9 @@ pub struct Fixture {
     upload_calls: Arc<AtomicUsize>,
     upload_gate: Option<Arc<tokio::sync::Semaphore>>,
     upload_fail_at: Option<usize>,
+    file_read_calls: Arc<AtomicUsize>,
+    file_read_gate: Option<Arc<tokio::sync::Semaphore>>,
+    file_read_override: Option<Value>,
     presets: Option<bool>,
     inventory_sender: broadcast::Sender<Value>,
     workspace_sender: broadcast::Sender<Value>,
@@ -160,6 +163,9 @@ impl Default for Fixture {
             upload_calls: Arc::new(AtomicUsize::new(0)),
             upload_gate: None,
             upload_fail_at: None,
+            file_read_calls: Arc::new(AtomicUsize::new(0)),
+            file_read_gate: None,
+            file_read_override: None,
             presets: None,
             inventory_sender: broadcast::channel(256).0,
             workspace_sender: broadcast::channel(256).0,
@@ -182,6 +188,17 @@ impl Fixture {
     }
     pub fn upload_calls(&self) -> usize {
         self.upload_calls.load(Ordering::SeqCst)
+    }
+    pub fn with_file_read_gate(mut self, gate: Arc<tokio::sync::Semaphore>) -> Self {
+        self.file_read_gate = Some(gate);
+        self
+    }
+    pub fn with_file_read_override(mut self, value: Value) -> Self {
+        self.file_read_override = Some(value);
+        self
+    }
+    pub fn file_read_calls(&self) -> usize {
+        self.file_read_calls.load(Ordering::SeqCst)
     }
     pub fn with_presets(mut self, legacy_roster: bool) -> Self {
         self.presets = Some(legacy_roster);
@@ -325,8 +342,11 @@ impl SessionEndpoint for Endpoint {
     fn capabilities(&self) -> EndpointCapabilities {
         let mut caps = EndpointCapabilities::methods(&["session.prompt", "session.cancel"]);
         if self.fixture.uploads {
-            caps.methods
-                .extend(["session.uploadFile".into(), "attachments.policy".into()]);
+            caps.methods.extend([
+                "session.uploadFile".into(),
+                "attachments.policy".into(),
+                "session.fileAttachment".into(),
+            ]);
         }
         if let Some(legacy) = self.fixture.presets {
             caps.methods.extend([
@@ -453,6 +473,22 @@ impl SessionEndpoint for Endpoint {
         Err(unsupported("fixture actionable"))
     }
     async fn call(&self, method: &str, p: Value, rpc: &str) -> Result<Value> {
+        if self.fixture.uploads && method == "session.fileAttachment" {
+            self.fixture.file_read_calls.fetch_add(1, Ordering::SeqCst);
+            if let Some(gate) = &self.fixture.file_read_gate {
+                gate.acquire()
+                    .await
+                    .map_err(|_| unsupported("read gate closed"))?
+                    .forget();
+            }
+            if let Some(value) = &self.fixture.file_read_override {
+                return Ok(value.clone());
+            }
+            return self.fixture.mutations.lock().unwrap().values().find_map(|(method,payload,result)| {
+                (method=="session.uploadFile" && payload["sessionId"]==p["sessionId"] && result["file"]["attachmentId"]==p["attachmentId"])
+                    .then(||json!({"attachment":{"attachmentId":result["file"]["attachmentId"],"name":result["file"]["name"],"bytes":result["file"]["bytes"],"mediaType":payload["mediaType"]},"data":payload["data"]}))
+            }).ok_or_else(||unsupported("file unavailable in this session"));
+        }
         if self.fixture.uploads && method == "attachments.policy" {
             return Ok(json!({"inlineMediaTypes":[],"maxAttachmentBytes":8388608,
                 "maxAttachmentsPerMessage":4,"maxMessageAttachmentBytes":16777216}));

@@ -55,10 +55,16 @@ pub const RECONNECT: ComponentId = ComponentId(102);
 pub const NEW_SESSION: ComponentId = ComponentId(103);
 pub const CREATE_AUTOMATIC: ComponentId = ComponentId(104);
 
+#[path = "component_file_preview.rs"]
+mod file_preview;
 #[path = "component_uploads.rs"]
 mod uploads;
+use file_preview::FilePreviewGesture;
 use uploads::UploadGesture;
 pub enum DemoCommand {
+    ReadFilePreview {
+        request: Arc<tekes_agent_ui_bindings::FilePreviewRequest>,
+    },
     SelectFiles {
         request: Arc<tekes_agent_ui_bindings::AttachmentSelection>,
     },
@@ -117,6 +123,8 @@ pub enum DemoCommand {
 }
 
 pub struct ComponentDemo {
+    file_preview_available: bool,
+    preview_gesture: Option<FilePreviewGesture>,
     file_picker_available: bool,
     uploads: BTreeMap<String, UploadGesture>,
     next_upload_namespace: u32,
@@ -384,6 +392,8 @@ impl ComponentDemo {
         tree.set_action_events(true);
         let retained = (0..bindings.len()).map(|_| None).collect();
         let mut view = Self {
+            file_preview_available: false,
+            preview_gesture: None,
             file_picker_available: false,
             uploads: BTreeMap::new(),
             next_upload_namespace: 2_000_000,
@@ -1661,6 +1671,7 @@ impl ComponentDemo {
         Ok(())
     }
     pub fn sync(&mut self) -> Result<()> {
+        self.sync_file_preview();
         self.sync_upload_status()?;
         self.sync_annotation()?;
         if self
@@ -1737,6 +1748,13 @@ impl ComponentDemo {
             .set_labels(Self::composer_labels(&snapshot));
         let upload_gate = self.upload_gate(&binding);
         let attachment_available = self.attachment_affordance(&binding);
+        let context_affordances = self.context_affordances(&binding);
+        self.tree
+            .get_mut(ids.root)
+            .unwrap()
+            .component_mut::<Composer>()
+            .unwrap()
+            .set_context_affordances(context_affordances);
         self.tree
             .get_mut(ids.root)
             .expect("composer")
@@ -2115,6 +2133,13 @@ impl ComponentDemo {
             .set_labels(Self::composer_labels(&snapshot));
         let attachment = self.attachment_affordance(&binding);
         let upload_gate = self.upload_gate(&binding);
+        let context_affordances = self.context_affordances(&binding);
+        self.tree
+            .get_mut(ids.root)
+            .unwrap()
+            .component_mut::<Composer>()
+            .unwrap()
+            .set_context_affordances(context_affordances);
         self.tree
             .get_mut(ids.root)
             .expect("pane composer")
@@ -2561,10 +2586,22 @@ impl ComponentDemo {
                                 self.set_notice(error.to_string());
                             }
                         } else {
-                            commands.push(DemoCommand::OpenContext {
-                                binding: binding.clone(),
-                                intent: *intent,
-                            });
+                            if matches!(&intent.item,tekes_agent_components_ui::ComposerContextItem::Artifact(tekes_agent_presentation::ComposerArtifact::Attachment {content,..}) if content["type"]=="file")
+                            {
+                                if self.preview_gesture.is_none() {
+                                    match self.begin_file_preview(binding.clone(), &intent) {
+                                        Ok(request) => {
+                                            commands.push(DemoCommand::ReadFilePreview { request })
+                                        }
+                                        Err(error) => self.set_notice(error.to_string()),
+                                    }
+                                }
+                            } else {
+                                commands.push(DemoCommand::OpenContext {
+                                    binding: binding.clone(),
+                                    intent: *intent,
+                                });
+                            }
                         }
                     }
                 }

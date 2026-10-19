@@ -830,12 +830,17 @@ fn attachment_facts_are_backward_compatible_and_never_enter_prompt() {
     assert_eq!(serde_json::to_value(&artifact).unwrap(), value);
     if let ComposerArtifact::Attachment { facts, .. } = &mut artifact {
         *facts = Some(AttachmentFacts {
+            attachment_id: Some("read-id-distinct-from-receipt".into()),
             byte_count: 12,
             media_type: Some("text/plain".into()),
         });
     }
     let serialized = serde_json::to_value(&artifact).unwrap();
     assert_eq!(serialized["facts"]["byteCount"], 12);
+    assert_eq!(
+        serialized["facts"]["attachmentId"],
+        "read-id-distinct-from-receipt"
+    );
     assert_eq!(
         serde_json::from_value::<ComposerArtifact>(serialized).unwrap(),
         artifact

@@ -468,9 +468,12 @@ impl Composer {
                         self.context_affordances.edit_annotations
                     }
                     (
-                        crate::ComposerContextItem::Artifact(_),
+                        crate::ComposerContextItem::Artifact(artifact),
                         crate::ComposerContextAction::Open,
-                    ) => self.context_affordances.preview_artifacts,
+                    ) => {
+                        self.context_affordances.preview_artifacts
+                            || self.context_affordances.can_preview_file(artifact)
+                    }
                     (
                         crate::ComposerContextItem::Annotation(_),
                         crate::ComposerContextAction::Open,

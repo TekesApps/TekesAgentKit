@@ -9,6 +9,9 @@ use tekes_agent_session::MemoryProjectionStore;
 #[serde(rename_all = "camelCase")]
 pub struct AttachmentFacts {
     pub byte_count: u64,
+    /// Public read identity from the upload receipt, distinct from receiptId.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attachment_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub media_type: Option<String>,
 }

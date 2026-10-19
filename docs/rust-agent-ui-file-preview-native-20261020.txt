@@ -1,0 +1,73 @@
+Window: "AgentKit · Composer / Indicators 验证", App: AgentKitFilePreviewProof.
+0 standard window AgentKit · Composer / Indicators 验证, Secondary Actions: Raise
+	1 container (settable)
+		2 container (settable) 会话
+			3 container (settable) 会话
+				4 container (settable)
+					5 button (selected, settable) 会话 a
+					6 text (settable) 已完成
+				7 container (settable)
+					8 button (settable) 会话 b
+					9 text (settable) 已完成
+				10 container (settable)
+					11 button (settable) 会话 bounded-b
+					12 text (settable) 空闲
+				13 container (settable)
+					14 button (settable) 会话 child-a
+					15 text (settable) 空闲
+				16 container (settable)
+					17 button (settable) 会话 child-b
+					18 text (settable) 空闲
+				19 container (settable)
+					20 button (settable) 会话 nested-a
+					21 text (settable) 空闲
+			22 container (settable) 会话操作
+				23 button (settable) 置顶
+				24 button (settable) 重命名
+				25 button (settable) 分叉会话
+				26 button (settable) 复制会话 ID
+				27 button (settable) 归档会话
+		28 container (settable)
+			29 container (settable)
+				30 button (selected, settable) 会话 A
+				31 button (settable) 会话 B
+				32 button (settable) 重新连接
+				33 button (settable) 新会话
+			34 text (settable) 附件已读取，正在打开系统预览
+			35 text (settable) Transcript 待 TekesUI #22 / #23；此处不是消息视图。
+回传诊断：20 条内容，0 条流式内容，历史已同步。
+			36 container (settable)
+				37 text (settable) 已连接 · 空闲
+				38 container (settable) 消息编辑与发送
+					39 container (settable) 草稿内容
+						40 container (settable)
+							41 text (settable) 附件 · 中文附件.txt
+							42 text (settable) 54 B
+							43 button (settable) 移除
+							44 button (settable) 预览附件
+					45 text entry area (settable) 消息
+					46 container (settable)
+						47 button (settable) 模型
+						48 button (disabled, settable) 停止
+						49 button (settable) 发送
+			50 text (settable) 附件 · 会话 a
+			51 container (settable) 附件上传
+				52 text (settable) 附件已加入原会话草稿 · 1
+				53 button (settable) 关闭附件状态
+		54 container (settable) Agent 侧面板
+			55 button (selected, settable) Summary
+			56 container (settable)
+				57 button (settable) 关闭当前标签
+				58 button (settable) 新建 SideChat
+			59 container (settable) Summary
+				60 container (settable) Summary
+					61 text (settable) 任务
+					62 text (settable) 验证会话 a 的数据回传 · completed
+					63 text (settable) 接入正式 Transcript · pending
+	64 close button
+	65 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	66 minimize button
+	67 text AgentKit · Composer / Indicators 验证
+68 menu bar
+	69 AgentKitFilePreviewProof
+	70 Window

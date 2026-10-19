@@ -1,12 +1,14 @@
 use std::{fs, path::PathBuf};
 use tekes_agent_contract::MAX_UPLOAD_BYTES;
 use tekes_agent_ui_demo::attachment_files::*;
+static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 struct Owned(PathBuf);
 impl Owned {
     fn new() -> Self {
         let path = std::env::temp_dir().join(format!(
-            "agentkit-file-read-{}-{}",
+            "agentkit-file-read-{}-{}-{}",
             std::process::id(),
+            NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()

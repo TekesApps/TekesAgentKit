@@ -1991,6 +1991,7 @@ name = "tekes-agent-ui-bindings"
 version = "0.0.0"
 dependencies = [
  "async-trait",
+ "base64",
  "serde_json",
  "tekes-agent-components-ui",
  "tekes-agent-contract",

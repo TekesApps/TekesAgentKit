@@ -216,6 +216,7 @@ async fn embedded_context_keeps_payloads_private_uses_captured_items_and_obeys_i
         name: "设计.png".into(),
         content: json!({"type":"image","data":"PRIVATE_MEDIA_PAYLOAD"}),
         facts: Some(tekes_agent_presentation::AttachmentFacts {
+            attachment_id: None,
             byte_count: 123,
             media_type: Some("image/png".into()),
         }),
@@ -232,6 +233,7 @@ async fn embedded_context_keeps_payloads_private_uses_captured_items_and_obeys_i
         .unwrap();
     view.set_context_affordances(ComposerContextAffordances {
         preview_artifacts: true,
+        preview_file_attachments: false,
         reveal_annotations: true,
         edit_annotations: false,
     });
