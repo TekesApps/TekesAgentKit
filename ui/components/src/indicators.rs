@@ -1,5 +1,5 @@
 //! Presentation facts only: never infer success from an idle run or estimate token counts.
-use tekes_agent_presentation::{ConnectionPhase, RunPhase, RunSnapshot};
+use tekes_agent_presentation::{ChildComposerAvailability, ConnectionPhase, RunPhase, RunSnapshot};
 use tekes_ui_controls::{ButtonTextRenderer, composition::*, layout::MeasuredChild};
 use tekes_ui_scene::{Rect, Size};
 
@@ -18,6 +18,7 @@ pub struct IndicatorFacts {
     pub waiting: usize,
     pub queued: usize,
     pub output_usage: Option<OutputUsage>,
+    pub child_availability: Option<ChildComposerAvailability>,
 }
 impl IndicatorFacts {
     pub fn read(snapshot: &RunSnapshot) -> Self {
@@ -45,6 +46,7 @@ impl IndicatorFacts {
             waiting: snapshot.run.as_ref().map_or(0, |run| run.actionables.len()),
             queued: snapshot.run.as_ref().map_or(0, |run| run.queue.len()),
             output_usage,
+            child_availability: snapshot.child_availability.clone(),
         }
     }
     pub fn accessible_text(&self) -> String {
@@ -67,6 +69,20 @@ impl IndicatorFacts {
             None => "未选择会话",
         };
         let mut parts = vec![connection.to_owned(), run.to_owned()];
+        if let Some(child) = &self.child_availability {
+            parts.push(
+                match child {
+                    ChildComposerAvailability::Loading => "子代理控制能力未确认",
+                    ChildComposerAvailability::Available => "子代理可继续执行",
+                    ChildComposerAvailability::OneShot => "子代理为单次执行，历史可读",
+                    ChildComposerAvailability::ParentUnavailable => {
+                        "父代理暂不可用，子代理历史可读"
+                    }
+                    ChildComposerAvailability::Unavailable => "子代理控制不可用，历史可读",
+                }
+                .into(),
+            );
+        }
         if self.history_stale {
             parts.push("历史待同步".into());
         }

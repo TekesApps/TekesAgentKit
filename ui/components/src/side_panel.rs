@@ -27,6 +27,8 @@ pub struct SidePanelTab {
     pub title: String,
     /// Explicit adapter policy; never open bounded Native history as an independent session.
     pub child_history_layout: Option<ChildHistoryLayout>,
+    /// Actual receiving parent, which may be nested under the panel's thread.
+    pub child_parent: Option<RunScope>,
     /// Resolved task pointer is content data, never part of the task tab's identity.
     pub task_scope: Option<RunScope>,
     /// Optional existing load state, including loading/missing/error. Never a second task store.
@@ -38,6 +40,7 @@ impl SidePanelTab {
             kind: SidePanelTabKind::Summary,
             title: title.into(),
             child_history_layout: None,
+            child_parent: None,
             task_scope: None,
             task_state: None,
         }
@@ -49,6 +52,7 @@ impl SidePanelTab {
             },
             title: task.name.clone(),
             child_history_layout: None,
+            child_parent: None,
             task_scope: Some(task.scope.clone()),
             task_state: None,
         }
@@ -70,6 +74,7 @@ impl SidePanelTab {
                 .map(|task| task.name.clone())
                 .unwrap_or_else(|| pending_title.into()),
             child_history_layout: None,
+            child_parent: None,
             task_scope: state.value.as_ref().map(|task| task.scope.clone()),
             task_state: Some(Box::new(state.clone())),
         })
@@ -85,6 +90,7 @@ impl SidePanelTab {
             },
             title: title.into(),
             child_history_layout: Some(layout),
+            child_parent: None,
             task_scope: None,
             task_state: None,
         }
@@ -96,6 +102,7 @@ impl SidePanelTab {
             },
             title: chat.title.clone(),
             child_history_layout: None,
+            child_parent: None,
             task_scope: None,
             task_state: None,
         }
@@ -169,10 +176,13 @@ struct TabMount {
     epoch: u64,
     layout: Option<ChildHistoryLayout>,
     task_scope: Option<RunScope>,
+    child_parent: Option<RunScope>,
 }
 impl TabMount {
     fn same_source(&self, tab: &SidePanelTab) -> bool {
-        self.layout == tab.child_history_layout && self.task_scope == tab.task_scope
+        self.layout == tab.child_history_layout
+            && self.task_scope == tab.task_scope
+            && self.child_parent == tab.child_parent
     }
 }
 
@@ -331,6 +341,7 @@ impl SidePanel {
             let valid = match &tab.kind {
                 SidePanelTabKind::Summary => {
                     tab.child_history_layout.is_none()
+                        && tab.child_parent.is_none()
                         && tab.task_scope.is_none()
                         && tab.task_state.is_none()
                 }
@@ -353,11 +364,18 @@ impl SidePanel {
                         && scope_valid
                         && state_valid
                         && tab.child_history_layout.is_none()
+                        && tab.child_parent.is_none()
                 }
                 SidePanelTabKind::Subagent { child_id } => {
                     !child_id.is_empty()
                         && child_id != &input.parent.session_id
                         && tab.child_history_layout.is_some()
+                        && tab.child_parent.as_ref().is_none_or(|parent| {
+                            parent.validate().is_ok()
+                                && parent.endpoint_id == input.parent.endpoint_id
+                                && parent.thread_id == input.parent.thread_id
+                                && parent.session_id != *child_id
+                        })
                         && tab.task_scope.is_none()
                         && tab.task_state.is_none()
                 }
@@ -370,6 +388,7 @@ impl SidePanel {
                             && chat.scope.session_id != input.parent.session_id
                             && chat.scope.thread_id == chat.scope.session_id
                     }) && tab.child_history_layout.is_none()
+                        && tab.child_parent.is_none()
                         && tab.task_scope.is_none()
                         && tab.task_state.is_none()
                 }
@@ -506,6 +525,7 @@ impl SidePanel {
                         epoch: self.epoch,
                         layout: tab.child_history_layout,
                         task_scope: tab.task_scope.clone(),
+                        child_parent: tab.child_parent.clone(),
                     },
                 );
             }

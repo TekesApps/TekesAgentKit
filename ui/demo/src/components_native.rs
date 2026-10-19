@@ -7,10 +7,13 @@ use std::{
 };
 use tekes_agent_components_ui::{SidePanel, Sidebar, SidebarIntent};
 use tekes_agent_contract::{Result, require};
-use tekes_agent_presentation::{PreparedSubmission, RunScope, SubmissionPreparation};
+use tekes_agent_presentation::{
+    ChildHistoryLayout, PreparedSubmission, RunScope, SubmissionPreparation,
+};
 use tekes_agent_session::SessionRuntime;
 use tekes_agent_ui_bindings::{
-    BoundSideChatRun, RunBinding, SideChatBinding, SidebarActionOutcome, SidebarBinding,
+    BoundSideChatRun, ChildPaneBinding, PaneAccess, PaneSnapshot, RunBinding, SideChatBinding,
+    SidebarActionOutcome, SidebarBinding,
 };
 use tekes_agent_ui_demo::component_demo::{
     ComponentDemo, DemoCommand, NavigationRequest, PanelRequest, RECONNECT,
@@ -63,8 +66,28 @@ struct Host {
     side_chat_test_session: Option<String>,
     task_test_requested: bool,
     task_test_started: bool,
+    child_layout: ChildHistoryLayout,
+    child_test_requested: bool,
+    child_test_started: bool,
+    bounded_test_requested: bool,
+    bounded_test_started: bool,
+    test_child_source: Option<Arc<ChildPaneBinding>>,
+    test_bounded_source: Option<Arc<ChildPaneBinding>>,
+    bounded_initial_items: usize,
+    bounded_max_items: usize,
 }
 enum HostResult {
+    ChildOpened {
+        request: PanelRequest,
+        title: String,
+        result: std::result::Result<(Arc<ChildPaneBinding>, PaneSnapshot), String>,
+    },
+    ChildRead {
+        panel_parent: RunScope,
+        source: Arc<ChildPaneBinding>,
+        result: std::result::Result<PaneSnapshot, String>,
+        catalog_error: Option<String>,
+    },
     TaskOpened {
         parent: RunScope,
         task_id: String,
@@ -111,13 +134,113 @@ impl Host {
             }
         };
         for command in commands {
+            let command = if let DemoCommand::Summary(ref intent) = command
+                && let tekes_agent_presentation::SummaryAction::OpenSubagent { parent, child_id } =
+                    &intent.action
+            {
+                let request = match self.view.begin_child_open(&intent.scope) {
+                    Ok(request) => request,
+                    Err(error) => {
+                        self.failure(error.to_string());
+                        continue;
+                    }
+                };
+                DemoCommand::OpenChild {
+                    request,
+                    direct_parent: parent.clone(),
+                    child_id: child_id.clone(),
+                    title: child_id.clone(),
+                    layout: self.child_layout,
+                }
+            } else {
+                command
+            };
             let sender = self.sender.clone();
             let wake = self.wake.clone();
             let runtime = self.runtime.clone();
             let sidebar = self.sidebar.clone();
             let side_chats = self.side_chats.clone();
+            let cached_child = match &command {
+                DemoCommand::OpenChild {
+                    request,
+                    direct_parent,
+                    child_id,
+                    layout,
+                    ..
+                } => self.view.cached_child_source(
+                    request.parent(),
+                    direct_parent,
+                    child_id,
+                    *layout,
+                ),
+                _ => None,
+            };
             self.executor.spawn(async move {
                 let special = match command {
+                    DemoCommand::OpenChild {
+                        request,
+                        direct_parent,
+                        child_id,
+                        title,
+                        layout,
+                    } => {
+                        let result = async {
+                            let source = if let Some(source) = cached_child {
+                                source
+                            } else {
+                                Arc::new(
+                                    ChildPaneBinding::open(
+                                        runtime.clone(),
+                                        direct_parent,
+                                        child_id,
+                                        layout,
+                                        None,
+                                    )
+                                    .await?,
+                                )
+                            };
+                            let snapshot = source.snapshot().await?;
+                            Ok::<_, tekes_agent_contract::Error>((source, snapshot))
+                        }
+                        .await
+                        .map_err(|error| error.to_string());
+                        HostResult::ChildOpened {
+                            request,
+                            title,
+                            result,
+                        }
+                    }
+                    DemoCommand::ReadChild {
+                        panel_parent,
+                        source,
+                        page,
+                    } => {
+                        let catalog_error = if !page
+                            && source.layout() == ChildHistoryLayout::IndependentSessions
+                        {
+                            source
+                                .refresh_controls()
+                                .await
+                                .err()
+                                .map(|error| error.to_string())
+                        } else {
+                            None
+                        };
+                        let result = async {
+                            if page {
+                                source.load_earlier().await?;
+                            }
+                            source.snapshot().await
+                        }
+                        .await
+                        .map_err(|error| error.to_string());
+                        HostResult::ChildRead {
+                            panel_parent,
+                            source,
+                            result,
+                            catalog_error,
+                        }
+                    }
                     DemoCommand::OpenTask {
                         parent,
                         task_id,
@@ -245,6 +368,8 @@ impl Host {
                                 ))
                             }
                             DemoCommand::Sidebar(_)
+                            | DemoCommand::OpenChild { .. }
+                            | DemoCommand::ReadChild { .. }
                             | DemoCommand::OpenTask { .. }
                             | DemoCommand::CreateSideChat(_)
                             | DemoCommand::OpenSideChat { .. }
@@ -271,6 +396,89 @@ impl Host {
     fn draw(&mut self, window: &Window) {
         while let Ok(result) = self.results.try_recv() {
             match result {
+                HostResult::ChildOpened {
+                    request,
+                    title,
+                    result: Ok((source, snapshot)),
+                } => {
+                    if self.selftest {
+                        if source.child_id() == "child-b" {
+                            self.test_child_source = Some(source.clone());
+                        }
+                        if source.child_id() == "bounded-b" {
+                            self.test_bounded_source = Some(source.clone());
+                            if let PaneSnapshot::ReadOnlyChild { transcript, .. } = &snapshot {
+                                self.bounded_initial_items = transcript.items.len();
+                                self.bounded_max_items = transcript.items.len();
+                            }
+                        }
+                    }
+                    let binding = source.binding().clone();
+                    match self
+                        .view
+                        .install_child_source(request, source, title, snapshot)
+                    {
+                        Ok(_) => self.observe(&binding, window),
+                        Err(error) => self.failure(error.to_string()),
+                    }
+                }
+                HostResult::ChildOpened {
+                    request,
+                    result: Err(error),
+                    ..
+                } => {
+                    if self.view.child_request_current(&request) {
+                        self.failure(error);
+                    }
+                }
+                HostResult::ChildRead {
+                    panel_parent,
+                    source,
+                    result,
+                    catalog_error,
+                } => {
+                    if source.binding().access() != PaneAccess::Missing {
+                        let active = self
+                            .view
+                            .child_pane_active(&panel_parent, source.child_id());
+                        if let Some(error) = catalog_error
+                            && active
+                        {
+                            self.view.set_notice(error);
+                        }
+                        match result {
+                            Ok(snapshot) => {
+                                if self.selftest
+                                    && source.child_id() == "bounded-b"
+                                    && let PaneSnapshot::ReadOnlyChild { transcript, .. } =
+                                        &snapshot
+                                {
+                                    self.bounded_max_items =
+                                        self.bounded_max_items.max(transcript.items.len());
+                                }
+                                if let Err(error) = self.view.update_child_snapshot(
+                                    &panel_parent,
+                                    &source,
+                                    snapshot,
+                                ) {
+                                    self.failure(error.to_string());
+                                }
+                            }
+                            Err(error) => {
+                                if let Err(reset) = self.view.child_read_failed(
+                                    &panel_parent,
+                                    &source,
+                                    error.clone(),
+                                ) {
+                                    self.failure(reset.to_string());
+                                }
+                                if active {
+                                    self.failure(error);
+                                }
+                            }
+                        }
+                    }
+                }
                 HostResult::TaskOpened {
                     parent,
                     task_id,
@@ -425,9 +633,74 @@ impl Host {
                 task_script(&self.view);
             }
         }
+        if self.selftest
+            && self.task_test_started
+            && self.view.tree.get(self.view.summary_id()).is_some()
+        {
+            if !self.child_test_requested {
+                self.child_test_requested = true;
+                self.open_fixture_child("child-b", ChildHistoryLayout::IndependentSessions);
+            } else if self.child_test_started && !self.bounded_test_requested {
+                self.bounded_test_requested = true;
+                self.open_fixture_child("bounded-b", ChildHistoryLayout::SameSession);
+            }
+        }
+        if self.selftest
+            && self.child_test_requested
+            && !self.child_test_started
+            && self.test_child_source.as_ref().is_some_and(|source| {
+                source
+                    .binding()
+                    .current_run()
+                    .is_some_and(|run| run.can_submit)
+            })
+            && self.view.panel_composer_ids().is_some()
+        {
+            self.child_test_started = true;
+            child_script(&self.view);
+        }
+        if self.selftest
+            && self.bounded_test_requested
+            && !self.bounded_test_started
+            && self.view.bounded_child_buttons().is_some_and(|(_, page)| {
+                self.view
+                    .tree
+                    .get(page)
+                    .and_then(|node| {
+                        node.component::<tekes_ui_controls::composition::ButtonContent>()
+                    })
+                    .is_some_and(|button| !button.button.state.disabled)
+            })
+        {
+            self.bounded_test_started = true;
+            bounded_script(&self.view);
+        }
+    }
+    fn open_fixture_child(&mut self, child_id: &str, layout: ChildHistoryLayout) {
+        let parent = self.view.binding().scope().clone();
+        let request = self.view.begin_child_open(&parent).unwrap();
+        self.commands(Ok(vec![DemoCommand::OpenChild {
+            request,
+            direct_parent: parent,
+            child_id: child_id.into(),
+            title: child_id.into(),
+            layout,
+        }]));
     }
     fn observe(&mut self, binding: &RunBinding, window: &Window) {
         let wake = window.wake_proxy();
+        if binding.subscribe_run().is_none() {
+            let mut changes = binding.subscribe_runtime();
+            self.observers.push(self.executor.spawn(async move {
+                while changes.changed().await.is_ok() {
+                    changes.borrow_and_update();
+                    if wake.wake() == tekes_ui_platform_macos::WakeResult::Closed {
+                        break;
+                    }
+                }
+            }));
+            return;
+        }
         self.observers.push(
             self.executor
                 .spawn(tekes_agent_ui_demo::notifications::forward(
@@ -438,6 +711,23 @@ impl Host {
     }
     fn close(&mut self, window: &Window) {
         if self.selftest {
+            assert!(self.child_test_started && self.bounded_test_started);
+            assert!(
+                self.bounded_max_items > self.bounded_initial_items,
+                "bounded paging reached the independent child prefix"
+            );
+            assert_eq!(
+                self.test_child_source.as_ref().unwrap().binding().access(),
+                PaneAccess::Missing
+            );
+            assert_eq!(
+                self.test_bounded_source
+                    .as_ref()
+                    .unwrap()
+                    .binding()
+                    .access(),
+                PaneAccess::Missing
+            );
             assert!(
                 self.task_test_started,
                 "task pane mounted through its resolved source"
@@ -512,6 +802,44 @@ impl Host {
             );
             let entries = &state.sessions["a"].entries;
             let task_entries = &state.sessions["b"].entries;
+            let child_entries = &state.sessions["child-b"].entries;
+            let child_message = child_entries
+                .values()
+                .filter(|row| {
+                    row.event.kind == "user/message"
+                        && row.event.data.to_string().contains("子代理消息")
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(child_message.len(), 1);
+            let child_turn = &child_message[0].event.data["turn"];
+            assert!(
+                child_entries
+                    .values()
+                    .any(|row| row.event.kind == "assistant/message"
+                        && &row.event.data["turn"] == child_turn)
+            );
+            assert!(
+                child_entries
+                    .values()
+                    .any(|row| row.event.kind == "turn/end"
+                        && &row.event.data["turn"] == child_turn
+                        && row.event.data["reason"] == "interrupted")
+            );
+            assert!(
+                !child_entries
+                    .values()
+                    .any(|row| row.event.kind == "user/message"
+                        && row.event.data.to_string().contains("子代理暂存草稿"))
+            );
+            assert!(
+                !task_entries
+                    .values()
+                    .any(|row| row.event.kind == "user/message"
+                        && row.event.data.to_string().contains("子代理消息"))
+            );
+            println!(
+                "NATIVE_AGENT_CHILD_SELFTEST_OK direct-parent+independent-composer+single-admission+stream+cancel+isolated-drafts+bounded-read-only+paging+local-retirement; formal-transcript=false; physical-ime=false"
+            );
             assert_eq!(
                 task_entries
                     .values()
@@ -769,7 +1097,8 @@ pub fn run() {
             Arc::new(
                 tekes_agent_ui_demo::fixture::Fixture::default()
                     .with_demo_summary()
-                    .with_side_chats(),
+                    .with_side_chats()
+                    .with_children(),
             ),
             "native",
             [
@@ -858,6 +1187,19 @@ pub fn run() {
         side_chat_test_session: None,
         task_test_requested: false,
         task_test_started: false,
+        child_layout: if kind == "native" {
+            ChildHistoryLayout::SameSession
+        } else {
+            ChildHistoryLayout::IndependentSessions
+        },
+        child_test_requested: false,
+        child_test_started: false,
+        bounded_test_requested: false,
+        bounded_test_started: false,
+        test_child_source: None,
+        test_bounded_source: None,
+        bounded_initial_items: 0,
+        bounded_max_items: 0,
         text: TextBackend {
             shaper: CoreTextShaper::new(fonts.clone()),
             rasterizer: CoreTextRasterizer::new(fonts),
@@ -1093,6 +1435,62 @@ fn task_script(view: &ComponentDemo) {
         script.push((1300, Action::Capture { path }));
     }
     script.push((1600, click(panel.close_id())));
+    run_script(script);
+}
+fn child_script(view: &ComponentDemo) {
+    use tekes_ui_platform_macos::selftest::{Action, run_script};
+    let click = |id| {
+        let point = view.tree.get(id).unwrap().frame().center();
+        Action::Click {
+            x: point.x as f64,
+            y: point.y as f64,
+        }
+    };
+    let ids = view.panel_composer_ids().unwrap();
+    let close = view
+        .tree
+        .get(view.panel_id())
+        .unwrap()
+        .component::<SidePanel>()
+        .unwrap()
+        .close_id();
+    let mut script = vec![
+        (100, click(ids.editor)),
+        (200, Action::Text("子代理消息".into())),
+        (400, click(ids.send)),
+        (600, click(ids.editor)),
+        (700, Action::Text("子代理暂存草稿".into())),
+        (900, click(ids.cancel)),
+    ];
+    if let Ok(path) = std::env::var("AGENT_CHILD_CAPTURE") {
+        script.push((1300, Action::Capture { path }));
+    }
+    script.push((1600, click(close)));
+    run_script(script);
+}
+fn bounded_script(view: &ComponentDemo) {
+    use tekes_ui_platform_macos::selftest::{Action, run_script};
+    let click = |id| {
+        let point = view.tree.get(id).unwrap().frame().center();
+        Action::Click {
+            x: point.x as f64,
+            y: point.y as f64,
+        }
+    };
+    assert!(view.panel_composer_ids().is_none());
+    let (refresh, page) = view.bounded_child_buttons().unwrap();
+    let close = view
+        .tree
+        .get(view.panel_id())
+        .unwrap()
+        .component::<SidePanel>()
+        .unwrap()
+        .close_id();
+    let mut script = vec![(200, click(page)), (600, click(refresh))];
+    if let Ok(path) = std::env::var("AGENT_BOUNDED_CAPTURE") {
+        script.push((1000, Action::Capture { path }));
+    }
+    script.push((1500, click(close)));
     script.push((2200, Action::Close));
     run_script(script);
 }

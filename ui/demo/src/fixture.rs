@@ -20,6 +20,9 @@ pub struct Fixture {
     connects: Arc<AtomicUsize>,
     forks: Arc<AtomicUsize>,
     side_chats: bool,
+    children: Arc<Mutex<BTreeMap<String, (String, String)>>>,
+    parent_available: Arc<AtomicBool>,
+    catalog_fails: Arc<AtomicBool>,
 }
 struct Line {
     rows: Vec<HistoryEntry>,
@@ -76,10 +79,69 @@ impl Default for Fixture {
             connects: Arc::new(AtomicUsize::new(0)),
             forks: Arc::new(AtomicUsize::new(0)),
             side_chats: false,
+            children: Arc::new(Mutex::new(BTreeMap::new())),
+            parent_available: Arc::new(AtomicBool::new(true)),
+            catalog_fails: Arc::new(AtomicBool::new(false)),
         }
     }
 }
 impl Fixture {
+    pub fn with_children(self) -> Self {
+        let mut children = self.children.lock().unwrap();
+        let mut sessions = self.sessions.lock().unwrap();
+        for (id, parent, mode) in [
+            ("child-a", "a", "continuable"),
+            ("child-b", "b", "continuable"),
+            ("nested-a", "child-a", "continuable"),
+            ("bounded-b", "b", "one-shot"),
+        ] {
+            let mut line = Line {
+                rows: vec![],
+                sender: broadcast::channel(256).0,
+                cancel: Arc::new(AtomicBool::new(false)),
+                busy: false,
+                turn: 30,
+                ephemeral: false,
+            };
+            for turn in 1..=30 {
+                append(&mut line, "turn/start", json!({"turn":turn}));
+                append(
+                    &mut line,
+                    "user/message",
+                    json!({"turn":turn,"id":format!("{id}-u{turn}"),"content":[{"type":"text","text":format!("{id} · 子历史 {turn}")}]}),
+                );
+                append(
+                    &mut line,
+                    "assistant/message",
+                    json!({"turn":turn,"step":1,"message":{"id":format!("{id}-m{turn}"),"content":[{"type":"text","text":"子代理历史回答"}]}}),
+                );
+                append(
+                    &mut line,
+                    "turn/end",
+                    json!({"turn":turn,"reason":"completed"}),
+                );
+            }
+            children.insert(id.into(), (parent.into(), mode.into()));
+            sessions.insert(id.into(), line);
+        }
+        drop(sessions);
+        drop(children);
+        self
+    }
+    pub fn set_child_mode(&self, id: &str, mode: &str) {
+        self.children
+            .lock()
+            .unwrap()
+            .get_mut(id)
+            .expect("fixture child")
+            .1 = mode.into();
+    }
+    pub fn set_parent_available(&self, available: bool) {
+        self.parent_available.store(available, Ordering::SeqCst);
+    }
+    pub fn set_catalog_fails(&self, fails: bool) {
+        self.catalog_fails.store(fails, Ordering::SeqCst);
+    }
     pub fn with_side_chats(mut self) -> Self {
         self.side_chats = true;
         self
@@ -134,6 +196,14 @@ impl SessionEndpoint for Endpoint {
             caps.methods
                 .extend(["session.fork".into(), "session.discard".into()]);
             caps.supports_ephemeral_fork = true;
+        }
+        if !self.fixture.children.lock().unwrap().is_empty() {
+            caps.methods.extend([
+                "subagents.list".into(),
+                "subagents.prompt".into(),
+                "subagents.cancel".into(),
+                "subagents.history".into(),
+            ]);
         }
         caps
     }
@@ -205,6 +275,94 @@ impl SessionEndpoint for Endpoint {
         Err(unsupported("fixture actionable"))
     }
     async fn call(&self, method: &str, p: Value, rpc: &str) -> Result<Value> {
+        if method == "subagents.list" {
+            if self.fixture.catalog_fails.load(Ordering::SeqCst) {
+                return Err(Error::Transport("fixture catalog unavailable".into()));
+            }
+            let parent = string(&p, "parentSessionId")?;
+            let entries: Vec<_> = self
+                .fixture
+                .children
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|(_, (owner, _))| owner == parent)
+                .map(|(id, (_, mode))| json!({"kind":"child","id":id,"mode":mode}))
+                .collect();
+            return Ok(
+                json!({"entries":entries,"parentAvailable":self.fixture.parent_available.load(Ordering::SeqCst)}),
+            );
+        }
+        if method == "subagents.history" {
+            let request: BoundedChildHistoryRequest = serde_json::from_value(p)?;
+            request.validate()?;
+            require(
+                self.fixture
+                    .children
+                    .lock()
+                    .unwrap()
+                    .get(&request.child_session_id)
+                    .is_some_and(|(owner, _)| owner == &request.parent_session_id),
+                "bounded child owner mismatch",
+            )?;
+            let sessions = self.fixture.sessions.lock().unwrap();
+            let child = &sessions[&request.child_session_id];
+            let cut = request
+                .through_sequence
+                .unwrap_or(child.rows.len() as i64 - 1);
+            require(cut < child.rows.len() as i64, "bounded fixture cut")?;
+            let revision = format!("{:064x}", cut + 1);
+            if request
+                .history_revision
+                .as_ref()
+                .is_some_and(|expected| expected != &revision)
+            {
+                return Err(Error::Remote(json!({"code":"history-stale"})));
+            }
+            let end = request
+                .before_sequence
+                .unwrap_or(cut + 1)
+                .min(cut + 1)
+                .max(0) as usize;
+            let start = end.saturating_sub(request.max_messages);
+            return Ok(serde_json::to_value(BoundedChildHistoryPage {
+                parent_session_id: request.parent_session_id,
+                child_session_id: request.child_session_id,
+                through_sequence: cut,
+                history_revision: revision,
+                entries: child.rows[start..end].to_vec(),
+                has_more_before: start > 0,
+                run_open: child.busy,
+                source_call: None,
+            })?);
+        }
+        let (method, p) = if matches!(method, "subagents.prompt" | "subagents.cancel") {
+            let parent = string(&p, "parentSessionId")?;
+            let child = string(&p, "childSessionId")?;
+            require(
+                self.fixture.parent_available.load(Ordering::SeqCst)
+                    && self
+                        .fixture
+                        .children
+                        .lock()
+                        .unwrap()
+                        .get(child)
+                        .is_some_and(|(owner, mode)| owner == parent && mode == "continuable"),
+                "child control ownership or continuation unavailable",
+            )?;
+            let mut payload = p.clone();
+            payload["sessionId"] = json!(child);
+            (
+                if method == "subagents.prompt" {
+                    "session.prompt"
+                } else {
+                    "session.cancel"
+                },
+                payload,
+            )
+        } else {
+            (method, p)
+        };
         let id = string(&p, "sessionId")?.to_owned();
         let mut sessions = self.fixture.sessions.lock().unwrap();
         let line = sessions

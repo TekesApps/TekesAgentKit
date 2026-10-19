@@ -9,11 +9,12 @@ use tekes_agent_components_ui::{
 };
 use tekes_agent_contract::{PromptMode, Result, SessionAddress, require, unsupported};
 use tekes_agent_presentation::{
-    ComposerDestination, PreparedSubmission, RunScope, SideChat, SideChatSnapshot, SummaryAction,
-    TaskLoadToken,
+    ChildHistoryLayout, ComposerDestination, PreparedSubmission, RunScope, SideChat,
+    SideChatSnapshot, SummaryAction, TaskLoadToken,
 };
 use tekes_agent_ui_bindings::{
-    BoundSideChatRun, PaneAccess, RunBinding, SideChatBinding, SidebarPublication, TaskPaneBinding,
+    BoundSideChatRun, ChildPaneBinding, PaneAccess, PaneSnapshot, RunBinding, SideChatBinding,
+    SidebarPublication, TaskPaneBinding,
 };
 use tekes_ui_controls::{
     ButtonTextRenderer, TextSurface,
@@ -39,6 +40,18 @@ pub const SELECT_B: ComponentId = ComponentId(101);
 pub const RECONNECT: ComponentId = ComponentId(102);
 
 pub enum DemoCommand {
+    OpenChild {
+        request: PanelRequest,
+        direct_parent: RunScope,
+        child_id: String,
+        title: String,
+        layout: ChildHistoryLayout,
+    },
+    ReadChild {
+        panel_parent: RunScope,
+        source: Arc<ChildPaneBinding>,
+        page: bool,
+    },
     OpenTask {
         parent: RunScope,
         task_id: String,
@@ -83,6 +96,7 @@ pub struct ComponentDemo {
     task_sources: BTreeMap<(RunScope, String), TaskSource>,
     task_runs: BTreeMap<(RunScope, String), PanelRun>,
     task_attempts: BTreeMap<(RunScope, String), RunScope>,
+    child_panes: BTreeMap<(RunScope, String), ChildPane>,
     background_commands: Vec<DemoCommand>,
     next_panel_namespace: u32,
     panel_navigation_revision: u64,
@@ -94,6 +108,15 @@ struct PanelRun {
 struct TaskSource {
     source: Arc<TaskPaneBinding>,
     token: Option<TaskLoadToken>,
+}
+struct ChildPane {
+    source: Arc<ChildPaneBinding>,
+    controls: PanelRun,
+    title: String,
+    snapshot: PaneSnapshot,
+    refresh_key: Option<(u64, bool)>,
+    reading: bool,
+    read_error: Option<String>,
 }
 #[derive(Clone, Debug)]
 pub struct PanelRequest {
@@ -244,6 +267,7 @@ impl ComponentDemo {
             task_sources: BTreeMap::new(),
             task_runs: BTreeMap::new(),
             task_attempts: BTreeMap::new(),
+            child_panes: BTreeMap::new(),
             background_commands: vec![],
             next_panel_namespace: 50_000,
             panel_navigation_revision: 0,
@@ -323,6 +347,20 @@ impl ComponentDemo {
             .map(|run| run.ids)
             .filter(|ids| self.tree.get(ids.root).is_some())
     }
+    pub fn bounded_child_buttons(&self) -> Option<(ComponentId, ComponentId)> {
+        let parent = self.binding().scope();
+        let SidePanelTabKind::Subagent { child_id } = self.panel_selections.get(parent)? else {
+            return None;
+        };
+        let pane = self.child_panes.get(&(parent.clone(), child_id.clone()))?;
+        if !matches!(pane.snapshot, PaneSnapshot::ReadOnlyChild { .. }) {
+            return None;
+        }
+        let refresh = ComponentId(pane.controls.ids.root.0 + 19);
+        self.tree
+            .get(refresh)
+            .map(|_| (refresh, ComponentId(pane.controls.ids.root.0 + 20)))
+    }
     fn active_panel_run(&self) -> Option<&PanelRun> {
         let parent = self.binding().scope();
         match self.panel_selections.get(parent)? {
@@ -332,11 +370,185 @@ impl ComponentDemo {
             SidePanelTabKind::Task { task_id } => {
                 self.task_runs.get(&(parent.clone(), task_id.clone()))
             }
+            SidePanelTabKind::Subagent { child_id } => self
+                .child_panes
+                .get(&(parent.clone(), child_id.clone()))
+                .map(|pane| &pane.controls),
             _ => None,
         }
     }
     pub fn take_background_commands(&mut self) -> Vec<DemoCommand> {
         std::mem::take(&mut self.background_commands)
+    }
+    pub fn begin_child_open(&mut self, panel_parent: &RunScope) -> Result<PanelRequest> {
+        require(
+            !self.composing() && self.binding().scope() == panel_parent,
+            "child navigation parent changed or composing",
+        )?;
+        Ok(self.panel_request(panel_parent.clone()))
+    }
+    pub fn child_request_current(&self, request: &PanelRequest) -> bool {
+        self.binding().scope() == &request.parent
+            && self.navigation_revision == request.main_revision
+            && self.panel_navigation_revision == request.panel_revision
+            && !self.composing()
+    }
+    pub fn child_pane_active(&self, panel_parent: &RunScope, child: &str) -> bool {
+        self.binding().scope() == panel_parent
+            && self.panel_selections.get(panel_parent)
+                == Some(&SidePanelTabKind::Subagent {
+                    child_id: child.into(),
+                })
+    }
+    pub fn cached_child_source(
+        &self,
+        panel_parent: &RunScope,
+        direct_parent: &RunScope,
+        child_id: &str,
+        layout: ChildHistoryLayout,
+    ) -> Option<Arc<ChildPaneBinding>> {
+        self.child_panes
+            .get(&(panel_parent.clone(), child_id.into()))
+            .filter(|pane| {
+                pane.source.parent() == direct_parent
+                    && pane.source.layout() == layout
+                    && pane.source.binding().access() != PaneAccess::Missing
+            })
+            .map(|pane| pane.source.clone())
+    }
+    pub fn install_child_source(
+        &mut self,
+        request: PanelRequest,
+        source: Arc<ChildPaneBinding>,
+        title: String,
+        snapshot: PaneSnapshot,
+    ) -> Result<bool> {
+        let panel_parent = request.parent.clone();
+        let parent = self
+            .bindings
+            .iter()
+            .find(|binding| binding.scope() == &panel_parent)
+            .ok_or_else(|| unsupported("child panel parent not mounted"))?;
+        require(
+            source.uses_run(parent) && source.parent().thread_id == panel_parent.thread_id,
+            "child source authority mismatch",
+        )?;
+        Self::validate_child_snapshot(&source, &snapshot)?;
+        let key = (panel_parent.clone(), source.child_id().to_owned());
+        if self.composing()
+            && self.binding().scope() == &panel_parent
+            && self.panel_selections.get(&panel_parent)
+                == Some(&SidePanelTabKind::Subagent {
+                    child_id: source.child_id().into(),
+                })
+            && self
+                .child_panes
+                .get(&key)
+                .is_some_and(|pane| !Arc::ptr_eq(&pane.source, &source))
+        {
+            return Ok(false);
+        }
+        let same = self
+            .child_panes
+            .get(&key)
+            .is_some_and(|pane| Arc::ptr_eq(&pane.source, &source));
+        if same {
+            self.child_panes.get_mut(&key).unwrap().title = title;
+        } else {
+            if let Some(old) = self.child_panes.remove(&key) {
+                old.source.retire();
+            }
+            let ids = self.allocate_panel_ids()?;
+            self.child_panes.insert(
+                key,
+                ChildPane {
+                    controls: PanelRun {
+                        binding: source.binding().clone(),
+                        ids,
+                    },
+                    source: source.clone(),
+                    title,
+                    snapshot,
+                    refresh_key: None,
+                    reading: false,
+                    read_error: None,
+                },
+            );
+        }
+        // Installing a result for an inactive parent caches its body without
+        // taking over the active parent's navigation or focus.
+        let selected = self.child_request_current(&request);
+        if selected {
+            self.panel_selections.insert(
+                panel_parent,
+                SidePanelTabKind::Subagent {
+                    child_id: source.child_id().into(),
+                },
+            );
+        }
+        self.sync()?;
+        Ok(selected)
+    }
+    fn validate_child_snapshot(source: &ChildPaneBinding, snapshot: &PaneSnapshot) -> Result<()> {
+        require(
+            source.binding().access() != PaneAccess::Missing,
+            "child source retired",
+        )?;
+        let valid = match snapshot {
+            PaneSnapshot::Run { snapshot, .. }
+                if source.layout() == ChildHistoryLayout::IndependentSessions =>
+            {
+                snapshot
+                    .run
+                    .as_ref()
+                    .is_some_and(|run| &run.scope == source.binding().scope())
+            }
+            PaneSnapshot::ReadOnlyChild { scope, .. }
+                if source.layout() == ChildHistoryLayout::SameSession =>
+            {
+                scope == source.binding().scope()
+            }
+            _ => false,
+        };
+        require(valid, "child snapshot source mismatch")
+    }
+    pub fn update_child_snapshot(
+        &mut self,
+        panel_parent: &RunScope,
+        source: &Arc<ChildPaneBinding>,
+        snapshot: PaneSnapshot,
+    ) -> Result<bool> {
+        let Some(pane) = self
+            .child_panes
+            .get_mut(&(panel_parent.clone(), source.child_id().into()))
+        else {
+            return Ok(false);
+        };
+        if !Arc::ptr_eq(&pane.source, source) || source.binding().access() == PaneAccess::Missing {
+            return Ok(false);
+        }
+        Self::validate_child_snapshot(source, &snapshot)?;
+        pane.snapshot = snapshot;
+        pane.reading = false;
+        pane.read_error = None;
+        self.sync()?;
+        Ok(true)
+    }
+    pub fn child_read_failed(
+        &mut self,
+        panel_parent: &RunScope,
+        source: &Arc<ChildPaneBinding>,
+        error: String,
+    ) -> Result<()> {
+        if let Some(pane) = self
+            .child_panes
+            .get_mut(&(panel_parent.clone(), source.child_id().into()))
+            && Arc::ptr_eq(&pane.source, source)
+        {
+            pane.reading = false;
+            pane.read_error = Some(error);
+        }
+        self.sync()
     }
     /// Explicit host navigation for task rows supplied by its authoritative
     /// loader. Summary todo rows deliberately have no fabricated OpenTask action.
@@ -625,6 +837,25 @@ impl ComponentDemo {
                 tabs.push(task.source.tab("Task")?);
             }
         }
+        self.child_panes
+            .retain(|_, pane| pane.source.binding().access() != PaneAccess::Missing);
+        for ((panel_parent, _), pane) in &mut self.child_panes {
+            if panel_parent == &parent {
+                tabs.push(pane.source.tab(pane.title.clone()));
+            }
+            if let Some(key) = pane.source.refresh_key()
+                && pane.refresh_key != Some(key)
+                && !pane.reading
+            {
+                pane.refresh_key = Some(key);
+                pane.reading = true;
+                self.background_commands.push(DemoCommand::ReadChild {
+                    panel_parent: panel_parent.clone(),
+                    source: pane.source.clone(),
+                    page: false,
+                });
+            }
+        }
         let wanted = self
             .panel_selections
             .entry(parent.clone())
@@ -728,7 +959,122 @@ impl ComponentDemo {
                     });
                 }
             }
-            _ => {}
+            SidePanelTabKind::Subagent { child_id } => {
+                if let Some(pane) = self.child_panes.get(&(parent, child_id.clone())) {
+                    let ids = pane.controls.ids;
+                    let binding = pane.controls.binding.clone();
+                    let reading = pane.reading;
+                    let read_error = pane.read_error.clone();
+                    let paging = pane.source.supports_pagination();
+                    match &pane.snapshot {
+                        PaneSnapshot::Run { .. } => {
+                            self.sync_pane_controls(
+                                SidePanelTabKind::Subagent { child_id },
+                                ids,
+                                binding,
+                            )?;
+                            if self.tree.get(ComponentId(ids.root.0 + 19)).is_none() {
+                                self.tree
+                                    .get_mut(ComponentId(ids.root.0 + 16))
+                                    .unwrap()
+                                    .component_mut::<StackContent>()
+                                    .unwrap()
+                                    .children
+                                    .push(Content::new(
+                                        ComponentId(ids.root.0 + 19),
+                                        ButtonContent::new("刷新子代理能力"),
+                                    ));
+                            }
+                            self.tree
+                                .get_mut(ComponentId(ids.root.0 + 19))
+                                .unwrap()
+                                .component_mut::<ButtonContent>()
+                                .unwrap()
+                                .button
+                                .state
+                                .disabled = reading;
+                        }
+                        PaneSnapshot::ReadOnlyChild { transcript, .. } => {
+                            let mut text = format!(
+                                "有界子历史：{} 项；{}。只读。\nTranscript 待 TekesUI #22 / #23。",
+                                transcript.items.len(),
+                                if transcript.is_stale || read_error.is_some() {
+                                    "历史待同步"
+                                } else {
+                                    "历史已同步"
+                                }
+                            );
+                            if let Some(error) = read_error {
+                                text.push_str(&format!("\n读取失败，保留已加载历史：{error}"));
+                            }
+                            let more = transcript.has_more_before;
+                            if self.tree.get(ComponentId(ids.root.0 + 18)).is_none() {
+                                let panel = self
+                                    .tree
+                                    .get_mut(panel_id)
+                                    .unwrap()
+                                    .component_mut::<SidePanel>()
+                                    .unwrap();
+                                let token = panel
+                                    .content_token(&SidePanelTabKind::Subagent { child_id })
+                                    .ok_or_else(|| unsupported("bounded child token missing"))?;
+                                panel
+                                    .install_content(
+                                        &token,
+                                        Content::new(
+                                            ComponentId(ids.root.0 + 16),
+                                            StackContent {
+                                                model: Stack {
+                                                    axis: Axis::Vertical,
+                                                    gap: Spacing::Regular.value(),
+                                                },
+                                                flexible_child: None,
+                                                children: vec![
+                                                    Content::new(
+                                                        ComponentId(ids.root.0 + 18),
+                                                        TextContent::new(text.clone()),
+                                                    ),
+                                                    Content::new(
+                                                        ComponentId(ids.root.0 + 19),
+                                                        ButtonContent::new("刷新子历史"),
+                                                    ),
+                                                    Content::new(
+                                                        ComponentId(ids.root.0 + 20),
+                                                        ButtonContent::new("加载更早子历史"),
+                                                    ),
+                                                ],
+                                            },
+                                        ),
+                                    )
+                                    .map_err(unsupported)?;
+                            }
+                            self.tree
+                                .get_mut(ComponentId(ids.root.0 + 18))
+                                .unwrap()
+                                .component_mut::<TextContent>()
+                                .unwrap()
+                                .text = text;
+                            self.tree
+                                .get_mut(ComponentId(ids.root.0 + 20))
+                                .unwrap()
+                                .component_mut::<ButtonContent>()
+                                .unwrap()
+                                .button
+                                .state
+                                .disabled = reading || !more || !paging;
+                            self.tree
+                                .get_mut(ComponentId(ids.root.0 + 19))
+                                .unwrap()
+                                .component_mut::<ButtonContent>()
+                                .unwrap()
+                                .button
+                                .state
+                                .disabled = reading;
+                        }
+                        PaneSnapshot::Missing { .. } => {}
+                    }
+                }
+            }
         }
         Ok(())
     }
@@ -1031,6 +1377,18 @@ impl ComponentDemo {
                     self.panel_navigation_revision += 1;
                     self.tree.focus(None, false);
                 }
+                SidePanelIntent::Close {
+                    parent,
+                    tab: SidePanelTabKind::Subagent { child_id },
+                } => {
+                    if let Some(pane) = self.child_panes.remove(&(parent.clone(), child_id)) {
+                        pane.source.retire();
+                    }
+                    self.panel_selections
+                        .insert(parent, SidePanelTabKind::Summary);
+                    self.panel_navigation_revision += 1;
+                    self.tree.focus(None, false);
+                }
                 SidePanelIntent::Select { parent, tab } if &parent == self.binding().scope() => {
                     self.tree.focus(None, false);
                     self.panel_selections
@@ -1080,6 +1438,22 @@ impl ComponentDemo {
             .iter()
             .filter(|action| action.kind == ContentActionKind::Activate)
         {
+            if let Some(SidePanelTabKind::Subagent { child_id }) =
+                self.panel_selections.get(binding.scope())
+                && let Some(pane) = self
+                    .child_panes
+                    .get_mut(&(binding.scope().clone(), child_id.clone()))
+                && !pane.reading
+                && (action.target == ComponentId(pane.controls.ids.root.0 + 19)
+                    || action.target == ComponentId(pane.controls.ids.root.0 + 20))
+            {
+                pane.reading = true;
+                commands.push(DemoCommand::ReadChild {
+                    panel_parent: binding.scope().clone(),
+                    source: pane.source.clone(),
+                    page: action.target == ComponentId(pane.controls.ids.root.0 + 20),
+                });
+            }
             match action.target {
                 SELECT_A => self.select(0)?,
                 SELECT_B => self.select(1)?,

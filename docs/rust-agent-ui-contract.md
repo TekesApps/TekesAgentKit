@@ -122,6 +122,8 @@ Task tab 以 task ID 为稳定身份，scope 是可更新的内容输入。TaskP
 
 ## 完成账本
 
+最新 [子代理 pane 接入记录](rust-agent-ui-child-20261019.md) 覆盖 typed 子源、直接 parent、独立 Composer/Indicators、有界只读加载与分页诊断、复用与撤销、单次读取及过期结果处理。本地 UI 增至 83 tests；原生 fixture 覆盖两条路径，但不是正式子 Transcript，也不是三端子 pane 的完整原生交互验收。
+
 最新 [任务 pane 接入记录](rust-agent-ui-task-20261019.md) 覆盖 TaskPanelState 绑定、源指针替换、异步发送撤销、独立 Composer/Indicators 与原生 fixture 验证。本地 UI 增至 79 tests。显式宿主任务源与既有 Summary OpenTask 动作可接入，同会话 todo 的无独立 run 导航语义保持不变；仍不代表任务正式 Transcript 或子代理 pane 完成。
 
 最新 [SideChat 接入记录](rust-agent-ui-sidechat-20261019.md) 与 [机器收据](rust-agent-ui-sidechat-20261019.json) 覆盖共享 pointer 绑定、独立 Composer/Indicators、创建/发送/取消关闭、Unknown 保留与父草稿隔离。本地 root 104、UI 74、工具 18 tests 通过，三端协议与组件到 GPU 路径复验通过；正式 Transcript 与完整原生交互仍不在这些通过项内。
@@ -132,7 +134,7 @@ Task tab 以 task ID 为稳定身份，scope 是可更新的内容输入。TaskP
 | Indicators | 首批事实组件与 unknown/0/partial/error 测试 | 原生 RunView 呈现、主题/语义验收 |
 | Transcript / RunView | 布局契约已核实，正式组件未交付 | #22/#23 等价公共 API、结构化实现、阅读/分页/流式/原生验收 |
 | Sidebar | 共享服务绑定、选择/置顶/复制与局部原生验证；三端数据到 GPU 通过 | 重命名/分叉/归档交互与完整宿主验收 |
-| SidePanel / Summary | Summary 原生挂载；任务与 SideChat 共享 pointer 绑定、独立 Composer/Indicators 已接入 | 子代理 pane、任务/SideChat 正式 Transcript 与完整原生联调 |
+| SidePanel / Summary | Summary 原生挂载；任务、SideChat、独立子代理控制与绑定已接入；有界子历史只读加载诊断/分页已验证 | 各类 pane 正式 Transcript、真实三端子 pane 原生操作与完整联调 |
 | 第二公开 API consumer | Composer、Indicators、Sidebar、SidePanel 公共组合，Summary 独立挂载；不依赖 RunSurface | 正式 RunView/Transcript 与完整原生宿主组合验证 |
 | 原生窗口验收 | Composer/Indicators、Sidebar、Summary + 共享绑定的局部窗口验证已通过（合成文本服务） | 物理中文输入法、正式 RunView/Transcript/其余 SidePanel 内容和阅读/分页锚点验收 |
 | review / CI / merge / tag | 草稿 PR #10 已提交；先前提交 CI 通过，后续增量仍需各自验证 | 完整要求审计、独立 review、最新 CI、合并与新阶段 tag |

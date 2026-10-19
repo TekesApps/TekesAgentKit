@@ -11,6 +11,12 @@ pub fn resolved_task_tab(
 ) -> Result<tekes_agent_components_ui::SidePanelTab, String> {
     source.tab("Task").map_err(|error| error.to_string())
 }
+/// Child layout and actual receiving parent come from the typed shared source.
+pub fn child_tab(
+    source: &tekes_agent_ui_bindings::ChildPaneBinding,
+) -> tekes_agent_components_ui::SidePanelTab {
+    source.tab("Subagent")
+}
 /// A second host composes the canonical scratch tab inventory without importing
 /// presentation internals or manufacturing pointers from session-list rows.
 pub fn sync_scratch_tabs(

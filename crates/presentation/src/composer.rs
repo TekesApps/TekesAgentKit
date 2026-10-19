@@ -285,6 +285,10 @@ pub struct RunSnapshot {
     pub summary: Option<SummaryFacts>,
     pub draft: ComposerDraft,
     pub can_submit: bool,
+    /// Derived from the same catalog authority that gates child controls. None
+    /// for a main run; older serialized snapshots may omit this presentation.
+    #[serde(default)]
+    pub child_availability: Option<ChildComposerAvailability>,
     pub submissions: Vec<SubmissionState>,
     pub events: Vec<SubmissionState>,
 }
@@ -643,6 +647,7 @@ impl PresentationStore {
             self.child_catalog = None;
         }
         let mut run = scope.map(|s| RunPresentation::read(authority, s, self.was_connected));
+        let mut child_availability = None;
         if let Some(run) = &mut run
             && run.scope.thread_id != run.scope.session_id
         {
@@ -651,8 +656,9 @@ impl PresentationStore {
                 .as_ref()
                 .filter(|(token, _)| Some(token.clone()) == self.selection())
                 .map(|(_, catalog)| catalog);
-            let available = ChildComposerAvailability::resolve(catalog, &run.scope.session_id)
-                == ChildComposerAvailability::Available;
+            let availability = ChildComposerAvailability::resolve(catalog, &run.scope.session_id);
+            let available = availability == ChildComposerAvailability::Available;
+            child_availability = Some(availability);
             run.can_submit &=
                 available && authority.endpoint_capabilities.supports("subagents.prompt");
             run.can_cancel &=
@@ -792,6 +798,7 @@ impl PresentationStore {
             run: run.clone(),
             transcript,
             summary,
+            child_availability,
             draft: selected.as_ref().map(|d| self.draft(d)).unwrap_or_default(),
             can_submit: selected.is_some()
                 && run

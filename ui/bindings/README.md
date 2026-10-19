@@ -130,6 +130,56 @@ complete task RunView still await the same structured-content integration as the
 main run. Tests cover source ABA, stale load tokens, slow baseline completion,
 host-preparation fences, draft lifetime and public-control composition.
 
+## Child pane routing
+
+Keep one `ChildPaneBinding` per retained child pane. `open(runtime, direct_parent,
+child_id, layout, source)` and `for_run(parent_binding, ...)` return a typed child
+source; its private construction prevents main-run cache substitution. Layout is
+an explicit adapter registration fact, independent of continuation capability.
+Native bounded history uses `SameSession` and the public bounded API (or an
+explicit `ChildHistorySource`); Pi/DSH independent history uses
+`IndependentSessions`. Never discover layout from a child ID or failed read.
+
+The **direct receiving parent** can differ from the root thread shown by the
+SidePanel. Keep it in `ChildPaneBinding::parent()` and `SidePanelTab::child_parent`.
+Changing it or the history layout retires old content/install tokens. Child
+continuation still uses RunController's existing catalog policy, queried against
+that direct parent, and the runtime rechecks ownership immediately before control.
+`RunSnapshot::child_availability` exposes that same derived policy to Indicators;
+it is optional when decoding older snapshots. The UI does not compute another
+availability state or infer permission from readable history.
+
+`binding()` provides the existing run lease, subscriptions, send/cancel and
+pagination. Independent sources produce `PaneSnapshot::Run`; bounded sources
+produce `ReadOnlyChild` with no Composer snapshot. Refresh controls only for an
+independent source. Failed catalog reads remove control authority while leaving
+history readable. Custom sources own their pagination, so
+`supports_pagination()` is false for them; supply the adapter's own paging UI.
+
+Cache the typed source with its controls across tab switches. `retire()` or owner
+drop revokes captured controls without cancelling/discarding remote work. A new
+mount is a new lifetime even if its ID is reused. Before async installation, also
+check the panel/navigation token; source role and UI navigation are separate.
+
+The demo's `begin_child_open` / `install_child_source` fence async navigation;
+`cached_child_source` preserves the original controller/draft on repeated opens.
+Summary OpenSubagent callbacks go through the host's registered layout. The host
+maps Native to bounded history and Pi/DSH to independent history at connector
+registration; components do not infer this from endpoint identity. Runtime/run
+subscriptions schedule updates via public window wake. `refresh_key` coalesces
+initial, reconnect and observed direct-parent execution-state reads; it grants no
+control authority and does not replace a producer-specific change notification.
+Explicit refresh remains available. There is no per-frame query timer.
+
+Bounded demo content is explicitly a **history-load diagnostic**, not Transcript:
+loaded-item count, stale/read-error information, refresh and supported pagination.
+It preserves the last read on error and admits one read per pane at a time; a
+same-key failure waits for an explicit retry. Retired/inactive async results do
+not replace another parent's content or notice. `update_child_snapshot` and
+`child_read_failed` finish the host's read command; always drain pending background
+commands after sync. Formal child Transcript/RunView still need structured text
+and reading-anchor integration, including live Native presentation acceptance.
+
 ## Shared inventory and thread actions
 
 Create `SidebarBinding::new(agent, endpoint_id)` inside the async runtime, using

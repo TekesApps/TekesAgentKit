@@ -1,0 +1,132 @@
+//! Typed child run ownership; layout and control capabilities are independent.
+use crate::{PaneSnapshot, RunBinding};
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
+use tekes_agent_components_ui::SidePanelTab;
+use tekes_agent_contract::Result;
+use tekes_agent_presentation::{ChildHistoryLayout, ChildHistorySource, RunScope};
+use tekes_agent_session::SessionRuntime;
+
+/// A source role proof, not a second child/capability state machine. Retiring the
+/// pane revokes captured controls without cancelling remote work or removing its
+/// history. A new mount gets a new lifetime even for the same child ID.
+pub struct ChildPaneBinding {
+    parent: RunScope,
+    child_id: String,
+    layout: ChildHistoryLayout,
+    run: Arc<RunBinding>,
+    alive: Arc<AtomicBool>,
+    paging: bool,
+}
+impl ChildPaneBinding {
+    pub async fn open(
+        runtime: Arc<SessionRuntime>,
+        direct_parent: RunScope,
+        child_id: impl Into<String>,
+        layout: ChildHistoryLayout,
+        source: Option<Arc<dyn ChildHistorySource>>,
+    ) -> Result<Self> {
+        let child_id = child_id.into();
+        let paging = source.is_none();
+        let mut run = RunBinding::open_child(
+            runtime,
+            direct_parent.clone(),
+            child_id.clone(),
+            layout,
+            source,
+        )
+        .await?;
+        let alive = Arc::new(AtomicBool::new(true));
+        run.child_owner = Some(Arc::downgrade(&alive));
+        Ok(Self {
+            parent: direct_parent,
+            child_id,
+            layout,
+            run: Arc::new(run),
+            alive,
+            paging,
+        })
+    }
+    pub async fn for_run(
+        parent: &RunBinding,
+        child_id: impl Into<String>,
+        layout: ChildHistoryLayout,
+        source: Option<Arc<dyn ChildHistorySource>>,
+    ) -> Result<Self> {
+        tekes_agent_contract::require(
+            parent.access() != crate::PaneAccess::Missing,
+            "child parent pane retired",
+        )?;
+        Self::open(
+            parent.runtime.clone(),
+            parent.scope().clone(),
+            child_id,
+            layout,
+            source,
+        )
+        .await
+    }
+    pub fn parent(&self) -> &RunScope {
+        &self.parent
+    }
+    pub fn child_id(&self) -> &str {
+        &self.child_id
+    }
+    pub fn layout(&self) -> ChildHistoryLayout {
+        self.layout
+    }
+    /// Custom ChildHistorySource owns its own pagination; do not enable the
+    /// endpoint page button solely because its projection has more history.
+    pub fn supports_pagination(&self) -> bool {
+        self.paging
+    }
+    pub fn binding(&self) -> &Arc<RunBinding> {
+        &self.run
+    }
+    pub fn tab(&self, title: impl Into<String>) -> SidePanelTab {
+        let mut tab = SidePanelTab::subagent(self.child_id.clone(), title, self.layout);
+        tab.child_parent = Some(self.parent.clone());
+        tab
+    }
+    pub fn retire(&self) {
+        self.alive.store(false, Ordering::Release);
+    }
+    /// Catalog refresh is a read. On failure existing presentation removes
+    /// control authority, while callers may still show the readable history.
+    pub async fn refresh_controls(&self) -> Result<()> {
+        tekes_agent_contract::require(
+            self.run.access() != crate::PaneAccess::Missing,
+            "child pane retired",
+        )?;
+        self.run.refresh_child_catalog().await
+    }
+    pub async fn snapshot(&self) -> Result<PaneSnapshot> {
+        self.run.snapshot().await
+    }
+    pub async fn load_earlier(&self) -> Result<bool> {
+        self.run.load_earlier().await
+    }
+    pub fn uses_run(&self, parent: &RunBinding) -> bool {
+        Arc::ptr_eq(&self.run.runtime, &parent.runtime)
+    }
+    /// Host read scheduling only; this does not grant continuation authority.
+    /// Consumers observe runtime notifications and coalesce unchanged keys.
+    pub fn refresh_key(&self) -> Option<(u64, bool)> {
+        if self.run.access() == crate::PaneAccess::Missing {
+            return None;
+        }
+        self.run.runtime.inspect(|state| {
+            (state.connection == tekes_agent_session::ConnectionState::Ready).then(|| {
+                (
+                    state.connection_epoch,
+                    state
+                        .sessions
+                        .get(&self.parent.session_id)
+                        .is_some_and(|parent| parent.run_open),
+                )
+            })
+        })
+    }
+}

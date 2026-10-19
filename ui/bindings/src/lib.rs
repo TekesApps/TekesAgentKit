@@ -6,7 +6,9 @@ mod sidebar;
 pub use sidebar::*;
 mod sidechat;
 pub use sidechat::*;
+mod child;
 mod task;
+pub use child::*;
 use std::sync::Arc;
 pub use task::*;
 use tekes_agent_components_ui::{Composer, ComposerAffordances, ComposerControlGate};
@@ -37,6 +39,7 @@ impl PaneAccess {
     }
 }
 
+#[derive(Clone)]
 pub enum PaneSnapshot {
     Run {
         snapshot: Arc<RunSnapshot>,
@@ -62,6 +65,7 @@ pub struct RunBinding {
     child: Option<ChildRun>,
     side_chat: Option<(Arc<SideChatController>, SideChat)>,
     task: Option<task::TaskRunGuard>,
+    child_owner: Option<std::sync::Weak<std::sync::atomic::AtomicBool>>,
 }
 struct ScopedPreparation<'a> {
     binding: &'a RunBinding,
@@ -212,6 +216,7 @@ impl RunBinding {
             child: None,
             side_chat: None,
             task: None,
+            child_owner: None,
         })
     }
 
@@ -256,6 +261,7 @@ impl RunBinding {
             child: Some(child),
             side_chat: None,
             task: None,
+            child_owner: None,
         })
     }
 
@@ -305,6 +311,13 @@ impl RunBinding {
             .flatten()
     }
     pub fn access(&self) -> PaneAccess {
+        if self.child_owner.as_ref().is_some_and(|owner| {
+            !owner
+                .upgrade()
+                .is_some_and(|alive| alive.load(std::sync::atomic::Ordering::Acquire))
+        }) {
+            return PaneAccess::Missing;
+        }
         if self.task.as_ref().is_some_and(|task| !task.live()) {
             return PaneAccess::Missing;
         }

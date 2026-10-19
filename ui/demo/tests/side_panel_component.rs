@@ -21,6 +21,45 @@ fn panel_mut(host: &mut ContentHost, id: ComponentId) -> &mut SidePanel {
         .unwrap()
 }
 #[test]
+fn nested_child_parent_is_content_identity_and_foreign_parents_cannot_replace_it() {
+    let parent = RunScope::main("fixture", "a");
+    let mut model = input(parent.clone());
+    let mut tab =
+        SidePanelTab::subagent("nested", "Nested", ChildHistoryLayout::IndependentSessions);
+    tab.child_parent = Some(parent.clone());
+    model.tabs.push(tab.clone());
+    model.selected = Some(tab.kind.clone());
+    let mut panel = SidePanel::new(74, SidePanelLabels::default(), 4);
+    panel.update(&model).unwrap();
+    let token = panel.content_token(&tab.kind).unwrap();
+    panel
+        .install_content(
+            &token,
+            Content::new(ComponentId(4600), TextContent::new("old receiving parent")),
+        )
+        .unwrap();
+    let root = panel.id();
+    let mut host = panel.into_host().unwrap();
+    model.revision = 2;
+    model.tabs[1].child_parent = Some(RunScope {
+        session_id: "direct-parent".into(),
+        ..parent.clone()
+    });
+    panel_mut(&mut host, root).update(&model).unwrap();
+    assert!(host.get(ComponentId(4600)).is_none());
+    assert!(
+        panel_mut(&mut host, root)
+            .install_content(
+                &token,
+                Content::new(ComponentId(4601), TextContent::new("late stale body"))
+            )
+            .is_err()
+    );
+    model.revision = 3;
+    model.tabs[1].child_parent = Some(RunScope::main("fixture", "foreign-thread"));
+    assert!(panel_mut(&mut host, root).update(&model).is_err());
+}
+#[test]
 fn confirmed_scratch_absence_retires_inactive_parent_content_and_install_tokens() {
     let parent = RunScope::main("fixture", "a");
     let chat = SideChat {
