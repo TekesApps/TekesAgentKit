@@ -13,27 +13,15 @@
 
 `RunSurface` 仅是现有协议/控件测试宿主，不是标准 RunView。正式组件契约、App 的 input/output/footnote 布局、基础 Issue 和完整交付账本见 [Rust Agent UI 接入契约](../docs/rust-agent-ui-contract.md)。
 
-当前已有可独立挂载的 `Composer`、`Indicators`、`Sidebar`、`SidePanel`、`SummaryView` 和 `ThreadRename` 首批实现。正式 Transcript、RunView，以及任务/子代理/SideChat 的 Run 内容、完整宿主集成和原生窗口验收仍在进行中。不要把下面的测试宿主截图当成最终 Transcript 设计。
+可独立挂载的组件包括 Composer、ComposerContext、ComposerChoices、AnnotationEditor、Indicators、Sidebar、ThreadRename、SidePanel 和 SummaryView。它们使用同一套共享 presentation；RunSurface/ComponentDemo 是测试与接入宿主，正式 Transcript/RunView 和各 pane 的消息内容仍待完成。
 
-模型/预设新增独立 `ComposerChoices` 内容和 `ComposerSettingsRequest` 绑定；公开目录输入、回调与宿主责任见 [接入说明](bindings/README.md#composer-model-and-preset-content)。模型已接入 demo 的公开 `session.models` 目录与发送前配置，预设等入口仍待接入；见 [模型闭环记录](../docs/rust-agent-ui-model-integration-20261019.md)。
+Composer 已接入输入/草稿/发送/取消、公开模型目录与发送前配置、初始预设/自动创建、内容卡片移除和已有批注评论编辑。实际文件选择/上传/预览、选区批注捕获/来源高亮、内容移除 undo 和其余能力入口仍待适配。模型、创建和评论编辑的证据分别见 [模型闭环](../docs/rust-agent-ui-model-integration-20261019.md)、[新会话](../docs/rust-agent-ui-creation-20261020.md)、[评论编辑](../docs/rust-agent-ui-annotation-editor-20261020.md)。
 
-`ComposerContext` 提供附件/引用/命令/技能/批注内容卡片与捕获目标的移除/预览/编辑意图。
-demo 已接入原子移除；文件选择、上传、预览、批注编辑和来源高亮仍需明确适配器。
-`--components --context-selftest` 使用隔离 fixture 验证组字屏障与提交；真实三端脚本可加
-`--ui-context --ui-components --ui-demo <binary>` 验证引用/批注的数据回传。
-公开责任和证据见 [草稿内容记录](../docs/rust-agent-ui-context-20261020.md)。
+Sidebar 使用共享列表、置顶和动作 dispatcher，已接入选择、复制、重命名、分叉和归档。SidePanel 组合任务、子代理、SideChat 与 Summary；任务与独立子代理保留各自 Composer/Indicators，有界子历史是只读来源。SideChat 保留临时 pointer 与 Unknown/Closing 草稿，源撤销、晚结果和异步准备继续由原绑定检查。
 
-新增实验 [runtime 绑定包](bindings/README.md)，连接组件回调、既有 RunController、历史 lease 与 SideChat 通知；不复制业务状态机。原生 demo 尚未迁移到正式 RunView。
+[绑定包](bindings/README.md) 连接原 RunController、history lease、任务/子代理/SideChat 生命周期。宿主拥有窗口、布局、导航与系统能力；来源替换不能重定向旧回调。第二 public consumer 只依赖两个公开 UI 包。
 
-`--components` 启用实际 Composer/Indicators + RunBinding 的独立原生验证窗口，可与 `--native-selftest`、`--offscreen` 或显式 `--endpoint-config` 组合。已完成合成文本服务、发送/取消、草稿隔离和重连的窗口验证；真实三端离屏接入可加 `--ui-components`。截图与验收范围见 [原生组件接入记录](../docs/rust-agent-ui-native-controls-20261019.md)。它不包含正式 Transcript，也不是标准 RunView。
-
-最新窗口还接入了实际 Sidebar / SidePanel / SummaryView：共享列表和置顶、异步会话选择、当前父会话 Summary 已验证。共享服务的自定义 pin 回传/通知修正仍未发布；未接入的重命名/分叉/归档交互会在 RPC 前明确拒绝。运行方式与范围见 [Sidebar/Summary 记录](../docs/rust-agent-ui-sidebar-summary-20261019.md)。
-
-SideChat 增量使用同一 runtime 的 `SideChatBinding`：已可创建 owned scratch、挂载独立 Composer/Indicators、发送与流式状态回传、取消后确认丢弃，并隔离父会话草稿。关闭结果不确定时保留 pointer/草稿并禁用发送；无自动重试或私有数据库读取。完整 Transcript 尚未接入，仍不是正式 SideChat RunView。公共接入与 reconciliation 责任见 [绑定说明](bindings/README.md#sidechat-tab-authority)。
-
-任务 pane 使用 `TaskPaneBinding` 和既有 TaskPanelState：跟随当前任务行，保留同一 run 的草稿，指针变化时撤销旧控件及回调。demo 支持显式宿主任务源和已有 Summary OpenTask 动作；同会话 todo 保持原来的无独立 run 导航语义。任务原生脚本验证独立输入/发送/取消及父草稿隔离；正式任务 Transcript 仍待实现。详见 [任务绑定说明](bindings/README.md#task-pane-resolution)。
-
-子代理增量使用 `ChildPaneBinding`：明确接收 parent 与历史布局，独立 session 挂载自己的 Composer/Indicators，有界历史只读且没有 Composer。Summary 的子代理动作已接入宿主布局注册；重复打开复用原实例。原生 fixture 验证发送/回传/取消和有界分页，正式子 Transcript 仍待实现；真实三端子 pane 原生交互尚未验收。见 [子代理接入记录](../docs/rust-agent-ui-child-20261019.md)。
+`--components` 打开实际组件验证窗口，可与 `--offscreen` 或显式 `--endpoint-config` 组合。原生 fixture 的 `--native-selftest` 及各单项模式验证合成文本服务、发送/取消/重连、草稿与 pointer 隔离；真实三端离屏接入使用 `--ui-components`。物理 IME、正式 Transcript 阅读/分页锚点、完整宿主和三端原生交互仍需验收。最新范围与收据以 [交付账本](../docs/rust-agent-ui-contract.md) 为准。
 
 ## 依赖
 
@@ -147,3 +135,5 @@ Sidebar 重命名、分叉和归档通过共享 dispatcher 接入，归档后显
 初始预设通过 `InitialPresetChoices` 适配 Native/Pi 初始目录和 DSH roster，仅在创建时应用。已有会话不提供预设切换。三端脚本的 `--ui-initial-presets` 在隔离状态下验证公开面板选择、共享 controller 创建和单次发送；这仍不是交互式新会话入口或原生预设验收。见 [预设接入记录](../docs/rust-agent-ui-initial-presets-20261020.md)。
 
 `--components --creation-selftest` 使用隔离 fixture 验证交互式新会话、公开预设选择、组字屏障和正常 Composer 发送，保留原草稿。真实 endpoint 窗口需显式提供 `--create-cwd ABSOLUTE_PATH` 才启用新会话入口。创建失败保留 session/RPC 身份并阻止替代点击；专用失败对账 UI 尚未实现。见 [新会话接入记录](../docs/rust-agent-ui-creation-20261020.md)。
+
+`--components --annotation-selftest` 验证已有批注评论的原生编辑、组字屏障和共享发送。真实三端脚本可加 `--ui-annotation-editor`，自动包含 context 证明；它不提供来源高亮或结构化历史卡片。公共 AnnotationEditor、原 binding 写入与快照确认流程见 [评论编辑接入](../docs/rust-agent-ui-annotation-editor-20261020.md)。

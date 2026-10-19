@@ -202,6 +202,39 @@ impl RunBinding {
         }
         self.patch_context(&intent.baseline, artifacts, annotations)
     }
+    /// Replace only one captured comment, retaining excerpt/source/provenance.
+    /// A failed CAS is not rebased or retried against the newest draft.
+    pub fn edit_annotation(
+        &self,
+        change: &tekes_agent_components_ui::AnnotationEditChange,
+    ) -> Result<Option<Arc<RunSnapshot>>> {
+        require(
+            change
+                .baseline
+                .annotations
+                .iter()
+                .filter(|a| a.id == change.annotation.id)
+                .count()
+                == 1
+                && change.baseline.annotations.contains(&change.annotation),
+            "annotation capture ambiguous or missing",
+        )?;
+        let mut annotations = change.baseline.annotations.clone();
+        let annotation = annotations
+            .iter_mut()
+            .find(|a| a.id == change.annotation.id)
+            .expect("validated annotation");
+        annotation.comment = change.comment.clone();
+        annotation.validate()?;
+        if !self.patch_context(
+            &change.baseline,
+            change.baseline.artifacts.clone(),
+            annotations,
+        )? {
+            return Ok(None);
+        }
+        Ok(self.current_run())
+    }
     /// Begin one settings gesture, invalidating an older catalog request through
     /// the existing presentation generation. Hosts must also fence navigation
     /// before presenting results and retain this exact request for completion.

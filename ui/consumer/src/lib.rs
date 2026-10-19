@@ -1,4 +1,32 @@
 //! Second consumer: depends only on AgentKit's public UI packages.
+/// A host acknowledges an edit against its original binding, never the newest
+/// selected pane. The component keeps rejected text visible and does not retry.
+pub fn apply_annotation_change(
+    binding: &tekes_agent_ui_bindings::RunBinding,
+    editor: &mut tekes_agent_components_ui::AnnotationEditor,
+    change: &tekes_agent_components_ui::AnnotationEditChange,
+) -> bool {
+    let result = binding
+        .edit_annotation(change)
+        .map_err(|error| error.to_string());
+    let applied = matches!(&result, Ok(Some(_)));
+    editor.complete(change, result);
+    applied
+}
+#[test]
+fn independent_host_mounts_the_annotation_editor_without_a_run_surface_or_private_types() {
+    let editor = tekes_agent_components_ui::AnnotationEditor::new(87, Default::default());
+    let root = editor.ids().root;
+    let host = editor.into_host().unwrap();
+    assert!(
+        !host
+            .get(root)
+            .unwrap()
+            .component::<tekes_agent_components_ui::AnnotationEditor>()
+            .unwrap()
+            .is_open()
+    );
+}
 /// A second host can create through its original endpoint binding without
 /// importing runtime internals or a demo host. It decides whether to navigate.
 pub async fn create_initial_session(

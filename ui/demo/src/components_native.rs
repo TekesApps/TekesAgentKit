@@ -76,6 +76,8 @@ struct Host {
     creation_selftest: bool,
     creation_stage: u8,
     creation_scope: Option<RunScope>,
+    annotation_selftest: bool,
+    annotation_stage: u8,
 }
 enum HostResult {
     InitialPresets {
@@ -444,7 +446,7 @@ impl Host {
                             }
                             DemoCommand::OpenContext { .. } => {
                                 Err(tekes_agent_contract::unsupported(
-                                    "no preview or annotation editor host adapter",
+                                    "no preview or source reveal host adapter",
                                 ))
                             }
                             DemoCommand::Sidebar(_)
@@ -708,6 +710,105 @@ impl Host {
                 .expect("component frame");
         }
         window.set_animating(self.text.frame_requested);
+        if self.annotation_selftest {
+            use tekes_ui_platform_macos::selftest::{Action, run_script};
+            if self.annotation_stage == 0 && self.view.annotation_editor_ids().is_some() {
+                self.annotation_stage = 1;
+                let ids = self.view.annotation_editor_ids().unwrap();
+                let click = |id| {
+                    let p = self.view.tree.get(id).unwrap().frame().center();
+                    Action::Click {
+                        x: p.x as f64,
+                        y: p.y as f64,
+                    }
+                };
+                let mut script = vec![];
+                if let Ok(path) = std::env::var("AGENT_ANNOTATION_CAPTURE") {
+                    script.push((100, Action::Capture { path }));
+                }
+                script.extend([
+                    (200, click(ids.editor)),
+                    (300, Action::TextCommand("selectAll:")),
+                    (400, Action::Text(String::new())),
+                    (
+                        500,
+                        Action::ExpectText {
+                            text: String::new(),
+                            marked: false,
+                        },
+                    ),
+                    (
+                        700,
+                        Action::PreeditRange {
+                            text: "中文批注组字".into(),
+                            selection: 6..6,
+                            replacement: None,
+                        },
+                    ),
+                    (900, click(self.view.ids().send)),
+                    (1100, click(tekes_agent_ui_demo::component_demo::SELECT_B)),
+                    (
+                        1300,
+                        Action::ExpectText {
+                            text: "中文批注组字".into(),
+                            marked: true,
+                        },
+                    ),
+                    (1500, Action::Text("更新后的中文批注\n第二行 😀".into())),
+                ]);
+                run_script(script);
+            } else if self.annotation_stage == 1
+                && self.view.annotation_editor_ids().is_some()
+                && !self.view.composing()
+                && self
+                    .view
+                    .binding()
+                    .current_run()
+                    .unwrap()
+                    .draft
+                    .annotations
+                    .first()
+                    .is_some_and(|a| a.comment == "更新后的中文批注\n第二行 😀")
+            {
+                self.annotation_stage = 2;
+                let close = self.view.annotation_editor_ids().unwrap().close;
+                let p = self.view.tree.get(close).unwrap().frame().center();
+                run_script(vec![(
+                    100,
+                    Action::Click {
+                        x: p.x as f64,
+                        y: p.y as f64,
+                    },
+                )]);
+            } else if self.annotation_stage == 2 && self.view.annotation_editor_ids().is_none() {
+                self.annotation_stage = 3;
+                let click = |id| {
+                    let p = self.view.tree.get(id).unwrap().frame().center();
+                    Action::Click {
+                        x: p.x as f64,
+                        y: p.y as f64,
+                    }
+                };
+                run_script(vec![
+                    (100, click(self.view.ids().send)),
+                    (400, click(tekes_agent_ui_demo::component_demo::SELECT_B)),
+                ]);
+            } else if self.annotation_stage == 3
+                && self.view.selected() == 1
+                && self.runtime.inspect(|s| {
+                    s.sessions.get("a").is_some_and(|s| {
+                        !s.run_open
+                            && s.entries.values().any(|e| {
+                                e.event.kind == "user/message"
+                                    && e.event.data.to_string().contains("更新后的中文批注")
+                            })
+                    })
+                })
+            {
+                self.annotation_stage = 4;
+                run_script(vec![(200, Action::Close)]);
+            }
+        }
         if self.creation_selftest {
             use tekes_ui_platform_macos::selftest::{Action, run_script};
             if self.creation_stage == 0 && self.view.initial_preset_choice_id("coding").is_some() {
@@ -1085,6 +1186,50 @@ impl Host {
         );
     }
     fn close(&mut self, window: &Window) {
+        if self.annotation_selftest {
+            assert!(
+                self.failures.is_empty(),
+                "annotation errors: {:?}",
+                self.failures
+            );
+            assert_eq!(self.annotation_stage, 4);
+            let state = self.runtime.snapshot();
+            let entries = &state.sessions["a"].entries;
+            let inputs: Vec<_> = entries
+                .values()
+                .filter(|e| {
+                    e.event.kind == "user/message"
+                        && e.event.data.to_string().contains("更新后的中文批注")
+                })
+                .collect();
+            assert_eq!(inputs.len(), 1);
+            let text = inputs[0].event.data.to_string();
+            assert!(text.contains("中文引用") && text.contains("批注正文"));
+            assert!(!text.contains("中文批注组字"));
+            assert!(
+                self.view.bindings()[0]
+                    .current_run()
+                    .unwrap()
+                    .draft
+                    .annotations
+                    .is_empty()
+            );
+            assert_eq!(
+                self.view.bindings()[1].current_run().unwrap().draft.text,
+                "B 注释隔离"
+            );
+            assert!(
+                self.view.bindings()[1]
+                    .current_run()
+                    .unwrap()
+                    .draft
+                    .annotations
+                    .is_empty()
+            );
+            println!(
+                "NATIVE_AGENT_ANNOTATION_SELFTEST_OK public-editor+committed-comment+synthetic-ime-barrier+shared-draft+shared-compilation+single-admission+stream+destination-isolation; physical-ime=false; source-highlight=false; formal-transcript=false"
+            );
+        }
         if self.creation_selftest {
             assert!(
                 self.failures.is_empty(),
@@ -1532,6 +1677,37 @@ impl WindowHandler for Host {
                         (20000, tekes_ui_platform_macos::selftest::Action::Close),
                     ]);
                 }
+                if self.annotation_selftest {
+                    use tekes_agent_components_ui::{
+                        Composer, ComposerContextAction, ComposerContextItem,
+                    };
+                    let (_, notes) = tekes_agent_ui_demo::fixture::composer_context_fixture();
+                    let target = self
+                        .view
+                        .tree
+                        .get(self.view.ids().root)
+                        .unwrap()
+                        .component::<Composer>()
+                        .unwrap()
+                        .context()
+                        .unwrap()
+                        .action_id(
+                            &ComposerContextItem::Annotation(notes[0].clone()),
+                            ComposerContextAction::EditAnnotation,
+                        )
+                        .unwrap();
+                    let p = self.view.tree.get(target).unwrap().frame().center();
+                    tekes_ui_platform_macos::selftest::run_script(vec![
+                        (
+                            100,
+                            tekes_ui_platform_macos::selftest::Action::Click {
+                                x: p.x as f64,
+                                y: p.y as f64,
+                            },
+                        ),
+                        (20000, tekes_ui_platform_macos::selftest::Action::Close),
+                    ]);
+                }
                 if self.context_selftest {
                     self.context_stage = 1;
                     context_script(&self.view);
@@ -1653,13 +1829,15 @@ pub fn run() {
     let models_selftest = args.iter().any(|arg| arg == "--model-choices-selftest");
     let context_selftest = args.iter().any(|arg| arg == "--context-selftest");
     let creation_selftest = args.iter().any(|arg| arg == "--creation-selftest");
+    let annotation_selftest = args.iter().any(|arg| arg == "--annotation-selftest");
     assert!(
         [
             selftest,
             actions_selftest,
             models_selftest,
             context_selftest,
-            creation_selftest
+            creation_selftest,
+            annotation_selftest
         ]
         .into_iter()
         .filter(|v| *v)
@@ -1679,7 +1857,8 @@ pub fn run() {
                 && !actions_selftest
                 && !models_selftest
                 && !context_selftest
-                && !creation_selftest,
+                && !creation_selftest
+                && !annotation_selftest,
             "native selftest uses isolated fixture only"
         );
         let value = serde_json::from_slice(
@@ -1777,6 +1956,32 @@ pub fn run() {
         ([a, b], sidebar)
     });
     let mut view = ComponentDemo::new(bindings).unwrap();
+    if annotation_selftest {
+        use tekes_agent_presentation::{ComposerContextBaseline, ComposerDestination};
+        let binding = &view.bindings()[0];
+        let (_, notes) = tekes_agent_ui_demo::fixture::composer_context_fixture();
+        assert!(
+            binding
+                .patch_context(
+                    &ComposerContextBaseline::read(&binding.current_run().unwrap()).unwrap(),
+                    vec![],
+                    notes
+                )
+                .unwrap()
+        );
+        binding
+            .edit_text(
+                &ComposerDestination::run(binding.scope().clone()),
+                "批注正文".into(),
+            )
+            .unwrap();
+        let b = &view.bindings()[1];
+        b.edit_text(
+            &ComposerDestination::run(b.scope().clone()),
+            "B 注释隔离".into(),
+        )
+        .unwrap();
+    }
     if creation_selftest {
         let binding = view.binding();
         binding
@@ -1903,6 +2108,8 @@ pub fn run() {
         creation_selftest,
         creation_stage: 0,
         creation_scope: None,
+        annotation_selftest,
+        annotation_stage: 0,
         text: TextBackend {
             shaper: CoreTextShaper::new(fonts.clone()),
             rasterizer: CoreTextRasterizer::new(fonts),
@@ -1930,6 +2137,12 @@ pub fn run() {
     if let Some(index) = args.iter().position(|arg| arg == "--offscreen") {
         let mut model_proof = serde_json::Value::Null;
         let mut context_proof = serde_json::Value::Null;
+        let mut annotation_proof = serde_json::Value::Null;
+        assert!(
+            !args.iter().any(|arg| arg == "--annotation-proof")
+                || args.iter().any(|arg| arg == "--context-proof"),
+            "annotation proof requires context proof"
+        );
         let mut preset_proof = serde_json::Value::Null;
         if args.iter().any(|arg| arg == "--model-choice-proof") {
             let commands = host
@@ -2066,6 +2279,46 @@ pub fn run() {
             host.view
                 .accessibility_action(target, None, AccessibilityAction::Press)
                 .unwrap();
+            if args.iter().any(|arg| arg == "--annotation-proof") {
+                let original = binding.current_run().unwrap().draft.annotations[0].clone();
+                let target = host
+                    .view
+                    .tree
+                    .get(host.view.ids().root)
+                    .unwrap()
+                    .component::<Composer>()
+                    .unwrap()
+                    .context()
+                    .unwrap()
+                    .action_id(
+                        &ComposerContextItem::Annotation(original.clone()),
+                        ComposerContextAction::EditAnnotation,
+                    )
+                    .unwrap();
+                host.view
+                    .accessibility_action(target, None, AccessibilityAction::Press)
+                    .unwrap();
+                let ids = host.view.annotation_editor_ids().unwrap();
+                host.view
+                    .event(&ContentEvent::TextCommand("selectAll:".into()))
+                    .unwrap();
+                host.view
+                    .event(&ContentEvent::Commit {
+                        text: "请解释这段内容：更新后的批注\n第二行 😀".into(),
+                        replacement: None,
+                    })
+                    .unwrap();
+                let mut expected = original;
+                expected.comment = "请解释这段内容：更新后的批注\n第二行 😀".into();
+                assert_eq!(
+                    binding.current_run().unwrap().draft.annotations[0],
+                    expected
+                );
+                host.view
+                    .accessibility_action(ids.close, None, AccessibilityAction::Press)
+                    .unwrap();
+                assert!(host.view.annotation_editor_ids().is_none());
+            }
             let destination = ComposerDestination::run(binding.scope().clone());
             let previous = binding
                 .current_run()
@@ -2130,6 +2383,10 @@ pub fn run() {
                     && input.text.contains("请解释这段内容")
             );
             assert!(!input.text.contains("CONTEXT_NOT_SUBMITTED"));
+            if args.iter().any(|arg| arg == "--annotation-proof") {
+                assert!(input.text.contains("更新后的批注") && input.text.contains("第二行"));
+                annotation_proof = serde_json::json!({"componentEditor":true,"committedComment":true,"sourceRetained":true,"sharedCompilation":true,"promptSettled":true,"nativeInteraction":false,"physicalIME":false,"sourceHighlight":false});
+            }
             assert!(snapshot.draft.artifacts.is_empty() && snapshot.draft.annotations.is_empty());
             host.view.sync().unwrap();
             context_proof = serde_json::json!({"mountedCards":true,"explicitRemoval":true,"referenceReturned":true,"annotationReturned":true,"promptSettled":true,"clearedDraft":true,"fileUpload":false,"nativeInteraction":false,"structuredTranscript":false});
@@ -2370,6 +2627,7 @@ pub fn run() {
             "summaryMounted": host.view.tree.get(host.view.summary_id()).is_some(),
             "modelChoiceProof":model_proof,
             "contextProof":context_proof,
+            "annotationProof":annotation_proof,
             "initialPresetProof":preset_proof,
             })
         );

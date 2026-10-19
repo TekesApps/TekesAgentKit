@@ -322,7 +322,8 @@ Remove. It delegates to shared atomic patch_context, preserving newer prose and
 settings. False means the capture became stale; refresh the UI and require an
 explicit new gesture. Never automatically replay against a newer capture.
 Open/EditAnnotation are captured host callbacks, not evidence that preview,
-source navigation or an annotation editor has been implemented. Verify source
+source navigation has been implemented. Existing comment editing is now available
+through AnnotationEditor as documented below. Verify source
 locator/revision/digest and permissions before revealing or editing.
 
 For an explicit host file-picker/upload/capture adapter, take
@@ -344,12 +345,14 @@ captures; NewThread captures still require the exact selection generation. Rust
 struct-literal callers must supply the new snapshot field. The original binding also rechecks missing/retired/read-only/unknown
 pane authority. Keep one controller authority for each component lifetime.
 
-The demo mounts cards and implements removal only. Native --context-selftest
+The demo mounts cards, implements removal and explicitly enables existing comment
+editing. Native --context-selftest
 uses a display-only attachment receipt and removes it before Send; no file
 upload/preview is claimed. --ui-context in the real-SEP script proves reference
 and annotation text return with isolated local synthetic providers. It does not
 prove structured historical cards, content undo, a native file picker, an
-annotation editor, source highlights, physical IME or VoiceOver.
+source highlights, physical IME or VoiceOver. The separate --annotation-selftest
+exercises comment editing with synthetic text services.
 
 ## Initial preset creation inputs
 
@@ -398,3 +401,28 @@ creation or automatic retry is generated. The host still owns reconciliation UI.
 Native --creation-selftest validates this entry with synthetic text services; physical
 IME remains unverified. The real-SEP script now uses the same ComponentDemo entry
 and normal Composer Send, rather than a separate scripted picker.
+
+## Existing annotation comments
+
+AnnotationEditor opens the original ComposerContextIntent and emits typed changes
+with its immutable context baseline and source annotation. Drain events, apply
+RunBinding.edit_annotation synchronously on the original binding, and complete
+with the returned Option<Arc<RunSnapshot>>. The returned publication revision
+fences older snapshots as well as acknowledging the context mutation. Feed later
+snapshots from that same controller through update_authority with current pane
+authority. Never redirect a delayed change to the newest selected binding.
+
+Committed edits preserve whitespace/newlines and update only comment; excerpt,
+source, locator and other draft fields remain captured/authoritative. TextField
+owns selection, marked text, undo and scrolling; readonly quote preview also uses
+the public field. During composition there is no business write. If a host awaits
+its write, gate sends while is_pending and drain again after successful complete
+to publish any newer typing. This is new authored text, not replay of a failed
+write. None/error invalidates the capture and retains the visible local buffer;
+reopen explicitly rather than rebase/retry automatically.
+
+Demo inline placement is host layout. Closed editors are retained but unmounted.
+All active editors participate in the host composition barrier, including the
+main/pane Composers. Source reveal/highlights, selection-to-annotation capture and
+structured historical cards are separate unfinished capabilities. See
+docs/rust-agent-ui-annotation-editor-20261020.md for evidence and limits.

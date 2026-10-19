@@ -14,11 +14,14 @@ parser.add_argument('--ui-components',action='store_true',help='Mount formal Com
 parser.add_argument('--ui-model-choices',action='store_true',help='Exercise public model choices and explicit Send preparation in isolated offscreen component sessions')
 parser.add_argument('--ui-context',action='store_true',help='Exercise draft context cards, explicit removal and annotation/reference return in isolated component sessions')
 parser.add_argument('--ui-initial-presets',action='store_true',help='Exercise public initial preset selection through shared create and prompt in isolated component sessions')
+parser.add_argument('--ui-annotation-editor',action='store_true',help='Exercise public annotation editing and shared context compilation; implies the context proof')
 args=parser.parse_args()
 if args.ui_model_choices and not args.ui_components:
     parser.error('--ui-model-choices requires --ui-components')
 if args.ui_context and not args.ui_components:
     parser.error('--ui-context requires --ui-components')
+if args.ui_annotation_editor and not args.ui_components:
+    parser.error('--ui-annotation-editor requires --ui-components')
 if args.ui_initial_presets and not args.ui_components:
     parser.error('--ui-initial-presets requires --ui-components')
 if args.ui_output and not args.ui_demo:
@@ -171,7 +174,8 @@ def ui_smoke(config, first):
     if kind!='native':output=output.with_name(output.stem+'-'+kind+output.suffix)
     mode=['--components'] if args.ui_components else []
     if args.ui_model_choices:mode+=['--model-choice-proof']
-    if args.ui_context:mode+=['--context-proof']
+    if args.ui_context or args.ui_annotation_editor:mode+=['--context-proof']
+    if args.ui_annotation_editor:mode+=['--annotation-proof']
     if args.ui_initial_presets:mode+=['--initial-preset-proof','--initial-preset-cwd',str(cwd)]
     ui=subprocess.run([str(args.ui_demo.resolve()),*mode,'--endpoint-config',str(path),'--offscreen',str(output)],env=ui_env,text=True,capture_output=True,timeout=60)
     assert ui.returncode==0,ui.stderr[-3000:]
@@ -184,10 +188,14 @@ def ui_smoke(config, first):
         if args.ui_model_choices:
             proof=receipt['modelChoiceProof']
             assert proof['catalogChoices']>=1 and proof['explicitSelection'] and proof['configurationReceipt'] and proof['promptSettled'] and not proof['nativeInteraction'],proof
-        if args.ui_context:
+        if args.ui_context or args.ui_annotation_editor:
             proof=receipt['contextProof']
             assert proof['mountedCards'] and proof['explicitRemoval'] and proof['referenceReturned'] and proof['annotationReturned'] and proof['promptSettled'] and proof['clearedDraft'],proof
             assert not proof['fileUpload'] and not proof['nativeInteraction'] and not proof['structuredTranscript'],proof
+        if args.ui_annotation_editor:
+            proof=receipt['annotationProof']
+            assert proof['componentEditor'] and proof['committedComment'] and proof['sourceRetained'] and proof['sharedCompilation'] and proof['promptSettled'],proof
+            assert not proof['nativeInteraction'] and not proof['physicalIME'] and not proof['sourceHighlight'],proof
         if args.ui_initial_presets:
             proof=receipt['initialPresetProof']
             assert proof['catalogChoices']>=1 and proof['explicitSelection'] and proof['createdSession'] and proof['singleInput'] and proof['promptSettled'] and proof['originalDraftPreserved'],proof

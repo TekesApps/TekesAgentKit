@@ -2,13 +2,13 @@
 //! The absent structured Transcript is explicit until upstream #22/#23 land.
 use std::{collections::BTreeMap, sync::Arc};
 use tekes_agent_components_ui::{
-    Composer, ComposerAffordances, ComposerCatalogPhase, ComposerChoiceCatalog,
-    ComposerChoiceIntent, ComposerChoiceKind, ComposerChoiceRequest, ComposerChoices,
-    ComposerEntry, ComposerIds, ComposerIntent, ComposerLabels, Indicators, RenameFailure,
-    RenameIds, RenameIntent, RenameLabels, RenameSubmission, SidePanel, SidePanelInput,
-    SidePanelIntent, SidePanelLabels, SidePanelTab, SidePanelTabKind, Sidebar, SidebarInput,
-    SidebarIntent, SidebarLabels, SummaryInput, SummaryIntent, SummaryLabels, SummaryView,
-    ThreadRename,
+    AnnotationEditor, AnnotationEditorIds, AnnotationEditorIntent, Composer, ComposerAffordances,
+    ComposerCatalogPhase, ComposerChoiceCatalog, ComposerChoiceIntent, ComposerChoiceKind,
+    ComposerChoiceRequest, ComposerChoices, ComposerEntry, ComposerIds, ComposerIntent,
+    ComposerLabels, Indicators, RenameFailure, RenameIds, RenameIntent, RenameLabels,
+    RenameSubmission, SidePanel, SidePanelInput, SidePanelIntent, SidePanelLabels, SidePanelTab,
+    SidePanelTabKind, Sidebar, SidebarInput, SidebarIntent, SidebarLabels, SummaryInput,
+    SummaryIntent, SummaryLabels, SummaryView, ThreadRename,
 };
 use tekes_agent_contract::{
     PromptMode, Result, SessionAddress, ThreadActionOutcome, require, unsupported,
@@ -46,6 +46,7 @@ const PANEL_NAMESPACE: u32 = 41;
 const RENAME_NAMESPACE: u32 = 42;
 const CHOICES_NAMESPACE: u32 = 43;
 const CREATE_NAMESPACE: u32 = 44;
+const ANNOTATION_NAMESPACE: u32 = 45;
 pub const SELECT_A: ComponentId = ComponentId(100);
 pub const SELECT_B: ComponentId = ComponentId(101);
 pub const RECONNECT: ComponentId = ComponentId(102);
@@ -132,6 +133,13 @@ pub struct ComponentDemo {
     creation_inputs: Option<(tekes_agent_contract::CreateSessionRequest, String)>,
     creation_gesture: Option<CreationGesture>,
     creation_panel: Option<Content>,
+    annotation_panel: Option<Content>,
+    annotation_gesture: Option<AnnotationGesture>,
+}
+struct AnnotationGesture {
+    binding: Arc<RunBinding>,
+    navigation: u64,
+    panel_navigation: u64,
 }
 struct CreationGesture {
     request: ComposerChoiceRequest,
@@ -247,6 +255,8 @@ impl ComponentDemo {
         let pair = Self::new_pair(0);
         let rename = ThreadRename::new(RENAME_NAMESPACE, RenameLabels::default());
         let choices = ComposerChoices::new(CHOICES_NAMESPACE, Default::default());
+        let annotation = AnnotationEditor::new(ANNOTATION_NAMESPACE, Default::default());
+        let annotation_panel = Content::new(annotation.ids().root, annotation);
         let creation_choices = ComposerChoices::new(CREATE_NAMESPACE, Default::default());
         let creation_panel = Content::new(
             CREATE_PANEL,
@@ -364,6 +374,8 @@ impl ComponentDemo {
             creation_inputs: None,
             creation_gesture: None,
             creation_panel: Some(creation_panel),
+            annotation_panel: Some(annotation_panel),
+            annotation_gesture: None,
             background_commands: vec![],
             next_panel_namespace: 50_000,
             panel_navigation_revision: 0,
@@ -376,6 +388,13 @@ impl ComponentDemo {
         Self::run_controls(ids)
     }
     fn run_controls(ids: ComposerIds) -> Content {
+        let mut composer = Composer::new(ids)
+            .with_context(1_000_000 + (ids.root.0 >> 32) as u32, Default::default())
+            .expect("separate draft context namespace");
+        composer.set_context_affordances(tekes_agent_components_ui::ComposerContextAffordances {
+            edit_annotations: true,
+            ..Default::default()
+        });
         Content::new(
             ComponentId(ids.root.0 + 16),
             StackContent {
@@ -386,12 +405,7 @@ impl ComponentDemo {
                 flexible_child: None,
                 children: vec![
                     Content::new(ComponentId(ids.root.0 + 17), Indicators::default()),
-                    Content::new(
-                        ids.root,
-                        Composer::new(ids)
-                            .with_context(1_000_000 + (ids.root.0 >> 32) as u32, Default::default())
-                            .expect("separate draft context namespace"),
-                    ),
+                    Content::new(ids.root, composer),
                 ],
             },
         )
@@ -414,6 +428,143 @@ impl ComponentDemo {
     }
     pub fn selected(&self) -> usize {
         self.selected
+    }
+    fn annotation_root() -> ComponentId {
+        ComponentId((ANNOTATION_NAMESPACE as u64) << 32)
+    }
+    pub fn annotation_editor_ids(&self) -> Option<AnnotationEditorIds> {
+        self.tree
+            .get(Self::annotation_root())?
+            .component::<AnnotationEditor>()
+            .filter(|editor| editor.is_open())
+            .map(AnnotationEditor::ids)
+    }
+    fn cancel_annotation(&mut self) -> Result<()> {
+        if self.annotation_gesture.is_some() {
+            self.tree
+                .get_mut(Self::annotation_root())
+                .unwrap()
+                .component_mut::<AnnotationEditor>()
+                .unwrap()
+                .dismiss()
+                .map_err(unsupported)?;
+            self.annotation_panel = Some(
+                self.tree
+                    .remove(Self::annotation_root())
+                    .map_err(|_| unsupported("detach annotation editor"))?,
+            );
+            self.annotation_gesture = None;
+        }
+        Ok(())
+    }
+    fn begin_annotation(
+        &mut self,
+        binding: Arc<RunBinding>,
+        intent: &tekes_agent_components_ui::ComposerContextIntent,
+    ) -> Result<()> {
+        require(
+            !self.composing() && binding.access() == PaneAccess::Ready,
+            "annotation editing unavailable",
+        )?;
+        require(
+            binding
+                .current_run()
+                .is_some_and(|snapshot| intent.baseline.matches_snapshot(&snapshot)),
+            "annotation capture obsolete",
+        )?;
+        self.cancel_annotation()?;
+        self.cancel_creation();
+        self.cancel_model_choices();
+        self.tree.focus(None, false);
+        let mut panel = self
+            .annotation_panel
+            .take()
+            .expect("retained annotation editor");
+        if let Err(error) = panel
+            .component_mut::<AnnotationEditor>()
+            .unwrap()
+            .open(intent)
+        {
+            self.annotation_panel = Some(panel);
+            return Err(unsupported(error));
+        }
+        self.tree
+            .insert(MAIN, panel)
+            .map_err(|_| unsupported("mount annotation editor"))?;
+        self.annotation_gesture = Some(AnnotationGesture {
+            binding,
+            navigation: self.navigation_revision,
+            panel_navigation: self.panel_navigation_revision,
+        });
+        self.tree
+            .reorder(
+                MAIN,
+                &[
+                    NAV,
+                    NOTICE,
+                    DIAGNOSTIC,
+                    RenameIds::new(RENAME_NAMESPACE).root,
+                    Self::choices_id(),
+                    Self::annotation_root(),
+                    Self::pair_id(self.selected),
+                ],
+            )
+            .map_err(|_| unsupported("annotation panel order"))?;
+        self.tree
+            .focus(Some(self.annotation_editor_ids().unwrap().editor), true);
+        self.sync_annotation()
+    }
+    fn sync_annotation(&mut self) -> Result<()> {
+        let Some(gesture) = self.annotation_gesture.as_ref() else {
+            return Ok(());
+        };
+        let binding = gesture.binding.clone();
+        if gesture.navigation != self.navigation_revision
+            || gesture.panel_navigation != self.panel_navigation_revision
+        {
+            return self.cancel_annotation();
+        }
+        let editor = self
+            .tree
+            .get_mut(Self::annotation_root())
+            .unwrap()
+            .component_mut::<AnnotationEditor>()
+            .unwrap();
+        if let Some(snapshot) = binding.current_run() {
+            editor
+                .update_authority(&snapshot, binding.access() == PaneAccess::Ready)
+                .map_err(unsupported)?;
+        } else {
+            editor.invalidate();
+        }
+        Ok(())
+    }
+    fn drain_annotation(&mut self, actions: &[ContentAction]) -> Result<()> {
+        let Some(panel) = self.tree.get_mut(Self::annotation_root()) else {
+            return Ok(());
+        };
+        let intents = panel
+            .component_mut::<AnnotationEditor>()
+            .unwrap()
+            .take_intents(actions);
+        for intent in intents {
+            match intent {
+                AnnotationEditorIntent::Change(change) => {
+                    let binding = self.annotation_gesture.as_ref().unwrap().binding.clone();
+                    let result = binding
+                        .edit_annotation(&change)
+                        .map_err(|error| error.to_string());
+                    self.tree
+                        .get_mut(Self::annotation_root())
+                        .unwrap()
+                        .component_mut::<AnnotationEditor>()
+                        .unwrap()
+                        .complete(&change, result);
+                }
+                AnnotationEditorIntent::Dismiss => self.cancel_annotation()?,
+            }
+        }
+        Ok(())
     }
     pub fn configure_creation(
         &mut self,
@@ -479,6 +630,7 @@ impl ComponentDemo {
             .clone()
             .ok_or_else(|| unsupported("host creation inputs missing"))?;
         self.cancel_model_choices();
+        self.cancel_annotation()?;
         self.cancel_creation();
         self.tree.focus(None, false);
         self.tree
@@ -738,6 +890,7 @@ impl ComponentDemo {
             "model choices unavailable",
         )?;
         self.cancel_creation();
+        self.cancel_annotation()?;
         self.cancel_model_choices();
         let settings = binding.begin_settings(&destination)?;
         let request = self
@@ -1339,6 +1492,14 @@ impl ComponentDemo {
         Ok(ComposerIds::new((namespace as u64) << 32))
     }
     fn composing_editor(&self) -> Option<ComponentId> {
+        if let Some(editor) = self
+            .tree
+            .get(Self::annotation_root())
+            .and_then(|node| node.component::<AnnotationEditor>())
+            && editor.is_composing()
+        {
+            return Some(editor.ids().editor);
+        }
         let rename = self
             .tree
             .get(RenameIds::new(RENAME_NAMESPACE).root)?
@@ -1466,6 +1627,7 @@ impl ComponentDemo {
         Ok(())
     }
     pub fn sync(&mut self) -> Result<()> {
+        self.sync_annotation()?;
         if self
             .creation_gesture
             .as_ref()
@@ -1952,6 +2114,7 @@ impl ComponentDemo {
             "finish or cancel composition before switching sessions",
         )?;
         self.cancel_model_choices();
+        self.cancel_annotation()?;
         self.cancel_creation();
         if self.selection_cleared {
             self.tree
@@ -2134,6 +2297,7 @@ impl ComponentDemo {
             })
             .collect();
         let mut commands = vec![];
+        self.drain_annotation(&actions)?;
         self.drain_model_choices(&actions)?;
         commands.extend(self.drain_creation(&actions)?);
         let rename_root = RenameIds::new(RENAME_NAMESPACE).root;
@@ -2344,13 +2508,28 @@ impl ComponentDemo {
                             self.set_notice("草稿内容已变化，请重新操作");
                         }
                     } else {
-                        commands.push(DemoCommand::OpenContext {
-                            binding: binding.clone(),
-                            intent: *intent,
-                        });
+                        if intent.action
+                            == tekes_agent_components_ui::ComposerContextAction::EditAnnotation
+                        {
+                            if let Err(error) = self.begin_annotation(binding.clone(), &intent) {
+                                self.set_notice(error.to_string());
+                            }
+                        } else {
+                            commands.push(DemoCommand::OpenContext {
+                                binding: binding.clone(),
+                                intent: *intent,
+                            });
+                        }
                     }
                 }
                 ComposerIntent::Send { destination } => {
+                    if self
+                        .annotation_gesture
+                        .as_ref()
+                        .is_some_and(|gesture| Arc::ptr_eq(&gesture.binding, &binding))
+                    {
+                        self.cancel_annotation()?;
+                    }
                     let ticket = binding.prepare_send(&destination, PromptMode::Queue)?;
                     commands.push(DemoCommand::Send {
                         binding: binding.clone(),

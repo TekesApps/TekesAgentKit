@@ -14,7 +14,7 @@ AgentKit 定义业务结构、展示语义、组件组合、组件输入及回�
 
 输入为现有 RunController 发布的 `RunSnapshot` 及显式 `ComposerAffordances`。`update` 接受同一 authority 的单调 revision；无版本和旧版本失败。整个组件生命周期绑定一个 RunController；更换 controller authority 时重新创建组件，不把另一个 controller 的局部 revision 冒充旧 authority 的后续版本。组件保留各 destination 的编辑器实例与本地撤销/选区；确认 discard 后可对非当前 destination 调用 `forget` 释放实例。
 
-`ComposerLabels` 允许宿主提供产品 copy/本地化；`ComposerAffordances` 显式提供附件、模型、预设入口，默认不显示。入口只产生 `OpenEntry {destination, entry}`，不扫描路径、安装 provider、读取凭证或推测 Harness 能力。附件上传、model/preset 等确认写入仍经共享 runtime/presentation；内容卡片已接入，实际附件适配器、批注编辑器、创建失败专用对账 UI 和完整弹层仍未完成。
+`ComposerLabels` 允许宿主提供产品 copy/本地化；`ComposerAffordances` 显式提供附件、模型、预设入口，默认不显示。入口只产生 `OpenEntry {destination, entry}`，不扫描路径、安装 provider、读取凭证或推测 Harness 能力。附件上传、model/preset 等确认写入仍经共享 runtime/presentation；内容卡片已接入，实际附件适配器、来源定位/高亮、创建失败专用对账 UI 和完整弹层仍未完成。
 
 `ComposerContext` 可独立挂载，或通过 `Composer::with_context` 使用宿主明确保留的 namespace 放入编辑器上方；空内容不增加布局占位。输入为同一 authority 的 RunSnapshot，输出携带原 baseline/item 的移除/预览/编辑意图，编辑器组字期间禁用卡片操作。原子 context 更新及 `draft_context_revision` 由共享 presentation 拥有，保留最新正文/settings，并阻止 Send、内容 ABA 或旧来源回调覆盖新草稿。API/字段尚未发布；[内容接入记录](rust-agent-ui-context-20261020.md) 明确区分原生 fixture、三端规范化文本回传与未完成能力。
 
@@ -34,6 +34,8 @@ AgentKit 定义业务结构、展示语义、组件组合、组件输入及回�
 6. 改变 destination 前先排出动作并解除旧编辑器 focus。组字未结束时 `update` 拒绝改变 destination。Enter/Submit 永不转成业务发送；Send 在组字时被禁用且 intent 层再次拦截。
 
 确认清空使用发送时的 TextEditBaseline，走 TekesUI 受控事务；晚确认不能清除发送后新输入。不再复制一份 TextFieldContent 事件处理代码；正式 Composer 与旧测试宿主只共享一个薄的 `editor.rs` delegate。
+
+`AnnotationEditor` 通过当前卡片的 EditAnnotation 意图编辑已有评论，已提交输入同步至共享草稿；不改原文、source/locator，不自行解析 prompt。原 controller snapshot 确认同时推进 context 与 publication 屏障，保留 TekesUI 字段/选区/undo；失效时保留本地文字，不自动重放。见 [评论编辑接入](rust-agent-ui-annotation-editor-20261020.md)。
 
 ## Indicators（首批实现）
 
@@ -145,7 +147,7 @@ Task tab 以 task ID 为稳定身份，scope 是可更新的内容输入。TaskP
 
 | 要求 | 当前状态 | 还需要的证据 |
 |---|---|---|
-| Composer 独立输入/草稿/发送/取消及入口 | 基础组件、模型闭环、内容卡片/原子移除；UI 100 tests 与局部原生/三端离屏验证 | 实际附件适配器、批注编辑/来源高亮/内容 undo、预设与推理开关、完整弹层/三端原生验收 |
+| Composer 独立输入/草稿/发送/取消及入口 | 基础组件、模型/新会话闭环、内容卡片/原子移除/批注评论；UI 115 tests 与局部原生/三端离屏验证 | 实际附件适配器、选区捕获/来源高亮/内容 undo、推理等剩余入口、完整弹层/三端原生验收 |
 | Indicators | 首批事实组件与 unknown/0/partial/error 测试 | 原生 RunView 呈现、主题/语义验收 |
 | Transcript / RunView | 布局契约已核实，正式组件未交付 | #22/#23 等价公共 API、结构化实现、阅读/分页/流式/原生验收 |
 | Sidebar | 共享服务绑定、选择/置顶/复制；重命名/分叉/归档已接入，局部原生 fixture 验证 | 真实三端操作与完整宿主验收 |
