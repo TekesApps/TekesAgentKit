@@ -338,6 +338,18 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
         }
         match event.kind.as_str() {
             "turn/start" => {
+                // A durable turn start proves the worker is running. Derive
+                // recovery on replay too, including notices from older Kernels.
+                for row in &mut out.items {
+                    if row.kind == TranscriptItemKind::Notice
+                        && row.metadata["classification"] == "worker_launch"
+                        && row.metadata["status"] == "error"
+                    {
+                        row.metadata["status"] = json!("recovered");
+                        row.metadata["recoveredAtSequence"] = json!(event.seq);
+                        row.metadata["recoveredAt"] = json!(time);
+                    }
+                }
                 current = number;
                 opened_turns.insert(turn_id.clone());
                 turn(&mut out, &turn_id, time);
@@ -527,6 +539,8 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
                     time,
                 );
                 row.text = data["message"].as_str().unwrap_or("").into();
+                row.metadata = json!({"classification":data["classification"],
+                    "operation":data["operation"], "status":data["severity"]});
                 out.items.push(row);
             }
             _ => {}
