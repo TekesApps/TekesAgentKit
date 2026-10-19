@@ -15,7 +15,7 @@
 
 当前已有可独立挂载的 `Composer`、`Indicators`、`Sidebar`、`SidePanel`、`SummaryView` 和 `ThreadRename` 首批实现。正式 Transcript、RunView，以及任务/子代理/SideChat 的 Run 内容、完整宿主集成和原生窗口验收仍在进行中。不要把下面的测试宿主截图当成最终 Transcript 设计。
 
-模型/预设新增独立 `ComposerChoices` 内容和 `ComposerSettingsRequest` 绑定；公开目录输入、回调与宿主责任见 [接入说明](bindings/README.md#composer-model-and-preset-content)。该增量尚未接入 demo 的实际目录和原生面板，详情见 [验证记录](../docs/rust-agent-ui-composer-choices-20261019.md)。
+模型/预设新增独立 `ComposerChoices` 内容和 `ComposerSettingsRequest` 绑定；公开目录输入、回调与宿主责任见 [接入说明](bindings/README.md#composer-model-and-preset-content)。模型已接入 demo 的公开 `session.models` 目录与发送前配置，预设等入口仍待接入；见 [模型闭环记录](../docs/rust-agent-ui-model-integration-20261019.md)。
 
 新增实验 [runtime 绑定包](bindings/README.md)，连接组件回调、既有 RunController、历史 lease 与 SideChat 通知；不复制业务状态机。原生 demo 尚未迁移到正式 RunView。
 
@@ -135,3 +135,5 @@ python3 scripts/test-real-session-endpoints.py \
 交付包的一键复现、失败收据和公开不可变 pin 字节比对见 [消费侧验收工具](../docs/tekesui-acceptance-tools.md)；工具不提升当前冻结候选。
 
 Sidebar 重命名、分叉和归档通过共享 dispatcher 接入，归档后显式清除选择且保留草稿。`--components --thread-actions-selftest` 使用隔离 fixture 验证这些操作；不可与真实 endpoint 配置组合。见 [操作接入记录](../docs/rust-agent-ui-thread-actions-20261019.md) 和 [公共绑定说明](bindings/README.md#shared-inventory-and-thread-actions)。
+
+`--components --model-choices-selftest` 使用隔离 fixture 验证模型目录、选择、发送前配置回执与流式结束。真实三端验证脚本可加 `--ui-model-choices`（须同时提供 `--ui-components --ui-demo`），仅在脚本自建的隔离会话与本地合成 provider 上执行额外一条模型选择证明消息。不要将离屏证明等同于三端原生窗口验收。

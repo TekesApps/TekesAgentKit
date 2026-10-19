@@ -8,14 +8,12 @@ use std::{
 use tekes_agent_components_ui::{
     RenameFailure, RenameSubmission, SidePanel, Sidebar, SidebarIntent,
 };
-use tekes_agent_contract::{Result, require};
-use tekes_agent_presentation::{
-    ChildHistoryLayout, PreparedSubmission, RunScope, SubmissionPreparation,
-};
+use tekes_agent_contract::Result;
+use tekes_agent_presentation::{ChildHistoryLayout, RunScope};
 use tekes_agent_session::SessionRuntime;
 use tekes_agent_ui_bindings::{
-    BoundSideChatRun, ChildPaneBinding, PaneAccess, PaneSnapshot, RunBinding, SideChatBinding,
-    SidebarActionOutcome, SidebarBinding,
+    BoundSideChatRun, ChildPaneBinding, ModelChoices, ModelSelectionPreparation, PaneAccess,
+    PaneSnapshot, RunBinding, SideChatBinding, SidebarActionOutcome, SidebarBinding,
 };
 use tekes_agent_ui_demo::component_demo::{
     ComponentDemo, DemoCommand, NavigationRequest, PanelRequest, RECONNECT, SidebarActionToken,
@@ -30,21 +28,6 @@ use tekes_ui_scene::{GlyphAtlas, Rect, Scene};
 use tekes_ui_text::coretext::{CoreTextFonts, CoreTextRasterizer, CoreTextShaper};
 use tekes_ui_tokens::{Palette, Theme};
 
-struct NoSettings;
-#[async_trait::async_trait]
-impl SubmissionPreparation for NoSettings {
-    async fn prepare(
-        &self,
-        _: &SessionRuntime,
-        ticket: &PreparedSubmission,
-        _: &RunScope,
-    ) -> Result<()> {
-        require(
-            ticket.settings().is_empty(),
-            "demo has no host settings adapter",
-        )
-    }
-}
 struct Host {
     view: ComponentDemo,
     text: TextBackend,
@@ -84,8 +67,14 @@ struct Host {
     archive_test_started: bool,
     empty_selection_seen: bool,
     fork_test_session: Option<String>,
+    models_selftest: bool,
+    model_test_stage: u8,
 }
 enum HostResult {
+    ModelCatalog {
+        request: tekes_agent_components_ui::ComposerChoiceRequest,
+        result: std::result::Result<ModelChoices, String>,
+    },
     ChildOpened {
         request: PanelRequest,
         title: String,
@@ -204,6 +193,14 @@ impl Host {
             let rename_rpc_prefix = self.rename_rpc_prefix.clone();
             self.executor.spawn(async move {
                 let special = match command {
+                    DemoCommand::ReadModels { binding, request } => {
+                        let rpc = format!("{rename_rpc_prefix}:models:{}", request.generation);
+                        let result = binding
+                            .model_choices(1, &rpc)
+                            .await
+                            .map_err(|e| e.to_string());
+                        HostResult::ModelCatalog { request, result }
+                    }
                     DemoCommand::Rename(ticket) => {
                         let rpc_id = format!(
                             "{rename_rpc_prefix}:{}:{}",
@@ -388,7 +385,9 @@ impl Host {
                     command => {
                         let result = match command {
                             DemoCommand::Send { binding, ticket } => {
-                                binding.dispatch_prepared_with(ticket, &NoSettings).await
+                                binding
+                                    .dispatch_prepared_with(ticket, &ModelSelectionPreparation)
+                                    .await
                             }
                             DemoCommand::Cancel {
                                 binding,
@@ -404,6 +403,7 @@ impl Host {
                                 ))
                             }
                             DemoCommand::Sidebar(_)
+                            | DemoCommand::ReadModels { .. }
                             | DemoCommand::Rename(_)
                             | DemoCommand::OpenChild { .. }
                             | DemoCommand::ReadChild { .. }
@@ -433,6 +433,11 @@ impl Host {
     fn draw(&mut self, window: &Window) {
         while let Ok(result) = self.results.try_recv() {
             match result {
+                HostResult::ModelCatalog { request, result } => {
+                    if let Err(error) = self.view.complete_model_catalog(&request, result) {
+                        self.failure(error.to_string());
+                    }
+                }
                 HostResult::Renamed { ticket, result } => {
                     if let Err(error) = self.view.complete_rename(&ticket, result.map(|_| ())) {
                         self.failure(error.to_string());
@@ -639,6 +644,63 @@ impl Host {
                 .expect("component frame");
         }
         window.set_animating(self.text.frame_requested);
+        if self.models_selftest {
+            let chosen = serde_json::json!(["fixture", "chosen"]).to_string();
+            if self.model_test_stage == 0 && self.view.model_choice_id(&chosen).is_some() {
+                self.model_test_stage = 1;
+                let target = self.view.model_choice_id(&chosen).unwrap();
+                let point = self.view.tree.get(target).unwrap().frame().center();
+                let mut script = vec![];
+                if let Ok(path) = std::env::var("AGENT_MODEL_CHOICES_CAPTURE") {
+                    script.push((
+                        100,
+                        tekes_ui_platform_macos::selftest::Action::Capture { path },
+                    ));
+                }
+                script.push((
+                    300,
+                    tekes_ui_platform_macos::selftest::Action::Click {
+                        x: point.x as f64,
+                        y: point.y as f64,
+                    },
+                ));
+                tekes_ui_platform_macos::selftest::run_script(script);
+            } else if self.model_test_stage == 1 && self.view.model_choice_request().is_none() {
+                self.model_test_stage = 2;
+                let ids = self.view.ids();
+                let click = |id| {
+                    let p = self.view.tree.get(id).unwrap().frame().center();
+                    tekes_ui_platform_macos::selftest::Action::Click {
+                        x: p.x as f64,
+                        y: p.y as f64,
+                    }
+                };
+                tekes_ui_platform_macos::selftest::run_script(vec![
+                    (100, click(ids.editor)),
+                    (
+                        200,
+                        tekes_ui_platform_macos::selftest::Action::Text("模型选择后的消息".into()),
+                    ),
+                    (500, click(ids.send)),
+                ]);
+            } else if self.model_test_stage == 2
+                && self.runtime.inspect(|s| {
+                    s.sessions.get("a").is_some_and(|s| {
+                        !s.run_open
+                            && s.entries.values().any(|e| {
+                                e.event.kind == "user/message"
+                                    && e.event.data.to_string().contains("模型选择后的消息")
+                            })
+                    })
+                })
+            {
+                self.model_test_stage = 3;
+                tekes_ui_platform_macos::selftest::run_script(vec![(
+                    200,
+                    tekes_ui_platform_macos::selftest::Action::Close,
+                )]);
+            }
+        }
         if self.actions_selftest {
             if !self.rename_test_started && self.view.rename_ids().is_some() {
                 self.rename_test_started = true;
@@ -801,6 +863,44 @@ impl Host {
         );
     }
     fn close(&mut self, window: &Window) {
+        if self.models_selftest {
+            assert!(
+                self.failures.is_empty(),
+                "model fixture failures: {:?}",
+                self.failures
+            );
+            assert_eq!(self.model_test_stage, 3);
+            let state = self.runtime.snapshot();
+            let entries = &state.sessions["a"].entries;
+            assert_eq!(
+                entries
+                    .values()
+                    .filter(
+                        |e| e.event.kind == "model/selection" && e.event.data["model"] == "chosen"
+                    )
+                    .count(),
+                1
+            );
+            assert_eq!(
+                entries
+                    .values()
+                    .filter(|e| e.event.kind == "user/message"
+                        && e.event.data.to_string().contains("模型选择后的消息"))
+                    .count(),
+                1
+            );
+            assert!(
+                self.view.bindings()[1]
+                    .current_run()
+                    .unwrap()
+                    .draft
+                    .settings
+                    .is_empty()
+            );
+            println!(
+                "NATIVE_AGENT_MODEL_CHOICES_SELFTEST_OK public-catalog+explicit-choice+shared-settings+send-preparation+single-admission+stream+destination-isolation; physical-ime=false; provider-switches=false"
+            );
+        }
         if self.actions_selftest {
             assert!(
                 self.failures.is_empty(),
@@ -1110,6 +1210,20 @@ impl WindowHandler for Host {
                         tekes_ui_platform_macos::selftest::Action::Close,
                     )]);
                 }
+                if self.models_selftest {
+                    let target = self.view.ids().model;
+                    let p = self.view.tree.get(target).unwrap().frame().center();
+                    tekes_ui_platform_macos::selftest::run_script(vec![
+                        (
+                            100,
+                            tekes_ui_platform_macos::selftest::Action::Click {
+                                x: p.x as f64,
+                                y: p.y as f64,
+                            },
+                        ),
+                        (15000, tekes_ui_platform_macos::selftest::Action::Close),
+                    ]);
+                }
             }
             Event::Resized {
                 drawable_size,
@@ -1224,8 +1338,13 @@ pub fn run() {
     let args: Vec<_> = std::env::args().collect();
     let selftest = args.iter().any(|arg| arg == "--native-selftest");
     let actions_selftest = args.iter().any(|arg| arg == "--thread-actions-selftest");
+    let models_selftest = args.iter().any(|arg| arg == "--model-choices-selftest");
     assert!(
-        !(selftest && actions_selftest),
+        [selftest, actions_selftest, models_selftest]
+            .into_iter()
+            .filter(|v| *v)
+            .count()
+            <= 1,
         "choose one native fixture selftest mode"
     );
     let executor = tokio::runtime::Runtime::new().unwrap();
@@ -1236,7 +1355,7 @@ pub fn run() {
         _,
     ) = if let Some(index) = args.iter().position(|arg| arg == "--endpoint-config") {
         assert!(
-            !selftest && !actions_selftest,
+            !selftest && !actions_selftest && !models_selftest,
             "native selftest uses isolated fixture only"
         );
         let value = serde_json::from_slice(
@@ -1259,7 +1378,8 @@ pub fn run() {
                     .with_demo_summary()
                     .with_side_chats()
                     .with_children()
-                    .with_lifecycle(),
+                    .with_lifecycle()
+                    .with_models(),
             ),
             "native",
             [
@@ -1384,6 +1504,8 @@ pub fn run() {
         archive_test_started: false,
         empty_selection_seen: false,
         fork_test_session: None,
+        models_selftest,
+        model_test_stage: 0,
         text: TextBackend {
             shaper: CoreTextShaper::new(fonts.clone()),
             rasterizer: CoreTextRasterizer::new(fonts),
@@ -1409,6 +1531,96 @@ pub fn run() {
         focus_before_deactivate: None,
     };
     if let Some(index) = args.iter().position(|arg| arg == "--offscreen") {
+        let mut model_proof = serde_json::Value::Null;
+        if args.iter().any(|arg| arg == "--model-choice-proof") {
+            let commands = host
+                .view
+                .accessibility_action(host.view.ids().model, None, AccessibilityAction::Press)
+                .unwrap();
+            let DemoCommand::ReadModels { binding, request } =
+                commands.into_iter().next().expect("model catalog intent")
+            else {
+                panic!("model catalog intent")
+            };
+            let options = host
+                .executor
+                .block_on(binding.model_choices(1, "offscreen-model-read"))
+                .expect("public model catalog");
+            let chosen = options
+                .catalog
+                .selected
+                .as_ref()
+                .and_then(|id| {
+                    options
+                        .catalog
+                        .choices
+                        .iter()
+                        .find(|c| &c.id == id && c.enabled)
+                })
+                .or_else(|| options.catalog.choices.iter().find(|c| c.enabled))
+                .expect("explicit synthetic model choice")
+                .id
+                .clone();
+            let count = options.catalog.choices.len();
+            host.view
+                .complete_model_catalog(&request, Ok(options))
+                .unwrap();
+            let target = host.view.model_choice_id(&chosen).unwrap();
+            host.view
+                .accessibility_action(target, None, AccessibilityAction::Press)
+                .unwrap();
+            let destination =
+                tekes_agent_presentation::ComposerDestination::run(binding.scope().clone());
+            let previous = binding
+                .current_run()
+                .unwrap()
+                .transcript
+                .items
+                .iter()
+                .filter(|i| {
+                    i.kind == tekes_agent_presentation::TranscriptItemKind::Assistant && i.is_final
+                })
+                .count();
+            binding
+                .edit_text(&destination, "AgentKit explicit model-choice proof".into())
+                .unwrap();
+            host.executor.block_on(async {
+                let mut changes = binding.subscribe_run().unwrap();
+                binding
+                    .send_with(
+                        &destination,
+                        tekes_agent_contract::PromptMode::Queue,
+                        &ModelSelectionPreparation,
+                    )
+                    .await
+                    .unwrap();
+                tokio::time::timeout(Duration::from_secs(30), async {
+                    loop {
+                        let snapshot = changes.borrow_and_update().clone();
+                        if snapshot.can_submit
+                            && snapshot
+                                .transcript
+                                .items
+                                .iter()
+                                .filter(|i| {
+                                    i.kind
+                                        == tekes_agent_presentation::TranscriptItemKind::Assistant
+                                        && i.is_final
+                                })
+                                .count()
+                                > previous
+                        {
+                            break;
+                        }
+                        changes.changed().await.unwrap();
+                    }
+                })
+                .await
+                .expect("model-choice assistant settlement");
+            });
+            host.view.sync().unwrap();
+            model_proof = serde_json::json!({"catalogChoices":count,"selected":chosen,"explicitSelection":true,"configurationReceipt":true,"promptSettled":true,"nativeInteraction":false});
+        }
         let clip = Rect::new(0., 0., 1000., 760.);
         host.text.atlas.begin_frame();
         host.view
@@ -1454,6 +1666,7 @@ pub fn run() {
             "sharedRuntime": Arc::ptr_eq(host.sidebar.runtime(), &host.runtime),
             "sidebarMounted": host.view.tree.get(host.view.sidebar_id()).is_some(),
             "summaryMounted": host.view.tree.get(host.view.summary_id()).is_some(),
+            "modelChoiceProof":model_proof,
             })
         );
         host.executor.block_on(host.runtime.stop()).unwrap();

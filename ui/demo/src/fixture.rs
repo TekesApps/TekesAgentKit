@@ -25,6 +25,7 @@ pub struct Fixture {
     parent_available: Arc<AtomicBool>,
     catalog_fails: Arc<AtomicBool>,
     lifecycle: bool,
+    models: bool,
     inventory_sender: broadcast::Sender<Value>,
     workspace_sender: broadcast::Sender<Value>,
     mutations: Arc<Mutex<MutationReceipts>>,
@@ -38,6 +39,7 @@ struct Line {
     ephemeral: bool,
     title: String,
     archived: bool,
+    model_selection: Value,
 }
 fn entry(seq: i64, kind: &str, data: Value) -> HistoryEntry {
     serde_json::from_value(json!({"event":{"seq":seq,"time":seq+1,"type":kind,"data":data}}))
@@ -86,6 +88,7 @@ impl Default for Fixture {
                 ephemeral: false,
                 title: format!("会话 {id}"),
                 archived: false,
+                model_selection: json!({"provider":"fixture","model":"initial"}),
             };
             for n in 1..=30 {
                 append(&mut line, "turn/start", json!({"turn":n}));
@@ -116,6 +119,7 @@ impl Default for Fixture {
             parent_available: Arc::new(AtomicBool::new(true)),
             catalog_fails: Arc::new(AtomicBool::new(false)),
             lifecycle: false,
+            models: false,
             inventory_sender: broadcast::channel(256).0,
             workspace_sender: broadcast::channel(256).0,
             mutations: Arc::new(Mutex::new(BTreeMap::new())),
@@ -123,6 +127,10 @@ impl Default for Fixture {
     }
 }
 impl Fixture {
+    pub fn with_models(mut self) -> Self {
+        self.models = true;
+        self
+    }
     pub fn with_lifecycle(mut self) -> Self {
         self.lifecycle = true;
         self
@@ -152,6 +160,7 @@ impl Fixture {
                 ephemeral: false,
                 title: format!("会话 {id}"),
                 archived: false,
+                model_selection: json!({"provider":"fixture","model":"initial"}),
             };
             for turn in 1..=30 {
                 append(&mut line, "turn/start", json!({"turn":turn}));
@@ -246,6 +255,10 @@ impl SessionEndpoint for Endpoint {
     }
     fn capabilities(&self) -> EndpointCapabilities {
         let mut caps = EndpointCapabilities::methods(&["session.prompt", "session.cancel"]);
+        if self.fixture.models {
+            caps.methods
+                .extend(["session.models".into(), "session.selectModel".into()]);
+        }
         if self.fixture.side_chats {
             caps.methods
                 .extend(["session.fork".into(), "session.discard".into()]);
@@ -469,6 +482,25 @@ impl SessionEndpoint for Endpoint {
         let line = sessions
             .get_mut(&id)
             .ok_or_else(|| unsupported("fixture session"))?;
+        if method == "session.models" && self.fixture.models {
+            return Ok(
+                json!({"current":line.model_selection,"routable":true,"routableProviders":["fixture"],"groups":[{"id":"fixture","name":"Fixture provider","models":[{"id":"initial","name":"初始模型"},{"id":"chosen","name":"显式选择模型"}]},{"id":"unroutable","name":"不可路由","models":[{"id":"disabled","name":"不可用模型"}]}],"failures":[]}),
+            );
+        }
+        if method == "session.selectModel" && self.fixture.models {
+            require(
+                p["provider"] == "fixture"
+                    && matches!(p["model"].as_str(), Some("initial" | "chosen")),
+                "fixture model unavailable",
+            )?;
+            line.model_selection = json!({"provider":p["provider"],"model":p["model"]});
+            if let Some(effort) = p["reasoningEffort"].as_str() {
+                line.model_selection["reasoningEffort"] = json!(effort);
+            }
+            let selection = line.model_selection.clone();
+            append(line, "model/selection", selection.clone());
+            return Ok(json!({"selected":selection}));
+        }
         if method == "session.rename" && self.fixture.lifecycle {
             let title = string(&p, "title")?.trim();
             require(!title.is_empty(), "empty fixture title")?;
@@ -531,6 +563,7 @@ impl SessionEndpoint for Endpoint {
                     ephemeral,
                     title,
                     archived: false,
+                    model_selection: json!({"provider":"fixture","model":"initial"}),
                 },
             );
             if !ephemeral {

@@ -2,11 +2,13 @@
 //! The absent structured Transcript is explicit until upstream #22/#23 land.
 use std::{collections::BTreeMap, sync::Arc};
 use tekes_agent_components_ui::{
-    Composer, ComposerAffordances, ComposerEntry, ComposerIds, ComposerIntent, Indicators,
-    RenameFailure, RenameIds, RenameIntent, RenameLabels, RenameSubmission, SidePanel,
-    SidePanelInput, SidePanelIntent, SidePanelLabels, SidePanelTab, SidePanelTabKind, Sidebar,
-    SidebarInput, SidebarIntent, SidebarLabels, SummaryInput, SummaryIntent, SummaryLabels,
-    SummaryView, ThreadRename,
+    Composer, ComposerAffordances, ComposerCatalogPhase, ComposerChoiceCatalog,
+    ComposerChoiceIntent, ComposerChoiceKind, ComposerChoiceRequest, ComposerChoices,
+    ComposerEntry, ComposerIds, ComposerIntent, ComposerLabels, Indicators, RenameFailure,
+    RenameIds, RenameIntent, RenameLabels, RenameSubmission, SidePanel, SidePanelInput,
+    SidePanelIntent, SidePanelLabels, SidePanelTab, SidePanelTabKind, Sidebar, SidebarInput,
+    SidebarIntent, SidebarLabels, SummaryInput, SummaryIntent, SummaryLabels, SummaryView,
+    ThreadRename,
 };
 use tekes_agent_contract::{
     PromptMode, Result, SessionAddress, ThreadActionOutcome, require, unsupported,
@@ -16,8 +18,9 @@ use tekes_agent_presentation::{
     SideChatSnapshot, SummaryAction, TaskLoadToken,
 };
 use tekes_agent_ui_bindings::{
-    BoundSideChatRun, ChildPaneBinding, PaneAccess, PaneSnapshot, RunBinding, SideChatBinding,
-    SidebarPublication, TaskPaneBinding,
+    BoundSideChatRun, ChildPaneBinding, ComposerSettingsRequest, MODEL_SELECTION_SETTING,
+    ModelChoices, PaneAccess, PaneSnapshot, RunBinding, SideChatBinding, SidebarPublication,
+    TaskPaneBinding,
 };
 use tekes_ui_controls::{
     ButtonTextRenderer, TextSurface,
@@ -40,11 +43,16 @@ const EMPTY_MAIN: ComponentId = ComponentId(9);
 const SIDEBAR_NAMESPACE: u32 = 40;
 const PANEL_NAMESPACE: u32 = 41;
 const RENAME_NAMESPACE: u32 = 42;
+const CHOICES_NAMESPACE: u32 = 43;
 pub const SELECT_A: ComponentId = ComponentId(100);
 pub const SELECT_B: ComponentId = ComponentId(101);
 pub const RECONNECT: ComponentId = ComponentId(102);
 
 pub enum DemoCommand {
+    ReadModels {
+        binding: Arc<RunBinding>,
+        request: ComposerChoiceRequest,
+    },
     Rename(RenameSubmission),
     OpenChild {
         request: PanelRequest,
@@ -108,6 +116,15 @@ pub struct ComponentDemo {
     background_commands: Vec<DemoCommand>,
     next_panel_namespace: u32,
     panel_navigation_revision: u64,
+    model_gesture: Option<ModelGesture>,
+}
+struct ModelGesture {
+    request: ComposerChoiceRequest,
+    settings: Option<ComposerSettingsRequest>,
+    binding: Arc<RunBinding>,
+    source: Option<ModelChoices>,
+    navigation: u64,
+    panel_navigation: u64,
 }
 struct PanelRun {
     binding: Arc<RunBinding>,
@@ -195,6 +212,7 @@ impl ComponentDemo {
         )?;
         let pair = Self::new_pair(0);
         let rename = ThreadRename::new(RENAME_NAMESPACE, RenameLabels::default());
+        let choices = ComposerChoices::new(CHOICES_NAMESPACE, Default::default());
         let main = Content::new(
             MAIN,
             StackContent {
@@ -231,6 +249,7 @@ impl ComponentDemo {
                         TextContent::new("Transcript 待 TekesUI #22 / #23；此处不是消息视图。"),
                     ),
                     Content::new(rename.ids().root, rename),
+                    Content::new(choices.id(), choices),
                     pair,
                 ],
             },
@@ -291,6 +310,7 @@ impl ComponentDemo {
             task_runs: BTreeMap::new(),
             task_attempts: BTreeMap::new(),
             child_panes: BTreeMap::new(),
+            model_gesture: None,
             background_commands: vec![],
             next_panel_namespace: 50_000,
             panel_navigation_revision: 0,
@@ -336,6 +356,202 @@ impl ComponentDemo {
     }
     pub fn selected(&self) -> usize {
         self.selected
+    }
+    fn choices_id() -> ComponentId {
+        ComponentId((CHOICES_NAMESPACE as u64) << 32)
+    }
+    pub fn model_choice_id(&self, choice: &str) -> Option<ComponentId> {
+        self.tree
+            .get(Self::choices_id())?
+            .component::<ComposerChoices>()?
+            .choice_id(choice)
+    }
+    pub fn model_choice_request(&self) -> Option<&ComposerChoiceRequest> {
+        self.tree
+            .get(Self::choices_id())?
+            .component::<ComposerChoices>()?
+            .request()
+    }
+    fn cancel_model_choices(&mut self) {
+        if let Some(gesture) = self.model_gesture.take() {
+            self.tree
+                .get_mut(Self::choices_id())
+                .unwrap()
+                .component_mut::<ComposerChoices>()
+                .unwrap()
+                .dismiss(&gesture.request);
+        }
+    }
+    fn model_gesture_current(&self, gesture: &ModelGesture) -> bool {
+        !self.selection_cleared
+            && gesture.navigation == self.navigation_revision
+            && gesture.panel_navigation == self.panel_navigation_revision
+            && gesture.binding.access() == PaneAccess::Ready
+            && !self.composing()
+    }
+    fn begin_model_choices(
+        &mut self,
+        binding: Arc<RunBinding>,
+        destination: ComposerDestination,
+    ) -> Result<DemoCommand> {
+        require(
+            !self.composing(),
+            "finish composition before opening model choices",
+        )?;
+        require(
+            binding.supports_model_choices(),
+            "model choices unavailable",
+        )?;
+        self.cancel_model_choices();
+        let settings = binding.begin_settings(&destination)?;
+        let request = self
+            .tree
+            .get_mut(Self::choices_id())
+            .unwrap()
+            .component_mut::<ComposerChoices>()
+            .unwrap()
+            .open(destination, ComposerChoiceKind::Model)
+            .map_err(unsupported)?;
+        self.model_gesture = Some(ModelGesture {
+            request: request.clone(),
+            settings: Some(settings),
+            binding: binding.clone(),
+            source: None,
+            navigation: self.navigation_revision,
+            panel_navigation: self.panel_navigation_revision,
+        });
+        Ok(DemoCommand::ReadModels { binding, request })
+    }
+    pub fn complete_model_catalog(
+        &mut self,
+        request: &ComposerChoiceRequest,
+        result: std::result::Result<ModelChoices, String>,
+    ) -> Result<bool> {
+        let Some(gesture) = self.model_gesture.as_ref() else {
+            return Ok(false);
+        };
+        if &gesture.request != request {
+            return Ok(false);
+        }
+        if !self.model_gesture_current(gesture) {
+            self.cancel_model_choices();
+            return Ok(false);
+        }
+        let (catalog, source) = match result {
+            Ok(mut source) => {
+                if let Some(snapshot) = gesture.binding.current_run()
+                    && let Some(value) = snapshot.draft.settings.get(MODEL_SELECTION_SETTING)
+                    && let (Some(provider), Some(model)) =
+                        (value["provider"].as_str(), value["model"].as_str())
+                {
+                    let id = serde_json::json!([provider, model]).to_string();
+                    source.catalog.selected = Some(id.clone());
+                    if let Some(effort) = value["reasoningEffort"].as_str()
+                        && let Some(payload) = source.selections.get_mut(&id)
+                    {
+                        payload["reasoningEffort"] = serde_json::json!(effort);
+                    }
+                }
+                (source.catalog.clone(), Some(source))
+            }
+            Err(error) => (
+                ComposerChoiceCatalog {
+                    revision: 1,
+                    phase: ComposerCatalogPhase::Failed(error),
+                    choices: vec![],
+                    selected: None,
+                },
+                None,
+            ),
+        };
+        let accepted = self
+            .tree
+            .get_mut(Self::choices_id())
+            .unwrap()
+            .component_mut::<ComposerChoices>()
+            .unwrap()
+            .update(request, catalog)
+            .map_err(unsupported)?;
+        if accepted {
+            if let Some(failures) = source
+                .as_ref()
+                .and_then(|source| source.raw.get("failures"))
+                .and_then(serde_json::Value::as_array)
+                && !failures.is_empty()
+            {
+                self.set_notice(format!("部分供应商目录读取失败（{} 项）", failures.len()));
+            }
+            self.model_gesture.as_mut().unwrap().source = source;
+        }
+        Ok(accepted)
+    }
+    fn drain_model_choices(&mut self, actions: &[ContentAction]) -> Result<()> {
+        let intents = self
+            .tree
+            .get_mut(Self::choices_id())
+            .unwrap()
+            .component_mut::<ComposerChoices>()
+            .unwrap()
+            .take_intents(actions);
+        for intent in intents {
+            match intent {
+                ComposerChoiceIntent::Dismiss(_) => {
+                    self.model_gesture = None;
+                }
+                ComposerChoiceIntent::Select(selection) => {
+                    let Some(mut gesture) = self.model_gesture.take() else {
+                        continue;
+                    };
+                    if gesture.request != selection.request || !self.model_gesture_current(&gesture)
+                    {
+                        self.tree
+                            .get_mut(Self::choices_id())
+                            .unwrap()
+                            .component_mut::<ComposerChoices>()
+                            .unwrap()
+                            .dismiss(&gesture.request);
+                        continue;
+                    }
+                    let result = (|| {
+                        let source = gesture
+                            .source
+                            .as_ref()
+                            .ok_or_else(|| unsupported("model catalog missing"))?;
+                        require(
+                            source.catalog.revision == selection.catalog_revision,
+                            "model catalog revision changed",
+                        )?;
+                        let payload = source.selection(&selection.choice.id)?;
+                        let mut settings = gesture
+                            .binding
+                            .current_run()
+                            .ok_or_else(|| unsupported("model source missing"))?
+                            .draft
+                            .settings
+                            .clone();
+                        settings.insert(MODEL_SELECTION_SETTING.into(), payload);
+                        let request = match gesture.settings.take() {
+                            Some(request) => request,
+                            None => gesture
+                                .binding
+                                .begin_settings(&selection.request.destination)?,
+                        };
+                        require(request.commit(settings)?, "model settings request obsolete")
+                    })();
+                    let failed = result.is_err();
+                    self.tree
+                        .get_mut(Self::choices_id())
+                        .unwrap()
+                        .component_mut::<ComposerChoices>()
+                        .unwrap()
+                        .complete(&selection, result.map_err(|e| e.to_string()));
+                    if failed {
+                        self.model_gesture = Some(gesture);
+                    }
+                }
+            }
+        }
+        Ok(())
     }
     pub fn binding(&self) -> &Arc<RunBinding> {
         &self.bindings[self.selected]
@@ -434,6 +650,7 @@ impl ComponentDemo {
         if self.selection_cleared {
             return Ok(());
         }
+        self.cancel_model_choices();
         self.tree.focus(None, false);
         self.retained[self.selected] = Some(
             self.tree
@@ -913,6 +1130,13 @@ impl ComponentDemo {
         Ok(())
     }
     pub fn sync(&mut self) -> Result<()> {
+        if self
+            .model_gesture
+            .as_ref()
+            .is_some_and(|gesture| !self.model_gesture_current(gesture))
+        {
+            self.cancel_model_choices();
+        }
         if self.selection_cleared {
             self.sync_sidebar()?;
             for id in [SELECT_A, SELECT_B] {
@@ -940,13 +1164,22 @@ impl ComponentDemo {
             .current_run()
             .ok_or_else(|| unsupported("demo needs a present main run"))?;
         let ids = self.ids();
+        self.tree
+            .get_mut(ids.root)
+            .unwrap()
+            .component_mut::<Composer>()
+            .unwrap()
+            .set_labels(Self::composer_labels(&snapshot));
         binding.sync_composer(
             self.tree
                 .get_mut(ids.root)
                 .expect("composer")
                 .component_mut::<Composer>()
                 .expect("Composer"),
-            ComposerAffordances::default(),
+            ComposerAffordances {
+                model: binding.supports_model_choices(),
+                ..Default::default()
+            },
         )?;
         self.tree
             .get_mut(Self::indicator_id(self.selected))
@@ -1307,9 +1540,18 @@ impl ComponentDemo {
             .expect("pane composer")
             .component_mut::<Composer>()
             .expect("Composer")
+            .set_labels(Self::composer_labels(&snapshot));
+        self.tree
+            .get_mut(ids.root)
+            .expect("pane composer")
+            .component_mut::<Composer>()
+            .expect("Composer")
             .update_gated(
                 &snapshot,
-                ComposerAffordances::default(),
+                ComposerAffordances {
+                    model: binding.supports_model_choices(),
+                    ..Default::default()
+                },
                 binding.access().composer_gate(),
             )
             .map_err(unsupported)?;
@@ -1322,12 +1564,26 @@ impl ComponentDemo {
             .map_err(unsupported)?;
         Ok(())
     }
+    fn composer_labels(snapshot: &tekes_agent_presentation::RunSnapshot) -> ComposerLabels {
+        let mut labels = ComposerLabels::default();
+        if let Some(model) = snapshot
+            .draft
+            .settings
+            .get(MODEL_SELECTION_SETTING)
+            .and_then(|value| value.get("model"))
+            .and_then(serde_json::Value::as_str)
+        {
+            labels.model = format!("模型 · {model}（发送时应用）");
+        }
+        labels
+    }
     pub fn select(&mut self, index: usize) -> Result<()> {
         require(index < self.bindings.len(), "unknown demo session")?;
         require(
             !self.composing(),
             "finish or cancel composition before switching sessions",
         )?;
+        self.cancel_model_choices();
         if self.selection_cleared {
             self.tree
                 .remove(EMPTY_MAIN)
@@ -1376,6 +1632,7 @@ impl ComponentDemo {
                     NOTICE,
                     DIAGNOSTIC,
                     RenameIds::new(RENAME_NAMESPACE).root,
+                    Self::choices_id(),
                     Self::pair_id(index),
                 ],
             )
@@ -1508,6 +1765,7 @@ impl ComponentDemo {
             })
             .collect();
         let mut commands = vec![];
+        self.drain_model_choices(&actions)?;
         let rename_root = RenameIds::new(RENAME_NAMESPACE).root;
         let rename_intents = self
             .tree
@@ -1722,7 +1980,11 @@ impl ComponentDemo {
                     destination: ComposerDestination::run(scope),
                 }),
                 ComposerIntent::OpenEntry { destination, entry } => {
-                    commands.push(DemoCommand::OpenEntry { destination, entry })
+                    if entry == ComposerEntry::Model {
+                        commands.push(self.begin_model_choices(binding.clone(), destination)?);
+                    } else {
+                        commands.push(DemoCommand::OpenEntry { destination, entry })
+                    }
                 }
             }
         }

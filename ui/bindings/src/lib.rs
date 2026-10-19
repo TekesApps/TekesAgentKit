@@ -2,7 +2,9 @@
 //!
 //! This adapter retains history observations and projects existing presentation;
 //! it does not implement a Run state machine, renderer, or window event loop.
+mod models;
 mod sidebar;
+pub use models::*;
 pub use sidebar::*;
 mod sidechat;
 pub use sidechat::*;

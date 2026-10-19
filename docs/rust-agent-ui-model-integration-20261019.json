@@ -1,0 +1,153 @@
+{
+  "date": "2026-10-19",
+  "publishedBaseline": "v0.3.8",
+  "tekesui": {
+    "commit": "431093786de47b48cd566d0d9c0eafa088b10d68",
+    "packages": 8,
+    "files": 188,
+    "sha256": "03721866a362b1d31261ebbbc86140eb07e9e23320871c325234a5212591213d"
+  },
+  "tests": {
+    "uiWorkspace": 95,
+    "modelTargeted": 3,
+    "tools": 18
+  },
+  "strictClippy": true,
+  "binarySha256": "3910a5843378369dee3fde09ea5520bb914c1b44c5ddb96bf08bf9e8c91fbe0e",
+  "consumedSourceSha256": {
+    "ui/bindings/src/models.rs": "fb2dfd493ccd1eb65402d60a859da97b34268c1f24f6b807a4bad98a9269b8a5",
+    "ui/bindings/src/lib.rs": "3a66063cd87c6b65db84b3c5f00c2501fef38e3fe75ed5800eb99894c501a9a0",
+    "ui/components/src/composer_choices.rs": "32737ecb9c18f44bbc34762ad5ab9af93ceb085adaf9d117ca05766bad031039",
+    "ui/demo/src/component_demo.rs": "f98feb6af0f3fa123e83e177afaddbdd331b8d8186c5caf65234ef447b78afe0",
+    "ui/demo/src/components_native.rs": "bb25e236401bd0f021bff3afda4d68817b3929cfc632e843ba0e2596ddd5578a",
+    "ui/demo/src/fixture.rs": "70091306fdb47f16fa966ff92417afce3bc98bd8af07dd7e74d43e78144942c5"
+  },
+  "nativeFixture": {
+    "modelCatalog": true,
+    "explicitSelection": true,
+    "sendPreparation": true,
+    "oneModelReceipt": true,
+    "onePrompt": true,
+    "streamSettlement": true,
+    "otherDraftIsolation": true,
+    "physicalIme": false,
+    "providerSpecificSwitches": false,
+    "formalTranscript": false,
+    "formalRunView": false
+  },
+  "realEndpoints": {
+    "PI": {
+      "components": true,
+      "finalAssistantItems": 3,
+      "inventoryRows": 13,
+      "isStale": false,
+      "modelChoiceProof": {
+        "catalogChoices": 1,
+        "configurationReceipt": true,
+        "explicitSelection": true,
+        "nativeInteraction": false,
+        "promptSettled": true,
+        "selected": "[\"endpoint-test\",\"endpoint-test\"]"
+      },
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 7,
+      "transcriptView": false
+    },
+    "DSH": {
+      "components": true,
+      "finalAssistantItems": 2,
+      "inventoryRows": 8,
+      "isStale": false,
+      "modelChoiceProof": {
+        "catalogChoices": 1,
+        "configurationReceipt": true,
+        "explicitSelection": true,
+        "nativeInteraction": false,
+        "promptSettled": true,
+        "selected": "[\"endpoint-test\",\"endpoint-test\"]"
+      },
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 7,
+      "transcriptView": false
+    },
+    "NATIVE": {
+      "components": true,
+      "finalAssistantItems": 2,
+      "inventoryRows": 4,
+      "isStale": false,
+      "modelChoiceProof": {
+        "catalogChoices": 1,
+        "configurationReceipt": true,
+        "explicitSelection": true,
+        "nativeInteraction": false,
+        "promptSettled": true,
+        "selected": "[\"openai\",\"gpt-5\"]"
+      },
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 4,
+      "transcriptView": false
+    }
+  },
+  "firstRealAttempt": {
+    "passed": false,
+    "piAndDshPassed": true,
+    "nativeFailed": "consumer required optional routableProviders extension",
+    "fixed": "consume basic Kernel 0.9 SessionModels groups plus explicit provider failures",
+    "regressionTest": true,
+    "threeEndpointRerunPassed": true
+  },
+  "logs": {
+    "uiWorkspace": {
+      "path": "/tmp/agentkit-model-ui-tests-release.log",
+      "sha256": "299c99e248024511f6609e7d4e4ebadfadd8b90b9aba312555d3fd966362b8b1"
+    },
+    "modelTargeted": {
+      "path": "/tmp/agentkit-model-options-tests-release.log",
+      "sha256": "668257d3a438a93651772a6d677b38135d653e4fb07d4ad934adaef13b3d7059"
+    },
+    "strictClippy": {
+      "path": "/tmp/agentkit-model-ui-clippy-release.log",
+      "sha256": "a665d2e10b7caf5dd48594f088029a2647aef97e353819cbf33f9b9fb5f5ca96"
+    },
+    "nativeModel": {
+      "path": "/tmp/agentkit-model-choices-native-release.log",
+      "sha256": "f06cf6ebdd792180a8ff0cc44d0553076811453fd7e98b8d6b08f3d179fcd1a8"
+    },
+    "nativeRegression": {
+      "path": "/tmp/agentkit-model-native-regression.log",
+      "sha256": "aee00c7ba482da426e22712f215d09baeae4841eaf0f5777c5ea620174665b19"
+    },
+    "realEndpoints": {
+      "path": "/tmp/agentkit-model-real-sep-release.log",
+      "sha256": "e5c3325b632997877ff784e2805c5c4dc9dcc350a5ebc9f4312819367d3a8e97"
+    },
+    "realFirstAttempt": {
+      "path": "/tmp/agentkit-model-real-sep.log",
+      "sha256": "be3b9287edd46d6b40c01a271427a2b32998227c611dc4597b6f72adbdeff635"
+    }
+  },
+  "screenshot": {
+    "path": "ui/docs/model-choices-native.png",
+    "sha256": "621fdbb476bc0b3cc2870b8466296e57d573e41f4b73307371bbaebf2d778564"
+  },
+  "remaining": [
+    "preset and attachment/annotation entry UI",
+    "reasoning/fast/thinking controls",
+    "formal Transcript and RunView",
+    "real three-harness native UX",
+    "physical IME and reading anchors",
+    "review, CI, merge and stage tag"
+  ]
+}

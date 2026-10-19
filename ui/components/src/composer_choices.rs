@@ -130,6 +130,15 @@ impl ComposerChoices {
     pub fn request(&self) -> Option<&ComposerChoiceRequest> {
         self.request.as_ref()
     }
+    /// Host navigation/cancellation retires only its captured gesture.
+    pub fn dismiss(&mut self, request: &ComposerChoiceRequest) -> bool {
+        if self.request.as_ref() != Some(request) {
+            return false;
+        }
+        self.close();
+        self.rebuild();
+        true
+    }
     pub fn choice_id(&self, choice: &str) -> Option<ComponentId> {
         self.rows
             .iter()

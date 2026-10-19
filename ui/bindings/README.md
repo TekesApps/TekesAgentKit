@@ -275,7 +275,25 @@ navigation; this button-only component does not own an input context.
    a fresh binding request. Shared Send still freezes settings in PreparedSubmission;
    the existing host SubmissionPreparation applies model/preset/auth before dispatch.
 
-This increment has component/fixture and second-public-consumer tests. It does not
-yet wire a real catalog adapter into ComponentDemo or prove a native menu/panel,
-physical IME, provider-specific reasoning switches or complete model/preset parity.
-The demo's default NoSettings preparation continues to reject nonempty settings.
+`RunBinding::model_choices(revision, rpc_id)` now reads public `session.models`
+for the captured receiving session and rechecks pane ownership after the read.
+`ModelChoices` retains raw catalog/extension/failure metadata and uses framed
+provider/model IDs. Explicit routableProviders governs newer catalogs. The basic
+Kernel 0.9 SessionModels contract instead provides configured enabled groups plus
+explicit provider failures; that legacy shape is accepted without inventing the
+optional extension. Missing routing facts disable choices, rather than defaulting
+an unknown provider to available. Read support and write capability stay separate.
+
+The native ComponentDemo mounts this content and fences both main and pane
+navigation. Failed reads remain in the panel; stale success/error cannot reopen it.
+`ModelSelectionPreparation` is an explicit host opt-in for the single
+`modelSelection: {provider, model, reasoningEffort?}` setting. It rechecks the public catalog, uses
+a stable per-submission model RPC ID, validates the selection receipt, then lets
+the existing controller dispatch the prompt. Failure restores the unsent draft;
+there is no automatic retry. It rejects all other setting keys. Credentials,
+installation and provider-specific policy remain explicit host responsibilities.
+
+The model path has native fixture and actual three-SEP offscreen integration
+receipts. These do not prove physical IME, a standard native menu, three-harness
+native UX, provider-specific reasoning switches or complete model/preset parity.
+See `docs/rust-agent-ui-model-integration-20261019.md` for exact scope.
