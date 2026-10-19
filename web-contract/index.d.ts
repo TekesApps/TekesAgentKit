@@ -67,3 +67,6 @@ export interface ThreadActionOutcome {
   renameSeq?: number;
   warning?: string;
 }
+export interface TranscriptLiveUsage {
+  outputTokens: number;
+}

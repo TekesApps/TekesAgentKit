@@ -106,7 +106,7 @@ mod tests {
     fn shared_compiler_roundtrips_unicode_delimiters_comments_and_authored_body() {
         let a = annotation();
         let text = "  body\n\nlast line  ";
-        let compiled = compile_annotation_input(text, &[a.clone()]).unwrap();
+        let compiled = compile_annotation_input(text, std::slice::from_ref(&a)).unwrap();
         assert_eq!(compiled.matches("</user_annotations>").count(), 1);
         let restored = annotation_input_presentation(&compiled).unwrap();
         assert_eq!(restored.text, text);

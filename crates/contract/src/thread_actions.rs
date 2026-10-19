@@ -38,7 +38,7 @@ binding!(ThreadActionNavigation, NAVIGATION_TYPESCRIPT, {
     endpoint: String => "endpoint": "string",
     session_id: String => "sessionId": "string",
 });
-binding!(ThreadActionOutcome, OUTCOME_TYPESCRIPT, {
+binding!(#[derive(Default)] ThreadActionOutcome, OUTCOME_TYPESCRIPT, {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     navigation: Option<ThreadActionNavigation> => "navigation?": "ThreadActionNavigation",
     clear_selection: bool => "clearSelection": "boolean",
@@ -49,17 +49,6 @@ binding!(ThreadActionOutcome, OUTCOME_TYPESCRIPT, {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     warning: Option<String> => "warning?": "string",
 });
-impl Default for ThreadActionOutcome {
-    fn default() -> Self {
-        Self {
-            navigation: None,
-            clear_selection: false,
-            renamed_title: None,
-            rename_seq: None,
-            warning: None,
-        }
-    }
-}
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ThreadPinState {

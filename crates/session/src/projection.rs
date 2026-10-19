@@ -22,6 +22,9 @@ pub struct LivePreview {
     pub reasoning: String,
     #[serde(default)]
     pub reasoning_ended: bool,
+    /// Latest provider report for this step. None means unavailable, not zero.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_tokens: Option<u64>,
 }
 /// A headless read model; journal entries remain lossless. UI surface folding is out of scope.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -143,6 +146,32 @@ impl SessionProjection {
                 self.previews.remove(&preview_key(event));
             }
             "assistant/chunk" => {
+                if event.data["chunk"]["type"] == "usage" {
+                    // Transient usage must not resurrect a closed turn or a sealed step.
+                    let current = self
+                        .entries
+                        .values()
+                        .rev()
+                        .find(|e| e.event.kind == "turn/start");
+                    let sealed = self.entries.values().any(|e| {
+                        matches!(e.event.kind.as_str(), "assistant/message" | "step/end")
+                            && e.event.data["turn"] == event.data["turn"]
+                            && e.event.data["step"] == event.data["step"]
+                    });
+                    if !self.run_open
+                        || sealed
+                        || current.is_some_and(|e| e.event.data["turn"] != event.data["turn"])
+                    {
+                        return;
+                    }
+                    if let Some(count) = event.data["chunk"]["usage"]["outputTokens"].as_u64() {
+                        self.previews
+                            .entry(preview_key(event))
+                            .or_default()
+                            .output_tokens = Some(count);
+                    }
+                    return;
+                }
                 let p = self.previews.entry(preview_key(event)).or_default();
                 if let Some(presentation) = event.data.get("presentation") {
                     p.text = presentation["text"].as_str().unwrap_or("").into();

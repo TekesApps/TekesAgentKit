@@ -1,10 +1,10 @@
 //! ClientKit-aligned headless SessionEndpoint contract. Extension payloads stay lossless JSON.
-mod commands;
 mod annotations;
+mod commands;
 pub use annotations::*;
 mod thread_actions;
-pub use thread_actions::*;
 pub use commands::*;
+pub use thread_actions::*;
 mod capabilities;
 mod registry;
 pub use capabilities::*;
@@ -506,3 +506,6 @@ pub trait EndpointConnector: Send + Sync {
 
 mod subagents;
 pub use subagents::*;
+
+mod live_usage;
+pub use live_usage::*;

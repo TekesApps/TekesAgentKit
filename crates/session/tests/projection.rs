@@ -293,3 +293,26 @@ fn workspace_replacement_and_events_preserve_generation_and_authority() {
     assert!(store.endpoint_events.is_empty());
     assert!(!store.workspace_ready);
 }
+
+#[test]
+fn live_provider_usage_preserves_cursor_and_resets_with_journal() {
+    let mut s = store();
+    s.apply(
+        "journal:s",
+        snapshot(0, vec![event(0, "turn/start")], false, None),
+    )
+    .unwrap();
+    for count in [0, 12, 12, 25] {
+        s.apply("journal:s", json!({"type":"transient","generation":"g","sessionId":"s","event":{"type":"assistant/chunk","seq":99,"time":1,"data":{"turn":1,"step":1,"chunk":{"type":"usage","usage":{"outputTokens":count}}}}})).unwrap();
+        assert_eq!(s.sessions["s"].tail_sequence, 0);
+        assert_eq!(s.sessions["s"].previews["1:1"].output_tokens, Some(count));
+    }
+    s.reset_journal("s");
+    assert!(s.sessions["s"].previews.is_empty());
+    s.apply(
+        "journal:s",
+        snapshot(0, vec![event(0, "turn/start")], false, None),
+    )
+    .unwrap();
+    assert!(s.sessions["s"].previews.is_empty());
+}

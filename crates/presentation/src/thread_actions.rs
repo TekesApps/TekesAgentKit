@@ -107,6 +107,86 @@ pub fn thread_actions(context: &ThreadActionContext<'_>) -> ThreadActionsPresent
     }
 }
 
+pub enum ThreadActionCommand {
+    Rename(String),
+    Fork,
+    Archive,
+    Unarchive,
+    Host,
+}
+pub fn increased_fork_title(title: &str) -> String {
+    for (opening, closing) in [('(', ')'), ('（', '）')] {
+        if let Some(stripped) = title.strip_suffix(closing)
+            && let Some((prefix, digits)) = stripped.rsplit_once(opening)
+            && !digits.is_empty()
+            && digits.bytes().all(|c| c.is_ascii_digit())
+        {
+            let mut digits = digits.trim_start_matches('0').as_bytes().to_vec();
+            if digits.is_empty() {
+                digits.push(b'0');
+            }
+            let mut carry = true;
+            for digit in digits.iter_mut().rev() {
+                if *digit == b'9' {
+                    *digit = b'0';
+                } else {
+                    *digit += 1;
+                    carry = false;
+                    break;
+                }
+            }
+            if carry {
+                digits.insert(0, b'1');
+            }
+            return format!(
+                "{prefix}{opening}{}{closing}",
+                String::from_utf8(digits).expect("ASCII digits")
+            );
+        }
+    }
+    format!("{title} (1)")
+}
+pub fn thread_action_command(
+    presentation: &ThreadActionsPresentation,
+    request: &ThreadActionRequest,
+) -> Result<ThreadActionCommand> {
+    require(
+        presentation.session_id == request.session_id,
+        "thread action target mismatch",
+    )?;
+    let action = presentation
+        .items
+        .iter()
+        .find(|a| a.id == request.action_id)
+        .ok_or_else(|| Error::Unsupported("unknown thread action".into()))?;
+    require(
+        action.enabled,
+        action
+            .disabled_reason
+            .as_deref()
+            .unwrap_or("thread action unavailable"),
+    )?;
+    Ok(match action.id.as_str() {
+        "rename" => {
+            let title = request.title.as_deref().unwrap_or("").trim();
+            require(
+                !title.is_empty() && title.chars().count() <= 300,
+                "invalid thread title",
+            )?;
+            ThreadActionCommand::Rename(title.into())
+        }
+        "fork" => ThreadActionCommand::Fork,
+        "archive" => ThreadActionCommand::Archive,
+        "unarchive" => ThreadActionCommand::Unarchive,
+        "pin" | "unpin" => ThreadActionCommand::Host,
+        _ => {
+            return Err(Error::Unsupported(
+                "thread action requires a client gesture".into(),
+            ));
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -204,7 +284,7 @@ mod tests {
     }
     #[test]
     fn fresh_policy_rejects_stale_commands_unknown_actions_and_wrong_targets() {
-        let mut capabilities = caps();
+        let capabilities = caps();
         let methods = BTreeSet::new();
         let context = ThreadActionContext {
             endpoint: "k",
@@ -281,84 +361,4 @@ mod tests {
         );
         assert_eq!(increased_fork_title("Chat (x)"), "Chat (x) (1)");
     }
-}
-
-pub enum ThreadActionCommand {
-    Rename(String),
-    Fork,
-    Archive,
-    Unarchive,
-    Host,
-}
-pub fn increased_fork_title(title: &str) -> String {
-    for (opening, closing) in [('(', ')'), ('（', '）')] {
-        if let Some(stripped) = title.strip_suffix(closing) {
-            if let Some((prefix, digits)) = stripped.rsplit_once(opening) {
-                if !digits.is_empty() && digits.bytes().all(|c| c.is_ascii_digit()) {
-                    let mut digits = digits.trim_start_matches('0').as_bytes().to_vec();
-                    if digits.is_empty() {
-                        digits.push(b'0');
-                    }
-                    let mut carry = true;
-                    for digit in digits.iter_mut().rev() {
-                        if *digit == b'9' {
-                            *digit = b'0';
-                        } else {
-                            *digit += 1;
-                            carry = false;
-                            break;
-                        }
-                    }
-                    if carry {
-                        digits.insert(0, b'1');
-                    }
-                    return format!(
-                        "{prefix}{opening}{}{closing}",
-                        String::from_utf8(digits).expect("ASCII digits")
-                    );
-                }
-            }
-        }
-    }
-    format!("{title} (1)")
-}
-pub fn thread_action_command(
-    presentation: &ThreadActionsPresentation,
-    request: &ThreadActionRequest,
-) -> Result<ThreadActionCommand> {
-    require(
-        presentation.session_id == request.session_id,
-        "thread action target mismatch",
-    )?;
-    let action = presentation
-        .items
-        .iter()
-        .find(|a| a.id == request.action_id)
-        .ok_or_else(|| Error::Unsupported("unknown thread action".into()))?;
-    require(
-        action.enabled,
-        action
-            .disabled_reason
-            .as_deref()
-            .unwrap_or("thread action unavailable"),
-    )?;
-    Ok(match action.id.as_str() {
-        "rename" => {
-            let title = request.title.as_deref().unwrap_or("").trim();
-            require(
-                !title.is_empty() && title.chars().count() <= 300,
-                "invalid thread title",
-            )?;
-            ThreadActionCommand::Rename(title.into())
-        }
-        "fork" => ThreadActionCommand::Fork,
-        "archive" => ThreadActionCommand::Archive,
-        "unarchive" => ThreadActionCommand::Unarchive,
-        "pin" | "unpin" => ThreadActionCommand::Host,
-        _ => {
-            return Err(Error::Unsupported(
-                "thread action requires a client gesture".into(),
-            ));
-        }
-    })
 }
