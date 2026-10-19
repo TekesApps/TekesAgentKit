@@ -7,6 +7,8 @@ p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('--source',type=Path,required=True)
 p.add_argument('--capture',action='store_true',help='Explicitly replace the development source manifest; never a published dependency pin')
 a=p.parse_args();src=a.source.resolve(strict=True);lock=ROOT/'ui/tekesui-source.json'
+if lock.exists() and json.loads(lock.read_text())['kind']=='published-git-revision':
+    p.error('published pin is resolved by Cargo; capture/path preparation is disabled')
 crates={'controls','scene','tokens','text','render','platform-macos','motion','design-export'}
 if a.capture:
     names={'Cargo.toml','LICENSE','design/tokens.json','design/gallery/brands.json','design/behavior/scroll.json'}

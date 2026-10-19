@@ -1,0 +1,42 @@
+{
+  "status": "local-progress-not-release",
+  "agentkit_published_baseline": "v0.3.7",
+  "agentkit_baseline_commit": "a8610a420bad72eaedcf706b30df87153a0f3e16",
+  "tekesui_commit": "431093786de47b48cd566d0d9c0eafa088b10d68",
+  "tekesui_reviewed_files": 188,
+  "tekesui_sha256": "03721866a362b1d31261ebbbc86140eb07e9e23320871c325234a5212591213d",
+  "tests": {"root": 104, "ui": 62, "acceptance_tools": 18, "run_binding_integration": 5},
+  "gates": {
+    "root_tests": true,
+    "ui_tests_including_public_consumer": true,
+    "root_strict_all_targets_clippy": true,
+    "ui_strict_all_targets_clippy": true,
+    "fmt": true,
+    "dependency_boundaries": true,
+    "cargo_resolved_ui_inputs": true,
+    "remote_ci_for_this_work": false,
+    "formal_component_native_window_acceptance": false,
+    "physical_ime_acceptance": false
+  },
+  "verified_changes": [
+    "task ID stable while resolved pointer changes; old pane token rejected",
+    "nested child controller sends to direct owner, never main session.prompt",
+    "SideChat cancellation-to-Unknown publishes; reads and no-op reconciliation do not",
+    "separate binding history leases coexist; existing pagination remains canonical",
+    "binding stream and cancel reuse RunController",
+    "bounded custom child projection remains read-only with no parent history fallback",
+    "SideChat body missing after confirmed absence; foreign pointer/runtime rejected",
+    "pointer removal during host preparation prevents prompt RPC"
+  ],
+  "open_upstream_issues": [
+    "https://github.com/TekesApps/TekesUI/issues/22",
+    "https://github.com/TekesApps/TekesUI/issues/23"
+  ],
+  "remaining": [
+    "formal mixed-content Transcript and RunView",
+    "formal task/subagent/SideChat body composition and native demo integration",
+    "full capability entry UIs and host adapters",
+    "formal component Native/Pi/DSH and physical IME/reading native acceptance",
+    "delivery review, remote CI, merge and stage tag"
+  ]
+}

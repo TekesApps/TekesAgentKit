@@ -6,3 +6,7 @@ publish.workspace = true
 license.workspace = true
 [dependencies]
 tekes-agent-components-ui.workspace = true
+tekes-agent-ui-bindings.workspace = true
+
+[dev-dependencies]
+tekes-ui-controls.workspace = true

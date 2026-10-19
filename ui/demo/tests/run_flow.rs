@@ -202,10 +202,8 @@ async fn ui_send_callback_carries_the_presented_destination() {
     .unwrap();
     let mut ui = RunSurface::new();
     ui.sync(&c.snapshot()).unwrap();
-    ui.tree
-        .accessibility_action(SEND, None, AccessibilityAction::Press);
     let callback = ui
-        .event(&ContentEvent::PointerMove(Point::new(-1., -1.)))
+        .accessibility_action(SEND, None, AccessibilityAction::Press)
         .into_iter()
         .find_map(|i| match i {
             Intent::Send { destination } => Some(destination),

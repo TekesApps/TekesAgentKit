@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["components", "demo", "consumer"]
+members = ["components", "bindings", "demo", "consumer"]
 exclude = [".deps/tekesui"]
 [workspace.package]
 version = "0.0.0"
@@ -9,15 +9,20 @@ publish = false
 license = "MIT"
 [workspace.dependencies]
 tekes-agent-endpoint-kernel = { path = "../crates/endpoint-kernel" }
+tekes-agent-endpoint-pi = { path = "../crates/endpoint-pi" }
+tekes-agent-endpoint-dsh = { path = "../crates/endpoint-dsh" }
+tekes-agent-web = { path = "../crates/web" }
 tekes-agent-contract = { path = "../crates/contract" }
 tekes-agent-session = { path = "../crates/session" }
 tekes-agent-presentation = { path = "../crates/presentation" }
 tekes-agent-components-ui = { path = "components" }
-tekes-ui-controls = { path = ".deps/tekesui/crates/tekes-ui-controls" }
-tekes-ui-scene = { path = ".deps/tekesui/crates/tekes-ui-scene" }
-tekes-ui-tokens = { path = ".deps/tekesui/crates/tekes-ui-tokens" }
-tekes-ui-text = { path = ".deps/tekesui/crates/tekes-ui-text" }
-tekes-ui-render = { path = ".deps/tekesui/crates/tekes-ui-render" }
-tekes-ui-platform-macos = { path = ".deps/tekesui/crates/tekes-ui-platform-macos" }
+tekes-agent-ui-bindings = { path = "bindings" }
+tekes-ui-controls = { git = "https://github.com/TekesApps/TekesUI.git", rev = "431093786de47b48cd566d0d9c0eafa088b10d68" }
+tekes-ui-scene = { git = "https://github.com/TekesApps/TekesUI.git", rev = "431093786de47b48cd566d0d9c0eafa088b10d68" }
+tekes-ui-tokens = { git = "https://github.com/TekesApps/TekesUI.git", rev = "431093786de47b48cd566d0d9c0eafa088b10d68" }
+tekes-ui-text = { git = "https://github.com/TekesApps/TekesUI.git", rev = "431093786de47b48cd566d0d9c0eafa088b10d68" }
+tekes-ui-render = { git = "https://github.com/TekesApps/TekesUI.git", rev = "431093786de47b48cd566d0d9c0eafa088b10d68" }
+tekes-ui-platform-macos = { git = "https://github.com/TekesApps/TekesUI.git", rev = "431093786de47b48cd566d0d9c0eafa088b10d68" }
 tokio = { version = "1", features = ["rt-multi-thread", "time", "sync", "macros"] }
 serde_json = "1"
+async-trait = "0.1"

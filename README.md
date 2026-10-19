@@ -9,7 +9,7 @@
 
 ## 当前阶段
 
-`v0.1.0` 保存三个 SEP 与无 UI presentation 的阶段成果；`v0.1.1` 增加公开仓库的 MIT 授权、包元数据和使用文档；`v0.2.0` 冻结任务、子代理、SideChat 与 Summary 的无 UI 状态层；`v0.3.0` 补齐 Pi 子代理与 Native 有界子历史，见 [说明](docs/child-history.md)。API 仍处于早期阶段，crate 尚未发布到 crates.io（`publish = false`）。宿主应固定 tag/完整 commit，升级前检查变更。
+`v0.1.0` 保存三个 SEP 与无 UI presentation 的阶段成果；`v0.1.1` 增加公开仓库的 MIT 授权、包元数据和使用文档；`v0.2.0` 冻结任务、子代理、SideChat 与 Summary 的无 UI 状态层；`v0.3.0` 补齐 Pi 子代理与 Native 有界子历史，见 [说明](docs/child-history.md)。当前公开基线为 `v0.3.7`，已加入共享批注、线程操作与置顶关系、provider 用量和完成回合 Fork 契约，见 [Web 契约](docs/web-ui.md) 及 [变更记录](CHANGELOG.md)。API 仍处于早期阶段，crate 尚未发布到 crates.io（`publish = false`）。宿主应固定 tag/完整 commit，升级前检查变更。
 
 | Endpoint | 验证版本 | 权威数据路径 |
 |---|---|---|
@@ -19,7 +19,7 @@
 
 已实现会话地址/指针、历史恢复、文件读取/观察、附件、交互回传和显式能力检查；独立 presentation 层提供 Run、Transcript、Composer 和连接状态。Pi 保留原生 entry ID，不伪造 journal sequence。DSH 官方未提供的 ephemeral fork/discard 明确返回 Unsupported。
 
-历史投影在内存中。Pi 的宿主指针、receipt、队列及 Goal 元数据用于会话恢复和提交去重，不是 transcript Mirror。可选远端 durable cache、正式 UI 控件、生产 launcher 和大历史性能验收尚未交付。独立 [UI 试点 workspace](ui/README.md) 已接入 TekesUI 开发快照，复用现有 presentation；不属于 v0.3.0 发布 API，也不影响默认 headless 构建。
+历史投影在内存中。Pi 的宿主指针、receipt、队列及 Goal 元数据用于会话恢复和提交去重，不是 transcript Mirror。可选远端 durable cache、正式 UI 控件、生产 launcher 和大历史性能验收尚未交付。独立 [UI 试点 workspace](ui/README.md) 固定 TekesUI 公开 Git commit，复用现有 presentation；不属于 v0.3.7 headless 发布 API，也不影响默认 headless 构建。
 
 ## 开始使用
 
@@ -93,6 +93,7 @@ python3 scripts/install-dsh-runtime.py \
 
 ## 文档
 
+- [消费侧一键验收与正式 pin 比对工具](docs/tekesui-acceptance-tools.md)
 - [TekesUI 短接入契约](docs/tekesui-integration-contract.md) · [消费侧缺口](docs/tekesui-gaps.md) · [Rust UI demo](ui/README.md)
 - [快速入门与 Rust API](docs/getting-started.md)
 - [Headless JSON 配置与命令](docs/headless-cli.md)

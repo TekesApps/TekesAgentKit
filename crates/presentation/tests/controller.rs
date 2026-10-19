@@ -21,6 +21,7 @@ struct Connector {
     hold_fork: Arc<AtomicBool>,
     bounded: Arc<AtomicBool>,
     pages: Arc<std::sync::Mutex<std::collections::VecDeque<Value>>>,
+    catalog_owner: Arc<std::sync::Mutex<Option<String>>>,
 }
 struct Endpoint {
     connector: Connector,
@@ -111,8 +112,15 @@ impl SessionEndpoint for Endpoint {
             };
         }
         if method == "subagents.list" {
+            let owner = self
+                .connector
+                .catalog_owner
+                .lock()
+                .unwrap()
+                .clone()
+                .unwrap_or("a".into());
             return Ok(
-                json!({"parentAvailable":payload["parentSessionId"] == "a","entries":[{"kind":"child","id":"child","mode":"continuable"},{"kind":"child","id":"bounded","mode":"one-shot"}]}),
+                json!({"parentAvailable":payload["parentSessionId"] == owner,"entries":[{"kind":"child","id":"child","mode":"continuable"},{"kind":"child","id":"bounded","mode":"one-shot"}]}),
             );
         }
         if method == "session.fork" {
@@ -378,6 +386,8 @@ async fn cancelled_fork_is_unknown_blocks_duplicate_and_retains_originating_pare
     let (connector, runtime, _) = setup().await;
     connector.hold_fork.store(true, Ordering::SeqCst);
     let side = Arc::new(SideChatController::new(runtime.clone()));
+    let mut changes = side.subscribe();
+    assert!(!changes.has_changed().unwrap());
     let worker = side.clone();
     let task = tokio::spawn(async move {
         worker
@@ -385,8 +395,21 @@ async fn cancelled_fork_is_unknown_blocks_duplicate_and_retains_originating_pare
             .await
     });
     connector.sent.notified().await;
+    changes.changed().await.unwrap();
+    assert!(
+        changes
+            .borrow_and_update()
+            .is_creating_for(&RunScope::main("test", "a"))
+    );
     task.abort();
     let _ = task.await;
+    changes.changed().await.unwrap();
+    assert!(
+        changes
+            .borrow_and_update()
+            .unknown_creation_for(&RunScope::main("test", "a"))
+            .is_some()
+    );
     assert_eq!(side.snapshot().unknown_creations.len(), 1);
     assert!(
         side.create(RunScope::main("test", "a"), None, "duplicate")
@@ -397,6 +420,70 @@ async fn cancelled_fork_is_unknown_blocks_duplicate_and_retains_originating_pare
     side.reconcile_creation(&RunScope::main("test", "a"), None)
         .unwrap();
     assert!(side.snapshot().unknown_creations.is_empty());
+    changes.changed().await.unwrap();
+    assert!(changes.borrow_and_update().unknown_creations.is_empty());
+    // Reading and rejected no-op reconciliation must not cause a UI wake loop.
+    let _ = side.snapshot();
+    assert!(
+        side.reconcile_creation(&RunScope::main("test", "a"), None)
+            .is_err()
+    );
+    assert!(!changes.has_changed().unwrap());
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn nested_child_controller_uses_direct_owner_and_rejects_other_destinations() {
+    let (connector, runtime, _) = setup().await;
+    *connector.catalog_owner.lock().unwrap() = Some("nested".into());
+    let parent = RunScope {
+        endpoint_id: "test".into(),
+        thread_id: "a".into(),
+        session_id: "nested".into(),
+    };
+    let scope = RunScope {
+        session_id: "child".into(),
+        ..parent.clone()
+    };
+    let target = ComposerDestination::run(scope.clone());
+    let _lease = runtime.acquire_history("child").await.unwrap();
+    let controller = RunController::for_child(runtime.clone(), &parent, "child").unwrap();
+    assert!(controller.select(destination("a")).is_err());
+    assert!(
+        controller
+            .edit_text(&destination("a"), "wrong".into())
+            .is_err()
+    );
+    assert!(
+        controller
+            .edit(&destination("a"), ComposerDraft::default())
+            .is_err()
+    );
+    assert!(
+        controller
+            .prepare(&destination("a"), PromptMode::Queue)
+            .is_err()
+    );
+    controller.refresh_child_catalog(&scope).await.unwrap();
+    controller
+        .edit_text(&target, "nested child input".into())
+        .unwrap();
+    let ticket = controller.prepare(&target, PromptMode::Queue).unwrap();
+    controller.dispatch(ticket, None).await.unwrap();
+    let requests = connector.requests.lock().unwrap().clone();
+    let prompts: Vec<_> = requests
+        .iter()
+        .filter(|(m, _)| m == "subagents.prompt")
+        .collect();
+    assert_eq!(prompts.len(), 1);
+    assert_eq!(prompts[0].1["parentSessionId"], "nested");
+    assert!(
+        requests
+            .iter()
+            .filter(|(m, _)| m == "subagents.list")
+            .all(|(_, p)| p["parentSessionId"] == "nested")
+    );
+    assert!(!requests.iter().any(|(m, _)| m == "session.prompt"));
     runtime.stop().await.unwrap();
 }
 #[tokio::test]

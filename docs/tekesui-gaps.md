@@ -1,5 +1,11 @@
 # TekesUI 消费侧缺口
 
+2026-10-19 正式pin更新：已固定公开4310937并完成独立消费复验；原始缺口/旧阻塞记录作为历史保留。最新逐Issue关闭结论与上游CI边界见 [正式pin复验](tekesui-public-pin-verification-20261019.md)。
+
+最新候选消费状态见 [独立复验](tekesui-consumer-verification-20261018.md)：UI27/headless76、真实 Native SEP 到 GPU 通过，尚非原生窗口或正式发布验收。
+
+2026-10-18 更新：TKUI-001/002 已消费最新全部 WIP 的 WindowWake / 版本化 ReadingController；下文保留原始需求基线，当前实现、通过证据与未验收边界以 [P0 联调记录](tekesui-p0-closeout-20261018.md) 为准。正式 pin 与原生最终体验尚未完成。
+
 可直接交给 TekesUI 开发的优先级、接口需求和验收标准见 [七项开发任务](tekesui-development-tasks.md)。
 
 只列需求与证据，不修改 TekesUI，不在 AgentKit 内补通用实现。基准是 ui/tekesui-source.json 的冻结开发快照。
@@ -17,3 +23,5 @@
 已有能力不列为缺失：TextInput 的 preedit/UTF-16、选择、undo/redo；ContentHost focus；TextInputState 原生候选位置；ReadingController 尾追加保护；AX 节点/动作桥接。它们存在不等于真实物理输入法、VoiceOver 或性能已经验收。
 
 不在本轮扩展：富 Markdown/工具卡片/附件、任务/子代理/SideChat/Summary UI；正式虚拟化、大历史增量投影、生产 launcher。先完成基础 Run 可验证部分，再以缺口清单协调 TekesUI。
+
+TKUI-006 更新：公共完整指针入口、AgentText转交及原生demo适配已实现；共享双击字素/三击段落修复与消费者回归已通过。Gallery原生证据与AgentKit未验收边界见 [记录](tekesui-pointer-metadata-20261018.md)。表格保留初始缺口基线，不代表当前仍未实现。

@@ -35,8 +35,26 @@ struct Shared {
     runtime: Arc<SessionRuntime>,
     core: Mutex<PresentationStore>,
     snapshots: watch::Sender<Arc<RunSnapshot>>,
+    child_owner: Option<(RunScope, String)>,
 }
 impl Shared {
+    fn validate_destination(&self, destination: &ComposerDestination) -> Result<()> {
+        if let Some((scope, _)) = &self.child_owner {
+            require(
+                destination == &ComposerDestination::run(scope.clone()),
+                "child controller target mismatch",
+            )?;
+        }
+        Ok(())
+    }
+    fn child_parent<'a>(&'a self, scope: &'a RunScope) -> Result<Option<&'a str>> {
+        if let Some((target, parent)) = &self.child_owner {
+            require(target == scope, "child controller target mismatch")?;
+            Ok(Some(parent))
+        } else {
+            Ok((scope.thread_id != scope.session_id).then_some(scope.thread_id.as_str()))
+        }
+    }
     fn refresh(&self) {
         let mut core = self.core.lock().expect("presentation lock poisoned");
         let snapshot = self.runtime.inspect(|authority| core.refresh(authority));
@@ -49,6 +67,7 @@ impl Shared {
                     old.summary = None;
                     old.run = None;
                 }
+                old.revision = core.next_snapshot_revision();
                 old.selection = core.selection();
                 old.draft = core
                     .selected
@@ -94,6 +113,37 @@ impl Drop for RunController {
 }
 impl RunController {
     pub fn new(runtime: Arc<SessionRuntime>) -> Result<Self> {
+        Self::new_with_child_owner(runtime, None)
+    }
+    /// An independent child may be owned by a nested parent, not the navigation thread root.
+    /// History observation is separately owned by ChildRun/SessionHistoryLease.
+    pub fn for_child(
+        runtime: Arc<SessionRuntime>,
+        parent: &RunScope,
+        child: impl Into<String>,
+    ) -> Result<Self> {
+        parent.validate()?;
+        let scope = RunScope {
+            endpoint_id: parent.endpoint_id.clone(),
+            thread_id: parent.thread_id.clone(),
+            session_id: child.into(),
+        };
+        scope.validate()?;
+        require(
+            scope.endpoint_id == runtime.inspect(|store| store.endpoint_id.clone())
+                && scope.session_id != parent.session_id
+                && scope.session_id != scope.thread_id,
+            "invalid child controller identity",
+        )?;
+        let controller =
+            Self::new_with_child_owner(runtime, Some((scope.clone(), parent.session_id.clone())))?;
+        controller.select(ComposerDestination::run(scope))?;
+        Ok(controller)
+    }
+    fn new_with_child_owner(
+        runtime: Arc<SessionRuntime>,
+        child_owner: Option<(RunScope, String)>,
+    ) -> Result<Self> {
         let mut core = PresentationStore::default();
         let initial = runtime.inspect(|authority| core.refresh(authority))?;
         let (snapshots, _) = watch::channel(Arc::new(initial));
@@ -101,6 +151,7 @@ impl RunController {
             runtime: runtime.clone(),
             core: Mutex::new(core),
             snapshots,
+            child_owner,
         });
         let weak = Arc::downgrade(&shared);
         let mut changes = runtime.subscribe();
@@ -121,6 +172,7 @@ impl RunController {
         self.shared.snapshots.borrow().clone()
     }
     pub fn select(&self, destination: ComposerDestination) -> Result<SelectionToken> {
+        self.shared.validate_destination(&destination)?;
         require(
             destination.endpoint_id() == self.shared.runtime.inspect(|s| s.endpoint_id.clone()),
             "controller endpoint mismatch",
@@ -154,7 +206,11 @@ impl RunController {
             "child catalog scope mismatch",
         )?;
         let epoch = self.shared.runtime.inspect(|s| s.connection_epoch);
-        let result = self.shared.runtime.subagent_catalog(&scope.thread_id).await;
+        let parent = self
+            .shared
+            .child_parent(scope)?
+            .ok_or_else(|| unsupported("no child owner"))?;
+        let result = self.shared.runtime.subagent_catalog(parent).await;
         if epoch != self.shared.runtime.inspect(|s| s.connection_epoch) {
             return Err(Error::Disconnected);
         }
@@ -175,11 +231,22 @@ impl RunController {
         result.map(|_| ())
     }
     pub fn edit(&self, destination: &ComposerDestination, draft: ComposerDraft) -> Result<()> {
+        self.shared.validate_destination(destination)?;
         self.shared
             .core
             .lock()
             .expect("presentation lock poisoned")
             .edit(destination, draft)?;
+        self.shared.refresh();
+        Ok(())
+    }
+    pub fn edit_text(&self, destination: &ComposerDestination, text: String) -> Result<()> {
+        self.shared.validate_destination(destination)?;
+        self.shared
+            .core
+            .lock()
+            .expect("presentation lock poisoned")
+            .edit_text(destination, text)?;
         self.shared.refresh();
         Ok(())
     }
@@ -203,6 +270,7 @@ impl RunController {
         destination: &ComposerDestination,
         mode: PromptMode,
     ) -> Result<PreparedSubmission> {
+        self.shared.validate_destination(destination)?;
         let result = {
             let mut core = self.shared.core.lock().expect("presentation lock poisoned");
             self.shared
@@ -279,13 +347,14 @@ impl RunController {
             self.shared.refresh();
             host.prepare(&self.shared.runtime,&ticket,&scope).await?;
             self.shared.runtime.open_session(&scope.session_id).await?;
-            if scope.thread_id != scope.session_id {
+            let child_parent = self.shared.child_parent(&scope)?;
+            if let Some(parent) = child_parent {
                 require(matches!(ticket.plan, SubmissionPlan::Prompt { .. }), "child commands unavailable")?;
-                self.shared.runtime.subagent_catalog(&scope.thread_id).await?.require_continuable(&scope.session_id)?;
+                self.shared.runtime.subagent_catalog(parent).await?.require_continuable(&scope.session_id)?;
             }
             self.shared.core.lock().expect("presentation lock poisoned").mark_dispatched(&ticket)?;
             let value=match &ticket.plan {
-                SubmissionPlan::Prompt{content,..} if scope.thread_id != scope.session_id => self.shared.runtime.prompt_child(&scope.thread_id, &scope.session_id, ticket.mode, content.clone(), &ticket.id).await?,
+                SubmissionPlan::Prompt{content,..} if child_parent.is_some() => self.shared.runtime.prompt_child(child_parent.expect("child owner"), &scope.session_id, ticket.mode, content.clone(), &ticket.id).await?,
                 SubmissionPlan::Prompt{content,..}=>self.shared.runtime.submit(PromptRequest{session_id:scope.session_id.clone(),mode:ticket.mode,content:content.clone(),client_time_zone:None},&ticket.id).await?,
                 SubmissionPlan::Command{name,arguments,attachments}=>self.shared.runtime.call_optional("commands/run",json!({"sessionId":scope.session_id,"name":name,"arguments":arguments,"attachments":attachments}),&ticket.id).await?,
             };
@@ -312,14 +381,10 @@ impl RunController {
             .runtime
             .inspect(|s| RunPresentation::read(s, scope, true).can_cancel);
         require(valid, "Run is not cancellable")?;
-        if scope.thread_id != scope.session_id {
+        if let Some(parent) = self.shared.child_parent(scope)? {
             self.shared
                 .runtime
-                .cancel_child(
-                    &scope.thread_id,
-                    &scope.session_id,
-                    &uuid::Uuid::new_v4().to_string(),
-                )
+                .cancel_child(parent, &scope.session_id, &uuid::Uuid::new_v4().to_string())
                 .await
         } else {
             self.shared

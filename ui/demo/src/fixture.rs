@@ -73,6 +73,25 @@ impl Default for Fixture {
         }
     }
 }
+impl Fixture {
+    /// Explicit owned demo data, emitted through the same journal contract.
+    pub fn with_demo_summary(self) -> Self {
+        {
+            let mut sessions = self.sessions.lock().unwrap();
+            for (id, line) in sessions.iter_mut() {
+                append(
+                    line,
+                    "todo/write",
+                    json!({"todos":[
+                        {"content":format!("验证会话 {id} 的数据回传"),"status":"completed"},
+                        {"content":"接入正式 Transcript","status":"pending"}
+                    ]}),
+                );
+            }
+        }
+        self
+    }
+}
 struct Endpoint {
     fixture: Fixture,
     host: HostDescription,
@@ -106,7 +125,9 @@ impl SessionEndpoint for Endpoint {
         let g = &self.generation;
         let baseline = match target {
             StreamTarget::SessionInventory => {
-                json!({"type":"baseline","generation":g,"snapshot":{"items":[]}})
+                let sessions = self.fixture.sessions.lock().unwrap();
+                let items: Vec<_> = sessions.iter().map(|(id,line)| json!({"sessionId":id,"title":format!("会话 {id}"),"running":line.busy,"blank":line.rows.is_empty(),"updatedAt":line.rows.len()})).collect();
+                json!({"type":"baseline","generation":g,"snapshot":{"items":items}})
             }
             StreamTarget::SessionControl => {
                 json!({"type":"baseline","generation":g,"snapshot":{"queues":[],"jobs":[],"projections":[]}})

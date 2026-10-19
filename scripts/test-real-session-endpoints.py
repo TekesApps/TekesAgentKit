@@ -8,13 +8,14 @@ parser.add_argument('--pi-root',type=Path)
 parser.add_argument('--dsh-root',type=Path)
 parser.add_argument('--kernel-root',type=Path)
 parser.add_argument('--kernel-target-dir',type=Path)
-parser.add_argument('--ui-demo',type=Path,help='Optional already-built AgentKit UI consumer for Native history-to-GPU acceptance')
+parser.add_argument('--ui-demo',type=Path,help='Optional already-built AgentKit UI consumer for each supplied harness history-to-GPU acceptance')
 parser.add_argument('--ui-output',type=Path)
+parser.add_argument('--ui-components',action='store_true',help='Mount formal Composer/Indicators with RunBinding; structured Transcript remains unavailable')
 args=parser.parse_args()
-if args.ui_demo and not args.kernel_root:
-    parser.error("--ui-demo requires --kernel-root")
 if args.ui_output and not args.ui_demo:
     parser.error("--ui-output requires --ui-demo")
+if args.ui_components and not args.ui_demo:
+    parser.error("--ui-components requires --ui-demo")
 if not any((args.pi_root,args.dsh_root,args.kernel_root)):parser.error("supply at least one runtime root")
 subprocess.run(['cargo','build','--locked','-p','tekes-agent-headless'],cwd=ROOT,check=True)
 requests=[]
@@ -139,6 +140,40 @@ def run(config):
     print(config['kind'].upper()+'_PANELS_LIVE_OK summary-scope+sidechat-capability+lifecycle-or-catalog')
     print(config['kind'].upper()+'_PRESENTATION_LIVE_OK composer+immediate-echo+identity-reconciliation+final-answer+reconnect')
     return outputs
+def ui_smoke(config, first):
+    if not args.ui_demo:
+        return
+    kind=config['kind']
+    second=next(row['result']['sessionId'] for row in execute(dict(config,commands=[{'op':'create','cwd':str(cwd)}])) if row.get('op')=='create')
+    explicit={'kind':kind,'endpointId':kind+'-ui','sessions':[first,second]}
+    ui_env=dict(os.environ)
+    if kind=='pi':
+        for field in ('executable','arguments','dataRoot','environment','extensions','sessionRoots'):
+            if field in config: explicit[field]=config[field]
+    else:
+        explicit['url']=config['url']
+        field='cookie' if 'cookie' in config else 'bearer'
+        explicit[field+'Env']='AGENTKIT_UI_FIXTURE_CREDENTIAL'
+        ui_env['AGENTKIT_UI_FIXTURE_CREDENTIAL']=config[field]
+    path=base/('ui-'+kind+'.json')
+    path.write_text(json.dumps(explicit))
+    # Preserve --ui-output's original Native path when multiple harnesses are requested.
+    output=args.ui_output.resolve() if args.ui_output else base/'ui-native.png'
+    if kind!='native':output=output.with_name(output.stem+'-'+kind+output.suffix)
+    mode=['--components'] if args.ui_components else []
+    ui=subprocess.run([str(args.ui_demo.resolve()),*mode,'--endpoint-config',str(path),'--offscreen',str(output)],env=ui_env,text=True,capture_output=True,timeout=60)
+    assert ui.returncode==0,ui.stderr[-3000:]
+    receipt=next(json.loads(line) for line in ui.stdout.splitlines() if line.startswith('{') and json.loads(line).get('offscreen'))
+    assert not receipt['isStale'] and receipt['finalAssistantItems']>=1,receipt
+    assert output.read_bytes().startswith(b'\x89PNG\r\n\x1a\n'),kind+' UI image missing'
+    if args.ui_components:
+        assert receipt['components'] and not receipt['transcriptView'],receipt
+        assert receipt['inventoryRows']>=1 and receipt['sharedRuntime'] and receipt['sidebarMounted'] and receipt['summaryMounted'],receipt
+        print(kind.upper()+'_UI_COMPONENTS_RECEIPT '+json.dumps(receipt,sort_keys=True))
+        print(kind.upper()+'_UI_COMPONENTS_LIVE_OK explicit-SEP+shared-runtime+restored-data+Composer+Indicators+Sidebar+Summary+GPU; transcript-view=false; native-interaction=false')
+    else:
+        print(kind.upper()+'_UI_CONSUMER_LIVE_OK explicit-SEP+RunController+restored-final-answer+TekesUI-offscreen; native-interaction=false')
+
 try:
     with tempfile.TemporaryDirectory(prefix='agentkit-three-endpoints-') as tmp:
         base=Path(tmp);cwd=base/'project';cwd.mkdir();(cwd/'proof.txt').write_text('proof line one\nline two\n')
@@ -293,6 +328,7 @@ try:
             assert 'QUEUED_EDIT_OK' in conversation and 'QUEUED_BEFORE_EDIT' not in conversation and 'QUEUED_TO_REMOVE' not in conversation,'queue edit/remove/drain lost'
             assert not result[-1]['result']['sessions'][queue_id]['queue'],'queue did not settle'
             print('PI_QUEUE_LIVE_OK durable-admission+edit+remove+automatic-drain')
+            ui_smoke(config,next(row['result']['sessionId'] for row in outputs if row.get('op')=='create'))
 
         if args.dsh_root:
             dsh=args.dsh_root.resolve();node=dsh/'node/bin/node';entry=dsh/'node_modules/@deepseek-ai/dsh/lib/bin.js';home=base/'dsh';home.mkdir()
@@ -404,6 +440,7 @@ try:
                     assert Path(locator['cwd']).resolve()==cwd.resolve() and Path(locator['workingDirectory']).resolve()==child.resolve(),locator
                     assert 'working-directory/change' in json.dumps(result[-1]),'new required event lost'
                     print('DSH_WORKING_DIRECTORY_LIVE_OK original root + current directory + reconnect')
+                ui_smoke(config,session_id)
             finally:
                 if process.poll() is None:os.killpg(process.pid,signal.SIGTERM)
                 try:process.wait(timeout=15)
@@ -462,16 +499,7 @@ try:
                     assert all(h['tools'][0]['arguments']['task_name']=='Bounded child proof' for h in histories),'missing parent source-call projection'
                     print('NATIVE_BOUNDED_CHILD_LIVE_OK real-task+source-call+read-only-history+reconnect+ownership')
                 print('NATIVE_COMPLETE_LIFECYCLE_LIVE_OK models+commands+skills+settings+presets+upload+scratch-discard+rename+archive')
-                if args.ui_demo:
-                    second=next(row['result']['sessionId'] for row in execute(dict(config,commands=[{'op':'create','cwd':str(cwd)}])) if row.get('op')=='create')
-                    ui_config=base/'ui-native.json'
-                    ui_config.write_text(json.dumps({'endpointId':'native-ui','url':ready['url'],'bearerEnv':'AGENTKIT_UI_FIXTURE_BEARER','sessions':[native_id,second]}))
-                    output=args.ui_output.resolve() if args.ui_output else base/'ui-native.png'
-                    ui_env=dict(os.environ,AGENTKIT_UI_FIXTURE_BEARER=config['bearer'])
-                    ui=subprocess.run([str(args.ui_demo.resolve()),'--endpoint-config',str(ui_config),'--offscreen',str(output)],env=ui_env,text=True,capture_output=True,timeout=30)
-                    assert ui.returncode==0,ui.stderr[-3000:]
-                    assert output.read_bytes().startswith(b'\x89PNG\r\n\x1a\n'),'Native UI image missing'
-                    print('NATIVE_UI_CONSUMER_LIVE_OK authenticated-SEP+RunController+TekesUI-offscreen; native-interaction=false')
+                ui_smoke(config,native_id)
 
             finally:
                 process.stdin.close()

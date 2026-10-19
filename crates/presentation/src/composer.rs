@@ -262,6 +262,7 @@ struct SubmissionRecord {
 pub struct PresentationStore {
     pub(crate) selected: Option<ComposerDestination>,
     generation: u64,
+    snapshot_revision: u64,
     drafts: BTreeMap<ComposerDestination, ComposerDraft>,
     submissions: BTreeMap<String, SubmissionRecord>,
     pub(crate) events: VecDeque<SubmissionState>,
@@ -273,6 +274,10 @@ pub struct PresentationStore {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct RunSnapshot {
+    /// Monotonic canonical publication order for this PresentationStore. Zero
+    /// denotes a legacy unversioned serialized snapshot, not a UI arrival clock.
+    #[serde(default)]
+    pub revision: u64,
     pub selection: Option<SelectionToken>,
     pub connection: ConnectionPresentation,
     pub run: Option<RunPresentation>,
@@ -284,6 +289,13 @@ pub struct RunSnapshot {
     pub events: Vec<SubmissionState>,
 }
 impl PresentationStore {
+    pub(crate) fn next_snapshot_revision(&mut self) -> u64 {
+        self.snapshot_revision = self
+            .snapshot_revision
+            .checked_add(1)
+            .expect("snapshot revision exhausted");
+        self.snapshot_revision
+    }
     fn resolve(&self, destination: &ComposerDestination) -> ComposerDestination {
         self.aliases.get(destination).unwrap_or(destination).clone()
     }
@@ -333,6 +345,16 @@ impl PresentationStore {
     pub fn edit(&mut self, destination: &ComposerDestination, draft: ComposerDraft) -> Result<()> {
         destination.validate()?;
         self.drafts.insert(self.resolve(destination), draft);
+        Ok(())
+    }
+    /// Apply only authored text. A delayed editor callback cannot erase newer host attachments,
+    /// annotations or settings, and retains its captured destination across selection changes.
+    pub fn edit_text(&mut self, destination: &ComposerDestination, text: String) -> Result<()> {
+        destination.validate()?;
+        self.drafts
+            .entry(self.resolve(destination))
+            .or_default()
+            .text = text;
         Ok(())
     }
     /// Asynchronous model/catalog reads must carry both scope and generation (A -> B -> A is stale).
@@ -762,7 +784,9 @@ impl PresentationStore {
                 None
             }
         };
+        let revision = self.next_snapshot_revision();
         Ok(RunSnapshot {
+            revision,
             selection: self.selection(),
             connection: connection.clone(),
             run: run.clone(),

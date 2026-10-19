@@ -5,9 +5,13 @@ edition.workspace = true
 publish.workspace = true
 license.workspace = true
 [dependencies]
+tekes-agent-ui-bindings.workspace = true
+tekes-agent-web.workspace = true
 tekes-agent-components-ui.workspace = true
 tekes-agent-contract.workspace = true
 tekes-agent-endpoint-kernel.workspace = true
+tekes-agent-endpoint-pi.workspace = true
+tekes-agent-endpoint-dsh.workspace = true
 tekes-agent-session.workspace = true
 tekes-agent-presentation.workspace = true
 tekes-ui-controls.workspace = true

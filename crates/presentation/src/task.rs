@@ -31,7 +31,7 @@ pub struct TaskLoadToken {
     task_id: String,
     generation: u64,
 }
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct TaskPanelState {
     current: Option<TaskLoadToken>,
     generation: u64,
@@ -40,6 +40,12 @@ pub struct TaskPanelState {
     pub error: Option<String>,
 }
 impl TaskPanelState {
+    pub fn active_task_id(&self) -> Option<&str> {
+        self.current.as_ref().map(|token| token.task_id.as_str())
+    }
+    pub fn parent_scope(&self) -> Option<&RunScope> {
+        self.current.as_ref().map(|token| &token.scope)
+    }
     pub fn begin(&mut self, parent: RunScope, task_id: impl Into<String>) -> Result<TaskLoadToken> {
         parent.validate()?;
         let task_id = task_id.into();

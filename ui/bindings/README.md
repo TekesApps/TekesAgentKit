@@ -1,0 +1,91 @@
+# Agent UI runtime bindings (experimental)
+
+`RunBinding` binds one mounted pane to existing `SessionRuntime`, `RunController`,
+`ChildRun` and `SideChatController` authority. It owns observations, not windows or
+another Run state machine. This package does not yet supply a formal Transcript
+or RunView. It consumes the UI workspace's exact published TekesUI revision.
+
+Choose the source explicitly:
+
+- `open_main`: a main session; acquires its own history lease.
+- `open_task`: an already resolved `AgentTask`. Resolve through `TaskPanelState`
+  first; loading/missing/error is a pane state, never a fallback new conversation.
+- `open_child`: pass the actual direct parent, child ID and `ChildHistoryLayout`.
+  Independent history uses `RunController::for_child`; refresh the existing child
+  catalog before enabling send, and on relevant reconnect/control changes.
+  Same-session bounded history is read-only. Its explicit source or endpoint
+  bounded-history API owns history; it never displays the parent's transcript.
+- `open_side_chat`: pass the shared owner and owned pointer. Missing/foreign
+  pointers fail mounting; disappearance after mounting produces `Missing`.
+
+Keep a binding with the retained pane. Before installing asynchronous content,
+validate the existing `SidePanel` content token. A task pointer change retires the
+old source even when task ID and tab header remain the same. Drop releases this
+mount's observation; it does not cancel work or discard an ephemeral session.
+
+On UI events, drain `Composer::take_intents` before applying newer snapshots:
+
+- `Edit`: call `edit_text` with the captured destination. This patches text only.
+- `Send`: call `send_with` with that destination, explicit prompt mode and the
+  host's existing `SubmissionPreparation`. It retains RunController admission
+  identity and uncertainty behavior and never retries automatically.
+  Native hosts can instead call `prepare_send` synchronously, sync the controlled
+  clear, then spawn `dispatch_prepared_with`. If the host abandons that prepared
+  ticket before dispatch, resolve it with `cancel_prepared`; don't silently drop
+  a reserved submission. Callbacks must retain the original binding and ticket.
+- `Cancel`: call `cancel` with the captured run destination.
+- `OpenEntry`: invoke the host's attachment/model/preset capability UI; commit
+  results through existing presentation token validation. Entry UI is not
+  implemented by this binding.
+
+`sync_composer` reads the canonical snapshot and restricts controls during
+SideChat Closing/Unknown. Send validates pointer authority before preparation
+and after the host callback returns. Missing panes must unmount their body;
+bounded children do not get a fabricated Composer snapshot. The final transport
+still uses the endpoint's capability and ownership checks.
+
+Use `subscribe_run`, `subscribe_runtime` and `subscribe_side_chat` to schedule
+updates via the host's public window wake integration. Read `snapshot` when
+notified; don't poll per frame. Native bounded history refreshes/paginates through
+its existing `ChildRun`. SideChat reads/no-op reconciliation don't publish wakes.
+
+Tests in `ui/demo/tests/run_binding.rs` use an isolated local SEP fixture. They
+cover actual stream/cancel, lease coexistence, pagination, read-only child source,
+SideChat cancellation-to-Unknown, pointer removal and host-preparation fencing.
+They do not prove physical IME, native window UX or real three-harness UI parity.
+
+## Shared inventory and thread actions
+
+Create `SidebarBinding::new(agent, endpoint_id)` inside the async runtime, using
+the **same** `Arc<SharedAgent>` endpoint whose runtime backs RunBinding. Register
+the connector once and await its baseline before mounting the connected demo.
+`EndpointConfiguration::into_connector` is the demo host's ownership transfer;
+it avoids starting another Pi connector or opening the same dataRoot twice.
+
+The binding observes `SharedAgent::follow(target="state")` directly through its
+Rust API; it starts no WebUI/HTTP listener. `snapshot`/`subscribe` publish versioned
+`SidebarPublication` rows, including canonical activity, pins and action definitions.
+`loaded` means an inventory frame has arrived; errors retain the last readable
+rows, mark activity stale and publish the error. Host navigation supplies selection
+through `publication.input(selected)`. Hosts may apply their own grouping/order.
+
+Drain `SidebarIntent` before changing inputs. Pass captured address/definition and
+the **same RPC ID on reconciliation/replay** to `perform`. Mutations use the shared
+`thread.performAction` dispatcher, which rechecks current capabilities and owns pin
+replay. Copy returns a fresh shared value for the host's clipboard gesture, rather
+than trusting stale `copy_text`. Rename passes the host's explicitly collected title.
+Apply returned navigation/clear-selection/warnings in the host; the binding never
+changes selection itself and never retries a mutation.
+
+Install shared preferences through `SharedAgent::open_thread_preferences(path,
+scope)` or an explicit shared host adapter before wrapping the service in Arc.
+There is no UI pin database. The unreleased shared-service fix makes custom
+`ThreadActionHost::pin_state` drive inventory badges as well as menus, and publishes
+after host mutations. An external adapter can call `invalidate_thread_inventory`
+after its local authority changes; invalidation edits no pin or session.
+
+The demo routes newly selected inventory rows through captured navigation requests.
+Newer selections, an in-progress composition or confirmed pointer disappearance
+retire late open results. Reappearing pointers get fresh row IDs, and retired
+callbacks cannot reactivate them. Each cached run retains its original controller,
+Composer and Summary pane; async opens do not replace that revision authority.

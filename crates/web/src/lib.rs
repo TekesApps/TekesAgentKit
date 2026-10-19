@@ -151,8 +151,20 @@ pub struct SharedAgent {
     thread_action_host: Option<Arc<dyn ThreadActionHost>>,
     session_url_scheme: Option<String>,
     thread_preferences: Option<Arc<tekes_agent_presentation::ThreadPreferences>>,
+    inventory_changes: InventoryChanges,
+}
+struct InventoryChanges(tokio::sync::watch::Sender<()>);
+impl Default for InventoryChanges {
+    fn default() -> Self {
+        Self(tokio::sync::watch::channel(()).0)
+    }
 }
 impl SharedAgent {
+    /// Host adapters call this after an external inventory-affecting local change.
+    /// It publishes existing authority again; it never edits a session or a pin.
+    pub fn invalidate_thread_inventory(&self) {
+        self.inventory_changes.0.send_replace(());
+    }
     pub fn set_session_url_scheme(&mut self, scheme: &str) -> Result<()> {
         require(
             !scheme.is_empty()
@@ -174,26 +186,27 @@ impl SharedAgent {
         )?);
         self.thread_action_host = Some(store.clone());
         self.thread_preferences = Some(store);
+        self.invalidate_thread_inventory();
         Ok(())
     }
     fn inventory(&self, shared: &SharedEndpoint, state: &MemoryProjectionStore) -> Value {
-        let pins = self
-            .thread_preferences
-            .as_ref()
-            .map(|p| p.pins())
-            .unwrap_or_default();
         let sessions: Vec<Value> = active_inventory(state)
             .into_iter()
             .map(|mut row| {
-                if pins
-                    .iter()
-                    .any(|p| p.endpoint == state.endpoint_id && row["sessionId"] == p.session_id)
+                let id = row["sessionId"]
+                    .as_str()
+                    .expect("inventory identity")
+                    .to_owned();
+                if self
+                    .thread_action_host
+                    .as_ref()
+                    .and_then(|host| host.pin_state(&state.endpoint_id, &id))
+                    .is_some_and(|pin| pin.pinned)
                 {
                     row["pin"] = json!(ThreadPinPresentation { pinned: true });
                 }
-                let id = row["sessionId"].as_str().expect("inventory identity");
                 row["activity"] =
-                    serde_json::to_value(tekes_agent_presentation::thread_activity(state, id))
+                    serde_json::to_value(tekes_agent_presentation::thread_activity(state, &id))
                         .expect("thread activity");
                 row
             })
@@ -202,6 +215,7 @@ impl SharedAgent {
     }
     pub fn install_thread_action_host(&mut self, host: Arc<dyn ThreadActionHost>) {
         self.thread_action_host = Some(host);
+        self.invalidate_thread_inventory();
     }
     pub fn thread_actions(
         &self,
@@ -403,12 +417,14 @@ impl SharedAgent {
                 outcome.clear_selection = archive;
             }
             ThreadActionCommand::Host => {
-                return self
+                let result = self
                     .thread_action_host
                     .as_ref()
                     .ok_or_else(|| unsupported("thread action host unavailable"))?
                     .perform(&presentation.endpoint, &request, rpc_id)
                     .await;
+                self.invalidate_thread_inventory();
+                return result;
             }
         }
         Ok(outcome)
@@ -551,6 +567,7 @@ impl SharedAgent {
             if let Some(store) = &self.thread_preferences {
                 preferences = store.subscribe();
             }
+            let mut local_changes = self.inventory_changes.0.subscribe();
             loop {
                 let state = runtime.snapshot();
                 let value = if let Some(id) = session {
@@ -572,7 +589,7 @@ impl SharedAgent {
                 if output.send(value).await.is_err() {
                     break;
                 }
-                tokio::select! { result = preferences.changed() => {if result.is_err(){break}}, result = observer.changed() => {if result.is_err(){break}}, _ = output.closed() => break }
+                tokio::select! { result = local_changes.changed() => {if result.is_err(){break}}, result = preferences.changed() => {if result.is_err(){break}}, result = observer.changed() => {if result.is_err(){break}}, _ = output.closed() => break }
             }
         } else {
             let mut stream = shared

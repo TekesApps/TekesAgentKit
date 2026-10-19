@@ -19,3 +19,33 @@ jobs:
         with:
           python-version: "3.12"
       - run: python3 scripts/check-ui-boundaries.py
+      - run: python3 -m unittest discover -s scripts/tests -v
+  ui-consumer:
+    name: Rust UI consumer (no native interaction)
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: rustfmt, clippy
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python3 scripts/check-ui-boundaries.py
+      - name: Resolve and verify the compiled public pin
+        run: |
+          cargo metadata --manifest-path ui/Cargo.toml --locked --format-version 1 > "$RUNNER_TEMP/agentkit-ui-metadata.json"
+          python3 scripts/check-ui-consumer-inputs.py --metadata "$RUNNER_TEMP/agentkit-ui-metadata.json" > "$RUNNER_TEMP/agentkit-ui-inputs.json"
+      - run: cargo fmt --manifest-path ui/Cargo.toml --all --check
+      - run: cargo clippy --manifest-path ui/Cargo.toml --workspace --all-targets --locked -- -D warnings
+      - run: cargo test --manifest-path ui/Cargo.toml --workspace --locked
+      - run: cargo build --manifest-path ui/Cargo.toml --locked -p tekes-agent-ui-demo
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rust-ui-consumer-inputs
+          path: |
+            ${{ runner.temp }}/agentkit-ui-inputs.json
+            ${{ runner.temp }}/agentkit-ui-metadata.json
+          if-no-files-found: warn
