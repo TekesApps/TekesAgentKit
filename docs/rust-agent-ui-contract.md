@@ -16,6 +16,10 @@ AgentKit 定义业务结构、展示语义、组件组合、组件输入及回�
 
 `ComposerLabels` 允许宿主提供产品 copy/本地化；`ComposerAffordances` 显式提供附件、模型、预设入口，默认不显示。入口只产生 `OpenEntry {destination, entry}`，不扫描路径、安装 provider、读取凭证或推测 Harness 能力。附件上传、model/preset 等确认写入仍经共享 runtime/presentation；当前首批尚未提供这些入口对应的完整弹层、附件/批注卡片和 settings 控件。
 
+模型/预设新增可独立挂载的 `ComposerChoices` 内容组件，输入捕获的 destination/kind、版本化宿主 catalog、selected 值与 loading/ready/error；输出带 request、catalog revision 和原 choice 的选择/关闭回调。未知 selected 保持可见，不自动选择第一项；disabled reason 保留。控件复用 TekesUI Stack/Text/Button，不实现菜单、滚动、焦点或窗口。宿主决定面板/弹层挂载位置，并在 Composer 组字期间阻止打开/切换目标。此增量尚未接入 demo 的实际目录适配器或原生窗口，不等于完整入口交付。
+
+`RunBinding::begin_settings` 返回保留原 binding 的一次性 `ComposerSettingsRequest`，使用既有 selection generation 防止旧目录覆盖新选择；`commit` 仅更新现有 presentation 的 draft settings，不写入新控制器、不覆盖文字/附件/批注，也不直接调用模型 RPC。宿主仍要 fence 导航和能力、校验最新目录项，并为 Send 提供既有 `SubmissionPreparation`；保留的旧 pane 不会自行知道宿主已切换窗口。详见 [绑定说明](../ui/bindings/README.md#composer-model-and-preset-content)。
+
 事件流程：
 
 1. 宿主将原始公开平台事件交给 ContentHost，保留键盘/指针元数据。

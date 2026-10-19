@@ -67,6 +67,32 @@ pub struct RunBinding {
     task: Option<task::TaskRunGuard>,
     child_owner: Option<std::sync::Weak<std::sync::atomic::AtomicBool>>,
 }
+/// Captures the original controller and its selection generation for an async
+/// settings/catalog gesture. Commit never looks up a newer visible binding.
+pub struct ComposerSettingsRequest {
+    binding: Arc<RunBinding>,
+    token: tekes_agent_presentation::SelectionToken,
+}
+impl ComposerSettingsRequest {
+    pub fn destination(&self) -> &ComposerDestination {
+        &self.token.destination
+    }
+    /// Settings are host-supplied explicit inputs. They are applied by the
+    /// existing SubmissionPreparation hook at Send, never as an implicit RPC.
+    /// Consume this request exactly once; cancellation simply drops it.
+    pub fn commit(
+        self,
+        settings: std::collections::BTreeMap<String, serde_json::Value>,
+    ) -> Result<bool> {
+        self.binding.require_controls(&self.token.destination)?;
+        Ok(self
+            .binding
+            .controller
+            .as_ref()
+            .expect("validated controller")
+            .commit_settings(&self.token, settings, false))
+    }
+}
 struct ScopedPreparation<'a> {
     binding: &'a RunBinding,
     host: &'a dyn SubmissionPreparation,
@@ -113,6 +139,24 @@ impl RunBinding {
             .as_ref()
             .ok_or_else(|| unsupported("read-only bounded child"))?
             .edit_text(destination, text)
+    }
+    /// Begin one settings gesture, invalidating an older catalog request through
+    /// the existing presentation generation. Hosts must also fence navigation
+    /// before presenting results and retain this exact request for completion.
+    pub fn begin_settings(
+        self: &Arc<Self>,
+        destination: &ComposerDestination,
+    ) -> Result<ComposerSettingsRequest> {
+        self.require_controls(destination)?;
+        let token = self
+            .controller
+            .as_ref()
+            .expect("validated controller")
+            .select(destination.clone())?;
+        Ok(ComposerSettingsRequest {
+            binding: self.clone(),
+            token,
+        })
     }
     /// One captured admission through RunController, without automatic retry.
     /// Model/auth/preset work is an explicit host callback.

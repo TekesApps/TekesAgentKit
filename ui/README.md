@@ -15,6 +15,8 @@
 
 当前已有可独立挂载的 `Composer`、`Indicators`、`Sidebar`、`SidePanel`、`SummaryView` 和 `ThreadRename` 首批实现。正式 Transcript、RunView，以及任务/子代理/SideChat 的 Run 内容、完整宿主集成和原生窗口验收仍在进行中。不要把下面的测试宿主截图当成最终 Transcript 设计。
 
+模型/预设新增独立 `ComposerChoices` 内容和 `ComposerSettingsRequest` 绑定；公开目录输入、回调与宿主责任见 [接入说明](bindings/README.md#composer-model-and-preset-content)。该增量尚未接入 demo 的实际目录和原生面板，详情见 [验证记录](../docs/rust-agent-ui-composer-choices-20261019.md)。
+
 新增实验 [runtime 绑定包](bindings/README.md)，连接组件回调、既有 RunController、历史 lease 与 SideChat 通知；不复制业务状态机。原生 demo 尚未迁移到正式 RunView。
 
 `--components` 启用实际 Composer/Indicators + RunBinding 的独立原生验证窗口，可与 `--native-selftest`、`--offscreen` 或显式 `--endpoint-config` 组合。已完成合成文本服务、发送/取消、草稿隔离和重连的窗口验证；真实三端离屏接入可加 `--ui-components`。截图与验收范围见 [原生组件接入记录](../docs/rust-agent-ui-native-controls-20261019.md)。它不包含正式 Transcript，也不是标准 RunView。

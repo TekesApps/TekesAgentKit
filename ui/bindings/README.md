@@ -235,3 +235,47 @@ fork pointer is opened through a fresh history lease even if its inventory updat
 has not arrived. Late completion never steals a newer selection or composition.
 Archive clears only its still-current source selection, leaving an explicit empty
 state and preserving retained drafts. Neither action creates a blank fallback run.
+
+## Composer model and preset content
+
+`ComposerChoices` is independently mountable **content**, not a new menu/window
+implementation. Place it in the host's public TekesUI layout/panel/popover. Keep
+the Composer's existing marked-text barrier around opening, target changes and
+navigation; this button-only component does not own an input context.
+
+1. Capture the exact `Arc<RunBinding>` and destination from `ComposerIntent::OpenEntry`.
+   Call `binding.begin_settings(&destination)` once, and keep that non-cloneable
+   `ComposerSettingsRequest` with the gesture. It advances the existing controller's
+   selection generation; an earlier catalog/settings request can no longer commit.
+2. Call `choices.open(destination, Model|Preset)` and keep its returned request.
+   Read a catalog through an explicit host adapter using current endpoint capability
+   and the actual receiving session. No installation, credentials or filesystem
+   discovery is performed by the component. Fence host navigation before presenting
+   that read; an inactive retained binding does not know the current window selection.
+3. `choices.update(&request, catalog)` accepts a nonzero increasing revision and
+   unique choice IDs. Loading/error rows are readable but disabled; current values
+   absent from the catalog remain visible. It never defaults to the first row.
+   New versions and open gestures use fresh row IDs; stale async data/AX callbacks
+   cannot target a newer catalog. Invalid input leaves the prior catalog intact.
+4. Drain `choices.take_intents` after each event and before updates. A Select callback
+   contains the original request, catalog revision and choice. Recheck current catalog
+   authority in the host. Pending blocks duplicate clicks; there is no automatic
+   retry or network call. Dismissal unmounts local content without cancelling an
+   already-dispatched remote operation. Retain remote reconciliation identity if
+   the host performs a mutation and the result is uncertain.
+5. Compile the host's **complete explicit settings map** and consume the captured
+   `settings_request.commit(settings)`. This calls the existing RunController
+   `commit_settings`; it does not patch message prose or parse a prompt into options.
+   It preserves text/artifacts/annotations and checks task/child/SideChat lifetime.
+   `Ok(false)` means the generation is obsolete; `Err` means the pane is no longer
+   writable. Drop the request on cancellation. Never resolve through the newest
+   visible binding or replay a stale request against another controller.
+6. Complete the local choice gesture using its exact selection. On success it closes;
+   an error stays visible with the catalog. Any explicit fresh settings gesture needs
+   a fresh binding request. Shared Send still freezes settings in PreparedSubmission;
+   the existing host SubmissionPreparation applies model/preset/auth before dispatch.
+
+This increment has component/fixture and second-public-consumer tests. It does not
+yet wire a real catalog adapter into ComponentDemo or prove a native menu/panel,
+physical IME, provider-specific reasoning switches or complete model/preset parity.
+The demo's default NoSettings preparation continues to reject nonempty settings.

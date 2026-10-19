@@ -1,4 +1,27 @@
 //! Second consumer: depends only on AgentKit's public UI packages.
+#[test]
+fn independent_host_mounts_composer_choices_without_a_catalog_service_or_run_surface() {
+    use tekes_agent_components_ui::{
+        ComposerChoiceKind, ComposerChoices, ComposerDestination, RunScope,
+    };
+    let mut choices = ComposerChoices::new(85, Default::default());
+    let request = choices
+        .open(
+            ComposerDestination::run(RunScope::main("public", "session")),
+            ComposerChoiceKind::Preset,
+        )
+        .unwrap();
+    let root = choices.id();
+    let host = choices.into_host().unwrap();
+    assert_eq!(
+        host.get(root)
+            .unwrap()
+            .component::<ComposerChoices>()
+            .unwrap()
+            .request(),
+        Some(&request)
+    );
+}
 /// Hosts use the binding's current pointer authority rather than caching a tab's
 /// creation phase or treating an absent ephemeral pointer as a new conversation.
 pub fn pane_is_present(binding: &tekes_agent_ui_bindings::RunBinding) -> bool {
