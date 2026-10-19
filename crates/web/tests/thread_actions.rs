@@ -164,14 +164,10 @@ struct Host {
 #[async_trait]
 impl ThreadActionHost for Host {
     fn methods(&self) -> std::collections::BTreeSet<String> {
-        ["thread.setPinned".into(), "thread.movePin".into()].into()
+        ["thread.setPinned".into()].into()
     }
-    fn pin_position(&self, _: &str, _: &str) -> Option<ThreadPinPosition> {
-        Some(ThreadPinPosition {
-            pinned: true,
-            can_move_up: false,
-            can_move_down: true,
-        })
+    fn pin_state(&self, _: &str, _: &str) -> Option<ThreadPinState> {
+        Some(ThreadPinState { pinned: true })
     }
     async fn perform(
         &self,
@@ -198,10 +194,10 @@ async fn pin_authority_is_an_explicit_shared_host_callback() {
         .unwrap();
     assert_eq!(menu.items[0].id, "unpin");
     assert!(menu.items[0].enabled);
-    agent.request(&request("movePinDown")).await.unwrap();
+    agent.request(&request("unpin")).await.unwrap();
     assert_eq!(
         *host.calls.lock().unwrap(),
-        vec!["test:source:movePinDown:stable"]
+        vec!["test:source:unpin:stable"]
     );
     assert!(connector.calls.lock().unwrap().is_empty());
 }
@@ -213,16 +209,23 @@ async fn owned_pins_broadcast_to_multiple_observers_and_replay_survives_restart(
     let path = directory.join("preferences.json");
     let _ = std::fs::remove_file(&path);
     let (mut agent, connector) = setup().await;
-    agent.open_thread_preferences(&path, "user/workspace").unwrap();
+    agent
+        .open_thread_preferences(&path, "user/workspace")
+        .unwrap();
     let agent = Arc::new(agent);
     let mut observers = Vec::new();
     let mut tasks = Vec::new();
     for _ in 0..2 {
         let (tx, mut rx) = tokio::sync::mpsc::channel(8);
         let owner = agent.clone();
-        tasks.push(tokio::spawn(async move { owner.follow(&json!({"endpoint":"test","target":"state"}), tx).await }));
+        tasks.push(tokio::spawn(async move {
+            owner
+                .follow(&json!({"endpoint":"test","target":"state"}), tx)
+                .await
+        }));
         let baseline = rx.recv().await.unwrap();
         assert!(baseline["sessions"][0].get("pin").is_none());
+        assert_eq!(baseline["sessions"][0]["activity"]["status"], "idle");
         observers.push(rx);
     }
     agent.request(&request("pin")).await.unwrap();
@@ -230,21 +233,44 @@ async fn owned_pins_broadcast_to_multiple_observers_and_replay_survives_restart(
         tokio::time::timeout(Duration::from_secs(2), async {
             loop {
                 let inventory = rx.recv().await.unwrap();
-                if inventory["sessions"][0]["pin"]["order"] == 0 { break; }
+                if inventory["sessions"][0]["pin"]["pinned"] == true {
+                    break;
+                }
             }
-        }).await.unwrap();
+        })
+        .await
+        .unwrap();
     }
     // A retry reconciles successfully even though "pin" is no longer today's menu ID.
     agent.request(&request("pin")).await.unwrap();
-    assert_eq!(agent.thread_actions(&agent.endpoint("test").unwrap(), "source").unwrap().items[0].id, "unpin");
+    assert_eq!(
+        agent
+            .thread_actions(&agent.endpoint("test").unwrap(), "source")
+            .unwrap()
+            .items[0]
+            .id,
+        "unpin"
+    );
     assert!(connector.calls.lock().unwrap().is_empty());
-    for task in tasks { task.abort(); let _ = task.await; }
+    for task in tasks {
+        task.abort();
+        let _ = task.await;
+    }
     drop(observers);
     drop(agent);
     let (mut restarted, _) = setup().await;
-    restarted.open_thread_preferences(&path, "user/workspace").unwrap();
+    restarted
+        .open_thread_preferences(&path, "user/workspace")
+        .unwrap();
     restarted.request(&request("pin")).await.unwrap();
-    assert_eq!(restarted.thread_actions(&restarted.endpoint("test").unwrap(), "source").unwrap().items[0].id, "unpin");
+    assert_eq!(
+        restarted
+            .thread_actions(&restarted.endpoint("test").unwrap(), "source")
+            .unwrap()
+            .items[0]
+            .id,
+        "unpin"
+    );
     let mut unpin = request("unpin");
     unpin["rpcId"] = json!("unpin-once");
     restarted.request(&unpin).await.unwrap();

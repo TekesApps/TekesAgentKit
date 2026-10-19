@@ -12,9 +12,15 @@ use std::{
 use tekes_agent_contract::*;
 use tokio::sync::watch;
 
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PinIdentity {
+    endpoint: String,
+    session_id: String,
+}
 #[derive(Clone, Default, Serialize, Deserialize)]
 struct Scope {
-    pins: Vec<ThreadActionNavigation>,
+    pins: BTreeSet<PinIdentity>,
     receipts: BTreeMap<String, ThreadActionRequest>,
 }
 #[derive(Clone, Serialize, Deserialize)]
@@ -56,16 +62,16 @@ impl ThreadPreferences {
         lock.try_lock().map_err(|e| {
             Error::Transport(format!("thread preference store already in use: {e}"))
         })?;
-        let document: Document = match fs::read(&path) {
+        let mut document: Document = match fs::read(&path) {
             Ok(bytes) => serde_json::from_slice(&bytes)?,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Document {
-                version: 1,
+                version: 2,
                 scopes: BTreeMap::new(),
             },
             Err(e) => return Err(io_error(e)),
         };
         require(
-            document.version == 1,
+            matches!(document.version, 1 | 2),
             "unsupported thread preference version",
         )?;
         for value in document.scopes.values() {
@@ -79,13 +85,24 @@ impl ThreadPreferences {
                 )?;
             }
         }
-        Ok(Self {
+        let migrate = document.version == 1;
+        document.version = 2;
+        for scope in document.scopes.values_mut() {
+            scope
+                .receipts
+                .retain(|_, r| matches!(r.action_id.as_str(), "pin" | "unpin"));
+        }
+        let store = Self {
             path,
             scope: scope.into(),
             state: Mutex::new(document),
             changes: watch::channel(0).0,
             _lock: lock,
-        })
+        };
+        if migrate {
+            store.commit(&store.state.lock().expect("preferences lock"))?;
+        }
+        Ok(store)
     }
     pub fn subscribe(&self) -> watch::Receiver<u64> {
         self.changes.subscribe()
@@ -96,7 +113,15 @@ impl ThreadPreferences {
             .expect("preferences lock")
             .scopes
             .get(&self.scope)
-            .map(|s| s.pins.clone())
+            .map(|s| {
+                s.pins
+                    .iter()
+                    .map(|p| ThreadActionNavigation {
+                        endpoint: p.endpoint.clone(),
+                        session_id: p.session_id.clone(),
+                    })
+                    .collect()
+            })
             .unwrap_or_default()
     }
     /// Reconcile an acknowledged local action before checking today's menu state.
@@ -157,17 +182,15 @@ impl ThreadPreferences {
 #[async_trait]
 impl ThreadActionHost for ThreadPreferences {
     fn methods(&self) -> BTreeSet<String> {
-        BTreeSet::from(["thread.setPinned".into(), "thread.movePin".into()])
+        BTreeSet::from(["thread.setPinned".into()])
     }
-    fn pin_position(&self, endpoint: &str, session: &str) -> Option<ThreadPinPosition> {
+    fn pin_state(&self, endpoint: &str, session: &str) -> Option<ThreadPinState> {
         let pins = self.pins();
         let index = pins
             .iter()
             .position(|p| p.endpoint == endpoint && p.session_id == session);
-        Some(ThreadPinPosition {
+        Some(ThreadPinState {
             pinned: index.is_some(),
-            can_move_up: index.is_some_and(|i| i > 0),
-            can_move_down: index.is_some_and(|i| i + 1 < pins.len()),
         })
     }
     async fn perform(
@@ -183,33 +206,16 @@ impl ThreadActionHost for ThreadPreferences {
         }
         let mut next = state.clone();
         let scope = next.scopes.entry(self.scope.clone()).or_default();
-        let index = scope
-            .pins
-            .iter()
-            .position(|p| p.endpoint == endpoint && p.session_id == request.session_id);
+        let identity = PinIdentity {
+            endpoint: endpoint.into(),
+            session_id: request.session_id.clone(),
+        };
         match request.action_id.as_str() {
             "pin" => {
-                if index.is_none() {
-                    scope.pins.push(ThreadActionNavigation {
-                        endpoint: endpoint.into(),
-                        session_id: request.session_id.clone(),
-                    });
-                }
+                scope.pins.insert(identity);
             }
             "unpin" => {
-                if let Some(i) = index {
-                    scope.pins.remove(i);
-                }
-            }
-            "movePinUp" | "movePinDown" => {
-                let i = index.ok_or_else(|| unsupported("thread is not pinned"))?;
-                let target = if request.action_id == "movePinUp" {
-                    i.checked_sub(1)
-                } else {
-                    (i + 1 < scope.pins.len()).then_some(i + 1)
-                }
-                .ok_or_else(|| unsupported("pin order boundary"))?;
-                scope.pins.swap(i, target);
+                scope.pins.remove(&identity);
             }
             _ => return Err(unsupported("unknown local thread action")),
         }
@@ -240,7 +246,7 @@ mod tests {
         }
     }
     #[tokio::test]
-    async fn durable_order_scopes_identity_replay_and_notifications() {
+    async fn durable_relations_scopes_identity_replay_and_notifications() {
         let path = path();
         {
             let store = ThreadPreferences::open(&path, "alice/workspace").unwrap();
@@ -256,18 +262,19 @@ mod tests {
                 .await
                 .unwrap();
             store
-                .perform("pi", &request("same", "movePinUp"), "3")
+                .perform("pi", &request("same", "pin"), "2")
                 .await
                 .unwrap();
-            store
-                .perform("pi", &request("same", "movePinUp"), "3")
-                .await
-                .unwrap();
-            assert_eq!(store.pins()[0].endpoint, "pi");
-            assert!(!store.pin_position("pi", "same").unwrap().can_move_up);
+            assert!(store.pin_state("pi", "same").unwrap().pinned);
             assert!(
                 store
-                    .perform("pi", &request("different", "pin"), "3")
+                    .perform("pi", &request("same", "movePinUp"), "3")
+                    .await
+                    .is_err()
+            );
+            assert!(
+                store
+                    .perform("pi", &request("different", "pin"), "2")
                     .await
                     .is_err()
             );
@@ -280,13 +287,9 @@ mod tests {
                     .iter()
                     .map(|p| p.endpoint.as_str())
                     .collect::<Vec<_>>(),
-                ["pi", "kernel"]
+                ["kernel", "pi"]
             );
-            assert!(
-                store
-                    .replay("pi", &request("same", "movePinUp"), "3")
-                    .unwrap()
-            );
+            assert!(store.replay("pi", &request("same", "pin"), "2").unwrap());
             store
                 .perform("kernel", &request("same", "unpin"), "4")
                 .await
@@ -313,6 +316,27 @@ mod tests {
                 );
             }
         }
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+    #[test]
+    fn legacy_order_migrates_to_relations_without_losing_pins() {
+        let path = path();
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, br#"{"version":1,"scopes":{"s":{"pins":[{"endpoint":"z","sessionId":"same"},{"endpoint":"a","sessionId":"same"}],"receipts":{"old":{"sessionId":"same","actionId":"movePinUp"}}}}}"#).unwrap();
+        let store = ThreadPreferences::open(&path, "s").unwrap();
+        assert!(store.pin_state("z", "same").unwrap().pinned);
+        assert!(store.pin_state("a", "same").unwrap().pinned);
+        let value: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        assert_eq!(value["version"], 2);
+        assert_eq!(value["scopes"]["s"]["receipts"], serde_json::json!({}));
+        assert!(
+            value["scopes"]["s"]["pins"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|p| p.get("order").is_none())
+        );
+        drop(store);
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
     }
     #[tokio::test]

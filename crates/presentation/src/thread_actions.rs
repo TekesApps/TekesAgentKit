@@ -11,7 +11,7 @@ pub struct ThreadActionContext<'a> {
     pub ready: bool,
     pub running: bool,
     pub archived: bool,
-    pub pin: Option<&'a ThreadPinPosition>,
+    pub pin: Option<&'a ThreadPinState>,
     pub host_methods: &'a BTreeSet<String>,
 }
 fn action(
@@ -82,25 +82,6 @@ pub fn thread_actions(context: &ThreadActionContext<'_>) -> ThreadActionsPresent
     };
     copy.copy_text = Some(format!("{}://{backend}/{raw}", c.url_scheme));
     items.push(copy);
-    if let Some(pin) = c.pin.filter(|p| p.pinned) {
-        let support = {
-            (!c.host_methods.contains("thread.movePin")).then_some("当前连接暂不支持置顶排序")
-        };
-        items.push(action(
-            "movePinUp",
-            "上移置顶",
-            "moveUp",
-            "execute",
-            support.or_else(|| (!pin.can_move_up).then_some("已经是第一个置顶会话")),
-        ));
-        items.push(action(
-            "movePinDown",
-            "下移置顶",
-            "moveDown",
-            "execute",
-            support.or_else(|| (!pin.can_move_down).then_some("已经是最后一个置顶会话")),
-        ));
-    }
     if c.archived {
         if c.capabilities.supports_unarchive_session && c.capabilities.supports("session.unarchive")
         {
@@ -189,12 +170,8 @@ mod tests {
     #[test]
     fn pinned_order_and_archive_variant_come_from_authority() {
         let capabilities = caps();
-        let methods = BTreeSet::from(["thread.setPinned".into(), "thread.movePin".into()]);
-        let pin = ThreadPinPosition {
-            pinned: true,
-            can_move_up: false,
-            can_move_down: true,
-        };
+        let methods = BTreeSet::from(["thread.setPinned".into()]);
+        let pin = ThreadPinState { pinned: true };
         let context = ThreadActionContext {
             endpoint: "k",
             session_id: "s",
@@ -214,19 +191,10 @@ mod tests {
                 .iter()
                 .map(|i| i.id.as_str())
                 .collect::<Vec<_>>(),
-            [
-                "unpin",
-                "rename",
-                "fork",
-                "copySessionId",
-                "movePinUp",
-                "movePinDown",
-                "unarchive"
-            ]
+            ["unpin", "rename", "fork", "copySessionId", "unarchive"]
         );
         assert!(result.items[0].enabled);
-        assert!(!result.items[4].enabled);
-        assert!(result.items[5].enabled);
+        assert!(result.items[4].enabled);
         let request = ThreadActionRequest {
             session_id: "s".into(),
             action_id: "movePinUp".into(),
@@ -386,7 +354,7 @@ pub fn thread_action_command(
         "fork" => ThreadActionCommand::Fork,
         "archive" => ThreadActionCommand::Archive,
         "unarchive" => ThreadActionCommand::Unarchive,
-        "pin" | "unpin" | "movePinUp" | "movePinDown" => ThreadActionCommand::Host,
+        "pin" | "unpin" => ThreadActionCommand::Host,
         _ => {
             return Err(Error::Unsupported(
                 "thread action requires a client gesture".into(),

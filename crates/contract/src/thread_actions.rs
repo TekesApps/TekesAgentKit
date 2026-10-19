@@ -22,7 +22,11 @@ binding!(ThreadActionsPresentation, ACTIONS_TYPESCRIPT, {
     items: Vec<ThreadActionDefinition> => "items": "ThreadActionDefinition[]",
 });
 binding!(ThreadPinPresentation, PIN_TYPESCRIPT, {
-    order: u64 => "order": "number",
+    pinned: bool => "pinned": "boolean",
+});
+binding!(ThreadActivity, ACTIVITY_TYPESCRIPT, {
+    status: String => "status": "'running' | 'queued' | 'waitingForInput' | 'completed' | 'notStarted' | 'failed' | 'cancelled' | 'idle' | 'unknown'",
+    is_stale: bool => "isStale": "boolean",
 });
 binding!(ThreadActionRequest, ACTION_REQUEST_TYPESCRIPT, {
     session_id: String => "sessionId": "string",
@@ -58,17 +62,15 @@ impl Default for ThreadActionOutcome {
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct ThreadPinPosition {
+pub struct ThreadPinState {
     pub pinned: bool,
-    pub can_move_up: bool,
-    pub can_move_down: bool,
 }
 
 /// Shared local-action authority. AgentKit supplies durable pin storage; hosts may adapt it. A consumer must not create an independent pin database.
 #[async_trait]
 pub trait ThreadActionHost: Send + Sync {
     fn methods(&self) -> BTreeSet<String>;
-    fn pin_position(&self, endpoint: &str, session: &str) -> Option<ThreadPinPosition>;
+    fn pin_state(&self, endpoint: &str, session: &str) -> Option<ThreadPinState>;
     async fn perform(
         &self,
         endpoint: &str,
@@ -82,6 +84,7 @@ pub fn thread_actions_typescript() -> String {
         ACTIONS_TYPESCRIPT,
         ACTION_REQUEST_TYPESCRIPT,
         PIN_TYPESCRIPT,
+        ACTIVITY_TYPESCRIPT,
         NAVIGATION_TYPESCRIPT,
         OUTCOME_TYPESCRIPT,
     ]

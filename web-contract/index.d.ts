@@ -50,7 +50,11 @@ export interface ThreadActionRequest {
   title?: string;
 }
 export interface ThreadPinPresentation {
-  order: number;
+  pinned: boolean;
+}
+export interface ThreadActivity {
+  status: 'running' | 'queued' | 'waitingForInput' | 'completed' | 'notStarted' | 'failed' | 'cancelled' | 'idle' | 'unknown';
+  isStale: boolean;
 }
 export interface ThreadActionNavigation {
   endpoint: string;

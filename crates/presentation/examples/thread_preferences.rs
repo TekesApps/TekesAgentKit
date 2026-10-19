@@ -18,7 +18,7 @@ async fn main() -> tekes_agent_contract::Result<()> {
     }
     {
         let reopened = ThreadPreferences::open(&path, "example/workspace")?;
-        assert!(reopened.pin_position("example", "example").unwrap().pinned);
+        assert!(reopened.pin_state("example", "example").unwrap().pinned);
         assert!(reopened.replay("example", &request, "consumer-pin")?);
     }
     std::fs::remove_dir_all(root).unwrap();

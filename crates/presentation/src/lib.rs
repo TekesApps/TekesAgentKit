@@ -28,3 +28,6 @@ mod bounded_history;
 
 mod thread_preferences;
 pub use thread_preferences::*;
+
+mod thread_activity;
+pub use thread_activity::*;

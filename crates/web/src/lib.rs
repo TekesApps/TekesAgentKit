@@ -178,9 +178,11 @@ impl SharedAgent {
     fn inventory(&self, shared: &SharedEndpoint, state: &MemoryProjectionStore) -> Value {
         let pins = self.thread_preferences.as_ref().map(|p| p.pins()).unwrap_or_default();
         let sessions: Vec<Value> = active_inventory(state).into_iter().map(|mut row| {
-            if let Some(order) = pins.iter().position(|p| p.endpoint == state.endpoint_id && row["sessionId"] == p.session_id) {
-                row["pin"] = json!(ThreadPinPresentation {order:order as u64});
+            if pins.iter().any(|p| p.endpoint == state.endpoint_id && row["sessionId"] == p.session_id) {
+                row["pin"] = json!(ThreadPinPresentation {pinned:true});
             }
+            let id = row["sessionId"].as_str().expect("inventory identity");
+            row["activity"] = serde_json::to_value(tekes_agent_presentation::thread_activity(state, id)).expect("thread activity");
             row
         }).collect();
         json!({"description":shared.description(),"sessions":sessions})
@@ -211,7 +213,7 @@ impl SharedAgent {
         let pin = self
             .thread_action_host
             .as_ref()
-            .and_then(|h| h.pin_position(&state.endpoint_id, id));
+            .and_then(|h| h.pin_state(&state.endpoint_id, id));
         let summary = session.summary.as_ref();
         let archived = state.archived_session_ids.iter().any(|s| s == id)
             || summary.is_some_and(|s| s["status"] == "archived");
@@ -246,7 +248,7 @@ impl SharedAgent {
         rpc_id: &str,
     ) -> Result<ThreadActionOutcome> {
         use tekes_agent_presentation::{ThreadActionCommand, thread_action_command};
-        if matches!(request.action_id.as_str(), "pin" | "unpin" | "movePinUp" | "movePinDown") {
+        if matches!(request.action_id.as_str(), "pin" | "unpin") {
             if let Some(store) = &self.thread_preferences {
                 if store.replay(&shared.runtime.snapshot().endpoint_id, &request, rpc_id)? {
                     return Ok(ThreadActionOutcome::default());
