@@ -1692,6 +1692,7 @@ pub fn run() {
     if let Some(index) = args.iter().position(|arg| arg == "--offscreen") {
         let mut model_proof = serde_json::Value::Null;
         let mut context_proof = serde_json::Value::Null;
+        let mut preset_proof = serde_json::Value::Null;
         if args.iter().any(|arg| arg == "--model-choice-proof") {
             let commands = host
                 .view
@@ -1895,6 +1896,173 @@ pub fn run() {
             host.view.sync().unwrap();
             context_proof = serde_json::json!({"mountedCards":true,"explicitRemoval":true,"referenceReturned":true,"annotationReturned":true,"promptSettled":true,"clearedDraft":true,"fileUpload":false,"nativeInteraction":false,"structuredTranscript":false});
         }
+        if args.iter().any(|arg| arg == "--initial-preset-proof") {
+            use tekes_agent_components_ui::{
+                ComposerChoiceIntent, ComposerChoiceKind, ComposerChoices,
+            };
+            use tekes_agent_presentation::{ComposerDestination, RunController};
+            use tekes_agent_ui_bindings::{InitialPresetChoices, MODEL_SELECTION_SETTING};
+            let cwd_index = args
+                .iter()
+                .position(|arg| arg == "--initial-preset-cwd")
+                .expect("explicit preset create cwd");
+            let cwd = args.get(cwd_index + 1).expect("preset create cwd").clone();
+            assert!(std::path::Path::new(&cwd).is_absolute());
+            let binding = host.view.binding().clone();
+            let original_draft = binding.current_run().unwrap().draft.clone();
+            let source = host
+                .executor
+                .block_on(InitialPresetChoices::load(
+                    &host.runtime,
+                    1,
+                    "proof-initial-presets",
+                ))
+                .expect("initial preset catalog");
+            // Scripted synthetic proof choice only. Production never auto-selects a row.
+            let chosen = source
+                .catalog
+                .choices
+                .iter()
+                .find(|row| row.enabled)
+                .expect("selectable initial preset")
+                .id
+                .clone();
+            let destination = ComposerDestination::NewThread {
+                endpoint_id: binding.scope().endpoint_id.clone(),
+                workspace_id: "explicit-preset-proof".into(),
+            };
+            let mut panel = ComposerChoices::new(98, Default::default());
+            let request = panel
+                .open(destination.clone(), ComposerChoiceKind::Preset)
+                .unwrap();
+            panel.update(&request, source.catalog.clone()).unwrap();
+            let root = panel.id();
+            let target = panel.choice_id(&chosen).unwrap();
+            let mut panel_host = panel.into_host().unwrap();
+            panel_host.accessibility_action(target, None, AccessibilityAction::Press);
+            let actions = panel_host.drain_actions();
+            let mut intents = panel_host
+                .get_mut(root)
+                .unwrap()
+                .component_mut::<ComposerChoices>()
+                .unwrap()
+                .take_intents(&actions);
+            assert_eq!(intents.len(), 1);
+            let ComposerChoiceIntent::Select(selection) = intents.remove(0) else {
+                panic!("explicit preset selection")
+            };
+            let snapshot = host.executor.block_on(async {
+                let controller = RunController::new(host.runtime.clone()).unwrap();
+                let token = controller.select(destination.clone()).unwrap();
+                let models = binding
+                    .model_choices(1, "proof-preset-models")
+                    .await
+                    .unwrap();
+                let current = models
+                    .catalog
+                    .selected
+                    .as_ref()
+                    .expect("synthetic current model");
+                let model = models.selection(current).unwrap();
+                assert!(controller.commit_settings(
+                    &token,
+                    std::collections::BTreeMap::from([(MODEL_SELECTION_SETTING.into(), model)]),
+                    false
+                ));
+                controller
+                    .edit_text(&destination, "AgentKit initial preset UI proof".into())
+                    .unwrap();
+                let create = InitialPresetChoices::revalidate_create(
+                    &host.runtime,
+                    &selection,
+                    tekes_agent_contract::CreateSessionRequest {
+                        cwd: Some(cwd),
+                        workspace_id: None,
+                        session_id: None,
+                        agent_preset: None,
+                    },
+                    "proof-preset-before-create",
+                )
+                .await
+                .unwrap();
+                let ticket = controller
+                    .prepare(&destination, tekes_agent_contract::PromptMode::Queue)
+                    .unwrap();
+                let mut changes = controller.subscribe();
+                controller
+                    .dispatch_with(ticket, Some(create), &ModelSelectionPreparation)
+                    .await
+                    .unwrap();
+                tokio::time::timeout(Duration::from_secs(30), async {
+                    loop {
+                        let snapshot = controller.snapshot();
+                        if snapshot.can_submit
+                            && snapshot.transcript.items.iter().any(|i| {
+                                i.kind == tekes_agent_presentation::TranscriptItemKind::Assistant
+                                    && i.is_final
+                            })
+                        {
+                            return snapshot;
+                        }
+                        changes.changed().await.unwrap();
+                    }
+                })
+                .await
+                .expect("created preset prompt settlement")
+            });
+            let scope = snapshot
+                .selection
+                .as_ref()
+                .and_then(|token| match &token.destination {
+                    ComposerDestination::Run { scope } => Some(scope),
+                    _ => None,
+                })
+                .expect("materialized preset scope");
+            assert_ne!(scope.session_id, binding.scope().session_id);
+            assert_eq!(
+                snapshot
+                    .transcript
+                    .items
+                    .iter()
+                    .filter(
+                        |i| i.kind == tekes_agent_presentation::TranscriptItemKind::User
+                            && i.text == "AgentKit initial preset UI proof"
+                    )
+                    .count(),
+                1
+            );
+            assert_eq!(binding.current_run().unwrap().draft, original_draft);
+            let returned = host
+                .runtime
+                .inspect(|s| {
+                    s.sessions
+                        .get(&scope.session_id)
+                        .and_then(|s| s.summary.clone())
+                })
+                .expect("created preset inventory");
+            let returned_preset = returned["initialPresetId"]
+                .as_str()
+                .or_else(|| returned["initialPresetID"].as_str())
+                .or_else(|| returned["agentPreset"].as_str())
+                .or_else(|| returned["identityProfile"].as_str())
+                .map(str::to_owned)
+                .or_else(|| {
+                    host.runtime.inspect(|s| {
+                        s.sessions
+                            .get(&scope.session_id)
+                            .and_then(|s| s.projections.get("agentPreset"))
+                            .and_then(|value| value.value.as_str().map(str::to_owned))
+                    })
+                });
+            if let Some(id) = &returned_preset {
+                assert_eq!(id, &chosen, "preset identity round trip");
+            }
+            if kind != "pi" {
+                assert!(returned_preset.is_some(), "preset identity not published");
+            }
+            host.view.sync().unwrap();
+            preset_proof = serde_json::json!({"catalogChoices":source.catalog.choices.len(),"explicitSelection":true,"createdSession":true,"selectedPreset":chosen,"presetIdentityReturned":returned_preset.is_some(),"singleInput":true,"promptSettled":true,"originalDraftPreserved":true,"nativeInteraction":false,"productionCreationEntry":false});
+        }
         let clip = Rect::new(0., 0., 1000., 760.);
         host.text.atlas.begin_frame();
         host.view
@@ -1942,6 +2110,7 @@ pub fn run() {
             "summaryMounted": host.view.tree.get(host.view.summary_id()).is_some(),
             "modelChoiceProof":model_proof,
             "contextProof":context_proof,
+            "initialPresetProof":preset_proof,
             })
         );
         host.executor.block_on(host.runtime.stop()).unwrap();

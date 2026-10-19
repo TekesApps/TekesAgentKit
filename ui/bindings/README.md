@@ -350,3 +350,42 @@ upload/preview is claimed. --ui-context in the real-SEP script proves reference
 and annotation text return with isolated local synthetic providers. It does not
 prove structured historical cards, content undo, a native file picker, an
 annotation editor, source highlights, physical IME or VoiceOver.
+
+## Initial preset creation inputs
+
+`InitialPresetChoices::load(runtime, revision, rpc_id)` reads the advertised public
+`session.initialPresets`, or DSH `presets.list` when the former is absent. Read
+errors remain errors; there is no cached/empty-success fallback. A connection
+epoch change rejects the read. The normalized catalog mounts in ComposerChoices
+with `ComposerChoiceKind::Preset`. Preserve the original request/destination and
+host navigation generation around every await. Only mount it for NewThread;
+existing sessions retain their initial preset, including blank sessions.
+
+The adapter retains the raw source and default ID, disables unavailable/broken
+rows, and rejects malformed/duplicate/ambiguous identities. A harness default is
+metadata, not an explicit user selection: keep catalog.selected unset until the
+host has an actual draft choice. For automatic selection, pass the original
+CreateSessionRequest with agent_preset=None directly to the existing controller.
+Do not insert configurationText into authored text or model instructions.
+
+After an explicit choice, use `create_request` to validate proposed host inputs.
+At Send, freeze the draft with the existing controller.prepare immediately, then
+re-read with `InitialPresetChoices::revalidate_create` before dispatch_with. Match
+the choice request destination to the prepared ticket, recheck the host's current
+gesture/navigation authority, and pass the returned CreateSessionRequest as the
+controller's create argument. If validation fails after prepare, cancel_prepared
+to restore the admitted draft. Never leave a ticket reserved or automatically
+replace a missing choice. Preserve the session ID and RPC identity on uncertain
+creation; the controller owns materialization and submission reconciliation.
+
+The helper sets only agent_preset and checks conflicting preset/workspace inputs.
+Paths, workspace routing and permissions remain explicit host inputs. It never
+calls presets.select or changes an existing session. Initial presets remain
+creation inputs separate from modelSelection draft settings; an explicit host
+SubmissionPreparation may still configure the created model before one prompt.
+
+The second public consumer exposes initial_preset_panel without RunSurface. The
+demo's `--initial-preset-proof --initial-preset-cwd ABSOLUTE_PATH --offscreen PNG`
+script exercises public selection and shared creation with synthetic providers.
+This is not the interactive NewThread creation entry or native preset acceptance;
+those still need to be wired in the component demo. Physical IME remains unverified.

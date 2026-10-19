@@ -56,6 +56,7 @@ pub struct Fixture {
     catalog_fails: Arc<AtomicBool>,
     lifecycle: bool,
     models: bool,
+    presets: Option<bool>,
     inventory_sender: broadcast::Sender<Value>,
     workspace_sender: broadcast::Sender<Value>,
     mutations: Arc<Mutex<MutationReceipts>>,
@@ -150,6 +151,7 @@ impl Default for Fixture {
             catalog_fails: Arc::new(AtomicBool::new(false)),
             lifecycle: false,
             models: false,
+            presets: None,
             inventory_sender: broadcast::channel(256).0,
             workspace_sender: broadcast::channel(256).0,
             mutations: Arc::new(Mutex::new(BTreeMap::new())),
@@ -157,6 +159,19 @@ impl Default for Fixture {
     }
 }
 impl Fixture {
+    pub fn with_presets(mut self, legacy_roster: bool) -> Self {
+        self.presets = Some(legacy_roster);
+        self
+    }
+    pub fn creation_receipts(&self) -> Vec<Value> {
+        self.mutations
+            .lock()
+            .unwrap()
+            .values()
+            .filter(|(method, _, _)| method == "session.create")
+            .map(|(_, payload, _)| payload.clone())
+            .collect()
+    }
     pub fn with_models(mut self) -> Self {
         self.models = true;
         self
@@ -285,6 +300,17 @@ impl SessionEndpoint for Endpoint {
     }
     fn capabilities(&self) -> EndpointCapabilities {
         let mut caps = EndpointCapabilities::methods(&["session.prompt", "session.cancel"]);
+        if let Some(legacy) = self.fixture.presets {
+            caps.methods.extend([
+                "session.create".into(),
+                if legacy {
+                    "presets.list"
+                } else {
+                    "session.initialPresets"
+                }
+                .into(),
+            ]);
+        }
         if self.fixture.models {
             caps.methods
                 .extend(["session.models".into(), "session.selectModel".into()]);
@@ -399,6 +425,65 @@ impl SessionEndpoint for Endpoint {
         Err(unsupported("fixture actionable"))
     }
     async fn call(&self, method: &str, p: Value, rpc: &str) -> Result<Value> {
+        if let Some(legacy) = self.fixture.presets {
+            if method
+                == if legacy {
+                    "presets.list"
+                } else {
+                    "session.initialPresets"
+                }
+            {
+                require(
+                    !self.fixture.catalog_fails.load(Ordering::SeqCst),
+                    "fixture preset catalog unavailable",
+                )?;
+                return Ok(if legacy {
+                    json!({"presets":[{"id":"coding","name":"编程","isDefault":true},{"id":"broken","name":"不可用","broken":"缺少配置"}]})
+                } else {
+                    json!({"presets":[{"id":"coding","title":"编程","configurationText":"SOURCE_NOT_PROMPT"},{"id":"broken","title":"不可用","unavailableReason":"缺少配置"}],"defaultID":"coding"})
+                });
+            }
+            if method == "session.create" {
+                if let Some((old_method, old_payload, result)) =
+                    self.fixture.mutations.lock().unwrap().get(rpc)
+                {
+                    require(
+                        old_method == method && old_payload == &p,
+                        "fixture create identity changed",
+                    )?;
+                    return Ok(result.clone());
+                }
+                let id = string(&p, "sessionId")?;
+                require(
+                    p["agentPreset"].is_null() || p["agentPreset"] == "coding",
+                    "fixture initial preset unavailable",
+                )?;
+                let mut sessions = self.fixture.sessions.lock().unwrap();
+                require(
+                    !sessions.contains_key(id),
+                    "fixture create identity collision",
+                )?;
+                let line = Line {
+                    rows: vec![],
+                    sender: broadcast::channel(256).0,
+                    cancel: Arc::new(AtomicBool::new(false)),
+                    busy: false,
+                    turn: 0,
+                    ephemeral: false,
+                    title: "预设新会话".into(),
+                    archived: false,
+                    model_selection: json!({"provider":"fixture","model":"initial"}),
+                };
+                let _ = self
+                    .fixture
+                    .inventory_sender
+                    .send(json!({"type":"upsert","session":summary(id,&line)}));
+                sessions.insert(id.into(), line);
+                return Ok(self
+                    .fixture
+                    .record(method, &p, rpc, json!({"sessionId":id})));
+            }
+        }
         if method == "subagents.list" {
             if self.fixture.catalog_fails.load(Ordering::SeqCst) {
                 return Err(Error::Transport("fixture catalog unavailable".into()));

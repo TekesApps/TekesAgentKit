@@ -1,4 +1,27 @@
 //! Second consumer: depends only on AgentKit's public UI packages.
+/// Initial preset content is mounted before creation. Hosts retain navigation,
+/// the source/request lifetime and explicit controller create inputs.
+pub fn initial_preset_panel(
+    namespace: u32,
+    source: &tekes_agent_ui_bindings::InitialPresetChoices,
+    destination: tekes_agent_components_ui::ComposerDestination,
+) -> Result<tekes_agent_components_ui::ComposerChoices, String> {
+    use tekes_agent_components_ui::{ComposerChoiceKind, ComposerChoices};
+    if !matches!(
+        &destination,
+        tekes_agent_components_ui::ComposerDestination::NewThread { .. }
+    ) {
+        return Err("existing session retains its initial preset".into());
+    }
+    let mut panel = ComposerChoices::new(namespace, Default::default());
+    let request = panel
+        .open(destination, ComposerChoiceKind::Preset)
+        .map_err(str::to_owned)?;
+    panel
+        .update(&request, source.catalog.clone())
+        .map_err(str::to_owned)?;
+    Ok(panel)
+}
 #[test]
 fn independent_host_mounts_context_inside_composer_with_an_explicit_separate_namespace() {
     use tekes_agent_components_ui::{Composer, ComposerIds};
