@@ -70,3 +70,7 @@ export interface ThreadActionOutcome {
 export interface TranscriptLiveUsage {
   outputTokens: number;
 }
+export interface TranscriptReportedUsage {
+  outputTokens: number;
+  isComplete: boolean;
+}

@@ -174,6 +174,7 @@ impl BoundedHistory {
                     ended_at: None,
                     usage: TokenUsage::default(),
                     live_usage: None,
+                    reported_usage: None,
                 },
             );
             transcript.tools.insert(

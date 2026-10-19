@@ -30,5 +30,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         assert_eq!(value["liveUsage"]["outputTokens"], count);
         println!("{}", value["liveUsage"]);
     }
+    session.apply_live(entry(4, "assistant/message", json!({"turn":1,"step":1,"message":{"id":"response-1","content":[]},"usage":{"outputTokens":38}})))?;
+    session.apply_live(entry(5, "assistant/message", json!({"turn":1,"step":2,"message":{"id":"response-2","content":[]},"usage":{"outputTokens":7}})))?;
+    session.apply_live(entry(6, "turn/end", json!({"turn":1,"reason":"completed"})))?;
+    let restored: SessionProjection = serde_json::from_value(serde_json::to_value(session)?)?;
+    let history = TranscriptSnapshot::read(&RunScope::main("public-consumer", "demo"), &restored)?;
+    let report = history.turns[0].reported_usage.as_ref().unwrap();
+    assert_eq!(report.output_tokens, 45);
+    assert!(report.is_complete);
+    println!("{}", serde_json::to_string(report)?);
     Ok(())
 }

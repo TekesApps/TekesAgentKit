@@ -75,3 +75,30 @@ isolation, reset, a Web service subscription test, and the independent public AP
 consumer `cargo run -p tekes-agent-presentation --example live_output_usage`.
 Existing formatting and Clippy findings in thread actions/annotations were also
 resolved so the standard workspace gates run cleanly; policy behavior is unchanged.
+
+
+## Durable response usage (v0.3.6)
+
+`TranscriptTurn.reportedUsage?: TranscriptReportedUsage` is the uniform durable
+output-token projection for renderers. DSH data is obtained solely through
+DSHEndpoint's authenticated public `session/follow` / `session/page` path. It
+reads actual `assistant/message.usage` or the completed compact stream's usage,
+including reported abandoned attempts. No renderer reads DSH logs or calls its
+specialized endpoints. No provider/protocol switch or Kernel change is involved.
+
+Each admitted durable report replaces the same message identity and then joins
+the turn sum. A provider's authoritative turn/end output total takes precedence.
+`outputTokens=0` means a real zero report; absence means unknown. `isComplete`
+requires either an authoritative turn total or a loaded turn/start plus usage
+for all loaded responses. Known reports can still be summed when history or usage
+is incomplete, but the UI must label them as recorded partial output, never as
+an estimated or complete total. Paging can upgrade coverage and counts; snapshot
+replay, disconnection and reconnection recompute the same facts without double
+counting. Durable usage remains available after settlement, cancellation/failure,
+and while cached authority is stale. Live usage retains its freshness fence.
+
+The Web uses the durable projection for per-turn counters, in progress and in
+history. It updates only when durable reports change, with an x-to-y transition;
+there is no timer ticking, chunk counting or estimation when realtime usage is
+unavailable. The second public API example verifies both live and restored
+completed reports; service tests verify the uniform serialized view contract.
