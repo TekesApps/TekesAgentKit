@@ -4,6 +4,13 @@
 pub fn pane_is_present(binding: &tekes_agent_ui_bindings::RunBinding) -> bool {
     binding.access() != tekes_agent_ui_bindings::PaneAccess::Missing
 }
+/// Task tab identity and loading/missing/error inputs come from the shared task
+/// projection, never a cached session ID selected by this consumer.
+pub fn resolved_task_tab(
+    source: &tekes_agent_ui_bindings::TaskPaneBinding,
+) -> Result<tekes_agent_components_ui::SidePanelTab, String> {
+    source.tab("Task").map_err(|error| error.to_string())
+}
 /// A second host composes the canonical scratch tab inventory without importing
 /// presentation internals or manufacturing pointers from session-list rows.
 pub fn sync_scratch_tabs(

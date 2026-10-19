@@ -61,8 +61,15 @@ struct Host {
     sidebar_error: Option<String>,
     side_chat_test_started: bool,
     side_chat_test_session: Option<String>,
+    task_test_requested: bool,
+    task_test_started: bool,
 }
 enum HostResult {
+    TaskOpened {
+        parent: RunScope,
+        task_id: String,
+        result: std::result::Result<Option<Arc<RunBinding>>, String>,
+    },
     SideChatOpened {
         request: PanelRequest,
         result: std::result::Result<BoundSideChatRun, String>,
@@ -111,6 +118,18 @@ impl Host {
             let side_chats = self.side_chats.clone();
             self.executor.spawn(async move {
                 let special = match command {
+                    DemoCommand::OpenTask {
+                        parent,
+                        task_id,
+                        source,
+                    } => HostResult::TaskOpened {
+                        parent,
+                        task_id,
+                        result: source
+                            .open_resolved()
+                            .await
+                            .map_err(|error| error.to_string()),
+                    },
                     DemoCommand::CreateSideChat(request) => {
                         let title = sidebar
                             .snapshot()
@@ -226,6 +245,7 @@ impl Host {
                                 ))
                             }
                             DemoCommand::Sidebar(_)
+                            | DemoCommand::OpenTask { .. }
                             | DemoCommand::CreateSideChat(_)
                             | DemoCommand::OpenSideChat { .. }
                             | DemoCommand::CloseSideChat(_)
@@ -251,6 +271,21 @@ impl Host {
     fn draw(&mut self, window: &Window) {
         while let Ok(result) = self.results.try_recv() {
             match result {
+                HostResult::TaskOpened {
+                    parent,
+                    task_id,
+                    result: Ok(Some(binding)),
+                } => match self.view.install_task_run(parent, task_id, binding.clone()) {
+                    Ok(true) => self.observe(&binding, window),
+                    Ok(false) => {}
+                    Err(error) => self.failure(error.to_string()),
+                },
+                HostResult::TaskOpened {
+                    result: Ok(None), ..
+                } => {}
+                HostResult::TaskOpened {
+                    result: Err(error), ..
+                } => self.failure(error),
                 HostResult::SideChatOpened {
                     request,
                     result: Ok(run),
@@ -313,6 +348,8 @@ impl Host {
         if let Err(error) = self.view.sync() {
             self.failure(error.to_string());
         }
+        let background = self.view.take_background_commands();
+        self.commands(Ok(background));
         self.text.scale = window.scale() as f32;
         self.text.frame_requested = false;
         self.text.atlas.begin_frame();
@@ -355,6 +392,39 @@ impl Host {
                 .map(|chat| chat.scope.session_id.clone());
             side_chat_script(&self.view);
         }
+        if self.selftest
+            && self.side_chat_test_started
+            && self.side_chats.snapshot().chats.is_empty()
+        {
+            if !self.task_test_requested {
+                self.task_test_requested = true;
+                // Host navigation explicitly opens a resolved fixture task.
+                // Same-session todo rows have no Summary OpenTask action.
+                let source = Arc::new(tekes_agent_ui_bindings::TaskPaneBinding::for_run(
+                    self.view.binding(),
+                ));
+                let row = self
+                    .view
+                    .binding()
+                    .current_run()
+                    .unwrap()
+                    .summary
+                    .as_ref()
+                    .unwrap()
+                    .tasks[0]
+                    .clone();
+                let token = source
+                    .begin(self.view.binding().scope().clone(), row.id.clone())
+                    .unwrap();
+                assert!(source.commit(&token, Ok(Some(row))));
+                self.view.open_task_source(source).unwrap();
+                let commands = self.view.take_background_commands();
+                self.commands(Ok(commands));
+            } else if !self.task_test_started && self.view.panel_composer_ids().is_some() {
+                self.task_test_started = true;
+                task_script(&self.view);
+            }
+        }
     }
     fn observe(&mut self, binding: &RunBinding, window: &Window) {
         let wake = window.wake_proxy();
@@ -368,6 +438,10 @@ impl Host {
     }
     fn close(&mut self, window: &Window) {
         if self.selftest {
+            assert!(
+                self.task_test_started,
+                "task pane mounted through its resolved source"
+            );
             assert!(
                 self.side_chat_test_started && self.side_chats.snapshot().chats.is_empty(),
                 "scratch closed only after confirmed discard"
@@ -437,6 +511,43 @@ impl Host {
                 "NATIVE_AGENT_SIDECHAT_SELFTEST_OK owned-create+separate-composer+send+stream+draft+cancel-discard+parent-isolation; transcript=false; physical-ime=false"
             );
             let entries = &state.sessions["a"].entries;
+            let task_entries = &state.sessions["b"].entries;
+            assert_eq!(
+                task_entries
+                    .values()
+                    .filter(|row| row.event.kind == "user/message"
+                        && row.event.data.to_string().contains("任务消息"))
+                    .count(),
+                1
+            );
+            assert!(
+                !task_entries
+                    .values()
+                    .any(|row| row.event.kind == "user/message"
+                        && row.event.data.to_string().contains("任务暂存草稿"))
+            );
+            let task_turn = &task_entries
+                .values()
+                .find(|row| {
+                    row.event.kind == "user/message"
+                        && row.event.data.to_string().contains("任务消息")
+                })
+                .unwrap()
+                .event
+                .data["turn"];
+            assert!(
+                task_entries
+                    .values()
+                    .any(|row| row.event.kind == "assistant/message"
+                        && &row.event.data["turn"] == task_turn)
+            );
+            assert!(task_entries.values().any(|row| row.event.kind == "turn/end"
+                && &row.event.data["turn"] == task_turn
+                && row.event.data["reason"] == "interrupted"));
+            assert!(!state.sessions["b"].run_open);
+            println!(
+                "NATIVE_AGENT_TASK_SELFTEST_OK resolved-task+independent-composer+single-admission+stream+cancel+parent-draft-isolation+close; transcript=false; physical-ime=false"
+            );
             for text in ["中文消息", "停止演示"] {
                 assert_eq!(
                     entries
@@ -745,6 +856,8 @@ pub fn run() {
         sidebar_error: None,
         side_chat_test_started: false,
         side_chat_test_session: None,
+        task_test_requested: false,
+        task_test_started: false,
         text: TextBackend {
             shaper: CoreTextShaper::new(fonts.clone()),
             rasterizer: CoreTextRasterizer::new(fonts),
@@ -950,6 +1063,36 @@ fn side_chat_script(view: &ComponentDemo) {
         script.push((800, Action::Capture { path }));
     }
     script.push((900, click(panel.close_id())));
-    script.push((2500, Action::Close));
+    run_script(script);
+}
+fn task_script(view: &ComponentDemo) {
+    use tekes_ui_platform_macos::selftest::{Action, run_script};
+    let click = |id| {
+        let point = view.tree.get(id).unwrap().frame().center();
+        Action::Click {
+            x: point.x as f64,
+            y: point.y as f64,
+        }
+    };
+    let ids = view.panel_composer_ids().expect("resolved task Composer");
+    let panel = view
+        .tree
+        .get(view.panel_id())
+        .unwrap()
+        .component::<SidePanel>()
+        .unwrap();
+    let mut script = vec![
+        (100, click(ids.editor)),
+        (200, Action::Text("任务消息".into())),
+        (400, click(ids.send)),
+        (600, click(ids.editor)),
+        (700, Action::Text("任务暂存草稿".into())),
+        (900, click(ids.cancel)),
+    ];
+    if let Ok(path) = std::env::var("AGENT_TASK_CAPTURE") {
+        script.push((1300, Action::Capture { path }));
+    }
+    script.push((1600, click(panel.close_id())));
+    script.push((2200, Action::Close));
     run_script(script);
 }

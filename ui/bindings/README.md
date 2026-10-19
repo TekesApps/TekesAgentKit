@@ -90,6 +90,46 @@ isolation, late creation, streaming/cancel/discard, stale close callbacks, and
 interrupted discard with explicit reconciliation. The native fixture script
 exercises its own scratch transport and leaves both parent drafts unchanged.
 
+## Task pane resolution
+
+`TaskPaneBinding::new(runtime)` (or `for_run(parent)`) owns the existing
+`TaskPanelState` plus the mounted run lifetime. Begin a selection with the actual
+parent and task ID; commit the host's row query using the returned `TaskLoadToken`.
+Keep observations serial within that selection; begin a new load when replacing
+or cancelling it. The host supplies task lookup/observation explicitly, without
+reading a harness-private database. `snapshot`, `subscribe` and `tab(title)` expose
+the canonical loading/missing/error/value state to the shared SidePanel.
+
+`open_resolved().await` returns no binding for loading/missing/error, and fences a
+late history baseline against source replacement. Name/status updates preserve
+the exact run/Composer draft; pointer changes, failed reads, cancellation, and
+owner drop retire the old binding. `RunBinding` checks that authority both before
+submission and after async host preparation. A→B→A cannot revive old callbacks.
+`owns_run` lets a consumer reject substitution by a main-run cache entry with the
+same session ID. Cache the returned binding with its pane, not with a task's first
+session ID forever. Subscribe to task publications as well as run/runtime changes.
+
+This adapter consumes an explicitly resolved ordinary task run. Independent child
+control remains subject to the existing catalog/continuation policy. Native
+bounded subagent history must use `RunBinding::open_child` with explicit layout;
+do not fabricate a task session from a tool call or use parent history as fallback.
+
+The component demo accepts `open_task_source(Arc<TaskPaneBinding>)` for an explicit
+host loader/navigation input. It also routes existing Summary `OpenTask` actions
+and resolves those rows from canonical SummaryFacts. Same-session todo rows do
+not gain such an action. Drain `take_background_commands` after fact updates to
+open the resolved source; install results through `install_task_run`. A source
+change retires old content, while a failed open waits for explicit tab activation
+before retry. Task-tab close is local navigation: it never cancels/discards the
+remote task. External task loaders must forward their subscription to the host's
+window wake. The native fixture script uses explicit host navigation for a known
+same-session task row; it does not invent Summary navigation for a todo.
+
+Tasks currently mount public Composer/Indicators only. Formal Transcript and the
+complete task RunView still await the same structured-content integration as the
+main run. Tests cover source ABA, stale load tokens, slow baseline completion,
+host-preparation fences, draft lifetime and public-control composition.
+
 ## Shared inventory and thread actions
 
 Create `SidebarBinding::new(agent, endpoint_id)` inside the async runtime, using

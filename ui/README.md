@@ -23,6 +23,8 @@
 
 SideChat 增量使用同一 runtime 的 `SideChatBinding`：已可创建 owned scratch、挂载独立 Composer/Indicators、发送与流式状态回传、取消后确认丢弃，并隔离父会话草稿。关闭结果不确定时保留 pointer/草稿并禁用发送；无自动重试或私有数据库读取。完整 Transcript 尚未接入，仍不是正式 SideChat RunView。公共接入与 reconciliation 责任见 [绑定说明](bindings/README.md#sidechat-tab-authority)。
 
+任务 pane 使用 `TaskPaneBinding` 和既有 TaskPanelState：跟随当前任务行，保留同一 run 的草稿，指针变化时撤销旧控件及回调。demo 支持显式宿主任务源和已有 Summary OpenTask 动作；同会话 todo 保持原来的无独立 run 导航语义。任务原生脚本验证独立输入/发送/取消及父草稿隔离；正式 Transcript 和子代理 pane 仍待接入。详见 [任务绑定说明](bindings/README.md#task-pane-resolution)。
+
 ## 依赖
 
 - Rust 1.95.0、macOS + Metal（原生窗口/文本服务/GPU）；Python 3.11+（准备和边界检查）。

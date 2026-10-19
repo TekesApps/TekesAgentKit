@@ -9,9 +9,12 @@ use tekes_agent_components_ui::{
 };
 use tekes_agent_contract::{PromptMode, Result, SessionAddress, require, unsupported};
 use tekes_agent_presentation::{
-    ComposerDestination, PreparedSubmission, RunScope, SideChat, SideChatSnapshot,
+    ComposerDestination, PreparedSubmission, RunScope, SideChat, SideChatSnapshot, SummaryAction,
+    TaskLoadToken,
 };
-use tekes_agent_ui_bindings::{BoundSideChatRun, RunBinding, SideChatBinding, SidebarPublication};
+use tekes_agent_ui_bindings::{
+    BoundSideChatRun, PaneAccess, RunBinding, SideChatBinding, SidebarPublication, TaskPaneBinding,
+};
 use tekes_ui_controls::{
     ButtonTextRenderer, TextSurface,
     composition::*,
@@ -36,6 +39,11 @@ pub const SELECT_B: ComponentId = ComponentId(101);
 pub const RECONNECT: ComponentId = ComponentId(102);
 
 pub enum DemoCommand {
+    OpenTask {
+        parent: RunScope,
+        task_id: String,
+        source: Arc<TaskPaneBinding>,
+    },
     CreateSideChat(PanelRequest),
     OpenSideChat {
         request: PanelRequest,
@@ -72,12 +80,20 @@ pub struct ComponentDemo {
     side_chats: Option<Arc<SideChatBinding>>,
     panel_selections: BTreeMap<RunScope, SidePanelTabKind>,
     panel_runs: BTreeMap<(RunScope, String), PanelRun>,
+    task_sources: BTreeMap<(RunScope, String), TaskSource>,
+    task_runs: BTreeMap<(RunScope, String), PanelRun>,
+    task_attempts: BTreeMap<(RunScope, String), RunScope>,
+    background_commands: Vec<DemoCommand>,
     next_panel_namespace: u32,
     panel_navigation_revision: u64,
 }
 struct PanelRun {
     binding: Arc<RunBinding>,
     ids: ComposerIds,
+}
+struct TaskSource {
+    source: Arc<TaskPaneBinding>,
+    token: Option<TaskLoadToken>,
 }
 #[derive(Clone, Debug)]
 pub struct PanelRequest {
@@ -225,6 +241,10 @@ impl ComponentDemo {
             side_chats: None,
             panel_selections: BTreeMap::new(),
             panel_runs: BTreeMap::new(),
+            task_sources: BTreeMap::new(),
+            task_runs: BTreeMap::new(),
+            task_attempts: BTreeMap::new(),
+            background_commands: vec![],
             next_panel_namespace: 50_000,
             panel_navigation_revision: 0,
         };
@@ -299,14 +319,105 @@ impl ComponentDemo {
         self.side_chats = Some(binding);
     }
     pub fn panel_composer_ids(&self) -> Option<ComposerIds> {
-        let parent = self.binding().scope();
-        let SidePanelTabKind::SideChat { session_id } = self.panel_selections.get(parent)? else {
-            return None;
-        };
-        self.panel_runs
-            .get(&(parent.clone(), session_id.clone()))
+        self.active_panel_run()
             .map(|run| run.ids)
             .filter(|ids| self.tree.get(ids.root).is_some())
+    }
+    fn active_panel_run(&self) -> Option<&PanelRun> {
+        let parent = self.binding().scope();
+        match self.panel_selections.get(parent)? {
+            SidePanelTabKind::SideChat { session_id } => {
+                self.panel_runs.get(&(parent.clone(), session_id.clone()))
+            }
+            SidePanelTabKind::Task { task_id } => {
+                self.task_runs.get(&(parent.clone(), task_id.clone()))
+            }
+            _ => None,
+        }
+    }
+    pub fn take_background_commands(&mut self) -> Vec<DemoCommand> {
+        std::mem::take(&mut self.background_commands)
+    }
+    /// Explicit host navigation for task rows supplied by its authoritative
+    /// loader. Summary todo rows deliberately have no fabricated OpenTask action.
+    pub fn open_task_source(&mut self, source: Arc<TaskPaneBinding>) -> Result<()> {
+        require(!self.composing(), "finish composition before opening task")?;
+        let state = source.snapshot();
+        let parent = state
+            .parent_scope()
+            .ok_or_else(|| unsupported("task parent unresolved"))?
+            .clone();
+        let task_id = state
+            .active_task_id()
+            .ok_or_else(|| unsupported("task identity unresolved"))?
+            .to_owned();
+        let binding = self
+            .bindings
+            .iter()
+            .find(|binding| binding.scope() == &parent)
+            .ok_or_else(|| unsupported("task parent not mounted"))?;
+        require(source.uses_run(binding), "task runtime authority mismatch")?;
+        let key = (parent.clone(), task_id.clone());
+        if let Some(old) = self.task_sources.get(&key)
+            && !Arc::ptr_eq(&old.source, &source)
+        {
+            old.source.cancel();
+            self.task_runs.remove(&key);
+        }
+        self.task_sources.insert(
+            key.clone(),
+            TaskSource {
+                source,
+                token: None,
+            },
+        );
+        self.task_attempts.remove(&key);
+        self.panel_selections
+            .insert(parent, SidePanelTabKind::Task { task_id });
+        self.panel_navigation_revision += 1;
+        self.tree.focus(None, false);
+        self.sync()
+    }
+    pub fn install_task_run(
+        &mut self,
+        parent: RunScope,
+        task_id: String,
+        run: Arc<RunBinding>,
+    ) -> Result<bool> {
+        let key = (parent, task_id);
+        let Some(source) = self.task_sources.get(&key) else {
+            return Ok(false);
+        };
+        if !source.source.owns_run(&run)
+            || run.access() == PaneAccess::Missing
+            || source
+                .source
+                .snapshot()
+                .value
+                .as_ref()
+                .map(|task| &task.scope)
+                != Some(run.scope())
+        {
+            return Ok(false);
+        }
+        if self
+            .task_runs
+            .get(&key)
+            .is_none_or(|old| !Arc::ptr_eq(&old.binding, &run))
+        {
+            let ids = self.allocate_panel_ids()?;
+            self.task_runs.insert(key, PanelRun { binding: run, ids });
+        }
+        self.sync()?;
+        Ok(true)
+    }
+    fn allocate_panel_ids(&mut self) -> Result<ComposerIds> {
+        let namespace = self.next_panel_namespace;
+        self.next_panel_namespace = namespace
+            .checked_add(1)
+            .filter(|next| *next <= 65_535)
+            .ok_or_else(|| unsupported("demo pane namespaces exhausted"))?;
+        Ok(ComposerIds::new((namespace as u64) << 32))
     }
     fn composing_editor(&self) -> Option<ComponentId> {
         std::iter::once(self.ids())
@@ -350,16 +461,12 @@ impl ComponentDemo {
         }
         let key = (chat.parent.clone(), chat.scope.session_id.clone());
         if !self.panel_runs.contains_key(&key) {
-            let namespace = self.next_panel_namespace;
-            self.next_panel_namespace = namespace
-                .checked_add(1)
-                .filter(|next| *next <= 65_535)
-                .ok_or_else(|| unsupported("demo pane namespaces exhausted"))?;
+            let ids = self.allocate_panel_ids()?;
             self.panel_runs.insert(
                 key,
                 PanelRun {
                     binding: run.binding().clone(),
-                    ids: ComposerIds::new((namespace as u64) << 32),
+                    ids,
                 },
             );
         }
@@ -484,6 +591,40 @@ impl ComponentDemo {
         }
         let panel_id = self.panel_id();
         let parent = binding.scope().clone();
+        // Resolve task rows from each original parent's canonical SummaryFacts,
+        // including inactive parents. A missing/error row revokes old callbacks.
+        self.task_sources.retain(|(parent, id), task| {
+            let state = task.source.snapshot();
+            state.parent_scope() == Some(parent) && state.active_task_id() == Some(id.as_str())
+        });
+        for ((parent, task_id), task) in &self.task_sources {
+            let Some(token) = &task.token else {
+                continue;
+            };
+            let facts = self
+                .bindings
+                .iter()
+                .find(|binding| binding.scope() == parent)
+                .and_then(|binding| binding.current_run())
+                .and_then(|snapshot| snapshot.summary.clone());
+            let result = facts
+                .map(|facts| facts.tasks.into_iter().find(|row| &row.id == task_id))
+                .ok_or_else(|| "Task projection unavailable".into());
+            task.source.commit(token, result);
+        }
+        self.task_runs
+            .retain(|_, run| run.binding.access() != PaneAccess::Missing);
+        self.task_attempts.retain(|key, _| {
+            self.task_sources
+                .get(key)
+                .is_some_and(|source| source.source.snapshot().value.is_some())
+        });
+        let mut tabs = vec![SidePanelTab::summary("Summary")];
+        for ((task_parent, _), task) in &self.task_sources {
+            if task_parent == &parent {
+                tabs.push(task.source.tab("Task")?);
+            }
+        }
         let wanted = self
             .panel_selections
             .entry(parent.clone())
@@ -498,18 +639,14 @@ impl ComponentDemo {
                     .get(id)
                     .is_some_and(|chat| &chat.parent == parent)
             });
-            owner.input(
-                self.panel_revision,
-                &parent,
-                vec![SidePanelTab::summary("Summary")],
-                Some(wanted),
-            )?
+            owner.input(self.panel_revision, &parent, tabs, Some(wanted))?
         } else {
+            let selected = tabs.iter().any(|tab| tab.kind == wanted).then_some(wanted);
             SidePanelInput {
                 revision: self.panel_revision,
                 parent: parent.clone(),
-                tabs: vec![SidePanelTab::summary("Summary")],
-                selected: Some(SidePanelTabKind::Summary),
+                tabs,
+                selected,
                 side_chats: SideChatSnapshot::default(),
                 supports_side_chat: None,
             }
@@ -562,44 +699,81 @@ impl ComponentDemo {
                     .map_err(unsupported)?;
             }
             SidePanelTabKind::SideChat { session_id } => {
-                if let Some(run) = self.panel_runs.get(&(parent, session_id.clone())) {
-                    let ids = run.ids;
-                    let binding = run.binding.clone();
-                    if let Some(snapshot) = binding.current_run() {
-                        if self.tree.get(ids.root).is_none() {
-                            let panel = self
-                                .tree
-                                .get_mut(panel_id)
-                                .expect("panel")
-                                .component_mut::<SidePanel>()
-                                .expect("SidePanel");
-                            let token = panel
-                                .content_token(&SidePanelTabKind::SideChat { session_id })
-                                .expect("scratch token");
-                            panel
-                                .install_content(&token, Self::run_controls(ids))
-                                .map_err(unsupported)?;
-                        }
-                        let gate = binding.access().composer_gate();
-                        self.tree
-                            .get_mut(ids.root)
-                            .expect("scratch composer")
-                            .component_mut::<Composer>()
-                            .expect("Composer")
-                            .update_gated(&snapshot, ComposerAffordances::default(), gate)
-                            .map_err(unsupported)?;
-                        self.tree
-                            .get_mut(ComponentId(ids.root.0 + 17))
-                            .expect("scratch indicators")
-                            .component_mut::<Indicators>()
-                            .expect("Indicators")
-                            .update(&snapshot)
-                            .map_err(unsupported)?;
-                    }
+                let key = (parent, session_id.clone());
+                if let Some(run) = self.panel_runs.get(&key) {
+                    self.sync_pane_controls(
+                        SidePanelTabKind::SideChat { session_id },
+                        run.ids,
+                        run.binding.clone(),
+                    )?;
+                }
+            }
+            SidePanelTabKind::Task { task_id } => {
+                let key = (parent.clone(), task_id.clone());
+                if let Some(run) = self.task_runs.get(&key) {
+                    self.sync_pane_controls(
+                        SidePanelTabKind::Task { task_id },
+                        run.ids,
+                        run.binding.clone(),
+                    )?;
+                } else if let Some(source) = self.task_sources.get(&key)
+                    && let Some(task) = source.source.snapshot().value
+                    && self.task_attempts.get(&key) != Some(&task.scope)
+                {
+                    self.task_attempts.insert(key, task.scope);
+                    self.background_commands.push(DemoCommand::OpenTask {
+                        parent,
+                        task_id,
+                        source: source.source.clone(),
+                    });
                 }
             }
             _ => {}
         }
+        Ok(())
+    }
+    fn sync_pane_controls(
+        &mut self,
+        kind: SidePanelTabKind,
+        ids: ComposerIds,
+        binding: Arc<RunBinding>,
+    ) -> Result<()> {
+        let Some(snapshot) = binding.current_run() else {
+            return Ok(());
+        };
+        if self.tree.get(ids.root).is_none() {
+            let panel_id = self.panel_id();
+            let panel = self
+                .tree
+                .get_mut(panel_id)
+                .expect("panel")
+                .component_mut::<SidePanel>()
+                .expect("SidePanel");
+            let token = panel
+                .content_token(&kind)
+                .ok_or_else(|| unsupported("pane content source unavailable"))?;
+            panel
+                .install_content(&token, Self::run_controls(ids))
+                .map_err(unsupported)?;
+        }
+        self.tree
+            .get_mut(ids.root)
+            .expect("pane composer")
+            .component_mut::<Composer>()
+            .expect("Composer")
+            .update_gated(
+                &snapshot,
+                ComposerAffordances::default(),
+                binding.access().composer_gate(),
+            )
+            .map_err(unsupported)?;
+        self.tree
+            .get_mut(ComponentId(ids.root.0 + 17))
+            .expect("pane indicators")
+            .component_mut::<Indicators>()
+            .expect("Indicators")
+            .update(&snapshot)
+            .map_err(unsupported)?;
         Ok(())
     }
     pub fn select(&mut self, index: usize) -> Result<()> {
@@ -738,11 +912,7 @@ impl ComponentDemo {
         let ids = self.ids();
         let mut composers = vec![(ids, binding.clone())];
         if let Some(ids) = self.panel_composer_ids()
-            && let Some(SidePanelTabKind::SideChat { session_id }) =
-                self.panel_selections.get(binding.scope())
-            && let Some(run) = self
-                .panel_runs
-                .get(&(binding.scope().clone(), session_id.clone()))
+            && let Some(run) = self.active_panel_run()
         {
             composers.push((ids, run.binding.clone()));
         }
@@ -801,11 +971,35 @@ impl ComponentDemo {
                 commands.push(DemoCommand::Sidebar(intent));
             }
         }
-        commands.extend(summary_intents.into_iter().map(DemoCommand::Summary));
+        for intent in summary_intents {
+            if let SummaryAction::OpenTask { task_id, .. } = &intent.action {
+                require(&intent.scope == binding.scope(), "Summary parent changed")?;
+                let key = (intent.scope.clone(), task_id.clone());
+                if !self.task_sources.contains_key(&key) {
+                    let source = Arc::new(TaskPaneBinding::for_run(&binding));
+                    let token = source.begin(intent.scope.clone(), task_id.clone())?;
+                    self.task_sources.insert(
+                        key.clone(),
+                        TaskSource {
+                            source,
+                            token: Some(token),
+                        },
+                    );
+                }
+                self.panel_selections.insert(
+                    intent.scope.clone(),
+                    SidePanelTabKind::Task {
+                        task_id: task_id.clone(),
+                    },
+                );
+                self.task_attempts.remove(&key);
+                self.panel_navigation_revision += 1;
+                self.tree.focus(None, false);
+            } else {
+                commands.push(DemoCommand::Summary(intent));
+            }
+        }
         for intent in panel_intents {
-            let Some(owner) = self.side_chats.clone() else {
-                continue;
-            };
             match intent {
                 SidePanelIntent::CreateSideChat { parent } => {
                     commands.push(DemoCommand::CreateSideChat(self.panel_request(parent)));
@@ -816,16 +1010,42 @@ impl ComponentDemo {
                 } => {
                     self.panel_navigation_revision += 1;
                     commands.push(DemoCommand::CloseSideChat(
-                        owner.pointer(&parent, &session_id)?,
+                        self.side_chats
+                            .as_ref()
+                            .ok_or_else(|| unsupported("SideChat owner unavailable"))?
+                            .pointer(&parent, &session_id)?,
                     ));
+                }
+                SidePanelIntent::Close {
+                    parent,
+                    tab: SidePanelTabKind::Task { task_id },
+                } => {
+                    let key = (parent.clone(), task_id);
+                    if let Some(source) = self.task_sources.remove(&key) {
+                        source.source.cancel();
+                    }
+                    self.task_runs.remove(&key);
+                    self.task_attempts.remove(&key);
+                    self.panel_selections
+                        .insert(parent, SidePanelTabKind::Summary);
+                    self.panel_navigation_revision += 1;
+                    self.tree.focus(None, false);
                 }
                 SidePanelIntent::Select { parent, tab } if &parent == self.binding().scope() => {
                     self.tree.focus(None, false);
                     self.panel_selections
                         .insert(parent.clone(), tab.kind.clone());
                     let request = self.panel_request(parent.clone());
+                    if let SidePanelTabKind::Task { task_id } = &tab.kind {
+                        self.task_attempts
+                            .remove(&(parent.clone(), task_id.clone()));
+                    }
                     if let SidePanelTabKind::SideChat { session_id } = tab.kind {
-                        let chat = owner.pointer(&parent, &session_id)?;
+                        let chat = self
+                            .side_chats
+                            .as_ref()
+                            .ok_or_else(|| unsupported("SideChat owner unavailable"))?
+                            .pointer(&parent, &session_id)?;
                         if !self.has_side_chat_run(&chat) {
                             commands.push(DemoCommand::OpenSideChat { request, chat });
                         }
@@ -868,6 +1088,7 @@ impl ComponentDemo {
             }
         }
         self.sync()?;
+        commands.extend(self.take_background_commands());
         Ok(commands)
     }
     pub fn render(

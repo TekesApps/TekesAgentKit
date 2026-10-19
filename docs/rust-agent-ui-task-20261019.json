@@ -1,0 +1,88 @@
+{
+  "date": "2026-10-19",
+  "publishedBaseline": "v0.3.7",
+  "tekesui": {
+    "commit": "431093786de47b48cd566d0d9c0eafa088b10d68",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 188,
+    "sha256": "03721866a362b1d31261ebbbc86140eb07e9e23320871c325234a5212591213d",
+    "ui_packages": 8
+  },
+  "tests": {
+    "root": 104,
+    "ui": 79,
+    "tools": 18
+  },
+  "uiStrictAllTargetsClippy": true,
+  "nativeFixture": {
+    "marker": "NATIVE_AGENT_TASK_SELFTEST_OK",
+    "navigation": "explicit host resolved task source; no fabricated Summary todo action",
+    "physicalIme": false,
+    "formalTranscript": false,
+    "fullRunView": false,
+    "checks": [
+      "independent-composer",
+      "single-task-admission",
+      "same-turn-assistant-result",
+      "interrupted-settlement",
+      "unsent-task-draft",
+      "parent-draft-isolation",
+      "local-task-tab-close"
+    ]
+  },
+  "realEndpoints": {
+    "NATIVE": {
+      "components": true,
+      "finalAssistantItems": 1,
+      "inventoryRows": 4,
+      "isStale": false,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 2,
+      "transcriptView": false
+    },
+    "PI": {
+      "components": true,
+      "finalAssistantItems": 2,
+      "inventoryRows": 13,
+      "isStale": false,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 5,
+      "transcriptView": false
+    },
+    "DSH": {
+      "components": true,
+      "finalAssistantItems": 1,
+      "inventoryRows": 8,
+      "isStale": false,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 5,
+      "transcriptView": false
+    }
+  },
+  "realTaskNativeInteraction": false,
+  "screenshotSha256": "65c0ad79c4286bd60f17f8f4882a408735d08bf75d4f63706161cc1436df75b3",
+  "upstreamOpenIssues": [
+    22,
+    23
+  ],
+  "remaining": [
+    "formal Transcript/RunView",
+    "subagent pane",
+    "remaining host interactions",
+    "physical IME/reading/paging acceptance",
+    "independent review/latest CI/merge/stage tag"
+  ]
+}

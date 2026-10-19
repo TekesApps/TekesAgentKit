@@ -6,7 +6,9 @@ mod sidebar;
 pub use sidebar::*;
 mod sidechat;
 pub use sidechat::*;
+mod task;
 use std::sync::Arc;
+pub use task::*;
 use tekes_agent_components_ui::{Composer, ComposerAffordances, ComposerControlGate};
 use tekes_agent_contract::{PromptMode, Result, require, unsupported};
 use tekes_agent_presentation::{
@@ -17,7 +19,7 @@ use tekes_agent_presentation::{
 use tekes_agent_session::{ProjectionSubscription, SessionHistoryLease, SessionRuntime};
 use tokio::sync::watch;
 
-/// A projection of canonical SideChat ownership, not another mutation state.
+/// A projection of canonical pointer ownership, not another mutation state.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PaneAccess {
     Ready,
@@ -46,7 +48,7 @@ pub enum PaneSnapshot {
         connection: ConnectionPresentation,
         transcript: TranscriptSnapshot,
     },
-    /// An absent/foreign ephemeral pointer must not become a new conversation.
+    /// An absent/changed task or ephemeral pointer must not become a new conversation.
     Missing { scope: RunScope },
 }
 
@@ -59,6 +61,7 @@ pub struct RunBinding {
     _lease: Option<SessionHistoryLease>,
     child: Option<ChildRun>,
     side_chat: Option<(Arc<SideChatController>, SideChat)>,
+    task: Option<task::TaskRunGuard>,
 }
 struct ScopedPreparation<'a> {
     binding: &'a RunBinding,
@@ -87,7 +90,7 @@ impl RunBinding {
         )?;
         require(
             self.access() != PaneAccess::Missing,
-            "SideChat pointer missing",
+            "pane pointer missing or changed",
         )
     }
     fn require_controls(&self, destination: &ComposerDestination) -> Result<()> {
@@ -208,6 +211,7 @@ impl RunBinding {
             _lease: Some(lease),
             child: None,
             side_chat: None,
+            task: None,
         })
     }
 
@@ -251,6 +255,7 @@ impl RunBinding {
             _lease: None,
             child: Some(child),
             side_chat: None,
+            task: None,
         })
     }
 
@@ -300,6 +305,9 @@ impl RunBinding {
             .flatten()
     }
     pub fn access(&self) -> PaneAccess {
+        if self.task.as_ref().is_some_and(|task| !task.live()) {
+            return PaneAccess::Missing;
+        }
         self.side_chat
             .as_ref()
             .map_or(PaneAccess::Ready, |(owner, chat)| {
