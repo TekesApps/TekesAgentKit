@@ -43,5 +43,23 @@
     "native window and physical IME",
     "formal Transcript and RunView with upstream #22/#23 gates",
     "review and latest CI before merge/tag"
-  ]
+  ],
+  "commands": [
+    "cargo +1.95.0 test --workspace --locked",
+    "cargo +1.95.0 test --manifest-path ui/Cargo.toml --workspace --locked",
+    "cargo +1.95.0 test --manifest-path ui/Cargo.toml -p tekes-agent-ui-demo --test composer_context --locked",
+    "cargo +1.95.0 clippy --workspace --all-targets --locked -- -D warnings",
+    "cargo +1.95.0 clippy --manifest-path ui/Cargo.toml --workspace --all-targets --locked -- -D warnings",
+    "cargo +1.95.0 fmt --all -- --check",
+    "cargo +1.95.0 fmt --manifest-path ui/Cargo.toml --all -- --check",
+    "python3 scripts/check-ui-boundaries.py",
+    "cargo +1.95.0 metadata --manifest-path ui/Cargo.toml --format-version 1 --locked > /tmp/agentkit-attachments-metadata.json",
+    "python3 scripts/check-ui-consumer-inputs.py --metadata /tmp/agentkit-attachments-metadata.json",
+    "python3 -m unittest discover -s scripts/tests"
+  ],
+  "command_environment": {
+    "CARGO_TARGET_DIR": "/tmp/agentkit-final-receive-target",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "python3": "/Users/frankqin/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3"
+  }
 }
