@@ -1,10 +1,10 @@
 # AgentKit × TekesUI：首个 Run 接入契约
 
-状态：开发试点，非生产 UI 发布。范围为连接状态、纯文本 Transcript、基础 Composer、显式发送/停止、流式回传、会话草稿切换、重连和分页。初始提交为单行 Composer；当前开发候选消费公共多行视口，Enter 换行，发送策略不变。Tasks/Subagents/SideChat/Summary 暂不接 UI。
+状态：开发试点，非生产 UI 发布。本文件保留首个 RunSurface 协议/阅读测试宿主的契约，不是正式 Transcript/RunView 的组件规格。当前独立组件、任务/子代理/SideChat/Summary 与 Sidebar 操作进度以 [Rust Agent UI 契约](rust-agent-ui-contract.md) 为准。首段闭环覆盖连接、纯文本历史测试、Composer、显式发送/停止、流式、草稿切换、重连和分页；Composer 消费公共多行视口，Enter 换行。
 
 ## 依赖与构建
 
-- AgentKit 当前基线 v0.3.8 / f1daa0ffcf6ced41e21f351e22845455ca78006c，Rust 1.95.0。已合入 WebUI 使用的批注、线程操作/置顶、用量与完成回合 Fork 契约；本 UI 的挂载范围仍为首段 Run 闭环，不把这些共享能力等同于控件已接入。
+- AgentKit 当前基线 v0.3.8 / f1daa0ffcf6ced41e21f351e22845455ca78006c，Rust 1.95.0。已合入 WebUI 使用的批注、线程操作/置顶、用量与完成回合 Fork 契约；共享能力和具体控件的接入状态分别记录在正式契约中。
 - WebUI 对照版本 v0.1.17 / 8b9b11c；仅保留既有 Fork，不加入已撤回的回退/编辑重跑实验。Native/Pi/DSH 显式配置与分层验收见 [三端记录](tekesui-three-endpoint-demo-20261019.md)。
 - TekesUI composition仍为实验API；源码固定为公开 `https://github.com/TekesApps/TekesUI.git` 的完整rev `431093786de47b48cd566d0d9c0eafa088b10d68`，Cargo.lock固定同一来源。188个输入与已验收037相同，清单见 `ui/tekesui-source.json`。
 - 默认由Cargo取得公开Git输入，不读取活跃兄弟工作树或旧 `.deps`。开发快照准备/capture在公开pin模式禁用；旧e4依赖和回滚文件保留。UI workspace与headless默认构建隔离。
@@ -16,7 +16,7 @@
 |---|---|---|
 | TekesUI | 通用输入/选区/撤销/组字、控件焦点、布局/渲染、ReadingController/滚动几何、平台文本服务 | Session、发送回执、连接状态、Agent 草稿归属 |
 | AgentKit presentation | Session scope、RunSnapshot、草稿、提交身份/echo、取消、重连后的状态、历史分页 | 原生编辑与滚动的另一个实现 |
-| AgentKit UI components | RunSurface 组合、每 destination 的控件实例、Agent 意图映射、只读 snapshot 展示 | SEP 协议、重试策略、第二套 Run 状态机 |
+| AgentKit UI components | Agent 业务控件组合、每 destination 的控件实例、Agent 意图映射、只读 snapshot 展示；RunSurface 仅作测试宿主 | SEP 协议、重试策略、第二套 Run 状态机 |
 | Demo host | 窗口/主题输入、Tokio 执行器、公开平台事件翻译、Clipboard/AX/TextInputState 桥接、transport 配置 | 私有 AppKit 接口、TekesUI 缺失能力的通用替代实现 |
 
 输入是 `RunSnapshot`；输出是捕获 destination 的 Edit、Send、Cancel、Earlier、Reconnect、Select 意图。
@@ -30,6 +30,8 @@ Edit 调用 RunController::edit；Send 在发起时 prepare 捕获 ticket，再�
 - 发送回填、草稿恢复和晚回包归属继续由现有 presentation 管理。取消网络任务不等于取消本地编辑器组字。
 
 ## 阅读与历史
+
+以下是 RunSurface 单文本 History 的阅读 API 测试路径，不满足正式 Transcript 的 input 气泡、output/activity 与 footnote 分层，也不能证明混合文档分页锚点。正式组件使用上述 Rust 契约，缺失的通用能力通过 TekesUI #22/#23 交付。
 
 - Transcript 保留只读 TextFieldContent 的输入/选区语义，使用其公开 TextSurface + ReadingController 绘制完整阅读视口。向上滚动/选择后停止跟随；尾部追加与重排通过现有阅读锚点保留位置；只有显式“回到最新”恢复跟随，不抢 Composer 焦点。
 - 每个 destination 保留自己的 Transcript 控件/阅读状态。消息内容来自现有 projector，不直接读取 harness 文件。
@@ -45,4 +47,4 @@ Demo 支持显式 Native endpoint JSON（URL、bearer 环境变量名、两个 s
 
 ## 指针接入更新
 
-#19最新WIP已接入原生button/modifiers/click_count；AgentText包装器转交pointer_event，RunSurface的组字屏障覆盖完整指针入口。双击沿原Unicode分词选择实际命中字素，三击逻辑段落。旧简化事件兼容；详见 [分层证据与迁移](tekesui-pointer-metadata-20261018.md)。原生AgentKit窗口尚未验收，正式pin仍阻塞。
+#19 的指针能力已纳入上文固定公开 pin；AgentText 包装器转交 pointer_event，RunSurface 的组字屏障覆盖完整指针入口。双击沿 Unicode 分词选择实际命中字素，三击逻辑段落。旧简化事件兼容；历史证据见 [分层证据与迁移](tekesui-pointer-metadata-20261018.md)。当前局部原生合成文本服务验证见正式契约，物理 IME 和正式 Transcript 阅读验收仍未完成。
