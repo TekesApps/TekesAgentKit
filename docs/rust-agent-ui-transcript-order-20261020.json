@@ -1,0 +1,200 @@
+{
+  "kind": "public-transcript-event-source-order",
+  "baseCommit": "37f8094b7ea73f3662c0eba007e18d1050498091",
+  "sourceSha256": {
+    "crates/presentation/src/transcript.rs": "d91c8360c4f87a4f288cbd015a43afd48dd0ecc7388bf469844816443eb45307",
+    "crates/presentation/src/transcript_order.rs": "e6f1ffbbf9e39477133a9ac400a90b731a31d43070479d91b75d76278cce2790",
+    "crates/presentation/src/transcript_document.rs": "89f6f2e8e30d63b289aae4fa47d6c0b832f9cef3bd6de5ef46aa4b9451b3e5a8",
+    "crates/presentation/src/bounded_history.rs": "d7ad8e29ee4e3441d4ca557265af4a19dfc7070e2060d150b424d02dce3fe7ef",
+    "crates/presentation/src/composer.rs": "7c184545666fd73406305a33870c2ce6141dbfcd23ca8b9cdf3bea6f1cc169e0",
+    "crates/presentation/tests/transcript_order.rs": "88dc605dd9cf97951c4dec9f980f6f4e2e8589ee501fe67ff59029b7e86d8bb2",
+    "ui/consumer/src/lib.rs": "8a4343f13c0e059ab35a5f4589e22fb73ee36b623a24d02369c140f06f93efe1",
+    "ui/demo/src/components_native.rs": "80d41320fbcc4169761116e95c35b98f900848e91f19eaaf35f4b2f807c0fde5",
+    "scripts/test-real-session-endpoints.py": "dac1b67dd3927b06b98977e2d422031cb94378c8e4505a50622bd81b1940a8d4"
+  },
+  "binarySha256": "33d99e2f53ac92c7951d872aaa8e89e81b46cd0fae4d0bb8e25f7cb8d1fc0956",
+  "tekesUI": {
+    "commit": "431093786de47b48cd566d0d9c0eafa088b10d68",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 188,
+    "sha256": "03721866a362b1d31261ebbbc86140eb07e9e23320871c325234a5212591213d",
+    "ui_packages": 8
+  },
+  "runtimeVersions": {
+    "kernel": "0.9.1",
+    "pi": "1.3.0",
+    "dsh": "0.2.1-rc.2"
+  },
+  "receipts": {
+    "pi": {
+      "actionableProof": {
+        "canonicalAnswerRecord": true,
+        "followupInputCount": 1,
+        "freshHistoryAfterReconnect": true,
+        "nativeInteraction": false,
+        "oneAttempt": true,
+        "originalScope": true,
+        "otherDraftPreserved": true,
+        "physicalIME": false,
+        "probeConfigured": true,
+        "publicCard": true,
+        "publicComposer": true,
+        "reconnectNoDuplicateInput": true,
+        "sharedResolved": true
+      },
+      "annotationProof": null,
+      "components": true,
+      "contextProof": null,
+      "documentProjection": {
+        "hasMoreBefore": false,
+        "isStale": false,
+        "positionedEvents": 9,
+        "renderer": false,
+        "sections": 4,
+        "sessionNotices": 0,
+        "toolCalls": 1,
+        "unplacedEvents": 1,
+        "unplacedFacts": [
+          {
+            "id": "echo-item:30d3a5b4-569e-4fc2-b80f-1ce3d5d7dab3",
+            "kind": "message",
+            "provisional": true,
+            "recordId": null,
+            "sourceSequence": null
+          }
+        ],
+        "visibleMessages": 8
+      },
+      "finalAssistantItems": 3,
+      "initialPresetProof": null,
+      "inventoryRows": 13,
+      "isStale": false,
+      "modelChoiceProof": null,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 8,
+      "transcriptView": false,
+      "uploadProof": null
+    },
+    "dsh": {
+      "actionableProof": {
+        "canonicalAnswerRecord": true,
+        "followupInputCount": 1,
+        "freshHistoryAfterReconnect": true,
+        "nativeInteraction": false,
+        "oneAttempt": true,
+        "originalScope": true,
+        "otherDraftPreserved": true,
+        "physicalIME": false,
+        "probeConfigured": true,
+        "publicCard": true,
+        "publicComposer": true,
+        "reconnectNoDuplicateInput": true,
+        "sharedResolved": true
+      },
+      "annotationProof": null,
+      "components": true,
+      "contextProof": null,
+      "documentProjection": {
+        "hasMoreBefore": false,
+        "isStale": false,
+        "positionedEvents": 14,
+        "renderer": false,
+        "sections": 4,
+        "sessionNotices": 0,
+        "toolCalls": 2,
+        "unplacedEvents": 0,
+        "unplacedFacts": [],
+        "visibleMessages": 10
+      },
+      "finalAssistantItems": 4,
+      "initialPresetProof": null,
+      "inventoryRows": 8,
+      "isStale": false,
+      "modelChoiceProof": null,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 13,
+      "transcriptView": false,
+      "uploadProof": null
+    },
+    "native": {
+      "actionableProof": {
+        "canonicalAnswerRecord": true,
+        "followupInputCount": 1,
+        "freshHistoryAfterReconnect": true,
+        "nativeInteraction": false,
+        "oneAttempt": true,
+        "originalScope": true,
+        "otherDraftPreserved": true,
+        "physicalIME": false,
+        "probeConfigured": true,
+        "publicCard": true,
+        "publicComposer": true,
+        "reconnectNoDuplicateInput": true,
+        "sharedResolved": true
+      },
+      "annotationProof": null,
+      "components": true,
+      "contextProof": null,
+      "documentProjection": {
+        "hasMoreBefore": false,
+        "isStale": false,
+        "positionedEvents": 7,
+        "renderer": false,
+        "sections": 2,
+        "sessionNotices": 0,
+        "toolCalls": 1,
+        "unplacedEvents": 0,
+        "unplacedFacts": [],
+        "visibleMessages": 5
+      },
+      "finalAssistantItems": 2,
+      "initialPresetProof": null,
+      "inventoryRows": 5,
+      "isStale": false,
+      "modelChoiceProof": null,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 5,
+      "transcriptView": false,
+      "uploadProof": null
+    }
+  },
+  "localChecks": {
+    "rootTests": 118,
+    "uiTests": 173,
+    "toolTests": 18,
+    "rootStrictClippy": true,
+    "uiStrictClippy": true,
+    "fmt": true,
+    "boundaries": true
+  },
+  "provider": "local synthetic; isolated HOME/dataRoot",
+  "nativeInteraction": false,
+  "physicalIME": false,
+  "formalTranscript": false,
+  "review": "manual review of first call retention, separate result origins, preview/echo unknown positions, old JSON defaults and child parent-source isolation",
+  "knownLimitations": [
+    "Pi extension question retains one provisional echo without canonical record ID; explicitly unplaced",
+    "event/container order is not complete intra-message text/reasoning/tool block layout",
+    "source ordinals are current-window positions, not persisted identities or anchors"
+  ],
+  "remaining": [
+    "formal Transcript and RunView",
+    "complete normalized content-block layout",
+    "public #22/#23 consumption gates",
+    "physical IME and native reading/paging acceptance",
+    "full delivery review CI merge and tag"
+  ]
+}

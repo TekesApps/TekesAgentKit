@@ -1,4 +1,4 @@
-use crate::RunScope;
+use crate::{RunScope, TranscriptSourcePosition};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -56,6 +56,8 @@ pub struct TranscriptItem {
     pub is_provisional: bool,
     pub reasoning_ended: bool,
     pub source_sequence: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_position: Option<TranscriptSourcePosition>,
     pub time: Option<f64>,
     pub metadata: Value,
 }
@@ -70,6 +72,10 @@ pub struct TranscriptToolCall {
     pub phase: String,
     pub call_view: Option<Value>,
     pub result_view: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_position: Option<TranscriptSourcePosition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub result_position: Option<TranscriptSourcePosition>,
 }
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -221,6 +227,10 @@ fn item(
         is_provisional: false,
         reasoning_ended: true,
         source_sequence: seq,
+        source_position: seq.map(|sequence| TranscriptSourcePosition::Journal {
+            sequence,
+            content_index: None,
+        }),
         time,
         metadata: Value::Null,
     }
@@ -403,7 +413,11 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
                             .unwrap_or_else(|| format!("assistant-{}", event.seq)),
                     );
                     if let Some(blocks) = data["message"]["content"].as_array() {
-                        for block in blocks.iter().filter(|b| b["type"] == "tool-call") {
+                        for (index, block) in blocks
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, b)| b["type"] == "tool-call")
+                        {
                             admit_tool(
                                 &mut out,
                                 scope,
@@ -411,7 +425,13 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
                                 block["id"].as_str().unwrap_or(""),
                                 block["name"].as_str().unwrap_or(""),
                                 block["arguments"].clone(),
-                                None,
+                                ToolSource {
+                                    view: None,
+                                    position: Some(TranscriptSourcePosition::Journal {
+                                        sequence: event.seq,
+                                        content_index: Some(index),
+                                    }),
+                                },
                             );
                         }
                     }
@@ -456,7 +476,13 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
                     data["callId"].as_str().unwrap_or(""),
                     data["name"].as_str().unwrap_or(""),
                     data["arguments"].clone(),
-                    entry.view.clone(),
+                    ToolSource {
+                        view: entry.view.clone(),
+                        position: Some(TranscriptSourcePosition::Journal {
+                            sequence: event.seq,
+                            content_index: None,
+                        }),
+                    },
                 );
             }
             "tool/result" => {
@@ -467,7 +493,15 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
                     .or_else(|| first["toolCallId"].as_str())
                     .or_else(|| first["callId"].as_str())
                     .unwrap_or("");
-                admit_tool(&mut out, scope, &turn_id, call, call, Value::Null, None);
+                admit_tool(
+                    &mut out,
+                    scope,
+                    &turn_id,
+                    call,
+                    call,
+                    Value::Null,
+                    ToolSource::default(),
+                );
                 let tool = out
                     .tools
                     .iter_mut()
@@ -475,6 +509,10 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
                     .expect("admitted");
                 tool.result = Some(message.clone());
                 tool.result_view = entry.view.clone();
+                tool.result_position = Some(TranscriptSourcePosition::Journal {
+                    sequence: event.seq,
+                    content_index: None,
+                });
                 tool.phase = if data["error"]["code"] == "interrupted" {
                     "stopped"
                 } else if data["error"].is_object()
@@ -634,6 +672,11 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
     out.diagnostics.truncate(32);
     Ok(out)
 }
+#[derive(Default)]
+struct ToolSource {
+    view: Option<Value>,
+    position: Option<TranscriptSourcePosition>,
+}
 fn admit_tool(
     out: &mut TranscriptSnapshot,
     scope: &RunScope,
@@ -641,10 +684,14 @@ fn admit_tool(
     id: &str,
     name: &str,
     arguments: Value,
-    view: Option<Value>,
+    source: ToolSource,
 ) {
+    let ToolSource { view, position } = source;
     let key = scoped(scope, &format!("tool:{id}"));
     if let Some(tool) = out.tools.iter_mut().find(|t| t.id == key) {
+        if tool.source_position.is_none() {
+            tool.source_position = position;
+        }
         if !arguments.is_null() {
             tool.arguments = arguments;
         }
@@ -665,6 +712,8 @@ fn admit_tool(
             phase: "doing".into(),
             call_view: view,
             result_view: None,
+            source_position: position,
+            result_position: None,
         });
     }
 }
@@ -695,7 +744,7 @@ fn native(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSna
                 .push(id.into());
         }
     }
-    for entry in &snapshot.entries {
+    for (entry_ordinal, entry) in snapshot.entries.iter().enumerate() {
         if matches!(
             entry["customType"].as_str(),
             Some("agentkit.run.v1" | "tekes.run.v1")
@@ -752,6 +801,7 @@ fn native(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSna
                     time,
                 );
                 row.record_id = Some(record.into());
+                row.source_position = native_position(entry, entry_ordinal, None);
                 row.text = body(&message["content"]);
                 row.attachments = attachments(&message["content"]);
                 let key = format!(
@@ -798,6 +848,7 @@ fn native(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSna
                     time,
                 );
                 row.record_id = Some(record.into());
+                row.source_position = native_position(entry, entry_ordinal, None);
                 row.text = body(&message["content"]);
                 row.reasoning = text_blocks(&message["content"], "thinking");
                 row.attachments = attachments(&message["content"]);
@@ -807,7 +858,11 @@ fn native(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSna
                 turn.usage.input_tokens = turn.usage.input_tokens.saturating_add(u.input_tokens);
                 turn.usage.output_tokens = turn.usage.output_tokens.saturating_add(u.output_tokens);
                 if let Some(blocks) = message["content"].as_array() {
-                    for block in blocks.iter().filter(|b| b["type"] == "toolCall") {
+                    for (index, block) in blocks
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, b)| b["type"] == "toolCall")
+                    {
                         let (name, arguments) = native_tool_semantic(
                             block["name"].as_str().unwrap_or(""),
                             block["arguments"].clone(),
@@ -819,7 +874,10 @@ fn native(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSna
                             block["id"].as_str().unwrap_or(""),
                             &name,
                             arguments,
-                            None,
+                            ToolSource {
+                                view: None,
+                                position: native_position(entry, entry_ordinal, Some(index)),
+                            },
                         );
                     }
                 }
@@ -834,7 +892,7 @@ fn native(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSna
                     call,
                     message["toolName"].as_str().unwrap_or(call),
                     Value::Null,
-                    None,
+                    ToolSource::default(),
                 );
                 if let Some(tool) = out
                     .tools
@@ -848,6 +906,7 @@ fn native(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSna
                     }
                     .into();
                     tool.result = Some(message.clone());
+                    tool.result_position = native_position(entry, entry_ordinal, None);
                 }
             }
             _ => {}
@@ -917,4 +976,19 @@ fn native_tool_semantic(name: &str, mut arguments: Value) -> (String, Value) {
     } else {
         (name.into(), arguments)
     }
+}
+
+fn native_position(
+    entry: &Value,
+    entry_ordinal: usize,
+    content_index: Option<usize>,
+) -> Option<TranscriptSourcePosition> {
+    entry["id"]
+        .as_str()
+        .filter(|id| !id.is_empty())
+        .map(|entry_id| TranscriptSourcePosition::Native {
+            entry_id: entry_id.into(),
+            entry_ordinal,
+            content_index,
+        })
 }

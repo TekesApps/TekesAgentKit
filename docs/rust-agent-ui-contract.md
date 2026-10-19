@@ -183,3 +183,5 @@ Task tab 以 task ID 为稳定身份，scope 是可更新的内容输入。TaskP
 最新 [首批 actionable 接入](rust-agent-ui-actionables-20261020.md) 增加共享审批/单选问题的公共卡片、原来源一次响应绑定和宿主回调；原生 fixture 与 9 项新测试验证回应、失效、重复点击、组字和离屏晚失败。复杂表单、自定义/secret 输入、显式对账及三端各自的 actionable UI 仍未完成，不提升正式 RunView/Transcript 的交付状态。
 
 三端公开问答卡片的 Composer → 卡片 → 原 scope 回传 → 后续发送 → 新 epoch 历史恢复已完成局部联调，见 [三端问答记录](rust-agent-ui-actionables-live-20261020.md)。该证据不扩展为正式 Transcript、物理 IME 或真实审批验收。
+
+Transcript 现已保留公开来源位置并提供 [事件顺序输入](rust-agent-ui-transcript-order-20261020.md)：已知事件与未定位预览分开，结果不反推调用位置。它不是完整块级内容布局；正式 Transcript/RunView、阅读/分页与原生验收仍未完成。

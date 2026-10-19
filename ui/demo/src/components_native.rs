@@ -2906,13 +2906,31 @@ pub fn run() {
                 .count()
         );
         assert_eq!(document_tools, snapshot.transcript.tools.len());
+        let mut positioned_events = 0usize;
+        let mut unplaced_events = 0usize;
+        let mut unplaced_facts = Vec::new();
+        for section in &document.sections {
+            let order = section
+                .event_order()
+                .expect("canonical Transcript source order");
+            positioned_events += order.ordered.len();
+            unplaced_events += order.unplaced.len();
+            for event in order.unplaced {
+                use tekes_agent_presentation::TranscriptOrderedEvent as Event;
+                unplaced_facts.push(match event {
+                    Event::Message(item) => serde_json::json!({"kind":"message","id":item.id,"recordId":item.record_id,"provisional":item.is_provisional,"sourceSequence":item.source_sequence}),
+                    Event::ToolCall(tool) => serde_json::json!({"kind":"toolCall","id":tool.id,"name":tool.name,"hasResult":tool.result.is_some(),"argumentsPresent":!tool.arguments.is_null(),"resultPosition":tool.result_position}),
+                    Event::ToolResult(tool) => serde_json::json!({"kind":"toolResult","id":tool.id,"name":tool.name}),
+                });
+            }
+        }
         println!(
             "{}",
             serde_json::json!({
                 "offscreen": true, "components": true, "nativeInteraction": false,
                 "transcriptView": false, "isStale": snapshot.transcript.is_stale,
                 "transcriptItems": snapshot.transcript.items.len(),
-                "documentProjection": {"sections":document.sections.len(),"visibleMessages":document_messages,"sessionNotices":document.session_notices.len(),"toolCalls":document_tools,"hasMoreBefore":document.has_more_before,"isStale":document.is_stale,"renderer":false},
+                "documentProjection": {"sections":document.sections.len(),"visibleMessages":document_messages,"sessionNotices":document.session_notices.len(),"toolCalls":document_tools,"hasMoreBefore":document.has_more_before,"isStale":document.is_stale,"renderer":false,"positionedEvents":positioned_events,"unplacedEvents":unplaced_events,"unplacedFacts":unplaced_facts},
                 "finalAssistantItems": snapshot.transcript.items.iter().filter(|item| item.kind == tekes_agent_presentation::TranscriptItemKind::Assistant && item.is_final).count(),
             "inventoryRows": host.sidebar.snapshot().rows.len(),
             "sharedRuntime": Arc::ptr_eq(host.sidebar.runtime(), &host.runtime),

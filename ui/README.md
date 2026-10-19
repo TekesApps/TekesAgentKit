@@ -151,3 +151,5 @@ SidePanel 附件共享相同选择/上传/状态组件，按原 binding/request 
 正式 Transcript 前的公共 `TranscriptDocument` 只读组织消息、工具及 footnote lanes，保留已有身份/覆盖事实，第二 consumer 直接使用。它不含渲染或阅读控制器，不改变 Transcript/RunView 尚未交付的状态。见 [数据模型与证据](../docs/rust-agent-ui-transcript-document-20261020.md)。
 
 `--components --session-notice-fixture --offscreen <PNG>` 只验证合法无 turn 提示进入文档出口，`documentProjection.sessionNotices` 必须为 1；不是正式提示卡片的视觉验收。
+
+公共 `TranscriptSourcePosition` 和 `TranscriptSection::event_order()` 提供已知事件/容器顺序及明确的 unplaced 覆盖状态；ordinal 不作身份或锚点，正式文本块与工具交错仍待实现。见 [来源顺序说明](../docs/rust-agent-ui-transcript-order-20261020.md)。

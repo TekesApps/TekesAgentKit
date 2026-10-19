@@ -10,7 +10,7 @@
 - input 引用整条原消息，包括所有正文块与附件；消费组件将其组合为一个靠右圆角气泡。附件为空/正文为空都不自行删除消息。
 - input footnote 独立为 Pending 或 Recorded { time }。provisional 消息即使携带时间也显示 Pending；没有时间就保留 None，不使用本机当前时间。
 - output 引用同一条原消息的 kind/text/reasoning/reasoning_ended/final/provisional 等事实；展开和折叠仍属于未来视图本地状态。
-- 工具引用完整原 call/result/view/phase DTO。当前 DTO 没有足以统一重建工具与消息顺序的时序字段，本投影明确保留独立工具 lane，不凭工具完成状态或列表位置伪造交错顺序。
+- 工具引用完整原 call/result/view/phase DTO。初版 DTO 没有工具位置；后续 [来源顺序增量](rust-agent-ui-transcript-order-20261020.md) 保留公开事件/entry 位置，提供独立 event_order。仍不凭工具完成状态或列表位置伪造顺序，也不把事件容器顺序称为正文内部的文本块布局。
 - output footnote 返回已有 turn：共享 action definitions、live/reported usage 与边界不重新计算；reportedUsage 缺失不显示成已知零。
 - has_more_before、is_stale、diagnostics 原样传入。分页 loading/error/retry 及公开阅读事务仍待正式组件绑定，不把三个事实字段称作完整分页 UI。
 

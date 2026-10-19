@@ -15,6 +15,7 @@ fn item(id: &str, turn: &str, kind: TranscriptItemKind) -> TranscriptItem {
         is_provisional: false,
         reasoning_ended: false,
         source_sequence: None,
+        source_position: None,
         time: None,
         metadata: json!({}),
     }
@@ -87,6 +88,8 @@ fn activity_output_and_shared_footnote_are_lossless_and_do_not_infer_settlement(
         phase: "done".into(),
         call_view: Some(json!({"kind":"file"})),
         result_view: None,
+        source_position: None,
+        result_position: None,
     };
     let snapshot = TranscriptSnapshot {
         turns: vec![turn("turn")],
@@ -149,6 +152,8 @@ fn clipped_orphan_tools_and_notices_are_preserved_without_synthetic_turns() {
             phase: "doing".into(),
             call_view: None,
             result_view: None,
+            source_position: None,
+            result_position: None,
         }],
         is_stale: true,
         diagnostics: vec!["partial".into()],

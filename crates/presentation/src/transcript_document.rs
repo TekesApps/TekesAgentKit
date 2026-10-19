@@ -38,8 +38,8 @@ pub struct TranscriptSection<'a> {
     pub turn: Option<&'a TranscriptTurn>,
     pub inputs: Vec<TranscriptInput<'a>>,
     pub outputs: Vec<TranscriptOutput<'a>>,
-    /// Existing call/result DTOs, in their source order. This separate lane does
-    /// not invent chronological interleaving with messages (not present in the DTO).
+    /// Existing call/result DTOs. event_order() exposes proven event/container
+    /// positions separately; this lane does not imply text-block layout.
     pub tools: Vec<&'a TranscriptToolCall>,
 }
 impl TranscriptSection<'_> {

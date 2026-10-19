@@ -430,6 +430,7 @@ fn independent_host_keeps_session_notice_outside_turns_and_footnotes() {
             is_provisional: false,
             reasoning_ended: true,
             source_sequence: Some(4),
+            source_position: None,
             time: Some(123.0),
             metadata: Default::default(),
         }],
@@ -443,4 +444,40 @@ fn independent_host_keeps_session_notice_outside_turns_and_footnotes() {
         TranscriptMessageKey::Item("session-notice")
     );
     assert_eq!(document.session_notices[0].item.text, "Worker unavailable");
+    assert_eq!(transcript_event_counts(&document).unwrap(), (0, 0));
+    let mut with_message = source.clone();
+    let mut output = source.items[0].clone();
+    output.id = "answer".into();
+    output.turn_id = "turn".into();
+    output.kind = TranscriptItemKind::Assistant;
+    output.source_position = Some(
+        tekes_agent_components_ui::TranscriptSourcePosition::Journal {
+            sequence: 5,
+            content_index: None,
+        },
+    );
+    with_message.items.push(output);
+    assert_eq!(
+        transcript_event_counts(&transcript_document(&with_message).unwrap()).unwrap(),
+        (1, 0)
+    );
+    with_message.items[1].source_position = None;
+    assert_eq!(
+        transcript_event_counts(&transcript_document(&with_message).unwrap()).unwrap(),
+        (0, 1)
+    );
+}
+
+/// One consumer can inspect proven event/container ordering while keeping
+/// unplaced previews explicit; this does not implement a text or scroll engine.
+pub fn transcript_event_counts(
+    document: &tekes_agent_components_ui::TranscriptDocument<'_>,
+) -> Result<(usize, usize), String> {
+    let mut counts = (0, 0);
+    for section in &document.sections {
+        let order = section.event_order().map_err(|error| error.to_string())?;
+        counts.0 += order.ordered.len();
+        counts.1 += order.unplaced.len();
+    }
+    Ok(counts)
 }

@@ -213,6 +213,12 @@ def ui_smoke(config, first):
         assert receipt['inventoryRows']>=1 and receipt['sharedRuntime'] and receipt['sidebarMounted'] and receipt['summaryMounted'],receipt
         document=receipt['documentProjection']
         assert document['sections']>=1 and document['visibleMessages']>=1 and not document['isStale'] and not document['renderer'],document
+        assert document['positionedEvents']>=1,document
+        unplaced=document['unplacedFacts']
+        assert document['unplacedEvents']==len(unplaced),document
+        # Pi extension commands can retain a local echo with no native user entry.
+        # Unknown positions are explicit, never promoted to a fake source sequence.
+        assert all(fact['kind']=='message' and fact['provisional'] and fact['recordId'] is None and fact['sourceSequence'] is None for fact in unplaced),document
         if args.ui_actionables:
             proof=receipt['actionableProof']
             assert all(proof[key] for key in ('probeConfigured','publicComposer','publicCard','originalScope','oneAttempt','sharedResolved','canonicalAnswerRecord','otherDraftPreserved','freshHistoryAfterReconnect','reconnectNoDuplicateInput')),proof

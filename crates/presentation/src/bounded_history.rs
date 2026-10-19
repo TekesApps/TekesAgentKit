@@ -190,6 +190,8 @@ impl BoundedHistory {
                     phase: phase.into(),
                     call_view: None,
                     result_view: None,
+                    source_position: None,
+                    result_position: None,
                 },
             );
         }

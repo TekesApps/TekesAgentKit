@@ -860,6 +860,7 @@ impl PresentationStore {
                     is_provisional: true,
                     reasoning_ended: true,
                     source_sequence: None,
+                    source_position: None,
                     time: None,
                     metadata: json!({"submissionPhase":record.state.phase,"message":record.state.message}),
                 });
