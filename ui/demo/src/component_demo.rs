@@ -1955,7 +1955,14 @@ impl ComponentDemo {
             }
             _ => false,
         };
-        require(valid, "child snapshot source mismatch")
+        require(valid, "child snapshot source mismatch")?;
+        if let PaneSnapshot::ReadOnlyChild { transcript, .. } = snapshot {
+            let document = tekes_agent_presentation::TranscriptDocument::read(transcript)?;
+            for section in &document.sections {
+                section.event_order()?;
+            }
+        }
+        Ok(())
     }
     pub fn update_child_snapshot(
         &mut self,
@@ -1972,34 +1979,88 @@ impl ComponentDemo {
         if !Arc::ptr_eq(&pane.source, source) || source.binding().access() == PaneAccess::Missing {
             return Ok(false);
         }
-        Self::validate_child_snapshot(source, &snapshot)?;
-        if let (
-            PaneSnapshot::ReadOnlyChild {
-                publication: old,
-                connection_epoch: old_epoch,
-                connection: old_connection,
-                transcript: old_transcript,
-                ..
-            },
-            PaneSnapshot::ReadOnlyChild {
-                publication: next,
-                connection_epoch: next_epoch,
-                connection: next_connection,
-                transcript: next_transcript,
-                ..
-            },
-        ) = (&pane.snapshot, &snapshot)
-        {
-            if next < old || next_epoch < old_epoch {
-                return Ok(false);
+        let admission = (|| -> Result<bool> {
+            if let (
+                PaneSnapshot::ReadOnlyChild {
+                    publication: old,
+                    connection_epoch: old_epoch,
+                    connection: old_connection,
+                    transcript: old_transcript,
+                    ..
+                },
+                PaneSnapshot::ReadOnlyChild {
+                    publication: next,
+                    connection_epoch: next_epoch,
+                    connection: next_connection,
+                    transcript: next_transcript,
+                    ..
+                },
+            ) = (&pane.snapshot, &snapshot)
+            {
+                if next < old || next_epoch < old_epoch {
+                    return Ok(false);
+                }
+                require(
+                    next != old
+                        || (next_epoch == old_epoch
+                            && next_connection == old_connection
+                            && next_transcript == old_transcript),
+                    "conflicting read-only child frame",
+                )?;
             }
-            require(
-                next != old
-                    || (next_epoch == old_epoch
-                        && next_connection == old_connection
-                        && next_transcript == old_transcript),
-                "conflicting read-only child frame",
-            )?;
+            Self::validate_child_snapshot(source, &snapshot)?;
+            if let PaneSnapshot::ReadOnlyChild {
+                transcript: next, ..
+            } = &snapshot
+                && let PaneSnapshot::ReadOnlyChild {
+                    transcript: old, ..
+                } = &pane.snapshot
+            {
+                let before = tekes_agent_presentation::TranscriptDocument::read(old)?;
+                let after = tekes_agent_presentation::TranscriptDocument::read(next)?;
+                let inputs: std::collections::BTreeSet<_> = before
+                    .sections
+                    .iter()
+                    .flat_map(|section| section.inputs.iter().map(|row| row.key))
+                    .collect();
+                let outputs: std::collections::BTreeSet<_> = before
+                    .sections
+                    .iter()
+                    .flat_map(|section| section.outputs.iter().map(|row| row.key))
+                    .chain(before.session_notices.iter().map(|row| row.key))
+                    .collect();
+                require(
+                    after.sections.iter().all(|section| {
+                        section.inputs.iter().all(|row| !outputs.contains(&row.key))
+                            && section.outputs.iter().all(|row| !inputs.contains(&row.key))
+                    }) && after
+                        .session_notices
+                        .iter()
+                        .all(|row| !inputs.contains(&row.key)),
+                    "read-only Transcript message lane changed",
+                )?;
+                if let Some(view) = self
+                    .tree
+                    .get(ComponentId(pane.controls.ids.root.0 + 16))
+                    .and_then(|node| {
+                        node.component::<tekes_agent_components_ui::ReadOnlyTranscript>()
+                    })
+                {
+                    view.validate_update(&source.readonly_input(&snapshot, false, None)?)
+                        .map_err(unsupported)?;
+                }
+            }
+            Ok(true)
+        })();
+        match admission {
+            Ok(false) => return Ok(false),
+            Err(error) => {
+                pane.reading = false;
+                pane.read_error = Some(error.to_string());
+                self.sync()?;
+                return Err(error);
+            }
+            Ok(true) => {}
         }
         pane.snapshot = snapshot;
         pane.reading = false;

@@ -476,3 +476,144 @@ async fn a_captured_page_cannot_cross_epochs_but_explicit_refresh_can_renew_the_
     assert!(new > old);
     runtime.stop().await.unwrap();
 }
+
+#[tokio::test]
+async fn invalid_child_frames_cannot_poison_the_host_cache_or_prevent_a_later_explicit_read() {
+    let runtime = runtime().await;
+    let source = source(runtime.clone(), None).await;
+    let initial = source.snapshot().await.unwrap();
+    let mut stale = initial.clone();
+    let mut view = host(runtime.clone()).await;
+    let request = view
+        .begin_child_open(&RunScope::main("fixture", "b"))
+        .unwrap();
+    view.install_child_source(request, source.clone(), "bounded".into(), initial)
+        .unwrap();
+    // Finish the mount-triggered refresh before testing a new explicit retry.
+    for command in view.take_background_commands() {
+        let tekes_agent_ui_demo::component_demo::DemoCommand::ReadChild {
+            source: mounted,
+            panel_parent,
+            ..
+        } = command
+        else {
+            panic!("only mounted child refresh");
+        };
+        assert!(Arc::ptr_eq(&mounted, &source));
+        let frame = mounted.snapshot().await.unwrap();
+        view.update_child_snapshot(&panel_parent, &mounted, frame)
+            .unwrap();
+    }
+    let original = view.bounded_child_content_id().unwrap();
+    for change in ["blocks", "lane"] {
+        let mut invalid = source.snapshot().await.unwrap();
+        if let PaneSnapshot::ReadOnlyChild { transcript, .. } = &mut invalid {
+            if change == "blocks" {
+                transcript.items[0].content_blocks = Some(vec![
+                    TranscriptContentBlock {
+                        index: 0,
+                        content: TranscriptBlockContent::Text { text: "a".into() },
+                    },
+                    TranscriptContentBlock {
+                        index: 0,
+                        content: TranscriptBlockContent::Text { text: "b".into() },
+                    },
+                ]);
+            } else {
+                transcript.items[0].kind = if transcript.items[0].kind == TranscriptItemKind::User {
+                    TranscriptItemKind::Assistant
+                } else {
+                    TranscriptItemKind::User
+                };
+            }
+        }
+        assert!(
+            view.update_child_snapshot(&RunScope::main("fixture", "b"), &source, invalid)
+                .is_err()
+        );
+        view.sync().unwrap();
+        assert_eq!(view.bounded_child_content_id(), Some(original));
+    }
+    let (refresh, _) = view.bounded_child_buttons().unwrap();
+    let commands = view
+        .accessibility_action(refresh, None, AccessibilityAction::Press)
+        .unwrap();
+    let [
+        tekes_agent_ui_demo::component_demo::DemoCommand::ReadChild {
+            source: retry_source,
+            panel_parent,
+            read_intent: Some(intent),
+            page: false,
+        },
+    ] = commands.as_slice()
+    else {
+        panic!("one explicit retry on original source");
+    };
+    assert!(Arc::ptr_eq(retry_source, &source));
+    let repaired = source.read_intent(intent.clone()).await.unwrap();
+    assert!(
+        view.update_child_snapshot(panel_parent, &source, repaired)
+            .unwrap()
+    );
+    assert_eq!(view.bounded_child_content_id(), Some(original));
+    if let PaneSnapshot::ReadOnlyChild { transcript, .. } = &mut stale {
+        transcript.items[0].content_blocks = Some(vec![
+            TranscriptContentBlock {
+                index: 0,
+                content: TranscriptBlockContent::Text {
+                    text: "stale".into(),
+                },
+            },
+            TranscriptContentBlock {
+                index: 0,
+                content: TranscriptBlockContent::Text {
+                    text: "stale".into(),
+                },
+            },
+        ]);
+    }
+    assert!(
+        !view
+            .update_child_snapshot(&RunScope::main("fixture", "b"), &source, stale)
+            .unwrap()
+    );
+    view.sync().unwrap();
+    runtime.stop().await.unwrap();
+}
+struct InvalidSource(TranscriptSnapshot);
+#[async_trait::async_trait]
+impl ChildHistorySource for InvalidSource {
+    async fn read(&self, _: &RunScope, _: &str) -> Result<TranscriptSnapshot> {
+        Ok(self.0.clone())
+    }
+}
+#[tokio::test]
+async fn invalid_custom_history_is_rejected_before_it_becomes_a_renderable_frame() {
+    let runtime = runtime().await;
+    let original = source(runtime.clone(), None).await;
+    let PaneSnapshot::ReadOnlyChild { mut transcript, .. } = original.snapshot().await.unwrap()
+    else {
+        panic!("bounded")
+    };
+    transcript.items[0].content_blocks = Some(vec![
+        TranscriptContentBlock {
+            index: 1,
+            content: TranscriptBlockContent::Text { text: "a".into() },
+        },
+        TranscriptContentBlock {
+            index: 0,
+            content: TranscriptBlockContent::Text { text: "b".into() },
+        },
+    ]);
+    let source = source(runtime.clone(), Some(Arc::new(InvalidSource(transcript)))).await;
+    assert!(
+        source
+            .snapshot()
+            .await
+            .err()
+            .unwrap()
+            .to_string()
+            .contains("content block order")
+    );
+    runtime.stop().await.unwrap();
+}

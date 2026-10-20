@@ -3215,19 +3215,19 @@ pub fn run() {
             let row=host.view.tree.get(id).unwrap();let content=row.component::<tekes_agent_components_ui::TranscriptContent>().unwrap();let frame=row.frame();
             let composer=host.view.tree.get(host.view.ids().root).unwrap().frame();
             assert!(composer.min_y()>=0. && composer.max_y()<=760., "content viewport must leave Composer inside the host window");
-            let mut messages=0;let mut footnotes=0;let mut tools=0;
+            let mut messages=0;let mut footnotes=0;let mut tools=0;let mut known_empty=0;
             for key in content.row_keys() {
                 let node=host.view.tree.get(content.row_id(key).unwrap()).unwrap();
                 if let Some(input)=node.component::<tekes_agent_components_ui::InputMessage>() {
                     let ids=input.ids();let bubble=host.view.tree.get(ids.bubble).unwrap().frame();let caption=host.view.tree.get(ids.footnote).unwrap().frame();
                     assert!((bubble.max_x()-frame.max_x()).abs()<0.5);assert!((caption.max_x()-frame.max_x()).abs()<0.5);
                     messages+=1;
-                } else if node.component::<tekes_agent_components_ui::OutputMessage>().is_some() {assert!((node.frame().min_x()-frame.min_x()).abs()<0.5);messages+=1;}
+                } else if let Some(output)=node.component::<tekes_agent_components_ui::OutputMessage>() {assert!((node.frame().min_x()-frame.min_x()).abs()<0.5);if !output.active(){assert!(output.content_ids().is_empty());known_empty+=1;}messages+=1;}
                 else if node.component::<tekes_agent_components_ui::TurnFootnote>().is_some() {assert!((node.frame().min_x()-frame.min_x()).abs()<0.5);footnotes+=1;}
                 else if node.component::<tekes_agent_components_ui::ToolActivity>().is_some() {assert!((node.frame().min_x()-frame.min_x()).abs()<0.5);tools+=1;}
             }
             assert_eq!(messages, snapshot.transcript.items.iter().filter(|item|item.is_visible).count());
-            serde_json::json!({"renderer":true,"rows":content.row_keys().len(),"messages":messages,"footnotes":footnotes,"independentTools":tools,"userTrailing":true,"machineLeading":true,"genericViewport":true,"keyedReadingAcceptance":false,"richContent":false,"completeTranscript":false,"nativeInteraction":false})
+            serde_json::json!({"renderer":true,"rows":content.row_keys().len(),"knownEmptyContainersHidden":known_empty,"messages":messages,"footnotes":footnotes,"independentTools":tools,"userTrailing":true,"machineLeading":true,"genericViewport":true,"keyedReadingAcceptance":false,"richContent":false,"completeTranscript":false,"nativeInteraction":false})
         });
         let turn_footnote_proof=turn_footnote_id.map(|id| {
             let row=host.view.tree.get(id).unwrap();let frame=row.frame();

@@ -228,7 +228,8 @@ impl ReadOnlyTranscript {
             .component_mut::<TranscriptContent>()
             .unwrap()
     }
-    pub fn update(&mut self, input: ReadOnlyTranscriptInput<'_>) -> Result<(), &'static str> {
+    /// Validate the proposed frame before a host replaces its last readable cache.
+    pub fn validate_update(&self, input: &ReadOnlyTranscriptInput<'_>) -> Result<(), &'static str> {
         if input.scope != &self.scope {
             return Err("read-only transcript source mismatch");
         }
@@ -244,6 +245,16 @@ impl ReadOnlyTranscript {
         {
             return Err("conflicting read-only transcript publication");
         }
+        self.content().validate_update(
+            input.scope,
+            input.publication,
+            input.connection_epoch,
+            input.transcript,
+            false,
+        )
+    }
+    pub fn update(&mut self, input: ReadOnlyTranscriptInput<'_>) -> Result<(), &'static str> {
+        self.validate_update(&input)?;
         self.content_mut().update(
             input.scope,
             input.publication,

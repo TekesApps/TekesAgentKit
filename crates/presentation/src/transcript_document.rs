@@ -93,6 +93,13 @@ impl<'a> TranscriptDocument<'a> {
                 !indices.contains_key(turn.id.as_str()),
                 "duplicate Transcript turn identity",
             )?;
+            let mut actions = BTreeSet::new();
+            require(
+                turn.footnote_actions
+                    .iter()
+                    .all(|action| !action.id.is_empty() && actions.insert(action.id.as_str())),
+                "invalid Transcript turn action catalog",
+            )?;
             indices.insert(turn.id.as_str(), sections.len());
             sections.push(TranscriptSection {
                 id: &turn.id,
@@ -114,6 +121,12 @@ impl<'a> TranscriptDocument<'a> {
             )?;
             if !item.is_visible {
                 continue;
+            }
+            if let Some(blocks) = &item.content_blocks {
+                require(
+                    blocks.windows(2).all(|pair| pair[0].index < pair[1].index),
+                    "invalid Transcript content block order",
+                )?;
             }
             let source_key = match &item.source_position {
                 Some(crate::TranscriptSourcePosition::Native { entry_id, .. }) => {

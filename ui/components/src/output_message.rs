@@ -500,6 +500,9 @@ impl OutputMessage {
     }
 }
 impl Component for OutputMessage {
+    fn active(&self) -> bool {
+        !self.rows.children.is_empty()
+    }
     fn children(&self) -> &[Content] {
         &self.rows.children
     }
@@ -646,7 +649,15 @@ fn parts(
             });
         }
     }
-    if result.is_empty() {
+    // An explicitly empty canonical assistant container is not missing data.
+    // Keep legacy/aggregate-only and status lanes visible; never infer emptiness
+    // from a sibling tool, matching prose, clock or settlement state.
+    let known_empty = item.kind == TranscriptItemKind::Assistant
+        && item.text.is_empty()
+        && item.reasoning.is_empty()
+        && item.attachments.is_empty()
+        && item.content_blocks.as_ref().is_some_and(Vec::is_empty);
+    if result.is_empty() && !known_empty {
         result.push(PartFacts {
             slot: Slot::Empty,
             kind: OutputContentKind::Status,

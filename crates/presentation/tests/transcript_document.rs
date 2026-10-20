@@ -314,3 +314,51 @@ fn native_entries_are_validated_independently_of_submission_and_item_namespaces(
     }
     assert!(TranscriptDocument::read(&snapshot).is_err());
 }
+
+#[test]
+fn document_rejects_duplicate_or_descending_visible_content_indices_but_keeps_gaps() {
+    for indices in [[1, 1], [4, 1], [1, 4]] {
+        let mut message = item("message", "turn", TranscriptItemKind::Assistant);
+        message.content_blocks = Some(
+            indices
+                .into_iter()
+                .map(|index| TranscriptContentBlock {
+                    index,
+                    content: TranscriptBlockContent::Text {
+                        text: "body".into(),
+                    },
+                })
+                .collect(),
+        );
+        let snapshot = TranscriptSnapshot {
+            items: vec![message],
+            ..Default::default()
+        };
+        assert_eq!(
+            TranscriptDocument::read(&snapshot).is_ok(),
+            indices == [1, 4]
+        );
+    }
+}
+#[test]
+fn turn_action_catalog_cannot_have_empty_or_repeated_identities() {
+    let action = tekes_agent_contract::ThreadActionDefinition {
+        id: "fork".into(),
+        label: "fork".into(),
+        icon: "fork".into(),
+        interaction: "execute".into(),
+        enabled: true,
+        disabled_reason: None,
+        copy_text: None,
+    };
+    let mut snapshot = TranscriptSnapshot {
+        turns: vec![turn("turn")],
+        ..Default::default()
+    };
+    snapshot.turns[0].footnote_actions = vec![action.clone(), action.clone()];
+    assert!(TranscriptDocument::read(&snapshot).is_err());
+    snapshot.turns[0].footnote_actions = vec![action];
+    assert!(TranscriptDocument::read(&snapshot).is_ok());
+    snapshot.turns[0].footnote_actions[0].id.clear();
+    assert!(TranscriptDocument::read(&snapshot).is_err());
+}

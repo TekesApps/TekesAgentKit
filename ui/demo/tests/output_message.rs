@@ -534,3 +534,74 @@ fn repeated_public_tool_references_preserve_order_and_disclosure_semantics() {
         Some(false)
     );
 }
+
+#[test]
+fn known_empty_assistant_containers_stay_hidden_until_prose_arrives_and_legacy_stays_visible() {
+    use tekes_agent_presentation::TranscriptSourcePosition as Position;
+    use tekes_ui_controls::composition::Component;
+    let mut message = item();
+    message.text.clear();
+    message.content_blocks = Some(vec![]);
+    message.source_position = Some(Position::Native {
+        entry_id: "native-message".into(),
+        entry_ordinal: 4,
+        content_index: None,
+    });
+    let mut call = tool();
+    call.source_position = Some(Position::Native {
+        entry_id: "native-message".into(),
+        entry_ordinal: 4,
+        content_index: Some(0),
+    });
+    let container = section(&call);
+    let mut standalone = OutputMessage::new(722, scope());
+    standalone
+        .update(&scope(), 1, 1, &output(&message), None)
+        .unwrap();
+    assert!(standalone.content_ids().is_empty());
+    assert!(!standalone.active());
+    let mut row = OutputMessage::new(720, scope());
+    row.update(&scope(), 1, 1, &output(&message), Some(&container))
+        .unwrap();
+    assert!(row.content_ids().is_empty());
+    assert!(!row.active());
+    let root = row.id();
+    let mut host = row.into_host().unwrap();
+    message.text = "后来到达的正文".into();
+    message.content_blocks = Some(vec![block(
+        0,
+        Block::Text {
+            text: message.text.clone(),
+        },
+    )]);
+    view_mut(&mut host, root)
+        .update(&scope(), 2, 1, &output(&message), Some(&container))
+        .unwrap();
+    assert!(view(&host, root).active());
+    let id = view(&host, root).content_ids()[0].body;
+    assert_eq!(host.text_surface(id).unwrap().input.text, "后来到达的正文");
+    message.text.clear();
+    message.content_blocks = None;
+    let mut other = call.clone();
+    other.source_position = Some(Position::Native {
+        entry_id: "other-container".into(),
+        entry_ordinal: 4,
+        content_index: Some(0),
+    });
+    let mut ordinal = call.clone();
+    ordinal.source_position = Some(Position::Native {
+        entry_id: "native-message".into(),
+        entry_ordinal: 5,
+        content_index: Some(0),
+    });
+    let mut turn = call;
+    turn.turn_id = "other-turn".into();
+    for unrelated in [other, ordinal, turn] {
+        let unproven = section(&unrelated);
+        let mut row = OutputMessage::new(721, scope());
+        row.update(&scope(), 1, 1, &output(&message), Some(&unproven))
+            .unwrap();
+        assert_eq!(row.content_ids()[0].kind, OutputContentKind::Status);
+        assert!(row.active());
+    }
+}

@@ -539,6 +539,10 @@ impl RunBinding {
             "child history connection changed during read",
         )?;
         transcript.is_stale |= connection.history_is_stale;
+        let document = tekes_agent_presentation::TranscriptDocument::read(&transcript)?;
+        for section in &document.sections {
+            section.event_order()?;
+        }
         Ok(PaneSnapshot::ReadOnlyChild {
             scope: self.scope.clone(),
             publication,
