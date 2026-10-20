@@ -422,3 +422,68 @@ async fn return_to_latest_preserves_the_real_composer_focus_and_preedit_for_poin
     assert_eq!(composer.editor().input.text, before);
     runtime.stop().await.unwrap();
 }
+
+/// Reproduces the documented upstream boundary, not an acceptance of this
+/// behavior for RunView. Keep fallible editor updates outside reading callbacks
+/// until TekesUI #26 provides a supported preflight/rejection contract.
+#[tokio::test]
+async fn issue26_editor_composition_conflict_does_not_reject_the_reading_version() {
+    use tekes_ui_controls::{
+        DraftRevision, ExternalSelection, ExternalUndo, ExternalValueConflict, ExternalValueResult,
+    };
+    let (runtime, mut host, id, mut text) = setup().await;
+    let first = document("A", 0, 20);
+    let version = attach(&mut host, id, "A", 1, &first);
+    render(&mut host, &mut text);
+    let editor = &mut host
+        .get_mut(composer_ids().editor)
+        .unwrap()
+        .component_mut::<AgentText>()
+        .unwrap()
+        .field
+        .surface;
+    assert!(editor.input.preedit("中文组字", 0..4, None));
+    let baseline = editor.input.external_baseline();
+    let current = editor.input.external_value().unwrap();
+    let value = DraftRevision {
+        identity: current.identity.clone(),
+        version: current.version + 1,
+        payload: "另一份权威草稿".into(),
+    };
+    let text_before = editor.input.text.clone();
+    let rows = transcript(&host, id).row_keys().to_vec();
+    let items = transcript(&host, id)
+        .prepare_update(&scope("A"), 2, 1, &first, false)
+        .unwrap()
+        .item_ids();
+    let (advanced, conflict) = host
+        .update_scroll_reading_document(SCROLL, &version, 2, items, |host| {
+            host.get_mut(composer_ids().editor)
+                .unwrap()
+                .component_mut::<AgentText>()
+                .unwrap()
+                .field
+                .surface
+                .apply_external_value(
+                    &baseline,
+                    &value,
+                    ExternalSelection::Preserve,
+                    ExternalUndo::Preserve,
+                )
+        })
+        .unwrap();
+    assert_eq!(
+        conflict,
+        ExternalValueResult::Conflict(ExternalValueConflict::Composition)
+    );
+    assert_eq!(scroll(&host).reading_document_version(), Some(&advanced));
+    assert_ne!(
+        advanced, version,
+        "A callback conflict is not a reading transaction rejection"
+    );
+    let editor = host.text_surface(composer_ids().editor).unwrap();
+    assert_eq!(editor.input.external_baseline(), baseline);
+    assert_eq!(editor.input.text, text_before);
+    assert_eq!(transcript(&host, id).row_keys(), rows);
+    runtime.stop().await.unwrap();
+}

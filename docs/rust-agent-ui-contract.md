@@ -4,6 +4,8 @@
 
 源码基线：AgentKit 已发布 v0.3.8 / `f1daa0ffcf6ced41e21f351e22845455ca78006c`；TekesUI 实验开发输入固定公开 `8cf0840790334ba224afc0595897c74231c712e6`，199 输入 SHA `f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f`，原 431 基线清单保留在 `ui/baselines/`。以下新增 API 尚是当前分支 WIP。RunSurface 明确保留为协议/控件测试宿主，不改名充当 RunView，也不是正式组件树的包装层。
 
+Layout 和显示逻辑须逐项参照当前 ClientKit 对应 Views；[对应关系与初步差异](clientkit-view-layout-review-20261020.md)列出源码及待验收项。组件类型存在、协议通过或 TekesUI 基础样式一致均不等于布局已经对齐。
+
 ## 所有权
 
 ### 排版与基础样式
@@ -31,6 +33,8 @@ AgentKit 定义业务结构、展示语义、组件组合、组件输入及回�
 [三端取消/错误/恢复专项](rust-agent-ui-run-controls-20261020.md)已通过真实窗口 Send、流式中 Cancel、两次重连不重发、公开错误说明的原生 AX 查询及显式恢复。新增共享 latest_failure/failure_message 只读事实，修复 Pi 错误正文丢失、Indicators 只显示 idle，以及 DSH 新执行后旧 operational error 粘滞。基础路径已验收，不扩大为全部错误、队列/工具取消或真实 IME 验收。
 
 [阅读事务候选输入](tekesui-reading-candidate-intake-20261020.md)已核验新包的449文件与压缩包身份；后续[独立回放与正式 Transcript 探针](rust-agent-ui-reading-candidate-20261020.md)已验证预检行身份、追加/前插、A/B 恢复和保留焦点的回到最新。默认8cf固定依赖未替换，完整 RunView 与原生阅读仍待完成，不据此提升/关闭#22。
+
+[RunView/Composer context 预检修复](rust-agent-ui-context-preflight-20261020.md)防止卡片拒绝后正文部分安装，已通过完整 UI 及正式组件树原生 fixture 专项。完整受控编辑器与阅读事务的可组合预检交由 [TekesUI #26](https://github.com/TekesApps/TekesUI/issues/26)，已有精确公开 API 复现；未在消费侧复制通用校验。
 
 ## Composer（首批实现）
 

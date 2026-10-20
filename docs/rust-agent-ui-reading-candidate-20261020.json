@@ -74,7 +74,7 @@
   "retained_failures": [
     {
       "replay": "01",
-      "reason": "Candidate adds Preedit.clauses and AX required; receiver literals need explicit adaptation"
+      "reason": "Probe omitted existing Preedit.clauses; candidate AX node adds required and needs explicit receiver adaptation"
     },
     {
       "replay": "02",

@@ -377,3 +377,78 @@ async fn invalid_auxiliary_facts_cannot_publish_a_new_draft_or_grant_controls() 
     assert_eq!(view.composer().editor().input.text, initial.draft.text);
     runtime.stop().await.unwrap();
 }
+
+#[tokio::test]
+async fn rejected_context_frame_cannot_partially_install_the_composer_or_transcript() {
+    let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
+    let mut first = (*controller.snapshot()).clone();
+    first.draft.text = "原草稿".into();
+    first
+        .draft
+        .artifacts
+        .push(tekes_agent_presentation::ComposerArtifact::Reference {
+            id: "reference".into(),
+            mention: Some("原引用".into()),
+            path: None,
+            excerpt: None,
+        });
+    let composer = Composer::new(ids().composer)
+        .with_context(1001, Default::default())
+        .unwrap();
+    let mut run = RunView::new(ids(), RunScope::main("fixture", "a"), composer, 701, 702)
+        .unwrap()
+        .with_transcript(703, 704..1000, Default::default())
+        .unwrap();
+    update(&mut run, &first).unwrap();
+    let context = run.composer().context().unwrap().id();
+    let transcript_rows = run.transcript().unwrap().row_keys().to_vec();
+    let mut host = run.into_host().unwrap();
+    // An independently advanced public child must reject an older parent frame
+    // without letting that rejection install the parent's draft first.
+    let mut newer_context = first.clone();
+    newer_context.revision += 10;
+    host.get_mut(context)
+        .unwrap()
+        .component_mut::<ComposerContext>()
+        .unwrap()
+        .update(&newer_context, true, Default::default())
+        .unwrap();
+    let old_baseline = host
+        .text_surface(ids().composer.editor)
+        .unwrap()
+        .input
+        .external_baseline();
+    let old_value = host
+        .text_surface(ids().composer.editor)
+        .unwrap()
+        .input
+        .external_value()
+        .cloned();
+    let mut rejected = first.clone();
+    rejected.revision += 1;
+    rejected.draft.text = "不能部分安装的新草稿".into();
+    let run = host
+        .get_mut(ids().root)
+        .unwrap()
+        .component_mut::<RunView>()
+        .unwrap();
+    assert_eq!(update(run, &rejected), Err("stale context snapshot"));
+    assert_eq!(run.composer().editor().input.text, "原草稿");
+    assert_eq!(
+        run.composer().editor().input.external_baseline(),
+        old_baseline
+    );
+    assert_eq!(
+        run.composer().editor().input.external_value(),
+        old_value.as_ref()
+    );
+    assert_eq!(run.transcript().unwrap().row_keys(), transcript_rows);
+    // The child catches up only through a valid publication, not an automatic
+    // retry/rewrite. The same original editor instance remains mounted.
+    let mut recovered = first;
+    recovered.revision = newer_context.revision + 1;
+    recovered.draft.text = "显式恢复草稿".into();
+    update(run, &recovered).unwrap();
+    assert_eq!(run.composer().editor().input.text, "显式恢复草稿");
+    runtime.stop().await.unwrap();
+}

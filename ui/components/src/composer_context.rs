@@ -127,12 +127,12 @@ impl ComposerContext {
             (self.matches_item(*row, item) && *kind == action).then_some(*id)
         })
     }
-    pub fn update(
-        &mut self,
+    /// Agent card revision/capacity preflight; no editor or generic text checks.
+    pub(crate) fn check_update(
+        &self,
         snapshot: &RunSnapshot,
-        editable: bool,
         affordances: ComposerContextAffordances,
-    ) -> Result<(), &'static str> {
+    ) -> Result<(bool, bool), &'static str> {
         if snapshot.revision == 0 || snapshot.revision < self.revision {
             return Err("stale context snapshot");
         }
@@ -155,6 +155,15 @@ impl ComposerContext {
                 .filter(|next| *next < u32::MAX as u64)
                 .ok_or("context namespace exhausted")?;
         }
+        Ok((source_changed, changed))
+    }
+    pub fn update(
+        &mut self,
+        snapshot: &RunSnapshot,
+        editable: bool,
+        affordances: ComposerContextAffordances,
+    ) -> Result<(), &'static str> {
+        let (source_changed, changed) = self.check_update(snapshot, affordances)?;
         self.revision = snapshot.revision;
         self.editable = editable;
         self.affordances = affordances;

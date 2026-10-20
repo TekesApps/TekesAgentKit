@@ -324,6 +324,11 @@ impl Composer {
         if destination != self.destination && self.is_composing() {
             return Err("finish composition before changing composer destination");
         }
+        // A rejected card frame must not first synchronize the controlled draft
+        // or enqueue local edits. Generic editor validation stays in TekesUI.
+        if let Some(context) = self.context() {
+            context.check_update(snapshot, self.context_affordances)?;
+        }
         self.local_edit();
         if destination != self.destination {
             let key = destination

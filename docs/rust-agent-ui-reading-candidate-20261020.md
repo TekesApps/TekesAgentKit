@@ -8,7 +8,7 @@ AgentKit 新增 `TranscriptContent::prepare_update` / `apply_prepared_update` �
 
 采用[接收记录](tekesui-reading-candidate-intake-20261020.md)中的449文件包，身份 `bd3ed1b0af81b044306af90d3594bb31110147b7194bda6053b1d2e185871c9a`。全部输入在执行前后逐项核验。候选源码只读；显式 path override 仅写入忽略目录下的 AgentKit 源码快照。Cargo metadata 确认八个 TekesUI 包均来自该输入，构建使用 `--locked --offline`，默认 manifest、lockfile 和 `tekesui-source.json` 不变。
 
-候选新增 AX `required` 字段，隔离快照的原生宿主将公开 semantics.required 转发给平台节点；探针按新 Preedit 契约提供空 clauses。这些是记录在收据中的候选 API 适配，不是对默认 pin 的静默兼容补丁。
+候选新增 AX `required` 字段，隔离快照的原生宿主将公开 semantics.required 转发给平台节点；探针按已有 Preedit 契约提供空 clauses。这些是记录在收据中的候选 API 适配，不是对默认 pin 的静默兼容补丁。
 
 独立重跑上游公开契约19项、composition consumer164项、严格 Clippy，以及一个 GPU 测试（内部48场景、192帧）。后者证明上游混合 Content 的几何/像素连续性，不证明 AgentKit 的像素、原生输入或 ClientKit 视觉一致。
 
@@ -34,7 +34,7 @@ python3 scripts/test-reading-candidate.py \
   --target-dir /absolute/owned-cargo-target
 ```
 
-runner 保留 AgentKit 输入哈希、实际解析 metadata、测试/Clippy 日志及候选专用宿主适配。失败也保留收据；不升级 registry、不修改默认依赖、不据此提升候选。首次回放发现两个新增字段不兼容；第二次测试通过但严格 Clippy 拒绝了探针大写测试名；修正后重跑并加强 Activate/follow_latest 检查，replay-04 通过；补充 override 哈希收据后最终 replay-05 再次通过。
+runner 保留 AgentKit 输入哈希、实际解析 metadata、测试/Clippy 日志及候选专用宿主适配。失败也保留收据；不升级 registry、不修改默认依赖、不据此提升候选。首次回放发现探针漏填已有 Preedit.clauses，且候选 AX 节点新增 required；第二次测试通过但严格 Clippy 拒绝了探针大写测试名；修正后重跑并加强 Activate/follow_latest 检查，replay-04 通过；补充 override 哈希收据后最终 replay-05 再次通过。
 
 ## 剩余交付
 
@@ -47,3 +47,5 @@ runner 保留 AgentKit 输入哈希、实际解析 metadata、测试/Clippy 日�
 默认 pin 下完整 UI workspace 288 项、脚本26项、严格 UI Clippy/fmt、headless/UI 边界及实际解析的八包199输入验证通过。root 代码未改，本轮未重复 headless 全量166测试。汇总与日志哈希见[JSON 收据](rust-agent-ui-reading-candidate-20261020.json)。
 
 脚本测试首次误用系统 Python 3.9，因缺少 tomllib 无法导入验收模块；保留失败日志，随后使用仓库验证流程所需的 bundled Python 原样重跑26项通过。
+
+后续完整 RunView 更新边界见 [TekesUI #26](https://github.com/TekesApps/TekesUI/issues/26)：默认 pin 已有 Preedit.clauses，本文件先前将它描述为新增契约不准确，现已修正；新增字段差异是 AX required。另有公开 API 探针精确复现“编辑器 Composition 冲突不会拒绝 reading version”，这不是 RunView 成功验收。
