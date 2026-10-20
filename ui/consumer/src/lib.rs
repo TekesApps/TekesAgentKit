@@ -1433,6 +1433,31 @@ fn second_product_does_not_invent_geometry_before_a_run_is_arranged() {
     assert!(arranged_run_geometry(&run).is_none());
 }
 
+/// Read shared geometry instead of estimating input height and Send/Stop from
+/// another copy of the draft or run lifecycle.
+pub fn arranged_composer_layout(
+    run: &tekes_agent_components_ui::RunView,
+) -> Option<&tekes_agent_components_ui::ComposerLayoutGeometry> {
+    if !run.is_pane_presented() {
+        return None;
+    }
+    let layout = run.composer().layout_geometry()?;
+    (Some(layout.publication) == run.displayed_snapshot().map(|snapshot| snapshot.revision))
+        .then_some(layout)
+}
+#[test]
+fn second_product_queries_shared_primary_and_waits_for_actual_composer_geometry() {
+    use tekes_agent_components_ui::{ComposerPrimaryActionKind, RunScope};
+    let run =
+        new_agent_run_view(1950, 1954..1990, RunScope::main("public", "composer-band")).unwrap();
+    assert_eq!(
+        run.composer().primary_action_kind(),
+        ComposerPrimaryActionKind::Send
+    );
+    assert_eq!(run.composer().primary_action_id(), run.ids().composer.send);
+    assert!(arranged_composer_layout(&run).is_none());
+}
+
 #[test]
 fn second_product_captures_real_turn_rows_without_interpreting_timestamps_or_scroll_offsets() {
     use tekes_agent_components_ui::{

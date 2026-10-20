@@ -3778,7 +3778,8 @@ fn native_script(view: &ComponentDemo) {
         (2800, editor.clone()),
         (3000, Action::Text("停止演示".into())),
         (3200, click(ids.send)),
-        (3500, click(ids.cancel)),
+        // Send has cleared the input; the same visible primary slot now owns Stop.
+        (3500, click(ids.send)),
         (4100, click(select_b)),
         (4300, Action::Text("B 会话草稿".into())),
         (4500, click(select_a)),
@@ -3860,9 +3861,11 @@ fn task_script(view: &ComponentDemo) {
         (100, click(ids.editor)),
         (200, Action::Text("任务消息".into())),
         (400, click(ids.send)),
-        (600, click(ids.editor)),
-        (700, Action::Text("任务暂存草稿".into())),
-        (900, click(ids.cancel)),
+        // Cancel with an empty input, then retain a fresh unsent task draft.
+        // The slot is captured while it contains Send; it contains Stop at 600ms.
+        (600, click(ids.send)),
+        (700, click(ids.editor)),
+        (800, Action::Text("任务暂存草稿".into())),
     ];
     if let Ok(path) = std::env::var("AGENT_TASK_CAPTURE") {
         script.push((1300, Action::Capture { path }));
@@ -3891,9 +3894,9 @@ fn child_script(view: &ComponentDemo) {
         (100, click(ids.editor)),
         (200, Action::Text("子代理消息".into())),
         (400, click(ids.send)),
-        (600, click(ids.editor)),
-        (700, Action::Text("子代理暂存草稿".into())),
-        (900, click(ids.cancel)),
+        (600, click(ids.send)),
+        (700, click(ids.editor)),
+        (800, Action::Text("子代理暂存草稿".into())),
     ];
     if let Ok(path) = std::env::var("AGENT_CHILD_CAPTURE") {
         script.push((1300, Action::Capture { path }));

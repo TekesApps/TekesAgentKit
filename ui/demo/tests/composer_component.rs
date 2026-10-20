@@ -37,6 +37,77 @@ async fn until(c: &RunController, predicate: impl Fn(&RunSnapshot) -> bool) {
 }
 
 #[tokio::test]
+async fn one_primary_tracks_live_run_and_ready_input_and_retains_original_buttons() {
+    use tekes_agent_components_ui::{ComposerControlGate, ComposerPrimaryActionKind as Kind};
+    let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
+    let ids = ComposerIds::new(9800);
+    let mut snapshot = (*controller.snapshot()).clone();
+    snapshot.run.as_mut().unwrap().phase = tekes_agent_presentation::RunPhase::Running;
+    snapshot.run.as_mut().unwrap().can_cancel = true;
+    snapshot.can_submit = true;
+    snapshot.draft.text = "继续排队的新输入".into();
+    let mut view = Composer::new(ids);
+    view.update(&snapshot, Default::default()).unwrap();
+    assert_eq!(view.primary_action_kind(), Kind::Send);
+    let mut host = view.into_host().unwrap();
+    assert!(host.get(ids.send).is_some());
+    assert!(host.get(ids.cancel).is_none());
+    host.accessibility_action(ids.send, None, AccessibilityAction::Press);
+    let old_send = host.drain_actions();
+    snapshot.revision += 1;
+    snapshot.draft.text.clear();
+    composer_mut(&mut host, ids)
+        .update(&snapshot, Default::default())
+        .unwrap();
+    assert_eq!(composer(&host, ids).primary_action_kind(), Kind::Stop);
+    assert_eq!(composer(&host, ids).primary_action_id(), ids.cancel);
+    assert!(host.get(ids.send).is_none());
+    assert!(host.get(ids.cancel).is_some());
+    assert!(
+        composer_mut(&mut host, ids)
+            .take_intents(&old_send)
+            .is_empty()
+    );
+    assert!(matches!(
+        activate(&mut host, ids, ids.cancel).as_slice(),
+        [ComposerIntent::Cancel { .. }]
+    ));
+    composer_mut(&mut host, ids)
+        .update_gated(&snapshot, Default::default(), ComposerControlGate::CLOSED)
+        .unwrap();
+    assert_eq!(composer(&host, ids).primary_action_kind(), Kind::Stop);
+    assert!(activate(&mut host, ids, ids.cancel).is_empty());
+    snapshot.revision += 1;
+    snapshot.draft.text = "恢复同一个发送按钮".into();
+    composer_mut(&mut host, ids)
+        .update(&snapshot, Default::default())
+        .unwrap();
+    assert_eq!(composer(&host, ids).primary_action_id(), ids.send);
+    assert_eq!(
+        host.get(ids.send)
+            .unwrap()
+            .component::<ButtonContent>()
+            .unwrap()
+            .activations,
+        1
+    );
+    assert!(host.get(ids.cancel).is_none());
+    snapshot.revision += 1;
+    snapshot.draft.text.clear();
+    snapshot.run.as_mut().unwrap().phase = tekes_agent_presentation::RunPhase::Idle;
+    snapshot.run.as_mut().unwrap().can_cancel = false;
+    for turn in &mut snapshot.transcript.turns {
+        turn.status = "running".into();
+    }
+    composer_mut(&mut host, ids)
+        .update(&snapshot, Default::default())
+        .unwrap();
+    assert_eq!(composer(&host, ids).primary_action_kind(), Kind::Send);
+    assert!(activate(&mut host, ids, ids.send).is_empty());
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
 async fn standalone_composer_ime_and_switch_keep_destination_and_draft() {
     let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
     let ids = ComposerIds::new(800);

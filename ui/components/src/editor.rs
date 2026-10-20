@@ -38,6 +38,15 @@ pub struct AgentText {
     pub(super) clear_baseline: Option<TextEditBaseline>,
 }
 impl AgentText {
+    pub(super) fn composer() -> Self {
+        let mut text = Self::new(false);
+        text.field.surface.presentation = tekes_ui_controls::TextSurfacePresentation::Content;
+        text.field.viewport = TextViewport::Grow {
+            min: 0.,
+            max: text.field.surface.role.style().line_height * 10.,
+        };
+        text
+    }
     pub(super) fn new(transcript: bool) -> Self {
         let mut field = TextFieldContent::new(if transcript { "会话记录" } else { "消息" }, "");
         field.surface = TextSurface::new("", true, transcript);

@@ -1,17 +1,20 @@
 //! Agent composer: canonical drafts arrive from presentation; editing belongs to TekesUI.
+use crate::composer_layout::{ComposerActions, ComposerMeasurements};
 use crate::{
     AgentText, ComposerContext, ComposerContextAffordances, ComposerContextIntent,
     ComposerContextLabels,
 };
+use crate::{ComposerLayoutGeometry, ComposerPrimaryActionKind};
 use std::collections::BTreeMap;
 use tekes_agent_presentation::{ComposerDestination, ComposerDraft, RunScope, RunSnapshot};
+use tekes_ui_controls::feedback_view::SurfaceView;
 use tekes_ui_controls::{
     ButtonTextRenderer, TextSurface,
     composition::*,
     extended::{Axis, Stack},
     layout::MeasuredChild,
 };
-use tekes_ui_scene::{Rect, Size};
+use tekes_ui_scene::{Rect, Scene, Size};
 use tekes_ui_tokens::Spacing;
 
 /// Reserve these IDs in the embedding ContentHost, including hidden affordances.
@@ -141,6 +144,10 @@ pub struct Composer {
     context_id: Option<ComponentId>,
     retained_context: Option<Content>,
     context_affordances: ComposerContextAffordances,
+    primary_kind: ComposerPrimaryActionKind,
+    retained_actions: BTreeMap<ComponentId, Content>,
+    geometry: Option<ComposerLayoutGeometry>,
+    surface: SurfaceView,
 }
 impl Composer {
     pub fn new(ids: ComposerIds) -> Self {
@@ -153,18 +160,8 @@ impl Composer {
                 },
                 flexible_child: None,
                 children: vec![
-                    Content::new(ids.editor, AgentText::new(false)),
-                    Content::new(
-                        ids.toolbar,
-                        StackContent {
-                            model: Stack {
-                                axis: Axis::Horizontal,
-                                gap: Spacing::Tight.value(),
-                            },
-                            flexible_child: None,
-                            children: Vec::new(),
-                        },
-                    ),
+                    Content::new(ids.editor, AgentText::composer()),
+                    Content::new(ids.toolbar, ComposerActions::new(ids)),
                 ],
             },
             retained: BTreeMap::new(),
@@ -181,10 +178,29 @@ impl Composer {
             context_id: None,
             retained_context: None,
             context_affordances: Default::default(),
+            primary_kind: ComposerPrimaryActionKind::Send,
+            retained_actions: BTreeMap::new(),
+            geometry: None,
+            surface: SurfaceView::default(),
         }
     }
     pub fn ids(&self) -> ComposerIds {
         self.ids
+    }
+    pub fn primary_action_kind(&self) -> ComposerPrimaryActionKind {
+        self.primary_kind
+    }
+    pub fn primary_action_id(&self) -> ComponentId {
+        match self.primary_kind {
+            ComposerPrimaryActionKind::Send => self.ids.send,
+            ComposerPrimaryActionKind::Stop => self.ids.cancel,
+        }
+    }
+    /// Retained geometry is not current after update or while archived.
+    pub fn layout_geometry(&self) -> Option<&ComposerLayoutGeometry> {
+        self.geometry.as_ref().filter(|g| {
+            self.presented && g.publication == self.revision && g.destination == self.destination
+        })
     }
     /// Optional draft cards use a separately reserved namespace. The original
     /// eight Composer IDs and editor/undo instance remain unchanged.
@@ -287,13 +303,13 @@ impl Composer {
             .component_mut::<AgentText>()
             .expect("composer editor")
     }
-    fn toolbar(&mut self) -> &mut StackContent {
+    fn toolbar(&mut self) -> &mut ComposerActions {
         self.body
             .children
             .iter_mut()
             .find(|node| node.id() == self.ids.toolbar)
             .unwrap()
-            .component_mut::<StackContent>()
+            .component_mut::<ComposerActions>()
             .expect("composer toolbar")
     }
     fn local_edit(&mut self) {
@@ -368,7 +384,7 @@ impl Composer {
             let editor = self
                 .retained
                 .remove(&key)
-                .unwrap_or_else(|| Content::new(self.ids.editor, AgentText::new(false)));
+                .unwrap_or_else(|| Content::new(self.ids.editor, AgentText::composer()));
             let mut previous = std::mem::replace(
                 self.body
                     .children
@@ -434,6 +450,14 @@ impl Composer {
             && snapshot.can_submit
             && snapshot.draft.compile(true).is_ok();
         self.can_cancel = gate.cancel && snapshot.run.as_ref().is_some_and(|run| run.can_cancel);
+        let canonical_send_ready = snapshot.can_submit && snapshot.draft.compile(true).is_ok();
+        self.primary_kind =
+            if snapshot.run.as_ref().is_some_and(|run| run.can_cancel) && !canonical_send_ready {
+                ComposerPrimaryActionKind::Stop
+            } else {
+                ComposerPrimaryActionKind::Send
+            };
+        self.geometry = None;
         if !self.is_composing() && self.editor().input.text == self.draft.text {
             self.committed = self.draft.text.clone();
         }
@@ -467,17 +491,24 @@ impl Composer {
         let send_enabled =
             self.can_send && !composing && self.editor().input.text == self.draft.text;
         let cancel_enabled = self.can_cancel;
-        let toolbar = self.toolbar();
-        let mut old = std::mem::take(&mut toolbar.children);
-        for (id, label, visible) in entries.into_iter().chain([
-            (ids.cancel, cancel_label, true),
-            (ids.send, send_label, true),
-        ]) {
+        let primary = self.primary_action_id();
+        let mut old = std::mem::take(&mut self.toolbar().children);
+        let mut retained = std::mem::take(&mut self.retained_actions);
+        let mut children = Vec::new();
+        for (id, label, visible) in [
+            (ids.cancel, cancel_label, primary == ids.cancel),
+            (ids.send, send_label, primary == ids.send),
+        ]
+        .into_iter()
+        .chain(entries)
+        {
             if !visible {
                 continue;
             }
             let mut button = if let Some(index) = old.iter().position(|child| child.id() == id) {
                 old.remove(index)
+            } else if let Some(button) = retained.remove(&id) {
+                button
             } else {
                 Content::new(id, ButtonContent::new(label.clone()))
             };
@@ -498,8 +529,19 @@ impl Composer {
                 .button
                 .state
                 .disabled = !enabled;
-            toolbar.children.push(button);
+            children.push(button);
         }
+        for mut node in old {
+            node.component_mut::<ButtonContent>()
+                .unwrap()
+                .button
+                .clear_layout();
+            retained.insert(node.id(), node);
+        }
+        self.retained_actions = retained;
+        let toolbar = self.toolbar();
+        toolbar.primary = primary;
+        toolbar.children = children;
     }
     /// Typed intents retain the exact presented destination. Submit/Enter never sends.
     pub fn take_intents(&mut self, actions: &[ContentAction]) -> Vec<ComposerIntent> {
@@ -542,12 +584,16 @@ impl Composer {
             let Some(destination) = self.destination.clone() else {
                 continue;
             };
-            if action.target == self.ids.cancel && self.can_cancel {
+            if action.target == self.ids.cancel
+                && self.primary_kind == ComposerPrimaryActionKind::Stop
+                && self.can_cancel
+            {
                 if let ComposerDestination::Run { scope } = destination {
                     self.pending.push(ComposerIntent::Cancel { scope });
                 }
             } else if !self.is_composing() {
                 if action.target == self.ids.send
+                    && self.primary_kind == ComposerPrimaryActionKind::Send
                     && self.can_send
                     && self.editor().input.text == self.draft.text
                 {
@@ -583,6 +629,71 @@ impl Composer {
         self.retained.remove(&destination.storage_key());
         Ok(())
     }
+    fn measurements(
+        &mut self,
+        text: &mut dyn ButtonTextRenderer,
+        width: f32,
+        height: f32,
+    ) -> ComposerMeasurements {
+        // The business cap is ten lines; shaping and scrolling stay in the
+        // library's original editor across font-scale changes.
+        let scale = text
+            .text_surface_host()
+            .map_or(1., |host| host.type_scale());
+        let scale = if scale.is_finite() { scale.max(1.) } else { 1. };
+        let max = self.editor().role.style().line_height * scale * 10.;
+        let padding = Spacing::Snug.value();
+        let inner = (width - padding * 2.).max(0.);
+        let actions = self.toolbar().group(text, inner, true);
+        let setup = self.toolbar().group(text, inner, false);
+        let context = self
+            .body
+            .children
+            .iter_mut()
+            .find(|node| Some(node.id()) == self.context_id)
+            .map_or(Size::default(), |node| {
+                node.measure(text, Size::new(width, 1e8)).size
+            });
+        let overhead = 2. * (Spacing::Snug.value() + Spacing::Regular.value())
+            + if context.height > 0. {
+                context.height + Spacing::Regular.value()
+            } else {
+                0.
+            }
+            + if setup.height > 0. {
+                setup.height + Spacing::Snug.value()
+            } else {
+                0.
+            };
+        let max = max
+            .min((height - overhead).max(0.))
+            .max(self.editor().minimum_outer_height(scale));
+        self.text_mut().field.viewport = TextViewport::Grow { min: 0., max };
+        // Default library actions may be shorter than the single-line editor
+        // envelope. Reserve their real trailing inset before shaping the input,
+        // so a type-scale change cannot overlap the text and action targets.
+        let minimum_envelope =
+            self.editor().minimum_outer_height(scale) + 2. * Spacing::Regular.value();
+        let trailing = padding + (minimum_envelope - actions.height).max(0.) / 2.;
+        let editor_width =
+            (width - Spacing::Loose.value() - trailing - actions.width - Spacing::Regular.value())
+                .max(0.);
+        let editor = self
+            .body
+            .children
+            .iter_mut()
+            .find(|node| node.id() == self.ids.editor)
+            .unwrap()
+            .measure(text, Size::new(editor_width, 1e8))
+            .size;
+        ComposerMeasurements {
+            context,
+            editor,
+            actions,
+            setup,
+            row_height: (editor.height + Spacing::Regular.value() * 2.).max(actions.height),
+        }
+    }
 }
 impl Component for Composer {
     fn active(&self) -> bool {
@@ -598,14 +709,123 @@ impl Component for Composer {
         if !self.presented {
             return MeasuredChild::new(Size::new(0., 0.));
         }
-        let measured = self.body.measure(text, available);
-        // Like ClientKit's resident controls, the outer Composer uses the
-        // assigned conversation column; intrinsic toolbar width is not its frame.
-        MeasuredChild::new(Size::new(available.width, measured.size.height))
+        let measured = self.measurements(text, available.width, available.height);
+        MeasuredChild::new(Size::new(available.width, measured.height()))
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
-        if self.presented {
-            self.body.arrange(text, frame, clip);
+        if !self.presented {
+            return;
+        }
+        let measured = self.measurements(text, frame.size.width, frame.size.height);
+        // A tall context stack may exceed a small host. Preserve the resident
+        // input/actions at the bottom; do not let cards push Send/Stop off-screen.
+        let content_top = frame.min_y() - (measured.height() - frame.size.height).max(0.);
+        let band = Rect::new(
+            frame.min_x(),
+            content_top + measured.context_clearance(),
+            frame.size.width,
+            measured.band_height(),
+        );
+        let context = if measured.context.height > 0. {
+            let rect = Rect::new(
+                frame.min_x(),
+                content_top,
+                frame.size.width,
+                measured.context.height,
+            );
+            self.body
+                .children
+                .iter_mut()
+                .find(|node| Some(node.id()) == self.context_id)
+                .unwrap()
+                .arrange(text, rect, clip);
+            Some(rect)
+        } else {
+            None
+        };
+        let envelope = measured.editor.height + 2. * Spacing::Regular.value();
+        let row_center = band.min_y() + Spacing::Snug.value() + measured.row_height / 2.;
+        let editor = Rect::new(
+            band.min_x() + Spacing::Loose.value(),
+            row_center - envelope / 2. + Spacing::Regular.value(),
+            measured.editor.width,
+            measured.editor.height,
+        );
+        self.body
+            .children
+            .iter_mut()
+            .find(|node| node.id() == self.ids.editor)
+            .unwrap()
+            .arrange(text, editor, clip);
+        let line_height = self.editor().role.style().line_height * self.editor().type_scale;
+        let center = row_center
+            .max(self.editor().inner.max_y() - line_height / 2.)
+            .min(band.max_y() - measured.actions.height / 2.);
+        let trailing = (band.max_y() - center - measured.actions.height / 2.).max(0.);
+        let action_frame = Rect::new(
+            band.max_x() - trailing - measured.actions.width,
+            center - measured.actions.height / 2.,
+            measured.actions.width,
+            measured.actions.height,
+        );
+        let setup = (measured.setup.height > 0.).then(|| {
+            Rect::new(
+                frame.min_x(),
+                band.max_y() + Spacing::Snug.value(),
+                frame.size.width,
+                measured.setup.height,
+            )
+        });
+        let toolbar_id = self.ids.toolbar;
+        let toolbar = self.toolbar();
+        toolbar.input_frame = action_frame;
+        toolbar.setup_frame = setup.unwrap_or_default();
+        self.body
+            .children
+            .iter_mut()
+            .find(|node| node.id() == toolbar_id)
+            .unwrap()
+            .arrange(text, frame, clip);
+        let actions = self.toolbar();
+        let primary = actions
+            .children
+            .iter()
+            .find(|node| node.id() == actions.primary)
+            .map(Content::frame)
+            .unwrap_or_default();
+        let attachment = actions
+            .children
+            .iter()
+            .find(|node| node.id() == actions.ids.attachment)
+            .map(Content::frame);
+        self.geometry = Some(ComposerLayoutGeometry {
+            publication: self.revision,
+            destination: self.destination.clone(),
+            context,
+            input_band: band,
+            editor,
+            primary,
+            attachment,
+            setup,
+        });
+    }
+    fn paint(
+        &mut self,
+        scene: &mut Scene,
+        text: &mut dyn ButtonTextRenderer,
+        _: Rect,
+        clip: Rect,
+        theme: ContentTheme,
+    ) {
+        if let Some(geometry) = &self.geometry {
+            self.surface.render_at_scale(
+                scene,
+                geometry.input_band,
+                Some(clip),
+                theme.palette,
+                true,
+                text.backing_scale(),
+            );
         }
     }
     fn semantics(&self) -> ContentSemantics {

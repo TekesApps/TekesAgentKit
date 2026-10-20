@@ -78,6 +78,184 @@ fn update(run: &mut RunView, snapshot: &RunSnapshot) {
 }
 
 #[tokio::test]
+async fn composer_input_and_primary_share_one_band_without_field_chrome_or_an_empty_toolbar_slot() {
+    use tekes_ui_controls::TextSurfacePresentation;
+    use tekes_ui_tokens::{Spacing, Stroke};
+    let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
+    for scale in [1., 1.5, 2.] {
+        for theme in [Theme::LIGHT, Theme::DARK] {
+            for width in [420., 900.] {
+                for long in [false, true] {
+                    let mut snapshot = (*controller.snapshot()).clone();
+                    snapshot.draft.text = if long {
+                        "长中文输入保持正文和操作区分离\n".repeat(25)
+                    } else {
+                        "短输入".into()
+                    };
+                    let ids = ComposerIds::new(24000);
+                    let mut view = Composer::new(ids);
+                    view.update(
+                        &snapshot,
+                        ComposerAffordances {
+                            attachment: true,
+                            model: true,
+                            preset: true,
+                        },
+                    )
+                    .unwrap();
+                    let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()), scale);
+                    let measured = view.measure(&mut text, Size::new(width, 1000.));
+                    let frame = Rect::new(20., 40., width, measured.size.height);
+                    let mut host = view.into_host().unwrap();
+                    host.render(&mut Scene::new(), &mut text, frame, frame, theme.into())
+                        .unwrap();
+                    let view = host.get(ids.root).unwrap().component::<Composer>().unwrap();
+                    let g = view.layout_geometry().unwrap();
+                    assert_eq!(g.publication, snapshot.revision);
+                    assert_eq!(view.editor().presentation, TextSurfacePresentation::Content);
+                    assert!(!view.editor().input.read_only);
+                    assert!(
+                        g.primary.min_x() >= g.editor.max_x() + Spacing::Regular.value() - 0.1,
+                        "scale={scale} width={width} long={long} geometry={g:?}"
+                    );
+                    assert!(g.primary.max_y() <= g.input_band.max_y() + 0.1);
+                    assert!(g.primary.min_y() >= g.input_band.min_y());
+                    let add = g.attachment.unwrap();
+                    assert!((add.min_x() - g.primary.max_x() - Stroke::Rule.value()).abs() < 0.1);
+                    assert!(add.max_x() <= g.input_band.max_x());
+                    assert_eq!(add.center().y, g.primary.center().y);
+                    let setup = g.setup.unwrap();
+                    assert_eq!(setup.min_y(), g.input_band.max_y() + Spacing::Snug.value());
+                    for id in [ids.model, ids.preset] {
+                        assert!(host.get(id).unwrap().frame().min_y() >= setup.min_y());
+                    }
+                    assert!(host.get(ids.cancel).is_none());
+                    assert!(g.context.is_none());
+                    assert!(g.editor.max_y() <= g.input_band.max_y());
+                    if long {
+                        assert_eq!(
+                            view.editor().outer.size.height,
+                            view.editor().role.style().line_height * scale * 10.
+                        );
+                        assert!(view.editor().scroll.limit().y > 0.);
+                        assert!(g.primary.center().y > g.input_band.center().y);
+                    }
+                }
+            }
+        }
+    }
+    let snapshot = controller.snapshot();
+    let ids = ComposerIds::new(25000);
+    let mut view = Composer::new(ids);
+    view.update(&snapshot, Default::default()).unwrap();
+    let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()), 1.);
+    let size = view.measure(&mut text, Size::new(420., 1000.)).size;
+    let frame = Rect::new(0., 0., size.width, size.height);
+    let mut host = view.into_host().unwrap();
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        frame,
+        frame,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    let g = host
+        .get(ids.root)
+        .unwrap()
+        .component::<Composer>()
+        .unwrap()
+        .layout_geometry()
+        .unwrap();
+    assert!(g.setup.is_none());
+    assert!(g.attachment.is_none());
+    assert_eq!(g.input_band.max_y(), frame.max_y());
+    // A bounded host uses library editor scrolling instead of clipping away
+    // the primary action when the draft grows past the available pane height.
+    let mut snapshot = (*snapshot).clone();
+    snapshot.revision += 1;
+    snapshot.draft.text = "短窗口中的中文草稿\n".repeat(40);
+    host.get_mut(ids.root)
+        .unwrap()
+        .component_mut::<Composer>()
+        .unwrap()
+        .update(&snapshot, Default::default())
+        .unwrap();
+    let short = Rect::new(0., 0., 420., 120.);
+    host.focus(Some(ids.editor), true);
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        short,
+        short,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    let view = host.get(ids.root).unwrap().component::<Composer>().unwrap();
+    let g = view.layout_geometry().unwrap();
+    assert!(g.primary.min_y() >= short.min_y());
+    assert!(g.primary.max_y() <= short.max_y());
+    assert!(g.editor.min_y() >= short.min_y());
+    assert!(g.editor.max_y() <= short.max_y());
+    assert!(view.editor().scroll.limit().y > 0.);
+    assert_eq!(host.focused(), Some(ids.editor));
+    let ids = ComposerIds::new(26000);
+    snapshot.revision += 1;
+    snapshot.draft.artifacts = (0..8)
+        .map(
+            |index| tekes_agent_presentation::ComposerArtifact::Attachment {
+                id: format!("card-{index}"),
+                name: format!("附件 {index}"),
+                content: serde_json::json!({"type":"image","url":"fixture://image"}),
+                facts: None,
+            },
+        )
+        .collect();
+    let mut view = Composer::new(ids)
+        .with_context(27000, Default::default())
+        .unwrap();
+    view.update(&snapshot, Default::default()).unwrap();
+    // ContentHost grows a standalone intrinsic root. RunView is the real
+    // bounded pane that assigns a smaller frame to the resident Composer.
+    let base = 28000_u64 << 32;
+    let mut run = RunView::new(
+        RunViewIds {
+            root: tekes_ui_controls::composition::ComponentId(base),
+            indicators: tekes_ui_controls::composition::ComponentId(base + 1),
+            viewport: tekes_ui_controls::composition::ComponentId(base + 2),
+            composer: ids,
+        },
+        RunScope::main("fixture", "a"),
+        view,
+        27001,
+        27002,
+    )
+    .unwrap();
+    update(&mut run, &snapshot);
+    let mut host = run.into_host().unwrap();
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        short,
+        short,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    let g = host
+        .get(ids.root)
+        .unwrap()
+        .component::<Composer>()
+        .unwrap()
+        .layout_geometry()
+        .unwrap();
+    assert!(g.context.unwrap().min_y() < short.min_y());
+    assert!(g.primary.min_y() >= short.min_y());
+    assert!(g.primary.max_y() <= short.max_y());
+    assert!(host.get(ids.send).unwrap().visible().is_some());
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
 async fn rail_visibility_comes_from_arranged_rows_and_never_from_loaded_history() {
     let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
     let mut snapshot = (*controller.snapshot()).clone();
