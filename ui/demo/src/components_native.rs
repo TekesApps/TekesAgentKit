@@ -41,6 +41,7 @@ impl Drop for OwnedFilePreview {
     }
 }
 struct Host {
+    clipboard_writes: Vec<tekes_agent_components_ui::TranscriptCopyIntent>,
     file_viewer: Option<OwnedFilePreview>,
     view: ComponentDemo,
     text: TextBackend,
@@ -224,6 +225,10 @@ impl Host {
             }
         };
         for command in commands {
+            if let DemoCommand::CopyTranscript(intent) = command {
+                self.clipboard_writes.push(intent);
+                continue;
+            }
             let command = if let DemoCommand::Summary(ref intent) = command
                 && let tekes_agent_presentation::SummaryAction::OpenSubagent { parent, child_id } =
                     &intent.action
@@ -666,7 +671,8 @@ impl Host {
                             | DemoCommand::OpenSideChat { .. }
                             | DemoCommand::CloseSideChat(_)
                             | DemoCommand::OpenSession(_)
-                            | DemoCommand::Summary(_) => unreachable!("handled above"),
+                            | DemoCommand::Summary(_)
+                            | DemoCommand::CopyTranscript(_) => unreachable!("handled above"),
                         }
                         .map_err(|error| error.to_string());
                         HostResult::Operation(result)
@@ -685,6 +691,11 @@ impl Host {
         self.failures.push(error);
     }
     fn draw(&mut self, window: &Window) {
+        for intent in self.clipboard_writes.drain(..) {
+            if intent.claim() {
+                window.set_clipboard_text(intent.text());
+            }
+        }
         if self
             .file_viewer
             .as_mut()
@@ -2091,7 +2102,7 @@ impl WindowHandler for Host {
                 self.draw(window);
             }
             Event::Focus(active) => {
-                if self.selftest || self.context_selftest {
+                if self.selftest || self.context_selftest || self.system_ime_selftest {
                     eprintln!(
                         "COMPONENT_FOCUS active={active} id={:?}",
                         self.view.tree.focused()
@@ -2171,6 +2182,13 @@ impl WindowHandler for Host {
             Event::CloseRequested => self.close(window),
             other => {
                 if let Some(event) = input_event(other, window, &self.view.tree) {
+                    if self.system_ime_selftest {
+                        eprintln!(
+                            "SYSTEM_IME_EVENT {event:?} composing={} focus={:?}",
+                            self.view.composing(),
+                            self.view.tree.focused()
+                        );
+                    }
                     let commands = self.view.event_with_text(&event, &mut self.text);
                     self.commands(commands);
                     self.draw(window);
@@ -2484,6 +2502,7 @@ pub fn run() {
         0
     };
     let mut host = Host {
+        clipboard_writes: vec![],
         file_viewer: None,
         view,
         sidebar,

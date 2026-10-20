@@ -42,6 +42,7 @@ pub struct TranscriptContentLabels {
     pub stale: String,
     pub input_details: OutputMessageLabels,
     pub input_information: fn(TranscriptDelivery) -> String,
+    pub input_copy: String,
     pub output: OutputMessageLabels,
     pub tool: ToolActivityLabels,
     pub footnote: TurnFootnoteLabels,
@@ -54,6 +55,7 @@ impl Default for TranscriptContentLabels {
             notices: "会话提示".into(),
             stale: "历史待同步".into(),
             input_details: InputMessage::default_details_labels(),
+            input_copy: "复制输入".into(),
             input_information: |delivery| match delivery {
                 TranscriptDelivery::Pending => "发送中".into(),
                 TranscriptDelivery::Recorded { .. } => "已发送".into(),
@@ -316,11 +318,12 @@ impl TranscriptContent {
         let root = ComponentId((namespace as u64) << 32);
         match &row.content {
             PlannedContent::Input(_) => {
-                let view = InputMessage::with_details_labels(
+                let mut view = InputMessage::with_details_labels(
                     namespace,
                     self.scope.clone(),
                     self.labels.input_details,
                 );
+                view.set_copy_label(self.labels.input_copy.clone());
                 Content::new(view.ids().root, view)
             }
             PlannedContent::Output(_, _) => {
@@ -444,6 +447,14 @@ impl TranscriptContent {
         }
         self.refresh_detached();
         result
+    }
+    pub fn take_copy_intents(&self, actions: &[ContentAction]) -> Vec<crate::TranscriptCopyIntent> {
+        self.rows
+            .children
+            .iter()
+            .filter_map(|node| node.component::<InputMessage>())
+            .flat_map(|input| input.take_copy_intents(actions))
+            .collect()
     }
     pub fn into_host(self) -> Result<ContentHost, CompositionError> {
         let root = self.root;

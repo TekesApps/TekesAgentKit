@@ -16,6 +16,35 @@ use tekes_ui_tokens::{Spacing, proposal};
 use crate::TranscriptMessageIdentity as Key;
 use crate::output_message::{OutputPart, PartFacts, Slot};
 use crate::{OutputContentKind, OutputMessageLabels, OutputMessageText};
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
+
+/// Clipboard capability captured from one displayed message. No endpoint call;
+/// hosts use the captured text, never look up the newly selected session.
+#[derive(Clone, Debug)]
+pub struct TranscriptCopyIntent {
+    scope: RunScope,
+    message: Key,
+    text: String,
+    claimed: Arc<AtomicBool>,
+}
+impl TranscriptCopyIntent {
+    pub fn scope(&self) -> &RunScope {
+        &self.scope
+    }
+    pub fn message(&self) -> &Key {
+        &self.message
+    }
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+    /// Clones share one clipboard write admission. No retry or network authority.
+    pub fn claim(&self) -> bool {
+        !self.claimed.swap(true, Ordering::AcqRel)
+    }
+}
 #[derive(Clone, Copy, Debug)]
 pub struct InputMessageIds {
     pub root: ComponentId,
@@ -185,6 +214,8 @@ pub struct InputMessage {
     details: Vec<PartFacts>,
     next_detail: u64,
     detail_labels: OutputMessageLabels,
+    copy_id: Option<ComponentId>,
+    copy_label: String,
 }
 impl InputMessage {
     pub fn new(namespace: u32, scope: RunScope) -> Self {
@@ -219,6 +250,8 @@ impl InputMessage {
             details: vec![],
             next_detail: 16,
             detail_labels,
+            copy_id: None,
+            copy_label: "复制输入".into(),
             children: vec![
                 Content::new(
                     ids.bubble,
@@ -337,6 +370,25 @@ impl InputMessage {
         }
         self.children.push(bubble);
         self.children.push(footer);
+        let same_copy = self
+            .last_item
+            .as_ref()
+            .is_some_and(|old| old.text == input.item.text)
+            && self.key.as_ref() == Some(&next)
+            && self.epoch == epoch;
+        let old_copy = self
+            .copy_id
+            .and_then(|id| previous.into_iter().find(|node| node.id() == id));
+        self.copy_id = None;
+        if !input.item.text.is_empty() {
+            let node = if same_copy { old_copy } else { None }.unwrap_or_else(|| {
+                let id = ComponentId(self.ids.root.0 + self.next_detail);
+                self.next_detail += 1;
+                Content::new(id, ButtonContent::new(&self.copy_label))
+            });
+            self.copy_id = Some(node.id());
+            self.children.push(node);
+        }
         self.details = facts;
         self.last_item = Some(input.item.clone());
         self.key = Some(next);
@@ -368,7 +420,7 @@ impl InputMessage {
             .count() as u64;
         if self
             .next_detail
-            .checked_add(additions * 3)
+            .checked_add(additions * 3 + 1)
             .is_none_or(|end| end >= u32::MAX as u64)
         {
             return Err("input details namespace exhausted");
@@ -409,6 +461,34 @@ impl InputMessage {
             .iter()
             .filter_map(|node| node.component::<OutputPart>().map(OutputPart::ids))
             .collect()
+    }
+    pub fn copy_button_id(&self) -> Option<ComponentId> {
+        self.copy_id
+    }
+    pub fn set_copy_label(&mut self, label: impl Into<String>) {
+        self.copy_label = label.into();
+        if let Some(id) = self.copy_id
+            && let Some(node) = self.children.iter_mut().find(|node| node.id() == id)
+        {
+            node.component_mut::<ButtonContent>().unwrap().label = self.copy_label.clone();
+        }
+    }
+    /// Copy is available for loaded text even offline and in a read-only pane.
+    /// Empty/attachment-only inputs do not pretend to offer file copying.
+    pub fn take_copy_intents(&self, actions: &[ContentAction]) -> Vec<TranscriptCopyIntent> {
+        if self.copy_id.is_none()
+            || !actions.iter().any(|action| {
+                Some(action.target) == self.copy_id && action.kind == ContentActionKind::Activate
+            })
+        {
+            return vec![];
+        }
+        vec![TranscriptCopyIntent {
+            scope: self.scope.clone(),
+            message: self.key.clone().unwrap(),
+            text: self.last_item.as_ref().unwrap().text.clone(),
+            claimed: Arc::new(AtomicBool::new(false)),
+        }]
     }
     pub fn handle_actions(&mut self, actions: &[ContentAction]) -> bool {
         let mut changed = false;

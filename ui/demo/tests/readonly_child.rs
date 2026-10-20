@@ -581,6 +581,58 @@ async fn invalid_child_frames_cannot_poison_the_host_cache_or_prevent_a_later_ex
     runtime.stop().await.unwrap();
 }
 struct InvalidSource(TranscriptSnapshot);
+
+#[tokio::test]
+async fn readonly_offline_history_copies_loaded_user_text_without_a_write_controller() {
+    let runtime = runtime().await;
+    let source = source(runtime.clone(), None).await;
+    let mut frame = source.snapshot().await.unwrap();
+    let PaneSnapshot::ReadOnlyChild { transcript, .. } = &mut frame else {
+        panic!("read-only")
+    };
+    transcript.items[0].kind = tekes_agent_presentation::TranscriptItemKind::User;
+    transcript.items[0].text = "只读历史输入".into();
+    transcript.items[0].content_blocks = None;
+    let mut view = ReadOnlyTranscript::standard(
+        7000,
+        7003..7100,
+        source.binding().scope().clone(),
+        Default::default(),
+    )
+    .unwrap();
+    let mut input = source.readonly_input(&frame, false, Some("离线")).unwrap();
+    input.source_ready = false;
+    input.frame_current = false;
+    view.update(input).unwrap();
+    let rows: Vec<_> = view
+        .content()
+        .row_keys()
+        .iter()
+        .map(|key| view.content().row_id(key).unwrap())
+        .collect();
+    let root = view.ids().root;
+    let mut host = view.into_host().unwrap();
+    let button = rows
+        .into_iter()
+        .find_map(|id| host.get(id)?.component::<InputMessage>()?.copy_button_id())
+        .unwrap();
+    host.accessibility_action(button, None, AccessibilityAction::Press);
+    let actions = host.drain_actions();
+    let view = host
+        .get_mut(root)
+        .unwrap()
+        .component_mut::<ReadOnlyTranscript>()
+        .unwrap();
+    assert!(
+        view.take_intents(&actions).is_empty(),
+        "copy does not refresh or mutate"
+    );
+    let copies = view.take_copy_intents(&actions);
+    assert_eq!(copies.len(), 1);
+    assert_eq!(copies[0].scope(), source.binding().scope());
+    assert_eq!(copies[0].text(), "只读历史输入");
+    runtime.stop().await.unwrap();
+}
 #[async_trait::async_trait]
 impl ChildHistorySource for InvalidSource {
     async fn read(&self, _: &RunScope, _: &str) -> Result<TranscriptSnapshot> {

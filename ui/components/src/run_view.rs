@@ -21,6 +21,7 @@ pub enum RunViewIntent {
     LoadEarlier { scope: RunScope },
     Actionable(ActionableResponseIntent),
     TurnAction(Box<TurnFootnoteIntent>),
+    CopyTranscript(TranscriptCopyIntent),
 }
 /// Experimental reusable Run composition. Mount one per original binding; it
 /// cannot be retargeted. A complete Transcript requires upstream reading/rich APIs.
@@ -439,6 +440,12 @@ impl RunView {
                     .handle_actions(actions)
                     .into_iter()
                     .map(|intent| RunViewIntent::TurnAction(Box::new(intent))),
+            );
+            intents.extend(
+                content
+                    .take_copy_intents(actions)
+                    .into_iter()
+                    .map(RunViewIntent::CopyTranscript),
             );
         }
         intents

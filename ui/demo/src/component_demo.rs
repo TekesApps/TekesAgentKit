@@ -63,6 +63,7 @@ mod uploads;
 use file_preview::FilePreviewGesture;
 use uploads::UploadGesture;
 pub enum DemoCommand {
+    CopyTranscript(tekes_agent_components_ui::TranscriptCopyIntent),
     TurnAction {
         binding: Arc<RunBinding>,
         intent: tekes_agent_components_ui::TurnFootnoteIntent,
@@ -2995,6 +2996,9 @@ impl ComponentDemo {
             use tekes_agent_components_ui::RunViewIntent;
             match intent {
                 RunViewIntent::Composer(intent) => intents.push((binding, intent)),
+                RunViewIntent::CopyTranscript(intent) => {
+                    commands.push(DemoCommand::CopyTranscript(intent))
+                }
                 RunViewIntent::TurnAction(intent) => commands.push(DemoCommand::TurnAction {
                     binding,
                     intent: *intent,
@@ -3306,6 +3310,20 @@ impl ComponentDemo {
                     }
                 }
             }
+        }
+        if !composing && let Some(root) = self.bounded_child_content_id() {
+            let content = self
+                .tree
+                .get(root)
+                .unwrap()
+                .component::<tekes_agent_components_ui::TranscriptContent>()
+                .unwrap();
+            commands.extend(
+                content
+                    .take_copy_intents(&actions)
+                    .into_iter()
+                    .map(DemoCommand::CopyTranscript),
+            );
         }
         if !self.composing()
             && let Some(SidePanelTabKind::Subagent { child_id }) =

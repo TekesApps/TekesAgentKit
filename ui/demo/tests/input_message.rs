@@ -98,6 +98,19 @@ async fn user_row_uses_library_content_surface_and_external_trailing_caption() {
             .unwrap();
         let bubble = host.get(ids.bubble).unwrap().frame();
         let note = host.get(ids.footnote).unwrap().frame();
+        let copy = host
+            .get(
+                host.get(ids.root)
+                    .unwrap()
+                    .component::<InputMessage>()
+                    .unwrap()
+                    .copy_button_id()
+                    .unwrap(),
+            )
+            .unwrap()
+            .frame();
+        assert!((copy.max_x() - frame.max_x()).abs() < 0.01);
+        assert!(copy.min_y() >= note.max_y());
         assert!(
             bubble.size.width < frame.size.width / 2.,
             "short input must shrink to prose"
@@ -351,7 +364,66 @@ async fn attachments_precede_the_user_bubble_and_external_caption_in_app_order()
     let order: Vec<_> = message.children().iter().map(|node| node.id()).collect();
     assert_eq!(
         order,
-        vec![message.detail_ids()[0].root, ids.bubble, ids.footnote]
+        vec![
+            message.detail_ids()[0].root,
+            ids.bubble,
+            ids.footnote,
+            message.copy_button_id().unwrap()
+        ]
     );
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn input_copy_captures_exact_original_text_and_retires_old_targets() {
+    use tekes_ui_controls::composition::*;
+    let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
+    let scope = RunScope::main("fixture", "a");
+    let source = controller.snapshot();
+    let document = TranscriptDocument::read(&source.transcript).unwrap();
+    let mut item = document.sections[0].inputs[0].item.clone();
+    item.content_blocks = None;
+    item.text = "中文 **源码**\n  保留空白 😀 ".into();
+    fn input(item: &tekes_agent_presentation::TranscriptItem) -> TranscriptInput<'_> {
+        TranscriptInput {
+            key: TranscriptMessageKey::NativeEntry("original"),
+            item,
+            footnote: TranscriptDelivery::Recorded { time: None },
+        }
+    }
+    let mut row = InputMessage::new(991, scope.clone());
+    row.update(&scope, 1, 1, &input(&item)).unwrap();
+    let old = row.copy_button_id().unwrap();
+    let action = |target| ContentAction {
+        target,
+        kind: ContentActionKind::Activate,
+        source: ContentActionSource::Programmatic,
+    };
+    let intents = row.take_copy_intents(&[action(old), action(old)]);
+    assert_eq!(intents.len(), 1);
+    let captured = intents[0].clone();
+    assert_eq!(captured.scope(), &scope);
+    assert_eq!(
+        captured.message(),
+        &tekes_agent_components_ui::TranscriptMessageIdentity::NativeEntry("original".into())
+    );
+    row.update(&scope, 2, 1, &input(&item)).unwrap();
+    assert_eq!(row.copy_button_id(), Some(old));
+    let original_text = item.text.clone();
+    item.text = "新的服务端内容".into();
+    row.update(&scope, 3, 1, &input(&item)).unwrap();
+    assert_ne!(row.copy_button_id(), Some(old));
+    assert!(row.take_copy_intents(&[action(old)]).is_empty());
+    assert_eq!(captured.text(), original_text);
+    assert!(captured.claim());
+    assert!(
+        !intents[0].claim(),
+        "clones cannot replay a clipboard write"
+    );
+    item.text.clear();
+    item.attachments
+        .push(serde_json::json!({"name":"file.txt"}));
+    row.update(&scope, 4, 2, &input(&item)).unwrap();
+    assert!(row.copy_button_id().is_none());
     runtime.stop().await.unwrap();
 }

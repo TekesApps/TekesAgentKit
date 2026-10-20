@@ -21,6 +21,59 @@ fn view() -> RunView {
     .with_transcript(703, 704..1000, Default::default())
     .unwrap()
 }
+
+#[tokio::test]
+async fn run_routes_loaded_input_copy_and_blocks_it_while_composing() {
+    let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
+    let snapshot = controller.snapshot();
+    let mut run = view();
+    update(&mut run, &snapshot).unwrap();
+    let rows: Vec<_> = run
+        .transcript()
+        .unwrap()
+        .row_keys()
+        .iter()
+        .map(|key| run.transcript().unwrap().row_id(key).unwrap())
+        .collect();
+    let mut host = run.into_host().unwrap();
+    let row_id = rows
+        .into_iter()
+        .find(|id| host.get(*id).unwrap().component::<InputMessage>().is_some())
+        .unwrap();
+    let row = host
+        .get(row_id)
+        .unwrap()
+        .component::<InputMessage>()
+        .unwrap();
+    let button = row.copy_button_id().unwrap();
+    host.accessibility_action(button, None, AccessibilityAction::Press);
+    let actions = host.drain_actions();
+    let intents = host
+        .get_mut(ids().root)
+        .unwrap()
+        .component_mut::<RunView>()
+        .unwrap()
+        .take_intents(&actions);
+    assert!(
+        matches!(intents.as_slice(), [RunViewIntent::CopyTranscript(copy)] if copy.scope()==&RunScope::main("fixture","a") && !copy.text().is_empty())
+    );
+    host.focus(Some(ids().composer.editor), true);
+    host.event(&ContentEvent::Preedit {
+        text: "组字".into(),
+        selection: 2..2,
+        clauses: vec![],
+        replacement: None,
+    });
+    assert!(
+        host.get_mut(ids().root)
+            .unwrap()
+            .component_mut::<RunView>()
+            .unwrap()
+            .take_intents(&actions)
+            .is_empty()
+    );
+    runtime.stop().await.unwrap();
+}
 fn update(view: &mut RunView, snapshot: &RunSnapshot) -> Result<(), &'static str> {
     view.update(
         snapshot,

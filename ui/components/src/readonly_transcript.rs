@@ -309,6 +309,9 @@ impl ReadOnlyTranscript {
         self.connection = Some(input.connection.clone());
         Ok(())
     }
+    pub fn take_copy_intents(&self, actions: &[ContentAction]) -> Vec<crate::TranscriptCopyIntent> {
+        self.content().take_copy_intents(actions)
+    }
     pub fn take_intents(&mut self, actions: &[ContentAction]) -> Vec<ReadOnlyTranscriptIntent> {
         // Local disclosures are shared. This lane never dispatches a mutation.
         let _ = self.content_mut().handle_actions(actions);

@@ -870,7 +870,7 @@ fn independent_host_mounts_canonical_content_without_private_demo_types() {
     assert!(!view.capabilities().keyed_reading_transactions);
     assert!(!view.capabilities().rich_content);
     let root = view.id();
-    let host = view.into_host().unwrap();
+    let mut host = view.into_host().unwrap();
     assert!(host.get(root).is_some());
     let input = host
         .get(input)
@@ -893,6 +893,24 @@ fn independent_host_mounts_canonical_content_without_private_demo_types() {
             .text,
         "机器回复"
     );
+    let copy = input.copy_button_id().unwrap();
+    host.accessibility_action(
+        copy,
+        None,
+        tekes_ui_controls::composition::AccessibilityAction::Press,
+    );
+    let actions = host.drain_actions();
+    let copies = host
+        .get(root)
+        .unwrap()
+        .component::<tekes_agent_components_ui::TranscriptContent>()
+        .unwrap()
+        .take_copy_intents(&actions);
+    assert_eq!(copies.len(), 1);
+    assert_eq!(copies[0].scope(), &RunScope::main("public", "a"));
+    assert_eq!(copies[0].text(), "用户输入");
+    assert!(copies[0].claim());
+    assert!(!copies[0].clone().claim());
 }
 
 /// A separate product assembles the same public RunView, never the demo host.
