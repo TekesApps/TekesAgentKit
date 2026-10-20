@@ -1,5 +1,6 @@
 //! Headless session runtime and in-memory projection; no database or UI dependencies.
 mod client;
+mod inventory_refresh;
 mod projection;
 mod runtime;
 pub use projection::*;

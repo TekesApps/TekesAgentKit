@@ -138,3 +138,6 @@ ask_user_question → public actionable sync → runtime 用共享 session envel
 ## 共享只读会话搜索
 
 `SessionRuntime::search_sessions_at_epoch` 基于真实方法能力调用 `session.search`，并在请求入场和回复时校验连接代数。typed `SessionSearchResults` 要求 items/sessionId/snippet/hasMore，保留未知扩展字段，不将缺少 hasMore 当成已穷尽。Pi 返回至多 100 个匹配并以第 101 个匹配证明 hasMore；引用候选接口仍为 20 条。DSH 全文索引由部署决定，默认关闭时保持明确失败，AgentKit 不自动打开它。读取取消只撤销 search reader，不取消远程 Agent 执行。组件、shared presentation 和分项证据见[接入记录](rust-agent-ui-sidebar-query-controller-20261021.md)。
+
+
+搜索遇到未知库存身份时，共享运行时通过 `refresh_inventory_at_epoch` 重读公开 session/workspace cursor 的原子 baseline 对；原连接 epoch、已加载 journal/preview 和分页 cut 保持，旧 cursor 被淘汰。刷新失败保留原库存并向搜索传播失败，不伪造空命中或偷偷重连。实现与验收范围见 [Sidebar 库存恢复](rust-agent-ui-sidebar-inventory-refresh-20261021.md)。

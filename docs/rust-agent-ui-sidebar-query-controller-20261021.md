@@ -11,7 +11,7 @@
 
 只搜索显式选择的 endpoint，不暗中扫描其它 harness。不变的 query 不重复请求；A → B → A 使用新代数；空白 query 立即撤销旧尝试。连接身份改变会重新读取当前 query，旧回复不能在新 epoch 下发布。这是读取恢复，不重放 prompt 或其它 mutation。连接通知在同一状态锁内读取当前 query 与实时身份，不能携带早先缓存的 query 覆盖用户新输入；已应用的身份通知不重复发起读取，`reconcile_connection()` 也遵循同一规则。
 
-命中去重保留 provider 原顺序，同 ID 的最后一个 snippet/元数据生效，地址总是来自原 endpoint。不会对返回成员再加标题过滤、私读 harness 数据库或伪造本地全文索引。`unresolved` 保留尚未进入当前 inventory 的身份；后来 canonical inventory 到达时可更新解析状态，不触发额外搜索 RPC。**主动刷新未知命中的公开 inventory baseline 尚未补齐**，没有把命中直接变成可写会话事实。
+命中去重保留 provider 原顺序，同 ID 的最后一个 snippet/元数据生效，地址总是来自原 endpoint。不会对返回成员再加标题过滤、私读 harness 数据库或伪造本地全文索引。`unresolved` 保留尚未进入当前 inventory 的身份；后来 canonical inventory 到达时可更新解析状态，不触发额外搜索 RPC。后续已补 [未知命中的公开 inventory baseline 恢复](rust-agent-ui-sidebar-inventory-refresh-20261021.md)，只消费正常基线确认的身份，不把命中直接变成可写会话事实。
 
 ## 控件接入与生命周期
 
@@ -48,4 +48,4 @@ Native 测试固定干净的 Kernel v0.9.1 / ae5d6fdf；supervisor、worker、he
 
 ## 尚待完成
 
-多 endpoint 聚合、完整搜索结果成员关系/FTS 语义、未知 inventory 命中的主动公开刷新、snippet/help、搜索 header/count、项目分组及完整 outline/status-pane 布局仍由 AgentKit 完成。不会要求宿主各自实现这些业务状态。默认混合阅读与其它 Views 的清单继续保持开放；本轮不合并、发布或升级 TekesUI pin。
+多 endpoint 聚合、完整搜索结果成员关系/FTS 语义、snippet/help、搜索 header/count、项目分组及完整 outline/status-pane 布局仍由 AgentKit 完成。不会要求宿主各自实现这些业务状态。默认混合阅读与其它 Views 的清单继续保持开放；本轮不合并、发布或升级 TekesUI pin。

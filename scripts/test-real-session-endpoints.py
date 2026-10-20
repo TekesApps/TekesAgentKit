@@ -30,7 +30,7 @@ parser.add_argument('--ui-transcript-content',action='store_true',help='Mount th
 parser.add_argument('--ui-message-rows',action='store_true',help='Mount canonical plain user and machine rows through public components; not a full Transcript')
 parser.add_argument('--ui-history-pages',action='store_true',help='Seed long isolated sessions and verify public page receipts, original scope and fresh reconnect history')
 parser.add_argument('--ui-actionables',action='store_true',help='Exercise public actionable cards on configured Native/Pi/DSH question sources')
-parser.add_argument('--ui-sidebar-query',action='store_true',help='Read typed public search through the shared controller on owned conversation-history targets; offscreen protocol proof only')
+parser.add_argument('--ui-sidebar-query',action='store_true',help='Read typed public search and explicitly refresh public inventory cursors on owned conversation-history targets; offscreen protocol proof only')
 args=parser.parse_args()
 if args.ui_sidebar_query and not (args.ui_demo and args.ui_components):
     parser.error('--ui-sidebar-query requires --ui-demo and --ui-components')
@@ -330,6 +330,9 @@ def ui_smoke(config, first, bounded_child=None):
         search=receipt['sidebarSearchProof']
         assert search['publicTypedSearch'] and search['sharedController'] and search['expectedTargetFound'] and search['noSubmission'],search
         assert isinstance(search['hasMore'],bool),search
+        refresh=search['inventoryRefresh']
+        assert all(refresh[key] for key in ('publicCursors','sameConnectionEpoch','historyUnchanged','searchResultRetained')),refresh
+        print(kind.upper()+'_UI_INVENTORY_REFRESH_OK public-cursors+same-epoch+retained-history+search-result; offscreen-only',flush=True)
         print(kind.upper()+'_UI_SIDEBAR_QUERY_OK public-typed-search+shared-controller+owned-target+original-endpoint; offscreen-only',flush=True)
     if args.ui_native_feedback and bounded_child is None:
         native_log=output.with_suffix('.native-feedback.log')

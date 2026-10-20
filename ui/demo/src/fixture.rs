@@ -55,6 +55,9 @@ pub struct Fixture {
     search_active: Arc<AtomicUsize>,
     search_fails: Arc<AtomicBool>,
     search_gate: Option<Arc<tokio::sync::Semaphore>>,
+    inventory_reads: Arc<AtomicUsize>,
+    inventory_refresh_gate: Option<Arc<tokio::sync::Semaphore>>,
+    inventory_refresh_fails: Arc<AtomicBool>,
     connects: Arc<AtomicUsize>,
     forks: Arc<AtomicUsize>,
     side_chats: bool,
@@ -176,6 +179,9 @@ impl Default for Fixture {
             search_active: Arc::new(AtomicUsize::new(0)),
             search_fails: Arc::new(AtomicBool::new(false)),
             search_gate: None,
+            inventory_reads: Arc::new(AtomicUsize::new(0)),
+            inventory_refresh_gate: None,
+            inventory_refresh_fails: Arc::new(AtomicBool::new(false)),
             connects: Arc::new(AtomicUsize::new(0)),
             forks: Arc::new(AtomicUsize::new(0)),
             side_chats: false,
@@ -210,6 +216,37 @@ impl Default for Fixture {
     }
 }
 impl Fixture {
+    pub fn with_inventory_refresh_gate(mut self, gate: Arc<tokio::sync::Semaphore>) -> Self {
+        self.inventory_refresh_gate = Some(gate);
+        self
+    }
+    pub fn set_inventory_refresh_failure(&self, failed: bool) {
+        self.inventory_refresh_fails.store(failed, Ordering::SeqCst);
+    }
+    pub fn inventory_reads(&self) -> usize {
+        self.inventory_reads.load(Ordering::SeqCst)
+    }
+    /// Authority-only fixture setup: model a search finding a native session
+    /// before an inventory delta arrives. Never install this row in the client.
+    pub fn install_unannounced_session(&self, id: &str, title: &str) {
+        let mut sessions = self.sessions.lock().unwrap();
+        assert!(!id.is_empty() && !sessions.contains_key(id));
+        sessions.insert(
+            id.into(),
+            Line {
+                rows: vec![],
+                sender: broadcast::channel(256).0,
+                cancel: Arc::new(AtomicBool::new(false)),
+                busy: false,
+                turn: 0,
+                ephemeral: false,
+                title: title.into(),
+                archived: false,
+                history_revision: None,
+                model_selection: json!({"provider":"fixture","model":"initial"}),
+            },
+        );
+    }
     pub fn with_session_search(mut self) -> Self {
         self.search_enabled = true;
         self
@@ -470,6 +507,7 @@ struct Endpoint {
     fixture: Fixture,
     host: HostDescription,
     generation: String,
+    inventory_reads: AtomicUsize,
 }
 #[async_trait]
 impl EndpointConnector for Fixture {
@@ -477,6 +515,7 @@ impl EndpointConnector for Fixture {
         tokio::time::sleep(Duration::from_millis(100)).await;
         let mut endpoint = Endpoint {
             fixture: self.clone(),
+            inventory_reads: AtomicUsize::new(0),
             generation: format!("fixture-{}", self.connects.fetch_add(1, Ordering::SeqCst)),
             host: serde_json::from_value(
                 json!({"protocolVersion":4,"product":{"name":"Local SEP fixture","version":"1"},"capabilities":["session-journal","session-inventory-sync","session-control-sync","actionable-sync"],"cwd":"/fixture","home":"/fixture","attachedSessions":0,"canOpenPath":false}),
@@ -553,6 +592,20 @@ impl SessionEndpoint for Endpoint {
         let g = &self.generation;
         let baseline = match target {
             StreamTarget::SessionInventory => {
+                let previous = self.inventory_reads.fetch_add(1, Ordering::SeqCst);
+                self.fixture.inventory_reads.fetch_add(1, Ordering::SeqCst);
+                if previous > 0 {
+                    if let Some(gate) = &self.fixture.inventory_refresh_gate {
+                        gate.acquire()
+                            .await
+                            .map_err(|_| unsupported("inventory read gate closed"))?
+                            .forget();
+                    }
+                    require(
+                        !self.fixture.inventory_refresh_fails.load(Ordering::SeqCst),
+                        "owned inventory refresh failure",
+                    )?;
+                }
                 let sessions = self.fixture.sessions.lock().unwrap();
                 let receiver = self.fixture.inventory_sender.subscribe();
                 let items: Vec<_> = sessions

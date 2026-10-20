@@ -2954,6 +2954,28 @@ pub fn run() {
                     .iter()
                     .all(|hit| hit.address.endpoint_id == expected.endpoint_id)
             );
+            let retained = |runtime: &SessionRuntime| {
+                runtime.inspect(|snapshot| {
+                let session = &snapshot.sessions[&expected.session_id];
+                (snapshot.connection_epoch, serde_json::json!({
+                    "entries":session.entries,"preview":session.previews,
+                    "conversation":session.native_conversation,"reading":session.native_reading_identities,
+                    "cursor":[session.tail_sequence,session.history_through_sequence,session.history_base_sequence],
+                    "hasMore":session.has_more_before,"historyRevision":session.history_revision
+                }))
+            })
+            };
+            let before = retained(&host.runtime);
+            host.executor
+                .block_on(host.runtime.refresh_inventory_at_epoch(before.0))
+                .expect("explicit public inventory cursor refresh");
+            assert_eq!(
+                retained(&host.runtime),
+                before,
+                "refresh changed loaded history or connection epoch"
+            );
+            assert_eq!(source.snapshot().input.key, state.input.key);
+            assert_eq!(source.snapshot().hits, state.hits);
             assert!(
                 host.view
                     .binding()
@@ -2965,7 +2987,8 @@ pub fn run() {
             host.view
                 .update_sidebar_search_source(source.owner(), &state.input)
                 .unwrap();
-            serde_json::json!({"publicTypedSearch":true,"sharedController":true,"expectedTargetFound":true,"hits":state.hits.len(),"hasMore":state.result.as_ref().unwrap().has_more,"unresolved":state.unresolved.len(),"originalEndpoint":expected.endpoint_id,"noSubmission":true,"nativeInteraction":false,"fullSidebarParity":false})
+            serde_json::json!({"publicTypedSearch":true,"sharedController":true,"expectedTargetFound":true,"hits":state.hits.len(),"hasMore":state.result.as_ref().unwrap().has_more,"unresolved":state.unresolved.len(),"originalEndpoint":expected.endpoint_id,"noSubmission":true,"nativeInteraction":false,"fullSidebarParity":false,
+                "inventoryRefresh":{"publicCursors":true,"sameConnectionEpoch":true,"historyUnchanged":true,"searchResultRetained":true,"realUnknownRace":false}})
         } else {
             serde_json::Value::Null
         };

@@ -2,6 +2,23 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
 use tekes_agent_contract::*;
+type InventoryRows = BTreeMap<String, (Value, Option<ProjectionBlock>)>;
+fn inventory_rows(frame: &Value) -> Result<InventoryRows> {
+    let mut rows = BTreeMap::new();
+    for item in array(&frame["snapshot"], "items")? {
+        let id = validate_summary(item)?.to_owned();
+        let block = item
+            .get("projections")
+            .filter(|v| !v.is_null())
+            .map(|v| serde_json::from_value::<ProjectionBlock>(v.clone()))
+            .transpose()?;
+        require(
+            rows.insert(id, (item.clone(), block)).is_none(),
+            "duplicate inventory identity",
+        )?;
+    }
+    Ok(rows)
+}
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 pub enum ConnectionState {
@@ -337,6 +354,56 @@ impl MemoryProjectionStore {
             .then(|| self.sessions.get(&address.session_id))
             .flatten()
     }
+    /// Replace fresh reader baselines in one publication, without cloning any
+    /// journal, preview or history. Parse every summary/projection before commit.
+    pub(crate) fn replace_inventory_baselines(
+        &mut self,
+        workspace: Option<Value>,
+        mut inventory: Value,
+    ) -> Result<()> {
+        require(
+            inventory["type"] == "baseline",
+            "inventory refresh requires baseline",
+        )?;
+        let generation = string(&inventory, "generation")?.to_owned();
+        let mut validator = GenerationValidator::default();
+        validator.accept(&generation, true)?;
+        normalize_title(&mut inventory);
+        let rows = inventory_rows(&inventory)?;
+        let expects_workspace = self
+            .host
+            .as_ref()
+            .is_some_and(|h| h.capabilities.contains("workspace-sync"));
+        require(
+            workspace.is_some() == expects_workspace,
+            "inventory refresh workspace capability mismatch",
+        )?;
+        let workspace = workspace
+            .map(|frame| -> Result<Self> {
+                require(
+                    frame["type"] == "baseline" && frame["generation"] == generation,
+                    "incoherent workspace/inventory refresh generation",
+                )?;
+                let mut staged = Self::new(self.endpoint_id.clone());
+                staged.apply("workspace", frame)?;
+                Ok(staged)
+            })
+            .transpose()?;
+        if let Some(staged) = workspace {
+            self.workspaces = staged.workspaces;
+            self.archived_session_ids = staged.archived_session_ids;
+            self.pinned_session_ids = staged.pinned_session_ids;
+            self.workspace_ready = true;
+            self.validators
+                .insert("workspace".into(), validator.clone());
+        }
+        self.commit_inventory(rows);
+        self.validators.insert("inventory".into(), validator);
+        if self.ready() {
+            self.connection = ConnectionState::Ready;
+        }
+        Ok(())
+    }
     pub fn apply(&mut self, stream: &str, mut frame: Value) -> Result<()> {
         if matches!(stream, "inventory" | "control") {
             normalize_title(&mut frame);
@@ -458,23 +525,8 @@ impl MemoryProjectionStore {
     fn inventory(&mut self, kind: &str, frame: &Value) -> Result<()> {
         match kind {
             "baseline" => {
-                let items = array(&frame["snapshot"], "items")?;
-                let mut summaries = BTreeMap::new();
-                for item in items {
-                    let id = validate_summary(item)?;
-                    require(
-                        summaries.insert(id.to_owned(), item.clone()).is_none(),
-                        "duplicate inventory identity",
-                    )?;
-                }
-                // Retain readable history for removed/archived sessions, but retire inventory authority.
-                for session in self.sessions.values_mut() {
-                    session.summary = None;
-                }
-                for (id, value) in summaries {
-                    self.upsert_summary(&id, value)?;
-                }
-                self.inventory_ready = true;
+                let rows = inventory_rows(frame)?;
+                self.commit_inventory(rows);
             }
             "upsert" => {
                 let value = frame["session"].clone();
@@ -527,6 +579,20 @@ impl MemoryProjectionStore {
             .filter(|v| !v.is_null())
             .map(|v| serde_json::from_value::<ProjectionBlock>(v.clone()))
             .transpose()?;
+        self.commit_summary(id, value, block);
+        Ok(())
+    }
+    fn commit_inventory(&mut self, rows: InventoryRows) {
+        // Missing membership retires authority, never a reader's retained history.
+        for session in self.sessions.values_mut() {
+            session.summary = None;
+        }
+        for (id, (value, block)) in rows {
+            self.commit_summary(&id, value, block);
+        }
+        self.inventory_ready = true;
+    }
+    fn commit_summary(&mut self, id: &str, value: Value, block: Option<ProjectionBlock>) {
         let session = self.sessions.entry(id.into()).or_default();
         if !session.journal_ready {
             session.run_open = value["running"].as_bool().unwrap_or(false);
@@ -535,7 +601,6 @@ impl MemoryProjectionStore {
         if let Some(block) = block {
             session.block(block);
         }
-        Ok(())
     }
     fn control(&mut self, kind: &str, frame: &Value) -> Result<()> {
         match kind {
@@ -772,5 +837,7 @@ fn validate_summary(value: &Value) -> Result<&str> {
     if let Some(block) = value.get("projections").filter(|v| !v.is_null()) {
         let _: ProjectionBlock = serde_json::from_value(block.clone())?;
     }
-    string(value, "sessionId")
+    let id = string(value, "sessionId")?;
+    require(!id.is_empty(), "empty inventory session identity")?;
+    Ok(id)
 }

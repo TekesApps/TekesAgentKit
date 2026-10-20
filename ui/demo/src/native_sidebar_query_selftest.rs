@@ -47,6 +47,15 @@ impl Probe {
         );
         self.callbacks += 1;
         self.fixture.set_search_failure(false);
+        self.fixture
+            .install_unannounced_session("late-search", "搜索刷新恢复的会话");
+        self.fixture.set_search_result(
+            "中文检索",
+            serde_json::json!({"items":[
+            {"sessionId":"b","snippet":"命中 B"},
+            {"sessionId":"late-search","snippet":"尚无库存通知的正文命中"},
+            {"sessionId":"a","snippet":"命中 A"}],"hasMore":true}),
+        );
         self.phase = 2;
     }
     pub fn advance(&mut self, host: &Host, window: &Window) {
@@ -129,14 +138,27 @@ impl Probe {
                 SidebarSearchPhase::Complete { has_more: true }
             ) =>
             {
+                let late = tekes_agent_contract::SessionAddress {
+                    endpoint_id: "fixture".into(),
+                    session_id: "late-search".into(),
+                };
+                if sidebar.row_id(&late).is_none() {
+                    window.request_redraw();
+                    return;
+                }
                 assert_eq!(self.fixture.search_calls(), 2);
+                assert_eq!(self.fixture.inventory_reads(), 2);
+                assert_eq!(
+                    model.input.key.as_ref().unwrap().connection_epoch,
+                    self.key.as_ref().unwrap().connection_epoch
+                );
                 assert_eq!(
                     model
                         .hits
                         .iter()
                         .map(|hit| hit.address.session_id.as_str())
                         .collect::<Vec<_>>(),
-                    vec!["b", "a"]
+                    vec!["b", "late-search", "a"]
                 );
                 assert!(
                     model
@@ -182,7 +204,12 @@ impl Probe {
                 assert!(run.submissions.is_empty());
                 assert_eq!(self.fixture.search_calls(), 2);
                 self.phase = 5;
-                run_script(vec![(100, Action::Close)]);
+                let mut actions = vec![];
+                if let Ok(path) = std::env::var("AGENT_SIDEBAR_QUERY_REFRESH_CAPTURE") {
+                    actions.push((300, Action::Capture { path }));
+                }
+                actions.push((500, Action::Close));
+                run_script(actions);
             }
             _ => {}
         }
@@ -193,6 +220,6 @@ impl Probe {
     pub fn receipt(&self) -> serde_json::Value {
         assert_eq!(self.phase, 5);
         assert_eq!(self.callbacks, 1);
-        serde_json::json!({"nativeWindow":true,"sharedPresentationController":true,"publicSearchRPC":true,"searchReads":self.fixture.search_calls(),"pointerRetry":true,"originalQueryCaptured":true,"retiredRetryRejected":true,"clearRevokesResult":true,"inventoryControlsRetained":true,"draftRetained":true,"noSubmission":true,"ownedFixture":true,"realHarness":false,"physicalIme":false,"voiceOver":false,"fullSidebarParity":false})
+        serde_json::json!({"nativeWindow":true,"sharedPresentationController":true,"publicSearchRPC":true,"searchReads":self.fixture.search_calls(),"unknownHitRefresh":true,"inventoryReads":self.fixture.inventory_reads(),"sameConnectionEpoch":true,"pointerRetry":true,"originalQueryCaptured":true,"retiredRetryRejected":true,"clearRevokesResult":true,"inventoryControlsRetained":true,"draftRetained":true,"noSubmission":true,"ownedFixture":true,"realHarness":false,"physicalIme":false,"voiceOver":false,"fullSidebarParity":false})
     }
 }

@@ -32,6 +32,10 @@ enum Command {
     Close(String, Reply<()>),
     Earlier(String, Reply<bool>),
     Observe(String, String, Reply<FrameStream>),
+    RefreshInventory {
+        expected_epoch: u64,
+        reply: Reply<()>,
+    },
     Call {
         method: String,
         payload: Value,
@@ -354,7 +358,34 @@ impl SessionRuntime {
             .call_at_epoch(epoch, "session.search", json!({"query":query}), rpc_id)
             .await?;
         require(allowed(), "session search source unavailable or changed")?;
-        SessionSearchResults::read(value)
+        let result = SessionSearchResults::read(value)?;
+        let unknown = self.inspect(|state| {
+            result.items.iter().any(|hit| {
+                state
+                    .sessions
+                    .get(&hit.session_id)
+                    .is_none_or(|session| session.summary.is_none())
+            })
+        });
+        if unknown {
+            self.refresh_inventory_at_epoch(epoch).await?;
+            require(allowed(), "session search source unavailable or changed")?;
+        }
+        Ok(result)
+    }
+    /// Reopen only the public inventory/workspace cursors, atomically publishing
+    /// their validated baseline pair. Overlapping requests drain one flight.
+    /// Journal readers, connection epoch and remote execution are unchanged.
+    pub async fn refresh_inventory_at_epoch(&self, expected_epoch: u64) -> Result<()> {
+        let (reply, result) = oneshot::channel();
+        self.send(
+            Command::RefreshInventory {
+                expected_epoch,
+                reply,
+            },
+            result,
+        )
+        .await
     }
     pub async fn call(&self, method: &str, payload: Value, rpc_id: &str) -> Result<Value> {
         self.call_context(None, method, payload, rpc_id).await
@@ -449,6 +480,15 @@ fn tagged(name: String, epoch: u64, frames: FrameStream) -> TaggedStream {
             .chain(end)
             .map(move |frame| (name.clone(), epoch, frame)),
     )
+}
+fn inventory_reader(
+    name: &str,
+    epoch: u64,
+    frames: FrameStream,
+) -> (futures_util::future::AbortHandle, TaggedStream) {
+    let (handle, registration) = futures_util::future::AbortHandle::new_pair();
+    let frames = futures_util::stream::Abortable::new(frames, registration);
+    (handle, tagged(name.into(), epoch, Box::pin(frames)))
 }
 /// Revision notifications carry no history payload; reads hold only a short synchronous lock.
 struct SharedProjection {
@@ -570,7 +610,10 @@ async fn run(
 }
 fn reject(command: Command) {
     match command {
-        Command::Open(_, reply) | Command::Close(_, reply) | Command::Respond { reply, .. } => {
+        Command::Open(_, reply)
+        | Command::Close(_, reply)
+        | Command::Respond { reply, .. }
+        | Command::RefreshInventory { reply, .. } => {
             let _ = reply.send(Err(Error::Disconnected));
         }
         Command::Observe(_, _, reply) => {
@@ -594,24 +637,36 @@ async fn connected(
     wanted: &mut BTreeSet<String>,
     epoch: u64,
 ) -> Result<bool> {
+    let connection_epoch = store.read(|state| state.connection_epoch);
     let mut operations: tokio::task::JoinSet<OperationResult> = tokio::task::JoinSet::new();
+    let mut inventory_refreshes = tokio::task::JoinSet::new();
+    let mut inventory_waiters: Vec<Reply<()>> = vec![];
+    let mut inventory_dirty = false;
+    let mut inventory_epoch = epoch;
+    let mut inventory_cancellations = Vec::new();
     let mut streams = SelectAll::new();
     for (name, target) in [
         ("inventory", StreamTarget::SessionInventory),
         ("control", StreamTarget::SessionControl),
         ("actionables", StreamTarget::Actionables),
     ] {
-        streams.push(tagged(name.into(), epoch, endpoint.follow(target).await?));
+        let frames = endpoint.follow(target).await?;
+        if name == "inventory" {
+            let (cancel, stream) = inventory_reader(name, inventory_epoch, frames);
+            inventory_cancellations.push(cancel);
+            streams.push(stream);
+        } else {
+            streams.push(tagged(name.into(), epoch, frames));
+        }
     }
     if endpoint.supports_events() {
         streams.push(tagged("events".into(), epoch, endpoint.events().await?));
     }
     if endpoint.host().capabilities.contains("workspace-sync") {
-        streams.push(tagged(
-            "workspace".into(),
-            epoch,
-            endpoint.follow(StreamTarget::WorkspaceInventory).await?,
-        ));
+        let frames = endpoint.follow(StreamTarget::WorkspaceInventory).await?;
+        let (cancel, stream) = inventory_reader("workspace", inventory_epoch, frames);
+        inventory_cancellations.push(cancel);
+        streams.push(stream);
     }
     let mut journal_epochs = std::collections::BTreeMap::new();
     let mut journal_cancellations = std::collections::BTreeMap::new();
@@ -640,6 +695,41 @@ async fn connected(
     tokio::pin!(baseline_deadline);
     loop {
         tokio::select! {
+            refreshed = inventory_refreshes.join_next(), if !inventory_refreshes.is_empty() => {
+                let result = match refreshed {
+                    Some(Ok(result)) => result,
+                    _ => Err(Error::Transport("inventory refresh task ended".into())),
+                };
+                let result = result.and_then(|fresh: crate::inventory_refresh::InventoryRefresh| {
+                    let next = inventory_epoch.checked_add(1).ok_or_else(|| unsupported("inventory reader epoch exhausted"))?;
+                    store.update(|state| {
+                        require(state.connection == ConnectionState::Ready && state.connection_epoch == connection_epoch, "inventory refresh source changed")?;
+                        state.replace_inventory_baselines(fresh.workspace.as_ref().map(|cursor| cursor.baseline.clone()), fresh.inventory.baseline.clone())
+                    })?;
+                    inventory_epoch = next;
+                    for cancel in inventory_cancellations.drain(..) { cancel.abort(); }
+                    let mut cursors = vec![("inventory", fresh.inventory)];
+                    if let Some(workspace) = fresh.workspace { cursors.push(("workspace", workspace)); }
+                    for (name, cursor) in cursors {
+                        let (cancel, stream) = inventory_reader(name, inventory_epoch, cursor.frames);
+                        inventory_cancellations.push(cancel);
+                        streams.push(stream);
+                    }
+                    Ok(())
+                });
+                match result {
+                    Ok(()) if inventory_dirty => {
+                        inventory_dirty = false;
+                        inventory_refreshes.spawn(crate::inventory_refresh::read(endpoint.clone()));
+                    }
+                    Ok(()) => { for reply in inventory_waiters.drain(..) { let _ = reply.send(Ok(())); } }
+                    Err(error) => {
+                        inventory_dirty = false;
+                        let message = format!("inventory refresh failed: {error}");
+                        for reply in inventory_waiters.drain(..) { let _ = reply.send(Err(Error::Protocol(message.clone()))); }
+                    }
+                }
+            },
             completed = operations.join_next(), if !operations.is_empty() => {
                 if let Some(Ok(Some((removed,reply,result))))=completed {
                     if result.is_err() && let Some(id)=removed {
@@ -656,6 +746,8 @@ async fn connected(
                 let Some((name, frame_epoch, frame)) = frame else { return Err(Error::Disconnected); };
                 if let Some(id) = name.strip_prefix("journal:") {
                     if journal_epochs.get(id) != Some(&frame_epoch) { continue; }
+                } else if name == "inventory" || name == "workspace" {
+                    if frame_epoch != inventory_epoch { continue; }
                 } else if frame_epoch != epoch { continue; }
                 let is_live = frame.as_ref().is_ok_and(|frame| frame["type"] == "event");
                 let result = frame.and_then(|frame| store.update(|s| {
@@ -702,6 +794,16 @@ async fn connected(
                 match command {
                     Command::Stop(reply) => { store.update(|s| { s.disconnect(); s.connection = ConnectionState::Stopped; }); let _ = reply.send(Ok(())); return Ok(true); }
                     Command::Reconnect(reply) => { store.update(MemoryProjectionStore::disconnect); let _ = reply.send(Ok(())); return Ok(false); }
+                    Command::RefreshInventory { expected_epoch, reply } => {
+                        if !store.read(|state| state.connection == ConnectionState::Ready && state.connection_epoch == expected_epoch)
+                            || inventory_waiters.len() >= 64 {
+                            let _ = reply.send(Err(Error::Disconnected)); continue;
+                        }
+                        inventory_waiters.push(reply);
+                        if inventory_refreshes.is_empty() {
+                            inventory_refreshes.spawn(crate::inventory_refresh::read(endpoint.clone()));
+                        } else { inventory_dirty = true; }
+                    }
                     Command::Open(id, reply) => {
                         if !store.read(MemoryProjectionStore::ready) { let _ = reply.send(Err(Error::Disconnected)); continue; }
                         let result = if let std::collections::btree_map::Entry::Vacant(entry) = journal_epochs.entry(id.clone()) {

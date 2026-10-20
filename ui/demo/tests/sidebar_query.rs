@@ -349,3 +349,145 @@ async fn connection_notifications_read_the_current_query_and_do_not_restart_an_a
     assert_eq!(fixture.search_calls(), 2);
     runtime.stop().await.unwrap();
 }
+
+#[tokio::test]
+async fn unknown_search_hit_resolves_through_public_inventory_and_the_second_consumer_keeps_drafts()
+{
+    use tekes_agent_components_ui::{ComposerDestination, RunScope};
+    use tekes_agent_ui_bindings::{RunBinding, SidebarBinding};
+    use tekes_agent_web::SharedAgent;
+    let fixture = Fixture::default().with_session_search().with_lifecycle();
+    fixture.set_search_result(
+        "body",
+        json!({"items":[{"sessionId":"late","snippet":"命中正文"}],"hasMore":false}),
+    );
+    let mut agent = SharedAgent::default();
+    agent
+        .register(
+            "fixture".into(),
+            "native".into(),
+            "owned refresh fixture".into(),
+            Arc::new(fixture.clone()),
+        )
+        .unwrap();
+    let agent = Arc::new(agent);
+    let runtime = agent.endpoint("fixture").unwrap().runtime.clone();
+    runtime.wait_ready(Duration::from_secs(3)).await.unwrap();
+    let run = RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "a"))
+        .await
+        .unwrap();
+    run.edit_text(
+        &ComposerDestination::run(run.scope().clone()),
+        "原会话中文草稿".into(),
+    )
+    .unwrap();
+    let inventory = SidebarBinding::new(agent, "fixture").unwrap();
+    wait_for(|| inventory.snapshot().loaded).await;
+    fixture.install_unannounced_session("late", "迟到的真实库存会话");
+    assert!(runtime.inspect(|s| !s.sessions.contains_key("late")));
+    let source = tekes_agent_ui_consumer_check::new_sidebar_search(&inventory).unwrap();
+    source.set_query("body").unwrap();
+    until(&source, |state| state.result.is_some()).await;
+    assert!(source.snapshot().unresolved.is_empty());
+    wait_for(|| {
+        inventory
+            .snapshot()
+            .rows
+            .iter()
+            .any(|row| row.address.session_id == "late")
+    })
+    .await;
+    let mut sidebar = Sidebar::new(55, SidebarLabels::default());
+    sidebar.update(&inventory.snapshot().input(None)).unwrap();
+    tekes_agent_ui_consumer_check::mount_sidebar_search(&mut sidebar, &source).unwrap();
+    let hit = source.snapshot().hits[0].address.clone();
+    assert!(sidebar.row_id(&hit).is_some());
+    let frame = run.current_run().unwrap();
+    assert_eq!(frame.draft.text, "原会话中文草稿");
+    assert!(frame.submissions.is_empty());
+    assert_eq!(fixture.inventory_reads(), 2);
+    source.set_query("body").unwrap();
+    assert_eq!(fixture.search_calls(), 1);
+    assert_eq!(fixture.inventory_reads(), 2);
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn refresh_failure_is_search_failure_and_explicit_retry_uses_the_same_query_without_submission()
+ {
+    let fixture = Fixture::default().with_session_search();
+    let runtime = setup(&fixture).await;
+    fixture.install_unannounced_session("late", "late");
+    fixture.set_search_result(
+        "original",
+        json!({"items":[{"sessionId":"late","snippet":"正文"}],"hasMore":false}),
+    );
+    fixture.set_inventory_refresh_failure(true);
+    let source = SidebarSearchBinding::new(runtime.clone()).unwrap();
+    source.set_query("original").unwrap();
+    until(&source, |state| {
+        matches!(
+            state.input.phase,
+            SidebarSearchPhase::Failed {
+                retryable: true,
+                ..
+            }
+        )
+    })
+    .await;
+    assert!(source.snapshot().hits.is_empty() && source.snapshot().result.is_none());
+    assert!(runtime.inspect(|s| !s.sessions.contains_key("late")));
+    assert_eq!(
+        runtime.inspect(|s| s.connection.clone()),
+        tekes_agent_session::ConnectionState::Ready
+    );
+    let old = source.snapshot().input.key.clone().unwrap();
+    fixture.set_inventory_refresh_failure(false);
+    source
+        .retry(&SidebarSearchIntent::Retry { key: old.clone() })
+        .unwrap();
+    assert!(
+        source
+            .retry(&SidebarSearchIntent::Retry { key: old })
+            .is_err()
+    );
+    until(&source, |state| state.result.is_some()).await;
+    assert_eq!(source.snapshot().query, "original");
+    assert!(source.snapshot().unresolved.is_empty());
+    assert_eq!(fixture.search_calls(), 2);
+    assert_eq!(fixture.inventory_reads(), 3);
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn replacing_query_during_shared_refresh_never_publishes_the_retired_query() {
+    let gate = Arc::new(tokio::sync::Semaphore::new(0));
+    let fixture = Fixture::default()
+        .with_session_search()
+        .with_inventory_refresh_gate(gate.clone());
+    let runtime = setup(&fixture).await;
+    fixture.install_unannounced_session("late", "late");
+    fixture.set_search_result(
+        "old",
+        json!({"items":[{"sessionId":"late","snippet":"old"}],"hasMore":false}),
+    );
+    fixture.set_search_result(
+        "fresh",
+        json!({"items":[{"sessionId":"a","snippet":"fresh"}],"hasMore":false}),
+    );
+    let source = SidebarSearchBinding::new(runtime.clone()).unwrap();
+    source.set_query("old").unwrap();
+    wait_for(|| fixture.inventory_reads() == 2).await;
+    source.set_query("fresh").unwrap();
+    until(&source, |state| state.result.is_some()).await;
+    let current = source.snapshot();
+    assert_eq!(current.query, "fresh");
+    gate.add_permits(1);
+    wait_for(|| runtime.inspect(|s| s.sessions.contains_key("late"))).await;
+    assert_eq!(source.snapshot().query, "fresh");
+    assert_eq!(source.snapshot().input.key, current.input.key);
+    assert_eq!(source.snapshot().hits[0].address.session_id, "a");
+    assert_eq!(fixture.search_calls(), 2);
+    assert_eq!(fixture.inventory_reads(), 2);
+    runtime.stop().await.unwrap();
+}
