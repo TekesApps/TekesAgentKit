@@ -17,7 +17,8 @@ pub struct RunViewIds {
     pub composer: ComposerIds,
 }
 /// The last arranged pane and its real document clip. This is layout evidence,
-/// not a second reading state. Check is_pane_presented before using saved geometry.
+/// not a second reading state. Publish it only after ContentHost::render succeeds
+/// for that frame and is_pane_presented is true. Failed layout may retain changes.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RunViewGeometry {
     pub publication: Option<u64>,
@@ -206,6 +207,9 @@ impl RunView {
         self.column = column.normalized()?;
         Ok(())
     }
+    /// Last arranged values, not a successful-render receipt. A failed library
+    /// render can retain application layout changes; the host must fence native
+    /// geometry/input/AX publication until a subsequent render returns Ok.
     pub fn layout_geometry(&self) -> Option<RunViewGeometry> {
         self.geometry
     }
@@ -242,6 +246,7 @@ impl RunView {
         self.transcript
     }
     /// No visibility is reported for a collapsed or not-yet-arranged Run pane.
+    /// Like layout_geometry, current-frame visibility requires a successful render.
     pub fn turn_targets(&self) -> Result<Vec<TranscriptTurnTarget>, &'static str> {
         let mut targets = self
             .transcript()

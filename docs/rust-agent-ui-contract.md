@@ -12,6 +12,8 @@ Layout 和显示逻辑须逐项严格对齐当前 ClientKit 对应 Views；[对�
 
 [Summary 标题槽与 #31 候选消费](rust-agent-ui-summary-label-slot-20261021.md)记录默认库组件组合与隔离 label API 验证；默认 pin 的省略能力仍待公开版本。
 
+[布局激活与成功帧边界](tekesui-layout-text-candidate-20261021.md)记录 #27 的独立候选消费。`render` 成功且原业务 publication/epoch 匹配后，宿主才发布当前原生文本、AX、几何和可见性；失败帧不靠更换编辑器或重试 Agent 操作恢复。
+
 ### 排版与基础样式
 
 [Summary section 顺序与折叠](rust-agent-ui-summary-sections-20261021.md)现已补齐宿主优先顺序、按 section ID 保留的折叠、真实隐藏的输入/AX 子树及任务 pointer 改变时的旧动作拒绝。公开 DTO/查询支持第二 consumer；单行省略见 TekesUI #31，完整 Summary rows/custom slots 与整体视觉仍未验收。

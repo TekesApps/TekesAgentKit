@@ -36,3 +36,6 @@ TKUI-006 更新：公共完整指针入口、AgentText转交及原生demo适配�
 
 
 2026-10-21后续观察：[TekesUI #27](https://github.com/TekesApps/TekesUI/issues/27)记录layout中inactive→active对缺失TextSurfaceHost的诊断时序；通用最小探针在只读2b16候选复现。它不替代原七项清单，也不是有效backend原生恢复的失败。生产宿主每帧必须提供文本服务，消费侧不补通用校验；证据见[Run叠层记录](rust-agent-ui-overlay-20261021.md)。
+
+
+#27 后续收到精确 292 开发候选；正式 RunView 的 12 次失败/恢复与原 8 项事务已有 receiver 检查，见 [独立候选消费](tekesui-layout-text-candidate-20261021.md)。原默认 pin 与历史 known-boundary 仍按原身份保留，不能把新候选结果当默认公开版本已修复。

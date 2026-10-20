@@ -33,6 +33,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source', type=Path, required=True)
     parser.add_argument('--probe', type=Path, help='Explicit receiver test source; default: Transcript-only probe')
+    parser.add_argument('--append-run-probe', action='store_true',
+                        help='Append the explicit probe to the unchanged formal RunView transaction probe')
     parser.add_argument('--summary-labels', action='store_true',
                         help='Candidate-only Summary row labels and existing native text-host adapter')
     parser.add_argument('--manifest', type=Path, required=True)
@@ -41,6 +43,8 @@ def main():
     args = parser.parse_args()
     if args.summary_labels and args.probe is None:
         parser.error('--summary-labels requires an explicit receiver --probe')
+    if args.append_run_probe and args.probe is None:
+        parser.error('--append-run-probe requires an explicit receiver --probe')
     repo = Path(__file__).resolve().parent.parent
     source = args.source.resolve()
     manifest = json.loads(args.manifest.read_text())
@@ -70,6 +74,11 @@ def main():
     if not probe.is_file():
         raise ValueError('receiver probe must be an existing Rust source')
     shutil.copyfile(probe, snapshot / 'ui/demo/tests/reading_candidate.rs')
+    probe_base = None
+    if args.append_run_probe:
+        probe_base = repo / 'scripts/probes/agentkit-run-preflight-candidate.rs'
+        (snapshot / 'ui/demo/tests/reading_candidate.rs').write_bytes(
+            probe_base.read_bytes().rstrip() + b'\n\n' + probe.read_bytes())
     cargo = snapshot / 'ui/Cargo.toml'
     cargo.write_text(re.sub(
         r'^(tekes-ui-[\w-]+) = \{ git = "https://github.com/TekesApps/TekesUI.git", rev = "[a-f0-9]+" \}$',
@@ -178,6 +187,8 @@ def main():
     receipt = dict(candidate_identity=manifest['identity'], candidate_files=len(manifest['files']),
                    portable_manifest_sha256=sha(args.manifest), agentkit_inputs=inputs,
                    probe_sha256=sha(probe), source=str(source), snapshot=str(snapshot),
+                   probe_base_sha256=sha(probe_base) if probe_base else None,
+                   prepared_probe_sha256=sha(snapshot / 'ui/demo/tests/reading_candidate.rs'),
                    candidate_only_host_adaptations=adaptations,
                    candidate_overrides={name: sha(snapshot / name) for name in
                                         overrides},
