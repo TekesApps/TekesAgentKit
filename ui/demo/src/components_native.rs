@@ -36,6 +36,8 @@ mod feedback_probe;
 mod run_controls_probe;
 #[path = "native_sidebar_restore_selftest.rs"]
 mod sidebar_restore_probe;
+#[path = "native_sidebar_search_selftest.rs"]
+mod sidebar_search_probe;
 #[path = "native_stream_selftest.rs"]
 mod stream_probe;
 #[path = "native_summary_sections_selftest.rs"]
@@ -53,6 +55,7 @@ impl Drop for OwnedFilePreview {
     }
 }
 struct Host {
+    sidebar_search_probe: Option<sidebar_search_probe::Probe>,
     sidebar_restore_probe: Option<sidebar_restore_probe::Probe>,
     summary_sections_probe: Option<summary_sections_probe::Probe>,
     visibility_probe: Option<visibility_probe::Probe>,
@@ -244,6 +247,15 @@ impl Host {
             }
         };
         for command in commands {
+            if let DemoCommand::SidebarSearch(intent) = &command
+                && let Some(probe) = &mut self.sidebar_search_probe
+            {
+                probe.retry(&mut self.view, intent);
+                if let Some(wake) = &self.wake {
+                    wake.wake();
+                }
+                continue;
+            }
             if let DemoCommand::CopyTranscript(intent) = command {
                 self.clipboard_writes.push(intent);
                 continue;
@@ -645,6 +657,9 @@ impl Host {
                                 .map_err(|error| error.to_string()),
                         }
                     }
+                    DemoCommand::SidebarSearch(_) => HostResult::Operation(Err(
+                        "此实验宿主尚未安装 Sidebar 搜索数据源适配器".into(),
+                    )),
                     DemoCommand::Sidebar(SidebarIntent::Select { .. }) => {
                         HostResult::Operation(Err("unexpected unbound navigation".into()))
                     }
@@ -680,6 +695,7 @@ impl Host {
                             | DemoCommand::ReadHistoryPage(_)
                             | DemoCommand::ReadFilePreview { .. }
                             | DemoCommand::SelectFiles { .. }
+                            | DemoCommand::SidebarSearch(_)
                             | DemoCommand::Sidebar(_)
                             | DemoCommand::TurnAction { .. }
                             | DemoCommand::Feedback(_)
@@ -994,6 +1010,9 @@ impl Host {
         }
         let background = self.view.take_background_commands();
         self.commands(Ok(background));
+        if let Some(probe) = &self.sidebar_search_probe {
+            probe.install(&mut self.view);
+        }
         self.text.scale = window.scale() as f32;
         self.text.frame_requested = false;
         self.text.atlas.begin_frame();
@@ -1024,6 +1043,10 @@ impl Host {
                 .expect("component frame");
         }
         window.set_animating(self.text.frame_requested);
+        if let Some(mut probe) = self.sidebar_search_probe.take() {
+            probe.advance(self, window);
+            self.sidebar_search_probe = Some(probe);
+        }
         if let Some(mut probe) = self.sidebar_restore_probe.take() {
             probe.advance(self, window);
             self.sidebar_restore_probe = Some(probe);
@@ -2008,6 +2031,17 @@ impl Host {
                 "NATIVE_AGENT_COMPONENTS_SELFTEST_OK composer+indicators+run-binding+synthetic-text-services+send+stream+cancel+draft-isolation+reconnect; physical-ime=false; transcript=false; reading-anchor=false"
             );
         }
+        if let Some(probe) = &self.sidebar_search_probe {
+            assert!(
+                self.failures.is_empty(),
+                "Sidebar search failures: {:?}",
+                self.failures
+            );
+            println!(
+                "NATIVE_AGENT_SIDEBAR_SEARCH_SELFTEST_RECEIPT {}",
+                probe.receipt()
+            );
+        }
         if let Some(probe) = &self.sidebar_restore_probe {
             assert!(
                 self.failures.is_empty(),
@@ -2341,9 +2375,10 @@ pub fn run() {
     let actions_selftest = args.iter().any(|arg| arg == "--thread-actions-selftest");
     let models_selftest = args.iter().any(|arg| arg == "--model-choices-selftest");
     let context_selftest = args.iter().any(|arg| arg == "--context-selftest");
+    let sidebar_search_selftest = args.iter().any(|arg| arg == "--sidebar-search-selftest");
     let sidebar_restore_selftest = args.iter().any(|arg| arg == "--sidebar-restore-selftest");
     let summary_sections_selftest = args.iter().any(|arg| arg == "--summary-sections-selftest");
-    if summary_sections_selftest || sidebar_restore_selftest {
+    if summary_sections_selftest || sidebar_restore_selftest || sidebar_search_selftest {
         assert!(
             !args
                 .iter()
@@ -2366,6 +2401,7 @@ pub fn run() {
             context_selftest,
             summary_sections_selftest,
             sidebar_restore_selftest,
+            sidebar_search_selftest,
             creation_selftest,
             annotation_selftest
         ]
@@ -2691,6 +2727,7 @@ pub fn run() {
         0
     };
     let mut host = Host {
+        sidebar_search_probe: sidebar_search_selftest.then(sidebar_search_probe::Probe::new),
         sidebar_restore_probe: sidebar_restore_selftest.then(sidebar_restore_probe::Probe::new),
         summary_sections_probe: summary_sections_selftest.then(summary_sections_probe::Probe::new),
         visibility_probe: visibility_selftest

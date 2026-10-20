@@ -1,4 +1,8 @@
 //! Agent session inventory and shared actions. No local pin database or action policy.
+use crate::{
+    SidebarSearchInput, SidebarSearchIntent, SidebarSearchKey, SidebarSearchLabels,
+    sidebar_search::SearchFooter,
+};
 use std::collections::{BTreeMap, BTreeSet};
 use tekes_agent_contract::{
     SessionAddress, ThreadActionDefinition, ThreadActionsPresentation, ThreadActivity,
@@ -104,6 +108,11 @@ pub struct Sidebar {
     end: u64,
     revision: u64,
     displayed: Option<SidebarInput>,
+    search: Option<SidebarSearchInput>,
+    search_labels: SidebarSearchLabels,
+    search_retry: Option<(SidebarSearchKey, ComponentId)>,
+    search_pending: bool,
+    search_seen: BTreeMap<(String, String), (u64, u64)>,
     bindings: BTreeMap<ComponentId, SidebarIntent>,
     pending: BTreeSet<(SessionAddress, String)>,
 }
@@ -137,6 +146,21 @@ impl Sidebar {
                 ),
             ],
         };
+        let search_labels = SidebarSearchLabels::default();
+        let body = StackContent {
+            model: Stack {
+                axis: Axis::Vertical,
+                gap: 0.,
+            },
+            flexible_child: Some(ComponentId(base + 7)),
+            children: vec![
+                Content::new(ComponentId(base + 7), body),
+                Content::new(
+                    ComponentId(base + 8),
+                    SearchFooter::new(search_labels.name.clone()),
+                ),
+            ],
+        };
         Self {
             root: ComponentId(base),
             body,
@@ -146,6 +170,11 @@ impl Sidebar {
             end: base | u32::MAX as u64,
             revision: 0,
             displayed: None,
+            search: None,
+            search_labels,
+            search_retry: None,
+            search_pending: false,
+            search_seen: BTreeMap::new(),
             bindings: BTreeMap::new(),
             pending: BTreeSet::new(),
         }
@@ -156,6 +185,153 @@ impl Sidebar {
     /// The complete accepted host publication, including restoration/failure state.
     pub fn displayed_input(&self) -> Option<&SidebarInput> {
         self.displayed.as_ref()
+    }
+    pub fn inventory_region_id(&self) -> ComponentId {
+        ComponentId(self.root.0 + 7)
+    }
+    pub fn inventory_viewport_id(&self) -> ComponentId {
+        ComponentId(self.root.0 + 1)
+    }
+    pub fn search_footer_id(&self) -> ComponentId {
+        ComponentId(self.root.0 + 8)
+    }
+    pub fn displayed_search(&self) -> Option<&SidebarSearchInput> {
+        self.search.as_ref()
+    }
+    pub fn search_retry_id(&self) -> Option<ComponentId> {
+        self.search_retry.as_ref().map(|(_, id)| *id)
+    }
+    /// Product copy is a host input; all paint and sizing remain library defaults.
+    pub fn set_search_labels(&mut self, labels: SidebarSearchLabels) -> Result<(), &'static str> {
+        self.search_labels = labels;
+        if let Some(input) = self.search.clone() {
+            self.update_search(&input)?;
+        }
+        Ok(())
+    }
+    fn search_footer_mut(&mut self) -> &mut SearchFooter {
+        self.body.children[1]
+            .component_mut::<SearchFooter>()
+            .unwrap()
+    }
+    /// Search is independent from inventory restoration. Every displayed result
+    /// belongs to its exact query attempt; no old raw Retry gesture is retargeted.
+    pub fn update_search(&mut self, input: &SidebarSearchInput) -> Result<(), &'static str> {
+        input.validate()?;
+        if let Some(old) = &self.search {
+            if input.revision < old.revision {
+                return Err("stale sidebar search input");
+            }
+            if input.revision == old.revision && input != old {
+                return Err("conflicting sidebar search publication");
+            }
+        }
+        if let Some(key) = &input.key
+            && let Some((epoch, generation)) = self
+                .search_seen
+                .get(&(key.owner.clone(), key.endpoint_id.clone()))
+        {
+            let current = self.search.as_ref().and_then(|input| input.key.as_ref());
+            if key.connection_epoch < *epoch
+                || key.generation < *generation
+                || (key.generation == *generation && current != Some(key))
+            {
+                return Err("retired sidebar search attempt");
+            }
+        }
+        let retry = input.retry_key().cloned();
+        let retained = self
+            .search_retry
+            .as_ref()
+            .filter(|(key, _)| Some(key) == retry.as_ref())
+            .cloned();
+        let next = if retry.is_some() && retained.is_none() {
+            self.next
+                .checked_add(1)
+                .filter(|next| *next <= self.end)
+                .ok_or("sidebar ID namespace exhausted")?
+        } else {
+            self.next
+        };
+        let target = retry.map(|key| retained.unwrap_or((key, ComponentId(self.next))));
+        if target != self.search_retry {
+            self.search_pending = false;
+        }
+        let pending = self.search_pending;
+        let text = input.notice(&self.search_labels);
+        let labels = self.search_labels.clone();
+        let text_id = ComponentId(self.root.0 + 9);
+        let footer = self.search_footer_mut();
+        let old = std::mem::take(&mut footer.body.children);
+        let mut old: BTreeMap<_, _> = old.into_iter().map(|node| (node.id(), node)).collect();
+        if let Some(text) = &text {
+            let mut node = old
+                .remove(&text_id)
+                .unwrap_or_else(|| Content::new(text_id, TextContent::new("")));
+            node.component_mut::<TextContent>().unwrap().text = text.clone();
+            footer.body.children.push(node);
+        }
+        if let Some((_, id)) = &target {
+            let mut node = old
+                .remove(id)
+                .unwrap_or_else(|| Content::new(*id, ButtonContent::new("")));
+            let button = node.component_mut::<ButtonContent>().unwrap();
+            button.label = labels.retry;
+            button.button.state.disabled = pending;
+            footer.body.children.push(node);
+        }
+        footer.name = labels.name;
+        footer.visible = text.is_some();
+        self.next = next;
+        self.search_retry = target;
+        if let Some(key) = &input.key {
+            self.search_seen.insert(
+                (key.owner.clone(), key.endpoint_id.clone()),
+                (key.connection_epoch, key.generation),
+            );
+        }
+        self.search = Some(input.clone());
+        Ok(())
+    }
+    /// Local admission can only restrict the current source's retry capability.
+    pub fn set_search_retry_pending(&mut self, key: &SidebarSearchKey, pending: bool) -> bool {
+        let Some((source, id)) = &self.search_retry else {
+            return false;
+        };
+        if source != key {
+            return false;
+        }
+        let id = *id;
+        self.search_pending = pending;
+        if let Some(node) = self
+            .search_footer_mut()
+            .body
+            .children
+            .iter_mut()
+            .find(|node| node.id() == id)
+        {
+            node.component_mut::<ButtonContent>()
+                .unwrap()
+                .button
+                .state
+                .disabled = pending;
+        }
+        true
+    }
+    /// Route this separate read-only callback to the original search source.
+    /// The receiver must recheck the captured source/epoch/generation before IO.
+    pub fn take_search_intents(&self, actions: &[ContentAction]) -> Vec<SidebarSearchIntent> {
+        let Some((key, id)) = &self.search_retry else {
+            return vec![];
+        };
+        if self.search_pending {
+            return vec![];
+        }
+        actions
+            .iter()
+            .filter(|action| action.kind == ContentActionKind::Activate && action.target == *id)
+            .map(|_| SidebarSearchIntent::Retry { key: key.clone() })
+            .collect()
     }
     /// Local gesture admission only; it can restrict, never enable, a shared action.
     pub fn set_pending(&mut self, address: &SessionAddress, action: &str, pending: bool) {
@@ -172,7 +348,10 @@ impl Sidebar {
             } = intent
                 && target == address
                 && definition.id == action
-                && let Some(content) = self.body.children[1]
+                && let Some(content) = self.body.children[0]
+                    .component_mut::<StackContent>()
+                    .unwrap()
+                    .children[1]
                     .component_mut::<ListContent>()
                     .unwrap()
                     .rows
@@ -207,6 +386,9 @@ impl Sidebar {
     }
     fn rows_mut(&mut self) -> &mut ListContent {
         self.body.children[0]
+            .component_mut::<StackContent>()
+            .unwrap()
+            .children[0]
             .component_mut::<ScrollContent>()
             .expect("sidebar viewport")
             .children_mut()
@@ -351,7 +533,10 @@ impl Sidebar {
             ));
         }
         self.rows_mut().rows.children = children;
-        let actions = self.body.children[1]
+        let actions = self.body.children[0]
+            .component_mut::<StackContent>()
+            .unwrap()
+            .children[1]
             .component_mut::<ListContent>()
             .expect("shared action panel");
         let pending = self.pending.clone();
@@ -426,10 +611,33 @@ impl Component for Sidebar {
         Some(&mut self.body.children)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
-        self.body.measure(text, available)
+        let measured = self.body.measure(text, available);
+        MeasuredChild::new(Size::new(
+            measured.size.width.min(available.width).max(0.),
+            measured.size.height.min(available.height).max(0.),
+        ))
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
-        self.body.arrange(text, frame, clip);
+        // ClientKit anchors the search footer to the bottom even when its
+        // preferred height exceeds the pane. The list then has zero height;
+        // the footer's Retry stays reachable while its top is ancestor-clipped.
+        let footer = self.body.children[1].measure(text, frame.size).size.height;
+        let body = Rect::new(
+            frame.min_x(),
+            frame.min_y(),
+            frame.size.width,
+            (frame.size.height - footer).max(0.),
+        );
+        let footer = Rect::new(
+            frame.min_x(),
+            frame.max_y() - footer,
+            frame.size.width,
+            footer,
+        );
+        let pane_clip = frame.intersection(&clip).unwrap_or_default();
+        let body_clip = body.intersection(&pane_clip).unwrap_or_default();
+        self.body.children[0].arrange(text, body, body_clip);
+        self.body.children[1].arrange(text, footer, pane_clip);
     }
     fn semantics(&self) -> ContentSemantics {
         ContentSemantics::new(ContentRole::Group, &self.labels.name)

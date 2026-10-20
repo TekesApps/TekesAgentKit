@@ -1,0 +1,92 @@
+{
+  "format": "agentkit-sidebar-search-footer/1",
+  "verified_at_utc": "2026-10-20T20:18:40.535530+00:00",
+  "based_on": "532d47c4abc26c649906bf5f6b14c1915b357030",
+  "published_agentkit": "v0.3.8",
+  "default_inputs": {
+    "commit": "8cf0840790334ba224afc0595897c74231c712e6",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 199,
+    "sha256": "f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f",
+    "ui_packages": 8
+  },
+  "sources": {
+    "ui/components/src/sidebar.rs": "f8eef05b596a9bfd3e45aa53731d4d030667223bd65c908ae3c2bef5360c9ac9",
+    "ui/components/src/sidebar_search.rs": "688ed3cd3ef97d60c668071d8c6c7e54107417d77358dd563e6669f4a106bca0",
+    "ui/components/src/lib.rs": "3a20cf137328d5a0a75cc55ae188c1ae74762ff6c867cf0e1292aac91bfba4a5",
+    "ui/consumer/src/lib.rs": "af81617516242e13ccb082d7c817c5c680ba512188c940c72e62b5b1523ac988",
+    "ui/demo/src/component_demo.rs": "5934714f9c4c440c1b46b3eabe99eff8d6f290c9f1307bb20268f935330ccf1c",
+    "ui/demo/src/components_native.rs": "f99d38691e1b99f9a532c6967a3c60c05cd61d88939f99e6e59870ca8343b603",
+    "ui/demo/src/native_sidebar_search_selftest.rs": "5f240a0f7da72d553d1465e7161d736b891e1273f172a80cd539d216e801876c",
+    "ui/demo/tests/sidebar_search.rs": "f0a3440b9068ce48f6df22b926c4f3a9293facf2bd28226d5508347468899b96"
+  },
+  "reference_sources": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Agent/ClientAgentSidebarListView.swift": "c29c80b8726f8ac6b5988ed6c9ad3e7902d09e8f656ac745eba4f5ee0bb70069",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Agent/ClientAgentSidebarModel.swift": "82c1bbb6519b9cb9573b9963f565eeee8d297702250a00f9243b5c1e66a1ddc9",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Contract/SessionEndpoint/SessionSearch.swift": "d48b361b935de2a6329568807d410213d80a72aa56b7b34821180e22be11ee62",
+    "/Users/frankqin/dev/Tekes/Tekes/ClientAgentSidebarHostAdapter.swift": "e932b300763674511f17ceb28fa3bfc83bcb924f7e661082134d5efd79d9bf19"
+  },
+  "reference_heads": {
+    "/Users/frankqin/dev/TekesClientKit": "c289bc9d33edcd83a782ac17927a8c65a027eccd",
+    "/Users/frankqin/dev/Tekes": "8858ccd9d46590852ec7a0949aee289fc6798d70"
+  },
+  "validation": {
+    "ui_tests": 329,
+    "second_public_consumer_tests": 33,
+    "targeted_sidebar_tests": 17,
+    "coretext_footer_matrix_combinations": 16,
+    "strict_clippy": true,
+    "fmt": true,
+    "boundaries": true,
+    "native_sidebar_search": {
+      "fullLayoutParity": false,
+      "loadingFailureMoreClear": true,
+      "nativeWindow": true,
+      "noSubmission": true,
+      "originalInventoryRowsRetained": true,
+      "originalQueryCaptured": true,
+      "physicalIme": false,
+      "pointerRetry": true,
+      "searchRPC": false,
+      "voiceOver": false
+    },
+    "native_component_fixture_regression": true,
+    "review_scope": "local source and ownership review; no external PR approval claimed"
+  },
+  "binary_sha256": "c9051f08ca87e27ba7583a0d16b3537df70fea03aa847406cafe207c7890a498",
+  "screenshot": {
+    "path": "docs/evidence/sidebar-search-footer-20261021.png",
+    "sha256": "b1b3f3ae6f7d0a123f9d1374e16ca00607f5d0637d99b7e723860c85bd976b3f",
+    "width": 2136,
+    "height": 1584,
+    "inspected": true,
+    "scope": "owned UI publication fixture with failed search footer; no paired ClientKit visual acceptance"
+  },
+  "logs": {
+    "/tmp/agentkit-sidebar-search-tests-accepted.log": "c1c6c2ed8e91da387c700e2136c6a65a3d04314e4faba3aa44dac126a21eff13",
+    "/tmp/agentkit-sidebar-search-targeted-final.log": "4820062f3f773a96561df9be5300af5b4f2fc67c1409d29d12576fa4e9dd6997",
+    "/tmp/agentkit-sidebar-search-clippy-final.log": "5c723216aa9e20ab5a0be95fa14294638b89f679338efd3bae340031aa07d8d2",
+    "/tmp/agentkit-sidebar-search-build-final.log": "a178c7902ac24dda0e2c0cd4cf0e47a2a6976ef30481cb4015f2f71620380d8b",
+    "/tmp/agentkit-sidebar-search-native.log": "7aab2d9a817c187e865d6693f37505cb306c7780c7c7cf607aa4a10d4a6b16ae",
+    "/tmp/agentkit-sidebar-search-native-regression.log": "9ec37f98fa20efe9624568b83cc23f51fd9500206fa00e83d1b3a7dc3b6c047f"
+  },
+  "not_accepted": [
+    "search_rpc_and_results",
+    "multi_endpoint_search_aggregation",
+    "query_controller_and_debounce",
+    "unknown_inventory_hit_refresh",
+    "full_sidebar_outline_status_pane_layout",
+    "paired_clientkit_visuals",
+    "physical_ime",
+    "voiceover",
+    "default_mixed_reading_integration"
+  ],
+  "prior_runs": {
+    "initial_geometry_failure": "test expected the viewport to fill the entire Sidebar despite the existing shared action panel; corrected to verify the combined inventory region; full outline/menu layout remains open",
+    "superseded_workspace_run": "explicitly terminated after source review added the body-region ancestor clip; not acceptance evidence",
+    "initial_clippy_failure": "collapsible_if corrected before final Clippy run"
+  },
+  "headless_scope": "no root crate changes; previous 532d47c headless 169-test receipt remains separately scoped; not rerun this turn",
+  "candidate_scope": "no candidate rerun or promotion; immutable default pin unchanged"
+}

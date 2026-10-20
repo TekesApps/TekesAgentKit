@@ -141,6 +141,8 @@ RunView 组合正式 Composer / Transcript / Indicators，拥有 Agent 组件间
 
 ## Sidebar（首批实现）
 
+[搜索 footer](rust-agent-ui-sidebar-search-footer-20261021.md)现已接入独立显示输入、底部锚定、长错误下 Retry 可见性及捕获原请求的公开回调。真实查询控制器、跨端结果聚合和完整 outline 仍未完成，不由宿主另写业务状态机。
+
 `Sidebar::new(namespace, labels)` 实现公共 Component，也可 `into_host()` 独立挂载。每个组件使用独立的 u32 ID namespace；输入 `SidebarInput` 提供单调 inventory revision、loaded/error、按消费方分组/排序偏好排列的 rows 和当前 SessionAddress。首次恢复前不显示确认空；观察失败保留已恢复列表。选择来自独立宿主导航，可在同一库存 revision 下变化。
 
 每行直接提供共享服务的 ThreadActivity、ThreadPinPresentation 与 ThreadActionsPresentation。组件检查动作的 endpoint/session 与行身份一致，不从标题、编码 ID、是否有运行来猜权限/完成状态；置顶关系不决定显示顺序、不写 UI 自有存储。选择回调携带完整 SessionAddress，同名 session 在不同 endpoint 中保持独立。

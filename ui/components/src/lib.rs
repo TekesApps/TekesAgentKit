@@ -29,6 +29,8 @@ pub use editor::ComposerDraftUpdate;
 mod indicators;
 mod side_panel;
 mod sidebar;
+mod sidebar_search;
+pub use sidebar_search::*;
 mod summary;
 mod summary_section;
 pub use summary_section::SummarySectionLayout;

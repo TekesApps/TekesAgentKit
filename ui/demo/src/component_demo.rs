@@ -74,6 +74,7 @@ use uploads::UploadGesture;
 mod feedback;
 pub use feedback::{FeedbackDemoCompletion, FeedbackDemoRequest};
 pub enum DemoCommand {
+    SidebarSearch(tekes_agent_components_ui::SidebarSearchIntent),
     Feedback(Box<FeedbackDemoRequest>),
     CopyTranscript(tekes_agent_components_ui::TranscriptCopyIntent),
     TurnAction {
@@ -1779,6 +1780,18 @@ impl ComponentDemo {
     pub fn summary_id(&self) -> ComponentId {
         ComponentId((101 + self.selected as u64 * 2) << 32)
     }
+    pub fn set_sidebar_search(
+        &mut self,
+        input: &tekes_agent_components_ui::SidebarSearchInput,
+    ) -> Result<()> {
+        self.tree
+            .get_mut(self.sidebar_id())
+            .unwrap()
+            .component_mut::<Sidebar>()
+            .unwrap()
+            .update_search(input)
+            .map_err(unsupported)
+    }
     pub fn set_sidebar_source(&mut self, source: Arc<SidebarPublication>) -> Result<()> {
         require(
             self.sidebar_source.as_ref().is_none_or(|old| {
@@ -3122,6 +3135,16 @@ impl ComponentDemo {
             .and_then(|node| node.component::<SidePanel>())
             .map(|panel| panel.take_intents(&actions))
             .unwrap_or_default();
+        commands.extend(
+            self.tree
+                .get(self.sidebar_id())
+                .unwrap()
+                .component::<Sidebar>()
+                .unwrap()
+                .take_search_intents(&actions)
+                .into_iter()
+                .map(DemoCommand::SidebarSearch),
+        );
         for intent in sidebar_intents {
             if let SidebarIntent::Select { address } = intent {
                 if let Some(index) = self.bindings.iter().position(|binding| {

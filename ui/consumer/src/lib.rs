@@ -1558,3 +1558,58 @@ fn sidebar_observation_exposes_restoration_and_failure_through_public_api() {
     sidebar.update(&source.input(None)).unwrap();
     assert!(sidebar.displayed_input().unwrap().loaded);
 }
+
+#[test]
+fn second_product_consumes_sidebar_search_footer_and_captured_retry_without_private_api() {
+    use tekes_agent_components_ui::*;
+    use tekes_ui_controls::composition::AccessibilityAction;
+    let key = SidebarSearchKey {
+        owner: "second-product-search".into(),
+        endpoint_id: "dsh".into(),
+        connection_epoch: 2,
+        generation: 1,
+        query: "中文".into(),
+    };
+    let input = SidebarSearchInput {
+        revision: 1,
+        key: Some(key.clone()),
+        phase: SidebarSearchPhase::Failed {
+            message: "offline".into(),
+            has_more: false,
+            retryable: true,
+        },
+    };
+    let mut sidebar = Sidebar::new(97, SidebarLabels::default());
+    sidebar.update_search(&input).unwrap();
+    let root = sidebar.id();
+    let retry = sidebar.search_retry_id().unwrap();
+    let mut host = sidebar.into_host().unwrap();
+    host.accessibility_action(retry, None, AccessibilityAction::Press);
+    let actions = host.drain_actions();
+    assert_eq!(
+        host.get(root)
+            .unwrap()
+            .component::<Sidebar>()
+            .unwrap()
+            .take_search_intents(&actions),
+        vec![SidebarSearchIntent::Retry { key }]
+    );
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<Sidebar>()
+        .unwrap()
+        .update_search(&SidebarSearchInput {
+            revision: 2,
+            key: None,
+            phase: SidebarSearchPhase::Idle,
+        })
+        .unwrap();
+    assert!(
+        host.get(root)
+            .unwrap()
+            .component::<Sidebar>()
+            .unwrap()
+            .take_search_intents(&actions)
+            .is_empty()
+    );
+}
