@@ -27,8 +27,8 @@ Sidebar 使用共享列表、置顶和动作 dispatcher，已接入选择、复�
 
 - Rust 1.95.0、macOS + Metal（原生窗口/文本服务/GPU）；Python 3.11+（准备和边界检查）。
 - AgentKit 基线 v0.3.8（公开 main `f1daa0ffcf6ced41e21f351e22845455ca78006c`）；Native 真实集成基线 Kernel v0.9.1。
-- TekesUI composition 仍是实验 API，但源码现在固定为公开 Git commit `431093786de47b48cd566d0d9c0eafa088b10d68`；6 个直接依赖和2个传递依赖均由 Cargo 按该完整 rev 取得，ui/Cargo.lock 同步固定。
-- `tekesui-source.json` 的 kind 为 `published-git-revision`，188文件 SHA-256 为 `03721866a362b1d31261ebbbc86140eb07e9e23320871c325234a5212591213d`，与此前已验收037候选完全一致。固定的是不可变commit，不跟随分支HEAD。
+- TekesUI composition 仍是实验 API，但实验开发源码固定为公开 Git commit `8cf0840790334ba224afc0595897c74231c712e6`；6 个直接依赖和2个传递依赖均由 Cargo 按该完整 rev 取得，ui/Cargo.lock 同步固定。
+- `tekesui-source.json` 的 kind 为 `published-git-revision`，199文件 SHA-256 为 `f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f`，对应实际八包依赖闭包；原431基线在 `baselines/` 原样保留。固定的是不可变commit，不跟随分支HEAD。
 - 旧e4 manifest、lockfile、消费适配和188依赖另有备份；旧 `.deps/tekesui` 原样保留但不参与当前构建。无需从兄弟工作树复制代码，`prepare-tekesui-demo.py` 在公开pin模式拒绝path/capture。
 - UI包继续 `0.0.0` / `publish=false`；公开源码pin不代表AgentKit UI稳定版。最新验收与独立CI边界见 [正式pin复验](../docs/tekesui-public-pin-verification-20261019.md)。
 
@@ -157,3 +157,5 @@ SidePanel 附件共享相同选择/上传/状态组件，按原 binding/request 
 `TranscriptItem.content_blocks` 规范化公开消息内部的 Text/Reasoning/ToolCall/Attachment/Unknown；None 明确保留聚合/旧内容覆盖状态。第二 consumer 直接读取覆盖与待解析工具引用，见 [内容块契约](../docs/rust-agent-ui-transcript-content-20261020.md)。
 
 `--components --history-page-proof --offscreen <PNG>` 从公开 TranscriptPaging 按钮捕获原 A 的读取请求，验证 B 草稿隔离、源回执发布和新 epoch 历史保留，不是正式 Transcript 或阅读锚点验收。真实三端脚本加 `--ui-components --ui-history-pages` 可在隔离长会话上复验。公共接口见 [分页读取契约](../docs/rust-agent-ui-history-paging-20261020.md) 和 [分页控件](../docs/rust-agent-ui-paging-controls-20261020.md)。
+
+`InputMessage` 是可独立挂载的纯文本用户消息行：默认 TekesUI Surface 气泡右对齐，caption 在气泡外靠右，正文使用公开只读 Content 文本服务。`--components --input-message-proof --offscreen /tmp/input-row.png` 在测试宿主挂载一个真实 snapshot 输入行；它不是完整 Transcript，附件/结构化内容与混合锚点仍待实现。

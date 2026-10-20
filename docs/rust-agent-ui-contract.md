@@ -2,7 +2,7 @@
 
 本文件是正式业务组件的实现契约与进度入口，不是完成声明。完整交付目标保持 Composer、Transcript、Indicators、RunView、SidePanel、Sidebar，加 Native/Pi/DSH 能力验证、第二公开 consumer、原生窗口验收、review/CI/合并与阶段 tag。
 
-源码基线：AgentKit 已发布 v0.3.8 / `f1daa0ffcf6ced41e21f351e22845455ca78006c`；TekesUI 固定公开 `431093786de47b48cd566d0d9c0eafa088b10d68`，188 输入 SHA `03721866a362b1d31261ebbbc86140eb07e9e23320871c325234a5212591213d`。以下新增 API 尚是当前分支 WIP。RunSurface 明确保留为协议/控件测试宿主，不改名充当 RunView，也不是正式组件树的包装层。
+源码基线：AgentKit 已发布 v0.3.8 / `f1daa0ffcf6ced41e21f351e22845455ca78006c`；TekesUI 实验开发输入固定公开 `8cf0840790334ba224afc0595897c74231c712e6`，199 输入 SHA `f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f`，原 431 基线清单保留在 `ui/baselines/`。以下新增 API 尚是当前分支 WIP。RunSurface 明确保留为协议/控件测试宿主，不改名充当 RunView，也不是正式组件树的包装层。
 
 ## 所有权
 
@@ -192,10 +192,12 @@ Transcript 现已保留公开来源位置并提供 [事件顺序输入](rust-age
 
 文档的已落盘 native 消息改用公开 NativeEntry key，修复同时间戳历史前插时 timeline occurrence 改变造成的身份换绑，见[消息身份修正](rust-agent-ui-native-message-identity-20261020.md)。底层 Item ID 和流式行为保持兼容；无 entry 的临时流不能冒充持久阅读身份。可靠的流/记录阅读目标迁移仍属于 AgentKit 后续工作，并非仅等待 TekesUI 即可完成。
 
-TekesUI #23 后继公开 8cf0840 已独立通过注册/API、实际八包输入闭包、隔离 AgentKit workspace 与有界原生选择/复制/追加/父滚动验证，见[CI 后继消费评估](tekesui-issue23-ci-review-20261020.md)。建议作为独立开发冻结候选；本轮产品仍固定 4310937，没有将 #23 的局部技术接收扩展成 #22、物理 IME 或完整 Transcript/RunView 完成。
+TekesUI #23 后继公开 8cf0840 已独立通过注册/API、实际八包输入闭包、隔离 AgentKit workspace 与有界原生选择/复制/追加/父滚动验证，见[CI 后继消费评估](tekesui-issue23-ci-review-20261020.md)。现已接入实验 UI workspace，原 431 基线及历史验收收据保留；没有将 #23 的局部技术接收扩展成 #22、物理 IME 或完整 Transcript/RunView 完成。
 
 Native [消息生命周期边界修正](rust-agent-ui-native-stream-boundary-20261020.md) 防止同时间戳的新预览覆盖持久消息，并在刷新快照时原子保留 Pi 的 message_end 原因；消息结束不等同于 Agent/turn 结算。它不生成流到持久记录的阅读别名，完整 UI/阅读验收继续独立保留。
 
 新增 [规范化内容块](rust-agent-ui-transcript-content-20261020.md) 保留公开消息内的正文/推理/工具/附件/未知块及覆盖状态，工具只引用既有 DTO。正式组件尚未实现；该模型不替代 TekesUI 文本、混合内容锚点或真实排版验收。
 
 已补 [分页读取回执](rust-agent-ui-history-paging-20261020.md)：原 binding/epoch 的 Loading、Failed、Interrupted 与显式重试，复用现有 runtime / ChildRun 页合并。正式分页控件、文档安装与阅读锚点事务仍未完成。
+
+首个实际内容行 [`InputMessage`](rust-agent-ui-input-message-20261020.md) 只组合 TekesUI 默认 Surface、只读正文及 caption，用户正文气泡和外置 footnote 右对齐；浅深色、短输入收窄、长中文重排使用库的公开文字服务验证。当前仅支持纯文本，结构化块/附件显式拒绝，不能把此行视为完整 Transcript / RunView。

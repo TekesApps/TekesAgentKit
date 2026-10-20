@@ -2262,6 +2262,15 @@ pub fn run() {
     view.sync().unwrap();
     let fonts = CoreTextFonts::new();
     let (sender, results) = mpsc::channel();
+    let mut input_message_ids = None;
+    if args.iter().any(|arg| arg == "--input-message-proof")
+        && !args.iter().any(|arg| arg == "--offscreen")
+    {
+        input_message_ids = Some(
+            view.mount_input_message_proof()
+                .expect("canonical input message row"),
+        );
+    }
     let mut host = Host {
         file_viewer: None,
         view,
@@ -2856,6 +2865,13 @@ pub fn run() {
             host.view.sync().unwrap();
             preset_proof = serde_json::json!({"catalogChoices":count,"explicitSelection":true,"createdSession":true,"selectedPreset":chosen,"presetIdentityReturned":returned_preset.is_some(),"singleInput":true,"promptSettled":true,"originalDraftPreserved":true,"nativeInteraction":false,"componentCreationEntry":true});
         }
+        if args.iter().any(|arg| arg == "--input-message-proof") {
+            input_message_ids = Some(
+                host.view
+                    .mount_input_message_proof()
+                    .expect("canonical input message row"),
+            );
+        }
         let clip = Rect::new(0., 0., 1000., 760.);
         host.text.atlas.begin_frame();
         host.view
@@ -2976,6 +2992,18 @@ pub fn run() {
                 });
             }
         }
+        let input_message_proof = input_message_ids.map(|ids| {
+            let row = host.view.tree.get(ids.root).unwrap().frame();
+            let bubble = host.view.tree.get(ids.bubble).unwrap().frame();
+            let note = host.view.tree.get(ids.footnote).unwrap().frame();
+            let body = host.view.tree.text_surface(ids.body).unwrap();
+            assert!((bubble.max_x()-row.max_x()).abs()<0.5);
+            assert!((note.max_x()-row.max_x()).abs()<0.5);
+            assert!(note.min_y()>=bubble.max_y());
+            assert!(body.input.read_only);
+            assert_eq!(body.presentation, tekes_ui_controls::TextSurfacePresentation::Content);
+            serde_json::json!({"rightBubble":true,"externalRightFootnote":true,"plainReadonlyContent":true,"bubbleWidth":bubble.size.width,"rowWidth":row.size.width,"completeTranscript":false,"nativeInteraction":false})
+        });
         println!(
             "{}",
             serde_json::json!({
@@ -2995,6 +3023,7 @@ pub fn run() {
             "uploadProof":upload_proof,
             "actionableProof":actionable_proof,
             "historyPagingProof":history_page_proof,
+            "inputMessageProof":input_message_proof,
             })
         );
         host.executor.block_on(host.runtime.stop()).unwrap();

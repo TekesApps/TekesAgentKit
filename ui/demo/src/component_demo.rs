@@ -1,5 +1,5 @@
 //! Demo host layout for real Composer/Indicators, not a replacement RunView.
-//! The absent structured Transcript is explicit until upstream #22/#23 land.
+//! The absent structured Transcript is explicit while mixed-document #22 and Agent composition remain incomplete.
 use std::{collections::BTreeMap, sync::Arc};
 use tekes_agent_components_ui::{
     AnnotationEditor, AnnotationEditorIds, AnnotationEditorIntent, Composer, ComposerAffordances,
@@ -338,7 +338,9 @@ impl ComponentDemo {
                     ),
                     Content::new(
                         DIAGNOSTIC,
-                        TextContent::new("Transcript 待 TekesUI #22 / #23；此处不是消息视图。"),
+                        TextContent::new(
+                            "正式 Transcript / RunView 尚未接入；混合文档阅读待 TekesUI #22。",
+                        ),
                     ),
                     Content::new(rename.ids().root, rename),
                     Content::new(choices.id(), choices),
@@ -494,6 +496,55 @@ impl ComponentDemo {
             .get(Self::paging_id(self.ids()))?
             .component::<tekes_agent_components_ui::TranscriptPaging>()
             .map(tekes_agent_components_ui::TranscriptPaging::button_id)
+    }
+    /// A row-only public API probe. This does not install a Transcript or RunView.
+    pub fn mount_input_message_proof(
+        &mut self,
+    ) -> Result<tekes_agent_components_ui::InputMessageIds> {
+        let binding = self.binding().clone();
+        let snapshot = binding
+            .current_run()
+            .ok_or_else(|| unsupported("input proof source missing"))?;
+        let document = tekes_agent_presentation::TranscriptDocument::read(&snapshot.transcript)?;
+        let input = document
+            .sections
+            .iter()
+            .flat_map(|section| &section.inputs)
+            .last()
+            .ok_or_else(|| unsupported("input proof needs a canonical user message"))?;
+        let mut message =
+            tekes_agent_components_ui::InputMessage::new(6_000_000, binding.scope().clone());
+        message
+            .update(
+                binding.scope(),
+                snapshot.revision,
+                snapshot.connection_epoch,
+                input,
+            )
+            .map_err(unsupported)?;
+        let ids = message.ids();
+        let parent = ComponentId(self.ids().root.0 + 16);
+        let composer = self.ids().root;
+        self.tree
+            .insert(parent, Content::new(ids.root, message))
+            .map_err(|_| unsupported("input proof mount"))?;
+        let mut order: Vec<_> = self
+            .tree
+            .get(parent)
+            .unwrap()
+            .component::<StackContent>()
+            .unwrap()
+            .children
+            .iter()
+            .map(Content::id)
+            .filter(|id| *id != ids.root)
+            .collect();
+        let index = order.iter().position(|id| *id == composer).unwrap();
+        order.insert(index, ids.root);
+        self.tree
+            .reorder(parent, &order)
+            .map_err(|_| unsupported("input proof order"))?;
+        Ok(ids)
     }
     fn sync_paging(&mut self, ids: ComposerIds, binding: &Arc<RunBinding>) -> Result<()> {
         let snapshot = binding
@@ -1997,7 +2048,7 @@ impl ComponentDemo {
             .component_mut::<TextContent>()
             .expect("text")
             .text = format!(
-            "Transcript 待 TekesUI #22 / #23；此处不是消息视图。\n回传诊断：{} 条内容，{} 条流式内容，历史{}同步。",
+            "正式 Transcript 尚未完成；混合阅读待 TekesUI #22。\n回传诊断：{} 条内容，{} 条流式内容，历史{}同步。",
             snapshot.transcript.items.len(),
             snapshot
                 .transcript
@@ -2220,7 +2271,7 @@ impl ComponentDemo {
                         }
                         PaneSnapshot::ReadOnlyChild { transcript, .. } => {
                             let mut text = format!(
-                                "有界子历史：{} 项；{}。只读。\nTranscript 待 TekesUI #22 / #23。",
+                                "有界子历史：{} 项；{}。只读。\n正式 Transcript 尚未完成；混合阅读待 TekesUI #22。",
                                 transcript.items.len(),
                                 if transcript.is_stale || read_error.is_some() {
                                     "历史待同步"

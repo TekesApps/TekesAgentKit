@@ -675,10 +675,41 @@ fn independent_consumer_retains_the_same_native_entry_when_the_loaded_prefix_cha
     let user_document = transcript_document(&user).unwrap();
     let input = &user_document.sections[0].inputs[0];
     assert_eq!(native_transcript_entry(input.key), Some("retained"));
+    let message = input_message_row(
+        640,
+        &tekes_agent_components_ui::RunScope::main("endpoint", "a"),
+        1,
+        1,
+        input,
+    )
+    .unwrap();
+    let ids = message.ids();
+    let host = message.into_host().unwrap();
+    assert!(host.get(ids.bubble).is_some());
+    assert!(host.get(ids.footnote).is_some());
+    assert_eq!(
+        host.text_surface(ids.body).unwrap().input.text,
+        "same answer"
+    );
+
     assert!(matches!(
         input.reconciliation_key(),
         Some(tekes_agent_components_ui::TranscriptMessageKey::Submission(
             "original-rpc"
         ))
     ));
+}
+
+/// A host mounts a message row directly from canonical presentation, without
+/// RunSurface or a private copy of the text/IME/layout implementation.
+pub fn input_message_row(
+    namespace: u32,
+    scope: &tekes_agent_components_ui::RunScope,
+    publication: u64,
+    epoch: u64,
+    input: &tekes_agent_components_ui::TranscriptInput<'_>,
+) -> Result<tekes_agent_components_ui::InputMessage, &'static str> {
+    let mut row = tekes_agent_components_ui::InputMessage::new(namespace, scope.clone());
+    row.update(scope, publication, epoch, input)?;
+    Ok(row)
 }
