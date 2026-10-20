@@ -68,6 +68,26 @@ impl TranscriptSection<'_> {
     pub fn output_footnote(&self) -> Option<&TranscriptTurn> {
         self.turn
     }
+    /// Final prose selected by the existing normalized transcript policy.
+    /// Ambiguous, clipped, live, hidden or empty answers have no copy target;
+    /// callers must not substitute the last text/tool/reasoning row.
+    pub fn final_output(&self) -> Option<TranscriptOutput<'_>> {
+        if self.turn?.status != "completed" {
+            return None;
+        }
+        let mut candidates = self.outputs.iter().filter(|output| {
+            output.item.kind == TranscriptItemKind::Assistant && output.item.is_final
+        });
+        let candidate = *candidates.next()?;
+        if candidates.next().is_some()
+            || !candidate.item.is_visible
+            || candidate.item.is_provisional
+            || candidate.item.text.is_empty()
+        {
+            return None;
+        }
+        Some(candidate)
+    }
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct TranscriptDocument<'a> {

@@ -95,6 +95,42 @@ fn turn() -> TranscriptTurn {
 fn scope() -> RunScope {
     RunScope::main("fixture", "a")
 }
+#[tokio::test]
+async fn invalid_explicit_copy_target_does_not_advance_a_standalone_footer_frame() {
+    let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
+    let snapshot = controller.snapshot();
+    let document =
+        tekes_agent_presentation::TranscriptDocument::read(&snapshot.transcript).unwrap();
+    let section = document
+        .sections
+        .iter()
+        .find(|section| section.final_output().is_some())
+        .unwrap();
+    let turn = section.turn.unwrap();
+    let output = section.final_output().unwrap();
+    let mut footer = tekes_agent_components_ui::TurnFootnote::new(870, scope(), Default::default());
+    footer
+        .update_with_output(&scope(), 1, 1, turn, false, Some(output))
+        .unwrap();
+    let copy = footer.copy_button_id().unwrap();
+    let mut wrong = output.item.clone();
+    wrong.kind = tekes_agent_presentation::TranscriptItemKind::User;
+    let wrong = tekes_agent_presentation::TranscriptOutput {
+        key: output.key,
+        item: &wrong,
+    };
+    assert!(
+        footer
+            .update_with_output(&scope(), 2, 1, turn, false, Some(wrong))
+            .is_err()
+    );
+    assert_eq!(footer.copy_button_id(), Some(copy));
+    footer
+        .update_with_output(&scope(), 2, 1, turn, false, Some(output))
+        .unwrap();
+    assert_eq!(footer.copy_button_id(), Some(copy));
+    runtime.stop().await.unwrap();
+}
 fn row(host: &mut ContentHost, id: ComponentId) -> &mut TurnFootnote {
     host.get_mut(id)
         .unwrap()

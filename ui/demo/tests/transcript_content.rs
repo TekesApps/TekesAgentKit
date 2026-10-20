@@ -86,6 +86,95 @@ fn key(id: &str) -> TranscriptContentRowKey {
     TranscriptContentRowKey::Message(TranscriptMessageIdentity::Item(id.into()))
 }
 #[test]
+fn output_copy_uses_the_original_final_message_and_remains_local_when_mutations_are_disabled() {
+    let mut source = snapshot();
+    let answer = source
+        .items
+        .iter_mut()
+        .find(|item| item.id == "output")
+        .unwrap();
+    answer.is_final = true;
+    answer.reasoning = "private reasoning".into();
+    let mut view = content();
+    view.update(&scope(), 1, 1, &source, false).unwrap();
+    let footer = view
+        .row_id(&TranscriptContentRowKey::TurnFootnote("turn".into()))
+        .unwrap();
+    let id = view.id();
+    let mut host = view.into_host().unwrap();
+    let button = host
+        .get(footer)
+        .unwrap()
+        .component::<TurnFootnote>()
+        .unwrap()
+        .copy_button_id()
+        .unwrap();
+    assert!(
+        !host
+            .get(button)
+            .unwrap()
+            .component::<ButtonContent>()
+            .unwrap()
+            .button
+            .state
+            .disabled
+    );
+    host.accessibility_action(button, None, AccessibilityAction::Press);
+    let actions = host.drain_actions();
+    assert!(
+        root(&mut host, id).handle_actions(&actions).is_empty(),
+        "copy is not an endpoint mutation"
+    );
+    let copies = root(&mut host, id).take_copy_intents(&actions);
+    assert_eq!(copies.len(), 1);
+    assert_eq!(copies[0].scope(), &scope());
+    assert_eq!(
+        copies[0].message(),
+        &TranscriptMessageIdentity::Item("output".into())
+    );
+    assert_eq!(copies[0].text(), "output");
+    source
+        .items
+        .iter_mut()
+        .find(|item| item.id == "output")
+        .unwrap()
+        .text = "updated".into();
+    assert!(
+        root(&mut host, id)
+            .update(&scope(), 1, 1, &source, false)
+            .is_err()
+    );
+    assert_eq!(
+        host.get(footer)
+            .unwrap()
+            .component::<TurnFootnote>()
+            .unwrap()
+            .copy_button_id(),
+        Some(button)
+    );
+    root(&mut host, id)
+        .update(&scope(), 2, 1, &source, false)
+        .unwrap();
+    assert!(root(&mut host, id).take_copy_intents(&actions).is_empty());
+    assert_eq!(copies[0].text(), "output");
+    assert!(copies[0].claim());
+    assert!(!copies[0].clone().claim());
+    let mut second = message("second", TranscriptItemKind::Assistant, 9);
+    second.is_final = true;
+    source.items.push(second);
+    root(&mut host, id)
+        .update(&scope(), 3, 1, &source, false)
+        .unwrap();
+    assert!(
+        host.get(footer)
+            .unwrap()
+            .component::<TurnFootnote>()
+            .unwrap()
+            .copy_button_id()
+            .is_none()
+    );
+}
+#[test]
 fn journal_events_compose_once_with_a_turn_aside_and_cumulative_tool_result() {
     let mut source = snapshot();
     source.tools.push(tool());

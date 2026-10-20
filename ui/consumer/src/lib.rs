@@ -848,6 +848,18 @@ fn independent_host_mounts_canonical_content_without_private_demo_types() {
     output.text = "机器回复".into();
     let snapshot = TranscriptSnapshot {
         items: vec![input, output],
+        turns: vec![tekes_agent_components_ui::TranscriptTurn {
+            id: "turn".into(),
+            status: "completed".into(),
+            input: "用户输入".into(),
+            started_at: None,
+            ended_at: None,
+            usage: Default::default(),
+            fork_boundary: None,
+            footnote_actions: vec![],
+            live_usage: None,
+            reported_usage: None,
+        }],
         ..Default::default()
     };
     let view = transcript_content(
@@ -870,6 +882,9 @@ fn independent_host_mounts_canonical_content_without_private_demo_types() {
     assert!(!view.capabilities().keyed_reading_transactions);
     assert!(!view.capabilities().rich_content);
     let root = view.id();
+    let footer = view
+        .row_id(&tekes_agent_components_ui::TranscriptContentRowKey::TurnFootnote("turn".into()))
+        .unwrap();
     let mut host = view.into_host().unwrap();
     assert!(host.get(root).is_some());
     let input = host
@@ -911,6 +926,31 @@ fn independent_host_mounts_canonical_content_without_private_demo_types() {
     assert_eq!(copies[0].text(), "用户输入");
     assert!(copies[0].claim());
     assert!(!copies[0].clone().claim());
+    let output_copy = host
+        .get(footer)
+        .unwrap()
+        .component::<tekes_agent_components_ui::TurnFootnote>()
+        .unwrap()
+        .copy_button_id()
+        .unwrap();
+    host.accessibility_action(
+        output_copy,
+        None,
+        tekes_ui_controls::composition::AccessibilityAction::Press,
+    );
+    let actions = host.drain_actions();
+    let copies = host
+        .get(root)
+        .unwrap()
+        .component::<tekes_agent_components_ui::TranscriptContent>()
+        .unwrap()
+        .take_copy_intents(&actions);
+    assert_eq!(copies.len(), 1);
+    assert_eq!(copies[0].text(), "机器回复");
+    assert_eq!(
+        copies[0].message(),
+        &tekes_agent_components_ui::TranscriptMessageIdentity::Item("output".into())
+    );
 }
 
 /// A separate product assembles the same public RunView, never the demo host.

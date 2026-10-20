@@ -264,6 +264,7 @@ def ui_smoke(config, first, bounded_child=None):
     if (args.ui_transcript_content or bounded_child is not None):
         content=receipt['transcriptContentProof']
         assert content['renderer'] and content['messages']>=1 and content['userTrailing'] and content['machineLeading'] and content['genericViewport'],content
+        assert content['outputCopyControls'] >= 1, 'restored completed reply must expose a final-output copy control'
         assert not content['keyedReadingAcceptance'] and not content['richContent'] and not content['completeTranscript'],content
         print(kind.upper()+'_UI_TRANSCRIPT_CONTENT_OK canonical-mixed-tree+stable-identities+role-layout+public-generic-viewport; keyed-reading=false; native-interaction=false',flush=True)
     if (args.ui_message_rows and bounded_child is None):

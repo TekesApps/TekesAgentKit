@@ -336,7 +336,7 @@ impl TranscriptContent {
                     ToolActivity::new(namespace, self.scope.clone(), self.labels.tool.clone());
                 Content::new(view.id(), view)
             }
-            PlannedContent::Footnote(_) => {
+            PlannedContent::Footnote(..) => {
                 let view =
                     TurnFootnote::new(namespace, self.scope.clone(), self.labels.footnote.clone());
                 Content::new(view.id(), view)
@@ -374,10 +374,17 @@ impl TranscriptContent {
                     .ok_or("transcript tool role changed")?
                     .check_update(&self.scope, publication, epoch, tool, *placement)?;
             }
-            PlannedContent::Footnote(turn) => {
+            PlannedContent::Footnote(turn, output) => {
                 node.component::<TurnFootnote>()
                     .ok_or("transcript footnote role changed")?
-                    .check_update(&self.scope, publication, epoch, turn, available)?;
+                    .check_update_with_output(
+                        &self.scope,
+                        publication,
+                        epoch,
+                        turn,
+                        available,
+                        *output,
+                    )?;
             }
             PlannedContent::Label(_) => {
                 if node.component::<TextContent>().is_none() {
@@ -413,10 +420,10 @@ impl TranscriptContent {
                 .component_mut::<ToolActivity>()
                 .unwrap()
                 .update(&self.scope, publication, epoch, tool, *placement)?,
-            PlannedContent::Footnote(turn) => node
+            PlannedContent::Footnote(turn, output) => node
                 .component_mut::<TurnFootnote>()
                 .unwrap()
-                .update(&self.scope, publication, epoch, turn, available)?,
+                .update_with_output(&self.scope, publication, epoch, turn, available, *output)?,
             PlannedContent::Label(text) => {
                 node.component_mut::<TextContent>().unwrap().text = text.clone()
             }
@@ -452,8 +459,15 @@ impl TranscriptContent {
         self.rows
             .children
             .iter()
-            .filter_map(|node| node.component::<InputMessage>())
-            .flat_map(|input| input.take_copy_intents(actions))
+            .flat_map(|node| {
+                if let Some(input) = node.component::<InputMessage>() {
+                    input.take_copy_intents(actions)
+                } else if let Some(footnote) = node.component::<TurnFootnote>() {
+                    footnote.take_copy_intents(actions)
+                } else {
+                    vec![]
+                }
+            })
             .collect()
     }
     pub fn into_host(self) -> Result<ContentHost, CompositionError> {
@@ -490,7 +504,7 @@ enum PlannedContent<'a> {
     Input(TranscriptInput<'a>),
     Output(TranscriptOutput<'a>, Option<&'a TranscriptSection<'a>>),
     Tool(&'a TranscriptToolCall, ToolActivityPlacement),
-    Footnote(&'a TranscriptTurn),
+    Footnote(&'a TranscriptTurn, Option<TranscriptOutput<'a>>),
     Label(String),
 }
 fn label(key: TranscriptContentRowKey, text: String) -> Planned<'static> {
@@ -548,7 +562,7 @@ fn plan<'a>(
             result.push(Planned {
                 key: Key::TurnFootnote(turn.id.clone()),
                 alias: None,
-                content: PlannedContent::Footnote(turn),
+                content: PlannedContent::Footnote(turn, section.final_output()),
             });
         }
     }

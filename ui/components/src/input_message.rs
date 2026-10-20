@@ -31,6 +31,14 @@ pub struct TranscriptCopyIntent {
     claimed: Arc<AtomicBool>,
 }
 impl TranscriptCopyIntent {
+    pub(crate) fn new(scope: RunScope, message: Key, text: String) -> Self {
+        Self {
+            scope,
+            message,
+            text,
+            claimed: Arc::new(AtomicBool::new(false)),
+        }
+    }
     pub fn scope(&self) -> &RunScope {
         &self.scope
     }
@@ -483,12 +491,11 @@ impl InputMessage {
         {
             return vec![];
         }
-        vec![TranscriptCopyIntent {
-            scope: self.scope.clone(),
-            message: self.key.clone().unwrap(),
-            text: self.last_item.as_ref().unwrap().text.clone(),
-            claimed: Arc::new(AtomicBool::new(false)),
-        }]
+        vec![TranscriptCopyIntent::new(
+            self.scope.clone(),
+            self.key.clone().unwrap(),
+            self.last_item.as_ref().unwrap().text.clone(),
+        )]
     }
     pub fn handle_actions(&mut self, actions: &[ContentAction]) -> bool {
         let mut changed = false;

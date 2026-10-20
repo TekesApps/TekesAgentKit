@@ -175,6 +175,8 @@ SidePanel 附件共享相同选择/上传/状态组件，按原 binding/request 
 
 用户文本的外置复制按钮通过 `TranscriptCopyIntent` 捕获原消息文本，RunView 返回 `CopyTranscript`，只读组件单独提供 `take_copy_intents`。宿主按事件顺序、一次 `claim()` 后写系统剪贴板；离线和只读不会禁用已有文本复制。纯附件不提供文本复制。接入、状态边界与本轮失败/成功证据见[输入复制记录](../docs/rust-agent-ui-input-copy-20261020.md)。
 
+输出 footnote 的复制也使用相同回调，由共享 `TranscriptSection::final_output()` 选择唯一最终正文；不复制推理或工具详情，不回退到最后一条消息。独立 TurnFootnote 消费方用 `update_with_output` 显式传入该目标；机器内容和操作继续靠左。公开 API、三端恢复验证与限制见[输出复制记录](../docs/rust-agent-ui-output-copy-20261020.md)。
+
 ```sh
 ui/target/debug/tekes-agent-ui-demo --components --transcript-content
 ui/target/debug/tekes-agent-ui-demo --components --transcript-content --offscreen /tmp/transcript-tree.png

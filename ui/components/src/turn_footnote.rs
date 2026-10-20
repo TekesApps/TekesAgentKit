@@ -1,11 +1,12 @@
 //! Turn-level output aside; no window, endpoint or independent Run state.
 use crate::OutputUsage;
+use crate::{TranscriptCopyIntent, TranscriptMessageIdentity};
 use std::{
     collections::BTreeMap,
     sync::{Arc, Mutex},
 };
 use tekes_agent_contract::{ThreadActionDefinition, ThreadActionOutcome};
-use tekes_agent_presentation::{RunScope, TranscriptTurn};
+use tekes_agent_presentation::{RunScope, TranscriptItemKind, TranscriptOutput, TranscriptTurn};
 use tekes_ui_controls::{
     ButtonTextRenderer,
     composition::*,
@@ -125,6 +126,7 @@ impl TurnFootnoteFacts {
 }
 #[derive(Clone, Debug)]
 pub struct TurnFootnoteLabels {
+    pub copy: String,
     pub group: String,
     pub pending: String,
     pub completed: String,
@@ -134,6 +136,7 @@ pub struct TurnFootnoteLabels {
 impl Default for TurnFootnoteLabels {
     fn default() -> Self {
         Self {
+            copy: "复制输出".into(),
             group: "回合信息".into(),
             pending: "正在处理回合操作".into(),
             completed: "操作已完成".into(),
@@ -144,6 +147,8 @@ impl Default for TurnFootnoteLabels {
 }
 #[derive(Debug)]
 pub struct TurnFootnote {
+    output_copy: Option<(TranscriptMessageIdentity, String)>,
+    copy_id: Option<ComponentId>,
     root: ComponentId,
     scope: RunScope,
     turn: Option<TranscriptTurn>,
@@ -162,6 +167,8 @@ impl TurnFootnote {
     pub fn new(namespace: u32, scope: RunScope, labels: TurnFootnoteLabels) -> Self {
         let root = ComponentId((namespace as u64) << 32);
         Self {
+            output_copy: None,
+            copy_id: None,
             root,
             scope,
             turn: None,
@@ -221,7 +228,31 @@ impl TurnFootnote {
         turn: &TranscriptTurn,
         available: bool,
     ) -> Result<(), &'static str> {
-        let rekey = self.check_update(scope, publication, epoch, turn, available)?;
+        self.update_with_output(scope, publication, epoch, turn, available, None)
+    }
+    /// Pass `section.final_output()` from the same canonical document frame.
+    /// Copy remains local when shared mutations are unavailable. Missing or
+    /// ambiguous targets must be None, never a last-message fallback.
+    pub fn update_with_output(
+        &mut self,
+        scope: &RunScope,
+        publication: u64,
+        epoch: u64,
+        turn: &TranscriptTurn,
+        available: bool,
+        output: Option<TranscriptOutput<'_>>,
+    ) -> Result<(), &'static str> {
+        let rekey =
+            self.check_update_with_output(scope, publication, epoch, turn, available, output)?;
+        let copy = copy_facts(turn, output)?;
+        if copy != self.output_copy || epoch != self.epoch {
+            self.copy_id = copy.as_ref().map(|_| {
+                let id = ComponentId(self.root.0 + self.next);
+                self.next += 1;
+                id
+            });
+        }
+        self.output_copy = copy;
         self.turn = Some(turn.clone());
         self.publication = publication;
         self.epoch = epoch;
@@ -236,6 +267,41 @@ impl TurnFootnote {
         self.refresh();
         self.render_actions();
         Ok(())
+    }
+    pub fn copy_button_id(&self) -> Option<ComponentId> {
+        self.copy_id
+    }
+    pub fn take_copy_intents(&self, actions: &[ContentAction]) -> Vec<TranscriptCopyIntent> {
+        let Some((message, text)) = &self.output_copy else {
+            return vec![];
+        };
+        if !actions
+            .iter()
+            .any(|a| Some(a.target) == self.copy_id && a.kind == ContentActionKind::Activate)
+        {
+            return vec![];
+        }
+        vec![TranscriptCopyIntent::new(
+            self.scope.clone(),
+            message.clone(),
+            text.clone(),
+        )]
+    }
+    pub(crate) fn check_update_with_output(
+        &self,
+        scope: &RunScope,
+        publication: u64,
+        epoch: u64,
+        turn: &TranscriptTurn,
+        available: bool,
+        output: Option<TranscriptOutput<'_>>,
+    ) -> Result<bool, &'static str> {
+        let rekey = self.check_update(scope, publication, epoch, turn, available)?;
+        let copy = copy_facts(turn, output)?;
+        if publication == self.publication && copy != self.output_copy {
+            return Err("conflicting turn copy publication");
+        }
+        Ok(rekey)
     }
     pub(crate) fn has_unresolved_action(&self) -> bool {
         self.pending.is_some()
@@ -277,7 +343,7 @@ impl TurnFootnote {
         let count = turn.footnote_actions.len() as u64;
         if self
             .next
-            .checked_add(count)
+            .checked_add(count + 1)
             .is_none_or(|n| n >= (1_u64 << 31))
         {
             return Err("turn footnote namespace exhausted");
@@ -359,6 +425,15 @@ impl TurnFootnote {
                 ));
             }
         }
+        if let Some(id) = self.copy_id {
+            let mut node = previous
+                .iter()
+                .position(|node| node.id() == id)
+                .map(|index| previous.remove(index))
+                .unwrap_or_else(|| Content::new(id, ButtonContent::new(&self.labels.copy)));
+            node.component_mut::<ButtonContent>().unwrap().label = self.labels.copy.clone();
+            self.rows.children.push(node);
+        }
         let notice = if self.pending.is_some() && self.observed.is_none() {
             &self.labels.pending
         } else {
@@ -407,6 +482,25 @@ impl TurnFootnote {
         host.set_action_events(true);
         Ok(host)
     }
+}
+fn copy_facts(
+    turn: &TranscriptTurn,
+    output: Option<TranscriptOutput<'_>>,
+) -> Result<Option<(TranscriptMessageIdentity, String)>, &'static str> {
+    let Some(output) = output else {
+        return Ok(None);
+    };
+    if turn.status != "completed"
+        || output.item.turn_id != turn.id
+        || output.item.kind != TranscriptItemKind::Assistant
+        || !output.item.is_final
+        || !output.item.is_visible
+        || output.item.is_provisional
+        || output.item.text.is_empty()
+    {
+        return Err("invalid final output copy target");
+    }
+    Ok(Some((output.key.into(), output.item.text.clone())))
 }
 impl Component for TurnFootnote {
     fn children(&self) -> &[Content] {

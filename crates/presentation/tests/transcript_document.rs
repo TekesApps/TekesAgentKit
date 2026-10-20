@@ -36,6 +36,77 @@ fn turn(id: &str) -> TranscriptTurn {
     }
 }
 #[test]
+fn final_output_uses_shared_final_marker_instead_of_the_last_text_or_reasoning() {
+    let mut completed = turn("t");
+    completed.status = "completed".into();
+    let mut answer = item("answer", "t", TranscriptItemKind::Assistant);
+    answer.is_final = true;
+    answer.text = "最终 **答案**\n保留原文".into();
+    answer.reasoning = "不要复制的推理".into();
+    let mut later = item("later", "t", TranscriptItemKind::Assistant);
+    later.text = "后来的非最终文本".into();
+    let source = TranscriptSnapshot {
+        turns: vec![completed],
+        items: vec![answer, later],
+        ..Default::default()
+    };
+    let document = TranscriptDocument::read(&source).unwrap();
+    let output = document.sections[0].final_output().unwrap();
+    assert_eq!(output.key, TranscriptMessageKey::Item("answer"));
+    assert_eq!(output.item.text, "最终 **答案**\n保留原文");
+}
+#[test]
+fn incomplete_ambiguous_and_non_prose_outputs_have_no_turn_copy_target() {
+    let mut completed = turn("t");
+    completed.status = "completed".into();
+    let mut answer = item("answer", "t", TranscriptItemKind::Assistant);
+    answer.is_final = true;
+    answer.text = "正文".into();
+    let baseline = TranscriptSnapshot {
+        turns: vec![completed],
+        items: vec![answer],
+        ..Default::default()
+    };
+    for case in [
+        "live",
+        "missing-turn",
+        "unmarked",
+        "provisional",
+        "hidden",
+        "reasoning-only",
+        "ambiguous",
+        "status",
+    ] {
+        let mut source = baseline.clone();
+        match case {
+            "live" => source.turns[0].status = "running".into(),
+            "missing-turn" => source.turns.clear(),
+            "unmarked" => source.items[0].is_final = false,
+            "provisional" => source.items[0].is_provisional = true,
+            "hidden" => source.items[0].is_visible = false,
+            "reasoning-only" => {
+                source.items[0].text.clear();
+                source.items[0].reasoning = "推理".into();
+            }
+            "ambiguous" => {
+                let mut second = source.items[0].clone();
+                second.id = "second".into();
+                source.items.push(second);
+            }
+            "status" => source.items[0].kind = TranscriptItemKind::Notice,
+            _ => unreachable!(),
+        }
+        let document = TranscriptDocument::read(&source).unwrap();
+        assert!(
+            document
+                .sections
+                .iter()
+                .all(|section| section.final_output().is_none()),
+            "{case}"
+        );
+    }
+}
+#[test]
 fn whole_input_bubble_keeps_attachments_and_pending_footnote_separate() {
     let mut input = item("echo", "local", TranscriptItemKind::User);
     input.reconciliation_id = Some("rpc".into());
