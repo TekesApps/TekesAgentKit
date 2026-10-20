@@ -878,3 +878,99 @@ fn run_publication_retains_its_own_authority_epoch_across_reconnect_and_legacy_d
         0
     );
 }
+
+#[test]
+fn a_new_native_stream_cannot_replace_a_committed_message_with_the_same_timestamp() {
+    let entries = vec![
+        json!({"id":"u","type":"message","message":{"role":"user","timestamp":1,"content":"input"}}),
+        json!({"id":"old","type":"message","message":{"role":"assistant","timestamp":2,"content":"retained answer","stopReason":"toolUse"}}),
+    ];
+    let preview = json!({"type":"message_update","message":{"role":"assistant","timestamp":2,"content":"new stream"}});
+    let projected =
+        TranscriptSnapshot::read(&scope("a"), &native(entries.clone(), vec![preview], true))
+            .unwrap();
+    let retained = projected
+        .items
+        .iter()
+        .find(|row| row.record_id.as_deref() == Some("old"))
+        .expect("committed row must survive");
+    assert_eq!(retained.text, "retained answer");
+    assert!(!retained.is_provisional);
+    let live = projected
+        .items
+        .iter()
+        .find(|row| row.is_provisional)
+        .unwrap();
+    assert_eq!(live.text, "new stream");
+    assert_ne!(retained.id, live.id);
+    let live_id = live.id.clone();
+    let mut completed = entries;
+    completed.push(json!({"id":"new","type":"message","message":{"role":"assistant","timestamp":2,"content":"new stream","stopReason":"stop"}}));
+    let completed =
+        TranscriptSnapshot::read(&scope("a"), &native(completed, vec![], false)).unwrap();
+    assert_eq!(
+        completed
+            .items
+            .iter()
+            .find(|row| row.record_id.as_deref() == Some("new"))
+            .unwrap()
+            .id,
+        live_id
+    );
+}
+
+#[test]
+fn an_assistant_end_boundary_retires_its_preview_while_the_agent_is_still_running() {
+    let message =
+        json!({"role":"assistant","timestamp":2,"content":"tool step","stopReason":"toolUse"});
+    let source = native(
+        vec![
+            json!({"id":"u","type":"message","message":{"role":"user","timestamp":1,"content":"input"}}),
+            json!({"id":"answer","type":"message","message":message}),
+        ],
+        vec![
+            json!({"type":"message_update","message":message}),
+            json!({"type":"message_end","message":message}),
+        ],
+        true,
+    );
+    let snapshot = TranscriptSnapshot::read(&scope("a"), &source).unwrap();
+    assert_eq!(
+        snapshot
+            .items
+            .iter()
+            .filter(|row| row.kind == TranscriptItemKind::Assistant)
+            .count(),
+        1
+    );
+    assert!(!snapshot.items.iter().any(|row| row.is_provisional));
+    assert_eq!(
+        snapshot.items.last().unwrap().record_id.as_deref(),
+        Some("answer")
+    );
+    assert!(snapshot.items.last().unwrap().reasoning_ended);
+    assert_eq!(snapshot.turns.last().unwrap().status, "running");
+}
+
+#[test]
+fn a_tool_result_end_does_not_retire_an_active_assistant_preview() {
+    let source = native(
+        vec![
+            json!({"id":"u","type":"message","message":{"role":"user","timestamp":1,"content":"input"}}),
+        ],
+        vec![
+            json!({"type":"message_update","message":{"role":"assistant","timestamp":2,"content":"still streaming"}}),
+            json!({"type":"message_end","message":{"role":"toolResult","toolCallId":"call","content":"done"}}),
+        ],
+        true,
+    );
+    let snapshot = TranscriptSnapshot::read(&scope("a"), &source).unwrap();
+    assert_eq!(
+        snapshot
+            .items
+            .iter()
+            .filter(|row| row.is_provisional && row.text == "still streaming")
+            .count(),
+        1
+    );
+}

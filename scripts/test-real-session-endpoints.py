@@ -148,7 +148,9 @@ def run(config):
     proof_commands=[{'op':'create','cwd':str(Path(next(iter(stat))['absolutePath']).parent),'saveAs':'presented'},
         {'op':'call','sessionId':'presented','method':'session.selectModel','args':selected_model},
         {'op':'open','sessionId':'presented'},{'op':'compose','sessionId':'presented','text':'Presentation layer proof'},
-        {'op':'waitSettled','sessionId':'presented'},{'op':'presentation','sessionId':'presented'},
+        {'op':'waitSettled','sessionId':'presented'},
+        *([{'op':'waitNativeEvent','sessionId':'presented','eventType':'message_end','role':'assistant'}] if config['kind']=='pi' else []),
+        {'op':'snapshot'},{'op':'presentation','sessionId':'presented'},
         {'op':'reconnect'},{'op':'open','sessionId':'presented'},{'op':'presentation','sessionId':'presented'}]
     if config['kind'] in ('native','pi'):
         proof_commands += [
@@ -159,6 +161,13 @@ def run(config):
     else:
         proof_commands += [{'op':'sideChatCreateError','sessionId':'presented'},{'op':'childCatalog','sessionId':'presented'}]
     proof=execute(dict(config,commands=proof_commands))
+    if config['kind']=='pi':
+        presented=next(row['result']['sessionId'] for row in proof if row.get('op')=='create')
+        settled=next(row['result'] for row in proof if row.get('op')=='snapshot')['sessions'][presented]
+        kinds=[(event.get('type'),event.get('message',{}).get('role') if isinstance(event.get('message'),dict) else None) for event in settled['native_events']]
+        assert any(kind=='message_end' and role=='assistant' for kind,role in kinds), 'Pi dropped the assistant lifecycle cause: '+json.dumps(kinds)
+        assert any(entry.get('message',{}).get('role')=='assistant' for entry in settled['native_conversation']['entries']), 'Pi lifecycle cause missing its canonical snapshot'
+        print('PI_NATIVE_ASSISTANT_BOUNDARY_LIVE_OK canonical-snapshot+original-message-end')
     for row in (row for row in proof if row.get('op')=='presentation'):
         view=row['result']
         assert view['connection']['phase']=='connected' and view['canSubmit'],view

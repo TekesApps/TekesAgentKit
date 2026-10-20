@@ -41,6 +41,8 @@ Native 要求 Kernel 0.9 的 v4 wire；Pi/DSH 的标准化 HostDescription 保�
 | 附件 | 原生策略、文件上传及会话内字节读取 | 限额校验、图片/文件上传、会话隔离及历史附件读取；普通文件在 prompt 中转为路径引用 | 原生策略和 raw binary 文件上传；历史保留文件元数据；公开 attachment 只读图片，无通用文件下载 |
 | 文件观察 | 认证 WS changes | 有界轮询 ready/change/absent | workspaceFiles/changes |
 | 扩展 | 服务端公开方法 | 模型/命令/skills/tools/settings 读取、Goal/反馈 CAS | ClientKit 对应公开服务路由及规范化参数 |
+
+Pi 的关键事件刷新在同一 `conversation-update` 帧中携带 `snapshot` 和可选的原始 `event` 原因。投影先验证两者，再一次发布；`message_end` 可以结束 assistant 临时预览，而不把仍在工具阶段的整个 Agent 标为完成。旧的无 event 帧仍可读取；新字段不生成 journal seq 或伪造消息 entry ID。相同 timestamp 不再作为临时回复覆盖持久消息的依据；完整 native 流/记录阅读身份迁移仍另行验收。
 | 子代理 | 原生 catalog；扩展只读子历史；bounded child 控制不可用 | create/list/prompt/read/cancel，官方扩展模型工具 | projection catalog + 父拥有的 prompt/cancel；child 地址历史与重连 |
 | 产品服务 | 服务端或显式宿主能力 | 显式 HostServices | 服务端部署或显式 HostServices |
 

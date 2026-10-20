@@ -880,6 +880,9 @@ fn native(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSna
                 row.attachments = attachments(&message["content"]);
                 row.content_blocks =
                     content_blocks(scope, &message["content"], ContentDialect::Native);
+                row.reasoning_ended = message["stopReason"]
+                    .as_str()
+                    .is_some_and(|reason| !reason.is_empty());
                 row.metadata = json!({"stopReason":message["stopReason"]});
                 let u = usage(&message["usage"]);
                 let turn = turn(&mut out, &current, time);
@@ -963,20 +966,26 @@ fn native(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSna
         }
     }
     if snapshot.is_streaming {
-        // RPC message_update carries the complete current message, so the retained tail is sufficient.
-        if let Some(event) = session.native_events.iter().rev().find(|e| {
-            matches!(e["type"].as_str(), Some("message_update" | "message_start"))
-                && e["message"]["role"] == "assistant"
-        }) {
+        // Updates carry the whole active message. An assistant end attached to
+        // its authoritative snapshot retires that preview even during tool work.
+        if let Some(event) = session
+            .native_events
+            .iter()
+            .rev()
+            .find(|e| {
+                matches!(
+                    e["type"].as_str(),
+                    Some("message_update" | "message_start" | "message_end")
+                ) && e["message"]["role"] == "assistant"
+            })
+            .filter(|event| event["type"] != "message_end")
+        {
             let message = &event["message"];
             let timestamp = message["timestamp"].as_f64().unwrap_or(0.0).to_bits();
             let base = format!("{timestamp:x}");
-            let mut occurrence = *occurrences.get(&base).unwrap_or(&0);
-            if out.items.iter().any(|i| {
-                i.kind == TranscriptItemKind::Assistant && i.time == message["timestamp"].as_f64()
-            }) {
-                occurrence = occurrence.saturating_sub(1);
-            }
+            // A timestamp is not proof that this preview is a committed row.
+            // Reserve the next occurrence rather than overwriting stored data.
+            let occurrence = *occurrences.get(&base).unwrap_or(&0);
             let mut row = item(
                 scope,
                 &format!("native-assistant:{base}:{occurrence}"),

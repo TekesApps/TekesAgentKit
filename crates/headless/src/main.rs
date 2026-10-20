@@ -339,6 +339,32 @@ async fn main() -> Result<()> {
                 .map_err(|_| Error::Timeout)??;
                 Value::Null
             }
+            "waitNativeEvent" => {
+                let id = id.ok_or_else(|| unsupported("sessionId required"))?;
+                let event_type = string(command, "eventType")?;
+                let role = command["role"].as_str();
+                let mut changes = runtime.subscribe();
+                tokio::time::timeout(Duration::from_secs(30), async {
+                    loop {
+                        let observed = changes.inspect(|store| {
+                            store.sessions.get(id).is_some_and(|session| {
+                                session.native_events.iter().any(|event| {
+                                    event["type"] == event_type
+                                        && role.is_none_or(|role| event["message"]["role"] == role)
+                                })
+                            })
+                        });
+                        if observed {
+                            break;
+                        }
+                        changes.changed().await.map_err(|_| Error::Disconnected)?;
+                    }
+                    Ok::<_, Error>(())
+                })
+                .await
+                .map_err(|_| Error::Timeout)??;
+                json!({"observed":true,"eventType":event_type,"role":role})
+            }
             "observeReady" => {
                 use futures_util::StreamExt;
                 let mut stream = runtime

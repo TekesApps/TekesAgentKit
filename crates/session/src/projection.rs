@@ -71,6 +71,12 @@ impl Default for SessionProjection {
     }
 }
 impl SessionProjection {
+    fn push_native_event(&mut self, event: Value) {
+        if self.native_events.len() >= 256 {
+            self.native_events.pop_front();
+        }
+        self.native_events.push_back(event);
+    }
     fn block(&mut self, block: ProjectionBlock) {
         for (key, value) in block.values {
             let old = self.projections.get(&key);
@@ -644,9 +650,22 @@ impl MemoryProjectionStore {
                         "conversation generation mismatch",
                     )?;
                 }
+                let event = frame
+                    .get("event")
+                    .map(|event| {
+                        require(
+                            !string(event, "type")?.is_empty(),
+                            "empty native event type",
+                        )?;
+                        Ok::<_, Error>(event.clone())
+                    })
+                    .transpose()?;
                 let session = self.sessions.entry(id.into()).or_default();
                 session.run_open = snapshot.is_streaming;
                 session.native_conversation = Some(snapshot);
+                if let Some(event) = event {
+                    session.push_native_event(event);
+                }
             }
             "native-event" => {
                 require(
@@ -658,10 +677,7 @@ impl MemoryProjectionStore {
                     .ok_or_else(|| Error::Protocol("missing native event".into()))?
                     .clone();
                 let session = self.sessions.entry(id.into()).or_default();
-                if session.native_events.len() >= 256 {
-                    session.native_events.pop_front();
-                }
-                session.native_events.push_back(event);
+                session.push_native_event(event);
             }
             "snapshot" => {
                 let snapshot: JournalSnapshot = serde_json::from_value(frame["snapshot"].clone())?;

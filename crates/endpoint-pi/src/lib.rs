@@ -771,7 +771,14 @@ impl SessionEndpoint for PiSessionEndpoint {
                                 | "agentkit/refresh"
                         ) {
                             let limit = *windows.lock().await.get(&id).unwrap_or(&50);
-                            conversation_frame(&rpc, &id, &generation, limit, false).await
+                            conversation_frame(&rpc, &id, &generation, limit, false)
+                                .await
+                                .map(|mut frame| {
+                                    // Carry the actual cause in the same publication;
+                                    // message_end must not leave an old preview active.
+                                    frame["event"] = event;
+                                    frame
+                                })
                         } else {
                             Ok(
                                 json!({"type":"native-event","generation":generation,"sessionId":id,"event":event}),

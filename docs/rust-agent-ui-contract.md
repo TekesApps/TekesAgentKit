@@ -194,6 +194,8 @@ Transcript 现已保留公开来源位置并提供 [事件顺序输入](rust-age
 
 TekesUI #23 后继公开 8cf0840 已独立通过注册/API、实际八包输入闭包、隔离 AgentKit workspace 与有界原生选择/复制/追加/父滚动验证，见[CI 后继消费评估](tekesui-issue23-ci-review-20261020.md)。建议作为独立开发冻结候选；本轮产品仍固定 4310937，没有将 #23 的局部技术接收扩展成 #22、物理 IME 或完整 Transcript/RunView 完成。
 
+Native [消息生命周期边界修正](rust-agent-ui-native-stream-boundary-20261020.md) 防止同时间戳的新预览覆盖持久消息，并在刷新快照时原子保留 Pi 的 message_end 原因；消息结束不等同于 Agent/turn 结算。它不生成流到持久记录的阅读别名，完整 UI/阅读验收继续独立保留。
+
 新增 [规范化内容块](rust-agent-ui-transcript-content-20261020.md) 保留公开消息内的正文/推理/工具/附件/未知块及覆盖状态，工具只引用既有 DTO。正式组件尚未实现；该模型不替代 TekesUI 文本、混合内容锚点或真实排版验收。
 
 已补 [分页读取回执](rust-agent-ui-history-paging-20261020.md)：原 binding/epoch 的 Loading、Failed、Interrupted 与显式重试，复用现有 runtime / ChildRun 页合并。正式分页控件、文档安装与阅读锚点事务仍未完成。

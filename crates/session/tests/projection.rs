@@ -316,3 +316,62 @@ fn live_provider_usage_preserves_cursor_and_resets_with_journal() {
     .unwrap();
     assert!(s.sessions["s"].previews.is_empty());
 }
+
+#[test]
+fn conversation_refresh_publishes_its_assistant_end_with_the_snapshot() {
+    let mut store = store();
+    let mut snapshot = json!({"sessionId":"s","generation":"g","leafId":"u","entries":[{"id":"u","type":"message","message":{"role":"user","content":"input"}}],"hasMoreBefore":false,"isStreaming":true,"state":{}});
+    store
+        .apply(
+            "journal:s",
+            json!({"type":"conversation","generation":"g","snapshot":snapshot}),
+        )
+        .unwrap();
+    store.apply("journal:s",json!({"type":"native-event","generation":"g","sessionId":"s","event":{"type":"message_update","message":{"role":"assistant","content":"stream"}}})).unwrap();
+    let message = json!({"role":"assistant","content":"committed","stopReason":"toolUse"});
+    snapshot["entries"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"id":"a","type":"message","message":message}));
+    snapshot["leafId"] = json!("a");
+    let end = json!({"type":"message_end","message":message});
+    store
+        .apply(
+            "journal:s",
+            json!({"type":"conversation-update","generation":"g","snapshot":snapshot,"event":end}),
+        )
+        .unwrap();
+    let session = &store.sessions["s"];
+    assert_eq!(
+        session
+            .native_conversation
+            .as_ref()
+            .unwrap()
+            .leaf_id
+            .as_deref(),
+        Some("a")
+    );
+    assert_eq!(session.native_events.back(), Some(&end));
+    assert!(session.run_open);
+    assert_eq!(session.tail_sequence, -1);
+    assert!(session.entries.is_empty());
+}
+
+#[test]
+fn invalid_refresh_cause_is_rejected_before_changing_the_native_snapshot() {
+    let mut store = store();
+    let snapshot = json!({"sessionId":"s","generation":"g","leafId":"u","entries":[{"id":"u","type":"message","message":{"role":"user","content":"input"}}],"hasMoreBefore":false,"isStreaming":true,"state":{}});
+    store
+        .apply(
+            "journal:s",
+            json!({"type":"conversation","generation":"g","snapshot":snapshot}),
+        )
+        .unwrap();
+    let before = serde_json::to_value(&store.sessions["s"]).unwrap();
+    let mut changed = snapshot;
+    changed["isStreaming"] = json!(false);
+    for event in [json!(null), json!({"type":7}), json!({"type":""})] {
+        assert!(store.apply("journal:s",json!({"type":"conversation-update","generation":"g","snapshot":changed,"event":event})).is_err());
+        assert_eq!(serde_json::to_value(&store.sessions["s"]).unwrap(), before);
+    }
+}
