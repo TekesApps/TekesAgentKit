@@ -37,7 +37,9 @@
 - 默认 reading column 使用 ClientKit 的320最小/770最大宽度及 `max(gutter, centering margin)`；gutter按对应 TekesUI `ControlSize::FocusBar + 3 × Spacing::Loose` 语义推导，当前 Rust 的 Relaxed 净空不等价。FullWidth 和非对称文档 pane 边距分别遵循源分支；比例输入按源有限值/0..0.45归一化，而非现有 Rust 的拒绝策略。宿主必须消费正确的 pane 最小宽度。
 - RunView 文档、Composer/chrome/selection 的叠层顺序、共享列、底部遮挡和 Jump 位置/可见性严格对应 RunNativeController/RunOverlay/RunChrome/UserControlsGraph；纵向 docked 栈不能作为最终替代。
 - Indicators 的完整回合 rail 及位置/导航/hover/AX、以及连接/执行/失败等显示条件都要核对；单行状态不能算同名 View 已完成。
-- Composer 的显示遵循 ThreadStatusPolicy：archived隐藏、interrupted可继续输入；不能简单把不能提交等同于隐藏。任务、子代理、SideChat、有界历史分别使用源 View 的可写/只读/loading/missing/error 组合。
+- Composer 的显示遵循 ThreadStatusPolicy：archived隐藏、interrupted可继续输入；不能简单把不能提交等同于隐藏。[正式组件与原生fixture归档恢复专项](rust-agent-ui-composer-visibility-20261021.md)已补这一规则。任务、子代理、SideChat、有界历史的完整可写/只读/loading/missing/error组合仍需逐项对应源View验证。
 - 现有消息左右归属、外置用户 footnote 等已接入规则仍要纳入最终严格对照；SidePanel tabs/内容保留与投影未到状态、Summary section/折叠、Sidebar恢复/空/搜索/选中等显示逻辑逐项验收。
 
 基础颜色、字体、圆角和控件反馈仍消费 TekesUI；严格对齐不要求把 AppKit/Metal 的通用渲染/编辑/滚动实现移入 AgentKit。缺基础属性/事件继续提上游 Issue。当前本表所有未通过项仍是交付工作，不是可由宿主各自实现的共享组件差异。
+
+2026-10-21可见性审查另发现：controller历史投影失败的fallback统一写Unavailable，须继续验证并保留已知Archived语义；详见[显示规则记录](rust-agent-ui-composer-visibility-20261021.md)。

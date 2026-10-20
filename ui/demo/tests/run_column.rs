@@ -292,3 +292,110 @@ fn view_input_precedence_and_test_host_floor_follow_shared_column() {
         expected as f64
     );
 }
+
+#[tokio::test]
+async fn archived_composer_has_no_layout_slot_and_library_blurs_original_preedit() {
+    use tekes_agent_presentation::RunPhase;
+    let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
+    let mut snapshot = (*controller.snapshot()).clone();
+    let mut run = RunView::standard(2400, 2404..2600, RunScope::main("fixture", "a")).unwrap();
+    update(&mut run, &snapshot);
+    let ids = run.ids();
+    let mut host = run.into_host().unwrap();
+    let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()), 1.);
+    let frame = Rect::new(0., 0., 700., 900.);
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        frame,
+        frame,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    let before = host.get(ids.viewport).unwrap().frame();
+    let composer_height = host.get(ids.composer.root).unwrap().frame().size.height;
+    assert!(host.focus(Some(ids.composer.editor), true));
+    host.event(&ContentEvent::Preedit {
+        text: "未完成中文组字".into(),
+        selection: 7..7,
+        clauses: vec![],
+        replacement: None,
+    });
+    let before_editor = host
+        .text_surface(ids.composer.editor)
+        .unwrap()
+        .input
+        .external_baseline();
+    snapshot.revision += 1;
+    snapshot.run.as_mut().unwrap().phase = RunPhase::Archived;
+    snapshot.run.as_mut().unwrap().can_submit = false;
+    snapshot.can_submit = false;
+    let run = host
+        .get_mut(ids.root)
+        .unwrap()
+        .component_mut::<RunView>()
+        .unwrap();
+    update(run, &snapshot);
+    assert!(!run.composer().is_presented());
+    assert!(
+        !run.composer().is_composing(),
+        "hidden preedit must not trap host navigation"
+    );
+    assert_eq!(
+        run.composer().editor().input.external_baseline(),
+        before_editor,
+        "visibility does not mutate the generic editor"
+    );
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        frame,
+        frame,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    assert!(host.focused().is_none());
+    assert!(host.focused_text().is_none());
+    let archived = host.get(ids.viewport).unwrap().frame();
+    assert!(
+        (archived.size.height
+            - before.size.height
+            - composer_height
+            - tekes_ui_tokens::Spacing::Regular.value())
+        .abs()
+            < 0.1
+    );
+    assert!(!host.semantics().iter().any(|n| n.id == ids.composer.root));
+    let run = host
+        .get_mut(ids.root)
+        .unwrap()
+        .component_mut::<RunView>()
+        .unwrap();
+    assert!(
+        run.take_intents(&[]).is_empty(),
+        "library blur must not synthesize Send/Edit"
+    );
+    assert_eq!(run.composer().editor().input.text, "未完成中文组字");
+    assert!(
+        run.composer().editor().input.marked.is_none(),
+        "TekesUI blur owns unmark"
+    );
+    snapshot.revision += 1;
+    snapshot.run.as_mut().unwrap().phase = RunPhase::Interrupted;
+    snapshot.run.as_mut().unwrap().can_submit = true;
+    snapshot.can_submit = true;
+    update(run, &snapshot);
+    assert!(run.composer().is_presented());
+    assert_eq!(run.composer().editor().input.text, "未完成中文组字");
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        frame,
+        frame,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    assert!(host.focused().is_none(), "unarchive never steals focus");
+    assert!(host.focus(Some(ids.composer.editor), true));
+    runtime.stop().await.unwrap();
+}

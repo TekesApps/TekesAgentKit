@@ -1388,3 +1388,22 @@ fn independent_host_does_not_prepare_a_missing_pointer_as_a_new_run() {
     assert!(run.composer().destination().is_none());
     assert!(run.transcript().unwrap().row_keys().is_empty());
 }
+
+/// A product's explicit focus action must not target a hidden archived Composer.
+/// This is a query of shared presentation, not a second status policy.
+pub fn composer_focus_target(
+    run: &tekes_agent_components_ui::RunView,
+) -> Option<tekes_agent_components_ui::ComposerIds> {
+    run.composer().is_presented().then_some(run.ids().composer)
+}
+#[test]
+fn second_product_uses_shared_composer_presentation_for_focus() {
+    let run = new_agent_run_view(
+        1700,
+        1704..1750,
+        tekes_agent_components_ui::RunScope::main("public", "focus"),
+    )
+    .unwrap();
+    assert!(run.displayed_snapshot().is_none());
+    assert_eq!(composer_focus_target(&run), Some(run.ids().composer));
+}

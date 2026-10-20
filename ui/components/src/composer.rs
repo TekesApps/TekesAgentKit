@@ -132,6 +132,7 @@ pub struct Composer {
     draft: ComposerDraft,
     committed: String,
     revision: u64,
+    presented: bool,
     can_send: bool,
     can_cancel: bool,
     affordances: ComposerAffordances,
@@ -171,6 +172,7 @@ impl Composer {
             draft: ComposerDraft::default(),
             committed: String::new(),
             revision: 0,
+            presented: true,
             can_send: false,
             can_cancel: false,
             affordances: ComposerAffordances::default(),
@@ -259,8 +261,13 @@ impl Composer {
     pub fn editor(&self) -> &TextSurface {
         &self.text().field.surface
     }
+    /// Visibility follows ClientKit acceptsInput, separately from transport or
+    /// admission authority. Interrupted/unavailable runs retain their Composer.
+    pub fn is_presented(&self) -> bool {
+        self.presented
+    }
     pub fn is_composing(&self) -> bool {
-        self.editor().input.marked.is_some()
+        self.presented && self.editor().input.marked.is_some()
     }
     fn text(&self) -> &AgentText {
         self.body
@@ -394,6 +401,18 @@ impl Composer {
             self.rebuild_actions();
             return Err(error);
         }
+        self.presented = snapshot
+            .run
+            .as_ref()
+            .is_none_or(|run| run.phase != tekes_agent_presentation::RunPhase::Archived);
+        let gate = if self.presented {
+            gate
+        } else {
+            ComposerControlGate::CLOSED
+        };
+        if !self.presented {
+            self.pending.clear();
+        }
         self.revision = snapshot.revision;
         self.draft = snapshot.draft.clone();
         let context_editable = gate.entries && !self.is_composing();
@@ -484,6 +503,10 @@ impl Composer {
     }
     /// Typed intents retain the exact presented destination. Submit/Enter never sends.
     pub fn take_intents(&mut self, actions: &[ContentAction]) -> Vec<ComposerIntent> {
+        if !self.presented {
+            self.pending.clear();
+            return Vec::new();
+        }
         if !self.is_composing()
             && let Some(context) = self.context()
         {
@@ -562,6 +585,9 @@ impl Composer {
     }
 }
 impl Component for Composer {
+    fn active(&self) -> bool {
+        self.presented
+    }
     fn children(&self) -> &[Content] {
         &self.body.children
     }
@@ -569,13 +595,18 @@ impl Component for Composer {
         Some(&mut self.body.children)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        if !self.presented {
+            return MeasuredChild::new(Size::new(0., 0.));
+        }
         let measured = self.body.measure(text, available);
         // Like ClientKit's resident controls, the outer Composer uses the
         // assigned conversation column; intrinsic toolbar width is not its frame.
         MeasuredChild::new(Size::new(available.width, measured.size.height))
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
-        self.body.arrange(text, frame, clip);
+        if self.presented {
+            self.body.arrange(text, frame, clip);
+        }
     }
     fn semantics(&self) -> ContentSemantics {
         ContentSemantics::new(ContentRole::Group, &self.labels.group)

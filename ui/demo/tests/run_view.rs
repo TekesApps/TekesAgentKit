@@ -620,3 +620,105 @@ async fn advanced_paging_and_actionable_authority_refreshes_retire_stored_plans(
     assert_eq!(run.composer().editor().input.external_baseline(), before);
     runtime.stop().await.unwrap();
 }
+
+#[tokio::test]
+async fn composer_visibility_is_independent_of_admission_and_keeps_original_editor() {
+    use tekes_agent_presentation::RunPhase;
+    let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
+    let mut snapshot = (*controller.snapshot()).clone();
+    snapshot.draft.text = "归档前的会话草稿".into();
+    let mut run = view();
+    update(&mut run, &snapshot).unwrap();
+    let editor_instance = run.composer().editor() as *const _;
+    let rows = run.transcript().unwrap().row_keys().to_vec();
+    let mut host = run.into_host().unwrap();
+    let mut queued = Vec::new();
+    for (phase, can_submit, gate, visible) in [
+        (RunPhase::Interrupted, true, ComposerControlGate::OPEN, true),
+        (
+            RunPhase::Unavailable,
+            false,
+            ComposerControlGate::OPEN,
+            true,
+        ),
+        (RunPhase::Idle, false, ComposerControlGate::CLOSED, true),
+        (RunPhase::Archived, false, ComposerControlGate::OPEN, false),
+        (RunPhase::Idle, true, ComposerControlGate::OPEN, true),
+    ] {
+        snapshot.revision += 1;
+        snapshot.can_submit = can_submit;
+        snapshot.run.as_mut().unwrap().phase = phase;
+        snapshot.run.as_mut().unwrap().can_submit = can_submit;
+        let run = host
+            .get_mut(ids().root)
+            .unwrap()
+            .component_mut::<RunView>()
+            .unwrap();
+        run.update(
+            &snapshot,
+            Default::default(),
+            gate,
+            TranscriptPagingFacts {
+                scope: run.scope().clone(),
+                supported: false,
+                has_more_before: snapshot.transcript.has_more_before,
+                is_stale: snapshot.transcript.is_stale,
+                source_ready: true,
+                read: TranscriptPageRead::Idle,
+            },
+            true,
+        )
+        .unwrap();
+        assert_eq!(run.displayed_snapshot(), Some(&snapshot));
+        assert_eq!(run.composer().is_presented(), visible);
+        assert_eq!(run.composer().editor().input.text, "归档前的会话草稿");
+        assert_eq!(run.composer().editor() as *const _, editor_instance);
+        assert_eq!(run.transcript().unwrap().row_keys(), rows);
+        assert_eq!(
+            host.semantics()
+                .iter()
+                .any(|n| n.id == ids().composer.editor),
+            visible
+        );
+        if visible {
+            host.focus(Some(ids().composer.editor), true);
+            assert_eq!(host.focused(), Some(ids().composer.editor));
+        } else {
+            assert!(!host.focus(Some(ids().composer.editor), true));
+        }
+        if !visible {
+            let run = host
+                .get_mut(ids().root)
+                .unwrap()
+                .component_mut::<RunView>()
+                .unwrap();
+            assert!(
+                run.take_intents(&queued).is_empty(),
+                "old visible Send action must not survive archive"
+            );
+            assert!(host.focused_text().is_none());
+            assert!(
+                !host
+                    .accessibility_action(ids().composer.send, None, AccessibilityAction::Press)
+                    .activated
+            );
+            let actions = host.drain_actions();
+            assert!(
+                host.get_mut(ids().root)
+                    .unwrap()
+                    .component_mut::<RunView>()
+                    .unwrap()
+                    .take_intents(&actions)
+                    .is_empty()
+            );
+        } else if queued.is_empty() && can_submit {
+            assert!(
+                host.accessibility_action(ids().composer.send, None, AccessibilityAction::Press)
+                    .activated
+            );
+            queued = host.drain_actions();
+            assert!(!queued.is_empty());
+        }
+    }
+    runtime.stop().await.unwrap();
+}

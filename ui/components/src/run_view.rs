@@ -207,6 +207,12 @@ impl RunView {
     pub fn scope(&self) -> &RunScope {
         &self.scope
     }
+    /// The canonical publication actually installed in this retained Run tree.
+    /// A newer binding publication may arrive after layout; hosts must not pair
+    /// that newer value with this tree's geometry or editor ownership.
+    pub fn displayed_snapshot(&self) -> Option<&RunSnapshot> {
+        self.last.as_ref()
+    }
     pub fn transcript_id(&self) -> Option<ComponentId> {
         self.transcript
     }
@@ -694,6 +700,26 @@ impl RunView {
         self.body.children.push(content);
         Ok(())
     }
+    // The Composer stays in the mounted tree so TekesUI owns inactive-subtree
+    // input/focus reconciliation and retains the original editor. Only omit its
+    // business slot during layout: zero-height Stack children still reserve gaps.
+    // No generic layout, focus or IME algorithm lives here.
+    fn with_presented_body<T>(&mut self, layout: impl FnOnce(&mut StackContent) -> T) -> T {
+        let hidden = (!self.composer().is_presented()).then(|| {
+            let index = self
+                .body
+                .children
+                .iter()
+                .position(|node| node.id() == self.ids.composer.root)
+                .expect("resident Composer");
+            (index, self.body.children.remove(index))
+        });
+        let result = layout(&mut self.body);
+        if let Some((index, composer)) = hidden {
+            self.body.children.insert(index, composer);
+        }
+        result
+    }
     pub fn into_host(self) -> Result<ContentHost, CompositionError> {
         let id = self.ids.root;
         let mut host = ContentHost::new(Content::new(id, self))?;
@@ -712,11 +738,12 @@ impl Component for RunView {
         let column = self
             .column
             .frame(Rect::new(0., 0., available.width, available.height));
-        let measured = self.body.measure(text, column.size);
+        let measured = self.with_presented_body(|body| body.measure(text, column.size));
         MeasuredChild::new(Size::new(available.width, measured.size.height))
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
-        self.body.arrange(text, self.column.frame(frame), clip);
+        let column = self.column.frame(frame);
+        self.with_presented_body(|body| body.arrange(text, column, clip));
     }
     fn semantics(&self) -> ContentSemantics {
         ContentSemantics::new(ContentRole::Group, &self.label)

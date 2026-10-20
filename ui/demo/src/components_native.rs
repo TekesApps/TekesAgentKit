@@ -36,6 +36,8 @@ mod feedback_probe;
 mod run_controls_probe;
 #[path = "native_stream_selftest.rs"]
 mod stream_probe;
+#[path = "native_composer_visibility_selftest.rs"]
+mod visibility_probe;
 struct OwnedFilePreview {
     child: std::process::Child,
     _staged: tekes_agent_ui_demo::file_preview_host::StagedFilePreview,
@@ -47,6 +49,7 @@ impl Drop for OwnedFilePreview {
     }
 }
 struct Host {
+    visibility_probe: Option<visibility_probe::Probe>,
     feedback_probe: Option<feedback_probe::Probe>,
     stream_probe: Option<stream_probe::Probe>,
     run_controls_probe: Option<run_controls_probe::Probe>,
@@ -1011,6 +1014,10 @@ impl Host {
                 .expect("component frame");
         }
         window.set_animating(self.text.frame_requested);
+        if let Some(mut probe) = self.visibility_probe.take() {
+            probe.advance(self, window);
+            self.visibility_probe = Some(probe);
+        }
         if let Some(mut probe) = self.feedback_probe.take() {
             probe.advance(self, window);
             self.feedback_probe = Some(probe);
@@ -1983,6 +1990,17 @@ impl Host {
                 "NATIVE_AGENT_COMPONENTS_SELFTEST_OK composer+indicators+run-binding+synthetic-text-services+send+stream+cancel+draft-isolation+reconnect; physical-ime=false; transcript=false; reading-anchor=false"
             );
         }
+        if let Some(probe) = &self.visibility_probe {
+            assert!(
+                self.failures.is_empty(),
+                "visibility callback failures: {:?}",
+                self.failures
+            );
+            println!(
+                "NATIVE_AGENT_COMPOSER_VISIBILITY_SELFTEST_RECEIPT {}",
+                probe.receipt(&self.view)
+            );
+        }
         if let Some(probe) = &self.feedback_probe {
             assert!(
                 self.failures.is_empty(),
@@ -2270,6 +2288,9 @@ pub fn run() {
         .iter()
         .any(|arg| arg == "--run-controls-native-selftest");
     let stream_selftest = args.iter().any(|arg| arg == "--stream-native-selftest");
+    let visibility_selftest = args
+        .iter()
+        .any(|arg| arg == "--composer-visibility-selftest");
     let feedback_selftest = args.iter().any(|arg| arg == "--feedback-native-selftest");
     let selftest = args.iter().any(|arg| arg == "--native-selftest");
     let system_ime_selftest = args.iter().any(|arg| arg == "--system-ime-selftest");
@@ -2280,6 +2301,7 @@ pub fn run() {
     let annotation_selftest = args.iter().any(|arg| arg == "--annotation-selftest");
     assert!(
         [
+            visibility_selftest,
             feedback_selftest,
             stream_selftest,
             run_controls_selftest,
@@ -2430,6 +2452,10 @@ pub fn run() {
         );
         ([a, b], sidebar)
     });
+    assert!(
+        !visibility_selftest || fixture,
+        "visibility selftest requires the owned local fixture"
+    );
     let mut view = ComponentDemo::new(bindings).unwrap();
     view.set_file_picker_available(true);
     view.set_file_preview_available(std::path::Path::new("/usr/bin/qlmanage").is_file());
@@ -2605,6 +2631,7 @@ pub fn run() {
         0
     };
     let mut host = Host {
+        visibility_probe: visibility_selftest.then(visibility_probe::Probe::new),
         feedback_probe: feedback_selftest.then(feedback_probe::Probe::new),
         stream_probe: stream_selftest.then(stream_probe::Probe::new),
         run_controls_probe: run_controls_selftest.then(run_controls_probe::Probe::new),
