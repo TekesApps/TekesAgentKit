@@ -30,6 +30,8 @@ use tekes_ui_scene::{GlyphAtlas, Rect, Scene};
 use tekes_ui_text::coretext::{CoreTextFonts, CoreTextRasterizer, CoreTextShaper};
 use tekes_ui_tokens::{Palette, Theme};
 
+#[path = "native_feedback_selftest.rs"]
+mod feedback_probe;
 struct OwnedFilePreview {
     child: std::process::Child,
     _staged: tekes_agent_ui_demo::file_preview_host::StagedFilePreview,
@@ -41,6 +43,7 @@ impl Drop for OwnedFilePreview {
     }
 }
 struct Host {
+    feedback_probe: Option<feedback_probe::Probe>,
     clipboard_writes: Vec<tekes_agent_components_ui::TranscriptCopyIntent>,
     file_viewer: Option<OwnedFilePreview>,
     view: ComponentDemo,
@@ -1002,6 +1005,11 @@ impl Host {
                 .expect("component frame");
         }
         window.set_animating(self.text.frame_requested);
+        if let Some(mut probe) = self.feedback_probe.take() {
+            probe.advance(self, window);
+            self.feedback_probe = Some(probe);
+        }
+
         if self.annotation_selftest {
             use tekes_ui_platform_macos::selftest::{Action, run_script};
             if self.annotation_stage == 0 && self.view.annotation_editor_ids().is_some() {
@@ -1959,6 +1967,17 @@ impl Host {
                 "NATIVE_AGENT_COMPONENTS_SELFTEST_OK composer+indicators+run-binding+synthetic-text-services+send+stream+cancel+draft-isolation+reconnect; physical-ime=false; transcript=false; reading-anchor=false"
             );
         }
+        if let Some(probe) = &self.feedback_probe {
+            assert!(
+                self.failures.is_empty(),
+                "native feedback callback failures: {:?}",
+                self.failures
+            );
+            println!(
+                "NATIVE_AGENT_FEEDBACK_SELFTEST_RECEIPT {}",
+                probe.receipt(&self.view)
+            );
+        }
         for observer in self.observers.drain(..) {
             observer.abort();
         }
@@ -2209,6 +2228,7 @@ impl WindowHandler for Host {
 }
 pub fn run() {
     let args: Vec<_> = std::env::args().collect();
+    let feedback_selftest = args.iter().any(|arg| arg == "--feedback-native-selftest");
     let selftest = args.iter().any(|arg| arg == "--native-selftest");
     let system_ime_selftest = args.iter().any(|arg| arg == "--system-ime-selftest");
     let actions_selftest = args.iter().any(|arg| arg == "--thread-actions-selftest");
@@ -2218,6 +2238,7 @@ pub fn run() {
     let annotation_selftest = args.iter().any(|arg| arg == "--annotation-selftest");
     assert!(
         [
+            feedback_selftest,
             selftest,
             system_ime_selftest,
             actions_selftest,
@@ -2232,6 +2253,14 @@ pub fn run() {
             <= 1,
         "choose one native fixture selftest mode"
     );
+    if feedback_selftest {
+        assert!(
+            args.iter().any(|arg| arg == "--endpoint-config")
+                && args.iter().any(|arg| arg == "--transcript-content")
+                && !args.iter().any(|arg| arg == "--offscreen"),
+            "native feedback probe requires explicit owned-session endpoint configuration and Transcript window"
+        );
+    }
     let executor = tokio::runtime::Runtime::new().unwrap();
     let (connector, kind, scopes, fixture): (
         Arc<dyn tekes_agent_contract::EndpointConnector>,
@@ -2462,6 +2491,20 @@ pub fn run() {
             )
             .unwrap();
     }
+    if feedback_selftest {
+        for (index, binding) in view.bindings().iter().enumerate() {
+            if binding.current_run().unwrap().draft.text.is_empty() {
+                binding
+                    .edit_text(
+                        &tekes_agent_presentation::ComposerDestination::run(
+                            binding.scope().clone(),
+                        ),
+                        format!("native feedback retained draft {index}"),
+                    )
+                    .unwrap();
+            }
+        }
+    }
     let side_chats = Arc::new(SideChatBinding::new(runtime.clone()));
     view.set_side_chat_binding(side_chats.clone());
     view.set_sidebar_source(sidebar.snapshot()).unwrap();
@@ -2512,6 +2555,7 @@ pub fn run() {
         0
     };
     let mut host = Host {
+        feedback_probe: feedback_selftest.then(feedback_probe::Probe::new),
         clipboard_writes: vec![],
         file_viewer: None,
         view,

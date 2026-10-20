@@ -1,5 +1,7 @@
 # Transcript 评价 footnote 接入（实验，2026-10-20）
 
+本页保留挂载阶段的原始验证范围；后续[三端原生窗口专项](rust-agent-ui-feedback-native-20261020.md)已验证自动化原生点击与文本服务。
+
 评价现已挂入公开 `TranscriptContent`，并通过 `RunViewIntent::Feedback` 和原 binding 的一次性请求执行。它属于机器输出的 footnote 区域：输出正文、TurnFootnote、TurnFeedback 依次排列并靠左；用户气泡与用户 footnote 继续靠右。按钮、编辑器、字体、圆角、颜色和交互样式仍继承固定 TekesUI，没有新增视觉主题。
 
 ## 公开输入和事件

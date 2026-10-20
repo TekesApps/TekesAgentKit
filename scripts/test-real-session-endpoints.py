@@ -18,6 +18,7 @@ parser.add_argument('--ui-annotation-editor',action='store_true',help='Exercise 
 parser.add_argument('--ui-attachments',action='store_true',help='Exercise public upload entry, original draft, Send, history and capability-specific file reads')
 parser.add_argument('--ui-bounded-child',action='store_true',help='Verify actual read-only Native child messages through the public component; requires components and Kernel')
 parser.add_argument('--ui-feedback-read',action='store_true',help='Read typed committed feedback and verify proven final response IDs; no mutations or rating controls')
+parser.add_argument('--ui-native-feedback',action='store_true',help='Open each owned-session native window sequentially and exercise feedback clicks, text services and session switching')
 parser.add_argument('--ui-feedback-transcript',action='store_true',help='Exercise feedback through actual Transcript/RunView and captured host callbacks; offscreen only')
 parser.add_argument('--ui-feedback-controls',action='store_true',help='Exercise public feedback controls and note editing over isolated real transports; offscreen only')
 parser.add_argument('--ui-feedback-write',action='store_true',help='Mutating CAS/note proof on isolated fixture targets; no rating UI acceptance')
@@ -27,6 +28,8 @@ parser.add_argument('--ui-message-rows',action='store_true',help='Mount canonica
 parser.add_argument('--ui-history-pages',action='store_true',help='Seed long isolated sessions and verify public page receipts, original scope and fresh reconnect history')
 parser.add_argument('--ui-actionables',action='store_true',help='Exercise public actionable cards on configured Native/Pi/DSH question sources')
 args=parser.parse_args()
+if args.ui_native_feedback and not (args.ui_demo and args.ui_components and args.ui_transcript_content):
+    parser.error('--ui-native-feedback requires --ui-demo, --ui-components and --ui-transcript-content')
 if args.ui_feedback_transcript and not (args.ui_demo and args.ui_components and args.ui_transcript_content):
     parser.error('--ui-feedback-transcript requires --ui-demo, --ui-components and --ui-transcript-content')
 if args.ui_feedback_controls and not (args.ui_demo and args.ui_components and args.ui_transcript_content):
@@ -265,6 +268,18 @@ def ui_smoke(config, first, bounded_child=None):
     ui=subprocess.run([str(args.ui_demo.resolve()),*mode,'--endpoint-config',str(path),'--offscreen',str(output)],env=ui_env,text=True,capture_output=True,timeout=60)
     assert ui.returncode==0,ui.stderr[-3000:]
     receipt=next(json.loads(line) for line in ui.stdout.splitlines() if line.startswith('{') and json.loads(line).get('offscreen'))
+    if args.ui_native_feedback and bounded_child is None:
+        native_log=output.with_suffix('.native-feedback.log')
+        with native_log.open('w') as capture:
+            native=subprocess.run([str(args.ui_demo.resolve()),'--components','--transcript-content','--endpoint-config',str(path),'--feedback-native-selftest'],env=ui_env,stdout=capture,stderr=subprocess.STDOUT,timeout=55)
+        native_text=native_log.read_text()
+        assert native.returncode==0, str(native_log)+'\n'+native_text[-3000:]
+        marker='NATIVE_AGENT_FEEDBACK_SELFTEST_RECEIPT '
+        proof=next(json.loads(line[len(marker):]) for line in native_text.splitlines() if line.startswith(marker))
+        assert all(proof[key] for key in ('nativeInteraction','nativePointer','nativeTextServices','syntheticPreedit','imeSendAndNavigationBlocked','savedChineseNote','noteReopened','retainedAcrossSessionSwitch','sameRatingDeletes','freshReadAfterDelete','draftsPreserved','nonemptyComposerDrafts','sendEnabledBeforeComposition','noPromptSubmitted','stateDrivenCallbacks')),proof
+        assert not proof['physicalIme'] and not proof['voiceOver'] and not proof['readingAnchorAcceptance'],proof
+        print(kind.upper()+'_UI_NATIVE_FEEDBACK_RECEIPT '+json.dumps(proof,ensure_ascii=False,sort_keys=True),flush=True)
+
     assert not receipt['isStale'] and receipt['finalAssistantItems']>=1,receipt
     assert output.read_bytes().startswith(b'\x89PNG\r\n\x1a\n'),kind+' UI image missing'
     if bounded_child:
