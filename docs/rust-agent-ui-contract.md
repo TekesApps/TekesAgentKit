@@ -18,6 +18,8 @@ AgentKit 定义业务结构、展示语义、组件组合、组件输入及回�
 
 [Pi 实时预览与落盘身份](rust-agent-ui-stream-identity-20261020.md)补齐 Pi 1.3 delta-only RPC 的公开 extension 归一化及 Stream→NativeEntry 明确回执。正式 Transcript 保留原输出行与文本控件；完整阅读锚点、富内容和三端原生验收范围不变。
 
+[三端流式原生专项](rust-agent-ui-stream-native-20261020.md)已验证正常 Send、真实预览、落盘后的原行/正文控件/选区、会话草稿和重连不重发，并修复聚合/结构化回补时的唯一正文/推理控件迁移；多块内容不猜测关联。这是专项原生证据，完整三端取消/错误/IME 交互及阅读锚点仍须继续。
+
 ## Composer（首批实现）
 
 `Composer` 实现 TekesUI `Component`，通过 `Content::new(ids.root, composer)` 放入任意公共 ContentHost，也可 `composer.into_host()` 独立挂载。`ComposerIds::new(base)` 占用连续 8 个 ID，宿主保证其与其他子树不冲突。可在一个窗口内用不同 ID 段挂载多个 Composer。

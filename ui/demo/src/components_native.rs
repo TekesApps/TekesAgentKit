@@ -32,6 +32,8 @@ use tekes_ui_tokens::{Palette, Theme};
 
 #[path = "native_feedback_selftest.rs"]
 mod feedback_probe;
+#[path = "native_stream_selftest.rs"]
+mod stream_probe;
 struct OwnedFilePreview {
     child: std::process::Child,
     _staged: tekes_agent_ui_demo::file_preview_host::StagedFilePreview,
@@ -44,6 +46,7 @@ impl Drop for OwnedFilePreview {
 }
 struct Host {
     feedback_probe: Option<feedback_probe::Probe>,
+    stream_probe: Option<stream_probe::Probe>,
     clipboard_writes: Vec<tekes_agent_components_ui::TranscriptCopyIntent>,
     file_viewer: Option<OwnedFilePreview>,
     view: ComponentDemo,
@@ -1008,6 +1011,11 @@ impl Host {
         if let Some(mut probe) = self.feedback_probe.take() {
             probe.advance(self, window);
             self.feedback_probe = Some(probe);
+        }
+
+        if let Some(mut probe) = self.stream_probe.take() {
+            probe.advance(self, window);
+            self.stream_probe = Some(probe);
         }
 
         if self.annotation_selftest {
@@ -1978,6 +1986,17 @@ impl Host {
                 probe.receipt(&self.view)
             );
         }
+        if let Some(probe) = &self.stream_probe {
+            assert!(
+                self.failures.is_empty(),
+                "native stream callback failures: {:?}",
+                self.failures
+            );
+            println!(
+                "NATIVE_AGENT_STREAM_SELFTEST_RECEIPT {}",
+                probe.receipt(&self.view)
+            );
+        }
         for observer in self.observers.drain(..) {
             observer.abort();
         }
@@ -2228,6 +2247,7 @@ impl WindowHandler for Host {
 }
 pub fn run() {
     let args: Vec<_> = std::env::args().collect();
+    let stream_selftest = args.iter().any(|arg| arg == "--stream-native-selftest");
     let feedback_selftest = args.iter().any(|arg| arg == "--feedback-native-selftest");
     let selftest = args.iter().any(|arg| arg == "--native-selftest");
     let system_ime_selftest = args.iter().any(|arg| arg == "--system-ime-selftest");
@@ -2239,6 +2259,7 @@ pub fn run() {
     assert!(
         [
             feedback_selftest,
+            stream_selftest,
             selftest,
             system_ime_selftest,
             actions_selftest,
@@ -2253,12 +2274,12 @@ pub fn run() {
             <= 1,
         "choose one native fixture selftest mode"
     );
-    if feedback_selftest {
+    if feedback_selftest || stream_selftest {
         assert!(
             args.iter().any(|arg| arg == "--endpoint-config")
                 && args.iter().any(|arg| arg == "--transcript-content")
                 && !args.iter().any(|arg| arg == "--offscreen"),
-            "native feedback probe requires explicit owned-session endpoint configuration and Transcript window"
+            "native probes require explicit owned-session endpoint configuration and Transcript window"
         );
     }
     let executor = tokio::runtime::Runtime::new().unwrap();
@@ -2505,6 +2526,9 @@ pub fn run() {
             }
         }
     }
+    if stream_selftest {
+        stream_probe::Probe::prepare(&view);
+    }
     let side_chats = Arc::new(SideChatBinding::new(runtime.clone()));
     view.set_side_chat_binding(side_chats.clone());
     view.set_sidebar_source(sidebar.snapshot()).unwrap();
@@ -2556,6 +2580,7 @@ pub fn run() {
     };
     let mut host = Host {
         feedback_probe: feedback_selftest.then(feedback_probe::Probe::new),
+        stream_probe: stream_selftest.then(stream_probe::Probe::new),
         clipboard_writes: vec![],
         file_viewer: None,
         view,

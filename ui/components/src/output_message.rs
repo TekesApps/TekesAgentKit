@@ -404,10 +404,14 @@ impl OutputMessage {
         let (key, facts) = self.check_update(scope, publication, epoch, output, section)?;
         let mut old = std::mem::take(&mut self.rows.children);
         for f in &facts {
-            let mut content = if let Some(i) = old
-                .iter()
-                .position(|c| c.component::<OutputPart>().unwrap().facts.slot == f.slot)
-            {
+            let mut content = if let Some(i) = old.iter().position(|c| {
+                self.reuses_part(
+                    output,
+                    &facts,
+                    &c.component::<OutputPart>().unwrap().facts,
+                    f,
+                )
+            }) {
                 old.remove(i)
             } else {
                 let id = ComponentId(self.root.0 + self.next);
@@ -471,7 +475,12 @@ impl OutputMessage {
         }
         let new_count = facts
             .iter()
-            .filter(|f| !self.facts.iter().any(|old| old.slot == f.slot))
+            .filter(|f| {
+                !self
+                    .facts
+                    .iter()
+                    .any(|old| self.reuses_part(output, &facts, old, f))
+            })
             .count();
         if self
             .next
@@ -481,6 +490,45 @@ impl OutputMessage {
             return Err("output message namespace exhausted");
         }
         Ok((key, facts))
+    }
+    /// A stable message may change between aggregate and ordered encodings.
+    /// Only its sole body/reasoning role has an unambiguous semantic target;
+    /// multiple blocks never acquire an association through text or position.
+    fn reuses_part(
+        &self,
+        output: &TranscriptOutput<'_>,
+        facts: &[PartFacts],
+        old: &PartFacts,
+        new: &PartFacts,
+    ) -> bool {
+        if old.slot == new.slot {
+            return true;
+        }
+        self.item.as_ref().is_some_and(|previous| {
+            previous.kind == TranscriptItemKind::Assistant
+                && output.item.kind == TranscriptItemKind::Assistant
+                && previous.content_blocks.is_some() != output.item.content_blocks.is_some()
+        }) && old.kind == new.kind
+            && self
+                .facts
+                .iter()
+                .filter(|part| part.kind == new.kind)
+                .count()
+                == 1
+            && facts.iter().filter(|part| part.kind == new.kind).count() == 1
+            && matches!(
+                (&old.slot, &new.slot),
+                (Slot::AggregateBody, Slot::Block(_, OutputContentKind::Text))
+                    | (Slot::Block(_, OutputContentKind::Text), Slot::AggregateBody)
+                    | (
+                        Slot::AggregateReasoning,
+                        Slot::Block(_, OutputContentKind::Reasoning)
+                    )
+                    | (
+                        Slot::Block(_, OutputContentKind::Reasoning),
+                        Slot::AggregateReasoning
+                    )
+            )
     }
     /// UI-local disclosure only. The host drains the original ContentHost action
     /// batch exactly once; retired button IDs cannot target a replacement block.

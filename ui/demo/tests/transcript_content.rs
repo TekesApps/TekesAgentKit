@@ -846,3 +846,154 @@ fn equal_payload_without_receipt_does_not_alias_and_ambiguous_receipts_are_atomi
         Some(old)
     );
 }
+
+#[test]
+fn journal_single_body_retains_text_owner_across_aggregate_and_structured_history() {
+    let mut item = message("response:1:1", TranscriptItemKind::Assistant, 1);
+    item.text = "ENDPOINT_".into();
+    item.is_provisional = true;
+    let mut source = TranscriptSnapshot {
+        items: vec![item],
+        ..Default::default()
+    };
+    let mut view = content();
+    view.update(&scope(), 1, 1, &source, true).unwrap();
+    let row = view
+        .message_id(TranscriptMessageKey::Item("response:1:1"))
+        .unwrap();
+    let root_id = view.id();
+    let mut host = view.into_host().unwrap();
+    let body = host
+        .get(row)
+        .unwrap()
+        .component::<OutputMessage>()
+        .unwrap()
+        .content_ids()[0]
+        .body;
+    host.focus(Some(body), true);
+    host.get_mut(body)
+        .unwrap()
+        .component_mut::<TextFieldContent>()
+        .unwrap()
+        .surface
+        .input
+        .select_range(0..4);
+    source.items[0].text = "ENDPOINT_REPLY_OK".into();
+    source.items[0].is_provisional = false;
+    source.items[0].content_blocks = Some(vec![TranscriptContentBlock {
+        index: 7,
+        content: TranscriptBlockContent::Text {
+            text: "ENDPOINT_REPLY_OK".into(),
+        },
+    }]);
+    root(&mut host, root_id)
+        .update(&scope(), 2, 1, &source, true)
+        .unwrap();
+    assert_eq!(
+        host.get(row)
+            .unwrap()
+            .component::<OutputMessage>()
+            .unwrap()
+            .content_ids()[0]
+            .body,
+        body
+    );
+    assert_eq!(host.focused(), Some(body));
+    assert_eq!(host.text_surface(body).unwrap().input.selection(), 0..4);
+    // A compatible legacy read keeps the same semantic sole body as well.
+    source.items[0].content_blocks = None;
+    root(&mut host, root_id)
+        .update(&scope(), 3, 1, &source, true)
+        .unwrap();
+    assert_eq!(
+        host.get(row)
+            .unwrap()
+            .component::<OutputMessage>()
+            .unwrap()
+            .content_ids()[0]
+            .body,
+        body
+    );
+    assert_eq!(host.text_surface(body).unwrap().input.selection(), 0..4);
+    // Aggregate text cannot identify either of two structured text blocks.
+    source.items[0].content_blocks = Some(vec![
+        TranscriptContentBlock {
+            index: 0,
+            content: TranscriptBlockContent::Text {
+                text: "ENDPOINT_".into(),
+            },
+        },
+        TranscriptContentBlock {
+            index: 1,
+            content: TranscriptBlockContent::Text {
+                text: "REPLY_OK".into(),
+            },
+        },
+    ]);
+    root(&mut host, root_id)
+        .update(&scope(), 4, 1, &source, true)
+        .unwrap();
+    assert!(
+        host.get(row)
+            .unwrap()
+            .component::<OutputMessage>()
+            .unwrap()
+            .content_ids()
+            .iter()
+            .all(|ids| ids.body != body)
+    );
+}
+
+#[test]
+fn sole_aggregate_reasoning_retains_its_disclosure_and_text_owner_when_order_arrives() {
+    let mut item = message("response", TranscriptItemKind::Assistant, 1);
+    item.text.clear();
+    item.reasoning = "thinking".into();
+    let mut source = TranscriptSnapshot {
+        items: vec![item],
+        ..Default::default()
+    };
+    let mut view = content();
+    view.update(&scope(), 1, 1, &source, true).unwrap();
+    let row = view
+        .message_id(TranscriptMessageKey::Item("response"))
+        .unwrap();
+    let root_id = view.id();
+    let mut host = view.into_host().unwrap();
+    let ids = host
+        .get(row)
+        .unwrap()
+        .component::<OutputMessage>()
+        .unwrap()
+        .content_ids()
+        .into_iter()
+        .find(|ids| ids.kind == OutputContentKind::Reasoning)
+        .unwrap();
+    host.accessibility_action(ids.disclosure.unwrap(), None, AccessibilityAction::Press);
+    let actions = host.drain_actions();
+    root(&mut host, root_id).handle_actions(&actions);
+    assert!(host.get(ids.body).is_some());
+    source.items[0].reasoning = "completed thought".into();
+    source.items[0].content_blocks = Some(vec![TranscriptContentBlock {
+        index: 4,
+        content: TranscriptBlockContent::Reasoning {
+            text: "completed thought".into(),
+        },
+    }]);
+    root(&mut host, root_id)
+        .update(&scope(), 2, 1, &source, true)
+        .unwrap();
+    let retained = host
+        .get(row)
+        .unwrap()
+        .component::<OutputMessage>()
+        .unwrap()
+        .content_ids()[0];
+    assert_eq!(retained.root, ids.root);
+    assert_eq!(retained.body, ids.body);
+    assert_eq!(retained.disclosure, ids.disclosure);
+    assert_eq!(
+        host.text_surface(ids.body).unwrap().input.text,
+        "completed thought"
+    );
+}

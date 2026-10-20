@@ -1184,4 +1184,34 @@ fn independent_host_reconciles_explicit_stream_receipt_through_public_api() {
         view.message_id(TranscriptMessageKey::NativeEntry("entry")),
         Some(original)
     );
+    let root = view.id();
+    let mut host = view.into_host().unwrap();
+    let body = host
+        .get(original)
+        .unwrap()
+        .component::<OutputMessage>()
+        .unwrap()
+        .content_ids()[0]
+        .body;
+    source.items[0].content_blocks = Some(vec![TranscriptContentBlock {
+        index: 9,
+        content: TranscriptBlockContent::Text {
+            text: "回答".into(),
+        },
+    }]);
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<TranscriptContent>()
+        .unwrap()
+        .update(&scope, 3, 1, &source, true)
+        .unwrap();
+    assert_eq!(
+        host.get(original)
+            .unwrap()
+            .component::<OutputMessage>()
+            .unwrap()
+            .content_ids()[0]
+            .body,
+        body
+    );
 }
