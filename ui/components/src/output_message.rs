@@ -1,0 +1,604 @@
+//! Agent machine-message composition. TekesUI owns text, controls and geometry.
+use crate::input_message::Key;
+use tekes_agent_presentation::{
+    RunScope, TranscriptBlockContent, TranscriptItem, TranscriptItemKind, TranscriptOutput,
+    TranscriptSection, TranscriptToolCall,
+};
+use tekes_ui_controls::{
+    ButtonTextRenderer, DraftRevision, ExternalSelection, ExternalUndo, ExternalValueResult,
+    composition::*,
+    extended::{Axis, Stack},
+    layout::{AlignmentOverride, MeasuredChild, layout_measured_children},
+};
+use tekes_ui_scene::{Rect, Size};
+use tekes_ui_tokens::{Spacing, proposal};
+
+/// Host copy hooks. Defaults are only fallback copy, never a private visual theme.
+#[derive(Clone, Copy, Debug)]
+pub enum OutputMessageText {
+    Group,
+    Body,
+    Reasoning,
+    ReasoningEnded,
+    Attachment,
+    Unknown,
+    AggregateOrder,
+    System,
+    Error,
+    Notice,
+    Empty,
+    MissingTool,
+    Expand,
+    Collapse,
+}
+#[derive(Clone, Copy, Debug)]
+pub struct OutputMessageLabels {
+    pub text: fn(OutputMessageText) -> String,
+    pub tool: fn(&TranscriptToolCall) -> (String, String),
+}
+impl Default for OutputMessageLabels {
+    fn default() -> Self {
+        Self {
+            text: |kind| {
+                match kind {
+                    OutputMessageText::Group => "机器消息",
+                    OutputMessageText::Body => "机器正文",
+                    OutputMessageText::Reasoning => "推理",
+                    OutputMessageText::ReasoningEnded => "思考过程",
+                    OutputMessageText::Attachment => "附件（暂不支持预览）",
+                    OutputMessageText::Unknown => "未支持的内容类型（原始数据）",
+                    OutputMessageText::AggregateOrder => "来源仅提供聚合内容，未提供块间顺序",
+                    OutputMessageText::System => "系统消息",
+                    OutputMessageText::Error => "错误",
+                    OutputMessageText::Notice => "会话提示",
+                    OutputMessageText::Empty => "来源未提供可显示正文",
+                    OutputMessageText::MissingTool => "工具详情尚未回传",
+                    OutputMessageText::Expand => "展开",
+                    OutputMessageText::Collapse => "收起",
+                }
+                .into()
+            },
+            tool: |t| {
+                (
+                    format!("{} · {}", t.name, t.phase),
+                    format!(
+                        "调用输入\n{}\n\n结果\n{}\n\n调用视图\n{}\n\n结果视图\n{}",
+                        t.arguments,
+                        t.result
+                            .as_ref()
+                            .map_or_else(|| "尚未回传".into(), ToString::to_string),
+                        t.call_view
+                            .as_ref()
+                            .map_or_else(|| "未提供".into(), ToString::to_string),
+                        t.result_view
+                            .as_ref()
+                            .map_or_else(|| "未提供".into(), ToString::to_string)
+                    ),
+                )
+            },
+        }
+    }
+}
+
+/// Component slot within one message; never a durable reading anchor. Block
+/// positions have only the source's current message-local ordering guarantee.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum Slot {
+    Block(usize, OutputContentKind),
+    Tool(usize, String),
+    AggregateReasoning,
+    AggregateBody,
+    AggregateAttachment(usize),
+    MessageKind,
+    Empty,
+    Coverage,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OutputContentKind {
+    Text,
+    Reasoning,
+    Tool,
+    Attachment,
+    Unknown,
+    Coverage,
+    Status,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct PartFacts {
+    slot: Slot,
+    kind: OutputContentKind,
+    title: String,
+    text: String,
+}
+impl PartFacts {
+    fn disclosure(&self) -> bool {
+        !matches!(
+            self.kind,
+            OutputContentKind::Text | OutputContentKind::Coverage | OutputContentKind::Status
+        )
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct OutputContentIds {
+    pub root: ComponentId,
+    pub body: ComponentId,
+    pub disclosure: Option<ComponentId>,
+    pub kind: OutputContentKind,
+}
+#[derive(Debug)]
+struct OutputPart {
+    facts: PartFacts,
+    ids: OutputContentIds,
+    rows: StackContent,
+    hidden: Option<Content>,
+    labels: OutputMessageLabels,
+}
+impl OutputPart {
+    fn new(root: ComponentId, facts: PartFacts, labels: OutputMessageLabels) -> Self {
+        let ids = OutputContentIds {
+            root,
+            body: ComponentId(root.0 + 2),
+            disclosure: facts.disclosure().then_some(ComponentId(root.0 + 1)),
+            kind: facts.kind,
+        };
+        let body = Content::new(
+            ids.body,
+            TextFieldContent::read_only_content(
+                (labels.text)(OutputMessageText::Body),
+                "",
+                if matches!(
+                    facts.kind,
+                    OutputContentKind::Coverage | OutputContentKind::Status
+                ) {
+                    proposal::TextRole::UiCaption
+                } else {
+                    proposal::TextRole::UiBody
+                },
+            ),
+        );
+        let (children, hidden) = if let Some(button) = ids.disclosure {
+            (
+                vec![Content::new(button, ButtonContent::new(&facts.title))],
+                Some(body),
+            )
+        } else {
+            (vec![body], None)
+        };
+        Self {
+            facts,
+            ids,
+            rows: StackContent {
+                model: Stack {
+                    axis: Axis::Vertical,
+                    gap: Spacing::Tight.value(),
+                },
+                flexible_child: None,
+                children,
+            },
+            hidden,
+            labels,
+        }
+    }
+    fn field_mut(&mut self) -> &mut TextFieldContent {
+        self.hidden
+            .as_mut()
+            .unwrap_or_else(|| self.rows.children.last_mut().unwrap())
+            .component_mut::<TextFieldContent>()
+            .unwrap()
+    }
+    fn update(&mut self, publication: u64, facts: PartFacts) {
+        let id = self.ids.body;
+        let field = self.field_mut();
+        let baseline = field.surface.input.external_baseline();
+        let outcome = field.surface.apply_external_value(
+            &baseline,
+            &DraftRevision {
+                identity: format!("output-content:{}", id.0),
+                version: publication,
+                payload: facts.text.clone(),
+            },
+            ExternalSelection::Preserve,
+            ExternalUndo::Preserve,
+        );
+        // These fields are exclusively read-only and owned by this message. A
+        // failed external transaction is an invariant violation, not a partial UI update.
+        assert!(matches!(
+            outcome,
+            ExternalValueResult::Applied { .. } | ExternalValueResult::Unchanged
+        ));
+        self.facts = facts;
+        self.refresh_header();
+    }
+    fn refresh_header(&mut self) {
+        if self.ids.disclosure.is_some() {
+            let button = self.rows.children[0]
+                .component_mut::<ButtonContent>()
+                .unwrap();
+            button.label = format!(
+                "{} · {}",
+                (self.labels.text)(if self.hidden.is_none() {
+                    OutputMessageText::Collapse
+                } else {
+                    OutputMessageText::Expand
+                }),
+                self.facts.title
+            );
+            button.button.state.selected = self.hidden.is_none();
+        }
+    }
+    fn toggle(&mut self) {
+        if let Some(body) = self.hidden.take() {
+            self.rows.children.push(body);
+        } else {
+            self.hidden = self.rows.children.pop();
+        }
+        self.refresh_header();
+    }
+}
+fn arrange_leading(
+    children: &mut [Content],
+    text: &mut dyn ButtonTextRenderer,
+    frame: Rect,
+    clip: Rect,
+    gap: f32,
+) {
+    let measured: Vec<_> = children
+        .iter_mut()
+        .map(|c| c.measure(text, frame.size))
+        .collect();
+    let placed = layout_measured_children(
+        frame,
+        Axis::Vertical,
+        &measured,
+        gap,
+        proposal::layout::COLUMN,
+        AlignmentOverride {
+            cross_axis: Some(proposal::layout::CrossAxisAlignment::Leading),
+            ..Default::default()
+        },
+    );
+    for (child, placed) in children.iter_mut().zip(placed) {
+        child.arrange(text, placed.frame, clip);
+    }
+}
+impl Component for OutputPart {
+    fn children(&self) -> &[Content] {
+        &self.rows.children
+    }
+    fn children_mut(&mut self) -> Option<&mut Vec<Content>> {
+        Some(&mut self.rows.children)
+    }
+    fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        self.rows.measure(text, available)
+    }
+    fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        arrange_leading(
+            &mut self.rows.children,
+            text,
+            frame,
+            clip,
+            Spacing::Tight.value(),
+        );
+    }
+    fn semantics(&self) -> ContentSemantics {
+        let mut semantics = ContentSemantics::new(
+            ContentRole::Group,
+            if self.facts.title.is_empty() {
+                (self.labels.text)(OutputMessageText::Body)
+            } else {
+                self.facts.title.clone()
+            },
+        );
+        semantics.expanded = self.ids.disclosure.map(|_| self.hidden.is_none());
+        semantics
+    }
+}
+
+/// One machine message. Stable source keys, canonical block order and existing
+/// tool DTOs feed this component; it does not infer settlement or read offsets.
+/// Markdown is currently displayed as source prose. Opaque blocks remain explicit
+/// raw-data disclosures until the corresponding rich-content adapters are provided.
+#[derive(Debug)]
+pub struct OutputMessage {
+    root: ComponentId,
+    scope: RunScope,
+    key: Option<Key>,
+    publication: u64,
+    epoch: u64,
+    item: Option<TranscriptItem>,
+    facts: Vec<PartFacts>,
+    rows: StackContent,
+    next: u64,
+    labels: OutputMessageLabels,
+}
+impl OutputMessage {
+    pub fn new(namespace: u32, scope: RunScope) -> Self {
+        Self::with_labels(namespace, scope, OutputMessageLabels::default())
+    }
+    pub fn with_labels(namespace: u32, scope: RunScope, labels: OutputMessageLabels) -> Self {
+        Self {
+            root: ComponentId((namespace as u64) << 32),
+            scope,
+            key: None,
+            publication: 0,
+            epoch: 0,
+            item: None,
+            facts: vec![],
+            rows: StackContent {
+                model: Stack {
+                    axis: Axis::Vertical,
+                    gap: Spacing::Regular.value(),
+                },
+                flexible_child: None,
+                children: vec![],
+            },
+            next: 16,
+            labels,
+        }
+    }
+    pub fn id(&self) -> ComponentId {
+        self.root
+    }
+    pub fn scope(&self) -> &RunScope {
+        &self.scope
+    }
+    pub fn content_ids(&self) -> Vec<OutputContentIds> {
+        self.rows
+            .children
+            .iter()
+            .map(|c| c.component::<OutputPart>().unwrap().ids)
+            .collect()
+    }
+    /// Missing tool DTOs stay unresolved, never resolved through another turn or
+    /// the currently selected session. None is valid for a session-wide notice.
+    pub fn update(
+        &mut self,
+        scope: &RunScope,
+        publication: u64,
+        epoch: u64,
+        output: &TranscriptOutput<'_>,
+        section: Option<&TranscriptSection<'_>>,
+    ) -> Result<(), &'static str> {
+        if scope != &self.scope {
+            return Err("output message scope mismatch");
+        }
+        if publication == 0 || publication < self.publication || epoch < self.epoch {
+            return Err("stale output message publication");
+        }
+        if !output.item.is_visible || output.item.kind == TranscriptItemKind::User {
+            return Err("output is not a visible machine message");
+        }
+        if section.is_some_and(|s| s.id != output.item.turn_id) {
+            return Err("output tool section mismatch");
+        }
+        let key = Key::from(output.key);
+        if self.key.as_ref().is_some_and(|old| old != &key) {
+            return Err("output message identity changed");
+        }
+        let facts = parts(output, section, self.labels)?;
+        if publication == self.publication
+            && (epoch != self.epoch
+                || self.item.as_ref() != Some(output.item)
+                || self.facts != facts)
+        {
+            return Err("conflicting output message publication");
+        }
+        let new_count = facts
+            .iter()
+            .filter(|f| !self.facts.iter().any(|old| old.slot == f.slot))
+            .count();
+        if self
+            .next
+            .checked_add(new_count as u64 * 3)
+            .is_none_or(|v| v >= u32::MAX as u64)
+        {
+            return Err("output message namespace exhausted");
+        }
+        let mut old = std::mem::take(&mut self.rows.children);
+        for f in &facts {
+            let mut content = if let Some(i) = old
+                .iter()
+                .position(|c| c.component::<OutputPart>().unwrap().facts.slot == f.slot)
+            {
+                old.remove(i)
+            } else {
+                let id = ComponentId(self.root.0 + self.next);
+                self.next += 3;
+                Content::new(id, OutputPart::new(id, f.clone(), self.labels))
+            };
+            content
+                .component_mut::<OutputPart>()
+                .unwrap()
+                .update(publication, f.clone());
+            self.rows.children.push(content);
+        }
+        self.key = Some(key);
+        self.publication = publication;
+        self.epoch = epoch;
+        self.item = Some(output.item.clone());
+        self.facts = facts;
+        Ok(())
+    }
+    /// UI-local disclosure only. The host drains the original ContentHost action
+    /// batch exactly once; retired button IDs cannot target a replacement block.
+    pub fn handle_actions(&mut self, actions: &[ContentAction]) -> bool {
+        let mut changed = false;
+        for a in actions
+            .iter()
+            .filter(|a| a.kind == ContentActionKind::Activate)
+        {
+            if let Some(part) = self.rows.children.iter_mut().find_map(|c| {
+                let part = c.component_mut::<OutputPart>().unwrap();
+                (part.ids.disclosure == Some(a.target)).then_some(part)
+            }) {
+                part.toggle();
+                changed = true;
+            }
+        }
+        changed
+    }
+    pub fn into_host(self) -> Result<ContentHost, CompositionError> {
+        let id = self.root;
+        {
+            let mut host = ContentHost::new(Content::new(id, self))?;
+            host.set_action_events(true);
+            Ok(host)
+        }
+    }
+}
+impl Component for OutputMessage {
+    fn children(&self) -> &[Content] {
+        &self.rows.children
+    }
+    fn children_mut(&mut self) -> Option<&mut Vec<Content>> {
+        Some(&mut self.rows.children)
+    }
+    fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        let measured = self.rows.measure(text, available);
+        MeasuredChild::new(Size::new(available.width, measured.size.height))
+    }
+    fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        arrange_leading(
+            &mut self.rows.children,
+            text,
+            frame,
+            clip,
+            Spacing::Regular.value(),
+        );
+    }
+    fn semantics(&self) -> ContentSemantics {
+        ContentSemantics::new(
+            ContentRole::Group,
+            (self.labels.text)(OutputMessageText::Group),
+        )
+    }
+}
+fn parts(
+    output: &TranscriptOutput<'_>,
+    section: Option<&TranscriptSection<'_>>,
+    labels: OutputMessageLabels,
+) -> Result<Vec<PartFacts>, &'static str> {
+    let item = output.item;
+    let mut result = vec![];
+    let status = match item.kind {
+        TranscriptItemKind::System => Some(OutputMessageText::System),
+        TranscriptItemKind::Error => Some(OutputMessageText::Error),
+        TranscriptItemKind::Notice => Some(OutputMessageText::Notice),
+        _ => None,
+    };
+    if let Some(status) = status {
+        result.push(PartFacts {
+            slot: Slot::MessageKind,
+            kind: OutputContentKind::Status,
+            title: String::new(),
+            text: (labels.text)(status),
+        });
+    }
+    if let Some(blocks) = &item.content_blocks {
+        let mut previous = None;
+        for block in blocks {
+            if previous.is_some_and(|i| i >= block.index) {
+                return Err("invalid machine content block order");
+            }
+            previous = Some(block.index);
+            let (kind, title, text) = match &block.content {
+                TranscriptBlockContent::Text { text } => {
+                    (OutputContentKind::Text, String::new(), text.clone())
+                }
+                TranscriptBlockContent::Reasoning { text } => (
+                    OutputContentKind::Reasoning,
+                    (labels.text)(if item.reasoning_ended {
+                        OutputMessageText::ReasoningEnded
+                    } else {
+                        OutputMessageText::Reasoning
+                    }),
+                    text.clone(),
+                ),
+                TranscriptBlockContent::ToolCall { tool_id } => {
+                    let tool = section
+                        .and_then(|s| s.tool_for_block(block))
+                        .filter(|t| t.turn_id == item.turn_id);
+                    let (title, text) = tool.map_or_else(
+                        || {
+                            (
+                                format!(
+                                    "{} · {tool_id}",
+                                    (labels.text)(OutputMessageText::MissingTool)
+                                ),
+                                tool_id.clone(),
+                            )
+                        },
+                        labels.tool,
+                    );
+                    (OutputContentKind::Tool, title, text)
+                }
+                TranscriptBlockContent::Attachment { content } => (
+                    OutputContentKind::Attachment,
+                    (labels.text)(OutputMessageText::Attachment),
+                    content.to_string(),
+                ),
+                TranscriptBlockContent::Unknown { content } => (
+                    OutputContentKind::Unknown,
+                    (labels.text)(OutputMessageText::Unknown),
+                    content.to_string(),
+                ),
+            };
+            result.push(PartFacts {
+                slot: if let TranscriptBlockContent::ToolCall { tool_id } = &block.content {
+                    Slot::Tool(block.index, tool_id.clone())
+                } else {
+                    Slot::Block(block.index, kind)
+                },
+                kind,
+                title,
+                text,
+            });
+        }
+    } else {
+        if !item.reasoning.is_empty() && !item.text.is_empty() {
+            result.push(PartFacts {
+                slot: Slot::Coverage,
+                kind: OutputContentKind::Coverage,
+                title: String::new(),
+                text: (labels.text)(OutputMessageText::AggregateOrder),
+            });
+        }
+        if !item.reasoning.is_empty() {
+            result.push(PartFacts {
+                slot: Slot::AggregateReasoning,
+                kind: OutputContentKind::Reasoning,
+                title: (labels.text)(if item.reasoning_ended {
+                    OutputMessageText::ReasoningEnded
+                } else {
+                    OutputMessageText::Reasoning
+                }),
+                text: item.reasoning.clone(),
+            });
+        }
+        if !item.text.is_empty() {
+            result.push(PartFacts {
+                slot: Slot::AggregateBody,
+                kind: OutputContentKind::Text,
+                title: String::new(),
+                text: item.text.clone(),
+            });
+        }
+        for (i, attachment) in item.attachments.iter().enumerate() {
+            result.push(PartFacts {
+                slot: Slot::AggregateAttachment(i),
+                kind: OutputContentKind::Attachment,
+                title: (labels.text)(OutputMessageText::Attachment),
+                text: attachment.to_string(),
+            });
+        }
+    }
+    if result.is_empty() {
+        result.push(PartFacts {
+            slot: Slot::Empty,
+            kind: OutputContentKind::Status,
+            title: String::new(),
+            text: (labels.text)(OutputMessageText::Empty),
+        });
+    }
+    Ok(result)
+}

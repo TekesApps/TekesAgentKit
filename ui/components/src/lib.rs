@@ -20,6 +20,8 @@ mod summary;
 mod thread_rename;
 pub use thread_rename::*;
 mod input_message;
+mod output_message;
+pub use output_message::*;
 mod transcript;
 pub use input_message::*;
 mod transcript_paging;
@@ -405,5 +407,5 @@ pub use tekes_agent_presentation::{
     TranscriptBlockContent, TranscriptContentBlock, TranscriptDelivery, TranscriptDocument,
     TranscriptEventOrder, TranscriptInput, TranscriptItem, TranscriptItemKind,
     TranscriptMessageKey, TranscriptOrderedEvent, TranscriptOutput, TranscriptSection,
-    TranscriptSnapshot, TranscriptSourcePosition,
+    TranscriptSnapshot, TranscriptSourcePosition, TranscriptToolCall,
 };

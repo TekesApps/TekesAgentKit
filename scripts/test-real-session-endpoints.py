@@ -16,9 +16,14 @@ parser.add_argument('--ui-context',action='store_true',help='Exercise draft cont
 parser.add_argument('--ui-initial-presets',action='store_true',help='Exercise public initial preset selection through shared create and prompt in isolated component sessions')
 parser.add_argument('--ui-annotation-editor',action='store_true',help='Exercise public annotation editing and shared context compilation; implies the context proof')
 parser.add_argument('--ui-attachments',action='store_true',help='Exercise public upload entry, original draft, Send, history and capability-specific file reads')
+parser.add_argument('--ui-message-rows',action='store_true',help='Mount canonical plain user and machine rows through public components; not a full Transcript')
 parser.add_argument('--ui-history-pages',action='store_true',help='Seed long isolated sessions and verify public page receipts, original scope and fresh reconnect history')
 parser.add_argument('--ui-actionables',action='store_true',help='Exercise public actionable cards on configured Native/Pi/DSH question sources')
 args=parser.parse_args()
+if args.ui_message_rows and not args.ui_components:
+    parser.error('--ui-message-rows requires --ui-components')
+if args.ui_message_rows and args.ui_attachments:
+    parser.error('--ui-message-rows currently requires a plain user message; attachment rows are not implemented')
 if args.ui_history_pages and not args.ui_components:
     parser.error('--ui-history-pages requires --ui-components')
 if args.ui_actionables and not args.ui_components:
@@ -225,12 +230,18 @@ def ui_smoke(config, first):
     if args.ui_attachments:mode+=['--upload-proof']
     if args.ui_actionables:mode+=['--actionable-proof']
     if args.ui_history_pages:mode+=['--history-page-proof']
+    if args.ui_message_rows:mode+=['--input-message-proof','--output-message-proof']
     if args.ui_initial_presets:mode+=['--initial-preset-proof','--initial-preset-cwd',str(cwd)]
     ui=subprocess.run([str(args.ui_demo.resolve()),*mode,'--endpoint-config',str(path),'--offscreen',str(output)],env=ui_env,text=True,capture_output=True,timeout=60)
     assert ui.returncode==0,ui.stderr[-3000:]
     receipt=next(json.loads(line) for line in ui.stdout.splitlines() if line.startswith('{') and json.loads(line).get('offscreen'))
     assert not receipt['isStale'] and receipt['finalAssistantItems']>=1,receipt
     assert output.read_bytes().startswith(b'\x89PNG\r\n\x1a\n'),kind+' UI image missing'
+    if args.ui_message_rows:
+        user=receipt['inputMessageProof'];machine=receipt['outputMessageProof']
+        assert user['rightBubble'] and user['externalRightFootnote'] and user['plainReadonlyContent'] and not user['completeTranscript'],user
+        assert machine['leadingContent'] and machine['parts']>=1 and not machine['completeTranscript'],machine
+        print(kind.upper()+'_UI_MESSAGE_ROWS_OK canonical-user+external-caption+machine-content+public-controls; full-transcript=false; native-interaction=false',flush=True)
     if args.ui_components:
         assert receipt['components'] and not receipt['transcriptView'],receipt
         assert receipt['inventoryRows']>=1 and receipt['sharedRuntime'] and receipt['sidebarMounted'] and receipt['summaryMounted'],receipt

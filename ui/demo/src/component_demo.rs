@@ -546,6 +546,54 @@ impl ComponentDemo {
             .map_err(|_| unsupported("input proof order"))?;
         Ok(ids)
     }
+    /// Machine-row probe over the existing canonical document, not a Transcript.
+    pub fn mount_output_message_proof(&mut self) -> Result<ComponentId> {
+        let binding = self.binding().clone();
+        let snapshot = binding
+            .current_run()
+            .ok_or_else(|| unsupported("output proof source missing"))?;
+        let document = tekes_agent_presentation::TranscriptDocument::read(&snapshot.transcript)?;
+        let (section, output) = document
+            .sections
+            .iter()
+            .rev()
+            .find_map(|section| section.outputs.last().map(|output| (section, output)))
+            .ok_or_else(|| unsupported("output proof needs a machine message"))?;
+        let mut message =
+            tekes_agent_components_ui::OutputMessage::new(6_000_001, binding.scope().clone());
+        message
+            .update(
+                binding.scope(),
+                snapshot.revision,
+                snapshot.connection_epoch,
+                output,
+                Some(section),
+            )
+            .map_err(unsupported)?;
+        let id = message.id();
+        let parent = ComponentId(self.ids().root.0 + 16);
+        let composer = self.ids().root;
+        self.tree
+            .insert(parent, Content::new(id, message))
+            .map_err(|_| unsupported("output proof mount"))?;
+        let mut order: Vec<_> = self
+            .tree
+            .get(parent)
+            .unwrap()
+            .component::<StackContent>()
+            .unwrap()
+            .children
+            .iter()
+            .map(Content::id)
+            .filter(|child| *child != id)
+            .collect();
+        let index = order.iter().position(|id| *id == composer).unwrap();
+        order.insert(index, id);
+        self.tree
+            .reorder(parent, &order)
+            .map_err(|_| unsupported("output proof order"))?;
+        Ok(id)
+    }
     fn sync_paging(&mut self, ids: ComposerIds, binding: &Arc<RunBinding>) -> Result<()> {
         let snapshot = binding
             .current_run()
@@ -2597,6 +2645,14 @@ impl ComponentDemo {
     }
     pub fn drain_commands(&mut self) -> Result<Vec<DemoCommand>> {
         let actions = self.tree.drain_actions();
+        let output_probe = ComponentId((6_000_001_u64) << 32);
+        if let Some(row) = self
+            .tree
+            .get_mut(output_probe)
+            .and_then(|c| c.component_mut::<tekes_agent_components_ui::OutputMessage>())
+        {
+            row.handle_actions(&actions);
+        }
         let binding = self.binding().clone();
         let ids = self.ids();
         let mut composers = if self.selection_cleared {

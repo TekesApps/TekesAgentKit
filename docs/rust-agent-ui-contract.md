@@ -82,16 +82,13 @@ AgentKit 定义业务结构、展示语义、组件组合、组件输入及回�
 
 当前 `RunSurface` 中将消息串成单一文本的 `History` 仅用于协议与阅读 API 测试，不满足上述布局，也不作为正式 Transcript 或 RunView 的实现基础。
 
-### 已核实的基础阻塞
+### 当前基础能力与阻塞
 
-- [TekesUI #22](https://github.com/TekesApps/TekesUI/issues/22)：混合 Content 文档的稳定子项锚点、历史前插/高度变化/重排事务。现有 ScrollContent 可滚动，ReadingController 已完成单 TextSurface；这不是重开 #16，也不能用拼成单一文本框替代多块 Transcript。
-- [TekesUI #23](https://github.com/TekesApps/TekesUI/issues/23)：无表单装饰的可选中文本 Component/presentation 模式，保留现有 TextSurface/AX/选择/复制/受控更新。当前 TextFieldContent 固定 form 的 label/message/边框布局；TextContent 不提供等价文本选择服务。
+- [TekesUI #22](https://github.com/TekesApps/TekesUI/issues/22) 尚待交付：混合 Content 文档的稳定子项锚点、历史前插/高度变化/重排事务。现有 ScrollContent 可滚动，ReadingController 已完成单 TextSurface；不能用拼成单一文本框替代多块 Transcript。
+- [TekesUI #25](https://github.com/TekesApps/TekesUI/issues/25) 新增：可选中富内容 Component、受控流式更新与原生文本映射。现有 MarkdownView 提供有界 Markdown 被动绘制，不能据此宣称已有可选中富内容组合接口。当前源码文字显示和显式原始数据详情保留内容，富内容样式继续待接入。
+- #23 的无表单只读 Content API 已由当前固定 8cf 后继实际消费。原61dd候选的注册失败保留在[历史评估](tekesui-issue23-public-review-20261020.md)，后继的通过证据见[独立复验](tekesui-issue23-ci-review-20261020.md)，不再列作当前纯文本阻塞。
 
-新 #23 公开 `61ddf7c68fccd819e20a01ba3104a8a0f8d7e64f` 的独立消费复验通过正文 API/核心/consumer 和临时 AgentKit 历史/流式探针，但公共类型注册门禁失败，暂不提升正式 pin。见 [公开输入复验](tekesui-issue23-public-review-20261020.md)。
-
-两个 Issue 均有精确源码、所需事件/属性、独立 consumer 和验收条件。上游若给出等价公共 API，则用它并补消费证据，不重复开发。新输入必须显式升级 pin 后复验；不能跟随活跃 WIP。
-
-#23 的未发布归档候选 `2f0902d9f90fb069696c52edc38d9b7e7f8f0d0c4a3f0141e21fe1ac3f3183d0` 已独立校验 991 个文件，并复验公开 API、控件核心和第二 consumer；详见 [候选技术评估](tekesui-plain-candidate-review-20261019.md)。这不改变正式 pin 或 #22/#23 的交付状态。
+基础能力由 TekesUI 实现；收到公开不可变版本后显式升级并验证，不跟随活跃 WIP。AgentKit 自身仍需完成消息组合、stream 到 durable 的可靠阅读身份关联、两类 footnote 动作、正式 Transcript/RunView 和 pane 消息接入，不把这些工作归为上游阻塞。
 
 ## RunView 的后续实施
 
@@ -201,3 +198,5 @@ Native [消息生命周期边界修正](rust-agent-ui-native-stream-boundary-202
 已补 [分页读取回执](rust-agent-ui-history-paging-20261020.md)：原 binding/epoch 的 Loading、Failed、Interrupted 与显式重试，复用现有 runtime / ChildRun 页合并。正式分页控件、文档安装与阅读锚点事务仍未完成。
 
 首个实际内容行 [`InputMessage`](rust-agent-ui-input-message-20261020.md) 只组合 TekesUI 默认 Surface、只读正文及 caption，用户正文气泡和外置 footnote 右对齐；浅深色、短输入收窄、长中文重排使用库的公开文字服务验证。当前仅支持纯文本，结构化块/附件显式拒绝，不能把此行视为完整 Transcript / RunView。
+
+[`OutputMessage`](rust-agent-ui-output-message-20261020.md) 现可独立挂载机器正文、推理与工具引用的局部展开层；按 canonical blocks 顺序消费，同一个正文控件在流式更新时保留选区。附件/未知块以明确的原始数据详情保留，Markdown 当前仍是源码文字；这是 Transcript 内容层进展，完整 Transcript / RunView、turn footnote 与混合阅读仍未完成。

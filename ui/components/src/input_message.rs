@@ -13,7 +13,7 @@ use tekes_ui_scene::{Rect, Scene, Size};
 use tekes_ui_tokens::{Spacing, proposal};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-enum Key {
+pub(super) enum Key {
     Submission(String),
     NativeEntry(String),
     Item(String),

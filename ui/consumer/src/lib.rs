@@ -669,6 +669,22 @@ fn independent_consumer_retains_the_same_native_entry_when_the_loaded_prefix_cha
         Some("retained")
     );
     assert_ne!(a.sections[0].outputs[0].key, b.sections[0].outputs[0].key);
+    let machine = output_message_row(
+        641,
+        &tekes_agent_components_ui::RunScope::main("endpoint", "a"),
+        1,
+        1,
+        &b.sections[0].outputs[1],
+        Some(&b.sections[0]),
+    )
+    .unwrap();
+    let machine_ids = machine.content_ids();
+    let host = machine.into_host().unwrap();
+    assert_eq!(
+        host.text_surface(machine_ids[0].body).unwrap().input.text,
+        "same answer"
+    );
+
     let mut user = before.clone();
     user.items[0].kind = TranscriptItemKind::User;
     user.items[0].reconciliation_id = Some("original-rpc".into());
@@ -711,5 +727,20 @@ pub fn input_message_row(
 ) -> Result<tekes_agent_components_ui::InputMessage, &'static str> {
     let mut row = tekes_agent_components_ui::InputMessage::new(namespace, scope.clone());
     row.update(scope, publication, epoch, input)?;
+    Ok(row)
+}
+
+/// Machine body composition is shared too; hosts forward drained ContentActions
+/// to OutputMessage::handle_actions for local disclosure and render again.
+pub fn output_message_row(
+    namespace: u32,
+    scope: &tekes_agent_components_ui::RunScope,
+    publication: u64,
+    epoch: u64,
+    output: &tekes_agent_components_ui::TranscriptOutput<'_>,
+    section: Option<&tekes_agent_components_ui::TranscriptSection<'_>>,
+) -> Result<tekes_agent_components_ui::OutputMessage, &'static str> {
+    let mut row = tekes_agent_components_ui::OutputMessage::new(namespace, scope.clone());
+    row.update(scope, publication, epoch, output, section)?;
     Ok(row)
 }

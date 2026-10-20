@@ -2262,6 +2262,15 @@ pub fn run() {
     view.sync().unwrap();
     let fonts = CoreTextFonts::new();
     let (sender, results) = mpsc::channel();
+    let mut output_message_id = None;
+    if args.iter().any(|arg| arg == "--output-message-proof")
+        && !args.iter().any(|arg| arg == "--offscreen")
+    {
+        output_message_id = Some(
+            view.mount_output_message_proof()
+                .expect("canonical machine message row"),
+        );
+    }
     let mut input_message_ids = None;
     if args.iter().any(|arg| arg == "--input-message-proof")
         && !args.iter().any(|arg| arg == "--offscreen")
@@ -2872,6 +2881,13 @@ pub fn run() {
                     .expect("canonical input message row"),
             );
         }
+        if args.iter().any(|arg| arg == "--output-message-proof") {
+            output_message_id = Some(
+                host.view
+                    .mount_output_message_proof()
+                    .expect("canonical machine message row"),
+            );
+        }
         let clip = Rect::new(0., 0., 1000., 760.);
         host.text.atlas.begin_frame();
         host.view
@@ -2992,6 +3008,17 @@ pub fn run() {
                 });
             }
         }
+        let output_message_proof = output_message_id.map(|id| {
+            let row = host.view.tree.get(id).unwrap();
+            let frame = row.frame();
+            let ids = row.component::<tekes_agent_components_ui::OutputMessage>().unwrap().content_ids();
+            for part in &ids {
+                let f = host.view.tree.get(part.root).unwrap().frame();
+                assert!((f.min_x() - frame.min_x()).abs() < 0.5);
+                if let Some(body) = host.view.tree.text_surface(part.body) { assert!(body.input.read_only); }
+            }
+            serde_json::json!({"leadingContent":true,"parts":ids.len(),"completeTranscript":false,"nativeInteraction":false})
+        });
         let input_message_proof = input_message_ids.map(|ids| {
             let row = host.view.tree.get(ids.root).unwrap().frame();
             let bubble = host.view.tree.get(ids.bubble).unwrap().frame();
@@ -3023,7 +3050,7 @@ pub fn run() {
             "uploadProof":upload_proof,
             "actionableProof":actionable_proof,
             "historyPagingProof":history_page_proof,
-            "inputMessageProof":input_message_proof,
+            "inputMessageProof":input_message_proof, "outputMessageProof":output_message_proof,
             })
         );
         host.executor.block_on(host.runtime.stop()).unwrap();
