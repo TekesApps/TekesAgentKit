@@ -1,0 +1,33 @@
+{
+  "softwareIme": true,
+  "pidTargetedEvents": true,
+  "physicalKeyboard": false,
+  "candidateWindow": false,
+  "sourceBefore": "com.apple.inputmethod.SCIM.ITABC",
+  "sourceAfter": "com.apple.inputmethod.SCIM.ITABC",
+  "binarySha256": "dfeeb571b3dd4633a20e20dabad5168b39bf13bd427008d34a6dc8025321d615",
+  "date": "2026-10-20",
+  "platform": {
+    "version": "26.6.2",
+    "build": "25G83"
+  },
+  "tekesuiRev": "8cf0840790334ba224afc0595897c74231c712e6",
+  "nativeLog": "selftest: Click { x: 470.0, y: 678.0 }\nselftest: Log(\"SYSTEM_IME_TYPE_READY\")\n2026-10-20 16:09:04.426 tekes-agent-ui-demo[99081:46547401] TSM AdjustCapsLockLEDForKeyTransitionHandling - _ISSetPhysicalKeyboardCapsLockLED Inhibit\n2026-10-20 16:09:04.475 tekes-agent-ui-demo[99081:46547401] error messaging the mach port for IMKCFRunLoopWakeUpReliable\nselftest: ExpectText { text: \"ni hao\", marked: true }\nSELFTEST PASS text query, selection NSRange { location: 6, length: 0 }, candidate rect CGRect { origin: CGPoint { x: 2226.896484375, y: 98.0 }, size: CGSize { width: 0.0, height: 17.0 } }\nselftest: Click { x: 332.0184631347656, y: 732.0 }\nselftest: ExpectText { text: \"ni hao\", marked: true }\nSELFTEST PASS text query, selection NSRange { location: 6, length: 0 }, candidate rect CGRect { origin: CGPoint { x: 2226.896484375, y: 98.0 }, size: CGSize { width: 0.0, height: 17.0 } }\nselftest: Click { x: 50.248321533203125, y: 84.5 }\nselftest: ExpectText { text: \"ni hao\", marked: true }\nSELFTEST PASS text query, selection NSRange { location: 6, length: 0 }, candidate rect CGRect { origin: CGPoint { x: 2226.896484375, y: 98.0 }, size: CGSize { width: 0.0, height: 17.0 } }\nselftest: Log(\"SYSTEM_IME_COMMIT_READY\")\nselftest: ExpectText { text: \"你好\", marked: false }\nSELFTEST PASS text query, selection NSRange { location: 2, length: 0 }, candidate rect CGRect { origin: CGPoint { x: 2213.854108956602, y: 98.0 }, size: CGSize { width: 0.0, height: 17.0 } }\nselftest: Click { x: 332.0184631347656, y: 732.0 }\nselftest: Close\nNATIVE_AGENT_SYSTEM_IME_PROBE_OK software-ime+pid-targeted-key-events+marked-text+send-barrier+navigation-barrier+commit+single-submit; physical-keyboard=false; candidate-window=false\n{\n  \"softwareIme\": true,\n  \"pidTargetedEvents\": true,\n  \"physicalKeyboard\": false,\n  \"candidateWindow\": false,\n  \"sourceBefore\": \"com.apple.inputmethod.SCIM.ITABC\",\n  \"sourceAfter\": \"com.apple.inputmethod.SCIM.ITABC\",\n  \"binarySha256\": \"dfeeb571b3dd4633a20e20dabad5168b39bf13bd427008d34a6dc8025321d615\"\n}\n",
+  "nativeRegressionMarkers": [
+    "NATIVE_AGENT_READONLY_CHILD_CONTENT_SELFTEST_OK actual-child-messages+original-scope+native-pagination+no-composer; reading-anchor=false; physical-ime=false",
+    "NATIVE_AGENT_SIDEBAR_SUMMARY_SELFTEST_OK shared-inventory+shared-pin+sidebar-selection+summary-facts; full-run-view=false; physical-ime=false",
+    "NATIVE_AGENT_SIDECHAT_SELFTEST_OK owned-create+separate-composer+send+stream+draft+cancel-discard+parent-isolation; transcript=false; physical-ime=false",
+    "NATIVE_AGENT_CHILD_SELFTEST_OK direct-parent+independent-composer+single-admission+stream+cancel+isolated-drafts+bounded-read-only+paging+local-retirement; formal-transcript=false; physical-ime=false",
+    "NATIVE_AGENT_TASK_SELFTEST_OK resolved-task+independent-composer+single-admission+stream+cancel+parent-draft-isolation+close; transcript=false; physical-ime=false",
+    "NATIVE_AGENT_COMPONENTS_SELFTEST_OK composer+indicators+run-binding+synthetic-text-services+send+stream+cancel+draft-isolation+reconnect; physical-ime=false; transcript=false; reading-anchor=false"
+  ],
+  "publicConsumerTests": 19,
+  "scriptTests": 21,
+  "uiStrictClippy": true,
+  "completeImeAcceptance": false,
+  "completeGoal": false,
+  "sourceSha256": {
+    "ui/demo/src/components_native.rs": "716a35c0b0b87e590224a5344535a7778997f6e0c551497cb586660e2aa91fbc",
+    "scripts/test-system-ime.py": "1d2e3988f3c9a895eb84ef460e509340683217b7099448acf3e97975e184fae4"
+  }
+}

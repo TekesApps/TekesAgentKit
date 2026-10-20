@@ -56,6 +56,8 @@ struct Host {
     wake: Option<tekes_ui_platform_macos::WindowWake>,
     observers: Vec<tokio::task::JoinHandle<()>>,
     selftest: bool,
+    system_ime_selftest: bool,
+    system_ime_initial_users: usize,
     failures: Vec<String>,
     focus_before_deactivate: Option<ComponentId>,
     _owned_preferences: Option<OwnedPreferencesDirectory>,
@@ -1497,6 +1499,35 @@ impl Host {
         );
     }
     fn close(&mut self, window: &Window) {
+        if self.system_ime_selftest {
+            assert!(
+                self.failures.is_empty(),
+                "IME probe failures: {:?}",
+                self.failures
+            );
+            let state = self.runtime.snapshot();
+            let inputs: Vec<_> = state.sessions["a"]
+                .entries
+                .values()
+                .filter(|entry| entry.event.kind == "user/message")
+                .collect();
+            assert_eq!(
+                inputs.len(),
+                self.system_ime_initial_users + 1,
+                "composition must not submit before commit"
+            );
+            assert_eq!(
+                inputs
+                    .iter()
+                    .filter(|entry| entry.event.data.to_string().contains("你好"))
+                    .count(),
+                1
+            );
+            assert_eq!(self.view.binding().scope().session_id, "a");
+            println!(
+                "NATIVE_AGENT_SYSTEM_IME_PROBE_OK software-ime+pid-targeted-key-events+marked-text+send-barrier+navigation-barrier+commit+single-submit; physical-keyboard=false; candidate-window=false"
+            );
+        }
         if self.annotation_selftest {
             assert!(
                 self.failures.is_empty(),
@@ -1960,6 +1991,9 @@ impl WindowHandler for Host {
                 if self.selftest {
                     native_script(&self.view);
                 }
+                if self.system_ime_selftest {
+                    system_ime_script(&self.view);
+                }
                 if self.actions_selftest {
                     click_thread_action_script(&self.view, "rename");
                     tekes_ui_platform_macos::selftest::run_script(vec![(
@@ -2148,6 +2182,7 @@ impl WindowHandler for Host {
 pub fn run() {
     let args: Vec<_> = std::env::args().collect();
     let selftest = args.iter().any(|arg| arg == "--native-selftest");
+    let system_ime_selftest = args.iter().any(|arg| arg == "--system-ime-selftest");
     let actions_selftest = args.iter().any(|arg| arg == "--thread-actions-selftest");
     let models_selftest = args.iter().any(|arg| arg == "--model-choices-selftest");
     let context_selftest = args.iter().any(|arg| arg == "--context-selftest");
@@ -2156,6 +2191,7 @@ pub fn run() {
     assert!(
         [
             selftest,
+            system_ime_selftest,
             actions_selftest,
             models_selftest,
             context_selftest,
@@ -2177,6 +2213,7 @@ pub fn run() {
     ) = if let Some(index) = args.iter().position(|arg| arg == "--endpoint-config") {
         assert!(
             !selftest
+                && !system_ime_selftest
                 && !actions_selftest
                 && !models_selftest
                 && !context_selftest
@@ -2437,6 +2474,15 @@ pub fn run() {
             );
         }
     }
+    let system_ime_initial_users = if system_ime_selftest {
+        runtime.snapshot().sessions["a"]
+            .entries
+            .values()
+            .filter(|entry| entry.event.kind == "user/message")
+            .count()
+    } else {
+        0
+    };
     let mut host = Host {
         file_viewer: None,
         view,
@@ -2513,6 +2559,8 @@ pub fn run() {
         wake: None,
         observers: vec![],
         selftest,
+        system_ime_selftest,
+        system_ime_initial_users,
         failures: vec![],
         focus_before_deactivate: None,
     };
@@ -3379,6 +3427,68 @@ fn context_script(view: &ComponentDemo) {
         (15000, Action::Close),
     ]);
     run_script(script);
+}
+/// Opt-in integration probe. The caller must verify the active macOS Simplified
+/// Pinyin source; no Preedit/Text injection and no global input-source changes.
+fn system_ime_script(view: &ComponentDemo) {
+    use tekes_ui_platform_macos::selftest::{Action, run_script};
+    let click = |id| {
+        let point = view.tree.get(id).unwrap().frame().center();
+        Action::Click {
+            x: point.x as f64,
+            y: point.y as f64,
+        }
+    };
+    let ids = view.ids();
+    let sidebar = view
+        .tree
+        .get(view.sidebar_id())
+        .unwrap()
+        .component::<Sidebar>()
+        .unwrap();
+    let other = sidebar
+        .row_id(&tekes_agent_contract::SessionAddress {
+            endpoint_id: view.binding().scope().endpoint_id.clone(),
+            session_id: "b".into(),
+        })
+        .unwrap();
+    run_script(vec![
+        (300, click(ids.editor)),
+        (600, Action::Log("SYSTEM_IME_TYPE_READY".into())),
+        (
+            2000,
+            Action::ExpectText {
+                text: "ni hao".into(),
+                marked: true,
+            },
+        ),
+        (2300, click(ids.send)),
+        (
+            2600,
+            Action::ExpectText {
+                text: "ni hao".into(),
+                marked: true,
+            },
+        ),
+        (2900, click(other)),
+        (
+            3200,
+            Action::ExpectText {
+                text: "ni hao".into(),
+                marked: true,
+            },
+        ),
+        (3500, Action::Log("SYSTEM_IME_COMMIT_READY".into())),
+        (
+            4500,
+            Action::ExpectText {
+                text: "你好".into(),
+                marked: false,
+            },
+        ),
+        (4800, click(ids.send)),
+        (7000, Action::Close),
+    ]);
 }
 fn native_script(view: &ComponentDemo) {
     use tekes_ui_platform_macos::selftest::{Action, run_script};

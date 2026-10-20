@@ -8,6 +8,8 @@
 
 最新 Transcript 审查修复及分层验证见[非法历史隔离与空容器记录](rust-agent-ui-transcript-review-20261020.md)：公开只读组件支持缓存替换前预检，非法新历史保留原内容并允许显式刷新；明确为空的 Assistant 容器不显示缺失正文提示。这不提升阅读锚点、富内容或真实 IME 的验收状态。
 
+后续[系统拼音软件探针](rust-agent-ui-system-ime-20261020.md)已通过真实系统 marked text、发送/导航屏障、确认及单次提交检查；按键定向合成到隔离进程，不注入 Preedit。此证据不提升实体键盘、候选窗、完整 IME 或完整三端原生体验验收状态。
+
 AgentKit 定义业务结构、展示语义、组件组合、组件输入及回调，复用现有 presentation。TekesUI 拥有编辑/撤销/选区/IME/焦点、文字排版、滚动/锚点、通用布局与渲染；AgentKit 只调用其公开接口。宿主提供窗口、总体布局、导航、产品 copy/主题、安装、凭证、路径与系统权限，并执行显式 host capability 回调。不能向宿主转移本应共享的 Agent 状态机或动作策略。
 
 ## Composer（首批实现）
