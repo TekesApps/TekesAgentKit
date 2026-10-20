@@ -115,6 +115,41 @@ fn journal_feedback_requires_an_explicit_protocol_id_not_a_display_fallback() {
     }
 }
 #[test]
+fn captured_feedback_response_survives_native_window_ordinals_but_not_changed_content() {
+    let mut completed = turn("t");
+    completed.status = "completed".into();
+    let mut response = item("old-window-id", "t", TranscriptItemKind::Assistant);
+    response.record_id = Some("entry".into());
+    response.is_final = true;
+    response.text = "answer".into();
+    response.source_position = Some(TranscriptSourcePosition::Native {
+        entry_id: "entry".into(),
+        entry_ordinal: 0,
+        content_index: None,
+    });
+    let mut source = TranscriptSnapshot {
+        turns: vec![completed],
+        items: vec![response],
+        ..Default::default()
+    };
+    let document = TranscriptDocument::read(&source).unwrap();
+    let captured = TurnFeedbackTarget::read(&document.sections[0])
+        .unwrap()
+        .capture(&RunScope::main("e", "s"))
+        .unwrap();
+    source.items[0].id = "new-window-id".into();
+    if let Some(TranscriptSourcePosition::Native { entry_ordinal, .. }) =
+        &mut source.items[0].source_position
+    {
+        *entry_ordinal = 100;
+    }
+    let document = TranscriptDocument::read(&source).unwrap();
+    assert!(captured.matches(TurnFeedbackTarget::read(&document.sections[0]).unwrap()));
+    source.items[0].text = "different answer".into();
+    let document = TranscriptDocument::read(&source).unwrap();
+    assert!(!captured.matches(TurnFeedbackTarget::read(&document.sections[0]).unwrap()));
+}
+#[test]
 fn final_output_uses_shared_final_marker_instead_of_the_last_text_or_reasoning() {
     let mut completed = turn("t");
     completed.status = "completed".into();

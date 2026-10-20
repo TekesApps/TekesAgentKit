@@ -211,11 +211,13 @@ impl PiSessionEndpoint {
         let mut manifest = self.context.manifest.lock().await;
         let row = manifest.sessions.get_mut(id).expect("owned row");
         let current = row.feedback.get(message);
-        require(
-            current.map(|value| &value["version"])
-                == payload.get("ifVersion").filter(|value| !value.is_null()),
-            "feedback version conflict",
-        )?;
+        if current.map(|value| &value["version"])
+            != payload.get("ifVersion").filter(|value| !value.is_null())
+        {
+            return Err(Error::Remote(
+                json!({"code":"version-conflict","current":current}),
+            ));
+        }
         let result = if method == "feedback.delete" {
             row.feedback.remove(message);
             Value::Null
@@ -225,7 +227,11 @@ impl PiSessionEndpoint {
                 ["positive", "negative", "up", "down"].contains(&rating),
                 "invalid feedback rating",
             )?;
-            let value = json!({"messageId":message,"rating":rating,"note":payload["note"],"version":uuid::Uuid::new_v4().to_string()});
+            let updated_at = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_err(|_| Error::Protocol("feedback host clock unavailable".into()))?
+                .as_millis();
+            let value = json!({"messageId":message,"rating":rating,"note":payload["note"],"version":uuid::Uuid::new_v4().to_string(),"updatedAtMilliseconds":updated_at});
             row.feedback.insert(message.into(), value.clone());
             value
         };

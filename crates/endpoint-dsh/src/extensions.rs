@@ -141,7 +141,16 @@ pub(crate) fn route(method: &str, payload: &Value) -> Result<Option<(String, Val
             json!({"agentId":agent()?,"ref":payload["ref"]}),
         ),
         "feedback.list" => ("messageFeedback/list", json!({"request":payload})),
-        "feedback.put" => ("messageFeedback/put", json!({"request":payload})),
+        "feedback.put" => {
+            let mut request = payload.clone();
+            if request.get("note").is_some_and(Value::is_null) {
+                request
+                    .as_object_mut()
+                    .ok_or_else(|| Error::Protocol("feedback request must be an object".into()))?
+                    .remove("note");
+            }
+            ("messageFeedback/put", json!({"request":request}))
+        }
         "feedback.delete" => ("messageFeedback/delete", json!({"request":payload})),
         "subagents.list" => ("subagents/list", payload.clone()),
         _ => return Ok(None),
@@ -198,35 +207,41 @@ pub(crate) fn normalize_feedback_reply(method: &str, reply: Value) -> Result<Val
     }
     match reply["ok"].as_bool() {
         Some(false) => {
-            let error = reply
+            let mut error = reply
                 .get("error")
                 .filter(|error| error.is_object())
-                .ok_or_else(|| Error::Protocol("invalid DSH feedback error envelope".into()))?;
-            let code = string(error, "code")?;
+                .ok_or_else(|| Error::Protocol("invalid DSH feedback error envelope".into()))?
+                .clone();
+            let code = string(&error, "code")?;
             if code == "version-conflict" {
                 let current = error.get("current").ok_or_else(|| {
                     Error::Protocol("feedback conflict is missing current".into())
                 })?;
                 if !current.is_null() {
-                    let record: SessionMessageFeedback = serde_json::from_value(current.clone())?;
-                    record.validate()?;
+                    error["current"] = normalize_feedback_item(current.clone())?;
                 }
             }
-            Err(Error::Remote(error.clone()))
+            Err(Error::Remote(error))
         }
         Some(true) => {
             if method == "feedback.delete" {
                 return Ok(Value::Null);
             }
-            let value = reply
+            let mut value = reply
                 .get("value")
                 .ok_or_else(|| Error::Protocol("DSH feedback value is missing".into()))?
                 .clone();
             if method == "feedback.list" {
+                let items = value
+                    .get_mut("items")
+                    .and_then(Value::as_array_mut)
+                    .ok_or_else(|| Error::Protocol("DSH feedback list is missing items".into()))?;
+                for item in items {
+                    *item = normalize_feedback_item(item.clone())?;
+                }
                 SessionMessageFeedbackList::read(value.clone())?;
             } else {
-                let record: SessionMessageFeedback = serde_json::from_value(value.clone())?;
-                record.validate()?;
+                value = normalize_feedback_item(value)?;
             }
             Ok(value)
         }
@@ -235,9 +250,55 @@ pub(crate) fn normalize_feedback_reply(method: &str, reply: Value) -> Result<Val
         )),
     }
 }
+fn normalize_feedback_item(mut value: Value) -> Result<Value> {
+    if let Some(timestamp) = value
+        .get("updatedAt")
+        .filter(|value| value.is_number())
+        .cloned()
+    {
+        if let Some(canonical) = value.get("updatedAtMilliseconds") {
+            require(
+                canonical == &timestamp,
+                "conflicting DSH feedback timestamps",
+            )?;
+        }
+        value["updatedAtMilliseconds"] = timestamp;
+    }
+    let record: SessionMessageFeedback = serde_json::from_value(value.clone())?;
+    record.validate()?;
+    Ok(value)
+}
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn feedback_note_clearing_and_server_timestamps_use_the_common_contract() {
+        let(_,request)=route("feedback.put",&json!({"sessionId":"s","messageId":"m","rating":"positive","ifVersion":null,"note":null})).unwrap().unwrap();
+        assert!(request["request"].get("note").is_none());
+        let (_, request) = route("feedback.put", &json!({"sessionId":"s","note":"中文"}))
+            .unwrap()
+            .unwrap();
+        assert_eq!(request["request"]["note"], "中文");
+        let record = json!({"messageId":"m","rating":"positive","version":"v","updatedAt":1234});
+        let saved =
+            normalize_feedback_reply("feedback.put", json!({"ok":true,"value":record.clone()}))
+                .unwrap();
+        assert_eq!(saved["updatedAtMilliseconds"], 1234);
+        assert_eq!(saved["updatedAt"], 1234);
+        let listed = normalize_feedback_reply(
+            "feedback.list",
+            json!({"ok":true,"value":{"items":[record.clone()]}}),
+        )
+        .unwrap();
+        assert_eq!(listed["items"][0]["updatedAtMilliseconds"], 1234);
+        let Err(Error::Remote(conflict)) = normalize_feedback_reply(
+            "feedback.put",
+            json!({"ok":false,"error":{"code":"version-conflict","current":record}}),
+        ) else {
+            panic!("conflict")
+        };
+        assert_eq!(conflict["current"]["updatedAtMilliseconds"], 1234);
+    }
     #[test]
     fn feedback_success_is_unwrapped_without_changing_other_extension_results() {
         let record = json!({"messageId":"m","rating":"positive","version":"v","note":"中文"});

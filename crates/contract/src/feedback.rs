@@ -59,3 +59,45 @@ impl SessionMessageFeedbackList {
         self.items.iter().find(|item| item.message_id == message_id)
     }
 }
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum SessionFeedbackFailure {
+    VersionConflict {
+        current: Option<SessionMessageFeedback>,
+    },
+    Rejected {
+        code: String,
+    },
+}
+impl SessionFeedbackFailure {
+    /// Native errors carry details.current; DSH/Pi use current directly. Preserve
+    /// authoritative absence, and never invent it from a malformed conflict.
+    pub fn read(error: &serde_json::Value, message_id: &str) -> Result<Self> {
+        let code = crate::string(error, "code")?;
+        require(!code.is_empty(), "feedback rejection code is empty")?;
+        if code != "version-conflict" {
+            return Ok(Self::Rejected { code: code.into() });
+        }
+        let direct = error.get("current");
+        let nested = error.get("details").and_then(|value| value.get("current"));
+        require(
+            !matches!((direct,nested),(Some(a),Some(b)) if a!=b),
+            "conflicting feedback current values",
+        )?;
+        let current = direct
+            .or(nested)
+            .ok_or_else(|| crate::Error::Protocol("feedback conflict is missing current".into()))?;
+        let current = if current.is_null() {
+            None
+        } else {
+            let value: SessionMessageFeedback = serde_json::from_value(current.clone())?;
+            value.validate()?;
+            require(
+                value.message_id == message_id,
+                "feedback conflict current identity mismatch",
+            )?;
+            Some(value)
+        };
+        Ok(Self::VersionConflict { current })
+    }
+}

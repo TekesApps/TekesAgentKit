@@ -12,8 +12,15 @@ Read order and connection epoch are separate from opaque server CAS versions.
 `TurnFeedbackTarget::read(section)` requires a proven public final-message ID,
 and bounded child history is not treated as an independent feedback session.
 Cold/failed reads are not an empty list, and advertised put/delete facts are not
-mutation permission. Rating writes and controls are pending; see the
-[feedback read contract](../../docs/rust-agent-ui-feedback-read-20261020.md).
+mutation permission. Capture the proven `TurnFeedbackTarget` with the original
+scope, then call `prepare_feedback(&frame, &target, change)` for one explicit
+rating/note gesture. A prepared request atomically claims the frame, has a fixed
+RPC ID, is not Clone, and consumes itself on execute. Handle Applied / Conflict /
+Rejected / NeedsRefresh without optimistic success or automatic retries. Dispatch
+is fenced at the runtime actor epoch; hosts still guard mount/navigation adoption.
+Versions are opaque; same-value writes need not advance them. Controls and the note
+editor remain pending. See the [read contract](../../docs/rust-agent-ui-feedback-read-20261020.md)
+and [CAS contract](../../docs/rust-agent-ui-feedback-cas-20261020.md).
 
 Choose the source explicitly:
 

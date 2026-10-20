@@ -1,0 +1,216 @@
+{
+  "date": "2026-10-20",
+  "status": "experimental-feedback-cas-binding",
+  "publishedAgentKitBaseline": "v0.3.8",
+  "tests": {
+    "root": 158,
+    "ui": 262,
+    "scripts": 21,
+    "feedbackWriteBoundaryTests": 12
+  },
+  "strictClippy": {
+    "root": true,
+    "ui": true
+  },
+  "publicConsumerIncluded": true,
+  "resolvedTekesui": {
+    "rev": "8cf0840790334ba224afc0595897c74231c712e6",
+    "packages": 8,
+    "files": 199,
+    "inputsSha256": "f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f"
+  },
+  "binarySha256": "15f9b547a9dd0e1af20f3e2a2e6773309699ebc8c5c99d3474244c0742a4ec9b",
+  "realReceipts": {
+    "PI": {
+      "feedbackReadProof": {
+        "connectionEpoch": 2,
+        "deleteAdvertised": true,
+        "finalTargets": 2,
+        "knownEmpty": true,
+        "mutated": false,
+        "nativeInteraction": false,
+        "originalScope": true,
+        "publication": 1,
+        "putAdvertised": true,
+        "ratingControls": false,
+        "readCommitted": true,
+        "records": 0
+      },
+      "feedbackWriteProof": {
+        "casConflictCurrent": true,
+        "draftsPreserved": true,
+        "duplicateFrameRejected": true,
+        "freshReadAfterDelete": true,
+        "mutated": true,
+        "nativeInteraction": false,
+        "newJudgmentClearsNote": true,
+        "noteSave": true,
+        "opaqueVersions": true,
+        "originalScope": true,
+        "ratingControls": false,
+        "sameRatingDeletes": true,
+        "sameValueSet": true,
+        "serverTimestamp": true,
+        "setRatingPreservesNote": true
+      },
+      "transcriptContentProof": {
+        "completeTranscript": false,
+        "footnotes": 2,
+        "genericViewport": true,
+        "independentTools": 0,
+        "keyedReadingAcceptance": false,
+        "knownEmptyContainersHidden": 0,
+        "machineLeading": true,
+        "messages": 5,
+        "nativeInteraction": false,
+        "outputCopyControls": 2,
+        "renderer": true,
+        "richContent": false,
+        "rows": 7,
+        "userTrailing": true
+      },
+      "offscreen": true,
+      "nativeInteraction": false
+    },
+    "DSH": {
+      "feedbackReadProof": {
+        "connectionEpoch": 2,
+        "deleteAdvertised": true,
+        "finalTargets": 2,
+        "knownEmpty": true,
+        "mutated": false,
+        "nativeInteraction": false,
+        "originalScope": true,
+        "publication": 1,
+        "putAdvertised": true,
+        "ratingControls": false,
+        "readCommitted": true,
+        "records": 0
+      },
+      "feedbackWriteProof": {
+        "casConflictCurrent": true,
+        "draftsPreserved": true,
+        "duplicateFrameRejected": true,
+        "freshReadAfterDelete": true,
+        "mutated": true,
+        "nativeInteraction": false,
+        "newJudgmentClearsNote": true,
+        "noteSave": true,
+        "opaqueVersions": true,
+        "originalScope": true,
+        "ratingControls": false,
+        "sameRatingDeletes": true,
+        "sameValueSet": true,
+        "serverTimestamp": true,
+        "setRatingPreservesNote": true
+      },
+      "transcriptContentProof": {
+        "completeTranscript": false,
+        "footnotes": 2,
+        "genericViewport": true,
+        "independentTools": 0,
+        "keyedReadingAcceptance": false,
+        "knownEmptyContainersHidden": 0,
+        "machineLeading": true,
+        "messages": 5,
+        "nativeInteraction": false,
+        "outputCopyControls": 2,
+        "renderer": true,
+        "richContent": false,
+        "rows": 7,
+        "userTrailing": true
+      },
+      "offscreen": true,
+      "nativeInteraction": false
+    },
+    "NATIVE": {
+      "feedbackReadProof": {
+        "connectionEpoch": 2,
+        "deleteAdvertised": true,
+        "finalTargets": 1,
+        "knownEmpty": true,
+        "mutated": false,
+        "nativeInteraction": false,
+        "originalScope": true,
+        "publication": 1,
+        "putAdvertised": true,
+        "ratingControls": false,
+        "readCommitted": true,
+        "records": 0
+      },
+      "feedbackWriteProof": {
+        "casConflictCurrent": true,
+        "draftsPreserved": true,
+        "duplicateFrameRejected": true,
+        "freshReadAfterDelete": true,
+        "mutated": true,
+        "nativeInteraction": false,
+        "newJudgmentClearsNote": true,
+        "noteSave": true,
+        "opaqueVersions": true,
+        "originalScope": true,
+        "ratingControls": false,
+        "sameRatingDeletes": true,
+        "sameValueSet": true,
+        "serverTimestamp": true,
+        "setRatingPreservesNote": true
+      },
+      "transcriptContentProof": {
+        "completeTranscript": false,
+        "footnotes": 1,
+        "genericViewport": true,
+        "independentTools": 0,
+        "keyedReadingAcceptance": false,
+        "knownEmptyContainersHidden": 0,
+        "machineLeading": true,
+        "messages": 2,
+        "nativeInteraction": false,
+        "outputCopyControls": 1,
+        "renderer": true,
+        "richContent": false,
+        "rows": 3,
+        "userTrailing": true
+      },
+      "offscreen": true,
+      "nativeInteraction": false
+    }
+  },
+  "nativeSynthetic": [
+    "NATIVE_AGENT_READONLY_CHILD_CONTENT_SELFTEST_OK actual-child-messages+original-scope+native-pagination+no-composer; reading-anchor=false; physical-ime=false",
+    "NATIVE_AGENT_SIDEBAR_SUMMARY_SELFTEST_OK shared-inventory+shared-pin+sidebar-selection+summary-facts; full-run-view=false; physical-ime=false",
+    "NATIVE_AGENT_SIDECHAT_SELFTEST_OK owned-create+separate-composer+send+stream+draft+cancel-discard+parent-isolation; transcript=false; physical-ime=false",
+    "NATIVE_AGENT_CHILD_SELFTEST_OK direct-parent+independent-composer+single-admission+stream+cancel+isolated-drafts+bounded-read-only+paging+local-retirement; formal-transcript=false; physical-ime=false",
+    "NATIVE_AGENT_TASK_SELFTEST_OK resolved-task+independent-composer+single-admission+stream+cancel+parent-draft-isolation+close; transcript=false; physical-ime=false",
+    "NATIVE_AGENT_COMPONENTS_SELFTEST_OK composer+indicators+run-binding+synthetic-text-services+send+stream+cancel+draft-isolation+reconnect; physical-ime=false; transcript=false; reading-anchor=false"
+  ],
+  "softwareIme": {
+    "softwareIme": true,
+    "pidTargetedEvents": true,
+    "physicalKeyboard": false,
+    "candidateWindow": false,
+    "sourceBefore": "com.apple.inputmethod.SCIM.ITABC",
+    "sourceAfter": "com.apple.inputmethod.SCIM.ITABC",
+    "binarySha256": "15f9b547a9dd0e1af20f3e2a2e6773309699ebc8c5c99d3474244c0742a4ec9b"
+  },
+  "retainedFailures": [
+    {
+      "log": "/tmp/agentkit-feedback-cas-real.log",
+      "observed": "Native delete succeeded remotely, but the binding rejected its deleted:true receipt",
+      "fixed": "accept explicit deleted:true or null; deleted:false remains invalid; all three endpoints rerun successfully"
+    },
+    {
+      "log": "/tmp/agentkit-feedback-cas-ime.log",
+      "observed": "window lost focus after ni hao marked text; assertion failed",
+      "retryLog": "/tmp/agentkit-feedback-cas-ime-retry.log",
+      "retryPassed": true,
+      "assertionsRelaxed": false
+    }
+  ],
+  "feedbackCasDispatcher": true,
+  "ratingControls": false,
+  "noteEditor": false,
+  "readingAnchorAcceptance": false,
+  "richContentAcceptance": false,
+  "nativeClipboardReadback": false,
+  "completeGoal": false
+}

@@ -36,6 +36,7 @@ enum Command {
         method: String,
         payload: Value,
         rpc_id: String,
+        expected_epoch: Option<u64>,
         reply: Reply<Value>,
     },
     Respond {
@@ -334,12 +335,34 @@ impl SessionRuntime {
         }
     }
     pub async fn call(&self, method: &str, payload: Value, rpc_id: &str) -> Result<Value> {
+        self.call_context(None, method, payload, rpc_id).await
+    }
+    /// Fence at actor dispatch, not just at the caller's earlier snapshot check.
+    /// A queued operation cannot cross a reconnect and target the new endpoint.
+    pub async fn call_at_epoch(
+        &self,
+        expected_epoch: u64,
+        method: &str,
+        payload: Value,
+        rpc_id: &str,
+    ) -> Result<Value> {
+        self.call_context(Some(expected_epoch), method, payload, rpc_id)
+            .await
+    }
+    async fn call_context(
+        &self,
+        expected_epoch: Option<u64>,
+        method: &str,
+        payload: Value,
+        rpc_id: &str,
+    ) -> Result<Value> {
         let (reply, result) = oneshot::channel();
         self.send(
             Command::Call {
                 method: method.into(),
                 payload,
                 rpc_id: rpc_id.into(),
+                expected_epoch,
                 reply,
             },
             result,
@@ -678,8 +701,8 @@ async fn connected(
                         operations.spawn(async move {let result=endpoint.observe_files(&id,&path).await;let _=reply.send(result);None});
                     }
                     Command::Earlier(id, reply) => { let result = load_earlier(endpoint.as_ref(), store, &id).await; let _ = reply.send(result); }
-                    Command::Call { method, payload, rpc_id, reply } => {
-                        if !store.read(MemoryProjectionStore::ready) || operations.len() >= 64 { let _ = reply.send(Err(Error::Disconnected)); continue; }
+                    Command::Call { method, payload, rpc_id, expected_epoch, reply } => {
+                        if !store.read(|state|state.ready() && expected_epoch.is_none_or(|epoch|epoch==state.connection_epoch)) || operations.len() >= 64 { let _ = reply.send(Err(Error::Disconnected)); continue; }
                         let endpoint = endpoint.clone();
                         let removed=if matches!(method.as_str(),"session.discard"|"session.archive") {
                             let id=payload["sessionId"].as_str().unwrap_or("").to_owned();

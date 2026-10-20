@@ -1,12 +1,13 @@
-//! Read-only committed feedback publications over an original RunBinding.
+//! Committed feedback publications over an original RunBinding.
 use crate::{PaneAccess, RunBinding};
 use std::sync::{Arc, Weak, atomic::Ordering};
 use tekes_agent_contract::{Result, require, unsupported};
 pub use tekes_agent_contract::{
-    SessionMessageFeedback, SessionMessageFeedbackList, SessionMessageFeedbackRating,
+    SessionFeedbackFailure, SessionMessageFeedback, SessionMessageFeedbackList,
+    SessionMessageFeedbackRating,
 };
 use tekes_agent_presentation::RunScope;
-pub use tekes_agent_presentation::TurnFeedbackTarget;
+pub use tekes_agent_presentation::{FeedbackChange, FeedbackTargetCapture, TurnFeedbackTarget};
 use tekes_agent_session::ConnectionState;
 
 #[derive(Clone, Debug)]
@@ -38,8 +39,8 @@ impl FeedbackFrame {
     pub fn delete_advertised(&self) -> bool {
         self.delete_advertised
     }
-    /// Display metadata is not mutation authority. A future dispatcher must
-    /// revalidate the target and CAS again immediately before IO.
+    /// Display metadata alone is not mutation authority. Preparation and
+    /// execution revalidate target and CAS context immediately before IO.
     pub fn is_current(&self, source: &Arc<RunBinding>) -> bool {
         self.source
             .upgrade()
@@ -47,7 +48,7 @@ impl FeedbackFrame {
             && source.scope() == &self.scope
             && source.access() == PaneAccess::Ready
             && source.controller.is_some()
-            && source.feedback_reads.load(Ordering::Acquire) == self.publication
+            && source.feedback_publications.load(Ordering::Acquire) == self.publication
             && source.runtime.inspect(|state| {
                 state.connection == ConnectionState::Ready
                     && state.connection_epoch == self.connection_epoch
@@ -57,6 +58,42 @@ impl FeedbackFrame {
                     && state.endpoint_capabilities.supports("feedback.delete")
                         == self.delete_advertised
             })
+    }
+}
+impl FeedbackFrame {
+    pub(crate) fn reserve_write(&self, source: &Arc<RunBinding>) -> Result<Self> {
+        require(self.is_current(source), "feedback frame is not current")?;
+        let next = self
+            .publication
+            .checked_add(1)
+            .ok_or_else(|| unsupported("feedback publication exhausted"))?;
+        source
+            .feedback_publications
+            .compare_exchange(self.publication, next, Ordering::AcqRel, Ordering::Acquire)
+            .map_err(|_| unsupported("feedback frame already claimed or superseded"))?;
+        let mut frame = self.clone();
+        frame.publication = next;
+        Ok(frame)
+    }
+    pub(crate) fn with_record(
+        mut self,
+        message_id: &str,
+        current: Option<SessionMessageFeedback>,
+    ) -> Result<Self> {
+        if let Some(record) = &current {
+            record.validate()?;
+            require(
+                record.message_id == message_id,
+                "feedback result identity mismatch",
+            )?;
+        }
+        self.records
+            .items
+            .retain(|record| record.message_id != message_id);
+        if let Some(current) = current {
+            self.records.items.push(current);
+        }
+        Ok(self)
     }
 }
 impl RunBinding {
@@ -74,7 +111,7 @@ impl RunBinding {
         )?;
         // Allocate before await: completion order must never become publication order.
         let publication = self
-            .feedback_reads
+            .feedback_publications
             .fetch_update(Ordering::AcqRel, Ordering::Acquire, |value| {
                 value.checked_add(1)
             })
@@ -82,7 +119,8 @@ impl RunBinding {
             + 1;
         let raw = self
             .runtime
-            .call(
+            .call_at_epoch(
+                state.connection_epoch,
                 "feedback.list",
                 serde_json::json!({"sessionId":self.scope.session_id}),
                 &format!("feedback-read:{}", uuid::Uuid::new_v4()),

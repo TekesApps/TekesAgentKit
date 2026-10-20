@@ -3149,6 +3149,16 @@ pub fn run() {
         } else {
             serde_json::Value::Null
         };
+        let feedback_write_proof = if args.iter().any(|arg| arg == "--feedback-write-proof") {
+            host.executor
+                .block_on(tekes_agent_ui_demo::feedback_write_proof::run(
+                    &host.view,
+                    &host.runtime,
+                ))
+                .expect("feedback CAS proof")
+        } else {
+            serde_json::Value::Null
+        };
         let bounded_child_proof = if args.iter().any(|arg| arg == "--bounded-child-proof") {
             let index = args
                 .iter()
@@ -3345,7 +3355,7 @@ pub fn run() {
         println!(
             "{}",
             serde_json::json!({
-                "runViewComposition":run_view_proof,"boundedChildProof":bounded_child_proof,"feedbackReadProof":feedback_read_proof,
+                "runViewComposition":run_view_proof,"boundedChildProof":bounded_child_proof,"feedbackReadProof":feedback_read_proof,"feedbackWriteProof":feedback_write_proof,
                 "offscreen": true, "components": true, "nativeInteraction": false,
                 "transcriptView": false, "isStale": snapshot.transcript.is_stale,
                 "transcriptItems": snapshot.transcript.items.len(),

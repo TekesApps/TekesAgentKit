@@ -1,5 +1,6 @@
 pub mod endpoint_config;
 pub mod feedback_read_proof;
+pub mod feedback_write_proof;
 pub mod fixture;
 
 pub mod actionable_proof;

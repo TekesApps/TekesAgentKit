@@ -8,6 +8,8 @@ mod attachments;
 mod file_preview;
 pub use file_preview::*;
 mod feedback;
+mod feedback_write;
+pub use feedback_write::*;
 mod models;
 pub use attachments::*;
 pub use feedback::*;
@@ -79,7 +81,7 @@ pub struct RunBinding {
     scope: RunScope,
     history_pages: history::HistoryPages,
     readonly_reads: std::sync::atomic::AtomicU64,
-    feedback_reads: std::sync::atomic::AtomicU64,
+    feedback_publications: std::sync::atomic::AtomicU64,
     controller: Option<RunController>,
     _lease: Option<SessionHistoryLease>,
     child: Option<ChildRun>,
@@ -368,7 +370,7 @@ impl RunBinding {
             scope,
             history_pages: history::HistoryPages::default(),
             readonly_reads: std::sync::atomic::AtomicU64::new(0),
-            feedback_reads: std::sync::atomic::AtomicU64::new(0),
+            feedback_publications: std::sync::atomic::AtomicU64::new(0),
             controller: Some(controller),
             _lease: Some(lease),
             child: None,
@@ -416,7 +418,7 @@ impl RunBinding {
             scope,
             history_pages: history::HistoryPages::default(),
             readonly_reads: std::sync::atomic::AtomicU64::new(0),
-            feedback_reads: std::sync::atomic::AtomicU64::new(0),
+            feedback_publications: std::sync::atomic::AtomicU64::new(0),
             controller,
             _lease: None,
             child: Some(child),

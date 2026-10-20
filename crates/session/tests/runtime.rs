@@ -96,6 +96,48 @@ impl SessionEndpoint for Endpoint {
     async fn close(&self) {}
 }
 #[tokio::test]
+async fn epoch_fenced_calls_cannot_reach_a_reconnected_endpoint() {
+    let connector = Connector {
+        connects: Arc::new(AtomicUsize::new(0)),
+        prompts: Arc::new(AtomicUsize::new(0)),
+    };
+    let runtime = SessionRuntime::spawn("k", Arc::new(connector.clone()));
+    runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
+    let old = runtime.snapshot().connection_epoch;
+    runtime.reconnect().await.unwrap();
+    let current = runtime.snapshot().connection_epoch;
+    assert!(current > old);
+    assert!(
+        runtime
+            .call_at_epoch(
+                old,
+                "session.prompt",
+                json!({"sessionId":"s"}),
+                "stale-epoch"
+            )
+            .await
+            .is_err()
+    );
+    assert_eq!(connector.prompts.load(Ordering::SeqCst), 0);
+    assert!(
+        runtime
+            .call_at_epoch(
+                current,
+                "session.prompt",
+                json!({"sessionId":"s"}),
+                "current-epoch"
+            )
+            .await
+            .is_err()
+    );
+    assert_eq!(
+        connector.prompts.load(Ordering::SeqCst),
+        1,
+        "current-epoch call reached the endpoint exactly once, which deliberately returned Timeout"
+    );
+    runtime.stop().await.unwrap();
+}
+#[tokio::test]
 async fn automatic_reconnect_restores_open_journal_without_retrying_mutation() {
     let connector = Connector {
         connects: Arc::new(AtomicUsize::new(0)),

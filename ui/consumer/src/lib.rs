@@ -1,4 +1,16 @@
 //! Second consumer: depends only on AgentKit's public UI packages.
+/// The queued gesture retains its original source/frame/target; do not resolve
+/// these again from the host's newer selection when dispatching it.
+pub fn prepare_feedback_change(
+    source: &std::sync::Arc<tekes_agent_ui_bindings::RunBinding>,
+    frame: &tekes_agent_ui_bindings::FeedbackFrame,
+    target: &tekes_agent_ui_bindings::FeedbackTargetCapture,
+    change: tekes_agent_ui_bindings::FeedbackChange,
+) -> Result<tekes_agent_ui_bindings::FeedbackPreparation, String> {
+    source
+        .prepare_feedback(frame, target, change)
+        .map_err(|error| error.to_string())
+}
 /// Keep failure/stale distinct from a successful empty committed-feedback list.
 pub fn committed_feedback<'a>(
     source: &std::sync::Arc<tekes_agent_ui_bindings::RunBinding>,
