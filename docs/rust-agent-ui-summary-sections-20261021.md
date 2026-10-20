@@ -1,5 +1,7 @@
 # Summary sections：顺序、折叠与动作身份（实验）
 
+后续 [标题槽与 #31 候选消费](rust-agent-ui-summary-label-slot-20261021.md)补齐 header 的基础库组合；本页原验证仍按其记录源码和 binary 解释。
+
 本轮对照当前 ClientKit 的 `ClientAgentSummaryView` / `SummaryProviders` / `SummaryStyle`，以及 Tekes 的 `ClientAgentSummaryHostAdapter`。只读核对后修正 Rust Summary 的两个实际差异：application/host sections 应在默认 providers 之前；section 标题应能折叠，而非静态文本。没有改 Swift、Kernel 或 TekesUI 的默认精确 pin。
 
 ## 当前公开行为

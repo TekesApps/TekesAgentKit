@@ -33,10 +33,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source', type=Path, required=True)
     parser.add_argument('--probe', type=Path, help='Explicit receiver test source; default: Transcript-only probe')
+    parser.add_argument('--summary-labels', action='store_true',
+                        help='Candidate-only Summary row labels and existing native text-host adapter')
     parser.add_argument('--manifest', type=Path, required=True)
     parser.add_argument('--workdir', type=Path, required=True)
     parser.add_argument('--target-dir', type=Path, required=True)
     args = parser.parse_args()
+    if args.summary_labels and args.probe is None:
+        parser.error('--summary-labels requires an explicit receiver --probe')
     repo = Path(__file__).resolve().parent.parent
     source = args.source.resolve()
     manifest = json.loads(args.manifest.read_text())
@@ -80,6 +84,92 @@ def main():
     old = '                invalid: n.semantics.invalid,'
     assert native.read_text().count(old) == 1
     native.write_text(native.read_text().replace(old, old + '\n                required: n.semantics.required,'))
+    adaptations = ['AX required forwarded from public semantics']
+    overrides = ['ui/Cargo.toml', 'ui/Cargo.lock', 'ui/demo/src/native.rs']
+    if args.summary_labels:
+        component_manifest = snapshot / 'ui/components/Cargo.toml'
+        component_manifest.write_text(component_manifest.read_text() + '\ntekes-ui-text.workspace = true\n')
+        lock_text, count = re.subn(
+            r'(name = "tekes-agent-components-ui"\n.*?dependencies = \[\n)',
+            r'\1 "tekes-ui-text",\n', lock.read_text(), count=1, flags=re.S)
+        assert count == 1
+        lock.write_text(lock_text)
+        # Apply the public opt-in to the actual retained Summary row nodes,
+        # not a substitute demonstration component or pre-truncated string.
+        summary = snapshot / 'ui/components/src/summary.rs'
+        old = '                view.rows_mut().push(content);'
+        assert summary.read_text().count(old) == 1
+        summary.write_text(summary.read_text().replace(old, '''                let content = content.with_label_layout(
+                    tekes_ui_text::LabelOptions::single_line(tekes_ui_text::LabelOverflow::TailEllipsis),
+                ).expect("Summary row is an original TextContent or ButtonContent");
+                view.rows_mut().push(content);'''))
+        section = snapshot / 'ui/components/src/summary_section.rs'
+        old = 'Content::new(label, TextContent::new(""))'
+        assert section.read_text().count(old) == 1
+        section.write_text(section.read_text().replace(old, old + '''
+                    .with_label_layout(tekes_ui_text::LabelOptions::single_line(
+                        tekes_ui_text::LabelOverflow::TailEllipsis))
+                    .expect("Summary header has a passive TextContent title")'''))
+        old = 'impl TextSurfaceHost for TextBackend {\n'
+        assert native.read_text().count(old) == 1
+        native.write_text(native.read_text().replace(old, old + '''    fn shape_label(
+        &mut self, text: &str, role: proposal::TextRole, width: f32,
+        options: tekes_ui_text::LabelOptions,
+    ) -> Option<Rc<tekes_ui_text::LabelLayout>> {
+        let m = role.style();
+        let style = if proposal::text_family(role.id()) == Some("mono") {
+            TextStyle::named("Menlo", m.size * self.type_scale)
+        } else { TextStyle::system(m.size * self.type_scale) }.with_weight(m.weight);
+        Some(Rc::new(self.shaper.shape_label(text, &style,
+            &ShapeOptions::with_width(f64::from(width)), options)
+            .with_min_line_height(f64::from(m.line_height * self.type_scale))))
+    }
+'''))
+        shutil.copyfile(repo / 'scripts/probes/agentkit-reading-candidate.rs',
+                        snapshot / 'ui/demo/tests/agentkit-reading-candidate.rs')
+        shutil.copyfile(repo / 'scripts/probes/agentkit-run-preflight-candidate.rs',
+                        snapshot / 'ui/demo/tests/agentkit-run-preflight-candidate.rs')
+        fixture = snapshot / 'ui/demo/src/fixture.rs'
+        old = 'format!("验证会话 {id} 的数据回传")'
+        assert fixture.read_text().count(old) == 1
+        fixture.write_text(fixture.read_text().replace(old,
+            'format!("验证会话 {id} 的长标题 English 👩🏽‍💻 e\\u{301} 组合字素 ").repeat(16)'))
+        native_probe = snapshot / 'ui/demo/src/native_summary_sections_selftest.rs'
+        old = '                self.widget = Self::widget(view, row);'
+        assert native_probe.read_text().count(old) == 1
+        native_probe.write_text(native_probe.read_text().replace(old, '''                let node = view.tree.get(row).unwrap();
+                let ax = view.tree.semantics().into_iter().find(|n| n.id == row).unwrap();
+                assert!(ax.semantics.name.contains("组合字素"));
+                assert!(ax.semantics.name.chars().count() > 300);
+                assert!(node.frame().size.height > 0.);
+                assert!(node.frame().size.height < 2. * tekes_ui_tokens::proposal::TextRole::UiBody.style().line_height);
+                let header_ax = view.tree.semantics().into_iter().find(|n| n.id == header).unwrap();
+                assert!(header_ax.semantics.name.chars().count() > 300);
+                assert!(header_ax.frame.size.height < 2. * tekes_ui_tokens::proposal::TextRole::UiBody.style().line_height);
+''' + old))
+        old = '                run_script(vec![(100, Action::Close)]);'
+        assert native_probe.read_text().count(old) == 1
+        native_probe.write_text(native_probe.read_text().replace(old, '''                let mut actions = vec![];
+                if let Ok(path) = std::env::var("AGENT_SUMMARY_LABEL_CAPTURE") {
+                    actions.push((300, Action::Capture { path }));
+                }
+                actions.push((500, Action::Close));
+                run_script(actions);'''))
+        demo = snapshot / 'ui/demo/src/component_demo.rs'
+        old = 'SummaryView::new(101 + self.selected as u32 * 2, SummaryLabels::default())'
+        assert demo.read_text().count(old) == 1
+        demo.write_text(demo.read_text().replace(old, '''SummaryView::new(101 + self.selected as u32 * 2, SummaryLabels {
+                            section: |id| format!("{id} · 长标题 English 👩🏽‍💻 e\\u{301} 组合字素 ").repeat(16),
+                            ..SummaryLabels::default()
+                        })'''))
+        overrides.extend(['ui/components/Cargo.toml', 'ui/components/src/summary.rs',
+                          'ui/components/src/summary_section.rs', 'ui/demo/src/component_demo.rs',
+                          'ui/demo/tests/agentkit-reading-candidate.rs',
+                          'ui/demo/tests/agentkit-run-preflight-candidate.rs',
+                          'ui/demo/src/fixture.rs', 'ui/demo/src/native_summary_sections_selftest.rs'])
+        adaptations.extend(['Original Summary row Content opts into single-line tail ellipsis',
+                            'Existing native TextBackend delegates shape_label to its original CoreTextShaper',
+                            'Owned native Summary fixture supplies long mixed-language titles; existing pointer probe checks full AX names and row bounds'])
     env = dict(os.environ, CARGO_TARGET_DIR=str(args.target_dir.resolve()),
                CARGO_PROFILE_DEV_DEBUG='0', CARGO_PROFILE_TEST_DEBUG='0',
                CARGO_PROFILE_DEV_INCREMENTAL='false', CARGO_PROFILE_TEST_INCREMENTAL='false')
@@ -88,9 +178,10 @@ def main():
     receipt = dict(candidate_identity=manifest['identity'], candidate_files=len(manifest['files']),
                    portable_manifest_sha256=sha(args.manifest), agentkit_inputs=inputs,
                    probe_sha256=sha(probe), source=str(source), snapshot=str(snapshot),
-                   candidate_only_host_adaptations=['AX required forwarded from public semantics'],
+                   candidate_only_host_adaptations=adaptations,
                    candidate_overrides={name: sha(snapshot / name) for name in
-                                        ('ui/Cargo.toml', 'ui/Cargo.lock', 'ui/demo/src/native.rs')},
+                                        overrides},
+                   summary_labels=args.summary_labels,
                    default_pin_promoted=False, native_acceptance=False, visual_acceptance=False,
                    full_runview_acceptance=False, checks=[])
     try:
@@ -99,10 +190,16 @@ def main():
         packages = [p for p in json.loads(metadata)['packages'] if p['name'].startswith('tekes-ui-')]
         assert len(packages) == 8, [p['name'] for p in packages]
         assert all(Path(p['manifest_path']).resolve().is_relative_to(source) for p in packages)
-        for label, cmd in [
+        steps = [
             ('tests', ['test', *common, '-p', 'tekes-agent-ui-demo', '--test', 'reading_candidate']),
             ('clippy', ['clippy', *common, '-p', 'tekes-agent-ui-demo', '--test', 'reading_candidate', '--', '-D', 'warnings']),
-        ]:
+        ]
+        if args.summary_labels:
+            steps.extend([
+                ('public-consumer', ['test', *common, '-p', 'tekes-agent-ui-consumer-check', '--lib']),
+                ('native-build', ['build', *common, '-p', 'tekes-agent-ui-demo']),
+            ])
+        for label, cmd in steps:
             with (work / f'{label}.log').open('w') as log:
                 result = subprocess.run(base + cmd, env=env, stdout=log, stderr=subprocess.STDOUT)
             receipt['checks'].append(dict(check=label, exit_code=result.returncode))

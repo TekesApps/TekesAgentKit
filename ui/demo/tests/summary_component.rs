@@ -441,3 +441,66 @@ fn real_summary_component_mounts_inside_a_domain_panel_slot_and_retains_shared_a
         matches!(intents.as_slice(),[SummaryIntent{scope,action:SummaryAction::OpenTask{task_id,..}}] if scope==&parent && task_id=="task")
     );
 }
+
+#[test]
+fn composed_header_keeps_one_full_accessible_name_focus_and_disclosure_after_refresh() {
+    let labels = SummaryLabels {
+        section: |id| format!("{id}：完整中文标题 English 👩🏽‍💻 e\u{301} ").repeat(12),
+        ..Default::default()
+    };
+    let title = (labels.section)("repository");
+    let mut input = SummaryInput {
+        revision: 1,
+        scope: RunScope::main("consumer", "summary-header"),
+        facts: None,
+        host_sections: vec![SummarySection {
+            id: "repository".into(),
+            rows: vec![SummaryRow {
+                id: "branch".into(),
+                title: "main".into(),
+                value: Default::default(),
+                action: None,
+            }],
+        }],
+    };
+    let mut view = SummaryView::new(209, labels);
+    view.update(&input).unwrap();
+    let root = view.id();
+    let header = view.section_header_id("repository").unwrap();
+    let mut host = view.into_host().unwrap();
+    assert!(host.focus(Some(header), true));
+    for expanded in [true, false] {
+        let nodes: Vec<_> = host
+            .semantics()
+            .into_iter()
+            .filter(|node| node.semantics.name == title)
+            .collect();
+        assert_eq!(
+            nodes.len(),
+            1,
+            "the compound title is decorative, not a second AX element"
+        );
+        assert_eq!(nodes[0].id, header);
+        assert_eq!(nodes[0].semantics.expanded, Some(expanded));
+        assert_eq!(host.focused(), Some(header));
+        if expanded {
+            assert!(activate(&mut host, root, header).is_empty());
+            input.revision += 1;
+            input.host_sections[0].rows[0].title = "updated".into();
+            host.get_mut(root)
+                .unwrap()
+                .component_mut::<SummaryView>()
+                .unwrap()
+                .update(&input)
+                .unwrap();
+            assert_eq!(
+                host.get(root)
+                    .unwrap()
+                    .component::<SummaryView>()
+                    .unwrap()
+                    .section_header_id("repository"),
+                Some(header)
+            );
+        }
+    }
+}

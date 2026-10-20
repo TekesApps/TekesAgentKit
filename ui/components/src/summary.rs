@@ -73,6 +73,7 @@ impl Default for SummaryLabels {
 enum Key {
     Section(RunScope, String),
     Header(RunScope, String),
+    HeaderLabel(RunScope, String),
     Body(RunScope, String),
     Row(RunScope, String, String, ActionIdentity),
 }
@@ -241,6 +242,7 @@ impl SummaryView {
             }
             keys.insert(Key::Section(input.scope.clone(), section.id.clone()));
             keys.insert(Key::Header(input.scope.clone(), section.id.clone()));
+            keys.insert(Key::HeaderLabel(input.scope.clone(), section.id.clone()));
             keys.insert(Key::Body(input.scope.clone(), section.id.clone()));
             let mut row_ids = BTreeSet::new();
             for row in &section.rows {
@@ -327,6 +329,7 @@ impl SummaryView {
                     SummarySectionView::new(
                         section.id.clone(),
                         ids[&Key::Header(input.scope.clone(), section.id.clone())],
+                        ids[&Key::HeaderLabel(input.scope.clone(), section.id.clone())],
                         ids[&Key::Body(input.scope.clone(), section.id.clone())],
                         expansion,
                     ),
@@ -334,7 +337,8 @@ impl SummaryView {
             });
             let view = block.component_mut::<SummarySectionView>().unwrap();
             view.layout = None;
-            view.header_mut().button.label = (self.labels.section)(&section.id);
+            view.header_mut()
+                .set_title((self.labels.section)(&section.id));
             let mut old_rows: BTreeMap<_, _> = std::mem::take(view.rows_mut())
                 .into_iter()
                 .map(|node| (node.id(), node))

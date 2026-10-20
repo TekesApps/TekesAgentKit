@@ -14,10 +14,27 @@ pub(crate) type Expansion = Rc<RefCell<Disclosure>>;
 
 #[derive(Debug)]
 pub(crate) struct SummaryHeader {
-    pub button: ButtonContent,
+    button: CompoundButton,
     pub expansion: Expansion,
 }
 impl SummaryHeader {
+    fn new(label: ComponentId, expansion: Expansion) -> Self {
+        Self {
+            button: CompoundButton::new(
+                "Summary section",
+                Content::new(label, TextContent::new("")),
+            )
+            .expect("Summary header has one passive text slot"),
+            expansion,
+        }
+    }
+    pub fn set_title(&mut self, title: String) {
+        self.button.action.label = title.clone();
+        self.button.children_mut().unwrap()[0]
+            .component_mut::<TextContent>()
+            .expect("Summary title")
+            .text = title;
+    }
     fn activated(&mut self, response: ContentResponse) -> ContentResponse {
         if response.activated {
             self.expansion.borrow_mut().toggle();
@@ -26,8 +43,26 @@ impl SummaryHeader {
     }
 }
 impl Component for SummaryHeader {
+    fn children(&self) -> &[Content] {
+        self.button.children()
+    }
+    fn children_mut(&mut self) -> Option<&mut Vec<Content>> {
+        self.button.children_mut()
+    }
+    fn fixed_slots(&self) -> bool {
+        self.button.fixed_slots()
+    }
+    fn validate(&self) -> Result<(), CompositionError> {
+        self.button.validate()
+    }
+    fn child_theme(&self, theme: ContentTheme) -> ContentTheme {
+        self.button.child_theme(theme)
+    }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, size: Size) -> MeasuredChild {
         self.button.measure(text, size)
+    }
+    fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        self.button.arrange(text, frame, clip)
     }
     fn paint(
         &mut self,
@@ -113,6 +148,7 @@ impl SummarySectionView {
     pub fn new(
         section: String,
         header: ComponentId,
+        label: ComponentId,
         body: ComponentId,
         expansion: Expansion,
     ) -> Self {
@@ -121,13 +157,7 @@ impl SummarySectionView {
             expansion: expansion.clone(),
             layout: None,
             children: vec![
-                Content::new(
-                    header,
-                    SummaryHeader {
-                        button: ButtonContent::new(""),
-                        expansion: expansion.clone(),
-                    },
-                ),
+                Content::new(header, SummaryHeader::new(label, expansion.clone())),
                 Content::new(
                     body,
                     SummaryRows {

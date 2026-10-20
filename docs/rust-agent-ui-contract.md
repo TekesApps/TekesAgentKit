@@ -10,6 +10,8 @@ Layout 和显示逻辑须逐项严格对齐当前 ClientKit 对应 Views；[对�
 
 [Sidebar 首次恢复与观察失败](rust-agent-ui-sidebar-restoration-20261021.md)现已贯通 shared inventory 就绪事实、binding 和公开组件输入；未恢复不再显示确认空，观察失败保留最近列表。搜索/分组和完整 outline/status-pane 布局仍待继续。
 
+[Summary 标题槽与 #31 候选消费](rust-agent-ui-summary-label-slot-20261021.md)记录默认库组件组合与隔离 label API 验证；默认 pin 的省略能力仍待公开版本。
+
 ### 排版与基础样式
 
 [Summary section 顺序与折叠](rust-agent-ui-summary-sections-20261021.md)现已补齐宿主优先顺序、按 section ID 保留的折叠、真实隐藏的输入/AX 子树及任务 pointer 改变时的旧动作拒绝。公开 DTO/查询支持第二 consumer；单行省略见 TekesUI #31，完整 Summary rows/custom slots 与整体视觉仍未验收。
