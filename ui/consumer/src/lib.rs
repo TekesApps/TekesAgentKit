@@ -1246,3 +1246,33 @@ fn independent_host_reads_known_failure_without_fabricating_message_or_success()
     snapshot.turns[0].status = "completed".into();
     assert!(current_failure(&snapshot).is_none());
 }
+
+#[test]
+fn independent_host_prepares_reading_items_before_committing_shared_content() {
+    use tekes_agent_components_ui::{RunScope, TranscriptContent, TranscriptSnapshot};
+    let scope = RunScope::main("consumer", "reading");
+    let mut content =
+        TranscriptContent::new(920, 921..940, scope.clone(), Default::default()).unwrap();
+    let snapshot = TranscriptSnapshot {
+        is_stale: true,
+        ..Default::default()
+    };
+    let plan = content
+        .prepare_update(&scope, 1, 1, &snapshot, false)
+        .unwrap();
+    assert!(content.row_keys().is_empty());
+    assert_eq!(plan.scope(), &scope);
+    assert_eq!(plan.publication(), 1);
+    assert_eq!(plan.connection_epoch(), 1);
+    let items = plan.item_ids();
+    assert_eq!(items.len(), 1);
+    content.apply_prepared_update(&plan).unwrap();
+    assert_eq!(content.row_id(&plan.rows()[0].0), Some(items[0]));
+    let next = content
+        .prepare_update(&scope, 2, 1, &snapshot, false)
+        .unwrap();
+    assert_eq!(next.item_ids(), items);
+    content.apply_prepared_update(&next).unwrap();
+    assert!(content.apply_prepared_update(&plan).is_err());
+    assert_eq!(content.row_id(&next.rows()[0].0), Some(items[0]));
+}

@@ -1,0 +1,100 @@
+{
+  "format": "agentkit-reading-candidate-receiver/1",
+  "date": "2026-10-20",
+  "default_pin": {
+    "commit": "8cf0840790334ba224afc0595897c74231c712e6",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 199,
+    "sha256": "f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f",
+    "ui_packages": 8
+  },
+  "candidate": {
+    "candidate_identity": "bd3ed1b0af81b044306af90d3594bb31110147b7194bda6053b1d2e185871c9a",
+    "candidate_files": 449,
+    "portable_manifest_sha256": "b1e6deba267feb207981970a85ba12a9c02ea9e6c4c43a98052d750b6171487b",
+    "probe_sha256": "095eb247cfd79d9db3e091eeb8e7022f6dab7be76f1e68be58eccb06ed0f1c69",
+    "candidate_only_host_adaptations": [
+      "AX required forwarded from public semantics"
+    ],
+    "candidate_overrides": {
+      "ui/Cargo.toml": "d0a1fda4f44188e630115dea3e369d1c30c9d1e9b7f5dd01e3cc905de34bf969",
+      "ui/Cargo.lock": "2a45305cc0cd67304051877aaab06386d6ee0b1986fbf1e687f7ba498c1427f1",
+      "ui/demo/src/native.rs": "0c91f56503b7dbd04374d82e65bbdfa6d2027820693a0df79b914707345a8f01"
+    },
+    "checks": [
+      {
+        "check": "tests",
+        "exit_code": 0
+      },
+      {
+        "check": "clippy",
+        "exit_code": 0
+      }
+    ]
+  },
+  "receiver_receipt": {
+    "path": ".runtime-fixtures/agentkit-reading-replay-05/receipt.json",
+    "sha256": "ab703ebf8a911e555309452c91851e07b84a45417b876d55eb735bc753a4231f"
+  },
+  "upstream_replay": {
+    "reading_contract_tests": 19,
+    "composition_consumer_tests": 164,
+    "strict_clippy": true,
+    "gpu_tests": 1,
+    "gpu_cases": 48,
+    "gpu_frames": 192,
+    "gpu_receipt_sha256": "ed22b832128cf5bcd5fbe6e92b4157ddf061e4f8301b273366d6f837c1532812"
+  },
+  "agentkit": {
+    "default_ui_tests": 288,
+    "new_component_tests": 2,
+    "new_second_consumer_tests": 1,
+    "candidate_integration_tests": 3,
+    "strict_default_ui_clippy": true,
+    "strict_candidate_probe_clippy": true,
+    "no_generic_scroll_controller": true,
+    "no_pixel_compensation": true,
+    "python_script_tests": 26
+  },
+  "scope": {
+    "default_pin_promoted": false,
+    "candidate_is_public_git_pin": false,
+    "full_runview_integrated": false,
+    "actual_sep_reading_acceptance": false,
+    "agentkit_gpu_pixel_acceptance": false,
+    "native_reading_acceptance": false,
+    "physical_ime_acceptance": false,
+    "voiceover_acceptance": false,
+    "persistent_checkpoint_acceptance": false,
+    "final_component_parity_review_complete": false,
+    "merged": false,
+    "tagged": false
+  },
+  "retained_failures": [
+    {
+      "replay": "01",
+      "reason": "Candidate adds Preedit.clauses and AX required; receiver literals need explicit adaptation"
+    },
+    {
+      "replay": "02",
+      "reason": "Three tests pass but strict Clippy rejects non-snake-case test name"
+    },
+    {
+      "gate": "script tests first invocation",
+      "reason": "System Python 3.9 lacks tomllib; reran unchanged suite with bundled Python, 26 passed"
+    }
+  ],
+  "logs": {
+    "/tmp/agentkit-reading-candidate-contracts.log": "3e1998f20ddd5e065a43ff489b4ee7bfddb783cdf87e8fb7a8051ec54a7415ec",
+    "/tmp/agentkit-reading-candidate-consumer.log": "10704c5bcfb1048baa4ddff2afeeec780694d9e3402a27e8e84ffb97be98215e",
+    "/tmp/agentkit-reading-candidate-clippy.log": "54d0e8ac823cd1303e1f935ce4d12d5b05b55b929b23100c678a320ebfd2827e",
+    "/tmp/agentkit-reading-candidate-gpu.log": "7f8945aa6d61d8bbcf65da4ab6236ba0fe1453d5c86729e8ba4979d8ee5c1a54",
+    "/tmp/agentkit-reading-default-ui-tests.log": "c48b8d2d40d7526d14dfb56ddaa31d0cdd1a896cfde3ccd37efec00c1baef054",
+    "/tmp/agentkit-reading-default-ui-clippy.log": "1bc8defcbf12db8f6195a7758f8f0aaee158a6dd081b9b0a62700b8482fb2e44",
+    "/tmp/agentkit-reading-default-inputs.json": "8a8e6f786e5a4fb57110e2f331b248f99fe8dad47a38e5bc642de1aa021324f8",
+    "/tmp/agentkit-reading-script-tests.log": "d02f377c859fb1694264cfef6c669c28a86e4ccfb97ae49b015efa43b9b37fc3",
+    "/tmp/agentkit-reading-headless-boundaries.log": "e9fa1e12a0afd70528040f81fe3199172a3974910d7760c0216bb6d110181081",
+    "/tmp/agentkit-reading-script-tests2.log": "1221d4c47470841b365260a8e071478b86b71d66acb746c71b90916a0e1b9145"
+  }
+}

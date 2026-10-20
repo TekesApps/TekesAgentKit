@@ -997,3 +997,93 @@ fn sole_aggregate_reasoning_retains_its_disclosure_and_text_owner_when_order_arr
         "completed thought"
     );
 }
+
+#[test]
+fn prepared_update_predicts_retained_and_new_rows_without_allocating_or_mutating() {
+    let source = snapshot();
+    let mut view = content();
+    let plan = view.prepare_update(&scope(), 1, 1, &source, true).unwrap();
+    let predicted = plan.rows().to_vec();
+    assert!(view.row_keys().is_empty());
+    assert_eq!(
+        view.prepare_update(&scope(), 1, 1, &source, true)
+            .unwrap()
+            .rows(),
+        predicted
+    );
+    view.apply_prepared_update(&plan).unwrap();
+    assert!(
+        predicted
+            .iter()
+            .all(|(key, id)| view.row_id(key) == Some(*id))
+    );
+    let mut prefixed = source.clone();
+    let mut older = message("older", TranscriptItemKind::Assistant, 0);
+    older.turn_id = "older-turn".into();
+    prefixed.items.insert(0, older);
+    let next = view
+        .prepare_update(&scope(), 2, 1, &prefixed, true)
+        .unwrap();
+    assert!(
+        predicted
+            .iter()
+            .all(|(key, id)| next.rows().contains(&(key.clone(), *id)))
+    );
+    let expected = next.rows().to_vec();
+    view.apply_prepared_update(&next).unwrap();
+    assert!(
+        expected
+            .iter()
+            .all(|(key, id)| view.row_id(key) == Some(*id))
+    );
+    let retained = view.row_keys().to_vec();
+    assert!(view.apply_prepared_update(&plan).is_err());
+    assert_eq!(view.row_keys(), retained);
+}
+
+#[test]
+fn prepared_update_validates_before_publication_and_respects_explicit_aliases() {
+    let mut source = snapshot();
+    source.items.remove(0);
+    source.items[0].source_position = None;
+    source.items[0].is_provisional = true;
+    source.items[0].metadata = json!({"nativeStreamId":"live"});
+    let mut view = content();
+    view.update(&scope(), 1, 1, &source, true).unwrap();
+    let row = view
+        .message_id(TranscriptMessageKey::Stream("live"))
+        .unwrap();
+    source.items[0].is_provisional = false;
+    source.items[0].source_position = Some(TranscriptSourcePosition::Native {
+        entry_id: "committed".into(),
+        entry_ordinal: 0,
+        content_index: None,
+    });
+    let plan = view.prepare_update(&scope(), 2, 1, &source, true).unwrap();
+    assert!(plan.rows().contains(&(
+        TranscriptContentRowKey::Message(TranscriptMessageIdentity::NativeEntry(
+            "committed".into()
+        )),
+        row
+    )));
+    view.apply_prepared_update(&plan).unwrap();
+    source.items[0].content_blocks = Some(vec![
+        TranscriptContentBlock {
+            index: 0,
+            content: TranscriptBlockContent::Text { text: "a".into() },
+        },
+        TranscriptContentBlock {
+            index: 0,
+            content: TranscriptBlockContent::Text { text: "b".into() },
+        },
+    ]);
+    assert!(view.prepare_update(&scope(), 3, 1, &source, true).is_err());
+    assert_eq!(
+        view.message_id(TranscriptMessageKey::NativeEntry("committed")),
+        Some(row)
+    );
+    assert!(
+        view.prepare_update(&RunScope::main("fixture", "other"), 3, 1, &source, true)
+            .is_err()
+    );
+}

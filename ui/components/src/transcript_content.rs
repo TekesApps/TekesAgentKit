@@ -35,6 +35,38 @@ pub enum TranscriptContentRowKey {
     Diagnostics,
     Stale,
 }
+/// A view-local, borrowed publication plan. Row IDs are predicted without
+/// reserving namespaces or changing controls. This is not endpoint/read authority.
+#[derive(Debug)]
+pub struct TranscriptContentUpdate<'a> {
+    root: ComponentId,
+    scope: RunScope,
+    base_publication: u64,
+    base_epoch: u64,
+    base_next: u32,
+    publication: u64,
+    epoch: u64,
+    snapshot: &'a TranscriptSnapshot,
+    available: bool,
+    rows: Vec<(TranscriptContentRowKey, ComponentId)>,
+}
+impl TranscriptContentUpdate<'_> {
+    pub fn rows(&self) -> &[(TranscriptContentRowKey, ComponentId)] {
+        &self.rows
+    }
+    pub fn item_ids(&self) -> Vec<ComponentId> {
+        self.rows.iter().map(|(_, id)| *id).collect()
+    }
+    pub fn publication(&self) -> u64 {
+        self.publication
+    }
+    pub fn connection_epoch(&self) -> u64 {
+        self.epoch
+    }
+    pub fn scope(&self) -> &RunScope {
+        &self.scope
+    }
+}
 #[derive(Clone, Debug)]
 pub struct TranscriptContentLabels {
     pub group: String,
@@ -251,6 +283,95 @@ impl TranscriptContent {
         namespaces
             .iter()
             .all(|ns| *ns as u64 != self.root.0 >> 32 && !(self.start..self.end).contains(ns))
+    }
+    /// Validate the complete message update and expose its ordered row identities
+    /// before a library reading transaction. Use immediately on the same UI turn;
+    /// retain the library's original request token separately for async reads.
+    pub fn prepare_update<'a>(
+        &self,
+        scope: &RunScope,
+        publication: u64,
+        epoch: u64,
+        snapshot: &'a TranscriptSnapshot,
+        available: bool,
+    ) -> Result<TranscriptContentUpdate<'a>, &'static str> {
+        self.validate_update(scope, publication, epoch, snapshot, available)?;
+        let document =
+            TranscriptDocument::read(snapshot).map_err(|_| "invalid transcript document")?;
+        let planned = plan(&document, &self.labels)?;
+        let desired: BTreeSet<_> = planned.iter().map(|row| row.key.clone()).collect();
+        let index: BTreeMap<_, _> = self
+            .keys
+            .iter()
+            .cloned()
+            .enumerate()
+            .map(|(i, key)| (key, i))
+            .collect();
+        let mut next = self.next;
+        let rows = planned
+            .iter()
+            .map(|row| {
+                let retained = self
+                    .find(&row.key, &index)
+                    .or_else(|| {
+                        row.alias
+                            .as_ref()
+                            .filter(|key| !desired.contains(*key))
+                            .and_then(|key| self.find(key, &index))
+                    })
+                    .filter(|node| self.feedback_matches(node, row));
+                let id = retained.map(Content::id).unwrap_or_else(|| {
+                    let id = ComponentId((next as u64) << 32);
+                    next += 1;
+                    id
+                });
+                (row.key.clone(), id)
+            })
+            .collect();
+        Ok(TranscriptContentUpdate {
+            root: self.root,
+            scope: scope.clone(),
+            base_publication: self.publication,
+            base_epoch: self.epoch,
+            base_next: self.next,
+            publication,
+            epoch,
+            snapshot,
+            available,
+            rows,
+        })
+    }
+    /// Recheck before committing. Stale plans cannot change the tree, controls
+    /// or namespace allocation, even when a detached action settled meanwhile.
+    pub fn apply_prepared_update(
+        &mut self,
+        prepared: &TranscriptContentUpdate<'_>,
+    ) -> Result<(), &'static str> {
+        if self.root != prepared.root
+            || self.scope != prepared.scope
+            || self.publication != prepared.base_publication
+            || self.epoch != prepared.base_epoch
+            || self.next != prepared.base_next
+        {
+            return Err("stale or foreign transcript update plan");
+        }
+        let current = self.prepare_update(
+            &prepared.scope,
+            prepared.publication,
+            prepared.epoch,
+            prepared.snapshot,
+            prepared.available,
+        )?;
+        if current.rows != prepared.rows {
+            return Err("transcript update plan identities changed");
+        }
+        self.update(
+            &prepared.scope,
+            prepared.publication,
+            prepared.epoch,
+            prepared.snapshot,
+            prepared.available,
+        )
     }
     pub(crate) fn validate_update(
         &self,

@@ -6,6 +6,14 @@
 
 ## 所有权
 
+### 排版与基础样式
+
+AgentKit 固定消息排版语义：机器正文、推理、工具内容及机器 footnote 靠左；用户输入使用靠右的圆角气泡，用户 footnote 在气泡外靠右。主会话和各类子 pane 共用此规则。
+
+基础视觉跟随 TekesUI：优先使用公开组件的默认样式，必要的语义间距和文字层级使用库提供的 tokens。AgentKit 不另建颜色、字体、圆角或控件皮肤，也不为复刻 Tekes App 的旧外观覆盖库默认值。宿主主题通过 TekesUI 的公开主题输入传递。
+
+升级精确固定的 TekesUI 版本后，其基础样式调整应在所有 Agent 组件中统一体现，无需逐个组件补丁；消息方向、footnote 归属和业务行为继续保持。升级验收检查浅色/深色、长短消息、换行和窄窗口下的对齐及可读性，不锁定旧版具体像素值。缺少基础组件属性或事件时向 TekesUI 提 issue，不在消费侧复制通用实现。
+
 最新 Transcript 审查修复及分层验证见[非法历史隔离与空容器记录](rust-agent-ui-transcript-review-20261020.md)：公开只读组件支持缓存替换前预检，非法新历史保留原内容并允许显式刷新；明确为空的 Assistant 容器不显示缺失正文提示。这不提升阅读锚点、富内容或真实 IME 的验收状态。
 
 后续[系统拼音软件探针](rust-agent-ui-system-ime-20261020.md)已通过真实系统 marked text、发送/导航屏障、确认及单次提交检查；按键定向合成到隔离进程，不注入 Preedit。此证据不提升实体键盘、候选窗、完整 IME 或完整三端原生体验验收状态。
@@ -22,7 +30,7 @@ AgentKit 定义业务结构、展示语义、组件组合、组件输入及回�
 
 [三端取消/错误/恢复专项](rust-agent-ui-run-controls-20261020.md)已通过真实窗口 Send、流式中 Cancel、两次重连不重发、公开错误说明的原生 AX 查询及显式恢复。新增共享 latest_failure/failure_message 只读事实，修复 Pi 错误正文丢失、Indicators 只显示 idle，以及 DSH 新执行后旧 operational error 粘滞。基础路径已验收，不扩大为全部错误、队列/工具取消或真实 IME 验收。
 
-[阅读事务候选输入](tekesui-reading-candidate-intake-20261020.md)已核验新包的449文件与压缩包身份；尚未独立构建或接入，不替换当前8cf固定依赖，也不提升/关闭#22。
+[阅读事务候选输入](tekesui-reading-candidate-intake-20261020.md)已核验新包的449文件与压缩包身份；后续[独立回放与正式 Transcript 探针](rust-agent-ui-reading-candidate-20261020.md)已验证预检行身份、追加/前插、A/B 恢复和保留焦点的回到最新。默认8cf固定依赖未替换，完整 RunView 与原生阅读仍待完成，不据此提升/关闭#22。
 
 ## Composer（首批实现）
 
