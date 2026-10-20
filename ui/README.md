@@ -155,3 +155,5 @@ SidePanel 附件共享相同选择/上传/状态组件，按原 binding/request 
 公共 `TranscriptSourcePosition` 和 `TranscriptSection::event_order()` 提供已知事件/容器顺序及明确的 unplaced 覆盖状态；ordinal 不作身份或锚点，正式文本块与工具交错仍待实现。见 [来源顺序说明](../docs/rust-agent-ui-transcript-order-20261020.md)。
 
 `TranscriptItem.content_blocks` 规范化公开消息内部的 Text/Reasoning/ToolCall/Attachment/Unknown；None 明确保留聚合/旧内容覆盖状态。第二 consumer 直接读取覆盖与待解析工具引用，见 [内容块契约](../docs/rust-agent-ui-transcript-content-20261020.md)。
+
+`--components --history-page-proof --offscreen <PNG>` 验证原 A 分页、B 草稿隔离与源回执发布，不是正式分页视图或锚点验收。公共接口见 [分页读取契约](../docs/rust-agent-ui-history-paging-20261020.md)。

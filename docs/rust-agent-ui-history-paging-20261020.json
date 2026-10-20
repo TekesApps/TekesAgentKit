@@ -1,0 +1,95 @@
+{
+  "kind": "per-mount-history-page-read-receipts",
+  "baseCommit": "39a81f7ab96e982733a309553fc74a2a79454ece",
+  "sourceSha256": {
+    "ui/bindings/src/history.rs": "c3c63f0ea99ada69301f37bc5f421077dcdf3d1db8a7c76a182c138f679d728c",
+    "ui/bindings/src/lib.rs": "5451c0eca1821e831972b14abf0b6230148721251d4ad2289738e555c3bff275",
+    "ui/consumer/src/lib.rs": "9de69611b049b5d531a922d375aa61b3c0c8c24ea9780e79fb625343be7f015c",
+    "ui/demo/src/components_native.rs": "59b2f9ccf7470d172364fba25d3deea3770b116c3d161d127814d182e6384558",
+    "ui/demo/src/fixture.rs": "1c85e62878108ce9306d85ac2c3816bb20eda9a50110e886980c05a2d37c5084",
+    "ui/demo/tests/history_paging.rs": "fced37cbf06446717c316f56988e624baba834961a3808a27a15a6887d65e5f0",
+    "ui/demo/tests/child_binding.rs": "1c38dc0463d9e1ff6b34f5964a94f5da023674b7462fa48a17cdd7787b6a12e8"
+  },
+  "binarySha256": "343292b4b0d480aa5e5fc5a87f6047b1df2b19eb335e3b047b8c155a29cbba79",
+  "imageSha256": "679c880a262bf147756e195cb7c974555e08216305f0dda45c34bc1c0c6b5114",
+  "tekesUI": {
+    "commit": "431093786de47b48cd566d0d9c0eafa088b10d68",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 188,
+    "sha256": "03721866a362b1d31261ebbbc86140eb07e9e23320871c325234a5212591213d",
+    "ui_packages": 8
+  },
+  "receipt": {
+    "actionableProof": null,
+    "annotationProof": null,
+    "components": true,
+    "contextProof": null,
+    "documentProjection": {
+      "aggregateMessages": 0,
+      "contentBlocks": 20,
+      "hasMoreBefore": true,
+      "isStale": false,
+      "positionedEvents": 20,
+      "renderer": false,
+      "sections": 10,
+      "sessionNotices": 0,
+      "structuredMessages": 20,
+      "toolCalls": 0,
+      "unknownBlocks": 0,
+      "unplacedEvents": 0,
+      "unplacedFacts": [],
+      "unresolvedToolBlocks": 0,
+      "visibleMessages": 20
+    },
+    "finalAssistantItems": 10,
+    "historyPagingProof": {
+      "extended": true,
+      "frozenCut": true,
+      "nativeInteraction": false,
+      "originalScope": true,
+      "otherDraftPreserved": true,
+      "readingAnchorAcceptance": false,
+      "sourceStatusPublished": true
+    },
+    "initialPresetProof": null,
+    "inventoryRows": 6,
+    "isStale": false,
+    "modelChoiceProof": null,
+    "nativeInteraction": false,
+    "offscreen": true,
+    "sharedRuntime": true,
+    "sidebarMounted": true,
+    "summaryMounted": true,
+    "transcriptItems": 20,
+    "transcriptView": false,
+    "uploadProof": null
+  },
+  "localChecks": {
+    "uiWorkspaceTests": 178,
+    "newPagingTests": 5,
+    "boundedChildTests": 3,
+    "toolTests": 18,
+    "uiStrictClippy": true,
+    "fmt": true,
+    "boundaries": true
+  },
+  "review": "manual review of original scope/epoch captures, per-binding single flight, consumed request ownership, Drop/abort receipts, stale revision completion fencing and unchanged runtime/child merging",
+  "scope": "public SEP fixture replay, second public consumer compile and offscreen host proof; real Native/Pi/DSH and full root tests not rerun for this binding-only patch",
+  "nativeInteraction": false,
+  "physicalIME": false,
+  "formalTranscript": false,
+  "readingAnchorAcceptance": false,
+  "knownLimitations": [
+    "read receipts supplement runtime/pointer notifications",
+    "is_current is not a document-install or reading-anchor token",
+    "aborting the observer does not prove cancellation of backend reads",
+    "independent mounts have independent receipts, not global endpoint read deduplication"
+  ],
+  "remaining": [
+    "formal Transcript pagination controls and RunView",
+    "public #22/#23 mixed-document consumption gates",
+    "native layout theme IME and reading/paging acceptance",
+    "full delivery review CI merge and tag"
+  ]
+}

@@ -624,3 +624,7 @@ reconciliation; no optimistic removal. Shared resolution drives removal.
 The second public consumer mounts the card and consumes the response request.
 
 The real-runtime smoke script supports `--ui-components --ui-actionables` for Native, Pi and DSH. It drives public Send/card callbacks, answers the original source after navigating away, checks a durable successful answer, sends a followup and reconnects without duplicate input or cross-session draft changes. This is an offscreen consumer proof with a local synthetic provider, not physical IME/native interaction acceptance. See [the scoped receipt](../../docs/rust-agent-ui-actionables-live-20261020.md).
+
+## History page read receipts
+
+Capture `binding.begin_history_page()` on the original gesture and move its once-consumed `HistoryPageRequest::load()` into the host executor. `history_page_state()` and `subscribe_history_pages()` expose per-mount Loading/Loaded/Failed/Interrupted facts; keep observing the existing runtime and pointer publications too. An old epoch or retired pointer cannot acknowledge a newer request. A dropped future does not cancel the backend read, and failures never retry automatically. Canonical has-more/stale state and custom child pagination capabilities still gate the UI. This is a read receipt, not a document-install or reading-anchor token. See [the scoped contract](../../docs/rust-agent-ui-history-paging-20261020.md).

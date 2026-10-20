@@ -61,6 +61,9 @@ pub struct Fixture {
     responses: Arc<Mutex<Vec<Value>>>,
     response_calls: Arc<AtomicUsize>,
     response_gate: Option<Arc<tokio::sync::Semaphore>>,
+    history_page_gate: Option<Arc<tokio::sync::Semaphore>>,
+    history_page_calls: Arc<AtomicUsize>,
+    history_page_fails: Arc<AtomicBool>,
     response_fails: Arc<AtomicBool>,
     models: bool,
     model_read_gate: Option<Arc<tokio::sync::Semaphore>>,
@@ -171,6 +174,9 @@ impl Default for Fixture {
             responses: Arc::new(Mutex::new(vec![])),
             response_calls: Arc::new(AtomicUsize::new(0)),
             response_gate: None,
+            history_page_gate: None,
+            history_page_calls: Arc::new(AtomicUsize::new(0)),
+            history_page_fails: Arc::new(AtomicBool::new(false)),
             response_fails: Arc::new(AtomicBool::new(false)),
             models: false,
             model_read_gate: None,
@@ -190,6 +196,16 @@ impl Default for Fixture {
     }
 }
 impl Fixture {
+    pub fn with_history_page_gate(mut self, gate: Arc<tokio::sync::Semaphore>) -> Self {
+        self.history_page_gate = Some(gate);
+        self
+    }
+    pub fn history_page_calls(&self) -> usize {
+        self.history_page_calls.load(Ordering::SeqCst)
+    }
+    pub fn set_history_page_fails(&self, fails: bool) {
+        self.history_page_fails.store(fails, Ordering::SeqCst);
+    }
     /// Public event fixture; a session notice deliberately has no turn.
     pub fn with_session_notice(self) -> Self {
         {
@@ -530,6 +546,19 @@ impl SessionEndpoint for Endpoint {
     }
     async fn history_page(&self, r: HistoryRequest) -> Result<HistoryPage> {
         r.validate()?;
+        self.fixture
+            .history_page_calls
+            .fetch_add(1, Ordering::SeqCst);
+        if let Some(gate) = &self.fixture.history_page_gate {
+            gate.acquire()
+                .await
+                .map_err(|_| Error::Disconnected)?
+                .forget();
+        }
+        require(
+            !self.fixture.history_page_fails.load(Ordering::SeqCst),
+            "fixture history read failed",
+        )?;
         let sessions = self.fixture.sessions.lock().unwrap();
         let line = sessions
             .get(&r.session_id)

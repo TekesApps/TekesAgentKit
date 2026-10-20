@@ -203,6 +203,10 @@ async fn builtin_bounded_history_pages_only_child_content_and_mounts_without_a_c
     );
     assert!(source.refresh_controls().await.is_err());
     source.load_earlier().await.unwrap();
+    assert!(matches!(
+        source.binding().history_page_state().phase,
+        tekes_agent_ui_bindings::HistoryPagePhase::Loaded { extended: true }
+    ));
     let snapshot = source.snapshot().await.unwrap();
     let PaneSnapshot::ReadOnlyChild {
         transcript: after, ..

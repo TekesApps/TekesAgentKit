@@ -2,6 +2,8 @@
 //!
 //! This adapter retains history observations and projects existing presentation;
 //! it does not implement a Run state machine, renderer, or window event loop.
+mod history;
+pub use history::*;
 mod attachments;
 mod file_preview;
 pub use file_preview::*;
@@ -68,6 +70,7 @@ pub enum PaneSnapshot {
 pub struct RunBinding {
     runtime: Arc<SessionRuntime>,
     scope: RunScope,
+    history_pages: history::HistoryPages,
     controller: Option<RunController>,
     _lease: Option<SessionHistoryLease>,
     child: Option<ChildRun>,
@@ -354,6 +357,7 @@ impl RunBinding {
         Ok(Self {
             runtime,
             scope,
+            history_pages: history::HistoryPages::default(),
             controller: Some(controller),
             _lease: Some(lease),
             child: None,
@@ -399,6 +403,7 @@ impl RunBinding {
         Ok(Self {
             runtime,
             scope,
+            history_pages: history::HistoryPages::default(),
             controller,
             _lease: None,
             child: Some(child),
@@ -538,15 +543,7 @@ impl RunBinding {
             .map_err(unsupported)
     }
     pub async fn load_earlier(&self) -> Result<bool> {
-        require(
-            self.access() != PaneAccess::Missing,
-            "SideChat pointer missing",
-        )?;
-        if let Some(child) = &self.child {
-            child.load_earlier().await
-        } else {
-            self.runtime.load_earlier(&self.scope.session_id).await
-        }
+        self.load_history_page(self.begin_history_lease()?).await
     }
 }
 mod actionable;

@@ -546,3 +546,18 @@ pub fn transcript_content_coverage(
     }
     (counts.0, counts.1, counts.2)
 }
+
+/// Capture on the host's original binding, then move this request into its
+/// executor. Status subscriptions supplement the existing runtime observation.
+pub fn begin_history_page(
+    binding: &std::sync::Arc<tekes_agent_ui_bindings::RunBinding>,
+) -> Result<tekes_agent_ui_bindings::HistoryPageRequest, String> {
+    binding
+        .begin_history_page()
+        .map_err(|error| error.to_string())
+}
+pub async fn read_history_page(
+    request: tekes_agent_ui_bindings::HistoryPageRequest,
+) -> Result<bool, String> {
+    request.load().await.map_err(|error| error.to_string())
+}

@@ -2326,6 +2326,63 @@ pub fn run() {
         focus_before_deactivate: None,
     };
     if let Some(index) = args.iter().position(|arg| arg == "--offscreen") {
+        let history_page_proof = if args.iter().any(|arg| arg == "--history-page-proof") {
+            assert!(
+                fixture,
+                "history page host proof requires the isolated fixture"
+            );
+            let a = host.view.bindings()[0].clone();
+            let b = host.view.bindings()[1].clone();
+            b.edit_text(
+                &tekes_agent_presentation::ComposerDestination::run(b.scope().clone()),
+                "B 分页隔离草稿".into(),
+            )
+            .unwrap();
+            let draft = b.current_run().unwrap().draft.clone();
+            let before = host.runtime.inspect(|store| {
+                (
+                    store.sessions[&a.scope().session_id].history_through_sequence,
+                    store.sessions[&a.scope().session_id].history_base_sequence,
+                )
+            });
+            let request = a.begin_history_page().unwrap();
+            assert_eq!(
+                a.history_page_state().phase,
+                tekes_agent_ui_bindings::HistoryPagePhase::Loading
+            );
+            host.view
+                .accessibility_action(
+                    tekes_agent_ui_demo::component_demo::SELECT_B,
+                    None,
+                    tekes_ui_controls::composition::AccessibilityAction::Press,
+                )
+                .unwrap();
+            let extended = host.executor.block_on(request.load()).unwrap();
+            assert!(extended);
+            let after = host.runtime.inspect(|store| {
+                (
+                    store.sessions[&a.scope().session_id].history_through_sequence,
+                    store.sessions[&a.scope().session_id].history_base_sequence,
+                )
+            });
+            assert_eq!(before.0, after.0);
+            assert!(after.1 < before.1);
+            assert!(a.history_page_state().is_current);
+            assert_eq!(
+                a.history_page_state().phase,
+                tekes_agent_ui_bindings::HistoryPagePhase::Loaded { extended: true }
+            );
+            assert_eq!(
+                b.history_page_state().phase,
+                tekes_agent_ui_bindings::HistoryPagePhase::Idle
+            );
+            assert_eq!(b.current_run().unwrap().draft, draft);
+            assert_eq!(host.view.selected(), 1);
+            host.view.sync().unwrap();
+            serde_json::json!({"originalScope":true,"extended":true,"frozenCut":true,"otherDraftPreserved":true,"sourceStatusPublished":true,"nativeInteraction":false,"readingAnchorAcceptance":false})
+        } else {
+            serde_json::Value::Null
+        };
         let actionable_proof = if args.iter().any(|arg| arg == "--actionable-proof") {
             host.executor
                 .block_on(tekes_agent_ui_demo::actionable_proof::run(
@@ -2976,6 +3033,7 @@ pub fn run() {
             "initialPresetProof":preset_proof,
             "uploadProof":upload_proof,
             "actionableProof":actionable_proof,
+            "historyPagingProof":history_page_proof,
             })
         );
         host.executor.block_on(host.runtime.stop()).unwrap();
