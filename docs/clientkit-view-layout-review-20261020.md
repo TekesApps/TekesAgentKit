@@ -45,3 +45,20 @@
 2026-10-21可见性审查发现的controller错误fallback已在[降级快照修正](rust-agent-ui-degraded-frame-20261021.md)补齐：归档、epoch和目标隔离有控制器及原生fixture故障恢复证据。其余完整叠层、rail及pane显示清单继续保持未完成。
 
 下一步叠层的源规则已核对：`RunView.composerBottomPadding = Spacing.regular`，`composerContentSpacing = Spacing.loose`；后者属于文档遮挡净空，不应加进Composer自身高度或Jump位置。`RunOverlayView.layout`在任一维度为0时保留已有子几何。公开ScrollContent已有frame与可见clip区分，需先消费这些能力，不自行实现像素滚动补偿。叠层本身尚未实现。
+
+## 2026-10-21：视觉对照证据边界
+
+当前**没有**与当前 ClientKit 在相同内容、主题、窗口尺寸、backing scale 和正常字号下的逐项截图对照。Native fixture/压力夹具、CoreText几何测试、候选GPU回放以及构建通过都不能记为ClientKit视觉通过。Swift共享Agent UI仍由ClientKit拥有；本Rust移植不改Tekes/ClientKit的Swift控件，不把测试宿主当标准组件。
+
+| 实际输入/证据 | 身份与范围 |
+| --- | --- |
+| 本轮AgentKit业务代码 | `32b764046fbdb6fc950143ead428ab27ee7ce2ce`：降级快照与本地原生fixture故障恢复；本轮没有保存与ClientKit配对的截图。 |
+| ClientKit参考 | 当前HEAD `c289bc9d33edcd83a782ac17927a8c65a027eccd`；按当前工作树只读核对（有WIP，以文件哈希为准），未运行它的对照窗口。源文件哈希见降级快照及先前layout记录。 |
+| 默认TekesUI | 公开pin `8cf0840790334ba224afc0595897c74231c712e6`，199输入SHA `f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f`。 |
+| 本轮隔离候选 | 2b16 identity `2b16eaa6200fecdde9a0c615166064effb9446249cde05087d5d7c288d81d4ec`，463文件；只用于已记录的预检/阅读回放，不替换默认pin。 |
+| 先前阅读候选 | bd3 identity `bd3ed1b0af81b044306af90d3594bb31110147b7194bda6053b1d2e185871c9a`，449文件；是历史回放输入，不是当前默认依赖或ClientKit视觉基线。 |
+| 已有AgentKit截图 | `/tmp/agentkit-strict-column-native-context-20261021.png`，SHA `bdf6699601b38d2a7bb77c571f4e620f1cee23c891d60f2f929735254d5fec41`。它属于先前 `ec735c4` 共享列fixture，源码哈希已对照该commit；不是本轮32b代码的视觉验收，更没有配对ClientKit截图。 |
+
+可见剩余差异保持开放：RunView目前仍是docked纵向栈，未完成文档/Composer/chrome/selection叠层；Indicators仍为状态文本，完整leading rail、导航/hover/AX和位置映射未完成；默认宿主混合阅读事务/富内容、各pane及Sidebar/Summary完整显示规则仍待对应View验收。最后必须建立上述等条件、正常字号的正式RunView对照，再逐项核对差异。
+
+Gallery新的集合焦点修复不在这些冻结输入中，不能据其WIP改变本轮验收结论。本记录仅说明证据边界，不授权升级pin、改写2b16/bd3包、发布、关闭Issue或把阶段截图当视觉通过。
