@@ -21,6 +21,8 @@ impl SidebarPublication {
     pub fn input(&self, selected: Option<SessionAddress>) -> SidebarInput {
         SidebarInput {
             revision: self.revision,
+            loaded: self.loaded,
+            error: self.error.clone(),
             rows: self.rows.clone(),
             selected,
         }
@@ -82,7 +84,8 @@ impl SidebarBinding {
                         match rows(&owner, &source, &frame) {
                             Ok(rows) => {
                                 let revision = match sender.borrow().revision.checked_add(1) { Some(revision) => revision, None => break Err(unsupported("inventory revision exhausted")) };
-                                sender.send_replace(Arc::new(SidebarPublication { revision, rows, loaded: true, error: None }));
+                                let loaded = sender.borrow().loaded || frame["inventoryReady"].as_bool().unwrap_or(false);
+                                sender.send_replace(Arc::new(SidebarPublication { revision, rows, loaded, error: None }));
                             }
                             Err(error) => break Err(error),
                         }

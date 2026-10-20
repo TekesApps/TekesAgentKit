@@ -1781,9 +1781,9 @@ impl ComponentDemo {
     }
     pub fn set_sidebar_source(&mut self, source: Arc<SidebarPublication>) -> Result<()> {
         require(
-            self.sidebar_source
-                .as_ref()
-                .is_none_or(|old| source.revision >= old.revision),
+            self.sidebar_source.as_ref().is_none_or(|old| {
+                source.revision > old.revision || source.as_ref() == old.as_ref()
+            }),
             "stale sidebar source",
         )?;
         self.sidebar_source = Some(source);
@@ -2328,14 +2328,17 @@ impl ComponentDemo {
                     .sidebar_presented
                     .as_ref()
                     .map_or(1, |old| old.revision + 1),
+                loaded: source.loaded,
+                error: source.error.clone(),
                 rows: source.rows.clone(),
                 selected,
             };
-            if self
-                .sidebar_presented
-                .as_ref()
-                .is_none_or(|old| old.rows != next.rows || old.selected != next.selected)
-            {
+            if self.sidebar_presented.as_ref().is_none_or(|old| {
+                old.rows != next.rows
+                    || old.selected != next.selected
+                    || old.loaded != next.loaded
+                    || old.error != next.error
+            }) {
                 let id = self.sidebar_id();
                 self.tree
                     .get_mut(id)

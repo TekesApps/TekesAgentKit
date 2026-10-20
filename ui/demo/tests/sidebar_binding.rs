@@ -605,3 +605,130 @@ async fn sidebar_navigation_fences_late_open_results_and_keeps_each_summary_pare
     );
     runtime.stop().await.unwrap();
 }
+
+#[derive(Clone)]
+struct DelayedInventory {
+    fixture: Fixture,
+    gate: Arc<tokio::sync::Semaphore>,
+}
+struct DelayedEndpoint {
+    inner: Arc<dyn SessionEndpoint>,
+    gate: Arc<tokio::sync::Semaphore>,
+}
+#[async_trait::async_trait]
+impl EndpointConnector for DelayedInventory {
+    async fn connect(&self) -> Result<Arc<dyn SessionEndpoint>> {
+        Ok(Arc::new(DelayedEndpoint {
+            inner: self.fixture.connect().await?,
+            gate: self.gate.clone(),
+        }))
+    }
+}
+#[async_trait::async_trait]
+impl SessionEndpoint for DelayedEndpoint {
+    fn identity(&self) -> &str {
+        self.inner.identity()
+    }
+    fn host(&self) -> &HostDescription {
+        self.inner.host()
+    }
+    fn capabilities(&self) -> EndpointCapabilities {
+        self.inner.capabilities()
+    }
+    async fn call(
+        &self,
+        method: &str,
+        payload: serde_json::Value,
+        rpc_id: &str,
+    ) -> Result<serde_json::Value> {
+        self.inner.call(method, payload, rpc_id).await
+    }
+    async fn history_page(&self, request: HistoryRequest) -> Result<HistoryPage> {
+        self.inner.history_page(request).await
+    }
+    async fn respond(&self, id: &str, epoch: i64, outcome: serde_json::Value) -> Result<()> {
+        self.inner.respond(id, epoch, outcome).await
+    }
+    async fn close(&self) {
+        self.inner.close().await;
+    }
+    async fn follow(&self, target: StreamTarget) -> Result<FrameStream> {
+        use futures_util::StreamExt;
+        let inventory = matches!(target, StreamTarget::SessionInventory);
+        let stream = self.inner.follow(target).await?;
+        if !inventory {
+            return Ok(stream);
+        }
+        let gate = self.gate.clone();
+        Ok(Box::pin(
+            futures_util::stream::once(async move {
+                gate.acquire_owned().await.unwrap().forget();
+                stream
+            })
+            .flatten(),
+        ))
+    }
+}
+
+#[tokio::test]
+async fn delayed_initial_baseline_is_not_restored_and_reconnect_keeps_last_readable_inventory() {
+    let gate = Arc::new(tokio::sync::Semaphore::new(0));
+    let mut agent = SharedAgent::default();
+    agent
+        .register(
+            "fixture".into(),
+            "native".into(),
+            "Delayed inventory".into(),
+            Arc::new(DelayedInventory {
+                fixture: Fixture::default(),
+                gate: gate.clone(),
+            }),
+        )
+        .unwrap();
+    let agent = Arc::new(agent);
+    let binding = SidebarBinding::new(agent.clone(), "fixture").unwrap();
+    // The shared state stream emits before the inventory baseline. Wait for that
+    // actual frame, not just the binding's constructor placeholder.
+    until(&binding, |state| state.revision > 1).await;
+    assert!(!binding.snapshot().loaded);
+    assert!(binding.snapshot().rows.is_empty());
+    let mut sidebar = Sidebar::new(36, SidebarLabels::default());
+    sidebar.update(&binding.snapshot().input(None)).unwrap();
+    assert!(!sidebar.displayed_input().unwrap().loaded);
+    gate.add_permits(1);
+    until(&binding, |state| state.loaded && !state.rows.is_empty()).await;
+    sidebar.update(&binding.snapshot().input(None)).unwrap();
+    let first = sidebar.row_id(&binding.snapshot().rows[0].address).unwrap();
+    let runtime = binding.runtime();
+    let old_epoch = runtime.inspect(|state| state.connection_epoch);
+    let reconnect_runtime = runtime.clone();
+    let reconnect = tokio::spawn(async move { reconnect_runtime.reconnect().await });
+    tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            let source = binding.snapshot();
+            if runtime.inspect(|state| state.connection_epoch > old_epoch && !state.inventory_ready)
+                && source.rows.iter().all(|row| row.activity.is_stale)
+            {
+                assert!(
+                    source.loaded,
+                    "reconnect erased completed initial restoration"
+                );
+                sidebar.update(&source.input(None)).unwrap();
+                assert_eq!(sidebar.row_id(&source.rows[0].address), Some(first));
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    gate.add_permits(1);
+    reconnect.await.unwrap().unwrap();
+    runtime.wait_ready(Duration::from_secs(3)).await.unwrap();
+    until(&binding, |state| {
+        state.rows.iter().all(|row| !row.activity.is_stale)
+    })
+    .await;
+    assert!(binding.snapshot().loaded);
+    runtime.stop().await.unwrap();
+}

@@ -26,6 +26,11 @@ pub struct SidebarRow {
 pub struct SidebarInput {
     /// Monotonic publication revision from one host inventory authority.
     pub revision: u64,
+    /// False until the first coherent inventory has restored. Rows supplied before
+    /// restoration are not visible or actionable; empty is only confirmed when true.
+    pub loaded: bool,
+    /// Observation failure is independent of absence. Keep the last readable rows.
+    pub error: Option<String>,
     /// Order is supplied by the consumer's grouping/sorting preferences, never by pin storage.
     pub rows: Vec<SidebarRow>,
     pub selected: Option<SessionAddress>,
@@ -45,6 +50,7 @@ pub enum SidebarIntent {
 pub struct SidebarLabels {
     pub name: String,
     pub empty: String,
+    pub restoring: String,
     pub actions: String,
     pub pinned: String,
     pub activity: fn(&ThreadActivity) -> String,
@@ -54,6 +60,7 @@ impl Default for SidebarLabels {
         Self {
             name: "会话".into(),
             empty: "暂无会话".into(),
+            restoring: "正在恢复会话…".into(),
             actions: "会话操作".into(),
             pinned: "已置顶".into(),
             activity: activity_label,
@@ -96,6 +103,7 @@ pub struct Sidebar {
     next: u64,
     end: u64,
     revision: u64,
+    displayed: Option<SidebarInput>,
     bindings: BTreeMap<ComponentId, SidebarIntent>,
     pending: BTreeSet<(SessionAddress, String)>,
 }
@@ -108,7 +116,7 @@ impl Sidebar {
                 &labels.name,
                 vec![Content::new(
                     ComponentId(base + 5),
-                    TextContent::new(&labels.empty),
+                    TextContent::new(&labels.restoring),
                 )],
             ),
         );
@@ -137,12 +145,17 @@ impl Sidebar {
             next: base + 16,
             end: base | u32::MAX as u64,
             revision: 0,
+            displayed: None,
             bindings: BTreeMap::new(),
             pending: BTreeSet::new(),
         }
     }
     pub fn id(&self) -> ComponentId {
         self.root
+    }
+    /// The complete accepted host publication, including restoration/failure state.
+    pub fn displayed_input(&self) -> Option<&SidebarInput> {
+        self.displayed.as_ref()
     }
     /// Local gesture admission only; it can restrict, never enable, a shared action.
     pub fn set_pending(&mut self, address: &SessionAddress, action: &str, pending: bool) {
@@ -206,6 +219,19 @@ impl Sidebar {
         if input.revision == 0 || input.revision < self.revision {
             return Err("stale or unversioned sidebar input");
         }
+        if self.displayed.as_ref().is_some_and(|last| {
+            last.revision == input.revision
+                && (last.loaded != input.loaded
+                    || last.error != input.error
+                    || last.rows != input.rows)
+        }) {
+            return Err("conflicting sidebar publication");
+        }
+        let visible_rows = if input.loaded {
+            input.rows.as_slice()
+        } else {
+            &[]
+        };
         let mut addresses = BTreeSet::new();
         let mut keys = BTreeSet::new();
         for row in &input.rows {
@@ -220,17 +246,19 @@ impl Sidebar {
             {
                 return Err("sidebar actions belong to another session");
             }
-            keys.extend([
-                Key::Row(row.address.clone()),
-                Key::Select(row.address.clone()),
-                Key::Status(row.address.clone()),
-            ]);
+            if input.loaded {
+                keys.extend([
+                    Key::Row(row.address.clone()),
+                    Key::Select(row.address.clone()),
+                    Key::Status(row.address.clone()),
+                ]);
+            }
             let mut action_ids = BTreeSet::new();
             for action in &row.actions.items {
                 if action.id.is_empty() || !action_ids.insert(&action.id) {
                     return Err("invalid or duplicate shared action identity");
                 }
-                if input.selected.as_ref() == Some(&row.address) {
+                if input.loaded && input.selected.as_ref() == Some(&row.address) {
                     keys.insert(Key::Action(row.address.clone(), action.id.clone()));
                 }
             }
@@ -259,7 +287,7 @@ impl Sidebar {
         let mut old: BTreeMap<_, _> = old.into_iter().map(|row| (row.id(), row)).collect();
         let mut children = Vec::new();
         let mut bindings = BTreeMap::new();
-        for row in &input.rows {
+        for row in visible_rows {
             let row_id = ids[&Key::Row(row.address.clone())];
             let select_id = ids[&Key::Select(row.address.clone())];
             let status_id = ids[&Key::Status(row.address.clone())];
@@ -307,7 +335,19 @@ impl Sidebar {
         if children.is_empty() {
             children.push(Content::new(
                 ComponentId(self.root.0 + 5),
-                TextContent::new(&self.labels.empty),
+                TextContent::new(if input.loaded {
+                    &self.labels.empty
+                } else {
+                    &self.labels.restoring
+                }),
+            ));
+        }
+        // Independent failure notice: an observation error never turns retained
+        // inventory into an empty list or confirms an unrestored list as empty.
+        if let Some(error) = &input.error {
+            children.push(Content::new(
+                ComponentId(self.root.0 + 6),
+                TextContent::new(error),
             ));
         }
         self.rows_mut().rows.children = children;
@@ -320,8 +360,7 @@ impl Sidebar {
             .into_iter()
             .map(|content| (content.id(), content))
             .collect();
-        if let Some(row) = input
-            .rows
+        if let Some(row) = visible_rows
             .iter()
             .find(|row| input.selected.as_ref() == Some(&row.address))
         {
@@ -357,6 +396,7 @@ impl Sidebar {
         self.next = next;
         self.bindings = bindings;
         self.revision = input.revision;
+        self.displayed = Some(input.clone());
         Ok(())
     }
     /// Copy/rename are host gestures; execute goes to the shared dispatcher with stable RPC identity.

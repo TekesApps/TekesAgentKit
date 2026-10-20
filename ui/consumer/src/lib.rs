@@ -1530,3 +1530,31 @@ fn second_product_captures_real_turn_rows_without_interpreting_timestamps_or_scr
     view.update(&scope, 2, 8, &source, false).unwrap();
     assert!(view.validate_turn_target(&target).is_err());
 }
+
+#[test]
+fn sidebar_observation_exposes_restoration_and_failure_through_public_api() {
+    use tekes_agent_components_ui::{Sidebar, SidebarLabels};
+    use tekes_agent_ui_bindings::SidebarPublication;
+    let mut source = SidebarPublication {
+        revision: 1,
+        loaded: false,
+        rows: vec![],
+        error: None,
+    };
+    let mut sidebar = Sidebar::new(96, SidebarLabels::default());
+    sidebar.update(&source.input(None)).unwrap();
+    assert!(!sidebar.displayed_input().unwrap().loaded);
+    source.revision += 1;
+    source.error = Some("observation ended".into());
+    sidebar.update(&source.input(None)).unwrap();
+    assert!(!sidebar.displayed_input().unwrap().loaded);
+    assert_eq!(
+        sidebar.displayed_input().unwrap().error.as_deref(),
+        Some("observation ended")
+    );
+    source.revision += 1;
+    source.loaded = true;
+    source.error = None;
+    sidebar.update(&source.input(None)).unwrap();
+    assert!(sidebar.displayed_input().unwrap().loaded);
+}

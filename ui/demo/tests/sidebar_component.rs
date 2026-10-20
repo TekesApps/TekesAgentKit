@@ -58,6 +58,8 @@ fn same_session_ids_on_two_endpoints_keep_scoped_selection_and_authoritative_act
     let native = make_row("native", "same-id", true);
     let pi = make_row("pi", "same-id", true);
     let mut input = SidebarInput {
+        loaded: true,
+        error: None,
         revision: 1,
         rows: vec![native.clone(), pi.clone()],
         selected: Some(native.address.clone()),
@@ -126,6 +128,8 @@ fn same_session_ids_on_two_endpoints_keep_scoped_selection_and_authoritative_act
 fn stale_invalid_and_removed_inventory_never_retarget_actions_or_change_a_valid_tree() {
     let row = make_row("native", "a", true);
     let input = SidebarInput {
+        loaded: true,
+        error: None,
         revision: 8,
         rows: vec![row.clone()],
         selected: Some(row.address.clone()),
@@ -152,6 +156,8 @@ fn stale_invalid_and_removed_inventory_never_retarget_actions_or_change_a_valid_
     invalid.rows.push(row.clone());
     assert!(update(&mut host, root, &invalid).is_err());
     let empty = SidebarInput {
+        loaded: true,
+        error: None,
         revision: 9,
         rows: Vec::new(),
         selected: Some(row.address.clone()),
@@ -159,6 +165,8 @@ fn stale_invalid_and_removed_inventory_never_retarget_actions_or_change_a_valid_
     update(&mut host, root, &empty).unwrap();
     assert!(activate(&mut host, root, id).is_empty());
     let restored = SidebarInput {
+        loaded: true,
+        error: None,
         revision: 10,
         ..input
     };
@@ -178,6 +186,8 @@ fn shared_dispatch_rechecks_capabilities_instead_of_trusting_the_displayed_defin
     let mut sidebar = Sidebar::new(32, SidebarLabels::default());
     sidebar
         .update(&SidebarInput {
+            loaded: true,
+            error: None,
             revision: 1,
             rows: vec![row.clone()],
             selected: Some(row.address.clone()),
@@ -285,6 +295,8 @@ async fn service_input(agent: &tekes_agent_web::SharedAgent, revision: u64) -> S
         actions: agent.thread_actions(&endpoint, "a").unwrap(),
     };
     SidebarInput {
+        loaded: true,
+        error: None,
         revision,
         selected: Some(row.address.clone()),
         rows: vec![row],
@@ -366,4 +378,121 @@ async fn actual_shared_service_pin_receipt_and_reconnect_publish_authority_witho
         Some(true)
     );
     endpoint.runtime.stop().await.unwrap();
+}
+
+#[test]
+fn restoration_is_not_empty_and_observation_failure_keeps_readable_rows() {
+    let row = make_row("native", "a", true);
+    let mut input = SidebarInput {
+        revision: 1,
+        loaded: false,
+        error: None,
+        rows: vec![row.clone()], // A cached row cannot confirm initial restoration.
+        selected: Some(row.address.clone()),
+    };
+    let mut sidebar = Sidebar::new(34, SidebarLabels::default());
+    assert!(sidebar.displayed_input().is_none());
+    sidebar.update(&input).unwrap();
+    assert!(sidebar.row_id(&row.address).is_none());
+    let root = sidebar.id();
+    let mut host = sidebar.into_host().unwrap();
+    let labels = |host: &ContentHost| {
+        host.semantics()
+            .iter()
+            .map(|node| node.semantics.name.clone())
+            .collect::<Vec<_>>()
+    };
+    assert!(labels(&host).iter().any(|label| label == "正在恢复会话…"));
+    assert!(!labels(&host).iter().any(|label| label == "暂无会话"));
+    input.revision += 1;
+    input.loaded = true;
+    update(&mut host, root, &input).unwrap();
+    let id = host
+        .get(root)
+        .unwrap()
+        .component::<Sidebar>()
+        .unwrap()
+        .row_id(&row.address)
+        .unwrap();
+    let owner = host.get(id).unwrap().component::<ButtonContent>().unwrap() as *const _ as usize;
+    input.revision += 1;
+    input.error = Some("库存观察中断，保留最后列表".into());
+    input.rows[0].activity.is_stale = true;
+    update(&mut host, root, &input).unwrap();
+    assert_eq!(
+        host.get(id).unwrap().component::<ButtonContent>().unwrap() as *const _ as usize,
+        owner
+    );
+    assert!(
+        labels(&host)
+            .iter()
+            .any(|label| label == input.error.as_ref().unwrap())
+    );
+    assert_eq!(
+        activate(&mut host, root, id),
+        vec![SidebarIntent::Select {
+            address: row.address.clone()
+        }]
+    );
+    // A new unrestored authority must retire old interactive IDs immediately.
+    input.revision += 1;
+    input.loaded = false;
+    update(&mut host, root, &input).unwrap();
+    assert!(activate(&mut host, root, id).is_empty());
+    input.revision += 1;
+    input.loaded = true;
+    input.rows.clear();
+    input.error = None;
+    update(&mut host, root, &input).unwrap();
+    assert!(labels(&host).iter().any(|label| label == "暂无会话"));
+    assert!(!labels(&host).iter().any(|label| label == "正在恢复会话…"));
+}
+
+#[test]
+fn same_publication_cannot_replace_restoration_or_inventory() {
+    let input = SidebarInput {
+        revision: 1,
+        loaded: false,
+        error: None,
+        rows: vec![],
+        selected: None,
+    };
+    let mut sidebar = Sidebar::new(35, SidebarLabels::default());
+    sidebar.update(&input).unwrap();
+    sidebar.update(&input).unwrap();
+    let mut conflict = input.clone();
+    conflict.loaded = true;
+    assert_eq!(
+        sidebar.update(&conflict),
+        Err("conflicting sidebar publication")
+    );
+    assert_eq!(sidebar.displayed_input(), Some(&input));
+    conflict.revision = 2;
+    sidebar.update(&conflict).unwrap();
+    assert_eq!(sidebar.displayed_input(), Some(&conflict));
+}
+
+#[test]
+fn host_selection_changes_do_not_require_a_fabricated_inventory_revision() {
+    let a = make_row("native", "a", true);
+    let b = make_row("native", "b", true);
+    let mut input = SidebarInput {
+        revision: 1,
+        loaded: true,
+        error: None,
+        rows: vec![a.clone(), b.clone()],
+        selected: Some(a.address.clone()),
+    };
+    let mut sidebar = Sidebar::new(37, SidebarLabels::default());
+    sidebar.update(&input).unwrap();
+    let old_action = sidebar.action_id(&a.address, "copySessionId").unwrap();
+    input.selected = Some(b.address.clone());
+    sidebar.update(&input).unwrap();
+    assert_eq!(
+        sidebar.displayed_input().unwrap().selected,
+        Some(b.address.clone())
+    );
+    let root = sidebar.id();
+    let mut host = sidebar.into_host().unwrap();
+    assert!(activate(&mut host, root, old_action).is_empty());
 }

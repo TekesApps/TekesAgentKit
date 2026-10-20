@@ -34,6 +34,8 @@ use tekes_ui_tokens::{Palette, Theme};
 mod feedback_probe;
 #[path = "native_run_controls_selftest.rs"]
 mod run_controls_probe;
+#[path = "native_sidebar_restore_selftest.rs"]
+mod sidebar_restore_probe;
 #[path = "native_stream_selftest.rs"]
 mod stream_probe;
 #[path = "native_summary_sections_selftest.rs"]
@@ -51,6 +53,7 @@ impl Drop for OwnedFilePreview {
     }
 }
 struct Host {
+    sidebar_restore_probe: Option<sidebar_restore_probe::Probe>,
     summary_sections_probe: Option<summary_sections_probe::Probe>,
     visibility_probe: Option<visibility_probe::Probe>,
     feedback_probe: Option<feedback_probe::Probe>,
@@ -973,7 +976,11 @@ impl Host {
             }
         }
         let source = self.sidebar.snapshot();
-        if source.error != self.sidebar_error {
+        let source = self
+            .sidebar_restore_probe
+            .as_mut()
+            .map_or_else(|| source.clone(), |probe| probe.source(source.clone()));
+        if self.sidebar_restore_probe.is_none() && source.error != self.sidebar_error {
             self.sidebar_error = source.error.clone();
             if let Some(error) = &source.error {
                 self.failure(error.clone());
@@ -1017,6 +1024,10 @@ impl Host {
                 .expect("component frame");
         }
         window.set_animating(self.text.frame_requested);
+        if let Some(mut probe) = self.sidebar_restore_probe.take() {
+            probe.advance(self, window);
+            self.sidebar_restore_probe = Some(probe);
+        }
         if let Some(mut probe) = self.summary_sections_probe.take() {
             probe.advance(self, window);
             self.summary_sections_probe = Some(probe);
@@ -1997,6 +2008,17 @@ impl Host {
                 "NATIVE_AGENT_COMPONENTS_SELFTEST_OK composer+indicators+run-binding+synthetic-text-services+send+stream+cancel+draft-isolation+reconnect; physical-ime=false; transcript=false; reading-anchor=false"
             );
         }
+        if let Some(probe) = &self.sidebar_restore_probe {
+            assert!(
+                self.failures.is_empty(),
+                "Sidebar callback failures: {:?}",
+                self.failures
+            );
+            println!(
+                "NATIVE_AGENT_SIDEBAR_RESTORE_SELFTEST_RECEIPT {}",
+                probe.receipt()
+            );
+        }
         if let Some(probe) = &self.summary_sections_probe {
             assert!(
                 self.failures.is_empty(),
@@ -2319,8 +2341,9 @@ pub fn run() {
     let actions_selftest = args.iter().any(|arg| arg == "--thread-actions-selftest");
     let models_selftest = args.iter().any(|arg| arg == "--model-choices-selftest");
     let context_selftest = args.iter().any(|arg| arg == "--context-selftest");
+    let sidebar_restore_selftest = args.iter().any(|arg| arg == "--sidebar-restore-selftest");
     let summary_sections_selftest = args.iter().any(|arg| arg == "--summary-sections-selftest");
-    if summary_sections_selftest {
+    if summary_sections_selftest || sidebar_restore_selftest {
         assert!(
             !args
                 .iter()
@@ -2342,6 +2365,7 @@ pub fn run() {
             models_selftest,
             context_selftest,
             summary_sections_selftest,
+            sidebar_restore_selftest,
             creation_selftest,
             annotation_selftest
         ]
@@ -2667,6 +2691,7 @@ pub fn run() {
         0
     };
     let mut host = Host {
+        sidebar_restore_probe: sidebar_restore_selftest.then(sidebar_restore_probe::Probe::new),
         summary_sections_probe: summary_sections_selftest.then(summary_sections_probe::Probe::new),
         visibility_probe: visibility_selftest
             .then(|| visibility_probe::Probe::new(visibility_fixture)),

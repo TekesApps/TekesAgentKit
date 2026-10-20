@@ -211,7 +211,7 @@ impl SharedAgent {
                 row
             })
             .collect();
-        json!({"description":shared.description(),"sessions":sessions})
+        json!({"description":shared.description(),"sessions":sessions,"inventoryReady":state.inventory_ready})
     }
     pub fn install_thread_action_host(&mut self, host: Arc<dyn ThreadActionHost>) {
         self.thread_action_host = Some(host);
