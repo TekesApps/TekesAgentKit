@@ -159,7 +159,7 @@ impl FeedbackRequest {
         }
     }
 }
-fn validate(
+pub(crate) fn validate(
     source: &Arc<RunBinding>,
     frame: &FeedbackFrame,
     target: &FeedbackTargetCapture,

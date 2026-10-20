@@ -15,3 +15,5 @@ pub mod history_proof;
 pub mod turn_footnote_proof;
 
 pub mod readonly_child_proof;
+
+pub mod feedback_controls_proof;

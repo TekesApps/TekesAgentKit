@@ -1,4 +1,6 @@
 //! Agent-owned composition of public TekesUI controls. No endpoint or Run state machine.
+mod feedback;
+pub use feedback::*;
 mod readonly_transcript;
 pub use readonly_transcript::*;
 mod run_view;

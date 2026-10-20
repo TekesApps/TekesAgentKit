@@ -646,3 +646,358 @@ async fn simultaneous_preparations_from_one_observed_frame_admit_one_request() {
     assert_eq!(service.writes().len(), 1);
     runtime.stop().await.unwrap();
 }
+
+use tekes_agent_components_ui::{FeedbackGesture, FeedbackIds, TurnFeedback};
+use tekes_agent_ui_bindings::FeedbackUiAdoption;
+use tekes_ui_controls::composition::{AccessibilityAction, ComponentId, ContentEvent, ContentHost};
+fn control(host: &mut ContentHost, root: ComponentId) -> &mut TurnFeedback {
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<TurnFeedback>()
+        .unwrap()
+}
+fn activate(host: &mut ContentHost, root: ComponentId, id: ComponentId) -> Vec<FeedbackGesture> {
+    host.accessibility_action(id, None, AccessibilityAction::Press);
+    let actions = host.drain_actions();
+    control(host, root).take_intents(&actions)
+}
+fn ids(host: &mut ContentHost, root: ComponentId) -> FeedbackIds {
+    control(host, root).ids()
+}
+fn mounted(binding: &Arc<RunBinding>, frame: &FeedbackFrame) -> (ContentHost, ComponentId) {
+    let mut c = TurnFeedback::new(190, Default::default());
+    c.update(frame.controls(binding, &target(binding)).unwrap())
+        .unwrap();
+    let root = c.ids().root;
+    (c.into_host().unwrap(), root)
+}
+async fn dispatch_ui(
+    binding: &Arc<RunBinding>,
+    frame: &mut Option<FeedbackFrame>,
+    host: &mut ContentHost,
+    root: ComponentId,
+    gesture: FeedbackGesture,
+) {
+    match binding
+        .prepare_feedback_gesture(frame.as_ref(), gesture)
+        .execute()
+        .await
+        .apply(control(host, root))
+    {
+        FeedbackUiAdoption::Adopted(next) => *frame = next,
+        FeedbackUiAdoption::Ignored => panic!("current mount must adopt its completion"),
+    }
+}
+fn replace_note(host: &mut ContentHost, root: ComponentId, text: &str) {
+    let id = ids(host, root).editor;
+    host.focus(Some(id), true);
+    assert!(host.focused_text().is_some());
+    let len = control(host, root)
+        .editor()
+        .unwrap()
+        .input
+        .text
+        .encode_utf16()
+        .count();
+    host.accessibility_action(id, None, AccessibilityAction::SetSelection(0..len));
+    host.drain_actions();
+    host.event(&ContentEvent::Commit {
+        text: text.into(),
+        replacement: None,
+    });
+    host.drain_actions();
+}
+#[tokio::test]
+async fn feedback_controls_use_public_actions_and_upstream_ime_before_one_explicit_note_save() {
+    let (runtime, binding, service) = setup(true).await;
+    let initial = binding.read_feedback().await.unwrap();
+    let (mut host, root) = mounted(&binding, &initial);
+    let mut frame = Some(initial);
+    let id = ids(&mut host, root).positive;
+    let gesture = activate(&mut host, root, id).pop().unwrap();
+    let duplicate = gesture.clone();
+    let request = binding.prepare_feedback_gesture(frame.as_ref(), gesture);
+    // A duplicate bridge cannot retire the real in-flight gesture or its pending UI.
+    assert!(matches!(
+        binding
+            .prepare_feedback_gesture(frame.as_ref(), duplicate)
+            .execute()
+            .await
+            .apply(control(&mut host, root)),
+        FeedbackUiAdoption::Ignored
+    ));
+    assert!(control(&mut host, root).is_pending());
+    match request.execute().await.apply(control(&mut host, root)) {
+        FeedbackUiAdoption::Adopted(next) => frame = next,
+        _ => panic!("apply"),
+    }
+    assert_eq!(service.writes().len(), 1);
+    let id = ids(&mut host, root).edit_note;
+    assert!(activate(&mut host, root, id).is_empty());
+    replace_note(&mut host, root, " \n\u{feff}中文备注\u{feff} \n");
+    let editor_id = ids(&mut host, root).editor;
+    host.event(&ContentEvent::Preedit {
+        text: "ni".into(),
+        selection: 2..2,
+        clauses: std::iter::once(0..2).collect(),
+        replacement: None,
+    });
+    host.drain_actions();
+    let actions = host.drain_actions();
+    assert!(control(&mut host, root).take_intents(&actions).is_empty());
+    assert!(control(&mut host, root).is_composing());
+    let save = ids(&mut host, root).save;
+    assert!(activate(&mut host, root, save).is_empty());
+    let close = ids(&mut host, root).close;
+    assert!(activate(&mut host, root, close).is_empty());
+    assert!(control(&mut host, root).is_open());
+    host.event(&ContentEvent::Commit {
+        text: String::new(),
+        replacement: None,
+    });
+    host.drain_actions();
+    replace_note(&mut host, root, " \n\u{feff}中文备注\u{feff} \n");
+    // Generic Submit/Enter never invokes the Agent save action.
+    host.event(&ContentEvent::TextCommand("insertNewline:".into()));
+    let actions = host.drain_actions();
+    assert!(control(&mut host, root).take_intents(&actions).is_empty());
+    assert_eq!(service.writes().len(), 1);
+    assert_eq!(ids(&mut host, root).editor, editor_id);
+    let save = ids(&mut host, root).save;
+    let gesture = activate(&mut host, root, save).pop().unwrap();
+    dispatch_ui(&binding, &mut frame, &mut host, root, gesture).await;
+    assert!(!control(&mut host, root).is_open());
+    assert_eq!(
+        frame.as_ref().unwrap().records().items[0].note.as_deref(),
+        Some("中文备注")
+    );
+    let positive = ids(&mut host, root).positive;
+    let gesture = activate(&mut host, root, positive).pop().unwrap();
+    dispatch_ui(&binding, &mut frame, &mut host, root, gesture).await;
+    assert!(frame.as_ref().unwrap().records().items.is_empty());
+    assert_eq!(service.writes().len(), 3);
+    runtime.stop().await.unwrap();
+}
+#[tokio::test]
+async fn note_conflict_preserves_editor_and_unknown_outcome_requires_explicit_read() {
+    let (runtime, binding, service) = setup(true).await;
+    let target = target(&binding);
+    let initial = binding.read_feedback().await.unwrap();
+    let rated = apply(prepare(
+        &binding,
+        &initial,
+        &target,
+        Change::ToggleRating(Rating::Positive),
+    ))
+    .await;
+    let (mut host, root) = mounted(&binding, &rated);
+    let mut frame = Some(rated);
+    let note = ids(&mut host, root).edit_note;
+    activate(&mut host, root, note);
+    replace_note(&mut host, root, "本地草稿");
+    let editor_id = ids(&mut host, root).editor;
+    let remote = json!({"messageId":target.message_id(),"rating":"negative","version":"other","note":"远端"});
+    service
+        .state
+        .lock()
+        .unwrap()
+        .records
+        .insert(target.message_id().into(), remote);
+    let save = ids(&mut host, root).save;
+    let gesture = activate(&mut host, root, save).pop().unwrap();
+    dispatch_ui(&binding, &mut frame, &mut host, root, gesture).await;
+    assert_eq!(
+        control(&mut host, root).editor().unwrap().input.text,
+        "本地草稿"
+    );
+    assert_eq!(ids(&mut host, root).editor, editor_id);
+    assert_eq!(
+        frame.as_ref().unwrap().records().items[0].rating,
+        Rating::Negative
+    );
+    assert!(control(&mut host, root).notice().contains("别处"));
+    service.state.lock().unwrap().fault = Some(Fault::TimeoutAfterApply);
+    let save = ids(&mut host, root).save;
+    let gesture = activate(&mut host, root, save).pop().unwrap();
+    dispatch_ui(&binding, &mut frame, &mut host, root, gesture).await;
+    assert!(frame.is_none());
+    assert!(control(&mut host, root).needs_refresh());
+    let count = service.writes().len();
+    let save = ids(&mut host, root).save;
+    assert!(activate(&mut host, root, save).is_empty());
+    assert_eq!(service.writes().len(), count);
+    let refresh = ids(&mut host, root).refresh;
+    let gesture = activate(&mut host, root, refresh).pop().unwrap();
+    dispatch_ui(&binding, &mut frame, &mut host, root, gesture).await;
+    assert!(!control(&mut host, root).needs_refresh());
+    assert!(control(&mut host, root).is_open());
+    assert_eq!(
+        control(&mut host, root).editor().unwrap().input.text,
+        "本地草稿"
+    );
+    assert_eq!(
+        frame.unwrap().records().items[0].note.as_deref(),
+        Some("本地草稿")
+    );
+    assert_eq!(service.writes().len(), count);
+    runtime.stop().await.unwrap();
+}
+#[tokio::test]
+async fn closing_during_note_save_retains_row_failure_and_foreign_mount_ignores_completion() {
+    let (runtime, binding, service) = setup(true).await;
+    let initial = binding.read_feedback().await.unwrap();
+    let rated = apply(prepare(
+        &binding,
+        &initial,
+        &target(&binding),
+        Change::ToggleRating(Rating::Positive),
+    ))
+    .await;
+    let (mut host, root) = mounted(&binding, &rated);
+    let note = ids(&mut host, root).edit_note;
+    activate(&mut host, root, note);
+    replace_note(&mut host, root, "不可串草稿");
+    service.state.lock().unwrap().fault = Some(Fault::Remote(json!({"code":"rejected"})));
+    let save = ids(&mut host, root).save;
+    let gesture = activate(&mut host, root, save).pop().unwrap();
+    let request = binding.prepare_feedback_gesture(Some(&rated), gesture);
+    let close = ids(&mut host, root).close;
+    activate(&mut host, root, close);
+    assert!(!control(&mut host, root).is_open());
+    let FeedbackUiAdoption::Adopted(Some(frame)) =
+        request.execute().await.apply(control(&mut host, root))
+    else {
+        panic!("known rejection")
+    };
+    assert!(!control(&mut host, root).is_open());
+    assert!(!control(&mut host, root).notice().is_empty());
+    let positive = ids(&mut host, root).positive;
+    let gesture = activate(&mut host, root, positive).pop().unwrap();
+    let request = binding.prepare_feedback_gesture(Some(&frame), gesture);
+    let mut new_mount = TurnFeedback::new(190, Default::default());
+    assert!(matches!(
+        request.execute().await.apply(&mut new_mount),
+        FeedbackUiAdoption::Ignored
+    ));
+    assert!(new_mount.state().is_none());
+    runtime.stop().await.unwrap();
+}
+#[tokio::test]
+async fn removed_rating_conflict_closes_note_without_resubmit_and_readonly_capabilities_stay_disabled()
+ {
+    let (runtime, binding, service) = setup(true).await;
+    let initial = binding.read_feedback().await.unwrap();
+    let rated = apply(prepare(
+        &binding,
+        &initial,
+        &target(&binding),
+        Change::ToggleRating(Rating::Positive),
+    ))
+    .await;
+    let (mut host, root) = mounted(&binding, &rated);
+    let mut frame = Some(rated);
+    let note = ids(&mut host, root).edit_note;
+    activate(&mut host, root, note);
+    replace_note(&mut host, root, "保留到冲突");
+    service.state.lock().unwrap().records.clear();
+    let save = ids(&mut host, root).save;
+    let gesture = activate(&mut host, root, save).pop().unwrap();
+    dispatch_ui(&binding, &mut frame, &mut host, root, gesture).await;
+    assert!(!control(&mut host, root).is_open());
+    assert!(frame.unwrap().records().items.is_empty());
+    assert!(control(&mut host, root).notice().contains("别处"));
+    runtime.stop().await.unwrap();
+    let (runtime, binding, service) = setup(false).await;
+    let frame = binding.read_feedback().await.unwrap();
+    let (mut host, root) = mounted(&binding, &frame);
+    let positive = ids(&mut host, root).positive;
+    assert!(activate(&mut host, root, positive).is_empty());
+    assert!(service.writes().is_empty());
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn repeated_control_frames_retain_ids_and_invalid_completions_cannot_poison_pending_target() {
+    let (runtime, binding, _) = setup(true).await;
+    let frame = binding.read_feedback().await.unwrap();
+    let state = frame.controls(&binding, &target(&binding)).unwrap();
+    let (mut host, root) = mounted(&binding, &frame);
+    let initial = ids(&mut host, root);
+    control(&mut host, root).update(state.clone()).unwrap();
+    assert_eq!(ids(&mut host, root).positive, initial.positive);
+    let gesture = activate(&mut host, root, initial.positive).pop().unwrap();
+    let request = binding.prepare_feedback_gesture(Some(&frame), gesture.clone());
+    let mut bad = state;
+    bad.publication += 1;
+    bad.current = Some(
+        serde_json::from_value(json!({"messageId":"foreign","rating":"positive","version":"v"}))
+            .unwrap(),
+    );
+    assert!(!control(&mut host, root).complete(
+        &gesture,
+        tekes_agent_components_ui::FeedbackControlResult::Conflict(bad)
+    ));
+    assert!(control(&mut host, root).is_pending());
+    assert!(control(&mut host, root).state().unwrap().current.is_none());
+    assert!(matches!(
+        request.execute().await.apply(control(&mut host, root)),
+        FeedbackUiAdoption::Adopted(Some(_))
+    ));
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn cold_feedback_control_can_explicitly_load_without_treating_unread_as_absent() {
+    let (runtime, binding, service) = setup(true).await;
+    let mut ui = TurnFeedback::new(190, Default::default());
+    ui.bind_target(target(&binding)).unwrap();
+    let root = ui.ids().root;
+    let mut host = ui.into_host().unwrap();
+    let positive = ids(&mut host, root).positive;
+    assert!(activate(&mut host, root, positive).is_empty());
+    assert!(control(&mut host, root).state().is_none());
+    let refresh = ids(&mut host, root).refresh;
+    let gesture = activate(&mut host, root, refresh).pop().unwrap();
+    let mut frame = None;
+    dispatch_ui(&binding, &mut frame, &mut host, root, gesture).await;
+    assert!(frame.is_some());
+    assert!(control(&mut host, root).state().unwrap().current.is_none());
+    assert!(service.writes().is_empty());
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn fresh_authoritative_read_can_close_removed_rating_while_old_save_is_inflight() {
+    let (runtime, binding, service) = setup(true).await;
+    let frame = binding.read_feedback().await.unwrap();
+    let rated = apply(prepare(
+        &binding,
+        &frame,
+        &target(&binding),
+        Change::ToggleRating(Rating::Positive),
+    ))
+    .await;
+    let (mut host, root) = mounted(&binding, &rated);
+    let note = ids(&mut host, root).edit_note;
+    activate(&mut host, root, note);
+    replace_note(&mut host, root, "旧保存");
+    let save = ids(&mut host, root).save;
+    let gesture = activate(&mut host, root, save).pop().unwrap();
+    let request = binding.prepare_feedback_gesture(Some(&rated), gesture);
+    service.delay.store(true, Ordering::Release);
+    let execution = tokio::spawn(request.execute());
+    service.entered.notified().await;
+    service.state.lock().unwrap().records.clear();
+    let fresh = binding.read_feedback().await.unwrap();
+    let state = fresh.controls(&binding, &target(&binding)).unwrap();
+    control(&mut host, root).update(state.clone()).unwrap();
+    assert!(!control(&mut host, root).is_open());
+    service.release.notify_one();
+    assert!(matches!(
+        execution.await.unwrap().apply(control(&mut host, root)),
+        FeedbackUiAdoption::Ignored
+    ));
+    assert_eq!(control(&mut host, root).state(), Some(&state));
+    assert_eq!(service.writes().len(), 2);
+    runtime.stop().await.unwrap();
+}

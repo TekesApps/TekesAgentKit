@@ -18,8 +18,13 @@ rating/note gesture. A prepared request atomically claims the frame, has a fixed
 RPC ID, is not Clone, and consumes itself on execute. Handle Applied / Conflict /
 Rejected / NeedsRefresh without optimistic success or automatic retries. Dispatch
 is fenced at the runtime actor epoch; hosts still guard mount/navigation adoption.
-Versions are opaque; same-value writes need not advance them. Controls and the note
-editor remain pending. See the [read contract](../../docs/rust-agent-ui-feedback-read-20261020.md)
+Versions are opaque; same-value writes need not advance them. Public `TurnFeedback` now supplies rating/note gestures. Use
+`frame.controls(&source, &capture)` for its committed input, and synchronously
+`source.prepare_feedback_gesture(frame.as_ref(), gesture)` before scheduling.
+Completion `apply` returns Ignored (keep current frame) or Adopted (replace with
+the supplied optional frame). Cold/unknown states use explicit Refresh. See the
+[control contract](../../docs/rust-agent-ui-feedback-controls-20261020.md);
+formal Transcript footnote integration remains pending. See the [read contract](../../docs/rust-agent-ui-feedback-read-20261020.md)
 and [CAS contract](../../docs/rust-agent-ui-feedback-cas-20261020.md).
 
 Choose the source explicitly:

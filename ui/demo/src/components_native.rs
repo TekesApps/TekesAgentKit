@@ -3159,6 +3159,50 @@ pub fn run() {
         } else {
             serde_json::Value::Null
         };
+        let feedback_controls_proof = if args.iter().any(|arg| arg == "--feedback-controls-proof") {
+            let source = host.view.binding().clone();
+            let (mut controls, frame) = host
+                .executor
+                .block_on(tekes_agent_ui_demo::feedback_controls_proof::start(&source))
+                .expect("feedback controls start");
+            for (name, theme) in [("light", Theme::LIGHT), ("dark", Theme::DARK)] {
+                let palette = Palette::from(theme);
+                let mut scene = Scene::new();
+                let clip = Rect::new(0., 0., 640., 520.);
+                host.text.atlas.begin_frame();
+                controls
+                    .render(&mut scene, &mut host.text, clip.inset(16.), clip, palette)
+                    .unwrap();
+                let bytes = Renderer::new_headless()
+                    .unwrap()
+                    .render_to_rgba8(
+                        &scene,
+                        &mut host.text.atlas,
+                        (640, 520),
+                        1.,
+                        palette.color("surface-1").unwrap(),
+                    )
+                    .unwrap();
+                let path = format!("{}-feedback-{name}.png", args.get(index + 1).unwrap());
+                let mut encoder = png::Encoder::new(std::fs::File::create(path).unwrap(), 640, 520);
+                encoder.set_color(png::ColorType::Rgba);
+                encoder.set_depth(png::BitDepth::Eight);
+                encoder
+                    .write_header()
+                    .unwrap()
+                    .write_image_data(&bytes)
+                    .unwrap();
+            }
+            host.executor
+                .block_on(tekes_agent_ui_demo::feedback_controls_proof::finish(
+                    &source,
+                    &mut controls,
+                    frame,
+                ))
+                .expect("feedback controls cleanup")
+        } else {
+            serde_json::Value::Null
+        };
         let bounded_child_proof = if args.iter().any(|arg| arg == "--bounded-child-proof") {
             let index = args
                 .iter()
@@ -3355,7 +3399,7 @@ pub fn run() {
         println!(
             "{}",
             serde_json::json!({
-                "runViewComposition":run_view_proof,"boundedChildProof":bounded_child_proof,"feedbackReadProof":feedback_read_proof,"feedbackWriteProof":feedback_write_proof,
+                "runViewComposition":run_view_proof,"boundedChildProof":bounded_child_proof,"feedbackReadProof":feedback_read_proof,"feedbackWriteProof":feedback_write_proof,"feedbackControlsProof":feedback_controls_proof,
                 "offscreen": true, "components": true, "nativeInteraction": false,
                 "transcriptView": false, "isStale": snapshot.transcript.is_stale,
                 "transcriptItems": snapshot.transcript.items.len(),

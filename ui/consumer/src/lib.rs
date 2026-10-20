@@ -1101,3 +1101,27 @@ fn second_product_mounts_child_history_without_composer_or_run_surface() {
             .disabled
     );
 }
+
+/// A second host consumes the same original-binding gesture bridge; it does not
+/// assemble RPC payloads or implement feedback retry/optimistic state.
+pub fn feedback_request(
+    source: &std::sync::Arc<tekes_agent_ui_bindings::RunBinding>,
+    frame: Option<&tekes_agent_ui_bindings::FeedbackFrame>,
+    gesture: tekes_agent_components_ui::FeedbackGesture,
+) -> tekes_agent_ui_bindings::FeedbackUiRequest {
+    source.prepare_feedback_gesture(frame, gesture)
+}
+#[test]
+fn independent_host_mounts_feedback_without_a_demo_or_private_binding_type() {
+    let controls = tekes_agent_components_ui::TurnFeedback::new(92, Default::default());
+    let root = controls.ids().root;
+    let host = controls.into_host().unwrap();
+    assert!(
+        host.get(root)
+            .unwrap()
+            .component::<tekes_agent_components_ui::TurnFeedback>()
+            .unwrap()
+            .state()
+            .is_none()
+    );
+}

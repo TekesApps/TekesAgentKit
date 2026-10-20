@@ -18,6 +18,7 @@ parser.add_argument('--ui-annotation-editor',action='store_true',help='Exercise 
 parser.add_argument('--ui-attachments',action='store_true',help='Exercise public upload entry, original draft, Send, history and capability-specific file reads')
 parser.add_argument('--ui-bounded-child',action='store_true',help='Verify actual read-only Native child messages through the public component; requires components and Kernel')
 parser.add_argument('--ui-feedback-read',action='store_true',help='Read typed committed feedback and verify proven final response IDs; no mutations or rating controls')
+parser.add_argument('--ui-feedback-controls',action='store_true',help='Exercise public feedback controls and note editing over isolated real transports; offscreen only')
 parser.add_argument('--ui-feedback-write',action='store_true',help='Mutating CAS/note proof on isolated fixture targets; no rating UI acceptance')
 parser.add_argument('--ui-turn-footnote',action='store_true',help='Opt in to shared completed-turn fork in isolated UI sessions; requires components')
 parser.add_argument('--ui-transcript-content',action='store_true',help='Mount the canonical mixed content tree with a generic TekesUI viewport; no keyed reading acceptance')
@@ -25,6 +26,8 @@ parser.add_argument('--ui-message-rows',action='store_true',help='Mount canonica
 parser.add_argument('--ui-history-pages',action='store_true',help='Seed long isolated sessions and verify public page receipts, original scope and fresh reconnect history')
 parser.add_argument('--ui-actionables',action='store_true',help='Exercise public actionable cards on configured Native/Pi/DSH question sources')
 args=parser.parse_args()
+if args.ui_feedback_controls and not (args.ui_demo and args.ui_components and args.ui_transcript_content):
+    parser.error('--ui-feedback-controls requires --ui-demo, --ui-components and --ui-transcript-content')
 if args.ui_feedback_write and not (args.ui_demo and args.ui_components and args.ui_transcript_content):
     parser.error('--ui-feedback-write requires --ui-demo, --ui-components and --ui-transcript-content')
 if args.ui_feedback_read and not (args.ui_demo and args.ui_components and args.ui_transcript_content):
@@ -244,6 +247,7 @@ def ui_smoke(config, first, bounded_child=None):
     if bounded_child:mode+=['--bounded-child-proof','--bounded-child-id',bounded_child]
     if args.ui_feedback_read:mode+=['--feedback-read-proof']
     if args.ui_feedback_write:mode+=['--feedback-write-proof']
+    if args.ui_feedback_controls:mode+=['--feedback-controls-proof']
     if (args.ui_model_choices and bounded_child is None):mode+=['--model-choice-proof']
     if (args.ui_context and bounded_child is None) or (args.ui_annotation_editor and bounded_child is None):mode+=['--context-proof']
     if (args.ui_annotation_editor and bounded_child is None):mode+=['--annotation-proof']
@@ -281,6 +285,10 @@ def ui_smoke(config, first, bounded_child=None):
             feedback=receipt['feedbackWriteProof']
             assert feedback['mutated'] and all(feedback[key] for key in ('originalScope','duplicateFrameRejected','casConflictCurrent','noteSave','setRatingPreservesNote','newJudgmentClearsNote','sameRatingDeletes','sameValueSet','serverTimestamp','opaqueVersions','freshReadAfterDelete','draftsPreserved')),feedback
             assert not feedback['ratingControls'] and not feedback['nativeInteraction'],feedback
+        if args.ui_feedback_controls:
+            feedback=receipt['feedbackControlsProof']
+            assert all(feedback[key] for key in ('publicControls','semanticActions','committedNoteReopened','trimmedChineseNote','blankClearsNote','sameRatingDeletes','freshReadAfterDelete','draftPreserved','lightDarkRendered')),feedback
+            assert not feedback['nativeInteraction'] and not feedback['physicalIme'] and not feedback['embeddedTranscript'],feedback
         assert not content['keyedReadingAcceptance'] and not content['richContent'] and not content['completeTranscript'],content
         print(kind.upper()+'_UI_TRANSCRIPT_CONTENT_OK canonical-mixed-tree+stable-identities+role-layout+public-generic-viewport; keyed-reading=false; native-interaction=false',flush=True)
     if (args.ui_message_rows and bounded_child is None):

@@ -2,6 +2,8 @@
 //!
 //! This adapter retains history observations and projects existing presentation;
 //! it does not implement a Run state machine, renderer, or window event loop.
+mod feedback_controls;
+pub use feedback_controls::*;
 mod history;
 pub use history::*;
 mod attachments;

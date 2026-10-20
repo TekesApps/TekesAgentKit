@@ -1,0 +1,111 @@
+{
+  "date": "2026-10-20",
+  "status": "experimental-independent-feedback-controls",
+  "publishedAgentKitBaseline": "v0.3.8",
+  "clientKitReadOnlyHead": "c289bc9d33edcd83a782ac17927a8c65a027eccd",
+  "tests": {
+    "uiWorkspace": 270,
+    "feedbackBindingAndControls": 19,
+    "scripts": 21,
+    "rootUnchangedBaseline": {
+      "tests": 158,
+      "commit": "547a9e86391232c54a9f8aff699e938a7a66e408",
+      "evidence": "rust-agent-ui-feedback-cas-20261020.json"
+    }
+  },
+  "strictUiClippy": true,
+  "publicConsumerIncluded": true,
+  "resolvedTekesui": {
+    "rev": "8cf0840790334ba224afc0595897c74231c712e6",
+    "packages": 8,
+    "inputs": 199,
+    "sha256": "f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f"
+  },
+  "binarySha256": "f2b23a0e2c7881a7a2ffc44dfc8431b5b164603d168b734326d2563345205b14",
+  "realControlReceipts": {
+    "PI": {
+      "blankClearsNote": true,
+      "committedNoteReopened": true,
+      "draftPreserved": true,
+      "embeddedTranscript": false,
+      "freshReadAfterDelete": true,
+      "lightDarkRendered": true,
+      "nativeInteraction": false,
+      "physicalIme": false,
+      "publicControls": true,
+      "sameRatingDeletes": true,
+      "semanticActions": true,
+      "trimmedChineseNote": true
+    },
+    "DSH": {
+      "blankClearsNote": true,
+      "committedNoteReopened": true,
+      "draftPreserved": true,
+      "embeddedTranscript": false,
+      "freshReadAfterDelete": true,
+      "lightDarkRendered": true,
+      "nativeInteraction": false,
+      "physicalIme": false,
+      "publicControls": true,
+      "sameRatingDeletes": true,
+      "semanticActions": true,
+      "trimmedChineseNote": true
+    },
+    "NATIVE": {
+      "blankClearsNote": true,
+      "committedNoteReopened": true,
+      "draftPreserved": true,
+      "embeddedTranscript": false,
+      "freshReadAfterDelete": true,
+      "lightDarkRendered": true,
+      "nativeInteraction": false,
+      "physicalIme": false,
+      "publicControls": true,
+      "sameRatingDeletes": true,
+      "semanticActions": true,
+      "trimmedChineseNote": true
+    }
+  },
+  "screenshots": {
+    "NATIVE-light": {
+      "path": "/tmp/agentkit-feedback-controls-audited.png-feedback-light.png",
+      "sha256": "ce1338c44243987e487a2694c811070fdc5d719616ef032317da33fede9a04a6"
+    },
+    "NATIVE-dark": {
+      "path": "/tmp/agentkit-feedback-controls-audited.png-feedback-dark.png",
+      "sha256": "80b2e8dfce2ecab7777521e8c75fde3d7cbc88eb0dc8a7d5e486c9eb67462ae8"
+    },
+    "PI-light": {
+      "path": "/tmp/agentkit-feedback-controls-audited-pi.png-feedback-light.png",
+      "sha256": "ce1338c44243987e487a2694c811070fdc5d719616ef032317da33fede9a04a6"
+    },
+    "PI-dark": {
+      "path": "/tmp/agentkit-feedback-controls-audited-pi.png-feedback-dark.png",
+      "sha256": "80b2e8dfce2ecab7777521e8c75fde3d7cbc88eb0dc8a7d5e486c9eb67462ae8"
+    },
+    "DSH-light": {
+      "path": "/tmp/agentkit-feedback-controls-audited-dsh.png-feedback-light.png",
+      "sha256": "ce1338c44243987e487a2694c811070fdc5d719616ef032317da33fede9a04a6"
+    },
+    "DSH-dark": {
+      "path": "/tmp/agentkit-feedback-controls-audited-dsh.png-feedback-dark.png",
+      "sha256": "80b2e8dfce2ecab7777521e8c75fde3d7cbc88eb0dc8a7d5e486c9eb67462ae8"
+    }
+  },
+  "testLogs": {
+    "ui": "/tmp/agentkit-feedback-controls-ui-delivery.log",
+    "clippy": "/tmp/agentkit-feedback-controls-clippy-delivery.log",
+    "scripts": "/tmp/agentkit-feedback-controls-scripts.log",
+    "real": "/tmp/agentkit-feedback-controls-real-audited.log",
+    "latestInFlightAuthority": "/tmp/agentkit-feedback-controls-authority-final.log"
+  },
+  "syntheticMarkedTextBarrier": true,
+  "coldStateDistinctFromAbsent": true,
+  "inflightSupersededByAuthoritativeRead": true,
+  "embeddedTranscript": false,
+  "nativeInteraction": false,
+  "physicalIme": false,
+  "readingAnchorAcceptance": false,
+  "richContentAcceptance": false,
+  "completeGoal": false
+}
