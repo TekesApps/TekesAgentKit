@@ -16,8 +16,11 @@ parser.add_argument('--ui-context',action='store_true',help='Exercise draft cont
 parser.add_argument('--ui-initial-presets',action='store_true',help='Exercise public initial preset selection through shared create and prompt in isolated component sessions')
 parser.add_argument('--ui-annotation-editor',action='store_true',help='Exercise public annotation editing and shared context compilation; implies the context proof')
 parser.add_argument('--ui-attachments',action='store_true',help='Exercise public upload entry, original draft, Send, history and capability-specific file reads')
+parser.add_argument('--ui-history-pages',action='store_true',help='Seed long isolated sessions and verify public page receipts, original scope and fresh reconnect history')
 parser.add_argument('--ui-actionables',action='store_true',help='Exercise public actionable cards on configured Native/Pi/DSH question sources')
 args=parser.parse_args()
+if args.ui_history_pages and not args.ui_components:
+    parser.error('--ui-history-pages requires --ui-components')
 if args.ui_actionables and not args.ui_components:
     parser.error('--ui-actionables requires --ui-components')
 if args.ui_model_choices and not args.ui_components:
@@ -180,6 +183,16 @@ def ui_smoke(config, first):
         first=str(uuid.uuid4())
         execute(dict(config,commands=[{'op':'call','method':'session.create','args':{'sessionId':first,'execution':{'cwd':str(cwd),'read_roots':[],'writable_roots':[],'toolchain_roots':[],'network':False,'allowed_tools':['ask_user_questions'],'mcp':[]}}},
             {'op':'call','sessionId':first,'method':'session.selectModel','args':{'provider':providers['providers'][0]['id'],'model':providers['providers'][0]['models'][0]['id']}}]))
+    if args.ui_history_pages:
+        model=next(command['args'] for command in config['commands'] if command.get('method')=='session.selectModel')
+        if not (kind=='native' and args.ui_actionables):
+            first=next(row['result']['sessionId'] for row in execute(dict(config,commands=[{'op':'create','cwd':str(cwd)}])) if row.get('op')=='create')
+        history=[{'op':'call','sessionId':first,'method':'session.selectModel','args':model},{'op':'open','sessionId':first}]
+        for turn in range(1,29):
+            text='UI_HISTORY_PAGE_TURN_'+str(turn)
+            history += [{'op':'compose','sessionId':first,'text':text},{'op':'waitSettled','sessionId':first,'inputText':text}]
+        execute(dict(config,commands=history))
+        print(kind.upper()+'_UI_HISTORY_SEEDED turns=28 exact-input+completed-reply',flush=True)
     second=next(row['result']['sessionId'] for row in execute(dict(config,commands=[{'op':'create','cwd':str(cwd)}])) if row.get('op')=='create')
     explicit={'kind':kind,'endpointId':kind+'-ui','sessions':[first,second]}
     ui_env=dict(os.environ)
@@ -202,6 +215,7 @@ def ui_smoke(config, first):
     if args.ui_annotation_editor:mode+=['--annotation-proof']
     if args.ui_attachments:mode+=['--upload-proof']
     if args.ui_actionables:mode+=['--actionable-proof']
+    if args.ui_history_pages:mode+=['--history-page-proof']
     if args.ui_initial_presets:mode+=['--initial-preset-proof','--initial-preset-cwd',str(cwd)]
     ui=subprocess.run([str(args.ui_demo.resolve()),*mode,'--endpoint-config',str(path),'--offscreen',str(output)],env=ui_env,text=True,capture_output=True,timeout=60)
     assert ui.returncode==0,ui.stderr[-3000:]
@@ -221,6 +235,10 @@ def ui_smoke(config, first):
         # Pi extension commands can retain a local echo with no native user entry.
         # Unknown positions are explicit, never promoted to a fake source sequence.
         assert all(fact['kind']=='message' and fact['provisional'] and fact['recordId'] is None and fact['sourceSequence'] is None for fact in unplaced),document
+        if args.ui_history_pages:
+            proof=receipt['historyPagingProof']
+            assert all(proof[key] for key in ('originalScope','extended','frozenCut','otherDraftPreserved','sourceStatusPublished','newEpochHistoryRetained','noDuplicateMessages','oldReceiptInvalidated')),proof
+            assert proof['retainedMessages']>=1 and not proof['nativeInteraction'] and not proof['readingAnchorAcceptance'],proof
         if args.ui_actionables:
             proof=receipt['actionableProof']
             assert all(proof[key] for key in ('probeConfigured','publicComposer','publicCard','originalScope','oneAttempt','sharedResolved','canonicalAnswerRecord','otherDraftPreserved','freshHistoryAfterReconnect','reconnectNoDuplicateInput')),proof

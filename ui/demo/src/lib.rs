@@ -7,3 +7,5 @@ pub mod component_demo;
 pub mod file_preview_host;
 pub mod notifications;
 pub mod upload_proof;
+
+pub mod history_proof;

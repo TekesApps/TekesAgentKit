@@ -305,7 +305,13 @@ async fn main() -> Result<()> {
                             s.sessions.get(id).is_some_and(|s| {
                                 s.journal_ready
                                     && !s.run_open
-                                    && if let Some(native) = &s.native_conversation {
+                                    && if let Some(text) = command["inputText"].as_str() {
+                                        tekes_agent_presentation::TranscriptSnapshot::read(
+                                            &RunScope::main(identity, id),
+                                            s,
+                                        )
+                                        .is_ok_and(|snapshot| settled_reply_after(&snapshot, text))
+                                    } else if let Some(native) = &s.native_conversation {
                                         native
                                             .entries
                                             .iter()
@@ -462,4 +468,97 @@ fn resolve_variables(mut value: Value, variables: &BTreeMap<String, Value>) -> R
         _ => {}
     }
     Ok(value)
+}
+
+/// Match the latest exact authored input, never an absolute count in a clipped window.
+fn settled_reply_after(
+    snapshot: &tekes_agent_presentation::TranscriptSnapshot,
+    text: &str,
+) -> bool {
+    use tekes_agent_presentation::TranscriptItemKind;
+    let Some(index) = snapshot.items.iter().rposition(|item| {
+        item.kind == TranscriptItemKind::User && !item.is_provisional && item.text == text
+    }) else {
+        return false;
+    };
+    let turn = &snapshot.items[index].turn_id;
+    snapshot.items[index + 1..].iter().any(|item| {
+        item.turn_id == *turn
+            && item.kind == TranscriptItemKind::Assistant
+            && item.is_final
+            && !item.is_provisional
+    })
+}
+
+#[cfg(test)]
+mod settled_tests {
+    use super::*;
+    fn source(
+        messages: Vec<(&str, &str)>,
+        streaming: bool,
+    ) -> tekes_agent_presentation::TranscriptSnapshot {
+        let entries:Vec<_>=messages.into_iter().enumerate().map(|(n,(role,text))|json!({"type":"message","id":format!("entry-{n}"),"message":{"role":role,"timestamp":n,"content":text}})).collect();
+        let session = tekes_agent_session::SessionProjection {
+            journal_ready: true,
+            native_conversation: Some(NativeConversationSnapshot {
+                session_id: "s".into(),
+                generation: "g".into(),
+                leaf_id: entries
+                    .last()
+                    .and_then(|entry| entry["id"].as_str())
+                    .map(str::to_owned),
+                entries,
+                has_more_before: true,
+                is_streaming: streaming,
+                state: json!({}),
+            }),
+            ..Default::default()
+        };
+        tekes_agent_presentation::TranscriptSnapshot::read(&RunScope::main("e", "s"), &session)
+            .unwrap()
+    }
+    #[test]
+    fn exact_input_requires_its_own_completed_reply_in_the_current_window() {
+        assert!(!settled_reply_after(
+            &source(vec![("user", "old"), ("assistant", "reply")], false),
+            "target"
+        ));
+        assert!(!settled_reply_after(
+            &source(vec![("user", "target")], false),
+            "target"
+        ));
+        assert!(!settled_reply_after(
+            &source(vec![("user", "target"), ("assistant", "reply")], true),
+            "target"
+        ));
+        assert!(settled_reply_after(
+            &source(vec![("user", "target"), ("assistant", "reply")], false),
+            "target"
+        ));
+    }
+    #[test]
+    fn another_turn_and_an_older_identical_input_cannot_satisfy_the_wait() {
+        assert!(!settled_reply_after(
+            &source(
+                vec![
+                    ("user", "target"),
+                    ("user", "other"),
+                    ("assistant", "reply")
+                ],
+                false
+            ),
+            "target"
+        ));
+        assert!(!settled_reply_after(
+            &source(
+                vec![
+                    ("user", "target"),
+                    ("assistant", "reply"),
+                    ("user", "target")
+                ],
+                false
+            ),
+            "target"
+        ));
+    }
 }

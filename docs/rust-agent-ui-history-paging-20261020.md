@@ -19,7 +19,7 @@ is_current 核对原挂载 pointer、连接 ready 和 epoch；它不是 Transcri
 
 新增 5 个异步测试覆盖单次读取/watch、冻结 cut 与 B 草稿隔离、失败后的显式重试、未启动与在途 abort、旧 epoch Drop 不覆盖新请求、已退休 child pointer 不发 RPC。现有有界只读子历史分页测试补充核对 Loaded 回执；第二公开 consumer 捕获/派发公共 request，不依赖 demo。
 
-`tekes-agent-ui-demo --components --history-page-proof --offscreen /tmp/agentkit-history.png` 使用隔离 SEP fixture：A 捕获读取，切到 B 后完成 A 页，核对 A 边界扩展且 frozen cut 不变，B 的状态与草稿保留，结果不抢导航。出口 historyPagingProof 明确 nativeInteraction=false、readingAnchorAcceptance=false。这里没有实现正式 Transcript 分页控件，现有 RunSurface/ComponentDemo 仍是测试宿主。
+`tekes-agent-ui-demo --components --history-page-proof --offscreen /tmp/agentkit-history.png` 最初使用隔离 SEP fixture。后续扩展为可接受有足够历史的显式 endpoint：A 捕获读取，切到 B 后完成 A 页，核对 A 边界扩展且 frozen cut 不变，B 的状态与草稿保留，结果不抢导航；新 epoch 恢复历史后才显式选择 A 输出投影。出口 historyPagingProof 明确 nativeInteraction=false、readingAnchorAcceptance=false。这里没有实现正式 Transcript 分页控件，现有 RunSurface/ComponentDemo 仍是测试宿主。真实三端与重连修复见[后续验证](rust-agent-ui-history-real-20261020.md)。
 
 只读对照 ClientKit ThreadTranscriptPresenter+Scroll 的请求身份、当前文档与用户阅读意图边界，以及 Tekes 的 TranscriptVisibleWindowTests 的旧文档提交拒绝。没有移植其像素阈值/滚动算法；TekesUI #22/#23 的公开消费与正式混合文档前插/高度变化/锚点事务仍待完成。
 
