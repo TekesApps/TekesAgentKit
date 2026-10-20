@@ -51,14 +51,7 @@ impl IndicatorFacts {
         }
     }
     pub fn accessible_text(&self) -> String {
-        let connection = match self.connection {
-            ConnectionPhase::Connecting => "正在连接",
-            ConnectionPhase::Connected => "已连接",
-            ConnectionPhase::Reconnecting => "正在重连",
-            ConnectionPhase::Degraded => "连接受限",
-            ConnectionPhase::Failed => "连接失败",
-            ConnectionPhase::Stopped => "已停止连接",
-        };
+        let connection = connection_status_text(&self.connection);
         let run = match self.run {
             Some(RunPhase::Running) => "执行中",
             Some(RunPhase::WaitingForInput) => "等待输入",
@@ -110,6 +103,18 @@ impl IndicatorFacts {
         parts.extend(self.connection_error.iter().cloned());
         parts.extend(self.run_error.iter().cloned());
         parts.join(" · ")
+    }
+}
+
+/// Shared default copy for a canonical connection phase; products may format facts.
+pub fn connection_status_text(phase: &ConnectionPhase) -> &'static str {
+    match phase {
+        ConnectionPhase::Connecting => "正在连接",
+        ConnectionPhase::Connected => "已连接",
+        ConnectionPhase::Reconnecting => "正在重连",
+        ConnectionPhase::Degraded => "连接受限",
+        ConnectionPhase::Failed => "连接失败",
+        ConnectionPhase::Stopped => "已停止连接",
     }
 }
 

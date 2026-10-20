@@ -73,6 +73,7 @@ struct Host {
     test_bounded_source: Option<Arc<ChildPaneBinding>>,
     bounded_initial_items: usize,
     bounded_max_items: usize,
+    bounded_rendered_items: usize,
     rename_rpc_prefix: String,
     actions_selftest: bool,
     turn_footnote_selftest: bool,
@@ -179,6 +180,39 @@ impl Drop for OwnedPreferencesDirectory {
     }
 }
 impl Host {
+    fn verify_bounded_content(&mut self) {
+        if !self.selftest {
+            return;
+        }
+        let Some(root) = self.view.bounded_child_content_id() else {
+            return;
+        };
+        let content = self
+            .view
+            .tree
+            .get(root)
+            .unwrap()
+            .component::<tekes_agent_components_ui::TranscriptContent>()
+            .unwrap();
+        assert_eq!(content.scope().session_id, "bounded-b");
+        assert!(self.view.panel_composer_ids().is_none());
+        let messages = content
+            .row_keys()
+            .iter()
+            .filter(|key| {
+                matches!(
+                    key,
+                    tekes_agent_components_ui::TranscriptContentRowKey::Message(_)
+                )
+            })
+            .count();
+        assert!(
+            messages > 0,
+            "native child pane must render actual messages"
+        );
+        self.bounded_rendered_items = self.bounded_rendered_items.max(messages);
+    }
+
     fn commands(&mut self, result: Result<Vec<DemoCommand>>) {
         let commands = match result {
             Ok(commands) => commands,
@@ -456,6 +490,7 @@ impl Host {
                         panel_parent,
                         source,
                         page,
+                        read_intent,
                     } => {
                         let catalog_error = if !page
                             && source.layout() == ChildHistoryLayout::IndependentSessions
@@ -469,6 +504,9 @@ impl Host {
                             None
                         };
                         let result = async {
+                            if let Some(intent) = read_intent {
+                                return source.read_intent(intent).await;
+                            }
                             if page {
                                 source.load_earlier().await?;
                             }
@@ -776,7 +814,10 @@ impl Host {
                         .view
                         .install_child_source(request, source, title, snapshot)
                     {
-                        Ok(_) => self.observe(&binding, window),
+                        Ok(_) => {
+                            self.observe(&binding, window);
+                            self.verify_bounded_content();
+                        }
                         Err(error) => self.failure(error.to_string()),
                     }
                 }
@@ -821,6 +862,7 @@ impl Host {
                                 ) {
                                     self.failure(error.to_string());
                                 }
+                                self.verify_bounded_content();
                             }
                             Err(error) => {
                                 if let Err(reset) = self.view.child_read_failed(
@@ -1666,6 +1708,13 @@ impl Host {
         if self.selftest {
             assert!(self.child_test_started && self.bounded_test_started);
             assert!(
+                self.bounded_rendered_items > self.bounded_initial_items,
+                "native paging must extend rendered child messages"
+            );
+            println!(
+                "NATIVE_AGENT_READONLY_CHILD_CONTENT_SELFTEST_OK actual-child-messages+original-scope+native-pagination+no-composer; reading-anchor=false; physical-ime=false"
+            );
+            assert!(
                 self.bounded_max_items > self.bounded_initial_items,
                 "bounded paging reached the independent child prefix"
             );
@@ -2412,6 +2461,7 @@ pub fn run() {
         test_bounded_source: None,
         bounded_initial_items: 0,
         bounded_max_items: 0,
+        bounded_rendered_items: 0,
         rename_rpc_prefix: format!(
             "demo-rename:{}:{}",
             std::process::id(),
@@ -3025,6 +3075,22 @@ pub fn run() {
         } else {
             serde_json::Value::Null
         };
+        let bounded_child_proof = if args.iter().any(|arg| arg == "--bounded-child-proof") {
+            let index = args
+                .iter()
+                .position(|arg| arg == "--bounded-child-id")
+                .expect("explicit child ID required");
+            let child = args.get(index + 1).expect("child ID argument");
+            host.executor
+                .block_on(tekes_agent_ui_demo::readonly_child_proof::run(
+                    &mut host.view,
+                    &host.runtime,
+                    child,
+                ))
+                .expect("read-only child content proof")
+        } else {
+            serde_json::Value::Null
+        };
         let clip = Rect::new(0., 0., 1000., 760.);
         host.text.atlas.begin_frame();
         host.view
@@ -3204,7 +3270,7 @@ pub fn run() {
         println!(
             "{}",
             serde_json::json!({
-                "runViewComposition":run_view_proof,
+                "runViewComposition":run_view_proof,"boundedChildProof":bounded_child_proof,
                 "offscreen": true, "components": true, "nativeInteraction": false,
                 "transcriptView": false, "isStale": snapshot.transcript.is_stale,
                 "transcriptItems": snapshot.transcript.items.len(),

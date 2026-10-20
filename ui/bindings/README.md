@@ -638,3 +638,10 @@ Capture `binding.begin_history_page()` on the original gesture and move its once
 ## Shared RunView composition
 
 The public RunView consumes one captured RunSnapshot plus gates and page facts from its original binding. If a later HistoryPageSnapshot has another connection_epoch, lower source_ready/is_current; never substitute that epoch into the older RunSnapshot. Route the four RunViewIntent variants to the same binding before handing work to the executor. Navigation remains a host callback fenced by its original token. The second consumer demonstrates construction and snapshot synchronization without importing ComponentDemo or RunSurface; see the [RunView contract](../../docs/rust-agent-ui-run-view-20261020.md).
+
+
+## Read-only child frames and gestures
+
+ReadOnlyChild now includes per-binding snapshot invocation publication and connection_epoch. Allocate order before awaiting; a late older read must not become a newer UI publication. Reads crossing an epoch fail, and a retired source returns Missing. These unpublished UI fields are not SEP journal cursors. ChildPaneBinding::readonly_input lowers page gates when the runtime no longer matches the frame; custom sources retain no Kernel pagination capability.
+
+Mount ReadOnlyTranscript with an exclusive namespace pool. Route its immutable Refresh/Earlier intents to the original source.read_intent, not a newly selected source. The executor checks scope, liveness, page capability/epoch and one-shot admission before IO. Refresh may explicitly renew an old frame on a ready connection; page gestures cannot cross epochs. Keep failed reads with their original pane/task, retain readable content and retry only on a new gesture. See the [read-only contract](../../docs/rust-agent-ui-readonly-child-20261020.md).

@@ -60,6 +60,9 @@ pub enum PaneSnapshot {
     /// Native bounded child history has no fabricated main-run Composer state.
     ReadOnlyChild {
         scope: RunScope,
+        /// Per-binding read invocation order; not a journal sequence or controller revision.
+        publication: u64,
+        connection_epoch: u64,
         connection: ConnectionPresentation,
         transcript: TranscriptSnapshot,
     },
@@ -73,6 +76,7 @@ pub struct RunBinding {
     runtime: Arc<SessionRuntime>,
     scope: RunScope,
     history_pages: history::HistoryPages,
+    readonly_reads: std::sync::atomic::AtomicU64,
     controller: Option<RunController>,
     _lease: Option<SessionHistoryLease>,
     child: Option<ChildRun>,
@@ -360,6 +364,7 @@ impl RunBinding {
             runtime,
             scope,
             history_pages: history::HistoryPages::default(),
+            readonly_reads: std::sync::atomic::AtomicU64::new(0),
             controller: Some(controller),
             _lease: Some(lease),
             child: None,
@@ -406,6 +411,7 @@ impl RunBinding {
             runtime,
             scope,
             history_pages: history::HistoryPages::default(),
+            readonly_reads: std::sync::atomic::AtomicU64::new(0),
             controller,
             _lease: None,
             child: Some(child),
@@ -499,17 +505,44 @@ impl RunBinding {
                 access,
             });
         }
-        let transcript = self
+        // Stamp invocation order before awaiting a custom/bounded source. A late
+        // older read must not become a newer UI publication by completion time.
+        let publication = self
+            .readonly_reads
+            .fetch_update(
+                std::sync::atomic::Ordering::AcqRel,
+                std::sync::atomic::Ordering::Acquire,
+                |value| value.checked_add(1),
+            )
+            .map_err(|_| unsupported("read-only child publication exhausted"))?
+            + 1;
+        let epoch = self.runtime.inspect(|store| store.connection_epoch);
+        let mut transcript = self
             .child
             .as_ref()
             .ok_or_else(|| unsupported("missing child source"))?
             .transcript()
             .await?;
-        let connection = self
-            .runtime
-            .inspect(|s| ConnectionPresentation::read(s, None, false));
+        if self.access() == PaneAccess::Missing {
+            return Ok(PaneSnapshot::Missing {
+                scope: self.scope.clone(),
+            });
+        }
+        let (connection_epoch, connection) = self.runtime.inspect(|store| {
+            (
+                store.connection_epoch,
+                ConnectionPresentation::read(store, None, false),
+            )
+        });
+        require(
+            connection_epoch == epoch,
+            "child history connection changed during read",
+        )?;
+        transcript.is_stale |= connection.history_is_stale;
         Ok(PaneSnapshot::ReadOnlyChild {
             scope: self.scope.clone(),
+            publication,
+            connection_epoch,
             connection,
             transcript,
         })

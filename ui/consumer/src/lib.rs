@@ -956,3 +956,68 @@ pub fn sync_agent_run_view(
     )
     .map_err(str::to_owned)
 }
+
+/// Read-only child history mounts independently, without a synthetic Run snapshot.
+pub fn new_readonly_child(
+    namespace: u32,
+    rows: std::ops::Range<u32>,
+    scope: tekes_agent_components_ui::RunScope,
+) -> Result<tekes_agent_components_ui::ReadOnlyTranscript, &'static str> {
+    tekes_agent_components_ui::ReadOnlyTranscript::standard(
+        namespace,
+        rows,
+        scope,
+        Default::default(),
+    )
+}
+pub fn sync_readonly_child(
+    view: &mut tekes_agent_components_ui::ReadOnlyTranscript,
+    source: &tekes_agent_ui_bindings::ChildPaneBinding,
+    snapshot: &tekes_agent_ui_bindings::PaneSnapshot,
+    reading: bool,
+    error: Option<&str>,
+) -> Result<(), String> {
+    view.update(
+        source
+            .readonly_input(snapshot, reading, error)
+            .map_err(|error| error.to_string())?,
+    )
+    .map_err(str::to_owned)
+}
+#[test]
+fn second_product_mounts_child_history_without_composer_or_run_surface() {
+    let view = new_readonly_child(
+        1300,
+        1303..1400,
+        tekes_agent_components_ui::RunScope {
+            endpoint_id: "public".into(),
+            thread_id: "parent".into(),
+            session_id: "bounded".into(),
+        },
+    )
+    .unwrap();
+    let ids = view.ids();
+    let content = view.content_id();
+    let host = view.into_host().unwrap();
+    assert!(
+        host.get(ids.root)
+            .unwrap()
+            .component::<tekes_agent_components_ui::ReadOnlyTranscript>()
+            .is_some()
+    );
+    assert!(
+        host.get(content)
+            .unwrap()
+            .component::<tekes_agent_components_ui::TranscriptContent>()
+            .is_some()
+    );
+    assert!(
+        host.get(ids.refresh)
+            .unwrap()
+            .component::<tekes_ui_controls::composition::ButtonContent>()
+            .unwrap()
+            .button
+            .state
+            .disabled
+    );
+}

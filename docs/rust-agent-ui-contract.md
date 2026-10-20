@@ -94,7 +94,7 @@ AgentKit 定义业务结构、展示语义、组件组合、组件输入及回�
 
 RunView 组合正式 Composer / Transcript / Indicators，拥有 Agent 组件间意图路由；不拥有窗口、其他产品导航或第二套 Run 状态机。异步通知继续订阅已有 presentation，通过公开 WindowWake 唤醒。
 
-当前公开 [`RunView`](rust-agent-ui-run-view-20261020.md) 已组合 Composer、Indicators、分页、问答和可安装的混合内容树，提供同帧 update 与类型化意图出口。实验主会话和可写 pane 已复用它，第二 consumer 可独立构造；RunSurface / ComponentDemo 仍仅作测试宿主。完整 Transcript/RunView 验收尚未通过：只读有界子历史的消息树、#22 阅读/分页锚点、#25 富内容及物理 IME/完整三端原生 UX 仍需完成。
+当前公开 [`RunView`](rust-agent-ui-run-view-20261020.md) 已组合 Composer、Indicators、分页、问答和可安装的混合内容树，提供同帧 update 与类型化意图出口。实验主会话和可写 pane 已复用它，第二 consumer 可独立构造；RunSurface / ComponentDemo 仍仅作测试宿主。完整 Transcript/RunView 验收尚未通过：可靠 stream-to-durable 关联、#22 阅读/分页锚点、#25 富内容及物理 IME/完整三端原生 UX 仍需完成。
 
 ## Sidebar（首批实现）
 
@@ -152,7 +152,7 @@ Task tab 以 task ID 为稳定身份，scope 是可更新的内容输入。TaskP
 |---|---|---|
 | Composer 独立输入/草稿/发送/取消及入口 | 基础组件、模型/新会话闭环、内容卡片/原子移除/批注评论、Main/任务/独立子代理/SideChat 附件选择/上传状态；局部原生与三端离屏证据分开记录 | 真实三端 pane 附件联调、预览/失败对账、选区捕获/来源高亮/内容 undo、其余设置入口、完整弹层/三端原生验收 |
 | Indicators | 首批事实组件与 unknown/0/partial/error 测试 | 原生 RunView 呈现、主题/语义验收 |
-| Transcript / RunView | 内容树与实验 RunView 已实现并接入公共 consumer | 只读有界子历史消息树、#22/#25、阅读/分页/流式关联与完整原生验收 |
+| Transcript / RunView | 内容树与实验 RunView 已实现并接入公共 consumer | 其余 footnote、#22/#25、阅读/分页/流式关联与完整原生验收 |
 | Sidebar | 共享服务绑定、选择/置顶/复制；重命名/分叉/归档已接入，局部原生 fixture 验证 | 真实三端操作与完整宿主验收 |
 | SidePanel / Summary | Summary 原生挂载；任务、SideChat、独立子代理控制与绑定已接入；有界子历史只读加载诊断/分页已验证 | 各类 pane 正式 Transcript、真实三端子 pane 原生操作与完整联调 |
 | 第二公开 API consumer | Composer、Indicators、Sidebar、SidePanel 公共组合，Summary 独立挂载；不依赖 RunSurface | 正式 RunView/Transcript 与完整原生宿主组合验证 |
@@ -209,3 +209,6 @@ Native [消息生命周期边界修正](rust-agent-ui-native-stream-boundary-202
 
 
 当前 [`TranscriptContent`](rust-agent-ui-transcript-tree-20261020.md) 将 InputMessage、OutputMessage、独立 ToolActivity 和 TurnFootnote 组合成公开内容树。源事件决定顺序，未定位内容明确单列；用户附件 → 正文气泡 → 外置 caption 均靠右，机器内容及 aside 靠左。纯附件不挂空正文文本目标。NativeEntry 和显式 submission receipt 保留既有控件；重复认领同一 receipt 会在修改前拒绝。实验宿主仅套用 TekesUI 的 ScrollContent；没有自行实现阅读状态或滚动补偿，完整 Transcript / RunView、#22 混合锚点与 #25 富内容仍待完成。
+
+
+[ReadOnlyTranscript](rust-agent-ui-readonly-child-20261020.md) 已将 Native 有界子历史接入实际内容树、只读 source-call 详情和显式刷新/分页，不再仅显示数量。原绑定在 await 前分配 publication 并校验 epoch/存活；旧结果和旧页意图不能覆盖新 frame/获得新连接权限。读取回调一次性 admission，仍不构造可写 Run/Composer。组件、第二 consumer、原生多页消息渲染和真实 Native child 到 GPU 分层验证；混合阅读锚点/富内容/物理 IME 与完整 Run/Transcript 仍未完成。

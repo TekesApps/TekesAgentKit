@@ -11,3 +11,5 @@ pub mod upload_proof;
 pub mod history_proof;
 
 pub mod turn_footnote_proof;
+
+pub mod readonly_child_proof;

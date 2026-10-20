@@ -16,12 +16,15 @@ parser.add_argument('--ui-context',action='store_true',help='Exercise draft cont
 parser.add_argument('--ui-initial-presets',action='store_true',help='Exercise public initial preset selection through shared create and prompt in isolated component sessions')
 parser.add_argument('--ui-annotation-editor',action='store_true',help='Exercise public annotation editing and shared context compilation; implies the context proof')
 parser.add_argument('--ui-attachments',action='store_true',help='Exercise public upload entry, original draft, Send, history and capability-specific file reads')
+parser.add_argument('--ui-bounded-child',action='store_true',help='Verify actual read-only Native child messages through the public component; requires components and Kernel')
 parser.add_argument('--ui-turn-footnote',action='store_true',help='Opt in to shared completed-turn fork in isolated UI sessions; requires components')
 parser.add_argument('--ui-transcript-content',action='store_true',help='Mount the canonical mixed content tree with a generic TekesUI viewport; no keyed reading acceptance')
 parser.add_argument('--ui-message-rows',action='store_true',help='Mount canonical plain user and machine rows through public components; not a full Transcript')
 parser.add_argument('--ui-history-pages',action='store_true',help='Seed long isolated sessions and verify public page receipts, original scope and fresh reconnect history')
 parser.add_argument('--ui-actionables',action='store_true',help='Exercise public actionable cards on configured Native/Pi/DSH question sources')
 args=parser.parse_args()
+if args.ui_bounded_child and (not args.ui_components or not args.kernel_root):
+    parser.error('--ui-bounded-child requires --ui-components and --kernel-root')
 if args.ui_turn_footnote and not args.ui_components:
     parser.error('--ui-turn-footnote requires --ui-components')
 if args.ui_message_rows and not args.ui_components:
@@ -195,17 +198,18 @@ def run(config):
     print(config['kind'].upper()+'_PANELS_LIVE_OK summary-scope+sidechat-capability+lifecycle-or-catalog')
     print(config['kind'].upper()+'_PRESENTATION_LIVE_OK composer+immediate-echo+identity-reconciliation+final-answer+reconnect')
     return outputs
-def ui_smoke(config, first):
+def ui_smoke(config, first, bounded_child=None):
+    history_pages=args.ui_history_pages and bounded_child is None
     if not args.ui_demo:
         return
     kind=config['kind']
-    if kind=='native' and args.ui_actionables:
+    if kind=='native' and (args.ui_actionables and bounded_child is None):
         first=str(uuid.uuid4())
         execute(dict(config,commands=[{'op':'call','method':'session.create','args':{'sessionId':first,'execution':{'cwd':str(cwd),'read_roots':[],'writable_roots':[],'toolchain_roots':[],'network':False,'allowed_tools':['ask_user_questions'],'mcp':[]}}},
             {'op':'call','sessionId':first,'method':'session.selectModel','args':{'provider':providers['providers'][0]['id'],'model':providers['providers'][0]['models'][0]['id']}}]))
-    if args.ui_history_pages:
+    if history_pages:
         model=next(command['args'] for command in config['commands'] if command.get('method')=='session.selectModel')
-        if not (kind=='native' and args.ui_actionables):
+        if not (kind=='native' and (args.ui_actionables and bounded_child is None)):
             first=next(row['result']['sessionId'] for row in execute(dict(config,commands=[{'op':'create','cwd':str(cwd)}])) if row.get('op')=='create')
         history=[{'op':'call','sessionId':first,'method':'session.selectModel','args':model},{'op':'open','sessionId':first}]
         for turn in range(1,29):
@@ -228,34 +232,41 @@ def ui_smoke(config, first):
     path.write_text(json.dumps(explicit))
     # Preserve --ui-output's original Native path when multiple harnesses are requested.
     output=args.ui_output.resolve() if args.ui_output else base/'ui-native.png'
+    if bounded_child:output=output.with_name(output.stem+'-bounded'+output.suffix)
     if kind!='native':output=output.with_name(output.stem+'-'+kind+output.suffix)
     mode=['--components'] if args.ui_components else []
-    if args.ui_model_choices:mode+=['--model-choice-proof']
-    if args.ui_context or args.ui_annotation_editor:mode+=['--context-proof']
-    if args.ui_annotation_editor:mode+=['--annotation-proof']
-    if args.ui_attachments:mode+=['--upload-proof']
-    if args.ui_actionables:mode+=['--actionable-proof']
-    if args.ui_history_pages:mode+=['--history-page-proof']
-    if args.ui_transcript_content:mode+=['--transcript-content']
-    if args.ui_message_rows:mode+=['--input-message-proof','--output-message-proof']
-    if args.ui_turn_footnote:mode+=['--turn-footnote-proof','--turn-fork-proof']
-    if args.ui_initial_presets:mode+=['--initial-preset-proof','--initial-preset-cwd',str(cwd)]
+    if bounded_child:mode+=['--bounded-child-proof','--bounded-child-id',bounded_child]
+    if (args.ui_model_choices and bounded_child is None):mode+=['--model-choice-proof']
+    if (args.ui_context and bounded_child is None) or (args.ui_annotation_editor and bounded_child is None):mode+=['--context-proof']
+    if (args.ui_annotation_editor and bounded_child is None):mode+=['--annotation-proof']
+    if (args.ui_attachments and bounded_child is None):mode+=['--upload-proof']
+    if (args.ui_actionables and bounded_child is None):mode+=['--actionable-proof']
+    if history_pages:mode+=['--history-page-proof']
+    if (args.ui_transcript_content or bounded_child is not None):mode+=['--transcript-content']
+    if (args.ui_message_rows and bounded_child is None):mode+=['--input-message-proof','--output-message-proof']
+    if (args.ui_turn_footnote and bounded_child is None):mode+=['--turn-footnote-proof','--turn-fork-proof']
+    if (args.ui_initial_presets and bounded_child is None):mode+=['--initial-preset-proof','--initial-preset-cwd',str(cwd)]
     ui=subprocess.run([str(args.ui_demo.resolve()),*mode,'--endpoint-config',str(path),'--offscreen',str(output)],env=ui_env,text=True,capture_output=True,timeout=60)
     assert ui.returncode==0,ui.stderr[-3000:]
     receipt=next(json.loads(line) for line in ui.stdout.splitlines() if line.startswith('{') and json.loads(line).get('offscreen'))
     assert not receipt['isStale'] and receipt['finalAssistantItems']>=1,receipt
     assert output.read_bytes().startswith(b'\x89PNG\r\n\x1a\n'),kind+' UI image missing'
-    if args.ui_turn_footnote:
+    if bounded_child:
+        bounded=receipt['boundedChildProof']
+        assert all(bounded[key] for key in ['readOnlyComponent','childScope','originalReadIntent','sourceCallReadonlyDetails','retainedWidgets','reconnect','noComposer','sendRejected','parentDraftPreserved']),bounded
+        assert bounded['messages']>=1 and not bounded['readingAnchorAcceptance'],bounded
+        print(kind.upper()+'_UI_BOUNDED_CHILD_OK real-child+source-call+readonly-details+explicit-read+retained-widgets+reconnect+no-composer; reading-anchor=false; native-interaction=false',flush=True)
+    if (args.ui_turn_footnote and bounded_child is None):
         footer=receipt['turnFootnoteProof'];fork=receipt['turnForkProof']
         assert footer['leadingAside'],footer
         assert all(fork[key] for key in ['sharedCatalog','originalScope','explicitBoundary','singleAdmission','forkHistoryRestored','lateNavigationIgnored','originalDraftPreserved','otherDraftPreserved']),fork
         print(kind.upper()+'_UI_TURN_FOOTNOTE_OK shared-catalog+durable-boundary+single-admission+fork-history+late-navigation-fence+draft-isolation; native-interaction=false',flush=True)
-    if args.ui_transcript_content:
+    if (args.ui_transcript_content or bounded_child is not None):
         content=receipt['transcriptContentProof']
         assert content['renderer'] and content['messages']>=1 and content['userTrailing'] and content['machineLeading'] and content['genericViewport'],content
         assert not content['keyedReadingAcceptance'] and not content['richContent'] and not content['completeTranscript'],content
         print(kind.upper()+'_UI_TRANSCRIPT_CONTENT_OK canonical-mixed-tree+stable-identities+role-layout+public-generic-viewport; keyed-reading=false; native-interaction=false',flush=True)
-    if args.ui_message_rows:
+    if (args.ui_message_rows and bounded_child is None):
         user=receipt['inputMessageProof'];machine=receipt['outputMessageProof']
         assert user['rightBubble'] and user['externalRightFootnote'] and user['plainReadonlyContent'] and not user['completeTranscript'],user
         assert machine['leadingContent'] and machine['parts']>=1 and not machine['completeTranscript'],machine
@@ -264,8 +275,12 @@ def ui_smoke(config, first):
         assert receipt['components'] and not receipt['transcriptView'],receipt
         run=receipt['runViewComposition']
         assert run['mounted'] and run['sharedIntents'] and not run['ownsRuntime'] and not run['completeRunView'],run
-        if args.ui_transcript_content:assert run['transcriptMounted'],run
-        assert receipt['inventoryRows']>=1 and receipt['sharedRuntime'] and receipt['sidebarMounted'] and receipt['summaryMounted'],receipt
+        if (args.ui_transcript_content or bounded_child is not None):assert run['transcriptMounted'],run
+        assert receipt['inventoryRows']>=1 and receipt['sharedRuntime'] and receipt['sidebarMounted'],receipt
+        if bounded_child:
+            assert not receipt['summaryMounted'] and receipt['boundedChildProof']['readOnlyComponent'],receipt
+        else:
+            assert receipt['summaryMounted'],receipt
         document=receipt['documentProjection']
         assert document['sections']>=1 and document['visibleMessages']>=1 and not document['isStale'] and not document['renderer'],document
         assert document['positionedEvents']>=1,document
@@ -276,31 +291,31 @@ def ui_smoke(config, first):
         # Pi extension commands can retain a local echo with no native user entry.
         # Unknown positions are explicit, never promoted to a fake source sequence.
         assert all(fact['kind']=='message' and fact['provisional'] and fact['recordId'] is None and fact['sourceSequence'] is None for fact in unplaced),document
-        if args.ui_history_pages:
+        if history_pages:
             proof=receipt['historyPagingProof']
             assert all(proof[key] for key in ('originalScope','extended','frozenCut','otherDraftPreserved','sourceStatusPublished','newEpochHistoryRetained','noDuplicateMessages','oldReceiptInvalidated')),proof
             assert proof['retainedMessages']>=1 and not proof['nativeInteraction'] and not proof['readingAnchorAcceptance'],proof
-        if args.ui_actionables:
+        if (args.ui_actionables and bounded_child is None):
             proof=receipt['actionableProof']
             assert all(proof[key] for key in ('probeConfigured','publicComposer','publicCard','originalScope','oneAttempt','sharedResolved','canonicalAnswerRecord','otherDraftPreserved','freshHistoryAfterReconnect','reconnectNoDuplicateInput')),proof
             assert proof['followupInputCount']==1 and not proof['nativeInteraction'] and not proof['physicalIME'],proof
-        if args.ui_model_choices:
+        if (args.ui_model_choices and bounded_child is None):
             proof=receipt['modelChoiceProof']
             assert proof['catalogChoices']>=1 and proof['explicitSelection'] and proof['configurationReceipt'] and proof['promptSettled'] and not proof['nativeInteraction'],proof
-        if args.ui_context or args.ui_annotation_editor:
+        if (args.ui_context and bounded_child is None) or (args.ui_annotation_editor and bounded_child is None):
             proof=receipt['contextProof']
             assert proof['mountedCards'] and proof['explicitRemoval'] and proof['referenceReturned'] and proof['annotationReturned'] and proof['promptSettled'] and proof['clearedDraft'],proof
             assert not proof['fileUpload'] and not proof['nativeInteraction'] and not proof['structuredTranscript'],proof
-        if args.ui_annotation_editor:
+        if (args.ui_annotation_editor and bounded_child is None):
             proof=receipt['annotationProof']
             assert proof['componentEditor'] and proof['committedComment'] and proof['sourceRetained'] and proof['sharedCompilation'] and proof['promptSettled'],proof
             assert not proof['nativeInteraction'] and not proof['physicalIME'] and not proof['sourceHighlight'],proof
-        if args.ui_initial_presets:
+        if (args.ui_initial_presets and bounded_child is None):
             proof=receipt['initialPresetProof']
             assert proof['catalogChoices']>=1 and proof['explicitSelection'] and proof['createdSession'] and proof['singleInput'] and proof['promptSettled'] and proof['originalDraftPreserved'],proof
             if kind!='pi': assert proof['presetIdentityReturned'],proof
             assert not proof['nativeInteraction'] and proof['componentCreationEntry'],proof
-        if args.ui_attachments:
+        if (args.ui_attachments and bounded_child is None):
             proof=receipt['uploadProof']
             assert all(proof[key] for key in ('publicEntry','hostBoundedFileRead','receiptValidated','originalDraft','otherDraftPreserved','oneShotUpload','componentSend','promptSettled','reconnectNoDuplicate')),proof
             assert proof['durableInputCount']==1 and (proof['historyFileMetadata'] or proof['historyFileReference']),proof
@@ -308,7 +323,7 @@ def ui_smoke(config, first):
             assert not proof['nativeInteraction'] and not proof['inlineImage'],proof
             if kind in ('native','pi'): assert proof['publicByteRead'] and proof['foreignSessionReadRejected'],proof
             else: assert proof['readUnavailable'] and not proof['publicByteRead'],proof
-        print(kind.upper()+'_UI_COMPONENTS_RECEIPT '+json.dumps(receipt,sort_keys=True))
+        print(kind.upper()+('_UI_BOUNDED_COMPONENTS_RECEIPT ' if bounded_child else '_UI_COMPONENTS_RECEIPT ')+json.dumps(receipt,sort_keys=True))
         print(kind.upper()+'_UI_COMPONENTS_LIVE_OK explicit-SEP+shared-runtime+restored-data+Composer+Indicators+Sidebar+Summary+GPU; transcript-view=false; native-interaction=false')
     else:
         print(kind.upper()+'_UI_CONSUMER_LIVE_OK explicit-SEP+RunController+restored-final-answer+TekesUI-offscreen; native-interaction=false')
@@ -631,6 +646,7 @@ try:
                 result=execute(dict(config,commands=native))
                 assert any(row.get('op')=='call' and isinstance(row.get('result'),dict) and row['result'].get('data')==base64.b64encode(b'Native upload proof').decode() for row in result),'native upload round trip lost'
                 caps=next(row['result'] for row in result if row.get('op')=='call' and isinstance(row.get('result'),dict) and 'methods' in row['result'])
+                if args.ui_bounded_child:assert 'subagents.history' in caps['methods'],'Native endpoint does not publish bounded child history'
                 if 'subagents.history' in caps['methods']:
                     parent=str(uuid.uuid4())
                     native_children=[{'op':'call','method':'session.create','args':{'sessionId':parent,'execution':{'cwd':str(cwd),'read_roots':[],'writable_roots':[],'toolchain_roots':[],'network':False,'allowed_tools':['task'],'mcp':[]}},'saveAs':'parent'},
@@ -648,6 +664,9 @@ try:
                     assert len(histories)==2 and all(any(item['text']=='ENDPOINT_REPLY_OK' and item['isFinal'] for item in h['items']) for h in histories),histories
                     assert all(h['tools'][0]['arguments']['task_name']=='Bounded child proof' for h in histories),'missing parent source-call projection'
                     print('NATIVE_BOUNDED_CHILD_LIVE_OK real-task+source-call+read-only-history+reconnect+ownership')
+                    if args.ui_bounded_child:
+                        child_id=next(row['result']['entries'][1]['id'] for row in child_result if row.get('op')=='childCatalog')
+                        ui_smoke(config,parent,child_id)
                 print('NATIVE_COMPLETE_LIFECYCLE_LIVE_OK models+commands+skills+settings+presets+upload+scratch-discard+rename+archive')
                 ui_smoke(config,native_id)
 

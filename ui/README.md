@@ -180,3 +180,6 @@ ui/target/debug/tekes-agent-ui-demo --components --transcript-content --offscree
 
 
 [`RunView`](../docs/rust-agent-ui-run-view-20261020.md) 现提供独立的公开组合和类型化意图出口；`standard(namespace, row_pool, scope)` 直接包含混合内容树。实验宿主 `--components --transcript-content` 已复用它，窗口/导航/执行器仍由宿主提供。完整更新使用同帧 RunSnapshot、gate 和原绑定分页事实；焦点改变前按 `allows_focus_target` 维护组字屏障。原生 receipt 的 `runViewComposition.mounted=true` 只证明组合挂载，`completeRunView=false` 继续表示完整验收未通过。
+
+
+`ReadOnlyTranscript` 为 Native 有界子历史复用同一内容树，显示真实消息与来源调用详情，只有显式读取回调。新 `PaneSnapshot::ReadOnlyChild` 带原读取调用 publication/epoch；`ChildPaneBinding::read_intent` 在 IO 前校验来源并只允许一次 admission。真实脚本可加 `--ui-components --ui-bounded-child --kernel-root <root>`，另存 `-bounded.png` 和 `NATIVE_UI_BOUNDED_COMPONENTS_RECEIPT`，不要求该 tab 同时挂 Summary。见[只读子历史契约](../docs/rust-agent-ui-readonly-child-20261020.md)。

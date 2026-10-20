@@ -103,6 +103,7 @@ pub enum DemoCommand {
         panel_parent: RunScope,
         source: Arc<ChildPaneBinding>,
         page: bool,
+        read_intent: Option<tekes_agent_components_ui::ReadOnlyTranscriptIntent>,
     },
     OpenTask {
         parent: RunScope,
@@ -1784,10 +1785,24 @@ impl ComponentDemo {
         if !matches!(pane.snapshot, PaneSnapshot::ReadOnlyChild { .. }) {
             return None;
         }
-        let refresh = ComponentId(pane.controls.ids.root.0 + 19);
-        self.tree
-            .get(refresh)
-            .map(|_| (refresh, ComponentId(pane.controls.ids.root.0 + 20)))
+        let view = self
+            .tree
+            .get(ComponentId(pane.controls.ids.root.0 + 16))?
+            .component::<tekes_agent_components_ui::ReadOnlyTranscript>()?;
+        Some((view.ids().refresh, view.paging_button_id()))
+    }
+    pub fn bounded_child_content_id(&self) -> Option<ComponentId> {
+        let (refresh, _) = self.bounded_child_buttons()?;
+        let parent = self.binding().scope();
+        let SidePanelTabKind::Subagent { child_id } = self.panel_selections.get(parent)? else {
+            return None;
+        };
+        let pane = self.child_panes.get(&(parent.clone(), child_id.clone()))?;
+        let view = self
+            .tree
+            .get(ComponentId(pane.controls.ids.root.0 + 16))?
+            .component::<tekes_agent_components_ui::ReadOnlyTranscript>()?;
+        (view.ids().refresh == refresh).then_some(view.content_id())
     }
     fn active_panel_run(&self) -> Option<&PanelRun> {
         let parent = self.binding().scope();
@@ -1933,10 +1948,10 @@ impl ComponentDemo {
                     .as_ref()
                     .is_some_and(|run| &run.scope == source.binding().scope())
             }
-            PaneSnapshot::ReadOnlyChild { scope, .. }
-                if source.layout() == ChildHistoryLayout::SameSession =>
-            {
-                scope == source.binding().scope()
+            PaneSnapshot::ReadOnlyChild {
+                scope, publication, ..
+            } if source.layout() == ChildHistoryLayout::SameSession => {
+                scope == source.binding().scope() && *publication > 0
             }
             _ => false,
         };
@@ -1958,6 +1973,34 @@ impl ComponentDemo {
             return Ok(false);
         }
         Self::validate_child_snapshot(source, &snapshot)?;
+        if let (
+            PaneSnapshot::ReadOnlyChild {
+                publication: old,
+                connection_epoch: old_epoch,
+                connection: old_connection,
+                transcript: old_transcript,
+                ..
+            },
+            PaneSnapshot::ReadOnlyChild {
+                publication: next,
+                connection_epoch: next_epoch,
+                connection: next_connection,
+                transcript: next_transcript,
+                ..
+            },
+        ) = (&pane.snapshot, &snapshot)
+        {
+            if next < old || next_epoch < old_epoch {
+                return Ok(false);
+            }
+            require(
+                next != old
+                    || (next_epoch == old_epoch
+                        && next_connection == old_connection
+                        && next_transcript == old_transcript),
+                "conflicting read-only child frame",
+            )?;
+        }
         pane.snapshot = snapshot;
         pane.reading = false;
         pane.read_error = None;
@@ -2379,6 +2422,7 @@ impl ComponentDemo {
                     panel_parent: panel_parent.clone(),
                     source: pane.source.clone(),
                     page: false,
+                    read_intent: None,
                 });
             }
         }
@@ -2491,7 +2535,6 @@ impl ComponentDemo {
                     let binding = pane.controls.binding.clone();
                     let reading = pane.reading;
                     let read_error = pane.read_error.clone();
-                    let paging = pane.source.supports_pagination();
                     match &pane.snapshot {
                         PaneSnapshot::Run { .. } => {
                             self.sync_pane_controls(
@@ -2533,21 +2576,50 @@ impl ComponentDemo {
                                 .state
                                 .disabled = reading;
                         }
-                        PaneSnapshot::ReadOnlyChild { transcript, .. } => {
-                            let mut text = format!(
-                                "有界子历史：{} 项；{}。只读。\n正式 Transcript 尚未完成；混合阅读待 TekesUI #22。",
-                                transcript.items.len(),
-                                if transcript.is_stale || read_error.is_some() {
-                                    "历史待同步"
-                                } else {
-                                    "历史已同步"
-                                }
-                            );
-                            if let Some(error) = read_error {
-                                text.push_str(&format!("\n读取失败，保留已加载历史：{error}"));
-                            }
-                            let more = transcript.has_more_before;
-                            if self.tree.get(ComponentId(ids.root.0 + 18)).is_none() {
+                        PaneSnapshot::ReadOnlyChild { .. } => {
+                            let input = pane.source.readonly_input(
+                                &pane.snapshot,
+                                reading,
+                                read_error.as_deref(),
+                            )?;
+                            let root = ComponentId(ids.root.0 + 16);
+                            if self
+                                .tree
+                                .get(root)
+                                .and_then(|node| {
+                                    node.component::<tekes_agent_components_ui::ReadOnlyTranscript>(
+                                    )
+                                })
+                                .is_none()
+                            {
+                                let namespace = self.next_document_namespace;
+                                let end = namespace
+                                    .checked_add(10_000)
+                                    .ok_or_else(|| unsupported("read-only row pool exhausted"))?;
+                                let labels =
+                                    tekes_agent_components_ui::ReadOnlyTranscriptLabels::default();
+                                let content = tekes_agent_components_ui::TranscriptContent::new(
+                                    namespace,
+                                    namespace + 1..end,
+                                    binding.scope().clone(),
+                                    labels.content.clone(),
+                                )
+                                .map_err(unsupported)?;
+                                let mut view = tekes_agent_components_ui::ReadOnlyTranscript::new(
+                                    tekes_agent_components_ui::ReadOnlyTranscriptIds {
+                                        root,
+                                        status: ComponentId(ids.root.0 + 18),
+                                        refresh: ComponentId(ids.root.0 + 19),
+                                        viewport: ComponentId(ids.root.0 + 21),
+                                    },
+                                    binding.scope().clone(),
+                                    5_000_000 + (ids.root.0 >> 32) as u32,
+                                    content,
+                                    labels,
+                                )
+                                .map_err(unsupported)?;
+                                view.update(input).map_err(unsupported)?;
+                                let content_id = view.content_id();
                                 let panel = self
                                     .tree
                                     .get_mut(panel_id)
@@ -2556,59 +2628,22 @@ impl ComponentDemo {
                                     .unwrap();
                                 let token = panel
                                     .content_token(&SidePanelTabKind::Subagent { child_id })
-                                    .ok_or_else(|| unsupported("bounded child token missing"))?;
+                                    .ok_or_else(|| unsupported("read-only child token missing"))?;
                                 panel
-                                    .install_content(
-                                        &token,
-                                        Content::new(
-                                            ComponentId(ids.root.0 + 16),
-                                            StackContent {
-                                                model: Stack {
-                                                    axis: Axis::Vertical,
-                                                    gap: Spacing::Regular.value(),
-                                                },
-                                                flexible_child: None,
-                                                children: vec![
-                                                    Content::new(
-                                                        ComponentId(ids.root.0 + 18),
-                                                        TextContent::new(text.clone()),
-                                                    ),
-                                                    Content::new(
-                                                        ComponentId(ids.root.0 + 19),
-                                                        ButtonContent::new("刷新子历史"),
-                                                    ),
-                                                    Content::new(
-                                                        ComponentId(ids.root.0 + 20),
-                                                        ButtonContent::new("加载更早子历史"),
-                                                    ),
-                                                ],
-                                            },
-                                        ),
+                                    .install_content(&token, Content::new(root, view))
+                                    .map_err(unsupported)?;
+                                self.next_document_namespace = end;
+                                self.document_roots.insert(ids.root, content_id);
+                            } else {
+                                self.tree
+                                    .get_mut(root)
+                                    .unwrap()
+                                    .component_mut::<tekes_agent_components_ui::ReadOnlyTranscript>(
                                     )
+                                    .unwrap()
+                                    .update(input)
                                     .map_err(unsupported)?;
                             }
-                            self.tree
-                                .get_mut(ComponentId(ids.root.0 + 18))
-                                .unwrap()
-                                .component_mut::<TextContent>()
-                                .unwrap()
-                                .text = text;
-                            self.tree
-                                .get_mut(ComponentId(ids.root.0 + 20))
-                                .unwrap()
-                                .component_mut::<ButtonContent>()
-                                .unwrap()
-                                .button
-                                .state
-                                .disabled = reading || !more || !paging;
-                            self.tree
-                                .get_mut(ComponentId(ids.root.0 + 19))
-                                .unwrap()
-                                .component_mut::<ButtonContent>()
-                                .unwrap()
-                                .button
-                                .state
-                                .disabled = reading;
                         }
                         PaneSnapshot::Missing { .. } => {}
                     }
@@ -3211,6 +3246,34 @@ impl ComponentDemo {
                 }
             }
         }
+        if !self.composing()
+            && let Some(SidePanelTabKind::Subagent { child_id }) =
+                self.panel_selections.get(binding.scope())
+            && let Some(pane) = self
+                .child_panes
+                .get_mut(&(binding.scope().clone(), child_id.clone()))
+            && !pane.reading
+            && matches!(pane.snapshot, PaneSnapshot::ReadOnlyChild { .. })
+        {
+            let root = ComponentId(pane.controls.ids.root.0 + 16);
+            if let Some(view) = self.tree.get_mut(root).and_then(|node| {
+                node.component_mut::<tekes_agent_components_ui::ReadOnlyTranscript>()
+            }) && let Some(intent) = view.take_intents(&actions).into_iter().next()
+            {
+                require(
+                    intent.scope() == pane.source.binding().scope(),
+                    "read-only history origin mismatch",
+                )?;
+                pane.reading = true;
+                commands.push(DemoCommand::ReadChild {
+                    panel_parent: binding.scope().clone(),
+                    source: pane.source.clone(),
+                    page: intent.read()
+                        == tekes_agent_components_ui::ReadOnlyTranscriptRead::Earlier,
+                    read_intent: Some(intent),
+                });
+            }
+        }
         for action in actions
             .iter()
             .filter(|action| action.kind == ContentActionKind::Activate)
@@ -3221,14 +3284,15 @@ impl ComponentDemo {
                     .child_panes
                     .get_mut(&(binding.scope().clone(), child_id.clone()))
                 && !pane.reading
-                && (action.target == ComponentId(pane.controls.ids.root.0 + 19)
-                    || action.target == ComponentId(pane.controls.ids.root.0 + 20))
+                && matches!(pane.snapshot, PaneSnapshot::Run { .. })
+                && action.target == ComponentId(pane.controls.ids.root.0 + 19)
             {
                 pane.reading = true;
                 commands.push(DemoCommand::ReadChild {
                     panel_parent: binding.scope().clone(),
                     source: pane.source.clone(),
-                    page: action.target == ComponentId(pane.controls.ids.root.0 + 20),
+                    page: false,
+                    read_intent: None,
                 });
             }
             match action.target {

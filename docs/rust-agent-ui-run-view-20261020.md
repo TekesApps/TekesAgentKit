@@ -2,7 +2,7 @@
 
 `RunView` 是 AgentKit 的可独立挂载组件，组合已有 Composer、Indicators、TranscriptPaging、ActionableCard 和可安装的 TranscriptContent。它不是 RunSurface / ComponentDemo 的改名或包装；这两个仍是测试宿主。主会话和可写任务、独立子代理、SideChat 的实验宿主现用同一个 RunView 更新和意图出口。
 
-这是可接入的实验组合，尚未通过完整 Run/Transcript 验收。只读 Native 有界子历史当前仍走原专用读取面板，未假造 RunController 或可发送 Composer；其实际消息树接入仍属于 AgentKit 后续工作。阅读/分页锚点、富内容、真实中文 IME 和完整三端原生 UX 也未完成。
+这是可接入的实验组合，尚未通过完整 Run/Transcript 验收。只读 Native 有界子历史现已接入独立 [ReadOnlyTranscript](rust-agent-ui-readonly-child-20261020.md)，不假造 RunController 或可发送 Composer；原 RunView 收据保留此前验证范围。阅读/分页锚点、富内容、真实中文 IME 和完整三端原生 UX 也未完成。
 
 ## 依赖与来源
 

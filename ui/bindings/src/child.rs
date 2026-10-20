@@ -108,6 +108,76 @@ impl ChildPaneBinding {
         )?;
         self.run.refresh_child_catalog().await
     }
+    /// Render one original read frame. A later transport sample can only lower
+    /// page authority; refresh remains explicit once the source is ready again.
+    pub fn readonly_input<'a>(
+        &self,
+        snapshot: &'a PaneSnapshot,
+        reading: bool,
+        read_error: Option<&'a str>,
+    ) -> Result<tekes_agent_components_ui::ReadOnlyTranscriptInput<'a>> {
+        let PaneSnapshot::ReadOnlyChild {
+            scope,
+            publication,
+            connection_epoch,
+            connection,
+            transcript,
+        } = snapshot
+        else {
+            return Err(tekes_agent_contract::unsupported(
+                "child is not a read-only source",
+            ));
+        };
+        tekes_agent_contract::require(
+            self.layout == ChildHistoryLayout::SameSession
+                && scope == self.run.scope()
+                && *publication > 0
+                && self.run.access() != crate::PaneAccess::Missing,
+            "read-only child frame origin mismatch",
+        )?;
+        let ready = self.refresh_key();
+        Ok(tekes_agent_components_ui::ReadOnlyTranscriptInput {
+            scope,
+            publication: *publication,
+            connection_epoch: *connection_epoch,
+            connection,
+            transcript,
+            frame_current: ready.is_some_and(|key| key.connection_epoch == *connection_epoch),
+            source_ready: ready.is_some(),
+            supports_pagination: self.supports_pagination(),
+            reading,
+            read_error,
+        })
+    }
+    /// Execute the original explicit read on this same source, checking again
+    /// immediately before IO. Refresh can deliberately renew an old epoch;
+    /// pagination cannot silently acquire authority in a newer connection.
+    pub async fn read_intent(
+        &self,
+        intent: tekes_agent_components_ui::ReadOnlyTranscriptIntent,
+    ) -> Result<PaneSnapshot> {
+        use tekes_agent_components_ui::ReadOnlyTranscriptRead;
+        tekes_agent_contract::require(
+            intent.scope() == self.run.scope()
+                && self.layout == ChildHistoryLayout::SameSession
+                && self.run.access() != crate::PaneAccess::Missing
+                && intent.publication() > 0
+                && intent.publication() <= self.run.readonly_reads.load(Ordering::Acquire),
+            "read-only child intent source mismatch",
+        )?;
+        tekes_agent_contract::require(intent.claim(), "read-only child gesture already admitted")?;
+        let key = self
+            .refresh_key()
+            .ok_or_else(|| tekes_agent_contract::unsupported("read-only child source not ready"))?;
+        if intent.read() == ReadOnlyTranscriptRead::Earlier {
+            tekes_agent_contract::require(
+                self.supports_pagination() && key.connection_epoch == intent.connection_epoch(),
+                "read-only child page epoch expired",
+            )?;
+            self.load_earlier().await?;
+        }
+        self.snapshot().await
+    }
     pub async fn snapshot(&self) -> Result<PaneSnapshot> {
         self.run.snapshot().await
     }
