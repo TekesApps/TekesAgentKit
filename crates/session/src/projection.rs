@@ -490,6 +490,12 @@ impl MemoryProjectionStore {
                 let id = string(frame, "sessionId")?;
                 let running = boolean(frame, "running")?;
                 if let Some(s) = self.sessions.get_mut(id) {
+                    // Operational errors belong to the preceding execution.
+                    // Only an ordered live inventory start clears them; replaying
+                    // turn/start from snapshots or pagination must not do so.
+                    if running {
+                        s.agent_error = None;
+                    }
                     if let Some(summary) = &mut s.summary {
                         summary["running"] = Value::Bool(running);
                     }

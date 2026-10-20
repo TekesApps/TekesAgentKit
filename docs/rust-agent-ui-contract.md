@@ -20,6 +20,10 @@ AgentKit 定义业务结构、展示语义、组件组合、组件输入及回�
 
 [三端流式原生专项](rust-agent-ui-stream-native-20261020.md)已验证正常 Send、真实预览、落盘后的原行/正文控件/选区、会话草稿和重连不重发，并修复聚合/结构化回补时的唯一正文/推理控件迁移；多块内容不猜测关联。这是专项原生证据，完整三端取消/错误/IME 交互及阅读锚点仍须继续。
 
+[三端取消/错误/恢复专项](rust-agent-ui-run-controls-20261020.md)已通过真实窗口 Send、流式中 Cancel、两次重连不重发、公开错误说明的原生 AX 查询及显式恢复。新增共享 latest_failure/failure_message 只读事实，修复 Pi 错误正文丢失、Indicators 只显示 idle，以及 DSH 新执行后旧 operational error 粘滞。基础路径已验收，不扩大为全部错误、队列/工具取消或真实 IME 验收。
+
+[阅读事务候选输入](tekesui-reading-candidate-intake-20261020.md)已核验新包的449文件与压缩包身份；尚未独立构建或接入，不替换当前8cf固定依赖，也不提升/关闭#22。
+
 ## Composer（首批实现）
 
 `Composer` 实现 TekesUI `Component`，通过 `Content::new(ids.root, composer)` 放入任意公共 ContentHost，也可 `composer.into_host()` 独立挂载。`ComposerIds::new(base)` 占用连续 8 个 ID，宿主保证其与其他子树不冲突。可在一个窗口内用不同 ID 段挂载多个 Composer。

@@ -974,3 +974,41 @@ fn a_tool_result_end_does_not_retire_an_active_assistant_preview() {
         1
     );
 }
+
+#[test]
+fn pi_provider_error_retains_its_public_message_and_is_not_a_final_answer() {
+    let result=TranscriptSnapshot::read(&scope("a"),&native(vec![
+        json!({"id":"u","type":"message","message":{"role":"user","content":"input","timestamp":1}}),
+        json!({"id":"failure","type":"message","message":{"role":"assistant","content":[],"timestamp":2,"stopReason":"error","errorMessage":"controlled provider error"}}),
+    ],vec![],false)).unwrap();
+    assert_eq!(result.turns[0].status, "error");
+    assert_eq!(
+        result.items.last().unwrap().metadata["errorMessage"],
+        "controlled provider error"
+    );
+    assert!(!result.items.iter().any(|item| item.is_final));
+    assert_eq!(
+        result.latest_failure().unwrap().message,
+        Some("controlled provider error")
+    );
+    for status in ["running", "completed", "aborted"] {
+        let mut newer = result.clone();
+        let mut turn = newer.turns[0].clone();
+        turn.id = "newer".into();
+        turn.status = status.into();
+        newer.turns.push(turn);
+        assert!(newer.latest_failure().is_none());
+        assert_eq!(
+            newer.items.last().unwrap().failure_message(),
+            Some("controlled provider error")
+        );
+    }
+    let mut unknown = result.clone();
+    unknown.items.last_mut().unwrap().metadata["errorMessage"] = Value::Null;
+    assert_eq!(unknown.latest_failure().unwrap().message, None);
+    let mut cancelled = result.clone();
+    cancelled.turns[0].status = "aborted".into();
+    cancelled.items.last_mut().unwrap().metadata["stopReason"] = "aborted".into();
+    assert!(cancelled.latest_failure().is_none());
+    assert!(cancelled.items.last().unwrap().failure_message().is_none());
+}

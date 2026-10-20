@@ -90,6 +90,7 @@ pub(crate) enum Slot {
     AggregateBody,
     AggregateAttachment(usize),
     MessageKind,
+    Failure,
     Empty,
     Coverage,
 }
@@ -607,6 +608,16 @@ fn parts(
             kind: OutputContentKind::Status,
             title: String::new(),
             text: (labels.text)(status),
+        });
+    }
+    if item.kind == TranscriptItemKind::Assistant
+        && let Some(error) = item.failure_message()
+    {
+        result.push(PartFacts {
+            slot: Slot::Failure,
+            kind: OutputContentKind::Status,
+            title: String::new(),
+            text: format!("{}：{error}", (labels.text)(OutputMessageText::Error)),
         });
     }
     if let Some(blocks) = &item.content_blocks {

@@ -1215,3 +1215,34 @@ fn independent_host_reconciles_explicit_stream_receipt_through_public_api() {
         body
     );
 }
+
+/// A host formats shared settlement facts without deriving failure from idle.
+pub fn current_failure(
+    snapshot: &tekes_agent_components_ui::TranscriptSnapshot,
+) -> Option<tekes_agent_components_ui::TranscriptFailure<'_>> {
+    snapshot.latest_failure()
+}
+#[test]
+fn independent_host_reads_known_failure_without_fabricating_message_or_success() {
+    use tekes_agent_components_ui::*;
+    let mut snapshot = TranscriptSnapshot {
+        turns: vec![TranscriptTurn {
+            id: "failed".into(),
+            status: "error".into(),
+            input: String::new(),
+            started_at: None,
+            ended_at: None,
+            usage: Default::default(),
+            fork_boundary: None,
+            footnote_actions: vec![],
+            live_usage: None,
+            reported_usage: None,
+        }],
+        ..Default::default()
+    };
+    let failure: TranscriptFailure<'_> = current_failure(&snapshot).unwrap();
+    assert_eq!(failure.turn_id, "failed");
+    assert_eq!(failure.message, None);
+    snapshot.turns[0].status = "completed".into();
+    assert!(current_failure(&snapshot).is_none());
+}

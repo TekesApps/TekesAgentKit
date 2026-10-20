@@ -32,6 +32,8 @@ use tekes_ui_tokens::{Palette, Theme};
 
 #[path = "native_feedback_selftest.rs"]
 mod feedback_probe;
+#[path = "native_run_controls_selftest.rs"]
+mod run_controls_probe;
 #[path = "native_stream_selftest.rs"]
 mod stream_probe;
 struct OwnedFilePreview {
@@ -47,6 +49,7 @@ impl Drop for OwnedFilePreview {
 struct Host {
     feedback_probe: Option<feedback_probe::Probe>,
     stream_probe: Option<stream_probe::Probe>,
+    run_controls_probe: Option<run_controls_probe::Probe>,
     clipboard_writes: Vec<tekes_agent_components_ui::TranscriptCopyIntent>,
     file_viewer: Option<OwnedFilePreview>,
     view: ComponentDemo,
@@ -1016,6 +1019,11 @@ impl Host {
         if let Some(mut probe) = self.stream_probe.take() {
             probe.advance(self, window);
             self.stream_probe = Some(probe);
+        }
+
+        if let Some(mut probe) = self.run_controls_probe.take() {
+            probe.advance(self, window);
+            self.run_controls_probe = Some(probe);
         }
 
         if self.annotation_selftest {
@@ -1997,6 +2005,17 @@ impl Host {
                 probe.receipt(&self.view)
             );
         }
+        if let Some(probe) = &self.run_controls_probe {
+            assert!(
+                self.failures.is_empty(),
+                "native run control callback failures: {:?}",
+                self.failures
+            );
+            println!(
+                "NATIVE_AGENT_RUN_CONTROLS_SELFTEST_RECEIPT {}",
+                probe.receipt(&self.view)
+            );
+        }
         for observer in self.observers.drain(..) {
             observer.abort();
         }
@@ -2247,6 +2266,9 @@ impl WindowHandler for Host {
 }
 pub fn run() {
     let args: Vec<_> = std::env::args().collect();
+    let run_controls_selftest = args
+        .iter()
+        .any(|arg| arg == "--run-controls-native-selftest");
     let stream_selftest = args.iter().any(|arg| arg == "--stream-native-selftest");
     let feedback_selftest = args.iter().any(|arg| arg == "--feedback-native-selftest");
     let selftest = args.iter().any(|arg| arg == "--native-selftest");
@@ -2260,6 +2282,7 @@ pub fn run() {
         [
             feedback_selftest,
             stream_selftest,
+            run_controls_selftest,
             selftest,
             system_ime_selftest,
             actions_selftest,
@@ -2274,7 +2297,7 @@ pub fn run() {
             <= 1,
         "choose one native fixture selftest mode"
     );
-    if feedback_selftest || stream_selftest {
+    if feedback_selftest || stream_selftest || run_controls_selftest {
         assert!(
             args.iter().any(|arg| arg == "--endpoint-config")
                 && args.iter().any(|arg| arg == "--transcript-content")
@@ -2529,6 +2552,9 @@ pub fn run() {
     if stream_selftest {
         stream_probe::Probe::prepare(&view);
     }
+    if run_controls_selftest {
+        run_controls_probe::Probe::prepare(&view);
+    }
     let side_chats = Arc::new(SideChatBinding::new(runtime.clone()));
     view.set_side_chat_binding(side_chats.clone());
     view.set_sidebar_source(sidebar.snapshot()).unwrap();
@@ -2581,6 +2607,7 @@ pub fn run() {
     let mut host = Host {
         feedback_probe: feedback_selftest.then(feedback_probe::Probe::new),
         stream_probe: stream_selftest.then(stream_probe::Probe::new),
+        run_controls_probe: run_controls_selftest.then(run_controls_probe::Probe::new),
         clipboard_writes: vec![],
         file_viewer: None,
         view,

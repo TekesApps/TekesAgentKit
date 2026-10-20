@@ -67,6 +67,28 @@ pub struct TranscriptItem {
     pub time: Option<f64>,
     pub metadata: Value,
 }
+impl TranscriptItem {
+    /// Explicit committed failure text, never inferred from prose or an idle run.
+    pub fn failure_message(&self) -> Option<&str> {
+        if !self.is_visible || self.is_provisional {
+            return None;
+        }
+        let message = match self.kind {
+            TranscriptItemKind::Error => Some(self.text.as_str()),
+            TranscriptItemKind::Assistant if self.metadata["stopReason"] == "error" => {
+                self.metadata["errorMessage"].as_str()
+            }
+            _ => None,
+        };
+        message.filter(|text| !text.trim().is_empty())
+    }
+}
+/// The latest source turn explicitly failed. A missing message remains unknown.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TranscriptFailure<'a> {
+    pub turn_id: &'a str,
+    pub message: Option<&'a str>,
+}
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct TranscriptToolCall {
@@ -165,6 +187,20 @@ fn response_usage(data: &Value) -> &Value {
         .unwrap_or(&Value::Null)
 }
 impl TranscriptSnapshot {
+    /// Current canonical settlement only: old failures remain historical after
+    /// a newer running/completed/aborted turn, without clearing their records.
+    pub fn latest_failure(&self) -> Option<TranscriptFailure<'_>> {
+        let turn = self.turns.last().filter(|turn| turn.status == "error")?;
+        Some(TranscriptFailure {
+            turn_id: &turn.id,
+            message: self
+                .items
+                .iter()
+                .rev()
+                .filter(|item| item.turn_id == turn.id)
+                .find_map(TranscriptItem::failure_message),
+        })
+    }
     /// Replay already validated authority. Rebuilds only this selected session; never advances a cursor.
     pub fn read(scope: &RunScope, session: &SessionProjection) -> Result<Self> {
         let mut snapshot = if session.native_conversation.is_some() {
@@ -901,6 +937,14 @@ fn native(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSna
                     .as_str()
                     .is_some_and(|reason| !reason.is_empty());
                 row.metadata = json!({"stopReason":message["stopReason"]});
+                if message["stopReason"] == "error"
+                    && let Some(error) = message["errorMessage"]
+                        .as_str()
+                        .filter(|text| !text.trim().is_empty())
+                {
+                    row.metadata["errorMessage"] = json!(error);
+                }
+
                 if let Some(id) = reading_ids.get(record) {
                     row.metadata["nativeStreamId"] =
                         json!(scoped(scope, &format!("pi-stream:{id}")));

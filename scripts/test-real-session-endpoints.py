@@ -2,6 +2,7 @@
 """Exercise the three separate endpoints with owned temporary state and synthetic local providers."""
 import argparse, base64, zlib, shutil, uuid, http.server, json, os, re, select, signal, struct, subprocess, tempfile, threading, time, urllib.request, urllib.parse
 from pathlib import Path
+from native_probe_provider import native_probe_intent
 ROOT=Path(__file__).resolve().parent.parent
 parser=argparse.ArgumentParser()
 parser.add_argument('--pi-root',type=Path)
@@ -18,6 +19,7 @@ parser.add_argument('--ui-annotation-editor',action='store_true',help='Exercise 
 parser.add_argument('--ui-attachments',action='store_true',help='Exercise public upload entry, original draft, Send, history and capability-specific file reads')
 parser.add_argument('--ui-bounded-child',action='store_true',help='Verify actual read-only Native child messages through the public component; requires components and Kernel')
 parser.add_argument('--ui-feedback-read',action='store_true',help='Read typed committed feedback and verify proven final response IDs; no mutations or rating controls')
+parser.add_argument('--ui-native-run-controls',action='store_true',help='Native Send/Cancel/provider failure/explicit recovery over fresh owned sessions; no physical IME or reading-anchor acceptance')
 parser.add_argument('--ui-native-stream',action='store_true',help='Use fresh owned sessions for native Send, active preview, selection, settlement, draft isolation and reconnect; excludes reading anchors')
 parser.add_argument('--ui-native-feedback',action='store_true',help='Open each owned-session native window sequentially and exercise feedback clicks, text services and session switching')
 parser.add_argument('--ui-feedback-transcript',action='store_true',help='Exercise feedback through actual Transcript/RunView and captured host callbacks; offscreen only')
@@ -29,6 +31,8 @@ parser.add_argument('--ui-message-rows',action='store_true',help='Mount canonica
 parser.add_argument('--ui-history-pages',action='store_true',help='Seed long isolated sessions and verify public page receipts, original scope and fresh reconnect history')
 parser.add_argument('--ui-actionables',action='store_true',help='Exercise public actionable cards on configured Native/Pi/DSH question sources')
 args=parser.parse_args()
+if args.ui_native_run_controls and not (args.ui_demo and args.ui_components and args.ui_transcript_content):
+    parser.error('--ui-native-run-controls requires --ui-demo, --ui-components and --ui-transcript-content')
 if args.ui_native_stream and not (args.ui_demo and args.ui_components and args.ui_transcript_content):
     parser.error('--ui-native-stream requires --ui-demo, --ui-components and --ui-transcript-content')
 if args.ui_native_feedback and not (args.ui_demo and args.ui_components and args.ui_transcript_content):
@@ -76,10 +80,21 @@ class Provider(http.server.BaseHTTPRequestHandler):
     def log_message(self,*_):pass
     def do_POST(self):
         body=json.loads(self.rfile.read(int(self.headers['Content-Length'])));requests.append(self.path)
+        intent=native_probe_intent(body)
+        native_cancel=intent=='ENDPOINT_CANCEL_NATIVE_PROOF'
+        if intent=='ENDPOINT_ERROR_NATIVE_PROOF':
+            error=json.dumps({'error':{'message':'ENDPOINT_ERROR_NATIVE_PROOF: controlled invalid request','type':'invalid_request_error','code':'invalid_request_error'}}).encode()
+            self.send_response(400);self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(error)));self.end_headers();self.wfile.write(error);return
         if 'ENDPOINT_QUEUE_HOLD' in json.dumps(body):time.sleep(0.6)
         self.send_response(200);self.send_header('Content-Type','text/event-stream');self.end_headers()
         if self.path.endswith('/responses'):
             frames=[{'type':'response.completed','response':{'id':'synthetic-response','status':'completed','output':[{'type':'message','role':'assistant','phase':'final_answer','status':'completed','content':[{'type':'output_text','text':'ENDPOINT_REPLY_OK'}]}],'usage':{'input_tokens':10,'output_tokens':4,'total_tokens':14}}}]
+            if native_cancel:
+                frames=[
+                    {'type':'response.output_item.added','output_index':0,'item':{'id':'cancel-native-output','type':'message','role':'assistant','phase':'final_answer','content':[]}},
+                    {'type':'response.output_text.delta','output_index':0,'content_index':0,'delta':'CANCEL_PENDING'},
+                    *frames,
+                ]
             if 'ENDPOINT_STREAM_NATIVE_PROOF' in json.dumps(body):
                 frames=[
                     {'type':'response.output_item.added','output_index':0,'item':{'id':'stream-native-output','type':'message','role':'assistant','phase':'final_answer','content':[]}},
@@ -106,6 +121,8 @@ class Provider(http.server.BaseHTTPRequestHandler):
         else:
             common={'id':'synthetic-chat','object':'chat.completion.chunk','created':1,'model':'endpoint-test'}
             frames=[dict(common,choices=[{'index':0,'delta':{'role':'assistant','content':'ENDPOINT_'},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{'content':'REPLY_OK'},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{},'finish_reason':'stop'}],usage={'prompt_tokens':10,'completion_tokens':4,'total_tokens':14})]
+            if native_cancel:
+                frames=[dict(common,choices=[{'index':0,'delta':{'role':'assistant','content':'CANCEL_PENDING'},'finish_reason':None}]),*frames[1:]]
             transcript=json.dumps(body.get('messages',[]))
             change=re.search(r'ENDPOINT_CHANGE_DIRECTORY=([^\s"\\]+)',transcript)
             if change and not any(message.get('role')=='tool' for message in body.get('messages',[])):
@@ -137,6 +154,7 @@ class Provider(http.server.BaseHTTPRequestHandler):
         try:
             for frame in frames:
                 self.wfile.write(('data: '+json.dumps(frame)+'\n\n').encode());self.wfile.flush()
+                if native_cancel:time.sleep(1)
                 if 'ENDPOINT_STREAM_IDENTITY_PROOF' in json.dumps(body):time.sleep(0.5)
                 if 'ENDPOINT_STREAM_NATIVE_PROOF' in json.dumps(body):time.sleep(1)
             if not self.path.endswith('/responses'):self.wfile.write(b'data: [DONE]\n\n')
@@ -306,24 +324,30 @@ def ui_smoke(config, first, bounded_child=None):
         assert not proof['physicalIme'] and not proof['voiceOver'] and not proof['readingAnchorAcceptance'],proof
         print(kind.upper()+'_UI_NATIVE_FEEDBACK_RECEIPT '+json.dumps(proof,ensure_ascii=False,sort_keys=True),flush=True)
 
-    if args.ui_native_stream and bounded_child is None:
-        model=next(command['args'] for command in config['commands'] if command.get('method')=='session.selectModel')
-        commands=[{'op':'create','cwd':str(cwd),'saveAs':'stream'},
-                  {'op':'call','sessionId':'stream','method':'session.selectModel','args':model},
-                  {'op':'create','cwd':str(cwd)}]
-        fresh=[row['result']['sessionId'] for row in execute(dict(config,commands=commands)) if row.get('op')=='create']
-        stream_path=base/('ui-native-stream-'+kind+'.json')
-        stream_path.write_text(json.dumps(dict(explicit,sessions=fresh)))
-        stream_log=output.with_suffix('.native-stream.log')
-        with stream_log.open('w') as capture:
-            native=subprocess.run([str(args.ui_demo.resolve()),'--components','--transcript-content','--endpoint-config',str(stream_path),'--stream-native-selftest'],env=ui_env,stdout=capture,stderr=subprocess.STDOUT,timeout=55)
-        native_text=stream_log.read_text()
-        assert native.returncode==0,str(stream_log)+'\n'+native_text[-4000:]
-        marker='NATIVE_AGENT_STREAM_SELFTEST_RECEIPT '
-        stream=next(json.loads(line[len(marker):]) for line in native_text.splitlines() if line.startswith(marker))
-        assert all(stream[key] for key in ('nativeWindow','nativePointer','nativeTextServices','nativeAxSelection','activePreview','sameOutputRow','sameTextOwner','selectionRetained','focusRetainedDuringSettlement','oneSubmission','sessionDraftIsolation','reconnectNoReplay','stateDrivenCallbacks')),stream
-        assert not stream['physicalIme'] and not stream['voiceOver'] and not stream['readingAnchorAcceptance'],stream
-        print(kind.upper()+'_UI_NATIVE_STREAM_RECEIPT '+json.dumps(stream,ensure_ascii=False,sort_keys=True),flush=True)
+    native_modes=[]
+    if args.ui_native_stream:
+        native_modes.append(('stream','--stream-native-selftest','NATIVE_AGENT_STREAM_SELFTEST_RECEIPT ',('nativeWindow','nativePointer','nativeTextServices','nativeAxSelection','activePreview','sameOutputRow','sameTextOwner','selectionRetained','focusRetainedDuringSettlement','oneSubmission','sessionDraftIsolation','reconnectNoReplay','stateDrivenCallbacks')))
+    if args.ui_native_run_controls:
+        native_modes.append(('run-controls','--run-controls-native-selftest','NATIVE_AGENT_RUN_CONTROLS_SELFTEST_RECEIPT ',('nativeWindow','nativePointer','nativeTextServices','activePreviewBeforeCancel','normalCancelCallback','authoritativeAbortedTurn','cancelReconnectNoReplay','providerFailureInIndicators','providerFailureInTranscript','nativeFailureTextQuery','explicitRecovery','priorFailureCleared','oneSubmissionPerSend','draftIsolation','recoveryReconnectNoReplay','stateDrivenCallbacks')))
+    if bounded_child is None:
+        for probe_name,flag,marker,required in native_modes:
+            model=next(command['args'] for command in config['commands'] if command.get('method')=='session.selectModel')
+            commands=[{'op':'create','cwd':str(cwd),'saveAs':'native-probe'},
+                      {'op':'call','sessionId':'native-probe','method':'session.selectModel','args':model},
+                      {'op':'create','cwd':str(cwd)}]
+            fresh=[row['result']['sessionId'] for row in execute(dict(config,commands=commands)) if row.get('op')=='create']
+            probe_path=base/('ui-native-'+probe_name+'-'+kind+'.json')
+            probe_path.write_text(json.dumps(dict(explicit,sessions=fresh)))
+            native_log=output.with_suffix('.native-'+probe_name+'.log')
+            with native_log.open('w') as capture:
+                native=subprocess.run([str(args.ui_demo.resolve()),'--components','--transcript-content','--endpoint-config',str(probe_path),flag],env=ui_env,stdout=capture,stderr=subprocess.STDOUT,timeout=55)
+            native_text=native_log.read_text()
+            assert native.returncode==0,str(native_log)+'\n'+native_text[-4000:]
+            proof=next(json.loads(line[len(marker):]) for line in native_text.splitlines() if line.startswith(marker))
+            assert all(proof[key] for key in required),proof
+            if probe_name=='run-controls':assert isinstance(proof.get('reportedError'),str) and proof['reportedError'].strip(),proof
+            assert not proof['physicalIme'] and not proof['voiceOver'] and not proof['readingAnchorAcceptance'],proof
+            print(kind.upper()+'_UI_NATIVE_'+probe_name.upper().replace('-','_')+'_RECEIPT '+json.dumps(proof,ensure_ascii=False,sort_keys=True),flush=True)
 
     assert not receipt['isStale'] and receipt['finalAssistantItems']>=1,receipt
     assert output.read_bytes().startswith(b'\x89PNG\r\n\x1a\n'),kind+' UI image missing'

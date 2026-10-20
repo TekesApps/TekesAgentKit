@@ -29,6 +29,8 @@ pub struct IndicatorFacts {
     pub history_stale: bool,
     pub connection_error: Option<String>,
     pub run_error: Option<String>,
+    /// Latest canonical turn explicitly settled with error; not inferred from idle.
+    pub last_turn_failed: bool,
     pub waiting: usize,
     pub queued: usize,
     pub output_usage: Option<OutputUsage>,
@@ -38,12 +40,17 @@ impl IndicatorFacts {
     pub fn read(snapshot: &RunSnapshot) -> Self {
         let turn = snapshot.transcript.turns.last();
         let output_usage = turn.and_then(OutputUsage::read_turn);
+        let failure = snapshot.transcript.latest_failure();
         Self {
             connection: snapshot.connection.phase.clone(),
             run: snapshot.run.as_ref().map(|run| run.phase.clone()),
             history_stale: snapshot.transcript.is_stale || snapshot.connection.history_is_stale,
             connection_error: snapshot.connection.message.clone(),
-            run_error: snapshot.run.as_ref().and_then(|run| run.error.clone()),
+            run_error: failure
+                .and_then(|failure| failure.message)
+                .map(str::to_owned)
+                .or_else(|| snapshot.run.as_ref().and_then(|run| run.error.clone())),
+            last_turn_failed: failure.is_some(),
             waiting: snapshot.run.as_ref().map_or(0, |run| run.actionables.len()),
             queued: snapshot.run.as_ref().map_or(0, |run| run.queue.len()),
             output_usage,
@@ -56,6 +63,7 @@ impl IndicatorFacts {
             Some(RunPhase::Running) => "执行中",
             Some(RunPhase::WaitingForInput) => "等待输入",
             Some(RunPhase::Loading) => "正在加载",
+            Some(RunPhase::Idle) if self.last_turn_failed || self.run_error.is_some() => "执行失败",
             Some(RunPhase::Idle) => "空闲",
             Some(RunPhase::Interrupted) => "已中断",
             Some(RunPhase::Archived) => "已归档",

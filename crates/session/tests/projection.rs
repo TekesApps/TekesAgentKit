@@ -399,3 +399,59 @@ fn native_reading_receipts_are_atomic_scoped_and_cleared_on_reconnect() {
         .unwrap();
     assert!(store.sessions["s"].native_reading_identities.is_empty());
 }
+
+#[test]
+fn a_confirmed_inventory_start_clears_only_its_sessions_operational_error() {
+    let mut store = store();
+    store.apply("inventory", inventory()).unwrap();
+    store.apply("inventory",json!({"type":"agent-error","generation":"g","sessionId":"s","message":"provider failed"})).unwrap();
+    store.apply("inventory",json!({"type":"agent-error","generation":"g","sessionId":"other","message":"other failure"})).unwrap();
+    // Historical turn/start replay is not a new execution signal.
+    store
+        .apply(
+            "journal:s",
+            snapshot(0, vec![event(0, "turn/start")], false, None),
+        )
+        .unwrap();
+    assert_eq!(
+        store.sessions["s"].agent_error.as_deref(),
+        Some("provider failed")
+    );
+    store
+        .apply(
+            "inventory",
+            json!({"type":"status","generation":"g","sessionId":"s","running":false}),
+        )
+        .unwrap();
+    assert_eq!(
+        store.sessions["s"].agent_error.as_deref(),
+        Some("provider failed")
+    );
+    store
+        .apply(
+            "inventory",
+            json!({"type":"status","generation":"g","sessionId":"s","running":true}),
+        )
+        .unwrap();
+    assert_eq!(store.sessions["s"].agent_error, None);
+    assert_eq!(
+        store.sessions["other"].agent_error.as_deref(),
+        Some("other failure")
+    );
+    store
+        .apply(
+            "inventory",
+            json!({"type":"agent-error","generation":"g","sessionId":"s","message":"new failure"}),
+        )
+        .unwrap();
+    store
+        .apply(
+            "inventory",
+            json!({"type":"status","generation":"g","sessionId":"s","running":false}),
+        )
+        .unwrap();
+    assert_eq!(
+        store.sessions["s"].agent_error.as_deref(),
+        Some("new failure")
+    );
+}
