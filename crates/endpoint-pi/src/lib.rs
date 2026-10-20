@@ -8,6 +8,7 @@ mod models;
 mod queue;
 mod reading;
 mod rpc;
+mod search;
 mod subagents;
 use async_trait::async_trait;
 use futures_util::{StreamExt, stream};

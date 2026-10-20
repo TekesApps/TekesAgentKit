@@ -9,7 +9,7 @@
 
 ## 当前阶段
 
-`v0.1.0` 保存三个 SEP 与无 UI presentation 的阶段成果；`v0.1.1` 增加公开仓库的 MIT 授权、包元数据和使用文档；`v0.2.0` 冻结任务、子代理、SideChat 与 Summary 的无 UI 状态层；`v0.3.0` 补齐 Pi 子代理与 Native 有界子历史，见 [说明](docs/child-history.md)。当前公开基线为 `v0.3.7`，已加入共享批注、线程操作与置顶关系、provider 用量和完成回合 Fork 契约，见 [Web 契约](docs/web-ui.md) 及 [变更记录](CHANGELOG.md)。API 仍处于早期阶段，crate 尚未发布到 crates.io（`publish = false`）。宿主应固定 tag/完整 commit，升级前检查变更。
+`v0.1.0` 保存三个 SEP 与无 UI presentation 的阶段成果；`v0.1.1` 增加公开仓库的 MIT 授权、包元数据和使用文档；`v0.2.0` 冻结任务、子代理、SideChat 与 Summary 的无 UI 状态层；`v0.3.0` 补齐 Pi 子代理与 Native 有界子历史，见 [说明](docs/child-history.md)。当前公开基线为 `v0.3.8`，已加入共享批注、线程操作与置顶关系、provider 用量和完成回合 Fork 契约，见 [Web 契约](docs/web-ui.md) 及 [变更记录](CHANGELOG.md)。API 仍处于早期阶段，crate 尚未发布到 crates.io（`publish = false`）。宿主应固定 tag/完整 commit，升级前检查变更。
 
 | Endpoint | 验证版本 | 权威数据路径 |
 |---|---|---|
@@ -102,6 +102,7 @@ python3 scripts/install-dsh-runtime.py \
 - [实验 UI：Pi 实时预览与落盘阅读身份](docs/rust-agent-ui-stream-identity-20261020.md)
 - [实验 UI：三端流式原生窗口验收](docs/rust-agent-ui-stream-native-20261020.md)
 - [实验 UI：三端取消、错误与显式恢复](docs/rust-agent-ui-run-controls-20261020.md)
+- [实验 UI：Sidebar 共享查询控制器与公开搜索 RPC](docs/rust-agent-ui-sidebar-query-controller-20261021.md)
 - [Kernel v4 同步、历史及恢复](docs/headless-kernel.md)
 - [路线与交付边界](docs/roadmap.md)
 - [阶段变更](CHANGELOG.md) · [贡献说明](CONTRIBUTING.md)

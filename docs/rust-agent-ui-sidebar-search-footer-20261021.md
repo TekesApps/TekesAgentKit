@@ -1,5 +1,7 @@
 # Sidebar 搜索 footer 的布局与显示输入
 
+本记录属于 footer 阶段；后续[单端共享 reader 与公开 RPC](rust-agent-ui-sidebar-query-controller-20261021.md)已继续推进，旧收据仍保持其原始范围。
+
 本轮只读对照当前 ClientKit `ClientAgentSidebarListView.swift` 的 `observe()` / `layout()`、`ClientAgentSidebarModel.swift` 的搜索来源与状态、`SessionSearch.swift`，以及 Tekes 的 `ClientAgentSidebarHostAdapter.swift`。源码哈希见同名 JSON。Rust UI 保持实验状态，尚未完整对齐 Sidebar。
 
 ## 对应 View 的已接入规则

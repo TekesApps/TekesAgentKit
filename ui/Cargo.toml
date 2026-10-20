@@ -17,6 +17,7 @@ tekes-agent-session = { path = "../crates/session" }
 tekes-agent-presentation = { path = "../crates/presentation" }
 tekes-agent-components-ui = { path = "components" }
 tekes-agent-ui-bindings = { path = "bindings" }
+tekes-agent-ui-consumer-check = { path = "consumer" }
 tekes-ui-controls = { git = "https://github.com/TekesApps/TekesUI.git", rev = "8cf0840790334ba224afc0595897c74231c712e6" }
 tekes-ui-scene = { git = "https://github.com/TekesApps/TekesUI.git", rev = "8cf0840790334ba224afc0595897c74231c712e6" }
 tekes-ui-tokens = { git = "https://github.com/TekesApps/TekesUI.git", rev = "8cf0840790334ba224afc0595897c74231c712e6" }

@@ -29,3 +29,6 @@ png = "0.17"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 rfd = { version = "=0.17.2", default-features = false }
+
+[dev-dependencies]
+tekes-agent-ui-consumer-check.workspace = true

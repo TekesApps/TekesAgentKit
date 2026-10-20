@@ -1613,3 +1613,24 @@ fn second_product_consumes_sidebar_search_footer_and_captured_retry_without_priv
             .is_empty()
     );
 }
+
+/// Construct search on the original observed endpoint, with query policy owned
+/// by AgentKit's renderer-independent controller.
+pub fn new_sidebar_search(
+    source: &tekes_agent_ui_bindings::SidebarBinding,
+) -> Result<tekes_agent_ui_bindings::SidebarSearchBinding, String> {
+    tekes_agent_ui_bindings::SidebarSearchBinding::new(source.runtime().clone())
+        .map_err(|error| error.to_string())
+}
+pub fn sync_sidebar_search(
+    sidebar: &mut tekes_agent_components_ui::Sidebar,
+    source: &tekes_agent_ui_bindings::SidebarSearchBinding,
+) -> Result<(), &'static str> {
+    sidebar.update_search_from(source.owner(), &source.snapshot().input)
+}
+pub fn mount_sidebar_search(
+    sidebar: &mut tekes_agent_components_ui::Sidebar,
+    source: &tekes_agent_ui_bindings::SidebarSearchBinding,
+) -> Result<(), &'static str> {
+    sidebar.replace_search_source(source.owner(), &source.snapshot().input)
+}

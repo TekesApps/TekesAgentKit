@@ -1780,6 +1780,32 @@ impl ComponentDemo {
     pub fn summary_id(&self) -> ComponentId {
         ComponentId((101 + self.selected as u64 * 2) << 32)
     }
+    pub fn bind_sidebar_search_source(
+        &mut self,
+        owner: &str,
+        input: &tekes_agent_components_ui::SidebarSearchInput,
+    ) -> Result<()> {
+        self.tree
+            .get_mut(self.sidebar_id())
+            .unwrap()
+            .component_mut::<Sidebar>()
+            .unwrap()
+            .replace_search_source(owner, input)
+            .map_err(unsupported)
+    }
+    pub fn update_sidebar_search_source(
+        &mut self,
+        owner: &str,
+        input: &tekes_agent_components_ui::SidebarSearchInput,
+    ) -> Result<()> {
+        self.tree
+            .get_mut(self.sidebar_id())
+            .unwrap()
+            .component_mut::<Sidebar>()
+            .unwrap()
+            .update_search_from(owner, input)
+            .map_err(unsupported)
+    }
     pub fn set_sidebar_search(
         &mut self,
         input: &tekes_agent_components_ui::SidebarSearchInput,

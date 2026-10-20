@@ -133,3 +133,8 @@ ask_user_question → public actionable sync → runtime 用共享 session envel
 未做原生 actionable UI。后续 UI 必须消费共享回答契约，适配差异留在 SEP。
 
 本轮本地 gates：root workspace 108 tests、DSH 9 tests（包含在 root 总数）、18 项工具测试、DSH all-targets strict Clippy、fmt 与 headless 依赖边界通过。此为协议增量，不作为 UI/物理 IME 的新证据。
+
+
+## 共享只读会话搜索
+
+`SessionRuntime::search_sessions_at_epoch` 基于真实方法能力调用 `session.search`，并在请求入场和回复时校验连接代数。typed `SessionSearchResults` 要求 items/sessionId/snippet/hasMore，保留未知扩展字段，不将缺少 hasMore 当成已穷尽。Pi 返回至多 100 个匹配并以第 101 个匹配证明 hasMore；引用候选接口仍为 20 条。DSH 全文索引由部署决定，默认关闭时保持明确失败，AgentKit 不自动打开它。读取取消只撤销 search reader，不取消远程 Agent 执行。组件、shared presentation 和分项证据见[接入记录](rust-agent-ui-sidebar-query-controller-20261021.md)。

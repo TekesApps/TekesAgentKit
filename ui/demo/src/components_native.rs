@@ -34,6 +34,8 @@ use tekes_ui_tokens::{Palette, Theme};
 mod feedback_probe;
 #[path = "native_run_controls_selftest.rs"]
 mod run_controls_probe;
+#[path = "native_sidebar_query_selftest.rs"]
+mod sidebar_query_probe;
 #[path = "native_sidebar_restore_selftest.rs"]
 mod sidebar_restore_probe;
 #[path = "native_sidebar_search_selftest.rs"]
@@ -55,6 +57,8 @@ impl Drop for OwnedFilePreview {
     }
 }
 struct Host {
+    sidebar_query: Option<Arc<tekes_agent_ui_bindings::SidebarSearchBinding>>,
+    sidebar_query_probe: Option<sidebar_query_probe::Probe>,
     sidebar_search_probe: Option<sidebar_search_probe::Probe>,
     sidebar_restore_probe: Option<sidebar_restore_probe::Probe>,
     summary_sections_probe: Option<summary_sections_probe::Probe>,
@@ -247,6 +251,18 @@ impl Host {
             }
         };
         for command in commands {
+            if let DemoCommand::SidebarSearch(intent) = &command
+                && let Some(source) = &self.sidebar_query
+            {
+                if let Some(probe) = &mut self.sidebar_query_probe {
+                    probe.before_retry(intent);
+                }
+                let result = source.retry(intent);
+                if let Err(error) = result {
+                    self.failure(error.to_string());
+                }
+                continue;
+            }
             if let DemoCommand::SidebarSearch(intent) = &command
                 && let Some(probe) = &mut self.sidebar_search_probe
             {
@@ -1010,6 +1026,13 @@ impl Host {
         }
         let background = self.view.take_background_commands();
         self.commands(Ok(background));
+        if let Some(source) = &self.sidebar_query
+            && let Err(error) = self
+                .view
+                .update_sidebar_search_source(source.owner(), &source.snapshot().input)
+        {
+            self.failure(error.to_string());
+        }
         if let Some(probe) = &self.sidebar_search_probe {
             probe.install(&mut self.view);
         }
@@ -1043,6 +1066,10 @@ impl Host {
                 .expect("component frame");
         }
         window.set_animating(self.text.frame_requested);
+        if let Some(mut probe) = self.sidebar_query_probe.take() {
+            probe.advance(self, window);
+            self.sidebar_query_probe = Some(probe);
+        }
         if let Some(mut probe) = self.sidebar_search_probe.take() {
             probe.advance(self, window);
             self.sidebar_search_probe = Some(probe);
@@ -2031,6 +2058,17 @@ impl Host {
                 "NATIVE_AGENT_COMPONENTS_SELFTEST_OK composer+indicators+run-binding+synthetic-text-services+send+stream+cancel+draft-isolation+reconnect; physical-ime=false; transcript=false; reading-anchor=false"
             );
         }
+        if let Some(probe) = &self.sidebar_query_probe {
+            assert!(
+                self.failures.is_empty(),
+                "query callback failures: {:?}",
+                self.failures
+            );
+            println!(
+                "NATIVE_AGENT_SIDEBAR_QUERY_SELFTEST_RECEIPT {}",
+                probe.receipt()
+            );
+        }
         if let Some(probe) = &self.sidebar_search_probe {
             assert!(
                 self.failures.is_empty(),
@@ -2138,6 +2176,17 @@ impl WindowHandler for Host {
                         tekes_agent_ui_demo::notifications::forward(
                             binding.subscribe_run().expect("main run"),
                             move || wake.wake() != tekes_ui_platform_macos::WakeResult::Closed,
+                        ),
+                    ));
+                }
+                if let Some(source) = &self.sidebar_query {
+                    let search_wake = wake.clone();
+                    self.observers.push(self.executor.spawn(
+                        tekes_agent_ui_demo::notifications::forward(
+                            source.subscribe(),
+                            move || {
+                                search_wake.wake() != tekes_ui_platform_macos::WakeResult::Closed
+                            },
                         ),
                     ));
                 }
@@ -2375,10 +2424,15 @@ pub fn run() {
     let actions_selftest = args.iter().any(|arg| arg == "--thread-actions-selftest");
     let models_selftest = args.iter().any(|arg| arg == "--model-choices-selftest");
     let context_selftest = args.iter().any(|arg| arg == "--context-selftest");
+    let sidebar_query_selftest = args.iter().any(|arg| arg == "--sidebar-query-selftest");
     let sidebar_search_selftest = args.iter().any(|arg| arg == "--sidebar-search-selftest");
     let sidebar_restore_selftest = args.iter().any(|arg| arg == "--sidebar-restore-selftest");
     let summary_sections_selftest = args.iter().any(|arg| arg == "--summary-sections-selftest");
-    if summary_sections_selftest || sidebar_restore_selftest || sidebar_search_selftest {
+    if summary_sections_selftest
+        || sidebar_restore_selftest
+        || sidebar_search_selftest
+        || sidebar_query_selftest
+    {
         assert!(
             !args
                 .iter()
@@ -2402,6 +2456,7 @@ pub fn run() {
             summary_sections_selftest,
             sidebar_restore_selftest,
             sidebar_search_selftest,
+            sidebar_query_selftest,
             creation_selftest,
             annotation_selftest
         ]
@@ -2421,6 +2476,7 @@ pub fn run() {
     }
     let executor = tokio::runtime::Runtime::new().unwrap();
     let mut visibility_fixture = None;
+    let mut query_fixture = None;
     let (connector, kind, scopes, fixture): (
         Arc<dyn tekes_agent_contract::EndpointConnector>,
         _,
@@ -2460,6 +2516,15 @@ pub fn run() {
                     .with_lifecycle()
                     .with_presets(false)
                     .with_models();
+                let fixture = if sidebar_query_selftest {
+                    let fixture = fixture.with_session_search();
+                    fixture.set_search_failure(true);
+                    fixture.set_search_result("中文检索",serde_json::json!({"items":[{"sessionId":"b","snippet":"命中 B"},{"sessionId":"a","snippet":"命中 A"}],"hasMore":true}));
+                    query_fixture = Some(fixture.clone());
+                    fixture
+                } else {
+                    fixture
+                };
                 let fixture = if args.iter().any(|arg| arg == "--session-notice-fixture") {
                     fixture.with_session_notice()
                 } else {
@@ -2552,7 +2617,31 @@ pub fn run() {
         !visibility_selftest || fixture,
         "visibility selftest requires the owned local fixture"
     );
+    let query_text = if sidebar_query_selftest {
+        Some("中文检索".to_owned())
+    } else {
+        args.iter()
+            .position(|arg| arg == "--sidebar-query")
+            .map(|index| args.get(index + 1).expect("sidebar query text").clone())
+    };
+    let sidebar_query = query_text.map(|query| {
+        executor.block_on(async {
+            let source = Arc::new(
+                tekes_agent_ui_bindings::SidebarSearchBinding::new(runtime.clone()).unwrap(),
+            );
+            source.set_query(query).unwrap();
+            source
+        })
+    });
     let mut view = ComponentDemo::new(bindings).unwrap();
+    if let Some(source) = &sidebar_query {
+        view.bind_sidebar_search_source(source.owner(), &source.snapshot().input)
+            .unwrap();
+    }
+    if sidebar_query_selftest {
+        sidebar_query_probe::Probe::prepare(&view);
+    }
+
     view.set_file_picker_available(true);
     view.set_file_preview_available(std::path::Path::new("/usr/bin/qlmanage").is_file());
     if annotation_selftest {
@@ -2727,6 +2816,8 @@ pub fn run() {
         0
     };
     let mut host = Host {
+        sidebar_query,
+        sidebar_query_probe: query_fixture.map(sidebar_query_probe::Probe::new),
         sidebar_search_probe: sidebar_search_selftest.then(sidebar_search_probe::Probe::new),
         sidebar_restore_probe: sidebar_restore_selftest.then(sidebar_restore_probe::Probe::new),
         summary_sections_probe: summary_sections_selftest.then(summary_sections_probe::Probe::new),
@@ -2816,7 +2907,69 @@ pub fn run() {
         failures: vec![],
         focus_before_deactivate: None,
     };
+    if args.iter().any(|arg| arg == "--sidebar-query-proof") {
+        assert!(
+            args.iter().any(|arg| arg == "--offscreen")
+                && args.iter().any(|arg| arg == "--endpoint-config")
+                && host.sidebar_query.is_some(),
+            "query protocol proof requires explicit endpoint, query and offscreen output"
+        );
+    }
     if let Some(index) = args.iter().position(|arg| arg == "--offscreen") {
+        let sidebar_query_proof = if args.iter().any(|arg| arg == "--sidebar-query-proof") {
+            let source = host.sidebar_query.as_ref().unwrap();
+            let state = host.executor.block_on(async {
+                let mut changes = source.subscribe();
+                tokio::time::timeout(Duration::from_secs(20), async {
+                    loop {
+                        let state = source.snapshot();
+                        match &state.input.phase {
+                            tekes_agent_components_ui::SidebarSearchPhase::Complete { .. } => {
+                                break state;
+                            }
+                            tekes_agent_components_ui::SidebarSearchPhase::Failed {
+                                message,
+                                ..
+                            } => panic!("owned search failed: {message}"),
+                            _ => {}
+                        }
+                        changes.changed().await.expect("query source ended");
+                    }
+                })
+                .await
+                .expect("query protocol proof deadline")
+            });
+            let expected = host.view.binding().scope().clone();
+            assert!(
+                state
+                    .hits
+                    .iter()
+                    .any(|hit| hit.address.session_id == expected.session_id
+                        && hit.address.endpoint_id == expected.endpoint_id),
+                "owned target not returned by public search"
+            );
+            assert!(
+                state
+                    .hits
+                    .iter()
+                    .all(|hit| hit.address.endpoint_id == expected.endpoint_id)
+            );
+            assert!(
+                host.view
+                    .binding()
+                    .current_run()
+                    .unwrap()
+                    .submissions
+                    .is_empty()
+            );
+            host.view
+                .update_sidebar_search_source(source.owner(), &state.input)
+                .unwrap();
+            serde_json::json!({"publicTypedSearch":true,"sharedController":true,"expectedTargetFound":true,"hits":state.hits.len(),"hasMore":state.result.as_ref().unwrap().has_more,"unresolved":state.unresolved.len(),"originalEndpoint":expected.endpoint_id,"noSubmission":true,"nativeInteraction":false,"fullSidebarParity":false})
+        } else {
+            serde_json::Value::Null
+        };
+
         let history_page_proof = if args.iter().any(|arg| arg == "--history-page-proof") {
             host.executor
                 .block_on(tekes_agent_ui_demo::history_proof::run(
@@ -3589,7 +3742,7 @@ pub fn run() {
             }
         }
         let transcript_content_proof=host.view.transcript_content_id(host.view.ids()).map(|id| {
-            let row=host.view.tree.get(id).unwrap();let content=row.component::<tekes_agent_components_ui::TranscriptContent>().unwrap();let frame=row.frame();
+            let row=host.view.tree.get(id).unwrap();let content=row.component::<tekes_agent_components_ui::TranscriptContent>().unwrap();let frame=host.view.tree.get(ComponentId(host.view.ids().root.0+16)).unwrap().component::<tekes_agent_components_ui::RunView>().unwrap().layout_geometry().expect("arranged shared Run column").content_column;
             let composer=host.view.tree.get(host.view.ids().root).unwrap().frame();
             assert!(composer.min_y()>=0. && composer.max_y()<=760., "content viewport must leave Composer inside the host window");
             let mut messages=0;let mut footnotes=0;let mut tools=0;let mut known_empty=0;let mut output_copies=0;let mut feedback_rows=0;
@@ -3598,7 +3751,7 @@ pub fn run() {
                 if node.component::<tekes_agent_components_ui::TurnFeedback>().is_some(){assert!((node.frame().min_x()-frame.min_x()).abs()<0.5);feedback_rows+=1;}
                 if let Some(input)=node.component::<tekes_agent_components_ui::InputMessage>() {
                     let ids=input.ids();let bubble=host.view.tree.get(ids.bubble).unwrap().frame();let caption=host.view.tree.get(ids.footnote).unwrap().frame();
-                    assert!((bubble.max_x()-frame.max_x()).abs()<0.5);assert!((caption.max_x()-frame.max_x()).abs()<0.5);
+                    assert!((bubble.max_x()-frame.max_x()).abs()<0.5,"user bubble must trail shared column: bubble={bubble:?} column={frame:?}");assert!((caption.max_x()-frame.max_x()).abs()<0.5,"user aside must trail shared column: aside={caption:?} column={frame:?}");
                     messages+=1;
                 } else if let Some(output)=node.component::<tekes_agent_components_ui::OutputMessage>() {assert!((node.frame().min_x()-frame.min_x()).abs()<0.5);if !output.active(){assert!(output.content_ids().is_empty());known_empty+=1;}messages+=1;}
                 else if let Some(footer)=node.component::<tekes_agent_components_ui::TurnFootnote>() {assert!((node.frame().min_x()-frame.min_x()).abs()<0.5);if let Some(copy)=footer.copy_button_id(){assert!((host.view.tree.get(copy).unwrap().frame().min_x()-frame.min_x()).abs()<0.5);output_copies+=1;}footnotes+=1;}
@@ -3649,6 +3802,7 @@ pub fn run() {
         println!(
             "{}",
             serde_json::json!({
+                "sidebarSearchProof":sidebar_query_proof,
                 "runViewComposition":run_view_proof,"boundedChildProof":bounded_child_proof,"feedbackReadProof":feedback_read_proof,"feedbackWriteProof":feedback_write_proof,"feedbackControlsProof":feedback_controls_proof,"feedbackTranscriptProof":feedback_transcript_proof,
                 "offscreen": true, "components": true, "nativeInteraction": false,
                 "transcriptView": false, "isStale": snapshot.transcript.is_stale,

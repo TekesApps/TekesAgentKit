@@ -334,6 +334,28 @@ impl SessionRuntime {
             }
         }
     }
+    /// Read-only host-wide search over the advertised public SEP extension.
+    /// Fence both actor admission and response delivery to the original connection.
+    pub async fn search_sessions_at_epoch(
+        &self,
+        epoch: u64,
+        query: &str,
+        rpc_id: &str,
+    ) -> Result<SessionSearchResults> {
+        let allowed = || {
+            self.inspect(|state| {
+                state.connection == ConnectionState::Ready
+                    && state.connection_epoch == epoch
+                    && state.endpoint_capabilities.supports("session.search")
+            })
+        };
+        require(allowed(), "session search source unavailable or changed")?;
+        let value = self
+            .call_at_epoch(epoch, "session.search", json!({"query":query}), rpc_id)
+            .await?;
+        require(allowed(), "session search source unavailable or changed")?;
+        SessionSearchResults::read(value)
+    }
     pub async fn call(&self, method: &str, payload: Value, rpc_id: &str) -> Result<Value> {
         self.call_context(None, method, payload, rpc_id).await
     }
@@ -701,7 +723,7 @@ async fn connected(
                         operations.spawn(async move {let result=endpoint.observe_files(&id,&path).await;let _=reply.send(result);None});
                     }
                     Command::Earlier(id, reply) => { let result = load_earlier(endpoint.as_ref(), store, &id).await; let _ = reply.send(result); }
-                    Command::Call { method, payload, rpc_id, expected_epoch, reply } => {
+                    Command::Call { method, payload, rpc_id, expected_epoch, mut reply } => {
                         if !store.read(|state|state.ready() && expected_epoch.is_none_or(|epoch|epoch==state.connection_epoch)) || operations.len() >= 64 { let _ = reply.send(Err(Error::Disconnected)); continue; }
                         let endpoint = endpoint.clone();
                         let removed=if matches!(method.as_str(),"session.discard"|"session.archive") {
@@ -711,7 +733,17 @@ async fn connected(
                                 store.update(|s|s.reset_journal(&id));Some(id)
                             } else {None}
                         } else {None};
-                        operations.spawn(async move { let result = invoke(endpoint.as_ref(), &method, payload, &rpc_id).await; Some((removed,reply,result)) });
+                        operations.spawn(async move {
+                            let result = if method == "session.search" {
+                                // Cancel only this specified read operation. Losing a mutation
+                                // receiver must never be interpreted as cancelling remote work.
+                                tokio::select! { biased;
+                                    _ = reply.closed() => return None,
+                                    result = invoke(endpoint.as_ref(), &method, payload, &rpc_id) => result,
+                                }
+                            } else { invoke(endpoint.as_ref(), &method, payload, &rpc_id).await };
+                            Some((removed,reply,result))
+                        });
                     }
                     Command::Respond { id, revision, outcome, reply } => {
                         let valid = store.read(|s| s.ready() && s.actionables.get(&id).is_some_and(|a| integer(a, "revision").ok() == Some(revision)));

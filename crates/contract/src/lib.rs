@@ -10,6 +10,8 @@ pub use thread_actions::*;
 mod capabilities;
 mod registry;
 pub use capabilities::*;
+mod search;
+pub use search::*;
 mod session;
 use async_trait::async_trait;
 use futures_util::stream::BoxStream;

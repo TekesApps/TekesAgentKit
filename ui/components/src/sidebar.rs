@@ -1,7 +1,7 @@
 //! Agent session inventory and shared actions. No local pin database or action policy.
 use crate::{
     SidebarSearchInput, SidebarSearchIntent, SidebarSearchKey, SidebarSearchLabels,
-    sidebar_search::SearchFooter,
+    sidebar_search::{SearchFooter, SearchInputView},
 };
 use std::collections::{BTreeMap, BTreeSet};
 use tekes_agent_contract::{
@@ -109,6 +109,7 @@ pub struct Sidebar {
     revision: u64,
     displayed: Option<SidebarInput>,
     search: Option<SidebarSearchInput>,
+    search_owner: Option<String>,
     search_labels: SidebarSearchLabels,
     search_retry: Option<(SidebarSearchKey, ComponentId)>,
     search_pending: bool,
@@ -171,6 +172,7 @@ impl Sidebar {
             revision: 0,
             displayed: None,
             search: None,
+            search_owner: None,
             search_labels,
             search_retry: None,
             search_pending: false,
@@ -205,7 +207,7 @@ impl Sidebar {
     pub fn set_search_labels(&mut self, labels: SidebarSearchLabels) -> Result<(), &'static str> {
         self.search_labels = labels;
         if let Some(input) = self.search.clone() {
-            self.update_search(&input)?;
+            self.apply_search(&input)?;
         }
         Ok(())
     }
@@ -217,6 +219,57 @@ impl Sidebar {
     /// Search is independent from inventory restoration. Every displayed result
     /// belongs to its exact query attempt; no old raw Retry gesture is retargeted.
     pub fn update_search(&mut self, input: &SidebarSearchInput) -> Result<(), &'static str> {
+        if self.search_owner.is_some() {
+            return Err("bound sidebar search requires original source");
+        }
+        self.apply_search(input)
+    }
+    /// Explicit host navigation/mount barrier. A new controller may start at
+    /// revision one; all prior view action IDs remain permanently retired.
+    pub fn replace_search_source(
+        &mut self,
+        owner: &str,
+        input: &SidebarSearchInput,
+    ) -> Result<(), &'static str> {
+        Self::validate_search_owner(owner, input)?;
+        let old = (
+            self.search.take(),
+            self.search_retry.take(),
+            self.search_pending,
+            self.search_seen.clone(),
+        );
+        self.search_pending = false;
+        self.search_seen.retain(|(source, _), _| source != owner);
+        if let Err(error) = self.apply_search(input) {
+            (
+                self.search,
+                self.search_retry,
+                self.search_pending,
+                self.search_seen,
+            ) = old;
+            return Err(error);
+        }
+        self.search_owner = Some(owner.into());
+        Ok(())
+    }
+    pub fn update_search_from(
+        &mut self,
+        owner: &str,
+        input: &SidebarSearchInput,
+    ) -> Result<(), &'static str> {
+        Self::validate_search_owner(owner, input)?;
+        if self.search_owner.as_deref() != Some(owner) {
+            return Err("sidebar search source replaced");
+        }
+        self.apply_search(input)
+    }
+    fn validate_search_owner(owner: &str, input: &SidebarSearchInput) -> Result<(), &'static str> {
+        if owner.is_empty() || input.key.as_ref().is_some_and(|key| key.owner != owner) {
+            return Err("sidebar search owner mismatch");
+        }
+        input.validate()
+    }
+    fn apply_search(&mut self, input: &SidebarSearchInput) -> Result<(), &'static str> {
         input.validate()?;
         if let Some(old) = &self.search {
             if input.revision < old.revision {

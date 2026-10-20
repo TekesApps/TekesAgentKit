@@ -2028,6 +2028,7 @@ dependencies = [
  "tekes-agent-presentation",
  "tekes-agent-session",
  "tekes-agent-ui-bindings",
+ "tekes-agent-ui-consumer-check",
  "tekes-agent-web",
  "tekes-ui-controls",
  "tekes-ui-platform-macos",

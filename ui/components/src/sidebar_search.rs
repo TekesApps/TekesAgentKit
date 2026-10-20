@@ -9,42 +9,9 @@ use tekes_ui_controls::{
 use tekes_ui_scene::{Rect, Size};
 use tekes_ui_tokens::Spacing;
 
-/// Capture the source, endpoint epoch and query attempt, including ABA queries.
-/// `owner` identifies one search source lifetime; generations are never recycled.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SidebarSearchKey {
-    pub owner: String,
-    pub endpoint_id: String,
-    pub connection_epoch: u64,
-    pub generation: u64,
-    pub query: String,
-}
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub enum SidebarSearchPhase {
-    #[default]
-    Idle,
-    Searching,
-    Complete {
-        has_more: bool,
-    },
-    Failed {
-        message: String,
-        has_more: bool,
-        retryable: bool,
-    },
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SidebarSearchInput {
-    /// Monotonic display publication, independent from inventory publications.
-    pub revision: u64,
-    /// None means search was cleared. No result or callback survives clearing.
-    pub key: Option<SidebarSearchKey>,
-    pub phase: SidebarSearchPhase,
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum SidebarSearchIntent {
-    Retry { key: SidebarSearchKey },
-}
+pub use tekes_agent_presentation::{
+    SidebarSearchInput, SidebarSearchIntent, SidebarSearchKey, SidebarSearchPhase,
+};
 #[derive(Clone, Debug)]
 pub struct SidebarSearchLabels {
     pub name: String,
@@ -62,8 +29,13 @@ impl Default for SidebarSearchLabels {
         }
     }
 }
-impl SidebarSearchInput {
-    pub(crate) fn validate(&self) -> Result<(), &'static str> {
+pub(crate) trait SearchInputView {
+    fn validate(&self) -> Result<(), &'static str>;
+    fn notice(&self, labels: &SidebarSearchLabels) -> Option<String>;
+    fn retry_key(&self) -> Option<&SidebarSearchKey>;
+}
+impl SearchInputView for SidebarSearchInput {
+    fn validate(&self) -> Result<(), &'static str> {
         if self.revision == 0 {
             return Err("unversioned sidebar search input");
         }
@@ -83,7 +55,7 @@ impl SidebarSearchInput {
         }
         Ok(())
     }
-    pub(crate) fn notice(&self, labels: &SidebarSearchLabels) -> Option<String> {
+    fn notice(&self, labels: &SidebarSearchLabels) -> Option<String> {
         self.key.as_ref()?;
         match &self.phase {
             SidebarSearchPhase::Idle => None,
@@ -98,7 +70,7 @@ impl SidebarSearchInput {
             }),
         }
     }
-    pub(crate) fn retry_key(&self) -> Option<&SidebarSearchKey> {
+    fn retry_key(&self) -> Option<&SidebarSearchKey> {
         matches!(
             self.phase,
             SidebarSearchPhase::Failed {

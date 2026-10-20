@@ -48,3 +48,6 @@ pub use transcript_order::*;
 
 mod transcript_content;
 pub use transcript_content::{TranscriptBlockContent, TranscriptContentBlock};
+
+mod sidebar_search;
+pub use sidebar_search::*;

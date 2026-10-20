@@ -49,6 +49,12 @@ type MutationReceipts = BTreeMap<String, (String, Value, Value)>;
 #[derive(Clone)]
 pub struct Fixture {
     sessions: Arc<Mutex<BTreeMap<String, Line>>>,
+    search_enabled: bool,
+    search_results: Arc<Mutex<BTreeMap<String, Value>>>,
+    search_calls: Arc<AtomicUsize>,
+    search_active: Arc<AtomicUsize>,
+    search_fails: Arc<AtomicBool>,
+    search_gate: Option<Arc<tokio::sync::Semaphore>>,
     connects: Arc<AtomicUsize>,
     forks: Arc<AtomicUsize>,
     side_chats: bool,
@@ -164,6 +170,12 @@ impl Default for Fixture {
         }
         Self {
             sessions: Arc::new(Mutex::new(sessions)),
+            search_enabled: false,
+            search_results: Arc::new(Mutex::new(BTreeMap::new())),
+            search_calls: Arc::new(AtomicUsize::new(0)),
+            search_active: Arc::new(AtomicUsize::new(0)),
+            search_fails: Arc::new(AtomicBool::new(false)),
+            search_gate: None,
             connects: Arc::new(AtomicUsize::new(0)),
             forks: Arc::new(AtomicUsize::new(0)),
             side_chats: false,
@@ -198,6 +210,30 @@ impl Default for Fixture {
     }
 }
 impl Fixture {
+    pub fn with_session_search(mut self) -> Self {
+        self.search_enabled = true;
+        self
+    }
+    pub fn with_search_gate(mut self, gate: Arc<tokio::sync::Semaphore>) -> Self {
+        self.search_gate = Some(gate);
+        self
+    }
+    pub fn set_search_result(&self, query: &str, value: Value) {
+        self.search_results
+            .lock()
+            .unwrap()
+            .insert(query.into(), value);
+    }
+    pub fn set_search_failure(&self, value: bool) {
+        self.search_fails.store(value, Ordering::SeqCst);
+    }
+    pub fn search_calls(&self) -> usize {
+        self.search_calls.load(Ordering::SeqCst)
+    }
+    pub fn active_searches(&self) -> usize {
+        self.search_active.load(Ordering::SeqCst)
+    }
+
     pub fn with_history_page_gate(mut self, gate: Arc<tokio::sync::Semaphore>) -> Self {
         self.history_page_gate = Some(gate);
         self
@@ -462,6 +498,9 @@ impl SessionEndpoint for Endpoint {
     }
     fn capabilities(&self) -> EndpointCapabilities {
         let mut caps = EndpointCapabilities::methods(&["session.prompt", "session.cancel"]);
+        if self.fixture.search_enabled {
+            caps.methods.insert("session.search".into());
+        }
         if self.fixture.uploads {
             caps.methods.extend([
                 "session.uploadFile".into(),
@@ -649,6 +688,36 @@ impl SessionEndpoint for Endpoint {
         Ok(())
     }
     async fn call(&self, method: &str, p: Value, rpc: &str) -> Result<Value> {
+        if self.fixture.search_enabled && method == "session.search" {
+            struct Active(Arc<AtomicUsize>);
+            impl Drop for Active {
+                fn drop(&mut self) {
+                    self.0.fetch_sub(1, Ordering::SeqCst);
+                }
+            }
+            self.fixture.search_calls.fetch_add(1, Ordering::SeqCst);
+            self.fixture.search_active.fetch_add(1, Ordering::SeqCst);
+            let _active = Active(self.fixture.search_active.clone());
+            let value = self
+                .fixture
+                .search_results
+                .lock()
+                .unwrap()
+                .get(string(&p, "query")?)
+                .cloned()
+                .unwrap_or_else(|| json!({"items":[],"hasMore":false}));
+            let failed = self.fixture.search_fails.load(Ordering::SeqCst);
+            if let Some(gate) = &self.fixture.search_gate {
+                gate.acquire()
+                    .await
+                    .map_err(|_| unsupported("search read gate closed"))?
+                    .forget();
+            }
+            if failed {
+                return Err(Error::Transport("owned search failure".into()));
+            }
+            return Ok(value);
+        }
         if self.fixture.models && method == "session.models" {
             self.fixture.model_read_calls.fetch_add(1, Ordering::SeqCst);
             if let Some(gate) = &self.fixture.model_read_gate {

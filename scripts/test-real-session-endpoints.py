@@ -30,7 +30,10 @@ parser.add_argument('--ui-transcript-content',action='store_true',help='Mount th
 parser.add_argument('--ui-message-rows',action='store_true',help='Mount canonical plain user and machine rows through public components; not a full Transcript')
 parser.add_argument('--ui-history-pages',action='store_true',help='Seed long isolated sessions and verify public page receipts, original scope and fresh reconnect history')
 parser.add_argument('--ui-actionables',action='store_true',help='Exercise public actionable cards on configured Native/Pi/DSH question sources')
+parser.add_argument('--ui-sidebar-query',action='store_true',help='Read typed public search through the shared controller on owned conversation-history targets; offscreen protocol proof only')
 args=parser.parse_args()
+if args.ui_sidebar_query and not (args.ui_demo and args.ui_components):
+    parser.error('--ui-sidebar-query requires --ui-demo and --ui-components')
 if args.ui_native_run_controls and not (args.ui_demo and args.ui_components and args.ui_transcript_content):
     parser.error('--ui-native-run-controls requires --ui-demo, --ui-components and --ui-transcript-content')
 if args.ui_native_stream and not (args.ui_demo and args.ui_components and args.ui_transcript_content):
@@ -276,6 +279,16 @@ def ui_smoke(config, first, bounded_child=None):
             history += [{'op':'compose','sessionId':first,'text':text},{'op':'waitSettled','sessionId':first,'inputText':text}]
         execute(dict(config,commands=history))
         print(kind.upper()+'_UI_HISTORY_SEEDED turns=28 exact-input+completed-reply',flush=True)
+    search_query=None
+    if args.ui_sidebar_query and bounded_child is None:
+        # A content-search contract does not promise that rename metadata is an
+        # indexed document. Seed a unique word through the ordinary owned
+        # conversation and local synthetic provider, then search that history.
+        search_query='AgentKitOwnedQuery'+uuid.uuid4().hex
+        model=next(command['args'] for command in config['commands'] if command.get('method')=='session.selectModel')
+        execute(dict(config,commands=[{'op':'call','sessionId':first,'method':'session.selectModel','args':model},
+            {'op':'open','sessionId':first},{'op':'compose','sessionId':first,'text':search_query},
+            {'op':'waitSettled','sessionId':first,'inputText':search_query}]))
     second=next(row['result']['sessionId'] for row in execute(dict(config,commands=[{'op':'create','cwd':str(cwd)}])) if row.get('op')=='create')
     explicit={'kind':kind,'endpointId':kind+'-ui','sessions':[first,second]}
     ui_env=dict(os.environ)
@@ -294,6 +307,7 @@ def ui_smoke(config, first, bounded_child=None):
     if bounded_child:output=output.with_name(output.stem+'-bounded'+output.suffix)
     if kind!='native':output=output.with_name(output.stem+'-'+kind+output.suffix)
     mode=['--components'] if args.ui_components else []
+    if search_query:mode+=['--sidebar-query',search_query,'--sidebar-query-proof']
     if bounded_child:mode+=['--bounded-child-proof','--bounded-child-id',bounded_child]
     if args.ui_feedback_read:mode+=['--feedback-read-proof']
     if args.ui_feedback_write:mode+=['--feedback-write-proof']
@@ -312,6 +326,11 @@ def ui_smoke(config, first, bounded_child=None):
     ui=subprocess.run([str(args.ui_demo.resolve()),*mode,'--endpoint-config',str(path),'--offscreen',str(output)],env=ui_env,text=True,capture_output=True,timeout=60)
     assert ui.returncode==0,ui.stderr[-3000:]
     receipt=next(json.loads(line) for line in ui.stdout.splitlines() if line.startswith('{') and json.loads(line).get('offscreen'))
+    if search_query:
+        search=receipt['sidebarSearchProof']
+        assert search['publicTypedSearch'] and search['sharedController'] and search['expectedTargetFound'] and search['noSubmission'],search
+        assert isinstance(search['hasMore'],bool),search
+        print(kind.upper()+'_UI_SIDEBAR_QUERY_OK public-typed-search+shared-controller+owned-target+original-endpoint; offscreen-only',flush=True)
     if args.ui_native_feedback and bounded_child is None:
         native_log=output.with_suffix('.native-feedback.log')
         with native_log.open('w') as capture:
@@ -613,6 +632,9 @@ try:
                 {'id':'agent-default-model','config':{'provider':'endpoint-test','model':'endpoint-test'}},
                 {'id':'llm-pi-ai','config':{'providers':{'endpoint-test':{'api':'openai-completions','apiKeyEnv':'AGENTKIT_SYNTHETIC_KEY','baseURL':base_url,'models':[{'id':'endpoint-test','contextWindow':32768,'maxTokens':1024}]}}}},
                 {'id':'session-persistence-jsonl','config':{'root':str(base/'dsh-sessions'),'compression':'none'}},
+                # Explicit opt-in for this isolated protocol probe only. DSH's
+                # documented Web default is openAt=never; leave it untouched otherwise.
+                *([{'id':'session-query-sqlite','config':{'path':':memory:','openAt':'first-search'}}] if args.ui_sidebar_query else []),
                 {'insert':[{'name':plugin.as_uri()}]},
             ]))
             env=dict(os.environ,HOME=str(home),DSH_HOME=str(home),DSH_AGENTS_HOME=str(home/'agents'),DSH_TELEMETRY_DISABLED='1',AGENTKIT_SYNTHETIC_KEY='synthetic-key')

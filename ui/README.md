@@ -201,3 +201,5 @@ ui/target/debug/tekes-agent-ui-demo --components --transcript-content --offscree
 独立公开 `TurnFeedback` 与备注编辑器现可挂载，使用原 binding 的 committed frame 和一次性 gesture bridge；详见[控件接入](../docs/rust-agent-ui-feedback-controls-20261020.md)。`--feedback-controls-proof` / 三端脚本的 `--ui-feedback-controls` 显式验证真实读写及浅深色 offscreen 渲染，不代表原生 UX 已完成。后续[Transcript 接入](../docs/rust-agent-ui-feedback-transcript-20261020.md)已提供 per-turn mount，三端脚本使用 `--ui-feedback-transcript` 通过实际 RunView/Transcript 路由验证。
 
 三端脚本新增 `--ui-native-feedback`，在自有临时会话中顺序打开真实 macOS 窗口，以自动化 AppKit 点击/文本服务驱动正式 Transcript 评价入口；见[专项原生窗口验收](../docs/rust-agent-ui-feedback-native-20261020.md)。合成 marked text 与物理 IME/VoiceOver 分开，不扩大为阅读锚点验收。
+
+`SidebarSearchBinding` 复用无渲染器的 `presentation::SidebarSearchController`，接收宿主 query，拥有 250ms 去抖、来源/epoch/代数、只读请求撤销和显式 Retry。首次安装用 `replace_search_source`，后续用 `update_search_from`；切换 binding 不沿用旧来源的 revision 或动作 ID。`--sidebar-query <text>` 与显式 endpoint 配置组合使用；`--components --transcript-content --sidebar-query-selftest` 是 owned fixture 的原生指针重试探针。公开接入、Pi/DSH 搜索限制与分层证据见 [Sidebar 共享查询控制器](../docs/rust-agent-ui-sidebar-query-controller-20261021.md)。完整搜索结果列表和多 endpoint 聚合仍待补齐。

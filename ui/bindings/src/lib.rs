@@ -18,6 +18,8 @@ pub use feedback::*;
 mod presets;
 pub use presets::*;
 mod sidebar;
+mod sidebar_search;
+pub use sidebar_search::*;
 mod turn_actions;
 pub use models::*;
 pub use sidebar::*;

@@ -13,6 +13,7 @@ use tekes_agent_session::*;
 use tokio::sync::Notify;
 #[derive(Clone, Default)]
 struct Connector {
+    search: bool,
     sent: Arc<Notify>,
     release: Arc<Notify>,
     calls: Arc<AtomicUsize>,
@@ -63,6 +64,9 @@ impl SessionEndpoint for Endpoint {
         if self.connector.bounded.load(Ordering::SeqCst) {
             caps.methods.insert("subagents.history".into());
         }
+        if self.connector.search {
+            caps.methods.insert("session.search".into());
+        }
         caps.supports_ephemeral_fork = true;
         caps
     }
@@ -97,6 +101,11 @@ impl SessionEndpoint for Endpoint {
             .lock()
             .unwrap()
             .push((method.into(), payload.clone()));
+        if method == "session.search" {
+            return Ok(
+                json!({"items":[{"sessionId":"a","snippet":payload["query"],"extra":"retained"}],"hasMore":true}),
+            );
+        }
         if method == "subagents.history" {
             let page = self
                 .connector
@@ -614,5 +623,58 @@ async fn attachment_context_commit_checks_epoch_with_authority_and_preserves_typ
             .unwrap()
     );
     assert_eq!(controller.snapshot().draft.text, "新正文");
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn headless_search_uses_the_shared_reader_and_preserves_the_run_draft() {
+    let connector = Connector {
+        search: true,
+        ..Default::default()
+    };
+    let runtime = Arc::new(SessionRuntime::spawn("test", Arc::new(connector.clone())));
+    runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
+    let run = RunController::new(runtime.clone()).unwrap();
+    run.open(RunScope::main("test", "a")).await.unwrap();
+    run.edit_text(&destination("a"), "独立草稿".into()).unwrap();
+    let reader = SidebarSearchController::new(runtime.clone()).unwrap();
+    let mut changes = reader.subscribe();
+    reader.set_query("中文检索").unwrap();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while reader.snapshot().result.is_none() {
+            changes.changed().await.unwrap();
+        }
+    })
+    .await
+    .unwrap();
+    let found = reader.snapshot();
+    assert_eq!(
+        found.hits[0].address,
+        SessionAddress {
+            endpoint_id: "test".into(),
+            session_id: "a".into()
+        }
+    );
+    assert_eq!(found.hits[0].hit.snippet, "中文检索");
+    assert_eq!(
+        found.unresolved.len(),
+        1,
+        "the empty inventory is not fabricated from a hit"
+    );
+    assert_eq!(run.snapshot().draft.text, "独立草稿");
+    let encoded = serde_json::to_value(found.as_ref()).unwrap();
+    assert_eq!(encoded["input"]["phase"]["complete"]["hasMore"], true);
+    let roundtrip: SidebarSearchPublication = serde_json::from_value(encoded).unwrap();
+    assert_eq!(&roundtrip, found.as_ref());
+    let epoch = runtime.inspect(|state| state.connection_epoch);
+    assert!(
+        runtime
+            .search_sessions_at_epoch(epoch + 1, "query", "wrong-epoch")
+            .await
+            .is_err()
+    );
+    let requests = connector.requests.lock().unwrap().clone();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(requests[0].0, "session.search");
     runtime.stop().await.unwrap();
 }
