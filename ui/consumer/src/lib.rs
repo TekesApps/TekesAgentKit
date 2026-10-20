@@ -663,6 +663,9 @@ fn independent_consumer_retains_the_same_native_entry_when_the_loaded_prefix_cha
     };
     let a = transcript_document(&before).unwrap();
     let b = transcript_document(&after).unwrap();
+    // A clipped message without a turn must not fabricate a turn footer.
+    assert!(b.sections[0].output_footnote().is_none());
+
     assert_eq!(a.sections[0].outputs[0].key, b.sections[0].outputs[1].key);
     assert_eq!(
         native_transcript_entry(b.sections[0].outputs[1].key),
@@ -743,4 +746,54 @@ pub fn output_message_row(
     let mut row = tekes_agent_components_ui::OutputMessage::new(namespace, scope.clone());
     row.update(scope, publication, epoch, output, section)?;
     Ok(row)
+}
+
+/// Turn output aside remains independent of message bodies and host windows.
+pub fn turn_footnote(
+    namespace: u32,
+    scope: &tekes_agent_components_ui::RunScope,
+    publication: u64,
+    epoch: u64,
+    turn: &tekes_agent_components_ui::TranscriptTurn,
+    available: bool,
+) -> Result<tekes_agent_components_ui::TurnFootnote, &'static str> {
+    let mut footer =
+        tekes_agent_components_ui::TurnFootnote::new(namespace, scope.clone(), Default::default());
+    footer.update(scope, publication, epoch, turn, available)?;
+    Ok(footer)
+}
+
+#[test]
+fn independent_host_mounts_a_turn_aside_without_a_message_body() {
+    use tekes_agent_components_ui::{RunScope, TranscriptTurn};
+    let turn = TranscriptTurn {
+        id: "turn".into(),
+        status: "completed".into(),
+        input: String::new(),
+        started_at: None,
+        ended_at: None,
+        usage: Default::default(),
+        fork_boundary: None,
+        footnote_actions: vec![],
+        live_usage: None,
+        reported_usage: None,
+    };
+    let footer = turn_footnote(645, &RunScope::main("endpoint", "a"), 1, 1, &turn, true).unwrap();
+    let id = footer.id();
+    let host = footer.into_host().unwrap();
+    assert_eq!(
+        host.get(id)
+            .unwrap()
+            .component::<tekes_agent_components_ui::TurnFootnote>()
+            .unwrap()
+            .facts()
+            .unwrap()
+            .status,
+        "completed"
+    );
+}
+pub async fn execute_turn_action(
+    request: tekes_agent_ui_bindings::TurnActionRequest,
+) -> Result<tekes_agent_ui_bindings::ThreadActionOutcome, String> {
+    request.execute().await.map_err(|error| error.to_string())
 }

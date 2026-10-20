@@ -216,6 +216,7 @@ pub struct SessionEvent {
     pub kind: String,
     #[serde(deserialize_with = "decode_i64")]
     pub seq: i64,
+    /// Unix milliseconds, matching the public SEP event wire contract.
     pub time: f64,
     pub data: Value,
     #[serde(skip_serializing_if = "Option::is_none")]

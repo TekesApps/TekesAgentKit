@@ -244,15 +244,7 @@ impl SharedAgent {
         let summary = session.summary.as_ref();
         let archived = state.archived_session_ids.iter().any(|s| s == id)
             || summary.is_some_and(|s| s["status"] == "archived");
-        let running = session.run_open
-            || !session.queue.is_empty()
-            || summary.is_some_and(|s| {
-                s["running"] == true
-                    || matches!(
-                        s["status"].as_str(),
-                        Some("running" | "waitingForInput" | "cancelling")
-                    )
-            });
+        let running = tekes_agent_presentation::session_has_active_work(session);
         Ok(tekes_agent_presentation::thread_actions(
             &tekes_agent_presentation::ThreadActionContext {
                 endpoint: &state.endpoint_id,
@@ -279,24 +271,19 @@ impl SharedAgent {
             .ok()
             .map(|e| e.capabilities())
             .unwrap_or_default();
-        let fork = self
-            .thread_actions(shared, id)?
-            .items
-            .into_iter()
-            .find(|a| a.id == "fork");
-        for turn in &mut transcript.turns {
-            turn.footnote_actions.clear();
-            if caps.can_fork_completed_turn
-                && turn.fork_boundary.is_some()
-                && !transcript.is_stale
-                && !matches!(turn.status.as_str(), "running" | "waitingForInput")
-                && let Some(mut action) = fork.clone()
-            {
-                action.id = format!("forkTurn:{}", turn.id);
-                action.label = "从此回合分叉".into();
-                turn.footnote_actions.push(action);
-            }
-        }
+        let state = shared.runtime.snapshot();
+        let session = state
+            .sessions
+            .get(id)
+            .ok_or_else(|| unsupported("unknown thread"))?;
+        tekes_agent_presentation::present_turn_actions(
+            &tekes_agent_presentation::TurnActionContext {
+                capabilities: &caps,
+                ready: state.connection == ConnectionState::Ready && shared.connected().is_ok(),
+                running: tekes_agent_presentation::session_has_active_work(session),
+            },
+            transcript,
+        );
         Ok(())
     }
     async fn perform_thread_action(

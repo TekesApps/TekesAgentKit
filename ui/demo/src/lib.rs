@@ -9,3 +9,5 @@ pub mod notifications;
 pub mod upload_proof;
 
 pub mod history_proof;
+
+pub mod turn_footnote_proof;

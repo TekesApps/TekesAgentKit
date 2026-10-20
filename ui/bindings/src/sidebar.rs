@@ -53,6 +53,10 @@ impl Drop for SidebarBinding {
     }
 }
 impl SidebarBinding {
+    pub fn turn_action_dispatcher(&self) -> crate::TurnActionDispatcher {
+        crate::TurnActionDispatcher::new(self.agent.clone())
+    }
+
     pub fn new(agent: Arc<SharedAgent>, endpoint_id: &str) -> Result<Self> {
         let endpoint = agent.endpoint(endpoint_id)?;
         let executor = tokio::runtime::Handle::try_current()

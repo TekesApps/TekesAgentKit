@@ -1,0 +1,271 @@
+{
+  "kind": "shared-turn-footnote-and-original-source-action",
+  "date": "2026-10-20",
+  "sourceBaseCommit": "59b5b4bf0fbf82b38cbb295c0185875094396ceb",
+  "implementationFileSha256": {
+    "crates/contract/src/lib.rs": "fcf51398cac2fdddc7be27db43d343d5a092c5d7deb5e92d0f5594aeeda18a9c",
+    "crates/presentation/src/composer.rs": "ed7ceacc7a29534ccfa43459940ffbdcf9bd725dd2c88a5f4794b1c89fb6c74e",
+    "crates/presentation/src/lib.rs": "6df2c37f4095451f7f0a45f439d24f8fbbaefd0d2530d3463bd5df25b028ed53",
+    "crates/presentation/src/thread_actions.rs": "df2b4775ee232338829454577142f8fee82827b3a41358999ab779bb9c088b28",
+    "crates/presentation/src/turn_actions.rs": "96a0d18749498fcad41ad5253b1ac11ab9f1b1698f8fafda15fe4770871abc0e",
+    "crates/presentation/src/transcript.rs": "3599bb8a98d12a93ef12c70da7e99627340b86035c8230a9624f644b6213ba65",
+    "crates/web/src/lib.rs": "258ec9beb6c6f019aea29134d4d1db6e90524029131a853b18bd4daf257bdb0e",
+    "ui/components/src/turn_footnote.rs": "dd3cdd774fa66245cf09e21b88cc433c072c5272cef327d7eef4f1dfec5b600c",
+    "ui/components/src/indicators.rs": "cf54a15d4034a313b7708f51f484431fbb16b00e757fbfdeab5c52077bbe32d0",
+    "ui/components/src/lib.rs": "a2a4f0c3b4831dce3302ab7621b83979e182573710271d925cbd321844c09e1e",
+    "ui/bindings/src/turn_actions.rs": "12520113548a64055a1c5e4c5005d0c93c45a9a5d02a2c7c4b42ef7760111ef0",
+    "ui/bindings/src/sidebar.rs": "ddabd8434d4ca6cbc8ad64dce9d2fe28f74678fd2bd4ef4ea0748ba7834b9c47",
+    "ui/bindings/src/lib.rs": "3fa2ffb08f7b1d4c2dd7f491d6698f0a01d1a0e4363d98bca1c8fb9c554544a2",
+    "ui/demo/src/component_demo.rs": "f9262304deffc4c300181446c1e9ff3b9ace675cd049ea64c299df013d0b41d7",
+    "ui/demo/src/components_native.rs": "ce533fe0c79740b41e03b325586bf13a54977f587499434c99ee54084e8a70fd",
+    "ui/demo/src/turn_footnote_proof.rs": "ddb0c991632620252012e402142edb5b5322af31b3a9f1afc74806539757afd2",
+    "ui/demo/src/lib.rs": "e4b27b9b920ea1d625499c1317849a57f9c26d36d3a490cdae5f1a2bc607a7e5",
+    "ui/demo/src/fixture.rs": "1f711ad18d223c1cc4fc360c224914f035e6fd79aadf5753bb2512104b49f8f7",
+    "ui/demo/tests/turn_footnote.rs": "5cb3d2c7edb0e2df494e3575bc02fecb5a02b1283cac7027f055f7fac48938a8",
+    "ui/consumer/src/lib.rs": "06448165b4a3a78abaf081d3886b8d21383affb786c2964bca56c2e6749b4778",
+    "scripts/test-real-session-endpoints.py": "9550b7661525cf47fda20dcaf7763a274e78ca56f901f8bc96390dd91e5f2b13"
+  },
+  "demoBinarySha256": "a7e42948a0eaf3f88b8f745cd57c66e692a5e7c03fd189255543bd4b207cbab4",
+  "agentKitPublishedBaseline": {
+    "publishedAt": "2026-10-19T14:25:34Z",
+    "tagName": "v0.3.8"
+  },
+  "tekesUI": {
+    "rev": "8cf0840790334ba224afc0595897c74231c712e6",
+    "reviewedFiles": 199,
+    "sha256": "f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f"
+  },
+  "validation": {
+    "rootTests": 139,
+    "uiTests": 206,
+    "scriptTests": 18,
+    "strictClippy": true,
+    "fmt": true,
+    "dependencyBoundaries": true,
+    "secondPublicConsumer": true
+  },
+  "realEndpoints": {
+    "pi": {
+      "turnFootnoteProof": {
+        "completeTranscript": false,
+        "elapsedSeconds": 0.001,
+        "endedAtMilliseconds": 1792474336779.0,
+        "leadingAside": true,
+        "nativeInteraction": false,
+        "startedAtMilliseconds": 1792474336778.0
+      },
+      "turnForkProof": {
+        "boundaryKind": "nativeEntry",
+        "completeTranscript": false,
+        "explicitBoundary": true,
+        "forkHistoryRestored": true,
+        "lateNavigationIgnored": true,
+        "nativeInteraction": false,
+        "originalDraftPreserved": true,
+        "originalScope": true,
+        "otherDraftPreserved": true,
+        "sharedCatalog": true,
+        "singleAdmission": true
+      },
+      "historyPagingProof": {
+        "extended": true,
+        "frozenCut": true,
+        "nativeInteraction": false,
+        "newEpochHistoryRetained": true,
+        "noDuplicateMessages": true,
+        "oldReceiptInvalidated": true,
+        "originalScope": true,
+        "otherDraftPreserved": true,
+        "readingAnchorAcceptance": false,
+        "retainedMessages": 56,
+        "sourceKind": "nativeConversation",
+        "sourceStatusPublished": true
+      },
+      "inputMessageProof": {
+        "bubbleWidth": 214.0,
+        "completeTranscript": false,
+        "externalRightFootnote": true,
+        "nativeInteraction": false,
+        "plainReadonlyContent": true,
+        "rightBubble": true,
+        "rowWidth": 532.0
+      },
+      "outputMessageProof": {
+        "completeTranscript": false,
+        "leadingContent": true,
+        "nativeInteraction": false,
+        "parts": 1
+      },
+      "imageSha256": "eccff9c4a06289ff2be906d38ef261228b6ab0458a8f89112530999ee9a95934"
+    },
+    "dsh": {
+      "turnFootnoteProof": {
+        "completeTranscript": false,
+        "elapsedSeconds": 0.017,
+        "endedAtMilliseconds": 1792474343326.0,
+        "leadingAside": true,
+        "nativeInteraction": false,
+        "startedAtMilliseconds": 1792474343309.0
+      },
+      "turnForkProof": {
+        "boundaryKind": "journalSequence",
+        "completeTranscript": false,
+        "explicitBoundary": true,
+        "forkHistoryRestored": true,
+        "lateNavigationIgnored": true,
+        "nativeInteraction": false,
+        "originalDraftPreserved": true,
+        "originalScope": true,
+        "otherDraftPreserved": true,
+        "sharedCatalog": true,
+        "singleAdmission": true
+      },
+      "historyPagingProof": {
+        "extended": true,
+        "frozenCut": true,
+        "nativeInteraction": false,
+        "newEpochHistoryRetained": true,
+        "noDuplicateMessages": true,
+        "oldReceiptInvalidated": true,
+        "originalScope": true,
+        "otherDraftPreserved": true,
+        "readingAnchorAcceptance": false,
+        "retainedMessages": 56,
+        "sourceKind": "journal",
+        "sourceStatusPublished": true
+      },
+      "inputMessageProof": {
+        "bubbleWidth": 214.0,
+        "completeTranscript": false,
+        "externalRightFootnote": true,
+        "nativeInteraction": false,
+        "plainReadonlyContent": true,
+        "rightBubble": true,
+        "rowWidth": 532.0
+      },
+      "outputMessageProof": {
+        "completeTranscript": false,
+        "leadingContent": true,
+        "nativeInteraction": false,
+        "parts": 1
+      },
+      "imageSha256": "8f5e40ee9e03861fffe3fef333abd8520a7ad0f5816be8c6cd46d973c58a5f51"
+    },
+    "native": {
+      "turnFootnoteProof": {
+        "completeTranscript": false,
+        "elapsedSeconds": 0.085,
+        "endedAtMilliseconds": 1792474399815.0,
+        "leadingAside": true,
+        "nativeInteraction": false,
+        "startedAtMilliseconds": 1792474399730.0
+      },
+      "turnForkProof": {
+        "boundaryKind": "journalSequence",
+        "completeTranscript": false,
+        "explicitBoundary": true,
+        "forkHistoryRestored": true,
+        "lateNavigationIgnored": true,
+        "nativeInteraction": false,
+        "originalDraftPreserved": true,
+        "originalScope": true,
+        "otherDraftPreserved": true,
+        "sharedCatalog": true,
+        "singleAdmission": true
+      },
+      "historyPagingProof": {
+        "extended": true,
+        "frozenCut": true,
+        "nativeInteraction": false,
+        "newEpochHistoryRetained": true,
+        "noDuplicateMessages": true,
+        "oldReceiptInvalidated": true,
+        "originalScope": true,
+        "otherDraftPreserved": true,
+        "readingAnchorAcceptance": false,
+        "retainedMessages": 56,
+        "sourceKind": "journal",
+        "sourceStatusPublished": true
+      },
+      "inputMessageProof": {
+        "bubbleWidth": 214.0,
+        "completeTranscript": false,
+        "externalRightFootnote": true,
+        "nativeInteraction": false,
+        "plainReadonlyContent": true,
+        "rightBubble": true,
+        "rowWidth": 532.0
+      },
+      "outputMessageProof": {
+        "completeTranscript": false,
+        "leadingContent": true,
+        "nativeInteraction": false,
+        "parts": 1
+      },
+      "imageSha256": "3e058b2cb8c9d0c295c911fb943c34277377f457758cd12c27628f6f8902586d"
+    }
+  },
+  "nativeFixture": {
+    "markers": [
+      "NATIVE_AGENT_SIDEBAR_SUMMARY_SELFTEST_OK shared-inventory+shared-pin+sidebar-selection+summary-facts; full-run-view=false; physical-ime=false",
+      "NATIVE_AGENT_SIDECHAT_SELFTEST_OK owned-create+separate-composer+send+stream+draft+cancel-discard+parent-isolation; transcript=false; physical-ime=false",
+      "NATIVE_AGENT_CHILD_SELFTEST_OK direct-parent+independent-composer+single-admission+stream+cancel+isolated-drafts+bounded-read-only+paging+local-retirement; formal-transcript=false; physical-ime=false",
+      "NATIVE_AGENT_TASK_SELFTEST_OK resolved-task+independent-composer+single-admission+stream+cancel+parent-draft-isolation+close; transcript=false; physical-ime=false",
+      "NATIVE_AGENT_COMPONENTS_SELFTEST_OK composer+indicators+run-binding+synthetic-text-services+send+stream+cancel+draft-isolation+reconnect; physical-ime=false; transcript=false; reading-anchor=false",
+      "NATIVE_AGENT_TURN_FOOTNOTE_SELFTEST_OK native-pointer+shared-turn-action+fork-navigation+archive+draft-isolation; physical-ime=false; complete-transcript=false",
+      "NATIVE_AGENT_THREAD_ACTIONS_SELFTEST_OK rename-ime-barrier+shared-inventory+fork-navigation+archive-clear+restored-selection+draft-isolation; physical-ime=false; formal-run-view=false"
+    ],
+    "syntheticPointerAndTextEvents": true,
+    "physicalIME": false,
+    "voiceOver": false,
+    "completeTranscript": false,
+    "readingAnchorAcceptance": false
+  },
+  "fixes": [
+    {
+      "kind": "elapsed-unit",
+      "sourceUnit": "Unix milliseconds",
+      "presentationUnit": "seconds",
+      "regression": "10000 -> 13000 milliseconds equals 3 seconds"
+    },
+    {
+      "kind": "pointer-retirement-frame",
+      "observedFailure": "unsupported: actionable run missing",
+      "failingNativeLogSha256": "0ae8e4d3d8894fc0f30b4a9e2169e4a661f5c0a554ba652b473a4e711eaaae02",
+      "fix": "one captured RunSnapshot for Composer/Indicators/actionable/paging; page receipt epoch must match",
+      "deterministicRegressionTests": 2
+    },
+    {
+      "kind": "native-row-order",
+      "order": [
+        "input",
+        "output",
+        "turnFootnote"
+      ]
+    }
+  ],
+  "logSha256": {
+    "agentkit-turn-footer-root.log": "adb2453656b3d15063fad86cb8b8d57d7d8ec57ccafd515263e57b92f6bc96a9",
+    "agentkit-turn-footer-ui-frame-final.log": "1d3a105b72222eb7df1573ad315eb10dd114abb0bff0e675760152d985e1e2bc",
+    "agentkit-turn-footer-root-clippy.log": "e49d76985d1353fc28e87e9e464121fd3bad4ad21315a5ced7349b45a4ee6c7f",
+    "agentkit-turn-footer-ui-clippy-frame-final.log": "41dfc035fd82f63b79a2c6f164aaf9f7b93b2cb3095148cb7b49ae2b6a0b346a",
+    "agentkit-turn-footer-tools.log": "1ad695b699d557f7262cfd2a400c4f9251fde7b730ffee8f22335e629444569b",
+    "agentkit-real-turn-footer-frame-final.log": "886bdf775bb4a08a789eb215daddd04d11a469ab9d1b82adc906f597df32ec0d",
+    "agentkit-turn-footer-native-frame-final.log": "bc40b176d85b50bba08ced4344aed080499af786ed4fc3b14eb3fefef38dbbfc",
+    "agentkit-turn-footer-native-fork-final.log": "9af29c17e2c0d41629be334af0b848e605bbf90af5cdbeeea1c9d2df837db57e",
+    "agentkit-turn-footer-frame-tests.log": "aa6ab98ab11a2e5642b8df0834469f13ea8bfa8420f839212ca8e38065b78050"
+  },
+  "evidenceBoundary": {
+    "provider": "isolated owned sessions and synthetic local provider",
+    "nativeFixture": "scripted native window routes, not physical IME or complete three-harness UX",
+    "unknownForkOutcomeReconciliation": false,
+    "fullTranscript": false,
+    "runView": false,
+    "richContent": false,
+    "mixedReading": false,
+    "remainingUpstreamIssues": [
+      "https://github.com/TekesApps/TekesUI/issues/22",
+      "https://github.com/TekesApps/TekesUI/issues/25"
+    ]
+  }
+}

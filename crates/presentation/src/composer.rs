@@ -890,6 +890,16 @@ impl PresentationStore {
                         | SubmissionPhase::Unknown
                 )
         });
+        if let Some(session) = scope.and_then(|s| authority.sessions.get(&s.session_id)) {
+            present_turn_actions(
+                &TurnActionContext {
+                    capabilities: &authority.endpoint_capabilities,
+                    ready: authority.connection == tekes_agent_session::ConnectionState::Ready,
+                    running: session_has_active_work(session),
+                },
+                &mut transcript,
+            );
+        }
         let summary = match scope
             .and_then(|scope| {
                 authority

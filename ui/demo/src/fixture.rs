@@ -296,6 +296,9 @@ impl Fixture {
         self.models = true;
         self
     }
+    pub fn mutation_receipts(&self) -> BTreeMap<String, (String, Value, Value)> {
+        self.mutations.lock().unwrap().clone()
+    }
     pub fn with_lifecycle(mut self) -> Self {
         self.lifecycle = true;
         self
@@ -456,6 +459,7 @@ impl SessionEndpoint for Endpoint {
             ]);
         }
         if self.fixture.lifecycle {
+            caps.can_fork_completed_turn = true;
             caps.supports_archive_session = true;
             caps.supports_unarchive_session = true;
             caps.methods.extend([

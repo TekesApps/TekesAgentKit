@@ -8,6 +8,20 @@ pub enum OutputUsage {
     Live { output_tokens: u64 },
     Reported { output_tokens: u64, complete: bool },
 }
+impl OutputUsage {
+    pub fn read_turn(turn: &tekes_agent_presentation::TranscriptTurn) -> Option<Self> {
+        if turn.status == "running" {
+            turn.live_usage.as_ref().map(|usage| Self::Live {
+                output_tokens: usage.output_tokens,
+            })
+        } else {
+            turn.reported_usage.as_ref().map(|usage| Self::Reported {
+                output_tokens: usage.output_tokens,
+                complete: usage.is_complete,
+            })
+        }
+    }
+}
 #[derive(Clone, Debug, PartialEq)]
 pub struct IndicatorFacts {
     pub connection: ConnectionPhase,
@@ -23,20 +37,7 @@ pub struct IndicatorFacts {
 impl IndicatorFacts {
     pub fn read(snapshot: &RunSnapshot) -> Self {
         let turn = snapshot.transcript.turns.last();
-        let output_usage = turn.and_then(|turn| {
-            if turn.status == "running" {
-                turn.live_usage.as_ref().map(|usage| OutputUsage::Live {
-                    output_tokens: usage.output_tokens,
-                })
-            } else {
-                turn.reported_usage
-                    .as_ref()
-                    .map(|usage| OutputUsage::Reported {
-                        output_tokens: usage.output_tokens,
-                        complete: usage.is_complete,
-                    })
-            }
-        });
+        let output_usage = turn.and_then(OutputUsage::read_turn);
         Self {
             connection: snapshot.connection.phase.clone(),
             run: snapshot.run.as_ref().map(|run| run.phase.clone()),

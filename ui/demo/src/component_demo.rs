@@ -63,6 +63,10 @@ mod uploads;
 use file_preview::FilePreviewGesture;
 use uploads::UploadGesture;
 pub enum DemoCommand {
+    TurnAction {
+        binding: Arc<RunBinding>,
+        intent: tekes_agent_components_ui::TurnFootnoteIntent,
+    },
     ReadHistoryPage(tekes_agent_ui_bindings::HistoryPageRequest),
     RespondActionable {
         request: Arc<tekes_agent_ui_bindings::ActionableResponseRequest>,
@@ -594,10 +598,134 @@ impl ComponentDemo {
             .map_err(|_| unsupported("output proof order"))?;
         Ok(id)
     }
-    fn sync_paging(&mut self, ids: ComposerIds, binding: &Arc<RunBinding>) -> Result<()> {
+    pub fn turn_footnote_id() -> ComponentId {
+        ComponentId(6_000_002_u64 << 32)
+    }
+    /// Turn-aside probe, independently mounted outside both message bodies.
+    pub fn mount_turn_footnote_proof(&mut self) -> Result<ComponentId> {
+        let binding = self.binding().clone();
         let snapshot = binding
             .current_run()
-            .ok_or_else(|| unsupported("paging run missing"))?;
+            .ok_or_else(|| unsupported("footnote run missing"))?;
+        let turn = snapshot
+            .transcript
+            .turns
+            .last()
+            .ok_or_else(|| unsupported("footnote turn missing"))?;
+        let mut footer = tekes_agent_components_ui::TurnFootnote::new(
+            6_000_002,
+            binding.scope().clone(),
+            Default::default(),
+        );
+        footer
+            .update(
+                binding.scope(),
+                snapshot.revision,
+                snapshot.connection_epoch,
+                turn,
+                binding.access() == PaneAccess::Ready && !self.composing(),
+            )
+            .map_err(unsupported)?;
+        let id = footer.id();
+        let parent = ComponentId(self.ids().root.0 + 16);
+        let composer = self.ids().root;
+        self.tree
+            .insert(parent, Content::new(id, footer))
+            .map_err(|_| unsupported("footnote mount"))?;
+        let mut order: Vec<_> = self
+            .tree
+            .get(parent)
+            .unwrap()
+            .component::<StackContent>()
+            .unwrap()
+            .children
+            .iter()
+            .map(Content::id)
+            .filter(|child| *child != id)
+            .collect();
+        let index = order.iter().position(|id| *id == composer).unwrap();
+        order.insert(index, id);
+        self.tree
+            .reorder(parent, &order)
+            .map_err(|_| unsupported("footnote order"))?;
+        Ok(id)
+    }
+    fn sync_turn_footnote_proof(&mut self) -> Result<()> {
+        let root = Self::turn_footnote_id();
+        let Some(footer) = self
+            .tree
+            .get(root)
+            .and_then(|c| c.component::<tekes_agent_components_ui::TurnFootnote>())
+        else {
+            return Ok(());
+        };
+        let turn_id = footer
+            .facts()
+            .ok_or_else(|| unsupported("footnote facts missing"))?
+            .turn_id;
+        let binding = self.binding().clone();
+        require(
+            footer.scope() == binding.scope(),
+            "footnote mount scope mismatch",
+        )?;
+        let snapshot = binding
+            .current_run()
+            .ok_or_else(|| unsupported("footnote source missing"))?;
+        let Some(turn) = snapshot
+            .transcript
+            .turns
+            .iter()
+            .find(|turn| turn.id == turn_id)
+        else {
+            self.tree
+                .get_mut(root)
+                .unwrap()
+                .component_mut::<tekes_agent_components_ui::TurnFootnote>()
+                .unwrap()
+                .set_available(false);
+            return Ok(());
+        };
+        let available = binding.access() == PaneAccess::Ready && !self.composing();
+        self.tree
+            .get_mut(root)
+            .unwrap()
+            .component_mut::<tekes_agent_components_ui::TurnFootnote>()
+            .unwrap()
+            .update(
+                binding.scope(),
+                snapshot.revision,
+                snapshot.connection_epoch,
+                turn,
+                available,
+            )
+            .map_err(unsupported)
+    }
+    pub fn apply_turn_action_outcome(
+        &mut self,
+        token: &SidebarActionToken,
+        outcome: &ThreadActionOutcome,
+    ) -> Result<Option<NavigationRequest>> {
+        if token.revision != self.navigation_revision
+            || self.current_binding().is_none_or(|binding| {
+                binding.scope().endpoint_id != token.address.endpoint_id
+                    || binding.scope().session_id != token.address.session_id
+            })
+        {
+            return Ok(None);
+        }
+        self.apply_sidebar_outcome(token, outcome)
+    }
+    fn sync_paging(
+        &mut self,
+        ids: ComposerIds,
+        binding: &Arc<RunBinding>,
+        snapshot: &tekes_agent_presentation::RunSnapshot,
+    ) -> Result<()> {
+        let mut receipt = binding.history_page_state();
+        if receipt.connection_epoch != snapshot.connection_epoch {
+            receipt.source_ready = false;
+            receipt.is_current = false;
+        }
         let supported = self
             .child_panes
             .values()
@@ -608,17 +736,15 @@ impl ComponentDemo {
             .expect("paging control")
             .component_mut::<tekes_agent_components_ui::TranscriptPaging>()
             .unwrap()
-            .update(
-                binding
-                    .history_page_state()
-                    .controls(&snapshot.transcript, supported),
-            )
+            .update(receipt.controls(&snapshot.transcript, supported))
             .map_err(unsupported)
     }
-    fn sync_actionable(&mut self, ids: ComposerIds, binding: &Arc<RunBinding>) -> Result<()> {
-        let snapshot = binding
-            .current_run()
-            .ok_or_else(|| unsupported("actionable run missing"))?;
+    fn sync_actionable(
+        &mut self,
+        ids: ComposerIds,
+        binding: &Arc<RunBinding>,
+        snapshot: &tekes_agent_presentation::RunSnapshot,
+    ) -> Result<()> {
         let prompt = snapshot
             .run
             .as_ref()
@@ -632,7 +758,11 @@ impl ComponentDemo {
             })
             .transpose()?;
         let epoch = snapshot.connection_epoch;
-        let controls = !self.composing() && binding.access() == PaneAccess::Ready;
+        let authority = binding.history_page_state();
+        let controls = !self.composing()
+            && binding.access() == PaneAccess::Ready
+            && authority.source_ready
+            && authority.connection_epoch == epoch;
         self.tree
             .get_mut(Self::actionable_id(ids))
             .expect("actionable card")
@@ -1429,7 +1559,7 @@ impl ComponentDemo {
         address: SessionAddress,
         action: String,
     ) -> SidebarActionToken {
-        if action == "fork" {
+        if action == "fork" || action.starts_with("forkTurn:") {
             self.navigation_revision += 1;
         }
         SidebarActionToken {
@@ -2076,8 +2206,9 @@ impl ComponentDemo {
             .expect("Indicators")
             .update(&snapshot)
             .map_err(unsupported)?;
-        self.sync_actionable(ids, &binding)?;
-        self.sync_paging(ids, &binding)?;
+        self.sync_actionable(ids, &binding, &snapshot)?;
+        self.sync_paging(ids, &binding, &snapshot)?;
+        self.sync_turn_footnote_proof()?;
         for (index, id) in [SELECT_A, SELECT_B].into_iter().enumerate() {
             let composing = self.composing();
             let button = &mut self
@@ -2463,8 +2594,8 @@ impl ComponentDemo {
             .expect("Indicators")
             .update(&snapshot)
             .map_err(unsupported)?;
-        self.sync_actionable(ids, &binding)?;
-        self.sync_paging(ids, &binding)?;
+        self.sync_actionable(ids, &binding, &snapshot)?;
+        self.sync_paging(ids, &binding, &snapshot)?;
         Ok(())
     }
     fn composer_labels(snapshot: &tekes_agent_presentation::RunSnapshot) -> ComposerLabels {
@@ -2681,6 +2812,18 @@ impl ComponentDemo {
             .collect();
         let mut commands = vec![];
         if !self.composing() {
+            if let Some(footer) = self
+                .tree
+                .get_mut(Self::turn_footnote_id())
+                .and_then(|node| node.component_mut::<tekes_agent_components_ui::TurnFootnote>())
+            {
+                for intent in footer.take_intents(&actions) {
+                    commands.push(DemoCommand::TurnAction {
+                        binding: binding.clone(),
+                        intent,
+                    });
+                }
+            }
             for (ids, binding) in actionable_sources {
                 if self
                     .tree
@@ -2692,7 +2835,9 @@ impl ComponentDemo {
                     .is_some_and(|scope| scope == binding.scope())
                 {
                     let request = binding.begin_history_page()?;
-                    self.sync_paging(ids, &binding)?;
+                    if let Some(snapshot) = binding.current_run() {
+                        self.sync_paging(ids, &binding, &snapshot)?;
+                    }
                     commands.push(DemoCommand::ReadHistoryPage(request));
                 }
                 let intents = self
@@ -3045,5 +3190,99 @@ impl ComponentDemo {
         palette: Palette,
     ) -> std::result::Result<(), CompositionError> {
         self.tree.render(scene, text, frame, clip, palette)
+    }
+}
+
+#[cfg(test)]
+mod frame_consistency_tests {
+    use super::*;
+    use crate::fixture::Fixture;
+    use std::time::Duration;
+    use tekes_agent_session::SessionRuntime;
+    #[tokio::test]
+    async fn revoked_pointer_after_frame_capture_disables_auxiliary_controls_without_rereading() {
+        let runtime = Arc::new(SessionRuntime::spawn(
+            "fixture",
+            Arc::new(Fixture::default().with_side_chats()),
+        ));
+        runtime.wait_ready(Duration::from_secs(3)).await.unwrap();
+        let a = Arc::new(
+            RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "a"))
+                .await
+                .unwrap(),
+        );
+        let b = Arc::new(
+            RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "b"))
+                .await
+                .unwrap(),
+        );
+        let source = SideChatBinding::new(runtime.clone());
+        let chat = source
+            .create(a.scope().clone(), None, "frame-chat")
+            .await
+            .unwrap();
+        let scratch = source.open(&chat).await.unwrap();
+        let binding = scratch.binding().clone();
+        let frame = binding.current_run().unwrap();
+        let mut view = ComponentDemo::new([a, b]).unwrap();
+        let ids = ComposerIds::new(999_999_u64 << 32);
+        view.tree
+            .insert(
+                MAIN_COLUMN,
+                ComponentDemo::run_controls(ids, binding.scope()),
+            )
+            .unwrap();
+        source.close(&chat, "frame-close").await.unwrap();
+        assert!(binding.current_run().is_none());
+        view.sync_actionable(ids, &binding, &frame).unwrap();
+        view.sync_paging(ids, &binding, &frame).unwrap();
+        let paging = view
+            .tree
+            .get(ComponentDemo::paging_id(ids))
+            .unwrap()
+            .component::<tekes_agent_components_ui::TranscriptPaging>()
+            .unwrap();
+        assert!(!paging.facts().unwrap().source_ready);
+        runtime.stop().await.unwrap();
+    }
+    #[tokio::test]
+    async fn old_frame_cannot_pair_with_a_new_epoch_page_receipt() {
+        let runtime = Arc::new(SessionRuntime::spawn(
+            "fixture",
+            Arc::new(Fixture::default()),
+        ));
+        runtime.wait_ready(Duration::from_secs(3)).await.unwrap();
+        let a = Arc::new(
+            RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "a"))
+                .await
+                .unwrap(),
+        );
+        let b = Arc::new(
+            RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "b"))
+                .await
+                .unwrap(),
+        );
+        let frame = a.current_run().unwrap();
+        let mut view = ComponentDemo::new([a.clone(), b]).unwrap();
+        runtime.reconnect().await.unwrap();
+        runtime.wait_ready(Duration::from_secs(3)).await.unwrap();
+        assert_ne!(
+            a.history_page_state().connection_epoch,
+            frame.connection_epoch
+        );
+        let ids = view.ids();
+        view.sync_paging(ids, &a, &frame).unwrap();
+        assert!(
+            !view
+                .tree
+                .get(ComponentDemo::paging_id(ids))
+                .unwrap()
+                .component::<tekes_agent_components_ui::TranscriptPaging>()
+                .unwrap()
+                .facts()
+                .unwrap()
+                .source_ready
+        );
+        runtime.stop().await.unwrap();
     }
 }

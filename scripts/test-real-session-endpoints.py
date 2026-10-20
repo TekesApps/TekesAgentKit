@@ -16,10 +16,13 @@ parser.add_argument('--ui-context',action='store_true',help='Exercise draft cont
 parser.add_argument('--ui-initial-presets',action='store_true',help='Exercise public initial preset selection through shared create and prompt in isolated component sessions')
 parser.add_argument('--ui-annotation-editor',action='store_true',help='Exercise public annotation editing and shared context compilation; implies the context proof')
 parser.add_argument('--ui-attachments',action='store_true',help='Exercise public upload entry, original draft, Send, history and capability-specific file reads')
+parser.add_argument('--ui-turn-footnote',action='store_true',help='Opt in to shared completed-turn fork in isolated UI sessions; requires components')
 parser.add_argument('--ui-message-rows',action='store_true',help='Mount canonical plain user and machine rows through public components; not a full Transcript')
 parser.add_argument('--ui-history-pages',action='store_true',help='Seed long isolated sessions and verify public page receipts, original scope and fresh reconnect history')
 parser.add_argument('--ui-actionables',action='store_true',help='Exercise public actionable cards on configured Native/Pi/DSH question sources')
 args=parser.parse_args()
+if args.ui_turn_footnote and not args.ui_components:
+    parser.error('--ui-turn-footnote requires --ui-components')
 if args.ui_message_rows and not args.ui_components:
     parser.error('--ui-message-rows requires --ui-components')
 if args.ui_message_rows and args.ui_attachments:
@@ -231,12 +234,18 @@ def ui_smoke(config, first):
     if args.ui_actionables:mode+=['--actionable-proof']
     if args.ui_history_pages:mode+=['--history-page-proof']
     if args.ui_message_rows:mode+=['--input-message-proof','--output-message-proof']
+    if args.ui_turn_footnote:mode+=['--turn-footnote-proof','--turn-fork-proof']
     if args.ui_initial_presets:mode+=['--initial-preset-proof','--initial-preset-cwd',str(cwd)]
     ui=subprocess.run([str(args.ui_demo.resolve()),*mode,'--endpoint-config',str(path),'--offscreen',str(output)],env=ui_env,text=True,capture_output=True,timeout=60)
     assert ui.returncode==0,ui.stderr[-3000:]
     receipt=next(json.loads(line) for line in ui.stdout.splitlines() if line.startswith('{') and json.loads(line).get('offscreen'))
     assert not receipt['isStale'] and receipt['finalAssistantItems']>=1,receipt
     assert output.read_bytes().startswith(b'\x89PNG\r\n\x1a\n'),kind+' UI image missing'
+    if args.ui_turn_footnote:
+        footer=receipt['turnFootnoteProof'];fork=receipt['turnForkProof']
+        assert footer['leadingAside'],footer
+        assert all(fork[key] for key in ['sharedCatalog','originalScope','explicitBoundary','singleAdmission','forkHistoryRestored','lateNavigationIgnored','originalDraftPreserved','otherDraftPreserved']),fork
+        print(kind.upper()+'_UI_TURN_FOOTNOTE_OK shared-catalog+durable-boundary+single-admission+fork-history+late-navigation-fence+draft-isolation; native-interaction=false',flush=True)
     if args.ui_message_rows:
         user=receipt['inputMessageProof'];machine=receipt['outputMessageProof']
         assert user['rightBubble'] and user['externalRightFootnote'] and user['plainReadonlyContent'] and not user['completeTranscript'],user

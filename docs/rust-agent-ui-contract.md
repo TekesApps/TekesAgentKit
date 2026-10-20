@@ -88,7 +88,7 @@ AgentKit 定义业务结构、展示语义、组件组合、组件输入及回�
 - [TekesUI #25](https://github.com/TekesApps/TekesUI/issues/25) 新增：可选中富内容 Component、受控流式更新与原生文本映射。现有 MarkdownView 提供有界 Markdown 被动绘制，不能据此宣称已有可选中富内容组合接口。当前源码文字显示和显式原始数据详情保留内容，富内容样式继续待接入。
 - #23 的无表单只读 Content API 已由当前固定 8cf 后继实际消费。原61dd候选的注册失败保留在[历史评估](tekesui-issue23-public-review-20261020.md)，后继的通过证据见[独立复验](tekesui-issue23-ci-review-20261020.md)，不再列作当前纯文本阻塞。
 
-基础能力由 TekesUI 实现；收到公开不可变版本后显式升级并验证，不跟随活跃 WIP。AgentKit 自身仍需完成消息组合、stream 到 durable 的可靠阅读身份关联、两类 footnote 动作、正式 Transcript/RunView 和 pane 消息接入，不把这些工作归为上游阻塞。
+基础能力由 TekesUI 实现；收到公开不可变版本后显式升级并验证，不跟随活跃 WIP。AgentKit 自身仍需完成消息组合、stream 到 durable 的可靠阅读身份关联、其余 footnote 动作、正式 Transcript/RunView 和 pane 消息接入，不把这些工作归为上游阻塞。
 
 ## RunView 的后续实施
 
@@ -200,3 +200,7 @@ Native [消息生命周期边界修正](rust-agent-ui-native-stream-boundary-202
 首个实际内容行 [`InputMessage`](rust-agent-ui-input-message-20261020.md) 只组合 TekesUI 默认 Surface、只读正文及 caption，用户正文气泡和外置 footnote 右对齐；浅深色、短输入收窄、长中文重排使用库的公开文字服务验证。当前仅支持纯文本，结构化块/附件显式拒绝，不能把此行视为完整 Transcript / RunView。
 
 [`OutputMessage`](rust-agent-ui-output-message-20261020.md) 现可独立挂载机器正文、推理与工具引用的局部展开层；按 canonical blocks 顺序消费，同一个正文控件在流式更新时保留选区。附件/未知块以明确的原始数据详情保留，Markdown 当前仍是源码文字；这是 Transcript 内容层进展，完整 Transcript / RunView、turn footnote 与混合阅读仍未完成。
+
+当前 [`TurnFootnote`](rust-agent-ui-turn-footnote-20261020.md) 已接入 turn 级状态、provider 用量、毫秒时间戳的区间换算与共享完成回合 Fork。动作目录移入同一 presentation，Web 与 RunSnapshot 共用；原来源 ticket 在派发前再检查 pointer、epoch、边界和能力，已知完成可再次显式操作，Unknown 不自动重试。三端真实分叉/历史恢复、原生 footnote 点击和完整 fixture 回归通过；这不等于已交付其余 footnote 能力或完整 Transcript。
+
+本轮还修正了原生测试宿主在 SideChat 撤销中重复读取快照的竞态：同一次 Composer/Indicators/actionable/paging 刷新消费同一 RunSnapshot，page receipt 必须匹配其 epoch。撤销后保留的旧快照只可读，不能因此恢复动作。新增确定性测试和此前失败的完整原生场景均已通过。

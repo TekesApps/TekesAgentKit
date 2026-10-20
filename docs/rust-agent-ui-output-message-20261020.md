@@ -33,7 +33,7 @@ host.get_mut(root).unwrap().component_mut::<OutputMessage>().unwrap()
 
 ## 尚未交付
 
-Markdown 当前按完整源码文字显示；附件/未知块明确标为未支持的原始数据详情，没有图像解码、下载或富卡片预览。上游 [#25](https://github.com/TekesApps/TekesUI/issues/25) 请求可选中富内容与原生映射，已有 MarkdownView 不等于完整交互能力。此行不是完整 Transcript，不提供 turn 级 footnote、独立 tool-result 事件列表或整个文档的排序/滚动；它们必须在正式组合层按已证明的事件顺序接入。匿名 preview 到 NativeEntry 的阅读别名也不能用文字或时间戳猜测。
+Markdown 当前按完整源码文字显示；附件/未知块明确标为未支持的原始数据详情，没有图像解码、下载或富卡片预览。上游 [#25](https://github.com/TekesApps/TekesUI/issues/25) 请求可选中富内容与原生映射，已有 MarkdownView 不等于完整交互能力。此行不是完整 Transcript，turn 级信息可组合独立 [TurnFootnote](rust-agent-ui-turn-footnote-20261020.md)；消息行自身不提供独立 tool-result 事件列表或整个文档的排序/滚动；它们必须在正式组合层按已证明的事件顺序接入。匿名 preview 到 NativeEntry 的阅读别名也不能用文字或时间戳猜测。
 
 混合阅读与历史分页保位仍待 [#22](https://github.com/TekesApps/TekesUI/issues/22)。正文控件的选区保留不等于整个混合文档的阅读锚点验收，也不等于物理中文 IME 或 VoiceOver 验收。
 

@@ -25,6 +25,7 @@ pub use output_message::*;
 mod transcript;
 pub use input_message::*;
 mod transcript_paging;
+mod turn_footnote;
 pub use composer::*;
 pub use indicators::*;
 pub use side_panel::*;
@@ -41,6 +42,7 @@ use tekes_ui_controls::{
 use tekes_ui_scene::{Rect, Scene};
 use tekes_ui_tokens::{Palette, Spacing};
 pub use transcript_paging::*;
+pub use turn_footnote::*;
 
 pub const ROOT: ComponentId = ComponentId(1);
 pub const STATUS: ComponentId = ComponentId(2);
@@ -407,5 +409,5 @@ pub use tekes_agent_presentation::{
     TranscriptBlockContent, TranscriptContentBlock, TranscriptDelivery, TranscriptDocument,
     TranscriptEventOrder, TranscriptInput, TranscriptItem, TranscriptItemKind,
     TranscriptMessageKey, TranscriptOrderedEvent, TranscriptOutput, TranscriptSection,
-    TranscriptSnapshot, TranscriptSourcePosition, TranscriptToolCall,
+    TranscriptSnapshot, TranscriptSourcePosition, TranscriptToolCall, TranscriptTurn,
 };

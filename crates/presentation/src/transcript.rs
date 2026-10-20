@@ -19,7 +19,9 @@ pub struct TranscriptTurn {
     pub id: String,
     pub status: String,
     pub input: String,
+    /// Source Unix milliseconds; consumers convert only for presentation.
     pub started_at: Option<f64>,
+    /// Source Unix milliseconds, absent until a public settlement supplies it.
     pub ended_at: Option<f64>,
     pub usage: TokenUsage,
     /// Exact public endpoint boundary, admitted only from a durable settlement record.

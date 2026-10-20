@@ -21,7 +21,7 @@ use tekes_agent_ui_demo::component_demo::{
     SidebarActionToken,
 };
 use tekes_agent_web::SharedAgent;
-use tekes_ui_controls::composition::{AccessibilityAction, ComponentId, ContentEvent};
+use tekes_ui_controls::composition::{AccessibilityAction, Component, ComponentId, ContentEvent};
 use tekes_ui_platform_macos::{
     App, AppConfig, Event, MenuBar, Size, Window, WindowConfig, WindowHandler,
 };
@@ -75,6 +75,7 @@ struct Host {
     bounded_max_items: usize,
     rename_rpc_prefix: String,
     actions_selftest: bool,
+    turn_footnote_selftest: bool,
     rename_test_started: bool,
     fork_test_started: bool,
     archive_test_started: bool,
@@ -91,6 +92,10 @@ struct Host {
     annotation_stage: u8,
 }
 enum HostResult {
+    TurnAction {
+        token: SidebarActionToken,
+        result: std::result::Result<tekes_agent_contract::ThreadActionOutcome, String>,
+    },
     HistoryPageCompleted,
     Actionable {
         ids: tekes_agent_components_ui::ComposerIds,
@@ -225,6 +230,15 @@ impl Host {
                 _ => None,
             };
             let sidebar_token = match &command {
+                DemoCommand::TurnAction { binding, intent } => {
+                    Some(self.view.begin_sidebar_action(
+                        tekes_agent_contract::SessionAddress {
+                            endpoint_id: binding.scope().endpoint_id.clone(),
+                            session_id: binding.scope().session_id.clone(),
+                        },
+                        intent.action().id.clone(),
+                    ))
+                }
                 DemoCommand::Sidebar(SidebarIntent::Action {
                     address,
                     definition,
@@ -331,6 +345,28 @@ impl Host {
                         HostResult::Files {
                             request,
                             files,
+                            result,
+                        }
+                    }
+                    DemoCommand::TurnAction { binding, intent } => {
+                        let rpc = format!(
+                            "{rename_rpc_prefix}:turn:{}:{}",
+                            std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap()
+                                .as_nanos(),
+                            intent.action().id
+                        );
+                        let result = match sidebar
+                            .turn_action_dispatcher()
+                            .prepare(binding, &intent, rpc)
+                        {
+                            Ok(request) => request.execute().await,
+                            Err(error) => Err(error),
+                        }
+                        .map_err(|error| error.to_string());
+                        HostResult::TurnAction {
+                            token: sidebar_token.expect("captured turn gesture"),
                             result,
                         }
                     }
@@ -578,6 +614,7 @@ impl Host {
                             | DemoCommand::ReadFilePreview { .. }
                             | DemoCommand::SelectFiles { .. }
                             | DemoCommand::Sidebar(_)
+                            | DemoCommand::TurnAction { .. }
                             | DemoCommand::ReadInitialPresets { .. }
                             | DemoCommand::CreateSession(_)
                             | DemoCommand::ReadModels { .. }
@@ -617,6 +654,14 @@ impl Host {
         }
         while let Ok(result) = self.results.try_recv() {
             match result {
+                HostResult::TurnAction { token, result } => {
+                    if let Ok(outcome) = result
+                        && let Ok(Some(request)) =
+                            self.view.apply_turn_action_outcome(&token, &outcome)
+                    {
+                        self.commands(Ok(vec![DemoCommand::OpenSession(request)]));
+                    }
+                }
                 HostResult::Actionable {
                     ids,
                     intent,
@@ -1222,7 +1267,28 @@ impl Host {
                     .any(|row| row.address.session_id == "a" && row.title == "原生重命名")
             {
                 self.fork_test_started = true;
-                click_thread_action_script(&self.view, "fork");
+                if self.turn_footnote_selftest {
+                    let snapshot = self.view.binding().current_run().unwrap();
+                    let action = &snapshot.transcript.turns.last().unwrap().footnote_actions[0];
+                    let footer = self
+                        .view
+                        .tree
+                        .get(ComponentDemo::turn_footnote_id())
+                        .unwrap()
+                        .component::<tekes_agent_components_ui::TurnFootnote>()
+                        .unwrap();
+                    let button = footer.action_id(&action.id).unwrap();
+                    let point = self.view.tree.get(button).unwrap().frame().center();
+                    tekes_ui_platform_macos::selftest::run_script(vec![(
+                        200,
+                        tekes_ui_platform_macos::selftest::Action::Click {
+                            x: point.x as f64,
+                            y: point.y as f64,
+                        },
+                    )]);
+                } else {
+                    click_thread_action_script(&self.view, "fork");
+                }
             }
             if self.fork_test_started
                 && !self.archive_test_started
@@ -1567,6 +1633,11 @@ impl Host {
                     .any(|entry| entry.event.kind == "user/message"
                         && entry.event.data.to_string().contains("原生重命名"))
             );
+            if self.turn_footnote_selftest {
+                println!(
+                    "NATIVE_AGENT_TURN_FOOTNOTE_SELFTEST_OK native-pointer+shared-turn-action+fork-navigation+archive+draft-isolation; physical-ime=false; complete-transcript=false"
+                );
+            }
             println!(
                 "NATIVE_AGENT_THREAD_ACTIONS_SELFTEST_OK rename-ime-barrier+shared-inventory+fork-navigation+archive-clear+restored-selection+draft-isolation; physical-ime=false; formal-run-view=false"
             );
@@ -2262,23 +2333,28 @@ pub fn run() {
     view.sync().unwrap();
     let fonts = CoreTextFonts::new();
     let (sender, results) = mpsc::channel();
+    let mut turn_footnote_id = None;
     let mut output_message_id = None;
-    if args.iter().any(|arg| arg == "--output-message-proof")
-        && !args.iter().any(|arg| arg == "--offscreen")
-    {
-        output_message_id = Some(
-            view.mount_output_message_proof()
-                .expect("canonical machine message row"),
-        );
-    }
     let mut input_message_ids = None;
-    if args.iter().any(|arg| arg == "--input-message-proof")
-        && !args.iter().any(|arg| arg == "--offscreen")
-    {
-        input_message_ids = Some(
-            view.mount_input_message_proof()
-                .expect("canonical input message row"),
-        );
+    if !args.iter().any(|arg| arg == "--offscreen") {
+        if args.iter().any(|arg| arg == "--input-message-proof") {
+            input_message_ids = Some(
+                view.mount_input_message_proof()
+                    .expect("canonical input message row"),
+            );
+        }
+        if args.iter().any(|arg| arg == "--output-message-proof") {
+            output_message_id = Some(
+                view.mount_output_message_proof()
+                    .expect("canonical machine message row"),
+            );
+        }
+        if args.iter().any(|arg| arg == "--turn-footnote-proof") {
+            turn_footnote_id = Some(
+                view.mount_turn_footnote_proof()
+                    .expect("turn footnote source"),
+            );
+        }
     }
     let mut host = Host {
         file_viewer: None,
@@ -2313,6 +2389,8 @@ pub fn run() {
                 .as_nanos()
         ),
         actions_selftest,
+        turn_footnote_selftest: actions_selftest
+            && args.iter().any(|arg| arg == "--turn-footnote-proof"),
         rename_test_started: false,
         fork_test_started: false,
         archive_test_started: false,
@@ -2888,6 +2966,28 @@ pub fn run() {
                     .expect("canonical machine message row"),
             );
         }
+        if args.iter().any(|arg| arg == "--turn-footnote-proof") {
+            turn_footnote_id = Some(
+                host.view
+                    .mount_turn_footnote_proof()
+                    .expect("turn footnote source"),
+            );
+        }
+        let turn_fork_proof = if args.iter().any(|arg| arg == "--turn-fork-proof") {
+            assert!(
+                turn_footnote_id.is_some(),
+                "turn fork proof requires --turn-footnote-proof"
+            );
+            host.executor
+                .block_on(tekes_agent_ui_demo::turn_footnote_proof::run(
+                    &mut host.view,
+                    &host.runtime,
+                    host.sidebar.turn_action_dispatcher(),
+                ))
+                .expect("shared turn fork proof")
+        } else {
+            serde_json::Value::Null
+        };
         let clip = Rect::new(0., 0., 1000., 760.);
         host.text.atlas.begin_frame();
         host.view
@@ -3008,6 +3108,12 @@ pub fn run() {
                 });
             }
         }
+        let turn_footnote_proof=turn_footnote_id.map(|id| {
+            let row=host.view.tree.get(id).unwrap();let frame=row.frame();
+            for child in row.component::<tekes_agent_components_ui::TurnFootnote>().unwrap().children() {let f=host.view.tree.get(child.id()).unwrap().frame();assert!((f.min_x()-frame.min_x()).abs()<0.5);}
+            let facts=row.component::<tekes_agent_components_ui::TurnFootnote>().unwrap().facts().unwrap();
+            serde_json::json!({"leadingAside":true,"elapsedSeconds":facts.elapsed_seconds(),"startedAtMilliseconds":facts.started_at,"endedAtMilliseconds":facts.ended_at,"nativeInteraction":false,"completeTranscript":false})
+        });
         let output_message_proof = output_message_id.map(|id| {
             let row = host.view.tree.get(id).unwrap();
             let frame = row.frame();
@@ -3050,7 +3156,7 @@ pub fn run() {
             "uploadProof":upload_proof,
             "actionableProof":actionable_proof,
             "historyPagingProof":history_page_proof,
-            "inputMessageProof":input_message_proof, "outputMessageProof":output_message_proof,
+            "inputMessageProof":input_message_proof, "outputMessageProof":output_message_proof, "turnFootnoteProof":turn_footnote_proof,"turnForkProof":turn_fork_proof,
             })
         );
         host.executor.block_on(host.runtime.stop()).unwrap();
