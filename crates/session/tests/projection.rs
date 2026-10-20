@@ -375,3 +375,27 @@ fn invalid_refresh_cause_is_rejected_before_changing_the_native_snapshot() {
         assert_eq!(serde_json::to_value(&store.sessions["s"]).unwrap(), before);
     }
 }
+
+#[test]
+fn native_reading_receipts_are_atomic_scoped_and_cleared_on_reconnect() {
+    let mut store = store();
+    let snapshot = json!({"sessionId":"s","generation":"g","leafId":"a","entries":[{"type":"message","id":"a","message":{"role":"assistant","content":[]}}],"hasMoreBefore":false,"isStreaming":false,"state":{}});
+    store.apply("journal:s",json!({"type":"conversation","generation":"g","snapshot":snapshot,"readingIdentities":[{"streamId":"one","entryId":"a"}]})).unwrap();
+    let before = serde_json::to_value(&store.sessions["s"]).unwrap();
+    for receipts in [
+        json!([{"streamId":"one","entryId":"foreign"}]),
+        json!([{"streamId":"one","entryId":"a"},{"streamId":"two","entryId":"a"}]),
+    ] {
+        assert!(store.apply("journal:s",json!({"type":"conversation-update","generation":"g","snapshot":snapshot,"readingIdentities":receipts})).is_err());
+        assert_eq!(serde_json::to_value(&store.sessions["s"]).unwrap(), before);
+    }
+    store.reset_journal("s");
+    assert!(store.sessions["s"].native_reading_identities.is_empty());
+    store
+        .apply(
+            "journal:s",
+            json!({"type":"conversation","generation":"g","snapshot":snapshot}),
+        )
+        .unwrap();
+    assert!(store.sessions["s"].native_reading_identities.is_empty());
+}

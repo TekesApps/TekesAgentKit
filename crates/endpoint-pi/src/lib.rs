@@ -6,6 +6,7 @@ mod goal_driver;
 mod management;
 mod models;
 mod queue;
+mod reading;
 mod rpc;
 mod subagents;
 use async_trait::async_trait;
@@ -151,6 +152,12 @@ impl PiConnector {
             require(root.is_dir(), "Pi session root must be directory")?;
         }
         let file = config.data_root.join("agentkit-sessions.json");
+        tokio::fs::write(
+            config.data_root.join("agentkit-reading.mjs"),
+            include_str!("../resources/agentkit-reading.mjs"),
+        )
+        .await
+        .map_err(io_error)?;
         tokio::fs::write(
             config.data_root.join("agentkit-control.mjs"),
             include_str!("../resources/agentkit-control.mjs"),
@@ -554,8 +561,20 @@ async fn conversation_frame(
         state,
     };
     snapshot.validate()?;
+    let identities: Vec<NativeMessageReadingIdentity> =
+        serde_json::from_value(rpc.control("reading.identities", json!({})).await?)?;
+    let loaded: std::collections::BTreeSet<_> = snapshot
+        .entries
+        .iter()
+        .filter_map(|entry| entry["id"].as_str())
+        .collect();
+    let identities: Vec<_> = identities
+        .into_iter()
+        .filter(|identity| loaded.contains(identity.entry_id.as_str()))
+        .collect();
+    validate_native_reading_identities(&snapshot, &identities)?;
     Ok(
-        json!({"type":if initial {"conversation"} else {"conversation-update"},"generation":generation,"snapshot":snapshot}),
+        json!({"type":if initial {"conversation"} else {"conversation-update"},"generation":generation,"snapshot":snapshot,"readingIdentities":identities}),
     )
 }
 /// Reconstruct active ancestry; get_entries includes inactive branches, which are not current conversation.

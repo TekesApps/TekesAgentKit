@@ -730,7 +730,9 @@ fn event_row<'a>(
                     .ok_or("missing transcript output")?;
                 Some(Planned {
                     key: Key::Message(output.key.into()),
-                    alias: None,
+                    alias: output
+                        .reconciliation_key()
+                        .map(|key| Key::Message(key.into())),
                     content: PlannedContent::Output(*output, Some(section)),
                 })
             }

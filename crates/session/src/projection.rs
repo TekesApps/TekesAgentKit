@@ -31,6 +31,8 @@ pub struct LivePreview {
 pub struct SessionProjection {
     pub summary: Option<Value>,
     pub native_conversation: Option<NativeConversationSnapshot>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub native_reading_identities: Vec<NativeMessageReadingIdentity>,
     pub native_events: std::collections::VecDeque<Value>,
     pub agent_error: Option<String>,
     pub entries: BTreeMap<i64, HistoryEntry>,
@@ -52,6 +54,7 @@ impl Default for SessionProjection {
         Self {
             summary: None,
             native_conversation: None,
+            native_reading_identities: vec![],
             native_events: std::collections::VecDeque::new(),
             agent_error: None,
             entries: BTreeMap::new(),
@@ -306,6 +309,7 @@ impl MemoryProjectionStore {
             session.journal_ready = false;
             session.previews.clear();
             session.native_events.clear();
+            session.native_reading_identities.clear();
         }
         self.connection = ConnectionState::Connecting;
     }
@@ -315,6 +319,7 @@ impl MemoryProjectionStore {
             s.journal_ready = false;
             s.previews.clear();
             s.native_events.clear();
+            s.native_reading_identities.clear();
         }
     }
     pub fn ready(&self) -> bool {
@@ -632,8 +637,15 @@ impl MemoryProjectionStore {
                         "conversation generation mismatch",
                     )?;
                 }
+                let identities: Vec<NativeMessageReadingIdentity> = frame
+                    .get("readingIdentities")
+                    .map(|value| serde_json::from_value(value.clone()))
+                    .transpose()?
+                    .unwrap_or_default();
+                validate_native_reading_identities(&snapshot, &identities)?;
                 let session = self.sessions.entry(id.into()).or_default();
                 session.run_open = snapshot.is_streaming;
+                session.native_reading_identities = identities;
                 session.native_conversation = Some(snapshot);
                 session.journal_ready = true;
                 session.journal_error = None;
@@ -660,8 +672,15 @@ impl MemoryProjectionStore {
                         Ok::<_, Error>(event.clone())
                     })
                     .transpose()?;
+                let identities: Vec<NativeMessageReadingIdentity> = frame
+                    .get("readingIdentities")
+                    .map(|value| serde_json::from_value(value.clone()))
+                    .transpose()?
+                    .unwrap_or_default();
+                validate_native_reading_identities(&snapshot, &identities)?;
                 let session = self.sessions.entry(id.into()).or_default();
                 session.run_open = snapshot.is_streaming;
+                session.native_reading_identities = identities;
                 session.native_conversation = Some(snapshot);
                 if let Some(event) = event {
                     session.push_native_event(event);

@@ -16,6 +16,8 @@ pub enum TranscriptMessageKey<'a> {
     /// timeline IDs use window-local timestamp occurrences and are not durable
     /// across prefix expansion. This key never uses entry ordinal or text.
     NativeEntry(&'a str),
+    /// Process-local explicit assistant lifecycle identity, never durable authority.
+    Stream(&'a str),
     /// Legacy/journal item or temporary native preview. A native preview without
     /// a public entry identity must not be aliased to a durable record by text,
     /// timestamp or a window-local occurrence counter.
@@ -52,6 +54,22 @@ pub struct TranscriptOutput<'a> {
     /// Includes existing kind, reasoning, reasoning_ended and final/provisional facts.
     pub item: &'a TranscriptItem,
 }
+impl<'a> TranscriptOutput<'a> {
+    /// Explicit native receipt, not a text/timestamp/occurrence association.
+    pub fn reconciliation_key(&self) -> Option<TranscriptMessageKey<'a>> {
+        if self.item.kind != TranscriptItemKind::Assistant
+            || self.item.is_provisional
+            || !matches!(self.key, TranscriptMessageKey::NativeEntry(_))
+        {
+            return None;
+        }
+        self.item.metadata["nativeStreamId"]
+            .as_str()
+            .filter(|id| !id.is_empty())
+            .map(TranscriptMessageKey::Stream)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct TranscriptSection<'a> {
     pub id: &'a str,
@@ -137,6 +155,7 @@ impl<'a> TranscriptDocument<'a> {
         let mut item_ids = BTreeSet::new();
         let mut native_entries = BTreeSet::new();
         let mut submissions = BTreeSet::new();
+        let mut streams = BTreeSet::new();
         for item in &snapshot.items {
             require(!item.id.is_empty(), "empty Transcript message identity")?;
             require(
@@ -152,6 +171,15 @@ impl<'a> TranscriptDocument<'a> {
                     "invalid Transcript content block order",
                 )?;
             }
+            let stream = item.metadata["nativeStreamId"].as_str();
+            if let Some(stream) = stream {
+                require(
+                    item.kind == TranscriptItemKind::Assistant
+                        && !stream.is_empty()
+                        && streams.insert(stream),
+                    "ambiguous assistant stream identity",
+                )?;
+            }
             let source_key = match &item.source_position {
                 Some(crate::TranscriptSourcePosition::Native { entry_id, .. }) => {
                     require(
@@ -164,7 +192,15 @@ impl<'a> TranscriptDocument<'a> {
                     )?;
                     TranscriptMessageKey::NativeEntry(entry_id)
                 }
-                _ => TranscriptMessageKey::Item(&item.id),
+                _ => {
+                    if item.is_provisional
+                        && let Some(stream) = stream
+                    {
+                        TranscriptMessageKey::Stream(stream)
+                    } else {
+                        TranscriptMessageKey::Item(&item.id)
+                    }
+                }
             };
             let submission = if item.kind == TranscriptItemKind::User {
                 match item.reconciliation_id.as_deref() {

@@ -733,3 +733,116 @@ fn composing_feedback_preflights_response_replacement_and_keeps_the_original_tex
         feedback
     );
 }
+
+#[test]
+fn explicit_stream_receipt_retains_output_row_text_surface_and_selection() {
+    let mut item = message("preview", TranscriptItemKind::Assistant, 0);
+    item.source_position = None;
+    item.is_provisional = true;
+    item.metadata = json!({"nativeStreamId":"stream-one"});
+    item.content_blocks = Some(vec![TranscriptContentBlock {
+        index: 0,
+        content: TranscriptBlockContent::Text {
+            text: "中文 streaming".into(),
+        },
+    }]);
+    let mut source = TranscriptSnapshot {
+        items: vec![item],
+        turns: vec![turn()],
+        ..Default::default()
+    };
+    let mut view = content();
+    view.update(&scope(), 1, 1, &source, true).unwrap();
+    let original = view
+        .message_id(TranscriptMessageKey::Stream("stream-one"))
+        .unwrap();
+    let root_id = view.id();
+    let mut host = view.into_host().unwrap();
+    let body = host
+        .get(original)
+        .unwrap()
+        .component::<OutputMessage>()
+        .unwrap()
+        .content_ids()[0]
+        .body;
+    host.focus(Some(body), true);
+    host.get_mut(body)
+        .unwrap()
+        .component_mut::<TextFieldContent>()
+        .unwrap()
+        .surface
+        .input
+        .select_range(0..2);
+    source.items[0].id = "history-window-id".into();
+    source.items[0].is_provisional = false;
+    source.items[0].source_position = Some(TranscriptSourcePosition::Native {
+        entry_id: "committed".into(),
+        entry_ordinal: 1,
+        content_index: None,
+    });
+    root(&mut host, root_id)
+        .update(&scope(), 2, 1, &source, true)
+        .unwrap();
+    assert_eq!(
+        root(&mut host, root_id).message_id(TranscriptMessageKey::NativeEntry("committed")),
+        Some(original)
+    );
+    assert_eq!(
+        host.get(original)
+            .unwrap()
+            .component::<OutputMessage>()
+            .unwrap()
+            .content_ids()[0]
+            .body,
+        body
+    );
+    assert_eq!(host.focused(), Some(body));
+    assert_eq!(host.text_surface(body).unwrap().input.selection(), 0..2);
+    // A fresh history read may omit the process-local receipt: native identity wins.
+    source.items[0].metadata = json!({});
+    root(&mut host, root_id)
+        .update(&scope(), 3, 1, &source, true)
+        .unwrap();
+    assert_eq!(
+        root(&mut host, root_id).message_id(TranscriptMessageKey::NativeEntry("committed")),
+        Some(original)
+    );
+}
+
+#[test]
+fn equal_payload_without_receipt_does_not_alias_and_ambiguous_receipts_are_atomic() {
+    let mut item = message("preview", TranscriptItemKind::Assistant, 0);
+    item.is_provisional = true;
+    item.source_position = None;
+    item.metadata = json!({"nativeStreamId":"stream-one"});
+    let mut source = TranscriptSnapshot {
+        items: vec![item],
+        ..Default::default()
+    };
+    let mut view = content();
+    view.update(&scope(), 1, 1, &source, true).unwrap();
+    let old = view
+        .message_id(TranscriptMessageKey::Stream("stream-one"))
+        .unwrap();
+    let mut duplicate = source.items[0].clone();
+    duplicate.id = "other-preview".into();
+    source.items.push(duplicate);
+    assert!(view.update(&scope(), 2, 1, &source, true).is_err());
+    assert_eq!(
+        view.message_id(TranscriptMessageKey::Stream("stream-one")),
+        Some(old)
+    );
+    source.items.pop();
+    source.items[0].is_provisional = false;
+    source.items[0].source_position = Some(TranscriptSourcePosition::Native {
+        entry_id: "committed".into(),
+        entry_ordinal: 0,
+        content_index: None,
+    });
+    source.items[0].metadata = json!({});
+    view.update(&scope(), 2, 1, &source, true).unwrap();
+    assert_ne!(
+        view.message_id(TranscriptMessageKey::NativeEntry("committed")),
+        Some(old)
+    );
+}

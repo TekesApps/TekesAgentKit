@@ -1140,3 +1140,48 @@ fn independent_host_can_opt_in_to_transcript_feedback() {
     assert_eq!(run.transcript().unwrap().feedback_controls().count(), 0);
     run.into_host().unwrap();
 }
+
+#[test]
+fn independent_host_reconciles_explicit_stream_receipt_through_public_api() {
+    use tekes_agent_components_ui::*;
+    let scope = RunScope::main("public", "stream-session");
+    let mut item = TranscriptItem {
+        id: "preview".into(),
+        record_id: None,
+        reconciliation_id: None,
+        turn_id: "turn".into(),
+        kind: TranscriptItemKind::Assistant,
+        text: "回答".into(),
+        reasoning: String::new(),
+        attachments: vec![],
+        content_blocks: None,
+        is_visible: true,
+        is_final: false,
+        is_provisional: true,
+        reasoning_ended: false,
+        source_sequence: None,
+        source_position: None,
+        time: None,
+        metadata: Default::default(),
+    };
+    item.metadata["nativeStreamId"] = "stream".into();
+    let mut source = TranscriptSnapshot {
+        items: vec![item],
+        ..Default::default()
+    };
+    let mut view = transcript_content(1900, 1901..1920, scope.clone(), &source, 1, 1).unwrap();
+    let original = view
+        .message_id(TranscriptMessageKey::Stream("stream"))
+        .unwrap();
+    source.items[0].is_provisional = false;
+    source.items[0].source_position = Some(TranscriptSourcePosition::Native {
+        entry_id: "entry".into(),
+        entry_ordinal: 0,
+        content_index: None,
+    });
+    view.update(&scope, 2, 1, &source, true).unwrap();
+    assert_eq!(
+        view.message_id(TranscriptMessageKey::NativeEntry("entry")),
+        Some(original)
+    );
+}

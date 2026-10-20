@@ -16,6 +16,8 @@
 
 AgentKit 定义业务结构、展示语义、组件组合、组件输入及回调，复用现有 presentation。TekesUI 拥有编辑/撤销/选区/IME/焦点、文字排版、滚动/锚点、通用布局与渲染；AgentKit 只调用其公开接口。宿主提供窗口、总体布局、导航、产品 copy/主题、安装、凭证、路径与系统权限，并执行显式 host capability 回调。不能向宿主转移本应共享的 Agent 状态机或动作策略。
 
+[Pi 实时预览与落盘身份](rust-agent-ui-stream-identity-20261020.md)补齐 Pi 1.3 delta-only RPC 的公开 extension 归一化及 Stream→NativeEntry 明确回执。正式 Transcript 保留原输出行与文本控件；完整阅读锚点、富内容和三端原生验收范围不变。
+
 ## Composer（首批实现）
 
 `Composer` 实现 TekesUI `Component`，通过 `Content::new(ids.root, composer)` 放入任意公共 ContentHost，也可 `composer.into_host()` 独立挂载。`ComposerIds::new(base)` 占用连续 8 个 ID，宿主保证其与其他子树不冲突。可在一个窗口内用不同 ID 段挂载多个 Composer。

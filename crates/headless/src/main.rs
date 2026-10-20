@@ -254,7 +254,39 @@ async fn main() -> Result<()> {
                         .any(|i| i.id.starts_with("echo-item:")),
                     "missing optimistic echo",
                 )?;
-                presentation.dispatch(ticket, None).await?
+                if command["captureNativePreview"] == true {
+                    // Capture a publication from the active dispatch, without a second
+                    // submission or a timing-based identity association.
+                    let mut changes = runtime.subscribe();
+                    let capture = tokio::time::timeout(Duration::from_secs(30), async {
+                        loop {
+                            let observed = changes.inspect(|store| {
+                                store
+                                    .sessions
+                                    .get(id.unwrap())
+                                    .filter(|session| {
+                                        session.native_events.iter().any(|event| {
+                                            event["type"] == "message_update"
+                                                && event["message"]["role"] == "assistant"
+                                        })
+                                    })
+                                    .cloned()
+                            });
+                            if let Some(session) = observed {
+                                break Ok::<_, Error>(session);
+                            }
+                            changes.changed().await.map_err(|_| Error::Disconnected)?;
+                        }
+                    });
+                    let (result, preview) =
+                        tokio::join!(presentation.dispatch(ticket, None), capture);
+                    let mut result = result?;
+                    result["nativePreview"] =
+                        serde_json::to_value(preview.map_err(|_| Error::Timeout)??)?;
+                    result
+                } else {
+                    presentation.dispatch(ticket, None).await?
+                }
             }
             "list" => runtime.inspect(|s| {
                 json!(

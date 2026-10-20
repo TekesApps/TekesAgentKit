@@ -99,6 +99,7 @@ python3 scripts/install-dsh-runtime.py \
 - [Headless JSON 配置与命令](docs/headless-cli.md)
 - [三端能力、session pointer 与验收](docs/session-endpoints.md)
 - [Run / Transcript / Composer / 连接状态](docs/headless-presentation.md)
+- [实验 UI：Pi 实时预览与落盘阅读身份](docs/rust-agent-ui-stream-identity-20261020.md)
 - [Kernel v4 同步、历史及恢复](docs/headless-kernel.md)
 - [路线与交付边界](docs/roadmap.md)
 - [阶段变更](CHANGELOG.md) · [贡献说明](CONTRIBUTING.md)

@@ -125,7 +125,9 @@ class Provider(http.server.BaseHTTPRequestHandler):
             if 'ENDPOINT_GOAL_COMPLETE' in transcript and not any(message.get('role')=='tool' for message in body.get('messages',[])):
                 frames=[dict(common,choices=[{'index':0,'delta':{'role':'assistant','tool_calls':[{'index':0,'id':'goal-call','type':'function','function':{'name':'agentkit_goal','arguments':json.dumps({'phase':'complete'})}}]},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{},'finish_reason':'tool_calls'}])]
         try:
-            for frame in frames:self.wfile.write(('data: '+json.dumps(frame)+'\n\n').encode());self.wfile.flush()
+            for frame in frames:
+                self.wfile.write(('data: '+json.dumps(frame)+'\n\n').encode());self.wfile.flush()
+                if 'ENDPOINT_STREAM_IDENTITY_PROOF' in json.dumps(body):time.sleep(0.5)
             if not self.path.endswith('/responses'):self.wfile.write(b'data: [DONE]\n\n')
         except (BrokenPipeError,ConnectionResetError):pass
 server=http.server.ThreadingHTTPServer(('127.0.0.1',0),Provider)
@@ -176,7 +178,7 @@ def run(config):
     selected_model=next(command['args'] for command in config['commands'] if command.get('method')=='session.selectModel')
     proof_commands=[{'op':'create','cwd':str(Path(next(iter(stat))['absolutePath']).parent),'saveAs':'presented'},
         {'op':'call','sessionId':'presented','method':'session.selectModel','args':selected_model},
-        {'op':'open','sessionId':'presented'},{'op':'compose','sessionId':'presented','text':'Presentation layer proof'},
+        {'op':'open','sessionId':'presented'},{'op':'compose','sessionId':'presented','text':'ENDPOINT_STREAM_IDENTITY_PROOF' if config['kind']=='pi' else 'Presentation layer proof','captureNativePreview':config['kind']=='pi'},
         {'op':'waitSettled','sessionId':'presented'},
         *([{'op':'waitNativeEvent','sessionId':'presented','eventType':'message_end','role':'assistant'}] if config['kind']=='pi' else []),
         {'op':'snapshot'},{'op':'presentation','sessionId':'presented'},
@@ -196,6 +198,19 @@ def run(config):
         kinds=[(event.get('type'),event.get('message',{}).get('role') if isinstance(event.get('message'),dict) else None) for event in settled['native_events']]
         assert any(kind=='message_end' and role=='assistant' for kind,role in kinds), 'Pi dropped the assistant lifecycle cause: '+json.dumps(kinds)
         assert any(entry.get('message',{}).get('role')=='assistant' for entry in settled['native_conversation']['entries']), 'Pi lifecycle cause missing its canonical snapshot'
+        live=next(row['result']['nativePreview'] for row in proof if row.get('op')=='compose' and 'nativePreview' in row['result'])
+        assert live['native_conversation']['isStreaming'], 'Live probe did not observe an active source'
+        live_ids={event.get('agentkitStreamId') for event in live['native_events'] if event.get('type')=='message_update' and event.get('message',{}).get('role')=='assistant'}
+        assert live_ids and None not in live_ids, 'Actual active Pi preview has no stream identity'
+        assert not any(entry.get('message',{}).get('role')=='assistant' for entry in live['native_conversation']['entries']), 'Live probe did not precede persistence'
+        receipts=settled.get('native_reading_identities',[])
+        assert receipts and live_ids <= {receipt['streamId'] for receipt in receipts}, 'Pi active preview did not reconcile to a loaded entry receipt'
+        assistants={entry['id'] for entry in settled['native_conversation']['entries'] if entry.get('message',{}).get('role')=='assistant'}
+        ended={event.get('agentkitStreamId') for event in settled['native_events'] if event.get('type')=='message_end' and event.get('message',{}).get('role')=='assistant'}
+        assert all(receipt['entryId'] in assistants and receipt['streamId'] in ended for receipt in receipts), receipts
+        assert len({receipt['streamId'] for receipt in receipts})==len(receipts),receipts
+        assert len({receipt['entryId'] for receipt in receipts})==len(receipts),receipts
+        print('PI_READING_IDENTITY_LIVE_OK active-preview+public-final-object+loaded-entry+authenticated-stream-event')
         print('PI_NATIVE_ASSISTANT_BOUNDARY_LIVE_OK canonical-snapshot+original-message-end')
     for row in (row for row in proof if row.get('op')=='presentation'):
         view=row['result']

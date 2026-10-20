@@ -449,7 +449,17 @@ impl OutputMessage {
         }
         let key = Key::from(output.key);
         if self.key.as_ref().is_some_and(|old| old != &key) {
-            return Err("output message identity changed");
+            let receipt = output.reconciliation_key().map(Key::from);
+            if !self
+                .key
+                .as_ref()
+                .is_some_and(|old| matches!(old, Key::Stream(_)) && Some(old) == receipt.as_ref())
+                || !self.item.as_ref().is_some_and(|old| {
+                    old.kind == TranscriptItemKind::Assistant && old.is_provisional
+                })
+            {
+                return Err("output message identity changed");
+            }
         }
         let facts = parts(output, section, self.labels)?;
         if publication == self.publication

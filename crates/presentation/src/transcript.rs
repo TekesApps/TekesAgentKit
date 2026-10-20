@@ -756,6 +756,15 @@ fn native(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSna
         .as_ref()
         .ok_or_else(|| Error::Protocol("missing native snapshot".into()))?;
     snapshot.validate()?;
+    tekes_agent_contract::validate_native_reading_identities(
+        snapshot,
+        &session.native_reading_identities,
+    )?;
+    let reading_ids: BTreeMap<_, _> = session
+        .native_reading_identities
+        .iter()
+        .map(|identity| (identity.entry_id.as_str(), identity.stream_id.as_str()))
+        .collect();
     let mut out = TranscriptSnapshot::default();
     let mut current = scoped(scope, "native:partial");
     let mut occurrences = BTreeMap::<String, usize>::new();
@@ -892,6 +901,11 @@ fn native(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSna
                     .as_str()
                     .is_some_and(|reason| !reason.is_empty());
                 row.metadata = json!({"stopReason":message["stopReason"]});
+                if let Some(id) = reading_ids.get(record) {
+                    row.metadata["nativeStreamId"] =
+                        json!(scoped(scope, &format!("pi-stream:{id}")));
+                }
+
                 let u = usage(&message["usage"]);
                 let turn = turn(&mut out, &current, time);
                 turn.usage.input_tokens = turn.usage.input_tokens.saturating_add(u.input_tokens);
@@ -988,6 +1002,14 @@ fn native(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSna
             })
             .filter(|event| event["type"] != "message_end")
         {
+            let stream_id = event["agentkitStreamId"]
+                .as_str()
+                .filter(|id| !id.is_empty());
+            // A receipt can precede an already-buffered update. Never resurrect
+            // a preview explicitly known to have become a loaded native entry.
+            if stream_id.is_some_and(|id| reading_ids.values().any(|known| *known == id)) {
+                return Ok(out);
+            }
             let message = &event["message"];
             let timestamp = message["timestamp"].as_f64().unwrap_or(0.0).to_bits();
             let base = format!("{timestamp:x}");
@@ -996,7 +1018,9 @@ fn native(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSna
             let occurrence = *occurrences.get(&base).unwrap_or(&0);
             let mut row = item(
                 scope,
-                &format!("native-assistant:{base}:{occurrence}"),
+                &stream_id
+                    .map(|id| format!("native-stream:{id}"))
+                    .unwrap_or_else(|| format!("native-assistant:{base}:{occurrence}")),
                 &current,
                 TranscriptItemKind::Assistant,
                 None,
@@ -1006,6 +1030,9 @@ fn native(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSna
             row.content_blocks = content_blocks(scope, &message["content"], ContentDialect::Native);
             row.reasoning = text_blocks(&message["content"], "thinking");
             row.is_provisional = true;
+            if let Some(id) = stream_id {
+                row.metadata["nativeStreamId"] = json!(scoped(scope, &format!("pi-stream:{id}")));
+            }
             row.reasoning_ended = event["assistantMessageEvent"]["type"] == "thinking_end";
             upsert(&mut out, row);
         }

@@ -423,3 +423,58 @@ fn durable_native_input_key_survives_a_receipt_discovered_in_an_earlier_page() {
         Some(TranscriptMessageKey::Submission("rpc"))
     );
 }
+
+#[test]
+fn pi_stream_receipt_preserves_canonical_entry_and_suppresses_late_preview() {
+    let scope = RunScope::main("e", "a");
+    let user = json!({"type":"message","id":"u","message":{"role":"user","timestamp":1,"content":"input"}});
+    let final_message = json!({"role":"assistant","timestamp":2,"stopReason":"stop","content":[{"type":"text","text":"answer"}]});
+    let preview =
+        json!({"type":"message_update","agentkitStreamId":"stream-one","message":final_message});
+    let mut session = SessionProjection {
+        journal_ready: true,
+        native_conversation: Some(NativeConversationSnapshot {
+            session_id: "a".into(),
+            generation: "g".into(),
+            leaf_id: Some("u".into()),
+            entries: vec![user],
+            has_more_before: false,
+            is_streaming: true,
+            state: json!({}),
+        }),
+        native_events: vec![preview].into(),
+        ..Default::default()
+    };
+    let live = TranscriptSnapshot::read(&scope, &session).unwrap();
+    let live_doc = TranscriptDocument::read(&live).unwrap();
+    let live_output = &live_doc.sections[0].outputs[0];
+    assert!(matches!(live_output.key, TranscriptMessageKey::Stream(_)));
+    assert_eq!(live_output.reconciliation_key(), None);
+    let stream_key = live_output.key;
+    let history = session.native_conversation.as_mut().unwrap();
+    history
+        .entries
+        .push(json!({"type":"message","id":"durable","message":final_message}));
+    history.leaf_id = Some("durable".into());
+    session
+        .native_reading_identities
+        .push(NativeMessageReadingIdentity {
+            stream_id: "stream-one".into(),
+            entry_id: "durable".into(),
+        });
+    let settled = TranscriptSnapshot::read(&scope, &session).unwrap();
+    let doc = TranscriptDocument::read(&settled).unwrap();
+    assert_eq!(doc.sections[0].outputs.len(), 1);
+    let output = &doc.sections[0].outputs[0];
+    assert_eq!(output.key, TranscriptMessageKey::NativeEntry("durable"));
+    assert_eq!(output.reconciliation_key(), Some(stream_key));
+    session.native_events.clear();
+    session.native_reading_identities.clear();
+    let restored = TranscriptSnapshot::read(&scope, &session).unwrap();
+    let doc = TranscriptDocument::read(&restored).unwrap();
+    assert_eq!(
+        doc.sections[0].outputs[0].key,
+        TranscriptMessageKey::NativeEntry("durable")
+    );
+    assert_eq!(doc.sections[0].outputs[0].reconciliation_key(), None);
+}

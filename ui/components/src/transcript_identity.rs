@@ -4,6 +4,7 @@ use tekes_agent_presentation::TranscriptMessageKey;
 pub enum TranscriptMessageIdentity {
     Submission(String),
     NativeEntry(String),
+    Stream(String),
     /// A journal item or temporary preview. Not proof of a durable native anchor.
     Item(String),
 }
@@ -12,6 +13,7 @@ impl From<TranscriptMessageKey<'_>> for TranscriptMessageIdentity {
         match value {
             TranscriptMessageKey::Submission(id) => Self::Submission(id.into()),
             TranscriptMessageKey::NativeEntry(id) => Self::NativeEntry(id.into()),
+            TranscriptMessageKey::Stream(id) => Self::Stream(id.into()),
             TranscriptMessageKey::Item(id) => Self::Item(id.into()),
         }
     }
