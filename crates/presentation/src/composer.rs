@@ -327,6 +327,11 @@ pub struct RunSnapshot {
     /// denotes a legacy unversioned serialized snapshot, not a UI arrival clock.
     #[serde(default)]
     pub revision: u64,
+    /// Authority epoch read atomically with this publication's connection/run facts.
+    /// Zero is the legacy default; consumers must not replace it with a separately
+    /// sampled runtime epoch while retaining this snapshot's revision/content.
+    #[serde(default)]
+    pub connection_epoch: u64,
     pub selection: Option<SelectionToken>,
     pub connection: ConnectionPresentation,
     pub run: Option<RunPresentation>,
@@ -905,6 +910,7 @@ impl PresentationStore {
         let revision = self.next_snapshot_revision();
         Ok(RunSnapshot {
             revision,
+            connection_epoch: authority.connection_epoch,
             selection: self.selection(),
             connection: connection.clone(),
             run: run.clone(),

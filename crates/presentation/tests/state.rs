@@ -854,3 +854,27 @@ fn attachment_facts_are_backward_compatible_and_never_enter_prompt() {
     };
     assert_eq!(content, vec![json!({"type":"file","receiptId":"receipt"})]);
 }
+
+#[test]
+fn run_publication_retains_its_own_authority_epoch_across_reconnect_and_legacy_decode() {
+    let mut authority = authority();
+    authority.connection_epoch = 7;
+    let mut store = PresentationStore::default();
+    store.select(destination("a")).unwrap();
+    let old = store.refresh(&authority).unwrap();
+    authority.connection_epoch = 8;
+    authority.connection = ConnectionState::Connecting;
+    let next = store.refresh(&authority).unwrap();
+    assert!(next.revision > old.revision);
+    assert_eq!(old.connection_epoch, 7);
+    assert_eq!(next.connection_epoch, 8);
+    assert_eq!(next.connection.phase, ConnectionPhase::Reconnecting);
+    let mut legacy = serde_json::to_value(old).unwrap();
+    legacy.as_object_mut().unwrap().remove("connectionEpoch");
+    assert_eq!(
+        serde_json::from_value::<RunSnapshot>(legacy)
+            .unwrap()
+            .connection_epoch,
+        0
+    );
+}

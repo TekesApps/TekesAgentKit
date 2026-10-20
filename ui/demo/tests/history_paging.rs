@@ -119,6 +119,13 @@ async fn old_epoch_drop_cannot_clear_a_new_request_and_expired_capture_does_no_r
     let old = a.begin_history_page().unwrap();
     runtime.reconnect().await.unwrap();
     assert!(!a.history_page_state().is_current);
+    assert!(a.history_page_state().source_ready);
+    assert_eq!(
+        a.history_page_state()
+            .controls(&a.current_run().unwrap().transcript, true)
+            .read,
+        tekes_agent_components_ui::TranscriptPageRead::Idle
+    );
     let fresh = a.begin_history_page().unwrap();
     drop(old);
     assert_eq!(a.history_page_state().phase, HistoryPagePhase::Loading);
@@ -151,5 +158,44 @@ async fn retiring_a_child_pointer_revokes_a_captured_read_without_rpc() {
     assert!(request.load().await.is_err());
     assert!(!child.binding().history_page_state().is_current);
     assert_eq!(fixture.history_page_calls(), 0);
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn public_paging_button_captures_before_navigation_and_disables_duplicate_activation() {
+    use tekes_agent_ui_demo::component_demo::{ComponentDemo, DemoCommand, SELECT_B};
+    use tekes_ui_controls::composition::AccessibilityAction;
+    let gate = Arc::new(tokio::sync::Semaphore::new(0));
+    let (runtime, a, b) = setup(Fixture::default().with_history_page_gate(gate.clone())).await;
+    let mut view = ComponentDemo::new([a.clone(), b.clone()]).unwrap();
+    let button = view.history_page_button().unwrap();
+    let commands = view
+        .accessibility_action(button, None, AccessibilityAction::Press)
+        .unwrap();
+    let mut requests = commands.into_iter().filter_map(|command| match command {
+        DemoCommand::ReadHistoryPage(request) => Some(request),
+        _ => None,
+    });
+    let request = requests.next().expect("public paging action");
+    assert!(requests.next().is_none());
+    assert_eq!(request.scope(), a.scope());
+    assert_eq!(a.history_page_state().phase, HistoryPagePhase::Loading);
+    assert!(
+        view.accessibility_action(button, None, AccessibilityAction::Press)
+            .unwrap()
+            .is_empty()
+    );
+    view.accessibility_action(SELECT_B, None, AccessibilityAction::Press)
+        .unwrap();
+    let read = tokio::spawn(request.load());
+    gate.add_permits(1);
+    assert!(read.await.unwrap().unwrap());
+    view.sync().unwrap();
+    assert_eq!(view.selected(), 1);
+    assert_eq!(
+        a.history_page_state().phase,
+        HistoryPagePhase::Loaded { extended: true }
+    );
+    assert_eq!(b.history_page_state().phase, HistoryPagePhase::Idle);
     runtime.stop().await.unwrap();
 }

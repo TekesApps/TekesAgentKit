@@ -561,3 +561,51 @@ pub async fn read_history_page(
 ) -> Result<bool, String> {
     request.load().await.map_err(|error| error.to_string())
 }
+
+/// Mount a history entrance with the original binding's facts. No RunSurface or
+/// private demo types are required. Custom child sources pass false here.
+pub fn history_controls(
+    namespace: u32,
+    binding: &tekes_agent_ui_bindings::RunBinding,
+    transcript: &tekes_agent_components_ui::TranscriptSnapshot,
+    supports_pagination: bool,
+) -> tekes_agent_components_ui::TranscriptPaging {
+    let mut control = tekes_agent_components_ui::TranscriptPaging::new(
+        namespace,
+        binding.scope().clone(),
+        Default::default(),
+    );
+    control
+        .update(
+            binding
+                .history_page_state()
+                .controls(transcript, supports_pagination),
+        )
+        .expect("same binding");
+    control
+}
+
+#[test]
+fn independent_host_mounts_default_paging_controls_without_a_run_surface() {
+    use tekes_agent_components_ui::{
+        RunScope, TranscriptPageRead, TranscriptPaging, TranscriptPagingFacts,
+    };
+    let mut control = TranscriptPaging::new(
+        134,
+        RunScope::main("endpoint", "session"),
+        Default::default(),
+    );
+    control
+        .update(TranscriptPagingFacts {
+            scope: RunScope::main("endpoint", "session"),
+            supported: true,
+            has_more_before: true,
+            is_stale: false,
+            source_ready: true,
+            read: TranscriptPageRead::Idle,
+        })
+        .unwrap();
+    let button = control.button_id();
+    let host = control.into_host().unwrap();
+    assert!(host.get(button).is_some());
+}

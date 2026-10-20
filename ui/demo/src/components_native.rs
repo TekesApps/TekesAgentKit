@@ -91,6 +91,7 @@ struct Host {
     annotation_stage: u8,
 }
 enum HostResult {
+    HistoryPageCompleted,
     Actionable {
         ids: tekes_agent_components_ui::ComposerIds,
         intent: tekes_agent_components_ui::ActionableResponseIntent,
@@ -264,6 +265,12 @@ impl Host {
             };
             self.executor.spawn(async move {
                 let special = match command {
+                    DemoCommand::ReadHistoryPage(request) => {
+                        // Success and failure are published only on the original
+                        // binding, never as a global error on the selected pane.
+                        let _ = request.load().await;
+                        HostResult::HistoryPageCompleted
+                    }
                     DemoCommand::RespondActionable {
                         request,
                         ids,
@@ -567,6 +574,7 @@ impl Host {
                                 ))
                             }
                             DemoCommand::RespondActionable { .. }
+                            | DemoCommand::ReadHistoryPage(_)
                             | DemoCommand::ReadFilePreview { .. }
                             | DemoCommand::SelectFiles { .. }
                             | DemoCommand::Sidebar(_)
@@ -836,7 +844,7 @@ impl Host {
                         Err(error) => self.failure(error.to_string()),
                     }
                 }
-                HostResult::Operation(Ok(())) => {}
+                HostResult::Operation(Ok(())) | HostResult::HistoryPageCompleted => {}
             }
         }
         let source = self.sidebar.snapshot();

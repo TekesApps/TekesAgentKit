@@ -156,4 +156,4 @@ SidePanel 附件共享相同选择/上传/状态组件，按原 binding/request 
 
 `TranscriptItem.content_blocks` 规范化公开消息内部的 Text/Reasoning/ToolCall/Attachment/Unknown；None 明确保留聚合/旧内容覆盖状态。第二 consumer 直接读取覆盖与待解析工具引用，见 [内容块契约](../docs/rust-agent-ui-transcript-content-20261020.md)。
 
-`--components --history-page-proof --offscreen <PNG>` 验证原 A 分页、B 草稿隔离与源回执发布，不是正式分页视图或锚点验收。公共接口见 [分页读取契约](../docs/rust-agent-ui-history-paging-20261020.md)。
+`--components --history-page-proof --offscreen <PNG>` 从公开 TranscriptPaging 按钮捕获原 A 的读取请求，验证 B 草稿隔离、源回执发布和新 epoch 历史保留，不是正式 Transcript 或阅读锚点验收。真实三端脚本加 `--ui-components --ui-history-pages` 可在隔离长会话上复验。公共接口见 [分页读取契约](../docs/rust-agent-ui-history-paging-20261020.md) 和 [分页控件](../docs/rust-agent-ui-paging-controls-20261020.md)。

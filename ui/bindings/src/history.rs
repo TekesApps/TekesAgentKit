@@ -24,10 +24,41 @@ pub struct HistoryPageSnapshot {
     pub revision: u64,
     pub connection_epoch: u64,
     pub request_epoch: Option<u64>,
+    /// Current pointer and transport can accept a new read, even when an old
+    /// request receipt belongs to a previous epoch. Loading is gated separately.
+    pub source_ready: bool,
     /// Also observe the binding's runtime/pointer publications. A disconnected or
     /// expired receipt must not drive another pane's loading/error indicator.
     pub is_current: bool,
     pub phase: HistoryPagePhase,
+}
+impl HistoryPageSnapshot {
+    /// Pair with the canonical transcript from this same binding/publication.
+    /// Custom child sources must pass supports_pagination=false. This is display
+    /// input, not an authority token; begin_history_page validates dispatch again.
+    pub fn controls(
+        &self,
+        transcript: &tekes_agent_presentation::TranscriptSnapshot,
+        supports_pagination: bool,
+    ) -> tekes_agent_components_ui::TranscriptPagingFacts {
+        use tekes_agent_components_ui::{TranscriptPageRead, TranscriptPagingFacts};
+        TranscriptPagingFacts {
+            scope: self.scope.clone(),
+            supported: supports_pagination,
+            has_more_before: transcript.has_more_before,
+            is_stale: transcript.is_stale,
+            source_ready: self.source_ready,
+            read: match &self.phase {
+                _ if !self.is_current => TranscriptPageRead::Idle,
+                HistoryPagePhase::Idle | HistoryPagePhase::Loaded { .. } => {
+                    TranscriptPageRead::Idle
+                }
+                HistoryPagePhase::Loading => TranscriptPageRead::Loading,
+                HistoryPagePhase::Failed { message } => TranscriptPageRead::Failed(message.clone()),
+                HistoryPagePhase::Interrupted => TranscriptPageRead::Interrupted,
+            },
+        }
+    }
 }
 struct PageState {
     revision: u64,
@@ -107,14 +138,14 @@ impl RunBinding {
             .runtime
             .inspect(|store| (store.connection_epoch, store.ready()));
         let state = self.history_pages.state.lock().unwrap();
+        let source_ready = ready && self.access() != PaneAccess::Missing;
         HistoryPageSnapshot {
             scope: self.scope.clone(),
             revision: state.revision,
             connection_epoch: epoch,
             request_epoch: state.epoch,
-            is_current: ready
-                && self.access() != PaneAccess::Missing
-                && state.epoch.is_none_or(|captured| captured == epoch),
+            source_ready,
+            is_current: source_ready && state.epoch.is_none_or(|captured| captured == epoch),
             phase: state.phase.clone(),
         }
     }

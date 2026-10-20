@@ -63,6 +63,7 @@ mod uploads;
 use file_preview::FilePreviewGesture;
 use uploads::UploadGesture;
 pub enum DemoCommand {
+    ReadHistoryPage(tekes_agent_ui_bindings::HistoryPageRequest),
     RespondActionable {
         request: Arc<tekes_agent_ui_bindings::ActionableResponseRequest>,
         ids: ComposerIds,
@@ -282,7 +283,7 @@ impl ComponentDemo {
                 }),
             "demo needs distinct run sources",
         )?;
-        let pair = Self::new_pair(0);
+        let pair = Self::new_pair(0, bindings[0].scope());
         let rename = ThreadRename::new(RENAME_NAMESPACE, RenameLabels::default());
         let choices = ComposerChoices::new(CHOICES_NAMESPACE, Default::default());
         let reasoning = ComposerChoices::new(REASONING_NAMESPACE, Default::default());
@@ -440,11 +441,11 @@ impl ComponentDemo {
         view.sync()?;
         Ok(view)
     }
-    fn new_pair(index: usize) -> Content {
+    fn new_pair(index: usize, scope: &RunScope) -> Content {
         let ids = Self::ids_for(index);
-        Self::run_controls(ids)
+        Self::run_controls(ids, scope)
     }
-    fn run_controls(ids: ComposerIds) -> Content {
+    fn run_controls(ids: ComposerIds, scope: &RunScope) -> Content {
         let mut composer = Composer::new(ids)
             .with_context(1_000_000 + (ids.root.0 >> 32) as u32, Default::default())
             .expect("separate draft context namespace");
@@ -463,6 +464,14 @@ impl ComponentDemo {
                 children: vec![
                     Content::new(ComponentId(ids.root.0 + 17), Indicators::default()),
                     Content::new(
+                        Self::paging_id(ids),
+                        tekes_agent_components_ui::TranscriptPaging::new(
+                            4_000_000 + (ids.root.0 >> 32) as u32,
+                            scope.clone(),
+                            Default::default(),
+                        ),
+                    ),
+                    Content::new(
                         Self::actionable_id(ids),
                         tekes_agent_components_ui::ActionableCard::new(
                             3_000_000 + (ids.root.0 >> 32) as u32,
@@ -476,6 +485,36 @@ impl ComponentDemo {
     }
     fn actionable_id(ids: ComposerIds) -> ComponentId {
         ComponentId((3_000_000 + (ids.root.0 >> 32)) << 32)
+    }
+    fn paging_id(ids: ComposerIds) -> ComponentId {
+        ComponentId((4_000_000 + (ids.root.0 >> 32)) << 32)
+    }
+    pub fn history_page_button(&self) -> Option<ComponentId> {
+        self.tree
+            .get(Self::paging_id(self.ids()))?
+            .component::<tekes_agent_components_ui::TranscriptPaging>()
+            .map(tekes_agent_components_ui::TranscriptPaging::button_id)
+    }
+    fn sync_paging(&mut self, ids: ComposerIds, binding: &Arc<RunBinding>) -> Result<()> {
+        let snapshot = binding
+            .current_run()
+            .ok_or_else(|| unsupported("paging run missing"))?;
+        let supported = self
+            .child_panes
+            .values()
+            .find(|pane| Arc::ptr_eq(pane.source.binding(), binding))
+            .is_none_or(|pane| pane.source.supports_pagination());
+        self.tree
+            .get_mut(Self::paging_id(ids))
+            .expect("paging control")
+            .component_mut::<tekes_agent_components_ui::TranscriptPaging>()
+            .unwrap()
+            .update(
+                binding
+                    .history_page_state()
+                    .controls(&snapshot.transcript, supported),
+            )
+            .map_err(unsupported)
     }
     fn sync_actionable(&mut self, ids: ComposerIds, binding: &Arc<RunBinding>) -> Result<()> {
         let snapshot = binding
@@ -493,9 +532,7 @@ impl ComponentDemo {
                 .map(Arc::new)
             })
             .transpose()?;
-        let epoch = binding
-            .subscribe_runtime()
-            .inspect(|store| store.connection_epoch);
+        let epoch = snapshot.connection_epoch;
         let controls = !self.composing() && binding.access() == PaneAccess::Ready;
         self.tree
             .get_mut(Self::actionable_id(ids))
@@ -1941,6 +1978,7 @@ impl ComponentDemo {
             .update(&snapshot)
             .map_err(unsupported)?;
         self.sync_actionable(ids, &binding)?;
+        self.sync_paging(ids, &binding)?;
         for (index, id) in [SELECT_A, SELECT_B].into_iter().enumerate() {
             let composing = self.composing();
             let button = &mut self
@@ -2286,7 +2324,7 @@ impl ComponentDemo {
                 .content_token(&kind)
                 .ok_or_else(|| unsupported("pane content source unavailable"))?;
             panel
-                .install_content(&token, Self::run_controls(ids))
+                .install_content(&token, Self::run_controls(ids, binding.scope()))
                 .map_err(unsupported)?;
         }
         self.tree
@@ -2327,6 +2365,7 @@ impl ComponentDemo {
             .update(&snapshot)
             .map_err(unsupported)?;
         self.sync_actionable(ids, &binding)?;
+        self.sync_paging(ids, &binding)?;
         Ok(())
     }
     fn composer_labels(snapshot: &tekes_agent_presentation::RunSnapshot) -> ComposerLabels {
@@ -2386,7 +2425,7 @@ impl ComponentDemo {
         );
         let content = self.retained[index]
             .take()
-            .unwrap_or_else(|| Self::new_pair(index));
+            .unwrap_or_else(|| Self::new_pair(index, self.bindings[index].scope()));
         self.tree
             .insert(MAIN, content)
             .map_err(|_| unsupported("restore component pair"))?;
@@ -2536,6 +2575,19 @@ impl ComponentDemo {
         let mut commands = vec![];
         if !self.composing() {
             for (ids, binding) in actionable_sources {
+                if self
+                    .tree
+                    .get(Self::paging_id(ids))
+                    .unwrap()
+                    .component::<tekes_agent_components_ui::TranscriptPaging>()
+                    .unwrap()
+                    .activation(&actions)
+                    .is_some_and(|scope| scope == binding.scope())
+                {
+                    let request = binding.begin_history_page()?;
+                    self.sync_paging(ids, &binding)?;
+                    commands.push(DemoCommand::ReadHistoryPage(request));
+                }
                 let intents = self
                     .tree
                     .get_mut(Self::actionable_id(ids))

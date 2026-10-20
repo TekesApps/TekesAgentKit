@@ -1,5 +1,5 @@
 //! Real SEP/page facade proof; no scrolling or reading-anchor implementation.
-use crate::component_demo::{ComponentDemo, SELECT_A, SELECT_B};
+use crate::component_demo::{ComponentDemo, DemoCommand, SELECT_A, SELECT_B};
 use serde_json::{Value, json};
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
 use tekes_agent_contract::{Error, Result, require, unsupported};
@@ -101,7 +101,21 @@ pub async fn run(view: &mut ComponentDemo, runtime: &Arc<SessionRuntime>) -> Res
     let mut updates = a
         .subscribe_run()
         .ok_or_else(|| unsupported("page source not observable"))?;
-    let request = a.begin_history_page()?;
+    view.sync()?;
+    let button = view
+        .history_page_button()
+        .ok_or_else(|| unsupported("paging control not mounted"))?;
+    let mut requests = view
+        .accessibility_action(button, None, AccessibilityAction::Press)?
+        .into_iter()
+        .filter_map(|command| match command {
+            DemoCommand::ReadHistoryPage(request) => Some(request),
+            _ => None,
+        });
+    let request = requests
+        .next()
+        .ok_or_else(|| unsupported("paging control did not activate"))?;
+    require(requests.next().is_none(), "duplicate paging activation")?;
     require(
         a.history_page_state().phase == HistoryPagePhase::Loading,
         "missing page loading receipt",

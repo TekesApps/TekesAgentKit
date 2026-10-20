@@ -20,6 +20,7 @@ mod summary;
 mod thread_rename;
 pub use thread_rename::*;
 mod transcript;
+mod transcript_paging;
 pub use composer::*;
 pub use indicators::*;
 pub use side_panel::*;
@@ -35,6 +36,7 @@ use tekes_ui_controls::{
 };
 use tekes_ui_scene::{Rect, Scene};
 use tekes_ui_tokens::{Palette, Spacing};
+pub use transcript_paging::*;
 
 pub const ROOT: ComponentId = ComponentId(1);
 pub const STATUS: ComponentId = ComponentId(2);
