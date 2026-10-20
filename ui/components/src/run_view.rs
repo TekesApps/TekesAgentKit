@@ -42,6 +42,7 @@ pub struct RunView {
     last: Option<RunSnapshot>,
     gate: ComposerControlGate,
     label: String,
+    column: RunColumnLayout,
 }
 impl RunView {
     /// Four consecutive namespaces for controls/paging/actionables/transcript;
@@ -123,6 +124,7 @@ impl RunView {
             last: None,
             gate: ComposerControlGate::CLOSED,
             label: "Agent Run".into(),
+            column: Default::default(),
             body: StackContent {
                 model: Stack {
                     axis: Axis::Vertical,
@@ -137,6 +139,16 @@ impl RunView {
                 ],
             },
         })
+    }
+    /// Change pane layout without replacing the Transcript, Composer, selection
+    /// or operation receipts. Invalid host input leaves the previous policy intact.
+    pub fn set_column_layout(&mut self, column: RunColumnLayout) -> Result<(), &'static str> {
+        column.validate()?;
+        self.column = column;
+        Ok(())
+    }
+    pub fn column_layout(&self) -> RunColumnLayout {
+        self.column
     }
     pub fn set_label(&mut self, label: impl Into<String>) {
         self.label = label.into();
@@ -514,10 +526,14 @@ impl Component for RunView {
         Some(&mut self.body.children)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
-        self.body.measure(text, available)
+        let column = self
+            .column
+            .frame(Rect::new(0., 0., available.width, available.height));
+        let measured = self.body.measure(text, column.size);
+        MeasuredChild::new(Size::new(available.width, measured.size.height))
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
-        self.body.arrange(text, frame, clip);
+        self.body.arrange(text, self.column.frame(frame), clip);
     }
     fn semantics(&self) -> ContentSemantics {
         ContentSemantics::new(ContentRole::Group, &self.label)

@@ -17,6 +17,8 @@
 
 [独立阅读事务候选联调](../docs/rust-agent-ui-reading-candidate-20261020.md)提供正式 Transcript 的预检行 ID API 和显式隔离回放命令；不替换默认 pin，尚未接入完整 RunView 或完成原生阅读验收。
 
+正式 RunView 的 [共享会话列](../docs/rust-agent-ui-column-layout-20261020.md)使用公开 `RunColumnLayout` 配置限宽、全宽或子 pane 边距，改布局不替换原组件。
+
 可选的[系统拼音软件探针](../docs/rust-agent-ui-system-ime-20261020.md)使用 `python3 scripts/test-system-ime.py --demo ui/target/debug/tekes-agent-ui-demo`（在仓库根目录执行）。它要求当前已选简体拼音和已有事件权限，不改变输入源，只向自己启动的 fixture 进程发送键码；通过真实 marked text、发送/导航屏障、确认和单次提交检查。实体键盘、候选窗视觉和完整 IME 验收仍未完成。
 
 Composer 已接入输入/草稿/发送/取消、公开模型目录与发送前配置、初始预设/自动创建、内容卡片移除和已有批注评论编辑。Main 已接入真实 macOS 文件选择和公共上传状态；三端公开上传→草稿→发送→历史/重连已验证，Native/Pi 另验证通用文件字节读取，DSH 暂无通用文件下载。SidePanel 选择器已接入任务、独立子代理和 SideChat；预览/持久化对账、选区批注捕获/来源高亮、内容移除 undo 和其余能力入口仍待适配。模型、创建和评论编辑的证据分别见 [模型闭环](../docs/rust-agent-ui-model-integration-20261019.md)、[新会话](../docs/rust-agent-ui-creation-20261020.md)、[评论编辑](../docs/rust-agent-ui-annotation-editor-20261020.md)。

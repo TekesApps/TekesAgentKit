@@ -3,6 +3,8 @@ mod feedback;
 pub use feedback::*;
 mod readonly_transcript;
 pub use readonly_transcript::*;
+mod run_column;
+pub use run_column::*;
 mod run_view;
 pub use run_view::*;
 mod actionable;

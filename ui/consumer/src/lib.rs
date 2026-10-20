@@ -1276,3 +1276,49 @@ fn independent_host_prepares_reading_items_before_committing_shared_content() {
     assert!(content.apply_prepared_update(&plan).is_err());
     assert_eq!(content.row_id(&next.rows()[0].0), Some(items[0]));
 }
+
+#[test]
+fn independent_host_configures_pane_columns_without_a_private_run_surface() {
+    use tekes_agent_components_ui::{RunColumnLayout, RunScope, RunView};
+    let mut first = RunView::standard(1300, 1304..1350, RunScope::main("consumer", "A")).unwrap();
+    let second = RunView::standard(1400, 1404..1450, RunScope::main("consumer", "B")).unwrap();
+    let column = RunColumnLayout::Insets {
+        leading: 0.15,
+        trailing: 0.08,
+    };
+    first.set_column_layout(column).unwrap();
+    let composer = first.composer().ids();
+    let transcript = first.transcript_id();
+    let first_id = first.ids().root;
+    let mut host = first.into_host().unwrap();
+    let run = host
+        .get_mut(first_id)
+        .unwrap()
+        .component_mut::<RunView>()
+        .unwrap();
+    assert_eq!(run.column_layout(), column);
+    for invalid in [
+        RunColumnLayout::Reading {
+            maximum_width: f32::NAN,
+        },
+        RunColumnLayout::Insets {
+            leading: f32::INFINITY,
+            trailing: 0.,
+        },
+        RunColumnLayout::Insets {
+            leading: -0.1,
+            trailing: 0.,
+        },
+        RunColumnLayout::Insets {
+            leading: 0.46,
+            trailing: 0.,
+        },
+    ] {
+        assert!(run.set_column_layout(invalid).is_err());
+        assert_eq!(run.column_layout(), column);
+    }
+    run.set_column_layout(RunColumnLayout::FullWidth).unwrap();
+    assert_eq!(run.composer().ids(), composer);
+    assert_eq!(run.transcript_id(), transcript);
+    assert_eq!(second.column_layout(), RunColumnLayout::default());
+}

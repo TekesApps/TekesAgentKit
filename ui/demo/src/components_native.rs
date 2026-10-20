@@ -3590,9 +3590,6 @@ fn context_script(view: &ComponentDemo) {
         }
     };
     let mut script = vec![];
-    if let Ok(path) = std::env::var("AGENT_CONTEXT_CAPTURE") {
-        script.push((100, Action::Capture { path }));
-    }
     script.extend([
         (200, click(ids.editor)),
         (300, Action::TextCommand("selectAll:")),
@@ -3624,6 +3621,12 @@ fn context_script(view: &ComponentDemo) {
         (1600, click(remove)),
         (15000, Action::Close),
     ]);
+    if let Ok(path) = std::env::var("AGENT_CONTEXT_CAPTURE") {
+        // Capture after the actual native marked-text assertions, not before
+        // activation/first presentation. Keep every interaction/assertion time.
+        script.push((1200, Action::Capture { path }));
+        script.sort_by_key(|(time, _)| *time);
+    }
     run_script(script);
 }
 /// Opt-in integration probe. The caller must verify the active macOS Simplified

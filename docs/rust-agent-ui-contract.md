@@ -36,6 +36,10 @@ AgentKit 定义业务结构、展示语义、组件组合、组件输入及回�
 
 [RunView/Composer context 预检修复](rust-agent-ui-context-preflight-20261020.md)防止卡片拒绝后正文部分安装，已通过完整 UI 及正式组件树原生 fixture 专项。完整受控编辑器与阅读事务的可组合预检交由 [TekesUI #26](https://github.com/TekesApps/TekesUI/issues/26)，已有精确公开 API 复现；未在消费侧复制通用校验。
 
+[共享会话列](rust-agent-ui-column-layout-20261020.md)现已接入正式 RunView，提供居中限宽/全宽/非对称边距并保留编辑器和消息身份；完整叠层和回合 rail 仍未完成。
+
+[#26 新隔离候选](tekesui-controlled-preflight-candidate-20261020.md)已通过接收方463输入核验、388 controls/168 consumer/严格 Clippy/48场景192帧回放；尚非正式 AgentKit RunView 或原生阅读接入，也不替换默认公开 pin。
+
 ## Composer（首批实现）
 
 `Composer` 实现 TekesUI `Component`，通过 `Content::new(ids.root, composer)` 放入任意公共 ContentHost，也可 `composer.into_host()` 独立挂载。`ComposerIds::new(base)` 占用连续 8 个 ID，宿主保证其与其他子树不冲突。可在一个窗口内用不同 ID 段挂载多个 Composer。
