@@ -1044,3 +1044,83 @@ async fn overlay_clearance_keeps_the_final_row_visible_at_the_library_scroll_lim
     );
     runtime.stop().await.unwrap();
 }
+
+#[test]
+fn summary_usage_columns_keep_values_on_right_and_long_titles_clear_at_library_scales() {
+    use tekes_ui_controls::composition::TextContent;
+    use tekes_ui_tokens::Spacing;
+    for scale in [0.85, 1., 1.5, 2.] {
+        for width in [96., 240., 420.] {
+            for theme in [Theme::LIGHT, Theme::DARK] {
+                let scope = RunScope::main("native", "usage-layout");
+                let mut view = SummaryView::new(
+                    30999,
+                    SummaryLabels {
+                        usage_row: |row| {
+                            let mut text = SummaryUsageRowText::read(row);
+                            text.title = "中文标题 English 👩🏽‍💻 e\u{301} ".repeat(12);
+                            text
+                        },
+                        ..Default::default()
+                    },
+                );
+                view.update(&SummaryInput {
+                    revision: 1,
+                    scope: scope.clone(),
+                    facts: Some(SummaryFacts {
+                        scope,
+                        tasks: vec![],
+                        subagents: vec![],
+                        artifacts: vec![],
+                        usage: Some(SummaryUsage {
+                            input_tokens: 0,
+                            cached_input_tokens: 0,
+                            cache_creation_input_tokens: 0,
+                            output_tokens: 1234,
+                            cost_usd: None,
+                            is_cost_complete: false,
+                        }),
+                    }),
+                    host_sections: vec![],
+                })
+                .unwrap();
+                let ids = view.usage_row_ids("output").unwrap();
+                let mut host = view.into_host().unwrap();
+                let fonts = CoreTextFonts::new();
+                let mut text = Text(CoreTextShaper::new(fonts), scale);
+                let frame = Rect::new(17., 23., width, 4000.);
+                host.render(&mut Scene::default(), &mut text, frame, frame, theme.into())
+                    .unwrap();
+                let row = host.get(ids.row).unwrap().frame();
+                let title = host.get(ids.title).unwrap().frame();
+                let value = host.get(ids.value).unwrap().frame();
+                assert!((title.min_x() - row.min_x() - Spacing::Regular.value()).abs() < 0.1);
+                assert!((value.max_x() - row.max_x() + Spacing::Regular.value()).abs() < 0.1);
+                assert!(
+                    title.max_x() <= value.min_x(),
+                    "overlapping columns: {scale}/{width}"
+                );
+                let line = text.measure("Mg", proposal::TextRole::UiBody, width).height;
+                assert!(value.min_y() >= title.min_y());
+                assert!(value.min_y() <= title.min_y() + line);
+                assert!(
+                    title.size.height > line,
+                    "fixture must wrap {scale}/{width}: title={title:?} value={value:?} line={line}"
+                );
+                assert_eq!(
+                    host.get(ids.value)
+                        .unwrap()
+                        .component::<TextContent>()
+                        .unwrap()
+                        .role,
+                    proposal::TextRole::UiCaption
+                );
+                assert!(
+                    host.semantics()
+                        .iter()
+                        .any(|node| node.id == ids.title && node.semantics.name.contains("👩🏽‍💻"))
+                );
+            }
+        }
+    }
+}

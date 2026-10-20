@@ -65,6 +65,7 @@ pub struct Fixture {
     parent_available: Arc<AtomicBool>,
     catalog_fails: Arc<AtomicBool>,
     lifecycle: bool,
+    summary_usage: bool,
     pending_actionables: Arc<Mutex<BTreeMap<String, Value>>>,
     actionable_sender: broadcast::Sender<Value>,
     responses: Arc<Mutex<Vec<Value>>>,
@@ -189,6 +190,7 @@ impl Default for Fixture {
             parent_available: Arc::new(AtomicBool::new(true)),
             catalog_fails: Arc::new(AtomicBool::new(false)),
             lifecycle: false,
+            summary_usage: false,
             pending_actionables: Arc::new(Mutex::new(BTreeMap::new())),
             actionable_sender: broadcast::channel(256).0,
             responses: Arc::new(Mutex::new(vec![])),
@@ -485,6 +487,12 @@ impl Fixture {
         self.side_chats = true;
         self
     }
+    /// Opt-in synthetic usage delivered via public control projections. No model
+    /// call or inferred usage; ordinary and configured harness demos are untouched.
+    pub fn with_summary_usage(mut self) -> Self {
+        self.summary_usage = true;
+        self
+    }
     /// Explicit owned demo data, emitted through the same journal contract.
     pub fn with_demo_summary(self) -> Self {
         {
@@ -628,7 +636,16 @@ impl SessionEndpoint for Endpoint {
                 return Ok(inventory_stream(baseline, receiver, g.clone()));
             }
             StreamTarget::SessionControl => {
-                json!({"type":"baseline","generation":g,"snapshot":{"queues":[],"jobs":[],"projections":[]}})
+                let projections: Vec<Value> = if self.fixture.summary_usage {
+                    self.fixture.sessions.lock().unwrap().iter().map(|(id, line)| {
+                        json!({"sessionId":id,"projections":{"asOfSeq":line.rows.len() as i64 - 1,
+                            "values":{"tokenUsage":{"uncachedInputTokens":2000,"cacheReadTokens":1000,
+                                "cacheWriteTokens":0,"outputTokens":1234}}}})
+                    }).collect()
+                } else {
+                    vec![]
+                };
+                json!({"type":"baseline","generation":g,"snapshot":{"queues":[],"jobs":[],"projections":projections}})
             }
             StreamTarget::Actionables => {
                 let pending = self.fixture.pending_actionables.lock().unwrap();

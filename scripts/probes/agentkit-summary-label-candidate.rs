@@ -143,7 +143,9 @@ fn render(
     width: f32,
     dark: bool,
 ) -> Result<(), CompositionError> {
-    let frame = Rect::new(0., 0., width, 640.);
+    // Give the actual rows enough document space; viewport/reading tests are
+    // independently retained below through the unchanged regression modules.
+    let frame = Rect::new(0., 0., width, 100_000.);
     host.render(
         &mut Scene::new(),
         text,
@@ -153,7 +155,7 @@ fn render(
     )
 }
 #[test]
-fn retained_summary_rows_use_library_single_line_layout_without_changing_models_names_or_actions() {
+fn summary_header_is_single_line_while_original_rows_wrap_and_keep_names_and_actions() {
     let sources = [
         "很长的中文任务与分支标题".repeat(30),
         "very long English task and branch title ".repeat(30),
@@ -180,17 +182,17 @@ fn retained_summary_rows_use_library_single_line_layout_without_changing_models_
                 for dark in [false, true] {
                     text.labels.clear();
                     render(&mut host, &mut text, width, dark).unwrap();
-                    let labels: Vec<_> =
-                        text.labels.iter().filter(|p| p.source() == title).collect();
                     assert!(
-                        !labels.is_empty(),
-                        "actual Summary never requested the public label service"
+                        text.labels.iter().all(|p| p.source() != title),
+                        "ordinary Summary rows must not opt into the header's single-line policy"
                     );
-                    assert!(
-                        labels
-                            .iter()
-                            .all(|p| p.paragraph().lines.len() == 1 && p.is_truncated())
-                    );
+                    for id in [passive, action] {
+                        assert!(
+                            host.get(id).unwrap().frame().size.height
+                                > 2. * proposal::TextRole::UiBody.style().line_height * scale,
+                            "the long original row title must wrap"
+                        );
+                    }
                     assert_eq!(
                         host.get(passive)
                             .unwrap()

@@ -2516,6 +2516,11 @@ pub fn run() {
                     .with_lifecycle()
                     .with_presets(false)
                     .with_models();
+                let fixture = if summary_sections_selftest {
+                    fixture.with_summary_usage()
+                } else {
+                    fixture
+                };
                 let fixture = if sidebar_query_selftest {
                     let fixture = fixture.with_session_search();
                     fixture.set_search_failure(true);

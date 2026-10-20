@@ -1,5 +1,6 @@
 //! Agent summary UI. Membership, totals, costs and domain actions come from SummaryFacts.
 use crate::summary_section::{Expansion, SummaryDocument, SummarySectionView};
+use crate::summary_usage::{SummaryUsageRow, SummaryUsageRowIds, SummaryUsageRowText};
 use std::collections::{BTreeMap, BTreeSet};
 use std::{cell::RefCell, rc::Rc};
 use tekes_agent_presentation::{RunScope, append_summary_sections};
@@ -30,6 +31,9 @@ pub struct SummaryLabels {
     pub empty: String,
     pub section: fn(&str) -> String,
     pub row: fn(&str, &SummaryRow) -> String,
+    /// Usage uses distinct title/value slots, as in ClientKit. Product localization
+    /// formats these facts; it must not recompute usage or infer missing costs.
+    pub usage_row: fn(&SummaryRow) -> SummaryUsageRowText,
 }
 impl Default for SummaryLabels {
     fn default() -> Self {
@@ -48,6 +52,7 @@ impl Default for SummaryLabels {
                 }
                 .into()
             },
+            usage_row: SummaryUsageRowText::read,
             row: |section, row| {
                 if row.value.is_null() {
                     if section == "usage" {
@@ -76,6 +81,8 @@ enum Key {
     HeaderLabel(RunScope, String),
     Body(RunScope, String),
     Row(RunScope, String, String, ActionIdentity),
+    UsageTitle(RunScope, String),
+    UsageValue(RunScope, String),
 }
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum ActionIdentity {
@@ -158,6 +165,16 @@ impl SummaryView {
                 Some(*id)
             }
             _ => None,
+        })
+    }
+    /// Retained passive text slots of a usage row. IDs remain stable through
+    /// coherent publications and disclosure toggles; a new run gets new IDs.
+    pub fn usage_row_ids(&self, row: &str) -> Option<SummaryUsageRowIds> {
+        let scope = self.scope.as_ref()?;
+        Some(SummaryUsageRowIds {
+            row: self.row_id("usage", row)?,
+            title: *self.ids.get(&Key::UsageTitle(scope.clone(), row.into()))?,
+            value: *self.ids.get(&Key::UsageValue(scope.clone(), row.into()))?,
         })
     }
     pub fn into_host(self) -> Result<ContentHost, CompositionError> {
@@ -270,6 +287,10 @@ impl SummaryView {
                         return Err("summary action belongs to another run");
                     }
                 }
+                if section.id == "usage" && row.action.is_none() {
+                    keys.insert(Key::UsageTitle(input.scope.clone(), row.id.clone()));
+                    keys.insert(Key::UsageValue(input.scope.clone(), row.id.clone()));
+                }
                 keys.insert(Key::Row(
                     input.scope.clone(),
                     section.id.clone(),
@@ -350,8 +371,8 @@ impl SummaryView {
                     row.id.clone(),
                     ActionIdentity::read(row.action.as_ref()),
                 )];
-                let label = (self.labels.row)(&section.id, &row);
                 let content = if let Some(action) = row.action.clone() {
+                    let label = (self.labels.row)(&section.id, &row);
                     let mut content = old_rows
                         .remove(&id)
                         .unwrap_or_else(|| Content::new(id, ButtonContent::new("")));
@@ -370,7 +391,19 @@ impl SummaryView {
                         ),
                     );
                     content
+                } else if section.id == "usage" {
+                    let title_id = ids[&Key::UsageTitle(input.scope.clone(), row.id.clone())];
+                    let value_id = ids[&Key::UsageValue(input.scope.clone(), row.id.clone())];
+                    let mut content = old_rows.remove(&id).unwrap_or_else(|| {
+                        Content::new(id, SummaryUsageRow::new(title_id, value_id))
+                    });
+                    content
+                        .component_mut::<SummaryUsageRow>()
+                        .expect("summary usage row")
+                        .update((self.labels.usage_row)(&row));
+                    content
                 } else {
+                    let label = (self.labels.row)(&section.id, &row);
                     let mut content = old_rows
                         .remove(&id)
                         .unwrap_or_else(|| Content::new(id, TextContent::new("")));

@@ -36,7 +36,7 @@ def main():
     parser.add_argument('--append-run-probe', action='store_true',
                         help='Append the explicit probe to the unchanged formal RunView transaction probe')
     parser.add_argument('--summary-labels', action='store_true',
-                        help='Candidate-only Summary row labels and existing native text-host adapter')
+                        help='Candidate-only Summary header label and existing native text-host adapter')
     parser.add_argument('--manifest', type=Path, required=True)
     parser.add_argument('--workdir', type=Path, required=True)
     parser.add_argument('--target-dir', type=Path, required=True)
@@ -103,15 +103,8 @@ def main():
             r'\1 "tekes-ui-text",\n', lock.read_text(), count=1, flags=re.S)
         assert count == 1
         lock.write_text(lock_text)
-        # Apply the public opt-in to the actual retained Summary row nodes,
-        # not a substitute demonstration component or pre-truncated string.
-        summary = snapshot / 'ui/components/src/summary.rs'
-        old = '                view.rows_mut().push(content);'
-        assert summary.read_text().count(old) == 1
-        summary.write_text(summary.read_text().replace(old, '''                let content = content.with_label_layout(
-                    tekes_ui_text::LabelOptions::single_line(tekes_ui_text::LabelOverflow::TailEllipsis),
-                ).expect("Summary row is an original TextContent or ButtonContent");
-                view.rows_mut().push(content);'''))
+        # Only section headers are single-line in ClientKit. Ordinary Summary
+        # row titles must keep natural wrapping, including passive usage slots.
         section = snapshot / 'ui/components/src/summary_section.rs'
         old = 'Content::new(label, TextContent::new(""))'
         assert section.read_text().count(old) == 1
@@ -138,21 +131,10 @@ def main():
                         snapshot / 'ui/demo/tests/agentkit-reading-candidate.rs')
         shutil.copyfile(repo / 'scripts/probes/agentkit-run-preflight-candidate.rs',
                         snapshot / 'ui/demo/tests/agentkit-run-preflight-candidate.rs')
-        fixture = snapshot / 'ui/demo/src/fixture.rs'
-        old = 'format!("验证会话 {id} 的数据回传")'
-        assert fixture.read_text().count(old) == 1
-        fixture.write_text(fixture.read_text().replace(old,
-            'format!("验证会话 {id} 的长标题 English 👩🏽‍💻 e\\u{301} 组合字素 ").repeat(16)'))
         native_probe = snapshot / 'ui/demo/src/native_summary_sections_selftest.rs'
         old = '                self.widget = Self::widget(view, row);'
         assert native_probe.read_text().count(old) == 1
-        native_probe.write_text(native_probe.read_text().replace(old, '''                let node = view.tree.get(row).unwrap();
-                let ax = view.tree.semantics().into_iter().find(|n| n.id == row).unwrap();
-                assert!(ax.semantics.name.contains("组合字素"));
-                assert!(ax.semantics.name.chars().count() > 300);
-                assert!(node.frame().size.height > 0.);
-                assert!(node.frame().size.height < 2. * tekes_ui_tokens::proposal::TextRole::UiBody.style().line_height);
-                let header_ax = view.tree.semantics().into_iter().find(|n| n.id == header).unwrap();
+        native_probe.write_text(native_probe.read_text().replace(old, '''                let header_ax = view.tree.semantics().into_iter().find(|n| n.id == header).unwrap();
                 assert!(header_ax.semantics.name.chars().count() > 300);
                 assert!(header_ax.frame.size.height < 2. * tekes_ui_tokens::proposal::TextRole::UiBody.style().line_height);
 ''' + old))
@@ -171,14 +153,14 @@ def main():
                             section: |id| format!("{id} · 长标题 English 👩🏽‍💻 e\\u{301} 组合字素 ").repeat(16),
                             ..SummaryLabels::default()
                         })'''))
-        overrides.extend(['ui/components/Cargo.toml', 'ui/components/src/summary.rs',
+        overrides.extend(['ui/components/Cargo.toml',
                           'ui/components/src/summary_section.rs', 'ui/demo/src/component_demo.rs',
                           'ui/demo/tests/agentkit-reading-candidate.rs',
                           'ui/demo/tests/agentkit-run-preflight-candidate.rs',
-                          'ui/demo/src/fixture.rs', 'ui/demo/src/native_summary_sections_selftest.rs'])
-        adaptations.extend(['Original Summary row Content opts into single-line tail ellipsis',
+                          'ui/demo/src/native_summary_sections_selftest.rs'])
+        adaptations.extend(['Only original Summary header opts into single-line tail ellipsis; ordinary row titles retain natural wrapping',
                             'Existing native TextBackend delegates shape_label to its original CoreTextShaper',
-                            'Owned native Summary fixture supplies long mixed-language titles; existing pointer probe checks full AX names and row bounds'])
+                            'Owned native Summary header supplies a long mixed-language title; existing pointer probe checks its full AX name and row bounds'])
     env = dict(os.environ, CARGO_TARGET_DIR=str(args.target_dir.resolve()),
                CARGO_PROFILE_DEV_DEBUG='0', CARGO_PROFILE_TEST_DEBUG='0',
                CARGO_PROFILE_DEV_INCREMENTAL='false', CARGO_PROFILE_TEST_INCREMENTAL='false')

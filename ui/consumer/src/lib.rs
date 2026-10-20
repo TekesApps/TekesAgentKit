@@ -1634,3 +1634,65 @@ pub fn mount_sidebar_search(
 ) -> Result<(), &'static str> {
     sidebar.replace_search_source(source.owner(), &source.snapshot().input)
 }
+
+#[test]
+fn independent_summary_consumer_formats_usage_slots_without_recomputing_facts() {
+    use tekes_agent_components_ui::{
+        RunScope, SummaryFacts, SummaryInput, SummaryLabels, SummaryUsage, SummaryUsageRowText,
+        SummaryView,
+    };
+    let scope = RunScope::main("consumer", "usage-columns");
+    let mut view = SummaryView::new(
+        1981,
+        SummaryLabels {
+            usage_row: |row| {
+                let mut label = SummaryUsageRowText::read(row);
+                label.title = format!("Host: {}", label.title);
+                label
+            },
+            ..Default::default()
+        },
+    );
+    view.update(&SummaryInput {
+        revision: 1,
+        scope: scope.clone(),
+        facts: Some(SummaryFacts {
+            scope,
+            tasks: vec![],
+            subagents: vec![],
+            artifacts: vec![],
+            usage: Some(SummaryUsage {
+                input_tokens: 1000,
+                cached_input_tokens: 0,
+                cache_creation_input_tokens: 0,
+                output_tokens: 0,
+                cost_usd: None,
+                is_cost_complete: false,
+            }),
+        }),
+        host_sections: vec![],
+    })
+    .unwrap();
+    let ids = view.usage_row_ids("input").unwrap();
+    let host = view.into_host().unwrap();
+    let nodes = host.semantics();
+    assert_eq!(
+        nodes
+            .iter()
+            .find(|node| node.id == ids.title)
+            .unwrap()
+            .semantics
+            .name,
+        "Host: 输入"
+    );
+    assert_eq!(
+        nodes
+            .iter()
+            .find(|node| node.id == ids.value)
+            .unwrap()
+            .semantics
+            .name,
+        "1,000"
+    );
+    assert!(nodes.iter().any(|node| node.semantics.name == "未知"));
+}

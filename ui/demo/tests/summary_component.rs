@@ -339,8 +339,10 @@ fn actual_shared_sections_keep_actions_scoped_and_distinguish_known_zero_from_un
         .into_iter()
         .map(|node| node.semantics.name)
         .collect();
-    assert!(text.iter().any(|text| text == "output · 0"));
-    assert!(text.iter().any(|text| text == "cost · 未知"));
+    assert!(text.iter().any(|text| text == "输出"));
+    assert!(text.iter().any(|text| text == "0"));
+    assert!(text.iter().any(|text| text == "成本"));
+    assert!(text.iter().any(|text| text == "未知"));
     assert!(
         !text.iter().any(|text| text.contains("0.4")),
         "incomplete cost was presented as known"
@@ -503,4 +505,123 @@ fn composed_header_keeps_one_full_accessible_name_focus_and_disclosure_after_ref
             );
         }
     }
+}
+
+#[test]
+fn usage_formatting_matches_source_precision_and_preserves_integer_and_unknown_facts() {
+    let cases = [
+        (
+            "total",
+            serde_json::json!(u64::MAX),
+            "18,446,744,073,709,551,615",
+        ),
+        ("input", serde_json::json!(1234567), "1,234,567"),
+        ("output", serde_json::json!(0), "0"),
+        ("cache", serde_json::json!(0), "0"),
+        ("hit-rate", serde_json::json!(0.123456), "12.3%"),
+        ("hit-rate", serde_json::json!(0), "0.0%"),
+        ("hit-rate", serde_json::Value::Null, "—"),
+        ("cost", serde_json::json!(0), "US$0.00"),
+        ("cost", serde_json::json!(0.1234567), "US$0.123457"),
+        ("cost", serde_json::json!(12.34), "US$12.34"),
+        ("cost", serde_json::json!(12345.1234), "US$12,345.1234"),
+        ("cost", serde_json::json!(-0.0), "US$0.00"),
+        ("cost", serde_json::Value::Null, "未知"),
+        ("cost", serde_json::json!(-1), "未知"),
+        ("cache", serde_json::json!(-1), "未知"),
+        ("input", serde_json::json!(1.5), "未知"),
+        ("hit-rate", serde_json::json!(1.5), "未知"),
+    ];
+    for (id, value, expected) in cases {
+        let row = SummaryRow {
+            id: id.into(),
+            title: id.into(),
+            value,
+            action: None,
+        };
+        assert_eq!(SummaryUsageRowText::read(&row).value, expected, "{id}");
+    }
+}
+
+#[test]
+fn usage_slots_retain_original_controls_and_follow_disclosure_and_run_identity() {
+    let scope = RunScope::main("native", "usage");
+    let mut input = SummaryInput {
+        revision: 1,
+        scope: scope.clone(),
+        facts: Some(facts(scope)),
+        host_sections: vec![],
+    };
+    let mut view = SummaryView::new(210, Default::default());
+    view.update(&input).unwrap();
+    let root = view.id();
+    let ids = view.usage_row_ids("output").unwrap();
+    let header = view.section_header_id("usage").unwrap();
+    assert_eq!(view.action_id("usage", "output"), None);
+    let mut host = view.into_host().unwrap();
+    let original = host
+        .get(ids.value)
+        .unwrap()
+        .component::<TextContent>()
+        .unwrap() as *const _;
+    activate(&mut host, root, header);
+    assert!(!host.semantics().iter().any(|node| node.id == ids.value));
+    input.revision += 1;
+    input
+        .facts
+        .as_mut()
+        .unwrap()
+        .usage
+        .as_mut()
+        .unwrap()
+        .output_tokens = 2345;
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<SummaryView>()
+        .unwrap()
+        .update(&input)
+        .unwrap();
+    let view = host.get(root).unwrap().component::<SummaryView>().unwrap();
+    assert_eq!(view.usage_row_ids("output"), Some(ids));
+    assert_eq!(view.section_expanded("usage"), Some(false));
+    assert_eq!(
+        host.get(ids.value)
+            .unwrap()
+            .component::<TextContent>()
+            .unwrap() as *const _,
+        original
+    );
+    assert_eq!(
+        host.get(ids.value)
+            .unwrap()
+            .component::<TextContent>()
+            .unwrap()
+            .text,
+        "2,345"
+    );
+    activate(&mut host, root, header);
+    assert!(
+        host.semantics()
+            .iter()
+            .any(|node| node.id == ids.value && node.semantics.name == "2,345")
+    );
+    input.revision += 1;
+    input.scope = RunScope::main("native", "other-usage");
+    input.facts.as_mut().unwrap().scope = input.scope.clone();
+    input.facts.as_mut().unwrap().tasks.clear();
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<SummaryView>()
+        .unwrap()
+        .update(&input)
+        .unwrap();
+    assert_ne!(
+        host.get(root)
+            .unwrap()
+            .component::<SummaryView>()
+            .unwrap()
+            .usage_row_ids("output"),
+        Some(ids)
+    );
+    assert!(host.get(ids.value).is_none());
 }

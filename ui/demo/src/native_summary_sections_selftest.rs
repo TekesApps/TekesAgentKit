@@ -1,7 +1,7 @@
 //! Owned-fixture native Summary disclosure probe; normal pointer callbacks and
 //! a real presentation publication, without endpoint mutation or a UI mirror.
 use super::*;
-use tekes_agent_components_ui::SummaryView;
+use tekes_agent_components_ui::{SummaryUsageRowIds, SummaryView};
 use tekes_ui_controls::composition::{ButtonContent, TextContent};
 use tekes_ui_platform_macos::selftest::{Action, run_script};
 const DRAFT: &str = "Summary 折叠期间的新草稿";
@@ -12,6 +12,8 @@ pub(super) struct Probe {
     header: Option<ComponentId>,
     row: Option<ComponentId>,
     widget: usize,
+    usage: Option<SummaryUsageRowIds>,
+    usage_widget: usize,
     revision: u64,
     items: usize,
     submissions: usize,
@@ -25,6 +27,8 @@ impl Probe {
             header: None,
             row: None,
             widget: 0,
+            usage: None,
+            usage_widget: 0,
             revision: 0,
             items: 0,
             submissions: 0,
@@ -73,6 +77,30 @@ impl Probe {
                 let Some(header) = summary.section_header_id("tasks") else {
                     return;
                 };
+                let Some(usage) = summary.usage_row_ids("output") else {
+                    return;
+                };
+                self.usage = Some(usage);
+                self.usage_widget = Self::widget(view, usage.value);
+                assert_eq!(
+                    view.tree
+                        .get(usage.value)
+                        .unwrap()
+                        .component::<TextContent>()
+                        .unwrap()
+                        .text,
+                    "1,234"
+                );
+                let cost = summary.usage_row_ids("cost").unwrap();
+                assert_eq!(
+                    view.tree
+                        .get(cost.value)
+                        .unwrap()
+                        .component::<TextContent>()
+                        .unwrap()
+                        .text,
+                    "未知"
+                );
                 let row = summary.row_id("tasks", &task.id).unwrap();
                 assert_eq!(summary.section_expanded("tasks"), Some(true));
                 assert!(view.tree.semantics().iter().any(|node| node.id == row));
@@ -134,16 +162,57 @@ impl Probe {
                 assert_eq!(run.transcript.items.len(), self.items);
                 assert_eq!(run.submissions.len(), self.submissions);
                 self.phase = 4;
+                run_script(vec![(
+                    100,
+                    Self::click(view, summary.section_header_id("usage").unwrap()),
+                )]);
+            }
+            4 if summary.section_expanded("usage") == Some(false) => {
+                let ids = self.usage.unwrap();
+                assert!(
+                    !view
+                        .tree
+                        .semantics()
+                        .iter()
+                        .any(|node| node.id == ids.title || node.id == ids.value)
+                );
+                assert_eq!(Self::widget(view, ids.value), self.usage_widget);
+                self.phase = 5;
+                run_script(vec![(
+                    100,
+                    Self::click(view, summary.section_header_id("usage").unwrap()),
+                )]);
+            }
+            5 if summary.section_expanded("usage") == Some(true) => {
+                let ids = self.usage.unwrap();
+                assert_eq!(summary.usage_row_ids("output"), Some(ids));
+                assert_eq!(Self::widget(view, ids.value), self.usage_widget);
+                let row = view.tree.get(ids.row).unwrap().frame();
+                let title = view.tree.get(ids.title).unwrap().frame();
+                let value = view.tree.get(ids.value).unwrap().frame();
+                assert!(title.max_x() < value.min_x());
+                assert!(
+                    (row.max_x() - value.max_x() - tekes_ui_tokens::Spacing::Regular.value()).abs()
+                        < 0.1
+                );
+                assert!(
+                    view.tree
+                        .semantics()
+                        .iter()
+                        .any(|node| node.id == ids.value && node.semantics.name == "1,234")
+                );
+                self.phase = 6;
                 run_script(vec![(100, Action::Close)]);
             }
             _ => {}
         }
     }
     pub fn receipt(&self, view: &ComponentDemo) -> serde_json::Value {
-        assert_eq!(self.phase, 4, "incomplete Summary probe");
+        assert_eq!(self.phase, 6, "incomplete Summary probe");
         assert_eq!(Self::widget(view, self.row.unwrap()), self.widget);
         serde_json::json!({"nativeWindow":true,"pointerCollapseExpand":true,"collapsedCanonicalUpdate":true,
             "originalRowsRetained":true,"hiddenFromAccessibility":true,"noSubmission":true,
-            "runtimeDraft":true,"realHarness":false,"physicalIme":false,"voiceOver":false,"fullLayoutParity":false})
+            "runtimeDraft":true,"usageColumns":true,"usagePointerCollapseExpand":true,"usageControlsRetained":true,
+            "usageFromControlProjection":true,"knownCount":"1,234","unknownCost":true,"realHarness":false,"physicalIme":false,"voiceOver":false,"fullLayoutParity":false})
     }
 }
