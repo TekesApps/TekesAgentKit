@@ -59,7 +59,7 @@ pub enum FeedbackControlResult {
     },
     NeedsRefresh(String),
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FeedbackLabels {
     pub group: String,
     pub positive: String,
@@ -171,6 +171,21 @@ impl TurnFeedback {
     }
     pub fn ids(&self) -> FeedbackIds {
         self.ids
+    }
+    pub fn target(&self) -> Option<&FeedbackTargetCapture> {
+        self.target.as_ref()
+    }
+    pub fn invalidate_authority(&mut self) {
+        if self.needs_refresh {
+            return;
+        }
+        self.pending = None;
+        self.needs_refresh = true;
+        if self.state.is_some() {
+            self.notice = self.labels.uncertain.clone();
+        }
+        self.rekey();
+        self.render();
     }
     pub fn state(&self) -> Option<&FeedbackControlState> {
         self.state.as_ref()
@@ -439,6 +454,11 @@ impl TurnFeedback {
             self.rows.children.push(node);
         }
         let mut note = retained_button(&mut old, self.ids.edit_note, &self.labels.edit_note);
+        note.component_mut::<ButtonContent>()
+            .unwrap()
+            .button
+            .state
+            .selected = current.is_some_and(|record| record.note.is_some());
         note.component_mut::<ButtonContent>()
             .unwrap()
             .button

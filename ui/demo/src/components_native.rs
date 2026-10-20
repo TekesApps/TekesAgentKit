@@ -96,6 +96,7 @@ struct Host {
     annotation_stage: u8,
 }
 enum HostResult {
+    Feedback(Box<tekes_agent_ui_demo::component_demo::FeedbackDemoCompletion>),
     TurnAction {
         token: SidebarActionToken,
         result: std::result::Result<tekes_agent_contract::ThreadActionOutcome, String>,
@@ -389,6 +390,9 @@ impl Host {
                             result,
                         }
                     }
+                    DemoCommand::Feedback(request) => {
+                        HostResult::Feedback(Box::new(request.execute().await))
+                    }
                     DemoCommand::TurnAction { binding, intent } => {
                         let rpc = format!(
                             "{rename_rpc_prefix}:turn:{}:{}",
@@ -660,6 +664,7 @@ impl Host {
                             | DemoCommand::SelectFiles { .. }
                             | DemoCommand::Sidebar(_)
                             | DemoCommand::TurnAction { .. }
+                            | DemoCommand::Feedback(_)
                             | DemoCommand::ReadInitialPresets { .. }
                             | DemoCommand::CreateSession(_)
                             | DemoCommand::ReadModels { .. }
@@ -705,6 +710,11 @@ impl Host {
         }
         while let Ok(result) = self.results.try_recv() {
             match result {
+                HostResult::Feedback(result) => {
+                    if let Err(error) = self.view.complete_feedback(*result) {
+                        self.failure(error.to_string());
+                    }
+                }
                 HostResult::TurnAction { token, result } => {
                     if let Ok(outcome) = result
                         && let Ok(Some(request)) =
@@ -3203,6 +3213,16 @@ pub fn run() {
         } else {
             serde_json::Value::Null
         };
+        let feedback_transcript_proof =
+            if args.iter().any(|arg| arg == "--feedback-transcript-proof") {
+                host.executor
+                    .block_on(tekes_agent_ui_demo::feedback_transcript_proof::run(
+                        &mut host.view,
+                    ))
+                    .expect("mounted Transcript feedback proof")
+            } else {
+                serde_json::Value::Null
+            };
         let bounded_child_proof = if args.iter().any(|arg| arg == "--bounded-child-proof") {
             let index = args
                 .iter()
@@ -3343,9 +3363,10 @@ pub fn run() {
             let row=host.view.tree.get(id).unwrap();let content=row.component::<tekes_agent_components_ui::TranscriptContent>().unwrap();let frame=row.frame();
             let composer=host.view.tree.get(host.view.ids().root).unwrap().frame();
             assert!(composer.min_y()>=0. && composer.max_y()<=760., "content viewport must leave Composer inside the host window");
-            let mut messages=0;let mut footnotes=0;let mut tools=0;let mut known_empty=0;let mut output_copies=0;
+            let mut messages=0;let mut footnotes=0;let mut tools=0;let mut known_empty=0;let mut output_copies=0;let mut feedback_rows=0;
             for key in content.row_keys() {
                 let node=host.view.tree.get(content.row_id(key).unwrap()).unwrap();
+                if node.component::<tekes_agent_components_ui::TurnFeedback>().is_some(){assert!((node.frame().min_x()-frame.min_x()).abs()<0.5);feedback_rows+=1;}
                 if let Some(input)=node.component::<tekes_agent_components_ui::InputMessage>() {
                     let ids=input.ids();let bubble=host.view.tree.get(ids.bubble).unwrap().frame();let caption=host.view.tree.get(ids.footnote).unwrap().frame();
                     assert!((bubble.max_x()-frame.max_x()).abs()<0.5);assert!((caption.max_x()-frame.max_x()).abs()<0.5);
@@ -3356,7 +3377,7 @@ pub fn run() {
             }
             assert_eq!(messages, snapshot.transcript.items.iter().filter(|item|item.is_visible).count());
             assert_eq!(output_copies, document.sections.iter().filter(|section|section.final_output().is_some()).count());
-            serde_json::json!({"renderer":true,"rows":content.row_keys().len(),"knownEmptyContainersHidden":known_empty,"outputCopyControls":output_copies,"messages":messages,"footnotes":footnotes,"independentTools":tools,"userTrailing":true,"machineLeading":true,"genericViewport":true,"keyedReadingAcceptance":false,"richContent":false,"completeTranscript":false,"nativeInteraction":false})
+            serde_json::json!({"renderer":true,"rows":content.row_keys().len(),"knownEmptyContainersHidden":known_empty,"outputCopyControls":output_copies,"feedbackRows":feedback_rows,"messages":messages,"footnotes":footnotes,"independentTools":tools,"userTrailing":true,"machineLeading":true,"genericViewport":true,"keyedReadingAcceptance":false,"richContent":false,"completeTranscript":false,"nativeInteraction":false})
         });
         let turn_footnote_proof=turn_footnote_id.map(|id| {
             let row=host.view.tree.get(id).unwrap();let frame=row.frame();
@@ -3399,7 +3420,7 @@ pub fn run() {
         println!(
             "{}",
             serde_json::json!({
-                "runViewComposition":run_view_proof,"boundedChildProof":bounded_child_proof,"feedbackReadProof":feedback_read_proof,"feedbackWriteProof":feedback_write_proof,"feedbackControlsProof":feedback_controls_proof,
+                "runViewComposition":run_view_proof,"boundedChildProof":bounded_child_proof,"feedbackReadProof":feedback_read_proof,"feedbackWriteProof":feedback_write_proof,"feedbackControlsProof":feedback_controls_proof,"feedbackTranscriptProof":feedback_transcript_proof,
                 "offscreen": true, "components": true, "nativeInteraction": false,
                 "transcriptView": false, "isStale": snapshot.transcript.is_stale,
                 "transcriptItems": snapshot.transcript.items.len(),

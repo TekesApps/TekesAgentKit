@@ -62,7 +62,11 @@ mod file_preview;
 mod uploads;
 use file_preview::FilePreviewGesture;
 use uploads::UploadGesture;
+#[path = "component_feedback.rs"]
+mod feedback;
+pub use feedback::{FeedbackDemoCompletion, FeedbackDemoRequest};
 pub enum DemoCommand {
+    Feedback(Box<FeedbackDemoRequest>),
     CopyTranscript(tekes_agent_components_ui::TranscriptCopyIntent),
     TurnAction {
         binding: Arc<RunBinding>,
@@ -136,6 +140,8 @@ pub enum DemoCommand {
 }
 
 pub struct ComponentDemo {
+    feedback_panes: BTreeMap<ComponentId, feedback::FeedbackPane>,
+    feedback_completions: Vec<FeedbackDemoCompletion>,
     document_enabled: bool,
     document_roots: BTreeMap<ComponentId, ComponentId>,
     next_document_namespace: u32,
@@ -445,6 +451,8 @@ impl ComponentDemo {
             creation_panel: Some(creation_panel),
             annotation_panel: Some(annotation_panel),
             annotation_gesture: None,
+            feedback_panes: BTreeMap::new(),
+            feedback_completions: vec![],
             document_enabled: false,
             document_roots: BTreeMap::new(),
             next_document_namespace: 7_000_000,
@@ -616,9 +624,16 @@ impl ComponentDemo {
                 .unwrap()
                 .flexible_child = Some(ComponentId(ids.root.0 + 16));
         }
+        let feedback_labels = self.feedback_labels(ids, binding);
         if let Some(root) = self.document_roots.get(&ids.root).copied() {
-            return self
-                .tree
+            self.tree
+                .get_mut(root)
+                .unwrap()
+                .component_mut::<tekes_agent_components_ui::TranscriptContent>()
+                .unwrap()
+                .configure_feedback(feedback_labels)
+                .map_err(unsupported)?;
+            self.tree
                 .get_mut(root)
                 .ok_or_else(|| unsupported("transcript mount missing"))?
                 .component_mut::<tekes_agent_components_ui::TranscriptContent>()
@@ -630,7 +645,8 @@ impl ComponentDemo {
                     &snapshot.transcript,
                     available,
                 )
-                .map_err(unsupported);
+                .map_err(unsupported)?;
+            return self.sync_feedback(ids, binding);
         }
         let namespace = self.next_document_namespace;
         let end = namespace
@@ -640,7 +656,10 @@ impl ComponentDemo {
             namespace,
             namespace + 1..end,
             binding.scope().clone(),
-            Default::default(),
+            tekes_agent_components_ui::TranscriptContentLabels {
+                feedback: feedback_labels,
+                ..Default::default()
+            },
         )
         .map_err(unsupported)?;
         content
@@ -662,7 +681,7 @@ impl ComponentDemo {
             .map_err(unsupported)?;
         self.next_document_namespace = end;
         self.document_roots.insert(ids.root, root);
-        Ok(())
+        self.sync_feedback(ids, binding)
     }
     pub fn turn_footnote_id() -> ComponentId {
         ComponentId(6_000_002_u64 << 32)
@@ -2167,6 +2186,17 @@ impl ComponentDemo {
         Ok(ComposerIds::new((namespace as u64) << 32))
     }
     fn composing_editor(&self) -> Option<ComponentId> {
+        for root in self.document_roots.values() {
+            if let Some(editor) = self
+                .tree
+                .get(*root)
+                .and_then(|node| node.component::<tekes_agent_components_ui::TranscriptContent>())
+                .and_then(|content| content.composing_feedback_editor())
+            {
+                return Some(editor);
+            }
+        }
+
         if let Some(editor) = self
             .tree
             .get(Self::annotation_root())
@@ -2976,15 +3006,7 @@ impl ComponentDemo {
                     .unwrap()
                     .component_mut::<RunView>()
                     .unwrap();
-                let intents = if composing {
-                    run.composer_mut()
-                        .take_intents(&actions)
-                        .into_iter()
-                        .map(tekes_agent_components_ui::RunViewIntent::Composer)
-                        .collect()
-                } else {
-                    run.take_intents(&actions)
-                };
+                let intents = run.take_intents(&actions);
                 intents
                     .into_iter()
                     .map(move |intent| (ids, binding.clone(), intent))
@@ -2996,6 +3018,9 @@ impl ComponentDemo {
             use tekes_agent_components_ui::RunViewIntent;
             match intent {
                 RunViewIntent::Composer(intent) => intents.push((binding, intent)),
+                RunViewIntent::Feedback { control, gesture } => {
+                    commands.push(self.prepare_feedback(ids, &binding, control, *gesture)?)
+                }
                 RunViewIntent::CopyTranscript(intent) => {
                     commands.push(DemoCommand::CopyTranscript(intent))
                 }

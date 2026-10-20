@@ -24,7 +24,8 @@ Versions are opaque; same-value writes need not advance them. Public `TurnFeedba
 Completion `apply` returns Ignored (keep current frame) or Adopted (replace with
 the supplied optional frame). Cold/unknown states use explicit Refresh. See the
 [control contract](../../docs/rust-agent-ui-feedback-controls-20261020.md);
-formal Transcript footnote integration remains pending. See the [read contract](../../docs/rust-agent-ui-feedback-read-20261020.md)
+formal Transcript footnote routing is now available through `RunViewIntent::Feedback`
+and original-widget completion; see the [integration contract](../../docs/rust-agent-ui-feedback-transcript-20261020.md). See the [read contract](../../docs/rust-agent-ui-feedback-read-20261020.md)
 and [CAS contract](../../docs/rust-agent-ui-feedback-cas-20261020.md).
 
 Choose the source explicitly:

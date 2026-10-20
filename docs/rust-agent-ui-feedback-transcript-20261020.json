@@ -1,0 +1,199 @@
+{
+  "date": "2026-10-20",
+  "status": "experimental-mounted-transcript-feedback",
+  "publishedAgentKitBaseline": "v0.3.8",
+  "clientKitReadOnlyHead": "c289bc9d33edcd83a782ac17927a8c65a027eccd",
+  "kernelFixtureReadOnlyHead": "ae5d6fdf32290207b646b8c99b96f2a002902cb3",
+  "tests": {
+    "uiWorkspace": 277,
+    "feedback": 22,
+    "transcriptContent": 14,
+    "scripts": 21,
+    "rootUnchangedBaseline": {
+      "tests": 158,
+      "commit": "547a9e86391232c54a9f8aff699e938a7a66e408",
+      "receipt": "rust-agent-ui-feedback-cas-20261020.json"
+    }
+  },
+  "strictUiClippy": {
+    "passed": true,
+    "log": "/tmp/agentkit-feedback-transcript-clippy-fixed.log"
+  },
+  "publicConsumerIncluded": true,
+  "resolvedTekesui": {
+    "rev": "8cf0840790334ba224afc0595897c74231c712e6",
+    "packages": 8,
+    "inputs": 199,
+    "sha256": "f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f"
+  },
+  "binarySha256": "b61de3eceb211196340124d9c870c738c3d2d19c74e9ce142674d427746c49c2",
+  "sourceSha256": {
+    "ui/components/src/feedback.rs": "5b763e0156de1995f6d1143510026a375ad088bed37f59f3eb186e3bcf1667ff",
+    "ui/components/src/transcript_content.rs": "ed166efed1c56fc60283b2ebcbe4dcbf04657d1aebcab28e3562e4f7bd172880",
+    "ui/components/src/run_view.rs": "0b1bd89ef1513fcfbcbb814452980e35f3bbc44f1f33909128715b9aaba4ed33",
+    "ui/components/src/readonly_transcript.rs": "ed11d9b6a5debb4e27729260c00ce23a011ee4126f6a6dd4637b574e33107d9a",
+    "ui/bindings/src/feedback.rs": "f20d83714bf2ff6a3cafce5274292c13d57e65beb352ef0e2ae50593958ec5ef",
+    "ui/bindings/src/feedback_controls.rs": "8ebfc4720e42007c79b995dc90b79cbdb575b0356300add2662a483faa77d385",
+    "ui/demo/src/component_demo.rs": "9020215f543d47c0d3d7ff17ffb586d8d092466355afa6787e93605dbf7037e9",
+    "ui/demo/src/component_feedback.rs": "7e1f4d46e066fc36bef0026ea1dc771bc7b29306ed0fec7c66bc63face705414",
+    "ui/demo/src/components_native.rs": "7f924ff59edd236578e5aa6f2d1c3f2d11ff0eda89c24c52dd366746ba0210e5",
+    "ui/demo/src/feedback_transcript_proof.rs": "bd8496c0dd89837067d134aaf8e0d9176d0a8cbc3ce8b015fc311ed61013f892"
+  },
+  "realReceipts": {
+    "PI": {
+      "feedback": {
+        "coldRead": true,
+        "draftsPreserved": true,
+        "embeddedTranscript": true,
+        "freshReadAfterDelete": true,
+        "nativeInteraction": false,
+        "noteReopened": true,
+        "originalTarget": true,
+        "readingAnchorAcceptance": false,
+        "runViewRouting": true,
+        "sameRatingDeletes": true,
+        "savedChineseNote": true
+      },
+      "layout": {
+        "completeTranscript": false,
+        "feedbackRows": 2,
+        "footnotes": 2,
+        "genericViewport": true,
+        "independentTools": 0,
+        "keyedReadingAcceptance": false,
+        "knownEmptyContainersHidden": 0,
+        "machineLeading": true,
+        "messages": 5,
+        "nativeInteraction": false,
+        "outputCopyControls": 2,
+        "renderer": true,
+        "richContent": false,
+        "rows": 9,
+        "userTrailing": true
+      }
+    },
+    "DSH": {
+      "feedback": {
+        "coldRead": true,
+        "draftsPreserved": true,
+        "embeddedTranscript": true,
+        "freshReadAfterDelete": true,
+        "nativeInteraction": false,
+        "noteReopened": true,
+        "originalTarget": true,
+        "readingAnchorAcceptance": false,
+        "runViewRouting": true,
+        "sameRatingDeletes": true,
+        "savedChineseNote": true
+      },
+      "layout": {
+        "completeTranscript": false,
+        "feedbackRows": 2,
+        "footnotes": 2,
+        "genericViewport": true,
+        "independentTools": 0,
+        "keyedReadingAcceptance": false,
+        "knownEmptyContainersHidden": 0,
+        "machineLeading": true,
+        "messages": 5,
+        "nativeInteraction": false,
+        "outputCopyControls": 2,
+        "renderer": true,
+        "richContent": false,
+        "rows": 9,
+        "userTrailing": true
+      }
+    },
+    "NATIVE": {
+      "feedback": {
+        "coldRead": true,
+        "draftsPreserved": true,
+        "embeddedTranscript": true,
+        "freshReadAfterDelete": true,
+        "nativeInteraction": false,
+        "noteReopened": true,
+        "originalTarget": true,
+        "readingAnchorAcceptance": false,
+        "runViewRouting": true,
+        "sameRatingDeletes": true,
+        "savedChineseNote": true
+      },
+      "layout": {
+        "completeTranscript": false,
+        "feedbackRows": 1,
+        "footnotes": 1,
+        "genericViewport": true,
+        "independentTools": 0,
+        "keyedReadingAcceptance": false,
+        "knownEmptyContainersHidden": 0,
+        "machineLeading": true,
+        "messages": 2,
+        "nativeInteraction": false,
+        "outputCopyControls": 1,
+        "renderer": true,
+        "richContent": false,
+        "rows": 4,
+        "userTrailing": true
+      }
+    }
+  },
+  "screenshots": {
+    "NATIVE": {
+      "path": "/tmp/agentkit-feedback-transcript-verified.png",
+      "sha256": "7c743d1d17ce79d552f3eb5d2a0632d7cf2e8c857b56c47372a32812b021f72a"
+    },
+    "PI": {
+      "path": "/tmp/agentkit-feedback-transcript-verified-pi.png",
+      "sha256": "34c245b4e3464307fd957122fe286e4642452439df47d2b5b878805acf59b505"
+    },
+    "DSH": {
+      "path": "/tmp/agentkit-feedback-transcript-verified-dsh.png",
+      "sha256": "5a7a5fb190e02508741bdf960800869a5a83294cfb2733162b6862cfe13c905c"
+    }
+  },
+  "nativeSyntheticRegression": [
+    "NATIVE_AGENT_READONLY_CHILD_CONTENT_SELFTEST_OK actual-child-messages+original-scope+native-pagination+no-composer; reading-anchor=false; physical-ime=false",
+    "NATIVE_AGENT_SIDEBAR_SUMMARY_SELFTEST_OK shared-inventory+shared-pin+sidebar-selection+summary-facts; full-run-view=false; physical-ime=false",
+    "NATIVE_AGENT_SIDECHAT_SELFTEST_OK owned-create+separate-composer+send+stream+draft+cancel-discard+parent-isolation; transcript=false; physical-ime=false",
+    "NATIVE_AGENT_CHILD_SELFTEST_OK direct-parent+independent-composer+single-admission+stream+cancel+isolated-drafts+bounded-read-only+paging+local-retirement; formal-transcript=false; physical-ime=false",
+    "NATIVE_AGENT_TASK_SELFTEST_OK resolved-task+independent-composer+single-admission+stream+cancel+parent-draft-isolation+close; transcript=false; physical-ime=false",
+    "NATIVE_AGENT_COMPONENTS_SELFTEST_OK composer+indicators+run-binding+synthetic-text-services+send+stream+cancel+draft-isolation+reconnect; physical-ime=false; transcript=false; reading-anchor=false"
+  ],
+  "softwareImeComposer": {
+    "softwareIme": true,
+    "pidTargetedEvents": true,
+    "physicalKeyboard": false,
+    "candidateWindow": false,
+    "sourceBefore": "com.apple.inputmethod.SCIM.ITABC",
+    "sourceAfter": "com.apple.inputmethod.SCIM.ITABC",
+    "binarySha256": "b61de3eceb211196340124d9c870c738c3d2d19c74e9ce142674d427746c49c2"
+  },
+  "noteIme": {
+    "syntheticContentHost": true,
+    "nativeKeyboard": false,
+    "physicalKeyboard": false
+  },
+  "retainedFailures": [
+    {
+      "log": "/tmp/agentkit-feedback-transcript-native-verified.log",
+      "observed": "fixture busy before stop-demo send; subsequent original-draft assertion failed",
+      "parallelGatesWereRunning": true,
+      "causeConfirmed": false,
+      "isolatedRetryLog": "/tmp/agentkit-feedback-transcript-native-isolated.log",
+      "sameBinaryAndAssertions": true,
+      "isolatedRetryPassed": true
+    }
+  ],
+  "boundedReadOnlyFeedbackRejected": true,
+  "delayedAdoptionRevalidatesSourceAndTarget": true,
+  "completedReceiptsRetainClosedBinding": false,
+  "nativeFeedbackInteraction": false,
+  "readingAnchorAcceptance": false,
+  "richContentAcceptance": false,
+  "completeGoal": false,
+  "logs": {
+    "ui": "/tmp/agentkit-feedback-transcript-ui-verified.log",
+    "real": "/tmp/agentkit-feedback-transcript-real-verified.log",
+    "scripts": "/tmp/agentkit-feedback-transcript-scripts.log"
+  }
+}

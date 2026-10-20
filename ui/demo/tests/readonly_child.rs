@@ -669,3 +669,20 @@ async fn invalid_custom_history_is_rejected_before_it_becomes_a_renderable_frame
     );
     runtime.stop().await.unwrap();
 }
+
+#[test]
+fn bounded_readonly_wrapper_rejects_an_independently_writable_feedback_configuration() {
+    let scope = RunScope::main("fixture", "bounded-b");
+    let mut content =
+        TranscriptContent::new(803, 804..850, scope.clone(), Default::default()).unwrap();
+    content
+        .configure_feedback(Some(Default::default()))
+        .unwrap();
+    let ids = ReadOnlyTranscriptIds {
+        root: ComponentId(800_u64 << 32),
+        status: ComponentId((800_u64 << 32) + 1),
+        refresh: ComponentId((800_u64 << 32) + 2),
+        viewport: ComponentId((800_u64 << 32) + 3),
+    };
+    assert!(ReadOnlyTranscript::new(ids, scope, 801, content, Default::default()).is_err());
+}

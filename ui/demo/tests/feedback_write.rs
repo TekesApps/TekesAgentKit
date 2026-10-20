@@ -1001,3 +1001,171 @@ async fn fresh_authoritative_read_can_close_removed_rating_while_old_save_is_inf
     assert_eq!(service.writes().len(), 2);
     runtime.stop().await.unwrap();
 }
+
+use tekes_agent_ui_demo::component_demo::{ComponentDemo, DemoCommand};
+fn transcript_control(view: &ComponentDemo) -> ComponentId {
+    let root = view.transcript_content_id(view.ids()).unwrap();
+    view.tree
+        .get(root)
+        .unwrap()
+        .component::<tekes_agent_components_ui::TranscriptContent>()
+        .unwrap()
+        .feedback_controls()
+        .next()
+        .unwrap()
+        .0
+}
+fn demo_control(view: &ComponentDemo, id: ComponentId) -> &TurnFeedback {
+    view.tree
+        .get(id)
+        .unwrap()
+        .component::<TurnFeedback>()
+        .unwrap()
+}
+fn demo_press(view: &mut ComponentDemo, id: ComponentId) -> Vec<DemoCommand> {
+    view.accessibility_action(id, None, AccessibilityAction::Press)
+        .unwrap()
+}
+fn feedback_request(
+    commands: Vec<DemoCommand>,
+) -> tekes_agent_ui_demo::component_demo::FeedbackDemoRequest {
+    let mut commands = commands.into_iter();
+    let Some(DemoCommand::Feedback(request)) = commands.next() else {
+        panic!("feedback command")
+    };
+    assert!(commands.next().is_none());
+    *request
+}
+async fn complete_demo(view: &mut ComponentDemo, commands: Vec<DemoCommand>) {
+    let request = feedback_request(commands);
+    view.complete_feedback(request.execute().await).unwrap();
+}
+#[tokio::test]
+async fn transcript_feedback_mounted_run_routes_ime_save_and_hidden_original_receipt_without_touching_other_draft()
+ {
+    let (runtime, a, service) = setup(true).await;
+    let b = Arc::new(
+        RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "b"))
+            .await
+            .unwrap(),
+    );
+    let b_draft = b.current_run().unwrap().draft.clone();
+    let mut view = ComponentDemo::new([a.clone(), b.clone()]).unwrap();
+    view.enable_transcript_content().unwrap();
+    let id = transcript_control(&view);
+    assert!(demo_control(&view, id).state().is_none());
+    let refresh = demo_control(&view, id).ids().refresh;
+    let commands = demo_press(&mut view, refresh);
+    complete_demo(&mut view, commands).await;
+    let positive = demo_control(&view, id).ids().positive;
+    let commands = demo_press(&mut view, positive);
+    complete_demo(&mut view, commands).await;
+    let note = demo_control(&view, id).ids().edit_note;
+    assert!(demo_press(&mut view, note).is_empty());
+    let editor = demo_control(&view, id).ids().editor;
+    view.tree.focus(Some(editor), true);
+    assert!(
+        view.event(&ContentEvent::Preedit {
+            text: "ni".into(),
+            selection: 2..2,
+            clauses: vec![],
+            replacement: None
+        })
+        .unwrap()
+        .is_empty()
+    );
+    assert!(view.composing());
+    assert!(view.select(1).is_err());
+    let send = view.ids().send;
+    assert!(demo_press(&mut view, send).is_empty());
+    let save = demo_control(&view, id).ids().save;
+    assert!(demo_press(&mut view, save).is_empty());
+    assert_eq!(service.writes().len(), 1);
+    assert!(
+        view.event(&ContentEvent::Commit {
+            text: "中文备注".into(),
+            replacement: None
+        })
+        .unwrap()
+        .is_empty()
+    );
+    assert!(!view.composing());
+    let save = demo_control(&view, id).ids().save;
+    let request = feedback_request(demo_press(&mut view, save));
+    view.select(1).unwrap();
+    assert_eq!(view.selected(), 1);
+    let other = transcript_control(&view);
+    assert!(demo_control(&view, other).state().is_none());
+    view.complete_feedback(request.execute().await).unwrap();
+    assert_eq!(view.selected(), 1);
+    assert!(demo_control(&view, other).state().is_none());
+    assert_eq!(b.current_run().unwrap().draft, b_draft);
+    view.select(0).unwrap();
+    assert_eq!(transcript_control(&view), id);
+    let state = demo_control(&view, id).state().unwrap();
+    assert_eq!(
+        state.current.as_ref().unwrap().note.as_deref(),
+        Some("中文备注")
+    );
+    assert!(!demo_control(&view, id).is_open());
+    let note = demo_control(&view, id).ids().edit_note;
+    assert!(
+        view.tree
+            .get(note)
+            .unwrap()
+            .component::<tekes_ui_controls::composition::ButtonContent>()
+            .unwrap()
+            .button
+            .state
+            .selected,
+        "committed note presence uses upstream selected semantics"
+    );
+    assert_eq!(service.writes().len(), 2);
+    runtime.stop().await.unwrap();
+}
+#[tokio::test]
+async fn delayed_control_completion_cannot_adopt_a_frame_superseded_after_execute() {
+    let (runtime, binding, service) = setup(true).await;
+    let initial = binding.read_feedback().await.unwrap();
+    let (mut host, root) = mounted(&binding, &initial);
+    let positive = ids(&mut host, root).positive;
+    let gesture = activate(&mut host, root, positive).pop().unwrap();
+    let completion = binding
+        .prepare_feedback_gesture(Some(&initial), gesture)
+        .execute()
+        .await;
+    let fresh = binding.read_feedback().await.unwrap();
+    assert!(fresh.records().items.len() == 1);
+    assert!(matches!(
+        completion.apply(control(&mut host, root)),
+        FeedbackUiAdoption::Adopted(None)
+    ));
+    assert!(control(&mut host, root).needs_refresh());
+    assert_eq!(service.writes().len(), 1);
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn finished_feedback_ui_receipts_do_not_retain_a_closed_binding_or_its_history_lease() {
+    let (runtime, binding, _) = setup(true).await;
+    let frame = binding.read_feedback().await.unwrap();
+    let (mut host, root) = mounted(&binding, &frame);
+    let positive = ids(&mut host, root).positive;
+    let gesture = activate(&mut host, root, positive).pop().unwrap();
+    let completion = binding
+        .prepare_feedback_gesture(Some(&frame), gesture)
+        .execute()
+        .await;
+    let weak = Arc::downgrade(&binding);
+    drop(binding);
+    assert!(
+        weak.upgrade().is_none(),
+        "a completed UI receipt must not own the closed RunBinding"
+    );
+    assert!(matches!(
+        completion.apply(control(&mut host, root)),
+        FeedbackUiAdoption::Adopted(None)
+    ));
+    assert!(control(&mut host, root).needs_refresh());
+    runtime.stop().await.unwrap();
+}

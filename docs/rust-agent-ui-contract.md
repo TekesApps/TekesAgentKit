@@ -12,7 +12,7 @@
 
 用户消息的[外置复制入口](rust-agent-ui-input-copy-20261020.md)已接入 RunView 与只读 lane，返回捕获原 scope/message/text 的公开 intent，由宿主写剪贴板。[输出 footnote 复制](rust-agent-ui-output-copy-20261020.md)复用共享 is_final 语义，只为已完成回合中唯一的最终正文提供目标；评价等其余 footnote 语义仍待补齐。离线复制不授予 endpoint mutation 权限。
 
-[评价读取基础](rust-agent-ui-feedback-read-20261020.md)已增加 committed records、真实目标身份和原 binding/连接/读顺序约束；DSH feedback 包裹已在适配器边界归一化。[评价 CAS 写入基础](rust-agent-ui-feedback-cas-20261020.md)已补齐原目标捕获、一次性 mutation、备注策略和权威冲突恢复，并通过三端真实读写；[独立评价控件与备注编辑器](rust-agent-ui-feedback-controls-20261020.md)现已提供公开 API 和原 binding gesture bridge；正式 Transcript 的 per-turn footnote 挂载尚待接入，独立控件和协议成功不等于完整评价交互验收。
+[评价读取基础](rust-agent-ui-feedback-read-20261020.md)已增加 committed records、真实目标身份和原 binding/连接/读顺序约束；DSH feedback 包裹已在适配器边界归一化。[评价 CAS 写入基础](rust-agent-ui-feedback-cas-20261020.md)已补齐原目标捕获、一次性 mutation、备注策略和权威冲突恢复，并通过三端真实读写；[独立评价控件与备注编辑器](rust-agent-ui-feedback-controls-20261020.md)现已提供公开 API 和原 binding gesture bridge；现已[挂入正式 Transcript/RunView 的输出 footnote](rust-agent-ui-feedback-transcript-20261020.md)，包括原 binding 路由、组字/导航屏障及延迟回执隔离；专项原生评价交互与完整 Transcript 仍待验收。
 
 AgentKit 定义业务结构、展示语义、组件组合、组件输入及回调，复用现有 presentation。TekesUI 拥有编辑/撤销/选区/IME/焦点、文字排版、滚动/锚点、通用布局与渲染；AgentKit 只调用其公开接口。宿主提供窗口、总体布局、导航、产品 copy/主题、安装、凭证、路径与系统权限，并执行显式 host capability 回调。不能向宿主转移本应共享的 Agent 状态机或动作策略。
 

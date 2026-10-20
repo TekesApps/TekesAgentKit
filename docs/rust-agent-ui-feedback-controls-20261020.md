@@ -1,5 +1,7 @@
 # 评价控件接入（实验，2026-10-20）
 
+本页保留独立控件阶段的验证范围；后续 [Transcript footnote 挂载](rust-agent-ui-feedback-transcript-20261020.md) 已补齐，专项原生评价交互仍待验收。
+
 `TurnFeedback` 是 AgentKit 的独立公开组件，组合 TekesUI 默认按钮和多行文本字段。它拥有评价手势与临时备注编辑，committed records、目标身份、CAS、连接 epoch 和实际调用由现有 presentation / RunBinding 决定。评价按钮横排；正文之外的机器 footnote 区域靠左。颜色、字体、圆角及交互样式继承 TekesUI，没有局部主题副本。
 
 ## 输入与回调

@@ -97,6 +97,14 @@ impl FeedbackFrame {
     }
 }
 impl RunBinding {
+    /// Source capability, not current permission to mutate/read. Preserve mounted
+    /// editors through temporary disconnection; actual calls revalidate readiness.
+    pub fn supports_feedback(&self) -> bool {
+        self.controller.is_some()
+            && self
+                .runtime
+                .inspect(|state| state.endpoint_capabilities.supports("feedback.list"))
+    }
     pub async fn read_feedback(self: &Arc<Self>) -> Result<FeedbackFrame> {
         require(
             self.access() == PaneAccess::Ready && self.controller.is_some(),

@@ -18,6 +18,7 @@ parser.add_argument('--ui-annotation-editor',action='store_true',help='Exercise 
 parser.add_argument('--ui-attachments',action='store_true',help='Exercise public upload entry, original draft, Send, history and capability-specific file reads')
 parser.add_argument('--ui-bounded-child',action='store_true',help='Verify actual read-only Native child messages through the public component; requires components and Kernel')
 parser.add_argument('--ui-feedback-read',action='store_true',help='Read typed committed feedback and verify proven final response IDs; no mutations or rating controls')
+parser.add_argument('--ui-feedback-transcript',action='store_true',help='Exercise feedback through actual Transcript/RunView and captured host callbacks; offscreen only')
 parser.add_argument('--ui-feedback-controls',action='store_true',help='Exercise public feedback controls and note editing over isolated real transports; offscreen only')
 parser.add_argument('--ui-feedback-write',action='store_true',help='Mutating CAS/note proof on isolated fixture targets; no rating UI acceptance')
 parser.add_argument('--ui-turn-footnote',action='store_true',help='Opt in to shared completed-turn fork in isolated UI sessions; requires components')
@@ -26,6 +27,8 @@ parser.add_argument('--ui-message-rows',action='store_true',help='Mount canonica
 parser.add_argument('--ui-history-pages',action='store_true',help='Seed long isolated sessions and verify public page receipts, original scope and fresh reconnect history')
 parser.add_argument('--ui-actionables',action='store_true',help='Exercise public actionable cards on configured Native/Pi/DSH question sources')
 args=parser.parse_args()
+if args.ui_feedback_transcript and not (args.ui_demo and args.ui_components and args.ui_transcript_content):
+    parser.error('--ui-feedback-transcript requires --ui-demo, --ui-components and --ui-transcript-content')
 if args.ui_feedback_controls and not (args.ui_demo and args.ui_components and args.ui_transcript_content):
     parser.error('--ui-feedback-controls requires --ui-demo, --ui-components and --ui-transcript-content')
 if args.ui_feedback_write and not (args.ui_demo and args.ui_components and args.ui_transcript_content):
@@ -248,6 +251,7 @@ def ui_smoke(config, first, bounded_child=None):
     if args.ui_feedback_read:mode+=['--feedback-read-proof']
     if args.ui_feedback_write:mode+=['--feedback-write-proof']
     if args.ui_feedback_controls:mode+=['--feedback-controls-proof']
+    if args.ui_feedback_transcript:mode+=['--feedback-transcript-proof']
     if (args.ui_model_choices and bounded_child is None):mode+=['--model-choice-proof']
     if (args.ui_context and bounded_child is None) or (args.ui_annotation_editor and bounded_child is None):mode+=['--context-proof']
     if (args.ui_annotation_editor and bounded_child is None):mode+=['--annotation-proof']
@@ -285,6 +289,11 @@ def ui_smoke(config, first, bounded_child=None):
             feedback=receipt['feedbackWriteProof']
             assert feedback['mutated'] and all(feedback[key] for key in ('originalScope','duplicateFrameRejected','casConflictCurrent','noteSave','setRatingPreservesNote','newJudgmentClearsNote','sameRatingDeletes','sameValueSet','serverTimestamp','opaqueVersions','freshReadAfterDelete','draftsPreserved')),feedback
             assert not feedback['ratingControls'] and not feedback['nativeInteraction'],feedback
+        if args.ui_feedback_transcript:
+            feedback=receipt['feedbackTranscriptProof']
+            assert all(feedback[key] for key in ('embeddedTranscript','runViewRouting','originalTarget','coldRead','savedChineseNote','noteReopened','sameRatingDeletes','freshReadAfterDelete','draftsPreserved')),feedback
+            assert not feedback['nativeInteraction'] and not feedback['readingAnchorAcceptance'],feedback
+            assert content['feedbackRows']>=1,content
         if args.ui_feedback_controls:
             feedback=receipt['feedbackControlsProof']
             assert all(feedback[key] for key in ('publicControls','semanticActions','committedNoteReopened','trimmedChineseNote','blankClearsNote','sameRatingDeletes','freshReadAfterDelete','draftPreserved','lightDarkRendered')),feedback

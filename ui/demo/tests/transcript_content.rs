@@ -616,3 +616,120 @@ fn two_durable_entries_cannot_both_claim_one_optimistic_widget() {
         Some(original)
     );
 }
+
+fn feedback_snapshot() -> TranscriptSnapshot {
+    let mut source = snapshot();
+    let answer = source.items.iter_mut().find(|i| i.id == "output").unwrap();
+    answer.record_id = Some("public-output".into());
+    answer.metadata = json!({"feedbackMessageId":"public-output"});
+    source
+}
+#[test]
+fn feedback_mounts_only_for_a_proven_final_response_and_retires_corrected_payload_ids() {
+    let mut source = feedback_snapshot();
+    let mut view = content();
+    view.configure_feedback(Some(Default::default())).unwrap();
+    view.update(&scope(), 1, 1, &source, true).unwrap();
+    let feedback = view.feedback_controls().next().unwrap().0;
+    let keys = view.row_keys();
+    let pos = keys
+        .iter()
+        .position(|k| matches!(k, TranscriptContentRowKey::TurnFeedback(_)))
+        .unwrap();
+    assert!(matches!(
+        &keys[pos - 1],
+        TranscriptContentRowKey::TurnFootnote(_)
+    ));
+    source.items[1].time = Some(200.);
+    view.update(&scope(), 2, 1, &source, true).unwrap();
+    assert_eq!(view.feedback_controls().next().unwrap().0, feedback);
+    source.items[1].text = "corrected response".into();
+    view.update(&scope(), 3, 1, &source, true).unwrap();
+    assert_ne!(view.feedback_controls().next().unwrap().0, feedback);
+    source.items[1].metadata = json!({});
+    view.update(&scope(), 4, 1, &source, true).unwrap();
+    assert_eq!(view.feedback_controls().count(), 0);
+}
+#[test]
+fn composing_feedback_preflights_response_replacement_and_keeps_the_original_text_field() {
+    let mut source = feedback_snapshot();
+    let mut view = content();
+    view.configure_feedback(Some(Default::default())).unwrap();
+    view.update(&scope(), 1, 1, &source, true).unwrap();
+    let feedback = view.feedback_controls().next().unwrap().0;
+    let target = view
+        .feedback_controls()
+        .next()
+        .unwrap()
+        .1
+        .target()
+        .unwrap()
+        .clone();
+    view.feedback_mut(feedback)
+        .unwrap()
+        .update(FeedbackControlState {
+            target,
+            publication: 1,
+            connection_epoch: 1,
+            current: Some(
+                serde_json::from_value(
+                    json!({"messageId":"public-output","rating":"positive","version":"v"}),
+                )
+                .unwrap(),
+            ),
+            put_available: true,
+            delete_available: true,
+        })
+        .unwrap();
+    let id = view.id();
+    let mut host = view.into_host().unwrap();
+    let note = root(&mut host, id)
+        .feedback_mut(feedback)
+        .unwrap()
+        .ids()
+        .edit_note;
+    host.accessibility_action(note, None, AccessibilityAction::Press);
+    let actions = host.drain_actions();
+    assert!(
+        root(&mut host, id)
+            .take_feedback_intents(&actions)
+            .is_empty()
+    );
+    let editor = root(&mut host, id)
+        .feedback_mut(feedback)
+        .unwrap()
+        .ids()
+        .editor;
+    host.focus(Some(editor), true);
+    host.event(&ContentEvent::Preedit {
+        text: "组字".into(),
+        selection: 2..2,
+        clauses: vec![],
+        replacement: None,
+    });
+    let actions = host.drain_actions();
+    root(&mut host, id).take_feedback_intents(&actions);
+    source.items[1].text = "corrected response".into();
+    assert!(
+        root(&mut host, id)
+            .update(&scope(), 2, 1, &source, true)
+            .is_err()
+    );
+    assert_eq!(
+        root(&mut host, id).composing_feedback_editor(),
+        Some(editor)
+    );
+    host.event(&ContentEvent::Commit {
+        text: "中文".into(),
+        replacement: None,
+    });
+    let actions = host.drain_actions();
+    root(&mut host, id).take_feedback_intents(&actions);
+    root(&mut host, id)
+        .update(&scope(), 2, 1, &source, true)
+        .unwrap();
+    assert_ne!(
+        root(&mut host, id).feedback_controls().next().unwrap().0,
+        feedback
+    );
+}

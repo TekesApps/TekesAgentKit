@@ -1,6 +1,6 @@
 //! Original-binding bridge for public feedback controls. No host-side CAS policy.
 use crate::{FeedbackFrame, FeedbackOutcome, FeedbackPreparation, FeedbackRequest, RunBinding};
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 use tekes_agent_components_ui::{
     FeedbackControlResult, FeedbackControlState, FeedbackGesture, FeedbackGestureAction,
     TurnFeedback,
@@ -44,6 +44,7 @@ pub enum FeedbackUiAdoption {
     Adopted(Option<FeedbackFrame>),
 }
 pub struct FeedbackUiCompletion {
+    source: Weak<RunBinding>,
     ignored: bool,
     gesture: FeedbackGesture,
     result: FeedbackControlResult,
@@ -86,6 +87,7 @@ impl FeedbackUiRequest {
         let outcome = match self.operation {
             Operation::Ignored => {
                 return FeedbackUiCompletion {
+                    source: Arc::downgrade(&self.source),
                     ignored: true,
                     gesture: self.gesture,
                     result: FeedbackControlResult::NeedsRefresh(String::new()),
@@ -127,6 +129,7 @@ impl FeedbackUiRequest {
             }
         };
         FeedbackUiCompletion {
+            source: Arc::downgrade(&self.source),
             ignored: false,
             gesture: self.gesture,
             result,
@@ -137,7 +140,17 @@ impl FeedbackUiRequest {
 impl FeedbackUiCompletion {
     /// A stale/closed mount never adopts a result or replaces a newer draft.
     /// None also invalidates a host's old frame after an uncertain completion.
-    pub fn apply(self, control: &mut TurnFeedback) -> FeedbackUiAdoption {
+    pub fn apply(mut self, control: &mut TurnFeedback) -> FeedbackUiAdoption {
+        if self.frame.as_ref().is_some_and(|frame| {
+            self.source
+                .upgrade()
+                .is_none_or(|source| frame.controls(&source, self.gesture.target()).is_err())
+        }) {
+            self.frame = None;
+            self.result = FeedbackControlResult::NeedsRefresh(
+                "feedback completion was superseded before adoption".into(),
+            );
+        }
         if self.ignored || !control.complete(&self.gesture, self.result) {
             FeedbackUiAdoption::Ignored
         } else {

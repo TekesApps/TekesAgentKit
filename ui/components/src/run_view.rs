@@ -18,10 +18,16 @@ pub struct RunViewIds {
 #[derive(Debug)]
 pub enum RunViewIntent {
     Composer(ComposerIntent),
-    LoadEarlier { scope: RunScope },
+    LoadEarlier {
+        scope: RunScope,
+    },
     Actionable(ActionableResponseIntent),
     TurnAction(Box<TurnFootnoteIntent>),
     CopyTranscript(TranscriptCopyIntent),
+    Feedback {
+        control: ComponentId,
+        gesture: Box<FeedbackGesture>,
+    },
 }
 /// Experimental reusable Run composition. Mount one per original binding; it
 /// cannot be retargeted. A complete Transcript requires upstream reading/rich APIs.
@@ -245,6 +251,16 @@ impl RunView {
         self.install_transcript(content)?;
         Ok(self)
     }
+    /// Opt into evaluation controls for independently addressable sources with
+    /// public feedback capability. Keep None for bounded read-only child history.
+    pub fn configure_feedback(
+        &mut self,
+        labels: Option<FeedbackLabels>,
+    ) -> Result<(), &'static str> {
+        self.transcript_mut()
+            .ok_or("RunView has no Transcript")?
+            .configure_feedback(labels)
+    }
     /// Apply one frame, including per-binding read/response authority. The
     /// controls flag only restricts canonical actions; dispatch still revalidates.
     pub fn update(
@@ -404,6 +420,13 @@ impl RunView {
     /// Drain once immediately after ContentHost event/AX delivery, before update.
     /// The host resolves these intents against the original binding, not selection.
     pub fn take_intents(&mut self, actions: &[ContentAction]) -> Vec<RunViewIntent> {
+        if self
+            .transcript()
+            .is_some_and(|content| content.composing_feedback_editor().is_some())
+        {
+            self.transcript_mut().unwrap().take_feedback_intents(&[]);
+            return vec![];
+        }
         let mut intents: Vec<_> = self
             .composer_mut()
             .take_intents(actions)
@@ -412,6 +435,14 @@ impl RunView {
             .collect();
         if self.composer().is_composing() {
             return intents;
+        }
+        if let Some(content) = self.transcript_mut() {
+            intents.extend(content.take_feedback_intents(actions).into_iter().map(
+                |(control, gesture)| RunViewIntent::Feedback {
+                    control,
+                    gesture: Box::new(gesture),
+                },
+            ));
         }
         for node in &mut self.body.children {
             if node.id() == self.paging {

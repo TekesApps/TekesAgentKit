@@ -1125,3 +1125,18 @@ fn independent_host_mounts_feedback_without_a_demo_or_private_binding_type() {
             .is_none()
     );
 }
+
+/// Public RunView composition opts into per-turn feedback without a test host.
+pub fn run_with_feedback(
+    scope: tekes_agent_components_ui::RunScope,
+) -> tekes_agent_components_ui::RunView {
+    let mut run = tekes_agent_components_ui::RunView::standard(93, 97..120, scope).unwrap();
+    run.configure_feedback(Some(Default::default())).unwrap();
+    run
+}
+#[test]
+fn independent_host_can_opt_in_to_transcript_feedback() {
+    let run = run_with_feedback(tekes_agent_components_ui::RunScope::main("fixture", "a"));
+    assert_eq!(run.transcript().unwrap().feedback_controls().count(), 0);
+    run.into_host().unwrap();
+}

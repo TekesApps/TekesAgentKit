@@ -143,6 +143,9 @@ impl ReadOnlyTranscript {
         content: TranscriptContent,
         labels: ReadOnlyTranscriptLabels,
     ) -> Result<Self, &'static str> {
+        if content.feedback_enabled() {
+            return Err("bounded read-only history cannot mount evaluation controls");
+        }
         if content.scope() != &scope {
             return Err("read-only transcript scope mismatch");
         }
