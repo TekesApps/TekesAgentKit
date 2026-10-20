@@ -1,9 +1,12 @@
 //! Real SEP/page facade proof; no scrolling or reading-anchor implementation.
 use crate::component_demo::{ComponentDemo, DemoCommand, SELECT_A, SELECT_B};
 use serde_json::{Value, json};
-use std::{collections::BTreeSet, sync::Arc, time::Duration};
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
 use tekes_agent_contract::{Error, Result, require, unsupported};
-use tekes_agent_presentation::{ComposerDestination, TranscriptSnapshot};
+use tekes_agent_presentation::{
+    ComposerDestination, TranscriptDocument, TranscriptItem, TranscriptMessageKey,
+    TranscriptSnapshot,
+};
 use tekes_agent_session::SessionRuntime;
 use tekes_agent_ui_bindings::{HistoryPagePhase, RunBinding};
 use tekes_ui_controls::composition::AccessibilityAction;
@@ -37,20 +40,36 @@ fn frontier(runtime: &SessionRuntime, binding: &RunBinding) -> Result<Frontier> 
         })
     })
 }
-fn keys(snapshot: &TranscriptSnapshot) -> BTreeSet<&str> {
-    snapshot
-        .items
-        .iter()
-        .filter(|item| item.is_visible && !item.is_provisional)
-        .map(|item| item.id.as_str())
-        .collect()
+fn records(
+    snapshot: &TranscriptSnapshot,
+) -> Result<BTreeMap<TranscriptMessageKey<'_>, &TranscriptItem>> {
+    let document = TranscriptDocument::read(snapshot)?;
+    let mut result = BTreeMap::new();
+    for section in document.sections {
+        for row in section.inputs {
+            if !row.item.is_provisional {
+                result.insert(row.key, row.item);
+            }
+        }
+        for row in section.outputs {
+            if !row.item.is_provisional {
+                result.insert(row.key, row.item);
+            }
+        }
+    }
+    for row in document.session_notices {
+        if !row.item.is_provisional {
+            result.insert(row.key, row.item);
+        }
+    }
+    Ok(result)
 }
 fn retained(before: &TranscriptSnapshot, after: &TranscriptSnapshot) -> Result<()> {
-    let previous = keys(before);
-    let next = keys(after);
+    let previous = records(before)?;
+    let next = records(after)?;
     require(
-        previous.is_subset(&next),
-        "page/reconnect lost stable message identities",
+        previous.keys().all(|key| next.contains_key(key)),
+        "page/reconnect lost message document identities",
     )?;
     require(
         next.len()
@@ -61,16 +80,8 @@ fn retained(before: &TranscriptSnapshot, after: &TranscriptSnapshot) -> Result<(
                 .count(),
         "duplicate page identities",
     )?;
-    for item in before
-        .items
-        .iter()
-        .filter(|item| item.is_visible && !item.is_provisional)
-    {
-        let next = after
-            .items
-            .iter()
-            .find(|next| next.id == item.id)
-            .expect("verified subset");
+    for (key, item) in previous {
+        let next = next.get(&key).expect("verified subset");
         require(
             item.text == next.text
                 && item.reasoning == next.reasoning
@@ -155,7 +166,7 @@ pub async fn run(view: &mut ComponentDemo, runtime: &Arc<SessionRuntime>) -> Res
         loop {
             let snapshot = a.current_run().unwrap();
             if !snapshot.transcript.is_stale
-                && keys(&snapshot.transcript).len() > keys(&before_history).len()
+                && records(&snapshot.transcript)?.len() > records(&before_history)?.len()
             {
                 return Ok::<_, Error>(snapshot.transcript.clone());
             }
@@ -217,6 +228,6 @@ pub async fn run(view: &mut ComponentDemo, runtime: &Arc<SessionRuntime>) -> Res
     view.sync()?;
     Ok(
         json!({"originalScope":true,"extended":true,"frozenCut":true,"sourceKind":source_kind,"otherDraftPreserved":true,"sourceStatusPublished":true,
-        "retainedMessages":keys(&after_history).len(),"newEpochHistoryRetained":true,"noDuplicateMessages":true,"oldReceiptInvalidated":true,"nativeInteraction":false,"readingAnchorAcceptance":false}),
+        "retainedMessages":records(&after_history)?.len(),"newEpochHistoryRetained":true,"noDuplicateMessages":true,"oldReceiptInvalidated":true,"nativeInteraction":false,"readingAnchorAcceptance":false}),
     )
 }

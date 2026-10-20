@@ -333,3 +333,93 @@ fn pure_attachment_input_is_structured_and_conflicting_legacy_text_stays_unorder
     assert_eq!(conflict.items[0].text, "legacy different");
     assert!(conflict.items[0].content_blocks.is_none());
 }
+
+#[test]
+fn durable_native_message_key_does_not_shift_when_same_timestamp_history_is_prepended() {
+    let retained = vec![
+        json!({"type":"message","id":"new-user","message":{"role":"user","timestamp":8,"content":"same input"}}),
+        json!({"type":"message","id":"new-answer","message":{"role":"assistant","timestamp":9,"content":"same answer","stopReason":"stop"}}),
+    ];
+    let before = native(retained.clone(), None);
+    let mut expanded = vec![
+        json!({"type":"message","id":"old-user","message":{"role":"user","timestamp":8,"content":"same input"}}),
+        json!({"type":"message","id":"old-answer","message":{"role":"assistant","timestamp":9,"content":"same answer","stopReason":"stop"}}),
+    ];
+    expanded.extend(retained);
+    let after = native(expanded, None);
+    let old = TranscriptDocument::read(&before).unwrap();
+    let next = TranscriptDocument::read(&after).unwrap();
+    assert_eq!(
+        old.sections[0].outputs[0].item.record_id,
+        next.sections[1].outputs[0].item.record_id
+    );
+    assert_eq!(
+        old.sections[0].outputs[0].key,
+        next.sections[1].outputs[0].key
+    );
+    assert_ne!(
+        old.sections[0].outputs[0].key,
+        next.sections[0].outputs[0].key
+    );
+}
+
+#[test]
+fn native_preview_does_not_claim_a_durable_entry_or_guess_an_alias_from_equal_content() {
+    let user = json!({"type":"message","id":"u","message":{"role":"user","timestamp":1,"content":"input"}});
+    let message =
+        json!({"role":"assistant","timestamp":2,"content":"same answer","stopReason":"stop"});
+    let live = native(
+        vec![user.clone()],
+        Some(json!({"type":"message_update","message":message})),
+    );
+    let recorded = native(
+        vec![
+            user,
+            json!({"type":"message","id":"answer-entry","message":message}),
+        ],
+        None,
+    );
+    let before = TranscriptDocument::read(&live).unwrap();
+    let after = TranscriptDocument::read(&recorded).unwrap();
+    assert_eq!(
+        before.sections[0].outputs[0].item.id,
+        after.sections[0].outputs[0].item.id
+    );
+    assert!(matches!(
+        before.sections[0].outputs[0].key,
+        TranscriptMessageKey::Item(_)
+    ));
+    assert_eq!(
+        after.sections[0].outputs[0].key,
+        TranscriptMessageKey::NativeEntry("answer-entry")
+    );
+    assert_ne!(
+        before.sections[0].outputs[0].key,
+        after.sections[0].outputs[0].key
+    );
+    assert!(before.sections[0].outputs[0].item.source_position.is_none());
+}
+
+#[test]
+fn durable_native_input_key_survives_a_receipt_discovered_in_an_earlier_page() {
+    use sha2::{Digest, Sha256};
+    let entries = vec![
+        json!({"type":"message","id":"u","message":{"role":"user","timestamp":1,"content":"input"}}),
+    ];
+    let before = native(entries.clone(), None);
+    let mut expanded = vec![
+        json!({"type":"custom","id":"receipt-entry","customType":"agentkit.inputReceipt.v1","data":{"rpcId":"rpc","timestamp":1,"hash":format!("{:x}",Sha256::digest(b"input"))}}),
+    ];
+    expanded.extend(entries);
+    let after = native(expanded, None);
+    assert!(before.items[0].reconciliation_id.is_none());
+    assert_eq!(after.items[0].reconciliation_id.as_deref(), Some("rpc"));
+    let a = TranscriptDocument::read(&before).unwrap();
+    let b = TranscriptDocument::read(&after).unwrap();
+    assert_eq!(a.sections[0].inputs[0].key, b.sections[0].inputs[0].key);
+    assert_eq!(a.sections[0].inputs[0].reconciliation_key(), None);
+    assert_eq!(
+        b.sections[0].inputs[0].reconciliation_key(),
+        Some(TranscriptMessageKey::Submission("rpc"))
+    );
+}

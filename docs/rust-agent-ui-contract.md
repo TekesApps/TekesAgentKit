@@ -190,6 +190,8 @@ Transcript 现已保留公开来源位置并提供 [事件顺序输入](rust-age
 
 独立公开 [TranscriptPaging 控件](rust-agent-ui-paging-controls-20261020.md) 组合默认 TekesUI 按钮与状态文字，并复用原 binding 的一次性分页请求、原 scope 回执及 canonical has-more/stale。主会话和可写 pane 的测试宿主已接入，完整 Transcript/RunView 和阅读锚点仍待上游公开能力及原生验收。
 
+文档的已落盘 native 消息改用公开 NativeEntry key，修复同时间戳历史前插时 timeline occurrence 改变造成的身份换绑，见[消息身份修正](rust-agent-ui-native-message-identity-20261020.md)。底层 Item ID 和流式行为保持兼容；无 entry 的临时流不能冒充持久阅读身份。可靠的流/记录阅读目标迁移仍属于 AgentKit 后续工作，并非仅等待 TekesUI 即可完成。
+
 新增 [规范化内容块](rust-agent-ui-transcript-content-20261020.md) 保留公开消息内的正文/推理/工具/附件/未知块及覆盖状态，工具只引用既有 DTO。正式组件尚未实现；该模型不替代 TekesUI 文本、混合内容锚点或真实排版验收。
 
 已补 [分页读取回执](rust-agent-ui-history-paging-20261020.md)：原 binding/epoch 的 Loading、Failed、Interrupted 与显式重试，复用现有 runtime / ChildRun 页合并。正式分页控件、文档安装与阅读锚点事务仍未完成。

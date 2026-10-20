@@ -609,3 +609,76 @@ fn independent_host_mounts_default_paging_controls_without_a_run_surface() {
     let host = control.into_host().unwrap();
     assert!(host.get(button).is_some());
 }
+
+/// Native durable identities are a separate namespace from journal/timeline
+/// keys. Hosts must keep the original RunScope with the returned entry ID.
+pub fn native_transcript_entry<'a>(
+    key: tekes_agent_components_ui::TranscriptMessageKey<'a>,
+) -> Option<&'a str> {
+    match key {
+        tekes_agent_components_ui::TranscriptMessageKey::NativeEntry(id) => Some(id),
+        _ => None,
+    }
+}
+#[test]
+fn independent_consumer_retains_the_same_native_entry_when_the_loaded_prefix_changes() {
+    use tekes_agent_components_ui::{
+        TranscriptItem, TranscriptItemKind, TranscriptSnapshot, TranscriptSourcePosition,
+    };
+    fn row(id: &str, entry: &str, ordinal: usize) -> TranscriptItem {
+        TranscriptItem {
+            id: id.into(),
+            record_id: Some(entry.into()),
+            reconciliation_id: None,
+            turn_id: "turn".into(),
+            kind: TranscriptItemKind::Assistant,
+            text: "same answer".into(),
+            reasoning: String::new(),
+            attachments: vec![],
+            content_blocks: None,
+            is_visible: true,
+            is_final: true,
+            is_provisional: false,
+            reasoning_ended: true,
+            source_sequence: None,
+            source_position: Some(TranscriptSourcePosition::Native {
+                entry_id: entry.into(),
+                entry_ordinal: ordinal,
+                content_index: None,
+            }),
+            time: Some(9.0),
+            metadata: Default::default(),
+        }
+    }
+    let before = TranscriptSnapshot {
+        items: vec![row("timeline:0", "retained", 0)],
+        ..Default::default()
+    };
+    let after = TranscriptSnapshot {
+        items: vec![
+            row("timeline:0", "older", 0),
+            row("timeline:1", "retained", 1),
+        ],
+        ..Default::default()
+    };
+    let a = transcript_document(&before).unwrap();
+    let b = transcript_document(&after).unwrap();
+    assert_eq!(a.sections[0].outputs[0].key, b.sections[0].outputs[1].key);
+    assert_eq!(
+        native_transcript_entry(b.sections[0].outputs[1].key),
+        Some("retained")
+    );
+    assert_ne!(a.sections[0].outputs[0].key, b.sections[0].outputs[0].key);
+    let mut user = before.clone();
+    user.items[0].kind = TranscriptItemKind::User;
+    user.items[0].reconciliation_id = Some("original-rpc".into());
+    let user_document = transcript_document(&user).unwrap();
+    let input = &user_document.sections[0].inputs[0];
+    assert_eq!(native_transcript_entry(input.key), Some("retained"));
+    assert!(matches!(
+        input.reconciliation_key(),
+        Some(tekes_agent_components_ui::TranscriptMessageKey::Submission(
+            "original-rpc"
+        ))
+    ));
+}

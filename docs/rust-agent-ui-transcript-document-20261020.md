@@ -14,7 +14,9 @@
 - output footnote 返回已有 turn：共享 action definitions、live/reported usage 与边界不重新计算；reportedUsage 缺失不显示成已知零。
 - has_more_before、is_stale、diagnostics 原样传入。分页 loading/error/retry 及公开阅读事务仍待正式组件绑定，不把三个事实字段称作完整分页 UI。
 
-key 在同一 RunScope 内有效。User 有 reconciliation_id 时使用 Submission key，optimistic echo 变成服务端记录、所属 turn 改变也保留这个 key；其余使用既有 Item key。不按文本匹配、不以行号为 key。分页前插与流式修改正文不会改变既有 key。缺少 reconciliation_id 时不能承诺恢复另一条记录的 identity；这不是新的对账算法。空身份、重复 item/turn/tool 身份或重复可见 submission key 会失败，避免把阅读目标绑定到错误内容。
+key 在同一 RunScope 内有效。NativeConversation 已有公开 source_position.entry_id 的记录始终使用 NativeEntry key，不因后来读到输入回执而改 key。输入的 reconciliation_key() 单独暴露公开回执中的 Submission 关联；正式视图可据此关联原 optimistic echo。其余输入有 reconciliation_id 时使用 Submission key，没有则保留既有 Item key。不按文本匹配、不以行号为 key。空身份、重复 item/turn/tool 身份、重复可见 native entry 或 submission key 会失败，避免把阅读目标绑定到错误内容。
+
+Native assistant 的底层 timeline Item ID 沿用 ClientKit 对齐的 timestamp + 当前窗口 occurrence；前插同时间戳历史时它会变化，不能直接用作持久阅读目标。文档的 NativeEntry key 修复这一点，不更改底层 Item ID、stream reconciliation 或 harness。无公开 entry 的 native preview 仍是临时 Item key，不能据此承诺跨分页或落盘的稳定锚点，也不把它与某个 NativeEntry 按相同正文/时间戳自动关联。stream → durable 的阅读目标迁移仍须有独立来源证明和正式事务验收，不能把此前底层 Item ID 的正常同值样例当作普遍证明。详见[身份修正](rust-agent-ui-native-message-identity-20261020.md)。
 
 ## 行为参考与最小样式扩展
 

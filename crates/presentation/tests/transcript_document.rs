@@ -254,3 +254,63 @@ fn public_session_notices_are_not_rejected_or_assigned_to_a_fake_turn() {
     };
     assert!(TranscriptDocument::read(&malformed).is_err());
 }
+
+#[test]
+fn native_entries_are_validated_independently_of_submission_and_item_namespaces() {
+    let mut input = item("user", "turn", TranscriptItemKind::User);
+    input.reconciliation_id = Some("rpc".into());
+    input.source_position = Some(TranscriptSourcePosition::Native {
+        entry_id: "entry".into(),
+        entry_ordinal: 0,
+        content_index: None,
+    });
+    let mut output = item("answer", "turn", TranscriptItemKind::Assistant);
+    output.source_position = Some(TranscriptSourcePosition::Native {
+        entry_id: "entry".into(),
+        entry_ordinal: 1,
+        content_index: None,
+    });
+    let mut snapshot = TranscriptSnapshot {
+        items: vec![input, output],
+        ..Default::default()
+    };
+    assert!(TranscriptDocument::read(&snapshot).is_err());
+    if let Some(TranscriptSourcePosition::Native { entry_id, .. }) =
+        &mut snapshot.items[1].source_position
+    {
+        *entry_id = "answer-entry".into();
+    }
+    let doc = TranscriptDocument::read(&snapshot).unwrap();
+    assert_eq!(
+        doc.sections[0].inputs[0].key,
+        TranscriptMessageKey::NativeEntry("entry")
+    );
+    assert_eq!(
+        doc.sections[0].inputs[0].reconciliation_key(),
+        Some(TranscriptMessageKey::Submission("rpc"))
+    );
+    assert_eq!(
+        doc.sections[0].outputs[0].key,
+        TranscriptMessageKey::NativeEntry("answer-entry")
+    );
+    assert_ne!(
+        doc.sections[0].outputs[0].key,
+        TranscriptMessageKey::Item("answer-entry")
+    );
+    let mut duplicate_submission = snapshot.clone();
+    let mut repeated = snapshot.items[0].clone();
+    repeated.id = "another-user".into();
+    repeated.source_position = Some(TranscriptSourcePosition::Native {
+        entry_id: "another-user-entry".into(),
+        entry_ordinal: 2,
+        content_index: None,
+    });
+    duplicate_submission.items.push(repeated);
+    assert!(TranscriptDocument::read(&duplicate_submission).is_err());
+    if let Some(TranscriptSourcePosition::Native { entry_id, .. }) =
+        &mut snapshot.items[0].source_position
+    {
+        entry_id.clear();
+    }
+    assert!(TranscriptDocument::read(&snapshot).is_err());
+}

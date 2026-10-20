@@ -5,11 +5,20 @@ use crate::{
 use std::collections::{BTreeMap, BTreeSet};
 use tekes_agent_contract::{Result, require};
 
-/// Identity within the owning RunScope, independent of list position or text.
-/// A submission keeps its message identity when an optimistic echo is reconciled.
+/// Key within the owning RunScope. Submission identifies a pending/journal input
+/// or an explicit receipt association; NativeEntry survives loaded-window changes.
+/// Item retains the existing legacy
+/// or temporary timeline key and is not proof of a durable native reading target.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TranscriptMessageKey<'a> {
     Submission(&'a str),
+    /// Public durable NativeConversation entry identity. Native assistant
+    /// timeline IDs use window-local timestamp occurrences and are not durable
+    /// across prefix expansion. This key never uses entry ordinal or text.
+    NativeEntry(&'a str),
+    /// Legacy/journal item or temporary native preview. A native preview without
+    /// a public entry identity must not be aliased to a durable record by text,
+    /// timestamp or a window-local occurrence counter.
     Item(&'a str),
 }
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -24,6 +33,18 @@ pub struct TranscriptInput<'a> {
     pub item: &'a TranscriptItem,
     /// Render outside the bubble. Pending inputs never acquire a made-up timestamp.
     pub footnote: TranscriptDelivery,
+}
+impl<'a> TranscriptInput<'a> {
+    /// Explicit shared receipt association for an optimistic Submission key.
+    /// A NativeEntry remains canonical even if this receipt is discovered later.
+    /// Keep the original RunScope/publication; this is not an authority token.
+    pub fn reconciliation_key(&self) -> Option<TranscriptMessageKey<'a>> {
+        self.item
+            .reconciliation_id
+            .as_deref()
+            .filter(|id| !id.is_empty())
+            .map(TranscriptMessageKey::Submission)
+    }
 }
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TranscriptOutput<'a> {
@@ -83,6 +104,8 @@ impl<'a> TranscriptDocument<'a> {
         }
         let mut keys = BTreeSet::new();
         let mut item_ids = BTreeSet::new();
+        let mut native_entries = BTreeSet::new();
+        let mut submissions = BTreeSet::new();
         for item in &snapshot.items {
             require(!item.id.is_empty(), "empty Transcript message identity")?;
             require(
@@ -92,16 +115,38 @@ impl<'a> TranscriptDocument<'a> {
             if !item.is_visible {
                 continue;
             }
-            let key = if item.kind == TranscriptItemKind::User {
+            let source_key = match &item.source_position {
+                Some(crate::TranscriptSourcePosition::Native { entry_id, .. }) => {
+                    require(
+                        !entry_id.is_empty(),
+                        "empty native Transcript entry identity",
+                    )?;
+                    require(
+                        native_entries.insert(entry_id.as_str()),
+                        "duplicate native Transcript entry identity",
+                    )?;
+                    TranscriptMessageKey::NativeEntry(entry_id)
+                }
+                _ => TranscriptMessageKey::Item(&item.id),
+            };
+            let submission = if item.kind == TranscriptItemKind::User {
                 match item.reconciliation_id.as_deref() {
                     Some(id) => {
                         require(!id.is_empty(), "empty Transcript submission identity")?;
-                        TranscriptMessageKey::Submission(id)
+                        require(
+                            submissions.insert(id),
+                            "ambiguous Transcript submission identity",
+                        )?;
+                        Some(TranscriptMessageKey::Submission(id))
                     }
-                    None => TranscriptMessageKey::Item(&item.id),
+                    None => None,
                 }
             } else {
-                TranscriptMessageKey::Item(&item.id)
+                None
+            };
+            let key = match source_key {
+                TranscriptMessageKey::NativeEntry(_) => source_key,
+                _ => submission.unwrap_or(source_key),
             };
             require(keys.insert(key), "ambiguous Transcript message identity")?;
             if item.kind == TranscriptItemKind::Notice && item.turn_id.is_empty() {
