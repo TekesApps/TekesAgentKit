@@ -1,7 +1,11 @@
 //! Agent summary UI. Membership, totals, costs and domain actions come from SummaryFacts.
+use crate::summary_section::{Expansion, SummaryDocument, SummarySectionView};
 use std::collections::{BTreeMap, BTreeSet};
-use tekes_agent_presentation::{
-    RunScope, SummaryAction, SummaryFacts, SummaryRow, SummarySection, append_summary_sections,
+use std::{cell::RefCell, rc::Rc};
+use tekes_agent_presentation::{RunScope, append_summary_sections};
+pub use tekes_agent_presentation::{
+    SummaryAction, SummaryArtifact, SummaryFacts, SummaryRow, SummarySection, SummarySubagent,
+    SummaryUsage,
 };
 use tekes_ui_controls::{ButtonTextRenderer, ScrollArea, composition::*, layout::MeasuredChild};
 use tekes_ui_scene::{Rect, Size};
@@ -11,7 +15,7 @@ pub struct SummaryInput {
     pub revision: u64,
     pub scope: RunScope,
     pub facts: Option<SummaryFacts>,
-    /// Host additions (e.g. Git) in caller order, through the existing public section contract.
+    /// Host additions (e.g. Git) precede default providers, in caller order.
     pub host_sections: Vec<SummarySection>,
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -68,7 +72,32 @@ impl Default for SummaryLabels {
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Key {
     Section(RunScope, String),
-    Row(RunScope, String, String, bool),
+    Header(RunScope, String),
+    Body(RunScope, String),
+    Row(RunScope, String, String, ActionIdentity),
+}
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum ActionIdentity {
+    Passive,
+    Task(String, RunScope),
+    Subagent(RunScope, String),
+    Artifact(RunScope, String),
+}
+impl ActionIdentity {
+    fn read(action: Option<&SummaryAction>) -> Self {
+        match action {
+            None => Self::Passive,
+            Some(SummaryAction::OpenTask { task_id, scope }) => {
+                Self::Task(task_id.clone(), scope.clone())
+            }
+            Some(SummaryAction::OpenSubagent { parent, child_id }) => {
+                Self::Subagent(parent.clone(), child_id.clone())
+            }
+            Some(SummaryAction::OpenArtifact { scope, path }) => {
+                Self::Artifact(scope.clone(), path.clone())
+            }
+        }
+    }
 }
 #[derive(Debug)]
 pub struct SummaryView {
@@ -79,7 +108,9 @@ pub struct SummaryView {
     next: u64,
     revision: u64,
     scope: Option<RunScope>,
-    bindings: BTreeMap<ComponentId, SummaryIntent>,
+    bindings: BTreeMap<ComponentId, (String, SummaryIntent)>,
+    expansions: BTreeMap<String, Expansion>,
+    last: Option<SummaryInput>,
 }
 impl SummaryView {
     pub fn new(namespace: u32, labels: SummaryLabels) -> Self {
@@ -90,13 +121,15 @@ impl SummaryView {
                 ScrollArea::default(),
                 Content::new(
                     ComponentId(base + 1),
-                    ListContent::new(
-                        &labels.name,
-                        vec![Content::new(
-                            ComponentId(base + 2),
-                            TextContent::new(&labels.unavailable),
-                        )],
-                    ),
+                    SummaryDocument {
+                        list: ListContent::new(
+                            &labels.name,
+                            vec![Content::new(
+                                ComponentId(base + 2),
+                                TextContent::new(&labels.unavailable),
+                            )],
+                        ),
+                    },
                 ),
             ),
             labels,
@@ -105,10 +138,26 @@ impl SummaryView {
             revision: 0,
             scope: None,
             bindings: BTreeMap::new(),
+            expansions: BTreeMap::new(),
+            last: None,
         }
     }
     pub fn id(&self) -> ComponentId {
         self.root
+    }
+    pub fn displayed_input(&self) -> Option<&SummaryInput> {
+        self.last.as_ref()
+    }
+    pub fn row_id(&self, section: &str, row: &str) -> Option<ComponentId> {
+        let scope = self.scope.as_ref()?;
+        self.ids.iter().find_map(|(key, id)| match key {
+            Key::Row(owner, section_id, row_id, _)
+                if owner == scope && section_id == section && row_id == row =>
+            {
+                Some(*id)
+            }
+            _ => None,
+        })
     }
     pub fn into_host(self) -> Result<ContentHost, CompositionError> {
         let mut host = ContentHost::new(Content::new(self.root, self))?;
@@ -116,17 +165,55 @@ impl SummaryView {
         Ok(host)
     }
     pub fn action_id(&self, section: &str, row: &str) -> Option<ComponentId> {
+        self.row_id(section, row)
+            .filter(|id| self.bindings.contains_key(id))
+    }
+    pub fn section_header_id(&self, section: &str) -> Option<ComponentId> {
         self.ids
-            .get(&Key::Row(
-                self.scope.as_ref()?.clone(),
-                section.into(),
-                row.into(),
-                true,
-            ))
+            .get(&Key::Header(self.scope.as_ref()?.clone(), section.into()))
             .copied()
     }
+    pub fn section_expanded(&self, section: &str) -> Option<bool> {
+        self.section_header_id(section)?;
+        Some(self.expansions.get(section)?.borrow().open)
+    }
+    pub fn section_order(&self) -> Vec<&str> {
+        self.scroll.children()[0]
+            .component::<SummaryDocument>()
+            .unwrap()
+            .list
+            .rows
+            .children
+            .iter()
+            .filter_map(|node| {
+                node.component::<SummarySectionView>()
+                    .map(|block| block.section.as_str())
+            })
+            .collect()
+    }
+    pub fn section_layouts(&self) -> Vec<&crate::SummarySectionLayout> {
+        let mut layouts = vec![];
+        for node in &self.scroll.children()[0]
+            .component::<SummaryDocument>()
+            .unwrap()
+            .list
+            .rows
+            .children
+        {
+            if let Some(block) = node.component::<SummarySectionView>() {
+                let Some(layout) = block.arranged() else {
+                    return vec![];
+                };
+                layouts.push(layout);
+            }
+        }
+        layouts
+    }
     pub fn update(&mut self, input: &SummaryInput) -> Result<(), &'static str> {
-        if input.revision == 0 || input.revision < self.revision {
+        if input.revision == 0
+            || input.revision < self.revision
+            || (input.revision == self.revision && self.last.as_ref() != Some(input))
+        {
             return Err("stale or unversioned summary input");
         }
         input
@@ -138,19 +225,23 @@ impl SummaryView {
         {
             return Err("summary facts belong to another run");
         }
-        let mut sections = input
+        let providers = input
             .facts
             .as_ref()
             .map(|facts| facts.sections(&input.scope))
             .unwrap_or_default();
+        let mut sections = vec![];
         append_summary_sections(&mut sections, input.host_sections.clone());
+        sections.extend(providers);
         let mut section_ids = BTreeSet::new();
         let mut keys = BTreeSet::new();
         for section in &sections {
-            if section.id.is_empty() || !section_ids.insert(&section.id) {
+            if section.id.is_empty() || !section_ids.insert(section.id.clone()) {
                 return Err("invalid or duplicate summary section identity");
             }
             keys.insert(Key::Section(input.scope.clone(), section.id.clone()));
+            keys.insert(Key::Header(input.scope.clone(), section.id.clone()));
+            keys.insert(Key::Body(input.scope.clone(), section.id.clone()));
             let mut row_ids = BTreeSet::new();
             for row in &section.rows {
                 if row.id.is_empty() || !row_ids.insert(&row.id) {
@@ -181,7 +272,7 @@ impl SummaryView {
                     input.scope.clone(),
                     section.id.clone(),
                     row.id.clone(),
-                    row.action.is_some(),
+                    ActionIdentity::read(row.action.as_ref()),
                 ));
             }
         }
@@ -208,8 +299,10 @@ impl SummaryView {
             self.scroll.scroll = ScrollArea::default();
         }
         let list = self.scroll.children_mut().expect("summary content")[0]
-            .component_mut::<ListContent>()
+            .component_mut::<SummaryDocument>()
             .expect("summary sections");
+        let list = &mut list.list;
+        list.rows.model.gap = tekes_ui_tokens::Spacing::Section.value();
         let old = std::mem::take(&mut list.rows.children);
         let mut old: BTreeMap<_, _> = old
             .into_iter()
@@ -218,24 +311,44 @@ impl SummaryView {
         let mut bindings = BTreeMap::new();
         for section in sections {
             let id = ids[&Key::Section(input.scope.clone(), section.id.clone())];
-            let mut title = old
-                .remove(&id)
-                .unwrap_or_else(|| Content::new(id, TextContent::new("")));
-            title
-                .component_mut::<TextContent>()
-                .expect("summary section label")
-                .text = (self.labels.section)(&section.id);
-            list.rows.children.push(title);
+            let expansion = self
+                .expansions
+                .entry(section.id.clone())
+                .or_insert_with(|| {
+                    Rc::new(RefCell::new(tekes_ui_controls::extended::Disclosure {
+                        open: true,
+                        disabled: false,
+                    }))
+                })
+                .clone();
+            let mut block = old.remove(&id).unwrap_or_else(|| {
+                Content::new(
+                    id,
+                    SummarySectionView::new(
+                        section.id.clone(),
+                        ids[&Key::Header(input.scope.clone(), section.id.clone())],
+                        ids[&Key::Body(input.scope.clone(), section.id.clone())],
+                        expansion,
+                    ),
+                )
+            });
+            let view = block.component_mut::<SummarySectionView>().unwrap();
+            view.layout = None;
+            view.header_mut().button.label = (self.labels.section)(&section.id);
+            let mut old_rows: BTreeMap<_, _> = std::mem::take(view.rows_mut())
+                .into_iter()
+                .map(|node| (node.id(), node))
+                .collect();
             for row in section.rows {
                 let id = ids[&Key::Row(
                     input.scope.clone(),
                     section.id.clone(),
                     row.id.clone(),
-                    row.action.is_some(),
+                    ActionIdentity::read(row.action.as_ref()),
                 )];
                 let label = (self.labels.row)(&section.id, &row);
                 let content = if let Some(action) = row.action.clone() {
-                    let mut content = old
+                    let mut content = old_rows
                         .remove(&id)
                         .unwrap_or_else(|| Content::new(id, ButtonContent::new("")));
                     content
@@ -244,14 +357,17 @@ impl SummaryView {
                         .label = label;
                     bindings.insert(
                         id,
-                        SummaryIntent {
-                            scope: input.scope.clone(),
-                            action,
-                        },
+                        (
+                            section.id.clone(),
+                            SummaryIntent {
+                                scope: input.scope.clone(),
+                                action,
+                            },
+                        ),
                     );
                     content
                 } else {
-                    let mut content = old
+                    let mut content = old_rows
                         .remove(&id)
                         .unwrap_or_else(|| Content::new(id, TextContent::new("")));
                     content
@@ -260,8 +376,9 @@ impl SummaryView {
                         .text = label;
                     content
                 };
-                list.rows.children.push(content);
+                view.rows_mut().push(content);
             }
+            list.rows.children.push(block);
         }
         if list.rows.children.is_empty() {
             list.rows.children.push(Content::new(
@@ -278,13 +395,24 @@ impl SummaryView {
         self.revision = input.revision;
         self.scope = Some(input.scope.clone());
         self.bindings = bindings;
+        // ClientKit remembers collapsed section IDs even while absent; expanded
+        // absent sections need no retained model or row tree.
+        self.expansions
+            .retain(|section, model| section_ids.contains(section) || !model.borrow().open);
+        self.last = Some(input.clone());
         Ok(())
     }
     pub fn take_intents(&self, actions: &[ContentAction]) -> Vec<SummaryIntent> {
         actions
             .iter()
             .filter(|action| action.kind == ContentActionKind::Activate)
-            .filter_map(|action| self.bindings.get(&action.target).cloned())
+            .filter_map(|action| self.bindings.get(&action.target))
+            .filter(|(section, _)| {
+                self.expansions
+                    .get(section)
+                    .is_some_and(|model| model.borrow().open)
+            })
+            .map(|(_, intent)| intent.clone())
             .collect()
     }
 }

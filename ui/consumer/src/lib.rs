@@ -310,6 +310,47 @@ fn public_summary_mounts_without_a_runtime_or_harness_dependency() {
     );
 }
 
+#[test]
+fn public_summary_host_sections_and_disclosure_need_no_runtime_or_presentation_dependency() {
+    use tekes_agent_components_ui::{
+        RunScope, SummaryInput, SummaryRow, SummarySection, SummaryView,
+    };
+    use tekes_ui_controls::composition::AccessibilityAction;
+    let mut view = SummaryView::new(1980, Default::default());
+    view.update(&SummaryInput {
+        revision: 1,
+        scope: RunScope::main("consumer", "summary"),
+        facts: None,
+        host_sections: vec![SummarySection {
+            id: "repository".into(),
+            rows: vec![SummaryRow {
+                id: "branch".into(),
+                title: "main".into(),
+                value: Default::default(),
+                action: None,
+            }],
+        }],
+    })
+    .unwrap();
+    let header = view.section_header_id("repository").unwrap();
+    let root = view.id();
+    let mut host = view.into_host().unwrap();
+    assert_eq!(
+        host.get(root)
+            .unwrap()
+            .component::<SummaryView>()
+            .unwrap()
+            .section_order(),
+        ["repository"]
+    );
+    host.accessibility_action(header, None, AccessibilityAction::Press);
+    let actions = host.drain_actions();
+    let view = host.get(root).unwrap().component::<SummaryView>().unwrap();
+    assert_eq!(view.section_expanded("repository"), Some(false));
+    assert!(view.take_intents(&actions).is_empty());
+    assert!(view.section_layouts().is_empty());
+}
+
 /// A second host supplies bounded immutable bytes from its own system picker.
 /// It keeps the captured request through completion, including uncertain errors.
 /// This helper does not import runtime internals, paths or the demo host.

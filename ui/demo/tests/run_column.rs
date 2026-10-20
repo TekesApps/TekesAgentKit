@@ -78,6 +78,108 @@ fn update(run: &mut RunView, snapshot: &RunSnapshot) {
 }
 
 #[tokio::test]
+async fn summary_sections_follow_source_spacing_and_collapsed_bodies_leave_no_layout_or_focus_slot()
+{
+    use tekes_ui_controls::composition::AccessibilityAction;
+    use tekes_ui_tokens::Spacing;
+    let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
+    let snapshot = controller.snapshot();
+    for scale in [1., 1.5, 2.] {
+        for width in [320., 600.] {
+            for theme in [Theme::LIGHT, Theme::DARK] {
+                let mut view = SummaryView::new(30000, Default::default());
+                view.update(&SummaryInput {
+                    revision: snapshot.revision,
+                    scope: RunScope::main("fixture", "a"),
+                    facts: Some(SummaryFacts {
+                        scope: RunScope::main("fixture", "a"),
+                        tasks: vec![tekes_agent_presentation::AgentTask {
+                            id: "summary-task".into(),
+                            scope: RunScope::main("fixture", "a"),
+                            name: "中文任务".into(),
+                            status: "running".into(),
+                            kind: "todo".into(),
+                        }],
+                        subagents: vec![],
+                        artifacts: vec![],
+                        usage: None,
+                    }),
+                    host_sections: vec![SummarySection {
+                        id: "repository".into(),
+                        rows: vec![SummaryRow {
+                            id: "branch".into(),
+                            title: "main".into(),
+                            value: Default::default(),
+                            action: Some(SummaryAction::OpenArtifact {
+                                scope: RunScope::main("fixture", "a"),
+                                path: "/owned/branch".into(),
+                            }),
+                        }],
+                    }],
+                })
+                .unwrap();
+                let root = view.id();
+                let first = view.section_header_id("repository").unwrap();
+                let row = view.row_id("repository", "branch").unwrap();
+                let mut host = view.into_host().unwrap();
+                let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()), scale);
+                let frame = Rect::new(20., 40., width, 1000.);
+                host.render(&mut Scene::new(), &mut text, frame, frame, theme.into())
+                    .unwrap();
+                let view = host.get(root).unwrap().component::<SummaryView>().unwrap();
+                let layouts = view.section_layouts();
+                assert!(layouts.len() >= 2);
+                assert_eq!(layouts[0].section_id, "repository");
+                for pair in layouts.windows(2) {
+                    assert!(
+                        (pair[1].header.min_y()
+                            - pair[0].body.unwrap().max_y()
+                            - Spacing::Section.value())
+                        .abs()
+                            < 0.1
+                    );
+                }
+                for layout in layouts {
+                    assert_eq!(layout.header.max_y(), layout.body.unwrap().min_y());
+                    assert!(layout.expanded);
+                }
+                assert!(host.focus(Some(row), true));
+                host.accessibility_action(first, None, AccessibilityAction::Press);
+                assert!(
+                    host.get(root)
+                        .unwrap()
+                        .component::<SummaryView>()
+                        .unwrap()
+                        .section_layouts()
+                        .is_empty()
+                );
+                host.render(&mut Scene::new(), &mut text, frame, frame, theme.into())
+                    .unwrap();
+                let view = host.get(root).unwrap().component::<SummaryView>().unwrap();
+                let layouts = view.section_layouts();
+                assert_eq!(layouts[0].body, None);
+                assert!(
+                    (layouts[1].header.min_y()
+                        - layouts[0].header.max_y()
+                        - Spacing::Section.value())
+                    .abs()
+                        < 0.1
+                );
+                assert_eq!(host.focused(), Some(first));
+                assert!(!host.focus_targets().iter().any(|(id, _)| *id == row));
+                assert!(
+                    !host
+                        .semantics()
+                        .iter()
+                        .any(|node| node.semantics.name == "main")
+                );
+            }
+        }
+    }
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
 async fn composer_input_and_primary_share_one_band_without_field_chrome_or_an_empty_toolbar_slot() {
     use tekes_ui_controls::TextSurfacePresentation;
     use tekes_ui_tokens::{Spacing, Stroke};

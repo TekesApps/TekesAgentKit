@@ -1,5 +1,7 @@
 # TekesUI 消费侧缺口
 
+2026-10-21 Summary 对照新增：[TekesUI #31](https://github.com/TekesApps/TekesUI/issues/31)请求基础标签的行数限制与尾部省略，保留完整 AX name，并由库处理 CJK/emoji/fallback/RTL 的测量与绘制。当前 Summary 的顺序/折叠可用现有组合完成，但不能据短标题用例宣称 Source 的单行截断也已支持；详见[Summary section 记录](rust-agent-ui-summary-sections-20261021.md)。
+
 2026-10-21 Composer 对照新增：[TekesUI #30](https://github.com/TekesApps/TekesUI/issues/30)请求复合输入面的装饰区到原编辑器的通用焦点路由。只读候选探针确认未聚焦时点留白不获取焦点，但已有焦点/组字保持安全；不报告成 IME 回归。准确复现与证据边界见[Composer 输入行记录](rust-agent-ui-composer-band-20261021.md)。
 
 2026-10-21 rail 对照新增：[TekesUI #28](https://github.com/TekesApps/TekesUI/issues/28)要求按真实 item、保留原编辑焦点的 reveal 与独立轨道导航；[#29](https://github.com/TekesApps/TekesUI/issues/29)要求显式紧凑 action 的准确 hit/AX frame、装饰 slot 和激活阶段。已分别写明公开 pin 证据、所需接口及第二 consumer 验收。AgentKit 的目标/可见范围/槽位输入已推进，但尚无可交互 rail；见[范围与未完成项](rust-agent-ui-turn-rail-20261021.md)。

@@ -35,6 +35,254 @@ fn facts(parent: RunScope) -> SummaryFacts {
         }),
     }
 }
+
+#[test]
+fn host_sections_precede_providers_and_collapsed_rows_keep_their_owner_without_accepting_actions() {
+    let scope = RunScope::main("native", "summary");
+    let mut input = SummaryInput {
+        revision: 1,
+        scope: scope.clone(),
+        facts: Some(facts(scope.clone())),
+        host_sections: vec![
+            SummarySection {
+                id: "repository:one".into(),
+                rows: vec![SummaryRow {
+                    id: "branch".into(),
+                    title: "main".into(),
+                    value: serde_json::Value::Null,
+                    action: None,
+                }],
+            },
+            SummarySection {
+                id: "empty-host".into(),
+                rows: vec![],
+            },
+        ],
+    };
+    let mut view = SummaryView::new(94, Default::default());
+    view.update(&input).unwrap();
+    assert_eq!(
+        view.section_order(),
+        [
+            "repository:one",
+            "tasks",
+            "subagents",
+            "sources",
+            "artifacts",
+            "usage"
+        ]
+    );
+    let root = view.id();
+    let header = view.section_header_id("tasks").unwrap();
+    let task = view.action_id("tasks", "task").unwrap();
+    let mut host = view.into_host().unwrap();
+    host.accessibility_action(task, None, AccessibilityAction::Press);
+    let old_action = host.drain_actions();
+    assert_eq!(
+        host.get(task)
+            .unwrap()
+            .component::<ButtonContent>()
+            .unwrap()
+            .activations,
+        1
+    );
+    assert!(activate(&mut host, root, header).is_empty());
+    let view = host.get(root).unwrap().component::<SummaryView>().unwrap();
+    assert_eq!(view.section_expanded("tasks"), Some(false));
+    assert!(view.take_intents(&old_action).is_empty());
+    assert!(activate(&mut host, root, task).is_empty());
+    assert!(!host.semantics().iter().any(|node| node.id == task));
+    assert_eq!(
+        host.semantics()
+            .iter()
+            .find(|node| node.id == header)
+            .unwrap()
+            .semantics
+            .expanded,
+        Some(false)
+    );
+    input.revision += 1;
+    input.facts.as_mut().unwrap().tasks[0].status = "completed".into();
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<SummaryView>()
+        .unwrap()
+        .update(&input)
+        .unwrap();
+    let view = host.get(root).unwrap().component::<SummaryView>().unwrap();
+    assert_eq!(view.section_header_id("tasks"), Some(header));
+    assert_eq!(view.action_id("tasks", "task"), Some(task));
+    assert_eq!(view.section_expanded("tasks"), Some(false));
+    activate(&mut host, root, header);
+    assert!(host.semantics().iter().any(|node| node.id == task));
+    assert_eq!(
+        host.get(task)
+            .unwrap()
+            .component::<ButtonContent>()
+            .unwrap()
+            .activations,
+        1
+    );
+    assert_eq!(activate(&mut host, root, task).len(), 1);
+}
+
+#[test]
+fn collapse_preference_survives_absence_and_scope_changes_but_old_row_actions_do_not() {
+    let scope = RunScope::main("native", "one");
+    let mut input = SummaryInput {
+        revision: 1,
+        scope: scope.clone(),
+        facts: Some(facts(scope)),
+        host_sections: vec![],
+    };
+    let mut view = SummaryView::new(95, Default::default());
+    view.update(&input).unwrap();
+    let root = view.id();
+    let header = view.section_header_id("tasks").unwrap();
+    let row = view.action_id("tasks", "task").unwrap();
+    let mut host = view.into_host().unwrap();
+    host.accessibility_action(row, None, AccessibilityAction::Press);
+    let captured = host.drain_actions();
+    activate(&mut host, root, header);
+    input.revision += 1;
+    input.facts.as_mut().unwrap().tasks.clear();
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<SummaryView>()
+        .unwrap()
+        .update(&input)
+        .unwrap();
+    assert_eq!(
+        host.get(root)
+            .unwrap()
+            .component::<SummaryView>()
+            .unwrap()
+            .section_expanded("tasks"),
+        None
+    );
+    input.revision += 1;
+    input.scope = RunScope::main("native", "two");
+    input.facts = Some(facts(input.scope.clone()));
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<SummaryView>()
+        .unwrap()
+        .update(&input)
+        .unwrap();
+    let view = host.get(root).unwrap().component::<SummaryView>().unwrap();
+    assert_eq!(view.section_expanded("tasks"), Some(false));
+    assert_ne!(view.action_id("tasks", "task"), Some(row));
+    assert!(view.take_intents(&captured).is_empty());
+}
+
+#[test]
+fn conflicting_publications_preserve_disclosure_and_empty_is_distinct_from_unavailable() {
+    let scope = RunScope::main("native", "status");
+    let input = SummaryInput {
+        revision: 1,
+        scope: scope.clone(),
+        facts: Some(facts(scope.clone())),
+        host_sections: vec![],
+    };
+    let mut view = SummaryView::new(96, Default::default());
+    view.update(&input).unwrap();
+    let root = view.id();
+    let header = view.section_header_id("tasks").unwrap();
+    let mut host = view.into_host().unwrap();
+    activate(&mut host, root, header);
+    let mut conflicting = input.clone();
+    conflicting.facts.as_mut().unwrap().tasks.clear();
+    assert!(
+        host.get_mut(root)
+            .unwrap()
+            .component_mut::<SummaryView>()
+            .unwrap()
+            .update(&conflicting)
+            .is_err()
+    );
+    assert_eq!(
+        host.get(root)
+            .unwrap()
+            .component::<SummaryView>()
+            .unwrap()
+            .section_expanded("tasks"),
+        Some(false)
+    );
+    let empty = SummaryInput {
+        revision: 2,
+        scope: scope.clone(),
+        facts: Some(SummaryFacts {
+            scope: scope.clone(),
+            tasks: vec![],
+            subagents: vec![],
+            artifacts: vec![],
+            usage: None,
+        }),
+        host_sections: vec![],
+    };
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<SummaryView>()
+        .unwrap()
+        .update(&empty)
+        .unwrap();
+    assert!(
+        host.semantics()
+            .iter()
+            .any(|node| node.semantics.name == "暂无 Summary 内容")
+    );
+    let unavailable = SummaryInput {
+        revision: 3,
+        facts: None,
+        ..empty
+    };
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<SummaryView>()
+        .unwrap()
+        .update(&unavailable)
+        .unwrap();
+    assert!(
+        host.semantics()
+            .iter()
+            .any(|node| node.semantics.name == "Summary 暂不可用")
+    );
+}
+
+#[test]
+fn a_changed_task_pointer_requires_a_new_gesture_and_never_retargets_an_old_action() {
+    let scope = RunScope::main("native", "pointer");
+    let mut input = SummaryInput {
+        revision: 1,
+        scope: scope.clone(),
+        facts: Some(facts(scope)),
+        host_sections: vec![],
+    };
+    let mut view = SummaryView::new(97, Default::default());
+    view.update(&input).unwrap();
+    let root = view.id();
+    let header = view.section_header_id("tasks").unwrap();
+    let old = view.action_id("tasks", "task").unwrap();
+    let mut host = view.into_host().unwrap();
+    host.accessibility_action(old, None, AccessibilityAction::Press);
+    let captured = host.drain_actions();
+    input.revision += 1;
+    input.facts.as_mut().unwrap().tasks[0].scope.session_id = "replacement-child".into();
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<SummaryView>()
+        .unwrap()
+        .update(&input)
+        .unwrap();
+    let view = host.get(root).unwrap().component::<SummaryView>().unwrap();
+    assert!(view.take_intents(&captured).is_empty());
+    assert_eq!(view.section_header_id("tasks"), Some(header));
+    let current = view.action_id("tasks", "task").unwrap();
+    assert_ne!(old, current);
+    assert!(
+        matches!(activate(&mut host, root, current).as_slice(), [SummaryIntent { action: SummaryAction::OpenTask { scope, .. }, .. }] if scope.session_id == "replacement-child")
+    );
+}
 fn activate(host: &mut ContentHost, root: ComponentId, target: ComponentId) -> Vec<SummaryIntent> {
     host.accessibility_action(target, None, AccessibilityAction::Press);
     let actions = host.drain_actions();

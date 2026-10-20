@@ -36,6 +36,8 @@ mod feedback_probe;
 mod run_controls_probe;
 #[path = "native_stream_selftest.rs"]
 mod stream_probe;
+#[path = "native_summary_sections_selftest.rs"]
+mod summary_sections_probe;
 #[path = "native_composer_visibility_selftest.rs"]
 mod visibility_probe;
 struct OwnedFilePreview {
@@ -49,6 +51,7 @@ impl Drop for OwnedFilePreview {
     }
 }
 struct Host {
+    summary_sections_probe: Option<summary_sections_probe::Probe>,
     visibility_probe: Option<visibility_probe::Probe>,
     feedback_probe: Option<feedback_probe::Probe>,
     stream_probe: Option<stream_probe::Probe>,
@@ -1014,6 +1017,10 @@ impl Host {
                 .expect("component frame");
         }
         window.set_animating(self.text.frame_requested);
+        if let Some(mut probe) = self.summary_sections_probe.take() {
+            probe.advance(self, window);
+            self.summary_sections_probe = Some(probe);
+        }
         if let Some(mut probe) = self.visibility_probe.take() {
             probe.advance(self, window);
             self.visibility_probe = Some(probe);
@@ -1990,6 +1997,17 @@ impl Host {
                 "NATIVE_AGENT_COMPONENTS_SELFTEST_OK composer+indicators+run-binding+synthetic-text-services+send+stream+cancel+draft-isolation+reconnect; physical-ime=false; transcript=false; reading-anchor=false"
             );
         }
+        if let Some(probe) = &self.summary_sections_probe {
+            assert!(
+                self.failures.is_empty(),
+                "Summary callback failures: {:?}",
+                self.failures
+            );
+            println!(
+                "NATIVE_AGENT_SUMMARY_SECTIONS_SELFTEST_RECEIPT {}",
+                probe.receipt(&self.view)
+            );
+        }
         if let Some(probe) = &self.visibility_probe {
             assert!(
                 self.failures.is_empty(),
@@ -2301,6 +2319,15 @@ pub fn run() {
     let actions_selftest = args.iter().any(|arg| arg == "--thread-actions-selftest");
     let models_selftest = args.iter().any(|arg| arg == "--model-choices-selftest");
     let context_selftest = args.iter().any(|arg| arg == "--context-selftest");
+    let summary_sections_selftest = args.iter().any(|arg| arg == "--summary-sections-selftest");
+    if summary_sections_selftest {
+        assert!(
+            !args
+                .iter()
+                .any(|arg| arg == "--endpoint-config" || arg == "--offscreen"),
+            "Summary probe requires the owned local fixture window"
+        );
+    }
     let creation_selftest = args.iter().any(|arg| arg == "--creation-selftest");
     let annotation_selftest = args.iter().any(|arg| arg == "--annotation-selftest");
     assert!(
@@ -2314,6 +2341,7 @@ pub fn run() {
             actions_selftest,
             models_selftest,
             context_selftest,
+            summary_sections_selftest,
             creation_selftest,
             annotation_selftest
         ]
@@ -2639,6 +2667,7 @@ pub fn run() {
         0
     };
     let mut host = Host {
+        summary_sections_probe: summary_sections_selftest.then(summary_sections_probe::Probe::new),
         visibility_probe: visibility_selftest
             .then(|| visibility_probe::Probe::new(visibility_fixture)),
         feedback_probe: feedback_selftest.then(feedback_probe::Probe::new),

@@ -10,6 +10,8 @@ Layout 和显示逻辑须逐项严格对齐当前 ClientKit 对应 Views；[对�
 
 ### 排版与基础样式
 
+[Summary section 顺序与折叠](rust-agent-ui-summary-sections-20261021.md)现已补齐宿主优先顺序、按 section ID 保留的折叠、真实隐藏的输入/AX 子树及任务 pointer 改变时的旧动作拒绝。公开 DTO/查询支持第二 consumer；单行省略见 TekesUI #31，完整 Summary rows/custom slots 与整体视觉仍未验收。
+
 [Composer 输入行与单一主动作](rust-agent-ui-composer-band-20261021.md)已按对应 View 的内容顺序推进：正文与主动作/Add 共用输入 band，发送/停止互斥并保留原控件，空 setup 不占位，十行上限随字体倍率更新。模型/预设的宿主 toolbar、完整 palette/chip/notice 与 glyph slot 仍待对齐；默认 TekesUI 样式和固定 pin 不变。
 
 [回合 rail 的真实目标与布局输入](rust-agent-ui-turn-rail-20261021.md)已公开：源回合到原内容行的映射、实际排版可见性、原 owner/publication/epoch 校验，以及对应 ClientKit 的 gutter/track 几何。该几何是计划槽位，尚非可交互 rail 子树；基础 reveal 和紧凑 action 需求分别见 TekesUI #28/#29，实际 hover/预览/跟随与完整组合仍由 AgentKit 完成。

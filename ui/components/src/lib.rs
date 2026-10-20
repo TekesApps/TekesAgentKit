@@ -30,6 +30,8 @@ mod indicators;
 mod side_panel;
 mod sidebar;
 mod summary;
+mod summary_section;
+pub use summary_section::SummarySectionLayout;
 mod thread_rename;
 pub use thread_rename::*;
 mod transcript_content;
