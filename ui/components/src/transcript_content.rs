@@ -19,7 +19,7 @@ use tekes_ui_controls::{
     ButtonTextRenderer,
     composition::*,
     extended::{Axis, Stack},
-    layout::MeasuredChild,
+    layout::{ContainerLayout, Insets, MeasuredChild},
 };
 use tekes_ui_scene::{Rect, Size};
 use tekes_ui_tokens::{Spacing, proposal};
@@ -126,8 +126,19 @@ pub struct TranscriptContent {
     last: Option<TranscriptSnapshot>,
     labels: TranscriptContentLabels,
     feedback_dirty: bool,
+    run_layout: Option<RunTranscriptLayout>,
+}
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct RunTranscriptLayout {
+    pub column_x: f32,
+    pub column_width: f32,
+    pub top: f32,
+    pub bottom: f32,
 }
 impl TranscriptContent {
+    pub(crate) fn set_run_layout(&mut self, layout: RunTranscriptLayout) {
+        self.run_layout = Some(layout);
+    }
     /// The host grants an exclusive row namespace range (one namespace per row).
     /// IDs never recycle after removal. Reserve this range across all Kit controls.
     pub fn new(
@@ -161,6 +172,7 @@ impl TranscriptContent {
             last: None,
             labels,
             feedback_dirty: false,
+            run_layout: None,
         })
     }
     pub fn id(&self) -> ComponentId {
@@ -728,11 +740,37 @@ impl Component for TranscriptContent {
         Some(&mut self.rows.children)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
-        let measured = self.rows.measure(text, available);
-        MeasuredChild::new(Size::new(available.width, measured.size.height))
+        let layout = self.run_layout;
+        let width = layout.map_or(available.width, |layout| layout.column_width);
+        let measured = self.rows.measure(text, Size::new(width, available.height));
+        let clearance = layout.map_or(0., |layout| layout.top + layout.bottom);
+        MeasuredChild::new(Size::new(available.width, measured.size.height + clearance))
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
-        self.rows.arrange(text, frame, clip);
+        let content = if let Some(layout) = self.run_layout {
+            // The Run supplies its pane-space column. The library owns the
+            // ScrollContent focus gutter, scrolling origin, clip and placement.
+            // Only vertical document clearance belongs to this Agent composition.
+            ContainerLayout::new(
+                Rect::new(
+                    layout.column_x,
+                    frame.min_y(),
+                    layout.column_width,
+                    frame.size.height,
+                ),
+                Insets::ZERO,
+                Insets {
+                    top: layout.top,
+                    bottom: layout.bottom,
+                    ..Insets::ZERO
+                },
+                None,
+            )
+            .content()
+        } else {
+            frame
+        };
+        self.rows.arrange(text, content, clip);
     }
     fn semantics(&self) -> ContentSemantics {
         ContentSemantics::new(ContentRole::Group, &self.labels.group)

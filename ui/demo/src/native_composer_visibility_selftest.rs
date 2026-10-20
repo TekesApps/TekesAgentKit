@@ -72,7 +72,6 @@ impl Probe {
         );
         let ids = host.view.ids();
         let run_id = ComponentId(ids.root.0 + 16);
-        let viewport = ComponentId(ids.root.0 + 21);
         let snapshot = host
             .view
             .tree
@@ -88,7 +87,17 @@ impl Probe {
                 assert!(Self::composer(&host.view).is_presented());
                 self.editor = Some(Self::composer(&host.view).editor() as *const _ as usize);
                 self.items = snapshot.transcript.items.len();
-                self.viewport_bottom = host.view.tree.get(viewport).unwrap().frame().max_y();
+                self.viewport_bottom = host
+                    .view
+                    .tree
+                    .get(run_id)
+                    .unwrap()
+                    .component::<RunView>()
+                    .unwrap()
+                    .layout_geometry()
+                    .unwrap()
+                    .visible_document
+                    .max_y();
                 self.composer_height = host.view.tree.get(ids.root).unwrap().frame().size.height;
                 let p = host.view.tree.get(ids.editor).unwrap().frame().center();
                 self.phase = 1;
@@ -113,7 +122,17 @@ impl Probe {
             1 if Self::composer(&host.view).is_composing() => {
                 assert_eq!(snapshot.draft.text, "", "preedit must stay local");
                 // Capture the settled preedit frame, not the initial window frame.
-                self.viewport_bottom = host.view.tree.get(viewport).unwrap().frame().max_y();
+                self.viewport_bottom = host
+                    .view
+                    .tree
+                    .get(run_id)
+                    .unwrap()
+                    .component::<RunView>()
+                    .unwrap()
+                    .layout_geometry()
+                    .unwrap()
+                    .visible_document
+                    .max_y();
                 self.composer_height = host.view.tree.get(ids.root).unwrap().frame().size.height;
                 if let Some(fixture) = &self.failure_fixture {
                     fixture
@@ -188,12 +207,23 @@ impl Probe {
                 // Archive also changes paging readiness and can grow its status
                 // row. The freed lower edge, not total viewport height, proves
                 // that the original Composer and its gap leave no bottom slot.
-                let bottom = host.view.tree.get(viewport).unwrap().frame().max_y();
+                let bottom = host
+                    .view
+                    .tree
+                    .get(run_id)
+                    .unwrap()
+                    .component::<RunView>()
+                    .unwrap()
+                    .layout_geometry()
+                    .unwrap()
+                    .visible_document
+                    .max_y();
                 assert!(
                     (bottom
                         - self.viewport_bottom
                         - self.composer_height
-                        - tekes_ui_tokens::Spacing::Regular.value())
+                        - tekes_ui_tokens::Spacing::Regular.value()
+                        - tekes_ui_tokens::Spacing::Loose.value())
                     .abs()
                         < 0.1
                 );

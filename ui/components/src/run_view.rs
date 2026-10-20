@@ -1,4 +1,5 @@
 //! Agent composition only. Presentation owns the Run; TekesUI owns its viewport.
+use crate::transcript_content::RunTranscriptLayout;
 use crate::*;
 use std::ops::Range;
 use std::sync::Arc;
@@ -14,6 +15,19 @@ pub struct RunViewIds {
     pub indicators: ComponentId,
     pub viewport: ComponentId,
     pub composer: ComposerIds,
+}
+/// The last arranged pane and its real document clip. This is layout evidence,
+/// not a second reading state. Check is_pane_presented before using saved geometry.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RunViewGeometry {
+    pub publication: Option<u64>,
+    pub connection_epoch: Option<u64>,
+    pub pane: Rect,
+    pub content_column: Rect,
+    pub composer: Option<Rect>,
+    pub visible_document: Rect,
+    pub document_top_clearance: f32,
+    pub document_bottom_clearance: f32,
 }
 #[derive(Debug)]
 pub enum RunViewIntent {
@@ -82,6 +96,8 @@ pub struct RunView {
     label: String,
     column: RunColumnLayout,
     publication_generation: u64,
+    pane_presented: bool,
+    geometry: Option<RunViewGeometry>,
 }
 impl RunView {
     /// Four consecutive namespaces for controls/paging/actionables/transcript;
@@ -165,6 +181,8 @@ impl RunView {
             label: "Agent Run".into(),
             column: Default::default(),
             publication_generation: 0,
+            pane_presented: true,
+            geometry: None,
             body: StackContent {
                 model: Stack {
                     axis: Axis::Vertical,
@@ -186,6 +204,12 @@ impl RunView {
     pub fn set_column_layout(&mut self, column: RunColumnLayout) -> Result<(), &'static str> {
         self.column = column.normalized()?;
         Ok(())
+    }
+    pub fn layout_geometry(&self) -> Option<RunViewGeometry> {
+        self.geometry
+    }
+    pub fn is_pane_presented(&self) -> bool {
+        self.pane_presented
     }
     pub fn column_layout(&self) -> RunColumnLayout {
         self.column
@@ -290,19 +314,16 @@ impl RunView {
             )?;
         }
         self.transcript = Some(content.id());
-        let viewport = ScrollContent::new(
-            tekes_ui_controls::ScrollArea::default(),
-            Content::new(content.id(), content),
+        let mut scroll = tekes_ui_controls::ScrollArea::default();
+        scroll.set_scroll_policy(
+            tekes_ui_controls::ScrollPolicy::Disabled,
+            tekes_ui_controls::ScrollPolicy::Auto,
         );
-        let index = self
-            .body
-            .children
-            .iter()
-            .position(|node| node.id() == self.ids.composer.root)
-            .unwrap();
+        let viewport = ScrollContent::new(scroll, Content::new(content.id(), content));
+        // Paint/hit order: document, then chrome/controls. No detached mirror tree.
         self.body
             .children
-            .insert(index, Content::new(self.ids.viewport, viewport));
+            .insert(0, Content::new(self.ids.viewport, viewport));
         self.body.flexible_child = Some(self.ids.viewport);
         Ok(())
     }
@@ -621,6 +642,9 @@ impl RunView {
     /// Drain once immediately after ContentHost event/AX delivery, before update.
     /// The host resolves these intents against the original binding, not selection.
     pub fn take_intents(&mut self, actions: &[ContentAction]) -> Vec<RunViewIntent> {
+        if !self.pane_presented {
+            return Vec::new();
+        }
         if self
             .transcript()
             .is_some_and(|content| content.composing_feedback_editor().is_some())
@@ -700,23 +724,26 @@ impl RunView {
         self.body.children.push(content);
         Ok(())
     }
-    // The Composer stays in the mounted tree so TekesUI owns inactive-subtree
-    // input/focus reconciliation and retains the original editor. Only omit its
-    // business slot during layout: zero-height Stack children still reserve gaps.
-    // No generic layout, focus or IME algorithm lives here.
-    fn with_presented_body<T>(&mut self, layout: impl FnOnce(&mut StackContent) -> T) -> T {
-        let hidden = (!self.composer().is_presented()).then(|| {
-            let index = self
-                .body
-                .children
-                .iter()
-                .position(|node| node.id() == self.ids.composer.root)
-                .expect("resident Composer");
-            (index, self.body.children.remove(index))
-        });
+    // Keep resident IDs/editors in the same mounted tree. The header is the
+    // existing status/page/actionable/accessory composition; its final rail and
+    // selection counterparts are separate outstanding ClientKit View work.
+    fn with_header<T>(&mut self, layout: impl FnOnce(&mut StackContent) -> T) -> T {
+        let mut held = Vec::new();
+        let mut index = 0;
+        while index < self.body.children.len() {
+            let id = self.body.children[index].id();
+            let empty_actionable = self.body.children[index]
+                .component::<ActionableCard>()
+                .is_some_and(|card| !card.active());
+            if id == self.ids.composer.root || id == self.ids.viewport || empty_actionable {
+                held.push((index + held.len(), self.body.children.remove(index)));
+            } else {
+                index += 1;
+            }
+        }
         let result = layout(&mut self.body);
-        if let Some((index, composer)) = hidden {
-            self.body.children.insert(index, composer);
+        for (index, content) in held {
+            self.body.children.insert(index, content);
         }
         result
     }
@@ -734,16 +761,113 @@ impl Component for RunView {
     fn children_mut(&mut self) -> Option<&mut Vec<Content>> {
         Some(&mut self.body.children)
     }
-    fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
-        let column = self
-            .column
-            .frame(Rect::new(0., 0., available.width, available.height));
-        let measured = self.with_presented_body(|body| body.measure(text, column.size));
-        MeasuredChild::new(Size::new(available.width, measured.size.height))
+    fn active(&self) -> bool {
+        self.pane_presented
+    }
+    fn measure(&mut self, _text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        // Run is a bounded viewport, not the sum of docked sibling heights.
+        MeasuredChild::new(available)
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        self.pane_presented = frame.size.width > 0. && frame.size.height > 0.;
+        if !self.pane_presented {
+            return;
+        } // Preserve prior child geometry, as RunOverlay does.
+        let pane_clip = frame.intersection(&clip).unwrap_or_default();
         let column = self.column.frame(frame);
-        self.with_presented_body(|body| body.arrange(text, column, clip));
+        let composer = if self.composer().is_presented() {
+            let bottom = Spacing::Regular.value().min(frame.size.height);
+            let height = self
+                .composer_mut()
+                .measure(text, column.size)
+                .size
+                .height
+                .min((frame.size.height - bottom).max(0.));
+            Some(Rect::new(
+                column.min_x(),
+                frame.max_y() - bottom - height,
+                column.size.width,
+                height,
+            ))
+        } else {
+            None
+        };
+        let bottom_clearance = composer.map_or(0., |composer| {
+            frame.max_y() - composer.min_y() + Spacing::Loose.value()
+        });
+        let document_bottom = (frame.max_y() - bottom_clearance).max(frame.min_y());
+        let header_height = self
+            .with_header(|header| header.measure(text, column.size))
+            .size
+            .height
+            .min((document_bottom - frame.min_y()).max(0.));
+        let header = Rect::new(
+            column.min_x(),
+            frame.min_y(),
+            column.size.width,
+            header_height,
+        );
+        let top_clearance = (header_height
+            + if header_height > 0. {
+                Spacing::Regular.value()
+            } else {
+                0.
+            })
+        .min((document_bottom - frame.min_y()).max(0.));
+        let document_top = frame.min_y() + top_clearance;
+        let visible_document = Rect::new(
+            frame.min_x(),
+            document_top,
+            frame.size.width,
+            (document_bottom - document_top).max(0.),
+        );
+        let document_clip = visible_document
+            .intersection(&pane_clip)
+            .unwrap_or_default();
+        if let Some(content) = self.transcript_mut() {
+            content.set_run_layout(RunTranscriptLayout {
+                column_x: column.min_x(),
+                column_width: column.size.width,
+                top: top_clearance,
+                bottom: bottom_clearance,
+            });
+        }
+        if let Some(viewport) = self
+            .body
+            .children
+            .iter_mut()
+            .find(|node| node.id() == self.ids.viewport)
+        {
+            // Full pane remains the scrolling coordinate system. The library
+            // receives the actual unobstructed clip, and measures the document's
+            // own clearance. No offset compensation or reading state is copied.
+            viewport.arrange(text, frame, document_clip);
+        }
+        self.with_header(|body| {
+            body.arrange(
+                text,
+                header,
+                header.intersection(&pane_clip).unwrap_or_default(),
+            )
+        });
+        if let Some(composer) = composer {
+            self.body
+                .children
+                .iter_mut()
+                .find(|node| node.id() == self.ids.composer.root)
+                .unwrap()
+                .arrange(text, composer, pane_clip);
+        }
+        self.geometry = Some(RunViewGeometry {
+            publication: self.last.as_ref().map(|snapshot| snapshot.revision),
+            connection_epoch: self.last.as_ref().map(|snapshot| snapshot.connection_epoch),
+            pane: frame,
+            content_column: column,
+            composer,
+            visible_document: document_clip,
+            document_top_clearance: top_clearance,
+            document_bottom_clearance: bottom_clearance,
+        });
     }
     fn semantics(&self) -> ContentSemantics {
         ContentSemantics::new(ContentRole::Group, &self.label)

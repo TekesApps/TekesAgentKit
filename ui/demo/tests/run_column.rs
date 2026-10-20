@@ -4,7 +4,7 @@ use tekes_agent_components_ui::*;
 use tekes_agent_presentation::RunSnapshot;
 use tekes_ui_controls::{
     ButtonTextAlign, ButtonTextRenderer, TextSurfaceHost, TextSurfaceTextRenderer,
-    composition::ContentEvent,
+    composition::{Component, ContentEvent, ScrollContent},
 };
 use tekes_ui_scene::{Point, Rect, Scene, Size};
 use tekes_ui_text::{
@@ -151,18 +151,62 @@ async fn shared_column_bounds_follow_pane_policy_without_replacing_text_or_draft
                         .unwrap();
                     let viewport = host.get(ids.viewport).unwrap().frame();
                     let composer = host.get(ids.composer.root).unwrap().frame();
-                    assert!((viewport.min_x() - (frame.min_x() + left)).abs() < 0.01);
-                    assert!((viewport.size.width - expected_width).abs() < 0.01);
-                    assert!((composer.min_x() - viewport.min_x()).abs() < 0.01);
-                    assert!((composer.size.width - viewport.size.width).abs() < 0.01);
-                    assert!(composer.max_y() <= frame.max_y() + 0.01);
-                    assert!(viewport.max_y() <= composer.min_y());
+                    let geometry = host
+                        .get(ids.root)
+                        .unwrap()
+                        .component::<RunView>()
+                        .unwrap()
+                        .layout_geometry()
+                        .unwrap();
+                    assert_eq!(
+                        viewport, frame,
+                        "document remains the pane's scroll coordinate system"
+                    );
+                    assert!(
+                        (geometry.content_column.min_x() - (frame.min_x() + left)).abs() < 0.01
+                    );
+                    assert!((geometry.content_column.size.width - expected_width).abs() < 0.01);
+                    assert!((composer.min_x() - geometry.content_column.min_x()).abs() < 0.01);
+                    assert!(
+                        (composer.size.width - geometry.content_column.size.width).abs() < 0.01
+                    );
+                    assert!(
+                        (composer.max_y()
+                            - (frame.max_y() - tekes_ui_tokens::Spacing::Regular.value()))
+                        .abs()
+                            < 0.01
+                    );
+                    assert!(
+                        (geometry.visible_document.max_y()
+                            - (composer.min_y() - tekes_ui_tokens::Spacing::Loose.value()))
+                        .abs()
+                            < 0.01
+                    );
+                    assert!(
+                        viewport.max_y() > composer.min_y(),
+                        "document is an underlay, not a docked sibling"
+                    );
+                    assert_eq!(
+                        host.get(ids.viewport).unwrap().visible(),
+                        Some(geometry.visible_document)
+                    );
                     assert_eq!(host.focused(), Some(ids.composer.editor));
                     let input = &host.text_surface(ids.composer.editor).unwrap().input;
                     assert_eq!(input.external_baseline(), baseline);
                     assert_eq!(input.external_value(), value.as_ref());
                     let run = host.get(ids.root).unwrap().component::<RunView>().unwrap();
                     assert!(run.composer().is_composing());
+                    for row in run.transcript().unwrap().children() {
+                        if row.component::<InputMessage>().is_some()
+                            || row.component::<OutputMessage>().is_some()
+                        {
+                            assert!(
+                                (row.frame().min_x() - geometry.content_column.min_x()).abs()
+                                    < 0.01
+                            );
+                            assert!(row.frame().max_x() <= geometry.content_column.max_x() + 0.01);
+                        }
+                    }
                     assert_eq!(run.transcript_id(), transcript);
                     assert_eq!(run.transcript().unwrap().row_keys(), rows);
                 }
@@ -246,8 +290,9 @@ async fn column_geometry_and_normalization_match_frozen_clientkit_view_vectors()
                 Theme::LIGHT.into(),
             )
             .unwrap();
-            for id in [ids.viewport, ids.composer.root] {
-                let actual = host.get(id).unwrap().frame();
+            assert_eq!(host.get(ids.viewport).unwrap().frame(), frame);
+            {
+                let actual = host.get(ids.composer.root).unwrap().frame();
                 assert!(
                     (actual.min_x() - (frame.min_x() + reference_number(&case["expected_x"])))
                         .abs()
@@ -312,7 +357,15 @@ async fn archived_composer_has_no_layout_slot_and_library_blurs_original_preedit
         Theme::LIGHT.into(),
     )
     .unwrap();
-    let before = host.get(ids.viewport).unwrap().frame();
+    let viewport_before = host.get(ids.viewport).unwrap().frame();
+    let before = host
+        .get(ids.root)
+        .unwrap()
+        .component::<RunView>()
+        .unwrap()
+        .layout_geometry()
+        .unwrap()
+        .visible_document;
     let composer_height = host.get(ids.composer.root).unwrap().frame().size.height;
     assert!(host.focus(Some(ids.composer.editor), true));
     host.event(&ContentEvent::Preedit {
@@ -356,12 +409,21 @@ async fn archived_composer_has_no_layout_slot_and_library_blurs_original_preedit
     .unwrap();
     assert!(host.focused().is_none());
     assert!(host.focused_text().is_none());
-    let archived = host.get(ids.viewport).unwrap().frame();
+    assert_eq!(host.get(ids.viewport).unwrap().frame(), viewport_before);
+    let archived = host
+        .get(ids.root)
+        .unwrap()
+        .component::<RunView>()
+        .unwrap()
+        .layout_geometry()
+        .unwrap()
+        .visible_document;
     assert!(
         (archived.size.height
             - before.size.height
             - composer_height
-            - tekes_ui_tokens::Spacing::Regular.value())
+            - tekes_ui_tokens::Spacing::Regular.value()
+            - tekes_ui_tokens::Spacing::Loose.value())
         .abs()
             < 0.1
     );
@@ -397,5 +459,202 @@ async fn archived_composer_has_no_layout_slot_and_library_blurs_original_preedit
     .unwrap();
     assert!(host.focused().is_none(), "unarchive never steals focus");
     assert!(host.focus(Some(ids.composer.editor), true));
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn collapsed_run_retains_geometry_and_scroll_without_measuring_at_zero_and_never_steals_focus()
+ {
+    let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
+    let snapshot = controller.snapshot();
+    let mut run = RunView::standard(2700, 2704..2900, RunScope::main("fixture", "a")).unwrap();
+    update(&mut run, &snapshot);
+    let ids = run.ids();
+    let editor = run.composer().editor() as *const _;
+    let mut host = run.into_host().unwrap();
+    let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()), 1.);
+    let frame = Rect::new(20., 40., 760., 650.);
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        frame,
+        frame,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    let geometry = host
+        .get(ids.root)
+        .unwrap()
+        .component::<RunView>()
+        .unwrap()
+        .layout_geometry()
+        .unwrap();
+    assert_eq!(geometry.publication, Some(snapshot.revision));
+    assert_eq!(geometry.connection_epoch, Some(snapshot.connection_epoch));
+    host.event(&ContentEvent::Scroll {
+        position: geometry.visible_document.center(),
+        delta: Point::new(0., 400.),
+        precise: true,
+        begin: true,
+        end: true,
+        momentum: false,
+        time: 1.,
+    });
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        frame,
+        frame,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    assert!(host.focus(Some(ids.composer.editor), true));
+    let before: Vec<_> = host
+        .get(ids.root)
+        .unwrap()
+        .component::<RunView>()
+        .unwrap()
+        .children()
+        .iter()
+        .map(|node| (node.id(), node.frame()))
+        .collect();
+    let offset = host
+        .get(ids.viewport)
+        .unwrap()
+        .component::<ScrollContent>()
+        .unwrap()
+        .scroll
+        .offset;
+    for collapsed in [Rect::new(20., 40., 0., 650.), Rect::new(20., 40., 760., 0.)] {
+        host.render(
+            &mut Scene::new(),
+            &mut text,
+            collapsed,
+            frame,
+            Theme::LIGHT.into(),
+        )
+        .unwrap();
+        let run = host.get(ids.root).unwrap().component::<RunView>().unwrap();
+        assert!(!run.is_pane_presented());
+        assert_eq!(run.layout_geometry(), Some(geometry));
+        assert_eq!(
+            run.children()
+                .iter()
+                .map(|node| (node.id(), node.frame()))
+                .collect::<Vec<_>>(),
+            before
+        );
+        assert_eq!(run.composer().editor() as *const _, editor);
+        assert!(host.focused().is_none());
+        assert!(host.semantics().is_empty());
+        assert_eq!(
+            host.get(ids.viewport)
+                .unwrap()
+                .component::<ScrollContent>()
+                .unwrap()
+                .scroll
+                .offset,
+            offset
+        );
+    }
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        frame,
+        frame,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    let run = host.get(ids.root).unwrap().component::<RunView>().unwrap();
+    assert!(run.is_pane_presented());
+    assert_eq!(run.layout_geometry(), Some(geometry));
+    assert_eq!(run.composer().editor() as *const _, editor);
+    assert!(host.focused().is_none());
+    assert_eq!(
+        host.get(ids.viewport)
+            .unwrap()
+            .component::<ScrollContent>()
+            .unwrap()
+            .scroll
+            .offset,
+        offset
+    );
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn overlay_clearance_keeps_the_final_row_visible_at_the_library_scroll_limit() {
+    let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
+    let mut run = RunView::standard(3000, 3004..3200, RunScope::main("fixture", "a")).unwrap();
+    update(&mut run, &controller.snapshot());
+    let ids = run.ids();
+    let mut host = run.into_host().unwrap();
+    let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()), 1.);
+    let frame = Rect::new(20., 40., 760., 650.);
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        frame,
+        frame,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    let scroll = host
+        .get_mut(ids.viewport)
+        .unwrap()
+        .component_mut::<ScrollContent>()
+        .unwrap();
+    assert!(scroll.scroll.limit().y > 0.);
+    scroll.scroll.scroll_by(0., 1e8); // Test-only public library command, no offset assignment/compensation.
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        frame,
+        frame,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    let run = host.get(ids.root).unwrap().component::<RunView>().unwrap();
+    let geometry = run.layout_geometry().unwrap();
+    let final_row = run
+        .transcript()
+        .unwrap()
+        .children()
+        .iter()
+        .rev()
+        .find(|node| node.frame().size.height > 0.)
+        .unwrap();
+    assert!(final_row.visible().is_some());
+    assert!(
+        final_row.frame().max_y() <= geometry.visible_document.max_y() + 0.1,
+        "final footnote must rest above the Composer clearance"
+    );
+    assert!(geometry.visible_document.max_y() < geometry.composer.unwrap().min_y());
+    let scroll = host
+        .get(ids.viewport)
+        .unwrap()
+        .component::<ScrollContent>()
+        .unwrap();
+    assert_eq!(scroll.scroll.offset.y, scroll.scroll.limit().y);
+    let offset = scroll.scroll.offset;
+    host.event(&ContentEvent::Scroll {
+        position: geometry.composer.unwrap().center(),
+        delta: Point::new(0., -100.),
+        precise: true,
+        begin: true,
+        end: true,
+        momentum: false,
+        time: 2.,
+    });
+    assert_eq!(
+        host.get(ids.viewport)
+            .unwrap()
+            .component::<ScrollContent>()
+            .unwrap()
+            .scroll
+            .offset,
+        offset,
+        "wheel over Composer must not leak through the overlay into history"
+    );
     runtime.stop().await.unwrap();
 }

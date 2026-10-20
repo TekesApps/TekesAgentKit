@@ -476,7 +476,8 @@ fn wheel(host: &mut ContentHost, root: ComponentId, delta: f32) {
     let position = host
         .get(run(host, root).ids().viewport)
         .unwrap()
-        .frame()
+        .visible()
+        .expect("actual unobstructed document clip")
         .center();
     host.event(&ContentEvent::Scroll {
         position,
@@ -670,5 +671,42 @@ async fn same_publication_close_open_aba_rejects_a_stored_plan_before_reading_ca
         scroll(&host, root).reading_document_version(),
         Some(&version)
     );
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn collapsed_formal_run_retains_library_reading_attachment_and_anchor_until_reopen() {
+    let (runtime, mut host, root, _, version, mut text) = setup().await;
+    wheel(&mut host, root, 420.);
+    render(&mut host, &mut text);
+    let item = anchor(&host, root);
+    let y = host.get(item).unwrap().frame().min_y();
+    let geometry = run(&host, root).layout_geometry().unwrap();
+    for frame in [Rect::new(0., 0., 0., 650.), Rect::new(0., 0., 760., 0.)] {
+        host.render(
+            &mut Scene::new(),
+            &mut text,
+            frame,
+            frame,
+            Theme::LIGHT.into(),
+        )
+        .unwrap();
+        assert!(!run(&host, root).is_pane_presented());
+        assert_eq!(run(&host, root).layout_geometry(), Some(geometry));
+        assert_eq!(
+            scroll(&host, root).reading_document_version(),
+            Some(&version)
+        );
+        assert!(!scroll(&host, root).is_following_latest());
+    }
+    render(&mut host, &mut text);
+    assert!(run(&host, root).is_pane_presented());
+    assert_eq!(
+        scroll(&host, root).reading_document_version(),
+        Some(&version)
+    );
+    assert_eq!(anchor(&host, root), item);
+    assert!((host.get(item).unwrap().frame().min_y() - y).abs() <= 1.);
+    assert!(!scroll(&host, root).is_following_latest());
     runtime.stop().await.unwrap();
 }

@@ -258,6 +258,9 @@ impl ActionableCard {
     }
 }
 impl Component for ActionableCard {
+    fn active(&self) -> bool {
+        !self.body.children.is_empty()
+    }
     fn children(&self) -> &[Content] {
         &self.body.children
     }

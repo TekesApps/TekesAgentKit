@@ -1394,7 +1394,7 @@ fn independent_host_does_not_prepare_a_missing_pointer_as_a_new_run() {
 pub fn composer_focus_target(
     run: &tekes_agent_components_ui::RunView,
 ) -> Option<tekes_agent_components_ui::ComposerIds> {
-    run.composer().is_presented().then_some(run.ids().composer)
+    (run.is_pane_presented() && run.composer().is_presented()).then_some(run.ids().composer)
 }
 #[test]
 fn second_product_uses_shared_composer_presentation_for_focus() {
@@ -1406,4 +1406,29 @@ fn second_product_uses_shared_composer_presentation_for_focus() {
     .unwrap();
     assert!(run.displayed_snapshot().is_none());
     assert_eq!(composer_focus_target(&run), Some(run.ids().composer));
+}
+
+/// Geometry and model must describe the same arranged publication. A host must
+/// not interpret a retained collapsed frame or a pre-render update as current.
+pub fn arranged_run_geometry(
+    run: &tekes_agent_components_ui::RunView,
+) -> Option<tekes_agent_components_ui::RunViewGeometry> {
+    let geometry = run.layout_geometry()?;
+    (run.is_pane_presented()
+        && geometry.publication == run.displayed_snapshot().map(|snapshot| snapshot.revision)
+        && geometry.connection_epoch
+            == run
+                .displayed_snapshot()
+                .map(|snapshot| snapshot.connection_epoch))
+    .then_some(geometry)
+}
+#[test]
+fn second_product_does_not_invent_geometry_before_a_run_is_arranged() {
+    let run = new_agent_run_view(
+        1800,
+        1804..1850,
+        tekes_agent_components_ui::RunScope::main("public", "unarranged"),
+    )
+    .unwrap();
+    assert!(arranged_run_geometry(&run).is_none());
 }

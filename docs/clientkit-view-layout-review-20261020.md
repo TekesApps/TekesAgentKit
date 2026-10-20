@@ -18,7 +18,7 @@
 
 ## 已确认的差异，仍需完成
 
-1. Rust RunView 当前为纵向 Stack：Indicators、历史控件、actionable、Transcript viewport、Composer。ClientKit 的 `RunNativeController` + `RunOverlay` 保留文档与叠层，`RunChrome` 为 leading gutter 提供 indicator rail，并把 Composer/selection 放在其上。**当前 Rust 组合不等于该布局已完成**；后续应使用 TekesUI 公开组合/布局能力对齐相对层次、列边界与可见性，不能用 RunSurface 测试窗口代替正式 RunView。
+1. 原纵向 docked 栈已由[基础 underlay/Composer 叠层](rust-agent-ui-overlay-20261021.md)替换；顶部状态/分页/actionable区域仍是临时组合。ClientKit 的 `RunNativeController` + `RunOverlay` 保留文档与叠层，`RunChrome` 为 leading gutter 提供 indicator rail，并把 Composer/selection 放在其上。**当前 Rust 组合仍不等于完整 RunOverlay/RunChrome 布局已完成**；后续应使用 TekesUI 公开组合/布局能力对齐相对层次、列边界与可见性，不能用 RunSurface 测试窗口代替正式 RunView。
 2. 当前 Rust Indicators 已有连接/执行/等待/失败/用量事实与文本显示，但完整回合 rail 的位置映射、选中/hover/跳转及可达性仍要逐项核对。阅读位置基础依赖 #22；不能用业务侧像素估算填补。
 3. Transcript-only 候选事务已验证，完整 RunView 中受控编辑器可能拒绝；缺少无副作用预检已提交 [TekesUI #26](https://github.com/TekesApps/TekesUI/issues/26)。不把 fallible 更新直接塞入现有阅读回调。
 4. 当前进程 A/B 恢复不是 ClientKit 的持久 checkpoint 恢复；#25 富内容选择、真实三端阅读分页、实体 IME/候选窗、原生动量/VoiceOver、全部入口与最终并排验收仍未完成。
@@ -44,7 +44,7 @@
 
 2026-10-21可见性审查发现的controller错误fallback已在[降级快照修正](rust-agent-ui-degraded-frame-20261021.md)补齐：归档、epoch和目标隔离有控制器及原生fixture故障恢复证据。其余完整叠层、rail及pane显示清单继续保持未完成。
 
-下一步叠层的源规则已核对：`RunView.composerBottomPadding = Spacing.regular`，`composerContentSpacing = Spacing.loose`；后者属于文档遮挡净空，不应加进Composer自身高度或Jump位置。`RunOverlayView.layout`在任一维度为0时保留已有子几何。公开ScrollContent已有frame与可见clip区分，需先消费这些能力，不自行实现像素滚动补偿。叠层本身尚未实现。
+下一步叠层的源规则已核对：`RunView.composerBottomPadding = Spacing.regular`，`composerContentSpacing = Spacing.loose`；后者属于文档遮挡净空，不应加进Composer自身高度或Jump位置。`RunOverlayView.layout`在任一维度为0时保留已有子几何。公开ScrollContent已有frame与可见clip区分，需先消费这些能力，不自行实现像素滚动补偿。基础叠层现见[本轮记录](rust-agent-ui-overlay-20261021.md)；完整chrome/selection/Jump仍未实现。
 
 ## 2026-10-21：视觉对照证据边界
 
@@ -59,6 +59,8 @@
 | 先前阅读候选 | bd3 identity `bd3ed1b0af81b044306af90d3594bb31110147b7194bda6053b1d2e185871c9a`，449文件；是历史回放输入，不是当前默认依赖或ClientKit视觉基线。 |
 | 已有AgentKit截图 | `/tmp/agentkit-strict-column-native-context-20261021.png`，SHA `bdf6699601b38d2a7bb77c571f4e620f1cee23c891d60f2f929735254d5fec41`。它属于先前 `ec735c4` 共享列fixture，源码哈希已对照该commit；不是本轮32b代码的视觉验收，更没有配对ClientKit截图。 |
 
-可见剩余差异保持开放：RunView目前仍是docked纵向栈，未完成文档/Composer/chrome/selection叠层；Indicators仍为状态文本，完整leading rail、导航/hover/AX和位置映射未完成；默认宿主混合阅读事务/富内容、各pane及Sidebar/Summary完整显示规则仍待对应View验收。最后必须建立上述等条件、正常字号的正式RunView对照，再逐项核对差异。
+可见剩余差异保持开放：RunView已补基础文档/Composer叠层，但完整chrome/selection/Jump和bounded pane配置未完成；Indicators仍为状态文本，完整leading rail、导航/hover/AX和位置映射未完成；默认宿主混合阅读事务/富内容、各pane及Sidebar/Summary完整显示规则仍待对应View验收。最后必须建立上述等条件、正常字号的正式RunView对照，再逐项核对差异。
 
 Gallery新的集合焦点修复不在这些冻结输入中，不能据其WIP改变本轮验收结论。本记录仅说明证据边界，不授权升级pin、改写2b16/bd3包、发布、关闭Issue或把阶段截图当视觉通过。
+
+本轮新增fixture截图为 `/tmp/agentkit-overlay-native-context-20261021.png`，对应源码/二进制/截图哈希见overlay JSON；仍无配对ClientKit截图，不升级视觉验收结论。

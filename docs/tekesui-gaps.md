@@ -27,3 +27,6 @@
 不在本轮扩展：富 Markdown/工具卡片/附件、任务/子代理/SideChat/Summary UI；正式虚拟化、大历史增量投影、生产 launcher。先完成基础 Run 可验证部分，再以缺口清单协调 TekesUI。
 
 TKUI-006 更新：公共完整指针入口、AgentText转交及原生demo适配已实现；共享双击字素/三击段落修复与消费者回归已通过。Gallery原生证据与AgentKit未验收边界见 [记录](tekesui-pointer-metadata-20261018.md)。表格保留初始缺口基线，不代表当前仍未实现。
+
+
+2026-10-21后续观察：[TekesUI #27](https://github.com/TekesApps/TekesUI/issues/27)记录layout中inactive→active对缺失TextSurfaceHost的诊断时序；通用最小探针在只读2b16候选复现。它不替代原七项清单，也不是有效backend原生恢复的失败。生产宿主每帧必须提供文本服务，消费侧不补通用校验；证据见[Run叠层记录](rust-agent-ui-overlay-20261021.md)。
