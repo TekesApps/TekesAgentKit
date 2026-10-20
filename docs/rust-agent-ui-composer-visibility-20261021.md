@@ -18,4 +18,4 @@ Composer 保留原 Content / TextSurface。TekesUI 的 `Component::active` 拒�
 
 精确门禁、文件哈希和分层证据见[JSON收据](rust-agent-ui-composer-visibility-20261021.json)。该探针是本地 SEP fixture 与合成原生文本服务，不是实际三端/实体 IME/VoiceOver 或完整布局验收。默认公开 TekesUI pin 不变；完整文档/Composer/chrome/selection 叠层、rail、阅读集成及其它 pane 的显示审查仍按[原清单](clientkit-view-layout-review-20261020.md)继续。RunSurface仍只作测试宿主。
 
-待继续修正的降级边界：`crates/presentation/src/controller.rs::Shared.refresh` 在历史投影失败时把旧 Run phase 一律改为 Unavailable，可能令已知 Archived 丢失。需要控制器回归与修正，不能把本轮正常 canonical phase / fixture 生命周期专项扩大为该错误路径已验收。
+后续已修正降级边界：[controller降级快照与原生故障恢复](rust-agent-ui-degraded-frame-20261021.md)补齐当前archive事实、epoch和换目标隔离；本页原先的JSON仍是修复前正常canonical生命周期专项的历史收据。

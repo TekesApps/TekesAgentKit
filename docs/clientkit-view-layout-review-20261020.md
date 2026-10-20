@@ -42,4 +42,6 @@
 
 基础颜色、字体、圆角和控件反馈仍消费 TekesUI；严格对齐不要求把 AppKit/Metal 的通用渲染/编辑/滚动实现移入 AgentKit。缺基础属性/事件继续提上游 Issue。当前本表所有未通过项仍是交付工作，不是可由宿主各自实现的共享组件差异。
 
-2026-10-21可见性审查另发现：controller历史投影失败的fallback统一写Unavailable，须继续验证并保留已知Archived语义；详见[显示规则记录](rust-agent-ui-composer-visibility-20261021.md)。
+2026-10-21可见性审查发现的controller错误fallback已在[降级快照修正](rust-agent-ui-degraded-frame-20261021.md)补齐：归档、epoch和目标隔离有控制器及原生fixture故障恢复证据。其余完整叠层、rail及pane显示清单继续保持未完成。
+
+下一步叠层的源规则已核对：`RunView.composerBottomPadding = Spacing.regular`，`composerContentSpacing = Spacing.loose`；后者属于文档遮挡净空，不应加进Composer自身高度或Jump位置。`RunOverlayView.layout`在任一维度为0时保留已有子几何。公开ScrollContent已有frame与可见clip区分，需先消费这些能力，不自行实现像素滚动补偿。叠层本身尚未实现。

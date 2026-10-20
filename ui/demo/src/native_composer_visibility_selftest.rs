@@ -5,6 +5,7 @@ use tekes_agent_presentation::RunPhase;
 use tekes_ui_platform_macos::selftest::{Action, run_script};
 const PREEDIT: &str = "中文归档草稿";
 pub(super) struct Probe {
+    failure_fixture: Option<tekes_agent_ui_demo::fixture::Fixture>,
     started: Instant,
     phase: u8,
     deadline: bool,
@@ -14,8 +15,9 @@ pub(super) struct Probe {
     items: usize,
 }
 impl Probe {
-    pub fn new() -> Self {
+    pub fn new(failure_fixture: Option<tekes_agent_ui_demo::fixture::Fixture>) -> Self {
         Self {
+            failure_fixture,
             started: Instant::now(),
             phase: 0,
             deadline: false,
@@ -113,6 +115,31 @@ impl Probe {
                 // Capture the settled preedit frame, not the initial window frame.
                 self.viewport_bottom = host.view.tree.get(viewport).unwrap().frame().max_y();
                 self.composer_height = host.view.tree.get(ids.root).unwrap().frame().size.height;
+                if let Some(fixture) = &self.failure_fixture {
+                    fixture
+                        .publish_projection_failure(&host.view.binding().scope().session_id)
+                        .unwrap();
+                    self.phase = 10;
+                } else {
+                    self.phase = 2;
+                    Self::lifecycle(host, "session.archive");
+                }
+            }
+            10 if snapshot.connection.phase
+                == tekes_agent_presentation::ConnectionPhase::Degraded =>
+            {
+                assert!(
+                    snapshot
+                        .connection
+                        .message
+                        .as_deref()
+                        .is_some_and(|message| message
+                            .contains("promoted assistant is outside loaded history")),
+                    "must exercise semantic projection fallback, not a transport error"
+                );
+                assert!(Self::composer(&host.view).is_presented());
+                assert!(!snapshot.can_submit);
+                assert_eq!(snapshot.transcript.items.len(), self.items);
                 self.phase = 2;
                 Self::lifecycle(host, "session.archive");
             }
@@ -121,6 +148,16 @@ impl Probe {
                 .as_ref()
                 .is_some_and(|r| r.phase == RunPhase::Archived) =>
             {
+                if self.failure_fixture.is_some() {
+                    assert!(
+                        snapshot
+                            .connection
+                            .message
+                            .as_deref()
+                            .is_some_and(|message| message
+                                .contains("promoted assistant is outside loaded history"))
+                    );
+                }
                 let composer = Self::composer(&host.view);
                 assert!(!composer.is_presented());
                 assert!(!composer.is_composing());
@@ -173,7 +210,31 @@ impl Probe {
                 self.phase = 3;
                 Self::lifecycle(host, "session.unarchive");
             }
-            3 if snapshot.can_submit => {
+            3 if self.failure_fixture.is_some()
+                && snapshot
+                    .run
+                    .as_ref()
+                    .is_some_and(|r| r.phase != RunPhase::Archived)
+                && snapshot.connection.phase
+                    == tekes_agent_presentation::ConnectionPhase::Degraded =>
+            {
+                assert!(Self::composer(&host.view).is_presented());
+                assert!(!snapshot.can_submit);
+                self.failure_fixture
+                    .as_ref()
+                    .unwrap()
+                    .repair_projection_failure(&host.view.binding().scope().session_id)
+                    .unwrap();
+                let runtime = host.runtime.clone();
+                host.executor.spawn(async move {
+                    runtime
+                        .reconnect()
+                        .await
+                        .expect("explicit repair reconnect");
+                });
+                self.phase = 11;
+            }
+            3 | 11 if snapshot.can_submit => {
                 let composer = Self::composer(&host.view);
                 assert!(composer.is_presented());
                 assert_eq!(composer.editor() as *const _ as usize, self.editor.unwrap());
@@ -215,7 +276,7 @@ impl Probe {
             view.binding().current_run().unwrap().transcript.items.len(),
             self.items
         );
-        serde_json::json!({"nativeWindow":true,"formalRunView":true,"runtimeArchiveUnarchive":true,
+        serde_json::json!({"nativeWindow":true,"formalRunView":true,"runtimeArchiveUnarchive":true,"projectionFailureRecovery":self.failure_fixture.is_some(),
             "nativeSyntheticMarkedText":true,"hiddenFromAccessibility":true,"focusReconciledByLibrary":true,
             "noHiddenLayoutSlot":true,"sameEditorRetained":true,"draftIsolation":true,"noSubmission":true,
             "physicalIme":false,"voiceOver":false,"realHarness":false,"fullLayoutParity":false})

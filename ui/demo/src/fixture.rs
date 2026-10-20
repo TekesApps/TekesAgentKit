@@ -89,6 +89,7 @@ struct Line {
     ephemeral: bool,
     title: String,
     archived: bool,
+    history_revision: Option<String>,
     model_selection: Value,
 }
 fn entry(seq: i64, kind: &str, data: Value) -> HistoryEntry {
@@ -138,6 +139,7 @@ impl Default for Fixture {
                 ephemeral: false,
                 title: format!("会话 {id}"),
                 archived: false,
+                history_revision: None,
                 model_selection: json!({"provider":"fixture","model":"initial"}),
             };
             for n in 1..=30 {
@@ -299,6 +301,42 @@ impl Fixture {
     pub fn mutation_receipts(&self) -> BTreeMap<String, (String, Value, Value)> {
         self.mutations.lock().unwrap().clone()
     }
+    /// Deliberately invalid semantic history in the owned local test endpoint.
+    /// The journal remains protocol-valid so controller fallback is exercised.
+    pub fn publish_projection_failure(&self, id: &str) -> Result<()> {
+        let mut sessions = self.sessions.lock().unwrap();
+        let line = sessions
+            .get_mut(id)
+            .ok_or_else(|| unsupported("fixture session"))?;
+        require(!line.busy, "settled fixture required")?;
+        append(
+            line,
+            "turn/end",
+            json!({"turn":line.turn+1,"reason":"completed",
+            "promotedMessageID":"fixture-missing-projection-output"}),
+        );
+        Ok(())
+    }
+    /// Repair is consumed through a new public journal baseline, never by editing
+    /// the consumer's projection. Changing historyRevision retires the bad tail.
+    pub fn repair_projection_failure(&self, id: &str) -> Result<()> {
+        let mut sessions = self.sessions.lock().unwrap();
+        let line = sessions
+            .get_mut(id)
+            .ok_or_else(|| unsupported("fixture session"))?;
+        require(
+            line.rows.last().is_some_and(|row| {
+                row.event.data["promotedMessageID"] == "fixture-missing-projection-output"
+            }),
+            "no owned projection failure",
+        )?;
+        line.rows.pop();
+        line.history_revision = Some(format!(
+            "{}:repaired",
+            line.history_revision.as_deref().unwrap_or("fixture")
+        ));
+        Ok(())
+    }
     pub fn with_lifecycle(mut self) -> Self {
         self.lifecycle = true;
         self
@@ -328,6 +366,7 @@ impl Fixture {
                 ephemeral: false,
                 title: format!("会话 {id}"),
                 archived: false,
+                history_revision: None,
                 model_selection: json!({"provider":"fixture","model":"initial"}),
             };
             for turn in 1..=30 {
@@ -519,7 +558,7 @@ impl SessionEndpoint for Endpoint {
                     .ok_or_else(|| unsupported("fixture session"))?;
                 let receiver = line.sender.subscribe();
                 let start = line.rows.len().saturating_sub(40);
-                let baseline = json!({"type":"snapshot","snapshot":{"sessionId":address.session_id,"generation":g,"throughSequence":line.rows.len() as i64-1,"windowLimit":40,"entries":line.rows[start..],"hasMoreBefore":start>0}});
+                let baseline = json!({"type":"snapshot","snapshot":{"sessionId":address.session_id,"generation":g,"throughSequence":line.rows.len() as i64-1,"windowLimit":40,"entries":line.rows[start..],"hasMoreBefore":start>0,"historyRevision":line.history_revision}});
                 let id = address.session_id;
                 let generation = g.clone();
                 let updates = stream::unfold(receiver, move |mut receiver| {
@@ -710,6 +749,7 @@ impl SessionEndpoint for Endpoint {
                     ephemeral: false,
                     title: "预设新会话".into(),
                     archived: false,
+                    history_revision: None,
                     model_selection: json!({"provider":"fixture","model":"initial"}),
                 };
                 let _ = self
@@ -916,6 +956,7 @@ impl SessionEndpoint for Endpoint {
                     ephemeral,
                     title,
                     archived: false,
+                    history_revision: None,
                     model_selection: json!({"provider":"fixture","model":"initial"}),
                 },
             );

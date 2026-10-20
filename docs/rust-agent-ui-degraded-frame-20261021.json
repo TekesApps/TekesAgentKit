@@ -1,0 +1,96 @@
+{
+  "format": "agentkit-degraded-run-frame/1",
+  "date": "2026-10-21",
+  "verified_at_utc": "2026-10-20T17:17:40.625795+00:00",
+  "published_contract_baseline": "v0.3.8",
+  "source": {
+    "crates/presentation/src/controller.rs": "aff0bf3a86aa2fe44a035b43ff4f37f7584053ba160b48f40ff6769db8e5c036",
+    "crates/presentation/src/controller_fallback_tests.rs": "8f135e5cdec4b29f95fa05181343033b7d841dc52c00d69134639b30be613b80",
+    "ui/demo/src/fixture.rs": "061394aaf9c84e2a4a0993e08ec3686b97acefd69551b5e38c581ddfbfda18d0",
+    "ui/demo/src/components_native.rs": "f3013856bf9e2dd6e6f4911c4a9bdaad9253769f169c6c045e428a54ae0b5fe0",
+    "ui/demo/src/native_composer_visibility_selftest.rs": "ba58356e6fc6a4c429618e3230b27e073295e39e1a789275b694d666ce0fa425"
+  },
+  "reference_sources": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/TranscriptRendering/ThreadStatusPolicy.swift": "20257f99a496f0c84711ddf0a401b1095afe2c3ea61ac3fdb1510f1d9f13b417",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Run/RunView.swift": "4453b67fb8e4e6cabe4a9653ce378bffb939a9a01188a7df9a4bb89f0bd7674e",
+    "/Users/frankqin/dev/Tekes/Tekes/ClientAgentHostAdapters.swift": "7d907c654ec3df76c7a8b492e32bbc68f1bd4d0b46044cae615aa712b9f67c71"
+  },
+  "default_inputs": {
+    "commit": "8cf0840790334ba224afc0595897c74231c712e6",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 199,
+    "sha256": "f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f",
+    "ui_packages": 8
+  },
+  "validation": {
+    "headless_tests": 169,
+    "ui_tests": 301,
+    "new_controller_regressions": 3,
+    "second_public_consumer_tests": 27,
+    "strict_headless_clippy": true,
+    "strict_ui_clippy": true,
+    "fmt": true,
+    "native_projection_failure": {
+      "draftIsolation": true,
+      "focusReconciledByLibrary": true,
+      "formalRunView": true,
+      "fullLayoutParity": false,
+      "hiddenFromAccessibility": true,
+      "nativeSyntheticMarkedText": true,
+      "nativeWindow": true,
+      "noHiddenLayoutSlot": true,
+      "noSubmission": true,
+      "physicalIme": false,
+      "projectionFailureRecovery": true,
+      "realHarness": false,
+      "runtimeArchiveUnarchive": true,
+      "sameEditorRetained": true,
+      "voiceOver": false
+    },
+    "semantic_projection_error_asserted": true,
+    "native_component_regression": true,
+    "candidate_run_tests": 7,
+    "candidate_strict_clippy": true,
+    "candidate_current_inputs_match": true,
+    "candidate_source_unchanged": true
+  },
+  "candidate": {
+    "identity": "2b16eaa6200fecdde9a0c615166064effb9446249cde05087d5d7c288d81d4ec",
+    "files": 463,
+    "receiver_receipt_sha256": "229cd7157d9028b2c1f3e03e96e5b27a5cc16c16e39047972d84b1ff72337f1c"
+  },
+  "binary_sha256": "4f098605d5e5ecb7bb9f65fd9a169a44b06a1bac28381b0fb1d5c2c3edf75bf1",
+  "logs": {
+    "/tmp/agentkit-degraded-frame-before.log": "0b040ebbb1527945ac13a429818d4ff20964c62e67136a113026237991c143f7",
+    "/tmp/agentkit-degraded-frame-red.log": "2c67500c66ab08873760430dfbdc4ab54aa395a733a699368735bd81fa381541",
+    "/tmp/agentkit-degraded-frame-green.log": "3ac36eb65790ebada16ae9d1c75172e391e4446d45093d82d8e29931105e3bd9",
+    "/tmp/agentkit-degraded-frame-green2.log": "5235f3703b71fc535f6f2ce916d87ea1b231233f655595de4c85c39c30e2deb3",
+    "/tmp/agentkit-degraded-frame-headless-tests.log": "21319cdd1791794df0d60bf4d2c39098cda54a4925940c02e2dafdd1b0846a84",
+    "/tmp/agentkit-degraded-frame-headless-clippy.log": "a51bf171001ac022abb3de478c06cd1cda8b004da0e3d8854b405bf5b35a3575",
+    "/tmp/agentkit-degraded-frame-ui-tests.log": "a8362fe7a69834be393bd6915674d0365a23b6e1be01376ca4cbcbccf5c03162",
+    "/tmp/agentkit-degraded-frame-ui-clippy.log": "3aa1b53681cd75e3ed60cda62fc5b7de02f323925cf29beb844f2758ec2c44b3",
+    "/tmp/agentkit-degraded-frame-demo-build-final.log": "203aa0d78b506065055e89762039cf85c87390884614576242b56f31df70dd83",
+    "/tmp/agentkit-degraded-frame-native-final-20261021.log": "77628ae04890820bc001c6fa62657adb8a2b166fcaaf97a70e35022a35bc99c7",
+    "/tmp/agentkit-degraded-frame-native-regression-20261021.log": "653ef61c54bcb87a80e2fbb029cb83ad431836900172cb20b2316fbf513526e4",
+    ".runtime-fixtures/agentkit-degraded-frame-preflight-20261021-final/tests.log": "cdd1929f8e111bf514e0b67e2b7bec4f5c81fc96792f826e4721862a2679fb40",
+    ".runtime-fixtures/agentkit-degraded-frame-preflight-20261021-final/clippy.log": "bc7ca739d212a74cb9e11ac4ea0047e3733b9a38af903c7a4eb1539984ad7ec8"
+  },
+  "retained_failures": [
+    "Initial test compile used nonexistent PromptMode::Enqueue; public Queue used.",
+    "Three regressions failed on the old fallback (archive overwritten, old epoch, changed target lacked current Run facts).",
+    "Initial repair fixture retained invalid tail under unchanged historyRevision; explicit new revision now models authoritative replacement. Prepare clears submitted draft, so isolation checks the next A draft written after prepare."
+  ],
+  "closed_gap": "history projection failure no longer loses current archive, authority epoch or target isolation",
+  "remaining": [
+    "Run document/Composer/chrome/selection overlay and complete rail",
+    "per-pane loading/missing/error display parity",
+    "default/native reading and rich selection integration",
+    "actual three-harness reading/paging",
+    "physical IME and VoiceOver",
+    "final View parity review and CI/merge/stage tag"
+  ],
+  "pin_promoted": false,
+  "merged": false,
+  "tagged": false
+}

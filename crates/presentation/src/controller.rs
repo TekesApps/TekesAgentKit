@@ -31,6 +31,78 @@ impl SubmissionPreparation for NoPreparation {
         )
     }
 }
+// One projection read pairs the degraded frame with the same authority epoch.
+fn refreshed_snapshot(
+    core: &mut PresentationStore,
+    authority: &tekes_agent_session::MemoryProjectionStore,
+    previous: &RunSnapshot,
+) -> RunSnapshot {
+    match core.refresh(authority) {
+        Ok(snapshot) => snapshot,
+        Err(error) => {
+            let mut old = previous.clone();
+            let selection = core.selection();
+            let endpoint_matches = selection
+                .as_ref()
+                .is_none_or(|token| token.destination.endpoint_id() == authority.endpoint_id);
+            let same_target = old.selection == selection && endpoint_matches;
+            if !same_target {
+                old.transcript = TranscriptSnapshot::default();
+                old.summary = None;
+                old.submissions.clear();
+                old.events.clear();
+            }
+            if !same_target || old.connection_epoch != authority.connection_epoch {
+                old.child_availability = None;
+            }
+            let scope = selection
+                .as_ref()
+                .and_then(|token| match &token.destination {
+                    ComposerDestination::Run { scope } if endpoint_matches => Some(scope),
+                    _ => None,
+                });
+            // Archive is an independent public lifecycle fact, not the result of
+            // parsing history. Read it under this same authority lock/epoch even
+            // when archive and malformed history arrived in one publication.
+            old.run = scope.map(|scope| RunPresentation::read(authority, scope, false));
+            old.connection = ConnectionPresentation::read(
+                authority,
+                scope.map(|scope| scope.session_id.as_str()),
+                false,
+            );
+            old.revision = core.next_snapshot_revision();
+            old.connection_epoch = authority.connection_epoch;
+            old.selection = selection;
+            old.draft = core
+                .selected
+                .as_ref()
+                .map(|d| core.draft(d))
+                .unwrap_or_default();
+            old.draft_context_revision = core
+                .selected
+                .as_ref()
+                .map(|d| core.context_revision(d))
+                .unwrap_or_default();
+            old.can_submit = false;
+            old.connection.phase = ConnectionPhase::Degraded;
+            old.connection.can_submit = false;
+            old.connection.history_is_stale = true;
+            old.connection.message = Some(error.to_string());
+            old.transcript.is_stale = true;
+            if let Some(run) = &mut old.run {
+                run.connection = old.connection.clone();
+                run.can_submit = false;
+                run.can_cancel = false;
+                if run.phase != RunPhase::Archived {
+                    run.phase = RunPhase::Unavailable;
+                }
+                run.actionables.clear();
+            }
+            old
+        }
+    }
+}
+
 struct Shared {
     runtime: Arc<SessionRuntime>,
     core: Mutex<PresentationStore>,
@@ -57,44 +129,9 @@ impl Shared {
     }
     fn refresh(&self) {
         let mut core = self.core.lock().expect("presentation lock poisoned");
-        let snapshot = self.runtime.inspect(|authority| core.refresh(authority));
-        let snapshot = match snapshot {
-            Ok(snapshot) => snapshot,
-            Err(error) => {
-                let mut old = (**self.snapshots.borrow()).clone();
-                if old.selection != core.selection() {
-                    old.transcript = TranscriptSnapshot::default();
-                    old.summary = None;
-                    old.run = None;
-                }
-                old.revision = core.next_snapshot_revision();
-                old.selection = core.selection();
-                old.draft = core
-                    .selected
-                    .as_ref()
-                    .map(|d| core.draft(d))
-                    .unwrap_or_default();
-                old.draft_context_revision = core
-                    .selected
-                    .as_ref()
-                    .map(|d| core.context_revision(d))
-                    .unwrap_or_default();
-                old.can_submit = false;
-                old.connection.phase = ConnectionPhase::Degraded;
-                old.connection.can_submit = false;
-                old.connection.history_is_stale = true;
-                old.connection.message = Some(error.to_string());
-                old.transcript.is_stale = true;
-                if let Some(run) = &mut old.run {
-                    run.connection = old.connection.clone();
-                    run.can_submit = false;
-                    run.can_cancel = false;
-                    run.phase = RunPhase::Unavailable;
-                    run.actionables.clear();
-                }
-                old
-            }
-        };
+        let snapshot = self.runtime.inspect(|authority| {
+            refreshed_snapshot(&mut core, authority, &self.snapshots.borrow())
+        });
         self.snapshots.send_replace(Arc::new(snapshot));
     }
     fn finish(&self, id: &str, outcome: std::result::Result<(), String>) {
@@ -478,3 +515,7 @@ impl Drop for Completion {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "controller_fallback_tests.rs"]
+mod fallback_tests;

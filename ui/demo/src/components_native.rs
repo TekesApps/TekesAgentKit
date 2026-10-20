@@ -2288,9 +2288,13 @@ pub fn run() {
         .iter()
         .any(|arg| arg == "--run-controls-native-selftest");
     let stream_selftest = args.iter().any(|arg| arg == "--stream-native-selftest");
-    let visibility_selftest = args
+    let projection_failure_selftest = args
         .iter()
-        .any(|arg| arg == "--composer-visibility-selftest");
+        .any(|arg| arg == "--composer-projection-failure-selftest");
+    let visibility_selftest = projection_failure_selftest
+        || args
+            .iter()
+            .any(|arg| arg == "--composer-visibility-selftest");
     let feedback_selftest = args.iter().any(|arg| arg == "--feedback-native-selftest");
     let selftest = args.iter().any(|arg| arg == "--native-selftest");
     let system_ime_selftest = args.iter().any(|arg| arg == "--system-ime-selftest");
@@ -2328,6 +2332,7 @@ pub fn run() {
         );
     }
     let executor = tokio::runtime::Runtime::new().unwrap();
+    let mut visibility_fixture = None;
     let (connector, kind, scopes, fixture): (
         Arc<dyn tekes_agent_contract::EndpointConnector>,
         _,
@@ -2375,6 +2380,9 @@ pub fn run() {
                 if args.iter().any(|arg| arg == "--actionable-fixture") {
                     fixture.publish_actionable(serde_json::json!({"id":"fixture-approval","sessionId":"a","revision":0,"kind":"approval","payload":{"sessionId":"a","approvalId":"synthetic-only","toolName":"本地测试审批","reason":"仅验证回调，不执行系统操作"}}));
                     fixture.publish_actionable(serde_json::json!({"id":"fixture-question","sessionId":"a","revision":0,"kind":"question","payload":{"sessionId":"a","questions":[{"id":"q","question":"选择测试回答","options":[{"label":"继续测试"},{"label":"稍后"}],"multiSelect":false,"allowCustom":false}]}}));
+                }
+                if projection_failure_selftest {
+                    visibility_fixture = Some(fixture.clone());
                 }
                 if args.iter().any(|arg| arg == "--file-attachments") {
                     fixture.with_uploads()
@@ -2631,7 +2639,8 @@ pub fn run() {
         0
     };
     let mut host = Host {
-        visibility_probe: visibility_selftest.then(visibility_probe::Probe::new),
+        visibility_probe: visibility_selftest
+            .then(|| visibility_probe::Probe::new(visibility_fixture)),
         feedback_probe: feedback_selftest.then(feedback_probe::Probe::new),
         stream_probe: stream_selftest.then(stream_probe::Probe::new),
         run_controls_probe: run_controls_selftest.then(run_controls_probe::Probe::new),
