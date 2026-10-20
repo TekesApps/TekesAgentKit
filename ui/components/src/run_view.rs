@@ -99,6 +99,7 @@ pub struct RunView {
     column: RunColumnLayout,
     publication_generation: u64,
     pane_presented: bool,
+    navigation_lifetime: Arc<()>,
     geometry: Option<RunViewGeometry>,
 }
 impl RunView {
@@ -184,6 +185,7 @@ impl RunView {
             column: Default::default(),
             publication_generation: 0,
             pane_presented: true,
+            navigation_lifetime: Arc::new(()),
             geometry: None,
             body: StackContent {
                 model: Stack {
@@ -266,6 +268,72 @@ impl RunView {
         self.transcript()
             .ok_or("RunView has no Transcript")?
             .validate_turn_target(target)
+    }
+    /// Capture a non-focusing local navigation gesture from the installed,
+    /// arranged content. Hosts must call this after a successful current render;
+    /// layout alone is not proof that native geometry is publishable. Unlike a
+    /// focus-changing control, this path may preserve an active Composer preedit.
+    pub fn prepare_turn_navigation(
+        &self,
+        target: &TranscriptTurnTarget,
+    ) -> Result<RunTurnNavigation, &'static str> {
+        if !self.pane_presented || target.is_visible().is_none() {
+            return Err("RunView navigation requires a presented arranged pane");
+        }
+        self.transcript()
+            .ok_or("RunView has no Transcript")?
+            .validate_turn_target(target)?;
+        let geometry = self.geometry.ok_or("RunView is not arranged")?;
+        if geometry.publication != Some(target.publication())
+            || geometry.connection_epoch != Some(target.connection_epoch())
+        {
+            return Err("RunView navigation geometry belongs to another publication");
+        }
+        let latest = self
+            .turn_targets()?
+            .last()
+            .is_some_and(|last| last.turn_id() == target.turn_id());
+        Ok(RunTurnNavigation {
+            target: target.clone(),
+            kind: if latest {
+                RunTurnNavigationKind::Latest
+            } else {
+                RunTurnNavigationKind::TurnStart(
+                    *target.row_ids().first().ok_or("turn has no mounted row")?,
+                )
+            },
+            viewport: self.ids.viewport,
+            generation: self.publication_generation,
+            lifetime: self.navigation_lifetime.clone(),
+            claimed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        })
+    }
+    /// Revalidate immediately before a public TekesUI navigation call. No
+    /// scroll offset, focus change, editor write or network request occurs here.
+    pub fn claim_turn_navigation(
+        &self,
+        navigation: &RunTurnNavigation,
+    ) -> Result<RunTurnNavigationKind, &'static str> {
+        if navigation.viewport != self.ids.viewport
+            || navigation.generation != self.publication_generation
+            || !Arc::ptr_eq(&navigation.lifetime, &self.navigation_lifetime)
+        {
+            return Err("stale or foreign RunView navigation gesture");
+        }
+        let current = self.prepare_turn_navigation(&navigation.target)?;
+        if current.kind != navigation.kind {
+            return Err("RunView navigation target changed");
+        }
+        navigation
+            .claimed
+            .compare_exchange(
+                false,
+                true,
+                std::sync::atomic::Ordering::AcqRel,
+                std::sync::atomic::Ordering::Acquire,
+            )
+            .map_err(|_| "RunView navigation gesture already dispatched")?;
+        Ok(navigation.kind)
     }
     pub fn composer(&self) -> &Composer {
         self.body
@@ -796,7 +864,13 @@ impl Component for RunView {
         MeasuredChild::new(available)
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
-        self.pane_presented = frame.size.width > 0. && frame.size.height > 0.;
+        let presented = frame.size.width > 0. && frame.size.height > 0.;
+        if presented != self.pane_presented {
+            // Retire local gestures across collapse/reopen, including same-
+            // publication ABA. Reading attachment/editor state remains upstream.
+            self.navigation_lifetime = Arc::new(());
+        }
+        self.pane_presented = presented;
         if !self.pane_presented {
             return;
         } // Preserve prior child geometry, as RunOverlay does.

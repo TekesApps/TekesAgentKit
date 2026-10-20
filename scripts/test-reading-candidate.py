@@ -40,11 +40,15 @@ def main():
     parser.add_argument('--manifest', type=Path, required=True)
     parser.add_argument('--workdir', type=Path, required=True)
     parser.add_argument('--target-dir', type=Path, required=True)
+    parser.add_argument('--item-navigation-native', action='store_true',
+                        help='Build the owned native stable-item diagnostic on the actual RunView')
     args = parser.parse_args()
     if args.summary_labels and args.probe is None:
         parser.error('--summary-labels requires an explicit receiver --probe')
     if args.append_run_probe and args.probe is None:
         parser.error('--append-run-probe requires an explicit receiver --probe')
+    if args.item_navigation_native and not args.append_run_probe:
+        parser.error('--item-navigation-native requires --append-run-probe')
     repo = Path(__file__).resolve().parent.parent
     source = args.source.resolve()
     manifest = json.loads(args.manifest.read_text())
@@ -161,6 +165,32 @@ def main():
         adaptations.extend(['Only original Summary header opts into single-line tail ellipsis; ordinary row titles retain natural wrapping',
                             'Existing native TextBackend delegates shape_label to its original CoreTextShaper',
                             'Owned native Summary header supplies a long mixed-language title; existing pointer probe checks its full AX name and row bounds'])
+    if args.item_navigation_native:
+        native_probe_name = 'ui/demo/src/native_item_navigation_candidate.rs'
+        shutil.copyfile(repo / 'scripts/probes/native-item-navigation-candidate.rs', snapshot / native_probe_name)
+        host = snapshot / 'ui/demo/src/components_native.rs'
+        code = host.read_text()
+        replacements = [
+            ('mod summary_sections_probe;', 'mod summary_sections_probe;\n#[path = "native_item_navigation_candidate.rs"]\nmod item_navigation_probe;'),
+            ('    summary_sections_probe: Option<summary_sections_probe::Probe>,',
+             '    summary_sections_probe: Option<summary_sections_probe::Probe>,\n    item_navigation_probe: Option<item_navigation_probe::Probe>,'),
+            ('    let summary_sections_selftest =',
+             '    let item_navigation_selftest = args.iter().any(|arg| arg == "--item-navigation-selftest");\n    if item_navigation_selftest { assert!(!args.iter().any(|arg| arg == "--endpoint-config" || arg == "--offscreen" || arg == "--native-selftest"), "item diagnostic requires only the owned local fixture window"); }\n    let summary_sections_selftest ='),
+            ('        summary_sections_probe: summary_sections_selftest.then(summary_sections_probe::Probe::new),',
+             '        summary_sections_probe: summary_sections_selftest.then(summary_sections_probe::Probe::new),\n        item_navigation_probe: item_navigation_selftest.then(item_navigation_probe::Probe::new),'),
+            ('        self.text.atlas.begin_frame();',
+             '        if let Some(mut probe) = self.item_navigation_probe.take() { probe.before_render(self, window); self.item_navigation_probe = Some(probe); }\n        self.text.atlas.begin_frame();'),
+            ('        window.set_animating(self.text.frame_requested);',
+             '        if let Some(mut probe) = self.item_navigation_probe.take() { probe.after_render(self, window); self.item_navigation_probe = Some(probe); }\n        window.set_animating(self.text.frame_requested);'),
+            ('        if let Some(probe) = &self.summary_sections_probe {',
+             '        if let Some(probe) = &self.item_navigation_probe { assert!(self.failures.is_empty()); println!("NATIVE_AGENT_ITEM_NAVIGATION_RECEIPT {}", probe.receipt(self)); }\n        if let Some(probe) = &self.summary_sections_probe {'),
+        ]
+        for before, after in replacements:
+            assert code.count(before) == 1, before
+            code = code.replace(before, after)
+        host.write_text(code)
+        overrides.extend([native_probe_name, 'ui/demo/src/components_native.rs'])
+        adaptations.append('Owned native diagnostic uses actual RunView, original backend and public Kit capture/claim; second-consumer execution is checked in CLI; only public library reading/reveal calls; synthetic AppKit preedit, not a physical IME or interactive rail')
     env = dict(os.environ, CARGO_TARGET_DIR=str(args.target_dir.resolve()),
                CARGO_PROFILE_DEV_DEBUG='0', CARGO_PROFILE_TEST_DEBUG='0',
                CARGO_PROFILE_DEV_INCREMENTAL='false', CARGO_PROFILE_TEST_INCREMENTAL='false')
@@ -175,6 +205,7 @@ def main():
                    candidate_overrides={name: sha(snapshot / name) for name in
                                         overrides},
                    summary_labels=args.summary_labels,
+                   item_navigation_native=args.item_navigation_native,
                    default_pin_promoted=False, native_acceptance=False, visual_acceptance=False,
                    full_runview_acceptance=False, checks=[])
     try:
@@ -187,7 +218,7 @@ def main():
             ('tests', ['test', *common, '-p', 'tekes-agent-ui-demo', '--test', 'reading_candidate']),
             ('clippy', ['clippy', *common, '-p', 'tekes-agent-ui-demo', '--test', 'reading_candidate', '--', '-D', 'warnings']),
         ]
-        if args.summary_labels:
+        if args.summary_labels or args.item_navigation_native:
             steps.extend([
                 ('public-consumer', ['test', *common, '-p', 'tekes-agent-ui-consumer-check', '--lib']),
                 ('native-build', ['build', *common, '-p', 'tekes-agent-ui-demo']),

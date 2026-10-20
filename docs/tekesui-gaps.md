@@ -1,5 +1,7 @@
 # TekesUI 消费侧缺口
 
+2026-10-21 实际 #28 消费补充：[TekesUI #32](https://github.com/TekesApps/TekesUI/issues/32) 请求普通回合的纵向起端对齐、横轴保留和实际 clip/margin/clamp 语义，已[补充回原 #28](https://github.com/TekesApps/TekesUI/issues/28#issuecomment-6304084232)。10b5 的 nearest/centered 只计基础能力接入，不作为 ClientKit 回合跳转对齐。见[接入记录](rust-agent-ui-turn-navigation-20261021.md)。
+
 2026-10-21 Summary 对照新增：[TekesUI #31](https://github.com/TekesApps/TekesUI/issues/31)请求基础标签的行数限制与尾部省略，保留完整 AX name，并由库处理 CJK/emoji/fallback/RTL 的测量与绘制。当前 Summary 的顺序/折叠可用现有组合完成，但不能据短标题用例宣称 Source 的单行截断也已支持；详见[Summary section 记录](rust-agent-ui-summary-sections-20261021.md)。
 
 2026-10-21 Composer 对照新增：[TekesUI #30](https://github.com/TekesApps/TekesUI/issues/30)请求复合输入面的装饰区到原编辑器的通用焦点路由。只读候选探针确认未聚焦时点留白不获取焦点，但已有焦点/组字保持安全；不报告成 IME 回归。准确复现与证据边界见[Composer 输入行记录](rust-agent-ui-composer-band-20261021.md)。

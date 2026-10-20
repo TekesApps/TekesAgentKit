@@ -2,6 +2,8 @@
 
 本文件是正式业务组件的实现契约与进度入口，不是完成声明。完整交付目标保持 Composer、Transcript、Indicators、RunView、SidePanel、Sidebar，加 Native/Pi/DSH 能力验证、第二公开 consumer、原生窗口验收、review/CI/合并与阶段 tag。
 
+[原回合导航契约](rust-agent-ui-turn-navigation-20261021.md)增加非抢焦点的捕获/一次 dispatch 与 pane ABA 拒绝；#28 的 nearest/centered 在真实 RunView 中单独验证。普通回合顶端对齐仍缺 TekesUI [#32](https://github.com/TekesApps/TekesUI/issues/32)，正式入口未接通，不以居中替代。
+
 [Summary 用量两列布局](rust-agent-ui-summary-usage-20261021.md)将六项用量的标题与数值拆成原 TekesUI 文本槽，增加公开格式化回调；不重算 facts 或切换默认依赖。完整 Summary rows/slots 与原生产品验收仍待完成。
 
 源码基线：AgentKit 已发布 v0.3.8 / `f1daa0ffcf6ced41e21f351e22845455ca78006c`；TekesUI 实验开发输入固定公开 `8cf0840790334ba224afc0595897c74231c712e6`，199 输入 SHA `f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f`，原 431 基线清单保留在 `ui/baselines/`。以下新增 API 尚是当前分支 WIP。RunSurface 明确保留为协议/控件测试宿主，不改名充当 RunView，也不是正式组件树的包装层。

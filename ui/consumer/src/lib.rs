@@ -1696,3 +1696,18 @@ fn independent_summary_consumer_formats_usage_slots_without_recomputing_facts() 
     );
     assert!(nodes.iter().any(|node| node.semantics.name == "未知"));
 }
+
+/// A host's non-focusing navigation gesture comes from the original installed
+/// Run, not a newly selected session or a duplicated list of turn identities.
+pub fn prepare_turn_navigation(
+    run: &tekes_agent_components_ui::RunView,
+    target: &tekes_agent_components_ui::TranscriptTurnTarget,
+) -> Result<tekes_agent_components_ui::RunTurnNavigation, &'static str> {
+    run.prepare_turn_navigation(target)
+}
+pub fn claim_turn_navigation(
+    run: &tekes_agent_components_ui::RunView,
+    navigation: &tekes_agent_components_ui::RunTurnNavigation,
+) -> Result<tekes_agent_components_ui::RunTurnNavigationKind, &'static str> {
+    run.claim_turn_navigation(navigation)
+}

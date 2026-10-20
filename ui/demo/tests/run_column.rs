@@ -1124,3 +1124,101 @@ fn summary_usage_columns_keep_values_on_right_and_long_titles_clear_at_library_s
         }
     }
 }
+
+#[tokio::test]
+async fn nonfocusing_turn_navigation_keeps_preedit_and_fences_clone_publication_and_pane_aba() {
+    let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
+    let snapshot = controller.snapshot();
+    let mut view = RunView::standard(33000, 33004..33400, RunScope::main("fixture", "a")).unwrap();
+    update(&mut view, &snapshot);
+    let before = view.turn_targets().unwrap().remove(0);
+    assert!(view.prepare_turn_navigation(&before).is_err());
+    let ids = view.ids();
+    let mut host = view.into_host().unwrap();
+    let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()), 1.);
+    let frame = Rect::new(0., 0., 760., 650.);
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        frame,
+        frame,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    let view = host.get(ids.root).unwrap().component::<RunView>().unwrap();
+    let targets = view.turn_targets().unwrap();
+    let navigation = view.prepare_turn_navigation(&targets[0]).unwrap();
+    assert_eq!(navigation.viewport(), ids.viewport);
+    assert_eq!(
+        navigation.kind(),
+        RunTurnNavigationKind::TurnStart(targets[0].row_ids()[0])
+    );
+    let clone = navigation.clone();
+    let latest = view
+        .prepare_turn_navigation(targets.last().unwrap())
+        .unwrap();
+    assert_eq!(latest.kind(), RunTurnNavigationKind::Latest);
+    host.focus(Some(ids.composer.editor), true);
+    host.event(&ContentEvent::Preedit {
+        text: "组字".into(),
+        selection: 0..2,
+        clauses: vec![],
+        replacement: None,
+    });
+    let view = host.get(ids.root).unwrap().component::<RunView>().unwrap();
+    let baseline = view.composer().editor().input.external_baseline();
+    assert!(view.composer().is_composing());
+    assert_eq!(
+        view.claim_turn_navigation(&navigation).unwrap(),
+        navigation.kind()
+    );
+    assert!(view.claim_turn_navigation(&clone).is_err());
+    assert_eq!(
+        view.claim_turn_navigation(&latest).unwrap(),
+        RunTurnNavigationKind::Latest
+    );
+    assert!(view.composer().is_composing());
+    assert_eq!(view.composer().editor().input.external_baseline(), baseline);
+    assert_eq!(host.focused(), Some(ids.composer.editor));
+    let pending = view.prepare_turn_navigation(&targets[0]).unwrap();
+    let collapsed = Rect::new(0., 0., 0., 650.);
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        collapsed,
+        collapsed,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        frame,
+        frame,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    let view = host.get(ids.root).unwrap().component::<RunView>().unwrap();
+    assert!(view.claim_turn_navigation(&pending).is_err());
+    let targets = view.turn_targets().unwrap();
+    let old = view.prepare_turn_navigation(&targets[0]).unwrap();
+    let mut next = (*snapshot).clone();
+    next.revision += 1;
+    host.event(&ContentEvent::Unmark);
+    update(
+        host.get_mut(ids.root)
+            .unwrap()
+            .component_mut::<RunView>()
+            .unwrap(),
+        &next,
+    );
+    assert!(
+        host.get(ids.root)
+            .unwrap()
+            .component::<RunView>()
+            .unwrap()
+            .claim_turn_navigation(&old)
+            .is_err()
+    );
+    runtime.stop().await.unwrap();
+}

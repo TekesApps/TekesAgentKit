@@ -132,3 +132,36 @@ impl TurnRailGeometry {
 fn finite(value: f32) -> f32 {
     if value.is_finite() { value.max(0.) } else { 0. }
 }
+
+/// Local conversation navigation. The last turn uses the existing library
+/// return-to-latest path, matching ClientKit's last-section behavior. Other
+/// turns require START alignment of their first actual row. Hosts must report
+/// unsupported until their fixed library supports that placement; Nearest and
+/// Centered are not substitutes for the corresponding ClientKit View.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RunTurnNavigationKind {
+    TurnStart(ComponentId),
+    Latest,
+}
+/// An original, non-focusing gesture. Clones share one dispatch admission;
+/// neither this value nor its row ID grants endpoint/mutation authority.
+#[derive(Clone, Debug)]
+pub struct RunTurnNavigation {
+    pub(crate) target: TranscriptTurnTarget,
+    pub(crate) kind: RunTurnNavigationKind,
+    pub(crate) generation: u64,
+    pub(crate) lifetime: std::sync::Arc<()>,
+    pub(crate) claimed: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    pub(crate) viewport: ComponentId,
+}
+impl RunTurnNavigation {
+    pub fn target(&self) -> &TranscriptTurnTarget {
+        &self.target
+    }
+    pub fn kind(&self) -> RunTurnNavigationKind {
+        self.kind
+    }
+    pub fn viewport(&self) -> ComponentId {
+        self.viewport
+    }
+}
