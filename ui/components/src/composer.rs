@@ -308,6 +308,29 @@ impl Composer {
     ) -> Result<(), &'static str> {
         self.update_gated(snapshot, affordances, ComposerControlGate::OPEN)
     }
+    /// Preflight the Agent policy for a transaction on an already mounted
+    /// original destination. The caller validates returned arguments through
+    /// TekesUI's public controlled-value check; no generic checks are copied.
+    pub(crate) fn prepare_current_update(
+        &self,
+        snapshot: &RunSnapshot,
+    ) -> Result<Option<crate::ComposerDraftUpdate>, &'static str> {
+        if snapshot.revision == 0 || snapshot.revision < self.revision {
+            return Err("stale or unversioned composer input");
+        }
+        let target = snapshot.selection.as_ref().map(|s| &s.destination);
+        if self.destination.as_ref() != target || target.is_none() {
+            return Err("initialize the original Composer before transactional updates");
+        }
+        if let Some(context) = self.context() {
+            context.check_update(snapshot, self.context_affordances)?;
+        }
+        self.text().prepare_sync_draft(
+            &self.destination.as_ref().unwrap().storage_key(),
+            snapshot.revision,
+            &snapshot.draft.text,
+        )
+    }
     pub fn update_gated(
         &mut self,
         snapshot: &RunSnapshot,

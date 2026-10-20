@@ -1322,3 +1322,52 @@ fn independent_host_configures_pane_columns_without_a_private_run_surface() {
     assert_eq!(run.transcript_id(), transcript);
     assert_eq!(second.column_layout(), RunColumnLayout::default());
 }
+
+/// Prepare from the captured paired frame. A late task must not resample a
+/// binding's newest selection/epoch or treat read-only history as writable Run.
+/// The host next checks controlled_draft on the original TekesUI editor, then
+/// enters the reading transaction with the token captured by its original read.
+pub fn prepare_original_run<'a>(
+    run: &tekes_agent_components_ui::RunView,
+    frame: &'a tekes_agent_ui_bindings::PaneSnapshot,
+    paging: tekes_agent_components_ui::TranscriptPagingFacts,
+) -> Result<tekes_agent_components_ui::RunViewUpdate<'a>, &'static str> {
+    match frame {
+        tekes_agent_ui_bindings::PaneSnapshot::Run { snapshot, access } => run.prepare_update(
+            snapshot,
+            Default::default(),
+            access.composer_gate(),
+            paging,
+            *access == tekes_agent_ui_bindings::PaneAccess::Ready,
+        ),
+        tekes_agent_ui_bindings::PaneSnapshot::ReadOnlyChild { .. } => {
+            Err("bounded history has no transactional Composer")
+        }
+        tekes_agent_ui_bindings::PaneSnapshot::Missing { .. } => {
+            Err("original Run pointer is missing")
+        }
+    }
+}
+#[test]
+fn independent_host_does_not_prepare_a_missing_pointer_as_a_new_run() {
+    use tekes_agent_components_ui::{RunScope, RunView, TranscriptPageRead, TranscriptPagingFacts};
+    let scope = RunScope::main("consumer", "missing");
+    let run = RunView::standard(1600, 1604..1650, scope.clone()).unwrap();
+    let frame = tekes_agent_ui_bindings::PaneSnapshot::Missing {
+        scope: scope.clone(),
+    };
+    let paging = TranscriptPagingFacts {
+        scope,
+        supported: false,
+        has_more_before: false,
+        is_stale: true,
+        source_ready: false,
+        read: TranscriptPageRead::Idle,
+    };
+    assert!(matches!(
+        prepare_original_run(&run, &frame, paging),
+        Err("original Run pointer is missing")
+    ));
+    assert!(run.composer().destination().is_none());
+    assert!(run.transcript().unwrap().row_keys().is_empty());
+}

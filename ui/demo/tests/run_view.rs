@@ -452,3 +452,171 @@ async fn rejected_context_frame_cannot_partially_install_the_composer_or_transcr
     assert_eq!(run.composer().editor().input.text, "显式恢复草稿");
     runtime.stop().await.unwrap();
 }
+
+fn prepare<'a>(
+    view: &RunView,
+    snapshot: &'a RunSnapshot,
+) -> Result<RunViewUpdate<'a>, &'static str> {
+    view.prepare_update(
+        snapshot,
+        Default::default(),
+        ComposerControlGate::OPEN,
+        TranscriptPagingFacts {
+            scope: view.scope().clone(),
+            supported: false,
+            has_more_before: snapshot.transcript.has_more_before,
+            is_stale: snapshot.transcript.is_stale,
+            source_ready: true,
+            read: TranscriptPageRead::Idle,
+        },
+        true,
+    )
+}
+#[tokio::test]
+async fn whole_run_plan_is_read_only_and_commits_original_editor_arguments_and_row_ids() {
+    let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
+    let mut first = (*controller.snapshot()).clone();
+    first.draft.text = "原草稿".into();
+    let mut run = view();
+    update(&mut run, &first).unwrap();
+    let mut next = first.clone();
+    next.revision += 1;
+    next.draft.text = "新草稿".into();
+    let baseline = run.composer().editor().input.external_baseline();
+    let rows = run.transcript().unwrap().row_keys().to_vec();
+    let plan = prepare(&run, &next).unwrap();
+    assert_eq!(plan.scope(), run.scope());
+    assert_eq!(plan.publication(), next.revision);
+    assert_eq!(plan.connection_epoch(), next.connection_epoch);
+    let draft = plan.controlled_draft().unwrap();
+    assert_eq!(draft.expected(), &baseline);
+    assert_eq!(draft.value().payload, "新草稿");
+    assert_eq!(run.composer().editor().input.text, "原草稿");
+    assert_eq!(run.composer().editor().input.external_baseline(), baseline);
+    assert_eq!(run.transcript().unwrap().row_keys(), rows);
+    let item_ids = plan.item_ids();
+    // No library reading transaction in this default-pin test: generic apply
+    // still validates the exact request on the original mounted editor.
+    run.apply_prepared_update(&plan).unwrap();
+    assert_eq!(run.composer().editor().input.text, "新草稿");
+    assert_eq!(
+        run.transcript()
+            .unwrap()
+            .row_keys()
+            .iter()
+            .map(|key| run.transcript().unwrap().row_id(key).unwrap())
+            .collect::<Vec<_>>(),
+        item_ids
+    );
+    assert!(run.apply_prepared_update(&plan).is_err());
+    runtime.stop().await.unwrap();
+}
+#[tokio::test]
+async fn whole_run_plan_rejects_edit_undo_aba_and_invalid_frames_before_mutation() {
+    let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
+    let first = (*controller.snapshot()).clone();
+    let mut run = view();
+    update(&mut run, &first).unwrap();
+    let mut next = first.clone();
+    next.revision += 1;
+    next.draft.text = "不能安装".into();
+    let plan = prepare(&run, &next).unwrap();
+    let rows = run.transcript().unwrap().row_keys().to_vec();
+    let mut host = run.into_host().unwrap();
+    let input = &mut host
+        .get_mut(ids().composer.editor)
+        .unwrap()
+        .component_mut::<AgentText>()
+        .unwrap()
+        .field
+        .surface
+        .input;
+    assert!(input.insert("临时编辑", None));
+    assert!(input.undo());
+    assert_eq!(input.text, first.draft.text);
+    let after = input.external_baseline();
+    let run = host
+        .get_mut(ids().root)
+        .unwrap()
+        .component_mut::<RunView>()
+        .unwrap();
+    assert_eq!(
+        run.apply_prepared_update(&plan),
+        Err("stale or foreign RunView update plan")
+    );
+    assert_eq!(run.composer().editor().input.external_baseline(), after);
+    assert_eq!(run.transcript().unwrap().row_keys(), rows);
+    next.transcript.items.push(next.transcript.items[0].clone());
+    assert!(prepare(run, &next).is_err());
+    assert_eq!(run.composer().editor().input.external_baseline(), after);
+    assert_eq!(run.transcript().unwrap().row_keys(), rows);
+    runtime.stop().await.unwrap();
+}
+#[tokio::test]
+async fn same_publication_gate_change_invalidates_an_older_prepared_open_frame() {
+    let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
+    let snapshot = controller.snapshot();
+    let mut run = view();
+    update(&mut run, &snapshot).unwrap();
+    let plan = prepare(&run, &snapshot).unwrap();
+    let old_rows = run.transcript().unwrap().row_keys().to_vec();
+    let page = TranscriptPagingFacts {
+        scope: run.scope().clone(),
+        supported: false,
+        has_more_before: snapshot.transcript.has_more_before,
+        is_stale: snapshot.transcript.is_stale,
+        source_ready: false,
+        read: TranscriptPageRead::Idle,
+    };
+    run.update(
+        &snapshot,
+        Default::default(),
+        ComposerControlGate::CLOSED,
+        page,
+        false,
+    )
+    .unwrap();
+    let before = run.composer().editor().input.external_baseline();
+    // Even close→open under the same canonical publication cannot revive the
+    // old plan; the editor itself received only an unchanged acknowledgement.
+    update(&mut run, &snapshot).unwrap();
+    assert_eq!(run.composer().editor().input.external_baseline(), before);
+    assert_eq!(
+        run.apply_prepared_update(&plan),
+        Err("stale or foreign RunView update plan")
+    );
+    assert_eq!(run.composer().editor().input.external_baseline(), before);
+    assert_eq!(run.transcript().unwrap().row_keys(), old_rows);
+    runtime.stop().await.unwrap();
+}
+#[tokio::test]
+async fn advanced_paging_and_actionable_authority_refreshes_retire_stored_plans() {
+    let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
+    let snapshot = controller.snapshot();
+    let mut run = view();
+    update(&mut run, &snapshot).unwrap();
+    let plan = prepare(&run, &snapshot).unwrap();
+    let before = run.composer().editor().input.external_baseline();
+    let page = TranscriptPagingFacts {
+        scope: run.scope().clone(),
+        supported: false,
+        has_more_before: snapshot.transcript.has_more_before,
+        is_stale: snapshot.transcript.is_stale,
+        source_ready: false,
+        read: TranscriptPageRead::Loading,
+    };
+    run.update_paging(page).unwrap();
+    assert_eq!(
+        run.validate_prepared_update(&plan),
+        Err("stale or foreign RunView update plan")
+    );
+    let plan = prepare(&run, &snapshot).unwrap();
+    run.update_actionable(snapshot.revision, snapshot.connection_epoch, None, false)
+        .unwrap();
+    assert_eq!(
+        run.validate_prepared_update(&plan),
+        Err("stale or foreign RunView update plan")
+    );
+    assert_eq!(run.composer().editor().input.external_baseline(), before);
+    runtime.stop().await.unwrap();
+}

@@ -29,3 +29,5 @@ Reading / FullWidth 的两侧净空使用当前 TekesUI `Spacing::Relaxed`，而
 - 当前列在过窄 pane 内收窄，不复制 ClientKit 的320点最小列宽并让内容超出 pane；宿主仍需按其控件/窗口约束设置最小可用尺寸。更窄窗口、长本地化工具栏和完整弹层布局未验收。
 - 没有引入持久 checkpoint、像素补偿或自制阅读状态。#22 阅读事务、#26 受控编辑预检、#25 富内容和真实三端阅读分页仍需完成正式接入/验收。
 - 默认 TekesUI 仍是公开固定 `8cf0840790334ba224afc0595897c74231c712e6`，UI 仍 `0.0.0` / `publish=false`。共享会话列通过不代表全部 [ClientKit Views 对齐](clientkit-view-layout-review-20261020.md)完成，也不据此合并/打稳定 tag。
+
+2026-10-21要求已改为**严格对齐**：上述320最小列宽、Relaxed净空及非法比例处理的差异现在都是必须修正项，不再视为最终可接受的消费侧策略。36组测试只证明当时实现的几何/状态稳定，不证明它已经严格匹配ClientKit。完整硬性清单见[对应Views审查](clientkit-view-layout-review-20261020.md)。

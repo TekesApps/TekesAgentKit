@@ -4,7 +4,7 @@
 
 源码基线：AgentKit 已发布 v0.3.8 / `f1daa0ffcf6ced41e21f351e22845455ca78006c`；TekesUI 实验开发输入固定公开 `8cf0840790334ba224afc0595897c74231c712e6`，199 输入 SHA `f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f`，原 431 基线清单保留在 `ui/baselines/`。以下新增 API 尚是当前分支 WIP。RunSurface 明确保留为协议/控件测试宿主，不改名充当 RunView，也不是正式组件树的包装层。
 
-Layout 和显示逻辑须逐项参照当前 ClientKit 对应 Views；[对应关系与初步差异](clientkit-view-layout-review-20261020.md)列出源码及待验收项。组件类型存在、协议通过或 TekesUI 基础样式一致均不等于布局已经对齐。
+Layout 和显示逻辑须逐项严格对齐当前 ClientKit 对应 Views；[对应关系与初步差异](clientkit-view-layout-review-20261020.md)列出源码及待验收项。组件类型存在、协议通过或 TekesUI 基础样式一致均不等于布局已经对齐。
 
 ## 所有权
 
@@ -39,6 +39,8 @@ AgentKit 定义业务结构、展示语义、组件组合、组件输入及回�
 [共享会话列](rust-agent-ui-column-layout-20261020.md)现已接入正式 RunView，提供居中限宽/全宽/非对称边距并保留编辑器和消息身份；完整叠层和回合 rail 仍未完成。
 
 [#26 新隔离候选](tekesui-controlled-preflight-candidate-20261020.md)已通过接收方463输入核验、388 controls/168 consumer/严格 Clippy/48场景192帧回放；尚非正式 AgentKit RunView 或原生阅读接入，也不替换默认公开 pin。
+
+[正式 RunView 整帧准备与候选阅读事务](rust-agent-ui-run-preflight-20261021.md)提供只读 Agent 参数计划、事务前计划重检与提交重检；七项正式组件候选检查覆盖合法/拒绝更新、旧 token、ABA、迟到清空、组字保留及前插位置。默认宿主与三端原生阅读尚未迁移，未替换公开固定 pin。
 
 ## Composer（首批实现）
 

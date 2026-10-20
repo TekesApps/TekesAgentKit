@@ -146,6 +146,12 @@ impl Indicators {
     pub fn facts(&self) -> Option<&IndicatorFacts> {
         self.facts.as_ref()
     }
+    pub(crate) fn check_update(&self, snapshot: &RunSnapshot) -> Result<(), &'static str> {
+        if snapshot.revision == 0 || snapshot.revision < self.revision {
+            return Err("stale or unversioned indicator input");
+        }
+        Ok(())
+    }
     pub fn update(&mut self, snapshot: &RunSnapshot) -> Result<(), &'static str> {
         self.update_with(snapshot, IndicatorFacts::accessible_text)
     }
@@ -155,9 +161,7 @@ impl Indicators {
         snapshot: &RunSnapshot,
         format: impl FnOnce(&IndicatorFacts) -> String,
     ) -> Result<(), &'static str> {
-        if snapshot.revision == 0 || snapshot.revision < self.revision {
-            return Err("stale or unversioned indicator input");
-        }
+        self.check_update(snapshot)?;
         let facts = IndicatorFacts::read(snapshot);
         self.text.text = format(&facts);
         self.facts = Some(facts);

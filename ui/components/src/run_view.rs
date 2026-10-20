@@ -29,6 +29,44 @@ pub enum RunViewIntent {
         gesture: Box<FeedbackGesture>,
     },
 }
+/// Borrowed, same-UI-turn Agent publication plan. It does not reserve editor
+/// state or validate a reading token. Check `controlled_draft()` on the original
+/// TekesUI surface before entering a reading transaction; apply rechecks state.
+#[derive(Debug)]
+pub struct RunViewUpdate<'a> {
+    root: ComponentId,
+    scope: RunScope,
+    base_revision: Option<(u64, u64)>,
+    base_editor: tekes_ui_controls::TextEditBaseline,
+    base_gate: ComposerControlGate,
+    base_generation: u64,
+    snapshot: &'a RunSnapshot,
+    affordances: ComposerAffordances,
+    gate: ComposerControlGate,
+    paging: TranscriptPagingFacts,
+    actionable_controls: bool,
+    transcript: TranscriptContentUpdate<'a>,
+    editor: Option<ComposerDraftUpdate>,
+}
+impl RunViewUpdate<'_> {
+    pub fn scope(&self) -> &RunScope {
+        &self.scope
+    }
+    pub fn publication(&self) -> u64 {
+        self.snapshot.revision
+    }
+    pub fn connection_epoch(&self) -> u64 {
+        self.snapshot.connection_epoch
+    }
+    pub fn item_ids(&self) -> Vec<ComponentId> {
+        self.transcript.item_ids()
+    }
+    /// None means Agent policy retains unacknowledged local input/preedit for
+    /// an unchanged authority value. Do not replay or synthesize an editor write.
+    pub fn controlled_draft(&self) -> Option<&ComposerDraftUpdate> {
+        self.editor.as_ref()
+    }
+}
 /// Experimental reusable Run composition. Mount one per original binding; it
 /// cannot be retargeted. A complete Transcript requires upstream reading/rich APIs.
 #[derive(Debug)]
@@ -43,6 +81,7 @@ pub struct RunView {
     gate: ComposerControlGate,
     label: String,
     column: RunColumnLayout,
+    publication_generation: u64,
 }
 impl RunView {
     /// Four consecutive namespaces for controls/paging/actionables/transcript;
@@ -125,6 +164,7 @@ impl RunView {
             gate: ComposerControlGate::CLOSED,
             label: "Agent Run".into(),
             column: Default::default(),
+            publication_generation: 0,
             body: StackContent {
                 model: Stack {
                     axis: Axis::Vertical,
@@ -269,9 +309,15 @@ impl RunView {
         &mut self,
         labels: Option<FeedbackLabels>,
     ) -> Result<(), &'static str> {
+        let generation = self
+            .publication_generation
+            .checked_add(1)
+            .ok_or("RunView publication generation exhausted")?;
         self.transcript_mut()
             .ok_or("RunView has no Transcript")?
-            .configure_feedback(labels)
+            .configure_feedback(labels)?;
+        self.publication_generation = generation;
+        Ok(())
     }
     /// Apply one frame, including per-binding read/response authority. The
     /// controls flag only restricts canonical actions; dispatch still revalidates.
@@ -283,6 +329,22 @@ impl RunView {
         paging: TranscriptPagingFacts,
         actionable_controls: bool,
     ) -> Result<(), &'static str> {
+        let prompt = self.check_frame(snapshot, &paging)?;
+        self.update_run(snapshot, affordances, gate)?;
+        self.update_paging(paging)?;
+        self.update_actionable(
+            snapshot.revision,
+            snapshot.connection_epoch,
+            prompt,
+            actionable_controls,
+        )?;
+        Ok(())
+    }
+    fn check_frame(
+        &self,
+        snapshot: &RunSnapshot,
+        paging: &TranscriptPagingFacts,
+    ) -> Result<Option<Arc<ActionablePrompt>>, &'static str> {
         if paging.scope != self.scope
             || paging.has_more_before != snapshot.transcript.has_more_before
             || paging.is_stale != snapshot.transcript.is_stale
@@ -306,15 +368,94 @@ impl RunView {
                 snapshot.connection_epoch,
                 prompt.as_ref(),
             )?;
-        self.update_run(snapshot, affordances, gate)?;
-        self.update_paging(paging)?;
-        self.update_actionable(
-            snapshot.revision,
-            snapshot.connection_epoch,
-            prompt,
+        Ok(prompt)
+    }
+    /// Prepare the complete Agent frame and its controlled-value arguments
+    /// without editing controls, consuming local changes or allocating rows.
+    /// Initial Composer mounting still uses update() before reading attachment.
+    pub fn prepare_update<'a>(
+        &self,
+        snapshot: &'a RunSnapshot,
+        affordances: ComposerAffordances,
+        gate: ComposerControlGate,
+        paging: TranscriptPagingFacts,
+        actionable_controls: bool,
+    ) -> Result<RunViewUpdate<'a>, &'static str> {
+        self.check_frame(snapshot, &paging)?;
+        self.check_run_update(snapshot, gate)?;
+        let editor = self.composer().prepare_current_update(snapshot)?;
+        let transcript = self
+            .transcript()
+            .ok_or("RunView has no Transcript")?
+            .prepare_update(
+                &self.scope,
+                snapshot.revision,
+                snapshot.connection_epoch,
+                &snapshot.transcript,
+                gate.entries && !self.composer().is_composing(),
+            )?;
+        Ok(RunViewUpdate {
+            root: self.ids.root,
+            scope: self.scope.clone(),
+            base_revision: self.last.as_ref().map(|s| (s.revision, s.connection_epoch)),
+            base_editor: self.composer().editor().input.external_baseline(),
+            base_gate: self.gate,
+            base_generation: self.publication_generation,
+            snapshot,
+            affordances,
+            gate,
+            paging,
             actionable_controls,
+            transcript,
+            editor,
+        })
+    }
+    /// Recheck a stored plan before entering the library reading transaction.
+    /// This catches authority refresh/ABA even if the editor value is unchanged.
+    /// It does not replace TekesUI's controlled-value check or original token.
+    pub fn validate_prepared_update(
+        &self,
+        prepared: &RunViewUpdate<'_>,
+    ) -> Result<(), &'static str> {
+        if self.ids.root != prepared.root
+            || self.scope != prepared.scope
+            || self.last.as_ref().map(|s| (s.revision, s.connection_epoch))
+                != prepared.base_revision
+            || self.publication_generation != prepared.base_generation
+            || self.gate != prepared.base_gate
+            || self.composer().editor().input.external_baseline() != prepared.base_editor
+        {
+            return Err("stale or foreign RunView update plan");
+        }
+        let current = self.prepare_update(
+            prepared.snapshot,
+            prepared.affordances,
+            prepared.gate,
+            prepared.paging.clone(),
+            prepared.actionable_controls,
         )?;
+        if current.editor != prepared.editor
+            || current.transcript.rows() != prepared.transcript.rows()
+        {
+            return Err("RunView update plan inputs changed");
+        }
         Ok(())
+    }
+    /// Use immediately after Agent plan validation and library controlled-value
+    /// preflight, inside the original reading-token callback. No event/yield or
+    /// retarget may intervene; arbitrary application callbacks are not rolled back.
+    pub fn apply_prepared_update(
+        &mut self,
+        prepared: &RunViewUpdate<'_>,
+    ) -> Result<(), &'static str> {
+        self.validate_prepared_update(prepared)?;
+        self.update(
+            prepared.snapshot,
+            prepared.affordances,
+            prepared.gate,
+            prepared.paging.clone(),
+            prepared.actionable_controls,
+        )
     }
     /// One paired canonical publication updates all Run content. This method
     /// neither subscribes, dispatches nor caches a second Run state.
@@ -324,6 +465,41 @@ impl RunView {
         affordances: ComposerAffordances,
         gate: ComposerControlGate,
     ) -> Result<(), &'static str> {
+        self.check_run_update(snapshot, gate)?;
+        let scope = self.scope.clone();
+        self.composer_mut()
+            .update_gated(snapshot, affordances, gate)?;
+        let available = gate.entries && !self.composer().is_composing();
+        self.body
+            .children
+            .iter_mut()
+            .find_map(|node| node.component_mut::<Indicators>())
+            .unwrap()
+            .update(snapshot)?;
+        if let Some(content) = self.transcript_mut() {
+            content.update(
+                &scope,
+                snapshot.revision,
+                snapshot.connection_epoch,
+                &snapshot.transcript,
+                available,
+            )?;
+        }
+        self.last = Some(snapshot.clone());
+        self.gate = gate;
+        // A same-publication authority refresh (including close→open ABA)
+        // retires older plans even when the controlled editor value is unchanged.
+        self.publication_generation += 1;
+        Ok(())
+    }
+    fn check_run_update(
+        &self,
+        snapshot: &RunSnapshot,
+        gate: ComposerControlGate,
+    ) -> Result<(), &'static str> {
+        self.publication_generation
+            .checked_add(3)
+            .ok_or("RunView publication generation exhausted")?;
         if snapshot.revision == 0
             || self.last.as_ref().is_some_and(|old| {
                 snapshot.revision < old.revision
@@ -347,7 +523,7 @@ impl RunView {
         }
         let scope = self.scope.clone();
         let available = gate.entries && !self.composer().is_composing();
-        if let Some(content) = self.transcript_mut() {
+        if let Some(content) = self.transcript() {
             content.validate_update(
                 &scope,
                 snapshot.revision,
@@ -356,26 +532,12 @@ impl RunView {
                 available,
             )?;
         }
-        self.composer_mut()
-            .update_gated(snapshot, affordances, gate)?;
-        let available = gate.entries && !self.composer().is_composing();
         self.body
             .children
-            .iter_mut()
-            .find_map(|node| node.component_mut::<Indicators>())
+            .iter()
+            .find_map(|node| node.component::<Indicators>())
             .unwrap()
-            .update(snapshot)?;
-        if let Some(content) = self.transcript_mut() {
-            content.update(
-                &scope,
-                snapshot.revision,
-                snapshot.connection_epoch,
-                &snapshot.transcript,
-                available,
-            )?;
-        }
-        self.last = Some(snapshot.clone());
-        self.gate = gate;
+            .check_update(snapshot)?;
         Ok(())
     }
     pub fn update_paging(&mut self, mut facts: TranscriptPagingFacts) -> Result<(), &'static str> {
@@ -387,12 +549,18 @@ impl RunView {
             return Err("RunView paging input mismatch");
         }
         facts.source_ready &= self.gate.entries;
+        let generation = self
+            .publication_generation
+            .checked_add(1)
+            .ok_or("RunView publication generation exhausted")?;
         self.body
             .children
             .iter_mut()
             .find_map(|node| node.component_mut::<TranscriptPaging>())
             .unwrap()
-            .update(facts)
+            .update(facts)?;
+        self.publication_generation = generation;
+        Ok(())
     }
     /// Advanced authority refresh against the already installed canonical frame.
     pub fn update_actionable(
@@ -422,12 +590,19 @@ impl RunView {
             return Err("RunView actionable facts mismatch");
         }
         let controls = controls && self.gate.entries && !self.composer().is_composing();
-        self.body
+        let generation = self
+            .publication_generation
+            .checked_add(1)
+            .ok_or("RunView publication generation exhausted")?;
+        let changed = self
+            .body
             .children
             .iter_mut()
             .find_map(|node| node.component_mut::<ActionableCard>())
             .unwrap()
-            .update(publication, epoch, prompt, controls)
+            .update(publication, epoch, prompt, controls)?;
+        self.publication_generation = generation;
+        Ok(changed)
     }
     /// Drain once immediately after ContentHost event/AX delivery, before update.
     /// The host resolves these intents against the original binding, not selection.

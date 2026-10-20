@@ -22,3 +22,5 @@
 库的公开 consumer 已示范编辑器只读预检 → 应用结构预检 → 原 reading token 校验 → 同 turn 更新原 editor 和 Transcript。接收方测试通过只是**库及其 consumer**的证据；AgentKit 完整 RunView、Composer 业务冲突/clear receipt、上下文容量、旧 token、原生焦点/选区/组字和真实三端阅读仍要独立适配。旧 bd3 原生结构阅读报告不认证本包。
 
 该包不是公开 Git pin，默认依赖仍为 `8cf0840790334ba224afc0595897c74231c712e6`；未提升冻结、关闭 #26、合并或打 tag。下一步在明确的独立候选工作区对正式 AgentKit RunView 完成合法/拒绝更新检查，不能把发送方示例或本次库级绿色结果当作完成。
+
+后续：[AgentKit 正式 RunView 候选接入](rust-agent-ui-run-preflight-20261021.md)已增加整帧准备/重检，七项 API/几何/状态检查通过。它不提升本次源包到默认公开 pin，也不补齐新路径的原生/三端验收。

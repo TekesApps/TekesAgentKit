@@ -21,6 +21,7 @@ pub use composer_choices::*;
 mod editor;
 #[doc(hidden)]
 pub use editor::AgentText;
+pub use editor::ComposerDraftUpdate;
 mod indicators;
 mod side_panel;
 mod sidebar;
@@ -46,7 +47,7 @@ pub use side_panel::*;
 pub use sidebar::*;
 use std::collections::BTreeMap;
 pub use summary::*;
-use tekes_agent_presentation::RunSnapshot;
+pub use tekes_agent_presentation::RunSnapshot;
 pub use tekes_agent_presentation::{ComposerDestination, RunScope};
 use tekes_ui_controls::{
     ButtonTextRenderer, TextSurface,

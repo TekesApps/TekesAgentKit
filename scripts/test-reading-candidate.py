@@ -32,6 +32,7 @@ def verify(source, manifest):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source', type=Path, required=True)
+    parser.add_argument('--probe', type=Path, help='Explicit receiver test source; default: Transcript-only probe')
     parser.add_argument('--manifest', type=Path, required=True)
     parser.add_argument('--workdir', type=Path, required=True)
     parser.add_argument('--target-dir', type=Path, required=True)
@@ -61,7 +62,9 @@ def main():
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(original, dest)
         inputs[name] = sha(original)
-    probe = repo / 'scripts/probes/agentkit-reading-candidate.rs'
+    probe = (args.probe or repo / 'scripts/probes/agentkit-reading-candidate.rs').resolve()
+    if not probe.is_file():
+        raise ValueError('receiver probe must be an existing Rust source')
     shutil.copyfile(probe, snapshot / 'ui/demo/tests/reading_candidate.rs')
     cargo = snapshot / 'ui/Cargo.toml'
     cargo.write_text(re.sub(

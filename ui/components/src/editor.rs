@@ -5,6 +5,31 @@ use tekes_ui_controls::{
     TextEditBaseline, TextSurface, composition::*, layout::MeasuredChild,
 };
 use tekes_ui_scene::{Rect, Scene, Size};
+/// Agent-selected arguments for a controlled draft synchronization. Validate
+/// against the original TekesUI surface before a reading transaction; this
+/// value is not a generic editor validator or a cross-event reservation.
+#[derive(Debug, PartialEq, Eq)]
+pub struct ComposerDraftUpdate {
+    expected: TextEditBaseline,
+    value: tekes_ui_controls::DraftRevision,
+    selection: ExternalSelection,
+    undo: ExternalUndo,
+    clearing: bool,
+}
+impl ComposerDraftUpdate {
+    pub fn expected(&self) -> &TextEditBaseline {
+        &self.expected
+    }
+    pub fn value(&self) -> &tekes_ui_controls::DraftRevision {
+        &self.value
+    }
+    pub fn selection(&self) -> &ExternalSelection {
+        &self.selection
+    }
+    pub fn undo(&self) -> ExternalUndo {
+        self.undo
+    }
+}
 /// Agent layout role. Editing, selection, IME and scrolling delegate to TekesUI unchanged.
 #[derive(Debug)]
 pub struct AgentText {
@@ -36,12 +61,12 @@ impl AgentText {
     }
 }
 impl AgentText {
-    pub(super) fn sync_draft(
-        &mut self,
+    pub(super) fn prepare_sync_draft(
+        &self,
         key: &str,
         revision: u64,
         text: &str,
-    ) -> Result<bool, &'static str> {
+    ) -> Result<Option<ComposerDraftUpdate>, &'static str> {
         let current = self.field.surface.input.external_value();
         if current.is_some_and(|value| value.identity == key && value.payload == text)
             && (self.field.surface.input.text != text || self.field.surface.input.marked.is_some())
@@ -50,7 +75,7 @@ impl AgentText {
             // unacknowledged local input or preedit. The envelope revision still
             // fences old snapshots; unchanged editor values acknowledge newer
             // revisions through the public transaction without resetting state.
-            return Ok(false);
+            return Ok(None);
         }
         let first = current.is_none_or(|value| value.identity != key);
         let local_pending =
@@ -81,19 +106,36 @@ impl AgentText {
         } else {
             ExternalUndo::Preserve
         };
-        let result = self.field.surface.apply_external_value(
-            &expected,
-            &tekes_ui_controls::DraftRevision {
+        Ok(Some(ComposerDraftUpdate {
+            expected,
+            value: tekes_ui_controls::DraftRevision {
                 identity: key.into(),
                 version: revision,
                 payload: text.into(),
             },
             selection,
             undo,
+            clearing,
+        }))
+    }
+    pub(super) fn sync_draft(
+        &mut self,
+        key: &str,
+        revision: u64,
+        text: &str,
+    ) -> Result<bool, &'static str> {
+        let Some(update) = self.prepare_sync_draft(key, revision, text)? else {
+            return Ok(false);
+        };
+        let result = self.field.surface.apply_external_value(
+            &update.expected,
+            &update.value,
+            update.selection,
+            update.undo,
         );
         match result {
             ExternalValueResult::Applied { .. } => {
-                if clearing {
+                if update.clearing {
                     self.clear_baseline = None;
                 }
                 Ok(true)
