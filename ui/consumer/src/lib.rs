@@ -1432,3 +1432,35 @@ fn second_product_does_not_invent_geometry_before_a_run_is_arranged() {
     .unwrap();
     assert!(arranged_run_geometry(&run).is_none());
 }
+
+#[test]
+fn second_product_captures_real_turn_rows_without_interpreting_timestamps_or_scroll_offsets() {
+    use tekes_agent_components_ui::{
+        RunScope, TranscriptContent, TranscriptSnapshot, TranscriptTurn,
+    };
+    let scope = RunScope::main("consumer", "rail");
+    let mut view =
+        TranscriptContent::new(1900, 1901..1950, scope.clone(), Default::default()).unwrap();
+    let mut source = TranscriptSnapshot::default();
+    source.turns.push(TranscriptTurn {
+        id: "original-turn".into(),
+        status: "running".into(),
+        input: "中文问题".into(),
+        started_at: None,
+        ended_at: None,
+        usage: Default::default(),
+        fork_boundary: None,
+        footnote_actions: vec![],
+        live_usage: None,
+        reported_usage: None,
+    });
+    view.update(&scope, 1, 8, &source, false).unwrap();
+    let target = view.turn_targets().unwrap().remove(0);
+    assert_eq!(target.turn_id(), "original-turn");
+    assert_eq!(target.scope(), &scope);
+    assert_eq!(target.is_visible(), None);
+    assert_eq!(target.row_ids().len(), 1); // actual retained turn footer
+    view.validate_turn_target(&target).unwrap();
+    view.update(&scope, 2, 8, &source, false).unwrap();
+    assert!(view.validate_turn_target(&target).is_err());
+}

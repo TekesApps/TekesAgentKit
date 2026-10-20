@@ -1,5 +1,7 @@
 # TekesUI 消费侧缺口
 
+2026-10-21 rail 对照新增：[TekesUI #28](https://github.com/TekesApps/TekesUI/issues/28)要求按真实 item、保留原编辑焦点的 reveal 与独立轨道导航；[#29](https://github.com/TekesApps/TekesUI/issues/29)要求显式紧凑 action 的准确 hit/AX frame、装饰 slot 和激活阶段。已分别写明公开 pin 证据、所需接口及第二 consumer 验收。AgentKit 的目标/可见范围/槽位输入已推进，但尚无可交互 rail；见[范围与未完成项](rust-agent-ui-turn-rail-20261021.md)。
+
 2026-10-20 当前状态：实验 UI workspace 已消费固定公开 8cf0840 的纯文本 Content API；#23 不再阻塞纯文本消息行。混合阅读仍待 [#22](https://github.com/TekesApps/TekesUI/issues/22)，可选中富内容与原生映射已提 [#25](https://github.com/TekesApps/TekesUI/issues/25)。现有 MarkdownView 是被动有界绘制，不在 AgentKit 复制其解析/选择/字形逻辑。以下早期七项与旧候选记录按时间保留；当前依据为 [正式契约](rust-agent-ui-contract.md)。
 
 2026-10-19 正式pin更新：已固定公开4310937并完成独立消费复验；原始缺口/旧阻塞记录作为历史保留。最新逐Issue关闭结论与上游CI边界见 [正式pin复验](tekesui-public-pin-verification-20261019.md)。

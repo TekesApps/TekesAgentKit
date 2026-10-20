@@ -76,6 +76,112 @@ fn update(run: &mut RunView, snapshot: &RunSnapshot) {
     )
     .unwrap();
 }
+
+#[tokio::test]
+async fn rail_visibility_comes_from_arranged_rows_and_never_from_loaded_history() {
+    let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
+    let mut snapshot = (*controller.snapshot()).clone();
+    for turn in &mut snapshot.transcript.turns {
+        turn.input = format!("回合 {}", turn.id);
+    }
+    assert!(!snapshot.transcript.turns.is_empty());
+    let mut run = RunView::standard(1900, 1904..2300, RunScope::main("fixture", "a")).unwrap();
+    update(&mut run, &snapshot);
+    assert!(
+        run.turn_targets()
+            .unwrap()
+            .iter()
+            .all(|target| target.is_visible().is_none())
+    );
+    let ids = run.ids();
+    let mut host = run.into_host().unwrap();
+    let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()), 1.);
+    let pane = Rect::new(20., 40., 900., 900.);
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        pane,
+        pane,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    let run = host.get(ids.root).unwrap().component::<RunView>().unwrap();
+    let targets = run.turn_targets().unwrap();
+    assert!(targets.iter().all(|target| target.is_visible().is_some()));
+    for target in &targets {
+        let actual_visible = target.row_ids().iter().any(|id| {
+            host.get(*id)
+                .unwrap()
+                .visible()
+                .is_some_and(|r| r.size.width > 0. && r.size.height > 0.)
+        });
+        assert_eq!(target.is_visible(), Some(actual_visible));
+        run.validate_turn_target(target).unwrap();
+    }
+    let geometry = run.layout_geometry().unwrap().turn_rail;
+    assert_eq!(
+        geometry.document_size.height,
+        targets.len() as f32 * TurnRailGeometry::ROW_HEIGHT
+    );
+    host.focus(Some(ids.composer.editor), true);
+    host.event(&ContentEvent::Preedit {
+        text: "组字".into(),
+        selection: 0..2,
+        clauses: vec![],
+        replacement: None,
+    });
+    assert!(
+        host.get(ids.root)
+            .unwrap()
+            .component::<RunView>()
+            .unwrap()
+            .validate_turn_target(&targets[0])
+            .is_err()
+    );
+    host.event(&ContentEvent::Unmark);
+    let collapsed = Rect::new(20., 40., 0., 900.);
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        collapsed,
+        collapsed,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    let run = host.get(ids.root).unwrap().component::<RunView>().unwrap();
+    assert!(
+        run.turn_targets()
+            .unwrap()
+            .iter()
+            .all(|target| target.is_visible().is_none())
+    );
+    assert!(run.validate_turn_target(&targets[0]).is_err());
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        pane,
+        pane,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    snapshot.revision += 1;
+    update(
+        host.get_mut(ids.root)
+            .unwrap()
+            .component_mut::<RunView>()
+            .unwrap(),
+        &snapshot,
+    );
+    let run = host.get(ids.root).unwrap().component::<RunView>().unwrap();
+    assert!(
+        run.turn_targets()
+            .unwrap()
+            .iter()
+            .all(|target| target.is_visible().is_none())
+    );
+    assert!(run.validate_turn_target(&targets[0]).is_err());
+    runtime.stop().await.unwrap();
+}
 #[tokio::test]
 async fn shared_column_bounds_follow_pane_policy_without_replacing_text_or_draft_state() {
     let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();

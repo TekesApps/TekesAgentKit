@@ -85,6 +85,126 @@ fn root(host: &mut ContentHost, id: ComponentId) -> &mut TranscriptContent {
 fn key(id: &str) -> TranscriptContentRowKey {
     TranscriptContentRowKey::Message(TranscriptMessageIdentity::Item(id.into()))
 }
+
+#[test]
+fn rail_targets_reference_actual_turn_rows_and_exclude_blank_turns_and_session_notices() {
+    let mut source = snapshot();
+    source.turns[0].input = "中文输入".into();
+    source.tools.push(tool());
+    let mut blank = turn();
+    blank.id = "blank".into();
+    blank.input = " \n\t".into();
+    source.turns.push(blank);
+    let mut notice = message("notice", TranscriptItemKind::Notice, 4);
+    notice.turn_id.clear();
+    source.items.push(notice);
+    let mut view = content();
+    view.update(&scope(), 1, 5, &source, false).unwrap();
+    let targets = view.turn_targets().unwrap();
+    assert_eq!(targets.len(), 1);
+    let target = &targets[0];
+    assert_eq!(target.scope(), &scope());
+    assert_eq!((target.publication(), target.connection_epoch()), (1, 5));
+    assert_eq!(target.turn_id(), "turn");
+    assert_eq!(target.input(), "中文输入");
+    assert_eq!(target.status(), "completed");
+    assert_eq!(target.is_visible(), None);
+    for key in [
+        key("input"),
+        key("output"),
+        TranscriptContentRowKey::Tool("tool".into()),
+        TranscriptContentRowKey::TurnFootnote("turn".into()),
+    ] {
+        assert!(target.row_ids().contains(&view.row_id(&key).unwrap()));
+    }
+    assert!(
+        !target
+            .row_ids()
+            .contains(&view.row_id(&key("notice")).unwrap())
+    );
+    assert!(
+        !target.row_ids().contains(
+            &view
+                .row_id(&TranscriptContentRowKey::TurnFootnote("blank".into()))
+                .unwrap()
+        )
+    );
+    view.validate_turn_target(target).unwrap();
+}
+
+#[test]
+fn rail_target_capture_rejects_other_trees_publications_epochs_and_clipped_turns() {
+    let mut source = snapshot();
+    source.turns[0].input = "原输入".into();
+    let mut view = content();
+    view.update(&scope(), 1, 5, &source, false).unwrap();
+    let captured = view.turn_targets().unwrap().remove(0);
+    let mut same_ids = content();
+    same_ids.update(&scope(), 1, 5, &source, false).unwrap();
+    assert_eq!(
+        same_ids.turn_targets().unwrap()[0].row_ids(),
+        captured.row_ids()
+    );
+    assert!(same_ids.validate_turn_target(&captured).is_err());
+    let mut other = TranscriptContent::new(2100, 2101..2200, scope(), Default::default()).unwrap();
+    other.update(&scope(), 1, 5, &source, false).unwrap();
+    assert!(other.validate_turn_target(&captured).is_err());
+    view.update(&scope(), 2, 5, &source, false).unwrap();
+    assert!(view.validate_turn_target(&captured).is_err());
+    let captured = view.turn_targets().unwrap().remove(0);
+    view.update(&scope(), 3, 6, &source, false).unwrap();
+    assert!(view.validate_turn_target(&captured).is_err());
+    let captured = view.turn_targets().unwrap().remove(0);
+    view.update(&scope(), 4, 6, &TranscriptSnapshot::default(), false)
+        .unwrap();
+    assert!(view.turn_targets().unwrap().is_empty());
+    assert!(view.validate_turn_target(&captured).is_err());
+}
+
+#[test]
+fn rail_layout_uses_source_track_gutter_and_document_coordinates() {
+    use tekes_ui_scene::Rect;
+    let pane = Rect::new(20., 40., 900., 900.);
+    let regular = TurnRailGeometry::for_run(pane, RunColumnLayout::default(), 3);
+    assert_eq!(regular.rail, Rect::new(20., 40., 65., 900.));
+    assert_eq!(regular.track, Rect::new(28., 475., 42., 30.));
+    assert!(!regular.centers_ticks);
+    assert_eq!(
+        regular.tick_rect(0, TurnRailGeometry::RESTING_LENGTH),
+        Some(Rect::new(16., 4., 6., 2.))
+    );
+    assert_eq!(
+        regular.tick_rect(2, f32::MAX),
+        Some(Rect::new(16., 24., 26., 2.))
+    );
+    assert_eq!(regular.tick_rect(3, 6.), None);
+    let overflow = TurnRailGeometry::for_run(pane, RunColumnLayout::default(), 100);
+    assert_eq!(overflow.document_size.height, 1000.);
+    assert_eq!(overflow.track, Rect::new(28., 175., 42., 630.));
+    let narrow = TurnRailGeometry::for_run(
+        Rect::new(0., 0., 400., 100.),
+        RunColumnLayout::document_pane(0.01, Some(0.45)),
+        1,
+    );
+    assert_eq!(narrow.rail.size.width, 4.);
+    assert!(narrow.centers_ticks);
+    assert_eq!(narrow.tick_rect(0, 26.), Some(Rect::new(0., 4., 4., 2.)));
+    assert_eq!(narrow.tick_rect(0, f32::NAN).unwrap().size.width, 0.);
+    let full = TurnRailGeometry::for_run(
+        Rect::new(0., 0., 1600., 900.),
+        RunColumnLayout::FullWidth,
+        0,
+    );
+    assert_eq!(full.rail.size.width, 415.);
+    assert_eq!(full.track.size.height, 0.);
+    let empty = TurnRailGeometry::for_run(
+        Rect::new(0., 0., f32::NAN, -3.),
+        RunColumnLayout::default(),
+        1,
+    );
+    assert_eq!(empty.rail.size.width, 0.);
+    assert_eq!(empty.track.size.height, 0.);
+}
 #[test]
 fn output_copy_uses_the_original_final_message_and_remains_local_when_mutations_are_disabled() {
     let mut source = snapshot();

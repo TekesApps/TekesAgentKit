@@ -127,6 +127,8 @@ pub struct TranscriptContent {
     labels: TranscriptContentLabels,
     feedback_dirty: bool,
     run_layout: Option<RunTranscriptLayout>,
+    arranged_revision: Option<(u64, u64)>,
+    turn_target_owner: std::sync::Arc<()>,
 }
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct RunTranscriptLayout {
@@ -173,6 +175,8 @@ impl TranscriptContent {
             labels,
             feedback_dirty: false,
             run_layout: None,
+            arranged_revision: None,
+            turn_target_owner: std::sync::Arc::new(()),
         })
     }
     pub fn id(&self) -> ComponentId {
@@ -200,6 +204,86 @@ impl TranscriptContent {
     }
     pub fn row_keys(&self) -> &[TranscriptContentRowKey] {
         &self.keys
+    }
+    /// Rail facts from the installed canonical publication and original rows.
+    /// Empty-input turns are omitted exactly as in ClientKit's rail; orphan and
+    /// session-wide rows never acquire an invented turn.
+    pub fn turn_targets(&self) -> Result<Vec<crate::TranscriptTurnTarget>, &'static str> {
+        let Some(snapshot) = &self.last else {
+            return Ok(vec![]);
+        };
+        let document =
+            TranscriptDocument::read(snapshot).map_err(|_| "invalid transcript document")?;
+        let planned = plan(&document, &self.labels)?;
+        let mounted: BTreeMap<_, _> = self.keys.iter().zip(&self.rows.children).collect();
+        let mut rows: BTreeMap<&str, (Vec<ComponentId>, bool)> = BTreeMap::new();
+        for row in &planned {
+            let turn = match &row.content {
+                PlannedContent::Input(input) => Some(input.item.turn_id.as_str()),
+                PlannedContent::Output(output, section) => {
+                    section.map(|_| output.item.turn_id.as_str())
+                }
+                PlannedContent::Tool(tool, _) => Some(tool.turn_id.as_str()),
+                PlannedContent::Footnote(turn, _) => Some(turn.id.as_str()),
+                PlannedContent::Feedback(target) => Some(target.turn_id),
+                PlannedContent::Label(_) => match &row.key {
+                    TranscriptContentRowKey::Unplaced(turn) => Some(turn.as_str()),
+                    _ => None,
+                },
+            };
+            if let Some(turn) = turn
+                && let Some(node) = mounted.get(&row.key)
+            {
+                let (ids, visible) = rows.entry(turn).or_default();
+                ids.push(node.id());
+                *visible |= node
+                    .visible()
+                    .is_some_and(|r| r.size.width > 0. && r.size.height > 0.);
+            }
+        }
+        let arranged = self.arranged_revision == Some((self.publication, self.epoch));
+        Ok(snapshot
+            .turns
+            .iter()
+            .filter(|turn| !turn.input.trim().is_empty())
+            .map(|turn| {
+                let (ids, visible) = rows.remove(turn.id.as_str()).unwrap_or_default();
+                let visible = arranged.then_some(visible);
+                crate::TranscriptTurnTarget {
+                    owner: self.turn_target_owner.clone(),
+                    scope: self.scope.clone(),
+                    publication: self.publication,
+                    epoch: self.epoch,
+                    turn_id: turn.id.clone(),
+                    input: turn.input.clone(),
+                    status: turn.status.clone(),
+                    rows: ids,
+                    visible,
+                }
+            })
+            .collect())
+    }
+    /// Recheck a captured local target before calling a public library reveal
+    /// service. This check does not perform scrolling or grant endpoint authority.
+    pub fn validate_turn_target(
+        &self,
+        target: &crate::TranscriptTurnTarget,
+    ) -> Result<(), &'static str> {
+        if !std::sync::Arc::ptr_eq(&target.owner, &self.turn_target_owner)
+            || target.scope != self.scope
+            || target.publication != self.publication
+            || target.epoch != self.epoch
+        {
+            return Err("stale or foreign transcript turn target");
+        }
+        if !self.turn_targets()?.iter().any(|current| {
+            current.turn_id == target.turn_id
+                && current.rows == target.rows
+                && !current.rows.is_empty()
+        }) {
+            return Err("transcript turn target is no longer present");
+        }
+        Ok(())
     }
     pub fn retained_operation_count(&self) -> usize {
         self.detached.len()
@@ -288,6 +372,7 @@ impl TranscriptContent {
             }
         }
         self.last = Some(snapshot.clone());
+        self.arranged_revision = None;
         self.feedback_dirty = false;
         Ok(())
     }
@@ -771,6 +856,7 @@ impl Component for TranscriptContent {
             frame
         };
         self.rows.arrange(text, content, clip);
+        self.arranged_revision = Some((self.publication, self.epoch));
     }
     fn semantics(&self) -> ContentSemantics {
         ContentSemantics::new(ContentRole::Group, &self.labels.group)

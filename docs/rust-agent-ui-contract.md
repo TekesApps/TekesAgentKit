@@ -10,6 +10,8 @@ Layout 和显示逻辑须逐项严格对齐当前 ClientKit 对应 Views；[对�
 
 ### 排版与基础样式
 
+[回合 rail 的真实目标与布局输入](rust-agent-ui-turn-rail-20261021.md)已公开：源回合到原内容行的映射、实际排版可见性、原 owner/publication/epoch 校验，以及对应 ClientKit 的 gutter/track 几何。该几何是计划槽位，尚非可交互 rail 子树；基础 reveal 和紧凑 action 需求分别见 TekesUI #28/#29，实际 hover/预览/跟随与完整组合仍由 AgentKit 完成。
+
 AgentKit 固定消息排版语义：机器正文、推理、工具内容及机器 footnote 靠左；用户输入使用靠右的圆角气泡，用户 footnote 在气泡外靠右。主会话和各类子 pane 共用此规则。
 
 基础视觉跟随 TekesUI：优先使用公开组件的默认样式，必要的语义间距和文字层级使用库提供的 tokens。AgentKit 不另建颜色、字体、圆角或控件皮肤，也不为复刻 Tekes App 的旧外观覆盖库默认值。宿主主题通过 TekesUI 的公开主题输入传递。

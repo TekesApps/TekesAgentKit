@@ -28,6 +28,7 @@ pub struct RunViewGeometry {
     pub visible_document: Rect,
     pub document_top_clearance: f32,
     pub document_bottom_clearance: f32,
+    pub turn_rail: TurnRailGeometry,
 }
 #[derive(Debug)]
 pub enum RunViewIntent {
@@ -239,6 +240,27 @@ impl RunView {
     }
     pub fn transcript_id(&self) -> Option<ComponentId> {
         self.transcript
+    }
+    /// No visibility is reported for a collapsed or not-yet-arranged Run pane.
+    pub fn turn_targets(&self) -> Result<Vec<TranscriptTurnTarget>, &'static str> {
+        let mut targets = self
+            .transcript()
+            .ok_or("RunView has no Transcript")?
+            .turn_targets()?;
+        if !self.pane_presented {
+            for target in &mut targets {
+                target.visible = None;
+            }
+        }
+        Ok(targets)
+    }
+    pub fn validate_turn_target(&self, target: &TranscriptTurnTarget) -> Result<(), &'static str> {
+        if !self.pane_presented || self.composer().is_composing() {
+            return Err("RunView navigation is unavailable during collapse or composition");
+        }
+        self.transcript()
+            .ok_or("RunView has no Transcript")?
+            .validate_turn_target(target)
     }
     pub fn composer(&self) -> &Composer {
         self.body
@@ -867,6 +889,18 @@ impl Component for RunView {
             visible_document: document_clip,
             document_top_clearance: top_clearance,
             document_bottom_clearance: bottom_clearance,
+            turn_rail: TurnRailGeometry::for_run(
+                frame,
+                self.column,
+                self.last.as_ref().map_or(0, |snapshot| {
+                    snapshot
+                        .transcript
+                        .turns
+                        .iter()
+                        .filter(|turn| !turn.input.trim().is_empty())
+                        .count()
+                }),
+            ),
         });
     }
     fn semantics(&self) -> ContentSemantics {
