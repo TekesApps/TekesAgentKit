@@ -1,0 +1,243 @@
+{
+  "format": "clientkit-run-column-reference/1",
+  "reference_theme": "PreviewDesignTheme",
+  "source_files": {
+    "TekesClientKit/Sources/Composer/Run/RunOverlay.swift": {
+      "symbol": "ClientRunColumnLayout.geometry",
+      "sha256": "32c27a8488dd313f356b720752cb51a5b92eeb3caeb8d9399bc28ec6f93acf26"
+    },
+    "TekesClientKit/Sources/Composer/RunUserControlsGraph.swift": {
+      "symbol": "UserControlsOverlayController.viewDidLayout",
+      "sha256": "aecc2c5012d25a1e4c0072d1bfef013d99bdf6d48961a2c5d8dca186120d1227"
+    },
+    "TekesMetalTextKit/Sources/TekesMetalTextKit/Shared/WorkspaceLayoutMetrics.swift": {
+      "symbol": "conversationColumnGeometry",
+      "sha256": "8e271f774ffb741f4fb959ff1fbfe8d44d26d97f34522b48ef209770ebfa3da0"
+    },
+    "TekesMetalTextKit/Sources/TekesMetalTextKit/Design/TekesControlSize.swift": {
+      "symbol": "focusBar",
+      "sha256": "0620829e2fbe268f187d5d437ec6d17c44b12c8d85f1ce26b7e21d5f60e660da"
+    },
+    "TekesMetalTextKit/Sources/TekesMetalTextKit/Design/PreviewDesignTheme.swift": {
+      "symbol": "spacing.loose",
+      "sha256": "2e2114161f449f34becf34ed7015d460c5357fcec0845385fdd1b38169ef5e33"
+    }
+  },
+  "clientkit_head": "c289bc9d33edcd83a782ac17927a8c65a027eccd",
+  "minimum_content_width": 320,
+  "default_maximum_width": 770,
+  "focus_bar": 2,
+  "loose_spacing": 16,
+  "rail_width": 34,
+  "horizontal_inset": 50,
+  "cases": [
+    {
+      "name": "reading_-10",
+      "mode": "reading",
+      "viewport": -10,
+      "expected_x": 50,
+      "expected_width": 320
+    },
+    {
+      "name": "reading_0",
+      "mode": "reading",
+      "viewport": 0,
+      "expected_x": 50,
+      "expected_width": 320
+    },
+    {
+      "name": "reading_300",
+      "mode": "reading",
+      "viewport": 300,
+      "expected_x": 50,
+      "expected_width": 320
+    },
+    {
+      "name": "reading_419",
+      "mode": "reading",
+      "viewport": 419,
+      "expected_x": 50,
+      "expected_width": 320
+    },
+    {
+      "name": "reading_420",
+      "mode": "reading",
+      "viewport": 420,
+      "expected_x": 50,
+      "expected_width": 320
+    },
+    {
+      "name": "reading_760",
+      "mode": "reading",
+      "viewport": 760,
+      "expected_x": 50,
+      "expected_width": 660
+    },
+    {
+      "name": "reading_870",
+      "mode": "reading",
+      "viewport": 870,
+      "expected_x": 50,
+      "expected_width": 770
+    },
+    {
+      "name": "reading_1000",
+      "mode": "reading",
+      "viewport": 1000,
+      "expected_x": 115,
+      "expected_width": 770
+    },
+    {
+      "name": "reading_1280",
+      "mode": "reading",
+      "viewport": 1280,
+      "expected_x": 255,
+      "expected_width": 770
+    },
+    {
+      "name": "reading_nan",
+      "mode": "reading",
+      "viewport": "nan",
+      "expected_x": 50,
+      "expected_width": 320
+    },
+    {
+      "name": "reading_infinity",
+      "mode": "reading",
+      "viewport": "infinity",
+      "expected_x": 50,
+      "expected_width": 320
+    },
+    {
+      "name": "full_0",
+      "mode": "full",
+      "viewport": 0,
+      "expected_x": 50,
+      "expected_width": 0
+    },
+    {
+      "name": "full_40",
+      "mode": "full",
+      "viewport": 40,
+      "expected_x": 50,
+      "expected_width": 0
+    },
+    {
+      "name": "full_100",
+      "mode": "full",
+      "viewport": 100,
+      "expected_x": 50,
+      "expected_width": 0
+    },
+    {
+      "name": "full_360",
+      "mode": "full",
+      "viewport": 360,
+      "expected_x": 50,
+      "expected_width": 260
+    },
+    {
+      "name": "full_420",
+      "mode": "full",
+      "viewport": 420,
+      "expected_x": 50,
+      "expected_width": 320
+    },
+    {
+      "name": "full_1000",
+      "mode": "full",
+      "viewport": 1000,
+      "expected_x": 50,
+      "expected_width": 900
+    },
+    {
+      "name": "asymmetric",
+      "mode": "insets",
+      "viewport": 360,
+      "leading": 0.18,
+      "trailing": 0.08,
+      "expected_x": 64.8,
+      "expected_width": 266.4,
+      "normalized_leading": 0.18,
+      "normalized_trailing": 0.08
+    },
+    {
+      "name": "symmetric_default",
+      "mode": "insets",
+      "viewport": 1000,
+      "leading": 0.1,
+      "trailing": null,
+      "expected_x": 100,
+      "expected_width": 800,
+      "normalized_leading": 0.1,
+      "normalized_trailing": 0.1
+    },
+    {
+      "name": "clamp_both",
+      "mode": "insets",
+      "viewport": 1000,
+      "leading": -0.3,
+      "trailing": 2,
+      "expected_x": 0,
+      "expected_width": 550,
+      "normalized_leading": 0,
+      "normalized_trailing": 0.45
+    },
+    {
+      "name": "clamp_leading",
+      "mode": "insets",
+      "viewport": 1000,
+      "leading": 1,
+      "trailing": 0.3,
+      "expected_x": 450,
+      "expected_width": 250,
+      "normalized_leading": 0.45,
+      "normalized_trailing": 0.3
+    },
+    {
+      "name": "nonfinite_both",
+      "mode": "insets",
+      "viewport": 1000,
+      "leading": "nan",
+      "trailing": "infinity",
+      "expected_x": 0,
+      "expected_width": 1000,
+      "normalized_leading": 0,
+      "normalized_trailing": 0
+    },
+    {
+      "name": "negative_infinity",
+      "mode": "insets",
+      "viewport": 1000,
+      "leading": "negative_infinity",
+      "trailing": 0.2,
+      "expected_x": 0,
+      "expected_width": 800,
+      "normalized_leading": 0,
+      "normalized_trailing": 0.2
+    },
+    {
+      "name": "nonfinite_viewport",
+      "mode": "insets",
+      "viewport": "infinity",
+      "leading": 0.18,
+      "trailing": 0.08,
+      "expected_x": 0,
+      "expected_width": 0,
+      "normalized_leading": 0.18,
+      "normalized_trailing": 0.08
+    },
+    {
+      "name": "zero_viewport",
+      "mode": "insets",
+      "viewport": 0,
+      "leading": 0.18,
+      "trailing": 0.08,
+      "expected_x": 0,
+      "expected_width": 0,
+      "normalized_leading": 0.18,
+      "normalized_trailing": 0.08
+    }
+  ],
+  "scope": "Source formula reference data only; not native ClientKit screenshot or complete View parity"
+}

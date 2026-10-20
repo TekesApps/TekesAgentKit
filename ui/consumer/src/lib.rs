@@ -1301,26 +1301,43 @@ fn independent_host_configures_pane_columns_without_a_private_run_surface() {
         RunColumnLayout::Reading {
             maximum_width: f32::NAN,
         },
-        RunColumnLayout::Insets {
-            leading: f32::INFINITY,
-            trailing: 0.,
-        },
-        RunColumnLayout::Insets {
-            leading: -0.1,
-            trailing: 0.,
-        },
-        RunColumnLayout::Insets {
-            leading: 0.46,
-            trailing: 0.,
+        RunColumnLayout::Reading {
+            maximum_width: 319.,
         },
     ] {
         assert!(run.set_column_layout(invalid).is_err());
         assert_eq!(run.column_layout(), column);
     }
+    for (leading, trailing, normalized_leading, normalized_trailing) in [
+        (f32::INFINITY, 0., 0., 0.),
+        (-0.1, 0., 0., 0.),
+        (0.46, 0., 0.45, 0.),
+        (0.2, f32::NAN, 0.2, 0.),
+    ] {
+        run.set_column_layout(RunColumnLayout::Insets { leading, trailing })
+            .unwrap();
+        assert_eq!(
+            run.column_layout(),
+            RunColumnLayout::Insets {
+                leading: normalized_leading,
+                trailing: normalized_trailing
+            }
+        );
+    }
+    run.set_column_layout(RunColumnLayout::document_pane(0.1, None))
+        .unwrap();
+    assert_eq!(
+        run.column_layout(),
+        RunColumnLayout::Insets {
+            leading: 0.1,
+            trailing: 0.1
+        }
+    );
     run.set_column_layout(RunColumnLayout::FullWidth).unwrap();
     assert_eq!(run.composer().ids(), composer);
     assert_eq!(run.transcript_id(), transcript);
     assert_eq!(second.column_layout(), RunColumnLayout::default());
+    assert_eq!(second.minimum_pane_width(), 420.);
 }
 
 /// Prepare from the captured paired frame. A late task must not resample a

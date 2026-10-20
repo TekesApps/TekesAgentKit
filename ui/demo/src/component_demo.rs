@@ -31,6 +31,14 @@ use tekes_ui_controls::{
 use tekes_ui_scene::{Rect, Scene, Size};
 use tekes_ui_tokens::{Palette, Spacing};
 
+const SIDEBAR_WIDTH: f32 = 180.;
+// Test-host policy: both simultaneous Run panes must fit a reading column.
+// This is not the product SidePanel's minimum width or collapse policy.
+fn panel_width() -> f32 {
+    tekes_agent_components_ui::RunColumnLayout::MINIMUM_CONTENT_WIDTH
+        + 2. * tekes_agent_components_ui::RunColumnLayout::horizontal_inset()
+}
+pub const DEMO_CONTENT_INSET: f32 = Spacing::Loose.value();
 const ROOT: ComponentId = ComponentId(1);
 const NAV: ComponentId = ComponentId(2);
 const NOTICE: ComponentId = ComponentId(3);
@@ -287,6 +295,16 @@ impl Component for DemoColumn {
     }
 }
 impl ComponentDemo {
+    /// Current demo uses the default reading policy. Hosts with different pane
+    /// policies query their RunView.minimum_pane_width instead.
+    pub fn minimum_window_width() -> f64 {
+        (SIDEBAR_WIDTH
+            + panel_width()
+            + 2. * Spacing::Regular.value()
+            + tekes_agent_components_ui::RunColumnLayout::MINIMUM_CONTENT_WIDTH
+            + 2. * tekes_agent_components_ui::RunColumnLayout::horizontal_inset()
+            + 2. * DEMO_CONTENT_INSET) as f64
+    }
     pub fn new(bindings: impl IntoIterator<Item = Arc<RunBinding>>) -> Result<Self> {
         let bindings: Vec<_> = bindings.into_iter().collect();
         require(
@@ -378,7 +396,7 @@ impl ComponentDemo {
                     Content::new(
                         SIDEBAR_COLUMN,
                         DemoColumn {
-                            width: Some(180.),
+                            width: Some(SIDEBAR_WIDTH),
                             children: vec![Content::new(sidebar.id(), sidebar)],
                         },
                     ),
@@ -402,7 +420,7 @@ impl ComponentDemo {
                     Content::new(
                         PANEL_COLUMN,
                         DemoColumn {
-                            width: Some(240.),
+                            width: Some(panel_width()),
                             children: vec![Content::new(
                                 PANEL_UPLOAD_HOST,
                                 StackContent {

@@ -995,7 +995,7 @@ impl Host {
             .render(
                 &mut self.scene,
                 &mut self.text,
-                clip.inset(16.),
+                clip.inset(tekes_agent_ui_demo::component_demo::DEMO_CONTENT_INSET),
                 clip,
                 self.palette,
             )
@@ -3277,7 +3277,13 @@ pub fn run() {
                 let clip = Rect::new(0., 0., 640., 520.);
                 host.text.atlas.begin_frame();
                 controls
-                    .render(&mut scene, &mut host.text, clip.inset(16.), clip, palette)
+                    .render(
+                        &mut scene,
+                        &mut host.text,
+                        clip.inset(tekes_agent_ui_demo::component_demo::DEMO_CONTENT_INSET),
+                        clip,
+                        palette,
+                    )
                     .unwrap();
                 let bytes = Renderer::new_headless()
                     .unwrap()
@@ -3335,13 +3341,13 @@ pub fn run() {
         } else {
             serde_json::Value::Null
         };
-        let clip = Rect::new(0., 0., 1000., 760.);
+        let clip = Rect::new(0., 0., ComponentDemo::minimum_window_width() as f32, 760.);
         host.text.atlas.begin_frame();
         host.view
             .render(
                 &mut host.scene,
                 &mut host.text,
-                clip.inset(16.),
+                clip.inset(tekes_agent_ui_demo::component_demo::DEMO_CONTENT_INSET),
                 clip,
                 host.palette,
             )
@@ -3351,15 +3357,15 @@ pub fn run() {
             .render_to_rgba8(
                 &host.scene,
                 &mut host.text.atlas,
-                (1000, 760),
+                (clip.size.width as u32, clip.size.height as u32),
                 1.,
                 host.palette.color("surface-1").unwrap(),
             )
             .unwrap();
         let mut encoder = png::Encoder::new(
             std::fs::File::create(args.get(index + 1).expect("PNG path")).unwrap(),
-            1000,
-            760,
+            clip.size.width as u32,
+            clip.size.height as u32,
         );
         encoder.set_color(png::ColorType::Rgba);
         encoder.set_depth(png::BitDepth::Eight);
@@ -3547,11 +3553,11 @@ pub fn run() {
         WindowConfig {
             title: "AgentKit · Composer / Indicators 验证".into(),
             size: Size {
-                width: 1000.,
+                width: ComponentDemo::minimum_window_width().max(1000.),
                 height: 760.,
             },
             min_size: Some(Size {
-                width: 820.,
+                width: ComponentDemo::minimum_window_width(),
                 height: 520.,
             }),
             placement: tekes_ui_platform_macos::WindowPlacement::Auto {

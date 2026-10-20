@@ -32,7 +32,7 @@
 
 ## 2026-10-21：严格对齐的硬性缺口
 
-此前的近似列策略不是最终可接受差异。下列规则必须修正并有对应 Views/原生证据，不能靠修改验收口径保留：
+此前的近似列策略不是最终可接受差异。下列规则必须修正并有对应 Views/原生证据，不能靠修改验收口径保留。共享水平列的源规则现已修正，详见[严格列记录](rust-agent-ui-strict-column-20261021.md)；这不关闭其它布局缺口：
 
 - 默认 reading column 使用 ClientKit 的320最小/770最大宽度及 `max(gutter, centering margin)`；gutter按对应 TekesUI `ControlSize::FocusBar + 3 × Spacing::Loose` 语义推导，当前 Rust 的 Relaxed 净空不等价。FullWidth 和非对称文档 pane 边距分别遵循源分支；比例输入按源有限值/0..0.45归一化，而非现有 Rust 的拒绝策略。宿主必须消费正确的 pane 最小宽度。
 - RunView 文档、Composer/chrome/selection 的叠层顺序、共享列、底部遮挡和 Jump 位置/可见性严格对应 RunNativeController/RunOverlay/RunChrome/UserControlsGraph；纵向 docked 栈不能作为最终替代。

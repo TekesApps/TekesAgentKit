@@ -569,7 +569,10 @@ impl Component for Composer {
         Some(&mut self.body.children)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
-        self.body.measure(text, available)
+        let measured = self.body.measure(text, available);
+        // Like ClientKit's resident controls, the outer Composer uses the
+        // assigned conversation column; intrinsic toolbar width is not its frame.
+        MeasuredChild::new(Size::new(available.width, measured.size.height))
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
         self.body.arrange(text, frame, clip);

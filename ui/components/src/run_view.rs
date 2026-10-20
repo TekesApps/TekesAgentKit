@@ -181,14 +181,22 @@ impl RunView {
         })
     }
     /// Change pane layout without replacing the Transcript, Composer, selection
-    /// or operation receipts. Invalid host input leaves the previous policy intact.
+    /// or operation receipts. Fractions normalize as ClientKit does; invalid
+    /// reading maxima leave the previous policy intact.
     pub fn set_column_layout(&mut self, column: RunColumnLayout) -> Result<(), &'static str> {
-        column.validate()?;
-        self.column = column;
+        self.column = column.normalized()?;
         Ok(())
     }
     pub fn column_layout(&self) -> RunColumnLayout {
         self.column
+    }
+    /// Host pane minimum; a full host window also includes its own sidebars,
+    /// panel widths, gaps and content insets. No window policy lives in the Kit.
+    pub fn minimum_pane_width(&self) -> f32 {
+        self.column.minimum_pane_width()
+    }
+    pub fn column_geometry(&self, viewport_width: f32) -> RunColumnGeometry {
+        self.column.geometry(viewport_width)
     }
     pub fn set_label(&mut self, label: impl Into<String>) {
         self.label = label.into();

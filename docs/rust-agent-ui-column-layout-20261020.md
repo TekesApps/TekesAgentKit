@@ -1,5 +1,7 @@
 # 正式 RunView 的共享会话列（实验）
 
+> 本文保留2026-10-20的阶段证据；2026-10-21严格列规则的修正见[新记录](rust-agent-ui-strict-column-20261021.md)，旧Relaxed净空、窄列收缩和拒绝比例策略已由新实现替代。
+
 参照当前 ClientKit 的 `Composer/Run/RunOverlay.swift::ClientRunColumnLayout` 和 `Composer/RunUserControlsGraph.swift::viewDidLayout`，正式 Rust RunView 新增公开 `RunColumnLayout` 以及 `set_column_layout` / `column_layout`。Transcript viewport、Composer、分页/等待/状态和宿主附加的 Run controls 共用一条水平列；宽窗不再把正文/编辑器铺满整个 pane。改变布局保留原控件、编辑器、消息行、操作回执和 presentation。
 
 ```rust

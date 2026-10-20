@@ -129,13 +129,14 @@ async fn shared_column_bounds_follow_pane_policy_without_replacing_text_or_draft
             .unwrap()
             .set_column_layout(mode)
             .unwrap();
-        for width in [360., 760., 1280.] {
+        for width in [420., 760., 1280.] {
             // Expected pane bounds do not call the private layout helper.
-            let gutter = tekes_ui_tokens::Spacing::Relaxed.value();
+            let gutter = tekes_ui_tokens::ControlSize::FocusBar.value()
+                + 3. * tekes_ui_tokens::Spacing::Loose.value();
             let (left, expected_width) = match mode {
                 RunColumnLayout::Reading { maximum_width } => {
-                    let content_width = (width - 2. * gutter).min(maximum_width);
-                    ((width - content_width) * 0.5, content_width)
+                    let content_width = (width - 2. * gutter).max(320.).min(maximum_width);
+                    (gutter.max((width - content_width) * 0.5), content_width)
                 }
                 RunColumnLayout::FullWidth => (gutter, width - 2. * gutter),
                 RunColumnLayout::Insets { leading, trailing } => {
@@ -169,4 +170,125 @@ async fn shared_column_bounds_follow_pane_policy_without_replacing_text_or_draft
         }
     }
     runtime.stop().await.unwrap();
+}
+
+fn reference_number(value: &serde_json::Value) -> f32 {
+    value
+        .as_f64()
+        .map(|n| n as f32)
+        .unwrap_or_else(|| match value.as_str().unwrap() {
+            "nan" => f32::NAN,
+            "infinity" => f32::INFINITY,
+            "negative_infinity" => f32::NEG_INFINITY,
+            other => panic!("unexpected reference number {other}"),
+        })
+}
+#[tokio::test]
+async fn column_geometry_and_normalization_match_frozen_clientkit_view_vectors() {
+    let reference: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/clientkit-run-column.json")).unwrap();
+    assert_eq!(
+        tekes_ui_tokens::ControlSize::FocusBar.value(),
+        reference_number(&reference["focus_bar"])
+    );
+    assert_eq!(
+        tekes_ui_tokens::Spacing::Loose.value(),
+        reference_number(&reference["loose_spacing"])
+    );
+    let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
+    let mut view = RunView::standard(1900, 1904..2200, RunScope::main("fixture", "a")).unwrap();
+    update(&mut view, &controller.snapshot());
+    let ids = view.ids();
+    let mut host = view.into_host().unwrap();
+    let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()), 1.);
+    for case in reference["cases"].as_array().unwrap() {
+        let policy = match case["mode"].as_str().unwrap() {
+            "reading" => RunColumnLayout::default(),
+            "full" => RunColumnLayout::FullWidth,
+            "insets" => RunColumnLayout::document_pane(
+                reference_number(&case["leading"]),
+                (!case["trailing"].is_null()).then(|| reference_number(&case["trailing"])),
+            ),
+            _ => unreachable!(),
+        };
+        let viewport = reference_number(&case["viewport"]);
+        let run = host
+            .get_mut(ids.root)
+            .unwrap()
+            .component_mut::<RunView>()
+            .unwrap();
+        run.set_column_layout(policy).unwrap();
+        let geometry = run.column_geometry(viewport);
+        assert!(
+            (geometry.leading - reference_number(&case["expected_x"])).abs() < 0.001,
+            "{case}"
+        );
+        assert!(
+            (geometry.width - reference_number(&case["expected_width"])).abs() < 0.001,
+            "{case}"
+        );
+        if case["mode"] == "insets" {
+            assert_eq!(
+                run.column_layout(),
+                RunColumnLayout::Insets {
+                    leading: reference_number(&case["normalized_leading"]),
+                    trailing: reference_number(&case["normalized_trailing"])
+                }
+            );
+        }
+        if viewport.is_finite() && viewport > 0. {
+            let frame = Rect::new(20., 40., viewport, 900.);
+            host.render(
+                &mut Scene::new(),
+                &mut text,
+                frame,
+                frame,
+                Theme::LIGHT.into(),
+            )
+            .unwrap();
+            for id in [ids.viewport, ids.composer.root] {
+                let actual = host.get(id).unwrap().frame();
+                assert!(
+                    (actual.min_x() - (frame.min_x() + reference_number(&case["expected_x"])))
+                        .abs()
+                        < 0.01,
+                    "{case}"
+                );
+                assert!(
+                    (actual.size.width - reference_number(&case["expected_width"])).abs() < 0.01,
+                    "{case}"
+                );
+            }
+        }
+    }
+    runtime.stop().await.unwrap();
+}
+
+#[test]
+fn view_input_precedence_and_test_host_floor_follow_shared_column() {
+    assert_eq!(
+        RunColumnLayout::from_view_inputs(true, Some(0.1), None),
+        RunColumnLayout::Insets {
+            leading: 0.1,
+            trailing: 0.1
+        }
+    );
+    assert_eq!(
+        RunColumnLayout::from_view_inputs(false, None, Some(0.4)),
+        RunColumnLayout::default()
+    );
+    assert_eq!(
+        RunColumnLayout::from_view_inputs(true, None, Some(0.4)),
+        RunColumnLayout::FullWidth
+    );
+    let pane_floor =
+        RunColumnLayout::MINIMUM_CONTENT_WIDTH + 2. * RunColumnLayout::horizontal_inset();
+    let expected = 180.
+        + 2. * pane_floor
+        + 2. * tekes_ui_tokens::Spacing::Regular.value()
+        + 2. * tekes_agent_ui_demo::component_demo::DEMO_CONTENT_INSET;
+    assert_eq!(
+        tekes_agent_ui_demo::component_demo::ComponentDemo::minimum_window_width(),
+        expected as f64
+    );
 }
