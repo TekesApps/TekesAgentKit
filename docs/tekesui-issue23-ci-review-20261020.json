@@ -1,0 +1,154 @@
+{
+  "kind": "isolated-public-issue23-ci-candidate-review",
+  "commit": "8cf0840790334ba224afc0595897c74231c712e6",
+  "parent": "61ddf7c68fccd819e20a01ba3104a8a0f8d7e64f",
+  "upstreamCI": {
+    "run": 39365340268,
+    "conclusion": "success"
+  },
+  "publisherManifest": {
+    "inputs": 201,
+    "sha256": "ae0b1055118d50d4d6e28a3d47e5e40bab254c7c6721d0c483e2a49f78114a4e"
+  },
+  "actualConsumerInputs": {
+    "commit": "8cf0840790334ba224afc0595897c74231c712e6",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 199,
+    "sha256": "f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f",
+    "ui_packages": 8
+  },
+  "scopeProjection": {
+    "initialCheck": "rejected broader publisher manifest because Gallery is not an AgentKit dependency",
+    "excludedNonDependencyInputs": [
+      "crates/tekes-ui-gallery/Cargo.toml",
+      "crates/tekes-ui-gallery/src/gallery/snapshot.rs"
+    ],
+    "strictSourceHashAndExtraFilesChecksUnchanged": true
+  },
+  "resolvedPackages": [
+    {
+      "name": "tekes-ui-controls",
+      "source": "git+https://github.com/TekesApps/TekesUI.git?rev=8cf0840790334ba224afc0595897c74231c712e6#8cf0840790334ba224afc0595897c74231c712e6",
+      "manifest": "/Users/frankqin/.cargo/git/checkouts/tekesui-d66ba5efbf6c8866/8cf0840/crates/tekes-ui-controls/Cargo.toml"
+    },
+    {
+      "name": "tekes-ui-design-export",
+      "source": "git+https://github.com/TekesApps/TekesUI.git?rev=8cf0840790334ba224afc0595897c74231c712e6#8cf0840790334ba224afc0595897c74231c712e6",
+      "manifest": "/Users/frankqin/.cargo/git/checkouts/tekesui-d66ba5efbf6c8866/8cf0840/crates/tekes-ui-design-export/Cargo.toml"
+    },
+    {
+      "name": "tekes-ui-motion",
+      "source": "git+https://github.com/TekesApps/TekesUI.git?rev=8cf0840790334ba224afc0595897c74231c712e6#8cf0840790334ba224afc0595897c74231c712e6",
+      "manifest": "/Users/frankqin/.cargo/git/checkouts/tekesui-d66ba5efbf6c8866/8cf0840/crates/tekes-ui-motion/Cargo.toml"
+    },
+    {
+      "name": "tekes-ui-platform-macos",
+      "source": "git+https://github.com/TekesApps/TekesUI.git?rev=8cf0840790334ba224afc0595897c74231c712e6#8cf0840790334ba224afc0595897c74231c712e6",
+      "manifest": "/Users/frankqin/.cargo/git/checkouts/tekesui-d66ba5efbf6c8866/8cf0840/crates/tekes-ui-platform-macos/Cargo.toml"
+    },
+    {
+      "name": "tekes-ui-render",
+      "source": "git+https://github.com/TekesApps/TekesUI.git?rev=8cf0840790334ba224afc0595897c74231c712e6#8cf0840790334ba224afc0595897c74231c712e6",
+      "manifest": "/Users/frankqin/.cargo/git/checkouts/tekesui-d66ba5efbf6c8866/8cf0840/crates/tekes-ui-render/Cargo.toml"
+    },
+    {
+      "name": "tekes-ui-scene",
+      "source": "git+https://github.com/TekesApps/TekesUI.git?rev=8cf0840790334ba224afc0595897c74231c712e6#8cf0840790334ba224afc0595897c74231c712e6",
+      "manifest": "/Users/frankqin/.cargo/git/checkouts/tekesui-d66ba5efbf6c8866/8cf0840/crates/tekes-ui-scene/Cargo.toml"
+    },
+    {
+      "name": "tekes-ui-text",
+      "source": "git+https://github.com/TekesApps/TekesUI.git?rev=8cf0840790334ba224afc0595897c74231c712e6#8cf0840790334ba224afc0595897c74231c712e6",
+      "manifest": "/Users/frankqin/.cargo/git/checkouts/tekesui-d66ba5efbf6c8866/8cf0840/crates/tekes-ui-text/Cargo.toml"
+    },
+    {
+      "name": "tekes-ui-tokens",
+      "source": "git+https://github.com/TekesApps/TekesUI.git?rev=8cf0840790334ba224afc0595897c74231c712e6#8cf0840790334ba224afc0595897c74231c712e6",
+      "manifest": "/Users/frankqin/.cargo/git/checkouts/tekesui-d66ba5efbf6c8866/8cf0840/crates/tekes-ui-tokens/Cargo.toml"
+    }
+  ],
+  "sourceSnapshotSha256": "788b759d43cdbbc8902fa92dfdd96ffd572740350378c40d01a4364bd0a38336",
+  "currentRustSourcesMatchSnapshot": true,
+  "nonUILockedPackagesUnchanged": 299,
+  "checks": {
+    "publicAPIAndRegistry": 6,
+    "controlsCore": 233,
+    "upstreamConsumer": 134,
+    "agentkitUI": 186
+  },
+  "upstreamConsumerStrictClippy": true,
+  "agentkitStrictClippy": true,
+  "nativeConsumer": {
+    "binarySha256": "af2b2d0f0fd90a055c9b8e1cc36152622dcd38e2aace4fc5010ee9f4e8dda766",
+    "bundleIdentifier": "com.tekesapps.agentkit.issue23.consumer.review",
+    "states": {
+      "selection-copy": {
+        "sha256": "b788b66baff65782a96388b3246efb145afdcd41d6755f15caf8c478404dcbd0",
+        "metrics": {
+          "body_height": 480.0,
+          "copied_text": "中文😀",
+          "nested_offset": 0.0,
+          "parent_offset": 0.0,
+          "version": 2,
+          "wrap_width": 663.0
+        },
+        "selection": [
+          8,
+          12
+        ]
+      },
+      "after-append": {
+        "sha256": "19df26b8c9313ffd8e025e0be66bbd252c578dec2bf1af2ce5ff61b69288a22a",
+        "metrics": {
+          "body_height": 496.0,
+          "copied_text": "中文😀",
+          "nested_offset": 0.0,
+          "parent_offset": 0.0,
+          "version": 3,
+          "wrap_width": 663.0
+        },
+        "selection": [
+          8,
+          12
+        ]
+      },
+      "parent-scroll": {
+        "sha256": "d8c3415e919181a64e24484ae078785562f96a4f53196f98f58c213894cd4892",
+        "metrics": {
+          "body_height": 624.0,
+          "copied_text": "中文😀",
+          "nested_offset": 0.0,
+          "parent_offset": 158.0,
+          "version": 11,
+          "wrap_width": 663.0
+        },
+        "selection": null
+      },
+      "wide-layout": {
+        "sha256": "e3c2ff4c8d32e0a776166b01a15a1c6b7e747e10955aba5c9dcba1670615e4cc",
+        "metrics": {
+          "body_height": 624.0,
+          "copied_text": "中文😀",
+          "nested_offset": 0.0,
+          "parent_offset": 0.0,
+          "version": 11,
+          "wrap_width": 1863.0
+        },
+        "selection": null
+      }
+    },
+    "scenario": "unmodified public composition-consumer plain mode at exact clone SHA",
+    "clipboard": "process-private selftest pasteboard",
+    "ordinaryField": "default appearance observed; native editing/paste not established by CUA attempts",
+    "windowClosed": true,
+    "physicalIME": false,
+    "voiceOver": false,
+    "performance": false
+  },
+  "technicalAcceptance": "public read-only content API, source closure, registration fix, shared-history/transient probe and bounded native selection/copy/update/scroll verified; recommend a separate development frozen candidate, not automatic release promotion",
+  "formalInputUnchanged": "431093786de47b48cd566d0d9c0eafa088b10d68",
+  "issue22": "independent mixed-document prepend/anchor transaction still outstanding",
+  "formalTranscript": false,
+  "formalRunView": false
+}
