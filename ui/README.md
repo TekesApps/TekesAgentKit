@@ -158,7 +158,7 @@ SidePanel 附件共享相同选择/上传/状态组件，按原 binding/request 
 
 `--components --history-page-proof --offscreen <PNG>` 从公开 TranscriptPaging 按钮捕获原 A 的读取请求，验证 B 草稿隔离、源回执发布和新 epoch 历史保留，不是正式 Transcript 或阅读锚点验收。真实三端脚本加 `--ui-components --ui-history-pages` 可在隔离长会话上复验。公共接口见 [分页读取契约](../docs/rust-agent-ui-history-paging-20261020.md) 和 [分页控件](../docs/rust-agent-ui-paging-controls-20261020.md)。
 
-`InputMessage` 是可独立挂载的纯文本用户消息行：默认 TekesUI Surface 气泡右对齐，caption 在气泡外靠右，正文使用公开只读 Content 文本服务。`--components --input-message-proof --offscreen /tmp/input-row.png` 在测试宿主挂载一个真实 snapshot 输入行；它不是完整 Transcript，附件/结构化内容与混合锚点仍待实现。
+`InputMessage` 是可独立挂载的用户消息行：默认 TekesUI Surface 气泡右对齐，caption 在气泡外靠右，正文使用公开只读 Content 文本服务。`--components --input-message-proof --offscreen /tmp/input-row.png` 在测试宿主挂载一个真实 snapshot 输入行；它不是完整 Transcript，附件/结构化原始信息现已支持，富内容预览与混合锚点仍待实现。
 
 `OutputMessage` 从同一份 `TranscriptDocument` / `TranscriptSection` 消费机器内容，所有正文、推理、工具和原始数据详情靠左。`with_labels` 提供宿主 copy/工具详情格式化，样式继续由 TekesUI 提供。正文历史与流式更新使用同一公开只读文本组件，工具 DTO 仅在当前 section 查找；不猜测流/持久消息关联，不把工具结束当成 turn 结算。局部展开动作由宿主将 `drain_actions()` 的结果交给原行的 `handle_actions()` 后重新渲染。
 
@@ -167,3 +167,13 @@ SidePanel 附件共享相同选择/上传/状态组件，按原 binding/request 
 `TurnFootnote` 独立组合 turn 的次级信息及共享动作，保持在机器正文外靠左。`TurnActionDispatcher` / `TurnActionRequest` 绑定原 RunBinding 与稳定 RPC ID，已知拒绝/完成可由下一次显式点击继续，未知结果保留禁用。新建分叉的导航始终由宿主核对原导航 token 后决定。
 
 `--components --input-message-proof --output-message-proof --turn-footnote-proof` 显示独立内容行和 turn aside；`--turn-fork-proof --offscreen /tmp/footer.png` 明确启用一次分叉验证。真实端点脚本的 `--ui-turn-footnote` 只在隔离临时会话中验证同一动作链；这些 opt-in 探针不是正式 Transcript / RunView。接入、限制和分层证据见 [turn footnote](../docs/rust-agent-ui-turn-footnote-20261020.md)。
+
+
+`TranscriptContent` 是公开的混合内容组件，组合规范化 InputMessage / OutputMessage / ToolActivity / TurnFootnote。用户附件位于正文气泡上方，外置 caption 在下方，整体右对齐；机器内容左对齐。样式直接继承默认 TekesUI 组件、tokens 与宿主主题，升级固定 UI 版本后统一体现，不维护 AgentKit 样式副本。
+
+```sh
+ui/target/debug/tekes-agent-ui-demo --components --transcript-content
+ui/target/debug/tekes-agent-ui-demo --components --transcript-content --offscreen /tmp/transcript-tree.png
+```
+
+实验宿主使用公共 ScrollContent，不提供稳定子项阅读事务或富文本能力；此内容树不等于完整 Transcript / RunView。真实三端脚本可加 `--ui-components --ui-transcript-content --ui-history-pages --ui-attachments`；不能同时启用独立的 `--ui-message-rows` / `--ui-turn-footnote` 探针。公开接入与证据见[内容树记录](../docs/rust-agent-ui-transcript-tree-20261020.md)。

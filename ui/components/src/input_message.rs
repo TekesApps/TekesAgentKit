@@ -1,6 +1,7 @@
 //! User prose lane; generic text/selection/IME/painting remain in TekesUI.
 use tekes_agent_presentation::{
-    RunScope, TranscriptDelivery, TranscriptInput, TranscriptItemKind, TranscriptMessageKey,
+    RunScope, TranscriptBlockContent, TranscriptDelivery, TranscriptInput, TranscriptItem,
+    TranscriptItemKind,
 };
 use tekes_ui_controls::{
     ButtonTextRenderer, DraftRevision, ExternalSelection, ExternalUndo, ExternalValueResult,
@@ -12,21 +13,9 @@ use tekes_ui_controls::{
 use tekes_ui_scene::{Rect, Scene, Size};
 use tekes_ui_tokens::{Spacing, proposal};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) enum Key {
-    Submission(String),
-    NativeEntry(String),
-    Item(String),
-}
-impl From<TranscriptMessageKey<'_>> for Key {
-    fn from(value: TranscriptMessageKey<'_>) -> Self {
-        match value {
-            TranscriptMessageKey::Submission(s) => Self::Submission(s.into()),
-            TranscriptMessageKey::NativeEntry(s) => Self::NativeEntry(s.into()),
-            TranscriptMessageKey::Item(s) => Self::Item(s.into()),
-        }
-    }
-}
+use crate::TranscriptMessageIdentity as Key;
+use crate::output_message::{OutputPart, PartFacts, Slot};
+use crate::{OutputContentKind, OutputMessageLabels, OutputMessageText};
 #[derive(Clone, Copy, Debug)]
 pub struct InputMessageIds {
     pub root: ComponentId,
@@ -74,12 +63,44 @@ impl Bubble {
 }
 impl Component for Bubble {
     fn children(&self) -> &[Content] {
-        &self.children
+        if self.children[0]
+            .component::<TextFieldContent>()
+            .unwrap()
+            .surface
+            .input
+            .text
+            .is_empty()
+        {
+            &[]
+        } else {
+            &self.children
+        }
     }
     fn children_mut(&mut self) -> Option<&mut Vec<Content>> {
-        Some(&mut self.children)
+        if self.children[0]
+            .component::<TextFieldContent>()
+            .unwrap()
+            .surface
+            .input
+            .text
+            .is_empty()
+        {
+            None
+        } else {
+            Some(&mut self.children)
+        }
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        if self.children[0]
+            .component::<TextFieldContent>()
+            .unwrap()
+            .surface
+            .input
+            .text
+            .is_empty()
+        {
+            return MeasuredChild::new(Size::new(0., 0.));
+        }
         let (x, y) = self.insets(text, available);
         let max_width = (available.width - 2. * x).max(0.);
         let field = self.children[0].component::<TextFieldContent>().unwrap();
@@ -97,6 +118,16 @@ impl Component for Bubble {
         ))
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        if self.children[0]
+            .component::<TextFieldContent>()
+            .unwrap()
+            .surface
+            .input
+            .text
+            .is_empty()
+        {
+            return;
+        }
         let layout = self.surface.render_at_scale(
             &mut Scene::new(),
             frame,
@@ -115,6 +146,16 @@ impl Component for Bubble {
         clip: Rect,
         theme: ContentTheme,
     ) {
+        if self.children[0]
+            .component::<TextFieldContent>()
+            .unwrap()
+            .surface
+            .input
+            .text
+            .is_empty()
+        {
+            return;
+        }
         self.surface.render_at_scale(
             scene,
             frame,
@@ -129,9 +170,8 @@ impl Component for Bubble {
     }
 }
 
-/// Independently mountable plain user-message body and external footnote.
-/// This is a Transcript row, not a complete Transcript or RunView. Unsupported
-/// attachments/structured blocks return an error before modifying the row.
+/// One whole user message: attachments/raw details, prose bubble and
+/// external footnote, all trailing. Rich text/image preview are separate capabilities.
 #[derive(Debug)]
 pub struct InputMessage {
     ids: InputMessageIds,
@@ -141,9 +181,32 @@ pub struct InputMessage {
     epoch: u64,
     delivery: Option<TranscriptDelivery>,
     children: Vec<Content>,
+    last_item: Option<TranscriptItem>,
+    details: Vec<PartFacts>,
+    next_detail: u64,
+    detail_labels: OutputMessageLabels,
 }
 impl InputMessage {
     pub fn new(namespace: u32, scope: RunScope) -> Self {
+        Self::with_details_labels(namespace, scope, Self::default_details_labels())
+    }
+    pub fn default_details_labels() -> OutputMessageLabels {
+        OutputMessageLabels {
+            text: |kind| {
+                if matches!(kind, OutputMessageText::Body) {
+                    "用户附件或原始内容".into()
+                } else {
+                    (OutputMessageLabels::default().text)(kind)
+                }
+            },
+            ..Default::default()
+        }
+    }
+    pub fn with_details_labels(
+        namespace: u32,
+        scope: RunScope,
+        detail_labels: OutputMessageLabels,
+    ) -> Self {
         let ids = InputMessageIds::new(namespace);
         Self {
             ids,
@@ -152,6 +215,10 @@ impl InputMessage {
             publication: 0,
             epoch: 0,
             delivery: None,
+            last_item: None,
+            details: vec![],
+            next_detail: 16,
+            detail_labels,
             children: vec![
                 Content::new(
                     ids.bubble,
@@ -210,53 +277,14 @@ impl InputMessage {
         input: &TranscriptInput<'_>,
         format: impl FnOnce(TranscriptDelivery) -> String,
     ) -> Result<(), &'static str> {
-        if scope != &self.scope {
-            return Err("input message scope mismatch");
-        }
-        if publication == 0 || publication < self.publication || epoch < self.epoch {
-            return Err("stale input message publication");
-        }
-        if input.item.kind != TranscriptItemKind::User || !input.item.is_visible {
-            return Err("input message is not a visible user row");
-        }
-        if !input.item.attachments.is_empty()
-            || !input.item.reasoning.is_empty()
-            || input.item.content_blocks.as_ref().is_some_and(|blocks| {
-                blocks.iter().any(|block| {
-                    !matches!(
-                        block.content,
-                        tekes_agent_presentation::TranscriptBlockContent::Text { .. }
-                    )
-                })
-            })
-        {
-            return Err("input message requires structured content composition");
-        }
-        let next = Key::from(input.key);
-        let migrated = self.key.as_ref().is_some_and(|old| {
-            matches!(old, Key::Submission(_))
-                && matches!(next, Key::NativeEntry(_))
-                && input.reconciliation_key().map(Key::from).as_ref() == Some(old)
-        });
-        if self.key.as_ref().is_some_and(|old| old != &next) && !migrated {
-            return Err("input message identity changed");
-        }
-        let previous_text = &self.children[0].component::<Bubble>().unwrap().children[0]
-            .component::<TextFieldContent>()
-            .unwrap()
-            .surface
-            .input
-            .text;
-        if publication == self.publication
-            && (epoch != self.epoch
-                || previous_text != &input.item.text
-                || self.delivery != Some(input.footnote)
-                || self.key.as_ref() != Some(&next))
-        {
-            return Err("conflicting input message publication");
-        }
+        let next = self.check_update(scope, publication, epoch, input)?;
         let footnote = format(input.footnote);
-        let field = self.children[0].component_mut::<Bubble>().unwrap().children[0]
+        let field = self
+            .children
+            .iter_mut()
+            .find_map(|node| node.component_mut::<Bubble>())
+            .unwrap()
+            .children[0]
             .component_mut::<TextFieldContent>()
             .unwrap();
         let baseline = field.surface.input.external_baseline();
@@ -276,19 +304,133 @@ impl InputMessage {
         ) {
             return Err("input message text transaction rejected");
         }
-        self.children[1]
-            .component_mut::<TextContent>()
-            .unwrap()
-            .text = footnote;
+        let facts = input_details(input.item)?;
+        let mut previous = std::mem::take(&mut self.children);
+        let bubble = previous
+            .iter()
+            .position(|node| node.id() == self.ids.bubble)
+            .unwrap();
+        let bubble = previous.remove(bubble);
+        let footer = previous
+            .iter()
+            .position(|node| node.id() == self.ids.footnote)
+            .unwrap();
+        let mut footer = previous.remove(footer);
+        footer.component_mut::<TextContent>().unwrap().text = footnote;
+        for facts in &facts {
+            let mut node = previous
+                .iter()
+                .position(|node| {
+                    node.component::<OutputPart>()
+                        .is_some_and(|part| part.slot() == &facts.slot)
+                })
+                .map(|index| previous.remove(index))
+                .unwrap_or_else(|| {
+                    let id = ComponentId(self.ids.root.0 + self.next_detail);
+                    self.next_detail += 3;
+                    Content::new(id, OutputPart::new(id, facts.clone(), self.detail_labels))
+                });
+            let part = node.component_mut::<OutputPart>().unwrap();
+            part.set_trailing(true);
+            part.update(publication, facts.clone());
+            self.children.push(node);
+        }
+        self.children.push(bubble);
+        self.children.push(footer);
+        self.details = facts;
+        self.last_item = Some(input.item.clone());
         self.key = Some(next);
         self.publication = publication;
         self.epoch = epoch;
         self.delivery = Some(input.footnote);
         Ok(())
     }
+    pub(crate) fn check_update(
+        &self,
+        scope: &RunScope,
+        publication: u64,
+        epoch: u64,
+        input: &TranscriptInput<'_>,
+    ) -> Result<Key, &'static str> {
+        if scope != &self.scope {
+            return Err("input message scope mismatch");
+        }
+        if publication == 0 || publication < self.publication || epoch < self.epoch {
+            return Err("stale input message publication");
+        }
+        if input.item.kind != TranscriptItemKind::User || !input.item.is_visible {
+            return Err("input message is not a visible user row");
+        }
+        let facts = input_details(input.item)?;
+        let additions = facts
+            .iter()
+            .filter(|part| !self.details.iter().any(|old| old.slot == part.slot))
+            .count() as u64;
+        if self
+            .next_detail
+            .checked_add(additions * 3)
+            .is_none_or(|end| end >= u32::MAX as u64)
+        {
+            return Err("input details namespace exhausted");
+        }
+        let next = Key::from(input.key);
+        let migrated = self.key.as_ref().is_some_and(|old| {
+            matches!(old, Key::Submission(_))
+                && matches!(next, Key::NativeEntry(_))
+                && input.reconciliation_key().map(Key::from).as_ref() == Some(old)
+        });
+        if self.key.as_ref().is_some_and(|old| old != &next) && !migrated {
+            return Err("input message identity changed");
+        }
+        let previous_text = &self
+            .children
+            .iter()
+            .find_map(|node| node.component::<Bubble>())
+            .unwrap()
+            .children[0]
+            .component::<TextFieldContent>()
+            .unwrap()
+            .surface
+            .input
+            .text;
+        if publication == self.publication
+            && (epoch != self.epoch
+                || previous_text != &input.item.text
+                || self.delivery != Some(input.footnote)
+                || self.key.as_ref() != Some(&next)
+                || self.last_item.as_ref() != Some(input.item))
+        {
+            return Err("conflicting input message publication");
+        }
+        Ok(next)
+    }
+    pub fn detail_ids(&self) -> Vec<crate::OutputContentIds> {
+        self.children
+            .iter()
+            .filter_map(|node| node.component::<OutputPart>().map(OutputPart::ids))
+            .collect()
+    }
+    pub fn handle_actions(&mut self, actions: &[ContentAction]) -> bool {
+        let mut changed = false;
+        for node in &mut self.children {
+            if let Some(part) = node.component_mut::<OutputPart>() {
+                let target = part.ids().disclosure;
+                for _ in actions
+                    .iter()
+                    .filter(|a| a.kind == ContentActionKind::Activate && target == Some(a.target))
+                {
+                    part.toggle();
+                    changed = true;
+                }
+            }
+        }
+        changed
+    }
     pub fn into_host(self) -> Result<ContentHost, CompositionError> {
         let root = self.ids.root;
-        ContentHost::new(Content::new(root, self))
+        let mut host = ContentHost::new(Content::new(root, self))?;
+        host.set_action_events(true);
+        Ok(host)
     }
 }
 impl Component for InputMessage {
@@ -299,12 +441,13 @@ impl Component for InputMessage {
         Some(&mut self.children)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
-        let a = self.children[0].measure(text, available).size;
-        let b = self.children[1].measure(text, available).size;
-        MeasuredChild::new(Size::new(
-            available.width,
-            a.height + Spacing::Tight.value() + b.height,
-        ))
+        let height = self
+            .children
+            .iter_mut()
+            .map(|child| child.measure(text, available).size.height)
+            .sum::<f32>()
+            + Spacing::Tight.value() * self.children.len().saturating_sub(1) as f32;
+        MeasuredChild::new(Size::new(available.width, height))
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
         let sizes: Vec<_> = self
@@ -330,4 +473,108 @@ impl Component for InputMessage {
     fn semantics(&self) -> ContentSemantics {
         ContentSemantics::new(ContentRole::Group, "用户消息")
     }
+}
+
+fn input_details(item: &TranscriptItem) -> Result<Vec<PartFacts>, &'static str> {
+    let mut facts = vec![];
+    let mut canonical_attachments = vec![];
+    let mut text_blocks = String::new();
+    let mut has_reasoning = false;
+    if let Some(blocks) = &item.content_blocks {
+        let mut previous = None;
+        for block in blocks {
+            if previous.is_some_and(|index| index >= block.index) {
+                return Err("invalid input content block order");
+            }
+            previous = Some(block.index);
+            let (kind, title, text) = match &block.content {
+                TranscriptBlockContent::Text { text } => {
+                    text_blocks.push_str(text);
+                    continue;
+                }
+                TranscriptBlockContent::Attachment { content } => {
+                    canonical_attachments.push(content);
+                    (
+                        OutputContentKind::Attachment,
+                        content
+                            .get("name")
+                            .or_else(|| content.get("fileName"))
+                            .and_then(|value| value.as_str())
+                            .map_or_else(
+                                || "附件（原始信息）".into(),
+                                |name| format!("附件 · {name}"),
+                            ),
+                        content.to_string(),
+                    )
+                }
+                TranscriptBlockContent::Reasoning { text } => {
+                    has_reasoning = true;
+                    (
+                        OutputContentKind::Unknown,
+                        "用户消息中的 reasoning 字段".into(),
+                        text.clone(),
+                    )
+                }
+                TranscriptBlockContent::ToolCall { tool_id } => (
+                    OutputContentKind::Unknown,
+                    "用户消息中的工具引用".into(),
+                    tool_id.clone(),
+                ),
+                TranscriptBlockContent::Unknown { content } => (
+                    OutputContentKind::Unknown,
+                    "未支持的用户内容（原始信息）".into(),
+                    content.to_string(),
+                ),
+            };
+            facts.push(PartFacts {
+                slot: Slot::Block(block.index, kind),
+                kind,
+                title,
+                text,
+            });
+        }
+        if !text_blocks.is_empty() && text_blocks != item.text {
+            facts.push(PartFacts {
+                slot: Slot::AggregateBody,
+                kind: OutputContentKind::Unknown,
+                title: "原始文本块（与聚合正文不同）".into(),
+                text: text_blocks,
+            });
+        }
+    }
+    // Both fields represent the same message content. Match occurrences, so two
+    // identical attachments remain two attachments rather than a value-set dedup.
+    let mut matched = vec![false; canonical_attachments.len()];
+    for (index, content) in item.attachments.iter().enumerate() {
+        if let Some(i) = canonical_attachments
+            .iter()
+            .enumerate()
+            .position(|(i, value)| !matched[i] && **value == *content)
+        {
+            matched[i] = true;
+            continue;
+        }
+        facts.push(PartFacts {
+            slot: Slot::AggregateAttachment(index),
+            kind: OutputContentKind::Attachment,
+            title: content
+                .get("name")
+                .or_else(|| content.get("fileName"))
+                .and_then(|value| value.as_str())
+                .map_or_else(
+                    || "附件（原始信息）".into(),
+                    |name| format!("附件 · {name}"),
+                ),
+            text: content.to_string(),
+        });
+    }
+    if !item.reasoning.is_empty() && !has_reasoning {
+        facts.push(PartFacts {
+            slot: Slot::AggregateReasoning,
+            kind: OutputContentKind::Unknown,
+            title: "用户消息中的 reasoning 字段".into(),
+            text: item.reasoning.clone(),
+        });
+    }
+    Ok(facts)
 }

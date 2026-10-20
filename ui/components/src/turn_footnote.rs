@@ -221,6 +221,33 @@ impl TurnFootnote {
         turn: &TranscriptTurn,
         available: bool,
     ) -> Result<(), &'static str> {
+        let rekey = self.check_update(scope, publication, epoch, turn, available)?;
+        self.turn = Some(turn.clone());
+        self.publication = publication;
+        self.epoch = epoch;
+        self.available = available;
+        self.rows.children[0]
+            .component_mut::<TextContent>()
+            .unwrap()
+            .text = (self.labels.information)(&TurnFootnoteFacts::read(turn));
+        if rekey {
+            self.rekey();
+        }
+        self.refresh();
+        self.render_actions();
+        Ok(())
+    }
+    pub(crate) fn has_unresolved_action(&self) -> bool {
+        self.pending.is_some()
+    }
+    pub(crate) fn check_update(
+        &self,
+        scope: &RunScope,
+        publication: u64,
+        epoch: u64,
+        turn: &TranscriptTurn,
+        available: bool,
+    ) -> Result<bool, &'static str> {
         if scope != &self.scope {
             return Err("turn footnote scope mismatch");
         }
@@ -255,20 +282,7 @@ impl TurnFootnote {
         {
             return Err("turn footnote namespace exhausted");
         }
-        self.turn = Some(turn.clone());
-        self.publication = publication;
-        self.epoch = epoch;
-        self.available = available;
-        self.rows.children[0]
-            .component_mut::<TextContent>()
-            .unwrap()
-            .text = (self.labels.information)(&TurnFootnoteFacts::read(turn));
-        if rekey {
-            self.rekey();
-        }
-        self.refresh();
-        self.render_actions();
-        Ok(())
+        Ok(rekey)
     }
     fn rekey(&mut self) {
         self.actions.clear();

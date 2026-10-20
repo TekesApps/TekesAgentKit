@@ -1,5 +1,5 @@
 //! Agent machine-message composition. TekesUI owns text, controls and geometry.
-use crate::input_message::Key;
+use crate::TranscriptMessageIdentity as Key;
 use tekes_agent_presentation::{
     RunScope, TranscriptBlockContent, TranscriptItem, TranscriptItemKind, TranscriptOutput,
     TranscriptSection, TranscriptToolCall,
@@ -83,7 +83,7 @@ impl Default for OutputMessageLabels {
 /// Component slot within one message; never a durable reading anchor. Block
 /// positions have only the source's current message-local ordering guarantee.
 #[derive(Clone, Debug, PartialEq, Eq)]
-enum Slot {
+pub(crate) enum Slot {
     Block(usize, OutputContentKind),
     Tool(usize, String),
     AggregateReasoning,
@@ -104,11 +104,11 @@ pub enum OutputContentKind {
     Status,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct PartFacts {
-    slot: Slot,
-    kind: OutputContentKind,
-    title: String,
-    text: String,
+pub(crate) struct PartFacts {
+    pub(crate) slot: Slot,
+    pub(crate) kind: OutputContentKind,
+    pub(crate) title: String,
+    pub(crate) text: String,
 }
 impl PartFacts {
     fn disclosure(&self) -> bool {
@@ -126,15 +126,23 @@ pub struct OutputContentIds {
     pub kind: OutputContentKind,
 }
 #[derive(Debug)]
-struct OutputPart {
+pub(crate) struct OutputPart {
     facts: PartFacts,
     ids: OutputContentIds,
     rows: StackContent,
     hidden: Option<Content>,
     labels: OutputMessageLabels,
+    trailing: bool,
 }
 impl OutputPart {
-    fn new(root: ComponentId, facts: PartFacts, labels: OutputMessageLabels) -> Self {
+    pub(crate) fn slot(&self) -> &Slot {
+        &self.facts.slot
+    }
+    pub(crate) fn ids(&self) -> OutputContentIds {
+        self.ids
+    }
+
+    pub(crate) fn new(root: ComponentId, facts: PartFacts, labels: OutputMessageLabels) -> Self {
         let ids = OutputContentIds {
             root,
             body: ComponentId(root.0 + 2),
@@ -177,7 +185,11 @@ impl OutputPart {
             },
             hidden,
             labels,
+            trailing: false,
         }
+    }
+    pub(crate) fn set_trailing(&mut self, trailing: bool) {
+        self.trailing = trailing;
     }
     fn field_mut(&mut self) -> &mut TextFieldContent {
         self.hidden
@@ -186,7 +198,7 @@ impl OutputPart {
             .component_mut::<TextFieldContent>()
             .unwrap()
     }
-    fn update(&mut self, publication: u64, facts: PartFacts) {
+    pub(crate) fn update(&mut self, publication: u64, facts: PartFacts) {
         let id = self.ids.body;
         let field = self.field_mut();
         let baseline = field.surface.input.external_baseline();
@@ -226,7 +238,7 @@ impl OutputPart {
             button.button.state.selected = self.hidden.is_none();
         }
     }
-    fn toggle(&mut self) {
+    pub(crate) fn toggle(&mut self) {
         if let Some(body) = self.hidden.take() {
             self.rows.children.push(body);
         } else {
@@ -235,12 +247,13 @@ impl OutputPart {
         self.refresh_header();
     }
 }
-fn arrange_leading(
+fn arrange_content(
     children: &mut [Content],
     text: &mut dyn ButtonTextRenderer,
     frame: Rect,
     clip: Rect,
     gap: f32,
+    trailing: bool,
 ) {
     let measured: Vec<_> = children
         .iter_mut()
@@ -253,7 +266,11 @@ fn arrange_leading(
         gap,
         proposal::layout::COLUMN,
         AlignmentOverride {
-            cross_axis: Some(proposal::layout::CrossAxisAlignment::Leading),
+            cross_axis: Some(if trailing {
+                proposal::layout::CrossAxisAlignment::Trailing
+            } else {
+                proposal::layout::CrossAxisAlignment::Leading
+            }),
             ..Default::default()
         },
     );
@@ -269,15 +286,40 @@ impl Component for OutputPart {
         Some(&mut self.rows.children)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
-        self.rows.measure(text, available)
+        if self.trailing && self.hidden.is_none() && self.rows.children.len() > 1 {
+            let field = self
+                .rows
+                .children
+                .last()
+                .unwrap()
+                .component::<TextFieldContent>()
+                .unwrap();
+            let body_width = text
+                .measure(
+                    &field.surface.input.text,
+                    field.surface.role,
+                    available.width,
+                )
+                .width
+                .ceil()
+                .clamp(0., available.width);
+            let header_width = self.rows.children[0].measure(text, available).size.width;
+            self.rows.measure(
+                text,
+                Size::new(body_width.max(header_width), available.height),
+            )
+        } else {
+            self.rows.measure(text, available)
+        }
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
-        arrange_leading(
+        arrange_content(
             &mut self.rows.children,
             text,
             frame,
             clip,
             Spacing::Tight.value(),
+            self.trailing,
         );
     }
     fn semantics(&self) -> ContentSemantics {
@@ -359,6 +401,40 @@ impl OutputMessage {
         output: &TranscriptOutput<'_>,
         section: Option<&TranscriptSection<'_>>,
     ) -> Result<(), &'static str> {
+        let (key, facts) = self.check_update(scope, publication, epoch, output, section)?;
+        let mut old = std::mem::take(&mut self.rows.children);
+        for f in &facts {
+            let mut content = if let Some(i) = old
+                .iter()
+                .position(|c| c.component::<OutputPart>().unwrap().facts.slot == f.slot)
+            {
+                old.remove(i)
+            } else {
+                let id = ComponentId(self.root.0 + self.next);
+                self.next += 3;
+                Content::new(id, OutputPart::new(id, f.clone(), self.labels))
+            };
+            content
+                .component_mut::<OutputPart>()
+                .unwrap()
+                .update(publication, f.clone());
+            self.rows.children.push(content);
+        }
+        self.key = Some(key);
+        self.publication = publication;
+        self.epoch = epoch;
+        self.item = Some(output.item.clone());
+        self.facts = facts;
+        Ok(())
+    }
+    pub(crate) fn check_update(
+        &self,
+        scope: &RunScope,
+        publication: u64,
+        epoch: u64,
+        output: &TranscriptOutput<'_>,
+        section: Option<&TranscriptSection<'_>>,
+    ) -> Result<(Key, Vec<PartFacts>), &'static str> {
         if scope != &self.scope {
             return Err("output message scope mismatch");
         }
@@ -394,30 +470,7 @@ impl OutputMessage {
         {
             return Err("output message namespace exhausted");
         }
-        let mut old = std::mem::take(&mut self.rows.children);
-        for f in &facts {
-            let mut content = if let Some(i) = old
-                .iter()
-                .position(|c| c.component::<OutputPart>().unwrap().facts.slot == f.slot)
-            {
-                old.remove(i)
-            } else {
-                let id = ComponentId(self.root.0 + self.next);
-                self.next += 3;
-                Content::new(id, OutputPart::new(id, f.clone(), self.labels))
-            };
-            content
-                .component_mut::<OutputPart>()
-                .unwrap()
-                .update(publication, f.clone());
-            self.rows.children.push(content);
-        }
-        self.key = Some(key);
-        self.publication = publication;
-        self.epoch = epoch;
-        self.item = Some(output.item.clone());
-        self.facts = facts;
-        Ok(())
+        Ok((key, facts))
     }
     /// UI-local disclosure only. The host drains the original ContentHost action
     /// batch exactly once; retired button IDs cannot target a replacement block.
@@ -458,12 +511,13 @@ impl Component for OutputMessage {
         MeasuredChild::new(Size::new(available.width, measured.size.height))
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
-        arrange_leading(
+        arrange_content(
             &mut self.rows.children,
             text,
             frame,
             clip,
             Spacing::Regular.value(),
+            false,
         );
     }
     fn semantics(&self) -> ContentSemantics {

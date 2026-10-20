@@ -797,3 +797,100 @@ pub async fn execute_turn_action(
 ) -> Result<tekes_agent_ui_bindings::ThreadActionOutcome, String> {
     request.execute().await.map_err(|error| error.to_string())
 }
+
+/// A host supplies an exclusive namespace pool and canonical presentation facts.
+/// The shared content tree leaves viewport/reading transactions to TekesUI.
+pub fn transcript_content(
+    root_namespace: u32,
+    rows: std::ops::Range<u32>,
+    scope: tekes_agent_components_ui::RunScope,
+    snapshot: &tekes_agent_components_ui::TranscriptSnapshot,
+    publication: u64,
+    epoch: u64,
+) -> Result<tekes_agent_components_ui::TranscriptContent, &'static str> {
+    let mut view = tekes_agent_components_ui::TranscriptContent::new(
+        root_namespace,
+        rows,
+        scope.clone(),
+        Default::default(),
+    )?;
+    view.update(&scope, publication, epoch, snapshot, true)?;
+    Ok(view)
+}
+#[test]
+fn independent_host_mounts_canonical_content_without_private_demo_types() {
+    use tekes_agent_components_ui::{
+        InputMessage, OutputMessage, RunScope, TranscriptItem, TranscriptItemKind,
+        TranscriptMessageKey, TranscriptSnapshot,
+    };
+    let input = TranscriptItem {
+        id: "input".into(),
+        record_id: None,
+        reconciliation_id: None,
+        turn_id: "turn".into(),
+        kind: TranscriptItemKind::User,
+        text: "用户输入".into(),
+        reasoning: String::new(),
+        attachments: vec![],
+        content_blocks: None,
+        is_visible: true,
+        is_final: true,
+        is_provisional: false,
+        reasoning_ended: true,
+        source_sequence: None,
+        source_position: None,
+        time: None,
+        metadata: Default::default(),
+    };
+    let mut output = input.clone();
+    output.id = "output".into();
+    output.kind = TranscriptItemKind::Assistant;
+    output.text = "机器回复".into();
+    let snapshot = TranscriptSnapshot {
+        items: vec![input, output],
+        ..Default::default()
+    };
+    let view = transcript_content(
+        900,
+        901..1000,
+        RunScope::main("public", "a"),
+        &snapshot,
+        1,
+        1,
+    )
+    .unwrap();
+    let input = view
+        .message_id(TranscriptMessageKey::Item("input"))
+        .unwrap();
+    let output = view
+        .message_id(TranscriptMessageKey::Item("output"))
+        .unwrap();
+    assert!(view.capabilities().mixed_content);
+    assert!(view.capabilities().structured_user_content);
+    assert!(!view.capabilities().keyed_reading_transactions);
+    assert!(!view.capabilities().rich_content);
+    let root = view.id();
+    let host = view.into_host().unwrap();
+    assert!(host.get(root).is_some());
+    let input = host
+        .get(input)
+        .unwrap()
+        .component::<InputMessage>()
+        .unwrap();
+    let output = host
+        .get(output)
+        .unwrap()
+        .component::<OutputMessage>()
+        .unwrap();
+    assert_eq!(
+        host.text_surface(input.ids().body).unwrap().input.text,
+        "用户输入"
+    );
+    assert_eq!(
+        host.text_surface(output.content_ids()[0].body)
+            .unwrap()
+            .input
+            .text,
+        "机器回复"
+    );
+}

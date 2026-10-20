@@ -197,10 +197,13 @@ Native [消息生命周期边界修正](rust-agent-ui-native-stream-boundary-202
 
 已补 [分页读取回执](rust-agent-ui-history-paging-20261020.md)：原 binding/epoch 的 Loading、Failed、Interrupted 与显式重试，复用现有 runtime / ChildRun 页合并。正式分页控件、文档安装与阅读锚点事务仍未完成。
 
-首个实际内容行 [`InputMessage`](rust-agent-ui-input-message-20261020.md) 只组合 TekesUI 默认 Surface、只读正文及 caption，用户正文气泡和外置 footnote 右对齐；浅深色、短输入收窄、长中文重排使用库的公开文字服务验证。当前仅支持纯文本，结构化块/附件显式拒绝，不能把此行视为完整 Transcript / RunView。
+首个实际内容行 [`InputMessage`](rust-agent-ui-input-message-20261020.md) 只组合 TekesUI 默认 Surface、只读正文及 caption，用户正文气泡和外置 footnote 右对齐；浅深色、短输入收窄、长中文重排使用库的公开文字服务验证。最初纯文本验收收据保持原范围；当前已增加附件/原始信息详情，见下方内容树接入记录，仍不是完整 Transcript / RunView。
 
 [`OutputMessage`](rust-agent-ui-output-message-20261020.md) 现可独立挂载机器正文、推理与工具引用的局部展开层；按 canonical blocks 顺序消费，同一个正文控件在流式更新时保留选区。附件/未知块以明确的原始数据详情保留，Markdown 当前仍是源码文字；这是 Transcript 内容层进展，完整 Transcript / RunView、turn footnote 与混合阅读仍未完成。
 
 当前 [`TurnFootnote`](rust-agent-ui-turn-footnote-20261020.md) 已接入 turn 级状态、provider 用量、毫秒时间戳的区间换算与共享完成回合 Fork。动作目录移入同一 presentation，Web 与 RunSnapshot 共用；原来源 ticket 在派发前再检查 pointer、epoch、边界和能力，已知完成可再次显式操作，Unknown 不自动重试。三端真实分叉/历史恢复、原生 footnote 点击和完整 fixture 回归通过；这不等于已交付其余 footnote 能力或完整 Transcript。
 
 本轮还修正了原生测试宿主在 SideChat 撤销中重复读取快照的竞态：同一次 Composer/Indicators/actionable/paging 刷新消费同一 RunSnapshot，page receipt 必须匹配其 epoch。撤销后保留的旧快照只可读，不能因此恢复动作。新增确定性测试和此前失败的完整原生场景均已通过。
+
+
+当前 [`TranscriptContent`](rust-agent-ui-transcript-tree-20261020.md) 将 InputMessage、OutputMessage、独立 ToolActivity 和 TurnFootnote 组合成公开内容树。源事件决定顺序，未定位内容明确单列；用户附件 → 正文气泡 → 外置 caption 均靠右，机器内容及 aside 靠左。纯附件不挂空正文文本目标。NativeEntry 和显式 submission receipt 保留既有控件；重复认领同一 receipt 会在修改前拒绝。实验宿主仅套用 TekesUI 的 ScrollContent；没有自行实现阅读状态或滚动补偿，完整 Transcript / RunView、#22 混合锚点与 #25 富内容仍待完成。

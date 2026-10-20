@@ -134,6 +134,9 @@ pub enum DemoCommand {
 }
 
 pub struct ComponentDemo {
+    document_enabled: bool,
+    document_roots: BTreeMap<ComponentId, ComponentId>,
+    next_document_namespace: u32,
     file_preview_available: bool,
     preview_gesture: Option<FilePreviewGesture>,
     file_picker_available: bool,
@@ -440,6 +443,9 @@ impl ComponentDemo {
             creation_panel: Some(creation_panel),
             annotation_panel: Some(annotation_panel),
             annotation_gesture: None,
+            document_enabled: false,
+            document_roots: BTreeMap::new(),
+            next_document_namespace: 7_000_000,
             background_commands: vec![],
             next_panel_namespace: 50_000,
             panel_navigation_revision: 0,
@@ -597,6 +603,104 @@ impl ComponentDemo {
             .reorder(parent, &order)
             .map_err(|_| unsupported("output proof order"))?;
         Ok(id)
+    }
+    pub fn enable_transcript_content(&mut self) -> Result<()> {
+        self.document_enabled = true;
+        self.sync()
+    }
+    pub fn transcript_content_id(&self, ids: ComposerIds) -> Option<ComponentId> {
+        self.document_roots.get(&ids.root).copied()
+    }
+    fn sync_transcript_content(
+        &mut self,
+        ids: ComposerIds,
+        binding: &Arc<RunBinding>,
+        snapshot: &tekes_agent_presentation::RunSnapshot,
+    ) -> Result<()> {
+        if !self.document_enabled {
+            return Ok(());
+        }
+        let available = binding.access() == PaneAccess::Ready && !self.composing();
+        if ids.root == self.ids().root {
+            self.tree
+                .get_mut(MAIN)
+                .unwrap()
+                .component_mut::<StackContent>()
+                .unwrap()
+                .flexible_child = Some(ComponentId(ids.root.0 + 16));
+        }
+        if let Some(root) = self.document_roots.get(&ids.root).copied() {
+            return self
+                .tree
+                .get_mut(root)
+                .ok_or_else(|| unsupported("transcript mount missing"))?
+                .component_mut::<tekes_agent_components_ui::TranscriptContent>()
+                .unwrap()
+                .update(
+                    binding.scope(),
+                    snapshot.revision,
+                    snapshot.connection_epoch,
+                    &snapshot.transcript,
+                    available,
+                )
+                .map_err(unsupported);
+        }
+        let namespace = self.next_document_namespace;
+        let end = namespace
+            .checked_add(10_000)
+            .ok_or_else(|| unsupported("demo document namespace pool exhausted"))?;
+        let mut content = tekes_agent_components_ui::TranscriptContent::new(
+            namespace,
+            namespace + 1..end,
+            binding.scope().clone(),
+            Default::default(),
+        )
+        .map_err(unsupported)?;
+        content
+            .update(
+                binding.scope(),
+                snapshot.revision,
+                snapshot.connection_epoch,
+                &snapshot.transcript,
+                available,
+            )
+            .map_err(unsupported)?;
+        let root = content.id();
+        let scroll = ComponentId(root.0 + 1);
+        let parent = ComponentId(ids.root.0 + 16);
+        let viewport = tekes_ui_controls::composition::ScrollContent::new(
+            tekes_ui_controls::ScrollArea::default(),
+            Content::new(root, content),
+        );
+        self.tree
+            .insert(parent, Content::new(scroll, viewport))
+            .map_err(|_| unsupported("transcript viewport mount"))?;
+        let container = self
+            .tree
+            .get(parent)
+            .unwrap()
+            .component::<StackContent>()
+            .unwrap();
+        let mut order: Vec<_> = container
+            .children
+            .iter()
+            .map(Content::id)
+            .filter(|id| *id != scroll)
+            .collect();
+        let index = order.iter().position(|id| *id == ids.root).unwrap();
+        order.insert(index, scroll);
+        self.tree
+            .reorder(parent, &order)
+            .map_err(|_| unsupported("transcript viewport order"))?;
+        self.tree
+            .get_mut(parent)
+            .unwrap()
+            .component_mut::<StackContent>()
+            .unwrap()
+            .flexible_child = Some(scroll);
+        self.next_document_namespace = end;
+        self.document_roots.insert(ids.root, root);
+        Ok(())
     }
     pub fn turn_footnote_id() -> ComponentId {
         ComponentId(6_000_002_u64 << 32)
@@ -2208,6 +2312,7 @@ impl ComponentDemo {
             .map_err(unsupported)?;
         self.sync_actionable(ids, &binding, &snapshot)?;
         self.sync_paging(ids, &binding, &snapshot)?;
+        self.sync_transcript_content(ids, &binding, &snapshot)?;
         self.sync_turn_footnote_proof()?;
         for (index, id) in [SELECT_A, SELECT_B].into_iter().enumerate() {
             let composing = self.composing();
@@ -2596,6 +2701,7 @@ impl ComponentDemo {
             .map_err(unsupported)?;
         self.sync_actionable(ids, &binding, &snapshot)?;
         self.sync_paging(ids, &binding, &snapshot)?;
+        self.sync_transcript_content(ids, &binding, &snapshot)?;
         Ok(())
     }
     fn composer_labels(snapshot: &tekes_agent_presentation::RunSnapshot) -> ComposerLabels {
@@ -2825,6 +2931,18 @@ impl ComponentDemo {
                 }
             }
             for (ids, binding) in actionable_sources {
+                if let Some(root) = self.transcript_content_id(ids)
+                    && let Some(content) = self.tree.get_mut(root).and_then(|node| {
+                        node.component_mut::<tekes_agent_components_ui::TranscriptContent>()
+                    })
+                {
+                    for intent in content.handle_actions(&actions) {
+                        commands.push(DemoCommand::TurnAction {
+                            binding: binding.clone(),
+                            intent,
+                        });
+                    }
+                }
                 if self
                     .tree
                     .get(Self::paging_id(ids))

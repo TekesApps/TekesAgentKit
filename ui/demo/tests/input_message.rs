@@ -80,6 +80,7 @@ async fn user_row_uses_library_content_surface_and_external_trailing_caption() {
         .unwrap()
         .item
         .clone();
+    item.content_blocks = None;
     item.text = "中文 😀".into();
     let input = TranscriptInput {
         key: TranscriptMessageKey::NativeEntry("entry"),
@@ -204,7 +205,16 @@ async fn input_row_fences_scope_publication_and_explicit_identity_migration() {
         .text
         .clone();
     let mut unsupported = item.clone();
-    unsupported.reasoning = "unsupported".into();
+    unsupported.content_blocks = Some(vec![
+        tekes_agent_presentation::TranscriptContentBlock {
+            index: 0,
+            content: tekes_agent_presentation::TranscriptBlockContent::Text { text: "a".into() },
+        },
+        tekes_agent_presentation::TranscriptContentBlock {
+            index: 0,
+            content: tekes_agent_presentation::TranscriptBlockContent::Text { text: "b".into() },
+        },
+    ]);
     assert!(
         row.update(
             &scope,
@@ -220,6 +230,128 @@ async fn input_row_fences_scope_publication_and_explicit_identity_migration() {
     assert_eq!(
         row.children()[1].component::<TextContent>().unwrap().text,
         before
+    );
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn pure_attachment_keeps_occurrences_trailing_details_and_external_footnote_without_empty_bubble()
+ {
+    use tekes_agent_presentation::{TranscriptBlockContent, TranscriptContentBlock};
+    let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
+    let snapshot = controller.snapshot();
+    let doc = TranscriptDocument::read(&snapshot.transcript).unwrap();
+    let mut item = doc
+        .sections
+        .iter()
+        .flat_map(|s| &s.inputs)
+        .last()
+        .unwrap()
+        .item
+        .clone();
+    item.text.clear();
+    let file = serde_json::json!({"type":"file","name":"中文.txt","id":"same-file"});
+    item.attachments = vec![file.clone(), file.clone()];
+    item.content_blocks = Some(vec![
+        TranscriptContentBlock {
+            index: 0,
+            content: TranscriptBlockContent::Attachment {
+                content: file.clone(),
+            },
+        },
+        TranscriptContentBlock {
+            index: 1,
+            content: TranscriptBlockContent::Attachment {
+                content: file.clone(),
+            },
+        },
+    ]);
+    let input = TranscriptInput {
+        key: TranscriptMessageKey::NativeEntry("attachment-entry"),
+        item: &item,
+        footnote: TranscriptDelivery::Recorded { time: None },
+    };
+    let scope = RunScope::main("fixture", "a");
+    let mut message = InputMessage::new(603, scope.clone());
+    message.update(&scope, 1, 1, &input).unwrap();
+    let ids = message.ids();
+    let details = message.detail_ids();
+    assert_eq!(
+        details.len(),
+        2,
+        "aggregate projection must not double the canonical occurrences"
+    );
+    let mut host = message.into_host().unwrap();
+    assert!(host.get(ids.body).is_none());
+    let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()), 1.);
+    let frame = Rect::new(20., 30., 520., 800.);
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        frame,
+        frame,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    assert_eq!(host.get(ids.bubble).unwrap().frame().size.height, 0.);
+    host.accessibility_action(
+        details[0].disclosure.unwrap(),
+        None,
+        tekes_ui_controls::composition::AccessibilityAction::Press,
+    );
+    let actions = host.drain_actions();
+    host.get_mut(ids.root)
+        .unwrap()
+        .component_mut::<InputMessage>()
+        .unwrap()
+        .handle_actions(&actions);
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        frame,
+        frame,
+        Theme::DARK.into(),
+    )
+    .unwrap();
+    for id in [
+        details[0].root,
+        details[0].disclosure.unwrap(),
+        details[0].body,
+        details[1].root,
+        ids.footnote,
+    ] {
+        assert!((host.get(id).unwrap().frame().max_x() - frame.max_x()).abs() < 0.01);
+    }
+    assert!(
+        host.text_surface(details[0].body)
+            .unwrap()
+            .input
+            .text
+            .contains("中文.txt")
+    );
+    assert!(host.text_surface(details[0].body).unwrap().input.read_only);
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn attachments_precede_the_user_bubble_and_external_caption_in_app_order() {
+    use tekes_ui_controls::composition::Component;
+    let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
+    let mut snapshot = controller.snapshot().transcript.clone();
+    let scope = RunScope::main("fixture", "a");
+    snapshot.items[0]
+        .attachments
+        .push(serde_json::json!({"name":"输入附件.txt"}));
+    let document = TranscriptDocument::read(&snapshot).unwrap();
+    let mut message = InputMessage::new(998, scope.clone());
+    message
+        .update(&scope, 1, 1, &document.sections[0].inputs[0])
+        .unwrap();
+    let ids = message.ids();
+    let order: Vec<_> = message.children().iter().map(|node| node.id()).collect();
+    assert_eq!(
+        order,
+        vec![message.detail_ids()[0].root, ids.bubble, ids.footnote]
     );
     runtime.stop().await.unwrap();
 }

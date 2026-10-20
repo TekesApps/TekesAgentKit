@@ -1269,14 +1269,35 @@ impl Host {
                 self.fork_test_started = true;
                 if self.turn_footnote_selftest {
                     let snapshot = self.view.binding().current_run().unwrap();
-                    let action = &snapshot.transcript.turns.last().unwrap().footnote_actions[0];
+                    let footer_id = if let Some(root) =
+                        self.view.transcript_content_id(self.view.ids())
+                    {
+                        let content = self
+                            .view
+                            .tree
+                            .get(root)
+                            .unwrap()
+                            .component::<tekes_agent_components_ui::TranscriptContent>()
+                            .unwrap();
+                        content.row_keys().iter().find_map(|key|if matches!(key,tekes_agent_components_ui::TranscriptContentRowKey::TurnFootnote(_)) {content.row_id(key)}else{None}).unwrap()
+                    } else {
+                        ComponentDemo::turn_footnote_id()
+                    };
                     let footer = self
                         .view
                         .tree
-                        .get(ComponentDemo::turn_footnote_id())
+                        .get(footer_id)
                         .unwrap()
                         .component::<tekes_agent_components_ui::TurnFootnote>()
                         .unwrap();
+                    let turn_id = footer.facts().unwrap().turn_id;
+                    let action = &snapshot
+                        .transcript
+                        .turns
+                        .iter()
+                        .find(|turn| turn.id == turn_id)
+                        .unwrap()
+                        .footnote_actions[0];
                     let button = footer.action_id(&action.id).unwrap();
                     let point = self.view.tree.get(button).unwrap().frame().center();
                     tekes_ui_platform_macos::selftest::run_script(vec![(
@@ -2331,6 +2352,17 @@ pub fn run() {
     view.set_side_chat_binding(side_chats.clone());
     view.set_sidebar_source(sidebar.snapshot()).unwrap();
     view.sync().unwrap();
+    if args.iter().any(|arg| arg == "--transcript-content") {
+        assert!(
+            !args.iter().any(|arg| matches!(
+                arg.as_str(),
+                "--input-message-proof" | "--output-message-proof" | "--turn-footnote-proof"
+            )),
+            "content-tree mode and independent row probes are separate hosts"
+        );
+        view.enable_transcript_content()
+            .expect("canonical transcript content tree");
+    }
     let fonts = CoreTextFonts::new();
     let (sender, results) = mpsc::channel();
     let mut turn_footnote_id = None;
@@ -2390,7 +2422,12 @@ pub fn run() {
         ),
         actions_selftest,
         turn_footnote_selftest: actions_selftest
-            && args.iter().any(|arg| arg == "--turn-footnote-proof"),
+            && args.iter().any(|arg| {
+                matches!(
+                    arg.as_str(),
+                    "--turn-footnote-proof" | "--transcript-content"
+                )
+            }),
         rename_test_started: false,
         fork_test_started: false,
         archive_test_started: false,
@@ -3108,6 +3145,24 @@ pub fn run() {
                 });
             }
         }
+        let transcript_content_proof=host.view.transcript_content_id(host.view.ids()).map(|id| {
+            let row=host.view.tree.get(id).unwrap();let content=row.component::<tekes_agent_components_ui::TranscriptContent>().unwrap();let frame=row.frame();
+            let composer=host.view.tree.get(host.view.ids().root).unwrap().frame();
+            assert!(composer.min_y()>=0. && composer.max_y()<=760., "content viewport must leave Composer inside the host window");
+            let mut messages=0;let mut footnotes=0;let mut tools=0;
+            for key in content.row_keys() {
+                let node=host.view.tree.get(content.row_id(key).unwrap()).unwrap();
+                if let Some(input)=node.component::<tekes_agent_components_ui::InputMessage>() {
+                    let ids=input.ids();let bubble=host.view.tree.get(ids.bubble).unwrap().frame();let caption=host.view.tree.get(ids.footnote).unwrap().frame();
+                    assert!((bubble.max_x()-frame.max_x()).abs()<0.5);assert!((caption.max_x()-frame.max_x()).abs()<0.5);
+                    messages+=1;
+                } else if node.component::<tekes_agent_components_ui::OutputMessage>().is_some() {assert!((node.frame().min_x()-frame.min_x()).abs()<0.5);messages+=1;}
+                else if node.component::<tekes_agent_components_ui::TurnFootnote>().is_some() {assert!((node.frame().min_x()-frame.min_x()).abs()<0.5);footnotes+=1;}
+                else if node.component::<tekes_agent_components_ui::ToolActivity>().is_some() {assert!((node.frame().min_x()-frame.min_x()).abs()<0.5);tools+=1;}
+            }
+            assert_eq!(messages, snapshot.transcript.items.iter().filter(|item|item.is_visible).count());
+            serde_json::json!({"renderer":true,"rows":content.row_keys().len(),"messages":messages,"footnotes":footnotes,"independentTools":tools,"userTrailing":true,"machineLeading":true,"genericViewport":true,"keyedReadingAcceptance":false,"richContent":false,"completeTranscript":false,"nativeInteraction":false})
+        });
         let turn_footnote_proof=turn_footnote_id.map(|id| {
             let row=host.view.tree.get(id).unwrap();let frame=row.frame();
             for child in row.component::<tekes_agent_components_ui::TurnFootnote>().unwrap().children() {let f=host.view.tree.get(child.id()).unwrap().frame();assert!((f.min_x()-frame.min_x()).abs()<0.5);}
@@ -3156,7 +3211,7 @@ pub fn run() {
             "uploadProof":upload_proof,
             "actionableProof":actionable_proof,
             "historyPagingProof":history_page_proof,
-            "inputMessageProof":input_message_proof, "outputMessageProof":output_message_proof, "turnFootnoteProof":turn_footnote_proof,"turnForkProof":turn_fork_proof,
+            "inputMessageProof":input_message_proof, "outputMessageProof":output_message_proof, "turnFootnoteProof":turn_footnote_proof,"turnForkProof":turn_fork_proof,"transcriptContentProof":transcript_content_proof,
             })
         );
         host.executor.block_on(host.runtime.stop()).unwrap();

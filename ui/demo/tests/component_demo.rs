@@ -246,3 +246,53 @@ async fn native_host_command_freezes_admission_and_later_edit_and_navigation_can
     );
     runtime.stop().await.unwrap();
 }
+
+#[tokio::test]
+async fn canonical_content_mounts_per_session_and_preserves_original_widgets_and_drafts() {
+    use tekes_agent_components_ui::TranscriptContent;
+    let (_runtime, mut view) = setup().await;
+    view.enable_transcript_content().unwrap();
+    let a_ids = view.ids();
+    let a_root = view.transcript_content_id(a_ids).unwrap();
+    let rows = view
+        .tree
+        .get(a_root)
+        .unwrap()
+        .component::<TranscriptContent>()
+        .unwrap()
+        .row_keys()
+        .to_vec();
+    let first = rows.first().map(|key| {
+        view.tree
+            .get(a_root)
+            .unwrap()
+            .component::<TranscriptContent>()
+            .unwrap()
+            .row_id(key)
+            .unwrap()
+    });
+    view.tree.focus(Some(a_ids.editor), true);
+    commit(&mut view, "A 内容树草稿");
+    view.select(1).unwrap();
+    let b_ids = view.ids();
+    let b_root = view.transcript_content_id(b_ids).unwrap();
+    assert_ne!(a_root, b_root);
+    view.tree.focus(Some(b_ids.editor), true);
+    commit(&mut view, "B 内容树草稿");
+    view.select(0).unwrap();
+    assert_eq!(view.editor().input.text, "A 内容树草稿");
+    assert_eq!(view.transcript_content_id(view.ids()), Some(a_root));
+    let content = view
+        .tree
+        .get(a_root)
+        .unwrap()
+        .component::<TranscriptContent>()
+        .unwrap();
+    assert_eq!(content.row_keys(), rows);
+    if let Some(key) = rows.first() {
+        assert_eq!(content.row_id(key), first);
+    }
+    view.select(1).unwrap();
+    assert_eq!(view.editor().input.text, "B 内容树草稿");
+    assert_eq!(view.transcript_content_id(view.ids()), Some(b_root));
+}
