@@ -36,6 +36,85 @@ fn turn(id: &str) -> TranscriptTurn {
     }
 }
 #[test]
+fn feedback_uses_durable_native_identity_even_for_non_text_final_responses() {
+    let mut completed = turn("t");
+    completed.status = "completed".into();
+    let mut response = item("temporary-display-id", "t", TranscriptItemKind::Assistant);
+    response.record_id = Some("native-entry".into());
+    response.is_final = true;
+    response.attachments.push(json!({"type":"image"}));
+    response.source_position = Some(TranscriptSourcePosition::Native {
+        entry_id: "native-entry".into(),
+        entry_ordinal: 3,
+        content_index: None,
+    });
+    let mut source = TranscriptSnapshot {
+        turns: vec![completed],
+        items: vec![response],
+        ..Default::default()
+    };
+    let document = TranscriptDocument::read(&source).unwrap();
+    let target = TurnFeedbackTarget::read(&document.sections[0]).unwrap();
+    assert_eq!(target.message_id, "native-entry");
+    assert!(
+        document.sections[0].final_output().is_none(),
+        "rating an image is not copying invented prose"
+    );
+    source.items[0].record_id = Some("mismatched".into());
+    let document = TranscriptDocument::read(&source).unwrap();
+    assert!(TurnFeedbackTarget::read(&document.sections[0]).is_none());
+}
+#[test]
+fn journal_feedback_requires_an_explicit_protocol_id_not_a_display_fallback() {
+    use tekes_agent_contract::{HistoryEntry, JournalSnapshot};
+    use tekes_agent_session::SessionProjection;
+    for explicit in [false, true] {
+        let mut message = json!({"content":[{"type":"text","text":"answer"}]});
+        if explicit {
+            message["id"] = json!("assistant-1");
+        }
+        let rows = [
+            ("turn/start", json!({"turn":1})),
+            (
+                "assistant/message",
+                json!({"turn":1,"step":1,"message":message}),
+            ),
+            ("turn/end", json!({"turn":1,"reason":"completed"})),
+        ];
+        let entries: Vec<HistoryEntry> = rows
+            .into_iter()
+            .enumerate()
+            .map(|(seq, (kind, data))| {
+                serde_json::from_value(
+                    json!({"event":{"seq":seq,"time":1,"type":kind,"data":data}}),
+                )
+                .unwrap()
+            })
+            .collect();
+        let mut projection = SessionProjection::default();
+        projection
+            .apply_snapshot(JournalSnapshot {
+                session_id: "a".into(),
+                generation: "g".into(),
+                through_sequence: 2,
+                window_limit: 50,
+                entries,
+                has_more_before: false,
+                projections: None,
+                history_revision: None,
+            })
+            .unwrap();
+        let snapshot = TranscriptSnapshot::read(&RunScope::main("e", "a"), &projection).unwrap();
+        let document = TranscriptDocument::read(&snapshot).unwrap();
+        let section = &document.sections[0];
+        assert_eq!(
+            section.final_response().unwrap().item.record_id.as_deref(),
+            Some("assistant-1")
+        );
+        assert_eq!(TurnFeedbackTarget::read(section).is_some(), explicit);
+    }
+}
+#[test]
 fn final_output_uses_shared_final_marker_instead_of_the_last_text_or_reasoning() {
     let mut completed = turn("t");
     completed.status = "completed".into();

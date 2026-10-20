@@ -12,6 +12,8 @@
 
 用户消息的[外置复制入口](rust-agent-ui-input-copy-20261020.md)已接入 RunView 与只读 lane，返回捕获原 scope/message/text 的公开 intent，由宿主写剪贴板。[输出 footnote 复制](rust-agent-ui-output-copy-20261020.md)复用共享 is_final 语义，只为已完成回合中唯一的最终正文提供目标；评价等其余 footnote 语义仍待补齐。离线复制不授予 endpoint mutation 权限。
 
+[评价读取基础](rust-agent-ui-feedback-read-20261020.md)已增加 committed records、真实目标身份和原 binding/连接/读顺序约束；DSH feedback 包裹已在适配器边界归一化。评价 CAS mutation、备注及控件仍待接入，读取成功不等于评价交互完成。
+
 AgentKit 定义业务结构、展示语义、组件组合、组件输入及回调，复用现有 presentation。TekesUI 拥有编辑/撤销/选区/IME/焦点、文字排版、滚动/锚点、通用布局与渲染；AgentKit 只调用其公开接口。宿主提供窗口、总体布局、导航、产品 copy/主题、安装、凭证、路径与系统权限，并执行显式 host capability 回调。不能向宿主转移本应共享的 Agent 状态机或动作策略。
 
 ## Composer（首批实现）

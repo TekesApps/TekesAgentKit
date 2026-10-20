@@ -2,8 +2,18 @@
 
 `RunBinding` binds one mounted pane to existing `SessionRuntime`, `RunController`,
 `ChildRun` and `SideChatController` authority. It owns observations, not windows or
-another Run state machine. This package does not yet supply a formal Transcript
-or RunView. It consumes the UI workspace's exact published TekesUI revision.
+another Run state machine. Public RunView/TranscriptContent/ReadOnlyTranscript are
+supplied by the components package; full reading/rich-content acceptance remains
+experimental. The workspace consumes an exact published TekesUI revision.
+
+`Arc<RunBinding>::read_feedback()` returns a validated, original-binding
+`FeedbackFrame`; use `is_current(source)` before adopting committed records.
+Read order and connection epoch are separate from opaque server CAS versions.
+`TurnFeedbackTarget::read(section)` requires a proven public final-message ID,
+and bounded child history is not treated as an independent feedback session.
+Cold/failed reads are not an empty list, and advertised put/delete facts are not
+mutation permission. Rating writes and controls are pending; see the
+[feedback read contract](../../docs/rust-agent-ui-feedback-read-20261020.md).
 
 Choose the source explicitly:
 

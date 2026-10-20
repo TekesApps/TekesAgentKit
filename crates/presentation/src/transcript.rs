@@ -410,6 +410,12 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
                 let mut row = item(scope, &key, &turn_id, kind, seq, time);
                 row.metadata = json!({"sessionFinal":data["sessionFinal"],"hasToolCalls":data["message"]["content"].as_array().is_some_and(|a|a.iter().any(|b|b["type"]=="tool-call")),"classification":data["classification"],"source":data["source"],"sourceEventSeqs":event.metadata.get("sourceEventSeqs")});
                 if assistant {
+                    // Preserve a proven public feedback ID separately from the
+                    // legacy record_id fallback used only for presentation.
+                    row.metadata["feedbackMessageId"] = data["message"]["id"]
+                        .as_str()
+                        .filter(|id| !id.is_empty())
+                        .map_or(Value::Null, |id| json!(id));
                     row.text = body(&data["message"]["content"]);
                     row.reasoning = text_blocks(&data["message"]["content"], "reasoning");
                     row.attachments = attachments(&data["message"]["content"]);

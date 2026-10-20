@@ -9,6 +9,8 @@ Native 要求 Kernel 0.9 的 v4 wire；Pi/DSH 的标准化 HostDescription 保�
 连接身份、transport locality、harness、cache policy 相互独立。
 
 `SessionEndpointRegistry` 注册显式 connector。`SessionAddress { endpoint_id, session_id }` 是跨 harness 的稳定路由键。
+
+2026-10-20 补充：[评价读取与身份契约](rust-agent-ui-feedback-read-20261020.md)统一三端 committed feedback 数据。DSH 的公共 feedback.list/put/delete 现在在适配器中解包成功结果、将内层失败作为错误返回，并保留 CAS conflict current；使用这些公共别名的调用方不应再次按 DSH value 解包。该修正已有适配器单测和真实三端只读验证；评价写入控件仍未开放。
 `SessionLocator` 给出该地址、cwd、nativeSessionId、可用时的 nativeSessionFile，以及 historySource。
 `cwd` 保留原始工作区根，`workingDirectory` 是有权威投影时的当前执行目录；两者可以不同，文件相对路径仍遵循各服务端的 scope。
 原生文件指针是定位证据；历史读取仍通过对应 harness 的公开协议，不解析私有数据库或把远端路径当成本机路径。

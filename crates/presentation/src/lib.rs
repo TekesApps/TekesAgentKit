@@ -1,6 +1,8 @@
 //! Renderer-independent Run, Transcript, Composer and connection state.
 //! Harness facts come exclusively from the public session projection; local intent never gains authority.
 mod annotations;
+mod feedback;
+pub use feedback::*;
 mod attachment_transfer;
 pub use attachment_transfer::*;
 mod composer;

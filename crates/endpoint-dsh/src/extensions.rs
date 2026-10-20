@@ -190,9 +190,115 @@ pub(crate) const ALIASES: &[&str] = &[
     "directories.list",
     "directories.create",
 ];
+/// ClientKit's DSH feedbackCall boundary: errors inside an otherwise successful
+/// remote call are failures, and public feedback methods return unwrapped data.
+pub(crate) fn normalize_feedback_reply(method: &str, reply: Value) -> Result<Value> {
+    if !matches!(method, "feedback.list" | "feedback.put" | "feedback.delete") {
+        return Ok(reply);
+    }
+    match reply["ok"].as_bool() {
+        Some(false) => {
+            let error = reply
+                .get("error")
+                .filter(|error| error.is_object())
+                .ok_or_else(|| Error::Protocol("invalid DSH feedback error envelope".into()))?;
+            let code = string(error, "code")?;
+            if code == "version-conflict" {
+                let current = error.get("current").ok_or_else(|| {
+                    Error::Protocol("feedback conflict is missing current".into())
+                })?;
+                if !current.is_null() {
+                    let record: SessionMessageFeedback = serde_json::from_value(current.clone())?;
+                    record.validate()?;
+                }
+            }
+            Err(Error::Remote(error.clone()))
+        }
+        Some(true) => {
+            if method == "feedback.delete" {
+                return Ok(Value::Null);
+            }
+            let value = reply
+                .get("value")
+                .ok_or_else(|| Error::Protocol("DSH feedback value is missing".into()))?
+                .clone();
+            if method == "feedback.list" {
+                SessionMessageFeedbackList::read(value.clone())?;
+            } else {
+                let record: SessionMessageFeedback = serde_json::from_value(value.clone())?;
+                record.validate()?;
+            }
+            Ok(value)
+        }
+        None => Err(Error::Protocol(
+            "DSH feedback result must have boolean ok".into(),
+        )),
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn feedback_success_is_unwrapped_without_changing_other_extension_results() {
+        let record = json!({"messageId":"m","rating":"positive","version":"v","note":"中文"});
+        assert_eq!(
+            normalize_feedback_reply(
+                "feedback.list",
+                json!({"ok":true,"value":{"items":[record.clone()]}})
+            )
+            .unwrap(),
+            json!({"items":[record.clone()]})
+        );
+        assert_eq!(
+            normalize_feedback_reply("feedback.put", json!({"ok":true,"value":record.clone()}))
+                .unwrap(),
+            record
+        );
+        assert_eq!(
+            normalize_feedback_reply("feedback.delete", json!({"ok":true})).unwrap(),
+            Value::Null
+        );
+        let opaque = json!({"ok":false,"error":{"code":"vendor"}});
+        assert_eq!(
+            normalize_feedback_reply("goals.get", opaque.clone()).unwrap(),
+            opaque
+        );
+    }
+    #[test]
+    fn feedback_conflicts_and_rejections_are_remote_failures_with_current_preserved() {
+        for error in [
+            json!({"code":"version-conflict","current":null}),
+            json!({"code":"version-conflict","current":{"messageId":"m","rating":"negative","version":"new"}}),
+            json!({"code":"rejected","detail":"denied"}),
+        ] {
+            match normalize_feedback_reply(
+                "feedback.put",
+                json!({"ok":false,"error":error.clone()}),
+            ) {
+                Err(Error::Remote(actual)) => assert_eq!(actual, error),
+                other => panic!("expected preserved remote feedback failure, got {other:?}"),
+            }
+        }
+    }
+    #[test]
+    fn malformed_feedback_envelopes_never_become_empty_or_successful() {
+        for (method, reply) in [
+            ("feedback.list", json!({"value":{"items":[]}})),
+            ("feedback.list", json!({"ok":true})),
+            ("feedback.list", json!({"ok":true,"value":{"items":null}})),
+            (
+                "feedback.put",
+                json!({"ok":true,"value":{"messageId":"m","rating":"positive"}}),
+            ),
+            ("feedback.delete", json!({"ok":false})),
+            (
+                "feedback.delete",
+                json!({"ok":false,"error":{"code":"version-conflict"}}),
+            ),
+        ] {
+            assert!(normalize_feedback_reply(method, reply).is_err());
+        }
+    }
     #[test]
     fn routes_preserve_request_wrappers_and_agent_authority() {
         let (_, args) = route(

@@ -1,5 +1,7 @@
 //! ClientKit-aligned headless SessionEndpoint contract. Extension payloads stay lossless JSON.
 mod annotations;
+mod feedback;
+pub use feedback::*;
 mod commands;
 pub use annotations::*;
 mod thread_actions;

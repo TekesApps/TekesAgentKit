@@ -17,12 +17,15 @@ parser.add_argument('--ui-initial-presets',action='store_true',help='Exercise pu
 parser.add_argument('--ui-annotation-editor',action='store_true',help='Exercise public annotation editing and shared context compilation; implies the context proof')
 parser.add_argument('--ui-attachments',action='store_true',help='Exercise public upload entry, original draft, Send, history and capability-specific file reads')
 parser.add_argument('--ui-bounded-child',action='store_true',help='Verify actual read-only Native child messages through the public component; requires components and Kernel')
+parser.add_argument('--ui-feedback-read',action='store_true',help='Read typed committed feedback and verify proven final response IDs; no mutations or rating controls')
 parser.add_argument('--ui-turn-footnote',action='store_true',help='Opt in to shared completed-turn fork in isolated UI sessions; requires components')
 parser.add_argument('--ui-transcript-content',action='store_true',help='Mount the canonical mixed content tree with a generic TekesUI viewport; no keyed reading acceptance')
 parser.add_argument('--ui-message-rows',action='store_true',help='Mount canonical plain user and machine rows through public components; not a full Transcript')
 parser.add_argument('--ui-history-pages',action='store_true',help='Seed long isolated sessions and verify public page receipts, original scope and fresh reconnect history')
 parser.add_argument('--ui-actionables',action='store_true',help='Exercise public actionable cards on configured Native/Pi/DSH question sources')
 args=parser.parse_args()
+if args.ui_feedback_read and not (args.ui_demo and args.ui_components and args.ui_transcript_content):
+    parser.error('--ui-feedback-read requires --ui-demo, --ui-components and --ui-transcript-content')
 if args.ui_bounded_child and (not args.ui_components or not args.kernel_root):
     parser.error('--ui-bounded-child requires --ui-components and --kernel-root')
 if args.ui_turn_footnote and not args.ui_components:
@@ -236,6 +239,7 @@ def ui_smoke(config, first, bounded_child=None):
     if kind!='native':output=output.with_name(output.stem+'-'+kind+output.suffix)
     mode=['--components'] if args.ui_components else []
     if bounded_child:mode+=['--bounded-child-proof','--bounded-child-id',bounded_child]
+    if args.ui_feedback_read:mode+=['--feedback-read-proof']
     if (args.ui_model_choices and bounded_child is None):mode+=['--model-choice-proof']
     if (args.ui_context and bounded_child is None) or (args.ui_annotation_editor and bounded_child is None):mode+=['--context-proof']
     if (args.ui_annotation_editor and bounded_child is None):mode+=['--annotation-proof']
@@ -265,6 +269,10 @@ def ui_smoke(config, first, bounded_child=None):
         content=receipt['transcriptContentProof']
         assert content['renderer'] and content['messages']>=1 and content['userTrailing'] and content['machineLeading'] and content['genericViewport'],content
         assert content['outputCopyControls'] >= 1, 'restored completed reply must expose a final-output copy control'
+        if args.ui_feedback_read:
+            feedback=receipt['feedbackReadProof']
+            assert feedback['readCommitted'] and feedback['originalScope'] and feedback['publication']>0 and feedback['finalTargets']>0,feedback
+            assert not feedback['mutated'] and not feedback['ratingControls'],feedback
         assert not content['keyedReadingAcceptance'] and not content['richContent'] and not content['completeTranscript'],content
         print(kind.upper()+'_UI_TRANSCRIPT_CONTENT_OK canonical-mixed-tree+stable-identities+role-layout+public-generic-viewport; keyed-reading=false; native-interaction=false',flush=True)
     if (args.ui_message_rows and bounded_child is None):

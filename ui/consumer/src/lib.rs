@@ -1,4 +1,14 @@
 //! Second consumer: depends only on AgentKit's public UI packages.
+/// Keep failure/stale distinct from a successful empty committed-feedback list.
+pub fn committed_feedback<'a>(
+    source: &std::sync::Arc<tekes_agent_ui_bindings::RunBinding>,
+    frame: &'a tekes_agent_ui_bindings::FeedbackFrame,
+) -> Result<&'a tekes_agent_ui_bindings::SessionMessageFeedbackList, &'static str> {
+    if !frame.is_current(source) {
+        return Err("feedback frame is stale or belongs to another binding");
+    }
+    Ok(frame.records())
+}
 /// A host acknowledges an edit against its original binding, never the newest
 /// selected pane. The component keeps rejected text visible and does not retry.
 pub fn apply_annotation_change(

@@ -678,7 +678,8 @@ impl SessionEndpoint for DshSessionEndpoint {
             return Ok(json!({"accepted":true,"rpcId":rpc_id,"messageId":receipt["messageId"]}));
         }
         if let Some((endpoint, args)) = extensions::route(method, &payload)? {
-            return self.remote.call(&endpoint, args, rpc_id).await;
+            let result = self.remote.call(&endpoint, args, rpc_id).await?;
+            return extensions::normalize_feedback_reply(method, result);
         }
         let endpoint = match method {
             "session.uploadFile" => {
