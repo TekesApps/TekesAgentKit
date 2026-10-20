@@ -105,22 +105,9 @@ impl ActionableCard {
         prompt: Option<Arc<ActionablePrompt>>,
         controls: bool,
     ) -> Result<bool, &'static str> {
-        if publication == 0 || publication < self.publication {
-            return Err("stale actionable publication");
-        }
+        self.check_update(publication, epoch, prompt.as_ref())?;
         let changed = self.prompt != prompt || self.epoch != epoch;
-        if publication == self.publication && changed {
-            return Err("conflicting actionable publication");
-        }
         if changed {
-            let count = prompt.as_ref().map_or(0, |p| p.choices.len());
-            if self
-                .next
-                .checked_add(count as u64)
-                .is_none_or(|n| n >= u32::MAX as u64)
-            {
-                return Err("actionable namespace exhausted");
-            }
             self.rows.clear();
             self.attempted = false;
             self.receipt = None;
@@ -145,6 +132,29 @@ impl ActionableCard {
             self.rebuild();
         }
         Ok(rebuild)
+    }
+    pub(crate) fn check_update(
+        &self,
+        publication: u64,
+        epoch: u64,
+        prompt: Option<&Arc<ActionablePrompt>>,
+    ) -> Result<(), &'static str> {
+        if publication == 0 || publication < self.publication {
+            return Err("stale actionable publication");
+        }
+        let changed = self.prompt.as_ref() != prompt || self.epoch != epoch;
+        if publication == self.publication && changed {
+            return Err("conflicting actionable publication");
+        }
+        if changed
+            && self
+                .next
+                .checked_add(prompt.map_or(0, |p| p.choices.len()) as u64)
+                .is_none_or(|n| n >= u32::MAX as u64)
+        {
+            return Err("actionable namespace exhausted");
+        }
+        Ok(())
     }
     pub fn take_intents(&mut self, actions: &[ContentAction]) -> Vec<ActionableResponseIntent> {
         if !self.controls || self.attempted {

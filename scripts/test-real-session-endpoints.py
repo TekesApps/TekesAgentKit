@@ -262,6 +262,9 @@ def ui_smoke(config, first):
         print(kind.upper()+'_UI_MESSAGE_ROWS_OK canonical-user+external-caption+machine-content+public-controls; full-transcript=false; native-interaction=false',flush=True)
     if args.ui_components:
         assert receipt['components'] and not receipt['transcriptView'],receipt
+        run=receipt['runViewComposition']
+        assert run['mounted'] and run['sharedIntents'] and not run['ownsRuntime'] and not run['completeRunView'],run
+        if args.ui_transcript_content:assert run['transcriptMounted'],run
         assert receipt['inventoryRows']>=1 and receipt['sharedRuntime'] and receipt['sidebarMounted'] and receipt['summaryMounted'],receipt
         document=receipt['documentProjection']
         assert document['sections']>=1 and document['visibleMessages']>=1 and not document['isStale'] and not document['renderer'],document

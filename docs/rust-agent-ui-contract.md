@@ -90,9 +90,11 @@ AgentKit 定义业务结构、展示语义、组件组合、组件输入及回�
 
 基础能力由 TekesUI 实现；收到公开不可变版本后显式升级并验证，不跟随活跃 WIP。AgentKit 自身仍需完成消息组合、stream 到 durable 的可靠阅读身份关联、其余 footnote 动作、正式 Transcript/RunView 和 pane 消息接入，不把这些工作归为上游阻塞。
 
-## RunView 的后续实施
+## RunView（实验组合已实现）
 
 RunView 组合正式 Composer / Transcript / Indicators，拥有 Agent 组件间意图路由；不拥有窗口、其他产品导航或第二套 Run 状态机。异步通知继续订阅已有 presentation，通过公开 WindowWake 唤醒。
+
+当前公开 [`RunView`](rust-agent-ui-run-view-20261020.md) 已组合 Composer、Indicators、分页、问答和可安装的混合内容树，提供同帧 update 与类型化意图出口。实验主会话和可写 pane 已复用它，第二 consumer 可独立构造；RunSurface / ComponentDemo 仍仅作测试宿主。完整 Transcript/RunView 验收尚未通过：只读有界子历史的消息树、#22 阅读/分页锚点、#25 富内容及物理 IME/完整三端原生 UX 仍需完成。
 
 ## Sidebar（首批实现）
 
@@ -150,7 +152,7 @@ Task tab 以 task ID 为稳定身份，scope 是可更新的内容输入。TaskP
 |---|---|---|
 | Composer 独立输入/草稿/发送/取消及入口 | 基础组件、模型/新会话闭环、内容卡片/原子移除/批注评论、Main/任务/独立子代理/SideChat 附件选择/上传状态；局部原生与三端离屏证据分开记录 | 真实三端 pane 附件联调、预览/失败对账、选区捕获/来源高亮/内容 undo、其余设置入口、完整弹层/三端原生验收 |
 | Indicators | 首批事实组件与 unknown/0/partial/error 测试 | 原生 RunView 呈现、主题/语义验收 |
-| Transcript / RunView | 布局契约已核实，正式组件未交付 | #22/#23 等价公共 API、结构化实现、阅读/分页/流式/原生验收 |
+| Transcript / RunView | 内容树与实验 RunView 已实现并接入公共 consumer | 只读有界子历史消息树、#22/#25、阅读/分页/流式关联与完整原生验收 |
 | Sidebar | 共享服务绑定、选择/置顶/复制；重命名/分叉/归档已接入，局部原生 fixture 验证 | 真实三端操作与完整宿主验收 |
 | SidePanel / Summary | Summary 原生挂载；任务、SideChat、独立子代理控制与绑定已接入；有界子历史只读加载诊断/分页已验证 | 各类 pane 正式 Transcript、真实三端子 pane 原生操作与完整联调 |
 | 第二公开 API consumer | Composer、Indicators、Sidebar、SidePanel 公共组合，Summary 独立挂载；不依赖 RunSurface | 正式 RunView/Transcript 与完整原生宿主组合验证 |

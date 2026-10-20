@@ -1,12 +1,12 @@
-//! Demo host layout for real Composer/Indicators, not a replacement RunView.
-//! The absent structured Transcript is explicit while mixed-document #22 and Agent composition remain incomplete.
+//! Host window/navigation adapters around shared Agent components.
+//! RunView is experimental; mixed-document reading/rich content remain pending.
 use std::{collections::BTreeMap, sync::Arc};
 use tekes_agent_components_ui::{
     AnnotationEditor, AnnotationEditorIds, AnnotationEditorIntent, Composer, ComposerAffordances,
     ComposerCatalogPhase, ComposerChoiceCatalog, ComposerChoiceIntent, ComposerChoiceKind,
     ComposerChoiceRequest, ComposerChoices, ComposerEntry, ComposerIds, ComposerIntent,
-    ComposerLabels, Indicators, RenameFailure, RenameIds, RenameIntent, RenameLabels,
-    RenameSubmission, SidePanel, SidePanelInput, SidePanelIntent, SidePanelLabels, SidePanelTab,
+    ComposerLabels, RenameFailure, RenameIds, RenameIntent, RenameLabels, RenameSubmission,
+    RunView, RunViewIds, SidePanel, SidePanelInput, SidePanelIntent, SidePanelLabels, SidePanelTab,
     SidePanelTabKind, Sidebar, SidebarInput, SidebarIntent, SidebarLabels, SummaryInput,
     SummaryIntent, SummaryLabels, SummaryView, ThreadRename,
 };
@@ -465,35 +465,20 @@ impl ComponentDemo {
             edit_annotations: true,
             ..Default::default()
         });
-        Content::new(
-            ComponentId(ids.root.0 + 16),
-            StackContent {
-                model: Stack {
-                    axis: Axis::Vertical,
-                    gap: Spacing::Regular.value(),
-                },
-                flexible_child: None,
-                children: vec![
-                    Content::new(ComponentId(ids.root.0 + 17), Indicators::default()),
-                    Content::new(
-                        Self::paging_id(ids),
-                        tekes_agent_components_ui::TranscriptPaging::new(
-                            4_000_000 + (ids.root.0 >> 32) as u32,
-                            scope.clone(),
-                            Default::default(),
-                        ),
-                    ),
-                    Content::new(
-                        Self::actionable_id(ids),
-                        tekes_agent_components_ui::ActionableCard::new(
-                            3_000_000 + (ids.root.0 >> 32) as u32,
-                            Default::default(),
-                        ),
-                    ),
-                    Content::new(ids.root, composer),
-                ],
+        let view = RunView::new(
+            RunViewIds {
+                root: ComponentId(ids.root.0 + 16),
+                indicators: ComponentId(ids.root.0 + 17),
+                viewport: ComponentId(ids.root.0 + 21),
+                composer: ids,
             },
+            scope.clone(),
+            composer,
+            4_000_000 + (ids.root.0 >> 32) as u32,
+            3_000_000 + (ids.root.0 >> 32) as u32,
         )
+        .expect("separate RunView namespaces");
+        Content::new(view.ids().root, view)
     }
     fn actionable_id(ids: ComposerIds) -> ComponentId {
         ComponentId((3_000_000 + (ids.root.0 >> 32)) << 32)
@@ -542,9 +527,9 @@ impl ComponentDemo {
             .tree
             .get(parent)
             .unwrap()
-            .component::<StackContent>()
+            .component::<RunView>()
             .unwrap()
-            .children
+            .children()
             .iter()
             .map(Content::id)
             .filter(|id| *id != ids.root)
@@ -590,9 +575,9 @@ impl ComponentDemo {
             .tree
             .get(parent)
             .unwrap()
-            .component::<StackContent>()
+            .component::<RunView>()
             .unwrap()
-            .children
+            .children()
             .iter()
             .map(Content::id)
             .filter(|child| *child != id)
@@ -666,38 +651,13 @@ impl ComponentDemo {
             )
             .map_err(unsupported)?;
         let root = content.id();
-        let scroll = ComponentId(root.0 + 1);
-        let parent = ComponentId(ids.root.0 + 16);
-        let viewport = tekes_ui_controls::composition::ScrollContent::new(
-            tekes_ui_controls::ScrollArea::default(),
-            Content::new(root, content),
-        );
         self.tree
-            .insert(parent, Content::new(scroll, viewport))
-            .map_err(|_| unsupported("transcript viewport mount"))?;
-        let container = self
-            .tree
-            .get(parent)
+            .get_mut(ComponentId(ids.root.0 + 16))
             .unwrap()
-            .component::<StackContent>()
-            .unwrap();
-        let mut order: Vec<_> = container
-            .children
-            .iter()
-            .map(Content::id)
-            .filter(|id| *id != scroll)
-            .collect();
-        let index = order.iter().position(|id| *id == ids.root).unwrap();
-        order.insert(index, scroll);
-        self.tree
-            .reorder(parent, &order)
-            .map_err(|_| unsupported("transcript viewport order"))?;
-        self.tree
-            .get_mut(parent)
+            .component_mut::<RunView>()
             .unwrap()
-            .component_mut::<StackContent>()
-            .unwrap()
-            .flexible_child = Some(scroll);
+            .install_transcript(content)
+            .map_err(unsupported)?;
         self.next_document_namespace = end;
         self.document_roots.insert(ids.root, root);
         Ok(())
@@ -740,9 +700,9 @@ impl ComponentDemo {
             .tree
             .get(parent)
             .unwrap()
-            .component::<StackContent>()
+            .component::<RunView>()
             .unwrap()
-            .children
+            .children()
             .iter()
             .map(Content::id)
             .filter(|child| *child != id)
@@ -819,6 +779,41 @@ impl ComponentDemo {
         }
         self.apply_sidebar_outcome(token, outcome)
     }
+    fn sync_run_view(
+        &mut self,
+        ids: ComposerIds,
+        binding: &Arc<RunBinding>,
+        snapshot: &tekes_agent_presentation::RunSnapshot,
+        affordances: ComposerAffordances,
+        gate: tekes_agent_components_ui::ComposerControlGate,
+    ) -> Result<()> {
+        let mut receipt = binding.history_page_state();
+        if receipt.connection_epoch != snapshot.connection_epoch {
+            receipt.source_ready = false;
+            receipt.is_current = false;
+        }
+        let supported = self
+            .child_panes
+            .values()
+            .find(|pane| Arc::ptr_eq(pane.source.binding(), binding))
+            .is_none_or(|pane| pane.source.supports_pagination());
+        let controls =
+            !self.composing() && binding.access() == PaneAccess::Ready && receipt.source_ready;
+        self.tree
+            .get_mut(ComponentId(ids.root.0 + 16))
+            .unwrap()
+            .component_mut::<RunView>()
+            .unwrap()
+            .update(
+                snapshot,
+                affordances,
+                gate,
+                receipt.controls(&snapshot.transcript, supported),
+                controls,
+            )
+            .map_err(unsupported)
+    }
+    #[cfg(test)]
     fn sync_paging(
         &mut self,
         ids: ComposerIds,
@@ -836,13 +831,14 @@ impl ComponentDemo {
             .find(|pane| Arc::ptr_eq(pane.source.binding(), binding))
             .is_none_or(|pane| pane.source.supports_pagination());
         self.tree
-            .get_mut(Self::paging_id(ids))
-            .expect("paging control")
-            .component_mut::<tekes_agent_components_ui::TranscriptPaging>()
+            .get_mut(ComponentId(ids.root.0 + 16))
+            .expect("RunView")
+            .component_mut::<RunView>()
             .unwrap()
-            .update(receipt.controls(&snapshot.transcript, supported))
+            .update_paging(receipt.controls(&snapshot.transcript, supported))
             .map_err(unsupported)
     }
+    #[cfg(test)]
     fn sync_actionable(
         &mut self,
         ids: ComposerIds,
@@ -868,11 +864,11 @@ impl ComponentDemo {
             && authority.source_ready
             && authority.connection_epoch == epoch;
         self.tree
-            .get_mut(Self::actionable_id(ids))
-            .expect("actionable card")
-            .component_mut::<tekes_agent_components_ui::ActionableCard>()
+            .get_mut(ComponentId(ids.root.0 + 16))
+            .expect("RunView")
+            .component_mut::<RunView>()
             .unwrap()
-            .update(snapshot.revision, epoch, prompt, controls)
+            .update_actionable(snapshot.revision, epoch, prompt, controls)
             .map_err(unsupported)?;
         Ok(())
     }
@@ -894,9 +890,6 @@ impl ComponentDemo {
     }
     fn pair_id(index: usize) -> ComponentId {
         ComponentId(Self::ids_for(index).root.0 + 16)
-    }
-    fn indicator_id(index: usize) -> ComponentId {
-        ComponentId(Self::ids_for(index).root.0 + 17)
     }
     fn ids_for(index: usize) -> ComposerIds {
         assert!(
@@ -2288,30 +2281,17 @@ impl ComponentDemo {
             .component_mut::<Composer>()
             .unwrap()
             .set_context_affordances(context_affordances);
-        self.tree
-            .get_mut(ids.root)
-            .expect("composer")
-            .component_mut::<Composer>()
-            .expect("Composer")
-            .update_gated(
-                &snapshot,
-                ComposerAffordances {
-                    attachment: attachment_available,
-                    model: binding.supports_model_choices(),
-                    ..Default::default()
-                },
-                upload_gate,
-            )
-            .map_err(unsupported)?;
-        self.tree
-            .get_mut(Self::indicator_id(self.selected))
-            .expect("indicators")
-            .component_mut::<Indicators>()
-            .expect("Indicators")
-            .update(&snapshot)
-            .map_err(unsupported)?;
-        self.sync_actionable(ids, &binding, &snapshot)?;
-        self.sync_paging(ids, &binding, &snapshot)?;
+        self.sync_run_view(
+            ids,
+            &binding,
+            &snapshot,
+            ComposerAffordances {
+                attachment: attachment_available,
+                model: binding.supports_model_choices(),
+                ..Default::default()
+            },
+            upload_gate,
+        )?;
         self.sync_transcript_content(ids, &binding, &snapshot)?;
         self.sync_turn_footnote_proof()?;
         for (index, id) in [SELECT_A, SELECT_B].into_iter().enumerate() {
@@ -2536,13 +2516,13 @@ impl ComponentDemo {
                                 self.tree
                                     .get_mut(ComponentId(ids.root.0 + 16))
                                     .unwrap()
-                                    .component_mut::<StackContent>()
+                                    .component_mut::<RunView>()
                                     .unwrap()
-                                    .children
-                                    .push(Content::new(
+                                    .append_accessory(Content::new(
                                         ComponentId(ids.root.0 + 19),
                                         ButtonContent::new("刷新子代理能力"),
-                                    ));
+                                    ))
+                                    .map_err(unsupported)?;
                             }
                             self.tree
                                 .get_mut(ComponentId(ids.root.0 + 19))
@@ -2677,30 +2657,17 @@ impl ComponentDemo {
             .component_mut::<Composer>()
             .unwrap()
             .set_context_affordances(context_affordances);
-        self.tree
-            .get_mut(ids.root)
-            .expect("pane composer")
-            .component_mut::<Composer>()
-            .expect("Composer")
-            .update_gated(
-                &snapshot,
-                ComposerAffordances {
-                    attachment,
-                    model: binding.supports_model_choices(),
-                    ..Default::default()
-                },
-                upload_gate,
-            )
-            .map_err(unsupported)?;
-        self.tree
-            .get_mut(ComponentId(ids.root.0 + 17))
-            .expect("pane indicators")
-            .component_mut::<Indicators>()
-            .expect("Indicators")
-            .update(&snapshot)
-            .map_err(unsupported)?;
-        self.sync_actionable(ids, &binding, &snapshot)?;
-        self.sync_paging(ids, &binding, &snapshot)?;
+        self.sync_run_view(
+            ids,
+            &binding,
+            &snapshot,
+            ComposerAffordances {
+                attachment,
+                model: binding.supports_model_choices(),
+                ..Default::default()
+            },
+            upload_gate,
+        )?;
         self.sync_transcript_content(ids, &binding, &snapshot)?;
         Ok(())
     }
@@ -2902,70 +2869,48 @@ impl ComponentDemo {
         {
             composers.push((ids, run.binding.clone()));
         }
-        let actionable_sources = composers.clone();
-        let intents: Vec<_> = composers
+        let composing = self.composing();
+        let routed: Vec<_> = composers
             .into_iter()
             .flat_map(|(ids, binding)| {
-                self.tree
-                    .get_mut(ids.root)
-                    .expect("mounted composer")
-                    .component_mut::<Composer>()
-                    .expect("Composer")
-                    .take_intents(&actions)
+                let run = self
+                    .tree
+                    .get_mut(ComponentId(ids.root.0 + 16))
+                    .unwrap()
+                    .component_mut::<RunView>()
+                    .unwrap();
+                let intents = if composing {
+                    run.composer_mut()
+                        .take_intents(&actions)
+                        .into_iter()
+                        .map(tekes_agent_components_ui::RunViewIntent::Composer)
+                        .collect()
+                } else {
+                    run.take_intents(&actions)
+                };
+                intents
                     .into_iter()
-                    .map(move |intent| (binding.clone(), intent))
+                    .map(move |intent| (ids, binding.clone(), intent))
             })
             .collect();
+        let mut intents = vec![];
         let mut commands = vec![];
-        if !self.composing() {
-            if let Some(footer) = self
-                .tree
-                .get_mut(Self::turn_footnote_id())
-                .and_then(|node| node.component_mut::<tekes_agent_components_ui::TurnFootnote>())
-            {
-                for intent in footer.take_intents(&actions) {
-                    commands.push(DemoCommand::TurnAction {
-                        binding: binding.clone(),
-                        intent,
-                    });
-                }
-            }
-            for (ids, binding) in actionable_sources {
-                if let Some(root) = self.transcript_content_id(ids)
-                    && let Some(content) = self.tree.get_mut(root).and_then(|node| {
-                        node.component_mut::<tekes_agent_components_ui::TranscriptContent>()
-                    })
-                {
-                    for intent in content.handle_actions(&actions) {
-                        commands.push(DemoCommand::TurnAction {
-                            binding: binding.clone(),
-                            intent,
-                        });
-                    }
-                }
-                if self
-                    .tree
-                    .get(Self::paging_id(ids))
-                    .unwrap()
-                    .component::<tekes_agent_components_ui::TranscriptPaging>()
-                    .unwrap()
-                    .activation(&actions)
-                    .is_some_and(|scope| scope == binding.scope())
-                {
+        for (ids, binding, intent) in routed {
+            use tekes_agent_components_ui::RunViewIntent;
+            match intent {
+                RunViewIntent::Composer(intent) => intents.push((binding, intent)),
+                RunViewIntent::TurnAction(intent) => commands.push(DemoCommand::TurnAction {
+                    binding,
+                    intent: *intent,
+                }),
+                RunViewIntent::LoadEarlier { scope } => {
+                    require(&scope == binding.scope(), "history origin mismatch")?;
                     let request = binding.begin_history_page()?;
-                    if let Some(snapshot) = binding.current_run() {
-                        self.sync_paging(ids, &binding, &snapshot)?;
-                    }
+                    // The single full sync below publishes the loading receipt
+                    // together with its captured canonical Run frame.
                     commands.push(DemoCommand::ReadHistoryPage(request));
                 }
-                let intents = self
-                    .tree
-                    .get_mut(Self::actionable_id(ids))
-                    .unwrap()
-                    .component_mut::<tekes_agent_components_ui::ActionableCard>()
-                    .unwrap()
-                    .take_intents(&actions);
-                for intent in intents {
+                RunViewIntent::Actionable(intent) => {
                     match binding.begin_actionable_response(&intent) {
                         Ok(request) => commands.push(DemoCommand::RespondActionable {
                             request: Arc::new(request),
@@ -2977,6 +2922,19 @@ impl ComponentDemo {
                         }
                     }
                 }
+            }
+        }
+        if !composing
+            && let Some(footer) = self
+                .tree
+                .get_mut(Self::turn_footnote_id())
+                .and_then(|node| node.component_mut::<tekes_agent_components_ui::TurnFootnote>())
+        {
+            for intent in footer.take_intents(&actions) {
+                commands.push(DemoCommand::TurnAction {
+                    binding: binding.clone(),
+                    intent,
+                });
             }
         }
         self.drain_uploads(&actions)?;
@@ -3350,6 +3308,14 @@ mod frame_consistency_tests {
                 ComponentDemo::run_controls(ids, binding.scope()),
             )
             .unwrap();
+        view.sync_run_view(
+            ids,
+            &binding,
+            &frame,
+            Default::default(),
+            tekes_agent_components_ui::ComposerControlGate::OPEN,
+        )
+        .unwrap();
         source.close(&chat, "frame-close").await.unwrap();
         assert!(binding.current_run().is_none());
         view.sync_actionable(ids, &binding, &frame).unwrap();

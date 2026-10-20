@@ -633,3 +633,8 @@ Capture `binding.begin_history_page()` on the original gesture and move its once
 
 
 `TurnActionDispatcher::prepare(original_binding, intent, rpc_id)` 认领一次原 turn 点击并验证共享动作/持久边界；`TurnActionRequest::execute` 派发前再次核对 pointer、runtime 身份、epoch、未确认提交及 canonical action。执行仍由 SharedAgent 的 `thread.performAction` 处理。Drop 不会重试或撤销已派发操作；尚未派发报告 Rejected，派发后丢失结果报告 Unknown。原组件回执随 retained/offscreen 内容保留；宿主执行 wake + sync/refresh，并按原导航 token 处理返回 outcome，不能直接使用当前选中会话。Unknown 没有自动查询/解锁 API，也不能按相似标题猜测分叉归属。
+
+
+## Shared RunView composition
+
+The public RunView consumes one captured RunSnapshot plus gates and page facts from its original binding. If a later HistoryPageSnapshot has another connection_epoch, lower source_ready/is_current; never substitute that epoch into the older RunSnapshot. Route the four RunViewIntent variants to the same binding before handing work to the executor. Navigation remains a host callback fenced by its original token. The second consumer demonstrates construction and snapshot synchronization without importing ComponentDemo or RunSurface; see the [RunView contract](../../docs/rust-agent-ui-run-view-20261020.md).

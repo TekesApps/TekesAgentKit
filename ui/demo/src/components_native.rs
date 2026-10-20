@@ -3192,9 +3192,19 @@ pub fn run() {
             assert_eq!(body.presentation, tekes_ui_controls::TextSurfacePresentation::Content);
             serde_json::json!({"rightBubble":true,"externalRightFootnote":true,"plainReadonlyContent":true,"bubbleWidth":bubble.size.width,"rowWidth":row.size.width,"completeTranscript":false,"nativeInteraction":false})
         });
+        let run_view = host
+            .view
+            .tree
+            .get(ComponentId(host.view.ids().root.0 + 16))
+            .unwrap()
+            .component::<tekes_agent_components_ui::RunView>()
+            .expect("shared RunView mounted");
+        let run_view_proof = serde_json::json!({"mounted":true,"transcriptMounted":run_view.transcript_id().is_some(),
+            "sharedIntents":true,"ownsRuntime":false,"completeRunView":false,"keyedReadingAcceptance":false});
         println!(
             "{}",
             serde_json::json!({
+                "runViewComposition":run_view_proof,
                 "offscreen": true, "components": true, "nativeInteraction": false,
                 "transcriptView": false, "isStale": snapshot.transcript.is_stale,
                 "transcriptItems": snapshot.transcript.items.len(),

@@ -81,6 +81,7 @@ pub struct TranscriptContent {
     keys: Vec<TranscriptContentRowKey>,
     /// Only unresolved operations survive clipping; not a second session cache.
     detached: BTreeMap<TranscriptContentRowKey, Content>,
+    start: u32,
     next: u32,
     end: u32,
     publication: u64,
@@ -114,6 +115,7 @@ impl TranscriptContent {
             },
             keys: vec![],
             detached: BTreeMap::new(),
+            start: row_namespaces.start,
             next: row_namespaces.start,
             end: row_namespaces.end,
             publication: 0,
@@ -185,44 +187,8 @@ impl TranscriptContent {
         let document =
             TranscriptDocument::read(snapshot).map_err(|_| "invalid transcript document")?;
         let plan = plan(&document, &self.labels)?;
-        let index: BTreeMap<_, _> = self
-            .keys
-            .iter()
-            .cloned()
-            .enumerate()
-            .map(|(i, key)| (key, i))
-            .collect();
+        self.validate_plan(&plan, publication, epoch, available)?;
         let desired: BTreeSet<_> = plan.iter().map(|row| row.key.clone()).collect();
-        if desired.len() != plan.len() {
-            return Err("duplicate transcript content row");
-        }
-        let mut allocations = 0_u64;
-        let mut claimed = BTreeSet::new();
-        for row in &plan {
-            let original = if self.find(&row.key, &index).is_some() {
-                Some(&row.key)
-            } else {
-                row.alias
-                    .as_ref()
-                    .filter(|key| !desired.contains(*key) && self.find(key, &index).is_some())
-            };
-            if let Some(key) = original
-                && !claimed.insert(key.clone())
-            {
-                return Err("ambiguous transcript reconciliation receipt");
-            }
-            match original.and_then(|key| self.find(key, &index)) {
-                Some(content) => self.check_row(content, row, publication, epoch, available)?,
-                None => {
-                    allocations += 1;
-                    let candidate = self.new_row(0, row);
-                    self.check_row(&candidate, row, publication, epoch, available)?;
-                }
-            }
-        }
-        if allocations > u64::from(self.end - self.next) {
-            return Err("transcript row namespaces exhausted");
-        }
         // All source/identity/content/namespace checks precede tree mutation.
         let old = std::mem::take(&mut self.rows.children);
         let mut existing: BTreeMap<_, _> = std::mem::take(&mut self.keys)
@@ -258,6 +224,82 @@ impl TranscriptContent {
         self.publication = publication;
         self.epoch = epoch;
         self.last = Some(snapshot.clone());
+        Ok(())
+    }
+    pub(crate) fn namespaces_disjoint(&self, namespaces: &[u32]) -> bool {
+        namespaces
+            .iter()
+            .all(|ns| *ns as u64 != self.root.0 >> 32 && !(self.start..self.end).contains(ns))
+    }
+    pub(crate) fn validate_update(
+        &self,
+        scope: &RunScope,
+        publication: u64,
+        epoch: u64,
+        snapshot: &TranscriptSnapshot,
+        available: bool,
+    ) -> Result<(), &'static str> {
+        if scope != &self.scope {
+            return Err("transcript content scope mismatch");
+        }
+        if publication == 0 || publication < self.publication || epoch < self.epoch {
+            return Err("stale transcript content publication");
+        }
+        if publication == self.publication
+            && (epoch != self.epoch || self.last.as_ref() != Some(snapshot))
+        {
+            return Err("conflicting transcript content publication");
+        }
+        let document =
+            TranscriptDocument::read(snapshot).map_err(|_| "invalid transcript document")?;
+        let plan = plan(&document, &self.labels)?;
+        self.validate_plan(&plan, publication, epoch, available && !snapshot.is_stale)
+    }
+    fn validate_plan(
+        &self,
+        plan: &[Planned<'_>],
+        publication: u64,
+        epoch: u64,
+        available: bool,
+    ) -> Result<(), &'static str> {
+        let index: BTreeMap<_, _> = self
+            .keys
+            .iter()
+            .cloned()
+            .enumerate()
+            .map(|(i, key)| (key, i))
+            .collect();
+        let desired: BTreeSet<_> = plan.iter().map(|row| row.key.clone()).collect();
+        if desired.len() != plan.len() {
+            return Err("duplicate transcript content row");
+        }
+        let mut allocations = 0_u64;
+        let mut claimed = BTreeSet::new();
+        for row in plan {
+            let original = if self.find(&row.key, &index).is_some() {
+                Some(&row.key)
+            } else {
+                row.alias
+                    .as_ref()
+                    .filter(|key| !desired.contains(*key) && self.find(key, &index).is_some())
+            };
+            if let Some(key) = original
+                && !claimed.insert(key.clone())
+            {
+                return Err("ambiguous transcript reconciliation receipt");
+            }
+            match original.and_then(|key| self.find(key, &index)) {
+                Some(content) => self.check_row(content, row, publication, epoch, available)?,
+                None => {
+                    allocations += 1;
+                    let candidate = self.new_row(0, row);
+                    self.check_row(&candidate, row, publication, epoch, available)?;
+                }
+            }
+        }
+        if allocations > u64::from(self.end - self.next) {
+            return Err("transcript row namespaces exhausted");
+        }
         Ok(())
     }
     fn find<'a>(

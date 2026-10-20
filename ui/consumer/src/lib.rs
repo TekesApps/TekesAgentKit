@@ -894,3 +894,65 @@ fn independent_host_mounts_canonical_content_without_private_demo_types() {
         "机器回复"
     );
 }
+
+/// A separate product assembles the same public RunView, never the demo host.
+pub fn new_agent_run_view(
+    namespace: u32,
+    rows: std::ops::Range<u32>,
+    scope: tekes_agent_components_ui::RunScope,
+) -> Result<tekes_agent_components_ui::RunView, &'static str> {
+    tekes_agent_components_ui::RunView::standard(namespace, rows, scope)
+}
+#[test]
+fn second_product_mounts_a_run_with_its_own_namespace_pool_and_no_demo_or_run_surface() {
+    use tekes_agent_components_ui::{Composer, RunScope, RunView, TranscriptContent};
+    let view = new_agent_run_view(1100, 1104..1200, RunScope::main("public", "original")).unwrap();
+    let ids = view.ids();
+    let transcript = view.transcript_id().unwrap();
+    let host = view.into_host().unwrap();
+    assert_eq!(
+        host.get(ids.root)
+            .unwrap()
+            .component::<RunView>()
+            .unwrap()
+            .scope(),
+        &RunScope::main("public", "original")
+    );
+    assert!(
+        host.get(ids.composer.root)
+            .unwrap()
+            .component::<Composer>()
+            .is_some()
+    );
+    assert!(
+        host.get(transcript)
+            .unwrap()
+            .component::<TranscriptContent>()
+            .is_some()
+    );
+}
+
+/// Capture one original binding frame and lower permissions on a later epoch.
+/// This adapter adds no Run state and never chooses a newer visible destination.
+pub fn sync_agent_run_view(
+    view: &mut tekes_agent_components_ui::RunView,
+    source: &tekes_agent_ui_bindings::RunBinding,
+    supports_pagination: bool,
+) -> Result<(), String> {
+    let snapshot = source.current_run().ok_or("run source unavailable")?;
+    let mut page = source.history_page_state();
+    if page.connection_epoch != snapshot.connection_epoch {
+        page.source_ready = false;
+        page.is_current = false;
+    }
+    let controls =
+        source.access() == tekes_agent_ui_bindings::PaneAccess::Ready && page.source_ready;
+    view.update(
+        &snapshot,
+        Default::default(),
+        source.access().composer_gate(),
+        page.controls(&snapshot.transcript, supports_pagination),
+        controls,
+    )
+    .map_err(str::to_owned)
+}
