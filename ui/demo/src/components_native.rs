@@ -58,6 +58,8 @@ mod sidebar_search_probe;
 mod stream_probe;
 #[path = "native_stream_reading_selftest.rs"]
 mod stream_reading_probe;
+#[path = "native_summary_context_selftest.rs"]
+mod summary_context_probe;
 #[path = "native_summary_sections_selftest.rs"]
 mod summary_sections_probe;
 #[path = "native_composer_visibility_selftest.rs"]
@@ -96,6 +98,7 @@ struct Host {
     reading_probe: Option<reading_probe::Probe>,
     readonly_reading_probe: Option<readonly_reading_probe::Probe>,
     summary_sections_probe: Option<summary_sections_probe::Probe>,
+    summary_context_probe: Option<summary_context_probe::Probe>,
     visibility_probe: Option<visibility_probe::Probe>,
     feedback_probe: Option<feedback_probe::Probe>,
     stream_probe: Option<stream_probe::Probe>,
@@ -1372,6 +1375,10 @@ impl Host {
                 native_script(&self.view);
             }
         }
+        if let Some(mut probe) = self.summary_context_probe.take() {
+            probe.advance(self, window);
+            self.summary_context_probe = Some(probe);
+        }
         if let Some(mut probe) = self.disclosure_reading_probe.take() {
             probe.advance(self, window);
             self.disclosure_reading_probe = Some(probe);
@@ -2421,6 +2428,14 @@ impl Host {
                 probe.receipt()
             );
         }
+        if let Some(probe) = &self.summary_context_probe {
+            assert!(
+                self.failures.is_empty(),
+                "workspace Summary failures {:?}",
+                self.failures
+            );
+            println!("NATIVE_AGENT_SUMMARY_CONTEXT_RECEIPT {}", probe.receipt());
+        }
         if let Some(probe) = &self.disclosure_reading_probe {
             assert!(
                 self.failures.is_empty(),
@@ -2872,6 +2887,13 @@ pub fn run() {
     );
     let sidebar_restore_selftest = args.iter().any(|arg| arg == "--sidebar-restore-selftest");
     let sidebar_options_selftest = args.iter().any(|arg| arg == "--sidebar-options-selftest");
+    let summary_context_selftest = args
+        .iter()
+        .any(|arg| arg == "--summary-context-native-selftest");
+    assert!(
+        !summary_context_selftest || args.iter().any(|arg| arg == "--transcript-content"),
+        "workspace Summary requires formal host"
+    );
     let disclosure_reading_selftest = args
         .iter()
         .any(|arg| arg == "--disclosure-reading-native-selftest");
@@ -2900,6 +2922,7 @@ pub fn run() {
         || panel_projection_selftest
         || composer_notice_selftest
         || disclosure_reading_selftest
+        || summary_context_selftest
         || sidebar_session_menu_selftest
         || sidebar_search_selftest
         || sidebar_query_selftest
@@ -2935,6 +2958,7 @@ pub fn run() {
             panel_projection_selftest,
             composer_notice_selftest,
             disclosure_reading_selftest,
+            summary_context_selftest,
             sidebar_session_menu_selftest,
             sidebar_search_selftest,
             sidebar_query_selftest,
@@ -3353,6 +3377,7 @@ pub fn run() {
             None
         },
         summary_sections_probe: summary_sections_selftest.then(summary_sections_probe::Probe::new),
+        summary_context_probe: summary_context_selftest.then(summary_context_probe::Probe::new),
         visibility_probe: visibility_selftest
             .then(|| visibility_probe::Probe::new(visibility_fixture)),
         feedback_probe: feedback_selftest.then(feedback_probe::Probe::new),

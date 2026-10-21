@@ -2432,3 +2432,36 @@ pub fn drain_local_run_actions(
         .unwrap()
         .take_intents(&actions)
 }
+
+/// The same shared Summary component accepts an explicit workspace owner, with
+/// no runtime or fabricated session required by this consumer.
+pub fn publish_summary_context(
+    summary: &mut tekes_agent_components_ui::SummaryView,
+    input: &tekes_agent_components_ui::SummaryContextInput,
+) -> Result<(), &'static str> {
+    summary.update_context(input)
+}
+#[test]
+fn independent_workspace_summary_has_no_session_authority() {
+    use tekes_agent_components_ui::*;
+    let mut view = SummaryView::new(1984, Default::default());
+    let input = SummaryContextInput {
+        revision: 1,
+        owner: SummaryOwner::Workspace {
+            id: "public-consumer-workspace".into(),
+        },
+        facts: None,
+        host_sections: vec![],
+        ready: true,
+    };
+    publish_summary_context(&mut view, &input).unwrap();
+    assert!(
+        view.displayed_context_input()
+            .unwrap()
+            .owner
+            .run_scope()
+            .is_none()
+    );
+    assert!(view.displayed_input().is_none());
+    assert!(view.take_intents(&[]).is_empty());
+}

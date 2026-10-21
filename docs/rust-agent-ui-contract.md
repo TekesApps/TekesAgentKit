@@ -1,5 +1,7 @@
 # Rust Agent UI 组件接入契约
 
+[Summary 工作区上下文](rust-agent-ui-summary-context-20261022.md)已补显式owner，无需虚构RunScope即可独立挂载host sections；原Run输入适配、owner隔离/旧动作拒绝、组件及原生兼容验收通过。workspace自定义交互行和完整未选中会话宿主布局仍开放。
+
 [工具/推理与重排阅读](rust-agent-ui-disclosure-reflow-20261022.md)补齐视口上方已展开工具增长的组件回归，以及原生工具/推理点击、live resize和字号变化时原锚点/focus/中文marked保持。显式AX focus导航与被动重排分开验收；未提升为真实三端工具流或完整视觉通过。
 
 [Composer notice](rust-agent-ui-composer-notice-20261022.md)已补输入卡片外提示、显式刷新事件及原控件保留；连接epoch/会话/显示版本隔离、原生组字内刷新与分页锚点回归通过。默认库文字按钮不冒充ClientKit原refresh glyph，完整Composer palette/chips/toolbar仍需继续。

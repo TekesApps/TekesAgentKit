@@ -183,6 +183,7 @@ pub struct ComponentDemo {
     sidebar_search_presented: Option<tekes_agent_components_ui::SidebarSearchInput>,
     sidebar_presented: Option<SidebarInput>,
     panel_revision: u64,
+    workspace_summary: Option<tekes_agent_components_ui::SummaryContextInput>,
     side_chats: Option<Arc<SideChatBinding>>,
     panel_selections: BTreeMap<RunScope, SidePanelTabKind>,
     panel_parent_projection: BTreeMap<RunScope, (bool, u64)>,
@@ -495,6 +496,7 @@ impl ComponentDemo {
             sidebar_search_presented: None,
             sidebar_presented: None,
             panel_revision: 0,
+            workspace_summary: None,
             side_chats: None,
             panel_selections: BTreeMap::new(),
             panel_parent_projection: BTreeMap::new(),
@@ -2028,6 +2030,30 @@ impl ComponentDemo {
             .get(parent)
             .map_or(0, |value| value.1)
     }
+    /// Explicit owned-demo host input; the shared component validates workspace
+    /// rows without using the current session as their display/data authority.
+    pub fn set_workspace_summary(
+        &mut self,
+        input: tekes_agent_components_ui::SummaryContextInput,
+    ) -> Result<()> {
+        if !matches!(
+            input.owner,
+            tekes_agent_components_ui::SummaryOwner::Workspace { .. }
+        ) {
+            return Err(unsupported(
+                "workspace Summary needs an explicit workspace owner",
+            ));
+        }
+        let id = self.summary_id();
+        self.tree
+            .get_mut(id)
+            .and_then(|node| node.component_mut::<SummaryView>())
+            .ok_or_else(|| unsupported("Summary is not mounted"))?
+            .update_context(&input)
+            .map_err(unsupported)?;
+        self.workspace_summary = Some(input);
+        Ok(())
+    }
     pub fn summary_id(&self) -> ComponentId {
         ComponentId((101 + self.selected as u64 * 2) << 32)
     }
@@ -3043,18 +3069,24 @@ impl ComponentDemo {
                         .install_content(&token, Content::new(summary_id, summary))
                         .map_err(unsupported)?;
                 }
-                self.tree
+                let summary = self
+                    .tree
                     .get_mut(summary_id)
                     .expect("summary")
                     .component_mut::<SummaryView>()
-                    .expect("SummaryView")
-                    .update(&SummaryInput {
-                        revision: snapshot.revision,
-                        scope: parent,
-                        facts: snapshot.summary.clone(),
-                        host_sections: vec![],
-                    })
-                    .map_err(unsupported)?;
+                    .expect("SummaryView");
+                if let Some(context) = &self.workspace_summary {
+                    summary.update_context(context).map_err(unsupported)?;
+                } else {
+                    summary
+                        .update(&SummaryInput {
+                            revision: snapshot.revision,
+                            scope: parent,
+                            facts: snapshot.summary.clone(),
+                            host_sections: vec![],
+                        })
+                        .map_err(unsupported)?;
+                }
             }
             SidePanelTabKind::SideChat { session_id } => {
                 let key = (parent, session_id.clone());

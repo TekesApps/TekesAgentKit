@@ -231,3 +231,8 @@ RunSnapshot 的 destination/connection_epoch 和递增 display revision 发布�
 验证原工具/推理控件展开、AppKit live resize及字号变化时的阅读行、原Composer焦点和中文marked保持。
 工具增长的组件层证据、原生边界及公开consumer用法见
 [工具/推理重排阅读](../docs/rust-agent-ui-disclosure-reflow-20261022.md)。
+
+
+Summary 支持 `SummaryContextInput` / `SummaryOwner::Workspace`，无需runtime或虚构RunScope挂载应用工作区行；
+会话facts/动作仍只能属于明确Run owner。旧SummaryInput/update保留，统一查询使用displayed_context_input。
+公开输入、revision/owner边界与原生入口见[Summary上下文接入](../docs/rust-agent-ui-summary-context-20261022.md)。
