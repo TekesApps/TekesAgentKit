@@ -34,6 +34,8 @@ use tekes_ui_tokens::{Palette, Theme};
 
 #[path = "native_feedback_selftest.rs"]
 mod feedback_probe;
+#[path = "native_reading_selftest.rs"]
+mod reading_probe;
 #[path = "native_run_controls_selftest.rs"]
 mod run_controls_probe;
 #[path = "native_sidebar_query_selftest.rs"]
@@ -63,6 +65,7 @@ struct Host {
     sidebar_query_probe: Option<sidebar_query_probe::Probe>,
     sidebar_search_probe: Option<sidebar_search_probe::Probe>,
     sidebar_restore_probe: Option<sidebar_restore_probe::Probe>,
+    reading_probe: Option<reading_probe::Probe>,
     summary_sections_probe: Option<summary_sections_probe::Probe>,
     visibility_probe: Option<visibility_probe::Probe>,
     feedback_probe: Option<feedback_probe::Probe>,
@@ -1164,6 +1167,10 @@ impl Host {
             probe.advance(self, window);
             self.sidebar_search_probe = Some(probe);
         }
+        if let Some(mut probe) = self.reading_probe.take() {
+            probe.advance(self, window);
+            self.reading_probe = Some(probe);
+        }
         if let Some(mut probe) = self.sidebar_restore_probe.take() {
             probe.advance(self, window);
             self.sidebar_restore_probe = Some(probe);
@@ -2170,6 +2177,14 @@ impl Host {
                 probe.receipt()
             );
         }
+        if let Some(probe) = &self.reading_probe {
+            assert!(
+                self.failures.is_empty(),
+                "reading failures: {:?}",
+                self.failures
+            );
+            println!("NATIVE_AGENT_READING_SELFTEST_RECEIPT {}", probe.receipt());
+        }
         if let Some(probe) = &self.sidebar_restore_probe {
             assert!(
                 self.failures.is_empty(),
@@ -2400,7 +2415,11 @@ impl WindowHandler for Host {
                 self.draw(window);
             }
             Event::Focus(active) => {
-                if self.selftest || self.context_selftest || self.system_ime_selftest {
+                if self.selftest
+                    || self.context_selftest
+                    || self.system_ime_selftest
+                    || self.stream_probe.is_some()
+                {
                     eprintln!(
                         "COMPONENT_FOCUS active={active} id={:?}",
                         self.view.tree.focused()
@@ -2488,6 +2507,12 @@ impl WindowHandler for Host {
                         );
                     }
                     let commands = self.view.event_with_text(&event, &mut self.text);
+                    if self.stream_probe.is_some() {
+                        eprintln!(
+                            "NATIVE_STREAM_EVENT {event:?} focus={:?}",
+                            self.view.tree.focused()
+                        );
+                    }
                     self.commands(commands);
                     self.draw(window);
                 }
@@ -2516,9 +2541,16 @@ pub fn run() {
     let context_selftest = args.iter().any(|arg| arg == "--context-selftest");
     let sidebar_query_selftest = args.iter().any(|arg| arg == "--sidebar-query-selftest");
     let sidebar_search_selftest = args.iter().any(|arg| arg == "--sidebar-search-selftest");
+    let reading_selftest = args.iter().any(|arg| arg == "--reading-native-selftest");
+    let reading_gate = reading_selftest.then(|| Arc::new(tokio::sync::Semaphore::new(0)));
+    assert!(
+        !reading_selftest || args.iter().any(|arg| arg == "--transcript-content"),
+        "reading probe requires the retained Transcript window"
+    );
     let sidebar_restore_selftest = args.iter().any(|arg| arg == "--sidebar-restore-selftest");
     let summary_sections_selftest = args.iter().any(|arg| arg == "--summary-sections-selftest");
-    if summary_sections_selftest
+    if reading_selftest
+        || summary_sections_selftest
         || sidebar_restore_selftest
         || sidebar_search_selftest
         || sidebar_query_selftest
@@ -2543,6 +2575,7 @@ pub fn run() {
             actions_selftest,
             models_selftest,
             context_selftest,
+            reading_selftest,
             summary_sections_selftest,
             sidebar_restore_selftest,
             sidebar_search_selftest,
@@ -2606,6 +2639,11 @@ pub fn run() {
                     .with_lifecycle()
                     .with_presets(false)
                     .with_models();
+                let fixture = if let Some(gate) = &reading_gate {
+                    fixture.with_history_page_gate(gate.clone())
+                } else {
+                    fixture
+                };
                 let fixture = if summary_sections_selftest {
                     fixture.with_summary_usage()
                 } else {
@@ -2923,6 +2961,7 @@ pub fn run() {
         sidebar_query_probe: query_fixture.map(sidebar_query_probe::Probe::new),
         sidebar_search_probe: sidebar_search_selftest.then(sidebar_search_probe::Probe::new),
         sidebar_restore_probe: sidebar_restore_selftest.then(sidebar_restore_probe::Probe::new),
+        reading_probe: reading_gate.map(reading_probe::Probe::new),
         summary_sections_probe: summary_sections_selftest.then(summary_sections_probe::Probe::new),
         visibility_probe: visibility_selftest
             .then(|| visibility_probe::Probe::new(visibility_fixture)),

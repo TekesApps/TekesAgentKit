@@ -188,6 +188,12 @@ impl Probe {
             "native stream timeout phase {}",
             self.phase
         );
+        // A background window intentionally has no active text focus. Keep
+        // the retained-owner assertions for the next real activation instead
+        // of treating the native host's deactivation policy as a publication bug.
+        if !window.is_active() {
+            return;
+        }
         let view = &host.view;
         let run = view.binding().current_run().unwrap();
         match self.phase {

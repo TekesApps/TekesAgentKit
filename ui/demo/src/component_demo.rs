@@ -1,5 +1,5 @@
 //! Host window/navigation adapters around shared Agent components.
-//! RunView is experimental; mixed-document reading/rich content remain pending.
+//! RunView is experimental; generic reading belongs to the published SDK.
 use std::{collections::BTreeMap, sync::Arc};
 use tekes_agent_components_ui::{
     AnnotationEditor, AnnotationEditorIds, AnnotationEditorIntent, Composer, ComposerAffordances,
@@ -384,7 +384,7 @@ impl ComponentDemo {
                     ),
                     Content::new(
                         DIAGNOSTIC,
-                        TextContent::new("持续阅读事务与分页锚点尚待接入。"),
+                        TextContent::new("持续阅读由 TekesUI 管理；完整原生验收仍在进行。"),
                     ),
                     Content::new(rename.ids().root, rename),
                     Content::new(choices.id(), choices),
@@ -666,19 +666,10 @@ impl ComponentDemo {
                 .unwrap()
                 .configure_feedback(feedback_labels)
                 .map_err(unsupported)?;
-            self.tree
-                .get_mut(root)
-                .ok_or_else(|| unsupported("transcript mount missing"))?
-                .component_mut::<tekes_agent_components_ui::TranscriptContent>()
-                .unwrap()
-                .update(
-                    binding.scope(),
-                    snapshot.revision,
-                    snapshot.connection_epoch,
-                    &snapshot.transcript,
-                    available,
-                )
-                .map_err(unsupported)?;
+            // Existing content was already published with Composer in the
+            // original SDK reading transaction by sync_run_view. Do not write
+            // Transcript a second time outside that transaction.
+            self.attach_run_reading(ids, binding)?;
             return self.sync_feedback(ids, binding);
         }
         let namespace = self.next_document_namespace;
@@ -714,7 +705,42 @@ impl ComponentDemo {
             .map_err(unsupported)?;
         self.next_document_namespace = end;
         self.document_roots.insert(ids.root, root);
+        self.attach_run_reading(ids, binding)?;
         self.sync_feedback(ids, binding)
+    }
+    fn attach_run_reading(&mut self, ids: ComposerIds, binding: &Arc<RunBinding>) -> Result<()> {
+        let root = ComponentId(ids.root.0 + 16);
+        let run = self.tree.get(root).unwrap().component::<RunView>().unwrap();
+        let viewport = run.ids().viewport;
+        if self
+            .tree
+            .get(viewport)
+            .unwrap()
+            .component::<ScrollContent>()
+            .unwrap()
+            .reading_document_version()
+            .is_some()
+        {
+            return Ok(());
+        }
+        let content = run
+            .transcript()
+            .ok_or_else(|| unsupported("reading Transcript missing"))?;
+        let items = content
+            .row_keys()
+            .iter()
+            .map(|key| content.row_id(key).unwrap())
+            .collect();
+        self.tree
+            .set_scroll_reading_document(
+                viewport,
+                ComposerDestination::run(binding.scope().clone()).storage_key(),
+                0,
+                items,
+                |_| (),
+            )
+            .map_err(|error| unsupported(&format!("Run reading attachment: {error:?}")))?;
+        Ok(())
     }
     pub fn turn_footnote_id() -> ComponentId {
         ComponentId(6_000_002_u64 << 32)
@@ -853,18 +879,39 @@ impl ComponentDemo {
             .is_none_or(|pane| pane.source.supports_pagination());
         let controls =
             !self.composing() && binding.access() == PaneAccess::Ready && receipt.source_ready;
+        let root = ComponentId(ids.root.0 + 16);
+        let run = self.tree.get(root).unwrap().component::<RunView>().unwrap();
+        let version = self
+            .tree
+            .get(run.ids().viewport)
+            .and_then(|node| node.component::<ScrollContent>())
+            .and_then(ScrollContent::reading_document_version)
+            .cloned();
+        let paging = receipt.controls(&snapshot.transcript, supported);
+        if let Some(version) = version {
+            let plan = run
+                .prepare_update(snapshot, affordances, gate, paging, controls)
+                .map_err(unsupported)?;
+            let revision = version
+                .revision()
+                .checked_add(1)
+                .ok_or_else(|| unsupported("Run display revision exhausted"))?;
+            tekes_agent_components_ui::publish_run_reading_update(
+                &mut self.tree,
+                root,
+                &version,
+                revision,
+                &plan,
+            )
+            .map_err(|error| unsupported(&format!("Run reading publication: {error:?}")))?;
+            return Ok(());
+        }
         self.tree
-            .get_mut(ComponentId(ids.root.0 + 16))
+            .get_mut(root)
             .unwrap()
             .component_mut::<RunView>()
             .unwrap()
-            .update(
-                snapshot,
-                affordances,
-                gate,
-                receipt.controls(&snapshot.transcript, supported),
-                controls,
-            )
+            .update(snapshot, affordances, gate, paging, controls)
             .map_err(unsupported)
     }
     #[cfg(test)]
@@ -2688,7 +2735,7 @@ impl ComponentDemo {
             .component_mut::<TextContent>()
             .expect("text")
             .text = format!(
-            "持续阅读与分页锚点尚未完成。\n回传诊断：{} 条内容，{} 条流式内容，历史{}同步。",
+            "阅读事务已接入；完整原生验收尚未完成。\n回传诊断：{} 条内容，{} 条流式内容，历史{}同步。",
             snapshot.transcript.items.len(),
             snapshot
                 .transcript

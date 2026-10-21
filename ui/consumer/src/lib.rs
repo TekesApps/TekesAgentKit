@@ -1411,6 +1411,17 @@ pub fn prepare_original_run<'a>(
         }
     }
 }
+/// A second host consumes the shared adapter and original SDK token; no demo
+/// state, editor clone or reading engine is required.
+pub fn publish_original_run(
+    host: &mut tekes_ui_controls::composition::ContentHost,
+    root: tekes_ui_controls::composition::ComponentId,
+    version: &tekes_ui_controls::ReadingDocumentVersion,
+    revision: u64,
+    plan: &tekes_agent_components_ui::RunViewUpdate<'_>,
+) -> Result<tekes_ui_controls::ReadingDocumentVersion, tekes_agent_components_ui::RunReadingError> {
+    tekes_agent_components_ui::publish_run_reading_update(host, root, version, revision, plan)
+}
 #[test]
 fn independent_host_does_not_prepare_a_missing_pointer_as_a_new_run() {
     use tekes_agent_components_ui::{RunScope, RunView, TranscriptPageRead, TranscriptPagingFacts};

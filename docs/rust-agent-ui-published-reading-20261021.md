@@ -1,5 +1,7 @@
 # 已发布 reading 依赖与原生显式选择 reveal
 
+后续实现见[正式 Run 阅读事务](rust-agent-ui-continuous-reading-20261021.md)：已接入持续 Run 发布并完成原生本地夹具分页，以下记录保留公开 pin / reveal 交付时的验收边界；完整三端阅读验收仍未完成。
+
 默认 TekesUI 精确固定 `1294987dacabb33c0e411c13ee5ea544a1123f8e`，对应公开不可变 tag `remediation-checkpoint-20261021`。上游 PR40 和 main CI 均通过。AgentKit 原生 demo 现消费原 SDK 的稳定 item reveal，使显式选中的 Sidebar 行进入可见区域；不移动 Composer 焦点或手算滚动坐标。AgentKit UI 仍为实验 `0.0.0 / publish=false`，完整持续阅读及分页锚点尚未完成。
 
 ## 依赖与所有权
