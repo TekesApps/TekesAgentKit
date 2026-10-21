@@ -1554,3 +1554,157 @@ fn output_aside_feedback_notes_and_auxiliary_actions_keep_the_original_composer(
         baseline
     );
 }
+
+#[test]
+fn explicit_summary_hierarchy_moves_only_titles_and_retains_original_controls() {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicU32, Ordering},
+    };
+    use tekes_ui_tokens::Spacing;
+    for theme in Theme::ALL {
+        for scale in [0.85, 1., 1.5] {
+            for width in [144., 360.] {
+                let level = Arc::new(AtomicU32::new(0));
+                let projection = level.clone();
+                let scope = RunScope::main("consumer", "indent");
+                let mut source = input();
+                source.owner = SummaryOwner::Run(scope.clone());
+                source.host_sections[0].rows = ["action", "passive"]
+                    .map(|id| SummaryRow {
+                        id: id.into(),
+                        title: "中文标题 English 👩🏽‍💻 e\u{301} · 换行内容 ".repeat(3),
+                        value: "12 files".into(),
+                        action: (id == "action").then(|| SummaryAction::OpenArtifact {
+                            scope: scope.clone(),
+                            path: "/captured/path".into(),
+                        }),
+                    })
+                    .into();
+                let mut summary = SummaryView::new(
+                    49996,
+                    SummaryLabels {
+                        indent_level: Arc::new(move |owner, _, _| {
+                            assert!(
+                                matches!(owner,SummaryOwner::Run(scope) if scope.endpoint_id=="consumer" && scope.session_id=="indent")
+                            );
+                            projection.load(Ordering::SeqCst)
+                        }),
+                        ..Default::default()
+                    },
+                );
+                tekes_agent_ui_consumer_check::publish_summary_context(&mut summary, &source)
+                    .unwrap();
+                let root = summary.id();
+                let action = summary
+                    .default_row_ids("host:repository", "action")
+                    .unwrap();
+                let passive = summary
+                    .default_row_ids("host:repository", "passive")
+                    .unwrap();
+                let mut host = summary.into_host().unwrap();
+                let mut text = Text::new(scale, true);
+                let frame = Rect::new(0., 0., width, 10000.);
+                host.render(&mut Scene::new(), &mut text, frame, frame, theme.into())
+                    .unwrap();
+                let field = host.text_surface(passive.title).unwrap() as *const _ as usize;
+                let control = host
+                    .get(action.row)
+                    .unwrap()
+                    .component::<SummaryActionRow>()
+                    .unwrap()
+                    .button() as *const _ as usize;
+                if width > 300. {
+                    host.focus(Some(passive.title), true);
+                    host.accessibility_action(
+                        passive.title,
+                        None,
+                        AccessibilityAction::SetSelection(0..2),
+                    );
+                }
+                for depth in [1, 3, 0] {
+                    level.store(depth, Ordering::SeqCst);
+                    let row_before = host.get(action.title).unwrap().frame();
+                    assert!(
+                        tekes_agent_ui_consumer_check::publish_summary_context(
+                            host.get_mut(root)
+                                .unwrap()
+                                .component_mut::<SummaryView>()
+                                .unwrap(),
+                            &source
+                        )
+                        .is_err(),
+                        "changed hierarchy under the same publication must reject"
+                    );
+                    assert_eq!(host.get(action.title).unwrap().frame(), row_before);
+                    source.revision += 1;
+                    tekes_agent_ui_consumer_check::publish_summary_context(
+                        host.get_mut(root)
+                            .unwrap()
+                            .component_mut::<SummaryView>()
+                            .unwrap(),
+                        &source,
+                    )
+                    .unwrap();
+                    host.render(&mut Scene::new(), &mut text, frame, frame, theme.into())
+                        .unwrap();
+                    for ids in [action, passive] {
+                        let band = host.get(ids.row).unwrap().frame();
+                        let title = host.get(ids.title).unwrap().frame();
+                        let trailing = host.get(ids.trailing).unwrap().frame();
+                        assert!(
+                            (title.min_x()
+                                - band.min_x()
+                                - 2. * Spacing::Regular.value()
+                                - depth as f32 * 14. * scale)
+                                .abs()
+                                < 0.1
+                        );
+                        assert!(
+                            (trailing.max_x() - band.max_x() + 2. * Spacing::Regular.value()).abs()
+                                < 0.1,
+                            "metadata stays at the original trailing edge"
+                        );
+                        assert!(title.size.width >= 0. && trailing.size.width >= 0.);
+                    }
+                    assert_eq!(
+                        host.text_surface(passive.title).unwrap() as *const _ as usize,
+                        field
+                    );
+                    assert_eq!(
+                        host.get(action.row)
+                            .unwrap()
+                            .component::<SummaryActionRow>()
+                            .unwrap()
+                            .button() as *const _ as usize,
+                        control
+                    );
+                    if width > 300. {
+                        assert_eq!(host.focused(), Some(passive.title));
+                        assert_eq!(
+                            host.text_surface(passive.title)
+                                .unwrap()
+                                .input
+                                .selected_text(),
+                            "中文"
+                        );
+                        assert!(
+                            host.accessibility_action(action.row, None, AccessibilityAction::Press)
+                                .activated
+                        );
+                        assert_eq!(host.focused(), Some(passive.title));
+                        let actions = host.drain_actions();
+                        let intents = host
+                            .get(root)
+                            .unwrap()
+                            .component::<SummaryView>()
+                            .unwrap()
+                            .take_intents(&actions);
+                        assert_eq!(intents.len(), 1);
+                        assert_eq!(intents[0].scope, scope);
+                    }
+                }
+            }
+        }
+    }
+}

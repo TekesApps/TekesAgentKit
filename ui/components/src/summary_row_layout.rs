@@ -23,6 +23,7 @@ pub(crate) fn body_line(text: &mut dyn ButtonTextRenderer) -> f32 {
 pub(crate) struct SummaryRowBody {
     pub children: Vec<Content>,
     has_trailing: bool,
+    indent_level: u32,
 }
 impl SummaryRowBody {
     pub fn new(title: Content, trailing: ComponentId) -> Self {
@@ -42,14 +43,24 @@ impl SummaryRowBody {
                 .expect("original single-line Summary metadata"),
             ],
             has_trailing: false,
+            indent_level: 0,
         }
     }
-    pub fn update_trailing(&mut self, value: Option<String>) {
+    pub fn update(&mut self, value: Option<String>, indent_level: u32) {
+        self.indent_level = indent_level;
         self.has_trailing = value.is_some();
         self.children[1]
             .component_mut::<TextContent>()
             .unwrap()
             .text = value.unwrap_or_default();
+    }
+    fn indent(&self, text: &mut dyn ButtonTextRenderer) -> f32 {
+        // ClientKit ListMetrics deliberately uses 14 points per hierarchy level.
+        // This is row geometry, not a glyph or text-layout engine.
+        let scale = text
+            .text_surface_host()
+            .map_or(1., |host| host.type_scale());
+        self.indent_level as f32 * 14. * scale
     }
     fn measurements(&mut self, text: &mut dyn ButtonTextRenderer, width: f32) -> [Size; 2] {
         let width = width.max(0.);
@@ -61,6 +72,7 @@ impl SummaryRowBody {
             Size::new(0., 0.)
         };
         let title_width = (width
+            - self.indent(text)
             - meta.width
             - if self.has_trailing {
                 Spacing::Regular.value()
@@ -114,7 +126,12 @@ impl Component for SummaryRowBody {
         .content();
         let [title, meta] = self.measurements(text, content.size.width);
         let top = frame.min_y() + (frame.size.height - title.height) / 2.;
-        let title = Rect::new(content.min_x(), top, title.width, title.height);
+        let title = Rect::new(
+            content.min_x() + self.indent(text),
+            top,
+            title.width,
+            title.height,
+        );
         let meta = Rect::new(
             content.max_x() - meta.width,
             top + (body_line(text) - meta.height) / 2.,

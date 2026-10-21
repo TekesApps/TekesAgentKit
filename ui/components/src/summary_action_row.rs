@@ -26,12 +26,12 @@ impl SummaryActionRow {
     pub fn button(&self) -> &ButtonContent {
         &self.button.action
     }
-    pub(crate) fn update(&mut self, label: String, trailing: Option<String>) {
+    pub(crate) fn update(&mut self, label: String, trailing: Option<String>, indent: u32) {
         self.button.action.label = label.clone();
         self.button.children_mut().unwrap()[0]
             .component_mut::<SummaryRowBody>()
             .unwrap()
-            .update_trailing(trailing);
+            .update(trailing, indent);
         self.button.children_mut().unwrap()[0]
             .component_mut::<SummaryRowBody>()
             .unwrap()

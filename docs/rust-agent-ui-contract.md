@@ -248,7 +248,7 @@ Task tab 以 task ID 为稳定身份，scope 是可更新的内容输入。TaskP
 | Composer / Indicators | 原 RunView 中复用 presentation；草稿、发送/取消、入口与捕获来源、unknown/partial 状态；已有局部真实三端和原生窗口证据按各自程序解释 | 其余设置/附件 pane 组合、完整 Source 布局与交互/语义、物理输入及配对视觉 |
 | Transcript / RunView | 正式混合 Content、原 SDK reading/reveal 事务；分页20→44、流式/工具增长/重排、A/B保留阅读与重连、Start/Latest、原焦点/组字；真实三端历史/流式证据保留原程序归属 | #25富内容、#42 fresh-host持久阅读、#46结构化hover、完整footnote/rail显示规则和配对视觉；剩余真实多消息有界child组合 |
 | Sidebar | 原 inventory/search/folder/pin服务、共享操作、选中行补入与自动reveal；部分原生fixture与重挂载/过期请求fencing | #44原行上下文触发、完整列表阅读生命周期、剩余真实三端/目录/活动组合及整体布局验收 |
-| SidePanel / Summary | 共享pane状态与原RunView/只读内容、投影ready与生命周期、host clearance、Run/Workspace Summary、可选择文字、用量列、自定义host Content、header单行/焦点/repository分隔规则；child状态来源、源标题带/普通metadata/用量首行对齐及格式化publication校验已补 | #36/#5 toolbar、#45语义Panel、#47图标/不定状态附件、#30只读留白路由、#25语义runs、#38展开指示；默认行 leading/缩进/tone、具体产品行、完整tab/chrome和配对视觉 |
+| SidePanel / Summary | 共享pane状态与原RunView/只读内容、投影ready与生命周期、host clearance、Run/Workspace Summary、可选择文字、用量列、自定义host Content、header单行/焦点/repository分隔规则；child状态来源、源标题带/普通metadata/用量首行对齐及格式化publication校验及显式 owner/层级缩进已补 | #36/#5 toolbar、#45语义Panel、#47图标/不定状态附件、#30只读留白路由、#25语义runs、#38展开指示；默认行 leading/tone、具体产品行、完整tab/chrome和配对视觉 |
 | 第二公开 API consumer | 当前UI workspace含独立consumer；公开inputs/queries/actions、原SDK text/reveal及host适配、child状态更新保留原pointer | 完整目标的组合体验与宿主验收，不能以编译/局部组件测试代替 |
 | 原生 / 三 harness | 当前窗口验收及系统拼音软件输入；真实Native/Pi/DSH协议/阅读/流式保留各自program scope | 新child状态在真实三端的验收、Native0.9.3 lifecycle/archive已知未过项、实体键盘/候选窗/VoiceOver与整体体验 |
 | review / CI / merge / tag | PR #10仍为实验草稿，增量提交分别检查CI；本地验证和最终程序收据见各阶段文档 | 完整要求逐项审计、review、最终CI、合并和新阶段tag；整体目标尚未完成 |
@@ -347,3 +347,5 @@ wake scheduling remain host adapters. This does not complete footnote layout par
 [输出脚注显隐](rust-agent-ui-output-aside-20261022.md)进一步对齐 Source 的 live/output/settled-fork 门槛；结束时间、纯推理或工具本身不生成输出脚注。输出存在不授予复制、反馈或执行权限，原信息节点在显隐之间保留。
 
 [反馈脚注与辅助焦点](rust-agent-ui-feedback-aside-20261022.md)将评价挂载纳入输出脚注的同一显隐门槛，保留原响应授权与组字 preflight；备注仅在已有评分时显示，并展示 committed 文字。复制、回合及评价辅助按钮消费原 SDK 保焦点策略。单行整体排布仍未完成。
+
+[Summary 层级排版](rust-agent-ui-summary-indent-20261022.md)新增显式只读 indent_level 回调：按 Source 层级移动标题和减少其换行宽度，metadata 保持右端，原动作/文本 owner 不变；格式化结果随 publication 捕获。完整单行 Transcript aside 的图标渲染服务缺口已补充到既有 #47，未复制 SDK 实现。

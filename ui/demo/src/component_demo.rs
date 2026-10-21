@@ -159,6 +159,7 @@ pub enum DemoCommand {
 }
 
 pub struct ComponentDemo {
+    summary_labels: SummaryLabels,
     feedback_panes: BTreeMap<ComponentId, feedback::FeedbackPane>,
     feedback_completions: Vec<FeedbackDemoCompletion>,
     document_enabled: bool,
@@ -324,6 +325,13 @@ impl ComponentDemo {
             + 2. * DEMO_CONTENT_INSET) as f64
     }
     pub fn new(bindings: impl IntoIterator<Item = Arc<RunBinding>>) -> Result<Self> {
+        Self::new_with_summary_labels(bindings, SummaryLabels::default())
+    }
+    /// Host formatting/hierarchy inputs for the original reusable Summary.
+    pub fn new_with_summary_labels(
+        bindings: impl IntoIterator<Item = Arc<RunBinding>>,
+        summary_labels: SummaryLabels,
+    ) -> Result<Self> {
         let bindings: Vec<_> = bindings.into_iter().collect();
         require(
             !bindings.is_empty()
@@ -479,6 +487,7 @@ impl ComponentDemo {
         let mut view = Self {
             file_preview_available: false,
             preview_gesture: None,
+            summary_labels,
             file_picker_available: false,
             uploads: BTreeMap::new(),
             next_upload_namespace: 2_000_000,
@@ -3079,8 +3088,10 @@ impl ComponentDemo {
             SidePanelTabKind::Summary => {
                 let summary_id = self.summary_id();
                 if self.tree.get(summary_id).is_none() {
-                    let summary =
-                        SummaryView::new(101 + self.selected as u32 * 2, SummaryLabels::default());
+                    let summary = SummaryView::new(
+                        101 + self.selected as u32 * 2,
+                        self.summary_labels.clone(),
+                    );
                     let panel = self
                         .tree
                         .get_mut(panel_id)

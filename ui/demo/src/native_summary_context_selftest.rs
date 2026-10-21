@@ -18,6 +18,11 @@ pub(super) struct Probe {
     baseline: Option<tekes_ui_controls::TextEditBaseline>,
     repositories: bool,
     capture: Option<String>,
+    indentation: Option<Arc<std::sync::atomic::AtomicU32>>,
+    indented_ids: Option<tekes_agent_components_ui::SummaryDefaultRowIds>,
+    indented_owner: usize,
+    indented_left: f32,
+    metadata_right: f32,
 }
 impl Probe {
     pub fn new() -> Self {
@@ -33,6 +38,11 @@ impl Probe {
             baseline: None,
             repositories: false,
             capture: None,
+            indentation: None,
+            indented_ids: None,
+            indented_owner: 0,
+            indented_left: 0.,
+            metadata_right: 0.,
         }
     }
     pub fn with_repository_dividers() -> Self {
@@ -43,6 +53,18 @@ impl Probe {
             assert!(
                 std::path::Path::new(path).is_absolute() && !std::path::Path::new(path).exists(),
                 "use a new absolute divider screenshot path"
+            );
+        }
+        probe
+    }
+    pub fn with_indentation(level: Arc<std::sync::atomic::AtomicU32>) -> Self {
+        let mut probe = Self::new();
+        probe.indentation = Some(level);
+        probe.capture = std::env::var("AGENT_SUMMARY_INDENT_CAPTURE").ok();
+        if let Some(path) = &probe.capture {
+            assert!(
+                std::path::Path::new(path).is_absolute() && !std::path::Path::new(path).exists(),
+                "use a fresh absolute indentation screenshot"
             );
         }
         probe
@@ -117,6 +139,13 @@ impl Probe {
             .any(|node| node.semantics.name == label)
     }
     pub fn advance(&mut self, host: &mut Host, window: &Window) {
+        // All publication/geometry/IME assertions have finished. Closing a
+        // native window may legitimately retire its editing authority; do not
+        // turn teardown notifications into another publication observation.
+        if self.phase == 9 || (self.phase == 8 && !self.repositories && self.indentation.is_none())
+        {
+            return;
+        }
         assert!(
             self.started.elapsed() < Duration::from_secs(20),
             "workspace Summary deadline phase {}",
@@ -182,6 +211,9 @@ impl Probe {
             2 if summary.section_expanded(self.section()) == Some(false) => {
                 assert!(host.view.editor().input.marked.is_some());
                 self.baseline = Some(host.view.editor().input.external_baseline());
+                if let Some(level) = &self.indentation {
+                    level.store(2, std::sync::atomic::Ordering::Relaxed);
+                }
                 let mut input = self.input("workspace-a");
                 if self.repositories {
                     let layout = summary
@@ -268,6 +300,43 @@ impl Probe {
                 assert!(
                     (meta.min_y() - title.min_y() - (line - meta.size.height) / 2.).abs() < 0.1
                 );
+                if let Some(level) = &self.indentation {
+                    self.indented_ids = Some(ids);
+                    self.indented_owner =
+                        host.view.tree.text_surface(ids.title).unwrap() as *const _ as usize;
+                    self.indented_left = title.min_x();
+                    self.metadata_right = meta.max_x();
+                    let scale = host.text.text_surface_host().unwrap().type_scale();
+                    assert!(
+                        (title.min_x()
+                            - band.min_x()
+                            - 2. * tekes_ui_tokens::Spacing::Regular.value()
+                            - 28. * scale)
+                            .abs()
+                            < 0.1
+                    );
+                    level.store(1, std::sync::atomic::Ordering::Relaxed);
+                    self.publish(host, "workspace-b");
+                    self.phase = 20;
+                } else {
+                    let mut empty = self.input("workspace-b");
+                    empty.host_sections.clear();
+                    host.view.set_workspace_summary(empty).unwrap();
+                    self.phase = 6;
+                }
+            }
+            20 => {
+                let ids = summary.default_row_ids(self.section(), "name").unwrap();
+                assert_eq!(Some(ids), self.indented_ids);
+                assert_eq!(
+                    host.view.tree.text_surface(ids.title).unwrap() as *const _ as usize,
+                    self.indented_owner
+                );
+                let title = host.view.tree.get(ids.title).unwrap().frame();
+                let meta = host.view.tree.get(ids.trailing).unwrap().frame();
+                let scale = host.text.text_surface_host().unwrap().type_scale();
+                assert!((self.indented_left - title.min_x() - 14. * scale).abs() < 0.1);
+                assert!((meta.max_x() - self.metadata_right).abs() < 0.1);
                 let mut empty = self.input("workspace-b");
                 empty.host_sections.clear();
                 host.view.set_workspace_summary(empty).unwrap();
@@ -287,17 +356,19 @@ impl Probe {
                 assert_eq!(Some(&run.draft.text), self.draft.as_ref());
                 assert_eq!(run.transcript.items.len(), self.items);
                 assert_eq!(run.submissions.len(), self.submissions);
-                if self.repositories {
+                if self.repositories || self.indentation.is_some() {
                     self.publish(host, "workspace-c");
                 } else {
                     run_script(vec![(0, Action::Close)]);
                 }
                 self.phase = 8;
             }
-            8 if self.repositories => {
-                let layouts = summary.section_layouts();
-                assert!(layouts[0].divider.is_none());
-                assert!(layouts[1].divider.is_some());
+            8 if self.repositories || self.indentation.is_some() => {
+                if self.repositories {
+                    let layouts = summary.section_layouts();
+                    assert!(layouts[0].divider.is_none());
+                    assert!(layouts[1].divider.is_some());
+                }
                 let mut actions = vec![];
                 if let Some(path) = &self.capture {
                     actions.push((300, Action::Capture { path: path.clone() }));
@@ -314,7 +385,14 @@ impl Probe {
         }
     }
     pub fn receipt(&self) -> serde_json::Value {
-        assert_eq!(self.phase, if self.repositories { 9 } else { 8 });
-        json!({"nativeWindow":true,"explicitWorkspaceOwner":true,"noSyntheticRunScope":true,"hostRowsWithoutSessionFacts":true,"originalHeaderClicks":true,"sameOwnerRowsRetained":true,"ownerChangeRetiresIds":true,"collapseRetained":true,"emptyAndUnavailableDistinct":true,"mainDraftAndTranscriptUnchanged":true,"noSubmission":true,"realHarness":false,"physicalIme":false,"voiceOver":false,"fullUnselectedHostLayout":false,"ordinaryMetadataFirstLine":true,"titleAndMetadataSeparate":true,"originalComposerFocusAndMarkedBaseline":true,"syntheticPreedit":true,"repositoryDividerRules":self.repositories,"dividerBandOriginalDisclosure":self.repositories,"sameOwnerOrderChangesDivider":self.repositories})
+        assert_eq!(
+            self.phase,
+            if self.repositories || self.indentation.is_some() {
+                9
+            } else {
+                8
+            }
+        );
+        json!({"nativeWindow":true,"explicitWorkspaceOwner":true,"noSyntheticRunScope":true,"hostRowsWithoutSessionFacts":true,"originalHeaderClicks":true,"sameOwnerRowsRetained":true,"ownerChangeRetiresIds":true,"collapseRetained":true,"emptyAndUnavailableDistinct":true,"mainDraftAndTranscriptUnchanged":true,"noSubmission":true,"realHarness":false,"physicalIme":false,"voiceOver":false,"fullUnselectedHostLayout":false,"ordinaryMetadataFirstLine":true,"titleAndMetadataSeparate":true,"originalComposerFocusAndMarkedBaseline":true,"syntheticPreedit":true,"explicitIndentLevels":self.indentation.is_some(),"indentUpdateRetainsOriginalField":self.indentation.is_some(),"indentDoesNotMoveMetadata":self.indentation.is_some(),"repositoryDividerRules":self.repositories,"dividerBandOriginalDisclosure":self.repositories,"sameOwnerOrderChangesDivider":self.repositories})
     }
 }

@@ -298,3 +298,8 @@ targets have no note entry; committed note text is shown directly. Auxiliary cop
 turn and rating buttons consume SDK `preserving_focus()`. See the
 [feedback aside contract](../docs/rust-agent-ui-feedback-aside-20261022.md) for IME,
 publication and validation scope; complete inline packing remains unfinished.
+
+`SummaryLabels::indent_level` accepts explicit provider/host hierarchy for ordinary
+default rows. Titles indent and wrap while trailing metadata stays fixed; changed
+formatting requires a new publication. See [hierarchy contract](../docs/rust-agent-ui-summary-indent-20261022.md)
+for constructor injection, scaling, control/selection retention and native evidence.

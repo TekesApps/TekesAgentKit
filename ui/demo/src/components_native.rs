@@ -3337,7 +3337,31 @@ pub fn run() {
             source
         })
     });
-    let mut view = ComponentDemo::new(bindings).unwrap();
+    let summary_indent_level =
+        summary_context_selftest.then(|| Arc::new(std::sync::atomic::AtomicU32::new(0)));
+    let mut view = if let Some(level) = summary_indent_level.clone() {
+        ComponentDemo::new_with_summary_labels(
+            bindings,
+            tekes_agent_components_ui::SummaryLabels {
+                indent_level: Arc::new(move |owner, section, row| {
+                    if matches!(
+                        owner,
+                        tekes_agent_components_ui::SummaryOwner::Workspace { .. }
+                    ) && section == "host:workspace"
+                        && row.id == "name"
+                    {
+                        level.load(std::sync::atomic::Ordering::Relaxed)
+                    } else {
+                        0
+                    }
+                }),
+                ..Default::default()
+            },
+        )
+        .unwrap()
+    } else {
+        ComponentDemo::new(bindings).unwrap()
+    };
     view.set_sidebar_title_comparator(sidebar_collation::compare);
     if sidebar_query_selftest {
         sidebar_query_probe::Probe::prepare(&view);
@@ -3559,7 +3583,7 @@ pub fn run() {
         summary_context_probe: if summary_divider_selftest {
             Some(summary_context_probe::Probe::with_repository_dividers())
         } else {
-            summary_context_selftest.then(summary_context_probe::Probe::new)
+            summary_indent_level.map(summary_context_probe::Probe::with_indentation)
         },
         summary_custom_probe: summary_custom_selftest.then(summary_custom_probe::Probe::new),
         summary_label_probe: summary_label_selftest.then(summary_label_probe::Probe::new),

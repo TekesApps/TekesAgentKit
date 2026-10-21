@@ -79,6 +79,10 @@ pub struct SummaryIntent {
 /// Called during publication preflight. Hosts may capture a read-only product
 /// projection, and must publish a new Summary revision when that input changes.
 pub type SummaryTrailingFormatter = Arc<dyn Fn(&str, &SummaryRow) -> Option<String> + Send + Sync>;
+/// Explicit hierarchy supplied by a provider/host projection. Never inferred
+/// from a title, path separator or raw status. Captured with the publication.
+pub type SummaryIndentFormatter =
+    Arc<dyn Fn(&SummaryOwner, &str, &SummaryRow) -> u32 + Send + Sync>;
 #[derive(Clone)]
 pub struct SummaryLabels {
     pub name: String,
@@ -92,6 +96,7 @@ pub struct SummaryLabels {
     /// Optional plain metadata for ordinary default rows (not usage/custom).
     /// Host projection/localization supplies text; never infer it from status.
     pub trailing: SummaryTrailingFormatter,
+    pub indent_level: SummaryIndentFormatter,
 }
 impl Default for SummaryLabels {
     fn default() -> Self {
@@ -112,6 +117,7 @@ impl Default for SummaryLabels {
             },
             usage_row: SummaryUsageRowText::read,
             row: |_, row| row.title.clone(),
+            indent_level: Arc::new(|_, _, _| 0),
             trailing: Arc::new(|section, row| {
                 if matches!(
                     section,
@@ -182,6 +188,7 @@ impl ActionIdentity {
 pub(crate) struct PreparedSummaryContext {
     labels: BTreeMap<(String, String), String>,
     trailing: BTreeMap<(String, String), Option<String>>,
+    indent: BTreeMap<(String, String), u32>,
     sections: Vec<SummarySection>,
     section_ids: BTreeSet<String>,
     custom: BTreeMap<(String, String), SummaryCustomRowSpec>,
@@ -204,6 +211,7 @@ pub struct SummaryView {
     last_context: Option<SummaryContextInput>,
     displayed_labels: BTreeMap<(String, String), String>,
     displayed_trailing: BTreeMap<(String, String), Option<String>>,
+    displayed_indent: BTreeMap<(String, String), u32>,
     custom_context: Arc<()>,
 }
 impl SummaryView {
@@ -237,6 +245,7 @@ impl SummaryView {
             last_context: None,
             displayed_labels: BTreeMap::new(),
             displayed_trailing: BTreeMap::new(),
+            displayed_indent: BTreeMap::new(),
             custom_context: Arc::new(()),
         }
     }
@@ -456,6 +465,7 @@ impl SummaryView {
         sections.extend(providers);
         let mut labels = BTreeMap::new();
         let mut trailing = BTreeMap::new();
+        let mut indent = BTreeMap::new();
         let mut custom = BTreeMap::new();
         for spec in &input.custom_rows {
             if spec.content_key.trim().is_empty()
@@ -529,6 +539,10 @@ impl SummaryView {
                         (section.id.clone(), row.id.clone()),
                         (self.labels.trailing)(&section.id, row),
                     );
+                    indent.insert(
+                        (section.id.clone(), row.id.clone()),
+                        (self.labels.indent_level)(&input.owner, &section.id, row),
+                    );
                 }
                 if slot.is_none() && row.action.is_some() {
                     let identity = ActionIdentity::read(row.action.as_ref());
@@ -590,7 +604,9 @@ impl SummaryView {
         }
         let desired: BTreeSet<_> = ids.values().copied().collect();
         if input.revision == self.revision
-            && (labels != self.displayed_labels || trailing != self.displayed_trailing)
+            && (labels != self.displayed_labels
+                || trailing != self.displayed_trailing
+                || indent != self.displayed_indent)
         {
             return Err("Summary formatted content changed without publication");
         }
@@ -610,6 +626,7 @@ impl SummaryView {
         Ok(PreparedSummaryContext {
             labels,
             trailing,
+            indent,
             sections,
             section_ids,
             custom,
@@ -626,6 +643,7 @@ impl SummaryView {
         let PreparedSummaryContext {
             labels,
             trailing,
+            indent,
             sections,
             section_ids,
             custom,
@@ -737,6 +755,7 @@ impl SummaryView {
                         .update(
                             label,
                             trailing[&(section.id.clone(), row.id.clone())].clone(),
+                            indent[&(section.id.clone(), row.id.clone())],
                         );
                     bindings.insert(
                         id,
@@ -792,10 +811,10 @@ impl SummaryView {
                             ),
                         )
                     });
-                    content
-                        .component_mut::<SummaryRowBody>()
-                        .unwrap()
-                        .update_trailing(trailing[&(section.id.clone(), row.id.clone())].clone());
+                    content.component_mut::<SummaryRowBody>().unwrap().update(
+                        trailing[&(section.id.clone(), row.id.clone())].clone(),
+                        indent[&(section.id.clone(), row.id.clone())],
+                    );
                     crate::summary_text::update_text(
                         content.component_mut::<SummaryRowBody>().unwrap().children[0]
                             .component_mut::<TextFieldContent>()
@@ -831,6 +850,7 @@ impl SummaryView {
             .retain(|section, model| section_ids.contains(section) || !model.borrow().open);
         self.displayed_labels = labels;
         self.displayed_trailing = trailing;
+        self.displayed_indent = indent;
         self.last_context = Some(input.clone());
         self.last = None;
         Ok(())
