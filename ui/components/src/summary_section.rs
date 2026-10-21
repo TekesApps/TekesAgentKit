@@ -9,6 +9,7 @@ use tekes_ui_controls::{
     composition::*,
     extended::{Axis, Disclosure, Stack},
     layout::{ContainerLayout, Insets, MeasuredChild},
+    layout_view::SeparatorView,
 };
 use tekes_ui_scene::{Rect, Scene, Size};
 use tekes_ui_tokens::Spacing;
@@ -27,6 +28,9 @@ pub(crate) struct SummaryHeader {
     pub expansion: Expansion,
     epoch: Rc<Cell<u64>>,
     kind: SectionHeaderKind,
+    shows_divider: bool,
+    divider: SeparatorView,
+    divider_frame: Option<Rect>,
 }
 impl SummaryHeader {
     fn new(
@@ -51,7 +55,24 @@ impl SummaryHeader {
             expansion,
             epoch,
             kind,
+            shows_divider: false,
+            divider: SeparatorView::default(),
+            divider_frame: None,
         }
+    }
+    fn rule_height() -> f32 {
+        tekes_ui_tokens::proposal::metric("stroke", "stroke-rule")
+            .expect("published separator rule")
+    }
+    fn divider_reserve(&self) -> f32 {
+        if self.shows_divider {
+            Self::rule_height() + Spacing::Regular.value()
+        } else {
+            0.
+        }
+    }
+    pub fn set_repository_divider(&mut self, shown: bool) {
+        self.shows_divider = self.kind == SectionHeaderKind::Summary && shown;
     }
     pub fn set_title(&mut self, title: String) {
         self.button.action.label = title.clone();
@@ -92,20 +113,37 @@ impl Component for SummaryHeader {
         self.button.child_theme(theme)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, size: Size) -> MeasuredChild {
-        self.button.measure(text, size)
+        let mut measured = self.button.measure(text, size);
+        measured.size.height += self.divider_reserve();
+        measured
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        // The original button retains the full header hit/AX frame, including
+        // the divider band, as ClientKit's header hitTest does.
         self.button.arrange(text, frame, clip);
+        self.divider_frame = self.shows_divider.then(|| {
+            let inset = crate::summary_row_layout::title_inset();
+            Rect::new(
+                frame.min_x() + inset,
+                frame.min_y(),
+                (frame.size.width - 2. * inset).max(0.),
+                Self::rule_height(),
+            )
+        });
         if self.kind == SectionHeaderKind::Summary {
             let inset = crate::summary_row_layout::title_inset();
+            let reserve = self.divider_reserve();
             let label = &mut self.button.children_mut().unwrap()[0];
             let width = (frame.size.width - 2. * inset).max(0.);
             let measured = label
-                .measure(text, Size::new(width, frame.size.height))
+                .measure(
+                    text,
+                    Size::new(width, (frame.size.height - reserve).max(0.)),
+                )
                 .size;
             let bounds = Rect::new(
                 frame.min_x() + inset,
-                frame.min_y() + (frame.size.height - measured.height) / 2.,
+                frame.min_y() + reserve + (frame.size.height - reserve - measured.height) / 2.,
                 width,
                 measured.height,
             );
@@ -120,7 +158,11 @@ impl Component for SummaryHeader {
         clip: Rect,
         theme: ContentTheme,
     ) {
-        self.button.paint(scene, text, frame, clip, theme)
+        self.button.paint(scene, text, frame, clip, theme);
+        if let Some(divider) = self.divider_frame {
+            self.divider
+                .render(scene, divider, Axis::Horizontal, Some(clip), theme.palette);
+        }
     }
     fn event(&mut self, event: &ContentEvent) -> ContentResponse {
         let result = self.button.event(event);
@@ -182,6 +224,9 @@ impl Component for SummaryRows {
 pub struct SummarySectionLayout {
     pub section_id: String,
     pub header: Rect,
+    /// Arranged logical SDK separator band, before ancestor clipping. None for
+    /// first/non-repository sections. This is not an ink or pointer target.
+    pub divider: Option<Rect>,
     pub body: Option<Rect>,
     pub expanded: bool,
 }
@@ -302,6 +347,10 @@ impl Component for SummarySectionView {
         self.layout = Some(SummarySectionLayout {
             section_id: self.section.clone(),
             header,
+            divider: self.children[0]
+                .component::<SummaryHeader>()
+                .unwrap()
+                .divider_frame,
             body,
             expanded: body.is_some(),
         });

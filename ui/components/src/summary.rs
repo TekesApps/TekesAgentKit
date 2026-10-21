@@ -647,7 +647,7 @@ impl SummaryView {
             .map(|content| (content.id(), content))
             .collect();
         let mut bindings = BTreeMap::new();
-        for section in sections {
+        for (index, section) in sections.into_iter().enumerate() {
             let id = ids[&Key::Section(input.owner.clone(), section.id.clone())];
             let expansion = self
                 .expansions
@@ -674,6 +674,8 @@ impl SummaryView {
             });
             let view = block.component_mut::<SummarySectionView>().unwrap();
             view.layout = None;
+            view.header_mut()
+                .set_repository_divider(index != 0 && section.id.starts_with("repository:"));
             view.header_mut()
                 .set_title((self.labels.section)(&section.id));
             let mut old_rows: BTreeMap<_, _> = std::mem::take(view.rows_mut())

@@ -276,3 +276,8 @@ Summary 默认动作/静态行按 ClientKit 的文字带布局：左右两份 Re
 `SummaryLabels::trailing` 可捕获宿主只读投影，为默认行提供独立 plain metadata；
 同 revision 下 formatter 输出冲突会在改图前拒绝。新增 slot、迁移和原生组字证据见
 [Summary metadata](../docs/rust-agent-ui-summary-metadata-20261022.md)。多语义 runs/tone 继续跟踪 TekesUI #25。
+
+Summary 默认按实际顺序为非首个 `repository:` header 组合原 SDK SeparatorView；
+折叠保留分隔线，换序重新判断。`SummarySectionLayout::divider` 返回最近实际 arrange 的
+逻辑 band，原 header 继续拥有完整 hit/AX frame。
+[分隔规则与原生接入](../docs/rust-agent-ui-summary-divider-20261022.md)包含第二 consumer 和组字期间点击的证据。

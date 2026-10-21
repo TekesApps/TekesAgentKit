@@ -16,6 +16,8 @@ pub(super) struct Probe {
     items: usize,
     submissions: usize,
     baseline: Option<tekes_ui_controls::TextEditBaseline>,
+    repositories: bool,
+    capture: Option<String>,
 }
 impl Probe {
     pub fn new() -> Self {
@@ -29,6 +31,27 @@ impl Probe {
             items: 0,
             submissions: 0,
             baseline: None,
+            repositories: false,
+            capture: None,
+        }
+    }
+    pub fn with_repository_dividers() -> Self {
+        let mut probe = Self::new();
+        probe.repositories = true;
+        probe.capture = std::env::var("AGENT_SUMMARY_DIVIDER_CAPTURE").ok();
+        if let Some(path) = &probe.capture {
+            assert!(
+                std::path::Path::new(path).is_absolute() && !std::path::Path::new(path).exists(),
+                "use a new absolute divider screenshot path"
+            );
+        }
+        probe
+    }
+    fn section(&self) -> &'static str {
+        if self.repositories {
+            "repository:workspace"
+        } else {
+            SECTION
         }
     }
     fn view(host: &Host) -> Option<&SummaryView> {
@@ -36,14 +59,14 @@ impl Probe {
     }
     fn input(&mut self, id: &str) -> SummaryContextInput {
         self.revision += 1;
-        SummaryContextInput {
+        let mut input = SummaryContextInput {
             custom_rows: vec![],
             revision: self.revision,
             owner: SummaryOwner::Workspace { id: id.into() },
             facts: None,
             ready: true,
             host_sections: vec![SummarySection {
-                id: SECTION.into(),
+                id: self.section().into(),
                 rows: vec![SummaryRow {
                     id: "name".into(),
                     title: "工作区".into(),
@@ -51,7 +74,22 @@ impl Probe {
                     action: None,
                 }],
             }],
+        };
+        if self.repositories {
+            input.host_sections.insert(
+                0,
+                SummarySection {
+                    id: "repository:first".into(),
+                    rows: vec![SummaryRow {
+                        id: "branch".into(),
+                        title: "首个仓库".into(),
+                        value: json!("main"),
+                        action: None,
+                    }],
+                },
+            );
         }
+        input
     }
     fn publish(&mut self, host: &mut Host, id: &str) {
         let input = self.input(id);
@@ -108,8 +146,8 @@ impl Probe {
             1 => {
                 assert!(matches!(&source.owner,SummaryOwner::Workspace{id} if id=="workspace-a"));
                 assert!(source.facts.is_none() && summary.displayed_input().is_none());
-                self.original_row = summary.row_id(SECTION, "name");
-                let header = summary.section_header_id(SECTION).unwrap();
+                self.original_row = summary.row_id(self.section(), "name");
+                let header = summary.section_header_id(self.section()).unwrap();
                 run_script(vec![
                     (0, Self::click(host, host.view.ids().editor)),
                     (
@@ -120,21 +158,56 @@ impl Probe {
                             replacement: None,
                         },
                     ),
-                    (200, Self::click(host, header)),
+                    (
+                        200,
+                        if self.repositories {
+                            let divider = summary
+                                .section_layouts()
+                                .iter()
+                                .find(|layout| layout.section_id == self.section())
+                                .unwrap()
+                                .divider
+                                .unwrap();
+                            Action::Click {
+                                x: divider.center().x.into(),
+                                y: divider.center().y.into(),
+                            }
+                        } else {
+                            Self::click(host, header)
+                        },
+                    ),
                 ]);
                 self.phase = 2;
             }
-            2 if summary.section_expanded(SECTION) == Some(false) => {
+            2 if summary.section_expanded(self.section()) == Some(false) => {
                 assert!(host.view.editor().input.marked.is_some());
                 self.baseline = Some(host.view.editor().input.external_baseline());
                 let mut input = self.input("workspace-a");
-                input.host_sections[0].rows[0].value = json!("更新后的工作区 A");
+                if self.repositories {
+                    let layout = summary
+                        .section_layouts()
+                        .into_iter()
+                        .find(|layout| layout.section_id == self.section())
+                        .unwrap();
+                    assert!(layout.divider.is_some() && !layout.expanded);
+                    input.host_sections.swap(0, 1);
+                }
+                input
+                    .host_sections
+                    .iter_mut()
+                    .find(|section| section.id == self.section())
+                    .unwrap()
+                    .rows[0]
+                    .value = json!("更新后的工作区 A");
                 host.view.set_workspace_summary(input).unwrap();
                 self.phase = 3;
             }
             3 => {
-                assert_eq!(summary.row_id(SECTION, "name"), self.original_row);
-                assert_eq!(summary.section_expanded(SECTION), Some(false));
+                assert_eq!(summary.row_id(self.section(), "name"), self.original_row);
+                assert_eq!(summary.section_expanded(self.section()), Some(false));
+                if self.repositories {
+                    assert!(summary.section_layouts()[0].divider.is_none());
+                }
                 assert!(
                     !host
                         .view
@@ -148,18 +221,29 @@ impl Probe {
             }
             4 => {
                 assert!(matches!(&source.owner,SummaryOwner::Workspace{id} if id=="workspace-b"));
-                assert_ne!(summary.row_id(SECTION, "name"), self.original_row);
-                assert_eq!(summary.section_expanded(SECTION), Some(false));
-                let header = summary.section_header_id(SECTION).unwrap();
+                assert_ne!(summary.row_id(self.section(), "name"), self.original_row);
+                assert_eq!(summary.section_expanded(self.section()), Some(false));
+                let header = summary.section_header_id(self.section()).unwrap();
+                if self.repositories {
+                    assert!(
+                        summary
+                            .section_layouts()
+                            .into_iter()
+                            .find(|layout| layout.section_id == self.section())
+                            .unwrap()
+                            .divider
+                            .is_some()
+                    );
+                }
                 run_script(vec![(0, Self::click(host, header))]);
                 self.phase = 5;
             }
-            5 if summary.section_expanded(SECTION) == Some(true) => {
-                let id = summary.row_id(SECTION, "name").unwrap();
+            5 if summary.section_expanded(self.section()) == Some(true) => {
+                let id = summary.row_id(self.section(), "name").unwrap();
                 let field = host.view.tree.text_surface(id).unwrap();
                 assert!(field.input.read_only);
                 assert_eq!(field.input.text, "工作区");
-                let ids = summary.default_row_ids(SECTION, "name").unwrap();
+                let ids = summary.default_row_ids(self.section(), "name").unwrap();
                 let metadata = host.view.tree.get(ids.trailing).unwrap();
                 assert_eq!(
                     metadata
@@ -171,7 +255,7 @@ impl Probe {
                 let title = host.view.tree.get(ids.title).unwrap().frame();
                 let meta = metadata.frame();
                 let band = host.view.tree.get(ids.row).unwrap().frame();
-                assert!(summary.action_id(SECTION, "name").is_none());
+                assert!(summary.action_id(self.section(), "name").is_none());
                 let line = host
                     .text
                     .measure("Mg", tekes_ui_tokens::proposal::TextRole::UiBody, 1e8)
@@ -203,8 +287,24 @@ impl Probe {
                 assert_eq!(Some(&run.draft.text), self.draft.as_ref());
                 assert_eq!(run.transcript.items.len(), self.items);
                 assert_eq!(run.submissions.len(), self.submissions);
-                run_script(vec![(0, Action::Close)]);
+                if self.repositories {
+                    self.publish(host, "workspace-c");
+                } else {
+                    run_script(vec![(0, Action::Close)]);
+                }
                 self.phase = 8;
+            }
+            8 if self.repositories => {
+                let layouts = summary.section_layouts();
+                assert!(layouts[0].divider.is_none());
+                assert!(layouts[1].divider.is_some());
+                let mut actions = vec![];
+                if let Some(path) = &self.capture {
+                    actions.push((300, Action::Capture { path: path.clone() }));
+                }
+                actions.push((700, Action::Close));
+                run_script(actions);
+                self.phase = 9;
             }
             _ => {}
         }
@@ -214,7 +314,7 @@ impl Probe {
         }
     }
     pub fn receipt(&self) -> serde_json::Value {
-        assert_eq!(self.phase, 8);
-        json!({"nativeWindow":true,"explicitWorkspaceOwner":true,"noSyntheticRunScope":true,"hostRowsWithoutSessionFacts":true,"originalHeaderClicks":true,"sameOwnerRowsRetained":true,"ownerChangeRetiresIds":true,"collapseRetained":true,"emptyAndUnavailableDistinct":true,"mainDraftAndTranscriptUnchanged":true,"noSubmission":true,"realHarness":false,"physicalIme":false,"voiceOver":false,"fullUnselectedHostLayout":false,"ordinaryMetadataFirstLine":true,"titleAndMetadataSeparate":true,"originalComposerFocusAndMarkedBaseline":true,"syntheticPreedit":true})
+        assert_eq!(self.phase, if self.repositories { 9 } else { 8 });
+        json!({"nativeWindow":true,"explicitWorkspaceOwner":true,"noSyntheticRunScope":true,"hostRowsWithoutSessionFacts":true,"originalHeaderClicks":true,"sameOwnerRowsRetained":true,"ownerChangeRetiresIds":true,"collapseRetained":true,"emptyAndUnavailableDistinct":true,"mainDraftAndTranscriptUnchanged":true,"noSubmission":true,"realHarness":false,"physicalIme":false,"voiceOver":false,"fullUnselectedHostLayout":false,"ordinaryMetadataFirstLine":true,"titleAndMetadataSeparate":true,"originalComposerFocusAndMarkedBaseline":true,"syntheticPreedit":true,"repositoryDividerRules":self.repositories,"dividerBandOriginalDisclosure":self.repositories,"sameOwnerOrderChangesDivider":self.repositories})
     }
 }

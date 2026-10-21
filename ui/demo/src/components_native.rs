@@ -2981,6 +2981,13 @@ pub fn run() {
         !summary_label_selftest || args.iter().any(|arg| arg == "--transcript-content"),
         "Summary label requires formal host"
     );
+    let summary_divider_selftest = args
+        .iter()
+        .any(|arg| arg == "--summary-divider-native-selftest");
+    assert!(
+        !summary_divider_selftest || args.iter().any(|arg| arg == "--transcript-content"),
+        "Summary divider requires formal host"
+    );
     let summary_context_selftest = args
         .iter()
         .any(|arg| arg == "--summary-context-native-selftest");
@@ -3017,6 +3024,7 @@ pub fn run() {
         || composer_notice_selftest
         || disclosure_reading_selftest
         || summary_context_selftest
+        || summary_divider_selftest
         || summary_custom_selftest
         || summary_label_selftest
         || summary_child_selftest
@@ -3057,6 +3065,7 @@ pub fn run() {
             composer_notice_selftest,
             disclosure_reading_selftest,
             summary_context_selftest,
+            summary_divider_selftest,
             summary_custom_selftest,
             summary_label_selftest,
             summary_child_selftest,
@@ -3495,7 +3504,11 @@ pub fn run() {
             None
         },
         summary_sections_probe: summary_sections_selftest.then(summary_sections_probe::Probe::new),
-        summary_context_probe: summary_context_selftest.then(summary_context_probe::Probe::new),
+        summary_context_probe: if summary_divider_selftest {
+            Some(summary_context_probe::Probe::with_repository_dividers())
+        } else {
+            summary_context_selftest.then(summary_context_probe::Probe::new)
+        },
         summary_custom_probe: summary_custom_selftest.then(summary_custom_probe::Probe::new),
         summary_label_probe: summary_label_selftest.then(summary_label_probe::Probe::new),
         summary_child_probe: summary_child_fixture.map(summary_child_probe::Probe::new),

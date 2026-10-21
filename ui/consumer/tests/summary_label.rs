@@ -884,3 +884,218 @@ fn artifact_metadata_formatter_captures_host_counts_without_replacing_original_r
     );
     assert_eq!(host.text_surface(ids.title).unwrap().input.text, "报告.md");
 }
+
+#[test]
+fn repository_divider_follows_display_order_through_collapse_reorder_and_owner_change() {
+    use tekes_ui_tokens::Spacing;
+    let rule = proposal::metric("stroke", "stroke-rule").unwrap();
+    for theme in Theme::ALL {
+        for scale in [0.85, 1., 1.5] {
+            for width in [180., 420.] {
+                let mut source = input();
+                let section = |id: &str| SummarySection {
+                    id: id.into(),
+                    rows: vec![SummaryRow {
+                        id: "branch".into(),
+                        title: "分支 main".into(),
+                        value: Default::default(),
+                        action: None,
+                    }],
+                };
+                source.host_sections = vec![
+                    SummarySection {
+                        id: "empty".into(),
+                        rows: vec![],
+                    },
+                    section("repository:first"),
+                    section("host:info"),
+                    section("repository:second"),
+                    section("repository-alike"),
+                ];
+                let mut summary = SummaryView::new(49903, Default::default());
+                tekes_agent_ui_consumer_check::publish_summary_context(&mut summary, &source)
+                    .unwrap();
+                assert_eq!(
+                    summary.section_order(),
+                    [
+                        "repository:first",
+                        "host:info",
+                        "repository:second",
+                        "repository-alike"
+                    ]
+                );
+                let root = summary.id();
+                let first_header = summary.section_header_id("repository:first").unwrap();
+                let second_header = summary.section_header_id("repository:second").unwrap();
+                let first_label = summary.section_header_label_id("repository:first").unwrap();
+                let second_label = summary
+                    .section_header_label_id("repository:second")
+                    .unwrap();
+                let field = summary
+                    .passive_text_id("repository:first", "branch")
+                    .unwrap();
+                let mut host = summary.into_host().unwrap();
+                let mut text = Text::new(scale, true);
+                let frame = Rect::new(0., 0., width, 2000.);
+                let mut scene = Scene::new();
+                host.render(&mut scene, &mut text, frame, frame, theme.into())
+                    .unwrap();
+                let layouts: Vec<_> = host
+                    .get(root)
+                    .unwrap()
+                    .component::<SummaryView>()
+                    .unwrap()
+                    .section_layouts()
+                    .into_iter()
+                    .cloned()
+                    .collect();
+                assert!(layouts[0].divider.is_none());
+                assert!(layouts[1].divider.is_none());
+                assert!(layouts[3].divider.is_none());
+                let divider = layouts[2]
+                    .divider
+                    .expect("only non-first repository gets a divider");
+                assert!(
+                    (divider.min_x() - layouts[2].header.min_x() - 2. * Spacing::Regular.value())
+                        .abs()
+                        < 0.1
+                );
+                assert!(
+                    (divider.size.width
+                        - (layouts[2].header.size.width - 4. * Spacing::Regular.value()))
+                    .abs()
+                        < 0.1,
+                    "divider must follow the actual SDK header frame, not the outer host width"
+                );
+                assert_eq!(divider.min_y(), layouts[2].header.min_y());
+                assert!(
+                    (layouts[2].header.size.height
+                        - layouts[0].header.size.height
+                        - rule
+                        - Spacing::Regular.value())
+                    .abs()
+                        < 0.1
+                );
+                let a = host.get(first_label).unwrap().frame();
+                let b = host.get(second_label).unwrap().frame();
+                assert!(
+                    (b.min_y()
+                        - layouts[2].header.min_y()
+                        - (a.min_y() - layouts[0].header.min_y())
+                        - rule
+                        - Spacing::Regular.value())
+                    .abs()
+                        < 0.1
+                );
+                let mut expected = Scene::new();
+                tekes_ui_controls::layout_view::SeparatorView::default().render(
+                    &mut expected,
+                    divider,
+                    tekes_ui_controls::extended::Axis::Horizontal,
+                    Some(frame),
+                    theme.into(),
+                );
+                for ink in expected
+                    .primitives()
+                    .iter()
+                    .filter(|p| matches!(p, tekes_ui_scene::Primitive::Quad(_)))
+                {
+                    assert!(
+                        scene.primitives().contains(ink),
+                        "separator must use original SDK ink/theme"
+                    );
+                }
+                host.focus(Some(field), true);
+                host.accessibility_action(field, None, AccessibilityAction::SetSelection(0..2));
+                assert!(
+                    host.accessibility_action(second_header, None, AccessibilityAction::Press)
+                        .activated
+                );
+                assert!(
+                    host.get(root)
+                        .unwrap()
+                        .component::<SummaryView>()
+                        .unwrap()
+                        .section_layouts()
+                        .is_empty()
+                );
+                scene.clear();
+                host.render(&mut scene, &mut text, frame, frame, theme.into())
+                    .unwrap();
+                assert_eq!(host.focused(), Some(field));
+                let second = host
+                    .get(root)
+                    .unwrap()
+                    .component::<SummaryView>()
+                    .unwrap()
+                    .section_layouts()[2]
+                    .clone();
+                assert!(
+                    !second.expanded && second.body.is_none() && second.divider == Some(divider)
+                );
+                source.revision += 1;
+                source.host_sections.swap(1, 3);
+                tekes_agent_ui_consumer_check::publish_summary_context(
+                    host.get_mut(root)
+                        .unwrap()
+                        .component_mut::<SummaryView>()
+                        .unwrap(),
+                    &source,
+                )
+                .unwrap();
+                assert!(
+                    host.get(root)
+                        .unwrap()
+                        .component::<SummaryView>()
+                        .unwrap()
+                        .section_layouts()
+                        .is_empty()
+                );
+                scene.clear();
+                host.render(&mut scene, &mut text, frame, frame, theme.into())
+                    .unwrap();
+                let summary = host.get(root).unwrap().component::<SummaryView>().unwrap();
+                assert_eq!(
+                    summary.section_header_id("repository:first"),
+                    Some(first_header)
+                );
+                assert_eq!(
+                    summary.section_header_id("repository:second"),
+                    Some(second_header)
+                );
+                assert!(summary.section_layouts()[0].divider.is_none());
+                assert!(!summary.section_layouts()[0].expanded);
+                assert!(summary.section_layouts()[2].divider.is_some());
+                assert_eq!(
+                    host.text_surface(field).unwrap().input.selected_text(),
+                    "分支"
+                );
+                source.revision += 1;
+                source.owner = SummaryOwner::Workspace {
+                    id: "consumer-other-workspace".into(),
+                };
+                tekes_agent_ui_consumer_check::publish_summary_context(
+                    host.get_mut(root)
+                        .unwrap()
+                        .component_mut::<SummaryView>()
+                        .unwrap(),
+                    &source,
+                )
+                .unwrap();
+                scene.clear();
+                host.render(&mut scene, &mut text, frame, frame, theme.into())
+                    .unwrap();
+                assert!(host.get(first_header).is_none());
+                assert!(
+                    host.get(root)
+                        .unwrap()
+                        .component::<SummaryView>()
+                        .unwrap()
+                        .section_layouts()[0]
+                        .divider
+                        .is_none()
+                );
+            }
+        }
+    }
+}
