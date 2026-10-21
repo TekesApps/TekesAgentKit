@@ -10,6 +10,14 @@ use tekes_ui_platform_macos::selftest::{Action, run_script};
 const INPUT: &str = "ENDPOINT_READING_STREAM_PROOF";
 const DRAFT: &str = "流式期间中文草稿";
 const OTHER: &str = "另一会话独立草稿";
+#[derive(Debug, PartialEq, Eq)]
+struct SendObservation {
+    active: bool,
+    can_cancel: bool,
+    submissions: usize,
+    output: Option<(usize, bool)>,
+    editor_bytes: usize,
+}
 pub(super) struct Probe {
     phase: u8,
     started: Instant,
@@ -20,6 +28,7 @@ pub(super) struct Probe {
     last_len: usize,
     updates: usize,
     epoch: u64,
+    observed: Option<SendObservation>,
 }
 impl Probe {
     pub fn new() -> Self {
@@ -34,6 +43,7 @@ impl Probe {
             last_len: 0,
             updates: 0,
             epoch: 0,
+            observed: None,
         }
     }
     pub fn prepare(view: &ComponentDemo) {
@@ -139,6 +149,25 @@ impl Probe {
         }
     }
     pub fn advance(&mut self, host: &mut Host, window: &Window) {
+        if self.phase == 2 {
+            let snapshot = Self::snapshot(host);
+            let state = SendObservation {
+                active: window.is_active(),
+                can_cancel: snapshot.run.as_ref().is_some_and(|run| run.can_cancel),
+                submissions: snapshot
+                    .transcript
+                    .items
+                    .iter()
+                    .filter(|i| i.kind == TranscriptItemKind::User && i.text == INPUT)
+                    .count(),
+                output: Self::output(host).map(|(text, preview)| (text.len(), preview)),
+                editor_bytes: host.view.editor().input.text.len(),
+            };
+            if self.observed.as_ref() != Some(&state) {
+                eprintln!("NATIVE_STREAM_READING_WAIT {state:?}");
+                self.observed = Some(state);
+            }
+        }
         assert!(
             self.started.elapsed() < Duration::from_secs(40),
             "stream reading deadline {}",

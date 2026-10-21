@@ -2559,6 +2559,7 @@ impl WindowHandler for Host {
                     || self.system_ime_selftest
                     || self.stream_probe.is_some()
                     || self.reading_probe.is_some()
+                    || self.stream_reading_probe.is_some()
                 {
                     eprintln!(
                         "COMPONENT_FOCUS active={active} id={:?}",
