@@ -22,7 +22,6 @@ use tekes_ui_text::{
     coretext::{CoreTextFonts, CoreTextRasterizer, CoreTextShaper},
     model::{Paragraph, ShapeOptions},
     push::push_paragraph_visible,
-    style::TextStyle,
     traits::Shaper,
 };
 use tekes_ui_tokens::{Palette, Theme, proposal};
@@ -114,16 +113,11 @@ pub(super) struct TextBackend {
     pub(super) frame_requested: bool,
     pub(super) reduced_motion: bool,
     pub(super) caret_on: bool,
+    pub(super) last_label: Option<Rc<tekes_ui_text::LabelLayout>>,
 }
 impl TextBackend {
     fn shape(&mut self, text: &str, role: proposal::TextRole, width: Option<f32>) -> Rc<Paragraph> {
-        let m = role.style();
-        let style = if proposal::text_family(role.id()) == Some("mono") {
-            TextStyle::named("Menlo", m.size * self.type_scale)
-        } else {
-            TextStyle::system(m.size * self.type_scale)
-        }
-        .with_weight(m.weight);
+        let style = tekes_agent_ui_demo::label_host::text_style(role, self.type_scale);
         Rc::new(self.shaper.shape(
             text,
             &style,
@@ -166,6 +160,25 @@ impl TextSurfaceTextRenderer for TextBackend {
     }
 }
 impl TextSurfaceHost for TextBackend {
+    fn shape_label(
+        &mut self,
+        text: &str,
+        role: proposal::TextRole,
+        width: f32,
+        options: tekes_ui_text::LabelOptions,
+    ) -> Option<Rc<tekes_ui_text::LabelLayout>> {
+        let layout = tekes_agent_ui_demo::label_host::shape_label(
+            &mut self.shaper,
+            text,
+            role,
+            width,
+            self.type_scale,
+            options,
+        );
+        self.last_label = Some(layout.clone());
+        Some(layout)
+    }
+
     fn shape_surface(&mut self, s: &str, r: proposal::TextRole, w: Option<f32>) -> Rc<Paragraph> {
         self.shape(s, r, w)
     }
@@ -807,6 +820,7 @@ pub fn run() {
             frame_requested: false,
             reduced_motion: false,
             caret_on: true,
+            last_label: None,
         },
         scene: Scene::new(),
         palette: Palette::from(Theme::LIGHT),

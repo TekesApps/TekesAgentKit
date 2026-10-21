@@ -275,6 +275,16 @@ impl SummaryView {
             .get(&Key::Header(self.owner.as_ref()?.clone(), section.into()))
             .copied()
     }
+    /// Original decorative label slot. Text remains complete; the SDK shapes its
+    /// one-line tail ellipsis, independently of the button's full AX name.
+    pub fn section_header_label_id(&self, section: &str) -> Option<ComponentId> {
+        self.ids
+            .get(&Key::HeaderLabel(
+                self.owner.as_ref()?.clone(),
+                section.into(),
+            ))
+            .copied()
+    }
     pub fn section_expanded(&self, section: &str) -> Option<bool> {
         self.section_header_id(section)?;
         Some(self.expansions.get(section)?.borrow().open)
@@ -513,6 +523,7 @@ impl SummaryView {
                         ids[&Key::HeaderLabel(input.owner.clone(), section.id.clone())],
                         ids[&Key::Body(input.owner.clone(), section.id.clone())],
                         expansion,
+                        true,
                     ),
                 )
             });

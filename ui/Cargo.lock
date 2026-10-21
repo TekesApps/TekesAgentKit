@@ -1897,6 +1897,7 @@ dependencies = [
  "tekes-agent-presentation",
  "tekes-ui-controls",
  "tekes-ui-scene",
+ "tekes-ui-text",
  "tekes-ui-tokens",
  "unicode-segmentation",
 ]
@@ -2010,6 +2011,9 @@ dependencies = [
  "tekes-agent-components-ui",
  "tekes-agent-ui-bindings",
  "tekes-ui-controls",
+ "tekes-ui-scene",
+ "tekes-ui-text",
+ "tekes-ui-tokens",
 ]
 
 [[package]]

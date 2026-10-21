@@ -62,6 +62,8 @@ mod stream_reading_probe;
 mod summary_context_probe;
 #[path = "native_summary_custom_selftest.rs"]
 mod summary_custom_probe;
+#[path = "native_summary_label_selftest.rs"]
+mod summary_label_probe;
 #[path = "native_summary_sections_selftest.rs"]
 mod summary_sections_probe;
 #[path = "native_composer_visibility_selftest.rs"]
@@ -102,6 +104,7 @@ struct Host {
     summary_sections_probe: Option<summary_sections_probe::Probe>,
     summary_context_probe: Option<summary_context_probe::Probe>,
     summary_custom_probe: Option<summary_custom_probe::Probe>,
+    summary_label_probe: Option<summary_label_probe::Probe>,
     visibility_probe: Option<visibility_probe::Probe>,
     feedback_probe: Option<feedback_probe::Probe>,
     stream_probe: Option<stream_probe::Probe>,
@@ -1382,6 +1385,10 @@ impl Host {
             probe.advance(self, window);
             self.summary_custom_probe = Some(probe);
         }
+        if let Some(mut probe) = self.summary_label_probe.take() {
+            probe.advance(self, window);
+            self.summary_label_probe = Some(probe);
+        }
         if let Some(mut probe) = self.summary_context_probe.take() {
             probe.advance(self, window);
             self.summary_context_probe = Some(probe);
@@ -2443,6 +2450,14 @@ impl Host {
             );
             println!("NATIVE_AGENT_SUMMARY_CUSTOM_RECEIPT {}", probe.receipt());
         }
+        if let Some(probe) = &self.summary_label_probe {
+            assert!(
+                self.failures.is_empty(),
+                "Summary label failures {:?}",
+                self.failures
+            );
+            println!("NATIVE_AGENT_SUMMARY_LABEL_RECEIPT {}", probe.receipt());
+        }
         if let Some(probe) = &self.summary_context_probe {
             assert!(
                 self.failures.is_empty(),
@@ -2909,6 +2924,13 @@ pub fn run() {
         !summary_custom_selftest || args.iter().any(|arg| arg == "--transcript-content"),
         "custom Summary requires formal host"
     );
+    let summary_label_selftest = args
+        .iter()
+        .any(|arg| arg == "--summary-label-native-selftest");
+    assert!(
+        !summary_label_selftest || args.iter().any(|arg| arg == "--transcript-content"),
+        "Summary label requires formal host"
+    );
     let summary_context_selftest = args
         .iter()
         .any(|arg| arg == "--summary-context-native-selftest");
@@ -2946,6 +2968,7 @@ pub fn run() {
         || disclosure_reading_selftest
         || summary_context_selftest
         || summary_custom_selftest
+        || summary_label_selftest
         || sidebar_session_menu_selftest
         || sidebar_search_selftest
         || sidebar_query_selftest
@@ -2983,6 +3006,7 @@ pub fn run() {
             disclosure_reading_selftest,
             summary_context_selftest,
             summary_custom_selftest,
+            summary_label_selftest,
             sidebar_session_menu_selftest,
             sidebar_search_selftest,
             sidebar_query_selftest,
@@ -3403,6 +3427,7 @@ pub fn run() {
         summary_sections_probe: summary_sections_selftest.then(summary_sections_probe::Probe::new),
         summary_context_probe: summary_context_selftest.then(summary_context_probe::Probe::new),
         summary_custom_probe: summary_custom_selftest.then(summary_custom_probe::Probe::new),
+        summary_label_probe: summary_label_selftest.then(summary_label_probe::Probe::new),
         visibility_probe: visibility_selftest
             .then(|| visibility_probe::Probe::new(visibility_fixture)),
         feedback_probe: feedback_selftest.then(feedback_probe::Probe::new),
@@ -3480,6 +3505,7 @@ pub fn run() {
             frame_requested: false,
             reduced_motion: false,
             caret_on: true,
+            last_label: None,
         },
         scene: Scene::new(),
         palette: Palette::from(Theme::LIGHT),

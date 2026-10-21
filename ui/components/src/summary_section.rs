@@ -22,13 +22,25 @@ pub(crate) struct SummaryHeader {
     epoch: Rc<Cell<u64>>,
 }
 impl SummaryHeader {
-    fn new(label: ComponentId, expansion: Expansion, epoch: Rc<Cell<u64>>) -> Self {
+    fn new(
+        label: ComponentId,
+        expansion: Expansion,
+        epoch: Rc<Cell<u64>>,
+        single_line_title: bool,
+    ) -> Self {
+        let label = Content::new(label, TextContent::new(""));
+        let label = if single_line_title {
+            label
+                .with_label_layout(tekes_ui_text::LabelOptions::single_line(
+                    tekes_ui_text::LabelOverflow::TailEllipsis,
+                ))
+                .expect("published Summary label policy on original TextContent")
+        } else {
+            label
+        };
         Self {
-            button: CompoundButton::new(
-                "Summary section",
-                Content::new(label, TextContent::new("")),
-            )
-            .expect("Summary header has one passive text slot"),
+            button: CompoundButton::new("Summary section", label)
+                .expect("Summary header has one passive text slot"),
             expansion,
             epoch,
         }
@@ -166,6 +178,7 @@ impl SummarySectionView {
         label: ComponentId,
         body: ComponentId,
         expansion: Expansion,
+        single_line_title: bool,
     ) -> Self {
         let epoch = Rc::new(Cell::new(0));
         Self {
@@ -175,7 +188,10 @@ impl SummarySectionView {
             expansion: expansion.clone(),
             layout: None,
             children: vec![
-                Content::new(header, SummaryHeader::new(label, expansion.clone(), epoch)),
+                Content::new(
+                    header,
+                    SummaryHeader::new(label, expansion.clone(), epoch, single_line_title),
+                ),
                 Content::new(
                     body,
                     SummaryRows {

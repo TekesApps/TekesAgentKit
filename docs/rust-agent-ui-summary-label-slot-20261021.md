@@ -1,5 +1,7 @@
 # Summary 标题槽与 #31 候选消费
 
+当前状态（2026-10-22）：[公开单行标题消费](rust-agent-ui-summary-label-20261022.md)已接通精确 `09b4bab` 的 SDK label 服务。下文“默认 pin 缺少/候选未发布”是历史输入结论，不代表当前阻塞；普通默认行仍自然换行，历史实验不覆盖产品排版。
+
 2026-10-21 后续对照补充：本记录的隔离实验也对普通 row 试用了单行 ellipsis，所得通过项只证明库机制；当前 ClientKit `SummaryDefaultRowView` 的标题是 wrapping label，该实验行策略不作为产品布局采用。正式默认行保留自然换行，六项用量现采用[独立两列布局](rust-agent-ui-summary-usage-20261021.md)。历史收据不改写。
 
 本轮补齐同一 Summary header 的库组件组合，继续对照 ClientKit `ClientAgentSummaryView.swift::SummarySectionHeaderButton`。Tekes 的 `ClientAgentSummaryHostAdapter.swift` 只提供 repository sections 与导航回调，未将业务 header 或折叠状态移回宿主。

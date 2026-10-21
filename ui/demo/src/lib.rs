@@ -19,3 +19,6 @@ pub mod readonly_child_proof;
 pub mod feedback_controls_proof;
 
 pub mod feedback_transcript_proof;
+
+#[cfg(target_os = "macos")]
+pub mod label_host;

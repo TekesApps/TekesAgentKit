@@ -39,13 +39,13 @@ Layout 和显示逻辑须逐项严格对齐当前 ClientKit 对应 Views；[对�
 
 [Sidebar 首次恢复与观察失败](rust-agent-ui-sidebar-restoration-20261021.md)现已贯通 shared inventory 就绪事实、binding 和公开组件输入；未恢复不再显示确认空，观察失败保留最近列表。搜索/分组和完整 outline/status-pane 布局仍待继续。
 
-[Summary 标题槽与 #31 候选消费](rust-agent-ui-summary-label-slot-20261021.md)记录默认库组件组合与隔离 label API 验证；默认 pin 的省略能力仍待公开版本。
+[Summary 单行标题公开消费](rust-agent-ui-summary-label-20261022.md)接通当前精确公开 pin 的 `with_label_layout` / `shape_label`；宿主必须提供原 SDK label 服务。仅 header 单行尾部省略，完整源文本与 AX 名称保留，普通行继续换行。旧[候选记录](rust-agent-ui-summary-label-slot-20261021.md)按其历史输入解释。
 
 [布局激活与成功帧边界](tekesui-layout-text-candidate-20261021.md)记录 #27 的独立候选消费。`render` 成功且原业务 publication/epoch 匹配后，宿主才发布当前原生文本、AX、几何和可见性；失败帧不靠更换编辑器或重试 Agent 操作恢复。
 
 ### 排版与基础样式
 
-[Summary section 顺序与折叠](rust-agent-ui-summary-sections-20261021.md)现已补齐宿主优先顺序、按 section ID 保留的折叠、真实隐藏的输入/AX 子树及任务 pointer 改变时的旧动作拒绝。公开 DTO/查询支持第二 consumer；单行省略见 TekesUI #31，完整 Summary rows/custom slots 与整体视觉仍未验收。
+[Summary section 顺序与折叠](rust-agent-ui-summary-sections-20261021.md)现已补齐宿主优先顺序、按 section ID 保留的折叠、真实隐藏的输入/AX 子树及任务 pointer 改变时的旧动作拒绝。公开 DTO/查询支持第二 consumer；单行省略已消费当前公开 SDK；完整 Summary 默认行及整体视觉仍未验收，自定义 host Content 见后续接入文档。
 
 [Composer 输入行与单一主动作](rust-agent-ui-composer-band-20261021.md)已按对应 View 的内容顺序推进：正文与主动作/Add 共用输入 band，发送/停止互斥并保留原控件，空 setup 不占位，十行上限随字体倍率更新。模型/预设的宿主 toolbar、完整 palette/chip 与 glyph slot 仍待对齐，notice 见文首当前记录；默认 TekesUI 样式和固定 pin 不变。
 

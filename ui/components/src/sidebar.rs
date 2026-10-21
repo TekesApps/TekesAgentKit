@@ -1179,6 +1179,7 @@ impl Sidebar {
                                 label,
                                 body_id,
                                 expansion,
+                                false,
                             ),
                         )
                     });
@@ -1223,6 +1224,7 @@ impl Sidebar {
                             label,
                             ComponentId(self.root.0 + 11),
                             self.pinned_expansion.clone(),
+                            false,
                         ),
                     )
                 });

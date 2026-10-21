@@ -9,3 +9,8 @@ tekes-agent-components-ui.workspace = true
 tekes-agent-ui-bindings.workspace = true
 
 tekes-ui-controls.workspace = true
+
+[dev-dependencies]
+tekes-ui-text.workspace = true
+tekes-ui-scene.workspace = true
+tekes-ui-tokens.workspace = true

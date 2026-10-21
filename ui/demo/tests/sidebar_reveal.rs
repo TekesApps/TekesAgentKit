@@ -18,6 +18,23 @@ impl TextSurfaceTextRenderer for Text {
     fn push_visible(&mut self, _: &mut Scene, _: &Paragraph, _: Point, _: Rgba, _: Rect) {}
 }
 impl TextSurfaceHost for Text {
+    fn shape_label(
+        &mut self,
+        text: &str,
+        role: proposal::TextRole,
+        width: f32,
+        options: tekes_ui_text::LabelOptions,
+    ) -> Option<Rc<tekes_ui_text::LabelLayout>> {
+        Some(tekes_agent_ui_demo::label_host::shape_label(
+            &mut self.0,
+            text,
+            role,
+            width,
+            self.1,
+            options,
+        ))
+    }
+
     fn type_scale(&self) -> f32 {
         self.1
     }

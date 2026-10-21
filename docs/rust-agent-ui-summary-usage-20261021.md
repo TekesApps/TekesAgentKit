@@ -1,5 +1,7 @@
 # Summary 用量行：左标题、右数值
 
+当前状态（2026-10-22）：[公开单行标题消费](rust-agent-ui-summary-label-20261022.md)已接通精确 `09b4bab` 的 SDK label 服务。下文“默认 pin 缺少/候选未发布”是历史输入结论，不代表当前阻塞；普通默认行仍自然换行，历史实验不覆盖产品排版。
+
 本轮对应 ClientKit 的 `SummaryProviders.usageItems` 和
 `ClientAgentSummaryView.SummaryDefaultRowView`。此前 AgentKit 将 `output · 0`
 拼成一个文本控件；现在六个用量行分别挂载左侧标题与右侧数值，标题可换行，

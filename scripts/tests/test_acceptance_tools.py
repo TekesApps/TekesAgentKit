@@ -214,13 +214,16 @@ class Checks(unittest.TestCase):
                       rev='1' * 40, repository='https://github.com/TekesApps/TekesUI.git')
         (ui / 'tekesui-source.json').write_text(json.dumps(public))
         for name, dependencies in {
-            'components': ['tekes-agent-contract', 'tekes-agent-presentation', 'tekes-ui-controls', 'tekes-ui-scene', 'tekes-ui-tokens', 'unicode-segmentation'],
+            'components': ['tekes-agent-contract', 'tekes-agent-presentation', 'tekes-ui-controls', 'tekes-ui-scene', 'tekes-ui-tokens', 'tekes-ui-text', 'unicode-segmentation'],
             'bindings': ['tekes-agent-components-ui', 'tekes-agent-contract', 'tekes-agent-presentation', 'tekes-agent-session', 'tekes-agent-web', 'serde_json', 'tokio', 'async-trait', 'uuid', 'base64'],
             'consumer': ['tekes-agent-components-ui', 'tekes-agent-ui-bindings', 'tekes-ui-controls'],
         }.items():
             (ui / name).mkdir()
             text = '[package]\npublish.workspace=true\n[dependencies]\n'
             text += ''.join(f'{d}.workspace=true\n' for d in dependencies)
+            if name == 'consumer':
+                text += '[dev-dependencies]\n' + ''.join(
+                    f'{d}.workspace=true\n' for d in ('tekes-ui-text', 'tekes-ui-scene', 'tekes-ui-tokens'))
             (ui / name / 'Cargo.toml').write_text(text)
         header = '[workspace]\n[workspace.package]\npublish=false\nversion="0.0.0"\n[workspace.dependencies]\nunicode-segmentation="=1.13.3"\n'
         for dependency, valid in [

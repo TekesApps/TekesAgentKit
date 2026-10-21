@@ -24,7 +24,7 @@ for name, dependency in workspace['dependencies'].items():
 # Unicode segmentation implements ClientKit's bounded business preview string, not layout.
 assert workspace['dependencies']['unicode-segmentation'] == '=1.13.3'
 components = tomllib.loads((ui / 'components/Cargo.toml').read_text())['dependencies']
-assert set(components) == {'tekes-agent-contract', 'tekes-agent-presentation', 'tekes-ui-controls', 'tekes-ui-scene', 'tekes-ui-tokens', 'unicode-segmentation'}
+assert set(components) == {'tekes-agent-contract', 'tekes-agent-presentation', 'tekes-ui-controls', 'tekes-ui-scene', 'tekes-ui-tokens', 'tekes-ui-text', 'unicode-segmentation'}
 bindings = tomllib.loads((ui / 'bindings/Cargo.toml').read_text())['dependencies']
 # uuid allocates immutable session/create and attachment-operation identities;
 # bindings still cannot import a renderer, platform backend or harness adapter.
@@ -33,7 +33,11 @@ consumer = tomllib.loads((ui / 'consumer/Cargo.toml').read_text())['dependencies
 # Public reveal consumption needs the SDK's original token, options and text-host trait.
 # Controls are permitted; renderer/platform/harness dependencies remain excluded.
 assert set(consumer) == {'tekes-agent-components-ui', 'tekes-agent-ui-bindings', 'tekes-ui-controls'}
-assert not tomllib.loads((ui / 'consumer/Cargo.toml').read_text()).get('dev-dependencies', {})
+# Independent label-host tests use only fixed SDK text/scene/token primitives.
+assert tomllib.loads((ui / 'consumer/Cargo.toml').read_text()).get('dev-dependencies', {}) == {
+    name: {'workspace': True} for name in ('tekes-ui-text', 'tekes-ui-scene', 'tekes-ui-tokens')}
+for source in (ui / 'components/src').rglob('*.rs'):
+    assert 'tekes_ui_text::coretext' not in source.read_text(), 'native font adapters belong to the host'
 # Direct dependencies must go through the reviewed workspace or crates.io; no host sibling fallback.
 for path in ui.glob('*/Cargo.toml'):
     manifest = tomllib.loads(path.read_text())

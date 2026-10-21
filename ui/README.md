@@ -242,3 +242,12 @@ Summary 的 `custom_rows` 允许宿主在声明的产品行内安装原TekesUI C
 安装使用 `install_summary_custom_row`，可能淘汰原内容的发布使用 `publish_summary_context_update`，均走原SDK生命周期。
 事件时捕获的来源需在派发前校验；完整输入、namespace与宿主回调责任见
 [Summary自定义行](../docs/rust-agent-ui-summary-custom-20261022.md)。
+
+
+Summary section header 使用当前精确 SDK 的 `with_label_layout(LabelOptions::single_line(TailEllipsis))`，
+原 TextContent 保存完整源文本，原 CompoundButton 持有唯一完整 AX 名称和折叠动作。
+宿主的 `ButtonTextRenderer::text_surface_host` 必须提供 `TextSurfaceHost::shape_label`；
+macOS demo 的 `label_host` 只向原 CoreTextShaper 转交同一字体/字号/weight和排版参数，
+无自定义截断或编辑器替换。缺服务返回 `CompositionError::MissingLabelServices`，不默默多行。
+普通行保持自然换行。公开 label ID 查询、第二 consumer 和原生入口见
+[单行标题接入](../docs/rust-agent-ui-summary-label-20261022.md)。
