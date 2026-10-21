@@ -2,7 +2,7 @@
 
 本文件是正式业务组件的实现契约与进度入口，不是完成声明。完整交付目标保持 Composer、Transcript、Indicators、RunView、SidePanel、Sidebar，加 Native/Pi/DSH 能力验证、第二公开 consumer、原生窗口验收、review/CI/合并与阶段 tag。
 
-[原回合导航契约](rust-agent-ui-turn-navigation-20261021.md)增加非抢焦点的捕获/一次 dispatch 与 pane ABA 拒绝。当前公开1294已具备原item reveal和Start对齐；正式Run回合导航宿主桥接仍未接通，应继续消费库API，不再把[#32](https://github.com/TekesApps/TekesUI/issues/32)的源码交付当作阻塞。
+[公开版本回合导航](rust-agent-ui-published-navigation-20261021.md)已接通原生 demo 的普通 Start、Latest 和独立 rail 自动 reveal；复用原阅读 token、编辑器及宿主历史回调，中文合成预编辑专项通过。完整 rail/产品体验仍待验收，#22/#28/#32 的源码交付不再作为当前阻塞。
 [Summary 用量两列布局](rust-agent-ui-summary-usage-20261021.md)将六项用量的标题与数值拆成原 TekesUI 文本槽，增加公开格式化回调；不重算 facts 或切换默认依赖。完整 Summary rows/slots 与原生产品验收仍待完成。
 
 源码基线：AgentKit已发布v0.3.8 / `f1daa0ffcf6ced41e21f351e22845455ca78006c`；本分支Rust UI仍为实验0.0.0/publish=false。当前TekesUI精确公开pin为`1294987dacabb33c0e411c13ee5ea544a1123f8e` / `remediation-checkpoint-20261021`，实际八包241输入，清单SHA `5b5a5acdbb957b565eb73e5558769e38b8c34a4e7ae7b7553d76b98defb4c1f2`，以`ui/tekesui-source.json`和Cargo.lock核验。原431/8cf/2ee清单保留在`ui/baselines/`。
@@ -272,7 +272,7 @@ Native [消息生命周期边界修正](rust-agent-ui-native-stream-boundary-202
 
 [实际回合轨道组件](rust-agent-ui-turn-rail-controls-20261021.md)已接入原 RunView 的事件捕获、独立库滚动和生命周期隔离；当时8cf默认输入明确unsupported；当前1294的基础reading/reveal/Start已公开，#29隔离候选记录与#33需求仍需按实际消费范围核对，尚不构成完整轨道或稳定 UI 交付。
 
-[#32 普通回合 Start 的独立组件验证](rust-agent-ui-turn-start-20261021.md)已在新588277候选通过真实clip与高输入行检查；当前1294已包含Start；正式宿主桥接与整体体验仍待完成，不能用历史候选通过替代当前入口验收。
+[#32 普通回合 Start 的独立组件验证](rust-agent-ui-turn-start-20261021.md)已在新588277候选通过真实clip与高输入行检查；当前1294已包含Start；当前正式桥接及验收见文首公开版本记录；整体体验仍待完成。
 
 后续[主导航宿主回调与588277原生Start](rust-agent-ui-turn-navigation-host-20261021.md)已增加显式显示事实、原点击历史捕获和原生组字内选区检查；此前收据保持原范围，完整交付仍未完成。
 

@@ -48,7 +48,8 @@ impl TurnRailAction {
             CompoundButton::new("回合", Content::new(decoration, Tick { centers: false }))
                 .expect("one passive Agent tick");
         button.action.variant = ButtonVariant::Quiet;
-        // CANDIDATE_COMPACT_ACTION_CONFIGURATION
+        button.action.button.frame_policy = tekes_ui_controls::ButtonFramePolicy::Exact;
+        button.action.pointer_activation_phase = ButtonActivationPhase::Press;
         Self {
             button,
             prototype: None,
@@ -67,6 +68,9 @@ impl TurnRailAction {
     }
 }
 impl Component for TurnRailAction {
+    fn focus_decoration_above_siblings(&self) -> bool {
+        self.button.focus_decoration_above_siblings()
+    }
     fn children(&self) -> &[Content] {
         self.button.children()
     }
@@ -118,5 +122,30 @@ impl Component for TurnRailAction {
     }
     fn semantics(&self) -> ContentSemantics {
         self.button.semantics()
+    }
+}
+
+// The shared wrapper delegates the retained SDK control.
+#[cfg(test)]
+mod forwarded_focus_tests {
+    use super::*;
+
+    #[test]
+    fn actual_turn_rail_delegates_library_focus_decoration_state() {
+        let mut action = TurnRailAction::new(ComponentId(999));
+        action.button.action.button.frame_policy = tekes_ui_controls::ButtonFramePolicy::Exact;
+        assert!(!action.focus_decoration_above_siblings());
+        action.set_focus(true, true);
+        assert!(action.button.focus_decoration_above_siblings());
+        assert!(action.focus_decoration_above_siblings());
+        action.button.action.button.state.disabled = true;
+        assert!(!action.button.focus_decoration_above_siblings());
+        assert!(!action.focus_decoration_above_siblings());
+        action.button.action.button.state.disabled = false;
+        action.set_focus(true, false);
+        assert!(!action.button.focus_decoration_above_siblings());
+        assert!(!action.focus_decoration_above_siblings());
+        action.set_focus(false, false);
+        assert!(!action.focus_decoration_above_siblings());
     }
 }

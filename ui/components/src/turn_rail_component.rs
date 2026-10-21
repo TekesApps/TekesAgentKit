@@ -11,10 +11,9 @@ use std::{
 };
 use tekes_ui_controls::{ButtonTextRenderer, ScrollArea, composition::*, layout::MeasuredChild};
 use tekes_ui_scene::{Point, Rect, Size};
-/// The public fixed pin lacks exact compact controls. An explicit isolated SDK
-/// adapter enables this only alongside original Exact/Press APIs, never a skin.
+/// The exact published SDK provides original Exact/Press/preserving-focus APIs.
 pub fn turn_rail_supported() -> bool {
-    false
+    true
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct TurnRailNavigationGate {
@@ -518,6 +517,5 @@ impl Component for TurnRail {
 }
 
 fn rail_action_content(id: ComponentId, tick: ComponentId) -> Content {
-    // CANDIDATE_RAIL_PRESERVING_FOCUS
-    Content::new(id, TurnRailAction::new(tick))
+    Content::new(id, TurnRailAction::new(tick)).preserving_focus()
 }

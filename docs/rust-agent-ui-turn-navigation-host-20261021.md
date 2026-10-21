@@ -1,5 +1,7 @@
 # 回合导航：宿主历史回调与588277原生 Start
 
+此文保留历史588277候选证据。当前公开1294消费、正式宿主桥接与新原生验收见[公开版本回合导航](rust-agent-ui-published-navigation-20261021.md)；历史默认输入与阻塞不覆盖当前状态。
+
 对照 ClientKit `RunView.jumpToTurnFromIndicator`、`ThreadTranscriptPresenter.semanticLastSectionID` 及 Tekes `ClientAgentHostAdapters` / `NavigationModel`，补齐主 Run 的显式历史输入和回调。AgentKit 捕获 Agent 回合的原来源；宿主仍拥有选择历史、Back/Forward、持久化和窗口导航，没有在 Kit 内重写 NavigationModel。
 
 ## 主宿主契约

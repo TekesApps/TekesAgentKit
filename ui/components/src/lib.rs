@@ -18,6 +18,8 @@ mod run_view;
 pub use run_view::*;
 mod run_reading;
 pub use run_reading::*;
+mod run_navigation;
+pub use run_navigation::*;
 mod actionable;
 pub use actionable::*;
 mod annotation_editor;

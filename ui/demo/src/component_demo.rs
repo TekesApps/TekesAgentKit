@@ -704,6 +704,19 @@ impl ComponentDemo {
             .install_transcript(content)
             .map_err(unsupported)?;
         self.next_document_namespace = end;
+        let run = self
+            .tree
+            .get_mut(ComponentId(ids.root.0 + 16))
+            .unwrap()
+            .component_mut::<RunView>()
+            .unwrap();
+        run.install_turn_rail(9_000_000 + (ids.root.0 >> 32) as u32)
+            .map_err(unsupported)?;
+        run.set_rail_navigation_gate(tekes_agent_components_ui::TurnRailNavigationGate {
+            turn_start: true,
+            latest: true,
+        })
+        .map_err(unsupported)?;
         self.document_roots.insert(ids.root, root);
         self.attach_run_reading(ids, binding)?;
         self.sync_feedback(ids, binding)
@@ -3836,6 +3849,22 @@ impl ComponentDemo {
         commands.extend(self.take_background_commands());
         Ok(commands)
     }
+    /// Only original, currently mounted Run panes; retained unmounted panes are excluded.
+    pub fn mounted_run_roots(&self) -> Vec<ComponentId> {
+        self.document_roots
+            .keys()
+            .filter_map(|id| {
+                let root = ComponentId(id.0 + 16);
+                self.tree
+                    .get(root)
+                    .and_then(|node| node.component::<RunView>())
+                    .map(|_| root)
+            })
+            .collect()
+    }
+    pub fn is_main_run(&self, root: ComponentId) -> bool {
+        root == ComponentId(self.ids().root.0 + 16)
+    }
     pub fn render(
         &mut self,
         scene: &mut Scene,
@@ -3845,6 +3874,49 @@ impl ComponentDemo {
         palette: Palette,
     ) -> std::result::Result<(), CompositionError> {
         self.tree.render(scene, text, frame, clip, palette)?;
+        // Read actual successful layout, not sticky follow mode or running state.
+        for root in self.mounted_run_roots() {
+            let run = self.tree.get(root).unwrap().component::<RunView>().unwrap();
+            let context = if self.is_main_run(root) && run.is_pane_presented() {
+                run.layout_geometry().and_then(|geometry| {
+                    run.transcript()
+                        .and_then(|transcript| self.tree.get(transcript.id()))
+                        .map(
+                            |document| tekes_agent_components_ui::RunTurnNavigationContext {
+                                bottom_is_visible: document.frame().max_y()
+                                    - geometry.document_bottom_clearance
+                                    <= geometry.visible_document.max_y() + 40.,
+                            },
+                        )
+                })
+            } else {
+                None
+            };
+            let presented = run.is_pane_presented();
+            let following = self
+                .tree
+                .get(run.ids().viewport)
+                .unwrap()
+                .component::<ScrollContent>()
+                .unwrap()
+                .is_following_latest();
+            self.tree
+                .get_mut(root)
+                .unwrap()
+                .component_mut::<RunView>()
+                .unwrap()
+                .set_turn_navigation_context(context)
+                .expect("rendered Run navigation context");
+            if presented {
+                self.tree
+                    .get_mut(root)
+                    .unwrap()
+                    .component_mut::<RunView>()
+                    .unwrap()
+                    .update_rail_follow_target(following)
+                    .expect("rendered rail follow target");
+            }
+        }
         // CANDIDATE_COMPOSER_PADDING_BINDING
         Ok(())
     }

@@ -390,7 +390,7 @@ impl RunView {
     pub fn claim_turn_navigation_with_host(
         &self,
         navigation: &RunTurnNavigation,
-        host: &mut impl RunTurnNavigationHost,
+        host: &mut (impl RunTurnNavigationHost + ?Sized),
     ) -> Result<RunTurnNavigationKind, &'static str> {
         let jump = navigation
             .jump
@@ -401,8 +401,7 @@ impl RunView {
         let _ = host.take_pending_turn_reveal(&self.scope);
         Ok(kind)
     }
-    /// The default published library cannot mount nonoverlapping compact
-    /// actions. No ordinary minimum-height button is substituted for the rail.
+    /// Mount shared compact actions using the exact published SDK controls.
     pub fn install_turn_rail(&mut self, namespace: u32) -> Result<(), &'static str> {
         if !turn_rail_supported() {
             return Err("TekesUI exact compact actions unavailable");

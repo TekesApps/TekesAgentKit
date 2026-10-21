@@ -87,6 +87,8 @@ def main():
     if args.append_padding_intent_probe and not args.composer_padding:
         parser.error('--append-padding-intent-probe requires --composer-padding')
     repo = Path(__file__).resolve().parent.parent
+    if args.turn_rail or args.forwarded_focus or args.append_rail_probe or args.append_start_probe:
+        parser.error('Rail/Start/focus are now formal published-SDK paths. Run ui/demo/tests/run_reading.rs and --reading-native-selftest; the historical rewrite recipe requires its original AgentKit revision.')
     source = args.source.resolve()
     manifest = json.loads(args.manifest.read_text())
     verify(source, manifest)

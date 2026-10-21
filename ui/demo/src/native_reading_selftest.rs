@@ -469,8 +469,93 @@ impl Probe {
             }
             10 if host.view.selected() == 0 => {
                 self.restored_a(host);
-                self.phase = 11;
-                run_script(vec![(0, Action::Close)]);
+                if self.gate.is_some() {
+                    run_script(vec![
+                        (0, Self::click(host, host.view.ids().editor)),
+                        (
+                            100,
+                            Action::PreeditRange {
+                                text: "导航中文组字".into(),
+                                selection: 1..3,
+                                replacement: None,
+                            },
+                        ),
+                    ]);
+                    self.phase = 11;
+                } else {
+                    self.phase = 14;
+                    run_script(vec![(0, Action::Close)]);
+                }
+            }
+            11 if window.is_active() && host.view.editor().input.marked.is_some() => {
+                let root = ComponentId(host.view.ids().root.0 + 16);
+                let run = host
+                    .view
+                    .tree
+                    .get(root)
+                    .unwrap()
+                    .component::<RunView>()
+                    .unwrap();
+                let rail = run.turn_rail().unwrap();
+                let target = run
+                    .turn_targets()
+                    .unwrap()
+                    .into_iter()
+                    .skip(2)
+                    .find(|target| {
+                        rail.row_id(target.turn_id())
+                            .and_then(|id| host.view.tree.get(id))
+                            .and_then(|n| n.visible())
+                            .is_some()
+                    })
+                    .expect("visible ordinary rail target");
+                self.anchor = Some(target.row_ids()[0]);
+                self.baseline = Some(host.view.editor().input.external_baseline());
+                let row = rail.row_id(target.turn_id()).unwrap();
+                run_script(vec![(0, Self::click(host, row))]);
+                self.phase = 12;
+            }
+            12 if window.is_active()
+                && !Self::scroll(host).is_following_latest()
+                && !host.turn_history.0.is_empty() =>
+            {
+                assert_eq!(host.view.tree.focused(), self.editor);
+                assert_eq!(
+                    host.view.editor().input.external_baseline(),
+                    *self.baseline.as_ref().unwrap()
+                );
+                assert!(
+                    Self::relative_y(host, self.anchor.unwrap()).abs() <= 1.,
+                    "ordinary turn aligns at actual viewport start; relative_y={}",
+                    Self::relative_y(host, self.anchor.unwrap())
+                );
+                let root = ComponentId(host.view.ids().root.0 + 16);
+                let run = host
+                    .view
+                    .tree
+                    .get(root)
+                    .unwrap()
+                    .component::<RunView>()
+                    .unwrap();
+                let target = run.turn_targets().unwrap().pop().unwrap();
+                let row = run.turn_rail().unwrap().row_id(target.turn_id()).unwrap();
+                host.view
+                    .tree
+                    .accessibility_action(row, None, AccessibilityAction::Press);
+                let commands = host.view.drain_commands().unwrap();
+                host.commands(Ok(commands));
+                self.phase = 13;
+            }
+            13 if Self::scroll(host).is_following_latest() => {
+                assert_eq!(host.view.tree.focused(), self.editor);
+                assert_eq!(
+                    host.view.editor().input.external_baseline(),
+                    *self.baseline.as_ref().unwrap()
+                );
+                assert_eq!(host.turn_history.0.len(), 2);
+                assert!(Self::displayed_run(host).submissions.is_empty());
+                self.phase = 14;
+                run_script(vec![(0, Action::Unmark), (100, Action::Close)]);
             }
             _ => {}
         }
@@ -482,8 +567,8 @@ impl Probe {
         }
     }
     pub fn receipt(&self) -> serde_json::Value {
-        assert_eq!(self.phase, 11, "native reading probe did not complete");
-        serde_json::json!({"nativeWindow":true,"publicHistoryPage":true,
+        assert_eq!(self.phase, 14, "native reading probe did not complete");
+        serde_json::json!({"nativeWindow":true,"originalTurnNavigation":self.gate.is_some(),"turnStartAndLatest":self.gate.is_some(),"navigationPreeditPreserved":self.gate.is_some(),"publicHistoryPage":true,
             "prependAnchorPreserved":true,"upwardReadingPreserved":true,
             "focusAndMarkedBaselinePreserved":self.gate.is_some(),"samePublicationRefresh":true,
             "focusAndEditorBaselinePreserved":self.gate.is_some(),"markedTextPreserved":self.gate.is_some(),

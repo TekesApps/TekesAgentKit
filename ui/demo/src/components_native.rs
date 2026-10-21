@@ -50,6 +50,17 @@ mod stream_probe;
 mod summary_sections_probe;
 #[path = "native_composer_visibility_selftest.rs"]
 mod visibility_probe;
+/// This demo records host callbacks only. Product Back/Forward belongs to its host.
+#[derive(Default)]
+struct DemoTurnHistory(Vec<tekes_agent_components_ui::RunTurnJump>);
+impl tekes_agent_components_ui::RunTurnNavigationHost for DemoTurnHistory {
+    fn record_turn_jump(&mut self, jump: &tekes_agent_components_ui::RunTurnJump) {
+        self.0.push(jump.clone());
+    }
+    fn take_pending_turn_reveal(&mut self, _: &RunScope) -> Option<String> {
+        None
+    }
+}
 struct OwnedFilePreview {
     child: std::process::Child,
     _staged: tekes_agent_ui_demo::file_preview_host::StagedFilePreview,
@@ -71,6 +82,7 @@ struct Host {
     feedback_probe: Option<feedback_probe::Probe>,
     stream_probe: Option<stream_probe::Probe>,
     run_controls_probe: Option<run_controls_probe::Probe>,
+    turn_history: DemoTurnHistory,
     clipboard_writes: Vec<tekes_agent_components_ui::TranscriptCopyIntent>,
     file_viewer: Option<OwnedFilePreview>,
     view: ComponentDemo,
@@ -277,9 +289,36 @@ impl Host {
                 }
                 continue;
             }
-            if let DemoCommand::TurnNavigation { root: _, intent: _ } = command {
-                // CANDIDATE_TURN_RAIL_DISPATCH
-                self.failure("当前 UI 版本暂不支持此回合导航".into());
+            if let DemoCommand::TurnNavigation { root, intent } = command {
+                let version = self
+                    .view
+                    .tree
+                    .get(intent.viewport())
+                    .and_then(|node| {
+                        node.component::<tekes_ui_controls::composition::ScrollContent>()
+                    })
+                    .and_then(|scroll| scroll.reading_document_version())
+                    .cloned();
+                if let Some(version) = version {
+                    let role = if self.view.is_main_run(root) {
+                        tekes_agent_components_ui::RunNavigationHost::Main(&mut self.turn_history)
+                    } else {
+                        tekes_agent_components_ui::RunNavigationHost::Auxiliary
+                    };
+                    if let Err(error) = tekes_agent_components_ui::navigate_run_turn(
+                        &mut self.view.tree,
+                        root,
+                        &intent,
+                        &version,
+                        role,
+                        false,
+                        &mut self.text,
+                    ) {
+                        self.failure(format!("Run navigation rejected: {error:?}"));
+                    }
+                } else {
+                    self.failure("Run navigation reading document missing".into());
+                }
                 continue;
             }
             if let DemoCommand::CopyTranscript(intent) = command {
@@ -1063,6 +1102,20 @@ impl Host {
         if let Some(probe) = &self.sidebar_search_probe {
             probe.install(&mut self.view);
         }
+        let rail_versions: Vec<_> = self
+            .view
+            .mounted_run_roots()
+            .into_iter()
+            .filter_map(|root| {
+                match tekes_agent_components_ui::sync_run_rail_reading(&mut self.view.tree, root) {
+                    Ok(version) => Some((root, version)),
+                    Err(error) => {
+                        self.failure(format!("Run rail attachment failed: {error:?}"));
+                        None
+                    }
+                }
+            })
+            .collect();
         self.text.scale = window.scale() as f32;
         self.text.frame_requested = false;
         self.text.atlas.begin_frame();
@@ -1147,6 +1200,32 @@ impl Host {
                     self.failure(format!("Sidebar reading attachment failed: {error:?}"));
                 }
             }
+        }
+        let mut rail_changed = false;
+        for (root, version) in rail_versions {
+            match tekes_agent_components_ui::reveal_run_rail_follow(
+                &mut self.view.tree,
+                root,
+                &version,
+                false,
+                &mut self.text,
+            ) {
+                Ok(Some(_)) => rail_changed = true,
+                Ok(None) => {}
+                Err(error) => self.failure(format!("Run rail reveal failed: {error:?}")),
+            }
+        }
+        if rail_changed {
+            self.scene.clear();
+            self.view
+                .render(
+                    &mut self.scene,
+                    &mut self.text,
+                    clip.inset(tekes_agent_ui_demo::component_demo::DEMO_CONTENT_INSET),
+                    clip,
+                    self.palette,
+                )
+                .expect("Run rail reveal layout");
         }
         publish_content(&self.view.tree, window);
         if let Some(renderer) = &mut self.gpu {
@@ -2980,6 +3059,7 @@ pub fn run() {
         feedback_probe: feedback_selftest.then(feedback_probe::Probe::new),
         stream_probe: stream_selftest.then(stream_probe::Probe::new),
         run_controls_probe: run_controls_selftest.then(run_controls_probe::Probe::new),
+        turn_history: DemoTurnHistory::default(),
         clipboard_writes: vec![],
         file_viewer: None,
         view,

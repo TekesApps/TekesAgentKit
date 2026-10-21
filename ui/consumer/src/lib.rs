@@ -2249,3 +2249,18 @@ pub fn reveal_sidebar_selection(
 > {
     tekes_agent_components_ui::reveal_sidebar_selection(host, target, version, options, text)
 }
+
+/// Second consumer exercises only the published shared navigation boundary.
+pub fn navigate_original_run(
+    host: &mut tekes_ui_controls::composition::ContentHost,
+    root: tekes_ui_controls::composition::ComponentId,
+    intent: &tekes_agent_components_ui::RunTurnNavigation,
+    version: &tekes_ui_controls::ReadingDocumentVersion,
+    role: tekes_agent_components_ui::RunNavigationHost<'_>,
+    text: &mut dyn tekes_ui_controls::ButtonTextRenderer,
+) -> Result<
+    tekes_agent_components_ui::RunNavigationResult,
+    tekes_agent_components_ui::RunNavigationError,
+> {
+    tekes_agent_components_ui::navigate_run_turn(host, root, intent, version, role, false, text)
+}

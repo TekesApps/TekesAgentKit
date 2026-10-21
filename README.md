@@ -21,6 +21,8 @@
 
 历史投影在内存中。Pi 的宿主指针、receipt、队列及 Goal 元数据用于会话恢复和提交去重，不是 transcript Mirror。可选远端 durable cache、正式 UI 控件、生产 launcher 和大历史性能验收尚未交付。独立 [UI 试点 workspace](ui/README.md) 固定 TekesUI 公开 Git commit，复用现有 presentation；不属于 v0.3.8 headless 发布 API，也不影响默认 headless 构建。
 
+最新实验进展：[公开 SDK 原生回合导航、分页与组字验证](docs/rust-agent-ui-published-navigation-20261021.md)。
+
 ## 开始使用
 
 需要 Rust **1.95.0**（由 `rust-toolchain.toml` 固定）与 Python 3。普通构建/单测不需要 Kernel、Pi、DSH、Node、Swift 或模型凭证。
