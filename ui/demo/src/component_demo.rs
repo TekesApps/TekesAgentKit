@@ -349,7 +349,10 @@ impl ComponentDemo {
                     axis: Axis::Vertical,
                     gap: Spacing::Regular.value(),
                 },
-                flexible_child: Some(DIAGNOSTIC),
+                // RunView already owns a bounded viewport, including when the
+                // optional transcript diagnostic is disabled. Giving spare
+                // height to the notice would push its Composer below the window.
+                flexible_child: Some(pair.id()),
                 children: vec![
                     Content::new(
                         NAV,
@@ -2924,6 +2927,12 @@ impl ComponentDemo {
             .insert(MAIN, content)
             .map_err(|_| unsupported("restore component pair"))?;
         self.selected = index;
+        self.tree
+            .get_mut(MAIN)
+            .unwrap()
+            .component_mut::<StackContent>()
+            .unwrap()
+            .flexible_child = Some(Self::pair_id(index));
         self.tree
             .reorder(
                 MAIN,

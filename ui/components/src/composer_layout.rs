@@ -1,12 +1,13 @@
 //! Agent content placement only; all controls and editing stay in TekesUI.
-use crate::{ComposerDestination, ComposerIds};
+use crate::{AgentText, ComposerDestination, ComposerIds};
+use tekes_ui_controls::feedback_view::SurfaceView;
 use tekes_ui_controls::{
     ButtonTextRenderer,
     composition::*,
     extended::Axis,
     layout::{AlignmentOverride, MeasuredChild, layout_measured_children},
 };
-use tekes_ui_scene::{Rect, Size};
+use tekes_ui_scene::{Rect, Scene, Size};
 use tekes_ui_tokens::{Spacing, Stroke, proposal};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -53,7 +54,9 @@ impl ComposerActions {
         let mut size = Size::default();
         let mut count = 0usize;
         for node in &mut self.children {
-            if (node.id() == self.primary || node.id() == self.ids.attachment) != input {
+            if node.id() == self.ids.editor
+                || (node.id() == self.primary || node.id() == self.ids.attachment) != input
+            {
                 continue;
             }
             let measured = node.measure(text, Size::new(width, 1e8)).size;
@@ -91,7 +94,8 @@ impl Component for ComposerActions {
                 .children
                 .iter_mut()
                 .filter(|node| {
-                    (node.id() == self.primary || node.id() == self.ids.attachment) == input
+                    node.id() != self.ids.editor
+                        && (node.id() == self.primary || node.id() == self.ids.attachment) == input
                 })
                 .map(|node| node.measure(text, bounds.size))
                 .collect();
@@ -118,13 +122,109 @@ impl Component for ComposerActions {
                 .children
                 .iter_mut()
                 .filter(|node| {
-                    (node.id() == self.primary || node.id() == self.ids.attachment) == input
+                    node.id() != self.ids.editor
+                        && (node.id() == self.primary || node.id() == self.ids.attachment) == input
                 })
                 .zip(placements)
             {
                 node.arrange(text, placement.frame, clip);
             }
         }
+    }
+}
+
+/// Actual input-band subtree. Only business placement and the original
+/// library surface live here; focus, hit, caret and IME routing stay in TekesUI.
+#[derive(Debug)]
+pub(crate) struct ComposerInputBand {
+    pub actions: ComposerActions,
+    pub editor_frame: Rect,
+    pub row_center: f32,
+    pub actions_size: Size,
+    surface: SurfaceView,
+}
+impl ComposerInputBand {
+    pub fn new(ids: ComposerIds) -> Self {
+        let mut actions = ComposerActions::new(ids);
+        actions
+            .children
+            .push(Content::new(ids.editor, AgentText::composer()));
+        Self {
+            actions,
+            editor_frame: Rect::default(),
+            row_center: 0.,
+            actions_size: Size::default(),
+            surface: SurfaceView::default(),
+        }
+    }
+    pub fn editor(&self) -> &Content {
+        self.actions
+            .children
+            .iter()
+            .find(|n| n.id() == self.actions.ids.editor)
+            .unwrap()
+    }
+    pub fn editor_mut(&mut self) -> &mut Content {
+        let id = self.actions.ids.editor;
+        self.actions
+            .children
+            .iter_mut()
+            .find(|n| n.id() == id)
+            .unwrap()
+    }
+}
+impl Component for ComposerInputBand {
+    fn fixed_slots(&self) -> bool {
+        true
+    }
+    fn children(&self) -> &[Content] {
+        &self.actions.children
+    }
+    fn children_mut(&mut self) -> Option<&mut Vec<Content>> {
+        Some(&mut self.actions.children)
+    }
+    fn measure(&mut self, _: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        MeasuredChild::new(available)
+    }
+    fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        let editor_frame = self.editor_frame;
+        self.editor_mut().arrange(text, editor_frame, clip);
+        let editor = &self
+            .editor()
+            .component::<AgentText>()
+            .unwrap()
+            .field
+            .surface;
+        let line_height = editor.role.style().line_height * editor.type_scale;
+        let center = self
+            .row_center
+            .max(editor.inner.max_y() - line_height / 2.)
+            .min(frame.max_y() - self.actions_size.height / 2.);
+        let trailing = (frame.max_y() - center - self.actions_size.height / 2.).max(0.);
+        self.actions.input_frame = Rect::new(
+            frame.max_x() - trailing - self.actions_size.width,
+            center - self.actions_size.height / 2.,
+            self.actions_size.width,
+            self.actions_size.height,
+        );
+        self.actions.arrange(text, frame, clip);
+    }
+    fn paint(
+        &mut self,
+        scene: &mut Scene,
+        text: &mut dyn ButtonTextRenderer,
+        frame: Rect,
+        clip: Rect,
+        theme: ContentTheme,
+    ) {
+        self.surface.render_at_scale(
+            scene,
+            frame,
+            Some(clip),
+            theme.palette,
+            true,
+            text.backing_scale(),
+        );
     }
 }
 

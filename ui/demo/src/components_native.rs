@@ -4025,6 +4025,11 @@ fn native_script(view: &ComponentDemo) {
         }
     };
     let ids = view.ids();
+    eprintln!(
+        "COMPONENT_SCRIPT_GEOMETRY editor={:?} band={:?}",
+        view.tree.get(ids.editor).unwrap().frame(),
+        view.tree.get(ids.input_band).unwrap().frame()
+    );
     let editor = click(ids.editor);
     let sidebar = view
         .tree
@@ -4092,6 +4097,9 @@ fn native_script(view: &ComponentDemo) {
     script.push((6100, click(panel.create_side_chat_id())));
     // A bounded failure deadline also catches a missing creation/body notification.
     script.push((20000, Action::Close));
+    if let Ok(path) = std::env::var("AGENT_COMPONENTS_INITIAL_CAPTURE") {
+        script.insert(0, (50, Action::Capture { path }));
+    }
     run_script(script);
 }
 fn side_chat_script(view: &ComponentDemo) {

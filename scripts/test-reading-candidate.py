@@ -37,6 +37,8 @@ def main():
                         help='Append the explicit probe to the unchanged formal RunView transaction probe')
     parser.add_argument('--append-rail-probe', action='store_true',
                         help='Append the unchanged actual-rail probe before the explicit extension probe')
+    parser.add_argument('--append-start-probe', action='store_true',
+                        help='Also preserve the unchanged #32 Start/main-navigation tests')
     parser.add_argument('--summary-labels', action='store_true',
                         help='Candidate-only Summary header label and existing native text-host adapter')
     parser.add_argument('--manifest', type=Path, required=True)
@@ -47,6 +49,8 @@ def main():
     parser.add_argument('--turn-start-native', action='store_true',
                         help='Use explicit #32 Start for actual ordinary and Latest native rail clicks')
     parser.add_argument('--turn-rail', action='store_true', help='Enable actual rail with exact original compact actions in the isolated SDK only')
+    parser.add_argument('--forwarded-focus', action='store_true',
+                        help='Delegate the actual rail wrapper focus-decoration hook to its original CompoundButton (#33 SDK only)')
     args = parser.parse_args()
     if args.summary_labels and args.probe is None:
         parser.error('--summary-labels requires an explicit receiver --probe')
@@ -58,8 +62,12 @@ def main():
         parser.error('--turn-rail requires --append-run-probe')
     if args.append_rail_probe and not (args.append_run_probe and args.turn_rail):
         parser.error('--append-rail-probe requires --append-run-probe and --turn-rail')
+    if args.append_start_probe and not args.append_rail_probe:
+        parser.error('--append-start-probe requires --append-rail-probe')
     if args.turn_start_native and not (args.item_navigation_native and args.turn_rail):
         parser.error('--turn-start-native requires --item-navigation-native and --turn-rail')
+    if args.forwarded_focus and not args.turn_rail:
+        parser.error('--forwarded-focus requires --turn-rail')
     repo = Path(__file__).resolve().parent.parent
     source = args.source.resolve()
     manifest = json.loads(args.manifest.read_text())
@@ -99,6 +107,11 @@ def main():
         probe_rail = repo / 'scripts/probes/agentkit-turn-rail-candidate.rs'
         (snapshot / 'ui/demo/tests/reading_candidate.rs').write_bytes(
             probe_base.read_bytes().rstrip() + b'\n\n' + probe_rail.read_bytes().rstrip() + b'\n\n' + probe.read_bytes())
+    probe_start = None
+    if args.append_start_probe:
+        probe_start = repo / 'scripts/probes/agentkit-turn-start-candidate.rs'
+        prepared = snapshot / 'ui/demo/tests/reading_candidate.rs'
+        prepared.write_bytes(prepared.read_bytes().rstrip() + b'\n\n' + probe_start.read_bytes())
     cargo = snapshot / 'ui/Cargo.toml'
     cargo.write_text(re.sub(
         r'^(tekes-ui-[\w-]+) = \{ git = "https://github.com/TekesApps/TekesUI.git", rev = "[a-f0-9]+" \}$',
@@ -181,6 +194,18 @@ def main():
         adaptations.extend(['Only original Summary header opts into single-line tail ellipsis; ordinary row titles retain natural wrapping',
                             'Existing native TextBackend delegates shape_label to its original CoreTextShaper',
                             'Owned native Summary header supplies a long mixed-language title; existing pointer probe checks its full AX name and row bounds'])
+    if args.forwarded_focus:
+        action = snapshot / 'ui/components/src/turn_rail_action.rs'
+        old = 'impl Component for TurnRailAction {\n'
+        assert action.read_text().count(old) == 1
+        action.write_text(action.read_text().replace(old, old + '''    fn focus_decoration_above_siblings(&self) -> bool {
+        self.button.focus_decoration_above_siblings()
+    }
+'''))
+        focus_probe = repo / 'scripts/probes/agentkit-forwarded-focus-unit.rs'
+        action.write_bytes(action.read_bytes() + b'\n' + focus_probe.read_bytes())
+        overrides.append('ui/components/src/turn_rail_action.rs')
+        adaptations.append('Actual retained TurnRailAction delegates #33 focus decoration to its original CompoundButton; no copied predicates or ring painter')
     if args.turn_rail:
         rail = snapshot / 'ui/components/src/turn_rail_component.rs'
         old = 'pub fn turn_rail_supported() -> bool {\n    false\n}'
@@ -264,6 +289,7 @@ def main():
         overrides.extend([native_probe_name, 'ui/demo/src/components_native.rs'])
         adaptations.append('Owned native diagnostic uses actual RunView, original backend and public Kit capture/claim; second-consumer execution is checked in CLI; only public library reading/reveal calls; synthetic AppKit preedit, not a physical IME; actual latest-rail click only when --turn-rail')
     env = dict(os.environ, CARGO_TARGET_DIR=str(args.target_dir.resolve()),
+               CARGO_BUILD_JOBS=os.environ.get('CARGO_BUILD_JOBS', '4'),
                CARGO_PROFILE_DEV_DEBUG='0', CARGO_PROFILE_TEST_DEBUG='0',
                CARGO_PROFILE_DEV_INCREMENTAL='false', CARGO_PROFILE_TEST_INCREMENTAL='false')
     base = ['cargo', '+1.95.0']
@@ -273,6 +299,7 @@ def main():
                    probe_sha256=sha(probe), source=str(source), snapshot=str(snapshot),
                    probe_base_sha256=sha(probe_base) if probe_base else None,
                    probe_rail_sha256=sha(probe_rail) if probe_rail else None,
+                   probe_start_sha256=sha(probe_start) if probe_start else None,
                    prepared_probe_sha256=sha(snapshot / 'ui/demo/tests/reading_candidate.rs'),
                    candidate_only_host_adaptations=adaptations,
                    candidate_overrides={name: sha(snapshot / name) for name in
@@ -281,6 +308,8 @@ def main():
                    item_navigation_native=args.item_navigation_native,
                    turn_rail=args.turn_rail,
                    turn_start_native=args.turn_start_native,
+                   forwarded_focus=args.forwarded_focus,
+                   focus_probe_sha256=sha(focus_probe) if args.forwarded_focus else None,
                    default_pin_promoted=False, native_acceptance=False, visual_acceptance=False,
                    full_runview_acceptance=False, checks=[])
     try:
@@ -293,6 +322,9 @@ def main():
             ('tests', ['test', *common, '-p', 'tekes-agent-ui-demo', '--test', 'reading_candidate']),
             ('clippy', ['clippy', *common, '-p', 'tekes-agent-ui-demo', '--test', 'reading_candidate', '--', '-D', 'warnings']),
         ]
+        if args.forwarded_focus:
+            steps.append(('actual-wrapper', ['test', *common, '-p', 'tekes-agent-components-ui',
+                                             '--lib', 'forwarded_focus_candidate_tests']))
         if args.summary_labels or args.item_navigation_native or args.turn_rail:
             steps.extend([
                 ('public-consumer', ['test', *common, '-p', 'tekes-agent-ui-consumer-check', '--lib']),

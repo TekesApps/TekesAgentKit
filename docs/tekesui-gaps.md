@@ -41,3 +41,5 @@ TKUI-006 更新：公共完整指针入口、AgentText转交及原生demo适配�
 
 
 #27 后续收到精确 292 开发候选；正式 RunView 的 12 次失败/恢复与原 8 项事务已有 receiver 检查，见 [独立候选消费](tekesui-layout-text-candidate-20261021.md)。原默认 pin 与历史 known-boundary 仍按原身份保留，不能把新候选结果当默认公开版本已修复。
+
+2026-10-21 输入胶囊后续：[TekesUI #34](https://github.com/TekesApps/TekesUI/issues/34) 请求无副作用的原留白焦点意图查询，供宿主 IME 屏障安全转交。实际 Composer 子树已消费固定 #30/#33 候选进行组件验证；正式宿主的组字转交仍待此接口，详见[接收记录](rust-agent-ui-composer-padding-20261021.md)。

@@ -151,7 +151,7 @@ impl RunView {
             return Err("RunView composer IDs mismatch");
         }
         let composer_namespace = ids.composer.root.0 >> 32;
-        if ids.composer.preset.0 >> 32 != composer_namespace
+        if ids.composer.input_band.0 >> 32 != composer_namespace
             || paging_namespace == actionable_namespace
             || [paging_namespace as u64, actionable_namespace as u64].contains(&composer_namespace)
         {
@@ -160,7 +160,7 @@ impl RunView {
         let reserved = [ids.root, ids.indicators, ids.viewport];
         if reserved.iter().enumerate().any(|(i, id)| {
             reserved[..i].contains(id)
-                || (ids.composer.root.0..=ids.composer.preset.0).contains(&id.0)
+                || (ids.composer.root.0..=ids.composer.input_band.0).contains(&id.0)
                 || [paging_namespace as u64, actionable_namespace as u64].contains(&(id.0 >> 32))
         }) {
             return Err("RunView control IDs overlap");
@@ -1024,7 +1024,7 @@ impl RunView {
     }
     /// Host-specific capabilities may add controls without forking Run content.
     pub fn append_accessory(&mut self, content: Content) -> Result<(), &'static str> {
-        if (self.ids.composer.root.0..=self.ids.composer.preset.0).contains(&content.id().0)
+        if (self.ids.composer.root.0..=self.ids.composer.input_band.0).contains(&content.id().0)
             || self.transcript().is_some_and(|transcript| {
                 !transcript.namespaces_disjoint(&[(content.id().0 >> 32) as u32])
             })

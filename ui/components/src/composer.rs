@@ -1,5 +1,5 @@
 //! Agent composer: canonical drafts arrive from presentation; editing belongs to TekesUI.
-use crate::composer_layout::{ComposerActions, ComposerMeasurements};
+use crate::composer_layout::{ComposerActions, ComposerInputBand, ComposerMeasurements};
 use crate::{
     AgentText, ComposerContext, ComposerContextAffordances, ComposerContextIntent,
     ComposerContextLabels,
@@ -7,14 +7,13 @@ use crate::{
 use crate::{ComposerLayoutGeometry, ComposerPrimaryActionKind};
 use std::collections::BTreeMap;
 use tekes_agent_presentation::{ComposerDestination, ComposerDraft, RunScope, RunSnapshot};
-use tekes_ui_controls::feedback_view::SurfaceView;
 use tekes_ui_controls::{
     ButtonTextRenderer, TextSurface,
     composition::*,
     extended::{Axis, Stack},
     layout::MeasuredChild,
 };
-use tekes_ui_scene::{Rect, Scene, Size};
+use tekes_ui_scene::{Rect, Size};
 use tekes_ui_tokens::Spacing;
 
 /// Reserve these IDs in the embedding ContentHost, including hidden affordances.
@@ -28,11 +27,16 @@ pub struct ComposerIds {
     pub attachment: ComponentId,
     pub model: ComponentId,
     pub preset: ComponentId,
+    /// Actual input capsule containing the original editor and input actions.
+    /// Context cards and setup controls are outside this subtree. Hosts may
+    /// bind library padding-focus behavior here when their fixed SDK supports
+    /// it; editor replacement requires rebinding the original mounted editor.
+    pub input_band: ComponentId,
 }
 impl ComposerIds {
-    /// Eight contiguous IDs; separate namespaces allow multiple composers in one window.
+    /// Nine contiguous IDs; separate namespaces allow multiple composers in one window.
     pub fn new(base: u64) -> Self {
-        assert!(base <= u64::MAX - 7, "Composer ID namespace overflow");
+        assert!(base <= u64::MAX - 8, "Composer ID namespace overflow");
         Self {
             root: ComponentId(base),
             editor: ComponentId(base + 1),
@@ -42,6 +46,7 @@ impl ComposerIds {
             attachment: ComponentId(base + 5),
             model: ComponentId(base + 6),
             preset: ComponentId(base + 7),
+            input_band: ComponentId(base + 8),
         }
     }
 }
@@ -147,7 +152,6 @@ pub struct Composer {
     primary_kind: ComposerPrimaryActionKind,
     retained_actions: BTreeMap<ComponentId, Content>,
     geometry: Option<ComposerLayoutGeometry>,
-    surface: SurfaceView,
 }
 impl Composer {
     pub fn new(ids: ComposerIds) -> Self {
@@ -160,7 +164,7 @@ impl Composer {
                 },
                 flexible_child: None,
                 children: vec![
-                    Content::new(ids.editor, AgentText::composer()),
+                    Content::new(ids.input_band, ComposerInputBand::new(ids)),
                     Content::new(ids.toolbar, ComposerActions::new(ids)),
                 ],
             },
@@ -181,7 +185,6 @@ impl Composer {
             primary_kind: ComposerPrimaryActionKind::Send,
             retained_actions: BTreeMap::new(),
             geometry: None,
-            surface: SurfaceView::default(),
         }
     }
     pub fn ids(&self) -> ComposerIds {
@@ -202,15 +205,16 @@ impl Composer {
             self.presented && g.publication == self.revision && g.destination == self.destination
         })
     }
-    /// Optional draft cards use a separately reserved namespace. The original
-    /// eight Composer IDs and editor/undo instance remain unchanged.
+    /// Optional draft cards use a separately reserved namespace. The
+    /// original editor/action IDs and editor/undo instance remain unchanged.
     pub fn with_context(
         mut self,
         namespace: u32,
         labels: ComposerContextLabels,
     ) -> Result<Self, &'static str> {
         if self.context_id.is_some()
-            || ((self.ids.root.0 >> 32)..=(self.ids.preset.0 >> 32)).contains(&(namespace as u64))
+            || ((self.ids.root.0 >> 32)..=(self.ids.input_band.0 >> 32))
+                .contains(&(namespace as u64))
         {
             return Err("composer context namespace overlaps");
         }
@@ -285,21 +289,34 @@ impl Composer {
     pub fn is_composing(&self) -> bool {
         self.presented && self.editor().input.marked.is_some()
     }
-    fn text(&self) -> &AgentText {
+    fn band(&self) -> &ComposerInputBand {
         self.body
             .children
             .iter()
-            .find(|node| node.id() == self.ids.editor)
+            .find(|n| n.id() == self.ids.input_band)
             .unwrap()
+            .component::<ComposerInputBand>()
+            .unwrap()
+    }
+    fn band_mut(&mut self) -> &mut ComposerInputBand {
+        let id = self.ids.input_band;
+        self.body
+            .children
+            .iter_mut()
+            .find(|n| n.id() == id)
+            .unwrap()
+            .component_mut::<ComposerInputBand>()
+            .unwrap()
+    }
+    fn text(&self) -> &AgentText {
+        self.band()
+            .editor()
             .component::<AgentText>()
             .expect("composer editor")
     }
     fn text_mut(&mut self) -> &mut AgentText {
-        self.body
-            .children
-            .iter_mut()
-            .find(|node| node.id() == self.ids.editor)
-            .unwrap()
+        self.band_mut()
+            .editor_mut()
             .component_mut::<AgentText>()
             .expect("composer editor")
     }
@@ -385,14 +402,7 @@ impl Composer {
                 .retained
                 .remove(&key)
                 .unwrap_or_else(|| Content::new(self.ids.editor, AgentText::composer()));
-            let mut previous = std::mem::replace(
-                self.body
-                    .children
-                    .iter_mut()
-                    .find(|node| node.id() == self.ids.editor)
-                    .unwrap(),
-                editor,
-            );
+            let mut previous = std::mem::replace(self.band_mut().editor_mut(), editor);
             previous
                 .component_mut::<AgentText>()
                 .expect("composer editor")
@@ -493,6 +503,17 @@ impl Composer {
         let cancel_enabled = self.can_cancel;
         let primary = self.primary_action_id();
         let mut old = std::mem::take(&mut self.toolbar().children);
+        // Keep the original editor in its fixed band slot; move only action
+        // Content instances between mounted and retained business roles.
+        let band = self.band_mut();
+        let mut index = 0;
+        while index < band.actions.children.len() {
+            if band.actions.children[index].id() != ids.editor {
+                old.push(band.actions.children.remove(index));
+            } else {
+                index += 1;
+            }
+        }
         let mut retained = std::mem::take(&mut self.retained_actions);
         let mut children = Vec::new();
         for (id, label, visible) in [
@@ -539,9 +560,19 @@ impl Composer {
             retained.insert(node.id(), node);
         }
         self.retained_actions = retained;
+        let mut setup = vec![];
+        let band = self.band_mut();
+        band.actions.primary = primary;
+        for child in children {
+            if child.id() == primary || child.id() == ids.attachment {
+                band.actions.children.push(child);
+            } else {
+                setup.push(child);
+            }
+        }
         let toolbar = self.toolbar();
         toolbar.primary = primary;
-        toolbar.children = children;
+        toolbar.children = setup;
     }
     /// Typed intents retain the exact presented destination. Submit/Enter never sends.
     pub fn take_intents(&mut self, actions: &[ContentAction]) -> Vec<ComposerIntent> {
@@ -644,7 +675,7 @@ impl Composer {
         let max = self.editor().role.style().line_height * scale * 10.;
         let padding = Spacing::Snug.value();
         let inner = (width - padding * 2.).max(0.);
-        let actions = self.toolbar().group(text, inner, true);
+        let actions = self.band_mut().actions.group(text, inner, true);
         let setup = self.toolbar().group(text, inner, false);
         let context = self
             .body
@@ -679,11 +710,8 @@ impl Composer {
             (width - Spacing::Loose.value() - trailing - actions.width - Spacing::Regular.value())
                 .max(0.);
         let editor = self
-            .body
-            .children
-            .iter_mut()
-            .find(|node| node.id() == self.ids.editor)
-            .unwrap()
+            .band_mut()
+            .editor_mut()
             .measure(text, Size::new(editor_width, 1e8))
             .size;
         ComposerMeasurements {
@@ -751,23 +779,17 @@ impl Component for Composer {
             measured.editor.width,
             measured.editor.height,
         );
+        let band_id = self.ids.input_band;
+        let input = self.band_mut();
+        input.editor_frame = editor;
+        input.row_center = row_center;
+        input.actions_size = measured.actions;
         self.body
             .children
             .iter_mut()
-            .find(|node| node.id() == self.ids.editor)
+            .find(|n| n.id() == band_id)
             .unwrap()
-            .arrange(text, editor, clip);
-        let line_height = self.editor().role.style().line_height * self.editor().type_scale;
-        let center = row_center
-            .max(self.editor().inner.max_y() - line_height / 2.)
-            .min(band.max_y() - measured.actions.height / 2.);
-        let trailing = (band.max_y() - center - measured.actions.height / 2.).max(0.);
-        let action_frame = Rect::new(
-            band.max_x() - trailing - measured.actions.width,
-            center - measured.actions.height / 2.,
-            measured.actions.width,
-            measured.actions.height,
-        );
+            .arrange(text, band, clip);
         let setup = (measured.setup.height > 0.).then(|| {
             Rect::new(
                 frame.min_x(),
@@ -778,7 +800,7 @@ impl Component for Composer {
         });
         let toolbar_id = self.ids.toolbar;
         let toolbar = self.toolbar();
-        toolbar.input_frame = action_frame;
+        toolbar.input_frame = Rect::default();
         toolbar.setup_frame = setup.unwrap_or_default();
         self.body
             .children
@@ -786,7 +808,7 @@ impl Component for Composer {
             .find(|node| node.id() == toolbar_id)
             .unwrap()
             .arrange(text, frame, clip);
-        let actions = self.toolbar();
+        let actions = &self.band().actions;
         let primary = actions
             .children
             .iter()
@@ -809,26 +831,63 @@ impl Component for Composer {
             setup,
         });
     }
-    fn paint(
-        &mut self,
-        scene: &mut Scene,
-        text: &mut dyn ButtonTextRenderer,
-        _: Rect,
-        clip: Rect,
-        theme: ContentTheme,
-    ) {
-        if let Some(geometry) = &self.geometry {
-            self.surface.render_at_scale(
-                scene,
-                geometry.input_band,
-                Some(clip),
-                theme.palette,
-                true,
-                text.backing_scale(),
-            );
-        }
-    }
     fn semantics(&self) -> ContentSemantics {
         ContentSemantics::new(ContentRole::Group, &self.labels.group)
+    }
+}
+
+#[cfg(test)]
+mod input_band_tests {
+    use super::*;
+
+    #[test]
+    fn input_capsule_contains_only_original_editor_and_input_actions() {
+        let ids = ComposerIds::new(100);
+        let mut view = Composer::new(ids);
+        view.affordances = ComposerAffordances {
+            attachment: true,
+            model: true,
+            preset: true,
+        };
+        view.rebuild_actions();
+        assert_eq!(
+            view.band()
+                .children()
+                .iter()
+                .map(Content::id)
+                .collect::<Vec<_>>(),
+            vec![ids.editor, ids.send, ids.attachment]
+        );
+        assert_eq!(
+            view.toolbar()
+                .children()
+                .iter()
+                .map(Content::id)
+                .collect::<Vec<_>>(),
+            vec![ids.model, ids.preset]
+        );
+        assert!(view.band().fixed_slots());
+        assert!(view.band().editor().component::<AgentText>().is_some());
+        view.primary_kind = ComposerPrimaryActionKind::Stop;
+        view.rebuild_actions();
+        assert_eq!(
+            view.band()
+                .children()
+                .iter()
+                .map(Content::id)
+                .collect::<Vec<_>>(),
+            vec![ids.editor, ids.cancel, ids.attachment]
+        );
+        view.affordances = ComposerAffordances::default();
+        view.rebuild_actions();
+        assert_eq!(
+            view.band()
+                .children()
+                .iter()
+                .map(Content::id)
+                .collect::<Vec<_>>(),
+            vec![ids.editor, ids.cancel]
+        );
+        assert!(view.toolbar().children().is_empty());
     }
 }

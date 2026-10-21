@@ -213,6 +213,10 @@ async fn composer_input_and_primary_share_one_band_without_field_chrome_or_an_em
                         .unwrap();
                     let view = host.get(ids.root).unwrap().component::<Composer>().unwrap();
                     let g = view.layout_geometry().unwrap();
+                    // The library must see the same capsule subtree as the
+                    // user, so padding focus cannot absorb the setup toolbar.
+                    let band = host.get(ids.input_band).unwrap();
+                    assert_eq!(band.frame(), g.input_band);
                     assert_eq!(g.publication, snapshot.revision);
                     assert_eq!(view.editor().presentation, TextSurfacePresentation::Content);
                     assert!(!view.editor().input.read_only);
@@ -1338,5 +1342,55 @@ async fn main_history_captures_the_original_display_origin_and_never_replays_a_c
     );
     view.claim_turn_navigation(&local).unwrap();
     assert_eq!(history.0.len(), 2);
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn default_demo_keeps_the_resident_input_visible_across_session_switch_without_transcript_flag()
+ {
+    use std::sync::Arc;
+    use tekes_agent_ui_bindings::RunBinding;
+    use tekes_agent_ui_demo::component_demo::ComponentDemo;
+    let (runtime, _) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
+    let a = Arc::new(
+        RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "a"))
+            .await
+            .unwrap(),
+    );
+    let b = Arc::new(
+        RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "b"))
+            .await
+            .unwrap(),
+    );
+    let mut view = ComponentDemo::new([a, b]).unwrap();
+    let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()), 1.);
+    for height in [520., 760.] {
+        let frame = Rect::new(
+            10.,
+            10.,
+            ComponentDemo::minimum_window_width() as f32,
+            height - 20.,
+        );
+        for selected in [0, 1, 0] {
+            view.select(selected).unwrap();
+            view.render(
+                &mut Scene::new(),
+                &mut text,
+                frame,
+                frame,
+                Theme::LIGHT.into(),
+            )
+            .unwrap();
+            let ids = view.ids();
+            for id in [ids.editor, ids.send, ids.input_band] {
+                let rect = view.tree.get(id).unwrap().frame();
+                assert!(
+                    rect.min_y() >= frame.min_y() && rect.max_y() <= frame.max_y(),
+                    "height={height} selected={selected} id={id:?} rect={rect:?}"
+                );
+                assert!(rect.size.height > 0.);
+            }
+        }
+    }
     runtime.stop().await.unwrap();
 }

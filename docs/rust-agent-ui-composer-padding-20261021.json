@@ -1,0 +1,196 @@
+{
+  "format": "agentkit-composer-padding/1",
+  "verified_at_utc": "2026-10-21T01:24:32.432852+00:00",
+  "based_on": "1b353ca922f33226f09e87fefffd51da4c1733b7",
+  "published_headless_contract": "v0.3.8",
+  "default_inputs": {
+    "commit": "8cf0840790334ba224afc0595897c74231c712e6",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 199,
+    "sha256": "f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f",
+    "ui_packages": 8
+  },
+  "candidate_identity": "95b140c278a2257c11fb956eaf860313c38bc4829bae70e022cc3d8f33bb38ac",
+  "candidate_files": 496,
+  "receiver_receipt": {
+    "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-padding-forwarded-final-95b140/receipt.json",
+    "sha256": "5e398d38ca28fc8f2cb9681b34311eceb4584e874873966ca5a90f78a5e7aa3f"
+  },
+  "checks": [
+    {
+      "label": "default",
+      "kind": "workspace",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--manifest-path",
+        "/Users/frankqin/dev/TekesAgentKit/ui/Cargo.toml",
+        "--workspace",
+        "--locked",
+        "--offline"
+      ],
+      "log": "/tmp/agentkit-padding-final-default-workspace.log",
+      "exit_code": 0
+    },
+    {
+      "label": "default",
+      "kind": "clippy",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "clippy",
+        "--manifest-path",
+        "/Users/frankqin/dev/TekesAgentKit/ui/Cargo.toml",
+        "--workspace",
+        "--locked",
+        "--offline",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "log": "/tmp/agentkit-padding-final-default-clippy.log",
+      "exit_code": 0
+    },
+    {
+      "label": "candidate",
+      "kind": "workspace",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--manifest-path",
+        "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-padding-forwarded-final-95b140/agentkit/ui/Cargo.toml",
+        "--workspace",
+        "--locked",
+        "--offline"
+      ],
+      "log": "/tmp/agentkit-padding-final-candidate-workspace.log",
+      "exit_code": 0
+    },
+    {
+      "label": "candidate",
+      "kind": "clippy",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "clippy",
+        "--manifest-path",
+        "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-padding-forwarded-final-95b140/agentkit/ui/Cargo.toml",
+        "--workspace",
+        "--locked",
+        "--offline",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "log": "/tmp/agentkit-padding-final-candidate-clippy.log",
+      "exit_code": 0
+    }
+  ],
+  "workspace_tests": {
+    "default": 351,
+    "candidate": 371
+  },
+  "subsets": {
+    "run_rail_start_padding": 19,
+    "actual_wrapper": 1,
+    "public_consumer": 35
+  },
+  "native": [
+    {
+      "label": "initial-failure",
+      "log": "/tmp/agentkit-padding-default-native.log",
+      "sha256": "471b0e0273d2580069f76ef8fbd1dc96e2f136c611a8e6d9b393121d5c8a9914",
+      "flags": [
+        "--components",
+        "--native-selftest"
+      ],
+      "exit_code": 3,
+      "synthetic_input": true,
+      "physical_ime": false,
+      "reading_anchor": false
+    },
+    {
+      "label": "diagnostic-failure",
+      "log": "/tmp/agentkit-padding-native-diagnostic.log",
+      "sha256": "93d3d6ac796ee8d7c3e789b35ac1435e0d11ee286913f2e09ef5bcc5ccee68b2",
+      "flags": [
+        "--components",
+        "--native-selftest"
+      ],
+      "exit_code": 3,
+      "synthetic_input": true,
+      "physical_ime": false,
+      "reading_anchor": false
+    },
+    {
+      "label": "fixed",
+      "log": "/tmp/agentkit-padding-host-fixed-native.log",
+      "sha256": "ed5134578f73ff623504cf5ac484236acfec17c698f17daf6008041dc6d672b5",
+      "flags": [
+        "--components",
+        "--native-selftest"
+      ],
+      "exit_code": 0,
+      "synthetic_input": true,
+      "physical_ime": false,
+      "reading_anchor": false
+    },
+    {
+      "label": "formal-transcript",
+      "log": "/tmp/agentkit-padding-formal-transcript-native.log",
+      "sha256": "db45d22d62ea26e6d4ea4917186f5a702bb6b765f57bc845d5b06e77594de2f5",
+      "flags": [
+        "--components",
+        "--transcript-content",
+        "--native-selftest"
+      ],
+      "exit_code": 0,
+      "synthetic_input": true,
+      "physical_ime": false,
+      "reading_anchor": false
+    }
+  ],
+  "source_files": {
+    "docs/rust-agent-ui-composer-padding-20261021.md": "b31a48d86f01f454cb18aeee2bf06c1f316c205908dc8bb5a882c22982b73aea",
+    "docs/tekesui-gaps.md": "f4b524ee47e862e34151e1fea31831fdad2e395c399e279e2084255250fca457",
+    "scripts/probes/agentkit-composer-padding-candidate.rs": "3a65401f4d6d2d19b4af65c39e0bad6020beed03fd93735cb6088d3bc8a6f6dd",
+    "scripts/probes/agentkit-forwarded-focus-unit.rs": "b39f958170c765493acc30612c551d23475cda25acd5777d9547bfba8fa3870d",
+    "scripts/test-reading-candidate.py": "33c89dd2ac6190217911e37f2db871df15a57af66871b15334f303f5d0949e78",
+    "ui/README.md": "7319490d436c167a135198c0412dd60a34670730e4881ebca2a2d93f05d4b5c4",
+    "ui/components/src/composer.rs": "b3df8d34c254cf888ce9d759cb86a898107b4bc4862a58d16955515175a63c12",
+    "ui/components/src/composer_layout.rs": "4c9a971e4f24b2cf48c4614253a20d7513cc90642ded443ba212023683064dc2",
+    "ui/components/src/run_view.rs": "37445085622e50275625cc064d5190eba6007ed4848d3875663d77b56857bc36",
+    "ui/demo/src/component_demo.rs": "372df2b991a7dc1d318baf721164747a777f62262f3ccb068fe8cf674b3f602e",
+    "ui/demo/src/components_native.rs": "86ef809a3c06f64a97a8fea560afb828e588c239f6caad0276a8b0f6b1c9a4d0",
+    "ui/demo/tests/run_column.rs": "8a1a3c2fcdb42f7c9dc382b4e5c1385e06e203b7c682d4d132300dbcad47e971"
+  },
+  "artifacts": {
+    ".runtime-fixtures/agentkit-padding-host-fixed-native-demo": "f2159592769fa5dba9ef4e0fa32446608db0421a7fab2c9e71f12ad538f77c92",
+    ".runtime-fixtures/agentkit-padding-forwarded-final-95b140/native-demo": "56efc107fb5c551150eb64faa984d63e202969dd04ddc683a29e4db78971dcf1",
+    ".runtime-fixtures/agentkit-padding-host-fixed-sidechat.png": "8ceae506f9ccb668955edbf3b5913b32082966116507edf3bf94f4049287b966",
+    ".runtime-fixtures/agentkit-padding-formal-transcript-sidechat.png": "6fd76b2a837b4dd0ded4dcc53b71c6d7c9b70003c7c5a6a48a435673ec020115"
+  },
+  "cache": {
+    "target": "/tmp/agentkit-layout-text-292-target",
+    "allocated_kib": 11553988,
+    "incremental": false,
+    "new_independent_targets": 0,
+    "deleted_bytes": 0,
+    "retained_for_next_fixed_sdk_validation": true
+  },
+  "open_gates": [
+    "TekesUI #34 fixed receiver integration and native IME barrier",
+    "native #33 ring pixel and VoiceOver acceptance",
+    "full rich Transcript and remaining ClientKit Views",
+    "real Native/Pi/DSH UI paging and reading",
+    "physical IME and paired product acceptance"
+  ],
+  "default_pin_promoted": false,
+  "ui_experimental": true,
+  "goal_complete": false
+}
