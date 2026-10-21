@@ -286,6 +286,39 @@ impl Fixture {
         self.search_active.load(Ordering::SeqCst)
     }
 
+    /// Opt-in owned protocol history for disclosure/reflow acceptance. No tool runs.
+    pub fn with_reading_details(self) -> Self {
+        for line in self.sessions.lock().unwrap().values_mut() {
+            let old = std::mem::take(&mut line.rows);
+            for row in old {
+                let mut value = serde_json::to_value(row).unwrap();
+                let event = &mut value["event"];
+                let details = (event["type"] == "assistant/message").then(|| {
+                    let turn = event["data"]["turn"].as_u64().unwrap();
+                    let call = format!("reading-tool-{turn}");
+                    let content = event["data"]["message"]["content"].as_array_mut().unwrap();
+                    content.insert(0, json!({"type":"reasoning","text":"只读验收推理内容，验证展开后的中文换行。\n".repeat(8)}));
+                    (turn, call)
+                });
+                event["seq"] = json!(line.rows.len());
+                event["time"] = json!(line.rows.len() + 1);
+                line.rows.push(serde_json::from_value(value).unwrap());
+                if let Some((turn, call)) = details {
+                    append(
+                        line,
+                        "tool/call",
+                        json!({"turn":turn,"step":1,"callId":call,"name":"fixture_read","arguments":{"path":"/fixture/reading-only.txt"}}),
+                    );
+                    append(
+                        line,
+                        "tool/result",
+                        json!({"turn":turn,"step":1,"message":{"source":{"callId":call},"content":[{"type":"text","text":"只读验收工具结果，不读取真实文件。\n".repeat(12)}]}}),
+                    );
+                }
+            }
+        }
+        self
+    }
     pub fn with_history_page_gate(mut self, gate: Arc<tokio::sync::Semaphore>) -> Self {
         self.history_page_gate = Some(gate);
         self
@@ -1191,10 +1224,10 @@ impl SessionEndpoint for Endpoint {
     async fn close(&self) {}
 }
 pub async fn setup() -> Result<(Arc<SessionRuntime>, Arc<RunController>)> {
-    let runtime = Arc::new(SessionRuntime::spawn(
-        "fixture",
-        Arc::new(Fixture::default()),
-    ));
+    setup_fixture(Fixture::default()).await
+}
+pub async fn setup_fixture(fixture: Fixture) -> Result<(Arc<SessionRuntime>, Arc<RunController>)> {
+    let runtime = Arc::new(SessionRuntime::spawn("fixture", Arc::new(fixture)));
     runtime.wait_ready(Duration::from_secs(3)).await?;
     let controller = Arc::new(RunController::new(runtime.clone())?);
     controller.open(RunScope::main("fixture", "a")).await?;

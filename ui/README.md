@@ -225,3 +225,9 @@ Composer 的可选状态提示位于输入卡片外上方；安装 `ComposerNoti
 RunSnapshot 的 destination/connection_epoch 和递增 display revision 发布事实。刷新为显式事件时回调，
 宿主需在既有控制器上认领并执行；无自动网络重试。接口、组字屏障与验收边界见
 [Composer notice 接入](../docs/rust-agent-ui-composer-notice-20261022.md)。
+
+
+`--components --transcript-content --disclosure-reading-native-selftest` 使用隔离owned协议历史，
+验证原工具/推理控件展开、AppKit live resize及字号变化时的阅读行、原Composer焦点和中文marked保持。
+工具增长的组件层证据、原生边界及公开consumer用法见
+[工具/推理重排阅读](../docs/rust-agent-ui-disclosure-reflow-20261022.md)。

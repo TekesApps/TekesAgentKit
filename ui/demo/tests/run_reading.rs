@@ -119,7 +119,21 @@ async fn setup() -> (
     ReadingDocumentVersion,
     Text,
 ) {
-    let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
+    setup_with_fixture(tekes_agent_ui_demo::fixture::Fixture::default()).await
+}
+async fn setup_with_fixture(
+    fixture: tekes_agent_ui_demo::fixture::Fixture,
+) -> (
+    std::sync::Arc<tekes_agent_session::SessionRuntime>,
+    ContentHost,
+    ComponentId,
+    RunSnapshot,
+    ReadingDocumentVersion,
+    Text,
+) {
+    let (runtime, controller) = tekes_agent_ui_demo::fixture::setup_fixture(fixture)
+        .await
+        .unwrap();
     let mut snapshot = (*controller.snapshot()).clone();
     snapshot.draft.text = "原草稿 中文".into();
     let mut view = RunView::standard(2100, 2104..2500, RunScope::main("fixture", "a")).unwrap();
@@ -2186,5 +2200,167 @@ async fn composer_notice_height_changes_preserve_upward_reading_and_marked_edito
         assert!((next - y).abs() <= 1.);
         assert!(!scroll(&host, root).is_following_latest());
     }
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn expanded_tool_growth_and_reflow_preserve_reading_and_explicit_collapse_can_focus() {
+    use tekes_ui_controls::{ScrollRevealOptions, ScrollRevealPlacement, extended::Axis};
+    let fixture = tekes_agent_ui_demo::fixture::Fixture::default().with_reading_details();
+    let (runtime, mut host, root, mut snapshot, version, mut text) =
+        setup_with_fixture(fixture).await;
+    assert!(!snapshot.transcript.tools.is_empty());
+    let tool_key = TranscriptContentRowKey::Tool(snapshot.transcript.tools[0].id.clone());
+    let tool_row = run(&host, root)
+        .transcript()
+        .unwrap()
+        .row_id(&tool_key)
+        .unwrap();
+    let tool = host
+        .get(tool_row)
+        .unwrap()
+        .component::<ToolActivity>()
+        .unwrap()
+        .content_ids()
+        .unwrap();
+    let reasoning = rows(&host, root)
+        .iter()
+        .filter_map(|key| {
+            let id = run(&host, root).transcript().unwrap().row_id(key).unwrap();
+            host.get(id)
+                .unwrap()
+                .component::<OutputMessage>()
+                .and_then(|output| {
+                    output
+                        .content_ids()
+                        .into_iter()
+                        .find(|id| id.kind == OutputContentKind::Reasoning)
+                })
+        })
+        .next()
+        .unwrap();
+    for button in [tool.disclosure.unwrap(), reasoning.disclosure.unwrap()] {
+        host.accessibility_action(button, None, AccessibilityAction::Press);
+        let intents = tekes_agent_ui_consumer_check::drain_local_run_actions(&mut host, root);
+        assert!(
+            intents.is_empty(),
+            "disclosure must not submit or mutate a session"
+        );
+    }
+    render(&mut host, &mut text);
+    assert!(host.get(tool.body).is_some());
+    assert!(host.get(reasoning.body).is_some());
+    let original_tool = host
+        .get(tool.body)
+        .unwrap()
+        .component::<TextFieldContent>()
+        .unwrap() as *const _;
+    let tool_height = host.get(tool_row).unwrap().frame().size.height;
+    let target = rows(&host, root)
+        .iter()
+        .rev()
+        .filter_map(|key| {
+            let id = run(&host, root).transcript().unwrap().row_id(key).unwrap();
+            (host.get(id).unwrap().component::<InputMessage>().is_some()).then_some(id)
+        })
+        .nth(2)
+        .unwrap();
+    let viewport = run(&host, root).ids().viewport;
+    host.reveal_scroll_reading_item(
+        viewport,
+        &version,
+        target,
+        ScrollRevealOptions {
+            placement: ScrollRevealPlacement::Start(Axis::Vertical),
+            animated: false,
+            ..Default::default()
+        },
+        &mut text,
+    )
+    .unwrap();
+    render(&mut host, &mut text);
+    assert_eq!(anchor(&host, root), target);
+    let relative = |host: &ContentHost| {
+        host.get(target).unwrap().frame().min_y()
+            - host.get(viewport).unwrap().visible().unwrap().min_y()
+    };
+    let y = relative(&host);
+    let editor = run(&host, root).ids().composer.editor;
+    host.focus(Some(editor), true);
+    host.event(&ContentEvent::Preedit {
+        text: "工具回传和重排期间中文组字".into(),
+        selection: 2..5,
+        clauses: vec![],
+        replacement: None,
+    });
+    let before = baseline(&host, root);
+    snapshot.revision += 1;
+    snapshot.transcript.tools[0].result =
+        Some(serde_json::json!({"text":"额外的已回传工具内容，保持原调用位置。\n".repeat(80)}));
+    let plan = prepare(run(&host, root), &snapshot).unwrap();
+    publish_plan(&mut host, root, &version, &plan).unwrap();
+    render(&mut host, &mut text);
+    assert!(host.get(tool_row).unwrap().frame().size.height > tool_height);
+    assert!(
+        host.get(tool_row).unwrap().frame().max_y()
+            < host.get(viewport).unwrap().visible().unwrap().min_y(),
+        "growing tool must be above the reading viewport"
+    );
+    for (width, scale) in [(600., 1.), (900., 1.4), (760., 0.85), (760., 1.)] {
+        text.1 = scale;
+        let frame = Rect::new(0., 0., width, 650.);
+        host.render(
+            &mut Scene::new(),
+            &mut text,
+            frame,
+            frame,
+            Theme::LIGHT.into(),
+        )
+        .unwrap();
+        assert_eq!(anchor(&host, root), target);
+        assert!(
+            (relative(&host) - y).abs() <= 1.,
+            "reflow moved original reading item"
+        );
+        assert!(!scroll(&host, root).is_following_latest());
+        assert_eq!(host.focused(), Some(editor));
+        assert_eq!(baseline(&host, root), before);
+        assert_eq!(
+            host.get(tool.body)
+                .unwrap()
+                .component::<TextFieldContent>()
+                .unwrap() as *const _,
+            original_tool
+        );
+    }
+    host.event(&ContentEvent::Unmark);
+    for button in [tool.disclosure.unwrap(), reasoning.disclosure.unwrap()] {
+        host.accessibility_action(button, None, AccessibilityAction::Press);
+        for intent in tekes_agent_ui_consumer_check::drain_local_run_actions(&mut host, root) {
+            match intent {
+                RunViewIntent::Composer(ComposerIntent::Edit { destination, text }) => {
+                    assert_eq!(
+                        Some(&destination),
+                        run(&host, root).composer().destination()
+                    );
+                    assert_eq!(text, run(&host, root).composer().editor().input.text);
+                }
+                other => panic!("collapse may only flush the just-unmarked draft edit: {other:?}"),
+            }
+        }
+    }
+    render(&mut host, &mut text);
+    assert!(host.get(tool.body).is_none() && host.get(reasoning.body).is_none());
+    // Explicit AX activation focuses/reveals an offscreen disclosure through the
+    // SDK. That deliberate navigation must not be mislabelled passive reflow.
+    assert_eq!(host.focused(), reasoning.disclosure);
+    assert!(
+        host.get(reasoning.disclosure.unwrap())
+            .unwrap()
+            .visible()
+            .is_some()
+    );
+    assert!(!scroll(&host, root).is_following_latest());
+    assert!(snapshot.submissions.is_empty());
     runtime.stop().await.unwrap();
 }

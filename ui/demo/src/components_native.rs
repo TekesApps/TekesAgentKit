@@ -34,6 +34,8 @@ use tekes_ui_tokens::{Palette, Theme};
 
 #[path = "native_composer_notice_selftest.rs"]
 mod composer_notice_probe;
+#[path = "native_disclosure_reading_selftest.rs"]
+mod disclosure_reading_probe;
 #[path = "native_feedback_selftest.rs"]
 mod feedback_probe;
 #[path = "native_panel_projection_selftest.rs"]
@@ -90,6 +92,7 @@ struct Host {
     sidebar_options_probe: Option<sidebar_options_probe::Probe>,
     panel_projection_probe: Option<panel_projection_probe::Probe>,
     composer_notice_probe: Option<composer_notice_probe::Probe>,
+    disclosure_reading_probe: Option<disclosure_reading_probe::Probe>,
     reading_probe: Option<reading_probe::Probe>,
     readonly_reading_probe: Option<readonly_reading_probe::Probe>,
     summary_sections_probe: Option<summary_sections_probe::Probe>,
@@ -1369,6 +1372,10 @@ impl Host {
                 native_script(&self.view);
             }
         }
+        if let Some(mut probe) = self.disclosure_reading_probe.take() {
+            probe.advance(self, window);
+            self.disclosure_reading_probe = Some(probe);
+        }
         if let Some(mut probe) = self.composer_notice_probe.take() {
             probe.advance(self, window);
             self.composer_notice_probe = Some(probe);
@@ -2414,6 +2421,17 @@ impl Host {
                 probe.receipt()
             );
         }
+        if let Some(probe) = &self.disclosure_reading_probe {
+            assert!(
+                self.failures.is_empty(),
+                "reflow failures {:?}",
+                self.failures
+            );
+            println!(
+                "NATIVE_AGENT_DISCLOSURE_READING_RECEIPT {}",
+                probe.receipt()
+            );
+        }
         if let Some(probe) = &self.composer_notice_probe {
             assert!(
                 self.failures.is_empty(),
@@ -2679,6 +2697,7 @@ impl WindowHandler for Host {
                     || self.sidebar_options_probe.is_some()
                     || self.panel_projection_probe.is_some()
                     || self.composer_notice_probe.is_some()
+                    || self.disclosure_reading_probe.is_some()
                 {
                     eprintln!(
                         "COMPONENT_FOCUS active={active} id={:?}",
@@ -2853,6 +2872,13 @@ pub fn run() {
     );
     let sidebar_restore_selftest = args.iter().any(|arg| arg == "--sidebar-restore-selftest");
     let sidebar_options_selftest = args.iter().any(|arg| arg == "--sidebar-options-selftest");
+    let disclosure_reading_selftest = args
+        .iter()
+        .any(|arg| arg == "--disclosure-reading-native-selftest");
+    assert!(
+        !disclosure_reading_selftest || args.iter().any(|arg| arg == "--transcript-content"),
+        "reflow probe requires formal Transcript"
+    );
     let composer_notice_selftest = args.iter().any(|arg| arg == "--composer-notice-selftest");
     assert!(
         !composer_notice_selftest || args.iter().any(|arg| arg == "--transcript-content"),
@@ -2873,6 +2899,7 @@ pub fn run() {
         || sidebar_options_selftest
         || panel_projection_selftest
         || composer_notice_selftest
+        || disclosure_reading_selftest
         || sidebar_session_menu_selftest
         || sidebar_search_selftest
         || sidebar_query_selftest
@@ -2907,6 +2934,7 @@ pub fn run() {
             sidebar_options_selftest,
             panel_projection_selftest,
             composer_notice_selftest,
+            disclosure_reading_selftest,
             sidebar_session_menu_selftest,
             sidebar_search_selftest,
             sidebar_query_selftest,
@@ -2976,6 +3004,11 @@ pub fn run() {
                     .with_models();
                 let fixture = if let Some(gate) = &reading_gate {
                     fixture.with_history_page_gate(gate.clone())
+                } else {
+                    fixture
+                };
+                let fixture = if disclosure_reading_selftest {
+                    fixture.with_reading_details()
                 } else {
                     fixture
                 };
@@ -3310,6 +3343,8 @@ pub fn run() {
         },
         panel_projection_probe: panel_projection_selftest.then(panel_projection_probe::Probe::new),
         composer_notice_probe: composer_notice_selftest.then(composer_notice_probe::Probe::new),
+        disclosure_reading_probe: disclosure_reading_selftest
+            .then(disclosure_reading_probe::Probe::new),
         readonly_reading_probe: (readonly_reading_selftest || harness_readonly_reading_selftest)
             .then(|| readonly_reading_probe::Probe::new(bounded_probe_child)),
         reading_probe: if reading_selftest || harness_reading_selftest {

@@ -2418,3 +2418,17 @@ fn independent_composer_notice_uses_captured_public_callback_without_a_runtime()
     );
     assert!(composer_notice_refreshes(source).is_empty());
 }
+
+/// Route an original once-drained SDK action batch through the public RunView;
+/// local disclosures use its existing policy, without host reconstruction.
+pub fn drain_local_run_actions(
+    host: &mut tekes_ui_controls::composition::ContentHost,
+    root: tekes_ui_controls::composition::ComponentId,
+) -> Vec<tekes_agent_components_ui::RunViewIntent> {
+    let actions = host.drain_actions();
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<tekes_agent_components_ui::RunView>()
+        .unwrap()
+        .take_intents(&actions)
+}
