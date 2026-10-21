@@ -91,7 +91,7 @@ impl Probe {
             .unwrap()
             .button();
         assert_eq!(control as *const _ as usize, self.control);
-        assert!(control.label.contains(status));
+        assert_eq!(control.label, child.title);
         assert_eq!(host.view.tree.focused(), Some(host.view.ids().editor));
         assert_eq!(host.view.editor() as *const _ as usize, self.editor);
         assert_eq!(

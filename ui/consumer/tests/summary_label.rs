@@ -149,11 +149,20 @@ fn original_summary_label_ellipsizes_one_line_without_losing_source_or_ax_owner(
                 let frame = Rect::new(0., 0., width, 600.);
                 host.render(&mut Scene::new(), &mut text, frame, frame, theme.into())
                     .unwrap();
-                let (_, layout) = text.labels.last().expect("original SDK requested a label");
+                let (_, layout) = text
+                    .labels
+                    .iter()
+                    .rev()
+                    .find(|(_, layout)| layout.source() == TITLE.repeat(6))
+                    .expect("original SDK requested the header label");
                 assert!(text.labels.iter().all(|(options, layout)| {
-                    *options == LabelOptions::single_line(LabelOverflow::TailEllipsis)
-                        && layout.paragraph().lines.len() == 1
-                        && layout.source() == TITLE.repeat(6)
+                    if layout.source().is_empty() {
+                        *options == LabelOptions::single_line(LabelOverflow::Clip)
+                    } else {
+                        *options == LabelOptions::single_line(LabelOverflow::TailEllipsis)
+                            && layout.paragraph().lines.len() == 1
+                            && layout.source() == TITLE.repeat(6)
+                    }
                 }));
                 assert!(!layout.elided_utf16().is_empty());
                 assert!(layout.width() <= f64::from(width));
@@ -665,4 +674,213 @@ fn usage_metadata_stays_on_one_original_sdk_line_at_the_title_first_line() {
             );
         }
     }
+}
+
+#[test]
+fn ordinary_metadata_uses_original_single_line_and_keeps_selection_actions_and_slots() {
+    use tekes_ui_tokens::Spacing;
+    let scope = RunScope::main("consumer", "metadata");
+    for theme in [Theme::LIGHT, Theme::DARK] {
+        for scale in [0.85, 1., 1.5, 2.] {
+            for width in [96., 240., 420.] {
+                let mut input = input();
+                input.owner = SummaryOwner::Run(scope.clone());
+                input.host_sections[0].rows = ["action", "passive"]
+                    .map(|id| SummaryRow {
+                        id: id.into(),
+                        title: "中文标题 English e\u{301} · 长内容换行 ".repeat(7),
+                        value: "12 files".into(),
+                        action: (id == "action").then(|| SummaryAction::OpenArtifact {
+                            scope: scope.clone(),
+                            path: "/metadata/path".into(),
+                        }),
+                    })
+                    .into();
+                let mut summary = SummaryView::new(49901, SummaryLabels::default());
+                tekes_agent_ui_consumer_check::publish_summary_context(&mut summary, &input)
+                    .unwrap();
+                let root = summary.id();
+                let action = summary
+                    .default_row_ids("host:repository", "action")
+                    .unwrap();
+                let passive = summary
+                    .default_row_ids("host:repository", "passive")
+                    .unwrap();
+                let mut host = summary.into_host().unwrap();
+                let mut text = Text::new(scale, true);
+                let frame = Rect::new(0., 0., width, 10000.);
+                host.render(&mut Scene::new(), &mut text, frame, frame, theme.into())
+                    .unwrap();
+                for ids in [action, passive] {
+                    let title = host.get(ids.title).unwrap().frame();
+                    let meta = host.get(ids.trailing).unwrap().frame();
+                    let band = host.get(ids.row).unwrap().frame();
+                    let line = text.measure("Mg", proposal::TextRole::UiBody, 1e8).height;
+                    assert!(
+                        (meta.max_x() - band.max_x() + 2. * Spacing::Regular.value()).abs() < 0.1
+                    );
+                    assert!(
+                        (meta.min_y() - title.min_y() - (line - meta.size.height) / 2.).abs() < 0.1
+                    );
+                    assert!(title.max_x() <= meta.min_x());
+                    assert_eq!(
+                        host.get(ids.trailing)
+                            .unwrap()
+                            .component::<TextContent>()
+                            .unwrap()
+                            .text,
+                        "12 files"
+                    );
+                }
+                assert!(text.labels.iter().any(|(o, l)| *o
+                    == LabelOptions::single_line(LabelOverflow::Clip)
+                    && l.source() == "12 files"
+                    && l.paragraph().lines.len() == 1));
+                let control = host
+                    .get(action.row)
+                    .unwrap()
+                    .component::<SummaryActionRow>()
+                    .unwrap()
+                    .button() as *const _ as usize;
+                let field = host.text_surface(passive.title).unwrap() as *const _ as usize;
+                assert!(host.focus(Some(passive.title), true));
+                host.accessibility_action(
+                    passive.title,
+                    None,
+                    AccessibilityAction::SetSelection(0..2),
+                );
+                for value in [None, Some("更新值 123456789012345678901234567890")] {
+                    input.revision += 1;
+                    for row in &mut input.host_sections[0].rows {
+                        row.value = value.map(Into::into).unwrap_or_default();
+                    }
+                    tekes_agent_ui_consumer_check::publish_summary_context(
+                        host.get_mut(root)
+                            .unwrap()
+                            .component_mut::<SummaryView>()
+                            .unwrap(),
+                        &input,
+                    )
+                    .unwrap();
+                    host.render(&mut Scene::new(), &mut text, frame, frame, theme.into())
+                        .unwrap();
+                    assert_eq!(
+                        host.get(action.row)
+                            .unwrap()
+                            .component::<SummaryActionRow>()
+                            .unwrap()
+                            .button() as *const _ as usize,
+                        control
+                    );
+                    assert_eq!(
+                        host.text_surface(passive.title).unwrap() as *const _ as usize,
+                        field
+                    );
+                    assert_eq!(
+                        host.text_surface(passive.title)
+                            .unwrap()
+                            .input
+                            .selected_text(),
+                        "中文"
+                    );
+                    assert_eq!(host.focused(), Some(passive.title));
+                    assert_eq!(
+                        host.get(action.trailing).unwrap().visible().is_some(),
+                        value.is_some()
+                    );
+                    assert_eq!(
+                        host.get(root)
+                            .unwrap()
+                            .component::<SummaryView>()
+                            .unwrap()
+                            .default_row_ids("host:repository", "action"),
+                        Some(action)
+                    );
+                    assert!(
+                        host.accessibility_action(action.row, None, AccessibilityAction::Press)
+                            .activated
+                    );
+                    assert_eq!(host.focused(), Some(passive.title));
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn artifact_metadata_formatter_captures_host_counts_without_replacing_original_rows() {
+    use std::sync::{Arc, RwLock};
+    let counts = Arc::new(RwLock::new(String::from("+12 -3")));
+    let projection = counts.clone();
+    let mut summary = SummaryView::new(
+        49902,
+        SummaryLabels {
+            trailing: Arc::new(move |section, row| {
+                (section == "artifacts" && row.id == "artifact")
+                    .then(|| projection.read().unwrap().clone())
+            }),
+            ..Default::default()
+        },
+    );
+    let mut source = input();
+    source.host_sections[0].id = "artifacts".into();
+    source.host_sections[0].rows[0].id = "artifact".into();
+    source.host_sections[0].rows[0].title = "报告.md".into();
+    tekes_agent_ui_consumer_check::publish_summary_context(&mut summary, &source).unwrap();
+    let ids = summary.default_row_ids("artifacts", "artifact").unwrap();
+    let root = summary.id();
+    let mut host = summary.into_host().unwrap();
+    assert_eq!(
+        host.get(ids.trailing)
+            .unwrap()
+            .component::<TextContent>()
+            .unwrap()
+            .text,
+        "+12 -3"
+    );
+    *counts.write().unwrap() = "+20 -5".into();
+    assert_eq!(
+        tekes_agent_ui_consumer_check::publish_summary_context(
+            host.get_mut(root)
+                .unwrap()
+                .component_mut::<SummaryView>()
+                .unwrap(),
+            &source
+        ),
+        Err("Summary formatted content changed without publication")
+    );
+    assert_eq!(
+        host.get(ids.trailing)
+            .unwrap()
+            .component::<TextContent>()
+            .unwrap()
+            .text,
+        "+12 -3"
+    );
+    source.revision += 1;
+    tekes_agent_ui_consumer_check::publish_summary_context(
+        host.get_mut(root)
+            .unwrap()
+            .component_mut::<SummaryView>()
+            .unwrap(),
+        &source,
+    )
+    .unwrap();
+    assert_eq!(
+        host.get(root)
+            .unwrap()
+            .component::<SummaryView>()
+            .unwrap()
+            .default_row_ids("artifacts", "artifact"),
+        Some(ids)
+    );
+    assert_eq!(
+        host.get(ids.trailing)
+            .unwrap()
+            .component::<TextContent>()
+            .unwrap()
+            .text,
+        "+20 -5"
+    );
+    assert_eq!(host.text_surface(ids.title).unwrap().input.text, "报告.md");
 }

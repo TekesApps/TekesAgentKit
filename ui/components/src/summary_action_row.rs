@@ -10,12 +10,12 @@ pub struct SummaryActionRow {
     button: CompoundButton,
 }
 impl SummaryActionRow {
-    pub(crate) fn new(body: ComponentId, title: ComponentId) -> Self {
+    pub(crate) fn new(body: ComponentId, title: ComponentId, trailing: ComponentId) -> Self {
         let mut button = CompoundButton::new(
             "Summary row",
             Content::new(
                 body,
-                SummaryRowBody::new(Content::new(title, TextContent::new(""))),
+                SummaryRowBody::new(Content::new(title, TextContent::new("")), trailing),
             ),
         )
         .expect("one passive Summary title slot");
@@ -26,8 +26,12 @@ impl SummaryActionRow {
     pub fn button(&self) -> &ButtonContent {
         &self.button.action
     }
-    pub(crate) fn update(&mut self, label: String) {
+    pub(crate) fn update(&mut self, label: String, trailing: Option<String>) {
         self.button.action.label = label.clone();
+        self.button.children_mut().unwrap()[0]
+            .component_mut::<SummaryRowBody>()
+            .unwrap()
+            .update_trailing(trailing);
         self.button.children_mut().unwrap()[0]
             .component_mut::<SummaryRowBody>()
             .unwrap()

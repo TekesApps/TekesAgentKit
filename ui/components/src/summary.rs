@@ -76,7 +76,10 @@ pub struct SummaryIntent {
     pub scope: RunScope,
     pub action: SummaryAction,
 }
-#[derive(Clone, Debug)]
+/// Called during publication preflight. Hosts may capture a read-only product
+/// projection, and must publish a new Summary revision when that input changes.
+pub type SummaryTrailingFormatter = Arc<dyn Fn(&str, &SummaryRow) -> Option<String> + Send + Sync>;
+#[derive(Clone)]
 pub struct SummaryLabels {
     pub name: String,
     pub unavailable: String,
@@ -86,6 +89,9 @@ pub struct SummaryLabels {
     /// Usage uses distinct title/value slots, as in ClientKit. Product localization
     /// formats these facts; it must not recompute usage or infer missing costs.
     pub usage_row: fn(&SummaryRow) -> SummaryUsageRowText,
+    /// Optional plain metadata for ordinary default rows (not usage/custom).
+    /// Host projection/localization supplies text; never infer it from status.
+    pub trailing: SummaryTrailingFormatter,
 }
 impl Default for SummaryLabels {
     fn default() -> Self {
@@ -105,25 +111,33 @@ impl Default for SummaryLabels {
                 .into()
             },
             usage_row: SummaryUsageRowText::read,
-            row: |section, row| {
-                if row.value.is_null() {
-                    if section == "usage" {
-                        format!("{} · 未知", row.title)
-                    } else {
-                        row.title.clone()
-                    }
+            row: |_, row| row.title.clone(),
+            trailing: Arc::new(|section, row| {
+                if matches!(
+                    section,
+                    "tasks" | "subagents" | "sources" | "artifacts" | "usage"
+                ) || row.value.is_null()
+                {
+                    None
                 } else {
-                    format!(
-                        "{} · {}",
-                        row.title,
+                    Some(
                         row.value
                             .as_str()
                             .map(str::to_owned)
-                            .unwrap_or_else(|| row.value.to_string())
+                            .unwrap_or_else(|| row.value.to_string()),
                     )
                 }
-            },
+            }),
         }
+    }
+}
+impl std::fmt::Debug for SummaryLabels {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SummaryLabels")
+            .field("name", &self.name)
+            .field("unavailable", &self.unavailable)
+            .field("empty", &self.empty)
+            .finish_non_exhaustive()
     }
 }
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -134,6 +148,7 @@ enum Key {
     Body(SummaryOwner, String),
     Row(SummaryOwner, String, String, ActionIdentity),
     PassiveBody(SummaryOwner, String, String),
+    Trailing(SummaryOwner, String, String, ActionIdentity),
     ActionBody(SummaryOwner, String, String, ActionIdentity),
     ActionTitle(SummaryOwner, String, String, ActionIdentity),
     UsageTitle(SummaryOwner, String),
@@ -166,6 +181,7 @@ impl ActionIdentity {
 #[derive(Debug)]
 pub(crate) struct PreparedSummaryContext {
     labels: BTreeMap<(String, String), String>,
+    trailing: BTreeMap<(String, String), Option<String>>,
     sections: Vec<SummarySection>,
     section_ids: BTreeSet<String>,
     custom: BTreeMap<(String, String), SummaryCustomRowSpec>,
@@ -186,6 +202,8 @@ pub struct SummaryView {
     expansions: BTreeMap<String, Expansion>,
     last: Option<SummaryInput>,
     last_context: Option<SummaryContextInput>,
+    displayed_labels: BTreeMap<(String, String), String>,
+    displayed_trailing: BTreeMap<(String, String), Option<String>>,
     custom_context: Arc<()>,
 }
 impl SummaryView {
@@ -217,6 +235,8 @@ impl SummaryView {
             expansions: BTreeMap::new(),
             last: None,
             last_context: None,
+            displayed_labels: BTreeMap::new(),
+            displayed_trailing: BTreeMap::new(),
             custom_context: Arc::new(()),
         }
     }
@@ -284,9 +304,16 @@ impl SummaryView {
         }
         let id = self.row_id(section, row)?;
         let owner = self.owner.as_ref()?.clone();
+        let trailing = *self.ids.get(&Key::Trailing(
+            owner.clone(),
+            section.into(),
+            row.into(),
+            ActionIdentity::read(self.bindings.get(&id).map(|(_, intent)| &intent.action)),
+        ))?;
         if let Some((_, intent)) = self.bindings.get(&id) {
             Some(crate::SummaryDefaultRowIds {
                 row: id,
+                trailing,
                 title: *self.ids.get(&Key::ActionTitle(
                     owner,
                     section.into(),
@@ -300,6 +327,7 @@ impl SummaryView {
                     .ids
                     .get(&Key::PassiveBody(owner, section.into(), row.into()))?,
                 title: id,
+                trailing,
             })
         }
     }
@@ -427,6 +455,7 @@ impl SummaryView {
         append_summary_sections(&mut sections, input.host_sections.clone());
         sections.extend(providers);
         let mut labels = BTreeMap::new();
+        let mut trailing = BTreeMap::new();
         let mut custom = BTreeMap::new();
         for spec in &input.custom_rows {
             if spec.content_key.trim().is_empty()
@@ -489,6 +518,18 @@ impl SummaryView {
                     keys.insert(Key::UsageTitle(input.owner.clone(), row.id.clone()));
                     keys.insert(Key::UsageValue(input.owner.clone(), row.id.clone()));
                 }
+                if slot.is_none() && (row.action.is_some() || section.id != "usage") {
+                    keys.insert(Key::Trailing(
+                        input.owner.clone(),
+                        section.id.clone(),
+                        row.id.clone(),
+                        ActionIdentity::read(row.action.as_ref()),
+                    ));
+                    trailing.insert(
+                        (section.id.clone(), row.id.clone()),
+                        (self.labels.trailing)(&section.id, row),
+                    );
+                }
                 if slot.is_none() && row.action.is_some() {
                     let identity = ActionIdentity::read(row.action.as_ref());
                     keys.insert(Key::ActionBody(
@@ -548,6 +589,11 @@ impl SummaryView {
             });
         }
         let desired: BTreeSet<_> = ids.values().copied().collect();
+        if input.revision == self.revision
+            && (labels != self.displayed_labels || trailing != self.displayed_trailing)
+        {
+            return Err("Summary formatted content changed without publication");
+        }
         let retiring = self.scroll.children()[0]
             .component::<SummaryDocument>()
             .unwrap()
@@ -563,6 +609,7 @@ impl SummaryView {
             .collect();
         Ok(PreparedSummaryContext {
             labels,
+            trailing,
             sections,
             section_ids,
             custom,
@@ -578,6 +625,7 @@ impl SummaryView {
     ) -> Result<(), &'static str> {
         let PreparedSummaryContext {
             labels,
+            trailing,
             sections,
             section_ids,
             custom,
@@ -672,13 +720,22 @@ impl SummaryView {
                                     row.id.clone(),
                                     ActionIdentity::read(Some(&action)),
                                 )],
+                                ids[&Key::Trailing(
+                                    input.owner.clone(),
+                                    section.id.clone(),
+                                    row.id.clone(),
+                                    ActionIdentity::read(Some(&action)),
+                                )],
                             ),
                         )
                     });
                     content
                         .component_mut::<SummaryActionRow>()
                         .expect("summary action")
-                        .update(label);
+                        .update(
+                            label,
+                            trailing[&(section.id.clone(), row.id.clone())].clone(),
+                        );
                     bindings.insert(
                         id,
                         (
@@ -715,16 +772,28 @@ impl SummaryView {
                     let mut content = old_rows.remove(&body).unwrap_or_else(|| {
                         Content::new(
                             body,
-                            SummaryRowBody::new(Content::new(
-                                id,
-                                TextFieldContent::read_only_content(
-                                    "",
-                                    "",
-                                    tekes_ui_tokens::proposal::TextRole::UiBody,
+                            SummaryRowBody::new(
+                                Content::new(
+                                    id,
+                                    TextFieldContent::read_only_content(
+                                        "",
+                                        "",
+                                        tekes_ui_tokens::proposal::TextRole::UiBody,
+                                    ),
                                 ),
-                            )),
+                                ids[&Key::Trailing(
+                                    input.owner.clone(),
+                                    section.id.clone(),
+                                    row.id.clone(),
+                                    ActionIdentity::Passive,
+                                )],
+                            ),
                         )
                     });
+                    content
+                        .component_mut::<SummaryRowBody>()
+                        .unwrap()
+                        .update_trailing(trailing[&(section.id.clone(), row.id.clone())].clone());
                     crate::summary_text::update_text(
                         content.component_mut::<SummaryRowBody>().unwrap().children[0]
                             .component_mut::<TextFieldContent>()
@@ -758,6 +827,8 @@ impl SummaryView {
         // absent sections need no retained model or row tree.
         self.expansions
             .retain(|section, model| section_ids.contains(section) || !model.borrow().open);
+        self.displayed_labels = labels;
+        self.displayed_trailing = trailing;
         self.last_context = Some(input.clone());
         self.last = None;
         Ok(())

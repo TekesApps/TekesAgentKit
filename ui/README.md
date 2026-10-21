@@ -267,7 +267,12 @@ Summary 子代理 `status` 来自同 endpoint 的 child session 执行事实，�
 
 Summary 默认动作/静态行按 ClientKit 的文字带布局：左右两份 Regular、标题换行，
 用量值保持原 SDK 单行并相对标题首行居中。样式、字体和控件绘制仍来自 TekesUI。
-`default_row_ids(section,row)` 返回真实行带/标题槽；静态 `row_id` / `passive_text_id`
+`default_row_ids(section,row)` 返回真实行带/标题/metadata槽；静态 `row_id` / `passive_text_id`
 仍指向原可选择 field。`SummaryLabels::row` 在发布预检中每行调用一次，动作名为空会在改图前拒绝。
 完整 API、原生程序与范围见[默认行布局](../docs/rust-agent-ui-summary-row-layout-20261022.md)。
 只读文字的整行留白路由仍跟踪 TekesUI #30；图标和状态附件跟踪 #47。
+
+普通行标题默认只保留源 title；task/child raw status 不再拼入标题。
+`SummaryLabels::trailing` 可捕获宿主只读投影，为默认行提供独立 plain metadata；
+同 revision 下 formatter 输出冲突会在改图前拒绝。新增 slot、迁移和原生组字证据见
+[Summary metadata](../docs/rust-agent-ui-summary-metadata-20261022.md)。多语义 runs/tone 继续跟踪 TekesUI #25。

@@ -4,6 +4,7 @@ use serde_json::json;
 use tekes_agent_components_ui::{
     SummaryContextInput, SummaryOwner, SummaryRow, SummarySection, SummaryView,
 };
+use tekes_ui_controls::ButtonTextRenderer;
 use tekes_ui_platform_macos::selftest::{Action, run_script};
 const SECTION: &str = "host:workspace";
 pub(super) struct Probe {
@@ -14,6 +15,7 @@ pub(super) struct Probe {
     draft: Option<String>,
     items: usize,
     submissions: usize,
+    baseline: Option<tekes_ui_controls::TextEditBaseline>,
 }
 impl Probe {
     pub fn new() -> Self {
@@ -26,6 +28,7 @@ impl Probe {
             draft: None,
             items: 0,
             submissions: 0,
+            baseline: None,
         }
     }
     fn view(host: &Host) -> Option<&SummaryView> {
@@ -87,6 +90,10 @@ impl Probe {
         let Some(source) = summary.displayed_context_input() else {
             return;
         };
+        if let Some(baseline) = &self.baseline {
+            assert_eq!(&host.view.editor().input.external_baseline(), baseline);
+            assert_eq!(host.view.tree.focused(), Some(host.view.ids().editor));
+        }
         let old = self.phase;
         match self.phase {
             0 if window.is_active() => {
@@ -103,10 +110,23 @@ impl Probe {
                 assert!(source.facts.is_none() && summary.displayed_input().is_none());
                 self.original_row = summary.row_id(SECTION, "name");
                 let header = summary.section_header_id(SECTION).unwrap();
-                run_script(vec![(0, Self::click(host, header))]);
+                run_script(vec![
+                    (0, Self::click(host, host.view.ids().editor)),
+                    (
+                        100,
+                        Action::PreeditRange {
+                            text: "元数据更新期间中文组字".into(),
+                            selection: 1..3,
+                            replacement: None,
+                        },
+                    ),
+                    (200, Self::click(host, header)),
+                ]);
                 self.phase = 2;
             }
             2 if summary.section_expanded(SECTION) == Some(false) => {
+                assert!(host.view.editor().input.marked.is_some());
+                self.baseline = Some(host.view.editor().input.external_baseline());
                 let mut input = self.input("workspace-a");
                 input.host_sections[0].rows[0].value = json!("更新后的工作区 A");
                 host.view.set_workspace_summary(input).unwrap();
@@ -137,8 +157,33 @@ impl Probe {
             5 if summary.section_expanded(SECTION) == Some(true) => {
                 let id = summary.row_id(SECTION, "name").unwrap();
                 let field = host.view.tree.text_surface(id).unwrap();
-                assert!(field.input.read_only && field.input.text.contains("workspace-b"));
+                assert!(field.input.read_only);
+                assert_eq!(field.input.text, "工作区");
+                let ids = summary.default_row_ids(SECTION, "name").unwrap();
+                let metadata = host.view.tree.get(ids.trailing).unwrap();
+                assert_eq!(
+                    metadata
+                        .component::<tekes_ui_controls::composition::TextContent>()
+                        .unwrap()
+                        .text,
+                    "workspace-b"
+                );
+                let title = host.view.tree.get(ids.title).unwrap().frame();
+                let meta = metadata.frame();
+                let band = host.view.tree.get(ids.row).unwrap().frame();
                 assert!(summary.action_id(SECTION, "name").is_none());
+                let line = host
+                    .text
+                    .measure("Mg", tekes_ui_tokens::proposal::TextRole::UiBody, 1e8)
+                    .height;
+                assert!(
+                    (meta.max_x() - band.max_x() + 2. * tekes_ui_tokens::Spacing::Regular.value())
+                        .abs()
+                        < 0.1
+                );
+                assert!(
+                    (meta.min_y() - title.min_y() - (line - meta.size.height) / 2.).abs() < 0.1
+                );
                 let mut empty = self.input("workspace-b");
                 empty.host_sections.clear();
                 host.view.set_workspace_summary(empty).unwrap();
@@ -170,6 +215,6 @@ impl Probe {
     }
     pub fn receipt(&self) -> serde_json::Value {
         assert_eq!(self.phase, 8);
-        json!({"nativeWindow":true,"explicitWorkspaceOwner":true,"noSyntheticRunScope":true,"hostRowsWithoutSessionFacts":true,"originalHeaderClicks":true,"sameOwnerRowsRetained":true,"ownerChangeRetiresIds":true,"collapseRetained":true,"emptyAndUnavailableDistinct":true,"mainDraftAndTranscriptUnchanged":true,"noSubmission":true,"realHarness":false,"physicalIme":false,"voiceOver":false,"fullUnselectedHostLayout":false})
+        json!({"nativeWindow":true,"explicitWorkspaceOwner":true,"noSyntheticRunScope":true,"hostRowsWithoutSessionFacts":true,"originalHeaderClicks":true,"sameOwnerRowsRetained":true,"ownerChangeRetiresIds":true,"collapseRetained":true,"emptyAndUnavailableDistinct":true,"mainDraftAndTranscriptUnchanged":true,"noSubmission":true,"realHarness":false,"physicalIme":false,"voiceOver":false,"fullUnselectedHostLayout":false,"ordinaryMetadataFirstLine":true,"titleAndMetadataSeparate":true,"originalComposerFocusAndMarkedBaseline":true,"syntheticPreedit":true})
     }
 }

@@ -89,8 +89,10 @@ impl Probe {
         assert!(!labels.iter().any(|n| Some(n.id) == self.label));
         let layout = host
             .text
-            .last_label
-            .as_ref()
+            .recent_labels
+            .iter()
+            .rev()
+            .find(|layout| layout.source() == TITLE)
             .expect("SDK label service exercised");
         assert_eq!(layout.source(), TITLE);
         assert_eq!(layout.paragraph().lines.len(), 1);

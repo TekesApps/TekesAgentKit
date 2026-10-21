@@ -10,6 +10,8 @@ use tekes_ui_tokens::{Spacing, proposal};
 pub struct SummaryDefaultRowIds {
     pub row: ComponentId,
     pub title: ComponentId,
+    /// Original passive SDK label. Zero visible frame when metadata is absent.
+    pub trailing: ComponentId,
 }
 pub(crate) fn title_inset() -> f32 {
     2. * Spacing::Regular.value()
@@ -20,12 +22,57 @@ pub(crate) fn body_line(text: &mut dyn ButtonTextRenderer) -> f32 {
 #[derive(Debug)]
 pub(crate) struct SummaryRowBody {
     pub children: Vec<Content>,
+    has_trailing: bool,
 }
 impl SummaryRowBody {
-    pub fn new(title: Content) -> Self {
+    pub fn new(title: Content, trailing: ComponentId) -> Self {
         Self {
-            children: vec![title],
+            children: vec![
+                title,
+                Content::new(
+                    trailing,
+                    TextContent {
+                        text: String::new(),
+                        role: proposal::TextRole::UiCaption,
+                    },
+                )
+                .with_label_layout(tekes_ui_text::LabelOptions::single_line(
+                    tekes_ui_text::LabelOverflow::Clip,
+                ))
+                .expect("original single-line Summary metadata"),
+            ],
+            has_trailing: false,
         }
+    }
+    pub fn update_trailing(&mut self, value: Option<String>) {
+        self.has_trailing = value.is_some();
+        self.children[1]
+            .component_mut::<TextContent>()
+            .unwrap()
+            .text = value.unwrap_or_default();
+    }
+    fn measurements(&mut self, text: &mut dyn ButtonTextRenderer, width: f32) -> [Size; 2] {
+        let width = width.max(0.);
+        let meta = if self.has_trailing {
+            let mut size = self.children[1].measure(text, Size::new(width, 1e8)).size;
+            size.width = size.width.min(width);
+            size
+        } else {
+            Size::new(0., 0.)
+        };
+        let title_width = (width
+            - meta.width
+            - if self.has_trailing {
+                Spacing::Regular.value()
+            } else {
+                0.
+            })
+        .max(0.);
+        let mut title = self.children[0]
+            .measure(text, Size::new(title_width, 1e8))
+            .size;
+        title.width = title_width;
+        [title, meta]
     }
 }
 impl Component for SummaryRowBody {
@@ -33,7 +80,7 @@ impl Component for SummaryRowBody {
         true
     }
     fn validate(&self) -> Result<(), CompositionError> {
-        if self.children.len() == 1 {
+        if self.children.len() == 2 {
             Ok(())
         } else {
             Err(CompositionError::InvalidSlotCount)
@@ -46,12 +93,7 @@ impl Component for SummaryRowBody {
         Some(&mut self.children)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
-        let title = self.children[0]
-            .measure(
-                text,
-                Size::new((available.width - 2. * title_inset()).max(0.), 1e8),
-            )
-            .size;
+        let title = self.measurements(text, available.width - 2. * title_inset())[0];
         MeasuredChild::new(Size::new(
             available.width,
             title.height.max(body_line(text)) + 2. * Spacing::Regular.value(),
@@ -70,16 +112,18 @@ impl Component for SummaryRowBody {
             Some(clip),
         )
         .content();
-        let title = self.children[0]
-            .measure(text, Size::new(content.size.width, 1e8))
-            .size;
-        let title = Rect::new(
-            content.min_x(),
-            frame.min_y() + (frame.size.height - title.height) / 2.,
-            content.size.width,
-            title.height,
+        let [title, meta] = self.measurements(text, content.size.width);
+        let top = frame.min_y() + (frame.size.height - title.height) / 2.;
+        let title = Rect::new(content.min_x(), top, title.width, title.height);
+        let meta = Rect::new(
+            content.max_x() - meta.width,
+            top + (body_line(text) - meta.height) / 2.,
+            meta.width,
+            meta.height,
         );
-        self.children[0].arrange(text, title, title.intersection(&clip).unwrap_or_default());
+        for (node, rect) in self.children.iter_mut().zip([title, meta]) {
+            node.arrange(text, rect, rect.intersection(&clip).unwrap_or_default());
+        }
     }
     fn semantics(&self) -> ContentSemantics {
         ContentSemantics::new(ContentRole::Group, "")

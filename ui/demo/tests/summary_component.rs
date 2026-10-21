@@ -737,8 +737,12 @@ fn passive_summary_uses_the_original_readonly_text_owner_across_updates_and_disc
 #[test]
 fn summary_action_label_preflight_is_atomic_and_each_format_is_captured_once() {
     use std::sync::atomic::{AtomicUsize, Ordering};
+    static METAS: AtomicUsize = AtomicUsize::new(0);
     static FORMATS: AtomicUsize = AtomicUsize::new(0);
     let labels = SummaryLabels {
+        trailing: std::sync::Arc::new(|_, _| {
+            Some(format!("meta {}", METAS.fetch_add(1, Ordering::SeqCst)))
+        }),
         row: |_, row| {
             if row.title == "reject" {
                 String::new()
@@ -769,6 +773,7 @@ fn summary_action_label_preflight_is_atomic_and_each_format_is_captured_once() {
     let mut summary = SummaryView::new(49100, labels);
     summary.update(&input).unwrap();
     assert_eq!(FORMATS.load(Ordering::SeqCst), 1);
+    assert_eq!(METAS.load(Ordering::SeqCst), 1);
     let ids = summary.default_row_ids("host", "action").unwrap();
     let root = summary.id();
     let mut host = summary.into_host().unwrap();
@@ -799,4 +804,19 @@ fn summary_action_label_preflight_is_atomic_and_each_format_is_captured_once() {
             .label,
         "valid 0"
     );
+}
+
+#[test]
+fn default_summary_titles_do_not_leak_raw_execution_status_or_invent_metadata() {
+    let labels = SummaryLabels::default();
+    for section in ["tasks", "subagents", "sources", "artifacts"] {
+        let row = SummaryRow {
+            id: "r".into(),
+            title: "原始标题".into(),
+            value: "running".into(),
+            action: None,
+        };
+        assert_eq!((labels.row)(section, &row), "原始标题");
+        assert_eq!((labels.trailing)(section, &row), None);
+    }
 }

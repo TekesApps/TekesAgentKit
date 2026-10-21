@@ -132,7 +132,7 @@ async fn inventory_child_status_updates_the_retained_summary_without_touching_co
             .unwrap()
             .button();
         assert_eq!(button as *const _ as usize, control);
-        assert!(button.label.contains(raw));
+        assert_eq!(button.label, child.title);
         assert_eq!(view.tree.focused(), Some(view.ids().editor));
         assert_eq!(view.editor().input.external_baseline(), baseline);
         assert!(snapshot.submissions.is_empty());

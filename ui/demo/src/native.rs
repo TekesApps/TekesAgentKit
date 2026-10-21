@@ -113,7 +113,7 @@ pub(super) struct TextBackend {
     pub(super) frame_requested: bool,
     pub(super) reduced_motion: bool,
     pub(super) caret_on: bool,
-    pub(super) last_label: Option<Rc<tekes_ui_text::LabelLayout>>,
+    pub(super) recent_labels: Vec<Rc<tekes_ui_text::LabelLayout>>,
 }
 impl TextBackend {
     fn shape(&mut self, text: &str, role: proposal::TextRole, width: Option<f32>) -> Rc<Paragraph> {
@@ -175,7 +175,11 @@ impl TextSurfaceHost for TextBackend {
             self.type_scale,
             options,
         );
-        self.last_label = Some(layout.clone());
+        // Bounded diagnostic receipts from the original SDK label service.
+        if self.recent_labels.len() == 64 {
+            self.recent_labels.remove(0);
+        }
+        self.recent_labels.push(layout.clone());
         Some(layout)
     }
 
@@ -820,7 +824,7 @@ pub fn run() {
             frame_requested: false,
             reduced_motion: false,
             caret_on: true,
-            last_label: None,
+            recent_labels: Vec::new(),
         },
         scene: Scene::new(),
         palette: Palette::from(Theme::LIGHT),

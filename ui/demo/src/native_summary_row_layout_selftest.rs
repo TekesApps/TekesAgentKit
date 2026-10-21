@@ -2,7 +2,7 @@
 use super::*;
 use tekes_agent_components_ui::{SummaryActionRow, SummaryDefaultRowIds, SummaryView};
 use tekes_agent_ui_demo::fixture::Fixture;
-use tekes_ui_controls::ButtonTextRenderer;
+use tekes_ui_controls::{ButtonTextRenderer, composition::TextContent};
 use tekes_ui_platform_macos::selftest::{Action, run_script};
 use tekes_ui_tokens::{Spacing, proposal};
 const CHILD: &str = "b437cf34-5661-45e2-a674-113b27c92f89";
@@ -99,7 +99,21 @@ impl Probe {
         let value = host.view.tree.get(ids.value).unwrap().frame();
         assert!((value.max_x() - band.max_x() + 2. * Spacing::Regular.value()).abs() < 0.1);
         assert!((value.min_y() - title.min_y() - (line - value.size.height) / 2.).abs() < 0.1);
-        let shaped = host.text.last_label.as_ref().unwrap();
+        let source = &host
+            .view
+            .tree
+            .get(ids.value)
+            .unwrap()
+            .component::<TextContent>()
+            .unwrap()
+            .text;
+        let shaped = host
+            .text
+            .recent_labels
+            .iter()
+            .rev()
+            .find(|layout| layout.source() == source)
+            .expect("original usage metadata layout");
         assert_eq!(shaped.paragraph().lines.len(), 1);
     }
     fn unchanged(&self, host: &Host) {

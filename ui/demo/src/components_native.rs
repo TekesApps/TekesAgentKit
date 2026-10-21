@@ -3577,7 +3577,7 @@ pub fn run() {
             frame_requested: false,
             reduced_motion: false,
             caret_on: true,
-            last_label: None,
+            recent_labels: Vec::new(),
         },
         scene: Scene::new(),
         palette: Palette::from(Theme::LIGHT),
