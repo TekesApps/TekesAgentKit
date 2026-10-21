@@ -29,6 +29,12 @@ def verify(source, manifest):
             raise ValueError(f'candidate hash mismatch: {name}')
 
 
+def install_readonly_label_host(native):
+    old = 'impl TextSurfaceHost for TextBackend {\n'
+    assert native.read_text().count(old) == 1
+    native.write_text(native.read_text().replace(old, old + '    fn shape_label(\n        &mut self, text: &str, role: proposal::TextRole, width: f32,\n        options: tekes_ui_text::LabelOptions,\n    ) -> Option<Rc<tekes_ui_text::LabelLayout>> {\n        let m = role.style();\n        let style = if proposal::text_family(role.id()) == Some("mono") {\n            TextStyle::named("Menlo", m.size * self.type_scale)\n        } else { TextStyle::system(m.size * self.type_scale) }.with_weight(m.weight);\n        Some(Rc::new(self.shaper.shape_label(text, &style,\n            &ShapeOptions::with_width(f64::from(width)), options)\n            .with_min_line_height(f64::from(m.line_height * self.type_scale))))\n    }\n'))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source', type=Path, required=True)
@@ -53,6 +59,10 @@ def main():
                         help='Delegate the actual rail wrapper focus-decoration hook to its original CompoundButton (#33 SDK only)')
     parser.add_argument('--composer-padding', action='store_true',
                         help='Bind actual Composer capsules and consult the original #34 intent in the real host IME barrier')
+    parser.add_argument('--sidebar-help', action='store_true',
+                        help='Declare current query help on original Sidebar rows in an explicit fixed SDK only')
+    parser.add_argument('--append-padding-intent-probe', action='store_true',
+                        help='Retain the previous actual #34 host-barrier regressions before the new probe')
     args = parser.parse_args()
     if args.summary_labels and args.probe is None:
         parser.error('--summary-labels requires an explicit receiver --probe')
@@ -72,6 +82,10 @@ def main():
         parser.error('--forwarded-focus requires --turn-rail')
     if args.composer_padding and not args.forwarded_focus:
         parser.error('--composer-padding requires --forwarded-focus')
+    if args.sidebar_help and not (args.probe and args.append_run_probe):
+        parser.error('--sidebar-help requires an explicit probe and --append-run-probe')
+    if args.append_padding_intent_probe and not args.composer_padding:
+        parser.error('--append-padding-intent-probe requires --composer-padding')
     repo = Path(__file__).resolve().parent.parent
     source = args.source.resolve()
     manifest = json.loads(args.manifest.read_text())
@@ -121,6 +135,11 @@ def main():
         probe_padding = repo / 'scripts/probes/agentkit-composer-padding-candidate.rs'
         prepared = snapshot / 'ui/demo/tests/reading_candidate.rs'
         prepared.write_bytes(prepared.read_bytes().rstrip() + b'\n\n' + probe_padding.read_bytes())
+    probe_padding_host = None
+    if args.append_padding_intent_probe:
+        probe_padding_host = repo / 'scripts/probes/agentkit-composer-padding-intent-candidate.rs'
+        prepared = snapshot / 'ui/demo/tests/reading_candidate.rs'
+        prepared.write_bytes(prepared.read_bytes().rstrip() + b'\n\n' + probe_padding_host.read_bytes())
     cargo = snapshot / 'ui/Cargo.toml'
     cargo.write_text(re.sub(
         r'^(tekes-ui-[\w-]+) = \{ git = "https://github.com/TekesApps/TekesUI.git", rev = "[a-f0-9]+" \}$',
@@ -154,21 +173,7 @@ def main():
                     .with_label_layout(tekes_ui_text::LabelOptions::single_line(
                         tekes_ui_text::LabelOverflow::TailEllipsis))
                     .expect("Summary header has a passive TextContent title")'''))
-        old = 'impl TextSurfaceHost for TextBackend {\n'
-        assert native.read_text().count(old) == 1
-        native.write_text(native.read_text().replace(old, old + '''    fn shape_label(
-        &mut self, text: &str, role: proposal::TextRole, width: f32,
-        options: tekes_ui_text::LabelOptions,
-    ) -> Option<Rc<tekes_ui_text::LabelLayout>> {
-        let m = role.style();
-        let style = if proposal::text_family(role.id()) == Some("mono") {
-            TextStyle::named("Menlo", m.size * self.type_scale)
-        } else { TextStyle::system(m.size * self.type_scale) }.with_weight(m.weight);
-        Some(Rc::new(self.shaper.shape_label(text, &style,
-            &ShapeOptions::with_width(f64::from(width)), options)
-            .with_min_line_height(f64::from(m.line_height * self.type_scale))))
-    }
-'''))
+        install_readonly_label_host(native)
         shutil.copyfile(repo / 'scripts/probes/agentkit-reading-candidate.rs',
                         snapshot / 'ui/demo/tests/agentkit-reading-candidate.rs')
         shutil.copyfile(repo / 'scripts/probes/agentkit-run-preflight-candidate.rs',
@@ -203,6 +208,47 @@ def main():
         adaptations.extend(['Only original Summary header opts into single-line tail ellipsis; ordinary row titles retain natural wrapping',
                             'Existing native TextBackend delegates shape_label to its original CoreTextShaper',
                             'Owned native Summary header supplies a long mixed-language title; existing pointer probe checks its full AX name and row bounds'])
+    if args.sidebar_help:
+        sidebar = snapshot / 'ui/components/src/sidebar.rs'
+        old = '            // CANDIDATE_SIDEBAR_ROW_HELP_DECLARATION'
+        assert sidebar.read_text().count(old) == 1
+        sidebar.write_text(sidebar.read_text().replace(old, old + '\n            stack.children[0].set_help(input.search_help.as_ref()\n                .filter(|help| self.search.as_ref() == Some(&help.source))\n                .and_then(|help| help.snippets.get(&row.address)).or(row.folder_path.as_ref()).cloned());'))
+        support = snapshot / 'ui/components/src/sidebar_search.rs'
+        old = 'pub fn sidebar_row_help_supported() -> bool {\n    false\n}'
+        assert support.read_text().count(old) == 1
+        support.write_text(support.read_text().replace(old, old.replace('false', 'true')))
+        if not args.summary_labels:
+            install_readonly_label_host(native)
+        native_probe = snapshot / 'ui/demo/src/native_sidebar_query_selftest.rs'
+        code = native_probe.read_text()
+        old = '    results_capture: Option<std::path::PathBuf>,'
+        assert code.count(old) == 1
+        code = code.replace(old, old + '\n    help_editor: String,\n    help_focus: Option<(ComponentId, u64)>,\n    help_pointer_events: usize,\n    help_value: String,\n    help_cancel_observed: bool,')
+        old = '            results_capture: None,'
+        assert code.count(old) == 1
+        code = code.replace(old, old + '\n            help_editor: String::new(),\n            help_focus: None,\n            help_pointer_events: 0,\n            help_value: String::new(),\n            help_cancel_observed: false,')
+        old = '        // CANDIDATE_SIDEBAR_HELP_NATIVE_ADVANCE'
+        assert code.count(old) == 1
+        code = code.replace(old, old + '\n        if self.phase >= 10 { self.advance_help(host, window); return; }')
+        old = '                // CANDIDATE_SIDEBAR_HELP_NATIVE_BEGIN'
+        assert code.count(old) == 1
+        code = code.replace(old, old + '\n                if std::env::var_os("AGENT_SIDEBAR_HELP_CAPTURE").is_some() {\n                    let editor = host.view.tree.get(host.view.ids().editor).unwrap().visible().unwrap().center();\n                    let row_point = host.view.tree.get(row).unwrap().visible().unwrap().center();\n                    self.phase = 10;\n                    run_script(vec![(0, Action::Click { x: editor.x as f64, y: editor.y as f64 }),\n                        (100, Action::PreeditRange { text: "中文组字".into(), selection: 1..3, replacement: None }),\n                        (200, Action::MouseMove { x: row_point.x as f64, y: row_point.y as f64 })]);\n                    return;\n                }')
+        code = code.replace('run_script(vec![(15000, Action::Close)]);',
+                            'run_script(vec![(if std::env::var_os("AGENT_SIDEBAR_HELP_CAPTURE").is_some() { 30000 } else { 15000 }, Action::Close)]);')
+        code = code.replace('self.started.elapsed() < Duration::from_secs(15)',
+                            'self.started.elapsed() < Duration::from_secs(if std::env::var_os("AGENT_SIDEBAR_HELP_CAPTURE").is_some() { 30 } else { 15 })')
+        owned_probe = repo / 'scripts/probes/agentkit-sidebar-help-native.rs'
+        native_probe.write_bytes(code.encode() + b'\n' + owned_probe.read_bytes())
+        native_host = snapshot / 'ui/demo/src/components_native.rs'
+        old = '                    let commands = self.view.event_with_text(&event, &mut self.text);'
+        assert native_host.read_text().count(old) == 1
+        native_host.write_text(native_host.read_text().replace(old,
+            '                    if let Some(probe) = &mut self.sidebar_query_probe { probe.help_observe_input(&event); }\n' + old))
+        overrides.append('ui/demo/src/components_native.rs')
+        overrides.append('ui/demo/src/native_sidebar_query_selftest.rs')
+        overrides.extend(['ui/components/src/sidebar.rs', 'ui/components/src/sidebar_search.rs'])
+        adaptations.extend(['Current atomic Sidebar query help is declared on its original retained Button Content; no added row, action or tooltip engine',
+                            'Existing native TextBackend delegates readonly help label shaping to its original CoreTextShaper'])
     if args.forwarded_focus:
         action = snapshot / 'ui/components/src/turn_rail_action.rs'
         old = 'impl Component for TurnRailAction {\n'
@@ -391,6 +437,9 @@ def main():
                    candidate_only_host_adaptations=adaptations,
                    candidate_overrides={name: sha(snapshot / name) for name in
                                         overrides},
+                   sidebar_help=args.sidebar_help,
+                   native_help_probe_sha256=sha(repo / 'scripts/probes/agentkit-sidebar-help-native.rs') if args.sidebar_help else None,
+                   probe_padding_host_sha256=sha(probe_padding_host) if probe_padding_host else None,
                    summary_labels=args.summary_labels,
                    item_navigation_native=args.item_navigation_native,
                    turn_rail=args.turn_rail,
@@ -413,7 +462,7 @@ def main():
         if args.forwarded_focus:
             steps.append(('actual-wrapper', ['test', *common, '-p', 'tekes-agent-components-ui',
                                              '--lib', 'forwarded_focus_candidate_tests']))
-        if args.summary_labels or args.item_navigation_native or args.turn_rail:
+        if args.summary_labels or args.sidebar_help or args.item_navigation_native or args.turn_rail:
             steps.extend([
                 ('public-consumer', ['test', *common, '-p', 'tekes-agent-ui-consumer-check', '--lib']),
                 ('native-build', ['build', *common, '-p', 'tekes-agent-ui-demo']),

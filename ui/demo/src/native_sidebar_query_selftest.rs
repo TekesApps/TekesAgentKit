@@ -77,6 +77,7 @@ impl Probe {
             .unwrap()
             .component::<Sidebar>()
             .unwrap();
+        // CANDIDATE_SIDEBAR_HELP_NATIVE_ADVANCE
         if self.phase == 5 {
             return;
         }
@@ -208,6 +209,7 @@ impl Probe {
                     .unwrap()
                     .component::<ButtonContent>()
                     .unwrap() as *const _ as usize;
+                // CANDIDATE_SIDEBAR_HELP_NATIVE_BEGIN
                 if let Ok(path) = std::env::var("AGENT_SIDEBAR_QUERY_RESULTS_CAPTURE") {
                     let file = std::path::PathBuf::from(&path);
                     assert!(!file.exists(), "use a fresh results screenshot path");

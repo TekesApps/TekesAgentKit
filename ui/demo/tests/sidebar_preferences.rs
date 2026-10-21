@@ -5,6 +5,7 @@ use tekes_agent_contract::{
 use tekes_ui_controls::composition::*;
 fn row(id: &str, title: &str, pinned: bool) -> SidebarRow {
     SidebarRow {
+        folder_path: None,
         address: SessionAddress {
             endpoint_id: "p".into(),
             session_id: id.into(),
@@ -57,6 +58,7 @@ fn ordering_keeps_pins_separate_and_title_ties_ascending_in_both_directions() {
 #[test]
 fn pinned_section_retains_original_row_controls_and_retires_old_preference_callbacks() {
     let input = SidebarInput {
+        search_help: None,
         revision: 1,
         rows: vec![
             row("a", "A", true),

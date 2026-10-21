@@ -7,7 +7,7 @@ use crate::{
     sidebar_search::{SearchFooter, SearchInputView},
 };
 use std::collections::{BTreeMap, BTreeSet};
-use tekes_agent_contract::{
+pub use tekes_agent_contract::{
     SessionAddress, ThreadActionDefinition, ThreadActionsPresentation, ThreadActivity,
     ThreadPinPresentation,
 };
@@ -23,6 +23,9 @@ use tekes_ui_tokens::Spacing;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct SidebarRow {
+    /// Original conversation folder from canonical inventory or a host Primary
+    /// Folder adapter; never the current tool execution directory or routing ID.
+    pub folder_path: Option<String>,
     pub address: SessionAddress,
     pub title: String,
     pub activity: ThreadActivity,
@@ -31,6 +34,7 @@ pub struct SidebarRow {
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct SidebarInput {
+    pub search_help: Option<crate::SidebarSearchHelp>,
     /// Monotonic publication revision from one host inventory authority.
     pub revision: u64,
     /// False until the first coherent inventory has restored. Rows supplied before
@@ -347,6 +351,33 @@ impl Sidebar {
     pub fn displayed_search(&self) -> Option<&SidebarSearchInput> {
         self.search.as_ref()
     }
+    /// Accepted current-query metadata. The SDK owns visibility, dwell, clipping
+    /// and semantic help on the original row; metadata alone is not UI support.
+    pub fn search_snippet(&self, address: &SessionAddress) -> Option<&str> {
+        let input = self.displayed.as_ref()?;
+        if !input.loaded {
+            return None;
+        }
+        let help = input.search_help.as_ref()?;
+        if self.search.as_ref() != Some(&help.source) {
+            return None;
+        }
+        help.snippets.get(address).map(String::as_str)
+    }
+    pub fn row_help(&self, address: &SessionAddress) -> Option<&str> {
+        let input = self.displayed.as_ref()?;
+        if !input.loaded {
+            return None;
+        }
+        self.search_snippet(address).or_else(|| {
+            input
+                .rows
+                .iter()
+                .find(|row| &row.address == address)?
+                .folder_path
+                .as_deref()
+        })
+    }
     pub fn search_retry_id(&self) -> Option<ComponentId> {
         self.search_retry.as_ref().map(|(_, id)| *id)
     }
@@ -608,7 +639,8 @@ impl Sidebar {
             last.revision == input.revision
                 && (last.loaded != input.loaded
                     || last.error != input.error
-                    || last.rows != input.rows)
+                    || last.rows != input.rows
+                    || last.search_help != input.search_help)
         }) {
             return Err("conflicting sidebar publication");
         }
@@ -650,6 +682,23 @@ impl Sidebar {
                 if input.loaded && input.selected.as_ref() == Some(&row.address) {
                     keys.insert(Key::Action(row.address.clone(), action.id.clone()));
                 }
+            }
+        }
+        if let Some(help) = &input.search_help {
+            help.source.validate()?;
+            let key = help
+                .source
+                .key
+                .as_ref()
+                .ok_or("Sidebar help has no query source")?;
+            if key.query.trim().is_empty()
+                || help.source.phase == crate::SidebarSearchPhase::Idle
+                || help.snippets.keys().any(|address| {
+                    address.endpoint_id != key.endpoint_id
+                        || !input.rows.iter().any(|row| &row.address == address)
+                })
+            {
+                return Err("Sidebar help does not belong to its displayed rows");
             }
         }
         if has_pins {
@@ -725,6 +774,7 @@ impl Sidebar {
             button.button.state.selected = input.selected.as_ref() == Some(&row.address);
             button.label = row.title.clone();
             button.variant = ButtonVariant::Quiet;
+            // CANDIDATE_SIDEBAR_ROW_HELP_DECLARATION
             let mut status = (self.labels.activity)(&row.activity);
             if row.pin.as_ref().is_some_and(|pin| pin.pinned) {
                 status = format!("{} · {status}", self.labels.pinned);

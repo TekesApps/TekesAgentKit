@@ -275,3 +275,5 @@ Native [消息生命周期边界修正](rust-agent-ui-native-stream-boundary-202
 最新 [Sidebar 标题与活动映射](rust-agent-ui-sidebar-inventory-20261021.md) 已接通 reconciled projection 标题、显式清空和单绑定内最近活动/运行冻结，默认 UI357与共享服务9项回归、独立 consumer、原生 fixture 及三端离屏复验通过。活动排序尚未跨进程持久化，标题排序偏好、置顶区/顺序、文件夹、跨端与本地FTS仍待对齐；未提升默认SDK或完整UI交付状态。
 
 最新 [Sidebar置顶区与偏好](rust-agent-ui-sidebar-preferences-20261021.md) 已接通独立可折叠置顶区、原行保留、公开标题排序/置顶顺序输入和带持久revision的同一偏好存储；无比较器拒绝标题排序，宿主提供系统本地化比较。默认UI362、无UI183与独立consumer37项、实际原生折叠通过。原生选项/移动菜单仍待TekesUI #36，文件夹、多端、本地FTS、持久活动时钟和完整Views/最终验收仍未完成；未提升SDK或发布新的headless版本。
+
+后续 [Sidebar查询帮助与目录](rust-agent-ui-sidebar-help-20261021.md) 已将当前查询摘要和行成员关系放进同一公开输入，缺少摘要时回退原会话目录。默认公开pin仍只提供元数据，`sidebar_row_help_supported()`为false；隔离的固定336候选在原Content上消费SDK提示声明。默认UI364、候选UI391（含原26项候选回归和wrapper检查）、独立consumer38项与严格Clippy通过；实际窗口查询更新/目录回退/关闭保持/合成组字期间原点击门禁通过，三端公开查询与内容离屏回传复验通过。原生关闭经`cancelOperation:`，无物理Escape/IME或VoiceOver验收；SDK空字符合成控制键缺口为#37。来源、失败保留、像素检查和清理收据见同名JSON。完整Views、阅读锚点与最终交付仍未完成，PR保持草稿。

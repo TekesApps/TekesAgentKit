@@ -16,7 +16,7 @@ async fn until(source: &SidebarBinding, predicate: impl Fn(&SidebarPublication) 
     .unwrap();
 }
 fn summary(id: &str, title: Value, sequence: i64, time: f64, running: bool) -> Value {
-    json!({"sessionId":id,"title":"stale top-level title","updatedAt":time,"running":running,"blank":false,
+    json!({"sessionId":id,"cwd":"/original-conversation","workingDirectory":"/current-execution","title":"stale top-level title","updatedAt":time,"running":running,"blank":false,
         "projections":{"asOfSeq":sequence,"values":{"title":title}}})
 }
 #[tokio::test]
@@ -69,6 +69,17 @@ async fn reconciled_titles_and_recent_activity_reach_host_and_independent_consum
         })
         .await;
         assert_eq!(source.snapshot().rows[0].address.session_id, first);
+        assert_eq!(
+            source
+                .snapshot()
+                .rows
+                .iter()
+                .find(|r| r.address.session_id == id)
+                .unwrap()
+                .folder_path
+                .as_deref(),
+            Some("/original-conversation")
+        );
         view.set_sidebar_source(source.snapshot()).unwrap();
         view.sync().unwrap();
         tekes_agent_ui_consumer_check::sync_observed_sidebar(&mut second, &source).unwrap();

@@ -112,7 +112,7 @@ fn append(line: &mut Line, kind: &str, data: Value) {
     let _ = line.sender.send(json!({"type":"event","entry":row}));
 }
 fn summary(id: &str, line: &Line) -> Value {
-    json!({"sessionId":id,"title":line.title,"status":if line.archived {"archived"} else {"active"},"running":line.busy,"blank":line.rows.is_empty(),"updatedAt":line.rows.len()})
+    json!({"sessionId":id,"cwd":"/fixture","title":line.title,"status":if line.archived {"archived"} else {"active"},"running":line.busy,"blank":line.rows.is_empty(),"updatedAt":line.rows.len()})
 }
 fn inventory_stream(
     baseline: Value,

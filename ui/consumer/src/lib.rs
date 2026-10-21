@@ -1846,3 +1846,57 @@ fn independent_sidebar_preferences_consumer_keeps_explicit_collation_and_read_on
             .is_none()
     );
 }
+
+#[test]
+fn second_product_consumes_current_row_help_without_a_tooltip_or_query_state_machine() {
+    use tekes_agent_components_ui::*;
+    let source = SidebarSearchInput {
+        revision: 4,
+        key: Some(SidebarSearchKey {
+            owner: "consumer".into(),
+            endpoint_id: "p".into(),
+            connection_epoch: 1,
+            generation: 2,
+            query: "中文".into(),
+        }),
+        phase: SidebarSearchPhase::Complete { has_more: false },
+    };
+    let address = RunScope::main("p", "s").address();
+    let input = SidebarInput {
+        revision: 1,
+        loaded: true,
+        error: None,
+        selected: Some(address.clone()),
+        rows: vec![SidebarRow {
+            folder_path: Some("原会话目录".into()),
+            address: address.clone(),
+            title: "原会话".into(),
+            activity: ThreadActivity {
+                status: "idle".into(),
+                is_stale: false,
+            },
+            pin: None,
+            actions: ThreadActionsPresentation {
+                endpoint: "p".into(),
+                session_id: "s".into(),
+                label: "操作".into(),
+                items: vec![],
+            },
+        }],
+        search_help: Some(SidebarSearchHelp {
+            source: source.clone(),
+            snippets: [(address.clone(), "当前查询的摘要".into())].into(),
+        }),
+    };
+    let mut sidebar = Sidebar::new(2203, SidebarLabels::default());
+    sidebar.update_search(&source).unwrap();
+    sidebar.update(&input).unwrap();
+    assert_eq!(sidebar.row_help(&address), Some("当前查询的摘要"));
+    let mut cleared = source.clone();
+    cleared.revision += 1;
+    cleared.key = None;
+    cleared.phase = SidebarSearchPhase::Idle;
+    sidebar.update_search(&cleared).unwrap();
+    assert_eq!(sidebar.search_snippet(&address), None);
+    assert_eq!(sidebar.row_help(&address), Some("原会话目录"));
+}

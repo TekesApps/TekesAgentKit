@@ -97,6 +97,10 @@ impl SidebarPublication {
         input.loaded = self.loaded
             && unresolved.is_empty()
             && !matches!(search.input.phase, SidebarSearchPhase::Searching);
+        input.search_help = Some(tekes_agent_components_ui::SidebarSearchHelp {
+            source: search.input.clone(),
+            snippets: snippets.clone(),
+        });
         Ok(SidebarSearchProjection {
             input,
             snippets,

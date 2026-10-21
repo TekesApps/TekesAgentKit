@@ -13,6 +13,7 @@ fn address(id: &str) -> SessionAddress {
 }
 fn row(id: &str) -> SidebarRow {
     SidebarRow {
+        folder_path: None,
         address: address(id),
         title: format!("unrelated title {id}"),
         activity: ThreadActivity {
@@ -245,4 +246,71 @@ async fn demo_projects_full_publications_and_clearing_restores_inventory_without
     assert_eq!(view.selected(), 0);
     assert!(view.editor().input.text.is_empty());
     runtime.stop().await.unwrap();
+}
+
+#[test]
+fn help_is_an_atomic_query_scoped_part_of_the_row_publication() {
+    use tekes_ui_controls::composition::*;
+    let source = inventory();
+    let publication = search();
+    let projected = source
+        .project_search("fixture", &publication, None, 11)
+        .unwrap();
+    let mut sidebar = Sidebar::new(994, SidebarLabels::default());
+    sidebar
+        .replace_search_source("search-reader", &publication.input)
+        .unwrap();
+    sidebar.update(&projected.input).unwrap();
+    assert_eq!(sidebar.row_help(&address("a")), Some("a 的正文摘要"));
+    let original = sidebar.displayed_input().unwrap().clone();
+    let mut conflicting = original.clone();
+    conflicting
+        .search_help
+        .as_mut()
+        .unwrap()
+        .snippets
+        .insert(address("a"), "same revision must not retarget help".into());
+    assert!(sidebar.update(&conflicting).is_err());
+    assert_eq!(sidebar.displayed_input(), Some(&original));
+    let mut foreign = original.clone();
+    foreign.revision += 1;
+    foreign
+        .search_help
+        .as_mut()
+        .unwrap()
+        .snippets
+        .insert(address("not-displayed"), "unknown owner".into());
+    assert!(sidebar.update(&foreign).is_err());
+    assert_eq!(sidebar.displayed_input(), Some(&original));
+    let mut next = publication.input.clone();
+    next.revision += 1;
+    next.key.as_mut().unwrap().generation += 1;
+    next.key.as_mut().unwrap().query = "新查询".into();
+    sidebar.update_search_from("search-reader", &next).unwrap();
+    assert_eq!(
+        sidebar.row_help(&address("a")),
+        None,
+        "new footer revokes old help even before replacement rows arrive"
+    );
+    let root = sidebar.id();
+    let mut host = sidebar.into_host().unwrap();
+    let row = host
+        .get(root)
+        .unwrap()
+        .component::<Sidebar>()
+        .unwrap()
+        .row_id(&address("a"))
+        .unwrap();
+    host.accessibility_action(row, None, AccessibilityAction::Press);
+    let actions = host.drain_actions();
+    assert_eq!(
+        host.get(root)
+            .unwrap()
+            .component::<Sidebar>()
+            .unwrap()
+            .take_intents(&actions),
+        vec![SidebarIntent::Select {
+            address: address("a")
+        }]
+    );
 }

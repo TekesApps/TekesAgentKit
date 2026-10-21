@@ -1911,17 +1911,10 @@ impl ComponentDemo {
     }
     /// Help remains query-scoped metadata until the fixed SDK can present it.
     pub fn sidebar_search_snippet(&self, address: &SessionAddress) -> Option<&str> {
-        let shown = self.sidebar_presented.as_ref()?;
-        if !shown.loaded {
-            return None;
-        }
-        shown.rows.iter().find(|row| &row.address == address)?;
-        self.sidebar_search_publication
-            .as_ref()?
-            .hits
-            .iter()
-            .find(|hit| &hit.address == address)
-            .map(|hit| hit.hit.snippet.as_str())
+        self.tree
+            .get(self.sidebar_id())?
+            .component::<Sidebar>()?
+            .search_snippet(address)
     }
     pub fn set_sidebar_source(&mut self, source: Arc<SidebarPublication>) -> Result<()> {
         require(
@@ -2468,6 +2461,7 @@ impl ComponentDemo {
                 session_id: binding.scope().session_id.clone(),
             });
             let mut next = SidebarInput {
+                search_help: None,
                 revision: self
                     .sidebar_presented
                     .as_ref()
@@ -2497,6 +2491,7 @@ impl ComponentDemo {
                     || old.selected != next.selected
                     || old.loaded != next.loaded
                     || old.error != next.error
+                    || old.search_help != next.search_help
             }) || self.sidebar_search_presented != search_input
             {
                 let id = self.sidebar_id();

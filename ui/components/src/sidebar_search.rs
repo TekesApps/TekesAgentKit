@@ -159,3 +159,16 @@ impl Component for SearchFooter {
         ContentSemantics::new(ContentRole::Group, &self.name)
     }
 }
+
+/// Query-scoped help on the original session action owner, part of the same
+/// versioned SidebarInput as its row membership. No visible subtitle is added.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SidebarSearchHelp {
+    pub source: SidebarSearchInput,
+    pub snippets: std::collections::BTreeMap<tekes_agent_contract::SessionAddress, String>,
+}
+/// The default published SDK cannot declare help on an original Content owner.
+/// An explicit fixed candidate adapter enables this without a fallback engine.
+pub fn sidebar_row_help_supported() -> bool {
+    false
+}
