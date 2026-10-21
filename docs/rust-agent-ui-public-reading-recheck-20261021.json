@@ -1,0 +1,68 @@
+{
+  "publicAudit": {
+    "tag": "0.2.0",
+    "sha": "6d566a4774efba2c691bb8a596fc08cb2ecaf66a",
+    "anonymousControlsLibSha256": "0077f702affeeef56fca9caef84bf75417e0eba377bdf3ad12471128dfb39534",
+    "hasComposition": false,
+    "readingRevealPaths": [],
+    "upgradeAccepted": false,
+    "reason": "Published tag does not contain the required composition reading/reveal API closure; existing public branch pin retained."
+  },
+  "retainedExactPin": "8cf0840790334ba224afc0595897c74231c712e6",
+  "checks": [
+    {
+      "name": "fmt",
+      "exit": 0
+    },
+    {
+      "name": "boundaries",
+      "exit": 0
+    },
+    {
+      "name": "headless-boundaries",
+      "exit": 0
+    },
+    {
+      "name": "metadata",
+      "exit": 0
+    },
+    {
+      "name": "inputs",
+      "exit": 0
+    },
+    {
+      "name": "clippy",
+      "exit": 0
+    },
+    {
+      "name": "workspace",
+      "exit": 0
+    },
+    {
+      "name": "native-build",
+      "exit": 0
+    }
+  ],
+  "uiTestsPassed": 396,
+  "secondConsumerTestsPassed": 42,
+  "nativeBuild": true,
+  "nativeWindowRunThisTurn": false,
+  "automaticRevealConnected": false,
+  "physicalIme": false,
+  "voiceOver": false,
+  "newTargetDirectories": [],
+  "deletedBytesThisTurn": 0,
+  "logs": {
+    ".runtime-fixtures/agentkit-public-reading-recheck-evidence/source-hashes.json": "dc03adf5d249016cc33d25f020c35cb5b4c0b9a7dae80fa2d5bff98251290190",
+    ".runtime-fixtures/agentkit-public-reading-recheck-evidence/fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    ".runtime-fixtures/agentkit-public-reading-recheck-evidence/headless-boundaries.log": "e9fa1e12a0afd70528040f81fe3199172a3974910d7760c0216bb6d110181081",
+    ".runtime-fixtures/agentkit-public-reading-recheck-evidence/clippy.log": "ac346c44561e0599f96c9b165ee60ec072764209eb7c02dea80af526870aa5d0",
+    ".runtime-fixtures/agentkit-public-reading-recheck-evidence/workspace.log": "438d8a741e24aa00c06770d1fd95b720dc56fbf9d575e79e88e308f8c4467539",
+    ".runtime-fixtures/agentkit-public-reading-recheck-evidence/boundaries.log": "9480cc4382559b9a7a99240226a9f766048e30c8d38bb4bccd1fd8bca56661ad",
+    ".runtime-fixtures/agentkit-public-reading-recheck-evidence/checks.json": "07101305cec1ed38c3eab6dc971a8e42f4e008f30e087a842c8d9950de6d54c9",
+    ".runtime-fixtures/agentkit-public-reading-recheck-evidence/inputs.log": "8a8e6f786e5a4fb57110e2f331b248f99fe8dad47a38e5bc642de1aa021324f8",
+    ".runtime-fixtures/agentkit-public-reading-recheck-evidence/metadata.log": "ce27f16e0b531b9f9ddf5f6ebaa5729a2980b8a5d5a2b31722d9b8332056000d",
+    ".runtime-fixtures/agentkit-public-reading-recheck-evidence/native-build.log": "fcce12e8e9a3743502ec98eb1888a43a32489c10219b715f931aa40675ed5311"
+  },
+  "issueUpdate": "https://github.com/TekesApps/TekesUI/issues/28#issuecomment-6313593904"
+}

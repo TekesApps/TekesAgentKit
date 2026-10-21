@@ -121,3 +121,5 @@ Tasks、Subagents、SideChat 与 Summary 的无 UI 状态、宿主输入及能�
 Sidebar bounded paging and visibility contract: [2026-10-21 report](docs/rust-agent-ui-sidebar-paging-20261021.md).
 
 Canonical Sidebar selected-row reads: [2026-10-21 contract](docs/rust-agent-ui-sidebar-selected-read-20261021.md).
+
+Public TekesUI reading/reveal recheck and filter/sort paging: [2026-10-21 report](docs/rust-agent-ui-public-reading-recheck-20261021.md).

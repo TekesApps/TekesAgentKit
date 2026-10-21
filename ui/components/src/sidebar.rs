@@ -368,6 +368,10 @@ impl Sidebar {
             self.preferences_writable,
             self.preferences_generation,
         );
+        let old_limit = self.page_limit;
+        if value.preferences.sort != self.preferences.preferences.sort {
+            self.page_limit = crate::SIDEBAR_PAGE_SIZE;
+        }
         let old_reveal = self.navigation_reveal.borrow().clone();
         let mut reveal = old_reveal.clone();
         reveal.folders.retain(|key| {
@@ -392,6 +396,7 @@ impl Sidebar {
                 self.preferences_writable,
                 self.preferences_generation,
             ) = old;
+            self.page_limit = old_limit;
             *self.navigation_reveal.borrow_mut() = old_reveal;
             self.disclosure_dirty.set(dirty);
             return Err(error);
@@ -801,13 +806,24 @@ impl Sidebar {
             } else {
                 self.preferences_generation
             };
+        // ClientKit starts a new ordinary page when the folder filter changes.
+        // Compute locally so a rejected publication cannot consume the old page.
+        let page_limit = if self
+            .displayed
+            .as_ref()
+            .is_some_and(|last| last.folder_filter != input.folder_filter)
+        {
+            crate::SIDEBAR_PAGE_SIZE
+        } else {
+            self.page_limit
+        };
         let (outline, page_facts) = crate::sidebar_paged_outline(
             &input.rows,
             &self.preferences.preferences,
             self.title_comparator,
             input.folder_filter.as_ref(),
             input.selected.as_ref(),
-            self.page_limit,
+            page_limit,
             self.search.as_ref().is_some_and(|s| s.key.is_some())
                 || input
                     .search_help
@@ -1131,7 +1147,7 @@ impl Sidebar {
             Some(crate::SidebarPageRequest {
                 owner: self.page_owner.clone(),
                 control,
-                limit: self.page_limit,
+                limit: page_limit,
             })
         } else {
             None
@@ -1236,6 +1252,7 @@ impl Sidebar {
                 actions.rows.children.push(content);
             }
         }
+        self.page_limit = page_limit;
         self.page_facts = page_facts;
         self.page_request = page_request;
         self.ids = ids;
@@ -1317,6 +1334,21 @@ impl Sidebar {
             })
             .cloned()
             .collect()
+    }
+    /// Restart the ordinary page for an explicit repeated filter/sort choice.
+    /// Refreshes and unrelated preference updates keep the current page count.
+    pub fn reset_paging(&mut self) -> Result<bool, &'static str> {
+        if self.page_limit == crate::SIDEBAR_PAGE_SIZE {
+            return Ok(false);
+        }
+        let old = std::mem::replace(&mut self.page_limit, crate::SIDEBAR_PAGE_SIZE);
+        if let Some(input) = self.displayed.clone()
+            && let Err(error) = self.update(&input)
+        {
+            self.page_limit = old;
+            return Err(error);
+        }
+        Ok(true)
     }
     /// Local presentation only; the inventory observer/RPC policy is unchanged.
     /// Foreign, stale, repeated and remounted control captures are rejected.

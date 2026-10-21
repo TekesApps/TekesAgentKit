@@ -234,3 +234,158 @@ fn visibility_is_explicit_once_and_fenced_by_inventory_disclosure_and_mount() {
         .unwrap();
     assert!(sidebar.visibility_target().is_some());
 }
+
+fn grow(sidebar: &mut Sidebar) -> SidebarPageRequest {
+    let control = sidebar.page_button_id().unwrap();
+    let request = sidebar
+        .take_page_requests(&[ContentAction {
+            target: control,
+            kind: ContentActionKind::Activate,
+            source: ContentActionSource::Programmatic,
+        }])
+        .pop()
+        .unwrap();
+    assert!(sidebar.load_more(&request).unwrap());
+    request
+}
+
+#[test]
+fn filter_and_sort_restart_five_but_refresh_grouping_and_pins_keep_expanded_page() {
+    let mut input = input();
+    let mut sidebar = Sidebar::new(784, Default::default());
+    sidebar.set_title_comparator(|a, b| a.cmp(b));
+    sidebar.update(&input).unwrap();
+    let stale = grow(&mut sidebar);
+    input.revision += 1;
+    sidebar.update(&input).unwrap();
+    assert_eq!(sidebar.paging().limit, 10);
+    let mut prefs = SidebarPreferencesSnapshot {
+        revision: 1,
+        preferences: SidebarPreferences {
+            group_by_folder: true,
+            ..Default::default()
+        },
+    };
+    sidebar.update_preferences(&prefs, true).unwrap();
+    assert_eq!(sidebar.paging().limit, 10);
+    prefs.revision += 1;
+    prefs.preferences.pinned_expanded = false;
+    sidebar.update_preferences(&prefs, true).unwrap();
+    assert_eq!(sidebar.paging().limit, 10);
+    input.revision += 1;
+    input.folder_filter = Some(row(1, false).folder_key());
+    sidebar.update(&input).unwrap();
+    assert_eq!(sidebar.paging().limit, 5);
+    assert!(!sidebar.load_more(&stale).unwrap());
+    grow(&mut sidebar);
+    prefs.revision += 1;
+    prefs.preferences.sort = SidebarSort::TitleDescending;
+    sidebar.update_preferences(&prefs, true).unwrap();
+    assert_eq!(sidebar.paging().limit, 5);
+    grow(&mut sidebar);
+    sidebar.update_preferences(&prefs, true).unwrap();
+    assert_eq!(sidebar.paging().limit, 10);
+    assert!(tekes_agent_ui_consumer_check::restart_sidebar_page(&mut sidebar).unwrap());
+    assert!(!sidebar.reset_paging().unwrap());
+    assert_eq!(sidebar.paging().limit, 5);
+}
+
+#[test]
+fn conflicting_filter_publication_and_unsupported_sort_preserve_page_and_controls() {
+    let mut input = input();
+    let mut sidebar = Sidebar::new(785, Default::default());
+    sidebar.update(&input).unwrap();
+    grow(&mut sidebar);
+    let control = sidebar.page_button_id();
+    input.folder_filter = Some(row(1, false).folder_key());
+    assert!(sidebar.update(&input).is_err());
+    let prefs = SidebarPreferencesSnapshot {
+        revision: 1,
+        preferences: SidebarPreferences {
+            sort: SidebarSort::TitleAscending,
+            ..Default::default()
+        },
+    };
+    assert!(sidebar.update_preferences(&prefs, true).is_err());
+    assert_eq!(sidebar.paging().limit, 10);
+    assert_eq!(sidebar.page_button_id(), control);
+    assert_eq!(sidebar.displayed_input().unwrap().folder_filter, None);
+}
+
+#[tokio::test]
+async fn demo_repeated_filter_resets_page_without_touching_chinese_preedit_or_focus() {
+    use std::sync::Arc;
+    use tekes_agent_ui_bindings::{RunBinding, SidebarPublication};
+    use tekes_agent_ui_demo::component_demo::ComponentDemo;
+    let (runtime, _) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
+    let binding = Arc::new(
+        RunBinding::open_main(runtime, RunScope::main("fixture", "a"))
+            .await
+            .unwrap(),
+    );
+    let mut view = ComponentDemo::new([binding]).unwrap();
+    let input = input();
+    let filter = Some(row(1, false).folder_key());
+    view.set_sidebar_source(Arc::new(SidebarPublication {
+        revision: 1,
+        loaded: true,
+        error: None,
+        rows: input.rows,
+    }))
+    .unwrap();
+    view.sync().unwrap();
+    view.tree.focus(Some(view.ids().editor), false);
+    view.event(&ContentEvent::Preedit {
+        text: "中文组字".into(),
+        selection: 1..3,
+        clauses: vec![],
+        replacement: None,
+    })
+    .unwrap();
+    let before = format!(
+        "{:?}",
+        (
+            &view.editor().input.text,
+            view.editor().input.selection(),
+            &view.editor().input.marked,
+            view.editor().input.external_baseline()
+        )
+    );
+    let focus = view.tree.focused();
+    for _ in 0..2 {
+        let id = view.sidebar_id();
+        let sidebar = view
+            .tree
+            .get_mut(id)
+            .unwrap()
+            .component_mut::<Sidebar>()
+            .unwrap();
+        grow(sidebar);
+        assert_eq!(sidebar.paging().limit, 10);
+        view.set_sidebar_folder_filter(filter.clone()).unwrap();
+        assert_eq!(
+            view.tree
+                .get(id)
+                .unwrap()
+                .component::<Sidebar>()
+                .unwrap()
+                .paging()
+                .limit,
+            5
+        );
+        assert_eq!(view.tree.focused(), focus);
+        assert_eq!(
+            format!(
+                "{:?}",
+                (
+                    &view.editor().input.text,
+                    view.editor().input.selection(),
+                    &view.editor().input.marked,
+                    view.editor().input.external_baseline()
+                )
+            ),
+            before
+        );
+        assert!(view.binding().current_run().unwrap().submissions.is_empty());
+    }
+}

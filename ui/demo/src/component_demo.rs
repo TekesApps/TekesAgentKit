@@ -1928,6 +1928,15 @@ impl ComponentDemo {
         if let Some(key) = &filter {
             key.validate()?;
         }
+        if filter == self.sidebar_folder_filter {
+            let sidebar = self.sidebar_id();
+            self.tree
+                .get_mut(sidebar)
+                .and_then(|content| content.component_mut::<Sidebar>())
+                .ok_or_else(|| unsupported("Sidebar is not mounted"))?
+                .reset_paging()
+                .map_err(unsupported)?;
+        }
         let old = std::mem::replace(&mut self.sidebar_folder_filter, filter);
         if let Err(error) = self.sync_sidebar() {
             self.sidebar_folder_filter = old;

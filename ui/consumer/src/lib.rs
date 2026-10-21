@@ -2206,3 +2206,10 @@ pub fn supplement_selected_sidebar(
 ) -> bool {
     read.project_into(source, display, selection_generation)
 }
+
+/// Explicitly choosing the current filter/sort restarts only local paging.
+pub fn restart_sidebar_page(
+    view: &mut tekes_agent_components_ui::Sidebar,
+) -> Result<bool, &'static str> {
+    view.reset_paging()
+}
