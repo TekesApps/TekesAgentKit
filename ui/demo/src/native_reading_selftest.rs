@@ -483,7 +483,7 @@ impl Probe {
                     ]);
                     self.phase = 11;
                 } else {
-                    self.phase = 14;
+                    self.phase = 16;
                     run_script(vec![(0, Action::Close)]);
                 }
             }
@@ -554,7 +554,74 @@ impl Probe {
                 );
                 assert_eq!(host.turn_history.0.len(), 2);
                 assert!(Self::displayed_run(host).submissions.is_empty());
+                let viewport = Self::scroll(host);
+                let root = ComponentId(host.view.ids().root.0 + 16);
+                let viewport_id = host
+                    .view
+                    .tree
+                    .get(root)
+                    .unwrap()
+                    .component::<RunView>()
+                    .unwrap()
+                    .ids()
+                    .viewport;
+                assert!(viewport.is_following_latest());
+                let position = host
+                    .view
+                    .tree
+                    .get(viewport_id)
+                    .unwrap()
+                    .visible()
+                    .unwrap()
+                    .center();
+                host.view.tree.event(&ContentEvent::Scroll {
+                    position,
+                    delta: tekes_ui_scene::Point::new(0., -420.),
+                    precise: true,
+                    begin: true,
+                    end: true,
+                    momentum: false,
+                    time: 3.,
+                });
                 self.phase = 14;
+            }
+            14 if window.is_active() && !Self::scroll(host).is_following_latest() => {
+                let root = ComponentId(host.view.ids().root.0 + 16);
+                let run = host
+                    .view
+                    .tree
+                    .get(root)
+                    .unwrap()
+                    .component::<RunView>()
+                    .unwrap();
+                assert!(run.jump_is_visible());
+                run_script(vec![(0, Self::click(host, run.jump_button_id().unwrap()))]);
+                self.phase = 15;
+            }
+            15 if Self::scroll(host).is_following_latest() => {
+                let root = ComponentId(host.view.ids().root.0 + 16);
+                assert!(
+                    !host
+                        .view
+                        .tree
+                        .get(root)
+                        .unwrap()
+                        .component::<RunView>()
+                        .unwrap()
+                        .jump_is_visible()
+                );
+                assert_eq!(host.view.tree.focused(), self.editor);
+                assert_eq!(
+                    host.view.editor().input.external_baseline(),
+                    *self.baseline.as_ref().unwrap()
+                );
+                assert_eq!(
+                    host.turn_history.0.len(),
+                    2,
+                    "Jump must not record rail history"
+                );
+                assert!(Self::displayed_run(host).submissions.is_empty());
+                self.phase = 16;
                 run_script(vec![(0, Action::Unmark), (100, Action::Close)]);
             }
             _ => {}
@@ -567,8 +634,8 @@ impl Probe {
         }
     }
     pub fn receipt(&self) -> serde_json::Value {
-        assert_eq!(self.phase, 14, "native reading probe did not complete");
-        serde_json::json!({"nativeWindow":true,"originalTurnNavigation":self.gate.is_some(),"turnStartAndLatest":self.gate.is_some(),"navigationPreeditPreserved":self.gate.is_some(),"publicHistoryPage":true,
+        assert_eq!(self.phase, 16, "native reading probe did not complete");
+        serde_json::json!({"nativeWindow":true,"jumpLatestControl":self.gate.is_some(),"jumpHasNoHistory":self.gate.is_some(),"originalTurnNavigation":self.gate.is_some(),"turnStartAndLatest":self.gate.is_some(),"navigationPreeditPreserved":self.gate.is_some(),"publicHistoryPage":true,
             "prependAnchorPreserved":true,"upwardReadingPreserved":true,
             "focusAndMarkedBaselinePreserved":self.gate.is_some(),"samePublicationRefresh":true,
             "focusAndEditorBaselinePreserved":self.gate.is_some(),"markedTextPreserved":self.gate.is_some(),

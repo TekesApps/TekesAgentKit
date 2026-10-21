@@ -2264,3 +2264,12 @@ pub fn navigate_original_run(
 > {
     tekes_agent_components_ui::navigate_run_turn(host, root, intent, version, role, false, text)
 }
+
+pub fn jump_original_run(
+    host: &mut tekes_ui_controls::composition::ContentHost,
+    root: tekes_ui_controls::composition::ComponentId,
+    intent: &tekes_agent_components_ui::RunJumpLatest,
+    version: &tekes_ui_controls::ReadingDocumentVersion,
+) -> Result<bool, tekes_agent_components_ui::RunNavigationError> {
+    tekes_agent_components_ui::jump_run_latest(host, root, intent, version)
+}

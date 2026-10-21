@@ -78,6 +78,10 @@ pub enum DemoCommand {
     SidebarSearch(tekes_agent_components_ui::SidebarSearchIntent),
     Feedback(Box<FeedbackDemoRequest>),
     CopyTranscript(tekes_agent_components_ui::TranscriptCopyIntent),
+    JumpLatest {
+        root: ComponentId,
+        intent: Box<tekes_agent_components_ui::RunJumpLatest>,
+    },
     TurnNavigation {
         root: ComponentId,
         intent: Box<tekes_agent_components_ui::RunTurnNavigation>,
@@ -710,6 +714,8 @@ impl ComponentDemo {
             .unwrap()
             .component_mut::<RunView>()
             .unwrap();
+        run.install_jump_to_latest(8_000_000 + (ids.root.0 >> 32) as u32)
+            .map_err(unsupported)?;
         run.install_turn_rail(9_000_000 + (ids.root.0 >> 32) as u32)
             .map_err(unsupported)?;
         run.set_rail_navigation_gate(tekes_agent_components_ui::TurnRailNavigationGate {
@@ -3393,6 +3399,13 @@ impl ComponentDemo {
             use tekes_agent_components_ui::RunViewIntent;
             match intent {
                 RunViewIntent::Composer(intent) => intents.push((binding, intent)),
+                RunViewIntent::JumpLatest(intent) => {
+                    local_navigation = true;
+                    commands.push(DemoCommand::JumpLatest {
+                        root: ComponentId(ids.root.0 + 16),
+                        intent,
+                    });
+                }
                 RunViewIntent::TurnNavigation(intent) => {
                     local_navigation = true;
                     commands.push(DemoCommand::TurnNavigation {

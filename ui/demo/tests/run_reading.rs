@@ -1669,3 +1669,149 @@ async fn separate_rail_attachment_and_auto_reveal_leave_transcript_and_original_
     assert_eq!(host.focused(), Some(editor));
     runtime.stop().await.unwrap();
 }
+
+#[test]
+fn jump_visibility_tracks_unknown_geometry_disclosures_and_preserved_occlusion_acknowledgement() {
+    let mut state = RunJumpVisibility::default();
+    assert!(!state.shows_button());
+    state.update_geometry(41., 0.);
+    assert!(state.shows_button());
+    state.disclosure(1, true);
+    state.disclosure(2, true);
+    assert!(!state.shows_button());
+    state.update_geometry(200., 0.);
+    state.disclosure(1, false);
+    assert!(!state.shows_button());
+    state.disclosure(2, false);
+    assert!(state.shows_button());
+    state.update_geometry(40., 0.);
+    assert!(!state.shows_button());
+    state.preserved_occlusion_change(Some(0.), 20., 100.);
+    assert!(state.shows_button());
+    state.update_geometry(0., 80.); // queued sample predates new controls
+    assert!(state.shows_button());
+    state.update_geometry(0., 100.); // settled acknowledgement
+    assert!(!state.shows_button());
+    state.preserved_occlusion_change(Some(70.), -20., 80.);
+    assert!(state.shows_button());
+    state.incoming_document();
+    assert!(!state.shows_button());
+    state.update_geometry(f32::NAN, 80.);
+    assert!(!state.shows_button());
+}
+fn jump_intents(host: &mut ContentHost, root: ComponentId) -> Vec<RunJumpLatest> {
+    let actions = host.drain_actions();
+    run_mut(host, root)
+        .take_intents(&actions)
+        .into_iter()
+        .filter_map(|i| match i {
+            RunViewIntent::JumpLatest(n) => Some(*n),
+            _ => None,
+        })
+        .collect()
+}
+#[tokio::test]
+async fn jump_uses_original_control_and_follow_latest_without_changing_editor_or_reading_attachment()
+ {
+    let (runtime, mut host, root, _, version, mut text) = setup().await;
+    run_mut(&mut host, root)
+        .install_jump_to_latest(36000)
+        .unwrap();
+    let viewport = run(&host, root).ids().viewport;
+    host.get_mut(viewport)
+        .unwrap()
+        .component_mut::<ScrollContent>()
+        .unwrap()
+        .follow_latest();
+    render(&mut host, &mut text);
+    assert!(
+        !run(&host, root).jump_is_visible(),
+        "incoming document at latest must not flash Jump"
+    );
+    wheel(&mut host, root, -420.);
+    render(&mut host, &mut text);
+    assert!(run(&host, root).jump_is_visible());
+    let button = run(&host, root).jump_button_id().unwrap();
+    let frame = host.get(button).unwrap().frame();
+    let geometry = run(&host, root).layout_geometry().unwrap();
+    assert!((frame.center().x - geometry.pane.center().x).abs() < 0.01);
+    assert!(
+        (frame.max_y() + tekes_ui_tokens::Spacing::Regular.value()
+            - geometry.composer.unwrap().min_y())
+        .abs()
+            < 0.01
+    );
+    let editor = run(&host, root).ids().composer.editor;
+    host.focus(Some(editor), true);
+    host.event_with_text(
+        &ContentEvent::Preedit {
+            text: "回到底部中文组字".into(),
+            selection: 1..3,
+            clauses: vec![],
+            replacement: None,
+        },
+        &mut text,
+    )
+    .unwrap();
+    render(&mut host, &mut text);
+    let before = baseline(&host, root);
+    let owner = run(&host, root).composer().editor() as *const _;
+    host.event(&ContentEvent::PointerDown(frame.center()));
+    let intents = jump_intents(&mut host, root);
+    assert_eq!(intents.len(), 1);
+    tekes_agent_ui_consumer_check::jump_original_run(&mut host, root, &intents[0], &version)
+        .unwrap();
+    assert!(
+        tekes_agent_ui_consumer_check::jump_original_run(
+            &mut host,
+            root,
+            &intents[0].clone(),
+            &version
+        )
+        .is_err()
+    );
+    host.event(&ContentEvent::PointerUp(frame.center()));
+    assert!(jump_intents(&mut host, root).is_empty());
+    render(&mut host, &mut text);
+    assert!(scroll(&host, root).is_following_latest());
+    assert!(!run(&host, root).jump_is_visible());
+    assert!(!host.semantics().iter().any(|n| n.id == button));
+    assert_eq!(host.focused(), Some(editor));
+    assert_eq!(baseline(&host, root), before);
+    assert_eq!(run(&host, root).composer().editor() as *const _, owner);
+    assert_eq!(
+        scroll(&host, root).reading_document_version(),
+        Some(&version)
+    );
+    runtime.stop().await.unwrap();
+}
+#[tokio::test]
+async fn jump_rejects_prior_publication_and_sdk_attachment_before_following() {
+    let (runtime, mut host, root, snapshot, version, mut text) = setup().await;
+    run_mut(&mut host, root)
+        .install_jump_to_latest(36000)
+        .unwrap();
+    wheel(&mut host, root, 420.);
+    render(&mut host, &mut text);
+    let button = run(&host, root).jump_button_id().unwrap();
+    host.accessibility_action(button, None, AccessibilityAction::Press);
+    let intent = jump_intents(&mut host, root).pop().unwrap();
+    let mut next = snapshot.clone();
+    next.revision += 1;
+    let plan = prepare(run(&host, root), &next).unwrap();
+    let fresh = publish_plan(&mut host, root, &version, &plan).unwrap();
+    render(&mut host, &mut text);
+    assert!(
+        tekes_agent_ui_consumer_check::jump_original_run(&mut host, root, &intent, &fresh).is_err()
+    );
+    assert!(!scroll(&host, root).is_following_latest());
+    host.accessibility_action(button, None, AccessibilityAction::Press);
+    let intent = jump_intents(&mut host, root).pop().unwrap();
+    assert!(
+        tekes_agent_ui_consumer_check::jump_original_run(&mut host, root, &intent, &version)
+            .is_err()
+    );
+    assert!(!scroll(&host, root).is_following_latest());
+    tekes_agent_ui_consumer_check::jump_original_run(&mut host, root, &intent, &fresh).unwrap();
+    runtime.stop().await.unwrap();
+}

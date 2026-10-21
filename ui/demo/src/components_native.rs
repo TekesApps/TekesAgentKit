@@ -289,6 +289,28 @@ impl Host {
                 }
                 continue;
             }
+            if let DemoCommand::JumpLatest { root, intent } = command {
+                let version = self
+                    .view
+                    .tree
+                    .get(intent.viewport())
+                    .and_then(|n| n.component::<tekes_ui_controls::composition::ScrollContent>())
+                    .and_then(|s| s.reading_document_version())
+                    .cloned();
+                if let Some(version) = version {
+                    if let Err(error) = tekes_agent_components_ui::jump_run_latest(
+                        &mut self.view.tree,
+                        root,
+                        &intent,
+                        &version,
+                    ) {
+                        self.failure(format!("Run Jump rejected: {error:?}"));
+                    }
+                } else {
+                    self.failure("Run Jump reading attachment missing".into());
+                }
+                continue;
+            }
             if let DemoCommand::TurnNavigation { root, intent } = command {
                 let version = self
                     .view
@@ -416,7 +438,7 @@ impl Host {
             };
             self.executor.spawn(async move {
                 let special = match command {
-                    DemoCommand::TurnNavigation { .. } => {
+                    DemoCommand::TurnNavigation { .. } | DemoCommand::JumpLatest { .. } => {
                         unreachable!("local navigation is dispatched synchronously")
                     }
                     DemoCommand::ReadHistoryPage(request) => {
@@ -786,7 +808,8 @@ impl Host {
                             | DemoCommand::OpenSession(_)
                             | DemoCommand::Summary(_)
                             | DemoCommand::CopyTranscript(_)
-                            | DemoCommand::TurnNavigation { .. } => unreachable!("handled above"),
+                            | DemoCommand::TurnNavigation { .. }
+                            | DemoCommand::JumpLatest { .. } => unreachable!("handled above"),
                         }
                         .map_err(|error| error.to_string());
                         HostResult::Operation(result)

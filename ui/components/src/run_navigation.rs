@@ -199,3 +199,22 @@ pub fn reveal_run_rail_follow(
         .finish_reveal(&request, result.is_ok());
     result.map(Some).map_err(RunNavigationError::Reveal)
 }
+
+/// Jump is explicit local navigation, with no main-window history callback.
+pub fn jump_run_latest(
+    host: &mut ContentHost,
+    root: ComponentId,
+    intent: &crate::RunJumpLatest,
+    version: &ReadingDocumentVersion,
+) -> Result<bool, RunNavigationError> {
+    check_version(host, intent.viewport(), version)?;
+    run(host, root)?
+        .claim_jump_to_latest(intent)
+        .map_err(RunNavigationError::Agent)?;
+    Ok(host
+        .get_mut(intent.viewport())
+        .unwrap()
+        .component_mut::<ScrollContent>()
+        .unwrap()
+        .follow_latest())
+}

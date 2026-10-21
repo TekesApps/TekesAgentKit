@@ -1,6 +1,9 @@
 //! Agent composition only. Presentation owns the Run; TekesUI owns its viewport.
 use crate::transcript_content::RunTranscriptLayout;
 use crate::*;
+#[path = "run_jump.rs"]
+mod jump;
+pub use jump::*;
 use std::ops::Range;
 use std::sync::Arc;
 use tekes_agent_presentation::ActionablePrompt;
@@ -41,6 +44,7 @@ pub enum RunViewIntent {
     TurnAction(Box<TurnFootnoteIntent>),
     CopyTranscript(TranscriptCopyIntent),
     TurnNavigation(Box<RunTurnNavigation>),
+    JumpLatest(Box<RunJumpLatest>),
     Feedback {
         control: ComponentId,
         gesture: Box<FeedbackGesture>,
@@ -94,6 +98,8 @@ pub struct RunView {
     actionable: ComponentId,
     transcript: Option<ComponentId>,
     rail: Option<ComponentId>,
+    jump: Option<ComponentId>,
+    jump_visibility: RunJumpVisibility,
     body: StackContent,
     last: Option<RunSnapshot>,
     gate: ComposerControlGate,
@@ -184,6 +190,8 @@ impl RunView {
             actionable: actionable_id,
             transcript: None,
             rail: None,
+            jump: None,
+            jump_visibility: Default::default(),
             last: None,
             gate: ComposerControlGate::CLOSED,
             label: "Agent Run".into(),
@@ -473,21 +481,23 @@ impl RunView {
             .map_or_else(Vec::new, TurnRail::take_navigation)
     }
     pub fn is_nonfocusing_navigation_target(&self, id: ComponentId) -> bool {
-        self.pane_presented
-            && self.turn_rail().is_some_and(|rail| {
-                rail.permits_id(id)
-                    && rail.prototype(id).is_some_and(|p| {
-                        p.generation == self.publication_generation
-                            && Arc::ptr_eq(&p.lifetime, &self.navigation_lifetime)
-                            && p.target().is_visible().is_some()
-                    })
-            })
+        self.jump_permits(id)
+            || (self.pane_presented
+                && self.turn_rail().is_some_and(|rail| {
+                    rail.permits_id(id)
+                        && rail.prototype(id).is_some_and(|p| {
+                            p.generation == self.publication_generation
+                                && Arc::ptr_eq(&p.lifetime, &self.navigation_lifetime)
+                                && p.target().is_visible().is_some()
+                        })
+                }))
     }
     pub fn is_nonfocusing_navigation_at(&self, point: tekes_ui_scene::Point) -> bool {
-        self.turn_rail().is_some_and(|rail| {
-            rail.action_at(point)
-                .is_some_and(|id| self.is_nonfocusing_navigation_target(id))
-        })
+        self.jump_at(point)
+            || self.turn_rail().is_some_and(|rail| {
+                rail.action_at(point)
+                    .is_some_and(|id| self.is_nonfocusing_navigation_target(id))
+            })
     }
     /// Library reading state supplies following_latest; AgentKit chooses the
     /// semantic last or first actually visible turn, never scroll offsets.
@@ -973,6 +983,11 @@ impl RunView {
                 .into_iter()
                 .map(|n| RunViewIntent::TurnNavigation(Box::new(n))),
         );
+        intents.extend(
+            self.take_jump()
+                .into_iter()
+                .map(|intent| RunViewIntent::JumpLatest(Box::new(intent))),
+        );
         if self.composer().is_composing() {
             return intents;
         }
@@ -1053,6 +1068,7 @@ impl RunView {
             if id == self.ids.composer.root
                 || id == self.ids.viewport
                 || Some(id) == self.rail
+                || Some(id) == self.jump
                 || empty_actionable
             {
                 held.push((index + held.len(), self.body.children.remove(index)));
@@ -1081,6 +1097,7 @@ impl Component for RunView {
         }
         self.navigation_mounted = mounted;
         if !mounted {
+            self.jump_visibility.incoming_document();
             self.navigation_origin = None;
         }
     }
@@ -1106,6 +1123,7 @@ impl Component for RunView {
         }
         self.pane_presented = presented;
         if !self.pane_presented {
+            self.jump_visibility.incoming_document();
             self.navigation_origin = None;
             if let Some(rail) = self.turn_rail_mut() {
                 rail.invalidate_layout();
@@ -1231,6 +1249,7 @@ impl Component for RunView {
                 .unwrap()
                 .arrange(text, geometry.rail, pane_clip);
         }
+        self.arrange_jump(text, frame, pane_clip, composer);
     }
     fn semantics(&self) -> ContentSemantics {
         ContentSemantics::new(ContentRole::Group, &self.label)

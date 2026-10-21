@@ -42,6 +42,8 @@ Composer 的真实输入胶囊公开为 `ComposerIds::input_band`；现在保留
 - 旧e4 manifest、lockfile、消费适配和188依赖另有备份；旧 `.deps/tekesui` 原样保留但不参与当前构建。无需从兄弟工作树复制代码，`prepare-tekesui-demo.py` 在公开pin模式拒绝path/capture。
 - UI包继续 `0.0.0` / `publish=false`；公开源码pin不代表AgentKit UI稳定版。最新验收与独立CI边界见 [正式pin复验](../docs/tekesui-public-pin-verification-20261019.md)。
 
+最新正式组件进展：[原生 Jump/回到最新](../docs/rust-agent-ui-jump-latest-20261021.md)；仍为实验 API，未代表完整 ClientKit Views 验收。
+
 ## 构建与运行
 
 从 AgentKit 根目录：
