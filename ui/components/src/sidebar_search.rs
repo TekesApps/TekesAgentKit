@@ -18,10 +18,14 @@ pub struct SidebarSearchLabels {
     pub searching: String,
     pub retry: String,
     pub more: String,
+    pub no_results: String,
+    pub pending_results: String,
 }
 impl Default for SidebarSearchLabels {
     fn default() -> Self {
         Self {
+            no_results: "没有匹配的会话".into(),
+            pending_results: "搜索结果尚未就绪".into(),
             name: "会话搜索状态".into(),
             searching: "正在搜索…".into(),
             retry: "重试".into(),

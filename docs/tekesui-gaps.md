@@ -45,3 +45,5 @@ TKUI-006 更新：公共完整指针入口、AgentText转交及原生demo适配�
 2026-10-21 输入胶囊后续：[TekesUI #34](https://github.com/TekesApps/TekesUI/issues/34) 请求无副作用的原留白焦点意图查询，供宿主 IME 屏障安全转交。实际 Composer 子树已消费固定 #30/#33 候选进行组件验证；正式宿主的组字转交仍待此接口，详见[接收记录](rust-agent-ui-composer-padding-20261021.md)。
 
 2026-10-21 #34 固定输入接收：原查询已在隔离候选中接入实际 Composer 门禁，主输入及 SideChat 的真实窗口合成组字/选区查询通过。默认公开pin不变，物理IME与完整体验仍未完成；见[实际IME门禁记录](rust-agent-ui-padding-ime-20261021.md)，不把private接入视为Issue关闭。
+
+2026-10-21 Sidebar行帮助：[TekesUI #35](https://github.com/TekesApps/TekesUI/issues/35)请求原Content动态声明与统一Tooltip路由。已有description/AX help映射继续复用；Kit先保存按query隔离的snippet，不添加摘要行或复制hover/定位。见[结果投影记录](rust-agent-ui-sidebar-search-results-20261021.md)。

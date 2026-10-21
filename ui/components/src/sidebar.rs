@@ -344,6 +344,9 @@ impl Sidebar {
             );
         }
         self.search = Some(input.clone());
+        if let Some(inventory) = self.displayed.clone() {
+            self.update(&inventory)?;
+        }
         Ok(())
     }
     /// Local admission can only restrict the current source's retry capability.
@@ -570,11 +573,27 @@ impl Sidebar {
         if children.is_empty() {
             children.push(Content::new(
                 ComponentId(self.root.0 + 5),
-                TextContent::new(if input.loaded {
-                    &self.labels.empty
-                } else {
-                    &self.labels.restoring
-                }),
+                TextContent::new(
+                    if self
+                        .search
+                        .as_ref()
+                        .is_some_and(|search| search.key.is_some())
+                    {
+                        if input.loaded
+                            && self.search.as_ref().is_some_and(|search| {
+                                matches!(search.phase, crate::SidebarSearchPhase::Complete { .. })
+                            })
+                        {
+                            &self.search_labels.no_results
+                        } else {
+                            &self.search_labels.pending_results
+                        }
+                    } else if input.loaded {
+                        &self.labels.empty
+                    } else {
+                        &self.labels.restoring
+                    },
+                ),
             ));
         }
         // Independent failure notice: an observation error never turns retained

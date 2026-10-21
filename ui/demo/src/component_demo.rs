@@ -171,6 +171,8 @@ pub struct ComponentDemo {
     retained: Vec<Option<Content>>,
     navigation_revision: u64,
     sidebar_source: Option<Arc<SidebarPublication>>,
+    sidebar_search_publication: Option<tekes_agent_ui_bindings::SidebarSearchPublication>,
+    sidebar_search_presented: Option<tekes_agent_components_ui::SidebarSearchInput>,
     sidebar_presented: Option<SidebarInput>,
     panel_revision: u64,
     side_chats: Option<Arc<SideChatBinding>>,
@@ -462,6 +464,8 @@ impl ComponentDemo {
             retained,
             navigation_revision: 0,
             sidebar_source: None,
+            sidebar_search_publication: None,
+            sidebar_search_presented: None,
             sidebar_presented: None,
             panel_revision: 0,
             side_chats: None,
@@ -1798,7 +1802,9 @@ impl ComponentDemo {
             .component_mut::<Sidebar>()
             .unwrap()
             .replace_search_source(owner, input)
-            .map_err(unsupported)
+            .map_err(unsupported)?;
+        self.sidebar_search_publication = None;
+        Ok(())
     }
     pub fn update_sidebar_search_source(
         &mut self,
@@ -1811,7 +1817,9 @@ impl ComponentDemo {
             .component_mut::<Sidebar>()
             .unwrap()
             .update_search_from(owner, input)
-            .map_err(unsupported)
+            .map_err(unsupported)?;
+        self.sidebar_search_publication = None;
+        Ok(())
     }
     pub fn set_sidebar_search(
         &mut self,
@@ -1823,7 +1831,60 @@ impl ComponentDemo {
             .component_mut::<Sidebar>()
             .unwrap()
             .update_search(input)
+            .map_err(unsupported)?;
+        self.sidebar_search_publication = None;
+        Ok(())
+    }
+    /// Publish the complete original reader result, not only its status footer.
+    pub fn bind_sidebar_search_publication(
+        &mut self,
+        owner: &str,
+        publication: &tekes_agent_ui_bindings::SidebarSearchPublication,
+    ) -> Result<()> {
+        self.check_sidebar_search_publication(publication)?;
+        self.bind_sidebar_search_source(owner, &publication.input)?;
+        self.sidebar_search_publication = Some(publication.clone());
+        self.sync_sidebar()
+    }
+    pub fn update_sidebar_search_publication(
+        &mut self,
+        owner: &str,
+        publication: &tekes_agent_ui_bindings::SidebarSearchPublication,
+    ) -> Result<()> {
+        if self.sidebar_search_publication.as_ref().is_some_and(|old| {
+            old.input.revision == publication.input.revision && old != publication
+        }) {
+            return Err(unsupported("conflicting sidebar search result publication"));
+        }
+        self.check_sidebar_search_publication(publication)?;
+        self.update_sidebar_search_source(owner, &publication.input)?;
+        self.sidebar_search_publication = Some(publication.clone());
+        self.sync_sidebar()
+    }
+    fn check_sidebar_search_publication(
+        &self,
+        publication: &tekes_agent_ui_bindings::SidebarSearchPublication,
+    ) -> Result<()> {
+        self.sidebar_source
+            .as_ref()
+            .ok_or_else(|| unsupported("sidebar inventory not installed"))?
+            .project_search(&self.binding().scope().endpoint_id, publication, None, 1)
+            .map(|_| ())
             .map_err(unsupported)
+    }
+    /// Help remains query-scoped metadata until the fixed SDK can present it.
+    pub fn sidebar_search_snippet(&self, address: &SessionAddress) -> Option<&str> {
+        let shown = self.sidebar_presented.as_ref()?;
+        if !shown.loaded {
+            return None;
+        }
+        shown.rows.iter().find(|row| &row.address == address)?;
+        self.sidebar_search_publication
+            .as_ref()?
+            .hits
+            .iter()
+            .find(|hit| &hit.address == address)
+            .map(|hit| hit.hit.snippet.as_str())
     }
     pub fn set_sidebar_source(&mut self, source: Arc<SidebarPublication>) -> Result<()> {
         require(
@@ -2369,7 +2430,7 @@ impl ComponentDemo {
                 endpoint_id: binding.scope().endpoint_id.clone(),
                 session_id: binding.scope().session_id.clone(),
             });
-            let next = SidebarInput {
+            let mut next = SidebarInput {
                 revision: self
                     .sidebar_presented
                     .as_ref()
@@ -2379,12 +2440,28 @@ impl ComponentDemo {
                 rows: source.rows.clone(),
                 selected,
             };
+            if let Some(search) = &self.sidebar_search_publication {
+                next = source
+                    .project_search(
+                        &self.binding().scope().endpoint_id,
+                        search,
+                        next.selected,
+                        next.revision,
+                    )
+                    .map_err(unsupported)?
+                    .input;
+            }
+            let search_input = self
+                .sidebar_search_publication
+                .as_ref()
+                .map(|s| s.input.clone());
             if self.sidebar_presented.as_ref().is_none_or(|old| {
                 old.rows != next.rows
                     || old.selected != next.selected
                     || old.loaded != next.loaded
                     || old.error != next.error
-            }) {
+            }) || self.sidebar_search_presented != search_input
+            {
                 let id = self.sidebar_id();
                 self.tree
                     .get_mut(id)
@@ -2394,6 +2471,7 @@ impl ComponentDemo {
                     .update(&next)
                     .map_err(unsupported)?;
                 self.sidebar_presented = Some(next);
+                self.sidebar_search_presented = search_input;
             }
         }
         Ok(())

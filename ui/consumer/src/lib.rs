@@ -1744,3 +1744,63 @@ pub fn claim_turn_navigation_with_host(
 ) -> Result<tekes_agent_components_ui::RunTurnNavigationKind, &'static str> {
     run.claim_turn_navigation_with_host(navigation, host)
 }
+
+/// Second product projects the complete reader publication through the shared
+/// Kit API. Selection and the monotonically increasing view revision remain host inputs.
+pub fn project_sidebar_search_results(
+    source: &tekes_agent_ui_bindings::SidebarPublication,
+    search: &tekes_agent_ui_bindings::SidebarSearchPublication,
+    endpoint: &str,
+    display: &tekes_agent_components_ui::SidebarInput,
+) -> Result<tekes_agent_ui_bindings::SidebarSearchProjection, &'static str> {
+    source.project_search(endpoint, search, display.selected.clone(), display.revision)
+}
+
+#[test]
+fn second_product_consumes_result_projection_and_empty_state_without_private_types() {
+    use tekes_agent_components_ui::*;
+    use tekes_agent_ui_bindings::{SidebarPublication, SidebarSearchPublication};
+    let source = SidebarPublication {
+        revision: 1,
+        rows: vec![],
+        loaded: true,
+        error: Some("inventory warning".into()),
+    };
+    let mut display = source.input(None);
+    display.revision = 7;
+    let mut search = SidebarSearchPublication {
+        input: SidebarSearchInput {
+            revision: 1,
+            key: None,
+            phase: SidebarSearchPhase::Idle,
+        },
+        query: String::new(),
+        hits: vec![],
+        unresolved: vec![],
+        result: None,
+    };
+    let clear = project_sidebar_search_results(&source, &search, "source", &display).unwrap();
+    assert_eq!(clear.input.revision, 7);
+    assert_eq!(clear.input.error.as_deref(), Some("inventory warning"));
+    assert!(clear.input.loaded);
+    search.query = "正文".into();
+    search.input.key = Some(SidebarSearchKey {
+        owner: "reader".into(),
+        endpoint_id: "source".into(),
+        connection_epoch: 1,
+        generation: 1,
+        query: search.query.clone(),
+    });
+    search.input.revision = 2;
+    search.input.phase = SidebarSearchPhase::Complete { has_more: false };
+    let result = project_sidebar_search_results(&source, &search, "source", &display).unwrap();
+    let mut sidebar = Sidebar::new(2202, SidebarLabels::default());
+    sidebar.update_search(&search.input).unwrap();
+    sidebar.update(&result.input).unwrap();
+    let host = sidebar.into_host().unwrap();
+    assert!(
+        host.semantics()
+            .iter()
+            .any(|node| node.semantics.name == "没有匹配的会话")
+    );
+}

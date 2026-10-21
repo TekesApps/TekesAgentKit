@@ -1038,7 +1038,7 @@ impl Host {
         if let Some(source) = &self.sidebar_query
             && let Err(error) = self
                 .view
-                .update_sidebar_search_source(source.owner(), &source.snapshot().input)
+                .update_sidebar_search_publication(source.owner(), &source.snapshot())
         {
             self.failure(error.to_string());
         }
@@ -2648,10 +2648,6 @@ pub fn run() {
         })
     });
     let mut view = ComponentDemo::new(bindings).unwrap();
-    if let Some(source) = &sidebar_query {
-        view.bind_sidebar_search_source(source.owner(), &source.snapshot().input)
-            .unwrap();
-    }
     if sidebar_query_selftest {
         sidebar_query_probe::Probe::prepare(&view);
     }
@@ -2783,6 +2779,10 @@ pub fn run() {
     let side_chats = Arc::new(SideChatBinding::new(runtime.clone()));
     view.set_side_chat_binding(side_chats.clone());
     view.set_sidebar_source(sidebar.snapshot()).unwrap();
+    if let Some(source) = &sidebar_query {
+        view.bind_sidebar_search_publication(source.owner(), &source.snapshot())
+            .unwrap();
+    }
     view.sync().unwrap();
     if args.iter().any(|arg| arg == "--transcript-content") {
         assert!(
@@ -2998,10 +2998,68 @@ pub fn run() {
                     .submissions
                     .is_empty()
             );
+            let inventory = host.executor.block_on(async {
+                let mut changes = host.sidebar.subscribe();
+                tokio::time::timeout(Duration::from_secs(10), async {
+                    loop {
+                        let inventory = host.sidebar.snapshot();
+                        if inventory.loaded
+                            && state.hits.iter().all(|hit| {
+                                inventory.rows.iter().any(|row| row.address == hit.address)
+                            })
+                        {
+                            break inventory;
+                        }
+                        changes.changed().await.expect("inventory observer ended");
+                    }
+                })
+                .await
+                .expect("search inventory join deadline")
+            });
+            host.view.set_sidebar_source(inventory).unwrap();
             host.view
-                .update_sidebar_search_source(source.owner(), &state.input)
+                .update_sidebar_search_publication(source.owner(), &state)
                 .unwrap();
-            serde_json::json!({"publicTypedSearch":true,"sharedController":true,"expectedTargetFound":true,"hits":state.hits.len(),"hasMore":state.result.as_ref().unwrap().has_more,"unresolved":state.unresolved.len(),"originalEndpoint":expected.endpoint_id,"noSubmission":true,"nativeInteraction":false,"fullSidebarParity":false,
+            let sidebar = host
+                .view
+                .tree
+                .get(host.view.sidebar_id())
+                .unwrap()
+                .component::<Sidebar>()
+                .unwrap();
+            let inventory = host.sidebar.snapshot();
+            let rows: Vec<_> = inventory
+                .rows
+                .iter()
+                .filter(|row| state.hits.iter().any(|hit| hit.address == row.address))
+                .map(|row| row.address.clone())
+                .collect();
+            assert_eq!(
+                sidebar
+                    .displayed_input()
+                    .unwrap()
+                    .rows
+                    .iter()
+                    .map(|row| row.address.clone())
+                    .collect::<Vec<_>>(),
+                rows
+            );
+            assert!(
+                sidebar
+                    .row_id(&tekes_agent_contract::SessionAddress {
+                        endpoint_id: expected.endpoint_id.clone(),
+                        session_id: expected.session_id.clone(),
+                    })
+                    .is_some()
+            );
+            assert!(
+                state
+                    .hits
+                    .iter()
+                    .all(|hit| host.view.sidebar_search_snippet(&hit.address)
+                        == Some(hit.hit.snippet.as_str()))
+            );
+            serde_json::json!({"resultMembership":true,"inventorySortRetained":true,"queryScopedSnippetMetadata":true,"publicTypedSearch":true,"sharedController":true,"expectedTargetFound":true,"hits":state.hits.len(),"hasMore":state.result.as_ref().unwrap().has_more,"unresolved":state.unresolved.len(),"originalEndpoint":expected.endpoint_id,"noSubmission":true,"nativeInteraction":false,"fullSidebarParity":false,
                 "inventoryRefresh":{"publicCursors":true,"sameConnectionEpoch":true,"historyUnchanged":true,"searchResultRetained":true,"realUnknownRace":false}})
         } else {
             serde_json::Value::Null

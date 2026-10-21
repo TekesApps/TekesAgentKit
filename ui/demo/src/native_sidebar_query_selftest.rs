@@ -1,4 +1,4 @@
-//! Actual shared search controller -> public SEP read -> retained Sidebar footer.
+//! Actual shared search controller -> public SEP read -> filtered Sidebar rows/footer.
 //! The backend is the owned in-process fixture, not a real harness search index.
 use super::*;
 use tekes_agent_components_ui::{SidebarSearchIntent, SidebarSearchKey, SidebarSearchPhase};
@@ -13,6 +13,8 @@ pub(super) struct Probe {
     row: Option<ComponentId>,
     widget: usize,
     callbacks: usize,
+    clear_after: Option<Instant>,
+    results_capture: Option<std::path::PathBuf>,
 }
 impl Probe {
     pub fn new(fixture: tekes_agent_ui_demo::fixture::Fixture) -> Self {
@@ -26,6 +28,8 @@ impl Probe {
             row: None,
             widget: 0,
             callbacks: 0,
+            clear_after: None,
+            results_capture: None,
         }
     }
     pub fn prepare(view: &ComponentDemo) {
@@ -73,7 +77,7 @@ impl Probe {
             .unwrap()
             .component::<Sidebar>()
             .unwrap();
-        if self.phase >= 5 {
+        if self.phase == 5 {
             return;
         }
         if sidebar.displayed_search() != Some(&model.input) {
@@ -91,16 +95,14 @@ impl Probe {
             {
                 assert!(model.hits.is_empty() && model.result.is_none());
                 assert_eq!(self.fixture.search_calls(), 1);
-                let row = host.sidebar.snapshot().rows[0].address.clone();
-                let row = sidebar.row_id(&row).unwrap();
-                self.row = Some(row);
-                self.widget = host
-                    .view
-                    .tree
-                    .get(row)
-                    .unwrap()
-                    .component::<ButtonContent>()
-                    .unwrap() as *const _ as usize;
+                assert!(sidebar.displayed_input().unwrap().rows.is_empty());
+                assert!(
+                    host.sidebar
+                        .snapshot()
+                        .rows
+                        .iter()
+                        .all(|row| sidebar.row_id(&row.address).is_none())
+                );
                 self.key = model.input.key.clone();
                 let retry = sidebar.search_retry_id().unwrap();
                 self.retry = Some(retry);
@@ -174,8 +176,59 @@ impl Probe {
                         })
                         .is_err()
                 );
-                source.set_query("").unwrap();
-                self.phase = 4;
+                let inventory = host.sidebar.snapshot();
+                let expected: Vec<_> = inventory
+                    .rows
+                    .iter()
+                    .filter(|row| model.hits.iter().any(|hit| hit.address == row.address))
+                    .map(|row| row.address.clone())
+                    .collect();
+                assert_eq!(
+                    sidebar
+                        .displayed_input()
+                        .unwrap()
+                        .rows
+                        .iter()
+                        .map(|row| row.address.clone())
+                        .collect::<Vec<_>>(),
+                    expected
+                );
+                assert_eq!(expected.len(), 3);
+                let address = tekes_agent_contract::SessionAddress {
+                    endpoint_id: "fixture".into(),
+                    session_id: "a".into(),
+                };
+                assert_eq!(host.view.sidebar_search_snippet(&address), Some("命中 A"));
+                let row = sidebar.row_id(&address).unwrap();
+                self.row = Some(row);
+                self.widget = host
+                    .view
+                    .tree
+                    .get(row)
+                    .unwrap()
+                    .component::<ButtonContent>()
+                    .unwrap() as *const _ as usize;
+                if let Ok(path) = std::env::var("AGENT_SIDEBAR_QUERY_RESULTS_CAPTURE") {
+                    let file = std::path::PathBuf::from(&path);
+                    assert!(!file.exists(), "use a fresh results screenshot path");
+                    self.results_capture = Some(file);
+                    run_script(vec![(100, Action::Capture { path })]);
+                }
+                self.clear_after = Some(Instant::now());
+                self.phase = 6;
+                window.request_redraw();
+            }
+            6 => {
+                if self.clear_after.unwrap().elapsed() >= Duration::from_millis(500)
+                    && self
+                        .results_capture
+                        .as_ref()
+                        .is_none_or(|path| path.is_file())
+                {
+                    source.set_query("").unwrap();
+                    self.phase = 4;
+                }
+                window.request_redraw();
             }
             4 if model.input.phase == SidebarSearchPhase::Idle => {
                 assert!(
@@ -199,6 +252,15 @@ impl Probe {
                         .unwrap() as *const _ as usize,
                     self.widget
                 );
+                assert_eq!(
+                    sidebar.displayed_input().unwrap().rows,
+                    host.sidebar.snapshot().rows
+                );
+                let address = tekes_agent_contract::SessionAddress {
+                    endpoint_id: "fixture".into(),
+                    session_id: "a".into(),
+                };
+                assert_eq!(host.view.sidebar_search_snippet(&address), None);
                 let run = host.view.binding().current_run().unwrap();
                 assert_eq!(run.draft.text, "搜索期间保留的中文草稿");
                 assert!(run.submissions.is_empty());
@@ -220,6 +282,6 @@ impl Probe {
     pub fn receipt(&self) -> serde_json::Value {
         assert_eq!(self.phase, 5);
         assert_eq!(self.callbacks, 1);
-        serde_json::json!({"nativeWindow":true,"sharedPresentationController":true,"publicSearchRPC":true,"searchReads":self.fixture.search_calls(),"unknownHitRefresh":true,"inventoryReads":self.fixture.inventory_reads(),"sameConnectionEpoch":true,"pointerRetry":true,"originalQueryCaptured":true,"retiredRetryRejected":true,"clearRevokesResult":true,"inventoryControlsRetained":true,"draftRetained":true,"noSubmission":true,"ownedFixture":true,"realHarness":false,"physicalIme":false,"voiceOver":false,"fullSidebarParity":false})
+        serde_json::json!({"nativeWindow":true,"sharedPresentationController":true,"publicSearchRPC":true,"searchReads":self.fixture.search_calls(),"unknownHitRefresh":true,"inventoryReads":self.fixture.inventory_reads(),"sameConnectionEpoch":true,"pointerRetry":true,"originalQueryCaptured":true,"retiredRetryRejected":true,"clearRevokesResult":true,"retainedVisibleControl":true,"resultMembership":true,"inventorySortRetained":true,"queryScopedSnippet":true,"draftRetained":true,"noSubmission":true,"ownedFixture":true,"realHarness":false,"physicalIme":false,"voiceOver":false,"fullSidebarParity":false})
     }
 }

@@ -149,7 +149,7 @@ RunView 组合正式 Composer / Transcript / Indicators，拥有 Agent 组件间
 
 ## Sidebar（首批实现）
 
-[搜索 footer](rust-agent-ui-sidebar-search-footer-20261021.md)现已接入独立显示输入、底部锚定、长错误下 Retry 可见性及捕获原请求的公开回调。[共享单端查询控制器](rust-agent-ui-sidebar-query-controller-20261021.md)现已接入 presentation 与公开 RPC；[未知命中的公开库存恢复](rust-agent-ui-sidebar-inventory-refresh-20261021.md)已补齐；跨端聚合、搜索成员关系和完整 outline 仍待完成，不由宿主另写业务状态机。
+[搜索 footer](rust-agent-ui-sidebar-search-footer-20261021.md)现已接入独立显示输入、底部锚定、长错误下 Retry 可见性及捕获原请求的公开回调。[共享单端查询控制器](rust-agent-ui-sidebar-query-controller-20261021.md)现已接入 presentation 与公开 RPC；[未知命中的公开库存恢复](rust-agent-ui-sidebar-inventory-refresh-20261021.md)已补齐；[完整provider结果成员投影](rust-agent-ui-sidebar-search-results-20261021.md)已接通原publication、身份联结、未知库存恢复、查询隔离摘要元数据及清空恢复；跨端聚合、本地FTS OR/BM25、排序偏好和完整outline仍待完成，不由宿主另写业务状态机。
 
 `Sidebar::new(namespace, labels)` 实现公共 Component，也可 `into_host()` 独立挂载。每个组件使用独立的 u32 ID namespace；输入 `SidebarInput` 提供单调 inventory revision、loaded/error、按消费方分组/排序偏好排列的 rows 和当前 SessionAddress。首次恢复前不显示确认空；观察失败保留已恢复列表。选择来自独立宿主导航，可在同一库存 revision 下变化。
 
