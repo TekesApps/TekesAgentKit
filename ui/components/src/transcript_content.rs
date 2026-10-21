@@ -1042,38 +1042,37 @@ fn plan<'a>(
             }
         }
         if let Some(turn) = section.turn {
+            let output = section.final_output();
+            let display = timing.display(
+                turn,
+                &labels.footnote,
+                section.outputs.iter().any(|output| {
+                    output.item.kind == TranscriptItemKind::Assistant
+                        && output.item.is_final
+                        && output.item.is_visible
+                        && !output.item.is_provisional
+                        && (!output.item.text.is_empty()
+                            || !output.item.attachments.is_empty()
+                            || output.item.content_blocks.as_ref().is_some_and(|blocks| {
+                                blocks.iter().any(|block| match &block.content {
+                                    TranscriptBlockContent::Text { text } => !text.is_empty(),
+                                    TranscriptBlockContent::Attachment { .. }
+                                    | TranscriptBlockContent::Unknown { .. } => true,
+                                    TranscriptBlockContent::Reasoning { .. }
+                                    | TranscriptBlockContent::ToolCall { .. } => false,
+                                })
+                            }))
+                }),
+            );
+            let feedback_visible =
+                display.shows_aside(turn, output.is_some()) && !display.is_live_owner;
             result.push(Planned {
                 key: Key::TurnFootnote(turn.id.clone()),
                 alias: None,
-                content: PlannedContent::Footnote(
-                    turn,
-                    section.final_output(),
-                    timing.display(
-                        turn,
-                        &labels.footnote,
-                        section.outputs.iter().any(|output| {
-                            output.item.kind == TranscriptItemKind::Assistant
-                                && output.item.is_final
-                                && output.item.is_visible
-                                && !output.item.is_provisional
-                                && (!output.item.text.is_empty()
-                                    || !output.item.attachments.is_empty()
-                                    || output.item.content_blocks.as_ref().is_some_and(|blocks| {
-                                        blocks.iter().any(|block| match &block.content {
-                                            TranscriptBlockContent::Text { text } => {
-                                                !text.is_empty()
-                                            }
-                                            TranscriptBlockContent::Attachment { .. }
-                                            | TranscriptBlockContent::Unknown { .. } => true,
-                                            TranscriptBlockContent::Reasoning { .. }
-                                            | TranscriptBlockContent::ToolCall { .. } => false,
-                                        })
-                                    }))
-                        }),
-                    ),
-                ),
+                content: PlannedContent::Footnote(turn, output, display),
             });
             if labels.feedback.is_some()
+                && feedback_visible
                 && let Some(target) = TurnFeedbackTarget::read(section)
             {
                 result.push(Planned {

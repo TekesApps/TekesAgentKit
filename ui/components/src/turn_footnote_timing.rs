@@ -107,6 +107,15 @@ impl TranscriptFootnoteTiming {
     }
 }
 impl TurnFootnoteDisplay {
+    /// One source display gate for all output-aside contents. A validated copy
+    /// argument can establish presence for the standalone legacy footer API.
+    pub(crate) fn shows_aside(&self, turn: &TranscriptTurn, copy_output_present: bool) -> bool {
+        self.is_live_owner
+            || self.has_output
+            || copy_output_present
+            || (!matches!(turn.status.as_str(), "running" | "waitingForInput")
+                && !turn.footnote_actions.is_empty())
+    }
     pub(crate) fn validate(&self, turn: &TranscriptTurn) -> Result<(), &'static str> {
         if self.now_ms.is_some_and(|n| !n.is_finite() || n <= 0.)
             || (self.revision == 0 && self.now_ms.is_some())

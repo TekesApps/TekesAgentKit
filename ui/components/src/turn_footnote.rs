@@ -312,11 +312,7 @@ impl TurnFootnote {
         output: Option<TranscriptOutput<'_>>,
         display: &crate::TurnFootnoteDisplay,
     ) -> Result<(), &'static str> {
-        let shown = display.is_live_owner
-            || display.has_output
-            || output.is_some()
-            || (!matches!(turn.status.as_str(), "running" | "waitingForInput")
-                && !turn.footnote_actions.is_empty());
+        let shown = display.shows_aside(turn, output.is_some());
         let visibility_changed =
             self.shown != shown || self.display.is_live_owner != display.is_live_owner;
         let rekey = self.check_update_with_display(
@@ -532,7 +528,9 @@ impl TurnFootnote {
                 .iter()
                 .position(|node| node.id() == id)
                 .map(|index| previous.remove(index))
-                .unwrap_or_else(|| Content::new(id, ButtonContent::new(&self.labels.copy)));
+                .unwrap_or_else(|| {
+                    Content::new(id, ButtonContent::new(&self.labels.copy)).preserving_focus()
+                });
             node.component_mut::<ButtonContent>().unwrap().label = self.labels.copy.clone();
             self.rows.children.push(node);
         }
@@ -541,7 +539,9 @@ impl TurnFootnote {
                 .iter()
                 .position(|node| node.id() == *id)
                 .map(|index| previous.remove(index))
-                .unwrap_or_else(|| Content::new(*id, ButtonContent::new(&action.label)));
+                .unwrap_or_else(|| {
+                    Content::new(*id, ButtonContent::new(&action.label)).preserving_focus()
+                });
             let button = node.component_mut::<ButtonContent>().unwrap();
             button.label = action.label.clone();
             button.button.state.disabled =

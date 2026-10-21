@@ -453,21 +453,25 @@ impl TurnFeedback {
                 });
             self.rows.children.push(node);
         }
-        let mut note = retained_button(&mut old, self.ids.edit_note, &self.labels.edit_note);
-        note.component_mut::<ButtonContent>()
-            .unwrap()
-            .button
-            .state
-            .selected = current.is_some_and(|record| record.note.is_some());
-        note.component_mut::<ButtonContent>()
-            .unwrap()
-            .button
-            .state
-            .disabled = busy
-            || self.editor_open
-            || current.is_none()
-            || self.state.as_ref().is_none_or(|s| !s.put_available);
-        self.rows.children.push(note);
+        if let Some(current) = current {
+            let mut note = retained_button(
+                &mut old,
+                self.ids.edit_note,
+                current.note.as_deref().unwrap_or(&self.labels.edit_note),
+            );
+            note.component_mut::<ButtonContent>()
+                .unwrap()
+                .button
+                .state
+                .selected = current.note.is_some();
+            note.component_mut::<ButtonContent>()
+                .unwrap()
+                .button
+                .state
+                .disabled =
+                busy || self.editor_open || self.state.as_ref().is_none_or(|s| !s.put_available);
+            self.rows.children.push(note);
+        }
         let rating_buttons = std::mem::take(&mut self.rows.children);
         self.rows
             .children
@@ -529,13 +533,15 @@ impl TurnFeedback {
         } else {
             &self.notice
         };
-        self.rows.children.push(Content::new(
-            self.ids.status,
-            TextContent {
-                text: text.clone(),
-                role: proposal::TextRole::UiCaption,
-            },
-        ));
+        if !text.is_empty() {
+            self.rows.children.push(Content::new(
+                self.ids.status,
+                TextContent {
+                    text: text.clone(),
+                    role: proposal::TextRole::UiCaption,
+                },
+            ));
+        }
     }
     pub fn into_host(self) -> Result<ContentHost, CompositionError> {
         let root = self.ids.root;
@@ -568,7 +574,7 @@ fn retained_button(old: &mut Vec<Content>, id: ComponentId, label: &str) -> Cont
         .iter()
         .position(|n| n.id() == id)
         .map(|i| old.remove(i))
-        .unwrap_or_else(|| Content::new(id, ButtonContent::new(label)));
+        .unwrap_or_else(|| Content::new(id, ButtonContent::new(label)).preserving_focus());
     node.component_mut::<ButtonContent>().unwrap().label = label.into();
     node
 }

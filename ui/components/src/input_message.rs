@@ -392,7 +392,7 @@ impl InputMessage {
             let node = if same_copy { old_copy } else { None }.unwrap_or_else(|| {
                 let id = ComponentId(self.ids.root.0 + self.next_detail);
                 self.next_detail += 1;
-                Content::new(id, ButtonContent::new(&self.copy_label))
+                Content::new(id, ButtonContent::new(&self.copy_label)).preserving_focus()
             });
             self.copy_id = Some(node.id());
             self.children.push(node);

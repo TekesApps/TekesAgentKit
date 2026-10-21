@@ -345,3 +345,5 @@ old plans are fenced. Shared components own display rules; system time/calendar 
 wake scheduling remain host adapters. This does not complete footnote layout parity.
 
 [输出脚注显隐](rust-agent-ui-output-aside-20261022.md)进一步对齐 Source 的 live/output/settled-fork 门槛；结束时间、纯推理或工具本身不生成输出脚注。输出存在不授予复制、反馈或执行权限，原信息节点在显隐之间保留。
+
+[反馈脚注与辅助焦点](rust-agent-ui-feedback-aside-20261022.md)将评价挂载纳入输出脚注的同一显隐门槛，保留原响应授权与组字 preflight；备注仅在已有评分时显示，并展示 committed 文字。复制、回合及评价辅助按钮消费原 SDK 保焦点策略。单行整体排布仍未完成。

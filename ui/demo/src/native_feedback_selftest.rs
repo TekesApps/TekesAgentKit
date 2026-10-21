@@ -6,6 +6,28 @@ use tekes_agent_presentation::{RunSnapshot, TranscriptItemKind};
 use tekes_ui_controls::composition::{ComponentId, ContentHost};
 use tekes_ui_platform_macos::selftest::{Action, run_script};
 
+// Editor tickets can change when a new controlled draft publication is
+// acknowledged. Observe semantic state, not equality of an old authority token.
+#[derive(Debug, PartialEq, Eq)]
+struct ComposerObservation {
+    text: String,
+    anchor: usize,
+    caret: usize,
+    marked: Option<std::ops::Range<usize>>,
+    multiline: bool,
+}
+impl ComposerObservation {
+    fn read(view: &ComponentDemo) -> Self {
+        let input = &view.editor().input;
+        Self {
+            text: input.text.clone(),
+            anchor: input.anchor,
+            caret: input.caret,
+            marked: input.marked.clone(),
+            multiline: input.multiline,
+        }
+    }
+}
 pub(super) struct Probe {
     started: Instant,
     phase: u8,
@@ -14,6 +36,10 @@ pub(super) struct Probe {
     control: Option<ComponentId>,
     before: Vec<Arc<RunSnapshot>>,
     deleted_publication: u64,
+    auxiliary_focus: Option<ComponentId>,
+    composer_state: Option<ComposerObservation>,
+    capture_directory: Option<std::path::PathBuf>,
+    composer_owner: usize,
 }
 const NOTE: &str = "原生中文评价备注";
 impl Probe {
@@ -26,6 +52,17 @@ impl Probe {
             control: None,
             before: vec![],
             deleted_publication: 0,
+            auxiliary_focus: None,
+            composer_state: None,
+            capture_directory: std::env::var_os("AGENT_FEEDBACK_CAPTURE_DIRECTORY").map(|path| {
+                let path = std::path::PathBuf::from(path);
+                assert!(
+                    path.is_absolute() && path.is_dir(),
+                    "use an existing absolute evidence directory"
+                );
+                path
+            }),
+            composer_owner: 0,
         }
     }
     fn control<'a>(&self, view: &'a ComponentDemo) -> Option<&'a TurnFeedback> {
@@ -147,6 +184,10 @@ impl Probe {
                     "nonempty isolated drafts are required to verify the send barrier"
                 );
                 let refresh = control.ids().refresh;
+                self.auxiliary_focus = view.tree.focused();
+                assert_eq!(self.auxiliary_focus, Some(view.ids().editor));
+                self.composer_state = Some(ComposerObservation::read(view));
+                self.composer_owner = view.editor() as *const _ as usize;
                 self.next(1, vec![(0, Self::click(&view.tree, refresh))]);
             }
             1 if self.ready(view) => {
@@ -155,6 +196,9 @@ impl Probe {
                     control.state().unwrap().current.is_none(),
                     "native feedback probe requires an unrated owned target"
                 );
+                assert!(view.tree.get(control.ids().edit_note).is_none());
+                assert_eq!(view.tree.focused(), self.auxiliary_focus);
+                assert_eq!(Some(ComposerObservation::read(view)), self.composer_state);
                 self.next(
                     2,
                     vec![(0, Self::click(&view.tree, control.ids().positive))],
@@ -170,6 +214,9 @@ impl Probe {
                     .is_some() =>
             {
                 let control = self.control(view).unwrap();
+                assert_eq!(view.tree.focused(), self.auxiliary_focus);
+                assert_eq!(view.editor() as *const _ as usize, self.composer_owner);
+                assert_eq!(Some(ComposerObservation::read(view)), self.composer_state);
                 assert_eq!(
                     control.state().unwrap().current.as_ref().unwrap().rating,
                     tekes_agent_contract::SessionMessageFeedbackRating::Positive
@@ -250,13 +297,45 @@ impl Probe {
                     .and_then(|record| record.note.as_deref())
                     == Some(NOTE) =>
             {
-                self.next(
-                    6,
-                    vec![(
-                        0,
-                        Self::click(&view.tree, self.control(view).unwrap().ids().edit_note),
-                    )],
+                let note = self.control(view).unwrap().ids().edit_note;
+                assert_eq!(
+                    view.tree
+                        .get(note)
+                        .unwrap()
+                        .component::<tekes_ui_controls::composition::ButtonContent>()
+                        .unwrap()
+                        .label,
+                    NOTE
                 );
+                let mut actions = vec![];
+                if let Some(directory) = &self.capture_directory {
+                    let id: String = view
+                        .binding()
+                        .scope()
+                        .endpoint_id
+                        .chars()
+                        .map(|c| {
+                            if c.is_ascii_alphanumeric() || c == '-' {
+                                c
+                            } else {
+                                '_'
+                            }
+                        })
+                        .collect();
+                    let path = directory.join(format!("{id}-feedback-note.png"));
+                    assert!(!path.exists(), "do not overwrite acceptance screenshots");
+                    actions.push((
+                        0,
+                        Action::Capture {
+                            path: path.to_string_lossy().into_owned(),
+                        },
+                    ));
+                }
+                actions.push((
+                    0,
+                    Self::click(&view.tree, self.control(view).unwrap().ids().edit_note),
+                ));
+                self.next(6, actions);
             }
             6 if self.control(view).is_some_and(|control| control.is_open()) => {
                 assert_eq!(
@@ -333,6 +412,7 @@ impl Probe {
                     .is_none() =>
             {
                 let control = self.control(view).unwrap();
+                assert!(view.tree.get(control.ids().edit_note).is_none());
                 self.deleted_publication = control.state().unwrap().publication;
                 self.next(
                     11,
@@ -362,6 +442,6 @@ impl Probe {
     pub fn receipt(&self, view: &ComponentDemo) -> serde_json::Value {
         assert_eq!(self.phase, 12, "native feedback did not finish");
         self.check_drafts_and_messages(view);
-        serde_json::json!({"nativeInteraction":true,"nativePointer":true,"nativeTextServices":true,"syntheticPreedit":true,"imeSendAndNavigationBlocked":true,"savedChineseNote":true,"noteReopened":true,"retainedAcrossSessionSwitch":true,"sameRatingDeletes":true,"freshReadAfterDelete":true,"draftsPreserved":true,"nonemptyComposerDrafts":true,"sendEnabledBeforeComposition":true,"noPromptSubmitted":true,"stateDrivenCallbacks":true,"physicalIme":false,"voiceOver":false,"readingAnchorAcceptance":false})
+        serde_json::json!({"nativeInteraction":true,"nativePointer":true,"nativeTextServices":true,"syntheticPreedit":true,"imeSendAndNavigationBlocked":true,"savedChineseNote":true,"noteReopened":true,"retainedAcrossSessionSwitch":true,"sameRatingDeletes":true,"freshReadAfterDelete":true,"draftsPreserved":true,"nonemptyComposerDrafts":true,"sendEnabledBeforeComposition":true,"noPromptSubmitted":true,"stateDrivenCallbacks":true,"auxiliaryFocusPreserved":true,"composerContentsAndOwnerPreserved":true,"opaqueBaselinePreserved":false,"unratedNoteHidden":true,"committedNoteLabel":true,"physicalIme":false,"voiceOver":false,"readingAnchorAcceptance":false})
     }
 }

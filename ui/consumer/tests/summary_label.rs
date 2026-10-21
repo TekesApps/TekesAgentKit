@@ -1267,3 +1267,290 @@ fn transcript_clock_is_a_display_input_and_stale_plans_preserve_the_original_cap
         original
     );
 }
+
+#[test]
+fn output_aside_feedback_notes_and_auxiliary_actions_keep_the_original_composer() {
+    use tekes_agent_ui_bindings::{
+        SessionMessageFeedback, SessionMessageFeedbackRating, TurnFeedbackTarget,
+    };
+    use tekes_ui_controls::extended::{Axis, Stack};
+    let scope = RunScope::main("consumer", "feedback-aside");
+    let mut answer = TranscriptItem {
+        id: "answer".into(),
+        record_id: Some("public-answer".into()),
+        reconciliation_id: None,
+        turn_id: "turn".into(),
+        kind: TranscriptItemKind::Assistant,
+        text: String::new(),
+        reasoning: String::new(),
+        attachments: vec![],
+        content_blocks: None,
+        is_visible: true,
+        is_final: true,
+        is_provisional: false,
+        reasoning_ended: true,
+        source_sequence: Some(2),
+        source_position: Some(TranscriptSourcePosition::Journal {
+            sequence: 2,
+            content_index: None,
+        }),
+        time: Some(13000.),
+        metadata: Default::default(),
+    };
+    answer.metadata["feedbackMessageId"] = "public-answer".into();
+    let mut input = answer.clone();
+    input.id = "input".into();
+    input.record_id = None;
+    input.metadata = Default::default();
+    input.kind = TranscriptItemKind::User;
+    input.text = "原输入".into();
+    input.source_sequence = Some(1);
+    input.source_position = Some(TranscriptSourcePosition::Journal {
+        sequence: 1,
+        content_index: None,
+    });
+    let mut snapshot = TranscriptSnapshot {
+        items: vec![input, answer],
+        turns: vec![TranscriptTurn {
+            id: "turn".into(),
+            status: "completed".into(),
+            input: "原输入".into(),
+            started_at: Some(10000.),
+            ended_at: Some(13000.),
+            usage: Default::default(),
+            fork_boundary: None,
+            footnote_actions: vec![],
+            live_usage: None,
+            reported_usage: None,
+        }],
+        ..Default::default()
+    };
+    let mut content = TranscriptContent::new(
+        49970,
+        49971..49995,
+        scope.clone(),
+        TranscriptContentLabels {
+            feedback: Some(Default::default()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    content.update(&scope, 1, 1, &snapshot, true).unwrap();
+    assert_eq!(
+        content.feedback_controls().count(),
+        0,
+        "a proven empty answer alone has no aside"
+    );
+    let document = TranscriptDocument::read(&snapshot).unwrap();
+    assert!(
+        TurnFeedbackTarget::read(&document.sections[0]).is_some(),
+        "display never changes target authority"
+    );
+    snapshot.items[1].text = "正式回答".into();
+    content.update(&scope, 2, 1, &snapshot, true).unwrap();
+    let (feedback, control) = content.feedback_controls().next().unwrap();
+    let target = control.target().unwrap().clone();
+    let state = FeedbackControlState {
+        target: target.clone(),
+        publication: 1,
+        connection_epoch: 1,
+        current: None,
+        put_available: true,
+        delete_available: true,
+    };
+    content
+        .feedback_mut(feedback)
+        .unwrap()
+        .update(state.clone())
+        .unwrap();
+    let root = content.id();
+    let composer = tekes_agent_ui_consumer_check::new_composer(49969);
+    let editor = composer.ids().editor;
+    let mut host = ContentHost::new(Content::new(
+        ComponentId(64),
+        StackContent {
+            model: Stack {
+                axis: Axis::Vertical,
+                gap: 8.,
+            },
+            flexible_child: None,
+            children: vec![
+                Content::new(composer.ids().root, composer),
+                Content::new(root, content),
+            ],
+        },
+    ))
+    .unwrap();
+    host.set_action_events(true);
+    let mut text = Text::new(1., true);
+    let frame = Rect::new(0., 0., 900., 1400.);
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        frame,
+        frame,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    host.focus(Some(editor), true);
+    host.event(&ContentEvent::Preedit {
+        text: "辅助动作期间中文组字".into(),
+        selection: 1..3,
+        replacement: None,
+        clauses: vec![],
+    });
+    let baseline = host.text_surface(editor).unwrap().input.external_baseline();
+    let original = host.text_surface(editor).unwrap() as *const _ as usize;
+    let ids = host
+        .get(feedback)
+        .unwrap()
+        .component::<TurnFeedback>()
+        .unwrap()
+        .ids();
+    assert!(
+        host.get(ids.edit_note).is_none(),
+        "unrated means no note entry, not a disabled placeholder"
+    );
+    let content = host
+        .get(root)
+        .unwrap()
+        .component::<TranscriptContent>()
+        .unwrap();
+    let input = content
+        .message_id(TranscriptMessageKey::Item("input"))
+        .unwrap();
+    let input_copy = host
+        .get(input)
+        .unwrap()
+        .component::<InputMessage>()
+        .unwrap()
+        .copy_button_id()
+        .unwrap();
+    let footer = content
+        .row_id(&TranscriptContentRowKey::TurnFootnote("turn".into()))
+        .unwrap();
+    let output_copy = host
+        .get(footer)
+        .unwrap()
+        .component::<TurnFootnote>()
+        .unwrap()
+        .copy_button_id()
+        .unwrap();
+    for (index, button) in [input_copy, output_copy, ids.positive]
+        .into_iter()
+        .enumerate()
+    {
+        if index == 0 {
+            let point = host.get(button).unwrap().frame().center();
+            host.event(&ContentEvent::PointerDown(point));
+            assert!(host.event(&ContentEvent::PointerUp(point)).activated);
+        } else {
+            assert!(
+                host.accessibility_action(button, None, AccessibilityAction::Press)
+                    .activated
+            );
+        }
+        assert_eq!(host.focused(), Some(editor));
+        assert_eq!(
+            host.text_surface(editor).unwrap().input.external_baseline(),
+            baseline
+        );
+        assert_eq!(
+            host.text_surface(editor).unwrap() as *const _ as usize,
+            original
+        );
+        let actions = host.drain_actions();
+        let content = host
+            .get_mut(root)
+            .unwrap()
+            .component_mut::<TranscriptContent>()
+            .unwrap();
+        if index < 2 {
+            let copy = content.take_copy_intents(&actions);
+            assert_eq!(copy.len(), 1);
+            assert_eq!(copy[0].scope(), &scope);
+            assert_eq!(
+                copy[0].text(),
+                if index == 0 {
+                    "原输入"
+                } else {
+                    "正式回答"
+                }
+            );
+        } else {
+            let gestures = content.take_feedback_intents(&actions);
+            assert_eq!(gestures.len(), 1);
+            assert_eq!(gestures[0].1.target(), &target);
+        }
+    }
+    let mut rated = state;
+    rated.publication = 2;
+    rated.current = Some(SessionMessageFeedback {
+        message_id: "public-answer".into(),
+        rating: SessionMessageFeedbackRating::Positive,
+        version: "committed:2".into(),
+        note: Some("已提交的中文备注".into()),
+        updated_at_milliseconds: None,
+    });
+    host.get_mut(feedback)
+        .unwrap()
+        .component_mut::<TurnFeedback>()
+        .unwrap()
+        .update(rated)
+        .unwrap();
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        frame,
+        frame,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    let control = host
+        .get(feedback)
+        .unwrap()
+        .component::<TurnFeedback>()
+        .unwrap();
+    let note = control.ids().edit_note;
+    assert_eq!(
+        host.get(note)
+            .unwrap()
+            .component::<ButtonContent>()
+            .unwrap()
+            .label,
+        "已提交的中文备注"
+    );
+    assert!(
+        control
+            .children()
+            .iter()
+            .filter_map(|node| node.component::<TextContent>())
+            .all(|caption| !caption.text.is_empty()),
+        "known feedback adds no empty caption band"
+    );
+    assert!(
+        host.accessibility_action(note, None, AccessibilityAction::Press)
+            .activated
+    );
+    let actions = host.drain_actions();
+    assert!(
+        host.get_mut(feedback)
+            .unwrap()
+            .component_mut::<TurnFeedback>()
+            .unwrap()
+            .take_intents(&actions)
+            .is_empty()
+    );
+    assert!(
+        host.get(feedback)
+            .unwrap()
+            .component::<TurnFeedback>()
+            .unwrap()
+            .is_open()
+    );
+    assert_eq!(host.focused(), Some(editor));
+    assert_eq!(
+        host.text_surface(editor).unwrap().input.external_baseline(),
+        baseline
+    );
+}

@@ -1370,3 +1370,144 @@ fn output_aside_presence_uses_formal_visible_content_not_reasoning_tools_or_a_ti
         }
     }
 }
+
+#[test]
+fn hiding_the_aside_without_changing_the_response_keeps_feedback_ime_until_commit() {
+    let mut source = feedback_snapshot();
+    source.items[1].text.clear();
+    source.turns[0]
+        .footnote_actions
+        .push(tekes_agent_contract::ThreadActionDefinition {
+            id: "forkTurn:turn".into(),
+            label: "分叉".into(),
+            icon: "fork".into(),
+            interaction: "execute".into(),
+            enabled: true,
+            disabled_reason: None,
+            copy_text: None,
+        });
+    let mut view = content();
+    view.configure_feedback(Some(Default::default())).unwrap();
+    view.update(&scope(), 1, 1, &source, true).unwrap();
+    let feedback = view.feedback_controls().next().unwrap().0;
+    let target = view
+        .feedback_controls()
+        .next()
+        .unwrap()
+        .1
+        .target()
+        .unwrap()
+        .clone();
+    view.feedback_mut(feedback)
+        .unwrap()
+        .update(FeedbackControlState {
+            target,
+            publication: 1,
+            connection_epoch: 1,
+            current: Some(
+                serde_json::from_value(
+                    json!({"messageId":"public-output","rating":"positive","version":"v"}),
+                )
+                .unwrap(),
+            ),
+            put_available: true,
+            delete_available: true,
+        })
+        .unwrap();
+    let id = view.id();
+    let mut host = view.into_host().unwrap();
+    let note = root(&mut host, id)
+        .feedback_mut(feedback)
+        .unwrap()
+        .ids()
+        .edit_note;
+    host.accessibility_action(note, None, AccessibilityAction::Press);
+    let actions = host.drain_actions();
+    assert!(
+        root(&mut host, id)
+            .take_feedback_intents(&actions)
+            .is_empty()
+    );
+    let editor = root(&mut host, id)
+        .feedback_mut(feedback)
+        .unwrap()
+        .ids()
+        .editor;
+    host.focus(Some(editor), true);
+    host.event(&ContentEvent::Preedit {
+        text: "组字".into(),
+        selection: 2..2,
+        clauses: vec![],
+        replacement: None,
+    });
+    let actions = host.drain_actions();
+    root(&mut host, id).take_feedback_intents(&actions);
+    let unchanged_response = source.items[1].clone();
+    source.turns[0].footnote_actions.clear();
+    assert_eq!(source.items[1], unchanged_response);
+    assert!(
+        root(&mut host, id)
+            .update(&scope(), 2, 1, &source, true)
+            .is_err()
+    );
+    assert_eq!(
+        root(&mut host, id).composing_feedback_editor(),
+        Some(editor)
+    );
+    host.event(&ContentEvent::Commit {
+        text: "中文".into(),
+        replacement: None,
+    });
+    let actions = host.drain_actions();
+    root(&mut host, id).take_feedback_intents(&actions);
+    root(&mut host, id)
+        .update(&scope(), 2, 1, &source, true)
+        .unwrap();
+    assert_eq!(root(&mut host, id).feedback_controls().count(), 0);
+    assert!(host.get(editor).is_none());
+    assert!(host.get(feedback).is_none());
+}
+
+#[test]
+fn feedback_uses_the_same_aside_gate_while_final_response_authority_stays_independent() {
+    for has_image in [false, true] {
+        for has_fork in [false, true] {
+            let mut source = feedback_snapshot();
+            source.items[1].text.clear();
+            if has_image {
+                source.items[1].content_blocks = Some(vec![TranscriptContentBlock {
+                    index: 0,
+                    content: TranscriptBlockContent::Attachment {
+                        content: json!({"type":"image","mimeType":"image/png"}),
+                    },
+                }]);
+            }
+            if has_fork {
+                source.turns[0].footnote_actions.push(
+                    tekes_agent_contract::ThreadActionDefinition {
+                        id: "forkTurn:turn".into(),
+                        label: "分叉".into(),
+                        icon: "fork".into(),
+                        interaction: "execute".into(),
+                        enabled: false,
+                        disabled_reason: Some("当前只读".into()),
+                        copy_text: None,
+                    },
+                );
+            }
+            let document = TranscriptDocument::read(&source).unwrap();
+            assert!(
+                tekes_agent_presentation::TurnFeedbackTarget::read(&document.sections[0]).is_some(),
+                "display never changes canonical response proof"
+            );
+            let mut view = content();
+            view.configure_feedback(Some(Default::default())).unwrap();
+            view.update(&scope(), 1, 1, &source, false).unwrap();
+            assert_eq!(
+                view.feedback_controls().count(),
+                usize::from(has_image || has_fork)
+            );
+            assert!(view.take_copy_intents(&[]).is_empty());
+        }
+    }
+}

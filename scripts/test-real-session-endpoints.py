@@ -330,6 +330,16 @@ def ui_smoke(config, first, bounded_child=None):
         execute(dict(config,commands=[{'op':'call','sessionId':first,'method':'session.selectModel','args':model},
             {'op':'open','sessionId':first},{'op':'compose','sessionId':first,'text':search_query},
             {'op':'waitSettled','sessionId':first,'inputText':search_query}]))
+    # Independent Native UI mode intentionally skips the lifecycle scenario,
+    # which normally supplies a completed answer. Feedback still needs one
+    # real public response; seed it through normal admission before UI snapshots.
+    if kind=='native' and args.kernel_ui_only and args.ui_native_feedback and not (history_pages or search_query):
+        model=next(command['args'] for command in config['commands'] if command.get('method')=='session.selectModel')
+        text='UI_FEEDBACK_OWNED_TARGET'
+        execute(dict(config,commands=[{'op':'call','sessionId':first,'method':'session.selectModel','args':model},
+            {'op':'open','sessionId':first},{'op':'compose','sessionId':first,'text':text},
+            {'op':'waitSettled','sessionId':first,'inputText':text}]))
+        print('NATIVE_UI_FEEDBACK_TARGET_SEEDED public-prompt+real-final-response',flush=True)
     second=next(row['result']['sessionId'] for row in execute(dict(config,commands=[{'op':'create','cwd':str(cwd)}])) if row.get('op')=='create')
     if args.ui_native_reading and bounded_child is None:
         history=[{'op':'call','sessionId':second,'method':'session.selectModel','args':model},{'op':'open','sessionId':second}]

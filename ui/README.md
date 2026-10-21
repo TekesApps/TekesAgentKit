@@ -292,3 +292,9 @@ for API migration, native wake lifetime and evidence limits.
 `TurnFootnoteDisplay::has_output` expresses formal output presence independently of
 copy/feedback authority. Timestamp-only turns hide their aside unless live or
 provided settled-turn controls. See [visibility contract](../docs/rust-agent-ui-output-aside-20261022.md).
+
+Feedback mounts under the same output-aside visibility gate as its footer. Unrated
+targets have no note entry; committed note text is shown directly. Auxiliary copy,
+turn and rating buttons consume SDK `preserving_focus()`. See the
+[feedback aside contract](../docs/rust-agent-ui-feedback-aside-20261022.md) for IME,
+publication and validation scope; complete inline packing remains unfinished.
