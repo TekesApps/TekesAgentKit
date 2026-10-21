@@ -112,6 +112,22 @@ impl ChildRun {
         layout: ChildHistoryLayout,
         source: Option<std::sync::Arc<dyn ChildHistorySource>>,
     ) -> tekes_agent_contract::Result<Self> {
+        Self::open_with_page_size(runtime, parent, child, layout, source, 50).await
+    }
+    /// Explicit bounded page size (1..=200), fixed for this source lifetime.
+    pub async fn open_with_page_size(
+        runtime: std::sync::Arc<tekes_agent_session::SessionRuntime>,
+        parent: RunScope,
+        child: impl Into<String>,
+        layout: ChildHistoryLayout,
+        source: Option<std::sync::Arc<dyn ChildHistorySource>>,
+        page_size: usize,
+    ) -> tekes_agent_contract::Result<Self> {
+        tekes_agent_contract::require((1..=200).contains(&page_size), "invalid bounded page size")?;
+        tekes_agent_contract::require(
+            page_size == 50 || (layout == ChildHistoryLayout::SameSession && source.is_none()),
+            "page size requires built-in bounded history",
+        )?;
         parent.validate()?;
         let child = child.into();
         tekes_agent_contract::require(
@@ -127,6 +143,7 @@ impl ChildRun {
                 runtime.clone(),
                 parent.clone(),
                 child.clone(),
+                page_size,
             )
             .await?;
             return Ok(Self {

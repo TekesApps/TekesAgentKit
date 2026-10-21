@@ -5,6 +5,7 @@
 [公开版本回合导航](rust-agent-ui-published-navigation-20261021.md)已接通原生 demo 的普通 Start、Latest 和独立 rail 自动 reveal；复用原阅读 token、编辑器及宿主历史回调，中文合成预编辑专项通过。完整 rail/产品体验仍待验收，#22/#28/#32 的源码交付不再作为当前阻塞。
 [回到最新按钮](rust-agent-ui-jump-latest-20261021.md)已补公开控件、原跟随命令及原生组字内点击验证，保留原编辑器且不记录轨道导航历史；完整selection/chrome仍待完成。
 [有界只读子历史阅读](rust-agent-ui-readonly-reading-20261021.md)已接入原SDK事务，正文/状态/分页一起发布，公开consumer与原生fixture验证前插和刷新锚点；真实Native新pane验收及持久恢复仍单独开放。
+[真实Native只读pane阅读](rust-agent-ui-native-bounded-reading-20261021.md)现有Kernel0.9.1原生锚点/刷新及元数据页耗尽证据；本case可见行5→5，多消息child前插仍开放。
 [Summary 用量两列布局](rust-agent-ui-summary-usage-20261021.md)将六项用量的标题与数值拆成原 TekesUI 文本槽，增加公开格式化回调；不重算 facts 或切换默认依赖。完整 Summary rows/slots 与原生产品验收仍待完成。
 
 源码基线：AgentKit已发布v0.3.8 / `f1daa0ffcf6ced41e21f351e22845455ca78006c`；本分支Rust UI仍为实验0.0.0/publish=false。当前TekesUI精确公开pin为`1294987dacabb33c0e411c13ee5ea544a1123f8e` / `remediation-checkpoint-20261021`，实际八包241输入，清单SHA `5b5a5acdbb957b565eb73e5558769e38b8c34a4e7ae7b7553d76b98defb4c1f2`，以`ui/tekesui-source.json`和Cargo.lock核验。原431/8cf/2ee清单保留在`ui/baselines/`。

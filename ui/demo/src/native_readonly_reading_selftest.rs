@@ -11,9 +11,10 @@ pub(super) struct Probe {
     item: Option<ComponentId>,
     y: f32,
     revision: u64,
+    child: Option<String>,
 }
 impl Probe {
-    pub fn new() -> Self {
+    pub fn new(child: Option<String>) -> Self {
         run_script(vec![(25_000, Action::Close)]);
         Self {
             phase: 0,
@@ -23,6 +24,7 @@ impl Probe {
             item: None,
             y: 0.,
             revision: 0,
+            child,
         }
     }
     fn pane(host: &Host) -> &ReadOnlyTranscript {
@@ -103,7 +105,9 @@ impl Probe {
         let old = self.phase;
         match self.phase {
             0 if window.is_active() => {
-                host.view.select(1).unwrap();
+                host.view
+                    .select(if self.child.is_some() { 0 } else { 1 })
+                    .unwrap();
                 let binding = host.view.binding();
                 binding
                     .edit_text(
@@ -113,7 +117,10 @@ impl Probe {
                         "主会话中文草稿".into(),
                     )
                     .unwrap();
-                host.open_fixture_child("bounded-b", ChildHistoryLayout::SameSession);
+                host.open_fixture_child(
+                    self.child.as_deref().unwrap_or("bounded-b"),
+                    ChildHistoryLayout::SameSession,
+                );
                 self.phase = 1;
             }
             1 if host.view.bounded_child_view_id().is_some() && window.is_active() => {
@@ -121,6 +128,7 @@ impl Probe {
                 self.count = pane.content().row_keys().len();
                 let viewport = pane.ids().viewport;
                 assert!(Self::scroll(host).reading_document_version().is_some());
+                assert!(Self::pane(host).paging_facts().unwrap().has_more_before);
                 let position = host
                     .view
                     .tree
@@ -150,7 +158,42 @@ impl Probe {
                 Self::read(host, true);
                 self.phase = 3;
             }
-            3 if Self::pane(host).content().row_keys().len() > self.count => {
+            3 if Self::scroll(host)
+                .reading_document_version()
+                .unwrap()
+                .revision()
+                > self.revision
+                && !host
+                    .view
+                    .tree
+                    .get(Self::pane(host).ids().refresh)
+                    .unwrap()
+                    .component::<tekes_ui_controls::composition::ButtonContent>()
+                    .unwrap()
+                    .button
+                    .state
+                    .disabled =>
+            {
+                eprintln!(
+                    "NATIVE_BOUNDED_PAGE_STATE count={} before={} status={:?}",
+                    Self::pane(host).content().row_keys().len(),
+                    self.count,
+                    host.view
+                        .tree
+                        .get(Self::pane(host).ids().status)
+                        .unwrap()
+                        .component::<tekes_ui_controls::composition::TextContent>()
+                        .unwrap()
+                        .text
+                );
+                if self.child.is_some() {
+                    // A one-shot Native child may contain one assistant message;
+                    // its older page is real turn metadata, not another UI row.
+                    assert!(!Self::pane(host).paging_facts().unwrap().has_more_before);
+                    assert!(Self::pane(host).content().row_keys().len() >= self.count);
+                } else {
+                    assert!(Self::pane(host).content().row_keys().len() > self.count);
+                }
                 self.unchanged(host);
                 self.loaded = Self::pane(host).content().row_keys().len();
                 assert!(
@@ -197,6 +240,6 @@ impl Probe {
     }
     pub fn receipt(&self) -> serde_json::Value {
         assert_eq!(self.phase, 5);
-        serde_json::json!({"nativeWindow":true,"gpu":true,"boundedPublicSep":true,"originalPageAndRefreshControls":true,"prependAnchorPreserved":true,"refreshAnchorPreserved":true,"mainDraftPreserved":true,"readOnlyNoComposer":true,"noSubmission":true,"rowCountBefore":self.count,"rowCountAfter":self.loaded,"physicalIme":false,"voiceOver":false})
+        serde_json::json!({"nativeWindow":true,"realHarness":self.child.is_some(),"visibleRowsExtended":self.loaded>self.count,"historyExhausted":self.child.is_some(),"pageSize":if self.child.is_some(){1}else{50},"gpu":true,"boundedPublicSep":true,"originalPageAndRefreshControls":true,"prependAnchorPreserved":true,"refreshAnchorPreserved":true,"mainDraftPreserved":true,"readOnlyNoComposer":true,"noSubmission":true,"rowCountBefore":self.count,"rowCountAfter":self.loaded,"physicalIme":false,"voiceOver":false})
     }
 }

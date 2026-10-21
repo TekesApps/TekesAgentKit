@@ -113,6 +113,7 @@ struct Host {
     task_test_requested: bool,
     task_test_started: bool,
     child_layout: ChildHistoryLayout,
+    child_history_page_size: usize,
     child_test_requested: bool,
     child_test_started: bool,
     bounded_test_requested: bool,
@@ -439,6 +440,7 @@ impl Host {
             } else {
                 None
             };
+            let child_history_page_size = self.child_history_page_size;
             self.executor.spawn(async move {
                 let special = match command {
                     DemoCommand::TurnNavigation { .. } | DemoCommand::JumpLatest { .. } => {
@@ -599,12 +601,17 @@ impl Host {
                                 source
                             } else {
                                 Arc::new(
-                                    ChildPaneBinding::open(
+                                    ChildPaneBinding::open_with_page_size(
                                         runtime.clone(),
                                         direct_parent,
                                         child_id,
                                         layout,
                                         None,
+                                        if layout == ChildHistoryLayout::SameSession {
+                                            child_history_page_size
+                                        } else {
+                                            50
+                                        },
                                     )
                                     .await?,
                                 )
@@ -2662,6 +2669,29 @@ pub fn run() {
     let harness_reading_selftest = args
         .iter()
         .any(|arg| arg == "--history-reading-native-selftest");
+    let harness_readonly_reading_selftest = args
+        .iter()
+        .any(|arg| arg == "--history-readonly-native-selftest");
+    let bounded_probe_child = if harness_readonly_reading_selftest {
+        assert!(
+            args.iter().any(|arg| arg == "--endpoint-config")
+                && args.iter().any(|arg| arg == "--transcript-content")
+                && !args.iter().any(|arg| arg == "--offscreen"),
+            "real bounded probe needs explicit owned endpoint and Transcript window"
+        );
+        Some(
+            args.get(
+                args.iter()
+                    .position(|arg| arg == "--bounded-child-id")
+                    .expect("bounded child id required")
+                    + 1,
+            )
+            .expect("bounded child id value required")
+            .clone(),
+        )
+    } else {
+        None
+    };
     let readonly_reading_selftest = args
         .iter()
         .any(|arg| arg == "--readonly-reading-native-selftest");
@@ -2711,6 +2741,7 @@ pub fn run() {
             reading_selftest,
             harness_reading_selftest,
             readonly_reading_selftest,
+            harness_readonly_reading_selftest,
             summary_sections_selftest,
             sidebar_restore_selftest,
             sidebar_search_selftest,
@@ -3099,7 +3130,8 @@ pub fn run() {
         sidebar_query_probe: query_fixture.map(sidebar_query_probe::Probe::new),
         sidebar_search_probe: sidebar_search_selftest.then(sidebar_search_probe::Probe::new),
         sidebar_restore_probe: sidebar_restore_selftest.then(sidebar_restore_probe::Probe::new),
-        readonly_reading_probe: readonly_reading_selftest.then(readonly_reading_probe::Probe::new),
+        readonly_reading_probe: (readonly_reading_selftest || harness_readonly_reading_selftest)
+            .then(|| readonly_reading_probe::Probe::new(bounded_probe_child)),
         reading_probe: if reading_selftest || harness_reading_selftest {
             Some(reading_probe::Probe::new(reading_gate))
         } else {
@@ -3134,6 +3166,11 @@ pub fn run() {
         bounded_test_started: false,
         test_child_source: None,
         test_bounded_source: None,
+        child_history_page_size: if harness_readonly_reading_selftest {
+            1
+        } else {
+            50
+        },
         bounded_initial_items: 0,
         bounded_max_items: 0,
         bounded_rendered_items: 0,

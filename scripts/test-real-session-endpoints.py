@@ -20,6 +20,7 @@ parser.add_argument('--ui-attachments',action='store_true',help='Exercise public
 parser.add_argument('--ui-bounded-child',action='store_true',help='Verify actual read-only Native child messages through the public component; requires components and Kernel')
 parser.add_argument('--ui-feedback-read',action='store_true',help='Read typed committed feedback and verify proven final response IDs; no mutations or rating controls')
 parser.add_argument('--ui-native-run-controls',action='store_true',help='Native Send/Cancel/provider failure/explicit recovery over fresh owned sessions; no physical IME or reading-anchor acceptance')
+parser.add_argument('--ui-native-readonly',action='store_true',help='Real Native bounded pane: explicit one-message pages, native anchor/refresh and draft isolation')
 parser.add_argument('--ui-native-reading',action='store_true',help='Native public history page, retained A/B reading and reconnect on seeded owned harness sessions; synthetic wheel, no physical IME')
 parser.add_argument('--ui-native-stream',action='store_true',help='Use fresh owned sessions for native Send, active preview, selection, settlement, draft isolation and reconnect; excludes reading anchors')
 parser.add_argument('--ui-native-feedback',action='store_true',help='Open each owned-session native window sequentially and exercise feedback clicks, text services and session switching')
@@ -51,6 +52,8 @@ if args.ui_feedback_write and not (args.ui_demo and args.ui_components and args.
     parser.error('--ui-feedback-write requires --ui-demo, --ui-components and --ui-transcript-content')
 if args.ui_feedback_read and not (args.ui_demo and args.ui_components and args.ui_transcript_content):
     parser.error('--ui-feedback-read requires --ui-demo, --ui-components and --ui-transcript-content')
+if args.ui_native_readonly and not (args.ui_bounded_child and args.ui_demo and args.ui_transcript_content):
+    parser.error('--ui-native-readonly requires bounded child, UI demo and Transcript content')
 if args.ui_bounded_child and (not args.ui_components or not args.kernel_root):
     parser.error('--ui-bounded-child requires --ui-components and --kernel-root')
 if args.ui_turn_footnote and not args.ui_components:
@@ -81,6 +84,7 @@ if args.ui_components and not args.ui_demo:
     parser.error("--ui-components requires --ui-demo")
 if not any((args.pi_root,args.dsh_root,args.kernel_root)):parser.error("supply at least one runtime root")
 subprocess.run(['cargo','build','--locked','-p','tekes-agent-headless'],cwd=ROOT,check=True)
+native_child_reply='ENDPOINT_REPLY_OK'+(('\n原生有界子历史长回答，用于真实阅读锚点验证。'*120) if args.ui_native_readonly else '')
 requests=[]
 class Provider(http.server.BaseHTTPRequestHandler):
     def log_message(self,*_):pass
@@ -108,6 +112,8 @@ class Provider(http.server.BaseHTTPRequestHandler):
                     {'type':'response.output_text.delta','output_index':0,'content_index':0,'delta':'REPLY_OK'},
                     *frames,
                 ]
+            if args.ui_native_readonly and any(message.get('role')=='user' and 'CHILD_NATIVE_PROOF' in json.dumps(message) and 'ENDPOINT_NATIVE_CHILD' not in json.dumps(message) for message in body.get('input',[]) if isinstance(message,dict)):
+                frames=[{'type':'response.completed','response':{'id':'bounded-native-result','status':'completed','output':[{'id':'bounded-native-output','type':'message','role':'assistant','phase':'final_answer','status':'completed','content':[{'type':'output_text','text':native_child_reply}]}],'usage':{'input_tokens':10,'output_tokens':400,'total_tokens':410}}}]
             if 'ENDPOINT_NATIVE_CHILD' in json.dumps(body) and not any(item.get('type')=='function_call_output' for item in body.get('input',[]) if isinstance(item,dict)):
                 task={'task_name':'Bounded child proof','goal':'Return a short proof','instructions':'CHILD_NATIVE_PROOF. Reply ENDPOINT_REPLY_OK.','input_sources':[],'output':{'mode':'inline','format':'text','name':'result','path':'','contract':'short result'}}
                 frames=[
@@ -344,6 +350,24 @@ def ui_smoke(config, first, bounded_child=None):
         assert all(refresh[key] for key in ('publicCursors','sameConnectionEpoch','historyUnchanged','searchResultRetained')),refresh
         print(kind.upper()+'_UI_INVENTORY_REFRESH_OK public-cursors+same-epoch+retained-history+search-result; offscreen-only',flush=True)
         print(kind.upper()+'_UI_SIDEBAR_QUERY_OK public-typed-search+shared-controller+owned-target+original-endpoint; offscreen-only',flush=True)
+    if args.ui_native_readonly and bounded_child is not None:
+        raw=execute(dict(config,commands=[{'op':'call','method':'subagents.history','args':{'parentSessionId':first,'childSessionId':bounded_child,'maxMessages':1}}]))
+        first_page=next(row['result'] for row in raw if row.get('op')=='call')
+        older=execute(dict(config,commands=[{'op':'call','method':'subagents.history','args':{'parentSessionId':first,'childSessionId':bounded_child,'maxMessages':1,'throughSequence':first_page['throughSequence'],'beforeSequence':first_page['entries'][0]['event']['seq'],'historyRevision':first_page['historyRevision']}}]))
+        older_page=next(row['result'] for row in older if row.get('op')=='call')
+        assert first_page['hasMoreBefore'] and not older_page['hasMoreBefore'] and older_page['entries'],older_page
+        assert all(entry['event']['type']=='turn/start' for entry in older_page['entries']),older_page
+        output.with_suffix('.raw-bounded.json').write_text(json.dumps({'initial':raw,'older':older},ensure_ascii=False,indent=2)+'\n')
+        print('NATIVE_BOUND_RAW_PAGE '+json.dumps([{'kind':entry['event']['type'],'seq':entry['event']['seq']} for entry in next(row['result'] for row in raw if row.get('op')=='call')['entries']]),flush=True)
+        native_log=output.with_suffix('.native-readonly.log')
+        with native_log.open('w') as capture:
+            native=subprocess.run([str(args.ui_demo.resolve()),'-ApplePersistenceIgnoreState','YES','--components','--transcript-content','--endpoint-config',str(path),'--history-readonly-native-selftest','--bounded-child-id',bounded_child],env=ui_env,stdout=capture,stderr=subprocess.STDOUT,timeout=55)
+        text=native_log.read_text(); assert native.returncode==0,str(native_log)+'\n'+text[-5000:]
+        marker='NATIVE_AGENT_READONLY_READING_RECEIPT '
+        proof=next(json.loads(line[len(marker):]) for line in text.splitlines() if line.startswith(marker))
+        assert all(proof[key] for key in ('nativeWindow','gpu','boundedPublicSep','originalPageAndRefreshControls','prependAnchorPreserved','refreshAnchorPreserved','mainDraftPreserved','readOnlyNoComposer','noSubmission','realHarness')),proof
+        assert proof['rowCountAfter']>=proof['rowCountBefore']>0 and proof['pageSize']==1 and proof['historyExhausted'],proof
+        print('NATIVE_UI_BOUNDED_READING_RECEIPT '+json.dumps(proof,ensure_ascii=False,sort_keys=True),flush=True)
     if args.ui_native_reading and bounded_child is None:
         native_log=output.with_suffix('.native-reading.log')
         with native_log.open('w') as capture:
@@ -827,7 +851,7 @@ try:
                         {'op':'callError','method':'subagents.history','args':{'parentSessionId':native_id,'childSessionId':'@bounded','maxMessages':50}}]
                     child_result=execute(dict(config,commands=native_children))
                     histories=[row['result'] for row in child_result if row.get('op')=='childHistory']
-                    assert len(histories)==2 and all(any(item['text']=='ENDPOINT_REPLY_OK' and item['isFinal'] for item in h['items']) for h in histories),histories
+                    assert len(histories)==2 and all(any(item['text']==native_child_reply and item['isFinal'] for item in h['items']) for h in histories),histories
                     assert all(h['tools'][0]['arguments']['task_name']=='Bounded child proof' for h in histories),'missing parent source-call projection'
                     print('NATIVE_BOUNDED_CHILD_LIVE_OK real-task+source-call+read-only-history+reconnect+ownership')
                     if args.ui_bounded_child:

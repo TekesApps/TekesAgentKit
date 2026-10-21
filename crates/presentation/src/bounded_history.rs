@@ -7,6 +7,7 @@ pub(crate) struct BoundedHistory {
     runtime: Arc<SessionRuntime>,
     parent: RunScope,
     child: String,
+    page_size: usize,
     page: BoundedChildHistoryPage,
     entries: BTreeMap<i64, HistoryEntry>,
 }
@@ -15,9 +16,10 @@ impl BoundedHistory {
         runtime: Arc<SessionRuntime>,
         parent: RunScope,
         child: String,
+        page_size: usize,
     ) -> Result<Self> {
         let page = runtime
-            .bounded_child_history(Self::request(&parent, &child, None, None, None))
+            .bounded_child_history(Self::request(&parent, &child, None, None, None, page_size))
             .await?;
         let entries = page
             .entries
@@ -28,6 +30,7 @@ impl BoundedHistory {
             runtime,
             parent,
             child,
+            page_size,
             page,
             entries,
         })
@@ -38,13 +41,14 @@ impl BoundedHistory {
         cut: Option<i64>,
         before: Option<i64>,
         revision: Option<String>,
+        page_size: usize,
     ) -> BoundedChildHistoryRequest {
         BoundedChildHistoryRequest {
             parent_session_id: parent.session_id.clone(),
             child_session_id: child.into(),
             through_sequence: cut,
             before_sequence: before,
-            max_messages: 50,
+            max_messages: page_size,
             history_revision: revision,
         }
     }
@@ -52,7 +56,14 @@ impl BoundedHistory {
         let epoch = self.runtime.inspect(|s| s.connection_epoch);
         let next = self
             .runtime
-            .bounded_child_history(Self::request(&self.parent, &self.child, None, None, None))
+            .bounded_child_history(Self::request(
+                &self.parent,
+                &self.child,
+                None,
+                None,
+                None,
+                self.page_size,
+            ))
             .await?;
         // Retain loaded older pages only after the server re-verifies the previous frozen prefix.
         let same = self.page.through_sequence == next.through_sequence
@@ -68,6 +79,7 @@ impl BoundedHistory {
                     Some(self.page.through_sequence),
                     None,
                     Some(self.page.history_revision.clone()),
+                    self.page_size,
                 ))
                 .await
             {
@@ -127,6 +139,7 @@ impl BoundedHistory {
                 Some(self.page.through_sequence),
                 Some(before),
                 Some(self.page.history_revision.clone()),
+                self.page_size,
             ))
             .await?;
         require(!page.entries.is_empty(), "bounded history made no progress")?;

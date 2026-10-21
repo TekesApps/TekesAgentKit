@@ -227,6 +227,16 @@ impl ReadOnlyTranscript {
     pub fn content_id(&self) -> ComponentId {
         self.content
     }
+    pub fn paging_facts(&self) -> Option<&TranscriptPagingFacts> {
+        self.body
+            .children
+            .iter()
+            .find(|node| node.id() == self.paging)
+            .unwrap()
+            .component::<TranscriptPaging>()
+            .unwrap()
+            .facts()
+    }
     pub fn paging_button_id(&self) -> ComponentId {
         ComponentId(self.paging.0 + 1)
     }

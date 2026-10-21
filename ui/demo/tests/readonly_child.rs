@@ -686,3 +686,70 @@ fn bounded_readonly_wrapper_rejects_an_independently_writable_feedback_configura
     };
     assert!(ReadOnlyTranscript::new(ids, scope, 801, content, Default::default()).is_err());
 }
+
+#[tokio::test]
+async fn explicit_bounded_page_size_is_validated_and_retained_through_refresh_and_paging() {
+    let runtime = runtime().await;
+    let parent = RunScope::main("fixture", "b");
+    for size in [0, 201] {
+        assert!(
+            ChildPaneBinding::open_with_page_size(
+                runtime.clone(),
+                parent.clone(),
+                "bounded-b",
+                ChildHistoryLayout::SameSession,
+                None,
+                size
+            )
+            .await
+            .is_err()
+        );
+    }
+    assert!(
+        ChildPaneBinding::open_with_page_size(
+            runtime.clone(),
+            parent.clone(),
+            "child-b",
+            ChildHistoryLayout::IndependentSessions,
+            None,
+            4
+        )
+        .await
+        .is_err()
+    );
+    let source = ChildPaneBinding::open_with_page_size(
+        runtime.clone(),
+        parent,
+        "bounded-b",
+        ChildHistoryLayout::SameSession,
+        None,
+        4,
+    )
+    .await
+    .unwrap();
+    let before = source.snapshot().await.unwrap();
+    let PaneSnapshot::ReadOnlyChild {
+        transcript: first, ..
+    } = &before
+    else {
+        panic!("bounded")
+    };
+    assert!(first.has_more_before && !first.items.is_empty());
+    assert!(source.binding().load_earlier().await.unwrap());
+    let after = source.snapshot().await.unwrap();
+    let PaneSnapshot::ReadOnlyChild {
+        transcript: next, ..
+    } = after
+    else {
+        panic!("bounded")
+    };
+    assert!(next.items.len() > first.items.len());
+    assert!(
+        first
+            .items
+            .iter()
+            .all(|row| next.items.iter().any(|new| new.id == row.id))
+    );
+    assert!(source.binding().current_run().is_none());
+    runtime.stop().await.unwrap();
+}

@@ -397,17 +397,34 @@ impl RunBinding {
         layout: ChildHistoryLayout,
         source: Option<Arc<dyn ChildHistorySource>>,
     ) -> Result<Self> {
+        Self::open_child_with_page_size(runtime, parent, child_id, layout, source, 50).await
+    }
+    /// Explicit bounded page size (1..=200), fixed for this source lifetime.
+    pub async fn open_child_with_page_size(
+        runtime: Arc<SessionRuntime>,
+        parent: RunScope,
+        child_id: impl Into<String>,
+        layout: ChildHistoryLayout,
+        source: Option<Arc<dyn ChildHistorySource>>,
+        page_size: usize,
+    ) -> Result<Self> {
+        tekes_agent_contract::require((1..=200).contains(&page_size), "invalid bounded page size")?;
+        tekes_agent_contract::require(
+            page_size == 50 || (layout == ChildHistoryLayout::SameSession && source.is_none()),
+            "page size requires built-in bounded history",
+        )?;
         let child_id = child_id.into();
         require(
             layout == ChildHistoryLayout::SameSession || source.is_none(),
             "custom child projection requires same-session layout",
         )?;
-        let child = ChildRun::open(
+        let child = ChildRun::open_with_page_size(
             runtime.clone(),
             parent.clone(),
             child_id.clone(),
             layout,
             source,
+            page_size,
         )
         .await?;
         let scope = RunScope {
