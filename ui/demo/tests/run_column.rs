@@ -1234,3 +1234,109 @@ fn unsupported_compact_library_never_mounts_an_overlapping_rail_or_replaces_the_
         assert!(view.turn_rail().is_none());
     }
 }
+
+#[tokio::test]
+async fn main_history_captures_the_original_display_origin_and_never_replays_a_claimed_or_disabled_gesture()
+ {
+    #[derive(Default)]
+    struct History(Vec<String>);
+    impl RunTurnNavigationHost for History {
+        fn record_turn_jump(&mut self, jump: &RunTurnJump) {
+            self.0.push(format!(
+                "record:{}:{}:{}",
+                jump.scope().thread_id,
+                jump.from_turn().unwrap_or("none"),
+                jump.to_turn()
+            ));
+        }
+        fn take_pending_turn_reveal(&mut self, scope: &RunScope) -> Option<String> {
+            self.0.push(format!("take:{}", scope.thread_id));
+            Some("old-held-reveal".into())
+        }
+    }
+    let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
+    let mut view = RunView::standard(34500, 34504..34900, RunScope::main("fixture", "a")).unwrap();
+    update(&mut view, &controller.snapshot());
+    assert!(
+        view.set_turn_navigation_context(Some(RunTurnNavigationContext {
+            bottom_is_visible: true
+        }))
+        .is_err()
+    );
+    let root = view.ids().root;
+    let mut host = view.into_host().unwrap();
+    let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()), 1.);
+    let frame = Rect::new(0., 0., 760., 650.);
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        frame,
+        frame,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    let view = host
+        .get_mut(root)
+        .unwrap()
+        .component_mut::<RunView>()
+        .unwrap();
+    let targets = view.turn_targets().unwrap();
+    view.set_turn_navigation_context(Some(RunTurnNavigationContext {
+        bottom_is_visible: true,
+    }))
+    .unwrap();
+    let intent = view.prepare_turn_navigation(&targets[0]).unwrap();
+    assert_eq!(
+        intent.host_jump().unwrap().from_turn(),
+        Some(targets.last().unwrap().turn_id())
+    );
+    // A later display fact must not rebind the already captured history stop.
+    view.set_turn_navigation_context(Some(RunTurnNavigationContext {
+        bottom_is_visible: false,
+    }))
+    .unwrap();
+    let mut history = History::default();
+    view.claim_turn_navigation_with_host(&intent, &mut history)
+        .unwrap();
+    assert_eq!(
+        history.0,
+        vec![
+            format!(
+                "record:a:{}:{}",
+                targets.last().unwrap().turn_id(),
+                targets[0].turn_id()
+            ),
+            "take:a".into()
+        ]
+    );
+    assert!(
+        view.claim_turn_navigation_with_host(&intent.clone(), &mut history)
+            .is_err()
+    );
+    let next = view.prepare_turn_navigation(&targets[0]).unwrap();
+    let from = targets
+        .iter()
+        .find(|t| t.is_visible() == Some(true))
+        .map(|t| t.turn_id());
+    assert_eq!(next.host_jump().unwrap().from_turn(), from);
+    view.set_turn_navigation_context(None).unwrap();
+    view.set_turn_navigation_context(Some(RunTurnNavigationContext {
+        bottom_is_visible: false,
+    }))
+    .unwrap();
+    assert!(
+        view.claim_turn_navigation_with_host(&next, &mut history)
+            .is_err()
+    );
+    assert_eq!(history.0.len(), 2);
+    view.set_turn_navigation_context(None).unwrap();
+    let local = view.prepare_turn_navigation(&targets[0]).unwrap();
+    assert!(local.host_jump().is_none());
+    assert!(
+        view.claim_turn_navigation_with_host(&local, &mut history)
+            .is_err()
+    );
+    view.claim_turn_navigation(&local).unwrap();
+    assert_eq!(history.0.len(), 2);
+    runtime.stop().await.unwrap();
+}

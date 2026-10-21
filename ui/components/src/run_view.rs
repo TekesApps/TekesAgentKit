@@ -103,6 +103,7 @@ pub struct RunView {
     pane_presented: bool,
     navigation_lifetime: Arc<()>,
     navigation_mounted: bool,
+    navigation_origin: Option<(u64, Option<String>)>,
     geometry: Option<RunViewGeometry>,
 }
 impl RunView {
@@ -191,6 +192,7 @@ impl RunView {
             pane_presented: true,
             navigation_lifetime: Arc::new(()),
             navigation_mounted: false,
+            navigation_origin: None,
             geometry: None,
             body: StackContent {
                 model: Stack {
@@ -299,6 +301,7 @@ impl RunView {
             .last()
             .is_some_and(|last| last.turn_id() == target.turn_id());
         Ok(RunTurnNavigation {
+            jump: self.navigation_jump(target),
             target: target.clone(),
             kind: if latest {
                 RunTurnNavigationKind::Latest
@@ -339,6 +342,64 @@ impl RunView {
             )
             .map_err(|_| "RunView navigation gesture already dispatched")?;
         Ok(navigation.kind)
+    }
+    /// Main hosts opt in with an actual bottom-visibility fact after render.
+    /// Passing None retires host-history gestures (e.g. when changing pane role).
+    /// Task/subagent/SideChat hosts leave this disabled and use ordinary claim.
+    pub fn set_turn_navigation_context(
+        &mut self,
+        context: Option<RunTurnNavigationContext>,
+    ) -> Result<(), &'static str> {
+        let origin = if let Some(context) = context {
+            if !self.navigation_mounted || !self.pane_presented || self.geometry.is_none() {
+                return Err("navigation context needs a presented rendered Run");
+            }
+            let targets = self.turn_targets()?;
+            if targets.iter().any(|t| t.is_visible().is_none()) {
+                return Err("navigation context needs current arranged turns");
+            }
+            let from = if context.bottom_is_visible {
+                targets.last()
+            } else {
+                targets.iter().find(|t| t.is_visible() == Some(true))
+            };
+            Some((
+                self.publication_generation,
+                from.map(|t| t.turn_id().to_owned()),
+            ))
+        } else {
+            None
+        };
+        if self.navigation_origin.is_some() != origin.is_some() {
+            self.navigation_lifetime = Arc::new(());
+        }
+        self.navigation_origin = origin;
+        self.refresh_rail_contents(true)
+    }
+    fn navigation_jump(&self, target: &TranscriptTurnTarget) -> Option<RunTurnJump> {
+        let (generation, from) = self.navigation_origin.as_ref()?;
+        (*generation == self.publication_generation).then(|| RunTurnJump {
+            scope: self.scope.clone(),
+            from: from.clone(),
+            to: target.turn_id().to_owned(),
+        })
+    }
+    /// Check SDK attachment first, then claim and call these synchronous host
+    /// hooks immediately before SDK navigation. No callback runs for a rejected
+    /// capture. A callback panic or later SDK failure is not a rollback transaction.
+    pub fn claim_turn_navigation_with_host(
+        &self,
+        navigation: &RunTurnNavigation,
+        host: &mut impl RunTurnNavigationHost,
+    ) -> Result<RunTurnNavigationKind, &'static str> {
+        let jump = navigation
+            .jump
+            .as_ref()
+            .ok_or("main navigation context was not captured")?;
+        let kind = self.claim_turn_navigation(navigation)?;
+        host.record_turn_jump(jump);
+        let _ = host.take_pending_turn_reveal(&self.scope);
+        Ok(kind)
     }
     /// The default published library cannot mount nonoverlapping compact
     /// actions. No ordinary minimum-height button is substituted for the rail.
@@ -457,6 +518,7 @@ impl RunView {
             .into_iter()
             .enumerate()
             .map(|(index, target)| RunTurnNavigation {
+                jump: self.navigation_jump(&target),
                 kind: if index + 1 == count {
                     RunTurnNavigationKind::Latest
                 } else {
@@ -1019,6 +1081,9 @@ impl Component for RunView {
             self.navigation_lifetime = Arc::new(());
         }
         self.navigation_mounted = mounted;
+        if !mounted {
+            self.navigation_origin = None;
+        }
     }
     fn children(&self) -> &[Content] {
         &self.body.children
@@ -1042,6 +1107,7 @@ impl Component for RunView {
         }
         self.pane_presented = presented;
         if !self.pane_presented {
+            self.navigation_origin = None;
             if let Some(rail) = self.turn_rail_mut() {
                 rail.invalidate_layout();
             }

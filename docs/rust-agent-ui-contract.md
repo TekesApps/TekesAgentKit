@@ -269,3 +269,5 @@ Native [消息生命周期边界修正](rust-agent-ui-native-stream-boundary-202
 [实际回合轨道组件](rust-agent-ui-turn-rail-controls-20261021.md)已接入原 RunView 的事件捕获、独立库滚动和生命周期隔离；默认公开 pin 明确 unsupported，#29 隔离候选验收与 #32/#33 缺口分列，尚不构成完整轨道或稳定 UI 交付。
 
 [#32 普通回合 Start 的独立组件验证](rust-agent-ui-turn-start-20261021.md)已在新588277候选通过真实clip与高输入行检查；新身份的原生普通回合、宿主桥接与最终体验仍待验收，未替换默认公开pin。
+
+后续[主导航宿主回调与588277原生Start](rust-agent-ui-turn-navigation-host-20261021.md)已增加显式显示事实、原点击历史捕获和原生组字内选区检查；此前收据保持原范围，完整交付仍未完成。

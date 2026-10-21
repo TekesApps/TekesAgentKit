@@ -1,6 +1,6 @@
 //! Candidate-only native host diagnostic over the actual original RunView.
 //! Original rail pointer activation returns to latest while AppKit preedit is active.
-//! Ordinary turn Start and keyboard focus-ring visuals remain upstream gaps.
+//! An explicit #32 adapter adds ordinary Start; focus-ring visuals remain #33.
 use super::*;
 use tekes_agent_components_ui::{RunTurnNavigationKind, RunView};
 use tekes_ui_controls::{
@@ -8,7 +8,29 @@ use tekes_ui_controls::{
     composition::{ContentRevealStatus, ScrollContent},
 };
 use tekes_ui_platform_macos::selftest::{Action, run_script};
+// CANDIDATE_ORDINARY_TURN_MODE
+fn ordinary_turn_mode() -> bool {
+    false
+}
+#[derive(Default)]
+struct NavigationHistory {
+    jumps: Vec<tekes_agent_components_ui::RunTurnJump>,
+    takes: Vec<tekes_agent_components_ui::RunScope>,
+}
+impl tekes_agent_components_ui::RunTurnNavigationHost for NavigationHistory {
+    fn record_turn_jump(&mut self, jump: &tekes_agent_components_ui::RunTurnJump) {
+        self.jumps.push(jump.clone());
+    }
+    fn take_pending_turn_reveal(
+        &mut self,
+        scope: &tekes_agent_components_ui::RunScope,
+    ) -> Option<String> {
+        self.takes.push(scope.clone());
+        Some("held-history-reveal".into())
+    }
+}
 pub(super) struct Probe {
+    history: NavigationHistory,
     phase: u8,
     rail_version: Option<ReadingDocumentVersion>,
     rail_dispatches: usize,
@@ -24,6 +46,7 @@ pub(super) struct Probe {
 impl Probe {
     pub fn new() -> Self {
         Self {
+            history: NavigationHistory::default(),
             phase: 0,
             rail_version: None,
             rail_dispatches: 0,
@@ -61,6 +84,9 @@ impl Probe {
         assert_eq!(view.composer().editor() as *const _ as usize, self.editor);
         assert_eq!(host.view.tree.focused(), Some(view.ids().composer.editor));
         assert!(view.composer().is_composing());
+        if ordinary_turn_mode() {
+            assert_eq!(view.composer().editor().input.selection(), 1..3);
+        }
         assert_eq!(
             &view.composer().editor().input.external_baseline(),
             self.baseline.as_ref().unwrap()
@@ -128,32 +154,36 @@ impl Probe {
                 self.submissions = host.view.binding().current_run().unwrap().submissions.len();
                 let target = view.turn_targets().unwrap().remove(0);
                 self.turn = Some(target.turn_id().to_owned());
-                let request = view.prepare_turn_navigation(&target).unwrap();
-                let RunTurnNavigationKind::TurnStart(item) =
-                    view.claim_turn_navigation(&request).unwrap()
-                else {
-                    panic!("first turn must be an item")
-                };
-                let result = host
-                    .view
-                    .tree
-                    .reveal_scroll_reading_item(
-                        request.viewport(),
-                        self.version.as_ref().unwrap(),
-                        item,
-                        ScrollRevealOptions {
-                            placement: ScrollRevealPlacement::Centered,
-                            animated: true,
-                            ..Default::default()
-                        },
-                        &mut host.text,
-                    )
-                    .unwrap();
-                assert!(matches!(
-                    result.status,
-                    ContentRevealStatus::Animating | ContentRevealStatus::Completed
-                ));
-                self.phase = 4;
+                if ordinary_turn_mode() {
+                    self.phase = 9; // Capture a real button point after successful render.
+                } else {
+                    let request = view.prepare_turn_navigation(&target).unwrap();
+                    let RunTurnNavigationKind::TurnStart(item) =
+                        view.claim_turn_navigation(&request).unwrap()
+                    else {
+                        panic!("first turn must be an item")
+                    };
+                    let result = host
+                        .view
+                        .tree
+                        .reveal_scroll_reading_item(
+                            request.viewport(),
+                            self.version.as_ref().unwrap(),
+                            item,
+                            ScrollRevealOptions {
+                                placement: ScrollRevealPlacement::Centered,
+                                animated: true,
+                                ..Default::default()
+                            },
+                            &mut host.text,
+                        )
+                        .unwrap();
+                    assert!(matches!(
+                        result.status,
+                        ContentRevealStatus::Animating | ContentRevealStatus::Completed
+                    ));
+                    self.phase = 4;
+                }
                 self.check_editor(host);
             }
             _ => {}
@@ -174,6 +204,17 @@ impl Probe {
                 .unwrap()
                 .component_mut::<RunView>()
                 .unwrap();
+            // In this fixture following is used only at exact latest or after
+            // the explicit Start/Centered has completed far from the tail.
+            // A product host must provide actual bottom visibility separately.
+            if ordinary_turn_mode() {
+                run.set_turn_navigation_context(Some(
+                    tekes_agent_components_ui::RunTurnNavigationContext {
+                        bottom_is_visible: following,
+                    },
+                ))
+                .unwrap();
+            }
             run.update_rail_follow_target(following).unwrap();
             if let Some(request) = run.turn_rail_mut().unwrap().next_reveal() {
                 run.turn_rail().unwrap().claim_reveal(&request).unwrap();
@@ -258,7 +299,7 @@ impl Probe {
                     .component_mut::<RunView>()
                     .unwrap()
                     .set_rail_navigation_gate(tekes_agent_components_ui::TurnRailNavigationGate {
-                        turn_start: false,
+                        turn_start: ordinary_turn_mode(),
                         latest: true,
                     })
                     .unwrap();
@@ -278,6 +319,24 @@ impl Probe {
                 self.phase = 1;
                 run_script(vec![(30000, Action::Close)]);
                 window.request_redraw();
+            }
+            9 => {
+                let view = Self::run(host);
+                let row = view
+                    .turn_rail()
+                    .unwrap()
+                    .row_id(self.turn.as_ref().unwrap())
+                    .unwrap();
+                let point = host.view.tree.get(row).unwrap().visible().unwrap().center();
+                assert!(view.is_nonfocusing_navigation_at(point));
+                self.phase = 10;
+                run_script(vec![(
+                    100,
+                    Action::Click {
+                        x: point.x as f64,
+                        y: point.y as f64,
+                    },
+                )]);
             }
             2 => {
                 assert!(Self::scroll(host).is_following_latest());
@@ -313,6 +372,36 @@ impl Probe {
                             && t.is_visible() == Some(true))
                 );
                 assert!(!Self::scroll(host).is_following_latest());
+                if ordinary_turn_mode() {
+                    let view = Self::run(host);
+                    let target = view
+                        .turn_targets()
+                        .unwrap()
+                        .into_iter()
+                        .find(|t| Some(t.turn_id()) == self.turn.as_deref())
+                        .unwrap();
+                    let viewport = host
+                        .view
+                        .tree
+                        .get(view.ids().viewport)
+                        .unwrap()
+                        .visible()
+                        .unwrap();
+                    if !result.clamped {
+                        assert!(
+                            (host
+                                .view
+                                .tree
+                                .get(target.row_ids()[0])
+                                .unwrap()
+                                .frame()
+                                .min_y()
+                                - viewport.min_y())
+                            .abs()
+                                < 0.01
+                        );
+                    }
+                }
                 self.phase = 5;
                 self.latest_after = Some(Instant::now() + Duration::from_millis(900));
                 if let Ok(path) = std::env::var("AGENT_ITEM_NAV_CAPTURE") {
@@ -327,7 +416,28 @@ impl Probe {
             6 => {
                 self.check_editor(host);
                 assert!(Self::scroll(host).is_following_latest());
-                assert_eq!(self.rail_dispatches, 1);
+                assert_eq!(
+                    self.rail_dispatches,
+                    if ordinary_turn_mode() { 2 } else { 1 }
+                );
+                if ordinary_turn_mode() {
+                    assert_eq!(self.history.jumps.len(), 2);
+                    assert_eq!(self.history.takes.len(), 2);
+                    let targets = Self::run(host).turn_targets().unwrap();
+                    assert_eq!(
+                        self.history.jumps[0].from_turn(),
+                        Some(targets.last().unwrap().turn_id())
+                    );
+                    assert_eq!(self.history.jumps[0].to_turn(), targets[0].turn_id());
+                    assert_eq!(
+                        self.history.jumps[1].from_turn(),
+                        Some(targets[0].turn_id())
+                    );
+                    assert_eq!(
+                        self.history.jumps[1].to_turn(),
+                        targets.last().unwrap().turn_id()
+                    );
+                }
                 self.phase = 7;
                 let mut actions = vec![];
                 if let Ok(path) = std::env::var("AGENT_ITEM_NAV_LATEST_CAPTURE") {
@@ -343,8 +453,8 @@ impl Probe {
         assert_eq!(self.phase, 7);
         self.check_editor(host);
         serde_json::json!({"nativeWindow":true,"actualRunView":true,"originalBackend":true,"secondPublicConsumer":false,
-            "programmaticItemNavigation":true,"interactiveLatestRail":true,"railPointerDispatches":self.rail_dispatches,"keyboardRingVisualAccepted":false,"clientkitTurnStartAlignment":false,"initialAndExplicitLatest":true,"syntheticAppKitPreeditPreserved":true,
-            "originalEditorAndBaseline":true,"noSubmission":true,"realHarness":false,"physicalIme":false,"interactiveRail":true,"ordinaryTurnStart":false,"voiceOver":false})
+            "programmaticItemNavigation":!ordinary_turn_mode(),"hostHistoryJumps":self.history.jumps.len(),"hostPendingRevealsTaken":self.history.takes.len(),"interactiveLatestRail":true,"railPointerDispatches":self.rail_dispatches,"keyboardRingVisualAccepted":false,"clientkitTurnStartAlignment":ordinary_turn_mode(),"initialAndExplicitLatest":true,"syntheticAppKitPreeditPreserved":true,
+            "originalEditorAndBaseline":true,"noSubmission":true,"realHarness":false,"physicalIme":false,"interactiveRail":true,"ordinaryTurnStart":ordinary_turn_mode(),"markedSelectionPreserved":ordinary_turn_mode(),"voiceOver":false})
     }
 }
 
@@ -359,7 +469,8 @@ pub(super) fn dispatch(
         .item_navigation_probe
         .as_ref()
         .ok_or("rail diagnostic inactive")?;
-    if probe.phase != 8 || root != Probe::root(host) {
+    if !(probe.phase == 8 || ordinary_turn_mode() && probe.phase == 10) || root != Probe::root(host)
+    {
         return Err("unexpected rail command source".into());
     }
     let version = probe
@@ -367,23 +478,43 @@ pub(super) fn dispatch(
         .as_ref()
         .ok_or("missing reading attachment")?
         .clone();
-    let view = Probe::run(host);
-    let kind = view.claim_turn_navigation(intent).map_err(str::to_owned)?;
-    if kind != RunTurnNavigationKind::Latest {
-        return Err("Start alignment unavailable in this candidate".into());
-    }
     if Probe::scroll(host).reading_document_version() != Some(&version) {
         return Err("stale native reading attachment".into());
     }
-    host.view
+    let view = host
+        .view
         .tree
-        .get_mut(intent.viewport())
+        .get(root)
         .unwrap()
-        .component_mut::<ScrollContent>()
-        .unwrap()
-        .follow_latest();
+        .component::<RunView>()
+        .unwrap();
+    let kind = if ordinary_turn_mode() {
+        view.claim_turn_navigation_with_host(
+            intent,
+            &mut host.item_navigation_probe.as_mut().unwrap().history,
+        )
+    } else {
+        view.claim_turn_navigation(intent)
+    }
+    .map_err(str::to_owned)?;
+    let phase = match kind {
+        RunTurnNavigationKind::Latest => {
+            host.view
+                .tree
+                .get_mut(intent.viewport())
+                .unwrap()
+                .component_mut::<ScrollContent>()
+                .unwrap()
+                .follow_latest();
+            6
+        }
+        RunTurnNavigationKind::TurnStart(_) => {
+            // CANDIDATE_NATIVE_START_EXECUTION
+            return Err("Start alignment unavailable in this candidate".into());
+        }
+    };
     let probe = host.item_navigation_probe.as_mut().unwrap();
     probe.rail_dispatches += 1;
-    probe.phase = 6;
+    probe.phase = phase;
     Ok(())
 }

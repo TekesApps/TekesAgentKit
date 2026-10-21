@@ -1,0 +1,182 @@
+{
+  "format": "agentkit-turn-navigation-host/1",
+  "verified_at_utc": "2026-10-21T00:53:09.022470+00:00",
+  "based_on": "abb39ceffd49cb6dd5eecd6bad91bc76deb4f679",
+  "published_headless_contract": "v0.3.8",
+  "default_public_pin": "8cf0840790334ba224afc0595897c74231c712e6",
+  "candidate_identity": "5882774a0e73dfcb423efb4260c150e03f50f5cc9a87bd2331c1e171963faacd",
+  "candidate_files": 490,
+  "candidate_source_and_locks_unchanged": true,
+  "local_ui_packages": 8,
+  "receiver_receipt": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-start-588277-native-selection/receipt.json",
+  "receiver_receipt_sha256": "420955a8e0dcc7159d6b2b91f63a75a2170da46c3b9ae142da86c83ba156182d",
+  "receiver_checks": [
+    {
+      "check": "tests",
+      "exit_code": 0
+    },
+    {
+      "check": "clippy",
+      "exit_code": 0
+    },
+    {
+      "check": "public-consumer",
+      "exit_code": 0
+    },
+    {
+      "check": "native-build",
+      "exit_code": 0
+    }
+  ],
+  "source_files": {
+    "ui/components/src/run_view.rs": "12c737b8d2be8cacd01f736af7c6124eee3b0ce524298fde04ef5b29abff7800",
+    "ui/components/src/turn_rail.rs": "5ef551907370820c6f9d4a9cbf69194502ed2423ba12b272261fe85dcb3cc453",
+    "ui/consumer/src/lib.rs": "337d3dead4189d36b65cb7c2be486aed72e8a95065d05be226a1675b15ea87f9",
+    "ui/demo/tests/run_column.rs": "f399e645f466abc5577fb4766ab0d09a7ff2123f1e8c4f84e6acee2db34d433d",
+    "scripts/test-reading-candidate.py": "9f1ba11ad18eb4e9626448e0a3bf96878889a886cdf83d85c7561ecfd1e6e55a",
+    "scripts/probes/agentkit-turn-start-candidate.rs": "82e54f22ca6dc6d979a13a58c7c7fe72e4cadc0ebccbc7af3ec67b79d5bbfab3",
+    "scripts/probes/native-turn-rail-candidate.rs": "140cd8441bcd9bc2e8a0efd058bdda1ce8412862770424a95e2f14af8b48bdeb"
+  },
+  "references": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Run/RunView.swift": "4453b67fb8e4e6cabe4a9653ce378bffb939a9a01188a7df9a4bb89f0bd7674e",
+    "/Users/frankqin/dev/TekesClientKit/Sources/TranscriptCoordinator/ThreadTranscriptPresenter+Scroll.swift": "cc61572c9f79290b4ecd609b451d3f7f3b890ea6d3b3e3e292857638932f81e7",
+    "/Users/frankqin/dev/Tekes/Tekes/ClientAgentHostAdapters.swift": "7d907c654ec3df76c7a8b492e32bbc68f1bd4d0b46044cae615aa712b9f67c71",
+    "/Users/frankqin/dev/Tekes/Tekes/NavigationModel.swift": "9f991b7d6ad33fc35f2324e5b3ce6175c51fbe1bdbc529425c35348d19a2bbcb"
+  },
+  "checks": {
+    "/tmp/agentkit-navigation-host-default-workspace.log": {
+      "sha256": "4a29e535b6ca913170bdf4400951333bfc83a4d3d7ee4d8422a7f477d7b68b8f",
+      "tests_passed": 349
+    },
+    "/tmp/agentkit-navigation-host-default-clippy.log": {
+      "sha256": "1d1542889ed93496b7cac8dc3e6e1b293b6ce67dd7afd9ffeabb388a6c24b3d5",
+      "tests_passed": 0
+    },
+    "/tmp/agentkit-navigation-host-candidate-workspace.log": {
+      "sha256": "b6cc3667e1e52b2126a4c6402263af9cec332d7ebe44e515b95f059866431d45",
+      "tests_passed": 366
+    },
+    "/tmp/agentkit-navigation-host-candidate-clippy.log": {
+      "sha256": "a28f233025155f191893ecb5c6ef6dbf82445c414b9f087687ce0fa83e4b1488",
+      "tests_passed": 0
+    },
+    "/tmp/agentkit-navigation-host-default-native.log": {
+      "sha256": "00fdf8e12c33d96087301e546a3b911443b3cd657969993b5508a5d1d7501904",
+      "tests_passed": 0
+    }
+  },
+  "default_ui_tests": 349,
+  "candidate_ui_tests": 366,
+  "run_rail_start_host_tests": 17,
+  "independent_public_consumer_tests": 35,
+  "native_runs": [
+    {
+      "log": "/tmp/agentkit-start-588277-native.log",
+      "log_sha256": "14b7003324dfeae2c1c85aadf6df5fe53835f627525e5cdad16d6b7611280fc2",
+      "binary": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-start-588277-native/native-demo",
+      "binary_sha256": "52937df62135733dac33bfc171e21fb451b542ecf267cdefc26e39d6bacd597a",
+      "receipt": {
+        "actualRunView": true,
+        "clientkitTurnStartAlignment": true,
+        "hostHistoryJumps": 2,
+        "hostPendingRevealsTaken": 2,
+        "initialAndExplicitLatest": true,
+        "interactiveLatestRail": true,
+        "interactiveRail": true,
+        "keyboardRingVisualAccepted": false,
+        "nativeWindow": true,
+        "noSubmission": true,
+        "ordinaryTurnStart": true,
+        "originalBackend": true,
+        "originalEditorAndBaseline": true,
+        "physicalIme": false,
+        "programmaticItemNavigation": false,
+        "railPointerDispatches": 2,
+        "realHarness": false,
+        "secondPublicConsumer": false,
+        "syntheticAppKitPreeditPreserved": true,
+        "voiceOver": false
+      }
+    },
+    {
+      "log": "/tmp/agentkit-start-588277-native-selection.log",
+      "log_sha256": "ad301e0f0b41c6e205c19410cce657f3d613fc168ffcebebc77dbd3e8a0d5058",
+      "binary": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-start-588277-native-selection/native-demo",
+      "binary_sha256": "4b331bff13768a1fced98593c6897d48c46f6bc77b9eb6046bac2a1c69c8f127",
+      "receipt": {
+        "actualRunView": true,
+        "clientkitTurnStartAlignment": true,
+        "hostHistoryJumps": 2,
+        "hostPendingRevealsTaken": 2,
+        "initialAndExplicitLatest": true,
+        "interactiveLatestRail": true,
+        "interactiveRail": true,
+        "keyboardRingVisualAccepted": false,
+        "markedSelectionPreserved": true,
+        "nativeWindow": true,
+        "noSubmission": true,
+        "ordinaryTurnStart": true,
+        "originalBackend": true,
+        "originalEditorAndBaseline": true,
+        "physicalIme": false,
+        "programmaticItemNavigation": false,
+        "railPointerDispatches": 2,
+        "realHarness": false,
+        "secondPublicConsumer": false,
+        "syntheticAppKitPreeditPreserved": true,
+        "voiceOver": false
+      }
+    }
+  ],
+  "default_native_binary_sha256": "576f41e5a19784f441c11146c792e4f716698d99784bd77480cbb92a8c3de91d",
+  "default_native_receipt_scope": "Original component fixture send/stream/cancel/drafts/reconnect and child panes; no physical IME or reading anchor acceptance",
+  "main_host_bottom_visibility_is_explicit_input": true,
+  "native_bottom_visibility_scope": "Only controlled exact latest and distant original Start states; not a production near-bottom classifier",
+  "host_back_forward_product_stack": false,
+  "physical_ime": false,
+  "voiceover": false,
+  "native_undo_redo": false,
+  "native_real_three_harness_ui": false,
+  "keyboard_ring_visual_accepted": false,
+  "paired_clientkit_product_visual": false,
+  "full_goal_complete": false,
+  "default_pin_promoted": false,
+  "development_freeze_promoted": false,
+  "cache_cleanup": {
+    "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/build-cache-cleanup-navigation-host-20261021.json",
+    "sha256": "d2ecca02b4a33006688f0570d6e3901bc23d7588a0f31bdfd4dc06889ba34159",
+    "removed_allocated_bytes": 22047993856,
+    "observed_free_increase": 22131961856,
+    "free_bytes_after": 60671934464,
+    "preserved_executables": 4
+  },
+  "next_padding_candidate_intake": {
+    "identity": "5677b80f5462570525ea3d00f6256298baac7e018513844de5403364e9c097f0",
+    "archive_sha256": "e365b9a6d54e77c6315273d7638caa802bf3e21f440de4d30641235edf9ba990",
+    "files": 493,
+    "delta_paths": [
+      "crates/tekes-ui-controls/src/composition.rs",
+      "design/source/interaction-contracts.json",
+      "design/tokens.json",
+      "docs/design/padding-focus-routing-20261021.md",
+      "examples/composition-consumer/src/lib.rs",
+      "examples/composition-consumer/src/padding_focus.rs",
+      "examples/composition-consumer/tests/padding_focus.rs"
+    ],
+    "base_588277_unchanged": true,
+    "tokens_sets_api_unchanged": true,
+    "receiver_component_acceptance": false,
+    "default_pin_promoted": false
+  },
+  "default_public_source_files_verified": 199,
+  "captures": {
+    "agentkit-start-588277-selected-start.png": "2900ff249eb98b025dac13fbbe3ba3e74f4581c6687897e37cf40631ed3ce4e3",
+    "agentkit-start-588277-selected-latest.png": "b9f97b55f0906bec118851a61b7380cff3f3c43922889a9dfe2f29d008782b50",
+    "agentkit-start-588277-native-start-marked.png": "735df0cd2a616bdcc07b4902b0143c46767edaa080a5ac4e9bd602d1c9bb09b4",
+    "agentkit-start-588277-native-latest-marked.png": "74e18cc899927535dd1160ac2c60e8044cbde605a8a48f888f68a6ff6e68d61f"
+  },
+  "captures_visually_inspected": [
+    "agentkit-start-588277-native-start-marked.png",
+    "agentkit-start-588277-selected-start.png"
+  ]
+}

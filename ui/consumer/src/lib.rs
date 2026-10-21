@@ -1735,3 +1735,12 @@ fn rail_dependency_gate_is_explicit_and_preserves_the_original_run_on_unsupporte
     assert_eq!(run.composer().editor() as *const _, original);
     assert_eq!(run.turn_rail().is_some(), turn_rail_supported());
 }
+
+/// Main-host history integration, using only the public component contract.
+pub fn claim_turn_navigation_with_host(
+    run: &tekes_agent_components_ui::RunView,
+    navigation: &tekes_agent_components_ui::RunTurnNavigation,
+    host: &mut impl tekes_agent_components_ui::RunTurnNavigationHost,
+) -> Result<tekes_agent_components_ui::RunTurnNavigationKind, &'static str> {
+    run.claim_turn_navigation_with_host(navigation, host)
+}

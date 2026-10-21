@@ -44,6 +44,8 @@ def main():
     parser.add_argument('--target-dir', type=Path, required=True)
     parser.add_argument('--item-navigation-native', action='store_true',
                         help='Build the owned native stable-item diagnostic on the actual RunView')
+    parser.add_argument('--turn-start-native', action='store_true',
+                        help='Use explicit #32 Start for actual ordinary and Latest native rail clicks')
     parser.add_argument('--turn-rail', action='store_true', help='Enable actual rail with exact original compact actions in the isolated SDK only')
     args = parser.parse_args()
     if args.summary_labels and args.probe is None:
@@ -56,6 +58,8 @@ def main():
         parser.error('--turn-rail requires --append-run-probe')
     if args.append_rail_probe and not (args.append_run_probe and args.turn_rail):
         parser.error('--append-rail-probe requires --append-run-probe and --turn-rail')
+    if args.turn_start_native and not (args.item_navigation_native and args.turn_rail):
+        parser.error('--turn-start-native requires --item-navigation-native and --turn-rail')
     repo = Path(__file__).resolve().parent.parent
     source = args.source.resolve()
     manifest = json.loads(args.manifest.read_text())
@@ -198,6 +202,28 @@ def main():
     if args.item_navigation_native:
         native_probe_name = 'ui/demo/src/native_item_navigation_candidate.rs'
         shutil.copyfile(repo / ('scripts/probes/native-turn-rail-candidate.rs' if args.turn_rail else 'scripts/probes/native-item-navigation-candidate.rs'), snapshot / native_probe_name)
+        if args.turn_start_native:
+            native_probe = snapshot / native_probe_name
+            code = native_probe.read_text()
+            before = 'fn ordinary_turn_mode() -> bool {\n    false\n}'
+            assert code.count(before) == 1
+            code = code.replace(before, before.replace('false', 'true'))
+            before = '''        RunTurnNavigationKind::TurnStart(_) => {
+            // CANDIDATE_NATIVE_START_EXECUTION
+            return Err("Start alignment unavailable in this candidate".into());
+        }'''
+            assert code.count(before) == 1
+            code = code.replace(before, '''        RunTurnNavigationKind::TurnStart(item) => {
+            host.view.tree.reveal_scroll_reading_item(intent.viewport(), &version, item,
+                ScrollRevealOptions { placement: ScrollRevealPlacement::Start(tekes_ui_controls::extended::Axis::Vertical), animated: true, ..Default::default() },
+                &mut host.text).map_err(|error| format!("{error:?}"))?;
+            4
+        }''')
+            before = 'Action::Preedit("中文组字".into())'
+            assert code.count(before) == 1
+            code = code.replace(before, 'Action::PreeditRange { text: "中文组字".into(), selection: 1..3, replacement: None }')
+            adaptations.append('Native #32 mode uses original Vertical Start with zero margins, actual ordinary+Latest rail clicks, main-host history hooks and original marked selection1..3')
+            native_probe.write_text(code)
         host = snapshot / 'ui/demo/src/components_native.rs'
         code = host.read_text()
         replacements = [
@@ -254,6 +280,7 @@ def main():
                    summary_labels=args.summary_labels,
                    item_navigation_native=args.item_navigation_native,
                    turn_rail=args.turn_rail,
+                   turn_start_native=args.turn_start_native,
                    default_pin_promoted=False, native_acceptance=False, visual_acceptance=False,
                    full_runview_acceptance=False, checks=[])
     try:

@@ -147,3 +147,71 @@ async fn start_moves_an_already_visible_middle_target_and_a_viewport_tall_input_
     assert!((host.get(item).unwrap().frame().min_y() - visible.min_y()).abs() < 0.01);
     runtime.stop().await.unwrap();
 }
+
+#[tokio::test]
+async fn actual_rail_freezes_main_history_before_a_later_reading_fact_and_public_consumer_calls_hooks_once()
+ {
+    #[derive(Default)]
+    struct History(Vec<String>);
+    impl RunTurnNavigationHost for History {
+        fn record_turn_jump(&mut self, jump: &RunTurnJump) {
+            self.0.push(format!(
+                "record:{}:{}",
+                jump.from_turn().unwrap_or("none"),
+                jump.to_turn()
+            ));
+        }
+        fn take_pending_turn_reveal(&mut self, scope: &RunScope) -> Option<String> {
+            self.0.push(format!("take:{}", scope.thread_id));
+            Some("held-reveal".into())
+        }
+    }
+    let (runtime, mut host, root, _, _, _, mut text) = rail_setup().await;
+    let targets = run(&host, root).turn_targets().unwrap();
+    run_mut(&mut host, root)
+        .set_turn_navigation_context(Some(RunTurnNavigationContext {
+            bottom_is_visible: true,
+        }))
+        .unwrap();
+    let row = rail(&host, root).row_id(targets[3].turn_id()).unwrap();
+    let point = host.get(row).unwrap().visible().unwrap().center();
+    host.event(&ContentEvent::PointerDown(point));
+    let intents = rail_intents(&mut host, root);
+    assert_eq!(intents.len(), 1);
+    run_mut(&mut host, root)
+        .set_turn_navigation_context(Some(RunTurnNavigationContext {
+            bottom_is_visible: false,
+        }))
+        .unwrap();
+    let mut history = History::default();
+    tekes_agent_ui_consumer_check::claim_turn_navigation_with_host(
+        run(&host, root),
+        &intents[0],
+        &mut history,
+    )
+    .unwrap();
+    assert_eq!(
+        history.0,
+        vec![
+            format!(
+                "record:{}:{}",
+                targets.last().unwrap().turn_id(),
+                targets[3].turn_id()
+            ),
+            "take:a".into()
+        ]
+    );
+    host.event(&ContentEvent::PointerUp(point));
+    assert!(rail_intents(&mut host, root).is_empty());
+    assert!(
+        tekes_agent_ui_consumer_check::claim_turn_navigation_with_host(
+            run(&host, root),
+            &intents[0].clone(),
+            &mut history
+        )
+        .is_err()
+    );
+    assert_eq!(history.0.len(), 2);
+    render(&mut host, &mut text);
+    runtime.stop().await.unwrap();
+}

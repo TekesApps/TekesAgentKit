@@ -143,10 +143,41 @@ pub enum RunTurnNavigationKind {
     TurnStart(ComponentId),
     Latest,
 }
+/// Host display fact for the main Run, published after a successful render.
+/// This is bottom visibility, not the library's sticky following-latest intent.
+#[derive(Clone, Copy, Debug)]
+pub struct RunTurnNavigationContext {
+    pub bottom_is_visible: bool,
+}
+/// Event-time main-thread history stop. Hosts own the navigation stack.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RunTurnJump {
+    pub(crate) scope: RunScope,
+    pub(crate) from: Option<String>,
+    pub(crate) to: String,
+}
+impl RunTurnJump {
+    pub fn scope(&self) -> &RunScope {
+        &self.scope
+    }
+    pub fn from_turn(&self) -> Option<&str> {
+        self.from.as_deref()
+    }
+    pub fn to_turn(&self) -> &str {
+        &self.to
+    }
+}
+/// Same ordering as ClientKit's recordTurnJump then takePendingTurnReveal.
+/// Callbacks do not grant endpoint authority or implement a second Run state.
+pub trait RunTurnNavigationHost {
+    fn record_turn_jump(&mut self, jump: &RunTurnJump);
+    fn take_pending_turn_reveal(&mut self, scope: &RunScope) -> Option<String>;
+}
 /// An original, non-focusing gesture. Clones share one dispatch admission;
 /// neither this value nor its row ID grants endpoint/mutation authority.
 #[derive(Clone, Debug)]
 pub struct RunTurnNavigation {
+    pub(crate) jump: Option<RunTurnJump>,
     pub(crate) target: TranscriptTurnTarget,
     pub(crate) kind: RunTurnNavigationKind,
     pub(crate) generation: u64,
@@ -155,6 +186,9 @@ pub struct RunTurnNavigation {
     pub(crate) viewport: ComponentId,
 }
 impl RunTurnNavigation {
+    pub fn host_jump(&self) -> Option<&RunTurnJump> {
+        self.jump.as_ref()
+    }
     pub fn target(&self) -> &TranscriptTurnTarget {
         &self.target
     }
