@@ -64,8 +64,7 @@ UnlaidOut，不把该失败尝试计作已支持的首帧隐藏 owner 导航。�
 另验拒绝，原 offset/编辑状态保留；没有在消费侧越过该前置条件或修改库。
 
 初次 latest、rail follow-target 变化、同目标去重和用户手动浏览的业务规则仍归
-AgentKit。真实独立 rail 的命中、hover/预览及 follow 去重尚未接入；#29 紧凑动作基础
-控件仍待固定版本，不能把本轮普通程序导航 diagnostic 当作完整 rail。
+AgentKit。该份收据记录时真实独立 rail 尚未接入；后续[实际轨道组件](rust-agent-ui-turn-rail-controls-20261021.md)已增加原按钮命中、事件捕获、独立滚动及 follow 去重。hover/预览、#32/#33 与完整体验仍待完成，不能把普通程序导航 diagnostic 当作完整 rail。
 
 ## 验证与限制
 

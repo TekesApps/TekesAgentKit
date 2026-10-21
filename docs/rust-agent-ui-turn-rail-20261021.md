@@ -25,3 +25,5 @@
 AgentKit 仍负责实际 rail 组件、连续 hover 邻域、预览文案与内容分层、visible/follow-target 输入、同目标只跟随一次、真实目标导航策略和与 RunChrome 的完整组合；不会把这些业务工作交给 TekesUI。动画采样、滚动钳制和焦点生命周期由库执行。
 
 本轮没有改 ClientKit、Tekes、Kernel、TekesUI 或默认精确 pin。测试、第二公开 consumer、候选阅读探针及原生回归的最终结果见同名 JSON 收据。原生回归仍是 fixture，不能代表真实三端 rail 导航、物理 IME、VoiceOver 或配对视觉验收。完整目标继续保持未完成；不据此合并或打 tag。
+
+后续[实际轨道组件与原按钮接入](rust-agent-ui-turn-rail-controls-20261021.md)另有独立证据，以上历史收据范围保持不变。

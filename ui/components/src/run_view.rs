@@ -40,6 +40,7 @@ pub enum RunViewIntent {
     Actionable(ActionableResponseIntent),
     TurnAction(Box<TurnFootnoteIntent>),
     CopyTranscript(TranscriptCopyIntent),
+    TurnNavigation(Box<RunTurnNavigation>),
     Feedback {
         control: ComponentId,
         gesture: Box<FeedbackGesture>,
@@ -92,6 +93,7 @@ pub struct RunView {
     paging: ComponentId,
     actionable: ComponentId,
     transcript: Option<ComponentId>,
+    rail: Option<ComponentId>,
     body: StackContent,
     last: Option<RunSnapshot>,
     gate: ComposerControlGate,
@@ -100,6 +102,7 @@ pub struct RunView {
     publication_generation: u64,
     pane_presented: bool,
     navigation_lifetime: Arc<()>,
+    navigation_mounted: bool,
     geometry: Option<RunViewGeometry>,
 }
 impl RunView {
@@ -179,6 +182,7 @@ impl RunView {
             paging: paging_id,
             actionable: actionable_id,
             transcript: None,
+            rail: None,
             last: None,
             gate: ComposerControlGate::CLOSED,
             label: "Agent Run".into(),
@@ -186,6 +190,7 @@ impl RunView {
             publication_generation: 0,
             pane_presented: true,
             navigation_lifetime: Arc::new(()),
+            navigation_mounted: false,
             geometry: None,
             body: StackContent {
                 model: Stack {
@@ -277,7 +282,7 @@ impl RunView {
         &self,
         target: &TranscriptTurnTarget,
     ) -> Result<RunTurnNavigation, &'static str> {
-        if !self.pane_presented || target.is_visible().is_none() {
+        if !self.navigation_mounted || !self.pane_presented || target.is_visible().is_none() {
             return Err("RunView navigation requires a presented arranged pane");
         }
         self.transcript()
@@ -334,6 +339,144 @@ impl RunView {
             )
             .map_err(|_| "RunView navigation gesture already dispatched")?;
         Ok(navigation.kind)
+    }
+    /// The default published library cannot mount nonoverlapping compact
+    /// actions. No ordinary minimum-height button is substituted for the rail.
+    pub fn install_turn_rail(&mut self, namespace: u32) -> Result<(), &'static str> {
+        if !turn_rail_supported() {
+            return Err("TekesUI exact compact actions unavailable");
+        }
+        if self.rail.is_some() {
+            return Err("RunView rail already installed");
+        }
+        let transcript = self.transcript().ok_or("RunView rail needs a Transcript")?;
+        if !transcript.namespaces_disjoint(&[namespace])
+            || self
+                .body
+                .children
+                .iter()
+                .any(|node| node.id().0 >> 32 == namespace as u64)
+            || self.ids.root.0 >> 32 == namespace as u64
+            || self
+                .composer()
+                .context()
+                .is_some_and(|c| c.id().0 >> 32 == namespace as u64)
+        {
+            return Err("RunView rail namespace overlap");
+        }
+        let generation = self
+            .publication_generation
+            .checked_add(1)
+            .ok_or("RunView publication generation exhausted")?;
+        let rail = TurnRail::new(namespace, self.scope.clone());
+        self.rail = Some(rail.id());
+        self.publication_generation = generation;
+        self.body.children.push(Content::new(rail.id(), rail));
+        self.geometry = None;
+        Ok(())
+    }
+    pub fn with_turn_rail(mut self, namespace: u32) -> Result<Self, &'static str> {
+        self.install_turn_rail(namespace)?;
+        Ok(self)
+    }
+    pub fn turn_rail(&self) -> Option<&TurnRail> {
+        self.body
+            .children
+            .iter()
+            .find_map(|n| n.component::<TurnRail>())
+    }
+    pub fn turn_rail_mut(&mut self) -> Option<&mut TurnRail> {
+        self.body
+            .children
+            .iter_mut()
+            .find_map(|n| n.component_mut::<TurnRail>())
+    }
+    pub fn set_rail_navigation_gate(
+        &mut self,
+        gate: TurnRailNavigationGate,
+    ) -> Result<(), &'static str> {
+        if self
+            .turn_rail()
+            .ok_or("RunView has no rail")?
+            .navigation_gate()
+            != gate
+        {
+            self.navigation_lifetime = Arc::new(());
+            self.turn_rail_mut().unwrap().set_gate(gate);
+        }
+        Ok(())
+    }
+    /// Drain immutable event-time captures before changing the source/frame.
+    /// Validation at dispatch still rejects a publication/authority/pane ABA.
+    pub fn take_turn_navigation(&mut self) -> Vec<RunTurnNavigation> {
+        self.turn_rail_mut()
+            .map_or_else(Vec::new, TurnRail::take_navigation)
+    }
+    pub fn is_nonfocusing_navigation_target(&self, id: ComponentId) -> bool {
+        self.pane_presented
+            && self.turn_rail().is_some_and(|rail| {
+                rail.permits_id(id)
+                    && rail.prototype(id).is_some_and(|p| {
+                        p.generation == self.publication_generation
+                            && Arc::ptr_eq(&p.lifetime, &self.navigation_lifetime)
+                            && p.target().is_visible().is_some()
+                    })
+            })
+    }
+    pub fn is_nonfocusing_navigation_at(&self, point: tekes_ui_scene::Point) -> bool {
+        self.turn_rail().is_some_and(|rail| {
+            rail.action_at(point)
+                .is_some_and(|id| self.is_nonfocusing_navigation_target(id))
+        })
+    }
+    /// Library reading state supplies following_latest; AgentKit chooses the
+    /// semantic last or first actually visible turn, never scroll offsets.
+    pub fn update_rail_follow_target(
+        &mut self,
+        following_latest: bool,
+    ) -> Result<(), &'static str> {
+        let targets = self.turn_targets()?;
+        let target = if following_latest {
+            targets.last()
+        } else {
+            targets.iter().find(|t| t.is_visible() == Some(true))
+        }
+        .map(|t| t.turn_id().to_owned());
+        self.turn_rail_mut()
+            .ok_or("RunView has no rail")?
+            .set_follow_target(target);
+        Ok(())
+    }
+    fn refresh_rail_contents(&mut self, arranged: bool) -> Result<(), &'static str> {
+        if self.rail.is_none() {
+            return Ok(());
+        }
+        let targets = self.turn_targets()?;
+        let count = targets.len();
+        let prototypes = targets
+            .into_iter()
+            .enumerate()
+            .map(|(index, target)| RunTurnNavigation {
+                kind: if index + 1 == count {
+                    RunTurnNavigationKind::Latest
+                } else {
+                    RunTurnNavigationKind::TurnStart(target.row_ids()[0])
+                },
+                target,
+                viewport: self.ids.viewport,
+                generation: self.publication_generation,
+                lifetime: self.navigation_lifetime.clone(),
+                claimed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            })
+            .collect();
+        let pane = self.geometry.map_or_else(Rect::default, |g| g.pane);
+        let geometry = TurnRailGeometry::for_run(pane, self.column, count);
+        let rail = self.turn_rail_mut().unwrap();
+        rail.refresh(prototypes, geometry)?;
+        if !arranged {
+            rail.clear_geometry();
+        }
+        Ok(())
     }
     pub fn composer(&self) -> &Composer {
         self.body
@@ -620,6 +763,7 @@ impl RunView {
         // A same-publication authority refresh (including close→open ABA)
         // retires older plans even when the controlled editor value is unchanged.
         self.publication_generation += 1;
+        self.refresh_rail_contents(false)?;
         Ok(())
     }
     fn check_run_update(
@@ -650,6 +794,16 @@ impl RunView {
                 .is_some_and(|run| run.scope != self.scope)
         {
             return Err("RunView source mismatch");
+        }
+        if let Some(rail) = self.turn_rail() {
+            rail.check_membership(
+                snapshot
+                    .transcript
+                    .turns
+                    .iter()
+                    .filter(|t| !t.input.trim().is_empty())
+                    .map(|t| t.id.as_str()),
+            )?;
         }
         let scope = self.scope.clone();
         let available = gate.entries && !self.composer().is_composing();
@@ -753,6 +907,11 @@ impl RunView {
             .into_iter()
             .map(RunViewIntent::Composer)
             .collect();
+        intents.extend(
+            self.take_turn_navigation()
+                .into_iter()
+                .map(|n| RunViewIntent::TurnNavigation(Box::new(n))),
+        );
         if self.composer().is_composing() {
             return intents;
         }
@@ -830,7 +989,11 @@ impl RunView {
             let empty_actionable = self.body.children[index]
                 .component::<ActionableCard>()
                 .is_some_and(|card| !card.active());
-            if id == self.ids.composer.root || id == self.ids.viewport || empty_actionable {
+            if id == self.ids.composer.root
+                || id == self.ids.viewport
+                || Some(id) == self.rail
+                || empty_actionable
+            {
                 held.push((index + held.len(), self.body.children.remove(index)));
             } else {
                 index += 1;
@@ -850,6 +1013,13 @@ impl RunView {
     }
 }
 impl Component for RunView {
+    fn lifecycle(&mut self, event: Lifecycle) {
+        let mounted = event == Lifecycle::Mounted;
+        if self.navigation_mounted != mounted {
+            self.navigation_lifetime = Arc::new(());
+        }
+        self.navigation_mounted = mounted;
+    }
     fn children(&self) -> &[Content] {
         &self.body.children
     }
@@ -872,6 +1042,9 @@ impl Component for RunView {
         }
         self.pane_presented = presented;
         if !self.pane_presented {
+            if let Some(rail) = self.turn_rail_mut() {
+                rail.invalidate_layout();
+            }
             return;
         } // Preserve prior child geometry, as RunOverlay does.
         let pane_clip = frame.intersection(&clip).unwrap_or_default();
@@ -981,6 +1154,18 @@ impl Component for RunView {
                 }),
             ),
         });
+        if self.rail.is_some() {
+            self.refresh_rail_contents(true)
+                .expect("validated rail membership");
+            let geometry = self.geometry.unwrap().turn_rail;
+            let rail_id = self.rail.unwrap();
+            self.body
+                .children
+                .iter_mut()
+                .find(|n| n.id() == rail_id)
+                .unwrap()
+                .arrange(text, geometry.rail, pane_clip);
+        }
     }
     fn semantics(&self) -> ContentSemantics {
         ContentSemantics::new(ContentRole::Group, &self.label)

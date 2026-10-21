@@ -1222,3 +1222,15 @@ async fn nonfocusing_turn_navigation_keeps_preedit_and_fences_clone_publication_
     );
     runtime.stop().await.unwrap();
 }
+
+#[test]
+fn unsupported_compact_library_never_mounts_an_overlapping_rail_or_replaces_the_composer() {
+    let mut view = RunView::standard(33500, 33504..33600, RunScope::main("fixture", "a")).unwrap();
+    let original = view.composer().editor() as *const _;
+    let result = view.install_turn_rail(34000);
+    assert_eq!(result.is_ok(), turn_rail_supported());
+    assert_eq!(view.composer().editor() as *const _, original);
+    if !turn_rail_supported() {
+        assert!(view.turn_rail().is_none());
+    }
+}

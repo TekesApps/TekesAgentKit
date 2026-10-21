@@ -42,6 +42,7 @@ def main():
     parser.add_argument('--target-dir', type=Path, required=True)
     parser.add_argument('--item-navigation-native', action='store_true',
                         help='Build the owned native stable-item diagnostic on the actual RunView')
+    parser.add_argument('--turn-rail', action='store_true', help='Enable actual rail with exact original compact actions in the isolated SDK only')
     args = parser.parse_args()
     if args.summary_labels and args.probe is None:
         parser.error('--summary-labels requires an explicit receiver --probe')
@@ -49,6 +50,8 @@ def main():
         parser.error('--append-run-probe requires an explicit receiver --probe')
     if args.item_navigation_native and not args.append_run_probe:
         parser.error('--item-navigation-native requires --append-run-probe')
+    if args.turn_rail and not args.append_run_probe:
+        parser.error('--turn-rail requires --append-run-probe')
     repo = Path(__file__).resolve().parent.parent
     source = args.source.resolve()
     manifest = json.loads(args.manifest.read_text())
@@ -165,9 +168,27 @@ def main():
         adaptations.extend(['Only original Summary header opts into single-line tail ellipsis; ordinary row titles retain natural wrapping',
                             'Existing native TextBackend delegates shape_label to its original CoreTextShaper',
                             'Owned native Summary header supplies a long mixed-language title; existing pointer probe checks its full AX name and row bounds'])
+    if args.turn_rail:
+        rail = snapshot / 'ui/components/src/turn_rail_component.rs'
+        old = 'pub fn turn_rail_supported() -> bool {\n    false\n}'
+        assert rail.read_text().count(old) == 1
+        rail.write_text(rail.read_text().replace(old, old.replace('false', 'true')))
+        old = 'Content::new(id, TurnRailAction::new(tick))'
+        assert rail.read_text().count(old) == 1
+        rail.write_text(rail.read_text().replace(old, old + '.preserving_focus()'))
+        action = snapshot / 'ui/components/src/turn_rail_action.rs'
+        old = '        // CANDIDATE_COMPACT_ACTION_CONFIGURATION'
+        assert action.read_text().count(old) == 1
+        action.write_text(action.read_text().replace(old, old + '\n        button.action.button.frame_policy = tekes_ui_controls::ButtonFramePolicy::Exact;\n        button.action.pointer_activation_phase = tekes_ui_controls::composition::ButtonActivationPhase::Press;'))
+        demo = snapshot / 'ui/demo/src/component_demo.rs'
+        old = '        self.document_roots.insert(ids.root, root);'
+        assert demo.read_text().count(old) == 1
+        demo.write_text(demo.read_text().replace(old, '        self.tree.get_mut(ComponentId(ids.root.0 + 16)).unwrap().component_mut::<RunView>().unwrap().install_turn_rail(9_000_000 + (ids.root.0 >> 32) as u32).map_err(unsupported)?;\n' + old))
+        overrides.extend(['ui/components/src/turn_rail_component.rs', 'ui/components/src/turn_rail_action.rs', 'ui/demo/src/component_demo.rs'])
+        adaptations.append('Actual AgentKit rail enabled only with original library Exact/Press and preserving_focus; default fixed pin remains unsupported')
     if args.item_navigation_native:
         native_probe_name = 'ui/demo/src/native_item_navigation_candidate.rs'
-        shutil.copyfile(repo / 'scripts/probes/native-item-navigation-candidate.rs', snapshot / native_probe_name)
+        shutil.copyfile(repo / ('scripts/probes/native-turn-rail-candidate.rs' if args.turn_rail else 'scripts/probes/native-item-navigation-candidate.rs'), snapshot / native_probe_name)
         host = snapshot / 'ui/demo/src/components_native.rs'
         code = host.read_text()
         replacements = [
@@ -188,9 +209,25 @@ def main():
         for before, after in replacements:
             assert code.count(before) == 1, before
             code = code.replace(before, after)
+        if args.turn_rail:
+            before = '''            if let DemoCommand::TurnNavigation { root: _, intent: _ } = command {
+                // CANDIDATE_TURN_RAIL_DISPATCH
+                self.failure("当前 UI 版本暂不支持此回合导航".into());
+                continue;
+            }'''
+            assert code.count(before) == 1
+            code = code.replace(before, '''            if let DemoCommand::TurnNavigation { root, intent } = command {
+                if let Err(error) = item_navigation_probe::dispatch(self, root, &intent) { self.failure(error); }
+                continue;
+            }''')
+        if args.turn_rail:
+            before = "    fn handle(&mut self, event: Event, window: &mut Window) {\n"
+            assert code.count(before) == 1
+            code = code.replace(before, before + '''        if self.item_navigation_probe.is_some() && matches!(&event, Event::Mouse(_) | Event::TextUnmark | Event::TextCommit { .. } | Event::TextPreedit { .. } | Event::Focus(_)) { eprintln!("RAIL_NATIVE_EVENT {event:?}"); }
+''')
         host.write_text(code)
         overrides.extend([native_probe_name, 'ui/demo/src/components_native.rs'])
-        adaptations.append('Owned native diagnostic uses actual RunView, original backend and public Kit capture/claim; second-consumer execution is checked in CLI; only public library reading/reveal calls; synthetic AppKit preedit, not a physical IME or interactive rail')
+        adaptations.append('Owned native diagnostic uses actual RunView, original backend and public Kit capture/claim; second-consumer execution is checked in CLI; only public library reading/reveal calls; synthetic AppKit preedit, not a physical IME; actual latest-rail click only when --turn-rail')
     env = dict(os.environ, CARGO_TARGET_DIR=str(args.target_dir.resolve()),
                CARGO_PROFILE_DEV_DEBUG='0', CARGO_PROFILE_TEST_DEBUG='0',
                CARGO_PROFILE_DEV_INCREMENTAL='false', CARGO_PROFILE_TEST_INCREMENTAL='false')
@@ -206,6 +243,7 @@ def main():
                                         overrides},
                    summary_labels=args.summary_labels,
                    item_navigation_native=args.item_navigation_native,
+                   turn_rail=args.turn_rail,
                    default_pin_promoted=False, native_acceptance=False, visual_acceptance=False,
                    full_runview_acceptance=False, checks=[])
     try:
@@ -218,7 +256,7 @@ def main():
             ('tests', ['test', *common, '-p', 'tekes-agent-ui-demo', '--test', 'reading_candidate']),
             ('clippy', ['clippy', *common, '-p', 'tekes-agent-ui-demo', '--test', 'reading_candidate', '--', '-D', 'warnings']),
         ]
-        if args.summary_labels or args.item_navigation_native:
+        if args.summary_labels or args.item_navigation_native or args.turn_rail:
             steps.extend([
                 ('public-consumer', ['test', *common, '-p', 'tekes-agent-ui-consumer-check', '--lib']),
                 ('native-build', ['build', *common, '-p', 'tekes-agent-ui-demo']),

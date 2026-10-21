@@ -265,3 +265,5 @@ Native [消息生命周期边界修正](rust-agent-ui-native-stream-boundary-202
 
 
 [ReadOnlyTranscript](rust-agent-ui-readonly-child-20261020.md) 已将 Native 有界子历史接入实际内容树、只读 source-call 详情和显式刷新/分页，不再仅显示数量。原绑定在 await 前分配 publication 并校验 epoch/存活；旧结果和旧页意图不能覆盖新 frame/获得新连接权限。读取回调一次性 admission，仍不构造可写 Run/Composer。组件、第二 consumer、原生多页消息渲染和真实 Native child 到 GPU 分层验证；混合阅读锚点/富内容/物理 IME 与完整 Run/Transcript 仍未完成。
+
+[实际回合轨道组件](rust-agent-ui-turn-rail-controls-20261021.md)已接入原 RunView 的事件捕获、独立库滚动和生命周期隔离；默认公开 pin 明确 unsupported，#29 隔离候选验收与 #32/#33 缺口分列，尚不构成完整轨道或稳定 UI 交付。

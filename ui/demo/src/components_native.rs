@@ -272,6 +272,11 @@ impl Host {
                 }
                 continue;
             }
+            if let DemoCommand::TurnNavigation { root: _, intent: _ } = command {
+                // CANDIDATE_TURN_RAIL_DISPATCH
+                self.failure("当前 UI 版本暂不支持此回合导航".into());
+                continue;
+            }
             if let DemoCommand::CopyTranscript(intent) = command {
                 self.clipboard_writes.push(intent);
                 continue;
@@ -367,6 +372,9 @@ impl Host {
             };
             self.executor.spawn(async move {
                 let special = match command {
+                    DemoCommand::TurnNavigation { .. } => {
+                        unreachable!("local navigation is dispatched synchronously")
+                    }
                     DemoCommand::ReadHistoryPage(request) => {
                         // Success and failure are published only on the original
                         // binding, never as a global error on the selected pane.
@@ -727,7 +735,8 @@ impl Host {
                             | DemoCommand::CloseSideChat(_)
                             | DemoCommand::OpenSession(_)
                             | DemoCommand::Summary(_)
-                            | DemoCommand::CopyTranscript(_) => unreachable!("handled above"),
+                            | DemoCommand::CopyTranscript(_)
+                            | DemoCommand::TurnNavigation { .. } => unreachable!("handled above"),
                         }
                         .map_err(|error| error.to_string());
                         HostResult::Operation(result)

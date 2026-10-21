@@ -77,6 +77,10 @@ pub enum DemoCommand {
     SidebarSearch(tekes_agent_components_ui::SidebarSearchIntent),
     Feedback(Box<FeedbackDemoRequest>),
     CopyTranscript(tekes_agent_components_ui::TranscriptCopyIntent),
+    TurnNavigation {
+        root: ComponentId,
+        intent: Box<tekes_agent_components_ui::RunTurnNavigation>,
+    },
     TurnAction {
         binding: Arc<RunBinding>,
         intent: tekes_agent_components_ui::TurnFootnoteIntent,
@@ -2977,6 +2981,19 @@ impl ComponentDemo {
         self.select(index)?;
         Ok(true)
     }
+    fn composing_navigation_run(&self) -> Option<&RunView> {
+        let editor = self.composing_editor()?;
+        [Some(self.ids()), self.panel_composer_ids()]
+            .into_iter()
+            .flatten()
+            .find_map(|ids| {
+                let run = self
+                    .tree
+                    .get(ComponentId(ids.root.0 + 16))?
+                    .component::<RunView>()?;
+                (run.ids().composer.editor == editor && run.is_pane_presented()).then_some(run)
+            })
+    }
     fn blocked_pointer(&self, event: &ContentEvent) -> bool {
         if !self.composing() {
             return false;
@@ -2991,6 +3008,12 @@ impl ComponentDemo {
             _ => None,
         };
         position.is_some_and(|position| {
+            if self
+                .composing_navigation_run()
+                .is_some_and(|run| run.is_nonfocusing_navigation_at(position))
+            {
+                return false;
+            }
             !self
                 .tree
                 .get(self.composing_editor().expect("composing owner"))
@@ -3028,6 +3051,9 @@ impl ComponentDemo {
         if self
             .composing_editor()
             .is_some_and(|editor| editor != target)
+            && !self
+                .composing_navigation_run()
+                .is_some_and(|run| run.is_nonfocusing_navigation_target(target))
         {
             return Ok(vec![]);
         }
@@ -3074,10 +3100,18 @@ impl ComponentDemo {
             .collect();
         let mut intents = vec![];
         let mut commands = vec![];
+        let mut local_navigation = false;
         for (ids, binding, intent) in routed {
             use tekes_agent_components_ui::RunViewIntent;
             match intent {
                 RunViewIntent::Composer(intent) => intents.push((binding, intent)),
+                RunViewIntent::TurnNavigation(intent) => {
+                    local_navigation = true;
+                    commands.push(DemoCommand::TurnNavigation {
+                        root: ComponentId(ids.root.0 + 16),
+                        intent,
+                    });
+                }
                 RunViewIntent::Feedback { control, gesture } => {
                     commands.push(self.prepare_feedback(ids, &binding, control, *gesture)?)
                 }
@@ -3491,7 +3525,12 @@ impl ComponentDemo {
                 _ => {}
             }
         }
-        self.sync()?;
+        // Local navigation must dispatch against the event's installed frame.
+        // A pure refresh also advances Run authority generation; defer that
+        // refresh until the host has consumed this synchronous local command.
+        if !local_navigation {
+            self.sync()?;
+        }
         commands.extend(self.take_background_commands());
         Ok(commands)
     }

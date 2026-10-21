@@ -1711,3 +1711,27 @@ pub fn claim_turn_navigation(
 ) -> Result<tekes_agent_components_ui::RunTurnNavigationKind, &'static str> {
     run.claim_turn_navigation(navigation)
 }
+
+/// Install the shared rail only when the fixed library has original compact
+/// controls. No host list, pointer engine or minimum-height substitute is built.
+pub fn install_turn_rail(
+    run: &mut tekes_agent_components_ui::RunView,
+    namespace: u32,
+) -> Result<(), &'static str> {
+    run.install_turn_rail(namespace)
+}
+#[test]
+fn rail_dependency_gate_is_explicit_and_preserves_the_original_run_on_unsupported_pin() {
+    use tekes_agent_components_ui::{RunScope, turn_rail_supported};
+    let mut run = new_agent_run_view(
+        1960,
+        1964..1980,
+        RunScope::main("consumer", "rail-capability"),
+    )
+    .unwrap();
+    let original = run.composer().editor() as *const _;
+    let result = install_turn_rail(&mut run, 1999);
+    assert_eq!(result.is_ok(), turn_rail_supported());
+    assert_eq!(run.composer().editor() as *const _, original);
+    assert_eq!(run.turn_rail().is_some(), turn_rail_supported());
+}
