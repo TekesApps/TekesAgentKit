@@ -13,7 +13,7 @@
 
 `RunSurface` 仅是现有协议/控件测试宿主，不是标准 RunView。正式组件契约、App 的 input/output/footnote 布局、基础 Issue 和完整交付账本见 [Rust Agent UI 接入契约](../docs/rust-agent-ui-contract.md)。
 
-可独立挂载的组件包括 Composer、ComposerContext、ComposerChoices、AnnotationEditor、ComposerUploads、Indicators、Sidebar、ThreadRename、SidePanel、SummaryView、InputMessage、OutputMessage、TurnFootnote、TranscriptContent、ReadOnlyTranscript 和 RunView。它们使用同一套共享 presentation；RunSurface/ComponentDemo 是测试与接入宿主。主会话和可写 pane 已挂载 RunView，有界子历史使用 ReadOnlyTranscript；完整 Transcript 的阅读锚点、富内容与最终体验验收仍待完成。
+可独立挂载的组件包括 Composer、ComposerNotice、ComposerContext、ComposerChoices、AnnotationEditor、ComposerUploads、Indicators、Sidebar、ThreadRename、SidePanel、SummaryView、InputMessage、OutputMessage、TurnFootnote、TranscriptContent、ReadOnlyTranscript 和 RunView。它们使用同一套共享 presentation；RunSurface/ComponentDemo 是测试与接入宿主。主会话和可写 pane 已挂载 RunView，有界子历史使用 ReadOnlyTranscript；完整 Transcript 的阅读锚点、富内容与最终体验验收仍待完成。
 
 [独立阅读事务候选联调](../docs/rust-agent-ui-reading-candidate-20261020.md)提供正式 Transcript 的预检行 ID API 和显式隔离回放命令；不替换默认 pin，尚未接入完整 RunView 或完成原生阅读验收。
 
@@ -27,20 +27,20 @@ Composer 已接入输入/草稿/发送/取消、公开模型目录与发送前�
 
 Sidebar 使用共享列表、置顶和动作 dispatcher，已接入选择、复制、重命名、分叉和归档。SidePanel 组合任务、子代理、SideChat 与 Summary；任务与独立子代理保留各自 Composer/Indicators，有界子历史是只读来源。SideChat 保留临时 pointer 与 Unknown/Closing 草稿，源撤销、晚结果和异步准备继续由原绑定检查。
 
-Composer 的真实输入胶囊公开为 `ComposerIds::input_band`；现在保留9个连续 ID，原编辑器及8个既有 ID不变。仅在显式固定的新 SDK 候选中验证原库留白焦点与 rail 包装绘制委托，正式 IME 转交仍待 TekesUI #34。宿主绑定时机、替换后重绑及验收边界见[接入记录](../docs/rust-agent-ui-composer-padding-20261021.md)。
+Composer 的真实输入胶囊公开为 `ComposerIds::input_band`；现在保留9个连续 ID，原编辑器及8个既有 ID不变。当前公开固定 SDK 已提供留白焦点及原生 IME 转交；消费证据见下方公开版本接收记录。宿主绑定时机、替换后重绑及验收边界见[接入记录](../docs/rust-agent-ui-composer-padding-20261021.md)。
 
 [绑定包](bindings/README.md) 连接原 RunController、history lease、任务/子代理/SideChat 生命周期。宿主拥有窗口、布局、导航与系统能力；来源替换不能重定向旧回调。第二 public consumer 只依赖两个公开 UI 包。
 
-`--components` 打开实际组件验证窗口，可与 `--offscreen` 或显式 `--endpoint-config` 组合。原生 fixture 的 `--native-selftest` 及各单项模式验证合成文本服务、发送/取消/重连、草稿与 pointer 隔离；真实三端离屏接入使用 `--ui-components`。物理 IME、正式 Transcript 阅读/分页锚点、完整宿主和三端原生交互仍需验收。最新范围与收据以 [交付账本](../docs/rust-agent-ui-contract.md) 为准。
+`--components` 打开实际组件验证窗口，可与 `--offscreen` 或显式 `--endpoint-config` 组合。原生 fixture 的 `--native-selftest` 及各单项模式验证合成文本服务、发送/取消/重连、草稿与 pointer 隔离；真实三端离屏接入使用 `--ui-components`。原生阅读/分页及三端专项已有分层证据；物理键盘/候选窗、完整宿主与全部 Views 视觉验收仍需完成。最新范围与收据以 [交付账本](../docs/rust-agent-ui-contract.md) 为准。
 
 ## 依赖
 
 - Rust 1.95.0、macOS + Metal（原生窗口/文本服务/GPU）；Python 3.11+（准备和边界检查）。
-- AgentKit 基线 v0.3.8（公开 main `f1daa0ffcf6ced41e21f351e22845455ca78006c`）；Native 真实集成基线 Kernel v0.9.1。
-- TekesUI composition 仍是实验 API，但实验开发源码固定为公开 Git commit `8cf0840790334ba224afc0595897c74231c712e6`；6 个直接依赖和2个传递依赖均由 Cargo 按该完整 rev 取得，ui/Cargo.lock 同步固定。
-- `tekesui-source.json` 的 kind 为 `published-git-revision`，199文件 SHA-256 为 `f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f`，对应实际八包依赖闭包；原431基线在 `baselines/` 原样保留。固定的是不可变commit，不跟随分支HEAD。
+- AgentKit 基线 v0.3.8（公开 main `f1daa0ffcf6ced41e21f351e22845455ca78006c`）；最新独立三端 UI 验收使用 Kernel v0.9.3，历史收据按各自实际版本保留。
+- TekesUI composition 仍是实验 API，但实验开发源码固定为公开 Git commit `09b4bab44b6dfa65487250ea816b610b9df59095`（公开 tag `remediation-toolbar-checkpoint-20261021`）；6 个直接依赖和2个传递依赖均由 Cargo 按该完整 rev 取得，ui/Cargo.lock 同步固定。
+- `tekesui-source.json` 的 kind 为 `published-git-revision`，241文件 SHA-256 为 `44b3174022584d3c099a45b86892d17dbf948905476c0f038be104df12aefe46`，对应实际八包依赖闭包；原431/8cf/2ee/129基线在 `baselines/` 原样保留。固定的是不可变commit，不跟随分支HEAD。
 - 旧e4 manifest、lockfile、消费适配和188依赖另有备份；旧 `.deps/tekesui` 原样保留但不参与当前构建。无需从兄弟工作树复制代码，`prepare-tekesui-demo.py` 在公开pin模式拒绝path/capture。
-- UI包继续 `0.0.0` / `publish=false`；公开源码pin不代表AgentKit UI稳定版。最新验收与独立CI边界见 [正式pin复验](../docs/tekesui-public-pin-verification-20261019.md)。
+- UI包继续 `0.0.0` / `publish=false`；公开源码pin不代表AgentKit UI稳定版。最新验收与独立CI边界见 [最新公开接收](../docs/tekesui-toolbar-public-intake-20261021.md)及[reading/reveal复核](../docs/rust-agent-ui-public-reading-recheck-20261022.md)。
 
 最新正式组件进展：[原生 Jump/回到最新](../docs/rust-agent-ui-jump-latest-20261021.md)；仍为实验 API，未代表完整 ClientKit Views 验收。
 
@@ -219,3 +219,9 @@ SidePanel 宿主布局输入使用 `SidePanel::set_layout(SidePanelLayout { cont
 Summary 的普通静态行与用量标题现在使用原 TekesUI 只读可选择文本，`SummaryView::passive_text_id(section, row)` 提供其原ID。宿主通过同一ContentHost的既有文本命令处理选择/复制，并提供TextSurfaceHost，不另存选区；折叠ID存在不代表可见。详见[静态行契约](../docs/rust-agent-ui-summary-selectable-20261022.md)。
 
 `TranscriptTurnTarget::preview()`提供原回合的plain preview快照，`TurnRail::preview_target`捕获原项，`RunView::turn_preview`在当前来源/布局上只读验证，允许保留Composer组字。当前未显示hover卡片；被动原Content浮层等待TekesUI #46，详见[预览契约](../docs/rust-agent-ui-turn-preview-20261022.md)。
+
+
+Composer 的可选状态提示位于输入卡片外上方；安装 `ComposerNotice` 独立 namespace，使用当前
+RunSnapshot 的 destination/connection_epoch 和递增 display revision 发布事实。刷新为显式事件时回调，
+宿主需在既有控制器上认领并执行；无自动网络重试。接口、组字屏障与验收边界见
+[Composer notice 接入](../docs/rust-agent-ui-composer-notice-20261022.md)。

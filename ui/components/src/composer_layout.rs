@@ -22,6 +22,7 @@ pub enum ComposerPrimaryActionKind {
 pub struct ComposerLayoutGeometry {
     pub publication: u64,
     pub destination: Option<ComposerDestination>,
+    pub notice: Option<Rect>,
     pub context: Option<Rect>,
     pub input_band: Rect,
     pub editor: Rect,
@@ -229,6 +230,7 @@ impl Component for ComposerInputBand {
 }
 
 pub(crate) struct ComposerMeasurements {
+    pub notice: Size,
     pub context: Size,
     pub editor: Size,
     pub actions: Size,
@@ -236,6 +238,13 @@ pub(crate) struct ComposerMeasurements {
     pub row_height: f32,
 }
 impl ComposerMeasurements {
+    pub fn notice_clearance(&self) -> f32 {
+        if self.notice.height > 0. {
+            self.notice.height + Spacing::Snug.value()
+        } else {
+            0.
+        }
+    }
     pub fn context_clearance(&self) -> f32 {
         if self.context.height > 0. {
             self.context.height + Spacing::Regular.value()
@@ -247,7 +256,8 @@ impl ComposerMeasurements {
         self.row_height + 2. * Spacing::Snug.value()
     }
     pub fn height(&self) -> f32 {
-        self.context_clearance()
+        self.notice_clearance()
+            + self.context_clearance()
             + self.band_height()
             + if self.setup.height > 0. {
                 Spacing::Snug.value() + self.setup.height

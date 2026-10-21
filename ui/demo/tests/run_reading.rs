@@ -2129,3 +2129,62 @@ async fn preview_of_original_rail_target_preserves_marked_text_and_expires_on_pu
     assert!(run(&host, root).turn_preview(&current).is_err());
     runtime.stop().await.unwrap();
 }
+
+#[tokio::test]
+async fn composer_notice_height_changes_preserve_upward_reading_and_marked_editor() {
+    let (runtime, mut host, root, _, _, _, mut text) = rail_setup().await;
+    wheel(&mut host, root, 420.);
+    render(&mut host, &mut text);
+    let item = anchor(&host, root);
+    let viewport = run(&host, root).ids().viewport;
+    let y = host.get(item).unwrap().frame().min_y()
+        - host.get(viewport).unwrap().visible().unwrap().min_y();
+    let editor = run(&host, root).ids().composer.editor;
+    host.focus(Some(editor), true);
+    host.event(&ContentEvent::Preedit {
+        text: "提示中文组字".into(),
+        selection: 1..3,
+        clauses: vec![],
+        replacement: None,
+    });
+    let before = baseline(&host, root);
+    let connection_epoch = run(&host, root)
+        .displayed_snapshot()
+        .unwrap()
+        .connection_epoch;
+    let composer = run_mut(&mut host, root).composer_mut();
+    composer
+        .install_notice(0xfff0_0002, Default::default())
+        .unwrap();
+    let destination = composer.destination().unwrap().clone();
+    for (revision, notice) in [
+        (
+            1,
+            Some(ComposerNoticeState {
+                text: "需要刷新连接目录。".repeat(12),
+                can_refresh: true,
+                refreshing: false,
+            }),
+        ),
+        (2, None),
+    ] {
+        run_mut(&mut host, root)
+            .composer_mut()
+            .update_notice(&ComposerNoticeInput {
+                connection_epoch,
+                revision,
+                destination: destination.clone(),
+                notice,
+                enabled: true,
+            })
+            .unwrap();
+        render(&mut host, &mut text);
+        assert_eq!(host.focused(), Some(editor));
+        assert_eq!(baseline(&host, root), before);
+        let next = host.get(item).unwrap().frame().min_y()
+            - host.get(viewport).unwrap().visible().unwrap().min_y();
+        assert!((next - y).abs() <= 1.);
+        assert!(!scroll(&host, root).is_following_latest());
+    }
+    runtime.stop().await.unwrap();
+}

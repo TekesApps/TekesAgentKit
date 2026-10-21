@@ -146,6 +146,8 @@ pub struct Composer {
     affordances: ComposerAffordances,
     labels: ComposerLabels,
     pending: Vec<ComposerIntent>,
+    notice_id: Option<ComponentId>,
+    notice_epoch: Option<u64>,
     context_id: Option<ComponentId>,
     retained_context: Option<Content>,
     context_affordances: ComposerContextAffordances,
@@ -179,6 +181,8 @@ impl Composer {
             affordances: ComposerAffordances::default(),
             labels: ComposerLabels::default(),
             pending: Vec::new(),
+            notice_id: None,
+            notice_epoch: None,
             context_id: None,
             retained_context: None,
             context_affordances: Default::default(),
@@ -205,14 +209,99 @@ impl Composer {
             self.presented && g.publication == self.revision && g.destination == self.destination
         })
     }
-    /// Optional draft cards use a separately reserved namespace. The
-    /// original editor/action IDs and editor/undo instance remain unchanged.
+    /// Optional status notice uses a separate namespace above the input card.
+    /// Its native controls do not replace the original editor or Run state.
+    pub fn install_notice(
+        &mut self,
+        namespace: u32,
+        labels: crate::ComposerNoticeLabels,
+    ) -> Result<(), &'static str> {
+        if self.notice_id.is_some()
+            || ((self.ids.root.0 >> 32)..=(self.ids.input_band.0 >> 32))
+                .contains(&(namespace as u64))
+            || self
+                .context_id
+                .is_some_and(|id| id.0 >> 32 == namespace as u64)
+        {
+            return Err("composer notice namespace overlaps");
+        }
+        let notice = crate::ComposerNotice::new(namespace, labels);
+        self.notice_id = Some(notice.id());
+        self.body
+            .children
+            .insert(0, Content::new(notice.id(), notice));
+        self.geometry = None;
+        Ok(())
+    }
+    pub fn notice(&self) -> Option<&crate::ComposerNotice> {
+        self.body
+            .children
+            .iter()
+            .find(|node| Some(node.id()) == self.notice_id)?
+            .component()
+    }
+    pub fn notice_mut(&mut self) -> Option<&mut crate::ComposerNotice> {
+        self.body
+            .children
+            .iter_mut()
+            .find(|node| Some(node.id()) == self.notice_id)?
+            .component_mut()
+    }
+    /// IME host policy for this exact original preserving-focus action. This
+    /// query grants neither a refresh request nor endpoint authority.
+    pub fn is_nonfocusing_notice_refresh_target(&self, target: ComponentId) -> bool {
+        self.presented
+            && self.layout_geometry().is_some_and(|g| g.notice.is_some())
+            && self.notice().is_some_and(|notice| {
+                notice.refresh_id() == target
+                    && notice.displayed_input().is_some_and(|input| {
+                        self.destination.as_ref() == Some(&input.destination)
+                            && self.notice_epoch == Some(input.connection_epoch)
+                            && input.enabled
+                            && input
+                                .notice
+                                .as_ref()
+                                .is_some_and(|state| state.can_refresh && !state.refreshing)
+                    })
+            })
+    }
+    pub fn is_nonfocusing_notice_refresh_at(&self, point: tekes_ui_scene::Point) -> bool {
+        let Some(notice) = self.notice() else {
+            return false;
+        };
+        self.is_nonfocusing_notice_refresh_target(notice.refresh_id())
+            && notice
+                .children()
+                .iter()
+                .find(|node| node.id() == notice.refresh_id())
+                .and_then(Content::visible)
+                .is_some_and(|frame| frame.contains(point))
+    }
+    pub fn update_notice(
+        &mut self,
+        input: &crate::ComposerNoticeInput,
+    ) -> Result<(), &'static str> {
+        if !self.presented
+            || self.destination.as_ref() != Some(&input.destination)
+            || self.notice_epoch != Some(input.connection_epoch)
+        {
+            return Err("Composer notice belongs to another destination or connection");
+        }
+        self.notice_mut()
+            .ok_or("Composer has no notice slot")?
+            .update(input)?;
+        self.geometry = None;
+        Ok(())
+    }
     pub fn with_context(
         mut self,
         namespace: u32,
         labels: ComposerContextLabels,
     ) -> Result<Self, &'static str> {
         if self.context_id.is_some()
+            || self
+                .notice_id
+                .is_some_and(|id| id.0 >> 32 == namespace as u64)
             || ((self.ids.root.0 >> 32)..=(self.ids.input_band.0 >> 32))
                 .contains(&(namespace as u64))
         {
@@ -248,7 +337,8 @@ impl Composer {
             .is_some_and(|context| !context.children().is_empty());
         if visible {
             if let Some(context) = self.retained_context.take() {
-                self.body.children.insert(0, context);
+                let index = usize::from(self.notice_id.is_some());
+                self.body.children.insert(index, context);
             }
         } else if let Some(index) = self.body.children.iter().position(|node| node.id() == id) {
             self.retained_context = Some(self.body.children.remove(index));
@@ -410,6 +500,9 @@ impl Composer {
             if let Some(old) = &self.destination {
                 self.retained.insert(old.storage_key(), previous);
             }
+            if let Some(notice) = self.notice_mut() {
+                notice.clear();
+            }
             self.destination = destination;
             self.text_mut().field.field.label = self.labels.editor.clone();
             self.committed = snapshot.draft.text.clone();
@@ -425,8 +518,18 @@ impl Composer {
         {
             self.can_send = false;
             self.rebuild_actions();
+            if let Some(notice) = self.notice_mut() {
+                notice.clear();
+            }
+            self.notice_epoch = None;
             return Err(error);
         }
+        if self.notice_epoch != Some(snapshot.connection_epoch)
+            && let Some(notice) = self.notice_mut()
+        {
+            notice.clear();
+        }
+        self.notice_epoch = Some(snapshot.connection_epoch);
         self.presented = snapshot
             .run
             .as_ref()
@@ -438,6 +541,9 @@ impl Composer {
         };
         if !self.presented {
             self.pending.clear();
+            if let Some(notice) = self.notice_mut() {
+                notice.clear();
+            }
         }
         self.revision = snapshot.revision;
         self.draft = snapshot.draft.clone();
@@ -677,6 +783,14 @@ impl Composer {
         let inner = (width - padding * 2.).max(0.);
         let actions = self.band_mut().actions.group(text, inner, true);
         let setup = self.toolbar().group(text, inner, false);
+        let notice = self
+            .body
+            .children
+            .iter_mut()
+            .find(|node| Some(node.id()) == self.notice_id)
+            .map_or(Size::default(), |node| {
+                node.measure(text, Size::new(width, 1e8)).size
+            });
         let context = self
             .body
             .children
@@ -685,7 +799,11 @@ impl Composer {
             .map_or(Size::default(), |node| {
                 node.measure(text, Size::new(width, 1e8)).size
             });
-        let overhead = 2. * (Spacing::Snug.value() + Spacing::Regular.value())
+        let overhead = (if notice.height > 0. {
+            notice.height + Spacing::Snug.value()
+        } else {
+            0.
+        }) + 2. * (Spacing::Snug.value() + Spacing::Regular.value())
             + if context.height > 0. {
                 context.height + Spacing::Regular.value()
             } else {
@@ -715,6 +833,7 @@ impl Composer {
             .measure(text, Size::new(editor_width, 1e8))
             .size;
         ComposerMeasurements {
+            notice,
             context,
             editor,
             actions,
@@ -750,14 +869,31 @@ impl Component for Composer {
         let content_top = frame.min_y() - (measured.height() - frame.size.height).max(0.);
         let band = Rect::new(
             frame.min_x(),
-            content_top + measured.context_clearance(),
+            content_top + measured.notice_clearance() + measured.context_clearance(),
             frame.size.width,
             measured.band_height(),
         );
-        let context = if measured.context.height > 0. {
+        let notice = if measured.notice.height > 0. {
             let rect = Rect::new(
                 frame.min_x(),
                 content_top,
+                frame.size.width,
+                measured.notice.height,
+            );
+            self.body
+                .children
+                .iter_mut()
+                .find(|node| Some(node.id()) == self.notice_id)
+                .unwrap()
+                .arrange(text, rect, clip);
+            Some(rect)
+        } else {
+            None
+        };
+        let context = if measured.context.height > 0. {
+            let rect = Rect::new(
+                frame.min_x(),
+                content_top + measured.notice_clearance(),
                 frame.size.width,
                 measured.context.height,
             );
@@ -823,6 +959,7 @@ impl Component for Composer {
         self.geometry = Some(ComposerLayoutGeometry {
             publication: self.revision,
             destination: self.destination.clone(),
+            notice,
             context,
             input_band: band,
             editor,

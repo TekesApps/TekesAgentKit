@@ -1394,3 +1394,83 @@ async fn default_demo_keeps_the_resident_input_visible_across_session_switch_wit
     }
     runtime.stop().await.unwrap();
 }
+
+#[test]
+fn composer_notice_wraps_with_original_refresh_control_and_collapses_without_a_gap() {
+    use tekes_ui_controls::composition::{Content, ContentHost};
+    for scale in [0.85, 1., 1.5] {
+        for width in [160., 320., 600.] {
+            for theme in [Theme::LIGHT, Theme::DARK] {
+                let mut notice = ComposerNotice::new(39998, Default::default());
+                let mut input = ComposerNoticeInput {
+                    connection_epoch: 1,
+                    revision: 1,
+                    destination: ComposerDestination::run(RunScope::main(
+                        "fixture",
+                        "notice-layout",
+                    )),
+                    enabled: true,
+                    notice: Some(ComposerNoticeState {
+                        text: "目录快照暂不可用，保持当前输入并显式刷新。".repeat(3),
+                        can_refresh: true,
+                        refreshing: false,
+                    }),
+                };
+                notice.update(&input).unwrap();
+                let root = notice.id();
+                let label = notice.text_id();
+                let refresh = notice.refresh_id();
+                let mut host = ContentHost::new(Content::new(root, notice)).unwrap();
+                let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()), scale);
+                let size = host
+                    .get_mut(root)
+                    .unwrap()
+                    .measure(&mut text, Size::new(width, 2000.))
+                    .size;
+                let frame = Rect::new(17., 23., width, size.height);
+                host.render(&mut Scene::new(), &mut text, frame, frame, theme.into())
+                    .unwrap();
+                let label_frame = host.get(label).unwrap().frame();
+                let button = host.get(refresh).unwrap().frame();
+                assert!(label_frame.max_x() <= button.min_x());
+                assert!(button.max_x() <= frame.max_x());
+                assert!(
+                    label_frame.min_x()
+                        >= frame.min_x() + tekes_ui_tokens::Spacing::Relaxed.value()
+                );
+                let line = text
+                    .measure("Mg", proposal::TextRole::UiCaption, width)
+                    .height;
+                assert!(
+                    label_frame.size.height > line,
+                    "notice should wrap {scale}/{width}"
+                );
+                input.revision += 1;
+                input.notice.as_mut().unwrap().can_refresh = false;
+                host.get_mut(root)
+                    .unwrap()
+                    .component_mut::<ComposerNotice>()
+                    .unwrap()
+                    .update(&input)
+                    .unwrap();
+                assert!(host.get(refresh).is_none());
+                input.revision += 1;
+                input.notice = None;
+                host.get_mut(root)
+                    .unwrap()
+                    .component_mut::<ComposerNotice>()
+                    .unwrap()
+                    .update(&input)
+                    .unwrap();
+                assert_eq!(
+                    host.get_mut(root)
+                        .unwrap()
+                        .measure(&mut text, Size::new(width, 2000.))
+                        .size
+                        .height,
+                    0.
+                );
+            }
+        }
+    }
+}

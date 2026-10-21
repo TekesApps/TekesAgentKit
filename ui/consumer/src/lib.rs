@@ -2371,3 +2371,50 @@ pub fn turn_preview<'a>(
 ) -> Result<&'a tekes_agent_components_ui::TranscriptTurnPreview, &'static str> {
     run.turn_preview(target)
 }
+
+/// The host consumes an event-time refresh on its original source, then uses
+/// its existing service/controller to refresh. No request is automatically sent.
+pub fn composer_notice_refreshes(
+    notice: &mut tekes_agent_components_ui::ComposerNotice,
+) -> Vec<tekes_agent_components_ui::ComposerNoticeRefresh> {
+    notice
+        .take_refreshes()
+        .into_iter()
+        .filter(|request| notice.claim_refresh(request).is_ok())
+        .collect()
+}
+#[test]
+fn independent_composer_notice_uses_captured_public_callback_without_a_runtime() {
+    use tekes_agent_components_ui::*;
+    use tekes_ui_controls::composition::AccessibilityAction;
+    let mut notice = ComposerNotice::new(1983, Default::default());
+    notice
+        .update(&ComposerNoticeInput {
+            connection_epoch: 1,
+            revision: 1,
+            destination: ComposerDestination::run(RunScope::main("consumer", "notice")),
+            enabled: true,
+            notice: Some(ComposerNoticeState {
+                text: "刷新连接目录".into(),
+                can_refresh: true,
+                refreshing: false,
+            }),
+        })
+        .unwrap();
+    let root = notice.id();
+    let refresh = notice.refresh_id();
+    let mut host = notice.into_host().unwrap();
+    host.accessibility_action(refresh, None, AccessibilityAction::Press);
+    let source = host
+        .get_mut(root)
+        .unwrap()
+        .component_mut::<ComposerNotice>()
+        .unwrap();
+    let requests = composer_notice_refreshes(source);
+    assert_eq!(requests.len(), 1);
+    assert_eq!(
+        requests[0].source().destination,
+        ComposerDestination::run(RunScope::main("consumer", "notice"))
+    );
+    assert!(composer_notice_refreshes(source).is_empty());
+}

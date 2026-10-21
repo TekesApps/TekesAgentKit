@@ -28,6 +28,8 @@ mod actionable;
 pub use actionable::*;
 mod annotation_editor;
 mod composer;
+mod composer_notice;
+pub use composer_notice::*;
 mod composer_layout;
 pub use composer_layout::{ComposerLayoutGeometry, ComposerPrimaryActionKind};
 mod composer_uploads;

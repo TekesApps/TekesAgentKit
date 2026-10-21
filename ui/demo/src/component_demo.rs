@@ -3511,10 +3511,10 @@ impl ComponentDemo {
             _ => None,
         };
         position.is_some_and(|position| {
-            if self
-                .composing_navigation_run()
-                .is_some_and(|run| run.is_nonfocusing_navigation_at(position))
-            {
+            if self.composing_navigation_run().is_some_and(|run| {
+                run.is_nonfocusing_navigation_at(position)
+                    || run.composer().is_nonfocusing_notice_refresh_at(position)
+            }) {
                 return false;
             }
             !self
@@ -3554,9 +3554,10 @@ impl ComponentDemo {
         if self
             .composing_editor()
             .is_some_and(|editor| editor != target)
-            && !self
-                .composing_navigation_run()
-                .is_some_and(|run| run.is_nonfocusing_navigation_target(target))
+            && !self.composing_navigation_run().is_some_and(|run| {
+                run.is_nonfocusing_navigation_target(target)
+                    || run.composer().is_nonfocusing_notice_refresh_target(target)
+            })
         {
             return Ok(vec![]);
         }

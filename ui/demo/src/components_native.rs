@@ -32,6 +32,8 @@ use tekes_ui_scene::{GlyphAtlas, Rect, Scene};
 use tekes_ui_text::coretext::{CoreTextFonts, CoreTextRasterizer, CoreTextShaper};
 use tekes_ui_tokens::{Palette, Theme};
 
+#[path = "native_composer_notice_selftest.rs"]
+mod composer_notice_probe;
 #[path = "native_feedback_selftest.rs"]
 mod feedback_probe;
 #[path = "native_panel_projection_selftest.rs"]
@@ -87,6 +89,7 @@ struct Host {
     sidebar_restore_probe: Option<sidebar_restore_probe::Probe>,
     sidebar_options_probe: Option<sidebar_options_probe::Probe>,
     panel_projection_probe: Option<panel_projection_probe::Probe>,
+    composer_notice_probe: Option<composer_notice_probe::Probe>,
     reading_probe: Option<reading_probe::Probe>,
     readonly_reading_probe: Option<readonly_reading_probe::Probe>,
     summary_sections_probe: Option<summary_sections_probe::Probe>,
@@ -1366,6 +1369,10 @@ impl Host {
                 native_script(&self.view);
             }
         }
+        if let Some(mut probe) = self.composer_notice_probe.take() {
+            probe.advance(self, window);
+            self.composer_notice_probe = Some(probe);
+        }
         if let Some(mut probe) = self.panel_projection_probe.take() {
             probe.advance(self, window);
             self.panel_projection_probe = Some(probe);
@@ -2407,6 +2414,14 @@ impl Host {
                 probe.receipt()
             );
         }
+        if let Some(probe) = &self.composer_notice_probe {
+            assert!(
+                self.failures.is_empty(),
+                "notice failures {:?}",
+                self.failures
+            );
+            println!("NATIVE_AGENT_COMPOSER_NOTICE_RECEIPT {}", probe.receipt());
+        }
         if let Some(probe) = &self.panel_projection_probe {
             assert!(
                 self.failures.is_empty(),
@@ -2663,6 +2678,7 @@ impl WindowHandler for Host {
                     || self.stream_reading_probe.is_some()
                     || self.sidebar_options_probe.is_some()
                     || self.panel_projection_probe.is_some()
+                    || self.composer_notice_probe.is_some()
                 {
                     eprintln!(
                         "COMPONENT_FOCUS active={active} id={:?}",
@@ -2837,6 +2853,11 @@ pub fn run() {
     );
     let sidebar_restore_selftest = args.iter().any(|arg| arg == "--sidebar-restore-selftest");
     let sidebar_options_selftest = args.iter().any(|arg| arg == "--sidebar-options-selftest");
+    let composer_notice_selftest = args.iter().any(|arg| arg == "--composer-notice-selftest");
+    assert!(
+        !composer_notice_selftest || args.iter().any(|arg| arg == "--transcript-content"),
+        "notice probe requires formal Transcript window"
+    );
     let panel_projection_selftest = args.iter().any(|arg| arg == "--panel-projection-selftest");
     assert!(
         !panel_projection_selftest || args.iter().any(|arg| arg == "--transcript-content"),
@@ -2851,6 +2872,7 @@ pub fn run() {
         || sidebar_restore_selftest
         || sidebar_options_selftest
         || panel_projection_selftest
+        || composer_notice_selftest
         || sidebar_session_menu_selftest
         || sidebar_search_selftest
         || sidebar_query_selftest
@@ -2884,6 +2906,7 @@ pub fn run() {
             sidebar_restore_selftest,
             sidebar_options_selftest,
             panel_projection_selftest,
+            composer_notice_selftest,
             sidebar_session_menu_selftest,
             sidebar_search_selftest,
             sidebar_query_selftest,
@@ -3286,6 +3309,7 @@ pub fn run() {
             sidebar_options_selftest.then(sidebar_options_probe::Probe::new)
         },
         panel_projection_probe: panel_projection_selftest.then(panel_projection_probe::Probe::new),
+        composer_notice_probe: composer_notice_selftest.then(composer_notice_probe::Probe::new),
         readonly_reading_probe: (readonly_reading_selftest || harness_readonly_reading_selftest)
             .then(|| readonly_reading_probe::Probe::new(bounded_probe_child)),
         reading_probe: if reading_selftest || harness_reading_selftest {
