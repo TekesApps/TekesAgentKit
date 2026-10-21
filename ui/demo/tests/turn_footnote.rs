@@ -1,7 +1,8 @@
 #![cfg(target_os = "macos")]
 use std::rc::Rc;
 use tekes_agent_components_ui::{
-    OutputUsage, TurnActionResult, TurnFootnote, TurnFootnoteFacts, TurnFootnoteIntent,
+    OutputUsage, TurnActionResult, TurnFootnote, TurnFootnoteDisplay, TurnFootnoteFacts,
+    TurnFootnoteIntent,
 };
 use tekes_ui_controls::{
     ButtonTextAlign, ButtonTextRenderer, TextSurfaceHost, TextSurfaceTextRenderer,
@@ -242,7 +243,11 @@ fn facts_keep_unknown_partial_live_and_settled_time_distinct() {
         })
     );
     assert_eq!(facts.elapsed_seconds(), None);
-    assert!(facts.text().contains("error") && facts.text().contains("部分报告"));
+    assert_eq!(facts.status, "error");
+    assert!(
+        facts.text().is_empty(),
+        "no invented localized timestamp or raw status caption"
+    );
 }
 #[test]
 fn source_and_identity_fences_leave_readout_unchanged_and_render_disabled_reasons() {
@@ -452,4 +457,114 @@ async fn equal_endpoint_names_cannot_substitute_a_different_runtime_authority() 
     assert!(fixture.mutation_receipts().is_empty() && other_fixture.mutation_receipts().is_empty());
     runtime.stop().await.unwrap();
     other_runtime.stop().await.unwrap();
+}
+
+#[test]
+fn source_live_caption_requires_owner_and_clock_and_never_uses_legacy_or_zero_tokens() {
+    let mut t = turn();
+    t.status = "running".into();
+    t.started_at = Some(10_000.);
+    t.ended_at = None;
+    t.live_usage = Some(TranscriptLiveUsage { output_tokens: 0 });
+    t.usage.output_tokens = 999999;
+    let display = TurnFootnoteDisplay {
+        revision: 1,
+        now_ms: Some(75_999.),
+        is_live_owner: true,
+        finished_text: None,
+    };
+    let mut facts = TurnFootnoteFacts::read_with_display(&t, display.clone());
+    assert_eq!(facts.text(), "1m 5s");
+    facts.output_usage = Some(OutputUsage::Live {
+        output_tokens: 12400,
+    });
+    assert_eq!(facts.text(), "1m 5s   12.4k tokens");
+    facts.display.is_live_owner = false;
+    assert!(
+        facts.text().is_empty(),
+        "historical open turn does not run a clock"
+    );
+    facts.display = display;
+    facts.started_at = Some(0.);
+    assert_eq!(
+        facts.text(),
+        "   12.4k tokens",
+        "epoch placeholder never becomes a duration"
+    );
+    facts.output_usage = None;
+    assert!(facts.text().is_empty());
+    assert_eq!(TurnFootnoteFacts::elapsed_text(90061), "1d 1h 1m 1s");
+    assert_eq!(TurnFootnoteFacts::elapsed_text(3600), "1h 0s");
+    assert_eq!(TurnFootnoteFacts::elapsed_text(0), "0s");
+}
+#[test]
+fn explicit_caption_transition_keeps_information_owner_and_fences_hidden_actions() {
+    let mut t = turn();
+    let mut footer = TurnFootnote::new(49009, scope(), Default::default());
+    footer
+        .update_with_display(
+            &scope(),
+            1,
+            1,
+            &t,
+            true,
+            None,
+            &TurnFootnoteDisplay {
+                revision: 1,
+                finished_text: Some("周四 下午1:02".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    let info = footer.information_id().unwrap();
+    let action = footer.action_id(&t.footnote_actions[0].id).unwrap();
+    let root = footer.id();
+    let mut host = footer.into_host().unwrap();
+    host.accessibility_action(action, None, AccessibilityAction::Press);
+    let stale = host.drain_actions();
+    t.status = "running".into();
+    t.ended_at = None;
+    let live = TurnFootnoteDisplay {
+        revision: 2,
+        now_ms: Some(14000.),
+        is_live_owner: true,
+        finished_text: None,
+    };
+    let f = host
+        .get_mut(root)
+        .unwrap()
+        .component_mut::<TurnFootnote>()
+        .unwrap();
+    f.update_with_display(&scope(), 2, 1, &t, true, None, &live)
+        .unwrap();
+    assert_eq!(f.information_id(), Some(info));
+    assert!(f.action_id(&t.footnote_actions[0].id).is_none());
+    assert!(f.take_intents(&stale).is_empty());
+    let mut older = live.clone();
+    older.revision = 1;
+    assert_eq!(
+        f.update_with_display(&scope(), 2, 1, &t, true, None, &older),
+        Err("stale or conflicting footnote display")
+    );
+    assert_eq!(f.facts().unwrap().display, live);
+    t.status = "completed".into();
+    t.ended_at = Some(14000.);
+    f.update_with_display(
+        &scope(),
+        3,
+        1,
+        &t,
+        true,
+        None,
+        &TurnFootnoteDisplay {
+            revision: 3,
+            finished_text: Some("周四 下午1:03".into()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(f.information_id(), Some(info));
+    assert_ne!(f.action_id(&t.footnote_actions[0].id), Some(action));
+    assert!(f.take_intents(&stale).is_empty());
+    assert_eq!(f.facts().unwrap().text(), "周四 下午1:03");
 }

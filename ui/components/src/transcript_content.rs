@@ -48,6 +48,8 @@ pub struct TranscriptContentUpdate<'a> {
     epoch: u64,
     snapshot: &'a TranscriptSnapshot,
     available: bool,
+    timing: crate::TranscriptFootnoteTiming,
+    base_timing: crate::TranscriptFootnoteTiming,
     rows: Vec<(TranscriptContentRowKey, ComponentId)>,
 }
 impl TranscriptContentUpdate<'_> {
@@ -125,6 +127,7 @@ pub struct TranscriptContent {
     epoch: u64,
     last: Option<TranscriptSnapshot>,
     labels: TranscriptContentLabels,
+    timing: crate::TranscriptFootnoteTiming,
     feedback_dirty: bool,
     run_layout: Option<RunTranscriptLayout>,
     arranged_revision: Option<(u64, u64)>,
@@ -173,6 +176,7 @@ impl TranscriptContent {
             epoch: 0,
             last: None,
             labels,
+            timing: Default::default(),
             feedback_dirty: false,
             run_layout: None,
             arranged_revision: None,
@@ -181,6 +185,9 @@ impl TranscriptContent {
     }
     pub fn id(&self) -> ComponentId {
         self.root
+    }
+    pub fn footnote_timing(&self) -> &crate::TranscriptFootnoteTiming {
+        &self.timing
     }
     pub fn scope(&self) -> &RunScope {
         &self.scope
@@ -214,7 +221,7 @@ impl TranscriptContent {
         };
         let document =
             TranscriptDocument::read(snapshot).map_err(|_| "invalid transcript document")?;
-        let planned = plan(&document, &self.labels)?;
+        let planned = plan(&document, &self.labels, &self.timing)?;
         let mounted: BTreeMap<_, _> = self.keys.iter().zip(&self.rows.children).collect();
         let mut rows: BTreeMap<&str, (Vec<ComponentId>, bool)> = BTreeMap::new();
         for row in &planned {
@@ -224,7 +231,7 @@ impl TranscriptContent {
                     section.map(|_| output.item.turn_id.as_str())
                 }
                 PlannedContent::Tool(tool, _) => Some(tool.turn_id.as_str()),
-                PlannedContent::Footnote(turn, _) => Some(turn.id.as_str()),
+                PlannedContent::Footnote(turn, _, _) => Some(turn.id.as_str()),
                 PlannedContent::Feedback(target) => Some(target.turn_id),
                 PlannedContent::Label(_) => match &row.key {
                     TranscriptContentRowKey::Unplaced(turn) => Some(turn.as_str()),
@@ -314,6 +321,26 @@ impl TranscriptContent {
         snapshot: &TranscriptSnapshot,
         available: bool,
     ) -> Result<(), &'static str> {
+        self.update_with_timing(
+            scope,
+            publication,
+            epoch,
+            snapshot,
+            available,
+            &Default::default(),
+        )
+    }
+    pub fn update_with_timing(
+        &mut self,
+        scope: &RunScope,
+        publication: u64,
+        epoch: u64,
+        snapshot: &TranscriptSnapshot,
+        available: bool,
+        timing: &crate::TranscriptFootnoteTiming,
+    ) -> Result<(), &'static str> {
+        self.check_timing(publication, epoch, snapshot, timing)?;
+
         if scope != &self.scope {
             return Err("transcript content scope mismatch");
         }
@@ -326,7 +353,11 @@ impl TranscriptContent {
             return Err("conflicting transcript content publication");
         }
         let available = available && !snapshot.is_stale;
-        if !self.feedback_dirty && self.epoch == epoch && self.last.as_ref() == Some(snapshot) {
+        if !self.feedback_dirty
+            && self.epoch == epoch
+            && self.last.as_ref() == Some(snapshot)
+            && &self.timing == timing
+        {
             for node in &mut self.rows.children {
                 if let Some(footer) = node.component_mut::<TurnFootnote>() {
                     footer.set_available(available);
@@ -344,7 +375,7 @@ impl TranscriptContent {
         }
         let document =
             TranscriptDocument::read(snapshot).map_err(|_| "invalid transcript document")?;
-        let plan = plan(&document, &self.labels)?;
+        let plan = plan(&document, &self.labels, timing)?;
         self.validate_plan(&plan, publication, epoch, available)?;
         let desired: BTreeSet<_> = plan.iter().map(|row| row.key.clone()).collect();
         // All source/identity/content/namespace checks precede tree mutation.
@@ -390,6 +421,7 @@ impl TranscriptContent {
             }
         }
         self.last = Some(snapshot.clone());
+        self.timing = timing.clone();
         self.arranged_revision = None;
         self.feedback_dirty = false;
         Ok(())
@@ -410,10 +442,28 @@ impl TranscriptContent {
         snapshot: &'a TranscriptSnapshot,
         available: bool,
     ) -> Result<TranscriptContentUpdate<'a>, &'static str> {
-        self.validate_update(scope, publication, epoch, snapshot, available)?;
+        self.prepare_update_with_timing(
+            scope,
+            publication,
+            epoch,
+            snapshot,
+            available,
+            &Default::default(),
+        )
+    }
+    pub fn prepare_update_with_timing<'a>(
+        &self,
+        scope: &RunScope,
+        publication: u64,
+        epoch: u64,
+        snapshot: &'a TranscriptSnapshot,
+        available: bool,
+        timing: &crate::TranscriptFootnoteTiming,
+    ) -> Result<TranscriptContentUpdate<'a>, &'static str> {
+        self.validate_update_with_timing(scope, publication, epoch, snapshot, available, timing)?;
         let document =
             TranscriptDocument::read(snapshot).map_err(|_| "invalid transcript document")?;
-        let planned = plan(&document, &self.labels)?;
+        let planned = plan(&document, &self.labels, timing)?;
         let desired: BTreeSet<_> = planned.iter().map(|row| row.key.clone()).collect();
         let index: BTreeMap<_, _> = self
             .keys
@@ -453,6 +503,8 @@ impl TranscriptContent {
             epoch,
             snapshot,
             available,
+            timing: timing.clone(),
+            base_timing: self.timing.clone(),
             rows,
         })
     }
@@ -467,15 +519,17 @@ impl TranscriptContent {
             || self.publication != prepared.base_publication
             || self.epoch != prepared.base_epoch
             || self.next != prepared.base_next
+            || self.timing != prepared.base_timing
         {
             return Err("stale or foreign transcript update plan");
         }
-        let current = self.prepare_update(
+        let current = self.prepare_update_with_timing(
             &prepared.scope,
             prepared.publication,
             prepared.epoch,
             prepared.snapshot,
             prepared.available,
+            &prepared.timing,
         )?;
         if current.rows != prepared.rows {
             return Err("transcript update plan identities changed");
@@ -487,22 +541,44 @@ impl TranscriptContent {
         prepared: &TranscriptContentUpdate<'_>,
     ) -> Result<(), &'static str> {
         self.validate_prepared_update(prepared)?;
-        self.update(
+        self.update_with_timing(
             &prepared.scope,
             prepared.publication,
             prepared.epoch,
             prepared.snapshot,
             prepared.available,
+            &prepared.timing,
         )
     }
-    pub(crate) fn validate_update(
+    fn check_timing(
+        &self,
+        publication: u64,
+        epoch: u64,
+        snapshot: &TranscriptSnapshot,
+        timing: &crate::TranscriptFootnoteTiming,
+    ) -> Result<(), &'static str> {
+        timing.validate(snapshot)?;
+        if epoch == self.epoch
+            && (timing.revision < self.timing.revision
+                || (publication == self.publication
+                    && timing.revision == self.timing.revision
+                    && timing != &self.timing))
+        {
+            return Err("stale or conflicting Transcript footnote timing");
+        }
+        Ok(())
+    }
+    pub(crate) fn validate_update_with_timing(
         &self,
         scope: &RunScope,
         publication: u64,
         epoch: u64,
         snapshot: &TranscriptSnapshot,
         available: bool,
+        timing: &crate::TranscriptFootnoteTiming,
     ) -> Result<(), &'static str> {
+        self.check_timing(publication, epoch, snapshot, timing)?;
+
         if scope != &self.scope {
             return Err("transcript content scope mismatch");
         }
@@ -516,7 +592,7 @@ impl TranscriptContent {
         }
         let document =
             TranscriptDocument::read(snapshot).map_err(|_| "invalid transcript document")?;
-        let plan = plan(&document, &self.labels)?;
+        let plan = plan(&document, &self.labels, timing)?;
         self.validate_plan(&plan, publication, epoch, available && !snapshot.is_stale)
     }
     fn validate_plan(
@@ -678,16 +754,17 @@ impl TranscriptContent {
                     .ok_or("transcript tool role changed")?
                     .check_update(&self.scope, publication, epoch, tool, *placement)?;
             }
-            PlannedContent::Footnote(turn, output) => {
+            PlannedContent::Footnote(turn, output, display) => {
                 node.component::<TurnFootnote>()
                     .ok_or("transcript footnote role changed")?
-                    .check_update_with_output(
+                    .check_update_with_display(
                         &self.scope,
                         publication,
                         epoch,
                         turn,
                         available,
                         *output,
+                        display,
                     )?;
             }
             PlannedContent::Feedback(_) => {
@@ -729,10 +806,18 @@ impl TranscriptContent {
                 .component_mut::<ToolActivity>()
                 .unwrap()
                 .update(&self.scope, publication, epoch, tool, *placement)?,
-            PlannedContent::Footnote(turn, output) => node
+            PlannedContent::Footnote(turn, output, display) => node
                 .component_mut::<TurnFootnote>()
                 .unwrap()
-                .update_with_output(&self.scope, publication, epoch, turn, available, *output)?,
+                .update_with_display(
+                    &self.scope,
+                    publication,
+                    epoch,
+                    turn,
+                    available,
+                    *output,
+                    display,
+                )?,
             PlannedContent::Feedback(_) => {
                 if epoch != self.epoch {
                     node.component_mut::<TurnFeedback>()
@@ -896,7 +981,11 @@ enum PlannedContent<'a> {
     Input(TranscriptInput<'a>),
     Output(TranscriptOutput<'a>, Option<&'a TranscriptSection<'a>>),
     Tool(&'a TranscriptToolCall, ToolActivityPlacement),
-    Footnote(&'a TranscriptTurn, Option<TranscriptOutput<'a>>),
+    Footnote(
+        &'a TranscriptTurn,
+        Option<TranscriptOutput<'a>>,
+        crate::TurnFootnoteDisplay,
+    ),
     Feedback(TurnFeedbackTarget<'a>),
     Label(String),
 }
@@ -910,6 +999,7 @@ fn label(key: TranscriptContentRowKey, text: String) -> Planned<'static> {
 fn plan<'a>(
     document: &'a TranscriptDocument<'a>,
     labels: &TranscriptContentLabels,
+    timing: &crate::TranscriptFootnoteTiming,
 ) -> Result<Vec<Planned<'a>>, &'static str> {
     use TranscriptContentRowKey as Key;
     let mut result = vec![];
@@ -955,7 +1045,11 @@ fn plan<'a>(
             result.push(Planned {
                 key: Key::TurnFootnote(turn.id.clone()),
                 alias: None,
-                content: PlannedContent::Footnote(turn, section.final_output()),
+                content: PlannedContent::Footnote(
+                    turn,
+                    section.final_output(),
+                    timing.display(turn, &labels.footnote),
+                ),
             });
             if labels.feedback.is_some()
                 && let Some(target) = TurnFeedbackTarget::read(section)

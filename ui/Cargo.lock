@@ -2022,6 +2022,7 @@ version = "0.0.0"
 dependencies = [
  "async-trait",
  "futures-util",
+ "objc2-foundation",
  "png 0.17.16",
  "rfd",
  "serde_json",

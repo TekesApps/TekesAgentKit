@@ -82,15 +82,20 @@ pub struct TurnFootnoteFacts {
     pub started_at: Option<f64>,
     pub ended_at: Option<f64>,
     pub output_usage: Option<OutputUsage>,
+    pub display: crate::TurnFootnoteDisplay,
 }
 impl TurnFootnoteFacts {
     pub fn read(turn: &TranscriptTurn) -> Self {
+        Self::read_with_display(turn, Default::default())
+    }
+    pub fn read_with_display(turn: &TranscriptTurn, display: crate::TurnFootnoteDisplay) -> Self {
         Self {
             turn_id: turn.id.clone(),
             status: turn.status.clone(),
             started_at: turn.started_at,
             ended_at: turn.ended_at,
             output_usage: OutputUsage::read_turn(turn),
+            display,
         }
     }
     /// A settled interval converted from Unix milliseconds to seconds.
@@ -98,30 +103,58 @@ impl TurnFootnoteFacts {
     pub fn elapsed_seconds(&self) -> Option<f64> {
         self.started_at.zip(self.ended_at).and_then(|(start, end)| {
             let elapsed = (end - start) / 1000.;
-            (start.is_finite() && end.is_finite() && elapsed.is_finite() && elapsed >= 0.)
+            (start.is_finite()
+                && start > 0.
+                && end.is_finite()
+                && elapsed.is_finite()
+                && elapsed >= 0.)
                 .then_some(elapsed)
         })
     }
+    /// The live aside contains elapsed time and positive reported token count.
+    /// A settled aside contains only the host's localized source end timestamp.
     pub fn text(&self) -> String {
-        let mut parts = vec![self.status.clone()];
-        if let Some(usage) = &self.output_usage {
-            parts.push(match usage {
-                OutputUsage::Live { output_tokens } => {
-                    format!("输出 {output_tokens} tokens · 实时报告")
-                }
-                OutputUsage::Reported {
-                    output_tokens,
-                    complete,
-                } => format!(
-                    "输出 {output_tokens} tokens{}",
-                    if *complete { "" } else { " · 部分报告" }
-                ),
-            });
+        if !self.display.is_live_owner {
+            return self.display.finished_text.clone().unwrap_or_default();
         }
-        if let Some(duration) = self.elapsed_seconds() {
-            parts.push(format!("{duration:.1}s"));
+        let mut text = self
+            .started_at
+            .zip(self.display.now_ms)
+            .and_then(|(start, now)| {
+                let elapsed = (now - start) / 1000.;
+                (start.is_finite()
+                    && start > 0.
+                    && elapsed.is_finite()
+                    && elapsed >= 0.
+                    && elapsed < u64::MAX as f64)
+                    .then(|| Self::elapsed_text(elapsed.floor() as u64))
+            })
+            .unwrap_or_default();
+        if let Some(OutputUsage::Live { output_tokens }) = &self.output_usage
+            && *output_tokens > 0
+        {
+            let count = if *output_tokens < 1000 {
+                output_tokens.to_string()
+            } else {
+                format!("{:.1}k", *output_tokens as f64 / 1000.)
+            };
+            text.push_str(&format!("   {count} tokens"));
         }
-        parts.join(" · ")
+        text
+    }
+    pub fn elapsed_text(seconds: u64) -> String {
+        let mut parts = vec![];
+        for (value, unit) in [
+            (seconds / 86400, "d"),
+            (seconds % 86400 / 3600, "h"),
+            (seconds % 3600 / 60, "m"),
+        ] {
+            if value > 0 {
+                parts.push(format!("{value}{unit}"));
+            }
+        }
+        parts.push(format!("{}s", seconds % 60));
+        parts.join(" ")
     }
 }
 #[derive(Clone, Debug)]
@@ -132,6 +165,8 @@ pub struct TurnFootnoteLabels {
     pub completed: String,
     pub unknown: String,
     pub information: fn(&TurnFootnoteFacts) -> String,
+    /// Calendar/locale adapter. Receives source Unix ms and the explicit display clock.
+    pub finished_timestamp: fn(f64, Option<f64>) -> Option<String>,
 }
 impl Default for TurnFootnoteLabels {
     fn default() -> Self {
@@ -142,11 +177,15 @@ impl Default for TurnFootnoteLabels {
             completed: "操作已完成".into(),
             unknown: "操作结果未确认，请先核对；不会自动重试".into(),
             information: TurnFootnoteFacts::text,
+            finished_timestamp: |_, _| None,
         }
     }
 }
 #[derive(Debug)]
 pub struct TurnFootnote {
+    display: crate::TurnFootnoteDisplay,
+    information: Option<Content>,
+    information_text: String,
     output_copy: Option<(TranscriptMessageIdentity, String)>,
     copy_id: Option<ComponentId>,
     root: ComponentId,
@@ -167,6 +206,9 @@ impl TurnFootnote {
     pub fn new(namespace: u32, scope: RunScope, labels: TurnFootnoteLabels) -> Self {
         let root = ComponentId((namespace as u64) << 32);
         Self {
+            display: Default::default(),
+            information: None,
+            information_text: String::new(),
             output_copy: None,
             copy_id: None,
             root,
@@ -204,6 +246,9 @@ impl TurnFootnote {
         self.root
     }
     pub fn action_id(&self, id: &str) -> Option<ComponentId> {
+        if self.display.is_live_owner {
+            return None;
+        }
         self.actions
             .iter()
             .find_map(|(node, a)| (a.id == id).then_some(*node))
@@ -218,7 +263,9 @@ impl TurnFootnote {
         }
     }
     pub fn facts(&self) -> Option<TurnFootnoteFacts> {
-        self.turn.as_ref().map(TurnFootnoteFacts::read)
+        self.turn
+            .as_ref()
+            .map(|turn| TurnFootnoteFacts::read_with_display(turn, self.display.clone()))
     }
     pub fn update(
         &mut self,
@@ -242,8 +289,36 @@ impl TurnFootnote {
         available: bool,
         output: Option<TranscriptOutput<'_>>,
     ) -> Result<(), &'static str> {
-        let rekey =
-            self.check_update_with_output(scope, publication, epoch, turn, available, output)?;
+        self.update_with_display(
+            scope,
+            publication,
+            epoch,
+            turn,
+            available,
+            output,
+            &Default::default(),
+        )
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub fn update_with_display(
+        &mut self,
+        scope: &RunScope,
+        publication: u64,
+        epoch: u64,
+        turn: &TranscriptTurn,
+        available: bool,
+        output: Option<TranscriptOutput<'_>>,
+        display: &crate::TurnFootnoteDisplay,
+    ) -> Result<(), &'static str> {
+        let rekey = self.check_update_with_display(
+            scope,
+            publication,
+            epoch,
+            turn,
+            available,
+            output,
+            display,
+        )? || self.display.is_live_owner != display.is_live_owner;
         let copy = copy_facts(turn, output)?;
         if copy != self.output_copy || epoch != self.epoch {
             self.copy_id = copy.as_ref().map(|_| {
@@ -257,10 +332,9 @@ impl TurnFootnote {
         self.publication = publication;
         self.epoch = epoch;
         self.available = available;
-        self.rows.children[0]
-            .component_mut::<TextContent>()
-            .unwrap()
-            .text = (self.labels.information)(&TurnFootnoteFacts::read(turn));
+        self.display = display.clone();
+        self.information_text =
+            (self.labels.information)(&TurnFootnoteFacts::read_with_display(turn, display.clone()));
         if rekey {
             self.rekey();
         }
@@ -268,10 +342,19 @@ impl TurnFootnote {
         self.render_actions();
         Ok(())
     }
+    pub fn information_id(&self) -> Option<ComponentId> {
+        (!self.information_text.is_empty()).then_some(ComponentId(self.root.0 + 1))
+    }
     pub fn copy_button_id(&self) -> Option<ComponentId> {
+        if self.display.is_live_owner {
+            return None;
+        }
         self.copy_id
     }
     pub fn take_copy_intents(&self, actions: &[ContentAction]) -> Vec<TranscriptCopyIntent> {
+        if self.display.is_live_owner {
+            return vec![];
+        }
         let Some((message, text)) = &self.output_copy else {
             return vec![];
         };
@@ -287,7 +370,8 @@ impl TurnFootnote {
             text.clone(),
         )]
     }
-    pub(crate) fn check_update_with_output(
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn check_update_with_display(
         &self,
         scope: &RunScope,
         publication: u64,
@@ -295,7 +379,17 @@ impl TurnFootnote {
         turn: &TranscriptTurn,
         available: bool,
         output: Option<TranscriptOutput<'_>>,
+        display: &crate::TurnFootnoteDisplay,
     ) -> Result<bool, &'static str> {
+        display.validate(turn)?;
+        if epoch == self.epoch
+            && (display.revision < self.display.revision
+                || (publication == self.publication
+                    && display.revision == self.display.revision
+                    && display != &self.display))
+        {
+            return Err("stale or conflicting footnote display");
+        }
         let rekey = self.check_update(scope, publication, epoch, turn, available)?;
         let copy = copy_facts(turn, output)?;
         if publication == self.publication && copy != self.output_copy {
@@ -402,8 +496,32 @@ impl TurnFootnote {
         }
     }
     fn render_actions(&mut self) {
-        // Information node is retained through token/status-only publications.
-        let mut previous = self.rows.children.split_off(1);
+        let mut previous = std::mem::take(&mut self.rows.children);
+        let info_id = ComponentId(self.root.0 + 1);
+        let mut information = previous
+            .iter()
+            .position(|node| node.id() == info_id)
+            .map(|index| previous.remove(index))
+            .or_else(|| self.information.take())
+            .expect("retained original footnote information");
+        information.component_mut::<TextContent>().unwrap().text = self.information_text.clone();
+        if self.display.is_live_owner {
+            if self.information_text.is_empty() {
+                self.information = Some(information);
+            } else {
+                self.rows.children.push(information);
+            }
+            return;
+        }
+        if let Some(id) = self.copy_id {
+            let mut node = previous
+                .iter()
+                .position(|node| node.id() == id)
+                .map(|index| previous.remove(index))
+                .unwrap_or_else(|| Content::new(id, ButtonContent::new(&self.labels.copy)));
+            node.component_mut::<ButtonContent>().unwrap().label = self.labels.copy.clone();
+            self.rows.children.push(node);
+        }
         for (id, action) in &self.actions {
             let mut node = previous
                 .iter()
@@ -425,14 +543,10 @@ impl TurnFootnote {
                 ));
             }
         }
-        if let Some(id) = self.copy_id {
-            let mut node = previous
-                .iter()
-                .position(|node| node.id() == id)
-                .map(|index| previous.remove(index))
-                .unwrap_or_else(|| Content::new(id, ButtonContent::new(&self.labels.copy)));
-            node.component_mut::<ButtonContent>().unwrap().label = self.labels.copy.clone();
-            self.rows.children.push(node);
+        if self.information_text.is_empty() {
+            self.information = Some(information);
+        } else {
+            self.rows.children.push(information);
         }
         let notice = if self.pending.is_some() && self.observed.is_none() {
             &self.labels.pending
@@ -451,7 +565,7 @@ impl TurnFootnote {
     }
     pub fn take_intents(&mut self, actions: &[ContentAction]) -> Vec<TurnFootnoteIntent> {
         self.refresh();
-        if !self.available || self.pending.is_some() {
+        if self.display.is_live_owner || !self.available || self.pending.is_some() {
             return vec![];
         }
         let Some(action) = actions
@@ -503,6 +617,9 @@ fn copy_facts(
     Ok(Some((output.key.into(), output.item.text.clone())))
 }
 impl Component for TurnFootnote {
+    fn active(&self) -> bool {
+        !self.rows.children.is_empty()
+    }
     fn children(&self) -> &[Content] {
         &self.rows.children
     }

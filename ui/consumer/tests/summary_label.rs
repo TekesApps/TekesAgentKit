@@ -1099,3 +1099,140 @@ fn repository_divider_follows_display_order_through_collapse_reorder_and_owner_c
         }
     }
 }
+
+#[test]
+fn transcript_clock_is_a_display_input_and_stale_plans_preserve_the_original_caption() {
+    let scope = RunScope::main("consumer", "footnote-time");
+    let mut snapshot = TranscriptSnapshot {
+        turns: vec![TranscriptTurn {
+            id: "timed-turn".into(),
+            status: "running".into(),
+            input: "输入".into(),
+            started_at: Some(10000.),
+            ended_at: None,
+            usage: Default::default(),
+            fork_boundary: None,
+            footnote_actions: vec![],
+            live_usage: None,
+            reported_usage: None,
+        }],
+        ..Default::default()
+    };
+    let mut content = TranscriptContent::new(
+        49904,
+        49905..49920,
+        scope.clone(),
+        TranscriptContentLabels {
+            footnote: TurnFootnoteLabels {
+                finished_timestamp: |end, _| (end == 85000.).then(|| "周四 下午1:03".into()),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let mut timing = TranscriptFootnoteTiming {
+        revision: 1,
+        now_ms: Some(75000.),
+        live_turn_id: Some("timed-turn".into()),
+    };
+    content
+        .update_with_timing(&scope, 1, 1, &snapshot, true, &timing)
+        .unwrap();
+    let root = content.id();
+    let footer = content
+        .row_id(&TranscriptContentRowKey::TurnFootnote("timed-turn".into()))
+        .unwrap();
+    let mut host = ContentHost::new(Content::new(root, content)).unwrap();
+    let info = host
+        .get(footer)
+        .unwrap()
+        .component::<TurnFootnote>()
+        .unwrap()
+        .information_id()
+        .unwrap();
+    let original = host.get(info).unwrap().component::<TextContent>().unwrap() as *const _ as usize;
+    assert_eq!(
+        host.get(info)
+            .unwrap()
+            .component::<TextContent>()
+            .unwrap()
+            .text,
+        "1m 5s"
+    );
+    timing.revision = 2;
+    timing.now_ms = Some(80000.);
+    let planned = host
+        .get(root)
+        .unwrap()
+        .component::<TranscriptContent>()
+        .unwrap()
+        .prepare_update_with_timing(&scope, 1, 1, &snapshot, true, &timing)
+        .unwrap();
+    timing.revision = 3;
+    timing.now_ms = Some(85000.);
+    let content = host
+        .get_mut(root)
+        .unwrap()
+        .component_mut::<TranscriptContent>()
+        .unwrap();
+    content
+        .update_with_timing(&scope, 1, 1, &snapshot, true, &timing)
+        .unwrap();
+    assert!(content.apply_prepared_update(&planned).is_err());
+    assert_eq!(
+        host.get(info)
+            .unwrap()
+            .component::<TextContent>()
+            .unwrap()
+            .text,
+        "1m 15s"
+    );
+    assert_eq!(
+        host.get(info).unwrap().component::<TextContent>().unwrap() as *const _ as usize,
+        original
+    );
+    snapshot.turns[0].status = "completed".into();
+    snapshot.turns[0].ended_at = Some(85000.);
+    let older_clock = TranscriptFootnoteTiming {
+        revision: 2,
+        now_ms: Some(80000.),
+        live_turn_id: None,
+    };
+    assert_eq!(
+        host.get_mut(root)
+            .unwrap()
+            .component_mut::<TranscriptContent>()
+            .unwrap()
+            .update_with_timing(&scope, 2, 1, &snapshot, false, &older_clock),
+        Err("stale or conflicting Transcript footnote timing")
+    );
+    assert_eq!(
+        host.get(info)
+            .unwrap()
+            .component::<TextContent>()
+            .unwrap()
+            .text,
+        "1m 15s"
+    );
+    timing.revision = 4;
+    timing.live_turn_id = None;
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<TranscriptContent>()
+        .unwrap()
+        .update_with_timing(&scope, 2, 1, &snapshot, false, &timing)
+        .unwrap();
+    assert_eq!(
+        host.get(info)
+            .unwrap()
+            .component::<TextContent>()
+            .unwrap()
+            .text,
+        "周四 下午1:03"
+    );
+    assert_eq!(
+        host.get(info).unwrap().component::<TextContent>().unwrap() as *const _ as usize,
+        original
+    );
+}

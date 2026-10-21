@@ -93,6 +93,8 @@ impl Drop for OwnedFilePreview {
         let _ = self.child.wait();
     }
 }
+#[path = "native_footnote_time_selftest.rs"]
+mod footnote_time_probe;
 struct Host {
     scripted_sidebar_action: Option<ScriptedSidebarAction>,
     sidebar_query: Option<Arc<tekes_agent_ui_bindings::SidebarSearchBinding>>,
@@ -111,6 +113,7 @@ struct Host {
     summary_label_probe: Option<summary_label_probe::Probe>,
     summary_child_probe: Option<summary_child_probe::Probe>,
     summary_row_probe: Option<summary_row_probe::Probe>,
+    footnote_time_probe: Option<footnote_time_probe::Probe>,
     visibility_probe: Option<visibility_probe::Probe>,
     feedback_probe: Option<feedback_probe::Probe>,
     stream_probe: Option<stream_probe::Probe>,
@@ -132,6 +135,7 @@ struct Host {
     results: mpsc::Receiver<HostResult>,
     wake: Option<tekes_ui_platform_macos::WindowWake>,
     observers: Vec<tokio::task::JoinHandle<()>>,
+    footnote_wake: Option<tokio::task::JoinHandle<()>>,
     selftest: bool,
     native_script_waiting_for_pin: bool,
     system_ime_selftest: bool,
@@ -1303,6 +1307,26 @@ impl Host {
                 .expect("component frame");
         }
         window.set_animating(self.text.frame_requested);
+        if self.view.has_live_footnote() && self.footnote_wake.is_none() {
+            let wake = window.wake_proxy();
+            self.footnote_wake = Some(self.executor.spawn(async move {
+                loop {
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                    if wake.wake() == tekes_ui_platform_macos::WakeResult::Closed {
+                        break;
+                    }
+                }
+            }));
+        } else if !self.view.has_live_footnote()
+            && let Some(task) = self.footnote_wake.take()
+        {
+            task.abort();
+        }
+        if let Some(mut probe) = self.footnote_time_probe.take() {
+            probe.advance(self, window);
+            self.footnote_time_probe = Some(probe);
+        }
+
         if let Some(mut probe) = self.sidebar_query_probe.take() {
             probe.advance(self, window);
             self.sidebar_query_probe = Some(probe);
@@ -2600,6 +2624,17 @@ impl Host {
                 probe.receipt(&self.view)
             );
         }
+        if let Some(probe) = &self.footnote_time_probe {
+            assert!(
+                self.failures.is_empty(),
+                "footnote callback errors: {:?}",
+                self.failures
+            );
+            println!("NATIVE_AGENT_FOOTNOTE_TIME_RECEIPT {}", probe.receipt());
+        }
+        if let Some(task) = self.footnote_wake.take() {
+            task.abort();
+        }
         for observer in self.observers.drain(..) {
             observer.abort();
         }
@@ -2981,6 +3016,13 @@ pub fn run() {
         !summary_label_selftest || args.iter().any(|arg| arg == "--transcript-content"),
         "Summary label requires formal host"
     );
+    let footnote_time_selftest = args
+        .iter()
+        .any(|arg| arg == "--footnote-time-native-selftest");
+    assert!(
+        !footnote_time_selftest || args.iter().any(|arg| arg == "--transcript-content"),
+        "footnote clock requires formal host"
+    );
     let summary_divider_selftest = args
         .iter()
         .any(|arg| arg == "--summary-divider-native-selftest");
@@ -3025,6 +3067,7 @@ pub fn run() {
         || disclosure_reading_selftest
         || summary_context_selftest
         || summary_divider_selftest
+        || footnote_time_selftest
         || summary_custom_selftest
         || summary_label_selftest
         || summary_child_selftest
@@ -3066,6 +3109,7 @@ pub fn run() {
             disclosure_reading_selftest,
             summary_context_selftest,
             summary_divider_selftest,
+            footnote_time_selftest,
             summary_custom_selftest,
             summary_label_selftest,
             summary_child_selftest,
@@ -3100,6 +3144,7 @@ pub fn run() {
     let mut query_fixture = None;
     let mut summary_child_fixture = None;
     let mut summary_row_fixture = None;
+    let mut footnote_time_fixture = None;
     let (connector, kind, scopes, fixture): (
         Arc<dyn tekes_agent_contract::EndpointConnector>,
         _,
@@ -3139,6 +3184,13 @@ pub fn run() {
                     .with_lifecycle()
                     .with_presets(false)
                     .with_models();
+                let fixture = if footnote_time_selftest {
+                    let fixture = fixture.with_timed_turn();
+                    footnote_time_fixture = Some(fixture.clone());
+                    fixture
+                } else {
+                    fixture
+                };
                 let fixture = if summary_row_selftest {
                     let fixture = fixture.with_summary_row_layout();
                     summary_row_fixture = Some(fixture.clone());
@@ -3513,6 +3565,7 @@ pub fn run() {
         summary_label_probe: summary_label_selftest.then(summary_label_probe::Probe::new),
         summary_child_probe: summary_child_fixture.map(summary_child_probe::Probe::new),
         summary_row_probe: summary_row_fixture.map(summary_row_probe::Probe::new),
+        footnote_time_probe: footnote_time_fixture.map(footnote_time_probe::Probe::new),
         visibility_probe: visibility_selftest
             .then(|| visibility_probe::Probe::new(visibility_fixture)),
         feedback_probe: feedback_selftest.then(feedback_probe::Probe::new),
@@ -3601,6 +3654,7 @@ pub fn run() {
         results,
         wake: None,
         observers: vec![],
+        footnote_wake: None,
         selftest,
         native_script_waiting_for_pin: false,
         system_ime_selftest,

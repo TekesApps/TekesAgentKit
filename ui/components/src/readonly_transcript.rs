@@ -121,6 +121,8 @@ pub struct ReadOnlyTranscript {
     refresh_enabled: bool,
     plan_owner: std::sync::Arc<()>,
     generation: u64,
+    footnote_clock: Option<f64>,
+    footnote_clock_revision: u64,
 }
 impl ReadOnlyTranscript {
     /// Three consecutive namespaces for controls/paging/content; reserve the
@@ -216,7 +218,35 @@ impl ReadOnlyTranscript {
             refresh_enabled: false,
             plan_owner: std::sync::Arc::new(()),
             generation: 0,
+            footnote_clock: None,
+            footnote_clock_revision: 0,
         })
+    }
+    pub fn set_footnote_clock(&mut self, now_ms: Option<f64>) -> Result<(), &'static str> {
+        if now_ms.is_some_and(|n| !n.is_finite() || n <= 0.) {
+            return Err("invalid footnote display clock");
+        }
+        if self.footnote_clock != now_ms {
+            let revision = self
+                .footnote_clock_revision
+                .checked_add(1)
+                .ok_or("footnote display revision exhausted")?;
+            let generation = self
+                .generation
+                .checked_add(1)
+                .ok_or("read-only display generation exhausted")?;
+            self.footnote_clock = now_ms;
+            self.footnote_clock_revision = revision;
+            self.generation = generation;
+        }
+        Ok(())
+    }
+    fn footnote_timing(&self) -> crate::TranscriptFootnoteTiming {
+        crate::TranscriptFootnoteTiming {
+            revision: self.footnote_clock_revision,
+            now_ms: self.footnote_clock,
+            live_turn_id: None,
+        }
     }
     pub fn ids(&self) -> ReadOnlyTranscriptIds {
         self.ids
@@ -278,12 +308,13 @@ impl ReadOnlyTranscript {
         {
             return Err("conflicting read-only transcript publication");
         }
-        self.content().validate_update(
+        self.content().validate_update_with_timing(
             input.scope,
             input.publication,
             input.connection_epoch,
             input.transcript,
             false,
+            &self.footnote_timing(),
         )
     }
     pub fn prepare_update<'a>(
@@ -294,12 +325,13 @@ impl ReadOnlyTranscript {
         self.generation
             .checked_add(1)
             .ok_or("read-only display generation exhausted")?;
-        let content = self.content().prepare_update(
+        let content = self.content().prepare_update_with_timing(
             input.scope,
             input.publication,
             input.connection_epoch,
             input.transcript,
             false,
+            &self.footnote_timing(),
         )?;
         let mut text = (self.labels.information)(
             input.connection,

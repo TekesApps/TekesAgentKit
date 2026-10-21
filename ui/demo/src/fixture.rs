@@ -111,6 +111,12 @@ fn append(line: &mut Line, kind: &str, data: Value) {
     line.rows.push(row.clone());
     let _ = line.sender.send(json!({"type":"event","entry":row}));
 }
+fn append_now(line: &mut Line, kind: &str, data: Value) {
+    let mut row = entry(line.rows.len() as i64, kind, data);
+    row.event.time = crate::footnote_host::now_ms();
+    line.rows.push(row.clone());
+    let _ = line.sender.send(json!({"type":"event","entry":row}));
+}
 fn summary(id: &str, line: &Line) -> Value {
     json!({"sessionId":id,"cwd":"/fixture","title":line.title,"status":if line.archived {"archived"} else {"active"},"running":line.busy,"blank":line.rows.is_empty(),"updatedAt":line.rows.len()})
 }
@@ -218,6 +224,54 @@ impl Default for Fixture {
     }
 }
 impl Fixture {
+    /// Owned clock/usage fixture; no model request or user submission.
+    pub fn with_timed_turn(self) -> Self {
+        let mut sessions = self.sessions.lock().unwrap();
+        let line = sessions.get_mut("a").unwrap();
+        line.turn += 1;
+        line.busy = true;
+        let start = crate::footnote_host::now_ms() - 65000.;
+        for (kind, data) in [
+            ("turn/start", json!({"turn":line.turn})),
+            (
+                "user/message",
+                json!({"turn":line.turn,"id":"timed-input","content":[{"type":"text","text":"计时验证输入"}]}),
+            ),
+        ] {
+            let mut row = entry(line.rows.len() as i64, kind, data);
+            row.event.time = start;
+            line.rows.push(row);
+        }
+        drop(sessions);
+        self
+    }
+    pub fn publish_timed_usage(&self, tokens: u64) -> Result<()> {
+        let sessions = self.sessions.lock().unwrap();
+        let line = sessions.get("a").unwrap();
+        require(line.busy && line.turn == 31, "timed fixture only")?;
+        line.sender.send(json!({"type":"transient","event":{"seq":0,"time":crate::footnote_host::now_ms(),"type":"assistant/chunk","data":{"turn":line.turn,"step":1,"chunk":{"type":"usage","usage":{"outputTokens":tokens}}}}})).map_err(|_| Error::Disconnected)?;
+        Ok(())
+    }
+    pub fn finish_timed_turn(&self) -> Result<()> {
+        let mut sessions = self.sessions.lock().unwrap();
+        let line = sessions.get_mut("a").unwrap();
+        require(line.busy && line.turn == 31, "timed fixture only")?;
+        let now = crate::footnote_host::now_ms();
+        for (kind, data) in [
+            (
+                "assistant/message",
+                json!({"turn":line.turn,"step":1,"message":{"id":"timed-output","content":[{"type":"text","text":"计时结束的正式回复"}],"usage":{"inputTokens":10,"outputTokens":1200}}}),
+            ),
+            ("turn/end", json!({"turn":line.turn,"reason":"completed"})),
+        ] {
+            let mut row = entry(line.rows.len() as i64, kind, data);
+            row.event.time = now;
+            line.rows.push(row.clone());
+            let _ = line.sender.send(json!({"type":"event","entry":row}));
+        }
+        line.busy = false;
+        Ok(())
+    }
     /// Controlled public inventory notification for display regression fixtures.
     /// Does not edit the harness's stored title or submit a model request.
     pub fn publish_inventory_summary(&self, summary: Value) -> Result<()> {
@@ -1217,8 +1271,8 @@ impl SessionEndpoint for Endpoint {
         line.cancel = Arc::new(AtomicBool::new(false));
         let cancel = line.cancel.clone();
         let turn = line.turn;
-        append(line, "turn/start", json!({"turn":turn}));
-        append(
+        append_now(line, "turn/start", json!({"turn":turn}));
+        append_now(
             line,
             "user/message",
             json!({"turn":turn,"id":rpc,"source":{"kind":"user","rpcId":rpc},"content":content}),
@@ -1242,16 +1296,16 @@ impl SessionEndpoint for Endpoint {
                 text.push_str(chunk);
                 let sessions = fixture.sessions.lock().unwrap();
                 let line = &sessions[&id];
-                let _=line.sender.send(json!({"type":"transient","event":{"seq":0,"time":1,"type":"assistant/chunk","data":{"turn":turn,"step":1,"chunk":{"type":"text-delta","text":chunk}}}}));
+                let _=line.sender.send(json!({"type":"transient","event":{"seq":0,"time":crate::footnote_host::now_ms(),"type":"assistant/chunk","data":{"turn":turn,"step":1,"chunk":{"type":"text-delta","text":chunk}}}}));
             }
             let mut sessions = fixture.sessions.lock().unwrap();
             let line = sessions.get_mut(&id).unwrap();
-            append(
+            append_now(
                 line,
                 "assistant/message",
                 json!({"turn":turn,"step":1,"message":{"id":format!("{id}-m{turn}"),"content":[{"type":"text","text":text}]}}),
             );
-            append(
+            append_now(
                 line,
                 "turn/end",
                 json!({"turn":turn,"reason":if cancel.load(Ordering::SeqCst){"interrupted"}else{"completed"}}),

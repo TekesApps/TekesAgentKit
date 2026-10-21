@@ -485,3 +485,6 @@ pub use summary_custom::{
     SummaryCustomRowError, SummaryCustomRowSpec, SummaryCustomRowToken, install_summary_custom_row,
     publish_summary_context_update,
 };
+
+mod turn_footnote_timing;
+pub use turn_footnote_timing::*;

@@ -2381,3 +2381,141 @@ async fn expanded_tool_growth_and_reflow_preserve_reading_and_explicit_collapse_
     assert!(snapshot.submissions.is_empty());
     runtime.stop().await.unwrap();
 }
+
+#[tokio::test]
+async fn explicit_clock_tick_uses_original_reading_transaction_and_keeps_preedit() {
+    let (_runtime, mut host, id, mut snapshot, mut version, mut text) = setup().await;
+    let turn_id = snapshot.transcript.turns.last().unwrap().id.clone();
+    snapshot.revision += 1;
+    let turn = snapshot.transcript.turns.last_mut().unwrap();
+    turn.status = "running".into();
+    turn.ended_at = None;
+    turn.started_at = Some(10000.);
+    for item in &mut snapshot.transcript.items {
+        if item.turn_id == turn_id && item.kind == TranscriptItemKind::Assistant {
+            item.is_final = false;
+        }
+    }
+    // Retained open journals do not grant live ownership to an interrupted or
+    // noncontinuable destination, even when stale submit/cancel flags remain.
+    assert!(
+        TranscriptFootnoteTiming::for_run(&snapshot, 1, Some(75000.))
+            .live_turn_id
+            .is_some()
+    );
+    for phase in [
+        tekes_agent_presentation::RunPhase::Interrupted,
+        tekes_agent_presentation::RunPhase::Archived,
+        tekes_agent_presentation::RunPhase::Unavailable,
+        tekes_agent_presentation::RunPhase::Loading,
+    ] {
+        let mut unavailable = snapshot.clone();
+        unavailable.run.as_mut().unwrap().phase = phase;
+        assert!(
+            TranscriptFootnoteTiming::for_run(&unavailable, 1, Some(75000.))
+                .live_turn_id
+                .is_none()
+        );
+    }
+    for availability in [
+        tekes_agent_presentation::ChildComposerAvailability::Loading,
+        tekes_agent_presentation::ChildComposerAvailability::OneShot,
+        tekes_agent_presentation::ChildComposerAvailability::ParentUnavailable,
+        tekes_agent_presentation::ChildComposerAvailability::Unavailable,
+    ] {
+        let mut unavailable = snapshot.clone();
+        unavailable.child_availability = Some(availability);
+        assert!(
+            TranscriptFootnoteTiming::for_run(&unavailable, 1, Some(75000.))
+                .live_turn_id
+                .is_none()
+        );
+    }
+    run_mut(&mut host, id)
+        .set_footnote_clock(Some(75000.))
+        .unwrap();
+    let plan = prepare(run(&host, id), &snapshot).unwrap();
+    version =
+        publish_run_reading_update(&mut host, id, &version, version.revision() + 1, &plan).unwrap();
+    render(&mut host, &mut text);
+    let footer = run(&host, id)
+        .transcript()
+        .unwrap()
+        .row_id(&TranscriptContentRowKey::TurnFootnote(turn_id))
+        .unwrap();
+    let info = host
+        .get(footer)
+        .unwrap()
+        .component::<TurnFootnote>()
+        .unwrap()
+        .information_id()
+        .unwrap();
+    assert_eq!(
+        host.get(info)
+            .unwrap()
+            .component::<TextContent>()
+            .unwrap()
+            .text,
+        "1m 5s"
+    );
+    let editor = run(&host, id).ids().composer.editor;
+    host.focus(Some(editor), true);
+    host.event(&ContentEvent::Preedit {
+        text: "clock tick 期间中文组字".into(),
+        selection: 1..3,
+        replacement: None,
+        clauses: vec![],
+    });
+    let baseline = run(&host, id).composer().editor().input.external_baseline();
+    run_mut(&mut host, id)
+        .set_footnote_clock(Some(80000.))
+        .unwrap();
+    let stale = prepare(run(&host, id), &snapshot).unwrap();
+    run_mut(&mut host, id)
+        .set_footnote_clock(Some(85000.))
+        .unwrap();
+    assert!(matches!(
+        publish_run_reading_update(&mut host, id, &version, version.revision() + 1, &stale),
+        Err(RunReadingError::Agent(_))
+    ));
+    assert_eq!(
+        host.get(info)
+            .unwrap()
+            .component::<TextContent>()
+            .unwrap()
+            .text,
+        "1m 5s",
+        "staging a clock never edits controls outside the transaction"
+    );
+    let plan = prepare(run(&host, id), &snapshot).unwrap();
+    let next =
+        publish_run_reading_update(&mut host, id, &version, version.revision() + 1, &plan).unwrap();
+    render(&mut host, &mut text);
+    assert_eq!(next.revision(), version.revision() + 1);
+    assert_eq!(host.focused(), Some(editor));
+    assert_eq!(
+        run(&host, id).composer().editor().input.external_baseline(),
+        baseline
+    );
+    assert_eq!(
+        host.get(footer)
+            .unwrap()
+            .component::<TurnFootnote>()
+            .unwrap()
+            .information_id(),
+        Some(info)
+    );
+    assert_eq!(
+        host.get(info)
+            .unwrap()
+            .component::<TextContent>()
+            .unwrap()
+            .text,
+        "1m 15s"
+    );
+    assert!(
+        run_mut(&mut host, id)
+            .set_footnote_clock(Some(f64::NAN))
+            .is_err()
+    );
+}

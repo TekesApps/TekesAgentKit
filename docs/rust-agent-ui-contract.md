@@ -336,3 +336,10 @@ The [published reading checkpoint integration](rust-agent-ui-published-reading-2
 The subsequent [Run continuous reading integration](rust-agent-ui-continuous-reading-20261021.md) connects the existing whole-frame plan to original SDK transactions in the formal host. It removes the duplicate Transcript write, uses independent display revisions for gate-only refreshes, and validates native owned-fixture pagination with marked text and focus retained. This does not accept all three harnesses' history anchors or Sidebar's full inventory reading lifecycle.
 
 The [retained-reading follow-up](rust-agent-ui-retained-reading-20261021.md) fixes stale completed-turn catalog removal and verifies native public pages, A/B retained reading and reconnect on Native/Pi/DSH. It distinguishes button focus from publication focus, and editing-authority tokens from draft state. Fresh-host persistent checkpoints require TekesUI #42; bounded read-only panes, full Sidebar reading and dedicated native streaming-while-reading checks remain open.
+
+[Footnote display-time integration](rust-agent-ui-turn-footnote-time-20261022.md)
+adds explicit host-clock revisions and calendar callbacks to the existing Run/Transcript
+reading transaction. Live elapsed/positive tokens and settled source end timestamps
+replace diagnostic status prose; stale clocks, interrupted/noncontinuable owners and
+old plans are fenced. Shared components own display rules; system time/calendar and
+wake scheduling remain host adapters. This does not complete footnote layout parity.

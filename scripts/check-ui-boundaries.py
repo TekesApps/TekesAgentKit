@@ -45,7 +45,12 @@ for path in ui.glob('*/Cargo.toml'):
     targets = manifest.get('target', {})
     if path.parent.name == 'demo':
         assert targets == {'cfg(target_os = "macos")': {'dependencies': {
-            'rfd': {'version': '=0.17.2', 'default-features': False}}}}
+            'rfd': {'version': '=0.17.2', 'default-features': False},
+            # Calendar/locale formatting is a fixed native demo host adapter,
+            # never a shared component or presentation dependency.
+            'objc2-foundation': {'version': '=0.3.2', 'default-features': False,
+                'features': ['std', 'NSObject', 'NSString', 'NSDate', 'NSDateFormatter',
+                             'NSFormatter', 'NSCalendar', 'NSLocale', 'NSTimeZone']}}}}
     else:
         assert not targets, 'system adapters must remain in the demo host'
     for dependency in [*manifest.get('dependencies', {}).values(), *manifest.get('dev-dependencies', {}).values()]:

@@ -22,3 +22,5 @@ pub mod feedback_transcript_proof;
 
 #[cfg(target_os = "macos")]
 pub mod label_host;
+
+pub mod footnote_host;

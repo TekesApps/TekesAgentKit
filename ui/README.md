@@ -281,3 +281,10 @@ Summary 默认按实际顺序为非首个 `repository:` header 组合原 SDK Sep
 折叠保留分隔线，换序重新判断。`SummarySectionLayout::divider` 返回最近实际 arrange 的
 逻辑 band，原 header 继续拥有完整 hit/AX frame。
 [分隔规则与原生接入](../docs/rust-agent-ui-summary-divider-20261022.md)包含第二 consumer 和组字期间点击的证据。
+
+Transcript footnotes accept an explicit, revisioned display clock through the
+original reading transaction. The Run derives live eligibility from existing
+presentation; readonly history only receives calendar formatting. Hosts own
+Unix time, locale and timezone, using `TurnFootnoteLabels::finished_timestamp`.
+See [footnote time contract](../docs/rust-agent-ui-turn-footnote-time-20261022.md)
+for API migration, native wake lifetime and evidence limits.

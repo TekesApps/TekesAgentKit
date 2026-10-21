@@ -709,7 +709,7 @@ impl ComponentDemo {
             binding.scope().clone(),
             tekes_agent_components_ui::TranscriptContentLabels {
                 feedback: feedback_labels,
-                ..Default::default()
+                ..crate::footnote_host::transcript_labels()
             },
         )
         .map_err(unsupported)?;
@@ -752,6 +752,13 @@ impl ComponentDemo {
     }
     fn attach_run_reading(&mut self, ids: ComposerIds, binding: &Arc<RunBinding>) -> Result<()> {
         let root = ComponentId(ids.root.0 + 16);
+        self.tree
+            .get_mut(root)
+            .unwrap()
+            .component_mut::<RunView>()
+            .unwrap()
+            .set_footnote_clock(Some(crate::footnote_host::now_ms()))
+            .map_err(unsupported)?;
         let run = self.tree.get(root).unwrap().component::<RunView>().unwrap();
         let viewport = run.ids().viewport;
         if self
@@ -901,6 +908,21 @@ impl ComponentDemo {
         }
         self.apply_sidebar_outcome(token, outcome)
     }
+    pub fn has_live_footnote(&self) -> bool {
+        [Some(self.ids()), self.panel_composer_ids()]
+            .into_iter()
+            .flatten()
+            .any(|ids| {
+                self.tree
+                    .get(ComponentId(ids.root.0 + 16))
+                    .is_some_and(|node| {
+                        node.visible().is_some()
+                            && node
+                                .component::<RunView>()
+                                .is_some_and(RunView::has_live_footnote)
+                    })
+            })
+    }
     fn sync_run_view(
         &mut self,
         ids: ComposerIds,
@@ -922,6 +944,13 @@ impl ComponentDemo {
         let controls =
             !self.composing() && binding.access() == PaneAccess::Ready && receipt.source_ready;
         let root = ComponentId(ids.root.0 + 16);
+        self.tree
+            .get_mut(root)
+            .unwrap()
+            .component_mut::<RunView>()
+            .unwrap()
+            .set_footnote_clock(Some(crate::footnote_host::now_ms()))
+            .map_err(unsupported)?;
         let run = self.tree.get(root).unwrap().component::<RunView>().unwrap();
         let version = self
             .tree
@@ -3181,8 +3210,10 @@ impl ComponentDemo {
                                 let end = namespace
                                     .checked_add(10_000)
                                     .ok_or_else(|| unsupported("read-only row pool exhausted"))?;
-                                let labels =
-                                    tekes_agent_components_ui::ReadOnlyTranscriptLabels::default();
+                                let labels = tekes_agent_components_ui::ReadOnlyTranscriptLabels {
+                                    content: crate::footnote_host::transcript_labels(),
+                                    ..Default::default()
+                                };
                                 let content = tekes_agent_components_ui::TranscriptContent::new(
                                     namespace,
                                     namespace + 1..end,
@@ -3203,6 +3234,8 @@ impl ComponentDemo {
                                     labels,
                                 )
                                 .map_err(unsupported)?;
+                                view.set_footnote_clock(Some(crate::footnote_host::now_ms()))
+                                    .map_err(unsupported)?;
                                 view.update(input).map_err(unsupported)?;
                                 let content_id = view.content_id();
                                 let panel = self
@@ -3244,6 +3277,14 @@ impl ComponentDemo {
                                         ))
                                     })?;
                             } else {
+                                self.tree
+                                    .get_mut(root)
+                                    .unwrap()
+                                    .component_mut::<tekes_agent_components_ui::ReadOnlyTranscript>(
+                                    )
+                                    .unwrap()
+                                    .set_footnote_clock(Some(crate::footnote_host::now_ms()))
+                                    .map_err(unsupported)?;
                                 let pane = self
                                     .tree
                                     .get(root)

@@ -111,6 +111,8 @@ pub struct RunView {
     navigation_mounted: bool,
     navigation_origin: Option<(u64, Option<String>)>,
     geometry: Option<RunViewGeometry>,
+    footnote_clock: Option<f64>,
+    footnote_clock_revision: u64,
 }
 impl RunView {
     /// Four consecutive namespaces for controls/paging/actionables/transcript;
@@ -202,6 +204,8 @@ impl RunView {
             navigation_mounted: false,
             navigation_origin: None,
             geometry: None,
+            footnote_clock: None,
+            footnote_clock_revision: 0,
             body: StackContent {
                 model: Stack {
                     axis: Axis::Vertical,
@@ -686,6 +690,42 @@ impl RunView {
     }
     /// Apply one frame, including per-binding read/response authority. The
     /// controls flag only restricts canonical actions; dispatch still revalidates.
+    /// Supply a quantized host Unix-ms clock before preparing a reading frame.
+    /// This only stages display input; original controls change in update/apply.
+    /// Host clock scheduling follows the accepted, presented footnote input.
+    pub fn has_live_footnote(&self) -> bool {
+        self.pane_presented
+            && self.footnote_clock.is_some()
+            && self
+                .transcript()
+                .is_some_and(|content| content.footnote_timing().live_turn_id.is_some())
+    }
+    pub fn set_footnote_clock(&mut self, now_ms: Option<f64>) -> Result<(), &'static str> {
+        if now_ms.is_some_and(|n| !n.is_finite() || n <= 0.) {
+            return Err("invalid footnote display clock");
+        }
+        if self.footnote_clock != now_ms {
+            let revision = self
+                .footnote_clock_revision
+                .checked_add(1)
+                .ok_or("footnote display revision exhausted")?;
+            let generation = self
+                .publication_generation
+                .checked_add(1)
+                .ok_or("RunView publication generation exhausted")?;
+            self.footnote_clock = now_ms;
+            self.footnote_clock_revision = revision;
+            self.publication_generation = generation;
+        }
+        Ok(())
+    }
+    fn footnote_timing(&self, snapshot: &RunSnapshot) -> crate::TranscriptFootnoteTiming {
+        crate::TranscriptFootnoteTiming::for_run(
+            snapshot,
+            self.footnote_clock_revision,
+            self.footnote_clock,
+        )
+    }
     pub fn update(
         &mut self,
         snapshot: &RunSnapshot,
@@ -752,12 +792,13 @@ impl RunView {
         let transcript = self
             .transcript()
             .ok_or("RunView has no Transcript")?
-            .prepare_update(
+            .prepare_update_with_timing(
                 &self.scope,
                 snapshot.revision,
                 snapshot.connection_epoch,
                 &snapshot.transcript,
                 gate.entries && !self.composer().is_composing(),
+                &self.footnote_timing(snapshot),
             )?;
         Ok(RunViewUpdate {
             root: self.ids.root,
@@ -841,13 +882,15 @@ impl RunView {
             .find_map(|node| node.component_mut::<Indicators>())
             .unwrap()
             .update(snapshot)?;
+        let footnote_timing = self.footnote_timing(snapshot);
         if let Some(content) = self.transcript_mut() {
-            content.update(
+            content.update_with_timing(
                 &scope,
                 snapshot.revision,
                 snapshot.connection_epoch,
                 &snapshot.transcript,
                 available,
+                &footnote_timing,
             )?;
         }
         self.last = Some(snapshot.clone());
@@ -900,12 +943,13 @@ impl RunView {
         let scope = self.scope.clone();
         let available = gate.entries && !self.composer().is_composing();
         if let Some(content) = self.transcript() {
-            content.validate_update(
+            content.validate_update_with_timing(
                 &scope,
                 snapshot.revision,
                 snapshot.connection_epoch,
                 &snapshot.transcript,
                 available,
+                &self.footnote_timing(snapshot),
             )?;
         }
         self.body

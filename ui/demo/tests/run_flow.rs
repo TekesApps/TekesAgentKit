@@ -42,6 +42,7 @@ async fn real_presentation_stream_cancel_reconnect_and_frozen_page() {
     let destination = ComposerDestination::run(RunScope::main("fixture", "a"));
     c.edit(&destination, draft).unwrap();
     let ticket = c.prepare(&destination, PromptMode::Queue).unwrap();
+    let started_after = tekes_agent_ui_demo::footnote_host::now_ms();
     c.dispatch(ticket, None).await.unwrap();
     until(&c, |s| {
         s.transcript
@@ -50,12 +51,33 @@ async fn real_presentation_stream_cancel_reconnect_and_frozen_page() {
             .any(|i| i.is_provisional && !i.text.is_empty())
     })
     .await;
+    let live = c.snapshot();
+    let turn = live
+        .transcript
+        .turns
+        .iter()
+        .find(|t| t.input == "确认流式回传")
+        .unwrap();
+    assert!(
+        turn.started_at.unwrap() >= started_after,
+        "new demo runs use Unix-ms, not the history fixture's sequence clock"
+    );
+    assert!(turn.started_at.unwrap() <= tekes_agent_ui_demo::footnote_host::now_ms());
     c.cancel(&RunScope::main("fixture", "a")).await.unwrap();
     until(&c, |s| {
         s.run.as_ref().is_some_and(|r| !r.can_cancel)
             && !s.transcript.items.iter().any(|i| i.is_provisional)
     })
     .await;
+    let settled = c.snapshot();
+    let turn = settled
+        .transcript
+        .turns
+        .iter()
+        .find(|t| t.input == "确认流式回传")
+        .unwrap();
+    assert!(turn.ended_at.unwrap() >= turn.started_at.unwrap());
+    assert!(turn.ended_at.unwrap() <= tekes_agent_ui_demo::footnote_host::now_ms());
     assert_eq!(
         c.snapshot()
             .transcript
