@@ -439,3 +439,230 @@ fn summary_focus_policy_leaves_original_host_controls_and_static_text_selectable
         "静态"
     );
 }
+
+#[test]
+fn default_summary_rows_use_source_bands_and_keep_original_text_action_and_selection() {
+    use tekes_ui_tokens::Spacing;
+    for theme in [Theme::LIGHT, Theme::DARK] {
+        for scale in [0.85, 1., 1.5, 2.] {
+            for width in [180., 320., 600.] {
+                let scope = RunScope::main("consumer", "row-layout");
+                let title = "中文标题 English 👩🏽‍💻 e\u{301} 长路径/".repeat(8);
+                let mut input = SummaryContextInput {
+                    revision: 1,
+                    owner: SummaryOwner::Run(scope.clone()),
+                    facts: None,
+                    ready: true,
+                    custom_rows: vec![],
+                    host_sections: vec![SummarySection {
+                        id: "repository".into(),
+                        rows: vec![
+                            SummaryRow {
+                                id: "open".into(),
+                                title: title.clone(),
+                                value: Default::default(),
+                                action: Some(SummaryAction::OpenArtifact {
+                                    scope,
+                                    path: "file.txt".into(),
+                                }),
+                            },
+                            SummaryRow {
+                                id: "text".into(),
+                                title: title.clone(),
+                                value: Default::default(),
+                                action: None,
+                            },
+                        ],
+                    }],
+                };
+                let mut summary = SummaryView::new(49006, Default::default());
+                tekes_agent_ui_consumer_check::publish_summary_context(&mut summary, &input)
+                    .unwrap();
+                let root = summary.id();
+                let action = summary.default_row_ids("repository", "open").unwrap();
+                let passive = summary.default_row_ids("repository", "text").unwrap();
+                assert_eq!(
+                    summary.passive_text_id("repository", "text"),
+                    Some(passive.title)
+                );
+                assert_eq!(summary.row_id("repository", "text"), Some(passive.title));
+                let mut host = summary.into_host().unwrap();
+                let mut text = Text::new(scale, true);
+                let frame = Rect::new(0., 0., width, 10000.);
+                host.render(&mut Scene::new(), &mut text, frame, frame, theme.into())
+                    .unwrap();
+                let header_label = host
+                    .get(root)
+                    .unwrap()
+                    .component::<SummaryView>()
+                    .unwrap()
+                    .section_header_label_id("repository")
+                    .unwrap();
+                assert!(
+                    (host.get(header_label).unwrap().frame().min_x()
+                        - host.get(action.title).unwrap().frame().min_x())
+                    .abs()
+                        < 0.1
+                );
+                for ids in [action, passive] {
+                    let band = host.get(ids.row).unwrap().frame();
+                    let label = host.get(ids.title).unwrap().frame();
+                    assert!(
+                        (label.min_x() - band.min_x() - 2. * Spacing::Regular.value()).abs() < 0.1
+                    );
+                    assert!(
+                        (label.size.width - (band.size.width - 4. * Spacing::Regular.value()))
+                            .abs()
+                            < 0.1
+                    );
+                    assert!(
+                        (band.size.height - label.size.height - 2. * Spacing::Regular.value())
+                            .abs()
+                            < 0.1
+                    );
+                    assert!((label.min_y() - band.min_y() - Spacing::Regular.value()).abs() < 0.1);
+                    assert!(
+                        label.size.height
+                            > text.measure("Mg", proposal::TextRole::UiBody, 1e8).height,
+                        "title must wrap"
+                    );
+                }
+                assert_eq!(
+                    host.semantics()
+                        .iter()
+                        .filter(|n| n.id == action.title)
+                        .count(),
+                    0,
+                    "action title stays decorative"
+                );
+                let control = host
+                    .get(action.row)
+                    .unwrap()
+                    .component::<SummaryActionRow>()
+                    .unwrap()
+                    .button() as *const _ as usize;
+                let field = host.text_surface(passive.title).unwrap() as *const _ as usize;
+                host.focus(Some(passive.title), true);
+                host.accessibility_action(
+                    passive.title,
+                    None,
+                    AccessibilityAction::SetSelection(0..2),
+                );
+                input.revision += 1;
+                input.host_sections[0].rows[0].title.push_str(" · 更新");
+                tekes_agent_ui_consumer_check::publish_summary_context(
+                    host.get_mut(root)
+                        .unwrap()
+                        .component_mut::<SummaryView>()
+                        .unwrap(),
+                    &input,
+                )
+                .unwrap();
+                host.render(&mut Scene::new(), &mut text, frame, frame, theme.into())
+                    .unwrap();
+                assert_eq!(
+                    host.get(action.row)
+                        .unwrap()
+                        .component::<SummaryActionRow>()
+                        .unwrap()
+                        .button() as *const _ as usize,
+                    control
+                );
+                assert_eq!(
+                    host.text_surface(passive.title).unwrap() as *const _ as usize,
+                    field
+                );
+                assert_eq!(
+                    host.text_surface(passive.title)
+                        .unwrap()
+                        .input
+                        .selected_text(),
+                    "中文"
+                );
+                assert_eq!(host.focused(), Some(passive.title));
+                assert!(
+                    host.accessibility_action(action.row, None, AccessibilityAction::Press)
+                        .activated
+                );
+                assert_eq!(host.focused(), Some(passive.title));
+            }
+        }
+    }
+}
+
+#[test]
+fn usage_metadata_stays_on_one_original_sdk_line_at_the_title_first_line() {
+    use tekes_ui_tokens::Spacing;
+    for scale in [0.85, 1., 1.5, 2.] {
+        for width in [96., 240., 420.] {
+            let scope = RunScope::main("consumer", "metadata");
+            let mut summary = SummaryView::new(
+                49007,
+                SummaryLabels {
+                    usage_row: |_| SummaryUsageRowText {
+                        title: "很长的中文标题 English ".repeat(4),
+                        value: "123,456,789,012,345,678,901,234,567,890".into(),
+                    },
+                    ..Default::default()
+                },
+            );
+            summary
+                .update(&SummaryInput {
+                    revision: 1,
+                    scope: scope.clone(),
+                    host_sections: vec![],
+                    facts: Some(SummaryFacts {
+                        scope,
+                        tasks: vec![],
+                        subagents: vec![],
+                        artifacts: vec![],
+                        usage: Some(SummaryUsage {
+                            input_tokens: 0,
+                            cached_input_tokens: 0,
+                            cache_creation_input_tokens: 0,
+                            output_tokens: 0,
+                            cost_usd: None,
+                            is_cost_complete: true,
+                        }),
+                    }),
+                })
+                .unwrap();
+            let ids = summary.usage_row_ids("total").unwrap();
+            let mut host = summary.into_host().unwrap();
+            let mut text = Text::new(scale, true);
+            let frame = Rect::new(0., 0., width, 10000.);
+            host.render(
+                &mut Scene::new(),
+                &mut text,
+                frame,
+                frame,
+                Theme::LIGHT.into(),
+            )
+            .unwrap();
+            let band = host.get(ids.row).unwrap().frame();
+            let title = host.get(ids.title).unwrap().frame();
+            let value = host.get(ids.value).unwrap().frame();
+            assert!((title.min_x() - band.min_x() - 2. * Spacing::Regular.value()).abs() < 0.1);
+            assert!((value.max_x() - band.max_x() + 2. * Spacing::Regular.value()).abs() < 0.1);
+            let line = text.measure("Mg", proposal::TextRole::UiBody, 1e8).height;
+            assert!((value.min_y() - title.min_y() - (line - value.size.height) / 2.).abs() < 0.1);
+            let labels: Vec<_> = text
+                .labels
+                .iter()
+                .filter(|(_, layout)| layout.source() == "123,456,789,012,345,678,901,234,567,890")
+                .collect();
+            assert!(!labels.is_empty());
+            assert!(labels.iter().all(|(policy, layout)| *policy
+                == LabelOptions::single_line(LabelOverflow::Clip)
+                && layout.paragraph().lines.len() == 1));
+            assert_eq!(
+                host.get(ids.value)
+                    .unwrap()
+                    .component::<TextContent>()
+                    .unwrap()
+                    .text,
+                "123,456,789,012,345,678,901,234,567,890"
+            );
+        }
+    }
+}

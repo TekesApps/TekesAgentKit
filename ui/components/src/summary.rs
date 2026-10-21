@@ -1,5 +1,6 @@
 //! Agent summary UI. Membership, totals, costs and domain actions come from SummaryFacts.
 use crate::summary_custom::SummaryCustomRow;
+use crate::summary_row_layout::SummaryRowBody;
 use crate::summary_section::{Expansion, SectionHeaderKind, SummaryDocument, SummarySectionView};
 use crate::summary_usage::{SummaryUsageRow, SummaryUsageRowIds, SummaryUsageRowText};
 use crate::{SummaryActionRow, SummaryCustomRowSpec, SummaryCustomRowToken};
@@ -132,6 +133,9 @@ enum Key {
     HeaderLabel(SummaryOwner, String),
     Body(SummaryOwner, String),
     Row(SummaryOwner, String, String, ActionIdentity),
+    PassiveBody(SummaryOwner, String, String),
+    ActionBody(SummaryOwner, String, String, ActionIdentity),
+    ActionTitle(SummaryOwner, String, String, ActionIdentity),
     UsageTitle(SummaryOwner, String),
     UsageValue(SummaryOwner, String),
 }
@@ -161,6 +165,7 @@ impl ActionIdentity {
 }
 #[derive(Debug)]
 pub(crate) struct PreparedSummaryContext {
+    labels: BTreeMap<(String, String), String>,
     sections: Vec<SummarySection>,
     section_ids: BTreeSet<String>,
     custom: BTreeMap<(String, String), SummaryCustomRowSpec>,
@@ -269,6 +274,34 @@ impl SummaryView {
     pub fn action_id(&self, section: &str, row: &str) -> Option<ComponentId> {
         self.row_id(section, row)
             .filter(|id| self.bindings.contains_key(id))
+    }
+    /// Actual default row band and its original title slot. Passive row_id /
+    /// passive_text_id remain the original selectable field for compatibility.
+    /// Usage and custom host rows keep their separate slot contracts.
+    pub fn default_row_ids(&self, section: &str, row: &str) -> Option<crate::SummaryDefaultRowIds> {
+        if section == "usage" || self.custom_spec(section, row).is_some() {
+            return None;
+        }
+        let id = self.row_id(section, row)?;
+        let owner = self.owner.as_ref()?.clone();
+        if let Some((_, intent)) = self.bindings.get(&id) {
+            Some(crate::SummaryDefaultRowIds {
+                row: id,
+                title: *self.ids.get(&Key::ActionTitle(
+                    owner,
+                    section.into(),
+                    row.into(),
+                    ActionIdentity::read(Some(&intent.action)),
+                ))?,
+            })
+        } else {
+            Some(crate::SummaryDefaultRowIds {
+                row: *self
+                    .ids
+                    .get(&Key::PassiveBody(owner, section.into(), row.into()))?,
+                title: id,
+            })
+        }
     }
     pub fn section_header_id(&self, section: &str) -> Option<ComponentId> {
         self.ids
@@ -393,6 +426,7 @@ impl SummaryView {
         let mut sections = vec![];
         append_summary_sections(&mut sections, input.host_sections.clone());
         sections.extend(providers);
+        let mut labels = BTreeMap::new();
         let mut custom = BTreeMap::new();
         for spec in &input.custom_rows {
             if spec.content_key.trim().is_empty()
@@ -455,6 +489,34 @@ impl SummaryView {
                     keys.insert(Key::UsageTitle(input.owner.clone(), row.id.clone()));
                     keys.insert(Key::UsageValue(input.owner.clone(), row.id.clone()));
                 }
+                if slot.is_none() && row.action.is_some() {
+                    let identity = ActionIdentity::read(row.action.as_ref());
+                    keys.insert(Key::ActionBody(
+                        input.owner.clone(),
+                        section.id.clone(),
+                        row.id.clone(),
+                        identity.clone(),
+                    ));
+                    keys.insert(Key::ActionTitle(
+                        input.owner.clone(),
+                        section.id.clone(),
+                        row.id.clone(),
+                        identity,
+                    ));
+                } else if slot.is_none() && section.id != "usage" {
+                    keys.insert(Key::PassiveBody(
+                        input.owner.clone(),
+                        section.id.clone(),
+                        row.id.clone(),
+                    ));
+                }
+                if slot.is_some() || row.action.is_some() || section.id != "usage" {
+                    let label = (self.labels.row)(&section.id, row);
+                    if row.action.is_some() && label.trim().is_empty() {
+                        return Err("empty Summary action label");
+                    }
+                    labels.insert((section.id.clone(), row.id.clone()), label);
+                }
                 keys.insert(Key::Row(
                     input.owner.clone(),
                     section.id.clone(),
@@ -500,6 +562,7 @@ impl SummaryView {
             .flat_map(|row| row.children.iter().map(Content::id))
             .collect();
         Ok(PreparedSummaryContext {
+            labels,
             sections,
             section_ids,
             custom,
@@ -514,6 +577,7 @@ impl SummaryView {
         prepared: PreparedSummaryContext,
     ) -> Result<(), &'static str> {
         let PreparedSummaryContext {
+            labels,
             sections,
             section_ids,
             custom,
@@ -580,7 +644,7 @@ impl SummaryView {
                     ),
                 )];
                 let content = if slot.is_some() {
-                    let label = (self.labels.row)(&section.id, &row);
+                    let label = labels[&(section.id.clone(), row.id.clone())].clone();
                     let mut content = old_rows
                         .remove(&id)
                         .unwrap_or_else(|| Content::new(id, SummaryCustomRow::new(label.clone())));
@@ -591,15 +655,30 @@ impl SummaryView {
                         .text = label;
                     content
                 } else if let Some(action) = row.action.clone() {
-                    let label = (self.labels.row)(&section.id, &row);
-                    let mut content = old_rows
-                        .remove(&id)
-                        .unwrap_or_else(|| Content::new(id, SummaryActionRow::new()));
+                    let label = labels[&(section.id.clone(), row.id.clone())].clone();
+                    let mut content = old_rows.remove(&id).unwrap_or_else(|| {
+                        Content::new(
+                            id,
+                            SummaryActionRow::new(
+                                ids[&Key::ActionBody(
+                                    input.owner.clone(),
+                                    section.id.clone(),
+                                    row.id.clone(),
+                                    ActionIdentity::read(Some(&action)),
+                                )],
+                                ids[&Key::ActionTitle(
+                                    input.owner.clone(),
+                                    section.id.clone(),
+                                    row.id.clone(),
+                                    ActionIdentity::read(Some(&action)),
+                                )],
+                            ),
+                        )
+                    });
                     content
                         .component_mut::<SummaryActionRow>()
                         .expect("summary action")
-                        .button
-                        .label = label;
+                        .update(label);
                     bindings.insert(
                         id,
                         (
@@ -627,19 +706,27 @@ impl SummaryView {
                         .update(input.revision, (self.labels.usage_row)(&row));
                     content
                 } else {
-                    let label = (self.labels.row)(&section.id, &row);
-                    let mut content = old_rows.remove(&id).unwrap_or_else(|| {
+                    let label = labels[&(section.id.clone(), row.id.clone())].clone();
+                    let body = ids[&Key::PassiveBody(
+                        input.owner.clone(),
+                        section.id.clone(),
+                        row.id.clone(),
+                    )];
+                    let mut content = old_rows.remove(&body).unwrap_or_else(|| {
                         Content::new(
-                            id,
-                            TextFieldContent::read_only_content(
-                                "",
-                                "",
-                                tekes_ui_tokens::proposal::TextRole::UiBody,
-                            ),
+                            body,
+                            SummaryRowBody::new(Content::new(
+                                id,
+                                TextFieldContent::read_only_content(
+                                    "",
+                                    "",
+                                    tekes_ui_tokens::proposal::TextRole::UiBody,
+                                ),
+                            )),
                         )
                     });
                     crate::summary_text::update_text(
-                        content
+                        content.component_mut::<SummaryRowBody>().unwrap().children[0]
                             .component_mut::<TextFieldContent>()
                             .expect("summary passive text"),
                         id,

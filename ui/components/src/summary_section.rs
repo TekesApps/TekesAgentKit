@@ -95,7 +95,22 @@ impl Component for SummaryHeader {
         self.button.measure(text, size)
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
-        self.button.arrange(text, frame, clip)
+        self.button.arrange(text, frame, clip);
+        if self.kind == SectionHeaderKind::Summary {
+            let inset = crate::summary_row_layout::title_inset();
+            let label = &mut self.button.children_mut().unwrap()[0];
+            let width = (frame.size.width - 2. * inset).max(0.);
+            let measured = label
+                .measure(text, Size::new(width, frame.size.height))
+                .size;
+            let bounds = Rect::new(
+                frame.min_x() + inset,
+                frame.min_y() + (frame.size.height - measured.height) / 2.,
+                width,
+                measured.height,
+            );
+            label.arrange(text, bounds, bounds.intersection(&clip).unwrap_or_default());
+        }
     }
     fn paint(
         &mut self,

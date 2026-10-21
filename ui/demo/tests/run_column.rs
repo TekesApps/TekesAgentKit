@@ -1125,8 +1125,8 @@ fn summary_usage_columns_keep_values_on_right_and_long_titles_clear_at_library_s
                 let row = host.get(ids.row).unwrap().frame();
                 let title = host.get(ids.title).unwrap().frame();
                 let value = host.get(ids.value).unwrap().frame();
-                assert!((title.min_x() - row.min_x() - Spacing::Regular.value()).abs() < 0.1);
-                assert!((value.max_x() - row.max_x() + Spacing::Regular.value()).abs() < 0.1);
+                assert!((title.min_x() - row.min_x() - 2. * Spacing::Regular.value()).abs() < 0.1);
+                assert!((value.max_x() - row.max_x() + 2. * Spacing::Regular.value()).abs() < 0.1);
                 assert!(
                     title.max_x() <= value.min_x(),
                     "overlapping columns: {scale}/{width}"

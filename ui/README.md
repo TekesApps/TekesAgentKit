@@ -264,3 +264,10 @@ Summary 子代理 `status` 来自同 endpoint 的 child session 执行事实，�
 `SummarySubagent::indicator` / `SummarySubagentIndicator` 供显示分类，完成态无成功点；
 此分类不授予控制权限。SDK状态附件/默认行仍未对齐，详见
 [子代理状态契约](../docs/rust-agent-ui-summary-child-status-20261022.md)。
+
+Summary 默认动作/静态行按 ClientKit 的文字带布局：左右两份 Regular、标题换行，
+用量值保持原 SDK 单行并相对标题首行居中。样式、字体和控件绘制仍来自 TekesUI。
+`default_row_ids(section,row)` 返回真实行带/标题槽；静态 `row_id` / `passive_text_id`
+仍指向原可选择 field。`SummaryLabels::row` 在发布预检中每行调用一次，动作名为空会在改图前拒绝。
+完整 API、原生程序与范围见[默认行布局](../docs/rust-agent-ui-summary-row-layout-20261022.md)。
+只读文字的整行留白路由仍跟踪 TekesUI #30；图标和状态附件跟踪 #47。

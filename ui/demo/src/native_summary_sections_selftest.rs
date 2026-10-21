@@ -198,7 +198,8 @@ impl Probe {
                 let value = view.tree.get(ids.value).unwrap().frame();
                 assert!(title.max_x() < value.min_x());
                 assert!(
-                    (row.max_x() - value.max_x() - tekes_ui_tokens::Spacing::Regular.value()).abs()
+                    (row.max_x() - value.max_x() - 2. * tekes_ui_tokens::Spacing::Regular.value())
+                        .abs()
                         < 0.1
                 );
                 assert!(

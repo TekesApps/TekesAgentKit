@@ -1,24 +1,58 @@
 //! ClientKit Summary action rows activate without becoming first responder.
-//! Original SDK button owns input, capture, paint and activation state.
-use tekes_ui_controls::{ButtonTextRenderer, composition::*, layout::MeasuredChild};
+//! Original SDK CompoundButton owns input, capture, backing and activation.
+use crate::summary_row_layout::SummaryRowBody;
+use tekes_ui_controls::{
+    ButtonFramePolicy, ButtonTextRenderer, composition::*, layout::MeasuredChild,
+};
 use tekes_ui_scene::{Rect, Scene, Size};
-
 #[derive(Debug)]
 pub struct SummaryActionRow {
-    pub(crate) button: ButtonContent,
+    button: CompoundButton,
 }
 impl SummaryActionRow {
-    pub(crate) fn new() -> Self {
-        Self {
-            button: ButtonContent::new(""),
-        }
+    pub(crate) fn new(body: ComponentId, title: ComponentId) -> Self {
+        let mut button = CompoundButton::new(
+            "Summary row",
+            Content::new(
+                body,
+                SummaryRowBody::new(Content::new(title, TextContent::new(""))),
+            ),
+        )
+        .expect("one passive Summary title slot");
+        button.action.button.frame_policy = ButtonFramePolicy::Exact;
+        Self { button }
     }
-    /// Original SDK control, for inspection; facts still update through Summary.
+    /// Original SDK action control, retained across status/text publications.
     pub fn button(&self) -> &ButtonContent {
-        &self.button
+        &self.button.action
+    }
+    pub(crate) fn update(&mut self, label: String) {
+        self.button.action.label = label.clone();
+        self.button.children_mut().unwrap()[0]
+            .component_mut::<SummaryRowBody>()
+            .unwrap()
+            .children[0]
+            .component_mut::<TextContent>()
+            .unwrap()
+            .text = label;
     }
 }
 impl Component for SummaryActionRow {
+    fn children(&self) -> &[Content] {
+        self.button.children()
+    }
+    fn children_mut(&mut self) -> Option<&mut Vec<Content>> {
+        self.button.children_mut()
+    }
+    fn fixed_slots(&self) -> bool {
+        self.button.fixed_slots()
+    }
+    fn validate(&self) -> Result<(), CompositionError> {
+        self.button.validate()
+    }
+    fn child_theme(&self, theme: ContentTheme) -> ContentTheme {
+        self.button.child_theme(theme)
+    }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
         self.button.measure(text, available)
     }

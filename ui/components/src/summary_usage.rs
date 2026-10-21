@@ -4,8 +4,7 @@ use crate::SummaryRow;
 use tekes_ui_controls::{
     ButtonTextRenderer,
     composition::*,
-    extended::Axis,
-    layout::{AlignmentOverride, ContainerLayout, Insets, MeasuredChild, layout_measured_children},
+    layout::{ContainerLayout, Insets, MeasuredChild},
 };
 use tekes_ui_scene::{Rect, Size};
 use tekes_ui_tokens::{Spacing, proposal};
@@ -103,7 +102,11 @@ impl SummaryUsageRow {
                         text: String::new(),
                         role: proposal::TextRole::UiCaption,
                     },
-                ),
+                )
+                .with_label_layout(tekes_ui_text::LabelOptions::single_line(
+                    tekes_ui_text::LabelOverflow::Clip,
+                ))
+                .expect("original single-line Summary metadata"),
             ],
         }
     }
@@ -144,11 +147,15 @@ impl Component for SummaryUsageRow {
         Some(&mut self.children)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
-        let inset = Spacing::Regular.value();
+        let inset = crate::summary_row_layout::title_inset();
         let sizes = self.measurements(text, (available.width - 2. * inset).max(0.));
         MeasuredChild::new(Size::new(
             available.width,
-            sizes[0].size.height.max(sizes[1].size.height) + 2. * inset,
+            sizes[0]
+                .size
+                .height
+                .max(crate::summary_row_layout::body_line(text))
+                + 2. * Spacing::Regular.value(),
         ))
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
@@ -157,43 +164,29 @@ impl Component for SummaryUsageRow {
             Insets::ZERO,
             Insets::new(
                 Spacing::Regular.value(),
+                crate::summary_row_layout::title_inset(),
                 Spacing::Regular.value(),
-                Spacing::Regular.value(),
-                Spacing::Regular.value(),
+                crate::summary_row_layout::title_inset(),
             ),
             Some(clip),
         )
         .content();
         let sizes = self.measurements(text, bounds.size.width);
-        // A long title can wrap. Keep the value beside its first line rather
-        // than centering it against the entire multi-line title.
-        let line = text
-            .measure("Mg", proposal::TextRole::UiBody, bounds.size.width)
-            .height;
-        let placement_bounds = Rect::new(
-            bounds.min_x(),
-            bounds.min_y(),
-            bounds.size.width,
-            line.max(sizes[1].size.height),
-        );
-        let positions = layout_measured_children(
-            placement_bounds,
-            Axis::Horizontal,
-            &sizes,
-            Spacing::Regular.value(),
-            proposal::layout::ROW,
-            AlignmentOverride {
-                main_axis: Some(proposal::layout::MainAxisDistribution::SpaceBetween),
-                cross_axis: Some(proposal::layout::CrossAxisAlignment::Leading),
-            },
-        );
-        for (i, (node, position)) in self.children.iter_mut().zip(positions).enumerate() {
-            let mut frame = position.frame;
-            if i == 1 {
-                frame.origin.y += ((line - frame.size.height) / 2.).max(0.);
-            }
-            let visible = frame.intersection(&clip).unwrap_or_default();
-            node.arrange(text, frame, visible);
+        let title_width =
+            (bounds.size.width - sizes[1].size.width - Spacing::Regular.value()).max(0.);
+        let top = frame.min_y() + (frame.size.height - sizes[0].size.height) / 2.;
+        let line = crate::summary_row_layout::body_line(text);
+        let frames = [
+            Rect::new(bounds.min_x(), top, title_width, sizes[0].size.height),
+            Rect::new(
+                bounds.max_x() - sizes[1].size.width,
+                top + (line - sizes[1].size.height) / 2.,
+                sizes[1].size.width,
+                sizes[1].size.height,
+            ),
+        ];
+        for (node, frame) in self.children.iter_mut().zip(frames) {
+            node.arrange(text, frame, frame.intersection(&clip).unwrap_or_default());
         }
     }
     fn semantics(&self) -> ContentSemantics {

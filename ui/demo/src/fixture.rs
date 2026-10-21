@@ -541,6 +541,9 @@ impl Fixture {
     }
     /// A completed parent call whose child's status arrives independently via inventory.
     pub fn with_summary_subagent(self) -> Self {
+        self.with_summary_subagent_title("独立子会话状态")
+    }
+    pub fn with_summary_subagent_title(self, title: &str) -> Self {
         let child = "b437cf34-5661-45e2-a674-113b27c92f89";
         self.install_unannounced_session(child, "Summary child");
         let mut sessions = self.sessions.lock().unwrap();
@@ -551,7 +554,7 @@ impl Fixture {
         append(
             line,
             "tool/call",
-            json!({"turn":turn,"step":1,"callId":"summary-child-call","name":"subagent","arguments":{"brief":"独立子会话状态"}}),
+            json!({"turn":turn,"step":1,"callId":"summary-child-call","name":"subagent","arguments":{"brief":title}}),
         );
         append(
             line,
@@ -561,6 +564,19 @@ impl Fixture {
         append(line, "turn/end", json!({"turn":turn,"reason":"completed"}));
         drop(sessions);
         self
+    }
+    pub fn with_summary_row_layout(self) -> Self {
+        let fixture = self
+            .with_summary_subagent_title(&"动作行 · 中文 English é 路径／".repeat(5))
+            .with_summary_usage();
+        let mut sessions = fixture.sessions.lock().unwrap();
+        append(
+            sessions.get_mut("a").unwrap(),
+            "todo/write",
+            json!({"todos":[{"content":"静态行 · 中文 English é 路径／".repeat(3),"status":"pending"}]}),
+        );
+        drop(sessions);
+        fixture
     }
     /// Explicit owned demo data, emitted through the same journal contract.
     pub fn with_demo_summary(self) -> Self {
