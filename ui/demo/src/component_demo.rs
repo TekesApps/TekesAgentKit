@@ -3002,6 +3002,17 @@ impl ComponentDemo {
         }
         labels
     }
+    /// A native host with the explicit fixed SDK reading adapter can reveal
+    /// this original target after layout. The published default pin does not
+    /// silently focus a row to emulate that capability.
+    pub fn sidebar_visibility_target(
+        &self,
+    ) -> Option<tekes_agent_components_ui::SidebarVisibilityTarget> {
+        self.tree
+            .get(self.sidebar_id())?
+            .component::<Sidebar>()?
+            .visibility_target()
+    }
     fn reconcile_sidebar_selection(&mut self) -> Result<()> {
         let event = tekes_agent_components_ui::SidebarSelectionNavigation {
             revision: self.navigation_revision,
@@ -3327,6 +3338,23 @@ impl ComponentDemo {
                     self.tree.focus(None, false);
                 }
             }
+        }
+        let sidebar_id = self.sidebar_id();
+        let requests = self
+            .tree
+            .get(sidebar_id)
+            .unwrap()
+            .component::<Sidebar>()
+            .unwrap()
+            .take_page_requests(&actions);
+        for request in requests {
+            self.tree
+                .get_mut(sidebar_id)
+                .unwrap()
+                .component_mut::<Sidebar>()
+                .unwrap()
+                .load_more(&request)
+                .map_err(unsupported)?;
         }
         let sidebar_intents = self
             .tree

@@ -7,7 +7,7 @@ use crate::summary_section::{Expansion, SummarySectionView};
 use crate::{
     SidebarFolderKey, SidebarPreferenceChange, SidebarPreferencesSnapshot, SidebarSearchInput,
     SidebarSearchIntent, SidebarSearchKey, SidebarSearchLabels, SidebarSort,
-    SidebarTitleComparator, ordered_sidebar_rows, sidebar_folder_title, sidebar_outline,
+    SidebarTitleComparator, ordered_sidebar_rows, sidebar_folder_title,
     sidebar_search::{SearchFooter, SearchInputView},
 };
 use std::cell::{Cell, RefCell};
@@ -73,6 +73,7 @@ pub struct SidebarLabels {
     pub actions: String,
     pub pinned: String,
     pub no_folder: String,
+    pub more: String,
     pub activity: fn(&ThreadActivity) -> String,
 }
 impl Default for SidebarLabels {
@@ -84,6 +85,7 @@ impl Default for SidebarLabels {
             actions: "会话操作".into(),
             pinned: "已置顶".into(),
             no_folder: "无文件夹".into(),
+            more: "显示更多会话".into(),
             activity: activity_label,
         }
     }
@@ -107,6 +109,7 @@ fn activity_label(activity: &ThreadActivity) -> String {
 }
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Key {
+    More(u64),
     FolderRoot(SidebarFolderKey),
     FolderHeader(SidebarFolderKey, u64),
     FolderLabel(SidebarFolderKey, u64),
@@ -123,6 +126,11 @@ enum Key {
 /// Deliver and drain host actions before update(), just as for other public content controls.
 #[derive(Debug)]
 pub struct Sidebar {
+    page_owner: std::sync::Arc<()>,
+    visibility_honored: Cell<Option<u64>>,
+    page_limit: usize,
+    page_facts: crate::SidebarPagingFacts,
+    page_request: Option<crate::SidebarPageRequest>,
     preferences: SidebarPreferencesSnapshot,
     preferences_bound: bool,
     preferences_generation: u64,
@@ -199,6 +207,11 @@ impl Sidebar {
             ],
         };
         Self {
+            page_owner: std::sync::Arc::new(()),
+            visibility_honored: Cell::new(None),
+            page_limit: crate::SIDEBAR_PAGE_SIZE,
+            page_facts: Default::default(),
+            page_request: None,
             preferences: SidebarPreferencesSnapshot::default(),
             preferences_bound: false,
             preferences_generation: 1,
@@ -788,12 +801,21 @@ impl Sidebar {
             } else {
                 self.preferences_generation
             };
-        let outline = sidebar_outline(
+        let (outline, page_facts) = crate::sidebar_paged_outline(
             &input.rows,
             &self.preferences.preferences,
             self.title_comparator,
             input.folder_filter.as_ref(),
+            input.selected.as_ref(),
+            self.page_limit,
+            self.search.as_ref().is_some_and(|s| s.key.is_some())
+                || input
+                    .search_help
+                    .as_ref()
+                    .is_some_and(|h| h.source.key.is_some()),
         )?;
+        let more_key = Key::More(self.next);
+        let show_more = input.loaded && page_facts.has_more;
         let visible_rows: Vec<_> = if input.loaded {
             outline
                 .pinned
@@ -816,6 +838,9 @@ impl Sidebar {
             .any(|row| row.pin.as_ref().is_some_and(|pin| pin.pinned));
         let mut addresses = BTreeSet::new();
         let mut keys = BTreeSet::new();
+        if show_more {
+            keys.insert(more_key.clone());
+        }
         for row in &input.rows {
             if row.address.endpoint_id.is_empty()
                 || row.address.session_id.is_empty()
@@ -1100,6 +1125,17 @@ impl Sidebar {
             }
             children.insert(0, section);
         }
+        let page_request = if show_more {
+            let control = ids[&more_key];
+            children.push(Content::new(control, ButtonContent::new(&self.labels.more)));
+            Some(crate::SidebarPageRequest {
+                owner: self.page_owner.clone(),
+                control,
+                limit: self.page_limit,
+            })
+        } else {
+            None
+        };
         if children.is_empty() {
             children.push(Content::new(
                 ComponentId(self.root.0 + 5),
@@ -1200,6 +1236,8 @@ impl Sidebar {
                 actions.rows.children.push(content);
             }
         }
+        self.page_facts = page_facts;
+        self.page_request = page_request;
         self.ids = ids;
         self.next = next;
         self.bindings = bindings;
@@ -1210,6 +1248,99 @@ impl Sidebar {
         self.revision = input.revision;
         self.displayed = Some(input.clone());
         Ok(())
+    }
+    /// Only explicit navigation can produce a scroll target. Inventory refresh
+    /// alone never steals the reader's position; collapsed/filtered rows wait.
+    pub fn visibility_target(&self) -> Option<crate::SidebarVisibilityTarget> {
+        let event = self.last_navigation.as_ref()?;
+        let input = self.displayed.as_ref()?;
+        if self.disclosure_dirty.get()
+            || self.visibility_honored.get() == Some(event.revision)
+            || self.pending_navigation.borrow().is_some()
+            || input.selected != event.selected
+        {
+            return None;
+        }
+        let address = event.selected.as_ref()?;
+        let item = self.row_id(address)?;
+        if !self.bindings.contains_key(&item) {
+            return None;
+        }
+        Some(crate::SidebarVisibilityTarget {
+            owner: self.page_owner.clone(),
+            root: self.root,
+            viewport: ComponentId(self.root.0 + 1),
+            item,
+            address: address.clone(),
+            navigation: event.revision,
+            inventory: input.revision,
+            disclosure: self.preferences_generation,
+            claimed: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        })
+    }
+    pub fn claim_visibility(
+        &self,
+        target: &crate::SidebarVisibilityTarget,
+    ) -> Result<(), &'static str> {
+        let current = self
+            .visibility_target()
+            .ok_or("Sidebar visibility no longer pending")?;
+        if !std::sync::Arc::ptr_eq(&target.owner, &self.page_owner)
+            || target.item != current.item
+            || target.address != current.address
+            || target.navigation != current.navigation
+            || target.inventory != current.inventory
+            || target.disclosure != current.disclosure
+        {
+            return Err("stale or foreign Sidebar visibility target");
+        }
+        if !target.once() {
+            return Err("Sidebar visibility already claimed");
+        }
+        self.visibility_honored.set(Some(target.navigation));
+        Ok(())
+    }
+    pub fn paging(&self) -> &crate::SidebarPagingFacts {
+        &self.page_facts
+    }
+    pub fn page_button_id(&self) -> Option<ComponentId> {
+        self.page_request.as_ref().map(|r| r.control)
+    }
+    pub fn take_page_requests(&self, actions: &[ContentAction]) -> Vec<crate::SidebarPageRequest> {
+        self.page_request
+            .as_ref()
+            .into_iter()
+            .filter(|r| {
+                actions
+                    .iter()
+                    .any(|a| a.target == r.control && a.kind == ContentActionKind::Activate)
+            })
+            .cloned()
+            .collect()
+    }
+    /// Local presentation only; the inventory observer/RPC policy is unchanged.
+    /// Foreign, stale, repeated and remounted control captures are rejected.
+    pub fn load_more(&mut self, request: &crate::SidebarPageRequest) -> Result<bool, &'static str> {
+        if !std::sync::Arc::ptr_eq(&request.owner, &self.page_owner)
+            || self
+                .page_request
+                .as_ref()
+                .is_none_or(|r| r.control != request.control || r.limit != request.limit)
+        {
+            return Ok(false);
+        }
+        let next = self
+            .page_limit
+            .checked_add(crate::SIDEBAR_PAGE_SIZE)
+            .ok_or("Sidebar page limit exhausted")?;
+        let old = std::mem::replace(&mut self.page_limit, next);
+        if let Some(input) = self.displayed.clone()
+            && let Err(error) = self.update(&input)
+        {
+            self.page_limit = old;
+            return Err(error);
+        }
+        Ok(true)
     }
     /// Copy/rename are host gestures; execute goes to the shared dispatcher with stable RPC identity.
     /// No preference or inventory facts change until the next authoritative input.

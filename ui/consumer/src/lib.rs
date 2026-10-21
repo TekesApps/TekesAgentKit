@@ -2163,3 +2163,36 @@ fn independent_product_reconciles_navigation_once_without_rewriting_durable_coll
     );
     assert!(!host.semantics().iter().any(|node| node.id == leaf));
 }
+/// Preserve the captured row/source rather than resolving the newest selection
+/// after an async layout. The host dispatches through TekesUI's original reveal.
+pub fn sidebar_visibility_target(
+    view: &tekes_agent_components_ui::Sidebar,
+) -> Option<tekes_agent_components_ui::SidebarVisibilityTarget> {
+    view.visibility_target()
+}
+pub fn claim_sidebar_visibility(
+    view: &tekes_agent_components_ui::Sidebar,
+    target: &tekes_agent_components_ui::SidebarVisibilityTarget,
+) -> Result<(), &'static str> {
+    view.claim_visibility(target)
+}
+#[test]
+fn independent_sidebar_pages_an_empty_inventory_without_synthetic_rows_or_navigation() {
+    use tekes_agent_components_ui::*;
+    let mut sidebar = Sidebar::new(890, Default::default());
+    sidebar
+        .update(&SidebarInput {
+            revision: 1,
+            loaded: true,
+            error: None,
+            rows: vec![],
+            selected: None,
+            folder_filter: None,
+            search_help: None,
+        })
+        .unwrap();
+    assert_eq!(sidebar.paging().limit, SIDEBAR_PAGE_SIZE);
+    assert!(!sidebar.paging().has_more);
+    assert!(sidebar.page_button_id().is_none());
+    assert!(sidebar_visibility_target(&sidebar).is_none());
+}
