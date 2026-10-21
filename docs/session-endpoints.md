@@ -141,3 +141,7 @@ ask_user_question → public actionable sync → runtime 用共享 session envel
 
 
 搜索遇到未知库存身份时，共享运行时通过 `refresh_inventory_at_epoch` 重读公开 session/workspace cursor 的原子 baseline 对；原连接 epoch、已加载 journal/preview 和分页 cut 保持，旧 cursor 被淘汰。刷新失败保留原库存并向搜索传播失败，不伪造空命中或偷偷重连。实现与验收范围见 [Sidebar 库存恢复](rust-agent-ui-sidebar-inventory-refresh-20261021.md)。
+
+## 2026-10-22：当前运行版本与原生UI证据
+
+见[三端原生验收](rust-agent-ui-three-real-20261022.md)：Kernel0.9.3、Pi1.3.0、DSH0.2.1-rc.2在固定09b SDK及同一冻结UI程序下通过公开分页、流式阅读、合成中文预编辑、取消/错误恢复和重连。Native0.9.3完整协议流程的archive返回session-running，仍未完成其全量生命周期验收；独立UI模式不代替这项失败。脚本现在支持明确supervisor/worker路径、build哈希及精确版本/握手检查，旧target中的0.9.0开发程序不再被按目录名计作发布版。能力声明与单次运行验收结果保持区分。

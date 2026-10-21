@@ -1,5 +1,7 @@
 # Rust Agent UI 组件接入契约
 
+[当前固定程序的真实三端原生验收](rust-agent-ui-three-real-20261022.md)通过Kernel0.9.3、Pi1.3.0、DSH0.2.1-rc.2的分页/流式阅读/中文marked/取消恢复，并补精确程序与握手版本校验。Native完整生命周期仍有archive的session-running失败，未据独立UI模式提升为全量通过。
+
 本文件是正式业务组件的实现契约与进度入口，不是完成声明。完整交付目标保持 Composer、Transcript、Indicators、RunView、SidePanel、Sidebar，加 Native/Pi/DSH 能力验证、第二公开 consumer、原生窗口验收、review/CI/合并与阶段 tag。
 
 [最新公开 SDK 接收](tekesui-toolbar-public-intake-20261021.md)记录 09b4bab 的精确依赖、公开闭包、原生阅读/系统拼音证据及中断记录；此前版本的验收保持各自范围。

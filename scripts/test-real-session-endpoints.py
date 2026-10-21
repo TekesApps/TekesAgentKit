@@ -3,12 +3,17 @@
 import argparse, base64, zlib, shutil, uuid, http.server, json, os, re, select, signal, struct, subprocess, tempfile, threading, time, urllib.request, urllib.parse
 from pathlib import Path
 from native_probe_provider import native_probe_intent
+from runtime_provenance import kernel_programs
 ROOT=Path(__file__).resolve().parent.parent
 parser=argparse.ArgumentParser()
 parser.add_argument('--pi-root',type=Path)
 parser.add_argument('--dsh-root',type=Path)
 parser.add_argument('--kernel-root',type=Path)
 parser.add_argument('--kernel-target-dir',type=Path)
+parser.add_argument('--kernel-supervisor',type=Path,help='Explicit existing Kernel supervisor, paired with --kernel-worker; no rebuild or copy')
+parser.add_argument('--kernel-worker',type=Path)
+parser.add_argument('--kernel-expected-version',help='Require this exact build description and public host handshake version')
+parser.add_argument('--kernel-ui-only',action='store_true',help='Explicit independent UI acceptance, excluding Kernel lifecycle/child protocol proof; never an automatic fallback')
 parser.add_argument('--ui-demo',type=Path,help='Optional already-built AgentKit UI consumer for each supplied harness history-to-GPU acceptance')
 parser.add_argument('--ui-output',type=Path)
 parser.add_argument('--ui-components',action='store_true',help='Mount formal Composer/Indicators with RunBinding; structured Transcript remains unavailable')
@@ -86,6 +91,18 @@ if args.ui_output and not args.ui_demo:
 if args.ui_components and not args.ui_demo:
     parser.error("--ui-components requires --ui-demo")
 if not any((args.pi_root,args.dsh_root,args.kernel_root)):parser.error("supply at least one runtime root")
+if args.kernel_ui_only and not (args.kernel_root and args.ui_demo and args.ui_components):
+    parser.error('--kernel-ui-only requires Kernel and a formal component demo')
+if args.kernel_ui_only and (args.ui_bounded_child or args.ui_native_readonly):
+    parser.error('--kernel-ui-only does not provide the bounded child protocol fixture')
+if any((args.kernel_supervisor,args.kernel_worker,args.kernel_expected_version)) and not args.kernel_root:
+    parser.error('Kernel program/version inputs require --kernel-root for the fixture provider configuration')
+if args.kernel_root:
+    try:
+        kernel_supervisor, kernel_worker, kernel_identity = kernel_programs(args.kernel_root, args.kernel_target_dir, args.kernel_supervisor, args.kernel_worker, args.kernel_expected_version)
+    except (ValueError, OSError, subprocess.SubprocessError) as error:
+        parser.error(str(error))
+    print('NATIVE_RUNTIME_BUILD_RECEIPT '+json.dumps(kernel_identity,sort_keys=True),flush=True)
 subprocess.run(['cargo','build','--locked','-p','tekes-agent-headless'],cwd=ROOT,check=True)
 native_child_reply='ENDPOINT_REPLY_OK'+(('\n原生有界子历史长回答，用于真实阅读锚点验证。'*120) if args.ui_native_readonly else '')
 requests=[]
@@ -213,6 +230,7 @@ def execute(config):
         raise AssertionError(config['kind']+' endpoint failed')
     outputs=[json.loads(line) for line in result.stdout.splitlines()]
     if 'expectedVersion' in config:assert outputs[0]['version']==config['expectedVersion'],outputs[0]
+    print(config['kind'].upper()+'_RUNTIME_HANDSHAKE_RECEIPT '+json.dumps(outputs[0],sort_keys=True),flush=True)
     return outputs
 def run(config):
     outputs=execute(config)
@@ -826,63 +844,69 @@ try:
                 try:process.wait(timeout=15)
                 except subprocess.TimeoutExpired:os.killpg(process.pid,signal.SIGKILL);process.wait(timeout=5)
         if args.kernel_root:
-            kernel=args.kernel_root.resolve();kernel_target=args.kernel_target_dir.resolve() if args.kernel_target_dir else kernel/'target';home=base/'kernel-home';home.mkdir()
+            kernel=args.kernel_root.resolve();home=base/'kernel-home';home.mkdir()
             providers=json.loads((kernel/'fixtures/config/providers.canonical.json').read_text());providers['providers'][0]['endpoint']=base_url
             (base/'kernel').mkdir(mode=0o700)
             (base/'kernel/config').mkdir(mode=0o700)
             (base/'kernel/config/settings.json').write_text(json.dumps({'format':1,'revision':1,'limits':{'max_workers':8,'max_provider_leases':8}},sort_keys=True,separators=(',',':'))+'\n')
             (base/'kernel/config/settings.json').chmod(0o600)
-            launch=base/'kernel-launch.json';launch.write_text(json.dumps({'format':1,'bootstrap_version':1,'root':str(base/'kernel'),'worker':str(kernel_target/'debug/tekes-worker'),'listen':'127.0.0.1:0','providers':providers,'credential_bindings':{'openai-main':'AGENTKIT_SYNTHETIC_KEY'}}))
+            launch=base/'kernel-launch.json';launch.write_text(json.dumps({'format':1,'bootstrap_version':1,'root':str(base/'kernel'),'worker':str(kernel_worker),'listen':'127.0.0.1:0','providers':providers,'credential_bindings':{'openai-main':'AGENTKIT_SYNTHETIC_KEY'}}))
             env=dict(os.environ,HOME=str(home));env.pop('TEKES_KERNEL_ENDPOINT_TOKEN',None);env.pop('AGENTKIT_SYNTHETIC_KEY',None)
-            process=subprocess.Popen([str(kernel_target/'debug/tekes-supervisor'),'--built-in',str(launch)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=env)
+            process=subprocess.Popen([str(kernel_supervisor),'--built-in',str(launch)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=env)
             kernel_errors=[]
             threading.Thread(target=lambda:kernel_errors.extend(iter(process.stderr.readline,b'')),daemon=True).start()
             try:
                 token=os.urandom(32);payload=json.dumps({'endpointToken':token.hex(),'credentials':{'openai-main':'synthetic-key'}}).encode();process.stdin.write(b'TEKES-KERNEL-BOOTSTRAP/1\n'+struct.pack('!I',len(payload))+payload);process.stdin.flush()
                 assert select.select([process.stdout],[],[],15)[0],'Kernel readiness timeout';readiness=process.stdout.readline();assert readiness,b''.join(kernel_errors).decode(errors='replace');ready=json.loads(readiness)
                 config={'kind':'native','url':ready['url'],'bearer':base64.urlsafe_b64encode(token).decode().rstrip('='),'commands':commands(cwd,providers['providers'][0]['id'],providers['providers'][0]['models'][0]['id'])}
-                outputs=run(config);native_id=next(row['result']['sessionId'] for row in outputs if row.get('op')=='create')
-                native=[{'op':'call','method':'endpoint.capabilities'},
-                    {'op':'call','sessionId':native_id,'method':'session.models'},
-                    {'op':'call','sessionId':native_id,'method':'commands/list'},
-                    {'op':'call','sessionId':native_id,'method':'skills/list'},
-                    {'op':'call','sessionId':native_id,'method':'attachments.policy'},
-                    {'op':'observeReady','sessionId':native_id},
-                    {'op':'call','method':'settings.describe'},
-                    {'op':'call','method':'session.initialPresets'},
-                    {'op':'call','sessionId':native_id,'method':'session.uploadFile','args':{'name':'native-proof.txt','mediaType':'text/plain','data':base64.b64encode(b'Native upload proof').decode()},'saveAs':'native-upload','savePointer':'/file/attachmentId'},
-                    {'op':'call','sessionId':native_id,'method':'session.fileAttachment','args':{'attachmentId':'@native-upload'}},
-                    {'op':'call','sessionId':native_id,'method':'session.fork','args':{'ephemeral':True},'saveAs':'scratch'},
-                    {'op':'open','sessionId':'scratch'}, {'op':'call','sessionId':'scratch','method':'session.discard'},
-                    {'op':'call','sessionId':native_id,'method':'session.rename','args':{'title':'Native lifecycle proof'}},
-                    {'op':'call','sessionId':native_id,'method':'session.archive'},
-                    {'op':'call','sessionId':native_id,'method':'session.unarchive'},
-                    {'op':'open','sessionId':native_id},{'op':'snapshot'}]
-                result=execute(dict(config,commands=native))
-                assert any(row.get('op')=='call' and isinstance(row.get('result'),dict) and row['result'].get('data')==base64.b64encode(b'Native upload proof').decode() for row in result),'native upload round trip lost'
-                caps=next(row['result'] for row in result if row.get('op')=='call' and isinstance(row.get('result'),dict) and 'methods' in row['result'])
-                if args.ui_bounded_child:assert 'subagents.history' in caps['methods'],'Native endpoint does not publish bounded child history'
-                if 'subagents.history' in caps['methods']:
-                    parent=str(uuid.uuid4())
-                    native_children=[{'op':'call','method':'session.create','args':{'sessionId':parent,'execution':{'cwd':str(cwd),'read_roots':[],'writable_roots':[],'toolchain_roots':[],'network':False,'allowed_tools':['task'],'mcp':[]}},'saveAs':'parent'},
-                        {'op':'call','sessionId':'parent','method':'session.selectModel','args':{'provider':providers['providers'][0]['id'],'model':providers['providers'][0]['models'][0]['id']}},
-                        {'op':'call','sessionId':'parent','method':'approvals.select','args':{'mode':'danger-full-access'}},
-                        {'op':'open','sessionId':'parent'},{'op':'compose','sessionId':'parent','text':'ENDPOINT_NATIVE_CHILD'},
-                        {'op':'waitSettled','sessionId':'parent'},{'op':'presentation','sessionId':'parent'},
-                        {'op':'childCatalog','sessionId':'parent','saveAs':'bounded','savePointer':'/entries/1/id'},
-                        {'op':'childHistory','sessionId':'parent','childSessionId':'bounded'},
-                        {'op':'childEarlier','sessionId':'parent','childSessionId':'bounded'},
-                        {'op':'reconnect'},{'op':'childHistory','sessionId':'parent','childSessionId':'bounded'},
-                        {'op':'callError','method':'subagents.history','args':{'parentSessionId':native_id,'childSessionId':'@bounded','maxMessages':50}}]
-                    child_result=execute(dict(config,commands=native_children))
-                    histories=[row['result'] for row in child_result if row.get('op')=='childHistory']
-                    assert len(histories)==2 and all(any(item['text']==native_child_reply and item['isFinal'] for item in h['items']) for h in histories),histories
-                    assert all(h['tools'][0]['arguments']['task_name']=='Bounded child proof' for h in histories),'missing parent source-call projection'
-                    print('NATIVE_BOUNDED_CHILD_LIVE_OK real-task+source-call+read-only-history+reconnect+ownership')
-                    if args.ui_bounded_child:
-                        child_id=next(row['result']['entries'][1]['id'] for row in child_result if row.get('op')=='childCatalog')
-                        ui_smoke(config,parent,child_id)
-                print('NATIVE_COMPLETE_LIFECYCLE_LIVE_OK models+commands+skills+settings+presets+upload+scratch-discard+rename+archive')
+                if args.kernel_expected_version:config['expectedVersion']=args.kernel_expected_version
+                if args.kernel_ui_only:
+                    created=execute(dict(config,commands=[{'op':'create','cwd':str(cwd)}]))
+                    native_id=next(row['result']['sessionId'] for row in created if row.get('op')=='create')
+                    print('NATIVE_LIFECYCLE_NOT_RUN explicit-independent-ui-mode; no protocol/lifecycle/child acceptance',flush=True)
+                else:
+                    outputs=run(config);native_id=next(row['result']['sessionId'] for row in outputs if row.get('op')=='create')
+                    native=[{'op':'call','method':'endpoint.capabilities'},
+                        {'op':'call','sessionId':native_id,'method':'session.models'},
+                        {'op':'call','sessionId':native_id,'method':'commands/list'},
+                        {'op':'call','sessionId':native_id,'method':'skills/list'},
+                        {'op':'call','sessionId':native_id,'method':'attachments.policy'},
+                        {'op':'observeReady','sessionId':native_id},
+                        {'op':'call','method':'settings.describe'},
+                        {'op':'call','method':'session.initialPresets'},
+                        {'op':'call','sessionId':native_id,'method':'session.uploadFile','args':{'name':'native-proof.txt','mediaType':'text/plain','data':base64.b64encode(b'Native upload proof').decode()},'saveAs':'native-upload','savePointer':'/file/attachmentId'},
+                        {'op':'call','sessionId':native_id,'method':'session.fileAttachment','args':{'attachmentId':'@native-upload'}},
+                        {'op':'call','sessionId':native_id,'method':'session.fork','args':{'ephemeral':True},'saveAs':'scratch'},
+                        {'op':'open','sessionId':'scratch'}, {'op':'call','sessionId':'scratch','method':'session.discard'},
+                        {'op':'call','sessionId':native_id,'method':'session.rename','args':{'title':'Native lifecycle proof'}},
+                        {'op':'call','sessionId':native_id,'method':'session.archive'},
+                        {'op':'call','sessionId':native_id,'method':'session.unarchive'},
+                        {'op':'open','sessionId':native_id},{'op':'snapshot'}]
+                    result=execute(dict(config,commands=native))
+                    assert any(row.get('op')=='call' and isinstance(row.get('result'),dict) and row['result'].get('data')==base64.b64encode(b'Native upload proof').decode() for row in result),'native upload round trip lost'
+                    caps=next(row['result'] for row in result if row.get('op')=='call' and isinstance(row.get('result'),dict) and 'methods' in row['result'])
+                    if args.ui_bounded_child:assert 'subagents.history' in caps['methods'],'Native endpoint does not publish bounded child history'
+                    if 'subagents.history' in caps['methods']:
+                        parent=str(uuid.uuid4())
+                        native_children=[{'op':'call','method':'session.create','args':{'sessionId':parent,'execution':{'cwd':str(cwd),'read_roots':[],'writable_roots':[],'toolchain_roots':[],'network':False,'allowed_tools':['task'],'mcp':[]}},'saveAs':'parent'},
+                            {'op':'call','sessionId':'parent','method':'session.selectModel','args':{'provider':providers['providers'][0]['id'],'model':providers['providers'][0]['models'][0]['id']}},
+                            {'op':'call','sessionId':'parent','method':'approvals.select','args':{'mode':'danger-full-access'}},
+                            {'op':'open','sessionId':'parent'},{'op':'compose','sessionId':'parent','text':'ENDPOINT_NATIVE_CHILD'},
+                            {'op':'waitSettled','sessionId':'parent'},{'op':'presentation','sessionId':'parent'},
+                            {'op':'childCatalog','sessionId':'parent','saveAs':'bounded','savePointer':'/entries/1/id'},
+                            {'op':'childHistory','sessionId':'parent','childSessionId':'bounded'},
+                            {'op':'childEarlier','sessionId':'parent','childSessionId':'bounded'},
+                            {'op':'reconnect'},{'op':'childHistory','sessionId':'parent','childSessionId':'bounded'},
+                            {'op':'callError','method':'subagents.history','args':{'parentSessionId':native_id,'childSessionId':'@bounded','maxMessages':50}}]
+                        child_result=execute(dict(config,commands=native_children))
+                        histories=[row['result'] for row in child_result if row.get('op')=='childHistory']
+                        assert len(histories)==2 and all(any(item['text']==native_child_reply and item['isFinal'] for item in h['items']) for h in histories),histories
+                        assert all(h['tools'][0]['arguments']['task_name']=='Bounded child proof' for h in histories),'missing parent source-call projection'
+                        print('NATIVE_BOUNDED_CHILD_LIVE_OK real-task+source-call+read-only-history+reconnect+ownership')
+                        if args.ui_bounded_child:
+                            child_id=next(row['result']['entries'][1]['id'] for row in child_result if row.get('op')=='childCatalog')
+                            ui_smoke(config,parent,child_id)
+                    print('NATIVE_COMPLETE_LIFECYCLE_LIVE_OK models+commands+skills+settings+presets+upload+scratch-discard+rename+archive')
                 ui_smoke(config,native_id)
 
             finally:
