@@ -33,3 +33,5 @@ SDK截图子进程曾失败，最终通过Cua取得正式组件窗口和真实�
 所有验证复用现有target。终态确认进程/占用、持单一Cargo flock后，删除明确归属旧快照的406个中间文件；随后依据两次全部fresh的Cargo artifact图，删除86个已被1294替代的2ee编译产物。du减少与去重已分配块一致，共1,108,123,648字节（1056.8MiB）。源码/WIP/固定快照/原清单/日志/截图、当前全部产物和native/reading/独立consumer验收程序保留；无新增target。共享target仍约20GiB，含现用依赖及无法从相对depfile确认归属的旧变体，未据体积删除。
 
 下一步把RunView已有prepare/validate/apply publication计划接进原SDK持续reading事务，再验追加/前插/分页/阅读位置；之后推进剩余同名Views、菜单/管理入口及整体原生验收。PR10保持草稿，未完成最终review/合并/阶段tag，未标记整体目标完成。
+
+首次6136086核心CI的Rust检查通过；Python边界测试仍构造旧consumer dev-dependency布局而失败。已同步该夹具并增加platform/harness仍拒绝的子用例，本地26项Python测试通过；运行时代码和以上原生程序未变。失败日志保留，新提交CI另核对。

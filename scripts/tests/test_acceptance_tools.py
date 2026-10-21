@@ -216,13 +216,11 @@ class Checks(unittest.TestCase):
         for name, dependencies in {
             'components': ['tekes-agent-contract', 'tekes-agent-presentation', 'tekes-ui-controls', 'tekes-ui-scene', 'tekes-ui-tokens'],
             'bindings': ['tekes-agent-components-ui', 'tekes-agent-contract', 'tekes-agent-presentation', 'tekes-agent-session', 'tekes-agent-web', 'serde_json', 'tokio', 'async-trait', 'uuid', 'base64'],
-            'consumer': ['tekes-agent-components-ui', 'tekes-agent-ui-bindings'],
+            'consumer': ['tekes-agent-components-ui', 'tekes-agent-ui-bindings', 'tekes-ui-controls'],
         }.items():
             (ui / name).mkdir()
             text = '[package]\npublish.workspace=true\n[dependencies]\n'
             text += ''.join(f'{d}.workspace=true\n' for d in dependencies)
-            if name == 'consumer':
-                text += '[dev-dependencies]\ntekes-ui-controls.workspace=true\n'
             (ui / name / 'Cargo.toml').write_text(text)
         header = '[workspace]\n[workspace.package]\npublish=false\nversion="0.0.0"\n[workspace.dependencies]\n'
         for dependency, valid in [
@@ -234,6 +232,19 @@ class Checks(unittest.TestCase):
             result = subprocess.run([sys.executable, str(SCRIPTS / 'check-ui-boundaries.py'),
                                      '--root', str(self.root)], capture_output=True)
             self.assertEqual(result.returncode == 0, valid, result.stderr.decode())
+        # Controls are the original public reveal types; platform/harness access
+        # must remain rejected even with an otherwise valid published SDK pin.
+        (ui / 'Cargo.toml').write_text(header + 'tekes-ui-controls={git="' +
+                                      public['repository'] + '",rev="' + public['rev'] + '"}\n')
+        consumer = ui / 'consumer/Cargo.toml'
+        accepted = consumer.read_text()
+        for forbidden in ['tekes-ui-platform-macos', 'tekes-agent-endpoint-kernel']:
+            with self.subTest(forbidden=forbidden):
+                consumer.write_text(accepted + forbidden + '.workspace=true\n')
+                result = subprocess.run([sys.executable, str(SCRIPTS / 'check-ui-boundaries.py'),
+                                         '--root', str(self.root)], capture_output=True)
+                self.assertNotEqual(result.returncode, 0)
+        consumer.write_text(accepted)
 
     def test_capture_is_disabled_for_a_published_pin(self):
         scripts = self.root / 'scripts'

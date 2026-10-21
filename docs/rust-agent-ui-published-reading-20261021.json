@@ -246,6 +246,15 @@
     ".runtime-fixtures/agentkit-public-reading-1294-evidence/pinyin-initial.ax.txt": "19e3a66e88d880da690da68b03b6b25e8fc436b726d57c9f019fdb3d4189c118",
     ".runtime-fixtures/agentkit-public-reading-1294-evidence/native-program.json": "592c0f2f736569dc7a0342f310fd4bb60a8fd7fb967c9f7680d8178730c8bd44",
     ".runtime-fixtures/agentkit-public-reading-1294-evidence/three-native-endpoints-dsh.native-run-controls.log": "70922f421b61df2ff77890eca0ac697343a80156fc23cfe9a7795ea2ab38e1a6",
-    ".runtime-fixtures/agentkit-public-reading-1294-evidence/native-build.log": "1094a36867300c1838cdc4ee40efe961d83bac574665f8ee57a40d5b1e88698c"
+    ".runtime-fixtures/agentkit-public-reading-1294-evidence/native-build.log": "1094a36867300c1838cdc4ee40efe961d83bac574665f8ee57a40d5b1e88698c",
+    ".runtime-fixtures/agentkit-public-reading-1294-evidence/python-checks.log": "9eac29b7bcaca6928f76aee9217fce02b879d71e864955875300afabdf474fb6",
+    ".runtime-fixtures/agentkit-public-reading-1294-evidence/ci-initial-core-failure.log": "51bcc4d81706fe7107e4029149f3f86af43cd6a862679e0ceccd8a1f860d1595"
+  },
+  "pythonTestsPassed": 26,
+  "ciFixtureCorrection": {
+    "initialHead": "6136086",
+    "failure": "Python boundary test constructed the obsolete consumer dev-dependency layout",
+    "correction": "fixture reflects original controls public dependency; forbidden platform/harness cases stay rejected",
+    "runtimeCodeChanged": false
   }
 }
