@@ -1,4 +1,8 @@
 //! Agent session inventory and shared actions. No local pin database or action policy.
+use crate::SidebarSelectionNavigation;
+use crate::sidebar_navigation::{
+    DisclosureTarget, NavigationReveal, PendingNavigation, plan_reveal,
+};
 use crate::summary_section::{Expansion, SummarySectionView};
 use crate::{
     SidebarFolderKey, SidebarPreferenceChange, SidebarPreferencesSnapshot, SidebarSearchInput,
@@ -6,6 +10,7 @@ use crate::{
     SidebarTitleComparator, ordered_sidebar_rows, sidebar_folder_title, sidebar_outline,
     sidebar_search::{SearchFooter, SearchInputView},
 };
+use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, BTreeSet};
 pub use tekes_agent_contract::{
     SessionAddress, ThreadActionDefinition, ThreadActionsPresentation, ThreadActivity,
@@ -126,6 +131,11 @@ pub struct Sidebar {
     pinned_expansion: Expansion,
     folder_expansions: BTreeMap<SidebarFolderKey, Expansion>,
     preference_bindings: BTreeMap<ComponentId, SidebarPreferenceChange>,
+    disclosure_targets: BTreeMap<ComponentId, DisclosureTarget>,
+    navigation_reveal: RefCell<NavigationReveal>,
+    disclosure_dirty: Cell<bool>,
+    last_navigation: Option<SidebarSelectionNavigation>,
+    pending_navigation: RefCell<Option<PendingNavigation>>,
     root: ComponentId,
     body: StackContent,
     labels: SidebarLabels,
@@ -200,6 +210,11 @@ impl Sidebar {
             })),
             folder_expansions: BTreeMap::new(),
             preference_bindings: BTreeMap::new(),
+            disclosure_targets: BTreeMap::new(),
+            navigation_reveal: RefCell::new(NavigationReveal::default()),
+            disclosure_dirty: Cell::new(false),
+            last_navigation: None,
+            pending_navigation: RefCell::new(None),
             root: ComponentId(base),
             body,
             labels,
@@ -221,6 +236,67 @@ impl Sidebar {
     pub fn preferences(&self) -> &SidebarPreferencesSnapshot {
         &self.preferences
     }
+    fn pinned_open(&self) -> bool {
+        self.preferences.preferences.pinned_expanded || self.navigation_reveal.borrow().pinned
+    }
+    fn folder_open(&self, key: &SidebarFolderKey) -> bool {
+        !self.preferences.preferences.collapsed_folders.contains(key)
+            || self.navigation_reveal.borrow().folders.contains(key)
+    }
+    pub fn pending_navigation(&self) -> Option<SidebarSelectionNavigation> {
+        self.pending_navigation
+            .borrow()
+            .as_ref()
+            .map(|pending| pending.event.clone())
+    }
+    /// True means a new event was consumed; false means waiting for its row or
+    /// an idempotent duplicate. No preference write, routing or scroll occurs.
+    pub fn reconcile_navigation(
+        &mut self,
+        event: &SidebarSelectionNavigation,
+    ) -> Result<bool, &'static str> {
+        if event.revision == 0
+            || event
+                .selected
+                .as_ref()
+                .is_some_and(|id| id.endpoint_id.is_empty() || id.session_id.is_empty())
+        {
+            return Err("invalid Sidebar navigation");
+        }
+        if let Some(last) = &self.last_navigation {
+            if event.revision < last.revision {
+                return Err("stale Sidebar navigation");
+            }
+            if event.revision == last.revision {
+                return if event == last {
+                    Ok(false)
+                } else {
+                    Err("conflicting Sidebar navigation")
+                };
+            }
+        }
+        if self
+            .displayed
+            .as_ref()
+            .is_some_and(|input| input.selected != event.selected)
+        {
+            return Err("Sidebar navigation does not match current selection");
+        }
+        let old = (
+            self.last_navigation.clone(),
+            self.pending_navigation.borrow().clone(),
+        );
+        self.last_navigation = Some(event.clone());
+        *self.pending_navigation.borrow_mut() = Some(PendingNavigation::new(event.clone()));
+        if let Some(input) = self.displayed.clone()
+            && let Err(error) = self.update(&input)
+        {
+            self.last_navigation = old.0;
+            *self.pending_navigation.borrow_mut() = old.1;
+            return Err(error);
+        }
+        Ok(self.pending_navigation.borrow().is_none())
+    }
     pub fn set_title_comparator(&mut self, compare: SidebarTitleComparator) {
         self.title_comparator = Some(compare);
     }
@@ -229,12 +305,14 @@ impl Sidebar {
     /// next authoritative publication (including rollback after write failure).
     pub fn preferences_current(&self, value: &SidebarPreferencesSnapshot, writable: bool) -> bool {
         self.preferences_bound
+            && !self.disclosure_dirty.get()
             && value == &self.preferences
             && writable == self.preferences_writable
-            && self.pinned_expansion.borrow().open == value.preferences.pinned_expanded
-            && self.folder_expansions.iter().all(|(key, expansion)| {
-                expansion.borrow().open != value.preferences.collapsed_folders.contains(key)
-            })
+            && self.pinned_expansion.borrow().open == self.pinned_open()
+            && self
+                .folder_expansions
+                .iter()
+                .all(|(key, expansion)| expansion.borrow().open == self.folder_open(key))
     }
     pub fn update_preferences(
         &mut self,
@@ -259,7 +337,9 @@ impl Sidebar {
         {
             return Err("Sidebar title sort requires a host localized comparator");
         }
-        let generation = if !self.preferences_bound
+        let dirty = self.disclosure_dirty.get();
+        let generation = if dirty
+            || !self.preferences_bound
             || value != &self.preferences
             || writable != self.preferences_writable
         {
@@ -275,10 +355,21 @@ impl Sidebar {
             self.preferences_writable,
             self.preferences_generation,
         );
+        let old_reveal = self.navigation_reveal.borrow().clone();
+        let mut reveal = old_reveal.clone();
+        reveal.folders.retain(|key| {
+            self.preferences.preferences.collapsed_folders.contains(key)
+                == value.preferences.collapsed_folders.contains(key)
+        });
+        if self.preferences.preferences.pinned_expanded != value.preferences.pinned_expanded {
+            reveal.pinned = false;
+        }
+        *self.navigation_reveal.borrow_mut() = reveal;
         self.preferences_generation = generation;
         self.preferences = value.clone();
         self.preferences_bound = true;
         self.preferences_writable = writable;
+        self.disclosure_dirty.set(false);
         if let Some(input) = self.displayed.clone()
             && let Err(error) = self.update(&input)
         {
@@ -288,6 +379,8 @@ impl Sidebar {
                 self.preferences_writable,
                 self.preferences_generation,
             ) = old;
+            *self.navigation_reveal.borrow_mut() = old_reveal;
+            self.disclosure_dirty.set(dirty);
             return Err(error);
         }
         Ok(())
@@ -312,7 +405,22 @@ impl Sidebar {
         actions
             .iter()
             .filter(|a| a.kind == ContentActionKind::Activate)
-            .filter_map(|a| self.preference_bindings.get(&a.target).cloned())
+            .filter_map(|a| {
+                let change = self.preference_bindings.get(&a.target)?.clone();
+                let mut reveal = self.navigation_reveal.borrow_mut();
+                let target = self.disclosure_targets.get(&a.target)?;
+                if let Some(pending) = self.pending_navigation.borrow_mut().as_mut() {
+                    pending.suppress(target);
+                }
+                match target {
+                    DisclosureTarget::Folder(key) => {
+                        reveal.folders.remove(key);
+                    }
+                    DisclosureTarget::Pinned => reveal.pinned = false,
+                }
+                self.disclosure_dirty.set(true);
+                Some(change)
+            })
             .collect()
     }
     /// The same original pin-order algorithm as ClientKit. Unknown stored IDs
@@ -667,6 +775,19 @@ impl Sidebar {
         }) {
             return Err("conflicting sidebar publication");
         }
+        let (reveal, consume_navigation) = plan_reveal(
+            input,
+            self.pending_navigation.borrow().as_ref(),
+            &self.navigation_reveal.borrow(),
+        );
+        let generation =
+            if self.disclosure_dirty.get() || reveal != *self.navigation_reveal.borrow() {
+                self.preferences_generation
+                    .checked_add(1)
+                    .ok_or("Sidebar disclosure generation exhausted")?
+            } else {
+                self.preferences_generation
+            };
         let outline = sidebar_outline(
             &input.rows,
             &self.preferences.preferences,
@@ -746,15 +867,15 @@ impl Sidebar {
             }
         }
         if has_pins {
-            keys.insert(Key::PinnedHeader(self.preferences_generation));
-            keys.insert(Key::PinnedLabel(self.preferences_generation));
+            keys.insert(Key::PinnedHeader(generation));
+            keys.insert(Key::PinnedLabel(generation));
         }
         if input.loaded {
             for group in &outline.folders {
                 keys.extend([
                     Key::FolderRoot(group.key.clone()),
-                    Key::FolderHeader(group.key.clone(), self.preferences_generation),
-                    Key::FolderLabel(group.key.clone(), self.preferences_generation),
+                    Key::FolderHeader(group.key.clone(), generation),
+                    Key::FolderLabel(group.key.clone(), generation),
                     Key::FolderBody(group.key.clone()),
                 ]);
             }
@@ -779,6 +900,10 @@ impl Sidebar {
             });
         }
 
+        *self.navigation_reveal.borrow_mut() = reveal;
+        if consume_navigation {
+            *self.pending_navigation.borrow_mut() = None;
+        }
         let old = std::mem::take(&mut self.rows_mut().rows.children);
         let mut pinned_section = None;
         let mut folder_sections = BTreeMap::new();
@@ -801,8 +926,9 @@ impl Sidebar {
         let mut pinned_children = Vec::new();
         let mut folder_children: BTreeMap<SidebarFolderKey, Vec<Content>> = BTreeMap::new();
         let mut preference_bindings = BTreeMap::new();
+        let mut disclosure_targets = BTreeMap::new();
         *self.pinned_expansion.borrow_mut() = Disclosure {
-            open: self.preferences.preferences.pinned_expanded,
+            open: self.pinned_open(),
             disabled: !self.preferences_writable,
         };
         for row in &visible_rows {
@@ -846,14 +972,9 @@ impl Sidebar {
             let pinned = row.pin.as_ref().is_some_and(|pin| pin.pinned);
             let folder = row.folder_key();
             let active = if pinned {
-                self.preferences.preferences.pinned_expanded
+                self.pinned_open()
             } else {
-                !self.preferences.preferences.group_by_folder
-                    || !self
-                        .preferences
-                        .preferences
-                        .collapsed_folders
-                        .contains(&folder)
+                !self.preferences.preferences.group_by_folder || self.folder_open(&folder)
             };
             if active {
                 bindings.insert(
@@ -893,12 +1014,12 @@ impl Sidebar {
                     })
                     .clone();
                 *expansion.borrow_mut() = Disclosure {
-                    open: !self.preferences.preferences.collapsed_folders.contains(key),
+                    open: self.folder_open(key),
                     disabled: !self.preferences_writable,
                 };
                 let root = ids[&Key::FolderRoot(key.clone())];
-                let header = ids[&Key::FolderHeader(key.clone(), self.preferences_generation)];
-                let label = ids[&Key::FolderLabel(key.clone(), self.preferences_generation)];
+                let header = ids[&Key::FolderHeader(key.clone(), generation)];
+                let label = ids[&Key::FolderLabel(key.clone(), generation)];
                 let body_id = ids[&Key::FolderBody(key.clone())];
                 let mut section = folder_sections
                     .remove(&root)
@@ -925,16 +1046,12 @@ impl Sidebar {
                 *body.rows_mut() = folder_children.remove(key).unwrap_or_default();
                 if self.preferences_writable {
                     let mut value = self.preferences.preferences.clone();
-                    if let Some(index) = value
-                        .collapsed_folders
-                        .iter()
-                        .position(|folder| folder == key)
-                    {
-                        value.collapsed_folders.remove(index);
-                    } else {
+                    value.collapsed_folders.retain(|folder| folder != key);
+                    if self.folder_open(key) {
                         value.collapsed_folders.push(key.clone());
                         value.collapsed_folders.sort();
                     }
+                    disclosure_targets.insert(header, DisclosureTarget::Folder(key.clone()));
                     preference_bindings.insert(
                         header,
                         SidebarPreferenceChange {
@@ -947,8 +1064,8 @@ impl Sidebar {
             }
         }
         if has_pins {
-            let header = ids[&Key::PinnedHeader(self.preferences_generation)];
-            let label = ids[&Key::PinnedLabel(self.preferences_generation)];
+            let header = ids[&Key::PinnedHeader(generation)];
+            let label = ids[&Key::PinnedLabel(generation)];
             let mut section = pinned_section
                 .filter(|node| {
                     node.component::<SummarySectionView>().unwrap().children[0].id() == header
@@ -971,7 +1088,8 @@ impl Sidebar {
             *body.rows_mut() = pinned_children;
             if self.preferences_writable {
                 let mut value = self.preferences.preferences.clone();
-                value.pinned_expanded = !value.pinned_expanded;
+                value.pinned_expanded = !self.pinned_open();
+                disclosure_targets.insert(header, DisclosureTarget::Pinned);
                 preference_bindings.insert(
                     header,
                     SidebarPreferenceChange {
@@ -1086,6 +1204,9 @@ impl Sidebar {
         self.next = next;
         self.bindings = bindings;
         self.preference_bindings = preference_bindings;
+        self.disclosure_targets = disclosure_targets;
+        self.preferences_generation = generation;
+        self.disclosure_dirty.set(false);
         self.revision = input.revision;
         self.displayed = Some(input.clone());
         Ok(())

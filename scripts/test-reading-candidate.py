@@ -233,10 +233,9 @@ def main():
         old = '                // CANDIDATE_SIDEBAR_HELP_NATIVE_BEGIN'
         assert code.count(old) == 1
         code = code.replace(old, old + '\n                if std::env::var_os("AGENT_SIDEBAR_HELP_CAPTURE").is_some() {\n                    let editor = host.view.tree.get(host.view.ids().editor).unwrap().visible().unwrap().center();\n                    let row_point = host.view.tree.get(row).unwrap().visible().unwrap().center();\n                    self.phase = 10;\n                    run_script(vec![(0, Action::Click { x: editor.x as f64, y: editor.y as f64 }),\n                        (100, Action::PreeditRange { text: "中文组字".into(), selection: 1..3, replacement: None }),\n                        (200, Action::MouseMove { x: row_point.x as f64, y: row_point.y as f64 })]);\n                    return;\n                }')
-        code = code.replace('run_script(vec![(15000, Action::Close)]);',
-                            'run_script(vec![(if std::env::var_os("AGENT_SIDEBAR_HELP_CAPTURE").is_some() { 30000 } else { 15000 }, Action::Close)]);')
-        code = code.replace('self.started.elapsed() < Duration::from_secs(15)',
-                            'self.started.elapsed() < Duration::from_secs(if std::env::var_os("AGENT_SIDEBAR_HELP_CAPTURE").is_some() { 30 } else { 15 })')
+        old = '        // CANDIDATE_SIDEBAR_HELP_DEADLINE'
+        assert code.count(old) == 1
+        code = code.replace(old, old + '\n        if std::env::var_os("AGENT_SIDEBAR_HELP_CAPTURE").is_some() { return 30000; }')
         owned_probe = repo / 'scripts/probes/agentkit-sidebar-help-native.rs'
         native_probe.write_bytes(code.encode() + b'\n' + owned_probe.read_bytes())
         native_host = snapshot / 'ui/demo/src/components_native.rs'

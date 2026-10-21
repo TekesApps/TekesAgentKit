@@ -2080,3 +2080,86 @@ fn second_product_consumes_scoped_folder_grouping_filter_and_original_disclosure
         widget
     );
 }
+
+#[test]
+fn independent_product_reconciles_navigation_once_without_rewriting_durable_collapse() {
+    use tekes_agent_components_ui::*;
+    use tekes_ui_controls::composition::AccessibilityAction;
+    let address = RunScope::main("consumer", "a").address();
+    let row = SidebarRow {
+        primary_folder_id: Some("original-id".into()),
+        folder_path: Some("/original/folder".into()),
+        address: address.clone(),
+        title: "a".into(),
+        activity: ThreadActivity {
+            status: "idle".into(),
+            is_stale: false,
+        },
+        pin: None,
+        actions: ThreadActionsPresentation {
+            endpoint: address.endpoint_id.clone(),
+            session_id: address.session_id.clone(),
+            label: "操作".into(),
+            items: vec![],
+        },
+    };
+    let key = row.folder_key();
+    let value = SidebarPreferencesSnapshot {
+        revision: 1,
+        preferences: SidebarPreferences {
+            group_by_folder: true,
+            collapsed_folders: vec![key.clone()],
+            ..Default::default()
+        },
+    };
+    let input = SidebarInput {
+        folder_filter: None,
+        search_help: None,
+        revision: 1,
+        loaded: true,
+        error: None,
+        selected: Some(address.clone()),
+        rows: vec![row],
+    };
+    let event = SidebarSelectionNavigation {
+        revision: 1,
+        selected: Some(address),
+    };
+    let mut sidebar = Sidebar::new(2206, SidebarLabels::default());
+    sidebar.update_preferences(&value, true).unwrap();
+    sidebar.update(&input).unwrap();
+    assert!(sidebar.reconcile_navigation(&event).unwrap());
+    assert_eq!(sidebar.preferences(), &value);
+    let root = sidebar.id();
+    let header = sidebar.folder_header_id(&key).unwrap();
+    let leaf = sidebar.row_id(input.selected.as_ref().unwrap()).unwrap();
+    let mut host = sidebar.into_host().unwrap();
+    assert!(host.semantics().iter().any(|node| node.id == leaf));
+    host.accessibility_action(header, None, AccessibilityAction::Press);
+    let actions = host.drain_actions();
+    let change = host
+        .get(root)
+        .unwrap()
+        .component::<Sidebar>()
+        .unwrap()
+        .take_preference_intents(&actions)
+        .pop()
+        .unwrap();
+    assert_eq!(change.value, value.preferences);
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<Sidebar>()
+        .unwrap()
+        .update_preferences(&value, true)
+        .unwrap();
+    assert!(
+        !host
+            .get_mut(root)
+            .unwrap()
+            .component_mut::<Sidebar>()
+            .unwrap()
+            .reconcile_navigation(&event)
+            .unwrap()
+    );
+    assert!(!host.semantics().iter().any(|node| node.id == leaf));
+}

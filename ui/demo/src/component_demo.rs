@@ -1783,7 +1783,8 @@ impl ComponentDemo {
             .map_err(|_| unsupported("mount empty selection"))?;
         self.selection_cleared = true;
         self.navigation_revision += 1;
-        self.sync()
+        self.sync()?;
+        self.reconcile_sidebar_selection()
     }
     pub fn set_sidebar_title_comparator(
         &mut self,
@@ -3001,6 +3002,22 @@ impl ComponentDemo {
         }
         labels
     }
+    fn reconcile_sidebar_selection(&mut self) -> Result<()> {
+        let event = tekes_agent_components_ui::SidebarSelectionNavigation {
+            revision: self.navigation_revision,
+            selected: self
+                .current_binding()
+                .map(|binding| binding.scope().address()),
+        };
+        self.tree
+            .get_mut(self.sidebar_id())
+            .expect("sidebar")
+            .component_mut::<Sidebar>()
+            .expect("Sidebar")
+            .reconcile_navigation(&event)
+            .map_err(unsupported)?;
+        Ok(())
+    }
     pub fn select(&mut self, index: usize) -> Result<()> {
         require(index < self.bindings.len(), "unknown demo session")?;
         require(
@@ -3034,6 +3051,7 @@ impl ComponentDemo {
             .ok_or_else(|| unsupported("navigation revision exhausted"))?;
         if index == self.selected {
             self.sync()?;
+            self.reconcile_sidebar_selection()?;
             self.tree.focus(Some(self.ids().editor), true);
             return Ok(());
         }
@@ -3071,6 +3089,7 @@ impl ComponentDemo {
             )
             .map_err(|_| unsupported("demo layout order"))?;
         self.sync()?;
+        self.reconcile_sidebar_selection()?;
         self.tree.focus(Some(self.ids().editor), true);
         Ok(())
     }

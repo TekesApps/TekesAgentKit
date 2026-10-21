@@ -1,5 +1,7 @@
 # Primary Folder 分组、筛选与折叠
 
+本记录固定分组阶段的源码及验收；后续已补已知/随后恢复行的 [显式导航临时展开](rust-agent-ui-sidebar-navigation-20261021.md)，独立选中行补读和滚动可见性仍未完成。
+
 本轮推进当前 ClientKit `ClientSessionSidebar.sessionRows/setSessionGrouping/filterSessions/folderTitle` 的分组、筛选和持久折叠部分：普通会话按 Primary Folder 分组，分组顺序取排序后首次出现顺序；置顶区独立于分组和筛选。Tekes 宿主仍拥有外层导航、系统路径和工作区适配。本轮未修改 ClientKit、Tekes、Kernel 或 TekesUI。
 
 ## 公开输入

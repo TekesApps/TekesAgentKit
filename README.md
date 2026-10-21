@@ -104,6 +104,7 @@ python3 scripts/install-dsh-runtime.py \
 - [实验 UI：三端取消、错误与显式恢复](docs/rust-agent-ui-run-controls-20261020.md)
 - [实验 UI：Sidebar 共享查询控制器与公开搜索 RPC](docs/rust-agent-ui-sidebar-query-controller-20261021.md)
 - [实验 UI：Primary Folder 分组、筛选、持久折叠及格式4边界](docs/rust-agent-ui-sidebar-folders-20261021.md)
+- [实验 UI：选中导航、临时展开与手动折叠优先级](docs/rust-agent-ui-sidebar-navigation-20261021.md)
 - [Kernel v4 同步、历史及恢复](docs/headless-kernel.md)
 - [路线与交付边界](docs/roadmap.md)
 - [阶段变更](CHANGELOG.md) · [贡献说明](CONTRIBUTING.md)

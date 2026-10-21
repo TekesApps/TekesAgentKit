@@ -19,10 +19,19 @@ pub(super) struct Probe {
     callbacks: usize,
     clear_after: Option<Instant>,
     results_capture: Option<std::path::PathBuf>,
+    navigation_preferences: Option<tekes_agent_components_ui::SidebarPreferencesSnapshot>,
 }
 impl Probe {
+    fn deadline_millis() -> u64 {
+        // CANDIDATE_SIDEBAR_HELP_DEADLINE
+        if std::env::var_os("AGENT_SIDEBAR_NAVIGATION_CAPTURE").is_some() {
+            30000
+        } else {
+            15000
+        }
+    }
     pub fn new(fixture: tekes_agent_ui_demo::fixture::Fixture) -> Self {
-        run_script(vec![(15000, Action::Close)]);
+        run_script(vec![(Self::deadline_millis(), Action::Close)]);
         Self {
             fixture,
             started: Instant::now(),
@@ -34,6 +43,7 @@ impl Probe {
             callbacks: 0,
             clear_after: None,
             results_capture: None,
+            navigation_preferences: None,
         }
     }
     pub fn prepare(view: &ComponentDemo) {
@@ -68,7 +78,7 @@ impl Probe {
     }
     pub fn advance(&mut self, host: &mut Host, window: &Window) {
         assert!(
-            self.started.elapsed() < Duration::from_secs(15),
+            self.started.elapsed() < Duration::from_millis(Self::deadline_millis()),
             "query probe deadline phase {}",
             self.phase
         );

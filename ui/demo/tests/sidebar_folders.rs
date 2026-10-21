@@ -277,6 +277,20 @@ async fn folder_publications_and_filter_preserve_composition_while_header_naviga
         )
     );
     let focus = view.tree.focused();
+    assert!(
+        view.select(0).is_err(),
+        "composition still owns actual session navigation"
+    );
+    view.tree
+        .get_mut(view.sidebar_id())
+        .unwrap()
+        .component_mut::<Sidebar>()
+        .unwrap()
+        .reconcile_navigation(&SidebarSelectionNavigation {
+            revision: 1,
+            selected: Some(RunScope::main("fixture", "a").address()),
+        })
+        .unwrap();
     view.set_sidebar_folder_filter(Some(key.clone())).unwrap();
     let header = view
         .tree

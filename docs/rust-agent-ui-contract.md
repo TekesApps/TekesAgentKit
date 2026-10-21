@@ -281,3 +281,5 @@ Native [消息生命周期边界修正](rust-agent-ui-native-stream-boundary-202
 再对照 `ClientSessionSidebar.sessionRows` 后修正[搜索与置顶区](rust-agent-ui-sidebar-pinned-search-20261021.md)：搜索只过滤普通会话，独立全局置顶行在 Searching/失败/无命中时保留原控件。`loaded`只代表库存恢复，新增`SidebarSearchHelp.results_ready`区分结果等待，未知hit不伪报无命中。默认367/固定336候选394项、第二consumer39项、严格Clippy、原生置顶搜索和三端离屏回传通过。默认精确pin、headless契约及其余未完成范围不变；来源与边界见同名JSON。
 
 后续 [Primary Folder 分组](rust-agent-ui-sidebar-folders-20261021.md) 已接通端点隔离的 ID/路径/No Folder 身份、排序后首次出现的组序、持久分组/折叠及独立于全局 pin 的筛选。原行控件在分组/取消分组/折叠时保留，筛选退休旧叶子动作；搜索投影保留显式 filter。偏好文件升级为4并迁移1/2/3，旧二进制不能读取4，尚未发布。默认UI372、固定候选399、第二consumer40、无UI186项及严格Clippy、三端离屏回传、实际原生分组/折叠/筛选通过。标准 disclosure 指示器与触发器焦点连续性待SDK #38；选项菜单待#36，完整管理目录/按文件夹新建、分页/选中补齐、多端与其余完整UI目标仍未完成。
+
+最新 [Sidebar选中导航](rust-agent-ui-sidebar-navigation-20261021.md) 将显式导航展开与持久折叠分离，复用宿主原导航版本；普通刷新、重复/过时请求和晚到的目标行不能覆盖后续手动折叠。无变化偏好确认、失败回滚和筛选/置顶边界已接通；不做隐式补读或滚动。默认UI380、固定336候选407项、第二consumer41项及严格Clippy、原生导航/折叠/标题刷新和三端离屏回传通过。无UI核心与格式4未改，沿用上一阶段186项；缺失选中行的独立补读/分页、滚动可见性、基础组件及其余完整目标继续保留。
