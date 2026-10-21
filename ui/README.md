@@ -288,3 +288,7 @@ presentation; readonly history only receives calendar formatting. Hosts own
 Unix time, locale and timezone, using `TurnFootnoteLabels::finished_timestamp`.
 See [footnote time contract](../docs/rust-agent-ui-turn-footnote-time-20261022.md)
 for API migration, native wake lifetime and evidence limits.
+
+`TurnFootnoteDisplay::has_output` expresses formal output presence independently of
+copy/feedback authority. Timestamp-only turns hide their aside unless live or
+provided settled-turn controls. See [visibility contract](../docs/rust-agent-ui-output-aside-20261022.md).

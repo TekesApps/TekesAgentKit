@@ -183,6 +183,7 @@ impl Default for TurnFootnoteLabels {
 }
 #[derive(Debug)]
 pub struct TurnFootnote {
+    shown: bool,
     display: crate::TurnFootnoteDisplay,
     information: Option<Content>,
     information_text: String,
@@ -206,6 +207,7 @@ impl TurnFootnote {
     pub fn new(namespace: u32, scope: RunScope, labels: TurnFootnoteLabels) -> Self {
         let root = ComponentId((namespace as u64) << 32);
         Self {
+            shown: false,
             display: Default::default(),
             information: None,
             information_text: String::new(),
@@ -246,7 +248,7 @@ impl TurnFootnote {
         self.root
     }
     pub fn action_id(&self, id: &str) -> Option<ComponentId> {
-        if self.display.is_live_owner {
+        if !self.shown || self.display.is_live_owner {
             return None;
         }
         self.actions
@@ -310,6 +312,13 @@ impl TurnFootnote {
         output: Option<TranscriptOutput<'_>>,
         display: &crate::TurnFootnoteDisplay,
     ) -> Result<(), &'static str> {
+        let shown = display.is_live_owner
+            || display.has_output
+            || output.is_some()
+            || (!matches!(turn.status.as_str(), "running" | "waitingForInput")
+                && !turn.footnote_actions.is_empty());
+        let visibility_changed =
+            self.shown != shown || self.display.is_live_owner != display.is_live_owner;
         let rekey = self.check_update_with_display(
             scope,
             publication,
@@ -318,9 +327,9 @@ impl TurnFootnote {
             available,
             output,
             display,
-        )? || self.display.is_live_owner != display.is_live_owner;
+        )? || visibility_changed;
         let copy = copy_facts(turn, output)?;
-        if copy != self.output_copy || epoch != self.epoch {
+        if copy != self.output_copy || epoch != self.epoch || visibility_changed {
             self.copy_id = copy.as_ref().map(|_| {
                 let id = ComponentId(self.root.0 + self.next);
                 self.next += 1;
@@ -332,6 +341,7 @@ impl TurnFootnote {
         self.publication = publication;
         self.epoch = epoch;
         self.available = available;
+        self.shown = shown;
         self.display = display.clone();
         self.information_text =
             (self.labels.information)(&TurnFootnoteFacts::read_with_display(turn, display.clone()));
@@ -343,16 +353,16 @@ impl TurnFootnote {
         Ok(())
     }
     pub fn information_id(&self) -> Option<ComponentId> {
-        (!self.information_text.is_empty()).then_some(ComponentId(self.root.0 + 1))
+        (self.shown && !self.information_text.is_empty()).then_some(ComponentId(self.root.0 + 1))
     }
     pub fn copy_button_id(&self) -> Option<ComponentId> {
-        if self.display.is_live_owner {
+        if !self.shown || self.display.is_live_owner {
             return None;
         }
         self.copy_id
     }
     pub fn take_copy_intents(&self, actions: &[ContentAction]) -> Vec<TranscriptCopyIntent> {
-        if self.display.is_live_owner {
+        if !self.shown || self.display.is_live_owner {
             return vec![];
         }
         let Some((message, text)) = &self.output_copy else {
@@ -505,6 +515,10 @@ impl TurnFootnote {
             .or_else(|| self.information.take())
             .expect("retained original footnote information");
         information.component_mut::<TextContent>().unwrap().text = self.information_text.clone();
+        if !self.shown {
+            self.information = Some(information);
+            return;
+        }
         if self.display.is_live_owner {
             if self.information_text.is_empty() {
                 self.information = Some(information);
@@ -565,7 +579,7 @@ impl TurnFootnote {
     }
     pub fn take_intents(&mut self, actions: &[ContentAction]) -> Vec<TurnFootnoteIntent> {
         self.refresh();
-        if self.display.is_live_owner || !self.available || self.pending.is_some() {
+        if !self.shown || self.display.is_live_owner || !self.available || self.pending.is_some() {
             return vec![];
         }
         let Some(action) = actions
@@ -618,7 +632,7 @@ fn copy_facts(
 }
 impl Component for TurnFootnote {
     fn active(&self) -> bool {
-        !self.rows.children.is_empty()
+        self.shown && !self.rows.children.is_empty()
     }
     fn children(&self) -> &[Content] {
         &self.rows.children

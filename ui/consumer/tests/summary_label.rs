@@ -1223,6 +1223,37 @@ fn transcript_clock_is_a_display_input_and_stale_plans_preserve_the_original_cap
         .unwrap()
         .update_with_timing(&scope, 2, 1, &snapshot, false, &timing)
         .unwrap();
+    // A timestamp by itself is not an output aside. The original SDK node is
+    // privately retained while the turn has neither output nor fork controls.
+    assert!(host.get(info).is_none());
+    snapshot.items.push(TranscriptItem {
+        id: "timed-answer".into(),
+        record_id: None,
+        reconciliation_id: None,
+        turn_id: "timed-turn".into(),
+        kind: TranscriptItemKind::Assistant,
+        text: "正式输出".into(),
+        reasoning: String::new(),
+        attachments: vec![],
+        content_blocks: None,
+        is_visible: true,
+        is_final: true,
+        is_provisional: false,
+        reasoning_ended: true,
+        source_sequence: Some(1),
+        source_position: Some(TranscriptSourcePosition::Journal {
+            sequence: 1,
+            content_index: None,
+        }),
+        time: Some(85000.),
+        metadata: Default::default(),
+    });
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<TranscriptContent>()
+        .unwrap()
+        .update_with_timing(&scope, 3, 1, &snapshot, false, &timing)
+        .unwrap();
     assert_eq!(
         host.get(info)
             .unwrap()

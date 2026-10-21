@@ -18,6 +18,9 @@ pub struct TurnFootnoteDisplay {
     pub revision: u64,
     pub now_ms: Option<f64>,
     pub is_live_owner: bool,
+    /// Formal visible output exists (including image-only output). This does
+    /// not grant a copy target, feedback target or execution capability.
+    pub has_output: bool,
     /// Host-localized settle time, not an elapsed interval or raw status.
     pub finished_text: Option<String>,
 }
@@ -87,12 +90,14 @@ impl TranscriptFootnoteTiming {
         &self,
         turn: &TranscriptTurn,
         labels: &TurnFootnoteLabels,
+        has_output: bool,
     ) -> TurnFootnoteDisplay {
         let is_live_owner = self.live_turn_id.as_deref() == Some(turn.id.as_str());
         TurnFootnoteDisplay {
             revision: self.revision,
             now_ms: self.now_ms,
             is_live_owner,
+            has_output,
             finished_text: (!is_live_owner)
                 .then_some(turn.ended_at)
                 .flatten()

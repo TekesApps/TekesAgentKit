@@ -1278,3 +1278,95 @@ fn preview_prefix_keeps_240_extended_graphemes_and_cross_message_crlf() {
         assert_eq!(view.turn_targets().unwrap()[0].preview().output, expected);
     }
 }
+
+#[test]
+fn output_aside_presence_uses_formal_visible_content_not_reasoning_tools_or_a_timestamp() {
+    for (block, expected) in [
+        (
+            TranscriptBlockContent::Text {
+                text: String::new(),
+            },
+            false,
+        ),
+        (
+            TranscriptBlockContent::Text {
+                text: "正文".into(),
+            },
+            true,
+        ),
+        (
+            TranscriptBlockContent::Reasoning {
+                text: "推理".into(),
+            },
+            false,
+        ),
+        (
+            TranscriptBlockContent::ToolCall {
+                tool_id: "tool".into(),
+            },
+            false,
+        ),
+        (
+            TranscriptBlockContent::Attachment {
+                content: json!({"type":"image","mimeType":"image/png"}),
+            },
+            true,
+        ),
+    ] {
+        for (visible, provisional, final_answer) in [
+            (true, false, true),
+            (false, false, true),
+            (true, true, true),
+            (true, false, false),
+        ] {
+            let mut source = snapshot();
+            source.turns[0].ended_at = Some(13000.);
+            source.tools.push(tool());
+            let output = &mut source.items[1];
+            output.text.clear();
+            output.reasoning = "reasoning alone is not the output lane".into();
+            output.content_blocks = Some(vec![TranscriptContentBlock {
+                index: 0,
+                content: block.clone(),
+            }]);
+            output.is_visible = visible;
+            output.is_provisional = provisional;
+            output.is_final = final_answer;
+            let mut view = TranscriptContent::new(
+                49930,
+                49931..49960,
+                scope(),
+                TranscriptContentLabels {
+                    footnote: TurnFootnoteLabels {
+                        finished_timestamp: |_, _| Some("源结束时间".into()),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+            view.update(&scope(), 1, 1, &source, false).unwrap();
+            let id = view
+                .row_id(&TranscriptContentRowKey::TurnFootnote("turn".into()))
+                .unwrap();
+            let footer = view
+                .children()
+                .iter()
+                .find(|node| node.id() == id)
+                .unwrap()
+                .component::<TurnFootnote>()
+                .unwrap();
+            let shown = expected && visible && !provisional && final_answer;
+            assert_eq!(footer.facts().unwrap().display.has_output, shown);
+            assert_eq!(
+                footer.active(),
+                shown,
+                "{block:?}, visible={visible}, provisional={provisional}, final={final_answer}"
+            );
+            assert!(
+                footer.copy_button_id().is_none(),
+                "presence alone must not fabricate prose copy"
+            );
+        }
+    }
+}

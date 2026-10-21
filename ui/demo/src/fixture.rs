@@ -224,6 +224,21 @@ impl Default for Fixture {
     }
 }
 impl Fixture {
+    /// Seed one ended, empty-answer history turn with no completed-turn fork
+    /// capability. Used before connecting; never rewrites a running journal.
+    pub fn with_output_aside_guard(mut self) -> Self {
+        self.lifecycle = false;
+        {
+            let mut sessions = self.sessions.lock().unwrap();
+            let line = sessions.get_mut("a").unwrap();
+            for row in &mut line.rows {
+                if row.event.kind == "assistant/message" && row.event.data["turn"] == 30 {
+                    row.event.data["message"]["content"] = json!([]);
+                }
+            }
+        }
+        self
+    }
     /// Owned clock/usage fixture; no model request or user submission.
     pub fn with_timed_turn(self) -> Self {
         let mut sessions = self.sessions.lock().unwrap();

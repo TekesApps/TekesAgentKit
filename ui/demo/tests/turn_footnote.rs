@@ -471,6 +471,7 @@ fn source_live_caption_requires_owner_and_clock_and_never_uses_legacy_or_zero_to
         revision: 1,
         now_ms: Some(75_999.),
         is_live_owner: true,
+        has_output: false,
         finished_text: None,
     };
     let mut facts = TurnFootnoteFacts::read_with_display(&t, display.clone());
@@ -528,6 +529,7 @@ fn explicit_caption_transition_keeps_information_owner_and_fences_hidden_actions
         revision: 2,
         now_ms: Some(14000.),
         is_live_owner: true,
+        has_output: false,
         finished_text: None,
     };
     let f = host
@@ -567,4 +569,86 @@ fn explicit_caption_transition_keeps_information_owner_and_fences_hidden_actions
     assert_ne!(f.action_id(&t.footnote_actions[0].id), Some(action));
     assert!(f.take_intents(&stale).is_empty());
     assert_eq!(f.facts().unwrap().text(), "周四 下午1:03");
+}
+
+#[test]
+fn source_output_aside_guard_does_not_invent_output_or_execution_authority() {
+    for status in [
+        "completed",
+        "interrupted",
+        "failed",
+        "running",
+        "waitingForInput",
+    ] {
+        for has_output in [false, true] {
+            for fork_catalog in [false, true] {
+                let mut t = turn();
+                t.status = status.into();
+                if !fork_catalog {
+                    t.footnote_actions.clear();
+                }
+                let display = TurnFootnoteDisplay {
+                    revision: 1,
+                    has_output,
+                    finished_text: Some("源结束时间".into()),
+                    ..Default::default()
+                };
+                let mut footer = TurnFootnote::new(49010, scope(), Default::default());
+                footer
+                    .update_with_display(&scope(), 1, 1, &t, false, None, &display)
+                    .unwrap();
+                let expected = has_output
+                    || (fork_catalog && !matches!(status, "running" | "waitingForInput"));
+                assert_eq!(
+                    footer.active(),
+                    expected,
+                    "{status}, output={has_output}, fork={fork_catalog}"
+                );
+                assert_eq!(footer.information_id().is_some(), expected);
+                assert!(
+                    footer.copy_button_id().is_none(),
+                    "presence alone is never a copy target"
+                );
+                if expected && fork_catalog {
+                    let id = footer.action_id(&t.footnote_actions[0].id).unwrap();
+                    assert!(
+                        footer
+                            .take_intents(&[ContentAction {
+                                target: id,
+                                kind: ContentActionKind::Activate,
+                                source: ContentActionSource::Programmatic,
+                            }])
+                            .is_empty(),
+                        "display cannot grant execution"
+                    );
+                }
+            }
+        }
+    }
+    let mut t = turn();
+    t.status = "running".into();
+    t.ended_at = None;
+    t.footnote_actions.clear();
+    let mut footer = TurnFootnote::new(49011, scope(), Default::default());
+    footer
+        .update_with_display(
+            &scope(),
+            1,
+            1,
+            &t,
+            false,
+            None,
+            &TurnFootnoteDisplay {
+                revision: 1,
+                now_ms: Some(75000.),
+                is_live_owner: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert!(
+        footer.active(),
+        "the live owner can display before its first output"
+    );
+    assert_eq!(footer.facts().unwrap().text(), "1m 5s");
 }

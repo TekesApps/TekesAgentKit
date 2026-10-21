@@ -343,3 +343,5 @@ reading transaction. Live elapsed/positive tokens and settled source end timesta
 replace diagnostic status prose; stale clocks, interrupted/noncontinuable owners and
 old plans are fenced. Shared components own display rules; system time/calendar and
 wake scheduling remain host adapters. This does not complete footnote layout parity.
+
+[输出脚注显隐](rust-agent-ui-output-aside-20261022.md)进一步对齐 Source 的 live/output/settled-fork 门槛；结束时间、纯推理或工具本身不生成输出脚注。输出存在不授予复制、反馈或执行权限，原信息节点在显隐之间保留。

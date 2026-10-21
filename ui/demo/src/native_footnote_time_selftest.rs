@@ -51,6 +51,37 @@ impl Probe {
             .component::<TurnFootnote>()
             .unwrap()
     }
+    fn empty_history_aside_hidden(host: &Host) {
+        let snapshot = host.view.binding().current_run().unwrap();
+        let turn = snapshot
+            .transcript
+            .turns
+            .iter()
+            .find(|turn| turn.input == "会话 a · 历史问题 30")
+            .unwrap();
+        assert!(turn.ended_at.is_some() && turn.footnote_actions.is_empty());
+        let run = host
+            .view
+            .tree
+            .get(ComponentId(host.view.ids().root.0 + 16))
+            .unwrap()
+            .component::<RunView>()
+            .unwrap();
+        let transcript = run.transcript().unwrap();
+        let id = transcript
+            .row_id(&TranscriptContentRowKey::TurnFootnote(turn.id.clone()))
+            .unwrap();
+        let footer = transcript
+            .children()
+            .iter()
+            .find(|node| node.id() == id)
+            .unwrap()
+            .component::<TurnFootnote>()
+            .unwrap();
+        assert!(!footer.active() && footer.information_id().is_none());
+        assert!(!footer.facts().unwrap().display.has_output);
+        assert!(footer.copy_button_id().is_none());
+    }
     fn unchanged(&self, host: &Host) {
         assert_eq!(host.view.tree.focused(), Some(host.view.ids().editor));
         assert_eq!(
@@ -90,6 +121,7 @@ impl Probe {
         let old = self.phase;
         match self.phase {
             0 if window.is_active() => {
+                Self::empty_history_aside_hidden(host);
                 let snapshot = host.view.binding().current_run().unwrap();
                 let Some(turn) = snapshot
                     .transcript
@@ -238,6 +270,7 @@ impl Probe {
             }
             5 => {
                 self.unchanged(host);
+                Self::empty_history_aside_hidden(host);
                 let facts = self.footer(host).facts().unwrap();
                 if facts.status != "completed" {
                     return;
@@ -285,6 +318,7 @@ impl Probe {
         serde_json::json!({"nativeWindow":true,"ownedSepBackhaul":true,"displayClockWithoutDomainPublication":true,
             "onlyLiveOwnerTicks":true,"zeroTokensOmitted":true,"compactPositiveTokens":true,"settledCalendarTimestamp":true,
             "originalInformationAndComposer":true,"focusAndMarkedBaseline":true,"ownedWakeRetired":true,
+            "emptyHistoricalOutputAsideHidden":true,"timestampDoesNotInventOutput":true,
             "noSubmission":true,"syntheticPreedit":true,"physicalIme":false,"realHarness":false,"voiceOver":false,"fullFootnoteLayoutParity":false})
     }
 }

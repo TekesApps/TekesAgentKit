@@ -3185,7 +3185,7 @@ pub fn run() {
                     .with_presets(false)
                     .with_models();
                 let fixture = if footnote_time_selftest {
-                    let fixture = fixture.with_timed_turn();
+                    let fixture = fixture.with_output_aside_guard().with_timed_turn();
                     footnote_time_fixture = Some(fixture.clone());
                     fixture
                 } else {
