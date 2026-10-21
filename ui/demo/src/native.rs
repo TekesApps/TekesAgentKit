@@ -322,6 +322,7 @@ pub(super) fn publish_content(tree: &tekes_ui_controls::composition::ContentHost
                 selected: n.semantics.selected,
                 expanded: n.semantics.expanded,
                 invalid: n.semantics.invalid,
+                required: n.semantics.required,
                 text_selection: text.map(|s| s.input.selection()),
                 read_only: text.is_some_and(|s| s.input.read_only),
             })

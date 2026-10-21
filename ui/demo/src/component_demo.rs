@@ -384,9 +384,7 @@ impl ComponentDemo {
                     ),
                     Content::new(
                         DIAGNOSTIC,
-                        TextContent::new(
-                            "正式 Transcript / RunView 尚未接入；混合文档阅读待 TekesUI #22。",
-                        ),
+                        TextContent::new("持续阅读事务与分页锚点尚待接入。"),
                     ),
                     Content::new(rename.ids().root, rename),
                     Content::new(choices.id(), choices),
@@ -2690,7 +2688,7 @@ impl ComponentDemo {
             .component_mut::<TextContent>()
             .expect("text")
             .text = format!(
-            "正式 Transcript 尚未完成；混合阅读待 TekesUI #22。\n回传诊断：{} 条内容，{} 条流式内容，历史{}同步。",
+            "持续阅读与分页锚点尚未完成。\n回传诊断：{} 条内容，{} 条流式内容，历史{}同步。",
             snapshot.transcript.items.len(),
             snapshot
                 .transcript

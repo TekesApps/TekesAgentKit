@@ -455,3 +455,6 @@ pub use sidebar_navigation::SidebarSelectionNavigation;
 
 mod sidebar_catalog;
 pub use sidebar_catalog::*;
+
+mod sidebar_reveal;
+pub use sidebar_reveal::*;

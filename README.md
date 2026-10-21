@@ -125,3 +125,5 @@ Canonical Sidebar selected-row reads: [2026-10-21 contract](docs/rust-agent-ui-s
 Public TekesUI reading/reveal recheck and filter/sort paging: [2026-10-21 report](docs/rust-agent-ui-public-reading-recheck-20261021.md).
 
 Full Sidebar folder catalog input: [2026-10-21 contract](docs/rust-agent-ui-sidebar-catalog-20261021.md).
+
+Current experimental public UI pin and explicit native Sidebar reveal: [published checkpoint integration](docs/rust-agent-ui-published-reading-20261021.md). This supersedes the earlier public-source-absence finding; continuous reading/page-anchor acceptance remains pending.

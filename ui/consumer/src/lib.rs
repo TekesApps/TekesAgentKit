@@ -2224,3 +2224,17 @@ pub fn sidebar_folder_choices(
 ) -> Result<tekes_agent_ui_bindings::SidebarFolderCatalog, &'static str> {
     source.folder_catalog()
 }
+
+/// Explicit navigation only; retain the captured target and original SDK options.
+pub fn reveal_sidebar_selection(
+    host: &mut tekes_ui_controls::composition::ContentHost,
+    target: &tekes_agent_components_ui::SidebarVisibilityTarget,
+    version: &tekes_ui_controls::ReadingDocumentVersion,
+    options: tekes_ui_controls::ScrollRevealOptions,
+    text: &mut dyn tekes_ui_controls::ButtonTextRenderer,
+) -> Result<
+    tekes_ui_controls::composition::ContentRevealResult,
+    tekes_agent_components_ui::SidebarRevealError,
+> {
+    tekes_agent_components_ui::reveal_sidebar_selection(host, target, version, options, text)
+}

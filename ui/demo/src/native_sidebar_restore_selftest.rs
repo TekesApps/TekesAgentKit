@@ -14,6 +14,7 @@ pub(super) struct Probe {
     ime_started: bool,
     baseline: Option<tekes_ui_controls::TextEditBaseline>,
     editor: Option<ComponentId>,
+    capture_hold: Option<(u8, Instant)>,
 }
 impl Probe {
     pub fn new() -> Self {
@@ -27,7 +28,26 @@ impl Probe {
             ime_started: false,
             baseline: None,
             editor: None,
+            capture_hold: None,
         }
+    }
+    fn hold_capture(&mut self, key: &str, window: &Window) -> bool {
+        let Ok(path) = std::env::var(key) else {
+            return false;
+        };
+        if let Some((phase, started)) = self.capture_hold {
+            assert_eq!(phase, self.phase);
+            if started.elapsed() >= Duration::from_millis(1200) {
+                self.capture_hold = None;
+                return false;
+            }
+        } else {
+            run_script(vec![(0, Action::Capture { path })]);
+            self.capture_hold = Some((self.phase, Instant::now()));
+        }
+        // Owned probe only: allow the SDK's asynchronous screencapture to finish.
+        window.request_redraw();
+        true
     }
     pub fn source(&mut self, source: Arc<SidebarPublication>) -> Arc<SidebarPublication> {
         if !source.loaded || source.rows.is_empty() {
@@ -49,7 +69,7 @@ impl Probe {
         }
         Arc::new(input)
     }
-    pub fn advance(&mut self, host: &Host, window: &Window) {
+    pub fn advance(&mut self, host: &mut Host, window: &Window) {
         assert!(
             self.started.elapsed() < Duration::from_secs(15),
             "Sidebar probe deadline phase {}",
@@ -148,6 +168,20 @@ impl Probe {
                     .unwrap() as *const _ as usize;
             }
             2 => {
+                assert!(
+                    sidebar.visibility_target().is_none(),
+                    "native host must consume explicit reveal"
+                );
+                let version = host
+                    .view
+                    .tree
+                    .get(sidebar.inventory_viewport_id())
+                    .unwrap()
+                    .component::<tekes_ui_controls::composition::ScrollContent>()
+                    .unwrap()
+                    .reading_document_version()
+                    .expect("native host attached original SDK reading document");
+                assert_eq!(version.revision(), 1);
                 assert_eq!(input.error.as_deref(), Some(FAILURE));
                 assert!(names.iter().any(|name| name == FAILURE));
                 let id = sidebar.row_id(&input.rows[0].address).unwrap();
@@ -161,8 +195,8 @@ impl Probe {
                         .unwrap() as *const _ as usize,
                     self.widget
                 );
-                if let Ok(path) = std::env::var("AGENT_SIDEBAR_RESTORE_CAPTURE") {
-                    run_script(vec![(0, Action::Capture { path })]);
+                if self.hold_capture("AGENT_SIDEBAR_RESTORE_CAPTURE", window) {
+                    return;
                 }
             }
             4 => {
@@ -171,8 +205,8 @@ impl Probe {
                 assert!(input.loaded && input.rows.len() == 1);
                 assert_eq!(input.selected.as_ref(), Some(&input.rows[0].address));
                 assert!(!names.iter().any(|name| name == "暂无会话"));
-                if let Ok(path) = std::env::var("AGENT_SIDEBAR_SELECTED_CAPTURE") {
-                    run_script(vec![(0, Action::Capture { path })]);
+                if self.hold_capture("AGENT_SIDEBAR_SELECTED_CAPTURE", window) {
+                    return;
                 }
             }
             5 => {
@@ -190,11 +224,28 @@ impl Probe {
             }
             _ => unreachable!(),
         }
+        if self.phase == 1 {
+            // An explicit same-session reveal is not a context switch. Inject the
+            // public business navigation while native preedit owns the editor.
+            let selected = input.selected.clone();
+            let root = host.view.sidebar_id();
+            host.view
+                .tree
+                .get_mut(root)
+                .unwrap()
+                .component_mut::<Sidebar>()
+                .unwrap()
+                .reconcile_navigation(&tekes_agent_components_ui::SidebarSelectionNavigation {
+                    revision: 1,
+                    selected,
+                })
+                .unwrap();
+        }
         self.phase += 1;
         window.request_redraw();
     }
     pub fn receipt(&self) -> serde_json::Value {
         assert_eq!(self.phase, 6, "Sidebar probe did not finish");
-        serde_json::json!({"nativeWindow":true,"restoringNotEmpty":true,"failureRetainsRows":true,"canonicalSelectedSupplement":true,"markedBaselineAndFocusPreserved":true,"noSubmission":true,"retiredIdsNotReused":true,"realHarnessOutage":false,"fullLayoutParity":false,"physicalIme":false,"voiceOver":false})
+        serde_json::json!({"nativeWindow":true,"explicitNativeReveal":true,"restoringNotEmpty":true,"failureRetainsRows":true,"canonicalSelectedSupplement":true,"markedBaselineAndFocusPreserved":true,"noSubmission":true,"retiredIdsNotReused":true,"realHarnessOutage":false,"fullLayoutParity":false,"physicalIme":false,"voiceOver":false})
     }
 }

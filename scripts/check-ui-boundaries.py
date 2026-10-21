@@ -28,8 +28,10 @@ bindings = tomllib.loads((ui / 'bindings/Cargo.toml').read_text())['dependencies
 # bindings still cannot import a renderer, platform backend or harness adapter.
 assert set(bindings) == {'tekes-agent-components-ui', 'tekes-agent-contract', 'tekes-agent-presentation', 'tekes-agent-session', 'tekes-agent-web', 'serde_json', 'tokio', 'async-trait', 'uuid', 'base64'}
 consumer = tomllib.loads((ui / 'consumer/Cargo.toml').read_text())['dependencies']
-assert set(consumer) == {'tekes-agent-components-ui', 'tekes-agent-ui-bindings'}
-assert set(tomllib.loads((ui / 'consumer/Cargo.toml').read_text()).get('dev-dependencies', {})) == {'tekes-ui-controls'}
+# Public reveal consumption needs the SDK's original token, options and text-host trait.
+# Controls are permitted; renderer/platform/harness dependencies remain excluded.
+assert set(consumer) == {'tekes-agent-components-ui', 'tekes-agent-ui-bindings', 'tekes-ui-controls'}
+assert not tomllib.loads((ui / 'consumer/Cargo.toml').read_text()).get('dev-dependencies', {})
 # Direct dependencies must go through the reviewed workspace or crates.io; no host sibling fallback.
 for path in ui.glob('*/Cargo.toml'):
     manifest = tomllib.loads(path.read_text())

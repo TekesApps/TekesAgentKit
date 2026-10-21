@@ -153,7 +153,8 @@ def main():
     native = snapshot / 'ui/demo/src/native.rs'
     old = '                invalid: n.semantics.invalid,'
     assert native.read_text().count(old) == 1
-    native.write_text(native.read_text().replace(old, old + '\n                required: n.semantics.required,'))
+    if 'required: n.semantics.required,' not in native.read_text():
+        native.write_text(native.read_text().replace(old, old + '\n                required: n.semantics.required,'))
     adaptations = ['AX required forwarded from public semantics']
     overrides = ['ui/Cargo.toml', 'ui/Cargo.lock', 'ui/demo/src/native.rs']
     if args.summary_labels:

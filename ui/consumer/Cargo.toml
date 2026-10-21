@@ -8,5 +8,4 @@ license.workspace = true
 tekes-agent-components-ui.workspace = true
 tekes-agent-ui-bindings.workspace = true
 
-[dev-dependencies]
 tekes-ui-controls.workspace = true

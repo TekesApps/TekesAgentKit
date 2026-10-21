@@ -1079,6 +1079,72 @@ impl Host {
                 self.palette,
             )
             .expect("formal components layout");
+        if let Some(target) = self.view.sidebar_visibility_target() {
+            // This explicit-navigation attachment does not claim full inventory
+            // prepend/page anchoring. The complete reading adapter is separate.
+            let document = self.view.tree.set_scroll_reading_document(
+                target.viewport(),
+                format!("agentkit-sidebar-navigation:{}", target.root().0),
+                target.navigation_revision(),
+                vec![target.item()],
+                |_| {},
+            );
+            match document {
+                Ok((version, ())) => {
+                    self.scene.clear();
+                    self.view
+                        .render(
+                            &mut self.scene,
+                            &mut self.text,
+                            clip.inset(tekes_agent_ui_demo::component_demo::DEMO_CONTENT_INSET),
+                            clip,
+                            self.palette,
+                        )
+                        .expect("Sidebar reading attachment layout");
+                    match tekes_agent_components_ui::reveal_sidebar_selection(
+                        &mut self.view.tree,
+                        &target,
+                        &version,
+                        tekes_ui_controls::ScrollRevealOptions {
+                            animated: false,
+                            ..Default::default()
+                        },
+                        &mut self.text,
+                    ) {
+                        Ok(result) => {
+                            if self.sidebar_restore_probe.is_some() {
+                                eprintln!("NATIVE_AGENT_SIDEBAR_AUTO_REVEAL {:?}", result.status);
+                            }
+                            self.scene.clear();
+                            self.view
+                                .render(
+                                    &mut self.scene,
+                                    &mut self.text,
+                                    clip.inset(
+                                        tekes_agent_ui_demo::component_demo::DEMO_CONTENT_INSET,
+                                    ),
+                                    clip,
+                                    self.palette,
+                                )
+                                .expect("Sidebar reveal layout");
+                        }
+                        Err(error) => self.failure(format!("Sidebar reveal failed: {error:?}")),
+                    }
+                }
+                Err(error) => {
+                    // Fence this attempt even on rejection; refresh is not retry.
+                    if let Some(sidebar) = self
+                        .view
+                        .tree
+                        .get(target.root())
+                        .and_then(|node| node.component::<Sidebar>())
+                    {
+                        let _ = sidebar.claim_visibility(&target);
+                    }
+                    self.failure(format!("Sidebar reading attachment failed: {error:?}"));
+                }
+            }
+        }
         publish_content(&self.view.tree, window);
         if let Some(renderer) = &mut self.gpu {
             renderer

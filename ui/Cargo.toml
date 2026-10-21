@@ -18,12 +18,12 @@ tekes-agent-presentation = { path = "../crates/presentation" }
 tekes-agent-components-ui = { path = "components" }
 tekes-agent-ui-bindings = { path = "bindings" }
 tekes-agent-ui-consumer-check = { path = "consumer" }
-tekes-ui-controls = { git = "https://github.com/TekesApps/TekesUI.git", rev = "8cf0840790334ba224afc0595897c74231c712e6" }
-tekes-ui-scene = { git = "https://github.com/TekesApps/TekesUI.git", rev = "8cf0840790334ba224afc0595897c74231c712e6" }
-tekes-ui-tokens = { git = "https://github.com/TekesApps/TekesUI.git", rev = "8cf0840790334ba224afc0595897c74231c712e6" }
-tekes-ui-text = { git = "https://github.com/TekesApps/TekesUI.git", rev = "8cf0840790334ba224afc0595897c74231c712e6" }
-tekes-ui-render = { git = "https://github.com/TekesApps/TekesUI.git", rev = "8cf0840790334ba224afc0595897c74231c712e6" }
-tekes-ui-platform-macos = { git = "https://github.com/TekesApps/TekesUI.git", rev = "8cf0840790334ba224afc0595897c74231c712e6" }
+tekes-ui-controls = { git = "https://github.com/TekesApps/TekesUI.git", rev = "1294987dacabb33c0e411c13ee5ea544a1123f8e" }
+tekes-ui-scene = { git = "https://github.com/TekesApps/TekesUI.git", rev = "1294987dacabb33c0e411c13ee5ea544a1123f8e" }
+tekes-ui-tokens = { git = "https://github.com/TekesApps/TekesUI.git", rev = "1294987dacabb33c0e411c13ee5ea544a1123f8e" }
+tekes-ui-text = { git = "https://github.com/TekesApps/TekesUI.git", rev = "1294987dacabb33c0e411c13ee5ea544a1123f8e" }
+tekes-ui-render = { git = "https://github.com/TekesApps/TekesUI.git", rev = "1294987dacabb33c0e411c13ee5ea544a1123f8e" }
+tekes-ui-platform-macos = { git = "https://github.com/TekesApps/TekesUI.git", rev = "1294987dacabb33c0e411c13ee5ea544a1123f8e" }
 tokio = { version = "1", features = ["rt-multi-thread", "time", "sync", "macros"] }
 serde_json = "1"
 base64 = "0.22"
