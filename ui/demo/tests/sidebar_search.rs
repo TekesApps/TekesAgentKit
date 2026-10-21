@@ -47,6 +47,7 @@ fn footer_tracks_search_without_rewriting_inventory_and_retires_original_retry_g
     let mut sidebar = Sidebar::new(48, SidebarLabels::default());
     sidebar
         .update(&SidebarInput {
+            folder_filter: None,
             search_help: None,
             revision: 1,
             loaded: false,

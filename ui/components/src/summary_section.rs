@@ -142,6 +142,7 @@ pub struct SummarySectionLayout {
 }
 #[derive(Debug)]
 pub(crate) struct SummarySectionView {
+    pub body_indent: f32,
     pub section: String,
     pub children: Vec<Content>,
     pub expansion: Expansion,
@@ -157,6 +158,7 @@ impl SummarySectionView {
     ) -> Self {
         Self {
             section,
+            body_indent: 0.,
             expansion: expansion.clone(),
             layout: None,
             children: vec![
@@ -203,7 +205,15 @@ impl Component for SummarySectionView {
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
         let header = self.children[0].measure(text, available).size;
-        let body = self.children[1].measure(text, available).size;
+        let body = self.children[1]
+            .measure(
+                text,
+                Size::new(
+                    (available.width - self.body_indent).max(0.),
+                    available.height,
+                ),
+            )
+            .size;
         MeasuredChild::new(Size::new(available.width, header.height + body.height))
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
@@ -217,6 +227,15 @@ impl Component for SummarySectionView {
                 frame.size.width,
                 (frame.size.height - height).max(0.),
             )
+        });
+        let body = body.map(|body| {
+            ContainerLayout::new(
+                body,
+                Insets::ZERO,
+                Insets::new(0., 0., 0., self.body_indent),
+                Some(clip),
+            )
+            .content()
         });
         if let Some(body) = body {
             self.children[1].arrange(text, body, clip);

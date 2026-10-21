@@ -20,6 +20,7 @@ fn make_row(endpoint: &str, id: &str, ready: bool) -> SidebarRow {
         host_methods: &BTreeSet::new(),
     });
     SidebarRow {
+        primary_folder_id: None,
         folder_path: None,
         address: SessionAddress {
             endpoint_id: endpoint.into(),
@@ -59,6 +60,7 @@ fn same_session_ids_on_two_endpoints_keep_scoped_selection_and_authoritative_act
     let native = make_row("native", "same-id", true);
     let pi = make_row("pi", "same-id", true);
     let mut input = SidebarInput {
+        folder_filter: None,
         search_help: None,
         loaded: true,
         error: None,
@@ -130,6 +132,7 @@ fn same_session_ids_on_two_endpoints_keep_scoped_selection_and_authoritative_act
 fn stale_invalid_and_removed_inventory_never_retarget_actions_or_change_a_valid_tree() {
     let row = make_row("native", "a", true);
     let input = SidebarInput {
+        folder_filter: None,
         search_help: None,
         loaded: true,
         error: None,
@@ -159,6 +162,7 @@ fn stale_invalid_and_removed_inventory_never_retarget_actions_or_change_a_valid_
     invalid.rows.push(row.clone());
     assert!(update(&mut host, root, &invalid).is_err());
     let empty = SidebarInput {
+        folder_filter: None,
         search_help: None,
         loaded: true,
         error: None,
@@ -169,6 +173,7 @@ fn stale_invalid_and_removed_inventory_never_retarget_actions_or_change_a_valid_
     update(&mut host, root, &empty).unwrap();
     assert!(activate(&mut host, root, id).is_empty());
     let restored = SidebarInput {
+        folder_filter: None,
         search_help: None,
         loaded: true,
         error: None,
@@ -191,6 +196,7 @@ fn shared_dispatch_rechecks_capabilities_instead_of_trusting_the_displayed_defin
     let mut sidebar = Sidebar::new(32, SidebarLabels::default());
     sidebar
         .update(&SidebarInput {
+            folder_filter: None,
             search_help: None,
             loaded: true,
             error: None,
@@ -289,6 +295,7 @@ async fn service_input(agent: &tekes_agent_web::SharedAgent, revision: u64) -> S
     let session = &value["sessions"][0];
     let endpoint = agent.endpoint("fixture").unwrap();
     let row = SidebarRow {
+        primary_folder_id: None,
         folder_path: None,
         address: SessionAddress {
             endpoint_id: "fixture".into(),
@@ -302,6 +309,7 @@ async fn service_input(agent: &tekes_agent_web::SharedAgent, revision: u64) -> S
         actions: agent.thread_actions(&endpoint, "a").unwrap(),
     };
     SidebarInput {
+        folder_filter: None,
         search_help: None,
         loaded: true,
         error: None,
@@ -392,6 +400,7 @@ async fn actual_shared_service_pin_receipt_and_reconnect_publish_authority_witho
 fn restoration_is_not_empty_and_observation_failure_keeps_readable_rows() {
     let row = make_row("native", "a", true);
     let mut input = SidebarInput {
+        folder_filter: None,
         search_help: None,
         revision: 1,
         loaded: false,
@@ -460,6 +469,7 @@ fn restoration_is_not_empty_and_observation_failure_keeps_readable_rows() {
 #[test]
 fn same_publication_cannot_replace_restoration_or_inventory() {
     let input = SidebarInput {
+        folder_filter: None,
         search_help: None,
         revision: 1,
         loaded: false,
@@ -487,6 +497,7 @@ fn host_selection_changes_do_not_require_a_fabricated_inventory_revision() {
     let a = make_row("native", "a", true);
     let b = make_row("native", "b", true);
     let mut input = SidebarInput {
+        folder_filter: None,
         search_help: None,
         revision: 1,
         loaded: true,

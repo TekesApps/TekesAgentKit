@@ -54,3 +54,6 @@ pub use sidebar_search::*;
 
 mod sidebar_preferences;
 pub use sidebar_preferences::*;
+
+mod sidebar_folders;
+pub use sidebar_folders::*;

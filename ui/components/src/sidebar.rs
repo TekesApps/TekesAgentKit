@@ -1,9 +1,9 @@
 //! Agent session inventory and shared actions. No local pin database or action policy.
 use crate::summary_section::{Expansion, SummarySectionView};
 use crate::{
-    SidebarPreferenceChange, SidebarPreferencesSnapshot, SidebarSearchInput, SidebarSearchIntent,
-    SidebarSearchKey, SidebarSearchLabels, SidebarSort, SidebarTitleComparator,
-    ordered_sidebar_rows,
+    SidebarFolderKey, SidebarPreferenceChange, SidebarPreferencesSnapshot, SidebarSearchInput,
+    SidebarSearchIntent, SidebarSearchKey, SidebarSearchLabels, SidebarSort,
+    SidebarTitleComparator, ordered_sidebar_rows, sidebar_folder_title, sidebar_outline,
     sidebar_search::{SearchFooter, SearchInputView},
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -25,6 +25,7 @@ use tekes_ui_tokens::Spacing;
 pub struct SidebarRow {
     /// Original conversation folder from canonical inventory or a host Primary
     /// Folder adapter; never the current tool execution directory or routing ID.
+    pub primary_folder_id: Option<String>,
     pub folder_path: Option<String>,
     pub address: SessionAddress,
     pub title: String,
@@ -34,6 +35,8 @@ pub struct SidebarRow {
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct SidebarInput {
+    /// Ordinary sessions only; global pins remain independent.
+    pub folder_filter: Option<crate::SidebarFolderKey>,
     pub search_help: Option<crate::SidebarSearchHelp>,
     /// Monotonic publication revision from one host inventory authority.
     pub revision: u64,
@@ -64,6 +67,7 @@ pub struct SidebarLabels {
     pub restoring: String,
     pub actions: String,
     pub pinned: String,
+    pub no_folder: String,
     pub activity: fn(&ThreadActivity) -> String,
 }
 impl Default for SidebarLabels {
@@ -74,6 +78,7 @@ impl Default for SidebarLabels {
             restoring: "正在恢复会话…".into(),
             actions: "会话操作".into(),
             pinned: "已置顶".into(),
+            no_folder: "无文件夹".into(),
             activity: activity_label,
         }
     }
@@ -97,6 +102,10 @@ fn activity_label(activity: &ThreadActivity) -> String {
 }
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Key {
+    FolderRoot(SidebarFolderKey),
+    FolderHeader(SidebarFolderKey, u64),
+    FolderLabel(SidebarFolderKey, u64),
+    FolderBody(SidebarFolderKey),
     PinnedHeader(u64),
     PinnedLabel(u64),
     Row(SessionAddress),
@@ -115,6 +124,7 @@ pub struct Sidebar {
     preferences_writable: bool,
     title_comparator: Option<SidebarTitleComparator>,
     pinned_expansion: Expansion,
+    folder_expansions: BTreeMap<SidebarFolderKey, Expansion>,
     preference_bindings: BTreeMap<ComponentId, SidebarPreferenceChange>,
     root: ComponentId,
     body: StackContent,
@@ -188,6 +198,7 @@ impl Sidebar {
                 open: true,
                 disabled: false,
             })),
+            folder_expansions: BTreeMap::new(),
             preference_bindings: BTreeMap::new(),
             root: ComponentId(base),
             body,
@@ -221,6 +232,9 @@ impl Sidebar {
             && value == &self.preferences
             && writable == self.preferences_writable
             && self.pinned_expansion.borrow().open == value.preferences.pinned_expanded
+            && self.folder_expansions.iter().all(|(key, expansion)| {
+                expansion.borrow().open != value.preferences.collapsed_folders.contains(key)
+            })
     }
     pub fn update_preferences(
         &mut self,
@@ -282,6 +296,14 @@ impl Sidebar {
         self.ids
             .get(&Key::PinnedHeader(self.preferences_generation))
             .copied()
+    }
+    pub fn folder_header_id(&self, key: &SidebarFolderKey) -> Option<ComponentId> {
+        self.ids
+            .get(&Key::FolderHeader(key.clone(), self.preferences_generation))
+            .copied()
+    }
+    pub fn folder_body_id(&self, key: &SidebarFolderKey) -> Option<ComponentId> {
+        self.ids.get(&Key::FolderBody(key.clone())).copied()
     }
     pub fn take_preference_intents(
         &self,
@@ -640,16 +662,34 @@ impl Sidebar {
                 && (last.loaded != input.loaded
                     || last.error != input.error
                     || last.rows != input.rows
-                    || last.search_help != input.search_help)
+                    || last.search_help != input.search_help
+                    || last.folder_filter != input.folder_filter)
         }) {
             return Err("conflicting sidebar publication");
         }
-        let ordered = ordered_sidebar_rows(
+        let outline = sidebar_outline(
             &input.rows,
             &self.preferences.preferences,
             self.title_comparator,
+            input.folder_filter.as_ref(),
         )?;
-        let visible_rows = if input.loaded { ordered } else { vec![] };
+        let visible_rows: Vec<_> = if input.loaded {
+            outline
+                .pinned
+                .iter()
+                .copied()
+                .chain(outline.sessions.iter().copied())
+                .chain(
+                    outline
+                        .folders
+                        .iter()
+                        .flat_map(|group| group.rows.iter().copied()),
+                )
+                .collect()
+        } else {
+            vec![]
+        };
+        let visible_addresses: BTreeSet<_> = visible_rows.iter().map(|row| &row.address).collect();
         let has_pins = visible_rows
             .iter()
             .any(|row| row.pin.as_ref().is_some_and(|pin| pin.pinned));
@@ -667,7 +707,7 @@ impl Sidebar {
             {
                 return Err("sidebar actions belong to another session");
             }
-            if input.loaded {
+            if visible_addresses.contains(&row.address) {
                 keys.extend([
                     Key::Row(row.address.clone()),
                     Key::Select(row.address.clone()),
@@ -679,7 +719,9 @@ impl Sidebar {
                 if action.id.is_empty() || !action_ids.insert(&action.id) {
                     return Err("invalid or duplicate shared action identity");
                 }
-                if input.loaded && input.selected.as_ref() == Some(&row.address) {
+                if visible_addresses.contains(&row.address)
+                    && input.selected.as_ref() == Some(&row.address)
+                {
                     keys.insert(Key::Action(row.address.clone(), action.id.clone()));
                 }
             }
@@ -707,6 +749,16 @@ impl Sidebar {
             keys.insert(Key::PinnedHeader(self.preferences_generation));
             keys.insert(Key::PinnedLabel(self.preferences_generation));
         }
+        if input.loaded {
+            for group in &outline.folders {
+                keys.extend([
+                    Key::FolderRoot(group.key.clone()),
+                    Key::FolderHeader(group.key.clone(), self.preferences_generation),
+                    Key::FolderLabel(group.key.clone(), self.preferences_generation),
+                    Key::FolderBody(group.key.clone()),
+                ]);
+            }
+        }
         let needed = keys
             .iter()
             .filter(|key| !self.ids.contains_key(*key))
@@ -729,11 +781,16 @@ impl Sidebar {
 
         let old = std::mem::take(&mut self.rows_mut().rows.children);
         let mut pinned_section = None;
+        let mut folder_sections = BTreeMap::new();
         let mut retained = Vec::new();
         for mut node in old {
             if let Some(section) = node.component_mut::<SummarySectionView>() {
                 retained.append(section.rows_mut());
-                pinned_section = Some(node);
+                if section.section == "pinned" {
+                    pinned_section = Some(node);
+                } else {
+                    folder_sections.insert(node.id(), node);
+                }
             } else {
                 retained.push(node);
             }
@@ -742,6 +799,7 @@ impl Sidebar {
         let mut children = Vec::new();
         let mut bindings = BTreeMap::new();
         let mut pinned_children = Vec::new();
+        let mut folder_children: BTreeMap<SidebarFolderKey, Vec<Content>> = BTreeMap::new();
         let mut preference_bindings = BTreeMap::new();
         *self.pinned_expansion.borrow_mut() = Disclosure {
             open: self.preferences.preferences.pinned_expanded,
@@ -786,7 +844,18 @@ impl Sidebar {
                 .expect("row activity")
                 .text = status;
             let pinned = row.pin.as_ref().is_some_and(|pin| pin.pinned);
-            if !pinned || self.preferences.preferences.pinned_expanded {
+            let folder = row.folder_key();
+            let active = if pinned {
+                self.preferences.preferences.pinned_expanded
+            } else {
+                !self.preferences.preferences.group_by_folder
+                    || !self
+                        .preferences
+                        .preferences
+                        .collapsed_folders
+                        .contains(&folder)
+            };
+            if active {
                 bindings.insert(
                     select_id,
                     SidebarIntent::Select {
@@ -796,8 +865,85 @@ impl Sidebar {
             }
             if pinned {
                 pinned_children.push(content);
+            } else if self.preferences.preferences.group_by_folder {
+                folder_children.entry(folder).or_default().push(content);
             } else {
                 children.push(content);
+            }
+        }
+        let folder_keys: BTreeSet<_> = if input.loaded {
+            outline
+                .folders
+                .iter()
+                .map(|group| group.key.clone())
+                .collect()
+        } else {
+            BTreeSet::new()
+        };
+        self.folder_expansions
+            .retain(|key, _| folder_keys.contains(key));
+        if input.loaded {
+            for group in &outline.folders {
+                let key = &group.key;
+                let expansion = self
+                    .folder_expansions
+                    .entry(key.clone())
+                    .or_insert_with(|| {
+                        std::rc::Rc::new(std::cell::RefCell::new(Disclosure::default()))
+                    })
+                    .clone();
+                *expansion.borrow_mut() = Disclosure {
+                    open: !self.preferences.preferences.collapsed_folders.contains(key),
+                    disabled: !self.preferences_writable,
+                };
+                let root = ids[&Key::FolderRoot(key.clone())];
+                let header = ids[&Key::FolderHeader(key.clone(), self.preferences_generation)];
+                let label = ids[&Key::FolderLabel(key.clone(), self.preferences_generation)];
+                let body_id = ids[&Key::FolderBody(key.clone())];
+                let mut section = folder_sections
+                    .remove(&root)
+                    .filter(|node| {
+                        node.component::<SummarySectionView>().unwrap().children[0].id() == header
+                    })
+                    .unwrap_or_else(|| {
+                        Content::new(
+                            root,
+                            SummarySectionView::new(
+                                format!("folder:{key:?}"),
+                                header,
+                                label,
+                                body_id,
+                                expansion,
+                            ),
+                        )
+                    });
+                let body = section.component_mut::<SummarySectionView>().unwrap();
+                body.body_indent = Spacing::Regular.value();
+                body.header_mut()
+                    .set_title(sidebar_folder_title(group.path, &self.labels.no_folder));
+                body.header_mut().set_enabled(self.preferences_writable);
+                *body.rows_mut() = folder_children.remove(key).unwrap_or_default();
+                if self.preferences_writable {
+                    let mut value = self.preferences.preferences.clone();
+                    if let Some(index) = value
+                        .collapsed_folders
+                        .iter()
+                        .position(|folder| folder == key)
+                    {
+                        value.collapsed_folders.remove(index);
+                    } else {
+                        value.collapsed_folders.push(key.clone());
+                        value.collapsed_folders.sort();
+                    }
+                    preference_bindings.insert(
+                        header,
+                        SidebarPreferenceChange {
+                            expected: self.preferences.clone(),
+                            value,
+                        },
+                    );
+                }
+                children.push(section);
             }
         }
         if has_pins {

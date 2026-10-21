@@ -13,6 +13,7 @@ fn address(id: &str) -> SessionAddress {
 }
 fn row(id: &str) -> SidebarRow {
     SidebarRow {
+        primary_folder_id: None,
         folder_path: None,
         address: address(id),
         title: format!("unrelated title {id}"),

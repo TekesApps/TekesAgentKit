@@ -53,3 +53,5 @@ TKUI-006 更新：公共完整指针入口、AgentText转交及原生demo适配�
 2026-10-21 #35独立接收：固定336包已在实际Sidebar上消费原Content帮助声明，默认公开pin未提升。当前查询摘要/目录回退、原owner退休和重绑定、关闭保持、原生合成组字与原点击通过；默认364/候选391项、第二consumer38项及三端离屏复验通过。其余窗口/SideChat/物理IME/VoiceOver和发布验收仍分开，见[查询帮助记录](rust-agent-ui-sidebar-help-20261021.md)。
 
 2026-10-21 原生控制键测试：[TekesUI #37](https://github.com/TekesApps/TekesUI/issues/37)记录SDK `Action::Key`以空字符构造Escape时，编辑器聚焦且选区非空可回传空Commit并删除选区；它不能代表有效的Escape验收，尚未证明物理按键有同样问题。Kit不自行合成基础键盘事件。当前原生场景用现有`cancelOperation:`回调验证关闭，原失败及修复任务保留。
+
+2026-10-21 Disclosure组合：[TekesUI #38](https://github.com/TekesApps/TekesUI/issues/38)请求原组合触发器、默认展开指示、单一动作/语义owner和外部状态确认后的焦点连续性。Kit已用原CompoundButton/Disclosure模型完成[文件夹分组、持久折叠和筛选](rust-agent-ui-sidebar-folders-20261021.md)，未自行画箭头或补焦点。当前仅功能闭环，不代表标准disclosure或完整原生体验已验收；基础事件时记录可复用#36。默认公开pin未提升。

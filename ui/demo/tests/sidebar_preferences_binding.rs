@@ -144,7 +144,7 @@ async fn original_pin_membership_and_durable_layout_preferences_reach_both_consu
     let saved: serde_json::Value =
         serde_json::from_slice(&std::fs::read(directory.join("preferences.json")).unwrap())
             .unwrap();
-    assert_eq!(saved["version"], 3);
+    assert_eq!(saved["version"], 4);
     assert_eq!(
         saved["scopes"]["isolated-test"]["sidebar"]["preferences"]["pinnedExpanded"],
         false

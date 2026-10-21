@@ -68,13 +68,13 @@ impl ThreadPreferences {
         let mut document: Document = match fs::read(&path) {
             Ok(bytes) => serde_json::from_slice(&bytes)?,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Document {
-                version: 3,
+                version: 4,
                 scopes: BTreeMap::new(),
             },
             Err(e) => return Err(io_error(e)),
         };
         require(
-            matches!(document.version, 1..=3),
+            matches!(document.version, 1..=4),
             "unsupported thread preference version",
         )?;
         for value in document.scopes.values() {
@@ -93,8 +93,8 @@ impl ThreadPreferences {
                 )?;
             }
         }
-        let migrate = document.version != 3;
-        document.version = 3;
+        let migrate = document.version != 4;
+        document.version = 4;
         for scope in document.scopes.values_mut() {
             scope
                 .receipts
@@ -376,7 +376,7 @@ mod tests {
         assert!(store.pin_state("z", "same").unwrap().pinned);
         assert!(store.pin_state("a", "same").unwrap().pinned);
         let value: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
-        assert_eq!(value["version"], 3);
+        assert_eq!(value["version"], 4);
         assert_eq!(value["scopes"]["s"]["receipts"], serde_json::json!({}));
         assert!(
             value["scopes"]["s"]["pins"]
@@ -454,6 +454,11 @@ mod tests {
                     session_id: "a".into(),
                 }],
                 pinned_expanded: false,
+                group_by_folder: true,
+                collapsed_folders: vec![crate::SidebarFolderKey {
+                    endpoint_id: "pi".into(),
+                    identity: crate::SidebarFolderIdentity::Id("original-folder".into()),
+                }],
             };
             store
                 .set_sidebar_preferences(&SidebarPreferenceChange { expected, value })
@@ -473,6 +478,24 @@ mod tests {
             );
             assert!(store.pins().is_empty());
         }
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+    #[test]
+    fn format_three_migration_keeps_existing_sort_order_and_defaults_folder_state() {
+        let path = path();
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, br#"{"version":3,"scopes":{"s":{"pins":[],"receipts":{},"sidebar":{"revision":7,"preferences":{"sort":"titleAscending","pinOrder":[],"pinnedExpanded":false}}}}}"#).unwrap();
+        let store = ThreadPreferences::open(&path, "s").unwrap();
+        let value = store.sidebar_preferences();
+        assert_eq!(value.revision, 7);
+        assert_eq!(value.preferences.sort, crate::SidebarSort::TitleAscending);
+        assert!(!value.preferences.pinned_expanded);
+        assert!(!value.preferences.group_by_folder);
+        assert!(value.preferences.collapsed_folders.is_empty());
+        let document: serde_json::Value =
+            serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        assert_eq!(document["version"], 4);
+        drop(store);
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
     }
     #[test]

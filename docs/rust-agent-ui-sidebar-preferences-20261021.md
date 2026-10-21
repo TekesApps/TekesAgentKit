@@ -1,5 +1,7 @@
 # Sidebar 置顶区与显示偏好
 
+本记录保留格式3阶段的源码和验收边界；后续分组、折叠和格式4迁移见 [Primary Folder 接入](rust-agent-ui-sidebar-folders-20261021.md)。
+
 本轮对齐当前 ClientKit `ClientSessionSidebar.sessionRows/movePin`、Sidebar 的区段激活和 Sort by 偏好。Tekes 宿主仍只拥有外层导航/窗口。固定公开 TekesUI pin 保持 `8cf0840790334ba224afc0595897c74231c712e6`，没有修改 SDK、ClientKit、Tekes 或 Kernel。
 
 ## 业务行为和公开 API

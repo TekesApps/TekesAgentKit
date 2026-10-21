@@ -1758,7 +1758,7 @@ pub fn project_sidebar_search_results(
     endpoint: &str,
     display: &tekes_agent_components_ui::SidebarInput,
 ) -> Result<tekes_agent_ui_bindings::SidebarSearchProjection, &'static str> {
-    source.project_search(endpoint, search, display.selected.clone(), display.revision)
+    source.project_search_for_display(endpoint, search, display)
 }
 
 #[test]
@@ -1868,6 +1868,7 @@ fn second_product_consumes_current_row_help_without_a_tooltip_or_query_state_mac
         error: None,
         selected: Some(address.clone()),
         rows: vec![SidebarRow {
+            primary_folder_id: None,
             folder_path: Some("原会话目录".into()),
             address: address.clone(),
             title: "原会话".into(),
@@ -1883,6 +1884,7 @@ fn second_product_consumes_current_row_help_without_a_tooltip_or_query_state_mac
                 items: vec![],
             },
         }],
+        folder_filter: None,
         search_help: Some(SidebarSearchHelp {
             results_ready: true,
             source: source.clone(),
@@ -1914,6 +1916,7 @@ fn independent_product_keeps_unmatched_pins_when_query_results_are_pending() {
         loaded: true,
         error: None,
         rows: vec![SidebarRow {
+            primary_folder_id: None,
             folder_path: Some("/original-pin-folder".into()),
             address: address.clone(),
             title: "原置顶会话".into(),
@@ -1973,4 +1976,107 @@ fn independent_product_keeps_unmatched_pins_when_query_results_are_pending() {
     assert!(names.iter().any(|name| name == "原置顶会话"));
     assert!(names.iter().any(|name| name == "搜索结果尚未就绪"));
     assert!(!names.iter().any(|name| name == "没有匹配的会话"));
+}
+
+#[test]
+fn second_product_consumes_scoped_folder_grouping_filter_and_original_disclosure() {
+    use tekes_agent_components_ui::*;
+    use tekes_agent_ui_bindings::{SidebarPublication, SidebarSearchPublication};
+    use tekes_ui_controls::composition::{AccessibilityAction, ButtonContent};
+    let row = |id: &str, folder: &str, pinned: bool| SidebarRow {
+        primary_folder_id: Some(folder.into()),
+        folder_path: Some(format!("/original/{folder}")),
+        address: RunScope::main("consumer", id).address(),
+        title: id.into(),
+        activity: ThreadActivity {
+            status: "idle".into(),
+            is_stale: false,
+        },
+        pin: Some(ThreadPinPresentation { pinned }),
+        actions: ThreadActionsPresentation {
+            endpoint: "consumer".into(),
+            session_id: id.into(),
+            label: "操作".into(),
+            items: vec![],
+        },
+    };
+    let source = SidebarPublication {
+        revision: 1,
+        loaded: true,
+        error: None,
+        rows: vec![
+            row("a", "one", false),
+            row("b", "two", false),
+            row("pin", "three", true),
+        ],
+    };
+    let mut display = source.input(None);
+    let key = display.rows[0].folder_key();
+    display.folder_filter = Some(key.clone());
+    let clear = SidebarSearchPublication {
+        input: SidebarSearchInput {
+            revision: 1,
+            key: None,
+            phase: SidebarSearchPhase::Idle,
+        },
+        query: String::new(),
+        hits: vec![],
+        unresolved: vec![],
+        result: None,
+    };
+    let projection = project_sidebar_search_results(&source, &clear, "consumer", &display).unwrap();
+    assert_eq!(projection.input.folder_filter, Some(key.clone()));
+    let preferences = SidebarPreferencesSnapshot {
+        revision: 1,
+        preferences: SidebarPreferences {
+            group_by_folder: true,
+            ..Default::default()
+        },
+    };
+    let mut sidebar = Sidebar::new(2205, SidebarLabels::default());
+    sidebar.update_preferences(&preferences, true).unwrap();
+    sidebar.update(&projection.input).unwrap();
+    let root = sidebar.id();
+    let header = sidebar.folder_header_id(&key).unwrap();
+    let leaf = sidebar.row_id(&source.rows[0].address).unwrap();
+    assert!(sidebar.row_id(&source.rows[1].address).is_none());
+    assert!(sidebar.row_id(&source.rows[2].address).is_some());
+    let mut host = sidebar.into_host().unwrap();
+    let widget = host
+        .get(leaf)
+        .unwrap()
+        .component::<ButtonContent>()
+        .unwrap() as *const _ as usize;
+    host.accessibility_action(header, None, AccessibilityAction::Press);
+    let actions = host.drain_actions();
+    let change = host
+        .get(root)
+        .unwrap()
+        .component::<Sidebar>()
+        .unwrap()
+        .take_preference_intents(&actions)
+        .pop()
+        .unwrap();
+    assert_eq!(change.expected, preferences);
+    assert_eq!(change.value.collapsed_folders, [key]);
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<Sidebar>()
+        .unwrap()
+        .update_preferences(
+            &SidebarPreferencesSnapshot {
+                revision: 2,
+                preferences: change.value,
+            },
+            true,
+        )
+        .unwrap();
+    assert!(!host.semantics().iter().any(|node| node.id == leaf));
+    assert_eq!(
+        host.get(leaf)
+            .unwrap()
+            .component::<ButtonContent>()
+            .unwrap() as *const _ as usize,
+        widget
+    );
 }

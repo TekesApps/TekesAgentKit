@@ -172,6 +172,7 @@ pub struct ComponentDemo {
     retained: Vec<Option<Content>>,
     navigation_revision: u64,
     sidebar_source: Option<Arc<SidebarPublication>>,
+    sidebar_folder_filter: Option<tekes_agent_components_ui::SidebarFolderKey>,
     sidebar_search_publication: Option<tekes_agent_ui_bindings::SidebarSearchPublication>,
     sidebar_search_presented: Option<tekes_agent_components_ui::SidebarSearchInput>,
     sidebar_presented: Option<SidebarInput>,
@@ -465,6 +466,7 @@ impl ComponentDemo {
             retained,
             navigation_revision: 0,
             sidebar_source: None,
+            sidebar_folder_filter: None,
             sidebar_search_publication: None,
             sidebar_search_presented: None,
             sidebar_presented: None,
@@ -1916,6 +1918,20 @@ impl ComponentDemo {
             .component::<Sidebar>()?
             .search_snippet(address)
     }
+    pub fn set_sidebar_folder_filter(
+        &mut self,
+        filter: Option<tekes_agent_components_ui::SidebarFolderKey>,
+    ) -> Result<()> {
+        if let Some(key) = &filter {
+            key.validate()?;
+        }
+        let old = std::mem::replace(&mut self.sidebar_folder_filter, filter);
+        if let Err(error) = self.sync_sidebar() {
+            self.sidebar_folder_filter = old;
+            return Err(error);
+        }
+        Ok(())
+    }
     pub fn set_sidebar_source(&mut self, source: Arc<SidebarPublication>) -> Result<()> {
         require(
             self.sidebar_source.as_ref().is_none_or(|old| {
@@ -2461,6 +2477,7 @@ impl ComponentDemo {
                 session_id: binding.scope().session_id.clone(),
             });
             let mut next = SidebarInput {
+                folder_filter: self.sidebar_folder_filter.clone(),
                 search_help: None,
                 revision: self
                     .sidebar_presented
@@ -2473,12 +2490,7 @@ impl ComponentDemo {
             };
             if let Some(search) = &self.sidebar_search_publication {
                 next = source
-                    .project_search(
-                        &self.binding().scope().endpoint_id,
-                        search,
-                        next.selected,
-                        next.revision,
-                    )
+                    .project_search_for_display(&self.binding().scope().endpoint_id, search, &next)
                     .map_err(unsupported)?
                     .input;
             }
@@ -2492,6 +2504,7 @@ impl ComponentDemo {
                     || old.loaded != next.loaded
                     || old.error != next.error
                     || old.search_help != next.search_help
+                    || old.folder_filter != next.folder_filter
             }) || self.sidebar_search_presented != search_input
             {
                 let id = self.sidebar_id();

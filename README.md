@@ -5,7 +5,7 @@
 
 **A Rust Agent client suite aligned with TekesClientKit — independent SessionEndpoints, memory projection, and renderer-free Run / Transcript / Composer state.**
 
-与 TekesClientKit 对齐的 Rust Agent 客户端库。没有 Swift，不依赖 TekesUI、SQLite 或 harness 的内部数据库；本地连接不需要客户端磁盘 Mirror。
+与 TekesClientKit 对齐的 Rust Agent 客户端库。仓库没有 Swift；默认无 UI 构建不依赖 TekesUI、SQLite 或 harness 的内部数据库，本地连接不需要客户端磁盘 Mirror。
 
 ## 当前阶段
 
@@ -19,7 +19,7 @@
 
 已实现会话地址/指针、历史恢复、文件读取/观察、附件、交互回传和显式能力检查；独立 presentation 层提供 Run、Transcript、Composer 和连接状态。Pi 保留原生 entry ID，不伪造 journal sequence。DSH 官方未提供的 ephemeral fork/discard 明确返回 Unsupported。
 
-历史投影在内存中。Pi 的宿主指针、receipt、队列及 Goal 元数据用于会话恢复和提交去重，不是 transcript Mirror。可选远端 durable cache、正式 UI 控件、生产 launcher 和大历史性能验收尚未交付。独立 [UI 试点 workspace](ui/README.md) 固定 TekesUI 公开 Git commit，复用现有 presentation；不属于 v0.3.7 headless 发布 API，也不影响默认 headless 构建。
+历史投影在内存中。Pi 的宿主指针、receipt、队列及 Goal 元数据用于会话恢复和提交去重，不是 transcript Mirror。可选远端 durable cache、正式 UI 控件、生产 launcher 和大历史性能验收尚未交付。独立 [UI 试点 workspace](ui/README.md) 固定 TekesUI 公开 Git commit，复用现有 presentation；不属于 v0.3.8 headless 发布 API，也不影响默认 headless 构建。
 
 ## 开始使用
 
@@ -103,6 +103,7 @@ python3 scripts/install-dsh-runtime.py \
 - [实验 UI：三端流式原生窗口验收](docs/rust-agent-ui-stream-native-20261020.md)
 - [实验 UI：三端取消、错误与显式恢复](docs/rust-agent-ui-run-controls-20261020.md)
 - [实验 UI：Sidebar 共享查询控制器与公开搜索 RPC](docs/rust-agent-ui-sidebar-query-controller-20261021.md)
+- [实验 UI：Primary Folder 分组、筛选、持久折叠及格式4边界](docs/rust-agent-ui-sidebar-folders-20261021.md)
 - [Kernel v4 同步、历史及恢复](docs/headless-kernel.md)
 - [路线与交付边界](docs/roadmap.md)
 - [阶段变更](CHANGELOG.md) · [贡献说明](CONTRIBUTING.md)

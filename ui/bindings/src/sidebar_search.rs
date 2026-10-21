@@ -22,6 +22,24 @@ pub struct SidebarSearchProjection {
     pub unresolved: Vec<SessionAddress>,
 }
 impl SidebarPublication {
+    /// Preserve explicit host selection/filter/view revision while the shared
+    /// projection owns search membership and independent global pins.
+    pub fn project_search_for_display(
+        &self,
+        endpoint: &str,
+        search: &SidebarSearchPublication,
+        display: &SidebarInput,
+    ) -> Result<SidebarSearchProjection, &'static str> {
+        if let Some(key) = &display.folder_filter {
+            key.validate()
+                .map_err(|_| "invalid Sidebar folder filter")?;
+        }
+        let mut projection =
+            self.project_search(endpoint, search, display.selected.clone(), display.revision)?;
+        projection.input.folder_filter = display.folder_filter.clone();
+        Ok(projection)
+    }
+
     pub fn project_search(
         &self,
         endpoint: &str,

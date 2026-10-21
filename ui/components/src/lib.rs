@@ -442,3 +442,6 @@ pub use tekes_agent_presentation::{
 
 mod sidebar_preferences;
 pub use sidebar_preferences::*;
+
+mod sidebar_folders;
+pub use sidebar_folders::*;

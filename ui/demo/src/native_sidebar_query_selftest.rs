@@ -1,6 +1,8 @@
 //! Actual shared search controller -> public SEP read -> filtered Sidebar rows/footer.
 //! The backend is the owned in-process fixture, not a real harness search index.
 use super::*;
+#[path = "native_sidebar_folders_selftest.rs"]
+mod folders;
 #[path = "native_sidebar_pin_query_selftest.rs"]
 mod pin_query;
 use tekes_agent_components_ui::{SidebarSearchIntent, SidebarSearchKey, SidebarSearchPhase};
@@ -64,12 +66,16 @@ impl Probe {
         );
         self.phase = 2;
     }
-    pub fn advance(&mut self, host: &Host, window: &Window) {
+    pub fn advance(&mut self, host: &mut Host, window: &Window) {
         assert!(
             self.started.elapsed() < Duration::from_secs(15),
             "query probe deadline phase {}",
             self.phase
         );
+        if self.phase >= 50 {
+            self.advance_folders(host, window);
+            return;
+        }
         let source = host.sidebar_query.as_ref().unwrap();
         let model = source.snapshot();
         let sidebar = host
@@ -276,6 +282,49 @@ impl Probe {
                 assert_eq!(run.draft.text, "搜索期间保留的中文草稿");
                 assert!(run.submissions.is_empty());
                 assert_eq!(self.fixture.search_calls(), 2);
+                if std::env::var_os("AGENT_SIDEBAR_FOLDERS_CAPTURE").is_some() {
+                    for (id, path) in [("a", "/fixture/中文项目"), ("b", "/fixture/其他项目")]
+                    {
+                        let mut summary = host
+                            .runtime
+                            .inspect(|state| state.sessions[id].summary.clone())
+                            .unwrap();
+                        summary["cwd"] = serde_json::json!(path);
+                        self.fixture.publish_inventory_summary(summary).unwrap();
+                    }
+                    let inventory = host.sidebar.snapshot();
+                    let row = inventory
+                        .rows
+                        .iter()
+                        .find(|row| row.address.session_id == "late-search")
+                        .unwrap();
+                    let action = row
+                        .actions
+                        .items
+                        .iter()
+                        .find(|action| action.id == "pin")
+                        .unwrap();
+                    host.executor
+                        .block_on(host.sidebar.perform(
+                            &row.address,
+                            action,
+                            None,
+                            "native-folder-pin",
+                        ))
+                        .unwrap();
+                    let expected = host.sidebar.preferences().unwrap();
+                    let mut value = expected.preferences.clone();
+                    value.group_by_folder = true;
+                    host.sidebar
+                        .set_preferences(&tekes_agent_components_ui::SidebarPreferenceChange {
+                            expected,
+                            value,
+                        })
+                        .unwrap();
+                    self.phase = 50;
+                    run_script(vec![(50, Action::WakeRedraw)]);
+                    return;
+                }
                 if std::env::var_os("AGENT_SIDEBAR_PINNED_CAPTURE").is_some()
                     || std::env::var_os("AGENT_SIDEBAR_PIN_QUERY_CAPTURE").is_some()
                 {

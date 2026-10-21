@@ -25,7 +25,7 @@ impl ButtonTextRenderer for HelpClockText {
     }
 }
 fn help_row(id: &str) -> SidebarRow {
-    SidebarRow { folder_path: Some("/fixture/原会话目录".into()), address: RunScope::main("fixture", id).address(), title: format!("原会话 {id}"), activity: ThreadActivity { status: "idle".into(), is_stale: false }, pin: None, actions: ThreadActionsPresentation { endpoint: "fixture".into(), session_id: id.into(), label: "操作".into(), items: vec![] } }
+    SidebarRow { primary_folder_id: None, folder_path: Some("/fixture/原会话目录".into()), address: RunScope::main("fixture", id).address(), title: format!("原会话 {id}"), activity: ThreadActivity { status: "idle".into(), is_stale: false }, pin: None, actions: ThreadActionsPresentation { endpoint: "fixture".into(), session_id: id.into(), label: "操作".into(), items: vec![] } }
 }
 fn help_search(revision: u64, query: &str, ids: &[&str]) -> tekes_agent_ui_bindings::SidebarSearchPublication {
     use tekes_agent_ui_bindings::{SidebarSearchMatch, SidebarSearchPublication};

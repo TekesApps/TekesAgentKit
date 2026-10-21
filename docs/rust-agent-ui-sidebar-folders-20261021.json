@@ -1,0 +1,278 @@
+{
+  "format": "agentkit-sidebar-folders/1",
+  "baseline_commit": "ce3377c",
+  "source_files": {
+    "crates/presentation/src/lib.rs": "6a9d73dc3ee2f1ec3bd2b3a5509cb92baf1e2baef119ef7b62191fea6b08014d",
+    "crates/presentation/src/sidebar_preferences.rs": "40549420330658fb50e3d7d9248a1be38364f61d215ea6bd6117afa8309948cb",
+    "crates/presentation/src/thread_preferences.rs": "a3183a17189641eec42613a0f3a6a3443e89490c927703dda92e7ac0233fd202",
+    "scripts/probes/agentkit-sidebar-help-candidate.rs": "ad78343e9fac3b7773bde7984d45a3534476d85922f55c995d7a4f13dc062562",
+    "ui/bindings/src/sidebar.rs": "a2b40555f769f686b77b3efa856188644dbdcbb83bc65b59bfca215033015c3b",
+    "ui/bindings/src/sidebar_search.rs": "8a6cacf6712dec134e561e306ce79fc7852b6e1b629f10d956f149036416a140",
+    "ui/components/src/lib.rs": "8c2808f02c9160f20fd144c4bc754dad924c6e0e2201c202f599024299ac25c1",
+    "ui/components/src/sidebar.rs": "b88e518bcf657ab14fbdd84dc78d7f60516ade83ff01bebe14f92aff38f82189",
+    "ui/components/src/summary_section.rs": "755851b019a438b254f6bec5448eeff2b3a7e400165486bd0945f5493ea30588",
+    "ui/consumer/src/lib.rs": "939b7e01278e7896fa87d4e266515453d44e76e5d8c6bcb195549996af48ed9c",
+    "ui/demo/src/component_demo.rs": "46bdd64ef4c8b2c98e86eb9bec97ff3259af3318d63bf667ced650df8f1fc99b",
+    "ui/demo/src/native_sidebar_query_selftest.rs": "9308a986644538f1e50c3c968064d342774dbd7f3f2ee3170a93806ccb60466b",
+    "ui/demo/tests/sidebar_component.rs": "a86e3ef722cdd49d2e267b2ac768e6fed6e25c19a193eebf567293fc045ea855",
+    "ui/demo/tests/sidebar_preferences.rs": "d57e066b79978030dd5c34078e8c5c38e3132e9a8ae312c5f9748ce844201adf",
+    "ui/demo/tests/sidebar_preferences_binding.rs": "e7d3fa90bfa19d53a0a4bcb5c8e04497e94ca906508162b844e6e47c13583348",
+    "ui/demo/tests/sidebar_search.rs": "9efbb2a7065efde5f032e45c93483339c00097525c20b55cdce69489b5ae3cdb",
+    "ui/demo/tests/sidebar_search_results.rs": "b7b2e9d0ede4af0359691a12fdeaec193997cdb70fdc279be2f5e40a8f48013e",
+    "crates/presentation/src/sidebar_folders.rs": "0ffd53482ccc215875c8ea83ab664e4882dca73d4fc0a164d1460824da5b5630",
+    "ui/components/src/sidebar_folders.rs": "ff36a69378bf8400754ca19a4ccd22909551dc3a1a315710c00351f48a8f1d78",
+    "ui/demo/src/native_sidebar_folders_selftest.rs": "6e3087d58775911b23d054c4b8edb47924e5edd5c4f8d91851f7676786b99069",
+    "ui/demo/tests/sidebar_folders.rs": "51243a5fc1b18fdb7e29c022bc56cd0ebb00c8b97e3a5c636c8367e078e87dcc"
+  },
+  "read_only_references": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Agent/ClientSessionSidebar.swift": "c9a09d4dd40415e38ec08c5941fa729e981a0ed287692af0b836426f4e25457d",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Agent/ClientAgentSidebarModel.swift": "82c1bbb6519b9cb9573b9963f565eeee8d297702250a00f9243b5c1e66a1ddc9",
+    "/Users/frankqin/dev/Tekes/Tekes/SidebarColumnController.swift": "cc01190f2e25192aed25c7ee53d7d1adc621d24b93da62a034824a10fd770f6d"
+  },
+  "read_only_heads": {
+    "TekesClientKit": "c289bc9d33edcd83a782ac17927a8c65a027eccd",
+    "Tekes": "8858ccd9d46590852ec7a0949aee289fc6798d70"
+  },
+  "other_repositories_wip_preserved": true,
+  "default_pin": "8cf0840790334ba224afc0595897c74231c712e6",
+  "default_packages": 8,
+  "default_verified_files": 199,
+  "default_pin_promoted": false,
+  "published_headless_baseline": "v0.3.8",
+  "unpublished_preference_format": 4,
+  "checks": [
+    {
+      "check": "headless-workspace",
+      "exit_code": 0,
+      "log": {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-folders-evidence/agentkit-sidebar-folders-headless-workspace.log",
+        "sha256": "30b7d78a518827f42c10a3022245a11c287a6ba8d989ecc29cca73b8cab2975b"
+      },
+      "passed": 186
+    },
+    {
+      "check": "headless-clippy",
+      "exit_code": 0,
+      "log": {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-folders-evidence/agentkit-sidebar-folders-headless-clippy.log",
+        "sha256": "be11b96660688b3648e05dd6659bf7ac361b41dd061771a82a2e032f3cdf43fc"
+      }
+    },
+    {
+      "check": "default-workspace",
+      "exit_code": 0,
+      "log": {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-folders-evidence/agentkit-sidebar-folders-default-workspace.log",
+        "sha256": "c150522923beae8feb4f657afcb61d26477aa28c5a4f50d8d6593029c456b323"
+      },
+      "passed": 372
+    },
+    {
+      "check": "default-clippy",
+      "exit_code": 0,
+      "log": {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-folders-evidence/agentkit-sidebar-folders-default-clippy.log",
+        "sha256": "3cfe613cd21533f45d01420b622b71dae0b42082fdcdf367f3ba437c864b97fc"
+      }
+    },
+    {
+      "check": "default-build",
+      "exit_code": 0,
+      "log": {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-folders-evidence/agentkit-sidebar-folders-default-build.log",
+        "sha256": "e7a0e788c2f011df0653279f56cd58dcca091a34d28573a86e1b886eaa34b4d9"
+      }
+    },
+    {
+      "check": "candidate-replay",
+      "exit_code": 0,
+      "log": {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-folders-evidence/agentkit-sidebar-folders-candidate-replay.log",
+        "sha256": "9382c209c00d6489d4de7fda52fb9bc1e3ec2b094228ccf793f0c1bf1b66387a"
+      }
+    },
+    {
+      "check": "candidate-workspace",
+      "exit_code": 0,
+      "log": {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-folders-evidence/agentkit-sidebar-folders-candidate-workspace.log",
+        "sha256": "021aaccb9466b61bd4ed370fb73e514bf99d6164ee4ceebb3f600c60ca74a519"
+      },
+      "passed": 399
+    },
+    {
+      "check": "candidate-clippy",
+      "exit_code": 0,
+      "log": {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-folders-evidence/agentkit-sidebar-folders-candidate-clippy.log",
+        "sha256": "6c12392675525f0ced83d0f59889841a1733abe07f3cc023cd70ffd722d8667a"
+      }
+    }
+  ],
+  "public_consumer_tests": 40,
+  "candidate": {
+    "identity": "3366559a1a524909f562fa2fdd1c8646d762b5ba0eb1294b5480c39d9e9c37ef",
+    "files": 503,
+    "receipt": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-folders-3366559a/receipt.json",
+      "sha256": "f49cd04c2adfaf40e4cdcee47a541c148375910f5e4a00e3968a2bed7235ff00"
+    },
+    "source_and_inputs_unchanged": true,
+    "generator_checks": [
+      {
+        "check": "tests",
+        "exit_code": 0
+      },
+      {
+        "check": "clippy",
+        "exit_code": 0
+      },
+      {
+        "check": "actual-wrapper",
+        "exit_code": 0
+      },
+      {
+        "check": "public-consumer",
+        "exit_code": 0
+      },
+      {
+        "check": "native-build",
+        "exit_code": 0
+      }
+    ],
+    "native_help_rerun_this_phase": false
+  },
+  "native": {
+    "exit_code": 0,
+    "draftRetained": true,
+    "durableCollapsedFolder": true,
+    "filterKeepsGlobalPin": true,
+    "groupedLabels": true,
+    "libraryInsetBody": true,
+    "nativeWindow": true,
+    "noSubmission": true,
+    "originalButtonRetained": true,
+    "originalPointerDisclosure": true,
+    "physicalIme": false,
+    "publicInventoryFolders": true,
+    "realHarness": false,
+    "selectionRetained": true,
+    "ungroupRestoresRows": true,
+    "voiceOver": false,
+    "windowActive": true,
+    "log": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-folders-evidence/agentkit-sidebar-folders-native-v2.log",
+      "sha256": "8ebb0b9419bdce5570d5f44dffc730651ee2ab00aa7cab172e8e58f3e3dcbf87"
+    },
+    "binary": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-folders-native-v2-demo",
+      "sha256": "d8a79beb33a3017c918e6c6f6f225e59813ee27254d5c1c4297c3ef0f94c3bbd"
+    },
+    "same_binary_as_final_default": true,
+    "screenshots": [
+      {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-folders-v2-expanded.png",
+        "sha256": "a49bcbbcf8dd31aca8e8e513738cd297020ac6dbaedcd40c931d510feddb4c12",
+        "pixels_inspected": true
+      },
+      {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-folders-v2-collapsed.png",
+        "sha256": "2571c31de9022ff6f18752d8a97b0b98b57ee136fe4f81fe7e7f9010ec28aabc",
+        "pixels_inspected": true
+      },
+      {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-folders-v2-filtered.png",
+        "sha256": "bfbc1e464c29d7a5e237973da8bfe824f5ea1b2bfa0c3ebd2694a5a9dfa67e26",
+        "pixels_inspected": true
+      }
+    ],
+    "trigger_keyboard_focus_continuity_accepted": false,
+    "standard_disclosure_indicator_supported": false
+  },
+  "unaccepted_attempts": [
+    {
+      "reason": "initial native check observed inactive window before bounded activation wait",
+      "log": {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-folders-evidence/agentkit-sidebar-folders-native-v1.log",
+        "sha256": "ea17742c53f94c54369150f94da47a22835193d68c58982b17f32b82acc8136c"
+      },
+      "binary": {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-folders-native-v1-demo",
+        "sha256": "d53abe814cddce6ddaec7ade0a53c0e592e6ee4c287458edb2fd1bc344acc6de"
+      },
+      "accepted": false
+    },
+    {
+      "reason": "old integration test still expected preference format3",
+      "log": {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-folders-evidence/default-workspace-attempt1.log",
+        "sha256": "40a04aa909adda2764c86d874699da206bf827e6ae8eae80d61abe984c00be28"
+      },
+      "accepted": false
+    },
+    {
+      "reason": "test-only Clippy cloned-ref assertion; replaced with slice reference",
+      "log": {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-folders-evidence/default-clippy-attempt1.log",
+        "sha256": "562c53afe731e858e70d7b57e9e9178c0e9fcfe9c89cd2df73e499ada2e2d391"
+      },
+      "accepted": false
+    }
+  ],
+  "three_real": {
+    "exit_code": 0,
+    "log": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-folders-evidence/agentkit-sidebar-folders-three-real.log",
+      "sha256": "9c6023fe96c3714e4528f3f0a478c54e6f6b59d43a75c7867e4033e24ab5e4a7"
+    },
+    "binary": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-folders-final-demo",
+      "sha256": "d8a79beb33a3017c918e6c6f6f225e59813ee27254d5c1c4297c3ef0f94c3bbd"
+    },
+    "versions": {
+      "Native": "Kernel0.9.1",
+      "Pi": "1.3.0",
+      "DSH": "0.2.1-rc.2"
+    },
+    "offscreen_only": true,
+    "isolated_local_providers": true,
+    "real_folder_native": false
+  },
+  "python_tests": {
+    "exit_code": 0,
+    "passed": 26,
+    "log": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-folders-evidence/agentkit-sidebar-folders-python.log",
+      "sha256": "a525a276355fe353ee2a9f8fd6fd590c4f187e10236e1f5602d24047d8485a1b"
+    }
+  },
+  "cleanup": {
+    "deleted_count": 56,
+    "freed_allocated_bytes": 105414656,
+    "new_independent_targets": 0,
+    "exclusive_cargo_target_lock": true,
+    "process_inventory_checked": true,
+    "lsof_open_files": 0,
+    "preserved": "sources, WIP, fixed SDK snapshots, logs, receipts, screenshots, acceptance binaries, current/future and ambiguous caches"
+  },
+  "cleanup_receipt": {
+    "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/build-cache-cleanup-sidebar-folders-20261021.json",
+    "sha256": "d7734f93bbb9e8974af2d040c17e385db35092d3c47567f11426ca5a615c43af"
+  },
+  "issues": {
+    "menu": 36,
+    "synthetic_control_key": 37,
+    "standard_disclosure": 38
+  },
+  "remaining": [
+    "SDK standard disclosure/trigger focus continuity",
+    "options menus and event-time records",
+    "Primary Folder management and create-in-folder workspace resolver/source callback",
+    "Sidebar pagination, selected row supplementation and navigation-triggered folder reveal",
+    "multi-endpoint inventory aggregation/local FTS/persistent activity clock",
+    "complete Views/rich Transcript/native reading and paging anchors",
+    "physical IME/Escape and VoiceOver",
+    "published fixed SDK promotion/final review/CI/merge/stage tag"
+  ],
+  "complete": false
+}

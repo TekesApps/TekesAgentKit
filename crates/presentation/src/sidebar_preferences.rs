@@ -12,6 +12,10 @@ pub enum SidebarSort {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SidebarPreferences {
+    #[serde(default)]
+    pub group_by_folder: bool,
+    #[serde(default)]
+    pub collapsed_folders: Vec<crate::SidebarFolderKey>,
     pub sort: SidebarSort,
     pub pin_order: Vec<SessionAddress>,
     pub pinned_expanded: bool,
@@ -19,6 +23,8 @@ pub struct SidebarPreferences {
 impl Default for SidebarPreferences {
     fn default() -> Self {
         Self {
+            group_by_folder: false,
+            collapsed_folders: vec![],
             sort: SidebarSort::default(),
             pin_order: vec![],
             pinned_expanded: true,
@@ -27,6 +33,11 @@ impl Default for SidebarPreferences {
 }
 impl SidebarPreferences {
     pub fn validate(&self) -> Result<()> {
+        let mut folders = std::collections::BTreeSet::new();
+        for key in &self.collapsed_folders {
+            key.validate()?;
+            require(folders.insert(key), "duplicate collapsed Sidebar folder")?;
+        }
         let mut seen = std::collections::BTreeSet::new();
         for address in &self.pin_order {
             require(

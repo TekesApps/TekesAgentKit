@@ -20,6 +20,7 @@ impl SidebarPublication {
     /// Host navigation supplies selection; the inventory observer never selects a row.
     pub fn input(&self, selected: Option<SessionAddress>) -> SidebarInput {
         SidebarInput {
+            folder_filter: None,
             search_help: None,
             revision: self.revision,
             loaded: self.loaded,
@@ -236,6 +237,7 @@ impl InventoryRows {
             activity.insert(id.to_owned(), (running, effective));
             let title = inventory_title(item, id);
             rows.push(SidebarRow {
+                primary_folder_id: None,
                 folder_path: summary["cwd"].as_str().map(str::to_owned),
                 address: SessionAddress {
                     endpoint_id: endpoint_id.clone(),
