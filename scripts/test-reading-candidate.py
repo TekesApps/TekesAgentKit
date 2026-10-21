@@ -212,7 +212,7 @@ def main():
         sidebar = snapshot / 'ui/components/src/sidebar.rs'
         old = '            // CANDIDATE_SIDEBAR_ROW_HELP_DECLARATION'
         assert sidebar.read_text().count(old) == 1
-        sidebar.write_text(sidebar.read_text().replace(old, old + '\n            stack.children[0].set_help(input.search_help.as_ref()\n                .filter(|help| self.search.as_ref() == Some(&help.source))\n                .and_then(|help| help.snippets.get(&row.address)).or(row.folder_path.as_ref()).cloned());'))
+        sidebar.write_text(sidebar.read_text().replace(old, old + '\n            stack.children[0].set_help(input.search_help.as_ref()\n                .filter(|help| help.results_ready && self.search.as_ref() == Some(&help.source))\n                .and_then(|help| help.snippets.get(&row.address)).or(row.folder_path.as_ref()).cloned());'))
         support = snapshot / 'ui/components/src/sidebar_search.rs'
         old = 'pub fn sidebar_row_help_supported() -> bool {\n    false\n}'
         assert support.read_text().count(old) == 1

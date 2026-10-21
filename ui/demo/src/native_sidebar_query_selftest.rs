@@ -1,6 +1,8 @@
 //! Actual shared search controller -> public SEP read -> filtered Sidebar rows/footer.
 //! The backend is the owned in-process fixture, not a real harness search index.
 use super::*;
+#[path = "native_sidebar_pin_query_selftest.rs"]
+mod pin_query;
 use tekes_agent_components_ui::{SidebarSearchIntent, SidebarSearchKey, SidebarSearchPhase};
 use tekes_ui_controls::composition::ButtonContent;
 use tekes_ui_platform_macos::selftest::{Action, run_script};
@@ -77,6 +79,10 @@ impl Probe {
             .unwrap()
             .component::<Sidebar>()
             .unwrap();
+        if self.phase >= 40 {
+            self.advance_pin_query(host);
+            return;
+        }
         // CANDIDATE_SIDEBAR_HELP_NATIVE_ADVANCE
         if self.phase == 5 {
             return;
@@ -270,7 +276,9 @@ impl Probe {
                 assert_eq!(run.draft.text, "搜索期间保留的中文草稿");
                 assert!(run.submissions.is_empty());
                 assert_eq!(self.fixture.search_calls(), 2);
-                if std::env::var_os("AGENT_SIDEBAR_PINNED_CAPTURE").is_some() {
+                if std::env::var_os("AGENT_SIDEBAR_PINNED_CAPTURE").is_some()
+                    || std::env::var_os("AGENT_SIDEBAR_PIN_QUERY_CAPTURE").is_some()
+                {
                     for id in ["a", "b"] {
                         let inventory = host.sidebar.snapshot();
                         let row = inventory
@@ -324,6 +332,17 @@ impl Probe {
                     .count()
                     != 2
                 {
+                    run_script(vec![(50, Action::WakeRedraw)]);
+                    return;
+                }
+                if std::env::var_os("AGENT_SIDEBAR_PIN_QUERY_CAPTURE").is_some() {
+                    self.fixture.set_search_result("pin-query", serde_json::json!({"items":[{"sessionId":"b","snippet":"只有 b 命中，a 继续置顶"}],"hasMore":false}));
+                    self.fixture.set_search_result(
+                        "pin-empty",
+                        serde_json::json!({"items":[],"hasMore":false}),
+                    );
+                    self.phase = 40;
+                    source.set_query("pin-query").unwrap();
                     run_script(vec![(50, Action::WakeRedraw)]);
                     return;
                 }

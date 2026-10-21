@@ -94,7 +94,8 @@ fn unresolved_inventory_is_not_confirmed_empty_and_recovers_without_another_quer
     let mut result = search();
     source.rows.clear();
     let first = source.project_search("fixture", &result, None, 1).unwrap();
-    assert!(!first.input.loaded);
+    assert!(first.input.loaded);
+    assert!(!first.input.search_help.as_ref().unwrap().results_ready);
     assert_eq!(first.unresolved, vec![address("b"), address("a")]);
     assert!(first.snippets.is_empty());
     result.unresolved = first.unresolved;
@@ -104,13 +105,11 @@ fn unresolved_inventory_is_not_confirmed_empty_and_recovers_without_another_quer
     assert!(next.unresolved.is_empty());
     assert_eq!(next.input.rows.len(), 2);
     result.input.phase = SidebarSearchPhase::Searching;
-    assert!(
-        !source
-            .project_search("fixture", &result, None, 3)
-            .unwrap()
-            .input
-            .loaded
-    );
+    let waiting = source.project_search("fixture", &result, None, 3).unwrap();
+    assert!(waiting.input.loaded);
+    assert!(!waiting.input.search_help.as_ref().unwrap().results_ready);
+    assert!(waiting.input.rows.is_empty());
+    assert!(waiting.snippets.is_empty());
 }
 #[test]
 fn rejects_cross_endpoint_duplicate_inconsistent_and_retained_clear_payloads() {
@@ -282,6 +281,15 @@ fn help_is_an_atomic_query_scoped_part_of_the_row_publication() {
         .insert(address("not-displayed"), "unknown owner".into());
     assert!(sidebar.update(&foreign).is_err());
     assert_eq!(sidebar.displayed_input(), Some(&original));
+    let mut pending_with_help = original.clone();
+    pending_with_help.revision += 1;
+    pending_with_help
+        .search_help
+        .as_mut()
+        .unwrap()
+        .results_ready = false;
+    assert!(sidebar.update(&pending_with_help).is_err());
+    assert_eq!(sidebar.displayed_input(), Some(&original));
     let mut next = publication.input.clone();
     next.revision += 1;
     next.key.as_mut().unwrap().generation += 1;
@@ -313,4 +321,200 @@ fn help_is_an_atomic_query_scoped_part_of_the_row_publication() {
             address: address("a")
         }]
     );
+}
+
+fn pinned_row(id: &str) -> SidebarRow {
+    let mut value = row(id);
+    value.folder_path = Some(format!("/original/{id}"));
+    value.pin = Some(ThreadPinPresentation { pinned: true });
+    value
+}
+#[test]
+fn search_preserves_global_pins_while_result_coherence_is_independent_of_inventory() {
+    let mut source = inventory();
+    source.rows[1] = pinned_row("c");
+    let mut result = search();
+    let projected = source.project_search("fixture", &result, None, 1).unwrap();
+    assert_eq!(projected.input.rows, source.rows);
+    assert!(!projected.snippets.contains_key(&address("c")));
+    result.input.phase = SidebarSearchPhase::Searching;
+    let waiting = source.project_search("fixture", &result, None, 2).unwrap();
+    assert!(waiting.input.loaded);
+    assert_eq!(waiting.input.rows, vec![pinned_row("c")]);
+    assert!(waiting.snippets.is_empty());
+    assert!(!waiting.input.search_help.unwrap().results_ready);
+    result.input.phase = SidebarSearchPhase::Complete { has_more: false };
+    result.hits[0].address = address("unknown");
+    result.hits[0].hit.session_id = "unknown".into();
+    let unresolved = source.project_search("fixture", &result, None, 3).unwrap();
+    assert_eq!(unresolved.unresolved, vec![address("unknown")]);
+    assert_eq!(unresolved.input.rows, vec![pinned_row("c")]);
+    assert!(unresolved.input.loaded);
+    assert!(!unresolved.input.search_help.unwrap().results_ready);
+    source.loaded = false;
+    assert!(
+        !source
+            .project_search("fixture", &result, None, 4)
+            .unwrap()
+            .input
+            .loaded
+    );
+}
+#[tokio::test]
+async fn original_pin_survives_query_loading_failure_empty_and_unknown_hit_recovery_without_editor_changes()
+ {
+    use tekes_agent_ui_bindings::RunBinding;
+    use tekes_agent_ui_demo::component_demo::ComponentDemo;
+    use tekes_ui_controls::composition::*;
+    let (runtime, _) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
+    let binding = Arc::new(
+        RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "a"))
+            .await
+            .unwrap(),
+    );
+    let mut view = ComponentDemo::new([binding]).unwrap();
+    let mut source = inventory();
+    source.rows[1] = pinned_row("c");
+    view.set_sidebar_source(Arc::new(source.clone())).unwrap();
+    view.tree.focus(Some(view.ids().editor), false);
+    assert!(
+        view.event(&ContentEvent::Preedit {
+            text: "中文组字".into(),
+            selection: 1..3,
+            clauses: vec![],
+            replacement: None
+        })
+        .unwrap()
+        .is_empty()
+    );
+    let editor = format!(
+        "{:?}",
+        (
+            &view.editor().input.text,
+            view.editor().input.selection(),
+            &view.editor().input.marked,
+            view.editor().input.external_baseline()
+        )
+    );
+    let focus = view.tree.focused();
+    let pin_id = view
+        .tree
+        .get(view.sidebar_id())
+        .unwrap()
+        .component::<Sidebar>()
+        .unwrap()
+        .row_id(&address("c"))
+        .unwrap();
+    let pin_ptr = view
+        .tree
+        .get(pin_id)
+        .unwrap()
+        .component::<ButtonContent>()
+        .unwrap() as *const _ as usize;
+    let mut result = search();
+    view.bind_sidebar_search_publication("search-reader", &result)
+        .unwrap();
+    for phase in [
+        SidebarSearchPhase::Searching,
+        SidebarSearchPhase::Failed {
+            message: "query unavailable".into(),
+            has_more: false,
+            retryable: true,
+        },
+        SidebarSearchPhase::Complete { has_more: false },
+    ] {
+        result.input.revision += 1;
+        result.input.phase = phase;
+        result.hits.clear();
+        view.update_sidebar_search_publication("search-reader", &result)
+            .unwrap();
+        assert_eq!(
+            view.tree
+                .get(view.sidebar_id())
+                .unwrap()
+                .component::<Sidebar>()
+                .unwrap()
+                .row_id(&address("c")),
+            Some(pin_id)
+        );
+        assert_eq!(
+            view.tree
+                .get(pin_id)
+                .unwrap()
+                .component::<ButtonContent>()
+                .unwrap() as *const _ as usize,
+            pin_ptr
+        );
+        assert_eq!(
+            view.tree
+                .get(view.sidebar_id())
+                .unwrap()
+                .component::<Sidebar>()
+                .unwrap()
+                .row_help(&address("c")),
+            Some("/original/c")
+        );
+        assert!(view.drain_commands().unwrap().is_empty());
+    }
+    result.input.revision += 1;
+    result.hits.push(SidebarSearchMatch {
+        address: address("late"),
+        hit: SessionSearchHit {
+            session_id: "late".into(),
+            snippet: "late current hit".into(),
+            extra: Default::default(),
+        },
+    });
+    view.update_sidebar_search_publication("search-reader", &result)
+        .unwrap();
+    assert!(
+        view.tree
+            .semantics()
+            .iter()
+            .any(|node| node.semantics.name == "搜索结果尚未就绪")
+    );
+    assert!(
+        !view
+            .tree
+            .semantics()
+            .iter()
+            .any(|node| node.semantics.name == "没有匹配的会话")
+    );
+    source.revision += 1;
+    source.rows.push(row("late"));
+    view.set_sidebar_source(Arc::new(source)).unwrap();
+    view.sync().unwrap();
+    assert!(
+        view.tree
+            .get(view.sidebar_id())
+            .unwrap()
+            .component::<Sidebar>()
+            .unwrap()
+            .row_id(&address("late"))
+            .is_some()
+    );
+    assert_eq!(
+        view.tree
+            .get(pin_id)
+            .unwrap()
+            .component::<ButtonContent>()
+            .unwrap() as *const _ as usize,
+        pin_ptr
+    );
+    assert_eq!(
+        format!(
+            "{:?}",
+            (
+                &view.editor().input.text,
+                view.editor().input.selection(),
+                &view.editor().input.marked,
+                view.editor().input.external_baseline()
+            )
+        ),
+        editor
+    );
+    assert_eq!(view.tree.focused(), focus);
+    assert_eq!(view.selected(), 0);
+    assert!(view.binding().current_run().unwrap().submissions.is_empty());
+    runtime.stop().await.unwrap();
 }

@@ -359,7 +359,7 @@ impl Sidebar {
             return None;
         }
         let help = input.search_help.as_ref()?;
-        if self.search.as_ref() != Some(&help.source) {
+        if !help.results_ready || self.search.as_ref() != Some(&help.source) {
             return None;
         }
         help.snippets.get(address).map(String::as_str)
@@ -693,6 +693,8 @@ impl Sidebar {
                 .ok_or("Sidebar help has no query source")?;
             if key.query.trim().is_empty()
                 || help.source.phase == crate::SidebarSearchPhase::Idle
+                || (!help.results_ready && !help.snippets.is_empty())
+                || (help.results_ready && help.source.phase == crate::SidebarSearchPhase::Searching)
                 || help.snippets.keys().any(|address| {
                     address.endpoint_id != key.endpoint_id
                         || !input.rows.iter().any(|row| &row.address == address)
@@ -844,6 +846,10 @@ impl Sidebar {
                         .is_some_and(|search| search.key.is_some())
                     {
                         if input.loaded
+                            && input
+                                .search_help
+                                .as_ref()
+                                .is_none_or(|help| help.results_ready)
                             && self.search.as_ref().is_some_and(|search| {
                                 matches!(search.phase, crate::SidebarSearchPhase::Complete { .. })
                             })
@@ -858,6 +864,23 @@ impl Sidebar {
                         &self.labels.restoring
                     },
                 ),
+            ));
+        }
+        // Unknown hits awaiting a public inventory join are pending results,
+        // even when the independent pinned section already has visible rows.
+        if has_pins
+            && input
+                .search_help
+                .as_ref()
+                .is_some_and(|help| !help.results_ready)
+            && self
+                .search
+                .as_ref()
+                .is_some_and(|search| !matches!(search.phase, crate::SidebarSearchPhase::Searching))
+        {
+            children.push(Content::new(
+                ComponentId(self.root.0 + 5),
+                TextContent::new(&self.search_labels.pending_results),
             ));
         }
         // Independent failure notice: an observation error never turns retained

@@ -8,6 +8,7 @@ use crate::SidebarPublication;
 use std::collections::{BTreeMap, BTreeSet};
 use tekes_agent_components_ui::{SidebarInput, SidebarSearchPhase};
 use tekes_agent_contract::SessionAddress;
+pub use tekes_agent_contract::{SessionSearchHit, SessionSearchResults};
 
 /// Display projection of provider search hits joined to the original inventory.
 /// Inventory order remains authoritative (including the host's sort preference).
@@ -84,8 +85,8 @@ impl SidebarPublication {
         {
             return Err("invalid unresolved sidebar search hit");
         }
-        // Join IDs, never title-match: body-only hits can have unrelated titles.
-        input.rows.retain(|row| snippets.contains_key(&row.address));
+        // Search filters ordinary sessions, never the independent global pins.
+        // Determine coherence against the full original inventory before filtering.
         let known: BTreeSet<_> = input.rows.iter().map(|row| row.address.clone()).collect();
         let unresolved: Vec<_> = search
             .hits
@@ -93,11 +94,18 @@ impl SidebarPublication {
             .filter(|hit| !known.contains(&hit.address))
             .map(|hit| hit.address.clone())
             .collect();
-        snippets.retain(|address, _| known.contains(address));
-        input.loaded = self.loaded
-            && unresolved.is_empty()
-            && !matches!(search.input.phase, SidebarSearchPhase::Searching);
+        let results_ready =
+            unresolved.is_empty() && !matches!(search.input.phase, SidebarSearchPhase::Searching);
+        input.rows.retain(|row| {
+            row.pin.as_ref().is_some_and(|pin| pin.pinned)
+                || (results_ready && snippets.contains_key(&row.address))
+        });
+        snippets.retain(|address, _| results_ready && known.contains(address));
+        // loaded still means inventory restored. A pending search cannot retire
+        // original pinned controls or grant them a new mount/action identity.
+        input.loaded = self.loaded;
         input.search_help = Some(tekes_agent_components_ui::SidebarSearchHelp {
+            results_ready,
             source: search.input.clone(),
             snippets: snippets.clone(),
         });

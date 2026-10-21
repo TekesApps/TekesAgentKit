@@ -1884,6 +1884,7 @@ fn second_product_consumes_current_row_help_without_a_tooltip_or_query_state_mac
             },
         }],
         search_help: Some(SidebarSearchHelp {
+            results_ready: true,
             source: source.clone(),
             snippets: [(address.clone(), "当前查询的摘要".into())].into(),
         }),
@@ -1899,4 +1900,77 @@ fn second_product_consumes_current_row_help_without_a_tooltip_or_query_state_mac
     sidebar.update_search(&cleared).unwrap();
     assert_eq!(sidebar.search_snippet(&address), None);
     assert_eq!(sidebar.row_help(&address), Some("原会话目录"));
+}
+
+#[test]
+fn independent_product_keeps_unmatched_pins_when_query_results_are_pending() {
+    use tekes_agent_components_ui::*;
+    use tekes_agent_ui_bindings::{
+        SidebarPublication, SidebarSearchMatch, SidebarSearchPublication,
+    };
+    let address = RunScope::main("consumer-endpoint", "pin").address();
+    let source = SidebarPublication {
+        revision: 1,
+        loaded: true,
+        error: None,
+        rows: vec![SidebarRow {
+            folder_path: Some("/original-pin-folder".into()),
+            address: address.clone(),
+            title: "原置顶会话".into(),
+            activity: ThreadActivity {
+                status: "idle".into(),
+                is_stale: false,
+            },
+            pin: Some(ThreadPinPresentation { pinned: true }),
+            actions: ThreadActionsPresentation {
+                endpoint: address.endpoint_id.clone(),
+                session_id: address.session_id.clone(),
+                label: "操作".into(),
+                items: vec![],
+            },
+        }],
+    };
+    let search = SidebarSearchPublication {
+        input: SidebarSearchInput {
+            revision: 1,
+            key: Some(SidebarSearchKey {
+                owner: "second-product".into(),
+                endpoint_id: address.endpoint_id.clone(),
+                connection_epoch: 1,
+                generation: 1,
+                query: "尚未出现在库存的命中".into(),
+            }),
+            phase: SidebarSearchPhase::Complete { has_more: false },
+        },
+        query: "尚未出现在库存的命中".into(),
+        hits: vec![SidebarSearchMatch {
+            address: RunScope::main(&address.endpoint_id, "missing").address(),
+            hit: tekes_agent_ui_bindings::SessionSearchHit {
+                session_id: "missing".into(),
+                snippet: "current hit".into(),
+                extra: Default::default(),
+            },
+        }],
+        unresolved: vec![],
+        result: None,
+    };
+    let display = source.input(Some(address.clone()));
+    let projection =
+        project_sidebar_search_results(&source, &search, &address.endpoint_id, &display).unwrap();
+    assert!(projection.input.loaded);
+    assert!(!projection.input.search_help.as_ref().unwrap().results_ready);
+    assert_eq!(projection.input.rows, source.rows);
+    let mut sidebar = Sidebar::new(2204, SidebarLabels::default());
+    sidebar.update_search(&search.input).unwrap();
+    sidebar.update(&projection.input).unwrap();
+    assert_eq!(sidebar.row_help(&address), Some("/original-pin-folder"));
+    let host = sidebar.into_host().unwrap();
+    let names: Vec<_> = host
+        .semantics()
+        .into_iter()
+        .map(|node| node.semantics.name)
+        .collect();
+    assert!(names.iter().any(|name| name == "原置顶会话"));
+    assert!(names.iter().any(|name| name == "搜索结果尚未就绪"));
+    assert!(!names.iter().any(|name| name == "没有匹配的会话"));
 }

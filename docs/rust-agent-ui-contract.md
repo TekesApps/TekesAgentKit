@@ -277,3 +277,5 @@ Native [消息生命周期边界修正](rust-agent-ui-native-stream-boundary-202
 最新 [Sidebar置顶区与偏好](rust-agent-ui-sidebar-preferences-20261021.md) 已接通独立可折叠置顶区、原行保留、公开标题排序/置顶顺序输入和带持久revision的同一偏好存储；无比较器拒绝标题排序，宿主提供系统本地化比较。默认UI362、无UI183与独立consumer37项、实际原生折叠通过。原生选项/移动菜单仍待TekesUI #36，文件夹、多端、本地FTS、持久活动时钟和完整Views/最终验收仍未完成；未提升SDK或发布新的headless版本。
 
 后续 [Sidebar查询帮助与目录](rust-agent-ui-sidebar-help-20261021.md) 已将当前查询摘要和行成员关系放进同一公开输入，缺少摘要时回退原会话目录。默认公开pin仍只提供元数据，`sidebar_row_help_supported()`为false；隔离的固定336候选在原Content上消费SDK提示声明。默认UI364、候选UI391（含原26项候选回归和wrapper检查）、独立consumer38项与严格Clippy通过；实际窗口查询更新/目录回退/关闭保持/合成组字期间原点击门禁通过，三端公开查询与内容离屏回传复验通过。原生关闭经`cancelOperation:`，无物理Escape/IME或VoiceOver验收；SDK空字符合成控制键缺口为#37。来源、失败保留、像素检查和清理收据见同名JSON。完整Views、阅读锚点与最终交付仍未完成，PR保持草稿。
+
+再对照 `ClientSessionSidebar.sessionRows` 后修正[搜索与置顶区](rust-agent-ui-sidebar-pinned-search-20261021.md)：搜索只过滤普通会话，独立全局置顶行在 Searching/失败/无命中时保留原控件。`loaded`只代表库存恢复，新增`SidebarSearchHelp.results_ready`区分结果等待，未知hit不伪报无命中。默认367/固定336候选394项、第二consumer39项、严格Clippy、原生置顶搜索和三端离屏回传通过。默认精确pin、headless契约及其余未完成范围不变；来源与边界见同名JSON。
