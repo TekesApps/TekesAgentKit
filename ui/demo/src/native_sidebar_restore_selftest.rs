@@ -11,6 +11,9 @@ pub(super) struct Probe {
     started: Instant,
     row: Option<ComponentId>,
     widget: usize,
+    ime_started: bool,
+    baseline: Option<tekes_ui_controls::TextEditBaseline>,
+    editor: Option<ComponentId>,
 }
 impl Probe {
     pub fn new() -> Self {
@@ -21,6 +24,9 @@ impl Probe {
             started: Instant::now(),
             row: None,
             widget: 0,
+            ime_started: false,
+            baseline: None,
+            editor: None,
         }
     }
     pub fn source(&mut self, source: Arc<SidebarPublication>) -> Arc<SidebarPublication> {
@@ -69,6 +75,52 @@ impl Probe {
             .into_iter()
             .map(|node| node.semantics.name)
             .collect::<Vec<_>>();
+        if self.phase == 0 && self.baseline.is_none() {
+            if !window.is_active() {
+                window.request_redraw();
+                return;
+            }
+            if !self.ime_started {
+                let editor = host.view.ids().editor;
+                let point = host
+                    .view
+                    .tree
+                    .get(editor)
+                    .unwrap()
+                    .visible()
+                    .unwrap()
+                    .center();
+                self.editor = Some(editor);
+                self.ime_started = true;
+                run_script(vec![
+                    (
+                        0,
+                        Action::Click {
+                            x: point.x as f64,
+                            y: point.y as f64,
+                        },
+                    ),
+                    (
+                        100,
+                        Action::PreeditRange {
+                            text: "独立补读组字".into(),
+                            selection: 1..4,
+                            replacement: None,
+                        },
+                    ),
+                ]);
+                return;
+            }
+            if host.view.editor().input.marked.is_none() {
+                return;
+            }
+            self.baseline = Some(host.view.editor().input.external_baseline());
+        }
+        assert_eq!(host.view.tree.focused(), self.editor);
+        assert_eq!(
+            Some(host.view.editor().input.external_baseline()),
+            self.baseline
+        );
         match self.phase {
             0 | 3 => {
                 assert!(!input.loaded);
@@ -114,12 +166,26 @@ impl Probe {
                 }
             }
             4 => {
-                assert!(input.loaded && input.rows.is_empty());
-                assert!(names.iter().any(|name| name == "暂无会话"));
+                // The published inventory is empty, but a separate canonical
+                // read still owns the actual selected conversation.
+                assert!(input.loaded && input.rows.len() == 1);
+                assert_eq!(input.selected.as_ref(), Some(&input.rows[0].address));
+                assert!(!names.iter().any(|name| name == "暂无会话"));
+                if let Ok(path) = std::env::var("AGENT_SIDEBAR_SELECTED_CAPTURE") {
+                    run_script(vec![(0, Action::Capture { path })]);
+                }
             }
             5 => {
                 let id = sidebar.row_id(&input.rows[0].address).unwrap();
                 assert_ne!(Some(id), self.row);
+                assert!(
+                    host.view
+                        .binding()
+                        .current_run()
+                        .unwrap()
+                        .submissions
+                        .is_empty()
+                );
                 run_script(vec![(100, Action::Close)]);
             }
             _ => unreachable!(),
@@ -129,6 +195,6 @@ impl Probe {
     }
     pub fn receipt(&self) -> serde_json::Value {
         assert_eq!(self.phase, 6, "Sidebar probe did not finish");
-        serde_json::json!({"nativeWindow":true,"restoringNotEmpty":true,"failureRetainsRows":true,"retiredIdsNotReused":true,"realHarnessOutage":false,"fullLayoutParity":false,"physicalIme":false,"voiceOver":false})
+        serde_json::json!({"nativeWindow":true,"restoringNotEmpty":true,"failureRetainsRows":true,"canonicalSelectedSupplement":true,"markedBaselineAndFocusPreserved":true,"noSubmission":true,"retiredIdsNotReused":true,"realHarnessOutage":false,"fullLayoutParity":false,"physicalIme":false,"voiceOver":false})
     }
 }

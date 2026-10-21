@@ -1,5 +1,7 @@
 # Sidebar 有界分页与目标行可见性（2026-10-21）
 
+后续选中行独立读取见 [selected-read contract](rust-agent-ui-sidebar-selected-read-20261021.md)。本报告保留原阶段的能力与证据边界。
+
 Rust AgentKit 消费 TekesUI 原控件。参照当前 ClientKit `SidebarPaging.pageSize = 5`、`sessionLimit`、独立 pinned/selected 查询与 `mergingSelectedThread`；Tekes 宿主继续拥有路由、窗口和系统能力。本阶段没有改动这些外部仓库。
 
 ## 本地库存分页

@@ -1,0 +1,179 @@
+{
+  "format": "agentkit-sidebar-selected-read/1",
+  "baseline_commit": "43b9a4f",
+  "source_files": {
+    "crates/web/src/lib.rs": "122f0bad38c9a859c862c202a7a3015d7c67b6d0c57d3c3bfbf28329e48d9091",
+    "crates/web/src/sidebar.rs": "3efbe72df1748323658c0704ad14607afd85c23875640e53db335c1bf08d61fc",
+    "ui/bindings/src/lib.rs": "09d6f7f93bec2a8a04ae1175d74e7c8f0ce827fcf51e48c22cba714ef644c2bc",
+    "ui/bindings/src/sidebar.rs": "88a14b7118ad2074c92c20b757ff40759981b009188325c59c8e319582e60a68",
+    "ui/bindings/src/sidebar_selected.rs": "9e4320aaec20dcb3671f9cb49994b94e4a209f46fb1bb58c99643a7efc2f6c57",
+    "ui/consumer/src/lib.rs": "169175529fcde6ea27f237bed9a3736cd66745290ab13e8901b3bcd293af3071",
+    "ui/demo/src/component_demo.rs": "4d03361670da281f1ae51a83b4bb716330b78e9628a6ee2132fb6a930498241d",
+    "ui/demo/src/components_native.rs": "512af55eaf149625a6801f7ba42f60adca95e622b2988d31b795091f0109fda3",
+    "ui/demo/src/native_sidebar_restore_selftest.rs": "ad6b38049c2ff1eac6d8e6eb1372b4d5845fc7cf1e355eb47b61e137869d61e1",
+    "ui/demo/tests/sidebar_selected.rs": "3750406d05c87ae356cd7d0b5246f7ef3e67827599de2c7f2ed187d9b443416c"
+  },
+  "default_pin": "8cf0840790334ba224afc0595897c74231c712e6",
+  "default_pin_changed": false,
+  "candidate_identity": "3366559a1a524909f562fa2fdd1c8646d762b5ba0eb1294b5480c39d9e9c37ef",
+  "candidate_files": 503,
+  "candidate_inputs_unchanged": true,
+  "checks": [
+    {
+      "check": "default-workspace",
+      "exit_code": 0,
+      "log": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-selected-evidence/agentkit-sidebar-selected-accepted-default-workspace.log",
+      "sha256": "fe7333828498bb4529da5e3d7ce62cff5488015ebe20ad69d1ab6f88be04942d",
+      "passed": 393
+    },
+    {
+      "check": "default-clippy",
+      "exit_code": 0,
+      "log": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-selected-evidence/agentkit-sidebar-selected-accepted-default-clippy.log",
+      "sha256": "71e97177328b5b4207e429c480973d583d723fdb81498c7a009679ca01e5a4de"
+    },
+    {
+      "check": "default-build",
+      "exit_code": 0,
+      "log": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-selected-evidence/agentkit-sidebar-selected-accepted-default-build.log",
+      "sha256": "1c8d1f786821918fdcf1365da4e2279f678760ad63fee273a38ff82977f19ffb"
+    },
+    {
+      "check": "candidate-replay",
+      "exit_code": 0,
+      "log": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-selected-evidence/agentkit-sidebar-selected-accepted-candidate-replay.log",
+      "sha256": "4ba0289cb17219c66ab4aa15093590532c4457af2fa5df0fe186710bf8563dc6"
+    },
+    {
+      "check": "candidate-workspace",
+      "exit_code": 0,
+      "log": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-selected-evidence/agentkit-sidebar-selected-accepted-candidate-workspace.log",
+      "sha256": "2f3649de63fe698848ccd17e02a647465602165cae441da927a17ef75d363da9",
+      "passed": 421
+    },
+    {
+      "check": "candidate-clippy",
+      "exit_code": 0,
+      "log": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-selected-evidence/agentkit-sidebar-selected-accepted-candidate-clippy.log",
+      "sha256": "7151d465511e4b4e44f1abf217955a180bac156c1d7cdf4eefd1ab239112b4dd"
+    }
+  ],
+  "core_checks": [
+    {
+      "check": "core-final-tests",
+      "exit_code": 0,
+      "log": ".runtime-fixtures/agentkit-sidebar-selected-evidence/core-final-tests.log"
+    },
+    {
+      "check": "core-final-clippy",
+      "exit_code": 0,
+      "log": ".runtime-fixtures/agentkit-sidebar-selected-evidence/core-final-clippy.log"
+    }
+  ],
+  "core_tests": 187,
+  "fixed_candidate_checks": [
+    {
+      "check": "tests",
+      "exit_code": 0
+    },
+    {
+      "check": "clippy",
+      "exit_code": 0
+    },
+    {
+      "check": "actual-wrapper",
+      "exit_code": 0
+    },
+    {
+      "check": "public-consumer",
+      "exit_code": 0
+    },
+    {
+      "check": "native-build",
+      "exit_code": 0
+    }
+  ],
+  "public_consumer_tests": 42,
+  "native": {
+    "program": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/AgentKitSidebarSelectedCheck.app",
+      "executable": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/AgentKitSidebarSelectedCheck.app/Contents/MacOS/AgentKitSidebarSelectedCheck",
+      "source": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-selected-accepted-default-demo",
+      "hardlinked": true,
+      "sha256": "9415fb8d684588ce6728765d4a677bf24f64ca6aefef9bdd2f02afa9c3b38b2a"
+    },
+    "receipt": {
+      "canonicalSelectedSupplement": true,
+      "failureRetainsRows": true,
+      "fullLayoutParity": false,
+      "markedBaselineAndFocusPreserved": true,
+      "nativeWindow": true,
+      "noSubmission": true,
+      "physicalIme": false,
+      "realHarnessOutage": false,
+      "restoringNotEmpty": true,
+      "retiredIdsNotReused": true,
+      "voiceOver": false
+    },
+    "launch_services_wait_exit": 0,
+    "observed_terminal": true,
+    "first_bare_program_attempt": {
+      "exit": 134,
+      "phase": 0,
+      "cause": "unclassified preparation timeout",
+      "log": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-selected-evidence/native-attempt-01.log"
+    },
+    "screenshots_attempted": true,
+    "screenshot_commands_failed": true,
+    "visual_acceptance": false,
+    "physical_ime": false,
+    "voiceover": false
+  },
+  "real_harnesses": {
+    "program_sha256": "9415fb8d684588ce6728765d4a677bf24f64ca6aefef9bdd2f02afa9c3b38b2a",
+    "terminal_exit": 0,
+    "markers": [
+      "NATIVE_UI_COMPONENTS_LIVE_OK",
+      "PI_UI_COMPONENTS_LIVE_OK",
+      "DSH_UI_COMPONENTS_LIVE_OK"
+    ],
+    "offscreen_only": true,
+    "paid_model_calls": false,
+    "installed_config_changed": false
+  },
+  "cleanup": {
+    "scope": [
+      "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-paging-visibility-final-3366559a/agentkit/",
+      "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-selected-visibility-final-3366559a/agentkit/",
+      "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-selected-final-review-3366559a/agentkit/"
+    ],
+    "deleted_files": 420,
+    "allocated_bytes_released": 320397312,
+    "du_reduction_bytes": 320397312,
+    "single_exclusive_cargo_lock": true,
+    "other_target_handles": [],
+    "protected_program_sha256": {
+      "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-selected-accepted-default-demo": "9415fb8d684588ce6728765d4a677bf24f64ca6aefef9bdd2f02afa9c3b38b2a",
+      "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/AgentKitSidebarSelectedCheck.app/Contents/MacOS/AgentKitSidebarSelectedCheck": "9415fb8d684588ce6728765d4a677bf24f64ca6aefef9bdd2f02afa9c3b38b2a",
+      "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-paging-final-default-demo": "db317d0e66a84292f9c7df13d68a856a75e55090304692c1e8411e082e947214"
+    },
+    "new_target_created": false
+  },
+  "read_only_references": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/Session/Persistence/ClientMirrorStore.swift": "506f9e6886f244859e43cfcbda57d683c3f0b4fb22ec2e9841851cb104abb761",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Agent/ClientAgentSidebarModel.swift": "82c1bbb6519b9cb9573b9963f565eeee8d297702250a00f9243b5c1e66a1ddc9",
+    "/Users/frankqin/dev/Tekes/Tekes/SidebarColumnController.swift": "cc01190f2e25192aed25c7ee53d7d1adc621d24b93da62a034824a10fd770f6d"
+  },
+  "withdrawn_validation": {
+    "earlier_replay": "selected-final-review-3366559a",
+    "reason": "input checksum changed after lock-scope correction; not accepted",
+    "fixture_timeout": "required running/blank fields omitted; corrected fixture; final tests pass"
+  },
+  "full_goal_complete": false,
+  "remaining": [
+    "published composition/reading/reveal closure (latest Scene3D heads under separate source audit)",
+    "full rich Transcript/native reading and paging anchors",
+    "visual/native physical IME and VoiceOver acceptance",
+    "final review merge and stage tag"
+  ]
+}

@@ -2196,3 +2196,13 @@ fn independent_sidebar_pages_an_empty_inventory_without_synthetic_rows_or_naviga
     assert!(sidebar.page_button_id().is_none());
     assert!(sidebar_visibility_target(&sidebar).is_none());
 }
+/// Keep the selected-row read bound to its original source and selection scope;
+/// the component retains paging, filtering, pins and navigation ownership.
+pub fn supplement_selected_sidebar(
+    source: &tekes_agent_ui_bindings::SidebarBinding,
+    read: &tekes_agent_ui_bindings::SidebarSelectedRead,
+    display: &mut tekes_agent_components_ui::SidebarInput,
+    selection_generation: u64,
+) -> bool {
+    read.project_into(source, display, selection_generation)
+}

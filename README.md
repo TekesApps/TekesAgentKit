@@ -119,3 +119,5 @@ python3 scripts/install-dsh-runtime.py \
 Tasks、Subagents、SideChat 与 Summary 的无 UI 状态、宿主输入及能力边界见 [headless-agent-panels](docs/headless-agent-panels.md)。
 
 Sidebar bounded paging and visibility contract: [2026-10-21 report](docs/rust-agent-ui-sidebar-paging-20261021.md).
+
+Canonical Sidebar selected-row reads: [2026-10-21 contract](docs/rust-agent-ui-sidebar-selected-read-20261021.md).

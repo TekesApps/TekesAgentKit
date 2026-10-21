@@ -1,10 +1,12 @@
 //! Shared AgentKit service. Hosts own its authentication, listener and process lifetime.
 //! A disconnected view drops only its history lease; it never stops a runtime or Harness.
+mod sidebar;
 use async_trait::async_trait;
 use futures_util::StreamExt;
 use serde_json::{Value, json};
+pub use sidebar::*;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     sync::{Arc, RwLock},
 };
 use tekes_agent_contract::*;
@@ -12,24 +14,31 @@ use tekes_agent_presentation::{RunPresentation, RunScope, TranscriptSnapshot};
 use tekes_agent_session::{ConnectionState, MemoryProjectionStore, SessionRuntime};
 use tokio::sync::mpsc;
 
+fn inventory_summary(state: &MemoryProjectionStore, id: &str) -> Option<Value> {
+    if state
+        .archived_session_ids
+        .iter()
+        .any(|archived| archived == id)
+    {
+        return None;
+    }
+    let session = state.sessions.get(id)?;
+    let summary = session.summary.as_ref()?;
+    if summary["status"] == "archived" {
+        return None;
+    }
+    let projections: BTreeMap<_, _> = session
+        .projections
+        .iter()
+        .map(|(key, value)| (key, &value.value))
+        .collect();
+    Some(json!({"sessionId":id,"summary":summary,"projections":projections}))
+}
 fn active_inventory(state: &MemoryProjectionStore) -> Vec<Value> {
     state
         .sessions
-        .iter()
-        .filter(|(id, _)| !state.archived_session_ids.contains(*id))
-        .filter_map(|(id, session)| {
-            session.summary.as_ref().map(|summary| {
-                // A summary may carry an older projection block than the
-                // control/journal planes. Publish the already reconciled
-                // values without rewriting the original summary.
-                let projections: BTreeMap<_, _> = session
-                    .projections
-                    .iter()
-                    .map(|(key, value)| (key, &value.value))
-                    .collect();
-                json!({"sessionId":id,"summary":summary,"projections":projections})
-            })
-        })
+        .keys()
+        .filter_map(|id| inventory_summary(state, id))
         .collect()
 }
 
@@ -193,6 +202,12 @@ pub struct SharedAgent {
     thread_preferences: Option<Arc<tekes_agent_presentation::ThreadPreferences>>,
     inventory_changes: InventoryChanges,
 }
+struct ThreadActionInputs {
+    capabilities: EndpointCapabilities,
+    connected: bool,
+    host_methods: BTreeSet<String>,
+    pin: Option<ThreadPinState>,
+}
 struct InventoryChanges(tokio::sync::watch::Sender<()>);
 impl Default for InventoryChanges {
     fn default() -> Self {
@@ -248,26 +263,35 @@ impl SharedAgent {
     fn inventory(&self, shared: &SharedEndpoint, state: &MemoryProjectionStore) -> Value {
         let sessions: Vec<Value> = active_inventory(state)
             .into_iter()
-            .map(|mut row| {
-                let id = row["sessionId"]
-                    .as_str()
-                    .expect("inventory identity")
-                    .to_owned();
-                if self
-                    .thread_action_host
-                    .as_ref()
-                    .and_then(|host| host.pin_state(&state.endpoint_id, &id))
-                    .is_some_and(|pin| pin.pinned)
-                {
-                    row["pin"] = json!(ThreadPinPresentation { pinned: true });
-                }
-                row["activity"] =
-                    serde_json::to_value(tekes_agent_presentation::thread_activity(state, &id))
-                        .expect("thread activity");
-                row
-            })
+            .map(|row| self.decorate_inventory_row(state, row))
             .collect();
         json!({"description":shared.description(),"sessions":sessions,"inventoryReady":state.inventory_ready})
+    }
+    fn decorate_inventory_row(&self, state: &MemoryProjectionStore, row: Value) -> Value {
+        let id = row["sessionId"].as_str().expect("inventory identity");
+        let pin = self
+            .thread_action_host
+            .as_ref()
+            .and_then(|host| host.pin_state(&state.endpoint_id, id));
+        self.decorate_inventory_row_with_pin(state, row, pin.as_ref())
+    }
+    fn decorate_inventory_row_with_pin(
+        &self,
+        state: &MemoryProjectionStore,
+        mut row: Value,
+        pin: Option<&ThreadPinState>,
+    ) -> Value {
+        let id = row["sessionId"]
+            .as_str()
+            .expect("inventory identity")
+            .to_owned();
+        if pin.is_some_and(|pin| pin.pinned) {
+            row["pin"] = json!(ThreadPinPresentation { pinned: true });
+        }
+        row["activity"] =
+            serde_json::to_value(tekes_agent_presentation::thread_activity(state, &id))
+                .expect("thread activity");
+        row
     }
     pub fn install_thread_action_host(&mut self, host: Arc<dyn ThreadActionHost>) {
         self.thread_action_host = Some(host);
@@ -278,25 +302,44 @@ impl SharedAgent {
         shared: &SharedEndpoint,
         id: &str,
     ) -> Result<ThreadActionsPresentation> {
-        let state = shared.runtime.snapshot();
+        let inputs = self.thread_action_inputs(shared, id);
+        shared
+            .runtime
+            .inspect(|state| self.thread_actions_in_state(shared, id, state, &inputs))
+    }
+    // Host callbacks run before acquiring the projection read lock. An adapter
+    // may inspect runtime facts; no external callback is invoked under it.
+    fn thread_action_inputs(&self, shared: &SharedEndpoint, id: &str) -> ThreadActionInputs {
+        let endpoint = shared.connected().ok();
+        let endpoint_id = shared.runtime.inspect(|s| s.endpoint_id.clone());
+        ThreadActionInputs {
+            capabilities: endpoint
+                .as_ref()
+                .map(|e| e.capabilities())
+                .unwrap_or_default(),
+            connected: endpoint.is_some(),
+            host_methods: self
+                .thread_action_host
+                .as_ref()
+                .map(|h| h.methods())
+                .unwrap_or_default(),
+            pin: self
+                .thread_action_host
+                .as_ref()
+                .and_then(|h| h.pin_state(&endpoint_id, id)),
+        }
+    }
+    fn thread_actions_in_state(
+        &self,
+        shared: &SharedEndpoint,
+        id: &str,
+        state: &MemoryProjectionStore,
+        inputs: &ThreadActionInputs,
+    ) -> Result<ThreadActionsPresentation> {
         let session = state
             .sessions
             .get(id)
             .ok_or_else(|| unsupported("unknown thread"))?;
-        let endpoint = shared.connected().ok();
-        let capabilities = endpoint
-            .as_ref()
-            .map(|e| e.capabilities())
-            .unwrap_or_default();
-        let host_methods = self
-            .thread_action_host
-            .as_ref()
-            .map(|h| h.methods())
-            .unwrap_or_default();
-        let pin = self
-            .thread_action_host
-            .as_ref()
-            .and_then(|h| h.pin_state(&state.endpoint_id, id));
         let summary = session.summary.as_ref();
         let archived = state.archived_session_ids.iter().any(|s| s == id)
             || summary.is_some_and(|s| s["status"] == "archived");
@@ -307,12 +350,12 @@ impl SharedAgent {
                 session_id: id,
                 kind: &shared.kind,
                 url_scheme: self.session_url_scheme.as_deref().unwrap_or("agent"),
-                capabilities: &capabilities,
-                ready: state.connection == ConnectionState::Ready && endpoint.is_some(),
+                capabilities: &inputs.capabilities,
+                ready: state.connection == ConnectionState::Ready && inputs.connected,
                 running,
                 archived,
-                pin: pin.as_ref(),
-                host_methods: &host_methods,
+                pin: inputs.pin.as_ref(),
+                host_methods: &inputs.host_methods,
             },
         ))
     }

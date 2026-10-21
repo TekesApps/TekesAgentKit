@@ -20,7 +20,7 @@ use tekes_agent_presentation::{
 use tekes_agent_ui_bindings::{
     BoundSideChatRun, ChildPaneBinding, ComposerSettingsRequest, InitialPresetChoices,
     InitialSessionCreation, MODEL_SELECTION_SETTING, ModelChoices, PaneAccess, PaneSnapshot,
-    RunBinding, SideChatBinding, SidebarPublication, TaskPaneBinding,
+    RunBinding, SideChatBinding, SidebarBinding, SidebarPublication, TaskPaneBinding,
 };
 use tekes_ui_controls::{
     ButtonTextRenderer, TextSurface,
@@ -172,6 +172,7 @@ pub struct ComponentDemo {
     retained: Vec<Option<Content>>,
     navigation_revision: u64,
     sidebar_source: Option<Arc<SidebarPublication>>,
+    sidebar_reader: Option<Arc<SidebarBinding>>,
     sidebar_folder_filter: Option<tekes_agent_components_ui::SidebarFolderKey>,
     sidebar_search_publication: Option<tekes_agent_ui_bindings::SidebarSearchPublication>,
     sidebar_search_presented: Option<tekes_agent_components_ui::SidebarSearchInput>,
@@ -466,6 +467,7 @@ impl ComponentDemo {
             retained,
             navigation_revision: 0,
             sidebar_source: None,
+            sidebar_reader: None,
             sidebar_folder_filter: None,
             sidebar_search_publication: None,
             sidebar_search_presented: None,
@@ -1933,6 +1935,37 @@ impl ComponentDemo {
         }
         Ok(())
     }
+    pub fn set_sidebar_reader(&mut self, source: Arc<SidebarBinding>) -> Result<()> {
+        require(
+            self.current_binding()
+                .is_some_and(|b| b.shares_runtime(source.runtime())),
+            "Sidebar selected reader belongs to another runtime",
+        )?;
+        self.sidebar_reader = Some(source);
+        Ok(())
+    }
+    fn supplement_sidebar_selection(&self, display: &mut SidebarInput) -> Result<bool> {
+        let Some(source) = &self.sidebar_reader else {
+            return Ok(false);
+        };
+        let Some(address) = display.selected.as_ref() else {
+            return Ok(false);
+        };
+        if display.rows.iter().any(|row| &row.address == address)
+            || self
+                .sidebar_search_publication
+                .as_ref()
+                .is_some_and(|s| s.input.key.is_some())
+        {
+            return Ok(false);
+        }
+        let generation = self
+            .navigation_revision
+            .checked_add(1)
+            .ok_or_else(|| unsupported("Sidebar selected generation exhausted"))?;
+        let read = source.read_selected(address, generation)?;
+        Ok(read.project_into(source, display, generation))
+    }
     pub fn set_sidebar_source(&mut self, source: Arc<SidebarPublication>) -> Result<()> {
         require(
             self.sidebar_source.as_ref().is_none_or(|old| {
@@ -2489,6 +2522,7 @@ impl ComponentDemo {
                 rows: source.rows.clone(),
                 selected,
             };
+            self.supplement_sidebar_selection(&mut next)?;
             if let Some(search) = &self.sidebar_search_publication {
                 next = source
                     .project_search_for_display(&self.binding().scope().endpoint_id, search, &next)
@@ -3114,13 +3148,28 @@ impl ComponentDemo {
                 == &RunScope::main(&request.address.endpoint_id, &request.address.session_id),
             "navigation result target mismatch",
         )?;
-        let disappeared = self.sidebar_source.as_ref().is_some_and(|source| {
+        let mut disappeared = self.sidebar_source.as_ref().is_some_and(|source| {
             source.loaded
                 && source.error.is_none()
                 && !source.rows.iter().any(|row| row.address == request.address)
         });
         if request.revision != self.navigation_revision {
             return Ok(false);
+        }
+        if let Some(reader) = &self.sidebar_reader {
+            require(
+                binding.shares_runtime(reader.runtime()),
+                "navigation binding belongs to another Sidebar runtime",
+            )?;
+        }
+        if let Some(reader) = &self.sidebar_reader {
+            let generation = self
+                .navigation_revision
+                .checked_add(1)
+                .ok_or_else(|| unsupported("Sidebar selected generation exhausted"))?;
+            disappeared = !reader
+                .read_selected(&request.address, generation)?
+                .has_active_row(reader);
         }
         if self.composing() || (disappeared && !request.created) {
             self.navigation_revision = self

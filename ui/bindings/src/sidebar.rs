@@ -4,7 +4,7 @@ use std::sync::Arc;
 use tekes_agent_components_ui::{SidebarInput, SidebarRow};
 use tekes_agent_contract::{
     Result, SessionAddress, ThreadActionDefinition, ThreadActionOutcome, ThreadActionRequest,
-    require, unsupported,
+    ThreadActionsPresentation, require, unsupported,
 };
 use tekes_agent_web::{SharedAgent, SharedEndpoint};
 use tokio::sync::{mpsc, watch};
@@ -46,8 +46,8 @@ pub enum SidebarActionOutcome {
 /// Observes the same SharedAgent endpoint used by RunBinding. Drop cancels only
 /// the inventory observer, never remote execution or the endpoint's runtime.
 pub struct SidebarBinding {
-    agent: Arc<SharedAgent>,
-    endpoint: Arc<SharedEndpoint>,
+    pub(crate) agent: Arc<SharedAgent>,
+    pub(crate) endpoint: Arc<SharedEndpoint>,
     publications: watch::Receiver<Arc<SidebarPublication>>,
     observer: tokio::task::JoinHandle<()>,
 }
@@ -235,24 +235,11 @@ impl InventoryRows {
                 _ => updated,
             };
             activity.insert(id.to_owned(), (running, effective));
-            let title = inventory_title(item, id);
-            rows.push(SidebarRow {
-                primary_folder_id: None,
-                folder_path: summary["cwd"].as_str().map(str::to_owned),
-                address: SessionAddress {
-                    endpoint_id: endpoint_id.clone(),
-                    session_id: id.into(),
-                },
-                title,
-                activity: row_activity,
-                pin: item
-                    .get("pin")
-                    .filter(|value| !value.is_null())
-                    .cloned()
-                    .map(serde_json::from_value)
-                    .transpose()?,
-                actions: agent.thread_actions(endpoint, id)?,
-            });
+            rows.push(inventory_row(
+                &endpoint_id,
+                item,
+                agent.thread_actions(endpoint, id)?,
+            )?);
         }
         rows.sort_by(|a, b| {
             activity[&b.address.session_id]
@@ -264,6 +251,40 @@ impl InventoryRows {
         self.activity = activity;
         Ok(rows)
     }
+}
+pub(crate) fn inventory_row(
+    endpoint: &str,
+    item: &Value,
+    actions: ThreadActionsPresentation,
+) -> Result<SidebarRow> {
+    let id = tekes_agent_contract::string(item, "sessionId")?;
+    require(
+        !id.is_empty() && actions.endpoint == endpoint && actions.session_id == id,
+        "invalid Sidebar row source",
+    )?;
+    require(
+        item["summary"]["updatedAt"]
+            .as_f64()
+            .is_some_and(|v| v.is_finite()),
+        "missing inventory activity time",
+    )?;
+    Ok(SidebarRow {
+        primary_folder_id: None,
+        folder_path: item["summary"]["cwd"].as_str().map(str::to_owned),
+        address: SessionAddress {
+            endpoint_id: endpoint.into(),
+            session_id: id.into(),
+        },
+        title: inventory_title(item, id),
+        activity: serde_json::from_value(item["activity"].clone())?,
+        pin: item
+            .get("pin")
+            .filter(|v| !v.is_null())
+            .cloned()
+            .map(serde_json::from_value)
+            .transpose()?,
+        actions,
+    })
 }
 fn inventory_title(item: &Value, id: &str) -> String {
     // Presence is authoritative, including null/empty clears. Never resurrect an

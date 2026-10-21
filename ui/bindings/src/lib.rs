@@ -18,6 +18,8 @@ pub use feedback::*;
 mod presets;
 pub use presets::*;
 mod sidebar;
+mod sidebar_selected;
+pub use sidebar_selected::*;
 mod sidebar_search;
 pub use sidebar_search::*;
 mod turn_actions;
@@ -139,6 +141,10 @@ impl SubmissionPreparation for ScopedPreparation<'_> {
     }
 }
 impl RunBinding {
+    /// Source identity for a host adapter; equal endpoint strings are insufficient.
+    pub fn shares_runtime(&self, runtime: &Arc<SessionRuntime>) -> bool {
+        Arc::ptr_eq(&self.runtime, runtime)
+    }
     pub fn supports_creation(&self) -> bool {
         self.access() == PaneAccess::Ready
             && self.runtime.inspect(|s| {

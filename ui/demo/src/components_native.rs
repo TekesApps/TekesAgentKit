@@ -2794,6 +2794,7 @@ pub fn run() {
     }
     let side_chats = Arc::new(SideChatBinding::new(runtime.clone()));
     view.set_side_chat_binding(side_chats.clone());
+    view.set_sidebar_reader(sidebar.clone()).unwrap();
     view.set_sidebar_source(sidebar.snapshot()).unwrap();
     let preferences = sidebar.preferences();
     view.set_sidebar_preferences(
