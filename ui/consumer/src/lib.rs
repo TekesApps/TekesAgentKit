@@ -1,4 +1,11 @@
 //! Second consumer: depends only on AgentKit's public UI packages.
+/// Window clearance is supplied by the host; AgentKit owns the pane body inset.
+pub fn set_panel_layout(
+    panel: &mut tekes_agent_components_ui::SidePanel,
+    content_top_inset: f32,
+) -> Result<(), &'static str> {
+    panel.set_layout(tekes_agent_components_ui::SidePanelLayout { content_top_inset })
+}
 pub fn sidebar_session_menu_intents(
     sidebar: &tekes_agent_components_ui::Sidebar,
     records: &[tekes_ui_controls::composition::ContentActionRecord],

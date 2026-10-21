@@ -1,4 +1,5 @@
 //! Scoped Agent tabs and retained content. Task/child/SideChat execution stays in presentation.
+use crate::{SidePanelLayout, SidePanelLayoutGeometry, side_panel_layout::AgentPanelBody};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use tekes_agent_presentation::{
     AgentTask, ChildHistoryLayout, RunScope, SideChat, SideChatPhase, SideChatSnapshot,
@@ -205,6 +206,8 @@ pub struct PanelContentToken {
 pub struct SidePanel {
     root: ComponentId,
     body: StackContent,
+    layout: SidePanelLayout,
+    geometry: Option<SidePanelLayoutGeometry>,
     labels: SidePanelLabels,
     input: Option<SidePanelInput>,
     mounts: BTreeMap<Key, TabMount>,
@@ -263,20 +266,26 @@ impl SidePanel {
                     ),
                     Content::new(
                         ComponentId(base + 5),
-                        StackContent {
-                            model: Stack {
-                                axis: Axis::Vertical,
-                                gap: Spacing::Regular.value(),
+                        AgentPanelBody {
+                            framed: false,
+                            layout: None,
+                            stack: StackContent {
+                                model: Stack {
+                                    axis: Axis::Vertical,
+                                    gap: Spacing::Regular.value(),
+                                },
+                                flexible_child: None,
+                                children: vec![Content::new(
+                                    ComponentId(base + 6),
+                                    TextContent::new(&labels.empty),
+                                )],
                             },
-                            flexible_child: None,
-                            children: vec![Content::new(
-                                ComponentId(base + 6),
-                                TextContent::new(&labels.empty),
-                            )],
                         },
                     ),
                 ],
             },
+            layout: SidePanelLayout::default(),
+            geometry: None,
             labels,
             input: None,
             mounts: BTreeMap::new(),
@@ -296,6 +305,18 @@ impl SidePanel {
     }
     pub fn displayed_input(&self) -> Option<&SidePanelInput> {
         self.input.as_ref()
+    }
+    /// Layout-only host input. Does not replace pane content, tokens or editors.
+    pub fn set_layout(&mut self, layout: SidePanelLayout) -> Result<(), &'static str> {
+        layout.validate()?;
+        if self.layout != layout {
+            self.layout = layout;
+            self.geometry = None;
+        }
+        Ok(())
+    }
+    pub fn layout_geometry(&self) -> Option<SidePanelLayoutGeometry> {
+        self.geometry
     }
     pub fn content_slot_id(&self) -> ComponentId {
         ComponentId(self.root.0 + 5)
@@ -321,9 +342,10 @@ impl SidePanel {
             .map(|mount| mount.id)
     }
     fn slot(&mut self) -> &mut StackContent {
-        self.body.children[2]
-            .component_mut::<StackContent>()
+        &mut self.body.children[2]
+            .component_mut::<AgentPanelBody>()
             .expect("panel content slot")
+            .stack
     }
     fn stash(&mut self) {
         let content = self.slot().children.pop();
@@ -723,6 +745,11 @@ impl SidePanel {
                 TextContent::new(message),
             ));
         }
+        self.body.children[2]
+            .component_mut::<AgentPanelBody>()
+            .unwrap()
+            .framed = input.projection_ready && input.selected.is_some();
+        self.geometry = None;
         self.mounted = next_key;
         self.input = Some(input.clone());
         self.bindings = bindings;
@@ -792,10 +819,27 @@ impl Component for SidePanel {
         Some(&mut self.body.children)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
-        self.body.measure(text, available)
+        let _ = text;
+        MeasuredChild::new(available)
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
-        self.body.arrange(text, frame, clip);
+        let layout = self.layout.canvas(frame, clip);
+        self.body.arrange(
+            text,
+            layout.content(),
+            layout.visible_clip().unwrap_or_default(),
+        );
+        let body = self.body.children[2]
+            .component::<AgentPanelBody>()
+            .unwrap()
+            .layout
+            .unwrap();
+        self.geometry = Some(SidePanelLayoutGeometry {
+            pane: layout.frame(),
+            canvas: layout.content(),
+            body: body.content(),
+            visible_body: body.visible_clip(),
+        });
     }
     fn semantics(&self) -> ContentSemantics {
         ContentSemantics::new(ContentRole::Group, &self.labels.name)

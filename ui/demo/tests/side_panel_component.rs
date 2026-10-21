@@ -677,3 +677,97 @@ fn task_identity_is_stable_while_shared_resolution_retires_changed_or_missing_se
             .any(|node| node.semantics.name == "任务 Run 暂不可用")
     );
 }
+
+struct PanelText;
+impl tekes_ui_controls::ButtonTextRenderer for PanelText {
+    fn measure(
+        &mut self,
+        s: &str,
+        _: tekes_ui_tokens::proposal::TextRole,
+        _: f32,
+    ) -> tekes_ui_scene::Size {
+        tekes_ui_scene::Size::new(s.chars().count() as f32 * 8., 20.)
+    }
+    fn draw(
+        &mut self,
+        _: &mut tekes_ui_scene::Scene,
+        _: &str,
+        _: tekes_ui_tokens::proposal::TextRole,
+        _: tekes_ui_scene::Rect,
+        _: tekes_ui_controls::ButtonTextAlign,
+        _: tekes_ui_tokens::Rgba,
+    ) {
+    }
+}
+#[test]
+fn host_clearance_and_regular_body_inset_preserve_content_and_reject_invalid_layout() {
+    use tekes_ui_scene::{Rect, Size};
+    let mut panel = SidePanel::new(96, Default::default(), 2);
+    let model = input(RunScope::main("fixture", "a"));
+    panel.update(&model).unwrap();
+    let token = panel.content_token(&SidePanelTabKind::Summary).unwrap();
+    panel
+        .install_content(
+            &token,
+            Content::new(ComponentId(9900), TextContent::new("canonical body")),
+        )
+        .unwrap();
+    let root = panel.id();
+    let mut host = panel.into_host().unwrap();
+    let pane = Rect::new(80., 40., 420., 620.);
+    let mut text = PanelText;
+    host.get_mut(root).unwrap().measure(&mut text, pane.size);
+    host.get_mut(root).unwrap().arrange(&mut text, pane, pane);
+    let initial = mounted_panel(&host, root).layout_geometry().unwrap();
+    let owned = host.get(ComponentId(9900)).unwrap() as *const _ as usize;
+    tekes_agent_ui_consumer_check::set_panel_layout(panel_mut(&mut host, root), 32.).unwrap();
+    assert!(mounted_panel(&host, root).layout_geometry().is_none());
+    for invalid in [-1., f32::NAN, f32::INFINITY] {
+        assert!(
+            tekes_agent_ui_consumer_check::set_panel_layout(panel_mut(&mut host, root), invalid)
+                .is_err()
+        );
+    }
+    host.get_mut(root).unwrap().measure(&mut text, pane.size);
+    host.get_mut(root).unwrap().arrange(&mut text, pane, pane);
+    let layout = mounted_panel(&host, root).layout_geometry().unwrap();
+    assert_eq!(layout.canvas.min_y(), pane.min_y() + 32.);
+    assert_eq!(layout.body.min_y(), initial.body.min_y() + 32.);
+    assert_eq!(layout.body.max_y(), initial.body.max_y());
+    let slot = host
+        .get(mounted_panel(&host, root).content_slot_id())
+        .unwrap()
+        .frame();
+    let inset = tekes_ui_tokens::Spacing::Regular.value();
+    assert_eq!(layout.body.min_x(), slot.min_x() + inset);
+    assert_eq!(layout.body.max_x(), slot.max_x() - inset);
+    let child_frame = host.get(ComponentId(9900)).unwrap().frame();
+    assert_eq!(child_frame.min_x(), layout.body.min_x());
+    assert_eq!(child_frame.min_y(), layout.body.min_y());
+    assert!(child_frame.max_y() <= layout.body.max_y());
+    assert_eq!(
+        host.get(ComponentId(9900)).unwrap() as *const _ as usize,
+        owned
+    );
+    // Pure layout inputs do not replace content/mount authority.
+    panel_mut(&mut host, root)
+        .install_content(
+            &token,
+            Content::new(ComponentId(9901), TextContent::new("same mount")),
+        )
+        .unwrap();
+    assert!(host.get(ComponentId(9901)).is_some());
+    tekes_agent_ui_consumer_check::set_panel_layout(panel_mut(&mut host, root), 10_000.).unwrap();
+    host.get_mut(root).unwrap().arrange(&mut text, pane, pane);
+    let collapsed = mounted_panel(&host, root).layout_geometry().unwrap();
+    assert_eq!(collapsed.canvas.size.height, 0.);
+    assert_eq!(collapsed.visible_body, None);
+    assert!(collapsed.body.size.width >= 0. && collapsed.body.size.height >= 0.);
+    assert_eq!(
+        host.get_mut(root)
+            .unwrap()
+            .measure(&mut text, Size::new(420., 620.))
+            .size,
+        Size::new(420., 620.)
+    );
+}

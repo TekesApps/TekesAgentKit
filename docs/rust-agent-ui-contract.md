@@ -177,6 +177,8 @@ RunView 组合正式 Composer / Transcript / Indicators，拥有 Agent 组件间
 
 ## SidePanel 与 Summary（首批实现）
 
+[正文视口与顶部净空](rust-agent-ui-sidepanel-layout-20261022.md)公开 `SidePanelLayout` 与最近 arrange 几何，普通 Agent tab 采用 regular inset，短内容不收缩 pane；圆角子树裁切/focus 边界待 TekesUI #45，inline demo tabs 不算窗口 toolbar。
+
 [父投影与 pane 生命周期](rust-agent-ui-sidepanel-projection-20261022.md)明确等待时不构造正文、跨 thread 销毁 UI、同 thread 保留 tab、草稿与 pointer 不随 UI 销毁；最终程序的原生分页/reveal/组字证据也在该记录中。
 
 `SidePanel` 是 Agent 业务 tab/pane 容器，不再包一层 RunSurface。输入 `SidePanelInput` 提供父 RunScope、单调 revision、打开的 SidePanelTab、当前选择与现有 SideChatSnapshot。新增必填 `projection_ready` 表示父投影是否存在，不能从连接新鲜度或子历史加载状态推断；已知父投影的 `SideChatBinding::input` 默认 true，宿主可明确覆盖。第二 consumer 提供 `sync_scratch_tabs_with_projection`。task tab 来自 AgentTask；subagent tab 必须显式提供 ChildHistoryLayout；SideChat tab 来自实际 SideChat。`supports_side_chat` 使用现有 controller 的能力结果：Some(true)/Some(false)/None 分别为支持/不支持/尚无结论，不将未知显示成不支持。

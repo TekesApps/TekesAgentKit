@@ -182,6 +182,17 @@ impl Probe {
             }
             3 if host.view.editor().input.marked.is_some() => {
                 self.baseline = Some(host.view.editor().input.external_baseline());
+                let root = host.view.panel_id();
+                host.view
+                    .tree
+                    .get_mut(root)
+                    .unwrap()
+                    .component_mut::<SidePanel>()
+                    .unwrap()
+                    .set_layout(tekes_agent_components_ui::SidePanelLayout {
+                        content_top_inset: 28.,
+                    })
+                    .unwrap();
                 let parent = host.view.binding().scope().clone();
                 host.view
                     .set_panel_parent_projection_ready(&parent, false)
@@ -201,10 +212,15 @@ impl Probe {
                     .view
                     .tree
                     .get(Self::panel(host).content_slot_id())
-                    .unwrap()
-                    .component::<tekes_ui_controls::composition::StackContent>()
                     .unwrap();
-                assert!(slot.children.is_empty());
+                assert!(
+                    !host
+                        .view
+                        .tree
+                        .semantics()
+                        .iter()
+                        .any(|node| node.parent == Some(slot.id()))
+                );
                 assert!(host.view.tree.get(self.ids.unwrap().root).is_none());
                 let parent = host.view.binding().scope().clone();
                 host.view
@@ -215,6 +231,18 @@ impl Probe {
             5 => {
                 self.main_marked(host);
                 self.pane_draft(host);
+                let panel = Self::panel(host);
+                let geometry = panel.layout_geometry().unwrap();
+                assert_eq!(geometry.canvas.min_y() - geometry.pane.min_y(), 28.);
+                let slot_frame = host.view.tree.get(panel.content_slot_id()).unwrap().frame();
+                assert_eq!(
+                    geometry.body.min_x() - slot_frame.min_x(),
+                    tekes_ui_tokens::Spacing::Regular.value()
+                );
+                assert_eq!(
+                    geometry.body.min_y() - slot_frame.min_y(),
+                    tekes_ui_tokens::Spacing::Regular.value()
+                );
                 assert_ne!(Some(self.version(host)), self.version);
                 self.rebuilt_document = host.view.transcript_content_id(self.ids.unwrap());
                 assert_ne!(self.rebuilt_document, self.document);
@@ -300,6 +328,6 @@ impl Probe {
     }
     pub fn receipt(&self) -> serde_json::Value {
         assert_eq!(self.phase, 9);
-        serde_json::json!({"nativeWindow":true,"originalSideChatCreate":true,"projectionWaitingBodyEmpty":true,"retiredContentTokenRejected":true,"mainFocusAndMarkedBaselinePreserved":true,"freshPaneAndReadingAuthority":true,"threadChangeEvictsPane":true,"draftsPreserved":true,"scratchPointerAlive":true,"noSubmission":true,"physicalIme":false,"voiceOver":false,"persistentReadingCheckpoint":false})
+        serde_json::json!({"nativeWindow":true,"hostTopInsetAndBodySpacing":true,"originalSideChatCreate":true,"projectionWaitingBodyEmpty":true,"retiredContentTokenRejected":true,"mainFocusAndMarkedBaselinePreserved":true,"freshPaneAndReadingAuthority":true,"threadChangeEvictsPane":true,"draftsPreserved":true,"scratchPointerAlive":true,"noSubmission":true,"physicalIme":false,"voiceOver":false,"persistentReadingCheckpoint":false})
     }
 }

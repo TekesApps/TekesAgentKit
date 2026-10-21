@@ -213,3 +213,5 @@ ui/target/debug/tekes-agent-ui-demo --components --transcript-content --offscree
 `SidebarSearchBinding` 复用无渲染器的 `presentation::SidebarSearchController`，接收宿主 query，拥有 250ms 去抖、来源/epoch/代数、只读请求撤销和显式 Retry。首次安装用 `replace_search_source`，后续用 `update_search_from`；切换 binding 不沿用旧来源的 revision 或动作 ID。`--sidebar-query <text>` 与显式 endpoint 配置组合使用；`--components --transcript-content --sidebar-query-selftest` 是 owned fixture 的原生指针重试探针。公开接入、Pi/DSH 搜索限制与分层证据见 [Sidebar 共享查询控制器](../docs/rust-agent-ui-sidebar-query-controller-20261021.md)。完整搜索结果列表和多 endpoint 聚合仍待补齐。
 
 Summary 的六项用量行使用左标题、右数值的两个 TekesUI 文本槽；`SummaryLabels::usage_row` 负责本地化，`SummaryUsageRowText::read` 提供默认格式，`SummaryView::usage_row_ids` 提供原控件身份。完整接入与验证边界见[用量行记录](../docs/rust-agent-ui-summary-usage-20261021.md)。
+
+SidePanel 宿主布局输入使用 `SidePanel::set_layout(SidePanelLayout { content_top_inset })`，净空由窗口宿主测量。Kit 拥有 regular 正文 inset 和有界视口；纯布局变化保留 token/编辑器。`layout_geometry()` 只表示最近 arrange，不是 render/阅读 authority。圆角裁切与焦点边框跟踪 TekesUI #45，详见 [接入记录](../docs/rust-agent-ui-sidepanel-layout-20261022.md)。
