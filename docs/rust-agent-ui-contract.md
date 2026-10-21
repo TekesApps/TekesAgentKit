@@ -39,6 +39,8 @@ Layout 和显示逻辑须逐项严格对齐当前 ClientKit 对应 Views；[对�
 
 [Sidebar 首次恢复与观察失败](rust-agent-ui-sidebar-restoration-20261021.md)现已贯通 shared inventory 就绪事实、binding 和公开组件输入；未恢复不再显示确认空，观察失败保留最近列表。搜索/分组和完整 outline/status-pane 布局仍待继续。
 
+[Summary 子代理状态来源](rust-agent-ui-summary-child-status-20261022.md)现由同 endpoint child 执行投影提供，旧 parent-only read 保留未知；状态附件与默认行布局仍开放。
+
 [Summary 焦点与组字](rust-agent-ui-summary-focus-20261022.md)对齐 header/普通动作行不接管 first responder，保留静态可选择文字和自定义控件焦点；demo 仅对独立 Composer 组字时的原可见 disclosure 放行。
 
 [Summary 单行标题公开消费](rust-agent-ui-summary-label-20261022.md)接通当前精确公开 pin 的 `with_label_layout` / `shape_label`；宿主必须提供原 SDK label 服务。仅 header 单行尾部省略，完整源文本与 AX 名称保留，普通行继续换行。旧[候选记录](rust-agent-ui-summary-label-slot-20261021.md)按其历史输入解释。
@@ -235,16 +237,15 @@ Task tab 以 task ID 为稳定身份，scope 是可更新的内容输入。TaskP
 
 最新 [Sidebar 操作接入记录](rust-agent-ui-thread-actions-20261019.md) 覆盖 ThreadRename、分叉导航、归档空选择与子代理 owner 归档刷新。基线 v0.3.8；root 105、UI 88、工具 18 tests 和局部原生回归通过，正式 Transcript/RunView 仍未完成。
 
-| 要求 | 当前状态 | 还需要的证据 |
+| 要求 | 当前已验证范围 | 仍需完成 |
 |---|---|---|
-| Composer 独立输入/草稿/发送/取消及入口 | 基础组件、模型/新会话闭环、内容卡片/原子移除/批注评论、Main/任务/独立子代理/SideChat 附件选择/上传状态；局部原生与三端离屏证据分开记录 | 真实三端 pane 附件联调、预览/失败对账、选区捕获/来源高亮/内容 undo、其余设置入口、完整弹层/三端原生验收 |
-| Indicators | 首批事实组件与 unknown/0/partial/error 测试 | 原生 RunView 呈现、主题/语义验收 |
-| Transcript / RunView | 内容树与实验 RunView 已实现并接入公共 consumer | 其余 footnote、#22/#25、阅读/分页/流式关联与完整原生验收 |
-| Sidebar | 共享服务绑定、选择/置顶/复制；重命名/分叉/归档已接入，局部原生 fixture 验证 | 真实三端操作与完整宿主验收 |
-| SidePanel / Summary | Summary 原生挂载；任务、SideChat、独立子代理控制与绑定已接入；有界子历史只读加载诊断/分页已验证 | 各类 pane 正式 Transcript、真实三端子 pane 原生操作与完整联调 |
-| 第二公开 API consumer | Composer、Indicators、Sidebar、SidePanel 公共组合，Summary 独立挂载；不依赖 RunSurface | 正式 RunView/Transcript 与完整原生宿主组合验证 |
-| 原生窗口验收 | Composer/Indicators、Sidebar、Summary + 共享绑定的局部窗口验证已通过（合成文本服务） | 物理中文输入法、正式 RunView/Transcript/其余 SidePanel 内容和阅读/分页锚点验收 |
-| review / CI / merge / tag | 草稿 PR #10 已提交；先前提交 CI 通过，后续增量仍需各自验证 | 完整要求审计、独立 review、最新 CI、合并与新阶段 tag |
+| Composer / Indicators | 原 RunView 中复用 presentation；草稿、发送/取消、入口与捕获来源、unknown/partial 状态；已有局部真实三端和原生窗口证据按各自程序解释 | 其余设置/附件 pane 组合、完整 Source 布局与交互/语义、物理输入及配对视觉 |
+| Transcript / RunView | 正式混合 Content、原 SDK reading/reveal 事务；分页20→44、流式/工具增长/重排、A/B保留阅读与重连、Start/Latest、原焦点/组字；真实三端历史/流式证据保留原程序归属 | #25富内容、#42 fresh-host持久阅读、#46结构化hover、完整footnote/rail显示规则和配对视觉；剩余真实多消息有界child组合 |
+| Sidebar | 原 inventory/search/folder/pin服务、共享操作、选中行补入与自动reveal；部分原生fixture与重挂载/过期请求fencing | #44原行上下文触发、完整列表阅读生命周期、剩余真实三端/目录/活动组合及整体布局验收 |
+| SidePanel / Summary | 共享pane状态与原RunView/只读内容、投影ready与生命周期、host clearance、Run/Workspace Summary、可选择文字、用量列、自定义host Content、header单行与焦点策略；child状态来源已修正 | #36/#5 toolbar、#45语义Panel、#47图标/不定状态附件；默认行 leading/trailing/首行排版、具体产品行、完整tab/chrome和配对视觉 |
+| 第二公开 API consumer | 当前UI workspace含独立consumer；公开inputs/queries/actions、原SDK text/reveal及host适配、child状态更新保留原pointer | 完整目标的组合体验与宿主验收，不能以编译/局部组件测试代替 |
+| 原生 / 三 harness | 当前窗口验收及系统拼音软件输入；真实Native/Pi/DSH协议/阅读/流式保留各自program scope | 新child状态在真实三端的验收、Native0.9.3 lifecycle/archive已知未过项、实体键盘/候选窗/VoiceOver与整体体验 |
+| review / CI / merge / tag | PR #10仍为实验草稿，增量提交分别检查CI；本地验证和最终程序收据见各阶段文档 | 完整要求逐项审计、review、最终CI、合并和新阶段tag；整体目标尚未完成 |
 
 既有三端 test-harness 到 GPU 记录继续有效，但它不是正式业务组件树的原生窗口验收，也不是以上全部组件已完成的证据。目标保持 active，不因初步测试通过提前收口。
 

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeSet;
 use tekes_agent_contract::{Result, require};
-use tekes_agent_session::SessionProjection;
+use tekes_agent_session::{MemoryProjectionStore, SessionProjection};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,25 @@ pub struct SummarySubagent {
     pub id: String,
     pub title: String,
     pub session_id: Option<String>,
+    /// Child session execution status, never the parent tool-call phase. Empty
+    /// means no observed status; retained facts do not imply a live connection.
     pub status: String,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SummarySubagentIndicator {
+    Running,
+    Failed,
+}
+impl SummarySubagent {
+    /// ClientKit SummaryProviders uses only these child-execution statuses.
+    /// Complete/idle/unknown deliberately have no success or inferred dot.
+    pub fn indicator(&self) -> Option<SummarySubagentIndicator> {
+        match self.status.as_str() {
+            "running" | "in_progress" | "working" => Some(SummarySubagentIndicator::Running),
+            "failed" | "interrupted" => Some(SummarySubagentIndicator::Failed),
+            _ => None,
+        }
+    }
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -63,6 +81,33 @@ pub struct SummaryFacts {
     pub usage: Option<SummaryUsage>,
 }
 impl SummaryFacts {
+    /// Read retained facts from one endpoint authority. No child hydration or
+    /// status inference from control mode, parent execution or tool results.
+    /// Connection freshness remains in the existing Run connection snapshot.
+    pub fn read_with_store(
+        scope: &RunScope,
+        store: &MemoryProjectionStore,
+        transcript: &TranscriptSnapshot,
+    ) -> Result<Self> {
+        scope.validate()?;
+        require(
+            scope.endpoint_id == store.endpoint_id,
+            "Summary endpoint mismatch",
+        )?;
+        let session = store.sessions.get(&scope.session_id).ok_or_else(|| {
+            tekes_agent_contract::Error::Protocol("Summary parent unavailable".into())
+        })?;
+        let mut facts = Self::read(scope, session, transcript)?;
+        for child in &mut facts.subagents {
+            child.status = child
+                .session_id
+                .as_deref()
+                .filter(|id| *id != scope.session_id)
+                .map(|id| child_session_status(store, id))
+                .unwrap_or_default();
+        }
+        Ok(facts)
+    }
     pub fn read(
         scope: &RunScope,
         session: &SessionProjection,
@@ -158,8 +203,12 @@ impl SummaryFacts {
                 facts.subagents.push(SummarySubagent {
                     id: tool.id.clone(),
                     title: title.into(),
-                    session_id: tool.result.as_ref().and_then(subagent_result_id),
-                    status: tool.phase.clone(),
+                    session_id: tool
+                        .result
+                        .as_ref()
+                        .and_then(subagent_result_id)
+                        .filter(|id| id != &scope.session_id),
+                    status: String::new(),
                 });
             }
         }
@@ -198,7 +247,11 @@ impl SummaryFacts {
                 .map(|s| SummaryRow {
                     id: s.id.clone(),
                     title: s.title.clone(),
-                    value: Value::String(s.status.clone()),
+                    value: if s.status.is_empty() {
+                        Value::Null
+                    } else {
+                        Value::String(s.status.clone())
+                    },
                     action: s
                         .session_id
                         .as_ref()
@@ -313,6 +366,27 @@ pub fn append_summary_sections(
     sections.extend(host.into_iter().filter(|s| !s.rows.is_empty()));
 }
 
+fn child_session_status(store: &MemoryProjectionStore, id: &str) -> String {
+    let Some(summary) = store
+        .sessions
+        .get(id)
+        .and_then(|session| session.summary.as_ref())
+    else {
+        return String::new();
+    };
+    let raw = summary["status"].as_str().unwrap_or("");
+    if !matches!(raw, "" | "active" | "archived") {
+        return raw.into();
+    }
+    // `active` / `archived` are lifecycle states. The existing child-only
+    // execution projection handles public running flags and retained history.
+    let status = crate::thread_activity(store, id).status;
+    if status == "unknown" {
+        String::new()
+    } else {
+        status
+    }
+}
 // ClientKit resolves the first native startup UUID in the tool result. Keep it raw here: endpoint
 // identity is a separate scope, never a synthetic storage prefix.
 fn subagent_result_id(value: &Value) -> Option<String> {

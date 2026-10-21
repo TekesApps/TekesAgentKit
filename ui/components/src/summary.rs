@@ -9,7 +9,7 @@ use std::{cell::RefCell, rc::Rc};
 use tekes_agent_presentation::{RunScope, append_summary_sections};
 pub use tekes_agent_presentation::{
     SummaryAction, SummaryArtifact, SummaryFacts, SummaryRow, SummarySection, SummarySubagent,
-    SummaryUsage,
+    SummarySubagentIndicator, SummaryUsage,
 };
 use tekes_ui_controls::{ButtonTextRenderer, ScrollArea, composition::*, layout::MeasuredChild};
 use tekes_ui_scene::{Rect, Size};

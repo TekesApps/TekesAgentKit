@@ -2542,3 +2542,65 @@ fn independent_custom_summary_captures_the_source_before_event_delivery() {
             .is_err()
     );
 }
+
+#[test]
+fn independent_summary_consumer_keeps_child_pointer_and_control_across_status_updates() {
+    use tekes_agent_components_ui::*;
+    use tekes_ui_controls::composition::*;
+    let scope = RunScope::main("consumer", "parent");
+    let mut input = SummaryInput {
+        revision: 1,
+        scope: scope.clone(),
+        host_sections: vec![],
+        facts: Some(SummaryFacts {
+            scope: scope.clone(),
+            tasks: vec![],
+            artifacts: vec![],
+            usage: None,
+            subagents: vec![SummarySubagent {
+                id: "call".into(),
+                title: "Child".into(),
+                session_id: Some("child".into()),
+                status: String::new(),
+            }],
+        }),
+    };
+    let mut summary = SummaryView::new(49005, Default::default());
+    summary.update(&input).unwrap();
+    let root = summary.id();
+    let row = summary.action_id("subagents", "call").unwrap();
+    let mut host = summary.into_host().unwrap();
+    assert_eq!(
+        host.get(row)
+            .unwrap()
+            .component::<SummaryActionRow>()
+            .unwrap()
+            .button()
+            .label,
+        "Child"
+    );
+    input.revision += 1;
+    input.facts.as_mut().unwrap().subagents[0].status = "failed".into();
+    let summary = host
+        .get_mut(root)
+        .unwrap()
+        .component_mut::<SummaryView>()
+        .unwrap();
+    summary.update(&input).unwrap();
+    assert_eq!(summary.action_id("subagents", "call"), Some(row));
+    assert_eq!(
+        input.facts.as_ref().unwrap().subagents[0].indicator(),
+        Some(SummarySubagentIndicator::Failed)
+    );
+    host.accessibility_action(row, None, AccessibilityAction::Press);
+    let actions = host.drain_actions();
+    let intents = host
+        .get(root)
+        .unwrap()
+        .component::<SummaryView>()
+        .unwrap()
+        .take_intents(&actions);
+    assert!(
+        matches!(&intents[..],[SummaryIntent{scope:parent,action:SummaryAction::OpenSubagent{parent:action_parent,child_id}}] if parent==&scope && action_parent==&scope && child_id=="child")
+    );
+}

@@ -58,6 +58,8 @@ mod sidebar_search_probe;
 mod stream_probe;
 #[path = "native_stream_reading_selftest.rs"]
 mod stream_reading_probe;
+#[path = "native_summary_child_status_selftest.rs"]
+mod summary_child_probe;
 #[path = "native_summary_context_selftest.rs"]
 mod summary_context_probe;
 #[path = "native_summary_custom_selftest.rs"]
@@ -105,6 +107,7 @@ struct Host {
     summary_context_probe: Option<summary_context_probe::Probe>,
     summary_custom_probe: Option<summary_custom_probe::Probe>,
     summary_label_probe: Option<summary_label_probe::Probe>,
+    summary_child_probe: Option<summary_child_probe::Probe>,
     visibility_probe: Option<visibility_probe::Probe>,
     feedback_probe: Option<feedback_probe::Probe>,
     stream_probe: Option<stream_probe::Probe>,
@@ -1385,6 +1388,10 @@ impl Host {
             probe.advance(self, window);
             self.summary_custom_probe = Some(probe);
         }
+        if let Some(mut probe) = self.summary_child_probe.take() {
+            probe.advance(self, window);
+            self.summary_child_probe = Some(probe);
+        }
         if let Some(mut probe) = self.summary_label_probe.take() {
             probe.advance(self, window);
             self.summary_label_probe = Some(probe);
@@ -2450,6 +2457,17 @@ impl Host {
             );
             println!("NATIVE_AGENT_SUMMARY_CUSTOM_RECEIPT {}", probe.receipt());
         }
+        if let Some(probe) = &self.summary_child_probe {
+            assert!(
+                self.failures.is_empty(),
+                "Summary child status failures {:?}",
+                self.failures
+            );
+            println!(
+                "NATIVE_AGENT_SUMMARY_CHILD_STATUS_RECEIPT {}",
+                probe.receipt()
+            );
+        }
         if let Some(probe) = &self.summary_label_probe {
             assert!(
                 self.failures.is_empty(),
@@ -2924,6 +2942,13 @@ pub fn run() {
         !summary_custom_selftest || args.iter().any(|arg| arg == "--transcript-content"),
         "custom Summary requires formal host"
     );
+    let summary_child_selftest = args
+        .iter()
+        .any(|arg| arg == "--summary-child-status-selftest");
+    assert!(
+        !summary_child_selftest || args.iter().any(|arg| arg == "--transcript-content"),
+        "child Summary requires formal host"
+    );
     let summary_label_selftest = args
         .iter()
         .any(|arg| arg == "--summary-label-native-selftest");
@@ -2969,6 +2994,7 @@ pub fn run() {
         || summary_context_selftest
         || summary_custom_selftest
         || summary_label_selftest
+        || summary_child_selftest
         || sidebar_session_menu_selftest
         || sidebar_search_selftest
         || sidebar_query_selftest
@@ -3007,6 +3033,7 @@ pub fn run() {
             summary_context_selftest,
             summary_custom_selftest,
             summary_label_selftest,
+            summary_child_selftest,
             sidebar_session_menu_selftest,
             sidebar_search_selftest,
             sidebar_query_selftest,
@@ -3035,6 +3062,7 @@ pub fn run() {
     let executor = tokio::runtime::Runtime::new().unwrap();
     let mut visibility_fixture = None;
     let mut query_fixture = None;
+    let mut summary_child_fixture = None;
     let (connector, kind, scopes, fixture): (
         Arc<dyn tekes_agent_contract::EndpointConnector>,
         _,
@@ -3074,6 +3102,13 @@ pub fn run() {
                     .with_lifecycle()
                     .with_presets(false)
                     .with_models();
+                let fixture = if summary_child_selftest {
+                    let fixture = fixture.with_summary_subagent();
+                    summary_child_fixture = Some(fixture.clone());
+                    fixture
+                } else {
+                    fixture
+                };
                 let fixture = if let Some(gate) = &reading_gate {
                     fixture.with_history_page_gate(gate.clone())
                 } else {
@@ -3428,6 +3463,7 @@ pub fn run() {
         summary_context_probe: summary_context_selftest.then(summary_context_probe::Probe::new),
         summary_custom_probe: summary_custom_selftest.then(summary_custom_probe::Probe::new),
         summary_label_probe: summary_label_selftest.then(summary_label_probe::Probe::new),
+        summary_child_probe: summary_child_fixture.map(summary_child_probe::Probe::new),
         visibility_probe: visibility_selftest
             .then(|| visibility_probe::Probe::new(visibility_fixture)),
         feedback_probe: feedback_selftest.then(feedback_probe::Probe::new),

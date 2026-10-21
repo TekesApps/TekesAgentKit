@@ -295,3 +295,152 @@ fn malformed_optional_summary_does_not_disable_a_healthy_run() {
     assert!(snapshot.summary.is_none());
     assert!(!snapshot.transcript.diagnostics.is_empty());
 }
+
+fn summary_child_store() -> MemoryProjectionStore {
+    let mut store = MemoryProjectionStore::new("e");
+    store.connection = ConnectionState::Ready;
+    store.inventory_ready = true;
+    let child = "b437cf34-5661-45e2-a674-113b27c92f89";
+    let mut parent = SessionProjection {
+        journal_ready: true,
+        summary: Some(json!({"status":"failed"})),
+        ..Default::default()
+    };
+    parent
+        .entries
+        .insert(0, event(0, "turn/start", json!({"turn":1})));
+    parent.entries.insert(1,event(1,"tool/call",json!({"turn":1,"step":1,"callId":"child-call","name":"subagent","arguments":{"brief":"真实子会话"}})));
+    parent.entries.insert(2,event(2,"tool/result",json!({"turn":1,"step":1,"message":{"source":{"callId":"child-call"},"content":[{"type":"text","text":format!("Started child {child}")}]}})));
+    store.sessions.insert("p".into(), parent);
+    store.sessions.insert(
+        child.into(),
+        SessionProjection {
+            summary: Some(json!({"status":"running"})),
+            ..Default::default()
+        },
+    );
+    store
+}
+#[test]
+fn summary_child_status_comes_only_from_the_same_endpoint_session_summary() {
+    let mut store = summary_child_store();
+    let parent = scope("p");
+    let child = "b437cf34-5661-45e2-a674-113b27c92f89";
+    let mut transcript = TranscriptSnapshot::read(&parent, &store.sessions["p"]).unwrap();
+    transcript.tools[0].phase = "failed".into();
+    let isolated = SummaryFacts::read(&parent, &store.sessions["p"], &transcript).unwrap();
+    assert_eq!(isolated.subagents[0].status, "");
+    assert!(
+        isolated
+            .sections(&parent)
+            .iter()
+            .find(|s| s.id == "subagents")
+            .unwrap()
+            .rows[0]
+            .value
+            .is_null()
+    );
+    let read = |store: &MemoryProjectionStore| {
+        SummaryFacts::read_with_store(&parent, store, &transcript)
+            .unwrap()
+            .subagents
+            .remove(0)
+    };
+    assert_eq!(read(&store).status, "running");
+    assert_eq!(
+        read(&store).indicator(),
+        Some(SummarySubagentIndicator::Running)
+    );
+    for (status, indicator) in [
+        ("failed", Some(SummarySubagentIndicator::Failed)),
+        ("interrupted", Some(SummarySubagentIndicator::Failed)),
+        ("completed", None),
+        ("future-status", None),
+    ] {
+        store.sessions.get_mut(child).unwrap().summary = Some(json!({"status":status}));
+        assert_eq!(read(&store).status, status);
+        assert_eq!(read(&store).indicator(), indicator);
+    }
+    // The public child execution flag is authoritative even without a raw status.
+    store.sessions.get_mut(child).unwrap().run_open = true;
+    store.sessions.get_mut(child).unwrap().summary = Some(json!({"running":true}));
+    assert_eq!(read(&store).status, "running");
+    store.sessions.get_mut(child).unwrap().summary = None;
+    assert_eq!(read(&store).indicator(), None);
+    store.sessions.remove(child);
+    assert_eq!(read(&store).status, "");
+    store.endpoint_id = "foreign".into();
+    assert!(SummaryFacts::read_with_store(&parent, &store, &transcript).is_err());
+}
+#[test]
+fn run_summary_refreshes_child_status_without_changing_draft_or_inventing_live_authority() {
+    let mut store = summary_child_store();
+    let child = "b437cf34-5661-45e2-a674-113b27c92f89";
+    let mut core = PresentationStore::default();
+    core.select(ComposerDestination::run(scope("p"))).unwrap();
+    let first = core.refresh(&store).unwrap();
+    assert_eq!(first.summary.unwrap().subagents[0].status, "running");
+    store.sessions.get_mut(child).unwrap().summary = Some(json!({"status":"failed"}));
+    let second = core.refresh(&store).unwrap();
+    assert_eq!(
+        second.summary.unwrap().subagents[0].indicator(),
+        Some(SummarySubagentIndicator::Failed)
+    );
+    assert_eq!(second.draft, first.draft);
+    assert!(second.submissions.is_empty());
+    store.disconnect();
+    let stale = core.refresh(&store).unwrap();
+    assert_eq!(stale.summary.unwrap().subagents[0].status, "failed");
+    assert!(stale.connection.history_is_stale);
+    assert!(!stale.can_submit);
+    assert!(stale.submissions.is_empty());
+}
+#[test]
+fn summary_subagent_indicator_matches_clientkit_without_success_or_cancellation_inference() {
+    let mut child = SummarySubagent {
+        id: "call".into(),
+        title: "child".into(),
+        session_id: None,
+        status: String::new(),
+    };
+    for (status, expected) in [
+        ("running", Some(SummarySubagentIndicator::Running)),
+        ("in_progress", Some(SummarySubagentIndicator::Running)),
+        ("working", Some(SummarySubagentIndicator::Running)),
+        ("failed", Some(SummarySubagentIndicator::Failed)),
+        ("interrupted", Some(SummarySubagentIndicator::Failed)),
+        ("", None),
+        ("completed", None),
+        ("succeeded", None),
+        ("idle", None),
+        ("cancelled", None),
+        ("cancelling", None),
+        ("unknown", None),
+    ] {
+        child.status = status.into();
+        assert_eq!(child.indicator(), expected, "{status}");
+    }
+}
+
+#[test]
+fn summary_never_resolves_the_parent_result_uuid_as_a_child() {
+    let mut store = summary_child_store();
+    let id = "b437cf34-5661-45e2-a674-113b27c92f89";
+    let parent = store.sessions.remove("p").unwrap();
+    store.sessions.insert(id.into(), parent);
+    let scope = scope(id);
+    let transcript = TranscriptSnapshot::read(&scope, &store.sessions[id]).unwrap();
+    let facts = SummaryFacts::read_with_store(&scope, &store, &transcript).unwrap();
+    assert_eq!(facts.subagents[0].session_id, None);
+    assert_eq!(facts.subagents[0].indicator(), None);
+    assert!(
+        facts
+            .sections(&scope)
+            .iter()
+            .find(|s| s.id == "subagents")
+            .unwrap()
+            .rows[0]
+            .action
+            .is_none()
+    );
+}

@@ -1,5 +1,7 @@
 # Summary section header 的公开单行标题契约
 
+后续当前状态：[子代理状态来源](rust-agent-ui-summary-child-status-20261022.md)已修正并接入原 presentation；下文将该项列为待办的是本页原程序阶段。图形附件、默认行布局和整体目标仍未完成。
+
 当前精确公开 TekesUI `09b4bab44b6dfa65487250ea816b610b9df59095` 已包含 `Content::with_label_layout`、`TextSurfaceHost::shape_label` 和 CoreText 的 `shape_label`。此前“默认依赖尚未发布 #31 能力”的判断已过时；此次保持 SDK pin 与完整输入清单，不消费兄弟工作树或隔离候选。
 
 只读对照 ClientKit `Sources/Composer/Agent/ClientAgentSummaryView.swift` 的 `SummarySectionHeaderButton`：标题 `maximumNumberOfLines = 1`、`byTruncatingTail`，被动 label 不单独进入 AX，原 header button 保留完整名称和折叠动作。Tekes 的 `ClientAgentSummaryHostAdapter.swift` 仍负责产品环境及仓库能力。普通 `SummaryDefaultRowView` 标题允许换行，本次不将 header 策略施加到普通行或用量行。

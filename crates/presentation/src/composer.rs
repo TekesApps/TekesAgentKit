@@ -905,7 +905,7 @@ impl PresentationStore {
                 authority
                     .sessions
                     .get(&scope.session_id)
-                    .map(|session| SummaryFacts::read(scope, session, &transcript))
+                    .map(|_| SummaryFacts::read_with_store(scope, authority, &transcript))
             })
             .transpose()
         {

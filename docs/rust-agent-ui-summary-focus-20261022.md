@@ -1,5 +1,7 @@
 # Summary 的原编辑焦点与组字边界
 
+后续当前状态：[子代理状态来源](rust-agent-ui-summary-child-status-20261022.md)已修正并接入原 presentation；下文将该项列为待办的是本页原程序阶段。图形附件、默认行布局和整体目标仍未完成。
+
 ClientKit `Sources/Composer/Agent/ClientAgentSummaryView.swift` 中，`SummarySectionHeaderButton` 和 `SummaryDefaultRowView` 的 `acceptsFirstResponder` 都为 false；普通静态行的 hitTest 则返回可选择 label。Tekes 的 `ClientAgentSummaryHostAdapter.swift` 负责产品能力与内容回调，不另持一套焦点状态。
 
 本次对齐这项已确认差异。当前精确公开 TekesUI pin 仍为 `09b4bab44b6dfa65487250ea816b610b9df59095`，不修改 SDK 或兄弟仓库。

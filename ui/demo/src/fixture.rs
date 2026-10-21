@@ -539,6 +539,29 @@ impl Fixture {
         self.summary_usage = true;
         self
     }
+    /// A completed parent call whose child's status arrives independently via inventory.
+    pub fn with_summary_subagent(self) -> Self {
+        let child = "b437cf34-5661-45e2-a674-113b27c92f89";
+        self.install_unannounced_session(child, "Summary child");
+        let mut sessions = self.sessions.lock().unwrap();
+        let line = sessions.get_mut("a").unwrap();
+        line.turn += 1;
+        let turn = line.turn;
+        append(line, "turn/start", json!({"turn":turn}));
+        append(
+            line,
+            "tool/call",
+            json!({"turn":turn,"step":1,"callId":"summary-child-call","name":"subagent","arguments":{"brief":"独立子会话状态"}}),
+        );
+        append(
+            line,
+            "tool/result",
+            json!({"turn":turn,"step":1,"message":{"source":{"callId":"summary-child-call"},"content":[{"type":"text","text":format!("Started child {child}")}]}}),
+        );
+        append(line, "turn/end", json!({"turn":turn,"reason":"completed"}));
+        drop(sessions);
+        self
+    }
     /// Explicit owned demo data, emitted through the same journal contract.
     pub fn with_demo_summary(self) -> Self {
         {

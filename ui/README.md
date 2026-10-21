@@ -257,3 +257,10 @@ Summary 的 header 和普通动作行不成为键盘焦点，匹配 ClientKit �
 `action_id` 对应 `SummaryActionRow`，其 `button()` 提供原 SDK ButtonContent 的只读检查。
 静态文字仍可选择，自定义宿主 Content 保留自己的焦点策略。独立 Composer 组字时的
 原 disclosure 查询、宿主条件和原生验收见[Summary焦点契约](../docs/rust-agent-ui-summary-focus-20261022.md)。
+
+
+Summary 子代理 `status` 来自同 endpoint 的 child session 执行事实，不能传父工具 phase。
+新 `SummaryFacts::read_with_store` 已接入现有 Run presentation；原只有 parent 的 `read` 保留未知状态。
+`SummarySubagent::indicator` / `SummarySubagentIndicator` 供显示分类，完成态无成功点；
+此分类不授予控制权限。SDK状态附件/默认行仍未对齐，详见
+[子代理状态契约](../docs/rust-agent-ui-summary-child-status-20261022.md)。
