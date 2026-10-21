@@ -58,6 +58,7 @@ const CHOICES_NAMESPACE: u32 = 43;
 const CREATE_NAMESPACE: u32 = 44;
 const ANNOTATION_NAMESPACE: u32 = 45;
 const REASONING_NAMESPACE: u32 = 46;
+const SIDEBAR_OPTIONS_NAMESPACE: u32 = 47;
 pub const SELECT_A: ComponentId = ComponentId(100);
 pub const SELECT_B: ComponentId = ComponentId(101);
 pub const RECONNECT: ComponentId = ComponentId(102);
@@ -398,6 +399,10 @@ impl ComponentDemo {
             },
         );
         let sidebar = Sidebar::new(SIDEBAR_NAMESPACE, SidebarLabels::default());
+        let options = tekes_agent_components_ui::SidebarOptions::new(
+            SIDEBAR_OPTIONS_NAMESPACE,
+            tekes_agent_components_ui::SidebarOptionsLabels::default(),
+        );
         let panel = SidePanel::new(PANEL_NAMESPACE, SidePanelLabels::default(), 8);
         let mut tree = ContentHost::new(Content::new(
             ROOT,
@@ -412,7 +417,20 @@ impl ComponentDemo {
                         SIDEBAR_COLUMN,
                         DemoColumn {
                             width: Some(SIDEBAR_WIDTH),
-                            children: vec![Content::new(sidebar.id(), sidebar)],
+                            children: vec![Content::new(
+                                ComponentId(15),
+                                StackContent {
+                                    model: Stack {
+                                        axis: Axis::Vertical,
+                                        gap: Spacing::Regular.value(),
+                                    },
+                                    flexible_child: Some(sidebar.id()),
+                                    children: vec![
+                                        Content::new(options.id(), options),
+                                        Content::new(sidebar.id(), sidebar),
+                                    ],
+                                },
+                            )],
                         },
                     ),
                     Content::new(
@@ -1870,23 +1888,39 @@ impl ComponentDemo {
         writable: bool,
     ) -> Result<()> {
         let id = self.sidebar_id();
-        if self
+        let current = self
             .tree
             .get(id)
             .unwrap()
             .component::<Sidebar>()
             .unwrap()
-            .preferences_current(value, writable)
-        {
-            return Ok(());
+            .preferences_current(value, writable);
+        if !current {
+            self.tree
+                .get_mut(id)
+                .unwrap()
+                .component_mut::<Sidebar>()
+                .unwrap()
+                .update_preferences(value, writable)
+                .map_err(unsupported)?;
         }
+        let title_sort_supported = self
+            .tree
+            .get(id)
+            .unwrap()
+            .component::<Sidebar>()
+            .unwrap()
+            .title_sort_supported();
         self.tree
-            .get_mut(id)
+            .get_mut(self.sidebar_options_id())
             .unwrap()
-            .component_mut::<Sidebar>()
+            .component_mut::<tekes_agent_components_ui::SidebarOptions>()
             .unwrap()
-            .update_preferences(value, writable)
+            .update(value, writable, title_sort_supported)
             .map_err(unsupported)
+    }
+    pub fn sidebar_options_id(&self) -> ComponentId {
+        ComponentId((SIDEBAR_OPTIONS_NAMESPACE as u64) << 32)
     }
     pub fn sidebar_id(&self) -> ComponentId {
         ComponentId((SIDEBAR_NAMESPACE as u64) << 32)
@@ -3409,7 +3443,11 @@ impl ComponentDemo {
         self.drain_commands()
     }
     pub fn drain_commands(&mut self) -> Result<Vec<DemoCommand>> {
-        let actions = self.tree.drain_actions();
+        let records = self.tree.drain_action_records();
+        let actions = records
+            .iter()
+            .map(|record| record.action)
+            .collect::<Vec<_>>();
         let output_probe = ComponentId((6_000_001_u64) << 32);
         if let Some(row) = self
             .tree
@@ -3567,6 +3605,28 @@ impl ComponentDemo {
             .and_then(|node| node.component::<SidePanel>())
             .map(|panel| panel.take_intents(&actions))
             .unwrap_or_default();
+        let option_intents = self
+            .tree
+            .get(self.sidebar_options_id())
+            .unwrap()
+            .component::<tekes_agent_components_ui::SidebarOptions>()
+            .unwrap()
+            .take_intents(&records);
+        if !composing {
+            for intent in option_intents {
+                if intent.reset_paging {
+                    let sidebar = self.sidebar_id();
+                    self.tree
+                        .get_mut(sidebar)
+                        .unwrap()
+                        .component_mut::<Sidebar>()
+                        .unwrap()
+                        .reset_paging()
+                        .map_err(unsupported)?;
+                }
+                commands.push(DemoCommand::SidebarPreferences(intent.change));
+            }
+        }
         commands.extend(
             self.tree
                 .get(self.sidebar_id())

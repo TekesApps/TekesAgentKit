@@ -1,4 +1,12 @@
 //! Second consumer: depends only on AgentKit's public UI packages.
+/// A host uses the rich SDK queue once; legacy `drain_actions` would discard
+/// the original menu value. The resulting changes go to its existing store.
+pub fn sidebar_options_intents(
+    options: &tekes_agent_components_ui::SidebarOptions,
+    records: &[tekes_ui_controls::composition::ContentActionRecord],
+) -> Vec<tekes_agent_components_ui::SidebarOptionsIntent> {
+    options.take_intents(records)
+}
 /// The queued gesture retains its original source/frame/target; do not resolve
 /// these again from the host's newer selection when dispatching it.
 pub fn prepare_feedback_change(

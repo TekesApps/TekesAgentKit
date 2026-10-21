@@ -313,6 +313,9 @@ impl Sidebar {
     pub fn set_title_comparator(&mut self, compare: SidebarTitleComparator) {
         self.title_comparator = Some(compare);
     }
+    pub fn title_sort_supported(&self) -> bool {
+        self.title_comparator.is_some()
+    }
     /// Allows retained hosts to avoid even borrowing their tree mutably for an
     /// identical accepted input. A locally toggled disclosure still needs the
     /// next authoritative publication (including rollback after write failure).

@@ -40,6 +40,8 @@ mod reading_probe;
 mod readonly_reading_probe;
 #[path = "native_run_controls_selftest.rs"]
 mod run_controls_probe;
+#[path = "native_sidebar_options_selftest.rs"]
+mod sidebar_options_probe;
 #[path = "native_sidebar_query_selftest.rs"]
 mod sidebar_query_probe;
 #[path = "native_sidebar_restore_selftest.rs"]
@@ -80,6 +82,7 @@ struct Host {
     sidebar_query_probe: Option<sidebar_query_probe::Probe>,
     sidebar_search_probe: Option<sidebar_search_probe::Probe>,
     sidebar_restore_probe: Option<sidebar_restore_probe::Probe>,
+    sidebar_options_probe: Option<sidebar_options_probe::Probe>,
     reading_probe: Option<reading_probe::Probe>,
     readonly_reading_probe: Option<readonly_reading_probe::Probe>,
     summary_sections_probe: Option<summary_sections_probe::Probe>,
@@ -1294,6 +1297,10 @@ impl Host {
             probe.advance(self, window);
             self.sidebar_restore_probe = Some(probe);
         }
+        if let Some(mut probe) = self.sidebar_options_probe.take() {
+            probe.advance(self, window);
+            self.sidebar_options_probe = Some(probe);
+        }
         if let Some(mut probe) = self.summary_sections_probe.take() {
             probe.advance(self, window);
             self.summary_sections_probe = Some(probe);
@@ -2327,6 +2334,14 @@ impl Host {
                 probe.receipt()
             );
         }
+        if let Some(probe) = &self.sidebar_options_probe {
+            assert!(
+                self.failures.is_empty(),
+                "Sidebar options failures {:?}",
+                self.failures
+            );
+            println!("NATIVE_AGENT_SIDEBAR_OPTIONS_RECEIPT {}", probe.receipt());
+        }
         if let Some(probe) = &self.summary_sections_probe {
             assert!(
                 self.failures.is_empty(),
@@ -2560,6 +2575,7 @@ impl WindowHandler for Host {
                     || self.stream_probe.is_some()
                     || self.reading_probe.is_some()
                     || self.stream_reading_probe.is_some()
+                    || self.sidebar_options_probe.is_some()
                 {
                     eprintln!(
                         "COMPONENT_FOCUS active={active} id={:?}",
@@ -2640,6 +2656,9 @@ impl WindowHandler for Host {
             Event::CloseRequested => self.close(window),
             other => {
                 if let Some(event) = input_event(other, window, &self.view.tree) {
+                    if let Some(probe) = &mut self.sidebar_options_probe {
+                        probe.observe(&event, self.view.composing());
+                    }
                     if self.system_ime_selftest {
                         eprintln!(
                             "SYSTEM_IME_EVENT {event:?} composing={} focus={:?}",
@@ -2730,10 +2749,12 @@ pub fn run() {
         "reading probe requires the retained Transcript window"
     );
     let sidebar_restore_selftest = args.iter().any(|arg| arg == "--sidebar-restore-selftest");
+    let sidebar_options_selftest = args.iter().any(|arg| arg == "--sidebar-options-selftest");
     let summary_sections_selftest = args.iter().any(|arg| arg == "--summary-sections-selftest");
     if reading_selftest
         || summary_sections_selftest
         || sidebar_restore_selftest
+        || sidebar_options_selftest
         || sidebar_search_selftest
         || sidebar_query_selftest
     {
@@ -2764,6 +2785,7 @@ pub fn run() {
             harness_readonly_reading_selftest,
             summary_sections_selftest,
             sidebar_restore_selftest,
+            sidebar_options_selftest,
             sidebar_search_selftest,
             sidebar_query_selftest,
             creation_selftest,
@@ -3158,6 +3180,7 @@ pub fn run() {
         sidebar_query_probe: query_fixture.map(sidebar_query_probe::Probe::new),
         sidebar_search_probe: sidebar_search_selftest.then(sidebar_search_probe::Probe::new),
         sidebar_restore_probe: sidebar_restore_selftest.then(sidebar_restore_probe::Probe::new),
+        sidebar_options_probe: sidebar_options_selftest.then(sidebar_options_probe::Probe::new),
         readonly_reading_probe: (readonly_reading_selftest || harness_readonly_reading_selftest)
             .then(|| readonly_reading_probe::Probe::new(bounded_probe_child)),
         reading_probe: if reading_selftest || harness_reading_selftest {

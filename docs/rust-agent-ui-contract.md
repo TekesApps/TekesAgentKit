@@ -4,6 +4,8 @@
 
 [最新公开 SDK 接收](tekesui-toolbar-public-intake-20261021.md)记录 09b4bab 的精确依赖、公开闭包、原生阅读/系统拼音证据及中断记录；此前版本的验收保持各自范围。
 
+[Sidebar 原选项菜单](rust-agent-ui-sidebar-options-20261022.md)已消费当前公开 MenuContent：排序/分组的稳定事件、勾选/禁用、原偏好 CAS、重复排序的分页重置、第二 consumer 与原生中文组字屏障通过。Toolbar 的事件/逐项语义缺口已反馈 #36/#5；其余完整布局和阅读验收仍开放。
+
 [公开版本回合导航](rust-agent-ui-published-navigation-20261021.md)已接通原生 demo 的普通 Start、Latest 和独立 rail 自动 reveal；复用原阅读 token、编辑器及宿主历史回调，中文合成预编辑专项通过。完整 rail/产品体验仍待验收，#22/#28/#32 的源码交付不再作为当前阻塞。
 [回到最新按钮](rust-agent-ui-jump-latest-20261021.md)已补公开控件、原跟随命令及原生组字内点击验证，保留原编辑器且不记录轨道导航历史；完整selection/chrome仍待完成。
 [有界只读子历史阅读](rust-agent-ui-readonly-reading-20261021.md)已接入原SDK事务，正文/状态/分页一起发布，公开consumer与原生fixture验证前插和刷新锚点；真实Native新pane验收及持久恢复仍单独开放。

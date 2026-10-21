@@ -42,6 +42,8 @@ pub use editor::ComposerDraftUpdate;
 mod indicators;
 mod side_panel;
 mod sidebar;
+mod sidebar_options;
+pub use sidebar_options::*;
 mod sidebar_search;
 pub use sidebar_search::*;
 mod summary;
