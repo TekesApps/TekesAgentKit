@@ -51,6 +51,8 @@ def main():
     parser.add_argument('--turn-rail', action='store_true', help='Enable actual rail with exact original compact actions in the isolated SDK only')
     parser.add_argument('--forwarded-focus', action='store_true',
                         help='Delegate the actual rail wrapper focus-decoration hook to its original CompoundButton (#33 SDK only)')
+    parser.add_argument('--composer-padding', action='store_true',
+                        help='Bind actual Composer capsules and consult the original #34 intent in the real host IME barrier')
     args = parser.parse_args()
     if args.summary_labels and args.probe is None:
         parser.error('--summary-labels requires an explicit receiver --probe')
@@ -68,6 +70,8 @@ def main():
         parser.error('--turn-start-native requires --item-navigation-native and --turn-rail')
     if args.forwarded_focus and not args.turn_rail:
         parser.error('--forwarded-focus requires --turn-rail')
+    if args.composer_padding and not args.forwarded_focus:
+        parser.error('--composer-padding requires --forwarded-focus')
     repo = Path(__file__).resolve().parent.parent
     source = args.source.resolve()
     manifest = json.loads(args.manifest.read_text())
@@ -112,6 +116,11 @@ def main():
         probe_start = repo / 'scripts/probes/agentkit-turn-start-candidate.rs'
         prepared = snapshot / 'ui/demo/tests/reading_candidate.rs'
         prepared.write_bytes(prepared.read_bytes().rstrip() + b'\n\n' + probe_start.read_bytes())
+    probe_padding = None
+    if args.composer_padding:
+        probe_padding = repo / 'scripts/probes/agentkit-composer-padding-candidate.rs'
+        prepared = snapshot / 'ui/demo/tests/reading_candidate.rs'
+        prepared.write_bytes(prepared.read_bytes().rstrip() + b'\n\n' + probe_padding.read_bytes())
     cargo = snapshot / 'ui/Cargo.toml'
     cargo.write_text(re.sub(
         r'^(tekes-ui-[\w-]+) = \{ git = "https://github.com/TekesApps/TekesUI.git", rev = "[a-f0-9]+" \}$',
@@ -224,6 +233,83 @@ def main():
         demo.write_text(demo.read_text().replace(old, '        self.tree.get_mut(ComponentId(ids.root.0 + 16)).unwrap().component_mut::<RunView>().unwrap().install_turn_rail(9_000_000 + (ids.root.0 >> 32) as u32).map_err(unsupported)?;\n' + old))
         overrides.extend(['ui/components/src/turn_rail_component.rs', 'ui/components/src/turn_rail_action.rs', 'ui/demo/src/component_demo.rs'])
         adaptations.append('Actual AgentKit rail enabled only with original library Exact/Press and preserving_focus; default fixed pin remains unsupported')
+    if args.composer_padding:
+        demo = snapshot / 'ui/demo/src/component_demo.rs'
+        code = demo.read_text()
+        old = '        // CANDIDATE_COMPOSER_PADDING_IME_QUERY'
+        assert code.count(old) == 1
+        code = code.replace(old, old + '''
+        if self.tree.padding_focus_target(event).is_some_and(|target|
+            self.composing_editor() == Some(target)) {
+            return false;
+        }''')
+        old = '        // CANDIDATE_COMPOSER_PADDING_BINDING'
+        assert code.count(old) == 1
+        code = code.replace(old, old + '''
+        for ids in [Some(self.ids()), self.panel_composer_ids()].into_iter().flatten() {
+            if self.tree.get(ComponentId(ids.root.0 + 16))
+                .and_then(|node| node.component::<RunView>()).is_some_and(RunView::is_pane_presented)
+                && self.tree.get(ids.root).and_then(|node| node.component::<Composer>())
+                    .is_some_and(Composer::is_presented) {
+                self.tree.set_padding_focus(ids.input_band, Some(ids.editor))?;
+            }
+        }''')
+        # Receiver-only observation after the real host barrier, before the
+        # original dispatch. A swallowed event cannot produce this receipt.
+        old = '''        self.tree
+            .event_with_text(event, text)
+            .map_err(|_| unsupported("demo text input geometry"))?;'''
+        assert code.count(old) == 1
+        code = code.replace(old, '''        let padding_before = self.tree.padding_focus_target(event)
+            .filter(|id| self.composing_editor() == Some(*id))
+            .map(|id| (id, self.tree.capture_focus(),
+                self.tree.focused_text().unwrap().input.external_baseline(),
+                self.tree.focused_text().unwrap().input.marked.clone()));
+''' + old + '''
+        if let Some((id, focus, baseline, marked)) = padding_before {
+            assert_eq!(self.tree.focused(), Some(id));
+            assert_eq!(self.tree.capture_focus(), focus);
+            assert_eq!(self.tree.focused_text().unwrap().input.external_baseline(), baseline);
+            assert_eq!(self.tree.focused_text().unwrap().input.marked, marked);
+            eprintln!("COMPOSER_PADDING_IME_ROUTE_OK original-editor+mount+marked-selection+baseline");
+        }''')
+        demo.write_text(code)
+        host = snapshot / 'ui/demo/src/components_native.rs'
+        code = host.read_text()
+        start = code.index('fn native_script(view: &ComponentDemo)')
+        end = code.index('fn side_chat_script(', start)
+        script = code[start:end]
+        old = 'Action::Preedit("中文组字".into())'
+        assert script.count(old) == 1
+        script = script.replace(old, 'Action::PreeditRange { text: "中文组字".into(), selection: 1..3, replacement: None }')
+        old = '    run_script(script);'
+        assert script.count(old) == 1
+        script = script.replace(old, '''    let band = view.tree.get(ids.input_band).unwrap().frame();
+    let padding = tekes_ui_scene::Point::new(band.min_x() + 2., band.center().y);
+    assert!(!view.tree.get(ids.editor).unwrap().frame().contains(padding));
+    script.insert(3, (600, Action::Click { x: f64::from(padding.x), y: f64::from(padding.y) }));
+    script.insert(4, (650, Action::ExpectTextState { text: "中文组字".into(), selection: 1..3, marked: Some(0..4), query: 1..3, actual: 1..3 }));
+''' + old)
+        code = code[:start] + script + code[end:]
+        start = code.index('fn side_chat_script(view: &ComponentDemo)')
+        end = code.index('fn task_script(', start)
+        script = code[start:end]
+        old = '    run_script(script);'
+        assert script.count(old) == 1
+        script = script.replace(old, '''    let band = view.tree.get(ids.input_band).unwrap().frame();
+    let padding = tekes_ui_scene::Point::new(band.min_x() + 2., band.center().y);
+    assert!(!view.tree.get(ids.editor).unwrap().frame().contains(padding));
+    script.extend([
+        (720, Action::PreeditRange { text: "辅助组字".into(), selection: 1..3, replacement: None }),
+        (760, Action::Click { x: f64::from(padding.x), y: f64::from(padding.y) }),
+        (780, Action::ExpectTextState { text: "SideChat 暂存草稿辅助组字".into(), selection: 14..16, marked: Some(13..17), query: 14..16, actual: 14..16 }),
+        (820, Action::TextRange { text: String::new(), replacement: Some(13..17) }),
+    ]);
+    script.sort_by_key(|(time, _)| *time);
+''' + old)
+        host.write_text(code[:start] + script + code[end:])
+        overrides.extend(['ui/demo/src/component_demo.rs', 'ui/demo/src/components_native.rs'])
+        adaptations.append('Actual main/current auxiliary Composer capsules bind original mounted editor after successful render; #34 same-turn query opens only the composing editor route; original dispatch rechecks; native fixture asserts original mount/baseline/marked selection after a real padding click')
     if args.item_navigation_native:
         native_probe_name = 'ui/demo/src/native_item_navigation_candidate.rs'
         shutil.copyfile(repo / ('scripts/probes/native-turn-rail-candidate.rs' if args.turn_rail else 'scripts/probes/native-item-navigation-candidate.rs'), snapshot / native_probe_name)
@@ -300,6 +386,7 @@ def main():
                    probe_base_sha256=sha(probe_base) if probe_base else None,
                    probe_rail_sha256=sha(probe_rail) if probe_rail else None,
                    probe_start_sha256=sha(probe_start) if probe_start else None,
+                   probe_padding_sha256=sha(probe_padding) if probe_padding else None,
                    prepared_probe_sha256=sha(snapshot / 'ui/demo/tests/reading_candidate.rs'),
                    candidate_only_host_adaptations=adaptations,
                    candidate_overrides={name: sha(snapshot / name) for name in
@@ -309,6 +396,7 @@ def main():
                    turn_rail=args.turn_rail,
                    turn_start_native=args.turn_start_native,
                    forwarded_focus=args.forwarded_focus,
+                   composer_padding=args.composer_padding,
                    focus_probe_sha256=sha(focus_probe) if args.forwarded_focus else None,
                    default_pin_promoted=False, native_acceptance=False, visual_acceptance=False,
                    full_runview_acceptance=False, checks=[])

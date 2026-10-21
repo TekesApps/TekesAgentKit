@@ -48,3 +48,5 @@ Demo 支持显式 Native endpoint JSON（URL、bearer 环境变量名、两个 s
 ## 指针接入更新
 
 #19 的指针能力已纳入上文固定公开 pin；AgentText 包装器转交 pointer_event，RunSurface 的组字屏障覆盖完整指针入口。双击沿 Unicode 分词选择实际命中字素，三击逻辑段落。旧简化事件兼容；历史证据见 [分层证据与迁移](tekesui-pointer-metadata-20261018.md)。当前局部原生合成文本服务验证见正式契约，物理 IME 和正式 Transcript 阅读验收仍未完成。
+
+2026-10-21 开发候选补充：固定 #34 的实际 Composer IME 门禁、成功render后绑定、重挂重绑、折叠/恢复及主/SideChat原生合成组字证据见[接收契约](rust-agent-ui-padding-ime-20261021.md)。只有公开精确pin具备这些接口后，才可去除隔离适配；默认8cf0840仍保持原门禁，查询结果不得缓存或解释为整块输入胶囊的通行许可。

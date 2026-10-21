@@ -3007,6 +3007,7 @@ impl ComponentDemo {
         if !self.composing() {
             return false;
         }
+        // CANDIDATE_COMPOSER_PADDING_IME_QUERY
         let position = match event {
             ContentEvent::PointerDown(position) => Some(*position),
             ContentEvent::Pointer(pointer)
@@ -3551,7 +3552,9 @@ impl ComponentDemo {
         clip: Rect,
         palette: Palette,
     ) -> std::result::Result<(), CompositionError> {
-        self.tree.render(scene, text, frame, clip, palette)
+        self.tree.render(scene, text, frame, clip, palette)?;
+        // CANDIDATE_COMPOSER_PADDING_BINDING
+        Ok(())
     }
 }
 
