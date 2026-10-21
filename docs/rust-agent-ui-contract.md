@@ -39,6 +39,8 @@ Layout 和显示逻辑须逐项严格对齐当前 ClientKit 对应 Views；[对�
 
 [Sidebar 首次恢复与观察失败](rust-agent-ui-sidebar-restoration-20261021.md)现已贯通 shared inventory 就绪事实、binding 和公开组件输入；未恢复不再显示确认空，观察失败保留最近列表。搜索/分组和完整 outline/status-pane 布局仍待继续。
 
+[Summary 焦点与组字](rust-agent-ui-summary-focus-20261022.md)对齐 header/普通动作行不接管 first responder，保留静态可选择文字和自定义控件焦点；demo 仅对独立 Composer 组字时的原可见 disclosure 放行。
+
 [Summary 单行标题公开消费](rust-agent-ui-summary-label-20261022.md)接通当前精确公开 pin 的 `with_label_layout` / `shape_label`；宿主必须提供原 SDK label 服务。仅 header 单行尾部省略，完整源文本与 AX 名称保留，普通行继续换行。旧[候选记录](rust-agent-ui-summary-label-slot-20261021.md)按其历史输入解释。
 
 [布局激活与成功帧边界](tekesui-layout-text-candidate-20261021.md)记录 #27 的独立候选消费。`render` 成功且原业务 publication/epoch 匹配后，宿主才发布当前原生文本、AX、几何和可见性；失败帧不靠更换编辑器或重试 Agent 操作恢复。

@@ -13,6 +13,12 @@ use tekes_ui_controls::{
 use tekes_ui_scene::{Rect, Scene, Size};
 use tekes_ui_tokens::Spacing;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SectionHeaderKind {
+    Summary,
+    Sidebar,
+}
+
 pub(crate) type Expansion = Rc<RefCell<Disclosure>>;
 
 #[derive(Debug)]
@@ -20,16 +26,17 @@ pub(crate) struct SummaryHeader {
     button: CompoundButton,
     pub expansion: Expansion,
     epoch: Rc<Cell<u64>>,
+    kind: SectionHeaderKind,
 }
 impl SummaryHeader {
     fn new(
         label: ComponentId,
         expansion: Expansion,
         epoch: Rc<Cell<u64>>,
-        single_line_title: bool,
+        kind: SectionHeaderKind,
     ) -> Self {
         let label = Content::new(label, TextContent::new(""));
-        let label = if single_line_title {
+        let label = if kind == SectionHeaderKind::Summary {
             label
                 .with_label_layout(tekes_ui_text::LabelOptions::single_line(
                     tekes_ui_text::LabelOverflow::TailEllipsis,
@@ -43,6 +50,7 @@ impl SummaryHeader {
                 .expect("Summary header has one passive text slot"),
             expansion,
             epoch,
+            kind,
         }
     }
     pub fn set_title(&mut self, title: String) {
@@ -112,7 +120,7 @@ impl Component for SummaryHeader {
         self.activated(result)
     }
     fn focusable(&self) -> bool {
-        self.button.focusable()
+        self.kind == SectionHeaderKind::Sidebar && self.button.focusable()
     }
     fn set_focus(&mut self, focused: bool, visible: bool) {
         self.button.set_focus(focused, visible)
@@ -178,7 +186,7 @@ impl SummarySectionView {
         label: ComponentId,
         body: ComponentId,
         expansion: Expansion,
-        single_line_title: bool,
+        kind: SectionHeaderKind,
     ) -> Self {
         let epoch = Rc::new(Cell::new(0));
         Self {
@@ -190,7 +198,7 @@ impl SummarySectionView {
             children: vec![
                 Content::new(
                     header,
-                    SummaryHeader::new(label, expansion.clone(), epoch, single_line_title),
+                    SummaryHeader::new(label, expansion.clone(), epoch, kind),
                 ),
                 Content::new(
                     body,

@@ -3,7 +3,7 @@ use crate::SidebarSelectionNavigation;
 use crate::sidebar_navigation::{
     DisclosureTarget, NavigationReveal, PendingNavigation, plan_reveal,
 };
-use crate::summary_section::{Expansion, SummarySectionView};
+use crate::summary_section::{Expansion, SectionHeaderKind, SummarySectionView};
 use crate::{
     SidebarFolderKey, SidebarPreferenceChange, SidebarPreferencesSnapshot, SidebarSearchInput,
     SidebarSearchIntent, SidebarSearchKey, SidebarSearchLabels, SidebarSort,
@@ -1179,7 +1179,7 @@ impl Sidebar {
                                 label,
                                 body_id,
                                 expansion,
-                                false,
+                                SectionHeaderKind::Sidebar,
                             ),
                         )
                     });
@@ -1224,7 +1224,7 @@ impl Sidebar {
                             label,
                             ComponentId(self.root.0 + 11),
                             self.pinned_expansion.clone(),
-                            false,
+                            SectionHeaderKind::Sidebar,
                         ),
                     )
                 });

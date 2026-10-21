@@ -81,8 +81,9 @@ fn host_sections_precede_providers_and_collapsed_rows_keep_their_owner_without_a
     assert_eq!(
         host.get(task)
             .unwrap()
-            .component::<ButtonContent>()
+            .component::<SummaryActionRow>()
             .unwrap()
+            .button()
             .activations,
         1
     );
@@ -118,8 +119,9 @@ fn host_sections_precede_providers_and_collapsed_rows_keep_their_owner_without_a
     assert_eq!(
         host.get(task)
             .unwrap()
-            .component::<ButtonContent>()
+            .component::<SummaryActionRow>()
             .unwrap()
+            .button()
             .activations,
         1
     );
@@ -471,7 +473,7 @@ fn composed_header_keeps_one_full_accessible_name_focus_and_disclosure_after_ref
     let root = view.id();
     let header = view.section_header_id("repository").unwrap();
     let mut host = view.into_host().unwrap();
-    assert!(host.focus(Some(header), true));
+    assert!(!host.focus(Some(header), true));
     for expanded in [true, false] {
         let nodes: Vec<_> = host
             .semantics()
@@ -485,7 +487,7 @@ fn composed_header_keeps_one_full_accessible_name_focus_and_disclosure_after_ref
         );
         assert_eq!(nodes[0].id, header);
         assert_eq!(nodes[0].semantics.expanded, Some(expanded));
-        assert_eq!(host.focused(), Some(header));
+        assert_eq!(host.focused(), None);
         if expanded {
             assert!(activate(&mut host, root, header).is_empty());
             input.revision += 1;

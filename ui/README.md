@@ -251,3 +251,9 @@ macOS demo 的 `label_host` 只向原 CoreTextShaper 转交同一字体/字号/w
 无自定义截断或编辑器替换。缺服务返回 `CompositionError::MissingLabelServices`，不默默多行。
 普通行保持自然换行。公开 label ID 查询、第二 consumer 和原生入口见
 [单行标题接入](../docs/rust-agent-ui-summary-label-20261022.md)。
+
+
+Summary 的 header 和普通动作行不成为键盘焦点，匹配 ClientKit 的 first-responder 规则；
+`action_id` 对应 `SummaryActionRow`，其 `button()` 提供原 SDK ButtonContent 的只读检查。
+静态文字仍可选择，自定义宿主 Content 保留自己的焦点策略。独立 Composer 组字时的
+原 disclosure 查询、宿主条件和原生验收见[Summary焦点契约](../docs/rust-agent-ui-summary-focus-20261022.md)。

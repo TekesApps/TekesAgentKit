@@ -55,6 +55,8 @@ pub use sidebar_session_menu::*;
 mod sidebar_search;
 pub use sidebar_search::*;
 mod summary;
+mod summary_action_row;
+pub use summary_action_row::SummaryActionRow;
 mod summary_section;
 mod summary_text;
 mod summary_usage;

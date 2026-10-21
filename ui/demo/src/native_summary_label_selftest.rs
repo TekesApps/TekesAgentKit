@@ -169,21 +169,45 @@ impl Probe {
                 self.label(host);
                 self.unchanged(host);
                 host.text.type_scale = 1.;
-                run_script(vec![(0, Action::Unmark)]);
                 self.phase = 5;
             }
-            5 if host.view.editor().input.marked.is_none() => {
+            5 => {
+                // The scale change must publish a new layout before capturing
+                // the original header's pointer position.
                 self.label(host);
+                self.unchanged(host);
                 run_script(vec![(0, Self::click(host, self.header.unwrap()))]);
                 self.phase = 6;
             }
             6 if Self::view(host).section_expanded(TITLE) == Some(false) => {
                 self.label(host);
+                self.unchanged(host);
+                assert!(
+                    !host
+                        .view
+                        .tree
+                        .focus_targets()
+                        .iter()
+                        .any(|(id, _)| Some(*id) == self.header)
+                );
                 run_script(vec![(0, Self::click(host, self.header.unwrap()))]);
                 self.phase = 7;
             }
             7 if Self::view(host).section_expanded(TITLE) == Some(true) => {
                 self.label(host);
+                self.unchanged(host);
+                let commands = host
+                    .view
+                    .accessibility_action(self.header.unwrap(), None, AccessibilityAction::Press)
+                    .unwrap();
+                assert!(commands.is_empty());
+                self.unchanged(host);
+                run_script(vec![(0, Action::WakeRedraw)]);
+                self.phase = 8;
+            }
+            8 if Self::view(host).section_expanded(TITLE) == Some(false) => {
+                self.label(host);
+                self.unchanged(host);
                 assert!(
                     host.view
                         .binding()
@@ -193,7 +217,7 @@ impl Probe {
                         .is_empty()
                 );
                 run_script(vec![(0, Action::Close)]);
-                self.phase = 8;
+                self.phase = 9;
             }
             _ => {}
         }
@@ -203,9 +227,9 @@ impl Probe {
         }
     }
     pub fn receipt(&self) -> serde_json::Value {
-        assert_eq!(self.phase, 8);
+        assert_eq!(self.phase, 9);
         serde_json::json!({"nativeWindow":true,"originalSdkLabel":true,"singleLineEllipsis":true,
-            "fullSourceAndAxName":true,"originalHeaderRetained":true,"originalPointerDisclosure":true,
+            "fullSourceAndAxName":true,"originalHeaderRetained":true,"originalPointerDisclosure":true,"disclosureDuringMarkedText":true,"axPressDuringMarkedText":true,"headerExcludedFromTab":true,
             "typeScaleAndResize":true,"composerFocusAndMarkedBaseline":true,"noSubmission":true,
             "syntheticPreedit":true,"physicalIme":false,"physicalResizeDrag":false,"voiceOver":false,
             "realHarness":false,"fullSummaryRowParity":false})

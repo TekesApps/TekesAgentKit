@@ -3524,6 +3524,29 @@ impl ComponentDemo {
                 (run.ids().composer.editor == editor && run.is_pane_presented()).then_some(run)
             })
     }
+    // Only a separate Run Composer can use Summary disclosure during preedit.
+    // Custom Summary editors, navigation rows and inactive panes stay protected.
+    fn composing_summary_disclosures(&self) -> Option<&SummaryView> {
+        let editor = self.composing_navigation_run()?.ids().composer.editor;
+        if self.tree.focused() != Some(editor)
+            || !self
+                .tree
+                .focus_targets()
+                .iter()
+                .any(|(id, _)| *id == editor)
+        {
+            return None;
+        }
+        let input = self
+            .tree
+            .get(self.panel_id())?
+            .component::<SidePanel>()?
+            .displayed_input()?;
+        if !input.projection_ready || input.selected != Some(SidePanelTabKind::Summary) {
+            return None;
+        }
+        self.tree.get(self.summary_id())?.component::<SummaryView>()
+    }
     fn blocked_pointer(&self, event: &ContentEvent) -> bool {
         if !self.composing() {
             return false;
@@ -3542,6 +3565,9 @@ impl ComponentDemo {
             if self.composing_navigation_run().is_some_and(|run| {
                 run.is_nonfocusing_navigation_at(position)
                     || run.composer().is_nonfocusing_notice_refresh_at(position)
+                    || self
+                        .composing_summary_disclosures()
+                        .is_some_and(|summary| summary.is_nonfocusing_disclosure_at(position))
             }) {
                 return false;
             }
@@ -3586,6 +3612,11 @@ impl ComponentDemo {
                 run.is_nonfocusing_navigation_target(target)
                     || run.composer().is_nonfocusing_notice_refresh_target(target)
             })
+            && !(matches!(action, AccessibilityAction::Press)
+                && part.is_none()
+                && self
+                    .composing_summary_disclosures()
+                    .is_some_and(|summary| summary.is_nonfocusing_disclosure_target(target)))
         {
             return Ok(vec![]);
         }

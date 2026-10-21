@@ -215,3 +215,227 @@ fn missing_label_capability_is_explicit_and_never_silently_wraps() {
         .unwrap_err();
     assert!(matches!(error, CompositionError::MissingLabelServices(id) if id == label));
 }
+
+#[test]
+fn summary_disclosure_and_domain_actions_keep_the_original_composer_focus_and_preedit() {
+    use tekes_ui_controls::{
+        ControlKey,
+        extended::{Axis, Stack},
+    };
+    let scope = RunScope::main("consumer", "focus");
+    let mut summary = SummaryView::new(49002, Default::default());
+    summary
+        .update(&SummaryInput {
+            revision: 1,
+            scope: scope.clone(),
+            facts: None,
+            host_sections: vec![SummarySection {
+                id: "repository".into(),
+                rows: vec![
+                    SummaryRow {
+                        id: "open".into(),
+                        title: "原产物动作".into(),
+                        value: Default::default(),
+                        action: Some(SummaryAction::OpenArtifact {
+                            scope: scope.clone(),
+                            path: "artifact.txt".into(),
+                        }),
+                    },
+                    SummaryRow {
+                        id: "static".into(),
+                        title: "可选择正文".into(),
+                        value: Default::default(),
+                        action: None,
+                    },
+                ],
+            }],
+        })
+        .unwrap();
+    let root = summary.id();
+    let header = summary.section_header_id("repository").unwrap();
+    let action = summary.action_id("repository", "open").unwrap();
+    assert!(
+        !summary.is_nonfocusing_disclosure_target(header),
+        "no unlaid-out hit target"
+    );
+    let composer = tekes_agent_ui_consumer_check::new_composer(49003);
+    let editor = composer.ids().editor;
+    let mut host = ContentHost::new(Content::new(
+        ComponentId(49),
+        StackContent {
+            model: Stack {
+                axis: Axis::Vertical,
+                gap: 8.,
+            },
+            flexible_child: None,
+            children: vec![
+                Content::new(composer.ids().root, composer),
+                Content::new(root, summary),
+                Content::new(ComponentId(50), ButtonContent::new("下一控件")),
+            ],
+        },
+    ))
+    .unwrap();
+    host.set_action_events(true);
+    let frame = Rect::new(0., 0., 600., 1200.);
+    let mut text = Text::new(1., true);
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        frame,
+        frame,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    assert!(host.focus(Some(editor), true));
+    host.event(&ContentEvent::Preedit {
+        text: "中文组字".into(),
+        selection: 1..3,
+        replacement: None,
+        clauses: vec![],
+    });
+    let baseline = host.text_surface(editor).unwrap().input.external_baseline();
+    let original_editor = host.text_surface(editor).unwrap() as *const _ as usize;
+    let mut intents = vec![];
+    for id in [action, header] {
+        let p = host.get(id).unwrap().visible().unwrap().center();
+        assert!(host.event(&ContentEvent::PointerDown(p)).consumed);
+        assert!(host.event(&ContentEvent::PointerUp(p)).activated);
+        assert_eq!(host.focused(), Some(editor));
+        assert_eq!(
+            host.text_surface(editor).unwrap() as *const _ as usize,
+            original_editor
+        );
+        assert_eq!(
+            host.text_surface(editor).unwrap().input.external_baseline(),
+            baseline
+        );
+        assert!(host.text_surface(editor).unwrap().input.marked.is_some());
+        let records = host.drain_actions();
+        intents.extend(
+            host.get(root)
+                .unwrap()
+                .component::<SummaryView>()
+                .unwrap()
+                .take_intents(&records),
+        );
+    }
+    assert_eq!(intents.len(), 1);
+    assert_eq!(intents[0].scope, scope);
+    assert!(
+        matches!(&intents[0].action, SummaryAction::OpenArtifact{path,..} if path=="artifact.txt")
+    );
+    assert!(
+        !host
+            .accessibility_action(action, None, AccessibilityAction::Press)
+            .activated,
+        "closed action subtree rejects activation"
+    );
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        frame,
+        frame,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    assert!(
+        host.accessibility_action(header, None, AccessibilityAction::Press)
+            .activated
+    );
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        frame,
+        frame,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    assert!(
+        host.accessibility_action(action, None, AccessibilityAction::Press)
+            .activated
+    );
+    for id in [header, action] {
+        assert!(!host.focus(Some(id), true));
+        host.accessibility_action(id, None, AccessibilityAction::Focus);
+        assert_eq!(host.focused(), Some(editor));
+        assert!(!host.focus_targets().iter().any(|(target, _)| *target == id));
+    }
+    assert_eq!(
+        host.text_surface(editor).unwrap().input.external_baseline(),
+        baseline
+    );
+    host.event(&ContentEvent::Unmark);
+    host.event(&ContentEvent::Key {
+        key: ControlKey::Tab { reverse: false },
+        down: true,
+    });
+    assert!(![Some(header), Some(action)].contains(&host.focused()));
+    assert!(
+        !host
+            .get(root)
+            .unwrap()
+            .component::<SummaryView>()
+            .unwrap()
+            .is_nonfocusing_disclosure_target(action)
+    );
+}
+
+#[test]
+fn summary_focus_policy_leaves_original_host_controls_and_static_text_selectable() {
+    let mut source = input();
+    source.host_sections[0].rows.push(SummaryRow {
+        id: "static".into(),
+        title: "静态正文".into(),
+        value: Default::default(),
+        action: None,
+    });
+    source.custom_rows = vec![SummaryCustomRowSpec {
+        section: "host:repository".into(),
+        row: "branch".into(),
+        content_key: "original-host-button".into(),
+    }];
+    let mut summary = SummaryView::new(49004, Default::default());
+    tekes_agent_ui_consumer_check::publish_summary_context(&mut summary, &source).unwrap();
+    let root = summary.id();
+    let header = summary.section_header_id("host:repository").unwrap();
+    let passive = summary
+        .passive_text_id("host:repository", "static")
+        .unwrap();
+    let token = summary
+        .custom_row_token("host:repository", "branch")
+        .unwrap();
+    let button = ComponentId(51);
+    let mut host = summary.into_host().unwrap();
+    tekes_agent_ui_consumer_check::install_summary_host_content(
+        &mut host,
+        root,
+        &token,
+        Content::new(button, ButtonContent::new("宿主自己的焦点策略")),
+    )
+    .unwrap();
+    let frame = Rect::new(0., 0., 400., 600.);
+    host.render(
+        &mut Scene::new(),
+        &mut Text::new(1., true),
+        frame,
+        frame,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    assert!(host.focus(Some(button), true));
+    assert!(!host.focus(Some(header), true));
+    assert_eq!(host.focused(), Some(button));
+    assert!(
+        host.accessibility_action(button, None, AccessibilityAction::Press)
+            .activated
+    );
+    assert!(host.focus_targets().iter().any(|(id, _)| *id == button));
+    assert!(!host.focus_targets().iter().any(|(id, _)| *id == header));
+    assert!(host.focus(Some(passive), true));
+    host.accessibility_action(passive, None, AccessibilityAction::SetSelection(0..2));
+    assert_eq!(
+        host.text_surface(passive).unwrap().input.selected_text(),
+        "静态"
+    );
+}

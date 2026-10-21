@@ -123,21 +123,30 @@ async fn summary_sections_follow_source_spacing_and_collapsed_bodies_leave_no_la
                     }),
                     host_sections: vec![SummarySection {
                         id: "repository".into(),
-                        rows: vec![SummaryRow {
-                            id: "branch".into(),
-                            title: "main".into(),
-                            value: Default::default(),
-                            action: Some(SummaryAction::OpenArtifact {
-                                scope: RunScope::main("fixture", "a"),
-                                path: "/owned/branch".into(),
-                            }),
-                        }],
+                        rows: vec![
+                            SummaryRow {
+                                id: "branch".into(),
+                                title: "main".into(),
+                                value: Default::default(),
+                                action: Some(SummaryAction::OpenArtifact {
+                                    scope: RunScope::main("fixture", "a"),
+                                    path: "/owned/branch".into(),
+                                }),
+                            },
+                            SummaryRow {
+                                id: "status".into(),
+                                title: "可选择状态".into(),
+                                value: Default::default(),
+                                action: None,
+                            },
+                        ],
                     }],
                 })
                 .unwrap();
                 let root = view.id();
                 let first = view.section_header_id("repository").unwrap();
                 let row = view.row_id("repository", "branch").unwrap();
+                let selectable = view.passive_text_id("repository", "status").unwrap();
                 let mut host = view.into_host().unwrap();
                 let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()), scale);
                 let frame = Rect::new(20., 40., width, 1000.);
@@ -160,7 +169,8 @@ async fn summary_sections_follow_source_spacing_and_collapsed_bodies_leave_no_la
                     assert_eq!(layout.header.max_y(), layout.body.unwrap().min_y());
                     assert!(layout.expanded);
                 }
-                assert!(host.focus(Some(row), true));
+                assert!(!host.focus(Some(row), true));
+                assert!(host.focus(Some(selectable), true));
                 host.accessibility_action(first, None, AccessibilityAction::Press);
                 assert!(
                     host.get(root)
@@ -182,7 +192,7 @@ async fn summary_sections_follow_source_spacing_and_collapsed_bodies_leave_no_la
                     .abs()
                         < 0.1
                 );
-                assert_eq!(host.focused(), Some(first));
+                assert_eq!(host.focused(), None);
                 assert!(!host.focus_targets().iter().any(|(id, _)| *id == row));
                 assert!(
                     !host

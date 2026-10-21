@@ -1,8 +1,8 @@
 //! Agent summary UI. Membership, totals, costs and domain actions come from SummaryFacts.
 use crate::summary_custom::SummaryCustomRow;
-use crate::summary_section::{Expansion, SummaryDocument, SummarySectionView};
+use crate::summary_section::{Expansion, SectionHeaderKind, SummaryDocument, SummarySectionView};
 use crate::summary_usage::{SummaryUsageRow, SummaryUsageRowIds, SummaryUsageRowText};
-use crate::{SummaryCustomRowSpec, SummaryCustomRowToken};
+use crate::{SummaryActionRow, SummaryCustomRowSpec, SummaryCustomRowToken};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use std::{cell::RefCell, rc::Rc};
@@ -289,6 +289,39 @@ impl SummaryView {
         self.section_header_id(section)?;
         Some(self.expansions.get(section)?.borrow().open)
     }
+    fn arranged_headers(&self) -> impl Iterator<Item = &Content> {
+        self.scroll.children()[0]
+            .component::<SummaryDocument>()
+            .unwrap()
+            .list
+            .rows
+            .children
+            .iter()
+            .filter_map(|node| node.component::<SummarySectionView>())
+            .filter(|section| section.arranged().is_some())
+            .map(|section| &section.children[0])
+    }
+    /// Original, laid-out disclosure only. A host may allow this while a
+    /// separate Run Composer is composing; never use it to hide a composing
+    /// editor inside a custom Summary row or to permit navigation actions.
+    /// The host must also verify this Summary is the active presented pane.
+    pub fn is_nonfocusing_disclosure_target(&self, id: ComponentId) -> bool {
+        self.arranged_headers().any(|header| {
+            header.id() == id
+                && header.visible().is_some()
+                && !header
+                    .component::<crate::summary_section::SummaryHeader>()
+                    .unwrap()
+                    .semantics()
+                    .disabled
+        })
+    }
+    pub fn is_nonfocusing_disclosure_at(&self, point: tekes_ui_scene::Point) -> bool {
+        self.arranged_headers().any(|header| {
+            header.visible().is_some_and(|frame| frame.contains(point))
+                && self.is_nonfocusing_disclosure_target(header.id())
+        })
+    }
     pub fn section_order(&self) -> Vec<&str> {
         self.scroll.children()[0]
             .component::<SummaryDocument>()
@@ -523,7 +556,7 @@ impl SummaryView {
                         ids[&Key::HeaderLabel(input.owner.clone(), section.id.clone())],
                         ids[&Key::Body(input.owner.clone(), section.id.clone())],
                         expansion,
-                        true,
+                        SectionHeaderKind::Summary,
                     ),
                 )
             });
@@ -561,10 +594,11 @@ impl SummaryView {
                     let label = (self.labels.row)(&section.id, &row);
                     let mut content = old_rows
                         .remove(&id)
-                        .unwrap_or_else(|| Content::new(id, ButtonContent::new("")));
+                        .unwrap_or_else(|| Content::new(id, SummaryActionRow::new()));
                     content
-                        .component_mut::<ButtonContent>()
+                        .component_mut::<SummaryActionRow>()
                         .expect("summary action")
+                        .button
                         .label = label;
                     bindings.insert(
                         id,
