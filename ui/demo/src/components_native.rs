@@ -34,6 +34,8 @@ use tekes_ui_tokens::{Palette, Theme};
 
 #[path = "native_feedback_selftest.rs"]
 mod feedback_probe;
+#[path = "native_panel_projection_selftest.rs"]
+mod panel_projection_probe;
 #[path = "native_reading_selftest.rs"]
 mod reading_probe;
 #[path = "native_readonly_reading_selftest.rs"]
@@ -84,6 +86,7 @@ struct Host {
     sidebar_search_probe: Option<sidebar_search_probe::Probe>,
     sidebar_restore_probe: Option<sidebar_restore_probe::Probe>,
     sidebar_options_probe: Option<sidebar_options_probe::Probe>,
+    panel_projection_probe: Option<panel_projection_probe::Probe>,
     reading_probe: Option<reading_probe::Probe>,
     readonly_reading_probe: Option<readonly_reading_probe::Probe>,
     summary_sections_probe: Option<summary_sections_probe::Probe>,
@@ -109,6 +112,7 @@ struct Host {
     wake: Option<tekes_ui_platform_macos::WindowWake>,
     observers: Vec<tokio::task::JoinHandle<()>>,
     selftest: bool,
+    native_script_waiting_for_pin: bool,
     system_ime_selftest: bool,
     system_ime_initial_users: usize,
     failures: Vec<String>,
@@ -1338,6 +1342,34 @@ impl Host {
                 run_script(vec![(50, Action::WakeRedraw)]);
             }
         }
+        if self.selftest
+            && self.native_script_waiting_for_pin
+            && self.scripted_sidebar_action.is_none()
+            && window.is_active()
+        {
+            let pinned_in_rendered_frame = self
+                .view
+                .tree
+                .get(self.view.sidebar_id())
+                .unwrap()
+                .component::<Sidebar>()
+                .unwrap()
+                .displayed_input()
+                .is_some_and(|input| {
+                    input.rows.iter().any(|row| {
+                        row.address.session_id == "a"
+                            && row.pin.as_ref().is_some_and(|pin| pin.pinned)
+                    })
+                });
+            if pinned_in_rendered_frame {
+                self.native_script_waiting_for_pin = false;
+                native_script(&self.view);
+            }
+        }
+        if let Some(mut probe) = self.panel_projection_probe.take() {
+            probe.advance(self, window);
+            self.panel_projection_probe = Some(probe);
+        }
         if let Some(mut probe) = self.sidebar_options_probe.take() {
             probe.advance(self, window);
             self.sidebar_options_probe = Some(probe);
@@ -2375,6 +2407,14 @@ impl Host {
                 probe.receipt()
             );
         }
+        if let Some(probe) = &self.panel_projection_probe {
+            assert!(
+                self.failures.is_empty(),
+                "panel projection failures {:?}",
+                self.failures
+            );
+            println!("NATIVE_AGENT_PANEL_PROJECTION_RECEIPT {}", probe.receipt());
+        }
         if let Some(probe) = &self.sidebar_options_probe {
             assert!(
                 self.failures.is_empty(),
@@ -2508,7 +2548,12 @@ impl WindowHandler for Host {
                     eprintln!("COMPONENT_FOCUS after-draw={:?}", self.view.tree.focused());
                 }
                 if self.selftest {
-                    native_script(self);
+                    click_thread_action_script(self, "pin");
+                    self.native_script_waiting_for_pin = true;
+                    tekes_ui_platform_macos::selftest::run_script(vec![(
+                        30000,
+                        tekes_ui_platform_macos::selftest::Action::Close,
+                    )]);
                 }
                 if self.system_ime_selftest {
                     system_ime_script(&self.view);
@@ -2617,6 +2662,7 @@ impl WindowHandler for Host {
                     || self.reading_probe.is_some()
                     || self.stream_reading_probe.is_some()
                     || self.sidebar_options_probe.is_some()
+                    || self.panel_projection_probe.is_some()
                 {
                     eprintln!(
                         "COMPONENT_FOCUS active={active} id={:?}",
@@ -2791,6 +2837,11 @@ pub fn run() {
     );
     let sidebar_restore_selftest = args.iter().any(|arg| arg == "--sidebar-restore-selftest");
     let sidebar_options_selftest = args.iter().any(|arg| arg == "--sidebar-options-selftest");
+    let panel_projection_selftest = args.iter().any(|arg| arg == "--panel-projection-selftest");
+    assert!(
+        !panel_projection_selftest || args.iter().any(|arg| arg == "--transcript-content"),
+        "panel projection requires original Transcript window"
+    );
     let sidebar_session_menu_selftest = args
         .iter()
         .any(|arg| arg == "--sidebar-session-menu-selftest");
@@ -2799,6 +2850,7 @@ pub fn run() {
         || summary_sections_selftest
         || sidebar_restore_selftest
         || sidebar_options_selftest
+        || panel_projection_selftest
         || sidebar_session_menu_selftest
         || sidebar_search_selftest
         || sidebar_query_selftest
@@ -2831,6 +2883,7 @@ pub fn run() {
             summary_sections_selftest,
             sidebar_restore_selftest,
             sidebar_options_selftest,
+            panel_projection_selftest,
             sidebar_session_menu_selftest,
             sidebar_search_selftest,
             sidebar_query_selftest,
@@ -3232,6 +3285,7 @@ pub fn run() {
         } else {
             sidebar_options_selftest.then(sidebar_options_probe::Probe::new)
         },
+        panel_projection_probe: panel_projection_selftest.then(panel_projection_probe::Probe::new),
         readonly_reading_probe: (readonly_reading_selftest || harness_readonly_reading_selftest)
             .then(|| readonly_reading_probe::Probe::new(bounded_probe_child)),
         reading_probe: if reading_selftest || harness_reading_selftest {
@@ -3328,6 +3382,7 @@ pub fn run() {
         wake: None,
         observers: vec![],
         selftest,
+        native_script_waiting_for_pin: false,
         system_ime_selftest,
         system_ime_initial_users,
         failures: vec![],
@@ -4485,9 +4540,7 @@ fn system_ime_script(view: &ComponentDemo) {
         (7000, Action::Close),
     ]);
 }
-fn native_script(host: &mut Host) {
-    click_thread_action_script(host, "pin");
-    let view = &host.view;
+fn native_script(view: &ComponentDemo) {
     use tekes_ui_platform_macos::selftest::{Action, run_script};
     let click = |id| {
         let point = view.tree.get(id).unwrap().frame().center();

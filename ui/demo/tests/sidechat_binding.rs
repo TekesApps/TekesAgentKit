@@ -127,6 +127,96 @@ fn create_request(view: &mut ComponentDemo) -> tekes_agent_ui_demo::component_de
 }
 
 #[tokio::test]
+async fn parent_projection_loss_retires_the_pane_but_rebuilds_from_its_original_draft_and_pointer()
+{
+    let (runtime, source, mut view) = setup().await;
+    view.enable_transcript_content().unwrap();
+    let parent = view.binding().scope().clone();
+    let request = create_request(&mut view);
+    let chat = source
+        .create(parent.clone(), None, "projection-create")
+        .await
+        .unwrap();
+    let run = source.open(&chat).await.unwrap();
+    let scratch = run.binding().clone();
+    view.install_side_chat_run(request, run).unwrap();
+    let ids = view.panel_composer_ids().unwrap();
+    let old_document = view.transcript_content_id(ids).unwrap();
+    view.tree.focus(Some(ids.editor), true);
+    view.event(&ContentEvent::Preedit {
+        text: "面板组字".into(),
+        selection: 1..3,
+        clauses: vec![],
+        replacement: None,
+    })
+    .unwrap();
+    assert!(
+        view.set_panel_parent_projection_ready(&parent, false)
+            .is_err()
+    );
+    assert!(view.tree.get(ids.root).is_some());
+    view.event(&ContentEvent::Commit {
+        text: "完整面板草稿".into(),
+        replacement: None,
+    })
+    .unwrap();
+    let draft = scratch.current_run().unwrap().draft.text.clone();
+    assert!(draft.contains("完整面板草稿"));
+    view.set_panel_parent_projection_ready(&parent, false)
+        .unwrap();
+    assert!(view.tree.get(ids.root).is_none());
+    assert!(source.pointer(&parent, &chat.scope.session_id).is_ok());
+    assert!(view.has_side_chat_run(&chat));
+    assert!(view.begin_child_open(&parent).is_err());
+    view.set_panel_parent_projection_ready(&parent, true)
+        .unwrap();
+    assert_eq!(view.panel_composer_ids(), Some(ids));
+    let new_document = view.transcript_content_id(ids).unwrap();
+    assert_ne!(new_document, old_document);
+    assert!(view.tree.get(old_document).is_none());
+    assert_eq!(
+        view.tree
+            .get(ids.root)
+            .unwrap()
+            .component::<tekes_agent_components_ui::Composer>()
+            .unwrap()
+            .editor()
+            .input
+            .text,
+        draft
+    );
+    view.select(1).unwrap();
+    assert!(view.tree.get(ids.root).is_none());
+    view.select(0).unwrap();
+    assert_ne!(view.transcript_content_id(ids), Some(new_document));
+    assert_eq!(scratch.current_run().unwrap().draft.text, draft);
+    assert!(scratch.current_run().unwrap().submissions.is_empty());
+    assert!(source.pointer(&parent, &chat.scope.session_id).is_ok());
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn a_create_reply_from_before_projection_loss_cannot_reselect_after_ready_returns() {
+    let (runtime, source, mut view) = setup().await;
+    let parent = view.binding().scope().clone();
+    let request = create_request(&mut view);
+    let chat = source
+        .create(parent.clone(), None, "late-projection-create")
+        .await
+        .unwrap();
+    let run = source.open(&chat).await.unwrap();
+    view.set_panel_parent_projection_ready(&parent, false)
+        .unwrap();
+    view.set_panel_parent_projection_ready(&parent, true)
+        .unwrap();
+    assert!(!view.install_side_chat_run(request, run).unwrap());
+    assert!(view.panel_composer_ids().is_none());
+    assert!(view.has_side_chat_run(&chat));
+    assert!(source.pointer(&parent, &chat.scope.session_id).is_ok());
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
 async fn late_creation_keeps_its_parent_and_never_steals_another_sessions_panel() {
     let (runtime, source, mut view) = setup().await;
     let request = create_request(&mut view);

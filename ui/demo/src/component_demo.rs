@@ -185,6 +185,7 @@ pub struct ComponentDemo {
     panel_revision: u64,
     side_chats: Option<Arc<SideChatBinding>>,
     panel_selections: BTreeMap<RunScope, SidePanelTabKind>,
+    panel_parent_projection: BTreeMap<RunScope, (bool, u64)>,
     panel_runs: BTreeMap<(RunScope, String), PanelRun>,
     task_sources: BTreeMap<(RunScope, String), TaskSource>,
     task_runs: BTreeMap<(RunScope, String), PanelRun>,
@@ -259,6 +260,7 @@ pub struct PanelRequest {
     parent: RunScope,
     main_revision: u64,
     panel_revision: u64,
+    projection_generation: u64,
 }
 impl PanelRequest {
     pub fn parent(&self) -> &RunScope {
@@ -495,6 +497,7 @@ impl ComponentDemo {
             panel_revision: 0,
             side_chats: None,
             panel_selections: BTreeMap::new(),
+            panel_parent_projection: BTreeMap::new(),
             panel_runs: BTreeMap::new(),
             task_sources: BTreeMap::new(),
             task_runs: BTreeMap::new(),
@@ -1928,6 +1931,103 @@ impl ComponentDemo {
     pub fn panel_id(&self) -> ComponentId {
         ComponentId((PANEL_NAMESPACE as u64) << 32)
     }
+    fn panel_body_owns(&self, target: ComponentId) -> bool {
+        let Some(panel) = self
+            .tree
+            .get(self.panel_id())
+            .and_then(|node| node.component::<SidePanel>())
+        else {
+            return false;
+        };
+        let root = panel.content_slot_id();
+        let nodes = self.tree.semantics();
+        let mut cursor = Some(target);
+        while let Some(id) = cursor {
+            if id == root {
+                return true;
+            }
+            cursor = nodes
+                .iter()
+                .find(|node| node.id == id)
+                .and_then(|node| node.parent);
+        }
+        false
+    }
+    /// Host parent-projection availability is independent of connection state.
+    /// Finish a composing pane before retiring it; a composing main editor is
+    /// retained. Only the old pane's UI affordances and SDK focus are released.
+    pub fn set_panel_parent_projection_ready(
+        &mut self,
+        parent: &RunScope,
+        ready: bool,
+    ) -> Result<()> {
+        require(
+            self.bindings
+                .iter()
+                .any(|binding| binding.scope() == parent),
+            "unknown panel parent projection",
+        )?;
+        let (current, generation) = self
+            .panel_parent_projection
+            .get(parent)
+            .copied()
+            .unwrap_or((true, 0));
+        if current == ready {
+            return Ok(());
+        }
+        let generation = generation
+            .checked_add(1)
+            .ok_or_else(|| unsupported("panel projection generation exhausted"))?;
+        if self
+            .current_binding()
+            .is_some_and(|binding| binding.scope() == parent)
+            && !ready
+        {
+            let pane_binding = self.active_panel_run().map(|run| run.binding.clone());
+            let pane_annotation = self.annotation_gesture.as_ref().is_some_and(|gesture| {
+                pane_binding
+                    .as_ref()
+                    .is_some_and(|binding| Arc::ptr_eq(binding, &gesture.binding))
+            });
+            require(
+                !(self
+                    .composing_editor()
+                    .is_some_and(|id| self.panel_body_owns(id))
+                    || pane_annotation && self.composing()),
+                "finish pane composition before retiring its parent projection",
+            )?;
+            if self.model_gesture.as_ref().is_some_and(|gesture| {
+                pane_binding
+                    .as_ref()
+                    .is_some_and(|binding| Arc::ptr_eq(binding, &gesture.binding))
+            }) {
+                self.cancel_model_choices();
+            }
+            if pane_annotation {
+                self.cancel_annotation()?;
+            }
+            if self
+                .tree
+                .focused()
+                .is_some_and(|id| self.panel_body_owns(id))
+            {
+                self.tree.focus(None, false);
+            }
+        }
+        self.panel_parent_projection
+            .insert(parent.clone(), (ready, generation));
+        self.sync()
+    }
+    fn panel_parent_is_projected(&self, parent: &RunScope) -> bool {
+        self.panel_parent_projection
+            .get(parent)
+            .is_none_or(|value| value.0)
+    }
+    fn panel_projection_generation(&self, parent: &RunScope) -> u64 {
+        self.panel_parent_projection
+            .get(parent)
+            .map_or(0, |value| value.1)
+    }
     pub fn summary_id(&self) -> ComponentId {
         ComponentId((101 + self.selected as u64 * 2) << 32)
     }
@@ -2173,13 +2273,17 @@ impl ComponentDemo {
     }
     pub fn begin_child_open(&mut self, panel_parent: &RunScope) -> Result<PanelRequest> {
         require(
-            !self.composing() && self.binding().scope() == panel_parent,
+            !self.composing()
+                && self.binding().scope() == panel_parent
+                && self.panel_parent_is_projected(panel_parent),
             "child navigation parent changed or composing",
         )?;
         Ok(self.panel_request(panel_parent.clone()))
     }
     pub fn child_request_current(&self, request: &PanelRequest) -> bool {
         !self.selection_cleared
+            && self.panel_parent_is_projected(&request.parent)
+            && self.panel_projection_generation(&request.parent) == request.projection_generation
             && self.binding().scope() == &request.parent
             && self.navigation_revision == request.main_revision
             && self.panel_navigation_revision == request.panel_revision
@@ -2441,6 +2545,10 @@ impl ComponentDemo {
             .parent_scope()
             .ok_or_else(|| unsupported("task parent unresolved"))?
             .clone();
+        require(
+            self.panel_parent_is_projected(&parent),
+            "task parent projection is pending",
+        )?;
         let task_id = state
             .active_task_id()
             .ok_or_else(|| unsupported("task identity unresolved"))?
@@ -2552,10 +2660,12 @@ impl ComponentDemo {
     }
     fn panel_request(&mut self, parent: RunScope) -> PanelRequest {
         self.panel_navigation_revision += 1;
+        let projection_generation = self.panel_projection_generation(&parent);
         PanelRequest {
             parent,
             main_revision: self.navigation_revision,
             panel_revision: self.panel_navigation_revision,
+            projection_generation,
         }
     }
     pub fn has_side_chat_run(&self, chat: &SideChat) -> bool {
@@ -2591,6 +2701,8 @@ impl ComponentDemo {
             );
         }
         let selected = self.binding().scope() == &request.parent
+            && self.panel_parent_is_projected(&request.parent)
+            && self.panel_projection_generation(&request.parent) == request.projection_generation
             && self.navigation_revision == request.main_revision
             && self.panel_navigation_revision == request.panel_revision
             && !self.composing();
@@ -2886,6 +2998,7 @@ impl ComponentDemo {
             SidePanelInput {
                 revision: self.panel_revision,
                 parent: parent.clone(),
+                projection_ready: true,
                 tabs,
                 selected,
                 side_chats: SideChatSnapshot::default(),
@@ -2897,6 +3010,7 @@ impl ComponentDemo {
             self.tree.focus(None, false);
             input.selected = Some(SidePanelTabKind::Summary);
         }
+        input.projection_ready = self.panel_parent_is_projected(&parent);
         let selected = input.selected.clone().expect("Summary fallback");
         self.panel_selections
             .insert(parent.clone(), selected.clone());
@@ -2907,6 +3021,9 @@ impl ComponentDemo {
             .expect("SidePanel")
             .update(&input)
             .map_err(unsupported)?;
+        if !input.projection_ready {
+            return self.sync_upload_status();
+        }
         match selected {
             SidePanelTabKind::Summary => {
                 let summary_id = self.summary_id();
@@ -3150,6 +3267,10 @@ impl ComponentDemo {
             return Ok(());
         };
         if self.tree.get(ids.root).is_none() {
+            // The shared panel evicted this UI. Keep its binding/draft, but
+            // never reuse the old Transcript/editor authority on a fresh tree.
+            self.document_roots.remove(&ids.root);
+            self.feedback_panes.remove(&ids.root);
             let panel_id = self.panel_id();
             let panel = self
                 .tree

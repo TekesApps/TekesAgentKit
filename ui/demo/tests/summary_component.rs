@@ -427,6 +427,7 @@ fn real_summary_component_mounts_inside_a_domain_panel_slot_and_retains_shared_a
         .update(&SidePanelInput {
             revision: 1,
             parent: parent.clone(),
+            projection_ready: true,
             tabs: vec![SidePanelTab::summary("Summary")],
             selected: Some(SidePanelTabKind::Summary),
             side_chats: SideChatSnapshot::default(),

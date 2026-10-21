@@ -77,6 +77,7 @@ impl SideChatBinding {
         Ok(SidePanelInput {
             revision,
             parent: parent.clone(),
+            projection_ready: true,
             tabs,
             selected,
             side_chats: snapshot,

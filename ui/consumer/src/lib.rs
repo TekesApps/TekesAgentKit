@@ -191,7 +191,18 @@ pub fn sync_scratch_tabs(
     parent: &tekes_agent_ui_bindings::RunBinding,
     revision: u64,
 ) -> Result<(), String> {
-    let input = source
+    sync_scratch_tabs_with_projection(panel, source, parent, revision, true)
+}
+/// Canonical parent projection availability is a host input, independent of
+/// transport freshness. Waiting must not manufacture a pane for an absent parent.
+pub fn sync_scratch_tabs_with_projection(
+    panel: &mut tekes_agent_components_ui::SidePanel,
+    source: &tekes_agent_ui_bindings::SideChatBinding,
+    parent: &tekes_agent_ui_bindings::RunBinding,
+    revision: u64,
+    projection_ready: bool,
+) -> Result<(), String> {
+    let mut input = source
         .input(
             revision,
             parent.scope(),
@@ -199,6 +210,7 @@ pub fn sync_scratch_tabs(
             Some(tekes_agent_components_ui::SidePanelTabKind::Summary),
         )
         .map_err(|error| error.to_string())?;
+    input.projection_ready = projection_ready;
     panel.update(&input).map_err(str::to_owned)
 }
 /// Consume the observed shared inventory through public APIs only. Selection is

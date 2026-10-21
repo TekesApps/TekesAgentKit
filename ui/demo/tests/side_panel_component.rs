@@ -1,10 +1,51 @@
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 use tekes_agent_components_ui::*;
 use tekes_agent_presentation::*;
 use tekes_ui_controls::composition::*;
+#[derive(Debug)]
+struct PaneLifetime {
+    children: Vec<Content>,
+    dropped: Arc<AtomicBool>,
+}
+impl Drop for PaneLifetime {
+    fn drop(&mut self) {
+        self.dropped.store(true, Ordering::SeqCst);
+    }
+}
+impl Component for PaneLifetime {
+    fn measure(
+        &mut self,
+        text: &mut dyn tekes_ui_controls::ButtonTextRenderer,
+        available: tekes_ui_scene::Size,
+    ) -> tekes_ui_controls::layout::MeasuredChild {
+        self.children[0].measure(text, available)
+    }
+    fn arrange(
+        &mut self,
+        text: &mut dyn tekes_ui_controls::ButtonTextRenderer,
+        frame: tekes_ui_scene::Rect,
+        clip: tekes_ui_scene::Rect,
+    ) {
+        self.children[0].arrange(text, frame, clip);
+    }
+    fn children(&self) -> &[Content] {
+        &self.children
+    }
+    fn children_mut(&mut self) -> Option<&mut Vec<Content>> {
+        Some(&mut self.children)
+    }
+    fn semantics(&self) -> ContentSemantics {
+        ContentSemantics::new(ContentRole::Group, "owned pane")
+    }
+}
 fn input(parent: RunScope) -> SidePanelInput {
     SidePanelInput {
         revision: 1,
         parent,
+        projection_ready: true,
         tabs: vec![SidePanelTab::summary("Summary")],
         selected: Some(SidePanelTabKind::Summary),
         side_chats: SideChatSnapshot::default(),
@@ -87,7 +128,10 @@ fn confirmed_scratch_absence_retires_inactive_parent_content_and_install_tokens(
         )
         .unwrap();
     let mut host = panel.into_host().unwrap();
-    let mut b = input(RunScope::main("fixture", "b"));
+    let mut b = input(RunScope {
+        session_id: "b".into(),
+        ..a.parent.clone()
+    });
     b.revision = 2;
     b.side_chats = a.side_chats.clone();
     panel_mut(&mut host, root).update(&b).unwrap();
@@ -116,7 +160,7 @@ fn activate(host: &mut ContentHost, id: ComponentId, target: ComponentId) -> Vec
     mounted_panel(host, id).take_intents(&actions)
 }
 #[tokio::test]
-async fn exact_kit_composer_instances_survive_tab_and_parent_switches_but_old_install_tokens_do_not()
+async fn same_thread_tabs_retain_the_editor_but_thread_switch_retires_it_and_keeps_the_presentation_draft()
  {
     let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
     let parent = RunScope::main("fixture", "a");
@@ -140,8 +184,18 @@ async fn exact_kit_composer_instances_survive_tab_and_parent_switches_but_old_in
     composer
         .update(&controller.snapshot(), ComposerAffordances::default())
         .unwrap();
-    view.install_content(&token, Content::new(ids.root, composer))
-        .unwrap();
+    let dropped = Arc::new(AtomicBool::new(false));
+    view.install_content(
+        &token,
+        Content::new(
+            ComponentId(1999),
+            PaneLifetime {
+                children: vec![Content::new(ids.root, composer)],
+                dropped: dropped.clone(),
+            },
+        ),
+    )
+    .unwrap();
     let mut host = view.into_host().unwrap();
     host.focus(Some(ids.editor), true);
     host.event(&ContentEvent::Commit {
@@ -164,6 +218,10 @@ async fn exact_kit_composer_instances_survive_tab_and_parent_switches_but_old_in
     model.selected = Some(SidePanelTabKind::Summary);
     panel_mut(&mut host, root).update(&model).unwrap();
     assert!(host.get(ids.root).is_none());
+    assert!(
+        !dropped.load(Ordering::SeqCst),
+        "same-thread tab switch retains its exact UI"
+    );
     model.revision = 3;
     model.selected = Some(tab.kind.clone());
     panel_mut(&mut host, root).update(&model).unwrap();
@@ -181,10 +239,27 @@ async fn exact_kit_composer_instances_survive_tab_and_parent_switches_but_old_in
     b.revision = 4;
     panel_mut(&mut host, root).update(&b).unwrap();
     assert!(host.get(ids.root).is_none());
+    assert!(
+        dropped.load(Ordering::SeqCst),
+        "changing thread evicts cached pane UI"
+    );
     model.revision = 5;
     panel_mut(&mut host, root).update(&model).unwrap();
+    assert!(
+        host.get(ids.root).is_none(),
+        "returning does not resurrect the retired editor"
+    );
+    let fresh = panel_mut(&mut host, root).content_token(&tab.kind).unwrap();
+    let fresh_ids = ComposerIds::new(6000);
+    let mut composer = Composer::new(fresh_ids);
+    composer
+        .update(&controller.snapshot(), ComposerAffordances::default())
+        .unwrap();
+    panel_mut(&mut host, root)
+        .install_content(&fresh, Content::new(fresh_ids.root, composer))
+        .unwrap();
     assert_eq!(
-        host.get(ids.root)
+        host.get(fresh_ids.root)
             .unwrap()
             .component::<Composer>()
             .unwrap()
@@ -373,7 +448,10 @@ fn removed_and_reopened_tabs_and_evicted_parent_views_reject_old_mounts() {
         .is_err()
     );
     let a = view.content_token(&SidePanelTabKind::Summary).unwrap();
-    let mut other = input(RunScope::main("native", "b"));
+    let mut other = input(RunScope {
+        session_id: "b".into(),
+        ..model.parent.clone()
+    });
     other.revision = 4;
     view.update(&other).unwrap();
     model.revision = 5;
@@ -385,6 +463,129 @@ fn removed_and_reopened_tabs_and_evicted_parent_views_reject_old_mounts() {
         )
         .is_err()
     );
+}
+
+#[test]
+fn awaiting_projection_retires_all_content_without_empty_or_stale_body_and_never_revives_old_tokens()
+ {
+    let mut model = input(RunScope::main("fixture", "a"));
+    let child = SidePanelTab::subagent("child", "Child", ChildHistoryLayout::IndependentSessions);
+    model.tabs.push(child.clone());
+    model.supports_side_chat = Some(true);
+    let mut view = SidePanel::new(76, Default::default(), 4);
+    view.update(&model).unwrap();
+    let root = view.id();
+    let summary = view.content_token(&SidePanelTabKind::Summary).unwrap();
+    let child_token = view.content_token(&child.kind).unwrap();
+    let header = view.tab_id(&child.kind).unwrap();
+    let first = Arc::new(AtomicBool::new(false));
+    let second = Arc::new(AtomicBool::new(false));
+    for (token, id, flag) in [
+        (&summary, 5000, first.clone()),
+        (&child_token, 5100, second.clone()),
+    ] {
+        view.install_content(
+            token,
+            Content::new(
+                ComponentId(id),
+                PaneLifetime {
+                    children: vec![Content::new(
+                        ComponentId(id + 1),
+                        TextContent::new("canonical pane"),
+                    )],
+                    dropped: flag,
+                },
+            ),
+        )
+        .unwrap();
+    }
+    let mut host = view.into_host().unwrap();
+    let create = mounted_panel(&host, root).create_side_chat_id();
+    model.revision = 2;
+    model.projection_ready = false;
+    panel_mut(&mut host, root).update(&model).unwrap();
+    assert!(first.load(Ordering::SeqCst) && second.load(Ordering::SeqCst));
+    let names: Vec<_> = host
+        .semantics()
+        .into_iter()
+        .map(|node| node.semantics.name)
+        .collect();
+    assert!(!names.iter().any(|name| matches!(
+        name.as_str(),
+        "canonical pane" | "未打开标签" | "正在准备面板内容"
+    )));
+    assert!(
+        mounted_panel(&host, root)
+            .content_token(&SidePanelTabKind::Summary)
+            .is_none()
+    );
+    assert!(
+        mounted_panel(&host, root)
+            .content_token(&child.kind)
+            .is_none()
+    );
+    assert!(activate(&mut host, root, create).is_empty());
+    assert!(
+        matches!(
+            activate(&mut host, root, header).as_slice(),
+            [SidePanelIntent::Select { .. }]
+        ),
+        "navigation metadata remains usable without granting body authority"
+    );
+    model.revision = 3;
+    model.projection_ready = true;
+    panel_mut(&mut host, root).update(&model).unwrap();
+    assert!(
+        panel_mut(&mut host, root)
+            .install_content(
+                &summary,
+                Content::new(ComponentId(5200), TextContent::new("late result"))
+            )
+            .is_err()
+    );
+    let fresh = mounted_panel(&host, root)
+        .content_token(&SidePanelTabKind::Summary)
+        .unwrap();
+    panel_mut(&mut host, root)
+        .install_content(
+            &fresh,
+            Content::new(ComponentId(5300), TextContent::new("fresh parent")),
+        )
+        .unwrap();
+    assert!(host.get(ComponentId(5300)).is_some());
+    let mut conflict = model.clone();
+    conflict.projection_ready = false;
+    assert!(panel_mut(&mut host, root).update(&conflict).is_err());
+    assert!(
+        host.get(ComponentId(5300)).is_some(),
+        "a conflicting revision must not mutate accepted content"
+    );
+}
+
+#[tokio::test]
+async fn second_host_passes_parent_projection_explicitly_without_treating_it_as_a_connection_state()
+{
+    let (runtime, _) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
+    let parent = tekes_agent_ui_bindings::RunBinding::open_main(
+        runtime.clone(),
+        RunScope::main("fixture", "a"),
+    )
+    .await
+    .unwrap();
+    let owner = tekes_agent_ui_bindings::SideChatBinding::new(runtime.clone());
+    let mut view = SidePanel::new(77, Default::default(), 4);
+    tekes_agent_ui_consumer_check::sync_scratch_tabs_with_projection(
+        &mut view, &owner, &parent, 1, false,
+    )
+    .unwrap();
+    assert!(!view.displayed_input().unwrap().projection_ready);
+    assert!(view.content_token(&SidePanelTabKind::Summary).is_none());
+    tekes_agent_ui_consumer_check::sync_scratch_tabs_with_projection(
+        &mut view, &owner, &parent, 2, true,
+    )
+    .unwrap();
+    assert!(view.content_token(&SidePanelTabKind::Summary).is_some());
+    runtime.stop().await.unwrap();
 }
 
 #[test]

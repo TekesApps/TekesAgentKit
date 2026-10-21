@@ -177,7 +177,9 @@ RunView 组合正式 Composer / Transcript / Indicators，拥有 Agent 组件间
 
 ## SidePanel 与 Summary（首批实现）
 
-`SidePanel` 是 Agent 业务 tab/pane 容器，不再包一层 RunSurface。输入 `SidePanelInput` 提供父 RunScope、单调 revision、打开的 SidePanelTab、当前选择与现有 SideChatSnapshot。task tab 来自 AgentTask；subagent tab 必须显式提供 ChildHistoryLayout；SideChat tab 来自实际 SideChat。`supports_side_chat` 使用现有 controller 的能力结果：Some(true)/Some(false)/None 分别为支持/不支持/尚无结论，不将未知显示成不支持。
+[父投影与 pane 生命周期](rust-agent-ui-sidepanel-projection-20261022.md)明确等待时不构造正文、跨 thread 销毁 UI、同 thread 保留 tab、草稿与 pointer 不随 UI 销毁；最终程序的原生分页/reveal/组字证据也在该记录中。
+
+`SidePanel` 是 Agent 业务 tab/pane 容器，不再包一层 RunSurface。输入 `SidePanelInput` 提供父 RunScope、单调 revision、打开的 SidePanelTab、当前选择与现有 SideChatSnapshot。新增必填 `projection_ready` 表示父投影是否存在，不能从连接新鲜度或子历史加载状态推断；已知父投影的 `SideChatBinding::input` 默认 true，宿主可明确覆盖。第二 consumer 提供 `sync_scratch_tabs_with_projection`。task tab 来自 AgentTask；subagent tab 必须显式提供 ChildHistoryLayout；SideChat tab 来自实际 SideChat。`supports_side_chat` 使用现有 controller 的能力结果：Some(true)/Some(false)/None 分别为支持/不支持/尚无结论，不将未知显示成不支持。
 
 选择回调携带原始 parent 和完整 tab 定义，包括子历史策略。关闭与创建只发作用域明确的意图，不自行 fork/discard/cancel。SideChat unknown/closing 时禁用再次关闭，创建 pending/unknown 时禁用再次创建并呈现共享错误；在共享 controller 仍持有同一临时 pointer 时，组件拒绝从输入中移除该 tab。确认 discard 后才能移除，不能用隐藏 UI 冒充关闭成功。
 
@@ -186,10 +188,10 @@ pane 内容用独立 namespace 的 Kit Component 组合：
 1. `update` 打开/选择 tab 后获取 `content_token(kind)`。
 2. 数据首先通过现有 TaskPanelState 的 commit/generation 或 ChildRun / SideChatController 校验；subagent 仍用明确的 bounded/independent adapter，不能回退为父历史。
 3. 将实际 Kit 内容包装为公开 `Content`，通过 `install_content(token, content)` 放入对应 pane。上游正式 Transcript 尚未可消费时，未挂载位置只是明确的待接入位置，不能算子运行内容完成。
-4. 同一 tab 的普通数据更新保留组件实例；切换 tab/父 scope 后缓存精确实例，返回恢复编辑/阅读的控件状态。缓存有显式父 scope 数量上限，淘汰只释放 UI/观察，不取消运行或偷偷 discard。
-5. PanelContentToken 只约束 UI mount 生命周期，不能代替业务 load token。A→B→A、关闭重开、history layout 改变、父缓存淘汰会使旧 token 失效。
+4. 同一 endpoint/thread 内，普通更新及 tab 切换保留精确实例，父 scope 缓存有明确上限。跨 endpoint/thread 时释放旧 UI；父投影等待时清空正文与缓存，不显示伪空态或创建 pane。草稿、运行与 pointer 仍归原 binding/controller，不取消运行或偷偷 discard。销毁重建后的持久阅读恢复仍跟踪 TekesUI #42。
+5. PanelContentToken 只约束 UI mount 生命周期，不能代替业务 load token。A→B→A、ready→waiting→ready、关闭重开、history layout 改变、父缓存淘汰会使旧 token 失效。等待时 `content_token` 返回 None，Create/SideChat close 禁用，tab 仅保留导航元数据。相同 revision 的冲突输入被拒绝。
 
-宿主在结构切换前排出旧动作并通过公共 ContentHost 解除旧 focus、结束/取消组字；不能带着预编辑状态直接换走活动 pane。窗口级总体导航归宿主，pane 组件不另建业务状态机。tab strip 当前由基础 ButtonContent 组合；选中语义仍来自其现有 selected 属性，完整原生 tab 交互与视觉尚未验收。
+宿主在结构切换前排出旧动作，先完成 pane 内组字，再通过公共 ContentHost 解除被销毁子树的 focus；主编辑器可继续组字，不受 pane 生命周期干扰。异步子请求捕获父投影 generation；晚结果可保留有效业务 binding/pointer，但不能越过新 generation 接管选择。窗口级总体导航归宿主，pane 组件不另建业务状态机。tab strip 当前由基础 ButtonContent 组合；选中语义仍来自其现有 selected 属性，完整原生 tab 交互与视觉尚未验收。
 
 `SummaryView` 是实际可独立挂载的内容组件。`SummaryInput` 接收现有 SummaryFacts（与 scope 严格匹配）和显式 host sections。章节、membership、总量、cost 覆盖及动作直接来自 SummaryFacts.sections / append_summary_sections；渲染层不重新计算业务规则。已知 0 保留，成本不完整保持未知。`SummaryIntent` 携带原 scope 与原 SummaryAction，产物交显式宿主能力打开，不直接读文件。SummaryView 已在真实 SidePanel 内容 slot 中验证动作回传。
 

@@ -108,11 +108,14 @@ impl SidePanelTab {
         }
     }
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SidePanelInput {
     /// One monotonically versioned window/panel publication, including tab navigation.
     pub revision: u64,
     pub parent: RunScope,
+    /// The navigation target is known, but its canonical parent projection may
+    /// still be pending. Waiting hides the body and grants no content token.
+    pub projection_ready: bool,
     pub tabs: Vec<SidePanelTab>,
     pub selected: Option<SidePanelTabKind>,
     /// Complete snapshot from the same SideChatController across retained parents,
@@ -197,6 +200,7 @@ pub struct PanelContentToken {
 /// A composable pane with domain tabs and a content slot. It does not create another Run store.
 /// Hosts mount Kit content under the returned token, drain actions before updates, and clear
 /// focus/finish composition before changing a mounted pane. IDs use a unique u32 namespace.
+/// Same-thread tab changes retain instances; changing endpoint/thread evicts UI.
 #[derive(Debug)]
 pub struct SidePanel {
     root: ComponentId,
@@ -215,6 +219,8 @@ pub struct SidePanel {
     retained_parent_limit: usize,
 }
 impl SidePanel {
+    /// `retained_parent_limit` bounds parent-scope caches within the current
+    /// endpoint/thread only. Crossing that boundary always retires the old UI.
     pub fn new(namespace: u32, labels: SidePanelLabels, retained_parent_limit: usize) -> Self {
         let base = (namespace as u64) << 32;
         let mut close = ButtonContent::new(&labels.close);
@@ -288,6 +294,12 @@ impl SidePanel {
     pub fn id(&self) -> ComponentId {
         self.root
     }
+    pub fn displayed_input(&self) -> Option<&SidePanelInput> {
+        self.input.as_ref()
+    }
+    pub fn content_slot_id(&self) -> ComponentId {
+        ComponentId(self.root.0 + 5)
+    }
     pub fn close_id(&self) -> ComponentId {
         ComponentId(self.root.0 + 3)
     }
@@ -325,10 +337,9 @@ impl SidePanel {
     }
     pub fn update(&mut self, input: &SidePanelInput) -> Result<(), &'static str> {
         if input.revision == 0
-            || self
-                .input
-                .as_ref()
-                .is_some_and(|old| input.revision < old.revision)
+            || self.input.as_ref().is_some_and(|old| {
+                input.revision < old.revision || (input.revision == old.revision && input != old)
+            })
         {
             return Err("stale or unversioned side-panel input");
         }
@@ -433,26 +444,37 @@ impl SidePanel {
             .input
             .as_ref()
             .is_none_or(|old| old.parent != input.parent);
+        let changed_thread = self.input.as_ref().is_some_and(|old| {
+            old.parent.endpoint_id != input.parent.endpoint_id
+                || old.parent.thread_id != input.parent.thread_id
+        });
+        let changed_projection = self
+            .input
+            .as_ref()
+            .is_some_and(|old| old.projection_ready != input.projection_ready);
         let needed = input
             .tabs
             .iter()
             .filter(|tab| {
-                !self.mounts.contains_key(&Key {
-                    parent: input.parent.clone(),
-                    tab: tab.kind.clone(),
-                })
+                changed_thread
+                    || !self.mounts.contains_key(&Key {
+                        parent: input.parent.clone(),
+                        tab: tab.kind.clone(),
+                    })
             })
             .count() as u64;
         let source_changes = input
             .tabs
             .iter()
             .filter(|tab| {
-                self.mounts
-                    .get(&Key {
-                        parent: input.parent.clone(),
-                        tab: tab.kind.clone(),
-                    })
-                    .is_none_or(|old| !old.same_source(tab))
+                changed_thread
+                    || self
+                        .mounts
+                        .get(&Key {
+                            parent: input.parent.clone(),
+                            tab: tab.kind.clone(),
+                        })
+                        .is_none_or(|old| !old.same_source(tab))
             })
             .count() as u64;
         let next = self
@@ -466,13 +488,17 @@ impl SidePanel {
             .ok_or("panel mount epoch exhausted")?;
         let context = self
             .context
-            .checked_add(u64::from(changed_parent))
+            .checked_add(u64::from(changed_parent || changed_projection))
             .ok_or("panel context exhausted")?;
         // Keep the active subtree mounted across ordinary facts updates; otherwise retain its exact instance.
-        let next_key = input.selected.as_ref().map(|tab| Key {
-            parent: input.parent.clone(),
-            tab: tab.clone(),
-        });
+        let next_key = input
+            .selected
+            .as_ref()
+            .filter(|_| input.projection_ready)
+            .map(|tab| Key {
+                parent: input.parent.clone(),
+                tab: tab.clone(),
+            });
         let same_content = self.mounted == next_key
             && next_key.as_ref().is_some_and(|key| {
                 self.mounts.get(key).is_some_and(|old| {
@@ -485,6 +511,13 @@ impl SidePanel {
             });
         if !same_content {
             self.stash();
+        }
+        if changed_thread {
+            self.mounts.clear();
+            self.retained.clear();
+            self.parent_order.clear();
+        } else if !input.projection_ready {
+            self.retained.clear();
         }
         let live = |key: &Key| match &key.tab {
             SidePanelTabKind::SideChat { session_id } => input
@@ -576,14 +609,15 @@ impl SidePanel {
             );
         }
         let close_enabled = input.selected.as_ref().is_some_and(|tab| match tab {
-            SidePanelTabKind::SideChat { session_id } => input
-                .side_chats
-                .chats
-                .get(session_id)
-                .is_some_and(|chat| chat.phase == SideChatPhase::Ready),
+            SidePanelTabKind::SideChat { session_id } => {
+                input.side_chats.chats.get(session_id).is_some_and(|chat| {
+                    input.projection_ready && chat.phase == SideChatPhase::Ready
+                })
+            }
             _ => true,
         });
-        let create_enabled = input.supports_side_chat == Some(true)
+        let create_enabled = input.projection_ready
+            && input.supports_side_chat == Some(true)
             && !input.side_chats.is_creating_for(&input.parent)
             && input
                 .side_chats
@@ -621,7 +655,10 @@ impl SidePanel {
                 },
             );
         }
-        if !same_content || !self.mounted_custom {
+        if !input.projection_ready {
+            self.slot().children.clear();
+            self.slot().flexible_child = None;
+        } else if !same_content || !self.mounted_custom {
             if let Some(key) = &next_key
                 && let Some(content) = self.retained.remove(key)
             {
@@ -675,7 +712,8 @@ impl SidePanel {
         if input.supports_side_chat == Some(false) {
             messages.push(self.labels.unsupported_side_chat.clone());
         }
-        let message = (!messages.is_empty()).then(|| messages.join(" · "));
+        let message =
+            (input.projection_ready && !messages.is_empty()).then(|| messages.join(" · "));
         if self.body.children.len() == 4 {
             self.body.children.pop();
         }
@@ -691,6 +729,9 @@ impl SidePanel {
         Ok(())
     }
     pub fn content_token(&self, tab: &SidePanelTabKind) -> Option<PanelContentToken> {
+        if !self.input.as_ref()?.projection_ready {
+            return None;
+        }
         let key = Key {
             parent: self.input.as_ref()?.parent.clone(),
             tab: tab.clone(),
@@ -715,7 +756,7 @@ impl SidePanel {
             || self
                 .input
                 .as_ref()
-                .is_none_or(|input| input.parent != token.key.parent)
+                .is_none_or(|input| !input.projection_ready || input.parent != token.key.parent)
             || self
                 .mounts
                 .get(&token.key)
