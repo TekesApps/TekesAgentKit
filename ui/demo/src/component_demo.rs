@@ -1921,6 +1921,15 @@ impl ComponentDemo {
             .component::<Sidebar>()?
             .search_snippet(address)
     }
+    /// Full occupied-folder choices, independent of the current page/query/filter.
+    pub fn sidebar_folder_catalog(
+        &self,
+    ) -> Result<Option<tekes_agent_ui_bindings::SidebarFolderCatalog>> {
+        self.sidebar_source
+            .as_ref()
+            .map(|source| source.folder_catalog().map_err(unsupported))
+            .transpose()
+    }
     pub fn set_sidebar_folder_filter(
         &mut self,
         filter: Option<tekes_agent_components_ui::SidebarFolderKey>,

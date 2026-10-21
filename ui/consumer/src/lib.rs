@@ -1541,6 +1541,7 @@ fn sidebar_observation_exposes_restoration_and_failure_through_public_api() {
     use tekes_agent_components_ui::{Sidebar, SidebarLabels};
     use tekes_agent_ui_bindings::SidebarPublication;
     let mut source = SidebarPublication {
+        activity_at: Default::default(),
         revision: 1,
         loaded: false,
         rows: vec![],
@@ -1766,6 +1767,7 @@ fn second_product_consumes_result_projection_and_empty_state_without_private_typ
     use tekes_agent_components_ui::*;
     use tekes_agent_ui_bindings::{SidebarPublication, SidebarSearchPublication};
     let source = SidebarPublication {
+        activity_at: Default::default(),
         revision: 1,
         rows: vec![],
         loaded: true,
@@ -1912,6 +1914,7 @@ fn independent_product_keeps_unmatched_pins_when_query_results_are_pending() {
     };
     let address = RunScope::main("consumer-endpoint", "pin").address();
     let source = SidebarPublication {
+        activity_at: Default::default(),
         revision: 1,
         loaded: true,
         error: None,
@@ -2001,6 +2004,7 @@ fn second_product_consumes_scoped_folder_grouping_filter_and_original_disclosure
         },
     };
     let source = SidebarPublication {
+        activity_at: Default::default(),
         revision: 1,
         loaded: true,
         error: None,
@@ -2212,4 +2216,11 @@ pub fn restart_sidebar_page(
     view: &mut tekes_agent_components_ui::Sidebar,
 ) -> Result<bool, &'static str> {
     view.reset_paging()
+}
+
+/// Host menus consume a full versioned catalog, never the displayed page's headers.
+pub fn sidebar_folder_choices(
+    source: &tekes_agent_ui_bindings::SidebarPublication,
+) -> Result<tekes_agent_ui_bindings::SidebarFolderCatalog, &'static str> {
+    source.folder_catalog()
 }

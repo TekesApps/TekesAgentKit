@@ -13,10 +13,36 @@ use tokio::sync::{mpsc, watch};
 pub struct SidebarPublication {
     pub revision: u64,
     pub rows: Vec<SidebarRow>,
+    /// Canonical effective activity for the full inventory, before display transforms.
+    pub activity_at: std::collections::BTreeMap<SessionAddress, f64>,
     pub loaded: bool,
     pub error: Option<String>,
 }
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SidebarFolderCatalog {
+    pub revision: u64,
+    pub loaded: bool,
+    pub error: Option<String>,
+    pub folders: Vec<tekes_agent_components_ui::SidebarFolderOption>,
+}
 impl SidebarPublication {
+    /// No RPC/refresh, no search membership and no dependency on mounted rows.
+    pub fn folder_catalog(&self) -> std::result::Result<SidebarFolderCatalog, &'static str> {
+        if self.revision == 0 {
+            return Err("unversioned Sidebar catalog");
+        }
+        Ok(SidebarFolderCatalog {
+            revision: self.revision,
+            loaded: self.loaded,
+            error: self.error.clone(),
+            folders: if self.loaded {
+                tekes_agent_components_ui::sidebar_folder_catalog(&self.rows, &self.activity_at)?
+            } else {
+                vec![]
+            },
+        })
+    }
+
     /// Host navigation supplies selection; the inventory observer never selects a row.
     pub fn input(&self, selected: Option<SessionAddress>) -> SidebarInput {
         SidebarInput {
@@ -68,6 +94,7 @@ impl SidebarBinding {
         let (sender, publications) = watch::channel(Arc::new(SidebarPublication {
             revision: 1,
             rows: vec![],
+            activity_at: Default::default(),
             loaded: false,
             error: None,
         }));
@@ -88,7 +115,8 @@ impl SidebarBinding {
                             Ok(rows) => {
                                 let revision = match sender.borrow().revision.checked_add(1) { Some(revision) => revision, None => break Err(unsupported("inventory revision exhausted")) };
                                 let loaded = sender.borrow().loaded || frame["inventoryReady"].as_bool().unwrap_or(false);
-                                sender.send_replace(Arc::new(SidebarPublication { revision, rows, loaded, error: None }));
+                                let activity_at = rows.iter().map(|row| (row.address.clone(), inventory.activity[&row.address.session_id].1)).collect();
+                                sender.send_replace(Arc::new(SidebarPublication { revision, rows, activity_at, loaded, error: None }));
                             }
                             Err(error) => break Err(error),
                         }

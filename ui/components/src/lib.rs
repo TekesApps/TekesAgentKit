@@ -452,3 +452,6 @@ pub use sidebar_folders::*;
 
 mod sidebar_navigation;
 pub use sidebar_navigation::SidebarSelectionNavigation;
+
+mod sidebar_catalog;
+pub use sidebar_catalog::*;

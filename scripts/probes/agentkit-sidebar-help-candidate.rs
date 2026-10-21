@@ -44,7 +44,7 @@ async fn help_demo() -> (std::sync::Arc<tekes_agent_session::SessionRuntime>, te
     let binding = Arc::new(RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "a")).await.unwrap());
     let mut demo = tekes_agent_ui_demo::component_demo::ComponentDemo::new([binding]).unwrap();
     demo.enable_transcript_content().unwrap();
-    demo.set_sidebar_source(Arc::new(SidebarPublication { revision: 1, loaded: true, error: None, rows: vec![help_row("a"), help_row("b")] })).unwrap();
+    demo.set_sidebar_source(Arc::new(SidebarPublication { activity_at: Default::default(), revision: 1, loaded: true, error: None, rows: vec![help_row("a"), help_row("b")] })).unwrap();
     demo.bind_sidebar_search_publication("receiver-help", &help_search(1, "A", &["a", "b"])).unwrap();
     let mut text = HelpClockText { inner: Text(CoreTextShaper::new(CoreTextFonts::new()), 1.), millis: 0 };
     help_render(&mut demo, &mut text);

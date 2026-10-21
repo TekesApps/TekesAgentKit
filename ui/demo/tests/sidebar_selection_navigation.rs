@@ -491,6 +491,7 @@ async fn actual_demo_navigation_uses_existing_revision_and_never_turns_sync_into
     .unwrap();
     let mut view = ComponentDemo::new([a, b]).unwrap();
     let mut source = SidebarPublication {
+        activity_at: Default::default(),
         revision: 1,
         loaded: true,
         error: None,

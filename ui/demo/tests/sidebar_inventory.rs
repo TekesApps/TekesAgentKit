@@ -70,6 +70,23 @@ async fn reconciled_titles_and_recent_activity_reach_host_and_independent_consum
         .await;
         assert_eq!(source.snapshot().rows[0].address.session_id, first);
         assert_eq!(
+            source.snapshot().activity_at[&RunScope::main("fixture", id).address()],
+            if id == "a" && seq == 102 {
+                3000.0
+            } else {
+                time
+            }
+        );
+        assert!(
+            !source
+                .snapshot()
+                .folder_catalog()
+                .unwrap()
+                .folders
+                .is_empty()
+        );
+
+        assert_eq!(
             source
                 .snapshot()
                 .rows
