@@ -51,3 +51,6 @@ pub use transcript_content::{TranscriptBlockContent, TranscriptContentBlock};
 
 mod sidebar_search;
 pub use sidebar_search::*;
+
+mod sidebar_preferences;
+pub use sidebar_preferences::*;

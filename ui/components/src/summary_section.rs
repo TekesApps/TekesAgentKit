@@ -35,6 +35,9 @@ impl SummaryHeader {
             .expect("Summary title")
             .text = title;
     }
+    pub fn set_enabled(&mut self, enabled: bool) {
+        self.button.action.button.state.disabled = !enabled;
+    }
     fn activated(&mut self, response: ContentResponse) -> ContentResponse {
         if response.activated {
             self.expansion.borrow_mut().toggle();

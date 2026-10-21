@@ -1,5 +1,7 @@
 //! Native host of the actual public Composer/Indicators and RunBinding.
 //! This is a component integration window, not the final RunView or Transcript.
+#[path = "native_sidebar_collation.rs"]
+mod sidebar_collation;
 use super::native::{TextBackend, input_event, publish_content, window_renderer};
 use std::{
     sync::{Arc, mpsc},
@@ -681,6 +683,11 @@ impl Host {
                                 .map_err(|error| error.to_string()),
                         }
                     }
+                    DemoCommand::SidebarPreferences(change) => HostResult::Operation(
+                        sidebar
+                            .set_preferences(&change)
+                            .map_err(|error| error.to_string()),
+                    ),
                     DemoCommand::SidebarSearch(_) => HostResult::Operation(Err(
                         "此实验宿主尚未安装 Sidebar 搜索数据源适配器".into(),
                     )),
@@ -719,6 +726,7 @@ impl Host {
                             | DemoCommand::ReadHistoryPage(_)
                             | DemoCommand::ReadFilePreview { .. }
                             | DemoCommand::SelectFiles { .. }
+                            | DemoCommand::SidebarPreferences(_)
                             | DemoCommand::SidebarSearch(_)
                             | DemoCommand::Sidebar(_)
                             | DemoCommand::TurnAction { .. }
@@ -1028,6 +1036,13 @@ impl Host {
             }
         }
         if let Err(error) = self.view.set_sidebar_source(source) {
+            self.failure(error.to_string());
+        }
+        let preferences = self.sidebar.preferences();
+        if let Err(error) = self.view.set_sidebar_preferences(
+            &preferences.clone().unwrap_or_default(),
+            preferences.is_some(),
+        ) {
             self.failure(error.to_string());
         }
         if let Err(error) = self.view.sync() {
@@ -2648,6 +2663,7 @@ pub fn run() {
         })
     });
     let mut view = ComponentDemo::new(bindings).unwrap();
+    view.set_sidebar_title_comparator(sidebar_collation::compare);
     if sidebar_query_selftest {
         sidebar_query_probe::Probe::prepare(&view);
     }
@@ -2779,6 +2795,12 @@ pub fn run() {
     let side_chats = Arc::new(SideChatBinding::new(runtime.clone()));
     view.set_side_chat_binding(side_chats.clone());
     view.set_sidebar_source(sidebar.snapshot()).unwrap();
+    let preferences = sidebar.preferences();
+    view.set_sidebar_preferences(
+        &preferences.clone().unwrap_or_default(),
+        preferences.is_some(),
+    )
+    .unwrap();
     if let Some(source) = &sidebar_query {
         view.bind_sidebar_search_publication(source.owner(), &source.snapshot())
             .unwrap();

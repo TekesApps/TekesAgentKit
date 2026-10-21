@@ -109,6 +109,15 @@ impl SidebarBinding {
             observer,
         })
     }
+    pub fn preferences(&self) -> Option<tekes_agent_presentation::SidebarPreferencesSnapshot> {
+        self.agent.sidebar_preferences()
+    }
+    pub fn set_preferences(
+        &self,
+        change: &tekes_agent_presentation::SidebarPreferenceChange,
+    ) -> Result<()> {
+        self.agent.set_sidebar_preferences(change)
+    }
     pub fn snapshot(&self) -> Arc<SidebarPublication> {
         self.publications.borrow().clone()
     }

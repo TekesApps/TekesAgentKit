@@ -74,6 +74,7 @@ use uploads::UploadGesture;
 mod feedback;
 pub use feedback::{FeedbackDemoCompletion, FeedbackDemoRequest};
 pub enum DemoCommand {
+    SidebarPreferences(tekes_agent_components_ui::SidebarPreferenceChange),
     SidebarSearch(tekes_agent_components_ui::SidebarSearchIntent),
     Feedback(Box<FeedbackDemoRequest>),
     CopyTranscript(tekes_agent_components_ui::TranscriptCopyIntent),
@@ -1782,6 +1783,42 @@ impl ComponentDemo {
         self.navigation_revision += 1;
         self.sync()
     }
+    pub fn set_sidebar_title_comparator(
+        &mut self,
+        compare: tekes_agent_components_ui::SidebarTitleComparator,
+    ) {
+        let id = self.sidebar_id();
+        self.tree
+            .get_mut(id)
+            .unwrap()
+            .component_mut::<Sidebar>()
+            .unwrap()
+            .set_title_comparator(compare);
+    }
+    pub fn set_sidebar_preferences(
+        &mut self,
+        value: &tekes_agent_components_ui::SidebarPreferencesSnapshot,
+        writable: bool,
+    ) -> Result<()> {
+        let id = self.sidebar_id();
+        if self
+            .tree
+            .get(id)
+            .unwrap()
+            .component::<Sidebar>()
+            .unwrap()
+            .preferences_current(value, writable)
+        {
+            return Ok(());
+        }
+        self.tree
+            .get_mut(id)
+            .unwrap()
+            .component_mut::<Sidebar>()
+            .unwrap()
+            .update_preferences(value, writable)
+            .map_err(unsupported)
+    }
     pub fn sidebar_id(&self) -> ComponentId {
         ComponentId((SIDEBAR_NAMESPACE as u64) << 32)
     }
@@ -3292,6 +3329,16 @@ impl ComponentDemo {
                 .take_search_intents(&actions)
                 .into_iter()
                 .map(DemoCommand::SidebarSearch),
+        );
+        commands.extend(
+            self.tree
+                .get(self.sidebar_id())
+                .unwrap()
+                .component::<Sidebar>()
+                .unwrap()
+                .take_preference_intents(&actions)
+                .into_iter()
+                .map(DemoCommand::SidebarPreferences),
         );
         for intent in sidebar_intents {
             if let SidebarIntent::Select { address } = intent {

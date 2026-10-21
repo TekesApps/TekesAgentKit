@@ -193,6 +193,11 @@ pub fn sync_observed_sidebar(
     sidebar: &mut tekes_agent_components_ui::Sidebar,
     source: &tekes_agent_ui_bindings::SidebarBinding,
 ) -> Result<(), &'static str> {
+    let preferences = source.preferences();
+    sidebar.update_preferences(
+        &preferences.clone().unwrap_or_default(),
+        preferences.is_some(),
+    )?;
     sidebar.update(&source.snapshot().input(None))
 }
 pub fn new_run_surface() -> tekes_agent_components_ui::RunSurface {
@@ -1802,5 +1807,42 @@ fn second_product_consumes_result_projection_and_empty_state_without_private_typ
         host.semantics()
             .iter()
             .any(|node| node.semantics.name == "没有匹配的会话")
+    );
+}
+
+/// Host supplies a system comparator; Kit retains all ordering and pin rules.
+pub fn apply_sidebar_preferences(
+    sidebar: &mut tekes_agent_components_ui::Sidebar,
+    value: &tekes_agent_components_ui::SidebarPreferencesSnapshot,
+    writable: bool,
+    compare: tekes_agent_components_ui::SidebarTitleComparator,
+) -> Result<(), &'static str> {
+    sidebar.set_title_comparator(compare);
+    sidebar.update_preferences(value, writable)
+}
+#[test]
+fn independent_sidebar_preferences_consumer_keeps_explicit_collation_and_read_only_admission() {
+    use tekes_agent_components_ui::*;
+    let mut sidebar = Sidebar::new(1999, SidebarLabels::default());
+    let value = SidebarPreferencesSnapshot {
+        revision: 2,
+        preferences: SidebarPreferences {
+            sort: SidebarSort::TitleAscending,
+            pinned_expanded: false,
+            ..Default::default()
+        },
+    };
+    apply_sidebar_preferences(&mut sidebar, &value, false, |a, b| {
+        a.to_lowercase().cmp(&b.to_lowercase())
+    })
+    .unwrap();
+    assert_eq!(sidebar.preferences(), &value);
+    assert!(
+        sidebar
+            .move_pin_change(
+                &tekes_agent_components_ui::RunScope::main("p", "s").address(),
+                1
+            )
+            .is_none()
     );
 }

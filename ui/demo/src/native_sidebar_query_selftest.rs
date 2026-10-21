@@ -228,7 +228,10 @@ impl Probe {
                     source.set_query("").unwrap();
                     self.phase = 4;
                 }
-                window.request_redraw();
+                // Waiting for a file is not a display change. Yield the main
+                // queue instead of recursively requesting another draw; use the
+                // SDK's existing bounded test wake for the next observation.
+                run_script(vec![(50, Action::WakeRedraw)]);
             }
             4 if model.input.phase == SidebarSearchPhase::Idle => {
                 assert!(
@@ -265,6 +268,33 @@ impl Probe {
                 assert_eq!(run.draft.text, "搜索期间保留的中文草稿");
                 assert!(run.submissions.is_empty());
                 assert_eq!(self.fixture.search_calls(), 2);
+                if std::env::var_os("AGENT_SIDEBAR_PINNED_CAPTURE").is_some() {
+                    for id in ["a", "b"] {
+                        let inventory = host.sidebar.snapshot();
+                        let row = inventory
+                            .rows
+                            .iter()
+                            .find(|row| row.address.session_id == id)
+                            .unwrap();
+                        let action = row
+                            .actions
+                            .items
+                            .iter()
+                            .find(|action| action.id == "pin")
+                            .unwrap();
+                        host.executor
+                            .block_on(host.sidebar.perform(
+                                &row.address,
+                                action,
+                                None,
+                                &format!("native-layout-pin-{id}"),
+                            ))
+                            .unwrap();
+                    }
+                    self.phase = 8;
+                    window.request_redraw();
+                    return;
+                }
                 if std::env::var_os("AGENT_SIDEBAR_INVENTORY_CAPTURE").is_some() {
                     self.fixture.publish_inventory_summary(serde_json::json!({
                         "sessionId":"a", "updatedAt":42000.5, "running":false, "blank":false,
@@ -281,6 +311,83 @@ impl Probe {
                 }
                 actions.push((500, Action::Close));
                 run_script(actions);
+            }
+            8 => {
+                if sidebar
+                    .displayed_input()
+                    .unwrap()
+                    .rows
+                    .iter()
+                    .filter(|row| row.pin.as_ref().is_some_and(|pin| pin.pinned))
+                    .count()
+                    != 2
+                {
+                    run_script(vec![(50, Action::WakeRedraw)]);
+                    return;
+                }
+                let header = sidebar.pinned_header_id().unwrap();
+                assert!(
+                    host.sidebar
+                        .preferences()
+                        .unwrap()
+                        .preferences
+                        .pinned_expanded
+                );
+                let point = host.view.tree.get(header).unwrap().frame().center();
+                self.phase = 9;
+                run_script(vec![(
+                    200,
+                    Action::Click {
+                        x: point.x as f64,
+                        y: point.y as f64,
+                    },
+                )]);
+            }
+            9 => {
+                let preferences = host.sidebar.preferences().unwrap();
+                if preferences.preferences.pinned_expanded || sidebar.preferences() != &preferences
+                {
+                    run_script(vec![(50, Action::WakeRedraw)]);
+                    return;
+                }
+                assert_eq!(preferences.revision, 2);
+                let row = self.row.unwrap();
+                assert!(!host.view.tree.semantics().iter().any(|node| node.id == row));
+                assert_eq!(
+                    host.view
+                        .tree
+                        .get(row)
+                        .unwrap()
+                        .component::<ButtonContent>()
+                        .unwrap() as *const _ as usize,
+                    self.widget
+                );
+                let run = host.view.binding().current_run().unwrap();
+                assert_eq!(run.draft.text, "搜索期间保留的中文草稿");
+                assert!(run.submissions.is_empty());
+                let header = sidebar.pinned_header_id().unwrap();
+                assert_eq!(
+                    host.view
+                        .tree
+                        .semantics()
+                        .iter()
+                        .find(|node| node.id == header)
+                        .unwrap()
+                        .semantics
+                        .expanded,
+                    Some(false)
+                );
+                let path = std::env::var("AGENT_SIDEBAR_PINNED_CAPTURE").unwrap();
+                assert!(
+                    !std::path::Path::new(&path).exists(),
+                    "use a fresh pinned screenshot path"
+                );
+                eprintln!(
+                    "NATIVE_AGENT_SIDEBAR_PINNED_RECEIPT {}",
+                    serde_json::json!({"originalPointerDisclosure":true,"durableRevision":preferences.revision,"originalButtonRetained":true,"collapsedRowsInaccessible":true,"draftRetained":true,"selectionRetained":true,"noSubmission":true,"ownedFixture":true,"physicalIme":false,"nativePinReorder":false})
+                );
+                self.phase = 5;
+                run_script(vec![(300, Action::Capture { path }), (700, Action::Close)]);
             }
             7 => {
                 let shown = sidebar.displayed_input().unwrap();

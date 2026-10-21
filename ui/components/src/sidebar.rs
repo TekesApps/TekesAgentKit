@@ -1,6 +1,9 @@
 //! Agent session inventory and shared actions. No local pin database or action policy.
+use crate::summary_section::{Expansion, SummarySectionView};
 use crate::{
-    SidebarSearchInput, SidebarSearchIntent, SidebarSearchKey, SidebarSearchLabels,
+    SidebarPreferenceChange, SidebarPreferencesSnapshot, SidebarSearchInput, SidebarSearchIntent,
+    SidebarSearchKey, SidebarSearchLabels, SidebarSort, SidebarTitleComparator,
+    ordered_sidebar_rows,
     sidebar_search::{SearchFooter, SearchInputView},
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -11,7 +14,7 @@ use tekes_agent_contract::{
 use tekes_ui_controls::{
     ButtonTextRenderer, ScrollArea,
     composition::*,
-    extended::{Axis, Stack},
+    extended::{Axis, Disclosure, Stack},
     layout::MeasuredChild,
     paint::ButtonVariant,
 };
@@ -90,6 +93,8 @@ fn activity_label(activity: &ThreadActivity) -> String {
 }
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Key {
+    PinnedHeader(u64),
+    PinnedLabel(u64),
     Row(SessionAddress),
     Select(SessionAddress),
     Status(SessionAddress),
@@ -100,6 +105,13 @@ enum Key {
 /// Deliver and drain host actions before update(), just as for other public content controls.
 #[derive(Debug)]
 pub struct Sidebar {
+    preferences: SidebarPreferencesSnapshot,
+    preferences_bound: bool,
+    preferences_generation: u64,
+    preferences_writable: bool,
+    title_comparator: Option<SidebarTitleComparator>,
+    pinned_expansion: Expansion,
+    preference_bindings: BTreeMap<ComponentId, SidebarPreferenceChange>,
     root: ComponentId,
     body: StackContent,
     labels: SidebarLabels,
@@ -163,6 +175,16 @@ impl Sidebar {
             ],
         };
         Self {
+            preferences: SidebarPreferencesSnapshot::default(),
+            preferences_bound: false,
+            preferences_generation: 1,
+            preferences_writable: false,
+            title_comparator: None,
+            pinned_expansion: std::rc::Rc::new(std::cell::RefCell::new(Disclosure {
+                open: true,
+                disabled: false,
+            })),
+            preference_bindings: BTreeMap::new(),
             root: ComponentId(base),
             body,
             labels,
@@ -180,6 +202,131 @@ impl Sidebar {
             bindings: BTreeMap::new(),
             pending: BTreeSet::new(),
         }
+    }
+    pub fn preferences(&self) -> &SidebarPreferencesSnapshot {
+        &self.preferences
+    }
+    pub fn set_title_comparator(&mut self, compare: SidebarTitleComparator) {
+        self.title_comparator = Some(compare);
+    }
+    /// Allows retained hosts to avoid even borrowing their tree mutably for an
+    /// identical accepted input. A locally toggled disclosure still needs the
+    /// next authoritative publication (including rollback after write failure).
+    pub fn preferences_current(&self, value: &SidebarPreferencesSnapshot, writable: bool) -> bool {
+        self.preferences_bound
+            && value == &self.preferences
+            && writable == self.preferences_writable
+            && self.pinned_expansion.borrow().open == value.preferences.pinned_expanded
+    }
+    pub fn update_preferences(
+        &mut self,
+        value: &SidebarPreferencesSnapshot,
+        writable: bool,
+    ) -> Result<(), &'static str> {
+        if self.preferences_current(value, writable) {
+            return Ok(());
+        }
+        value
+            .preferences
+            .validate()
+            .map_err(|_| "invalid Sidebar preferences")?;
+        if value.revision == 0
+            || (self.preferences_bound
+                && (value.revision < self.preferences.revision
+                    || (value.revision == self.preferences.revision && value != &self.preferences)))
+        {
+            return Err("stale or conflicting Sidebar preferences");
+        }
+        if value.preferences.sort != SidebarSort::RecentActivity && self.title_comparator.is_none()
+        {
+            return Err("Sidebar title sort requires a host localized comparator");
+        }
+        let generation = if !self.preferences_bound
+            || value != &self.preferences
+            || writable != self.preferences_writable
+        {
+            self.preferences_generation
+                .checked_add(1)
+                .ok_or("Sidebar preference generation exhausted")?
+        } else {
+            self.preferences_generation
+        };
+        let old = (
+            self.preferences.clone(),
+            self.preferences_bound,
+            self.preferences_writable,
+            self.preferences_generation,
+        );
+        self.preferences_generation = generation;
+        self.preferences = value.clone();
+        self.preferences_bound = true;
+        self.preferences_writable = writable;
+        if let Some(input) = self.displayed.clone()
+            && let Err(error) = self.update(&input)
+        {
+            (
+                self.preferences,
+                self.preferences_bound,
+                self.preferences_writable,
+                self.preferences_generation,
+            ) = old;
+            return Err(error);
+        }
+        Ok(())
+    }
+    pub fn pinned_header_id(&self) -> Option<ComponentId> {
+        self.ids
+            .get(&Key::PinnedHeader(self.preferences_generation))
+            .copied()
+    }
+    pub fn take_preference_intents(
+        &self,
+        actions: &[ContentAction],
+    ) -> Vec<SidebarPreferenceChange> {
+        actions
+            .iter()
+            .filter(|a| a.kind == ContentActionKind::Activate)
+            .filter_map(|a| self.preference_bindings.get(&a.target).cloned())
+            .collect()
+    }
+    /// The same original pin-order algorithm as ClientKit. Unknown stored IDs
+    /// remain durable; a row must currently be pinned before offering its move.
+    pub fn move_pin_change(
+        &self,
+        address: &SessionAddress,
+        offset: isize,
+    ) -> Option<SidebarPreferenceChange> {
+        if !self.preferences_writable || !matches!(offset, -1 | 1) {
+            return None;
+        }
+        let input = self.displayed.as_ref()?;
+        if !input.loaded
+            || !input
+                .rows
+                .iter()
+                .any(|row| &row.address == address && row.pin.as_ref().is_some_and(|p| p.pinned))
+        {
+            return None;
+        }
+        let mut value = self.preferences.preferences.clone();
+        let rows = ordered_sidebar_rows(&input.rows, &value, self.title_comparator).ok()?;
+        for row in rows
+            .into_iter()
+            .filter(|r| r.pin.as_ref().is_some_and(|p| p.pinned))
+        {
+            if !value.pin_order.contains(&row.address) {
+                value.pin_order.push(row.address.clone());
+            }
+        }
+        let index = value.pin_order.iter().position(|id| id == address)?;
+        let other = index
+            .checked_add_signed(offset)
+            .filter(|i| *i < value.pin_order.len())?;
+        value.pin_order.swap(index, other);
+        Some(SidebarPreferenceChange {
+            expected: self.preferences.clone(),
+            value,
+        })
     }
     pub fn id(&self) -> ComponentId {
         self.root
@@ -465,11 +612,15 @@ impl Sidebar {
         }) {
             return Err("conflicting sidebar publication");
         }
-        let visible_rows = if input.loaded {
-            input.rows.as_slice()
-        } else {
-            &[]
-        };
+        let ordered = ordered_sidebar_rows(
+            &input.rows,
+            &self.preferences.preferences,
+            self.title_comparator,
+        )?;
+        let visible_rows = if input.loaded { ordered } else { vec![] };
+        let has_pins = visible_rows
+            .iter()
+            .any(|row| row.pin.as_ref().is_some_and(|pin| pin.pinned));
         let mut addresses = BTreeSet::new();
         let mut keys = BTreeSet::new();
         for row in &input.rows {
@@ -501,6 +652,10 @@ impl Sidebar {
                 }
             }
         }
+        if has_pins {
+            keys.insert(Key::PinnedHeader(self.preferences_generation));
+            keys.insert(Key::PinnedLabel(self.preferences_generation));
+        }
         let needed = keys
             .iter()
             .filter(|key| !self.ids.contains_key(*key))
@@ -522,10 +677,26 @@ impl Sidebar {
         }
 
         let old = std::mem::take(&mut self.rows_mut().rows.children);
-        let mut old: BTreeMap<_, _> = old.into_iter().map(|row| (row.id(), row)).collect();
+        let mut pinned_section = None;
+        let mut retained = Vec::new();
+        for mut node in old {
+            if let Some(section) = node.component_mut::<SummarySectionView>() {
+                retained.append(section.rows_mut());
+                pinned_section = Some(node);
+            } else {
+                retained.push(node);
+            }
+        }
+        let mut old: BTreeMap<_, _> = retained.into_iter().map(|row| (row.id(), row)).collect();
         let mut children = Vec::new();
         let mut bindings = BTreeMap::new();
-        for row in visible_rows {
+        let mut pinned_children = Vec::new();
+        let mut preference_bindings = BTreeMap::new();
+        *self.pinned_expansion.borrow_mut() = Disclosure {
+            open: self.preferences.preferences.pinned_expanded,
+            disabled: !self.preferences_writable,
+        };
+        for row in &visible_rows {
             let row_id = ids[&Key::Row(row.address.clone())];
             let select_id = ids[&Key::Select(row.address.clone())];
             let status_id = ids[&Key::Status(row.address.clone())];
@@ -562,13 +733,56 @@ impl Sidebar {
                 .component_mut::<TextContent>()
                 .expect("row activity")
                 .text = status;
-            bindings.insert(
-                select_id,
-                SidebarIntent::Select {
-                    address: row.address.clone(),
-                },
-            );
-            children.push(content);
+            let pinned = row.pin.as_ref().is_some_and(|pin| pin.pinned);
+            if !pinned || self.preferences.preferences.pinned_expanded {
+                bindings.insert(
+                    select_id,
+                    SidebarIntent::Select {
+                        address: row.address.clone(),
+                    },
+                );
+            }
+            if pinned {
+                pinned_children.push(content);
+            } else {
+                children.push(content);
+            }
+        }
+        if has_pins {
+            let header = ids[&Key::PinnedHeader(self.preferences_generation)];
+            let label = ids[&Key::PinnedLabel(self.preferences_generation)];
+            let mut section = pinned_section
+                .filter(|node| {
+                    node.component::<SummarySectionView>().unwrap().children[0].id() == header
+                })
+                .unwrap_or_else(|| {
+                    Content::new(
+                        ComponentId(self.root.0 + 10),
+                        SummarySectionView::new(
+                            "pinned".into(),
+                            header,
+                            label,
+                            ComponentId(self.root.0 + 11),
+                            self.pinned_expansion.clone(),
+                        ),
+                    )
+                });
+            let body = section.component_mut::<SummarySectionView>().unwrap();
+            body.header_mut().set_title(self.labels.pinned.clone());
+            body.header_mut().set_enabled(self.preferences_writable);
+            *body.rows_mut() = pinned_children;
+            if self.preferences_writable {
+                let mut value = self.preferences.preferences.clone();
+                value.pinned_expanded = !value.pinned_expanded;
+                preference_bindings.insert(
+                    header,
+                    SidebarPreferenceChange {
+                        expected: self.preferences.clone(),
+                        value,
+                    },
+                );
+            }
+            children.insert(0, section);
         }
         if children.is_empty() {
             children.push(Content::new(
@@ -652,6 +866,7 @@ impl Sidebar {
         self.ids = ids;
         self.next = next;
         self.bindings = bindings;
+        self.preference_bindings = preference_bindings;
         self.revision = input.revision;
         self.displayed = Some(input.clone());
         Ok(())

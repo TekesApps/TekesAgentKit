@@ -220,6 +220,22 @@ impl SharedAgent {
         self.session_url_scheme = Some(scheme.into());
         Ok(())
     }
+    pub fn sidebar_preferences(
+        &self,
+    ) -> Option<tekes_agent_presentation::SidebarPreferencesSnapshot> {
+        self.thread_preferences
+            .as_ref()
+            .map(|store| store.sidebar_preferences())
+    }
+    pub fn set_sidebar_preferences(
+        &self,
+        change: &tekes_agent_presentation::SidebarPreferenceChange,
+    ) -> Result<()> {
+        self.thread_preferences
+            .as_ref()
+            .ok_or_else(|| unsupported("Sidebar preference store not installed"))?
+            .set_sidebar_preferences(change)
+    }
     pub fn open_thread_preferences(&mut self, path: &std::path::Path, scope: &str) -> Result<()> {
         let store = Arc::new(tekes_agent_presentation::ThreadPreferences::open(
             path, scope,

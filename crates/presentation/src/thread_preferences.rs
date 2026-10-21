@@ -1,5 +1,6 @@
 //! AgentKit-owned durable client preferences, independent of Harness databases.
 //! One service owns a file lock; hosts supply only a private path and identity scope.
+use crate::{SidebarPreferenceChange, SidebarPreferencesSnapshot};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -21,6 +22,8 @@ struct PinIdentity {
 #[derive(Clone, Default, Serialize, Deserialize)]
 struct Scope {
     pins: BTreeSet<PinIdentity>,
+    #[serde(default)]
+    sidebar: SidebarPreferencesSnapshot,
     receipts: BTreeMap<String, ThreadActionRequest>,
 }
 #[derive(Clone, Serialize, Deserialize)]
@@ -65,16 +68,21 @@ impl ThreadPreferences {
         let mut document: Document = match fs::read(&path) {
             Ok(bytes) => serde_json::from_slice(&bytes)?,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Document {
-                version: 2,
+                version: 3,
                 scopes: BTreeMap::new(),
             },
             Err(e) => return Err(io_error(e)),
         };
         require(
-            matches!(document.version, 1 | 2),
+            matches!(document.version, 1..=3),
             "unsupported thread preference version",
         )?;
         for value in document.scopes.values() {
+            require(
+                value.sidebar.revision > 0,
+                "invalid Sidebar preference revision",
+            )?;
+            value.sidebar.preferences.validate()?;
             let mut identities = BTreeSet::new();
             for pin in &value.pins {
                 require(
@@ -85,8 +93,8 @@ impl ThreadPreferences {
                 )?;
             }
         }
-        let migrate = document.version == 1;
-        document.version = 2;
+        let migrate = document.version != 3;
+        document.version = 3;
         for scope in document.scopes.values_mut() {
             scope
                 .receipts
@@ -103,6 +111,47 @@ impl ThreadPreferences {
             store.commit(&store.state.lock().expect("preferences lock"))?;
         }
         Ok(store)
+    }
+    pub fn sidebar_preferences(&self) -> SidebarPreferencesSnapshot {
+        self.state
+            .lock()
+            .expect("preferences lock")
+            .scopes
+            .get(&self.scope)
+            .map(|scope| scope.sidebar.clone())
+            .unwrap_or_default()
+    }
+    /// Compare the original durable revision under the same store lock. A stale
+    /// callback (including ABA) never overwrites newer layout preferences.
+    pub fn set_sidebar_preferences(&self, change: &SidebarPreferenceChange) -> Result<()> {
+        change.value.validate()?;
+        let mut state = self.state.lock().expect("preferences lock");
+        let current = state
+            .scopes
+            .get(&self.scope)
+            .map(|scope| scope.sidebar.clone())
+            .unwrap_or_default();
+        require(
+            change.expected == current,
+            "stale Sidebar preference callback",
+        )?;
+        if change.value == current.preferences {
+            return Ok(());
+        }
+        let revision = current
+            .revision
+            .checked_add(1)
+            .ok_or_else(|| unsupported("Sidebar preference revision exhausted"))?;
+        let mut next = state.clone();
+        next.scopes.entry(self.scope.clone()).or_default().sidebar = SidebarPreferencesSnapshot {
+            revision,
+            preferences: change.value.clone(),
+        };
+        self.commit(&next)?;
+        *state = next;
+        self.changes
+            .send_modify(|revision| *revision = revision.wrapping_add(1));
+        Ok(())
     }
     pub fn subscribe(&self) -> watch::Receiver<u64> {
         self.changes.subscribe()
@@ -327,7 +376,7 @@ mod tests {
         assert!(store.pin_state("z", "same").unwrap().pinned);
         assert!(store.pin_state("a", "same").unwrap().pinned);
         let value: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
-        assert_eq!(value["version"], 2);
+        assert_eq!(value["version"], 3);
         assert_eq!(value["scopes"]["s"]["receipts"], serde_json::json!({}));
         assert!(
             value["scopes"]["s"]["pins"]
@@ -352,6 +401,116 @@ mod tests {
         fs::write(&path, b"broken").unwrap();
         assert!(ThreadPreferences::open(&path, "scope").is_err());
         assert_eq!(fs::read(&path).unwrap(), b"broken");
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+    #[test]
+    fn sidebar_preferences_migrate_persist_and_reject_stale_aba_without_changing_pin_membership() {
+        use crate::SidebarSort;
+        let path = path();
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, br#"{"version":2,"scopes":{"s":{"pins":[{"endpoint":"pi","sessionId":"a"}],"receipts":{}}}}"#).unwrap();
+        let last;
+        {
+            let store = ThreadPreferences::open(&path, "s").unwrap();
+            let original = store.sidebar_preferences();
+            let mut value = original.preferences.clone();
+            value.sort = SidebarSort::TitleDescending;
+            value.pin_order = vec![SessionAddress {
+                endpoint_id: "pi".into(),
+                session_id: "a".into(),
+            }];
+            value.pinned_expanded = false;
+            store
+                .set_sidebar_preferences(&SidebarPreferenceChange {
+                    expected: original.clone(),
+                    value,
+                })
+                .unwrap();
+            let changed = store.sidebar_preferences();
+            assert_eq!(changed.revision, original.revision + 1);
+            store
+                .set_sidebar_preferences(&SidebarPreferenceChange {
+                    expected: changed,
+                    value: original.preferences.clone(),
+                })
+                .unwrap();
+            assert!(
+                store
+                    .set_sidebar_preferences(&SidebarPreferenceChange {
+                        expected: original,
+                        value: crate::SidebarPreferences {
+                            pinned_expanded: false,
+                            ..Default::default()
+                        }
+                    })
+                    .is_err()
+            );
+            assert_eq!(store.pins().len(), 1);
+            let expected = store.sidebar_preferences();
+            let value = crate::SidebarPreferences {
+                sort: SidebarSort::TitleDescending,
+                pin_order: vec![SessionAddress {
+                    endpoint_id: "pi".into(),
+                    session_id: "a".into(),
+                }],
+                pinned_expanded: false,
+            };
+            store
+                .set_sidebar_preferences(&SidebarPreferenceChange { expected, value })
+                .unwrap();
+            last = store.sidebar_preferences();
+        }
+        {
+            let store = ThreadPreferences::open(&path, "s").unwrap();
+            assert_eq!(store.sidebar_preferences(), last);
+            assert_eq!(store.pins().len(), 1);
+        }
+        {
+            let store = ThreadPreferences::open(&path, "other-account").unwrap();
+            assert_eq!(
+                store.sidebar_preferences(),
+                SidebarPreferencesSnapshot::default()
+            );
+            assert!(store.pins().is_empty());
+        }
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+    #[test]
+    fn sidebar_write_failure_and_duplicate_order_do_not_publish_preferences() {
+        let path = path();
+        let store = ThreadPreferences::open(&path, "s").unwrap();
+        let original = store.sidebar_preferences();
+        let changes = store.subscribe();
+        let mut value = original.preferences.clone();
+        value.pinned_expanded = false;
+        fs::create_dir(&path).unwrap();
+        assert!(
+            store
+                .set_sidebar_preferences(&SidebarPreferenceChange {
+                    expected: original.clone(),
+                    value
+                })
+                .is_err()
+        );
+        assert_eq!(store.sidebar_preferences(), original);
+        assert!(!changes.has_changed().unwrap());
+        fs::remove_dir(&path).unwrap();
+        let mut invalid = original.preferences.clone();
+        let id = SessionAddress {
+            endpoint_id: "p".into(),
+            session_id: "a".into(),
+        };
+        invalid.pin_order = vec![id.clone(), id];
+        assert!(
+            store
+                .set_sidebar_preferences(&SidebarPreferenceChange {
+                    expected: original.clone(),
+                    value: invalid
+                })
+                .is_err()
+        );
+        assert_eq!(store.sidebar_preferences(), original);
+        drop(store);
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
     }
 }

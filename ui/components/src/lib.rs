@@ -439,3 +439,6 @@ pub use tekes_agent_presentation::{
     TranscriptMessageKey, TranscriptOrderedEvent, TranscriptOutput, TranscriptSection,
     TranscriptSnapshot, TranscriptSourcePosition, TranscriptToolCall, TranscriptTurn,
 };
+
+mod sidebar_preferences;
+pub use sidebar_preferences::*;

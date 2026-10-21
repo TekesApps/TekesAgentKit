@@ -47,3 +47,5 @@ TKUI-006 更新：公共完整指针入口、AgentText转交及原生demo适配�
 2026-10-21 #34 固定输入接收：原查询已在隔离候选中接入实际 Composer 门禁，主输入及 SideChat 的真实窗口合成组字/选区查询通过。默认公开pin不变，物理IME与完整体验仍未完成；见[实际IME门禁记录](rust-agent-ui-padding-ime-20261021.md)，不把private接入视为Issue关闭。
 
 2026-10-21 Sidebar行帮助：[TekesUI #35](https://github.com/TekesApps/TekesUI/issues/35)请求原Content动态声明与统一Tooltip路由。已有description/AX help映射继续复用；Kit先保存按query隔离的snippet，不添加摘要行或复制hover/定位。见[结果投影记录](rust-agent-ui-sidebar-search-results-20261021.md)。
+
+2026-10-21 Sidebar菜单：[TekesUI #36](https://github.com/TekesApps/TekesUI/issues/36)请求原激活时稳定选中值及子菜单/勾选/disabled声明。Kit已推进公开偏好、置顶区与原回调，不回读最后selected冒充原事件，不复制菜单引擎；原生排序/分组与pin移动菜单仍未完成，见[偏好记录](rust-agent-ui-sidebar-preferences-20261021.md)。
