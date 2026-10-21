@@ -2,7 +2,7 @@
 //! a real presentation publication, without endpoint mutation or a UI mirror.
 use super::*;
 use tekes_agent_components_ui::{SummaryUsageRowIds, SummaryView};
-use tekes_ui_controls::composition::{ButtonContent, TextContent};
+use tekes_ui_controls::composition::{ButtonContent, TextContent, TextFieldContent};
 use tekes_ui_platform_macos::selftest::{Action, run_script};
 const DRAFT: &str = "Summary 折叠期间的新草稿";
 pub(super) struct Probe {
@@ -17,6 +17,8 @@ pub(super) struct Probe {
     revision: u64,
     items: usize,
     submissions: usize,
+    text_started: Option<Instant>,
+    text_owner: usize,
 }
 impl Probe {
     pub fn new() -> Self {
@@ -32,6 +34,8 @@ impl Probe {
             revision: 0,
             items: 0,
             submissions: 0,
+            text_started: None,
+            text_owner: 0,
         }
     }
     fn summary(view: &ComponentDemo) -> Option<&SummaryView> {
@@ -41,6 +45,8 @@ impl Probe {
         let node = view.tree.get(row).unwrap();
         if let Some(button) = node.component::<ButtonContent>() {
             button as *const _ as usize
+        } else if let Some(text) = node.component::<TextFieldContent>() {
+            text as *const _ as usize
         } else {
             node.component::<TextContent>().unwrap() as *const _ as usize
         }
@@ -201,18 +207,99 @@ impl Probe {
                         .iter()
                         .any(|node| node.id == ids.value && node.semantics.name == "1,234")
                 );
+                self.text_owner = view
+                    .tree
+                    .get(ids.title)
+                    .unwrap()
+                    .component::<TextFieldContent>()
+                    .unwrap() as *const _ as usize;
+                self.text_started = Some(Instant::now());
                 self.phase = 6;
-                run_script(vec![(100, Action::Close)]);
+                run_script(vec![
+                    (100, Self::click(view, ids.title)),
+                    (
+                        200,
+                        Action::AXSelect {
+                            component: ids.title.0,
+                            range: 0..2,
+                        },
+                    ),
+                    (350, Action::Text("不应写入".into())),
+                    (450, Action::Preedit("不应组字".into())),
+                    (
+                        650,
+                        Action::ExpectAXText {
+                            component: ids.title.0,
+                            text: "输出".into(),
+                            selection: 0..2,
+                            selected: "输出".into(),
+                            query: 0..2,
+                            substring: Some("输出".into()),
+                        },
+                    ),
+                    (900, Action::WakeRedraw),
+                ]);
+            }
+            6 if self
+                .text_started
+                .is_some_and(|start| start.elapsed() >= Duration::from_millis(850)) =>
+            {
+                let id = self.usage.unwrap().title;
+                let field = view
+                    .tree
+                    .get(id)
+                    .unwrap()
+                    .component::<TextFieldContent>()
+                    .unwrap();
+                assert_eq!(view.tree.focused(), Some(id));
+                assert_eq!(field.surface.input.selected_text(), "输出");
+                assert!(field.surface.input.read_only && field.surface.input.marked.is_none());
+                assert_eq!(field.surface.input.text, "输出");
+                self.revision = input.revision;
+                self.phase = 7;
+                view.binding()
+                    .edit_text(
+                        &tekes_agent_components_ui::ComposerDestination::run(input.scope.clone()),
+                        format!("{DRAFT}追加"),
+                    )
+                    .unwrap();
+            }
+            7 if input.revision > self.revision => {
+                let id = self.usage.unwrap().title;
+                let field = view
+                    .tree
+                    .get(id)
+                    .unwrap()
+                    .component::<TextFieldContent>()
+                    .unwrap();
+                assert_eq!(field as *const _ as usize, self.text_owner);
+                assert_eq!(view.tree.focused(), Some(id));
+                assert_eq!(field.surface.input.selected_text(), "输出");
+                let run = view.binding().current_run().unwrap();
+                assert_eq!(run.draft.text, format!("{DRAFT}追加"));
+                assert_eq!(run.submissions.len(), self.submissions);
+                self.phase = 8;
+                let mut actions = vec![];
+                if let Ok(path) = std::env::var("AGENT_SUMMARY_SECTIONS_CAPTURE") {
+                    actions.push((
+                        0,
+                        Action::Capture {
+                            path: format!("{path}.selectable.png"),
+                        },
+                    ));
+                }
+                actions.push((100, Action::Close));
+                run_script(actions);
             }
             _ => {}
         }
     }
     pub fn receipt(&self, view: &ComponentDemo) -> serde_json::Value {
-        assert_eq!(self.phase, 6, "incomplete Summary probe");
+        assert_eq!(self.phase, 8, "incomplete Summary probe");
         assert_eq!(Self::widget(view, self.row.unwrap()), self.widget);
         serde_json::json!({"nativeWindow":true,"pointerCollapseExpand":true,"collapsedCanonicalUpdate":true,
             "originalRowsRetained":true,"hiddenFromAccessibility":true,"noSubmission":true,
-            "runtimeDraft":true,"usageColumns":true,"usagePointerCollapseExpand":true,"usageControlsRetained":true,
+            "runtimeDraft":true,"usageSelectableTitle":true,"nativeTextAndAxSelection":true,"readonlyMutationRejected":true,"selectedTextRetainedAfterPublication":true,"systemClipboardExercised":false,"usageColumns":true,"usagePointerCollapseExpand":true,"usageControlsRetained":true,
             "usageFromControlProjection":true,"knownCount":"1,234","unknownCost":true,"realHarness":false,"physicalIme":false,"voiceOver":false,"fullLayoutParity":false})
     }
 }

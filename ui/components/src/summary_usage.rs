@@ -93,7 +93,10 @@ impl SummaryUsageRow {
     pub fn new(title: ComponentId, value: ComponentId) -> Self {
         Self {
             children: vec![
-                Content::new(title, TextContent::new("")),
+                Content::new(
+                    title,
+                    TextFieldContent::read_only_content("", "", proposal::TextRole::UiBody),
+                ),
                 Content::new(
                     value,
                     TextContent {
@@ -104,11 +107,16 @@ impl SummaryUsageRow {
             ],
         }
     }
-    pub fn update(&mut self, text: SummaryUsageRowText) {
-        self.children[0]
-            .component_mut::<TextContent>()
-            .unwrap()
-            .text = text.title;
+    pub fn update(&mut self, revision: u64, text: SummaryUsageRowText) {
+        let id = self.children[0].id();
+        crate::summary_text::update_text(
+            self.children[0]
+                .component_mut::<TextFieldContent>()
+                .unwrap(),
+            id,
+            revision,
+            text.title,
+        );
         self.children[1]
             .component_mut::<TextContent>()
             .unwrap()

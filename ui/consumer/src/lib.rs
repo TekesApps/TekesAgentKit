@@ -2320,3 +2320,45 @@ pub fn publish_original_readonly(
 > {
     tekes_agent_components_ui::publish_readonly_reading_update(host, root, version, revision, plan)
 }
+
+#[test]
+fn second_summary_consumer_selects_passive_text_without_an_endpoint_or_copy_state_machine() {
+    use tekes_agent_components_ui::*;
+    use tekes_ui_controls::composition::*;
+    let mut view = SummaryView::new(1982, Default::default());
+    view.update(&SummaryInput {
+        revision: 1,
+        scope: RunScope::main("consumer", "selectable-summary"),
+        facts: None,
+        host_sections: vec![SummarySection {
+            id: "application".into(),
+            rows: vec![SummaryRow {
+                id: "source".into(),
+                title: "原始来源".into(),
+                value: Default::default(),
+                action: None,
+            }],
+        }],
+    })
+    .unwrap();
+    let root = view.id();
+    let text = view.passive_text_id("application", "source").unwrap();
+    let mut host = view.into_host().unwrap();
+    host.accessibility_action(text, None, AccessibilityAction::SetSelection(0..2));
+    let field = host
+        .get(text)
+        .unwrap()
+        .component::<TextFieldContent>()
+        .unwrap();
+    assert!(field.surface.input.read_only);
+    assert_eq!(field.surface.input.selected_text(), "原始");
+    let actions = host.drain_actions();
+    assert!(
+        host.get(root)
+            .unwrap()
+            .component::<SummaryView>()
+            .unwrap()
+            .take_intents(&actions)
+            .is_empty()
+    );
+}

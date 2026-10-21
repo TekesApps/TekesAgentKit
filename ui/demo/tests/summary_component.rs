@@ -626,3 +626,108 @@ fn usage_slots_retain_original_controls_and_follow_disclosure_and_run_identity()
     );
     assert!(host.get(ids.value).is_none());
 }
+
+#[test]
+fn passive_summary_uses_the_original_readonly_text_owner_across_updates_and_disclosure() {
+    let mut input = SummaryInput {
+        revision: 1,
+        scope: RunScope::main("native", "passive"),
+        facts: None,
+        host_sections: vec![SummarySection {
+            id: "host:info".into(),
+            rows: vec![SummaryRow {
+                id: "source".into(),
+                title: "来源中文👩🏽‍💻".into(),
+                value: serde_json::Value::Null,
+                action: None,
+            }],
+        }],
+    };
+    let mut view = SummaryView::new(211, Default::default());
+    view.update(&input).unwrap();
+    let root = view.id();
+    let field = view.passive_text_id("host:info", "source").unwrap();
+    let header = view.section_header_id("host:info").unwrap();
+    assert_eq!(view.action_id("host:info", "source"), None);
+    let mut host = view.into_host().unwrap();
+    let owner = host
+        .get(field)
+        .unwrap()
+        .component::<TextFieldContent>()
+        .unwrap() as *const _;
+    host.accessibility_action(field, None, AccessibilityAction::SetSelection(0..2));
+    let text = &host
+        .get(field)
+        .unwrap()
+        .component::<TextFieldContent>()
+        .unwrap()
+        .surface
+        .input;
+    assert!(text.read_only);
+    assert_eq!(text.selected_text(), "来源");
+    host.accessibility_action(
+        field,
+        None,
+        AccessibilityAction::ReplaceSelectedText("bad".into()),
+    );
+    assert_eq!(
+        host.get(field)
+            .unwrap()
+            .component::<TextFieldContent>()
+            .unwrap()
+            .surface
+            .input
+            .text,
+        "来源中文👩🏽‍💻"
+    );
+    activate(&mut host, root, header);
+    assert!(!host.semantics().iter().any(|node| node.id == field));
+    input.revision += 1;
+    input.host_sections[0].rows[0].title.push_str("追加");
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<SummaryView>()
+        .unwrap()
+        .update(&input)
+        .unwrap();
+    let text = host
+        .get(field)
+        .unwrap()
+        .component::<TextFieldContent>()
+        .unwrap();
+    assert_eq!(text as *const _, owner);
+    assert_eq!(text.surface.input.selected_text(), "来源");
+    let pending = host.drain_actions();
+    assert!(
+        host.get(root)
+            .unwrap()
+            .component::<SummaryView>()
+            .unwrap()
+            .take_intents(&pending)
+            .is_empty()
+    );
+    activate(&mut host, root, header);
+    assert!(
+        host.semantics()
+            .iter()
+            .any(|node| node.id == field
+                && node.semantics.value.as_deref() == Some("来源中文👩🏽‍💻追加"))
+    );
+    input.revision += 1;
+    input.scope = RunScope::main("native", "replacement");
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<SummaryView>()
+        .unwrap()
+        .update(&input)
+        .unwrap();
+    assert_ne!(
+        host.get(root)
+            .unwrap()
+            .component::<SummaryView>()
+            .unwrap()
+            .passive_text_id("host:info", "source"),
+        Some(field)
+    );
+    assert!(host.get(field).is_none());
+}

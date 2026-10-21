@@ -177,6 +177,19 @@ impl SummaryView {
             value: *self.ids.get(&Key::UsageValue(scope.clone(), row.into()))?,
         })
     }
+    /// Original selectable text for a passive row (the title slot for usage).
+    /// Activatable rows retain their button and do not expose an editor here.
+    pub fn passive_text_id(&self, section: &str, row: &str) -> Option<ComponentId> {
+        let id = self.row_id(section, row)?;
+        if self.bindings.contains_key(&id) {
+            return None;
+        }
+        if section == "usage" {
+            self.usage_row_ids(row).map(|ids| ids.title)
+        } else {
+            Some(id)
+        }
+    }
     pub fn into_host(self) -> Result<ContentHost, CompositionError> {
         let mut host = ContentHost::new(Content::new(self.root, self))?;
         host.set_action_events(true);
@@ -400,17 +413,28 @@ impl SummaryView {
                     content
                         .component_mut::<SummaryUsageRow>()
                         .expect("summary usage row")
-                        .update((self.labels.usage_row)(&row));
+                        .update(input.revision, (self.labels.usage_row)(&row));
                     content
                 } else {
                     let label = (self.labels.row)(&section.id, &row);
-                    let mut content = old_rows
-                        .remove(&id)
-                        .unwrap_or_else(|| Content::new(id, TextContent::new("")));
-                    content
-                        .component_mut::<TextContent>()
-                        .expect("summary value")
-                        .text = label;
+                    let mut content = old_rows.remove(&id).unwrap_or_else(|| {
+                        Content::new(
+                            id,
+                            TextFieldContent::read_only_content(
+                                "",
+                                "",
+                                tekes_ui_tokens::proposal::TextRole::UiBody,
+                            ),
+                        )
+                    });
+                    crate::summary_text::update_text(
+                        content
+                            .component_mut::<TextFieldContent>()
+                            .expect("summary passive text"),
+                        id,
+                        input.revision,
+                        label,
+                    );
                     content
                 };
                 view.rows_mut().push(content);

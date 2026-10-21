@@ -179,6 +179,8 @@ RunView 组合正式 Composer / Transcript / Indicators，拥有 Agent 组件间
 
 ## SidePanel 与 Summary（首批实现）
 
+[Summary 静态行可选中文字](rust-agent-ui-summary-selectable-20261022.md)已消费原 SDK 只读内容组件：普通静态行和用量标题保留原 owner/选区，章节隐藏与作用域淘汰继续由原组件处理；公开 `passive_text_id`，不新增剪贴板状态机。完整默认行与自定义host内容仍未完成。
+
 [正文视口与顶部净空](rust-agent-ui-sidepanel-layout-20261022.md)公开 `SidePanelLayout` 与最近 arrange 几何，普通 Agent tab 采用 regular inset，短内容不收缩 pane；圆角子树裁切/focus 边界待 TekesUI #45，inline demo tabs 不算窗口 toolbar。
 
 [父投影与 pane 生命周期](rust-agent-ui-sidepanel-projection-20261022.md)明确等待时不构造正文、跨 thread 销毁 UI、同 thread 保留 tab、草稿与 pointer 不随 UI 销毁；最终程序的原生分页/reveal/组字证据也在该记录中。

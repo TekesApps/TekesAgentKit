@@ -52,6 +52,7 @@ mod sidebar_search;
 pub use sidebar_search::*;
 mod summary;
 mod summary_section;
+mod summary_text;
 mod summary_usage;
 pub use summary_section::SummarySectionLayout;
 pub use summary_usage::{SummaryUsageRowIds, SummaryUsageRowText};
