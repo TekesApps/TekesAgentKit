@@ -214,7 +214,7 @@ class Checks(unittest.TestCase):
                       rev='1' * 40, repository='https://github.com/TekesApps/TekesUI.git')
         (ui / 'tekesui-source.json').write_text(json.dumps(public))
         for name, dependencies in {
-            'components': ['tekes-agent-contract', 'tekes-agent-presentation', 'tekes-ui-controls', 'tekes-ui-scene', 'tekes-ui-tokens'],
+            'components': ['tekes-agent-contract', 'tekes-agent-presentation', 'tekes-ui-controls', 'tekes-ui-scene', 'tekes-ui-tokens', 'unicode-segmentation'],
             'bindings': ['tekes-agent-components-ui', 'tekes-agent-contract', 'tekes-agent-presentation', 'tekes-agent-session', 'tekes-agent-web', 'serde_json', 'tokio', 'async-trait', 'uuid', 'base64'],
             'consumer': ['tekes-agent-components-ui', 'tekes-agent-ui-bindings', 'tekes-ui-controls'],
         }.items():
@@ -222,7 +222,7 @@ class Checks(unittest.TestCase):
             text = '[package]\npublish.workspace=true\n[dependencies]\n'
             text += ''.join(f'{d}.workspace=true\n' for d in dependencies)
             (ui / name / 'Cargo.toml').write_text(text)
-        header = '[workspace]\n[workspace.package]\npublish=false\nversion="0.0.0"\n[workspace.dependencies]\n'
+        header = '[workspace]\n[workspace.package]\npublish=false\nversion="0.0.0"\n[workspace.dependencies]\nunicode-segmentation="=1.13.3"\n'
         for dependency, valid in [
             ('{git="' + public['repository'] + '",rev="' + public['rev'] + '"}', True),
             ('{git="' + public['repository'] + '",rev="main"}', False),
@@ -236,6 +236,14 @@ class Checks(unittest.TestCase):
         # must remain rejected even with an otherwise valid published SDK pin.
         (ui / 'Cargo.toml').write_text(header + 'tekes-ui-controls={git="' +
                                       public['repository'] + '",rev="' + public['rev'] + '"}\n')
+        valid_workspace = (ui / 'Cargo.toml').read_text()
+        for wrong_unicode in ['1', '=1.13.2']:
+            with self.subTest(wrong_unicode=wrong_unicode):
+                (ui / 'Cargo.toml').write_text(valid_workspace.replace('=1.13.3', wrong_unicode))
+                result = subprocess.run([sys.executable, str(SCRIPTS / 'check-ui-boundaries.py'),
+                                         '--root', str(self.root)], capture_output=True)
+                self.assertNotEqual(result.returncode, 0)
+        (ui / 'Cargo.toml').write_text(valid_workspace)
         consumer = ui / 'consumer/Cargo.toml'
         accepted = consumer.read_text()
         for forbidden in ['tekes-ui-platform-macos', 'tekes-agent-endpoint-kernel']:
