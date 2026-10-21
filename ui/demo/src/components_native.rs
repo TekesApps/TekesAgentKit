@@ -78,6 +78,7 @@ impl Drop for OwnedFilePreview {
     }
 }
 struct Host {
+    scripted_sidebar_action: Option<ScriptedSidebarAction>,
     sidebar_query: Option<Arc<tekes_agent_ui_bindings::SidebarSearchBinding>>,
     sidebar_query_probe: Option<sidebar_query_probe::Probe>,
     sidebar_search_probe: Option<sidebar_search_probe::Probe>,
@@ -1297,6 +1298,46 @@ impl Host {
             probe.advance(self, window);
             self.sidebar_restore_probe = Some(probe);
         }
+        if let Some(script) = self.scripted_sidebar_action.take() {
+            use tekes_ui_platform_macos::selftest::{Action, run_script};
+            let menu = self
+                .view
+                .tree
+                .get(script.target)
+                .unwrap()
+                .component::<tekes_ui_controls::composition::MenuContent>()
+                .unwrap();
+            assert_eq!(
+                menu.model_revision(),
+                Some(script.model),
+                "native scripted action source changed"
+            );
+            let matches: Vec<_> = self
+                .view
+                .tree
+                .semantics()
+                .into_iter()
+                .find(|node| node.id == script.target)
+                .unwrap()
+                .parts
+                .into_iter()
+                .filter(|part| part.semantics.name == script.label && !part.semantics.disabled)
+                .collect();
+            if menu.menu.is_open() && matches.len() == 1 {
+                let point = matches[0].frame.center();
+                run_script(vec![(
+                    0,
+                    Action::Click {
+                        x: point.x as f64,
+                        y: point.y as f64,
+                    },
+                )]);
+            } else {
+                assert!(matches.len() <= 1, "ambiguous fixture action label");
+                self.scripted_sidebar_action = Some(script);
+                run_script(vec![(50, Action::WakeRedraw)]);
+            }
+        }
         if let Some(mut probe) = self.sidebar_options_probe.take() {
             probe.advance(self, window);
             self.sidebar_options_probe = Some(probe);
@@ -1699,7 +1740,7 @@ impl Host {
                         },
                     )]);
                 } else {
-                    click_thread_action_script(&self.view, "fork");
+                    click_thread_action_script(self, "fork");
                 }
             }
             if self.fork_test_started
@@ -1714,7 +1755,7 @@ impl Host {
                     .view
                     .current_binding()
                     .map(|binding| binding.scope().session_id.clone());
-                click_thread_action_script(&self.view, "archive");
+                click_thread_action_script(self, "archive");
             }
             if self.archive_test_started
                 && !self.empty_selection_seen
@@ -2467,13 +2508,13 @@ impl WindowHandler for Host {
                     eprintln!("COMPONENT_FOCUS after-draw={:?}", self.view.tree.focused());
                 }
                 if self.selftest {
-                    native_script(&self.view);
+                    native_script(self);
                 }
                 if self.system_ime_selftest {
                     system_ime_script(&self.view);
                 }
                 if self.actions_selftest {
-                    click_thread_action_script(&self.view, "rename");
+                    click_thread_action_script(self, "rename");
                     tekes_ui_platform_macos::selftest::run_script(vec![(
                         30000,
                         tekes_ui_platform_macos::selftest::Action::Close,
@@ -2750,11 +2791,15 @@ pub fn run() {
     );
     let sidebar_restore_selftest = args.iter().any(|arg| arg == "--sidebar-restore-selftest");
     let sidebar_options_selftest = args.iter().any(|arg| arg == "--sidebar-options-selftest");
+    let sidebar_session_menu_selftest = args
+        .iter()
+        .any(|arg| arg == "--sidebar-session-menu-selftest");
     let summary_sections_selftest = args.iter().any(|arg| arg == "--summary-sections-selftest");
     if reading_selftest
         || summary_sections_selftest
         || sidebar_restore_selftest
         || sidebar_options_selftest
+        || sidebar_session_menu_selftest
         || sidebar_search_selftest
         || sidebar_query_selftest
     {
@@ -2786,6 +2831,7 @@ pub fn run() {
             summary_sections_selftest,
             sidebar_restore_selftest,
             sidebar_options_selftest,
+            sidebar_session_menu_selftest,
             sidebar_search_selftest,
             sidebar_query_selftest,
             creation_selftest,
@@ -3176,11 +3222,16 @@ pub fn run() {
         0
     };
     let mut host = Host {
+        scripted_sidebar_action: None,
         sidebar_query,
         sidebar_query_probe: query_fixture.map(sidebar_query_probe::Probe::new),
         sidebar_search_probe: sidebar_search_selftest.then(sidebar_search_probe::Probe::new),
         sidebar_restore_probe: sidebar_restore_selftest.then(sidebar_restore_probe::Probe::new),
-        sidebar_options_probe: sidebar_options_selftest.then(sidebar_options_probe::Probe::new),
+        sidebar_options_probe: if sidebar_session_menu_selftest {
+            Some(sidebar_options_probe::Probe::new_session_menu())
+        } else {
+            sidebar_options_selftest.then(sidebar_options_probe::Probe::new)
+        },
         readonly_reading_probe: (readonly_reading_selftest || harness_readonly_reading_selftest)
             .then(|| readonly_reading_probe::Probe::new(bounded_probe_child)),
         reading_probe: if reading_selftest || harness_reading_selftest {
@@ -4434,7 +4485,9 @@ fn system_ime_script(view: &ComponentDemo) {
         (7000, Action::Close),
     ]);
 }
-fn native_script(view: &ComponentDemo) {
+fn native_script(host: &mut Host) {
+    click_thread_action_script(host, "pin");
+    let view = &host.view;
     use tekes_ui_platform_macos::selftest::{Action, run_script};
     let click = |id| {
         let point = view.tree.get(id).unwrap().frame().center();
@@ -4460,15 +4513,11 @@ fn native_script(view: &ComponentDemo) {
         endpoint_id: view.binding().scope().endpoint_id.clone(),
         session_id: "a".into(),
     };
-    let pin = sidebar
-        .action_id(&address, "pin")
-        .expect("owned fixture pin action");
     let select_a = sidebar.row_id(&address).unwrap();
     let mut address_b = address.clone();
     address_b.session_id = "b".into();
     let select_b = sidebar.row_id(&address_b).unwrap();
     let mut script = vec![
-        (250, click(pin)),
         (400, editor.clone()),
         (500, Action::Preedit("中文组字".into())),
         (700, click(ids.send)),
@@ -4639,21 +4688,59 @@ fn bounded_script(view: &ComponentDemo) {
     script.push((2200, Action::Close));
     run_script(script);
 }
-fn click_thread_action_script(view: &ComponentDemo, action: &str) {
+struct ScriptedSidebarAction {
+    target: ComponentId,
+    model: u64,
+    label: String,
+}
+fn click_thread_action_script(host: &mut Host, action: &str) {
     use tekes_ui_platform_macos::selftest::{Action, run_script};
+    let view = &host.view;
     let binding = view.current_binding().expect("selected action target");
     let address = tekes_agent_contract::SessionAddress {
         endpoint_id: binding.scope().endpoint_id.clone(),
         session_id: binding.scope().session_id.clone(),
     };
-    let id = view
+    let sidebar = view
         .tree
         .get(view.sidebar_id())
         .unwrap()
         .component::<Sidebar>()
+        .unwrap();
+    let root = sidebar
+        .session_menu_id()
+        .expect("shared session menu enabled");
+    let menu = view
+        .tree
+        .get(root)
         .unwrap()
-        .action_id(&address, action)
+        .component::<tekes_agent_components_ui::SidebarSessionMenu>()
+        .unwrap();
+    let id = menu.menu_id().unwrap();
+    let definition = sidebar
+        .displayed_input()
+        .unwrap()
+        .rows
+        .iter()
+        .find(|row| row.address == address)
+        .unwrap()
+        .actions
+        .items
+        .iter()
+        .find(|a| a.id == action && a.enabled)
         .expect("supported fixture action");
+    host.scripted_sidebar_action = Some(ScriptedSidebarAction {
+        target: id,
+        model: view
+            .tree
+            .get(id)
+            .unwrap()
+            .component::<tekes_ui_controls::composition::MenuContent>()
+            .unwrap()
+            .model_revision()
+            .unwrap(),
+        label: definition.label.clone(),
+    });
     let point = view.tree.get(id).unwrap().frame().center();
     run_script(vec![(
         100,

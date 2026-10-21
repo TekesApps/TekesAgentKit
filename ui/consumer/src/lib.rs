@@ -1,4 +1,10 @@
 //! Second consumer: depends only on AgentKit's public UI packages.
+pub fn sidebar_session_menu_intents(
+    sidebar: &tekes_agent_components_ui::Sidebar,
+    records: &[tekes_ui_controls::composition::ContentActionRecord],
+) -> Vec<tekes_agent_components_ui::SidebarSessionMenuIntent> {
+    sidebar.take_menu_intents(records)
+}
 /// A host uses the rich SDK queue once; legacy `drain_actions` would discard
 /// the original menu value. The resulting changes go to its existing store.
 pub fn sidebar_options_intents(

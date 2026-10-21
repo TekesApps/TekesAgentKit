@@ -5,6 +5,8 @@ use tekes_ui_controls::composition::{ButtonContent, MenuContent, PointerPhase};
 use tekes_ui_platform_macos::selftest::{Action, run_script};
 pub(super) struct Probe {
     phase: u8,
+    session_menu: bool,
+    other_draft: String,
     started: Instant,
     baseline: Option<tekes_ui_controls::TextEditBaseline>,
     draft: String,
@@ -19,6 +21,8 @@ impl Probe {
         run_script(vec![(20_000, Action::Close)]);
         Self {
             phase: 0,
+            session_menu: false,
+            other_draft: String::new(),
             started: Instant::now(),
             baseline: None,
             draft: String::new(),
@@ -29,7 +33,31 @@ impl Probe {
             barrier_seen: false,
         }
     }
-    fn menu(host: &Host) -> ComponentId {
+    pub fn new_session_menu() -> Self {
+        let mut probe = Self::new();
+        probe.session_menu = true;
+        probe
+    }
+    fn menu(&self, host: &Host) -> ComponentId {
+        if self.session_menu {
+            let sidebar = host
+                .view
+                .tree
+                .get(host.view.sidebar_id())
+                .unwrap()
+                .component::<Sidebar>()
+                .unwrap();
+            return host
+                .view
+                .tree
+                .get(sidebar.session_menu_id().unwrap())
+                .unwrap()
+                .component::<tekes_agent_components_ui::SidebarSessionMenu>()
+                .unwrap()
+                .menu_id()
+                .unwrap();
+        }
+
         host.view
             .tree
             .get(host.view.sidebar_options_id())
@@ -45,8 +73,8 @@ impl Probe {
             y: point.y as f64,
         }
     }
-    fn item(host: &Host, label: &str) -> Option<Action> {
-        let menu = Self::menu(host);
+    fn item(&self, host: &Host, label: &str) -> Option<Action> {
+        let menu = self.menu(host);
         let part = host
             .view
             .tree
@@ -125,6 +153,12 @@ impl Probe {
                     .component::<ButtonContent>()
                     .unwrap() as *const _ as usize;
                 self.revision = host.sidebar.preferences().unwrap().revision;
+                self.other_draft = host.view.bindings()[1]
+                    .current_run()
+                    .unwrap()
+                    .draft
+                    .text
+                    .clone();
                 run_script(vec![
                     (0, Self::click(host, host.view.ids().editor)),
                     (
@@ -140,9 +174,9 @@ impl Probe {
             }
             1 if host.view.editor().input.marked.is_some() => {
                 self.baseline = Some(host.view.editor().input.external_baseline());
-                self.barrier_target = host.view.tree.get(Self::menu(host)).unwrap().visible();
+                self.barrier_target = host.view.tree.get(self.menu(host)).unwrap().visible();
                 run_script(vec![
-                    (0, Self::click(host, Self::menu(host))),
+                    (0, Self::click(host, self.menu(host))),
                     (100, Action::Log("SIDEBAR_OPTIONS_IME_BARRIER".into())),
                 ]);
                 self.phase = 2;
@@ -157,7 +191,7 @@ impl Probe {
                     !host
                         .view
                         .tree
-                        .get(Self::menu(host))
+                        .get(self.menu(host))
                         .unwrap()
                         .component::<MenuContent>()
                         .unwrap()
@@ -171,17 +205,18 @@ impl Probe {
             3 if host.view.editor().input.marked.is_none() => {
                 self.draft = host.view.editor().input.text.clone();
                 assert!(self.draft.contains("选项中文组字"));
-                run_script(vec![(0, Self::click(host, Self::menu(host)))]);
+                run_script(vec![(0, Self::click(host, self.menu(host)))]);
                 self.phase = 4;
             }
+            _ if self.session_menu && self.phase >= 4 => self.advance_session_menu(host),
             4 => {
-                if let Some(action) = Self::item(host, "排序方式") {
+                if let Some(action) = self.item(host, "排序方式") {
                     run_script(vec![(0, action)]);
                     self.phase = 5;
                 }
             }
             5 => {
-                if let Some(action) = Self::item(host, "标题 A–Z") {
+                if let Some(action) = self.item(host, "标题 A–Z") {
                     run_script(vec![(0, action)]);
                     self.phase = 6;
                 }
@@ -191,17 +226,17 @@ impl Probe {
             {
                 assert!(host.sidebar.preferences().unwrap().revision > self.revision);
                 self.preserved(host);
-                run_script(vec![(0, Self::click(host, Self::menu(host)))]);
+                run_script(vec![(0, Self::click(host, self.menu(host)))]);
                 self.phase = 7;
             }
             7 => {
-                if let Some(action) = Self::item(host, "分组方式") {
+                if let Some(action) = self.item(host, "分组方式") {
                     run_script(vec![(0, action)]);
                     self.phase = 8;
                 }
             }
             8 => {
-                if let Some(action) = Self::item(host, "主文件夹") {
+                if let Some(action) = self.item(host, "主文件夹") {
                     run_script(vec![(0, action)]);
                     self.phase = 9;
                 }
@@ -229,8 +264,89 @@ impl Probe {
             window.request_redraw();
         }
     }
+    fn is_pinned(host: &Host, session: &str) -> bool {
+        host.sidebar
+            .snapshot()
+            .rows
+            .iter()
+            .find(|row| row.address.session_id == session)
+            .is_some_and(|row| row.pin.as_ref().is_some_and(|pin| pin.pinned))
+    }
+    fn advance_session_menu(&mut self, host: &mut Host) {
+        match self.phase {
+            4 => {
+                if let Some(action) = self.item(host, "置顶") {
+                    run_script(vec![(0, action)]);
+                    self.phase = 5;
+                }
+            }
+            5 if Self::is_pinned(host, "a") => {
+                self.preserved(host);
+                run_script(vec![(
+                    0,
+                    Self::click(host, tekes_agent_ui_demo::component_demo::SELECT_B),
+                )]);
+                self.phase = 6;
+            }
+            6 if host.view.selected() == 1 => {
+                assert_eq!(host.view.editor().input.text, self.other_draft);
+                click_thread_action_script(host, "pin");
+                self.phase = 7;
+            }
+            7 if Self::is_pinned(host, "b") => {
+                run_script(vec![(
+                    0,
+                    Self::click(host, tekes_agent_ui_demo::component_demo::SELECT_A),
+                )]);
+                self.phase = 8;
+            }
+            8 if host.view.selected() == 0 => {
+                self.preserved(host);
+                run_script(vec![(0, Self::click(host, self.menu(host)))]);
+                self.phase = 9;
+            }
+            9 => {
+                if let Some(action) = self.item(host, "下移置顶") {
+                    run_script(vec![(0, action)]);
+                    self.phase = 10;
+                }
+            }
+            10 if host.sidebar.preferences().unwrap().revision > self.revision => {
+                self.preserved(host);
+                let value = host.sidebar.preferences().unwrap();
+                assert_eq!(
+                    value
+                        .preferences
+                        .pin_order
+                        .iter()
+                        .map(|a| a.session_id.as_str())
+                        .collect::<Vec<_>>(),
+                    ["b", "a"]
+                );
+                assert_eq!(
+                    host.view.bindings()[1].current_run().unwrap().draft.text,
+                    self.other_draft
+                );
+                assert!(
+                    host.view.bindings()[1]
+                        .current_run()
+                        .unwrap()
+                        .submissions
+                        .is_empty()
+                );
+                let mut actions = vec![];
+                if let Ok(path) = std::env::var("AGENT_SIDEBAR_SESSION_MENU_CAPTURE") {
+                    actions.push((0, Action::Capture { path }));
+                }
+                actions.push((500, Action::Close));
+                run_script(actions);
+                self.phase = 11;
+            }
+            _ => {}
+        }
+    }
     pub fn receipt(&self) -> serde_json::Value {
-        assert_eq!(self.phase, 10);
-        serde_json::json!({"nativeWindow":true,"nativePointer":true,"originalSdkMenu":true,"sortAndGroupPersisted":true,"originalRowRetained":true,"draftPreserved":true,"markedTextBarrier":true,"noSubmission":true,"physicalIme":false,"voiceOver":false})
+        assert_eq!(self.phase, if self.session_menu { 11 } else { 10 });
+        serde_json::json!({"nativeWindow":true,"nativePointer":true,"originalSdkMenu":true,"sessionMenu":self.session_menu,"sortAndGroupPersisted":!self.session_menu,"sharedPinAndMovePersisted":self.session_menu,"originalRowRetained":true,"draftPreserved":true,"markedTextBarrier":true,"noSubmission":true,"physicalIme":false,"voiceOver":false})
     }
 }

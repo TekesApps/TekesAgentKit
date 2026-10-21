@@ -13,6 +13,8 @@ use tekes_agent_ui_demo::component_demo::{ComponentDemo, DemoCommand};
 use tekes_agent_ui_demo::fixture::Fixture;
 use tekes_agent_web::SharedAgent;
 use tekes_ui_controls::composition::*;
+#[path = "support/menu_host.rs"]
+mod menu_host;
 
 struct OwnedDirectory(PathBuf);
 impl OwnedDirectory {
@@ -85,21 +87,8 @@ async fn rename_fork_archive_flow_uses_shared_results_preserves_drafts_and_clear
     let mut view = ComponentDemo::new([a.clone(), b.clone()]).unwrap();
     view.set_sidebar_source(source.snapshot()).unwrap();
     view.sync().unwrap();
-    let action_id = |view: &ComponentDemo, id: &str| {
-        view.tree
-            .get(view.sidebar_id())
-            .unwrap()
-            .component::<Sidebar>()
-            .unwrap()
-            .action_id(&address("a"), id)
-            .unwrap()
-    };
-    let rename = action_id(&view, "rename");
-    assert!(
-        view.accessibility_action(rename, None, AccessibilityAction::Press)
-            .unwrap()
-            .is_empty()
-    );
+    let (commands, _, _) = menu_host::select(&mut view, &address("a"), "rename");
+    assert!(commands.is_empty());
     let ids = view.rename_ids().unwrap();
     assert!(
         view.accessibility_action(
@@ -146,15 +135,12 @@ async fn rename_fork_archive_flow_uses_shared_results_preserves_drafts_and_clear
     .await;
     view.set_sidebar_source(source.snapshot()).unwrap();
     view.sync().unwrap();
-    let fork = action_id(&view, "fork");
-    let mut commands = view
-        .accessibility_action(fork, None, AccessibilityAction::Press)
-        .unwrap();
+    let (mut commands, menu, part) = menu_host::select(&mut view, &address("a"), "fork");
     assert!(
-        view.accessibility_action(fork, None, AccessibilityAction::Press)
+        view.accessibility_action(menu, Some(part), AccessibilityAction::Press)
             .unwrap()
             .is_empty(),
-        "fork admission is single-flight"
+        "a consumed menu generation cannot emit another fork"
     );
     let DemoCommand::Sidebar(SidebarIntent::Action {
         address: origin,
@@ -196,17 +182,7 @@ async fn rename_fork_archive_flow_uses_shared_results_preserves_drafts_and_clear
     .await;
     view.set_sidebar_source(source.snapshot()).unwrap();
     view.sync().unwrap();
-    let archive = view
-        .tree
-        .get(view.sidebar_id())
-        .unwrap()
-        .component::<Sidebar>()
-        .unwrap()
-        .action_id(&forked, "archive")
-        .unwrap();
-    let mut commands = view
-        .accessibility_action(archive, None, AccessibilityAction::Press)
-        .unwrap();
+    let (mut commands, _, _) = menu_host::select(&mut view, &forked, "archive");
     let DemoCommand::Sidebar(SidebarIntent::Action {
         address: archive_address,
         definition,
@@ -334,7 +310,7 @@ async fn sidebar_consumes_shared_inventory_and_pins_broadcast_without_a_second_r
     assert_eq!(first.snapshot().rows.len(), 2);
     assert_eq!(first.snapshot().rows[0].title, "会话 a");
     let revision = run.current_run().unwrap().revision;
-    let sidebar = Sidebar::new(93, SidebarLabels::default());
+    let sidebar = Sidebar::new(93, SidebarLabels::default()).with_action_buttons();
     let id = sidebar.id();
     let mut host = sidebar.into_host().unwrap();
     let view = host

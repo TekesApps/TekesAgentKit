@@ -1,3 +1,4 @@
+//! Legacy action-button compatibility. Original menu/host coverage is separate.
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
 use tekes_agent_components_ui::{Sidebar, SidebarInput, SidebarIntent, SidebarLabels, SidebarRow};
 use tekes_agent_contract::*;
@@ -68,7 +69,7 @@ fn same_session_ids_on_two_endpoints_keep_scoped_selection_and_authoritative_act
         rows: vec![native.clone(), pi.clone()],
         selected: Some(native.address.clone()),
     };
-    let mut sidebar = Sidebar::new(30, SidebarLabels::default());
+    let mut sidebar = Sidebar::new(30, SidebarLabels::default()).with_action_buttons();
     let root = sidebar.id();
     sidebar.update(&input).unwrap();
     let a = sidebar.row_id(&native.address).unwrap();
@@ -140,7 +141,7 @@ fn stale_invalid_and_removed_inventory_never_retarget_actions_or_change_a_valid_
         rows: vec![row.clone()],
         selected: Some(row.address.clone()),
     };
-    let mut sidebar = Sidebar::new(31, SidebarLabels::default());
+    let mut sidebar = Sidebar::new(31, SidebarLabels::default()).with_action_buttons();
     let root = sidebar.id();
     sidebar.update(&input).unwrap();
     let id = sidebar.row_id(&row.address).unwrap();
@@ -193,7 +194,7 @@ fn stale_invalid_and_removed_inventory_never_retarget_actions_or_change_a_valid_
 #[test]
 fn shared_dispatch_rechecks_capabilities_instead_of_trusting_the_displayed_definition() {
     let row = make_row("native", "a", true);
-    let mut sidebar = Sidebar::new(32, SidebarLabels::default());
+    let mut sidebar = Sidebar::new(32, SidebarLabels::default()).with_action_buttons();
     sidebar
         .update(&SidebarInput {
             folder_filter: None,
@@ -355,7 +356,7 @@ async fn actual_shared_service_pin_receipt_and_reconnect_publish_authority_witho
         .unwrap();
     let input = service_input(&agent, 1).await;
     assert!(input.rows[0].pin.is_none());
-    let mut sidebar = Sidebar::new(33, SidebarLabels::default());
+    let mut sidebar = Sidebar::new(33, SidebarLabels::default()).with_action_buttons();
     let root = sidebar.id();
     sidebar.update(&input).unwrap();
     let pin = sidebar.action_id(&input.rows[0].address, "pin").unwrap();
@@ -408,7 +409,7 @@ fn restoration_is_not_empty_and_observation_failure_keeps_readable_rows() {
         rows: vec![row.clone()], // A cached row cannot confirm initial restoration.
         selected: Some(row.address.clone()),
     };
-    let mut sidebar = Sidebar::new(34, SidebarLabels::default());
+    let mut sidebar = Sidebar::new(34, SidebarLabels::default()).with_action_buttons();
     assert!(sidebar.displayed_input().is_none());
     sidebar.update(&input).unwrap();
     assert!(sidebar.row_id(&row.address).is_none());
@@ -477,7 +478,7 @@ fn same_publication_cannot_replace_restoration_or_inventory() {
         rows: vec![],
         selected: None,
     };
-    let mut sidebar = Sidebar::new(35, SidebarLabels::default());
+    let mut sidebar = Sidebar::new(35, SidebarLabels::default()).with_action_buttons();
     sidebar.update(&input).unwrap();
     sidebar.update(&input).unwrap();
     let mut conflict = input.clone();
@@ -505,7 +506,7 @@ fn host_selection_changes_do_not_require_a_fabricated_inventory_revision() {
         rows: vec![a.clone(), b.clone()],
         selected: Some(a.address.clone()),
     };
-    let mut sidebar = Sidebar::new(37, SidebarLabels::default());
+    let mut sidebar = Sidebar::new(37, SidebarLabels::default()).with_action_buttons();
     sidebar.update(&input).unwrap();
     let old_action = sidebar.action_id(&a.address, "copySessionId").unwrap();
     input.selected = Some(b.address.clone());

@@ -71,7 +71,7 @@ fn pinned_section_retains_original_row_controls_and_retires_old_preference_callb
         loaded: true,
         error: None,
     };
-    let mut view = Sidebar::new(998, SidebarLabels::default());
+    let mut view = Sidebar::new(998, SidebarLabels::default()).with_action_buttons();
     let root = view.id();
     let initial = SidebarPreferencesSnapshot::default();
     view.update_preferences(&initial, true).unwrap();

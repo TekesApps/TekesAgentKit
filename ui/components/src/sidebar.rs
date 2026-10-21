@@ -160,6 +160,7 @@ pub struct Sidebar {
     search_seen: BTreeMap<(String, String), (u64, u64)>,
     bindings: BTreeMap<ComponentId, SidebarIntent>,
     pending: BTreeSet<(SessionAddress, String)>,
+    session_menu: bool,
 }
 impl Sidebar {
     pub fn new(namespace: u32, labels: SidebarLabels) -> Self {
@@ -244,10 +245,91 @@ impl Sidebar {
             search_seen: BTreeMap::new(),
             bindings: BTreeMap::new(),
             pending: BTreeSet::new(),
+            session_menu: true,
         }
     }
     pub fn preferences(&self) -> &SidebarPreferencesSnapshot {
         &self.preferences
+    }
+    pub fn preferences_writable(&self) -> bool {
+        self.preferences_bound && self.preferences_writable
+    }
+    /// Explicitly select the default original compact SDK menu.
+    /// Configure before mounting or publishing input; IDs remain in this namespace.
+    pub fn with_session_menu(mut self) -> Self {
+        assert!(
+            self.displayed.is_none(),
+            "configure Sidebar menu before update"
+        );
+        self.session_menu = true;
+        self
+    }
+    /// Compatibility/diagnostic presentation for existing button-based hosts.
+    /// This is not the ClientKit-aligned menu layout used by the native demo.
+    pub fn with_action_buttons(mut self) -> Self {
+        assert!(self.displayed.is_none(), "configure Sidebar before update");
+        self.session_menu = false;
+        self
+    }
+    fn refresh_session_menu(&mut self) -> Result<(), &'static str> {
+        if !self.session_menu {
+            return Ok(());
+        }
+        let root = ComponentId(self.root.0 + 12);
+        let mut menu = self.body.children[0]
+            .component_mut::<StackContent>()
+            .unwrap()
+            .children[1]
+            .component_mut::<ListContent>()
+            .unwrap()
+            .rows
+            .children
+            .pop()
+            .unwrap_or_else(|| {
+                Content::new(
+                    root,
+                    crate::SidebarSessionMenu::at(
+                        root,
+                        crate::SidebarSessionMenuLabels {
+                            name: self.labels.actions.clone(),
+                            ..Default::default()
+                        },
+                    ),
+                )
+            });
+        let result = menu
+            .component_mut::<crate::SidebarSessionMenu>()
+            .unwrap()
+            .update_from_sidebar(self);
+        self.body.children[0]
+            .component_mut::<StackContent>()
+            .unwrap()
+            .children[1]
+            .component_mut::<ListContent>()
+            .unwrap()
+            .rows
+            .children = vec![menu];
+        result
+    }
+    pub fn session_menu_id(&self) -> Option<ComponentId> {
+        self.session_menu.then_some(ComponentId(self.root.0 + 12))
+    }
+    pub fn take_menu_intents(
+        &self,
+        records: &[ContentActionRecord],
+    ) -> Vec<crate::SidebarSessionMenuIntent> {
+        self.body.children[0]
+            .component::<StackContent>()
+            .unwrap()
+            .children[1]
+            .component::<ListContent>()
+            .unwrap()
+            .rows
+            .children
+            .first()
+            .and_then(|content| content.component::<crate::SidebarSessionMenu>())
+            .map(|menu| menu.take_intents(records))
+            .unwrap_or_default()
     }
     fn pinned_open(&self) -> bool {
         self.preferences.preferences.pinned_expanded || self.navigation_reveal.borrow().pinned
@@ -726,6 +808,11 @@ impl Sidebar {
         } else {
             self.pending.remove(&key);
         }
+        if self.session_menu {
+            self.refresh_session_menu()
+                .expect("previously validated session menu");
+            return;
+        }
         for (id, intent) in &self.bindings {
             if let SidebarIntent::Action {
                 address: target,
@@ -765,6 +852,9 @@ impl Sidebar {
         self.ids.get(&Key::Select(address.clone())).copied()
     }
     pub fn action_id(&self, address: &SessionAddress, action: &str) -> Option<ComponentId> {
+        if self.session_menu {
+            return None;
+        }
         self.ids
             .get(&Key::Action(address.clone(), action.into()))
             .copied()
@@ -783,6 +873,16 @@ impl Sidebar {
     }
     /// Validate all identity/capacity constraints before touching the mounted tree.
     pub fn update(&mut self, input: &SidebarInput) -> Result<(), &'static str> {
+        if self.session_menu
+            && (self.labels.actions.trim().is_empty()
+                || input
+                    .rows
+                    .iter()
+                    .flat_map(|row| &row.actions.items)
+                    .any(|action| action.label.trim().is_empty()))
+        {
+            return Err("Sidebar session menu labels must not be empty");
+        }
         if input.revision == 0 || input.revision < self.revision {
             return Err("stale or unversioned sidebar input");
         }
@@ -1211,48 +1311,50 @@ impl Sidebar {
             ));
         }
         self.rows_mut().rows.children = children;
-        let actions = self.body.children[0]
-            .component_mut::<StackContent>()
-            .unwrap()
-            .children[1]
-            .component_mut::<ListContent>()
-            .expect("shared action panel");
-        let pending = self.pending.clone();
-        let old = std::mem::take(&mut actions.rows.children);
-        let mut old: BTreeMap<_, _> = old
-            .into_iter()
-            .map(|content| (content.id(), content))
-            .collect();
-        if let Some(row) = visible_rows
-            .iter()
-            .find(|row| input.selected.as_ref() == Some(&row.address))
-        {
-            for definition in &row.actions.items {
-                let id = ids[&Key::Action(row.address.clone(), definition.id.clone())];
-                let mut content = old
-                    .remove(&id)
-                    .unwrap_or_else(|| Content::new(id, ButtonContent::new("")));
-                let button = content
-                    .component_mut::<ButtonContent>()
-                    .expect("shared action");
-                button.label = match &definition.disabled_reason {
-                    Some(reason) if !definition.enabled => {
-                        format!("{} · {reason}", definition.label)
+        if !self.session_menu {
+            let actions = self.body.children[0]
+                .component_mut::<StackContent>()
+                .unwrap()
+                .children[1]
+                .component_mut::<ListContent>()
+                .expect("shared action panel");
+            let pending = self.pending.clone();
+            let old = std::mem::take(&mut actions.rows.children);
+            let mut old: BTreeMap<_, _> = old
+                .into_iter()
+                .map(|content| (content.id(), content))
+                .collect();
+            if let Some(row) = visible_rows
+                .iter()
+                .find(|row| input.selected.as_ref() == Some(&row.address))
+            {
+                for definition in &row.actions.items {
+                    let id = ids[&Key::Action(row.address.clone(), definition.id.clone())];
+                    let mut content = old
+                        .remove(&id)
+                        .unwrap_or_else(|| Content::new(id, ButtonContent::new("")));
+                    let button = content
+                        .component_mut::<ButtonContent>()
+                        .expect("shared action");
+                    button.label = match &definition.disabled_reason {
+                        Some(reason) if !definition.enabled => {
+                            format!("{} · {reason}", definition.label)
+                        }
+                        _ => definition.label.clone(),
+                    };
+                    button.button.state.disabled = !definition.enabled
+                        || pending.contains(&(row.address.clone(), definition.id.clone()));
+                    if definition.enabled {
+                        bindings.insert(
+                            id,
+                            SidebarIntent::Action {
+                                address: row.address.clone(),
+                                definition: definition.clone(),
+                            },
+                        );
                     }
-                    _ => definition.label.clone(),
-                };
-                button.button.state.disabled = !definition.enabled
-                    || pending.contains(&(row.address.clone(), definition.id.clone()));
-                if definition.enabled {
-                    bindings.insert(
-                        id,
-                        SidebarIntent::Action {
-                            address: row.address.clone(),
-                            definition: definition.clone(),
-                        },
-                    );
+                    actions.rows.children.push(content);
                 }
-                actions.rows.children.push(content);
             }
         }
         self.page_limit = page_limit;
@@ -1267,6 +1369,7 @@ impl Sidebar {
         self.disclosure_dirty.set(false);
         self.revision = input.revision;
         self.displayed = Some(input.clone());
+        self.refresh_session_menu()?;
         Ok(())
     }
     /// Only explicit navigation can produce a scroll target. Inventory refresh

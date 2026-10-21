@@ -398,7 +398,7 @@ impl ComponentDemo {
                 ],
             },
         );
-        let sidebar = Sidebar::new(SIDEBAR_NAMESPACE, SidebarLabels::default());
+        let sidebar = Sidebar::new(SIDEBAR_NAMESPACE, SidebarLabels::default()).with_session_menu();
         let options = tekes_agent_components_ui::SidebarOptions::new(
             SIDEBAR_OPTIONS_NAMESPACE,
             tekes_agent_components_ui::SidebarOptionsLabels::default(),
@@ -3586,13 +3586,32 @@ impl ComponentDemo {
                 .load_more(&request)
                 .map_err(unsupported)?;
         }
-        let sidebar_intents = self
+        let mut sidebar_intents = self
             .tree
             .get(self.sidebar_id())
             .expect("sidebar")
             .component::<Sidebar>()
             .expect("Sidebar")
             .take_intents(&actions);
+        if !composing {
+            let menu_intents = self
+                .tree
+                .get(self.sidebar_id())
+                .unwrap()
+                .component::<Sidebar>()
+                .unwrap()
+                .take_menu_intents(&records);
+            for intent in menu_intents {
+                match intent {
+                    tekes_agent_components_ui::SidebarSessionMenuIntent::Shared(intent) => {
+                        sidebar_intents.push(intent)
+                    }
+                    tekes_agent_components_ui::SidebarSessionMenuIntent::Preferences(change) => {
+                        commands.push(DemoCommand::SidebarPreferences(change))
+                    }
+                }
+            }
+        }
         let summary_intents = self
             .tree
             .get(self.summary_id())
