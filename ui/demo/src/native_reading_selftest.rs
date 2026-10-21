@@ -509,6 +509,16 @@ impl Probe {
                             .is_some()
                     })
                     .expect("visible ordinary rail target");
+                let before_preview = host.view.editor().input.external_baseline();
+                let history_before = host.turn_history.0.len();
+                let captured = rail.preview_target(target.turn_id()).unwrap();
+                let preview = run.turn_preview(&captured).unwrap();
+                assert_eq!(preview.input, target.input());
+                assert!(!preview.output.is_empty());
+                assert!(preview.has_final_answer && preview.is_settled);
+                assert_eq!(host.view.tree.focused(), self.editor);
+                assert_eq!(host.view.editor().input.external_baseline(), before_preview);
+                assert_eq!(host.turn_history.0.len(), history_before);
                 self.anchor = Some(target.row_ids()[0]);
                 self.baseline = Some(host.view.editor().input.external_baseline());
                 let row = rail.row_id(target.turn_id()).unwrap();
@@ -635,7 +645,7 @@ impl Probe {
     }
     pub fn receipt(&self) -> serde_json::Value {
         assert_eq!(self.phase, 16, "native reading probe did not complete");
-        serde_json::json!({"nativeWindow":true,"jumpLatestControl":self.gate.is_some(),"jumpHasNoHistory":self.gate.is_some(),"originalTurnNavigation":self.gate.is_some(),"turnStartAndLatest":self.gate.is_some(),"navigationPreeditPreserved":self.gate.is_some(),"publicHistoryPage":true,
+        serde_json::json!({"nativeWindow":true,"previewFactsDuringPreedit":self.gate.is_some(),"hoverPreviewVisible":false,"jumpLatestControl":self.gate.is_some(),"jumpHasNoHistory":self.gate.is_some(),"originalTurnNavigation":self.gate.is_some(),"turnStartAndLatest":self.gate.is_some(),"navigationPreeditPreserved":self.gate.is_some(),"publicHistoryPage":true,
             "prependAnchorPreserved":true,"upwardReadingPreserved":true,
             "focusAndMarkedBaselinePreserved":self.gate.is_some(),"samePublicationRefresh":true,
             "focusAndEditorBaselinePreserved":self.gate.is_some(),"markedTextPreserved":self.gate.is_some(),

@@ -21,8 +21,10 @@ for name, dependency in workspace['dependencies'].items():
             assert dependency == {'git': lock['repository'], 'rev': lock['rev']}
         else:
             assert dependency['path'].startswith('.deps/tekesui/crates/')
+# Unicode segmentation implements ClientKit's bounded business preview string, not layout.
+assert workspace['dependencies']['unicode-segmentation'] == '=1.13.3'
 components = tomllib.loads((ui / 'components/Cargo.toml').read_text())['dependencies']
-assert set(components) == {'tekes-agent-contract', 'tekes-agent-presentation', 'tekes-ui-controls', 'tekes-ui-scene', 'tekes-ui-tokens'}
+assert set(components) == {'tekes-agent-contract', 'tekes-agent-presentation', 'tekes-ui-controls', 'tekes-ui-scene', 'tekes-ui-tokens', 'unicode-segmentation'}
 bindings = tomllib.loads((ui / 'bindings/Cargo.toml').read_text())['dependencies']
 # uuid allocates immutable session/create and attachment-operation identities;
 # bindings still cannot import a renderer, platform backend or harness adapter.

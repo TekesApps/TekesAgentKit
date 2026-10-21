@@ -276,6 +276,27 @@ impl RunView {
         }
         Ok(targets)
     }
+    /// Read-only preview of a captured original turn after a successful current
+    /// render. It may preserve an active Composer preedit; it does not activate
+    /// navigation, claim a gesture, invoke host history or display an overlay.
+    pub fn turn_preview<'a>(
+        &self,
+        target: &'a TranscriptTurnTarget,
+    ) -> Result<&'a TranscriptTurnPreview, &'static str> {
+        if !self.navigation_mounted || !self.pane_presented || target.is_visible().is_none() {
+            return Err("RunView preview requires a presented arranged pane");
+        }
+        self.transcript()
+            .ok_or("RunView has no Transcript")?
+            .validate_turn_target(target)?;
+        let geometry = self.geometry.ok_or("RunView is not arranged")?;
+        if geometry.publication != Some(target.publication())
+            || geometry.connection_epoch != Some(target.connection_epoch())
+        {
+            return Err("RunView preview geometry belongs to another publication");
+        }
+        Ok(target.preview())
+    }
     pub fn validate_turn_target(&self, target: &TranscriptTurnTarget) -> Result<(), &'static str> {
         if !self.pane_presented || self.composer().is_composing() {
             return Err("RunView navigation is unavailable during collapse or composition");

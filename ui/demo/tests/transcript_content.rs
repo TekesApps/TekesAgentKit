@@ -1207,3 +1207,74 @@ fn prepared_update_validates_before_publication_and_respects_explicit_aliases() 
             .is_err()
     );
 }
+
+#[test]
+fn preview_follows_clientkit_agentkit_bridge_join_and_settlement_rules() {
+    let mut source = snapshot();
+    source.turns[0].input = "原输入\n完整保留".into();
+    source.turns[0].status = "running".into();
+    source.items[1].text = "".into();
+    source.items[1].reasoning = "不能冒充输出的推理".into();
+    source.items[1].is_final = false;
+    let mut view = content();
+    view.update(&scope(), 1, 1, &source, false).unwrap();
+    let target = view.turn_targets().unwrap().remove(0);
+    assert_eq!(target.preview().input, source.turns[0].input);
+    assert_eq!(target.preview().output_text("运行中"), Some("运行中"));
+    assert!(!target.preview().has_final_answer);
+    assert!(!target.preview().is_settled);
+    source.items[1].text = "第一段".into();
+    let mut output = message("second", TranscriptItemKind::Assistant, 4);
+    output.text = "第二段".into();
+    source.items.push(output);
+    source
+        .items
+        .push(message("错误不混入预览", TranscriptItemKind::Error, 5));
+    source.tools.push(tool());
+    source.turns[0].status = "completed".into();
+    view.update(&scope(), 2, 1, &source, false).unwrap();
+    assert!(view.validate_turn_target(&target).is_err());
+    let next = view.turn_targets().unwrap().remove(0);
+    assert_eq!(next.preview().output, "第一段\n第二段");
+    assert!(next.preview().has_final_answer && next.preview().is_settled);
+    source
+        .items
+        .retain(|item| item.kind != TranscriptItemKind::Assistant);
+    view.update(&scope(), 3, 1, &source, false).unwrap();
+    let empty = view.turn_targets().unwrap().remove(0);
+    assert_eq!(empty.preview().output_text("运行中"), None);
+    assert!(!empty.preview().has_final_answer);
+}
+
+#[test]
+fn preview_prefix_keeps_240_extended_graphemes_and_cross_message_crlf() {
+    for (texts, expected) in [
+        (
+            vec![format!("{}e\u{301}截断", "👩🏽‍💻".repeat(239))],
+            format!("{}e\u{301}", "👩🏽‍💻".repeat(239)),
+        ),
+        (
+            vec![format!("{}\r", "中".repeat(239)), "X".into()],
+            format!("{}\r\n", "中".repeat(239)),
+        ),
+        (vec!["".into(), "最终回复".into()], "\n最终回复".into()),
+    ] {
+        let mut source = snapshot();
+        source.turns[0].input = "原回合输入".into();
+        source
+            .items
+            .retain(|item| item.kind != TranscriptItemKind::Assistant);
+        for (i, text) in texts.into_iter().enumerate() {
+            let mut item = message(
+                &format!("out-{i}"),
+                TranscriptItemKind::Assistant,
+                10 + i as i64,
+            );
+            item.text = text;
+            source.items.push(item);
+        }
+        let mut view = content();
+        view.update(&scope(), 1, 1, &source, false).unwrap();
+        assert_eq!(view.turn_targets().unwrap()[0].preview().output, expected);
+    }
+}

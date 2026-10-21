@@ -242,6 +242,16 @@ impl TranscriptContent {
             }
         }
         let arranged = self.arranged_revision == Some((self.publication, self.epoch));
+        // Match the ClientKit AgentKit bridge: assistant items in canonical
+        // source order, including empty items. Reasoning/tools/errors are not
+        // promoted to the turn's output preview. Group once for all targets.
+        let mut outputs: BTreeMap<&str, Vec<&tekes_agent_presentation::TranscriptItem>> =
+            BTreeMap::new();
+        for item in &snapshot.items {
+            if item.kind == TranscriptItemKind::Assistant {
+                outputs.entry(&item.turn_id).or_default().push(item);
+            }
+        }
         Ok(snapshot
             .turns
             .iter()
@@ -255,7 +265,13 @@ impl TranscriptContent {
                     publication: self.publication,
                     epoch: self.epoch,
                     turn_id: turn.id.clone(),
-                    input: turn.input.clone(),
+                    preview: crate::TranscriptTurnPreview::read(
+                        turn,
+                        outputs
+                            .get(turn.id.as_str())
+                            .map(Vec::as_slice)
+                            .unwrap_or_default(),
+                    ),
                     status: turn.status.clone(),
                     rows: ids,
                     visible,
@@ -278,6 +294,8 @@ impl TranscriptContent {
         }
         if !self.turn_targets()?.iter().any(|current| {
             current.turn_id == target.turn_id
+                && current.preview == target.preview
+                && current.status == target.status
                 && current.rows == target.rows
                 && !current.rows.is_empty()
         }) {

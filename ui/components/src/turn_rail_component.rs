@@ -239,6 +239,12 @@ impl TurnRail {
     pub fn item_ids(&self) -> Vec<ComponentId> {
         self.order.iter().map(|key| self.ids[key].0).collect()
     }
+    /// Captured data of the original rail item. Validate it through RunView
+    /// before reading a preview; this is neither overlay nor navigation authority.
+    pub fn preview_target(&self, turn: &str) -> Option<crate::TranscriptTurnTarget> {
+        self.prototype(self.row_id(turn)?)
+            .map(|source| source.target().clone())
+    }
     pub fn row_id(&self, turn: &str) -> Option<ComponentId> {
         self.ids.get(turn).map(|v| v.0)
     }

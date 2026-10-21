@@ -14,7 +14,7 @@ pub struct TranscriptTurnTarget {
     pub(crate) publication: u64,
     pub(crate) epoch: u64,
     pub(crate) turn_id: String,
-    pub(crate) input: String,
+    pub(crate) preview: crate::TranscriptTurnPreview,
     pub(crate) status: String,
     pub(crate) rows: Vec<ComponentId>,
     pub(crate) visible: Option<bool>,
@@ -33,7 +33,10 @@ impl TranscriptTurnTarget {
         &self.turn_id
     }
     pub fn input(&self) -> &str {
-        &self.input
+        &self.preview.input
+    }
+    pub fn preview(&self) -> &crate::TranscriptTurnPreview {
+        &self.preview
     }
     pub fn status(&self) -> &str {
         &self.status

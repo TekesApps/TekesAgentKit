@@ -2083,3 +2083,49 @@ async fn readonly_plan_is_original_owner_only_and_formats_status_before_the_sdk_
     );
     runtime.stop().await.unwrap();
 }
+
+#[tokio::test]
+async fn preview_of_original_rail_target_preserves_marked_text_and_expires_on_publication_or_collapse()
+ {
+    let (runtime, mut host, root, snapshot, version, _, mut text) = rail_setup().await;
+    let target = rail(&host, root)
+        .preview_target(&snapshot.transcript.turns[0].id)
+        .unwrap();
+    let preview = run(&host, root).turn_preview(&target).unwrap().clone();
+    assert_eq!(preview.input, target.input());
+    let editor = run(&host, root).ids().composer.editor;
+    host.focus(Some(editor), true);
+    host.event(&ContentEvent::Preedit {
+        text: "预览保持中文组字".into(),
+        selection: 1..3,
+        clauses: vec![],
+        replacement: None,
+    });
+    let baseline = baseline(&host, root);
+    assert_eq!(
+        tekes_agent_ui_consumer_check::turn_preview(run(&host, root), &target).unwrap(),
+        &preview
+    );
+    assert_eq!(host.focused(), Some(editor));
+    assert_eq!(baseline, self::baseline(&host, root));
+    assert!(rail_intents(&mut host, root).is_empty());
+    host.event(&ContentEvent::Unmark);
+    let next = append(&snapshot);
+    let plan = prepare(run(&host, root), &next).unwrap();
+    publish_plan(&mut host, root, &version, &plan).unwrap();
+    assert!(run(&host, root).turn_preview(&target).is_err());
+    render(&mut host, &mut text);
+    let current = rail(&host, root).preview_target(target.turn_id()).unwrap();
+    assert!(run(&host, root).turn_preview(&current).is_ok());
+    let collapsed = Rect::new(0., 0., 0., 700.);
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        collapsed,
+        collapsed,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    assert!(run(&host, root).turn_preview(&current).is_err());
+    runtime.stop().await.unwrap();
+}

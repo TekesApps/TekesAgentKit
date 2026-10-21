@@ -217,3 +217,5 @@ Summary 的六项用量行使用左标题、右数值的两个 TekesUI 文本槽
 SidePanel 宿主布局输入使用 `SidePanel::set_layout(SidePanelLayout { content_top_inset })`，净空由窗口宿主测量。Kit 拥有 regular 正文 inset 和有界视口；纯布局变化保留 token/编辑器。`layout_geometry()` 只表示最近 arrange，不是 render/阅读 authority。圆角裁切与焦点边框跟踪 TekesUI #45，详见 [接入记录](../docs/rust-agent-ui-sidepanel-layout-20261022.md)。
 
 Summary 的普通静态行与用量标题现在使用原 TekesUI 只读可选择文本，`SummaryView::passive_text_id(section, row)` 提供其原ID。宿主通过同一ContentHost的既有文本命令处理选择/复制，并提供TextSurfaceHost，不另存选区；折叠ID存在不代表可见。详见[静态行契约](../docs/rust-agent-ui-summary-selectable-20261022.md)。
+
+`TranscriptTurnTarget::preview()`提供原回合的plain preview快照，`TurnRail::preview_target`捕获原项，`RunView::turn_preview`在当前来源/布局上只读验证，允许保留Composer组字。当前未显示hover卡片；被动原Content浮层等待TekesUI #46，详见[预览契约](../docs/rust-agent-ui-turn-preview-20261022.md)。

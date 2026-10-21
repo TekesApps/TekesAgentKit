@@ -2362,3 +2362,12 @@ fn second_summary_consumer_selects_passive_text_without_an_endpoint_or_copy_stat
             .is_empty()
     );
 }
+
+/// Preview data is shared Agent content; placement/hit/dismiss belongs to the SDK.
+/// Call after a successful render and keep the captured target, not a new ordinal.
+pub fn turn_preview<'a>(
+    run: &tekes_agent_components_ui::RunView,
+    target: &'a tekes_agent_components_ui::TranscriptTurnTarget,
+) -> Result<&'a tekes_agent_components_ui::TranscriptTurnPreview, &'static str> {
+    run.turn_preview(target)
+}

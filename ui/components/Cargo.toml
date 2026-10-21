@@ -10,3 +10,4 @@ tekes-agent-presentation.workspace = true
 tekes-ui-controls.workspace = true
 tekes-ui-scene.workspace = true
 tekes-ui-tokens.workspace = true
+unicode-segmentation.workspace = true
