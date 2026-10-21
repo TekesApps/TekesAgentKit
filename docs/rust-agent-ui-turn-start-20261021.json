@@ -1,0 +1,99 @@
+{
+  "format": "agentkit-turn-start/1",
+  "verified_at_utc": "2026-10-21T00:33:24.686842+00:00",
+  "based_on": "913938708f6b4e27004d5785eeea2391bc3c46fb",
+  "candidate": {
+    "identity": "5882774a0e73dfcb423efb4260c150e03f50f5cc9a87bd2331c1e171963faacd",
+    "archive_sha256": "1d4a3541ba3bc8127b21d6dd8d69ef9608583c72a5287ced547078ccdec735d4",
+    "files": 490,
+    "delta_paths": [
+      "crates/tekes-ui-controls/src/composition.rs",
+      "crates/tekes-ui-controls/src/composition/content_reading.rs",
+      "crates/tekes-ui-controls/src/composition/content_reveal.rs",
+      "crates/tekes-ui-controls/src/scroll_view/reveal.rs",
+      "design/source/interaction-contracts.json",
+      "design/tokens.json",
+      "docs/design/item-start-alignment-20261021.md",
+      "examples/composition-consumer/tests/item_navigation.rs",
+      "examples/composition-consumer/tests/scroll_reveal.rs"
+    ],
+    "base_c779_unchanged": true,
+    "default_pin_promoted": false,
+    "tokens_sets_api_unchanged": true
+  },
+  "portable_manifest_sha256": "b28b626bcf0dac96ea4687a4c90ea8bc7d6cecf94b1e0fe14860107d4ab47450",
+  "all_490_source_and_locks_unchanged": true,
+  "all_local_sdk_packages_in_extraction": true,
+  "local_sdk_packages": 10,
+  "receiver_receipt": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-start-588277-core/receipt.json",
+  "receiver_receipt_sha256": "8cd4524e5e3c48d3e156d6e5b4bf0abe10b744981e1c7474af06a3b8689c10ea",
+  "receiver_checks": [
+    {
+      "check": "tests",
+      "exit_code": 0
+    },
+    {
+      "check": "clippy",
+      "exit_code": 0
+    },
+    {
+      "check": "public-consumer",
+      "exit_code": 0
+    },
+    {
+      "check": "native-build",
+      "exit_code": 0
+    }
+  ],
+  "source_files": {
+    "scripts/test-reading-candidate.py": "22147b867c16f3c416ba7523319d9de4928b17e176f15c9fd287a5549e36e938",
+    "scripts/probes/agentkit-turn-start-candidate.rs": "92fb248dcb4b459a3c7e367ee2fa4aba614ccac5a4240c5746f0a658cb116452",
+    "scripts/probes/agentkit-turn-rail-candidate.rs": "ffad3ce07067989cb2f28575aff57f92b28cfa0e9d8e77c9687189d81f7a892e",
+    "scripts/probes/agentkit-run-preflight-candidate.rs": "a2b5fa61a461bc0c1bf0f7cc55b726851371d71de23a7e5adb06d8c1b19cc320"
+  },
+  "checks": {
+    "/tmp/agentkit-start-588277-entire-ui.log": {
+      "sha256": "0803550b20daba110b7a452a7f9f2b7e1a3f049516799a7309b9f5b478c48a3e",
+      "tests_passed": 364
+    },
+    "/tmp/agentkit-start-588277-entire-clippy.log": {
+      "sha256": "3bb1cf653e432788e420df679e06686cb25aadbc48806296e135eb608356f44b",
+      "tests_passed": 0
+    },
+    "/tmp/agentkit-start-588277-sdk-tests.log": {
+      "sha256": "ea015efd7c9864cb00edf419c3e81ac7ad27ea1aa72e882a96ae4df4a22715ae",
+      "tests_passed": 437
+    },
+    "/tmp/agentkit-start-588277-sdk-consumer.log": {
+      "sha256": "59d9dfb0396a0269daa06420e610bbb9c72d103351539b3f97727c387b9f916e",
+      "tests_passed": 224
+    },
+    "/tmp/agentkit-start-588277-sdk-clippy.log": {
+      "sha256": "5b955bf178c80ccb053d99657e06cb9e141074f700d4fd97576924012166cf77",
+      "tests_passed": 0
+    },
+    "/tmp/agentkit-start-588277-sdk-consumer-clippy.log": {
+      "sha256": "6084b7630d3e7d93afc0991f7780778c3d34be8b71c38fbd17738c752424cd46",
+      "tests_passed": 0
+    },
+    "/tmp/agentkit-start-588277-sdk-native-build.log": {
+      "sha256": "4b395c9c76c7f7fb5221d30df7320c7a2387ff3842c426dbee6a59a54b5cffab",
+      "tests_passed": 0
+    }
+  },
+  "run_rail_start_tests": 16,
+  "whole_ui_tests": 364,
+  "independent_public_consumer_tests": 35,
+  "actual_ordinary_rail_pointer_component_test": true,
+  "visible_start_clip": 150,
+  "viewport_tall_already_visible_start": true,
+  "original_editor_preedit_baseline": true,
+  "horizontal_offset_preserved": true,
+  "native_start_acceptance": false,
+  "producer_gpu_borrowed": false,
+  "physical_ime": false,
+  "voiceover": false,
+  "default_pin_promoted": false,
+  "development_freeze_promoted": false,
+  "full_goal_complete": false
+}

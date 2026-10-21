@@ -35,6 +35,8 @@ def main():
     parser.add_argument('--probe', type=Path, help='Explicit receiver test source; default: Transcript-only probe')
     parser.add_argument('--append-run-probe', action='store_true',
                         help='Append the explicit probe to the unchanged formal RunView transaction probe')
+    parser.add_argument('--append-rail-probe', action='store_true',
+                        help='Append the unchanged actual-rail probe before the explicit extension probe')
     parser.add_argument('--summary-labels', action='store_true',
                         help='Candidate-only Summary header label and existing native text-host adapter')
     parser.add_argument('--manifest', type=Path, required=True)
@@ -52,6 +54,8 @@ def main():
         parser.error('--item-navigation-native requires --append-run-probe')
     if args.turn_rail and not args.append_run_probe:
         parser.error('--turn-rail requires --append-run-probe')
+    if args.append_rail_probe and not (args.append_run_probe and args.turn_rail):
+        parser.error('--append-rail-probe requires --append-run-probe and --turn-rail')
     repo = Path(__file__).resolve().parent.parent
     source = args.source.resolve()
     manifest = json.loads(args.manifest.read_text())
@@ -86,6 +90,11 @@ def main():
         probe_base = repo / 'scripts/probes/agentkit-run-preflight-candidate.rs'
         (snapshot / 'ui/demo/tests/reading_candidate.rs').write_bytes(
             probe_base.read_bytes().rstrip() + b'\n\n' + probe.read_bytes())
+    probe_rail = None
+    if args.append_rail_probe:
+        probe_rail = repo / 'scripts/probes/agentkit-turn-rail-candidate.rs'
+        (snapshot / 'ui/demo/tests/reading_candidate.rs').write_bytes(
+            probe_base.read_bytes().rstrip() + b'\n\n' + probe_rail.read_bytes().rstrip() + b'\n\n' + probe.read_bytes())
     cargo = snapshot / 'ui/Cargo.toml'
     cargo.write_text(re.sub(
         r'^(tekes-ui-[\w-]+) = \{ git = "https://github.com/TekesApps/TekesUI.git", rev = "[a-f0-9]+" \}$',
@@ -237,6 +246,7 @@ def main():
                    portable_manifest_sha256=sha(args.manifest), agentkit_inputs=inputs,
                    probe_sha256=sha(probe), source=str(source), snapshot=str(snapshot),
                    probe_base_sha256=sha(probe_base) if probe_base else None,
+                   probe_rail_sha256=sha(probe_rail) if probe_rail else None,
                    prepared_probe_sha256=sha(snapshot / 'ui/demo/tests/reading_candidate.rs'),
                    candidate_only_host_adaptations=adaptations,
                    candidate_overrides={name: sha(snapshot / name) for name in

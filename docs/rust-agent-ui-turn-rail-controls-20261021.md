@@ -56,3 +56,5 @@ python3 scripts/test-reading-candidate.py \
 最终带原生事件记录的同一二进制连续两次完成实际 Latest rail 点击：原 Editor、focus、输入 baseline 和合成 AppKit preedit 保留，Down/Up只派发一次，无提交。截图中用户气泡及外置 footnote 靠右，机器正文和 footnote 靠左；这只是当前fixture的显示证据，不是配对 ClientKit 产品页验收。普通回合的 centered 仍只是技术诊断。
 
 失败也保留：首次探针在 render 前用完整行中心，违反当前可见命中前提，已改为成功 render 后的库 visible rect；另一早期窗口在末尾遇到publication5→6，缺少原生事件来源，原因未确认，不能用最终两次通过反推其已解决。后者仍属于验收限制，尚不建议提升冻结。
+
+后续[#32 Start候选](rust-agent-ui-turn-start-20261021.md)另有独立输入与组件验证；本页c779收据和原生范围保持不变。
