@@ -440,8 +440,8 @@ impl TranscriptContent {
     }
     /// Recheck before committing. Stale plans cannot change the tree, controls
     /// or namespace allocation, even when a detached action settled meanwhile.
-    pub fn apply_prepared_update(
-        &mut self,
+    pub fn validate_prepared_update(
+        &self,
         prepared: &TranscriptContentUpdate<'_>,
     ) -> Result<(), &'static str> {
         if self.root != prepared.root
@@ -462,6 +462,13 @@ impl TranscriptContent {
         if current.rows != prepared.rows {
             return Err("transcript update plan identities changed");
         }
+        Ok(())
+    }
+    pub fn apply_prepared_update(
+        &mut self,
+        prepared: &TranscriptContentUpdate<'_>,
+    ) -> Result<(), &'static str> {
+        self.validate_prepared_update(prepared)?;
         self.update(
             &prepared.scope,
             prepared.publication,

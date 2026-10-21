@@ -45,6 +45,7 @@ impl Default for ReadOnlyTranscriptLabels {
 }
 /// Canonical frame metadata is separate from transient read/availability facts.
 /// publication is original binding read order, never an endpoint journal cursor.
+#[derive(Clone, Copy, Debug)]
 pub struct ReadOnlyTranscriptInput<'a> {
     pub scope: &'a RunScope,
     pub publication: u64,
@@ -89,6 +90,21 @@ impl ReadOnlyTranscriptIntent {
         self.read
     }
 }
+/// Same-UI-turn plan; not authority for a network history request.
+#[derive(Debug)]
+pub struct ReadOnlyTranscriptUpdate<'a> {
+    root: ComponentId,
+    owner: std::sync::Arc<()>,
+    generation: u64,
+    input: ReadOnlyTranscriptInput<'a>,
+    content: TranscriptContentUpdate<'a>,
+    status: String,
+}
+impl ReadOnlyTranscriptUpdate<'_> {
+    pub fn item_ids(&self) -> Vec<ComponentId> {
+        self.content.item_ids()
+    }
+}
 /// Independently mounted history pane, with default library viewport/controls.
 /// It cannot produce Send, Cancel, actionable responses or completed-turn actions.
 #[derive(Debug)]
@@ -103,6 +119,8 @@ pub struct ReadOnlyTranscript {
     epoch: u64,
     connection: Option<ConnectionPresentation>,
     refresh_enabled: bool,
+    plan_owner: std::sync::Arc<()>,
+    generation: u64,
 }
 impl ReadOnlyTranscript {
     /// Three consecutive namespaces for controls/paging/content; reserve the
@@ -196,6 +214,8 @@ impl ReadOnlyTranscript {
             epoch: 0,
             connection: None,
             refresh_enabled: false,
+            plan_owner: std::sync::Arc::new(()),
+            generation: 0,
         })
     }
     pub fn ids(&self) -> ReadOnlyTranscriptIds {
@@ -256,9 +276,15 @@ impl ReadOnlyTranscript {
             false,
         )
     }
-    pub fn update(&mut self, input: ReadOnlyTranscriptInput<'_>) -> Result<(), &'static str> {
+    pub fn prepare_update<'a>(
+        &self,
+        input: ReadOnlyTranscriptInput<'a>,
+    ) -> Result<ReadOnlyTranscriptUpdate<'a>, &'static str> {
         self.validate_update(&input)?;
-        self.content_mut().update(
+        self.generation
+            .checked_add(1)
+            .ok_or("read-only display generation exhausted")?;
+        let content = self.content().prepare_update(
             input.scope,
             input.publication,
             input.connection_epoch,
@@ -279,10 +305,43 @@ impl ReadOnlyTranscript {
         if let Some(error) = input.read_error {
             text.push_str(&format!("\n{error}"));
         }
+        Ok(ReadOnlyTranscriptUpdate {
+            root: self.ids.root,
+            owner: self.plan_owner.clone(),
+            generation: self.generation,
+            input,
+            content,
+            status: text,
+        })
+    }
+    pub fn validate_prepared_update(
+        &self,
+        plan: &ReadOnlyTranscriptUpdate<'_>,
+    ) -> Result<(), &'static str> {
+        if self.ids.root != plan.root
+            || !std::sync::Arc::ptr_eq(&self.plan_owner, &plan.owner)
+            || self.generation != plan.generation
+        {
+            return Err("stale or foreign read-only update plan");
+        }
+        self.validate_update(&plan.input)?;
+        self.content().validate_prepared_update(&plan.content)
+    }
+    pub fn update(&mut self, input: ReadOnlyTranscriptInput<'_>) -> Result<(), &'static str> {
+        let plan = self.prepare_update(input)?;
+        self.apply_prepared_update(&plan)
+    }
+    pub fn apply_prepared_update(
+        &mut self,
+        plan: &ReadOnlyTranscriptUpdate<'_>,
+    ) -> Result<(), &'static str> {
+        self.validate_prepared_update(plan)?;
+        let input = &plan.input;
+        self.content_mut().apply_prepared_update(&plan.content)?;
         self.body.children[0]
             .component_mut::<TextContent>()
             .unwrap()
-            .text = text;
+            .text = plan.status.clone();
         self.refresh_enabled = input.source_ready && !input.reading;
         self.body.children[1]
             .component_mut::<ButtonContent>()
@@ -307,6 +366,7 @@ impl ReadOnlyTranscript {
                     TranscriptPageRead::Idle
                 },
             })?;
+        self.generation += 1;
         self.publication = input.publication;
         self.epoch = input.connection_epoch;
         self.connection = Some(input.connection.clone());
@@ -352,6 +412,9 @@ impl ReadOnlyTranscript {
     }
 }
 impl Component for ReadOnlyTranscript {
+    fn lifecycle(&mut self, _: Lifecycle) {
+        self.plan_owner = std::sync::Arc::new(());
+    }
     fn children(&self) -> &[Content] {
         &self.body.children
     }

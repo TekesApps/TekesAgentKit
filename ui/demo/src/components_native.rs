@@ -36,6 +36,8 @@ use tekes_ui_tokens::{Palette, Theme};
 mod feedback_probe;
 #[path = "native_reading_selftest.rs"]
 mod reading_probe;
+#[path = "native_readonly_reading_selftest.rs"]
+mod readonly_reading_probe;
 #[path = "native_run_controls_selftest.rs"]
 mod run_controls_probe;
 #[path = "native_sidebar_query_selftest.rs"]
@@ -77,6 +79,7 @@ struct Host {
     sidebar_search_probe: Option<sidebar_search_probe::Probe>,
     sidebar_restore_probe: Option<sidebar_restore_probe::Probe>,
     reading_probe: Option<reading_probe::Probe>,
+    readonly_reading_probe: Option<readonly_reading_probe::Probe>,
     summary_sections_probe: Option<summary_sections_probe::Probe>,
     visibility_probe: Option<visibility_probe::Probe>,
     feedback_probe: Option<feedback_probe::Probe>,
@@ -1269,6 +1272,10 @@ impl Host {
             probe.advance(self, window);
             self.sidebar_search_probe = Some(probe);
         }
+        if let Some(mut probe) = self.readonly_reading_probe.take() {
+            probe.advance(self, window);
+            self.readonly_reading_probe = Some(probe);
+        }
         if let Some(mut probe) = self.reading_probe.take() {
             probe.advance(self, window);
             self.reading_probe = Some(probe);
@@ -2279,6 +2286,14 @@ impl Host {
                 probe.receipt()
             );
         }
+        if let Some(probe) = &self.readonly_reading_probe {
+            assert!(
+                self.failures.is_empty(),
+                "read-only reading failures {:?}",
+                self.failures
+            );
+            println!("NATIVE_AGENT_READONLY_READING_RECEIPT {}", probe.receipt());
+        }
         if let Some(probe) = &self.reading_probe {
             assert!(
                 self.failures.is_empty(),
@@ -2647,6 +2662,18 @@ pub fn run() {
     let harness_reading_selftest = args
         .iter()
         .any(|arg| arg == "--history-reading-native-selftest");
+    let readonly_reading_selftest = args
+        .iter()
+        .any(|arg| arg == "--readonly-reading-native-selftest");
+    if readonly_reading_selftest {
+        assert!(
+            args.iter().any(|arg| arg == "--transcript-content")
+                && !args
+                    .iter()
+                    .any(|arg| arg == "--endpoint-config" || arg == "--offscreen"),
+            "read-only probe requires owned fixture Transcript window"
+        );
+    }
     let reading_selftest = args.iter().any(|arg| arg == "--reading-native-selftest");
     let reading_gate = reading_selftest.then(|| Arc::new(tokio::sync::Semaphore::new(0)));
     assert!(
@@ -2683,6 +2710,7 @@ pub fn run() {
             context_selftest,
             reading_selftest,
             harness_reading_selftest,
+            readonly_reading_selftest,
             summary_sections_selftest,
             sidebar_restore_selftest,
             sidebar_search_selftest,
@@ -3071,6 +3099,7 @@ pub fn run() {
         sidebar_query_probe: query_fixture.map(sidebar_query_probe::Probe::new),
         sidebar_search_probe: sidebar_search_selftest.then(sidebar_search_probe::Probe::new),
         sidebar_restore_probe: sidebar_restore_selftest.then(sidebar_restore_probe::Probe::new),
+        readonly_reading_probe: readonly_reading_selftest.then(readonly_reading_probe::Probe::new),
         reading_probe: if reading_selftest || harness_reading_selftest {
             Some(reading_probe::Probe::new(reading_gate))
         } else {

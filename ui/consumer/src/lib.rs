@@ -2273,3 +2273,17 @@ pub fn jump_original_run(
 ) -> Result<bool, tekes_agent_components_ui::RunNavigationError> {
     tekes_agent_components_ui::jump_run_latest(host, root, intent, version)
 }
+
+/// Independent host consumes the same bounded/read-only reading transaction.
+pub fn publish_original_readonly(
+    host: &mut tekes_ui_controls::composition::ContentHost,
+    root: tekes_ui_controls::composition::ComponentId,
+    version: &tekes_ui_controls::ReadingDocumentVersion,
+    revision: u64,
+    plan: &tekes_agent_components_ui::ReadOnlyTranscriptUpdate<'_>,
+) -> Result<
+    tekes_ui_controls::ReadingDocumentVersion,
+    tekes_agent_components_ui::ReadOnlyReadingError,
+> {
+    tekes_agent_components_ui::publish_readonly_reading_update(host, root, version, revision, plan)
+}

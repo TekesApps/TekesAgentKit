@@ -2098,7 +2098,7 @@ impl ComponentDemo {
             .component::<tekes_agent_components_ui::ReadOnlyTranscript>()?;
         Some((view.ids().refresh, view.paging_button_id()))
     }
-    pub fn bounded_child_content_id(&self) -> Option<ComponentId> {
+    pub fn bounded_child_view_id(&self) -> Option<ComponentId> {
         let (refresh, _) = self.bounded_child_buttons()?;
         let parent = self.binding().scope();
         let SidePanelTabKind::Subagent { child_id } = self.panel_selections.get(parent)? else {
@@ -2109,7 +2109,14 @@ impl ComponentDemo {
             .tree
             .get(ComponentId(pane.controls.ids.root.0 + 16))?
             .component::<tekes_agent_components_ui::ReadOnlyTranscript>()?;
-        (view.ids().refresh == refresh).then_some(view.content_id())
+        (view.ids().refresh == refresh).then_some(view.ids().root)
+    }
+    pub fn bounded_child_content_id(&self) -> Option<ComponentId> {
+        let root = self.bounded_child_view_id()?;
+        self.tree
+            .get(root)?
+            .component::<tekes_agent_components_ui::ReadOnlyTranscript>()
+            .map(|pane| pane.content_id())
     }
     fn active_panel_run(&self) -> Option<&PanelRun> {
         let parent = self.binding().scope();
@@ -3033,15 +3040,62 @@ impl ComponentDemo {
                                     .map_err(unsupported)?;
                                 self.next_document_namespace = end;
                                 self.document_roots.insert(ids.root, content_id);
-                            } else {
+                                let pane = self
+                                    .tree
+                                    .get(root)
+                                    .unwrap()
+                                    .component::<tekes_agent_components_ui::ReadOnlyTranscript>()
+                                    .unwrap();
+                                let viewport = pane.ids().viewport;
+                                let items = pane
+                                    .content()
+                                    .row_keys()
+                                    .iter()
+                                    .map(|key| pane.content().row_id(key).unwrap())
+                                    .collect();
+                                let key = format!(
+                                    "agentkit-readonly:{}",
+                                    ComposerDestination::run(pane.scope().clone()).storage_key()
+                                );
                                 self.tree
-                                    .get_mut(root)
+                                    .set_scroll_reading_document(viewport, key, 0, items, |_| ())
+                                    .map_err(|error| {
+                                        unsupported(&format!(
+                                            "read-only reading attachment: {error:?}"
+                                        ))
+                                    })?;
+                            } else {
+                                let pane = self
+                                    .tree
+                                    .get(root)
                                     .unwrap()
-                                    .component_mut::<tekes_agent_components_ui::ReadOnlyTranscript>(
-                                    )
+                                    .component::<tekes_agent_components_ui::ReadOnlyTranscript>()
+                                    .unwrap();
+                                let viewport = pane.ids().viewport;
+                                let plan = pane.prepare_update(input).map_err(unsupported)?;
+                                let version = self
+                                    .tree
+                                    .get(viewport)
                                     .unwrap()
-                                    .update(input)
-                                    .map_err(unsupported)?;
+                                    .component::<ScrollContent>()
+                                    .unwrap()
+                                    .reading_document_version()
+                                    .expect("retained read-only reading attachment")
+                                    .clone();
+                                let revision =
+                                    version.revision().checked_add(1).ok_or_else(|| {
+                                        unsupported("read-only display revision exhausted")
+                                    })?;
+                                tekes_agent_components_ui::publish_readonly_reading_update(
+                                    &mut self.tree,
+                                    root,
+                                    &version,
+                                    revision,
+                                    &plan,
+                                )
+                                .map_err(|error| {
+                                    unsupported(&format!("read-only reading update: {error:?}"))
+                                })?;
                             }
                         }
                         PaneSnapshot::Missing { .. } => {}

@@ -44,6 +44,8 @@ Composer 的真实输入胶囊公开为 `ComposerIds::input_band`；现在保留
 
 最新正式组件进展：[原生 Jump/回到最新](../docs/rust-agent-ui-jump-latest-20261021.md)；仍为实验 API，未代表完整 ClientKit Views 验收。
 
+只读子历史宿主请使用[完整pane阅读事务](../docs/rust-agent-ui-readonly-reading-20261021.md)，不要在已声明SDK reading document后直接替换正文。
+
 ## 构建与运行
 
 从 AgentKit 根目录：

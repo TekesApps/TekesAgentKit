@@ -1815,3 +1815,271 @@ async fn jump_rejects_prior_publication_and_sdk_attachment_before_following() {
     tekes_agent_ui_consumer_check::jump_original_run(&mut host, root, &intent, &fresh).unwrap();
     runtime.stop().await.unwrap();
 }
+
+fn readonly_input<'a>(
+    scope: &'a RunScope,
+    snapshot: &'a RunSnapshot,
+    publication: u64,
+    loading: bool,
+) -> ReadOnlyTranscriptInput<'a> {
+    ReadOnlyTranscriptInput {
+        scope,
+        publication,
+        connection_epoch: snapshot.connection_epoch,
+        connection: &snapshot.connection,
+        transcript: &snapshot.transcript,
+        frame_current: true,
+        source_ready: true,
+        supports_pagination: true,
+        reading: loading,
+        read_error: None,
+    }
+}
+fn readonly(host: &ContentHost, root: ComponentId) -> &ReadOnlyTranscript {
+    host.get(root).unwrap().component().unwrap()
+}
+fn readonly_scroll(host: &ContentHost, root: ComponentId) -> &ScrollContent {
+    host.get(readonly(host, root).ids().viewport)
+        .unwrap()
+        .component()
+        .unwrap()
+}
+fn readonly_anchor(host: &ContentHost, root: ComponentId) -> ComponentId {
+    match readonly_scroll(host, root).reading_result().unwrap().anchor {
+        ContentReadingAnchorUpdate::Preserved(id)
+        | ContentReadingAnchorUpdate::Fallback(Some(id)) => id,
+        ref other => panic!("read-only anchor {other:?}"),
+    }
+}
+fn readonly_y(host: &ContentHost, root: ComponentId, item: ComponentId) -> f32 {
+    host.get(item).unwrap().frame().min_y()
+        - host
+            .get(readonly(host, root).ids().viewport)
+            .unwrap()
+            .visible()
+            .unwrap()
+            .min_y()
+}
+#[tokio::test]
+async fn readonly_transaction_preserves_anchor_across_availability_refresh_and_history_prepend() {
+    let (runtime, _, _, full, _, mut text) = setup().await;
+    let scope = RunScope {
+        session_id: "bounded-b".into(),
+        ..RunScope::main("fixture", "b")
+    };
+    let mut initial = full.clone();
+    let keep: std::collections::BTreeSet<_> = initial
+        .transcript
+        .turns
+        .iter()
+        .skip(5)
+        .map(|t| t.id.clone())
+        .collect();
+    initial.transcript.turns.retain(|t| keep.contains(&t.id));
+    initial
+        .transcript
+        .items
+        .retain(|i| keep.contains(&i.turn_id));
+    initial.transcript.has_more_before = true;
+    let mut pane =
+        tekes_agent_ui_consumer_check::new_readonly_child(37000, 37003..38000, scope.clone())
+            .unwrap();
+    pane.update(readonly_input(&scope, &initial, 1, false))
+        .unwrap();
+    let root = pane.ids().root;
+    let viewport = pane.ids().viewport;
+    let items = pane
+        .content()
+        .row_keys()
+        .iter()
+        .map(|k| pane.content().row_id(k).unwrap())
+        .collect();
+    let mut host = pane.into_host().unwrap();
+    let (version, ()) = host
+        .set_scroll_reading_document(viewport, "readonly-test", 0, items, |_| ())
+        .unwrap();
+    render(&mut host, &mut text);
+    let point = host.get(viewport).unwrap().visible().unwrap().center();
+    host.event(&ContentEvent::Scroll {
+        position: point,
+        delta: Point::new(0., 180.),
+        precise: true,
+        begin: true,
+        end: true,
+        momentum: false,
+        time: 1.,
+    });
+    render(&mut host, &mut text);
+    let item = readonly_anchor(&host, root);
+    let y = readonly_y(&host, root, item);
+    // Same-provider publication, but different header/paging geometry.
+    let loading = readonly(&host, root)
+        .prepare_update(readonly_input(&scope, &initial, 1, true))
+        .unwrap();
+    let version = tekes_agent_ui_consumer_check::publish_original_readonly(
+        &mut host, root, &version, 1, &loading,
+    )
+    .unwrap();
+    render(&mut host, &mut text);
+    assert_eq!(readonly_anchor(&host, root), item);
+    assert!((readonly_y(&host, root, item) - y).abs() <= 1.);
+    let plan = readonly(&host, root)
+        .prepare_update(readonly_input(&scope, &full, 2, false))
+        .unwrap();
+    let before = readonly(&host, root).content().row_keys().len();
+    tekes_agent_ui_consumer_check::publish_original_readonly(&mut host, root, &version, 2, &plan)
+        .unwrap();
+    render(&mut host, &mut text);
+    assert!(readonly(&host, root).content().row_keys().len() > before);
+    assert_eq!(readonly_anchor(&host, root), item);
+    assert!((readonly_y(&host, root, item) - y).abs() <= 1.);
+    assert!(!readonly_scroll(&host, root).is_following_latest());
+    assert!(!readonly(&host, root).content().feedback_enabled());
+    runtime.stop().await.unwrap();
+}
+#[tokio::test]
+async fn readonly_preflight_rejects_plan_aba_and_foreign_sdk_token_without_any_publication() {
+    let (runtime, _, _, full, _, mut text) = setup().await;
+    let scope = RunScope::main("fixture", "readonly");
+    let mut pane =
+        ReadOnlyTranscript::standard(38000, 38003..39000, scope.clone(), Default::default())
+            .unwrap();
+    pane.update(readonly_input(&scope, &full, 1, false))
+        .unwrap();
+    let root = pane.ids().root;
+    let viewport = pane.ids().viewport;
+    let items: Vec<_> = pane
+        .content()
+        .row_keys()
+        .iter()
+        .map(|k| pane.content().row_id(k).unwrap())
+        .collect();
+    let mut host = pane.into_host().unwrap();
+    let (version, ()) = host
+        .set_scroll_reading_document(viewport, "original-readonly", 0, items.clone(), |_| ())
+        .unwrap();
+    render(&mut host, &mut text);
+    let plan = readonly(&host, root)
+        .prepare_update(readonly_input(&scope, &full, 2, false))
+        .unwrap();
+    let (fresh, ()) = host
+        .set_scroll_reading_document(viewport, "replaced-readonly", 0, items, |_| ())
+        .unwrap();
+    let before = host
+        .get(readonly(&host, root).ids().status)
+        .unwrap()
+        .component::<TextContent>()
+        .unwrap()
+        .text
+        .clone();
+    assert!(matches!(
+        tekes_agent_ui_consumer_check::publish_original_readonly(
+            &mut host, root, &version, 1, &plan
+        ),
+        Err(ReadOnlyReadingError::Reading(_))
+    ));
+    assert_eq!(
+        readonly_scroll(&host, root).reading_document_version(),
+        Some(&fresh)
+    );
+    assert_eq!(
+        host.get(readonly(&host, root).ids().status)
+            .unwrap()
+            .component::<TextContent>()
+            .unwrap()
+            .text,
+        before
+    );
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<ReadOnlyTranscript>()
+        .unwrap()
+        .update(readonly_input(&scope, &full, 1, true))
+        .unwrap();
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<ReadOnlyTranscript>()
+        .unwrap()
+        .update(readonly_input(&scope, &full, 1, false))
+        .unwrap();
+    assert!(matches!(
+        tekes_agent_ui_consumer_check::publish_original_readonly(&mut host, root, &fresh, 1, &plan),
+        Err(ReadOnlyReadingError::Agent(_))
+    ));
+    assert_eq!(
+        readonly_scroll(&host, root).reading_document_version(),
+        Some(&fresh)
+    );
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn readonly_plan_is_original_owner_only_and_formats_status_before_the_sdk_callback() {
+    static FORMATS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    fn status(
+        _: &tekes_agent_presentation::ConnectionPresentation,
+        count: usize,
+        _: bool,
+    ) -> String {
+        FORMATS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        format!("owned {count}")
+    }
+    let (runtime, _, _, full, _, mut text) = setup().await;
+    let scope = RunScope::main("fixture", "bounded-owner");
+    let labels = ReadOnlyTranscriptLabels {
+        information: status,
+        ..Default::default()
+    };
+    let mut pane =
+        ReadOnlyTranscript::standard(39000, 39003..40000, scope.clone(), labels.clone()).unwrap();
+    pane.update(readonly_input(&scope, &full, 1, false))
+        .unwrap();
+    let root = pane.ids().root;
+    let viewport = pane.ids().viewport;
+    let items: Vec<_> = pane
+        .content()
+        .row_keys()
+        .iter()
+        .map(|k| pane.content().row_id(k).unwrap())
+        .collect();
+    let mut host = pane.into_host().unwrap();
+    let (version, ()) = host
+        .set_scroll_reading_document(viewport, "owner-test", 0, items.clone(), |_| ())
+        .unwrap();
+    render(&mut host, &mut text);
+    let plan = readonly(&host, root)
+        .prepare_update(readonly_input(&scope, &full, 2, false))
+        .unwrap();
+    let mut other =
+        ReadOnlyTranscript::standard(39000, 39003..40000, scope.clone(), labels).unwrap();
+    other
+        .update(readonly_input(&scope, &full, 1, false))
+        .unwrap();
+    let mut other = other.into_host().unwrap();
+    let (other_version, ()) = other
+        .set_scroll_reading_document(viewport, "owner-test", 0, items, |_| ())
+        .unwrap();
+    assert!(matches!(
+        tekes_agent_ui_consumer_check::publish_original_readonly(
+            &mut other,
+            root,
+            &other_version,
+            1,
+            &plan
+        ),
+        Err(ReadOnlyReadingError::Agent(_))
+    ));
+    assert_eq!(
+        readonly_scroll(&other, root).reading_document_version(),
+        Some(&other_version)
+    );
+    let before = FORMATS.load(std::sync::atomic::Ordering::SeqCst);
+    tekes_agent_ui_consumer_check::publish_original_readonly(&mut host, root, &version, 1, &plan)
+        .unwrap();
+    assert_eq!(
+        FORMATS.load(std::sync::atomic::Ordering::SeqCst),
+        before,
+        "host formatter must not run in the original SDK publication callback"
+    );
+    runtime.stop().await.unwrap();
+}

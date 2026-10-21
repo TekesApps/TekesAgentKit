@@ -5,6 +5,8 @@ mod sidebar_paging;
 pub use sidebar_paging::*;
 mod feedback;
 pub use feedback::*;
+mod readonly_reading;
+pub use readonly_reading::*;
 mod readonly_transcript;
 pub use readonly_transcript::*;
 mod run_column;
