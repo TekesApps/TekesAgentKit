@@ -255,6 +255,237 @@ async fn availability_refresh_uses_display_revision_without_advancing_provider_p
 fn rows(host: &ContentHost, root: ComponentId) -> Vec<TranscriptContentRowKey> {
     run(host, root).transcript().unwrap().row_keys().to_vec()
 }
+
+#[tokio::test]
+async fn reconnect_stale_frame_keeps_a_reading_point_inside_the_completed_turn_footnote() {
+    use tekes_agent_contract::EndpointCapabilities;
+    use tekes_agent_presentation::{TurnActionContext, present_turn_actions};
+    use tekes_ui_controls::{ScrollRevealOptions, ScrollRevealPlacement, extended::Axis};
+    let (runtime, mut host, root, first, version, mut text) = setup().await;
+    let mut caps = EndpointCapabilities::methods(&["session.fork"]);
+    caps.can_fork_completed_turn = true;
+    let mut enabled = first.clone();
+    enabled.revision += 1;
+    present_turn_actions(
+        &TurnActionContext {
+            capabilities: &caps,
+            ready: true,
+            running: false,
+        },
+        &mut enabled.transcript,
+    );
+    let turn = enabled
+        .transcript
+        .turns
+        .iter()
+        .find(|turn| !turn.footnote_actions.is_empty())
+        .unwrap();
+    let key = TranscriptContentRowKey::TurnFootnote(turn.id.clone());
+    let plan = prepare(run(&host, root), &enabled).unwrap();
+    let version = publish_plan(&mut host, root, &version, &plan).unwrap();
+    render(&mut host, &mut text);
+    let footer = run(&host, root).transcript().unwrap().row_id(&key).unwrap();
+    let viewport = run(&host, root).ids().viewport;
+    host.reveal_scroll_reading_item(
+        viewport,
+        &version,
+        footer,
+        ScrollRevealOptions {
+            placement: ScrollRevealPlacement::Start(Axis::Vertical),
+            animated: false,
+            ..Default::default()
+        },
+        &mut text,
+    )
+    .unwrap();
+    render(&mut host, &mut text);
+    // Position the synthetic reader at the footnote's end. Removing the known
+    // action during a stale frame previously truncated this local point.
+    let within = host.get(footer).unwrap().frame().size.height - 1.;
+    wheel(&mut host, root, within);
+    render(&mut host, &mut text);
+    assert_eq!(anchor(&host, root), footer);
+    let y = host.get(footer).unwrap().frame().min_y()
+        - host.get(viewport).unwrap().visible().unwrap().min_y();
+    let mut current = version;
+    for stale in [true, false] {
+        let mut next = enabled.clone();
+        next.revision = current.revision() + 1;
+        next.transcript.is_stale = stale;
+        present_turn_actions(
+            &TurnActionContext {
+                capabilities: &caps,
+                ready: true,
+                running: false,
+            },
+            &mut next.transcript,
+        );
+        assert!(
+            next.transcript
+                .turns
+                .iter()
+                .filter_map(|turn| turn.footnote_actions.first())
+                .all(|action| action.enabled != stale)
+        );
+        let plan = prepare(run(&host, root), &next).unwrap();
+        current = publish_plan(&mut host, root, &current, &plan).unwrap();
+        render(&mut host, &mut text);
+        assert_eq!(anchor(&host, root), footer);
+        let next_y = host.get(footer).unwrap().frame().min_y()
+            - host.get(viewport).unwrap().visible().unwrap().min_y();
+        assert!((next_y - y).abs() <= 1., "footnote moved: {y} -> {next_y}");
+    }
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn retained_demo_runs_restore_independent_reading_and_reject_pre_unmount_tokens() {
+    use std::{sync::Arc, time::Duration};
+    use tekes_agent_session::SessionRuntime;
+    use tekes_agent_ui_bindings::RunBinding;
+    use tekes_agent_ui_demo::{component_demo::ComponentDemo, fixture::Fixture};
+    let runtime = Arc::new(SessionRuntime::spawn(
+        "fixture",
+        Arc::new(Fixture::default().with_lifecycle()),
+    ));
+    runtime.wait_ready(Duration::from_secs(3)).await.unwrap();
+    let a = Arc::new(
+        RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "a"))
+            .await
+            .unwrap(),
+    );
+    let b = Arc::new(
+        RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "b"))
+            .await
+            .unwrap(),
+    );
+    for (binding, draft) in [(&a, "A 中文草稿"), (&b, "B 独立草稿")] {
+        binding
+            .edit_text(
+                &ComposerDestination::run(binding.scope().clone()),
+                draft.into(),
+            )
+            .unwrap();
+    }
+    let mut demo = ComponentDemo::new([a.clone(), b.clone()]).unwrap();
+    demo.enable_transcript_content().unwrap();
+    let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()), 1.);
+    let a_root = ComponentId(demo.ids().root.0 + 16);
+    render(&mut demo.tree, &mut text);
+    wheel(&mut demo.tree, a_root, 420.);
+    render(&mut demo.tree, &mut text);
+    let a_item = anchor(&demo.tree, a_root);
+    let relative_y = |host: &ContentHost, root, item| {
+        host.get(item).unwrap().frame().min_y()
+            - host
+                .get(run(host, root).ids().viewport)
+                .unwrap()
+                .visible()
+                .unwrap()
+                .min_y()
+    };
+    let a_y = relative_y(&demo.tree, a_root, a_item);
+    let old_a_version = scroll(&demo.tree, a_root)
+        .reading_document_version()
+        .unwrap()
+        .clone();
+    let a_baseline = baseline(&demo.tree, a_root);
+    let a_editor = run(&demo.tree, a_root).composer().editor() as *const _ as usize;
+    demo.select(1).unwrap();
+    let b_root = ComponentId(demo.ids().root.0 + 16);
+    render(&mut demo.tree, &mut text);
+    wheel(&mut demo.tree, b_root, 180.);
+    render(&mut demo.tree, &mut text);
+    let b_item = anchor(&demo.tree, b_root);
+    let b_y = relative_y(&demo.tree, b_root, b_item);
+    assert_ne!(a_item, b_item);
+    // An explicit original-A page completes while B owns the window. No
+    // current-selection resampling may publish it into B's document/editor.
+    let b_version = scroll(&demo.tree, b_root)
+        .reading_document_version()
+        .unwrap()
+        .clone();
+    let b_rows = rows(&demo.tree, b_root);
+    assert!(a.load_earlier().await.unwrap());
+    assert_eq!(rows(&demo.tree, b_root), b_rows);
+    assert_eq!(
+        scroll(&demo.tree, b_root).reading_document_version(),
+        Some(&b_version)
+    );
+    demo.select(0).unwrap();
+    render(&mut demo.tree, &mut text);
+    assert_eq!(anchor(&demo.tree, a_root), a_item);
+    assert!((relative_y(&demo.tree, a_root, a_item) - a_y).abs() <= 1.);
+    assert_eq!(
+        run(&demo.tree, a_root).composer().editor() as *const _ as usize,
+        a_editor
+    );
+    assert_ne!(
+        baseline(&demo.tree, a_root),
+        a_baseline,
+        "unmount fences old editor work"
+    );
+    assert_eq!(demo.editor().input.text, "A 中文草稿");
+    let restored_baseline = baseline(&demo.tree, a_root);
+    let current = scroll(&demo.tree, a_root)
+        .reading_document_version()
+        .unwrap()
+        .clone();
+    assert_ne!(
+        current, old_a_version,
+        "unmount renews opaque attachment identity"
+    );
+    let snapshot = a.current_run().unwrap();
+    let plan = prepare(run(&demo.tree, a_root), &snapshot).unwrap();
+    let before = rows(&demo.tree, a_root);
+    assert!(matches!(
+        tekes_agent_ui_consumer_check::publish_original_run(
+            &mut demo.tree,
+            a_root,
+            &old_a_version,
+            current.revision() + 1,
+            &plan,
+        ),
+        Err(Failure::Reading(_))
+    ));
+    assert_eq!(rows(&demo.tree, a_root), before);
+    assert_eq!(baseline(&demo.tree, a_root), restored_baseline);
+    demo.select(1).unwrap();
+    render(&mut demo.tree, &mut text);
+    assert_eq!(anchor(&demo.tree, b_root), b_item);
+    assert!((relative_y(&demo.tree, b_root, b_item) - b_y).abs() <= 1.);
+    assert_eq!(demo.editor().input.text, "B 独立草稿");
+    // Reconnect while A is detached. Canonical refresh may replace its history
+    // window, but it cannot restore B's reading point into A or submit a draft.
+    let epoch = a.current_run().unwrap().connection_epoch;
+    let mut a_changes = a.subscribe_run().unwrap();
+    let mut b_changes = b.subscribe_run().unwrap();
+    runtime.reconnect().await.unwrap();
+    for (binding, changes) in [(&a, &mut a_changes), (&b, &mut b_changes)] {
+        tokio::time::timeout(Duration::from_secs(3), async {
+            while binding
+                .current_run()
+                .is_none_or(|run| run.connection_epoch <= epoch || run.transcript.is_stale)
+            {
+                changes.changed().await.unwrap();
+            }
+        })
+        .await
+        .unwrap();
+    }
+    demo.sync().unwrap();
+    render(&mut demo.tree, &mut text);
+    assert_eq!(anchor(&demo.tree, b_root), b_item);
+    assert!((relative_y(&demo.tree, b_root, b_item) - b_y).abs() <= 1.);
+    demo.select(0).unwrap();
+    render(&mut demo.tree, &mut text);
+    assert_eq!(anchor(&demo.tree, a_root), a_item);
+    assert!((relative_y(&demo.tree, a_root, a_item) - a_y).abs() <= 1.);
+    assert_eq!(demo.editor().input.text, "A 中文草稿");
+    assert!(a.current_run().unwrap().submissions.is_empty());
+    assert!(b.current_run().unwrap().submissions.is_empty());
+    runtime.stop().await.unwrap();
+}
 #[tokio::test]
 async fn formal_run_updates_editor_and_transcript_together_and_old_reading_token_changes_neither() {
     let (runtime, mut host, root, first, version, mut text) = setup().await;

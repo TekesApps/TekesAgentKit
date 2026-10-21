@@ -2419,6 +2419,7 @@ impl WindowHandler for Host {
                     || self.context_selftest
                     || self.system_ime_selftest
                     || self.stream_probe.is_some()
+                    || self.reading_probe.is_some()
                 {
                     eprintln!(
                         "COMPONENT_FOCUS active={active} id={:?}",
@@ -2541,6 +2542,9 @@ pub fn run() {
     let context_selftest = args.iter().any(|arg| arg == "--context-selftest");
     let sidebar_query_selftest = args.iter().any(|arg| arg == "--sidebar-query-selftest");
     let sidebar_search_selftest = args.iter().any(|arg| arg == "--sidebar-search-selftest");
+    let harness_reading_selftest = args
+        .iter()
+        .any(|arg| arg == "--history-reading-native-selftest");
     let reading_selftest = args.iter().any(|arg| arg == "--reading-native-selftest");
     let reading_gate = reading_selftest.then(|| Arc::new(tokio::sync::Semaphore::new(0)));
     assert!(
@@ -2576,6 +2580,7 @@ pub fn run() {
             models_selftest,
             context_selftest,
             reading_selftest,
+            harness_reading_selftest,
             summary_sections_selftest,
             sidebar_restore_selftest,
             sidebar_search_selftest,
@@ -2589,7 +2594,7 @@ pub fn run() {
             <= 1,
         "choose one native fixture selftest mode"
     );
-    if feedback_selftest || stream_selftest || run_controls_selftest {
+    if feedback_selftest || stream_selftest || run_controls_selftest || harness_reading_selftest {
         assert!(
             args.iter().any(|arg| arg == "--endpoint-config")
                 && args.iter().any(|arg| arg == "--transcript-content")
@@ -2890,6 +2895,9 @@ pub fn run() {
             }
         }
     }
+    if harness_reading_selftest {
+        reading_probe::Probe::prepare_harness(&view);
+    }
     if stream_selftest {
         stream_probe::Probe::prepare(&view);
     }
@@ -2961,7 +2969,11 @@ pub fn run() {
         sidebar_query_probe: query_fixture.map(sidebar_query_probe::Probe::new),
         sidebar_search_probe: sidebar_search_selftest.then(sidebar_search_probe::Probe::new),
         sidebar_restore_probe: sidebar_restore_selftest.then(sidebar_restore_probe::Probe::new),
-        reading_probe: reading_gate.map(reading_probe::Probe::new),
+        reading_probe: if reading_selftest || harness_reading_selftest {
+            Some(reading_probe::Probe::new(reading_gate))
+        } else {
+            None
+        },
         summary_sections_probe: summary_sections_selftest.then(summary_sections_probe::Probe::new),
         visibility_probe: visibility_selftest
             .then(|| visibility_probe::Probe::new(visibility_fixture)),

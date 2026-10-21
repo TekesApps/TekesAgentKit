@@ -129,3 +129,5 @@ Full Sidebar folder catalog input: [2026-10-21 contract](docs/rust-agent-ui-side
 Current experimental public UI pin and explicit native Sidebar reveal: [published checkpoint integration](docs/rust-agent-ui-published-reading-20261021.md). This supersedes the earlier public-source-absence finding; continuous reading/page-anchor acceptance remains pending.
 
 RunView now publishes Transcript and Composer inside original SDK reading transactions: [continuous reading contract](docs/rust-agent-ui-continuous-reading-20261021.md). CoreText and owned-fixture native page anchors are checked separately from remaining cross-harness reading acceptance.
+
+Retained A/B reading, native pages and reconnect across all three harnesses: [reading restoration and stale-footnote fix](docs/rust-agent-ui-retained-reading-20261021.md). Fresh-host persistent checkpoints remain tracked in TekesUI #42.

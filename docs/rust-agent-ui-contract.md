@@ -2,11 +2,14 @@
 
 本文件是正式业务组件的实现契约与进度入口，不是完成声明。完整交付目标保持 Composer、Transcript、Indicators、RunView、SidePanel、Sidebar，加 Native/Pi/DSH 能力验证、第二公开 consumer、原生窗口验收、review/CI/合并与阶段 tag。
 
-[原回合导航契约](rust-agent-ui-turn-navigation-20261021.md)增加非抢焦点的捕获/一次 dispatch 与 pane ABA 拒绝；#28 的 nearest/centered 在真实 RunView 中单独验证。普通回合顶端对齐仍缺 TekesUI [#32](https://github.com/TekesApps/TekesUI/issues/32)，正式入口未接通，不以居中替代。
-
+[原回合导航契约](rust-agent-ui-turn-navigation-20261021.md)增加非抢焦点的捕获/一次 dispatch 与 pane ABA 拒绝。当前公开1294已具备原item reveal和Start对齐；正式Run回合导航宿主桥接仍未接通，应继续消费库API，不再把[#32](https://github.com/TekesApps/TekesUI/issues/32)的源码交付当作阻塞。
 [Summary 用量两列布局](rust-agent-ui-summary-usage-20261021.md)将六项用量的标题与数值拆成原 TekesUI 文本槽，增加公开格式化回调；不重算 facts 或切换默认依赖。完整 Summary rows/slots 与原生产品验收仍待完成。
 
-源码基线：AgentKit 已发布 v0.3.8 / `f1daa0ffcf6ced41e21f351e22845455ca78006c`；TekesUI 实验开发输入固定公开 `8cf0840790334ba224afc0595897c74231c712e6`，199 输入 SHA `f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f`，原 431 基线清单保留在 `ui/baselines/`。以下新增 API 尚是当前分支 WIP。RunSurface 明确保留为协议/控件测试宿主，不改名充当 RunView，也不是正式组件树的包装层。
+源码基线：AgentKit已发布v0.3.8 / `f1daa0ffcf6ced41e21f351e22845455ca78006c`；本分支Rust UI仍为实验0.0.0/publish=false。当前TekesUI精确公开pin为`1294987dacabb33c0e411c13ee5ea544a1123f8e` / `remediation-checkpoint-20261021`，实际八包241输入，清单SHA `5b5a5acdbb957b565eb73e5558769e38b8c34a4e7ae7b7553d76b98defb4c1f2`，以`ui/tekesui-source.json`和Cargo.lock核验。原431/8cf/2ee清单保留在`ui/baselines/`。
+
+当前阅读进展见[正式事务](rust-agent-ui-continuous-reading-20261021.md)和[真实三端保留阅读](rust-agent-ui-retained-reading-20261021.md)：公开库API已消费，Native/Pi/DSH分页、A/B保留阅读及重连通过。销毁后新建组件树的持久恢复跟踪TekesUI #42；完整UI目标仍未完成。
+
+阅读指南：下文保留了阶段性候选/默认输入和验收记录；其中历史的“未发布/等待交付/默认8cf”不覆盖本节当前pin，也不能继续作为当前阻塞理由。RunSurface始终只是协议/控件测试宿主，不是正式RunView。
 
 Layout 和显示逻辑须逐项严格对齐当前 ClientKit 对应 Views；[对应关系与初步差异](clientkit-view-layout-review-20261020.md)列出源码及待验收项。组件类型存在、协议通过或 TekesUI 基础样式一致均不等于布局已经对齐。[严格共享列修正](rust-agent-ui-strict-column-20261021.md)已补源320/770规则、token推导净空和比例归一化；基础文档/Composer叠层现已推进，详见[underlay与阅读净空](rust-agent-ui-overlay-20261021.md)；完整rail、selection/Jump及其它清单仍未完成。[Composer显示规则](rust-agent-ui-composer-visibility-20261021.md)现已补归档隐藏、中断/暂不可提交保留、原实例与原生归档恢复专项；后续[降级快照修正](rust-agent-ui-degraded-frame-20261021.md)补齐坏历史期间的归档、epoch和目标隔离。
 
@@ -135,7 +138,8 @@ AgentKit 定义业务结构、展示语义、组件组合、组件输入及回�
 
 ### 当前基础能力与阻塞
 
-- [TekesUI #22](https://github.com/TekesApps/TekesUI/issues/22) 尚待交付：混合 Content 文档的稳定子项锚点、历史前插/高度变化/重排事务。现有 ScrollContent 可滚动，ReadingController 已完成单 TextSurface；不能用拼成单一文本框替代多块 Transcript。
+- [TekesUI #22](https://github.com/TekesApps/TekesUI/issues/22) 的混合Content稳定item与更新事务已在当前公开pin交付，并在正式Run和三端原生分页中消费；issue仍为open，不代表源码不可取得。不可将多块Transcript拼成单一文本框替代。
+- [TekesUI #42](https://github.com/TekesApps/TekesUI/issues/42)：混合Content持久检查点的公开导出/新host恢复尚缺，不能复用旧attachment或在AgentKit手算像素补偿。
 - [TekesUI #25](https://github.com/TekesApps/TekesUI/issues/25) 新增：可选中富内容 Component、受控流式更新与原生文本映射。现有 MarkdownView 提供有界 Markdown 被动绘制，不能据此宣称已有可选中富内容组合接口。当前源码文字显示和显式原始数据详情保留内容，富内容样式继续待接入。
 - #23 的无表单只读 Content API 已由当前固定 8cf 后继实际消费。原61dd候选的注册失败保留在[历史评估](tekesui-issue23-public-review-20261020.md)，后继的通过证据见[独立复验](tekesui-issue23-ci-review-20261020.md)，不再列作当前纯文本阻塞。
 
@@ -266,9 +270,9 @@ Native [消息生命周期边界修正](rust-agent-ui-native-stream-boundary-202
 
 [ReadOnlyTranscript](rust-agent-ui-readonly-child-20261020.md) 已将 Native 有界子历史接入实际内容树、只读 source-call 详情和显式刷新/分页，不再仅显示数量。原绑定在 await 前分配 publication 并校验 epoch/存活；旧结果和旧页意图不能覆盖新 frame/获得新连接权限。读取回调一次性 admission，仍不构造可写 Run/Composer。组件、第二 consumer、原生多页消息渲染和真实 Native child 到 GPU 分层验证；混合阅读锚点/富内容/物理 IME 与完整 Run/Transcript 仍未完成。
 
-[实际回合轨道组件](rust-agent-ui-turn-rail-controls-20261021.md)已接入原 RunView 的事件捕获、独立库滚动和生命周期隔离；默认公开 pin 明确 unsupported，#29 隔离候选验收与 #32/#33 缺口分列，尚不构成完整轨道或稳定 UI 交付。
+[实际回合轨道组件](rust-agent-ui-turn-rail-controls-20261021.md)已接入原 RunView 的事件捕获、独立库滚动和生命周期隔离；当时8cf默认输入明确unsupported；当前1294的基础reading/reveal/Start已公开，#29隔离候选记录与#33需求仍需按实际消费范围核对，尚不构成完整轨道或稳定 UI 交付。
 
-[#32 普通回合 Start 的独立组件验证](rust-agent-ui-turn-start-20261021.md)已在新588277候选通过真实clip与高输入行检查；新身份的原生普通回合、宿主桥接与最终体验仍待验收，未替换默认公开pin。
+[#32 普通回合 Start 的独立组件验证](rust-agent-ui-turn-start-20261021.md)已在新588277候选通过真实clip与高输入行检查；当前1294已包含Start；正式宿主桥接与整体体验仍待完成，不能用历史候选通过替代当前入口验收。
 
 后续[主导航宿主回调与588277原生Start](rust-agent-ui-turn-navigation-host-20261021.md)已增加显式显示事实、原点击历史捕获和原生组字内选区检查；此前收据保持原范围，完整交付仍未完成。
 
@@ -293,3 +297,5 @@ The Sidebar selected-row adapter now reads one canonical memory item independent
 The [published reading checkpoint integration](rust-agent-ui-published-reading-20261021.md) supersedes the earlier lack of publicly obtainable #22/#28 source. The exact default pin now exposes original reading/item reveal; a source-fenced public adapter and explicit native Sidebar navigation use it. Navigation-only attachments do not establish continuous Transcript/inventory reading transactions or page-anchor preservation; those remain separate required work.
 
 The subsequent [Run continuous reading integration](rust-agent-ui-continuous-reading-20261021.md) connects the existing whole-frame plan to original SDK transactions in the formal host. It removes the duplicate Transcript write, uses independent display revisions for gate-only refreshes, and validates native owned-fixture pagination with marked text and focus retained. This does not accept all three harnesses' history anchors or Sidebar's full inventory reading lifecycle.
+
+The [retained-reading follow-up](rust-agent-ui-retained-reading-20261021.md) fixes stale completed-turn catalog removal and verifies native public pages, A/B retained reading and reconnect on Native/Pi/DSH. It distinguishes button focus from publication focus, and editing-authority tokens from draft state. Fresh-host persistent checkpoints require TekesUI #42; bounded read-only panes, full Sidebar reading and dedicated native streaming-while-reading checks remain open.

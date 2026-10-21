@@ -20,6 +20,7 @@ parser.add_argument('--ui-attachments',action='store_true',help='Exercise public
 parser.add_argument('--ui-bounded-child',action='store_true',help='Verify actual read-only Native child messages through the public component; requires components and Kernel')
 parser.add_argument('--ui-feedback-read',action='store_true',help='Read typed committed feedback and verify proven final response IDs; no mutations or rating controls')
 parser.add_argument('--ui-native-run-controls',action='store_true',help='Native Send/Cancel/provider failure/explicit recovery over fresh owned sessions; no physical IME or reading-anchor acceptance')
+parser.add_argument('--ui-native-reading',action='store_true',help='Native public history page, retained A/B reading and reconnect on seeded owned harness sessions; synthetic wheel, no physical IME')
 parser.add_argument('--ui-native-stream',action='store_true',help='Use fresh owned sessions for native Send, active preview, selection, settlement, draft isolation and reconnect; excludes reading anchors')
 parser.add_argument('--ui-native-feedback',action='store_true',help='Open each owned-session native window sequentially and exercise feedback clicks, text services and session switching')
 parser.add_argument('--ui-feedback-transcript',action='store_true',help='Exercise feedback through actual Transcript/RunView and captured host callbacks; offscreen only')
@@ -32,6 +33,8 @@ parser.add_argument('--ui-history-pages',action='store_true',help='Seed long iso
 parser.add_argument('--ui-actionables',action='store_true',help='Exercise public actionable cards on configured Native/Pi/DSH question sources')
 parser.add_argument('--ui-sidebar-query',action='store_true',help='Read typed public search and explicitly refresh public inventory cursors on owned conversation-history targets; offscreen protocol proof only')
 args=parser.parse_args()
+if args.ui_native_reading and not (args.ui_demo and args.ui_components and args.ui_transcript_content and args.ui_history_pages):
+    parser.error('--ui-native-reading requires --ui-demo, --ui-components, --ui-transcript-content and --ui-history-pages')
 if args.ui_sidebar_query and not (args.ui_demo and args.ui_components):
     parser.error('--ui-sidebar-query requires --ui-demo and --ui-components')
 if args.ui_native_run_controls and not (args.ui_demo and args.ui_components and args.ui_transcript_content):
@@ -290,6 +293,13 @@ def ui_smoke(config, first, bounded_child=None):
             {'op':'open','sessionId':first},{'op':'compose','sessionId':first,'text':search_query},
             {'op':'waitSettled','sessionId':first,'inputText':search_query}]))
     second=next(row['result']['sessionId'] for row in execute(dict(config,commands=[{'op':'create','cwd':str(cwd)}])) if row.get('op')=='create')
+    if args.ui_native_reading and bounded_child is None:
+        history=[{'op':'call','sessionId':second,'method':'session.selectModel','args':model},{'op':'open','sessionId':second}]
+        for turn in range(1,9):
+            text='UI_READING_B_TURN_'+str(turn)
+            history += [{'op':'compose','sessionId':second,'text':text},{'op':'waitSettled','sessionId':second,'inputText':text}]
+        execute(dict(config,commands=history))
+        print(kind.upper()+'_UI_READING_B_SEEDED turns=8 exact-input+completed-reply',flush=True)
     explicit={'kind':kind,'endpointId':kind+'-ui','sessions':[first,second]}
     ui_env=dict(os.environ)
     if kind=='pi':
@@ -334,6 +344,19 @@ def ui_smoke(config, first, bounded_child=None):
         assert all(refresh[key] for key in ('publicCursors','sameConnectionEpoch','historyUnchanged','searchResultRetained')),refresh
         print(kind.upper()+'_UI_INVENTORY_REFRESH_OK public-cursors+same-epoch+retained-history+search-result; offscreen-only',flush=True)
         print(kind.upper()+'_UI_SIDEBAR_QUERY_OK public-typed-search+shared-controller+owned-target+original-endpoint; offscreen-only',flush=True)
+    if args.ui_native_reading and bounded_child is None:
+        native_log=output.with_suffix('.native-reading.log')
+        with native_log.open('w') as capture:
+            native=subprocess.run([str(args.ui_demo.resolve()),'-ApplePersistenceIgnoreState','YES','--components','--transcript-content','--endpoint-config',str(path),'--history-reading-native-selftest'],env=ui_env,stdout=capture,stderr=subprocess.STDOUT,timeout=55)
+        native_text=native_log.read_text()
+        assert native.returncode==0,str(native_log)+'\n'+native_text[-5000:]
+        marker='NATIVE_AGENT_READING_SELFTEST_RECEIPT '
+        proof=next(json.loads(line[len(marker):]) for line in native_text.splitlines() if line.startswith(marker))
+        assert all(proof[key] for key in ('nativeWindow','publicHistoryPage','publicPageRequest','prependAnchorPreserved','upwardReadingPreserved','focusAndTextStatePreserved','samePublicationRefresh','retainedSessionReadingRestored','independentBReadingRestored','reconnectReadingRestored','draftIsolation','sameEditorOwner','noSubmission','realHarness','readingAnchorAcceptance')),proof
+        assert proof['loadedItemsAfter']>proof['loadedItemsBefore']>0,proof
+        assert not proof['syntheticPreedit'] and not proof['physicalIme'] and not proof['voiceOver'],proof
+        assert not proof['nativePagingControl'] and not proof['markedTextPreserved'] and not proof['opaqueBaselinePreserved'],proof
+        print(kind.upper()+'_UI_NATIVE_READING_RECEIPT '+json.dumps(proof,ensure_ascii=False,sort_keys=True),flush=True)
     if args.ui_native_feedback and bounded_child is None:
         native_log=output.with_suffix('.native-feedback.log')
         with native_log.open('w') as capture:

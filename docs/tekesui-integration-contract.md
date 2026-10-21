@@ -1,12 +1,12 @@
 # AgentKit × TekesUI：首个 Run 接入契约
 
-状态：开发试点，非生产 UI 发布。本文件保留首个 RunSurface 协议/阅读测试宿主的契约，不是正式 Transcript/RunView 的组件规格。当前独立组件、任务/子代理/SideChat/Summary 与 Sidebar 操作进度以 [Rust Agent UI 契约](rust-agent-ui-contract.md) 为准。首段闭环覆盖连接、纯文本历史测试、Composer、显式发送/停止、流式、草稿切换、重连和分页；Composer 消费公共多行视口，Enter 换行。
+状态：开发试点，非生产 UI 发布。当前阅读接入与三端恢复见[最新记录](rust-agent-ui-retained-reading-20261021.md)；以下RunSurface行为不作为正式组件完成声明。本文件保留首个 RunSurface 协议/阅读测试宿主的契约，不是正式 Transcript/RunView 的组件规格。当前独立组件、任务/子代理/SideChat/Summary 与 Sidebar 操作进度以 [Rust Agent UI 契约](rust-agent-ui-contract.md) 为准。首段闭环覆盖连接、纯文本历史测试、Composer、显式发送/停止、流式、草稿切换、重连和分页；Composer 消费公共多行视口，Enter 换行。
 
 ## 依赖与构建
 
 - AgentKit 当前基线 v0.3.8 / f1daa0ffcf6ced41e21f351e22845455ca78006c，Rust 1.95.0。已合入 WebUI 使用的批注、线程操作/置顶、用量与完成回合 Fork 契约；共享能力和具体控件的接入状态分别记录在正式契约中。
 - WebUI 对照版本 v0.1.17 / 8b9b11c；仅保留既有 Fork，不加入已撤回的回退/编辑重跑实验。Native/Pi/DSH 显式配置与分层验收见 [三端记录](tekesui-three-endpoint-demo-20261019.md)。
-- TekesUI composition仍为实验API；源码固定为公开 `https://github.com/TekesApps/TekesUI.git` 的完整rev `8cf0840790334ba224afc0595897c74231c712e6`，Cargo.lock固定同一来源。当前实验开发输入为实际八包的199文件闭包；原431基线已保留，清单见 `ui/tekesui-source.json`。
+- TekesUI composition仍为实验API；源码固定为公开 `https://github.com/TekesApps/TekesUI.git` 的完整rev `1294987dacabb33c0e411c13ee5ea544a1123f8e` / `remediation-checkpoint-20261021`，Cargo.lock固定同一来源。实际八包241文件输入；原431/8cf/2ee基线保留，清单见 `ui/tekesui-source.json`。
 - 默认由Cargo取得公开Git输入，不读取活跃兄弟工作树或旧 `.deps`。开发快照准备/capture在公开pin模式禁用；旧e4依赖和回滚文件保留。UI workspace与headless默认构建隔离。
 - 已具备公开不可变源码pin；AgentKit UI仍为0.0.0/publish=false，不打UI release tag。验收范围和CI边界见 [正式pin记录](tekesui-public-pin-verification-20261019.md)。
 

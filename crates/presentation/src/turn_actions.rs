@@ -24,13 +24,19 @@ pub struct TurnActionContext<'a> {
 /// Rebuild only the supplied shared action definitions. Boundaries originate
 /// from durable settlement records; no UI text, last-row or timestamp guessing.
 pub fn present_turn_actions(context: &TurnActionContext<'_>, transcript: &mut TranscriptSnapshot) {
-    let fork =
-        crate::thread_actions::fork_action(context.capabilities, context.ready, context.running);
+    // A reconnect changes admission, not the known completed-turn catalog.
+    // Keep its disabled readout mounted so transient staleness does not shrink
+    // footnotes and discard a reader's item-local position. ClientKit likewise
+    // separates the displayed completed-turn control from action admission.
+    let fork = crate::thread_actions::fork_action(
+        context.capabilities,
+        context.ready && !transcript.is_stale,
+        context.running,
+    );
     for turn in &mut transcript.turns {
         turn.footnote_actions.clear();
         if context.capabilities.can_fork_completed_turn
             && turn.fork_boundary.is_some()
-            && !transcript.is_stale
             && !matches!(turn.status.as_str(), "running" | "waitingForInput")
         {
             let mut action = fork.clone();
@@ -90,11 +96,28 @@ mod tests {
                 crate::thread_actions::fork_action(&caps, ready, running).disabled_reason
             );
         }
-        for invalid in 0..4 {
+        let mut stale = transcript();
+        stale.is_stale = true;
+        present_turn_actions(
+            &TurnActionContext {
+                capabilities: &caps,
+                ready: true,
+                running: false,
+            },
+            &mut stale,
+        );
+        assert_eq!(stale.turns[0].footnote_actions.len(), 1);
+        assert!(!stale.turns[0].footnote_actions[0].enabled);
+        assert_eq!(
+            stale.turns[0].footnote_actions[0]
+                .disabled_reason
+                .as_deref(),
+            Some("Agent 尚未连接")
+        );
+        for invalid in 1..4 {
             let mut transcript = transcript();
             let mut caps = caps.clone();
             match invalid {
-                0 => transcript.is_stale = true,
                 1 => transcript.turns[0].fork_boundary = None,
                 2 => transcript.turns[0].status = "running".into(),
                 _ => caps.can_fork_completed_turn = false,

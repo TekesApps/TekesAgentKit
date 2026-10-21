@@ -1,5 +1,7 @@
 # 已发布 SDK 的 Run 阅读事务
 
+后续见[保留会话阅读与真实三端分页](rust-agent-ui-retained-reading-20261021.md)：已修复重连 stale footnote 跳动，并取得真实三端分页/A-B阅读/重连原生收据。以下保留初次接入时的证据边界；新建 host 的持久恢复另跟踪 TekesUI #42。
+
 AgentKit 继续精确消费公开 TekesUI `1294987dacabb33c0e411c13ee5ea544a1123f8e`，不修改 SDK。#22/#28 的 issue 状态仍为 open，但公开检查点已提供 content reading 与 item reveal；不能再把 AgentKit 接入工作归因于 SDK 未发布。
 
 ## 接入契约
