@@ -34,6 +34,7 @@ impl Probe {
     fn input(&mut self, id: &str) -> SummaryContextInput {
         self.revision += 1;
         SummaryContextInput {
+            custom_rows: vec![],
             revision: self.revision,
             owner: SummaryOwner::Workspace { id: id.into() },
             facts: None,

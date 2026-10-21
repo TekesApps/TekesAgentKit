@@ -2446,6 +2446,7 @@ fn independent_workspace_summary_has_no_session_authority() {
     use tekes_agent_components_ui::*;
     let mut view = SummaryView::new(1984, Default::default());
     let input = SummaryContextInput {
+        custom_rows: vec![],
         revision: 1,
         owner: SummaryOwner::Workspace {
             id: "public-consumer-workspace".into(),
@@ -2464,4 +2465,80 @@ fn independent_workspace_summary_has_no_session_authority() {
     );
     assert!(view.displayed_input().is_none());
     assert!(view.take_intents(&[]).is_empty());
+}
+
+/// Host content enters the original SDK tree, including its ID/lifecycle checks.
+pub fn install_summary_host_content(
+    host: &mut tekes_ui_controls::composition::ContentHost,
+    root: tekes_ui_controls::composition::ComponentId,
+    source: &tekes_agent_components_ui::SummaryCustomRowToken,
+    content: tekes_ui_controls::composition::Content,
+) -> Result<(), tekes_agent_components_ui::SummaryCustomRowError> {
+    tekes_agent_components_ui::install_summary_custom_row(host, root, source, content)
+}
+#[test]
+fn independent_custom_summary_captures_the_source_before_event_delivery() {
+    fn assert_async_source<T: Send + Sync>() {}
+    assert_async_source::<tekes_agent_components_ui::SummaryCustomRowToken>();
+    use tekes_agent_components_ui::*;
+    use tekes_ui_controls::composition::*;
+    let mut summary = SummaryView::new(1985, Default::default());
+    let mut input = SummaryContextInput {
+        revision: 1,
+        owner: SummaryOwner::Workspace {
+            id: "consumer-host".into(),
+        },
+        facts: None,
+        ready: true,
+        host_sections: vec![SummarySection {
+            id: "product".into(),
+            rows: vec![SummaryRow {
+                id: "control".into(),
+                title: "Product action".into(),
+                value: Default::default(),
+                action: None,
+            }],
+        }],
+        custom_rows: vec![SummaryCustomRowSpec {
+            section: "product".into(),
+            row: "control".into(),
+            content_key: "control-v1".into(),
+        }],
+    };
+    summary.update_context(&input).unwrap();
+    let root = summary.id();
+    let source = summary.custom_row_token("product", "control").unwrap();
+    let mut host = summary.into_host().unwrap();
+    let button = ComponentId(1986u64 << 32);
+    install_summary_host_content(
+        &mut host,
+        root,
+        &source,
+        Content::new(button, ButtonContent::new("Product action")),
+    )
+    .unwrap();
+    // Capture the current immutable source before delivering the original event.
+    let captured = source.clone();
+    host.accessibility_action(button, None, AccessibilityAction::Press);
+    let records = host.drain_action_records();
+    assert_eq!(records.len(), 1);
+    let view = host
+        .get_mut(root)
+        .unwrap()
+        .component_mut::<SummaryView>()
+        .unwrap();
+    view.validate_custom_row_action(&captured).unwrap();
+    input.revision += 1;
+    input.owner = SummaryOwner::Workspace {
+        id: "another-host-context".into(),
+    };
+    publish_summary_context_update(&mut host, root, &input).unwrap();
+    assert!(
+        host.get(root)
+            .unwrap()
+            .component::<SummaryView>()
+            .unwrap()
+            .validate_custom_row_action(&captured)
+            .is_err()
+    );
 }

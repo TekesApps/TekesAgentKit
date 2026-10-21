@@ -475,3 +475,9 @@ pub use sidebar_catalog::*;
 
 mod sidebar_reveal;
 pub use sidebar_reveal::*;
+
+mod summary_custom;
+pub use summary_custom::{
+    SummaryCustomRowError, SummaryCustomRowSpec, SummaryCustomRowToken, install_summary_custom_row,
+    publish_summary_context_update,
+};

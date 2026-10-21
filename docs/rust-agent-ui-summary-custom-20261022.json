@@ -1,0 +1,156 @@
+{
+  "checked_at": "2026-10-21T19:18:23.687595+00:00",
+  "base_commit": "ad0ae085fef4ab4f7b8d5d097edb8666343e80d8",
+  "program": {
+    "program": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/AgentKitSummaryCustomFinal.app/Contents/MacOS/AgentKitSummaryCustomFinal",
+    "sha256": "f936b4775a3e0efb24c5835a60a58dda03d72fc99830b0d96ca1a4c264e9f5c3",
+    "sdk": "09b4bab44b6dfa65487250ea816b610b9df59095"
+  },
+  "intermediate_program": {
+    "metadata": {
+      "program": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/AgentKitSummaryCustom.app/Contents/MacOS/AgentKitSummaryCustom",
+      "sha256": "0665b63ca8c4469ad7a6481545267d3a6d750e87c95a22b89566fb028cbe1e3f",
+      "sdk": "09b4bab44b6dfa65487250ea816b610b9df59095"
+    },
+    "accepted_as_final": false,
+    "scope": "before SDK retirement lifecycle adapter; retained historical only"
+  },
+  "source_hashes": {
+    "ui/README.md": "0ad53cb8ca1a020f7562a27d744f04c4a310909ec9b4bc54b1b949ca22214126",
+    "ui/components/src/lib.rs": "4970d022bcf95dfc12a093da46b2b20bd2b333dbc4012c1ce18c42cff70162ec",
+    "ui/components/src/summary.rs": "23ea3263d08d14ead6fdd6931e112f19a0f2a7856a9179f10d58986f46ded3c0",
+    "ui/components/src/summary_section.rs": "7bffcf202a180ab4d168f5a362b2976d6251e665a724f4d709ff32b7158817f7",
+    "ui/consumer/src/lib.rs": "46fab27ccd547f4372ef27b2ef8340f8d70509e7f6609578fd737465f1cf5dce",
+    "ui/demo/src/component_demo.rs": "180bd8eab92628db934d51c3bd88cba9f7530e496779d1ce6e705810f4270341",
+    "ui/demo/src/components_native.rs": "8176a9a01184b8eefec4b3808880f5105a462dab5ae595032ee23136cca123d8",
+    "ui/demo/src/native_summary_context_selftest.rs": "b319e575fccd85b4207ce55aaa591f6521c3906fc00baac8367bdaed22171977",
+    "ui/demo/tests/summary_context.rs": "37d94b62ec11842ac024c791c5bd5bad3398dad6d7fb29e128e25f125bb3e98e",
+    "ui/components/src/summary_custom.rs": "9d7f2f1c29675b7b3407c0cf8c42fcf209b4b787be247766c3506fa518cbf3e6",
+    "ui/demo/src/native_summary_custom_selftest.rs": "d5b4aad807866fbaa848ae7d2bd1fa35792db3fd3df57905b47cb69a81a68dd3",
+    "ui/demo/tests/summary_custom.rs": "7f1619f3a3554c082212dd34ad26cea3f372ed5c8ac7154c4c9271a45dfff1bf"
+  },
+  "read_only_references": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Agent/ClientAgentSummaryView.swift": "5632d920bd21d44d6b68d49779e9f7746c9bc1ec4ad9e7bc1d01ab58b85f9154",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Agent/SummaryRegistry.swift": "dae021a8e567c0d2fe7b92b5c783484b831978fc60d9b181857b669ba6d98a6c",
+    "/Users/frankqin/dev/TekesClientKit/Sources/ToolPanels/RepositorySummaryItemNativeView.swift": "330686ce4465809fd4709ed747ab64e073d29b65183924fda222f625011b1798",
+    "/Users/frankqin/dev/Tekes/Tekes/ClientAgentSummaryHostAdapter.swift": "4e7875ae43ab06901a981077f81a4504c754e88f2c019a470dc67222b917714a"
+  },
+  "evidence_directory": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/summary-custom-20261022",
+  "evidence_hashes": {
+    "consumer-inputs.json": "cdc58abe6ba1a4ca2a3ae00fa2a73cb6481b9ba29e542c88359a5e8e330c6605",
+    "workspace-native-final.log": "95b0f5cf425d718ca7d4aa484a5051db40cc4ba8401d164d6bdda13ba90354a5",
+    "clippy-v2.log": "1c7008bdd57a8626b0a0c605c6aec353746973192181d2bbecfaea2560b7dba8",
+    "clippy-lifecycle-final.log": "cc53057f6eeff402f9c61d32a4f720b45a83dad30023afb5a5e1db0e97a0d1b4",
+    "legacy-native.log": "3a96e45ed10f8c7e43377f1c73edb1c7f6507fe7e52b1d5d5128ab135096f4bc",
+    "clippy-final.log": "3e2c668c6579e965085187967080b060ebe628b5013fa341cd39da7bf4036f41",
+    "check-v2.log": "2ab289d1cd57269b764ee59108e4645a8fdf68e66db45fd3eb59a3c97f5cd462",
+    "program.json": "bf54fa7f1f13d5f5811fc05d18936fab4535f64fc409b9b7b2a75d0cec7b2d8a",
+    "consumer-inputs-final.json": "cdc58abe6ba1a4ca2a3ae00fa2a73cb6481b9ba29e542c88359a5e8e330c6605",
+    "check-v3.log": "308d042c730059a8ecead7f6b17a95828fd8c2568d8553dbc988d93c4eb0027a",
+    "clippy.log": "9f4a8b631d91cf5571bd315a5315c0c012be917ad096fbfa9717ed86b0fa0bd7",
+    "components.log": "b526a8dd24bb0ccb1298362c62a0d8567f835275b23bead811866816d80f7dc4",
+    "legacy-native-final.log": "965adc6fc40316d0b3f6ba72bd7f0f3a89e19c7964f263e164ea27a9841be457",
+    "workspace.log": "e4aedc1dfa9f0b3011dc90395acee3bc4f7f58fb5d42ada53cd3c755438061b5",
+    "boundaries.log": "9480cc4382559b9a7a99240226a9f766048e30c8d38bb4bccd1fd8bca56661ad",
+    "build-final.log": "9ae36bb22d8f0f810a77044760863f70b81405396a32cce477ec08eecd4e6d59",
+    "workspace-final.log": "bb6f3122373400c97975777097c566b39d42a3de6603f8c305a8d87ed6bf715b",
+    "build-lifecycle.log": "9ae36bb22d8f0f810a77044760863f70b81405396a32cce477ec08eecd4e6d59",
+    "program-final.json": "0a7c36f0d079b9136fc0585f5347bf01472e84ef5f5f2d6610dc7f9e43196808",
+    "native.log": "d43f440ff879854c234bc5ea6f4ee9bdfb65d5db26121b4fdc97b0e51a39bb83",
+    "workspace-native.log": "8f052171de48deead28ba1b82c45645ae6476a87308bca7b5618d7f59e1b5947",
+    "lifecycle-check.log": "dd4c9b8c3caafc1dab6a081c2810f1edeaacf48e0e67f3e8eb90bb9faacbdf4a",
+    "clippy-lifecycle.log": "3e71a4bf2ec4fc914d015667c128972aa275bb02908eec224f7e60c19fb55524",
+    "native-final.log": "5df1f9a7ef11d84cc3fe177e56ee5923905074e18aef387a749da987f7d1a3cc",
+    "check.log": "4c2d2114d78fc62e798e0986bdbffc7fda06b602536dc41f8099ea91ce81442e",
+    "boundaries-final.log": "9480cc4382559b9a7a99240226a9f766048e30c8d38bb4bccd1fd8bca56661ad",
+    "workspace-lifecycle.log": "8a52d53b886931aaa48149c1d4b2044141a96998314d8837370040a1dc014c07",
+    "build.log": "661da8b8caaccac419f4800ccb28357681229cf3c42cda4aa5176b9e56497a3f"
+  },
+  "consumer_inputs": {
+    "commit": "09b4bab44b6dfa65487250ea816b610b9df59095",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 241,
+    "sha256": "44b3174022584d3c099a45b86892d17dbf948905476c0f038be104df12aefe46",
+    "ui_packages": 8
+  },
+  "ui_workspace_tests": 464,
+  "strict_all_target_clippy": true,
+  "native_receipts": {
+    "native-final.log": [
+      {
+        "collapseHiddenFromAx": true,
+        "disclosureAbaRetiresCallback": true,
+        "dynamicHeightMeasuredBySdk": true,
+        "eventTimeHostSource": true,
+        "fullRepositoryRows": false,
+        "hostCallbacks": 3,
+        "nativeWindow": true,
+        "noSubmission": true,
+        "noSyntheticRunScope": true,
+        "originalSdkHostControls": true,
+        "ownerChangeRetiresContent": true,
+        "physicalIme": false,
+        "realGitOperation": false,
+        "realHarness": false,
+        "sameOwnerControlRetained": true,
+        "voiceOver": false
+      }
+    ],
+    "workspace-native-final.log": [
+      {
+        "collapseRetained": true,
+        "emptyAndUnavailableDistinct": true,
+        "explicitWorkspaceOwner": true,
+        "fullUnselectedHostLayout": false,
+        "hostRowsWithoutSessionFacts": true,
+        "mainDraftAndTranscriptUnchanged": true,
+        "nativeWindow": true,
+        "noSubmission": true,
+        "noSyntheticRunScope": true,
+        "originalHeaderClicks": true,
+        "ownerChangeRetiresIds": true,
+        "physicalIme": false,
+        "realHarness": false,
+        "sameOwnerRowsRetained": true,
+        "voiceOver": false
+      }
+    ],
+    "legacy-native-final.log": [
+      {
+        "collapsedCanonicalUpdate": true,
+        "fullLayoutParity": false,
+        "hiddenFromAccessibility": true,
+        "knownCount": "1,234",
+        "nativeTextAndAxSelection": true,
+        "nativeWindow": true,
+        "noSubmission": true,
+        "originalRowsRetained": true,
+        "physicalIme": false,
+        "pointerCollapseExpand": true,
+        "readonlyMutationRejected": true,
+        "realHarness": false,
+        "runtimeDraft": true,
+        "selectedTextRetainedAfterPublication": true,
+        "systemClipboardExercised": false,
+        "unknownCost": true,
+        "usageColumns": true,
+        "usageControlsRetained": true,
+        "usageFromControlProjection": true,
+        "usagePointerCollapseExpand": true,
+        "usageSelectableTitle": true,
+        "voiceOver": false
+      }
+    ]
+  },
+  "token_send_sync": true,
+  "sdk_insert_and_retire_lifecycle": true,
+  "full_repository_rows": false,
+  "real_git_operation": false,
+  "paired_visual": false,
+  "real_harness": false,
+  "physical_ime": false,
+  "voiceover": false,
+  "new_target": false,
+  "deleted_bytes": 0
+}

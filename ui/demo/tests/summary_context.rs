@@ -2,6 +2,7 @@ use tekes_agent_components_ui::*;
 use tekes_ui_controls::composition::*;
 fn workspace(revision: u64, id: &str) -> SummaryContextInput {
     SummaryContextInput {
+        custom_rows: vec![],
         revision,
         owner: SummaryOwner::Workspace { id: id.into() },
         facts: None,

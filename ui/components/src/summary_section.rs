@@ -1,6 +1,9 @@
 //! Agent Summary section composition. Buttons, Disclosure state, focus and
 //! input handling remain in TekesUI; no generic accordion engine lives here.
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+};
 use tekes_ui_controls::{
     ButtonTextRenderer,
     composition::*,
@@ -16,9 +19,10 @@ pub(crate) type Expansion = Rc<RefCell<Disclosure>>;
 pub(crate) struct SummaryHeader {
     button: CompoundButton,
     pub expansion: Expansion,
+    epoch: Rc<Cell<u64>>,
 }
 impl SummaryHeader {
-    fn new(label: ComponentId, expansion: Expansion) -> Self {
+    fn new(label: ComponentId, expansion: Expansion, epoch: Rc<Cell<u64>>) -> Self {
         Self {
             button: CompoundButton::new(
                 "Summary section",
@@ -26,6 +30,7 @@ impl SummaryHeader {
             )
             .expect("Summary header has one passive text slot"),
             expansion,
+            epoch,
         }
     }
     pub fn set_title(&mut self, title: String) {
@@ -39,8 +44,13 @@ impl SummaryHeader {
         self.button.action.button.state.disabled = !enabled;
     }
     fn activated(&mut self, response: ContentResponse) -> ContentResponse {
-        if response.activated {
-            self.expansion.borrow_mut().toggle();
+        if response.activated && self.expansion.borrow_mut().toggle() {
+            self.epoch.set(
+                self.epoch
+                    .get()
+                    .checked_add(1)
+                    .expect("Summary disclosure generation exhausted"),
+            );
         }
         response
     }
@@ -147,6 +157,7 @@ pub(crate) struct SummarySectionView {
     pub children: Vec<Content>,
     pub expansion: Expansion,
     pub layout: Option<SummarySectionLayout>,
+    pub disclosure_epoch: Rc<Cell<u64>>,
 }
 impl SummarySectionView {
     pub fn new(
@@ -156,13 +167,15 @@ impl SummarySectionView {
         body: ComponentId,
         expansion: Expansion,
     ) -> Self {
+        let epoch = Rc::new(Cell::new(0));
         Self {
+            disclosure_epoch: epoch.clone(),
             section,
             body_indent: 0.,
             expansion: expansion.clone(),
             layout: None,
             children: vec![
-                Content::new(header, SummaryHeader::new(label, expansion.clone())),
+                Content::new(header, SummaryHeader::new(label, expansion.clone(), epoch)),
                 Content::new(
                     body,
                     SummaryRows {
@@ -182,6 +195,13 @@ impl SummarySectionView {
     }
     pub fn header_mut(&mut self) -> &mut SummaryHeader {
         self.children[0].component_mut::<SummaryHeader>().unwrap()
+    }
+    pub fn rows(&self) -> &[Content] {
+        &self.children[1]
+            .component::<SummaryRows>()
+            .unwrap()
+            .rows
+            .children
     }
     pub fn rows_mut(&mut self) -> &mut Vec<Content> {
         &mut self.children[1]

@@ -17,6 +17,7 @@ summary.update_context(&SummaryContextInput {
     owner: SummaryOwner::Workspace { id: stable_host_workspace_key },
     facts: None,
     host_sections: application_sections,
+    custom_rows: vec![],
     ready: application_snapshot_ready,
 })?;
 let host = summary.into_host()?;
@@ -28,7 +29,7 @@ let host = summary.into_host()?;
 
 - `SummaryOwner::Run(scope)` 可接收完全匹配且验证通过的SummaryFacts和既有会话动作。
 - `SummaryOwner::Workspace { id }` 接收显式host sections；facts必须为None，既有OpenTask/OpenSubagent/OpenArtifact动作均拒绝。
-  不把另一个会话的事实或artifact权限移给工作区。workspace自定义交互行仍需后续显式host slot/callback，未伪造会话动作替代。
+  不把另一个会话的事实或artifact权限移给工作区。产品交互行使用后续[原Content插槽](rust-agent-ui-summary-custom-20261022.md)，不伪造会话动作替代。
 - ready仅在没有任何section时区分“暂无 Summary 内容”和“Summary 暂不可用”；已提供的host rows仍显示。
   它不是连接、提交或动作权限，空数据也不等于已确认的零用量。
 - revision是整个组件的单调显示publication，覆盖owner切换及两个update API；不能将不同controller/工作区的局部时钟直接混用。

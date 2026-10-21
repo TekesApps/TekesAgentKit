@@ -236,3 +236,9 @@ RunSnapshot 的 destination/connection_epoch 和递增 display revision 发布�
 Summary 支持 `SummaryContextInput` / `SummaryOwner::Workspace`，无需runtime或虚构RunScope挂载应用工作区行；
 会话facts/动作仍只能属于明确Run owner。旧SummaryInput/update保留，统一查询使用displayed_context_input。
 公开输入、revision/owner边界与原生入口见[Summary上下文接入](../docs/rust-agent-ui-summary-context-20261022.md)。
+
+
+Summary 的 `custom_rows` 允许宿主在声明的产品行内安装原TekesUI Content，保留原控件并由SDK测量动态高度。
+安装使用 `install_summary_custom_row`，可能淘汰原内容的发布使用 `publish_summary_context_update`，均走原SDK生命周期。
+事件时捕获的来源需在派发前校验；完整输入、namespace与宿主回调责任见
+[Summary自定义行](../docs/rust-agent-ui-summary-custom-20261022.md)。

@@ -2045,12 +2045,8 @@ impl ComponentDemo {
             ));
         }
         let id = self.summary_id();
-        self.tree
-            .get_mut(id)
-            .and_then(|node| node.component_mut::<SummaryView>())
-            .ok_or_else(|| unsupported("Summary is not mounted"))?
-            .update_context(&input)
-            .map_err(unsupported)?;
+        tekes_agent_components_ui::publish_summary_context_update(&mut self.tree, id, &input)
+            .map_err(|error| unsupported(&format!("workspace Summary: {error:?}")))?;
         self.workspace_summary = Some(input);
         Ok(())
     }

@@ -1,7 +1,10 @@
 //! Agent summary UI. Membership, totals, costs and domain actions come from SummaryFacts.
+use crate::summary_custom::SummaryCustomRow;
 use crate::summary_section::{Expansion, SummaryDocument, SummarySectionView};
 use crate::summary_usage::{SummaryUsageRow, SummaryUsageRowIds, SummaryUsageRowText};
+use crate::{SummaryCustomRowSpec, SummaryCustomRowToken};
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 use std::{cell::RefCell, rc::Rc};
 use tekes_agent_presentation::{RunScope, append_summary_sections};
 pub use tekes_agent_presentation::{
@@ -49,6 +52,8 @@ pub struct SummaryContextInput {
     /// Session facts are valid only for the exact Run owner.
     pub facts: Option<SummaryFacts>,
     pub host_sections: Vec<SummarySection>,
+    /// Original host controls replace these passive host rows, in the same order.
+    pub custom_rows: Vec<SummaryCustomRowSpec>,
     /// Explicit host readiness. Only selects empty/unavailable when no rows exist.
     pub ready: bool,
 }
@@ -60,6 +65,7 @@ impl From<&SummaryInput> for SummaryContextInput {
             facts: input.facts.clone(),
             host_sections: input.host_sections.clone(),
             ready: input.facts.is_some(),
+            custom_rows: vec![],
         }
     }
 }
@@ -132,6 +138,7 @@ enum Key {
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum ActionIdentity {
     Passive,
+    Custom(String),
     Task(String, RunScope),
     Subagent(RunScope, String),
     Artifact(RunScope, String),
@@ -153,6 +160,15 @@ impl ActionIdentity {
     }
 }
 #[derive(Debug)]
+pub(crate) struct PreparedSummaryContext {
+    sections: Vec<SummarySection>,
+    section_ids: BTreeSet<String>,
+    custom: BTreeMap<(String, String), SummaryCustomRowSpec>,
+    ids: BTreeMap<Key, ComponentId>,
+    next: u64,
+    pub(crate) retiring: Vec<ComponentId>,
+}
+#[derive(Debug)]
 pub struct SummaryView {
     root: ComponentId,
     scroll: ScrollContent,
@@ -165,6 +181,7 @@ pub struct SummaryView {
     expansions: BTreeMap<String, Expansion>,
     last: Option<SummaryInput>,
     last_context: Option<SummaryContextInput>,
+    custom_context: Arc<()>,
 }
 impl SummaryView {
     pub fn new(namespace: u32, labels: SummaryLabels) -> Self {
@@ -195,6 +212,7 @@ impl SummaryView {
             expansions: BTreeMap::new(),
             last: None,
             last_context: None,
+            custom_context: Arc::new(()),
         }
     }
     pub fn id(&self) -> ComponentId {
@@ -234,7 +252,7 @@ impl SummaryView {
     /// Activatable rows retain their button and do not expose an editor here.
     pub fn passive_text_id(&self, section: &str, row: &str) -> Option<ComponentId> {
         let id = self.row_id(section, row)?;
-        if self.bindings.contains_key(&id) {
+        if self.bindings.contains_key(&id) || self.custom_spec(section, row).is_some() {
             return None;
         }
         if section == "usage" {
@@ -302,6 +320,16 @@ impl SummaryView {
     /// Use one revision authority across Run/workspace owner changes. Reject
     /// foreign session facts/actions before changing any original control.
     pub fn update_context(&mut self, input: &SummaryContextInput) -> Result<(), &'static str> {
+        let prepared = self.prepare_context(input)?;
+        if !prepared.retiring.is_empty() {
+            return Err("retire installed Summary rows through publish_summary_context_update");
+        }
+        self.apply_context(input, prepared)
+    }
+    pub(crate) fn prepare_context(
+        &self,
+        input: &SummaryContextInput,
+    ) -> Result<PreparedSummaryContext, &'static str> {
         if input.revision == 0
             || input.revision < self.revision
             || (input.revision == self.revision && self.last_context.as_ref() != Some(input))
@@ -322,6 +350,23 @@ impl SummaryView {
         let mut sections = vec![];
         append_summary_sections(&mut sections, input.host_sections.clone());
         sections.extend(providers);
+        let mut custom = BTreeMap::new();
+        for spec in &input.custom_rows {
+            if spec.content_key.trim().is_empty()
+                || custom
+                    .insert((spec.section.clone(), spec.row.clone()), spec.clone())
+                    .is_some()
+                || !input.host_sections.iter().any(|section| {
+                    section.id == spec.section
+                        && section
+                            .rows
+                            .iter()
+                            .any(|row| row.id == spec.row && row.action.is_none())
+                })
+            {
+                return Err("invalid or duplicate Summary custom host row");
+            }
+        }
         let mut section_ids = BTreeSet::new();
         let mut keys = BTreeSet::new();
         for section in &sections {
@@ -362,7 +407,8 @@ impl SummaryView {
                         return Err("summary action belongs to another run");
                     }
                 }
-                if section.id == "usage" && row.action.is_none() {
+                let slot = custom.get(&(section.id.clone(), row.id.clone()));
+                if section.id == "usage" && row.action.is_none() && slot.is_none() {
                     keys.insert(Key::UsageTitle(input.owner.clone(), row.id.clone()));
                     keys.insert(Key::UsageValue(input.owner.clone(), row.id.clone()));
                 }
@@ -370,7 +416,10 @@ impl SummaryView {
                     input.owner.clone(),
                     section.id.clone(),
                     row.id.clone(),
-                    ActionIdentity::read(row.action.as_ref()),
+                    slot.map_or_else(
+                        || ActionIdentity::read(row.action.as_ref()),
+                        |spec| ActionIdentity::Custom(spec.content_key.clone()),
+                    ),
                 ));
             }
         }
@@ -393,6 +442,42 @@ impl SummaryView {
                 id
             });
         }
+        let desired: BTreeSet<_> = ids.values().copied().collect();
+        let retiring = self.scroll.children()[0]
+            .component::<SummaryDocument>()
+            .unwrap()
+            .list
+            .rows
+            .children
+            .iter()
+            .filter_map(|node| node.component::<SummarySectionView>())
+            .flat_map(|block| block.rows())
+            .filter(|row| !desired.contains(&row.id()))
+            .filter_map(|row| row.component::<SummaryCustomRow>())
+            .flat_map(|row| row.children.iter().map(Content::id))
+            .collect();
+        Ok(PreparedSummaryContext {
+            sections,
+            section_ids,
+            custom,
+            ids,
+            next,
+            retiring,
+        })
+    }
+    pub(crate) fn apply_context(
+        &mut self,
+        input: &SummaryContextInput,
+        prepared: PreparedSummaryContext,
+    ) -> Result<(), &'static str> {
+        let PreparedSummaryContext {
+            sections,
+            section_ids,
+            custom,
+            ids,
+            next,
+            ..
+        } = prepared;
         if self.owner.as_ref() != Some(&input.owner) {
             self.scroll.scroll = ScrollArea::default();
         }
@@ -440,13 +525,28 @@ impl SummaryView {
                 .map(|node| (node.id(), node))
                 .collect();
             for row in section.rows {
+                let slot = custom.get(&(section.id.clone(), row.id.clone()));
                 let id = ids[&Key::Row(
                     input.owner.clone(),
                     section.id.clone(),
                     row.id.clone(),
-                    ActionIdentity::read(row.action.as_ref()),
+                    slot.map_or_else(
+                        || ActionIdentity::read(row.action.as_ref()),
+                        |spec| ActionIdentity::Custom(spec.content_key.clone()),
+                    ),
                 )];
-                let content = if let Some(action) = row.action.clone() {
+                let content = if slot.is_some() {
+                    let label = (self.labels.row)(&section.id, &row);
+                    let mut content = old_rows
+                        .remove(&id)
+                        .unwrap_or_else(|| Content::new(id, SummaryCustomRow::new(label.clone())));
+                    content
+                        .component_mut::<SummaryCustomRow>()
+                        .expect("Summary custom row")
+                        .placeholder
+                        .text = label;
+                    content
+                } else if let Some(action) = row.action.clone() {
                     let label = (self.labels.row)(&section.id, &row);
                     let mut content = old_rows
                         .remove(&id)
@@ -530,6 +630,136 @@ impl SummaryView {
         self.last = None;
         Ok(())
     }
+    fn custom_spec(&self, section: &str, row: &str) -> Option<&SummaryCustomRowSpec> {
+        self.last_context
+            .as_ref()?
+            .custom_rows
+            .iter()
+            .find(|spec| spec.section == section && spec.row == row)
+    }
+    fn custom_section_epoch(&self, section: &str) -> Option<u64> {
+        self.scroll.children()[0]
+            .component::<SummaryDocument>()?
+            .list
+            .rows
+            .children
+            .iter()
+            .filter_map(|node| node.component::<SummarySectionView>())
+            .find(|block| block.section == section)
+            .map(|block| block.disclosure_epoch.get())
+    }
+    pub fn custom_row_token(&self, section: &str, row: &str) -> Option<SummaryCustomRowToken> {
+        Some(SummaryCustomRowToken {
+            summary: self.custom_context.clone(),
+            owner: self.owner.clone()?,
+            revision: self.revision,
+            disclosure_epoch: self.custom_section_epoch(section)?,
+            id: self.row_id(section, row)?,
+            spec: self.custom_spec(section, row)?.clone(),
+        })
+    }
+    fn check_custom(&self, token: &SummaryCustomRowToken) -> Result<(), &'static str> {
+        if !Arc::ptr_eq(&self.custom_context, &token.summary)
+            || self.owner.as_ref() != Some(&token.owner)
+            || self.revision != token.revision
+            || self.custom_section_epoch(&token.spec.section) != Some(token.disclosure_epoch)
+            || self.custom_spec(&token.spec.section, &token.spec.row) != Some(&token.spec)
+            || self.row_id(&token.spec.section, &token.spec.row) != Some(token.id)
+        {
+            return Err("retired Summary custom-row source");
+        }
+        Ok(())
+    }
+    fn custom_row(&self, id: ComponentId) -> Option<&SummaryCustomRow> {
+        self.scroll.children()[0]
+            .component::<SummaryDocument>()?
+            .list
+            .rows
+            .children
+            .iter()
+            .filter_map(|node| node.component::<SummarySectionView>())
+            .flat_map(|section| section.rows())
+            .find(|row| row.id() == id)?
+            .component()
+    }
+    fn custom_row_mut(&mut self, id: ComponentId) -> Option<&mut SummaryCustomRow> {
+        let blocks = &mut self.scroll.children_mut()?[0]
+            .component_mut::<SummaryDocument>()?
+            .list
+            .rows
+            .children;
+        for block in blocks {
+            if let Some(section) = block.component_mut::<SummarySectionView>()
+                && section.rows().iter().any(|row| row.id() == id)
+            {
+                section.layout = None;
+                return section
+                    .rows_mut()
+                    .iter_mut()
+                    .find(|row| row.id() == id)?
+                    .component_mut();
+            }
+        }
+        None
+    }
+    pub(crate) fn invalidate_custom_layout(&mut self, id: ComponentId) {
+        self.custom_row_mut(id);
+    }
+    pub(crate) fn check_custom_install(
+        &self,
+        token: &SummaryCustomRowToken,
+        content: ComponentId,
+    ) -> Result<(), &'static str> {
+        self.check_custom(token)?;
+        if content.0 >> 32 == self.root.0 >> 32 {
+            return Err("Summary custom content needs a separate namespace");
+        }
+        if self
+            .custom_row(token.id)
+            .is_none_or(|slot| !slot.children.is_empty())
+        {
+            return Err("Summary custom row missing or already installed");
+        }
+        Ok(())
+    }
+    pub fn custom_row_component<T: Component>(
+        &self,
+        token: &SummaryCustomRowToken,
+    ) -> Result<&T, &'static str> {
+        self.check_custom(token)?;
+        self.custom_row(token.id)
+            .and_then(|row| row.children.first())
+            .and_then(Content::component::<T>)
+            .ok_or("Summary custom row component is not installed or has another type")
+    }
+    /// Configure the retained host component, then request the next ordinary
+    /// host render. SDK measurement owns height changes; there is no pixel callback.
+    pub fn custom_row_component_mut<T: Component>(
+        &mut self,
+        token: &SummaryCustomRowToken,
+    ) -> Result<&mut T, &'static str> {
+        self.check_custom(token)?;
+        self.custom_row_mut(token.id)
+            .and_then(|row| row.children.first_mut())
+            .and_then(Content::component_mut::<T>)
+            .ok_or("Summary custom row component is not installed or has another type")
+    }
+    /// Validate the source captured with a host event, before product dispatch.
+    /// Not an endpoint permission, once-only request claim, or async-result fence.
+    pub fn validate_custom_row_action(
+        &self,
+        token: &SummaryCustomRowToken,
+    ) -> Result<(), &'static str> {
+        self.check_custom(token)?;
+        if self.section_expanded(&token.spec.section) != Some(true)
+            || self
+                .custom_row(token.id)
+                .is_none_or(|row| row.children.is_empty())
+        {
+            return Err("Summary custom row is hidden or not installed");
+        }
+        Ok(())
+    }
     pub fn take_intents(&self, actions: &[ContentAction]) -> Vec<SummaryIntent> {
         actions
             .iter()
@@ -545,6 +775,11 @@ impl SummaryView {
     }
 }
 impl Component for SummaryView {
+    fn lifecycle(&mut self, event: Lifecycle) {
+        if event == Lifecycle::Unmounted {
+            self.custom_context = Arc::new(());
+        }
+    }
     fn children(&self) -> &[Content] {
         self.scroll.children()
     }
