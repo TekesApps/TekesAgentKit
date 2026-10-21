@@ -48,6 +48,8 @@ mod sidebar_restore_probe;
 mod sidebar_search_probe;
 #[path = "native_stream_selftest.rs"]
 mod stream_probe;
+#[path = "native_stream_reading_selftest.rs"]
+mod stream_reading_probe;
 #[path = "native_summary_sections_selftest.rs"]
 mod summary_sections_probe;
 #[path = "native_composer_visibility_selftest.rs"]
@@ -84,6 +86,7 @@ struct Host {
     visibility_probe: Option<visibility_probe::Probe>,
     feedback_probe: Option<feedback_probe::Probe>,
     stream_probe: Option<stream_probe::Probe>,
+    stream_reading_probe: Option<stream_reading_probe::Probe>,
     run_controls_probe: Option<run_controls_probe::Probe>,
     turn_history: DemoTurnHistory,
     clipboard_writes: Vec<tekes_agent_components_ui::TranscriptCopyIntent>,
@@ -1304,6 +1307,10 @@ impl Host {
             self.feedback_probe = Some(probe);
         }
 
+        if let Some(mut probe) = self.stream_reading_probe.take() {
+            probe.advance(self, window);
+            self.stream_reading_probe = Some(probe);
+        }
         if let Some(mut probe) = self.stream_probe.take() {
             probe.advance(self, window);
             self.stream_probe = Some(probe);
@@ -2353,6 +2360,14 @@ impl Host {
                 probe.receipt(&self.view)
             );
         }
+        if let Some(probe) = &self.stream_reading_probe {
+            assert!(
+                self.failures.is_empty(),
+                "stream reading failures {:?}",
+                self.failures
+            );
+            println!("NATIVE_AGENT_STREAM_READING_RECEIPT {}", probe.receipt());
+        }
         if let Some(probe) = &self.stream_probe {
             assert!(
                 self.failures.is_empty(),
@@ -2651,6 +2666,9 @@ pub fn run() {
         .iter()
         .any(|arg| arg == "--run-controls-native-selftest");
     let stream_selftest = args.iter().any(|arg| arg == "--stream-native-selftest");
+    let stream_reading_selftest = args
+        .iter()
+        .any(|arg| arg == "--stream-reading-native-selftest");
     let projection_failure_selftest = args
         .iter()
         .any(|arg| arg == "--composer-projection-failure-selftest");
@@ -2732,6 +2750,7 @@ pub fn run() {
             visibility_selftest,
             feedback_selftest,
             stream_selftest,
+            stream_reading_selftest,
             run_controls_selftest,
             selftest,
             system_ime_selftest,
@@ -2755,7 +2774,12 @@ pub fn run() {
             <= 1,
         "choose one native fixture selftest mode"
     );
-    if feedback_selftest || stream_selftest || run_controls_selftest || harness_reading_selftest {
+    if feedback_selftest
+        || stream_selftest
+        || stream_reading_selftest
+        || run_controls_selftest
+        || harness_reading_selftest
+    {
         assert!(
             args.iter().any(|arg| arg == "--endpoint-config")
                 && args.iter().any(|arg| arg == "--transcript-content")
@@ -3062,6 +3086,9 @@ pub fn run() {
     if stream_selftest {
         stream_probe::Probe::prepare(&view);
     }
+    if stream_reading_selftest {
+        stream_reading_probe::Probe::prepare(&view);
+    }
     if run_controls_selftest {
         run_controls_probe::Probe::prepare(&view);
     }
@@ -3142,6 +3169,7 @@ pub fn run() {
             .then(|| visibility_probe::Probe::new(visibility_fixture)),
         feedback_probe: feedback_selftest.then(feedback_probe::Probe::new),
         stream_probe: stream_selftest.then(stream_probe::Probe::new),
+        stream_reading_probe: stream_reading_selftest.then(stream_reading_probe::Probe::new),
         run_controls_probe: run_controls_selftest.then(run_controls_probe::Probe::new),
         turn_history: DemoTurnHistory::default(),
         clipboard_writes: vec![],

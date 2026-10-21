@@ -22,6 +22,7 @@ parser.add_argument('--ui-feedback-read',action='store_true',help='Read typed co
 parser.add_argument('--ui-native-run-controls',action='store_true',help='Native Send/Cancel/provider failure/explicit recovery over fresh owned sessions; no physical IME or reading-anchor acceptance')
 parser.add_argument('--ui-native-readonly',action='store_true',help='Real Native bounded pane: explicit one-message pages, native anchor/refresh and draft isolation')
 parser.add_argument('--ui-native-reading',action='store_true',help='Native public history page, retained A/B reading and reconnect on seeded owned harness sessions; synthetic wheel, no physical IME')
+parser.add_argument('--ui-native-stream-reading',action='store_true',help='Actual native stream while reading seeded history, with Chinese preedit and reconnect')
 parser.add_argument('--ui-native-stream',action='store_true',help='Use fresh owned sessions for native Send, active preview, selection, settlement, draft isolation and reconnect; excludes reading anchors')
 parser.add_argument('--ui-native-feedback',action='store_true',help='Open each owned-session native window sequentially and exercise feedback clicks, text services and session switching')
 parser.add_argument('--ui-feedback-transcript',action='store_true',help='Exercise feedback through actual Transcript/RunView and captured host callbacks; offscreen only')
@@ -40,6 +41,8 @@ if args.ui_sidebar_query and not (args.ui_demo and args.ui_components):
     parser.error('--ui-sidebar-query requires --ui-demo and --ui-components')
 if args.ui_native_run_controls and not (args.ui_demo and args.ui_components and args.ui_transcript_content):
     parser.error('--ui-native-run-controls requires --ui-demo, --ui-components and --ui-transcript-content')
+if args.ui_native_stream_reading and not (args.ui_demo and args.ui_components and args.ui_transcript_content and args.ui_history_pages):
+    parser.error('--ui-native-stream-reading requires owned history-pages, UI demo/components and Transcript')
 if args.ui_native_stream and not (args.ui_demo and args.ui_components and args.ui_transcript_content):
     parser.error('--ui-native-stream requires --ui-demo, --ui-components and --ui-transcript-content')
 if args.ui_native_feedback and not (args.ui_demo and args.ui_components and args.ui_transcript_content):
@@ -163,9 +166,20 @@ class Provider(http.server.BaseHTTPRequestHandler):
                     frames=[dict(common,choices=[{'index':0,'delta':{'role':'assistant','tool_calls':[{'index':0,'id':'pi-child-'+str(len(values)),'type':'function','function':{'name':'tekes_subagent','arguments':json.dumps(action)}}]},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{},'finish_reason':'tool_calls'}])]
             if 'ENDPOINT_GOAL_COMPLETE' in transcript and not any(message.get('role')=='tool' for message in body.get('messages',[])):
                 frames=[dict(common,choices=[{'index':0,'delta':{'role':'assistant','tool_calls':[{'index':0,'id':'goal-call','type':'function','function':{'name':'agentkit_goal','arguments':json.dumps({'phase':'complete'})}}]},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{},'finish_reason':'tool_calls'}])]
+        reading_stream='ENDPOINT_READING_STREAM_PROOF' in json.dumps(body)
+        if reading_stream:
+            chunks=['READING_STREAM_BEGIN\n','流式第一段\n'*60,'流式第二段\n'*60,'READING_STREAM_END']
+            if self.path.endswith('/responses'):
+                frames=[{'type':'response.output_item.added','output_index':0,'item':{'id':'reading-native-output','type':'message','role':'assistant','phase':'final_answer','content':[]}},
+                    *[{'type':'response.output_text.delta','output_index':0,'content_index':0,'delta':chunk} for chunk in chunks],
+                    {'type':'response.completed','response':{'id':'reading-native-response','status':'completed','output':[{'id':'reading-native-output','type':'message','role':'assistant','phase':'final_answer','status':'completed','content':[{'type':'output_text','text':''.join(chunks)}]}],'usage':{'input_tokens':10,'output_tokens':600,'total_tokens':610}}}]
+            else:
+                frames=[dict(common,choices=[{'index':0,'delta':dict(content=chunk,**({'role':'assistant'} if i==0 else {})),'finish_reason':None}]) for i,chunk in enumerate(chunks)]
+                frames.append(dict(common,choices=[{'index':0,'delta':{},'finish_reason':'stop'}],usage={'prompt_tokens':10,'completion_tokens':600,'total_tokens':610}))
         try:
             for frame in frames:
                 self.wfile.write(('data: '+json.dumps(frame)+'\n\n').encode());self.wfile.flush()
+                if reading_stream:time.sleep(1.5)
                 if native_cancel:time.sleep(1)
                 if 'ENDPOINT_STREAM_IDENTITY_PROOF' in json.dumps(body):time.sleep(0.5)
                 if 'ENDPOINT_STREAM_NATIVE_PROOF' in json.dumps(body):time.sleep(1)
@@ -393,6 +407,17 @@ def ui_smoke(config, first, bounded_child=None):
         assert not proof['physicalIme'] and not proof['voiceOver'] and not proof['readingAnchorAcceptance'],proof
         print(kind.upper()+'_UI_NATIVE_FEEDBACK_RECEIPT '+json.dumps(proof,ensure_ascii=False,sort_keys=True),flush=True)
 
+    if args.ui_native_stream_reading and bounded_child is None:
+        native_log=output.with_suffix('.native-stream-reading.log')
+        reading_env=dict(ui_env, AGENT_STREAM_READING_CAPTURE=str(output.with_suffix('.native-stream-reading.png')))
+        with native_log.open('w') as capture:
+            native=subprocess.run([str(args.ui_demo.resolve()),'-ApplePersistenceIgnoreState','YES','--components','--transcript-content','--endpoint-config',str(path),'--stream-reading-native-selftest'],env=reading_env,stdout=capture,stderr=subprocess.STDOUT,timeout=55)
+        text=native_log.read_text(); assert native.returncode==0,str(native_log)+'\n'+text[-6000:]
+        marker='NATIVE_AGENT_STREAM_READING_RECEIPT '
+        proof=next(json.loads(line[len(marker):]) for line in text.splitlines() if line.startswith(marker))
+        assert all(proof[key] for key in ('nativeWindow','realHarness','activeStreamingBeforeReading','originalItemAndLocalAnchorPreserved','markedTextAndFocusPreserved','originalEditorPreserved','streamFinalTextExact','oneSubmission','reconnectNoReplay','retainedReadingAfterSessionSwitch','draftIsolation')),proof
+        assert proof['appendsObserved']>0 and not proof['physicalIme'] and not proof['voiceOver'],proof
+        print(kind.upper()+'_UI_NATIVE_STREAM_READING_RECEIPT '+json.dumps(proof,ensure_ascii=False,sort_keys=True),flush=True)
     native_modes=[]
     if args.ui_native_stream:
         native_modes.append(('stream','--stream-native-selftest','NATIVE_AGENT_STREAM_SELFTEST_RECEIPT ',('nativeWindow','nativePointer','nativeTextServices','nativeAxSelection','activePreview','sameOutputRow','sameTextOwner','selectionRetained','focusRetainedDuringSettlement','oneSubmission','sessionDraftIsolation','reconnectNoReplay','stateDrivenCallbacks')))

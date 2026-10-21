@@ -46,6 +46,8 @@ Composer 的真实输入胶囊公开为 `ComposerIds::input_band`；现在保留
 
 只读子历史宿主请使用[完整pane阅读事务](../docs/rust-agent-ui-readonly-reading-20261021.md)，不要在已声明SDK reading document后直接替换正文。
 
+[三真实harness流式阅读验收](../docs/rust-agent-ui-stream-reading-native-20261021.md)覆盖旧回合锚点、中文合成preedit、重连与A/B隔离；普通完整产品UI仍未验收。
+
 ## 构建与运行
 
 从 AgentKit 根目录：

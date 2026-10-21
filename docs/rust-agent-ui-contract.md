@@ -6,6 +6,7 @@
 [回到最新按钮](rust-agent-ui-jump-latest-20261021.md)已补公开控件、原跟随命令及原生组字内点击验证，保留原编辑器且不记录轨道导航历史；完整selection/chrome仍待完成。
 [有界只读子历史阅读](rust-agent-ui-readonly-reading-20261021.md)已接入原SDK事务，正文/状态/分页一起发布，公开consumer与原生fixture验证前插和刷新锚点；真实Native新pane验收及持久恢复仍单独开放。
 [真实Native只读pane阅读](rust-agent-ui-native-bounded-reading-20261021.md)现有Kernel0.9.1原生锚点/刷新及元数据页耗尽证据；本case可见行5→5，多消息child前插仍开放。
+[三真实harness的流式阅读](rust-agent-ui-stream-reading-native-20261021.md)已新增原生验收：流内追加时旧回合锚点、中文preedit与焦点保持，结算/重连/会话切换不重发、不串草稿；仍不等于完整UI或物理IME验收。
 [Summary 用量两列布局](rust-agent-ui-summary-usage-20261021.md)将六项用量的标题与数值拆成原 TekesUI 文本槽，增加公开格式化回调；不重算 facts 或切换默认依赖。完整 Summary rows/slots 与原生产品验收仍待完成。
 
 源码基线：AgentKit已发布v0.3.8 / `f1daa0ffcf6ced41e21f351e22845455ca78006c`；本分支Rust UI仍为实验0.0.0/publish=false。当前TekesUI精确公开pin为`1294987dacabb33c0e411c13ee5ea544a1123f8e` / `remediation-checkpoint-20261021`，实际八包241输入，清单SHA `5b5a5acdbb957b565eb73e5558769e38b8c34a4e7ae7b7553d76b98defb4c1f2`，以`ui/tekesui-source.json`和Cargo.lock核验。原431/8cf/2ee清单保留在`ui/baselines/`。
@@ -50,7 +51,7 @@ AgentKit 定义业务结构、展示语义、组件组合、组件输入及回�
 
 [Pi 实时预览与落盘身份](rust-agent-ui-stream-identity-20261020.md)补齐 Pi 1.3 delta-only RPC 的公开 extension 归一化及 Stream→NativeEntry 明确回执。正式 Transcript 保留原输出行与文本控件；完整阅读锚点、富内容和三端原生验收范围不变。
 
-[三端流式原生专项](rust-agent-ui-stream-native-20261020.md)已验证正常 Send、真实预览、落盘后的原行/正文控件/选区、会话草稿和重连不重发，并修复聚合/结构化回补时的唯一正文/推理控件迁移；多块内容不猜测关联。这是专项原生证据，完整三端取消/错误/IME 交互及阅读锚点仍须继续。
+[三端流式原生专项](rust-agent-ui-stream-native-20261020.md)已验证正常 Send、真实预览、落盘后的原行/正文控件/选区、会话草稿和重连不重发，并修复聚合/结构化回补时的唯一正文/推理控件迁移；多块内容不猜测关联。这是早期专项的原范围；新增流式阅读锚点/合成preedit证据见文首链接，实体输入法/候选窗与完整交互仍须分别验收。
 
 [三端取消/错误/恢复专项](rust-agent-ui-run-controls-20261020.md)已通过真实窗口 Send、流式中 Cancel、两次重连不重发、公开错误说明的原生 AX 查询及显式恢复。新增共享 latest_failure/failure_message 只读事实，修复 Pi 错误正文丢失、Indicators 只显示 idle，以及 DSH 新执行后旧 operational error 粘滞。基础路径已验收，不扩大为全部错误、队列/工具取消或真实 IME 验收。
 
