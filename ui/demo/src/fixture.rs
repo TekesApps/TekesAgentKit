@@ -218,6 +218,19 @@ impl Default for Fixture {
     }
 }
 impl Fixture {
+    /// Controlled public inventory notification for display regression fixtures.
+    /// Does not edit the harness's stored title or submit a model request.
+    pub fn publish_inventory_summary(&self, summary: Value) -> Result<()> {
+        let id = string(&summary, "sessionId")?;
+        require(
+            self.sessions.lock().unwrap().contains_key(id),
+            "unknown fixture session",
+        )?;
+        self.inventory_sender
+            .send(json!({"type":"upsert","session":summary}))
+            .map_err(|_| Error::Disconnected)?;
+        Ok(())
+    }
     pub fn with_inventory_refresh_gate(mut self, gate: Arc<tokio::sync::Semaphore>) -> Self {
         self.inventory_refresh_gate = Some(gate);
         self

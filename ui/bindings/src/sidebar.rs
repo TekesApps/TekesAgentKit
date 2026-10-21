@@ -76,12 +76,13 @@ impl SidebarBinding {
             let request = json!({"endpoint":source.runtime.inspect(|state| state.endpoint_id.clone()), "target":"state"});
             let follow = owner.follow(&request, output);
             tokio::pin!(follow);
+            let mut inventory = InventoryRows::default();
             let result: Result<()> = loop {
                 tokio::select! {
                     result = &mut follow => break result.and_then(|()| Err(unsupported("inventory observation ended"))),
                     frame = frames.recv() => {
                         let Some(frame) = frame else { break Err(unsupported("inventory channel ended")); };
-                        match rows(&owner, &source, &frame) {
+                        match inventory.read(&owner, &source, &frame) {
                             Ok(rows) => {
                                 let revision = match sender.borrow().revision.checked_add(1) { Some(revision) => revision, None => break Err(unsupported("inventory revision exhausted")) };
                                 let loaded = sender.borrow().loaded || frame["inventoryReady"].as_bool().unwrap_or(false);
@@ -180,35 +181,57 @@ impl SidebarBinding {
         })
     }
 }
-fn rows(agent: &SharedAgent, endpoint: &SharedEndpoint, frame: &Value) -> Result<Vec<SidebarRow>> {
-    let endpoint_id = endpoint.runtime.inspect(|state| state.endpoint_id.clone());
-    require(
-        frame["description"]["id"] == endpoint_id,
-        "inventory endpoint mismatch",
-    )?;
-    let items = frame["sessions"]
-        .as_array()
-        .ok_or_else(|| unsupported("invalid inventory rows"))?;
-    let mut addresses = std::collections::BTreeSet::new();
-    items
-        .iter()
-        .map(|item| {
+/// Display-only activity metadata. Consecutive running updates retain the
+/// original activity position, matching ClientKit's sidebar_activity_at rule.
+#[derive(Default)]
+struct InventoryRows {
+    activity: std::collections::BTreeMap<String, (bool, f64)>,
+}
+impl InventoryRows {
+    fn read(
+        &mut self,
+        agent: &SharedAgent,
+        endpoint: &SharedEndpoint,
+        frame: &Value,
+    ) -> Result<Vec<SidebarRow>> {
+        let endpoint_id = endpoint.runtime.inspect(|state| state.endpoint_id.clone());
+        require(
+            frame["description"]["id"] == endpoint_id,
+            "inventory endpoint mismatch",
+        )?;
+        let items = frame["sessions"]
+            .as_array()
+            .ok_or_else(|| unsupported("invalid inventory rows"))?;
+        let mut addresses = std::collections::BTreeSet::new();
+        let mut activity = std::collections::BTreeMap::new();
+        let mut rows = Vec::new();
+        for item in items {
             let id = tekes_agent_contract::string(item, "sessionId")?;
             require(
                 !id.is_empty() && addresses.insert(id),
                 "duplicate or empty inventory identity",
             )?;
-            Ok(SidebarRow {
+            let summary = &item["summary"];
+            let updated = summary["updatedAt"]
+                .as_f64()
+                .filter(|v| v.is_finite())
+                .ok_or_else(|| unsupported("missing inventory activity time"))?;
+            let row_activity: tekes_agent_contract::ThreadActivity =
+                serde_json::from_value(item["activity"].clone())?;
+            let running = row_activity.status == "running";
+            let effective = match self.activity.get(id) {
+                Some((true, previous)) if running => *previous,
+                _ => updated,
+            };
+            activity.insert(id.to_owned(), (running, effective));
+            let title = inventory_title(item, id);
+            rows.push(SidebarRow {
                 address: SessionAddress {
                     endpoint_id: endpoint_id.clone(),
                     session_id: id.into(),
                 },
-                title: item["summary"]["title"]
-                    .as_str()
-                    .or_else(|| item["summary"]["name"].as_str())
-                    .unwrap_or(id)
-                    .into(),
-                activity: serde_json::from_value(item["activity"].clone())?,
+                title,
+                activity: row_activity,
                 pin: item
                     .get("pin")
                     .filter(|value| !value.is_null())
@@ -216,7 +239,34 @@ fn rows(agent: &SharedAgent, endpoint: &SharedEndpoint, frame: &Value) -> Result
                     .map(serde_json::from_value)
                     .transpose()?,
                 actions: agent.thread_actions(endpoint, id)?,
-            })
-        })
-        .collect()
+            });
+        }
+        rows.sort_by(|a, b| {
+            activity[&b.address.session_id]
+                .1
+                .total_cmp(&activity[&a.address.session_id].1)
+                .then_with(|| a.address.session_id.cmp(&b.address.session_id))
+        });
+        // Commit only after every row and action source was accepted.
+        self.activity = activity;
+        Ok(rows)
+    }
+}
+fn inventory_title(item: &Value, id: &str) -> String {
+    // Presence is authoritative, including null/empty clears. Never resurrect an
+    // older summary title when the reconciled projection explicitly clears it.
+    let canonical = item.get("projections").and_then(|p| p.get("title"));
+    let projected = canonical.or_else(|| item["summary"]["projections"]["values"].get("title"));
+    match projected {
+        Some(value) => value
+            .as_str()
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or(id),
+        None => item["summary"]["title"]
+            .as_str()
+            .or_else(|| item["summary"]["name"].as_str())
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or(id),
+    }
+    .to_owned()
 }

@@ -265,6 +265,15 @@ impl Probe {
                 assert_eq!(run.draft.text, "搜索期间保留的中文草稿");
                 assert!(run.submissions.is_empty());
                 assert_eq!(self.fixture.search_calls(), 2);
+                if std::env::var_os("AGENT_SIDEBAR_INVENTORY_CAPTURE").is_some() {
+                    self.fixture.publish_inventory_summary(serde_json::json!({
+                        "sessionId":"a", "updatedAt":42000.5, "running":false, "blank":false,
+                        "projections":{"asOfSeq":1000,"values":{"title":"投影中文标题 · 最新活动"}}
+                    })).unwrap();
+                    self.phase = 7;
+                    window.request_redraw();
+                    return;
+                }
                 self.phase = 5;
                 let mut actions = vec![];
                 if let Ok(path) = std::env::var("AGENT_SIDEBAR_QUERY_REFRESH_CAPTURE") {
@@ -272,6 +281,42 @@ impl Probe {
                 }
                 actions.push((500, Action::Close));
                 run_script(actions);
+            }
+            7 => {
+                let shown = sidebar.displayed_input().unwrap();
+                if shown.rows.first().is_none_or(|row| {
+                    row.address.session_id != "a" || row.title != "投影中文标题 · 最新活动"
+                }) {
+                    window.request_redraw();
+                    return;
+                }
+                assert_eq!(
+                    host.view
+                        .tree
+                        .get(self.row.unwrap())
+                        .unwrap()
+                        .component::<ButtonContent>()
+                        .unwrap() as *const _ as usize,
+                    self.widget
+                );
+                let run = host.view.binding().current_run().unwrap();
+                assert_eq!(run.draft.text, "搜索期间保留的中文草稿");
+                assert!(run.submissions.is_empty());
+                let path = std::env::var("AGENT_SIDEBAR_INVENTORY_CAPTURE").unwrap();
+                assert!(
+                    !std::path::Path::new(&path).exists(),
+                    "use a fresh inventory screenshot path"
+                );
+                eprintln!(
+                    "NATIVE_AGENT_SIDEBAR_INVENTORY_RECEIPT {}",
+                    serde_json::json!({
+                        "canonicalTitle":true,"recentActivityOrder":true,"retainedOriginalButton":true,
+                        "draftRetained":true,"selectionRetained":true,"noSubmission":true,
+                        "ownedFixture":true,"physicalIme":false,"nativeRunningFreeze":false
+                    })
+                );
+                self.phase = 5;
+                run_script(vec![(300, Action::Capture { path }), (700, Action::Close)]);
             }
             _ => {}
         }

@@ -18,10 +18,17 @@ fn active_inventory(state: &MemoryProjectionStore) -> Vec<Value> {
         .iter()
         .filter(|(id, _)| !state.archived_session_ids.contains(*id))
         .filter_map(|(id, session)| {
-            session
-                .summary
-                .as_ref()
-                .map(|summary| json!({"sessionId":id,"summary":summary}))
+            session.summary.as_ref().map(|summary| {
+                // A summary may carry an older projection block than the
+                // control/journal planes. Publish the already reconciled
+                // values without rewriting the original summary.
+                let projections: BTreeMap<_, _> = session
+                    .projections
+                    .iter()
+                    .map(|(key, value)| (key, &value.value))
+                    .collect();
+                json!({"sessionId":id,"summary":summary,"projections":projections})
+            })
         })
         .collect()
 }
@@ -96,11 +103,44 @@ mod tests {
         store.archived_session_ids.push("archived".into());
         assert_eq!(
             active_inventory(&store),
-            vec![json!({"sessionId":"active","summary":{"sessionId":"active"}})]
+            vec![json!({"sessionId":"active","summary":{"sessionId":"active"},"projections":{}})]
         );
         assert!(store.sessions["archived"].summary.is_some());
         store.archived_session_ids.clear();
         assert_eq!(active_inventory(&store).len(), 2);
+    }
+
+    #[test]
+    fn inventory_publishes_reconciled_projection_without_mutating_older_summary() {
+        let mut store = MemoryProjectionStore::new("pi");
+        let summary = json!({"sessionId":"a","projections":{"asOfSeq":1,"values":{"title":"old"}}});
+        let mut session = SessionProjection {
+            summary: Some(summary.clone()),
+            ..Default::default()
+        };
+        session.projections.insert(
+            "title".into(),
+            tekes_agent_session::VersionedValue {
+                sequence: 2,
+                value: json!("当前中文标题"),
+            },
+        );
+        store.sessions.insert("a".into(), session);
+        let rows = active_inventory(&store);
+        assert_eq!(rows[0]["projections"]["title"], "当前中文标题");
+        assert_eq!(rows[0]["summary"], summary);
+        store
+            .sessions
+            .get_mut("a")
+            .unwrap()
+            .projections
+            .get_mut("title")
+            .unwrap()
+            .value = Value::Null;
+        assert_eq!(
+            active_inventory(&store)[0]["projections"]["title"],
+            Value::Null
+        );
     }
 }
 
