@@ -1,5 +1,7 @@
 # Rust Agent UI 组件接入契约
 
+[SidePanel 空态入口与最新原生复验](rust-agent-ui-panel-launcher-20261022.md)补充原 SDK Button/Grid 的受控 Launcher、独立 consumer 与当前程序证据。当前程序已通过分页/reveal/焦点、Task B 断言及一次正常 app 系统拼音；下文旧阶段失败仍保持原程序归属，不代表稳定性或跨进程验收。
+
 [任务父会话边界](rust-agent-ui-task-parent-navigation-20261022.md)现区分显式打开与原请求完成：非当前父会话的 `open_task_source` 在变更 owner/焦点/导航代次前拒绝；`install_task_run` 仍可缓存原会话的合法完成，并保留另一父会话的中文 preedit。组件回归通过，但本轮原生组合在 B 失去激活，新增原生断言未执行，不能计为通过。
 
 [正常 app 系统拼音](rust-agent-ui-system-ime-app-20261022.md)在上一轮同一冻结程序取得一次完整通过：原生 marked text、发送/导航屏障、确认与单次提交；最终 CLI 复验在 `ni` 组字后失焦，逐键 guard 拒绝后续输入，未取得成功收据。新增 LaunchServices 模式核对原 bundle/PID/可执行文件，不切换输入源、重抢焦点或放宽原断言。稳定性尚未通过，不能据此断定失焦根因；实体键盘、候选窗、VoiceOver、真实三端原生 IME 和 ProcessContainer 仍未验收。

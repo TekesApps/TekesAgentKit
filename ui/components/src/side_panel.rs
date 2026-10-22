@@ -1,5 +1,8 @@
 //! Scoped Agent tabs and retained content. Task/child/SideChat execution stays in presentation.
-use crate::{SidePanelLayout, SidePanelLayoutGeometry, side_panel_layout::AgentPanelBody};
+use crate::{
+    SidePanelLauncher, SidePanelLauncherInput, SidePanelLauncherIntent, SidePanelLauncherOwner,
+    SidePanelLayout, SidePanelLayoutGeometry, side_panel_layout::AgentPanelBody,
+};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use tekes_agent_presentation::{
     AgentTask, ChildHistoryLayout, RunScope, SideChat, SideChatPhase, SideChatSnapshot,
@@ -126,6 +129,7 @@ pub struct SidePanelInput {
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SidePanelIntent {
+    Launch(SidePanelLauncherIntent),
     Select {
         parent: RunScope,
         tab: SidePanelTab,
@@ -148,6 +152,8 @@ pub struct SidePanelLabels {
     pub creating: String,
     pub closing: String,
     pub unknown_close: String,
+    /// Legacy copy input, retained for source compatibility. Unsupported
+    /// destinations are hidden/disabled rather than presented as an error.
     pub unsupported_side_chat: String,
     pub loading_task: String,
     pub missing_task: String,
@@ -220,6 +226,8 @@ pub struct SidePanel {
     context: u64,
     parent_order: VecDeque<RunScope>,
     retained_parent_limit: usize,
+    launcher: Option<Content>,
+    launcher_root: Option<ComponentId>,
 }
 impl SidePanel {
     /// `retained_parent_limit` bounds parent-scope caches within the current
@@ -232,6 +240,8 @@ impl SidePanel {
         create.button.state.disabled = true;
         Self {
             root: ComponentId(base),
+            launcher: None,
+            launcher_root: None,
             body: StackContent {
                 model: Stack {
                     axis: Axis::Vertical,
@@ -326,6 +336,102 @@ impl SidePanel {
     }
     pub fn create_side_chat_id(&self) -> ComponentId {
         ComponentId(self.root.0 + 4)
+    }
+    pub fn launcher(&self) -> Option<&SidePanelLauncher> {
+        self.launcher
+            .as_ref()
+            .or_else(|| {
+                self.body.children[2]
+                    .component::<AgentPanelBody>()?
+                    .stack
+                    .children
+                    .iter()
+                    .find(|child| Some(child.id()) == self.launcher_root)
+            })?
+            .component::<SidePanelLauncher>()
+    }
+    fn detach_launcher(&mut self) -> Option<Content> {
+        if let Some(content) = self.launcher.take() {
+            return Some(content);
+        }
+        let id = self.launcher_root?;
+        let slot = self.slot();
+        let index = slot.children.iter().position(|child| child.id() == id)?;
+        Some(slot.children.remove(index))
+    }
+    fn mount_launcher(&mut self) {
+        let eligible = self.input.as_ref().is_some_and(|input| {
+            input.projection_ready
+                && input.selected.is_none()
+                && self
+                    .launcher()
+                    .and_then(SidePanelLauncher::displayed_input)
+                    .is_some_and(|launcher| {
+                        launcher.owner == SidePanelLauncherOwner::Run(input.parent.clone())
+                    })
+        });
+        if eligible && let Some(content) = self.launcher.take() {
+            self.slot().flexible_child = Some(content.id());
+            self.slot().children = vec![content];
+        }
+    }
+    /// Publish after each panel update and before rendering, using a disjoint
+    /// namespace. Hiding retires its controls; fresh capabilities re-enable them.
+    /// Standalone workspace launchers need no fabricated RunScope.
+    pub fn configure_launcher(
+        &mut self,
+        namespace: u32,
+        input: &SidePanelLauncherInput,
+    ) -> Result<(), &'static str> {
+        let root = ComponentId((namespace as u64) << 32);
+        if namespace == (self.root.0 >> 32) as u32
+            || self.launcher_root.is_some_and(|old| old != root)
+        {
+            return Err("invalid or changed launcher namespace");
+        }
+        if self
+            .input
+            .as_ref()
+            .is_none_or(|panel| input.owner != SidePanelLauncherOwner::Run(panel.parent.clone()))
+        {
+            return Err("launcher parent mismatch");
+        }
+        let fresh = SidePanelLauncher::new(namespace, self.labels.name.clone());
+        self.launcher().unwrap_or(&fresh).validate_input(input)?;
+        let mut content = self
+            .detach_launcher()
+            .unwrap_or_else(|| Content::new(root, fresh));
+        let launcher = content.component_mut::<SidePanelLauncher>().unwrap();
+        if self
+            .input
+            .as_ref()
+            .is_some_and(|panel| panel.projection_ready && panel.selected.is_none())
+        {
+            launcher.update(input)?;
+        } else {
+            launcher.update_hidden(input)?;
+        }
+        self.launcher_root = Some(root);
+        self.launcher = Some(content);
+        self.mount_launcher();
+        Ok(())
+    }
+    pub fn accepts_launcher_intent(&self, intent: &SidePanelLauncherIntent) -> bool {
+        self.input.as_ref().is_some_and(|input| {
+            input.projection_ready
+                && input.selected.is_none()
+                && intent.owner == SidePanelLauncherOwner::Run(input.parent.clone())
+        }) && self.body.children[2]
+            .component::<AgentPanelBody>()
+            .is_some_and(|body| {
+                body.stack
+                    .children
+                    .iter()
+                    .any(|child| Some(child.id()) == self.launcher_root)
+            })
+            && self
+                .launcher()
+                .is_some_and(|launcher| launcher.accepts(intent))
     }
     pub fn into_host(self) -> Result<ContentHost, CompositionError> {
         let mut host = ContentHost::new(Content::new(self.root, self))?;
@@ -531,6 +637,15 @@ impl SidePanel {
                         .is_some_and(|tab| old.same_source(tab))
                 })
             });
+        if let Some(mut launcher) = self.detach_launcher() {
+            if changed_parent || !input.projection_ready || input.selected.is_some() {
+                launcher
+                    .component_mut::<SidePanelLauncher>()
+                    .unwrap()
+                    .retire_controls();
+            }
+            self.launcher = Some(launcher);
+        }
         if !same_content {
             self.stash();
         }
@@ -731,9 +846,6 @@ impl SidePanel {
                 ),
             }
         }
-        if input.supports_side_chat == Some(false) {
-            messages.push(self.labels.unsupported_side_chat.clone());
-        }
         let message =
             (input.projection_ready && !messages.is_empty()).then(|| messages.join(" · "));
         if self.body.children.len() == 4 {
@@ -753,6 +865,7 @@ impl SidePanel {
         self.mounted = next_key;
         self.input = Some(input.clone());
         self.bindings = bindings;
+        self.mount_launcher();
         Ok(())
     }
     pub fn content_token(&self, tab: &SidePanelTabKind) -> Option<PanelContentToken> {
@@ -804,11 +917,21 @@ impl SidePanel {
         Ok(())
     }
     pub fn take_intents(&self, actions: &[ContentAction]) -> Vec<SidePanelIntent> {
-        actions
+        let mut intents: Vec<_> = actions
             .iter()
             .filter(|action| action.kind == ContentActionKind::Activate)
             .filter_map(|action| self.bindings.get(&action.target).cloned())
-            .collect()
+            .collect();
+        if let Some(launcher) = self.launcher() {
+            intents.extend(
+                launcher
+                    .take_intents(actions)
+                    .into_iter()
+                    .filter(|intent| self.accepts_launcher_intent(intent))
+                    .map(SidePanelIntent::Launch),
+            );
+        }
+        intents
     }
 }
 impl Component for SidePanel {

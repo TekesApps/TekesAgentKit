@@ -45,6 +45,8 @@ pub use editor::AgentText;
 pub use editor::ComposerDraftUpdate;
 mod indicators;
 mod side_panel;
+mod side_panel_launcher;
+pub use side_panel_launcher::*;
 mod side_panel_layout;
 pub use side_panel_layout::{SidePanelLayout, SidePanelLayoutGeometry};
 mod sidebar;

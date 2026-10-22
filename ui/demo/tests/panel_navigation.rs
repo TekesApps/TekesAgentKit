@@ -56,6 +56,71 @@ fn close(view: &mut ComponentDemo) {
         "ordinary tab close has no endpoint command"
     );
 }
+fn launcher_id(
+    view: &ComponentDemo,
+    destination: tekes_agent_components_ui::SidePanelDestination,
+) -> tekes_ui_controls::composition::ComponentId {
+    view.tree
+        .get(view.panel_id())
+        .unwrap()
+        .component::<SidePanel>()
+        .unwrap()
+        .launcher()
+        .unwrap()
+        .button_id(destination)
+        .unwrap()
+}
+
+#[tokio::test]
+async fn empty_panel_launcher_opens_summary_through_the_original_callback() {
+    use tekes_agent_components_ui::SidePanelDestination;
+    let (runtime, parent, mut view) = setup().await;
+    close(&mut view);
+    let id = launcher_id(&view, SidePanelDestination::Summary);
+    let commands = view
+        .accessibility_action(id, None, AccessibilityAction::Press)
+        .unwrap();
+    assert!(commands.is_empty());
+    assert_eq!(input(&view).selected, Some(SidePanelTabKind::Summary));
+    assert!(view.tree.get(id).is_none());
+    assert_eq!(view.binding().scope(), parent.scope());
+    assert!(parent.current_run().unwrap().submissions.is_empty());
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn empty_panel_launcher_creates_one_actual_scratch_pointer_through_the_existing_binding() {
+    use tekes_agent_components_ui::SidePanelDestination;
+    let (runtime, parent, mut view) = setup().await;
+    let owner = Arc::new(SideChatBinding::new(runtime.clone()));
+    view.set_side_chat_binding(owner.clone());
+    view.sync().unwrap();
+    close(&mut view);
+    let id = launcher_id(&view, SidePanelDestination::SideChat);
+    let mut commands = view
+        .accessibility_action(id, None, AccessibilityAction::Press)
+        .unwrap();
+    assert_eq!(commands.len(), 1);
+    let DemoCommand::CreateSideChat(request) = commands.remove(0) else {
+        panic!("captured scratch request")
+    };
+    assert_eq!(request.parent(), parent.scope());
+    let chat = owner
+        .create(parent.scope().clone(), None, "launcher-create")
+        .await
+        .unwrap();
+    let bound = owner.open(&chat).await.unwrap();
+    assert!(view.install_side_chat_run(request, bound).unwrap());
+    assert_eq!(
+        input(&view).selected,
+        Some(SidePanelTabKind::SideChat {
+            session_id: chat.scope.session_id.clone()
+        })
+    );
+    assert!(owner.snapshot().chats.contains_key(&chat.scope.session_id));
+    assert!(parent.current_run().unwrap().submissions.is_empty());
+    runtime.stop().await.unwrap();
+}
 async fn task(
     view: &mut ComponentDemo,
     parent: &Arc<RunBinding>,

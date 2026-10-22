@@ -6,7 +6,8 @@ use tekes_agent_components_ui::{
     ComposerCatalogPhase, ComposerChoiceCatalog, ComposerChoiceIntent, ComposerChoiceKind,
     ComposerChoiceRequest, ComposerChoices, ComposerEntry, ComposerIds, ComposerIntent,
     ComposerLabels, RenameFailure, RenameIds, RenameIntent, RenameLabels, RenameSubmission,
-    RunPort, RunPortIds, SidePanel, SidePanelInput, SidePanelIntent, SidePanelLabels, SidePanelTab,
+    RunPort, RunPortIds, SidePanel, SidePanelDestination, SidePanelDestinationItem, SidePanelInput,
+    SidePanelIntent, SidePanelLabels, SidePanelLauncherInput, SidePanelLauncherOwner, SidePanelTab,
     SidePanelTabKind, Sidebar, SidebarInput, SidebarIntent, SidebarLabels, SummaryInput,
     SummaryIntent, SummaryLabels, SummaryView, ThreadRename,
 };
@@ -59,6 +60,7 @@ const CREATE_NAMESPACE: u32 = 44;
 const ANNOTATION_NAMESPACE: u32 = 45;
 const REASONING_NAMESPACE: u32 = 46;
 const SIDEBAR_OPTIONS_NAMESPACE: u32 = 47;
+const PANEL_LAUNCHER_NAMESPACE: u32 = 48;
 pub const SELECT_A: ComponentId = ComponentId(100);
 pub const SELECT_B: ComponentId = ComponentId(101);
 pub const RECONNECT: ComponentId = ComponentId(102);
@@ -3198,6 +3200,39 @@ impl ComponentDemo {
             .expect("SidePanel")
             .update(&input)
             .map_err(unsupported)?;
+        let launcher = SidePanelLauncherInput {
+            revision: input.revision,
+            owner: SidePanelLauncherOwner::Run(parent.clone()),
+            destinations: SidePanelDestination::ALL
+                .into_iter()
+                .map(|destination| {
+                    let mut item = SidePanelDestinationItem::unavailable(destination);
+                    match destination {
+                        SidePanelDestination::Summary => {
+                            item.available = true;
+                            item.enabled = input.projection_ready && !self.composing();
+                        }
+                        SidePanelDestination::SideChat => {
+                            item.available = input.supports_side_chat == Some(true);
+                            item.enabled = item.available
+                                && input.projection_ready
+                                && !self.composing()
+                                && !input.side_chats.is_creating_for(&parent)
+                                && input.side_chats.unknown_creation_for(&parent).is_none();
+                        }
+                        _ => {}
+                    }
+                    item
+                })
+                .collect(),
+        };
+        self.tree
+            .get_mut(panel_id)
+            .unwrap()
+            .component_mut::<SidePanel>()
+            .unwrap()
+            .configure_launcher(PANEL_LAUNCHER_NAMESPACE, &launcher)
+            .map_err(unsupported)?;
         if !input.projection_ready || selected.is_none() {
             return self.sync_upload_status();
         }
@@ -4171,6 +4206,26 @@ impl ComponentDemo {
         }
         for intent in panel_intents {
             match intent {
+                SidePanelIntent::Launch(intent) => {
+                    let panel = self
+                        .tree
+                        .get(self.panel_id())
+                        .unwrap()
+                        .component::<SidePanel>()
+                        .unwrap();
+                    if self.composing() || !panel.accepts_launcher_intent(&intent) {
+                        continue;
+                    }
+                    match intent.destination {
+                        SidePanelDestination::Summary => self.open_summary()?,
+                        SidePanelDestination::SideChat => {
+                            commands.push(DemoCommand::CreateSideChat(
+                                self.panel_request(binding.scope().clone()),
+                            ));
+                        }
+                        _ => {}
+                    }
+                }
                 SidePanelIntent::CreateSideChat { parent } => {
                     commands.push(DemoCommand::CreateSideChat(self.panel_request(parent)));
                 }
