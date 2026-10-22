@@ -220,9 +220,10 @@ impl TurnFeedback {
         self.render();
     }
     /// Optional metadata read failed. Does not invent an empty committed record,
-    /// grant write authority, or replace a retained editor/gesture.
+    /// grant write authority, or replace a retained editor/gesture. A previously
+    /// committed record may remain readable after its authority is invalidated.
     pub fn initial_read_failed(&mut self, message: String) {
-        if self.state.is_some() || self.pending.is_some() {
+        if self.pending.is_some() || (self.state.is_some() && !self.needs_refresh) {
             return;
         }
         self.needs_refresh = true;

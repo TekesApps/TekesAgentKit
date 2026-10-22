@@ -1,0 +1,30 @@
+{
+  "sourceBase": "4097e4fb4ebde814874b51c643c2c14e0b03d1ca",
+  "tekesui": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "regressionBeforeExitCode": 101,
+  "afterExitCode": 0,
+  "hostFeedbackReadPassed": 14,
+  "hostFeedbackWritePassed": 22,
+  "independentConsumerPassed": 22,
+  "independentConsumerIgnored": 1,
+  "strictWorkspaceClippy": true,
+  "fullWorkspaceThisTurn": false,
+  "sameProcessControlledEndpoint": true,
+  "realHarnessThisTurn": false,
+  "nativeThisTurn": false,
+  "crossProcess": false,
+  "newTargets": 0,
+  "newProgramCopies": 0,
+  "deletedBytes": 0,
+  "sourceInputs": {
+    "ui/components/src/feedback.rs": "58a0d12f7a9304384669a135f34ed823b767498245aed641afe2c3ba3f542178",
+    "ui/consumer/tests/summary_label.rs": "9bbf168a1f4792a6ec7327047f1244978bde4c4c06a7cea18d777f24f6b15f85",
+    "ui/demo/tests/feedback_read.rs": "5e4423a067effcef1ce3832229bd2dcf1b379880dc5664de5e8cee86155180c0"
+  },
+  "evidence": {
+    ".runtime-fixtures/feedback-reconnect-failure-20261022/clippy.log": "a6e5de1aa2406ba9e0bc90d1e629b60fa9f39b3d233d01ace5c1c0db874d5302",
+    ".runtime-fixtures/feedback-reconnect-failure-20261022/host-tests.log": "4153cc147f32372ffc97342b75f04f4c3843ccfe05724154b3a2aa6e5f49739f",
+    ".runtime-fixtures/feedback-reconnect-failure-20261022/regression-before.log": "85681abfe78d5e1888ef99bb63e43a6214246b1e10fce2cd7ea17dc52ee526bb",
+    ".runtime-fixtures/feedback-reconnect-failure-20261022/consumer-tests.log": "8599eaee981e3cd26a9845de937c53b39c98e3a1b4e989c4c51c28e8b54492f6"
+  }
+}

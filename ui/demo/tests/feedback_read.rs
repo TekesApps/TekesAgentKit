@@ -15,6 +15,7 @@ use tekes_agent_ui_demo::fixture::Fixture;
 
 struct FeedbackService {
     advertised: bool,
+    writable: bool,
     delay_first: bool,
     calls: AtomicUsize,
     reply: Mutex<Value>,
@@ -24,6 +25,7 @@ struct FeedbackService {
 fn service(delay_first: bool, advertised: bool) -> Arc<FeedbackService> {
     Arc::new(FeedbackService {
         advertised,
+        writable: false,
         delay_first,
         calls: AtomicUsize::new(0),
         reply: Mutex::new(
@@ -37,7 +39,11 @@ fn service(delay_first: bool, advertised: bool) -> Arc<FeedbackService> {
 impl HostServices for FeedbackService {
     fn methods(&self) -> BTreeSet<String> {
         if self.advertised {
-            ["feedback.list".into()].into()
+            let mut methods: BTreeSet<String> = ["feedback.list".into()].into();
+            if self.writable {
+                methods.extend(["feedback.put".into(), "feedback.delete".into()]);
+            }
+            methods
         } else {
             Default::default()
         }
@@ -441,5 +447,99 @@ async fn dropped_host_initial_request_never_reads_the_endpoint() {
     drop(view);
     let _completion = request.execute().await;
     assert_eq!(service.calls.load(Ordering::Acquire), 0);
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn reconnect_read_failure_keeps_committed_note_disabled_until_explicit_recovery() {
+    use tekes_ui_controls::composition::{AccessibilityAction, ButtonContent};
+    let mut service = service(false, true);
+    Arc::get_mut(&mut service).unwrap().writable = true;
+    let (runtime, binding) = setup(service.clone()).await;
+    let mut view = mounted(&binding);
+    let id = original_control(&view);
+    let message = feedback(&view, id)
+        .target()
+        .unwrap()
+        .message_id()
+        .to_string();
+    *service.reply.lock().unwrap() = json!({"items":[{"messageId":message,"rating":"positive","version":"opaque:old","note":"保留原备注"}]});
+    let read = initial(&mut view);
+    view.complete_initial_feedback(read.execute().await)
+        .unwrap();
+    let committed = feedback(&view, id).state().unwrap().clone();
+    assert!(committed.put_available && committed.delete_available);
+    assert!(
+        !view
+            .tree
+            .get(feedback(&view, id).ids().positive)
+            .unwrap()
+            .component::<ButtonContent>()
+            .unwrap()
+            .button
+            .state
+            .disabled
+    );
+    let draft = binding.current_run().unwrap().draft.clone();
+    runtime.reconnect().await.unwrap();
+    view.sync().unwrap();
+    *service.reply.lock().unwrap() = json!({"items":"invalid-after-reconnect"});
+    let read = initial(&mut view);
+    view.complete_initial_feedback(read.execute().await)
+        .unwrap();
+    assert_eq!(feedback(&view, id).notice(), "无法加载评价");
+    assert!(feedback(&view, id).diagnostic().is_some());
+    assert_eq!(
+        feedback(&view, id).state(),
+        Some(&committed),
+        "failed read must not fabricate deletion"
+    );
+    assert!(feedback(&view, id).needs_refresh());
+    for button in [
+        feedback(&view, id).ids().positive,
+        feedback(&view, id).ids().negative,
+        feedback(&view, id).ids().edit_note,
+    ] {
+        assert!(
+            view.tree
+                .get(button)
+                .unwrap()
+                .component::<ButtonContent>()
+                .unwrap()
+                .button
+                .state
+                .disabled
+        );
+        assert!(
+            view.accessibility_action(button, None, AccessibilityAction::Press)
+                .unwrap()
+                .is_empty()
+        );
+    }
+    for _ in 0..3 {
+        view.sync().unwrap();
+    }
+    assert!(view.take_background_commands().is_empty());
+    assert_eq!(service.calls.load(Ordering::Acquire), 2);
+    *service.reply.lock().unwrap() = json!({"items":[]});
+    let refresh = feedback(&view, id).ids().refresh;
+    let mut commands = view
+        .accessibility_action(refresh, None, AccessibilityAction::Press)
+        .unwrap();
+    assert_eq!(commands.len(), 1);
+    let DemoCommand::Feedback(request) = commands.remove(0) else {
+        panic!("explicit recovery read")
+    };
+    view.complete_feedback(request.execute().await).unwrap();
+    let current = feedback(&view, id).state().unwrap();
+    assert!(current.current.is_none());
+    assert!(current.connection_epoch > committed.connection_epoch);
+    assert!(current.publication > committed.publication);
+    assert!(!feedback(&view, id).needs_refresh());
+    assert!(feedback(&view, id).diagnostic().is_none());
+    assert!(feedback(&view, id).notice().is_empty());
+    assert!(view.tree.get(feedback(&view, id).ids().refresh).is_none());
+    assert_eq!(binding.current_run().unwrap().draft, draft);
+    assert_eq!(service.calls.load(Ordering::Acquire), 3);
     runtime.stop().await.unwrap();
 }

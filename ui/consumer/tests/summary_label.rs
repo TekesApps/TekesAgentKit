@@ -1487,6 +1487,26 @@ fn output_aside_feedback_notes_and_auxiliary_actions_keep_the_original_composer(
     committed.initial_read_failed("late read failure".into());
     assert_eq!(committed.state(), Some(&state));
     assert!(committed.diagnostic().is_none());
+    // A consumer can retain an old committed display after reconnect. Once
+    // authority is revoked, a read failure must remain visible without turning
+    // the old frame into a writable or empty record.
+    let mut revoked = TurnFeedback::new(49968, Default::default());
+    revoked.bind_target(target.clone()).unwrap();
+    revoked.update(state.clone()).unwrap();
+    revoked.invalidate_authority();
+    revoked.initial_read_failed("reconnect read failure".into());
+    assert_eq!(revoked.state(), Some(&state));
+    assert!(revoked.needs_refresh());
+    assert_eq!(revoked.notice(), "无法加载评价");
+    assert_eq!(revoked.diagnostic(), Some("reconnect read failure"));
+    let mut renewed = state.clone();
+    renewed.publication += 1;
+    renewed.connection_epoch += 1;
+    revoked.update(renewed.clone()).unwrap();
+    assert_eq!(revoked.state(), Some(&renewed));
+    assert!(!revoked.needs_refresh());
+    assert!(revoked.diagnostic().is_none());
+    assert!(revoked.notice().is_empty());
     let root = content.id();
     let composer = tekes_agent_ui_consumer_check::new_composer(49969);
     let editor = composer.ids().editor;
