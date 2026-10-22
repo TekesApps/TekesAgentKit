@@ -4,6 +4,7 @@ import argparse, base64, zlib, shutil, uuid, http.server, json, os, re, select, 
 from pathlib import Path
 from native_probe_provider import native_probe_intent
 from runtime_provenance import kernel_programs
+from native_probe_launcher import run_native_probe, validate_bundle
 ROOT=Path(__file__).resolve().parent.parent
 parser=argparse.ArgumentParser()
 parser.add_argument('--pi-root',type=Path)
@@ -15,6 +16,8 @@ parser.add_argument('--kernel-worker',type=Path)
 parser.add_argument('--kernel-expected-version',help='Require this exact build description and public host handshake version')
 parser.add_argument('--kernel-ui-only',action='store_true',help='Explicit independent UI acceptance, excluding Kernel lifecycle/child protocol proof; never an automatic fallback')
 parser.add_argument('--ui-demo',type=Path,help='Optional already-built AgentKit UI consumer for each supplied harness history-to-GPU acceptance')
+parser.add_argument('--ui-native-app',type=Path,help='Opt-in normal LaunchServices native launch of the exact --ui-demo APPL bundle; offscreen remains direct, no activation retries')
+parser.add_argument('--ui-native-observe-frontmost',action='store_true',help='Read-only macOS frontmost PID/bundle trace during native probes; never activates an app')
 parser.add_argument('--ui-output',type=Path)
 parser.add_argument('--ui-components',action='store_true',help='Mount formal Composer/Indicators with RunBinding; structured Transcript remains unavailable')
 parser.add_argument('--ui-model-choices',action='store_true',help='Exercise public model choices and explicit Send preparation in isolated offscreen component sessions')
@@ -40,6 +43,13 @@ parser.add_argument('--ui-history-pages',action='store_true',help='Seed long iso
 parser.add_argument('--ui-actionables',action='store_true',help='Exercise public actionable cards on configured Native/Pi/DSH question sources')
 parser.add_argument('--ui-sidebar-query',action='store_true',help='Read typed public search and explicitly refresh public inventory cursors on owned conversation-history targets; offscreen protocol proof only')
 args=parser.parse_args()
+if args.ui_native_app:
+    if not args.ui_demo:
+        parser.error('--ui-native-app requires --ui-demo')
+    try:
+        validate_bundle(args.ui_demo, args.ui_native_app)
+    except (OSError, ValueError) as error:
+        parser.error(str(error))
 if args.ui_native_reading and not (args.ui_demo and args.ui_components and args.ui_transcript_content and args.ui_history_pages):
     parser.error('--ui-native-reading requires --ui-demo, --ui-components, --ui-transcript-content and --ui-history-pages')
 if args.ui_sidebar_query and not (args.ui_demo and args.ui_components):
@@ -402,21 +412,16 @@ def ui_smoke(config, first, bounded_child=None):
         output.with_suffix('.raw-bounded.json').write_text(json.dumps({'initial':raw,'older':older},ensure_ascii=False,indent=2)+'\n')
         print('NATIVE_BOUND_RAW_PAGE '+json.dumps([{'kind':entry['event']['type'],'seq':entry['event']['seq']} for entry in next(row['result'] for row in raw if row.get('op')=='call')['entries']]),flush=True)
         native_log=output.with_suffix('.native-readonly.log')
-        with native_log.open('w') as capture:
-            native=subprocess.run([str(args.ui_demo.resolve()),'-ApplePersistenceIgnoreState','YES','--components','--transcript-content','--endpoint-config',str(path),'--history-readonly-native-selftest','--bounded-child-id',bounded_child],env=ui_env,stdout=capture,stderr=subprocess.STDOUT,timeout=55)
-        text=native_log.read_text(); assert native.returncode==0,str(native_log)+'\n'+text[-5000:]
         marker='NATIVE_AGENT_READONLY_READING_RECEIPT '
+        text=run_native_probe(args.ui_demo,['-ApplePersistenceIgnoreState','YES','--components','--transcript-content','--endpoint-config',str(path),'--history-readonly-native-selftest','--bounded-child-id',bounded_child],ui_env,native_log,marker,bundle=args.ui_native_app,observe_frontmost=args.ui_native_observe_frontmost)
         proof=next(json.loads(line[len(marker):]) for line in text.splitlines() if line.startswith(marker))
         assert all(proof[key] for key in ('nativeWindow','gpu','boundedPublicSep','originalPageAndRefreshControls','prependAnchorPreserved','refreshAnchorPreserved','mainDraftPreserved','readOnlyNoComposer','noSubmission','realHarness')),proof
         assert proof['rowCountAfter']>=proof['rowCountBefore']>0 and proof['pageSize']==1 and proof['historyExhausted'],proof
         print('NATIVE_UI_BOUNDED_READING_RECEIPT '+json.dumps(proof,ensure_ascii=False,sort_keys=True),flush=True)
     if args.ui_native_reading and bounded_child is None:
         native_log=output.with_suffix('.native-reading.log')
-        with native_log.open('w') as capture:
-            native=subprocess.run([str(args.ui_demo.resolve()),'-ApplePersistenceIgnoreState','YES','--components','--transcript-content','--endpoint-config',str(path),'--history-reading-native-selftest'],env=ui_env,stdout=capture,stderr=subprocess.STDOUT,timeout=55)
-        native_text=native_log.read_text()
-        assert native.returncode==0,str(native_log)+'\n'+native_text[-5000:]
         marker='NATIVE_AGENT_READING_SELFTEST_RECEIPT '
+        native_text=run_native_probe(args.ui_demo,['-ApplePersistenceIgnoreState','YES','--components','--transcript-content','--endpoint-config',str(path),'--history-reading-native-selftest'],ui_env,native_log,marker,bundle=args.ui_native_app,observe_frontmost=args.ui_native_observe_frontmost)
         proof=next(json.loads(line[len(marker):]) for line in native_text.splitlines() if line.startswith(marker))
         assert all(proof[key] for key in ('nativeWindow','publicHistoryPage','publicPageRequest','prependAnchorPreserved','upwardReadingPreserved','focusAndTextStatePreserved','samePublicationRefresh','retainedSessionReadingRestored','independentBReadingRestored','reconnectReadingRestored','draftIsolation','sameEditorOwner','noSubmission','realHarness','readingAnchorAcceptance')),proof
         assert proof['loadedItemsAfter']>proof['loadedItemsBefore']>0,proof
@@ -425,11 +430,8 @@ def ui_smoke(config, first, bounded_child=None):
         print(kind.upper()+'_UI_NATIVE_READING_RECEIPT '+json.dumps(proof,ensure_ascii=False,sort_keys=True),flush=True)
     if args.ui_native_feedback and bounded_child is None:
         native_log=output.with_suffix('.native-feedback.log')
-        with native_log.open('w') as capture:
-            native=subprocess.run([str(args.ui_demo.resolve()),'--components','--transcript-content','--endpoint-config',str(path),'--feedback-native-selftest'],env=ui_env,stdout=capture,stderr=subprocess.STDOUT,timeout=55)
-        native_text=native_log.read_text()
-        assert native.returncode==0, str(native_log)+'\n'+native_text[-3000:]
         marker='NATIVE_AGENT_FEEDBACK_SELFTEST_RECEIPT '
+        native_text=run_native_probe(args.ui_demo,['--components','--transcript-content','--endpoint-config',str(path),'--feedback-native-selftest'],ui_env,native_log,marker,bundle=args.ui_native_app,observe_frontmost=args.ui_native_observe_frontmost)
         proof=next(json.loads(line[len(marker):]) for line in native_text.splitlines() if line.startswith(marker))
         assert all(proof[key] for key in ('nativeInteraction','nativePointer','nativeTextServices','syntheticPreedit','imeSendAndNavigationBlocked','savedChineseNote','noteReopened','retainedAcrossSessionSwitch','sameRatingDeletes','freshReadAfterDelete','draftsPreserved','nonemptyComposerDrafts','sendEnabledBeforeComposition','noPromptSubmitted','stateDrivenCallbacks')),proof
         assert not proof['physicalIme'] and not proof['voiceOver'] and not proof['readingAnchorAcceptance'],proof
@@ -438,10 +440,8 @@ def ui_smoke(config, first, bounded_child=None):
     if args.ui_native_stream_reading and bounded_child is None:
         native_log=output.with_suffix('.native-stream-reading.log')
         reading_env=dict(ui_env, AGENT_STREAM_READING_CAPTURE=str(output.with_suffix('.native-stream-reading.png')))
-        with native_log.open('w') as capture:
-            native=subprocess.run([str(args.ui_demo.resolve()),'-ApplePersistenceIgnoreState','YES','--components','--transcript-content','--endpoint-config',str(path),'--stream-reading-native-selftest'],env=reading_env,stdout=capture,stderr=subprocess.STDOUT,timeout=55)
-        text=native_log.read_text(); assert native.returncode==0,str(native_log)+'\n'+text[-6000:]
         marker='NATIVE_AGENT_STREAM_READING_RECEIPT '
+        text=run_native_probe(args.ui_demo,['-ApplePersistenceIgnoreState','YES','--components','--transcript-content','--endpoint-config',str(path),'--stream-reading-native-selftest'],reading_env,native_log,marker,bundle=args.ui_native_app,observe_frontmost=args.ui_native_observe_frontmost)
         proof=next(json.loads(line[len(marker):]) for line in text.splitlines() if line.startswith(marker))
         assert all(proof[key] for key in ('nativeWindow','realHarness','activeStreamingBeforeReading','originalItemAndLocalAnchorPreserved','markedTextAndFocusPreserved','originalEditorPreserved','streamFinalTextExact','oneSubmission','reconnectNoReplay','retainedReadingAfterSessionSwitch','draftIsolation')),proof
         assert proof['appendsObserved']>0 and not proof['physicalIme'] and not proof['voiceOver'],proof
@@ -461,10 +461,7 @@ def ui_smoke(config, first, bounded_child=None):
             probe_path=base/('ui-native-'+probe_name+'-'+kind+'.json')
             probe_path.write_text(json.dumps(dict(explicit,sessions=fresh)))
             native_log=output.with_suffix('.native-'+probe_name+'.log')
-            with native_log.open('w') as capture:
-                native=subprocess.run([str(args.ui_demo.resolve()),'--components','--transcript-content','--endpoint-config',str(probe_path),flag],env=ui_env,stdout=capture,stderr=subprocess.STDOUT,timeout=55)
-            native_text=native_log.read_text()
-            assert native.returncode==0,str(native_log)+'\n'+native_text[-4000:]
+            native_text=run_native_probe(args.ui_demo,['--components','--transcript-content','--endpoint-config',str(probe_path),flag],ui_env,native_log,marker,bundle=args.ui_native_app,observe_frontmost=args.ui_native_observe_frontmost)
             proof=next(json.loads(line[len(marker):]) for line in native_text.splitlines() if line.startswith(marker))
             assert all(proof[key] for key in required),proof
             if probe_name=='run-controls':assert isinstance(proof.get('reportedError'),str) and proof['reportedError'].strip(),proof

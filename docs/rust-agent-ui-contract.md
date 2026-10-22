@@ -22,6 +22,8 @@
 
 [最新公开 SDK 接收](tekesui-toolbar-public-intake-20261021.md)记录 09b4bab 的精确依赖、公开闭包、原生阅读/系统拼音证据及中断记录；此前版本的验收保持各自范围。[2026-10-22 公开复核](tekesui-reading-public-recheck-20261022.md)确认 main/tag 仍为同一精确提交，重跑原生分页、Start/Latest、焦点/marked text 和系统拼音通过；真实 Pi 后续流式阅读的 inactive 失败单独保留。
 
+[正常 app 启动与只读前台追踪](rust-agent-ui-native-launch-20261022.md)补齐同一程序的 Pi/DSH 真实原生阅读、流式阅读、流式及发送/取消/错误恢复收据；Native 基础阅读通过，后续流式受外部前台切换影响仍未完成。启动器返回值不冒充应用退出码，旧失败不改判，跨进程仍待 #48。
+
 [Sidebar 原选项菜单](rust-agent-ui-sidebar-options-20261022.md)已消费当前公开 MenuContent：排序/分组的稳定事件、勾选/禁用、原偏好 CAS、重复排序的分页重置、第二 consumer 与原生中文组字屏障通过。Toolbar 的事件/逐项语义缺口已反馈 #36/#5；其余完整布局和阅读验收仍开放。
 
 [共享会话菜单与置顶移动](rust-agent-ui-sidebar-session-menu-20261022.md)已成为 Sidebar 默认展示：原共享动作、原 CAS 移动计划、pending/旧来源拒绝、第二 consumer及原生组字/A-B草稿/换序通过；原生 rename/fork/archive也已走原菜单。未选中行的右键/键盘上下文入口跟踪 TekesUI #44，完整 Sidebar 尚未验收。
