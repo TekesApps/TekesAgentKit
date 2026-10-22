@@ -509,7 +509,10 @@ impl InputMessage {
                 .unwrap_or_else(|| {
                     let id = ComponentId(self.ids.root.0 + self.next_detail);
                     self.next_detail += 3;
-                    Content::new(id, OutputPart::new(id, facts.clone(), self.detail_labels))
+                    Content::new(
+                        id,
+                        OutputPart::new(id, facts.clone(), self.detail_labels, false),
+                    )
                 });
             let part = node.component_mut::<OutputPart>().unwrap();
             part.set_trailing(true);

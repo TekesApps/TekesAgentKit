@@ -173,6 +173,8 @@ pub(crate) struct OutputPart {
     hidden: Option<Content>,
     labels: OutputMessageLabels,
     trailing: bool,
+    live_reasoning: bool,
+    bounded_details: bool,
 }
 impl OutputPart {
     pub(crate) fn slot(&self) -> &Slot {
@@ -182,28 +184,38 @@ impl OutputPart {
         self.ids
     }
 
-    pub(crate) fn new(root: ComponentId, facts: PartFacts, labels: OutputMessageLabels) -> Self {
+    pub(crate) fn new(
+        root: ComponentId,
+        facts: PartFacts,
+        labels: OutputMessageLabels,
+        bounded_details: bool,
+    ) -> Self {
         let ids = OutputContentIds {
             root,
             body: ComponentId(root.0 + 2),
             disclosure: facts.disclosure().then_some(ComponentId(root.0 + 1)),
             kind: facts.kind,
         };
-        let body = Content::new(
-            ids.body,
-            TextFieldContent::read_only_content(
-                (labels.text)(OutputMessageText::Body),
-                "",
-                if matches!(
-                    facts.kind,
-                    OutputContentKind::Coverage | OutputContentKind::Status
-                ) {
-                    proposal::TextRole::UiCaption
-                } else {
-                    proposal::TextRole::UiBody
-                },
-            ),
+        let mut field = TextFieldContent::read_only_content(
+            (labels.text)(OutputMessageText::Body),
+            "",
+            if matches!(
+                facts.kind,
+                OutputContentKind::Coverage | OutputContentKind::Status
+            ) {
+                proposal::TextRole::UiCaption
+            } else {
+                proposal::TextRole::UiBody
+            },
         );
+        if bounded_details && ids.disclosure.is_some() {
+            field.surface.scroll.set_scroll_policy(
+                tekes_ui_controls::ScrollPolicy::Disabled,
+                tekes_ui_controls::ScrollPolicy::Auto,
+            );
+            field.reading = Some(tekes_ui_controls::ReadingController::default());
+        }
+        let body = Content::new(ids.body, field);
         let (children, hidden) = if let Some(button) = ids.disclosure {
             (
                 vec![
@@ -232,6 +244,8 @@ impl OutputPart {
             hidden,
             labels,
             trailing: false,
+            live_reasoning: false,
+            bounded_details,
         }
     }
     pub(crate) fn set_trailing(&mut self, trailing: bool) {
@@ -243,6 +257,25 @@ impl OutputPart {
             .unwrap_or_else(|| self.rows.children.last_mut().unwrap())
             .component_mut::<TextFieldContent>()
             .unwrap()
+    }
+    fn configure_detail_viewport(&mut self, text: &mut dyn ButtonTextRenderer) {
+        if !self.bounded_details || self.ids.disclosure.is_none() {
+            return;
+        }
+        let scale = text
+            .text_surface_host()
+            .map_or(1., |host| host.type_scale());
+        // ClientKit's embedded-detail design bounds. The original SDK owns
+        // shaping, scrolling, reflow anchors, selection and native text services.
+        let minimum = if self.facts.kind == OutputContentKind::Reasoning && self.live_reasoning {
+            72. * scale
+        } else {
+            0.
+        };
+        self.field_mut().viewport = TextViewport::Grow {
+            min: minimum,
+            max: 240. * scale,
+        };
     }
     pub(crate) fn update(&mut self, publication: u64, facts: PartFacts) {
         let id = self.ids.body;
@@ -332,6 +365,7 @@ impl Component for OutputPart {
         Some(&mut self.rows.children)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        self.configure_detail_viewport(text);
         if self.trailing && self.hidden.is_none() && self.rows.children.len() > 1 {
             let field = self
                 .rows
@@ -359,6 +393,7 @@ impl Component for OutputPart {
         }
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        self.configure_detail_viewport(text);
         arrange_content(
             &mut self.rows.children,
             text,
@@ -398,6 +433,7 @@ pub struct OutputMessage {
     rows: StackContent,
     next: u64,
     labels: OutputMessageLabels,
+    bounded_details: bool,
 }
 impl OutputMessage {
     pub fn new(namespace: u32, scope: RunScope) -> Self {
@@ -422,7 +458,20 @@ impl OutputMessage {
             },
             next: 16,
             labels,
+            bounded_details: false,
         }
+    }
+    /// Experimental bounded reasoning/tool disclosures using original SDK
+    /// viewports. Configure before publishing. Standard RunPort keeps the inline
+    /// path until TekesUI #53's strict nested-reading gate is satisfied.
+    pub fn with_bounded_details(
+        namespace: u32,
+        scope: RunScope,
+        labels: OutputMessageLabels,
+    ) -> Self {
+        let mut view = Self::with_labels(namespace, scope, labels);
+        view.bounded_details = true;
+        view
     }
     pub fn id(&self) -> ComponentId {
         self.root
@@ -462,12 +511,14 @@ impl OutputMessage {
             } else {
                 let id = ComponentId(self.root.0 + self.next);
                 self.next += 3;
-                Content::new(id, OutputPart::new(id, f.clone(), self.labels))
+                Content::new(
+                    id,
+                    OutputPart::new(id, f.clone(), self.labels, self.bounded_details),
+                )
             };
-            content
-                .component_mut::<OutputPart>()
-                .unwrap()
-                .update(publication, f.clone());
+            let part = content.component_mut::<OutputPart>().unwrap();
+            part.live_reasoning = output.item.is_provisional && !output.item.reasoning_ended;
+            part.update(publication, f.clone());
             self.rows.children.push(content);
         }
         self.key = Some(key);

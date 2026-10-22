@@ -37,6 +37,7 @@ pub struct ToolActivity {
     tool: Option<TranscriptToolCall>,
     placement: ToolActivityPlacement,
     labels: ToolActivityLabels,
+    bounded_details: bool,
     children: Vec<Content>,
 }
 impl ToolActivity {
@@ -49,8 +50,20 @@ impl ToolActivity {
             tool: None,
             placement: ToolActivityPlacement::Unplaced,
             labels,
+            bounded_details: false,
             children: vec![],
         }
+    }
+    /// Explicit experimental viewport, gated by TekesUI #53 before standard
+    /// Transcript/RunPort adoption. Uses the same original tool/text owners.
+    pub fn with_bounded_details(
+        namespace: u32,
+        scope: RunScope,
+        labels: ToolActivityLabels,
+    ) -> Self {
+        let mut view = Self::new(namespace, scope, labels);
+        view.bounded_details = true;
+        view
     }
     pub fn id(&self) -> ComponentId {
         self.root
@@ -111,7 +124,7 @@ impl ToolActivity {
             let id = ComponentId(self.root.0 + 16);
             self.children.push(Content::new(
                 id,
-                OutputPart::new(id, facts.clone(), self.labels.details),
+                OutputPart::new(id, facts.clone(), self.labels.details, self.bounded_details),
             ));
         }
         self.children[0]

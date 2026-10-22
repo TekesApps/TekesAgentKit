@@ -44,6 +44,8 @@ jobs:
       - run: cargo fmt --manifest-path ui/Cargo.toml --all --check
       - run: cargo clippy --manifest-path ui/Cargo.toml --workspace --all-targets --locked -- -D warnings
       - run: cargo test --manifest-path ui/Cargo.toml --workspace --locked
+      - name: Verify nested detail reading intent (strict; no native window)
+        run: cargo run --manifest-path ui/Cargo.toml --locked -p tekes-agent-ui-consumer-check --example bounded_detail_reading > "$RUNNER_TEMP/agentkit-nested-detail-reading.json"
       - run: cargo build --manifest-path ui/Cargo.toml --locked -p tekes-agent-ui-demo
       - uses: actions/upload-artifact@v4
         if: always()
@@ -52,4 +54,5 @@ jobs:
           path: |
             ${{ runner.temp }}/agentkit-ui-inputs.json
             ${{ runner.temp }}/agentkit-ui-metadata.json
+            ${{ runner.temp }}/agentkit-nested-detail-reading.json
           if-no-files-found: warn

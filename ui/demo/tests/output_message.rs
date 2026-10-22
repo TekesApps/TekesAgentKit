@@ -736,3 +736,320 @@ fn embedded_tool_uses_producer_terminal_description_and_retains_raw_detail_owner
         );
     }
 }
+#[test]
+fn bounded_detail_caps_reasoning_and_tools_but_keeps_ordinary_prose_in_document_flow() {
+    let mut message = item();
+    let long = "中文详情 👩🏽‍💻 e\u{301} 一行完整内容\n".repeat(100);
+    message.text = String::new();
+    message.reasoning = long.clone();
+    message.content_blocks = Some(vec![
+        block(0, Block::Reasoning { text: long.clone() }),
+        block(
+            1,
+            Block::ToolCall {
+                tool_id: "tool".into(),
+            },
+        ),
+    ]);
+    let mut call = tool();
+    call.phase = "done".into();
+    call.result = Some(json!({"content":[{"type":"text","text":long}]}));
+    let mut row = OutputMessage::with_bounded_details(710, scope(), Default::default());
+    row.update(&scope(), 1, 1, &output(&message), Some(&section(&call)))
+        .unwrap();
+    let root = row.id();
+    let ids = row.content_ids();
+    let mut host = row.into_host().unwrap();
+    for id in &ids {
+        assert!(toggle(&mut host, root, id.disclosure.unwrap()));
+    }
+    for scale in [1., 1.5] {
+        let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()), scale);
+        let mut scene = Scene::default();
+        host.render(
+            &mut scene,
+            &mut text,
+            Rect::new(0., 0., 360., 100000.),
+            Rect::new(0., 0., 360., 100000.),
+            Theme::LIGHT.into(),
+        )
+        .unwrap();
+        for id in &ids {
+            let field = host
+                .get(id.body)
+                .unwrap()
+                .component::<TextFieldContent>()
+                .unwrap();
+            assert!(
+                field.surface.outer.size.height <= 240. * scale + 0.5,
+                "expanded {:?}: {} at scale {}",
+                id.kind,
+                field.surface.outer.size.height,
+                scale
+            );
+            assert_eq!(
+                field.surface.scroll.scroll_policy(),
+                (
+                    tekes_ui_controls::ScrollPolicy::Disabled,
+                    tekes_ui_controls::ScrollPolicy::Auto
+                )
+            );
+            assert!(field.reading.is_some());
+        }
+    }
+    let mut plain = item();
+    plain.text = "正文仍属于外层文档\n".repeat(100);
+    plain.content_blocks = Some(vec![block(
+        0,
+        Block::Text {
+            text: plain.text.clone(),
+        },
+    )]);
+    let mut row = OutputMessage::with_bounded_details(711, scope(), Default::default());
+    row.update(&scope(), 1, 1, &output(&plain), None).unwrap();
+    let id = row.content_ids()[0].body;
+    let mut host = row.into_host().unwrap();
+    let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()), 1.);
+    host.render(
+        &mut Scene::default(),
+        &mut text,
+        Rect::new(0., 0., 360., 100000.),
+        Rect::new(0., 0., 360., 100000.),
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    assert!(host.text_surface(id).unwrap().outer.size.height > 240.);
+}
+#[test]
+fn bounded_detail_live_reasoning_minimum_ends_on_the_same_original_text_owner() {
+    let mut message = item();
+    message.text.clear();
+    message.reasoning = "一行推理".into();
+    message.content_blocks = Some(vec![block(
+        0,
+        Block::Reasoning {
+            text: message.reasoning.clone(),
+        },
+    )]);
+    let mut row = OutputMessage::with_bounded_details(712, scope(), Default::default());
+    row.update(&scope(), 1, 1, &output(&message), None).unwrap();
+    let root = row.id();
+    let ids = row.content_ids()[0];
+    let mut host = row.into_host().unwrap();
+    assert!(toggle(&mut host, root, ids.disclosure.unwrap()));
+    let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()), 1.4);
+    let frame = Rect::new(0., 0., 400., 1000.);
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        frame,
+        frame,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    let owner = host.text_surface(ids.body).unwrap() as *const _ as usize;
+    assert!(host.text_surface(ids.body).unwrap().outer.size.height >= 72. * 1.4 - 0.5);
+    assert!(
+        !host
+            .text_surface(ids.body)
+            .unwrap()
+            .scroll
+            .axis_enabled(true)
+    );
+    assert!(host.focus(Some(ids.body), true));
+    host.get_mut(ids.body)
+        .unwrap()
+        .component_mut::<TextFieldContent>()
+        .unwrap()
+        .surface
+        .input
+        .select_range(0..2);
+    let selection = host.text_surface(ids.body).unwrap().input.selection();
+    message.reasoning_ended = true;
+    message.is_provisional = false;
+    view_mut(&mut host, root)
+        .update(&scope(), 2, 1, &output(&message), None)
+        .unwrap();
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        frame,
+        frame,
+        Theme::DARK.into(),
+    )
+    .unwrap();
+    assert!(host.text_surface(ids.body).unwrap().outer.size.height < 72. * 1.4);
+    assert_eq!(
+        host.text_surface(ids.body).unwrap() as *const _ as usize,
+        owner
+    );
+    assert_eq!(
+        host.text_surface(ids.body).unwrap().input.selection(),
+        selection
+    );
+    assert_eq!(host.focused(), Some(ids.body));
+}
+#[test]
+fn bounded_detail_original_reading_anchor_survives_append_reflow_and_reopen() {
+    let mut message = item();
+    message.text = "后续正文".into();
+    message.reasoning = "中文阅读位置 👩🏽‍💻 e\u{301}\n".repeat(100);
+    message.content_blocks = Some(vec![
+        block(
+            0,
+            Block::Reasoning {
+                text: message.reasoning.clone(),
+            },
+        ),
+        block(
+            1,
+            Block::Text {
+                text: message.text.clone(),
+            },
+        ),
+    ]);
+    let mut row = OutputMessage::with_bounded_details(713, scope(), Default::default());
+    row.update(&scope(), 1, 1, &output(&message), None).unwrap();
+    let root = row.id();
+    let ids = row.content_ids()[0];
+    let mut host = row.into_host().unwrap();
+    assert!(toggle(&mut host, root, ids.disclosure.unwrap()));
+    let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()), 1.);
+    let frame = Rect::new(0., 0., 360., 1000.);
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        frame,
+        frame,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    assert!(host.focus(Some(ids.body), true));
+    host.get_mut(ids.body)
+        .unwrap()
+        .component_mut::<TextFieldContent>()
+        .unwrap()
+        .surface
+        .input
+        .select_range(0..2);
+    let owner = host.text_surface(ids.body).unwrap() as *const _ as usize;
+    let selection = host.text_surface(ids.body).unwrap().input.selection();
+    host.event(&ContentEvent::Scroll {
+        position: host.get(ids.body).unwrap().visible().unwrap().center(),
+        delta: Point::new(0., 160.),
+        precise: true,
+        begin: true,
+        end: true,
+        momentum: false,
+        time: 1.,
+    });
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        frame,
+        frame,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    let surface = host.text_surface(ids.body).unwrap();
+    assert!(surface.scroll.offset.y > 0.);
+    let anchor = surface.reflow_anchor.unwrap().utf16;
+    assert!(anchor > 0);
+    message
+        .reasoning
+        .push_str(&"后来追加，不打断上方阅读\n".repeat(100));
+    message.content_blocks.as_mut().unwrap()[0].content = Block::Reasoning {
+        text: message.reasoning.clone(),
+    };
+    view_mut(&mut host, root)
+        .update(&scope(), 2, 1, &output(&message), None)
+        .unwrap();
+    for width in [360., 180., 360.] {
+        let frame = Rect::new(0., 0., width, 1000.);
+        host.render(
+            &mut Scene::new(),
+            &mut text,
+            frame,
+            frame,
+            Theme::DARK.into(),
+        )
+        .unwrap();
+        let surface = host.text_surface(ids.body).unwrap();
+        assert_eq!(surface.reflow_anchor.unwrap().utf16, anchor);
+        assert_eq!(surface.input.selection(), selection);
+        assert_eq!(surface as *const _ as usize, owner);
+        assert_eq!(host.focused(), Some(ids.body));
+    }
+    assert!(toggle(&mut host, root, ids.disclosure.unwrap()));
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        frame,
+        frame,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    assert!(host.get(ids.body).is_none());
+    message.reasoning.push_str("折叠期间追加");
+    message.content_blocks.as_mut().unwrap()[0].content = Block::Reasoning {
+        text: message.reasoning.clone(),
+    };
+    view_mut(&mut host, root)
+        .update(&scope(), 3, 1, &output(&message), None)
+        .unwrap();
+    assert!(toggle(&mut host, root, ids.disclosure.unwrap()));
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        frame,
+        frame,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    let surface = host.text_surface(ids.body).unwrap();
+    assert_eq!(surface as *const _ as usize, owner);
+    assert_eq!(surface.reflow_anchor.unwrap().utf16, anchor);
+    assert_eq!(surface.input.selection(), selection);
+}
+#[test]
+fn default_detail_path_remains_inline_while_the_nested_reading_contract_is_pending() {
+    let mut message = item();
+    message.text.clear();
+    message.reasoning = "默认可运行路径\n".repeat(100);
+    message.content_blocks = Some(vec![block(
+        0,
+        Block::Reasoning {
+            text: message.reasoning.clone(),
+        },
+    )]);
+    let mut row = OutputMessage::new(714, scope());
+    row.update(&scope(), 1, 1, &output(&message), None).unwrap();
+    let root = row.id();
+    let detail = row.content_ids()[0];
+    let mut host = row.into_host().unwrap();
+    assert!(toggle(&mut host, root, detail.disclosure.unwrap()));
+    let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()), 1.);
+    let frame = Rect::new(0., 0., 400., 10000.);
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        frame,
+        frame,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    let field = host
+        .get(detail.body)
+        .unwrap()
+        .component::<TextFieldContent>()
+        .unwrap();
+    assert!(field.surface.outer.size.height > 240.);
+    assert!(field.reading.is_none());
+    assert_eq!(
+        field.surface.scroll.scroll_policy(),
+        (
+            tekes_ui_controls::ScrollPolicy::Disabled,
+            tekes_ui_controls::ScrollPolicy::Disabled
+        )
+    );
+}

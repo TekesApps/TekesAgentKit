@@ -39,6 +39,10 @@ TextSurfaceHost::shape_label 服务并保留完整 source/AX 文案，AgentKit �
 `presentation_card()` 提供共享卡片事实；只在需要展开时派生，未知形状保留通用详情。
 [卡片与桥接说明](rust-agent-ui-tool-card-20261022.md)区分公开失败与旧退出标记；完整 selectable code/diff Content 仍待 #25。
 
+限高详情仅通过 `OutputMessage::with_bounded_details` / `ToolActivity::with_bounded_details` 显式试验；
+标准 RunPort/Transcript 保持原文档流。嵌套阅读严格检查当前失败，等待 #53；
+见[限高实验说明](rust-agent-ui-bounded-details-20261022.md)，不得用宿主滚动补偿替代 SDK 修复。
+
 ## 可运行参考与验证
 
 第二 consumer 的[公开组件挂载/整帧发布](../ui/consumer/src/lib.rs)提供

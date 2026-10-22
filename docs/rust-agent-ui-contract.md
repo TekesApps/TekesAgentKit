@@ -423,3 +423,6 @@ wake scheduling remain host adapters. This does not complete footnote layout par
 [反馈备注表单](rust-agent-ui-feedback-form-20261022.md)对齐标题/原编辑视口/错误位置与尾部取消→保存，并保留保存期间编辑、原 once/CAS 和迟到回包隔离。最终程序通过真实三端原生反馈专项及系统拼音；完整锚定弹层仍等待 [TekesUI #49](https://github.com/TekesApps/TekesUI/issues/49)，对应独立 consumer 接收门禁明确 ignored/显式运行失败，不计为已交付 Popover。
 
 [Summary 层级排版](rust-agent-ui-summary-indent-20261022.md)新增显式只读 indent_level 回调：按 Source 层级移动标题和减少其换行宽度，metadata 保持右端，原动作/文本 owner 不变；格式化结果随 publication 捕获。完整单行 Transcript aside 的图标渲染服务缺口已补充到既有 #47，未复制 SDK 实现。
+
+[限高详情实验](rust-agent-ui-bounded-details-20261022.md)保留标准路径，并通过独立公开 API 示例严格记录 #53 的父阅读意图缺口。
+[系统提示处理后的原生续验](rust-agent-ui-native-handled-20261022.md)推进到 phase 20 后期限失败，未完成分页/系统组字。

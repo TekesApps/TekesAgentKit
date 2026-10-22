@@ -1,0 +1,50 @@
+{
+  "sourceBase": "a8f3572fc451eb193291e9f9a81d3a0825c063ae",
+  "sourceIdentity": ".runtime-fixtures/native-handled-20261022/program.json",
+  "programSha256": "2bb325fe2e5c8b2c0ccb4111c2700e152aa69600d2d189fe5806a612648bcc1d",
+  "programBytes": 75982272,
+  "tekesui": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "nativeAccepted": false,
+  "completedPhase": 20,
+  "requiredPhase": 25,
+  "firstActiveDelaySeconds": 22.174616813659668,
+  "frontmostTrace": [
+    {
+      "asn": "ASN:0x0-0x2de3de1:",
+      "bundleId": "com.openai.codex",
+      "pid": 80394,
+      "unixSeconds": 1792683722.763874
+    },
+    {
+      "asn": "ASN:0x0-0x32fa2f7:",
+      "bundleId": "org.tekesapps.agentkit.nativehandled20261022",
+      "pid": 11766,
+      "unixSeconds": 1792683744.9384909
+    },
+    {
+      "asn": "ASN:0x0-0x32f72f4:",
+      "bundleId": "org.tekesui.review.processcontent20261022",
+      "pid": 9645,
+      "unixSeconds": 1792683749.211993
+    }
+  ],
+  "launcherExitCode": 0,
+  "applicationExitCode": null,
+  "wrapperExitCode": 1,
+  "deadlineSeconds": 25,
+  "deadlineOrigin": "Probe::new; starts before foreground activation",
+  "automaticRetry": false,
+  "focusOverride": false,
+  "physicalImeThisRun": "not run",
+  "paginationThisRun": "not run",
+  "newTargets": 0,
+  "newProgramCopies": 1,
+  "deletedBytes": 0,
+  "evidence": {
+    ".runtime-fixtures/native-handled-20261022/sidechat-menu.log.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    ".runtime-fixtures/native-handled-20261022/sidechat-menu.log.stderr": "af96a28cd14047d3d49770ac378d56d26fc0b430ccbab3ba9b282c92b31ccafe",
+    ".runtime-fixtures/native-handled-20261022/sidechat-menu.log": "171686a1ddd84905b4c9422b710340f4fc516ed9769a41812aad935b7cc36ca9",
+    ".runtime-fixtures/native-handled-20261022/sidechat-menu.log.launcher": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    ".runtime-fixtures/native-handled-20261022/sidechat-menu.log.frontmost.jsonl": "c37d610630ad25b5d2545a038345ed7110fd03e31b2a47a62ff2c845e459cfb4"
+  }
+}
