@@ -206,26 +206,17 @@ fn output_aside_is_one_leading_reading_band_with_original_nested_feedback() {
                             .filter(|(_, layout)| layout.source() == LONG_INFORMATION)
                             .all(|(_, layout)| layout.paragraph().lines.len() == 1)
                     );
-                    assert!(
-                        text.labels
-                            .iter()
-                            .any(|(_, layout)| layout.source() == LONG_INFORMATION
-                                && layout.is_truncated())
-                    );
                     if width == 1100. && scale == 1. && note == "备注" {
                         assert!(
                             info_frame.size.width > width * 0.4,
                             "read-only information has no action-label cap"
                         );
                     }
-                    let controls = [
-                        copy,
-                        ids.positive,
-                        ids.negative,
-                        ids.edit_note,
-                        ids.refresh,
-                        info,
-                    ];
+                    assert!(
+                        host.get(ids.refresh).is_none(),
+                        "ready aside has no read action"
+                    );
+                    let controls = [copy, ids.positive, ids.negative, ids.edit_note, info];
                     let rectangles: Vec<_> = controls
                         .iter()
                         .map(|id| host.get(*id).unwrap().frame())
@@ -269,6 +260,14 @@ fn output_aside_is_one_leading_reading_band_with_original_nested_feedback() {
                             host.get(ids.edit_note).unwrap().frame().size.width
                                 <= resized_width * 0.4 + 0.02
                         );
+                        if resized_width == 180. {
+                            assert!(
+                                text.labels.iter().any(|(_, layout)| {
+                                    layout.source() == LONG_INFORMATION && layout.is_truncated()
+                                }),
+                                "narrow information must still use original single-line truncation"
+                            );
+                        }
                         let info_frame = host.get(info).unwrap().frame();
                         let footer_frame = host.get(footer).unwrap().frame();
                         assert!(

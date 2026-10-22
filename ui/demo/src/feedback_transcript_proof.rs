@@ -22,6 +22,9 @@ async fn execute(view: &mut ComponentDemo, commands: Vec<DemoCommand>) -> Result
     view.complete_feedback(request.execute().await)
 }
 pub async fn run(view: &mut ComponentDemo) -> Result<serde_json::Value> {
+    for request in view.take_initial_feedback_requests() {
+        view.complete_initial_feedback(request.execute().await)?;
+    }
     let source = view.binding().clone();
     let before = source.current_run().unwrap().draft.clone();
     let other = view.bindings()[1].current_run().unwrap().draft.clone();
@@ -39,18 +42,17 @@ pub async fn run(view: &mut ComponentDemo) -> Result<serde_json::Value> {
         .map(|(id, _)| id)
         .ok_or_else(|| unsupported("no proven final response control"))?;
     let message = control(view, id).target().unwrap().message_id().to_string();
+    let state = control(view, id)
+        .state()
+        .ok_or_else(|| unsupported("automatic initial feedback read missing"))?;
     require(
-        source
-            .read_feedback()
-            .await?
-            .records()
-            .get(&message)
-            .is_none(),
+        state.current.is_none(),
         "proof requires an isolated unrated response",
     )?;
-    let refresh = control(view, id).ids().refresh;
-    let commands = press(view, refresh)?;
-    execute(view, commands).await?;
+    require(
+        view.tree.get(control(view, id).ids().refresh).is_none(),
+        "ready aside has a permanent refresh",
+    )?;
     let positive = control(view, id).ids().positive;
     let commands = press(view, positive)?;
     execute(view, commands).await?;
@@ -110,6 +112,6 @@ pub async fn run(view: &mut ComponentDemo) -> Result<serde_json::Value> {
         "feedback changed a Composer draft",
     )?;
     Ok(
-        serde_json::json!({"embeddedTranscript":true,"runPortRouting":true,"originalTarget":true,"coldRead":true,"savedChineseNote":true,"noteReopened":true,"sameRatingDeletes":true,"freshReadAfterDelete":true,"draftsPreserved":true,"nativeInteraction":false,"readingAnchorAcceptance":false}),
+        serde_json::json!({"embeddedTranscript":true,"runPortRouting":true,"originalTarget":true,"coldRead":true,"automaticInitialRead":true,"normalReadyRefreshHidden":true,"savedChineseNote":true,"noteReopened":true,"sameRatingDeletes":true,"freshReadAfterDelete":true,"draftsPreserved":true,"nativeInteraction":false,"readingAnchorAcceptance":false}),
     )
 }

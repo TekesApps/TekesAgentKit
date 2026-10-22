@@ -3807,6 +3807,15 @@ pub fn run() {
         );
     }
     if let Some(index) = args.iter().position(|arg| arg == "--offscreen") {
+        // Same queued request/completion path as the native command loop. A
+        // static snapshot has no event loop to dispatch optional metadata reads.
+        for request in host.view.take_initial_feedback_requests() {
+            let completion = host.executor.block_on(request.execute());
+            host.view
+                .complete_initial_feedback(completion)
+                .expect("initial feedback metadata");
+        }
+
         let sidebar_query_proof = if args.iter().any(|arg| arg == "--sidebar-query-proof") {
             let source = host.sidebar_query.as_ref().unwrap();
             let state = host.executor.block_on(async {

@@ -123,6 +123,18 @@ impl ComponentDemo {
             request,
         })))
     }
+    /// Hosts producing a static snapshot may execute just the initial metadata
+    /// reads. Leave every unrelated background operation in its original queue.
+    pub fn take_initial_feedback_requests(&mut self) -> Vec<FeedbackInitialRequest> {
+        let mut requests = vec![];
+        for command in std::mem::take(&mut self.background_commands) {
+            match command {
+                DemoCommand::ReadInitialFeedback(request) => requests.push(*request),
+                other => self.background_commands.push(other),
+            }
+        }
+        requests
+    }
     pub fn complete_initial_feedback(&mut self, result: FeedbackInitialCompletion) -> Result<()> {
         let request = result.request;
         let Some(pane) = self.feedback_panes.get_mut(&request.pane) else {

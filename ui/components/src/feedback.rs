@@ -73,6 +73,7 @@ pub struct FeedbackLabels {
     pub refresh: String,
     pub pending: String,
     pub unloaded: String,
+    pub load_failure: String,
     pub conflict: String,
     pub failure: String,
     pub uncertain: String,
@@ -91,6 +92,7 @@ impl Default for FeedbackLabels {
             refresh: "刷新评价".into(),
             pending: "正在处理评价".into(),
             unloaded: "评价尚未加载".into(),
+            load_failure: "无法加载评价".into(),
             conflict: "评价已在别处修改，已显示最新状态".into(),
             failure: "无法保存评价".into(),
             uncertain: "结果尚未确认，请刷新评价后再操作".into(),
@@ -225,7 +227,7 @@ impl TurnFeedback {
         }
         self.needs_refresh = true;
         self.diagnostic = Some(message);
-        self.notice = self.labels.uncertain.clone();
+        self.notice = self.labels.load_failure.clone();
         self.render();
     }
     pub fn state(&self) -> Option<&FeedbackControlState> {
@@ -394,7 +396,13 @@ impl TurnFeedback {
             if self.pending.is_some() {
                 continue;
             }
-            if action.target == self.ids.refresh {
+            if action.target == self.ids.refresh
+                && self
+                    .rows
+                    .children
+                    .iter()
+                    .any(|node| node.id() == self.ids.refresh)
+            {
                 let gesture = FeedbackGesture {
                     target: self.target.clone().unwrap(),
                     action: FeedbackGestureAction::Refresh,
@@ -608,14 +616,23 @@ impl TurnFeedback {
                 },
             ));
         }
-        let mut refresh = retained_button(&mut old, self.ids.refresh, &self.labels.refresh);
-        refresh
-            .component_mut::<ButtonContent>()
-            .unwrap()
-            .button
-            .state
-            .disabled = self.pending.is_some() || self.is_composing() || self.target.is_none();
-        self.rows.children.push(refresh);
+        // ClientKit's ordinary aside contains feedback actions/metadata, not
+        // a permanent read button. Cold/loading is handled by the host's
+        // initial read; an actual failure or invalidated committed frame must
+        // retain an explicit recovery path.
+        if !self.compact
+            || self.diagnostic.is_some()
+            || (self.needs_refresh && self.state.is_some())
+        {
+            let mut refresh = retained_button(&mut old, self.ids.refresh, &self.labels.refresh);
+            refresh
+                .component_mut::<ButtonContent>()
+                .unwrap()
+                .button
+                .state
+                .disabled = self.pending.is_some() || self.is_composing() || self.target.is_none();
+            self.rows.children.push(refresh);
+        }
         let text = if self.compact {
             &self.notice
         } else if self.pending.is_some() {

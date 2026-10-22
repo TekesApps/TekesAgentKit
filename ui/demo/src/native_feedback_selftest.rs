@@ -38,6 +38,7 @@ pub(super) struct Probe {
     control: Option<ComponentId>,
     before: Vec<Arc<RunSnapshot>>,
     deleted_publication: u64,
+    deleted_epoch: u64,
     auxiliary_focus: Option<ComponentId>,
     composer_state: Option<ComposerObservation>,
     capture_directory: Option<std::path::PathBuf>,
@@ -54,6 +55,7 @@ impl Probe {
             control: None,
             before: vec![],
             deleted_publication: 0,
+            deleted_epoch: 0,
             auxiliary_focus: None,
             composer_state: None,
             capture_directory: std::env::var_os("AGENT_FEEDBACK_CAPTURE_DIRECTORY").map(|path| {
@@ -232,10 +234,12 @@ impl Probe {
                     .component::<TranscriptContent>()
                     .unwrap();
                 let Some((id, control)) = content.feedback_controls().find(|(_, control)| {
-                    view.tree.get(control.ids().refresh).is_some_and(|node| {
-                        node.visible()
-                            .is_some_and(|rect| rect.contains(node.frame().center()))
-                    })
+                    control.state().is_some()
+                        && !control.needs_refresh()
+                        && view.tree.get(control.ids().positive).is_some_and(|node| {
+                            node.visible()
+                                .is_some_and(|rect| rect.contains(node.frame().center()))
+                        })
                 }) else {
                     return;
                 };
@@ -250,12 +254,15 @@ impl Probe {
                     self.before.iter().all(|run| !run.draft.text.is_empty()),
                     "nonempty isolated drafts are required to verify the send barrier"
                 );
-                let refresh = control.ids().refresh;
+                assert!(
+                    view.tree.get(control.ids().refresh).is_none(),
+                    "ready aside must not expose refresh"
+                );
                 self.auxiliary_focus = view.tree.focused();
                 assert_eq!(self.auxiliary_focus, Some(view.ids().editor));
                 self.composer_state = Some(ComposerObservation::read(view));
                 self.composer_owner = view.editor() as *const _ as usize;
-                self.next(1, vec![(0, Self::click(&view.tree, refresh))]);
+                self.next(1, vec![(0, Action::WakeRedraw)]);
             }
             1 if self.ready(view) => {
                 self.check_aside_band(view);
@@ -483,14 +490,20 @@ impl Probe {
                 let control = self.control(view).unwrap();
                 assert!(view.tree.get(control.ids().edit_note).is_none());
                 self.deleted_publication = control.state().unwrap().publication;
-                self.next(
-                    11,
-                    vec![(0, Self::click(&view.tree, control.ids().refresh))],
-                );
+                self.deleted_epoch = control.state().unwrap().connection_epoch;
+                assert!(view.tree.get(control.ids().refresh).is_none());
+                self.next(11, vec![(0, Self::click(&view.tree, RECONNECT))]);
             }
             11 if self.ready(view)
                 && self.control(view).unwrap().state().unwrap().publication
-                    > self.deleted_publication =>
+                    > self.deleted_publication
+                && self
+                    .control(view)
+                    .unwrap()
+                    .state()
+                    .unwrap()
+                    .connection_epoch
+                    > self.deleted_epoch =>
             {
                 assert!(
                     self.control(view)
@@ -511,6 +524,6 @@ impl Probe {
     pub fn receipt(&self, view: &ComponentDemo) -> serde_json::Value {
         assert_eq!(self.phase, 12, "native feedback did not finish");
         self.check_drafts_and_messages(view);
-        serde_json::json!({"nativeInteraction":true,"nativePointer":true,"nativeTextServices":true,"syntheticPreedit":true,"imeSendAndNavigationBlocked":true,"savedChineseNote":true,"noteReopened":true,"retainedAcrossSessionSwitch":true,"sameRatingDeletes":true,"freshReadAfterDelete":true,"draftsPreserved":true,"nonemptyComposerDrafts":true,"sendEnabledBeforeComposition":true,"noPromptSubmitted":true,"stateDrivenCallbacks":true,"auxiliaryFocusPreserved":true,"composerContentsAndOwnerPreserved":true,"opaqueBaselinePreserved":false,"unratedNoteHidden":true,"committedNoteLabel":true,"outputAsideSingleReadingBand":true,"inputAsideSingleTrailingBand":true,"physicalIme":false,"voiceOver":false,"readingAnchorAcceptance":false})
+        serde_json::json!({"nativeInteraction":true,"nativePointer":true,"nativeTextServices":true,"syntheticPreedit":true,"imeSendAndNavigationBlocked":true,"savedChineseNote":true,"noteReopened":true,"retainedAcrossSessionSwitch":true,"sameRatingDeletes":true,"freshReadAfterDelete":true,"freshReadViaOriginalReconnect":true,"automaticInitialRead":true,"normalReadyRefreshHidden":true,"draftsPreserved":true,"nonemptyComposerDrafts":true,"sendEnabledBeforeComposition":true,"noPromptSubmitted":true,"stateDrivenCallbacks":true,"auxiliaryFocusPreserved":true,"composerContentsAndOwnerPreserved":true,"opaqueBaselinePreserved":false,"unratedNoteHidden":true,"committedNoteLabel":true,"outputAsideSingleReadingBand":true,"inputAsideSingleTrailingBand":true,"physicalIme":false,"voiceOver":false,"readingAnchorAcceptance":false})
     }
 }

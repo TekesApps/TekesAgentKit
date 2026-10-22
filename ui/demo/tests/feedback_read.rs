@@ -324,6 +324,11 @@ async fn explicit_refresh_cancels_queued_initial_io_and_recovers_a_failed_read()
     let service = service(false, true);
     let (runtime, binding) = setup(service.clone()).await;
     let mut view = mounted(&binding);
+    let warm = initial(&mut view);
+    view.complete_initial_feedback(warm.execute().await)
+        .unwrap();
+    runtime.reconnect().await.unwrap();
+    view.sync().unwrap();
     let queued = initial(&mut view);
     let id = original_control(&view);
     let refresh = feedback(&view, id).ids().refresh;
@@ -342,7 +347,7 @@ async fn explicit_refresh_cancels_queued_initial_io_and_recovers_a_failed_read()
         .unwrap();
     assert_eq!(
         service.calls.load(Ordering::Acquire),
-        1,
+        2,
         "cancelled initial read never issues IO"
     );
     *service.reply.lock().unwrap() = json!({"items":[]});
@@ -359,13 +364,13 @@ async fn explicit_refresh_cancels_queued_initial_io_and_recovers_a_failed_read()
     assert!(!feedback(&view, id).needs_refresh());
     assert!(feedback(&view, id).notice().is_empty());
     assert!(view.take_background_commands().is_empty());
-    assert_eq!(service.calls.load(Ordering::Acquire), 2);
+    assert_eq!(service.calls.load(Ordering::Acquire), 3);
     let old_epoch = binding.feedback_read_epoch().unwrap();
     runtime.reconnect().await.unwrap();
     assert!(binding.read_feedback_at_epoch(old_epoch).await.is_err());
     assert_eq!(
         service.calls.load(Ordering::Acquire),
-        2,
+        3,
         "old epoch cannot follow reconnect"
     );
     runtime.stop().await.unwrap();

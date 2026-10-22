@@ -1073,9 +1073,16 @@ async fn transcript_feedback_mounted_run_routes_ime_save_and_hidden_original_rec
     view.enable_transcript_content().unwrap();
     let id = transcript_control(&view);
     assert!(demo_control(&view, id).state().is_none());
-    let refresh = demo_control(&view, id).ids().refresh;
-    let commands = demo_press(&mut view, refresh);
-    complete_demo(&mut view, commands).await;
+    assert!(
+        view.tree
+            .get(demo_control(&view, id).ids().refresh)
+            .is_none()
+    );
+    let mut requests = view.take_initial_feedback_requests();
+    assert_eq!(requests.len(), 1);
+    view.complete_initial_feedback(requests.remove(0).execute().await)
+        .unwrap();
+    assert!(demo_control(&view, id).state().is_some());
     let positive = demo_control(&view, id).ids().positive;
     let commands = demo_press(&mut view, positive);
     complete_demo(&mut view, commands).await;

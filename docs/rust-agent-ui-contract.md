@@ -1,5 +1,7 @@
 # Rust Agent UI 组件接入契约
 
+[反馈恢复入口与三端离屏复验](rust-agent-ui-feedback-recovery-20261022.md)：正常 aside 不再常驻 Refresh，失败/不确定状态保留恢复；544 项通过、1 项既有忽略。同程序 Pi/DSH/Native 离屏反馈通过；Pi 目标数据闭环通过但标签可见性仍失败，继续跟踪 #47。当前程序原生/IME、#48 跨进程仍未验收。
+
 [反馈首次读取与重连接入](rust-agent-ui-feedback-intake-20261022.md)：原 binding 按挂载来源/连接代次调度一次，手势及旧代次使排队读取失效；compact cold/loading 文案移除。7 项新增回归与独立 consumer 通过，原生/真实三端、常驻 Refresh 及完整 glyph 布局仍待验证和对齐。
 
 [反馈初次加载/显示审计](rust-agent-ui-feedback-intake-gap-20261022.md)记录了消费侧首次读取及 cold/refresh 的差异；上方增量已补初次读取和 cold/loading 文案，Refresh/glyph 完整布局仍需与 SDK #47 分开处理。

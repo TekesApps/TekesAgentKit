@@ -1559,6 +1559,18 @@ fn grouped_aside_keeps_one_reading_item_and_rejects_old_feedback_completion_afte
     let target = control.target().unwrap().clone();
     let old_refresh = control.ids().refresh;
     let old_positive = control.ids().positive;
+    assert!(
+        view.take_feedback_intents(&[ContentAction {
+            target: old_refresh,
+            kind: ContentActionKind::Activate,
+            source: ContentActionSource::Programmatic,
+        }])
+        .is_empty(),
+        "cold hidden refresh cannot dispatch"
+    );
+    view.feedback_mut(feedback)
+        .unwrap()
+        .initial_read_failed("owned initial read failure".into());
     let gesture = view
         .take_feedback_intents(&[ContentAction {
             target: old_refresh,

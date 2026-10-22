@@ -1439,6 +1439,12 @@ fn output_aside_feedback_notes_and_auxiliary_actions_keep_the_original_composer(
     let control = content.feedback_mut(feedback).unwrap();
     assert!(control.notice().is_empty());
     assert!(
+        !control
+            .children()
+            .iter()
+            .any(|node| node.id() == control.ids().refresh)
+    );
+    assert!(
         !control.children().iter().any(|node| {
             node.component::<TextContent>()
                 .is_some_and(|text| text.text == "评价尚未加载")
@@ -1449,6 +1455,13 @@ fn output_aside_feedback_notes_and_auxiliary_actions_keep_the_original_composer(
     assert!(control.state().is_none());
     assert!(control.needs_refresh());
     assert_eq!(control.diagnostic(), Some("owned read failure"));
+    assert_eq!(control.notice(), "无法加载评价");
+    assert!(
+        control
+            .children()
+            .iter()
+            .any(|node| node.id() == control.ids().refresh)
+    );
     let state = FeedbackControlState {
         target: target.clone(),
         publication: 1,
@@ -1465,6 +1478,12 @@ fn output_aside_feedback_notes_and_auxiliary_actions_keep_the_original_composer(
     let committed = content.feedback_mut(feedback).unwrap();
     assert!(committed.notice().is_empty());
     assert!(!committed.needs_refresh());
+    assert!(
+        !committed
+            .children()
+            .iter()
+            .any(|node| node.id() == committed.ids().refresh)
+    );
     committed.initial_read_failed("late read failure".into());
     assert_eq!(committed.state(), Some(&state));
     assert!(committed.diagnostic().is_none());
