@@ -699,6 +699,15 @@ impl Component for OutputPart {
 /// raw-data disclosures until the corresponding rich-content adapters are provided.
 #[derive(Debug)]
 pub struct OutputMessage {
+    state: OutputMessageState,
+    rows: StackContent,
+}
+// Canonical identity/provenance and update admission do not own a widget tree.
+// The same controller operates on the actual retained SDK nodes supplied by
+// its composition. This is the single message algorithm for standalone and
+// future turn-level activity/output layouts, not a parallel state machine.
+#[derive(Debug)]
+struct OutputMessageState {
     root: ComponentId,
     scope: RunScope,
     key: Option<Key>,
@@ -707,7 +716,6 @@ pub struct OutputMessage {
     header_revision: u64,
     item: Option<TranscriptItem>,
     facts: Vec<PartFacts>,
-    rows: StackContent,
     next: u64,
     labels: OutputMessageLabels,
     bounded_details: bool,
@@ -725,14 +733,20 @@ impl OutputMessage {
     }
     pub fn with_labels(namespace: u32, scope: RunScope, labels: OutputMessageLabels) -> Self {
         Self {
-            root: ComponentId((namespace as u64) << 32),
-            scope,
-            key: None,
-            publication: 0,
-            epoch: 0,
-            header_revision: 0,
-            item: None,
-            facts: vec![],
+            state: OutputMessageState {
+                root: ComponentId((namespace as u64) << 32),
+                scope,
+                key: None,
+                publication: 0,
+                epoch: 0,
+                header_revision: 0,
+                item: None,
+                facts: vec![],
+                next: 16,
+                labels,
+                bounded_details: false,
+                thinking: None,
+            },
             rows: StackContent {
                 model: Stack {
                     axis: Axis::Vertical,
@@ -741,12 +755,9 @@ impl OutputMessage {
                 flexible_child: None,
                 children: vec![],
             },
-            next: 16,
-            labels,
-            bounded_details: false,
-            thinking: None,
         }
     }
+
     /// Experimental bounded reasoning/tool disclosures using original SDK
     /// viewports. Configure before publishing. Standard RunPort keeps the inline
     /// path until TekesUI #53's strict nested-reading gate is satisfied.
@@ -756,14 +767,14 @@ impl OutputMessage {
         labels: OutputMessageLabels,
     ) -> Self {
         let mut view = Self::with_labels(namespace, scope, labels);
-        view.bounded_details = true;
+        view.state.bounded_details = true;
         view
     }
     pub fn id(&self) -> ComponentId {
-        self.root
+        self.state.root
     }
     pub fn scope(&self) -> &RunScope {
-        &self.scope
+        &self.state.scope
     }
     pub fn content_ids(&self) -> Vec<OutputContentIds> {
         self.part_nodes()
@@ -803,22 +814,12 @@ impl OutputMessage {
             .flat_map(|node| {
                 node.component::<OutputPart>()
                     .unwrap()
-                    .copy_intents(&self.scope, actions)
+                    .copy_intents(&self.state.scope, actions)
             })
             .collect()
     }
     fn part_nodes(&self) -> Vec<&Content> {
-        self.rows
-            .children
-            .iter()
-            .flat_map(|node| {
-                if let Some(group) = node.component::<crate::ToolRun>() {
-                    group.member_nodes().collect()
-                } else {
-                    vec![node]
-                }
-            })
-            .collect()
+        part_nodes(&self.rows.children)
     }
     fn visible_part_nodes(&self) -> Vec<&Content> {
         self.rows
@@ -858,10 +859,17 @@ impl OutputMessage {
         output: &TranscriptOutput<'_>,
         section: Option<&TranscriptSection<'_>>,
     ) -> Result<(), &'static str> {
-        if scope != &self.scope {
+        if scope != &self.state.scope {
             return Err("output message scope mismatch");
         }
-        self.update_display(publication, epoch, output, section, None)
+        self.state.update_display(
+            &mut self.rows.children,
+            publication,
+            epoch,
+            output,
+            section,
+            None,
+        )
     }
     /// Install the shared live-thinking decision for this original message.
     /// Once controlled, callers must keep supplying a matching frame; legacy
@@ -874,8 +882,17 @@ impl OutputMessage {
         section: Option<&TranscriptSection<'_>>,
         thinking: &tekes_agent_presentation::TranscriptThinkingFrame,
     ) -> Result<(), &'static str> {
-        let stamp = self.thinking_stamp(publication, epoch, output, thinking)?;
-        self.update_display(publication, epoch, output, section, Some(stamp))
+        let stamp = self
+            .state
+            .thinking_stamp(publication, epoch, output, thinking)?;
+        self.state.update_display(
+            &mut self.rows.children,
+            publication,
+            epoch,
+            output,
+            section,
+            Some(stamp),
+        )
     }
     pub(crate) fn check_update_with_thinking(
         &self,
@@ -885,10 +902,112 @@ impl OutputMessage {
         section: Option<&TranscriptSection<'_>>,
         thinking: &tekes_agent_presentation::TranscriptThinkingFrame,
     ) -> Result<(), &'static str> {
-        let stamp = self.thinking_stamp(publication, epoch, output, thinking)?;
-        self.check_update_display(publication, epoch, output, section, Some(&stamp))?;
+        let stamp = self
+            .state
+            .thinking_stamp(publication, epoch, output, thinking)?;
+        self.state.check_update_display(
+            &self.rows.children,
+            publication,
+            epoch,
+            output,
+            section,
+            Some(&stamp),
+        )?;
         Ok(())
     }
+
+    pub(crate) fn check_update(
+        &self,
+        scope: &RunScope,
+        publication: u64,
+        epoch: u64,
+        output: &TranscriptOutput<'_>,
+        section: Option<&TranscriptSection<'_>>,
+    ) -> Result<(Key, Vec<PartFacts>, u64), &'static str> {
+        if scope != &self.state.scope {
+            return Err("output message scope mismatch");
+        }
+        self.state.check_update_display(
+            &self.rows.children,
+            publication,
+            epoch,
+            output,
+            section,
+            None,
+        )
+    }
+
+    /// UI-local disclosure only. The host drains the original ContentHost action
+    /// batch exactly once; retired button IDs cannot target a replacement block.
+    pub fn handle_actions(&mut self, actions: &[ContentAction]) -> bool {
+        fn toggle(part: &mut OutputPart, actions: &[ContentAction]) -> bool {
+            let id = part.ids.disclosure;
+            let count = actions
+                .iter()
+                .filter(|a| a.kind == ContentActionKind::Activate && id == Some(a.target))
+                .count();
+            for _ in 0..count {
+                part.toggle();
+            }
+            count > 0
+        }
+        let mut changed = false;
+        for node in &mut self.rows.children {
+            if let Some(group) = node.component_mut::<crate::ToolRun>() {
+                changed |= group.handle_disclosure(actions);
+                if group.is_expanded() {
+                    for node in group.member_nodes_mut() {
+                        changed |= toggle(node.component_mut::<OutputPart>().unwrap(), actions);
+                    }
+                }
+            } else {
+                changed |= toggle(node.component_mut::<OutputPart>().unwrap(), actions);
+            }
+        }
+        changed
+    }
+
+    pub fn into_host(self) -> Result<ContentHost, CompositionError> {
+        let id = self.state.root;
+        {
+            let mut host = ContentHost::new(Content::new(id, self))?;
+            host.set_action_events(true);
+            Ok(host)
+        }
+    }
+}
+impl Component for OutputMessage {
+    fn active(&self) -> bool {
+        !self.rows.children.is_empty()
+    }
+    fn children(&self) -> &[Content] {
+        &self.rows.children
+    }
+    fn children_mut(&mut self) -> Option<&mut Vec<Content>> {
+        Some(&mut self.rows.children)
+    }
+    fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        let measured = self.rows.measure(text, available);
+        MeasuredChild::new(Size::new(available.width, measured.size.height))
+    }
+    fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        arrange_content(
+            &mut self.rows.children,
+            text,
+            frame,
+            clip,
+            Spacing::Regular.value(),
+            false,
+        );
+    }
+    fn semantics(&self) -> ContentSemantics {
+        ContentSemantics::new(
+            ContentRole::Group,
+            (self.state.labels.text)(OutputMessageText::Group),
+        )
+    }
+}
+impl OutputMessageState {
     fn thinking_stamp(
         &self,
         publication: u64,
@@ -913,17 +1032,24 @@ impl OutputMessage {
     }
     fn update_display(
         &mut self,
+        nodes: &mut Vec<Content>,
         publication: u64,
         epoch: u64,
         output: &TranscriptOutput<'_>,
         section: Option<&TranscriptSection<'_>>,
         thinking: Option<ThinkingStamp>,
     ) -> Result<(), &'static str> {
-        let (key, facts, header_revision) =
-            self.check_update_display(publication, epoch, output, section, thinking.as_ref())?;
+        let (key, facts, header_revision) = self.check_update_display(
+            nodes,
+            publication,
+            epoch,
+            output,
+            section,
+            thinking.as_ref(),
+        )?;
         let mut old = vec![];
         let mut old_groups = vec![];
-        for mut node in std::mem::take(&mut self.rows.children) {
+        for mut node in std::mem::take(nodes) {
             if let Some(group) = node.component_mut::<crate::ToolRun>() {
                 old.extend(group.take_members());
                 old_groups.push(node);
@@ -1010,7 +1136,7 @@ impl OutputMessage {
                 }
             }
             if run.len() < 2 {
-                self.rows.children.extend(run);
+                nodes.extend(run);
                 continue;
             }
             let ids: Vec<_> = run
@@ -1071,7 +1197,7 @@ impl OutputMessage {
                     id
                 },
             );
-            self.rows.children.push(node);
+            nodes.push(node);
         }
         self.key = Some(key);
         self.publication = publication;
@@ -1082,21 +1208,9 @@ impl OutputMessage {
         self.thinking = thinking;
         Ok(())
     }
-    pub(crate) fn check_update(
-        &self,
-        scope: &RunScope,
-        publication: u64,
-        epoch: u64,
-        output: &TranscriptOutput<'_>,
-        section: Option<&TranscriptSection<'_>>,
-    ) -> Result<(Key, Vec<PartFacts>, u64), &'static str> {
-        if scope != &self.scope {
-            return Err("output message scope mismatch");
-        }
-        self.check_update_display(publication, epoch, output, section, None)
-    }
     fn check_update_display(
         &self,
+        nodes: &[Content],
         publication: u64,
         epoch: u64,
         output: &TranscriptOutput<'_>,
@@ -1197,8 +1311,7 @@ impl OutputMessage {
             .iter()
             .filter(|part| part.slot == Slot::ThinkingStatus)
         {
-            if self
-                .part_nodes()
+            if part_nodes(nodes)
                 .into_iter()
                 .filter_map(|node| node.component::<OutputPart>())
                 .any(|part| {
@@ -1317,76 +1430,21 @@ impl OutputMessage {
                     )
             )
     }
-    /// UI-local disclosure only. The host drains the original ContentHost action
-    /// batch exactly once; retired button IDs cannot target a replacement block.
-    pub fn handle_actions(&mut self, actions: &[ContentAction]) -> bool {
-        fn toggle(part: &mut OutputPart, actions: &[ContentAction]) -> bool {
-            let id = part.ids.disclosure;
-            let count = actions
-                .iter()
-                .filter(|a| a.kind == ContentActionKind::Activate && id == Some(a.target))
-                .count();
-            for _ in 0..count {
-                part.toggle();
-            }
-            count > 0
-        }
-        let mut changed = false;
-        for node in &mut self.rows.children {
-            if let Some(group) = node.component_mut::<crate::ToolRun>() {
-                changed |= group.handle_disclosure(actions);
-                if group.is_expanded() {
-                    for node in group.member_nodes_mut() {
-                        changed |= toggle(node.component_mut::<OutputPart>().unwrap(), actions);
-                    }
-                }
-            } else {
-                changed |= toggle(node.component_mut::<OutputPart>().unwrap(), actions);
-            }
-        }
-        changed
-    }
+}
 
-    pub fn into_host(self) -> Result<ContentHost, CompositionError> {
-        let id = self.root;
-        {
-            let mut host = ContentHost::new(Content::new(id, self))?;
-            host.set_action_events(true);
-            Ok(host)
-        }
-    }
+fn part_nodes(nodes: &[Content]) -> Vec<&Content> {
+    nodes
+        .iter()
+        .flat_map(|node| {
+            if let Some(group) = node.component::<crate::ToolRun>() {
+                group.member_nodes().collect()
+            } else {
+                vec![node]
+            }
+        })
+        .collect()
 }
-impl Component for OutputMessage {
-    fn active(&self) -> bool {
-        !self.rows.children.is_empty()
-    }
-    fn children(&self) -> &[Content] {
-        &self.rows.children
-    }
-    fn children_mut(&mut self) -> Option<&mut Vec<Content>> {
-        Some(&mut self.rows.children)
-    }
-    fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
-        let measured = self.rows.measure(text, available);
-        MeasuredChild::new(Size::new(available.width, measured.size.height))
-    }
-    fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
-        arrange_content(
-            &mut self.rows.children,
-            text,
-            frame,
-            clip,
-            Spacing::Regular.value(),
-            false,
-        );
-    }
-    fn semantics(&self) -> ContentSemantics {
-        ContentSemantics::new(
-            ContentRole::Group,
-            (self.labels.text)(OutputMessageText::Group),
-        )
-    }
-}
+
 fn thinking_parts(
     facts: Vec<PartFacts>,
     thinking: Option<&ThinkingStamp>,

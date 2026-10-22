@@ -22,8 +22,8 @@
   "tekesuiInputDigest": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
   "richToolCardRendering": false,
   "crossProcessAccepted": false,
-  "sourceBase": "f61cfcb1f3bad58939da8bfd79e956292bc64dfb",
-  "sourceStage": "plus shared canonical activity/output facts and live-owner eligibility, passive Working row and installed-snapshot native probes; physical plane splitting and settled activity disclosure unfinished",
+  "sourceBase": "d2a55683c91cb658c8938011662d3fbc1888892a",
+  "sourceStage": "plus private OutputMessage control-state / retained-node-store separation; same original algorithms and public facade; physical plane splitting and settled disclosure unfinished",
   "sourcesRead": {
     "ui/components/src/run_port.rs": "9bf8c3d2e746bb1f4a6b9c7a8dabbdeb4738db980c17bfc619f4e3df6f3b9fbf",
     "ui/components/src/transcript_content.rs": "b475b807ff3377e09c4af2c59fe069d95728789ad740592a031cc90aaeda5605",
@@ -404,25 +404,28 @@
       }
     ]
   },
-  "latestVerifiedCiHead": "9909009293a40e72b8bbd8e22b94fcd3951a29a4",
+  "latestVerifiedCiHead": "d2a55683c91cb658c8938011662d3fbc1888892a",
   "latestVerifiedCiConclusion": "Linux x2 SUCCESS; macOS x2 FAILURE at strict bounded_detail_reading (#53)",
   "knownFailure": "Nested detail scroll leaves parent following; strict gate remains required",
-  "currentValidation": "rust-agent-ui-current-validation-20261023.json",
+  "currentValidation": "rust-agent-ui-output-controller-20261023.json",
   "currentSourceNativeAccepted": false,
   "latestNativeAcceptance": {
-    "sourceCommit": "9909009293a40e72b8bbd8e22b94fcd3951a29a4",
-    "programSha256": "3e0eeb6a127cc496b08f5e8134a30e38026c82eb2c05c6e93a2e60db035870be",
+    "sourceBase": "d2a55683c91cb658c8938011662d3fbc1888892a",
+    "sourceSha256": {
+      "ui/components/src/output_message.rs": "32e88afd52a49fc810cf0453a0b4913deee342157767af98275ef5a7e3d66f7e"
+    },
+    "programSha256": "20314521dadde53b0c29bea9af771c700a5a0648cb712cd2e1117b7c69f3ddb9",
     "realHarness": true,
     "realHarnessProfiles": [
       "stream",
       "stream-reading",
       "public-history-page"
     ],
-    "evidence": "rust-agent-ui-turn-planes-20261023.json",
-    "softwareIme": "One normal-app system Pinyin probe passed; earlier first-key failures retained; no stability claim",
+    "evidence": "rust-agent-ui-output-controller-20261023.json",
+    "softwareIme": "One normal-app system Pinyin probe passed; prior failures retained; stability unproven",
     "completeUiAccepted": false,
     "processContainer": false,
-    "currentSourceAccepted": false
+    "currentSourcePartialAccepted": true
   },
   "latestLocalValidation": {
     "rootTests": 289,
@@ -433,13 +436,14 @@
     "rootAndUiStrictAllTargetsClippy": true,
     "currentFullUiSuiteRerun": true,
     "strictReadingExitCode": 1,
-    "newNativeAcceptance": "No native receipts for this policy increment; prior 3e0eeb6a receipts retain original source identity",
+    "newNativeAcceptance": "Current 20314521 program: Pi/DSH/Native stream + stream-reading + public history-page; one software system-Pinyin probe. No physical keyboard/candidate window/VoiceOver or complete UI acceptance.",
     "finalThinkingSourceTests": 5,
     "newReadonlyLiveTestAfterFullSuite": 0,
     "displayOrderTests": 14,
     "readonlyReadingTests": 37,
     "planeTests": 8,
-    "activityPolicyDemoTests": 3
+    "activityPolicyDemoTests": 3,
+    "rootValidationReusedFrom": "Unchanged root source: prior d2a5568 activity-policy receipt; root tests/Clippy were not rerun for this UI-only refactor"
   },
   "publicProcessContractSources": {
     "crates/tekes-ui-module-runtime/src/container.rs": "b34423866204a1ee7e0346b5609ac3c4e1e278025ef8317962f44c54bb53b5e9",
@@ -453,7 +457,8 @@
     "rust-agent-ui-native-resumed-20261023.json",
     "rust-agent-ui-tool-run-20261023.json",
     "rust-agent-ui-tool-url-20261023.json",
-    "rust-agent-ui-tool-header-20261023.json"
+    "rust-agent-ui-tool-header-20261023.json",
+    "rust-agent-ui-current-validation-20261023.json"
   ],
   "importantScope": "Current native local-fixture checks and real protocol/offscreen checks are separate identities; Native 0.9.3 UI-only is not lifecycle or bounded child-history acceptance. No full UI/cross-process/physical keyboard/VoiceOver acceptance.",
   "thinkingPolicy": "rust-agent-ui-thinking-policy-20261023.json",
@@ -478,5 +483,7 @@
     "completeUiAccepted": false,
     "realHarness": false,
     "processContainer": false
-  }
+  },
+  "outputController": "rust-agent-ui-output-controller-20261023.json",
+  "currentSourceNativeAcceptedMeans": "Complete UI acceptance remains unproven; exact current-source partial native profiles are recorded separately"
 }

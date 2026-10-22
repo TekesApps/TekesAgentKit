@@ -1,9 +1,10 @@
 # Rust Agent UI：当前接入范围与交付状态
 
-本页以已提交基线 `f61cfcb` 与本轮共享 Activity 展示判定增量为准，按用户完整目标保留验收范围。
+本页以已提交基线 `d2a5568` 与本轮 OutputMessage 控制器分离增量为准，按用户完整目标保留验收范围。
 当前可供实验宿主接入，**完整交付尚未达到**。组件存在、离屏通过或单个 Issue 关闭都不能单独证明完整 Views 对齐。
-最新源码增量见 [Activity 展示规则](rust-agent-ui-activity-policy-20261023.md)：正常/异常终止默认展开、回合内追加输入和 direct task-source 使用共享判定；物理分区与 settled disclosure 尚未完成。
-原生、真实协议、离屏 GPU 和跨进程证据分别记录，不转移冻结程序身份。本轮结果见[当前程序续验](rust-agent-ui-current-validation-20261023.md)。
+Activity 展示判定见 [Activity 展示规则](rust-agent-ui-activity-policy-20261023.md)：正常/异常终止默认展开、回合内追加输入和 direct task-source 使用共享判定；物理分区与 settled disclosure 尚未完成。
+最新内部结构与当前程序验证见 [OutputMessage 控制器分离](rust-agent-ui-output-controller-20261023.md)。物理分区仍未完成。
+原生、真实协议、离屏 GPU 和跨进程证据分别记录，不转移冻结程序身份。较早程序的独立记录见[历史续验](rust-agent-ui-current-validation-20261023.md)。
 
 ## 依赖与运行身份
 
