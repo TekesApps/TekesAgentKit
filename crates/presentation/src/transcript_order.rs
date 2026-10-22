@@ -118,3 +118,96 @@ impl<'a> TranscriptSection<'a> {
         })
     }
 }
+
+/// A flat display timeline derived from public presentation provenance. Unlike
+/// event_order(), it can place a transient preview or move a committed response
+/// to its frame's first call. It never rewrites protocol positions or identities.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TranscriptDisplayOrder<'a> {
+    pub ordered: Vec<TranscriptOrderedEvent<'a>>,
+    /// No known source or normalized presentation anchor. Remains explicit.
+    pub unplaced: Vec<TranscriptOrderedEvent<'a>>,
+}
+impl<'a> TranscriptSection<'a> {
+    pub fn display_order(
+        &self,
+        scope: &crate::RunScope,
+        sources: &crate::TranscriptThinkingSources,
+    ) -> Result<TranscriptDisplayOrder<'a>> {
+        scope.validate()?;
+        // Preserve all original collision/family checks before display sorting.
+        let original = self.event_order()?;
+        let Some(owner) = &sources.scope else {
+            return Ok(TranscriptDisplayOrder {
+                ordered: original.ordered,
+                unplaced: original.unplaced,
+            });
+        };
+        require(owner == scope, "foreign Transcript presentation sources")?;
+        let mut known = vec![];
+        let mut unplaced = vec![];
+        for (index, event) in original
+            .ordered
+            .into_iter()
+            .chain(original.unplaced)
+            .enumerate()
+        {
+            let source = match event {
+                TranscriptOrderedEvent::Message(item)
+                    if item.kind == crate::TranscriptItemKind::Assistant =>
+                {
+                    sources.by_id.get(&item.id)
+                }
+                TranscriptOrderedEvent::ToolCall(tool) => sources.by_id.get(&tool.id),
+                _ => None,
+            };
+            let order = if let Some(source) = source {
+                require(
+                    source.arrival_order >= 0,
+                    "negative Transcript presentation order",
+                )?;
+                Some(source.arrival_order)
+            } else {
+                match event.position() {
+                    Some(TranscriptSourcePosition::Journal { sequence, .. }) => Some(*sequence),
+                    Some(TranscriptSourcePosition::Native { entry_ordinal, .. }) => {
+                        Some(i64::try_from(*entry_ordinal).map_err(|_| {
+                            tekes_agent_contract::unsupported("native display order exhausted")
+                        })?)
+                    }
+                    None => None,
+                }
+            };
+            if let Some(order) = order {
+                let rank = match event {
+                    TranscriptOrderedEvent::Message(item)
+                        if item.kind == crate::TranscriptItemKind::User =>
+                    {
+                        0
+                    }
+                    TranscriptOrderedEvent::Message(_) => 1,
+                    _ => 2,
+                };
+                known.push((order, rank, index, event));
+            } else {
+                unplaced.push(event);
+            }
+        }
+        known.sort_by(|left, right| {
+            (left.0, left.1).cmp(&(right.0, right.1)).then_with(|| {
+                match (left.3, right.3) {
+                    (TranscriptOrderedEvent::Message(a), TranscriptOrderedEvent::Message(b)) => {
+                        a.id.cmp(&b.id)
+                    }
+                    // Same-record calls retain proven content/call order rather
+                    // than alphabetical tool IDs. Results keep their own sink.
+                    _ => left.2.cmp(&right.2),
+                }
+            })
+        });
+        Ok(TranscriptDisplayOrder {
+            ordered: known.into_iter().map(|(_, _, _, event)| event).collect(),
+            unplaced,
+        })
+    }
+}

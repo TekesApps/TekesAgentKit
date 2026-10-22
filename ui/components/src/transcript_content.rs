@@ -263,7 +263,7 @@ impl TranscriptContent {
         epoch: u64,
         display: Option<crate::TranscriptThinkingDisplayInput>,
     ) -> Result<Vec<Planned<'a>>, &'static str> {
-        let mut rows = plan(snapshot, document, &self.labels, timing)?;
+        let mut rows = plan(&self.scope, snapshot, document, &self.labels, timing)?;
         if let Some(input) = display {
             let mut frames = BTreeMap::new();
             for row in &mut rows {
@@ -1427,6 +1427,7 @@ fn label(key: TranscriptContentRowKey, text: String) -> Planned<'static> {
     }
 }
 fn plan<'a>(
+    scope: &RunScope,
     snapshot: &TranscriptSnapshot,
     document: &'a TranscriptDocument<'a>,
     labels: &TranscriptContentLabels,
@@ -1458,8 +1459,8 @@ fn plan<'a>(
     }
     for section in &document.sections {
         let order = section
-            .event_order()
-            .map_err(|_| "ambiguous transcript event order")?;
+            .display_order(scope, &snapshot.thinking_sources)
+            .map_err(|_| "invalid transcript display order")?;
         let embedded = embedded_tools(section);
         let mut tools = BTreeSet::new();
         for event in &order.ordered {

@@ -478,3 +478,115 @@ fn pi_stream_receipt_preserves_canonical_entry_and_suppresses_late_preview() {
     );
     assert_eq!(doc.sections[0].outputs[0].reconciliation_key(), None);
 }
+
+fn call_before_response() -> TranscriptSnapshot {
+    let rows = vec![
+        ("turn/start", json!({"turn":1})),
+        (
+            "user/message",
+            json!({"turn":1,"id":"input","content":[{"type":"text","text":"输入"}]}),
+        ),
+        (
+            "tool/call",
+            json!({"turn":1,"step":1,"callId":"z","name":"read","arguments":{}}),
+        ),
+        (
+            "tool/call",
+            json!({"turn":1,"step":1,"callId":"a","name":"read","arguments":{}}),
+        ),
+        (
+            "assistant/message",
+            json!({"turn":1,"step":1,"message":{"id":"response","content":[{"type":"reasoning","text":"思考"},{"type":"text","text":"调用之前的说明"}]}}),
+        ),
+    ];
+    let entries:Vec<_>=rows.into_iter().enumerate().map(|(seq,(kind,data))|json!({"event":{"type":kind,"seq":seq,"time":100-seq,"data":data}})).collect();
+    let mut store = MemoryProjectionStore::new("e");
+    store.apply("journal:a",json!({"type":"snapshot","snapshot":{"sessionId":"a","generation":"g","throughSequence":4,"windowLimit":50,"hasMoreBefore":false,"entries":entries}})).unwrap();
+    store.apply("journal:a",json!({"type":"transient","generation":"g","sessionId":"a","event":{"type":"assistant/chunk","seq":9999,"time":0,"data":{"turn":1,"step":2,"chunk":{"type":"reasoning-delta","delta":"下一步思考"}}}})).unwrap();
+    TranscriptSnapshot::read(&RunScope::main("e", "a"), &store.sessions["a"]).unwrap()
+}
+#[test]
+fn display_order_anchors_delayed_commit_before_calls_and_places_preview_without_rewriting_protocol()
+{
+    let snapshot = call_before_response();
+    let original = snapshot.clone();
+    let doc = TranscriptDocument::read(&snapshot).unwrap();
+    let section = &doc.sections[0];
+    let first_id = json!(["e", "a", "tool:z"]).to_string();
+    let second_id = json!(["e", "a", "tool:a"]).to_string();
+    let raw = section.event_order().unwrap();
+    assert!(matches!(raw.ordered[1],TranscriptOrderedEvent::ToolCall(tool) if tool.id==first_id));
+    assert_eq!(raw.unplaced.len(), 1);
+    let display = section
+        .display_order(&RunScope::main("e", "a"), &snapshot.thinking_sources)
+        .unwrap();
+    assert!(display.unplaced.is_empty());
+    assert!(
+        matches!(display.ordered[1],TranscriptOrderedEvent::Message(row) if row.text=="调用之前的说明" && row.source_sequence==Some(4))
+    );
+    assert!(
+        matches!(display.ordered[2],TranscriptOrderedEvent::ToolCall(tool) if tool.id==first_id)
+    );
+    assert!(
+        matches!(display.ordered[3],TranscriptOrderedEvent::ToolCall(tool) if tool.id==second_id)
+    );
+    assert!(
+        matches!(display.ordered[4],TranscriptOrderedEvent::Message(row) if row.is_provisional && row.source_position.is_none())
+    );
+    assert_eq!(section.event_order().unwrap(), raw);
+    assert_eq!(snapshot, original);
+}
+#[test]
+fn display_sources_require_scope_and_valid_order_and_legacy_never_guesses_from_time() {
+    let snapshot = call_before_response();
+    let doc = TranscriptDocument::read(&snapshot).unwrap();
+    let section = &doc.sections[0];
+    assert!(
+        section
+            .display_order(&RunScope::main("other", "a"), &snapshot.thinking_sources)
+            .is_err()
+    );
+    let mut sources = (*snapshot.thinking_sources).clone();
+    sources.by_id.values_mut().next().unwrap().arrival_order = -1;
+    assert!(
+        section
+            .display_order(&RunScope::main("e", "a"), &sources)
+            .is_err()
+    );
+    let legacy = section
+        .display_order(
+            &RunScope::main("e", "a"),
+            &TranscriptThinkingSources::default(),
+        )
+        .unwrap();
+    let raw = section.event_order().unwrap();
+    assert_eq!(legacy.ordered, raw.ordered);
+    assert_eq!(legacy.unplaced, raw.unplaced);
+}
+#[test]
+fn native_display_order_rebases_after_paging_but_preview_never_acquires_entry_identity() {
+    let entries = native_entries()[..2].to_vec();
+    let preview = json!({"type":"message_update","message":{"role":"assistant","timestamp":2,"content":[{"type":"text","text":"streaming"}]}});
+    let first = native(entries.clone(), Some(preview.clone()));
+    let mut prefixed = vec![
+        json!({"type":"message","id":"older-u","message":{"role":"user","timestamp":0,"content":"older"}}),
+    ];
+    prefixed.extend(entries);
+    let next = native(prefixed, Some(preview));
+    let a = TranscriptDocument::read(&first).unwrap();
+    let b = TranscriptDocument::read(&next).unwrap();
+    let before = a.sections[0]
+        .display_order(&RunScope::main("e", "a"), &first.thinking_sources)
+        .unwrap();
+    let after = b.sections[1]
+        .display_order(&RunScope::main("e", "a"), &next.thinking_sources)
+        .unwrap();
+    assert!(before.unplaced.is_empty() && after.unplaced.is_empty());
+    for order in [&before, &after] {
+        assert!(
+            matches!(order.ordered.last(),Some(TranscriptOrderedEvent::Message(row)) if row.is_provisional && row.record_id.is_none() && row.source_position.is_none())
+        );
+    }
+    assert_eq!(first.tools[0].id, next.tools[0].id);
+    assert_eq!(a.sections[0].outputs[0].key, b.sections[1].outputs[0].key);
+}

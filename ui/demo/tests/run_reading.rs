@@ -2073,10 +2073,9 @@ fn readonly_y(host: &ContentHost, root: ComponentId, item: ComponentId) -> f32 {
 #[tokio::test]
 async fn readonly_transaction_preserves_anchor_across_availability_refresh_and_history_prepend() {
     let (runtime, _, _, full, _, mut text) = setup().await;
-    let scope = RunScope {
-        session_id: "bounded-b".into(),
-        ..RunScope::main("fixture", "b")
-    };
+    // This is a read-only rendering fixture, not a bounded-child SEP proof.
+    // Its provenance remains bound to the actual captured source scope.
+    let scope = full.run.as_ref().unwrap().scope.clone();
     let mut initial = full.clone();
     let keep: std::collections::BTreeSet<_> = initial
         .transcript
@@ -2150,7 +2149,7 @@ async fn readonly_transaction_preserves_anchor_across_availability_refresh_and_h
 #[tokio::test]
 async fn readonly_preflight_rejects_plan_aba_and_foreign_sdk_token_without_any_publication() {
     let (runtime, _, _, full, _, mut text) = setup().await;
-    let scope = RunScope::main("fixture", "readonly");
+    let scope = full.run.as_ref().unwrap().scope.clone();
     let mut pane =
         ReadOnlyTranscript::standard(38000, 38003..39000, scope.clone(), Default::default())
             .unwrap();
@@ -2235,7 +2234,7 @@ async fn readonly_plan_is_original_owner_only_and_formats_status_before_the_sdk_
         format!("owned {count}")
     }
     let (runtime, _, _, full, _, mut text) = setup().await;
-    let scope = RunScope::main("fixture", "bounded-owner");
+    let scope = full.run.as_ref().unwrap().scope.clone();
     let labels = ReadOnlyTranscriptLabels {
         information: status,
         ..Default::default()

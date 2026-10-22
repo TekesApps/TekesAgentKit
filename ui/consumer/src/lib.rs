@@ -8,6 +8,17 @@ pub fn thinking_policy<'a>(
     tekes_agent_components_ui::TranscriptThinkingPolicy::read(input)
         .map_err(|error| error.to_string())
 }
+/// Read-only display projection; consumers keep protocol source positions and
+/// reading identities unchanged instead of implementing their own sort.
+pub fn display_timeline<'a>(
+    section: &tekes_agent_components_ui::TranscriptSection<'a>,
+    scope: &tekes_agent_components_ui::RunScope,
+    sources: &tekes_agent_components_ui::TranscriptThinkingSources,
+) -> Result<tekes_agent_components_ui::TranscriptDisplayOrder<'a>, String> {
+    section
+        .display_order(scope, sources)
+        .map_err(|error| error.to_string())
+}
 /// The independent host forwards preference before the normal Run plan. It
 /// does not calculate message frames or issue endpoint reads.
 pub fn prepare_thinking_run<'a>(

@@ -76,3 +76,8 @@ TranscriptContent、RunPort 和 ReadOnlyTranscript 可用 `set_thinking_display`
 来源工厂还负责同 frame 的 reasoning carrier 与规范思考正文；受控详情合成一行并修剪首尾空白，
 不改原消息 DTO/整消息复制。宿主不自行比较正文选载体。精确范围及独立 kind/时间线剩余项见
 [思考载体契约](rust-agent-ui-reasoning-carrier-20261023.md)。
+
+TranscriptContent/RunPort/只读 pane 已直接消费 `TranscriptSection::display_order` 的共享容器展示顺序；
+`event_order` 继续用于原始事件证据，宿主不把原 seq 改成展示 anchor，也不自行重排。
+源目录必须来自当前真实 scope；只读 child 不能简单重新标记父快照。
+详细契约与本轮 IME 首键异常见[展示顺序记录](rust-agent-ui-display-order-20261023.md)。
