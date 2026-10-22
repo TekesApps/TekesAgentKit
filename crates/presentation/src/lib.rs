@@ -80,3 +80,6 @@ pub use sidebar_folders::*;
 
 mod goal;
 pub use goal::*;
+
+mod transcript_planes;
+pub use transcript_planes::*;

@@ -1,6 +1,6 @@
 # Rust Agent UI：当前接入范围与交付状态
 
-本页以已提交基线 `06d86f8` 与本轮平面容器顺序增量为准，按用户完整目标保留验收范围。
+本页以已提交基线 `8734185` 与本轮 activity/output 分区及 live 状态增量为准，按用户完整目标保留验收范围。
 当前可供实验宿主接入，**完整交付尚未达到**。组件存在、离屏通过或单个 Issue 关闭都不能单独证明完整 Views 对齐。
 原生、真实协议、离屏 GPU 和跨进程证据分别记录，不转移冻结程序身份。本轮结果见[当前程序续验](rust-agent-ui-current-validation-20261023.md)。
 
@@ -60,3 +60,5 @@
 [思考载体与排版](rust-agent-ui-reasoning-carrier-20261023.md)：当前根 278、UI 588 项通过，1 项已有忽略；严格检查与本地 fixture 原生阅读/软件拼音通过，完整布局及真实三端验收仍开放。
 
 [原始位置与展示顺序](rust-agent-ui-display-order-20261023.md)：当前根 281、UI 589 项通过，原生阅读通过；系统拼音首次失败、同程序复跑通过，稳定验收未证明，已补充 TekesUI #41。
+
+[分区与 live 状态](rust-agent-ui-turn-planes-20261023.md)：共享 presentation 负责原 live-owner 规则与分区事实，live Working 行已接原 planner；根 285、UI 590 项通过。当前程序的真实三端原生 stream、stream-reading 和公共分页 profile 通过；物理 plane 布局/settled disclosure、原生分页按钮、稳定系统 IME 与 ProcessContainer 仍未完成。

@@ -22,11 +22,11 @@
   "tekesuiInputDigest": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
   "richToolCardRendering": false,
   "crossProcessAccepted": false,
-  "sourceBase": "06d86f8",
-  "sourceStage": "plus protocol-position-preserving container display order, same-step commit anchoring and normalized preview placement; narration/kinds/plane splitting and full layout unfinished",
+  "sourceBase": "8734185",
+  "sourceStage": "plus shared canonical activity/output facts and live-owner eligibility, passive Working row and installed-snapshot native probes; physical plane splitting and settled activity disclosure unfinished",
   "sourcesRead": {
     "ui/components/src/run_port.rs": "9bf8c3d2e746bb1f4a6b9c7a8dabbdeb4738db980c17bfc619f4e3df6f3b9fbf",
-    "ui/components/src/transcript_content.rs": "e336e4302562d1b3e12c0b33f75e83428879833f4fbcc3cd16ad458aa9d4ba93",
+    "ui/components/src/transcript_content.rs": "b475b807ff3377e09c4af2c59fe069d95728789ad740592a031cc90aaeda5605",
     "ui/components/src/indicators.rs": "0e14f0615bbf6984faa21de8ff949407bff5f39cbc8d9132554e256d26b10706",
     "ui/components/src/sidebar.rs": "cc6ffe52644de133e634a1a49462e997bd26952357b2548d12fdea09667be566",
     "ui/components/src/side_panel.rs": "2e6a1a102e24856da8532c174e1d8700976e61caee1c80af75c3145499253094",
@@ -45,16 +45,21 @@
     "crates/session/src/native_assistant.rs": "0ddd4556c5df20782ca2378d4899f42777f0f76e6ed0a71647669ff2c72dd9ec",
     "ui/components/src/readonly_transcript.rs": "aed16ad8e4b8be14cfdb6e05faac134f56b3ac664324f78f3c25809883c7bfef",
     "ui/demo/src/component_demo.rs": "8ae8e2d975780075fba57799624c2e79e334ca5d97d4d16907bf0ec998affe4d",
-    "ui/consumer/src/lib.rs": "4ae9b24cd315930392850e6f40a0974860a2e2ae842038e50eb292f8bc9254b2",
+    "ui/consumer/src/lib.rs": "9452625e942326d6af183605300532b85a75563f0c60cf3f7f7bf9cb4a722f4f",
     "ui/demo/tests/thinking_sources.rs": "12642f76c1f3b87988d8bf6d2ff6216a3e4fff05267d9730408cea9d3d06b2ac",
     "crates/presentation/src/transcript.rs": "fb0da1616c1db12c9647c14093e36279239f42fc01b7707a6bb5f53a0000da16",
     "crates/presentation/tests/thinking_sources.rs": "b0bc26463c7848cf07852c9d5926e01d3dcfd721d92b11325826b6958d126459",
     "ui/demo/tests/output_message.rs": "4a5eb9658732a00755c8636c7a37515f32a54e8736fac78f31f8819774a1251a",
     "crates/presentation/src/transcript_order.rs": "43515cabe7da31d93888c922ac97447d9a23bfee6957951c206f427408a37c04",
     "crates/presentation/tests/transcript_order.rs": "513cef92e8aa1b88268e6b43fe395cffaa89a18d59567289976c71bdd62039e7",
-    "ui/components/src/lib.rs": "9b4e336530aee6697d5dbcf8fcd1e3f35db02e1071e16a9fbda251a16b7f2a70",
-    "ui/demo/tests/display_order.rs": "520830e560ae69b93bca07d0adac21d20b21872a4ab80ba47cd2c46f1ab58a87",
-    "ui/demo/tests/run_reading.rs": "e3421d9ea14dd7e72724ae0ef13f504f1a7c53b9569093c9d6dd2d6d3f81eec4"
+    "ui/components/src/lib.rs": "a9586a49983cd5e80b8a12ef8c3730aa5be32132e2f591207cfc94e4571bb663",
+    "ui/demo/tests/display_order.rs": "3d94a34603a450e021bfc6b2e7dce23ea31b07dda71f59e170de9c4ff1b87c8c",
+    "ui/demo/tests/run_reading.rs": "e3421d9ea14dd7e72724ae0ef13f504f1a7c53b9569093c9d6dd2d6d3f81eec4",
+    "crates/presentation/src/lib.rs": "90580d75101ffe730527972bad49929a764fbfe14ea939e6f2d2b64a94969572",
+    "crates/presentation/src/transcript_planes.rs": "d6850a68ac0f39ffa525156231ec0284a8fe7d71c858d25e7e2e7959da6c9778",
+    "crates/presentation/tests/transcript_planes.rs": "6ef6914f084e8ea63609c821eec69aeac037bcc7e64862fe1de4204e81e2eedf",
+    "ui/demo/src/native_stream_selftest.rs": "0b49ed42f72090a64fa8566ed8bf60356cc3b607c87b94f526584f0fa03a5ef7",
+    "ui/components/src/turn_footnote_timing.rs": "5cbded0aeadbd59f62ebbf2a08c7d13143b0d9a40a4d5f18232d21a6f19c0277"
   },
   "publicIssues": [
     {
@@ -416,19 +421,20 @@
     "processContainer": false
   },
   "latestLocalValidation": {
-    "rootTests": 281,
-    "fullUiTests": 589,
+    "rootTests": 285,
+    "fullUiTests": 590,
     "uiIgnored": 1,
     "newSourceTests": 11,
     "newFixtureConsumerPipelineTests": 1,
     "rootAndUiStrictAllTargetsClippy": true,
     "currentFullUiSuiteRerun": true,
     "strictReadingExitCode": 1,
-    "newNativeAcceptance": "local fixture reading passed; system Pinyin first attempt failed and unmodified repeat passed; stable acceptance false; f4dbd88f program",
+    "newNativeAcceptance": "current 3e0eeb6a program: Pi/DSH/Native native stream + stream-reading + public history-page profiles; native page button false; physical/system IME not accepted",
     "finalThinkingSourceTests": 5,
     "newReadonlyLiveTestAfterFullSuite": 0,
     "displayOrderTests": 14,
-    "readonlyReadingTests": 37
+    "readonlyReadingTests": 37,
+    "planeTests": 4
   },
   "publicProcessContractSources": {
     "crates/tekes-ui-module-runtime/src/container.rs": "b34423866204a1ee7e0346b5609ac3c4e1e278025ef8317962f44c54bb53b5e9",
@@ -452,5 +458,8 @@
   "reasoningCarrier": "rust-agent-ui-reasoning-carrier-20261023.json",
   "displayOrder": "rust-agent-ui-display-order-20261023.json",
   "systemImeStableAcceptanceProven": false,
-  "systemImeDiagnostic": "https://github.com/TekesApps/TekesUI/issues/41#issuecomment-6351744540"
+  "systemImeDiagnostic": "https://github.com/TekesApps/TekesUI/issues/41#issuecomment-6351744540",
+  "turnPlanes": "rust-agent-ui-turn-planes-20261023.json",
+  "sameProcessNativeThreeHarnessProfiles": true,
+  "physicalPlaneLayoutComplete": false
 }

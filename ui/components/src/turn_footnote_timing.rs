@@ -1,9 +1,6 @@
 //! Explicit display observations over an existing canonical publication.
 use crate::TurnFootnoteLabels;
-use tekes_agent_presentation::{
-    ChildComposerAvailability, ConnectionPhase, RunPhase, RunSnapshot, TranscriptSnapshot,
-    TranscriptTurn,
-};
+use tekes_agent_presentation::{ConnectionPhase, RunSnapshot, TranscriptSnapshot, TranscriptTurn};
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TranscriptFootnoteTiming {
@@ -29,36 +26,13 @@ pub struct TurnFootnoteDisplay {
     pub goal_state: Option<tekes_agent_presentation::GoalPhase>,
 }
 fn candidate(snapshot: &TranscriptSnapshot) -> Option<&TranscriptTurn> {
-    if snapshot.is_stale {
-        return None;
-    }
-    snapshot
-        .turns
-        .last()
-        .filter(|turn| turn.status == "running" && turn.ended_at.is_none())
+    snapshot.latest_open_turn()
 }
+
 impl TranscriptFootnoteTiming {
     /// ClientKit's eligible last open turn policy, using one original Run frame.
     /// A retained running string alone never grants live presentation.
     pub fn for_run(snapshot: &RunSnapshot, revision: u64, now_ms: Option<f64>) -> Self {
-        let can_present = snapshot.run.as_ref().is_some_and(|run| {
-            run.connection.phase == ConnectionPhase::Connected
-                && snapshot.connection.phase == ConnectionPhase::Connected
-                && !snapshot.connection.history_is_stale
-                && matches!(
-                    run.phase,
-                    RunPhase::Idle | RunPhase::Running | RunPhase::WaitingForInput
-                )
-                && matches!(
-                    snapshot.child_availability,
-                    None | Some(ChildComposerAvailability::Available)
-                )
-                && snapshot.selection.as_ref().is_some_and(|selection| {
-                    selection.destination
-                        == tekes_agent_presentation::ComposerDestination::run(run.scope.clone())
-                })
-                && (run.can_submit || run.can_cancel)
-        });
         Self {
             goal: snapshot
                 .goal
@@ -76,10 +50,9 @@ impl TranscriptFootnoteTiming {
                 .cloned(),
             revision,
             now_ms,
-            live_turn_id: can_present
-                .then(|| candidate(&snapshot.transcript))
-                .flatten()
-                .map(|t| t.id.clone()),
+            live_turn_id: snapshot
+                .live_presentation_turn()
+                .map(|turn| turn.id.clone()),
         }
     }
     pub(crate) fn validate(&self, snapshot: &TranscriptSnapshot) -> Result<(), &'static str> {

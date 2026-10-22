@@ -81,3 +81,10 @@ TranscriptContent/RunPort/只读 pane 已直接消费 `TranscriptSection::displa
 `event_order` 继续用于原始事件证据，宿主不把原 seq 改成展示 anchor，也不自行重排。
 源目录必须来自当前真实 scope；只读 child 不能简单重新标记父快照。
 详细契约与本轮 IME 首键异常见[展示顺序记录](rust-agent-ui-display-order-20261023.md)。
+
+`RunSnapshot::turn_planes(turn_id)` 和原组件 `TranscriptContent::turn_planes` 提供 activity/output/narration facts，
+正常宿主无需判断 live-owner。原 `TranscriptFootnoteTiming::for_run` 已复用 presentation 的
+`live_presentation_turn`。Working 被动行随同一发布的 owner 生命周期产生/退休，
+copy 可用 `TranscriptContentLabels.activity_working` 配置；不承担焦点或输入实现。
+分区 facts 不授予动作权限，也尚未完成历史 activity 折叠/物理 plane 布局；
+[API 与当前三端原生验收范围](rust-agent-ui-turn-planes-20261023.md)。

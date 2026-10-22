@@ -8,6 +8,13 @@ pub fn thinking_policy<'a>(
     tekes_agent_components_ui::TranscriptThinkingPolicy::read(input)
         .map_err(|error| error.to_string())
 }
+/// Installed business-plane facts; the host does not classify assistant prose.
+pub fn installed_turn_planes(
+    view: &tekes_agent_components_ui::TranscriptContent,
+    turn_id: &str,
+) -> Result<tekes_agent_components_ui::TranscriptTurnPlanes, &'static str> {
+    view.turn_planes(turn_id)
+}
 /// Read-only display projection; consumers keep protocol source positions and
 /// reading identities unchanged instead of implementing their own sort.
 pub fn display_timeline<'a>(

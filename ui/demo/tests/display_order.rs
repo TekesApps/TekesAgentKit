@@ -5,7 +5,7 @@ use tekes_agent_presentation::{ComposerDestination, PresentationStore};
 use tekes_agent_session::{ConnectionState, MemoryProjectionStore};
 use tekes_ui_controls::composition::*;
 
-fn captured_run() -> RunSnapshot {
+fn captured_store() -> MemoryProjectionStore {
     let rows = vec![
         ("turn/start", json!({"turn":1})),
         (
@@ -33,6 +33,10 @@ fn captured_run() -> RunSnapshot {
     store.inventory_ready = true;
     store.control_ready = true;
     store.actionables_ready = true;
+    store
+}
+fn captured_run() -> RunSnapshot {
+    let store = captured_store();
     let mut view = PresentationStore::default();
     view.select(ComposerDestination::run(RunScope::main("sep", "s")))
         .unwrap();
@@ -164,4 +168,98 @@ fn shared_display_order_drives_original_run_rows_tools_reading_keys_and_retained
         baseline
     );
     assert_eq!(source, original);
+}
+
+#[test]
+fn working_row_and_installed_plane_facts_follow_original_run_ownership_through_settlement() {
+    let scope = RunScope::main("sep", "s");
+    let mut store = captured_store();
+    let mut presentation = PresentationStore::default();
+    presentation
+        .select(ComposerDestination::run(scope.clone()))
+        .unwrap();
+    let first = presentation.refresh(&store).unwrap();
+    let turn = first.transcript.turns.last().unwrap().id.clone();
+    let mut run = RunPort::standard(6400, 6410..6600, scope.clone()).unwrap();
+    run.update(
+        &first,
+        Default::default(),
+        ComposerControlGate::OPEN,
+        paging(&scope),
+        true,
+    )
+    .unwrap();
+    let content = run.transcript().unwrap();
+    let status = TranscriptContentRowKey::ActivityStatus(turn.clone());
+    let key_index = content
+        .row_keys()
+        .iter()
+        .position(|key| key == &status)
+        .unwrap();
+    assert!(key_index > 0);
+    let input = first
+        .transcript
+        .items
+        .iter()
+        .find(|row| row.kind == TranscriptItemKind::User)
+        .unwrap();
+    assert_eq!(
+        content.row_keys()[0],
+        TranscriptContentRowKey::Message(TranscriptMessageIdentity::Item(input.id.clone()))
+    );
+    let status_id = content.row_id(&status).unwrap();
+    let original_output = first
+        .transcript
+        .items
+        .iter()
+        .find(|row| row.text == "工具之前的说明")
+        .unwrap();
+    let output_key = TranscriptContentRowKey::Message(TranscriptMessageIdentity::Item(
+        original_output.id.clone(),
+    ));
+    let output_id = content.row_id(&output_key).unwrap();
+    let facts = tekes_agent_ui_consumer_check::installed_turn_planes(content, &turn).unwrap();
+    assert!(facts.is_live_owner && facts.has_activity && !facts.has_output);
+    assert_eq!(first.turn_planes(&turn).unwrap(), facts);
+    assert_eq!(facts.items[&original_output.id].is_narration, Some(true));
+    let root = run.ids().root;
+    let mut host = run.into_host().unwrap();
+    assert_eq!(
+        host.get(status_id)
+            .unwrap()
+            .component::<TextContent>()
+            .unwrap()
+            .text,
+        "Working"
+    );
+    store.apply("journal:s",json!({"type":"event","generation":"g","sessionId":"s","entry":{"event":{"type":"turn/end","seq":5,"time":200,"data":{"turn":1,"reason":"completed"}}}})).unwrap();
+    let next = presentation.refresh(&store).unwrap();
+    let run = host
+        .get_mut(root)
+        .unwrap()
+        .component_mut::<RunPort>()
+        .unwrap();
+    run.update(
+        &next,
+        Default::default(),
+        ComposerControlGate::OPEN,
+        paging(&scope),
+        true,
+    )
+    .unwrap();
+    assert!(run.transcript().unwrap().row_id(&status).is_none());
+    assert_eq!(
+        run.transcript().unwrap().row_id(&output_key),
+        Some(output_id)
+    );
+    let facts =
+        tekes_agent_ui_consumer_check::installed_turn_planes(run.transcript().unwrap(), &turn)
+            .unwrap();
+    assert!(!facts.is_live_owner && facts.has_output);
+    assert_eq!(next.turn_planes(&turn).unwrap(), facts);
+    assert_eq!(
+        facts.items[&original_output.id].body,
+        Some(TranscriptPlane::Output)
+    );
+    assert!(host.get(status_id).is_none());
 }

@@ -29,6 +29,8 @@ pub enum TranscriptContentRowKey {
     Message(TranscriptMessageIdentity),
     Tool(String),
     TurnFootnote(String),
+    /// Passive status of the captured live owner, never a disclosure or action.
+    ActivityStatus(String),
     /// Compatibility lookup for the original nested feedback control. This is
     /// no longer a separate reading row; use feedback_controls() for callbacks.
     TurnFeedback(String),
@@ -82,6 +84,7 @@ pub struct TranscriptContentLabels {
     pub unplaced: String,
     pub notices: String,
     pub stale: String,
+    pub activity_working: String,
     pub input_details: OutputMessageLabels,
     pub input_information: fn(TranscriptDelivery) -> String,
     pub input_copy: String,
@@ -107,6 +110,7 @@ impl Default for TranscriptContentLabels {
             unplaced: "部分事件尚未提供公开位置".into(),
             notices: "会话提示".into(),
             stale: "历史待同步".into(),
+            activity_working: "Working".into(),
             input_details: InputMessage::default_details_labels(),
             input_copy: "复制输入".into(),
             input_information: |delivery| match delivery {
@@ -367,7 +371,8 @@ impl TranscriptContent {
                 }
                 PlannedContent::Footnote(turn, _, _, _) => Some(turn.id.as_str()),
                 PlannedContent::Label(_) => match &row.key {
-                    TranscriptContentRowKey::Unplaced(turn) => Some(turn.as_str()),
+                    TranscriptContentRowKey::Unplaced(turn)
+                    | TranscriptContentRowKey::ActivityStatus(turn) => Some(turn.as_str()),
                     _ => None,
                 },
             };
@@ -442,6 +447,25 @@ impl TranscriptContent {
             return Err("transcript turn target is no longer present");
         }
         Ok(())
+    }
+    /// Plane facts for the installed publication, not a new runtime read or
+    /// facts for a pending preference/clock. Use existing capture APIs for actions.
+    pub fn turn_planes(&self, turn_id: &str) -> Result<crate::TranscriptTurnPlanes, &'static str> {
+        let snapshot = self.last.as_ref().ok_or("transcript not published")?;
+        let document =
+            TranscriptDocument::read(snapshot).map_err(|_| "invalid transcript document")?;
+        let section = document
+            .sections
+            .iter()
+            .find(|section| section.id == turn_id)
+            .ok_or("transcript turn unavailable")?;
+        section
+            .planes(
+                &self.scope,
+                &snapshot.thinking_sources,
+                self.timing.live_turn_id.as_deref() == Some(turn_id),
+            )
+            .map_err(|_| "invalid transcript planes")
     }
     pub fn retained_operation_count(&self) -> usize {
         self.detached.len()
@@ -1458,6 +1482,14 @@ fn plan<'a>(
         }
     }
     for section in &document.sections {
+        let section_start = result.len();
+        let planes = section
+            .planes(
+                scope,
+                &snapshot.thinking_sources,
+                timing.live_turn_id.as_deref() == Some(section.id),
+            )
+            .map_err(|_| "invalid transcript planes")?;
         let order = section
             .display_order(scope, &snapshot.thinking_sources)
             .map_err(|_| "invalid transcript display order")?;
@@ -1478,6 +1510,19 @@ fn plan<'a>(
             if let Some(row) = event_row(*event, section, &embedded, &mut tools)? {
                 result.push(row);
             }
+        }
+        if planes.is_live_owner {
+            let before = result[section_start..]
+                .iter()
+                .position(|row| !matches!(row.content, PlannedContent::Input(_)))
+                .map_or(result.len(), |index| section_start + index);
+            result.insert(
+                before,
+                label(
+                    Key::ActivityStatus(section.id.into()),
+                    labels.activity_working.clone(),
+                ),
+            );
         }
         if let Some(turn) = section.turn {
             let output = copies.remove(&turn.id);

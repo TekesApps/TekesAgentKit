@@ -16,6 +16,7 @@ pub(super) struct Probe {
     row: Option<ComponentId>,
     body: Option<ComponentId>,
     epoch: u64,
+    live_status: Option<ComponentId>,
 }
 impl Probe {
     pub fn new() -> Self {
@@ -26,6 +27,7 @@ impl Probe {
             row: None,
             body: None,
             epoch: 0,
+            live_status: None,
         }
     }
     pub fn prepare(view: &ComponentDemo) {
@@ -79,6 +81,15 @@ impl Probe {
             .component::<TranscriptContent>()
             .unwrap()
     }
+    fn displayed(view: &ComponentDemo) -> &RunSnapshot {
+        view.tree
+            .get(ComponentId(view.ids().root.0 + 16))
+            .unwrap()
+            .component::<tekes_agent_components_ui::RunPort>()
+            .unwrap()
+            .displayed_snapshot()
+            .unwrap()
+    }
     fn final_output(run: &RunSnapshot) -> Option<(TranscriptMessageIdentity, String)> {
         let document = TranscriptDocument::read(&run.transcript).unwrap();
         document
@@ -88,8 +99,19 @@ impl Probe {
             .map(|output| (output.key.into(), output.item.text.clone()))
     }
     fn check_final(&self, view: &ComponentDemo) {
-        let run = view.binding().current_run().unwrap();
-        let (key, text) = Self::final_output(&run).expect("completed source answer");
+        let run = Self::displayed(view);
+        let status = self.live_status.expect("live activity status was observed");
+        assert!(
+            view.tree.get(status).is_none(),
+            "settlement must retire the actual activity status node"
+        );
+        assert!(
+            !Self::content(view)
+                .row_keys()
+                .iter()
+                .any(|key| matches!(key, TranscriptContentRowKey::ActivityStatus(_)))
+        );
+        let (key, text) = Self::final_output(run).expect("completed source answer");
         assert_eq!(text, "ENDPOINT_REPLY_OK");
         assert_eq!(
             Self::content(view).row_id(&TranscriptContentRowKey::Message(key)),
@@ -195,7 +217,7 @@ impl Probe {
             return;
         }
         let view = &host.view;
-        let run = view.binding().current_run().unwrap();
+        let run = Self::displayed(view);
         match self.phase {
             0 if run.can_submit && view.editor().input.text == INPUT => {
                 self.post(1, vec![Self::click(view, view.ids().send)]);
@@ -214,6 +236,39 @@ impl Probe {
                 else {
                     return;
                 };
+                let status = Self::content(view).row_id(&TranscriptContentRowKey::ActivityStatus(
+                    output.item.turn_id.clone(),
+                ));
+                if status.is_none() {
+                    eprintln!(
+                        "NATIVE_STREAM_PLANE_CONTEXT {}",
+                        serde_json::json!({
+                            "publication":run.revision,"previewTurn":output.item.turn_id,
+                            "lastTurn":run.transcript.turns.last().map(|turn|serde_json::json!({"id":turn.id,"status":turn.status,"endedAt":turn.ended_at})),
+                            "timingLive":Self::content(view).footnote_timing().live_turn_id,
+                            "sourceLive":run.transcript.thinking_sources.live_turn_id,
+                            "stale":run.transcript.is_stale,"historyStale":run.connection.history_is_stale,
+                            "phase":run.run.as_ref().map(|state|format!("{:?}",state.phase)),
+                            "runHistoryStale":run.run.as_ref().map(|state|state.connection.history_is_stale),
+                            "canSubmit":run.run.as_ref().map(|state|state.can_submit),
+                            "canCancel":run.run.as_ref().map(|state|state.can_cancel),
+                            "selection":run.selection.is_some()
+                        })
+                    );
+                }
+                let status = status.expect("installed live source owns a Working row");
+                let node = view.tree.get(status).expect("activity status mounted");
+                assert!(
+                    node.visible().is_some_and(|rect| rect.size.height > 0.),
+                    "activity status is actually visible"
+                );
+                assert_eq!(
+                    node.component::<tekes_ui_controls::composition::TextContent>()
+                        .unwrap()
+                        .text,
+                    "Working"
+                );
+                self.live_status = Some(status);
                 let key: TranscriptMessageIdentity = output.key.into();
                 let Some(row) = Self::content(view).row_id(&TranscriptContentRowKey::Message(key))
                 else {
@@ -254,7 +309,7 @@ impl Probe {
                     ],
                 );
             }
-            2 if Self::final_output(&run).is_some_and(|(key, _)| {
+            2 if Self::final_output(run).is_some_and(|(key, _)| {
                 Self::content(view)
                     .row_id(&TranscriptContentRowKey::Message(key))
                     .is_some()
@@ -306,7 +361,7 @@ impl Probe {
             }
             5 if run.connection_epoch > self.epoch
                 && !run.transcript.is_stale
-                && Self::final_output(&run).is_some_and(|(key, _)| {
+                && Self::final_output(run).is_some_and(|(key, _)| {
                     Self::content(view)
                         .row_id(&TranscriptContentRowKey::Message(key))
                         .is_some()
@@ -322,6 +377,6 @@ impl Probe {
     pub fn receipt(&self, view: &ComponentDemo) -> serde_json::Value {
         assert_eq!(self.phase, 6, "native stream probe incomplete");
         self.check_final(view);
-        serde_json::json!({"nativeWindow":true,"nativePointer":true,"nativeTextServices":true,"nativeAxSelection":true,"activePreview":true,"sameOutputRow":true,"sameTextOwner":true,"selectionRetained":true,"focusRetainedDuringSettlement":true,"oneSubmission":true,"sessionDraftIsolation":true,"reconnectNoReplay":true,"stateDrivenCallbacks":true,"physicalIme":false,"voiceOver":false,"readingAnchorAcceptance":false})
+        serde_json::json!({"nativeWindow":true,"nativePointer":true,"nativeTextServices":true,"nativeAxSelection":true,"activePreview":true,"sameOutputRow":true,"sameTextOwner":true,"selectionRetained":true,"focusRetainedDuringSettlement":true,"oneSubmission":true,"sessionDraftIsolation":true,"reconnectNoReplay":true,"stateDrivenCallbacks":true,"liveActivityStatus":true,"activityStatusRetired":true,"physicalIme":false,"voiceOver":false,"readingAnchorAcceptance":false})
     }
 }
