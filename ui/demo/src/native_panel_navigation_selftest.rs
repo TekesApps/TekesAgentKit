@@ -17,6 +17,9 @@ struct ChildOpenFixture {
 pub(super) struct Probe {
     phase: u8,
     host_navigation: bool,
+    side_chat_menu: bool,
+    chat_ids: Vec<String>,
+    chat_editor: Option<(ComponentId, usize)>,
     started: Instant,
     first_editor: Option<(ComponentId, usize)>,
     draft: String,
@@ -30,8 +33,12 @@ pub(super) struct Probe {
 impl Probe {
     pub fn new() -> Self {
         run_script(vec![(25_000, Action::Close)]);
+        let side_chat_menu = std::env::args().any(|arg| arg == "--panel-side-chat-menu-selftest");
         Self {
-            phase: 0,
+            phase: if side_chat_menu { 14 } else { 0 },
+            side_chat_menu,
+            chat_ids: vec![],
+            chat_editor: None,
             host_navigation: false,
             started: Instant::now(),
             first_editor: None,
@@ -131,6 +138,10 @@ impl Probe {
             "panel navigation phase {}",
             self.phase
         );
+        if self.side_chat_menu {
+            self.advance_chats(host, window);
+            return;
+        }
         let old = self.phase;
         match self.phase {
             0 if window.is_active() => {
@@ -408,7 +419,205 @@ impl Probe {
         }
     }
     pub fn receipt(&self) -> serde_json::Value {
+        if self.side_chat_menu {
+            assert_eq!(self.phase, 25, "SideChat menu did not finish");
+            return serde_json::json!({"nativeWindow":true,"hostPanelNavigation":true,"nativeWindowToolbar":false,"originalPointerMenu":true,"twoActualScratchPointers":true,"duplicateVisibleLabels":true,"currentMemberChecked":true,"firstEditorRetained":true,"closedScratchRemoved":true,"mainDraftRetained":true,"noSubmission":true,"ownedFixture":true,"realHarness":false,"syntheticPointer":true,"physicalIme":false,"voiceOver":false,"processContainer":false});
+        }
         assert_eq!(self.phase, 14, "panel navigation did not finish");
         serde_json::json!({"hostPanelNavigation":self.host_navigation,"nativeWindowToolbar":false,"nativeWindow":true,"originalPointerControls":true,"summaryCloseAndReopen":true,"openOrderRetained":true,"lastRemainingSelection":true,"emptyDocumentRetained":true,"originalTaskEditorRetained":true,"lateChildOwnerRejected":true,"duplicateChildDeliveryRejected":true,"pendingChildAfterCloseRejected":true,"originalChildEditorRetained":true,"inactiveTaskNavigationRejected":true,"currentParentDraftAndFocusRetained":true,"currentChildRequestRetained":true,"mainDraftRetained":true,"noSubmission":true,"ownedFixture":true,"realHarness":false,"physicalIme":false,"voiceOver":false,"processContainer":false})
+    }
+}
+
+impl Probe {
+    fn chat_menu(host: &Host) -> ComponentId {
+        host.view
+            .tree
+            .get(host.view.panel_navigation_id().unwrap())
+            .unwrap()
+            .component::<SidePanelNavigation>()
+            .unwrap()
+            .side_chat_menu_id()
+            .unwrap()
+    }
+    fn selected_chat(host: &Host) -> Option<String> {
+        match &Self::input(host).selected {
+            Some(SidePanelTabKind::SideChat { session_id }) => Some(session_id.clone()),
+            _ => None,
+        }
+    }
+    fn chat_count(host: &Host) -> usize {
+        host.side_chats
+            .snapshot()
+            .chats
+            .values()
+            .filter(|chat| &chat.parent == host.view.binding().scope())
+            .count()
+    }
+    fn click_menu_item(host: &Host, index: usize, checked: Option<usize>) -> bool {
+        use tekes_ui_controls::composition::{ContentRole, MenuContent};
+        let id = Self::chat_menu(host);
+        if !host
+            .view
+            .tree
+            .get(id)
+            .unwrap()
+            .component::<MenuContent>()
+            .unwrap()
+            .menu
+            .is_open()
+        {
+            return false;
+        }
+        let nodes = host.view.tree.semantics();
+        let menu = nodes.iter().find(|node| node.id == id).unwrap();
+        let items: Vec<_> = menu
+            .parts
+            .iter()
+            .filter(|part| part.semantics.role == ContentRole::MenuItem)
+            .collect();
+        if items.is_empty() {
+            return false;
+        }
+        assert_eq!(items[0].semantics.name, "新建 SideChat");
+        for item in &items[1..] {
+            assert_eq!(item.semantics.name, "SideChat");
+        }
+        if let Some(checked) = checked {
+            assert_eq!(items.len(), 3);
+            for (position, item) in items.iter().enumerate().skip(1) {
+                assert_eq!(item.semantics.selected, position == checked);
+            }
+        }
+        let point = items[index].frame.center();
+        run_script(vec![(
+            0,
+            Action::Click {
+                x: point.x.into(),
+                y: point.y.into(),
+            },
+        )]);
+        true
+    }
+    fn advance_chats(&mut self, host: &mut Host, window: &Window) {
+        if !window.is_active() {
+            return;
+        }
+        let old = self.phase;
+        match self.phase {
+            14 => {
+                assert!(host.view.panel_navigation_id().is_some());
+                assert_eq!(Self::input(host).selected, Some(SidePanelTabKind::Summary));
+                assert_eq!(Self::chat_count(host), 0);
+                let main = host.view.binding().current_run().unwrap();
+                self.draft = main.draft.text.clone();
+                self.admissions = main.submissions.len();
+                Self::close(host);
+                self.phase = 15;
+            }
+            15 if Self::input(host).selected.is_none() => {
+                let id = host
+                    .view
+                    .tree
+                    .get(host.view.panel_id())
+                    .unwrap()
+                    .component::<SidePanel>()
+                    .unwrap()
+                    .launcher()
+                    .unwrap()
+                    .button_id(tekes_agent_components_ui::SidePanelDestination::SideChat)
+                    .unwrap();
+                Self::click(host, id);
+                self.phase = 16;
+            }
+            16 if Self::selected_chat(host).is_some()
+                && host.view.panel_composer_ids().is_some() =>
+            {
+                assert_eq!(Self::chat_count(host), 1);
+                self.chat_ids.push(Self::selected_chat(host).unwrap());
+                let id = host.view.panel_composer_ids().unwrap().editor;
+                self.chat_editor = Some((
+                    id,
+                    host.view.tree.text_surface(id).unwrap() as *const _ as usize,
+                ));
+                Self::click(host, Self::chat_menu(host));
+                self.phase = 17;
+            }
+            17 if Self::click_menu_item(host, 0, None) => {
+                self.phase = 18;
+            }
+            18 if Self::selected_chat(host).is_some_and(|id| id != self.chat_ids[0])
+                && host.view.panel_composer_ids().is_some() =>
+            {
+                assert_eq!(Self::chat_count(host), 2);
+                self.chat_ids.push(Self::selected_chat(host).unwrap());
+                Self::click(host, Self::chat_menu(host));
+                self.phase = 19;
+            }
+            19 if Self::click_menu_item(host, 1, Some(2)) => {
+                self.phase = 20;
+            }
+            20 if Self::selected_chat(host).as_ref() == Some(&self.chat_ids[0]) => {
+                let (id, owner) = self.chat_editor.unwrap();
+                assert_eq!(host.view.panel_composer_ids().unwrap().editor, id);
+                assert_eq!(
+                    host.view.tree.text_surface(id).unwrap() as *const _ as usize,
+                    owner
+                );
+                Self::click(host, Self::chat_menu(host));
+                self.phase = 21;
+            }
+            21 if Self::click_menu_item(host, 2, Some(1)) => {
+                self.phase = 22;
+            }
+            22 if Self::selected_chat(host).as_ref() == Some(&self.chat_ids[1]) => {
+                Self::close(host);
+                self.phase = 23;
+            }
+            23 if Self::selected_chat(host).as_ref() == Some(&self.chat_ids[0])
+                && Self::chat_count(host) == 1 =>
+            {
+                assert!(
+                    !host
+                        .side_chats
+                        .snapshot()
+                        .chats
+                        .contains_key(&self.chat_ids[1])
+                );
+                let (id, owner) = self.chat_editor.unwrap();
+                assert_eq!(host.view.panel_composer_ids().unwrap().editor, id);
+                assert_eq!(
+                    host.view.tree.text_surface(id).unwrap() as *const _ as usize,
+                    owner
+                );
+                assert_eq!(
+                    host.view.binding().current_run().unwrap().draft.text,
+                    self.draft
+                );
+                assert_eq!(
+                    host.view.binding().current_run().unwrap().submissions.len(),
+                    self.admissions
+                );
+                Self::close(host);
+                self.phase = 24;
+            }
+            24 if Self::input(host).selected.is_none() && Self::chat_count(host) == 0 => {
+                assert!(Self::input(host).tabs.is_empty());
+                assert_eq!(
+                    host.view.binding().current_run().unwrap().draft.text,
+                    self.draft
+                );
+                assert_eq!(
+                    host.view.binding().current_run().unwrap().submissions.len(),
+                    self.admissions
+                );
+                self.phase = 25;
+                run_script(vec![(0, Action::Close)]);
+            }
+            _ => {}
+        }
+        if old != self.phase {
+            eprintln!("NATIVE_PANEL_SIDE_CHAT_PHASE {}", self.phase);
+            window.request_redraw();
+        }
     }
 }

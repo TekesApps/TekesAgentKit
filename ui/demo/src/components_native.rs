@@ -3047,7 +3047,15 @@ pub fn run() {
     let summary_row_selftest = args
         .iter()
         .any(|arg| arg == "--summary-row-layout-selftest");
-    let panel_navigation_selftest = args.iter().any(|arg| arg == "--panel-navigation-selftest");
+    let panel_side_chat_selftest = args
+        .iter()
+        .any(|arg| arg == "--panel-side-chat-menu-selftest");
+    assert!(
+        !panel_side_chat_selftest || args.iter().any(|arg| arg == "--panel-navigation-toolbar"),
+        "SideChat menu probe requires the shared host navigation"
+    );
+    let panel_navigation_selftest =
+        panel_side_chat_selftest || args.iter().any(|arg| arg == "--panel-navigation-selftest");
     let panel_launcher_selftest = args.iter().any(|arg| arg == "--panel-launcher-selftest");
     assert!(
         !panel_launcher_selftest || args.iter().any(|arg| arg == "--transcript-content"),
