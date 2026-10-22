@@ -1,6 +1,8 @@
 # Rust Agent UI 组件接入契约
 
-[输出脚注单一阅读项](rust-agent-ui-output-aside-row-20261022.md)将复制、原反馈控件和时间等组合到同一水平带；原 feedback root/回调保留，物理 reading rows 不再重复包含反馈。517项组件、独立 consumer、真实三端原生反馈及同程序阅读/系统拼音通过；窄列文字按钮裁剪、长备注40%限制、图标与弹层仍未完成。公开 main 新增3bef667尚待独立 intake，本阶段仍固定09b4bab。
+[3bef公开精确依赖接收](tekesui-3bef-public-intake-20261022.md)已完成8包/242文件来源核验、518项组件及原Kit控件在新Toolbar中的独立consumer；更新manifest/lock并保留09基线。原生结果按新程序单列：三端基础阅读、Pi/DSH反馈、Pi两类流式通过，组合批次因外部前台变化未完整通过；当前pin系统拼音未复验。#48/#49等和最终窗级组合仍开放。下列阶段记录保持各自原pin/程序范围。
+
+[输出脚注单一阅读项](rust-agent-ui-output-aside-row-20261022.md)将复制、原反馈控件和时间等组合到同一水平带；原 feedback root/回调保留，物理 reading rows 不再重复包含反馈。517项组件、独立 consumer、真实三端原生反馈及同程序阅读/系统拼音通过；窄列文字按钮裁剪、长备注40%限制、图标与弹层仍未完成。该阶段仍固定09b4bab；当前3bef接收及未完成范围见文首。
 
 [当前 Native 原生补验](rust-agent-ui-native-current-20261022.md)取得真实 Native 的流式阅读、流式发送及独立 Send/Cancel/error/recovery 完整收据。初始组合的第4模式失焦失败仍保留；新程序仅收紧验收脚本的 active/原编辑器 focus 门禁，不修改生产组件。各程序范围独立，完整生命周期、跨进程及实体输入仍未验收。
 

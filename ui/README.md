@@ -1,5 +1,7 @@
 # Rust Run demo（开发试点）
 
+[当前固定依赖已升级至3bef](../docs/tekesui-3bef-public-intake-20261022.md)：518项组件和新Toolbar公开组合验证通过；本轮三端基础原生阅读、Pi/DSH反馈及Pi流式已有收据，其余新pin原生/系统拼音尚未完成。#49显式门禁仍失败，保持已知忽略；不转移旧程序验收。
+
 [输出脚注组合与 API 迁移](../docs/rust-agent-ui-output-aside-row-20261022.md)：正常 aside 为单一阅读项，评价是原 Content 子控件；每个 aside 预留两套 namespace。使用 feedback_controls()/feedback_mut() 处理原反馈回调，TurnFeedback row key 仅保留兼容查询。窄列全可见、图标/弹层仍开放，三端原生与程序范围见记录。
 
 [真实 Native 原生补验](../docs/rust-agent-ui-native-current-20261022.md)补足先前未完成的流式阅读、流式发送和取消/错误恢复证据；原失败与新程序严格分开，仍为同进程、受控 provider、UI-only 范围。
@@ -65,10 +67,10 @@ Composer 的真实输入胶囊公开为 `ComposerIds::input_band`；现在保留
 
 - Rust 1.95.0、macOS + Metal（原生窗口/文本服务/GPU）；Python 3.11+（准备和边界检查）。
 - AgentKit 基线 v0.3.8（公开 main `f1daa0ffcf6ced41e21f351e22845455ca78006c`）；最新独立三端 UI 验收使用 Kernel v0.9.3，历史收据按各自实际版本保留。
-- TekesUI composition 仍是实验 API，但实验开发源码固定为公开 Git commit `09b4bab44b6dfa65487250ea816b610b9df59095`（公开 tag `remediation-toolbar-checkpoint-20261021`）；6 个直接依赖和2个传递依赖均由 Cargo 按该完整 rev 取得，ui/Cargo.lock 同步固定。
-- `tekesui-source.json` 的 kind 为 `published-git-revision`，241文件 SHA-256 为 `44b3174022584d3c099a45b86892d17dbf948905476c0f038be104df12aefe46`，对应实际八包依赖闭包；原431/8cf/2ee/129基线在 `baselines/` 原样保留。固定的是不可变commit，不跟随分支HEAD。
+- TekesUI composition 仍是实验 API，但实验开发源码固定为公开 Git commit `3bef66754a256e7723887de7d33518f5122805ad`（toolbar/split checkpoint）；6 个直接依赖和2个传递依赖均由 Cargo 按该完整 rev 取得，ui/Cargo.lock 同步固定。
+- `tekesui-source.json` 的 kind 为 `published-git-revision`，242文件 SHA-256 为 `e6f0dbcdfdadcc8e4a67a46cefd1a814956461d3896a78f8469091c4420a6824`，对应实际八包依赖闭包；原431/8cf/2ee/129/09基线在 `baselines/` 原样保留。固定的是不可变commit，不跟随分支HEAD。
 - 旧e4 manifest、lockfile、消费适配和188依赖另有备份；旧 `.deps/tekesui` 原样保留但不参与当前构建。无需从兄弟工作树复制代码，`prepare-tekesui-demo.py` 在公开pin模式拒绝path/capture。
-- UI包继续 `0.0.0` / `publish=false`；公开源码pin不代表AgentKit UI稳定版。最新验收与独立CI边界见 [最新公开接收](../docs/tekesui-toolbar-public-intake-20261021.md)及[reading/reveal复核](../docs/rust-agent-ui-public-reading-recheck-20261022.md)。
+- UI包继续 `0.0.0` / `publish=false`；公开源码pin不代表AgentKit UI稳定版。最新验收与独立CI边界见 [3bef公开接收与分层结果](../docs/tekesui-3bef-public-intake-20261022.md)及[reading/reveal复核](../docs/rust-agent-ui-public-reading-recheck-20261022.md)。
 
 最新正式组件进展：[原生 Jump/回到最新](../docs/rust-agent-ui-jump-latest-20261021.md)；仍为实验 API，未代表完整 ClientKit Views 验收。
 

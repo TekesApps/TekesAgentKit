@@ -24,6 +24,8 @@ mod output_aside_layout;
 mod panel_launcher_layout;
 #[path = "support/popover_intake.rs"]
 mod popover_intake;
+#[path = "support/toolbar_intake.rs"]
+mod toolbar_intake;
 struct Text {
     shaper: CoreTextShaper,
     scale: f32,
