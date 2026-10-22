@@ -59,6 +59,8 @@ Layout 和显示逻辑须逐项严格对齐当前 ClientKit 对应 Views；[对�
 
 [Summary 单行标题公开消费](rust-agent-ui-summary-label-20261022.md)接通当前精确公开 pin 的 `with_label_layout` / `shape_label`；宿主必须提供原 SDK label 服务。仅 header 单行尾部省略，完整源文本与 AX 名称保留，普通行继续换行。旧[候选记录](rust-agent-ui-summary-label-slot-20261021.md)按其历史输入解释。
 
+[Summary 普通 metadata 语义色](rust-agent-ui-summary-ink-20261022.md)保留原 SDK 标签和 owner，仅在 metadata 分支应用库 secondary 色，随主题直接更新。第二 consumer 实际绘制颜色与原生 GPU/输入收据通过；系统截图未生成，不算配对视觉或完整默认行交付。
+
 [布局激活与成功帧边界](tekesui-layout-text-candidate-20261021.md)记录 #27 的独立候选消费。`render` 成功且原业务 publication/epoch 匹配后，宿主才发布当前原生文本、AX、几何和可见性；失败帧不靠更换编辑器或重试 Agent 操作恢复。
 
 ### 排版与基础样式

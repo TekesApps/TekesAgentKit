@@ -37,7 +37,7 @@ class NativeLaunchTests(unittest.TestCase):
                 raise subprocess.TimeoutExpired(command, 1)
             return subprocess.CompletedProcess(command, status)
         with patch('native_probe_launcher.sys.platform', 'darwin'), patch('native_probe_launcher.subprocess.run', side_effect=run), contextlib.redirect_stdout(io.StringIO()) as output:
-            result = run_native_probe(self.program, ['--probe'], {'TEKES_SELFTEST': 'text', 'UNRELATED_SERVICE_KEY': 'do-not-forward'}, self.log, self.marker, bundle=self.bundle)
+            result = run_native_probe(self.program, ['--probe'], {'TEKES_SELFTEST': 'text', 'AGENT_SUMMARY_ROW_CAPTURE': str(self.base / 'native.png'), 'UNRELATED_SERVICE_KEY': 'do-not-forward'}, self.log, self.marker, bundle=self.bundle)
         return result, output.getvalue()
 
     def test_app_identity_is_exact_before_launch(self):
@@ -55,6 +55,7 @@ class NativeLaunchTests(unittest.TestCase):
         self.assertEqual(proof['profile'], 'launch-services-app')
         self.assertNotIn('do-not-forward', str(self.command))
         self.assertIn('TEKES_SELFTEST=text', self.command)
+        self.assertIn('AGENT_SUMMARY_ROW_CAPTURE=' + str(self.base / 'native.png'), self.command)
         self.assertEqual(self.command[-3:], [str(self.bundle.resolve()), '--args', '--probe'])
         self.assertNotEqual(self.command[self.command.index('--stdout') + 1], self.command[self.command.index('--stderr') + 1])
 

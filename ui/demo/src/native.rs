@@ -114,6 +114,7 @@ pub(super) struct TextBackend {
     pub(super) reduced_motion: bool,
     pub(super) caret_on: bool,
     pub(super) recent_labels: Vec<Rc<tekes_ui_text::LabelLayout>>,
+    pub(super) recent_label_ink: Vec<(Rc<tekes_ui_text::LabelLayout>, tekes_ui_tokens::Rgba)>,
 }
 impl TextBackend {
     fn shape(&mut self, text: &str, role: proposal::TextRole, width: Option<f32>) -> Rc<Paragraph> {
@@ -156,6 +157,17 @@ impl TextSurfaceTextRenderer for TextBackend {
         c: tekes_ui_tokens::Rgba,
         clip: Rect,
     ) {
+        if let Some(label) = self
+            .recent_labels
+            .iter()
+            .rev()
+            .find(|label| std::ptr::eq(label.paragraph(), p))
+        {
+            if self.recent_label_ink.len() == 128 {
+                self.recent_label_ink.remove(0);
+            }
+            self.recent_label_ink.push((label.clone(), c));
+        }
         self.push(s, p, o, c, clip)
     }
 }
@@ -825,6 +837,7 @@ pub fn run() {
             reduced_motion: false,
             caret_on: true,
             recent_labels: Vec::new(),
+            recent_label_ink: Vec::new(),
         },
         scene: Scene::new(),
         palette: Palette::from(Theme::LIGHT),

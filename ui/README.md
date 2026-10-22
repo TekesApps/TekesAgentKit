@@ -228,6 +228,8 @@ ui/target/debug/tekes-agent-ui-demo --components --transcript-content --offscree
 
 [备注表单接入更新](../docs/rust-agent-ui-feedback-form-20261022.md)：`FeedbackLabels.editor_title` 为新增宿主文案输入，完整 literal 需补字段或使用默认值。表单内部布局与保存期间编辑已更新，最终程序通过三端原生专项；当前仍走临时内联路径，锚定 Popover 等待 TekesUI #49。独立 consumer 的 ignored intake probe 是明确未通过的上游门禁，不是默认 CI 的功能通过证据。
 
+[Summary metadata 语义色](../docs/rust-agent-ui-summary-ink-20261022.md)修正原标签意外继承 Primary 的问题；普通 metadata 固定跟随当前库 SecondaryText，公开查询 ID/动作/owner 不变，不要求新业务 revision 才响应主题变化。完整状态附件、change-count runs 与配对视觉仍单独验收。
+
 `SidebarSearchBinding` 复用无渲染器的 `presentation::SidebarSearchController`，接收宿主 query，拥有 250ms 去抖、来源/epoch/代数、只读请求撤销和显式 Retry。首次安装用 `replace_search_source`，后续用 `update_search_from`；切换 binding 不沿用旧来源的 revision 或动作 ID。`--sidebar-query <text>` 与显式 endpoint 配置组合使用；`--components --transcript-content --sidebar-query-selftest` 是 owned fixture 的原生指针重试探针。公开接入、Pi/DSH 搜索限制与分层证据见 [Sidebar 共享查询控制器](../docs/rust-agent-ui-sidebar-query-controller-20261021.md)。完整搜索结果列表和多 endpoint 聚合仍待补齐。
 
 Summary 的六项用量行使用左标题、右数值的两个 TekesUI 文本槽；`SummaryLabels::usage_row` 负责本地化，`SummaryUsageRowText::read` 提供默认格式，`SummaryView::usage_row_ids` 提供原控件身份。完整接入与验证边界见[用量行记录](../docs/rust-agent-ui-summary-usage-20261021.md)。

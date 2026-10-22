@@ -10,12 +10,21 @@ pub struct SummaryActionRow {
     button: CompoundButton,
 }
 impl SummaryActionRow {
-    pub(crate) fn new(body: ComponentId, title: ComponentId, trailing: ComponentId) -> Self {
+    pub(crate) fn new(
+        body: ComponentId,
+        title: ComponentId,
+        trailing: ComponentId,
+        trailing_body: ComponentId,
+    ) -> Self {
         let mut button = CompoundButton::new(
             "Summary row",
             Content::new(
                 body,
-                SummaryRowBody::new(Content::new(title, TextContent::new("")), trailing),
+                SummaryRowBody::new(
+                    Content::new(title, TextContent::new("")),
+                    trailing,
+                    trailing_body,
+                ),
             ),
         )
         .expect("one passive Summary title slot");

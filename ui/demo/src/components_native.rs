@@ -1188,6 +1188,7 @@ impl Host {
         self.text.scale = window.scale() as f32;
         self.text.frame_requested = false;
         self.text.atlas.begin_frame();
+        self.text.recent_label_ink.clear();
         self.scene.clear();
         let clip = Rect::new(
             0.,
@@ -3359,6 +3360,18 @@ pub fn run() {
             },
         )
         .unwrap()
+    } else if summary_row_selftest {
+        ComponentDemo::new_with_summary_labels(
+            bindings,
+            tekes_agent_components_ui::SummaryLabels {
+                trailing: Arc::new(|section, _| {
+                    matches!(section, "tasks" | "subagents")
+                        .then(|| summary_row_probe::METADATA.into())
+                }),
+                ..Default::default()
+            },
+        )
+        .unwrap()
     } else {
         ComponentDemo::new(bindings).unwrap()
     };
@@ -3668,6 +3681,7 @@ pub fn run() {
             reduced_motion: false,
             caret_on: true,
             recent_labels: Vec::new(),
+            recent_label_ink: Vec::new(),
         },
         scene: Scene::new(),
         palette: Palette::from(Theme::LIGHT),

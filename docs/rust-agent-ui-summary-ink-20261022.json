@@ -1,0 +1,95 @@
+{
+  "tekesuiCommit": "09b4bab44b6dfa65487250ea816b610b9df59095",
+  "program": {
+    "program": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/AgentKitSummaryInk.app/Contents/MacOS/AgentKitSummaryInk",
+    "sha256": "1b80159b54f74b3a1c6e92ed7522570d71650531d1a6fc896f7e1afc079ce0e1"
+  },
+  "nativeFixture": {
+    "doubleRegularInset": true,
+    "fullDefaultRowParity": false,
+    "headerTitleAnchorAligned": true,
+    "metadataFirstLineAndSingleLine": true,
+    "nativeWindow": true,
+    "noSubmission": true,
+    "ordinaryMetadataSecondaryInk": true,
+    "originalActionRetained": true,
+    "originalComposerFocusAndMarkedBaseline": true,
+    "originalMetadataLabelOwner": true,
+    "ownedSepFacts": true,
+    "pairedClientKitVisual": false,
+    "physicalIme": false,
+    "physicalResizeDrag": false,
+    "realHarness": false,
+    "resizeAndTypeScale": true,
+    "staticAndActionTitlesWrap": true,
+    "staticSelectionAndControlRetained": true,
+    "statusDotRendered": false,
+    "syntheticPreedit": true,
+    "voiceOver": false
+  },
+  "nativeScreenshot": {
+    "created": false,
+    "error": "could not create image from window"
+  },
+  "uiTests": {
+    "passed": 496,
+    "failed": 0,
+    "ignored": 1
+  },
+  "consumerInputs": {
+    "commit": "09b4bab44b6dfa65487250ea816b610b9df59095",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 241,
+    "sha256": "44b3174022584d3c099a45b86892d17dbf948905476c0f038be104df12aefe46",
+    "ui_packages": 8
+  },
+  "scriptTests": 42,
+  "sameProcess": true,
+  "processContainerAcceptance": false,
+  "releasedBytes": 0,
+  "newTargets": 0,
+  "protocolOffscreen": {
+    "pi": {
+      "log": ".runtime-fixtures/summary-metadata-ink-20261022/three.log",
+      "sharedRuntime": true,
+      "summaryMounted": true,
+      "finalAssistantItems": 2,
+      "nativeInteraction": false,
+      "kernelUiOnly": false
+    },
+    "dsh": {
+      "log": ".runtime-fixtures/summary-metadata-ink-20261022/three.log",
+      "sharedRuntime": true,
+      "summaryMounted": true,
+      "finalAssistantItems": 2,
+      "nativeInteraction": false,
+      "kernelUiOnly": false
+    },
+    "native": {
+      "log": ".runtime-fixtures/summary-metadata-ink-20261022/native-components.log",
+      "sharedRuntime": true,
+      "summaryMounted": true,
+      "finalAssistantItems": 1,
+      "nativeInteraction": false,
+      "kernelUiOnly": true
+    }
+  },
+  "sourceFiles": {
+    "ui/components/src/summary.rs": "69057fbd7f39b24bab994cfd01935a9c86c31a2737cd1b6a003492e2808c5305",
+    "ui/components/src/summary_action_row.rs": "e7158f7795b00e50dadb7b03096a36b74a19183e92d5bb42be586e9a0c1ab2ee",
+    "ui/components/src/summary_row_layout.rs": "8bf95ca429e557ebed5dc987acdc96f8fee55a1835555972cc4c99516cc1e3bc",
+    "ui/consumer/tests/summary_label.rs": "95079d264eed985dd15aa1520f59c9bc99f270e9c681cd14a7664d259f9ff8c0",
+    "ui/demo/src/components_native.rs": "89dffded9fa925719b4c11eadba831952444af308c08cfe05eeca02c3dd1e01f",
+    "ui/demo/src/native.rs": "f16a66960ef32b6fdfdf2bd05ded90359d00104131afcfa518ccd79775ca53b3",
+    "ui/demo/src/native_summary_row_layout_selftest.rs": "095c69cb790e0ac205bd6594c52b97c4aad9626460e4bd90c8696afa4fea8f7f",
+    "scripts/native_probe_launcher.py": "6caeb5fee6c6d8a4338065ae6db193996431054e467634910ed0cb23b7023bd7",
+    "scripts/tests/test_native_probe_launcher.py": "60fb329c3767302d7ef5d45ebf93dc5f0897b4ff0b8ab924735797c1eb0d6940",
+    "scripts/test-real-session-endpoints.py": "6c0d478a89ce92bc98f794d7c54e9013250814e1ad4e0efb6958fe14076ed2b6"
+  },
+  "referenceHashes": {
+    "ClientAgentSummaryView.swift": "5632d920bd21d44d6b68d49779e9f7746c9bc1ec4ad9e7bc1d01ab58b85f9154",
+    "SummaryProviders.swift": "1f2eb4048c30bfde58edd72bd2e50b8e22d211272c609c9d2108c53b6bddf663",
+    "ClientAgentSummaryHostAdapter.swift": "4e7875ae43ab06901a981077f81a4504c754e88f2c019a470dc67222b917714a"
+  }
+}

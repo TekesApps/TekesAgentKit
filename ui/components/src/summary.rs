@@ -155,6 +155,7 @@ enum Key {
     Row(SummaryOwner, String, String, ActionIdentity),
     PassiveBody(SummaryOwner, String, String),
     Trailing(SummaryOwner, String, String, ActionIdentity),
+    TrailingBody(SummaryOwner, String, String, ActionIdentity),
     ActionBody(SummaryOwner, String, String, ActionIdentity),
     ActionTitle(SummaryOwner, String, String, ActionIdentity),
     UsageTitle(SummaryOwner, String),
@@ -529,6 +530,12 @@ impl SummaryView {
                     keys.insert(Key::UsageValue(input.owner.clone(), row.id.clone()));
                 }
                 if slot.is_none() && (row.action.is_some() || section.id != "usage") {
+                    keys.insert(Key::TrailingBody(
+                        input.owner.clone(),
+                        section.id.clone(),
+                        row.id.clone(),
+                        ActionIdentity::read(row.action.as_ref()),
+                    ));
                     keys.insert(Key::Trailing(
                         input.owner.clone(),
                         section.id.clone(),
@@ -746,6 +753,12 @@ impl SummaryView {
                                     row.id.clone(),
                                     ActionIdentity::read(Some(&action)),
                                 )],
+                                ids[&Key::TrailingBody(
+                                    input.owner.clone(),
+                                    section.id.clone(),
+                                    row.id.clone(),
+                                    ActionIdentity::read(Some(&action)),
+                                )],
                             ),
                         )
                     });
@@ -803,6 +816,12 @@ impl SummaryView {
                                     ),
                                 ),
                                 ids[&Key::Trailing(
+                                    input.owner.clone(),
+                                    section.id.clone(),
+                                    row.id.clone(),
+                                    ActionIdentity::Passive,
+                                )],
+                                ids[&Key::TrailingBody(
                                     input.owner.clone(),
                                     section.id.clone(),
                                     row.id.clone(),

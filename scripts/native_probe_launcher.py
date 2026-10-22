@@ -55,7 +55,7 @@ def run_native_probe(program, arguments, environment, log, marker, *, bundle=Non
         command = ['/usr/bin/open', '-W', '-n', '--stdout', str(stdout_log), '--stderr', str(stderr_log)]
         # These values are local test controls and a per-launch local fixture
         # token, never a user's model/service key. Do not forward os.environ.
-        for name in ('TEKES_SELFTEST', 'AGENT_STREAM_READING_CAPTURE', 'AGENTKIT_UI_FIXTURE_CREDENTIAL'):
+        for name in ('TEKES_SELFTEST', 'AGENT_STREAM_READING_CAPTURE', 'AGENT_SUMMARY_ROW_CAPTURE', 'AGENTKIT_UI_FIXTURE_CREDENTIAL'):
             if name in environment:
                 command += ['--env', name + '=' + environment[name]]
         command += [str(bundle), '--args', *arguments]

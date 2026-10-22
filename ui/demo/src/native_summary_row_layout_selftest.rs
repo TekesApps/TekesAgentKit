@@ -6,6 +6,7 @@ use tekes_ui_controls::{ButtonTextRenderer, composition::TextContent};
 use tekes_ui_platform_macos::selftest::{Action, run_script};
 use tekes_ui_tokens::{Spacing, proposal};
 const CHILD: &str = "b437cf34-5661-45e2-a674-113b27c92f89";
+pub(super) const METADATA: &str = "12 files";
 pub(super) struct Probe {
     fixture: Fixture,
     phase: u8,
@@ -13,6 +14,7 @@ pub(super) struct Probe {
     resized_at: Option<Instant>,
     passive: Option<SummaryDefaultRowIds>,
     action: Option<SummaryDefaultRowIds>,
+    metadata: Option<[(ComponentId, usize); 2]>,
     field: usize,
     control: usize,
     editor: usize,
@@ -36,6 +38,7 @@ impl Probe {
             resized_at: None,
             passive: None,
             action: None,
+            metadata: None,
             field: 0,
             control: 0,
             editor: 0,
@@ -66,6 +69,35 @@ impl Probe {
         }
     }
     fn geometry(&self, host: &mut Host) {
+        let metadata_ink = host
+            .text
+            .recent_label_ink
+            .iter()
+            .filter(|(label, _)| label.source() == METADATA)
+            .map(|(_, color)| *color)
+            .collect::<Vec<_>>();
+        let both_visible = [self.passive.unwrap(), self.action.unwrap()]
+            .iter()
+            .all(|ids| {
+                host.view
+                    .tree
+                    .get(ids.trailing)
+                    .unwrap()
+                    .visible()
+                    .is_some_and(|rect| !rect.is_empty())
+            });
+        if self.phase == 0 || both_visible {
+            assert!(
+                metadata_ink.len() >= 2,
+                "both visible original metadata labels must reach the GPU text path"
+            );
+        }
+        assert!(
+            metadata_ink
+                .iter()
+                .all(|color| Some(*color) == host.palette.color("secondary-text")),
+            "ordinary metadata keeps its own semantic ink"
+        );
         let line = host
             .text
             .measure("Mg", proposal::TextRole::UiBody, 1e8)
@@ -117,6 +149,17 @@ impl Probe {
         assert_eq!(shaped.paragraph().lines.len(), 1);
     }
     fn unchanged(&self, host: &Host) {
+        for (id, original) in self.metadata.unwrap() {
+            assert_eq!(
+                host.view
+                    .tree
+                    .get(id)
+                    .unwrap()
+                    .component::<TextContent>()
+                    .unwrap() as *const _ as usize,
+                original
+            );
+        }
         assert_eq!(
             host.view
                 .tree
@@ -179,6 +222,17 @@ impl Probe {
                     return;
                 }
                 self.geometry(host);
+                self.metadata = Some([self.passive.unwrap(), self.action.unwrap()].map(|ids| {
+                    (
+                        ids.trailing,
+                        host.view
+                            .tree
+                            .get(ids.trailing)
+                            .unwrap()
+                            .component::<TextContent>()
+                            .unwrap() as *const _ as usize,
+                    )
+                }));
                 self.control = host
                     .view
                     .tree
@@ -280,6 +334,6 @@ impl Probe {
         assert_eq!(self.phase, 6);
         serde_json::json!({"nativeWindow":true,"ownedSepFacts":true,"staticAndActionTitlesWrap":true,"doubleRegularInset":true,"headerTitleAnchorAligned":true,"metadataFirstLineAndSingleLine":true,
             "staticSelectionAndControlRetained":true,"originalActionRetained":true,"originalComposerFocusAndMarkedBaseline":true,"resizeAndTypeScale":true,
-            "noSubmission":true,"syntheticPreedit":true,"physicalIme":false,"physicalResizeDrag":false,"voiceOver":false,"statusDotRendered":false,"fullDefaultRowParity":false,"pairedClientKitVisual":false,"realHarness":false})
+            "ordinaryMetadataSecondaryInk":true,"originalMetadataLabelOwner":true,"noSubmission":true,"syntheticPreedit":true,"physicalIme":false,"physicalResizeDrag":false,"voiceOver":false,"statusDotRendered":false,"fullDefaultRowParity":false,"pairedClientKitVisual":false,"realHarness":false})
     }
 }

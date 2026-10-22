@@ -25,6 +25,7 @@ struct Text {
     scale: f32,
     labels: Vec<(LabelOptions, Rc<LabelLayout>)>,
     label_service: bool,
+    drawn_paragraphs: Vec<(usize, Rgba)>,
 }
 impl Text {
     fn new(scale: f32, label_service: bool) -> Self {
@@ -33,15 +34,38 @@ impl Text {
             scale,
             labels: vec![],
             label_service,
+            drawn_paragraphs: vec![],
         }
     }
     fn style(&self, role: proposal::TextRole) -> TextStyle {
         let style = role.style();
         TextStyle::system(style.size * self.scale).with_weight(style.weight)
     }
+    fn label_ink(&self, source: &str) -> Vec<Rgba> {
+        self.labels
+            .iter()
+            .filter(|(_, label)| label.source() == source)
+            .flat_map(|(_, label)| {
+                let pointer = label.paragraph() as *const _ as usize;
+                self.drawn_paragraphs
+                    .iter()
+                    .filter_map(move |(drawn, color)| (*drawn == pointer).then_some(*color))
+            })
+            .collect()
+    }
 }
 impl TextSurfaceTextRenderer for Text {
-    fn push_visible(&mut self, _: &mut Scene, _: &Paragraph, _: Point, _: Rgba, _: Rect) {}
+    fn push_visible(
+        &mut self,
+        _: &mut Scene,
+        paragraph: &Paragraph,
+        _: Point,
+        color: Rgba,
+        _: Rect,
+    ) {
+        self.drawn_paragraphs
+            .push((paragraph as *const _ as usize, color));
+    }
 }
 impl TextSurfaceHost for Text {
     fn type_scale(&self) -> f32 {
@@ -683,7 +707,7 @@ fn usage_metadata_stays_on_one_original_sdk_line_at_the_title_first_line() {
 fn ordinary_metadata_uses_original_single_line_and_keeps_selection_actions_and_slots() {
     use tekes_ui_tokens::Spacing;
     let scope = RunScope::main("consumer", "metadata");
-    for theme in [Theme::LIGHT, Theme::DARK] {
+    for theme in Theme::ALL {
         for scale in [0.85, 1., 1.5, 2.] {
             for width in [96., 240., 420.] {
                 let mut input = input();
@@ -739,6 +763,49 @@ fn ordinary_metadata_uses_original_single_line_and_keeps_selection_actions_and_s
                     == LabelOptions::single_line(LabelOverflow::Clip)
                     && l.source() == "12 files"
                     && l.paragraph().lines.len() == 1));
+                let metadata_ink = text.label_ink("12 files");
+                assert_eq!(
+                    metadata_ink.len(),
+                    2,
+                    "both original metadata labels must actually paint"
+                );
+                assert!(
+                    metadata_ink
+                        .iter()
+                        .all(|color| *color
+                            == tekes_ui_tokens::ColorRole::SecondaryText.resolve(theme)),
+                    "metadata keeps its secondary role inside an actionable row: {metadata_ink:?}"
+                );
+                let metadata_owner = host
+                    .get(action.trailing)
+                    .unwrap()
+                    .component::<TextContent>()
+                    .unwrap() as *const _ as usize;
+                for live_theme in [Theme::DARK, Theme::LIGHT_INCREASED] {
+                    text.drawn_paragraphs.clear();
+                    host.render(
+                        &mut Scene::new(),
+                        &mut text,
+                        frame,
+                        frame,
+                        live_theme.into(),
+                    )
+                    .unwrap();
+                    let ink = text.label_ink("12 files");
+                    assert_eq!(ink.len(), 2);
+                    assert!(
+                        ink.iter().all(|color| *color
+                            == tekes_ui_tokens::ColorRole::SecondaryText.resolve(live_theme)),
+                        "library theme changes update ink without a new business publication"
+                    );
+                    assert_eq!(
+                        host.get(action.trailing)
+                            .unwrap()
+                            .component::<TextContent>()
+                            .unwrap() as *const _ as usize,
+                        metadata_owner
+                    );
+                }
                 let control = host
                     .get(action.row)
                     .unwrap()
