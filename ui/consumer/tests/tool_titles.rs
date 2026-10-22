@@ -40,6 +40,9 @@ fn independent_tool_activity_consumes_producer_views_without_losing_focus_select
         .unwrap();
     let root = activity.id();
     let ids = activity.content_ids().unwrap();
+    let sections = activity.tool_detail_sections();
+    let input = sections[0].body;
+    let output = sections[1].body;
     let mut host = activity.into_host().unwrap();
     let label = &host
         .get(ids.disclosure.unwrap())
@@ -59,16 +62,16 @@ fn independent_tool_activity_consumes_producer_views_without_losing_focus_select
             .unwrap()
             .handle_actions(&actions)
     );
-    assert!(host.focus(Some(ids.body), true));
-    host.get_mut(ids.body)
+    assert!(host.focus(Some(input), true));
+    host.get_mut(input)
         .unwrap()
         .component_mut::<TextFieldContent>()
         .unwrap()
         .surface
         .input
         .select_range(0..2);
-    let owner = host.text_surface(ids.body).unwrap() as *const _ as usize;
-    let selection = host.text_surface(ids.body).unwrap().input.selection();
+    let owner = host.text_surface(input).unwrap() as *const _ as usize;
+    let selection = host.text_surface(input).unwrap().input.selection();
     tool.phase = "done".into();
     tool.result = Some(
         r#"{"text":"new raw result is not a guessed title"}"#
@@ -109,14 +112,14 @@ fn independent_tool_activity_consumes_producer_views_without_losing_focus_select
         Some(ids)
     );
     assert_eq!(
-        host.text_surface(ids.body).unwrap() as *const _ as usize,
+        host.text_surface(input).unwrap() as *const _ as usize,
         owner
     );
     assert_eq!(
-        host.text_surface(ids.body).unwrap().input.selection(),
+        host.text_surface(input).unwrap().input.selection(),
         selection
     );
-    assert_eq!(host.focused(), Some(ids.body));
+    assert_eq!(host.focused(), Some(input));
     let label = &host
         .get(ids.disclosure.unwrap())
         .unwrap()
@@ -126,7 +129,7 @@ fn independent_tool_activity_consumes_producer_views_without_losing_focus_select
     assert!(label.contains("Read · 读取 a.rs · 12 行 · done"));
     assert!(!label.contains("new raw result"));
     assert!(
-        host.text_surface(ids.body)
+        host.text_surface(output)
             .unwrap()
             .input
             .text
@@ -134,7 +137,7 @@ fn independent_tool_activity_consumes_producer_views_without_losing_focus_select
     );
     assert!(
         !host
-            .text_surface(ids.body)
+            .text_surface(output)
             .unwrap()
             .input
             .text
@@ -173,28 +176,31 @@ fn independent_tool_activity_consumes_producer_views_without_losing_focus_select
         .label;
     assert!(label.contains("Read · exit failure output · error"));
     assert_eq!(
-        host.text_surface(ids.body).unwrap() as *const _ as usize,
+        host.text_surface(input).unwrap() as *const _ as usize,
         owner
     );
     assert_eq!(
-        host.text_surface(ids.body).unwrap().input.selection(),
+        host.text_surface(input).unwrap().input.selection(),
         selection
     );
-    assert_eq!(host.focused(), Some(ids.body));
+    assert_eq!(host.focused(), Some(input));
     assert!(
-        host.text_surface(ids.body)
+        host.text_surface(output)
             .unwrap()
             .input
             .text
             .contains("exit failure output")
     );
-    assert!(
-        host.text_surface(ids.body)
+    assert_eq!(
+        host.get(output)
             .unwrap()
-            .input
-            .text
-            .contains("结果 · 失败\nexit failure output")
+            .component::<TextFieldContent>()
+            .unwrap()
+            .field
+            .label,
+        "结果 · 失败"
     );
+
     assert_eq!(
         host.get(root)
             .unwrap()

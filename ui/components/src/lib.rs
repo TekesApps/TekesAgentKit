@@ -1,6 +1,8 @@
 //! Agent-owned composition of public TekesUI controls. No endpoint or Run state machine.
 mod sidebar_visibility;
+mod tool_detail_content;
 pub use sidebar_visibility::*;
+pub use tool_detail_content::ToolDetailSectionIds;
 mod sidebar_paging;
 pub use sidebar_paging::*;
 mod feedback;

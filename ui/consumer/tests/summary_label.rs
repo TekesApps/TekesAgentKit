@@ -32,6 +32,8 @@ mod panel_launcher_layout;
 mod panel_navigation_layout;
 #[path = "support/popover_intake.rs"]
 mod popover_intake;
+#[path = "support/tool_sections.rs"]
+mod tool_sections;
 #[path = "support/toolbar_intake.rs"]
 mod toolbar_intake;
 struct Text {

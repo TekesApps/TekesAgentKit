@@ -1,5 +1,6 @@
 //! Agent machine-message composition. TekesUI owns text, controls and geometry.
 use crate::TranscriptMessageIdentity as Key;
+use crate::tool_detail_content::{ToolDetailContent, ToolDetailFacts};
 use tekes_agent_presentation::{
     RunScope, TranscriptBlockContent, TranscriptItem, TranscriptItemKind, TranscriptOutput,
     TranscriptSection, TranscriptToolCall, TranscriptToolDetailWording, TranscriptToolRowState,
@@ -31,11 +32,26 @@ pub enum OutputMessageText {
     MissingTool,
     Expand,
     Collapse,
+    ToolInput,
+    ToolOutput,
+    ToolFailed,
+    ToolCallView,
+    ToolResultView,
+    ToolReceivingInput,
+    ToolInputUnavailable,
+    CopyDetail,
 }
 #[derive(Clone, Copy, Debug)]
 pub struct OutputMessageLabels {
     pub text: fn(OutputMessageText) -> String,
     pub tool: fn(&TranscriptToolCall) -> (String, String),
+    /// Structured expansion. Set None to retain a custom `tool` text body.
+    pub tool_sections: Option<
+        fn(
+            &TranscriptToolCall,
+            OutputMessageLabels,
+        ) -> tekes_agent_presentation::TranscriptToolDetails,
+    >,
 }
 impl Default for OutputMessageLabels {
     fn default() -> Self {
@@ -56,9 +72,18 @@ impl Default for OutputMessageLabels {
                     OutputMessageText::MissingTool => "工具详情尚未回传",
                     OutputMessageText::Expand => "展开",
                     OutputMessageText::Collapse => "收起",
+                    OutputMessageText::ToolInput => "调用输入",
+                    OutputMessageText::ToolOutput => "结果",
+                    OutputMessageText::ToolFailed => "失败",
+                    OutputMessageText::ToolCallView => "调用视图",
+                    OutputMessageText::ToolResultView => "结果视图",
+                    OutputMessageText::ToolReceivingInput => "正在接收输入",
+                    OutputMessageText::ToolInputUnavailable => "输入不可用",
+                    OutputMessageText::CopyDetail => "复制",
                 }
                 .into()
             },
+            tool_sections: Some(default_tool_sections),
             tool: |t| {
                 let producer_title = t.presentation_title();
                 let label = tool_display_name(&t.name);
@@ -98,6 +123,55 @@ impl Default for OutputMessageLabels {
             },
         }
     }
+}
+
+fn default_tool_sections(
+    t: &TranscriptToolCall,
+    labels: OutputMessageLabels,
+) -> tekes_agent_presentation::TranscriptToolDetails {
+    let title = t.presentation_title();
+    t.presentation_details(TranscriptToolDetailWording {
+        input: &(labels.text)(OutputMessageText::ToolInput),
+        output: &(labels.text)(OutputMessageText::ToolOutput),
+        failed: &(labels.text)(OutputMessageText::ToolFailed),
+        call_view: &(labels.text)(OutputMessageText::ToolCallView),
+        result_view: &(labels.text)(OutputMessageText::ToolResultView),
+        receiving_input: &(labels.text)(OutputMessageText::ToolReceivingInput),
+        input_unavailable: &(labels.text)(OutputMessageText::ToolInputUnavailable),
+        fallback_output: &title,
+        ..Default::default()
+    })
+}
+pub(crate) fn tool_details_facts(
+    t: &TranscriptToolCall,
+    labels: OutputMessageLabels,
+) -> Option<ToolDetailFacts> {
+    labels.tool_sections.map(|make| ToolDetailFacts {
+        tool_id: t.id.clone(),
+        turn_id: t.turn_id.clone(),
+        details: make(t, labels),
+    })
+}
+pub(crate) fn validate_tool_details(facts: &PartFacts) -> Result<(), &'static str> {
+    if let Some(tool) = &facts.tool {
+        use tekes_agent_presentation::TranscriptToolDetailKind::*;
+        let kinds = tool
+            .details
+            .sections
+            .iter()
+            .map(|s| s.kind)
+            .collect::<Vec<_>>();
+        if !matches!(
+            kinds.as_slice(),
+            [Input, Output]
+                | [Input, Output, CallView]
+                | [Input, Output, ResultView]
+                | [Input, Output, CallView, ResultView]
+        ) {
+            return Err("invalid tool detail section order");
+        }
+    }
+    Ok(())
 }
 
 fn tool_display_name(name: &str) -> String {
@@ -151,6 +225,7 @@ pub(crate) struct PartFacts {
     pub(crate) kind: OutputContentKind,
     pub(crate) title: String,
     pub(crate) text: String,
+    pub(crate) tool: Option<ToolDetailFacts>,
 }
 impl PartFacts {
     fn disclosure(&self) -> bool {
@@ -185,6 +260,9 @@ impl OutputPart {
     pub(crate) fn ids(&self) -> OutputContentIds {
         self.ids
     }
+    pub(crate) fn matches_facts(&self, facts: &PartFacts) -> bool {
+        &self.facts == facts
+    }
 
     pub(crate) fn new(
         root: ComponentId,
@@ -217,7 +295,11 @@ impl OutputPart {
             );
             field.reading = Some(tekes_ui_controls::ReadingController::default());
         }
-        let body = Content::new(ids.body, field);
+        let body = if facts.tool.is_some() {
+            Content::new(ids.body, ToolDetailContent::new(bounded_details))
+        } else {
+            Content::new(ids.body, field)
+        };
         let (children, hidden) = if let Some(button) = ids.disclosure {
             (
                 vec![
@@ -261,7 +343,7 @@ impl OutputPart {
             .unwrap()
     }
     fn configure_detail_viewport(&mut self, text: &mut dyn ButtonTextRenderer) {
-        if !self.bounded_details || self.ids.disclosure.is_none() {
+        if !self.bounded_details || self.ids.disclosure.is_none() || self.facts.tool.is_some() {
             return;
         }
         let scale = text
@@ -279,7 +361,48 @@ impl OutputPart {
             max: 240. * scale,
         };
     }
-    pub(crate) fn update(&mut self, publication: u64, facts: PartFacts) {
+    pub(crate) fn update(
+        &mut self,
+        publication: u64,
+        epoch: u64,
+        facts: PartFacts,
+        alloc: &mut dyn FnMut() -> ComponentId,
+    ) {
+        if self.facts.tool.is_some() != facts.tool.is_some() {
+            self.ids.body = alloc();
+            let body = if facts.tool.is_some() {
+                Content::new(self.ids.body, ToolDetailContent::new(self.bounded_details))
+            } else {
+                let mut field = TextFieldContent::read_only_content(
+                    (self.labels.text)(OutputMessageText::Body),
+                    "",
+                    proposal::TextRole::UiBody,
+                );
+                if self.bounded_details {
+                    field.surface.scroll.set_scroll_policy(
+                        tekes_ui_controls::ScrollPolicy::Disabled,
+                        tekes_ui_controls::ScrollPolicy::Auto,
+                    );
+                    field.reading = Some(tekes_ui_controls::ReadingController::default());
+                }
+                Content::new(self.ids.body, field)
+            };
+            if let Some(hidden) = &mut self.hidden {
+                *hidden = body;
+            } else {
+                *self.rows.children.last_mut().unwrap() = body;
+            }
+        }
+        if let Some(tool) = &facts.tool {
+            let copy_label = (self.labels.text)(OutputMessageText::CopyDetail);
+            self.body_mut()
+                .component_mut::<ToolDetailContent>()
+                .unwrap()
+                .update(publication, epoch, tool, &copy_label, alloc);
+            self.facts = facts;
+            self.refresh_header();
+            return;
+        }
         let id = self.ids.body;
         let field = self.field_mut();
         let baseline = field.surface.input.external_baseline();
@@ -301,6 +424,41 @@ impl OutputPart {
         ));
         self.facts = facts;
         self.refresh_header();
+    }
+    fn body_mut(&mut self) -> &mut Content {
+        self.hidden
+            .as_mut()
+            .unwrap_or_else(|| self.rows.children.last_mut().unwrap())
+    }
+    fn tool_details(&self) -> Option<&ToolDetailContent> {
+        self.hidden
+            .as_ref()
+            .or_else(|| self.rows.children.last())
+            .and_then(|node| node.component::<ToolDetailContent>())
+    }
+    pub(crate) fn tool_detail_sections(&self) -> Vec<crate::ToolDetailSectionIds> {
+        self.tool_details()
+            .map_or_else(Vec::new, ToolDetailContent::ids)
+    }
+    pub(crate) fn copy_ids(&self) -> Vec<ComponentId> {
+        if self.hidden.is_some() {
+            vec![]
+        } else {
+            self.tool_details()
+                .map_or_else(Vec::new, ToolDetailContent::copy_ids)
+        }
+    }
+    pub(crate) fn copy_intents(
+        &self,
+        scope: &RunScope,
+        actions: &[ContentAction],
+    ) -> Vec<crate::TranscriptCopyIntent> {
+        if self.hidden.is_some() {
+            vec![]
+        } else {
+            self.tool_details()
+                .map_or_else(Vec::new, |view| view.copy_intents(scope, actions))
+        }
     }
     fn refresh_header(&mut self) {
         if self.ids.disclosure.is_some() {
@@ -368,7 +526,11 @@ impl Component for OutputPart {
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
         self.configure_detail_viewport(text);
-        if self.trailing && self.hidden.is_none() && self.rows.children.len() > 1 {
+        if self.trailing
+            && self.hidden.is_none()
+            && self.rows.children.len() > 1
+            && self.facts.tool.is_none()
+        {
             let field = self
                 .rows
                 .children
@@ -488,6 +650,37 @@ impl OutputMessage {
             .map(|c| c.component::<OutputPart>().unwrap().ids)
             .collect()
     }
+    /// Structured body groups expose their original section owners here;
+    /// `OutputContentIds::body` itself is a group for a structured tool.
+    pub fn tool_detail_sections(&self) -> Vec<crate::ToolDetailSectionIds> {
+        self.rows
+            .children
+            .iter()
+            .flat_map(|node| {
+                node.component::<OutputPart>()
+                    .unwrap()
+                    .tool_detail_sections()
+            })
+            .collect()
+    }
+    pub fn copy_action_ids(&self) -> Vec<ComponentId> {
+        self.rows
+            .children
+            .iter()
+            .flat_map(|node| node.component::<OutputPart>().unwrap().copy_ids())
+            .collect()
+    }
+    pub fn take_copy_intents(&self, actions: &[ContentAction]) -> Vec<crate::TranscriptCopyIntent> {
+        self.rows
+            .children
+            .iter()
+            .flat_map(|node| {
+                node.component::<OutputPart>()
+                    .unwrap()
+                    .copy_intents(&self.scope, actions)
+            })
+            .collect()
+    }
     /// Missing tool DTOs stay unresolved, never resolved through another turn or
     /// the currently selected session. None is valid for a session-wide notice.
     pub fn update(
@@ -520,7 +713,13 @@ impl OutputMessage {
             };
             let part = content.component_mut::<OutputPart>().unwrap();
             part.live_reasoning = output.item.is_provisional && !output.item.reasoning_ended;
-            part.update(publication, f.clone());
+            let base = self.root.0;
+            let next = &mut self.next;
+            part.update(publication, epoch, f.clone(), &mut || {
+                let id = ComponentId(base + *next);
+                *next += 1;
+                id
+            });
             self.rows.children.push(content);
         }
         self.key = Some(key);
@@ -583,7 +782,7 @@ impl OutputMessage {
             .count();
         if self
             .next
-            .checked_add(new_count as u64 * 3)
+            .checked_add(new_count as u64 * 3 + facts.len() as u64 * 32)
             .is_none_or(|v| v >= u32::MAX as u64)
         {
             return Err("output message namespace exhausted");
@@ -702,6 +901,7 @@ fn parts(
     };
     if let Some(status) = status {
         result.push(PartFacts {
+            tool: None,
             slot: Slot::MessageKind,
             kind: OutputContentKind::Status,
             title: String::new(),
@@ -712,6 +912,7 @@ fn parts(
         && let Some(error) = item.failure_message()
     {
         result.push(PartFacts {
+            tool: None,
             slot: Slot::Failure,
             kind: OutputContentKind::Status,
             title: String::new(),
@@ -725,6 +926,7 @@ fn parts(
                 return Err("invalid machine content block order");
             }
             previous = Some(block.index);
+            let mut tool_details = None;
             let (kind, title, text) = match &block.content {
                 TranscriptBlockContent::Text { text } => {
                     (OutputContentKind::Text, String::new(), text.clone())
@@ -742,6 +944,7 @@ fn parts(
                     let tool = section
                         .and_then(|s| s.tool_for_block(block))
                         .filter(|t| t.turn_id == item.turn_id);
+                    tool_details = tool.and_then(|tool| tool_details_facts(tool, labels));
                     let (title, text) = tool.map_or_else(
                         || {
                             (
@@ -768,6 +971,7 @@ fn parts(
                 ),
             };
             result.push(PartFacts {
+                tool: tool_details,
                 slot: if let TranscriptBlockContent::ToolCall { tool_id } = &block.content {
                     Slot::Tool(block.index, tool_id.clone())
                 } else {
@@ -781,6 +985,7 @@ fn parts(
     } else {
         if !item.reasoning.is_empty() && !item.text.is_empty() {
             result.push(PartFacts {
+                tool: None,
                 slot: Slot::Coverage,
                 kind: OutputContentKind::Coverage,
                 title: String::new(),
@@ -789,6 +994,7 @@ fn parts(
         }
         if !item.reasoning.is_empty() {
             result.push(PartFacts {
+                tool: None,
                 slot: Slot::AggregateReasoning,
                 kind: OutputContentKind::Reasoning,
                 title: (labels.text)(if item.reasoning_ended {
@@ -801,6 +1007,7 @@ fn parts(
         }
         if !item.text.is_empty() {
             result.push(PartFacts {
+                tool: None,
                 slot: Slot::AggregateBody,
                 kind: OutputContentKind::Text,
                 title: String::new(),
@@ -809,6 +1016,7 @@ fn parts(
         }
         for (i, attachment) in item.attachments.iter().enumerate() {
             result.push(PartFacts {
+                tool: None,
                 slot: Slot::AggregateAttachment(i),
                 kind: OutputContentKind::Attachment,
                 title: (labels.text)(OutputMessageText::Attachment),
@@ -826,11 +1034,15 @@ fn parts(
         && item.content_blocks.as_ref().is_some_and(Vec::is_empty);
     if result.is_empty() && !known_empty {
         result.push(PartFacts {
+            tool: None,
             slot: Slot::Empty,
             kind: OutputContentKind::Status,
             title: String::new(),
             text: (labels.text)(OutputMessageText::Empty),
         });
+    }
+    for facts in &result {
+        validate_tool_details(facts)?;
     }
     Ok(result)
 }

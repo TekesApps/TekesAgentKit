@@ -40,7 +40,9 @@ TextSurfaceHost::shape_label 服务并保留完整 source/AX 文案，AgentKit �
 [卡片与桥接说明](rust-agent-ui-tool-card-20261022.md)区分公开失败与旧退出标记；完整 selectable code/diff Content 仍待 #25。
 展开内容使用共享 `presentation_details(TranscriptToolDetailWording)`；宿主显式提供 producer
 progress/detail 和本地化 copy，按稳定 section kind 挂载原 SDK 控件。当前默认详情文字消费了
-该模型，独立文本区仍未完成，见[分区契约](rust-agent-ui-tool-details-20261022.md)。
+该模型；独立文本区和原复制通道已接入，见[控件与 API 迁移](rust-agent-ui-tool-section-controls-20261023.md)。
+结构化工具的 `OutputContentIds::body` 是容器；通过 `tool_detail_sections()` 获取各区原文本 ID。
+默认 `tool_sections` 回调可替换；旧 `tool` 单字段正文需显式 `tool_sections: None`。
 
 限高详情仅通过 `OutputMessage::with_bounded_details` / `ToolActivity::with_bounded_details` 显式试验；
 标准 RunPort/Transcript 保持原文档流。嵌套阅读严格检查当前失败，等待 #53；

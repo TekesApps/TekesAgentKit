@@ -161,6 +161,18 @@ fn toggle(host: &mut ContentHost, root: ComponentId, button: ComponentId) -> boo
     let actions = host.drain_actions();
     view_mut(host, root).handle_actions(&actions)
 }
+fn tool_body(
+    host: &ContentHost,
+    root: ComponentId,
+    kind: tekes_agent_presentation::TranscriptToolDetailKind,
+) -> ComponentId {
+    view(host, root)
+        .tool_detail_sections()
+        .into_iter()
+        .find(|ids| ids.kind == kind)
+        .unwrap()
+        .body
+}
 #[test]
 fn source_order_tool_details_and_opaque_payloads_remain_distinct() {
     let mut item = item();
@@ -232,9 +244,24 @@ fn source_order_tool_details_and_opaque_payloads_remain_distinct() {
         host.text_surface(ids[1].body).unwrap().input.text,
         "推理原文"
     );
-    let details = &host.text_surface(ids[2].body).unwrap().input.text;
-    assert!(details.contains("a.rs") && details.contains("结果\n"));
-    assert!(!details.contains("尚未回传") && !details.contains("未提供"));
+    let input = tool_body(
+        &host,
+        root,
+        tekes_agent_presentation::TranscriptToolDetailKind::Input,
+    );
+    let output = tool_body(
+        &host,
+        root,
+        tekes_agent_presentation::TranscriptToolDetailKind::Output,
+    );
+    assert!(
+        host.text_surface(input)
+            .unwrap()
+            .input
+            .text
+            .contains("a.rs")
+    );
+    assert!(host.text_surface(output).unwrap().input.text.is_empty());
     assert!(
         host.text_surface(ids[4].body)
             .unwrap()
@@ -294,11 +321,15 @@ fn streaming_and_tool_completion_keep_existing_text_selection_focus_and_disclosu
         0..2
     );
     assert!(
-        host.text_surface(ids[1].body)
-            .unwrap()
-            .input
-            .text
-            .contains("完整结果")
+        host.text_surface(tool_body(
+            &host,
+            root,
+            tekes_agent_presentation::TranscriptToolDetailKind::Output
+        ))
+        .unwrap()
+        .input
+        .text
+        .contains("完整结果")
     );
     assert!(toggle(&mut host, root, ids[1].disclosure.unwrap()));
     assert!(host.get(ids[1].body).is_none());
@@ -308,11 +339,15 @@ fn streaming_and_tool_completion_keep_existing_text_selection_focus_and_disclosu
         .unwrap();
     assert!(toggle(&mut host, root, ids[1].disclosure.unwrap()));
     assert!(
-        host.text_surface(ids[1].body)
-            .unwrap()
-            .input
-            .text
-            .contains("重连核对结果")
+        host.text_surface(tool_body(
+            &host,
+            root,
+            tekes_agent_presentation::TranscriptToolDetailKind::Output
+        ))
+        .unwrap()
+        .input
+        .text
+        .contains("重连核对结果")
     );
 }
 #[test]
@@ -658,9 +693,19 @@ fn embedded_tool_uses_producer_terminal_description_and_retains_raw_detail_owner
     assert!(header.label.contains("Shell · 检查项目 · doing"));
     assert!(!header.label.contains("echo original"));
     assert!(toggle(&mut host, root, ids.disclosure.unwrap()));
-    let owner = host.text_surface(ids.body).unwrap() as *const _ as usize;
+    let input = tool_body(
+        &host,
+        root,
+        tekes_agent_presentation::TranscriptToolDetailKind::Input,
+    );
+    let output_body = tool_body(
+        &host,
+        root,
+        tekes_agent_presentation::TranscriptToolDetailKind::Output,
+    );
+    let owner = host.text_surface(input).unwrap() as *const _ as usize;
     assert!(
-        host.text_surface(ids.body)
+        host.text_surface(input)
             .unwrap()
             .input
             .text
@@ -676,7 +721,7 @@ fn embedded_tool_uses_producer_terminal_description_and_retains_raw_detail_owner
         .unwrap();
     assert_eq!(view(&host, root).content_ids()[0], ids);
     assert_eq!(
-        host.text_surface(ids.body).unwrap() as *const _ as usize,
+        host.text_surface(input).unwrap() as *const _ as usize,
         owner
     );
     let header = host
@@ -687,7 +732,7 @@ fn embedded_tool_uses_producer_terminal_description_and_retains_raw_detail_owner
     assert!(header.label.contains("Shell · 检查项目 · done"));
     assert!(!header.label.contains("must not replace terminal action"));
     assert!(
-        host.text_surface(ids.body)
+        host.text_surface(output_body)
             .unwrap()
             .input
             .text
@@ -775,16 +820,27 @@ fn bounded_detail_caps_reasoning_and_tools_but_keeps_ordinary_prose_in_document_
             Theme::LIGHT.into(),
         )
         .unwrap();
-        for id in &ids {
+        let fields = ids
+            .iter()
+            .filter(|id| id.kind != OutputContentKind::Tool)
+            .map(|id| id.body)
+            .chain(
+                view(&host, root)
+                    .tool_detail_sections()
+                    .into_iter()
+                    .map(|id| id.body),
+            )
+            .collect::<Vec<_>>();
+        for body in fields {
             let field = host
-                .get(id.body)
+                .get(body)
                 .unwrap()
                 .component::<TextFieldContent>()
                 .unwrap();
             assert!(
                 field.surface.outer.size.height <= 240. * scale + 0.5,
                 "expanded {:?}: {} at scale {}",
-                id.kind,
+                body,
                 field.surface.outer.size.height,
                 scale
             );
@@ -1052,5 +1108,61 @@ fn default_detail_path_remains_inline_while_the_nested_reading_contract_is_pendi
             tekes_ui_controls::ScrollPolicy::Disabled,
             tekes_ui_controls::ScrollPolicy::Disabled
         )
+    );
+}
+
+#[test]
+fn tool_resolution_changes_retire_body_and_copy_ids_and_preserve_the_explicit_viewport_policy() {
+    let mut message = item();
+    message.content_blocks = Some(vec![block(
+        0,
+        Block::ToolCall {
+            tool_id: "tool".into(),
+        },
+    )]);
+    let mut row = OutputMessage::with_bounded_details(715, scope(), Default::default());
+    row.update(&scope(), 1, 1, &output(&message), None).unwrap();
+    let root = row.id();
+    let missing = row.content_ids()[0];
+    let mut host = row.into_host().unwrap();
+    assert!(toggle(&mut host, root, missing.disclosure.unwrap()));
+    let call = tool();
+    view_mut(&mut host, root)
+        .update(&scope(), 2, 1, &output(&message), Some(&section(&call)))
+        .unwrap();
+    let group = view(&host, root).content_ids()[0];
+    assert_ne!(group.body, missing.body);
+    assert!(host.get(missing.body).is_none());
+    let fields = view(&host, root).tool_detail_sections();
+    host.accessibility_action(fields[0].copy, None, AccessibilityAction::Press);
+    let actions = host.drain_actions();
+    assert_eq!(view(&host, root).take_copy_intents(&actions).len(), 1);
+    view_mut(&mut host, root)
+        .update(&scope(), 3, 1, &output(&message), None)
+        .unwrap();
+    let unresolved = view(&host, root).content_ids()[0];
+    assert_ne!(unresolved.body, group.body);
+    assert_ne!(unresolved.body, missing.body);
+    assert!(host.get(group.body).is_none());
+    assert!(view(&host, root).take_copy_intents(&actions).is_empty());
+    let field = host
+        .get(unresolved.body)
+        .unwrap()
+        .component::<TextFieldContent>()
+        .unwrap();
+    assert!(field.reading.is_some());
+    assert_eq!(
+        field.surface.scroll.scroll_policy(),
+        (
+            tekes_ui_controls::ScrollPolicy::Disabled,
+            tekes_ui_controls::ScrollPolicy::Auto
+        )
+    );
+    view_mut(&mut host, root)
+        .update(&scope(), 4, 1, &output(&message), Some(&section(&call)))
+        .unwrap();
+    assert_ne!(
+        view(&host, root).tool_detail_sections()[0].body,
+        fields[0].body
     );
 }

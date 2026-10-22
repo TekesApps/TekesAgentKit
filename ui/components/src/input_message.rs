@@ -31,6 +31,11 @@ pub enum TranscriptCopySource {
         turn_id: String,
         item_ids: Vec<String>,
     },
+    ToolDetail {
+        tool_id: String,
+        turn_id: String,
+        section: tekes_agent_presentation::TranscriptToolDetailKind,
+    },
 }
 
 /// Clipboard capability captured from the original message or turn. No endpoint call;
@@ -64,7 +69,9 @@ impl TranscriptCopyIntent {
     pub fn message(&self) -> Option<&Key> {
         match &self.source {
             TranscriptCopySource::Message(message) => Some(message),
-            TranscriptCopySource::TurnOutput { .. } => None,
+            TranscriptCopySource::TurnOutput { .. } | TranscriptCopySource::ToolDetail { .. } => {
+                None
+            }
         }
     }
     pub fn text(&self) -> &str {
@@ -516,7 +523,13 @@ impl InputMessage {
                 });
             let part = node.component_mut::<OutputPart>().unwrap();
             part.set_trailing(true);
-            part.update(publication, facts.clone());
+            let base = self.ids.root.0;
+            let next = &mut self.next_detail;
+            part.update(publication, epoch, facts.clone(), &mut || {
+                let id = ComponentId(base + *next);
+                *next += 1;
+                id
+            });
             self.children.push(node);
         }
         self.children.push(bubble);
@@ -895,6 +908,7 @@ fn input_details(item: &TranscriptItem) -> Result<Vec<PartFacts>, &'static str> 
                 ),
             };
             facts.push(PartFacts {
+                tool: None,
                 slot: Slot::Block(block.index, kind),
                 kind,
                 title,
@@ -903,6 +917,7 @@ fn input_details(item: &TranscriptItem) -> Result<Vec<PartFacts>, &'static str> 
         }
         if !text_blocks.is_empty() && text_blocks != item.text {
             facts.push(PartFacts {
+                tool: None,
                 slot: Slot::AggregateBody,
                 kind: OutputContentKind::Unknown,
                 title: "原始文本块（与聚合正文不同）".into(),
@@ -923,6 +938,7 @@ fn input_details(item: &TranscriptItem) -> Result<Vec<PartFacts>, &'static str> 
             continue;
         }
         facts.push(PartFacts {
+            tool: None,
             slot: Slot::AggregateAttachment(index),
             kind: OutputContentKind::Attachment,
             title: content
@@ -938,6 +954,7 @@ fn input_details(item: &TranscriptItem) -> Result<Vec<PartFacts>, &'static str> 
     }
     if !item.reasoning.is_empty() && !has_reasoning {
         facts.push(PartFacts {
+            tool: None,
             slot: Slot::AggregateReasoning,
             kind: OutputContentKind::Unknown,
             title: "用户消息中的 reasoning 字段".into(),

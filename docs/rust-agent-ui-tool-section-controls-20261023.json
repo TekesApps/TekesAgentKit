@@ -1,0 +1,94 @@
+{
+  "sourceBase": "cb1c28ecdcb290c8360ea2964260b484e03257ea",
+  "changedSourceFiles": {
+    "ui/components/src/input_message.rs": "a3ff9fb471097686b7a16d77c364ce1b09b42bbc444a90481d9117bed576d4c9",
+    "ui/components/src/lib.rs": "15a146994d6397f6426cf0e647a4e640bbb6662cf977c79b633c615f9ba875a9",
+    "ui/components/src/output_message.rs": "824de81b12f9c9279a1c2033445c33519a1d7477ca2c781650a05be6e53e3247",
+    "ui/components/src/tool_activity.rs": "0e5d73e71fa7131b469adf7633674f1af3a9ea2be9360f7bd5f08721197831db",
+    "ui/components/src/tool_detail_content.rs": "1315e623e17f55e572a31694b55bce9eca2689fa567c953c2a5b55c7ce168f02",
+    "ui/components/src/transcript_content.rs": "20b8f7783376d797bbbdffed855c0ca555805742a6ea5de977fafe0944a0901c",
+    "ui/consumer/tests/summary_label.rs": "cb5df8aa2f8a1e813c3a39b50e2584a111a26fa51817df00cc8be08408caee29",
+    "ui/consumer/tests/support/tool_sections.rs": "9944c199892d5216f508c73f065b04942424085b5e279d7af285bed61f9bf3f6",
+    "ui/consumer/tests/tool_titles.rs": "ad5032d79f0c3d8cb98de1de59faa1a819d5fec6f47c67ed893d04426e40377c",
+    "ui/demo/tests/output_message.rs": "0e70a413d195fd1ea820505d016312d517780fde2ebb1a489a7cc0e4ef0ba627",
+    "ui/demo/tests/run_reading.rs": "acf61f5f926ad52aa69f14e07d5b78cdeb813c8ca1e857a5d4476d8b1eac1b5c",
+    "ui/demo/tests/transcript_content.rs": "0afd22b7826c41b5fb9afc40b517d957b3d3e356db6925ab31c6b8d9fb7d7ed9"
+  },
+  "publicAgentKitRelease": {
+    "publishedAt": "2026-10-19T14:25:34Z",
+    "tagName": "v0.3.8",
+    "url": "https://github.com/TekesApps/TekesAgentKit/releases/tag/v0.3.8"
+  },
+  "publicAgentKitMain": {
+    "date": "2026-10-19T14:25:16Z",
+    "sha": "f1daa0ffcf6ced41e21f351e22845455ca78006c"
+  },
+  "tekesui": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "tekesuiInputCount": 243,
+  "tekesuiPackages": 8,
+  "validation": {
+    "uiWorkspace": {
+      "passed": 559,
+      "failed": 0,
+      "ignored": 1
+    },
+    "uiClippy": "passed",
+    "format": "passed",
+    "demoBuild": "passed",
+    "resolvedSdkInputs": "passed",
+    "root": "unchanged from cb1c28e; prior 241-pass receipt rust-agent-ui-tool-details-20261022.json",
+    "strictReading": {
+      "exitCode": 1,
+      "result": {
+        "accepted": false,
+        "parentFollowingAfterInnerUp": true,
+        "parentOffsetBefore": 0,
+        "parentOffsetAfterScroll": 0,
+        "parentOffsetAfterAppend": 634,
+        "innerOffset": 100,
+        "detailVisibleAfterAppend": false
+      }
+    },
+    "scope": "CoreText/component/synthetic preedit, pointer and AX; no new native window/system IME/harness/GPU/VO/ProcessContainer acceptance",
+    "resolutionTransition": "missing/resolved/missing retires body/copy identities and keeps explicit viewport policy"
+  },
+  "sourceReferencesReadOnly": {
+    "ClientKit/TranscriptMetalActivity.swift": "f08f6e8f34c76a71fb117dd84a46be50145f737a38e21534cf59d518bc2d3e8d",
+    "ClientKit/TranscriptMetalAppBridges.swift": "aced6682f06d2c5c6313e9bbb0e429a217ab05f5a7cacc181ce3af8a2bdb0d1c",
+    "Tekes/ClientAgentHostAdapters.swift": "7d907c654ec3df76c7a8b492e32bbc68f1bd4d0b46044cae615aa712b9f67c71"
+  },
+  "upstreamIssues": {
+    "nestedReading": 53,
+    "separatorContent": 54,
+    "richCode": 25,
+    "compactActionsAndActivity": 47,
+    "processContainer": 48
+  },
+  "standardDetails": "independent inline sections; bounded factory remains experimental",
+  "newTargets": 0,
+  "newAcceptanceProgramCopies": 0,
+  "deletedBytes": 0,
+  "evidence": {
+    ".runtime-fixtures/tool-section-controls-20261023/check.log": "b70f785dfa49392801486ab5a07292aefbb0730ddaa796d8e7bb5f6ad09f2d15",
+    ".runtime-fixtures/tool-section-controls-20261023/demo-build-final.log": "d7ba34e20b61e9242d2488631b62fd0c0608b42c1b083224644cb867e388fbb5",
+    ".runtime-fixtures/tool-section-controls-20261023/demo-build.log": "40108eb5c2e432741fc7f36afdf5c793ec02b19e7b1ce5e51bdd2ba377bd26cb",
+    ".runtime-fixtures/tool-section-controls-20261023/local-links.json": "92d0abbede4e34f78e27193c1e157473ff3e3529c4012ea0c380297c6e67b2fb",
+    ".runtime-fixtures/tool-section-controls-20261023/parent-ci.json": "d1d1ea350aebbbef62a9f6f81ef6dc7204f01aac48f86e0b9fe8d14185494cac",
+    ".runtime-fixtures/tool-section-controls-20261023/public-agentkit-main.json": "868a866a408adcb16158f0e97eb51ee081b74ad73e22aa128858f169bb880249",
+    ".runtime-fixtures/tool-section-controls-20261023/public-agentkit-release.json": "474c45a672119b5c7b6a1f01ad2ce9c88c5beafa9c4f378386ea836e4061b993",
+    ".runtime-fixtures/tool-section-controls-20261023/separator-issue-url.txt": "ff473992ef9b22d0f95814e2ff5e15939a94155ab15d0ba6548cc14bbe942ed1",
+    ".runtime-fixtures/tool-section-controls-20261023/separator-issue.md": "647af67568c43a7e6bb3409c1addeb71d4fa5df43f68e68b86afd01933e24d21",
+    ".runtime-fixtures/tool-section-controls-20261023/strict-reading-final.json": "c4f70b29538ecacd71995d9a3fc7678cf168834c54e6f348c8c095309b9f1b90",
+    ".runtime-fixtures/tool-section-controls-20261023/strict-reading-final.stderr": "1c0a9b776e29cecb3af8f859d3f5a83b7d3ab349f8d1ce05d21a43db159b8d3d",
+    ".runtime-fixtures/tool-section-controls-20261023/strict-reading.json": "c4f70b29538ecacd71995d9a3fc7678cf168834c54e6f348c8c095309b9f1b90",
+    ".runtime-fixtures/tool-section-controls-20261023/strict-reading.stderr": "b6f28855ec3dd5cae1526d15aedbde78daf931912c6ceb11621417145a475a78",
+    ".runtime-fixtures/tool-section-controls-20261023/targeted-tests-final.log": "1d23f575ad9152661c2c45cacc02e8313f9fc093cf2663435bb168c3384edbf7",
+    ".runtime-fixtures/tool-section-controls-20261023/targeted-tests.log": "936dd83ea932a1e7b706ab879833c0523c4a8022b6257fea2c6654df0dd1804d",
+    ".runtime-fixtures/tool-section-controls-20261023/ui-clippy-final.log": "94d784507c324383927c67149c8fbc4a8eaf22ba24cad46002fe37fc1591ca3d",
+    ".runtime-fixtures/tool-section-controls-20261023/ui-clippy.log": "d711d37b6e4a95d66d0d1e7dd8439a7a36a423a06c8e6127299ce260796af146",
+    ".runtime-fixtures/tool-section-controls-20261023/ui-inputs.json": "9543ade335292f9c7f61944edd341c2fb9297a7c6abc3cf44dc86c1f16bd6ee3",
+    ".runtime-fixtures/tool-section-controls-20261023/ui-tests-final.log": "3b6357d78c9f1d1999aeb8c3a834c0dbc902a65cad51764ed792d6f6b15b75cb",
+    ".runtime-fixtures/tool-section-controls-20261023/ui-tests.log": "1f325d390f4d5d144e2cd423de596d9e2550e3346350881132b4f615b8ba53a4",
+    ".runtime-fixtures/tool-section-controls-20261023/verification-exits.json": "1c1b79f2bdf93bf8671d09c352ef3db9e9d6971b5cb83634813fe96ae9303548"
+  }
+}

@@ -335,18 +335,25 @@ fn journal_events_compose_once_with_a_turn_aside_and_cumulative_tool_result() {
         .unwrap()
         .content_ids()
         .unwrap();
+    let output_body = host
+        .get(tool_id)
+        .unwrap()
+        .component::<ToolActivity>()
+        .unwrap()
+        .tool_detail_sections()[1]
+        .body;
     host.accessibility_action(ids.disclosure.unwrap(), None, AccessibilityAction::Press);
     let actions = host.drain_actions();
     assert!(root(&mut host, root_id).handle_actions(&actions).is_empty());
     assert!(
-        host.text_surface(ids.body)
+        host.text_surface(output_body)
             .unwrap()
             .input
             .text
             .contains("result")
     );
-    host.focus(Some(ids.body), true);
-    host.get_mut(ids.body)
+    host.focus(Some(output_body), true);
+    host.get_mut(output_body)
         .unwrap()
         .component_mut::<TextFieldContent>()
         .unwrap()
@@ -357,10 +364,13 @@ fn journal_events_compose_once_with_a_turn_aside_and_cumulative_tool_result() {
     root(&mut host, root_id)
         .update(&scope(), 2, 1, &source, true)
         .unwrap();
-    assert_eq!(host.focused(), Some(ids.body));
-    assert_eq!(host.text_surface(ids.body).unwrap().input.selection(), 0..2);
+    assert_eq!(host.focused(), Some(output_body));
+    assert_eq!(
+        host.text_surface(output_body).unwrap().input.selection(),
+        8..10 // SDK Preserve follows the originally selected "re" after the prefix insertion.
+    );
     assert!(
-        host.text_surface(ids.body)
+        host.text_surface(output_body)
             .unwrap()
             .input
             .text

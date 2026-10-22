@@ -283,6 +283,85 @@ async fn availability_refresh_uses_display_revision_without_advancing_provider_p
     }
     runtime.stop().await.unwrap();
 }
+#[tokio::test]
+async fn tool_section_copy_uses_original_run_channel_during_composer_preedit() {
+    use tekes_ui_controls::{ScrollRevealOptions, ScrollRevealPlacement, extended::Axis};
+    let fixture = tekes_agent_ui_demo::fixture::Fixture::default().with_reading_details();
+    let (runtime, mut host, root, snapshot, version, mut text) = setup_with_fixture(fixture).await;
+    let key = TranscriptContentRowKey::Tool(snapshot.transcript.tools[0].id.clone());
+    let row = run(&host, root).transcript().unwrap().row_id(&key).unwrap();
+    let toggle = host
+        .get(row)
+        .unwrap()
+        .component::<ToolActivity>()
+        .unwrap()
+        .content_ids()
+        .unwrap()
+        .disclosure
+        .unwrap();
+    host.accessibility_action(toggle, None, AccessibilityAction::Press);
+    assert!(tekes_agent_ui_consumer_check::drain_local_run_actions(&mut host, root).is_empty());
+    render(&mut host, &mut text);
+    let target = host
+        .get(row)
+        .unwrap()
+        .component::<ToolActivity>()
+        .unwrap()
+        .tool_detail_sections()[0]
+        .copy;
+    assert!(run(&host, root).copy_action_ids().contains(&target));
+    let viewport = run(&host, root).ids().viewport;
+    host.reveal_scroll_reading_item(
+        viewport,
+        &version,
+        row,
+        ScrollRevealOptions {
+            placement: ScrollRevealPlacement::Start(Axis::Vertical),
+            animated: false,
+            ..Default::default()
+        },
+        &mut text,
+    )
+    .unwrap();
+    render(&mut host, &mut text);
+    assert!(host.get(target).unwrap().visible().is_some());
+    let editor = run(&host, root).ids().composer.editor;
+    host.focus(Some(editor), true);
+    host.event(&ContentEvent::Preedit {
+        text: "分区复制期间中文组字".into(),
+        selection: 1..3,
+        clauses: vec![],
+        replacement: None,
+    });
+    let before = baseline(&host, root);
+    let owner = host.text_surface(editor).unwrap() as *const _ as usize;
+    host.accessibility_action(target, None, AccessibilityAction::Press);
+    let intents = tekes_agent_ui_consumer_check::drain_local_run_actions(&mut host, root);
+    let [RunPortIntent::CopyTranscript(copy)] = intents.as_slice() else {
+        panic!("copy must reach original RunPort before the preedit barrier");
+    };
+    assert!(matches!(
+        copy.source(),
+        TranscriptCopySource::ToolDetail {
+            section: TranscriptToolDetailKind::Input,
+            ..
+        }
+    ));
+    assert_eq!(
+        copy.text(),
+        snapshot.transcript.tools[0]
+            .presentation_details(Default::default())
+            .sections[0]
+            .copy_text
+    );
+    assert_eq!(baseline(&host, root), before);
+    assert_eq!(
+        host.text_surface(editor).unwrap() as *const _ as usize,
+        owner
+    );
+    assert_eq!(host.focused(), Some(editor));
+    runtime.stop().await.unwrap();
+}
 fn rows(host: &ContentHost, root: ComponentId) -> Vec<TranscriptContentRowKey> {
     run(host, root).transcript().unwrap().row_keys().to_vec()
 }
@@ -2240,6 +2319,13 @@ async fn expanded_tool_growth_and_reflow_preserve_reading_and_explicit_collapse_
         .unwrap()
         .content_ids()
         .unwrap();
+    let tool_output = host
+        .get(tool_row)
+        .unwrap()
+        .component::<ToolActivity>()
+        .unwrap()
+        .tool_detail_sections()[1]
+        .body;
     let reasoning = rows(&host, root)
         .iter()
         .filter_map(|key| {
@@ -2265,10 +2351,10 @@ async fn expanded_tool_growth_and_reflow_preserve_reading_and_explicit_collapse_
         );
     }
     render(&mut host, &mut text);
-    assert!(host.get(tool.body).is_some());
+    assert!(host.get(tool_output).is_some());
     assert!(host.get(reasoning.body).is_some());
     let original_tool = host
-        .get(tool.body)
+        .get(tool_output)
         .unwrap()
         .component::<TextFieldContent>()
         .unwrap() as *const _;
@@ -2343,7 +2429,7 @@ async fn expanded_tool_growth_and_reflow_preserve_reading_and_explicit_collapse_
         assert_eq!(host.focused(), Some(editor));
         assert_eq!(baseline(&host, root), before);
         assert_eq!(
-            host.get(tool.body)
+            host.get(tool_output)
                 .unwrap()
                 .component::<TextFieldContent>()
                 .unwrap() as *const _,
@@ -2367,7 +2453,7 @@ async fn expanded_tool_growth_and_reflow_preserve_reading_and_explicit_collapse_
         }
     }
     render(&mut host, &mut text);
-    assert!(host.get(tool.body).is_none() && host.get(reasoning.body).is_none());
+    assert!(host.get(tool_output).is_none() && host.get(reasoning.body).is_none());
     // Explicit AX activation focuses/reveals an offscreen disclosure through the
     // SDK. That deliberate navigation must not be mislabelled passive reflow.
     assert_eq!(host.focused(), reasoning.disclosure);

@@ -983,12 +983,18 @@ impl TranscriptContent {
         self.rows
             .children
             .iter()
-            .filter_map(|node| {
+            .flat_map(|node| {
                 if let Some(input) = node.component::<InputMessage>() {
-                    input.copy_button_id()
+                    input.copy_button_id().into_iter().collect()
+                } else if let Some(output) = node.component::<OutputMessage>() {
+                    output.copy_action_ids()
+                } else if let Some(tool) = node.component::<ToolActivity>() {
+                    tool.copy_action_ids()
                 } else {
                     node.component::<TurnFootnote>()
                         .and_then(TurnFootnote::copy_button_id)
+                        .into_iter()
+                        .collect::<Vec<_>>()
                 }
             })
             .collect()
@@ -1002,6 +1008,10 @@ impl TranscriptContent {
                     input.take_copy_intents(actions)
                 } else if let Some(footnote) = node.component::<TurnFootnote>() {
                     footnote.take_copy_intents(actions)
+                } else if let Some(output) = node.component::<OutputMessage>() {
+                    output.take_copy_intents(actions)
+                } else if let Some(tool) = node.component::<ToolActivity>() {
+                    tool.take_copy_intents(actions)
                 } else {
                     vec![]
                 }

@@ -426,4 +426,5 @@ wake scheduling remain host adapters. This does not complete footnote layout par
 
 [限高详情实验](rust-agent-ui-bounded-details-20261022.md)保留标准路径，并通过独立公开 API 示例严格记录 #53 的父阅读意图缺口。
 [工具展开分区](rust-agent-ui-tool-details-20261022.md)集中 Input/Output 与实际 View JSON 的显示事实；默认详情已消费，独立文本区仍待补齐。
+[独立分区与复制](rust-agent-ui-tool-section-controls-20261023.md)已消费原 SDK 字段/标题/按钮与复制通道；该增量取代上一条的单字段 UI 状态。#53 限高阅读、#54 分隔线和最终富卡片/原生对照仍未完成。
 [系统提示处理后的原生续验](rust-agent-ui-native-handled-20261022.md)推进到 phase 20 后期限失败，未完成分页/系统组字。

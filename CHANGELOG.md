@@ -2,6 +2,7 @@
 
 ## Unreleased — experimental Rust Agent UI
 
+- Mount independent tool Input/Output/view-JSON fields with original SDK controls and per-section captured copy intents. Retain text owners, retire changed/old copy targets, and forward copies through Transcript/RunPort during Composer preedit. Structured-tool body IDs now identify groups; use `tool_detail_sections()` for text IDs. Existing single-text callbacks remain an explicit opt-out.
 - Share ordered tool Input/Output/view-JSON section facts and consume them in default details without replacing text owners. Distinguish absent and delivered-empty results; preserve structured-error summaries without a message body. Independent section layout remains unfinished.
 - Add opt-in bounded reasoning/tool details using original SDK text owners; retain inline defaults pending TekesUI #53. Add a strict nested-reading consumer gate with the current failure preserved.
 

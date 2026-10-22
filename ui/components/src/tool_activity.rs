@@ -38,6 +38,7 @@ pub struct ToolActivity {
     placement: ToolActivityPlacement,
     labels: ToolActivityLabels,
     bounded_details: bool,
+    next: u64,
     children: Vec<Content>,
 }
 impl ToolActivity {
@@ -51,6 +52,7 @@ impl ToolActivity {
             placement: ToolActivityPlacement::Unplaced,
             labels,
             bounded_details: false,
+            next: 19,
             children: vec![],
         }
     }
@@ -73,14 +75,14 @@ impl ToolActivity {
             .first()
             .map(|c| c.component::<OutputPart>().unwrap().ids())
     }
-    pub(crate) fn check_update(
+    fn checked_facts(
         &self,
         scope: &RunScope,
         publication: u64,
         epoch: u64,
         tool: &TranscriptToolCall,
         placement: ToolActivityPlacement,
-    ) -> Result<(), &'static str> {
+    ) -> Result<PartFacts, &'static str> {
         if scope != &self.scope {
             return Err("tool activity scope mismatch");
         }
@@ -97,7 +99,37 @@ impl ToolActivity {
         {
             return Err("conflicting tool activity publication");
         }
-        Ok(())
+        if self
+            .next
+            .checked_add(32)
+            .is_none_or(|value| value >= u32::MAX as u64)
+        {
+            return Err("tool detail namespace exhausted");
+        }
+        let facts = self.facts(tool, placement);
+        crate::output_message::validate_tool_details(&facts)?;
+        if publication == self.publication
+            && self.children.first().is_some_and(|node| {
+                !node
+                    .component::<OutputPart>()
+                    .unwrap()
+                    .matches_facts(&facts)
+            })
+        {
+            return Err("conflicting tool detail publication");
+        }
+        Ok(facts)
+    }
+    pub(crate) fn check_update(
+        &self,
+        scope: &RunScope,
+        publication: u64,
+        epoch: u64,
+        tool: &TranscriptToolCall,
+        placement: ToolActivityPlacement,
+    ) -> Result<(), &'static str> {
+        self.checked_facts(scope, publication, epoch, tool, placement)
+            .map(|_| ())
     }
     pub fn update(
         &mut self,
@@ -107,19 +139,7 @@ impl ToolActivity {
         tool: &TranscriptToolCall,
         placement: ToolActivityPlacement,
     ) -> Result<(), &'static str> {
-        self.check_update(scope, publication, epoch, tool, placement)?;
-        let (title, text) = (self.labels.details.tool)(tool);
-        let prefix = match placement {
-            ToolActivityPlacement::Call => &self.labels.call,
-            ToolActivityPlacement::ResultOnly => &self.labels.result_only,
-            ToolActivityPlacement::Unplaced => &self.labels.unplaced,
-        };
-        let facts = PartFacts {
-            slot: Slot::Tool(0, tool.id.clone()),
-            kind: OutputContentKind::Tool,
-            title: format!("{prefix} · {title}"),
-            text,
-        };
+        let facts = self.checked_facts(scope, publication, epoch, tool, placement)?;
         if self.children.is_empty() {
             let id = ComponentId(self.root.0 + 16);
             self.children.push(Content::new(
@@ -127,15 +147,55 @@ impl ToolActivity {
                 OutputPart::new(id, facts.clone(), self.labels.details, self.bounded_details),
             ));
         }
+        let base = self.root.0;
+        let next = &mut self.next;
         self.children[0]
             .component_mut::<OutputPart>()
             .unwrap()
-            .update(publication, facts);
+            .update(publication, epoch, facts, &mut || {
+                let id = ComponentId(base + *next);
+                *next += 1;
+                id
+            });
         self.publication = publication;
         self.epoch = epoch;
         self.tool = Some(tool.clone());
         self.placement = placement;
         Ok(())
+    }
+    fn facts(&self, tool: &TranscriptToolCall, placement: ToolActivityPlacement) -> PartFacts {
+        let (title, text) = (self.labels.details.tool)(tool);
+        let prefix = match placement {
+            ToolActivityPlacement::Call => &self.labels.call,
+            ToolActivityPlacement::ResultOnly => &self.labels.result_only,
+            ToolActivityPlacement::Unplaced => &self.labels.unplaced,
+        };
+        PartFacts {
+            tool: crate::output_message::tool_details_facts(tool, self.labels.details),
+            slot: Slot::Tool(0, tool.id.clone()),
+            kind: OutputContentKind::Tool,
+            title: format!("{prefix} · {title}"),
+            text,
+        }
+    }
+    pub fn tool_detail_sections(&self) -> Vec<crate::ToolDetailSectionIds> {
+        self.children.first().map_or_else(Vec::new, |node| {
+            node.component::<OutputPart>()
+                .unwrap()
+                .tool_detail_sections()
+        })
+    }
+    pub fn copy_action_ids(&self) -> Vec<ComponentId> {
+        self.children.first().map_or_else(Vec::new, |node| {
+            node.component::<OutputPart>().unwrap().copy_ids()
+        })
+    }
+    pub fn take_copy_intents(&self, actions: &[ContentAction]) -> Vec<crate::TranscriptCopyIntent> {
+        self.children.first().map_or_else(Vec::new, |node| {
+            node.component::<OutputPart>()
+                .unwrap()
+                .copy_intents(&self.scope, actions)
+        })
     }
     pub fn handle_actions(&mut self, actions: &[ContentAction]) -> bool {
         let Some(part) = self
