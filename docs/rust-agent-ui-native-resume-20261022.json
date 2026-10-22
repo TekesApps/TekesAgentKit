@@ -1,0 +1,927 @@
+{
+  "format": 1,
+  "status": "partial-native-acceptance",
+  "sourceCommit": "4b7511f0151f87d48413b3e4cfa9a77729ddb4ff",
+  "program": {
+    "program": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/AgentKitExternalIME20261022.app/Contents/MacOS/AgentKitExternalIME20261022",
+    "sha256": "2696969bb4d0a27804acf9fbe48d4cb06b974ff67f571b030b9098936fae497e",
+    "base_commit": "d617b45f4359cefc1fe7bea073cff3c66994c260",
+    "sdk": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+    "source_sha256": {
+      "ui/components/src/turn_footnote.rs": "431fd197833e8bc94dbf27f87ae82fef7466e0fa7571099a696445ed4de8b2d5",
+      "ui/consumer/tests/support/output_aside_layout.rs": "87dd908ab36934d08d5ad7b6211545c1191968d93f8ab8bc19a86ecbdd624f75",
+      "ui/demo/src/native_feedback_selftest.rs": "ae5cd367acc1e202fa231adb5535adc6bd3d25d5c3bcd4f2d3bc39a0dd9669e3",
+      "ui/demo/src/components_native.rs": "59710d204a830cb645b59777f874e9dc6e1477c29a89b8c702a0575047835a13"
+    },
+    "probe_only_change": "external timing preserves original literal marked/committed expectations and widget clicks; bound-app route identified separately"
+  },
+  "runs": [
+    {
+      "stage": "three-native-exclusive-20261022",
+      "exitCode": 1,
+      "receipts": [
+        {
+          "kind": "PI_UI_NATIVE_READING_RECEIPT",
+          "receipt": {
+            "draftIsolation": true,
+            "focusAndEditorBaselinePreserved": false,
+            "focusAndMarkedBaselinePreserved": false,
+            "focusAndTextStatePreserved": true,
+            "hoverPreviewVisible": false,
+            "independentBReadingRestored": true,
+            "jumpHasNoHistory": false,
+            "jumpLatestControl": false,
+            "loadedItemsAfter": 56,
+            "loadedItemsBefore": 50,
+            "markedTextPreserved": false,
+            "nativePagingControl": false,
+            "nativeWindow": true,
+            "navigationPreeditPreserved": false,
+            "noSubmission": true,
+            "opaqueBaselinePreserved": false,
+            "originalTurnNavigation": false,
+            "physicalIme": false,
+            "prependAnchorPreserved": true,
+            "previewFactsDuringPreedit": false,
+            "publicHistoryPage": true,
+            "publicPageRequest": true,
+            "readingAnchorAcceptance": true,
+            "realHarness": true,
+            "reconnectReadingRestored": true,
+            "retainedSessionReadingRestored": true,
+            "sameEditorOwner": true,
+            "samePublicationRefresh": true,
+            "syntheticPreedit": false,
+            "syntheticWheel": true,
+            "turnStartAndLatest": false,
+            "upwardReadingPreserved": true,
+            "voiceOver": false
+          }
+        },
+        {
+          "kind": "PI_UI_NATIVE_FEEDBACK_RECEIPT",
+          "receipt": {
+            "auxiliaryFocusPreserved": true,
+            "committedNoteLabel": true,
+            "composerContentsAndOwnerPreserved": true,
+            "draftsPreserved": true,
+            "freshReadAfterDelete": true,
+            "imeSendAndNavigationBlocked": true,
+            "inputAsideSingleTrailingBand": true,
+            "nativeInteraction": true,
+            "nativePointer": true,
+            "nativeTextServices": true,
+            "noPromptSubmitted": true,
+            "nonemptyComposerDrafts": true,
+            "noteReopened": true,
+            "opaqueBaselinePreserved": false,
+            "outputAsideSingleReadingBand": true,
+            "physicalIme": false,
+            "readingAnchorAcceptance": false,
+            "retainedAcrossSessionSwitch": true,
+            "sameRatingDeletes": true,
+            "savedChineseNote": true,
+            "sendEnabledBeforeComposition": true,
+            "stateDrivenCallbacks": true,
+            "syntheticPreedit": true,
+            "unratedNoteHidden": true,
+            "voiceOver": false
+          }
+        }
+      ],
+      "artifacts": [
+        {
+          "path": ".runtime-fixtures/three-native-exclusive-20261022/exit.txt",
+          "bytes": 2,
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+        },
+        {
+          "path": ".runtime-fixtures/three-native-exclusive-20261022/three-pi.native-feedback.log",
+          "bytes": 3969,
+          "sha256": "b074792746c53b219af01c69519d98944f36a5d1d14509d251af677ac0f3cb74"
+        },
+        {
+          "path": ".runtime-fixtures/three-native-exclusive-20261022/three-pi.native-feedback.log.frontmost.jsonl",
+          "bytes": 353,
+          "sha256": "7715432ac717ceed4b5328eccf9d37a4212db050e745960c396d3ee2e748cb10"
+        },
+        {
+          "path": ".runtime-fixtures/three-native-exclusive-20261022/three-pi.native-feedback.log.launcher",
+          "bytes": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        },
+        {
+          "path": ".runtime-fixtures/three-native-exclusive-20261022/three-pi.native-feedback.log.stderr",
+          "bytes": 3225,
+          "sha256": "a741e33b5dd842ef28540519d7a8cb690feaad2f25e78c578040a867ba3a9525"
+        },
+        {
+          "path": ".runtime-fixtures/three-native-exclusive-20261022/three-pi.native-feedback.log.stdout",
+          "bytes": 743,
+          "sha256": "a6a82c81dcfa9a6f517829028736d685de7567af8aead991a9b21a3b8c947c4d"
+        },
+        {
+          "path": ".runtime-fixtures/three-native-exclusive-20261022/three-pi.native-reading.log",
+          "bytes": 1983,
+          "sha256": "8a5a5776c40bcaadcda9f24346be097b394335569078e1ba35eb4c22af63a764"
+        },
+        {
+          "path": ".runtime-fixtures/three-native-exclusive-20261022/three-pi.native-reading.log.frontmost.jsonl",
+          "bytes": 351,
+          "sha256": "4d4d0b52758260353ccd9d5fe472d5faf5719dfa461b5877341e7b690fdea75f"
+        },
+        {
+          "path": ".runtime-fixtures/three-native-exclusive-20261022/three-pi.native-reading.log.launcher",
+          "bytes": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        },
+        {
+          "path": ".runtime-fixtures/three-native-exclusive-20261022/three-pi.native-reading.log.stderr",
+          "bytes": 1024,
+          "sha256": "7fff246ec6b1494c970f8a214c5213fe4ff7c801d97fcbd7d5ce4971cf9255a4"
+        },
+        {
+          "path": ".runtime-fixtures/three-native-exclusive-20261022/three-pi.native-reading.log.stdout",
+          "bytes": 958,
+          "sha256": "0c5d43c15ac7b340ab7427a7d13d33ad0127d5c81923d8ebee1a1bdeb3b3c7c8"
+        },
+        {
+          "path": ".runtime-fixtures/three-native-exclusive-20261022/three-pi.native-stream-reading.log",
+          "bytes": 2030,
+          "sha256": "7f0caeeb691c8e79b0676747b7a4ca1f275046a94cc494d2b8c53a01b65884ab"
+        },
+        {
+          "path": ".runtime-fixtures/three-native-exclusive-20261022/three-pi.native-stream-reading.log.frontmost.jsonl",
+          "bytes": 351,
+          "sha256": "ebcb72188bef35b5003256bbab051be90f9791bcdd0d9354b21696b42d408ce6"
+        },
+        {
+          "path": ".runtime-fixtures/three-native-exclusive-20261022/three-pi.native-stream-reading.log.launcher",
+          "bytes": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        },
+        {
+          "path": ".runtime-fixtures/three-native-exclusive-20261022/three-pi.native-stream-reading.log.stderr",
+          "bytes": 2029,
+          "sha256": "ae6bcf5fa6c9a517a8b93ad1f1ff4f8b8219506dd6b80ba6a31b30ecb2335258"
+        },
+        {
+          "path": ".runtime-fixtures/three-native-exclusive-20261022/three-pi.native-stream-reading.log.stdout",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": ".runtime-fixtures/three-native-exclusive-20261022/three-pi.png",
+          "bytes": 207125,
+          "sha256": "992c988a71c2fe743dd311a2c68e92970e47f0b17defbba8b21f2126dc63b437"
+        },
+        {
+          "path": ".runtime-fixtures/three-native-exclusive-20261022/three.log",
+          "bytes": 8837,
+          "sha256": "ff727aa59a2b880b7f677ce6bdfe0239793e32a93190922a46b9922a5b23f234"
+        }
+      ]
+    },
+    {
+      "stage": "dsh-native-exclusive-20261022",
+      "exitCode": 1,
+      "receipts": [],
+      "artifacts": [
+        {
+          "path": ".runtime-fixtures/dsh-native-exclusive-20261022/dsh-dsh.native-reading.log",
+          "bytes": 1070,
+          "sha256": "70cea196ad46e41d33eb36d4a4748677fa9ba179a2d6498cf87cc42a26f3aef4"
+        },
+        {
+          "path": ".runtime-fixtures/dsh-native-exclusive-20261022/dsh-dsh.native-reading.log.frontmost.jsonl",
+          "bytes": 459,
+          "sha256": "f585ce3552d4bdec21acc644b2b5e4a8c84a1b1459639e85d6254107db51c7ac"
+        },
+        {
+          "path": ".runtime-fixtures/dsh-native-exclusive-20261022/dsh-dsh.native-reading.log.launcher",
+          "bytes": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        },
+        {
+          "path": ".runtime-fixtures/dsh-native-exclusive-20261022/dsh-dsh.native-reading.log.stderr",
+          "bytes": 1069,
+          "sha256": "aa2f4d5c5c38c98d875f669618e7caad52b9e91f01837763423e605984e5a9f5"
+        },
+        {
+          "path": ".runtime-fixtures/dsh-native-exclusive-20261022/dsh-dsh.native-reading.log.stdout",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": ".runtime-fixtures/dsh-native-exclusive-20261022/dsh-dsh.png",
+          "bytes": 201828,
+          "sha256": "f4ee948978930ac8312cbb33ae0c39339d4a9f64553b4c882fa1e4f8e14ec9a1"
+        },
+        {
+          "path": ".runtime-fixtures/dsh-native-exclusive-20261022/exit.txt",
+          "bytes": 2,
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+        },
+        {
+          "path": ".runtime-fixtures/dsh-native-exclusive-20261022/run.log",
+          "bytes": 4491,
+          "sha256": "b8becb1046048561d91642075198af791e6d911ff1307bbcfa006e9b72902390"
+        }
+      ]
+    },
+    {
+      "stage": "kernel-native-exclusive-20261022",
+      "exitCode": 0,
+      "receipts": [
+        {
+          "kind": "NATIVE_UI_NATIVE_READING_RECEIPT",
+          "receipt": {
+            "draftIsolation": true,
+            "focusAndEditorBaselinePreserved": false,
+            "focusAndMarkedBaselinePreserved": false,
+            "focusAndTextStatePreserved": true,
+            "hoverPreviewVisible": false,
+            "independentBReadingRestored": true,
+            "jumpHasNoHistory": false,
+            "jumpLatestControl": false,
+            "loadedItemsAfter": 56,
+            "loadedItemsBefore": 50,
+            "markedTextPreserved": false,
+            "nativePagingControl": false,
+            "nativeWindow": true,
+            "navigationPreeditPreserved": false,
+            "noSubmission": true,
+            "opaqueBaselinePreserved": false,
+            "originalTurnNavigation": false,
+            "physicalIme": false,
+            "prependAnchorPreserved": true,
+            "previewFactsDuringPreedit": false,
+            "publicHistoryPage": true,
+            "publicPageRequest": true,
+            "readingAnchorAcceptance": true,
+            "realHarness": true,
+            "reconnectReadingRestored": true,
+            "retainedSessionReadingRestored": true,
+            "sameEditorOwner": true,
+            "samePublicationRefresh": true,
+            "syntheticPreedit": false,
+            "syntheticWheel": true,
+            "turnStartAndLatest": false,
+            "upwardReadingPreserved": true,
+            "voiceOver": false
+          }
+        },
+        {
+          "kind": "NATIVE_UI_NATIVE_FEEDBACK_RECEIPT",
+          "receipt": {
+            "auxiliaryFocusPreserved": true,
+            "committedNoteLabel": true,
+            "composerContentsAndOwnerPreserved": true,
+            "draftsPreserved": true,
+            "freshReadAfterDelete": true,
+            "imeSendAndNavigationBlocked": true,
+            "inputAsideSingleTrailingBand": true,
+            "nativeInteraction": true,
+            "nativePointer": true,
+            "nativeTextServices": true,
+            "noPromptSubmitted": true,
+            "nonemptyComposerDrafts": true,
+            "noteReopened": true,
+            "opaqueBaselinePreserved": false,
+            "outputAsideSingleReadingBand": true,
+            "physicalIme": false,
+            "readingAnchorAcceptance": false,
+            "retainedAcrossSessionSwitch": true,
+            "sameRatingDeletes": true,
+            "savedChineseNote": true,
+            "sendEnabledBeforeComposition": true,
+            "stateDrivenCallbacks": true,
+            "syntheticPreedit": true,
+            "unratedNoteHidden": true,
+            "voiceOver": false
+          }
+        },
+        {
+          "kind": "NATIVE_UI_NATIVE_STREAM_RECEIPT",
+          "receipt": {
+            "activePreview": true,
+            "focusRetainedDuringSettlement": true,
+            "nativeAxSelection": true,
+            "nativePointer": true,
+            "nativeTextServices": true,
+            "nativeWindow": true,
+            "oneSubmission": true,
+            "physicalIme": false,
+            "readingAnchorAcceptance": false,
+            "reconnectNoReplay": true,
+            "sameOutputRow": true,
+            "sameTextOwner": true,
+            "selectionRetained": true,
+            "sessionDraftIsolation": true,
+            "stateDrivenCallbacks": true,
+            "voiceOver": false
+          }
+        },
+        {
+          "kind": "NATIVE_UI_NATIVE_RUN_CONTROLS_RECEIPT",
+          "receipt": {
+            "activePreviewBeforeCancel": true,
+            "authoritativeAbortedTurn": true,
+            "cancelReconnectNoReplay": true,
+            "draftIsolation": true,
+            "explicitRecovery": true,
+            "nativeFailureTextQuery": true,
+            "nativePointer": true,
+            "nativeTextServices": true,
+            "nativeWindow": true,
+            "normalCancelCallback": true,
+            "oneSubmissionPerSend": true,
+            "physicalIme": false,
+            "priorFailureCleared": true,
+            "providerFailureInIndicators": true,
+            "providerFailureInTranscript": true,
+            "readingAnchorAcceptance": false,
+            "recoveryReconnectNoReplay": true,
+            "reportedError": "The provider ended the response with an error.",
+            "stateDrivenCallbacks": true,
+            "syntheticPreedit": false,
+            "voiceOver": false
+          }
+        }
+      ],
+      "artifacts": [
+        {
+          "path": ".runtime-fixtures/kernel-native-exclusive-20261022/exit.txt",
+          "bytes": 2,
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+        },
+        {
+          "path": ".runtime-fixtures/kernel-native-exclusive-20261022/kernel.native-feedback.log",
+          "bytes": 3970,
+          "sha256": "4bb97b329b4125f94bbebec8458cde6892eba947dc9131df393413aec928ea23"
+        },
+        {
+          "path": ".runtime-fixtures/kernel-native-exclusive-20261022/kernel.native-feedback.log.frontmost.jsonl",
+          "bytes": 351,
+          "sha256": "7b30c811f7ebd779fb93bff87e2d31ad266a00fe4f16a4b3168be2ebeba0faef"
+        },
+        {
+          "path": ".runtime-fixtures/kernel-native-exclusive-20261022/kernel.native-feedback.log.launcher",
+          "bytes": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        },
+        {
+          "path": ".runtime-fixtures/kernel-native-exclusive-20261022/kernel.native-feedback.log.stderr",
+          "bytes": 3226,
+          "sha256": "cec428973792bf9f61c4974188e34a0e6b94f813349482df426b2969de4a6de0"
+        },
+        {
+          "path": ".runtime-fixtures/kernel-native-exclusive-20261022/kernel.native-feedback.log.stdout",
+          "bytes": 743,
+          "sha256": "a6a82c81dcfa9a6f517829028736d685de7567af8aead991a9b21a3b8c947c4d"
+        },
+        {
+          "path": ".runtime-fixtures/kernel-native-exclusive-20261022/kernel.native-reading.log",
+          "bytes": 2084,
+          "sha256": "bd7728b547f07d9327b51f0a05185024fabdd442dbb7ca1c1f27cdd09fafe8a1"
+        },
+        {
+          "path": ".runtime-fixtures/kernel-native-exclusive-20261022/kernel.native-reading.log.frontmost.jsonl",
+          "bytes": 351,
+          "sha256": "32b3ea9af5dafc80f44d29b7367f0b4fd43cd812903bfacbccd2aa4155a040f6"
+        },
+        {
+          "path": ".runtime-fixtures/kernel-native-exclusive-20261022/kernel.native-reading.log.launcher",
+          "bytes": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        },
+        {
+          "path": ".runtime-fixtures/kernel-native-exclusive-20261022/kernel.native-reading.log.stderr",
+          "bytes": 1125,
+          "sha256": "6f2fc17b359565dbd72944babcbd521363ff80eb47a74bacaae74bf17708613e"
+        },
+        {
+          "path": ".runtime-fixtures/kernel-native-exclusive-20261022/kernel.native-reading.log.stdout",
+          "bytes": 958,
+          "sha256": "0c5d43c15ac7b340ab7427a7d13d33ad0127d5c81923d8ebee1a1bdeb3b3c7c8"
+        },
+        {
+          "path": ".runtime-fixtures/kernel-native-exclusive-20261022/kernel.native-run-controls.log",
+          "bytes": 2636,
+          "sha256": "eabd5fbaf32295309be51a58e42fd905992067cff6bb40c7e7b0d71c83b0ca93"
+        },
+        {
+          "path": ".runtime-fixtures/kernel-native-exclusive-20261022/kernel.native-run-controls.log.frontmost.jsonl",
+          "bytes": 351,
+          "sha256": "8f82be01b9d19a9f70fd085c06e9027e772cff87313e126f983d5b855262c573"
+        },
+        {
+          "path": ".runtime-fixtures/kernel-native-exclusive-20261022/kernel.native-run-controls.log.launcher",
+          "bytes": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        },
+        {
+          "path": ".runtime-fixtures/kernel-native-exclusive-20261022/kernel.native-run-controls.log.stderr",
+          "bytes": 1977,
+          "sha256": "0e5f5fedd137b85a0b1c14b98b12261939708e544625a1edfefe95e278facfd3"
+        },
+        {
+          "path": ".runtime-fixtures/kernel-native-exclusive-20261022/kernel.native-run-controls.log.stdout",
+          "bytes": 658,
+          "sha256": "c059b4777a449195ecdc3a09d56f88f484587a663fd6efb7b1def26e767dfe37"
+        },
+        {
+          "path": ".runtime-fixtures/kernel-native-exclusive-20261022/kernel.native-stream.log",
+          "bytes": 5728,
+          "sha256": "281108e5180b2ce796d8ca243872ffc8424bcf019c937a1fc06f910c3df557bd"
+        },
+        {
+          "path": ".runtime-fixtures/kernel-native-exclusive-20261022/kernel.native-stream.log.frontmost.jsonl",
+          "bytes": 353,
+          "sha256": "183638113f1f2b2e23e06354be2575124d221150a89bc29be266f0c520cc1375"
+        },
+        {
+          "path": ".runtime-fixtures/kernel-native-exclusive-20261022/kernel.native-stream.log.launcher",
+          "bytes": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        },
+        {
+          "path": ".runtime-fixtures/kernel-native-exclusive-20261022/kernel.native-stream.log.stderr",
+          "bytes": 5298,
+          "sha256": "c305a52fb507453fd96843221e9c031b77164c8a0007b6a1c7688c720d198a68"
+        },
+        {
+          "path": ".runtime-fixtures/kernel-native-exclusive-20261022/kernel.native-stream.log.stdout",
+          "bytes": 429,
+          "sha256": "d842c4b72acba18da66065a6dfce42001d33dcfcc45cec200d7a828d576020c4"
+        },
+        {
+          "path": ".runtime-fixtures/kernel-native-exclusive-20261022/kernel.png",
+          "bytes": 182244,
+          "sha256": "a00b03a5ef213e059c32a33cb57f2da99a73b045d471f173b61b694d916d0146"
+        },
+        {
+          "path": ".runtime-fixtures/kernel-native-exclusive-20261022/run.log",
+          "bytes": 7466,
+          "sha256": "e9861eb1d401719d8d9f508a2136dc647c8a856836d7cc2bf8727cdf5bc6d609"
+        }
+      ]
+    },
+    {
+      "stage": "pi-dsh-native-actions-20261022",
+      "exitCode": 0,
+      "receipts": [
+        {
+          "kind": "PI_UI_NATIVE_FEEDBACK_RECEIPT",
+          "receipt": {
+            "auxiliaryFocusPreserved": true,
+            "committedNoteLabel": true,
+            "composerContentsAndOwnerPreserved": true,
+            "draftsPreserved": true,
+            "freshReadAfterDelete": true,
+            "imeSendAndNavigationBlocked": true,
+            "inputAsideSingleTrailingBand": true,
+            "nativeInteraction": true,
+            "nativePointer": true,
+            "nativeTextServices": true,
+            "noPromptSubmitted": true,
+            "nonemptyComposerDrafts": true,
+            "noteReopened": true,
+            "opaqueBaselinePreserved": false,
+            "outputAsideSingleReadingBand": true,
+            "physicalIme": false,
+            "readingAnchorAcceptance": false,
+            "retainedAcrossSessionSwitch": true,
+            "sameRatingDeletes": true,
+            "savedChineseNote": true,
+            "sendEnabledBeforeComposition": true,
+            "stateDrivenCallbacks": true,
+            "syntheticPreedit": true,
+            "unratedNoteHidden": true,
+            "voiceOver": false
+          }
+        },
+        {
+          "kind": "PI_UI_NATIVE_STREAM_RECEIPT",
+          "receipt": {
+            "activePreview": true,
+            "focusRetainedDuringSettlement": true,
+            "nativeAxSelection": true,
+            "nativePointer": true,
+            "nativeTextServices": true,
+            "nativeWindow": true,
+            "oneSubmission": true,
+            "physicalIme": false,
+            "readingAnchorAcceptance": false,
+            "reconnectNoReplay": true,
+            "sameOutputRow": true,
+            "sameTextOwner": true,
+            "selectionRetained": true,
+            "sessionDraftIsolation": true,
+            "stateDrivenCallbacks": true,
+            "voiceOver": false
+          }
+        },
+        {
+          "kind": "PI_UI_NATIVE_RUN_CONTROLS_RECEIPT",
+          "receipt": {
+            "activePreviewBeforeCancel": true,
+            "authoritativeAbortedTurn": true,
+            "cancelReconnectNoReplay": true,
+            "draftIsolation": true,
+            "explicitRecovery": true,
+            "nativeFailureTextQuery": true,
+            "nativePointer": true,
+            "nativeTextServices": true,
+            "nativeWindow": true,
+            "normalCancelCallback": true,
+            "oneSubmissionPerSend": true,
+            "physicalIme": false,
+            "priorFailureCleared": true,
+            "providerFailureInIndicators": true,
+            "providerFailureInTranscript": true,
+            "readingAnchorAcceptance": false,
+            "recoveryReconnectNoReplay": true,
+            "reportedError": "400: {\"message\":\"ENDPOINT_ERROR_NATIVE_PROOF: controlled invalid request\",\"type\":\"invalid_request_error\",\"code\":\"invalid_request_error\"}",
+            "stateDrivenCallbacks": true,
+            "syntheticPreedit": false,
+            "voiceOver": false
+          }
+        },
+        {
+          "kind": "DSH_UI_NATIVE_FEEDBACK_RECEIPT",
+          "receipt": {
+            "auxiliaryFocusPreserved": true,
+            "committedNoteLabel": true,
+            "composerContentsAndOwnerPreserved": true,
+            "draftsPreserved": true,
+            "freshReadAfterDelete": true,
+            "imeSendAndNavigationBlocked": true,
+            "inputAsideSingleTrailingBand": true,
+            "nativeInteraction": true,
+            "nativePointer": true,
+            "nativeTextServices": true,
+            "noPromptSubmitted": true,
+            "nonemptyComposerDrafts": true,
+            "noteReopened": true,
+            "opaqueBaselinePreserved": false,
+            "outputAsideSingleReadingBand": true,
+            "physicalIme": false,
+            "readingAnchorAcceptance": false,
+            "retainedAcrossSessionSwitch": true,
+            "sameRatingDeletes": true,
+            "savedChineseNote": true,
+            "sendEnabledBeforeComposition": true,
+            "stateDrivenCallbacks": true,
+            "syntheticPreedit": true,
+            "unratedNoteHidden": true,
+            "voiceOver": false
+          }
+        },
+        {
+          "kind": "DSH_UI_NATIVE_STREAM_RECEIPT",
+          "receipt": {
+            "activePreview": true,
+            "focusRetainedDuringSettlement": true,
+            "nativeAxSelection": true,
+            "nativePointer": true,
+            "nativeTextServices": true,
+            "nativeWindow": true,
+            "oneSubmission": true,
+            "physicalIme": false,
+            "readingAnchorAcceptance": false,
+            "reconnectNoReplay": true,
+            "sameOutputRow": true,
+            "sameTextOwner": true,
+            "selectionRetained": true,
+            "sessionDraftIsolation": true,
+            "stateDrivenCallbacks": true,
+            "voiceOver": false
+          }
+        },
+        {
+          "kind": "DSH_UI_NATIVE_RUN_CONTROLS_RECEIPT",
+          "receipt": {
+            "activePreviewBeforeCancel": true,
+            "authoritativeAbortedTurn": true,
+            "cancelReconnectNoReplay": true,
+            "draftIsolation": true,
+            "explicitRecovery": true,
+            "nativeFailureTextQuery": true,
+            "nativePointer": true,
+            "nativeTextServices": true,
+            "nativeWindow": true,
+            "normalCancelCallback": true,
+            "oneSubmissionPerSend": true,
+            "physicalIme": false,
+            "priorFailureCleared": true,
+            "providerFailureInIndicators": true,
+            "providerFailureInTranscript": true,
+            "readingAnchorAcceptance": false,
+            "recoveryReconnectNoReplay": true,
+            "reportedError": "400: {\"message\":\"ENDPOINT_ERROR_NATIVE_PROOF: controlled invalid request\",\"type\":\"invalid_request_error\",\"code\":\"invalid_request_error\"}",
+            "stateDrivenCallbacks": true,
+            "syntheticPreedit": false,
+            "voiceOver": false
+          }
+        }
+      ],
+      "artifacts": [
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/actions-dsh.native-feedback.log",
+          "bytes": 3718,
+          "sha256": "b253f70cbbf41895686ab8d43a8ea63a9d26e96b75deebd97fa590d796d32165"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/actions-dsh.native-feedback.log.frontmost.jsonl",
+          "bytes": 350,
+          "sha256": "546c5ac5fa5d3f45b11b5837cf603fa7517ec50df4fa1175188e130e1bd9e84b"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/actions-dsh.native-feedback.log.launcher",
+          "bytes": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/actions-dsh.native-feedback.log.stderr",
+          "bytes": 2974,
+          "sha256": "d1a3bd76f80b6c5144a0f57810be1f89814e0800ba09828fed5301c6df291ce8"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/actions-dsh.native-feedback.log.stdout",
+          "bytes": 743,
+          "sha256": "a6a82c81dcfa9a6f517829028736d685de7567af8aead991a9b21a3b8c947c4d"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/actions-dsh.native-run-controls.log",
+          "bytes": 3042,
+          "sha256": "8fa66ddc8373da0ccd7e9b1e080a056018c4eba1de6d3173481faaf94c065deb"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/actions-dsh.native-run-controls.log.frontmost.jsonl",
+          "bytes": 352,
+          "sha256": "8e48b4ff0f07ee0a7321a4b88d5e2eaff363dc181436916eb7644fe3426fd1ed"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/actions-dsh.native-run-controls.log.launcher",
+          "bytes": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/actions-dsh.native-run-controls.log.stderr",
+          "bytes": 2281,
+          "sha256": "50c014f86ac0a4fca44cf42a95a9435acf5b80ea90699efb69a68afb80d3dabb"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/actions-dsh.native-run-controls.log.stdout",
+          "bytes": 760,
+          "sha256": "d256caf33f2c001008fda73d8ed339337ea6088518913d65ed676ab38c5105fe"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/actions-dsh.native-stream.log",
+          "bytes": 6043,
+          "sha256": "7559123183bb028b045790b0c1aaa70ef48bfbe9ceccc3e41292910f379fddcc"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/actions-dsh.native-stream.log.frontmost.jsonl",
+          "bytes": 352,
+          "sha256": "d3de16febd848de01861fff433eeed979b737f7934f388ffcbe7f5ce1a54565b"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/actions-dsh.native-stream.log.launcher",
+          "bytes": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/actions-dsh.native-stream.log.stderr",
+          "bytes": 5613,
+          "sha256": "34e578a6584d5462f8de9a917e630e180429087c330bcb0527daab8399f0ba7f"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/actions-dsh.native-stream.log.stdout",
+          "bytes": 429,
+          "sha256": "d842c4b72acba18da66065a6dfce42001d33dcfcc45cec200d7a828d576020c4"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/actions-dsh.png",
+          "bytes": 188701,
+          "sha256": "567e7c2e0b373b3f6a24442e556baf0308cd604bc4a12b0a0e228d37c5dd3fd9"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/actions-pi.native-feedback.log",
+          "bytes": 3718,
+          "sha256": "8d60364c147f568f9096937a6cfd62d04265119761a239e3dd3d4f594e1ed46f"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/actions-pi.native-feedback.log.frontmost.jsonl",
+          "bytes": 352,
+          "sha256": "399e9f41b8c07fe4e13be0ad8a85261ba2d2894a840b18237d369d529792dbc1"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/actions-pi.native-feedback.log.launcher",
+          "bytes": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/actions-pi.native-feedback.log.stderr",
+          "bytes": 2974,
+          "sha256": "8623693e2e3f664383b4bfa945b41d168e370f70ef800ebfbacf325cf627c9f3"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/actions-pi.native-feedback.log.stdout",
+          "bytes": 743,
+          "sha256": "a6a82c81dcfa9a6f517829028736d685de7567af8aead991a9b21a3b8c947c4d"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/actions-pi.native-run-controls.log",
+          "bytes": 3064,
+          "sha256": "bd68929db89cde91781e6a4b692e175259d9de3c5a04b743aa873efe13f368a7"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/actions-pi.native-run-controls.log.frontmost.jsonl",
+          "bytes": 352,
+          "sha256": "e3f3e9d272291f8ed6b88eb1751d33cb49db6d5ece19b4d89b22ce2030f0cae0"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/actions-pi.native-run-controls.log.launcher",
+          "bytes": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/actions-pi.native-run-controls.log.stderr",
+          "bytes": 2303,
+          "sha256": "5143dc33eeadeb4d1796eaee70a82bfc0af0fa7611ebed6b738807f8221fb631"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/actions-pi.native-run-controls.log.stdout",
+          "bytes": 760,
+          "sha256": "d256caf33f2c001008fda73d8ed339337ea6088518913d65ed676ab38c5105fe"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/actions-pi.native-stream.log",
+          "bytes": 5695,
+          "sha256": "1d2aa9c5ab99f6b9be004c89bc1e59725bb07df324b77346edbbfe9f99c104cb"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/actions-pi.native-stream.log.frontmost.jsonl",
+          "bytes": 353,
+          "sha256": "53a28e7b4c82041ddfd99d702dd5d93d91f505c45b852b9727f9345a5851fbee"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/actions-pi.native-stream.log.launcher",
+          "bytes": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/actions-pi.native-stream.log.stderr",
+          "bytes": 5265,
+          "sha256": "c774c4fa2170da858ff4ee55f4418830e7fcb9a0c1edc90bf604958234a2a2b9"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/actions-pi.native-stream.log.stdout",
+          "bytes": 429,
+          "sha256": "d842c4b72acba18da66065a6dfce42001d33dcfcc45cec200d7a828d576020c4"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/actions-pi.png",
+          "bytes": 203581,
+          "sha256": "1cc19481eaefc379cfd9edae3e75e2be4c1af0eee712f19fb2af3508860572ca"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/exit.txt",
+          "bytes": 2,
+          "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+        },
+        {
+          "path": ".runtime-fixtures/pi-dsh-native-actions-20261022/run.log",
+          "bytes": 13251,
+          "sha256": "79f7e18d3e80dd2cda11085b7e67fd11baa803f6cab1a41ee8e56ab4d17923ae"
+        }
+      ]
+    },
+    {
+      "stage": "three-native-stream-reading-20261022",
+      "exitCode": 1,
+      "receipts": [
+        {
+          "kind": "PI_UI_NATIVE_READING_RECEIPT",
+          "receipt": {
+            "draftIsolation": true,
+            "focusAndEditorBaselinePreserved": false,
+            "focusAndMarkedBaselinePreserved": false,
+            "focusAndTextStatePreserved": true,
+            "hoverPreviewVisible": false,
+            "independentBReadingRestored": true,
+            "jumpHasNoHistory": false,
+            "jumpLatestControl": false,
+            "loadedItemsAfter": 56,
+            "loadedItemsBefore": 50,
+            "markedTextPreserved": false,
+            "nativePagingControl": false,
+            "nativeWindow": true,
+            "navigationPreeditPreserved": false,
+            "noSubmission": true,
+            "opaqueBaselinePreserved": false,
+            "originalTurnNavigation": false,
+            "physicalIme": false,
+            "prependAnchorPreserved": true,
+            "previewFactsDuringPreedit": false,
+            "publicHistoryPage": true,
+            "publicPageRequest": true,
+            "readingAnchorAcceptance": true,
+            "realHarness": true,
+            "reconnectReadingRestored": true,
+            "retainedSessionReadingRestored": true,
+            "sameEditorOwner": true,
+            "samePublicationRefresh": true,
+            "syntheticPreedit": false,
+            "syntheticWheel": true,
+            "turnStartAndLatest": false,
+            "upwardReadingPreserved": true,
+            "voiceOver": false
+          }
+        }
+      ],
+      "artifacts": [
+        {
+          "path": ".runtime-fixtures/three-native-stream-reading-20261022/exit.txt",
+          "bytes": 2,
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+        },
+        {
+          "path": ".runtime-fixtures/three-native-stream-reading-20261022/reading-pi.native-reading.log",
+          "bytes": 1983,
+          "sha256": "fc1a8df3affcecfaf91eee2259934b1a357f3c57c78be80ba99abcc3fb3f5a56"
+        },
+        {
+          "path": ".runtime-fixtures/three-native-stream-reading-20261022/reading-pi.native-reading.log.frontmost.jsonl",
+          "bytes": 353,
+          "sha256": "bb9d626cfcfbe19ba4d5471abeb48bc11abf810940d291f61ee4dcd8637b1290"
+        },
+        {
+          "path": ".runtime-fixtures/three-native-stream-reading-20261022/reading-pi.native-reading.log.launcher",
+          "bytes": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        },
+        {
+          "path": ".runtime-fixtures/three-native-stream-reading-20261022/reading-pi.native-reading.log.stderr",
+          "bytes": 1024,
+          "sha256": "458dbc70f9e8d031a5449fc62194477100cbe18b18b10dc855d128f5d887a089"
+        },
+        {
+          "path": ".runtime-fixtures/three-native-stream-reading-20261022/reading-pi.native-reading.log.stdout",
+          "bytes": 958,
+          "sha256": "0c5d43c15ac7b340ab7427a7d13d33ad0127d5c81923d8ebee1a1bdeb3b3c7c8"
+        },
+        {
+          "path": ".runtime-fixtures/three-native-stream-reading-20261022/reading-pi.native-stream-reading.log",
+          "bytes": 2030,
+          "sha256": "554c472dee22dcbea57a43f4840d26c7c000bce04f28309dfac543f002dd9358"
+        },
+        {
+          "path": ".runtime-fixtures/three-native-stream-reading-20261022/reading-pi.native-stream-reading.log.frontmost.jsonl",
+          "bytes": 352,
+          "sha256": "8d52824a2f752ea7edef4d5f31f28ee077f3c189b040cf3bee56cdebfc466094"
+        },
+        {
+          "path": ".runtime-fixtures/three-native-stream-reading-20261022/reading-pi.native-stream-reading.log.launcher",
+          "bytes": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        },
+        {
+          "path": ".runtime-fixtures/three-native-stream-reading-20261022/reading-pi.native-stream-reading.log.stderr",
+          "bytes": 2029,
+          "sha256": "0e790db61c2cc5db8fd537cc380ddb2876a133da96d9085cf2396fd3a14cea29"
+        },
+        {
+          "path": ".runtime-fixtures/three-native-stream-reading-20261022/reading-pi.native-stream-reading.log.stdout",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": ".runtime-fixtures/three-native-stream-reading-20261022/reading-pi.png",
+          "bytes": 208526,
+          "sha256": "0ac182fcb5ec1a3cad0459acf9fb7f6eee35cdd91f032443567ce6ac6c3086a2"
+        },
+        {
+          "path": ".runtime-fixtures/three-native-stream-reading-20261022/run.log",
+          "bytes": 7862,
+          "sha256": "758688a678c2b5814a5ee78470a73272b4d12d74a6f2b9cc09b764e8666c0f3f"
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "same-process only; ProcessContainer cross-process not accepted",
+    "stream-reading Pi phase 2 loses foreground; root cause unknown; DSH and Native stream-reading not run",
+    "DSH native reading phase 4 loses foreground; incomplete",
+    "synthetic preedit and native text services are not physical keyboard, candidate-window, or VoiceOver acceptance",
+    "Native explicit UI-only excludes lifecycle and bounded child acceptance",
+    "no source change, no relaxed assertion, no focus-retry workaround"
+  ],
+  "cache": {
+    "newTarget": false,
+    "deletedBytes": 0,
+    "reason": "Only logs, receipts and acceptance screenshots produced; all retained as evidence"
+  }
+}

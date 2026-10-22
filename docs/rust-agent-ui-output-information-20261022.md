@@ -1,5 +1,8 @@
 # 输出只读脚注与当前原生验收（2026-10-22，实验状态）
 
+后续三端原生窗口补验见[独立结果](rust-agent-ui-native-resume-20261022.md)：
+三端反馈、流式发送和取消/恢复通过；流式阅读组合仍因失焦未完成，不能据此宣称全部通过。
+
 默认公开 TekesUI 精确固定 `50ec49f3446924fdbc66b3cff22cd8cfe150fe7c`。
 `TurnFootnote` 的原时间、运行信息、操作禁用说明和回执提示现在使用 SDK 单行
 `LabelOptions::single_line(TailEllipsis)`；正常输出带按前面原控件之后的剩余宽度分配。
