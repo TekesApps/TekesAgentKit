@@ -992,4 +992,193 @@ mod native_text {
         assert_eq!(view.tree.focused(), Some(editor));
         runtime.stop().await.unwrap();
     }
+    #[tokio::test]
+    async fn host_family_menu_creates_selects_and_discards_original_scratch_pointers() {
+        use tekes_agent_components_ui::{SidePanelDestination, SidePanelNavigation};
+        use tekes_ui_controls::composition::{ComponentId, ContentRole};
+        fn paint(view: &mut ComponentDemo, text: &mut Text) {
+            let frame = Rect::new(0., 0., 1600., 1000.);
+            view.render(&mut Scene::new(), text, frame, frame, Theme::LIGHT.into())
+                .unwrap();
+        }
+        fn navigation(view: &ComponentDemo) -> &SidePanelNavigation {
+            view.tree
+                .get(view.panel_navigation_id().unwrap())
+                .unwrap()
+                .component::<SidePanelNavigation>()
+                .unwrap()
+        }
+        fn press_close(view: &mut ComponentDemo) -> Vec<DemoCommand> {
+            let id = navigation(view).close_id().unwrap();
+            view.accessibility_action(id, None, AccessibilityAction::Press)
+                .unwrap()
+        }
+        fn menu(
+            view: &mut ComponentDemo,
+            text: &mut Text,
+            index: usize,
+            checked: Option<usize>,
+        ) -> Vec<DemoCommand> {
+            let id = navigation(view).side_chat_menu_id().unwrap();
+            assert!(
+                view.accessibility_action(id, None, AccessibilityAction::Press)
+                    .unwrap()
+                    .is_empty()
+            );
+            paint(view, text);
+            let nodes = view.tree.semantics();
+            let items: Vec<_> = nodes
+                .iter()
+                .find(|node| node.id == id)
+                .unwrap()
+                .parts
+                .iter()
+                .filter(|part| part.semantics.role == ContentRole::MenuItem)
+                .collect();
+            assert_eq!(items[0].semantics.name, "新建 SideChat");
+            for item in &items[1..] {
+                assert_eq!(item.semantics.name, "SideChat");
+            }
+            if let Some(checked) = checked {
+                assert_eq!(items.len(), 3);
+                for (i, item) in items.iter().enumerate().skip(1) {
+                    assert_eq!(item.semantics.selected, i == checked);
+                }
+            }
+            view.accessibility_action(id, Some(items[index].index), AccessibilityAction::Press)
+                .unwrap()
+        }
+        let (runtime, parent, mut view) = setup().await;
+        let owner = Arc::new(SideChatBinding::new(runtime.clone()));
+        view.set_side_chat_binding(owner.clone());
+        parent
+            .edit_text(
+                &ComposerDestination::run(parent.scope().clone()),
+                "主会话草稿".into(),
+            )
+            .unwrap();
+        view.use_panel_navigation_toolbar().unwrap();
+        view.sync().unwrap();
+        assert!(press_close(&mut view).is_empty());
+        let create = launcher_id(&view, SidePanelDestination::SideChat);
+        let mut commands = view
+            .accessibility_action(create, None, AccessibilityAction::Press)
+            .unwrap();
+        assert_eq!(commands.len(), 1);
+        let DemoCommand::CreateSideChat(first_request) = commands.remove(0) else {
+            panic!("original launcher create")
+        };
+        let first = owner
+            .create(parent.scope().clone(), None, "family-first")
+            .await
+            .unwrap();
+        let first_run = owner.open(&first).await.unwrap();
+        first_run
+            .binding()
+            .edit_text(
+                &ComposerDestination::run(first.scope.clone()),
+                "第一个侧聊草稿".into(),
+            )
+            .unwrap();
+        assert!(
+            view.install_side_chat_run(first_request, first_run)
+                .unwrap()
+        );
+        let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()));
+        paint(&mut view, &mut text);
+        let first_editor = view.panel_composer_ids().unwrap().editor;
+        let first_owner = view.tree.text_surface(first_editor).unwrap() as *const _ as usize;
+        let mut commands = menu(&mut view, &mut text, 0, None);
+        assert_eq!(commands.len(), 1);
+        let DemoCommand::CreateSideChat(second_request) = commands.remove(0) else {
+            panic!("original menu create")
+        };
+        let second = owner
+            .create(parent.scope().clone(), None, "family-second")
+            .await
+            .unwrap();
+        assert_ne!(first.scope, second.scope);
+        assert!(
+            view.install_side_chat_run(second_request, owner.open(&second).await.unwrap())
+                .unwrap()
+        );
+        paint(&mut view, &mut text);
+        assert_eq!(owner.snapshot().chats.len(), 2);
+        assert!(menu(&mut view, &mut text, 1, Some(2)).is_empty());
+        paint(&mut view, &mut text);
+        assert_eq!(
+            input(&view).selected,
+            Some(SidePanelTabKind::SideChat {
+                session_id: first.scope.session_id.clone()
+            })
+        );
+        assert_eq!(view.panel_composer_ids().unwrap().editor, first_editor);
+        assert_eq!(
+            view.tree.text_surface(first_editor).unwrap() as *const _ as usize,
+            first_owner
+        );
+        assert_eq!(
+            view.tree.text_surface(first_editor).unwrap().input.text,
+            "第一个侧聊草稿"
+        );
+        assert!(menu(&mut view, &mut text, 2, Some(1)).is_empty());
+        assert_eq!(
+            input(&view).selected,
+            Some(SidePanelTabKind::SideChat {
+                session_id: second.scope.session_id.clone()
+            })
+        );
+        let mut commands = press_close(&mut view);
+        assert_eq!(commands.len(), 1);
+        let DemoCommand::CloseSideChat(captured) = commands.remove(0) else {
+            panic!("original close")
+        };
+        assert_eq!(captured.scope, second.scope);
+        assert!(
+            owner
+                .snapshot()
+                .chats
+                .contains_key(&second.scope.session_id)
+        );
+        assert_eq!(
+            input(&view).selected,
+            Some(SidePanelTabKind::SideChat {
+                session_id: second.scope.session_id.clone()
+            }),
+            "do not remove the tab before discard succeeds"
+        );
+        owner.close(&captured, "family-close-second").await.unwrap();
+        view.sync().unwrap();
+        paint(&mut view, &mut text);
+        assert!(
+            !owner
+                .snapshot()
+                .chats
+                .contains_key(&second.scope.session_id)
+        );
+        assert_eq!(
+            input(&view).selected,
+            Some(SidePanelTabKind::SideChat {
+                session_id: first.scope.session_id.clone()
+            })
+        );
+        assert_eq!(view.panel_composer_ids().unwrap().editor, first_editor);
+        assert_eq!(
+            view.tree.text_surface(first_editor).unwrap() as *const _ as usize,
+            first_owner
+        );
+        let mut commands = press_close(&mut view);
+        let DemoCommand::CloseSideChat(captured) = commands.remove(0) else {
+            panic!("first close")
+        };
+        owner.close(&captured, "family-close-first").await.unwrap();
+        view.sync().unwrap();
+        assert!(owner.snapshot().chats.is_empty());
+        assert!(input(&view).tabs.is_empty());
+        assert!(input(&view).selected.is_none());
+        assert_eq!(parent.current_run().unwrap().draft.text, "主会话草稿");
+        assert!(parent.current_run().unwrap().submissions.is_empty());
+        assert!(view.tree.get(ComponentId(first_editor.0)).is_none());
+        runtime.stop().await.unwrap();
+    }
 }

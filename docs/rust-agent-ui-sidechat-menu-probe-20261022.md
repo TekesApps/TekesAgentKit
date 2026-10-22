@@ -30,3 +30,18 @@ TekesUI ProcessContainer #48 仍 OPEN，当前探针仅验证同进程受控 SEP
 
 [检查记录](rust-agent-ui-sidechat-menu-probe-20261022.json) 保存来源和日志哈希。
 工作仍在 PR #10，未合并或打 tag。本轮没有删除缓存或证据，释放空间 0。
+
+## 宿主组合验证补强
+
+新增独立的 `panel_navigation` 用例
+`native_text::host_family_menu_creates_selects_and_discards_original_scratch_pointers`：
+通过 SDK 公开语义动作进入真实 ComponentDemo 回调与 SideChatBinding，实际创建两个 scratch pointer。
+两个同名菜单项分别映射到原 pointer，并核对勾选；切回保留第一个 editor 实例及其中文草稿。
+关闭第二个后，在 discard 确认前标签及 pointer 都保留；成功后回到第一个，最后关闭至空面板，
+主会话草稿保留且无提交。每个 create/close 都走现有绑定，不以构造 DTO 代替生命周期。
+
+这是 CoreText 排版与原 SDK 语义事件下的同进程组件/宿主验证，未打开原生窗口，
+不能证明实际菜单点击、系统焦点、物理输入、VoiceOver 或跨进程行为。
+当前 host suite 15 项，UI workspace 532 项通过、1 项既有 TekesUI #49 忽略；workspace 严格 Clippy 通过。
+完整原始日志在 `.runtime-fixtures/sidechat-family-host-20261022/`，哈希追加到检查记录。
+旧的 14 项记录保留为上一阶段证据；原生运行仍等待桌面空闲协调。

@@ -7,6 +7,7 @@ AgentKit 拥有可复用的 Composer、Transcript、Indicators、RunPort、Sideb
 当前接入与证据：
 
 - [组件所有权、布局与完成账本](../docs/rust-agent-ui-contract.md)：机器内容/footnote 靠左，用户气泡与 footnote 靠右；基础样式随 TekesUI。
+- [SideChat 家族菜单接入验证](../docs/rust-agent-ui-sidechat-menu-probe-20261022.md)：原菜单→宿主回调→两个实际 scratch pointer 组合测试通过，关闭等 discard 成功后移除；新增原生点击探针尚待运行。
 - [SidePanelNavigation 与 Host header](../docs/rust-agent-ui-side-panel-navigation-20261022.md)：普通 tab、SideChat 家族菜单及当前关闭回调，原正文保留。531 项本地回归、第二公开 consumer、最终三端协议→离屏 GPU 通过；新窗口 toolbar/完整原生组合未验收。
 - [历史输入回调](../docs/rust-agent-ui-historical-input-20261022.md)：实际能力和 handler 双重启用；当前三端不声明能力，正常 demo 隐藏入口。
 - [精确公开 TekesUI 输入](../docs/tekesui-50ec-public-intake-20261022.md)：固定 `50ec49f3446924fdbc66b3cff22cd8cfe150fe7c`，实际 8 包/243 文件；构建输入以 manifest/lock 和检查器为准。
