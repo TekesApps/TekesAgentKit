@@ -1,5 +1,9 @@
 # Rust Agent UI 组件接入契约
 
+[反馈初次加载/显示审计](rust-agent-ui-feedback-intake-gap-20261022.md)确认一项 AgentKit 待修差异：原 binding 缺少宿主初次读取接入，compact aside 常驻 cold/refresh；需与 SDK #47 分开处理。
+
+[本次原生续跑](rust-agent-ui-native-system-prompt-20261022.md)未获得活动窗口，phase 14 超时失败；系统提示待处理，后续分页/IME 未运行。
+
 [真实 Pi 目标回传复验](rust-agent-ui-real-goal-footnote-20261022.md)：公开 create/pause/get→原 footer 数据、clear/reconnect→新 consumer 通过；默认窄栏的目标标签可见性失败，严格门禁保留退出 1。继续跟踪 #47 和消费侧反馈状态布局，不视为完整 UI 通过。
 
 [目标终态脚注与首次安装](rust-agent-ui-goal-footnote-20261022.md)补充原 goal projection→同帧 RunSnapshot→原 footer 的只读路径；没有来源 turn 或目标耗时就不推断。首次晚安装 Transcript 复用完整显示输入，原生窗口/三端真实目标生命周期仍待专项验收。
