@@ -861,6 +861,25 @@ async fn closing_during_note_save_retains_row_failure_and_foreign_mount_ignores_
     let save = ids(&mut host, root).save;
     let gesture = activate(&mut host, root, save).pop().unwrap();
     let request = binding.prepare_feedback_gesture(Some(&rated), gesture);
+    let editor = ids(&mut host, root).editor;
+    let owner = control(&mut host, root).editor().unwrap() as *const _ as usize;
+    assert!(!control(&mut host, root).editor().unwrap().input.disabled);
+    replace_note(&mut host, root, "保存期间继续编辑");
+    assert!(control(&mut host, root).is_pending());
+    assert_eq!(ids(&mut host, root).editor, editor);
+    assert_eq!(
+        control(&mut host, root).editor().unwrap() as *const _ as usize,
+        owner
+    );
+    assert_eq!(
+        control(&mut host, root).editor().unwrap().input.text,
+        "保存期间继续编辑"
+    );
+    let save = ids(&mut host, root).save;
+    assert!(
+        activate(&mut host, root, save).is_empty(),
+        "editing during Save does not admit a second request"
+    );
     let close = ids(&mut host, root).close;
     activate(&mut host, root, close);
     assert!(!control(&mut host, root).is_open());

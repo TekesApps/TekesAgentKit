@@ -17,6 +17,9 @@ use tekes_ui_text::{
 use tekes_ui_tokens::{Rgba, Theme, proposal};
 
 const TITLE: &str = "工作区 Summary 👩🏽‍💻 e\u{301} · repository/非常长的分支名称与完整状态标题 ";
+
+#[path = "support/popover_intake.rs"]
+mod popover_intake;
 struct Text {
     shaper: CoreTextShaper,
     scale: f32,
@@ -1553,6 +1556,67 @@ fn output_aside_feedback_notes_and_auxiliary_actions_keep_the_original_composer(
         host.text_surface(editor).unwrap().input.external_baseline(),
         baseline
     );
+    let note_ids = host
+        .get(feedback)
+        .unwrap()
+        .component::<TurnFeedback>()
+        .unwrap()
+        .ids();
+    let note_owner = host.text_surface(note_ids.editor).unwrap() as *const _ as usize;
+    for theme in Theme::ALL {
+        for scale in [0.85, 1., 1.5] {
+            for width in [240., 400., 900.] {
+                let mut text = Text::new(scale, true);
+                let frame = Rect::new(0., 0., width, 1400.);
+                host.render(&mut Scene::new(), &mut text, frame, frame, theme.into())
+                    .unwrap();
+                let field = host
+                    .get(note_ids.editor)
+                    .unwrap()
+                    .component::<TextFieldContent>()
+                    .unwrap();
+                assert_eq!(
+                    field.surface.presentation,
+                    tekes_ui_controls::TextSurfacePresentation::Content
+                );
+                assert_eq!(field.field.label, "评价备注");
+                assert!((field.surface.outer.size.height - 120.).abs() <= 1.);
+                assert!(field.surface.outer.size.width <= 400.);
+                let cancel = host.get(note_ids.close).unwrap().frame();
+                let save = host.get(note_ids.save).unwrap().frame();
+                assert!(
+                    cancel.max_x() < save.min_x(),
+                    "Cancel precedes Save in source order"
+                );
+                assert!(
+                    (save.max_x() - field.surface.outer.max_x()).abs() <= 1.,
+                    "form actions trail the original editor"
+                );
+                assert_eq!(
+                    host.get(note_ids.save)
+                        .unwrap()
+                        .component::<ButtonContent>()
+                        .unwrap()
+                        .variant,
+                    tekes_ui_controls::paint::ButtonVariant::Primary
+                );
+                assert!(
+                    host.semantics()
+                        .iter()
+                        .any(|node| node.semantics.name == "评价")
+                );
+                assert_eq!(
+                    host.text_surface(note_ids.editor).unwrap() as *const _ as usize,
+                    note_owner
+                );
+                assert_eq!(host.focused(), Some(editor));
+                assert_eq!(
+                    host.text_surface(editor).unwrap().input.external_baseline(),
+                    baseline
+                );
+            }
+        }
+    }
 }
 
 #[test]

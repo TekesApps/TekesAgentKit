@@ -6,10 +6,11 @@ use std::sync::{
 use tekes_agent_contract::{SessionMessageFeedback, SessionMessageFeedbackRating as Rating};
 use tekes_agent_presentation::{FeedbackChange, FeedbackTargetCapture};
 use tekes_ui_controls::{
-    ButtonTextRenderer, TextSurface,
+    ButtonTextRenderer, TextSurface, TextSurfacePresentation,
     composition::*,
     extended::{Axis, Stack},
-    layout::MeasuredChild,
+    layout::{AlignmentOverride, MeasuredChild, layout_measured_children},
+    paint::ButtonVariant,
 };
 use tekes_ui_scene::{Rect, Size};
 use tekes_ui_tokens::{Spacing, proposal};
@@ -66,6 +67,7 @@ pub struct FeedbackLabels {
     pub negative: String,
     pub edit_note: String,
     pub note: String,
+    pub editor_title: String,
     pub save: String,
     pub close: String,
     pub refresh: String,
@@ -83,8 +85,9 @@ impl Default for FeedbackLabels {
             negative: "没有帮助".into(),
             edit_note: "备注".into(),
             note: "评价备注".into(),
+            editor_title: "评价".into(),
             save: "保存".into(),
-            close: "关闭".into(),
+            close: "取消".into(),
             refresh: "刷新评价".into(),
             pending: "正在处理评价".into(),
             unloaded: "评价尚未加载".into(),
@@ -105,6 +108,7 @@ pub struct FeedbackIds {
     pub close: ComponentId,
     pub refresh: ComponentId,
     status: ComponentId,
+    title: ComponentId,
 }
 /// One stable response per instance. Mount alongside its leading output footnote.
 /// All editing, marked text, undo, layout styles and focus are TekesUI-owned.
@@ -136,6 +140,7 @@ impl TurnFeedback {
                 close: root,
                 refresh: root,
                 status: root,
+                title: root,
             },
             next: 16,
             labels,
@@ -277,6 +282,7 @@ impl TurnFeedback {
         self.ids.close = ComponentId(base + 5);
         self.ids.refresh = ComponentId(base + 6);
         self.ids.status = ComponentId(base + 7);
+        self.ids.title = ComponentId(base + 8);
     }
     pub fn complete(&mut self, gesture: &FeedbackGesture, result: FeedbackControlResult) -> bool {
         if !self.pending.as_ref().is_some_and(|p| p.same(gesture)) {
@@ -428,6 +434,8 @@ impl TurnFeedback {
         for mut node in old.drain(..) {
             if let Some(row) = node.component_mut::<StackContent>() {
                 leaves.append(&mut row.children);
+            } else if let Some(footer) = node.component_mut::<FeedbackFooter>() {
+                leaves.append(&mut footer.rows.children);
             } else {
                 leaves.push(node);
             }
@@ -477,6 +485,13 @@ impl TurnFeedback {
             .children
             .push(horizontal(ComponentId(self.ids.root.0 + 1), rating_buttons));
         if self.editor_open {
+            self.rows.children.push(Content::new(
+                self.ids.title,
+                TextContent {
+                    text: self.labels.editor_title.clone(),
+                    role: proposal::TextRole::UiLabel,
+                },
+            ));
             let mut node = old
                 .iter()
                 .position(|n| n.id() == self.ids.editor)
@@ -485,21 +500,36 @@ impl TurnFeedback {
                     let text = current.and_then(|v| v.note.as_deref()).unwrap_or("");
                     let mut field = TextFieldContent::new(&self.labels.note, text);
                     field.surface = TextSurface::new(text, true, false);
+                    field.surface.presentation = TextSurfacePresentation::Content;
+                    field.surface.set_role(proposal::TextRole::UiBody);
                     field.submit_policy = TextSubmitPolicy::None;
-                    field.viewport = TextViewport::Grow {
-                        min: field.surface.minimum_outer_height(1.),
-                        max: field.surface.role.style().line_height * 6.
-                            + 2. * tekes_ui_tokens::proposal::SCROLL_CONTENT_PADDING,
-                    };
+                    // Named Agent form geometry from ClientKit's note editor;
+                    // shaping, inner scrolling, selection and IME stay in SDK.
+                    field.viewport = TextViewport::Fixed(120.);
                     Content::new(self.ids.editor, field)
                 });
             node.component_mut::<TextFieldContent>()
                 .unwrap()
                 .surface
                 .input
-                .disabled = self.pending.is_some();
+                .disabled = false;
             self.rows.children.push(node);
+            let status = if self.pending.is_some() {
+                &self.labels.pending
+            } else {
+                &self.notice
+            };
+            if !status.is_empty() {
+                self.rows.children.push(Content::new(
+                    self.ids.status,
+                    TextContent {
+                        text: status.clone(),
+                        role: proposal::TextRole::UiCaption,
+                    },
+                ));
+            }
             let mut save = retained_button(&mut old, self.ids.save, &self.labels.save);
+            save.component_mut::<ButtonContent>().unwrap().variant = ButtonVariant::Primary;
             save.component_mut::<ButtonContent>()
                 .unwrap()
                 .button
@@ -513,9 +543,18 @@ impl TurnFeedback {
                 .button
                 .state
                 .disabled = self.is_composing();
-            self.rows.children.push(horizontal(
+            self.rows.children.push(Content::new(
                 ComponentId(self.ids.root.0 + 2),
-                vec![save, close],
+                FeedbackFooter {
+                    rows: StackContent {
+                        model: Stack {
+                            axis: Axis::Horizontal,
+                            gap: Spacing::Tight.value(),
+                        },
+                        flexible_child: None,
+                        children: vec![close, save],
+                    },
+                },
             ));
         }
         let mut refresh = retained_button(&mut old, self.ids.refresh, &self.labels.refresh);
@@ -533,7 +572,7 @@ impl TurnFeedback {
         } else {
             &self.notice
         };
-        if !text.is_empty() {
+        if !text.is_empty() && !self.editor_open {
             self.rows.children.push(Content::new(
                 self.ids.status,
                 TextContent {
@@ -559,13 +598,68 @@ impl Component for TurnFeedback {
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
         self.render();
-        self.rows.measure(text, available)
+        let width = if self.editor_open {
+            available.width.min(400.)
+        } else {
+            available.width
+        };
+        self.rows.measure(text, Size::new(width, available.height))
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
-        self.rows.arrange(text, frame, clip)
+        let width = if self.editor_open {
+            frame.size.width.min(400.)
+        } else {
+            frame.size.width
+        };
+        self.rows.arrange(
+            text,
+            Rect::new(frame.min_x(), frame.min_y(), width, frame.size.height),
+            clip,
+        )
     }
     fn semantics(&self) -> ContentSemantics {
         ContentSemantics::new(ContentRole::Group, &self.labels.group)
+    }
+}
+
+/// Business form order/alignment only; original SDK buttons retain hit, focus,
+/// keyboard and AX. This is not a popup/overlay implementation.
+#[derive(Debug)]
+struct FeedbackFooter {
+    rows: StackContent,
+}
+impl Component for FeedbackFooter {
+    fn children(&self) -> &[Content] {
+        &self.rows.children
+    }
+    fn children_mut(&mut self) -> Option<&mut Vec<Content>> {
+        Some(&mut self.rows.children)
+    }
+    fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        let measured = self.rows.measure(text, available);
+        MeasuredChild::new(Size::new(available.width, measured.size.height))
+    }
+    fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        let measured = self
+            .rows
+            .children
+            .iter_mut()
+            .map(|c| c.measure(text, frame.size))
+            .collect::<Vec<_>>();
+        let placed = layout_measured_children(
+            frame,
+            Axis::Horizontal,
+            &measured,
+            self.rows.model.gap,
+            proposal::layout::ROW,
+            AlignmentOverride {
+                main_axis: Some(proposal::layout::MainAxisDistribution::End),
+                ..Default::default()
+            },
+        );
+        for (child, placement) in self.rows.children.iter_mut().zip(placed) {
+            child.arrange(text, placement.frame, clip);
+        }
     }
 }
 

@@ -135,9 +135,10 @@ impl Probe {
 
         if self.phase == 0 || self.last_log.elapsed() > Duration::from_secs(3) {
             eprintln!(
-                "NATIVE_FEEDBACK_WAIT phase={} elapsed_ms={} selected={} mounted={} open={} pending={} composing={}",
+                "NATIVE_FEEDBACK_WAIT phase={} elapsed_ms={} active={} selected={} mounted={} open={} pending={} composing={}",
                 self.phase,
                 self.started.elapsed().as_millis(),
+                window.is_active(),
                 host.view.selected(),
                 self.control(&host.view).is_some(),
                 self.control(&host.view).is_some_and(|c| c.is_open()),
@@ -154,7 +155,7 @@ impl Probe {
         );
         let view = &host.view;
         match self.phase {
-            0 => {
+            0 if window.is_active() => {
                 let Some(root) = view.transcript_content_id(view.ids()) else {
                     return;
                 };
