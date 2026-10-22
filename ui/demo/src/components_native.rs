@@ -4509,6 +4509,18 @@ pub fn run() {
         } else {
             serde_json::Value::Null
         };
+        // Prove the mounted cold read before independent protocol proofs
+        // intentionally supersede its feedback publication.
+        let feedback_transcript_proof =
+            if args.iter().any(|arg| arg == "--feedback-transcript-proof") {
+                host.executor
+                    .block_on(tekes_agent_ui_demo::feedback_transcript_proof::run(
+                        &mut host.view,
+                    ))
+                    .expect("mounted Transcript feedback proof")
+            } else {
+                serde_json::Value::Null
+            };
         let feedback_read_proof = if args.iter().any(|arg| arg == "--feedback-read-proof") {
             host.executor
                 .block_on(tekes_agent_ui_demo::feedback_read_proof::run(&host.view))
@@ -4576,16 +4588,6 @@ pub fn run() {
         } else {
             serde_json::Value::Null
         };
-        let feedback_transcript_proof =
-            if args.iter().any(|arg| arg == "--feedback-transcript-proof") {
-                host.executor
-                    .block_on(tekes_agent_ui_demo::feedback_transcript_proof::run(
-                        &mut host.view,
-                    ))
-                    .expect("mounted Transcript feedback proof")
-            } else {
-                serde_json::Value::Null
-            };
         let bounded_child_proof = if args.iter().any(|arg| arg == "--bounded-child-proof") {
             let index = args
                 .iter()

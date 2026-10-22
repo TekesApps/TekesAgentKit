@@ -46,6 +46,10 @@ progress/detail 和本地化 copy，按稳定 section kind 挂载原 SDK 控件�
 外部报告/diff 使用原 `scoped_tool(scope, tool)` 文案回调，分区回调也接收原 scope；
 不得按当前选中会话或全局 tool ID 查外部事实。报告权威性、计数优先级和未接三端来源范围见
 [报告与作用域契约](rust-agent-ui-tool-report-20261023.md)。
+统一工具标题优先使用 `ToolHeaderAdapter`，按原 scope 提供 report、workspace 计数及本地化 wording。
+同一 Run publication 内的展示变化递增独立 display revision；不修改源 tool DTO，也不伪造业务权限版本。
+独立工具、消息内工具和 RunPort 共用这一入口；旧回调仍可用。精确输入与拒绝旧帧规则见
+[工具标题契约](rust-agent-ui-tool-header-20261023.md)。
 
 限高详情仅通过 `OutputMessage::with_bounded_details` / `ToolActivity::with_bounded_details` 显式试验；
 标准 RunPort/Transcript 保持原文档流。嵌套阅读严格检查当前失败，等待 #53；

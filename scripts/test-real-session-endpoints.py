@@ -6,8 +6,10 @@ from native_probe_provider import native_probe_intent
 from runtime_provenance import kernel_programs
 from native_probe_launcher import run_native_probe, validate_bundle
 from goal_footnote_probe import verify_goal_identity, verify_goal_footer, verify_goal_cleared
+from cargo_program import cargo_program
 ROOT=Path(__file__).resolve().parent.parent
 parser=argparse.ArgumentParser()
+parser.add_argument('--headless-program',type=Path,help='Explicit existing headless executable; hash it and skip compilation')
 parser.add_argument('--pi-root',type=Path)
 parser.add_argument('--dsh-root',type=Path)
 parser.add_argument('--kernel-root',type=Path)
@@ -125,7 +127,8 @@ if args.kernel_root:
     except (ValueError, OSError, subprocess.SubprocessError) as error:
         parser.error(str(error))
     print('NATIVE_RUNTIME_BUILD_RECEIPT '+json.dumps(kernel_identity,sort_keys=True),flush=True)
-subprocess.run(['cargo','build','--locked','-p','tekes-agent-headless'],cwd=ROOT,check=True)
+headless_program, headless_identity = cargo_program(ROOT, 'tekes-agent-headless', 'tekes-agent-headless', existing=args.headless_program)
+print('HEADLESS_PROGRAM_RECEIPT '+json.dumps(headless_identity,sort_keys=True),flush=True)
 native_child_reply='ENDPOINT_REPLY_OK'+(('\n原生有界子历史长回答，用于真实阅读锚点验证。'*120) if args.ui_native_readonly else '')
 requests=[]
 class Provider(http.server.BaseHTTPRequestHandler):
@@ -242,7 +245,7 @@ def commands(cwd,provider,model):
         {'op':'reconnect'},{'op':'open','sessionId':'s'},{'op':'snapshot'},
     ]
 def execute(config):
-    result=subprocess.run([str(ROOT/'target/debug/tekes-agent-headless')],input=json.dumps(config),text=True,capture_output=True,timeout=120)
+    result=subprocess.run([str(headless_program)],input=json.dumps(config),text=True,capture_output=True,timeout=120)
     if result.returncode:
         print(result.stdout[-12000:]);print(result.stderr[-3000:])
         if config['kind']=='native':
@@ -427,11 +430,14 @@ def ui_smoke(config, first, bounded_child=None):
     if (args.ui_turn_footnote and bounded_child is None):mode+=['--turn-footnote-proof','--turn-fork-proof']
     if (args.ui_initial_presets and bounded_child is None):mode+=['--initial-preset-proof','--initial-preset-cwd',str(cwd)]
     ui=subprocess.run([str(args.ui_demo.resolve()),*mode,'--endpoint-config',str(path),'--offscreen',str(output)],env=ui_env,text=True,capture_output=True,timeout=60)
+    # Retain original consumer evidence for every harness, including failures;
+    # these streams contain owned fixture data, never the endpoint credential.
+    output.with_suffix('.consumer.stdout').write_text(ui.stdout)
+    output.with_suffix('.consumer.stderr').write_text(ui.stderr)
     assert ui.returncode==0,ui.stderr[-3000:]
     receipt=next(json.loads(line) for line in ui.stdout.splitlines() if line.startswith('{') and json.loads(line).get('offscreen'))
+    output.with_suffix('.consumer.json').write_text(json.dumps(receipt,ensure_ascii=False,indent=2)+'\n')
     if goal_case is not None:
-        output.with_suffix('.consumer.stdout').write_text(ui.stdout)
-        output.with_suffix('.consumer.stderr').write_text(ui.stderr)
         goal_scope={'endpointId':kind+'-ui','threadId':first,'sessionId':first}
         goal_proof=verify_goal_identity(receipt,goal_scope,goal_case)
         lifecycle={'scope':goal_scope,'created':goal_created,'paused':goal_case}
@@ -682,7 +688,7 @@ try:
             adopted=base/'adopted';adopted.mkdir();source=adopted/'existing.jsonl';shutil.copyfile(locator['nativeSessionFile'],source)
             imported_id=str(uuid.uuid4());resumed=dict(config,dataRoot=str(base/'resumed-pi'),sessionRoots=[str(adopted)])
             resumed['commands']=[{'op':'call','method':'session.adopt','args':{'sessionId':imported_id,'cwd':str(cwd),'sessionFile':str(source)}},{'op':'open','sessionId':imported_id},{'op':'snapshot'}]
-            result=subprocess.run([str(ROOT/'target/debug/tekes-agent-headless')],input=json.dumps(resumed),text=True,capture_output=True,timeout=40)
+            result=subprocess.run([str(headless_program)],input=json.dumps(resumed),text=True,capture_output=True,timeout=40)
             assert result.returncode==0,result.stderr
             assert 'ENDPOINT_REPLY_OK' in result.stdout and 'endpoint-answer' in result.stdout,'resumed native history missing'
             print('PI_NATIVE_POINTER_RESUME_LIVE_OK explicit root + native RPC history')

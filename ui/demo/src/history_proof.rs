@@ -10,6 +10,25 @@ use tekes_agent_presentation::{
 use tekes_agent_session::SessionRuntime;
 use tekes_agent_ui_bindings::{HistoryPagePhase, RunBinding};
 use tekes_ui_controls::composition::AccessibilityAction;
+
+// Navigation returns queued host work as well as the requested gesture. Run
+// metadata reads against their captured source instead of silently dropping
+// them while extracting a page request.
+async fn metadata(
+    view: &mut ComponentDemo,
+    commands: Vec<DemoCommand>,
+) -> Result<Vec<DemoCommand>> {
+    let mut remaining = vec![];
+    for command in commands {
+        match command {
+            DemoCommand::ReadInitialFeedback(request) => {
+                view.complete_initial_feedback(request.execute().await)?;
+            }
+            other => remaining.push(other),
+        }
+    }
+    Ok(remaining)
+}
 #[derive(Clone)]
 enum Frontier {
     Journal {
@@ -116,22 +135,21 @@ pub async fn run(view: &mut ComponentDemo, runtime: &Arc<SessionRuntime>) -> Res
     let button = view
         .history_page_button()
         .ok_or_else(|| unsupported("paging control not mounted"))?;
-    let mut requests = view
-        .accessibility_action(button, None, AccessibilityAction::Press)?
-        .into_iter()
-        .filter_map(|command| match command {
-            DemoCommand::ReadHistoryPage(request) => Some(request),
-            _ => None,
-        });
-    let request = requests
-        .next()
-        .ok_or_else(|| unsupported("paging control did not activate"))?;
+    let commands = view.accessibility_action(button, None, AccessibilityAction::Press)?;
+    let mut requests = metadata(view, commands).await?.into_iter();
+    let Some(DemoCommand::ReadHistoryPage(request)) = requests.next() else {
+        return Err(unsupported("paging control did not activate"));
+    };
     require(requests.next().is_none(), "duplicate paging activation")?;
     require(
         a.history_page_state().phase == HistoryPagePhase::Loading,
         "missing page loading receipt",
     )?;
-    view.accessibility_action(SELECT_B, None, AccessibilityAction::Press)?;
+    let commands = view.accessibility_action(SELECT_B, None, AccessibilityAction::Press)?;
+    require(
+        metadata(view, commands).await?.is_empty(),
+        "unexpected B navigation command",
+    )?;
     require(request.load().await?, "page did not extend")?;
     let source_kind = match (&before, frontier(runtime, &a)?) {
         (
@@ -224,7 +242,11 @@ pub async fn run(view: &mut ComponentDemo, runtime: &Arc<SessionRuntime>) -> Res
     )?;
     // An explicit final navigation makes the restored A data available to the
     // generic offscreen receipt; completion/reconnect themselves never navigate.
-    view.accessibility_action(SELECT_A, None, AccessibilityAction::Press)?;
+    let commands = view.accessibility_action(SELECT_A, None, AccessibilityAction::Press)?;
+    require(
+        metadata(view, commands).await?.is_empty(),
+        "unexpected A navigation command",
+    )?;
     view.sync()?;
     Ok(
         json!({"originalScope":true,"extended":true,"frozenCut":true,"sourceKind":source_kind,"otherDraftPreserved":true,"sourceStatusPublished":true,
