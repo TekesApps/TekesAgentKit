@@ -80,6 +80,32 @@ pub enum PaneSnapshot {
     /// An absent/changed task or ephemeral pointer must not become a new conversation.
     Missing { scope: RunScope },
 }
+impl PaneSnapshot {
+    /// Forward this pane's captured publication. Read-only children never borrow
+    /// parent Run authority or a separately sampled connection epoch.
+    pub fn thinking_frame(
+        &self,
+        turn_id: &str,
+        input: tekes_agent_presentation::TranscriptThinkingDisplayInput,
+    ) -> Result<tekes_agent_presentation::TranscriptThinkingFrame> {
+        match self {
+            Self::Run { snapshot, .. } => snapshot.thinking_frame(
+                turn_id,
+                input.mode,
+                input.display_revision,
+                input.elapsed_seconds,
+            ),
+            Self::ReadOnlyChild {
+                scope,
+                publication,
+                connection_epoch,
+                transcript,
+                ..
+            } => transcript.thinking_frame(scope, turn_id, *publication, *connection_epoch, input),
+            Self::Missing { .. } => Err(unsupported("thinking pane missing")),
+        }
+    }
+}
 
 /// One mount owns its own history lease. Dropping it never cancels an agent or
 /// discards a SideChat. Mount tokens in SidePanel fence installation of this value.

@@ -121,6 +121,11 @@ pub struct TranscriptSnapshot {
     pub has_more_before: bool,
     pub is_stale: bool,
     pub diagnostics: Vec<String>,
+    #[serde(
+        default,
+        skip_serializing_if = "crate::TranscriptThinkingSources::is_empty"
+    )]
+    pub thinking_sources: Box<crate::TranscriptThinkingSources>,
 }
 pub(crate) fn scoped(scope: &RunScope, suffix: &str) -> String {
     json!([scope.endpoint_id, scope.session_id, suffix]).to_string()
@@ -221,6 +226,9 @@ impl TranscriptSnapshot {
             .map(|v| v.has_more_before)
             .unwrap_or(session.has_more_before);
         snapshot.is_stale = !session.journal_ready;
+        snapshot.thinking_sources = Box::new(crate::transcript_thinking_sources::read(
+            scope, session, &snapshot,
+        )?);
         Ok(snapshot)
     }
     pub fn reconciliation_ids(&self) -> impl Iterator<Item = &str> {
@@ -371,6 +379,7 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
     let mut opened_turns = std::collections::BTreeSet::new();
     let mut active_tools = std::collections::BTreeSet::new();
     let mut closed_turns = std::collections::BTreeSet::new();
+    let mut sealed_responses = std::collections::BTreeSet::new();
     let mut authoritative_output = BTreeMap::new();
     let mut opening_inputs = std::collections::BTreeSet::new();
     for entry in session.entries.values() {
@@ -379,6 +388,9 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
         let number = data["turn"].as_i64().unwrap_or(current);
         let turn_id = scoped(scope, &format!("turn:{number}"));
         let step = data["step"].as_i64().unwrap_or(0);
+        if matches!(event.kind.as_str(), "assistant/message" | "step/end") {
+            sealed_responses.insert(scoped(scope, &format!("response:{number}:{step}")));
+        }
         let seq = Some(event.seq);
         let time = Some(event.time);
         // Account independently of surface visibility: model-only messages still consumed tokens.
@@ -738,6 +750,13 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
             continue;
         };
         let turn_id = scoped(scope, &format!("turn:{number}"));
+        let response_id = scoped(scope, &format!("response:{number}:{step}"));
+        if closed_turns.contains(&turn_id)
+            || sealed_responses.contains(&response_id)
+            || (!opened_turns.is_empty() && turn_id != scoped(scope, &format!("turn:{current}")))
+        {
+            continue;
+        }
         if session.run_open
             && session.journal_ready
             && let Some(count) = preview.output_tokens
@@ -1075,18 +1094,36 @@ fn native(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSna
     if snapshot.is_streaming {
         // Updates carry the whole active message. An assistant end attached to
         // its authoritative snapshot retires that preview even during tool work.
-        if let Some(event) = session
-            .native_events
-            .iter()
-            .rev()
-            .find(|e| {
-                matches!(
-                    e["type"].as_str(),
-                    Some("message_update" | "message_start" | "message_end")
-                ) && e["message"]["role"] == "assistant"
-            })
-            .filter(|event| event["type"] != "message_end")
-        {
+        let active = match &session.native_assistant {
+            Some(tekes_agent_session::NativeAssistantProjection::Idle) => None,
+            Some(tekes_agent_session::NativeAssistantProjection::Message {
+                event,
+                reasoning_ended,
+            }) => Some((event, *reasoning_ended)),
+            None => session
+                .native_events
+                .iter()
+                .rev()
+                .find(|e| {
+                    matches!(
+                        e["type"].as_str(),
+                        Some("message_update" | "message_start" | "message_end")
+                    ) && e["message"]["role"] == "assistant"
+                })
+                .filter(|event| event["type"] != "message_end")
+                .map(|event| {
+                    let kind = event["assistantMessageEvent"]["type"]
+                        .as_str()
+                        .unwrap_or("");
+                    (
+                        event,
+                        kind == "thinking_end"
+                            || kind.starts_with("text_")
+                            || kind.starts_with("toolcall_"),
+                    )
+                }),
+        };
+        if let Some((event, reasoning_ended)) = active {
             let stream_id = event["agentkitStreamId"]
                 .as_str()
                 .filter(|id| !id.is_empty());
@@ -1118,7 +1155,7 @@ fn native(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSna
             if let Some(id) = stream_id {
                 row.metadata["nativeStreamId"] = json!(scoped(scope, &format!("pi-stream:{id}")));
             }
-            row.reasoning_ended = event["assistantMessageEvent"]["type"] == "thinking_end";
+            row.reasoning_ended = reasoning_ended;
             upsert(&mut out, row);
         }
     }

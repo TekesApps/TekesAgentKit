@@ -1,5 +1,7 @@
 # 思考模式：受控 OutputMessage 接线（2026-10-23）
 
+> 来源顺序契约已按具体 ClientKit projector 修正，公开来源帧工厂也已补充；见[来源适配记录](rust-agent-ui-thinking-source-20261023.md)。以下输入哈希和当时验证范围保持原身份，不将其当作最新完整交付证明。
+
 在 `41249c8` 的共享思考策略上，新增 `TranscriptThinkingFrame` 与 `OutputMessage::update_with_thinking`。现在独立机器消息可以消费共享策略并更新原 SDK 控件；**Run/Transcript 自动来源适配、TranscriptContent/RunPort 接线仍未完成**，不把独立控件测试当作整个 Transcript 或真实三端验收。
 
 ## 输入和所有权

@@ -19,6 +19,42 @@ pub fn install_thinking_output(
 ) -> Result<(), &'static str> {
     view.update_with_thinking(publication, epoch, output, section, thinking)
 }
+/// A host forwards one immutable Run snapshot. Source facts and all thinking
+/// decisions are produced by AgentKit, without another runtime read or cache.
+pub fn install_run_thinking_output(
+    view: &mut tekes_agent_components_ui::OutputMessage,
+    snapshot: &tekes_agent_components_ui::RunSnapshot,
+    item_id: &str,
+    mode: tekes_agent_components_ui::TranscriptThinkingMode,
+    display_revision: u64,
+    elapsed_seconds: u64,
+) -> Result<(), String> {
+    let document = tekes_agent_components_ui::TranscriptDocument::read(&snapshot.transcript)
+        .map_err(|error| error.to_string())?;
+    let (section, output) = document
+        .sections
+        .iter()
+        .find_map(|section| {
+            section
+                .outputs
+                .iter()
+                .find(|row| row.item.id == item_id)
+                .map(|row| (section, row))
+        })
+        .ok_or_else(|| "thinking output unavailable".to_owned())?;
+    let frame = snapshot
+        .thinking_frame(section.id, mode, display_revision, elapsed_seconds)
+        .map_err(|error| error.to_string())?;
+    install_thinking_output(
+        view,
+        snapshot.revision,
+        snapshot.connection_epoch,
+        output,
+        Some(section),
+        &frame,
+    )
+    .map_err(str::to_owned)
+}
 /// Window clearance is supplied by the host; AgentKit owns the pane body inset.
 pub fn set_panel_layout(
     panel: &mut tekes_agent_components_ui::SidePanel,

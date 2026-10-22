@@ -33,8 +33,9 @@ impl TranscriptThinkingMode {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct TranscriptThinkingItem<'a> {
     pub id: &'a str,
-    /// First source arrival order, never a timestamp, loaded-window ordinal or
-    /// order invented from the current vector. Paging must not reassign it.
+    /// The dialect's presentation order in this publication: journal frame
+    /// anchor or public native ancestry order. Never a timestamp/UI row index,
+    /// durable identity or authority. Paging may rebase order in a new publication.
     pub arrival_order: i64,
     pub response_frame_id: Option<&'a str>,
     pub is_provisional: bool,

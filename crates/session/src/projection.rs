@@ -42,6 +42,10 @@ pub struct LivePreview {
     /// Latest provider report for this step. None means unavailable, not zero.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output_tokens: Option<u64>,
+    /// Dialect presentation anchor, not the transient transport's seq. For
+    /// transient chunks this is the last durable cursor + 1 at receipt time.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub presentation_order: Option<i64>,
 }
 /// A headless read model; journal entries remain lossless. UI surface folding is out of scope.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -51,6 +55,9 @@ pub struct SessionProjection {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub native_reading_identities: Vec<NativeMessageReadingIdentity>,
     pub native_events: std::collections::VecDeque<Value>,
+    /// None permits legacy event-only snapshots. Idle is an explicit retirement.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub native_assistant: Option<crate::NativeAssistantProjection>,
     pub agent_error: Option<String>,
     pub entries: BTreeMap<i64, HistoryEntry>,
     pub previews: BTreeMap<String, LivePreview>,
@@ -73,6 +80,7 @@ impl Default for SessionProjection {
             native_conversation: None,
             native_reading_identities: vec![],
             native_events: std::collections::VecDeque::new(),
+            native_assistant: None,
             agent_error: None,
             entries: BTreeMap::new(),
             previews: BTreeMap::new(),
@@ -92,6 +100,11 @@ impl Default for SessionProjection {
 }
 impl SessionProjection {
     fn push_native_event(&mut self, event: Value) {
+        if let Some(next) =
+            crate::NativeAssistantProjection::receive(self.native_assistant.as_ref(), &event)
+        {
+            self.native_assistant = Some(next);
+        }
         if self.native_events.len() >= 256 {
             self.native_events.pop_front();
         }
@@ -162,6 +175,9 @@ impl SessionProjection {
         }
     }
     fn fold(&mut self, event: &SessionEvent) {
+        self.fold_at(event, event.seq);
+    }
+    fn fold_at(&mut self, event: &SessionEvent, presentation_order: i64) {
         match event.kind.as_str() {
             "turn/start" => self.run_open = true,
             "turn/end" => {
@@ -199,17 +215,19 @@ impl SessionProjection {
                     return;
                 }
                 let p = self.previews.entry(preview_key(event)).or_default();
+                p.presentation_order = Some(presentation_order);
+                let kind = event.data["chunk"]["type"].as_str().unwrap_or("");
+                if kind == "reasoning-end" || kind.starts_with("text") {
+                    p.reasoning_ended = true;
+                } else if kind.starts_with("reasoning") {
+                    p.reasoning_ended = false;
+                }
                 if let Some(presentation) = event.data.get("presentation") {
                     p.text = presentation["text"].as_str().unwrap_or("").into();
                     p.reasoning = presentation["reasoning"].as_str().unwrap_or("").into();
                 } else {
                     let chunk = &event.data["chunk"];
                     let kind = chunk["type"].as_str().unwrap_or("");
-                    if kind == "reasoning-end" || kind.starts_with("text") {
-                        p.reasoning_ended = true;
-                    } else if kind.starts_with("reasoning") {
-                        p.reasoning_ended = false;
-                    }
                     let delta = chunk["text"]
                         .as_str()
                         .or_else(|| chunk["delta"].as_str())
@@ -326,6 +344,7 @@ impl MemoryProjectionStore {
             session.journal_ready = false;
             session.previews.clear();
             session.native_events.clear();
+            session.native_assistant = None;
             session.native_reading_identities.clear();
         }
         self.connection = ConnectionState::Connecting;
@@ -336,6 +355,7 @@ impl MemoryProjectionStore {
             s.journal_ready = false;
             s.previews.clear();
             s.native_events.clear();
+            s.native_assistant = None;
             s.native_reading_identities.clear();
         }
     }
@@ -721,6 +741,7 @@ impl MemoryProjectionStore {
                 session.journal_ready = true;
                 session.journal_error = None;
                 session.native_events.clear();
+                session.native_assistant = Some(crate::NativeAssistantProjection::Idle);
             }
             "conversation-update" => {
                 let snapshot: NativeConversationSnapshot =
@@ -755,6 +776,20 @@ impl MemoryProjectionStore {
                 session.native_conversation = Some(snapshot);
                 if let Some(event) = event {
                     session.push_native_event(event);
+                }
+                let committed = match &session.native_assistant {
+                    Some(crate::NativeAssistantProjection::Message { event, .. }) => {
+                        event["agentkitStreamId"].as_str().is_some_and(|stream| {
+                            session
+                                .native_reading_identities
+                                .iter()
+                                .any(|identity| identity.stream_id == stream)
+                        })
+                    }
+                    _ => false,
+                };
+                if !session.run_open || committed {
+                    session.native_assistant = Some(crate::NativeAssistantProjection::Idle);
                 }
             }
             "native-event" => {
@@ -794,7 +829,11 @@ impl MemoryProjectionStore {
                     require(event.kind == "assistant/chunk", "invalid transient event")?;
                     integer(&event.data, "turn")?;
                     integer(&event.data, "step")?;
-                    self.sessions.entry(id.into()).or_default().fold(&event);
+                    let session = self.sessions.entry(id.into()).or_default();
+                    let order = session.tail_sequence.checked_add(1).ok_or_else(|| {
+                        Error::Protocol("preview presentation order exhausted".into())
+                    })?;
+                    session.fold_at(&event, order);
                 }
             }
             "projection" => {

@@ -1,5 +1,7 @@
 # Transcript 思考模式：共享展示策略（2026-10-23）
 
+> 来源顺序契约已按具体 ClientKit projector 修正，公开来源帧工厂也已补充；见[来源适配记录](rust-agent-ui-thinking-source-20261023.md)。以下输入哈希和当时验证范围保持原身份，不将其当作最新完整交付证明。
+
 本页记录 `41249c8` 的 renderer-independent 共享策略基线。后续已增加[受控 OutputMessage 接线](rust-agent-ui-thinking-output-20261023.md)，但 Run/Transcript 自动来源适配和整体控件接线仍未完成。下文测试与输入哈希保持该基线身份，不转移为后续原生验收。
 
 ## 对齐来源

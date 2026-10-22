@@ -3,9 +3,10 @@ mod sidebar_visibility;
 mod tool_run;
 pub use tekes_agent_presentation::{
     TranscriptReasoningDisclosure, TranscriptReasoningDisplay, TranscriptThinkingCall,
-    TranscriptThinkingFrame, TranscriptThinkingInput, TranscriptThinkingItem,
-    TranscriptThinkingMode, TranscriptThinkingNarration, TranscriptThinkingPlaceholder,
-    TranscriptThinkingPolicy,
+    TranscriptThinkingDisplayInput, TranscriptThinkingFrame, TranscriptThinkingInput,
+    TranscriptThinkingItem, TranscriptThinkingMode, TranscriptThinkingNarration,
+    TranscriptThinkingPlaceholder, TranscriptThinkingPolicy, TranscriptThinkingSource,
+    TranscriptThinkingSources,
 };
 pub use tekes_agent_presentation::{TranscriptToolNameCount, TranscriptToolRunSummary};
 pub use tool_run::*;

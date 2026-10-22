@@ -60,6 +60,8 @@ pub use transcript_document::*;
 
 mod transcript_thinking;
 pub use transcript_thinking::*;
+mod transcript_thinking_sources;
+pub use transcript_thinking_sources::*;
 
 mod transcript_order;
 pub use transcript_order::*;
