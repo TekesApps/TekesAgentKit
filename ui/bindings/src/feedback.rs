@@ -105,7 +105,31 @@ impl RunBinding {
                 .runtime
                 .inspect(|state| state.endpoint_capabilities.supports("feedback.list"))
     }
+    /// Read admission for host scheduling. An epoch is not write authority;
+    /// read_feedback and FeedbackFrame still validate the original source.
+    pub fn feedback_read_epoch(&self) -> Option<u64> {
+        (self.access() == PaneAccess::Ready && self.controller.is_some())
+            .then(|| {
+                self.runtime.inspect(|state| {
+                    (state.connection == ConnectionState::Ready
+                        && state.sessions.contains_key(&self.scope.session_id)
+                        && state.endpoint_capabilities.supports("feedback.list"))
+                    .then_some(state.connection_epoch)
+                })
+            })
+            .flatten()
+    }
     pub async fn read_feedback(self: &Arc<Self>) -> Result<FeedbackFrame> {
+        self.read_feedback_for_epoch(None).await
+    }
+    /// A queued host read must not follow a newer connection when it executes.
+    pub async fn read_feedback_at_epoch(self: &Arc<Self>, epoch: u64) -> Result<FeedbackFrame> {
+        self.read_feedback_for_epoch(Some(epoch)).await
+    }
+    async fn read_feedback_for_epoch(
+        self: &Arc<Self>,
+        epoch: Option<u64>,
+    ) -> Result<FeedbackFrame> {
         require(
             self.access() == PaneAccess::Ready && self.controller.is_some(),
             "feedback requires an independently addressable ready run",
@@ -116,6 +140,10 @@ impl RunBinding {
                 && state.sessions.contains_key(&self.scope.session_id)
                 && state.endpoint_capabilities.supports("feedback.list"),
             "feedback read is unavailable",
+        )?;
+        require(
+            epoch.is_none_or(|epoch| epoch == state.connection_epoch),
+            "feedback read connection changed before execution",
         )?;
         // Allocate before await: completion order must never become publication order.
         let publication = self

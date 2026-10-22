@@ -185,6 +185,7 @@ struct Host {
 }
 enum HostResult {
     Feedback(Box<tekes_agent_ui_demo::component_demo::FeedbackDemoCompletion>),
+    InitialFeedback(Box<tekes_agent_ui_demo::component_demo::FeedbackInitialCompletion>),
     TurnAction {
         token: SidebarActionToken,
         result: std::result::Result<tekes_agent_contract::ThreadActionOutcome, String>,
@@ -557,6 +558,9 @@ impl Host {
                             result,
                         }
                     }
+                    DemoCommand::ReadInitialFeedback(request) => {
+                        HostResult::InitialFeedback(Box::new(request.execute().await))
+                    }
                     DemoCommand::Feedback(request) => {
                         HostResult::Feedback(Box::new(request.execute().await))
                     }
@@ -846,6 +850,7 @@ impl Host {
                             | DemoCommand::SidebarSearch(_)
                             | DemoCommand::Sidebar(_)
                             | DemoCommand::TurnAction { .. }
+                            | DemoCommand::ReadInitialFeedback(_)
                             | DemoCommand::Feedback(_)
                             | DemoCommand::ReadInitialPresets { .. }
                             | DemoCommand::CreateSession(_)
@@ -894,6 +899,11 @@ impl Host {
         }
         while let Ok(result) = self.results.try_recv() {
             match result {
+                HostResult::InitialFeedback(result) => {
+                    if let Err(error) = self.view.complete_initial_feedback(*result) {
+                        self.failure(error.to_string());
+                    }
+                }
                 HostResult::Feedback(result) => {
                     if let Err(error) = self.view.complete_feedback(*result) {
                         self.failure(error.to_string());

@@ -1,6 +1,8 @@
 # Rust Agent UI 组件接入契约
 
-[反馈初次加载/显示审计](rust-agent-ui-feedback-intake-gap-20261022.md)确认一项 AgentKit 待修差异：原 binding 缺少宿主初次读取接入，compact aside 常驻 cold/refresh；需与 SDK #47 分开处理。
+[反馈首次读取与重连接入](rust-agent-ui-feedback-intake-20261022.md)：原 binding 按挂载来源/连接代次调度一次，手势及旧代次使排队读取失效；compact cold/loading 文案移除。7 项新增回归与独立 consumer 通过，原生/真实三端、常驻 Refresh 及完整 glyph 布局仍待验证和对齐。
+
+[反馈初次加载/显示审计](rust-agent-ui-feedback-intake-gap-20261022.md)记录了消费侧首次读取及 cold/refresh 的差异；上方增量已补初次读取和 cold/loading 文案，Refresh/glyph 完整布局仍需与 SDK #47 分开处理。
 
 [本次原生续跑](rust-agent-ui-native-system-prompt-20261022.md)未获得活动窗口，phase 14 超时失败；系统提示待处理，后续分页/IME 未运行。
 

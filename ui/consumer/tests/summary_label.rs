@@ -1434,6 +1434,21 @@ fn output_aside_feedback_notes_and_auxiliary_actions_keep_the_original_composer(
     content.update(&scope, 2, 1, &snapshot, true).unwrap();
     let (feedback, control) = content.feedback_controls().next().unwrap();
     let target = control.target().unwrap().clone();
+    // The independent consumer observes cold/failure as metadata, never an
+    // invented empty record; the original committed frame supersedes failure.
+    let control = content.feedback_mut(feedback).unwrap();
+    assert!(control.notice().is_empty());
+    assert!(
+        !control.children().iter().any(|node| {
+            node.component::<TextContent>()
+                .is_some_and(|text| text.text == "评价尚未加载")
+        }),
+        "cold metadata is not a permanent compact aside caption"
+    );
+    control.initial_read_failed("owned read failure".into());
+    assert!(control.state().is_none());
+    assert!(control.needs_refresh());
+    assert_eq!(control.diagnostic(), Some("owned read failure"));
     let state = FeedbackControlState {
         target: target.clone(),
         publication: 1,
@@ -1447,6 +1462,12 @@ fn output_aside_feedback_notes_and_auxiliary_actions_keep_the_original_composer(
         .unwrap()
         .update(state.clone())
         .unwrap();
+    let committed = content.feedback_mut(feedback).unwrap();
+    assert!(committed.notice().is_empty());
+    assert!(!committed.needs_refresh());
+    committed.initial_read_failed("late read failure".into());
+    assert_eq!(committed.state(), Some(&state));
+    assert!(committed.diagnostic().is_none());
     let root = content.id();
     let composer = tekes_agent_ui_consumer_check::new_composer(49969);
     let editor = composer.ids().editor;

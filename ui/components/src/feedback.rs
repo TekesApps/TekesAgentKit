@@ -217,6 +217,17 @@ impl TurnFeedback {
         self.rekey();
         self.render();
     }
+    /// Optional metadata read failed. Does not invent an empty committed record,
+    /// grant write authority, or replace a retained editor/gesture.
+    pub fn initial_read_failed(&mut self, message: String) {
+        if self.state.is_some() || self.pending.is_some() {
+            return;
+        }
+        self.needs_refresh = true;
+        self.diagnostic = Some(message);
+        self.notice = self.labels.uncertain.clone();
+        self.render();
+    }
     pub fn state(&self) -> Option<&FeedbackControlState> {
         self.state.as_ref()
     }
@@ -605,7 +616,9 @@ impl TurnFeedback {
             .state
             .disabled = self.pending.is_some() || self.is_composing() || self.target.is_none();
         self.rows.children.push(refresh);
-        let text = if self.pending.is_some() {
+        let text = if self.compact {
+            &self.notice
+        } else if self.pending.is_some() {
             &self.labels.pending
         } else if self.notice.is_empty() && self.state.is_none() {
             &self.labels.unloaded

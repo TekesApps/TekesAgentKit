@@ -6,6 +6,40 @@ use tekes_agent_ui_bindings::{
 pub(super) struct FeedbackPane {
     pub source: std::sync::Weak<RunBinding>,
     pub frame: Option<FeedbackFrame>,
+    attempted_epoch: Option<u64>,
+    loading_epoch: Option<u64>,
+    failure: Option<String>,
+    initial_live: Option<Arc<()>>,
+}
+/// Original-binding read, scheduled once per mounted source/connection epoch.
+/// Execution never follows the host's current selection.
+pub struct FeedbackInitialRequest {
+    pane: ComponentId,
+    source: Arc<RunBinding>,
+    epoch: u64,
+    live: std::sync::Weak<()>,
+}
+pub struct FeedbackInitialCompletion {
+    request: FeedbackInitialRequest,
+    result: std::result::Result<FeedbackFrame, String>,
+}
+impl FeedbackInitialRequest {
+    pub async fn execute(self) -> FeedbackInitialCompletion {
+        let result = if self.live.upgrade().is_none()
+            || self.source.feedback_read_epoch() != Some(self.epoch)
+        {
+            Err("feedback initial source changed before execution".into())
+        } else {
+            self.source
+                .read_feedback_at_epoch(self.epoch)
+                .await
+                .map_err(|e| e.to_string())
+        };
+        FeedbackInitialCompletion {
+            request: self,
+            result,
+        }
+    }
 }
 pub struct FeedbackDemoRequest {
     pane: ComponentId,
@@ -44,6 +78,10 @@ impl ComponentDemo {
                     FeedbackPane {
                         source: Arc::downgrade(source),
                         frame: None,
+                        attempted_epoch: None,
+                        loading_epoch: None,
+                        failure: None,
+                        initial_live: None,
                     },
                 );
             }
@@ -70,12 +108,51 @@ impl ComponentDemo {
                 .is_some_and(|original| Arc::ptr_eq(&original, source)),
             "feedback binding changed",
         )?;
+        // Explicit gestures supersede the queued initial read, including a
+        // failure that could otherwise overwrite a successful manual refresh.
+        pane.loading_epoch = None;
+        pane.initial_live = None;
+        pane.failure = None;
+        self.background_commands.retain(|command| {
+            !matches!(command, DemoCommand::ReadInitialFeedback(request) if request.pane == ids.root)
+        });
         let request = source.prepare_feedback_gesture(pane.frame.as_ref(), gesture);
         Ok(DemoCommand::Feedback(Box::new(FeedbackDemoRequest {
             pane: ids.root,
             control,
             request,
         })))
+    }
+    pub fn complete_initial_feedback(&mut self, result: FeedbackInitialCompletion) -> Result<()> {
+        let request = result.request;
+        let Some(pane) = self.feedback_panes.get_mut(&request.pane) else {
+            return Ok(());
+        };
+        if pane
+            .initial_live
+            .as_ref()
+            .is_none_or(|live| !std::sync::Weak::ptr_eq(&Arc::downgrade(live), &request.live))
+            || pane.loading_epoch != Some(request.epoch)
+            || request.source.feedback_read_epoch() != Some(request.epoch)
+            || !pane
+                .source
+                .upgrade()
+                .is_some_and(|source| Arc::ptr_eq(&source, &request.source))
+        {
+            return Ok(());
+        }
+        pane.loading_epoch = None;
+        pane.initial_live = None;
+        match result.result {
+            Ok(frame) if frame.is_current(&request.source) => {
+                pane.frame = Some(frame);
+                pane.failure = None;
+            }
+            Ok(_) => {} // A newer publication owns the result.
+            Err(error) if pane.frame.is_none() => pane.failure = Some(error),
+            Err(_) => {}
+        }
+        self.sync()
     }
     pub fn complete_feedback(&mut self, result: FeedbackDemoCompletion) -> Result<()> {
         self.feedback_completions.push(result);
@@ -134,6 +211,24 @@ impl ComponentDemo {
         {
             pane.frame = None;
         }
+        if let Some(epoch) = source.feedback_read_epoch()
+            && pane.attempted_epoch != Some(epoch)
+        {
+            pane.attempted_epoch = Some(epoch);
+            pane.loading_epoch = Some(epoch);
+            pane.failure = None;
+            let live = Arc::new(());
+            pane.initial_live = Some(live.clone());
+            self.background_commands
+                .push(DemoCommand::ReadInitialFeedback(Box::new(
+                    FeedbackInitialRequest {
+                        pane: ids.root,
+                        source: source.clone(),
+                        epoch,
+                        live: Arc::downgrade(&live),
+                    },
+                )));
+        }
         if pane.frame.is_none() {
             let content = self
                 .tree
@@ -146,7 +241,11 @@ impl ComponentDemo {
                 .filter_map(|(id, control)| (!control.is_pending()).then_some(id))
                 .collect();
             for id in ids {
-                content.feedback_mut(id).unwrap().invalidate_authority();
+                let control = content.feedback_mut(id).unwrap();
+                control.invalidate_authority();
+                if let Some(error) = &pane.failure {
+                    control.initial_read_failed(error.clone());
+                }
             }
         }
         if let Some(frame) = &pane.frame {

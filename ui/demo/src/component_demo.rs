@@ -77,11 +77,14 @@ use file_preview::FilePreviewGesture;
 use uploads::UploadGesture;
 #[path = "component_feedback.rs"]
 mod feedback;
-pub use feedback::{FeedbackDemoCompletion, FeedbackDemoRequest};
+pub use feedback::{
+    FeedbackDemoCompletion, FeedbackDemoRequest, FeedbackInitialCompletion, FeedbackInitialRequest,
+};
 pub enum DemoCommand {
     SidebarPreferences(tekes_agent_components_ui::SidebarPreferenceChange),
     SidebarSearch(tekes_agent_components_ui::SidebarSearchIntent),
     Feedback(Box<FeedbackDemoRequest>),
+    ReadInitialFeedback(Box<FeedbackInitialRequest>),
     CopyTranscript(tekes_agent_components_ui::TranscriptCopyIntent),
     JumpLatest {
         root: ComponentId,
