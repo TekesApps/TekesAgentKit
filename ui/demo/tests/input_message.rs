@@ -78,10 +78,7 @@ impl ButtonTextRenderer for Text {
 use tekes_agent_presentation::{
     RunScope, TranscriptDelivery, TranscriptDocument, TranscriptInput, TranscriptMessageKey,
 };
-use tekes_ui_controls::{
-    TextSurfacePresentation,
-    composition::{Component, TextContent},
-};
+use tekes_ui_controls::TextSurfacePresentation;
 
 #[tokio::test]
 async fn user_row_uses_library_content_surface_and_external_trailing_caption() {
@@ -127,13 +124,27 @@ async fn user_row_uses_library_content_surface_and_external_trailing_caption() {
             .unwrap()
             .frame();
         assert!((copy.max_x() - frame.max_x()).abs() < 0.01);
-        assert!(copy.min_y() >= note.max_y());
+        assert!((copy.center().y - note.center().y).abs() < 0.01);
+        assert!(note.max_x() <= copy.min_x());
         assert!(
             bubble.size.width < frame.size.width / 2.,
             "short input must shrink to prose"
         );
         assert!((bubble.max_x() - frame.max_x()).abs() < 0.01);
-        assert!((note.max_x() - frame.max_x()).abs() < 0.01);
+        let copy = host
+            .get(
+                host.get(ids.root)
+                    .unwrap()
+                    .component::<InputMessage>()
+                    .unwrap()
+                    .copy_button_id()
+                    .unwrap(),
+            )
+            .unwrap()
+            .frame();
+        assert!((copy.max_x() - frame.max_x()).abs() < 0.01);
+        assert!(note.max_x() <= copy.min_x());
+        assert!((note.center().y - copy.center().y).abs() < 0.01);
         assert!(note.min_y() > bubble.max_y());
         assert_eq!(
             host.text_surface(ids.body).unwrap().presentation,
@@ -172,7 +183,20 @@ async fn user_row_uses_library_content_surface_and_external_trailing_caption() {
         let note = host.get(ids.footnote).unwrap().frame();
         assert!(bubble.size.width <= width);
         assert!((bubble.max_x() - frame.max_x()).abs() < 0.01);
-        assert!((note.max_x() - frame.max_x()).abs() < 0.01);
+        let copy = host
+            .get(
+                host.get(ids.root)
+                    .unwrap()
+                    .component::<InputMessage>()
+                    .unwrap()
+                    .copy_button_id()
+                    .unwrap(),
+            )
+            .unwrap()
+            .frame();
+        assert!((copy.max_x() - frame.max_x()).abs() < 0.01);
+        assert!(note.max_x() <= copy.min_x());
+        assert!((note.center().y - copy.center().y).abs() < 0.01);
         assert!(note.min_y() > bubble.max_y());
         heights.push(bubble.size.height);
     }
@@ -229,11 +253,7 @@ async fn input_row_fences_scope_publication_and_explicit_identity_migration() {
     };
     row.update(&scope, 3, 1, &recorded).unwrap();
     assert!(row.update(&scope, 3, 2, &recorded).is_err());
-    let before = row.children()[1]
-        .component::<TextContent>()
-        .unwrap()
-        .text
-        .clone();
+    let before = row.information_text().to_owned();
     let mut unsupported = item.clone();
     unsupported.content_blocks = Some(vec![
         tekes_agent_presentation::TranscriptContentBlock {
@@ -257,10 +277,7 @@ async fn input_row_fences_scope_publication_and_explicit_identity_migration() {
         )
         .is_err()
     );
-    assert_eq!(
-        row.children()[1].component::<TextContent>().unwrap().text,
-        before
-    );
+    assert_eq!(row.information_text(), before);
     runtime.stop().await.unwrap();
 }
 
@@ -381,12 +398,7 @@ async fn attachments_precede_the_user_bubble_and_external_caption_in_app_order()
     let order: Vec<_> = message.children().iter().map(|node| node.id()).collect();
     assert_eq!(
         order,
-        vec![
-            message.detail_ids()[0].root,
-            ids.bubble,
-            ids.footnote,
-            message.copy_button_id().unwrap()
-        ]
+        vec![message.detail_ids()[0].root, ids.bubble, message.aside_id()]
     );
     runtime.stop().await.unwrap();
 }

@@ -84,6 +84,24 @@ impl Probe {
             .unwrap()
             .component::<TranscriptContent>()
             .unwrap();
+        let mut inputs = 0;
+        for key in content.row_keys() {
+            let node = view.tree.get(content.row_id(key).unwrap()).unwrap();
+            if let Some(input) = node.component::<tekes_agent_components_ui::InputMessage>() {
+                let aside = view.tree.get(input.aside_id()).unwrap().frame();
+                let info = view.tree.get(input.ids().footnote).unwrap().frame();
+                if let Some(copy) = input.copy_button_id() {
+                    let copy = view.tree.get(copy).unwrap().frame();
+                    assert!((copy.max_x() - aside.max_x()).abs() < 0.5);
+                    assert!(info.max_x() <= copy.min_x());
+                    assert!((info.center().y - copy.center().y).abs() < 0.5);
+                    inputs += 1;
+                } else {
+                    assert!((info.max_x() - aside.max_x()).abs() < 0.5);
+                }
+            }
+        }
+        assert!(inputs > 0, "owned source has a copyable original input");
         let key = TranscriptContentRowKey::TurnFootnote(control.target().unwrap().turn_id().into());
         let footer = view.tree.get(content.row_id(&key).unwrap()).unwrap();
         let footnote = footer.component::<TurnFootnote>().unwrap();
@@ -487,6 +505,6 @@ impl Probe {
     pub fn receipt(&self, view: &ComponentDemo) -> serde_json::Value {
         assert_eq!(self.phase, 12, "native feedback did not finish");
         self.check_drafts_and_messages(view);
-        serde_json::json!({"nativeInteraction":true,"nativePointer":true,"nativeTextServices":true,"syntheticPreedit":true,"imeSendAndNavigationBlocked":true,"savedChineseNote":true,"noteReopened":true,"retainedAcrossSessionSwitch":true,"sameRatingDeletes":true,"freshReadAfterDelete":true,"draftsPreserved":true,"nonemptyComposerDrafts":true,"sendEnabledBeforeComposition":true,"noPromptSubmitted":true,"stateDrivenCallbacks":true,"auxiliaryFocusPreserved":true,"composerContentsAndOwnerPreserved":true,"opaqueBaselinePreserved":false,"unratedNoteHidden":true,"committedNoteLabel":true,"outputAsideSingleReadingBand":true,"physicalIme":false,"voiceOver":false,"readingAnchorAcceptance":false})
+        serde_json::json!({"nativeInteraction":true,"nativePointer":true,"nativeTextServices":true,"syntheticPreedit":true,"imeSendAndNavigationBlocked":true,"savedChineseNote":true,"noteReopened":true,"retainedAcrossSessionSwitch":true,"sameRatingDeletes":true,"freshReadAfterDelete":true,"draftsPreserved":true,"nonemptyComposerDrafts":true,"sendEnabledBeforeComposition":true,"noPromptSubmitted":true,"stateDrivenCallbacks":true,"auxiliaryFocusPreserved":true,"composerContentsAndOwnerPreserved":true,"opaqueBaselinePreserved":false,"unratedNoteHidden":true,"committedNoteLabel":true,"outputAsideSingleReadingBand":true,"inputAsideSingleTrailingBand":true,"physicalIme":false,"voiceOver":false,"readingAnchorAcceptance":false})
     }
 }

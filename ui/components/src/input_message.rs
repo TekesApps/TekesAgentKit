@@ -229,8 +229,87 @@ impl Component for Bubble {
     }
 }
 
-/// One whole user message: attachments/raw details, prose bubble and
-/// external footnote, all trailing. Rich text/image preview are separate capabilities.
+/// Business aside order/clearance only. Original SDK label/button components
+/// retain shaping, clipping, focus, semantics and activation ownership.
+#[derive(Debug)]
+struct InputAside {
+    children: Vec<Content>,
+}
+impl InputAside {
+    fn leading() -> f32 {
+        // The message stack already contributes Tight between its children.
+        // Source's bubble-to-aside clearance is Regular, not another text row.
+        (Spacing::Regular.value() - Spacing::Tight.value()).max(0.)
+    }
+    fn sizes(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> Vec<MeasuredChild> {
+        let mut sizes = Vec::new();
+        // Copy stays at the trailing edge. Information receives Source's 40%
+        // maximum and any remaining space; the SDK owns the actual ellipsis.
+        let copy = self
+            .children
+            .get_mut(1)
+            .map(|node| node.measure(text, available));
+        let gap = if copy.is_some() {
+            Spacing::Regular.value()
+        } else {
+            0.
+        };
+        let remaining =
+            (available.width - copy.as_ref().map_or(0., |m| m.size.width) - gap).max(0.);
+        sizes.push(self.children[0].measure(
+            text,
+            Size::new((available.width * 0.4).min(remaining), available.height),
+        ));
+        if let Some(copy) = copy {
+            sizes.push(copy);
+        }
+        sizes
+    }
+}
+impl Component for InputAside {
+    fn children(&self) -> &[Content] {
+        &self.children
+    }
+    fn children_mut(&mut self) -> Option<&mut Vec<Content>> {
+        Some(&mut self.children)
+    }
+    fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        let height = self
+            .sizes(text, available)
+            .iter()
+            .map(|m| m.size.height)
+            .fold(0., f32::max);
+        MeasuredChild::new(Size::new(available.width, height + Self::leading()))
+    }
+    fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        let sizes = self.sizes(text, frame.size);
+        let content = Rect::new(
+            frame.min_x(),
+            frame.min_y() + Self::leading(),
+            frame.size.width,
+            (frame.size.height - Self::leading()).max(0.),
+        );
+        let placements = layout_measured_children(
+            content,
+            Axis::Horizontal,
+            &sizes,
+            Spacing::Regular.value(),
+            proposal::layout::ROW,
+            AlignmentOverride {
+                main_axis: Some(proposal::layout::MainAxisDistribution::End),
+                cross_axis: Some(proposal::layout::CrossAxisAlignment::Center),
+            },
+        );
+        for (child, placed) in self.children.iter_mut().zip(placements) {
+            child.arrange(text, placed.frame, clip);
+        }
+    }
+    fn semantics(&self) -> ContentSemantics {
+        ContentSemantics::new(ContentRole::Group, "用户消息脚注")
+    }
+}
+/// One whole user message: attachments/raw details, prose bubble and an
+/// external trailing aside. Label shaping is supplied by the original SDK host.
 #[derive(Debug)]
 pub struct InputMessage {
     ids: InputMessageIds,
@@ -298,10 +377,21 @@ impl InputMessage {
                     },
                 ),
                 Content::new(
-                    ids.footnote,
-                    TextContent {
-                        text: String::new(),
-                        role: proposal::TextRole::UiCaption,
+                    ComponentId(ids.root.0 + 4),
+                    InputAside {
+                        children: vec![
+                            Content::new(
+                                ids.footnote,
+                                TextContent {
+                                    text: String::new(),
+                                    role: proposal::TextRole::UiCaption,
+                                },
+                            )
+                            .with_label_layout(tekes_ui_text::LabelOptions::single_line(
+                                tekes_ui_text::LabelOverflow::TailEllipsis,
+                            ))
+                            .expect("original information label"),
+                        ],
                     },
                 ),
             ],
@@ -309,6 +399,24 @@ impl InputMessage {
     }
     pub fn ids(&self) -> InputMessageIds {
         self.ids
+    }
+    /// Transparent trailing aside group; `ids().footnote` remains the original
+    /// information label. Neither ID grants clipboard or endpoint authority.
+    pub fn aside_id(&self) -> ComponentId {
+        ComponentId(self.ids.root.0 + 4)
+    }
+    /// Full formatted information, including text ellipsized by the SDK.
+    /// This is a display query, not a timestamp or transport authority.
+    pub fn information_text(&self) -> &str {
+        &self
+            .children
+            .iter()
+            .find_map(|node| node.component::<InputAside>())
+            .unwrap()
+            .children[0]
+            .component::<TextContent>()
+            .unwrap()
+            .text
     }
     pub fn scope(&self) -> &RunScope {
         &self.scope
@@ -374,11 +482,18 @@ impl InputMessage {
             .position(|node| node.id() == self.ids.bubble)
             .unwrap();
         let bubble = previous.remove(bubble);
-        let footer = previous
+        let aside = previous
+            .iter()
+            .position(|node| node.id() == self.aside_id())
+            .unwrap();
+        let mut aside = previous.remove(aside);
+        let mut old_aside =
+            std::mem::take(&mut aside.component_mut::<InputAside>().unwrap().children);
+        let footer = old_aside
             .iter()
             .position(|node| node.id() == self.ids.footnote)
             .unwrap();
-        let mut footer = previous.remove(footer);
+        let mut footer = old_aside.remove(footer);
         footer.component_mut::<TextContent>().unwrap().text = footnote;
         for facts in &facts {
             let mut node = previous
@@ -399,7 +514,11 @@ impl InputMessage {
             self.children.push(node);
         }
         self.children.push(bubble);
-        self.children.push(footer);
+        aside
+            .component_mut::<InputAside>()
+            .unwrap()
+            .children
+            .push(footer);
         let same_copy = self
             .last_item
             .as_ref()
@@ -408,17 +527,27 @@ impl InputMessage {
             && self.epoch == epoch;
         let old_copy = self
             .copy_id
-            .and_then(|id| previous.into_iter().find(|node| node.id() == id));
+            .and_then(|id| old_aside.into_iter().find(|node| node.id() == id));
         self.copy_id = None;
         if !input.item.text.is_empty() {
             let node = if same_copy { old_copy } else { None }.unwrap_or_else(|| {
                 let id = ComponentId(self.ids.root.0 + self.next_detail);
                 self.next_detail += 1;
-                Content::new(id, ButtonContent::new(&self.copy_label)).preserving_focus()
+                Content::new(id, ButtonContent::new(&self.copy_label))
+                    .with_label_layout(tekes_ui_text::LabelOptions::single_line(
+                        tekes_ui_text::LabelOverflow::TailEllipsis,
+                    ))
+                    .expect("original copy label")
+                    .preserving_focus()
             });
             self.copy_id = Some(node.id());
-            self.children.push(node);
+            aside
+                .component_mut::<InputAside>()
+                .unwrap()
+                .children
+                .push(node);
         }
+        self.children.push(aside);
         self.details = facts;
         self.last_item = Some(input.item.clone());
         self.key = Some(next);
@@ -498,7 +627,11 @@ impl InputMessage {
     pub fn set_copy_label(&mut self, label: impl Into<String>) {
         self.copy_label = label.into();
         if let Some(id) = self.copy_id
-            && let Some(node) = self.children.iter_mut().find(|node| node.id() == id)
+            && let Some(node) = self
+                .children
+                .iter_mut()
+                .find_map(|node| node.component_mut::<InputAside>())
+                .and_then(|aside| aside.children.iter_mut().find(|node| node.id() == id))
         {
             node.component_mut::<ButtonContent>().unwrap().label = self.copy_label.clone();
         }
@@ -550,19 +683,35 @@ impl Component for InputMessage {
         Some(&mut self.children)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
-        let height = self
-            .children
-            .iter_mut()
-            .map(|child| child.measure(text, available).size.height)
-            .sum::<f32>()
-            + Spacing::Tight.value() * self.children.len().saturating_sub(1) as f32;
-        MeasuredChild::new(Size::new(available.width, height))
-    }
-    fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
         let sizes: Vec<_> = self
             .children
             .iter_mut()
-            .map(|child| child.measure(text, frame.size))
+            .filter(|child| {
+                !child
+                    .component::<Bubble>()
+                    .is_some_and(|bubble| bubble.children().is_empty())
+            })
+            .map(|child| child.measure(text, available))
+            .collect();
+        let height = sizes.iter().map(|size| size.size.height).sum::<f32>()
+            + Spacing::Tight.value() * sizes.len().saturating_sub(1) as f32;
+        MeasuredChild::new(Size::new(available.width, height))
+    }
+    fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        let visible: Vec<_> = self
+            .children
+            .iter()
+            .enumerate()
+            .filter(|(_, child)| {
+                !child
+                    .component::<Bubble>()
+                    .is_some_and(|bubble| bubble.children().is_empty())
+            })
+            .map(|(index, _)| index)
+            .collect();
+        let sizes: Vec<_> = visible
+            .iter()
+            .map(|index| self.children[*index].measure(text, frame.size))
             .collect();
         let placed = layout_measured_children(
             frame,
@@ -575,8 +724,17 @@ impl Component for InputMessage {
                 ..Default::default()
             },
         );
-        for (child, position) in self.children.iter_mut().zip(placed) {
-            child.arrange(text, position.frame, clip);
+        for (index, position) in visible.into_iter().zip(placed) {
+            self.children[index].arrange(text, position.frame, clip);
+        }
+        // Preserve the original empty bubble node without allocating a row/gap.
+        for child in &mut self.children {
+            if child
+                .component::<Bubble>()
+                .is_some_and(|bubble| bubble.children().is_empty())
+            {
+                child.arrange(text, Rect::new(frame.max_x(), frame.min_y(), 0., 0.), clip);
+            }
         }
     }
     fn semantics(&self) -> ContentSemantics {

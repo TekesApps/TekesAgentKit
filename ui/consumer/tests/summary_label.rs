@@ -18,6 +18,8 @@ use tekes_ui_tokens::{Rgba, Theme, proposal};
 
 const TITLE: &str = "工作区 Summary 👩🏽‍💻 e\u{301} · repository/非常长的分支名称与完整状态标题 ";
 
+#[path = "support/input_aside_layout.rs"]
+mod input_aside_layout;
 #[path = "support/output_aside_layout.rs"]
 mod output_aside_layout;
 #[path = "support/panel_launcher_layout.rs"]

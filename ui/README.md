@@ -1,5 +1,7 @@
 # Rust Run demo（开发试点）
 
+[输入脚注同一右对齐带](../docs/rust-agent-ui-input-aside-row-20261022.md)补齐时间/复制的原控件组合与40%单行信息；aside_id()/information_text()保留稳定查询，原copy来源/claim不变。宿主需提供SDK shape_label；520项组件/独立consumer与三端离屏通过，本轮没有新原生/IME通过声明。
+
 [当前固定依赖已升级至3bef](../docs/tekesui-3bef-public-intake-20261022.md)：518项组件和新Toolbar公开组合验证通过；本轮三端基础原生阅读、Pi/DSH反馈及Pi流式已有收据，其余新pin原生/系统拼音尚未完成。#49显式门禁仍失败，保持已知忽略；不转移旧程序验收。
 
 [输出脚注组合与 API 迁移](../docs/rust-agent-ui-output-aside-row-20261022.md)：正常 aside 为单一阅读项，评价是原 Content 子控件；每个 aside 预留两套 namespace。使用 feedback_controls()/feedback_mut() 处理原反馈回调，TurnFeedback row key 仅保留兼容查询。窄列全可见、图标/弹层仍开放，三端原生与程序范围见记录。

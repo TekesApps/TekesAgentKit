@@ -4683,7 +4683,14 @@ pub fn run() {
                 let node=host.view.tree.get(content.row_id(key).unwrap()).unwrap();
                 if let Some(input)=node.component::<tekes_agent_components_ui::InputMessage>() {
                     let ids=input.ids();let bubble=host.view.tree.get(ids.bubble).unwrap().frame();let caption=host.view.tree.get(ids.footnote).unwrap().frame();
-                    assert!((bubble.max_x()-frame.max_x()).abs()<0.5,"user bubble must trail shared column: bubble={bubble:?} column={frame:?}");assert!((caption.max_x()-frame.max_x()).abs()<0.5,"user aside must trail shared column: aside={caption:?} column={frame:?}");
+                    assert!((bubble.max_x()-frame.max_x()).abs()<0.5,"user bubble must trail shared column: bubble={bubble:?} column={frame:?}");let aside=host.view.tree.get(input.aside_id()).unwrap().frame();
+                    assert!((aside.max_x()-frame.max_x()).abs()<0.5,"user aside must trail shared column");
+                    if let Some(copy)=input.copy_button_id() {
+                        let copy=host.view.tree.get(copy).unwrap().frame();
+                        assert!((copy.max_x()-frame.max_x()).abs()<0.5);
+                        assert!(caption.max_x()<=copy.min_x());
+                        assert!((caption.center().y-copy.center().y).abs()<0.5);
+                    } else { assert!((caption.max_x()-frame.max_x()).abs()<0.5); }
                     messages+=1;
                 } else if let Some(output)=node.component::<tekes_agent_components_ui::OutputMessage>() {assert!((node.frame().min_x()-frame.min_x()).abs()<0.5);if !output.active(){assert!(output.content_ids().is_empty());known_empty+=1;}messages+=1;}
                 else if let Some(footer)=node.component::<tekes_agent_components_ui::TurnFootnote>() {

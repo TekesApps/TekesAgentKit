@@ -1,5 +1,7 @@
 # Rust Agent UI 组件接入契约
 
+[输入脚注同一右对齐带](rust-agent-ui-input-aside-row-20261022.md)将信息/原复制入口置于气泡外单行，使用SDK单行省略并保留原message/copy身份；纯附件空气泡不占行。公开aside_id()/information_text()及shape_label宿主要求同步，520项组件/独立consumer、同程序三端离屏通过。原生断言已编译未执行，3bef原生/IME未完成项不改判。
+
 [3bef公开精确依赖接收](tekesui-3bef-public-intake-20261022.md)已完成8包/242文件来源核验、518项组件及原Kit控件在新Toolbar中的独立consumer；更新manifest/lock并保留09基线。原生结果按新程序单列：三端基础阅读、Pi/DSH反馈、Pi两类流式通过，组合批次因外部前台变化未完整通过；当前pin系统拼音未复验。#48/#49等和最终窗级组合仍开放。下列阶段记录保持各自原pin/程序范围。
 
 [输出脚注单一阅读项](rust-agent-ui-output-aside-row-20261022.md)将复制、原反馈控件和时间等组合到同一水平带；原 feedback root/回调保留，物理 reading rows 不再重复包含反馈。517项组件、独立 consumer、真实三端原生反馈及同程序阅读/系统拼音通过；窄列文字按钮裁剪、长备注40%限制、图标与弹层仍未完成。该阶段仍固定09b4bab；当前3bef接收及未完成范围见文首。
