@@ -288,3 +288,47 @@ fn duplicate_or_empty_source_identities_are_rejected() {
     }];
     assert!(TranscriptThinkingPolicy::read(&facts).is_err());
 }
+
+#[test]
+fn display_frame_binds_source_and_hashes_source_facts_separately_from_settings_and_elapsed() {
+    let scope = RunScope::main("sep", "session");
+    let items = [thought("reasoning", 2)];
+    let mut facts = input(&items);
+    let before = TranscriptThinkingFrame::read(&scope, "turn", 5, 2, 1, &facts).unwrap();
+    facts.mode = TranscriptThinkingMode::Compact;
+    facts.elapsed_seconds = 42;
+    let after = TranscriptThinkingFrame::read(&scope, "turn", 5, 2, 2, &facts).unwrap();
+    assert_eq!(before.source_fingerprint(), after.source_fingerprint());
+    assert!(before.matches_source(&scope, "turn", 5, 2));
+    for (wrong_scope, turn, publication, epoch) in [
+        (RunScope::main("sep", "other"), "turn", 5, 2),
+        (scope.clone(), "other-turn", 5, 2),
+        (scope.clone(), "turn", 6, 2),
+        (scope.clone(), "turn", 5, 3),
+    ] {
+        assert!(!before.matches_source(&wrong_scope, turn, publication, epoch));
+    }
+    assert_eq!(
+        before.display_for("reasoning"),
+        Some(TranscriptReasoningDisplay::Placeholder { dots: 2 })
+    );
+    assert_eq!(
+        after.display_for("reasoning"),
+        Some(TranscriptReasoningDisplay::Disclosure { active: true })
+    );
+    assert_eq!(after.display_for("unknown"), None);
+    facts.has_final_output = true;
+    let changed = TranscriptThinkingFrame::read(&scope, "turn", 6, 2, 3, &facts).unwrap();
+    assert_ne!(after.source_fingerprint(), changed.source_fingerprint());
+}
+#[test]
+fn display_frame_requires_real_versions_and_turn_identity() {
+    let scope = RunScope::main("sep", "session");
+    let items = [thought("reasoning", 2)];
+    for (turn, publication, revision) in [("", 1, 1), ("turn", 0, 1), ("turn", 1, 0)] {
+        assert!(
+            TranscriptThinkingFrame::read(&scope, turn, publication, 0, revision, &input(&items))
+                .is_err()
+        );
+    }
+}

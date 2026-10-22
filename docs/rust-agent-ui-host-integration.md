@@ -51,6 +51,11 @@ progress/detail 和本地化 copy，按稳定 section kind 挂载原 SDK 控件�
 独立工具、消息内工具和 RunPort 共用这一入口；旧回调仍可用。精确输入与拒绝旧帧规则见
 [工具标题契约](rust-agent-ui-tool-header-20261023.md)。
 
+独立机器消息可用 `TranscriptThinkingFrame` 和 `OutputMessage::update_with_thinking` 消费 None/Compact 策略。
+展示帧必须绑定同一 RunSnapshot 的 `revision`/`connection_epoch`、原 scope/turn 和独立展示修订；
+接入后不能用旧 `update` 跳过策略恢复隐藏正文。首次到达事实适配及 TranscriptContent/RunPort 的
+整帧输入尚未完成，不要求宿主自行缓存/推算顺序；见[接线范围与门禁](rust-agent-ui-thinking-output-20261023.md)。
+
 限高详情仅通过 `OutputMessage::with_bounded_details` / `ToolActivity::with_bounded_details` 显式试验；
 标准 RunPort/Transcript 保持原文档流。嵌套阅读严格检查当前失败，等待 #53；
 见[限高实验说明](rust-agent-ui-bounded-details-20261022.md)，不得用宿主滚动补偿替代 SDK 修复。

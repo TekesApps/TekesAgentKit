@@ -22,8 +22,8 @@
   "tekesuiInputDigest": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
   "richToolCardRendering": false,
   "crossProcessAccepted": false,
-  "sourceBase": "4d31a4c41422d19c53c2fd2e2148db46948d2a15",
-  "sourceStage": "plus renderer-independent thinking policy and public API; no view wiring",
+  "sourceBase": "41249c8d5668d73d0e4cb8d41502fddce30757bc",
+  "sourceStage": "plus controlled standalone OutputMessage thinking frames; source/TranscriptContent/RunPort integration unfinished",
   "sourcesRead": {
     "ui/components/src/run_port.rs": "9da2607af329d064265e1f3f6c42e2c08d3945531d5f7e5d6aede92abd48f6b4",
     "ui/components/src/transcript_content.rs": "3292c9b52ddac958a48201f14a3ef070b3de18a805c25904f93b591a3ef50a54",
@@ -38,7 +38,9 @@
     "ui/demo/src/component_feedback.rs": "60524e1be7a2f6189b043888a02e95c38ffd689241509e1d53da41e8e5ac5105",
     ".github/workflows/ci.yml": "fcb395c890de150e7d178bd6f3087ec92c127f4aa9975fa6513ba4a169bd74e5",
     "crates/presentation/src/tool_card.rs": "f30ee76b29a6c8c7ad74b5d9fb12765ed998b60f8a78be8c7511d3a05c5e5a16",
-    "crates/presentation/src/tool_row.rs": "82e17001e55eaffc2452d0d18aef21406ff68373344f221456791bdad8037de6"
+    "crates/presentation/src/tool_row.rs": "82e17001e55eaffc2452d0d18aef21406ff68373344f221456791bdad8037de6",
+    "crates/presentation/src/transcript_thinking.rs": "87b08c6ee0be0d69e501b99871391234451b5d2e8909a75d202170dfa4db5a01",
+    "ui/components/src/output_message.rs": "c96fe83003fc7e3634f8d76f3f529fd1dec7d03ee758589aeac03a572c7902d7"
   },
   "publicIssues": [
     {
@@ -338,52 +340,52 @@
   ],
   "publicIssuesCheckedAt": "2026-10-23",
   "ciSnapshot": {
-    "headRefOid": "4d31a4c41422d19c53c2fd2e2148db46948d2a15",
+    "headRefOid": "41249c8d5668d73d0e4cb8d41502fddce30757bc",
     "isDraft": true,
     "statusCheckRollup": [
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-22T19:15:20Z",
+        "completedAt": "2026-10-22T19:30:08Z",
         "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39838114254/job/120031686817",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39840217400/job/120038955283",
         "name": "checks",
-        "startedAt": "2026-10-22T19:12:56Z",
+        "startedAt": "2026-10-22T19:27:37Z",
         "status": "COMPLETED",
         "workflowName": "Rust headless"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-22T19:14:47Z",
+        "completedAt": "2026-10-22T19:29:29Z",
         "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39838108385/job/120031666432",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39840211142/job/120038933506",
         "name": "checks",
-        "startedAt": "2026-10-22T19:12:55Z",
+        "startedAt": "2026-10-22T19:27:29Z",
         "status": "COMPLETED",
         "workflowName": "Rust headless"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-22T19:18:58Z",
+        "completedAt": "2026-10-22T19:33:22Z",
         "conclusion": "FAILURE",
-        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39838114254/job/120031687410",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39840217400/job/120038955819",
         "name": "Rust UI consumer (no native interaction)",
-        "startedAt": "2026-10-22T19:13:21Z",
+        "startedAt": "2026-10-22T19:27:32Z",
         "status": "COMPLETED",
         "workflowName": "Rust headless"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-22T19:19:28Z",
+        "completedAt": "2026-10-22T19:32:53Z",
         "conclusion": "FAILURE",
-        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39838108385/job/120031665886",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39840211142/job/120038933055",
         "name": "Rust UI consumer (no native interaction)",
-        "startedAt": "2026-10-22T19:13:21Z",
+        "startedAt": "2026-10-22T19:27:29Z",
         "status": "COMPLETED",
         "workflowName": "Rust headless"
       }
     ]
   },
-  "latestVerifiedCiHead": "4d31a4c41422d19c53c2fd2e2148db46948d2a15",
+  "latestVerifiedCiHead": "41249c8d5668d73d0e4cb8d41502fddce30757bc",
   "latestVerifiedCiConclusion": "Linux x2 SUCCESS; macOS x2 FAILURE at strict bounded_detail_reading (#53)",
   "knownFailure": "Nested detail scroll leaves parent following; strict gate remains required",
   "currentValidation": "rust-agent-ui-current-validation-20261023.json",
@@ -400,14 +402,14 @@
     "processContainer": false
   },
   "latestLocalValidation": {
-    "rootTests": 265,
-    "newThinkingPolicyTests": 11,
-    "secondPublicConsumerTests": 93,
-    "consumerIgnored": 1,
+    "rootTests": 267,
+    "fullUiTests": 581,
+    "uiIgnored": 1,
+    "newOutputComponentTests": 8,
+    "thinkingPolicyAndFrameTests": 13,
     "rootAndUiStrictAllTargetsClippy": true,
-    "priorF44FullUiTests": 571,
-    "priorUiIgnored": 1,
-    "currentFullUiSuiteRerun": false,
+    "currentFullUiSuiteRerun": true,
+    "currentStrictReadingExitCode": 1,
     "newNativeAcceptance": false
   },
   "publicProcessContractSources": {
@@ -425,5 +427,6 @@
     "rust-agent-ui-tool-header-20261023.json"
   ],
   "importantScope": "Current native local-fixture checks and real protocol/offscreen checks are separate identities; Native 0.9.3 UI-only is not lifecycle or bounded child-history acceptance. No full UI/cross-process/physical keyboard/VoiceOver acceptance.",
-  "thinkingPolicy": "rust-agent-ui-thinking-policy-20261023.json"
+  "thinkingPolicy": "rust-agent-ui-thinking-policy-20261023.json",
+  "thinkingOutput": "rust-agent-ui-thinking-output-20261023.json"
 }

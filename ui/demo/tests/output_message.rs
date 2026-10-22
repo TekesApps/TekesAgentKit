@@ -1474,3 +1474,466 @@ fn structured_tool_headers_share_report_rules_across_scopes_and_repeated_referen
         }
     }
 }
+
+use tekes_agent_presentation::{
+    TranscriptThinkingFrame, TranscriptThinkingInput, TranscriptThinkingItem,
+    TranscriptThinkingMode,
+};
+fn thinking_item() -> TranscriptItem {
+    let mut source = item();
+    source.text.clear();
+    source.reasoning = "保留的推理中文".into();
+    source.content_blocks = Some(vec![block(
+        0,
+        Block::Reasoning {
+            text: source.reasoning.clone(),
+        },
+    )]);
+    source
+}
+fn thinking_frame(
+    source: &TranscriptItem,
+    scope: &RunScope,
+    version: (u64, u64, u64),
+    mode: TranscriptThinkingMode,
+    elapsed: u64,
+    live: bool,
+) -> TranscriptThinkingFrame {
+    // Explicit owned fixture facts, not a production first-arrival adapter.
+    let items = [TranscriptThinkingItem {
+        id: &source.id,
+        arrival_order: 7,
+        response_frame_id: Some("fixture-response"),
+        is_provisional: source.is_provisional,
+        reasoning_has_ended: source.reasoning_ended,
+        has_reasoning: true,
+        has_visible_content: !source.text.is_empty(),
+    }];
+    TranscriptThinkingFrame::read(
+        scope,
+        &source.turn_id,
+        version.0,
+        version.1,
+        version.2,
+        &TranscriptThinkingInput {
+            mode,
+            is_settled: !live,
+            is_live_presentation_owner: live,
+            has_final_output: source.is_final,
+            elapsed_seconds: elapsed,
+            items: &items,
+            calls: &[],
+            narrations: &[],
+        },
+    )
+    .unwrap()
+}
+#[test]
+fn controlled_none_is_a_passive_status_without_a_reasoning_target_or_visible_prose() {
+    let mut source = thinking_item();
+    source.content_blocks.as_mut().unwrap().push(block(
+        1,
+        Block::Reasoning {
+            text: "续段".into(),
+        },
+    ));
+    source.reasoning.push_str("续段");
+    let frame = thinking_frame(
+        &source,
+        &scope(),
+        (1, 0, 1),
+        TranscriptThinkingMode::None,
+        1,
+        true,
+    );
+    let mut row = OutputMessage::new(81, scope());
+    row.update_with_thinking(1, 0, &output(&source), None, &frame)
+        .unwrap();
+    let ids = row.content_ids();
+    assert_eq!(ids.len(), 1);
+    assert_eq!(ids[0].kind, OutputContentKind::Status);
+    assert!(ids[0].disclosure.is_none());
+    let host = row.into_host().unwrap();
+    assert_eq!(
+        host.text_surface(ids[0].body).unwrap().input.text,
+        "思考中.."
+    );
+    assert_eq!(source.reasoning, "保留的推理中文续段");
+}
+#[test]
+fn controlled_setting_changes_retire_old_disclosures_without_forging_run_authority() {
+    let source = thinking_item();
+    let compact = thinking_frame(
+        &source,
+        &scope(),
+        (1, 0, 1),
+        TranscriptThinkingMode::Compact,
+        1,
+        true,
+    );
+    let hidden = thinking_frame(
+        &source,
+        &scope(),
+        (1, 0, 2),
+        TranscriptThinkingMode::None,
+        1,
+        true,
+    );
+    let mut row = OutputMessage::new(82, scope());
+    row.update_with_thinking(1, 0, &output(&source), None, &compact)
+        .unwrap();
+    let root = row.id();
+    let before = row.content_ids()[0];
+    let mut host = row.into_host().unwrap();
+    assert!(toggle(&mut host, root, before.disclosure.unwrap()));
+    assert_eq!(
+        host.text_surface(before.body).unwrap().input.text,
+        source.reasoning
+    );
+    host.accessibility_action(before.disclosure.unwrap(), None, AccessibilityAction::Press);
+    let delayed = host.drain_actions();
+    view_mut(&mut host, root)
+        .update_with_thinking(1, 0, &output(&source), None, &hidden)
+        .unwrap();
+    assert!(host.get(before.body).is_none());
+    assert!(!view_mut(&mut host, root).handle_actions(&delayed));
+    assert!(view(&host, root).take_copy_intents(&delayed).is_empty());
+    assert!(
+        view_mut(&mut host, root)
+            .update_with_thinking(1, 0, &output(&source), None, &compact)
+            .is_err()
+    );
+    assert!(
+        view_mut(&mut host, root)
+            .update(&scope(), 2, 0, &output(&source), None)
+            .is_err()
+    );
+    let compact = thinking_frame(
+        &source,
+        &scope(),
+        (1, 0, 3),
+        TranscriptThinkingMode::Compact,
+        1,
+        true,
+    );
+    view_mut(&mut host, root)
+        .update_with_thinking(1, 0, &output(&source), None, &compact)
+        .unwrap();
+    let after = view(&host, root).content_ids()[0];
+    assert_ne!(after.disclosure, before.disclosure);
+    assert_ne!(after.body, before.body);
+    assert!(
+        host.get(after.body).is_none(),
+        "new disclosure starts collapsed"
+    );
+    assert!(!view_mut(&mut host, root).handle_actions(&delayed));
+}
+#[test]
+fn display_tick_preserves_passive_owner_and_rejects_unversioned_or_foreign_frames() {
+    let source = thinking_item();
+    let first = thinking_frame(
+        &source,
+        &scope(),
+        (1, 2, 1),
+        TranscriptThinkingMode::None,
+        1,
+        true,
+    );
+    let mut row = OutputMessage::new(83, scope());
+    row.update_with_thinking(1, 2, &output(&source), None, &first)
+        .unwrap();
+    let before = row.content_ids();
+    let conflict = thinking_frame(
+        &source,
+        &scope(),
+        (1, 2, 1),
+        TranscriptThinkingMode::None,
+        2,
+        true,
+    );
+    assert!(
+        row.update_with_thinking(1, 2, &output(&source), None, &conflict)
+            .is_err()
+    );
+    let tick = thinking_frame(
+        &source,
+        &scope(),
+        (1, 2, 2),
+        TranscriptThinkingMode::None,
+        2,
+        true,
+    );
+    row.update_with_thinking(1, 2, &output(&source), None, &tick)
+        .unwrap();
+    assert_eq!(row.content_ids(), before);
+    for frame in [
+        thinking_frame(
+            &source,
+            &RunScope::main("fixture", "b"),
+            (1, 2, 3),
+            TranscriptThinkingMode::Compact,
+            2,
+            true,
+        ),
+        thinking_frame(
+            &source,
+            &scope(),
+            (2, 2, 3),
+            TranscriptThinkingMode::Compact,
+            2,
+            true,
+        ),
+        thinking_frame(
+            &source,
+            &scope(),
+            (1, 3, 3),
+            TranscriptThinkingMode::Compact,
+            2,
+            true,
+        ),
+    ] {
+        assert!(
+            row.update_with_thinking(1, 2, &output(&source), None, &frame)
+                .is_err()
+        );
+    }
+    assert_eq!(row.content_ids(), before);
+}
+#[test]
+fn same_publication_source_change_cannot_hide_inside_a_new_display_revision() {
+    let source = thinking_item();
+    let first = thinking_frame(
+        &source,
+        &scope(),
+        (1, 0, 1),
+        TranscriptThinkingMode::None,
+        1,
+        true,
+    );
+    let mut row = OutputMessage::new(84, scope());
+    row.update_with_thinking(1, 0, &output(&source), None, &first)
+        .unwrap();
+    let before = row.content_ids();
+    let bad_source = thinking_frame(
+        &source,
+        &scope(),
+        (1, 0, 2),
+        TranscriptThinkingMode::Compact,
+        1,
+        false,
+    );
+    assert!(
+        row.update_with_thinking(1, 0, &output(&source), None, &bad_source)
+            .is_err()
+    );
+    let mut changed = source.clone();
+    changed.reasoning.push_str("unversioned");
+    let display = thinking_frame(
+        &source,
+        &scope(),
+        (1, 0, 2),
+        TranscriptThinkingMode::Compact,
+        1,
+        true,
+    );
+    assert!(
+        row.update_with_thinking(1, 0, &output(&changed), None, &display)
+            .is_err()
+    );
+    assert_eq!(row.content_ids(), before);
+}
+#[test]
+fn settlement_reopens_retained_reasoning_and_epoch_change_resets_display_revision() {
+    let mut source = thinking_item();
+    let frame = thinking_frame(
+        &source,
+        &scope(),
+        (1, 0, 8),
+        TranscriptThinkingMode::None,
+        1,
+        true,
+    );
+    let mut row = OutputMessage::new(85, scope());
+    row.update_with_thinking(1, 0, &output(&source), None, &frame)
+        .unwrap();
+    source.is_provisional = false;
+    source.reasoning_ended = true;
+    let settled = thinking_frame(
+        &source,
+        &scope(),
+        (2, 0, 9),
+        TranscriptThinkingMode::None,
+        1,
+        false,
+    );
+    row.update_with_thinking(2, 0, &output(&source), None, &settled)
+        .unwrap();
+    let root = row.id();
+    let ids = row.content_ids()[0];
+    let mut host = row.into_host().unwrap();
+    assert!(toggle(&mut host, root, ids.disclosure.unwrap()));
+    assert_eq!(
+        host.text_surface(ids.body).unwrap().input.text,
+        "保留的推理中文"
+    );
+    let reconnected = thinking_frame(
+        &source,
+        &scope(),
+        (3, 1, 1),
+        TranscriptThinkingMode::None,
+        1,
+        false,
+    );
+    view_mut(&mut host, root)
+        .update_with_thinking(3, 1, &output(&source), None, &reconnected)
+        .unwrap();
+    assert_eq!(view(&host, root).content_ids()[0], ids);
+    assert_eq!(
+        host.text_surface(ids.body).unwrap().input.text,
+        "保留的推理中文"
+    );
+}
+
+#[test]
+fn missing_reasoning_source_is_rejected_and_replaced_thinking_has_no_empty_fallback_row() {
+    use tekes_agent_presentation::TranscriptThinkingCall;
+    let source = thinking_item();
+    let mut row = OutputMessage::new(86, scope());
+    let mut facts = TranscriptThinkingInput {
+        mode: TranscriptThinkingMode::None,
+        is_settled: false,
+        is_live_presentation_owner: true,
+        has_final_output: false,
+        elapsed_seconds: 1,
+        items: &[],
+        calls: &[],
+        narrations: &[],
+    };
+    let missing = TranscriptThinkingFrame::read(&scope(), "turn", 1, 0, 1, &facts).unwrap();
+    assert!(
+        row.update_with_thinking(1, 0, &output(&source), None, &missing)
+            .is_err()
+    );
+    assert!(row.content_ids().is_empty());
+    let items = [TranscriptThinkingItem {
+        id: &source.id,
+        arrival_order: 7,
+        response_frame_id: Some("frame"),
+        is_provisional: true,
+        reasoning_has_ended: true,
+        has_reasoning: true,
+        has_visible_content: false,
+    }];
+    let calls = [TranscriptThinkingCall {
+        group_id: "next-frame",
+        arrival_order: 8,
+    }];
+    facts.items = &items;
+    facts.calls = &calls;
+    let replaced = TranscriptThinkingFrame::read(&scope(), "turn", 1, 0, 1, &facts).unwrap();
+    row.update_with_thinking(1, 0, &output(&source), None, &replaced)
+        .unwrap();
+    assert!(
+        row.content_ids().is_empty(),
+        "hidden reasoning must not become missing-content copy"
+    );
+}
+#[test]
+fn compact_reasoning_end_keeps_disclosure_editor_selection_and_focus() {
+    let mut source = thinking_item();
+    let frame = thinking_frame(
+        &source,
+        &scope(),
+        (1, 0, 1),
+        TranscriptThinkingMode::Compact,
+        1,
+        true,
+    );
+    let mut row = OutputMessage::new(87, scope());
+    row.update_with_thinking(1, 0, &output(&source), None, &frame)
+        .unwrap();
+    let root = row.id();
+    let ids = row.content_ids()[0];
+    let mut host = row.into_host().unwrap();
+    assert!(toggle(&mut host, root, ids.disclosure.unwrap()));
+    assert!(host.focus(Some(ids.body), true));
+    host.get_mut(ids.body)
+        .unwrap()
+        .component_mut::<TextFieldContent>()
+        .unwrap()
+        .surface
+        .input
+        .select_range(0..2);
+    source.reasoning_ended = true;
+    let ended = thinking_frame(
+        &source,
+        &scope(),
+        (2, 0, 1),
+        TranscriptThinkingMode::Compact,
+        2,
+        true,
+    );
+    view_mut(&mut host, root)
+        .update_with_thinking(2, 0, &output(&source), None, &ended)
+        .unwrap();
+    assert_eq!(view(&host, root).content_ids()[0], ids);
+    assert_eq!(host.focused(), Some(ids.body));
+    assert_eq!(host.text_surface(ids.body).unwrap().input.selection(), 0..2);
+    assert_eq!(
+        host.get(ids.disclosure.unwrap())
+            .unwrap()
+            .component::<tekes_ui_controls::composition::ButtonContent>()
+            .unwrap()
+            .label,
+        "收起 · 思考过程"
+    );
+}
+
+#[test]
+fn a_new_thinking_revision_cannot_smuggle_changed_embedded_tool_details() {
+    use tekes_agent_presentation::TranscriptThinkingCall;
+    let mut source = thinking_item();
+    source.content_blocks.as_mut().unwrap().push(block(
+        1,
+        Block::ToolCall {
+            tool_id: "tool".into(),
+        },
+    ));
+    let mut tool = tool();
+    let items = [TranscriptThinkingItem {
+        id: &source.id,
+        arrival_order: 7,
+        response_frame_id: Some("frame"),
+        is_provisional: true,
+        reasoning_has_ended: false,
+        has_reasoning: true,
+        has_visible_content: false,
+    }];
+    let calls = [TranscriptThinkingCall {
+        group_id: "frame",
+        arrival_order: 8,
+    }];
+    let mut facts = TranscriptThinkingInput {
+        mode: TranscriptThinkingMode::Compact,
+        is_settled: false,
+        is_live_presentation_owner: true,
+        has_final_output: false,
+        elapsed_seconds: 1,
+        items: &items,
+        calls: &calls,
+        narrations: &[],
+    };
+    let compact = TranscriptThinkingFrame::read(&scope(), "turn", 1, 0, 1, &facts).unwrap();
+    facts.mode = TranscriptThinkingMode::None;
+    let hidden = TranscriptThinkingFrame::read(&scope(), "turn", 1, 0, 2, &facts).unwrap();
+    let mut row = OutputMessage::new(88, scope());
+    row.update_with_thinking(1, 0, &output(&source), Some(&section(&tool)), &compact)
+        .unwrap();
+    let before = row.content_ids();
+    tool.arguments = json!({"path":"unversioned-replacement"});
+    assert!(
+        row.update_with_thinking(1, 0, &output(&source), Some(&section(&tool)), &hidden)
+            .is_err()
+    );
+    assert_eq!(row.content_ids(), before);
+}

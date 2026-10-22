@@ -40,6 +40,7 @@ pub enum OutputMessageText {
     ToolReceivingInput,
     ToolInputUnavailable,
     CopyDetail,
+    Thinking,
 }
 pub type ScopedToolFormatter = fn(&RunScope, &TranscriptToolCall) -> (String, String);
 pub type ToolHeaderInputsProvider =
@@ -106,6 +107,7 @@ impl Default for OutputMessageLabels {
                     OutputMessageText::ToolReceivingInput => "正在接收输入",
                     OutputMessageText::ToolInputUnavailable => "输入不可用",
                     OutputMessageText::CopyDetail => "复制",
+                    OutputMessageText::Thinking => "思考中",
                 }
                 .into()
             },
@@ -272,6 +274,7 @@ pub(crate) enum Slot {
     Block(usize, OutputContentKind),
     Tool(usize, String),
     AggregateReasoning,
+    ThinkingStatus,
     AggregateBody,
     AggregateAttachment(usize),
     MessageKind,
@@ -339,6 +342,7 @@ pub(crate) struct OutputPart {
     trailing: bool,
     live_reasoning: bool,
     bounded_details: bool,
+    thinking_text_version: u64,
 }
 impl OutputPart {
     pub(crate) fn tool_header(&self) -> Option<&tekes_agent_presentation::TranscriptToolHeader> {
@@ -423,6 +427,7 @@ impl OutputPart {
             trailing: false,
             live_reasoning: false,
             bounded_details,
+            thinking_text_version: 0,
         }
     }
     pub(crate) fn set_trailing(&mut self, trailing: bool) {
@@ -496,6 +501,20 @@ impl OutputPart {
             self.refresh_header();
             return;
         }
+        // A passive Thinking status can change during the same Run publication.
+        // Its read-only SDK value has its own monotonic widget version; source
+        // publication/epoch still gate the parent and every business action.
+        let text_version = if facts.slot == Slot::ThinkingStatus {
+            if self.thinking_text_version == 0 || self.facts.text != facts.text {
+                self.thinking_text_version = self
+                    .thinking_text_version
+                    .checked_add(1)
+                    .expect("preflighted thinking text version");
+            }
+            self.thinking_text_version
+        } else {
+            publication
+        };
         let id = self.ids.body;
         let field = self.field_mut();
         let baseline = field.surface.input.external_baseline();
@@ -503,7 +522,7 @@ impl OutputPart {
             &baseline,
             &DraftRevision {
                 identity: format!("output-content:{}", id.0),
-                version: publication,
+                version: text_version,
                 payload: facts.text.clone(),
             },
             ExternalSelection::Preserve,
@@ -692,6 +711,13 @@ pub struct OutputMessage {
     next: u64,
     labels: OutputMessageLabels,
     bounded_details: bool,
+    thinking: Option<ThinkingStamp>,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct ThinkingStamp {
+    revision: u64,
+    source_fingerprint: String,
+    display: tekes_agent_presentation::TranscriptReasoningDisplay,
 }
 impl OutputMessage {
     pub fn new(namespace: u32, scope: RunScope) -> Self {
@@ -718,6 +744,7 @@ impl OutputMessage {
             next: 16,
             labels,
             bounded_details: false,
+            thinking: None,
         }
     }
     /// Experimental bounded reasoning/tool disclosures using original SDK
@@ -831,8 +858,52 @@ impl OutputMessage {
         output: &TranscriptOutput<'_>,
         section: Option<&TranscriptSection<'_>>,
     ) -> Result<(), &'static str> {
+        if scope != &self.scope {
+            return Err("output message scope mismatch");
+        }
+        self.update_display(publication, epoch, output, section, None)
+    }
+    /// Install the shared live-thinking decision for this original message.
+    /// Once controlled, callers must keep supplying a matching frame; legacy
+    /// refresh cannot accidentally restore hidden reasoning or old actions.
+    pub fn update_with_thinking(
+        &mut self,
+        publication: u64,
+        epoch: u64,
+        output: &TranscriptOutput<'_>,
+        section: Option<&TranscriptSection<'_>>,
+        thinking: &tekes_agent_presentation::TranscriptThinkingFrame,
+    ) -> Result<(), &'static str> {
+        if !thinking.matches_source(&self.scope, &output.item.turn_id, publication, epoch) {
+            return Err("thinking frame source mismatch");
+        }
+        let decision = thinking.display_for(&output.item.id);
+        if decision.is_none()
+            && (!output.item.reasoning.is_empty()
+                || output.item.content_blocks.as_ref().is_some_and(|blocks| blocks.iter().any(|block| {
+                    matches!(&block.content, TranscriptBlockContent::Reasoning { text } if !text.is_empty())
+                })))
+        {
+            return Err("thinking frame is missing reasoning source");
+        }
+        let stamp = ThinkingStamp {
+            revision: thinking.display_revision(),
+            source_fingerprint: thinking.source_fingerprint().into(),
+            display: decision
+                .unwrap_or(tekes_agent_presentation::TranscriptReasoningDisplay::Hidden),
+        };
+        self.update_display(publication, epoch, output, section, Some(stamp))
+    }
+    fn update_display(
+        &mut self,
+        publication: u64,
+        epoch: u64,
+        output: &TranscriptOutput<'_>,
+        section: Option<&TranscriptSection<'_>>,
+        thinking: Option<ThinkingStamp>,
+    ) -> Result<(), &'static str> {
         let (key, facts, header_revision) =
-            self.check_update(scope, publication, epoch, output, section)?;
+            self.check_update_display(publication, epoch, output, section, thinking.as_ref())?;
         let mut old = vec![];
         let mut old_groups = vec![];
         for mut node in std::mem::take(&mut self.rows.children) {
@@ -863,7 +934,17 @@ impl OutputMessage {
                 )
             };
             let part = content.component_mut::<OutputPart>().unwrap();
-            part.live_reasoning = output.item.is_provisional && !output.item.reasoning_ended;
+            part.live_reasoning = thinking.as_ref().map_or(
+                output.item.is_provisional && !output.item.reasoning_ended,
+                |stamp| {
+                    matches!(
+                        stamp.display,
+                        tekes_agent_presentation::TranscriptReasoningDisplay::Disclosure {
+                            active: true
+                        }
+                    )
+                },
+            );
             let base = self.root.0;
             let next = &mut self.next;
             part.update(publication, epoch, f.clone(), &mut || {
@@ -981,6 +1062,7 @@ impl OutputMessage {
         self.item = Some(output.item.clone());
         self.facts = facts;
         self.header_revision = header_revision;
+        self.thinking = thinking;
         Ok(())
     }
     pub(crate) fn check_update(
@@ -994,6 +1076,17 @@ impl OutputMessage {
         if scope != &self.scope {
             return Err("output message scope mismatch");
         }
+        self.check_update_display(publication, epoch, output, section, None)
+    }
+    fn check_update_display(
+        &self,
+        publication: u64,
+        epoch: u64,
+        output: &TranscriptOutput<'_>,
+        section: Option<&TranscriptSection<'_>>,
+        thinking: Option<&ThinkingStamp>,
+    ) -> Result<(Key, Vec<PartFacts>, u64), &'static str> {
+        let scope = &self.scope;
         if publication == 0 || publication < self.publication || epoch < self.epoch {
             return Err("stale output message publication");
         }
@@ -1002,6 +1095,22 @@ impl OutputMessage {
         }
         if section.is_some_and(|s| s.id != output.item.turn_id) {
             return Err("output tool section mismatch");
+        }
+        if let Some(old) = &self.thinking {
+            let Some(next) = thinking else {
+                return Err("controlled thinking frame is required");
+            };
+            if epoch == self.epoch {
+                if next.revision < old.revision {
+                    return Err("stale thinking display revision");
+                }
+                if publication == self.publication
+                    && (next.source_fingerprint != old.source_fingerprint
+                        || (next.revision == old.revision && next != old))
+                {
+                    return Err("conflicting thinking display frame");
+                }
+            }
         }
         let key = Key::from(output.key);
         if self.key.as_ref().is_some_and(|old| old != &key) {
@@ -1021,7 +1130,25 @@ impl OutputMessage {
         if epoch == self.epoch && header_revision < self.header_revision {
             return Err("stale tool header revision");
         }
-        let facts = parts(&self.scope, output, section, self.labels)?;
+        let facts = thinking_parts(
+            parts(&self.scope, output, section, self.labels)?,
+            thinking,
+            self.labels,
+        );
+        let thinking_advanced = thinking.is_some_and(|next| {
+            self.thinking
+                .as_ref()
+                .is_none_or(|old| next.revision > old.revision)
+        });
+        let prior_display = if thinking_advanced {
+            Some(thinking_parts(
+                parts(&self.scope, output, section, self.labels)?,
+                self.thinking.as_ref(),
+                self.labels,
+            ))
+        } else {
+            None
+        };
         if header_revision != tool_header_revision(self.labels, scope) {
             return Err("tool header inputs changed during preparation");
         }
@@ -1035,9 +1162,36 @@ impl OutputMessage {
                             .facts
                             .iter()
                             .zip(&facts)
-                            .all(|(old, new)| old.matches_header_update(new)))))
+                            .all(|(old, new)| old.matches_header_update(new)))
+                    && !prior_display.as_ref().is_some_and(|prior| {
+                        &self.facts == prior
+                            || (header_revision > self.header_revision
+                                && self.facts.len() == prior.len()
+                                && self
+                                    .facts
+                                    .iter()
+                                    .zip(prior)
+                                    .all(|(old, new)| old.matches_header_update(new)))
+                    })))
         {
             return Err("conflicting output message publication");
+        }
+        for next in facts
+            .iter()
+            .filter(|part| part.slot == Slot::ThinkingStatus)
+        {
+            if self
+                .part_nodes()
+                .into_iter()
+                .filter_map(|node| node.component::<OutputPart>())
+                .any(|part| {
+                    part.facts.slot == Slot::ThinkingStatus
+                        && part.thinking_text_version == u64::MAX
+                        && part.facts.text != next.text
+                })
+            {
+                return Err("thinking text version exhausted");
+            }
         }
         let mut tools = vec![];
         for facts_part in &facts {
@@ -1215,6 +1369,62 @@ impl Component for OutputMessage {
             (self.labels.text)(OutputMessageText::Group),
         )
     }
+}
+fn thinking_parts(
+    facts: Vec<PartFacts>,
+    thinking: Option<&ThinkingStamp>,
+    labels: OutputMessageLabels,
+) -> Vec<PartFacts> {
+    use tekes_agent_presentation::TranscriptReasoningDisplay;
+    let Some(thinking) = thinking else {
+        return facts;
+    };
+    let mut status_installed = false;
+    facts
+        .into_iter()
+        .filter_map(|mut part| {
+            if part.kind == OutputContentKind::Coverage
+                && !matches!(
+                    thinking.display,
+                    TranscriptReasoningDisplay::Disclosure { .. }
+                )
+            {
+                return None;
+            }
+            if part.kind != OutputContentKind::Reasoning {
+                return Some(part);
+            }
+            match thinking.display {
+                TranscriptReasoningDisplay::Hidden => None,
+                TranscriptReasoningDisplay::Placeholder { dots } => {
+                    if status_installed {
+                        return None;
+                    }
+                    status_installed = true;
+                    Some(PartFacts {
+                        slot: Slot::ThinkingStatus,
+                        kind: OutputContentKind::Status,
+                        title: String::new(),
+                        text: format!(
+                            "{}{}",
+                            (labels.text)(OutputMessageText::Thinking),
+                            ".".repeat(dots as usize)
+                        ),
+                        tool: None,
+                        tool_header: None,
+                    })
+                }
+                TranscriptReasoningDisplay::Disclosure { active } => {
+                    part.title = (labels.text)(if active {
+                        OutputMessageText::Thinking
+                    } else {
+                        OutputMessageText::ReasoningEnded
+                    });
+                    Some(part)
+                }
+            }
+        })
+        .collect()
 }
 fn parts(
     scope: &RunScope,

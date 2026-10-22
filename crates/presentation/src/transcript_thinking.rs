@@ -1,6 +1,9 @@
 //! Live-thinking display policy, independent of a renderer or preference store.
 //! Facts describe source presentation carriers; they never grant session authority.
-use std::collections::BTreeSet;
+use crate::RunScope;
+use serde::Serialize;
+use sha2::{Digest, Sha256};
+use std::collections::{BTreeMap, BTreeSet};
 use tekes_agent_contract::{Result, require};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -27,7 +30,7 @@ impl TranscriptThinkingMode {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct TranscriptThinkingItem<'a> {
     pub id: &'a str,
     /// First source arrival order, never a timestamp, loaded-window ordinal or
@@ -41,16 +44,117 @@ pub struct TranscriptThinkingItem<'a> {
     /// by the policy from tool output or raw reasoning prose.
     pub has_visible_content: bool,
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct TranscriptThinkingCall<'a> {
     pub group_id: &'a str,
     pub arrival_order: i64,
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct TranscriptThinkingNarration<'a> {
     pub group_id: &'a str,
     /// First narration arrival, including a group's explicit narration order.
     pub arrival_order: i64,
+}
+
+/// One message's display decision. It conveys no session mutation authority.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TranscriptReasoningDisplay {
+    Hidden,
+    Placeholder { dots: u8 },
+    Disclosure { active: bool },
+}
+
+/// Owned display-only frame, explicitly bound to the original Run publication.
+/// Preference/elapsed changes advance display_revision, not Run authority.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TranscriptThinkingFrame {
+    scope: RunScope,
+    turn_id: String,
+    publication: u64,
+    epoch: u64,
+    display_revision: u64,
+    source_fingerprint: String,
+    decisions: BTreeMap<String, TranscriptReasoningDisplay>,
+}
+impl TranscriptThinkingFrame {
+    pub fn read(
+        scope: &RunScope,
+        turn_id: &str,
+        publication: u64,
+        epoch: u64,
+        display_revision: u64,
+        input: &TranscriptThinkingInput<'_>,
+    ) -> Result<Self> {
+        scope.validate()?;
+        require(!turn_id.is_empty(), "empty thinking turn identity")?;
+        require(
+            publication > 0 && display_revision > 0,
+            "invalid thinking frame version",
+        )?;
+        let policy = TranscriptThinkingPolicy::read(input)?;
+        // Only mode and projected elapsed duration may vary independently of
+        // the Run publication. Do not smuggle new source facts through a setting.
+        let source = serde_json::to_vec(&(
+            input.is_settled,
+            input.is_live_presentation_owner,
+            input.has_final_output,
+            input.items,
+            input.calls,
+            input.narrations,
+        ))?;
+        let source_fingerprint = format!("{:x}", Sha256::digest(source));
+        let disclosures: BTreeMap<_, _> = policy
+            .disclosures
+            .iter()
+            .map(|row| (row.item_id, row.active))
+            .collect();
+        let decisions = input
+            .items
+            .iter()
+            .filter(|item| item.has_reasoning)
+            .map(|item| {
+                let display = if let Some(&active) = disclosures.get(item.id) {
+                    TranscriptReasoningDisplay::Disclosure { active }
+                } else if let Some(status) = policy.placeholder.filter(|row| row.item_id == item.id)
+                {
+                    TranscriptReasoningDisplay::Placeholder { dots: status.dots }
+                } else {
+                    TranscriptReasoningDisplay::Hidden
+                };
+                (item.id.to_owned(), display)
+            })
+            .collect();
+        Ok(Self {
+            scope: scope.clone(),
+            turn_id: turn_id.into(),
+            publication,
+            epoch,
+            display_revision,
+            source_fingerprint,
+            decisions,
+        })
+    }
+    pub fn matches_source(
+        &self,
+        scope: &RunScope,
+        turn_id: &str,
+        publication: u64,
+        epoch: u64,
+    ) -> bool {
+        &self.scope == scope
+            && self.turn_id == turn_id
+            && self.publication == publication
+            && self.epoch == epoch
+    }
+    pub fn display_revision(&self) -> u64 {
+        self.display_revision
+    }
+    pub fn source_fingerprint(&self) -> &str {
+        &self.source_fingerprint
+    }
+    pub fn display_for(&self, item_id: &str) -> Option<TranscriptReasoningDisplay> {
+        self.decisions.get(item_id).copied()
+    }
 }
 #[derive(Clone, Copy, Debug)]
 pub struct TranscriptThinkingInput<'a> {

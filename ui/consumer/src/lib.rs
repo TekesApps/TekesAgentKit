@@ -8,6 +8,17 @@ pub fn thinking_policy<'a>(
     tekes_agent_components_ui::TranscriptThinkingPolicy::read(input)
         .map_err(|error| error.to_string())
 }
+/// Public component consumer: forwards a captured display frame unchanged.
+pub fn install_thinking_output(
+    view: &mut tekes_agent_components_ui::OutputMessage,
+    publication: u64,
+    epoch: u64,
+    output: &tekes_agent_components_ui::TranscriptOutput<'_>,
+    section: Option<&tekes_agent_components_ui::TranscriptSection<'_>>,
+    thinking: &tekes_agent_components_ui::TranscriptThinkingFrame,
+) -> Result<(), &'static str> {
+    view.update_with_thinking(publication, epoch, output, section, thinking)
+}
 /// Window clearance is supplied by the host; AgentKit owns the pane body inset.
 pub fn set_panel_layout(
     panel: &mut tekes_agent_components_ui::SidePanel,
