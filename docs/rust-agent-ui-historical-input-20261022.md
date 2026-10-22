@@ -6,6 +6,10 @@
 Rewind 需要显式配置。动作把原回合与原输入交给宿主 hook。
 Tekes host 的 `ClientAgentHostAdapters` 只读作为边界参考。
 
+AgentKit 的已发布 tag 基线是 v0.3.8，当前 UI 使用本分支同仓库契约/投影的开发路径，
+包括尚未发布的 TranscriptDocument 等增量。本入口复用已发布 capability 字段，
+但整个 UI 尚不能只依赖 v0.3.8 源码构建；共享增量需随本 PR 一并 review/tag。
+
 ## 接入
 
 `InputMessage`、`TranscriptContent` 和 `RunPort` 默认隐藏入口。

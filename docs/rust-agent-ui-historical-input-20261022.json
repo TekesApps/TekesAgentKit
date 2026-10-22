@@ -2,7 +2,6 @@
   "format": 1,
   "baseCommit": "cdffa4727339fc8b7ba21701508aea2cd8de8475",
   "sdk": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
-  "contractRelease": "v0.3.8",
   "fullSuite": {
     "passed": 526,
     "ignored": 1,
@@ -65,5 +64,14 @@
     "demoBuild": "passed",
     "unchangedHostInputDuringPreedit": "passed",
     "finalSourceDocumentationOnlyAfterBuild": true
+  },
+  "latestPublishedAgentKitTagBaseline": "v0.3.8",
+  "agentKitInput": {
+    "kind": "in-repository-development-paths",
+    "publishedTagCommit": "6d40e9b4ec705c4a1df6626fb90ec299aa58a3b2",
+    "publicMain": "f1daa0ffcf6ced41e21f351e22845455ca78006c",
+    "publicMainIsAncestor": true,
+    "unpublishedSharedContractPresentationChanges": true,
+    "publishedOnlyBuildAccepted": false
   }
 }
