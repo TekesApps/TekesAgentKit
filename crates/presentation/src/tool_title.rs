@@ -1,5 +1,6 @@
 //! Producer-owned SEP title selection; no tool execution or display state.
 use crate::TranscriptToolCall;
+use crate::tool_view::payload;
 use serde_json::Value;
 
 impl TranscriptToolCall {
@@ -73,12 +74,6 @@ impl TranscriptToolCall {
                 .into()
             })
     }
-}
-fn payload<'a>(value: Option<&'a Value>, expected: &str) -> Option<&'a Value> {
-    let value = value?;
-    (value.get("for").and_then(Value::as_str) == Some(expected))
-        .then(|| value.get("view"))
-        .flatten()
 }
 fn field<'a>(value: Option<&'a Value>, name: &str) -> Option<&'a str> {
     value?.get(name)?.as_str()

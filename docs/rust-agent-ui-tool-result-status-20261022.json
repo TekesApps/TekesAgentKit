@@ -1,0 +1,91 @@
+{
+  "sourceBase": "7e9a6515265b535cb045b9110b340cf11e7af493",
+  "sourceInputScope": "Changed Rust files over sourceBase, not a full compiler/environment closure",
+  "tekesui": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "regressionBefore": {
+    "exitCode": 101,
+    "failed": 4,
+    "passed": 1
+  },
+  "numericRegressionBeforeExitCode": 101,
+  "finalCounts": {
+    "presentation-complete.log": [
+      121,
+      0,
+      0
+    ],
+    "ui-workspace.log": [
+      547,
+      0,
+      1
+    ],
+    "root-workspace.log": [
+      208,
+      0,
+      0
+    ]
+  },
+  "newProjectionTests": 8,
+  "rootAndUiStrictClippy": true,
+  "boundaries": true,
+  "optionalSharedFields": [
+    "resultMeta",
+    "resultError"
+  ],
+  "legacySerdeDefaultsVerified": true,
+  "journalDialectOnly": true,
+  "nativePiDialectChanged": false,
+  "newProtocolMethods": 0,
+  "kernelChanged": false,
+  "realHarnessThisSource": false,
+  "nativeWindowThisSource": false,
+  "crossProcess": false,
+  "completeToolRows": false,
+  "newTargets": 0,
+  "newProgramCopies": 0,
+  "deletedBytes": 0,
+  "sourceInputs": {
+    "crates/presentation/src/bounded_history.rs": "eed619c20235ff5ea4c8855acc356ce4961caecbed886a7a39c013c7302b0883",
+    "crates/presentation/src/lib.rs": "d93d0d038dcfb5dc65ceb09051eb1b004d461dffaae0b8355e1269e1e7015122",
+    "crates/presentation/src/tool_title.rs": "8bcc5815af730c852169183fea7cc9b5883d17e2b9ccd9c5ef559425d3bd18f7",
+    "crates/presentation/src/transcript.rs": "bbbac3000c4f44dc91746323be391a2c056214f4e7f1a2a331ea5cd36611eb65",
+    "crates/presentation/tests/tool_title.rs": "e2bbb87f7359461e68293f255e7ae85a4956ba4d1a8d3f1be0fbb2cd1562cc05",
+    "crates/presentation/tests/transcript_document.rs": "516efbf76b72d3f3754f9c8a7cd45c85d89f8f1751f86f3ba80fba02625b8ff4",
+    "ui/components/src/output_message.rs": "e81ecfecddb0c22bb8b78b45b13ede03813efc0628013baa560e4d5c708b980a",
+    "ui/consumer/tests/tool_titles.rs": "2bf747015a062b856810d7771595873c549c1a11db283af5a6d884432756d243",
+    "ui/consumer/tests/turn_output_copy.rs": "8fb1c710569269ca804da363876e0c1f7c2e7d0110a288659317a2a0aaab339c",
+    "ui/demo/tests/output_message.rs": "434b831d6d6df3cdb4ce485bdc1e7e11cab95d678105e1a335e487f29922013c",
+    "ui/demo/tests/transcript_content.rs": "17b5e47dc2fea9bc2e8f28ff109c52e11530d09f6c6384df978eed54487da511",
+    "crates/presentation/src/tool_view.rs": "43556904b3bb2da816701ab1b7ceca6d3033674e94936460f61b5382d192fc55",
+    "crates/presentation/tests/tool_result_status.rs": "7d30cbcfeb2e18954b058c0964ffde8b946467262434b4b3af835abe8a317795"
+  },
+  "readOnlyReferences": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/Session/SessionEndpoint/Client/SessionEventProjector.swift": "e7a2ccc9e211f04f819e0a1866388420b7b15f0a25ea80a7777a3408414dd515",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Contract/SessionEndpoint/SessionJSONValue.swift": "82151031f0f14f2ccbfc6fceb1e83c9871a5d241fd2672e830d320bf6169f6af",
+    "/Users/frankqin/dev/Tekes/Tekes/ClientAgentHostAdapters.swift": "7d907c654ec3df76c7a8b492e32bbc68f1bd4d0b46044cae615aa712b9f67c71"
+  },
+  "evidence": {
+    ".runtime-fixtures/tool-result-status-20261022/host-tests-final.log": "ed191a1b56733f098b3fa3564d30e6d6d7274d99066352bee06d36ea2032b2c7",
+    ".runtime-fixtures/tool-result-status-20261022/numeric-regression-before.log": "099298e3a02907a2ae49433f94076028f22e82452d8ac737a545da4c088ec611",
+    ".runtime-fixtures/tool-result-status-20261022/ci-base.json": "df59ce40f3ece9018920ed2a3421b2de669aec1372b2bfdf69bec4fb14ec0e1a",
+    ".runtime-fixtures/tool-result-status-20261022/headless-boundaries.log": "e9fa1e12a0afd70528040f81fe3199172a3974910d7760c0216bb6d110181081",
+    ".runtime-fixtures/tool-result-status-20261022/ui-workspace.log": "6fa7fa8db00df60a6456789e71039a4e23f2ba2eea45e585fd9d576f70f90269",
+    ".runtime-fixtures/tool-result-status-20261022/ci-base-final.json": "f1dd1fda6eb6f9e51e10927aff8ee596cbcf51e4337cd7c6f2b215691cd7b87d",
+    ".runtime-fixtures/tool-result-status-20261022/root-clippy-complete.log": "1818f843dc21581df2ecf84a5860af2ff6920adbbba826c686caf559a6ed7bd6",
+    ".runtime-fixtures/tool-result-status-20261022/ui-clippy-complete.log": "e7af8c891a39e48280c2d54f15a46e0dd16916926e2e4dc88cc7ff4574ac24f6",
+    ".runtime-fixtures/tool-result-status-20261022/presentation-complete.log": "362f8dfb3cc4d9408de8db0f97aca5f415996579fb5b771b8db65a1e9d0d2c69",
+    ".runtime-fixtures/tool-result-status-20261022/presentation-tests.log": "197a88ce60aa4e8be22197f6764d30af859749babc06c579d0c16daadd228f1a",
+    ".runtime-fixtures/tool-result-status-20261022/ui-clippy.log": "c44bb8162340c7d116cb5e380e378f98981ac6e4f804c2fe67493875a49aaeed",
+    ".runtime-fixtures/tool-result-status-20261022/root-clippy-final.log": "97a541742ee4462fe347960b7b9c252c44a496c54a1d51c35797bab26979e677",
+    ".runtime-fixtures/tool-result-status-20261022/root-clippy.log": "9ef21a012cef19136c1cd85e5234ba8097793063cdcf7bc54db8ae1a53a3dfeb",
+    ".runtime-fixtures/tool-result-status-20261022/host-tests.log": "e94a8f6b2e31d264ce927fb640f83279f6b9a8834e9318df473a8faa4d9a02e9",
+    ".runtime-fixtures/tool-result-status-20261022/ui-clippy-final.log": "6d803df9e556fa0f078c5d9729f9b5ee5e947435f8dc44bd1a59d0b22ab146e6",
+    ".runtime-fixtures/tool-result-status-20261022/regression-before.log": "d218ea1ca27fdc1248ac9d1986d322c49e34773682011e77f99cb93714d576dc",
+    ".runtime-fixtures/tool-result-status-20261022/consumer-tests-final.log": "822b1126b08c379292fcc5256a02d97522e34e1d2128a25b891877aea179e0a6",
+    ".runtime-fixtures/tool-result-status-20261022/consumer-tests.log": "3838e476e638eb13c785fa3182f7dffc8283a312c90030f8efa69faa1786be6a",
+    ".runtime-fixtures/tool-result-status-20261022/presentation-tests-final.log": "ec9b58383a9e8a046c1072fd404d6dc45f55d52dadd269d5d9b86b115d739d91",
+    ".runtime-fixtures/tool-result-status-20261022/ui-boundaries.log": "9480cc4382559b9a7a99240226a9f766048e30c8d38bb4bccd1fd8bca56661ad",
+    ".runtime-fixtures/tool-result-status-20261022/root-workspace.log": "8284e3e125b9f30222facc6758945c36128ddc23abef63934bf809433ed49604"
+  },
+  "regressionEvidenceScope": "Raw failure logs retained; no frozen pre-fix binary retained"
+}

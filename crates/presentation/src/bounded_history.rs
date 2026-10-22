@@ -195,6 +195,8 @@ impl BoundedHistory {
             transcript.tools.insert(
                 0,
                 TranscriptToolCall {
+                    result_meta: None,
+                    result_error: None,
                     id: format!("{id}:call"),
                     turn_id: id,
                     name: source["name"].as_str().unwrap_or("task").into(),

@@ -2,6 +2,8 @@ use serde_json::{Value, json};
 use tekes_agent_presentation::TranscriptToolCall;
 fn tool() -> TranscriptToolCall {
     TranscriptToolCall {
+        result_meta: None,
+        result_error: None,
         id: "owned-call".into(),
         turn_id: "owned-turn".into(),
         name: "read".into(),

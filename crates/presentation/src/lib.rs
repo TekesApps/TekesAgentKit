@@ -15,6 +15,7 @@ mod controller;
 mod run;
 mod scope;
 mod tool_title;
+mod tool_view;
 mod transcript;
 pub use composer::*;
 pub use controller::*;

@@ -352,6 +352,8 @@ fn terminal_goal_fallback_ignores_newer_input_tools_hidden_and_provisional_answe
     assert_eq!(goal.terminal_turn_id(&snapshot), Some("later"));
     snapshot.items.last_mut().unwrap().kind = TranscriptItemKind::System;
     snapshot.tools.push(TranscriptToolCall {
+        result_meta: None,
+        result_error: None,
         id: "new-tool".into(),
         turn_id: "later".into(),
         name: "tool".into(),

@@ -266,6 +266,8 @@ fn activity_output_and_shared_footnote_are_lossless_and_do_not_infer_settlement(
     answer.reasoning = "思考中".into();
     answer.text = "流式正文".into();
     let tool = TranscriptToolCall {
+        result_meta: None,
+        result_error: None,
         id: "tool".into(),
         turn_id: "turn".into(),
         name: "read".into(),
@@ -330,6 +332,8 @@ fn clipped_orphan_tools_and_notices_are_preserved_without_synthetic_turns() {
     let snapshot = TranscriptSnapshot {
         items: vec![hidden, item("notice", "orphan", TranscriptItemKind::Notice)],
         tools: vec![TranscriptToolCall {
+            result_meta: None,
+            result_error: None,
             id: "call".into(),
             turn_id: "only-tool".into(),
             name: "read".into(),

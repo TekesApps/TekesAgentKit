@@ -97,6 +97,13 @@ pub struct TranscriptToolCall {
     pub name: String,
     pub arguments: Value,
     pub result: Option<Value>,
+    /// Original public tool/result metadata, not inferred from output text.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub result_meta: Option<Value>,
+    /// Original event error field, including unknown shapes. Only a structured
+    /// object contributes to the canonical failure/stopped classification.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub result_error: Option<Value>,
     pub phase: String,
     pub call_view: Option<Value>,
     pub result_view: Option<Value>,
@@ -574,23 +581,14 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
                     .find(|t| t.id == scoped(scope, &format!("tool:{call}")))
                     .expect("admitted");
                 tool.result = Some(message.clone());
+                tool.result_meta = data.get("meta").filter(|value| !value.is_null()).cloned();
+                tool.result_error = data.get("error").filter(|value| !value.is_null()).cloned();
                 tool.result_view = entry.view.clone();
                 tool.result_position = Some(TranscriptSourcePosition::Journal {
                     sequence: event.seq,
                     content_index: None,
                 });
-                tool.phase = if data["error"]["code"] == "interrupted" {
-                    "stopped"
-                } else if data["error"].is_object()
-                    || message["isError"] == true
-                    || first["isError"] == true
-                    || data["meta"]["exitCode"].as_i64().is_some_and(|n| n != 0)
-                {
-                    "error"
-                } else {
-                    "done"
-                }
-                .into();
+                tool.phase = crate::tool_view::result_phase(data, entry.view.as_ref()).into();
             }
             "turn/end" => {
                 if let Some(count) = output_count(&data["usage"]) {
@@ -772,6 +770,8 @@ fn admit_tool(
         }
     } else {
         out.tools.push(TranscriptToolCall {
+            result_meta: None,
+            result_error: None,
             id: key,
             turn_id: turn.into(),
             name: name.into(),

@@ -2,6 +2,7 @@
 
 ## Unreleased — experimental Rust Agent UI
 
+- Correct journal tool settlement for all content error markers, signals, timeouts and public result views; preserve raw result metadata/error in optional backward-readable fields without changing turn settlement.
 - Reusable Agent business components and original-binding host integration remain experimental; see the [delivery gates](docs/rust-agent-ui-delivery-status.md).
 - Add the read-only `TranscriptToolCall::presentation_title` selection for formal producer views; embedded and independent tool disclosures consume the same facts and SDK single-line labels.
 - Shared additions on this branch are not part of the immutable v0.3.8 contract, even while the workspace version field remains 0.3.8. UI packages remain 0.0.0 / publish=false; full tool rows/cards, native/IME and ProcessContainer acceptance remain open.

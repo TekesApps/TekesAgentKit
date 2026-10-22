@@ -124,6 +124,8 @@ fn output(item: &TranscriptItem) -> TranscriptOutput<'_> {
 }
 fn tool() -> TranscriptToolCall {
     TranscriptToolCall {
+        result_meta: None,
+        result_error: None,
         id: "tool".into(),
         turn_id: "turn".into(),
         name: "read".into(),

@@ -66,22 +66,23 @@ impl Default for OutputMessageLabels {
                 } else {
                     format!("{name} · {producer_title}")
                 };
-                (
-                    format!("{title} · {}", t.phase),
-                    format!(
-                        "调用输入\n{}\n\n结果\n{}\n\n调用视图\n{}\n\n结果视图\n{}",
-                        t.arguments,
-                        t.result
-                            .as_ref()
-                            .map_or_else(|| "尚未回传".into(), ToString::to_string),
-                        t.call_view
-                            .as_ref()
-                            .map_or_else(|| "未提供".into(), ToString::to_string),
-                        t.result_view
-                            .as_ref()
-                            .map_or_else(|| "未提供".into(), ToString::to_string)
-                    ),
-                )
+                let mut details = format!(
+                    "调用输入\n{}\n\n结果\n{}\n\n调用视图\n{}\n\n结果视图\n{}",
+                    t.arguments,
+                    t.result
+                        .as_ref()
+                        .map_or_else(|| "尚未回传".into(), ToString::to_string),
+                    t.call_view
+                        .as_ref()
+                        .map_or_else(|| "未提供".into(), ToString::to_string),
+                    t.result_view
+                        .as_ref()
+                        .map_or_else(|| "未提供".into(), ToString::to_string)
+                );
+                if let Some(error) = t.result_error.as_ref().filter(|value| value.is_object()) {
+                    details.push_str(&format!("\n\n结果错误\n{error}"));
+                }
+                (format!("{title} · {}", t.phase), details)
             },
         }
     }
