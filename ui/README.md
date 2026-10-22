@@ -45,6 +45,8 @@ Sidebar 使用共享列表、置顶和动作 dispatcher，已接入选择、复�
 
 SidePanel 是受控组件，宿主提供有序 `tabs` 和可为空的 `selected`；先排空原控件 intents 再发布下一帧。demo 导航按 ClientKit 保留打开顺序，关闭当前 tab 后选最后一个剩余 tab，全部关闭后保持空文档；宿主示例按钮 `OPEN_SUMMARY` 显式重开 Summary，不是新增 Kit launcher。关闭后旧 `PanelContentToken` 失效。晚到 SideChat 回包不重选已关闭文档，关闭确认不清除主 Composer 的组字焦点。详见[导航契约及分层证据](../docs/rust-agent-ui-panel-navigation-20261022.md)。
 
+子代理异步打开结果还受原 parent/child 的[安装代次与关闭 fence](../docs/rust-agent-ui-child-open-fencing-20261022.md)保护，旧/重复结果不能替换新 owner 或复活已关闭 tab。demo 的 `install_child_source` 返回是否选中；返回 false 时仍需用 `cached_child_source` 的原 source identity 区分有效非当前缓存与拒绝。不要给被拒绝的不同 source 新增观察者。
+
 Composer 的真实输入胶囊公开为 `ComposerIds::input_band`；现在保留9个连续 ID，原编辑器及8个既有 ID不变。当前公开固定 SDK 已提供留白焦点及原生 IME 转交；消费证据见下方公开版本接收记录。宿主绑定时机、替换后重绑及验收边界见[接入记录](../docs/rust-agent-ui-composer-padding-20261021.md)。
 
 [绑定包](bindings/README.md) 连接原 RunController、history lease、任务/子代理/SideChat 生命周期。宿主拥有窗口、布局、导航与系统能力；来源替换不能重定向旧回调。第二 public consumer 只依赖两个公开 UI 包。

@@ -245,6 +245,170 @@ async fn closing_a_subagent_returns_to_the_last_task_without_retiring_its_bindin
     runtime.stop().await.unwrap();
 }
 
+#[tokio::test]
+async fn late_child_open_cannot_replace_a_newer_owner_of_the_same_tab() {
+    use tekes_agent_presentation::ChildHistoryLayout;
+    use tekes_agent_ui_bindings::{ChildPaneBinding, PaneAccess};
+    let (runtime, parent, mut view) = setup().await;
+    let old_request = view.begin_child_open(parent.scope()).unwrap();
+    let old = Arc::new(
+        ChildPaneBinding::for_run(
+            &parent,
+            "child-a",
+            ChildHistoryLayout::IndependentSessions,
+            None,
+        )
+        .await
+        .unwrap(),
+    );
+    let new_request = view.begin_child_open(parent.scope()).unwrap();
+    let new = Arc::new(
+        ChildPaneBinding::for_run(
+            &parent,
+            "child-a",
+            ChildHistoryLayout::IndependentSessions,
+            None,
+        )
+        .await
+        .unwrap(),
+    );
+    assert!(
+        view.install_child_source(
+            new_request.clone(),
+            new.clone(),
+            "new owner".into(),
+            new.snapshot().await.unwrap()
+        )
+        .unwrap()
+    );
+    let ids = view.panel_composer_ids().unwrap();
+    assert!(
+        !view
+            .install_child_source(
+                old_request,
+                old.clone(),
+                "late old owner".into(),
+                old.snapshot().await.unwrap()
+            )
+            .unwrap()
+    );
+    let cached = view
+        .cached_child_source(
+            parent.scope(),
+            parent.scope(),
+            "child-a",
+            ChildHistoryLayout::IndependentSessions,
+        )
+        .unwrap();
+    assert!(
+        Arc::ptr_eq(&cached, &new),
+        "late result must not retire/replace the current original owner"
+    );
+    assert_ne!(new.binding().access(), PaneAccess::Missing);
+    assert_eq!(view.panel_composer_ids(), Some(ids));
+    assert!(
+        !view
+            .install_child_source(
+                new_request,
+                new.clone(),
+                "duplicate title".into(),
+                new.snapshot().await.unwrap(),
+            )
+            .unwrap()
+    );
+    assert_eq!(view.panel_composer_ids(), Some(ids));
+    assert_eq!(input(&view).tabs.last().unwrap().title, "new owner");
+    assert!(parent.current_run().unwrap().submissions.is_empty());
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn closing_a_child_fences_a_never_installed_older_open_result() {
+    use tekes_agent_presentation::ChildHistoryLayout;
+    use tekes_agent_ui_bindings::ChildPaneBinding;
+    let (runtime, parent, mut view) = setup().await;
+    let new_request = view.begin_child_open(parent.scope()).unwrap();
+    let new = Arc::new(
+        ChildPaneBinding::for_run(
+            &parent,
+            "child-a",
+            ChildHistoryLayout::IndependentSessions,
+            None,
+        )
+        .await
+        .unwrap(),
+    );
+    assert!(
+        view.install_child_source(
+            new_request,
+            new.clone(),
+            "new".into(),
+            new.snapshot().await.unwrap()
+        )
+        .unwrap()
+    );
+    let _ = view.take_background_commands();
+    // This pending request is newer than the accepted body: only the subsequent
+    // close tombstone can reject it. It has never owned the mounted pane.
+    let old_request = view.begin_child_open(parent.scope()).unwrap();
+    let old = Arc::new(
+        ChildPaneBinding::for_run(
+            &parent,
+            "child-a",
+            ChildHistoryLayout::IndependentSessions,
+            None,
+        )
+        .await
+        .unwrap(),
+    );
+    close(&mut view);
+    assert_eq!(input(&view).selected, Some(SidePanelTabKind::Summary));
+    assert!(
+        !view
+            .install_child_source(
+                old_request,
+                old.clone(),
+                "late".into(),
+                old.snapshot().await.unwrap()
+            )
+            .unwrap()
+    );
+    assert!(
+        view.cached_child_source(
+            parent.scope(),
+            parent.scope(),
+            "child-a",
+            ChildHistoryLayout::IndependentSessions
+        )
+        .is_none(),
+        "closed child must not reappear through a previously uninstalled result"
+    );
+    assert_eq!(input(&view).tabs.len(), 1);
+    // A new explicit open gets a new owner and can reopen the same business ID.
+    let request = view.begin_child_open(parent.scope()).unwrap();
+    let fresh = Arc::new(
+        ChildPaneBinding::for_run(
+            &parent,
+            "child-a",
+            ChildHistoryLayout::IndependentSessions,
+            None,
+        )
+        .await
+        .unwrap(),
+    );
+    assert!(
+        view.install_child_source(
+            request,
+            fresh.clone(),
+            "reopened".into(),
+            fresh.snapshot().await.unwrap()
+        )
+        .unwrap()
+    );
+    assert_eq!(input(&view).tabs.len(), 2);
+    runtime.stop().await.unwrap();
+}
+
 #[cfg(target_os = "macos")]
 mod native_text {
     use super::*;

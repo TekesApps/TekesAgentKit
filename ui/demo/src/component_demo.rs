@@ -197,6 +197,9 @@ pub struct ComponentDemo {
     task_runs: BTreeMap<(RunScope, String), PanelRun>,
     task_attempts: BTreeMap<(RunScope, String), RunScope>,
     child_panes: BTreeMap<(RunScope, String), ChildPane>,
+    // Host delivery fences, including closed-tab tombstones. A late open must
+    // not replace a newer original pane merely because its target ID matches.
+    child_open_revisions: BTreeMap<(RunScope, String), u64>,
     background_commands: Vec<DemoCommand>,
     next_panel_namespace: u32,
     panel_navigation_revision: u64,
@@ -520,6 +523,7 @@ impl ComponentDemo {
             task_runs: BTreeMap::new(),
             task_attempts: BTreeMap::new(),
             child_panes: BTreeMap::new(),
+            child_open_revisions: BTreeMap::new(),
             model_gesture: None,
             creation_inputs: None,
             creation_gesture: None,
@@ -2457,6 +2461,15 @@ impl ComponentDemo {
         {
             return Ok(false);
         }
+        if self
+            .child_open_revisions
+            .get(&key)
+            .is_some_and(|revision| request.panel_revision <= *revision)
+        {
+            return Ok(false);
+        }
+        self.child_open_revisions
+            .insert(key.clone(), request.panel_revision);
         let same = self
             .child_panes
             .get(&key)
@@ -4196,10 +4209,13 @@ impl ComponentDemo {
                             child_id: child_id.clone(),
                         },
                     );
-                    if let Some(pane) = self.child_panes.remove(&(parent.clone(), child_id)) {
+                    self.panel_navigation_revision += 1;
+                    let key = (parent.clone(), child_id);
+                    self.child_open_revisions
+                        .insert(key.clone(), self.panel_navigation_revision);
+                    if let Some(pane) = self.child_panes.remove(&key) {
                         pane.source.retire();
                     }
-                    self.panel_navigation_revision += 1;
                     self.tree.focus(None, false);
                 }
                 SidePanelIntent::Close {

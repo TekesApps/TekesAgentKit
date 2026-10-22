@@ -1013,14 +1013,27 @@ impl Host {
                             }
                         }
                     }
-                    let binding = source.binding().clone();
+                    let parent = request.parent().clone();
                     match self
                         .view
-                        .install_child_source(request, source, title, snapshot)
+                        .install_child_source(request, source.clone(), title, snapshot)
                     {
                         Ok(_) => {
-                            self.observe(&binding, window);
-                            self.verify_bounded_content();
+                            // false may mean cached-but-not-selected or rejected.
+                            // Only an admitted original owner gets a subscription.
+                            if self
+                                .view
+                                .cached_child_source(
+                                    &parent,
+                                    source.parent(),
+                                    source.child_id(),
+                                    source.layout(),
+                                )
+                                .is_some_and(|current| Arc::ptr_eq(&current, &source))
+                            {
+                                self.observe(source.binding(), window);
+                                self.verify_bounded_content();
+                            }
                         }
                         Err(error) => self.failure(error.to_string()),
                     }
