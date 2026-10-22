@@ -72,3 +72,7 @@ TranscriptContent、RunPort 和 ReadOnlyTranscript 可用 `set_thinking_display`
 构建方式与显式 SEP 配置见 [UI README](../ui/README.md)。沿用已有 CARGO_TARGET_DIR，固定 manifest/lock/SDK 输入；
 验证分别记录静态/组件、受控 endpoint、真实 harness、GPU、原生 IME/AX及跨进程，CI 不替代窗口验收。
 发布前使用含所需共享增量的新不可变 AgentKit pin；开发 path 和实验 UI 不能冒充已发布契约。
+
+来源工厂还负责同 frame 的 reasoning carrier 与规范思考正文；受控详情合成一行并修剪首尾空白，
+不改原消息 DTO/整消息复制。宿主不自行比较正文选载体。精确范围及独立 kind/时间线剩余项见
+[思考载体契约](rust-agent-ui-reasoning-carrier-20261023.md)。

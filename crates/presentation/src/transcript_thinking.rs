@@ -135,6 +135,40 @@ impl TranscriptThinkingFrame {
             decisions,
         })
     }
+    /// Normalized source factories can resolve response-frame carriers from
+    /// actual text. The raw lifecycle policy deliberately has no text guesses.
+    pub(crate) fn with_reasoning_carriers(
+        mut self,
+        sources: &[(String, String, String)],
+    ) -> Result<Self> {
+        use unicode_segmentation::UnicodeSegmentation;
+        let mut carriers = BTreeMap::new();
+        for (id, frame, text) in sources {
+            if text.trim().is_empty() {
+                continue;
+            }
+            let rank = (text.graphemes(true).count(), id.as_str());
+            let winner = carriers.entry(frame.as_str()).or_insert(rank);
+            if rank > *winner {
+                *winner = rank;
+            }
+        }
+        let selected: BTreeSet<_> = carriers.values().map(|(_, id)| *id).collect();
+        for (id, display) in &mut self.decisions {
+            if matches!(display, TranscriptReasoningDisplay::Disclosure { .. })
+                && !selected.contains(id.as_str())
+            {
+                *display = TranscriptReasoningDisplay::Hidden;
+            }
+        }
+        // Selection depends on all frame text, including a sibling message.
+        // Bind it too so a setting revision cannot smuggle changed source data.
+        self.source_fingerprint = format!(
+            "{:x}",
+            Sha256::digest(serde_json::to_vec(&(&self.source_fingerprint, sources))?)
+        );
+        Ok(self)
+    }
     pub fn matches_source(
         &self,
         scope: &RunScope,

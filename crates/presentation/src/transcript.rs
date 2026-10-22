@@ -68,6 +68,21 @@ pub struct TranscriptItem {
     pub metadata: Value,
 }
 impl TranscriptItem {
+    /// Canonical reasoning text for display policy. Proven block content owns
+    /// the value when present; aggregate text is only the legacy fallback.
+    /// Keep original whitespace/source bytes here; views trim the outer detail.
+    pub fn display_reasoning(&self) -> String {
+        match &self.content_blocks {
+            Some(blocks) => blocks
+                .iter()
+                .filter_map(|block| match &block.content {
+                    crate::TranscriptBlockContent::Reasoning { text } => Some(text.as_str()),
+                    _ => None,
+                })
+                .collect(),
+            None => self.reasoning.clone(),
+        }
+    }
     /// Explicit committed failure text, never inferred from prose or an idle run.
     pub fn failure_message(&self) -> Option<&str> {
         if !self.is_visible || self.is_provisional {

@@ -89,6 +89,18 @@ async fn normalized_run_sources_reach_second_consumer_and_survive_reconnect_with
     );
     assert_eq!(
         host.text_surface(ids.body).unwrap().input.text,
+        original_text.trim()
+    );
+    assert_eq!(
+        binding
+            .current_run()
+            .unwrap()
+            .transcript
+            .items
+            .iter()
+            .find(|row| row.id == item_id)
+            .unwrap()
+            .reasoning,
         original_text
     );
     assert!(host.focus(Some(ids.body), true));
@@ -467,4 +479,70 @@ fn readonly_live_status_ticks_use_child_publication_and_retire_preference_plans(
     assert_eq!(parts.len(), 1);
     assert_eq!(parts[0].kind, OutputContentKind::Reasoning);
     assert!(parts[0].disclosure.is_some());
+}
+
+#[tokio::test]
+async fn controlled_whitespace_record_leaves_no_transcript_row_or_reading_gap() {
+    use tekes_agent_components_ui::*;
+    let runtime = Arc::new(SessionRuntime::spawn(
+        "fixture",
+        Arc::new(Fixture::default().with_reading_details()),
+    ));
+    runtime.wait_ready(Duration::from_secs(3)).await.unwrap();
+    let scope = RunScope::main("fixture", "a");
+    let binding = RunBinding::open_main(runtime.clone(), scope.clone())
+        .await
+        .unwrap();
+    let original = binding.current_run().unwrap();
+    // Explicit captured value fixture, not a claim that this extra record was
+    // emitted by the protocol fixture. No production identity is inferred.
+    let mut transcript = original.transcript.clone();
+    let mut whitespace = transcript
+        .items
+        .iter()
+        .find(|row| row.kind == TranscriptItemKind::Assistant)
+        .unwrap()
+        .clone();
+    let facts = transcript.thinking_sources.by_id[&whitespace.id].clone();
+    whitespace.id = "explicit-whitespace-fixture".into();
+    whitespace.record_id = None;
+    whitespace.reconciliation_id = None;
+    whitespace.source_sequence = Some(1_000_000);
+    whitespace.source_position = Some(TranscriptSourcePosition::Journal {
+        sequence: 1_000_000,
+        content_index: None,
+    });
+    whitespace.text.clear();
+    whitespace.reasoning = " \n\t".into();
+    whitespace.attachments.clear();
+    whitespace.content_blocks = Some(vec![TranscriptContentBlock {
+        index: 0,
+        content: TranscriptBlockContent::Reasoning {
+            text: whitespace.reasoning.clone(),
+        },
+    }]);
+    let id = whitespace.id.clone();
+    transcript.thinking_sources.by_id.insert(id.clone(), facts);
+    transcript.items.push(whitespace);
+    let mut content =
+        TranscriptContent::new(5000, 5010..5300, scope.clone(), Default::default()).unwrap();
+    content
+        .set_thinking_display(display(1, TranscriptThinkingMode::Compact))
+        .unwrap();
+    content
+        .update(
+            &scope,
+            original.revision,
+            original.connection_epoch,
+            &transcript,
+            true,
+        )
+        .unwrap();
+    assert!(
+        content
+            .message_id(TranscriptMessageKey::Item(&id))
+            .is_none()
+    );
+    assert_eq!(transcript.items.last().unwrap().reasoning, " \n\t");
+    runtime.stop().await.unwrap();
 }

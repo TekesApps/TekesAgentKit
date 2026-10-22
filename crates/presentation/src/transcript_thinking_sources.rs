@@ -226,12 +226,14 @@ impl TranscriptSnapshot {
             .ok_or_else(|| unsupported("thinking turn unavailable"))?;
         let live = !self.is_stale && self.thinking_sources.live_turn_id.as_deref() == Some(turn_id);
         let mut items = vec![];
+        let mut reasoning_sources = vec![];
         let mut call_ids: BTreeSet<_> = section.tools.iter().map(|tool| tool.id.as_str()).collect();
         for row in &section.outputs {
             if row.item.kind != TranscriptItemKind::Assistant {
                 continue;
             }
-            let has_reasoning = !row.item.reasoning.is_empty() || row.item.content_blocks.iter().flatten().any(|block| matches!(&block.content, TranscriptBlockContent::Reasoning { text } if !text.is_empty()));
+            let reasoning = row.item.display_reasoning();
+            let has_reasoning = !reasoning.trim().is_empty();
             let visible = !row.item.text.is_empty() || !row.item.attachments.is_empty()
                 || row.item.content_blocks.iter().flatten().any(|block| matches!(&block.content, TranscriptBlockContent::Text { text } if !text.is_empty()) || matches!(&block.content, TranscriptBlockContent::Attachment { .. } | TranscriptBlockContent::Unknown { .. }));
             for block in row.item.content_blocks.iter().flatten() {
@@ -247,6 +249,11 @@ impl TranscriptSnapshot {
                 .by_id
                 .get(&row.item.id)
                 .ok_or_else(|| unsupported("thinking message provenance unavailable"))?;
+            reasoning_sources.push((
+                row.item.id.clone(),
+                source.response_frame_id.clone(),
+                reasoning,
+            ));
             items.push(TranscriptThinkingItem {
                 id: &row.item.id,
                 arrival_order: source.arrival_order,
@@ -286,7 +293,8 @@ impl TranscriptSnapshot {
                 calls: &calls,
                 narrations: &[],
             },
-        )
+        )?
+        .with_reasoning_carriers(&reasoning_sources)
     }
 }
 

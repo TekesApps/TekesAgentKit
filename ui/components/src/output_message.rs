@@ -900,12 +900,7 @@ impl OutputMessage {
             return Err("thinking frame source mismatch");
         }
         let decision = thinking.display_for(&output.item.id);
-        if decision.is_none()
-            && (!output.item.reasoning.is_empty()
-                || output.item.content_blocks.as_ref().is_some_and(|blocks| blocks.iter().any(|block| {
-                    matches!(&block.content, TranscriptBlockContent::Reasoning { text } if !text.is_empty())
-                })))
-        {
+        if decision.is_none() && !output.item.display_reasoning().trim().is_empty() {
             return Err("thinking frame is missing reasoning source");
         }
         let stamp = ThinkingStamp {
@@ -1401,52 +1396,58 @@ fn thinking_parts(
     let Some(thinking) = thinking else {
         return facts;
     };
-    let mut status_installed = false;
-    facts
+    // ClientKit presents one reasoning detail before this message's content,
+    // even when the protocol interleaves multiple reasoning blocks. Keep source
+    // DTOs/copy text intact and give the retained detail one stable local owner.
+    let reasoning: String = facts
+        .iter()
+        .filter(|part| part.kind == OutputContentKind::Reasoning)
+        .map(|part| part.text.as_str())
+        .collect();
+    let mut result: Vec<_> = facts
         .into_iter()
-        .filter_map(|mut part| {
-            if part.kind == OutputContentKind::Coverage
-                && !matches!(
-                    thinking.display,
-                    TranscriptReasoningDisplay::Disclosure { .. }
-                )
-            {
-                return None;
-            }
-            if part.kind != OutputContentKind::Reasoning {
-                return Some(part);
-            }
-            match thinking.display {
-                TranscriptReasoningDisplay::Hidden => None,
-                TranscriptReasoningDisplay::Placeholder { dots } => {
-                    if status_installed {
-                        return None;
-                    }
-                    status_installed = true;
-                    Some(PartFacts {
-                        slot: Slot::ThinkingStatus,
-                        kind: OutputContentKind::Status,
-                        title: String::new(),
-                        text: format!(
-                            "{}{}",
-                            (labels.text)(OutputMessageText::Thinking),
-                            ".".repeat(dots as usize)
-                        ),
-                        tool: None,
-                        tool_header: None,
-                    })
-                }
-                TranscriptReasoningDisplay::Disclosure { active } => {
-                    part.title = (labels.text)(if active {
-                        OutputMessageText::Thinking
-                    } else {
-                        OutputMessageText::ReasoningEnded
-                    });
-                    Some(part)
-                }
-            }
+        .filter(|part| {
+            part.kind != OutputContentKind::Reasoning
+                && (part.kind != OutputContentKind::Coverage
+                    || (!reasoning.trim().is_empty()
+                        && matches!(
+                            thinking.display,
+                            TranscriptReasoningDisplay::Disclosure { .. }
+                        )))
         })
-        .collect()
+        .collect();
+    if reasoning.trim().is_empty() {
+        return result;
+    }
+    let part = match thinking.display {
+        TranscriptReasoningDisplay::Hidden => return result,
+        TranscriptReasoningDisplay::Placeholder { dots } => PartFacts {
+            slot: Slot::ThinkingStatus,
+            kind: OutputContentKind::Status,
+            title: String::new(),
+            text: format!(
+                "{}{}",
+                (labels.text)(OutputMessageText::Thinking),
+                ".".repeat(dots as usize)
+            ),
+            tool: None,
+            tool_header: None,
+        },
+        TranscriptReasoningDisplay::Disclosure { active } => PartFacts {
+            slot: Slot::AggregateReasoning,
+            kind: OutputContentKind::Reasoning,
+            title: (labels.text)(if active {
+                OutputMessageText::Thinking
+            } else {
+                OutputMessageText::ReasoningEnded
+            }),
+            text: reasoning.trim().to_owned(),
+            tool: None,
+            tool_header: None,
+        },
+    };
+    result.insert(0, part);
+    result
 }
 fn parts(
     scope: &RunScope,

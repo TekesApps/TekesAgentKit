@@ -383,3 +383,110 @@ fn native_lifecycle_start_and_disconnect_retire_only_current_projection() {
             .any(|row| row.is_provisional)
     );
 }
+
+#[test]
+fn response_frame_keeps_one_fullest_reasoning_carrier_without_changing_source_items() {
+    let mut store = authority(vec![event(10, "turn/start", json!({"turn":1}))], false);
+    transient(&mut store, 999, "reasoning-delta", None);
+    let mut snapshot = run(&mut store);
+    let first = assistant(&snapshot).clone();
+    let mut second = first.clone();
+    second.id = "second-public-record".into();
+    second.source_position = None;
+    second.reasoning = "👩🏽‍💻".into();
+    second.content_blocks = Some(vec![TranscriptContentBlock {
+        index: 0,
+        content: TranscriptBlockContent::Reasoning {
+            text: second.reasoning.clone(),
+        },
+    }]);
+    let source = snapshot.transcript.thinking_sources.by_id[&first.id].clone();
+    snapshot
+        .transcript
+        .thinking_sources
+        .by_id
+        .insert(second.id.clone(), source);
+    snapshot.transcript.items.push(second.clone());
+    let before = snapshot.clone();
+    let frame = snapshot
+        .thinking_frame(&first.turn_id, TranscriptThinkingMode::Compact, 1, 0)
+        .unwrap();
+    assert!(matches!(
+        frame.display_for(&first.id),
+        Some(TranscriptReasoningDisplay::Disclosure { .. })
+    ));
+    assert_eq!(
+        frame.display_for(&second.id),
+        Some(TranscriptReasoningDisplay::Hidden)
+    );
+    assert_eq!(snapshot, before);
+    let candidate = snapshot
+        .transcript
+        .items
+        .iter_mut()
+        .find(|row| row.id == second.id)
+        .unwrap();
+    candidate.reasoning = "更完整的中文思考文本".into();
+    candidate.content_blocks = Some(vec![TranscriptContentBlock {
+        index: 0,
+        content: TranscriptBlockContent::Reasoning {
+            text: candidate.reasoning.clone(),
+        },
+    }]);
+    let next = snapshot
+        .thinking_frame(&first.turn_id, TranscriptThinkingMode::Compact, 2, 0)
+        .unwrap();
+    assert_eq!(
+        next.display_for(&first.id),
+        Some(TranscriptReasoningDisplay::Hidden)
+    );
+    assert!(matches!(
+        next.display_for(&second.id),
+        Some(TranscriptReasoningDisplay::Disclosure { .. })
+    ));
+    assert_ne!(frame.source_fingerprint(), next.source_fingerprint());
+    snapshot
+        .transcript
+        .thinking_sources
+        .by_id
+        .get_mut(&second.id)
+        .unwrap()
+        .response_frame_id = "independent-frame".into();
+    let independent = snapshot
+        .thinking_frame(&first.turn_id, TranscriptThinkingMode::Compact, 3, 0)
+        .unwrap();
+    assert!(matches!(
+        independent.display_for(&first.id),
+        Some(TranscriptReasoningDisplay::Disclosure { .. })
+    ));
+    assert!(matches!(
+        independent.display_for(&second.id),
+        Some(TranscriptReasoningDisplay::Disclosure { .. })
+    ));
+}
+
+#[test]
+fn whitespace_reasoning_and_empty_proven_blocks_do_not_resurrect_legacy_aggregate_text() {
+    let mut store = authority(vec![event(10, "turn/start", json!({"turn":1}))], false);
+    transient(&mut store, 999, "reasoning-delta", None);
+    let mut snapshot = run(&mut store);
+    let id = assistant(&snapshot).id.clone();
+    let turn = assistant(&snapshot).turn_id.clone();
+    for text in [" \n\t\u{3000}", ""] {
+        let item = snapshot
+            .transcript
+            .items
+            .iter_mut()
+            .find(|row| row.id == id)
+            .unwrap();
+        item.reasoning = "stale aggregate must not win".into();
+        item.content_blocks = Some(vec![TranscriptContentBlock {
+            index: 0,
+            content: TranscriptBlockContent::Reasoning { text: text.into() },
+        }]);
+        let frame = snapshot
+            .thinking_frame(&turn, TranscriptThinkingMode::None, 1, 1)
+            .unwrap();
+        assert_eq!(frame.display_for(&id), None);
+    }
+}

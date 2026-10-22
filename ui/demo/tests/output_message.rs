@@ -1937,3 +1937,123 @@ fn a_new_thinking_revision_cannot_smuggle_changed_embedded_tool_details() {
     );
     assert_eq!(row.content_ids(), before);
 }
+
+#[test]
+fn controlled_reasoning_blocks_form_one_trimmed_detail_before_content_and_keep_its_editor() {
+    let mut source = thinking_item();
+    source.content_blocks = Some(vec![
+        block(
+            0,
+            Block::Text {
+                text: "原始前段".into(),
+            },
+        ),
+        block(
+            1,
+            Block::Reasoning {
+                text: " \n第一段".into(),
+            },
+        ),
+        block(
+            2,
+            Block::Text {
+                text: "原始后段".into(),
+            },
+        ),
+        block(
+            3,
+            Block::Reasoning {
+                text: "第二段\n ".into(),
+            },
+        ),
+    ]);
+    let original = source.clone();
+    let frame = thinking_frame(
+        &source,
+        &scope(),
+        (1, 0, 1),
+        TranscriptThinkingMode::Compact,
+        0,
+        true,
+    );
+    let mut row = OutputMessage::new(86, scope());
+    row.update_with_thinking(1, 0, &output(&source), None, &frame)
+        .unwrap();
+    let parts = row.content_ids();
+    assert_eq!(
+        parts.iter().map(|part| part.kind).collect::<Vec<_>>(),
+        vec![
+            OutputContentKind::Reasoning,
+            OutputContentKind::Text,
+            OutputContentKind::Text
+        ]
+    );
+    assert_eq!(source, original);
+    let root = row.id();
+    let detail = parts[0];
+    let mut host = row.into_host().unwrap();
+    host.accessibility_action(detail.disclosure.unwrap(), None, AccessibilityAction::Press);
+    let actions = host.drain_actions();
+    assert!(view_mut(&mut host, root).handle_actions(&actions));
+    assert_eq!(
+        host.text_surface(detail.body).unwrap().input.text,
+        "第一段第二段"
+    );
+    assert!(host.focus(Some(detail.body), true));
+    host.get_mut(detail.body)
+        .unwrap()
+        .component_mut::<TextFieldContent>()
+        .unwrap()
+        .surface
+        .input
+        .select_range(0..2);
+    source.content_blocks.as_mut().unwrap().push(block(
+        4,
+        Block::Reasoning {
+            text: "新增".into(),
+        },
+    ));
+    let next = thinking_frame(
+        &source,
+        &scope(),
+        (2, 0, 1),
+        TranscriptThinkingMode::Compact,
+        0,
+        true,
+    );
+    view_mut(&mut host, root)
+        .update_with_thinking(2, 0, &output(&source), None, &next)
+        .unwrap();
+    assert_eq!(view(&host, root).content_ids(), parts);
+    assert_eq!(host.focused(), Some(detail.body));
+    assert_eq!(
+        host.text_surface(detail.body).unwrap().input.selection(),
+        0..2
+    );
+    assert_eq!(
+        host.text_surface(detail.body).unwrap().input.text,
+        "第一段第二段\n 新增"
+    );
+}
+
+#[test]
+fn controlled_whitespace_reasoning_has_no_disclosure_status_or_missing_content_fallback() {
+    let mut source = thinking_item();
+    source.content_blocks = Some(vec![block(
+        0,
+        Block::Reasoning {
+            text: " \n\t\u{3000}".into(),
+        },
+    )]);
+    for mode in [
+        TranscriptThinkingMode::Compact,
+        TranscriptThinkingMode::None,
+    ] {
+        let frame = thinking_frame(&source, &scope(), (1, 0, 1), mode, 0, true);
+        let mut row = OutputMessage::new(87, scope());
+        row.update_with_thinking(1, 0, &output(&source), None, &frame)
+            .unwrap();
+        assert!(row.content_ids().is_empty());
+        assert!(row.copy_action_ids().is_empty());
+    }
+}

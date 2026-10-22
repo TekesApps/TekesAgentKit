@@ -261,9 +261,10 @@ impl TranscriptContent {
         timing: &crate::TranscriptFootnoteTiming,
         publication: u64,
         epoch: u64,
+        display: Option<crate::TranscriptThinkingDisplayInput>,
     ) -> Result<Vec<Planned<'a>>, &'static str> {
         let mut rows = plan(snapshot, document, &self.labels, timing)?;
-        if let Some(input) = self.thinking_input {
+        if let Some(input) = display {
             let mut frames = BTreeMap::new();
             for row in &mut rows {
                 if let PlannedContent::Output(output, Some(section)) = &row.content
@@ -279,7 +280,19 @@ impl TranscriptContent {
                 }
             }
         }
-        Ok(rows)
+        // No empty layout gap or false tool-run boundary for reasoning whose
+        // controlled display has no nodes. Only proven reasoning-only content
+        // may disappear; failures, tools, unknown/legacy content stay explicit.
+        rows.retain(|row| !matches!((&row.content, &row.thinking),
+            (PlannedContent::Output(output, _), Some(frame))
+                if output.item.failure_message().is_none()
+                    && output.item.attachments.is_empty()
+                    && output.item.content_blocks.as_ref().is_some_and(|blocks|
+                        !blocks.is_empty() && blocks.iter().all(|block|
+                            matches!(&block.content, TranscriptBlockContent::Reasoning { .. })))
+                    && (output.item.display_reasoning().trim().is_empty()
+                        || frame.display_for(&output.item.id) == Some(crate::TranscriptReasoningDisplay::Hidden))));
+        Ok(group_tools(rows))
     }
     pub fn footnote_timing(&self) -> &crate::TranscriptFootnoteTiming {
         &self.timing
@@ -333,7 +346,14 @@ impl TranscriptContent {
         };
         let document =
             TranscriptDocument::read(snapshot).map_err(|_| "invalid transcript document")?;
-        let planned = plan(snapshot, &document, &self.labels, &self.timing)?;
+        let planned = self.plan_with_thinking(
+            snapshot,
+            &document,
+            &self.timing,
+            self.publication,
+            self.epoch,
+            self.applied_thinking,
+        )?;
         let mounted: BTreeMap<_, _> = self.keys.iter().zip(&self.rows.children).collect();
         let mut rows: BTreeMap<&str, (Vec<ComponentId>, bool)> = BTreeMap::new();
         for row in &planned {
@@ -495,7 +515,14 @@ impl TranscriptContent {
         }
         let document =
             TranscriptDocument::read(snapshot).map_err(|_| "invalid transcript document")?;
-        let plan = self.plan_with_thinking(snapshot, &document, timing, publication, epoch)?;
+        let plan = self.plan_with_thinking(
+            snapshot,
+            &document,
+            timing,
+            publication,
+            epoch,
+            self.thinking_input,
+        )?;
         self.validate_plan(&plan, publication, epoch, available)?;
         if header_revision != self.current_header_revision() {
             return Err("tool header inputs changed during preparation");
@@ -646,7 +673,14 @@ impl TranscriptContent {
         let header_revision = self.checked_header_revision(epoch)?;
         let document =
             TranscriptDocument::read(snapshot).map_err(|_| "invalid transcript document")?;
-        let planned = self.plan_with_thinking(snapshot, &document, timing, publication, epoch)?;
+        let planned = self.plan_with_thinking(
+            snapshot,
+            &document,
+            timing,
+            publication,
+            epoch,
+            self.thinking_input,
+        )?;
         let desired: BTreeSet<_> = planned.iter().map(|row| row.key.clone()).collect();
         let index: BTreeMap<_, _> = self
             .keys
@@ -798,7 +832,14 @@ impl TranscriptContent {
         let header_revision = self.checked_header_revision(epoch)?;
         let document =
             TranscriptDocument::read(snapshot).map_err(|_| "invalid transcript document")?;
-        let plan = self.plan_with_thinking(snapshot, &document, timing, publication, epoch)?;
+        let plan = self.plan_with_thinking(
+            snapshot,
+            &document,
+            timing,
+            publication,
+            epoch,
+            self.thinking_input,
+        )?;
         self.validate_plan(&plan, publication, epoch, available && !snapshot.is_stale)?;
         if header_revision != self.current_header_revision() {
             return Err("tool header inputs changed during preparation");
@@ -1474,6 +1515,9 @@ fn plan<'a>(
             });
         }
     }
+    Ok(group_tools(result))
+}
+fn group_tools<'a>(result: Vec<Planned<'a>>) -> Vec<Planned<'a>> {
     let mut grouped: Vec<Planned<'a>> = vec![];
     for row in result {
         if let PlannedContent::Tools(current) = &row.content
@@ -1495,7 +1539,7 @@ fn plan<'a>(
         }
         grouped.push(row);
     }
-    Ok(grouped)
+    grouped
 }
 fn event_row<'a>(
     event: TranscriptOrderedEvent<'a>,
