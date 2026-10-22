@@ -1,56 +1,26 @@
-# Rust Run demo（开发试点）
+# Rust Agent UI（开发试点）
 
-[历史输入入口与宿主回调](../docs/rust-agent-ui-historical-input-20261022.md)：原输入信息/编辑/复制同一右对齐带，复用原 SDK 控件；实际能力与显式 handler 双重启用，三端当前均未声明该能力，正常 demo 隐藏入口。526 项组件/宿主/第二 consumer 回归通过，新增入口尚未做原生窗口验收。
+AgentKit 拥有可复用的 Composer、Transcript、Indicators、RunPort、Sidebar、SidePanel 和业务状态；TekesUI 拥有通用控件、文字、输入/焦点/IME、滚动、渲染及进程基础能力。宿主拥有窗口、整体布局、导航与系统适配。RunSurface 和 demo 窗口是测试宿主，不是标准 RunPort。
 
-[三端原生补验](../docs/rust-agent-ui-native-resume-20261022.md)：固定 50ec、2696969 程序的三端反馈/流式发送/取消恢复通过；Pi/Native 分页阅读通过，DSH 分页及流式阅读组合仍未完成。以下旧阶段记录保留各自程序与验收范围，不代表当前全部覆盖。
+当前 UI 为 `0.0.0` / `publish=false`，PR #10 保持 draft；不能把局部组件或离屏通过当作完整 ClientKit Views、窗口级 toolbar 或 ProcessContainer 验收。AgentKit 已发布基线为 v0.3.8，本 UI 明确消费同仓库开发路径和未发布的共享增量；正式宿主需固定最终发布的新不可变版本。
 
-[输出只读信息与当前原生复验](../docs/rust-agent-ui-output-information-20261022.md)补齐原时间/状态的剩余行宽与SDK单行省略；522项组件/第二consumer通过。最终2696969程序主阅读20→44、只读38→75、正常app系统拼音和三端离屏通过；当前三端原生全套、跨进程和完整视觉仍未完成。
+当前接入与证据：
 
-[最新公开 50ec 精确依赖](../docs/tekesui-50ec-public-intake-20261022.md)：实际 8 包/243 输入，521 项组件/第二 consumer 通过；原 Composer 新增候选确认上下键回归。新 pin 原生/系统拼音尚未验收，#48/#49 等仍开放。
+- [组件所有权、布局与完成账本](../docs/rust-agent-ui-contract.md)：机器内容/footnote 靠左，用户气泡与 footnote 靠右；基础样式随 TekesUI。
+- [SidePanelNavigation 与 Host header](../docs/rust-agent-ui-side-panel-navigation-20261022.md)：普通 tab、SideChat 家族菜单及当前关闭回调，原正文保留。531 项本地回归、第二公开 consumer、最终三端协议→离屏 GPU 通过；新窗口 toolbar/完整原生组合未验收。
+- [历史输入回调](../docs/rust-agent-ui-historical-input-20261022.md)：实际能力和 handler 双重启用；当前三端不声明能力，正常 demo 隐藏入口。
+- [精确公开 TekesUI 输入](../docs/tekesui-50ec-public-intake-20261022.md)：固定 `50ec49f3446924fdbc66b3cff22cd8cfe150fe7c`，实际 8 包/243 文件；构建输入以 manifest/lock 和检查器为准。
+- [冻结基线程序的原生补验](../docs/rust-agent-ui-native-resume-20261022.md)：三端反馈/流式发送/取消恢复通过；Pi/Native 分页阅读通过，DSH 分页及流式阅读组合存在失焦未完成项。该结果不转移到新程序。
 
-[输出备注 40% 限宽](../docs/rust-agent-ui-output-note-cap-20261022.md)复用原备注按钮与 SDK 单行省略，保留完整 source/AX 和原 Composer；主题、字号与宽度往返的独立 consumer 已覆盖。窄列全可见、图标/弹层和当前程序原生/系统拼音仍待验收。
-
-[输入脚注同一右对齐带](../docs/rust-agent-ui-input-aside-row-20261022.md)补齐时间/复制的原控件组合；信息宽度规则已[更正为剩余行宽](../docs/rust-agent-ui-information-width-20261022.md)；aside_id()/information_text()保留稳定查询，原copy来源/claim不变。宿主需提供SDK shape_label；520项组件/独立consumer与三端离屏通过，本轮没有新原生/IME通过声明。
-
-[3bef阶段固定依赖接收](../docs/tekesui-3bef-public-intake-20261022.md)：518项组件和新Toolbar公开组合验证通过；本轮三端基础原生阅读、Pi/DSH反馈及Pi流式已有收据，其余新pin原生/系统拼音尚未完成。#49显式门禁仍失败，保持已知忽略；不转移旧程序验收。
-
-[输出脚注组合与 API 迁移](../docs/rust-agent-ui-output-aside-row-20261022.md)：正常 aside 为单一阅读项，评价是原 Content 子控件；每个 aside 预留两套 namespace。使用 feedback_controls()/feedback_mut() 处理原反馈回调，TurnFeedback row key 仅保留兼容查询。窄列全可见、图标/弹层仍开放，三端原生与程序范围见记录。
-
-[真实 Native 原生补验](../docs/rust-agent-ui-native-current-20261022.md)补足先前未完成的流式阅读、流式发送和取消/错误恢复证据；原失败与新程序严格分开，仍为同进程、受控 provider、UI-only 范围。
-
-[SidePanel 空态入口与阅读复验](../docs/rust-agent-ui-panel-launcher-20261022.md)：新增可复用 `SidePanelLauncher`，消费原 SDK Button/Grid；公开 pin 仍为09b4bab。最终程序原生分页/reveal/焦点、系统软件拼音及独立 consumer 已留证，图标 #47、远端交互 #48 仍开放。
-
-正式共享组合名为 **RunPort**；Sidebar、RunPort、SidePanel 的目标宿主接口是 TekesUI ProcessContainer。当前保留原同进程 Content 路径，远端输入/IME/滚动/AX 等待 [TekesUI #48](https://github.com/TekesApps/TekesUI/issues/48)。[迁移说明与验收矩阵](../docs/rust-agent-ui-run-port-20261022.md)区分 API 改名、同进程运行与尚未完成的跨进程接入。
-
-Output copy now captures the original whole turn via `TranscriptTurnCopy` rather
-than selecting one final item. `TranscriptCopyIntent::source()` distinguishes a
-message from `TurnOutput { turn_id, item_ids }`; `message()` returns Option and is
-None for a turn aggregate. Hosts still claim once and write captured `text()`.
-See the [copy/display contract](../docs/rust-agent-ui-turn-output-copy-20261022.md)
-for raw source order, live-owner gating and independent response authority.
-
-The demo now admits original copy controls across the mounted main RunPort,
-selected writable pane and readonly child while a Run Composer owns preedit.
-Copy keeps its original scope; AX Focus and endpoint read/send/navigation remain
-separately gated. The [cross-pane contract](../docs/rust-agent-ui-cross-pane-copy-20261022.md)
-records the same-process native probe, private pasteboard opt-in and remaining
-ProcessContainer/Task/SideChat native acceptance boundaries.
-
-只消费 TekesUI，复用本分支共享的 `SessionRuntime` / `RunController` / `RunSnapshot`。
-AgentKit 已发布基线为 v0.3.8；UI workspace 明确使用本仓库 `../crates/*` 开发源码，包含本 PR 尚未发布的共享 DTO/投影增量，不能当作仅依赖 v0.3.8 源码即可编译的独立消费者。
-组件层不实现另一套 Run 状态机。默认 headless workspace 和发布 API 保持独立。
-
-[短接入契约](../docs/tekesui-integration-contract.md) 定义所有权、输入、回调、焦点、IME 和阅读责任；
-[TekesUI 缺口](../docs/tekesui-gaps.md) 列出所需上游事件/属性，
-[七项开发任务](../docs/tekesui-development-tasks.md) 给出优先级与逐项验收标准。
-
-![基础 Run 离屏渲染，非原生窗口截图](docs/run-offscreen.png)
+更早阶段各自的 pin、程序和验收范围保留在独立记录及[旧 README 快照](https://github.com/TekesApps/TekesAgentKit/blob/7ff99718ed380ce13452b66c62ab39ea9ab57505/ui/README.md)中；不覆盖本页的当前接入边界。
 
 ## 正式组件开发
 
 `RunSurface` 仅是现有协议/控件测试宿主，不是标准 RunPort。正式组件契约、App 的 input/output/footnote 布局、基础 Issue 和完整交付账本见 [Rust Agent UI 接入契约](../docs/rust-agent-ui-contract.md)。
 
-可独立挂载的组件包括 Composer、ComposerNotice、ComposerContext、ComposerChoices、AnnotationEditor、ComposerUploads、Indicators、Sidebar、ThreadRename、SidePanel、SummaryView、InputMessage、OutputMessage、TurnFootnote、TranscriptContent、ReadOnlyTranscript 和 RunPort。它们使用同一套共享 presentation；RunSurface/ComponentDemo 是测试与接入宿主。主会话和可写 pane 已挂载 RunPort，有界子历史使用 ReadOnlyTranscript；完整 Transcript 的阅读锚点、富内容与最终体验验收仍待完成。
+可独立挂载的组件包括 Composer、ComposerNotice、ComposerContext、ComposerChoices、AnnotationEditor、ComposerUploads、Indicators、Sidebar、ThreadRename、SidePanel、SidePanelNavigation、SummaryView、InputMessage、OutputMessage、TurnFootnote、TranscriptContent、ReadOnlyTranscript 和 RunPort。它们使用同一套共享 presentation；RunSurface/ComponentDemo 是测试与接入宿主。主会话和可写 pane 已挂载 RunPort，有界子历史使用 ReadOnlyTranscript；完整 Transcript 的阅读锚点、富内容与最终体验验收仍待完成。
+
+宿主 header 使用 `SidePanelHeaderPlacement::Host` 配合原 `SidePanelNavigation`，二者消费同一 `SidePanelInput`。窗口与 ProcessContainer 注册由宿主/SDK 负责；当前 demo 的 `--panel-navigation-toolbar` 只分配 in-content toolbar 区域，不是原生窗口 toolbar 验收。旧 `InlineDiagnostic` 默认仅用于保留可运行路径。
 
 [独立阅读事务候选联调](../docs/rust-agent-ui-reading-candidate-20261020.md)保留早期候选的隔离回放记录。当前默认公开精确 pin 已接入 RunPort 的[持续阅读事务](../docs/rust-agent-ui-continuous-reading-20261021.md)，分页、reveal、焦点与 IME 的最新验收范围见[本轮复核](../docs/rust-agent-ui-panel-navigation-20261022.md)，不以早期候选状态描述当前实现。
 
@@ -92,6 +62,16 @@ Composer 的真实输入胶囊公开为 `ComposerIds::input_band`；现在保留
 [三真实harness流式阅读验收](../docs/rust-agent-ui-stream-reading-native-20261021.md)覆盖旧回合锚点、中文合成preedit、重连与A/B隔离；普通完整产品UI仍未验收。
 
 ## 构建与运行
+
+在仓库根目录沿用已有共享 target；不要为每次验证新建独立缓存。下例可直接预览新 header 的离屏 GPU 路径，实际窗口/IME 验收另行协调：
+
+```sh
+export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$PWD/target}"
+export CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0
+cargo +1.95.0 build --manifest-path ui/Cargo.toml --locked -p tekes-agent-ui-demo
+"$CARGO_TARGET_DIR/debug/tekes-agent-ui-demo" --components --transcript-content \
+  --panel-navigation-toolbar --offscreen /tmp/agentkit-panel-navigation.png
+```
 
 从 AgentKit 根目录：
 
@@ -144,7 +124,7 @@ DSH 0.2.1-rc.2（兼容 0.2.0-rc.2）：
 
 可将 `cookieEnv` 替换为 `bearerEnv`，不能同时设置；显式无认证的宿主可省略两者。
 沿用 DSH connector 的官方运行版本探测，宿主需提供 `/api/tekes/harness-version` 只读桥接，不能用配置伪造版本。
-三个 backend 共用现有 SessionRuntime / RunController 和同一个 RunSurface，发送使用已有 session 的实际模型配置。
+三个 backend 共用现有 SessionRuntime / RunController；`--components` 路径组合正式 RunPort，未启用时 RunSurface 仅是测试宿主。发送使用已有 session 的实际模型配置。
 未知 kind/字段、错误 session 槽位、缺失凭证变量均报错，不回退 fixture。通用 TekesUI 控件与状态逻辑保持上游所有。
 
 ## 验证

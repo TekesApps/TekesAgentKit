@@ -72,6 +72,109 @@ fn launcher_id(
 }
 
 #[tokio::test]
+async fn host_toolbar_uses_existing_panel_navigation_and_keeps_original_body_and_preedit() {
+    use tekes_agent_components_ui::{SidePanelHeaderPlacement, SidePanelNavigation, SummaryView};
+    use tekes_ui_controls::composition::ContentEvent;
+    let (runtime, parent, mut view) = setup().await;
+    let summary = view.summary_id();
+    let owner = view
+        .tree
+        .get(summary)
+        .unwrap()
+        .component::<SummaryView>()
+        .unwrap() as *const _ as usize;
+    let diagnostic_close = view
+        .tree
+        .get(view.panel_id())
+        .unwrap()
+        .component::<SidePanel>()
+        .unwrap()
+        .close_id();
+    view.use_panel_navigation_toolbar().unwrap();
+    assert!(view.tree.get(diagnostic_close).is_none());
+    assert_eq!(
+        view.tree
+            .get(summary)
+            .unwrap()
+            .component::<SummaryView>()
+            .unwrap() as *const _ as usize,
+        owner
+    );
+    assert_eq!(
+        view.tree
+            .get(view.panel_id())
+            .unwrap()
+            .component::<SidePanel>()
+            .unwrap()
+            .header_placement(),
+        SidePanelHeaderPlacement::Host
+    );
+    let nav = view.panel_navigation_id().unwrap();
+    let button = view
+        .tree
+        .get(nav)
+        .unwrap()
+        .component::<SidePanelNavigation>()
+        .unwrap()
+        .close_id()
+        .unwrap();
+    let commands = view
+        .accessibility_action(button, None, AccessibilityAction::Press)
+        .unwrap();
+    assert!(commands.is_empty());
+    assert!(input(&view).tabs.is_empty() && input(&view).selected.is_none());
+    let reopen = launcher_id(
+        &view,
+        tekes_agent_components_ui::SidePanelDestination::Summary,
+    );
+    assert!(
+        view.accessibility_action(reopen, None, AccessibilityAction::Press)
+            .unwrap()
+            .is_empty()
+    );
+    let editor = view.ids().editor;
+    view.tree.focus(Some(editor), true);
+    view.tree.event(&ContentEvent::Preedit {
+        text: "工具栏组字".into(),
+        selection: 1..3,
+        replacement: None,
+        clauses: vec![],
+    });
+    let baseline = view
+        .tree
+        .text_surface(editor)
+        .unwrap()
+        .input
+        .external_baseline();
+    let button = view
+        .tree
+        .get(nav)
+        .unwrap()
+        .component::<SidePanelNavigation>()
+        .unwrap()
+        .close_id()
+        .unwrap();
+    assert!(
+        view.accessibility_action(button, None, AccessibilityAction::Press)
+            .unwrap()
+            .is_empty()
+    );
+    view.sync().unwrap();
+    assert_eq!(input(&view).selected, Some(SidePanelTabKind::Summary));
+    assert_eq!(view.tree.focused(), Some(editor));
+    assert_eq!(
+        view.tree
+            .text_surface(editor)
+            .unwrap()
+            .input
+            .external_baseline(),
+        baseline
+    );
+    assert!(parent.current_run().unwrap().submissions.is_empty());
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
 async fn empty_panel_launcher_opens_summary_through_the_original_callback() {
     use tekes_agent_components_ui::SidePanelDestination;
     let (runtime, parent, mut view) = setup().await;

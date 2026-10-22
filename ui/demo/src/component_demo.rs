@@ -61,6 +61,7 @@ const ANNOTATION_NAMESPACE: u32 = 45;
 const REASONING_NAMESPACE: u32 = 46;
 const SIDEBAR_OPTIONS_NAMESPACE: u32 = 47;
 const PANEL_LAUNCHER_NAMESPACE: u32 = 48;
+const PANEL_NAVIGATION_NAMESPACE: u32 = 49;
 pub const SELECT_A: ComponentId = ComponentId(100);
 pub const SELECT_B: ComponentId = ComponentId(101);
 pub const RECONNECT: ComponentId = ComponentId(102);
@@ -335,6 +336,52 @@ impl ComponentDemo {
     }
     pub fn new(bindings: impl IntoIterator<Item = Arc<RunBinding>>) -> Result<Self> {
         Self::new_with_summary_labels(bindings, SummaryLabels::default())
+    }
+    pub fn panel_navigation_id(&self) -> Option<ComponentId> {
+        let id = ComponentId((PANEL_NAVIGATION_NAMESPACE as u64) << 32);
+        self.tree.get(id).map(|_| id)
+    }
+    /// Host allocation of the original Kit navigation above its pane body.
+    /// This is in-content SDK toolbar composition, not NSWindow registration.
+    pub fn use_panel_navigation_toolbar(&mut self) -> Result<()> {
+        if self.panel_navigation_id().is_some() {
+            return Ok(());
+        }
+        let input = self
+            .tree
+            .get(self.panel_id())
+            .unwrap()
+            .component::<SidePanel>()
+            .unwrap()
+            .displayed_input()
+            .ok_or_else(|| unsupported("panel input missing"))?
+            .clone();
+        let mut navigation = tekes_agent_components_ui::SidePanelNavigation::new(
+            PANEL_NAVIGATION_NAMESPACE,
+            Default::default(),
+        );
+        navigation
+            .update(&input, !self.composing())
+            .map_err(unsupported)?;
+        self.tree
+            .insert(PANEL_UPLOAD_HOST, Content::new(navigation.id(), navigation))
+            .map_err(|_| unsupported("panel navigation mount"))?;
+        let column = self
+            .tree
+            .get_mut(PANEL_UPLOAD_HOST)
+            .unwrap()
+            .component_mut::<StackContent>()
+            .unwrap();
+        column.children.rotate_right(1);
+        column.model.gap = 0.;
+        let panel = self.panel_id();
+        self.tree
+            .get_mut(panel)
+            .unwrap()
+            .component_mut::<SidePanel>()
+            .unwrap()
+            .set_header_placement(tekes_agent_components_ui::SidePanelHeaderPlacement::Host);
+        self.sync()
     }
     /// Host formatting/hierarchy inputs for the original reusable Summary.
     pub fn new_with_summary_labels(
@@ -3200,6 +3247,16 @@ impl ComponentDemo {
             .expect("SidePanel")
             .update(&input)
             .map_err(unsupported)?;
+        let navigation_enabled = !self.composing();
+        if let Some(id) = self.panel_navigation_id() {
+            self.tree
+                .get_mut(id)
+                .unwrap()
+                .component_mut::<tekes_agent_components_ui::SidePanelNavigation>()
+                .unwrap()
+                .update(&input, navigation_enabled)
+                .map_err(unsupported)?;
+        }
         let launcher = SidePanelLauncherInput {
             revision: input.revision,
             owner: SidePanelLauncherOwner::Run(parent.clone()),
@@ -4062,12 +4119,22 @@ impl ComponentDemo {
             .and_then(|node| node.component::<SummaryView>())
             .map(|summary| summary.take_intents(&actions))
             .unwrap_or_default();
-        let panel_intents = self
+        let mut panel_intents = self
             .tree
             .get(self.panel_id())
             .and_then(|node| node.component::<SidePanel>())
             .map(|panel| panel.take_intents(&actions))
             .unwrap_or_default();
+        if !composing && let Some(id) = self.panel_navigation_id() {
+            panel_intents.extend(
+                self.tree
+                    .get(id)
+                    .unwrap()
+                    .component::<tekes_agent_components_ui::SidePanelNavigation>()
+                    .unwrap()
+                    .take_intents(&records, &self.tree),
+            );
+        }
         let option_intents = self
             .tree
             .get(self.sidebar_options_id())

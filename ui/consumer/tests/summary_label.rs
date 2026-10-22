@@ -26,6 +26,8 @@ mod key_intake;
 mod output_aside_layout;
 #[path = "support/panel_launcher_layout.rs"]
 mod panel_launcher_layout;
+#[path = "support/panel_navigation_layout.rs"]
+mod panel_navigation_layout;
 #[path = "support/popover_intake.rs"]
 mod popover_intake;
 #[path = "support/toolbar_intake.rs"]

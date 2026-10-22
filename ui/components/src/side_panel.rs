@@ -4,10 +4,8 @@ use crate::{
     SidePanelLayout, SidePanelLayoutGeometry, side_panel_layout::AgentPanelBody,
 };
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
-use tekes_agent_presentation::{
-    AgentTask, ChildHistoryLayout, RunScope, SideChat, SideChatPhase, SideChatSnapshot,
-    TaskPanelState,
-};
+use tekes_agent_presentation::{AgentTask, ChildHistoryLayout, RunScope, TaskPanelState};
+pub use tekes_agent_presentation::{SideChat, SideChatPhase, SideChatSnapshot};
 use tekes_ui_controls::{
     ButtonTextRenderer,
     composition::*,
@@ -188,6 +186,14 @@ struct TabMount {
     task_scope: Option<RunScope>,
     child_parent: Option<RunScope>,
 }
+/// The host owns the window/header allocation. Inline controls are retained
+/// solely for the original diagnostic path; Host uses SidePanelNavigation.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SidePanelHeaderPlacement {
+    #[default]
+    InlineDiagnostic,
+    Host,
+}
 impl TabMount {
     fn same_source(&self, tab: &SidePanelTab) -> bool {
         self.layout == tab.child_history_layout
@@ -212,6 +218,7 @@ pub struct PanelContentToken {
 pub struct SidePanel {
     root: ComponentId,
     body: StackContent,
+    detached_chrome: Option<Vec<Content>>,
     layout: SidePanelLayout,
     geometry: Option<SidePanelLayoutGeometry>,
     labels: SidePanelLabels,
@@ -295,6 +302,7 @@ impl SidePanel {
                 ],
             },
             layout: SidePanelLayout::default(),
+            detached_chrome: None,
             geometry: None,
             labels,
             input: None,
@@ -315,6 +323,32 @@ impl SidePanel {
     }
     pub fn displayed_input(&self) -> Option<&SidePanelInput> {
         self.input.as_ref()
+    }
+    pub fn header_placement(&self) -> SidePanelHeaderPlacement {
+        if self.detached_chrome.is_some() {
+            SidePanelHeaderPlacement::Host
+        } else {
+            SidePanelHeaderPlacement::InlineDiagnostic
+        }
+    }
+    /// Retains the exact pane body and mount tokens. Detached diagnostic controls
+    /// have no mounted input/AX subtree or callback admission. The host mounts a
+    /// disjoint SidePanelNavigation from the same input and owns toolbar placement.
+    pub fn set_header_placement(&mut self, placement: SidePanelHeaderPlacement) {
+        if self.header_placement() == placement {
+            return;
+        }
+        match placement {
+            SidePanelHeaderPlacement::Host => {
+                self.detached_chrome = Some(self.body.children.drain(..2).collect());
+            }
+            SidePanelHeaderPlacement::InlineDiagnostic => {
+                self.body
+                    .children
+                    .splice(0..0, self.detached_chrome.take().unwrap());
+            }
+        }
+        self.geometry = None;
     }
     /// Layout-only host input. Does not replace pane content, tokens or editors.
     pub fn set_layout(&mut self, layout: SidePanelLayout) -> Result<(), &'static str> {
@@ -341,7 +375,7 @@ impl SidePanel {
         self.launcher
             .as_ref()
             .or_else(|| {
-                self.body.children[2]
+                self.body_content()
                     .component::<AgentPanelBody>()?
                     .stack
                     .children
@@ -421,7 +455,11 @@ impl SidePanel {
             input.projection_ready
                 && input.selected.is_none()
                 && intent.owner == SidePanelLauncherOwner::Run(input.parent.clone())
-        }) && self.body.children[2]
+        }) && self
+            .body
+            .children
+            .last()
+            .unwrap()
             .component::<AgentPanelBody>()
             .is_some_and(|body| {
                 body.stack
@@ -439,6 +477,9 @@ impl SidePanel {
         Ok(host)
     }
     pub fn tab_id(&self, tab: &SidePanelTabKind) -> Option<ComponentId> {
+        if self.detached_chrome.is_some() {
+            return None;
+        }
         let parent = &self.input.as_ref()?.parent;
         self.mounts
             .get(&Key {
@@ -447,8 +488,24 @@ impl SidePanel {
             })
             .map(|mount| mount.id)
     }
+    fn body_content(&self) -> &Content {
+        self.body
+            .children
+            .iter()
+            .find(|node| node.id() == self.content_slot_id())
+            .unwrap()
+    }
+    fn body_content_mut(&mut self) -> &mut Content {
+        let id = self.content_slot_id();
+        self.body
+            .children
+            .iter_mut()
+            .find(|node| node.id() == id)
+            .unwrap()
+    }
     fn slot(&mut self) -> &mut StackContent {
-        &mut self.body.children[2]
+        &mut self
+            .body_content_mut()
             .component_mut::<AgentPanelBody>()
             .expect("panel content slot")
             .stack
@@ -464,110 +521,7 @@ impl SidePanel {
         self.mounted_custom = false;
     }
     pub fn update(&mut self, input: &SidePanelInput) -> Result<(), &'static str> {
-        if input.revision == 0
-            || self.input.as_ref().is_some_and(|old| {
-                input.revision < old.revision || (input.revision == old.revision && input != old)
-            })
-        {
-            return Err("stale or unversioned side-panel input");
-        }
-        input
-            .parent
-            .validate()
-            .map_err(|_| "invalid panel parent")?;
-        let mut keys = BTreeSet::new();
-        for tab in &input.tabs {
-            let valid = match &tab.kind {
-                SidePanelTabKind::Summary => {
-                    tab.child_history_layout.is_none()
-                        && tab.child_parent.is_none()
-                        && tab.task_scope.is_none()
-                        && tab.task_state.is_none()
-                }
-                SidePanelTabKind::Task { task_id } => {
-                    let scope_valid = tab.task_scope.as_ref().is_none_or(|scope| {
-                        scope.validate().is_ok()
-                            && scope.endpoint_id == input.parent.endpoint_id
-                            && scope.thread_id == input.parent.thread_id
-                    });
-                    let state_valid = match &tab.task_state {
-                        Some(state) => {
-                            state.active_task_id() == Some(task_id.as_str())
-                                && state.parent_scope() == Some(&input.parent)
-                                && state.value.as_ref().map(|task| &task.scope)
-                                    == tab.task_scope.as_ref()
-                        }
-                        None => tab.task_scope.is_some(),
-                    };
-                    !task_id.is_empty()
-                        && scope_valid
-                        && state_valid
-                        && tab.child_history_layout.is_none()
-                        && tab.child_parent.is_none()
-                }
-                SidePanelTabKind::Subagent { child_id } => {
-                    !child_id.is_empty()
-                        && child_id != &input.parent.session_id
-                        && tab.child_history_layout.is_some()
-                        && tab.child_parent.as_ref().is_none_or(|parent| {
-                            parent.validate().is_ok()
-                                && parent.endpoint_id == input.parent.endpoint_id
-                                && parent.thread_id == input.parent.thread_id
-                                && parent.session_id != *child_id
-                        })
-                        && tab.task_scope.is_none()
-                        && tab.task_state.is_none()
-                }
-                SidePanelTabKind::SideChat { session_id } => {
-                    input.side_chats.chats.get(session_id).is_some_and(|chat| {
-                        chat.parent == input.parent
-                            && chat.scope.endpoint_id == input.parent.endpoint_id
-                            && chat.scope.session_id == *session_id
-                            && chat.scope.validate().is_ok()
-                            && chat.scope.session_id != input.parent.session_id
-                            && chat.scope.thread_id == chat.scope.session_id
-                    }) && tab.child_history_layout.is_none()
-                        && tab.child_parent.is_none()
-                        && tab.task_scope.is_none()
-                        && tab.task_state.is_none()
-                }
-            };
-            if !valid
-                || !keys.insert(Key {
-                    parent: input.parent.clone(),
-                    tab: tab.kind.clone(),
-                })
-            {
-                return Err("invalid, foreign or duplicate Agent tab");
-            }
-        }
-        if input.selected.as_ref().is_some_and(|tab| {
-            !keys.contains(&Key {
-                parent: input.parent.clone(),
-                tab: tab.clone(),
-            })
-        }) {
-            return Err("selected Agent tab is not open");
-        }
-        if let Some(previous) = &self.input
-            && previous.parent == input.parent
-        {
-            for tab in &previous.tabs {
-                if let SidePanelTabKind::SideChat { session_id } = &tab.kind
-                    && !keys.contains(&Key {
-                        parent: input.parent.clone(),
-                        tab: tab.kind.clone(),
-                    })
-                    && input
-                        .side_chats
-                        .chats
-                        .get(session_id)
-                        .is_some_and(|chat| chat.parent == input.parent)
-                {
-                    return Err("retain SideChat until shared controller confirms discard");
-                }
-            }
-        }
+        let keys = validated_keys(input, self.input.as_ref())?;
         let changed_parent = self
             .input
             .as_ref()
@@ -712,7 +666,11 @@ impl SidePanel {
                 self.retained.retain(|key, _| key.parent != removed);
             }
         }
-        let header = self.body.children[0]
+        let chrome = self
+            .detached_chrome
+            .as_mut()
+            .unwrap_or(&mut self.body.children);
+        let header = chrome[0]
             .component_mut::<StackContent>()
             .expect("panel tab strip");
         let old = std::mem::take(&mut header.children);
@@ -760,7 +718,11 @@ impl SidePanel {
                 .side_chats
                 .unknown_creation_for(&input.parent)
                 .is_none();
-        let toolbar = self.body.children[1]
+        let chrome = self
+            .detached_chrome
+            .as_mut()
+            .unwrap_or(&mut self.body.children);
+        let toolbar = chrome[1]
             .component_mut::<StackContent>()
             .expect("panel controls");
         toolbar.children[0]
@@ -848,16 +810,15 @@ impl SidePanel {
         }
         let message =
             (input.projection_ready && !messages.is_empty()).then(|| messages.join(" · "));
-        if self.body.children.len() == 4 {
-            self.body.children.pop();
-        }
+        let status_id = ComponentId(self.root.0 + 7);
+        self.body.children.retain(|node| node.id() != status_id);
         if let Some(message) = message {
             self.body.children.push(Content::new(
                 ComponentId(self.root.0 + 7),
                 TextContent::new(message),
             ));
         }
-        self.body.children[2]
+        self.body_content_mut()
             .component_mut::<AgentPanelBody>()
             .unwrap()
             .framed = input.projection_ready && input.selected.is_some();
@@ -920,6 +881,7 @@ impl SidePanel {
         let mut intents: Vec<_> = actions
             .iter()
             .filter(|action| action.kind == ContentActionKind::Activate)
+            .filter(|_| self.detached_chrome.is_none())
             .filter_map(|action| self.bindings.get(&action.target).cloned())
             .collect();
         if let Some(launcher) = self.launcher() {
@@ -952,7 +914,11 @@ impl Component for SidePanel {
             layout.content(),
             layout.visible_clip().unwrap_or_default(),
         );
-        let body = self.body.children[2]
+        let body = self
+            .body
+            .children
+            .last()
+            .unwrap()
             .component::<AgentPanelBody>()
             .unwrap()
             .layout
@@ -967,4 +933,122 @@ impl Component for SidePanel {
     fn semantics(&self) -> ContentSemantics {
         ContentSemantics::new(ContentRole::Group, &self.labels.name)
     }
+}
+
+fn validated_keys(
+    input: &SidePanelInput,
+    previous: Option<&SidePanelInput>,
+) -> Result<BTreeSet<Key>, &'static str> {
+    if input.revision == 0
+        || previous.is_some_and(|old| {
+            input.revision < old.revision || (input.revision == old.revision && input != old)
+        })
+    {
+        return Err("stale or unversioned side-panel input");
+    }
+    input
+        .parent
+        .validate()
+        .map_err(|_| "invalid panel parent")?;
+    let mut keys = BTreeSet::new();
+    for tab in &input.tabs {
+        let valid = match &tab.kind {
+            SidePanelTabKind::Summary => {
+                tab.child_history_layout.is_none()
+                    && tab.child_parent.is_none()
+                    && tab.task_scope.is_none()
+                    && tab.task_state.is_none()
+            }
+            SidePanelTabKind::Task { task_id } => {
+                let scope_valid = tab.task_scope.as_ref().is_none_or(|scope| {
+                    scope.validate().is_ok()
+                        && scope.endpoint_id == input.parent.endpoint_id
+                        && scope.thread_id == input.parent.thread_id
+                });
+                let state_valid = match &tab.task_state {
+                    Some(state) => {
+                        state.active_task_id() == Some(task_id.as_str())
+                            && state.parent_scope() == Some(&input.parent)
+                            && state.value.as_ref().map(|task| &task.scope)
+                                == tab.task_scope.as_ref()
+                    }
+                    None => tab.task_scope.is_some(),
+                };
+                !task_id.is_empty()
+                    && scope_valid
+                    && state_valid
+                    && tab.child_history_layout.is_none()
+                    && tab.child_parent.is_none()
+            }
+            SidePanelTabKind::Subagent { child_id } => {
+                !child_id.is_empty()
+                    && child_id != &input.parent.session_id
+                    && tab.child_history_layout.is_some()
+                    && tab.child_parent.as_ref().is_none_or(|parent| {
+                        parent.validate().is_ok()
+                            && parent.endpoint_id == input.parent.endpoint_id
+                            && parent.thread_id == input.parent.thread_id
+                            && parent.session_id != *child_id
+                    })
+                    && tab.task_scope.is_none()
+                    && tab.task_state.is_none()
+            }
+            SidePanelTabKind::SideChat { session_id } => {
+                input.side_chats.chats.get(session_id).is_some_and(|chat| {
+                    chat.parent == input.parent
+                        && chat.scope.endpoint_id == input.parent.endpoint_id
+                        && chat.scope.session_id == *session_id
+                        && chat.scope.validate().is_ok()
+                        && chat.scope.session_id != input.parent.session_id
+                        && chat.scope.thread_id == chat.scope.session_id
+                }) && tab.child_history_layout.is_none()
+                    && tab.child_parent.is_none()
+                    && tab.task_scope.is_none()
+                    && tab.task_state.is_none()
+            }
+        };
+        if !valid
+            || !keys.insert(Key {
+                parent: input.parent.clone(),
+                tab: tab.kind.clone(),
+            })
+        {
+            return Err("invalid, foreign or duplicate Agent tab");
+        }
+    }
+    if input.selected.as_ref().is_some_and(|tab| {
+        !keys.contains(&Key {
+            parent: input.parent.clone(),
+            tab: tab.clone(),
+        })
+    }) {
+        return Err("selected Agent tab is not open");
+    }
+    if let Some(previous) = previous
+        && previous.parent == input.parent
+    {
+        for tab in &previous.tabs {
+            if let SidePanelTabKind::SideChat { session_id } = &tab.kind
+                && !keys.contains(&Key {
+                    parent: input.parent.clone(),
+                    tab: tab.kind.clone(),
+                })
+                && input
+                    .side_chats
+                    .chats
+                    .get(session_id)
+                    .is_some_and(|chat| chat.parent == input.parent)
+            {
+                return Err("retain SideChat until shared controller confirms discard");
+            }
+        }
+    }
+    Ok(keys)
+}
+
+pub(crate) fn validate_panel_navigation_input(
+    input: &SidePanelInput,
+    previous: Option<&SidePanelInput>,
+) -> Result<(), &'static str> {
+    validated_keys(input, previous).map(|_| ())
 }

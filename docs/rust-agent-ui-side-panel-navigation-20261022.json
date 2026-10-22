@@ -1,0 +1,156 @@
+{
+  "format": 1,
+  "baseCommit": "7ff99718ed380ce13452b66c62ab39ea9ab57505",
+  "status": "experimental-same-process-content-toolbar",
+  "sdk": {
+    "commit": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+    "packages": 8,
+    "reviewedInputs": 243,
+    "manifestSha256": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c"
+  },
+  "agentKitSources": {
+    "latestPublishedTagBaseline": "v0.3.8",
+    "kind": "in-repository-development-paths",
+    "unpublishedSharedAdditions": true
+  },
+  "program": {
+    "sha256": "0583ddab0447604f20148dc1141eb17cc581c5a80ae6fffee082d463aac630dd",
+    "profile": {
+      "debug": 0,
+      "incremental": false
+    },
+    "rustToolchain": "1.95.0",
+    "recordedRepositoryInputs": 363,
+    "notRustcInputClosureClaim": true,
+    "earlyProgramPreservedSha256": "a535b154fc5e8fdafc2ea7b79491876dcb86dce8e4fb2ae60796c07ddad24623"
+  },
+  "localFullSuite": {
+    "passed": 531,
+    "ignored": 1,
+    "knownIgnoredIssue": 49,
+    "beforeFinalOwnerGuard": true
+  },
+  "finalFocused": {
+    "passed": 28,
+    "failed": 0
+  },
+  "strictClippy": true,
+  "demoBuild": true,
+  "fmt": true,
+  "boundaries": true,
+  "threeHarnesses": [
+    {
+      "harness": "pi",
+      "offscreen": true,
+      "nativeInteraction": false,
+      "sharedRuntime": true,
+      "panelNavigation": {
+        "bodySlotMounted": true,
+        "controlledInputMatches": true,
+        "crossProcess": false,
+        "hostHeader": true,
+        "inlineDiagnosticHidden": true,
+        "mounted": true,
+        "nativeInteraction": false,
+        "nativeWindowToolbar": false
+      },
+      "transcriptContent": {
+        "userTrailing": true,
+        "machineLeading": true,
+        "completeTranscript": false
+      }
+    },
+    {
+      "harness": "dsh",
+      "offscreen": true,
+      "nativeInteraction": false,
+      "sharedRuntime": true,
+      "panelNavigation": {
+        "bodySlotMounted": true,
+        "controlledInputMatches": true,
+        "crossProcess": false,
+        "hostHeader": true,
+        "inlineDiagnosticHidden": true,
+        "mounted": true,
+        "nativeInteraction": false,
+        "nativeWindowToolbar": false
+      },
+      "transcriptContent": {
+        "userTrailing": true,
+        "machineLeading": true,
+        "completeTranscript": false
+      }
+    },
+    {
+      "harness": "native",
+      "offscreen": true,
+      "nativeInteraction": false,
+      "sharedRuntime": true,
+      "panelNavigation": {
+        "bodySlotMounted": true,
+        "controlledInputMatches": true,
+        "crossProcess": false,
+        "hostHeader": true,
+        "inlineDiagnosticHidden": true,
+        "mounted": true,
+        "nativeInteraction": false,
+        "nativeWindowToolbar": false
+      },
+      "transcriptContent": {
+        "userTrailing": true,
+        "machineLeading": true,
+        "completeTranscript": false
+      }
+    }
+  ],
+  "harnessScope": "Owned main session/Summary data to offscreen GPU with isolated local provider; Native UI-only excludes lifecycle/child; not full real task/subagent/SideChat window acceptance",
+  "sourceSha256": {
+    "scripts/test-real-session-endpoints.py": "674e865a750bbe04247f9313884216d98df9d9b2dfd997b605ab54e2188d44fd",
+    "ui/components/src/lib.rs": "2b9dd5156cdd94b4117241e0938784fc2b3ebce5a73907cd461e6c373fc4fe28",
+    "ui/components/src/side_panel.rs": "2e6a1a102e24856da8532c174e1d8700976e61caee1c80af75c3145499253094",
+    "ui/components/src/side_panel_navigation.rs": "10d4754ccc07669b4c71d8fd2405e468f9b41af26dd83f018c42ee73435c43ea",
+    "ui/consumer/tests/side_panel_navigation.rs": "51ba3f35324a387abd4b44e582ef721e84e8085ec94f129255116774d849b4ba",
+    "ui/consumer/tests/summary_label.rs": "8064fade5cc183270f3f9cbd4ef1ba5bdc83c41046b69de5e814c95ca62c3945",
+    "ui/consumer/tests/support/panel_navigation_layout.rs": "bb6c0816fde2ecc111e42cc774c92c96a4f43e5aa79412711a0d604b7c6f8b28",
+    "ui/demo/src/component_demo.rs": "f977cfa3423572eb834845a9836f4f6b950b6141e63aaf86dbb407ed86ad9649",
+    "ui/demo/src/components_native.rs": "e9f94c0d1b3f77f2e7a357dadaac80ac08c5aba7c440efa27b3a5008bc063d6c",
+    "ui/demo/tests/panel_navigation.rs": "c61a1c81ee2fb80ab084daedc0f7f44aaa909537ae901bffbcda2e9dcad0f9f0"
+  },
+  "referenceSha256": {
+    "TekesClientKit/Sources/ToolPanels/ClientSidePanelHostView.swift": "435bb049951e5419a583b844d127dfac63ca4bcca98b2dc889713c246cfb65fb",
+    "TekesClientKit/Sources/ToolPanels/SidePanelTab.swift": "aa30887f587992d22317b2b57ca519c0914fb8308a4999e056a286a8078a6dbf",
+    "Tekes/Tekes/AppShell/MainWindowToolbar.swift": "ced2e2e7b2743e5fb8045ebf963cbe4a7ac9fcf6318751a86f3c898a520c8f28",
+    "Tekes/Tekes/ClientAgentHostAdapters.swift": "7d907c654ec3df76c7a8b492e32bbc68f1bd4d0b46044cae615aa712b9f67c71"
+  },
+  "artifactSha256": {
+    ".runtime-fixtures/side-panel-navigation-20261022/build.log": "a97cd1173de36337b0c780bdf54df70b0e3ca029f3090b6e98956e77e54fb4d4",
+    ".runtime-fixtures/side-panel-navigation-20261022/check-2.log": "4c39dac8d08cfe9d39e88fc9141205ce4562e4519876902bebf48561255a282d",
+    ".runtime-fixtures/side-panel-navigation-20261022/check.log": "d61429bc7c43363d0055123a5e64657f2898233f48c58328147d2dbe03346c6b",
+    ".runtime-fixtures/side-panel-navigation-20261022/cli-guard-receipt.json": "ef1929da5d291db15a6f4699d4aa4d619f5f022843c703b5071031eb0728b826",
+    ".runtime-fixtures/side-panel-navigation-20261022/clippy.log": "d7775a98aeea937235b06b6e6729cd7f71e2e6a724be6e5373ec6fe4d8f657ba",
+    ".runtime-fixtures/side-panel-navigation-20261022/final-build.log": "7e8397b3c3d5ef73830e57f61ffa6f2cfd565f338d3d371aefe79dbf3b020764",
+    ".runtime-fixtures/side-panel-navigation-20261022/final-clippy.log": "b86f5848e5f062ce66250c8b6379d97c7acf63d39ab4c8998c463dc4ff194825",
+    ".runtime-fixtures/side-panel-navigation-20261022/final-focused.log": "9ca22e385aa12d1ba2228dada85718d138550ddf65689667bdf4a362aa8cd6f7",
+    ".runtime-fixtures/side-panel-navigation-20261022/full-tests.log": "4aa89ded30a47e83e0c295555621031b67b3f00bb854fd538f44ca02157732db",
+    ".runtime-fixtures/side-panel-navigation-20261022/program-final.json": "af321aa0fadc08853fb08021878a1ff2d9e9795dcfa79ddeeec48dcc900992e2",
+    ".runtime-fixtures/side-panel-navigation-20261022/program.json": "3a771360ba06be730d2b56ad8026619819147cdb62eb5e67e6f1a88892cc0bd4",
+    ".runtime-fixtures/side-panel-navigation-20261022/tests.log": "6a269b46998160bd90bb60894925a7d3f2c27d32d43270b312643bb1648b79ea",
+    ".runtime-fixtures/side-panel-navigation-20261022/three-dsh.png": "55aac60129a9938e7d394fd9b05872f4ac1d379d1f6b2253e920fbc7f49d2991",
+    ".runtime-fixtures/side-panel-navigation-20261022/three-final-dsh.png": "df42868163babc5890091267624a42f0d7b309ae07128bdb015e36dec68ffa96",
+    ".runtime-fixtures/side-panel-navigation-20261022/three-final-pi.png": "711c0c5e71330716a61c5a7b494d200ec2dc99103775273d5a6e50e1f58c5cb0",
+    ".runtime-fixtures/side-panel-navigation-20261022/three-final.log": "1307c3684da2c580248098d7fbba6701a18c8af4d7e15603eeba5608cba6b419",
+    ".runtime-fixtures/side-panel-navigation-20261022/three-final.png": "b153c3d53af6634712c8f399f2968d18c7c21452ffb1fb32a53b0d9392f48300",
+    ".runtime-fixtures/side-panel-navigation-20261022/three-pi.png": "dd8681c96302ebcf53e4d2d8252809e909b5673a470163501448d981451b133a",
+    ".runtime-fixtures/side-panel-navigation-20261022/three.log": "60d4dd3444ec1e724deaaf47f7ef47d5e1c4ea768909acb0fbe1fc60e7138144",
+    ".runtime-fixtures/side-panel-navigation-20261022/three.png": "2aef3002d78a08e2b0b15221ebbc1fa62a8dc7fa7c3e0bc9507c1a2cace41fd7"
+  },
+  "upstreamWindowContract": "https://github.com/TekesApps/TekesUI/issues/14#issuecomment-6338249373",
+  "nativeWindowToolbar": false,
+  "crossProcess": false,
+  "nativeInteraction": false,
+  "cache": {
+    "newIndependentTarget": false,
+    "deletedBytes": 0,
+    "retained": "Two actually tested frozen executables and evidence, approximately 140 MiB; current shared target remains needed"
+  }
+}

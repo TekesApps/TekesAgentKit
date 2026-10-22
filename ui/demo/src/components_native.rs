@@ -3438,6 +3438,9 @@ pub fn run() {
         ComponentDemo::new(bindings).unwrap()
     };
     view.set_sidebar_title_comparator(sidebar_collation::compare);
+    if args.iter().any(|arg| arg == "--panel-navigation-toolbar") {
+        view.use_panel_navigation_toolbar().unwrap();
+    }
     if sidebar_query_selftest {
         sidebar_query_probe::Probe::prepare(&view);
     }
@@ -4769,6 +4772,16 @@ pub fn run() {
             "sharedRuntime": Arc::ptr_eq(host.sidebar.runtime(), &host.runtime),
             "sidebarMounted": host.view.tree.get(host.view.sidebar_id()).is_some(),
             "summaryMounted": host.view.tree.get(host.view.summary_id()).is_some(),
+            "hostPanelNavigation": host.view.panel_navigation_id().is_some(),
+            "panelNavigationProof": host.view.panel_navigation_id().map(|id| {
+                let navigation = host.view.tree.get(id).unwrap().component::<tekes_agent_components_ui::SidePanelNavigation>().unwrap();
+                let panel = host.view.tree.get(host.view.panel_id()).unwrap().component::<tekes_agent_components_ui::SidePanel>().unwrap();
+                serde_json::json!({"mounted":true,"controlledInputMatches":navigation.displayed_input()==panel.displayed_input(),
+                    "hostHeader":panel.header_placement()==tekes_agent_components_ui::SidePanelHeaderPlacement::Host,
+                    "inlineDiagnosticHidden":host.view.tree.get(panel.close_id()).is_none(),
+                    "bodySlotMounted":host.view.tree.get(panel.content_slot_id()).is_some(),
+                    "nativeWindowToolbar":false,"crossProcess":false,"nativeInteraction":false})
+            }),
             "modelChoiceProof":model_proof,
             "contextProof":context_proof,
             "annotationProof":annotation_proof,

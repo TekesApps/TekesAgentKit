@@ -19,7 +19,8 @@ parser.add_argument('--ui-demo',type=Path,help='Optional already-built AgentKit 
 parser.add_argument('--ui-native-app',type=Path,help='Opt-in normal LaunchServices native launch of the exact --ui-demo APPL bundle; offscreen remains direct, no activation retries')
 parser.add_argument('--ui-native-observe-frontmost',action='store_true',help='Read-only macOS frontmost PID/bundle trace during native probes; never activates an app')
 parser.add_argument('--ui-output',type=Path)
-parser.add_argument('--ui-components',action='store_true',help='Mount formal Composer/Indicators with RunBinding; structured Transcript remains unavailable')
+parser.add_argument('--ui-components',action='store_true',help='Mount RunPort/Composer/Indicators with RunBinding; canonical mixed content uses --ui-transcript-content')
+parser.add_argument('--ui-panel-navigation-toolbar',action='store_true',help='Use original Kit navigation in a host SDK toolbar, hide inline diagnostic controls; offscreen only, no native-window toolbar registration')
 parser.add_argument('--ui-model-choices',action='store_true',help='Exercise public model choices and explicit Send preparation in isolated offscreen component sessions')
 parser.add_argument('--ui-context',action='store_true',help='Exercise draft context cards, explicit removal and annotation/reference return in isolated component sessions')
 parser.add_argument('--ui-initial-presets',action='store_true',help='Exercise public initial preset selection through shared create and prompt in isolated component sessions')
@@ -100,6 +101,10 @@ if args.ui_output and not args.ui_demo:
     parser.error("--ui-output requires --ui-demo")
 if args.ui_components and not args.ui_demo:
     parser.error("--ui-components requires --ui-demo")
+if args.ui_panel_navigation_toolbar and not (args.ui_demo and args.ui_components):
+    parser.error('--ui-panel-navigation-toolbar requires --ui-demo and --ui-components')
+if args.ui_panel_navigation_toolbar and any((args.ui_native_reading,args.ui_native_feedback,args.ui_native_stream_reading,args.ui_native_stream,args.ui_native_run_controls,args.ui_native_readonly)):
+    parser.error('--ui-panel-navigation-toolbar is offscreen-only; do not combine with native probes that use the diagnostic header')
 if not any((args.pi_root,args.dsh_root,args.kernel_root)):parser.error("supply at least one runtime root")
 if args.kernel_ui_only and not (args.kernel_root and args.ui_demo and args.ui_components):
     parser.error('--kernel-ui-only requires Kernel and a formal component demo')
@@ -376,6 +381,7 @@ def ui_smoke(config, first, bounded_child=None):
     if bounded_child:output=output.with_name(output.stem+'-bounded'+output.suffix)
     if kind!='native':output=output.with_name(output.stem+'-'+kind+output.suffix)
     mode=['--components'] if args.ui_components else []
+    if args.ui_panel_navigation_toolbar:mode+=['--panel-navigation-toolbar']
     if search_query:mode+=['--sidebar-query',search_query,'--sidebar-query-proof']
     if bounded_child:mode+=['--bounded-child-proof','--bounded-child-id',bounded_child]
     if args.ui_feedback_read:mode+=['--feedback-read-proof']
@@ -395,6 +401,11 @@ def ui_smoke(config, first, bounded_child=None):
     ui=subprocess.run([str(args.ui_demo.resolve()),*mode,'--endpoint-config',str(path),'--offscreen',str(output)],env=ui_env,text=True,capture_output=True,timeout=60)
     assert ui.returncode==0,ui.stderr[-3000:]
     receipt=next(json.loads(line) for line in ui.stdout.splitlines() if line.startswith('{') and json.loads(line).get('offscreen'))
+    if args.ui_panel_navigation_toolbar:
+        proof=receipt['panelNavigationProof']
+        assert receipt['hostPanelNavigation'] and all(proof[key] for key in ('mounted','controlledInputMatches','hostHeader','inlineDiagnosticHidden','bodySlotMounted')),proof
+        assert not any(proof[key] for key in ('nativeWindowToolbar','crossProcess','nativeInteraction')),proof
+        print(kind.upper()+'_UI_PANEL_NAVIGATION_OK controlled-public-input+original-SDK-toolbar+body-only-panel; offscreen-only; window-registration=false; cross-process=false',flush=True)
     if search_query:
         search=receipt['sidebarSearchProof']
         assert search['publicTypedSearch'] and search['sharedController'] and search['expectedTargetFound'] and search['noSubmission'],search
