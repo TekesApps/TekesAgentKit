@@ -1,5 +1,7 @@
 # 思考来源：原归一化链与公开帧工厂（2026-10-23）
 
+后续整帧输入及 prepared-plan 接线见[整帧阶段](rust-agent-ui-thinking-parent-20261023.md)；本页保留来源阶段当时的验证范围。
+
 在 `f5dfd8e` 的独立 OutputMessage 接线上，补充原 Session/Transcript presentation 的来源适配。现在可直接从同一不可变 RunSnapshot 或只读 PaneSnapshot 生成思考帧；宿主无需维护到达顺序或查询一次新的 runtime。**TranscriptContent/RunPort 的受控输入、prepared-plan 和布局接线仍未完成，本页不是完整 UI 交付或真实三端/原生验收。**
 
 ## 对照源码后的契约修正

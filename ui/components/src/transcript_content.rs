@@ -56,6 +56,8 @@ pub struct TranscriptContentUpdate<'a> {
     base_header_revision: (u64, u64),
     header_revision: (u64, u64),
     rows: Vec<(TranscriptContentRowKey, ComponentId)>,
+    thinking_input: Option<crate::TranscriptThinkingDisplayInput>,
+    base_applied_thinking: Option<crate::TranscriptThinkingDisplayInput>,
 }
 impl TranscriptContentUpdate<'_> {
     pub fn rows(&self) -> &[(TranscriptContentRowKey, ComponentId)] {
@@ -151,6 +153,8 @@ pub struct TranscriptContent {
     turn_target_owner: std::sync::Arc<()>,
     historical_control: Option<crate::HistoricalInputControl>,
     historical_generation: u64,
+    thinking_input: Option<crate::TranscriptThinkingDisplayInput>,
+    applied_thinking: Option<crate::TranscriptThinkingDisplayInput>,
 }
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct RunTranscriptLayout {
@@ -219,10 +223,63 @@ impl TranscriptContent {
             turn_target_owner: std::sync::Arc::new(()),
             historical_control: None,
             historical_generation: 0,
+            thinking_input: None,
+            applied_thinking: None,
         })
     }
     pub fn id(&self) -> ComponentId {
         self.root
+    }
+    /// Controlled display preference/tick, independent of Run authority. Call
+    /// before preparing the original reading transaction, then publish normally.
+    /// Once enabled it cannot silently fall back to uncontrolled reasoning.
+    pub fn set_thinking_display(
+        &mut self,
+        input: crate::TranscriptThinkingDisplayInput,
+    ) -> Result<(), &'static str> {
+        if input.display_revision == 0 {
+            return Err("thinking display revision must be nonzero");
+        }
+        if let Some(old) = self.thinking_input {
+            if input.display_revision < old.display_revision {
+                return Err("stale thinking display input");
+            }
+            if input.display_revision == old.display_revision && input != old {
+                return Err("conflicting thinking display input");
+            }
+        }
+        self.thinking_input = Some(input);
+        Ok(())
+    }
+    pub fn thinking_display(&self) -> Option<crate::TranscriptThinkingDisplayInput> {
+        self.thinking_input
+    }
+    fn plan_with_thinking<'a>(
+        &self,
+        snapshot: &TranscriptSnapshot,
+        document: &'a TranscriptDocument<'a>,
+        timing: &crate::TranscriptFootnoteTiming,
+        publication: u64,
+        epoch: u64,
+    ) -> Result<Vec<Planned<'a>>, &'static str> {
+        let mut rows = plan(snapshot, document, &self.labels, timing)?;
+        if let Some(input) = self.thinking_input {
+            let mut frames = BTreeMap::new();
+            for row in &mut rows {
+                if let PlannedContent::Output(output, Some(section)) = &row.content
+                    && output.item.kind == TranscriptItemKind::Assistant
+                {
+                    if !frames.contains_key(section.id) {
+                        let frame = snapshot
+                            .thinking_frame(&self.scope, section.id, publication, epoch, input)
+                            .map_err(|_| "transcript thinking source unavailable")?;
+                        frames.insert(section.id, frame);
+                    }
+                    row.thinking = frames.get(section.id).cloned();
+                }
+            }
+        }
+        Ok(rows)
     }
     pub fn footnote_timing(&self) -> &crate::TranscriptFootnoteTiming {
         &self.timing
@@ -416,6 +473,8 @@ impl TranscriptContent {
             && self.last.as_ref() == Some(snapshot)
             && &self.timing == timing
             && self.header_revision == header_revision
+            && self.applied_thinking == self.thinking_input
+            && self.publication == publication
         {
             for node in &mut self.rows.children {
                 if let Some(footer) = node.component_mut::<TurnFootnote>() {
@@ -436,7 +495,7 @@ impl TranscriptContent {
         }
         let document =
             TranscriptDocument::read(snapshot).map_err(|_| "invalid transcript document")?;
-        let plan = plan(snapshot, &document, &self.labels, timing)?;
+        let plan = self.plan_with_thinking(snapshot, &document, timing, publication, epoch)?;
         self.validate_plan(&plan, publication, epoch, available)?;
         if header_revision != self.current_header_revision() {
             return Err("tool header inputs changed during preparation");
@@ -542,6 +601,7 @@ impl TranscriptContent {
             }
         }
         self.header_revision = header_revision;
+        self.applied_thinking = self.thinking_input;
         self.last = Some(snapshot.clone());
         self.timing = timing.clone();
         self.arranged_revision = None;
@@ -586,7 +646,7 @@ impl TranscriptContent {
         let header_revision = self.checked_header_revision(epoch)?;
         let document =
             TranscriptDocument::read(snapshot).map_err(|_| "invalid transcript document")?;
-        let planned = plan(snapshot, &document, &self.labels, timing)?;
+        let planned = self.plan_with_thinking(snapshot, &document, timing, publication, epoch)?;
         let desired: BTreeSet<_> = planned.iter().map(|row| row.key.clone()).collect();
         let index: BTreeMap<_, _> = self
             .keys
@@ -638,6 +698,8 @@ impl TranscriptContent {
             base_header_revision: self.header_revision,
             header_revision,
             rows,
+            thinking_input: self.thinking_input,
+            base_applied_thinking: self.applied_thinking,
         })
     }
     /// Recheck before committing. Stale plans cannot change the tree, controls
@@ -654,6 +716,8 @@ impl TranscriptContent {
             || self.timing != prepared.base_timing
             || self.historical_generation != prepared.base_historical_generation
             || self.header_revision != prepared.base_header_revision
+            || self.thinking_input != prepared.thinking_input
+            || self.applied_thinking != prepared.base_applied_thinking
         {
             return Err("stale or foreign transcript update plan");
         }
@@ -734,7 +798,7 @@ impl TranscriptContent {
         let header_revision = self.checked_header_revision(epoch)?;
         let document =
             TranscriptDocument::read(snapshot).map_err(|_| "invalid transcript document")?;
-        let plan = plan(snapshot, &document, &self.labels, timing)?;
+        let plan = self.plan_with_thinking(snapshot, &document, timing, publication, epoch)?;
         self.validate_plan(&plan, publication, epoch, available && !snapshot.is_stale)?;
         if header_revision != self.current_header_revision() {
             return Err("tool header inputs changed during preparation");
@@ -938,9 +1002,20 @@ impl TranscriptContent {
                     .check_update(&self.scope, publication, epoch, input)?;
             }
             PlannedContent::Output(output, section) => {
-                node.component::<OutputMessage>()
-                    .ok_or("transcript message role changed")?
-                    .check_update(&self.scope, publication, epoch, output, *section)?;
+                let view = node
+                    .component::<OutputMessage>()
+                    .ok_or("transcript message role changed")?;
+                if let Some(thinking) = &row.thinking {
+                    view.check_update_with_thinking(
+                        publication,
+                        epoch,
+                        output,
+                        *section,
+                        thinking,
+                    )?;
+                } else {
+                    view.check_update(&self.scope, publication, epoch, output, *section)?;
+                }
             }
             PlannedContent::Tools(tools) => {
                 let model = self.labels.tool_run.summary(
@@ -1014,10 +1089,14 @@ impl TranscriptContent {
                     None
                 })?;
             }
-            PlannedContent::Output(output, section) => node
-                .component_mut::<OutputMessage>()
-                .unwrap()
-                .update(&self.scope, publication, epoch, output, *section)?,
+            PlannedContent::Output(output, section) => {
+                let view = node.component_mut::<OutputMessage>().unwrap();
+                if let Some(thinking) = &row.thinking {
+                    view.update_with_thinking(publication, epoch, output, *section, thinking)?;
+                } else {
+                    view.update(&self.scope, publication, epoch, output, *section)?;
+                }
+            }
             PlannedContent::Tools(_) => {
                 unreachable!("parent installs preflighted original tool members")
             }
@@ -1275,6 +1354,7 @@ struct Planned<'a> {
     key: TranscriptContentRowKey,
     alias: Option<TranscriptContentRowKey>,
     content: PlannedContent<'a>,
+    thinking: Option<crate::TranscriptThinkingFrame>,
 }
 impl Planned<'_> {
     fn namespaces(&self) -> u32 {
@@ -1301,6 +1381,7 @@ fn label(key: TranscriptContentRowKey, text: String) -> Planned<'static> {
     Planned {
         key,
         alias: None,
+        thinking: None,
         content: PlannedContent::Label(text),
     }
 }
@@ -1329,6 +1410,7 @@ fn plan<'a>(
             result.push(Planned {
                 key: Key::Message(output.key.into()),
                 alias: None,
+                thinking: None,
                 content: PlannedContent::Output(*output, None),
             });
         }
@@ -1387,6 +1469,7 @@ fn plan<'a>(
             result.push(Planned {
                 key: Key::TurnFootnote(turn.id.clone()),
                 alias: None,
+                thinking: None,
                 content: PlannedContent::Footnote(turn, output, display, target),
             });
         }
@@ -1431,6 +1514,7 @@ fn event_row<'a>(
                     .ok_or("missing transcript input")?;
                 Some(Planned {
                     key: Key::Message(input.key.into()),
+                    thinking: None,
                     alias: input
                         .reconciliation_key()
                         .map(|key| Key::Message(key.into())),
@@ -1444,6 +1528,7 @@ fn event_row<'a>(
                     .ok_or("missing transcript output")?;
                 Some(Planned {
                     key: Key::Message(output.key.into()),
+                    thinking: None,
                     alias: output
                         .reconciliation_key()
                         .map(|key| Key::Message(key.into())),
@@ -1461,6 +1546,7 @@ fn event_row<'a>(
             Some(Planned {
                 key: Key::Tool(tool.id.clone()),
                 alias: None,
+                thinking: None,
                 content: PlannedContent::Tools(vec![(
                     tool,
                     if tool.source_position.is_some() {
@@ -1479,6 +1565,7 @@ fn event_row<'a>(
             Some(Planned {
                 key: Key::Tool(tool.id.clone()),
                 alias: None,
+                thinking: None,
                 content: PlannedContent::Tools(vec![(
                     tool,
                     if tool.result_position.is_some() {

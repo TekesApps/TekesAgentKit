@@ -8,6 +8,23 @@ pub fn thinking_policy<'a>(
     tekes_agent_components_ui::TranscriptThinkingPolicy::read(input)
         .map_err(|error| error.to_string())
 }
+/// The independent host forwards preference before the normal Run plan. It
+/// does not calculate message frames or issue endpoint reads.
+pub fn prepare_thinking_run<'a>(
+    view: &mut tekes_agent_components_ui::RunPort,
+    snapshot: &'a tekes_agent_components_ui::RunSnapshot,
+    input: tekes_agent_components_ui::TranscriptThinkingDisplayInput,
+    paging: tekes_agent_components_ui::TranscriptPagingFacts,
+) -> Result<tekes_agent_components_ui::RunPortUpdate<'a>, &'static str> {
+    view.set_thinking_display(input)?;
+    view.prepare_update(
+        snapshot,
+        Default::default(),
+        tekes_agent_components_ui::ComposerControlGate::OPEN,
+        paging,
+        true,
+    )
+}
 /// Public component consumer: forwards a captured display frame unchanged.
 pub fn install_thinking_output(
     view: &mut tekes_agent_components_ui::OutputMessage,

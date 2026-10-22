@@ -55,8 +55,9 @@ progress/detail 和本地化 copy，按稳定 section kind 挂载原 SDK 控件�
 展示帧必须绑定同一 RunSnapshot 的 `revision`/`connection_epoch`、原 scope/turn 和独立展示修订；
 接入后不能用旧 `update` 跳过策略恢复隐藏正文。来源现由 `RunSnapshot::thinking_frame` 或 `PaneSnapshot::thinking_frame` 从同一 snapshot 生成，
 包括只读 pane 自己的 publication；顺序按 dialect projector 定义，不要求宿主缓存/推算。
-TranscriptContent/RunPort 的整帧接线仍未完成，见[来源工厂与契约修正](rust-agent-ui-thinking-source-20261023.md)
-及[独立控件范围](rust-agent-ui-thinking-output-20261023.md)。
+TranscriptContent、RunPort 和 ReadOnlyTranscript 可用 `set_thinking_display` 在原 prepare 前传入显示偏好/计时；
+旧 plan 随显示修订失效，发布仍经过原 reading token。初次 Composer 仍先 update。详细顺序与剩余布局范围见
+[整帧思考输入](rust-agent-ui-thinking-parent-20261023.md)及[来源契约](rust-agent-ui-thinking-source-20261023.md)。
 
 限高详情仅通过 `OutputMessage::with_bounded_details` / `ToolActivity::with_bounded_details` 显式试验；
 标准 RunPort/Transcript 保持原文档流。嵌套阅读严格检查当前失败，等待 #53；

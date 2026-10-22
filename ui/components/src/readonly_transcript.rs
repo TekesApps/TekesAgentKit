@@ -271,6 +271,14 @@ impl ReadOnlyTranscript {
     pub fn paging_button_id(&self) -> ComponentId {
         ComponentId(self.paging.0 + 1)
     }
+    /// Uses the child pane's own publication and the same controlled Transcript
+    /// path; does not borrow parent Run authority or create a writable Run.
+    pub fn set_thinking_display(
+        &mut self,
+        input: crate::TranscriptThinkingDisplayInput,
+    ) -> Result<(), &'static str> {
+        self.content_mut().set_thinking_display(input)
+    }
     pub fn content(&self) -> &TranscriptContent {
         self.body
             .children

@@ -874,6 +874,28 @@ impl OutputMessage {
         section: Option<&TranscriptSection<'_>>,
         thinking: &tekes_agent_presentation::TranscriptThinkingFrame,
     ) -> Result<(), &'static str> {
+        let stamp = self.thinking_stamp(publication, epoch, output, thinking)?;
+        self.update_display(publication, epoch, output, section, Some(stamp))
+    }
+    pub(crate) fn check_update_with_thinking(
+        &self,
+        publication: u64,
+        epoch: u64,
+        output: &TranscriptOutput<'_>,
+        section: Option<&TranscriptSection<'_>>,
+        thinking: &tekes_agent_presentation::TranscriptThinkingFrame,
+    ) -> Result<(), &'static str> {
+        let stamp = self.thinking_stamp(publication, epoch, output, thinking)?;
+        self.check_update_display(publication, epoch, output, section, Some(&stamp))?;
+        Ok(())
+    }
+    fn thinking_stamp(
+        &self,
+        publication: u64,
+        epoch: u64,
+        output: &TranscriptOutput<'_>,
+        thinking: &tekes_agent_presentation::TranscriptThinkingFrame,
+    ) -> Result<ThinkingStamp, &'static str> {
         if !thinking.matches_source(&self.scope, &output.item.turn_id, publication, epoch) {
             return Err("thinking frame source mismatch");
         }
@@ -892,7 +914,7 @@ impl OutputMessage {
             display: decision
                 .unwrap_or(tekes_agent_presentation::TranscriptReasoningDisplay::Hidden),
         };
-        self.update_display(publication, epoch, output, section, Some(stamp))
+        Ok(stamp)
     }
     fn update_display(
         &mut self,

@@ -22,11 +22,11 @@
   "tekesuiInputDigest": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
   "richToolCardRendering": false,
   "crossProcessAccepted": false,
-  "sourceBase": "f5dfd8e083d001b3ebc7ff20942ca194391308ef",
-  "sourceStage": "plus source normalization/cache fixes and Run/Transcript/Pane thinking frame factories; whole TranscriptContent/RunPort wiring unfinished",
+  "sourceBase": "d8e975e",
+  "sourceStage": "plus controlled TranscriptContent/RunPort/ReadOnlyTranscript thinking input, prepared-plan fencing and demo consumption; carrier grouping/layout and full real-harness acceptance unfinished",
   "sourcesRead": {
-    "ui/components/src/run_port.rs": "9da2607af329d064265e1f3f6c42e2c08d3945531d5f7e5d6aede92abd48f6b4",
-    "ui/components/src/transcript_content.rs": "3292c9b52ddac958a48201f14a3ef070b3de18a805c25904f93b591a3ef50a54",
+    "ui/components/src/run_port.rs": "9bf8c3d2e746bb1f4a6b9c7a8dabbdeb4738db980c17bfc619f4e3df6f3b9fbf",
+    "ui/components/src/transcript_content.rs": "4f7fd26e10960172349bdd26d91c7a4794fb76caac83ab668b79d6c4f5f3bbd9",
     "ui/components/src/indicators.rs": "0e14f0615bbf6984faa21de8ff949407bff5f39cbc8d9132554e256d26b10706",
     "ui/components/src/sidebar.rs": "cc6ffe52644de133e634a1a49462e997bd26952357b2548d12fdea09667be566",
     "ui/components/src/side_panel.rs": "2e6a1a102e24856da8532c174e1d8700976e61caee1c80af75c3145499253094",
@@ -40,9 +40,13 @@
     "crates/presentation/src/tool_card.rs": "f30ee76b29a6c8c7ad74b5d9fb12765ed998b60f8a78be8c7511d3a05c5e5a16",
     "crates/presentation/src/tool_row.rs": "82e17001e55eaffc2452d0d18aef21406ff68373344f221456791bdad8037de6",
     "crates/presentation/src/transcript_thinking.rs": "9cbe05ab0e9c2f9e5c57234ccea29ae17f8ef19dabb52b69aec551143adab44c",
-    "ui/components/src/output_message.rs": "c96fe83003fc7e3634f8d76f3f529fd1dec7d03ee758589aeac03a572c7902d7",
+    "ui/components/src/output_message.rs": "b65248abe91e83f088318d7e538021a8ea448cb9f4cae5aba7e932e9fa8b0cb0",
     "crates/presentation/src/transcript_thinking_sources.rs": "2e65b720f3eb72e3cd899a2c4e6bf76226b787acfb1f45bb87edb691a7c07fea",
-    "crates/session/src/native_assistant.rs": "0ddd4556c5df20782ca2378d4899f42777f0f76e6ed0a71647669ff2c72dd9ec"
+    "crates/session/src/native_assistant.rs": "0ddd4556c5df20782ca2378d4899f42777f0f76e6ed0a71647669ff2c72dd9ec",
+    "ui/components/src/readonly_transcript.rs": "aed16ad8e4b8be14cfdb6e05faac134f56b3ac664324f78f3c25809883c7bfef",
+    "ui/demo/src/component_demo.rs": "8ae8e2d975780075fba57799624c2e79e334ca5d97d4d16907bf0ec998affe4d",
+    "ui/consumer/src/lib.rs": "35e13889d17a86ff445569decfa991cf1d61e5c527b58b448d01d691be19e3c1",
+    "ui/demo/tests/thinking_sources.rs": "255d9477350d88d5e6fddb26f9b5cfe144c80fdb8fa94e0c89b812466e502093"
   },
   "publicIssues": [
     {
@@ -405,14 +409,16 @@
   },
   "latestLocalValidation": {
     "rootTests": 276,
-    "fullUiTests": 582,
+    "fullUiTests": 584,
     "uiIgnored": 1,
     "newSourceTests": 9,
     "newFixtureConsumerPipelineTests": 1,
     "rootAndUiStrictAllTargetsClippy": true,
     "currentFullUiSuiteRerun": true,
     "strictReadingExitCode": 1,
-    "newNativeAcceptance": false
+    "newNativeAcceptance": "local fixture reading + PID-targeted software Pinyin only; 8d11baa0 program",
+    "finalThinkingSourceTests": 4,
+    "newReadonlyLiveTestAfterFullSuite": 1
   },
   "publicProcessContractSources": {
     "crates/tekes-ui-module-runtime/src/container.rs": "b34423866204a1ee7e0346b5609ac3c4e1e278025ef8317962f44c54bb53b5e9",
@@ -431,5 +437,6 @@
   "importantScope": "Current native local-fixture checks and real protocol/offscreen checks are separate identities; Native 0.9.3 UI-only is not lifecycle or bounded child-history acceptance. No full UI/cross-process/physical keyboard/VoiceOver acceptance.",
   "thinkingPolicy": "rust-agent-ui-thinking-policy-20261023.json",
   "thinkingOutput": "rust-agent-ui-thinking-output-20261023.json",
-  "thinkingSource": "rust-agent-ui-thinking-source-20261023.json"
+  "thinkingSource": "rust-agent-ui-thinking-source-20261023.json",
+  "thinkingParent": "rust-agent-ui-thinking-parent-20261023.json"
 }

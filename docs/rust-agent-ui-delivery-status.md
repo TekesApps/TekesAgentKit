@@ -1,6 +1,6 @@
 # Rust Agent UI：当前接入范围与交付状态
 
-本页以已提交基线 `f5dfd8e` 与本轮思考来源/公开工厂增量为准，按用户完整目标保留验收范围。
+本页以已提交基线 `d8e975e` 与本轮思考整帧接线增量为准，按用户完整目标保留验收范围。
 当前可供实验宿主接入，**完整交付尚未达到**。组件存在、离屏通过或单个 Issue 关闭都不能单独证明完整 Views 对齐。
 原生、真实协议、离屏 GPU 和跨进程证据分别记录，不转移冻结程序身份。本轮结果见[当前程序续验](rust-agent-ui-current-validation-20261023.md)。
 
@@ -20,7 +20,7 @@
 | --- | --- | --- |
 | Composer、发送/取消、流式回传 | 原 TekesUI editor + RunBinding/RunController；归档/中断、草稿、请求身份、模型/附件等有组件与宿主用例。 | 本轮源码的完整原生/IME组合；上下文高级入口按源规则逐项验收，缺少宿主能力时通过明确输入/回调接入。 |
 | Transcript：历史/推理/工具/分页/阅读 | 混合 Content、原阅读事务、canonical 身份与只读子历史；公开 page/reveal 已消费，工具关闭边界、共享 row、报告/完整计数选择规则与五类卡片事实有回归。 | 独立 Input/Output/view 原字段与复制通道已接入；真实报告来源、连续分组的完整输入/原生验收、富内容、#54 分隔线和最终 code-header 样式未完成，`rich_content=false`；选中富内容 #25、嵌套阅读意图 #53、新建 Host 的持久 checkpoint #42、当前原生与配对布局。 |
-| 实时思考模式 | 共享 None/Compact、来源绑定 Frame、独立 OutputMessage 与原归一化来源工厂已实现；Root Run/Transcript/Pane API 和第二 consumer 的 fixture 路径通过。Journal anchor 与 Pi ancestry 按实际 projector 定义，不使用 UI/buffer 下标作身份。 | TranscriptContent/RunPort 整帧输入、prepared-plan 门禁、业务布局及自动三端/原生验收仍未完成；有裁剪/未知来源时不能猜补或宣称完整能力。 |
+| 实时思考模式 | 共享 None/Compact、来源绑定 Frame、独立 OutputMessage 与原归一化来源工厂已实现；Root Run/Transcript/Pane API 和第二 consumer 的 fixture 路径通过。Journal anchor 与 Pi ancestry 按实际 projector 定义，不使用 UI/buffer 下标作身份。 | TranscriptContent/RunPort/只读 pane 整帧输入及 prepared-plan 门禁已接线，demo 显式消费 Compact；carrier 聚合/业务布局及真实三端整帧验收仍未完成；裁剪/未知来源不能猜补。 |
 | Input / output / footnote 排版 | 用户气泡/aside 右、机器内容/aside 左；共用列、单行、备注限宽与保留控件有独立 consumer。 | 真实 Pi 目标标签在窄列仍不可见，严格命令退出 1；#47 原 glyph/紧凑动作消费，完整时间/目标/状态可见性。 |
 | Indicators 与回合导航 | 原连接/运行/等待/失败/用量事实、TurnRail/Jump 与原 SDK reveal，非像素估算。 | 完整 hover/selection/chrome、可达性和当前程序原生对照；#46/#5 等。不能把已有单行状态当作完整 rail 的证明。 |
 | RunPort 组合与完整 Views 布局 | 正式 RunPort 组合 Composer/Transcript/Indicators，整帧 preflight/阅读发布；第二 consumer 无需 RunSurface。 | 完整 ClientKit 对应层次/selection/chrome 的逐项同内容对照；当前收据仍明确 `completeRunPort=false`。 |
@@ -49,7 +49,7 @@
 | --- | --- |
 | 当前验证 | [三端及原生续验](rust-agent-ui-current-validation-20261023.md)：f44 原生冻结程序与两处验收脚本修正后的离屏程序分别记录；不包含完整 Native 0.9.3 生命周期。 |
 | 来源帧工厂 | [来源适配与契约修正](rust-agent-ui-thinking-source-20261023.md)：原归一化链、缓存淘汰/迟到修复、Run/只读 Pane 工厂；整体控件接线仍开放。 |
-| 思考模式 | [受控 OutputMessage](rust-agent-ui-thinking-output-20261023.md) 已接线；[共享策略基线](rust-agent-ui-thinking-policy-20261023.md) 保留。整体来源和 RunPort 接线仍开放。 |
+| 思考模式 | [受控 OutputMessage](rust-agent-ui-thinking-output-20261023.md) 已接线；[共享策略基线](rust-agent-ui-thinking-policy-20261023.md) 保留。[整帧思考输入](rust-agent-ui-thinking-parent-20261023.md)已接线；业务布局和最终三端验收仍开放。 |
 | 当前工具共享状态 | [工具行标题/计数](rust-agent-ui-tool-header-20261023.md)、[URL 预览](rust-agent-ui-tool-url-20261023.md)、[连续分组](rust-agent-ui-tool-run-20261023.md)。同标签语义色等待 #25，完整工具视觉未完成。 |
 | 较早原生证据 | [原生续验](rust-agent-ui-native-resumed-20261023.md)：7c531a 冻结程序的本地专项；保留作历史记录。 |
 | 较早真实故障证据 | [反馈恢复](rust-agent-ui-feedback-recovery-20261022.md)：4097e4f 程序；当前成功路径不代替该故障路径。 |

@@ -603,6 +603,17 @@ impl RunPort {
             .find_map(|node| node.component_mut::<Composer>())
             .unwrap()
     }
+    /// Configure shared reasoning display before preparing/publishing this Run.
+    /// The existing Transcript plan fences preference/tick changes; no Run
+    /// revision, editor write, or new source read is synthesized here.
+    pub fn set_thinking_display(
+        &mut self,
+        input: TranscriptThinkingDisplayInput,
+    ) -> Result<(), &'static str> {
+        self.transcript_mut()
+            .ok_or("RunPort has no Transcript")?
+            .set_thinking_display(input)
+    }
     pub fn transcript(&self) -> Option<&TranscriptContent> {
         self.body
             .children

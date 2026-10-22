@@ -773,7 +773,7 @@ impl ComponentDemo {
         let end = namespace
             .checked_add(10_000)
             .ok_or_else(|| unsupported("demo document namespace pool exhausted"))?;
-        let content = tekes_agent_components_ui::TranscriptContent::new(
+        let mut content = tekes_agent_components_ui::TranscriptContent::new(
             namespace,
             namespace + 1..end,
             binding.scope().clone(),
@@ -783,6 +783,13 @@ impl ComponentDemo {
             },
         )
         .map_err(unsupported)?;
+        content
+            .set_thinking_display(tekes_agent_components_ui::TranscriptThinkingDisplayInput {
+                mode: tekes_agent_components_ui::TranscriptThinkingMode::Compact,
+                display_revision: 1,
+                elapsed_seconds: 0,
+            })
+            .map_err(unsupported)?;
         // The RunPort seeds its new Transcript from the already controlled
         // Run frame, including all display inputs. Do not publish a second,
         // partial footnote frame from the host before installing it.
@@ -3430,13 +3437,19 @@ impl ComponentDemo {
                                     content: crate::footnote_host::transcript_labels(),
                                     ..Default::default()
                                 };
-                                let content = tekes_agent_components_ui::TranscriptContent::new(
-                                    namespace,
-                                    namespace + 1..end,
-                                    binding.scope().clone(),
-                                    labels.content.clone(),
-                                )
-                                .map_err(unsupported)?;
+                                let mut content =
+                                    tekes_agent_components_ui::TranscriptContent::new(
+                                        namespace,
+                                        namespace + 1..end,
+                                        binding.scope().clone(),
+                                        labels.content.clone(),
+                                    )
+                                    .map_err(unsupported)?;
+                                content.set_thinking_display(tekes_agent_components_ui::TranscriptThinkingDisplayInput {
+                                    mode: tekes_agent_components_ui::TranscriptThinkingMode::Compact,
+                                    display_revision: 1,
+                                    elapsed_seconds: 0,
+                                }).map_err(unsupported)?;
                                 let mut view = tekes_agent_components_ui::ReadOnlyTranscript::new(
                                     tekes_agent_components_ui::ReadOnlyTranscriptIds {
                                         root,
