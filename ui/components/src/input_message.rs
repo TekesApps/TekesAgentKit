@@ -21,20 +21,35 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 
-/// Clipboard capability captured from one displayed message. No endpoint call;
+/// Captured clipboard source, not an endpoint/feedback/execute authority.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TranscriptCopySource {
+    Message(Key),
+    /// Canonical item IDs in original snapshot order, including empty text items.
+    /// They are source facts, not invented display IDs or durable reading targets.
+    TurnOutput {
+        turn_id: String,
+        item_ids: Vec<String>,
+    },
+}
+
+/// Clipboard capability captured from the original message or turn. No endpoint call;
 /// hosts use the captured text, never look up the newly selected session.
 #[derive(Clone, Debug)]
 pub struct TranscriptCopyIntent {
     scope: RunScope,
-    message: Key,
+    source: TranscriptCopySource,
     text: String,
     claimed: Arc<AtomicBool>,
 }
 impl TranscriptCopyIntent {
     pub(crate) fn new(scope: RunScope, message: Key, text: String) -> Self {
+        Self::from_source(scope, TranscriptCopySource::Message(message), text)
+    }
+    pub(crate) fn from_source(scope: RunScope, source: TranscriptCopySource, text: String) -> Self {
         Self {
             scope,
-            message,
+            source,
             text,
             claimed: Arc::new(AtomicBool::new(false)),
         }
@@ -42,8 +57,15 @@ impl TranscriptCopyIntent {
     pub fn scope(&self) -> &RunScope {
         &self.scope
     }
-    pub fn message(&self) -> &Key {
-        &self.message
+    pub fn source(&self) -> &TranscriptCopySource {
+        &self.source
+    }
+    /// Single-message copies only; a whole-turn aggregate has no one message ID.
+    pub fn message(&self) -> Option<&Key> {
+        match &self.source {
+            TranscriptCopySource::Message(message) => Some(message),
+            TranscriptCopySource::TurnOutput { .. } => None,
+        }
     }
     pub fn text(&self) -> &str {
         &self.text

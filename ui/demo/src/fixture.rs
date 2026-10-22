@@ -267,23 +267,43 @@ impl Fixture {
         line.sender.send(json!({"type":"transient","event":{"seq":0,"time":crate::footnote_host::now_ms(),"type":"assistant/chunk","data":{"turn":line.turn,"step":1,"chunk":{"type":"usage","usage":{"outputTokens":tokens}}}}})).map_err(|_| Error::Disconnected)?;
         Ok(())
     }
+    /// Two public formal assistant records before turn/end. The UI must retain
+    /// live presentation until settlement and later copy the complete source turn.
+    pub fn publish_timed_output(&self) -> Result<()> {
+        let mut sessions = self.sessions.lock().unwrap();
+        let line = sessions.get_mut("a").unwrap();
+        require(line.busy && line.turn == 31, "timed fixture only")?;
+        require(
+            !line
+                .rows
+                .iter()
+                .any(|row| row.event.kind == "assistant/message" && row.event.data["turn"] == 31),
+            "timed output already published",
+        )?;
+        for (step, text) in [(1, "计时结束前的第一段"), (2, "正式回复第二段")] {
+            let mut row = entry(
+                line.rows.len() as i64,
+                "assistant/message",
+                json!({"turn":line.turn,"step":step,"message":{"id":format!("timed-output-{step}"),"content":[{"type":"text","text":text}],"usage":{"inputTokens":10,"outputTokens":1200}}}),
+            );
+            row.event.time = crate::footnote_host::now_ms();
+            line.rows.push(row.clone());
+            let _ = line.sender.send(json!({"type":"event","entry":row}));
+        }
+        Ok(())
+    }
     pub fn finish_timed_turn(&self) -> Result<()> {
         let mut sessions = self.sessions.lock().unwrap();
         let line = sessions.get_mut("a").unwrap();
         require(line.busy && line.turn == 31, "timed fixture only")?;
-        let now = crate::footnote_host::now_ms();
-        for (kind, data) in [
-            (
-                "assistant/message",
-                json!({"turn":line.turn,"step":1,"message":{"id":"timed-output","content":[{"type":"text","text":"计时结束的正式回复"}],"usage":{"inputTokens":10,"outputTokens":1200}}}),
-            ),
-            ("turn/end", json!({"turn":line.turn,"reason":"completed"})),
-        ] {
-            let mut row = entry(line.rows.len() as i64, kind, data);
-            row.event.time = now;
-            line.rows.push(row.clone());
-            let _ = line.sender.send(json!({"type":"event","entry":row}));
-        }
+        let mut row = entry(
+            line.rows.len() as i64,
+            "turn/end",
+            json!({"turn":line.turn,"reason":"completed"}),
+        );
+        row.event.time = crate::footnote_host::now_ms();
+        line.rows.push(row.clone());
+        let _ = line.sender.send(json!({"type":"event","entry":row}));
         line.busy = false;
         Ok(())
     }

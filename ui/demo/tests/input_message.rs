@@ -422,7 +422,7 @@ async fn input_copy_captures_exact_original_text_and_retires_old_targets() {
     assert_eq!(captured.scope(), &scope);
     assert_eq!(
         captured.message(),
-        &tekes_agent_components_ui::TranscriptMessageIdentity::NativeEntry("original".into())
+        Some(&tekes_agent_components_ui::TranscriptMessageIdentity::NativeEntry("original".into()))
     );
     row.update(&scope, 2, 1, &input(&item)).unwrap();
     assert_eq!(row.copy_button_id(), Some(old));

@@ -2,6 +2,8 @@
 
 正式组合组件已统一为 **RunPort（原 Rust RunView）**，公开类型、demo、第二 consumer、实时验证脚本和当前文档同步命名。Sidebar、RunPort、SidePanel 的目标宿主边界是 TekesUI **ProcessContainer**；固定公开版本尚缺完整远端交互能力，跟踪 [TekesUI #48](https://github.com/TekesApps/TekesUI/issues/48)。保留现有同进程原 Content 路径，同进程/跨进程证据分别记录；见 [RunPort 迁移与容器契约](rust-agent-ui-run-port-20261022.md)。改名不代表 ProcessContainer 接入完成。
 
+[回合输出复制](rust-agent-ui-turn-output-copy-20261022.md)现按 ClientKit 原 snapshot 顺序聚合 assistant 文字，单条消息/整个回合分别捕获来源；复制不授予反馈或执行权限。最新实际回合的 live 显示不会因 final item 提前到达而退出，旧未结束回合也不能越过新回合取得 live owner。
+
 [Summary 原Content插槽](rust-agent-ui-summary-custom-20261022.md)已提供宿主产品行的原控件保留、动态测量与事件来源校验；安装/退役走原SDK生命周期，保留旧Run适配。完整repository具体行及未选中会话宿主布局仍需继续。
 
 [Summary 工作区上下文](rust-agent-ui-summary-context-20261022.md)已补显式owner，无需虚构RunScope即可独立挂载host sections；原Run输入适配、owner隔离/旧动作拒绝、组件及原生兼容验收通过。通用host Content插槽见文首；完整repository具体行和未选中会话宿主布局仍开放。

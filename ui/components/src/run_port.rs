@@ -505,6 +505,16 @@ impl RunPort {
         self.turn_rail_mut()
             .map_or_else(Vec::new, TurnRail::take_navigation)
     }
+    /// Same-publication original clipboard controls; no endpoint capability.
+    /// A hidden pane cannot admit these controls through a host IME barrier.
+    pub fn copy_action_ids(&self) -> Vec<ComponentId> {
+        if self.pane_presented {
+            self.transcript()
+                .map_or_else(Vec::new, TranscriptContent::copy_action_ids)
+        } else {
+            vec![]
+        }
+    }
     pub fn is_nonfocusing_navigation_target(&self, id: ComponentId) -> bool {
         self.jump_permits(id)
             || (self.pane_presented
@@ -1053,6 +1063,17 @@ impl RunPort {
                 .into_iter()
                 .map(|intent| RunPortIntent::JumpLatest(Box::new(intent))),
         );
+        // Original local clipboard controls preserve the current editor and do
+        // not dispatch an endpoint mutation. Admit them before the send/action
+        // preedit barrier; feedback/turn/page actions remain below it.
+        if let Some(content) = self.transcript() {
+            intents.extend(
+                content
+                    .take_copy_intents(actions)
+                    .into_iter()
+                    .map(RunPortIntent::CopyTranscript),
+            );
+        }
         if self.composer().is_composing() {
             return intents;
         }
@@ -1091,12 +1112,6 @@ impl RunPort {
                     .handle_actions(actions)
                     .into_iter()
                     .map(|intent| RunPortIntent::TurnAction(Box::new(intent))),
-            );
-            intents.extend(
-                content
-                    .take_copy_intents(actions)
-                    .into_iter()
-                    .map(RunPortIntent::CopyTranscript),
             );
         }
         intents

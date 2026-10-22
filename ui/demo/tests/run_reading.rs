@@ -2396,6 +2396,29 @@ async fn explicit_clock_tick_uses_original_reading_transaction_and_keeps_preedit
             item.is_final = false;
         }
     }
+    let mut with_final = snapshot.clone();
+    for item in &mut with_final.transcript.items {
+        if item.turn_id == turn_id && item.kind == TranscriptItemKind::Assistant {
+            item.is_final = true;
+        }
+    }
+    assert_eq!(
+        TranscriptFootnoteTiming::for_run(&with_final, 1, Some(75000.))
+            .live_turn_id
+            .as_deref(),
+        Some(turn_id.as_str()),
+        "formal answer availability is not settlement"
+    );
+    let mut later = with_final.transcript.turns.last().unwrap().clone();
+    later.id = "later-completed".into();
+    later.status = "completed".into();
+    with_final.transcript.turns.push(later);
+    assert!(
+        TranscriptFootnoteTiming::for_run(&with_final, 1, Some(75000.))
+            .live_turn_id
+            .is_none(),
+        "an earlier unfinished turn cannot own the last-turn presentation"
+    );
     // Retained open journals do not grant live ownership to an interrupted or
     // noncontinuable destination, even when stale submit/cancel flags remain.
     assert!(
@@ -2518,4 +2541,95 @@ async fn explicit_clock_tick_uses_original_reading_transaction_and_keeps_preedit
             .set_footnote_clock(Some(f64::NAN))
             .is_err()
     );
+}
+
+#[tokio::test]
+async fn demo_admits_only_original_copy_controls_during_composer_preedit() {
+    use std::{sync::Arc, time::Duration};
+    use tekes_agent_session::SessionRuntime;
+    use tekes_agent_ui_bindings::RunBinding;
+    use tekes_agent_ui_demo::{
+        component_demo::{ComponentDemo, DemoCommand},
+        fixture::Fixture,
+    };
+    let runtime = Arc::new(SessionRuntime::spawn(
+        "fixture",
+        Arc::new(Fixture::default().with_lifecycle()),
+    ));
+    runtime.wait_ready(Duration::from_secs(3)).await.unwrap();
+    let binding = Arc::new(
+        RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "a"))
+            .await
+            .unwrap(),
+    );
+    let mut demo = ComponentDemo::new([binding.clone()]).unwrap();
+    demo.enable_transcript_content().unwrap();
+    let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()), 1.);
+    let frame = Rect::new(0., 0., 1200., 900.);
+    demo.render(
+        &mut Scene::new(),
+        &mut text,
+        frame,
+        frame,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    let root = ComponentId(demo.ids().root.0 + 16);
+    let target = run(&demo.tree, root)
+        .copy_action_ids()
+        .into_iter()
+        .find(|id| {
+            let node = demo.tree.get(*id).unwrap();
+            node.visible().is_some()
+                && node.component::<ButtonContent>().unwrap().label == "复制输出"
+        })
+        .unwrap();
+    let point = demo.tree.get(target).unwrap().visible().unwrap().center();
+    let editor = demo.ids().editor;
+    demo.tree.focus(Some(editor), true);
+    demo.event_with_text(
+        &ContentEvent::Preedit {
+            text: "复制期间中文组字".into(),
+            selection: 1..3,
+            clauses: vec![],
+            replacement: None,
+        },
+        &mut text,
+    )
+    .unwrap();
+    let before = demo.editor().input.external_baseline();
+    let owner = demo.editor() as *const _ as usize;
+    demo.event_with_text(&ContentEvent::PointerDown(point), &mut text)
+        .unwrap();
+    let commands = demo
+        .event_with_text(&ContentEvent::PointerUp(point), &mut text)
+        .unwrap();
+    let [DemoCommand::CopyTranscript(copy)] = commands.as_slice() else {
+        panic!("original pointer copy must pass the host preedit barrier");
+    };
+    assert!(matches!(
+        copy.source(),
+        TranscriptCopySource::TurnOutput { .. }
+    ));
+    assert!(!copy.text().is_empty());
+    assert_eq!(demo.tree.focused(), Some(editor));
+    assert_eq!(demo.editor() as *const _ as usize, owner);
+    assert_eq!(demo.editor().input.external_baseline(), before);
+    let commands = demo
+        .accessibility_action(target, None, AccessibilityAction::Press)
+        .unwrap();
+    assert!(matches!(
+        commands.as_slice(),
+        [DemoCommand::CopyTranscript(_)]
+    ));
+    assert_eq!(demo.editor().input.external_baseline(), before);
+    assert!(
+        demo.accessibility_action(target, None, AccessibilityAction::Focus)
+            .unwrap()
+            .is_empty(),
+        "Press admission must not grant AX focus substitution"
+    );
+    assert_eq!(demo.tree.focused(), Some(editor));
+    assert!(binding.current_run().unwrap().submissions.is_empty());
+    runtime.stop().await.unwrap();
 }

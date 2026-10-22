@@ -206,7 +206,7 @@ fn rail_layout_uses_source_track_gutter_and_document_coordinates() {
     assert_eq!(empty.track.size.height, 0.);
 }
 #[test]
-fn output_copy_uses_the_original_final_message_and_remains_local_when_mutations_are_disabled() {
+fn output_copy_captures_the_original_turn_and_remains_local_when_mutations_are_disabled() {
     let mut source = snapshot();
     let answer = source
         .items
@@ -249,8 +249,11 @@ fn output_copy_uses_the_original_final_message_and_remains_local_when_mutations_
     assert_eq!(copies.len(), 1);
     assert_eq!(copies[0].scope(), &scope());
     assert_eq!(
-        copies[0].message(),
-        &TranscriptMessageIdentity::Item("output".into())
+        copies[0].source(),
+        &TranscriptCopySource::TurnOutput {
+            turn_id: "turn".into(),
+            item_ids: vec!["output".into()]
+        }
     );
     assert_eq!(copies[0].text(), "output");
     source
@@ -291,7 +294,15 @@ fn output_copy_uses_the_original_final_message_and_remains_local_when_mutations_
             .component::<TurnFootnote>()
             .unwrap()
             .copy_button_id()
-            .is_none()
+            .is_some()
+    );
+    assert!(
+        tekes_agent_presentation::TranscriptDocument::read(&source)
+            .unwrap()
+            .sections[0]
+            .final_response()
+            .is_none(),
+        "copy aggregation must not weaken ambiguous response authority"
     );
 }
 #[test]

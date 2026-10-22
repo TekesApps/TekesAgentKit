@@ -113,6 +113,9 @@ impl Probe {
         );
     }
     pub fn advance(&mut self, host: &mut Host, window: &Window) {
+        if self.phase == 8 {
+            return;
+        }
         assert!(
             self.started.elapsed() < Duration::from_secs(20),
             "footnote time deadline phase {}",
@@ -265,10 +268,45 @@ impl Probe {
                         .text()
                         .contains("1.2k tokens")
                 );
-                self.fixture.finish_timed_turn().unwrap();
+                self.fixture.publish_timed_output().unwrap();
                 self.phase = 5;
             }
             5 => {
+                self.unchanged(host);
+                let snapshot = host.view.binding().current_run().unwrap();
+                let turn = self.footer(host).facts().unwrap();
+                // Journal normalization assigns is_final at turn/end. Observe
+                // formal records here; direct final-before-end is a component
+                // test, not fabricated through this SEP fixture.
+                let outputs = snapshot
+                    .transcript
+                    .items
+                    .iter()
+                    .filter(|item| {
+                        item.turn_id == turn.turn_id
+                            && item.kind == tekes_agent_components_ui::TranscriptItemKind::Assistant
+                    })
+                    .collect::<Vec<_>>();
+                let text = outputs
+                    .iter()
+                    .map(|item| item.text.as_str())
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                if text != "计时结束前的第一段\n正式回复第二段" {
+                    return;
+                }
+                assert!(outputs.iter().all(|item| !item.is_provisional));
+                assert_eq!(turn.status, "running");
+                assert!(
+                    turn.display.is_live_owner,
+                    "a formal answer must not settle the turn presentation"
+                );
+                assert!(self.footer(host).copy_button_id().is_none());
+                assert!(host.footnote_wake.is_some());
+                self.fixture.finish_timed_turn().unwrap();
+                self.phase = 6;
+            }
+            6 => {
                 self.unchanged(host);
                 Self::empty_history_aside_hidden(host);
                 let facts = self.footer(host).facts().unwrap();
@@ -276,6 +314,10 @@ impl Probe {
                     return;
                 }
                 assert!(!facts.display.is_live_owner);
+                assert!(
+                    facts.elapsed_seconds().is_some(),
+                    "source end time must not precede its actual start"
+                );
                 assert!(facts.display.finished_text.is_some());
                 let expected = tekes_agent_ui_demo::footnote_host::day_clock(
                     facts.ended_at.unwrap(),
@@ -298,13 +340,45 @@ impl Probe {
                     host.footnote_wake.is_none(),
                     "settled footnote retires only its owned host wake"
                 );
+                let copy = self
+                    .footer(host)
+                    .copy_button_id()
+                    .expect("settled aggregate copy");
+                let point = host
+                    .view
+                    .tree
+                    .get(copy)
+                    .unwrap()
+                    .visible()
+                    .expect("original copy button visible")
+                    .center();
+                assert_eq!(
+                    std::env::var("TEKES_SELFTEST").as_deref(),
+                    Ok("text"),
+                    "copy proof must use the SDK private test pasteboard"
+                );
+                run_script(vec![(
+                    0,
+                    Action::Click {
+                        x: point.x.into(),
+                        y: point.y.into(),
+                    },
+                )]);
+                self.phase = 7;
+            }
+            7 => {
+                self.unchanged(host);
+                if window.clipboard_text().as_deref() != Some("计时结束前的第一段\n正式回复第二段")
+                {
+                    return;
+                }
                 let mut actions = vec![];
                 if let Some(path) = &self.capture {
                     actions.push((300, Action::Capture { path: path.clone() }));
                 }
                 actions.push((700, Action::Close));
                 run_script(actions);
-                self.phase = 6;
+                self.phase = 8;
             }
             _ => {}
         }
@@ -314,11 +388,12 @@ impl Probe {
         }
     }
     pub fn receipt(&self) -> serde_json::Value {
-        assert_eq!(self.phase, 6);
+        assert_eq!(self.phase, 8);
         serde_json::json!({"nativeWindow":true,"ownedSepBackhaul":true,"displayClockWithoutDomainPublication":true,
             "onlyLiveOwnerTicks":true,"zeroTokensOmitted":true,"compactPositiveTokens":true,"settledCalendarTimestamp":true,
             "originalInformationAndComposer":true,"focusAndMarkedBaseline":true,"ownedWakeRetired":true,
             "emptyHistoricalOutputAsideHidden":true,"timestampDoesNotInventOutput":true,
+            "formalJournalMessagesBeforeSettlementRemainLive":true,"sourceEndNotBeforeStart":true,"wholeTurnCopy":true,"originalPointerCopy":true,"privateClipboardReadback":true,
             "noSubmission":true,"syntheticPreedit":true,"physicalIme":false,"realHarness":false,"voiceOver":false,"fullFootnoteLayoutParity":false})
     }
 }

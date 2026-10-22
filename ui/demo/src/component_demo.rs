@@ -3616,6 +3616,12 @@ impl ComponentDemo {
         position.is_some_and(|position| {
             if self.composing_navigation_run().is_some_and(|run| {
                 run.is_nonfocusing_navigation_at(position)
+                    || run.copy_action_ids().iter().any(|id| {
+                        self.tree
+                            .get(*id)
+                            .and_then(|node| node.visible())
+                            .is_some_and(|frame| frame.contains(position))
+                    })
                     || run.composer().is_nonfocusing_notice_refresh_at(position)
                     || self
                         .composing_summary_disclosures()
@@ -3663,6 +3669,9 @@ impl ComponentDemo {
             && !self.composing_navigation_run().is_some_and(|run| {
                 run.is_nonfocusing_navigation_target(target)
                     || run.composer().is_nonfocusing_notice_refresh_target(target)
+                    || (matches!(action, AccessibilityAction::Press)
+                        && part.is_none()
+                        && run.copy_action_ids().contains(&target))
             })
             && !(matches!(action, AccessibilityAction::Press)
                 && part.is_none()

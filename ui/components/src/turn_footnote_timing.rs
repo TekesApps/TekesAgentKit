@@ -28,17 +28,10 @@ fn candidate(snapshot: &TranscriptSnapshot) -> Option<&TranscriptTurn> {
     if snapshot.is_stale {
         return None;
     }
-    snapshot.turns.iter().rev().find(|turn| {
-        turn.status == "running"
-            && turn.ended_at.is_none()
-            && !snapshot.items.iter().any(|item| {
-                item.turn_id == turn.id
-                    && item.is_final
-                    && item.is_visible
-                    && !item.is_provisional
-                    && item.kind == tekes_agent_presentation::TranscriptItemKind::Assistant
-            })
-    })
+    snapshot
+        .turns
+        .last()
+        .filter(|turn| turn.status == "running" && turn.ended_at.is_none())
 }
 impl TranscriptFootnoteTiming {
     /// ClientKit's eligible last open turn policy, using one original Run frame.

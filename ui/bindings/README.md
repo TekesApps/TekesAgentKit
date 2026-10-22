@@ -670,3 +670,9 @@ ReadOnlyChild now includes per-binding snapshot invocation publication and conne
 Mount ReadOnlyTranscript with an exclusive namespace pool. Route its immutable Refresh/Earlier intents to the original source.read_intent, not a newly selected source. The executor checks scope, liveness, page capability/epoch and one-shot admission before IO. Refresh may explicitly renew an old frame on a ready connection; page gestures cannot cross epochs. Keep failed reads with their original pane/task, retain readable content and retry only on a new gesture. See the [read-only contract](../../docs/rust-agent-ui-readonly-child-20261020.md).
 
 The Rust composition and intent/update/geometry types are now named RunPort. [Migration and ProcessContainer ownership](../../docs/rust-agent-ui-run-port-20261022.md) distinguish the current same-process path from blocked cross-process UI integration; endpoint IPC is not container acceptance.
+
+RunPort output clipboard intents now carry the captured whole-turn source, not a
+single final response. Use `intent.source()` for typed origin, or `message()` only
+when Some; system adapters still write `text()` after `claim()`. Copy eligibility
+does not relax binding feedback/fork/execute checks. The [turn-copy contract](../../docs/rust-agent-ui-turn-output-copy-20261022.md)
+also records the separate latest-turn live display rule.

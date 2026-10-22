@@ -2,6 +2,13 @@
 
 正式共享组合名为 **RunPort**；Sidebar、RunPort、SidePanel 的目标宿主接口是 TekesUI ProcessContainer。当前保留原同进程 Content 路径，远端输入/IME/滚动/AX 等待 [TekesUI #48](https://github.com/TekesApps/TekesUI/issues/48)。[迁移说明与验收矩阵](../docs/rust-agent-ui-run-port-20261022.md)区分 API 改名、同进程运行与尚未完成的跨进程接入。
 
+Output copy now captures the original whole turn via `TranscriptTurnCopy` rather
+than selecting one final item. `TranscriptCopyIntent::source()` distinguishes a
+message from `TurnOutput { turn_id, item_ids }`; `message()` returns Option and is
+None for a turn aggregate. Hosts still claim once and write captured `text()`.
+See the [copy/display contract](../docs/rust-agent-ui-turn-output-copy-20261022.md)
+for raw source order, live-owner gating and independent response authority.
+
 只消费 TekesUI，复用 AgentKit v0.3.8 的 `SessionRuntime` / `RunController` / `RunSnapshot`。
 组件层不实现另一套 Run 状态机。默认 headless workspace 和发布 API 保持独立。
 

@@ -1049,8 +1049,11 @@ fn independent_host_mounts_canonical_content_without_private_demo_types() {
     assert_eq!(copies.len(), 1);
     assert_eq!(copies[0].text(), "机器回复");
     assert_eq!(
-        copies[0].message(),
-        &tekes_agent_components_ui::TranscriptMessageIdentity::Item("output".into())
+        copies[0].source(),
+        &tekes_agent_components_ui::TranscriptCopySource::TurnOutput {
+            turn_id: "turn".into(),
+            item_ids: vec!["output".into()]
+        }
     );
 }
 

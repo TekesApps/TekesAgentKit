@@ -1,6 +1,6 @@
 //! Turn-level output aside; no window, endpoint or independent Run state.
 use crate::OutputUsage;
-use crate::{TranscriptCopyIntent, TranscriptMessageIdentity};
+use crate::{TranscriptCopyIntent, TranscriptCopySource, TranscriptTurnCopy};
 use std::{
     collections::BTreeMap,
     sync::{Arc, Mutex},
@@ -187,7 +187,7 @@ pub struct TurnFootnote {
     display: crate::TurnFootnoteDisplay,
     information: Option<Content>,
     information_text: String,
-    output_copy: Option<(TranscriptMessageIdentity, String)>,
+    output_copy: Option<OutputCopy>,
     copy_id: Option<ComponentId>,
     root: ComponentId,
     scope: RunScope,
@@ -312,19 +312,62 @@ impl TurnFootnote {
         output: Option<TranscriptOutput<'_>>,
         display: &crate::TurnFootnoteDisplay,
     ) -> Result<(), &'static str> {
-        let shown = display.shows_aside(turn, output.is_some());
-        let visibility_changed =
-            self.shown != shown || self.display.is_live_owner != display.is_live_owner;
-        let rekey = self.check_update_with_display(
+        self.update_copy(
             scope,
             publication,
             epoch,
             turn,
             available,
-            output,
+            copy_facts(turn, output)?,
+            display,
+        )
+    }
+    /// Whole-turn display text captured from the original canonical snapshot.
+    /// This does not change the response target or grant mutation capabilities.
+    #[allow(clippy::too_many_arguments)]
+    pub fn update_with_turn_copy(
+        &mut self,
+        scope: &RunScope,
+        publication: u64,
+        epoch: u64,
+        turn: &TranscriptTurn,
+        available: bool,
+        copy: Option<&TranscriptTurnCopy>,
+        display: &crate::TurnFootnoteDisplay,
+    ) -> Result<(), &'static str> {
+        self.update_copy(
+            scope,
+            publication,
+            epoch,
+            turn,
+            available,
+            turn_copy_facts(turn, copy)?,
+            display,
+        )
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn update_copy(
+        &mut self,
+        scope: &RunScope,
+        publication: u64,
+        epoch: u64,
+        turn: &TranscriptTurn,
+        available: bool,
+        copy: Option<OutputCopy>,
+        display: &crate::TurnFootnoteDisplay,
+    ) -> Result<(), &'static str> {
+        let shown = display.shows_aside(turn, copy.is_some());
+        let visibility_changed =
+            self.shown != shown || self.display.is_live_owner != display.is_live_owner;
+        let rekey = self.check_update_with_copy(
+            scope,
+            publication,
+            epoch,
+            turn,
+            available,
+            copy.as_ref(),
             display,
         )? || visibility_changed;
-        let copy = copy_facts(turn, output)?;
         if copy != self.output_copy || epoch != self.epoch || visibility_changed {
             self.copy_id = copy.as_ref().map(|_| {
                 let id = ComponentId(self.root.0 + self.next);
@@ -361,7 +404,7 @@ impl TurnFootnote {
         if !self.shown || self.display.is_live_owner {
             return vec![];
         }
-        let Some((message, text)) = &self.output_copy else {
+        let Some(copy) = &self.output_copy else {
             return vec![];
         };
         if !actions
@@ -370,21 +413,42 @@ impl TurnFootnote {
         {
             return vec![];
         }
-        vec![TranscriptCopyIntent::new(
+        vec![TranscriptCopyIntent::from_source(
             self.scope.clone(),
-            message.clone(),
-            text.clone(),
+            copy.source.clone(),
+            copy.text.clone(),
         )]
     }
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn check_update_with_display(
+    pub(crate) fn check_update_with_turn_copy(
         &self,
         scope: &RunScope,
         publication: u64,
         epoch: u64,
         turn: &TranscriptTurn,
         available: bool,
-        output: Option<TranscriptOutput<'_>>,
+        copy: Option<&TranscriptTurnCopy>,
+        display: &crate::TurnFootnoteDisplay,
+    ) -> Result<bool, &'static str> {
+        self.check_update_with_copy(
+            scope,
+            publication,
+            epoch,
+            turn,
+            available,
+            turn_copy_facts(turn, copy)?.as_ref(),
+            display,
+        )
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn check_update_with_copy(
+        &self,
+        scope: &RunScope,
+        publication: u64,
+        epoch: u64,
+        turn: &TranscriptTurn,
+        available: bool,
+        copy: Option<&OutputCopy>,
         display: &crate::TurnFootnoteDisplay,
     ) -> Result<bool, &'static str> {
         display.validate(turn)?;
@@ -397,8 +461,7 @@ impl TurnFootnote {
             return Err("stale or conflicting footnote display");
         }
         let rekey = self.check_update(scope, publication, epoch, turn, available)?;
-        let copy = copy_facts(turn, output)?;
-        if publication == self.publication && copy != self.output_copy {
+        if publication == self.publication && copy != self.output_copy.as_ref() {
             return Err("conflicting turn copy publication");
         }
         Ok(rekey)
@@ -611,10 +674,35 @@ impl TurnFootnote {
         Ok(host)
     }
 }
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct OutputCopy {
+    source: TranscriptCopySource,
+    provenance: Vec<crate::turn_output_copy::CopyProvenance>,
+    text: String,
+}
+fn turn_copy_facts(
+    turn: &TranscriptTurn,
+    copy: Option<&TranscriptTurnCopy>,
+) -> Result<Option<OutputCopy>, &'static str> {
+    let Some(copy) = copy else {
+        return Ok(None);
+    };
+    if copy.turn_id() != turn.id {
+        return Err("turn output copy belongs to another turn");
+    }
+    Ok(Some(OutputCopy {
+        source: TranscriptCopySource::TurnOutput {
+            turn_id: copy.turn_id().into(),
+            item_ids: copy.item_ids().into(),
+        },
+        text: copy.text().into(),
+        provenance: copy.provenance.clone(),
+    }))
+}
 fn copy_facts(
     turn: &TranscriptTurn,
     output: Option<TranscriptOutput<'_>>,
-) -> Result<Option<(TranscriptMessageIdentity, String)>, &'static str> {
+) -> Result<Option<OutputCopy>, &'static str> {
     let Some(output) = output else {
         return Ok(None);
     };
@@ -628,7 +716,11 @@ fn copy_facts(
     {
         return Err("invalid final output copy target");
     }
-    Ok(Some((output.key.into(), output.item.text.clone())))
+    Ok(Some(OutputCopy {
+        source: TranscriptCopySource::Message(output.key.into()),
+        provenance: vec![],
+        text: output.item.text.clone(),
+    }))
 }
 impl Component for TurnFootnote {
     fn active(&self) -> bool {

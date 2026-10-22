@@ -221,7 +221,7 @@ impl TranscriptContent {
         };
         let document =
             TranscriptDocument::read(snapshot).map_err(|_| "invalid transcript document")?;
-        let planned = plan(&document, &self.labels, &self.timing)?;
+        let planned = plan(snapshot, &document, &self.labels, &self.timing)?;
         let mounted: BTreeMap<_, _> = self.keys.iter().zip(&self.rows.children).collect();
         let mut rows: BTreeMap<&str, (Vec<ComponentId>, bool)> = BTreeMap::new();
         for row in &planned {
@@ -375,7 +375,7 @@ impl TranscriptContent {
         }
         let document =
             TranscriptDocument::read(snapshot).map_err(|_| "invalid transcript document")?;
-        let plan = plan(&document, &self.labels, timing)?;
+        let plan = plan(snapshot, &document, &self.labels, timing)?;
         self.validate_plan(&plan, publication, epoch, available)?;
         let desired: BTreeSet<_> = plan.iter().map(|row| row.key.clone()).collect();
         // All source/identity/content/namespace checks precede tree mutation.
@@ -463,7 +463,7 @@ impl TranscriptContent {
         self.validate_update_with_timing(scope, publication, epoch, snapshot, available, timing)?;
         let document =
             TranscriptDocument::read(snapshot).map_err(|_| "invalid transcript document")?;
-        let planned = plan(&document, &self.labels, timing)?;
+        let planned = plan(snapshot, &document, &self.labels, timing)?;
         let desired: BTreeSet<_> = planned.iter().map(|row| row.key.clone()).collect();
         let index: BTreeMap<_, _> = self
             .keys
@@ -592,7 +592,7 @@ impl TranscriptContent {
         }
         let document =
             TranscriptDocument::read(snapshot).map_err(|_| "invalid transcript document")?;
-        let plan = plan(&document, &self.labels, timing)?;
+        let plan = plan(snapshot, &document, &self.labels, timing)?;
         self.validate_plan(&plan, publication, epoch, available && !snapshot.is_stale)
     }
     fn validate_plan(
@@ -757,13 +757,13 @@ impl TranscriptContent {
             PlannedContent::Footnote(turn, output, display) => {
                 node.component::<TurnFootnote>()
                     .ok_or("transcript footnote role changed")?
-                    .check_update_with_display(
+                    .check_update_with_turn_copy(
                         &self.scope,
                         publication,
                         epoch,
                         turn,
                         available,
-                        *output,
+                        output.as_ref(),
                         display,
                     )?;
             }
@@ -809,13 +809,13 @@ impl TranscriptContent {
             PlannedContent::Footnote(turn, output, display) => node
                 .component_mut::<TurnFootnote>()
                 .unwrap()
-                .update_with_display(
+                .update_with_turn_copy(
                     &self.scope,
                     publication,
                     epoch,
                     turn,
                     available,
-                    *output,
+                    output.as_ref(),
                     display,
                 )?,
             PlannedContent::Feedback(_) => {
@@ -905,6 +905,23 @@ impl TranscriptContent {
         self.feedback_controls()
             .find_map(|(_, control)| control.is_composing().then(|| control.ids().editor))
     }
+    /// Original copy actions only. Hosts may admit these focus-preserving
+    /// business controls during preedit; SDK routing/geometry still decides hits.
+    /// IDs are not clipboard or mutation authority and must not be cached.
+    pub fn copy_action_ids(&self) -> Vec<ComponentId> {
+        self.rows
+            .children
+            .iter()
+            .filter_map(|node| {
+                if let Some(input) = node.component::<InputMessage>() {
+                    input.copy_button_id()
+                } else {
+                    node.component::<TurnFootnote>()
+                        .and_then(TurnFootnote::copy_button_id)
+                }
+            })
+            .collect()
+    }
     pub fn take_copy_intents(&self, actions: &[ContentAction]) -> Vec<crate::TranscriptCopyIntent> {
         self.rows
             .children
@@ -983,7 +1000,7 @@ enum PlannedContent<'a> {
     Tool(&'a TranscriptToolCall, ToolActivityPlacement),
     Footnote(
         &'a TranscriptTurn,
-        Option<TranscriptOutput<'a>>,
+        Option<crate::TranscriptTurnCopy>,
         crate::TurnFootnoteDisplay,
     ),
     Feedback(TurnFeedbackTarget<'a>),
@@ -997,11 +1014,13 @@ fn label(key: TranscriptContentRowKey, text: String) -> Planned<'static> {
     }
 }
 fn plan<'a>(
+    snapshot: &TranscriptSnapshot,
     document: &'a TranscriptDocument<'a>,
     labels: &TranscriptContentLabels,
     timing: &crate::TranscriptFootnoteTiming,
 ) -> Result<Vec<Planned<'a>>, &'static str> {
     use TranscriptContentRowKey as Key;
+    let mut copies = crate::TranscriptTurnCopy::catalog(snapshot);
     let mut result = vec![];
     if document.is_stale {
         result.push(label(Key::Stale, labels.stale.clone()));
@@ -1042,7 +1061,7 @@ fn plan<'a>(
             }
         }
         if let Some(turn) = section.turn {
-            let output = section.final_output();
+            let output = copies.remove(&turn.id);
             let display = timing.display(
                 turn,
                 &labels.footnote,

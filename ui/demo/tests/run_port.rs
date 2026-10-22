@@ -23,7 +23,7 @@ fn view() -> RunPort {
 }
 
 #[tokio::test]
-async fn run_routes_loaded_input_copy_and_blocks_it_while_composing() {
+async fn run_routes_local_copy_during_composition_without_admitting_send() {
     let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
     let snapshot = controller.snapshot();
     let mut run = view();
@@ -64,6 +64,32 @@ async fn run_routes_loaded_input_copy_and_blocks_it_while_composing() {
         clauses: vec![],
         replacement: None,
     });
+    let baseline = host
+        .text_surface(ids().composer.editor)
+        .unwrap()
+        .input
+        .external_baseline();
+    host.accessibility_action(button, None, AccessibilityAction::Press);
+    let actions = host.drain_actions();
+    let copies = host
+        .get_mut(ids().root)
+        .unwrap()
+        .component_mut::<RunPort>()
+        .unwrap()
+        .take_intents(&actions);
+    assert!(
+        matches!(copies.as_slice(), [RunPortIntent::CopyTranscript(copy)] if copy.scope()==&RunScope::main("fixture","a"))
+    );
+    assert_eq!(host.focused(), Some(ids().composer.editor));
+    assert_eq!(
+        host.text_surface(ids().composer.editor)
+            .unwrap()
+            .input
+            .external_baseline(),
+        baseline
+    );
+    host.accessibility_action(ids().composer.send, None, AccessibilityAction::Press);
+    let actions = host.drain_actions();
     assert!(
         host.get_mut(ids().root)
             .unwrap()
