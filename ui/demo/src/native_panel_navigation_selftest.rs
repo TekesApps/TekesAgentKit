@@ -1,7 +1,7 @@
 //! Owned native host navigation through the original SidePanel controls and
 //! TaskPaneBinding. Never cancels an execution or invents a task state machine.
 use super::*;
-use tekes_agent_components_ui::{RunPort, SidePanelTabKind};
+use tekes_agent_components_ui::{RunPort, SidePanelNavigation, SidePanelTabKind};
 use tekes_agent_presentation::AgentTask;
 use tekes_agent_ui_bindings::TaskPaneBinding;
 use tekes_ui_platform_macos::selftest::{Action, run_script};
@@ -16,6 +16,7 @@ struct ChildOpenFixture {
 }
 pub(super) struct Probe {
     phase: u8,
+    host_navigation: bool,
     started: Instant,
     first_editor: Option<(ComponentId, usize)>,
     draft: String,
@@ -31,6 +32,7 @@ impl Probe {
         run_script(vec![(25_000, Action::Close)]);
         Self {
             phase: 0,
+            host_navigation: false,
             started: Instant::now(),
             first_editor: None,
             draft: String::new(),
@@ -70,14 +72,24 @@ impl Probe {
         )]);
     }
     fn close(host: &Host) {
-        let id = host
-            .view
-            .tree
-            .get(host.view.panel_id())
-            .unwrap()
-            .component::<SidePanel>()
-            .unwrap()
-            .close_id();
+        let id = if let Some(navigation) = host.view.panel_navigation_id() {
+            host.view
+                .tree
+                .get(navigation)
+                .unwrap()
+                .component::<SidePanelNavigation>()
+                .unwrap()
+                .close_id()
+                .expect("current navigation has an original close control")
+        } else {
+            host.view
+                .tree
+                .get(host.view.panel_id())
+                .unwrap()
+                .component::<SidePanel>()
+                .unwrap()
+                .close_id()
+        };
         Self::click(host, id);
     }
     fn open_task(host: &mut Host, id: &str, session: &str) {
@@ -122,6 +134,7 @@ impl Probe {
         let old = self.phase;
         match self.phase {
             0 if window.is_active() => {
+                self.host_navigation = host.view.panel_navigation_id().is_some();
                 let run = host.view.binding().current_run().unwrap();
                 self.draft = run.draft.text.clone();
                 self.admissions = run.submissions.len();
@@ -396,6 +409,6 @@ impl Probe {
     }
     pub fn receipt(&self) -> serde_json::Value {
         assert_eq!(self.phase, 14, "panel navigation did not finish");
-        serde_json::json!({"nativeWindow":true,"originalPointerControls":true,"summaryCloseAndReopen":true,"openOrderRetained":true,"lastRemainingSelection":true,"emptyDocumentRetained":true,"originalTaskEditorRetained":true,"lateChildOwnerRejected":true,"duplicateChildDeliveryRejected":true,"pendingChildAfterCloseRejected":true,"originalChildEditorRetained":true,"inactiveTaskNavigationRejected":true,"currentParentDraftAndFocusRetained":true,"currentChildRequestRetained":true,"mainDraftRetained":true,"noSubmission":true,"ownedFixture":true,"realHarness":false,"physicalIme":false,"voiceOver":false,"processContainer":false})
+        serde_json::json!({"hostPanelNavigation":self.host_navigation,"nativeWindowToolbar":false,"nativeWindow":true,"originalPointerControls":true,"summaryCloseAndReopen":true,"openOrderRetained":true,"lastRemainingSelection":true,"emptyDocumentRetained":true,"originalTaskEditorRetained":true,"lateChildOwnerRejected":true,"duplicateChildDeliveryRejected":true,"pendingChildAfterCloseRejected":true,"originalChildEditorRetained":true,"inactiveTaskNavigationRejected":true,"currentParentDraftAndFocusRetained":true,"currentChildRequestRetained":true,"mainDraftRetained":true,"noSubmission":true,"ownedFixture":true,"realHarness":false,"physicalIme":false,"voiceOver":false,"processContainer":false})
     }
 }

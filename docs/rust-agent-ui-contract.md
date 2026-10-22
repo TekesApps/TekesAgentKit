@@ -1,5 +1,7 @@
 # Rust Agent UI 组件接入契约
 
+[新导航原生补验](rust-agent-ui-native-panel-toolbar-20261022.md)：新 header 的受控原生导航、分页、只读子历史与系统拼音通过；三个真实 harness 的现有布局流式阅读也取得完整收据。窗口截图失败、窗口级 toolbar、SideChat 原生家族菜单及跨进程仍未验收。
+
 [SidePanelNavigation 与宿主 header 接入](rust-agent-ui-side-panel-navigation-20261022.md)已补原 SDK toolbar/menu 业务控件、SideChat 家族与当前关闭回调，面板正文可移除诊断 header 并保留原实例。531 项本地回归、独立公开 consumer、最终三端协议→离屏 GPU 通过；窗口级契约跟踪 TekesUI #14/#36，跨进程 #48、新窗口及完整真实动态 tabs 尚未验收。
 
 当前增量见[历史输入宿主回调](rust-agent-ui-historical-input-20261022.md)：仅在实际端点能力与宿主 handler 同时存在时显示编辑/回退；当前三端默认隐藏，组件/宿主/独立 consumer 共 526 项回归通过。新增入口没有原生窗口通过声明。
