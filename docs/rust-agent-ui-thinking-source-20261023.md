@@ -45,3 +45,5 @@
 TekesUI 仍固定公开 `50ec49f3446924fdbc66b3cff22cd8cfe150fe7c`，AgentKit 最新已发布基线仍为 v0.3.8；本分支 API 增量未发布。#53 和 #48 等门禁不变，PR #10 保持 draft。完整范围见[交付状态](rust-agent-ui-delivery-status.md)。
 
 本轮复用现有 target，关闭 incremental；未新建 target、未复制验收程序或删除缓存。保留源码/WIP、固定依赖、测试/检查日志和原验收程序。
+
+后续当前源码本地 fixture 原生阅读与系统拼音续验已完成，见[独立原生收据](rust-agent-ui-source-native-20261023.md)。上述本阶段未运行原生的描述仅指来源帧测试阶段；未扩展为真实 harness 或整帧思考接线验收。
