@@ -1,0 +1,121 @@
+{
+  "sourceBase": "ae5f015f16eb3988fe71a7dcf30e744c76a50315",
+  "programReusedFrom": "goal-footnote-20261022/program-contract-final.json",
+  "programSha256": "649350a778988f59d03ef6c125846c7c356c7f663ce12014675d729635fcbd28",
+  "rustAndCargoInputsUnchanged": true,
+  "tekesui": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "piVersion": "1.3.0",
+  "scriptExitCode": 1,
+  "fullUiAccepted": false,
+  "dataLifecycleAccepted": true,
+  "nativeInteraction": false,
+  "sameMountedStreamUpdate": false,
+  "crossProcess": false,
+  "otherHarnessGoalLifecycle": "not covered by this Pi-only creation path; alternate public creation routes not inferred",
+  "goalReceipt": {
+    "clear": {
+      "clearedGoalAbsent": true,
+      "freshConsumerAfterReconnect": true,
+      "nativeInteraction": false,
+      "visibleConversationRetained": true
+    },
+    "dataLifecycleAccepted": true,
+    "footerVisibilityAccepted": false,
+    "goal": {
+      "durationInferred": false,
+      "externalEndpoint": true,
+      "goalId": "640230c5-af1d-4797-847c-4860bdbb1f23",
+      "goalRevision": 2,
+      "label": "目标 paused",
+      "labelVisible": false,
+      "nativeInteraction": false,
+      "originalFooter": true,
+      "originalGoalProjection": true,
+      "phase": "paused",
+      "scope": {
+        "endpointId": "pi-ui",
+        "sessionId": "5153b612-52e2-4809-89ee-aa9e7904e4ac",
+        "threadId": "5153b612-52e2-4809-89ee-aa9e7904e4ac"
+      },
+      "sourceMarkerInferred": false,
+      "turnId": "[\"pi-ui\",\"5153b612-52e2-4809-89ee-aa9e7904e4ac\",\"native-run:6385efcd-ed51-4ed6-8844-1d6e942c4d6f\"]"
+    },
+    "localControlledProvider": true,
+    "nativeInteraction": false,
+    "publicMethods": [
+      "goals.create",
+      "goals.pause",
+      "goals.get",
+      "goals.clear"
+    ],
+    "realHarness": true,
+    "sameMountedStreamUpdate": false
+  },
+  "lifecycle": {
+    "scope": {
+      "endpointId": "pi-ui",
+      "threadId": "5153b612-52e2-4809-89ee-aa9e7904e4ac",
+      "sessionId": "5153b612-52e2-4809-89ee-aa9e7904e4ac"
+    },
+    "created": {
+      "activation": "disarmed",
+      "blockedReason": null,
+      "createdAt": 1792671192287.2651,
+      "id": "640230c5-af1d-4797-847c-4860bdbb1f23",
+      "maxGoalRounds": 2,
+      "objective": "Owned UI goal footer proof",
+      "phase": "active",
+      "revision": 1,
+      "roundsStarted": 0,
+      "updatedAt": 1792671192287.2651
+    },
+    "paused": {
+      "activation": "disarmed",
+      "blockedReason": null,
+      "createdAt": 1792671192287.2651,
+      "id": "640230c5-af1d-4797-847c-4860bdbb1f23",
+      "maxGoalRounds": 2,
+      "objective": "Owned UI goal footer proof",
+      "phase": "paused",
+      "revision": 2,
+      "roundsStarted": 0,
+      "updatedAt": 1792671192307.3188
+    },
+    "afterClearReconnect": null,
+    "clearMutation": {
+      "id": "640230c5-af1d-4797-847c-4860bdbb1f23",
+      "revision": 3
+    }
+  },
+  "toolTestsPassed": 57,
+  "newTargets": 0,
+  "newProgramCopies": 0,
+  "deletedBytes": 0,
+  "evidenceFiles": {
+    "tool-tests.log": "4cbca1589226a923d9a60043f5f2d707668edd11257526693aa9506e6285bf5c",
+    "pi-goal-final-pi.consumer.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "pi-goal-pi.png": "37d655c730c847db7c17314e9ae645b933051fc0a76635e9354b8cbc15140c7f",
+    "pi-goal-final-pi-goal-cleared.png": "bcf6d2ed6070a4b7c00a1927ae3fa11344345434e7ff5342e8f4f96188387e71",
+    "pi-goal-final-pi.consumer.stdout": "522dd09536fb2903edcacd684f940e55d5dc030667d8c603bf4903497ff7d3cb",
+    "pi-goal.log": "d2cbadb5f1e26c4627ca29973eaba51cafbac164fedecd285c326895636a8508",
+    "pi-goal-final-pi.png": "bcf6d2ed6070a4b7c00a1927ae3fa11344345434e7ff5342e8f4f96188387e71",
+    "tool-tests-final.log": "9f66249015d943e0a39ca95a4e1dde6c6b8296813f0ebb33a0818ce71a3b13c2",
+    "pi-goal-final-pi-goal-cleared.consumer.stdout": "c8a2d2b7e62a136ff53928339e29be585bd2a11c9ec5f6ae406460ba3a175f33",
+    "pi-goal-evidence-pi.png": "9168454ff560db669ae5c44375afb7784a8c21dbf2440177232e8e56fa82d7ee",
+    "pi-goal-evidence.log": "71013eb644fee4882fdb960eca9fa781e47db88748f21a64f272d881deb63c4c",
+    "pi-goal-final.log": "2fc6b883a9d75d7f4a88d830e436aad5d2227c184c83e88436c22f2d28dafacf",
+    "pi-goal-evidence-pi-goal-cleared.consumer.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "pi-goal-evidence-pi.consumer.stdout": "5739ddad7da7241c723740db1f415ca350a5037cb852581acffc2b57196f78f1",
+    "pi-goal-evidence-pi.consumer.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "pi-goal-evidence-pi-goal-cleared.png": "9168454ff560db669ae5c44375afb7784a8c21dbf2440177232e8e56fa82d7ee",
+    "pi-goal-evidence-pi.goal-lifecycle.json": "a025ef8ec0dafca344c05d9c3143ea9fb442fadc68d216dd0e894a1f7f1c678f",
+    "tool-tests-evidence.log": "833f8b7dfc06a0ac063e90914e31d6c9bd70b2a352beae0de852e3a17fc095ff",
+    "pi-goal-evidence-pi-goal-cleared.consumer.stdout": "c8a2d2b7e62a136ff53928339e29be585bd2a11c9ec5f6ae406460ba3a175f33",
+    "pi-goal-final-pi-goal-cleared.consumer.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "scriptSources": {
+    "scripts/test-real-session-endpoints.py": "5448374360a8218d00dd311b1725d7b0fc7c3e743436ba8f05fb6e1a4005854c",
+    "scripts/goal_footnote_probe.py": "0dbc41b45eb8d9c2f9c5fd9ea5730df94eadf8e25a3e5c4fb9a822f346212dbd",
+    "scripts/tests/test_goal_footnote_probe.py": "3cf874ce2075b5f90a78a6008e9ab08b424bd7dad37d9938e463a84d9e7a7f0c"
+  }
+}

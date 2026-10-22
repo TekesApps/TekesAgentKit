@@ -1,5 +1,7 @@
 # Rust Agent UI 组件接入契约
 
+[真实 Pi 目标回传复验](rust-agent-ui-real-goal-footnote-20261022.md)：公开 create/pause/get→原 footer 数据、clear/reconnect→新 consumer 通过；默认窄栏的目标标签可见性失败，严格门禁保留退出 1。继续跟踪 #47 和消费侧反馈状态布局，不视为完整 UI 通过。
+
 [目标终态脚注与首次安装](rust-agent-ui-goal-footnote-20261022.md)补充原 goal projection→同帧 RunSnapshot→原 footer 的只读路径；没有来源 turn 或目标耗时就不推断。首次晚安装 Transcript 复用完整显示输入，原生窗口/三端真实目标生命周期仍待专项验收。
 
 [新导航原生补验](rust-agent-ui-native-panel-toolbar-20261022.md)：新 header 的受控原生导航、分页、只读子历史与系统拼音通过；三个真实 harness 的现有布局流式阅读也取得完整收据。窗口截图失败、窗口级 toolbar、SideChat 原生家族菜单及跨进程仍未验收。

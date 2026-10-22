@@ -5,6 +5,7 @@ from pathlib import Path
 from native_probe_provider import native_probe_intent
 from runtime_provenance import kernel_programs
 from native_probe_launcher import run_native_probe, validate_bundle
+from goal_footnote_probe import verify_goal_identity, verify_goal_footer, verify_goal_cleared
 ROOT=Path(__file__).resolve().parent.parent
 parser=argparse.ArgumentParser()
 parser.add_argument('--pi-root',type=Path)
@@ -19,6 +20,7 @@ parser.add_argument('--ui-demo',type=Path,help='Optional already-built AgentKit 
 parser.add_argument('--ui-native-app',type=Path,help='Opt-in normal LaunchServices native launch of the exact --ui-demo APPL bundle; offscreen remains direct, no activation retries')
 parser.add_argument('--ui-native-observe-frontmost',action='store_true',help='Read-only macOS frontmost PID/bundle trace during native probes; never activates an app')
 parser.add_argument('--ui-output',type=Path)
+parser.add_argument('--ui-goal-footnote',action='store_true',help='Pi-only public create/pause -> original goal footer -> clear/reconnect, using isolated owned sessions; other harness goal lifecycles remain not run')
 parser.add_argument('--ui-components',action='store_true',help='Mount RunPort/Composer/Indicators with RunBinding; canonical mixed content uses --ui-transcript-content')
 parser.add_argument('--ui-panel-navigation-toolbar',action='store_true',help='Use original Kit navigation in a host SDK toolbar, hide inline diagnostic controls; offscreen only, no native-window toolbar registration')
 parser.add_argument('--ui-model-choices',action='store_true',help='Exercise public model choices and explicit Send preparation in isolated offscreen component sessions')
@@ -101,6 +103,11 @@ if args.ui_output and not args.ui_demo:
     parser.error("--ui-output requires --ui-demo")
 if args.ui_components and not args.ui_demo:
     parser.error("--ui-components requires --ui-demo")
+if args.ui_goal_footnote:
+    if not (args.pi_root and args.ui_demo and args.ui_components and args.ui_transcript_content):
+        parser.error('--ui-goal-footnote requires Pi, UI demo/components and Transcript')
+    if any((args.ui_history_pages,args.ui_bounded_child,args.ui_native_reading,args.ui_native_feedback,args.ui_native_stream_reading,args.ui_native_stream,args.ui_native_run_controls,args.ui_native_readonly)):
+        parser.error('--ui-goal-footnote uses its own offscreen sessions; do not combine history/native/bounded probes')
 if args.ui_panel_navigation_toolbar and not (args.ui_demo and args.ui_components):
     parser.error('--ui-panel-navigation-toolbar requires --ui-demo and --ui-components')
 if args.ui_panel_navigation_toolbar and any((args.ui_native_reading,args.ui_native_feedback,args.ui_native_stream_reading,args.ui_native_stream,args.ui_native_run_controls,args.ui_native_readonly)):
@@ -356,6 +363,27 @@ def ui_smoke(config, first, bounded_child=None):
             {'op':'waitSettled','sessionId':first,'inputText':text}]))
         marker='NATIVE_UI_FEEDBACK_TARGET_SEEDED' if args.ui_native_feedback else 'NATIVE_UI_COMPONENTS_TARGET_SEEDED'
         print(marker+' public-prompt+real-final-response',flush=True)
+    goal_case=None
+    if args.ui_goal_footnote and bounded_child is None:
+        if kind != 'pi':
+            print(kind.upper()+'_UI_GOAL_NOT_RUN normalized-goals.create-not-in-this-path; no alternate creation protocol inferred',flush=True)
+        else:
+            first=next(row['result']['sessionId'] for row in execute(dict(config,commands=[{'op':'create','cwd':str(cwd)}])) if row.get('op')=='create')
+            model=next(command['args'] for command in config['commands'] if command.get('method')=='session.selectModel')
+            result=execute(dict(config,commands=[
+                {'op':'call','sessionId':first,'method':'session.selectModel','args':model},
+                {'op':'open','sessionId':first},
+                {'op':'compose','sessionId':first,'text':'UI_GOAL_FOOTNOTE_OWNED'},
+                {'op':'waitSettled','sessionId':first,'inputText':'UI_GOAL_FOOTNOTE_OWNED'},
+                {'op':'call','sessionId':first,'method':'goals.create','args':{'objective':'Owned UI goal footer proof','maxGoalRounds':2},'saveAs':'ui-goal','savePointer':''},
+                {'op':'call','sessionId':first,'method':'goals.pause','args':{'ref':'@ui-goal'}},
+                {'op':'call','sessionId':first,'method':'goals.get'},
+            ]))
+            goal_case=result[-1]['result']
+            created=next(row['result'] for row in result if isinstance(row.get('result'),dict) and row['result'].get('phase')=='active')
+            assert goal_case['id']==created['id'] and goal_case['revision']>created['revision'] and goal_case['phase']=='paused'
+            assert created['activation']=='disarmed'
+            goal_created=created
     second=next(row['result']['sessionId'] for row in execute(dict(config,commands=[{'op':'create','cwd':str(cwd)}])) if row.get('op')=='create')
     if args.ui_native_reading and bounded_child is None:
         history=[{'op':'call','sessionId':second,'method':'session.selectModel','args':model},{'op':'open','sessionId':second}]
@@ -401,6 +429,34 @@ def ui_smoke(config, first, bounded_child=None):
     ui=subprocess.run([str(args.ui_demo.resolve()),*mode,'--endpoint-config',str(path),'--offscreen',str(output)],env=ui_env,text=True,capture_output=True,timeout=60)
     assert ui.returncode==0,ui.stderr[-3000:]
     receipt=next(json.loads(line) for line in ui.stdout.splitlines() if line.startswith('{') and json.loads(line).get('offscreen'))
+    if goal_case is not None:
+        output.with_suffix('.consumer.stdout').write_text(ui.stdout)
+        output.with_suffix('.consumer.stderr').write_text(ui.stderr)
+        goal_scope={'endpointId':kind+'-ui','threadId':first,'sessionId':first}
+        goal_proof=verify_goal_identity(receipt,goal_scope,goal_case)
+        lifecycle={'scope':goal_scope,'created':goal_created,'paused':goal_case}
+        output.with_suffix('.goal-lifecycle.json').write_text(json.dumps(lifecycle,ensure_ascii=False,indent=2)+'\n')
+        # CAS clear is performed only on this owned pointer. Reconnect through
+        # the public runtime, then construct a fresh UI consumer of the same
+        # original session. No private file/cache inspection or synthetic goal.
+        cleared=execute(dict(config,commands=[{'op':'open','sessionId':first},
+            {'op':'call','sessionId':first,'method':'goals.clear','args':{'ref':{'id':goal_case['id'],'revision':goal_case['revision']}}},
+            {'op':'reconnect'},{'op':'call','sessionId':first,'method':'goals.get'}]))
+        assert cleared[-1]['result'] is None, 'cleared goal survived public reconnect'
+        lifecycle['afterClearReconnect']=cleared[-1]['result']
+        lifecycle['clearMutation']=next(row['result'] for row in cleared if row.get('op')=='call' and isinstance(row.get('result'),dict) and row['result'].get('id')==goal_case['id'])
+        output.with_suffix('.goal-lifecycle.json').write_text(json.dumps(lifecycle,ensure_ascii=False,indent=2)+'\n')
+        cleared_output=output.with_name(output.stem+'-goal-cleared'+output.suffix)
+        fresh=subprocess.run([str(args.ui_demo.resolve()),*mode,'--endpoint-config',str(path),'--offscreen',str(cleared_output)],env=ui_env,text=True,capture_output=True,timeout=60)
+        cleared_output.with_suffix('.consumer.stdout').write_text(fresh.stdout)
+        cleared_output.with_suffix('.consumer.stderr').write_text(fresh.stderr)
+        assert fresh.returncode==0,fresh.stderr[-3000:]
+        fresh_receipt=next(json.loads(line) for line in fresh.stdout.splitlines() if line.startswith('{') and json.loads(line).get('offscreen'))
+        clear_proof=verify_goal_cleared(receipt,fresh_receipt)
+        print(kind.upper()+'_UI_GOAL_FOOTNOTE_RECEIPT '+json.dumps({'goal':goal_proof,'clear':clear_proof,'publicMethods':['goals.create','goals.pause','goals.get','goals.clear'],'realHarness':True,'localControlledProvider':True,'sameMountedStreamUpdate':False,'dataLifecycleAccepted':True,'footerVisibilityAccepted':goal_proof['labelVisible'],'nativeInteraction':False},ensure_ascii=False,sort_keys=True),flush=True)
+        # Keep the original visibility gate strict. Protocol/clearance evidence
+        # is retained even if the current control library clips the real footer.
+        verify_goal_footer(receipt,goal_scope,goal_case)
     if args.ui_panel_navigation_toolbar:
         proof=receipt['panelNavigationProof']
         assert receipt['hostPanelNavigation'] and all(proof[key] for key in ('mounted','controlledInputMatches','hostHeader','inlineDiagnosticHidden','bodySlotMounted')),proof
