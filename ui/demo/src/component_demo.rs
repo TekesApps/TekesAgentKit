@@ -64,6 +64,7 @@ pub const SELECT_B: ComponentId = ComponentId(101);
 pub const RECONNECT: ComponentId = ComponentId(102);
 pub const NEW_SESSION: ComponentId = ComponentId(103);
 pub const CREATE_AUTOMATIC: ComponentId = ComponentId(104);
+pub const OPEN_SUMMARY: ComponentId = ComponentId(105);
 
 #[path = "component_file_preview.rs"]
 mod file_preview;
@@ -187,6 +188,9 @@ pub struct ComponentDemo {
     workspace_summary: Option<tekes_agent_components_ui::SummaryContextInput>,
     side_chats: Option<Arc<SideChatBinding>>,
     panel_selections: BTreeMap<RunScope, SidePanelTabKind>,
+    // Host navigation document only. Execution/pointers/drafts remain in the
+    // original bindings; map ordering is not the user's tab opening order.
+    panel_order: BTreeMap<RunScope, Vec<SidePanelTabKind>>,
     panel_parent_projection: BTreeMap<RunScope, (bool, u64)>,
     panel_runs: BTreeMap<(RunScope, String), PanelRun>,
     task_sources: BTreeMap<(RunScope, String), TaskSource>,
@@ -388,6 +392,7 @@ impl ComponentDemo {
                                 (SELECT_B, "会话 B"),
                                 (RECONNECT, "重新连接"),
                                 (NEW_SESSION, "新会话"),
+                                (OPEN_SUMMARY, "Summary"),
                             ]
                             .into_iter()
                             .map(|(id, label)| Content::new(id, ButtonContent::new(label)))
@@ -508,6 +513,7 @@ impl ComponentDemo {
             workspace_summary: None,
             side_chats: None,
             panel_selections: BTreeMap::new(),
+            panel_order: BTreeMap::new(),
             panel_parent_projection: BTreeMap::new(),
             panel_runs: BTreeMap::new(),
             task_sources: BTreeMap::new(),
@@ -2258,6 +2264,52 @@ impl ComponentDemo {
     pub fn set_side_chat_binding(&mut self, binding: Arc<SideChatBinding>) {
         self.side_chats = Some(binding);
     }
+    /// Explicit host destination. Reopening an existing tab selects it without
+    /// reordering; a closed Summary appends like ClientSidePanelState.open.
+    pub fn open_summary(&mut self) -> Result<()> {
+        require(
+            !self.composing(),
+            "finish composition before panel navigation",
+        )?;
+        let parent = self
+            .current_binding()
+            .ok_or_else(|| unsupported("no panel parent"))?
+            .scope()
+            .clone();
+        let order = self
+            .panel_order
+            .entry(parent.clone())
+            .or_insert_with(|| vec![SidePanelTabKind::Summary]);
+        if !order.contains(&SidePanelTabKind::Summary) {
+            order.push(SidePanelTabKind::Summary);
+        }
+        self.panel_selections
+            .insert(parent, SidePanelTabKind::Summary);
+        self.panel_navigation_revision += 1;
+        if self
+            .tree
+            .focused()
+            .is_some_and(|id| self.panel_body_owns(id))
+        {
+            self.tree.focus(None, false);
+        }
+        self.sync()
+    }
+    fn close_panel_navigation(&mut self, parent: &RunScope, tab: &SidePanelTabKind) {
+        let order = self.panel_order.entry(parent.clone()).or_default();
+        order.retain(|kind| kind != tab);
+        if self
+            .panel_selections
+            .get(parent)
+            .is_none_or(|selected| !order.contains(selected))
+        {
+            if let Some(last) = order.last() {
+                self.panel_selections.insert(parent.clone(), last.clone());
+            } else {
+                self.panel_selections.remove(parent);
+            }
+        }
+    }
     pub fn panel_composer_ids(&self) -> Option<ComposerIds> {
         self.active_panel_run()
             .map(|run| run.ids)
@@ -2894,6 +2946,15 @@ impl ComponentDemo {
         {
             self.cancel_model_choices();
         }
+        let summary_disabled = self.selection_cleared || self.composing();
+        self.tree
+            .get_mut(OPEN_SUMMARY)
+            .unwrap()
+            .component_mut::<ButtonContent>()
+            .unwrap()
+            .button
+            .state
+            .disabled = summary_disabled;
         if self.selection_cleared {
             self.sync_sidebar()?;
             for id in [SELECT_A, SELECT_B] {
@@ -3038,11 +3099,16 @@ impl ComponentDemo {
                 });
             }
         }
+        let initial_document = !self.panel_order.contains_key(&parent);
+        self.panel_order
+            .entry(parent.clone())
+            .or_insert_with(|| vec![SidePanelTabKind::Summary]);
         let wanted = self
             .panel_selections
-            .entry(parent.clone())
-            .or_insert(SidePanelTabKind::Summary)
-            .clone();
+            .get(&parent)
+            .cloned()
+            .or_else(|| initial_document.then_some(SidePanelTabKind::Summary));
+        let had_selection = wanted.is_some();
         self.panel_revision += 1;
         let mut input = if let Some(owner) = &self.side_chats {
             let snapshot = owner.snapshot();
@@ -3052,9 +3118,9 @@ impl ComponentDemo {
                     .get(id)
                     .is_some_and(|chat| &chat.parent == parent)
             });
-            owner.input(self.panel_revision, &parent, tabs, Some(wanted))?
+            owner.input(self.panel_revision, &parent, tabs, wanted)?
         } else {
-            let selected = tabs.iter().any(|tab| tab.kind == wanted).then_some(wanted);
+            let selected = wanted.filter(|wanted| tabs.iter().any(|tab| &tab.kind == wanted));
             SidePanelInput {
                 revision: self.panel_revision,
                 parent: parent.clone(),
@@ -3065,15 +3131,47 @@ impl ComponentDemo {
                 supports_side_chat: None,
             }
         };
-        if input.selected.is_none() {
-            // A confirmed lost scratch pointer never becomes a new conversation.
-            self.tree.focus(None, false);
-            input.selected = Some(SidePanelTabKind::Summary);
+        let order = self
+            .panel_order
+            .get_mut(&parent)
+            .expect("host panel document");
+        order.retain(|kind| input.tabs.iter().any(|tab| &tab.kind == kind));
+        for tab in &input.tabs {
+            if tab.kind != SidePanelTabKind::Summary && !order.contains(&tab.kind) {
+                order.push(tab.kind.clone());
+            }
+        }
+        input.tabs.retain(|tab| order.contains(&tab.kind));
+        input
+            .tabs
+            .sort_by_key(|tab| order.iter().position(|kind| kind == &tab.kind).unwrap());
+        if input
+            .selected
+            .as_ref()
+            .is_some_and(|selected| !order.contains(selected))
+        {
+            input.selected = None;
+        }
+        if input.selected.is_none() && had_selection {
+            // Confirmed pointer loss/close chooses the last remaining host tab;
+            // an empty document stays empty and never fabricates a new Run.
+            if self
+                .tree
+                .focused()
+                .is_some_and(|id| self.panel_body_owns(id))
+            {
+                self.tree.focus(None, false);
+            }
+            input.selected = input.tabs.last().map(|tab| tab.kind.clone());
         }
         input.projection_ready = self.panel_parent_is_projected(&parent);
-        let selected = input.selected.clone().expect("Summary fallback");
-        self.panel_selections
-            .insert(parent.clone(), selected.clone());
+        let selected = input.selected.clone();
+        if let Some(selected) = &selected {
+            self.panel_selections
+                .insert(parent.clone(), selected.clone());
+        } else {
+            self.panel_selections.remove(&parent);
+        }
         self.tree
             .get_mut(panel_id)
             .expect("panel")
@@ -3081,10 +3179,10 @@ impl ComponentDemo {
             .expect("SidePanel")
             .update(&input)
             .map_err(unsupported)?;
-        if !input.projection_ready {
+        if !input.projection_ready || selected.is_none() {
             return self.sync_upload_status();
         }
-        match selected {
+        match selected.unwrap() {
             SidePanelTabKind::Summary => {
                 let summary_id = self.summary_id();
                 if self.tree.get(summary_id).is_none() {
@@ -4073,14 +4171,18 @@ impl ComponentDemo {
                     parent,
                     tab: SidePanelTabKind::Task { task_id },
                 } => {
+                    self.close_panel_navigation(
+                        &parent,
+                        &SidePanelTabKind::Task {
+                            task_id: task_id.clone(),
+                        },
+                    );
                     let key = (parent.clone(), task_id);
                     if let Some(source) = self.task_sources.remove(&key) {
                         source.source.cancel();
                     }
                     self.task_runs.remove(&key);
                     self.task_attempts.remove(&key);
-                    self.panel_selections
-                        .insert(parent, SidePanelTabKind::Summary);
                     self.panel_navigation_revision += 1;
                     self.tree.focus(None, false);
                 }
@@ -4088,11 +4190,23 @@ impl ComponentDemo {
                     parent,
                     tab: SidePanelTabKind::Subagent { child_id },
                 } => {
+                    self.close_panel_navigation(
+                        &parent,
+                        &SidePanelTabKind::Subagent {
+                            child_id: child_id.clone(),
+                        },
+                    );
                     if let Some(pane) = self.child_panes.remove(&(parent.clone(), child_id)) {
                         pane.source.retire();
                     }
-                    self.panel_selections
-                        .insert(parent, SidePanelTabKind::Summary);
+                    self.panel_navigation_revision += 1;
+                    self.tree.focus(None, false);
+                }
+                SidePanelIntent::Close {
+                    parent,
+                    tab: SidePanelTabKind::Summary,
+                } => {
+                    self.close_panel_navigation(&parent, &SidePanelTabKind::Summary);
                     self.panel_navigation_revision += 1;
                     self.tree.focus(None, false);
                 }
@@ -4276,6 +4390,7 @@ impl ComponentDemo {
                 }
                 SELECT_A => self.select(0)?,
                 SELECT_B => self.select(1)?,
+                OPEN_SUMMARY if !self.composing() => self.open_summary()?,
                 RECONNECT if !self.composing() => commands.push(DemoCommand::Reconnect),
                 _ => {}
             }

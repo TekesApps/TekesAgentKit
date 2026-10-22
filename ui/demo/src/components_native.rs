@@ -38,6 +38,8 @@ mod composer_notice_probe;
 mod disclosure_reading_probe;
 #[path = "native_feedback_selftest.rs"]
 mod feedback_probe;
+#[path = "native_panel_navigation_selftest.rs"]
+mod panel_navigation_probe;
 #[path = "native_panel_projection_selftest.rs"]
 mod panel_projection_probe;
 #[path = "native_reading_selftest.rs"]
@@ -113,6 +115,7 @@ struct Host {
     summary_label_probe: Option<summary_label_probe::Probe>,
     summary_child_probe: Option<summary_child_probe::Probe>,
     summary_row_probe: Option<summary_row_probe::Probe>,
+    panel_navigation_probe: Option<panel_navigation_probe::Probe>,
     footnote_time_probe: Option<footnote_time_probe::Probe>,
     visibility_probe: Option<visibility_probe::Probe>,
     feedback_probe: Option<feedback_probe::Probe>,
@@ -1420,6 +1423,10 @@ impl Host {
             probe.advance(self, window);
             self.summary_row_probe = Some(probe);
         }
+        if let Some(mut probe) = self.panel_navigation_probe.take() {
+            probe.advance(self, window);
+            self.panel_navigation_probe = Some(probe);
+        }
         if let Some(mut probe) = self.summary_child_probe.take() {
             probe.advance(self, window);
             self.summary_child_probe = Some(probe);
@@ -2500,6 +2507,14 @@ impl Host {
                 probe.receipt()
             );
         }
+        if let Some(probe) = &self.panel_navigation_probe {
+            assert!(
+                self.failures.is_empty(),
+                "panel navigation failures: {:?}",
+                self.failures
+            );
+            println!("NATIVE_AGENT_PANEL_NAVIGATION_RECEIPT {}", probe.receipt());
+        }
         if let Some(probe) = &self.summary_child_probe {
             assert!(
                 self.failures.is_empty(),
@@ -2999,6 +3014,11 @@ pub fn run() {
     let summary_row_selftest = args
         .iter()
         .any(|arg| arg == "--summary-row-layout-selftest");
+    let panel_navigation_selftest = args.iter().any(|arg| arg == "--panel-navigation-selftest");
+    assert!(
+        !panel_navigation_selftest || args.iter().any(|arg| arg == "--transcript-content"),
+        "panel navigation requires formal host"
+    );
     assert!(
         !summary_row_selftest || args.iter().any(|arg| arg == "--transcript-content"),
         "Summary rows require formal host"
@@ -3073,6 +3093,7 @@ pub fn run() {
         || summary_label_selftest
         || summary_child_selftest
         || summary_row_selftest
+        || panel_navigation_selftest
         || sidebar_session_menu_selftest
         || sidebar_search_selftest
         || sidebar_query_selftest
@@ -3115,6 +3136,7 @@ pub fn run() {
             summary_label_selftest,
             summary_child_selftest,
             summary_row_selftest,
+            panel_navigation_selftest,
             sidebar_session_menu_selftest,
             sidebar_search_selftest,
             sidebar_query_selftest,
@@ -3602,6 +3624,7 @@ pub fn run() {
         summary_label_probe: summary_label_selftest.then(summary_label_probe::Probe::new),
         summary_child_probe: summary_child_fixture.map(summary_child_probe::Probe::new),
         summary_row_probe: summary_row_fixture.map(summary_row_probe::Probe::new),
+        panel_navigation_probe: panel_navigation_selftest.then(panel_navigation_probe::Probe::new),
         footnote_time_probe: footnote_time_fixture.map(footnote_time_probe::Probe::new),
         visibility_probe: visibility_selftest
             .then(|| visibility_probe::Probe::new(visibility_fixture)),

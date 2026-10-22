@@ -31,17 +31,19 @@ ProcessContainer/Task/SideChat native acceptance boundaries.
 
 可独立挂载的组件包括 Composer、ComposerNotice、ComposerContext、ComposerChoices、AnnotationEditor、ComposerUploads、Indicators、Sidebar、ThreadRename、SidePanel、SummaryView、InputMessage、OutputMessage、TurnFootnote、TranscriptContent、ReadOnlyTranscript 和 RunPort。它们使用同一套共享 presentation；RunSurface/ComponentDemo 是测试与接入宿主。主会话和可写 pane 已挂载 RunPort，有界子历史使用 ReadOnlyTranscript；完整 Transcript 的阅读锚点、富内容与最终体验验收仍待完成。
 
-[独立阅读事务候选联调](../docs/rust-agent-ui-reading-candidate-20261020.md)提供正式 Transcript 的预检行 ID API 和显式隔离回放命令；不替换默认 pin，尚未接入完整 RunPort 或完成原生阅读验收。
+[独立阅读事务候选联调](../docs/rust-agent-ui-reading-candidate-20261020.md)保留早期候选的隔离回放记录。当前默认公开精确 pin 已接入 RunPort 的[持续阅读事务](../docs/rust-agent-ui-continuous-reading-20261021.md)，分页、reveal、焦点与 IME 的最新验收范围见[本轮复核](../docs/rust-agent-ui-panel-navigation-20261022.md)，不以早期候选状态描述当前实现。
 
 正式 RunPort 的 [共享会话列](../docs/rust-agent-ui-column-layout-20261020.md)使用公开 `RunColumnLayout` 配置限宽、全宽或子 pane 边距，改布局不替换原组件。
 
-[RunPort 整帧准备](../docs/rust-agent-ui-run-preflight-20261021.md)公开只读业务计划与提交重检；正式组件已在独立 TekesUI #26 候选中验证阅读事务，默认宿主仍待迁移。
+[RunPort 整帧准备](../docs/rust-agent-ui-run-preflight-20261021.md)公开只读业务计划与提交重检；默认宿主已通过公开 SDK 的 `publish_run_reading_update` 在原阅读事务内发布整帧，持续检查原编辑器、目的地与版本。
 
 可选的[系统拼音软件探针](../docs/rust-agent-ui-system-ime-20261020.md)使用 `python3 scripts/test-system-ime.py --demo ui/target/debug/tekes-agent-ui-demo`（在仓库根目录执行）。它要求当前已选简体拼音和已有事件权限，不改变输入源，只向自己启动的 fixture 进程发送键码；通过真实 marked text、发送/导航屏障、确认和单次提交检查。实体键盘、候选窗视觉和完整 IME 验收仍未完成。
 
 Composer 已接入输入/草稿/发送/取消、公开模型目录与发送前配置、初始预设/自动创建、内容卡片移除和已有批注评论编辑。Main 已接入真实 macOS 文件选择和公共上传状态；三端公开上传→草稿→发送→历史/重连已验证，Native/Pi 另验证通用文件字节读取，DSH 暂无通用文件下载。SidePanel 选择器已接入任务、独立子代理和 SideChat；预览/持久化对账、选区批注捕获/来源高亮、内容移除 undo 和其余能力入口仍待适配。模型、创建和评论编辑的证据分别见 [模型闭环](../docs/rust-agent-ui-model-integration-20261019.md)、[新会话](../docs/rust-agent-ui-creation-20261020.md)、[评论编辑](../docs/rust-agent-ui-annotation-editor-20261020.md)。
 
 Sidebar 使用共享列表、置顶和动作 dispatcher，已接入选择、复制、重命名、分叉和归档。SidePanel 组合任务、子代理、SideChat 与 Summary；任务与独立子代理保留各自 Composer/Indicators，有界子历史是只读来源。SideChat 保留临时 pointer 与 Unknown/Closing 草稿，源撤销、晚结果和异步准备继续由原绑定检查。
+
+SidePanel 是受控组件，宿主提供有序 `tabs` 和可为空的 `selected`；先排空原控件 intents 再发布下一帧。demo 导航按 ClientKit 保留打开顺序，关闭当前 tab 后选最后一个剩余 tab，全部关闭后保持空文档；宿主示例按钮 `OPEN_SUMMARY` 显式重开 Summary，不是新增 Kit launcher。关闭后旧 `PanelContentToken` 失效。晚到 SideChat 回包不重选已关闭文档，关闭确认不清除主 Composer 的组字焦点。详见[导航契约及分层证据](../docs/rust-agent-ui-panel-navigation-20261022.md)。
 
 Composer 的真实输入胶囊公开为 `ComposerIds::input_band`；现在保留9个连续 ID，原编辑器及8个既有 ID不变。当前公开固定 SDK 已提供留白焦点及原生 IME 转交；消费证据见下方公开版本接收记录。宿主绑定时机、替换后重绑及验收边界见[接入记录](../docs/rust-agent-ui-composer-padding-20261021.md)。
 
