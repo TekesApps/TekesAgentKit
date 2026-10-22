@@ -1,5 +1,7 @@
 # 原生启动配置与真实端验证
 
+后续 [当前版本 Native 原生补验](rust-agent-ui-native-current-20261022.md)已取得新的流式/取消/恢复证据；本页表格及失败保持原程序归属，不回写为通过。
+
 本次不改变 Rust UI、presentation 或 SDK；新增的是原生验收驱动的显式启动配置与只读诊断。继续消费公开精确 TekesUI `09b4bab44b6dfa65487250ea816b610b9df59095`，2026-10-22 复核 main 未变化，[ProcessContainer #48](https://github.com/TekesApps/TekesUI/issues/48)仍 Open、无新增交付。
 
 ## 启动与证据契约

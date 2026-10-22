@@ -116,6 +116,12 @@ impl Probe {
             "native run controls timed out phase {}",
             self.phase
         );
+        // Like the stream probe, wait for a real activation. Do not start
+        // another action phase while an unrelated window is active.
+        // The original deadline still fails if activation/focus never returns.
+        if !window.is_active() {
+            return;
+        }
         let view = &host.view;
         let run = view.binding().current_run().unwrap();
         match self.phase {
@@ -162,10 +168,12 @@ impl Probe {
             {
                 self.check(view, 1);
                 assert_eq!(Self::status(&run), Some("aborted"));
+                self.post(40, vec![Self::click(view, view.ids().editor)]);
+            }
+            40 if view.tree.focused() == Some(view.ids().editor) => {
                 self.post(
                     4,
                     vec![
-                        Self::click(view, view.ids().editor),
                         Action::Text(ERROR.into()),
                         Action::ExpectText {
                             text: ERROR.into(),
@@ -234,7 +242,7 @@ impl Probe {
                 );
                 self.reported_error = Some(reported.into());
                 self.post(
-                    6,
+                    60,
                     vec![
                         Action::ExpectAXText {
                             component: body.0,
@@ -245,6 +253,13 @@ impl Probe {
                             substring: Some(reported.into()),
                         },
                         Self::click(view, view.ids().editor),
+                    ],
+                );
+            }
+            60 if view.tree.focused() == Some(view.ids().editor) => {
+                self.post(
+                    6,
+                    vec![
                         Action::Text(RECOVER.into()),
                         Action::ExpectText {
                             text: RECOVER.into(),

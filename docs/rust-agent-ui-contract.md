@@ -1,5 +1,7 @@
 # Rust Agent UI 组件接入契约
 
+[当前 Native 原生补验](rust-agent-ui-native-current-20261022.md)取得真实 Native 的流式阅读、流式发送及独立 Send/Cancel/error/recovery 完整收据。初始组合的第4模式失焦失败仍保留；新程序仅收紧验收脚本的 active/原编辑器 focus 门禁，不修改生产组件。各程序范围独立，完整生命周期、跨进程及实体输入仍未验收。
+
 [SidePanel 空态入口与最新原生复验](rust-agent-ui-panel-launcher-20261022.md)补充原 SDK Button/Grid 的受控 Launcher、独立 consumer 与当前程序证据。当前程序已通过分页/reveal/焦点、Task B 断言及一次正常 app 系统拼音；下文旧阶段失败仍保持原程序归属，不代表稳定性或跨进程验收。
 
 [任务父会话边界](rust-agent-ui-task-parent-navigation-20261022.md)现区分显式打开与原请求完成：非当前父会话的 `open_task_source` 在变更 owner/焦点/导航代次前拒绝；`install_task_run` 仍可缓存原会话的合法完成，并保留另一父会话的中文 preedit。组件回归通过，但本轮原生组合在 B 失去激活，新增原生断言未执行，不能计为通过。

@@ -1,5 +1,7 @@
 # Rust Run demo（开发试点）
 
+[真实 Native 原生补验](../docs/rust-agent-ui-native-current-20261022.md)补足先前未完成的流式阅读、流式发送和取消/错误恢复证据；原失败与新程序严格分开，仍为同进程、受控 provider、UI-only 范围。
+
 [SidePanel 空态入口与阅读复验](../docs/rust-agent-ui-panel-launcher-20261022.md)：新增可复用 `SidePanelLauncher`，消费原 SDK Button/Grid；公开 pin 仍为09b4bab。最终程序原生分页/reveal/焦点、系统软件拼音及独立 consumer 已留证，图标 #47、远端交互 #48 仍开放。
 
 正式共享组合名为 **RunPort**；Sidebar、RunPort、SidePanel 的目标宿主接口是 TekesUI ProcessContainer。当前保留原同进程 Content 路径，远端输入/IME/滚动/AX 等待 [TekesUI #48](https://github.com/TekesApps/TekesUI/issues/48)。[迁移说明与验收矩阵](../docs/rust-agent-ui-run-port-20261022.md)区分 API 改名、同进程运行与尚未完成的跨进程接入。
