@@ -181,6 +181,8 @@ impl Default for TurnFootnoteLabels {
         }
     }
 }
+/// Read-only aside captions use SDK single-line labels. Hosts must provide
+/// `TextSurfaceHost::shape_label`; complete text remains in the original nodes.
 #[derive(Debug)]
 pub struct TurnFootnote {
     feedback_namespace: Option<u32>,
@@ -231,13 +233,7 @@ impl TurnFootnote {
                     gap: Spacing::Tight.value(),
                 },
                 flexible_child: None,
-                children: vec![Content::new(
-                    ComponentId(root.0 + 1),
-                    TextContent {
-                        text: String::new(),
-                        role: proposal::TextRole::UiCaption,
-                    },
-                )],
+                children: vec![aside_information(ComponentId(root.0 + 1), "")],
             },
             actions: BTreeMap::new(),
             next: 16,
@@ -691,13 +687,9 @@ impl TurnFootnote {
                 !self.available || self.pending.is_some() || !action.enabled;
             self.rows.children.push(node);
             if let Some(reason) = &action.disabled_reason {
-                self.rows.children.push(Content::new(
-                    ComponentId(id.0 + (1_u64 << 31)),
-                    TextContent {
-                        text: reason.clone(),
-                        role: proposal::TextRole::UiCaption,
-                    },
-                ));
+                self.rows
+                    .children
+                    .push(aside_information(ComponentId(id.0 + (1_u64 << 31)), reason));
             }
         }
         if self.information_text.is_empty() {
@@ -711,13 +703,9 @@ impl TurnFootnote {
             &self.notice
         };
         if !notice.is_empty() {
-            self.rows.children.push(Content::new(
-                ComponentId(self.root.0 + 2),
-                TextContent {
-                    text: notice.clone(),
-                    role: proposal::TextRole::UiCaption,
-                },
-            ));
+            self.rows
+                .children
+                .push(aside_information(ComponentId(self.root.0 + 2), notice));
         }
     }
     pub fn take_intents(&mut self, actions: &[ContentAction]) -> Vec<TurnFootnoteIntent> {
@@ -822,11 +810,26 @@ impl Component for TurnFootnote {
         MeasuredChild::new(Size::new(available.width, measured.size.height))
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        let horizontal = self.rows.model.axis == Axis::Horizontal;
+        let mut remaining = frame.size.width;
         let sizes: Vec<_> = self
             .rows
             .children
             .iter_mut()
-            .map(|c| c.measure(text, frame.size))
+            .map(|child| {
+                // ClientKit's output information uses the space after preceding
+                // controls, not the 40% cap reserved for action labels (notes).
+                let width = if horizontal && child.component::<TextContent>().is_some() {
+                    remaining.max(1.)
+                } else {
+                    frame.size.width
+                };
+                let measured = child.measure(text, Size::new(width, frame.size.height));
+                if horizontal {
+                    remaining -= measured.size.width + Spacing::Tight.value();
+                }
+                measured
+            })
             .collect();
         let placed = layout_measured_children(
             frame,
@@ -854,4 +857,18 @@ impl Component for TurnFootnote {
     fn semantics(&self) -> ContentSemantics {
         ContentSemantics::new(ContentRole::Group, &self.labels.group)
     }
+}
+
+fn aside_information(id: ComponentId, text: &str) -> Content {
+    Content::new(
+        id,
+        TextContent {
+            text: text.into(),
+            role: proposal::TextRole::UiCaption,
+        },
+    )
+    .with_label_layout(tekes_ui_text::LabelOptions::single_line(
+        tekes_ui_text::LabelOverflow::TailEllipsis,
+    ))
+    .expect("original output aside information is an SDK text label")
 }

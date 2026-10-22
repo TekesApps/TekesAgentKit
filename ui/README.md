@@ -1,5 +1,7 @@
 # Rust Run demo（开发试点）
 
+[输出只读信息与当前原生复验](../docs/rust-agent-ui-output-information-20261022.md)补齐原时间/状态的剩余行宽与SDK单行省略；522项组件/第二consumer通过。最终2696969程序主阅读20→44、只读38→75、正常app系统拼音和三端离屏通过；当前三端原生全套、跨进程和完整视觉仍未完成。
+
 [最新公开 50ec 精确依赖](../docs/tekesui-50ec-public-intake-20261022.md)：实际 8 包/243 输入，521 项组件/第二 consumer 通过；原 Composer 新增候选确认上下键回归。新 pin 原生/系统拼音尚未验收，#48/#49 等仍开放。
 
 [输出备注 40% 限宽](../docs/rust-agent-ui-output-note-cap-20261022.md)复用原备注按钮与 SDK 单行省略，保留完整 source/AX 和原 Composer；主题、字号与宽度往返的独立 consumer 已覆盖。窄列全可见、图标/弹层和当前程序原生/系统拼音仍待验收。

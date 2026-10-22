@@ -1,5 +1,7 @@
 # TekesUI 50ec 公开精确依赖接收（2026-10-22，实验状态）
 
+> 后续当前程序验收见[输出信息与原生复验](rust-agent-ui-output-information-20261022.md)；下文保留纯pin接收阶段的证据边界。
+
 默认实验依赖固定为公开 `50ec49f3446924fdbc66b3cff22cd8cfe150fe7c`，
 上游 #51 数字输入/shared-key checkpoint。6 个直接和 2 个传递 SDK 包固定同一完整 Git rev。
 Cargo.lock 仅变更 8 个 SDK source 行，registry 版本与连接未变，`--locked --offline` 可复现。

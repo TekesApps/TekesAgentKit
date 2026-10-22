@@ -1,5 +1,6 @@
 use super::*;
 const LONG_NOTE: &str = "完整备注 👩🏽‍💻 e\u{301} 这是很长的已提交中文备注，不能改写原始内容。这是很长的已提交中文备注，不能改写原始内容。这是很长的已提交中文备注，不能改写原始内容。这是很长的已提交中文备注，不能改写原始内容。";
+const LONG_INFORMATION: &str = "完成时间与完整本地化信息 👩🏽‍💻 e\u{301}：这是由宿主提供的只读回合信息，不能改写原文。这是由宿主提供的只读回合信息，不能改写原文。这是由宿主提供的只读回合信息，不能改写原文。";
 #[test]
 fn output_aside_is_one_leading_reading_band_with_original_nested_feedback() {
     use tekes_agent_ui_bindings::{SessionMessageFeedback, SessionMessageFeedbackRating};
@@ -67,7 +68,7 @@ fn output_aside_is_one_leading_reading_band_with_original_nested_feedback() {
                         TranscriptContentLabels {
                             feedback: Some(Default::default()),
                             footnote: TurnFootnoteLabels {
-                                information: |_| "完成时间".into(),
+                                information: |_| LONG_INFORMATION.into(),
                                 ..Default::default()
                             },
                             ..Default::default()
@@ -174,6 +175,49 @@ fn output_aside_is_one_leading_reading_band_with_original_nested_feedback() {
                         .unwrap();
                     let copy = foot.copy_button_id().unwrap();
                     let info = foot.information_id().unwrap();
+                    let original_info = host.get(info).unwrap().component::<TextContent>().unwrap()
+                        as *const _ as usize;
+                    let info_frame = host.get(info).unwrap().frame();
+                    let footer_frame = host.get(footer).unwrap().frame();
+                    assert!(
+                        info_frame.size.width
+                            <= (footer_frame.max_x() - info_frame.min_x()).max(1.) + 0.02
+                    );
+                    assert_eq!(
+                        host.get(info)
+                            .unwrap()
+                            .component::<TextContent>()
+                            .unwrap()
+                            .text,
+                        LONG_INFORMATION
+                    );
+                    assert_eq!(
+                        host.semantics()
+                            .iter()
+                            .find(|node| node.id == info)
+                            .unwrap()
+                            .semantics
+                            .name,
+                        LONG_INFORMATION
+                    );
+                    assert!(
+                        text.labels
+                            .iter()
+                            .filter(|(_, layout)| layout.source() == LONG_INFORMATION)
+                            .all(|(_, layout)| layout.paragraph().lines.len() == 1)
+                    );
+                    assert!(
+                        text.labels
+                            .iter()
+                            .any(|(_, layout)| layout.source() == LONG_INFORMATION
+                                && layout.is_truncated())
+                    );
+                    if width == 1100. && scale == 1. && note == "备注" {
+                        assert!(
+                            info_frame.size.width > width * 0.4,
+                            "read-only information has no action-label cap"
+                        );
+                    }
                     let controls = [
                         copy,
                         ids.positive,
@@ -224,6 +268,12 @@ fn output_aside_is_one_leading_reading_band_with_original_nested_feedback() {
                         assert!(
                             host.get(ids.edit_note).unwrap().frame().size.width
                                 <= resized_width * 0.4 + 0.02
+                        );
+                        let info_frame = host.get(info).unwrap().frame();
+                        let footer_frame = host.get(footer).unwrap().frame();
+                        assert!(
+                            info_frame.size.width
+                                <= (footer_frame.max_x() - info_frame.min_x()).max(1.) + 0.02
                         );
                         assert_eq!(host.focused(), Some(editor));
                         assert_eq!(
@@ -285,6 +335,11 @@ fn output_aside_is_one_leading_reading_band_with_original_nested_feedback() {
                             .unwrap() as *const _ as usize,
                         original_note
                     );
+                    assert_eq!(
+                        host.get(info).unwrap().component::<TextContent>().unwrap() as *const _
+                            as usize,
+                        original_info
+                    );
                     assert_eq!(host.focused(), Some(editor));
                     assert_eq!(
                         host.text_surface(editor).unwrap().input.external_baseline(),
@@ -294,4 +349,45 @@ fn output_aside_is_one_leading_reading_band_with_original_nested_feedback() {
             }
         }
     }
+}
+
+#[test]
+fn output_information_requires_sdk_single_line_label_service() {
+    let scope = RunScope::main("consumer", "output-info-service");
+    let turn = TranscriptTurn {
+        id: "turn".into(),
+        status: "completed".into(),
+        input: String::new(),
+        started_at: Some(1000.),
+        ended_at: Some(2000.),
+        usage: Default::default(),
+        fork_boundary: None,
+        footnote_actions: vec![],
+        live_usage: None,
+        reported_usage: None,
+    };
+    let mut footnote = TurnFootnote::new(64600, scope.clone(), Default::default());
+    footnote
+        .update_with_display(
+            &scope,
+            1,
+            1,
+            &turn,
+            true,
+            None,
+            &TurnFootnoteDisplay {
+                revision: 1,
+                has_output: true,
+                finished_text: Some(LONG_INFORMATION.into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    let information = footnote.information_id().unwrap();
+    let mut host = footnote.into_host().unwrap();
+    let frame = Rect::new(0., 0., 240., 300.);
+    assert!(
+        matches!(host.render(&mut Scene::new(), &mut Text::new(1., false), frame, frame, Theme::LIGHT.into()),
+        Err(CompositionError::MissingLabelServices(id)) if id == information)
+    );
 }

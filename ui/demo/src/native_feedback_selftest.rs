@@ -121,6 +121,12 @@ impl Probe {
             band.insert(0, copy);
         }
         if let Some(info) = footnote.information_id() {
+            let information = view.tree.get(info).unwrap().frame();
+            assert!(
+                information.size.width
+                    <= (footer.frame().max_x() - information.min_x()).max(1.) + 0.5,
+                "output information uses width remaining after its original controls"
+            );
             band.push(info);
         }
         let rects: Vec<_> = band

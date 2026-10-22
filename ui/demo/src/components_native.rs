@@ -2045,8 +2045,13 @@ impl Host {
                 1
             );
             assert_eq!(self.view.binding().scope().session_id, "a");
+            let route = if std::env::args().any(|arg| arg == "--system-ime-external-input") {
+                "bound-app-key-events"
+            } else {
+                "pid-targeted-key-events"
+            };
             println!(
-                "NATIVE_AGENT_SYSTEM_IME_PROBE_OK software-ime+pid-targeted-key-events+marked-text+send-barrier+navigation-barrier+commit+single-submit; physical-keyboard=false; candidate-window=false"
+                "NATIVE_AGENT_SYSTEM_IME_PROBE_OK software-ime+{route}+marked-text+send-barrier+navigation-barrier+commit+single-submit; physical-keyboard=false; candidate-window=false"
             );
         }
         if self.annotation_selftest {
@@ -4891,42 +4896,49 @@ fn system_ime_script(view: &ComponentDemo) {
             session_id: "b".into(),
         })
         .unwrap();
+    // Explicit external-driver timing only. The same marked/committed checks,
+    // original widget clicks and single-submit assertions remain mandatory.
+    let external = std::env::args().any(|arg| arg == "--system-ime-external-input");
+    let at = |fast, external_time| if external { external_time } else { fast };
     run_script(vec![
-        (300, click(ids.editor)),
-        (600, Action::Log("SYSTEM_IME_TYPE_READY".into())),
+        (at(300, 300), click(ids.editor)),
+        (at(600, 600), Action::Log("SYSTEM_IME_TYPE_READY".into())),
         (
-            2000,
+            at(2000, 15000),
             Action::ExpectText {
                 text: "ni hao".into(),
                 marked: true,
             },
         ),
-        (2300, click(ids.send)),
+        (at(2300, 15500), click(ids.send)),
         (
-            2600,
+            at(2600, 15800),
             Action::ExpectText {
                 text: "ni hao".into(),
                 marked: true,
             },
         ),
-        (2900, click(other)),
+        (at(2900, 16100), click(other)),
         (
-            3200,
+            at(3200, 16500),
             Action::ExpectText {
                 text: "ni hao".into(),
                 marked: true,
             },
         ),
-        (3500, Action::Log("SYSTEM_IME_COMMIT_READY".into())),
         (
-            4500,
+            at(3500, 17000),
+            Action::Log("SYSTEM_IME_COMMIT_READY".into()),
+        ),
+        (
+            at(4500, 30000),
             Action::ExpectText {
                 text: "你好".into(),
                 marked: false,
             },
         ),
-        (4800, click(ids.send)),
-        (7000, Action::Close),
+        (at(4800, 30500), click(ids.send)),
+        (at(7000, 35000), Action::Close),
     ]);
 }
 fn native_script(view: &ComponentDemo) {
