@@ -38,6 +38,9 @@ TextSurfaceHost::shape_label 服务并保留完整 source/AX 文案，AgentKit �
 [工具行接入说明](rust-agent-ui-tool-row-20261022.md)。
 `presentation_card()` 提供共享卡片事实；只在需要展开时派生，未知形状保留通用详情。
 [卡片与桥接说明](rust-agent-ui-tool-card-20261022.md)区分公开失败与旧退出标记；完整 selectable code/diff Content 仍待 #25。
+展开内容使用共享 `presentation_details(TranscriptToolDetailWording)`；宿主显式提供 producer
+progress/detail 和本地化 copy，按稳定 section kind 挂载原 SDK 控件。当前默认详情文字消费了
+该模型，独立文本区仍未完成，见[分区契约](rust-agent-ui-tool-details-20261022.md)。
 
 限高详情仅通过 `OutputMessage::with_bounded_details` / `ToolActivity::with_bounded_details` 显式试验；
 标准 RunPort/Transcript 保持原文档流。嵌套阅读严格检查当前失败，等待 #53；

@@ -2,6 +2,7 @@
 
 ## Unreleased — experimental Rust Agent UI
 
+- Share ordered tool Input/Output/view-JSON section facts and consume them in default details without replacing text owners. Distinguish absent and delivered-empty results; preserve structured-error summaries without a message body. Independent section layout remains unfinished.
 - Add opt-in bounded reasoning/tool details using original SDK text owners; retain inline defaults pending TekesUI #53. Add a strict nested-reading consumer gate with the current failure preserved.
 
 - Expose typed tool-card facts and shared textual-result extraction; correct legacy shell exit-marker display and canonical meta-failure fallback through the actual ClientKit projector/View bridge. Rich card rendering remains open.

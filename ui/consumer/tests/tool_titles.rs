@@ -19,6 +19,21 @@ fn independent_tool_activity_consumes_producer_views_without_losing_focus_select
         result_position: None,
     };
     let before = tool.clone();
+    let live_details = tool.presentation_details(TranscriptToolDetailWording::default());
+    assert!(live_details.running);
+    assert_eq!(
+        live_details
+            .sections
+            .iter()
+            .map(|s| s.kind)
+            .collect::<Vec<_>>(),
+        vec![
+            TranscriptToolDetailKind::Input,
+            TranscriptToolDetailKind::Output,
+            TranscriptToolDetailKind::CallView,
+        ]
+    );
+    assert!(live_details.sections[1].copy_text.is_empty());
     let mut activity = ToolActivity::new(733, scope.clone(), Default::default());
     activity
         .update(&scope, 1, 1, &tool, ToolActivityPlacement::Call)
@@ -65,6 +80,20 @@ fn independent_tool_activity_consumes_producer_views_without_losing_focus_select
             .parse()
             .unwrap(),
     );
+    let settled_details = tool.presentation_details(TranscriptToolDetailWording {
+        progress: Some("new raw result is not a guessed title"),
+        ..Default::default()
+    });
+    assert!(!settled_details.running);
+    assert_eq!(settled_details.sections[0], live_details.sections[0]);
+    assert_eq!(
+        settled_details.sections[1].copy_text,
+        "new raw result is not a guessed title"
+    );
+    assert_eq!(
+        settled_details.sections[3].kind,
+        TranscriptToolDetailKind::ResultView
+    );
     host.get_mut(root)
         .unwrap()
         .component_mut::<ToolActivity>()
@@ -102,6 +131,14 @@ fn independent_tool_activity_consumes_producer_views_without_losing_focus_select
             .input
             .text
             .contains("new raw result")
+    );
+    assert!(
+        !host
+            .text_surface(ids.body)
+            .unwrap()
+            .input
+            .text
+            .contains("\"text\":")
     );
     // A canonical failed phase remains authoritative even when a process
     // failure was reported with isError:false by the underlying tool.
@@ -156,7 +193,7 @@ fn independent_tool_activity_consumes_producer_views_without_losing_focus_select
             .unwrap()
             .input
             .text
-            .contains("OwnedToolFailure")
+            .contains("结果 · 失败\nexit failure output")
     );
     assert_eq!(
         host.get(root)

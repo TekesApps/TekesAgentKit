@@ -18,6 +18,8 @@ mod tool_card;
 pub use tool_card::*;
 mod tool_row;
 pub use tool_row::*;
+mod tool_details;
+pub use tool_details::*;
 mod tool_title;
 mod tool_view;
 mod transcript;

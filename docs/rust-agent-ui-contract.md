@@ -425,4 +425,5 @@ wake scheduling remain host adapters. This does not complete footnote layout par
 [Summary 层级排版](rust-agent-ui-summary-indent-20261022.md)新增显式只读 indent_level 回调：按 Source 层级移动标题和减少其换行宽度，metadata 保持右端，原动作/文本 owner 不变；格式化结果随 publication 捕获。完整单行 Transcript aside 的图标渲染服务缺口已补充到既有 #47，未复制 SDK 实现。
 
 [限高详情实验](rust-agent-ui-bounded-details-20261022.md)保留标准路径，并通过独立公开 API 示例严格记录 #53 的父阅读意图缺口。
+[工具展开分区](rust-agent-ui-tool-details-20261022.md)集中 Input/Output 与实际 View JSON 的显示事实；默认详情已消费，独立文本区仍待补齐。
 [系统提示处理后的原生续验](rust-agent-ui-native-handled-20261022.md)推进到 phase 20 后期限失败，未完成分页/系统组字。

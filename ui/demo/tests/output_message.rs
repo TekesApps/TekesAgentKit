@@ -233,7 +233,8 @@ fn source_order_tool_details_and_opaque_payloads_remain_distinct() {
         "推理原文"
     );
     let details = &host.text_surface(ids[2].body).unwrap().input.text;
-    assert!(details.contains("a.rs") && details.contains("结果\n尚未回传"));
+    assert!(details.contains("a.rs") && details.contains("结果\n"));
+    assert!(!details.contains("尚未回传") && !details.contains("未提供"));
     assert!(
         host.text_surface(ids[4].body)
             .unwrap()

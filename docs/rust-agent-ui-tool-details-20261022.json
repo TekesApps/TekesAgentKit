@@ -1,0 +1,85 @@
+{
+  "sourceBase": "bbe3e7a6263c324cef01bae7e32cf8b8c6bc20de",
+  "sourceFiles": {
+    "crates/presentation/src/tool_details.rs": "216fdd3effc1e2170b88a943d453073c2f600a5af76895366a6a2259e7b28037",
+    "crates/presentation/src/tool_card.rs": "f30ee76b29a6c8c7ad74b5d9fb12765ed998b60f8a78be8c7511d3a05c5e5a16",
+    "crates/presentation/src/lib.rs": "867ca3c1da5a1bd591dfcd5256cb875575cf9eef517e884c78ec893cf8855caf",
+    "crates/presentation/tests/tool_details.rs": "f64a9100f48fce3bf7ec35a76ee4ef727cf7c001ceb78f5d55807e36803e2b54",
+    "ui/components/src/lib.rs": "4cb223e24cc2931e5eeb19154214acbeb7ddd411fbf3da8b4ec9ef9733b19bca",
+    "ui/components/src/output_message.rs": "dff16311324a1813b3727ddb73bb88e17ed1483654d7b9979982cd3d3f3c4031",
+    "ui/demo/tests/output_message.rs": "6e494a8f7f3e6037ea95c2938027b1a1103839de61f5da14f72e7bb9b1018d1f",
+    "ui/consumer/tests/tool_titles.rs": "b77a2d702859e1418a643faab068086e1f339b2b8c0cc25176ad13b1392a8668"
+  },
+  "referenceFilesReadOnly": {
+    "TekesClientKit/Sources/TranscriptRendering/TranscriptMetalActivity.swift": "f08f6e8f34c76a71fb117dd84a46be50145f737a38e21534cf59d518bc2d3e8d",
+    "TekesClientKit/Sources/TranscriptRendering/TranscriptMetalAppBridges.swift": "aced6682f06d2c5c6313e9bbb0e429a217ab05f5a7cacc181ce3af8a2bdb0d1c",
+    "TekesClientKit/Sources/Session/SessionEndpoint/Client/SessionEventProjector.swift": "e7a2ccc9e211f04f819e0a1866388420b7b15f0a25ea80a7777a3408414dd515",
+    "Tekes/Tekes/ClientAgentHostAdapters.swift": "7d907c654ec3df76c7a8b492e32bbc68f1bd4d0b46044cae615aa712b9f67c71"
+  },
+  "publicTekesui": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "publicAgentKit": "v0.3.8; this shared addition is unpublished",
+  "validation": {
+    "root": {
+      "passed": 241,
+      "failed": 0,
+      "ignored": 0
+    },
+    "ui": {
+      "passed": 553,
+      "failed": 0,
+      "ignored": 1
+    },
+    "rootClippy": "passed",
+    "uiClippy": "passed",
+    "format": "passed",
+    "hostDemoBuild": "passed",
+    "secondPublicConsumer": "existing tool_titles test extended; original owner/focus/selection retained",
+    "regressionBefore": {
+      "exitCode": 101,
+      "failed": [
+        "delivered_empty_output_is_distinct_from_an_absent_result",
+        "structured_error_without_a_message_keeps_its_source_summary"
+      ]
+    },
+    "strictReading": {
+      "exitCode": 1,
+      "result": {
+        "accepted": false,
+        "parentFollowingAfterInnerUp": true,
+        "parentOffsetBefore": 0,
+        "parentOffsetAfterScroll": 0,
+        "parentOffsetAfterAppend": 634,
+        "innerOffset": 100,
+        "detailVisibleAfterAppend": false
+      },
+      "issue": 53
+    }
+  },
+  "remaining": [
+    "Independent Input/Output text controls and per-section copy actions",
+    "Bounded nested reading SDK #53",
+    "Rich tool cards and source View visual comparison",
+    "Current native/harness/system IME and ProcessContainer acceptance"
+  ],
+  "parentCiSnapshot": "parent-ci-current.json",
+  "parentCiFailureJob": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39807615972/job/119924936818",
+  "newTargets": 0,
+  "newAcceptanceProgramCopies": 0,
+  "deletedBytes": 0,
+  "evidence": {
+    ".runtime-fixtures/tool-details-20261022/demo-build.log": "43ddda3fc4d2c06eec615b56bd83f059740d1ce91f6f4d1733f6bbbc0e1a3e13",
+    ".runtime-fixtures/tool-details-20261022/empty-error-regression-before.log": "6ff48677a4d617289cb8fad1c2ab06342ff9136bac8f89823f9f80d47db91cc4",
+    ".runtime-fixtures/tool-details-20261022/parent-ci-current.json": "a2ac119072c308a22dc0a02c56bdcd3c5f06bb106ae4508f760c1e36ddf440cc",
+    ".runtime-fixtures/tool-details-20261022/parent-ci-macos-failure.log": "d60091ec3a4ac5f4e992d42ab3758a4668c996c1541e59104e88fde4b742042c",
+    ".runtime-fixtures/tool-details-20261022/parent-ci.json": "977ca32f136d2fb8d4975ceb625519be5b4011a7bf7854fb0430de9450137f8d",
+    ".runtime-fixtures/tool-details-20261022/presentation-tests.log": "b3e2c32fd5282fb250e46e37cb670298c5589bd5b945de6f94e6b3d9e50e7a70",
+    ".runtime-fixtures/tool-details-20261022/root-clippy.log": "f1d2161d8d4e1330720cfd22e906568ae175de967bc0108bc88806f6978649a8",
+    ".runtime-fixtures/tool-details-20261022/root-tests.log": "a539a64a924736d56404ada64dbf1f142e78fe9c64070567d465f95c9462bf6a",
+    ".runtime-fixtures/tool-details-20261022/strict-reading.json": "c4f70b29538ecacd71995d9a3fc7678cf168834c54e6f348c8c095309b9f1b90",
+    ".runtime-fixtures/tool-details-20261022/strict-reading.stderr": "60834745f348f4ebed399fd86f10a1405f19206c982d28ad0295629da1fbead2",
+    ".runtime-fixtures/tool-details-20261022/ui-clippy.log": "b31588dc3da2109b3ec848e75d522374d273690da9e023498611772b9763b9fe",
+    ".runtime-fixtures/tool-details-20261022/ui-inputs.json": "9543ade335292f9c7f61944edd341c2fb9297a7c6abc3cf44dc86c1f16bd6ee3",
+    ".runtime-fixtures/tool-details-20261022/ui-tests-final.log": "23d89918369d35eebeb5334b0bb9cb256b633a0ef8da843739015d800aff46dd",
+    ".runtime-fixtures/tool-details-20261022/ui-tests.log": "462cce96abf97579796cc9a18f1bc03361028a204b5c7f1ccb1feecd05ce96ad"
+  }
+}

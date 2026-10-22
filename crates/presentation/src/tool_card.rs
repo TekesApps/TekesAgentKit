@@ -105,16 +105,17 @@ impl TranscriptToolCall {
     /// Textual public result content only. Media stays in the original message;
     /// this method does not create Markdown references or load attachments.
     pub fn presentation_result_text(&self) -> Option<String> {
-        let result = self.result.as_ref()?;
-        let text = if let Some(parts) = result["content"].as_array() {
-            parts
-                .iter()
-                .filter_map(|part| part["text"].as_str())
-                .collect::<Vec<_>>()
-                .join("\n")
-        } else {
-            result["text"].as_str().unwrap_or("").into()
-        };
+        let text = self.result.as_ref().map_or_else(String::new, |result| {
+            if let Some(parts) = result["content"].as_array() {
+                parts
+                    .iter()
+                    .filter_map(|part| part["text"].as_str())
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            } else {
+                result["text"].as_str().unwrap_or("").into()
+            }
+        });
         if !text.is_empty() {
             return Some(text);
         }

@@ -1,5 +1,5 @@
 {
-  "sourceBase": "a8f3572fc451eb193291e9f9a81d3a0825c063ae",
+  "sourceBase": "bbe3e7a6263c324cef01bae7e32cf8b8c6bc20de",
   "completionProven": false,
   "publicAgentKitRelease": {
     "publishedAt": "2026-10-19T14:25:34Z",
@@ -34,7 +34,7 @@
     "ui/bindings/src/feedback.rs": "b25168bd05c9d57424af7f4af9fda96af01253ec48f84fcd00fddea9474f0376",
     "ui/demo/src/component_feedback.rs": "60524e1be7a2f6189b043888a02e95c38ffd689241509e1d53da41e8e5ac5105",
     ".github/workflows/ci.yml": "fcb395c890de150e7d178bd6f3087ec92c127f4aa9975fa6513ba4a169bd74e5",
-    "crates/presentation/src/tool_card.rs": "4ae201c74a892108bdcdf84870945ca00b4ffb0eac5b738a1f3758d7f5afecd3",
+    "crates/presentation/src/tool_card.rs": "f30ee76b29a6c8c7ad74b5d9fb12765ed998b60f8a78be8c7511d3a05c5e5a16",
     "crates/presentation/src/tool_row.rs": "72117307c1d6d830506b13ec972cf66f662e84a16a18d328d088915ae6a4f889"
   },
   "publicIssues": [
@@ -310,52 +310,49 @@
     }
   ],
   "ciSnapshot": {
-    "body": "This adds reusable Rust Agent UI components over the existing shared presentation and exact public TekesUI controls. Experimental hosts can mount RunPort, Sidebar and SidePanel in the original same-process ContentHost, supply canonical state and dispatch captured intents. The full delivery target remains open; this PR stays draft.\n\n## Current implementation\n\n- Composer, mixed TranscriptContent/ReadOnlyTranscript, Indicators and the formal RunPort composition use retained SDK controls, shared columns, controlled-frame preflight and original reading/reveal transactions.\n- Sidebar consumes shared inventory/query/preferences and thread actions for session selection, activity, pins and menus. SidePanelNavigation consumes the same controlled SidePanelInput as retained Task/Subagent/SideChat/Summary content, including pointer replacement, close acknowledgement and stale-return fencing.\n- Original RunBinding/RunController authority carries destinations, request identity, connection epochs and feedback CAS. Feedback initially loads per mounted source/epoch; normal compact asides omit Refresh, while failed/uncertain data remains disabled until an explicit authoritative read succeeds.\n- Shared additions include read-only goal facts, producer-owned tool title derivation and public journal tool-result failure markers. Optional `resultMeta`/`resultError` retain raw source facts; absent fields in old JSON retain defaults. Rust struct literals need the two optional fields. Failed tools do not decide parent-turn settlement. Journal closure retires active calls so late unowned results cannot rewrite sealed rows; pending call enrichment, result-only history and explicit new-call admission remain supported.\n- Shared `TranscriptToolRowModel` selects running progress, detail/title/semantic arguments, stopped wording and tool-owned settled actions. Canonical failures, including public meta/result-view exit failures, use result summaries and generic-card fallback; only legacy shell output-marker failures retain action summaries. The bridge matches the actual projector-to-View call chain. The original OutputMessage/ToolActivity consumes it through the existing wording callback; absent producer progress/report is not invented.\n- Default tool disclosures preserve raw input/result/view/error details and original text owners. SDK single-line labels retain full source/AX names. Typed terminal/search/web/read/diff facts and textual result extraction are public; rich selectable card rendering, reports/change counts/continuous groups and full ClientKit visual parity remain unfinished.\n\n## Dependency and ownership contract\n\nPublished AgentKit baseline is v0.3.8. This branch's shared additions are unpublished development inputs; UI packages remain 0.0.0 / publish=false. Production adoption requires a new immutable release containing the required APIs.\n\nTekesUI is pinned to public `50ec49f3446924fdbc66b3cff22cd8cfe150fe7c`, with the actual eight-package/243-input manifest checked against Cargo resolution. AgentKit owns business components/state; TekesUI owns generic controls, input/focus/IME, reading/rendering and process foundations; hosts own windows, overall layout, navigation and system adapters. This Rust port adds no Swift or Kernel implementation changes.\n\n[Short host integration contract](https://github.com/TekesApps/TekesAgentKit/blob/a8f3572fc451eb193291e9f9a81d3a0825c063ae/docs/rust-agent-ui-host-integration.md) \u00b7 [Full delivery audit](https://github.com/TekesApps/TekesAgentKit/blob/a8f3572fc451eb193291e9f9a81d3a0825c063ae/docs/rust-agent-ui-delivery-status.md) \u00b7 [Detailed source/program ledger](https://github.com/TekesApps/TekesAgentKit/blob/a8f3572fc451eb193291e9f9a81d3a0825c063ae/docs/rust-agent-ui-contract.md)\n\n## Validation scope\n\nAt `a8f3572`, local root workspace: **234 pass**; UI workspace including the second public consumer: **548 pass, one existing #49 ignore**. Root/UI all-targets Clippy with warnings denied, format and headless/UI boundaries pass. Eight new result-status regressions cover live/history equivalence, stopped priority, numeric/scalar rules and optional metadata/legacy serde; original pre-fix failure logs remain preserved. Nine lifecycle regressions cover live/replay closure, sealed source facts, repeated declarations, pending enrichment, result-only windows and explicit readmission. Row/card regressions cover report/progress/error precedence, legacy terminal markers, persistent-shell and canonical-failure fallback, strict shapes and typed data round-trip. Eleven card tests, two additional row tests and one independent legacy-exit component test supplement the prior coverage; a UI-free Foundation reference also verifies numeric conversion and terminal end-anchor boundaries, including VT/FF; embedded and independent consumers retain focus/selection/text-owner checks.\n\n[Current card-data and projector/View bridge evidence](https://github.com/TekesApps/TekesAgentKit/blob/a8f3572fc451eb193291e9f9a81d3a0825c063ae/docs/rust-agent-ui-tool-card-20261022.md) \u00b7 [Collapsed-row model and consumer evidence](https://github.com/TekesApps/TekesAgentKit/blob/a8f3572fc451eb193291e9f9a81d3a0825c063ae/docs/rust-agent-ui-tool-row-20261022.md) \u00b7 [Lifecycle evidence](https://github.com/TekesApps/TekesAgentKit/blob/a8f3572fc451eb193291e9f9a81d3a0825c063ae/docs/rust-agent-ui-tool-lifecycle-20261022.md) \u00b7 [Tool-result evidence and API migration](https://github.com/TekesApps/TekesAgentKit/blob/a8f3572fc451eb193291e9f9a81d3a0825c063ae/docs/rust-agent-ui-tool-result-status-20261022.md) \u00b7 [Producer-title/component evidence](https://github.com/TekesApps/TekesAgentKit/blob/a8f3572fc451eb193291e9f9a81d3a0825c063ae/docs/rust-agent-ui-tool-title-20261022.md)\n\nHistorical frozen programs have separate Native/Pi/DSH protocol-to-GPU and native interaction receipts. They retain their exact source/program scopes. The current card-data/row/lifecycle/result changes has no actual harness-fault, native-window, system-IME or cross-process acceptance. CI runs headless/compiled-consumer checks; current status is in the Checks tab and does not establish native acceptance.\n\n## Required before full delivery\n\n- TekesUI #48: formal interactive ProcessContainer adoption and independent same-/cross-process validation for Sidebar, RunPort and SidePanel. Current ContentHost mounting is the runnable experimental path, not accepted ProcessContainer integration.\n- TekesUI #47: original glyph/compact-action composition. The last executed real Pi goal gate on frozen 4097e4f passed data/clear/reconnect and **failed strict narrow-footer visibility** (`labelVisible=false`, exit 1); that gate remains open.\n- Full rich tool-card presentation, report/change-count/continuous groups, rich selection/content and persistent reading restoration; remaining #25/#42/#44/#45/#46/#49 capabilities and relevant disclosure/focus seams must be consumed from fixed public SDK delivery.\n- Current frozen-program native checks for menu/navigation, Send/Cancel/stream, paging/reading/append/reconnect and Chinese composition; desktop input is deferred while the user is away. Historical native results do not transfer to this source.\n- Same-content ClientKit layout/display comparison, review, exact-head CI and complete requirement audit before merge/release tag. Partial protocol, GPU or component results do not satisfy the full scope.\n\nThe existing [TekesUI #25](https://github.com/TekesApps/TekesUI/issues/25#issuecomment-6343613638) now includes the generic selectable code/diff Content requirements; AgentKit does not copy passive renderers or text engines.\n\nWIP and original evidence/programs are preserved. Validation reuses existing targets; this tool card-data phase added no target or acceptance-program copy and deleted no cache/evidence.\n\n\n\n\n",
-    "headRefOid": "a8f3572fc451eb193291e9f9a81d3a0825c063ae",
-    "isDraft": true,
+    "headRefOid": "bbe3e7a6263c324cef01bae7e32cf8b8c6bc20de",
     "statusCheckRollup": [
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-22T14:54:44Z",
+        "completedAt": "2026-10-22T15:46:09Z",
         "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39799574906/job/119896112975",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39807622238/job/119924958854",
         "name": "checks",
-        "startedAt": "2026-10-22T14:52:47Z",
+        "startedAt": "2026-10-22T15:44:17Z",
         "status": "COMPLETED",
         "workflowName": "Rust headless"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-22T14:54:49Z",
+        "completedAt": "2026-10-22T15:45:54Z",
         "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39799567736/job/119896085966",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39807615972/job/119924936369",
         "name": "checks",
-        "startedAt": "2026-10-22T14:52:45Z",
+        "startedAt": "2026-10-22T15:44:15Z",
         "status": "COMPLETED",
         "workflowName": "Rust headless"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-22T14:57:46Z",
-        "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39799574906/job/119896113463",
+        "completedAt": "2026-10-22T15:49:39Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39807615972/job/119924936818",
         "name": "Rust UI consumer (no native interaction)",
-        "startedAt": "2026-10-22T14:52:49Z",
+        "startedAt": "2026-10-22T15:44:20Z",
         "status": "COMPLETED",
         "workflowName": "Rust headless"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-22T14:57:59Z",
-        "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39799567736/job/119896085521",
+        "completedAt": "0001-01-01T00:00:00Z",
+        "conclusion": "",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39807622238/job/119924958459",
         "name": "Rust UI consumer (no native interaction)",
-        "startedAt": "2026-10-22T14:52:45Z",
-        "status": "COMPLETED",
+        "startedAt": "2026-10-22T15:44:15Z",
+        "status": "QUEUED",
         "workflowName": "Rust headless"
       }
-    ],
-    "title": "Add experimental Rust Agent UI with RunPort and shared presentation"
+    ]
   },
   "newTargets": 0,
   "newProgramCopies": 0,
@@ -369,9 +366,9 @@
     "README.md": "d0dcb8e6548be85610092a17ac2703696872d89feaaa76a90b896cb49e3fd2f7",
     "ui/README.md": "2dacf5a4726b3f1671f6c8fea0470bdc3bd7348d215f71cfd3df52c931b02627",
     "ui/bindings/README.md": "b1f8fe627e5637ef1942b67ed8134438c4a49bdcfb614db81cdaefb229177501",
-    "docs/rust-agent-ui-contract.md": "846c5917f5d4bffea572210d510a360d80b2f2da476c1d3124f34bd4d5080624",
-    "docs/rust-agent-ui-delivery-status.md": "ef2333e876ef4ad4a26489db4acdcd099528e6c148216795929b60b06ee40a57",
-    "docs/rust-agent-ui-host-integration.md": "6dc5a30ded3431b13105fb8ff96586065ce0f924e774c25fa73ce2df2e3989b2",
+    "docs/rust-agent-ui-contract.md": "c3a72b7e1bb9995f631b248973ca9b49eec638205d7a4f5c533cfff2983eab38",
+    "docs/rust-agent-ui-delivery-status.md": "220698733fc81d65277452001b3faea23b2dd51ee1e8c5358e73b8b94f196c90",
+    "docs/rust-agent-ui-host-integration.md": "debdbf084ab59d445c19427af419f9f4a3fd61e9ea8ee703cf74bb9fc2667d25",
     "docs/rust-agent-ui-tool-card-20261022.md": "a4cb097850c1c84fbd169a4389b65be41fa424012b53745d914014a950de3839",
     "docs/rust-agent-ui-tool-row-20261022.md": "b94d99891ad617d2f25b14ef472fe4dc51f79e53add3eb95f6e071de032c4e30"
   },
@@ -382,16 +379,17 @@
   "supplement": "rust-agent-ui-tool-card-20261022.json",
   "latestLocalValidation": {
     "root-tests": {
-      "passed": 234,
+      "passed": 241,
       "failed": 0,
       "ignored": 0,
-      "sourceBase": "a8f3572fc451eb193291e9f9a81d3a0825c063ae"
+      "sourceReceipt": "rust-agent-ui-tool-details-20261022.json"
     },
     "ui-tests": {
       "passed": 553,
       "failed": 0,
       "ignored": 1,
-      "scope": "ordinary workspace tests; excludes strict example"
+      "scope": "ordinary workspace tests; strict example exits 1",
+      "sourceReceipt": "rust-agent-ui-tool-details-20261022.json"
     },
     "strict-nested-reading": {
       "accepted": false,
@@ -465,15 +463,29 @@
   },
   "validationBuildsPerformed": true,
   "buildScope": "Cargo tests and Clippy reuse the existing target; supplement identifies receipts and source stages",
-  "localLinkValidationCount": 316,
+  "localLinkValidationCount": 325,
   "supplements": [
     "rust-agent-ui-tool-card-20261022.json",
-    "rust-agent-ui-native-handled-20261022.json"
+    "rust-agent-ui-native-handled-20261022.json",
+    "rust-agent-ui-tool-details-20261022.json"
   ],
   "boundedDetails": "explicit experiment; standard RunPort/Transcript defaults remain inline",
   "latestNativeAcceptance": {
     "accepted": false,
     "phase": 20,
     "receipt": "rust-agent-ui-native-handled-20261022.json"
-  }
+  },
+  "toolDetails": "shared ordered facts consumed as original single read-only field; independent section controls incomplete",
+  "localLinkValidationFiles": [
+    "README.md",
+    "ui/README.md",
+    "ui/bindings/README.md",
+    "docs/rust-agent-ui-contract.md",
+    "docs/rust-agent-ui-delivery-status.md",
+    "docs/rust-agent-ui-host-integration.md",
+    "docs/rust-agent-ui-tool-card-20261022.md",
+    "docs/rust-agent-ui-tool-details-20261022.md",
+    "docs/rust-agent-ui-bounded-details-20261022.md",
+    "docs/rust-agent-ui-native-handled-20261022.md"
+  ]
 }
