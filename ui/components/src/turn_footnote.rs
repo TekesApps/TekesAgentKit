@@ -183,6 +183,9 @@ impl Default for TurnFootnoteLabels {
 }
 #[derive(Debug)]
 pub struct TurnFootnote {
+    feedback_namespace: Option<u32>,
+    feedback: Option<Content>,
+    feedback_shown: bool,
     shown: bool,
     display: crate::TurnFootnoteDisplay,
     information: Option<Content>,
@@ -207,6 +210,9 @@ impl TurnFootnote {
     pub fn new(namespace: u32, scope: RunScope, labels: TurnFootnoteLabels) -> Self {
         let root = ComponentId((namespace as u64) << 32);
         Self {
+            feedback_namespace: None,
+            feedback: None,
+            feedback_shown: false,
             shown: false,
             display: Default::default(),
             information: None,
@@ -240,6 +246,69 @@ impl TurnFootnote {
             observed: None,
             notice: String::new(),
         }
+    }
+    pub(crate) fn reserve_feedback_namespace(&mut self, namespace: u32) {
+        self.feedback_namespace = Some(namespace);
+    }
+    pub fn feedback(&self) -> Option<&crate::TurnFeedback> {
+        if !self.feedback_shown {
+            return None;
+        }
+        self.rows
+            .children
+            .iter()
+            .find_map(|node| node.component::<crate::TurnFeedback>())
+    }
+    pub fn feedback_mut(&mut self) -> Option<&mut crate::TurnFeedback> {
+        if !self.feedback_shown {
+            return None;
+        }
+        self.rows
+            .children
+            .iter_mut()
+            .find_map(|node| node.component_mut::<crate::TurnFeedback>())
+    }
+    pub(crate) fn check_feedback(
+        &self,
+        target: Option<&tekes_agent_presentation::FeedbackTargetCapture>,
+    ) -> Result<(), &'static str> {
+        if let Some(control) = self.feedback()
+            && control.is_composing()
+            && control.target() != target
+        {
+            return Err("finish feedback composition before replacing its response");
+        }
+        Ok(())
+    }
+    pub(crate) fn configure_feedback(
+        &mut self,
+        target: Option<tekes_agent_presentation::FeedbackTargetCapture>,
+        labels: Option<&crate::FeedbackLabels>,
+    ) {
+        let existing = self
+            .rows
+            .children
+            .iter()
+            .position(|node| node.component::<crate::TurnFeedback>().is_some())
+            .map(|index| self.rows.children.remove(index))
+            .or_else(|| self.feedback.take());
+        self.feedback_shown = target.is_some() && labels.is_some();
+        if existing.is_some() || self.feedback_shown {
+            let labels = labels.cloned().unwrap_or_default();
+            let mut node = existing.unwrap_or_else(|| {
+                let control = crate::TurnFeedback::new(
+                    self.feedback_namespace
+                        .expect("reserved feedback namespace"),
+                    labels.clone(),
+                );
+                Content::new(control.ids().root, control)
+            });
+            node.component_mut::<crate::TurnFeedback>()
+                .unwrap()
+                .set_aside_target(target, &labels);
+            self.feedback = Some(node);
+        }
+        self.render_actions();
     }
     pub fn scope(&self) -> &RunScope {
         &self.scope
@@ -566,6 +635,12 @@ impl TurnFootnote {
     }
     fn render_actions(&mut self) {
         let mut previous = std::mem::take(&mut self.rows.children);
+        if let Some(index) = previous
+            .iter()
+            .position(|node| node.component::<crate::TurnFeedback>().is_some())
+        {
+            self.feedback = Some(previous.remove(index));
+        }
         let info_id = ComponentId(self.root.0 + 1);
         let mut information = previous
             .iter()
@@ -596,6 +671,11 @@ impl TurnFootnote {
                 });
             node.component_mut::<ButtonContent>().unwrap().label = self.labels.copy.clone();
             self.rows.children.push(node);
+        }
+        if self.feedback_shown
+            && let Some(control) = self.feedback.take()
+        {
+            self.rows.children.push(control);
         }
         for (id, action) in &self.actions {
             let mut node = previous
@@ -733,6 +813,11 @@ impl Component for TurnFootnote {
         Some(&mut self.rows.children)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        self.rows.model.axis = if self.feedback().is_some_and(|control| control.is_open()) {
+            Axis::Vertical
+        } else {
+            Axis::Horizontal
+        };
         let measured = self.rows.measure(text, available);
         MeasuredChild::new(Size::new(available.width, measured.size.height))
     }
@@ -745,12 +830,20 @@ impl Component for TurnFootnote {
             .collect();
         let placed = layout_measured_children(
             frame,
-            Axis::Vertical,
+            self.rows.model.axis,
             &sizes,
             Spacing::Tight.value(),
-            proposal::layout::COLUMN,
+            if self.rows.model.axis == Axis::Horizontal {
+                proposal::layout::ROW
+            } else {
+                proposal::layout::COLUMN
+            },
             AlignmentOverride {
-                cross_axis: Some(proposal::layout::CrossAxisAlignment::Leading),
+                cross_axis: Some(if self.rows.model.axis == Axis::Horizontal {
+                    proposal::layout::CrossAxisAlignment::Center
+                } else {
+                    proposal::layout::CrossAxisAlignment::Leading
+                }),
                 ..Default::default()
             },
         );

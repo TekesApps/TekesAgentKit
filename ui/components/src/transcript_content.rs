@@ -29,6 +29,8 @@ pub enum TranscriptContentRowKey {
     Message(TranscriptMessageIdentity),
     Tool(String),
     TurnFootnote(String),
+    /// Compatibility lookup for the original nested feedback control. This is
+    /// no longer a separate reading row; use feedback_controls() for callbacks.
     TurnFeedback(String),
     Unplaced(String),
     SessionNotices,
@@ -144,7 +146,8 @@ impl TranscriptContent {
     pub(crate) fn set_run_layout(&mut self, layout: RunTranscriptLayout) {
         self.run_layout = Some(layout);
     }
-    /// The host grants an exclusive row namespace range (one namespace per row).
+    /// The host grants an exclusive row namespace range. Output asides reserve
+    /// two namespaces (footer and original feedback); other rows reserve one.
     /// IDs never recycle after removal. Reserve this range across all Kit controls.
     pub fn new(
         root_namespace: u32,
@@ -201,6 +204,16 @@ impl TranscriptContent {
         }
     }
     pub fn row_id(&self, key: &TranscriptContentRowKey) -> Option<ComponentId> {
+        if let TranscriptContentRowKey::TurnFeedback(turn) = key {
+            return self
+                .rows
+                .children
+                .iter()
+                .filter_map(|node| node.component::<TurnFootnote>())
+                .find(|footer| footer.facts().is_some_and(|facts| &facts.turn_id == turn))
+                .and_then(TurnFootnote::feedback)
+                .map(|control| control.ids().root);
+        }
         self.keys
             .iter()
             .position(|value| value == key)
@@ -231,8 +244,7 @@ impl TranscriptContent {
                     section.map(|_| output.item.turn_id.as_str())
                 }
                 PlannedContent::Tool(tool, _) => Some(tool.turn_id.as_str()),
-                PlannedContent::Footnote(turn, _, _) => Some(turn.id.as_str()),
-                PlannedContent::Feedback(target) => Some(target.turn_id),
+                PlannedContent::Footnote(turn, _, _, _) => Some(turn.id.as_str()),
                 PlannedContent::Label(_) => match &row.key {
                     TranscriptContentRowKey::Unplaced(turn) => Some(turn.as_str()),
                     _ => None,
@@ -364,7 +376,9 @@ impl TranscriptContent {
                     footer.refresh();
                 }
                 if snapshot.is_stale
-                    && let Some(control) = node.component_mut::<TurnFeedback>()
+                    && let Some(control) = node
+                        .component_mut::<TurnFootnote>()
+                        .and_then(TurnFootnote::feedback_mut)
                 {
                     control.invalidate_authority();
                 }
@@ -392,10 +406,9 @@ impl TranscriptContent {
                     .filter(|key| !desired.contains(*key))
                     .and_then(|key| existing.remove(key))
             });
-            let retained = retained.filter(|node| self.feedback_matches(node, row));
             let mut node = retained.unwrap_or_else(|| {
                 let namespace = self.next;
-                self.next += 1;
+                self.next += row.namespaces();
                 self.new_row(namespace, row)
             });
             self.update_row(&mut node, row, publication, epoch, available)?;
@@ -415,7 +428,10 @@ impl TranscriptContent {
         self.epoch = epoch;
         if snapshot.is_stale {
             for node in &mut self.rows.children {
-                if let Some(control) = node.component_mut::<TurnFeedback>() {
+                if let Some(control) = node
+                    .component_mut::<TurnFootnote>()
+                    .and_then(TurnFootnote::feedback_mut)
+                {
                     control.invalidate_authority();
                 }
             }
@@ -476,18 +492,15 @@ impl TranscriptContent {
         let rows = planned
             .iter()
             .map(|row| {
-                let retained = self
-                    .find(&row.key, &index)
-                    .or_else(|| {
-                        row.alias
-                            .as_ref()
-                            .filter(|key| !desired.contains(*key))
-                            .and_then(|key| self.find(key, &index))
-                    })
-                    .filter(|node| self.feedback_matches(node, row));
+                let retained = self.find(&row.key, &index).or_else(|| {
+                    row.alias
+                        .as_ref()
+                        .filter(|key| !desired.contains(*key))
+                        .and_then(|key| self.find(key, &index))
+                });
                 let id = retained.map(Content::id).unwrap_or_else(|| {
                     let id = ComponentId((next as u64) << 32);
-                    next += 1;
+                    next += row.namespaces();
                     id
                 });
                 (row.key.clone(), id)
@@ -614,16 +627,19 @@ impl TranscriptContent {
             return Err("duplicate transcript content row");
         }
         for (key, node) in self.keys.iter().zip(&self.rows.children) {
-            if node
-                .component::<TurnFeedback>()
-                .is_some_and(|control| control.is_composing())
-                && (!desired.contains(key)
-                    || plan
-                        .iter()
+            if let Some(footer) = node.component::<TurnFootnote>() {
+                let target =
+                    plan.iter()
                         .find(|row| &row.key == key)
-                        .is_some_and(|row| !self.feedback_matches(node, row)))
-            {
-                return Err("finish feedback composition before replacing its response");
+                        .and_then(|row| match &row.content {
+                            PlannedContent::Footnote(_, _, _, target) => target.map(|target| {
+                                target
+                                    .capture(&self.scope)
+                                    .expect("validated feedback scope")
+                            }),
+                            _ => None,
+                        });
+                footer.check_feedback(target.as_ref())?;
             }
         }
         let mut allocations = 0_u64;
@@ -642,14 +658,9 @@ impl TranscriptContent {
                 return Err("ambiguous transcript reconciliation receipt");
             }
             match original.and_then(|key| self.find(key, &index)) {
-                Some(content) if self.feedback_matches(content, row) => {
-                    self.check_row(content, row, publication, epoch, available)?
-                }
-                Some(_) => {
-                    allocations += 1;
-                }
+                Some(content) => self.check_row(content, row, publication, epoch, available)?,
                 None => {
-                    allocations += 1;
+                    allocations += u64::from(row.namespaces());
                     let candidate = self.new_row(0, row);
                     self.check_row(&candidate, row, publication, epoch, available)?;
                 }
@@ -669,18 +680,6 @@ impl TranscriptContent {
             .get(key)
             .map(|i| &self.rows.children[*i])
             .or_else(|| self.detached.get(key))
-    }
-    fn feedback_matches(&self, node: &Content, row: &Planned<'_>) -> bool {
-        match &row.content {
-            PlannedContent::Feedback(target) => {
-                node.component::<TurnFeedback>().is_some_and(|control| {
-                    control
-                        .target()
-                        .is_some_and(|old| old.scope() == &self.scope && old.matches(*target))
-                })
-            }
-            _ => true,
-        }
     }
     fn new_row(&self, namespace: u32, row: &Planned<'_>) -> Content {
         let root = ComponentId((namespace as u64) << 32);
@@ -705,21 +704,10 @@ impl TranscriptContent {
                 Content::new(view.id(), view)
             }
             PlannedContent::Footnote(..) => {
-                let view =
+                let mut view =
                     TurnFootnote::new(namespace, self.scope.clone(), self.labels.footnote.clone());
+                view.reserve_feedback_namespace(namespace + 1);
                 Content::new(view.id(), view)
-            }
-            PlannedContent::Feedback(target) => {
-                let mut control =
-                    TurnFeedback::new(namespace, self.labels.feedback.clone().unwrap());
-                control
-                    .bind_target(
-                        target
-                            .capture(&self.scope)
-                            .expect("validated feedback scope"),
-                    )
-                    .unwrap();
-                Content::new(control.ids().root, control)
             }
             PlannedContent::Label(text) => Content::new(
                 root,
@@ -754,23 +742,28 @@ impl TranscriptContent {
                     .ok_or("transcript tool role changed")?
                     .check_update(&self.scope, publication, epoch, tool, *placement)?;
             }
-            PlannedContent::Footnote(turn, output, display) => {
-                node.component::<TurnFootnote>()
-                    .ok_or("transcript footnote role changed")?
-                    .check_update_with_turn_copy(
-                        &self.scope,
-                        publication,
-                        epoch,
-                        turn,
-                        available,
-                        output.as_ref(),
-                        display,
-                    )?;
-            }
-            PlannedContent::Feedback(_) => {
-                if node.component::<TurnFeedback>().is_none() {
-                    return Err("feedback row role changed");
-                }
+            PlannedContent::Footnote(turn, output, display, target) => {
+                let footer = node
+                    .component::<TurnFootnote>()
+                    .ok_or("transcript footnote role changed")?;
+                footer.check_feedback(
+                    target
+                        .map(|target| {
+                            target
+                                .capture(&self.scope)
+                                .expect("validated feedback scope")
+                        })
+                        .as_ref(),
+                )?;
+                footer.check_update_with_turn_copy(
+                    &self.scope,
+                    publication,
+                    epoch,
+                    turn,
+                    available,
+                    output.as_ref(),
+                    display,
+                )?;
             }
             PlannedContent::Label(_) => {
                 if node.component::<TextContent>().is_none() {
@@ -806,10 +799,9 @@ impl TranscriptContent {
                 .component_mut::<ToolActivity>()
                 .unwrap()
                 .update(&self.scope, publication, epoch, tool, *placement)?,
-            PlannedContent::Footnote(turn, output, display) => node
-                .component_mut::<TurnFootnote>()
-                .unwrap()
-                .update_with_turn_copy(
+            PlannedContent::Footnote(turn, output, display, target) => {
+                let footer = node.component_mut::<TurnFootnote>().unwrap();
+                footer.update_with_turn_copy(
                     &self.scope,
                     publication,
                     epoch,
@@ -817,12 +809,19 @@ impl TranscriptContent {
                     available,
                     output.as_ref(),
                     display,
-                )?,
-            PlannedContent::Feedback(_) => {
-                if epoch != self.epoch {
-                    node.component_mut::<TurnFeedback>()
-                        .unwrap()
-                        .invalidate_authority();
+                )?;
+                footer.configure_feedback(
+                    target.map(|target| {
+                        target
+                            .capture(&self.scope)
+                            .expect("validated feedback scope")
+                    }),
+                    self.labels.feedback.as_ref(),
+                );
+                if epoch != self.epoch
+                    && let Some(control) = footer.feedback_mut()
+                {
+                    control.invalidate_authority();
                 }
             }
             PlannedContent::Label(text) => {
@@ -881,25 +880,32 @@ impl TranscriptContent {
             .children
             .iter_mut()
             .filter_map(|node| {
-                let id = node.id();
-                node.component_mut::<TurnFeedback>()
-                    .map(|control| (id, control.take_intents(actions)))
+                node.component_mut::<TurnFootnote>()
+                    .and_then(TurnFootnote::feedback_mut)
+                    .map(|control| (control.ids().root, control.take_intents(actions)))
             })
             .flat_map(|(id, gestures)| gestures.into_iter().map(move |gesture| (id, gesture)))
             .collect()
     }
     pub fn feedback_controls(&self) -> impl Iterator<Item = (ComponentId, &TurnFeedback)> {
-        self.rows.children.iter().filter_map(|node| {
-            node.component::<TurnFeedback>()
-                .map(|control| (node.id(), control))
-        })
+        self.rows
+            .children
+            .iter()
+            .filter_map(|node| {
+                node.component::<TurnFootnote>()
+                    .and_then(TurnFootnote::feedback)
+            })
+            .map(|control| (control.ids().root, control))
     }
     pub fn feedback_mut(&mut self, id: ComponentId) -> Option<&mut TurnFeedback> {
         self.rows
             .children
             .iter_mut()
-            .find(|node| node.id() == id)?
-            .component_mut::<TurnFeedback>()
+            .filter_map(|node| {
+                node.component_mut::<TurnFootnote>()
+                    .and_then(TurnFootnote::feedback_mut)
+            })
+            .find(|control| control.ids().root == id)
     }
     pub fn composing_feedback_editor(&self) -> Option<ComponentId> {
         self.feedback_controls()
@@ -994,6 +1000,15 @@ struct Planned<'a> {
     alias: Option<TranscriptContentRowKey>,
     content: PlannedContent<'a>,
 }
+impl Planned<'_> {
+    fn namespaces(&self) -> u32 {
+        if matches!(self.content, PlannedContent::Footnote(..)) {
+            2
+        } else {
+            1
+        }
+    }
+}
 enum PlannedContent<'a> {
     Input(TranscriptInput<'a>),
     Output(TranscriptOutput<'a>, Option<&'a TranscriptSection<'a>>),
@@ -1002,8 +1017,8 @@ enum PlannedContent<'a> {
         &'a TranscriptTurn,
         Option<crate::TranscriptTurnCopy>,
         crate::TurnFootnoteDisplay,
+        Option<TurnFeedbackTarget<'a>>,
     ),
-    Feedback(TurnFeedbackTarget<'a>),
     Label(String),
 }
 fn label(key: TranscriptContentRowKey, text: String) -> Planned<'static> {
@@ -1085,21 +1100,14 @@ fn plan<'a>(
             );
             let feedback_visible =
                 display.shows_aside(turn, output.is_some()) && !display.is_live_owner;
+            let target = (labels.feedback.is_some() && feedback_visible)
+                .then(|| TurnFeedbackTarget::read(section))
+                .flatten();
             result.push(Planned {
                 key: Key::TurnFootnote(turn.id.clone()),
                 alias: None,
-                content: PlannedContent::Footnote(turn, output, display),
+                content: PlannedContent::Footnote(turn, output, display, target),
             });
-            if labels.feedback.is_some()
-                && feedback_visible
-                && let Some(target) = TurnFeedbackTarget::read(section)
-            {
-                result.push(Planned {
-                    key: Key::TurnFeedback(turn.id.clone()),
-                    alias: None,
-                    content: PlannedContent::Feedback(target),
-                });
-            }
         }
     }
     Ok(result)

@@ -116,6 +116,7 @@ pub struct FeedbackIds {
 pub struct TurnFeedback {
     ids: FeedbackIds,
     next: u64,
+    compact: bool,
     labels: FeedbackLabels,
     state: Option<FeedbackControlState>,
     target: Option<FeedbackTargetCapture>,
@@ -143,6 +144,7 @@ impl TurnFeedback {
                 title: root,
             },
             next: 16,
+            compact: false,
             labels,
             state: None,
             target: None,
@@ -163,6 +165,27 @@ impl TurnFeedback {
         value.rekey();
         value.render();
         value
+    }
+    /// Internal composition mode; original controls and gesture authority remain.
+    pub(crate) fn set_aside_target(
+        &mut self,
+        target: Option<FeedbackTargetCapture>,
+        labels: &FeedbackLabels,
+    ) {
+        if self.target != target {
+            assert!(!self.is_composing(), "validated feedback replacement");
+            self.editor_open = false;
+            self.state = None;
+            self.pending = None;
+            self.needs_refresh = false;
+            self.notice.clear();
+            self.diagnostic = None;
+            self.target = target;
+            self.rekey();
+        }
+        self.labels = labels.clone();
+        self.compact = true;
+        self.render();
     }
     /// Bind a proven response before the initial read. Cold/failed is never an
     /// empty committed record; only explicit Refresh is available until loaded.
@@ -429,6 +452,11 @@ impl TurnFeedback {
         vec![]
     }
     fn render(&mut self) {
+        self.rows.model.axis = if self.compact && !self.editor_open {
+            Axis::Horizontal
+        } else {
+            Axis::Vertical
+        };
         let mut old = std::mem::take(&mut self.rows.children);
         let mut leaves = Vec::new();
         for mut node in old.drain(..) {

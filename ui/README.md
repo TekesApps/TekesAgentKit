@@ -1,5 +1,7 @@
 # Rust Run demo（开发试点）
 
+[输出脚注组合与 API 迁移](../docs/rust-agent-ui-output-aside-row-20261022.md)：正常 aside 为单一阅读项，评价是原 Content 子控件；每个 aside 预留两套 namespace。使用 feedback_controls()/feedback_mut() 处理原反馈回调，TurnFeedback row key 仅保留兼容查询。窄列全可见、图标/弹层仍开放，三端原生与程序范围见记录。
+
 [真实 Native 原生补验](../docs/rust-agent-ui-native-current-20261022.md)补足先前未完成的流式阅读、流式发送和取消/错误恢复证据；原失败与新程序严格分开，仍为同进程、受控 provider、UI-only 范围。
 
 [SidePanel 空态入口与阅读复验](../docs/rust-agent-ui-panel-launcher-20261022.md)：新增可复用 `SidePanelLauncher`，消费原 SDK Button/Grid；公开 pin 仍为09b4bab。最终程序原生分页/reveal/焦点、系统软件拼音及独立 consumer 已留证，图标 #47、远端交互 #48 仍开放。

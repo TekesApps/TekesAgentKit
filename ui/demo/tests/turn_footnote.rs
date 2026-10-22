@@ -438,8 +438,11 @@ fn status_updates_keep_pressed_buttons_and_aside_layout_leading() {
         Theme::DARK.into(),
     )
     .unwrap();
-    for child in row(&mut host, id).children() {
-        assert!((child.frame().min_x() - frame.min_x()).abs() < 0.01);
+    let children = row(&mut host, id).children();
+    assert!((children[0].frame().min_x() - frame.min_x()).abs() < 0.01);
+    for pair in children.windows(2) {
+        assert!(pair[1].frame().min_x() >= pair[0].frame().max_x());
+        assert!((pair[1].frame().center().y - pair[0].frame().center().y).abs() < 0.01);
     }
 }
 

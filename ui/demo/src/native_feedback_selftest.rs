@@ -1,7 +1,9 @@
 //! Native test host only. Advances on actual widget/committed state, never a
 //! guessed network delay; every mutation still enters normal UI callbacks.
 use super::*;
-use tekes_agent_components_ui::{TranscriptContent, TurnFeedback};
+use tekes_agent_components_ui::{
+    TranscriptContent, TranscriptContentRowKey, TurnFeedback, TurnFootnote,
+};
 use tekes_agent_presentation::{RunSnapshot, TranscriptItemKind};
 use tekes_ui_controls::composition::{ComponentId, ContentHost};
 use tekes_ui_platform_macos::selftest::{Action, run_script};
@@ -72,6 +74,46 @@ impl Probe {
         self.control(view).is_some_and(|control| {
             !control.is_pending() && !control.needs_refresh() && control.state().is_some()
         })
+    }
+    fn check_aside_band(&self, view: &ComponentDemo) {
+        let control = self.control(view).unwrap();
+        assert!(!control.is_open());
+        let content = view
+            .tree
+            .get(view.transcript_content_id(view.ids()).unwrap())
+            .unwrap()
+            .component::<TranscriptContent>()
+            .unwrap();
+        let key = TranscriptContentRowKey::TurnFootnote(control.target().unwrap().turn_id().into());
+        let footer = view.tree.get(content.row_id(&key).unwrap()).unwrap();
+        let footnote = footer.component::<TurnFootnote>().unwrap();
+        assert_eq!(footnote.feedback().unwrap().ids().root, control.ids().root);
+        assert!(
+            !content
+                .row_keys()
+                .iter()
+                .any(|key| matches!(key, TranscriptContentRowKey::TurnFeedback(_)))
+        );
+        let ids = control.ids();
+        let mut band = vec![ids.positive, ids.negative];
+        if control.state().unwrap().current.is_some() {
+            band.push(ids.edit_note);
+        }
+        if let Some(copy) = footnote.copy_button_id() {
+            band.insert(0, copy);
+        }
+        if let Some(info) = footnote.information_id() {
+            band.push(info);
+        }
+        let rects: Vec<_> = band
+            .iter()
+            .map(|id| view.tree.get(*id).unwrap().frame())
+            .collect();
+        for pair in rects.windows(2) {
+            assert!(pair[1].min_x() >= pair[0].max_x());
+            assert!((pair[0].center().y - pair[1].center().y).abs() < 0.5);
+        }
+        assert!((rects[0].min_x() - footer.frame().min_x()).abs() < 0.5);
     }
     fn click(tree: &ContentHost, id: ComponentId) -> Action {
         let node = tree.get(id).expect("native feedback control is mounted");
@@ -192,6 +234,7 @@ impl Probe {
                 self.next(1, vec![(0, Self::click(&view.tree, refresh))]);
             }
             1 if self.ready(view) => {
+                self.check_aside_band(view);
                 let control = self.control(view).unwrap();
                 assert!(
                     control.state().unwrap().current.is_none(),
@@ -299,6 +342,7 @@ impl Probe {
                     == Some(NOTE) =>
             {
                 let note = self.control(view).unwrap().ids().edit_note;
+                self.check_aside_band(view);
                 assert_eq!(
                     view.tree
                         .get(note)
@@ -443,6 +487,6 @@ impl Probe {
     pub fn receipt(&self, view: &ComponentDemo) -> serde_json::Value {
         assert_eq!(self.phase, 12, "native feedback did not finish");
         self.check_drafts_and_messages(view);
-        serde_json::json!({"nativeInteraction":true,"nativePointer":true,"nativeTextServices":true,"syntheticPreedit":true,"imeSendAndNavigationBlocked":true,"savedChineseNote":true,"noteReopened":true,"retainedAcrossSessionSwitch":true,"sameRatingDeletes":true,"freshReadAfterDelete":true,"draftsPreserved":true,"nonemptyComposerDrafts":true,"sendEnabledBeforeComposition":true,"noPromptSubmitted":true,"stateDrivenCallbacks":true,"auxiliaryFocusPreserved":true,"composerContentsAndOwnerPreserved":true,"opaqueBaselinePreserved":false,"unratedNoteHidden":true,"committedNoteLabel":true,"physicalIme":false,"voiceOver":false,"readingAnchorAcceptance":false})
+        serde_json::json!({"nativeInteraction":true,"nativePointer":true,"nativeTextServices":true,"syntheticPreedit":true,"imeSendAndNavigationBlocked":true,"savedChineseNote":true,"noteReopened":true,"retainedAcrossSessionSwitch":true,"sameRatingDeletes":true,"freshReadAfterDelete":true,"draftsPreserved":true,"nonemptyComposerDrafts":true,"sendEnabledBeforeComposition":true,"noPromptSubmitted":true,"stateDrivenCallbacks":true,"auxiliaryFocusPreserved":true,"composerContentsAndOwnerPreserved":true,"opaqueBaselinePreserved":false,"unratedNoteHidden":true,"committedNoteLabel":true,"outputAsideSingleReadingBand":true,"physicalIme":false,"voiceOver":false,"readingAnchorAcceptance":false})
     }
 }

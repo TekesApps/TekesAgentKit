@@ -762,21 +762,27 @@ fn feedback_mounts_only_for_a_proven_final_response_and_retires_corrected_payloa
     view.configure_feedback(Some(Default::default())).unwrap();
     view.update(&scope(), 1, 1, &source, true).unwrap();
     let feedback = view.feedback_controls().next().unwrap().0;
-    let keys = view.row_keys();
-    let pos = keys
-        .iter()
-        .position(|k| matches!(k, TranscriptContentRowKey::TurnFeedback(_)))
-        .unwrap();
-    assert!(matches!(
-        &keys[pos - 1],
-        TranscriptContentRowKey::TurnFootnote(_)
-    ));
+    assert!(
+        !view
+            .row_keys()
+            .iter()
+            .any(|key| matches!(key, TranscriptContentRowKey::TurnFeedback(_)))
+    );
+    assert_eq!(
+        view.row_id(&TranscriptContentRowKey::TurnFeedback("turn".into())),
+        Some(feedback)
+    );
+    let old_positive = view.feedback_controls().next().unwrap().1.ids().positive;
     source.items[1].time = Some(200.);
     view.update(&scope(), 2, 1, &source, true).unwrap();
     assert_eq!(view.feedback_controls().next().unwrap().0, feedback);
     source.items[1].text = "corrected response".into();
     view.update(&scope(), 3, 1, &source, true).unwrap();
-    assert_ne!(view.feedback_controls().next().unwrap().0, feedback);
+    assert_eq!(view.feedback_controls().next().unwrap().0, feedback);
+    assert_ne!(
+        view.feedback_controls().next().unwrap().1.ids().positive,
+        old_positive
+    );
     source.items[1].metadata = json!({});
     view.update(&scope(), 4, 1, &source, true).unwrap();
     assert_eq!(view.feedback_controls().count(), 0);
@@ -859,9 +865,19 @@ fn composing_feedback_preflights_response_replacement_and_keeps_the_original_tex
     root(&mut host, id)
         .update(&scope(), 2, 1, &source, true)
         .unwrap();
-    assert_ne!(
+    assert_eq!(
         root(&mut host, id).feedback_controls().next().unwrap().0,
         feedback
+    );
+    assert_ne!(
+        root(&mut host, id)
+            .feedback_controls()
+            .next()
+            .unwrap()
+            .1
+            .ids()
+            .editor,
+        editor
     );
 }
 
@@ -1521,4 +1537,75 @@ fn feedback_uses_the_same_aside_gate_while_final_response_authority_stays_indepe
             assert!(view.take_copy_intents(&[]).is_empty());
         }
     }
+}
+
+#[test]
+fn grouped_aside_keeps_one_reading_item_and_rejects_old_feedback_completion_after_retarget() {
+    let mut source = feedback_snapshot();
+    let mut view = content();
+    view.configure_feedback(Some(Default::default())).unwrap();
+    let prepared = view.prepare_update(&scope(), 1, 1, &source, true).unwrap();
+    assert!(
+        !prepared
+            .rows()
+            .iter()
+            .any(|(key, _)| matches!(key, TranscriptContentRowKey::TurnFeedback(_)))
+    );
+    view.update(&scope(), 1, 1, &source, true).unwrap();
+    let footer = view
+        .row_id(&TranscriptContentRowKey::TurnFootnote("turn".into()))
+        .unwrap();
+    let (feedback, control) = view.feedback_controls().next().unwrap();
+    let target = control.target().unwrap().clone();
+    let old_refresh = control.ids().refresh;
+    let old_positive = control.ids().positive;
+    let gesture = view
+        .take_feedback_intents(&[ContentAction {
+            target: old_refresh,
+            kind: ContentActionKind::Activate,
+            source: ContentActionSource::Programmatic,
+        }])
+        .pop()
+        .unwrap()
+        .1;
+    source.items[1].text = "new canonical response".into();
+    view.update(&scope(), 2, 1, &source, true).unwrap();
+    assert_eq!(
+        view.row_id(&TranscriptContentRowKey::TurnFootnote("turn".into())),
+        Some(footer)
+    );
+    assert_eq!(view.feedback_controls().next().unwrap().0, feedback);
+    let control = view.feedback_mut(feedback).unwrap();
+    assert_ne!(control.ids().positive, old_positive);
+    assert!(!control.complete(
+        &gesture,
+        FeedbackControlResult::Applied(FeedbackControlState {
+            target,
+            publication: 1,
+            connection_epoch: 1,
+            current: None,
+            put_available: true,
+            delete_available: true,
+        })
+    ));
+    assert!(
+        view.take_feedback_intents(&[ContentAction {
+            target: old_positive,
+            kind: ContentActionKind::Activate,
+            source: ContentActionSource::Programmatic,
+        }])
+        .is_empty()
+    );
+    source.items[1].metadata = json!({});
+    view.update(&scope(), 3, 1, &source, true).unwrap();
+    assert!(
+        view.row_id(&TranscriptContentRowKey::TurnFeedback("turn".into()))
+            .is_none()
+    );
+    source.items[1].metadata = json!({"feedbackMessageId":"public-output"});
+    view.update(&scope(), 4, 1, &source, true).unwrap();
+    assert_ne!(
+        view.feedback_controls().next().unwrap().1.ids().positive,
+        old_positive
+    );
 }

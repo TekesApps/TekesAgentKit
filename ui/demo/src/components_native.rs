@@ -4681,13 +4681,24 @@ pub fn run() {
             let mut messages=0;let mut footnotes=0;let mut tools=0;let mut known_empty=0;let mut output_copies=0;let mut feedback_rows=0;
             for key in content.row_keys() {
                 let node=host.view.tree.get(content.row_id(key).unwrap()).unwrap();
-                if node.component::<tekes_agent_components_ui::TurnFeedback>().is_some(){assert!((node.frame().min_x()-frame.min_x()).abs()<0.5);feedback_rows+=1;}
                 if let Some(input)=node.component::<tekes_agent_components_ui::InputMessage>() {
                     let ids=input.ids();let bubble=host.view.tree.get(ids.bubble).unwrap().frame();let caption=host.view.tree.get(ids.footnote).unwrap().frame();
                     assert!((bubble.max_x()-frame.max_x()).abs()<0.5,"user bubble must trail shared column: bubble={bubble:?} column={frame:?}");assert!((caption.max_x()-frame.max_x()).abs()<0.5,"user aside must trail shared column: aside={caption:?} column={frame:?}");
                     messages+=1;
                 } else if let Some(output)=node.component::<tekes_agent_components_ui::OutputMessage>() {assert!((node.frame().min_x()-frame.min_x()).abs()<0.5);if !output.active(){assert!(output.content_ids().is_empty());known_empty+=1;}messages+=1;}
-                else if let Some(footer)=node.component::<tekes_agent_components_ui::TurnFootnote>() {assert!((node.frame().min_x()-frame.min_x()).abs()<0.5);if let Some(copy)=footer.copy_button_id(){assert!((host.view.tree.get(copy).unwrap().frame().min_x()-frame.min_x()).abs()<0.5);output_copies+=1;}footnotes+=1;}
+                else if let Some(footer)=node.component::<tekes_agent_components_ui::TurnFootnote>() {
+                    assert!((node.frame().min_x()-frame.min_x()).abs()<0.5);
+                    if let Some(copy)=footer.copy_button_id(){
+                        assert!((host.view.tree.get(copy).unwrap().frame().min_x()-frame.min_x()).abs()<0.5);
+                        output_copies+=1;
+                    }
+                    if let Some(control)=footer.feedback(){
+                        let feedback=host.view.tree.get(control.ids().root).expect("original nested feedback");
+                        assert!(feedback.frame().min_x()>=node.frame().min_x());
+                        feedback_rows+=1;
+                    }
+                    footnotes+=1;
+                }
                 else if node.component::<tekes_agent_components_ui::ToolActivity>().is_some() {assert!((node.frame().min_x()-frame.min_x()).abs()<0.5);tools+=1;}
             }
             assert_eq!(messages, snapshot.transcript.items.iter().filter(|item|item.is_visible).count());

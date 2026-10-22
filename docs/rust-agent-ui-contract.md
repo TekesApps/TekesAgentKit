@@ -1,5 +1,7 @@
 # Rust Agent UI 组件接入契约
 
+[输出脚注单一阅读项](rust-agent-ui-output-aside-row-20261022.md)将复制、原反馈控件和时间等组合到同一水平带；原 feedback root/回调保留，物理 reading rows 不再重复包含反馈。517项组件、独立 consumer、真实三端原生反馈及同程序阅读/系统拼音通过；窄列文字按钮裁剪、长备注40%限制、图标与弹层仍未完成。公开 main 新增3bef667尚待独立 intake，本阶段仍固定09b4bab。
+
 [当前 Native 原生补验](rust-agent-ui-native-current-20261022.md)取得真实 Native 的流式阅读、流式发送及独立 Send/Cancel/error/recovery 完整收据。初始组合的第4模式失焦失败仍保留；新程序仅收紧验收脚本的 active/原编辑器 focus 门禁，不修改生产组件。各程序范围独立，完整生命周期、跨进程及实体输入仍未验收。
 
 [SidePanel 空态入口与最新原生复验](rust-agent-ui-panel-launcher-20261022.md)补充原 SDK Button/Grid 的受控 Launcher、独立 consumer 与当前程序证据。当前程序已通过分页/reveal/焦点、Task B 断言及一次正常 app 系统拼音；下文旧阶段失败仍保持原程序归属，不代表稳定性或跨进程验收。
