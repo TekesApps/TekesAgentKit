@@ -1,7 +1,7 @@
 //! Owned protocol history + original disclosure controls and SDK reflow.
 use super::*;
 use tekes_agent_components_ui::{
-    InputMessage, OutputContentIds, OutputContentKind, OutputMessage, RunView, ToolActivity,
+    InputMessage, OutputContentIds, OutputContentKind, OutputMessage, RunPort, ToolActivity,
     TranscriptContentRowKey,
 };
 use tekes_ui_controls::composition::ScrollContent;
@@ -35,7 +35,7 @@ impl Probe {
             resized_at: None,
         }
     }
-    fn run(host: &Host) -> &RunView {
+    fn run(host: &Host) -> &RunPort {
         host.view
             .tree
             .get(ComponentId(host.view.ids().root.0 + 16))

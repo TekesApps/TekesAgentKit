@@ -1,6 +1,6 @@
 //! Agent gesture admission and history hooks over the original SDK viewport.
 use crate::{
-    RunTurnNavigation, RunTurnNavigationHost, RunTurnNavigationKind, RunView, TurnRailRevealReason,
+    RunPort, RunTurnNavigation, RunTurnNavigationHost, RunTurnNavigationKind, TurnRailRevealReason,
 };
 use tekes_ui_controls::{
     ButtonTextRenderer, ReadingDocumentVersion, ReadingUpdateError, ScrollRevealOptions,
@@ -24,9 +24,9 @@ pub enum RunNavigationHost<'a> {
     Main(&'a mut dyn RunTurnNavigationHost),
     Auxiliary,
 }
-fn run(host: &ContentHost, root: ComponentId) -> Result<&RunView, RunNavigationError> {
+fn run(host: &ContentHost, root: ComponentId) -> Result<&RunPort, RunNavigationError> {
     host.get(root)
-        .and_then(|node| node.component::<RunView>())
+        .and_then(|node| node.component::<RunPort>())
         .ok_or(RunNavigationError::Agent(
             "Run navigation owner is not mounted",
         ))

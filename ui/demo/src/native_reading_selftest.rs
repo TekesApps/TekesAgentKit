@@ -1,7 +1,7 @@
 //! Actual native/GPU layout over an owned local SEP. Wheel and preedit are
 //! synthetic; the page travels through the public binding and original request.
 use super::*;
-use tekes_agent_components_ui::RunView;
+use tekes_agent_components_ui::RunPort;
 use tekes_ui_controls::composition::{ContentReadingAnchorUpdate, ScrollContent};
 use tekes_ui_platform_macos::selftest::{Action, run_script};
 
@@ -116,7 +116,7 @@ impl Probe {
             .tree
             .get(ComponentId(host.view.ids().root.0 + 16))
             .unwrap()
-            .component::<RunView>()
+            .component::<RunPort>()
             .unwrap();
         host.view
             .tree
@@ -142,7 +142,7 @@ impl Probe {
             .tree
             .get(ComponentId(host.view.ids().root.0 + 16))
             .unwrap()
-            .component::<RunView>()
+            .component::<RunPort>()
             .unwrap()
             .ids()
             .viewport;
@@ -163,7 +163,7 @@ impl Probe {
             .tree
             .get(ComponentId(host.view.ids().root.0 + 16))
             .unwrap()
-            .component::<RunView>()
+            .component::<RunPort>()
             .unwrap();
         assert_eq!(
             Self::anchor(host),
@@ -243,7 +243,7 @@ impl Probe {
             .tree
             .get(ComponentId(host.view.ids().root.0 + 16))
             .unwrap()
-            .component::<RunView>()
+            .component::<RunPort>()
             .unwrap()
             .displayed_snapshot()
             .unwrap()
@@ -266,7 +266,7 @@ impl Probe {
                     .tree
                     .get(ComponentId(ids.root.0 + 16))
                     .unwrap()
-                    .component::<RunView>()
+                    .component::<RunPort>()
                     .unwrap()
                     .ids()
                     .viewport;
@@ -328,7 +328,7 @@ impl Probe {
                     .tree
                     .get(ComponentId(host.view.ids().root.0 + 16))
                     .unwrap()
-                    .component::<RunView>()
+                    .component::<RunPort>()
                     .unwrap()
                     .transcript()
                     .unwrap();
@@ -399,7 +399,7 @@ impl Probe {
                     .tree
                     .get(ComponentId(host.view.ids().root.0 + 16))
                     .unwrap()
-                    .component::<RunView>()
+                    .component::<RunPort>()
                     .unwrap()
                     .ids()
                     .viewport;
@@ -494,7 +494,7 @@ impl Probe {
                     .tree
                     .get(root)
                     .unwrap()
-                    .component::<RunView>()
+                    .component::<RunPort>()
                     .unwrap();
                 let rail = run.turn_rail().unwrap();
                 let target = run
@@ -545,7 +545,7 @@ impl Probe {
                     .tree
                     .get(root)
                     .unwrap()
-                    .component::<RunView>()
+                    .component::<RunPort>()
                     .unwrap();
                 let target = run.turn_targets().unwrap().pop().unwrap();
                 let row = run.turn_rail().unwrap().row_id(target.turn_id()).unwrap();
@@ -571,7 +571,7 @@ impl Probe {
                     .tree
                     .get(root)
                     .unwrap()
-                    .component::<RunView>()
+                    .component::<RunPort>()
                     .unwrap()
                     .ids()
                     .viewport;
@@ -602,7 +602,7 @@ impl Probe {
                     .tree
                     .get(root)
                     .unwrap()
-                    .component::<RunView>()
+                    .component::<RunPort>()
                     .unwrap();
                 assert!(run.jump_is_visible());
                 run_script(vec![(0, Self::click(host, run.jump_button_id().unwrap()))]);
@@ -616,7 +616,7 @@ impl Probe {
                         .tree
                         .get(root)
                         .unwrap()
-                        .component::<RunView>()
+                        .component::<RunPort>()
                         .unwrap()
                         .jump_is_visible()
                 );

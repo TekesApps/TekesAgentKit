@@ -1,4 +1,4 @@
-//! Published SDK RunView integration; CoreText layout, not native/GPU acceptance.
+//! Published SDK RunPort integration; CoreText layout, not native/GPU acceptance.
 #![cfg(target_os = "macos")]
 use std::rc::Rc;
 use tekes_agent_components_ui::*;
@@ -78,7 +78,7 @@ impl ButtonTextRenderer for Text {
 }
 
 use tekes_agent_components_ui::RunReadingError as Failure;
-fn paging(run: &RunView, snapshot: &RunSnapshot) -> TranscriptPagingFacts {
+fn paging(run: &RunPort, snapshot: &RunSnapshot) -> TranscriptPagingFacts {
     TranscriptPagingFacts {
         scope: run.scope().clone(),
         supported: true,
@@ -88,7 +88,7 @@ fn paging(run: &RunView, snapshot: &RunSnapshot) -> TranscriptPagingFacts {
         read: TranscriptPageRead::Idle,
     }
 }
-fn prepare<'a>(run: &RunView, snapshot: &'a RunSnapshot) -> Result<RunViewUpdate<'a>, Failure> {
+fn prepare<'a>(run: &RunPort, snapshot: &'a RunSnapshot) -> Result<RunPortUpdate<'a>, Failure> {
     run.prepare_update(
         snapshot,
         Default::default(),
@@ -98,13 +98,13 @@ fn prepare<'a>(run: &RunView, snapshot: &'a RunSnapshot) -> Result<RunViewUpdate
     )
     .map_err(Failure::Agent)
 }
-fn run(host: &ContentHost, id: ComponentId) -> &RunView {
-    host.get(id).unwrap().component::<RunView>().unwrap()
+fn run(host: &ContentHost, id: ComponentId) -> &RunPort {
+    host.get(id).unwrap().component::<RunPort>().unwrap()
 }
-fn run_mut(host: &mut ContentHost, id: ComponentId) -> &mut RunView {
+fn run_mut(host: &mut ContentHost, id: ComponentId) -> &mut RunPort {
     host.get_mut(id)
         .unwrap()
-        .component_mut::<RunView>()
+        .component_mut::<RunPort>()
         .unwrap()
 }
 fn editor_mut(host: &mut ContentHost, id: ComponentId) -> &mut tekes_ui_controls::TextSurface {
@@ -153,7 +153,7 @@ async fn setup_with_fixture(
         .unwrap();
     let mut snapshot = (*controller.snapshot()).clone();
     snapshot.draft.text = "原草稿 中文".into();
-    let mut view = RunView::standard(2100, 2104..2500, RunScope::main("fixture", "a")).unwrap();
+    let mut view = RunPort::standard(2100, 2104..2500, RunScope::main("fixture", "a")).unwrap();
     view.update(
         &snapshot,
         Default::default(),
@@ -217,7 +217,7 @@ fn publish_plan(
     host: &mut ContentHost,
     root: ComponentId,
     version: &ReadingDocumentVersion,
-    plan: &RunViewUpdate<'_>,
+    plan: &RunPortUpdate<'_>,
 ) -> Result<ReadingDocumentVersion, Failure> {
     tekes_agent_ui_consumer_check::publish_original_run(
         host,
@@ -617,7 +617,7 @@ async fn composition_conflict_and_edit_undo_aba_are_rejected_before_reading_vers
     );
     assert_eq!(
         publish_plan(&mut host, root, &version, &plan),
-        Err(Failure::Agent("stale or foreign RunView update plan"))
+        Err(Failure::Agent("stale or foreign RunPort update plan"))
     );
     assert_eq!(baseline(&host, root), before);
     assert_eq!(rows(&host, root), old_rows);
@@ -699,7 +699,7 @@ async fn controlled_revision_and_foreign_editor_fail_before_any_reading_callback
     );
     // Another simultaneously mounted Run may show the exact same scope and
     // values; the opaque editor baseline must still reject cross-window reuse.
-    let mut other = RunView::standard(5100, 5104..5500, RunScope::main("fixture", "a")).unwrap();
+    let mut other = RunPort::standard(5100, 5104..5500, RunScope::main("fixture", "a")).unwrap();
     other
         .update(
             &first,
@@ -745,7 +745,7 @@ async fn controlled_revision_and_foreign_editor_fail_before_any_reading_callback
     );
     assert_eq!(
         publish_plan(&mut other_host, other_id, &other_version, &plan),
-        Err(Failure::Agent("stale or foreign RunView update plan"))
+        Err(Failure::Agent("stale or foreign RunPort update plan"))
     );
     assert_eq!(baseline(&other_host, other_id), before);
     assert_eq!(rows(&other_host, other_id), other_rows);
@@ -860,7 +860,7 @@ async fn delayed_send_clear_receipt_cannot_erase_new_local_input_or_publish_its_
     assert_eq!(
         intents
             .iter()
-            .filter(|intent| matches!(intent, RunViewIntent::Composer(ComposerIntent::Send { .. })))
+            .filter(|intent| matches!(intent, RunPortIntent::Composer(ComposerIntent::Send { .. })))
             .count(),
         1
     );
@@ -892,7 +892,7 @@ async fn delayed_send_clear_receipt_cannot_erase_new_local_input_or_publish_its_
         !run_mut(&mut host, root)
             .take_intents(&[])
             .iter()
-            .any(|intent| matches!(intent, RunViewIntent::Composer(ComposerIntent::Send { .. })))
+            .any(|intent| matches!(intent, RunPortIntent::Composer(ComposerIntent::Send { .. })))
     );
     runtime.stop().await.unwrap();
 }
@@ -924,7 +924,7 @@ async fn same_publication_close_open_aba_rejects_a_stored_plan_before_reading_ca
     ));
     assert_eq!(
         publish_plan(&mut host, root, &version, &plan),
-        Err(Failure::Agent("stale or foreign RunView update plan"))
+        Err(Failure::Agent("stale or foreign RunPort update plan"))
     );
     assert_eq!(baseline(&host, root), before);
     assert_eq!(rows(&host, root), before_rows);
@@ -938,7 +938,7 @@ async fn same_publication_close_open_aba_rejects_a_stored_plan_before_reading_ca
     run_mut(&mut host, root).update_paging(page).unwrap();
     assert_eq!(
         publish_plan(&mut host, root, &version, &plan),
-        Err(Failure::Agent("stale or foreign RunView update plan"))
+        Err(Failure::Agent("stale or foreign RunPort update plan"))
     );
     let plan = prepare(run(&host, root), &next).unwrap();
     run_mut(&mut host, root)
@@ -946,7 +946,7 @@ async fn same_publication_close_open_aba_rejects_a_stored_plan_before_reading_ca
         .unwrap();
     assert_eq!(
         publish_plan(&mut host, root, &version, &plan),
-        Err(Failure::Agent("stale or foreign RunView update plan"))
+        Err(Failure::Agent("stale or foreign RunPort update plan"))
     );
     assert_eq!(baseline(&host, root), before);
     assert_eq!(rows(&host, root), before_rows);
@@ -1044,7 +1044,7 @@ fn rail_intents(host: &mut ContentHost, root: ComponentId) -> Vec<RunTurnNavigat
         .take_intents(&actions)
         .into_iter()
         .filter_map(|i| match i {
-            RunViewIntent::TurnNavigation(n) => Some(*n),
+            RunPortIntent::TurnNavigation(n) => Some(*n),
             _ => None,
         })
         .collect()
@@ -1314,7 +1314,7 @@ async fn unmount_remount_retires_both_navigation_and_reveal_without_replacing_th
     use tekes_ui_controls::extended::{Axis, Stack};
     let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
     let snapshot = controller.snapshot();
-    let mut view = RunView::standard(2100, 2104..2500, RunScope::main("fixture", "a")).unwrap();
+    let mut view = RunPort::standard(2100, 2104..2500, RunScope::main("fixture", "a")).unwrap();
     view.update(
         &snapshot,
         Default::default(),
@@ -1353,7 +1353,7 @@ async fn unmount_remount_retires_both_navigation_and_reveal_without_replacing_th
     let removed = host.remove(root).unwrap();
     assert!(
         removed
-            .component::<RunView>()
+            .component::<RunPort>()
             .unwrap()
             .claim_turn_navigation(&navigation)
             .is_err()
@@ -1736,7 +1736,7 @@ fn jump_intents(host: &mut ContentHost, root: ComponentId) -> Vec<RunJumpLatest>
         .take_intents(&actions)
         .into_iter()
         .filter_map(|i| match i {
-            RunViewIntent::JumpLatest(n) => Some(*n),
+            RunPortIntent::JumpLatest(n) => Some(*n),
             _ => None,
         })
         .collect()
@@ -2355,7 +2355,7 @@ async fn expanded_tool_growth_and_reflow_preserve_reading_and_explicit_collapse_
         host.accessibility_action(button, None, AccessibilityAction::Press);
         for intent in tekes_agent_ui_consumer_check::drain_local_run_actions(&mut host, root) {
             match intent {
-                RunViewIntent::Composer(ComposerIntent::Edit { destination, text }) => {
+                RunPortIntent::Composer(ComposerIntent::Edit { destination, text }) => {
                     assert_eq!(
                         Some(&destination),
                         run(&host, root).composer().destination()

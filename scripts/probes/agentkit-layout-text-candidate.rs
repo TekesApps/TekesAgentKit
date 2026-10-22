@@ -1,4 +1,4 @@
-// Appended to the unchanged formal RunView probe by --append-run-probe.
+// Appended to the unchanged formal RunPort probe by --append-run-probe.
 // No substitute Run/editor/reading controller or consumption-side repair.
 #[derive(Default)]
 struct WithoutTextServices {

@@ -18,8 +18,8 @@ mod turn_rail_action;
 mod turn_rail_component;
 pub use turn_rail::*;
 pub use turn_rail_component::*;
-mod run_view;
-pub use run_view::*;
+mod run_port;
+pub use run_port::*;
 mod run_reading;
 pub use run_reading::*;
 mod run_navigation;
@@ -129,7 +129,7 @@ pub enum Intent {
     Select(&'static str),
 }
 
-/// Protocol/controls test harness. This is not the reusable Agent RunView API.
+/// Protocol/controls test harness. This is not the reusable Agent RunPort API.
 pub struct RunSurface {
     pub tree: ContentHost,
     selected: Option<ComposerDestination>,

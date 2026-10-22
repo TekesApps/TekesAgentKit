@@ -1054,25 +1054,25 @@ fn independent_host_mounts_canonical_content_without_private_demo_types() {
     );
 }
 
-/// A separate product assembles the same public RunView, never the demo host.
-pub fn new_agent_run_view(
+/// A separate product assembles the same public RunPort, never the demo host.
+pub fn new_agent_run_port(
     namespace: u32,
     rows: std::ops::Range<u32>,
     scope: tekes_agent_components_ui::RunScope,
-) -> Result<tekes_agent_components_ui::RunView, &'static str> {
-    tekes_agent_components_ui::RunView::standard(namespace, rows, scope)
+) -> Result<tekes_agent_components_ui::RunPort, &'static str> {
+    tekes_agent_components_ui::RunPort::standard(namespace, rows, scope)
 }
 #[test]
 fn second_product_mounts_a_run_with_its_own_namespace_pool_and_no_demo_or_run_surface() {
-    use tekes_agent_components_ui::{Composer, RunScope, RunView, TranscriptContent};
-    let view = new_agent_run_view(1100, 1104..1200, RunScope::main("public", "original")).unwrap();
+    use tekes_agent_components_ui::{Composer, RunPort, RunScope, TranscriptContent};
+    let view = new_agent_run_port(1100, 1104..1200, RunScope::main("public", "original")).unwrap();
     let ids = view.ids();
     let transcript = view.transcript_id().unwrap();
     let host = view.into_host().unwrap();
     assert_eq!(
         host.get(ids.root)
             .unwrap()
-            .component::<RunView>()
+            .component::<RunPort>()
             .unwrap()
             .scope(),
         &RunScope::main("public", "original")
@@ -1093,8 +1093,8 @@ fn second_product_mounts_a_run_with_its_own_namespace_pool_and_no_demo_or_run_su
 
 /// Capture one original binding frame and lower permissions on a later epoch.
 /// This adapter adds no Run state and never chooses a newer visible destination.
-pub fn sync_agent_run_view(
-    view: &mut tekes_agent_components_ui::RunView,
+pub fn sync_agent_run_port(
+    view: &mut tekes_agent_components_ui::RunPort,
     source: &tekes_agent_ui_bindings::RunBinding,
     supports_pagination: bool,
 ) -> Result<(), String> {
@@ -1205,11 +1205,11 @@ fn independent_host_mounts_feedback_without_a_demo_or_private_binding_type() {
     );
 }
 
-/// Public RunView composition opts into per-turn feedback without a test host.
+/// Public RunPort composition opts into per-turn feedback without a test host.
 pub fn run_with_feedback(
     scope: tekes_agent_components_ui::RunScope,
-) -> tekes_agent_components_ui::RunView {
-    let mut run = tekes_agent_components_ui::RunView::standard(93, 97..120, scope).unwrap();
+) -> tekes_agent_components_ui::RunPort {
+    let mut run = tekes_agent_components_ui::RunPort::standard(93, 97..120, scope).unwrap();
     run.configure_feedback(Some(Default::default())).unwrap();
     run
 }
@@ -1358,9 +1358,9 @@ fn independent_host_prepares_reading_items_before_committing_shared_content() {
 
 #[test]
 fn independent_host_configures_pane_columns_without_a_private_run_surface() {
-    use tekes_agent_components_ui::{RunColumnLayout, RunScope, RunView};
-    let mut first = RunView::standard(1300, 1304..1350, RunScope::main("consumer", "A")).unwrap();
-    let second = RunView::standard(1400, 1404..1450, RunScope::main("consumer", "B")).unwrap();
+    use tekes_agent_components_ui::{RunColumnLayout, RunPort, RunScope};
+    let mut first = RunPort::standard(1300, 1304..1350, RunScope::main("consumer", "A")).unwrap();
+    let second = RunPort::standard(1400, 1404..1450, RunScope::main("consumer", "B")).unwrap();
     let column = RunColumnLayout::Insets {
         leading: 0.15,
         trailing: 0.08,
@@ -1373,7 +1373,7 @@ fn independent_host_configures_pane_columns_without_a_private_run_surface() {
     let run = host
         .get_mut(first_id)
         .unwrap()
-        .component_mut::<RunView>()
+        .component_mut::<RunPort>()
         .unwrap();
     assert_eq!(run.column_layout(), column);
     for invalid in [
@@ -1424,10 +1424,10 @@ fn independent_host_configures_pane_columns_without_a_private_run_surface() {
 /// The host next checks controlled_draft on the original TekesUI editor, then
 /// enters the reading transaction with the token captured by its original read.
 pub fn prepare_original_run<'a>(
-    run: &tekes_agent_components_ui::RunView,
+    run: &tekes_agent_components_ui::RunPort,
     frame: &'a tekes_agent_ui_bindings::PaneSnapshot,
     paging: tekes_agent_components_ui::TranscriptPagingFacts,
-) -> Result<tekes_agent_components_ui::RunViewUpdate<'a>, &'static str> {
+) -> Result<tekes_agent_components_ui::RunPortUpdate<'a>, &'static str> {
     match frame {
         tekes_agent_ui_bindings::PaneSnapshot::Run { snapshot, access } => run.prepare_update(
             snapshot,
@@ -1451,15 +1451,15 @@ pub fn publish_original_run(
     root: tekes_ui_controls::composition::ComponentId,
     version: &tekes_ui_controls::ReadingDocumentVersion,
     revision: u64,
-    plan: &tekes_agent_components_ui::RunViewUpdate<'_>,
+    plan: &tekes_agent_components_ui::RunPortUpdate<'_>,
 ) -> Result<tekes_ui_controls::ReadingDocumentVersion, tekes_agent_components_ui::RunReadingError> {
     tekes_agent_components_ui::publish_run_reading_update(host, root, version, revision, plan)
 }
 #[test]
 fn independent_host_does_not_prepare_a_missing_pointer_as_a_new_run() {
-    use tekes_agent_components_ui::{RunScope, RunView, TranscriptPageRead, TranscriptPagingFacts};
+    use tekes_agent_components_ui::{RunPort, RunScope, TranscriptPageRead, TranscriptPagingFacts};
     let scope = RunScope::main("consumer", "missing");
-    let run = RunView::standard(1600, 1604..1650, scope.clone()).unwrap();
+    let run = RunPort::standard(1600, 1604..1650, scope.clone()).unwrap();
     let frame = tekes_agent_ui_bindings::PaneSnapshot::Missing {
         scope: scope.clone(),
     };
@@ -1482,13 +1482,13 @@ fn independent_host_does_not_prepare_a_missing_pointer_as_a_new_run() {
 /// A product's explicit focus action must not target a hidden archived Composer.
 /// This is a query of shared presentation, not a second status policy.
 pub fn composer_focus_target(
-    run: &tekes_agent_components_ui::RunView,
+    run: &tekes_agent_components_ui::RunPort,
 ) -> Option<tekes_agent_components_ui::ComposerIds> {
     (run.is_pane_presented() && run.composer().is_presented()).then_some(run.ids().composer)
 }
 #[test]
 fn second_product_uses_shared_composer_presentation_for_focus() {
-    let run = new_agent_run_view(
+    let run = new_agent_run_port(
         1700,
         1704..1750,
         tekes_agent_components_ui::RunScope::main("public", "focus"),
@@ -1501,8 +1501,8 @@ fn second_product_uses_shared_composer_presentation_for_focus() {
 /// Geometry and model must describe the same arranged publication. A host must
 /// not interpret a retained collapsed frame or a pre-render update as current.
 pub fn arranged_run_geometry(
-    run: &tekes_agent_components_ui::RunView,
-) -> Option<tekes_agent_components_ui::RunViewGeometry> {
+    run: &tekes_agent_components_ui::RunPort,
+) -> Option<tekes_agent_components_ui::RunPortGeometry> {
     let geometry = run.layout_geometry()?;
     (run.is_pane_presented()
         && geometry.publication == run.displayed_snapshot().map(|snapshot| snapshot.revision)
@@ -1514,7 +1514,7 @@ pub fn arranged_run_geometry(
 }
 #[test]
 fn second_product_does_not_invent_geometry_before_a_run_is_arranged() {
-    let run = new_agent_run_view(
+    let run = new_agent_run_port(
         1800,
         1804..1850,
         tekes_agent_components_ui::RunScope::main("public", "unarranged"),
@@ -1526,7 +1526,7 @@ fn second_product_does_not_invent_geometry_before_a_run_is_arranged() {
 /// Read shared geometry instead of estimating input height and Send/Stop from
 /// another copy of the draft or run lifecycle.
 pub fn arranged_composer_layout(
-    run: &tekes_agent_components_ui::RunView,
+    run: &tekes_agent_components_ui::RunPort,
 ) -> Option<&tekes_agent_components_ui::ComposerLayoutGeometry> {
     if !run.is_pane_presented() {
         return None;
@@ -1539,7 +1539,7 @@ pub fn arranged_composer_layout(
 fn second_product_queries_shared_primary_and_waits_for_actual_composer_geometry() {
     use tekes_agent_components_ui::{ComposerPrimaryActionKind, RunScope};
     let run =
-        new_agent_run_view(1950, 1954..1990, RunScope::main("public", "composer-band")).unwrap();
+        new_agent_run_port(1950, 1954..1990, RunScope::main("public", "composer-band")).unwrap();
     assert_eq!(
         run.composer().primary_action_kind(),
         ComposerPrimaryActionKind::Send
@@ -1750,13 +1750,13 @@ fn independent_summary_consumer_formats_usage_slots_without_recomputing_facts() 
 /// A host's non-focusing navigation gesture comes from the original installed
 /// Run, not a newly selected session or a duplicated list of turn identities.
 pub fn prepare_turn_navigation(
-    run: &tekes_agent_components_ui::RunView,
+    run: &tekes_agent_components_ui::RunPort,
     target: &tekes_agent_components_ui::TranscriptTurnTarget,
 ) -> Result<tekes_agent_components_ui::RunTurnNavigation, &'static str> {
     run.prepare_turn_navigation(target)
 }
 pub fn claim_turn_navigation(
-    run: &tekes_agent_components_ui::RunView,
+    run: &tekes_agent_components_ui::RunPort,
     navigation: &tekes_agent_components_ui::RunTurnNavigation,
 ) -> Result<tekes_agent_components_ui::RunTurnNavigationKind, &'static str> {
     run.claim_turn_navigation(navigation)
@@ -1765,7 +1765,7 @@ pub fn claim_turn_navigation(
 /// Install the shared rail only when the fixed library has original compact
 /// controls. No host list, pointer engine or minimum-height substitute is built.
 pub fn install_turn_rail(
-    run: &mut tekes_agent_components_ui::RunView,
+    run: &mut tekes_agent_components_ui::RunPort,
     namespace: u32,
 ) -> Result<(), &'static str> {
     run.install_turn_rail(namespace)
@@ -1773,7 +1773,7 @@ pub fn install_turn_rail(
 #[test]
 fn rail_dependency_gate_is_explicit_and_preserves_the_original_run_on_unsupported_pin() {
     use tekes_agent_components_ui::{RunScope, turn_rail_supported};
-    let mut run = new_agent_run_view(
+    let mut run = new_agent_run_port(
         1960,
         1964..1980,
         RunScope::main("consumer", "rail-capability"),
@@ -1788,7 +1788,7 @@ fn rail_dependency_gate_is_explicit_and_preserves_the_original_run_on_unsupporte
 
 /// Main-host history integration, using only the public component contract.
 pub fn claim_turn_navigation_with_host(
-    run: &tekes_agent_components_ui::RunView,
+    run: &tekes_agent_components_ui::RunPort,
     navigation: &tekes_agent_components_ui::RunTurnNavigation,
     host: &mut impl tekes_agent_components_ui::RunTurnNavigationHost,
 ) -> Result<tekes_agent_components_ui::RunTurnNavigationKind, &'static str> {
@@ -2366,7 +2366,7 @@ fn second_summary_consumer_selects_passive_text_without_an_endpoint_or_copy_stat
 /// Preview data is shared Agent content; placement/hit/dismiss belongs to the SDK.
 /// Call after a successful render and keep the captured target, not a new ordinal.
 pub fn turn_preview<'a>(
-    run: &tekes_agent_components_ui::RunView,
+    run: &tekes_agent_components_ui::RunPort,
     target: &'a tekes_agent_components_ui::TranscriptTurnTarget,
 ) -> Result<&'a tekes_agent_components_ui::TranscriptTurnPreview, &'static str> {
     run.turn_preview(target)
@@ -2419,16 +2419,16 @@ fn independent_composer_notice_uses_captured_public_callback_without_a_runtime()
     assert!(composer_notice_refreshes(source).is_empty());
 }
 
-/// Route an original once-drained SDK action batch through the public RunView;
+/// Route an original once-drained SDK action batch through the public RunPort;
 /// local disclosures use its existing policy, without host reconstruction.
 pub fn drain_local_run_actions(
     host: &mut tekes_ui_controls::composition::ContentHost,
     root: tekes_ui_controls::composition::ComponentId,
-) -> Vec<tekes_agent_components_ui::RunViewIntent> {
+) -> Vec<tekes_agent_components_ui::RunPortIntent> {
     let actions = host.drain_actions();
     host.get_mut(root)
         .unwrap()
-        .component_mut::<tekes_agent_components_ui::RunView>()
+        .component_mut::<tekes_agent_components_ui::RunPort>()
         .unwrap()
         .take_intents(&actions)
 }

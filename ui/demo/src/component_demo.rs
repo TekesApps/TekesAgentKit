@@ -1,12 +1,12 @@
 //! Host window/navigation adapters around shared Agent components.
-//! RunView is experimental; generic reading belongs to the published SDK.
+//! RunPort is experimental; generic reading belongs to the published SDK.
 use std::{collections::BTreeMap, sync::Arc};
 use tekes_agent_components_ui::{
     AnnotationEditor, AnnotationEditorIds, AnnotationEditorIntent, Composer, ComposerAffordances,
     ComposerCatalogPhase, ComposerChoiceCatalog, ComposerChoiceIntent, ComposerChoiceKind,
     ComposerChoiceRequest, ComposerChoices, ComposerEntry, ComposerIds, ComposerIntent,
     ComposerLabels, RenameFailure, RenameIds, RenameIntent, RenameLabels, RenameSubmission,
-    RunView, RunViewIds, SidePanel, SidePanelInput, SidePanelIntent, SidePanelLabels, SidePanelTab,
+    RunPort, RunPortIds, SidePanel, SidePanelInput, SidePanelIntent, SidePanelLabels, SidePanelTab,
     SidePanelTabKind, Sidebar, SidebarInput, SidebarIntent, SidebarLabels, SummaryInput,
     SummaryIntent, SummaryLabels, SummaryView, ThreadRename,
 };
@@ -315,7 +315,7 @@ impl Component for DemoColumn {
 }
 impl ComponentDemo {
     /// Current demo uses the default reading policy. Hosts with different pane
-    /// policies query their RunView.minimum_pane_width instead.
+    /// policies query their RunPort.minimum_pane_width instead.
     pub fn minimum_window_width() -> f64 {
         (SIDEBAR_WIDTH
             + panel_width()
@@ -370,7 +370,7 @@ impl ComponentDemo {
                     axis: Axis::Vertical,
                     gap: Spacing::Regular.value(),
                 },
-                // RunView already owns a bounded viewport, including when the
+                // RunPort already owns a bounded viewport, including when the
                 // optional transcript diagnostic is disabled. Giving spare
                 // height to the notice would push its Composer below the window.
                 flexible_child: Some(pair.id()),
@@ -544,8 +544,8 @@ impl ComponentDemo {
             edit_annotations: true,
             ..Default::default()
         });
-        let view = RunView::new(
-            RunViewIds {
+        let view = RunPort::new(
+            RunPortIds {
                 root: ComponentId(ids.root.0 + 16),
                 indicators: ComponentId(ids.root.0 + 17),
                 viewport: ComponentId(ids.root.0 + 21),
@@ -556,7 +556,7 @@ impl ComponentDemo {
             4_000_000 + (ids.root.0 >> 32) as u32,
             3_000_000 + (ids.root.0 >> 32) as u32,
         )
-        .expect("separate RunView namespaces");
+        .expect("separate RunPort namespaces");
         Content::new(view.ids().root, view)
     }
     fn actionable_id(ids: ComposerIds) -> ComponentId {
@@ -571,7 +571,7 @@ impl ComponentDemo {
             .component::<tekes_agent_components_ui::TranscriptPaging>()
             .map(tekes_agent_components_ui::TranscriptPaging::button_id)
     }
-    /// A row-only public API probe. This does not install a Transcript or RunView.
+    /// A row-only public API probe. This does not install a Transcript or RunPort.
     pub fn mount_input_message_proof(
         &mut self,
     ) -> Result<tekes_agent_components_ui::InputMessageIds> {
@@ -606,7 +606,7 @@ impl ComponentDemo {
             .tree
             .get(parent)
             .unwrap()
-            .component::<RunView>()
+            .component::<RunPort>()
             .unwrap()
             .children()
             .iter()
@@ -654,7 +654,7 @@ impl ComponentDemo {
             .tree
             .get(parent)
             .unwrap()
-            .component::<RunView>()
+            .component::<RunPort>()
             .unwrap()
             .children()
             .iter()
@@ -703,7 +703,7 @@ impl ComponentDemo {
                 .configure_feedback(feedback_labels)
                 .map_err(unsupported)?;
             // Existing content was already published with Composer in the
-            // original SDK reading transaction by sync_run_view. Do not write
+            // original SDK reading transaction by sync_run_port. Do not write
             // Transcript a second time outside that transaction.
             self.attach_run_reading(ids, binding)?;
             return self.sync_feedback(ids, binding);
@@ -735,7 +735,7 @@ impl ComponentDemo {
         self.tree
             .get_mut(ComponentId(ids.root.0 + 16))
             .unwrap()
-            .component_mut::<RunView>()
+            .component_mut::<RunPort>()
             .unwrap()
             .install_transcript(content)
             .map_err(unsupported)?;
@@ -744,7 +744,7 @@ impl ComponentDemo {
             .tree
             .get_mut(ComponentId(ids.root.0 + 16))
             .unwrap()
-            .component_mut::<RunView>()
+            .component_mut::<RunPort>()
             .unwrap();
         run.install_jump_to_latest(8_000_000 + (ids.root.0 >> 32) as u32)
             .map_err(unsupported)?;
@@ -764,11 +764,11 @@ impl ComponentDemo {
         self.tree
             .get_mut(root)
             .unwrap()
-            .component_mut::<RunView>()
+            .component_mut::<RunPort>()
             .unwrap()
             .set_footnote_clock(Some(crate::footnote_host::now_ms()))
             .map_err(unsupported)?;
-        let run = self.tree.get(root).unwrap().component::<RunView>().unwrap();
+        let run = self.tree.get(root).unwrap().component::<RunPort>().unwrap();
         let viewport = run.ids().viewport;
         if self
             .tree
@@ -838,7 +838,7 @@ impl ComponentDemo {
             .tree
             .get(parent)
             .unwrap()
-            .component::<RunView>()
+            .component::<RunPort>()
             .unwrap()
             .children()
             .iter()
@@ -927,12 +927,12 @@ impl ComponentDemo {
                     .is_some_and(|node| {
                         node.visible().is_some()
                             && node
-                                .component::<RunView>()
-                                .is_some_and(RunView::has_live_footnote)
+                                .component::<RunPort>()
+                                .is_some_and(RunPort::has_live_footnote)
                     })
             })
     }
-    fn sync_run_view(
+    fn sync_run_port(
         &mut self,
         ids: ComposerIds,
         binding: &Arc<RunBinding>,
@@ -956,11 +956,11 @@ impl ComponentDemo {
         self.tree
             .get_mut(root)
             .unwrap()
-            .component_mut::<RunView>()
+            .component_mut::<RunPort>()
             .unwrap()
             .set_footnote_clock(Some(crate::footnote_host::now_ms()))
             .map_err(unsupported)?;
-        let run = self.tree.get(root).unwrap().component::<RunView>().unwrap();
+        let run = self.tree.get(root).unwrap().component::<RunPort>().unwrap();
         let version = self
             .tree
             .get(run.ids().viewport)
@@ -989,7 +989,7 @@ impl ComponentDemo {
         self.tree
             .get_mut(root)
             .unwrap()
-            .component_mut::<RunView>()
+            .component_mut::<RunPort>()
             .unwrap()
             .update(snapshot, affordances, gate, paging, controls)
             .map_err(unsupported)
@@ -1013,8 +1013,8 @@ impl ComponentDemo {
             .is_none_or(|pane| pane.source.supports_pagination());
         self.tree
             .get_mut(ComponentId(ids.root.0 + 16))
-            .expect("RunView")
-            .component_mut::<RunView>()
+            .expect("RunPort")
+            .component_mut::<RunPort>()
             .unwrap()
             .update_paging(receipt.controls(&snapshot.transcript, supported))
             .map_err(unsupported)
@@ -1046,8 +1046,8 @@ impl ComponentDemo {
             && authority.connection_epoch == epoch;
         self.tree
             .get_mut(ComponentId(ids.root.0 + 16))
-            .expect("RunView")
-            .component_mut::<RunView>()
+            .expect("RunPort")
+            .component_mut::<RunPort>()
             .unwrap()
             .update_actionable(snapshot.revision, epoch, prompt, controls)
             .map_err(unsupported)?;
@@ -2936,7 +2936,7 @@ impl ComponentDemo {
             .component_mut::<Composer>()
             .unwrap()
             .set_context_affordances(context_affordances);
-        self.sync_run_view(
+        self.sync_run_port(
             ids,
             &binding,
             &snapshot,
@@ -3184,7 +3184,7 @@ impl ComponentDemo {
                                 self.tree
                                     .get_mut(ComponentId(ids.root.0 + 16))
                                     .unwrap()
-                                    .component_mut::<RunView>()
+                                    .component_mut::<RunPort>()
                                     .unwrap()
                                     .append_accessory(Content::new(
                                         ComponentId(ids.root.0 + 19),
@@ -3380,7 +3380,7 @@ impl ComponentDemo {
             .component_mut::<Composer>()
             .unwrap()
             .set_context_affordances(context_affordances);
-        self.sync_run_view(
+        self.sync_run_port(
             ids,
             &binding,
             &snapshot,
@@ -3563,7 +3563,7 @@ impl ComponentDemo {
         self.select(index)?;
         Ok(true)
     }
-    fn composing_navigation_run(&self) -> Option<&RunView> {
+    fn composing_navigation_run(&self) -> Option<&RunPort> {
         let editor = self.composing_editor()?;
         [Some(self.ids()), self.panel_composer_ids()]
             .into_iter()
@@ -3572,7 +3572,7 @@ impl ComponentDemo {
                 let run = self
                     .tree
                     .get(ComponentId(ids.root.0 + 16))?
-                    .component::<RunView>()?;
+                    .component::<RunPort>()?;
                 (run.ids().composer.editor == editor && run.is_pane_presented()).then_some(run)
             })
     }
@@ -3709,7 +3709,7 @@ impl ComponentDemo {
                     .tree
                     .get_mut(ComponentId(ids.root.0 + 16))
                     .unwrap()
-                    .component_mut::<RunView>()
+                    .component_mut::<RunPort>()
                     .unwrap();
                 let intents = run.take_intents(&actions);
                 intents
@@ -3721,41 +3721,41 @@ impl ComponentDemo {
         let mut commands = vec![];
         let mut local_navigation = false;
         for (ids, binding, intent) in routed {
-            use tekes_agent_components_ui::RunViewIntent;
+            use tekes_agent_components_ui::RunPortIntent;
             match intent {
-                RunViewIntent::Composer(intent) => intents.push((binding, intent)),
-                RunViewIntent::JumpLatest(intent) => {
+                RunPortIntent::Composer(intent) => intents.push((binding, intent)),
+                RunPortIntent::JumpLatest(intent) => {
                     local_navigation = true;
                     commands.push(DemoCommand::JumpLatest {
                         root: ComponentId(ids.root.0 + 16),
                         intent,
                     });
                 }
-                RunViewIntent::TurnNavigation(intent) => {
+                RunPortIntent::TurnNavigation(intent) => {
                     local_navigation = true;
                     commands.push(DemoCommand::TurnNavigation {
                         root: ComponentId(ids.root.0 + 16),
                         intent,
                     });
                 }
-                RunViewIntent::Feedback { control, gesture } => {
+                RunPortIntent::Feedback { control, gesture } => {
                     commands.push(self.prepare_feedback(ids, &binding, control, *gesture)?)
                 }
-                RunViewIntent::CopyTranscript(intent) => {
+                RunPortIntent::CopyTranscript(intent) => {
                     commands.push(DemoCommand::CopyTranscript(intent))
                 }
-                RunViewIntent::TurnAction(intent) => commands.push(DemoCommand::TurnAction {
+                RunPortIntent::TurnAction(intent) => commands.push(DemoCommand::TurnAction {
                     binding,
                     intent: *intent,
                 }),
-                RunViewIntent::LoadEarlier { scope } => {
+                RunPortIntent::LoadEarlier { scope } => {
                     require(&scope == binding.scope(), "history origin mismatch")?;
                     let request = binding.begin_history_page()?;
                     // The single full sync below publishes the loading receipt
                     // together with its captured canonical Run frame.
                     commands.push(DemoCommand::ReadHistoryPage(request));
                 }
-                RunViewIntent::Actionable(intent) => {
+                RunPortIntent::Actionable(intent) => {
                     match binding.begin_actionable_response(&intent) {
                         Ok(request) => commands.push(DemoCommand::RespondActionable {
                             request: Arc::new(request),
@@ -4236,7 +4236,7 @@ impl ComponentDemo {
                 let root = ComponentId(id.0 + 16);
                 self.tree
                     .get(root)
-                    .and_then(|node| node.component::<RunView>())
+                    .and_then(|node| node.component::<RunPort>())
                     .map(|_| root)
             })
             .collect()
@@ -4255,7 +4255,7 @@ impl ComponentDemo {
         self.tree.render(scene, text, frame, clip, palette)?;
         // Read actual successful layout, not sticky follow mode or running state.
         for root in self.mounted_run_roots() {
-            let run = self.tree.get(root).unwrap().component::<RunView>().unwrap();
+            let run = self.tree.get(root).unwrap().component::<RunPort>().unwrap();
             let context = if self.is_main_run(root) && run.is_pane_presented() {
                 run.layout_geometry().and_then(|geometry| {
                     run.transcript()
@@ -4282,7 +4282,7 @@ impl ComponentDemo {
             self.tree
                 .get_mut(root)
                 .unwrap()
-                .component_mut::<RunView>()
+                .component_mut::<RunPort>()
                 .unwrap()
                 .set_turn_navigation_context(context)
                 .expect("rendered Run navigation context");
@@ -4290,7 +4290,7 @@ impl ComponentDemo {
                 self.tree
                     .get_mut(root)
                     .unwrap()
-                    .component_mut::<RunView>()
+                    .component_mut::<RunPort>()
                     .unwrap()
                     .update_rail_follow_target(following)
                     .expect("rendered rail follow target");
@@ -4340,7 +4340,7 @@ mod frame_consistency_tests {
                 ComponentDemo::run_controls(ids, binding.scope()),
             )
             .unwrap();
-        view.sync_run_view(
+        view.sync_run_port(
             ids,
             &binding,
             &frame,

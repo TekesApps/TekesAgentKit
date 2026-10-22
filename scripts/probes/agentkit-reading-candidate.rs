@@ -424,7 +424,7 @@ async fn return_to_latest_preserves_the_real_composer_focus_and_preedit_for_poin
 }
 
 /// Reproduces the documented upstream boundary, not an acceptance of this
-/// behavior for RunView. Keep fallible editor updates outside reading callbacks
+/// behavior for RunPort. Keep fallible editor updates outside reading callbacks
 /// until TekesUI #26 provides a supported preflight/rejection contract.
 #[tokio::test]
 async fn issue26_editor_composition_conflict_does_not_reject_the_reading_version() {

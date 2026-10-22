@@ -1,6 +1,6 @@
 //! Real harness streaming while reading old content; no alternate UI/scroll state.
 use super::*;
-use tekes_agent_components_ui::RunView;
+use tekes_agent_components_ui::RunPort;
 use tekes_agent_presentation::{RunSnapshot, TranscriptDocument, TranscriptItemKind};
 use tekes_ui_controls::{
     TextEditBaseline,
@@ -65,7 +65,7 @@ impl Probe {
                 .unwrap();
         }
     }
-    fn run(host: &Host) -> &RunView {
+    fn run(host: &Host) -> &RunPort {
         host.view
             .tree
             .get(ComponentId(host.view.ids().root.0 + 16))

@@ -1,5 +1,7 @@
 # Rust Agent UI 组件接入契约
 
+正式组合组件已统一为 **RunPort（原 Rust RunView）**，公开类型、demo、第二 consumer、实时验证脚本和当前文档同步命名。Sidebar、RunPort、SidePanel 的目标宿主边界是 TekesUI **ProcessContainer**；固定公开版本尚缺完整远端交互能力，跟踪 [TekesUI #48](https://github.com/TekesApps/TekesUI/issues/48)。保留现有同进程原 Content 路径，同进程/跨进程证据分别记录；见 [RunPort 迁移与容器契约](rust-agent-ui-run-port-20261022.md)。改名不代表 ProcessContainer 接入完成。
+
 [Summary 原Content插槽](rust-agent-ui-summary-custom-20261022.md)已提供宿主产品行的原控件保留、动态测量与事件来源校验；安装/退役走原SDK生命周期，保留旧Run适配。完整repository具体行及未选中会话宿主布局仍需继续。
 
 [Summary 工作区上下文](rust-agent-ui-summary-context-20261022.md)已补显式owner，无需虚构RunScope即可独立挂载host sections；原Run输入适配、owner隔离/旧动作拒绝、组件及原生兼容验收通过。通用host Content插槽见文首；完整repository具体行和未选中会话宿主布局仍开放。
@@ -12,7 +14,7 @@
 
 [当前固定程序的真实三端原生验收](rust-agent-ui-three-real-20261022.md)通过Kernel0.9.3、Pi1.3.0、DSH0.2.1-rc.2的分页/流式阅读/中文marked/取消恢复，并补精确程序与握手版本校验。Native完整生命周期仍有archive的session-running失败，未据独立UI模式提升为全量通过。
 
-本文件是正式业务组件的实现契约与进度入口，不是完成声明。完整交付目标保持 Composer、Transcript、Indicators、RunView、SidePanel、Sidebar，加 Native/Pi/DSH 能力验证、第二公开 consumer、原生窗口验收、review/CI/合并与阶段 tag。
+本文件是正式业务组件的实现契约与进度入口，不是完成声明。完整交付目标保持 Composer、Transcript、Indicators、RunPort、SidePanel、Sidebar，加 Native/Pi/DSH 能力验证、第二公开 consumer、原生窗口验收、review/CI/合并与阶段 tag。
 
 [最新公开 SDK 接收](tekesui-toolbar-public-intake-20261021.md)记录 09b4bab 的精确依赖、公开闭包、原生阅读/系统拼音证据及中断记录；此前版本的验收保持各自范围。
 
@@ -31,7 +33,7 @@
 
 当前阅读进展见[正式事务](rust-agent-ui-continuous-reading-20261021.md)和[真实三端保留阅读](rust-agent-ui-retained-reading-20261021.md)：公开库API已消费，Native/Pi/DSH分页、A/B保留阅读及重连通过。销毁后新建组件树的持久恢复跟踪TekesUI #42；完整UI目标仍未完成。
 
-阅读指南：下文保留了阶段性候选/默认输入和验收记录；其中历史的“未发布/等待交付/默认8cf”不覆盖本节当前pin，也不能继续作为当前阻塞理由。RunSurface始终只是协议/控件测试宿主，不是正式RunView。
+阅读指南：下文保留了阶段性候选/默认输入和验收记录；其中历史的“未发布/等待交付/默认8cf”不覆盖本节当前pin，也不能继续作为当前阻塞理由。RunSurface始终只是协议/控件测试宿主，不是正式RunPort。
 
 Layout 和显示逻辑须逐项严格对齐当前 ClientKit 对应 Views；[对应关系与初步差异](clientkit-view-layout-review-20261020.md)列出源码及待验收项。组件类型存在、协议通过或 TekesUI 基础样式一致均不等于布局已经对齐。[严格共享列修正](rust-agent-ui-strict-column-20261021.md)已补源320/770规则、token推导净空和比例归一化；基础文档/Composer叠层现已推进，详见[underlay与阅读净空](rust-agent-ui-overlay-20261021.md)；完整rail、selection/Jump及其它清单仍未完成。[Composer显示规则](rust-agent-ui-composer-visibility-20261021.md)现已补归档隐藏、中断/暂不可提交保留、原实例与原生归档恢复专项；后续[降级快照修正](rust-agent-ui-degraded-frame-20261021.md)补齐坏历史期间的归档、epoch和目标隔离。
 
@@ -71,9 +73,9 @@ AgentKit 固定消息排版语义：机器正文、推理、工具内容及机�
 
 后续[系统拼音软件探针](rust-agent-ui-system-ime-20261020.md)已通过真实系统 marked text、发送/导航屏障、确认及单次提交检查；按键定向合成到隔离进程，不注入 Preedit。此证据不提升实体键盘、候选窗、完整 IME 或完整三端原生体验验收状态。
 
-用户消息的[外置复制入口](rust-agent-ui-input-copy-20261020.md)已接入 RunView 与只读 lane，返回捕获原 scope/message/text 的公开 intent，由宿主写剪贴板。[输出 footnote 复制](rust-agent-ui-output-copy-20261020.md)复用共享 is_final 语义，只为已完成回合中唯一的最终正文提供目标；评价等其余 footnote 语义仍待补齐。离线复制不授予 endpoint mutation 权限。
+用户消息的[外置复制入口](rust-agent-ui-input-copy-20261020.md)已接入 RunPort 与只读 lane，返回捕获原 scope/message/text 的公开 intent，由宿主写剪贴板。[输出 footnote 复制](rust-agent-ui-output-copy-20261020.md)复用共享 is_final 语义，只为已完成回合中唯一的最终正文提供目标；评价等其余 footnote 语义仍待补齐。离线复制不授予 endpoint mutation 权限。
 
-[评价读取基础](rust-agent-ui-feedback-read-20261020.md)已增加 committed records、真实目标身份和原 binding/连接/读顺序约束；DSH feedback 包裹已在适配器边界归一化。[评价 CAS 写入基础](rust-agent-ui-feedback-cas-20261020.md)已补齐原目标捕获、一次性 mutation、备注策略和权威冲突恢复，并通过三端真实读写；[独立评价控件与备注编辑器](rust-agent-ui-feedback-controls-20261020.md)现已提供公开 API 和原 binding gesture bridge；现已[挂入正式 Transcript/RunView 的输出 footnote](rust-agent-ui-feedback-transcript-20261020.md)，包括原 binding 路由、组字/导航屏障及延迟回执隔离；[三端评价专项原生窗口验收](rust-agent-ui-feedback-native-20261020.md)现已补齐自动化点击和原生文本服务路径；完整 Transcript、物理输入法与阅读锚点的证据范围仍单列。
+[评价读取基础](rust-agent-ui-feedback-read-20261020.md)已增加 committed records、真实目标身份和原 binding/连接/读顺序约束；DSH feedback 包裹已在适配器边界归一化。[评价 CAS 写入基础](rust-agent-ui-feedback-cas-20261020.md)已补齐原目标捕获、一次性 mutation、备注策略和权威冲突恢复，并通过三端真实读写；[独立评价控件与备注编辑器](rust-agent-ui-feedback-controls-20261020.md)现已提供公开 API 和原 binding gesture bridge；现已[挂入正式 Transcript/RunPort 的输出 footnote](rust-agent-ui-feedback-transcript-20261020.md)，包括原 binding 路由、组字/导航屏障及延迟回执隔离；[三端评价专项原生窗口验收](rust-agent-ui-feedback-native-20261020.md)现已补齐自动化点击和原生文本服务路径；完整 Transcript、物理输入法与阅读锚点的证据范围仍单列。
 
 AgentKit 定义业务结构、展示语义、组件组合、组件输入及回调，复用现有 presentation。TekesUI 拥有编辑/撤销/选区/IME/焦点、文字排版、滚动/锚点、通用布局与渲染；AgentKit 只调用其公开接口。宿主提供窗口、总体布局、导航、产品 copy/主题、安装、凭证、路径与系统权限，并执行显式 host capability 回调。不能向宿主转移本应共享的 Agent 状态机或动作策略。
 
@@ -83,15 +85,15 @@ AgentKit 定义业务结构、展示语义、组件组合、组件输入及回�
 
 [三端取消/错误/恢复专项](rust-agent-ui-run-controls-20261020.md)已通过真实窗口 Send、流式中 Cancel、两次重连不重发、公开错误说明的原生 AX 查询及显式恢复。新增共享 latest_failure/failure_message 只读事实，修复 Pi 错误正文丢失、Indicators 只显示 idle，以及 DSH 新执行后旧 operational error 粘滞。基础路径已验收，不扩大为全部错误、队列/工具取消或真实 IME 验收。
 
-[阅读事务候选输入](tekesui-reading-candidate-intake-20261020.md)已核验新包的449文件与压缩包身份；后续[独立回放与正式 Transcript 探针](rust-agent-ui-reading-candidate-20261020.md)已验证预检行身份、追加/前插、A/B 恢复和保留焦点的回到最新。默认8cf固定依赖未替换，完整 RunView 与原生阅读仍待完成，不据此提升/关闭#22。
+[阅读事务候选输入](tekesui-reading-candidate-intake-20261020.md)已核验新包的449文件与压缩包身份；后续[独立回放与正式 Transcript 探针](rust-agent-ui-reading-candidate-20261020.md)已验证预检行身份、追加/前插、A/B 恢复和保留焦点的回到最新。默认8cf固定依赖未替换，完整 RunPort 与原生阅读仍待完成，不据此提升/关闭#22。
 
-[RunView/Composer context 预检修复](rust-agent-ui-context-preflight-20261020.md)防止卡片拒绝后正文部分安装，已通过完整 UI 及正式组件树原生 fixture 专项。完整受控编辑器与阅读事务的可组合预检交由 [TekesUI #26](https://github.com/TekesApps/TekesUI/issues/26)，已有精确公开 API 复现；未在消费侧复制通用校验。
+[RunPort/Composer context 预检修复](rust-agent-ui-context-preflight-20261020.md)防止卡片拒绝后正文部分安装，已通过完整 UI 及正式组件树原生 fixture 专项。完整受控编辑器与阅读事务的可组合预检交由 [TekesUI #26](https://github.com/TekesApps/TekesUI/issues/26)，已有精确公开 API 复现；未在消费侧复制通用校验。
 
-[共享会话列](rust-agent-ui-column-layout-20261020.md)现已接入正式 RunView，提供居中限宽/全宽/非对称边距并保留编辑器和消息身份；完整叠层和回合 rail 仍未完成。
+[共享会话列](rust-agent-ui-column-layout-20261020.md)现已接入正式 RunPort，提供居中限宽/全宽/非对称边距并保留编辑器和消息身份；完整叠层和回合 rail 仍未完成。
 
-[#26 新隔离候选](tekesui-controlled-preflight-candidate-20261020.md)已通过接收方463输入核验、388 controls/168 consumer/严格 Clippy/48场景192帧回放；尚非正式 AgentKit RunView 或原生阅读接入，也不替换默认公开 pin。
+[#26 新隔离候选](tekesui-controlled-preflight-candidate-20261020.md)已通过接收方463输入核验、388 controls/168 consumer/严格 Clippy/48场景192帧回放；尚非正式 AgentKit RunPort 或原生阅读接入，也不替换默认公开 pin。
 
-[正式 RunView 整帧准备与候选阅读事务](rust-agent-ui-run-preflight-20261021.md)提供只读 Agent 参数计划、事务前计划重检与提交重检；七项正式组件候选检查覆盖合法/拒绝更新、旧 token、ABA、迟到清空、组字保留及前插位置。默认宿主与三端原生阅读尚未迁移，未替换公开固定 pin。
+[正式 RunPort 整帧准备与候选阅读事务](rust-agent-ui-run-preflight-20261021.md)提供只读 Agent 参数计划、事务前计划重检与提交重检；七项正式组件候选检查覆盖合法/拒绝更新、旧 token、ABA、迟到清空、组字保留及前插位置。默认宿主与三端原生阅读尚未迁移，未替换公开固定 pin。
 
 ## Composer（首批实现）
 
@@ -132,7 +134,7 @@ AgentKit 定义业务结构、展示语义、组件组合、组件输入及回�
 
 统一方向规则（与当前 Tekes App 对齐）：机器产生的正文、推理、工具、附件、会话提示及对应 footnote 全部靠左；用户输入、用户附件和用户 footnote 全部靠右。用户 footnote 在气泡外，与气泡尾端对齐；机器 footnote 与正文阅读列左边缘对齐。方向按所属消息 lane 判断，用户的送达/失败状态仍随用户 footnote 靠右，独立机器提示靠左。该规则统一用于主会话、任务、子代理和 SideChat，不能在 pane 中另设一套消息方向。这里约束正式视图；现有只读模型与测试宿主不构成视觉验收。
 
-已有 [只读消息分层](rust-agent-ui-transcript-document-20261020.md)：公共 TranscriptDocument 从既有 snapshot 组织 input/output/activity/footnote、保留身份和覆盖事实。它不是渲染组件，正式 Transcript / RunView 的上游门禁与验收范围不变。
+已有 [只读消息分层](rust-agent-ui-transcript-document-20261020.md)：公共 TranscriptDocument 从既有 snapshot 组织 input/output/activity/footnote、保留身份和覆盖事实。它不是渲染组件，正式 Transcript / RunPort 的上游门禁与验收范围不变。
 
 当前 Tekes App/ClientKit 的事实依据（只读对照，未改 Swift）：
 
@@ -166,7 +168,7 @@ AgentKit 定义业务结构、展示语义、组件组合、组件输入及回�
 - 页首加载更早历史、流式追加、工具展开及宽度变化后，向上阅读的位置仍绑定原消息与局部阅读位置；只有处于跟随底部状态时追加才继续跟随。
 - 会话切换分别恢复各自阅读位置；重连与历史回补不重复显示已有消息，不抢焦点或清除选区。分页的 loading/error/retry 使用共享状态，重试由用户显式触发。
 
-当前 `RunSurface` 中将消息串成单一文本的 `History` 仅用于协议与阅读 API 测试，不满足上述布局，也不作为正式 Transcript 或 RunView 的实现基础。
+当前 `RunSurface` 中将消息串成单一文本的 `History` 仅用于协议与阅读 API 测试，不满足上述布局，也不作为正式 Transcript 或 RunPort 的实现基础。
 
 ### 当前基础能力与阻塞
 
@@ -175,13 +177,13 @@ AgentKit 定义业务结构、展示语义、组件组合、组件输入及回�
 - [TekesUI #25](https://github.com/TekesApps/TekesUI/issues/25) 新增：可选中富内容 Component、受控流式更新与原生文本映射。现有 MarkdownView 提供有界 Markdown 被动绘制，不能据此宣称已有可选中富内容组合接口。当前源码文字显示和显式原始数据详情保留内容，富内容样式继续待接入。
 - #23 的无表单只读 Content API 已由当前固定 8cf 后继实际消费。原61dd候选的注册失败保留在[历史评估](tekesui-issue23-public-review-20261020.md)，后继的通过证据见[独立复验](tekesui-issue23-ci-review-20261020.md)，不再列作当前纯文本阻塞。
 
-基础能力由 TekesUI 实现；收到公开不可变版本后显式升级并验证，不跟随活跃 WIP。AgentKit 自身仍需完成消息组合、stream 到 durable 的可靠阅读身份关联、其余 footnote 动作、正式 Transcript/RunView 和 pane 消息接入，不把这些工作归为上游阻塞。
+基础能力由 TekesUI 实现；收到公开不可变版本后显式升级并验证，不跟随活跃 WIP。AgentKit 自身仍需完成消息组合、stream 到 durable 的可靠阅读身份关联、其余 footnote 动作、正式 Transcript/RunPort 和 pane 消息接入，不把这些工作归为上游阻塞。
 
-## RunView（实验组合已实现）
+## RunPort（实验组合已实现）
 
-RunView 组合正式 Composer / Transcript / Indicators，拥有 Agent 组件间意图路由；不拥有窗口、其他产品导航或第二套 Run 状态机。异步通知继续订阅已有 presentation，通过公开 WindowWake 唤醒。
+RunPort 组合正式 Composer / Transcript / Indicators，拥有 Agent 组件间意图路由；不拥有窗口、其他产品导航或第二套 Run 状态机。异步通知继续订阅已有 presentation，通过公开 WindowWake 唤醒。
 
-当前公开 [`RunView`](rust-agent-ui-run-view-20261020.md) 已组合 Composer、Indicators、分页、问答和可安装的混合内容树，提供同帧 update 与类型化意图出口。实验主会话和可写 pane 已复用它，第二 consumer 可独立构造；RunSurface / ComponentDemo 仍仅作测试宿主。完整 Transcript/RunView 验收尚未通过：可靠 stream-to-durable 关联、#22 阅读/分页锚点、#25 富内容及物理 IME/完整三端原生 UX 仍需完成。
+当前公开 [`RunPort`](rust-agent-ui-run-view-20261020.md) 已组合 Composer、Indicators、分页、问答和可安装的混合内容树，提供同帧 update 与类型化意图出口。实验主会话和可写 pane 已复用它，第二 consumer 可独立构造；RunSurface / ComponentDemo 仍仅作测试宿主。完整 Transcript/RunPort 验收尚未通过：可靠 stream-to-durable 关联、#22 阅读/分页锚点、#25 富内容及物理 IME/完整三端原生 UX 仍需完成。
 
 ## Sidebar（首批实现）
 
@@ -221,13 +223,13 @@ pane 内容用独立 namespace 的 Kit Component 组合：
 
 `SummaryView` 是实际可独立挂载的内容组件。`SummaryInput` 接收现有 SummaryFacts（与 scope 严格匹配）和显式 host sections。章节、membership、总量、cost 覆盖及动作直接来自 SummaryFacts.sections / append_summary_sections；渲染层不重新计算业务规则。已知 0 保留，成本不完整保持未知。`SummaryIntent` 携带原 scope 与原 SummaryAction，产物交显式宿主能力打开，不直接读文件。SummaryView 已在真实 SidePanel 内容 slot 中验证动作回传。
 
-任务详情、子代理与 SideChat 的正式 Run 内容仍要由正式 RunView 接上，当前没有把占位文案当成这些业务视图交付。既有 TaskPanelState、ChildRun、SideChatController 继续是状态权威，不迁移进 tab 容器。
+任务详情、子代理与 SideChat 的正式 Run 内容仍要由正式 RunPort 接上，当前没有把占位文案当成这些业务视图交付。既有 TaskPanelState、ChildRun、SideChatController 继续是状态权威，不迁移进 tab 容器。
 
 ## Runtime 绑定（首批实现）
 
 独立 `tekes-agent-ui-bindings` 包提供 `RunBinding`，只连接现有 runtime/presentation 与组件生命周期。详见 [绑定接入说明](../ui/bindings/README.md)。主会话、已解析任务、独立子代理和 SideChat 保留各自历史观察；Native 同 session 有界子历史只返回只读 Transcript，不伪造主会话 Composer，也不回退父历史。独立子代理必须传直接 parent；嵌套 parent 的 receiving session 不等同于导航 thread root。
 
-SideChat 的创建/关闭/取消至 Unknown、显式 reconciliation 均通过现有 controller 的新订阅通知；读取 snapshot 和失败的无变化查询不触发通知。绑定按当前 pointer 归属计算控件 gate，发送在 admission 前和宿主 preparation 返回后重新检查；pointer 移除后返回 Missing，宿主需卸载 pane body。该绑定不代替正式 RunView；主会话及任务、独立子代理、SideChat 绑定已接入 `--components` 原生 Composer/Indicators 验证窗口；各 pane 的正式 Transcript/RunView 尚未接入。
+SideChat 的创建/关闭/取消至 Unknown、显式 reconciliation 均通过现有 controller 的新订阅通知；读取 snapshot 和失败的无变化查询不触发通知。绑定按当前 pointer 归属计算控件 gate，发送在 admission 前和宿主 preparation 返回后重新检查；pointer 移除后返回 Missing，宿主需卸载 pane body。该绑定不代替正式 RunPort；主会话及任务、独立子代理、SideChat 绑定已接入 `--components` 原生 Composer/Indicators 验证窗口；各 pane 的正式 Transcript/RunPort 尚未接入。
 
 Task tab 以 task ID 为稳定身份，scope 是可更新的内容输入。TaskPanelState 的 loading/missing/error 原样传入；pointer 更新保持 header ID，但淘汰旧 body/mount token，旧结果不得覆盖新源。
 
@@ -241,21 +243,21 @@ Task tab 以 task ID 为稳定身份，scope 是可更新的内容输入。TaskP
 
 最新 [SideChat 接入记录](rust-agent-ui-sidechat-20261019.md) 与 [机器收据](rust-agent-ui-sidechat-20261019.json) 覆盖共享 pointer 绑定、独立 Composer/Indicators、创建/发送/取消关闭、Unknown 保留与父草稿隔离。本地 root 104、UI 74、工具 18 tests 通过，三端协议与组件到 GPU 路径复验通过；正式 Transcript 与完整原生交互仍不在这些通过项内。
 
-最新 [Sidebar 操作接入记录](rust-agent-ui-thread-actions-20261019.md) 覆盖 ThreadRename、分叉导航、归档空选择与子代理 owner 归档刷新。基线 v0.3.8；root 105、UI 88、工具 18 tests 和局部原生回归通过，正式 Transcript/RunView 仍未完成。
+最新 [Sidebar 操作接入记录](rust-agent-ui-thread-actions-20261019.md) 覆盖 ThreadRename、分叉导航、归档空选择与子代理 owner 归档刷新。基线 v0.3.8；root 105、UI 88、工具 18 tests 和局部原生回归通过，正式 Transcript/RunPort 仍未完成。
 
 | 要求 | 当前已验证范围 | 仍需完成 |
 |---|---|---|
-| Composer / Indicators | 原 RunView 中复用 presentation；草稿、发送/取消、入口与捕获来源、unknown/partial 状态；已有局部真实三端和原生窗口证据按各自程序解释 | 其余设置/附件 pane 组合、完整 Source 布局与交互/语义、物理输入及配对视觉 |
-| Transcript / RunView | 正式混合 Content、原 SDK reading/reveal 事务；分页20→44、流式/工具增长/重排、A/B保留阅读与重连、Start/Latest、原焦点/组字；真实三端历史/流式证据保留原程序归属 | #25富内容、#42 fresh-host持久阅读、#46结构化hover、完整footnote/rail显示规则和配对视觉；剩余真实多消息有界child组合 |
+| Composer / Indicators | 原 RunPort 中复用 presentation；草稿、发送/取消、入口与捕获来源、unknown/partial 状态；已有局部真实三端和原生窗口证据按各自程序解释 | 其余设置/附件 pane 组合、完整 Source 布局与交互/语义、物理输入及配对视觉 |
+| Transcript / RunPort | 正式混合 Content、原 SDK reading/reveal 事务；分页20→44、流式/工具增长/重排、A/B保留阅读与重连、Start/Latest、原焦点/组字；真实三端历史/流式证据保留原程序归属 | #25富内容、#42 fresh-host持久阅读、#46结构化hover、完整footnote/rail显示规则和配对视觉；剩余真实多消息有界child组合 |
 | Sidebar | 原 inventory/search/folder/pin服务、共享操作、选中行补入与自动reveal；部分原生fixture与重挂载/过期请求fencing | #44原行上下文触发、完整列表阅读生命周期、剩余真实三端/目录/活动组合及整体布局验收 |
-| SidePanel / Summary | 共享pane状态与原RunView/只读内容、投影ready与生命周期、host clearance、Run/Workspace Summary、可选择文字、用量列、自定义host Content、header单行/焦点/repository分隔规则；child状态来源、源标题带/普通metadata/用量首行对齐及格式化publication校验及显式 owner/层级缩进已补 | #36/#5 toolbar、#45语义Panel、#47图标/不定状态附件、#30只读留白路由、#25语义runs、#38展开指示；默认行 leading/tone、具体产品行、完整tab/chrome和配对视觉 |
+| SidePanel / Summary | 共享pane状态与原RunPort/只读内容、投影ready与生命周期、host clearance、Run/Workspace Summary、可选择文字、用量列、自定义host Content、header单行/焦点/repository分隔规则；child状态来源、源标题带/普通metadata/用量首行对齐及格式化publication校验及显式 owner/层级缩进已补 | #36/#5 toolbar、#45语义Panel、#47图标/不定状态附件、#30只读留白路由、#25语义runs、#38展开指示；默认行 leading/tone、具体产品行、完整tab/chrome和配对视觉 |
 | 第二公开 API consumer | 当前UI workspace含独立consumer；公开inputs/queries/actions、原SDK text/reveal及host适配、child状态更新保留原pointer | 完整目标的组合体验与宿主验收，不能以编译/局部组件测试代替 |
 | 原生 / 三 harness | 当前窗口验收及系统拼音软件输入；真实Native/Pi/DSH协议/阅读/流式保留各自program scope | 新child状态在真实三端的验收、Native0.9.3 lifecycle/archive已知未过项、实体键盘/候选窗/VoiceOver与整体体验 |
 | review / CI / merge / tag | PR #10仍为实验草稿，增量提交分别检查CI；本地验证和最终程序收据见各阶段文档 | 完整要求逐项审计、review、最终CI、合并和新阶段tag；整体目标尚未完成 |
 
 既有三端 test-harness 到 GPU 记录继续有效，但它不是正式业务组件树的原生窗口验收，也不是以上全部组件已完成的证据。目标保持 active，不因初步测试通过提前收口。
 
-最新的 [Composer/Indicators 原生接入记录](rust-agent-ui-native-controls-20261019.md) 进一步验证了实际公共组件与绑定的原生窗口和三端数据到 GPU 路径。该证据与原 RunSurface 测试路径分开，不提升尚未实现的 Transcript/RunView 或物理 IME 验收状态。
+最新的 [Composer/Indicators 原生接入记录](rust-agent-ui-native-controls-20261019.md) 进一步验证了实际公共组件与绑定的原生窗口和三端数据到 GPU 路径。该证据与原 RunSurface 测试路径分开，不提升尚未实现的 Transcript/RunPort 或物理 IME 验收状态。
 
 首批本地 gate（2026-10-19）：主 workspace 103 tests、UI workspace 42 tests（其中新增 4 个正式 Composer controller 用例、1 个 Indicators 用例、1 个第二 consumer 挂载用例），root/UI strict all-targets Clippy、fmt 与依赖边界通过。旧测试宿主在共享 delegate 提取后仍可构建并生成 GPU PNG；该图不证明正式组件原生窗口已验收。当前代码仍未提交/发布，TekesUI 的固定 188 输入重查一致。
 
@@ -265,27 +267,27 @@ Task tab 以 task ID 为稳定身份，scope 是可更新的内容输入。TaskP
 
 最新 [附件三端验收](rust-agent-ui-upload-three-20261020.md) 通过原 Composer 入口和绑定分别验证正文＋附件、纯附件发送、单条持久化输入和重连无重复；Native/Pi 公开字节回读与会话隔离通过。Pi 历史保留路径引用，Native/DSH 保留文件元数据；DSH 通用文件下载不支持，不借用图片接口或读取私有文件。此为数据/离屏证据，真实系统选择器证据仍单列，正式 Transcript 与阅读/分页未完成。
 
-最新 [SidePanel 附件记录](rust-agent-ui-pane-uploads-20261020.md) 接入任务、独立子代理与 SideChat 的同一选择/上传/状态路径，按原 binding/request 保留状态，区别同地址的独立 authority；关闭/换源后显示单独保留区，不回落父草稿。7 项新增 fixture 用例及真实本地 fixture 原生窗口证明分层记录；有界历史与独立单次子代理不提供上传。三端 Main 数据路径已复验，不冒充三端 pane 全部验收；正式 Transcript/RunView、预览/对账等完整目标仍未完成。
+最新 [SidePanel 附件记录](rust-agent-ui-pane-uploads-20261020.md) 接入任务、独立子代理与 SideChat 的同一选择/上传/状态路径，按原 binding/request 保留状态，区别同地址的独立 authority；关闭/换源后显示单独保留区，不回落父草稿。7 项新增 fixture 用例及真实本地 fixture 原生窗口证明分层记录；有界历史与独立单次子代理不提供上传。三端 Main 数据路径已复验，不冒充三端 pane 全部验收；正式 Transcript/RunPort、预览/对账等完整目标仍未完成。
 
 最新 [文件预览接入记录](rust-agent-ui-file-preview-20261020.md) 增加原会话公开读取绑定、逐文件 Composer 入口和宿主系统预览适配；Native/Pi 字节回读与 DSH 禁用已实测。原生宿主入口/读取/查看器进程启动已验证，Quick Look 内容视觉验收仍未完成；历史附件预览仍依赖正式 Transcript。
 
-最新 [推理强度接入记录](rust-agent-ui-reasoning-20261020.md) 复用模型目录、ComposerChoices 与 settings/Send 路径，补齐公开档位选择、未知/缺能力及发送前验证。158 项 UI tests、第二 consumer、Native/Pi 档位配置回执和本地 fixture 原生交互通过；DSH 按本轮目录保持无档位入口，完整原生/物理 IME 及正式 Transcript/RunView 仍未完成。
+最新 [推理强度接入记录](rust-agent-ui-reasoning-20261020.md) 复用模型目录、ComposerChoices 与 settings/Send 路径，补齐公开档位选择、未知/缺能力及发送前验证。158 项 UI tests、第二 consumer、Native/Pi 档位配置回执和本地 fixture 原生交互通过；DSH 按本轮目录保持无档位入口，完整原生/物理 IME 及正式 Transcript/RunPort 仍未完成。
 
 真实中文 IME 验收步骤、证据要求及本轮未进入可确认组字的自动化尝试见 [原生 IME 验收](rust-agent-ui-ime-acceptance.md)。当前提交的 5 项原生窗口回归通过，但使用注入文本服务；不提升为真实输入法、正式 Transcript 或阅读锚点通过。
 
 等待交互审查发现并修正 DSH 共享 actionable 回答信封适配，见 [SEP 对齐记录](session-endpoints.md#dsh-actionable-回答信封对齐2026-10-20)。真实 DSH 问题→回答→tool result→settle 已通过；Indicators 当前仍只显示等待事实，公开 actionable 业务组件及其原生 UI 仍待实现，不能据此认为该交互已交付。
 
-最新 [首批 actionable 接入](rust-agent-ui-actionables-20261020.md) 增加共享审批/单选问题的公共卡片、原来源一次响应绑定和宿主回调；原生 fixture 与 9 项新测试验证回应、失效、重复点击、组字和离屏晚失败。复杂表单、自定义/secret 输入、显式对账及三端各自的 actionable UI 仍未完成，不提升正式 RunView/Transcript 的交付状态。
+最新 [首批 actionable 接入](rust-agent-ui-actionables-20261020.md) 增加共享审批/单选问题的公共卡片、原来源一次响应绑定和宿主回调；原生 fixture 与 9 项新测试验证回应、失效、重复点击、组字和离屏晚失败。复杂表单、自定义/secret 输入、显式对账及三端各自的 actionable UI 仍未完成，不提升正式 RunPort/Transcript 的交付状态。
 
 三端公开问答卡片的 Composer → 卡片 → 原 scope 回传 → 后续发送 → 新 epoch 历史恢复已完成局部联调，见 [三端问答记录](rust-agent-ui-actionables-live-20261020.md)。该证据不扩展为正式 Transcript、物理 IME 或真实审批验收。
 
-Transcript 现已保留公开来源位置并提供 [事件顺序输入](rust-agent-ui-transcript-order-20261020.md)：已知事件与未定位预览分开，结果不反推调用位置。它不是完整块级内容布局；正式 Transcript/RunView、阅读/分页与原生验收仍未完成。
+Transcript 现已保留公开来源位置并提供 [事件顺序输入](rust-agent-ui-transcript-order-20261020.md)：已知事件与未定位预览分开，结果不反推调用位置。它不是完整块级内容布局；正式 Transcript/RunPort、阅读/分页与原生验收仍未完成。
 
-独立公开 [TranscriptPaging 控件](rust-agent-ui-paging-controls-20261020.md) 组合默认 TekesUI 按钮与状态文字，并复用原 binding 的一次性分页请求、原 scope 回执及 canonical has-more/stale。主会话和可写 pane 的测试宿主已接入，完整 Transcript/RunView 和阅读锚点仍待上游公开能力及原生验收。
+独立公开 [TranscriptPaging 控件](rust-agent-ui-paging-controls-20261020.md) 组合默认 TekesUI 按钮与状态文字，并复用原 binding 的一次性分页请求、原 scope 回执及 canonical has-more/stale。主会话和可写 pane 的测试宿主已接入，完整 Transcript/RunPort 和阅读锚点仍待上游公开能力及原生验收。
 
 文档的已落盘 native 消息改用公开 NativeEntry key，修复同时间戳历史前插时 timeline occurrence 改变造成的身份换绑，见[消息身份修正](rust-agent-ui-native-message-identity-20261020.md)。底层 Item ID 和流式行为保持兼容；无 entry 的临时流不能冒充持久阅读身份。可靠的流/记录阅读目标迁移仍属于 AgentKit 后续工作，并非仅等待 TekesUI 即可完成。
 
-TekesUI #23 后继公开 8cf0840 已独立通过注册/API、实际八包输入闭包、隔离 AgentKit workspace 与有界原生选择/复制/追加/父滚动验证，见[CI 后继消费评估](tekesui-issue23-ci-review-20261020.md)。现已接入实验 UI workspace，原 431 基线及历史验收收据保留；没有将 #23 的局部技术接收扩展成 #22、物理 IME 或完整 Transcript/RunView 完成。
+TekesUI #23 后继公开 8cf0840 已独立通过注册/API、实际八包输入闭包、隔离 AgentKit workspace 与有界原生选择/复制/追加/父滚动验证，见[CI 后继消费评估](tekesui-issue23-ci-review-20261020.md)。现已接入实验 UI workspace，原 431 基线及历史验收收据保留；没有将 #23 的局部技术接收扩展成 #22、物理 IME 或完整 Transcript/RunPort 完成。
 
 Native [消息生命周期边界修正](rust-agent-ui-native-stream-boundary-20261020.md) 防止同时间戳的新预览覆盖持久消息，并在刷新快照时原子保留 Pi 的 message_end 原因；消息结束不等同于 Agent/turn 结算。它不生成流到持久记录的阅读别名，完整 UI/阅读验收继续独立保留。
 
@@ -293,21 +295,21 @@ Native [消息生命周期边界修正](rust-agent-ui-native-stream-boundary-202
 
 已补 [分页读取回执](rust-agent-ui-history-paging-20261020.md)：原 binding/epoch 的 Loading、Failed、Interrupted 与显式重试，复用现有 runtime / ChildRun 页合并。正式分页控件、文档安装与阅读锚点事务仍未完成。
 
-首个实际内容行 [`InputMessage`](rust-agent-ui-input-message-20261020.md) 只组合 TekesUI 默认 Surface、只读正文及 caption，用户正文气泡和外置 footnote 右对齐；浅深色、短输入收窄、长中文重排使用库的公开文字服务验证。最初纯文本验收收据保持原范围；当前已增加附件/原始信息详情，见下方内容树接入记录，仍不是完整 Transcript / RunView。
+首个实际内容行 [`InputMessage`](rust-agent-ui-input-message-20261020.md) 只组合 TekesUI 默认 Surface、只读正文及 caption，用户正文气泡和外置 footnote 右对齐；浅深色、短输入收窄、长中文重排使用库的公开文字服务验证。最初纯文本验收收据保持原范围；当前已增加附件/原始信息详情，见下方内容树接入记录，仍不是完整 Transcript / RunPort。
 
-[`OutputMessage`](rust-agent-ui-output-message-20261020.md) 现可独立挂载机器正文、推理与工具引用的局部展开层；按 canonical blocks 顺序消费，同一个正文控件在流式更新时保留选区。附件/未知块以明确的原始数据详情保留，Markdown 当前仍是源码文字；这是 Transcript 内容层进展，完整 Transcript / RunView、turn footnote 与混合阅读仍未完成。
+[`OutputMessage`](rust-agent-ui-output-message-20261020.md) 现可独立挂载机器正文、推理与工具引用的局部展开层；按 canonical blocks 顺序消费，同一个正文控件在流式更新时保留选区。附件/未知块以明确的原始数据详情保留，Markdown 当前仍是源码文字；这是 Transcript 内容层进展，完整 Transcript / RunPort、turn footnote 与混合阅读仍未完成。
 
 当前 [`TurnFootnote`](rust-agent-ui-turn-footnote-20261020.md) 已接入 turn 级状态、provider 用量、毫秒时间戳的区间换算与共享完成回合 Fork。动作目录移入同一 presentation，Web 与 RunSnapshot 共用；原来源 ticket 在派发前再检查 pointer、epoch、边界和能力，已知完成可再次显式操作，Unknown 不自动重试。三端真实分叉/历史恢复、原生 footnote 点击和完整 fixture 回归通过；这不等于已交付其余 footnote 能力或完整 Transcript。
 
 本轮还修正了原生测试宿主在 SideChat 撤销中重复读取快照的竞态：同一次 Composer/Indicators/actionable/paging 刷新消费同一 RunSnapshot，page receipt 必须匹配其 epoch。撤销后保留的旧快照只可读，不能因此恢复动作。新增确定性测试和此前失败的完整原生场景均已通过。
 
 
-当前 [`TranscriptContent`](rust-agent-ui-transcript-tree-20261020.md) 将 InputMessage、OutputMessage、独立 ToolActivity 和 TurnFootnote 组合成公开内容树。源事件决定顺序，未定位内容明确单列；用户附件 → 正文气泡 → 外置 caption 均靠右，机器内容及 aside 靠左。纯附件不挂空正文文本目标。NativeEntry 和显式 submission receipt 保留既有控件；重复认领同一 receipt 会在修改前拒绝。实验宿主仅套用 TekesUI 的 ScrollContent；没有自行实现阅读状态或滚动补偿，完整 Transcript / RunView、#22 混合锚点与 #25 富内容仍待完成。
+当前 [`TranscriptContent`](rust-agent-ui-transcript-tree-20261020.md) 将 InputMessage、OutputMessage、独立 ToolActivity 和 TurnFootnote 组合成公开内容树。源事件决定顺序，未定位内容明确单列；用户附件 → 正文气泡 → 外置 caption 均靠右，机器内容及 aside 靠左。纯附件不挂空正文文本目标。NativeEntry 和显式 submission receipt 保留既有控件；重复认领同一 receipt 会在修改前拒绝。实验宿主仅套用 TekesUI 的 ScrollContent；没有自行实现阅读状态或滚动补偿，完整 Transcript / RunPort、#22 混合锚点与 #25 富内容仍待完成。
 
 
 [ReadOnlyTranscript](rust-agent-ui-readonly-child-20261020.md) 已将 Native 有界子历史接入实际内容树、只读 source-call 详情和显式刷新/分页，不再仅显示数量。原绑定在 await 前分配 publication 并校验 epoch/存活；旧结果和旧页意图不能覆盖新 frame/获得新连接权限。读取回调一次性 admission，仍不构造可写 Run/Composer。组件、第二 consumer、原生多页消息渲染和真实 Native child 到 GPU 分层验证；混合阅读锚点/富内容/物理 IME 与完整 Run/Transcript 仍未完成。
 
-[实际回合轨道组件](rust-agent-ui-turn-rail-controls-20261021.md)已接入原 RunView 的事件捕获、独立库滚动和生命周期隔离；当时8cf默认输入明确unsupported；当前1294的基础reading/reveal/Start已公开，#29隔离候选记录与#33需求仍需按实际消费范围核对，尚不构成完整轨道或稳定 UI 交付。
+[实际回合轨道组件](rust-agent-ui-turn-rail-controls-20261021.md)已接入原 RunPort 的事件捕获、独立库滚动和生命周期隔离；当时8cf默认输入明确unsupported；当前1294的基础reading/reveal/Start已公开，#29隔离候选记录与#33需求仍需按实际消费范围核对，尚不构成完整轨道或稳定 UI 交付。
 
 [#32 普通回合 Start 的独立组件验证](rust-agent-ui-turn-start-20261021.md)已在新588277候选通过真实clip与高输入行检查；当前1294已包含Start；当前正式桥接及验收见文首公开版本记录；整体体验仍待完成。
 

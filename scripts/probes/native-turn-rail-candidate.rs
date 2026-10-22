@@ -1,8 +1,8 @@
-//! Candidate-only native host diagnostic over the actual original RunView.
+//! Candidate-only native host diagnostic over the actual original RunPort.
 //! Original rail pointer activation returns to latest while AppKit preedit is active.
 //! An explicit #32 adapter adds ordinary Start; focus-ring visuals remain #33.
 use super::*;
-use tekes_agent_components_ui::{RunTurnNavigationKind, RunView};
+use tekes_agent_components_ui::{RunTurnNavigationKind, RunPort};
 use tekes_ui_controls::{
     ReadingDocumentVersion, ScrollRevealOptions, ScrollRevealPlacement,
     composition::{ContentRevealStatus, ScrollContent},
@@ -63,12 +63,12 @@ impl Probe {
     fn root(host: &Host) -> ComponentId {
         ComponentId(host.view.ids().root.0 + 16)
     }
-    fn run(host: &Host) -> &RunView {
+    fn run(host: &Host) -> &RunPort {
         host.view
             .tree
             .get(Self::root(host))
             .unwrap()
-            .component::<RunView>()
+            .component::<RunPort>()
             .unwrap()
     }
     fn scroll(host: &Host) -> &ScrollContent {
@@ -202,7 +202,7 @@ impl Probe {
                 .tree
                 .get_mut(root)
                 .unwrap()
-                .component_mut::<RunView>()
+                .component_mut::<RunPort>()
                 .unwrap();
             // In this fixture following is used only at exact latest or after
             // the explicit Start/Centered has completed far from the tail.
@@ -240,7 +240,7 @@ impl Probe {
                     .tree
                     .get_mut(root)
                     .unwrap()
-                    .component_mut::<RunView>()
+                    .component_mut::<RunPort>()
                     .unwrap()
                     .turn_rail_mut()
                     .unwrap()
@@ -296,7 +296,7 @@ impl Probe {
                     .tree
                     .get_mut(root)
                     .unwrap()
-                    .component_mut::<RunView>()
+                    .component_mut::<RunPort>()
                     .unwrap()
                     .set_rail_navigation_gate(tekes_agent_components_ui::TurnRailNavigationGate {
                         turn_start: ordinary_turn_mode(),
@@ -452,7 +452,7 @@ impl Probe {
     pub fn receipt(&self, host: &Host) -> serde_json::Value {
         assert_eq!(self.phase, 7);
         self.check_editor(host);
-        serde_json::json!({"nativeWindow":true,"actualRunView":true,"originalBackend":true,"secondPublicConsumer":false,
+        serde_json::json!({"nativeWindow":true,"actualRunPort":true,"originalBackend":true,"secondPublicConsumer":false,
             "programmaticItemNavigation":!ordinary_turn_mode(),"hostHistoryJumps":self.history.jumps.len(),"hostPendingRevealsTaken":self.history.takes.len(),"interactiveLatestRail":true,"railPointerDispatches":self.rail_dispatches,"keyboardRingVisualAccepted":false,"clientkitTurnStartAlignment":ordinary_turn_mode(),"initialAndExplicitLatest":true,"syntheticAppKitPreeditPreserved":true,
             "originalEditorAndBaseline":true,"noSubmission":true,"realHarness":false,"physicalIme":false,"interactiveRail":true,"ordinaryTurnStart":ordinary_turn_mode(),"markedSelectionPreserved":ordinary_turn_mode(),"voiceOver":false})
     }
@@ -486,7 +486,7 @@ pub(super) fn dispatch(
         .tree
         .get(root)
         .unwrap()
-        .component::<RunView>()
+        .component::<RunPort>()
         .unwrap();
     let kind = if ordinary_turn_mode() {
         view.claim_turn_navigation_with_host(

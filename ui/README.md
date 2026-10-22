@@ -1,5 +1,7 @@
 # Rust Run demo（开发试点）
 
+正式共享组合名为 **RunPort**；Sidebar、RunPort、SidePanel 的目标宿主接口是 TekesUI ProcessContainer。当前保留原同进程 Content 路径，远端输入/IME/滚动/AX 等待 [TekesUI #48](https://github.com/TekesApps/TekesUI/issues/48)。[迁移说明与验收矩阵](../docs/rust-agent-ui-run-port-20261022.md)区分 API 改名、同进程运行与尚未完成的跨进程接入。
+
 只消费 TekesUI，复用 AgentKit v0.3.8 的 `SessionRuntime` / `RunController` / `RunSnapshot`。
 组件层不实现另一套 Run 状态机。默认 headless workspace 和发布 API 保持独立。
 
@@ -11,15 +13,15 @@
 
 ## 正式组件开发
 
-`RunSurface` 仅是现有协议/控件测试宿主，不是标准 RunView。正式组件契约、App 的 input/output/footnote 布局、基础 Issue 和完整交付账本见 [Rust Agent UI 接入契约](../docs/rust-agent-ui-contract.md)。
+`RunSurface` 仅是现有协议/控件测试宿主，不是标准 RunPort。正式组件契约、App 的 input/output/footnote 布局、基础 Issue 和完整交付账本见 [Rust Agent UI 接入契约](../docs/rust-agent-ui-contract.md)。
 
-可独立挂载的组件包括 Composer、ComposerNotice、ComposerContext、ComposerChoices、AnnotationEditor、ComposerUploads、Indicators、Sidebar、ThreadRename、SidePanel、SummaryView、InputMessage、OutputMessage、TurnFootnote、TranscriptContent、ReadOnlyTranscript 和 RunView。它们使用同一套共享 presentation；RunSurface/ComponentDemo 是测试与接入宿主。主会话和可写 pane 已挂载 RunView，有界子历史使用 ReadOnlyTranscript；完整 Transcript 的阅读锚点、富内容与最终体验验收仍待完成。
+可独立挂载的组件包括 Composer、ComposerNotice、ComposerContext、ComposerChoices、AnnotationEditor、ComposerUploads、Indicators、Sidebar、ThreadRename、SidePanel、SummaryView、InputMessage、OutputMessage、TurnFootnote、TranscriptContent、ReadOnlyTranscript 和 RunPort。它们使用同一套共享 presentation；RunSurface/ComponentDemo 是测试与接入宿主。主会话和可写 pane 已挂载 RunPort，有界子历史使用 ReadOnlyTranscript；完整 Transcript 的阅读锚点、富内容与最终体验验收仍待完成。
 
-[独立阅读事务候选联调](../docs/rust-agent-ui-reading-candidate-20261020.md)提供正式 Transcript 的预检行 ID API 和显式隔离回放命令；不替换默认 pin，尚未接入完整 RunView 或完成原生阅读验收。
+[独立阅读事务候选联调](../docs/rust-agent-ui-reading-candidate-20261020.md)提供正式 Transcript 的预检行 ID API 和显式隔离回放命令；不替换默认 pin，尚未接入完整 RunPort 或完成原生阅读验收。
 
-正式 RunView 的 [共享会话列](../docs/rust-agent-ui-column-layout-20261020.md)使用公开 `RunColumnLayout` 配置限宽、全宽或子 pane 边距，改布局不替换原组件。
+正式 RunPort 的 [共享会话列](../docs/rust-agent-ui-column-layout-20261020.md)使用公开 `RunColumnLayout` 配置限宽、全宽或子 pane 边距，改布局不替换原组件。
 
-[RunView 整帧准备](../docs/rust-agent-ui-run-preflight-20261021.md)公开只读业务计划与提交重检；正式组件已在独立 TekesUI #26 候选中验证阅读事务，默认宿主仍待迁移。
+[RunPort 整帧准备](../docs/rust-agent-ui-run-preflight-20261021.md)公开只读业务计划与提交重检；正式组件已在独立 TekesUI #26 候选中验证阅读事务，默认宿主仍待迁移。
 
 可选的[系统拼音软件探针](../docs/rust-agent-ui-system-ime-20261020.md)使用 `python3 scripts/test-system-ime.py --demo ui/target/debug/tekes-agent-ui-demo`（在仓库根目录执行）。它要求当前已选简体拼音和已有事件权限，不改变输入源，只向自己启动的 fixture 进程发送键码；通过真实 marked text、发送/导航屏障、确认和单次提交检查。实体键盘、候选窗视觉和完整 IME 验收仍未完成。
 
@@ -164,7 +166,7 @@ Sidebar 重命名、分叉和归档通过共享 dispatcher 接入，归档后显
 
 SidePanel 附件共享相同选择/上传/状态组件，按原 binding/request 保留；关闭来源后的回执不会进入父草稿。同 session 地址不同 controller 的操作也不会合并。有界子历史与独立 one-shot 子代理不提供上传。原生选择器与源替换测试分层证据见 [SidePanel 附件记录](../docs/rust-agent-ui-pane-uploads-20261020.md)。
 
-正式 Transcript 前的公共 `TranscriptDocument` 只读组织消息、工具及 footnote lanes，保留已有身份/覆盖事实，第二 consumer 直接使用。它不含渲染或阅读控制器，不改变 Transcript/RunView 尚未交付的状态。见 [数据模型与证据](../docs/rust-agent-ui-transcript-document-20261020.md)。
+正式 Transcript 前的公共 `TranscriptDocument` 只读组织消息、工具及 footnote lanes，保留已有身份/覆盖事实，第二 consumer 直接使用。它不含渲染或阅读控制器，不改变 Transcript/RunPort 尚未交付的状态。见 [数据模型与证据](../docs/rust-agent-ui-transcript-document-20261020.md)。
 
 `--components --session-notice-fixture --offscreen <PNG>` 只验证合法无 turn 提示进入文档出口，`documentProjection.sessionNotices` 必须为 1；不是正式提示卡片的视觉验收。
 
@@ -182,12 +184,12 @@ SidePanel 附件共享相同选择/上传/状态组件，按原 binding/request 
 
 `TurnFootnote` 独立组合 turn 的次级信息及共享动作，保持在机器正文外靠左。`TurnActionDispatcher` / `TurnActionRequest` 绑定原 RunBinding 与稳定 RPC ID，已知拒绝/完成可由下一次显式点击继续，未知结果保留禁用。新建分叉的导航始终由宿主核对原导航 token 后决定。
 
-`--components --input-message-proof --output-message-proof --turn-footnote-proof` 显示独立内容行和 turn aside；`--turn-fork-proof --offscreen /tmp/footer.png` 明确启用一次分叉验证。真实端点脚本的 `--ui-turn-footnote` 只在隔离临时会话中验证同一动作链；这些 opt-in 探针不是正式 Transcript / RunView。接入、限制和分层证据见 [turn footnote](../docs/rust-agent-ui-turn-footnote-20261020.md)。
+`--components --input-message-proof --output-message-proof --turn-footnote-proof` 显示独立内容行和 turn aside；`--turn-fork-proof --offscreen /tmp/footer.png` 明确启用一次分叉验证。真实端点脚本的 `--ui-turn-footnote` 只在隔离临时会话中验证同一动作链；这些 opt-in 探针不是正式 Transcript / RunPort。接入、限制和分层证据见 [turn footnote](../docs/rust-agent-ui-turn-footnote-20261020.md)。
 
 
 `TranscriptContent` 是公开的混合内容组件，组合规范化 InputMessage / OutputMessage / ToolActivity / TurnFootnote。用户附件位于正文气泡上方，外置 caption 在下方，整体右对齐；机器内容左对齐。样式直接继承默认 TekesUI 组件、tokens 与宿主主题，升级固定 UI 版本后统一体现，不维护 AgentKit 样式副本。
 
-用户文本的外置复制按钮通过 `TranscriptCopyIntent` 捕获原消息文本，RunView 返回 `CopyTranscript`，只读组件单独提供 `take_copy_intents`。宿主按事件顺序、一次 `claim()` 后写系统剪贴板；离线和只读不会禁用已有文本复制。纯附件不提供文本复制。接入、状态边界与本轮失败/成功证据见[输入复制记录](../docs/rust-agent-ui-input-copy-20261020.md)。
+用户文本的外置复制按钮通过 `TranscriptCopyIntent` 捕获原消息文本，RunPort 返回 `CopyTranscript`，只读组件单独提供 `take_copy_intents`。宿主按事件顺序、一次 `claim()` 后写系统剪贴板；离线和只读不会禁用已有文本复制。纯附件不提供文本复制。接入、状态边界与本轮失败/成功证据见[输入复制记录](../docs/rust-agent-ui-input-copy-20261020.md)。
 
 输出 footnote 的复制也使用相同回调，由共享 `TranscriptSection::final_output()` 选择唯一最终正文；不复制推理或工具详情，不回退到最后一条消息。独立 TurnFootnote 消费方用 `update_with_output` 显式传入该目标；机器内容和操作继续靠左。公开 API、三端恢复验证与限制见[输出复制记录](../docs/rust-agent-ui-output-copy-20261020.md)。
 
@@ -196,17 +198,17 @@ ui/target/debug/tekes-agent-ui-demo --components --transcript-content
 ui/target/debug/tekes-agent-ui-demo --components --transcript-content --offscreen /tmp/transcript-tree.png
 ```
 
-实验宿主使用公共 ScrollContent，不提供稳定子项阅读事务或富文本能力；此内容树不等于完整 Transcript / RunView。真实三端脚本可加 `--ui-components --ui-transcript-content --ui-history-pages --ui-attachments`；不能同时启用独立的 `--ui-message-rows` / `--ui-turn-footnote` 探针。公开接入与证据见[内容树记录](../docs/rust-agent-ui-transcript-tree-20261020.md)。
+实验宿主使用公共 ScrollContent，不提供稳定子项阅读事务或富文本能力；此内容树不等于完整 Transcript / RunPort。真实三端脚本可加 `--ui-components --ui-transcript-content --ui-history-pages --ui-attachments`；不能同时启用独立的 `--ui-message-rows` / `--ui-turn-footnote` 探针。公开接入与证据见[内容树记录](../docs/rust-agent-ui-transcript-tree-20261020.md)。
 
 
-[`RunView`](../docs/rust-agent-ui-run-view-20261020.md) 现提供独立的公开组合和类型化意图出口；`standard(namespace, row_pool, scope)` 直接包含混合内容树。实验宿主 `--components --transcript-content` 已复用它，窗口/导航/执行器仍由宿主提供。完整更新使用同帧 RunSnapshot、gate 和原绑定分页事实；焦点改变前按 `allows_focus_target` 维护组字屏障。原生 receipt 的 `runViewComposition.mounted=true` 只证明组合挂载，`completeRunView=false` 继续表示完整验收未通过。
+[`RunPort`](../docs/rust-agent-ui-run-view-20261020.md) 现提供独立的公开组合和类型化意图出口；`standard(namespace, row_pool, scope)` 直接包含混合内容树。实验宿主 `--components --transcript-content` 已复用它，窗口/导航/执行器仍由宿主提供。完整更新使用同帧 RunSnapshot、gate 和原绑定分页事实；焦点改变前按 `allows_focus_target` 维护组字屏障。原生 receipt 的 `runPortComposition.mounted=true` 只证明组合挂载，`completeRunPort=false` 继续表示完整验收未通过。
 
 
 `ReadOnlyTranscript` 为 Native 有界子历史复用同一内容树，显示真实消息与来源调用详情，只有显式读取回调。新 `PaneSnapshot::ReadOnlyChild` 带原读取调用 publication/epoch；`ChildPaneBinding::read_intent` 在 IO 前校验来源并只允许一次 admission。真实脚本可加 `--ui-components --ui-bounded-child --kernel-root <root>`，另存 `-bounded.png` 和 `NATIVE_UI_BOUNDED_COMPONENTS_RECEIPT`，不要求该 tab 同时挂 Summary。见[只读子历史契约](../docs/rust-agent-ui-readonly-child-20261020.md)。
 
 共享绑定现支持原 committed feedback frame 的一次性评分/备注 CAS；三端真实验证与错误语义见[写入契约](../docs/rust-agent-ui-feedback-cas-20261020.md)。评价已挂入正式 Transcript 内容树，专项原生交互现已补齐（见下文）；`--feedback-write-proof` 仅用于显式启用的隔离验证。
 
-独立公开 `TurnFeedback` 与备注编辑器现可挂载，使用原 binding 的 committed frame 和一次性 gesture bridge；详见[控件接入](../docs/rust-agent-ui-feedback-controls-20261020.md)。`--feedback-controls-proof` / 三端脚本的 `--ui-feedback-controls` 显式验证真实读写及浅深色 offscreen 渲染，不代表原生 UX 已完成。后续[Transcript 接入](../docs/rust-agent-ui-feedback-transcript-20261020.md)已提供 per-turn mount，三端脚本使用 `--ui-feedback-transcript` 通过实际 RunView/Transcript 路由验证。
+独立公开 `TurnFeedback` 与备注编辑器现可挂载，使用原 binding 的 committed frame 和一次性 gesture bridge；详见[控件接入](../docs/rust-agent-ui-feedback-controls-20261020.md)。`--feedback-controls-proof` / 三端脚本的 `--ui-feedback-controls` 显式验证真实读写及浅深色 offscreen 渲染，不代表原生 UX 已完成。后续[Transcript 接入](../docs/rust-agent-ui-feedback-transcript-20261020.md)已提供 per-turn mount，三端脚本使用 `--ui-feedback-transcript` 通过实际 RunPort/Transcript 路由验证。
 
 三端脚本新增 `--ui-native-feedback`，在自有临时会话中顺序打开真实 macOS 窗口，以自动化 AppKit 点击/文本服务驱动正式 Transcript 评价入口；见[专项原生窗口验收](../docs/rust-agent-ui-feedback-native-20261020.md)。合成 marked text 与物理 IME/VoiceOver 分开，不扩大为阅读锚点验收。
 
@@ -218,7 +220,7 @@ SidePanel 宿主布局输入使用 `SidePanel::set_layout(SidePanelLayout { cont
 
 Summary 的普通静态行与用量标题现在使用原 TekesUI 只读可选择文本，`SummaryView::passive_text_id(section, row)` 提供其原ID。宿主通过同一ContentHost的既有文本命令处理选择/复制，并提供TextSurfaceHost，不另存选区；折叠ID存在不代表可见。详见[静态行契约](../docs/rust-agent-ui-summary-selectable-20261022.md)。
 
-`TranscriptTurnTarget::preview()`提供原回合的plain preview快照，`TurnRail::preview_target`捕获原项，`RunView::turn_preview`在当前来源/布局上只读验证，允许保留Composer组字。当前未显示hover卡片；被动原Content浮层等待TekesUI #46，详见[预览契约](../docs/rust-agent-ui-turn-preview-20261022.md)。
+`TranscriptTurnTarget::preview()`提供原回合的plain preview快照，`TurnRail::preview_target`捕获原项，`RunPort::turn_preview`在当前来源/布局上只读验证，允许保留Composer组字。当前未显示hover卡片；被动原Content浮层等待TekesUI #46，详见[预览契约](../docs/rust-agent-ui-turn-preview-20261022.md)。
 
 
 Composer 的可选状态提示位于输入卡片外上方；安装 `ComposerNotice` 独立 namespace，使用当前

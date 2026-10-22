@@ -69,7 +69,7 @@ impl RunColumnLayout {
             Self::Reading { maximum_width }
                 if !maximum_width.is_finite() || maximum_width < Self::MINIMUM_CONTENT_WIDTH =>
             {
-                Err("invalid RunView reading width")
+                Err("invalid RunPort reading width")
             }
             Self::Insets { leading, trailing } => Ok(Self::Insets {
                 leading: fraction(leading),

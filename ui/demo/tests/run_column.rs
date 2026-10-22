@@ -76,7 +76,7 @@ impl ButtonTextRenderer for Text {
     }
 }
 
-fn update(run: &mut RunView, snapshot: &RunSnapshot) {
+fn update(run: &mut RunPort, snapshot: &RunSnapshot) {
     run.update(
         snapshot,
         Default::default(),
@@ -348,11 +348,11 @@ async fn composer_input_and_primary_share_one_band_without_field_chrome_or_an_em
         .with_context(27000, Default::default())
         .unwrap();
     view.update(&snapshot, Default::default()).unwrap();
-    // ContentHost grows a standalone intrinsic root. RunView is the real
+    // ContentHost grows a standalone intrinsic root. RunPort is the real
     // bounded pane that assigns a smaller frame to the resident Composer.
     let base = 28000_u64 << 32;
-    let mut run = RunView::new(
-        RunViewIds {
+    let mut run = RunPort::new(
+        RunPortIds {
             root: tekes_ui_controls::composition::ComponentId(base),
             indicators: tekes_ui_controls::composition::ComponentId(base + 1),
             viewport: tekes_ui_controls::composition::ComponentId(base + 2),
@@ -396,7 +396,7 @@ async fn rail_visibility_comes_from_arranged_rows_and_never_from_loaded_history(
         turn.input = format!("回合 {}", turn.id);
     }
     assert!(!snapshot.transcript.turns.is_empty());
-    let mut run = RunView::standard(1900, 1904..2300, RunScope::main("fixture", "a")).unwrap();
+    let mut run = RunPort::standard(1900, 1904..2300, RunScope::main("fixture", "a")).unwrap();
     update(&mut run, &snapshot);
     assert!(
         run.turn_targets()
@@ -416,7 +416,7 @@ async fn rail_visibility_comes_from_arranged_rows_and_never_from_loaded_history(
         Theme::LIGHT.into(),
     )
     .unwrap();
-    let run = host.get(ids.root).unwrap().component::<RunView>().unwrap();
+    let run = host.get(ids.root).unwrap().component::<RunPort>().unwrap();
     let targets = run.turn_targets().unwrap();
     assert!(targets.iter().all(|target| target.is_visible().is_some()));
     for target in &targets {
@@ -444,7 +444,7 @@ async fn rail_visibility_comes_from_arranged_rows_and_never_from_loaded_history(
     assert!(
         host.get(ids.root)
             .unwrap()
-            .component::<RunView>()
+            .component::<RunPort>()
             .unwrap()
             .validate_turn_target(&targets[0])
             .is_err()
@@ -459,7 +459,7 @@ async fn rail_visibility_comes_from_arranged_rows_and_never_from_loaded_history(
         Theme::LIGHT.into(),
     )
     .unwrap();
-    let run = host.get(ids.root).unwrap().component::<RunView>().unwrap();
+    let run = host.get(ids.root).unwrap().component::<RunPort>().unwrap();
     assert!(
         run.turn_targets()
             .unwrap()
@@ -479,11 +479,11 @@ async fn rail_visibility_comes_from_arranged_rows_and_never_from_loaded_history(
     update(
         host.get_mut(ids.root)
             .unwrap()
-            .component_mut::<RunView>()
+            .component_mut::<RunPort>()
             .unwrap(),
         &snapshot,
     );
-    let run = host.get(ids.root).unwrap().component::<RunView>().unwrap();
+    let run = host.get(ids.root).unwrap().component::<RunPort>().unwrap();
     assert!(
         run.turn_targets()
             .unwrap()
@@ -498,7 +498,7 @@ async fn shared_column_bounds_follow_pane_policy_without_replacing_text_or_draft
     let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
     let mut snapshot = (*controller.snapshot()).clone();
     snapshot.draft.text = "中文草稿保持原编辑器".into();
-    let mut run = RunView::standard(1500, 1504..1800, RunScope::main("fixture", "a")).unwrap();
+    let mut run = RunPort::standard(1500, 1504..1800, RunScope::main("fixture", "a")).unwrap();
     update(&mut run, &snapshot);
     let ids = run.ids();
     let transcript = run.transcript_id();
@@ -542,7 +542,7 @@ async fn shared_column_bounds_follow_pane_policy_without_replacing_text_or_draft
     ] {
         host.get_mut(ids.root)
             .unwrap()
-            .component_mut::<RunView>()
+            .component_mut::<RunPort>()
             .unwrap()
             .set_column_layout(mode)
             .unwrap();
@@ -571,7 +571,7 @@ async fn shared_column_bounds_follow_pane_policy_without_replacing_text_or_draft
                     let geometry = host
                         .get(ids.root)
                         .unwrap()
-                        .component::<RunView>()
+                        .component::<RunPort>()
                         .unwrap()
                         .layout_geometry()
                         .unwrap();
@@ -611,7 +611,7 @@ async fn shared_column_bounds_follow_pane_policy_without_replacing_text_or_draft
                     let input = &host.text_surface(ids.composer.editor).unwrap().input;
                     assert_eq!(input.external_baseline(), baseline);
                     assert_eq!(input.external_value(), value.as_ref());
-                    let run = host.get(ids.root).unwrap().component::<RunView>().unwrap();
+                    let run = host.get(ids.root).unwrap().component::<RunPort>().unwrap();
                     assert!(run.composer().is_composing());
                     for row in run.transcript().unwrap().children() {
                         if row.component::<InputMessage>().is_some()
@@ -657,7 +657,7 @@ async fn column_geometry_and_normalization_match_frozen_clientkit_view_vectors()
         reference_number(&reference["loose_spacing"])
     );
     let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
-    let mut view = RunView::standard(1900, 1904..2200, RunScope::main("fixture", "a")).unwrap();
+    let mut view = RunPort::standard(1900, 1904..2200, RunScope::main("fixture", "a")).unwrap();
     update(&mut view, &controller.snapshot());
     let ids = view.ids();
     let mut host = view.into_host().unwrap();
@@ -676,7 +676,7 @@ async fn column_geometry_and_normalization_match_frozen_clientkit_view_vectors()
         let run = host
             .get_mut(ids.root)
             .unwrap()
-            .component_mut::<RunView>()
+            .component_mut::<RunPort>()
             .unwrap();
         run.set_column_layout(policy).unwrap();
         let geometry = run.column_geometry(viewport);
@@ -760,7 +760,7 @@ async fn archived_composer_has_no_layout_slot_and_library_blurs_original_preedit
     use tekes_agent_presentation::RunPhase;
     let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
     let mut snapshot = (*controller.snapshot()).clone();
-    let mut run = RunView::standard(2400, 2404..2600, RunScope::main("fixture", "a")).unwrap();
+    let mut run = RunPort::standard(2400, 2404..2600, RunScope::main("fixture", "a")).unwrap();
     update(&mut run, &snapshot);
     let ids = run.ids();
     let mut host = run.into_host().unwrap();
@@ -778,7 +778,7 @@ async fn archived_composer_has_no_layout_slot_and_library_blurs_original_preedit
     let before = host
         .get(ids.root)
         .unwrap()
-        .component::<RunView>()
+        .component::<RunPort>()
         .unwrap()
         .layout_geometry()
         .unwrap()
@@ -803,7 +803,7 @@ async fn archived_composer_has_no_layout_slot_and_library_blurs_original_preedit
     let run = host
         .get_mut(ids.root)
         .unwrap()
-        .component_mut::<RunView>()
+        .component_mut::<RunPort>()
         .unwrap();
     update(run, &snapshot);
     assert!(!run.composer().is_presented());
@@ -830,7 +830,7 @@ async fn archived_composer_has_no_layout_slot_and_library_blurs_original_preedit
     let archived = host
         .get(ids.root)
         .unwrap()
-        .component::<RunView>()
+        .component::<RunPort>()
         .unwrap()
         .layout_geometry()
         .unwrap()
@@ -848,7 +848,7 @@ async fn archived_composer_has_no_layout_slot_and_library_blurs_original_preedit
     let run = host
         .get_mut(ids.root)
         .unwrap()
-        .component_mut::<RunView>()
+        .component_mut::<RunPort>()
         .unwrap();
     assert!(
         run.take_intents(&[]).is_empty(),
@@ -884,7 +884,7 @@ async fn collapsed_run_retains_geometry_and_scroll_without_measuring_at_zero_and
  {
     let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
     let snapshot = controller.snapshot();
-    let mut run = RunView::standard(2700, 2704..2900, RunScope::main("fixture", "a")).unwrap();
+    let mut run = RunPort::standard(2700, 2704..2900, RunScope::main("fixture", "a")).unwrap();
     update(&mut run, &snapshot);
     let ids = run.ids();
     let editor = run.composer().editor() as *const _;
@@ -902,7 +902,7 @@ async fn collapsed_run_retains_geometry_and_scroll_without_measuring_at_zero_and
     let geometry = host
         .get(ids.root)
         .unwrap()
-        .component::<RunView>()
+        .component::<RunPort>()
         .unwrap()
         .layout_geometry()
         .unwrap();
@@ -929,7 +929,7 @@ async fn collapsed_run_retains_geometry_and_scroll_without_measuring_at_zero_and
     let before: Vec<_> = host
         .get(ids.root)
         .unwrap()
-        .component::<RunView>()
+        .component::<RunPort>()
         .unwrap()
         .children()
         .iter()
@@ -951,7 +951,7 @@ async fn collapsed_run_retains_geometry_and_scroll_without_measuring_at_zero_and
             Theme::LIGHT.into(),
         )
         .unwrap();
-        let run = host.get(ids.root).unwrap().component::<RunView>().unwrap();
+        let run = host.get(ids.root).unwrap().component::<RunPort>().unwrap();
         assert!(!run.is_pane_presented());
         assert_eq!(run.layout_geometry(), Some(geometry));
         assert_eq!(
@@ -982,7 +982,7 @@ async fn collapsed_run_retains_geometry_and_scroll_without_measuring_at_zero_and
         Theme::LIGHT.into(),
     )
     .unwrap();
-    let run = host.get(ids.root).unwrap().component::<RunView>().unwrap();
+    let run = host.get(ids.root).unwrap().component::<RunPort>().unwrap();
     assert!(run.is_pane_presented());
     assert_eq!(run.layout_geometry(), Some(geometry));
     assert_eq!(run.composer().editor() as *const _, editor);
@@ -1002,7 +1002,7 @@ async fn collapsed_run_retains_geometry_and_scroll_without_measuring_at_zero_and
 #[tokio::test]
 async fn overlay_clearance_keeps_the_final_row_visible_at_the_library_scroll_limit() {
     let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
-    let mut run = RunView::standard(3000, 3004..3200, RunScope::main("fixture", "a")).unwrap();
+    let mut run = RunPort::standard(3000, 3004..3200, RunScope::main("fixture", "a")).unwrap();
     update(&mut run, &controller.snapshot());
     let ids = run.ids();
     let mut host = run.into_host().unwrap();
@@ -1031,7 +1031,7 @@ async fn overlay_clearance_keeps_the_final_row_visible_at_the_library_scroll_lim
         Theme::LIGHT.into(),
     )
     .unwrap();
-    let run = host.get(ids.root).unwrap().component::<RunView>().unwrap();
+    let run = host.get(ids.root).unwrap().component::<RunPort>().unwrap();
     let geometry = run.layout_geometry().unwrap();
     let final_row = run
         .transcript()
@@ -1160,7 +1160,7 @@ fn summary_usage_columns_keep_values_on_right_and_long_titles_clear_at_library_s
 async fn nonfocusing_turn_navigation_keeps_preedit_and_fences_clone_publication_and_pane_aba() {
     let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
     let snapshot = controller.snapshot();
-    let mut view = RunView::standard(33000, 33004..33400, RunScope::main("fixture", "a")).unwrap();
+    let mut view = RunPort::standard(33000, 33004..33400, RunScope::main("fixture", "a")).unwrap();
     update(&mut view, &snapshot);
     let before = view.turn_targets().unwrap().remove(0);
     assert!(view.prepare_turn_navigation(&before).is_err());
@@ -1176,7 +1176,7 @@ async fn nonfocusing_turn_navigation_keeps_preedit_and_fences_clone_publication_
         Theme::LIGHT.into(),
     )
     .unwrap();
-    let view = host.get(ids.root).unwrap().component::<RunView>().unwrap();
+    let view = host.get(ids.root).unwrap().component::<RunPort>().unwrap();
     let targets = view.turn_targets().unwrap();
     let navigation = view.prepare_turn_navigation(&targets[0]).unwrap();
     assert_eq!(navigation.viewport(), ids.viewport);
@@ -1196,7 +1196,7 @@ async fn nonfocusing_turn_navigation_keeps_preedit_and_fences_clone_publication_
         clauses: vec![],
         replacement: None,
     });
-    let view = host.get(ids.root).unwrap().component::<RunView>().unwrap();
+    let view = host.get(ids.root).unwrap().component::<RunPort>().unwrap();
     let baseline = view.composer().editor().input.external_baseline();
     assert!(view.composer().is_composing());
     assert_eq!(
@@ -1229,7 +1229,7 @@ async fn nonfocusing_turn_navigation_keeps_preedit_and_fences_clone_publication_
         Theme::LIGHT.into(),
     )
     .unwrap();
-    let view = host.get(ids.root).unwrap().component::<RunView>().unwrap();
+    let view = host.get(ids.root).unwrap().component::<RunPort>().unwrap();
     assert!(view.claim_turn_navigation(&pending).is_err());
     let targets = view.turn_targets().unwrap();
     let old = view.prepare_turn_navigation(&targets[0]).unwrap();
@@ -1239,14 +1239,14 @@ async fn nonfocusing_turn_navigation_keeps_preedit_and_fences_clone_publication_
     update(
         host.get_mut(ids.root)
             .unwrap()
-            .component_mut::<RunView>()
+            .component_mut::<RunPort>()
             .unwrap(),
         &next,
     );
     assert!(
         host.get(ids.root)
             .unwrap()
-            .component::<RunView>()
+            .component::<RunPort>()
             .unwrap()
             .claim_turn_navigation(&old)
             .is_err()
@@ -1256,7 +1256,7 @@ async fn nonfocusing_turn_navigation_keeps_preedit_and_fences_clone_publication_
 
 #[test]
 fn unsupported_compact_library_never_mounts_an_overlapping_rail_or_replaces_the_composer() {
-    let mut view = RunView::standard(33500, 33504..33600, RunScope::main("fixture", "a")).unwrap();
+    let mut view = RunPort::standard(33500, 33504..33600, RunScope::main("fixture", "a")).unwrap();
     let original = view.composer().editor() as *const _;
     let result = view.install_turn_rail(34000);
     assert_eq!(result.is_ok(), turn_rail_supported());
@@ -1286,7 +1286,7 @@ async fn main_history_captures_the_original_display_origin_and_never_replays_a_c
         }
     }
     let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
-    let mut view = RunView::standard(34500, 34504..34900, RunScope::main("fixture", "a")).unwrap();
+    let mut view = RunPort::standard(34500, 34504..34900, RunScope::main("fixture", "a")).unwrap();
     update(&mut view, &controller.snapshot());
     assert!(
         view.set_turn_navigation_context(Some(RunTurnNavigationContext {
@@ -1309,7 +1309,7 @@ async fn main_history_captures_the_original_display_origin_and_never_replays_a_c
     let view = host
         .get_mut(root)
         .unwrap()
-        .component_mut::<RunView>()
+        .component_mut::<RunPort>()
         .unwrap();
     let targets = view.turn_targets().unwrap();
     view.set_turn_navigation_context(Some(RunTurnNavigationContext {

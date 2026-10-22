@@ -1,7 +1,7 @@
 //! Owned fixture: retiring/rebuilding panel UI leaves the real Run/draft alive.
 use super::*;
 use tekes_agent_components_ui::{
-    Composer, ComposerIds, PanelContentToken, RunView, SidePanelTabKind,
+    Composer, ComposerIds, PanelContentToken, RunPort, SidePanelTabKind,
 };
 use tekes_ui_controls::{ReadingDocumentVersion, TextEditBaseline, composition::ScrollContent};
 use tekes_ui_platform_macos::selftest::{Action, run_script};
@@ -51,12 +51,12 @@ impl Probe {
             .component::<SidePanel>()
             .unwrap()
     }
-    fn run<'a>(&self, host: &'a Host) -> &'a RunView {
+    fn run<'a>(&self, host: &'a Host) -> &'a RunPort {
         host.view
             .tree
             .get(ComponentId(self.ids.unwrap().root.0 + 16))
             .unwrap()
-            .component::<RunView>()
+            .component::<RunPort>()
             .unwrap()
     }
     fn version(&self, host: &Host) -> ReadingDocumentVersion {

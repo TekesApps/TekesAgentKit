@@ -1,5 +1,5 @@
 //! Paired Agent publication inside the original library reading transaction.
-use crate::{RunView, RunViewUpdate};
+use crate::{RunPort, RunPortUpdate};
 use tekes_ui_controls::{
     ExternalValueConflict, ExternalValueResult, ReadingDocumentVersion, ReadingUpdateError,
     composition::{ComponentId, ContentHost},
@@ -25,13 +25,13 @@ pub fn publish_run_reading_update(
     root: ComponentId,
     version: &ReadingDocumentVersion,
     revision: u64,
-    plan: &RunViewUpdate<'_>,
+    plan: &RunPortUpdate<'_>,
 ) -> Result<ReadingDocumentVersion, RunReadingError> {
     let run = host
         .get(root)
-        .and_then(|node| node.component::<RunView>())
+        .and_then(|node| node.component::<RunPort>())
         .ok_or(RunReadingError::Agent(
-            "RunView reading owner is not mounted",
+            "RunPort reading owner is not mounted",
         ))?;
     run.validate_prepared_update(plan)
         .map_err(RunReadingError::Agent)?;
@@ -50,7 +50,7 @@ pub fn publish_run_reading_update(
     host.update_scroll_reading_document(viewport, version, revision, plan.item_ids(), |host| {
         host.get_mut(root)
             .unwrap()
-            .component_mut::<RunView>()
+            .component_mut::<RunPort>()
             .unwrap()
             .apply_prepared_update(plan)
             .expect("same-turn complete preflight; no event or mutation intervenes");

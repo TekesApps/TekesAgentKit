@@ -40,7 +40,7 @@ def main():
     parser.add_argument('--source', type=Path, required=True)
     parser.add_argument('--probe', type=Path, help='Explicit receiver test source; default: Transcript-only probe')
     parser.add_argument('--append-run-probe', action='store_true',
-                        help='Append the explicit probe to the unchanged formal RunView transaction probe')
+                        help='Append the explicit probe to the unchanged formal RunPort transaction probe')
     parser.add_argument('--append-rail-probe', action='store_true',
                         help='Append the unchanged actual-rail probe before the explicit extension probe')
     parser.add_argument('--append-start-probe', action='store_true',
@@ -51,7 +51,7 @@ def main():
     parser.add_argument('--workdir', type=Path, required=True)
     parser.add_argument('--target-dir', type=Path, required=True)
     parser.add_argument('--item-navigation-native', action='store_true',
-                        help='Build the owned native stable-item diagnostic on the actual RunView')
+                        help='Build the owned native stable-item diagnostic on the actual RunPort')
     parser.add_argument('--turn-start-native', action='store_true',
                         help='Use explicit #32 Start for actual ordinary and Latest native rail clicks')
     parser.add_argument('--turn-rail', action='store_true', help='Enable actual rail with exact original compact actions in the isolated SDK only')
@@ -278,7 +278,7 @@ def main():
         demo = snapshot / 'ui/demo/src/component_demo.rs'
         old = '        self.document_roots.insert(ids.root, root);'
         assert demo.read_text().count(old) == 1
-        demo.write_text(demo.read_text().replace(old, '        self.tree.get_mut(ComponentId(ids.root.0 + 16)).unwrap().component_mut::<RunView>().unwrap().install_turn_rail(9_000_000 + (ids.root.0 >> 32) as u32).map_err(unsupported)?;\n' + old))
+        demo.write_text(demo.read_text().replace(old, '        self.tree.get_mut(ComponentId(ids.root.0 + 16)).unwrap().component_mut::<RunPort>().unwrap().install_turn_rail(9_000_000 + (ids.root.0 >> 32) as u32).map_err(unsupported)?;\n' + old))
         overrides.extend(['ui/components/src/turn_rail_component.rs', 'ui/components/src/turn_rail_action.rs', 'ui/demo/src/component_demo.rs'])
         adaptations.append('Actual AgentKit rail enabled only with original library Exact/Press and preserving_focus; default fixed pin remains unsupported')
     if args.composer_padding:
@@ -296,7 +296,7 @@ def main():
         code = code.replace(old, old + '''
         for ids in [Some(self.ids()), self.panel_composer_ids()].into_iter().flatten() {
             if self.tree.get(ComponentId(ids.root.0 + 16))
-                .and_then(|node| node.component::<RunView>()).is_some_and(RunView::is_pane_presented)
+                .and_then(|node| node.component::<RunPort>()).is_some_and(RunPort::is_pane_presented)
                 && self.tree.get(ids.root).and_then(|node| node.component::<Composer>())
                     .is_some_and(Composer::is_presented) {
                 self.tree.set_padding_focus(ids.input_band, Some(ids.editor))?;
@@ -421,7 +421,7 @@ def main():
 ''')
         host.write_text(code)
         overrides.extend([native_probe_name, 'ui/demo/src/components_native.rs'])
-        adaptations.append('Owned native diagnostic uses actual RunView, original backend and public Kit capture/claim; second-consumer execution is checked in CLI; only public library reading/reveal calls; synthetic AppKit preedit, not a physical IME; actual latest-rail click only when --turn-rail')
+        adaptations.append('Owned native diagnostic uses actual RunPort, original backend and public Kit capture/claim; second-consumer execution is checked in CLI; only public library reading/reveal calls; synthetic AppKit preedit, not a physical IME; actual latest-rail click only when --turn-rail')
     env = dict(os.environ, CARGO_TARGET_DIR=str(args.target_dir.resolve()),
                CARGO_BUILD_JOBS=os.environ.get('CARGO_BUILD_JOBS', '4'),
                CARGO_PROFILE_DEV_DEBUG='0', CARGO_PROFILE_TEST_DEBUG='0',

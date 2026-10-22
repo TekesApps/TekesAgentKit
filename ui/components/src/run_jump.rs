@@ -150,7 +150,7 @@ impl Component for JumpButton {
         ContentSemantics::new(ContentRole::Button, "回到最新")
     }
 }
-impl RunView {
+impl RunPort {
     /// Exclusive namespace, independent of rail and Transcript row pools.
     pub fn install_jump_to_latest(&mut self, namespace: u32) -> Result<(), &'static str> {
         if self.jump.is_some() {

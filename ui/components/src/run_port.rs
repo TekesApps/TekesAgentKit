@@ -13,7 +13,7 @@ use tekes_ui_scene::Size;
 /// Reserve the whole Composer namespace plus the three extra IDs, and distinct
 /// namespaces for paging/actionables/context/transcript. Hosts allocate these IDs.
 #[derive(Clone, Copy, Debug)]
-pub struct RunViewIds {
+pub struct RunPortIds {
     pub root: ComponentId,
     pub indicators: ComponentId,
     pub viewport: ComponentId,
@@ -23,7 +23,7 @@ pub struct RunViewIds {
 /// not a second reading state. Publish it only after ContentHost::render succeeds
 /// for that frame and is_pane_presented is true. Failed layout may retain changes.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct RunViewGeometry {
+pub struct RunPortGeometry {
     pub publication: Option<u64>,
     pub connection_epoch: Option<u64>,
     pub pane: Rect,
@@ -35,7 +35,7 @@ pub struct RunViewGeometry {
     pub turn_rail: TurnRailGeometry,
 }
 #[derive(Debug)]
-pub enum RunViewIntent {
+pub enum RunPortIntent {
     Composer(ComposerIntent),
     LoadEarlier {
         scope: RunScope,
@@ -54,7 +54,7 @@ pub enum RunViewIntent {
 /// state or validate a reading token. Check `controlled_draft()` on the original
 /// TekesUI surface before entering a reading transaction; apply rechecks state.
 #[derive(Debug)]
-pub struct RunViewUpdate<'a> {
+pub struct RunPortUpdate<'a> {
     root: ComponentId,
     scope: RunScope,
     base_revision: Option<(u64, u64)>,
@@ -69,7 +69,7 @@ pub struct RunViewUpdate<'a> {
     transcript: TranscriptContentUpdate<'a>,
     editor: Option<ComposerDraftUpdate>,
 }
-impl RunViewUpdate<'_> {
+impl RunPortUpdate<'_> {
     pub fn scope(&self) -> &RunScope {
         &self.scope
     }
@@ -91,8 +91,8 @@ impl RunViewUpdate<'_> {
 /// Experimental reusable Run composition. Mount one per original binding; it
 /// cannot be retargeted. A complete Transcript requires upstream reading/rich APIs.
 #[derive(Debug)]
-pub struct RunView {
-    ids: RunViewIds,
+pub struct RunPort {
+    ids: RunPortIds,
     scope: RunScope,
     paging: ComponentId,
     actionable: ComponentId,
@@ -110,11 +110,11 @@ pub struct RunView {
     navigation_lifetime: Arc<()>,
     navigation_mounted: bool,
     navigation_origin: Option<(u64, Option<String>)>,
-    geometry: Option<RunViewGeometry>,
+    geometry: Option<RunPortGeometry>,
     footnote_clock: Option<f64>,
     footnote_clock_revision: u64,
 }
-impl RunView {
+impl RunPort {
     /// Four consecutive namespaces for controls/paging/actionables/transcript;
     /// the host supplies a separate exclusive row pool. Default style is TekesUI.
     pub fn standard(
@@ -124,11 +124,11 @@ impl RunView {
     ) -> Result<Self, &'static str> {
         let transcript = namespace
             .checked_add(3)
-            .ok_or("RunView namespace overflow")?;
+            .ok_or("RunPort namespace overflow")?;
         let base = (namespace as u64) << 32;
         let composer = ComposerIds::new(base + 16);
         Self::new(
-            RunViewIds {
+            RunPortIds {
                 root: ComponentId(base),
                 indicators: ComponentId(base + 1),
                 viewport: ComponentId(base + 2),
@@ -142,28 +142,28 @@ impl RunView {
         .with_transcript(transcript, rows, Default::default())
     }
     pub fn new(
-        ids: RunViewIds,
+        ids: RunPortIds,
         scope: RunScope,
         composer: Composer,
         paging_namespace: u32,
         actionable_namespace: u32,
     ) -> Result<Self, &'static str> {
-        scope.validate().map_err(|_| "invalid RunView scope")?;
+        scope.validate().map_err(|_| "invalid RunPort scope")?;
         if composer
             .destination()
             .is_some_and(|destination| destination != &ComposerDestination::run(scope.clone()))
         {
-            return Err("RunView composer source mismatch");
+            return Err("RunPort composer source mismatch");
         }
         if ids.composer != composer.ids() {
-            return Err("RunView composer IDs mismatch");
+            return Err("RunPort composer IDs mismatch");
         }
         let composer_namespace = ids.composer.root.0 >> 32;
         if ids.composer.input_band.0 >> 32 != composer_namespace
             || paging_namespace == actionable_namespace
             || [paging_namespace as u64, actionable_namespace as u64].contains(&composer_namespace)
         {
-            return Err("RunView namespace overlap");
+            return Err("RunPort namespace overlap");
         }
         let reserved = [ids.root, ids.indicators, ids.viewport];
         if reserved.iter().enumerate().any(|(i, id)| {
@@ -171,7 +171,7 @@ impl RunView {
                 || (ids.composer.root.0..=ids.composer.input_band.0).contains(&id.0)
                 || [paging_namespace as u64, actionable_namespace as u64].contains(&(id.0 >> 32))
         }) {
-            return Err("RunView control IDs overlap");
+            return Err("RunPort control IDs overlap");
         }
         // Include a configured context's hidden IDs, even while its cards are empty.
         if composer.context().is_some_and(|context| {
@@ -179,7 +179,7 @@ impl RunView {
             [paging_namespace as u64, actionable_namespace as u64].contains(&ns)
                 || reserved.iter().any(|id| id.0 >> 32 == ns)
         }) {
-            return Err("RunView context namespace overlap");
+            return Err("RunPort context namespace overlap");
         }
         let paging = TranscriptPaging::new(paging_namespace, scope.clone(), Default::default());
         let paging_id = ComponentId((paging_namespace as u64) << 32);
@@ -231,7 +231,7 @@ impl RunView {
     /// Last arranged values, not a successful-render receipt. A failed library
     /// render can retain application layout changes; the host must fence native
     /// geometry/input/AX publication until a subsequent render returns Ok.
-    pub fn layout_geometry(&self) -> Option<RunViewGeometry> {
+    pub fn layout_geometry(&self) -> Option<RunPortGeometry> {
         self.geometry
     }
     pub fn is_pane_presented(&self) -> bool {
@@ -251,7 +251,7 @@ impl RunView {
     pub fn set_label(&mut self, label: impl Into<String>) {
         self.label = label.into();
     }
-    pub fn ids(&self) -> RunViewIds {
+    pub fn ids(&self) -> RunPortIds {
         self.ids
     }
     pub fn scope(&self) -> &RunScope {
@@ -271,7 +271,7 @@ impl RunView {
     pub fn turn_targets(&self) -> Result<Vec<TranscriptTurnTarget>, &'static str> {
         let mut targets = self
             .transcript()
-            .ok_or("RunView has no Transcript")?
+            .ok_or("RunPort has no Transcript")?
             .turn_targets()?;
         if !self.pane_presented {
             for target in &mut targets {
@@ -288,25 +288,25 @@ impl RunView {
         target: &'a TranscriptTurnTarget,
     ) -> Result<&'a TranscriptTurnPreview, &'static str> {
         if !self.navigation_mounted || !self.pane_presented || target.is_visible().is_none() {
-            return Err("RunView preview requires a presented arranged pane");
+            return Err("RunPort preview requires a presented arranged pane");
         }
         self.transcript()
-            .ok_or("RunView has no Transcript")?
+            .ok_or("RunPort has no Transcript")?
             .validate_turn_target(target)?;
-        let geometry = self.geometry.ok_or("RunView is not arranged")?;
+        let geometry = self.geometry.ok_or("RunPort is not arranged")?;
         if geometry.publication != Some(target.publication())
             || geometry.connection_epoch != Some(target.connection_epoch())
         {
-            return Err("RunView preview geometry belongs to another publication");
+            return Err("RunPort preview geometry belongs to another publication");
         }
         Ok(target.preview())
     }
     pub fn validate_turn_target(&self, target: &TranscriptTurnTarget) -> Result<(), &'static str> {
         if !self.pane_presented || self.composer().is_composing() {
-            return Err("RunView navigation is unavailable during collapse or composition");
+            return Err("RunPort navigation is unavailable during collapse or composition");
         }
         self.transcript()
-            .ok_or("RunView has no Transcript")?
+            .ok_or("RunPort has no Transcript")?
             .validate_turn_target(target)
     }
     /// Capture a non-focusing local navigation gesture from the installed,
@@ -318,16 +318,16 @@ impl RunView {
         target: &TranscriptTurnTarget,
     ) -> Result<RunTurnNavigation, &'static str> {
         if !self.navigation_mounted || !self.pane_presented || target.is_visible().is_none() {
-            return Err("RunView navigation requires a presented arranged pane");
+            return Err("RunPort navigation requires a presented arranged pane");
         }
         self.transcript()
-            .ok_or("RunView has no Transcript")?
+            .ok_or("RunPort has no Transcript")?
             .validate_turn_target(target)?;
-        let geometry = self.geometry.ok_or("RunView is not arranged")?;
+        let geometry = self.geometry.ok_or("RunPort is not arranged")?;
         if geometry.publication != Some(target.publication())
             || geometry.connection_epoch != Some(target.connection_epoch())
         {
-            return Err("RunView navigation geometry belongs to another publication");
+            return Err("RunPort navigation geometry belongs to another publication");
         }
         let latest = self
             .turn_targets()?
@@ -359,11 +359,11 @@ impl RunView {
             || navigation.generation != self.publication_generation
             || !Arc::ptr_eq(&navigation.lifetime, &self.navigation_lifetime)
         {
-            return Err("stale or foreign RunView navigation gesture");
+            return Err("stale or foreign RunPort navigation gesture");
         }
         let current = self.prepare_turn_navigation(&navigation.target)?;
         if current.kind != navigation.kind {
-            return Err("RunView navigation target changed");
+            return Err("RunPort navigation target changed");
         }
         navigation
             .claimed
@@ -373,7 +373,7 @@ impl RunView {
                 std::sync::atomic::Ordering::AcqRel,
                 std::sync::atomic::Ordering::Acquire,
             )
-            .map_err(|_| "RunView navigation gesture already dispatched")?;
+            .map_err(|_| "RunPort navigation gesture already dispatched")?;
         Ok(navigation.kind)
     }
     /// Main hosts opt in with an actual bottom-visibility fact after render.
@@ -440,9 +440,9 @@ impl RunView {
             return Err("TekesUI exact compact actions unavailable");
         }
         if self.rail.is_some() {
-            return Err("RunView rail already installed");
+            return Err("RunPort rail already installed");
         }
-        let transcript = self.transcript().ok_or("RunView rail needs a Transcript")?;
+        let transcript = self.transcript().ok_or("RunPort rail needs a Transcript")?;
         if !transcript.namespaces_disjoint(&[namespace])
             || self
                 .body
@@ -455,12 +455,12 @@ impl RunView {
                 .context()
                 .is_some_and(|c| c.id().0 >> 32 == namespace as u64)
         {
-            return Err("RunView rail namespace overlap");
+            return Err("RunPort rail namespace overlap");
         }
         let generation = self
             .publication_generation
             .checked_add(1)
-            .ok_or("RunView publication generation exhausted")?;
+            .ok_or("RunPort publication generation exhausted")?;
         let rail = TurnRail::new(namespace, self.scope.clone());
         self.rail = Some(rail.id());
         self.publication_generation = generation;
@@ -490,7 +490,7 @@ impl RunView {
     ) -> Result<(), &'static str> {
         if self
             .turn_rail()
-            .ok_or("RunView has no rail")?
+            .ok_or("RunPort has no rail")?
             .navigation_gate()
             != gate
         {
@@ -538,7 +538,7 @@ impl RunView {
         }
         .map(|t| t.turn_id().to_owned());
         self.turn_rail_mut()
-            .ok_or("RunView has no rail")?
+            .ok_or("RunPort has no rail")?
             .set_follow_target(target);
         Ok(())
     }
@@ -618,10 +618,10 @@ impl RunView {
         mut content: TranscriptContent,
     ) -> Result<(), &'static str> {
         if self.transcript.is_some() {
-            return Err("RunView transcript already mounted");
+            return Err("RunPort transcript already mounted");
         }
         if content.scope() != &self.scope {
-            return Err("RunView transcript scope mismatch");
+            return Err("RunPort transcript scope mismatch");
         }
         let mut reserved: Vec<_> = self
             .body
@@ -636,7 +636,7 @@ impl RunView {
             reserved.push((context.id().0 >> 32) as u32);
         }
         if !content.namespaces_disjoint(&reserved) {
-            return Err("RunView transcript namespace overlap");
+            return Err("RunPort transcript namespace overlap");
         }
         if let Some(snapshot) = &self.last {
             content.update(
@@ -681,9 +681,9 @@ impl RunView {
         let generation = self
             .publication_generation
             .checked_add(1)
-            .ok_or("RunView publication generation exhausted")?;
+            .ok_or("RunPort publication generation exhausted")?;
         self.transcript_mut()
-            .ok_or("RunView has no Transcript")?
+            .ok_or("RunPort has no Transcript")?
             .configure_feedback(labels)?;
         self.publication_generation = generation;
         Ok(())
@@ -712,7 +712,7 @@ impl RunView {
             let generation = self
                 .publication_generation
                 .checked_add(1)
-                .ok_or("RunView publication generation exhausted")?;
+                .ok_or("RunPort publication generation exhausted")?;
             self.footnote_clock = now_ms;
             self.footnote_clock_revision = revision;
             self.publication_generation = generation;
@@ -754,7 +754,7 @@ impl RunView {
             || paging.has_more_before != snapshot.transcript.has_more_before
             || paging.is_stale != snapshot.transcript.is_stale
         {
-            return Err("RunView paging input mismatch");
+            return Err("RunPort paging input mismatch");
         }
         let prompt = snapshot
             .run
@@ -762,7 +762,7 @@ impl RunView {
             .and_then(|run| run.actionables.first())
             .map(|value| ActionablePrompt::read(self.scope.clone(), value.clone()).map(Arc::new))
             .transpose()
-            .map_err(|_| "invalid RunView actionable")?;
+            .map_err(|_| "invalid RunPort actionable")?;
         self.body
             .children
             .iter()
@@ -785,13 +785,13 @@ impl RunView {
         gate: ComposerControlGate,
         paging: TranscriptPagingFacts,
         actionable_controls: bool,
-    ) -> Result<RunViewUpdate<'a>, &'static str> {
+    ) -> Result<RunPortUpdate<'a>, &'static str> {
         self.check_frame(snapshot, &paging)?;
         self.check_run_update(snapshot, gate)?;
         let editor = self.composer().prepare_current_update(snapshot)?;
         let transcript = self
             .transcript()
-            .ok_or("RunView has no Transcript")?
+            .ok_or("RunPort has no Transcript")?
             .prepare_update_with_timing(
                 &self.scope,
                 snapshot.revision,
@@ -800,7 +800,7 @@ impl RunView {
                 gate.entries && !self.composer().is_composing(),
                 &self.footnote_timing(snapshot),
             )?;
-        Ok(RunViewUpdate {
+        Ok(RunPortUpdate {
             root: self.ids.root,
             scope: self.scope.clone(),
             base_revision: self.last.as_ref().map(|s| (s.revision, s.connection_epoch)),
@@ -821,7 +821,7 @@ impl RunView {
     /// It does not replace TekesUI's controlled-value check or original token.
     pub fn validate_prepared_update(
         &self,
-        prepared: &RunViewUpdate<'_>,
+        prepared: &RunPortUpdate<'_>,
     ) -> Result<(), &'static str> {
         if self.ids.root != prepared.root
             || self.scope != prepared.scope
@@ -831,7 +831,7 @@ impl RunView {
             || self.gate != prepared.base_gate
             || self.composer().editor().input.external_baseline() != prepared.base_editor
         {
-            return Err("stale or foreign RunView update plan");
+            return Err("stale or foreign RunPort update plan");
         }
         let current = self.prepare_update(
             prepared.snapshot,
@@ -843,7 +843,7 @@ impl RunView {
         if current.editor != prepared.editor
             || current.transcript.rows() != prepared.transcript.rows()
         {
-            return Err("RunView update plan inputs changed");
+            return Err("RunPort update plan inputs changed");
         }
         Ok(())
     }
@@ -852,7 +852,7 @@ impl RunView {
     /// retarget may intervene; arbitrary application callbacks are not rolled back.
     pub fn apply_prepared_update(
         &mut self,
-        prepared: &RunViewUpdate<'_>,
+        prepared: &RunPortUpdate<'_>,
     ) -> Result<(), &'static str> {
         self.validate_prepared_update(prepared)?;
         self.update(
@@ -908,7 +908,7 @@ impl RunView {
     ) -> Result<(), &'static str> {
         self.publication_generation
             .checked_add(3)
-            .ok_or("RunView publication generation exhausted")?;
+            .ok_or("RunPort publication generation exhausted")?;
         if snapshot.revision == 0
             || self.last.as_ref().is_some_and(|old| {
                 snapshot.revision < old.revision
@@ -916,7 +916,7 @@ impl RunView {
                     || (snapshot.revision == old.revision && snapshot != old)
             })
         {
-            return Err("stale or conflicting RunView input");
+            return Err("stale or conflicting RunPort input");
         }
         let target = ComposerDestination::run(self.scope.clone());
         if snapshot
@@ -928,7 +928,7 @@ impl RunView {
                 .as_ref()
                 .is_some_and(|run| run.scope != self.scope)
         {
-            return Err("RunView source mismatch");
+            return Err("RunPort source mismatch");
         }
         if let Some(rail) = self.turn_rail() {
             rail.check_membership(
@@ -966,13 +966,13 @@ impl RunView {
                 || facts.has_more_before != snapshot.transcript.has_more_before
                 || facts.is_stale != snapshot.transcript.is_stale
         }) {
-            return Err("RunView paging input mismatch");
+            return Err("RunPort paging input mismatch");
         }
         facts.source_ready &= self.gate.entries;
         let generation = self
             .publication_generation
             .checked_add(1)
-            .ok_or("RunView publication generation exhausted")?;
+            .ok_or("RunPort publication generation exhausted")?;
         self.body
             .children
             .iter_mut()
@@ -994,12 +994,12 @@ impl RunView {
             .as_ref()
             .is_some_and(|prompt| prompt.scope() != &self.scope)
         {
-            return Err("RunView actionable source mismatch");
+            return Err("RunPort actionable source mismatch");
         }
         if self.last.as_ref().is_none_or(|snapshot| {
             snapshot.revision != publication || snapshot.connection_epoch != epoch
         }) {
-            return Err("RunView actionable publication mismatch");
+            return Err("RunPort actionable publication mismatch");
         }
         let canonical = self
             .last
@@ -1007,13 +1007,13 @@ impl RunView {
             .and_then(|snapshot| snapshot.run.as_ref())
             .and_then(|run| run.actionables.first());
         if prompt.as_ref().map(|prompt| prompt.source()) != canonical {
-            return Err("RunView actionable facts mismatch");
+            return Err("RunPort actionable facts mismatch");
         }
         let controls = controls && self.gate.entries && !self.composer().is_composing();
         let generation = self
             .publication_generation
             .checked_add(1)
-            .ok_or("RunView publication generation exhausted")?;
+            .ok_or("RunPort publication generation exhausted")?;
         let changed = self
             .body
             .children
@@ -1026,7 +1026,7 @@ impl RunView {
     }
     /// Drain once immediately after ContentHost event/AX delivery, before update.
     /// The host resolves these intents against the original binding, not selection.
-    pub fn take_intents(&mut self, actions: &[ContentAction]) -> Vec<RunViewIntent> {
+    pub fn take_intents(&mut self, actions: &[ContentAction]) -> Vec<RunPortIntent> {
         if !self.pane_presented {
             return Vec::new();
         }
@@ -1041,24 +1041,24 @@ impl RunView {
             .composer_mut()
             .take_intents(actions)
             .into_iter()
-            .map(RunViewIntent::Composer)
+            .map(RunPortIntent::Composer)
             .collect();
         intents.extend(
             self.take_turn_navigation()
                 .into_iter()
-                .map(|n| RunViewIntent::TurnNavigation(Box::new(n))),
+                .map(|n| RunPortIntent::TurnNavigation(Box::new(n))),
         );
         intents.extend(
             self.take_jump()
                 .into_iter()
-                .map(|intent| RunViewIntent::JumpLatest(Box::new(intent))),
+                .map(|intent| RunPortIntent::JumpLatest(Box::new(intent))),
         );
         if self.composer().is_composing() {
             return intents;
         }
         if let Some(content) = self.transcript_mut() {
             intents.extend(content.take_feedback_intents(actions).into_iter().map(
-                |(control, gesture)| RunViewIntent::Feedback {
+                |(control, gesture)| RunPortIntent::Feedback {
                     control,
                     gesture: Box::new(gesture),
                 },
@@ -1071,7 +1071,7 @@ impl RunView {
                     .unwrap()
                     .activation(actions)
                 {
-                    intents.push(RunViewIntent::LoadEarlier {
+                    intents.push(RunPortIntent::LoadEarlier {
                         scope: scope.clone(),
                     });
                 }
@@ -1081,7 +1081,7 @@ impl RunView {
                         .unwrap()
                         .take_intents(actions)
                         .into_iter()
-                        .map(RunViewIntent::Actionable),
+                        .map(RunPortIntent::Actionable),
                 );
             }
         }
@@ -1090,13 +1090,13 @@ impl RunView {
                 content
                     .handle_actions(actions)
                     .into_iter()
-                    .map(|intent| RunViewIntent::TurnAction(Box::new(intent))),
+                    .map(|intent| RunPortIntent::TurnAction(Box::new(intent))),
             );
             intents.extend(
                 content
                     .take_copy_intents(actions)
                     .into_iter()
-                    .map(RunViewIntent::CopyTranscript),
+                    .map(RunPortIntent::CopyTranscript),
             );
         }
         intents
@@ -1114,7 +1114,7 @@ impl RunView {
                 .iter()
                 .any(|node| node.id() == content.id())
         {
-            return Err("duplicate RunView accessory");
+            return Err("duplicate RunPort accessory");
         }
         self.body.children.push(content);
         Ok(())
@@ -1154,7 +1154,7 @@ impl RunView {
         Ok(host)
     }
 }
-impl Component for RunView {
+impl Component for RunPort {
     fn lifecycle(&mut self, event: Lifecycle) {
         let mounted = event == Lifecycle::Mounted;
         if self.navigation_mounted != mounted {
@@ -1280,7 +1280,7 @@ impl Component for RunView {
                 .unwrap()
                 .arrange(text, composer, pane_clip);
         }
-        self.geometry = Some(RunViewGeometry {
+        self.geometry = Some(RunPortGeometry {
             publication: self.last.as_ref().map(|snapshot| snapshot.revision),
             connection_epoch: self.last.as_ref().map(|snapshot| snapshot.connection_epoch),
             pane: frame,

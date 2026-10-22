@@ -1,6 +1,6 @@
 //! Local fixture lifecycle through the normal runtime and retained native Run.
 use super::*;
-use tekes_agent_components_ui::{Composer, RunView};
+use tekes_agent_components_ui::{Composer, RunPort};
 use tekes_agent_presentation::RunPhase;
 use tekes_ui_platform_macos::selftest::{Action, run_script};
 const PREEDIT: &str = "中文归档草稿";
@@ -77,7 +77,7 @@ impl Probe {
             .tree
             .get(run_id)
             .unwrap()
-            .component::<RunView>()
+            .component::<RunPort>()
             .unwrap()
             .displayed_snapshot()
             .expect("rendered Run publication")
@@ -92,7 +92,7 @@ impl Probe {
                     .tree
                     .get(run_id)
                     .unwrap()
-                    .component::<RunView>()
+                    .component::<RunPort>()
                     .unwrap()
                     .layout_geometry()
                     .unwrap()
@@ -127,7 +127,7 @@ impl Probe {
                     .tree
                     .get(run_id)
                     .unwrap()
-                    .component::<RunView>()
+                    .component::<RunPort>()
                     .unwrap()
                     .layout_geometry()
                     .unwrap()
@@ -212,7 +212,7 @@ impl Probe {
                     .tree
                     .get(run_id)
                     .unwrap()
-                    .component::<RunView>()
+                    .component::<RunPort>()
                     .unwrap()
                     .layout_geometry()
                     .unwrap()
@@ -232,7 +232,7 @@ impl Probe {
                         .tree
                         .get_mut(run_id)
                         .unwrap()
-                        .component_mut::<RunView>()
+                        .component_mut::<RunPort>()
                         .unwrap()
                         .take_intents(&[])
                         .is_empty()
@@ -306,7 +306,7 @@ impl Probe {
             view.binding().current_run().unwrap().transcript.items.len(),
             self.items
         );
-        serde_json::json!({"nativeWindow":true,"formalRunView":true,"runtimeArchiveUnarchive":true,"projectionFailureRecovery":self.failure_fixture.is_some(),
+        serde_json::json!({"nativeWindow":true,"formalRunPort":true,"runtimeArchiveUnarchive":true,"projectionFailureRecovery":self.failure_fixture.is_some(),
             "nativeSyntheticMarkedText":true,"hiddenFromAccessibility":true,"focusReconciledByLibrary":true,
             "noHiddenLayoutSlot":true,"sameEditorRetained":true,"draftIsolation":true,"noSubmission":true,
             "physicalIme":false,"voiceOver":false,"realHarness":false,"fullLayoutParity":false})

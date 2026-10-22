@@ -1,8 +1,8 @@
-//! Candidate-only native host diagnostic over the actual original RunView.
+//! Candidate-only native host diagnostic over the actual original RunPort.
 //! The navigation is programmatic; preedit enters through the AppKit bridge.
 //! This is not an interactive indicator rail or physical IME acceptance.
 use super::*;
-use tekes_agent_components_ui::{RunTurnNavigationKind, RunView};
+use tekes_agent_components_ui::{RunTurnNavigationKind, RunPort};
 use tekes_ui_controls::{
     ReadingDocumentVersion, ScrollRevealOptions, ScrollRevealPlacement,
     composition::{ContentRevealStatus, ScrollContent},
@@ -36,12 +36,12 @@ impl Probe {
     fn root(host: &Host) -> ComponentId {
         ComponentId(host.view.ids().root.0 + 16)
     }
-    fn run(host: &Host) -> &RunView {
+    fn run(host: &Host) -> &RunPort {
         host.view
             .tree
             .get(Self::root(host))
             .unwrap()
-            .component::<RunView>()
+            .component::<RunPort>()
             .unwrap()
     }
     fn scroll(host: &Host) -> &ScrollContent {
@@ -237,7 +237,7 @@ impl Probe {
     pub fn receipt(&self, host: &Host) -> serde_json::Value {
         assert_eq!(self.phase, 7);
         self.check_editor(host);
-        serde_json::json!({"nativeWindow":true,"actualRunView":true,"originalBackend":true,"secondPublicConsumer":false,
+        serde_json::json!({"nativeWindow":true,"actualRunPort":true,"originalBackend":true,"secondPublicConsumer":false,
             "programmaticItemNavigation":true,"clientkitTurnStartAlignment":false,"initialAndExplicitLatest":true,"syntheticAppKitPreeditPreserved":true,
             "originalEditorAndBaseline":true,"noSubmission":true,"realHarness":false,"physicalIme":false,"interactiveRail":false,"voiceOver":false})
     }

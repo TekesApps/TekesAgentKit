@@ -71,7 +71,7 @@ fn rail_intents(host: &mut ContentHost, root: ComponentId) -> Vec<RunTurnNavigat
         .take_intents(&actions)
         .into_iter()
         .filter_map(|i| match i {
-            RunViewIntent::TurnNavigation(n) => Some(*n),
+            RunPortIntent::TurnNavigation(n) => Some(*n),
             _ => None,
         })
         .collect()
@@ -341,7 +341,7 @@ async fn unmount_remount_retires_both_navigation_and_reveal_without_replacing_th
     use tekes_ui_controls::extended::{Axis, Stack};
     let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
     let snapshot = controller.snapshot();
-    let mut view = RunView::standard(2100, 2104..2500, RunScope::main("fixture", "a")).unwrap();
+    let mut view = RunPort::standard(2100, 2104..2500, RunScope::main("fixture", "a")).unwrap();
     view.update(
         &snapshot,
         Default::default(),
@@ -380,7 +380,7 @@ async fn unmount_remount_retires_both_navigation_and_reveal_without_replacing_th
     let removed = host.remove(root).unwrap();
     assert!(
         removed
-            .component::<RunView>()
+            .component::<RunPort>()
             .unwrap()
             .claim_turn_navigation(&navigation)
             .is_err()

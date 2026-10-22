@@ -1,16 +1,16 @@
 use tekes_agent_components_ui::*;
 use tekes_agent_presentation::RunSnapshot;
 use tekes_ui_controls::composition::*;
-fn ids() -> RunViewIds {
-    RunViewIds {
+fn ids() -> RunPortIds {
+    RunPortIds {
         root: ComponentId(700_u64 << 32),
         indicators: ComponentId((700_u64 << 32) + 1),
         viewport: ComponentId((700_u64 << 32) + 2),
         composer: ComposerIds::new((700_u64 << 32) + 16),
     }
 }
-fn view() -> RunView {
-    RunView::new(
+fn view() -> RunPort {
+    RunPort::new(
         ids(),
         RunScope::main("fixture", "a"),
         Composer::new(ids().composer),
@@ -51,11 +51,11 @@ async fn run_routes_loaded_input_copy_and_blocks_it_while_composing() {
     let intents = host
         .get_mut(ids().root)
         .unwrap()
-        .component_mut::<RunView>()
+        .component_mut::<RunPort>()
         .unwrap()
         .take_intents(&actions);
     assert!(
-        matches!(intents.as_slice(), [RunViewIntent::CopyTranscript(copy)] if copy.scope()==&RunScope::main("fixture","a") && !copy.text().is_empty())
+        matches!(intents.as_slice(), [RunPortIntent::CopyTranscript(copy)] if copy.scope()==&RunScope::main("fixture","a") && !copy.text().is_empty())
     );
     host.focus(Some(ids().composer.editor), true);
     host.event(&ContentEvent::Preedit {
@@ -67,14 +67,14 @@ async fn run_routes_loaded_input_copy_and_blocks_it_while_composing() {
     assert!(
         host.get_mut(ids().root)
             .unwrap()
-            .component_mut::<RunView>()
+            .component_mut::<RunPort>()
             .unwrap()
             .take_intents(&actions)
             .is_empty()
     );
     runtime.stop().await.unwrap();
 }
-fn update(view: &mut RunView, snapshot: &RunSnapshot) -> Result<(), &'static str> {
+fn update(view: &mut RunPort, snapshot: &RunSnapshot) -> Result<(), &'static str> {
     view.update(
         snapshot,
         Default::default(),
@@ -115,17 +115,17 @@ async fn a_run_mounts_the_real_components_and_emits_original_destination_intents
     );
     host.focus(Some(ids().composer.editor), true);
     host.event(&ContentEvent::Commit {
-        text: "RunView 原始输入".into(),
+        text: "RunPort 原始输入".into(),
         replacement: None,
     });
     let actions = host.drain_actions();
     let intents = host
         .get_mut(ids().root)
         .unwrap()
-        .component_mut::<RunView>()
+        .component_mut::<RunPort>()
         .unwrap()
         .take_intents(&actions);
-    let [RunViewIntent::Composer(ComposerIntent::Edit { destination, text })] = intents.as_slice()
+    let [RunPortIntent::Composer(ComposerIntent::Edit { destination, text })] = intents.as_slice()
     else {
         panic!("one shared edit intent");
     };
@@ -133,7 +133,7 @@ async fn a_run_mounts_the_real_components_and_emits_original_destination_intents
         destination,
         &ComposerDestination::run(RunScope::main("fixture", "a"))
     );
-    assert_eq!(text, "RunView 原始输入");
+    assert_eq!(text, "RunPort 原始输入");
     runtime.stop().await.unwrap();
 }
 #[tokio::test]
@@ -209,7 +209,7 @@ fn namespaces_include_future_rows_hidden_context_and_reserved_controls() {
     let composer = Composer::new(ids().composer)
         .with_context(799, Default::default())
         .unwrap();
-    let mut view = RunView::new(ids(), RunScope::main("fixture", "a"), composer, 701, 702).unwrap();
+    let mut view = RunPort::new(ids(), RunScope::main("fixture", "a"), composer, 701, 702).unwrap();
     assert!(
         view.install_transcript(
             TranscriptContent::new(
@@ -246,7 +246,7 @@ fn namespaces_include_future_rows_hidden_context_and_reserved_controls() {
     let mut overlap = ids();
     overlap.viewport = overlap.composer.send;
     assert!(
-        RunView::new(
+        RunPort::new(
             overlap,
             RunScope::main("fixture", "a"),
             Composer::new(overlap.composer),
@@ -292,7 +292,7 @@ async fn preedit_blocks_send_and_history_intents_until_the_original_composition_
     let view = host
         .get_mut(ids().root)
         .unwrap()
-        .component_mut::<RunView>()
+        .component_mut::<RunPort>()
         .unwrap();
     assert!(view.composer().is_composing());
     assert!(view.take_intents(&actions).is_empty());
@@ -312,17 +312,17 @@ async fn preedit_blocks_send_and_history_intents_until_the_original_composition_
     let intents = host
         .get_mut(ids().root)
         .unwrap()
-        .component_mut::<RunView>()
+        .component_mut::<RunPort>()
         .unwrap()
         .take_intents(&actions);
     assert!(matches!(
         intents.as_slice(),
-        [RunViewIntent::Composer(ComposerIntent::Edit { .. })]
+        [RunPortIntent::Composer(ComposerIntent::Edit { .. })]
     ));
     assert!(
         host.get(ids().root)
             .unwrap()
-            .component::<RunView>()
+            .component::<RunPort>()
             .unwrap()
             .allows_focus_target(ComponentId((701_u64 << 32) + 1))
     );
@@ -335,11 +335,11 @@ async fn preedit_blocks_send_and_history_intents_until_the_original_composition_
     let intents = host
         .get_mut(ids().root)
         .unwrap()
-        .component_mut::<RunView>()
+        .component_mut::<RunPort>()
         .unwrap()
         .take_intents(&actions);
     assert!(
-        matches!(intents.as_slice(),[RunViewIntent::LoadEarlier{scope}] if scope==&RunScope::main("fixture","a"))
+        matches!(intents.as_slice(),[RunPortIntent::LoadEarlier{scope}] if scope==&RunScope::main("fixture","a"))
     );
     runtime.stop().await.unwrap();
 }
@@ -395,7 +395,7 @@ async fn rejected_context_frame_cannot_partially_install_the_composer_or_transcr
     let composer = Composer::new(ids().composer)
         .with_context(1001, Default::default())
         .unwrap();
-    let mut run = RunView::new(ids(), RunScope::main("fixture", "a"), composer, 701, 702)
+    let mut run = RunPort::new(ids(), RunScope::main("fixture", "a"), composer, 701, 702)
         .unwrap()
         .with_transcript(703, 704..1000, Default::default())
         .unwrap();
@@ -430,7 +430,7 @@ async fn rejected_context_frame_cannot_partially_install_the_composer_or_transcr
     let run = host
         .get_mut(ids().root)
         .unwrap()
-        .component_mut::<RunView>()
+        .component_mut::<RunPort>()
         .unwrap();
     assert_eq!(update(run, &rejected), Err("stale context snapshot"));
     assert_eq!(run.composer().editor().input.text, "原草稿");
@@ -454,9 +454,9 @@ async fn rejected_context_frame_cannot_partially_install_the_composer_or_transcr
 }
 
 fn prepare<'a>(
-    view: &RunView,
+    view: &RunPort,
     snapshot: &'a RunSnapshot,
-) -> Result<RunViewUpdate<'a>, &'static str> {
+) -> Result<RunPortUpdate<'a>, &'static str> {
     view.prepare_update(
         snapshot,
         Default::default(),
@@ -538,11 +538,11 @@ async fn whole_run_plan_rejects_edit_undo_aba_and_invalid_frames_before_mutation
     let run = host
         .get_mut(ids().root)
         .unwrap()
-        .component_mut::<RunView>()
+        .component_mut::<RunPort>()
         .unwrap();
     assert_eq!(
         run.apply_prepared_update(&plan),
-        Err("stale or foreign RunView update plan")
+        Err("stale or foreign RunPort update plan")
     );
     assert_eq!(run.composer().editor().input.external_baseline(), after);
     assert_eq!(run.transcript().unwrap().row_keys(), rows);
@@ -583,7 +583,7 @@ async fn same_publication_gate_change_invalidates_an_older_prepared_open_frame()
     assert_eq!(run.composer().editor().input.external_baseline(), before);
     assert_eq!(
         run.apply_prepared_update(&plan),
-        Err("stale or foreign RunView update plan")
+        Err("stale or foreign RunPort update plan")
     );
     assert_eq!(run.composer().editor().input.external_baseline(), before);
     assert_eq!(run.transcript().unwrap().row_keys(), old_rows);
@@ -608,14 +608,14 @@ async fn advanced_paging_and_actionable_authority_refreshes_retire_stored_plans(
     run.update_paging(page).unwrap();
     assert_eq!(
         run.validate_prepared_update(&plan),
-        Err("stale or foreign RunView update plan")
+        Err("stale or foreign RunPort update plan")
     );
     let plan = prepare(&run, &snapshot).unwrap();
     run.update_actionable(snapshot.revision, snapshot.connection_epoch, None, false)
         .unwrap();
     assert_eq!(
         run.validate_prepared_update(&plan),
-        Err("stale or foreign RunView update plan")
+        Err("stale or foreign RunPort update plan")
     );
     assert_eq!(run.composer().editor().input.external_baseline(), before);
     runtime.stop().await.unwrap();
@@ -652,7 +652,7 @@ async fn composer_visibility_is_independent_of_admission_and_keeps_original_edit
         let run = host
             .get_mut(ids().root)
             .unwrap()
-            .component_mut::<RunView>()
+            .component_mut::<RunPort>()
             .unwrap();
         run.update(
             &snapshot,
@@ -690,7 +690,7 @@ async fn composer_visibility_is_independent_of_admission_and_keeps_original_edit
             let run = host
                 .get_mut(ids().root)
                 .unwrap()
-                .component_mut::<RunView>()
+                .component_mut::<RunPort>()
                 .unwrap();
             assert!(
                 run.take_intents(&queued).is_empty(),
@@ -706,7 +706,7 @@ async fn composer_visibility_is_independent_of_admission_and_keeps_original_edit
             assert!(
                 host.get_mut(ids().root)
                     .unwrap()
-                    .component_mut::<RunView>()
+                    .component_mut::<RunPort>()
                     .unwrap()
                     .take_intents(&actions)
                     .is_empty()

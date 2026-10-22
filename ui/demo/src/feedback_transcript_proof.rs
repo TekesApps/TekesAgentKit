@@ -1,4 +1,4 @@
-//! Opt-in proof through actual Transcript/RunView routing and original-binding callbacks.
+//! Opt-in proof through actual Transcript/RunPort routing and original-binding callbacks.
 use crate::component_demo::{ComponentDemo, DemoCommand};
 use tekes_agent_components_ui::{TranscriptContent, TurnFeedback};
 use tekes_agent_contract::{Result, require, unsupported};
@@ -110,6 +110,6 @@ pub async fn run(view: &mut ComponentDemo) -> Result<serde_json::Value> {
         "feedback changed a Composer draft",
     )?;
     Ok(
-        serde_json::json!({"embeddedTranscript":true,"runViewRouting":true,"originalTarget":true,"coldRead":true,"savedChineseNote":true,"noteReopened":true,"sameRatingDeletes":true,"freshReadAfterDelete":true,"draftsPreserved":true,"nativeInteraction":false,"readingAnchorAcceptance":false}),
+        serde_json::json!({"embeddedTranscript":true,"runPortRouting":true,"originalTarget":true,"coldRead":true,"savedChineseNote":true,"noteReopened":true,"sameRatingDeletes":true,"freshReadAfterDelete":true,"draftsPreserved":true,"nativeInteraction":false,"readingAnchorAcceptance":false}),
     )
 }

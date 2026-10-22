@@ -1,6 +1,6 @@
-//! Owned SEP facts -> original presentation/RunView -> native temporal aside.
+//! Owned SEP facts -> original presentation/RunPort -> native temporal aside.
 use super::*;
-use tekes_agent_components_ui::{OutputUsage, RunView, TranscriptContentRowKey, TurnFootnote};
+use tekes_agent_components_ui::{OutputUsage, RunPort, TranscriptContentRowKey, TurnFootnote};
 use tekes_agent_ui_demo::fixture::Fixture;
 use tekes_ui_controls::composition::TextContent;
 use tekes_ui_platform_macos::selftest::{Action, run_script};
@@ -65,7 +65,7 @@ impl Probe {
             .tree
             .get(ComponentId(host.view.ids().root.0 + 16))
             .unwrap()
-            .component::<RunView>()
+            .component::<RunPort>()
             .unwrap();
         let transcript = run.transcript().unwrap();
         let id = transcript
@@ -137,7 +137,7 @@ impl Probe {
                     .tree
                     .get(root)
                     .unwrap()
-                    .component::<RunView>()
+                    .component::<RunPort>()
                     .unwrap();
                 let Some(footer) = run
                     .transcript()

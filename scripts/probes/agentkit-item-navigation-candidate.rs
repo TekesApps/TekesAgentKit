@@ -1,4 +1,4 @@
-// Appended to the unchanged formal RunView transaction probe. Only public
+// Appended to the unchanged formal RunPort transaction probe. Only public
 // stable IDs/options and the original backend cross the library boundary.
 use tekes_ui_controls::{ScrollRevealOptions, ScrollRevealPlacement};
 fn navigation(host: &ContentHost, root: ComponentId, index: usize) -> RunTurnNavigation {
@@ -123,7 +123,7 @@ async fn old_reading_attachment_and_foreign_run_cannot_dispatch_a_local_turn_to_
     assert_eq!(scroll(&host, root).scroll.offset, offset);
     let fresh = navigation(&host, root, 0);
     reveal_navigation(&mut host, root, &replacement, &fresh, &mut text).unwrap();
-    let foreign = RunView::standard(2100, 2104..2500, RunScope::main("fixture", "a")).unwrap();
+    let foreign = RunPort::standard(2100, 2104..2500, RunScope::main("fixture", "a")).unwrap();
     assert!(
         foreign
             .claim_turn_navigation(&navigation(&host, root, 0))
@@ -260,7 +260,7 @@ async fn nested_run() -> (
     let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
     let mut snapshot = (*controller.snapshot()).clone();
     snapshot.draft.text = "原草稿 中文".into();
-    let mut view = RunView::standard(2100, 2104..2500, RunScope::main("fixture", "a")).unwrap();
+    let mut view = RunPort::standard(2100, 2104..2500, RunScope::main("fixture", "a")).unwrap();
     view.update(
         &snapshot,
         Default::default(),

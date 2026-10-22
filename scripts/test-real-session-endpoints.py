@@ -30,7 +30,7 @@ parser.add_argument('--ui-native-reading',action='store_true',help='Native publi
 parser.add_argument('--ui-native-stream-reading',action='store_true',help='Actual native stream while reading seeded history, with Chinese preedit and reconnect')
 parser.add_argument('--ui-native-stream',action='store_true',help='Use fresh owned sessions for native Send, active preview, selection, settlement, draft isolation and reconnect; excludes reading anchors')
 parser.add_argument('--ui-native-feedback',action='store_true',help='Open each owned-session native window sequentially and exercise feedback clicks, text services and session switching')
-parser.add_argument('--ui-feedback-transcript',action='store_true',help='Exercise feedback through actual Transcript/RunView and captured host callbacks; offscreen only')
+parser.add_argument('--ui-feedback-transcript',action='store_true',help='Exercise feedback through actual Transcript/RunPort and captured host callbacks; offscreen only')
 parser.add_argument('--ui-feedback-controls',action='store_true',help='Exercise public feedback controls and note editing over isolated real transports; offscreen only')
 parser.add_argument('--ui-feedback-write',action='store_true',help='Mutating CAS/note proof on isolated fixture targets; no rating UI acceptance')
 parser.add_argument('--ui-turn-footnote',action='store_true',help='Opt in to shared completed-turn fork in isolated UI sessions; requires components')
@@ -497,7 +497,7 @@ def ui_smoke(config, first, bounded_child=None):
             assert not feedback['ratingControls'] and not feedback['nativeInteraction'],feedback
         if args.ui_feedback_transcript:
             feedback=receipt['feedbackTranscriptProof']
-            assert all(feedback[key] for key in ('embeddedTranscript','runViewRouting','originalTarget','coldRead','savedChineseNote','noteReopened','sameRatingDeletes','freshReadAfterDelete','draftsPreserved')),feedback
+            assert all(feedback[key] for key in ('embeddedTranscript','runPortRouting','originalTarget','coldRead','savedChineseNote','noteReopened','sameRatingDeletes','freshReadAfterDelete','draftsPreserved')),feedback
             assert not feedback['nativeInteraction'] and not feedback['readingAnchorAcceptance'],feedback
             assert content['feedbackRows']>=1,content
         if args.ui_feedback_controls:
@@ -513,8 +513,8 @@ def ui_smoke(config, first, bounded_child=None):
         print(kind.upper()+'_UI_MESSAGE_ROWS_OK canonical-user+external-caption+machine-content+public-controls; full-transcript=false; native-interaction=false',flush=True)
     if args.ui_components:
         assert receipt['components'] and not receipt['transcriptView'],receipt
-        run=receipt['runViewComposition']
-        assert run['mounted'] and run['sharedIntents'] and not run['ownsRuntime'] and not run['completeRunView'],run
+        run=receipt['runPortComposition']
+        assert run['mounted'] and run['sharedIntents'] and not run['ownsRuntime'] and not run['completeRunPort'],run
         if (args.ui_transcript_content or bounded_child is not None):assert run['transcriptMounted'],run
         assert receipt['inventoryRows']>=1 and receipt['sharedRuntime'] and receipt['sidebarMounted'],receipt
         if bounded_child:

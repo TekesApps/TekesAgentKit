@@ -111,7 +111,7 @@ pub struct TranscriptContentCapabilities {
     pub structured_user_content: bool,
 }
 /// Real content composition, independently mountable. It is not the complete
-/// Transcript viewport or RunView. See capabilities()/the upstream #22/#25 gates.
+/// Transcript viewport or RunPort. See capabilities()/the upstream #22/#25 gates.
 #[derive(Debug)]
 pub struct TranscriptContent {
     root: ComponentId,

@@ -130,6 +130,8 @@ Full Sidebar folder catalog input: [2026-10-21 contract](docs/rust-agent-ui-side
 
 Current experimental public UI pin and explicit native Sidebar reveal: [published checkpoint integration](docs/rust-agent-ui-published-reading-20261021.md). This supersedes the earlier public-source-absence finding; continuous reading/page-anchor acceptance remains pending.
 
-RunView now publishes Transcript and Composer inside original SDK reading transactions: [continuous reading contract](docs/rust-agent-ui-continuous-reading-20261021.md). CoreText and owned-fixture native page anchors are checked separately from remaining cross-harness reading acceptance.
+RunPort now publishes Transcript and Composer inside original SDK reading transactions: [continuous reading contract](docs/rust-agent-ui-continuous-reading-20261021.md). CoreText and owned-fixture native page anchors are checked separately from remaining cross-harness reading acceptance.
 
 Retained A/B reading, native pages and reconnect across all three harnesses: [reading restoration and stale-footnote fix](docs/rust-agent-ui-retained-reading-20261021.md). Fresh-host persistent checkpoints remain tracked in TekesUI #42.
+
+The reusable Rust composition is now **RunPort** (formerly Rust RunView). Sidebar, RunPort and SidePanel target the TekesUI ProcessContainer host contract; current same-process Content remains runnable while remote input/IME/scroll/AX delivery is tracked in [TekesUI #48](https://github.com/TekesApps/TekesUI/issues/48). See the [API migration and separate execution-mode matrix](docs/rust-agent-ui-run-port-20261022.md).

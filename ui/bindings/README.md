@@ -2,7 +2,7 @@
 
 `RunBinding` binds one mounted pane to existing `SessionRuntime`, `RunController`,
 `ChildRun` and `SideChatController` authority. It owns observations, not windows or
-another Run state machine. Public RunView/TranscriptContent/ReadOnlyTranscript are
+another Run state machine. Public RunPort/TranscriptContent/ReadOnlyTranscript are
 supplied by the components package; full reading/rich-content acceptance remains
 experimental. The workspace consumes an exact published TekesUI revision.
 
@@ -24,7 +24,7 @@ Versions are opaque; same-value writes need not advance them. Public `TurnFeedba
 Completion `apply` returns Ignored (keep current frame) or Adopted (replace with
 the supplied optional frame). Cold/unknown states use explicit Refresh. See the
 [control contract](../../docs/rust-agent-ui-feedback-controls-20261020.md);
-formal Transcript footnote routing is now available through `RunViewIntent::Feedback`
+formal Transcript footnote routing is now available through `RunPortIntent::Feedback`
 and original-widget completion; see the [integration contract](../../docs/rust-agent-ui-feedback-transcript-20261020.md). See the [read contract](../../docs/rust-agent-ui-feedback-read-20261020.md)
 and [CAS contract](../../docs/rust-agent-ui-feedback-cas-20261020.md).
 
@@ -108,7 +108,7 @@ Unknown resolver and never reads a harness's private database.
 
 The `--components` demo mounts a separate public Composer and Indicators for an
 owned scratch run. Transcript remains pending upstream #22/#23, so this is not
-a complete SideChat RunView. `ui/demo/tests/sidechat_binding.rs` covers parent
+a complete SideChat RunPort. `ui/demo/tests/sidechat_binding.rs` covers parent
 isolation, late creation, streaming/cancel/discard, stale close callbacks, and
 interrupted discard with explicit reconciliation. The native fixture script
 exercises its own scratch transport and leaves both parent drafts unchanged.
@@ -149,7 +149,7 @@ window wake. The native fixture script uses explicit host navigation for a known
 same-session task row; it does not invent Summary navigation for a todo.
 
 Tasks currently mount public Composer/Indicators only. Formal Transcript and the
-complete task RunView still await the same structured-content integration as the
+complete task RunPort still await the same structured-content integration as the
 main run. Tests cover source ABA, stale load tokens, slow baseline completion,
 host-preparation fences, draft lifetime and public-control composition.
 
@@ -200,7 +200,7 @@ It preserves the last read on error and admits one read per pane at a time; a
 same-key failure waits for an explicit retry. Retired/inactive async results do
 not replace another parent's content or notice. `update_child_snapshot` and
 `child_read_failed` finish the host's read command; always drain pending background
-commands after sync. Formal child Transcript/RunView still need structured text
+commands after sync. Formal child Transcript/RunPort still need structured text
 and reading-anchor integration, including live Native presentation acceptance.
 
 ## Shared inventory and thread actions
@@ -658,9 +658,9 @@ Capture `binding.begin_history_page()` on the original gesture and move its once
 `TurnActionDispatcher::prepare(original_binding, intent, rpc_id)` 认领一次原 turn 点击并验证共享动作/持久边界；`TurnActionRequest::execute` 派发前再次核对 pointer、runtime 身份、epoch、未确认提交及 canonical action。执行仍由 SharedAgent 的 `thread.performAction` 处理。Drop 不会重试或撤销已派发操作；尚未派发报告 Rejected，派发后丢失结果报告 Unknown。原组件回执随 retained/offscreen 内容保留；宿主执行 wake + sync/refresh，并按原导航 token 处理返回 outcome，不能直接使用当前选中会话。Unknown 没有自动查询/解锁 API，也不能按相似标题猜测分叉归属。
 
 
-## Shared RunView composition
+## Shared RunPort composition
 
-The public RunView consumes one captured RunSnapshot plus gates and page facts from its original binding. If a later HistoryPageSnapshot has another connection_epoch, lower source_ready/is_current; never substitute that epoch into the older RunSnapshot. Route the four RunViewIntent variants to the same binding before handing work to the executor. Navigation remains a host callback fenced by its original token. The second consumer demonstrates construction and snapshot synchronization without importing ComponentDemo or RunSurface; see the [RunView contract](../../docs/rust-agent-ui-run-view-20261020.md).
+The public RunPort consumes one captured RunSnapshot plus gates and page facts from its original binding. If a later HistoryPageSnapshot has another connection_epoch, lower source_ready/is_current; never substitute that epoch into the older RunSnapshot. Route the four RunPortIntent variants to the same binding before handing work to the executor. Navigation remains a host callback fenced by its original token. The second consumer demonstrates construction and snapshot synchronization without importing ComponentDemo or RunSurface; see the [RunPort contract](../../docs/rust-agent-ui-run-view-20261020.md).
 
 
 ## Read-only child frames and gestures
@@ -668,3 +668,5 @@ The public RunView consumes one captured RunSnapshot plus gates and page facts f
 ReadOnlyChild now includes per-binding snapshot invocation publication and connection_epoch. Allocate order before awaiting; a late older read must not become a newer UI publication. Reads crossing an epoch fail, and a retired source returns Missing. These unpublished UI fields are not SEP journal cursors. ChildPaneBinding::readonly_input lowers page gates when the runtime no longer matches the frame; custom sources retain no Kernel pagination capability.
 
 Mount ReadOnlyTranscript with an exclusive namespace pool. Route its immutable Refresh/Earlier intents to the original source.read_intent, not a newly selected source. The executor checks scope, liveness, page capability/epoch and one-shot admission before IO. Refresh may explicitly renew an old frame on a ready connection; page gestures cannot cross epochs. Keep failed reads with their original pane/task, retain readable content and retry only on a new gesture. See the [read-only contract](../../docs/rust-agent-ui-readonly-child-20261020.md).
+
+The Rust composition and intent/update/geometry types are now named RunPort. [Migration and ProcessContainer ownership](../../docs/rust-agent-ui-run-port-20261022.md) distinguish the current same-process path from blocked cross-process UI integration; endpoint IPC is not container acceptance.

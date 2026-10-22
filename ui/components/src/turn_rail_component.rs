@@ -103,7 +103,7 @@ impl Default for TurnRailLabels {
         }
     }
 }
-/// Mount through RunView::install_turn_rail so source identity and layout stay
+/// Mount through RunPort::install_turn_rail so source identity and layout stay
 /// shared. The current default pin reports unsupported rather than overlapping
 /// minimum-height buttons or a hidden input mirror.
 #[derive(Debug)]
@@ -239,7 +239,7 @@ impl TurnRail {
     pub fn item_ids(&self) -> Vec<ComponentId> {
         self.order.iter().map(|key| self.ids[key].0).collect()
     }
-    /// Captured data of the original rail item. Validate it through RunView
+    /// Captured data of the original rail item. Validate it through RunPort
     /// before reading a preview; this is neither overlay nor navigation authority.
     pub fn preview_target(&self, turn: &str) -> Option<crate::TranscriptTurnTarget> {
         self.prototype(self.row_id(turn)?)

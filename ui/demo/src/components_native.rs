@@ -1,5 +1,5 @@
 //! Native host of the actual public Composer/Indicators and RunBinding.
-//! This is a component integration window, not the final RunView or Transcript.
+//! This is a component integration window, not the final RunPort or Transcript.
 #[path = "native_sidebar_collation.rs"]
 mod sidebar_collation;
 use super::native::{TextBackend, input_event, publish_content, window_renderer};
@@ -4602,7 +4602,7 @@ pub fn run() {
             }
         }
         let transcript_content_proof=host.view.transcript_content_id(host.view.ids()).map(|id| {
-            let row=host.view.tree.get(id).unwrap();let content=row.component::<tekes_agent_components_ui::TranscriptContent>().unwrap();let frame=host.view.tree.get(ComponentId(host.view.ids().root.0+16)).unwrap().component::<tekes_agent_components_ui::RunView>().unwrap().layout_geometry().expect("arranged shared Run column").content_column;
+            let row=host.view.tree.get(id).unwrap();let content=row.component::<tekes_agent_components_ui::TranscriptContent>().unwrap();let frame=host.view.tree.get(ComponentId(host.view.ids().root.0+16)).unwrap().component::<tekes_agent_components_ui::RunPort>().unwrap().layout_geometry().expect("arranged shared Run column").content_column;
             let composer=host.view.tree.get(host.view.ids().root).unwrap().frame();
             assert!(composer.min_y()>=0. && composer.max_y()<=760., "content viewport must leave Composer inside the host window");
             let mut messages=0;let mut footnotes=0;let mut tools=0;let mut known_empty=0;let mut output_copies=0;let mut feedback_rows=0;
@@ -4650,20 +4650,20 @@ pub fn run() {
             assert_eq!(body.presentation, tekes_ui_controls::TextSurfacePresentation::Content);
             serde_json::json!({"rightBubble":true,"externalRightFootnote":true,"plainReadonlyContent":true,"bubbleWidth":bubble.size.width,"rowWidth":row.size.width,"completeTranscript":false,"nativeInteraction":false})
         });
-        let run_view = host
+        let run_port = host
             .view
             .tree
             .get(ComponentId(host.view.ids().root.0 + 16))
             .unwrap()
-            .component::<tekes_agent_components_ui::RunView>()
-            .expect("shared RunView mounted");
-        let run_view_proof = serde_json::json!({"mounted":true,"transcriptMounted":run_view.transcript_id().is_some(),
-            "sharedIntents":true,"ownsRuntime":false,"completeRunView":false,"keyedReadingAcceptance":false});
+            .component::<tekes_agent_components_ui::RunPort>()
+            .expect("shared RunPort mounted");
+        let run_port_proof = serde_json::json!({"mounted":true,"transcriptMounted":run_port.transcript_id().is_some(),
+            "sharedIntents":true,"ownsRuntime":false,"completeRunPort":false,"keyedReadingAcceptance":false});
         println!(
             "{}",
             serde_json::json!({
                 "sidebarSearchProof":sidebar_query_proof,
-                "runViewComposition":run_view_proof,"boundedChildProof":bounded_child_proof,"feedbackReadProof":feedback_read_proof,"feedbackWriteProof":feedback_write_proof,"feedbackControlsProof":feedback_controls_proof,"feedbackTranscriptProof":feedback_transcript_proof,
+                "runPortComposition":run_port_proof,"boundedChildProof":bounded_child_proof,"feedbackReadProof":feedback_read_proof,"feedbackWriteProof":feedback_write_proof,"feedbackControlsProof":feedback_controls_proof,"feedbackTranscriptProof":feedback_transcript_proof,
                 "offscreen": true, "components": true, "nativeInteraction": false,
                 "transcriptView": false, "isStale": snapshot.transcript.is_stale,
                 "transcriptItems": snapshot.transcript.items.len(),
