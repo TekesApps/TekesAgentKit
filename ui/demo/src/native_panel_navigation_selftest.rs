@@ -24,6 +24,7 @@ pub(super) struct Probe {
     child: Option<ChildOpenFixture>,
     child_editor: Option<ComponentId>,
     pending_close: Option<PanelRequest>,
+    inactive_task_parent: Option<Arc<RunBinding>>,
 }
 impl Probe {
     pub fn new() -> Self {
@@ -38,6 +39,7 @@ impl Probe {
             child: None,
             child_editor: None,
             pending_close: None,
+            inactive_task_parent: None,
         }
     }
     fn input(host: &Host) -> &tekes_agent_components_ui::SidePanelInput {
@@ -333,6 +335,56 @@ impl Probe {
                     self.admissions
                 );
                 self.phase = 12;
+                self.inactive_task_parent = Some(host.view.binding().clone());
+                Self::click(host, tekes_agent_ui_demo::component_demo::SELECT_B);
+            }
+            12 if host.view.binding().scope().session_id == "b" => {
+                Self::click(host, host.view.ids().editor);
+                self.phase = 13;
+            }
+            13 if window.is_active()
+                && host.view.tree.focused() == Some(host.view.ids().editor) =>
+            {
+                let parent = self.inactive_task_parent.as_ref().unwrap();
+                let source = Arc::new(TaskPaneBinding::for_run(parent));
+                let token = source.begin(parent.scope().clone(), "late-task").unwrap();
+                assert!(source.commit(
+                    &token,
+                    Ok(Some(AgentTask {
+                        id: "late-task".into(),
+                        scope: RunScope {
+                            session_id: "child-a".into(),
+                            ..parent.scope().clone()
+                        },
+                        name: "inactive parent".into(),
+                        status: "running".into(),
+                        kind: "task".into(),
+                    }))
+                ));
+                let editor = host.view.ids().editor;
+                let owner = host.view.tree.text_surface(editor).unwrap() as *const _ as usize;
+                let baseline = host.view.editor().input.external_baseline();
+                let state = host.view.binding().current_run().unwrap();
+                let scope = host.view.binding().scope().clone();
+                let request = host.view.begin_child_open(&scope).unwrap();
+                assert!(host.view.open_task_source(source).is_err());
+                assert_eq!(host.view.binding().scope(), &scope);
+                assert_eq!(host.view.tree.focused(), Some(editor));
+                assert_eq!(
+                    host.view.tree.text_surface(editor).unwrap() as *const _ as usize,
+                    owner
+                );
+                assert_eq!(host.view.editor().input.external_baseline(), baseline);
+                assert_eq!(
+                    host.view.binding().current_run().unwrap().draft,
+                    state.draft
+                );
+                assert_eq!(
+                    host.view.binding().current_run().unwrap().submissions.len(),
+                    state.submissions.len()
+                );
+                assert!(host.view.child_request_current(&request));
+                self.phase = 14;
                 run_script(vec![(0, Action::Close)]);
             }
             _ => {}
@@ -343,7 +395,7 @@ impl Probe {
         }
     }
     pub fn receipt(&self) -> serde_json::Value {
-        assert_eq!(self.phase, 12, "panel navigation did not finish");
-        serde_json::json!({"nativeWindow":true,"originalPointerControls":true,"summaryCloseAndReopen":true,"openOrderRetained":true,"lastRemainingSelection":true,"emptyDocumentRetained":true,"originalTaskEditorRetained":true,"lateChildOwnerRejected":true,"duplicateChildDeliveryRejected":true,"pendingChildAfterCloseRejected":true,"originalChildEditorRetained":true,"mainDraftRetained":true,"noSubmission":true,"ownedFixture":true,"realHarness":false,"physicalIme":false,"voiceOver":false,"processContainer":false})
+        assert_eq!(self.phase, 14, "panel navigation did not finish");
+        serde_json::json!({"nativeWindow":true,"originalPointerControls":true,"summaryCloseAndReopen":true,"openOrderRetained":true,"lastRemainingSelection":true,"emptyDocumentRetained":true,"originalTaskEditorRetained":true,"lateChildOwnerRejected":true,"duplicateChildDeliveryRejected":true,"pendingChildAfterCloseRejected":true,"originalChildEditorRetained":true,"inactiveTaskNavigationRejected":true,"currentParentDraftAndFocusRetained":true,"currentChildRequestRetained":true,"mainDraftRetained":true,"noSubmission":true,"ownedFixture":true,"realHarness":false,"physicalIme":false,"voiceOver":false,"processContainer":false})
     }
 }

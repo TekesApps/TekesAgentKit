@@ -1,0 +1,90 @@
+{
+  "checked_at": "2026-10-22T04:37:01.693781+00:00",
+  "program": {
+    "program": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/AgentKitTaskParent20261022.app/Contents/MacOS/AgentKitTaskParent20261022",
+    "sha256": "5bf74a931e187dc9906277d8699a027d0f1c78d2f8fe5eff7873e138f26123b1",
+    "base_commit": "85d3b8073d12cab4e587182525e009ad7679c698",
+    "sdk": "09b4bab44b6dfa65487250ea816b610b9df59095",
+    "source_sha256": {
+      "ui/demo/src/component_demo.rs": "1b380b0354ae5be320af0fc90e8cc5194310241f868cae5aed1fc408eb21978a",
+      "ui/demo/src/native_panel_navigation_selftest.rs": "2cea9e5c41333ce03a075c2eda443e9392519341fdf582b963e71aa0dbaed3fd",
+      "ui/demo/tests/panel_navigation.rs": "c79f58f200a098481acb6f44ef667439c270ac727d051185e729c6e8fbcd5559"
+    }
+  },
+  "tests": {
+    "passed": 508,
+    "failed": 0,
+    "ignored": 1,
+    "ignored_gate": "TekesUI #49"
+  },
+  "strict_all_target_clippy": true,
+  "build": true,
+  "ui_boundaries": true,
+  "second_public_consumer_included": true,
+  "consumer_inputs": {
+    "commit": "09b4bab44b6dfa65487250ea816b610b9df59095",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 241,
+    "sha256": "44b3174022584d3c099a45b86892d17dbf948905476c0f038be104df12aefe46",
+    "ui_packages": 8
+  },
+  "native": {
+    "accepted": false,
+    "owned_fixture": true,
+    "phase": 13,
+    "expected_final_phase": 14,
+    "new_inactive_task_assertion_executed": false,
+    "reason": "foreground changed to Codex before active original B editor guard",
+    "driver_exit_code": 1,
+    "launcher_exit_code": 0,
+    "application_exit_code": null,
+    "original_receipt_present": false,
+    "forced_activation": false,
+    "retry": false
+  },
+  "three_harness": {
+    "protocol_to_offscreen_gpu": true,
+    "native_kernel_version": "0.9.3",
+    "native_kernel_ui_only": true,
+    "pi_version": "1.3.0",
+    "dsh_version": "0.2.1-rc.2",
+    "native_interaction": false,
+    "new_task_scenarios": false
+  },
+  "scope": {
+    "process_container": false,
+    "software_ime_rerun": false,
+    "physical_keyboard": false,
+    "candidate_window": false,
+    "voice_over": false,
+    "new_target": false,
+    "deleted_bytes": 0
+  },
+  "evidence_directory": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/task-parent-navigation-20261022",
+  "evidence_sha256": {
+    "consumer-inputs.json": "cdc58abe6ba1a4ca2a3ae00fa2a73cb6481b9ba29e542c88359a5e8e330c6605",
+    "three.png": "d8c5798935068ccd238d8a12531ce12e8c937f7d7366f93be3a97c15310aedad",
+    "before-final.log": "5a4a0697ebf5124b1bb90186280dbc0a45a3818e2935fe353e9dca8c0e257c4a",
+    "program.json": "6473e36cb23d0a0c0399e99efcac1451c5380b5e8d501fea5261794ec78c3560",
+    "native-launch.log": "89ba35cad0f148ca64e78b11e0ca7e51e6703481e7c2e7fce9aa8c2730f6f397",
+    "clippy.log": "c4b2a128b2843d6178a0c2e05b4cef9df48e8c0109f0127df2c4c39a5added24",
+    "native.log.frontmost.jsonl": "556cd2e1f1d368bd2fa862e6ade494643f00116c3ef1aca69112cfe191820388",
+    "metadata.json": "e779da10d0f43860ea2342e35015f21e10dcce8c76920657a1a6d9fd815aaa7c",
+    "boundaries.log": "9480cc4382559b9a7a99240226a9f766048e30c8d38bb4bccd1fd8bca56661ad",
+    "after-final.log": "a2f1b73fdddf0e0c498f3c9a2fcb42fd9a72704abf4355b5724a58b61f01b3a2",
+    "native.log": "d40da89f2ed45f89bd6e8a38e9d7c665efa36796eea618ca7a408b95eb8db8a4",
+    "three-pi.png": "748630946faef490aa47343d609d56d8e22defec89f7a52b9e39c0e276e9cef7",
+    "native.log.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tests.log": "6e4f16e0426657912608bba5105e55eae1dcf827c03e1b0ce78fa23652172868",
+    "three-dsh.png": "e4357400d658b61c9fc61f28d9596b33b7905dd7092e631c885bf4ba2bdcef7e",
+    "issue48.json": "16670d026ddf2cde1a1442d5699a0c599aa1256a9f10cbd2e971c437a4713646",
+    "before.log": "21a849e785d039fe7e8f8c796d93ce2068a573ed9318ed3a36a7fe98120f4389",
+    "native.log.launcher": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "native.log.stderr": "b88f89f58cd7afc99fcb22ae5d6fae7d0b4e63a9d3333dfd1086fd988842dd75",
+    "three.log": "97465f7b67c95bbdfe3ba8d183125cd2a7e20cac1a4ea4416c8a946448daa2f7",
+    "after.log": "b8ada29b3f5cff8090f11355cf961068d2b6c0edafe6aa80d2af8dd18d3ff106",
+    "public-refs.txt": "f9577607692504bf8e9b92361e843ad76773703639cae7f06bd9688d0f531aac",
+    "build.log": "d7ba34e20b61e9242d2488631b62fd0c0608b42c1b083224644cb867e388fbb5"
+  }
+}

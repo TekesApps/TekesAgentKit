@@ -409,6 +409,133 @@ async fn closing_a_child_fences_a_never_installed_older_open_result() {
     runtime.stop().await.unwrap();
 }
 
+#[tokio::test]
+async fn inactive_task_navigation_cannot_retire_old_owner_or_blur_current_parent() {
+    use tekes_agent_ui_bindings::PaneAccess;
+    let (runtime, a, mut view) = setup().await;
+    let original = task(&mut view, &a, "task", "child-a").await;
+    let original_ids = view.panel_composer_ids().unwrap();
+    original
+        .edit_text(
+            &ComposerDestination::run(original.scope().clone()),
+            "原任务草稿".into(),
+        )
+        .unwrap();
+    view.select(1).unwrap();
+    let b = view.binding().scope().clone();
+    let request = view.begin_child_open(&b).unwrap();
+    let editor = view.ids().editor;
+    view.tree.focus(Some(editor), true);
+    assert_eq!(view.tree.focused(), Some(editor));
+    let baseline = view.editor().input.external_baseline();
+    let rejected = Arc::new(TaskPaneBinding::for_run(&a));
+    let token = rejected.begin(a.scope().clone(), "task").unwrap();
+    assert!(rejected.commit(
+        &token,
+        Ok(Some(AgentTask {
+            id: "task".into(),
+            scope: RunScope {
+                session_id: "child-b".into(),
+                ..a.scope().clone()
+            },
+            name: "late inactive navigation".into(),
+            status: "running".into(),
+            kind: "task".into(),
+        }))
+    ));
+    assert!(
+        view.open_task_source(rejected).is_err(),
+        "a host must explicitly navigate to the task parent first"
+    );
+    assert_eq!(view.binding().scope(), &b);
+    assert_eq!(view.tree.focused(), Some(editor));
+    assert_eq!(view.editor().input.external_baseline(), baseline);
+    assert!(
+        view.child_request_current(&request),
+        "inactive navigation cannot invalidate B's pending request"
+    );
+    assert_ne!(original.access(), PaneAccess::Missing);
+    assert_eq!(original.current_run().unwrap().draft.text, "原任务草稿");
+    view.select(0).unwrap();
+    assert_eq!(view.panel_composer_ids(), Some(original_ids));
+    assert!(a.current_run().unwrap().submissions.is_empty());
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn original_task_completion_can_cache_after_parent_switch_without_navigating() {
+    let (runtime, a, mut view) = setup().await;
+    let source = Arc::new(TaskPaneBinding::for_run(&a));
+    let token = source.begin(a.scope().clone(), "pending-task").unwrap();
+    assert!(source.commit(
+        &token,
+        Ok(Some(AgentTask {
+            id: "pending-task".into(),
+            scope: RunScope {
+                session_id: "child-a".into(),
+                ..a.scope().clone()
+            },
+            name: "original pending task".into(),
+            status: "running".into(),
+            kind: "task".into(),
+        }))
+    ));
+    view.open_task_source(source.clone()).unwrap();
+    let _ = view.take_background_commands();
+    view.select(1).unwrap();
+    let b = view.binding().scope().clone();
+    let request = view.begin_child_open(&b).unwrap();
+    let editor = view.ids().editor;
+    view.tree.focus(Some(editor), true);
+    assert_eq!(view.tree.focused(), Some(editor));
+    let before = (
+        view.editor().input.text.clone(),
+        view.editor().input.anchor,
+        view.editor().input.caret,
+    );
+    let owner = view.editor() as *const _ as usize;
+    let run = source.open_resolved().await.unwrap().unwrap();
+    run.edit_text(
+        &ComposerDestination::run(run.scope().clone()),
+        "异步任务草稿".into(),
+    )
+    .unwrap();
+    // Acquiring the task's history can publish a new runtime revision to B.
+    // Let the original SDK acknowledge it; text, selection and owner must stay.
+    view.sync().unwrap();
+    assert_eq!(
+        (
+            view.editor().input.text.clone(),
+            view.editor().input.anchor,
+            view.editor().input.caret
+        ),
+        before
+    );
+    assert_eq!(view.editor() as *const _ as usize, owner);
+    assert_eq!(view.tree.focused(), Some(editor));
+    let baseline = view.editor().input.external_baseline();
+    assert!(
+        view.install_task_run(a.scope().clone(), "pending-task".into(), run.clone())
+            .unwrap()
+    );
+    assert_eq!(view.binding().scope(), &b);
+    assert!(view.panel_composer_ids().is_none());
+    assert_eq!(view.tree.focused(), Some(editor));
+    assert_eq!(view.editor().input.external_baseline(), baseline);
+    assert!(view.child_request_current(&request));
+    view.select(0).unwrap();
+    assert!(view.panel_composer_ids().is_some());
+    assert_eq!(
+        input(&view).selected,
+        Some(SidePanelTabKind::Task {
+            task_id: "pending-task".into()
+        })
+    );
+    assert_eq!(run.current_run().unwrap().draft.text, "异步任务草稿");
+    assert!(run.current_run().unwrap().submissions.is_empty());
+    runtime.stop().await.unwrap();
+}
+
 #[cfg(target_os = "macos")]
 mod native_text {
     use super::*;
@@ -574,6 +701,75 @@ mod native_text {
             before
         );
         assert!(parent.current_run().unwrap().submissions.is_empty());
+        runtime.stop().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn original_task_completion_preserves_another_parents_actual_preedit() {
+        let (runtime, a, mut view) = setup().await;
+        view.enable_transcript_content().unwrap();
+        let source = Arc::new(TaskPaneBinding::for_run(&a));
+        let token = source.begin(a.scope().clone(), "pending-task").unwrap();
+        assert!(source.commit(
+            &token,
+            Ok(Some(AgentTask {
+                id: "pending-task".into(),
+                scope: RunScope {
+                    session_id: "child-a".into(),
+                    ..a.scope().clone()
+                },
+                name: "original pending task".into(),
+                status: "running".into(),
+                kind: "task".into(),
+            }))
+        ));
+        view.open_task_source(source.clone()).unwrap();
+        let _ = view.take_background_commands();
+        view.select(1).unwrap();
+        let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()));
+        let frame = Rect::new(0., 0., 1600., 1000.);
+        view.render(
+            &mut Scene::new(),
+            &mut text,
+            frame,
+            frame,
+            Theme::LIGHT.into(),
+        )
+        .unwrap();
+        let editor = view.ids().editor;
+        view.tree.focus(Some(editor), true);
+        assert_eq!(view.tree.focused(), Some(editor));
+        let canonical = view.binding().current_run().unwrap();
+        view.event_with_text(
+            &ContentEvent::Preedit {
+                text: "任务回传期间中文组字".into(),
+                selection: 2..4,
+                clauses: vec![],
+                replacement: None,
+            },
+            &mut text,
+        )
+        .unwrap();
+        let owner = view.tree.text_surface(editor).unwrap() as *const _ as usize;
+        let baseline = view.editor().input.external_baseline();
+        let run = source.open_resolved().await.unwrap().unwrap();
+        assert!(
+            view.install_task_run(a.scope().clone(), "pending-task".into(), run)
+                .unwrap()
+        );
+        assert_eq!(view.binding().scope().session_id, "b");
+        assert_eq!(view.tree.focused(), Some(editor));
+        assert_eq!(
+            view.tree.text_surface(editor).unwrap() as *const _ as usize,
+            owner
+        );
+        assert_eq!(view.editor().input.external_baseline(), baseline);
+        assert!(view.editor().input.marked.is_some());
+        assert_eq!(view.binding().current_run().unwrap().draft, canonical.draft);
+        assert_eq!(
+            view.binding().current_run().unwrap().submissions.len(),
+            canonical.submissions.len()
+        );
         runtime.stop().await.unwrap();
     }
 

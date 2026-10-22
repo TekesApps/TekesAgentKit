@@ -2661,8 +2661,9 @@ impl ComponentDemo {
         }
         self.sync()
     }
-    /// Explicit host navigation for task rows supplied by its authoritative
-    /// loader. Summary todo rows deliberately have no fabricated OpenTask action.
+    /// Explicit navigation within the current parent, before awaiting its task
+    /// loader. Completion uses install_task_run and may cache an inactive parent.
+    /// Hosts select another parent explicitly; this method cannot do that for them.
     pub fn open_task_source(&mut self, source: Arc<TaskPaneBinding>) -> Result<()> {
         require(!self.composing(), "finish composition before opening task")?;
         let state = source.snapshot();
@@ -2670,6 +2671,11 @@ impl ComponentDemo {
             .parent_scope()
             .ok_or_else(|| unsupported("task parent unresolved"))?
             .clone();
+        require(
+            self.current_binding()
+                .is_some_and(|binding| binding.scope() == &parent),
+            "task navigation parent changed or cleared",
+        )?;
         require(
             self.panel_parent_is_projected(&parent),
             "task parent projection is pending",

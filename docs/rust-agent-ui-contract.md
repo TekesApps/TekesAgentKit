@@ -1,5 +1,7 @@
 # Rust Agent UI 组件接入契约
 
+[任务父会话边界](rust-agent-ui-task-parent-navigation-20261022.md)现区分显式打开与原请求完成：非当前父会话的 `open_task_source` 在变更 owner/焦点/导航代次前拒绝；`install_task_run` 仍可缓存原会话的合法完成，并保留另一父会话的中文 preedit。组件回归通过，但本轮原生组合在 B 失去激活，新增原生断言未执行，不能计为通过。
+
 [正常 app 系统拼音](rust-agent-ui-system-ime-app-20261022.md)在上一轮同一冻结程序取得一次完整通过：原生 marked text、发送/导航屏障、确认与单次提交；最终 CLI 复验在 `ni` 组字后失焦，逐键 guard 拒绝后续输入，未取得成功收据。新增 LaunchServices 模式核对原 bundle/PID/可执行文件，不切换输入源、重抢焦点或放宽原断言。稳定性尚未通过，不能据此断定失焦根因；实体键盘、候选窗、VoiceOver、真实三端原生 IME 和 ProcessContainer 仍未验收。
 
 [子 pane 回包隔离](rust-agent-ui-child-open-fencing-20261022.md)现按原 parent/child 的宿主代次拒绝旧/重复结果；关闭后 pending 回包不能复活 tab，新的显式 reopen 可正常创建 owner。原生窗口与只读分页/跨 pane 复制分别留证；系统拼音的后续正常 app 通过见上文，跨进程仍未验收。
