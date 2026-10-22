@@ -20,7 +20,7 @@
 
 本文件是正式业务组件的实现契约与进度入口，不是完成声明。完整交付目标保持 Composer、Transcript、Indicators、RunPort、SidePanel、Sidebar，加 Native/Pi/DSH 能力验证、第二公开 consumer、原生窗口验收、review/CI/合并与阶段 tag。
 
-[最新公开 SDK 接收](tekesui-toolbar-public-intake-20261021.md)记录 09b4bab 的精确依赖、公开闭包、原生阅读/系统拼音证据及中断记录；此前版本的验收保持各自范围。
+[最新公开 SDK 接收](tekesui-toolbar-public-intake-20261021.md)记录 09b4bab 的精确依赖、公开闭包、原生阅读/系统拼音证据及中断记录；此前版本的验收保持各自范围。[2026-10-22 公开复核](tekesui-reading-public-recheck-20261022.md)确认 main/tag 仍为同一精确提交，重跑原生分页、Start/Latest、焦点/marked text 和系统拼音通过；真实 Pi 后续流式阅读的 inactive 失败单独保留。
 
 [Sidebar 原选项菜单](rust-agent-ui-sidebar-options-20261022.md)已消费当前公开 MenuContent：排序/分组的稳定事件、勾选/禁用、原偏好 CAS、重复排序的分页重置、第二 consumer 与原生中文组字屏障通过。Toolbar 的事件/逐项语义缺口已反馈 #36/#5；其余完整布局和阅读验收仍开放。
 
