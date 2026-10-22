@@ -1,0 +1,379 @@
+{
+  "sourceBase": "d2d9c979bf25d8dfdfcb80e598748e7e093d8afc",
+  "completionProven": false,
+  "publicAgentKitRelease": {
+    "publishedAt": "2026-10-19T14:25:34Z",
+    "tagName": "v0.3.8",
+    "url": "https://github.com/TekesApps/TekesAgentKit/releases/tag/v0.3.8"
+  },
+  "agentKitPublicMain": "f1daa0ffcf6ced41e21f351e22845455ca78006c",
+  "uiVersion": "0.0.0; publish=false; development paths include unpublished shared additions",
+  "tekesui": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "tekesuiPackages": [
+    "tekes-ui-controls",
+    "tekes-ui-design-export",
+    "tekes-ui-motion",
+    "tekes-ui-platform-macos",
+    "tekes-ui-render",
+    "tekes-ui-scene",
+    "tekes-ui-text",
+    "tekes-ui-tokens"
+  ],
+  "tekesuiInputCount": 243,
+  "tekesuiInputDigest": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
+  "sourcesRead": {
+    "ui/components/src/run_port.rs": "2246f6e99df51d06c3aab9434c0e76d176dc78e5a657774fbc0509fc0fb1d1b7",
+    "ui/components/src/transcript_content.rs": "3eed5394c7125981b79874bfacea669cd41af61607aab1fcf5803dfcb3045c18",
+    "ui/components/src/indicators.rs": "0e14f0615bbf6984faa21de8ff949407bff5f39cbc8d9132554e256d26b10706",
+    "ui/components/src/sidebar.rs": "cc6ffe52644de133e634a1a49462e997bd26952357b2548d12fdea09667be566",
+    "ui/components/src/side_panel.rs": "2e6a1a102e24856da8532c174e1d8700976e61caee1c80af75c3145499253094",
+    "ui/components/src/side_panel_navigation.rs": "10d4754ccc07669b4c71d8fd2405e468f9b41af26dd83f018c42ee73435c43ea",
+    "ui/components/src/summary.rs": "69057fbd7f39b24bab994cfd01935a9c86c31a2737cd1b6a003492e2808c5305",
+    "ui/components/src/feedback.rs": "58a0d12f7a9304384669a135f34ed823b767498245aed641afe2c3ba3f542178",
+    "ui/bindings/src/lib.rs": "ea2c1087e323eee8eef8756d3e127b8335639304a88764234c0070732af37ef3",
+    "ui/bindings/src/feedback.rs": "b25168bd05c9d57424af7f4af9fda96af01253ec48f84fcd00fddea9474f0376",
+    "ui/demo/src/component_feedback.rs": "60524e1be7a2f6189b043888a02e95c38ffd689241509e1d53da41e8e5ac5105",
+    ".github/workflows/ci.yml": "ccb3e844e65aeafa4348e231b951fb5d59a13bbaa83aae16d67791bf0299ad9c"
+  },
+  "publicIssues": [
+    {
+      "number": 49,
+      "state": "OPEN",
+      "title": "[P1][Composition] 交付原 Content 可消费的交互式 Popover 组合入口",
+      "updatedAt": "2026-10-22T06:42:05Z"
+    },
+    {
+      "number": 48,
+      "state": "OPEN",
+      "title": "[P0][ProcessContainer] 完整交互式 Content 的远端输入、焦点、IME、滚动与 AX 契约",
+      "updatedAt": "2026-10-21T23:55:23Z"
+    },
+    {
+      "number": 47,
+      "state": "OPEN",
+      "title": "[P2][Composition] 提供原 Content 可消费的被动图标与不定状态附件",
+      "updatedAt": "2026-10-22T12:48:41Z"
+    },
+    {
+      "number": 46,
+      "state": "OPEN",
+      "title": "[P1][Composition] 非交互 hover preview 的原 Content 槽与锚定/关闭生命周期",
+      "updatedAt": "2026-10-21T17:41:35Z"
+    },
+    {
+      "number": 45,
+      "state": "OPEN",
+      "title": "[P1][Composition] 原 Content 的语义 Panel 容器、圆角子树裁切与焦点边界",
+      "updatedAt": "2026-10-21T17:08:46Z"
+    },
+    {
+      "number": 44,
+      "state": "OPEN",
+      "title": "[P1][Menu] 原 Content 的上下文菜单触发与锚定，保留 owner、事件身份和 IME 边界",
+      "updatedAt": "2026-10-21T16:21:07Z"
+    },
+    {
+      "number": 42,
+      "state": "OPEN",
+      "title": "[P1][Reading] 导出并恢复跨新建 ContentHost 的持久阅读检查点",
+      "updatedAt": "2026-10-21T13:02:50Z"
+    },
+    {
+      "number": 41,
+      "state": "OPEN",
+      "title": "[P1][Native input] 定位 Unicode 键事件注入丢失 CJK，补独立原生基线",
+      "updatedAt": "2026-10-21T12:01:00Z"
+    },
+    {
+      "number": 38,
+      "state": "OPEN",
+      "title": "[P2][Disclosure] 提供原组合触发器与默认展开指示，保持单一动作和语义 owner",
+      "updatedAt": "2026-10-21T05:21:58Z"
+    },
+    {
+      "number": 37,
+      "state": "OPEN",
+      "title": "[P1][macOS selftest] 有效控制键事件：Escape 空字符合成会删除编辑选区",
+      "updatedAt": "2026-10-21T04:37:34Z"
+    },
+    {
+      "number": 36,
+      "state": "OPEN",
+      "title": "[P1][Menu] 捕获稳定选中值，并支持原菜单的分组与勾选声明",
+      "updatedAt": "2026-10-21T15:59:30Z"
+    },
+    {
+      "number": 35,
+      "state": "OPEN",
+      "title": "[P1][Composition] 为原 Content 提供动态行帮助声明并复用现有 Tooltip",
+      "updatedAt": "2026-10-21T01:48:17Z"
+    },
+    {
+      "number": 34,
+      "state": "OPEN",
+      "title": "[P1][Focus] 公开原留白焦点意图查询，供宿主 IME 屏障安全转交事件",
+      "updatedAt": "2026-10-21T01:05:07Z"
+    },
+    {
+      "number": 33,
+      "state": "OPEN",
+      "title": "[P1][Composition] 为委托原紧凑 action 的业务组件公开焦点绘制层转发接口",
+      "updatedAt": "2026-10-20T23:51:58Z"
+    },
+    {
+      "number": 32,
+      "state": "OPEN",
+      "title": "[P1][Reading] 稳定 item reveal 增加起端对齐，支持 ClientKit 普通回合跳转",
+      "updatedAt": "2026-10-20T23:21:25Z"
+    },
+    {
+      "number": 31,
+      "state": "OPEN",
+      "title": "[P2][Typography] 为 Content 和控件标签公开行数限制与尾部省略策略",
+      "updatedAt": "2026-10-20T19:23:33Z"
+    },
+    {
+      "number": 30,
+      "state": "OPEN",
+      "title": "[P2][Composition] 提供复合输入面装饰区域到原编辑器的焦点路由契约",
+      "updatedAt": "2026-10-21T21:07:34Z"
+    },
+    {
+      "number": 29,
+      "state": "OPEN",
+      "title": "[P2][Composition] 提供精确紧凑 hit frame 的装饰 action 与激活阶段配置",
+      "updatedAt": "2026-10-20T18:12:38Z"
+    },
+    {
+      "number": 28,
+      "state": "OPEN",
+      "title": "[P1][Reading] 公开保留编辑焦点的稳定 item reveal 与独立轨道导航命令",
+      "updatedAt": "2026-10-22T05:31:29Z"
+    },
+    {
+      "number": 27,
+      "state": "OPEN",
+      "title": "[P2] ContentHost 布局激活子树后的 TextSurfaceHost 前置条件校验",
+      "updatedAt": "2026-10-20T17:45:38Z"
+    },
+    {
+      "number": 26,
+      "state": "OPEN",
+      "title": "[P1][Controlled input] 提供受控文本更新的无副作用预检，支持组合阅读事务",
+      "updatedAt": "2026-10-20T16:16:50Z"
+    },
+    {
+      "number": 25,
+      "state": "OPEN",
+      "title": "[P1][Content] 公开可选中富内容组件与原生文本映射接口",
+      "updatedAt": "2026-10-21T21:24:55Z"
+    },
+    {
+      "number": 23,
+      "state": "CLOSED",
+      "title": "[P1][Composition] 公开无表单装饰的可选中文本内容组件或 presentation 模式",
+      "updatedAt": "2026-10-21T23:28:52Z"
+    },
+    {
+      "number": 22,
+      "state": "OPEN",
+      "title": "[P1][Reading] 为混合 Content 文档提供稳定子项锚点与前插/重排阅读事务",
+      "updatedAt": "2026-10-19T08:41:32Z"
+    },
+    {
+      "number": 21,
+      "state": "CLOSED",
+      "title": "[P2][TKUI-004] 带目标与来源的控件动作",
+      "updatedAt": "2026-10-19T07:58:04Z"
+    },
+    {
+      "number": 20,
+      "state": "CLOSED",
+      "title": "[P1][TKUI-007] 可配置文本视口与多行尺寸约束",
+      "updatedAt": "2026-10-19T07:57:55Z"
+    },
+    {
+      "number": 19,
+      "state": "CLOSED",
+      "title": "[P1][TKUI-006] 指针选择元数据透传",
+      "updatedAt": "2026-10-19T07:57:45Z"
+    },
+    {
+      "number": 18,
+      "state": "CLOSED",
+      "title": "[P1][TKUI-005] 受控编辑值同步事务",
+      "updatedAt": "2026-10-19T07:57:38Z"
+    },
+    {
+      "number": 17,
+      "state": "CLOSED",
+      "title": "[P1][TKUI-003] 文本命令、修饰键与 IME 消费语义",
+      "updatedAt": "2026-10-19T07:57:30Z"
+    },
+    {
+      "number": 16,
+      "state": "CLOSED",
+      "title": "[P0][TKUI-002] 历史前插阅读锚点",
+      "updatedAt": "2026-10-19T07:57:22Z"
+    },
+    {
+      "number": 15,
+      "state": "CLOSED",
+      "title": "[P0][TKUI-001] 后台事件唤醒与窗口生命周期",
+      "updatedAt": "2026-10-19T07:57:14Z"
+    },
+    {
+      "number": 14,
+      "state": "OPEN",
+      "title": "[P1][Architecture][Audit] 统一组件模型与组合协议：控件内容组合、语义解耦与窗口级 Toolbar",
+      "updatedAt": "2026-10-22T10:12:05Z"
+    },
+    {
+      "number": 13,
+      "state": "OPEN",
+      "title": "[Audit] TekesUI 设计理念与 Design System 完整性审计总览（2026-10-17）",
+      "updatedAt": "2026-10-17T05:28:48Z"
+    },
+    {
+      "number": 12,
+      "state": "OPEN",
+      "title": "[P2][Acceptance] 完成当前整页视觉与原生交互验收，并连接组件成熟度",
+      "updatedAt": "2026-10-17T05:28:45Z"
+    },
+    {
+      "number": 11,
+      "state": "OPEN",
+      "title": "[P2][Patterns] 定义消费方草稿恢复与版本确认协议，并提供真实编辑器示例",
+      "updatedAt": "2026-10-17T05:28:44Z"
+    },
+    {
+      "number": 10,
+      "state": "OPEN",
+      "title": "[P2][Reading] 补齐流式追加时的阅读位置保护与显式回到最新",
+      "updatedAt": "2026-10-17T05:28:42Z"
+    },
+    {
+      "number": 9,
+      "state": "OPEN",
+      "title": "[P2][Motion] 补齐 Menu / Popover / Dialog 的进退场与中断生命周期",
+      "updatedAt": "2026-10-17T05:28:40Z"
+    },
+    {
+      "number": 8,
+      "state": "OPEN",
+      "title": "[P2][Governance] 生成当前有效的组件能力清单，并修正过期机器报告",
+      "updatedAt": "2026-10-17T05:28:38Z"
+    },
+    {
+      "number": 7,
+      "state": "OPEN",
+      "title": "[P2][API] 提供消费方自己的 BrandConfig 入口与独立项目接入示例",
+      "updatedAt": "2026-10-17T05:28:36Z"
+    },
+    {
+      "number": 6,
+      "state": "OPEN",
+      "title": "[P2][Quality] 校验品牌生成投影的实际内容，并把当前设计检查接入 CI",
+      "updatedAt": "2026-10-17T05:28:33Z"
+    },
+    {
+      "number": 5,
+      "state": "OPEN",
+      "title": "[P1][Accessibility] 建立真实控件语义树与 macOS VoiceOver 桥接",
+      "updatedAt": "2026-10-17T05:28:31Z"
+    },
+    {
+      "number": 4,
+      "state": "OPEN",
+      "title": "[P2][Interaction] 统一浮层输入焦点生命周期，修复 CommandPalette 关闭后意外重开",
+      "updatedAt": "2026-10-17T05:28:30Z"
+    },
+    {
+      "number": 3,
+      "state": "OPEN",
+      "title": "[P2][Interaction] 将原生 Tab / Shift+Tab 接入统一焦点遍历",
+      "updatedAt": "2026-10-17T05:28:27Z"
+    },
+    {
+      "number": 2,
+      "state": "CLOSED",
+      "title": "[P1][CI] 修复当前主分支的设计合并测试失败，恢复完整检查流程",
+      "updatedAt": "2026-10-19T09:17:07Z"
+    },
+    {
+      "number": 1,
+      "state": "OPEN",
+      "title": "[P1][Design System] 建立共享的视觉强调与边界层级，并迁移所有组件",
+      "updatedAt": "2026-10-17T05:28:23Z"
+    }
+  ],
+  "ciSnapshot": {
+    "headRefOid": "d2d9c979bf25d8dfdfcb80e598748e7e093d8afc",
+    "isDraft": true,
+    "reviews": [],
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-22T12:56:07Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39782214631/job/119836074830",
+        "name": "checks",
+        "startedAt": "2026-10-22T12:54:19Z",
+        "status": "COMPLETED",
+        "workflowName": "Rust headless"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-22T12:55:57Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39782206864/job/119836047101",
+        "name": "checks",
+        "startedAt": "2026-10-22T12:54:16Z",
+        "status": "COMPLETED",
+        "workflowName": "Rust headless"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-22T12:59:43Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39782214631/job/119836074552",
+        "name": "Rust UI consumer (no native interaction)",
+        "startedAt": "2026-10-22T12:54:20Z",
+        "status": "COMPLETED",
+        "workflowName": "Rust headless"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-22T12:59:03Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39782206864/job/119836048609",
+        "name": "Rust UI consumer (no native interaction)",
+        "startedAt": "2026-10-22T12:54:17Z",
+        "status": "COMPLETED",
+        "workflowName": "Rust headless"
+      }
+    ]
+  },
+  "newBuilds": 0,
+  "newTargets": 0,
+  "newProgramCopies": 0,
+  "deletedBytes": 0,
+  "currentSourceNativeAccepted": false,
+  "crossProcessAccepted": false,
+  "knownFailure": "Real Pi goal footer labelVisible=false on frozen 4097e4f source; source-specific strict gate exit 1",
+  "importantScope": "Open #22/#26/#28 contain already consumed public capabilities; open issue is not proof of total absence. Historical receipts keep original source/program identity.",
+  "documentationUpdatedThisAudit": true,
+  "updatedDocumentation": {
+    "README.md": "829c8516dcc8664c961c07ace17bd046c8f45699177d3bd3dc705e0bbd2111e7",
+    "ui/README.md": "1886b8c5321d68209b4a87c97c40a0b63e9efacdc04bafbae68d59df0bdcb4c9",
+    "ui/bindings/README.md": "b1f8fe627e5637ef1942b67ed8134438c4a49bdcfb614db81cdaefb229177501",
+    "docs/rust-agent-ui-contract.md": "2c12146ff528e61ff4cb7cd518f273a57458e3b6866734f7cf35b93e7e72490a",
+    "docs/rust-agent-ui-delivery-status.md": "c8531a5be7d15a6202a1ef23951ff5feb7d2da663fdd609f32baef79b28f339b",
+    "docs/rust-agent-ui-host-integration.md": "a7dbba541e459e2bf96c7e6e4ec63192cf740ab4f21d989e26d1598d62460aa2"
+  },
+  "localLinkValidationCount": 302,
+  "publicProcessContractSources": {
+    "crates/tekes-ui-module-runtime/src/container.rs": "b34423866204a1ee7e0346b5609ac3c4e1e278025ef8317962f44c54bb53b5e9",
+    "crates/tekes-ui-app-protocol/src/component.rs": "9690f9953b84c69f18e9e88c08b728cbb9c8b7fdcc2a01289cb072c0e1ea368c"
+  }
+}

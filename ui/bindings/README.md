@@ -29,7 +29,21 @@ Versions are opaque; same-value writes need not advance them. Public `TurnFeedba
 `frame.controls(&source, &capture)` for its committed input, and synchronously
 `source.prepare_feedback_gesture(frame.as_ref(), gesture)` before scheduling.
 Completion `apply` returns Ignored (keep current frame) or Adopted (replace with
-the supplied optional frame). Cold/unknown states use explicit Refresh. See the
+the supplied optional frame).
+
+For compact Transcript controls, schedule the initial metadata read once per
+mounted source/connection epoch with `feedback_read_epoch()` and
+`read_feedback_at_epoch(epoch)`. Validate the original frame/source/mount before
+adoption. Cold/loading is not an empty record and does not show a permanent
+Refresh entry; failed/uncertain metadata retains explicit recovery. A failed
+reconnect read may keep the previous rating/note visible while writes stay
+blocked. Only a fresh authoritative frame restores permission; a delayed error
+must not overwrite valid records or pending gestures. The demo queues
+`ReadInitialFeedback` and adopts through `complete_initial_feedback`; the public
+bindings own the actual read/CAS authority. See the [current host contract](../../docs/rust-agent-ui-host-integration.md).
+Standalone TurnFeedback and older experimental source had different explicit-read
+entry behavior; follow the current compact integration rather than recreating it.
+See the
 [control contract](../../docs/rust-agent-ui-feedback-controls-20261020.md);
 formal Transcript footnote routing is now available through `RunPortIntent::Feedback`
 and original-widget completion; see the [integration contract](../../docs/rust-agent-ui-feedback-transcript-20261020.md). See the [read contract](../../docs/rust-agent-ui-feedback-read-20261020.md)

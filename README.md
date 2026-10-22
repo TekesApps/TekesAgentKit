@@ -13,15 +13,17 @@
 
 | Endpoint | 验证版本 | 权威数据路径 |
 |---|---|---|
-| `NativeSessionEndpoint` | Kernel **0.9.1 / v4**（兼容 0.9.0；子历史需 0.9.1） | bearer HTTP、WebSocket mux、journal 与 frozen-cut history |
+| `NativeSessionEndpoint` | Kernel **0.9.1 / v4** 协议/子历史基线；**0.9.3** 已作明确 **UI-only** 验证 | bearer HTTP、WebSocket mux、journal 与 frozen-cut history |
 | `PiSessionEndpoint` | Pi **1.3.0** | 每会话原生 stdio RPC、native entry tree 活动分支 |
 | `DshSessionEndpoint` | DSH **0.2.1-rc.2**，兼容 **0.2.0-rc.2** | 认证 Remote HTTP/mux、journal/page、multipart 文件 |
+
+Kernel 0.9.3 的 UI-only 收据不包括完整生命周期与 child 协议验收；兼容范围和完整协议基线见[SEP 契约](docs/session-endpoints.md)。
 
 已实现会话地址/指针、历史恢复、文件读取/观察、附件、交互回传和显式能力检查；独立 presentation 层提供 Run、Transcript、Composer 和连接状态。Pi 保留原生 entry ID，不伪造 journal sequence。DSH 官方未提供的 ephemeral fork/discard 明确返回 Unsupported。
 
 历史投影在内存中。Pi 的宿主指针、receipt、队列及 Goal 元数据用于会话恢复和提交去重，不是 transcript Mirror。可选远端 durable cache、正式 UI 控件、生产 launcher 和大历史性能验收尚未交付。独立 [UI 试点 workspace](ui/README.md) 固定 TekesUI 公开 Git commit，复用现有 presentation；不属于 v0.3.8 headless 发布 API，也不影响默认 headless 构建。
 
-最新实验进展：[公开 SDK 原生回合导航、分页与组字验证](docs/rust-agent-ui-published-navigation-20261021.md)。
+当前实验宿主请先看[交付状态与剩余门禁](docs/rust-agent-ui-delivery-status.md)和[短接入说明](docs/rust-agent-ui-host-integration.md)。正式 RunPort/Sidebar/SidePanel 已有同进程可运行路径，完整布局、当前原生和 ProcessContainer 仍未验收，不能作为稳定 UI 发布。
 
 ## 开始使用
 
