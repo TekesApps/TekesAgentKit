@@ -41,13 +41,18 @@ pub enum OutputMessageText {
     ToolInputUnavailable,
     CopyDetail,
 }
+pub type ScopedToolFormatter = fn(&RunScope, &TranscriptToolCall) -> (String, String);
+
 #[derive(Clone, Copy, Debug)]
 pub struct OutputMessageLabels {
     pub text: fn(OutputMessageText) -> String,
+    /// Pure tool-local formatting; external lookups must use `scoped_tool`.
     pub tool: fn(&TranscriptToolCall) -> (String, String),
+    pub scoped_tool: Option<ScopedToolFormatter>,
     /// Structured expansion. Set None to retain a custom `tool` text body.
     pub tool_sections: Option<
         fn(
+            &RunScope,
             &TranscriptToolCall,
             OutputMessageLabels,
         ) -> tekes_agent_presentation::TranscriptToolDetails,
@@ -84,6 +89,7 @@ impl Default for OutputMessageLabels {
                 .into()
             },
             tool_sections: Some(default_tool_sections),
+            scoped_tool: None,
             tool: |t| {
                 let producer_title = t.presentation_title();
                 let label = tool_display_name(&t.name);
@@ -126,6 +132,7 @@ impl Default for OutputMessageLabels {
 }
 
 fn default_tool_sections(
+    _scope: &RunScope,
     t: &TranscriptToolCall,
     labels: OutputMessageLabels,
 ) -> tekes_agent_presentation::TranscriptToolDetails {
@@ -142,14 +149,24 @@ fn default_tool_sections(
         ..Default::default()
     })
 }
+pub(crate) fn tool_text(
+    scope: &RunScope,
+    tool: &TranscriptToolCall,
+    labels: OutputMessageLabels,
+) -> (String, String) {
+    labels
+        .scoped_tool
+        .map_or_else(|| (labels.tool)(tool), |make| make(scope, tool))
+}
 pub(crate) fn tool_details_facts(
+    scope: &RunScope,
     t: &TranscriptToolCall,
     labels: OutputMessageLabels,
 ) -> Option<ToolDetailFacts> {
     labels.tool_sections.map(|make| ToolDetailFacts {
         tool_id: t.id.clone(),
         turn_id: t.turn_id.clone(),
-        details: make(t, labels),
+        details: make(scope, t, labels),
     })
 }
 pub(crate) fn validate_tool_details(facts: &PartFacts) -> Result<(), &'static str> {
@@ -763,7 +780,7 @@ impl OutputMessage {
                 return Err("output message identity changed");
             }
         }
-        let facts = parts(output, section, self.labels)?;
+        let facts = parts(&self.scope, output, section, self.labels)?;
         if publication == self.publication
             && (epoch != self.epoch
                 || self.item.as_ref() != Some(output.item)
@@ -887,6 +904,7 @@ impl Component for OutputMessage {
     }
 }
 fn parts(
+    scope: &RunScope,
     output: &TranscriptOutput<'_>,
     section: Option<&TranscriptSection<'_>>,
     labels: OutputMessageLabels,
@@ -944,7 +962,7 @@ fn parts(
                     let tool = section
                         .and_then(|s| s.tool_for_block(block))
                         .filter(|t| t.turn_id == item.turn_id);
-                    tool_details = tool.and_then(|tool| tool_details_facts(tool, labels));
+                    tool_details = tool.and_then(|tool| tool_details_facts(scope, tool, labels));
                     let (title, text) = tool.map_or_else(
                         || {
                             (
@@ -955,7 +973,7 @@ fn parts(
                                 tool_id.clone(),
                             )
                         },
-                        labels.tool,
+                        |tool| tool_text(scope, tool, labels),
                     );
                     (OutputContentKind::Tool, title, text)
                 }

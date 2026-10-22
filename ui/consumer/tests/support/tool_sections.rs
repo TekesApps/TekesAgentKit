@@ -261,7 +261,11 @@ fn original_section_copy_and_background_append_do_not_touch_composer_marked_owne
 }
 #[test]
 fn invalid_section_callback_is_rejected_before_mounting_and_legacy_text_optout_is_explicit() {
-    fn duplicate(call: &TranscriptToolCall, _: OutputMessageLabels) -> TranscriptToolDetails {
+    fn duplicate(
+        _: &RunScope,
+        call: &TranscriptToolCall,
+        _: OutputMessageLabels,
+    ) -> TranscriptToolDetails {
         let mut facts = call.presentation_details(Default::default());
         facts.sections.push(facts.sections[0].clone());
         facts

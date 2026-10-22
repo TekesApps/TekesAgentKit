@@ -97,6 +97,9 @@ pub use summary::*;
 pub use tekes_agent_presentation::RunSnapshot;
 pub use tekes_agent_presentation::{ComposerDestination, RunScope};
 pub use tekes_agent_presentation::{
+    TranscriptToolChangeCount, TranscriptToolReport, TranscriptToolReportWording,
+};
+pub use tekes_agent_presentation::{
     TranscriptToolDetailKind, TranscriptToolDetailSection, TranscriptToolDetailWording,
     TranscriptToolDetails,
 };

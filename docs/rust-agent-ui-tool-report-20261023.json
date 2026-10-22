@@ -1,0 +1,102 @@
+{
+  "sourceBase": "c76278bfb0781338f27e030a1403117cc204c46f",
+  "changedSourceFiles": {
+    "crates/presentation/src/lib.rs": "ec4529eab4dbd5280e30d05f5be4feb5c1ff54d0a8373550324e8cc53e36eeeb",
+    "crates/presentation/src/tool_report.rs": "fbecf46f42b612f06245721a59418182438c52ee0a3f38ca38a0d34f4b430447",
+    "crates/presentation/tests/tool_report.rs": "f9c9bbe792abdaa317e19ab5af8f4399d007ddc82131b2e7deaf67f4007a4b8c",
+    "ui/components/src/lib.rs": "1f51bb741cfa20bd96ea5e894887af16ddaf0c0fcb3952f8af9c0299de27d8ee",
+    "ui/components/src/output_message.rs": "fdeea9f45633e814079814e7757a8750ed5ff4c4cd8e0729ca7bd3747488aab4",
+    "ui/components/src/tool_activity.rs": "7e7d91356658440417b942c03300f821138927f5948f5436195eb95894d14fb2",
+    "ui/consumer/tests/support/tool_sections.rs": "d9c41937accbb8c1e20689f380776b12e36a85ab807123ab2a646983ad94f33b",
+    "ui/consumer/tests/tool_titles.rs": "3dc4c2c6601f8b5600ebe864ed81658601c9b417f0ffd24989b559238e8a5397",
+    "ui/demo/tests/output_message.rs": "d8961597dd5b158c17234c44915a7c6e0c52c9b96844792a5dfe53b53160e566"
+  },
+  "readOnlyReferences": {
+    "ClientKit/TranscriptToolVocabulary.swift": "f9f539dfac029cce57c012ce0437ccdaf4ea6868d0d79bd6bb43c64ef228f176",
+    "ClientKit/TranscriptToolRowModel.swift": "76793271a68ca5a7a5ad872f9235a4d88fa8c801c1212e2a2b798043fa021818",
+    "ClientKit/TranscriptMetalActivity.swift": "f08f6e8f34c76a71fb117dd84a46be50145f737a38e21534cf59d518bc2d3e8d",
+    "ClientKit/SessionProjectionValues.swift": "4a7835084cfadbe0ced59dcf2771607641f1828e1b4d86fa91a494ecd1f56e77",
+    "ClientKit/ClientSQLiteSessionStore.swift": "547e4359102a638c1c791275149f1d6d5b5f5ebe7897b8b5453895a536f44cc6",
+    "Tekes/ClientAgentHostAdapters.swift": "7d907c654ec3df76c7a8b492e32bbc68f1bd4d0b46044cae615aa712b9f67c71"
+  },
+  "publicAgentKit": {
+    "publishedAt": "2026-10-19T14:25:34Z",
+    "tagName": "v0.3.8",
+    "url": "https://github.com/TekesApps/TekesAgentKit/releases/tag/v0.3.8"
+  },
+  "publicTekesui": {
+    "date": "2026-10-22T07:30:41Z",
+    "sha": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c"
+  },
+  "validation": {
+    "root": {
+      "passed": 246,
+      "failed": 0,
+      "ignored": 0
+    },
+    "uiWorkspace": {
+      "passed": 561,
+      "failed": 0,
+      "ignored": 1
+    },
+    "finalCallbacks": {
+      "passed": 19,
+      "failed": 0,
+      "ignored": 0
+    },
+    "uiScope": "Full workspace passed after scoped behavior; alias-only lint refinement followed by final 19 callback tests and all-targets Clippy",
+    "rootClippy": "passed",
+    "uiClippy": "passed",
+    "format": "passed",
+    "demoBuild": "passed",
+    "strictReading": {
+      "exitCode": 1,
+      "json": {
+        "accepted": false,
+        "parentFollowingAfterInnerUp": true,
+        "parentOffsetBefore": 0,
+        "parentOffsetAfterScroll": 0,
+        "parentOffsetAfterAppend": 634,
+        "innerOffset": 100,
+        "detailVisibleAfterAppend": false
+      }
+    }
+  },
+  "reportSource": "explicit host value only; no SEP field, no meta/stdout/private-mirror inference",
+  "sourceContract": "unchanged TranscriptToolCall/protocol; new standalone report value and scoped UI callbacks",
+  "remaining": [
+    "default count view/semantic runs",
+    "continuous tool grouping",
+    "real host/harness report source acceptance",
+    "native/system IME/GPU/VoiceOver/ProcessContainer and full Source layout comparison"
+  ],
+  "newTargets": 0,
+  "newAcceptanceProgramCopies": 0,
+  "deletedBytes": 0,
+  "evidence": {
+    ".runtime-fixtures/tool-report-20261023/demo-build-final.log": "703e7eca104f790350e17d972e1a99183de1c7b70c586dad54684bf0b710ec76",
+    ".runtime-fixtures/tool-report-20261023/demo-build.log": "0c640d3e6056e973186018eb9b5813373e71f3ed6be436183c1506ae0042300e",
+    ".runtime-fixtures/tool-report-20261023/final-callback-tests.log": "a8774bc6ec7cb6d834ac2711607485a1f63123ae5f5f5a8db893c32232344f35",
+    ".runtime-fixtures/tool-report-20261023/local-links.json": "66822650e433fdda9af7ee0759d4200e9397882c7fd3b2afd8d1837ba5d9e074",
+    ".runtime-fixtures/tool-report-20261023/parent-ci.json": "b6ff068f8bcb6697f415db5e79f7b6d5b2b7e48f44bd04729d57c0069d286c1c",
+    ".runtime-fixtures/tool-report-20261023/parent-failed-steps.json": "e38c077a111e6527029831c3df990670ca5ca17d278792aafebefb3ef431266f",
+    ".runtime-fixtures/tool-report-20261023/public-agentkit.json": "474c45a672119b5c7b6a1f01ad2ce9c88c5beafa9c4f378386ea836e4061b993",
+    ".runtime-fixtures/tool-report-20261023/public-tekesui.json": "ac88c6b5553ad32377ed0816255e3d28ca5a197b955ef5005707a016d7a80ac8",
+    ".runtime-fixtures/tool-report-20261023/report-tests.log": "a9867b19eb6673c9d74fafa97a20e145a243de66e756e82bc0620a9765ed1d43",
+    ".runtime-fixtures/tool-report-20261023/root-clippy.log": "2721cc1278f7f4b0603c37e738240782e6fb1808b0f2c010892e47ca80740825",
+    ".runtime-fixtures/tool-report-20261023/root-tests.log": "0dfd10f124df44e95bd7ece8249751b851d561f9cb834781d12732e826a4fef7",
+    ".runtime-fixtures/tool-report-20261023/scoped-consumer.log": "1bb804af5ae5223f91952dcc0b4c7f8f6baaed38563e2faaeb21f6ecbfe8d76c",
+    ".runtime-fixtures/tool-report-20261023/strict-reading-final.json": "c4f70b29538ecacd71995d9a3fc7678cf168834c54e6f348c8c095309b9f1b90",
+    ".runtime-fixtures/tool-report-20261023/strict-reading-final.stderr": "c7b351f8bceabef85ed6b1b70aacc6e0f7b728fee1840c1b07d6ae3cc22a086c",
+    ".runtime-fixtures/tool-report-20261023/strict-reading.json": "c4f70b29538ecacd71995d9a3fc7678cf168834c54e6f348c8c095309b9f1b90",
+    ".runtime-fixtures/tool-report-20261023/strict-reading.stderr": "518ba1d62b523c94ebe307a093b795b7ba74da996ff39b4c4646adf7f7d9a4bd",
+    ".runtime-fixtures/tool-report-20261023/ui-clippy-final.log": "5e852802214ce92198b6edfb9f728da544300b40e9de3c643d8e25af191bce4a",
+    ".runtime-fixtures/tool-report-20261023/ui-clippy-type-alias-before.log": "490dd2438941b44ce215b366557059e63f0a6b458411a3667b9019a092ff2c56",
+    ".runtime-fixtures/tool-report-20261023/ui-clippy.log": "6c5c62a3680e1fbd5d51578558596714e9d5d7f5d282527a329e2e680bebf036",
+    ".runtime-fixtures/tool-report-20261023/ui-tests-final.log": "700d67a4f8f948c77751be752555787f1df7d4cb4337079258840287c28696b1",
+    ".runtime-fixtures/tool-report-20261023/ui-tests-scope-setup.log": "5aac60ae533f7d4d373735dc947e2e0a2ce2ac6203ed920f1fcfcee4ee05ab6e",
+    ".runtime-fixtures/tool-report-20261023/ui-tests.log": "4e7ea5637af6576c6da32826505624ed34accaeb0f6503999d5b20180b432191",
+    ".runtime-fixtures/tool-report-20261023/verification-exits-final.json": "e2bfc6d362f822b37a06f25cc2a57c6dfad7dfa66d32227aaa30bdd81fdd5dad",
+    ".runtime-fixtures/tool-report-20261023/verification-exits.json": "d25055f8325fa9be3348575b1dce45f293731ba4332803f8568128ffbda4daca"
+  }
+}

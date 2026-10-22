@@ -43,6 +43,9 @@ progress/detail 和本地化 copy，按稳定 section kind 挂载原 SDK 控件�
 该模型；独立文本区和原复制通道已接入，见[控件与 API 迁移](rust-agent-ui-tool-section-controls-20261023.md)。
 结构化工具的 `OutputContentIds::body` 是容器；通过 `tool_detail_sections()` 获取各区原文本 ID。
 默认 `tool_sections` 回调可替换；旧 `tool` 单字段正文需显式 `tool_sections: None`。
+外部报告/diff 使用原 `scoped_tool(scope, tool)` 文案回调，分区回调也接收原 scope；
+不得按当前选中会话或全局 tool ID 查外部事实。报告权威性、计数优先级和未接三端来源范围见
+[报告与作用域契约](rust-agent-ui-tool-report-20261023.md)。
 
 限高详情仅通过 `OutputMessage::with_bounded_details` / `ToolActivity::with_bounded_details` 显式试验；
 标准 RunPort/Transcript 保持原文档流。嵌套阅读严格检查当前失败，等待 #53；

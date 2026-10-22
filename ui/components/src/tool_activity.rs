@@ -164,14 +164,15 @@ impl ToolActivity {
         Ok(())
     }
     fn facts(&self, tool: &TranscriptToolCall, placement: ToolActivityPlacement) -> PartFacts {
-        let (title, text) = (self.labels.details.tool)(tool);
+        let (title, text) =
+            crate::output_message::tool_text(&self.scope, tool, self.labels.details);
         let prefix = match placement {
             ToolActivityPlacement::Call => &self.labels.call,
             ToolActivityPlacement::ResultOnly => &self.labels.result_only,
             ToolActivityPlacement::Unplaced => &self.labels.unplaced,
         };
         PartFacts {
-            tool: crate::output_message::tool_details_facts(tool, self.labels.details),
+            tool: crate::output_message::tool_details_facts(&self.scope, tool, self.labels.details),
             slot: Slot::Tool(0, tool.id.clone()),
             kind: OutputContentKind::Tool,
             title: format!("{prefix} · {title}"),

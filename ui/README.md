@@ -9,6 +9,7 @@ AgentKit 拥有可复用的 Composer、Transcript、Indicators、RunPort、Sideb
 - [工具结算状态与元数据](../docs/rust-agent-ui-tool-result-status-20261022.md)：显式失败/停止事实与可选原 meta/error；不重算父回合结算，旧快照兼容。
 - [工具 producer 标题](../docs/rust-agent-ui-tool-title-20261022.md)：原公开 view envelope 的标题优先级、原 disclosure 的单行省略和保留原始详情；完整工具 row/card 仍待继续对齐。
 - [独立工具分区与复制](../docs/rust-agent-ui-tool-section-controls-20261023.md)：原 SDK 字段/标题/复制按钮；结构化工具 body ID 现在是容器，使用 `tool_detail_sections()` 取文本 ID。包含旧单字段 callback 的显式选择及未完成的 #53/#54。
+- [报告与作用域文案](../docs/rust-agent-ui-tool-report-20261023.md)：共享报告/计数规则；外部数据使用 `scoped_tool`，分区 callback 也接收原 scope。当前 SEP 没有独立报告来源，不从 opaque meta 推断。
 - [当前交付状态](../docs/rust-agent-ui-delivery-status.md)与[短接入说明](../docs/rust-agent-ui-host-integration.md)：版本、公开状态输入/回调、焦点/IME/阅读责任，以及仍未完成的完整要求。
 - [反馈初读与恢复](../docs/rust-agent-ui-feedback-recovery-20261022.md)、[重连读取失败](../docs/rust-agent-ui-feedback-reconnect-failure-20261022.md)：compact cold/loading 自动读取，正常 ready 无常驻 Refresh；失败保留旧显示且不可写，明确新读后恢复。
 - [组件所有权、布局与完成账本](../docs/rust-agent-ui-contract.md)：机器内容/footnote 靠左，用户气泡与 footnote 靠右；基础样式随 TekesUI。

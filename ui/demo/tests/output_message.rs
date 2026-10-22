@@ -1166,3 +1166,65 @@ fn tool_resolution_changes_retire_body_and_copy_ids_and_preserve_the_explicit_vi
         fields[0].body
     );
 }
+
+#[test]
+fn embedded_tool_formatters_receive_the_original_scope_even_when_ids_repeat() {
+    use tekes_agent_components_ui::{OutputMessageLabels, RunScope};
+    use tekes_ui_controls::composition::ButtonContent;
+    let mut message = item();
+    message.content_blocks = Some(vec![block(
+        0,
+        Block::ToolCall {
+            tool_id: "tool".into(),
+        },
+    )]);
+    let call = tool();
+    let labels = OutputMessageLabels {
+        scoped_tool: Some(|scope, _| {
+            (
+                format!("owner:{}/{}", scope.endpoint_id, scope.session_id),
+                String::new(),
+            )
+        }),
+        tool_sections: Some(|scope, tool, _| {
+            let mut details = tool.presentation_details(Default::default());
+            details.sections[0].title = format!("Input @ {}", scope.endpoint_id);
+            details
+        }),
+        ..Default::default()
+    };
+    for (endpoint, namespace) in [("one", 716), ("two", 717)] {
+        let own = RunScope::main(endpoint, "same-session-id");
+        let mut view = OutputMessage::with_labels(namespace, own.clone(), labels);
+        view.update(&own, 1, 1, &output(&message), Some(&section(&call)))
+            .unwrap();
+        let root = view.id();
+        let ids = view.content_ids()[0];
+        let fields = view.tool_detail_sections();
+        let mut host = view.into_host().unwrap();
+        assert!(
+            host.get(ids.disclosure.unwrap())
+                .unwrap()
+                .component::<ButtonContent>()
+                .unwrap()
+                .label
+                .contains(&format!("owner:{endpoint}/same-session-id"))
+        );
+        assert!(toggle(&mut host, root, ids.disclosure.unwrap()));
+        assert_eq!(
+            host.get(fields[0].body)
+                .unwrap()
+                .component::<TextFieldContent>()
+                .unwrap()
+                .field
+                .label,
+            format!("Input @ {endpoint}")
+        );
+        let foreign = RunScope::main("foreign", "same-session-id");
+        assert!(
+            view_mut(&mut host, root)
+                .update(&foreign, 2, 1, &output(&message), Some(&section(&call)))
+                .is_err()
+        );
+    }
+}

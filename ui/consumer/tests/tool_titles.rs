@@ -1,6 +1,213 @@
 //! Independent product consumes the same original tool disclosure and title facts.
 use tekes_agent_components_ui::*;
 use tekes_ui_controls::composition::*;
+
+#[test]
+fn independent_host_reports_use_shared_precedence_and_keep_original_section_owners() {
+    // Explicit host facts. These are not extracted from a tool's private metadata.
+    fn report(scope: &RunScope, tool: &TranscriptToolCall) -> Option<TranscriptToolReport> {
+        (scope == &RunScope::main("public-consumer", "tool-report")
+            && tool.id == "reported"
+            && tool.turn_id == "turn")
+            .then(|| TranscriptToolReport {
+                verb: "edit".into(),
+                subject: Some("owned.rs".into()),
+                result_count: Some(2),
+                result_object: Some("file".into()),
+                note: Some("已确认".into()),
+                added_lines: Some(0),
+                removed_lines: Some(0),
+            })
+    }
+    fn header(scope: &RunScope, tool: &TranscriptToolCall) -> (String, String) {
+        let report = report(scope, tool);
+        let action = report.as_ref().and_then(|report| {
+            report.row_text(TranscriptToolReportWording {
+                subject_phrase: |_, subject| format!("修改 {subject}"),
+                verb: str::to_owned,
+                magnitude: |count, object| {
+                    if object == "file" {
+                        format!("{count} 个文件")
+                    } else {
+                        format!("{count} {object}")
+                    }
+                },
+                join: |left, right| format!("{left} · {right}"),
+            })
+        });
+        let result = tool.presentation_result_text();
+        let row = tool.presentation_row(TranscriptToolRowWording {
+            label: "Edit",
+            stopped: "Stopped",
+            result: result.as_deref(),
+            settled_action: action.as_deref(),
+            ..Default::default()
+        });
+        let count = TranscriptToolChangeCount::select(
+            report.as_ref(),
+            (scope == &RunScope::main("public-consumer", "tool-report")).then_some(
+                TranscriptToolChangeCount {
+                    additions: 20,
+                    deletions: 9,
+                },
+            ),
+        );
+        // Plain label text only; SDK semantic runs/colors remain #25's responsibility.
+        (
+            count.map_or_else(
+                || row.text(),
+                |count| {
+                    format!(
+                        "{}    +{} −{}",
+                        row.text(),
+                        count.additions,
+                        count.deletions
+                    )
+                },
+            ),
+            String::new(),
+        )
+    }
+    fn sections(
+        scope: &RunScope,
+        tool: &TranscriptToolCall,
+        _: OutputMessageLabels,
+    ) -> TranscriptToolDetails {
+        let mut facts = tool.presentation_details(Default::default());
+        facts.sections[1].title = format!("{} · {}", scope.endpoint_id, facts.sections[1].title);
+        facts
+    }
+    let scope = RunScope::main("public-consumer", "tool-report");
+    let mut tool = TranscriptToolCall {
+        id: "reported".into(), turn_id: "turn".into(), name: "edit".into(), phase: "doing".into(),
+        arguments: r#"{"path":"owned.rs"}"#.parse().unwrap(),
+        result_meta: Some(r#"{"didDo":{"verb":"forged","subject":"not authoritative","addedLines":999,"removedLines":999}}"#.parse().unwrap()),
+        result: None, result_error: None, call_view: None, result_view: None, source_position: None, result_position: None,
+    };
+    let mut labels = ToolActivityLabels::default();
+    labels.details.scoped_tool = Some(header);
+    labels.details.tool_sections = Some(sections);
+    let mut activity = ToolActivity::new(735, scope.clone(), labels.clone());
+    activity
+        .update(&scope, 1, 1, &tool, ToolActivityPlacement::Call)
+        .unwrap();
+    let root = activity.id();
+    let ids = activity.content_ids().unwrap();
+    let fields = activity.tool_detail_sections();
+    let mut host = activity.into_host().unwrap();
+    let title = |host: &ContentHost| {
+        host.get(ids.disclosure.unwrap())
+            .unwrap()
+            .component::<ButtonContent>()
+            .unwrap()
+            .label
+            .clone()
+    };
+    assert!(title(&host).contains("Edit · owned.rs    +0 −0"));
+    assert!(!title(&host).contains("修改") && !title(&host).contains("999"));
+    host.accessibility_action(ids.disclosure.unwrap(), None, AccessibilityAction::Press);
+    let actions = host.drain_actions();
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<ToolActivity>()
+        .unwrap()
+        .handle_actions(&actions);
+    let owner = host.text_surface(fields[0].body).unwrap() as *const _ as usize;
+    assert_eq!(
+        host.get(fields[1].body)
+            .unwrap()
+            .component::<TextFieldContent>()
+            .unwrap()
+            .field
+            .label,
+        "public-consumer · Output"
+    );
+    assert!(host.focus(Some(fields[0].body), true));
+    tool.phase = "done".into();
+    tool.result = Some(r#"{"text":"stdout cannot name this action"}"#.parse().unwrap());
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<ToolActivity>()
+        .unwrap()
+        .update(&scope, 2, 1, &tool, ToolActivityPlacement::Call)
+        .unwrap();
+    assert!(title(&host).contains("修改 owned.rs · 2 个文件 · 已确认    +0 −0"));
+    assert!(!title(&host).contains("stdout"));
+    assert_eq!(
+        host.text_surface(fields[0].body).unwrap() as *const _ as usize,
+        owner
+    );
+    assert_eq!(host.focused(), Some(fields[0].body));
+    assert_eq!(
+        host.text_surface(fields[1].body).unwrap().input.text,
+        "stdout cannot name this action"
+    );
+    tool.phase = "error".into();
+    tool.result = Some(r#"{"text":"explicit failure"}"#.parse().unwrap());
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<ToolActivity>()
+        .unwrap()
+        .update(&scope, 3, 1, &tool, ToolActivityPlacement::Call)
+        .unwrap();
+    assert!(title(&host).contains("Edit · explicit failure    +0 −0"));
+    assert!(!title(&host).contains("修改"));
+    // A different explicit source has no report; its current-workspace fallback is separate.
+    tool.id = "without-report".into();
+    tool.phase = "done".into();
+    let mut activity = ToolActivity::new(736, scope.clone(), labels.clone());
+    activity
+        .update(&scope, 1, 1, &tool, ToolActivityPlacement::Call)
+        .unwrap();
+    let id = activity.content_ids().unwrap().disclosure.unwrap();
+    let host = activity.into_host().unwrap();
+    assert!(
+        host.get(id)
+            .unwrap()
+            .component::<ButtonContent>()
+            .unwrap()
+            .label
+            .contains("+20 −9")
+    );
+    tool.id = "reported".into();
+    let foreign = RunScope::main("other-endpoint", "tool-report");
+    let mut activity = ToolActivity::new(737, foreign.clone(), labels);
+    activity
+        .update(&foreign, 1, 1, &tool, ToolActivityPlacement::Call)
+        .unwrap();
+    let id = activity.content_ids().unwrap().disclosure.unwrap();
+    let root = activity.id();
+    let fields = activity.tool_detail_sections();
+    let mut host = activity.into_host().unwrap();
+    let title = &host
+        .get(id)
+        .unwrap()
+        .component::<ButtonContent>()
+        .unwrap()
+        .label;
+    assert!(
+        !title.contains("修改")
+            && !title.contains("已确认")
+            && !title.contains("+20")
+            && !title.contains("+0")
+    );
+    host.accessibility_action(id, None, AccessibilityAction::Press);
+    let actions = host.drain_actions();
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<ToolActivity>()
+        .unwrap()
+        .handle_actions(&actions);
+    assert_eq!(
+        host.get(fields[1].body)
+            .unwrap()
+            .component::<TextFieldContent>()
+            .unwrap()
+            .field
+            .label,
+        "other-endpoint · Output"
+    );
+}
 #[test]
 fn independent_tool_activity_consumes_producer_views_without_losing_focus_selection_or_source() {
     let scope = RunScope::main("public-consumer", "tool-title");

@@ -1,5 +1,5 @@
 {
-  "sourceBase": "cb1c28ecdcb290c8360ea2964260b484e03257ea",
+  "sourceBase": "c76278bfb0781338f27e030a1403117cc204c46f",
   "completionProven": false,
   "publicAgentKitRelease": {
     "publishedAt": "2026-10-19T14:25:34Z",
@@ -315,67 +315,47 @@
     }
   ],
   "ciSnapshot": {
-    "headRefOid": "cb1c28ecdcb290c8360ea2964260b484e03257ea",
+    "headRefOid": "c76278bfb0781338f27e030a1403117cc204c46f",
     "isDraft": true,
     "statusCheckRollup": [
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-22T15:59:39Z",
+        "completedAt": "2026-10-22T16:25:40Z",
         "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39809746322/job/119932471695",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39813650800/job/119946328615",
         "name": "checks",
-        "startedAt": "2026-10-22T15:57:59Z",
+        "startedAt": "2026-10-22T16:23:40Z",
         "status": "COMPLETED",
         "workflowName": "Rust headless"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-22T15:59:55Z",
+        "completedAt": "2026-10-22T16:25:39Z",
         "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39809734864/job/119932433212",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39813644250/job/119946287347",
         "name": "checks",
-        "startedAt": "2026-10-22T15:57:56Z",
+        "startedAt": "2026-10-22T16:23:34Z",
         "status": "COMPLETED",
         "workflowName": "Rust headless"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-22T15:59:49Z",
-        "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39809734961/job/119932434282",
-        "name": "checks",
-        "startedAt": "2026-10-22T15:57:58Z",
-        "status": "COMPLETED",
-        "workflowName": "Rust headless"
-      },
-      {
-        "__typename": "CheckRun",
-        "completedAt": "2026-10-22T16:04:31Z",
+        "completedAt": "2026-10-22T16:28:59Z",
         "conclusion": "FAILURE",
-        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39809746322/job/119932471497",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39813644250/job/119946287356",
         "name": "Rust UI consumer (no native interaction)",
-        "startedAt": "2026-10-22T15:58:00Z",
+        "startedAt": "2026-10-22T16:23:36Z",
         "status": "COMPLETED",
         "workflowName": "Rust headless"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-22T16:03:24Z",
-        "conclusion": "FAILURE",
-        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39809734864/job/119932432801",
+        "completedAt": "0001-01-01T00:00:00Z",
+        "conclusion": "",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39813650800/job/119946328329",
         "name": "Rust UI consumer (no native interaction)",
-        "startedAt": "2026-10-22T15:57:56Z",
-        "status": "COMPLETED",
-        "workflowName": "Rust headless"
-      },
-      {
-        "__typename": "CheckRun",
-        "completedAt": "2026-10-22T16:03:13Z",
-        "conclusion": "FAILURE",
-        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39809734961/job/119932432993",
-        "name": "Rust UI consumer (no native interaction)",
-        "startedAt": "2026-10-22T15:57:56Z",
-        "status": "COMPLETED",
+        "startedAt": "2026-10-22T16:23:40Z",
+        "status": "IN_PROGRESS",
         "workflowName": "Rust headless"
       }
     ]
@@ -390,11 +370,11 @@
   "documentationUpdatedThisAudit": true,
   "updatedDocumentation": {
     "README.md": "d0dcb8e6548be85610092a17ac2703696872d89feaaa76a90b896cb49e3fd2f7",
-    "ui/README.md": "517ab0d792dc3827cc173ac7545d88ad4f1f772939d0855deb8e708f476c2019",
+    "ui/README.md": "4b10f5b39dc9f9481152a28cfb5ac247edc6456aa9742fbf530d117e679c1490",
     "ui/bindings/README.md": "b1f8fe627e5637ef1942b67ed8134438c4a49bdcfb614db81cdaefb229177501",
-    "docs/rust-agent-ui-contract.md": "91b351e3bda3b0f94bf95bbf8ed2d63a1b890f38564b78757ead7244cfc0f689",
-    "docs/rust-agent-ui-delivery-status.md": "2563188c236d9ae59f9664d2af0c28f82c5524da40999b22b01c88b41a103b00",
-    "docs/rust-agent-ui-host-integration.md": "3fd2c62c47741bba34c30df992c1c3028c39e759ae7ae2a702c873dd4fe34f5f",
+    "docs/rust-agent-ui-contract.md": "f6af7fec935c17bd0d3c64cbe2cbb7cdeecd2cec3e0b6d6483b3f57dbdfae9bf",
+    "docs/rust-agent-ui-delivery-status.md": "8e84179f8c63a440bbcc6853b7d92913fc94930d5ea84a45032da113e8d937a3",
+    "docs/rust-agent-ui-host-integration.md": "02fe74a07a4d378062d7cbc1abab7c31951906c62306b6e8c0dcefa7ad6e3689",
     "docs/rust-agent-ui-tool-card-20261022.md": "a4cb097850c1c84fbd169a4389b65be41fa424012b53745d914014a950de3839",
     "docs/rust-agent-ui-tool-row-20261022.md": "b94d99891ad617d2f25b14ef472fe4dc51f79e53add3eb95f6e071de032c4e30"
   },
@@ -405,17 +385,17 @@
   "supplement": "rust-agent-ui-tool-card-20261022.json",
   "latestLocalValidation": {
     "root-tests": {
-      "passed": 241,
+      "passed": 246,
       "failed": 0,
       "ignored": 0,
-      "sourceReceipt": "rust-agent-ui-tool-details-20261022.json"
+      "sourceReceipt": "rust-agent-ui-tool-report-20261023.json"
     },
     "ui-tests": {
-      "passed": 559,
+      "passed": 561,
       "failed": 0,
       "ignored": 1,
-      "scope": "ordinary workspace; strict reading example exits 1",
-      "sourceReceipt": "rust-agent-ui-tool-section-controls-20261023.json"
+      "scope": "Full workspace passed after scoped behavior; alias-only lint refinement followed by final 19 callback tests and all-targets Clippy",
+      "sourceReceipt": "rust-agent-ui-tool-report-20261023.json"
     },
     "strict-nested-reading": {
       "accepted": false,
@@ -424,8 +404,8 @@
       "issue": 53
     }
   },
-  "latestVerifiedCiHead": "cb1c28ecdcb290c8360ea2964260b484e03257ea",
-  "latestVerifiedCiConclusion": "three-success-three-failure; macOS strict nested-reading gate fails",
+  "latestVerifiedCiHead": "c76278bfb0781338f27e030a1403117cc204c46f",
+  "latestVerifiedCiConclusion": "two-success-two-failure; macOS strict nested-reading gate fails",
   "richToolCardRendering": false,
   "historicalDocumentationAudit": {
     "sourceBase": "d2d9c979bf25d8dfdfcb80e598748e7e093d8afc",
@@ -489,12 +469,13 @@
   },
   "validationBuildsPerformed": true,
   "buildScope": "Cargo tests and Clippy reuse the existing target; supplement identifies receipts and source stages",
-  "localLinkValidationCount": 329,
+  "localLinkValidationCount": 334,
   "supplements": [
     "rust-agent-ui-tool-card-20261022.json",
     "rust-agent-ui-native-handled-20261022.json",
     "rust-agent-ui-tool-details-20261022.json",
-    "rust-agent-ui-tool-section-controls-20261023.json"
+    "rust-agent-ui-tool-section-controls-20261023.json",
+    "rust-agent-ui-tool-report-20261023.json"
   ],
   "boundedDetails": "explicit experiment; standard RunPort/Transcript defaults remain inline",
   "latestNativeAcceptance": {
@@ -514,10 +495,12 @@
     "docs/rust-agent-ui-tool-details-20261022.md",
     "docs/rust-agent-ui-bounded-details-20261022.md",
     "docs/rust-agent-ui-native-handled-20261022.md",
-    "docs/rust-agent-ui-tool-section-controls-20261023.md"
+    "docs/rust-agent-ui-tool-section-controls-20261023.md",
+    "docs/rust-agent-ui-tool-report-20261023.md"
   ],
   "historicalLastAllGreenCi": {
     "head": "a8f3572fc451eb193291e9f9a81d3a0825c063ae",
     "conclusion": "four-success"
-  }
+  },
+  "toolReport": "typed explicit host value and scoped callbacks; default SEP has no independent report; default count view and groups incomplete"
 }
