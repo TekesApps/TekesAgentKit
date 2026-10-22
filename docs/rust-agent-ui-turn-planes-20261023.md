@@ -34,8 +34,8 @@
 
 开发过程首次 Pi 探针读了较新的 binding snapshot、对应树尚未安装，错误地提前断言 Working 缺失。已改读原 RunPort.displayed_snapshot，所有状态/owner 断言保留，三端最终都通过。中间 Native 在窗口切回 Codex 后超时，该次不计通过；相同中间程序单独复跑通过，随后最终程序重新通过完整矩阵。旧程序/失败日志不覆盖、不移作最终收据。
 
-本阶段没有新的系统拼音或物理键盘验收。先前首次按键 Commit 异常及同程序复跑通过仍按 [TekesUI #41](https://github.com/TekesApps/TekesUI/issues/41#issuecomment-6351744540) 跟踪，稳定 IME 验收未证明；不会以 synthetic preedit 替代。VoiceOver 未验。
+用户确认系统提示已处理后，当前 3e0eeb6a 冻结程序通过一次正常 LaunchServices 系统拼音验收：精确前台 PID、原输入源不变，系统 Preedit 从 n 到 ni hao、组字期间发送/导航屏障、Commit 你好及单次提交均通过。原日志、前台身份轨迹和收据保留在 `.runtime-fixtures/thinking-source-20261023/planes-system-ime-resumed-20261023*`。这是 PID 定向按键驱动的系统软件 IME 证据，physicalKeyboard/candidateWindow=false；不覆盖真实三端的系统 IME 组合。先前首次按键 Commit 异常仍按 [TekesUI #41](https://github.com/TekesApps/TekesUI/issues/41#issuecomment-6351744540) 跟踪，单次通过不证明稳定性。VoiceOver 未验。
 
-8734185 的 CI 两项基础检查成功、两项 macOS UI 失败；已读取失败 job，仍是严格 bounded_detail_reading（#53）。公开 SDK main 未变，#48/#53 仍开放；PR #10 继续 draft，不合并或打 tag。完整目标与剩余布局见[交付状态](rust-agent-ui-delivery-status.md)。
+当前 9909009 的 CI 两项基础检查成功、两项 macOS UI 失败；已读取失败 job，仍是严格 bounded_detail_reading（#53）。公开 SDK main 未变，#48/#53 仍开放；PR #10 继续 draft，不合并或打 tag。完整目标与剩余布局见[交付状态](rust-agent-ui-delivery-status.md)。
 
 复用 `/tmp/agentkit-layout-text-292-target`、关闭 incremental；新建 target 0，纯编译缓存删除/释放 0 字节。冻结程序使用硬链接；保留失败/成功程序、源码/WIP、固定 runtime/SDK 输入及日志/收据/截图。原脚本退出时清理其受控临时 harness 会话，未清理共享 target 或其他任务。精确路径与摘要见[机器记录](rust-agent-ui-turn-planes-20261023.json)。

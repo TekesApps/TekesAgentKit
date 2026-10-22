@@ -508,5 +508,42 @@
     "acceptanceProgramsRetained": "hardlinks",
     "buildCacheDeletedBytes": 0,
     "ownedTemporaryHarnessState": "original driver cleanup; acceptance logs, receipts, images and exact programs retained"
+  },
+  "systemImeResumed": {
+    "sourceCommit": "9909009293a40e72b8bbd8e22b94fcd3951a29a4",
+    "receipt": {
+      "softwareIme": true,
+      "pidTargetedEvents": true,
+      "physicalKeyboard": false,
+      "candidateWindow": false,
+      "profile": "launch-services-app",
+      "applicationExitCode": null,
+      "launcherExitCode": 0,
+      "pid": 89373,
+      "sourceBefore": "com.apple.inputmethod.SCIM.ITABC",
+      "sourceAfter": "com.apple.inputmethod.SCIM.ITABC",
+      "binarySha256": "3e0eeb6a127cc496b08f5e8134a30e38026c82eb2c05c6e93a2e60db035870be"
+    },
+    "evidence": {
+      ".runtime-fixtures/thinking-source-20261023/planes-system-ime-resumed-20261023.json": "57f10461abf61a173fc7ac60b7d029835e22db0a5222d0571aba56c95dd1cf20",
+      ".runtime-fixtures/thinking-source-20261023/planes-system-ime-resumed-20261023.log": "14014f3b816025f78e96dcabb953006705b211b0e4008cddb84cda0c50ec2b6c",
+      ".runtime-fixtures/thinking-source-20261023/planes-system-ime-resumed-20261023.log.frontmost.jsonl": "6071e25b9259adb3bc5f3ac311ff78508ec8682ad98243762ae9a18e8b01884d",
+      ".runtime-fixtures/thinking-source-20261023/planes-system-ime-resumed-20261023.log.launcher": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      ".runtime-fixtures/thinking-source-20261023/planes-system-ime-resumed-20261023.log.stderr": "b0d1ced2c867f6146c6c4df3fd0a623d15ebad78140a38f407d812bf8508feac",
+      ".runtime-fixtures/thinking-source-20261023/planes-system-ime-resumed-20261023.log.stdout": "9c7feb3a3eeb8528c8b2d12f9e9721f263afccd0598b61019c170218adee6130"
+    },
+    "stableImeProven": false,
+    "priorFailuresRetained": true
+  },
+  "currentHeadCi": {
+    "head": "9909009293a40e72b8bbd8e22b94fcd3951a29a4",
+    "runIds": [
+      39864715261,
+      39864708640
+    ],
+    "checks": "SUCCESS",
+    "uiConsumer": "FAILURE",
+    "failedStep": "Verify nested detail reading intent (strict; no native window)",
+    "issue": "https://github.com/TekesApps/TekesUI/issues/53"
   }
 }
