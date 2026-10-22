@@ -1708,3 +1708,139 @@ fn explicit_summary_hierarchy_moves_only_titles_and_retains_original_controls() 
         }
     }
 }
+
+#[test]
+fn second_host_copies_another_scope_without_retargeting_the_original_composing_editor() {
+    use tekes_ui_controls::extended::{Axis, Stack};
+    let parent = RunScope::main("consumer", "parent");
+    let child = RunScope {
+        endpoint_id: "consumer".into(),
+        thread_id: "parent".into(),
+        session_id: "child".into(),
+    };
+    let snapshot = |text: &str| TranscriptSnapshot {
+        turns: vec![TranscriptTurn {
+            id: "same-turn".into(),
+            status: "completed".into(),
+            input: String::new(),
+            started_at: None,
+            ended_at: None,
+            usage: Default::default(),
+            fork_boundary: None,
+            footnote_actions: vec![],
+            live_usage: None,
+            reported_usage: None,
+        }],
+        items: vec![TranscriptItem {
+            id: "same-item".into(),
+            record_id: None,
+            reconciliation_id: None,
+            turn_id: "same-turn".into(),
+            kind: TranscriptItemKind::Assistant,
+            text: text.into(),
+            reasoning: String::new(),
+            attachments: vec![],
+            content_blocks: None,
+            is_visible: true,
+            is_final: true,
+            is_provisional: false,
+            reasoning_ended: true,
+            source_sequence: None,
+            source_position: None,
+            time: None,
+            metadata: Default::default(),
+        }],
+        ..Default::default()
+    };
+    let composer = tekes_agent_ui_consumer_check::new_composer(49200);
+    let editor = composer.ids().editor;
+    let mut left =
+        TranscriptContent::new(49201, 49202..49210, parent.clone(), Default::default()).unwrap();
+    left.update(&parent, 1, 1, &snapshot("原主回复"), false)
+        .unwrap();
+    let left_id = left.id();
+    let mut right =
+        TranscriptContent::new(49211, 49212..49220, child.clone(), Default::default()).unwrap();
+    right
+        .update(&child, 1, 1, &snapshot("原子回复"), false)
+        .unwrap();
+    let right_id = right.id();
+    let mut host = ContentHost::new(Content::new(
+        ComponentId(492),
+        StackContent {
+            model: Stack {
+                axis: Axis::Vertical,
+                gap: 8.,
+            },
+            flexible_child: None,
+            children: vec![
+                Content::new(composer.ids().root, composer),
+                Content::new(left_id, left),
+                Content::new(right_id, right),
+            ],
+        },
+    ))
+    .unwrap();
+    host.set_action_events(true);
+    let mut text = Text::new(1., true);
+    let frame = Rect::new(0., 0., 1800., 800.);
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        frame,
+        frame,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    host.focus(Some(editor), true);
+    host.event_with_text(
+        &ContentEvent::Preedit {
+            text: "原 Composer 中文组字".into(),
+            selection: 1..3,
+            clauses: vec![],
+            replacement: None,
+        },
+        &mut text,
+    )
+    .unwrap();
+    let baseline = host.text_surface(editor).unwrap().input.external_baseline();
+    let owner = host.text_surface(editor).unwrap() as *const _ as usize;
+    for (root, scope, expected) in [
+        (right_id, &child, "原子回复"),
+        (left_id, &parent, "原主回复"),
+    ] {
+        let copy = host
+            .get(root)
+            .unwrap()
+            .component::<TranscriptContent>()
+            .unwrap()
+            .copy_action_ids()[0];
+        let point = host.get(copy).unwrap().visible().unwrap().center();
+        host.event_with_text(&ContentEvent::PointerDown(point), &mut text)
+            .unwrap();
+        host.event_with_text(&ContentEvent::PointerUp(point), &mut text)
+            .unwrap();
+        let actions = host.drain_actions();
+        let captured = host
+            .get(root)
+            .unwrap()
+            .component::<TranscriptContent>()
+            .unwrap()
+            .take_copy_intents(&actions);
+        assert_eq!(captured.len(), 1);
+        assert_eq!(captured[0].scope(), scope);
+        assert_eq!(captured[0].text(), expected);
+        assert_eq!(captured[0].message(), None);
+        assert!(captured[0].claim());
+        assert!(!captured[0].clone().claim());
+        assert_eq!(host.focused(), Some(editor));
+        assert_eq!(
+            host.text_surface(editor).unwrap() as *const _ as usize,
+            owner
+        );
+        assert_eq!(
+            host.text_surface(editor).unwrap().input.external_baseline(),
+            baseline
+        );
+    }
+}

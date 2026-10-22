@@ -9,6 +9,13 @@ None for a turn aggregate. Hosts still claim once and write captured `text()`.
 See the [copy/display contract](../docs/rust-agent-ui-turn-output-copy-20261022.md)
 for raw source order, live-owner gating and independent response authority.
 
+The demo now admits original copy controls across the mounted main RunPort,
+selected writable pane and readonly child while a Run Composer owns preedit.
+Copy keeps its original scope; AX Focus and endpoint read/send/navigation remain
+separately gated. The [cross-pane contract](../docs/rust-agent-ui-cross-pane-copy-20261022.md)
+records the same-process native probe, private pasteboard opt-in and remaining
+ProcessContainer/Task/SideChat native acceptance boundaries.
+
 只消费 TekesUI，复用 AgentKit v0.3.8 的 `SessionRuntime` / `RunController` / `RunSnapshot`。
 组件层不实现另一套 Run 状态机。默认 headless workspace 和发布 API 保持独立。
 

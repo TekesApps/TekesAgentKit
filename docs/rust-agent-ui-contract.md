@@ -4,6 +4,8 @@
 
 [回合输出复制](rust-agent-ui-turn-output-copy-20261022.md)现按 ClientKit 原 snapshot 顺序聚合 assistant 文字，单条消息/整个回合分别捕获来源；复制不授予反馈或执行权限。最新实际回合的 live 显示不会因 final item 提前到达而退出，旧未结束回合也不能越过新回合取得 live owner。
 
+[跨 pane 本地复制](rust-agent-ui-cross-pane-copy-20261022.md)进一步放行当前挂载、可见的原复制动作：组字 owner 与复制来源分离，覆盖可写 pane 和只读子历史；原 scope、焦点、marked baseline 及 read/send/navigation 屏障保持。该同进程路径不代表 ProcessContainer 或全部辅助动作验收。
+
 [Summary 原Content插槽](rust-agent-ui-summary-custom-20261022.md)已提供宿主产品行的原控件保留、动态测量与事件来源校验；安装/退役走原SDK生命周期，保留旧Run适配。完整repository具体行及未选中会话宿主布局仍需继续。
 
 [Summary 工作区上下文](rust-agent-ui-summary-context-20261022.md)已补显式owner，无需虚构RunScope即可独立挂载host sections；原Run输入适配、owner隔离/旧动作拒绝、组件及原生兼容验收通过。通用host Content插槽见文首；完整repository具体行和未选中会话宿主布局仍开放。

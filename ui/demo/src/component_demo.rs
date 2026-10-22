@@ -3599,6 +3599,54 @@ impl ComponentDemo {
         }
         self.tree.get(self.summary_id())?.component::<SummaryView>()
     }
+    // Only original Run Composer preedit may admit these local business
+    // controls. A feedback/custom editor does not inherit this exception.
+    // IDs/visibility are read from mounted Kit controls; SDK owns actual hit,
+    // focus, capture and event disposition. Never cache this list across events.
+    fn nonfocusing_copy_ids(&self) -> Vec<ComponentId> {
+        let Some(run) = self.composing_navigation_run() else {
+            return vec![];
+        };
+        let editor = run.ids().composer.editor;
+        if self.tree.focused() != Some(editor)
+            || !self
+                .tree
+                .focus_targets()
+                .iter()
+                .any(|(id, _)| *id == editor)
+        {
+            return vec![];
+        }
+        let mut ids = vec![];
+        for controls in [Some(self.ids()), self.panel_composer_ids()]
+            .into_iter()
+            .flatten()
+        {
+            if let Some(run) = self
+                .tree
+                .get(ComponentId(controls.root.0 + 16))
+                .and_then(|node| node.component::<RunPort>())
+            {
+                ids.extend(run.copy_action_ids());
+            }
+        }
+        if let Some(root) = self.bounded_child_content_id()
+            && let Some(content) = self
+                .tree
+                .get(root)
+                .and_then(|node| node.component::<tekes_agent_components_ui::TranscriptContent>())
+        {
+            ids.extend(content.copy_action_ids());
+        }
+        ids.retain(|id| {
+            self.tree
+                .get(*id)
+                .is_some_and(|node| node.visible().is_some())
+        });
+        ids.sort();
+        ids.dedup();
+        ids
+    }
     fn blocked_pointer(&self, event: &ContentEvent) -> bool {
         if !self.composing() {
             return false;
@@ -3614,14 +3662,16 @@ impl ComponentDemo {
             _ => None,
         };
         position.is_some_and(|position| {
+            if self.nonfocusing_copy_ids().iter().any(|id| {
+                self.tree
+                    .get(*id)
+                    .and_then(|node| node.visible())
+                    .is_some_and(|frame| frame.contains(position))
+            }) {
+                return false;
+            }
             if self.composing_navigation_run().is_some_and(|run| {
                 run.is_nonfocusing_navigation_at(position)
-                    || run.copy_action_ids().iter().any(|id| {
-                        self.tree
-                            .get(*id)
-                            .and_then(|node| node.visible())
-                            .is_some_and(|frame| frame.contains(position))
-                    })
                     || run.composer().is_nonfocusing_notice_refresh_at(position)
                     || self
                         .composing_summary_disclosures()
@@ -3669,10 +3719,10 @@ impl ComponentDemo {
             && !self.composing_navigation_run().is_some_and(|run| {
                 run.is_nonfocusing_navigation_target(target)
                     || run.composer().is_nonfocusing_notice_refresh_target(target)
-                    || (matches!(action, AccessibilityAction::Press)
-                        && part.is_none()
-                        && run.copy_action_ids().contains(&target))
             })
+            && !(matches!(action, AccessibilityAction::Press)
+                && part.is_none()
+                && self.nonfocusing_copy_ids().contains(&target))
             && !(matches!(action, AccessibilityAction::Press)
                 && part.is_none()
                 && self
@@ -4143,7 +4193,9 @@ impl ComponentDemo {
                 }
             }
         }
-        if !composing && let Some(root) = self.bounded_child_content_id() {
+        // Local captured copy never reads/mutates the child endpoint. Read/page
+        // requests below retain their independent composition barrier.
+        if let Some(root) = self.bounded_child_content_id() {
             let content = self
                 .tree
                 .get(root)

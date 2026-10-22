@@ -2633,3 +2633,517 @@ async fn demo_admits_only_original_copy_controls_during_composer_preedit() {
     assert!(binding.current_run().unwrap().submissions.is_empty());
     runtime.stop().await.unwrap();
 }
+
+#[tokio::test]
+async fn original_cross_pane_copies_keep_composing_owner_scope_and_read_barriers() {
+    use std::{sync::Arc, time::Duration};
+    use tekes_agent_presentation::ChildHistoryLayout;
+    use tekes_agent_session::SessionRuntime;
+    use tekes_agent_ui_bindings::{ChildPaneBinding, RunBinding};
+    use tekes_agent_ui_demo::{
+        component_demo::{ComponentDemo, DemoCommand, SELECT_B},
+        fixture::Fixture,
+    };
+    fn visible_copy(view: &ComponentDemo, ids: Vec<ComponentId>) -> ComponentId {
+        ids.into_iter()
+            .find(|id| {
+                view.tree.get(*id).is_some_and(|node| {
+                    node.visible().is_some()
+                        && node
+                            .component::<ButtonContent>()
+                            .is_some_and(|button| button.label == "复制输出")
+                })
+            })
+            .expect("original visible output copy")
+    }
+    fn check_copy(commands: Vec<DemoCommand>, expected: &RunScope) {
+        let [DemoCommand::CopyTranscript(copy)] = commands.as_slice() else {
+            panic!("one original local copy, no read/send/navigation");
+        };
+        assert_eq!(copy.scope(), expected);
+        assert!(matches!(
+            copy.source(),
+            TranscriptCopySource::TurnOutput { .. }
+        ));
+        assert!(!copy.text().is_empty());
+    }
+    for readonly in [false, true] {
+        let runtime = Arc::new(SessionRuntime::spawn(
+            "fixture",
+            Arc::new(Fixture::default().with_children()),
+        ));
+        runtime.wait_ready(Duration::from_secs(3)).await.unwrap();
+        let parent_id = if readonly { "b" } else { "a" };
+        let parent = Arc::new(
+            RunBinding::open_main(runtime.clone(), RunScope::main("fixture", parent_id))
+                .await
+                .unwrap(),
+        );
+        let other = Arc::new(
+            RunBinding::open_main(
+                runtime.clone(),
+                RunScope::main("fixture", if readonly { "a" } else { "b" }),
+            )
+            .await
+            .unwrap(),
+        );
+        parent
+            .edit_text(
+                &ComposerDestination::run(parent.scope().clone()),
+                "原主草稿".into(),
+            )
+            .unwrap();
+        let child = Arc::new(
+            ChildPaneBinding::for_run(
+                &parent,
+                if readonly { "bounded-b" } else { "child-a" },
+                if readonly {
+                    ChildHistoryLayout::SameSession
+                } else {
+                    ChildHistoryLayout::IndependentSessions
+                },
+                None,
+            )
+            .await
+            .unwrap(),
+        );
+        if !readonly {
+            child.refresh_controls().await.unwrap();
+            child
+                .binding()
+                .edit_text(
+                    &ComposerDestination::run(child.binding().scope().clone()),
+                    "原子草稿".into(),
+                )
+                .unwrap();
+        }
+        let mut view = ComponentDemo::new([parent.clone(), other]).unwrap();
+        view.enable_transcript_content().unwrap();
+        let request = view.begin_child_open(parent.scope()).unwrap();
+        assert!(
+            view.install_child_source(
+                request,
+                child.clone(),
+                "原子历史".into(),
+                child.snapshot().await.unwrap()
+            )
+            .unwrap()
+        );
+        let _ = view.take_background_commands();
+        let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()), 1.);
+        let frame = Rect::new(0., 0., 1600., 1000.);
+        view.render(
+            &mut Scene::new(),
+            &mut text,
+            frame,
+            frame,
+            Theme::LIGHT.into(),
+        )
+        .unwrap();
+        let pane_copy_ids = if readonly {
+            view.tree
+                .get(view.bounded_child_content_id().unwrap())
+                .unwrap()
+                .component::<TranscriptContent>()
+                .unwrap()
+                .copy_action_ids()
+        } else {
+            run(
+                &view.tree,
+                ComponentId(view.panel_composer_ids().unwrap().root.0 + 16),
+            )
+            .copy_action_ids()
+        };
+        let pane_copy = visible_copy(&view, pane_copy_ids);
+        let main_editor = view.ids().editor;
+        view.tree.focus(Some(main_editor), true);
+        view.event_with_text(
+            &ContentEvent::Preedit {
+                text: "主窗口中文组字".into(),
+                selection: 1..3,
+                clauses: vec![],
+                replacement: None,
+            },
+            &mut text,
+        )
+        .unwrap();
+        let before = view.editor().input.external_baseline();
+        let point = view
+            .tree
+            .get(pane_copy)
+            .unwrap()
+            .visible()
+            .unwrap()
+            .center();
+        view.event_with_text(&ContentEvent::PointerDown(point), &mut text)
+            .unwrap();
+        check_copy(
+            view.event_with_text(&ContentEvent::PointerUp(point), &mut text)
+                .unwrap(),
+            child.binding().scope(),
+        );
+        check_copy(
+            view.accessibility_action(pane_copy, None, AccessibilityAction::Press)
+                .unwrap(),
+            child.binding().scope(),
+        );
+        assert_eq!(view.tree.focused(), Some(main_editor));
+        assert_eq!(view.editor().input.external_baseline(), before);
+        assert!(
+            view.accessibility_action(pane_copy, None, AccessibilityAction::Focus)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            view.accessibility_action(SELECT_B, None, AccessibilityAction::Press)
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(view.binding().scope(), parent.scope());
+        if readonly {
+            let (refresh, page) = view.bounded_child_buttons().unwrap();
+            for id in [refresh, page] {
+                assert!(
+                    view.accessibility_action(id, None, AccessibilityAction::Press)
+                        .unwrap()
+                        .is_empty()
+                );
+            }
+            view.set_panel_parent_projection_ready(parent.scope(), false)
+                .unwrap();
+            view.render(
+                &mut Scene::new(),
+                &mut text,
+                frame,
+                frame,
+                Theme::LIGHT.into(),
+            )
+            .unwrap();
+            assert!(view.tree.get(pane_copy).is_none());
+            assert!(
+                view.accessibility_action(pane_copy, None, AccessibilityAction::Press)
+                    .unwrap()
+                    .is_empty()
+            );
+            assert_eq!(view.editor().input.external_baseline(), before);
+            view.set_panel_parent_projection_ready(parent.scope(), true)
+                .unwrap();
+            view.render(
+                &mut Scene::new(),
+                &mut text,
+                frame,
+                frame,
+                Theme::LIGHT.into(),
+            )
+            .unwrap();
+            assert!(
+                view.accessibility_action(pane_copy, None, AccessibilityAction::Press)
+                    .unwrap()
+                    .is_empty(),
+                "retired pane IDs cannot activate the rebuilt child"
+            );
+        } else {
+            assert_eq!(parent.current_run().unwrap().draft.text, "原主草稿");
+            // Reverse direction: child Composer owns preedit; copy belongs to main.
+            view.event_with_text(&ContentEvent::Unmark, &mut text)
+                .unwrap();
+            let child_editor = view.panel_composer_ids().unwrap().editor;
+            view.tree.focus(Some(child_editor), true);
+            view.event_with_text(
+                &ContentEvent::Preedit {
+                    text: "子窗口中文组字".into(),
+                    selection: 1..3,
+                    clauses: vec![],
+                    replacement: None,
+                },
+                &mut text,
+            )
+            .unwrap();
+            let before = view
+                .tree
+                .text_surface(child_editor)
+                .unwrap()
+                .input
+                .external_baseline();
+            let main_copy = visible_copy(
+                &view,
+                run(&view.tree, ComponentId(view.ids().root.0 + 16)).copy_action_ids(),
+            );
+            check_copy(
+                view.accessibility_action(main_copy, None, AccessibilityAction::Press)
+                    .unwrap(),
+                parent.scope(),
+            );
+            assert_eq!(view.tree.focused(), Some(child_editor));
+            assert_eq!(
+                view.tree
+                    .text_surface(child_editor)
+                    .unwrap()
+                    .input
+                    .external_baseline(),
+                before
+            );
+            assert!(
+                view.accessibility_action(main_copy, None, AccessibilityAction::Focus)
+                    .unwrap()
+                    .is_empty()
+            );
+        }
+        assert_eq!(
+            parent.current_run().unwrap().draft.text,
+            if readonly {
+                "原主草稿"
+            } else {
+                "主窗口中文组字原主草稿"
+            },
+            "Unmark commits the original main preedit; copying never replaces it"
+        );
+        assert!(parent.current_run().unwrap().submissions.is_empty());
+        if !readonly {
+            assert_eq!(
+                child.binding().current_run().unwrap().draft.text,
+                "原子草稿"
+            );
+        }
+        runtime.stop().await.unwrap();
+    }
+}
+
+#[tokio::test]
+async fn task_and_sidechat_use_their_own_copy_scope_during_another_composers_preedit() {
+    use std::{sync::Arc, time::Duration};
+    use tekes_agent_contract::{PromptMode, Result};
+    use tekes_agent_presentation::{AgentTask, PreparedSubmission, SubmissionPreparation};
+    use tekes_agent_session::SessionRuntime;
+    use tekes_agent_ui_bindings::{RunBinding, SideChatBinding, TaskPaneBinding};
+    use tekes_agent_ui_demo::{
+        component_demo::{ComponentDemo, DemoCommand},
+        fixture::Fixture,
+    };
+    struct Prepare;
+    #[async_trait::async_trait]
+    impl SubmissionPreparation for Prepare {
+        async fn prepare(
+            &self,
+            _: &SessionRuntime,
+            _: &PreparedSubmission,
+            _: &RunScope,
+        ) -> Result<()> {
+            Ok(())
+        }
+    }
+    for sidechat in [false, true] {
+        let runtime = Arc::new(SessionRuntime::spawn(
+            "fixture",
+            Arc::new(Fixture::default().with_children().with_side_chats()),
+        ));
+        runtime.wait_ready(Duration::from_secs(3)).await.unwrap();
+        let parent = Arc::new(
+            RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "a"))
+                .await
+                .unwrap(),
+        );
+        parent
+            .edit_text(
+                &ComposerDestination::run(parent.scope().clone()),
+                "主草稿".into(),
+            )
+            .unwrap();
+        let mut view = ComponentDemo::new([parent.clone()]).unwrap();
+        view.enable_transcript_content().unwrap();
+        let auxiliary = if sidechat {
+            let source = Arc::new(SideChatBinding::new(runtime.clone()));
+            view.set_side_chat_binding(source.clone());
+            view.sync().unwrap();
+            let create = view
+                .tree
+                .get(view.panel_id())
+                .unwrap()
+                .component::<SidePanel>()
+                .unwrap()
+                .create_side_chat_id();
+            let mut commands = view
+                .accessibility_action(create, None, AccessibilityAction::Press)
+                .unwrap();
+            let DemoCommand::CreateSideChat(request) = commands.remove(0) else {
+                panic!("original create callback");
+            };
+            let chat = source
+                .create(parent.scope().clone(), None, "cross-pane-copy")
+                .await
+                .unwrap();
+            let bound = source.open(&chat).await.unwrap();
+            let binding = bound.binding().clone();
+            let target = ComposerDestination::run(binding.scope().clone());
+            binding
+                .edit_text(&target, "准备 SideChat 复制来源".into())
+                .unwrap();
+            let mut changes = binding.subscribe_run().unwrap();
+            binding
+                .send_with(&target, PromptMode::Queue, &Prepare)
+                .await
+                .unwrap();
+            tokio::time::timeout(Duration::from_secs(3), async {
+                loop {
+                    if binding
+                        .current_run()
+                        .unwrap()
+                        .transcript
+                        .items
+                        .iter()
+                        .any(|item| item.is_final)
+                    {
+                        break;
+                    }
+                    changes.changed().await.unwrap();
+                }
+            })
+            .await
+            .unwrap();
+            assert!(view.install_side_chat_run(request, bound).unwrap());
+            binding
+        } else {
+            let source = Arc::new(TaskPaneBinding::for_run(&parent));
+            let token = source.begin(parent.scope().clone(), "copy-task").unwrap();
+            assert!(source.commit(
+                &token,
+                Ok(Some(AgentTask {
+                    id: "copy-task".into(),
+                    scope: RunScope {
+                        endpoint_id: "fixture".into(),
+                        thread_id: "a".into(),
+                        session_id: "child-a".into()
+                    },
+                    name: "原任务".into(),
+                    status: "running".into(),
+                    kind: "task".into()
+                }))
+            ));
+            view.open_task_source(source.clone()).unwrap();
+            let binding = source.open_resolved().await.unwrap().unwrap();
+            assert!(
+                view.install_task_run(parent.scope().clone(), "copy-task".into(), binding.clone())
+                    .unwrap()
+            );
+            binding
+        };
+        auxiliary
+            .edit_text(
+                &ComposerDestination::run(auxiliary.scope().clone()),
+                "辅助草稿".into(),
+            )
+            .unwrap();
+        let admitted = auxiliary.current_run().unwrap().submissions.len();
+        view.sync().unwrap();
+        let _ = view.take_background_commands();
+        let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()), 1.);
+        let frame = Rect::new(0., 0., 1600., 1000.);
+        view.render(
+            &mut Scene::new(),
+            &mut text,
+            frame,
+            frame,
+            Theme::LIGHT.into(),
+        )
+        .unwrap();
+        let pane = ComponentId(view.panel_composer_ids().unwrap().root.0 + 16);
+        let output = run(&view.tree, pane)
+            .copy_action_ids()
+            .into_iter()
+            .find(|id| {
+                view.tree.get(*id).is_some_and(|node| {
+                    node.visible().is_some()
+                        && node
+                            .component::<ButtonContent>()
+                            .is_some_and(|button| button.label == "复制输出")
+                })
+            })
+            .unwrap();
+        let editor = view.ids().editor;
+        view.tree.focus(Some(editor), true);
+        view.event_with_text(
+            &ContentEvent::Preedit {
+                text: "主组字".into(),
+                selection: 1..2,
+                clauses: vec![],
+                replacement: None,
+            },
+            &mut text,
+        )
+        .unwrap();
+        let baseline = view.editor().input.external_baseline();
+        let point = view.tree.get(output).unwrap().visible().unwrap().center();
+        view.event_with_text(&ContentEvent::PointerDown(point), &mut text)
+            .unwrap();
+        let commands = view
+            .event_with_text(&ContentEvent::PointerUp(point), &mut text)
+            .unwrap();
+        let [DemoCommand::CopyTranscript(copy)] = commands.as_slice() else {
+            panic!("one original auxiliary copy");
+        };
+        assert_eq!(copy.scope(), auxiliary.scope());
+        assert!(!copy.text().is_empty());
+        assert_eq!(view.tree.focused(), Some(editor));
+        assert_eq!(view.editor().input.external_baseline(), baseline);
+        assert_eq!(parent.current_run().unwrap().draft.text, "主草稿");
+        assert_eq!(auxiliary.current_run().unwrap().draft.text, "辅助草稿");
+        assert_eq!(auxiliary.current_run().unwrap().submissions.len(), admitted);
+        assert!(parent.current_run().unwrap().submissions.is_empty());
+        // Child/task/SideChat all mount the original reusable RunPort. Reverse
+        // focus direction must keep that pane's editor and return main scope.
+        view.event_with_text(&ContentEvent::Unmark, &mut text)
+            .unwrap();
+        let main_draft = parent.current_run().unwrap().draft.text.clone();
+        let editor = view.panel_composer_ids().unwrap().editor;
+        view.tree.focus(Some(editor), true);
+        view.event_with_text(
+            &ContentEvent::Preedit {
+                text: "辅助组字".into(),
+                selection: 1..2,
+                clauses: vec![],
+                replacement: None,
+            },
+            &mut text,
+        )
+        .unwrap();
+        let baseline = view
+            .tree
+            .text_surface(editor)
+            .unwrap()
+            .input
+            .external_baseline();
+        let main = ComponentId(view.ids().root.0 + 16);
+        let copy = run(&view.tree, main)
+            .copy_action_ids()
+            .into_iter()
+            .find(|id| {
+                view.tree.get(*id).is_some_and(|node| {
+                    node.visible().is_some()
+                        && node
+                            .component::<ButtonContent>()
+                            .is_some_and(|button| button.label == "复制输出")
+                })
+            })
+            .unwrap();
+        let commands = view
+            .accessibility_action(copy, None, AccessibilityAction::Press)
+            .unwrap();
+        let [DemoCommand::CopyTranscript(copy)] = commands.as_slice() else {
+            panic!("one original main copy");
+        };
+        assert_eq!(copy.scope(), parent.scope());
+        assert_eq!(view.tree.focused(), Some(editor));
+        assert_eq!(
+            view.tree
+                .text_surface(editor)
+                .unwrap()
+                .input
+                .external_baseline(),
+            baseline
+        );
+        assert_eq!(parent.current_run().unwrap().draft.text, main_draft);
+        assert_eq!(auxiliary.current_run().unwrap().draft.text, "辅助草稿");
+        assert_eq!(auxiliary.current_run().unwrap().submissions.len(), admitted);
+        runtime.stop().await.unwrap();
+    }
+}
