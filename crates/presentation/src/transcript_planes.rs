@@ -8,6 +8,20 @@ pub enum TranscriptPlane {
     Activity,
     Output,
 }
+/// Business layout intent, not expansion storage or a replacement text/scroll tree.
+/// Hosts forward this captured fact; AgentKit components own local disclosure.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TranscriptActivityPresentation {
+    /// Retained/unsettled, clipped input/prompt order, or a direct task-source call.
+    /// Preserve source rows without inventing a settled disclosure.
+    Direct,
+    /// Passive live status. A candidate final answer never retires this owner.
+    Working,
+    /// Settled history with later user input keeps activity between input bubbles.
+    BetweenInputs,
+    /// No activity means a passive settled status, never an empty disclosure.
+    Settled { default_expanded: bool },
+}
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TranscriptItemPlanes {
     /// Reasoning always belongs to Activity, including a final assistant record.
@@ -24,6 +38,7 @@ pub struct TranscriptTurnPlanes {
     pub is_live_owner: bool,
     pub has_activity: bool,
     pub has_output: bool,
+    pub activity: TranscriptActivityPresentation,
     pub items: BTreeMap<String, TranscriptItemPlanes>,
 }
 impl TranscriptSection<'_> {
@@ -38,6 +53,10 @@ impl TranscriptSection<'_> {
     ) -> Result<TranscriptTurnPlanes> {
         scope.validate()?;
         require(!self.id.is_empty(), "empty transcript plane turn")?;
+        require(
+            self.turn.is_none_or(|turn| turn.id == self.id),
+            "foreign transcript plane turn",
+        )?;
         require(
             sources.scope.as_ref().is_none_or(|owner| owner == scope),
             "foreign transcript plane sources",
@@ -67,6 +86,7 @@ impl TranscriptSection<'_> {
             is_live_owner,
             has_activity: !self.tools.is_empty(),
             has_output: false,
+            activity: TranscriptActivityPresentation::Direct,
             items: BTreeMap::new(),
         };
         for output in &self.outputs {
@@ -128,7 +148,59 @@ impl TranscriptSection<'_> {
                 "duplicate transcript plane message",
             )?;
         }
+        result.activity = self.activity_presentation(scope, sources, &result)?;
         Ok(result)
+    }
+
+    fn activity_presentation(
+        &self,
+        scope: &RunScope,
+        sources: &TranscriptThinkingSources,
+        planes: &TranscriptTurnPlanes,
+    ) -> Result<TranscriptActivityPresentation> {
+        use TranscriptActivityPresentation as Presentation;
+        // Match ClientKit's direct source-call exception before live/settled gates.
+        if self.id.starts_with("task-source:") {
+            return Ok(Presentation::Direct);
+        }
+        if planes.is_live_owner {
+            return Ok(Presentation::Working);
+        }
+        let Some(turn) = self.turn.filter(|turn| turn.status != "running") else {
+            return Ok(Presentation::Direct);
+        };
+        let order = self.display_order(scope, sources)?;
+        // A missing input position is not evidence that it was the opening input.
+        // Keep it visible until a source-backed timeline can establish that fact.
+        if order.unplaced.iter().any(|event| {
+            matches!(event, TranscriptOrderedEvent::Message(item) if item.kind == TranscriptItemKind::User)
+        }) {
+            return Ok(Presentation::Direct);
+        }
+        let mut machine_seen = false;
+        let mut input_seen = false;
+        for event in order.ordered {
+            match event {
+                TranscriptOrderedEvent::Message(item) if item.kind == TranscriptItemKind::User => {
+                    if machine_seen {
+                        return Ok(Presentation::BetweenInputs);
+                    }
+                    input_seen = true;
+                }
+                TranscriptOrderedEvent::Message(item)
+                    if item.kind == TranscriptItemKind::System && !input_seen =>
+                {
+                    // The current canonical DTO has no systemPromptBeforeInput
+                    // role. Do not hide a possible initial prompt in Activity or
+                    // misclassify its following opening input as an inner input.
+                    return Ok(Presentation::Direct);
+                }
+                _ => machine_seen = true,
+            }
+        }
+        Ok(Presentation::Settled {
+            default_expanded: planes.has_activity && turn.status != "completed",
+        })
     }
 }
 

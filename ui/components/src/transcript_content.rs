@@ -1511,7 +1511,7 @@ fn plan<'a>(
                 result.push(row);
             }
         }
-        if planes.is_live_owner {
+        if planes.activity == crate::TranscriptActivityPresentation::Working {
             let before = result[section_start..]
                 .iter()
                 .position(|row| !matches!(row.content, PlannedContent::Input(_)))

@@ -22,7 +22,7 @@
   "tekesuiInputDigest": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
   "richToolCardRendering": false,
   "crossProcessAccepted": false,
-  "sourceBase": "8734185",
+  "sourceBase": "f61cfcb1f3bad58939da8bfd79e956292bc64dfb",
   "sourceStage": "plus shared canonical activity/output facts and live-owner eligibility, passive Working row and installed-snapshot native probes; physical plane splitting and settled activity disclosure unfinished",
   "sourcesRead": {
     "ui/components/src/run_port.rs": "9bf8c3d2e746bb1f4a6b9c7a8dabbdeb4738db980c17bfc619f4e3df6f3b9fbf",
@@ -404,37 +404,42 @@
       }
     ]
   },
-  "latestVerifiedCiHead": "f5dfd8e083d001b3ebc7ff20942ca194391308ef",
+  "latestVerifiedCiHead": "9909009293a40e72b8bbd8e22b94fcd3951a29a4",
   "latestVerifiedCiConclusion": "Linux x2 SUCCESS; macOS x2 FAILURE at strict bounded_detail_reading (#53)",
   "knownFailure": "Nested detail scroll leaves parent following; strict gate remains required",
   "currentValidation": "rust-agent-ui-current-validation-20261023.json",
   "currentSourceNativeAccepted": false,
   "latestNativeAcceptance": {
-    "partialLocalFixtureAccepted": [
-      "paging-reading-focus",
-      "system-pinyin-software-keys",
-      "sidechat-menu"
+    "sourceCommit": "9909009293a40e72b8bbd8e22b94fcd3951a29a4",
+    "programSha256": "3e0eeb6a127cc496b08f5e8134a30e38026c82eb2c05c6e93a2e60db035870be",
+    "realHarness": true,
+    "realHarnessProfiles": [
+      "stream",
+      "stream-reading",
+      "public-history-page"
     ],
-    "programSha256": "708f1d932de8b067d78237dbf59ac42c60fd8d2de53d0591e2246fe0d5c8a063",
+    "evidence": "rust-agent-ui-turn-planes-20261023.json",
+    "softwareIme": "One normal-app system Pinyin probe passed; earlier first-key failures retained; no stability claim",
     "completeUiAccepted": false,
-    "realHarness": false,
-    "processContainer": false
+    "processContainer": false,
+    "currentSourceAccepted": false
   },
   "latestLocalValidation": {
-    "rootTests": 285,
-    "fullUiTests": 590,
+    "rootTests": 289,
+    "fullUiTests": 591,
     "uiIgnored": 1,
     "newSourceTests": 11,
     "newFixtureConsumerPipelineTests": 1,
     "rootAndUiStrictAllTargetsClippy": true,
     "currentFullUiSuiteRerun": true,
     "strictReadingExitCode": 1,
-    "newNativeAcceptance": "current 3e0eeb6a program: Pi/DSH/Native native stream + stream-reading + public history-page profiles; native page button false; physical/system IME not accepted",
+    "newNativeAcceptance": "No native receipts for this policy increment; prior 3e0eeb6a receipts retain original source identity",
     "finalThinkingSourceTests": 5,
     "newReadonlyLiveTestAfterFullSuite": 0,
     "displayOrderTests": 14,
     "readonlyReadingTests": 37,
-    "planeTests": 4
+    "planeTests": 8,
+    "activityPolicyDemoTests": 3
   },
   "publicProcessContractSources": {
     "crates/tekes-ui-module-runtime/src/container.rs": "b34423866204a1ee7e0346b5609ac3c4e1e278025ef8317962f44c54bb53b5e9",
@@ -461,5 +466,17 @@
   "systemImeDiagnostic": "https://github.com/TekesApps/TekesUI/issues/41#issuecomment-6351744540",
   "turnPlanes": "rust-agent-ui-turn-planes-20261023.json",
   "sameProcessNativeThreeHarnessProfiles": true,
-  "physicalPlaneLayoutComplete": false
+  "physicalPlaneLayoutComplete": false,
+  "activityPolicy": "rust-agent-ui-activity-policy-20261023.json",
+  "historicalNativeAcceptanceBeforeTurnPlanes": {
+    "partialLocalFixtureAccepted": [
+      "paging-reading-focus",
+      "system-pinyin-software-keys",
+      "sidechat-menu"
+    ],
+    "programSha256": "708f1d932de8b067d78237dbf59ac42c60fd8d2de53d0591e2246fe0d5c8a063",
+    "completeUiAccepted": false,
+    "realHarness": false,
+    "processContainer": false
+  }
 }

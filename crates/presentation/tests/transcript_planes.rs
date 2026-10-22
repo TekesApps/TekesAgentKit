@@ -63,6 +63,12 @@ fn final_body_and_retained_reasoning_have_distinct_planes_without_reclassifying_
         .planes(&RunScope::main("sep", "s"), &source.thinking_sources, false)
         .unwrap();
     assert!(planes.has_activity && planes.has_output);
+    assert_eq!(
+        planes.activity,
+        TranscriptActivityPresentation::Settled {
+            default_expanded: false
+        }
+    );
     for row in source
         .items
         .iter()
@@ -97,6 +103,7 @@ fn a_live_final_candidate_does_not_settle_its_activity_owner() {
         .planes(&RunScope::main("sep", "s"), &source.thinking_sources, true)
         .unwrap();
     assert!(live.is_live_owner && live.has_activity);
+    assert_eq!(live.activity, TranscriptActivityPresentation::Working);
     assert!(!live.has_output);
     let candidate = source
         .items
@@ -111,12 +118,168 @@ fn a_live_final_candidate_does_not_settle_its_activity_owner() {
         .planes(&RunScope::main("sep", "s"), &source.thinking_sources, false)
         .unwrap();
     assert!(!retained.is_live_owner);
+    assert_eq!(retained.activity, TranscriptActivityPresentation::Direct);
+}
+
+#[test]
+fn abnormal_settlement_retains_activity_by_default_but_empty_activity_has_no_disclosure() {
+    for status in [
+        "error",
+        "failed",
+        "aborted",
+        "stopped",
+        "interrupted",
+        "max-tokens",
+        "blocked",
+        "unknown-terminal",
+    ] {
+        let mut source = snapshot(true);
+        source.turns[0].status = status.into();
+        let doc = TranscriptDocument::read(&source).unwrap();
+        let planes = doc.sections[0]
+            .planes(&RunScope::main("sep", "s"), &source.thinking_sources, false)
+            .unwrap();
+        assert_eq!(
+            planes.activity,
+            TranscriptActivityPresentation::Settled {
+                default_expanded: true
+            },
+            "{status}"
+        );
+        source.items.clear();
+        source.tools.clear();
+        let doc = TranscriptDocument::read(&source).unwrap();
+        let planes = doc.sections[0]
+            .planes(&RunScope::main("sep", "s"), &source.thinking_sources, false)
+            .unwrap();
+        assert!(!planes.has_activity);
+        assert_eq!(
+            planes.activity,
+            TranscriptActivityPresentation::Settled {
+                default_expanded: false
+            },
+            "{status}"
+        );
+    }
+}
+
+#[test]
+fn later_input_uses_between_input_timeline_and_unplaced_input_never_acquires_opening_identity() {
+    let mut source = snapshot(true);
+    let mut input = source
+        .items
+        .iter()
+        .find(|row| row.kind == TranscriptItemKind::User)
+        .unwrap()
+        .clone();
+    input.id = "later-input".into();
+    input.source_sequence = Some(9);
+    input.source_position = Some(TranscriptSourcePosition::Journal {
+        sequence: 9,
+        content_index: None,
+    });
+    source.items.push(input);
+    let project = |source: &TranscriptSnapshot| {
+        let doc = TranscriptDocument::read(source).unwrap();
+        doc.sections[0]
+            .planes(&RunScope::main("sep", "s"), &source.thinking_sources, false)
+            .unwrap()
+            .activity
+    };
+    assert_eq!(
+        project(&source),
+        TranscriptActivityPresentation::BetweenInputs
+    );
+    let input = source.items.last_mut().unwrap();
+    input.source_sequence = None;
+    input.source_position = None;
+    assert_eq!(project(&source), TranscriptActivityPresentation::Direct);
+    let input = source.items.last_mut().unwrap();
+    input.source_sequence = Some(0);
+    input.source_position = Some(TranscriptSourcePosition::Journal {
+        sequence: 0,
+        content_index: None,
+    });
+    assert_eq!(
+        project(&source),
+        TranscriptActivityPresentation::Settled {
+            default_expanded: false
+        }
+    );
+}
+
+#[test]
+fn clipped_turn_and_explicit_task_source_preserve_direct_rows_without_status_or_disclosure() {
+    let mut source = snapshot(true);
+    source.turns.clear();
+    let doc = TranscriptDocument::read(&source).unwrap();
+    assert!(doc.sections[0].turn.is_none());
+    assert_eq!(
+        doc.sections[0]
+            .planes(&RunScope::main("sep", "s"), &source.thinking_sources, false)
+            .unwrap()
+            .activity,
+        TranscriptActivityPresentation::Direct
+    );
+    for closed in [false, true] {
+        let mut source = snapshot(closed);
+        source.turns[0].id = "task-source:call".into();
+        for item in &mut source.items {
+            item.turn_id = "task-source:call".into();
+        }
+        for tool in &mut source.tools {
+            tool.turn_id = "task-source:call".into();
+        }
+        let doc = TranscriptDocument::read(&source).unwrap();
+        assert_eq!(
+            doc.sections[0]
+                .planes(
+                    &RunScope::main("sep", "s"),
+                    &source.thinking_sources,
+                    !closed
+                )
+                .unwrap()
+                .activity,
+            TranscriptActivityPresentation::Direct
+        );
+    }
+}
+
+#[test]
+fn initial_system_record_without_prompt_role_is_not_hidden_or_treated_as_inner_input() {
+    let mut source = snapshot(true);
+    let mut prompt = source.items[0].clone();
+    prompt.id = "initial-system".into();
+    prompt.kind = TranscriptItemKind::System;
+    prompt.source_sequence = Some(0);
+    prompt.source_position = Some(TranscriptSourcePosition::Journal {
+        sequence: 0,
+        content_index: None,
+    });
+    source.items.push(prompt);
+    let doc = TranscriptDocument::read(&source).unwrap();
+    assert_eq!(
+        doc.sections[0]
+            .planes(&RunScope::main("sep", "s"), &source.thinking_sources, false)
+            .unwrap()
+            .activity,
+        TranscriptActivityPresentation::Direct
+    );
 }
 #[test]
 fn missing_frame_provenance_is_explicit_and_foreign_or_settled_live_owners_fail() {
     let source = snapshot(true);
     let doc = TranscriptDocument::read(&source).unwrap();
     let scope = RunScope::main("sep", "s");
+    let mut foreign_turn = source.turns[0].clone();
+    foreign_turn.id = "another-turn".into();
+    let mut section = doc.sections[0].clone();
+    section.turn = Some(&foreign_turn);
+    assert!(
+        section
+            .planes(&scope, &source.thinking_sources, false)
+            .is_err()
+    );
     assert!(
         doc.sections[0]
             .planes(&scope, &source.thinking_sources, true)

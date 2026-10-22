@@ -220,6 +220,7 @@ fn working_row_and_installed_plane_facts_follow_original_run_ownership_through_s
     let output_id = content.row_id(&output_key).unwrap();
     let facts = tekes_agent_ui_consumer_check::installed_turn_planes(content, &turn).unwrap();
     assert!(facts.is_live_owner && facts.has_activity && !facts.has_output);
+    assert_eq!(facts.activity, TranscriptActivityPresentation::Working);
     assert_eq!(first.turn_planes(&turn).unwrap(), facts);
     assert_eq!(facts.items[&original_output.id].is_narration, Some(true));
     let root = run.ids().root;
@@ -256,10 +257,68 @@ fn working_row_and_installed_plane_facts_follow_original_run_ownership_through_s
         tekes_agent_ui_consumer_check::installed_turn_planes(run.transcript().unwrap(), &turn)
             .unwrap();
     assert!(!facts.is_live_owner && facts.has_output);
+    assert_eq!(
+        facts.activity,
+        TranscriptActivityPresentation::Settled {
+            default_expanded: false
+        }
+    );
     assert_eq!(next.turn_planes(&turn).unwrap(), facts);
     assert_eq!(
         facts.items[&original_output.id].body,
         Some(TranscriptPlane::Output)
     );
     assert!(host.get(status_id).is_none());
+}
+
+#[test]
+fn direct_task_source_keeps_original_content_without_a_working_status() {
+    let scope = RunScope::main("sep", "s");
+    let mut source = captured_run();
+    let turn = "task-source:captured-call";
+    source.transcript.turns[0].id = turn.into();
+    for item in &mut source.transcript.items {
+        item.turn_id = turn.into();
+    }
+    for tool in &mut source.transcript.tools {
+        tool.turn_id = turn.into();
+    }
+    source.transcript.thinking_sources.live_turn_id = Some(turn.into());
+    let mut run = RunPort::standard(6700, 6710..6900, scope.clone()).unwrap();
+    run.update(
+        &source,
+        Default::default(),
+        ComposerControlGate::OPEN,
+        paging(&scope),
+        true,
+    )
+    .unwrap();
+    let content = run.transcript().unwrap();
+    let facts = tekes_agent_ui_consumer_check::installed_turn_planes(content, turn).unwrap();
+    assert!(facts.is_live_owner);
+    assert_eq!(facts.activity, TranscriptActivityPresentation::Direct);
+    assert_eq!(source.turn_planes(turn).unwrap(), facts);
+    assert!(
+        !content
+            .row_keys()
+            .iter()
+            .any(|key| matches!(key, TranscriptContentRowKey::ActivityStatus(_)))
+    );
+    for item in &source.transcript.items {
+        assert!(
+            content
+                .row_id(&TranscriptContentRowKey::Message(
+                    TranscriptMessageIdentity::Item(item.id.clone())
+                ))
+                .is_some()
+        );
+    }
+    for tool in &source.transcript.tools {
+        assert!(
+            content.tool_run(&tool.id).is_some()
+                || content
+                    .row_id(&TranscriptContentRowKey::Tool(tool.id.clone()))
+                    .is_some()
+        );
+    }
 }

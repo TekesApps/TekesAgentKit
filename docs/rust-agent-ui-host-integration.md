@@ -88,3 +88,10 @@ TranscriptContent/RunPort/只读 pane 已直接消费 `TranscriptSection::displa
 copy 可用 `TranscriptContentLabels.activity_working` 配置；不承担焦点或输入实现。
 分区 facts 不授予动作权限，也尚未完成历史 activity 折叠/物理 plane 布局；
 [API 与当前三端原生验收范围](rust-agent-ui-turn-planes-20261023.md)。
+
+`TranscriptTurnPlanes.activity` 进一步提供 `TranscriptActivityPresentation`：Working、
+Settled 的默认展开值、回合内追加输入的 BetweenInputs，以及来源不足/直接任务来源的 Direct。
+这套判定由共享 presentation 产生；宿主不要根据运行字符串、正文或输入行下标重复推断。
+默认展开不是受控展开选择，后续 Activity 容器仍须保留用户选择和原控件身份。
+目前只有 live 状态行接入真实布局，settled 折叠与物理分区尚未接入；
+见[本阶段规则与限制](rust-agent-ui-activity-policy-20261023.md)。

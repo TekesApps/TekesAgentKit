@@ -1,0 +1,74 @@
+{
+  "completionProven": false,
+  "sourceBase": "f61cfcb1f3bad58939da8bfd79e956292bc64dfb",
+  "publicAgentKitRelease": "v0.3.8",
+  "publishedTekesui": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "sourceSha256": {
+    "crates/presentation/src/transcript_planes.rs": "58ccc16507e5f438f944d196eea748c5b38a923f1599f015dc0450946f7036e2",
+    "crates/presentation/tests/transcript_planes.rs": "207d1f8a2ef5298b07741066041edf365df40c8e56efdf4a35f7ed1007ed4ce7",
+    "ui/components/src/lib.rs": "65bd63f8024f92e085521a7c0ba9e551d1c73c3a6c4d0c3508f247d9a0835c29",
+    "ui/components/src/transcript_content.rs": "dc65fd88759c987319b20a36103c576ae39390541c05ca8ae28aac9a43e67ad4",
+    "ui/demo/tests/display_order.rs": "cefc89a1aea2badab585bd9f4ab3db0fb8fad287a7d7d8c0f5017e9122343abc"
+  },
+  "referenceSha256": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/TranscriptRendering/TranscriptMetalActivity.swift": "f08f6e8f34c76a71fb117dd84a46be50145f737a38e21534cf59d518bc2d3e8d",
+    "/Users/frankqin/dev/TekesClientKit/Sources/TranscriptRendering/TranscriptMetalAppBridges.swift": "aced6682f06d2c5c6313e9bbb0e429a217ab05f5a7cacc181ce3af8a2bdb0d1c",
+    "/Users/frankqin/dev/TekesClientKit/Sources/TranscriptRendering/TranscriptDisplaySupport.swift": "72c0c55f8cc7adb208039485973e8332b415d3f58b91a975d30ab42198c0e214",
+    "/Users/frankqin/dev/Tekes/Tekes/Settings/SettingsRootController.swift": "6a1670eb8de8842c5d624d52a7a1972f1abbdae5bf739c589acfd51e621330ca"
+  },
+  "tests": {
+    "root-tests-owned-turn.log": {
+      "passed": 289,
+      "failed": 0,
+      "ignored": 0
+    },
+    "ui-tests-owned-turn.log": {
+      "passed": 591,
+      "failed": 0,
+      "ignored": 1
+    }
+  },
+  "planeTests": 8,
+  "demoAndSecondConsumerDisplayOrderTests": 3,
+  "rootAndUiStrictAllTargetsClippy": true,
+  "formatAndBoundaryChecks": true,
+  "implemented": "Shared activity presentation policy, original Working planner uses it, direct task-source suppresses extra Working without removing original content; foreign turn facts rejected",
+  "incomplete": [
+    "Physical activity/output part ownership and layout",
+    "Settled disclosure control and retained local expansion choices",
+    "Canonical initial system prompt role",
+    "Narration carrier/fallback handoff",
+    "Formal ProcessContainer same/cross-process (#48)",
+    "Strict nested detail reading (#53)",
+    "Complete latest-source native/IME/AX and ClientKit paired-layout acceptance"
+  ],
+  "nativeEvidence": "Previous phase 3e0eeb6a program only; native receipts are not transferred to this changed source",
+  "newNativeAcceptance": false,
+  "sourceRoleFallback": "Unplaced input or initial System lacking prompt role preserves Direct rows; no fabricated opening identity",
+  "lastVerifiedCi": {
+    "head": "9909009293a40e72b8bbd8e22b94fcd3951a29a4",
+    "checks": "SUCCESS x2",
+    "uiConsumer": "FAILURE x2",
+    "step": "strict bounded_detail_reading (#53)"
+  },
+  "evidenceSha256": {
+    ".runtime-fixtures/activity-policy-20261023/clippy-result.json": "3606bec2cccf5874e0c2d9f97e68bfa9c7ea268bd52fa961505994fe143b32b5",
+    ".runtime-fixtures/activity-policy-20261023/root-clippy.log": "e89cd31449a6cd595e5fa1c842c7e128335b9654b17de7d34881c582d2e33008",
+    ".runtime-fixtures/activity-policy-20261023/root-tests-corrected.log": "de66148ee9d48212f48bde9cab5fd1375b6ff98c9d9f87d36e6defd19c469d23",
+    ".runtime-fixtures/activity-policy-20261023/root-tests-final.log": "51ba605d5f9602e2f772c9d3dd5cfa62d11065a31cbd45692b06737479b0226f",
+    ".runtime-fixtures/activity-policy-20261023/root-tests-owned-turn.log": "e7418376688766faeb9406222dd6010bb6bbf6399f28b95f6d926bf1c9f44d2d",
+    ".runtime-fixtures/activity-policy-20261023/root-tests.log": "442d8667597f2f24159fcae997dec01d7a1ff9f15ac66ff5f522eb9d2fb27620",
+    ".runtime-fixtures/activity-policy-20261023/ui-clippy.log": "492c61ba756736dc7ae3feaabd966529d80b8ba795f3ed48b986a0ebc7185d63",
+    ".runtime-fixtures/activity-policy-20261023/ui-tests-owned-turn.log": "7f86d3be5325d6f256d0da206557b14472716d7d7dfe622a2b90b105ce4e20cb",
+    ".runtime-fixtures/activity-policy-20261023/ui-tests.log": "2f11d97efb437af7dc58161bef857d0baf54674e07bbeb347511957f440486b8",
+    ".runtime-fixtures/activity-policy-20261023/boundaries.log": "9480cc4382559b9a7a99240226a9f766048e30c8d38bb4bccd1fd8bca56661ad"
+  },
+  "developmentFailure": "root-tests-final.log records a test function declaration typo; corrected before final owned-turn suites; failed log retained",
+  "disk": {
+    "newTargets": 0,
+    "deletedBytes": 0,
+    "target": "/tmp/agentkit-layout-text-292-target",
+    "incremental": false,
+    "temporaryStateAndAcceptanceProgramsRetained": true
+  }
+}
