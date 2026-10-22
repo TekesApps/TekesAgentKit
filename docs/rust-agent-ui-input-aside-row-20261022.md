@@ -1,5 +1,8 @@
 # 输入脚注的原控件右对齐组合（2026-10-22，实验状态）
 
+> 后续规则更正：只读输入信息应使用复制控件前的剩余行宽，40% 只适用于备注等动作标签。
+> 本文及原 JSON 保留阶段实现和程序归属；当前规则见[剩余行宽更正](rust-agent-ui-information-width-20261022.md)。
+
 只读对照 ClientKit `TranscriptTurnFootnote.rawInputNodes` / `rawMessageNodes`、MetalTextKit
 `MetalVirtualLayout.appendAside` 的 input/message lane，以及 Tekes `ClientAgentHostAdapters`。
 原信息在复制入口前，同一脚注带从右向左分配，并位于用户气泡外；没有将“每个控件单独贴右边”

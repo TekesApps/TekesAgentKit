@@ -1,7 +1,6 @@
 use super::*;
 use tekes_ui_controls::extended::{Axis, Stack};
-const INFO: &str =
-    "完整发送时间与本地化说明 👩🏽‍💻 e\u{301} 这是不可修改的完整信息。完整发送时间与本地化说明。";
+const INFO: &str = "完整发送时间与本地化说明 👩🏽‍💻 e\u{301} 这是不可修改的完整信息。完整发送时间与本地化说明。完整发送时间与本地化说明。完整发送时间与本地化说明。完整发送时间与本地化说明。";
 fn item(text: &str) -> TranscriptItem {
     TranscriptItem {
         id: "input".into(),
@@ -77,7 +76,19 @@ fn input_aside_is_one_external_trailing_band_with_full_source_and_original_copy_
                         .component::<TextContent>()
                         .unwrap() as *const _ as usize;
                     let note = host.get(ids.footnote).unwrap().frame();
-                    assert!(note.size.width <= width * 0.4 + 0.02);
+                    let copy_width = copy.map_or(0., |id| host.get(id).unwrap().frame().size.width);
+                    let gap = if copy.is_some() {
+                        tekes_ui_tokens::Spacing::Regular.value()
+                    } else {
+                        0.
+                    };
+                    assert!(note.size.width <= (width - copy_width - gap).max(0.) + 0.02);
+                    if width == 770. {
+                        assert!(
+                            note.size.width > width * 0.4,
+                            "read-only information must use remaining width rather than the action-label cap"
+                        );
+                    }
                     assert_eq!(
                         host.get(ids.footnote)
                             .unwrap()

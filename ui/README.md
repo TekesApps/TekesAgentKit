@@ -2,7 +2,7 @@
 
 [输出备注 40% 限宽](../docs/rust-agent-ui-output-note-cap-20261022.md)复用原备注按钮与 SDK 单行省略，保留完整 source/AX 和原 Composer；主题、字号与宽度往返的独立 consumer 已覆盖。窄列全可见、图标/弹层和当前程序原生/系统拼音仍待验收。
 
-[输入脚注同一右对齐带](../docs/rust-agent-ui-input-aside-row-20261022.md)补齐时间/复制的原控件组合与40%单行信息；aside_id()/information_text()保留稳定查询，原copy来源/claim不变。宿主需提供SDK shape_label；520项组件/独立consumer与三端离屏通过，本轮没有新原生/IME通过声明。
+[输入脚注同一右对齐带](../docs/rust-agent-ui-input-aside-row-20261022.md)补齐时间/复制的原控件组合；信息宽度规则已[更正为剩余行宽](../docs/rust-agent-ui-information-width-20261022.md)；aside_id()/information_text()保留稳定查询，原copy来源/claim不变。宿主需提供SDK shape_label；520项组件/独立consumer与三端离屏通过，本轮没有新原生/IME通过声明。
 
 [当前固定依赖已升级至3bef](../docs/tekesui-3bef-public-intake-20261022.md)：518项组件和新Toolbar公开组合验证通过；本轮三端基础原生阅读、Pi/DSH反馈及Pi流式已有收据，其余新pin原生/系统拼音尚未完成。#49显式门禁仍失败，保持已知忽略；不转移旧程序验收。
 

@@ -243,8 +243,9 @@ impl InputAside {
     }
     fn sizes(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> Vec<MeasuredChild> {
         let mut sizes = Vec::new();
-        // Copy stays at the trailing edge. Information receives Source's 40%
-        // maximum and any remaining space; the SDK owns the actual ellipsis.
+        // Copy stays at the trailing edge. Read-only information receives the
+        // remaining row width (the 40% rule is for action labels such as
+        // feedback notes). The SDK owns the actual single-line ellipsis.
         let copy = self
             .children
             .get_mut(1)
@@ -256,10 +257,7 @@ impl InputAside {
         };
         let remaining =
             (available.width - copy.as_ref().map_or(0., |m| m.size.width) - gap).max(0.);
-        sizes.push(self.children[0].measure(
-            text,
-            Size::new((available.width * 0.4).min(remaining), available.height),
-        ));
+        sizes.push(self.children[0].measure(text, Size::new(remaining, available.height)));
         if let Some(copy) = copy {
             sizes.push(copy);
         }
