@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — experimental Rust Agent UI
+
+- Reusable Agent business components and original-binding host integration remain experimental; see the [delivery gates](docs/rust-agent-ui-delivery-status.md).
+- Add the read-only `TranscriptToolCall::presentation_title` selection for formal producer views; embedded and independent tool disclosures consume the same facts and SDK single-line labels.
+- Shared additions on this branch are not part of the immutable v0.3.8 contract, even while the workspace version field remains 0.3.8. UI packages remain 0.0.0 / publish=false; full tool rows/cards, native/IME and ProcessContainer acceptance remain open.
+
+## 0.3.8 — 2026-10-19
+
+- Preserve the original worker launch notice and derive recovery only from a later durable turn start in the same session, including restored history.
+- Expose the same shared presentation status to Web hosts; validate replay through a second public-API consumer alongside workspace, renderer and boundary checks.
+
 ## 0.3.7 — 2026-10-19
 
 - Expose completed-turn footnote actions through the shared session view and existing thread action contract.

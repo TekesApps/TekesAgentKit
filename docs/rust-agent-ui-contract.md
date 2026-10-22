@@ -1,5 +1,7 @@
 # Rust Agent UI 组件接入契约
 
+[工具 producer 标题派生](rust-agent-ui-tool-title-20261022.md)：共享只读方法对齐 ClientKit SEP 标题优先级，内嵌/独立工具共用；原 disclosure 消费 SDK 单行省略。presentation113、UI547通过/1既有忽略，完整工具行模型/富卡片及当前原生仍未完成。
+
 **当前入口**：[完整交付状态/剩余门禁](rust-agent-ui-delivery-status.md)与[短宿主接入](rust-agent-ui-host-integration.md)。下文为各阶段来源账本，不把旧阶段的未交付描述当作当前能力结论，也不将旧程序原生结果转移到当前源码。
 
 [反馈重连加载失败修正](rust-agent-ui-feedback-reconnect-failure-20261022.md)：撤权旧记录保留可读内容并显示已知加载错误，三个写入口保持禁用，明确新读后才恢复；有效记录/待处理手势继续拒绝迟到错误。相关宿主 36、独立 consumer 22 项通过，原生/真实故障与跨进程未验收。
@@ -85,7 +87,7 @@
 [三真实harness的流式阅读](rust-agent-ui-stream-reading-native-20261021.md)已新增原生验收：流内追加时旧回合锚点、中文preedit与焦点保持，结算/重连/会话切换不重发、不串草稿；仍不等于完整UI或物理IME验收。
 [Summary 用量两列布局](rust-agent-ui-summary-usage-20261021.md)将六项用量的标题与数值拆成原 TekesUI 文本槽，增加公开格式化回调；不重算 facts 或切换默认依赖。完整 Summary rows/slots 与原生产品验收仍待完成。
 
-源码基线：AgentKit已发布 tag v0.3.8 为 `6d40e9b4ec705c4a1df6626fb90ec299aa58a3b2`，当前公开 main 为 `f1daa0ffcf6ced41e21f351e22845455ca78006c`，已包含在本分支中。UI workspace 明确使用同仓库 `../crates/*` 开发路径，包含本 PR 尚未发布的共享契约/投影增量；不能宣称当前 UI 可只消费已发布 v0.3.8 源码，发布前需一并 review/tag，正式宿主固定新不可变版本。本分支 Rust UI 仍为实验0.0.0/publish=false。TekesUI精确公开pin为`50ec49f3446924fdbc66b3cff22cd8cfe150fe7c`，实际八包243输入，清单SHA `3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c`，以`ui/tekesui-source.json`和Cargo.lock核验。历史清单保留在`ui/baselines/`。
+源码基线：AgentKit已发布 v0.3.8 的 annotated tag 对象为 `6d40e9b4ec705c4a1df6626fb90ec299aa58a3b2`，指向 commit `f1daa0ffcf6ced41e21f351e22845455ca78006c`（本次核对的公开 main 同此 commit），已包含在本分支中。UI workspace 明确使用同仓库 `../crates/*` 开发路径，包含本 PR 尚未发布的共享契约/投影增量；不能宣称当前 UI 可只消费已发布 v0.3.8 源码，发布前需一并 review/tag，正式宿主固定新不可变版本。本分支 Rust UI 仍为实验0.0.0/publish=false。TekesUI精确公开pin为`50ec49f3446924fdbc66b3cff22cd8cfe150fe7c`，实际八包243输入，清单SHA `3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c`，以`ui/tekesui-source.json`和Cargo.lock核验。历史清单保留在`ui/baselines/`。
 
 当前阅读进展见[正式事务](rust-agent-ui-continuous-reading-20261021.md)和[真实三端保留阅读](rust-agent-ui-retained-reading-20261021.md)：公开库API已消费，Native/Pi/DSH分页、A/B保留阅读及重连通过。销毁后新建组件树的持久恢复跟踪TekesUI #42；完整UI目标仍未完成。
 

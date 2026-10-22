@@ -30,6 +30,10 @@ compact cold/loading 由宿主原初读驱动，正常 ready 不显示 Refresh�
 - 宿主提供实际可用区域、namespace、窗口唤醒和系统适配。几何只在成功 render 后作为已发布证据；不自建滚动补偿或缓存像素位置。重连/分页/追加都使用原阅读版本和事务。
 - ProcessContainer 接入仍待 #48；当前原 ContentHost 路径不等于同/跨进程容器验收。缺基础属性/事件向 TekesUI 提 Issue，不复制 IPC、输入、焦点或渲染实现。
 
+只读消息 disclosure 和 aside 的单行标题也使用原 SDK LabelOptions；宿主提供
+TextSurfaceHost::shape_label 服务并保留完整 source/AX 文案，AgentKit 不提供自写 shaping/省略 fallback。
+工具标题的新增共享方法与未发布范围见[本轮记录](rust-agent-ui-tool-title-20261022.md)。
+
 ## 可运行参考与验证
 
 第二 consumer 的[公开组件挂载/整帧发布](../ui/consumer/src/lib.rs)提供

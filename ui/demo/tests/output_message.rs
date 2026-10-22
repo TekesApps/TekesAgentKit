@@ -622,3 +622,115 @@ fn known_empty_assistant_containers_stay_hidden_until_prose_arrives_and_legacy_s
         assert!(row.active());
     }
 }
+
+#[test]
+fn embedded_tool_uses_producer_terminal_description_and_retains_raw_detail_owner_on_update() {
+    use tekes_ui_controls::composition::ButtonContent;
+    let mut item = item();
+    item.content_blocks = Some(vec![block(
+        0,
+        Block::ToolCall {
+            tool_id: "tool".into(),
+        },
+    )]);
+    let mut tool = tool();
+    tool.name = "shell".into();
+    tool.arguments =
+        json!({"command":"echo original\nfull body","description":"argument fallback"});
+    tool.call_view = Some(
+        json!({"for":"call","view":{"card":"terminal","description":"检查项目","title":"echo original\nfull body"}}),
+    );
+    let original = tool.clone();
+    let mut row = OutputMessage::new(729, scope());
+    row.update(&scope(), 1, 1, &output(&item), Some(&section(&tool)))
+        .unwrap();
+    let root = row.id();
+    let ids = row.content_ids()[0];
+    let mut host = row.into_host().unwrap();
+    let header = host
+        .get(ids.disclosure.unwrap())
+        .unwrap()
+        .component::<ButtonContent>()
+        .unwrap();
+    assert!(header.label.contains("shell · 检查项目 · doing"));
+    assert!(!header.label.contains("echo original"));
+    assert!(toggle(&mut host, root, ids.disclosure.unwrap()));
+    let owner = host.text_surface(ids.body).unwrap() as *const _ as usize;
+    assert!(
+        host.text_surface(ids.body)
+            .unwrap()
+            .input
+            .text
+            .contains("full body")
+    );
+    assert_eq!(tool, original);
+    tool.phase = "done".into();
+    tool.result = Some(json!({"text":"complete raw result"}));
+    tool.result_view =
+        Some(json!({"for":"result","view":{"title":"must not replace terminal action"}}));
+    view_mut(&mut host, root)
+        .update(&scope(), 2, 1, &output(&item), Some(&section(&tool)))
+        .unwrap();
+    assert_eq!(view(&host, root).content_ids()[0], ids);
+    assert_eq!(
+        host.text_surface(ids.body).unwrap() as *const _ as usize,
+        owner
+    );
+    let header = host
+        .get(ids.disclosure.unwrap())
+        .unwrap()
+        .component::<ButtonContent>()
+        .unwrap();
+    assert!(header.label.contains("shell · 检查项目 · done"));
+    assert!(!header.label.contains("must not replace terminal action"));
+    assert!(
+        host.text_surface(ids.body)
+            .unwrap()
+            .input
+            .text
+            .contains("complete raw result")
+    );
+    let long = "原服务端提供的完整工具描述 👩🏽‍💻 e\u{301} ".repeat(20);
+    tool.call_view.as_mut().unwrap()["view"]["description"] = json!(long);
+    view_mut(&mut host, root)
+        .update(&scope(), 3, 1, &output(&item), Some(&section(&tool)))
+        .unwrap();
+    for scale in [1., 1.4] {
+        let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()), scale);
+        let mut heights = vec![];
+        for width in [600., 180., 600.] {
+            let frame = Rect::new(20., 20., width, 5000.);
+            host.render(
+                &mut Scene::new(),
+                &mut text,
+                frame,
+                frame,
+                Theme::LIGHT.into(),
+            )
+            .unwrap();
+            let header = host.get(ids.disclosure.unwrap()).unwrap();
+            assert!(header.frame().size.width <= width + 0.02);
+            assert!(
+                header
+                    .component::<ButtonContent>()
+                    .unwrap()
+                    .label
+                    .contains(&long)
+            );
+            assert_eq!(
+                host.semantics()
+                    .iter()
+                    .find(|node| node.id == ids.disclosure.unwrap())
+                    .unwrap()
+                    .semantics
+                    .name,
+                header.component::<ButtonContent>().unwrap().label
+            );
+            heights.push(header.frame().size.height);
+        }
+        assert!(
+            heights.iter().all(|h| (*h - heights[0]).abs() < 0.02),
+            "original SDK title must stay single line across widths"
+        );
+    }
+}

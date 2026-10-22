@@ -40,10 +40,10 @@ Git 消费示例（多个包位于同一 workspace）：
 
 ```toml
 [dependencies]
-tekes-agent-contract = { git = "https://github.com/TekesApps/TekesAgentKit", tag = "v0.3.0" }
-tekes-agent-session = { git = "https://github.com/TekesApps/TekesAgentKit", tag = "v0.3.0" }
-tekes-agent-presentation = { git = "https://github.com/TekesApps/TekesAgentKit", tag = "v0.3.0" }
-tekes-agent-endpoint-kernel = { git = "https://github.com/TekesApps/TekesAgentKit", tag = "v0.3.0" }
+tekes-agent-contract = { git = "https://github.com/TekesApps/TekesAgentKit", tag = "v0.3.8" }
+tekes-agent-session = { git = "https://github.com/TekesApps/TekesAgentKit", tag = "v0.3.8" }
+tekes-agent-presentation = { git = "https://github.com/TekesApps/TekesAgentKit", tag = "v0.3.8" }
+tekes-agent-endpoint-kernel = { git = "https://github.com/TekesApps/TekesAgentKit", tag = "v0.3.8" }
 ```
 
 本项目的已推送版本 tag 不移动；对审计要求严格的构建可改用 tag 对应的完整 `rev` 并提交 Cargo.lock。开发期 `path` override 应显式配置，不依赖隐式 sibling checkout。

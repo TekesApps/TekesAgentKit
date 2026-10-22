@@ -1,0 +1,54 @@
+{
+  "sourceBase": "7924650e95786bb03083081cb38ca564b70617f0",
+  "tekesui": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "presentationPackagePassed": 113,
+  "newTitleDerivationTests": 7,
+  "uiWorkspacePassed": 547,
+  "uiWorkspaceIgnored": 1,
+  "newEmbeddedToolTest": 1,
+  "newIndependentConsumerTest": 1,
+  "rootAndUiStrictClippy": true,
+  "headlessAndUiBoundaries": true,
+  "protocolFieldsChanged": false,
+  "unpublishedSharedApiAddition": "TranscriptToolCall::presentation_title",
+  "nativeThisSource": false,
+  "realHarnessThisSource": false,
+  "crossProcess": false,
+  "completeToolRowModel": false,
+  "richToolCards": false,
+  "newTargets": 0,
+  "newProgramCopies": 0,
+  "deletedBytes": 0,
+  "sourceInputs": {
+    "crates/presentation/src/lib.rs": "6b8021323db5cf04b508f06a43778118a893df603f9802048d5e481ad626b43e",
+    "crates/presentation/src/tool_title.rs": "54638334d8723774b680495b5fec8287a0e6625e27fb312e3aaa40de1229d088",
+    "crates/presentation/tests/tool_title.rs": "f672a2dc54c37fad86d194ce147b695b0e44fa859284bd20765268390a305592",
+    "ui/components/src/output_message.rs": "fc2d82413a883238fc439136f92f5b9ec9e46539b5de7e1a145a8dc2b128d600",
+    "ui/demo/tests/output_message.rs": "07626f06a81d9afb48329e9fd13f9794fac5eb2aba8b8d41a5b0df397cf485ef",
+    "ui/consumer/tests/tool_titles.rs": "6691db42fb2baab55b7814bf7b90900dd9f7eeb91cc0ae8dd0ded813a43680ea"
+  },
+  "readOnlyReferences": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/Session/SessionEndpoint/Client/SessionEventProjector.swift": "e7a2ccc9e211f04f819e0a1866388420b7b15f0a25ea80a7777a3408414dd515",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Contract/SessionEndpoint/SessionHistory.swift": "0a6c46f29c5aaf05e1da01532cb8daba16f3e62ac22c943adf2ac509443145cc",
+    "/Users/frankqin/dev/TekesClientKit/Sources/TranscriptRendering/TranscriptToolRowModel.swift": "76793271a68ca5a7a5ad872f9235a4d88fa8c801c1212e2a2b798043fa021818",
+    "/Users/frankqin/dev/Tekes/Tekes/ClientAgentHostAdapters.swift": "7d907c654ec3df76c7a8b492e32bbc68f1bd4d0b46044cae615aa712b9f67c71"
+  },
+  "evidence": {
+    ".runtime-fixtures/tool-title-20261022/ci-base.json": "14bf140502292563359944e9eb780509ce72c853b74127a67c41c0e48785bc7f",
+    ".runtime-fixtures/tool-title-20261022/presentation-all.log": "c34e10822fa08395aa20a52ce1e0bc1bee6e7cfcc011be7a7f25e0ccada23880",
+    ".runtime-fixtures/tool-title-20261022/headless-boundaries.log": "e9fa1e12a0afd70528040f81fe3199172a3974910d7760c0216bb6d110181081",
+    ".runtime-fixtures/tool-title-20261022/ui-workspace.log": "06afc4c01428a05507aa43fdd9f8bfa682ad4ff2b381706bf8a50b38d2f01bd5",
+    ".runtime-fixtures/tool-title-20261022/presentation-tests.log": "38967073f20e81aec74cab833ec34f82272fbb9eab550d9ba194bffcde9060c9",
+    ".runtime-fixtures/tool-title-20261022/ui-clippy.log": "566be348aca837995d577514944788ae46ec3f3e704907204ce9db280952b463",
+    ".runtime-fixtures/tool-title-20261022/root-clippy.log": "9ec225c86eb089aa5c1c3dd04071a2dc06e11a204ca682ebae25c3570c9854ee",
+    ".runtime-fixtures/tool-title-20261022/ui-workspace-final.log": "d6bc09e92d43c7464aeaf59a12d03a246b7409403d0f58459d1c5260deaf99f9",
+    ".runtime-fixtures/tool-title-20261022/ui-boundaries.log": "9480cc4382559b9a7a99240226a9f766048e30c8d38bb4bccd1fd8bca56661ad"
+  },
+  "publishedBaseline": {
+    "tag": "v0.3.8",
+    "annotatedTagObject": "6d40e9b4ec705c4a1df6626fb90ec299aa58a3b2",
+    "peeledCommit": "f1daa0ffcf6ced41e21f351e22845455ca78006c",
+    "tagUntouched": true
+  },
+  "sourceInputScope": "Modified Rust sources/tests over sourceBase, not a complete compiler/dependency/environment closure"
+}

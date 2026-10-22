@@ -59,8 +59,15 @@ impl Default for OutputMessageLabels {
                 .into()
             },
             tool: |t| {
+                let producer_title = t.presentation_title();
+                let name = t.name.split_whitespace().collect::<Vec<_>>().join(" ");
+                let title = if name.is_empty() || name == producer_title {
+                    producer_title
+                } else {
+                    format!("{name} · {producer_title}")
+                };
                 (
-                    format!("{} · {}", t.name, t.phase),
+                    format!("{title} · {}", t.phase),
                     format!(
                         "调用输入\n{}\n\n结果\n{}\n\n调用视图\n{}\n\n结果视图\n{}",
                         t.arguments,
@@ -167,7 +174,13 @@ impl OutputPart {
         );
         let (children, hidden) = if let Some(button) = ids.disclosure {
             (
-                vec![Content::new(button, ButtonContent::new(&facts.title))],
+                vec![
+                    Content::new(button, ButtonContent::new(&facts.title))
+                        .with_label_layout(tekes_ui_text::LabelOptions::single_line(
+                            tekes_ui_text::LabelOverflow::TailEllipsis,
+                        ))
+                        .expect("output disclosure uses the original SDK button"),
+                ],
                 Some(body),
             )
         } else {

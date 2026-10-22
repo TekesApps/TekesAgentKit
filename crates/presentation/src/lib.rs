@@ -14,6 +14,7 @@ pub use turn_actions::*;
 mod controller;
 mod run;
 mod scope;
+mod tool_title;
 mod transcript;
 pub use composer::*;
 pub use controller::*;
