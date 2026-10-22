@@ -2,6 +2,8 @@
 
 ## Unreleased — experimental Rust Agent UI
 
+- Fence journal tools at turn closure so late unowned results cannot overwrite sealed history; retain result-only paging and explicit new-call admission.
+
 - Correct journal tool settlement for all content error markers, signals, timeouts and public result views; preserve raw result metadata/error in optional backward-readable fields without changing turn settlement.
 - Reusable Agent business components and original-binding host integration remain experimental; see the [delivery gates](docs/rust-agent-ui-delivery-status.md).
 - Add the read-only `TranscriptToolCall::presentation_title` selection for formal producer views; embedded and independent tool disclosures consume the same facts and SDK single-line labels.

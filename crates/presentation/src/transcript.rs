@@ -369,6 +369,8 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
     let mut total_usage = BTreeMap::new();
     let mut reported_output = BTreeMap::new();
     let mut opened_turns = std::collections::BTreeSet::new();
+    let mut active_tools = std::collections::BTreeSet::new();
+    let mut closed_turns = std::collections::BTreeSet::new();
     let mut authoritative_output = BTreeMap::new();
     let mut opening_inputs = std::collections::BTreeSet::new();
     for entry in session.entries.values() {
@@ -476,11 +478,20 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
                             .enumerate()
                             .filter(|(_, b)| b["type"] == "tool-call")
                         {
+                            let Some(call) = block["id"].as_str().filter(|id| !id.is_empty())
+                            else {
+                                continue;
+                            };
+                            let key = scoped(scope, &format!("tool:{call}"));
+                            if active_tools.contains(&key) {
+                                continue;
+                            }
+                            begin_journal_tool(&mut out, &mut active_tools, &key);
                             admit_tool(
                                 &mut out,
                                 scope,
                                 &turn_id,
-                                block["id"].as_str().unwrap_or(""),
+                                call,
                                 block["name"].as_str().unwrap_or(""),
                                 block["arguments"].clone(),
                                 ToolSource {
@@ -542,11 +553,22 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
                 upsert(&mut out, row);
             }
             "tool/call" => {
+                let call = data["callId"].as_str().unwrap_or("");
+                let key = scoped(scope, &format!("tool:{call}"));
+                if active_tools.contains(&key)
+                    && out
+                        .tools
+                        .iter()
+                        .any(|tool| tool.id == key && tool.result.is_some())
+                {
+                    continue;
+                }
+                begin_journal_tool(&mut out, &mut active_tools, &key);
                 admit_tool(
                     &mut out,
                     scope,
                     &turn_id,
-                    data["callId"].as_str().unwrap_or(""),
+                    call,
                     data["name"].as_str().unwrap_or(""),
                     data["arguments"].clone(),
                     ToolSource {
@@ -566,6 +588,11 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
                     .or_else(|| first["toolCallId"].as_str())
                     .or_else(|| first["callId"].as_str())
                     .unwrap_or("");
+                let key = scoped(scope, &format!("tool:{call}"));
+                if !active_tools.contains(&key) && closed_turns.contains(&turn_id) {
+                    continue;
+                }
+                begin_journal_tool(&mut out, &mut active_tools, &key);
                 admit_tool(
                     &mut out,
                     scope,
@@ -578,7 +605,7 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
                 let tool = out
                     .tools
                     .iter_mut()
-                    .find(|t| t.id == scoped(scope, &format!("tool:{call}")))
+                    .find(|t| t.id == key)
                     .expect("admitted");
                 tool.result = Some(message.clone());
                 tool.result_meta = data.get("meta").filter(|value| !value.is_null()).cloned();
@@ -614,6 +641,10 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
                     time,
                     data["promotedMessageID"].as_str(),
                 )?;
+                for tool in out.tools.iter().filter(|tool| tool.turn_id == turn_id) {
+                    active_tools.remove(&tool.id);
+                }
+                closed_turns.insert(turn_id.clone());
                 turn(&mut out, &turn_id, time).fork_boundary = Some(json!({"atSeq":event.seq}));
                 if reason == "error"
                     && data["reason"]["error"]["code"] != "AUTH"
@@ -742,6 +773,16 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
 struct ToolSource {
     view: Option<Value>,
     position: Option<TranscriptSourcePosition>,
+}
+// Historical rows survive turn closure; only explicitly admitted calls remain writable.
+fn begin_journal_tool(
+    out: &mut TranscriptSnapshot,
+    active: &mut std::collections::BTreeSet<String>,
+    key: &str,
+) {
+    if active.insert(key.to_owned()) {
+        out.tools.retain(|tool| tool.id != key);
+    }
 }
 fn admit_tool(
     out: &mut TranscriptSnapshot,
