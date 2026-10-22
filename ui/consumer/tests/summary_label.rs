@@ -20,6 +20,8 @@ const TITLE: &str = "工作区 Summary 👩🏽‍💻 e\u{301} · repository/�
 
 #[path = "support/input_aside_layout.rs"]
 mod input_aside_layout;
+#[path = "support/key_intake.rs"]
+mod key_intake;
 #[path = "support/output_aside_layout.rs"]
 mod output_aside_layout;
 #[path = "support/panel_launcher_layout.rs"]

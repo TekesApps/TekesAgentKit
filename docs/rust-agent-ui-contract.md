@@ -1,5 +1,7 @@
 # Rust Agent UI 组件接入契约
 
+[最新公开 50ec 精确依赖](tekesui-50ec-public-intake-20261022.md)：实际 8 包/243 输入，521 项组件/第二 consumer 通过；原 Composer 新增候选确认上下键回归。新 pin 原生/系统拼音尚未验收，#48/#49 等仍开放。
+
 [只读信息宽度更正](rust-agent-ui-information-width-20261022.md)：输入时间等信息使用复制入口前的剩余行宽；40% 上限只给备注这类动作标签。原信息/复制身份与 SDK 单行省略不变。
 
 [输出备注 40% 限宽](rust-agent-ui-output-note-cap-20261022.md)复用原备注按钮与 SDK 单行省略，保留完整 source/AX 和原 Composer；主题、字号与宽度往返的独立 consumer 已覆盖。窄列全可见、图标/弹层和当前程序原生/系统拼音仍待验收。
@@ -57,7 +59,7 @@
 [三真实harness的流式阅读](rust-agent-ui-stream-reading-native-20261021.md)已新增原生验收：流内追加时旧回合锚点、中文preedit与焦点保持，结算/重连/会话切换不重发、不串草稿；仍不等于完整UI或物理IME验收。
 [Summary 用量两列布局](rust-agent-ui-summary-usage-20261021.md)将六项用量的标题与数值拆成原 TekesUI 文本槽，增加公开格式化回调；不重算 facts 或切换默认依赖。完整 Summary rows/slots 与原生产品验收仍待完成。
 
-源码基线：AgentKit已发布v0.3.8 / `f1daa0ffcf6ced41e21f351e22845455ca78006c`；本分支Rust UI仍为实验0.0.0/publish=false。当前TekesUI精确公开pin为`3bef66754a256e7723887de7d33518f5122805ad`，实际八包242输入，清单SHA `e6f0dbcdfdadcc8e4a67a46cefd1a814956461d3896a78f8469091c4420a6824`，以`ui/tekesui-source.json`和Cargo.lock核验。原431/8cf/2ee/129清单保留在`ui/baselines/`。
+源码基线：AgentKit已发布v0.3.8 / `f1daa0ffcf6ced41e21f351e22845455ca78006c`；本分支Rust UI仍为实验0.0.0/publish=false。当前TekesUI精确公开pin为`50ec49f3446924fdbc66b3cff22cd8cfe150fe7c`，实际八包243输入，清单SHA `3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c`，以`ui/tekesui-source.json`和Cargo.lock核验。原431/8cf/2ee/129清单保留在`ui/baselines/`。
 
 当前阅读进展见[正式事务](rust-agent-ui-continuous-reading-20261021.md)和[真实三端保留阅读](rust-agent-ui-retained-reading-20261021.md)：公开库API已消费，Native/Pi/DSH分页、A/B保留阅读及重连通过。销毁后新建组件树的持久恢复跟踪TekesUI #42；完整UI目标仍未完成。
 

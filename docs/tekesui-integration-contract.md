@@ -6,7 +6,7 @@
 
 - AgentKit 当前基线 v0.3.8 / f1daa0ffcf6ced41e21f351e22845455ca78006c，Rust 1.95.0。已合入 WebUI 使用的批注、线程操作/置顶、用量与完成回合 Fork 契约；共享能力和具体控件的接入状态分别记录在正式契约中。
 - WebUI 对照版本 v0.1.17 / 8b9b11c；仅保留既有 Fork，不加入已撤回的回退/编辑重跑实验。Native/Pi/DSH 显式配置与分层验收见 [三端记录](tekesui-three-endpoint-demo-20261019.md)。
-- TekesUI composition仍为实验API；源码固定为公开 `https://github.com/TekesApps/TekesUI.git` 的完整rev `09b4bab44b6dfa65487250ea816b610b9df59095` / `remediation-toolbar-checkpoint-20261021`，Cargo.lock固定同一来源。实际八包241文件输入；原431/8cf/2ee基线保留，清单见 `ui/tekesui-source.json`。
+- TekesUI composition仍为实验API；源码固定为公开 `https://github.com/TekesApps/TekesUI.git` 的完整rev `50ec49f3446924fdbc66b3cff22cd8cfe150fe7c`，Cargo.lock固定同一来源。实际八包243文件输入；原431/8cf/2ee基线保留，清单见 `ui/tekesui-source.json`。
 - 默认由Cargo取得公开Git输入，不读取活跃兄弟工作树或旧 `.deps`。开发快照准备/capture在公开pin模式禁用；旧e4依赖和回滚文件保留。UI workspace与headless默认构建隔离。
 - 已具备公开不可变源码pin；AgentKit UI仍为0.0.0/publish=false，不打UI release tag。验收范围和CI边界见 [正式pin记录](tekesui-public-pin-verification-20261019.md)。
 
