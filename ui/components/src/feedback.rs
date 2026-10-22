@@ -112,6 +112,8 @@ pub struct FeedbackIds {
 }
 /// One stable response per instance. Mount alongside its leading output footnote.
 /// All editing, marked text, undo, layout styles and focus are TekesUI-owned.
+/// Committed note buttons use the SDK single-line label service; rendering a
+/// note requires `TextSurfaceHost::shape_label` (no wrapping fallback).
 #[derive(Debug)]
 pub struct TurnFeedback {
     ids: FeedbackIds,
@@ -460,7 +462,7 @@ impl TurnFeedback {
         let mut old = std::mem::take(&mut self.rows.children);
         let mut leaves = Vec::new();
         for mut node in old.drain(..) {
-            if let Some(row) = node.component_mut::<StackContent>() {
+            if let Some(row) = node.component_mut::<FeedbackRatingRow>() {
                 leaves.append(&mut row.children);
             } else if let Some(footer) = node.component_mut::<FeedbackFooter>() {
                 leaves.append(&mut footer.rows.children);
@@ -506,12 +508,22 @@ impl TurnFeedback {
                 .state
                 .disabled =
                 busy || self.editor_open || self.state.as_ref().is_none_or(|s| !s.put_available);
+            let note = note
+                .with_label_layout(tekes_ui_text::LabelOptions::single_line(
+                    tekes_ui_text::LabelOverflow::TailEllipsis,
+                ))
+                .expect("original feedback note is an SDK button");
             self.rows.children.push(note);
         }
         let rating_buttons = std::mem::take(&mut self.rows.children);
-        self.rows
-            .children
-            .push(horizontal(ComponentId(self.ids.root.0 + 1), rating_buttons));
+        self.rows.children.push(Content::new(
+            ComponentId(self.ids.root.0 + 1),
+            FeedbackRatingRow {
+                children: rating_buttons,
+                note: self.ids.edit_note,
+                note_maximum: 0.,
+            },
+        ));
         if self.editor_open {
             self.rows.children.push(Content::new(
                 self.ids.title,
@@ -631,6 +643,16 @@ impl Component for TurnFeedback {
         } else {
             available.width
         };
+        if let Some(row) = self
+            .rows
+            .children
+            .first_mut()
+            .and_then(|node| node.component_mut::<FeedbackRatingRow>())
+        {
+            // ClientKit output aside labels are capped against the full content
+            // column, not the intrinsic width of this nested rating group.
+            row.note_maximum = width.max(0.) * 0.4;
+        }
         self.rows.measure(text, Size::new(width, available.height))
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
@@ -701,18 +723,65 @@ fn retained_button(old: &mut Vec<Content>, id: ComponentId, label: &str) -> Cont
     node
 }
 
-fn horizontal(id: ComponentId, children: Vec<Content>) -> Content {
-    Content::new(
-        id,
-        StackContent {
-            model: Stack {
-                axis: Axis::Horizontal,
-                gap: Spacing::Tight.value(),
+/// Output-aside business order and note width policy. All leaves are original
+/// SDK buttons; label shaping/ellipsis, hit testing, focus and IME stay in SDK.
+#[derive(Debug)]
+struct FeedbackRatingRow {
+    children: Vec<Content>,
+    note: ComponentId,
+    note_maximum: f32,
+}
+impl FeedbackRatingRow {
+    fn measurements(
+        &mut self,
+        text: &mut dyn ButtonTextRenderer,
+        available: Size,
+    ) -> Vec<MeasuredChild> {
+        self.children
+            .iter_mut()
+            .map(|child| {
+                let width = if child.id() == self.note {
+                    self.note_maximum
+                } else {
+                    available.width
+                };
+                child.measure(text, Size::new(width, available.height))
+            })
+            .collect()
+    }
+}
+impl Component for FeedbackRatingRow {
+    fn children(&self) -> &[Content] {
+        &self.children
+    }
+    fn children_mut(&mut self) -> Option<&mut Vec<Content>> {
+        Some(&mut self.children)
+    }
+    fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        let sizes = self.measurements(text, available);
+        MeasuredChild::new(Size::new(
+            sizes.iter().map(|size| size.size.width).sum::<f32>()
+                + Spacing::Tight.value() * sizes.len().saturating_sub(1) as f32,
+            sizes.iter().map(|size| size.size.height).fold(0., f32::max),
+        ))
+    }
+    fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        let sizes = self.measurements(text, frame.size);
+        let placements = layout_measured_children(
+            frame,
+            Axis::Horizontal,
+            &sizes,
+            Spacing::Tight.value(),
+            proposal::layout::ROW,
+            AlignmentOverride {
+                cross_axis: Some(proposal::layout::CrossAxisAlignment::Center),
+                ..Default::default()
             },
-            flexible_child: None,
-            children,
-        },
-    )
+        );
+        for (child, placement) in self.children.iter_mut().zip(placements) {
+            child.arrange(text, placement.frame, clip);
+        }
+    }
 }
 
 fn validate_state(state: &FeedbackControlState) -> Result<(), &'static str> {
