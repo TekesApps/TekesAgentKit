@@ -384,16 +384,24 @@
   },
   "supplement": "rust-agent-ui-tool-card-20261022.json",
   "latestLocalValidation": {
-    "rootPassed": 250,
-    "uiPassed": 565,
-    "uiIgnored": 1,
+    "rootPassed": 251,
+    "scopedUiPassed": 114,
+    "scopedUiIgnored": 1,
+    "scopedUiSuites": [
+      "demo transcript_content",
+      "demo output_message",
+      "demo run_reading",
+      "second consumer summary_label"
+    ],
+    "lastFullUiPassed": 565,
+    "lastFullUiHead": "c23bab6",
     "rootClippy": true,
     "uiClippy": true,
     "demoBuild": true,
     "strictNestedReading": false
   },
-  "latestVerifiedCiHead": "c76278bfb0781338f27e030a1403117cc204c46f",
-  "latestVerifiedCiConclusion": "two-success-two-failure; macOS strict nested-reading gate fails",
+  "latestVerifiedCiHead": "c23bab6e8234b18df0fcb77f7cc6a13c2d9c411c",
+  "latestVerifiedCiConclusion": "Linux success; macOS failure at required strict nested-reading step",
   "richToolCardRendering": false,
   "historicalDocumentationAudit": {
     "sourceBase": "d2d9c979bf25d8dfdfcb80e598748e7e093d8afc",
@@ -464,7 +472,8 @@
     "rust-agent-ui-tool-details-20261022.json",
     "rust-agent-ui-tool-section-controls-20261023.json",
     "rust-agent-ui-tool-report-20261023.json",
-    "rust-agent-ui-tool-run-20261023.json"
+    "rust-agent-ui-tool-run-20261023.json",
+    "rust-agent-ui-tool-url-20261023.json"
   ],
   "boundedDetails": "explicit experiment; standard RunPort/Transcript defaults remain inline",
   "latestNativeAcceptance": {
@@ -504,5 +513,21 @@
     "receipt": "rust-agent-ui-tool-run-20261023.json",
     "semanticGroupingImplemented": true,
     "fullSourceParityAccepted": false
+  },
+  "toolUrl": {
+    "receipt": "rust-agent-ui-tool-url-20261023.json",
+    "foundationCases": 61,
+    "completeParity": false
+  },
+  "latestCacheCleanup": {
+    "removedAllocatedBytes": 134037504,
+    "removedMiB": 127.83,
+    "incrementalBytes": 47136768,
+    "oldPresentationLibraryBytes": 86900736,
+    "retainedSharedTargetApproxGiB": 33,
+    "retainedDependencyMetadata": 3,
+    "preservedAcceptanceProgramSha256": "7c531ae04db52752dcb533648f702dda362a687e60eb1a5448e27324f5ab03f4",
+    "wipPreserved": true,
+    "measurement": "removed allocated blocks; excludes surviving hardlink anchors and does not infer exclusive reclaim from shared-volume free-space changes"
   }
 }

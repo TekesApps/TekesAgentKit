@@ -433,3 +433,5 @@ wake scheduling remain host adapters. This does not complete footnote layout par
 [本轮原生续验](rust-agent-ui-native-resumed-20261023.md)在单独记录的冻结 WIP 程序上通过 SideChat、分页/阅读/焦点及系统拼音专项；不继承到后续源码或真实三端/跨进程验收。
 
 [连续工具分组与 API 迁移](rust-agent-ui-tool-run-20261023.md)复用原业务成员控件与 SDK Button/Stack，并区分阅读 wrapper 与原 ToolActivity ID；严格阅读和完整 Source 验收仍开放。
+
+[连续工具 URL 预览](rust-agent-ui-tool-url-20261023.md)修正原路径/主机拼写与 opaque scheme，并增加 61 组无 Swift 的 Foundation 数据对照；非 RFC authority、完整 UI/原生与跨进程验收仍待完成。

@@ -117,7 +117,9 @@ impl TranscriptToolCall {
                     })
                 })
             }
-            "web_fetch" | "fetch" | "open" => value(&["url"]).and_then(|raw| preview_url(&raw)),
+            "web_fetch" | "fetch" | "open" => {
+                value(&["url"]).and_then(|raw| crate::tool_url::preview_url(&raw))
+            }
             _ => None,
         });
         let title = first_line(row_title)
@@ -131,25 +133,5 @@ impl TranscriptToolCall {
             (Some(_), Some(_)) => prefix + "…",
             (None, _) => prefix,
         }
-    }
-}
-fn preview_url(raw: &str) -> Option<String> {
-    let path = |url: &url::Url| {
-        percent_encoding::percent_decode_str(url.path())
-            .decode_utf8_lossy()
-            .into_owned()
-    };
-    if let Ok(url) = url::Url::parse(raw) {
-        return Some(format!("{}{}", url.host_str().unwrap_or(""), path(&url)));
-    }
-    let base = url::Url::parse("https://relative.invalid/").ok()?;
-    let url = base.join(raw).ok()?;
-    if raw.starts_with("//") {
-        Some(format!("{}{}", url.host_str().unwrap_or(""), path(&url)))
-    } else if raw.starts_with('/') {
-        Some(path(&url))
-    } else {
-        let path = path(&url);
-        Some(path.strip_prefix('/').unwrap_or(&path).into())
     }
 }

@@ -1756,3 +1756,42 @@ fn zero_node_assistant_is_transparent_but_unplaced_tools_never_imply_adjacency()
         view.tool_run("b").unwrap().id()
     );
 }
+
+#[test]
+fn native_host_transcript_uses_shared_url_projection_in_group_previews() {
+    let mut first = tool();
+    first.id = "fetch-a".into();
+    first.name = "fetch".into();
+    first.phase = "doing".into();
+    first.arguments = json!({"url":"https://user:secret@EXAMPLE.org/a/../b/?query=secret#secret"});
+    first.result_position = None;
+    let mut second = first.clone();
+    second.id = "fetch-b".into();
+    second.source_position = Some(TranscriptSourcePosition::Journal {
+        sequence: 2,
+        content_index: None,
+    });
+    second.arguments = json!({"url":"relative/a/./b/"});
+    let snapshot = TranscriptSnapshot {
+        tools: vec![first, second],
+        turns: vec![turn()],
+        ..Default::default()
+    };
+    let mut view = content();
+    view.update(&scope(), 1, 1, &snapshot, true).unwrap();
+    let group = view.tool_run("fetch-a").unwrap();
+    assert_eq!(
+        group.summary().unwrap().active_summaries,
+        ["Fetch · EXAMPLE.org/a/../b", "Fetch · relative/a/./b"]
+    );
+    let header = group.disclosure_id().unwrap();
+    let host = view.into_host().unwrap();
+    let label = &host
+        .get(header)
+        .unwrap()
+        .component::<ButtonContent>()
+        .unwrap()
+        .label;
+    assert!(label.contains("EXAMPLE.org/a/../b"));
+    assert!(!label.contains("secret"));
+}

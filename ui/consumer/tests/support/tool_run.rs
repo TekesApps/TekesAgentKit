@@ -125,3 +125,49 @@ fn public_group_retains_member_fields_and_rejects_hidden_copy_actions() {
         .unwrap();
     assert_ne!(group(&host, root).tool_activity("a").unwrap().id(), member);
 }
+
+#[test]
+fn default_public_group_header_uses_source_url_spelling_without_private_parts() {
+    let scope = RunScope::main("second-product", "url-preview");
+    let mut first = call("a");
+    first.name = "open".into();
+    first.arguments = r#"{"url":"https://user:secret@EXAMPLE.org/a/../中文/?query=secret#secret"}"#
+        .parse()
+        .unwrap();
+    let mut second = call("b");
+    second.name = "fetch".into();
+    second.arguments = r#"{"url":"../docs/./file/?query=secret"}"#.parse().unwrap();
+    let mut view = ToolRun::new(
+        65400,
+        65401..65410,
+        scope.clone(),
+        Default::default(),
+        Default::default(),
+    )
+    .unwrap();
+    view.update(&scope, 1, 1, &[first, second]).unwrap();
+    assert_eq!(
+        view.summary().unwrap().active_summaries,
+        ["Open · EXAMPLE.org/a/../中文", "Fetch · ../docs/./file"]
+    );
+    let header = view.disclosure_id().unwrap();
+    let mut host = view.into_host().unwrap();
+    let frame = Rect::new(0., 0., 300., 500.);
+    host.render(
+        &mut Scene::new(),
+        &mut Text::new(1.2, true),
+        frame,
+        frame,
+        Theme::DARK.into(),
+    )
+    .unwrap();
+    let label = &host
+        .get(header)
+        .unwrap()
+        .component::<ButtonContent>()
+        .unwrap()
+        .label;
+    assert!(label.contains("EXAMPLE.org/a/../中文"));
+    assert!(label.contains("../docs/./file"));
+    assert!(!label.contains("secret") && !label.contains("query") && !label.contains("user"));
+}

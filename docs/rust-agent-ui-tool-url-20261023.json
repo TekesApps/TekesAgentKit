@@ -1,0 +1,116 @@
+{
+  "sourceBase": "c23bab6e8234b18df0fcb77f7cc6a13c2d9c411c",
+  "changedSourceFiles": {
+    "Cargo.lock": "580fd4b0d2eb2e1eff0036f82ff6d8e804e754cf8953a339722db4da5ae53daf",
+    "crates/presentation/Cargo.toml": "fb97a0e8d556bfd7c72a86074eaff733026ca79504a13a2b83c18be70c3296bc",
+    "crates/presentation/src/lib.rs": "76b9e37164f2f3bca3c74e749c151b19a05207b6cd4e4b83a83abee37bc3457c",
+    "crates/presentation/src/tool_run.rs": "a2f0e0de9d7264ac2a4679a3d499986d125d6b25e661e9ce4119b7b46f7b1d03",
+    "crates/presentation/src/tool_url.rs": "330bdfa9e3f9a4d15cb84d617044ab8411f7b6a3eb01fc98b71035ac4a3c63b0",
+    "crates/presentation/tests/fixtures/tool-url-foundation-20261023.json": "228c74aad2c69521e86faad507683561a1b799c0dc330f9279ffa82cd5b2895d",
+    "crates/presentation/tests/tool_run.rs": "97aa34625f259ff6c79ce19a7fb9dbe661a21b76ac99eeefce208329206cfc83",
+    "scripts/check-tool-url-foundation.py": "ca4c31267069cad67ac02ec9e76901b0be2c522dd6067765d5ed1b5f5de6379d",
+    "ui/Cargo.lock": "6ac4403de417270123547328318815ff6af5e5eb4d674a9f35c393356062a435",
+    "ui/consumer/tests/support/tool_run.rs": "d8b2b99b7b789bfed71faaaf65bd99e7d2a04a311c79455804352c55675b1d46",
+    "ui/demo/tests/transcript_content.rs": "d142ac9ccc48d999866669d9719be3fb5b1fd64d2d4a4d82b56c5ed45922a60d"
+  },
+  "readOnlyReference": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/TranscriptRendering/TranscriptToolRowModel.swift": "76793271a68ca5a7a5ad872f9235a4d88fa8c801c1212e2a2b798043fa021818",
+    "/Users/frankqin/dev/Tekes/Tekes/ClientAgentHostAdapters.swift": "7d907c654ec3df76c7a8b492e32bbc68f1bd4d0b46044cae615aa712b9f67c71"
+  },
+  "foundation": {
+    "platform": "macOS 26.6.2",
+    "cases": 61,
+    "callFamilies": 3,
+    "dataOnly": true,
+    "swiftToolchain": false,
+    "uiInteraction": false,
+    "networkRequests": false,
+    "oracle": "scripts/check-tool-url-foundation.py",
+    "fixture": "crates/presentation/tests/fixtures/tool-url-foundation-20261023.json",
+    "exactScope": "Foundation NSURL host/path properties, used as a no-Swift behavioral oracle; not a Swift host build or native UI acceptance"
+  },
+  "newDependency": {
+    "name": "iri-string",
+    "version": "0.7.14",
+    "purpose": "standard IRI-reference component parsing without base resolution or path normalization",
+    "source": "https://docs.rs/iri-string/0.7.14/iri_string/types/type.IriReferenceStr.html"
+  },
+  "validation": {
+    "rootPassed": 251,
+    "rootFailed": 0,
+    "scopedUiPassed": 114,
+    "scopedUiIgnored": 1,
+    "scope": [
+      "demo transcript_content",
+      "demo output_message",
+      "demo run_reading",
+      "second consumer summary_label"
+    ],
+    "existingIgnore": "TekesUI #49",
+    "lastFullUi": "c23bab6 scope: 565 passed, one existing ignore; not rerun this phase",
+    "finalFixtureTestsPassed": 5,
+    "rootClippyExit": 0,
+    "uiClippyExit": 0,
+    "demoBuildExit": 0,
+    "strictReadingExit": 1,
+    "strictReadingProof": {
+      "accepted": false,
+      "parentFollowingAfterInnerUp": true,
+      "parentOffsetBefore": 0,
+      "parentOffsetAfterScroll": 0,
+      "parentOffsetAfterAppend": 634,
+      "innerOffset": 100,
+      "detailVisibleAfterAppend": false
+    }
+  },
+  "currentSourceNativeAccepted": false,
+  "currentSourceRealHarnessAccepted": false,
+  "crossProcessAccepted": false,
+  "remaining": [
+    "non-RFC authority compatibility, including nonnumeric ports where Foundation returns an object with no host/path",
+    "default report/count rendering and full ClientKit layout",
+    "#53 strict nested reading",
+    "#48 ProcessContainer same/cross-process native acceptance",
+    "final-source Native/Pi/DSH, system IME and accessibility acceptance"
+  ],
+  "cleanup": {
+    "removedAllocatedBytes": 134037504,
+    "removedMiB": 127.83,
+    "incrementalBytes": 47136768,
+    "oldPresentationLibraryBytes": 86900736,
+    "retainedSharedTargetApproxGiB": 33,
+    "retainedDependencyMetadata": 3,
+    "preservedAcceptanceProgramSha256": "7c531ae04db52752dcb533648f702dda362a687e60eb1a5448e27324f5ab03f4",
+    "wipPreserved": true,
+    "measurement": "removed allocated blocks; excludes surviving hardlink anchors and does not infer exclusive reclaim from shared-volume free-space changes"
+  },
+  "newTargets": 0,
+  "newAcceptanceProgramCopies": 0,
+  "evidence": {
+    ".runtime-fixtures/tool-url-20261023/demo-build.log": "40108eb5c2e432741fc7f36afdf5c793ec02b19e7b1ce5e51bdd2ba377bd26cb",
+    ".runtime-fixtures/tool-url-20261023/foundation-extra.json": "2e0c8f9c4750ec4f92253b153e1bbcb7d9054d5ebc167e6b38862d60fbfbb40c",
+    ".runtime-fixtures/tool-url-20261023/root-tests.log": "d3a703319cb7eb2c70fe8bee4cb34423f05edcc7096f1c4e7d0d69f669e2f8b2",
+    ".runtime-fixtures/tool-url-20261023/strict-reading.json": "c4f70b29538ecacd71995d9a3fc7678cf168834c54e6f348c8c095309b9f1b90",
+    ".runtime-fixtures/tool-url-20261023/cache-cleanup.json": "896d8b17d81f1f2d92d882afa9d6df1ee7a56d5b972636a68f02ace75ddbf6e7",
+    ".runtime-fixtures/tool-url-20261023/validation-exits.json": "bde503924f34c029064fd110b5e782667f0d14d079864bf7d6b447938d3e8e41",
+    ".runtime-fixtures/tool-url-20261023/foundation-verification.json": "6817be4fcb10e9d21b00a7a96d41c03ce00361cc546dd96c4e84648dd941a281",
+    ".runtime-fixtures/tool-url-20261023/root-metadata.json": "255103d78cc85c120182e1e94ef0fba6d80d9d31c3da7a30fa40f7b8d1889727",
+    ".runtime-fixtures/tool-url-20261023/parent-ci.json": "7eb5c3eb5f6df4ccf5c4a42423bf20e885befcf4a817bcf5cfde996f5d80f510",
+    ".runtime-fixtures/tool-url-20261023/ui-metadata.json": "6cc3ddf1b1790afcda54e6d3b00bf88363de20c9f8177f09bd8f8d2dc6fd783b",
+    ".runtime-fixtures/tool-url-20261023/parent-ci-final.json": "7eb5c3eb5f6df4ccf5c4a42423bf20e885befcf4a817bcf5cfde996f5d80f510",
+    ".runtime-fixtures/tool-url-20261023/final-fixture-tests.log": "3f9b66d698f9eee57cc749297b6b851098bea1f329de564bbba24b4da6e6c4a9",
+    ".runtime-fixtures/tool-url-20261023/model-tests.log": "b52a630996165b0d2be66814d8a1d7f4462db93c59ec9005047d08b1ec78cba0",
+    ".runtime-fixtures/tool-url-20261023/strict-exit.json": "8ef199e2ba32edcf45464649ce4dae0f2106f394db6f819c55faa6df8200c959",
+    ".runtime-fixtures/tool-url-20261023/ui-clippy.log": "95ab631f2b63f4e97c8a11b3c44ea5fdce71e0234bf0df81dc2a5a0a72dfc697",
+    ".runtime-fixtures/tool-url-20261023/parent-failed-steps.json": "d3ad5625be0dc2d6da452de90e9f7dbb771c31c43c3f675370b325d28c3a01bb",
+    ".runtime-fixtures/tool-url-20261023/foundation-oracle.js": "fd222fdef113c679c19e8ca7e4f7eaf00bef0b14d6d81663019153ebba43ec50",
+    ".runtime-fixtures/tool-url-20261023/ui-consumers.log": "e251b168e45c3105637c78311a994f9d1a4f1a0c03e7279ea252ad69dd8b8019",
+    ".runtime-fixtures/tool-url-20261023/root-clippy.log": "b85ee1d7c060a26d44abf8c2331455367daf5964b5a9ef59a09a78fde1ddf40e",
+    ".runtime-fixtures/tool-url-20261023/strict-reading.log": "52a98da56b6404e1e9d2eb9892324653d7ac6797f52d440751a4377e630aa7e2",
+    ".runtime-fixtures/tool-url-20261023/iri-package.log": "cd2bf1735cf7c8640deb2b384e019b395371f0a5afeac2c3bac2e4d6e545363d",
+    ".runtime-fixtures/tool-url-20261023/parent-push-failed-steps.json": "b07001652cd9219f134ecb3b23420266a582d3b63333c23bdd8a0d5713d1f744",
+    ".runtime-fixtures/tool-url-20261023/verified-ui-inputs.json": "9543ade335292f9c7f61944edd341c2fb9297a7c6abc3cf44dc86c1f16bd6ee3",
+    ".runtime-fixtures/tool-url-20261023/foundation-probe.json": "25486a22b0da3d35d7e3f22fa6a747fc3e71649da4ed92fd325e6ddae578e78f",
+    ".runtime-fixtures/tool-url-20261023/old-presentation-cache-cleanup.json": "b4ed787af7df33ede5626ab2f7cf6b488ca030278e23c3994f371f79c09ebd1f"
+  }
+}

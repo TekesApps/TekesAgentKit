@@ -2,7 +2,7 @@
 
 只读对照 ClientKit 的 `TranscriptMetalActivity` 与 `TranscriptToolRowModel.continuousSummary`，本轮在 AgentKit 的 presentation 和 Rust 业务组件中增加连续工具分组，仍只消费 TekesUI 通用控件。
 
-`TranscriptToolRunSummary` 接收原 canonical 顺序，不自行推断相邻关系。拒绝空 run、重复/空 tool ID 和跨回合成员；复用原 tool-row 失败/停止状态优先级，汇总运行预览、失败/停止数量以及按首次成功出现顺序归并的工具名称计数。摘要只读取允许的语义字段，截断到 96 个扩展字素；未知工具不将任意参数、凭据字段或原始 JSON 搬进常显标题。URL 预览去掉用户名、密码、查询和 fragment，中文/空格路径解码；Rust URL parser 的规范化仍需与 Foundation 的相对/特殊 URL 边界逐项核对，不声称全输入等价。
+`TranscriptToolRunSummary` 接收原 canonical 顺序，不自行推断相邻关系。拒绝空 run、重复/空 tool ID 和跨回合成员；复用原 tool-row 失败/停止状态优先级，汇总运行预览、失败/停止数量以及按首次成功出现顺序归并的工具名称计数。摘要只读取允许的语义字段，截断到 96 个扩展字素；未知工具不将任意参数、凭据字段或原始 JSON 搬进常显标题。URL 预览去掉用户名、密码、查询和 fragment，中文/空格路径解码；[后续 URL 对照](rust-agent-ui-tool-url-20261023.md)已修正相对/点路径与根路径、主机名大小写及 opaque scheme；非 RFC authority 仍未声明全输入等价。
 
 公开 `ToolRun::new(namespace, member_namespaces, scope, labels, tool_labels)` 可由第二宿主直接使用。`update` 使用原 publication/epoch 和 RunScope；默认折叠多成员组，单成员没有额外组标题。分组和成员的 disclosure 互不替代；关闭时移动并保留原控件，旧隐藏复制动作不产生意图；重新展开恢复原文本 owner。删除后重新出现的成员分配新命名空间，旧按钮不能获得新授权。
 

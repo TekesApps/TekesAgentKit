@@ -166,3 +166,32 @@ fn invalid_membership_is_rejected_instead_of_reordered_or_deduplicated() {
         TranscriptToolRunSummary::read(&[&one, &other], str::to_owned, |_| String::new()).is_err()
     );
 }
+
+#[test]
+fn url_previews_match_frozen_foundation_host_and_path_without_navigation_normalization() {
+    let rows: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/tool-url-foundation-20261023.json")).unwrap();
+    let rows = rows.as_array().unwrap();
+    assert_eq!(rows.len(), 61);
+    for row in rows {
+        let raw = row["input"].as_str().unwrap();
+        let expected = if raw.is_empty() || row["valid"] == false {
+            "fallback".into()
+        } else {
+            format!(
+                "URL · {}{}",
+                row["host"].as_str().unwrap_or(""),
+                row["path"].as_str().unwrap_or("")
+            )
+        };
+        for family in ["open", "fetch", "ns.web_fetch"] {
+            let mut tool = call("url", family, "doing");
+            tool.arguments = json!({"url":raw});
+            assert_eq!(
+                tool.continuous_summary("URL", None, "fallback"),
+                expected,
+                "{raw:?}"
+            );
+        }
+    }
+}
