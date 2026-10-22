@@ -32,7 +32,10 @@ compact cold/loading 由宿主原初读驱动，正常 ready 不显示 Refresh�
 
 只读消息 disclosure 和 aside 的单行标题也使用原 SDK LabelOptions；宿主提供
 TextSurfaceHost::shape_label 服务并保留完整 source/AX 文案，AgentKit 不提供自写 shaping/省略 fallback。
-工具标题的新增共享方法与未发布范围见[本轮记录](rust-agent-ui-tool-title-20261022.md)。
+工具标题的新增共享方法与未发布范围见[标题记录](rust-agent-ui-tool-title-20261022.md)。
+折叠行使用共享 `TranscriptToolCall::presentation_row(TranscriptToolRowWording)`；宿主通过原
+`OutputMessageLabels.tool` 提供本地化文案或公开 card 的 progress/report，完整规则和未交付范围见
+[工具行接入说明](rust-agent-ui-tool-row-20261022.md)。
 
 ## 可运行参考与验证
 

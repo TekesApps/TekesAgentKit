@@ -2,7 +2,7 @@
 use crate::TranscriptMessageIdentity as Key;
 use tekes_agent_presentation::{
     RunScope, TranscriptBlockContent, TranscriptItem, TranscriptItemKind, TranscriptOutput,
-    TranscriptSection, TranscriptToolCall,
+    TranscriptSection, TranscriptToolCall, TranscriptToolRowWording,
 };
 use tekes_ui_controls::{
     ButtonTextRenderer, DraftRevision, ExternalSelection, ExternalUndo, ExternalValueResult,
@@ -60,12 +60,40 @@ impl Default for OutputMessageLabels {
             },
             tool: |t| {
                 let producer_title = t.presentation_title();
-                let name = t.name.split_whitespace().collect::<Vec<_>>().join(" ");
-                let title = if name.is_empty() || name == producer_title {
-                    producer_title
-                } else {
-                    format!("{name} · {producer_title}")
-                };
+                let label = tool_display_name(&t.name);
+                let result = t
+                    .result
+                    .as_ref()
+                    .map(|result| {
+                        result["content"]
+                            .as_array()
+                            .map(|parts| {
+                                parts
+                                    .iter()
+                                    .filter_map(|part| part["text"].as_str())
+                                    .collect::<Vec<_>>()
+                                    .join("\n")
+                            })
+                            .or_else(|| result["text"].as_str().map(String::from))
+                            .unwrap_or_default()
+                    })
+                    .filter(|text| !text.is_empty())
+                    .or_else(|| {
+                        let error = t.result_error.as_ref()?;
+                        Some(format!(
+                            "{}: {}",
+                            error["name"].as_str()?,
+                            error["code"].as_str()?
+                        ))
+                    });
+                let row = t.presentation_row(TranscriptToolRowWording {
+                    label: &label,
+                    stopped: "已停止",
+                    title_hint: Some(&producer_title),
+                    result: result.as_deref(),
+                    ..Default::default()
+                });
+                let title = row.text();
                 let mut details = format!(
                     "调用输入\n{}\n\n结果\n{}\n\n调用视图\n{}\n\n结果视图\n{}",
                     t.arguments,
@@ -86,6 +114,27 @@ impl Default for OutputMessageLabels {
             },
         }
     }
+}
+
+fn tool_display_name(name: &str) -> String {
+    let action = name
+        .starts_with("mcp__")
+        .then(|| name.rsplit("__").next())
+        .flatten();
+    let name = match action {
+        Some("dxf_context") => "read drawing context",
+        Some("dxf_move") => "move drawing entities",
+        Some("dxf_delete") => "delete drawing entities",
+        Some("dxf_create_line") => "draw line",
+        Some("dxf_change_text") => "edit drawing text",
+        Some(action) => action,
+        None => name,
+    }
+    .replace('_', " ");
+    let mut chars = name.chars();
+    chars.next().map_or_else(String::new, |first| {
+        first.to_uppercase().collect::<String>() + chars.as_str()
+    })
 }
 
 /// Component slot within one message; never a durable reading anchor. Block

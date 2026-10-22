@@ -32,7 +32,7 @@ fn independent_tool_activity_consumes_producer_views_without_losing_focus_select
         .component::<ButtonContent>()
         .unwrap()
         .label;
-    assert!(label.contains("read · 读取 a.rs · doing"));
+    assert!(label.contains("Read · 读取 a.rs · doing"));
     assert!(!label.contains("not the headline"));
     assert_eq!(tool, before);
     host.accessibility_action(ids.disclosure.unwrap(), None, AccessibilityAction::Press);
@@ -94,7 +94,7 @@ fn independent_tool_activity_consumes_producer_views_without_losing_focus_select
         .component::<ButtonContent>()
         .unwrap()
         .label;
-    assert!(label.contains("read · 读取 a.rs · 12 行 · done"));
+    assert!(label.contains("Read · 读取 a.rs · 12 行 · done"));
     assert!(!label.contains("new raw result"));
     assert!(
         host.text_surface(ids.body)
@@ -134,7 +134,7 @@ fn independent_tool_activity_consumes_producer_views_without_losing_focus_select
         .component::<ButtonContent>()
         .unwrap()
         .label;
-    assert!(label.contains("read · 读取失败 · error"));
+    assert!(label.contains("Read · exit failure output · error"));
     assert_eq!(
         host.text_surface(ids.body).unwrap() as *const _ as usize,
         owner

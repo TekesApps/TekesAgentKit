@@ -1,5 +1,7 @@
 # Rust Agent UI 组件接入契约
 
+Latest collapsed row evidence: [shared tool-row model](rust-agent-ui-tool-row-20261022.md).
+
 Latest journal lifecycle evidence: [tool closure and late results](rust-agent-ui-tool-lifecycle-20261022.md).
 
 [工具结算状态与元数据](rust-agent-ui-tool-result-status-20261022.md)：补齐 journal 的 content/signal/超时/退出状态失败事实，保留 meta/error 可选源数据；旧快照兼容。presentation121、UI547通过/1既有忽略，完整工具行/富卡片与当前原生仍未完成。

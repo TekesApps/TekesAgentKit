@@ -14,6 +14,8 @@ pub use turn_actions::*;
 mod controller;
 mod run;
 mod scope;
+mod tool_row;
+pub use tool_row::*;
 mod tool_title;
 mod tool_view;
 mod transcript;

@@ -654,7 +654,7 @@ fn embedded_tool_uses_producer_terminal_description_and_retains_raw_detail_owner
         .unwrap()
         .component::<ButtonContent>()
         .unwrap();
-    assert!(header.label.contains("shell · 检查项目 · doing"));
+    assert!(header.label.contains("Shell · 检查项目 · doing"));
     assert!(!header.label.contains("echo original"));
     assert!(toggle(&mut host, root, ids.disclosure.unwrap()));
     let owner = host.text_surface(ids.body).unwrap() as *const _ as usize;
@@ -683,7 +683,7 @@ fn embedded_tool_uses_producer_terminal_description_and_retains_raw_detail_owner
         .unwrap()
         .component::<ButtonContent>()
         .unwrap();
-    assert!(header.label.contains("shell · 检查项目 · done"));
+    assert!(header.label.contains("Shell · 检查项目 · done"));
     assert!(!header.label.contains("must not replace terminal action"));
     assert!(
         host.text_surface(ids.body)

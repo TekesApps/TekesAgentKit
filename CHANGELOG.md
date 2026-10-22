@@ -2,6 +2,8 @@
 
 ## Unreleased — experimental Rust Agent UI
 
+- Add shared collapsed tool-row selection for progress, action/report, explicit-error and stopped summaries; original embedded and independent disclosures retain their text owners and full details.
+
 - Fence journal tools at turn closure so late unowned results cannot overwrite sealed history; retain result-only paging and explicit new-call admission.
 
 - Correct journal tool settlement for all content error markers, signals, timeouts and public result views; preserve raw result metadata/error in optional backward-readable fields without changing turn settlement.
