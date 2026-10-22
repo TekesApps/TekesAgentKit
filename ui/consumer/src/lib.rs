@@ -1,4 +1,13 @@
 //! Second consumer: depends only on AgentKit's public UI packages.
+/// Business display policy stays in AgentKit presentation. Consumers forward
+/// source facts and preference, without recreating live-thinking lifecycle rules.
+/// This contract probe is not an OutputMessage/Transcript renderer adapter.
+pub fn thinking_policy<'a>(
+    input: &tekes_agent_components_ui::TranscriptThinkingInput<'a>,
+) -> Result<tekes_agent_components_ui::TranscriptThinkingPolicy<'a>, String> {
+    tekes_agent_components_ui::TranscriptThinkingPolicy::read(input)
+        .map_err(|error| error.to_string())
+}
 /// Window clearance is supplied by the host; AgentKit owns the pane body inset.
 pub fn set_panel_layout(
     panel: &mut tekes_agent_components_ui::SidePanel,

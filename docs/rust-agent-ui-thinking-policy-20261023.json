@@ -1,0 +1,92 @@
+{
+  "sourceBase": "4d31a4c",
+  "scope": "renderer-independent eligibility policy only; no Transcript/OutputMessage/RunPort wiring yet",
+  "completionProven": false,
+  "tekesui": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "references": {
+    "ClientKit/Sources/Contract/TranscriptThinkingMode.swift": "1025d23d5bb79651e743bc93bbf6dd542b8007e08fa17a314a9cf2e324d9dd3a",
+    "ClientKit/Sources/TranscriptRendering/TranscriptMetalActivity.swift": "f08f6e8f34c76a71fb117dd84a46be50145f737a38e21534cf59d518bc2d3e8d",
+    "ClientKit/Tests/TranscriptRenderingTests/TranscriptThinkingModeTests.swift": "cc702a8b15b47639e3a7d091e2dfc9a85242da16856d6d3261b490fc6bb75970",
+    "ClientKit/Sources/Composer/Settings/TranscriptThinkingSettings.swift": "f753d87289fdd4c4ea09355c8e578fe062b04148fa1a3df78f17d799025ce3a0",
+    "Tekes/Tekes/Settings/SettingsRootController.swift": "6a1670eb8de8842c5d624d52a7a1972f1abbdae5bf739c589acfd51e621330ca"
+  },
+  "inputs": {
+    "crates/presentation/src/transcript_thinking.rs": "261f86a0816772998b83498e697eb21a095fc0ae588ed2e9efa990e3f096506e",
+    "crates/presentation/tests/transcript_thinking.rs": "27d6c2adfe160b47d053289ef4e3313bf96c4398b4c6722dcb34028d64b56e06",
+    "crates/presentation/src/lib.rs": "f5addf1fd1f7db48b4406f3bea079994b7f7724bb7862696b87365276e156862",
+    "ui/components/src/lib.rs": "64f360c86eceb6973c124e4ce28d45cd7d948f1a1212e06f5b4122d97a78791d",
+    "ui/consumer/src/lib.rs": "078239481b973f811298e39218cafe23b4988b482788a742e46f44217b61373d",
+    "ui/consumer/tests/thinking_policy.rs": "cd9401985d358c2c24ca9cb719f50e5803d22d7998098e5d14b1d1f726a195c2"
+  },
+  "rootTests": 265,
+  "newPolicyTests": 11,
+  "secondPublicConsumerTests": 93,
+  "consumerIgnored": 1,
+  "ignoredIssue": 49,
+  "rootStrictAllTargetsClippy": true,
+  "uiStrictAllTargetsClippy": true,
+  "hostCompileChecked": true,
+  "newNativeAcceptance": false,
+  "realSepIntegrationAccepted": false,
+  "crossProcessAccepted": false,
+  "sourceArrivalBridgeImplemented": false,
+  "controlledViewInputImplemented": false,
+  "firstSinkOrderCannotBeInferredFromDocumentPosition": true,
+  "newTargets": 0,
+  "newProgramCopies": 0,
+  "deletedBytes": 0,
+  "ciBase": {
+    "headRefOid": "4d31a4c41422d19c53c2fd2e2148db46948d2a15",
+    "isDraft": true,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-22T19:15:20Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39838114254/job/120031686817",
+        "name": "checks",
+        "startedAt": "2026-10-22T19:12:56Z",
+        "status": "COMPLETED",
+        "workflowName": "Rust headless"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-22T19:14:47Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39838108385/job/120031666432",
+        "name": "checks",
+        "startedAt": "2026-10-22T19:12:55Z",
+        "status": "COMPLETED",
+        "workflowName": "Rust headless"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-22T19:18:58Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39838114254/job/120031687410",
+        "name": "Rust UI consumer (no native interaction)",
+        "startedAt": "2026-10-22T19:13:21Z",
+        "status": "COMPLETED",
+        "workflowName": "Rust headless"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-22T19:19:28Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39838108385/job/120031665886",
+        "name": "Rust UI consumer (no native interaction)",
+        "startedAt": "2026-10-22T19:13:21Z",
+        "status": "COMPLETED",
+        "workflowName": "Rust headless"
+      }
+    ]
+  },
+  "evidence": {
+    ".runtime-fixtures/thinking-policy-20261023/root-tests.log": "b2ac64f6ca0b573a8eec6641a2bb6bdeba9524278ad1c0c36499038cdff4649f",
+    ".runtime-fixtures/thinking-policy-20261023/ci-4d-reading-failure.log": "54c19a0382d0ff487971ccef4935a277a1006072eb14450ff90beff00e87d1d0",
+    ".runtime-fixtures/thinking-policy-20261023/ui-clippy.log": "9f6ebc3b490fa172fcf58e608a4013b76b676e337f4c2492096f5be133f4d012",
+    ".runtime-fixtures/thinking-policy-20261023/root-clippy.log": "e70d73f80384f77c6cf1eaa1aa9a7c3b81833ed49f5d791bde5631d4450ea4b3",
+    ".runtime-fixtures/thinking-policy-20261023/ci-4d.json": "0a89cc95af462a21b84cf768389884b6e757e75863d2e989613cfb1c2c4e331c",
+    ".runtime-fixtures/thinking-policy-20261023/consumer-tests.log": "0210134a9b8fbe715da8451b659ef313ffe165424b0e37e25333579de9e2e231"
+  }
+}

@@ -22,8 +22,8 @@
   "tekesuiInputDigest": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
   "richToolCardRendering": false,
   "crossProcessAccepted": false,
-  "sourceBase": "f44f4fffb5b0104b06506d94cc3450b529e16bee",
-  "sourceStage": "plus opt-in proof routing and executable selection fixes; shared components unchanged",
+  "sourceBase": "4d31a4c41422d19c53c2fd2e2148db46948d2a15",
+  "sourceStage": "plus renderer-independent thinking policy and public API; no view wiring",
   "sourcesRead": {
     "ui/components/src/run_port.rs": "9da2607af329d064265e1f3f6c42e2c08d3945531d5f7e5d6aede92abd48f6b4",
     "ui/components/src/transcript_content.rs": "3292c9b52ddac958a48201f14a3ef070b3de18a805c25904f93b591a3ef50a54",
@@ -338,52 +338,52 @@
   ],
   "publicIssuesCheckedAt": "2026-10-23",
   "ciSnapshot": {
-    "headRefOid": "f44f4fffb5b0104b06506d94cc3450b529e16bee",
+    "headRefOid": "4d31a4c41422d19c53c2fd2e2148db46948d2a15",
     "isDraft": true,
     "statusCheckRollup": [
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-22T18:42:22Z",
+        "completedAt": "2026-10-22T19:15:20Z",
         "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39833403775/job/120015293586",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39838114254/job/120031686817",
         "name": "checks",
-        "startedAt": "2026-10-22T18:40:20Z",
+        "startedAt": "2026-10-22T19:12:56Z",
         "status": "COMPLETED",
         "workflowName": "Rust headless"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-22T18:41:58Z",
+        "completedAt": "2026-10-22T19:14:47Z",
         "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39833392352/job/120015253900",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39838108385/job/120031666432",
         "name": "checks",
-        "startedAt": "2026-10-22T18:40:16Z",
+        "startedAt": "2026-10-22T19:12:55Z",
         "status": "COMPLETED",
         "workflowName": "Rust headless"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-22T18:46:30Z",
+        "completedAt": "2026-10-22T19:18:58Z",
         "conclusion": "FAILURE",
-        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39833403775/job/120015294040",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39838114254/job/120031687410",
         "name": "Rust UI consumer (no native interaction)",
-        "startedAt": "2026-10-22T18:40:21Z",
+        "startedAt": "2026-10-22T19:13:21Z",
         "status": "COMPLETED",
         "workflowName": "Rust headless"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-22T18:45:49Z",
+        "completedAt": "2026-10-22T19:19:28Z",
         "conclusion": "FAILURE",
-        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39833392352/job/120015253243",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39838108385/job/120031665886",
         "name": "Rust UI consumer (no native interaction)",
-        "startedAt": "2026-10-22T18:40:17Z",
+        "startedAt": "2026-10-22T19:13:21Z",
         "status": "COMPLETED",
         "workflowName": "Rust headless"
       }
     ]
   },
-  "latestVerifiedCiHead": "f44f4fffb5b0104b06506d94cc3450b529e16bee",
+  "latestVerifiedCiHead": "4d31a4c41422d19c53c2fd2e2148db46948d2a15",
   "latestVerifiedCiConclusion": "Linux x2 SUCCESS; macOS x2 FAILURE at strict bounded_detail_reading (#53)",
   "knownFailure": "Nested detail scroll leaves parent following; strict gate remains required",
   "currentValidation": "rust-agent-ui-current-validation-20261023.json",
@@ -400,14 +400,15 @@
     "processContainer": false
   },
   "latestLocalValidation": {
-    "pythonTests": 61,
-    "demoFeedbackTests": 14,
-    "strictDemoClippy": true,
-    "priorF44RootTests": 254,
+    "rootTests": 265,
+    "newThinkingPolicyTests": 11,
+    "secondPublicConsumerTests": 93,
+    "consumerIgnored": 1,
+    "rootAndUiStrictAllTargetsClippy": true,
     "priorF44FullUiTests": 571,
     "priorUiIgnored": 1,
-    "priorF44FinalRelatedTests": 118,
-    "currentFullSuiteRerun": false
+    "currentFullUiSuiteRerun": false,
+    "newNativeAcceptance": false
   },
   "publicProcessContractSources": {
     "crates/tekes-ui-module-runtime/src/container.rs": "b34423866204a1ee7e0346b5609ac3c4e1e278025ef8317962f44c54bb53b5e9",
@@ -423,5 +424,6 @@
     "rust-agent-ui-tool-url-20261023.json",
     "rust-agent-ui-tool-header-20261023.json"
   ],
-  "importantScope": "Current native local-fixture checks and real protocol/offscreen checks are separate identities; Native 0.9.3 UI-only is not lifecycle or bounded child-history acceptance. No full UI/cross-process/physical keyboard/VoiceOver acceptance."
+  "importantScope": "Current native local-fixture checks and real protocol/offscreen checks are separate identities; Native 0.9.3 UI-only is not lifecycle or bounded child-history acceptance. No full UI/cross-process/physical keyboard/VoiceOver acceptance.",
+  "thinkingPolicy": "rust-agent-ui-thinking-policy-20261023.json"
 }

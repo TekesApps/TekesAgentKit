@@ -1,6 +1,11 @@
 //! Agent-owned composition of public TekesUI controls. No endpoint or Run state machine.
 mod sidebar_visibility;
 mod tool_run;
+pub use tekes_agent_presentation::{
+    TranscriptReasoningDisclosure, TranscriptThinkingCall, TranscriptThinkingInput,
+    TranscriptThinkingItem, TranscriptThinkingMode, TranscriptThinkingNarration,
+    TranscriptThinkingPlaceholder, TranscriptThinkingPolicy,
+};
 pub use tekes_agent_presentation::{TranscriptToolNameCount, TranscriptToolRunSummary};
 pub use tool_run::*;
 mod tool_detail_content;

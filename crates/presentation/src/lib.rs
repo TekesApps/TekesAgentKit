@@ -58,6 +58,9 @@ pub use actionable::*;
 mod transcript_document;
 pub use transcript_document::*;
 
+mod transcript_thinking;
+pub use transcript_thinking::*;
+
 mod transcript_order;
 pub use transcript_order::*;
 
