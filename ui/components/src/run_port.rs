@@ -893,6 +893,9 @@ impl RunPort {
         {
             return Err("stale or foreign RunPort update plan");
         }
+        self.transcript()
+            .ok_or("RunPort has no Transcript")?
+            .validate_prepared_update(&prepared.transcript)?;
         let current = self.prepare_update(
             prepared.snapshot,
             prepared.affordances,

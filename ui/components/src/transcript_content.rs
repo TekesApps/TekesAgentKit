@@ -53,6 +53,8 @@ pub struct TranscriptContentUpdate<'a> {
     timing: crate::TranscriptFootnoteTiming,
     base_timing: crate::TranscriptFootnoteTiming,
     base_historical_generation: u64,
+    base_header_revision: (u64, u64),
+    header_revision: (u64, u64),
     rows: Vec<(TranscriptContentRowKey, ComponentId)>,
 }
 impl TranscriptContentUpdate<'_> {
@@ -86,6 +88,15 @@ pub struct TranscriptContentLabels {
     pub tool_run: ToolRunLabels,
     pub footnote: TurnFootnoteLabels,
     pub feedback: Option<FeedbackLabels>,
+}
+impl TranscriptContentLabels {
+    /// One explicit report source for standalone and message-embedded tools.
+    /// Input-message disclosures and non-tool labels retain their existing copy.
+    pub fn with_tool_header(mut self, adapter: crate::ToolHeaderAdapter) -> Self {
+        self.output.tool_header = Some(adapter);
+        self.tool.details.tool_header = Some(adapter);
+        self
+    }
 }
 impl Default for TranscriptContentLabels {
     fn default() -> Self {
@@ -130,6 +141,7 @@ pub struct TranscriptContent {
     end: u32,
     publication: u64,
     epoch: u64,
+    header_revision: (u64, u64),
     last: Option<TranscriptSnapshot>,
     labels: TranscriptContentLabels,
     timing: crate::TranscriptFootnoteTiming,
@@ -148,6 +160,21 @@ pub(crate) struct RunTranscriptLayout {
     pub bottom: f32,
 }
 impl TranscriptContent {
+    fn current_header_revision(&self) -> (u64, u64) {
+        (
+            crate::output_message::tool_header_revision(self.labels.output, &self.scope),
+            crate::output_message::tool_header_revision(self.labels.tool.details, &self.scope),
+        )
+    }
+    fn checked_header_revision(&self, epoch: u64) -> Result<(u64, u64), &'static str> {
+        let next = self.current_header_revision();
+        if epoch == self.epoch
+            && (next.0 < self.header_revision.0 || next.1 < self.header_revision.1)
+        {
+            return Err("stale transcript tool header revision");
+        }
+        Ok(next)
+    }
     pub(crate) fn set_run_layout(&mut self, layout: RunTranscriptLayout) {
         self.run_layout = Some(layout);
     }
@@ -182,6 +209,7 @@ impl TranscriptContent {
             end: row_namespaces.end,
             publication: 0,
             epoch: 0,
+            header_revision: (0, 0),
             last: None,
             labels,
             timing: Default::default(),
@@ -380,12 +408,14 @@ impl TranscriptContent {
         {
             return Err("conflicting transcript content publication");
         }
+        let header_revision = self.checked_header_revision(epoch)?;
         let available = available && !snapshot.is_stale;
         if !self.controls_dirty
             && self.historical_control.is_none()
             && self.epoch == epoch
             && self.last.as_ref() == Some(snapshot)
             && &self.timing == timing
+            && self.header_revision == header_revision
         {
             for node in &mut self.rows.children {
                 if let Some(footer) = node.component_mut::<TurnFootnote>() {
@@ -408,6 +438,9 @@ impl TranscriptContent {
             TranscriptDocument::read(snapshot).map_err(|_| "invalid transcript document")?;
         let plan = plan(snapshot, &document, &self.labels, timing)?;
         self.validate_plan(&plan, publication, epoch, available)?;
+        if header_revision != self.current_header_revision() {
+            return Err("tool header inputs changed during preparation");
+        }
         let desired: BTreeSet<_> = plan.iter().map(|row| row.key.clone()).collect();
         // All source/identity/content/namespace checks precede tree mutation.
         let index: BTreeMap<_, _> = self
@@ -508,6 +541,7 @@ impl TranscriptContent {
                 }
             }
         }
+        self.header_revision = header_revision;
         self.last = Some(snapshot.clone());
         self.timing = timing.clone();
         self.arranged_revision = None;
@@ -549,6 +583,7 @@ impl TranscriptContent {
         timing: &crate::TranscriptFootnoteTiming,
     ) -> Result<TranscriptContentUpdate<'a>, &'static str> {
         self.validate_update_with_timing(scope, publication, epoch, snapshot, available, timing)?;
+        let header_revision = self.checked_header_revision(epoch)?;
         let document =
             TranscriptDocument::read(snapshot).map_err(|_| "invalid transcript document")?;
         let planned = plan(snapshot, &document, &self.labels, timing)?;
@@ -584,6 +619,9 @@ impl TranscriptContent {
                 (row.key.clone(), id)
             })
             .collect();
+        if header_revision != self.current_header_revision() {
+            return Err("tool header inputs changed during preparation");
+        }
         Ok(TranscriptContentUpdate {
             root: self.root,
             scope: scope.clone(),
@@ -597,6 +635,8 @@ impl TranscriptContent {
             timing: timing.clone(),
             base_timing: self.timing.clone(),
             base_historical_generation: self.historical_generation,
+            base_header_revision: self.header_revision,
+            header_revision,
             rows,
         })
     }
@@ -613,6 +653,7 @@ impl TranscriptContent {
             || self.next != prepared.base_next
             || self.timing != prepared.base_timing
             || self.historical_generation != prepared.base_historical_generation
+            || self.header_revision != prepared.base_header_revision
         {
             return Err("stale or foreign transcript update plan");
         }
@@ -624,7 +665,7 @@ impl TranscriptContent {
             prepared.available,
             &prepared.timing,
         )?;
-        if current.rows != prepared.rows {
+        if current.rows != prepared.rows || current.header_revision != prepared.header_revision {
             return Err("transcript update plan identities changed");
         }
         Ok(())
@@ -690,10 +731,15 @@ impl TranscriptContent {
         {
             return Err("conflicting transcript content publication");
         }
+        let header_revision = self.checked_header_revision(epoch)?;
         let document =
             TranscriptDocument::read(snapshot).map_err(|_| "invalid transcript document")?;
         let plan = plan(snapshot, &document, &self.labels, timing)?;
-        self.validate_plan(&plan, publication, epoch, available && !snapshot.is_stale)
+        self.validate_plan(&plan, publication, epoch, available && !snapshot.is_stale)?;
+        if header_revision != self.current_header_revision() {
+            return Err("tool header inputs changed during preparation");
+        }
+        Ok(())
     }
     fn validate_plan(
         &self,

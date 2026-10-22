@@ -100,7 +100,9 @@ pub use summary::*;
 pub use tekes_agent_presentation::RunSnapshot;
 pub use tekes_agent_presentation::{ComposerDestination, RunScope};
 pub use tekes_agent_presentation::{
-    TranscriptToolChangeCount, TranscriptToolReport, TranscriptToolReportWording,
+    TranscriptToolChangeCount, TranscriptToolHeader, TranscriptToolHeaderRole,
+    TranscriptToolHeaderSpan, TranscriptToolReport, TranscriptToolReportWording,
+    TranscriptToolRowInputs,
 };
 pub use tekes_agent_presentation::{
     TranscriptToolDetailKind, TranscriptToolDetailSection, TranscriptToolDetailWording,

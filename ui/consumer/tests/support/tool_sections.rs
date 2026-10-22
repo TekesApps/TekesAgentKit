@@ -1,7 +1,7 @@
 use super::*;
 use tekes_ui_controls::extended::{Axis, Stack};
 
-fn call() -> TranscriptToolCall {
+pub(super) fn call() -> TranscriptToolCall {
     TranscriptToolCall {
         id: "owned-call".into(),
         turn_id: "owned-turn".into(),

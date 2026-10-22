@@ -339,3 +339,5 @@ formatting requires a new publication. See [hierarchy contract](../docs/rust-age
 for constructor injection, scaling, control/selection retention and native evidence.
 
 连续工具的独立组件、Transcript/消息内组合与 `row_id` / `tool_activity_id` 迁移见[连续工具接入说明](../docs/rust-agent-ui-tool-run-20261023.md)。本地协议演示的原生 SideChat、分页/阅读/焦点与系统拼音续验见[独立程序记录](../docs/rust-agent-ui-native-resumed-20261023.md)；结果不转移到后续源码、真实三端或 ProcessContainer。
+
+工具行显式 report/workspace counts、`ToolHeaderAdapter`、同一 Run publication 的独立展示修订与只读 header getter，见[接入说明](../docs/rust-agent-ui-tool-header-20261023.md)。当前只消费原 SDK 单色标签，semantic runs 的实际颜色仍待 TekesUI #25。

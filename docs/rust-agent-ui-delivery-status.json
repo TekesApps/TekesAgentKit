@@ -384,23 +384,16 @@
   },
   "supplement": "rust-agent-ui-tool-card-20261022.json",
   "latestLocalValidation": {
-    "rootPassed": 251,
-    "scopedUiPassed": 114,
-    "scopedUiIgnored": 1,
-    "scopedUiSuites": [
-      "demo transcript_content",
-      "demo output_message",
-      "demo run_reading",
-      "second consumer summary_label"
-    ],
-    "lastFullUiPassed": 565,
-    "lastFullUiHead": "c23bab6",
+    "rootPassed": 254,
+    "fullUiBeforeFinalSourceFingerprintPassed": 571,
+    "uiIgnored": 1,
+    "finalRelatedUiPassed": 118,
     "rootClippy": true,
     "uiClippy": true,
     "demoBuild": true,
     "strictNestedReading": false
   },
-  "latestVerifiedCiHead": "c23bab6e8234b18df0fcb77f7cc6a13c2d9c411c",
+  "latestVerifiedCiHead": "bf1e21b6df9e48452f5ad95ed5bb8caa83ad027b",
   "latestVerifiedCiConclusion": "Linux success; macOS failure at required strict nested-reading step",
   "richToolCardRendering": false,
   "historicalDocumentationAudit": {
@@ -473,7 +466,8 @@
     "rust-agent-ui-tool-section-controls-20261023.json",
     "rust-agent-ui-tool-report-20261023.json",
     "rust-agent-ui-tool-run-20261023.json",
-    "rust-agent-ui-tool-url-20261023.json"
+    "rust-agent-ui-tool-url-20261023.json",
+    "rust-agent-ui-tool-header-20261023.json"
   ],
   "boundedDetails": "explicit experiment; standard RunPort/Transcript defaults remain inline",
   "latestNativeAcceptance": {
@@ -529,5 +523,11 @@
     "preservedAcceptanceProgramSha256": "7c531ae04db52752dcb533648f702dda362a687e60eb1a5448e27324f5ab03f4",
     "wipPreserved": true,
     "measurement": "removed allocated blocks; excludes surviving hardlink anchors and does not infer exclusive reclaim from shared-volume free-space changes"
+  },
+  "toolHeader": {
+    "receipt": "rust-agent-ui-tool-header-20261023.json",
+    "structuredInputs": true,
+    "independentDisplayRevision": true,
+    "semanticRunsRendered": false
   }
 }

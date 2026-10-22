@@ -1795,3 +1795,124 @@ fn native_host_transcript_uses_shared_url_projection_in_group_previews() {
     assert!(label.contains("EXAMPLE.org/a/../b"));
     assert!(!label.contains("secret"));
 }
+
+#[test]
+fn transcript_routes_one_explicit_header_adapter_to_independent_and_embedded_tools() {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static REV: AtomicU64 = AtomicU64::new(1);
+    let adapter = ToolHeaderAdapter {
+        revision: |_| REV.load(Ordering::SeqCst),
+        inputs: |scope, tool| TranscriptToolRowInputs {
+            report: Some(TranscriptToolReport {
+                verb: "read".into(),
+                subject: Some(format!("{}:{}", scope.session_id, tool.id)),
+                result_count: None,
+                result_object: None,
+                note: None,
+                added_lines: Some(if REV.load(Ordering::SeqCst) == 1 {
+                    0
+                } else {
+                    2
+                }),
+                removed_lines: Some(0),
+            }),
+            workspace_change_count: Some(TranscriptToolChangeCount {
+                additions: 99,
+                deletions: 99,
+            }),
+        },
+        name: None,
+        stopped: || "Stopped".into(),
+        report_wording: TranscriptToolReportWording {
+            subject_phrase: |v, s| format!("{s}: {v}"),
+            verb: str::to_owned,
+            magnitude: |n, o| format!("{n} {o}"),
+            join: |a, b| format!("{a} · {b}"),
+        },
+    };
+    let mut s = snapshot();
+    let independent = tool();
+    let mut embedded = tool();
+    embedded.id = "embedded".into();
+    embedded.result_position = Some(TranscriptSourcePosition::Journal {
+        sequence: 4,
+        content_index: None,
+    });
+    embedded.source_position = Some(TranscriptSourcePosition::Journal {
+        sequence: 2,
+        content_index: Some(1),
+    });
+    s.items[1].content_blocks = Some(vec![
+        TranscriptContentBlock {
+            index: 0,
+            content: TranscriptBlockContent::Text {
+                text: "output".into(),
+            },
+        },
+        TranscriptContentBlock {
+            index: 1,
+            content: TranscriptBlockContent::ToolCall {
+                tool_id: "embedded".into(),
+            },
+        },
+    ]);
+    s.tools = vec![independent, embedded];
+    let mut view = TranscriptContent::new(
+        65600,
+        65601..65700,
+        scope(),
+        TranscriptContentLabels::default().with_tool_header(adapter),
+    )
+    .unwrap();
+    view.update(&scope(), 1, 1, &s, true).unwrap();
+    assert_eq!(
+        view.tool_run("tool")
+            .unwrap()
+            .tool_activity("tool")
+            .unwrap()
+            .tool_header()
+            .unwrap()
+            .text,
+        "a:tool: read    +0 −0"
+    );
+    assert!(view.tool_run("embedded").is_none());
+    let old = view.prepare_update(&scope(), 1, 1, &s, true).unwrap();
+    REV.store(2, Ordering::SeqCst);
+    assert!(view.apply_prepared_update(&old).is_err());
+    assert!(
+        view.tool_run("tool")
+            .unwrap()
+            .tool_activity("tool")
+            .unwrap()
+            .tool_header()
+            .unwrap()
+            .text
+            .ends_with("+0 −0")
+    );
+    let current = view.prepare_update(&scope(), 1, 1, &s, true).unwrap();
+    view.apply_prepared_update(&current).unwrap();
+    assert!(
+        view.tool_run("tool")
+            .unwrap()
+            .tool_activity("tool")
+            .unwrap()
+            .tool_header()
+            .unwrap()
+            .text
+            .ends_with("+2 −0")
+    );
+    REV.store(1, Ordering::SeqCst);
+    assert!(view.update(&scope(), 1, 1, &s, true).is_err());
+    REV.store(2, Ordering::SeqCst);
+    let output = view.row_id(&key("output")).unwrap();
+    let host = view.into_host().unwrap();
+    assert_eq!(
+        host.get(output)
+            .unwrap()
+            .component::<OutputMessage>()
+            .unwrap()
+            .tool_headers()[0]
+            .text,
+        "a:embedded: read    +2 −0"
+    );
+}

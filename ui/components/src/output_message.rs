@@ -42,6 +42,23 @@ pub enum OutputMessageText {
     CopyDetail,
 }
 pub type ScopedToolFormatter = fn(&RunScope, &TranscriptToolCall) -> (String, String);
+pub type ToolHeaderInputsProvider =
+    fn(&RunScope, &TranscriptToolCall) -> tekes_agent_presentation::TranscriptToolRowInputs;
+
+/// Hosts supply explicit facts and copy. Shared presentation owns report/count
+/// precedence and UTF-16 business spans; this is not a second row state machine.
+#[derive(Clone, Copy, Debug)]
+pub struct ToolHeaderAdapter {
+    pub inputs: ToolHeaderInputsProvider,
+    /// Monotonic display-source revision within a connection epoch. Providers
+    /// must read one immutable UI-turn snapshot and perform no I/O or mutation.
+    /// Advancing this revision refreshes headers without changing Run authority;
+    /// it does not authorize changing legacy detail/section payloads.
+    pub revision: fn(&RunScope) -> u64,
+    pub name: Option<fn(&str) -> String>,
+    pub stopped: fn() -> String,
+    pub report_wording: tekes_agent_presentation::TranscriptToolReportWording,
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct OutputMessageLabels {
@@ -49,6 +66,9 @@ pub struct OutputMessageLabels {
     /// Pure tool-local formatting; external lookups must use `scoped_tool`.
     pub tool: fn(&TranscriptToolCall) -> (String, String),
     pub scoped_tool: Option<ScopedToolFormatter>,
+    /// When set, the shared structured header supersedes the legacy title;
+    /// legacy detail formatting and original structured detail owners remain.
+    pub tool_header: Option<ToolHeaderAdapter>,
     pub tool_run: crate::ToolRunLabels,
     /// Structured expansion. Set None to retain a custom `tool` text body.
     pub tool_sections: Option<
@@ -91,6 +111,7 @@ impl Default for OutputMessageLabels {
             },
             tool_sections: Some(default_tool_sections),
             scoped_tool: None,
+            tool_header: None,
             tool_run: Default::default(),
             tool: |t| {
                 let producer_title = t.presentation_title();
@@ -151,14 +172,44 @@ fn default_tool_sections(
         ..Default::default()
     })
 }
+pub(crate) fn tool_header_revision(labels: OutputMessageLabels, scope: &RunScope) -> u64 {
+    labels
+        .tool_header
+        .map_or(0, |adapter| (adapter.revision)(scope))
+}
 pub(crate) fn tool_text(
     scope: &RunScope,
     tool: &TranscriptToolCall,
     labels: OutputMessageLabels,
-) -> (String, String) {
-    labels
+) -> (
+    String,
+    String,
+    Option<tekes_agent_presentation::TranscriptToolHeader>,
+) {
+    let (legacy_title, details) = labels
         .scoped_tool
-        .map_or_else(|| (labels.tool)(tool), |make| make(scope, tool))
+        .map_or_else(|| (labels.tool)(tool), |make| make(scope, tool));
+    let header = labels.tool_header.map(|adapter| {
+        let inputs = (adapter.inputs)(scope, tool);
+        let name = adapter.name.unwrap_or(tool_display_name)(&tool.name);
+        let producer_title = tool.presentation_title();
+        let result = tool.presentation_result_text();
+        tool.presentation_header(
+            TranscriptToolRowWording {
+                label: &name,
+                stopped: &(adapter.stopped)(),
+                title_hint: Some(&producer_title),
+                result: result.as_deref(),
+                ..Default::default()
+            },
+            &inputs,
+            adapter.report_wording,
+        )
+    });
+    let title = header
+        .as_ref()
+        .map_or(legacy_title, |header| header.text.clone());
+    (title, details, header)
 }
 pub(crate) fn tool_details_facts(
     scope: &RunScope,
@@ -245,8 +296,25 @@ pub(crate) struct PartFacts {
     pub(crate) title: String,
     pub(crate) text: String,
     pub(crate) tool: Option<ToolDetailFacts>,
+    pub(crate) tool_header: Option<tekes_agent_presentation::TranscriptToolHeader>,
 }
 impl PartFacts {
+    pub(crate) fn matches_header_update(&self, next: &Self) -> bool {
+        self == next
+            || (self.slot == next.slot
+                && self.kind == next.kind
+                && self.text == next.text
+                && self.tool == next.tool
+                && self
+                    .tool_header
+                    .as_ref()
+                    .zip(next.tool_header.as_ref())
+                    .is_some_and(|(a, b)| {
+                        a.tool_id == b.tool_id
+                            && a.turn_id == b.turn_id
+                            && a.tool_fingerprint == b.tool_fingerprint
+                    }))
+    }
     fn disclosure(&self) -> bool {
         !matches!(
             self.kind,
@@ -273,6 +341,9 @@ pub(crate) struct OutputPart {
     bounded_details: bool,
 }
 impl OutputPart {
+    pub(crate) fn tool_header(&self) -> Option<&tekes_agent_presentation::TranscriptToolHeader> {
+        self.facts.tool_header.as_ref()
+    }
     pub(crate) fn slot(&self) -> &Slot {
         &self.facts.slot
     }
@@ -281,6 +352,9 @@ impl OutputPart {
     }
     pub(crate) fn matches_facts(&self, facts: &PartFacts) -> bool {
         &self.facts == facts
+    }
+    pub(crate) fn matches_header_update(&self, facts: &PartFacts) -> bool {
+        self.facts.matches_header_update(facts)
     }
 
     pub(crate) fn new(
@@ -611,6 +685,7 @@ pub struct OutputMessage {
     key: Option<Key>,
     publication: u64,
     epoch: u64,
+    header_revision: u64,
     item: Option<TranscriptItem>,
     facts: Vec<PartFacts>,
     rows: StackContent,
@@ -629,6 +704,7 @@ impl OutputMessage {
             key: None,
             publication: 0,
             epoch: 0,
+            header_revision: 0,
             item: None,
             facts: vec![],
             rows: StackContent {
@@ -666,6 +742,14 @@ impl OutputMessage {
         self.part_nodes()
             .into_iter()
             .map(|node| node.component::<OutputPart>().unwrap().ids)
+            .collect()
+    }
+    /// Read-only captured headers, including members of a collapsed group.
+    /// Semantic runs are facts; styled inline rendering awaits SDK #25.
+    pub fn tool_headers(&self) -> Vec<&tekes_agent_presentation::TranscriptToolHeader> {
+        self.part_nodes()
+            .into_iter()
+            .filter_map(|node| node.component::<OutputPart>()?.tool_header())
             .collect()
     }
     /// Structured body groups expose their original section owners here;
@@ -747,7 +831,8 @@ impl OutputMessage {
         output: &TranscriptOutput<'_>,
         section: Option<&TranscriptSection<'_>>,
     ) -> Result<(), &'static str> {
-        let (key, facts) = self.check_update(scope, publication, epoch, output, section)?;
+        let (key, facts, header_revision) =
+            self.check_update(scope, publication, epoch, output, section)?;
         let mut old = vec![];
         let mut old_groups = vec![];
         for mut node in std::mem::take(&mut self.rows.children) {
@@ -895,6 +980,7 @@ impl OutputMessage {
         self.epoch = epoch;
         self.item = Some(output.item.clone());
         self.facts = facts;
+        self.header_revision = header_revision;
         Ok(())
     }
     pub(crate) fn check_update(
@@ -904,7 +990,7 @@ impl OutputMessage {
         epoch: u64,
         output: &TranscriptOutput<'_>,
         section: Option<&TranscriptSection<'_>>,
-    ) -> Result<(Key, Vec<PartFacts>), &'static str> {
+    ) -> Result<(Key, Vec<PartFacts>, u64), &'static str> {
         if scope != &self.scope {
             return Err("output message scope mismatch");
         }
@@ -931,11 +1017,25 @@ impl OutputMessage {
                 return Err("output message identity changed");
             }
         }
+        let header_revision = tool_header_revision(self.labels, scope);
+        if epoch == self.epoch && header_revision < self.header_revision {
+            return Err("stale tool header revision");
+        }
         let facts = parts(&self.scope, output, section, self.labels)?;
+        if header_revision != tool_header_revision(self.labels, scope) {
+            return Err("tool header inputs changed during preparation");
+        }
         if publication == self.publication
             && (epoch != self.epoch
                 || self.item.as_ref() != Some(output.item)
-                || self.facts != facts)
+                || (self.facts != facts
+                    && !(header_revision > self.header_revision
+                        && self.facts.len() == facts.len()
+                        && self
+                            .facts
+                            .iter()
+                            .zip(&facts)
+                            .all(|(old, new)| old.matches_header_update(new)))))
         {
             return Err("conflicting output message publication");
         }
@@ -989,7 +1089,7 @@ impl OutputMessage {
         {
             return Err("output message namespace exhausted");
         }
-        Ok((key, facts))
+        Ok((key, facts, header_revision))
     }
     /// A stable message may change between aggregate and ordered encodings.
     /// Only its sole body/reasoning role has an unambiguous semantic target;
@@ -1133,6 +1233,7 @@ fn parts(
     if let Some(status) = status {
         result.push(PartFacts {
             tool: None,
+            tool_header: None,
             slot: Slot::MessageKind,
             kind: OutputContentKind::Status,
             title: String::new(),
@@ -1144,6 +1245,7 @@ fn parts(
     {
         result.push(PartFacts {
             tool: None,
+            tool_header: None,
             slot: Slot::Failure,
             kind: OutputContentKind::Status,
             title: String::new(),
@@ -1158,6 +1260,7 @@ fn parts(
             }
             previous = Some(block.index);
             let mut tool_details = None;
+            let mut tool_header = None;
             let (kind, title, text) = match &block.content {
                 TranscriptBlockContent::Text { text } => {
                     (OutputContentKind::Text, String::new(), text.clone())
@@ -1176,7 +1279,7 @@ fn parts(
                         .and_then(|s| s.tool_for_block(block))
                         .filter(|t| t.turn_id == item.turn_id);
                     tool_details = tool.and_then(|tool| tool_details_facts(scope, tool, labels));
-                    let (title, text) = tool.map_or_else(
+                    let (title, text, header) = tool.map_or_else(
                         || {
                             (
                                 format!(
@@ -1184,10 +1287,12 @@ fn parts(
                                     (labels.text)(OutputMessageText::MissingTool)
                                 ),
                                 tool_id.clone(),
+                                None,
                             )
                         },
                         |tool| tool_text(scope, tool, labels),
                     );
+                    tool_header = header;
                     (OutputContentKind::Tool, title, text)
                 }
                 TranscriptBlockContent::Attachment { content } => (
@@ -1203,6 +1308,7 @@ fn parts(
             };
             result.push(PartFacts {
                 tool: tool_details,
+                tool_header,
                 slot: if let TranscriptBlockContent::ToolCall { tool_id } = &block.content {
                     Slot::Tool(block.index, tool_id.clone())
                 } else {
@@ -1217,6 +1323,7 @@ fn parts(
         if !item.reasoning.is_empty() && !item.text.is_empty() {
             result.push(PartFacts {
                 tool: None,
+                tool_header: None,
                 slot: Slot::Coverage,
                 kind: OutputContentKind::Coverage,
                 title: String::new(),
@@ -1226,6 +1333,7 @@ fn parts(
         if !item.reasoning.is_empty() {
             result.push(PartFacts {
                 tool: None,
+                tool_header: None,
                 slot: Slot::AggregateReasoning,
                 kind: OutputContentKind::Reasoning,
                 title: (labels.text)(if item.reasoning_ended {
@@ -1239,6 +1347,7 @@ fn parts(
         if !item.text.is_empty() {
             result.push(PartFacts {
                 tool: None,
+                tool_header: None,
                 slot: Slot::AggregateBody,
                 kind: OutputContentKind::Text,
                 title: String::new(),
@@ -1248,6 +1357,7 @@ fn parts(
         for (i, attachment) in item.attachments.iter().enumerate() {
             result.push(PartFacts {
                 tool: None,
+                tool_header: None,
                 slot: Slot::AggregateAttachment(i),
                 kind: OutputContentKind::Attachment,
                 title: (labels.text)(OutputMessageText::Attachment),
@@ -1266,6 +1376,7 @@ fn parts(
     if result.is_empty() && !known_empty {
         result.push(PartFacts {
             tool: None,
+            tool_header: None,
             slot: Slot::Empty,
             kind: OutputContentKind::Status,
             title: String::new(),

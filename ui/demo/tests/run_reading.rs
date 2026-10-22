@@ -138,6 +138,101 @@ async fn setup() -> (
 ) {
     setup_with_fixture(tekes_agent_ui_demo::fixture::Fixture::default()).await
 }
+
+#[tokio::test]
+async fn external_tool_header_revision_refreshes_without_changing_run_authority_and_fences_old_plans()
+ {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static REV: AtomicU64 = AtomicU64::new(1);
+    let (_runtime, controller) = tekes_agent_ui_demo::fixture::setup_fixture(Default::default())
+        .await
+        .unwrap();
+    let mut snapshot = (*controller.snapshot()).clone();
+    snapshot.draft.text = "保留原草稿".into();
+    snapshot.transcript.tools.push(serde_json::from_value(serde_json::json!({"id":"header-context","turnId":snapshot.transcript.turns[0].id,"name":"read","phase":"done","arguments":{}})).unwrap());
+    let source = snapshot.clone();
+    let adapter = ToolHeaderAdapter {
+        revision: |_| REV.load(Ordering::SeqCst),
+        inputs: |_, _| TranscriptToolRowInputs {
+            report: None,
+            workspace_change_count: Some(TranscriptToolChangeCount {
+                additions: REV.load(Ordering::SeqCst) as i64,
+                deletions: 0,
+            }),
+        },
+        name: None,
+        stopped: || "Stopped".into(),
+        report_wording: TranscriptToolReportWording {
+            subject_phrase: |v, s| format!("{s}: {v}"),
+            verb: str::to_owned,
+            magnitude: |n, o| format!("{n} {o}"),
+            join: |a, b| format!("{a} · {b}"),
+        },
+    };
+    let base = 65800u64 << 32;
+    let composer = ComposerIds::new(base + 16);
+    let mut view = RunPort::new(
+        RunPortIds {
+            root: ComponentId(base),
+            indicators: ComponentId(base + 1),
+            viewport: ComponentId(base + 2),
+            composer,
+        },
+        RunScope::main("fixture", "a"),
+        Composer::new(composer),
+        65801,
+        65802,
+    )
+    .unwrap()
+    .with_transcript(
+        65803,
+        65804..65900,
+        TranscriptContentLabels::default().with_tool_header(adapter),
+    )
+    .unwrap();
+    view.update(
+        &snapshot,
+        Default::default(),
+        ComposerControlGate::OPEN,
+        paging(&view, &snapshot),
+        true,
+    )
+    .unwrap();
+    let baseline = view.composer().editor().input.external_baseline();
+    let old = prepare(&view, &snapshot).unwrap();
+    REV.store(2, Ordering::SeqCst);
+    assert!(view.validate_prepared_update(&old).is_err());
+    assert!(
+        view.transcript()
+            .unwrap()
+            .tool_run("header-context")
+            .unwrap()
+            .tool_activity("header-context")
+            .unwrap()
+            .tool_header()
+            .unwrap()
+            .text
+            .ends_with("+1 −0")
+    );
+    let next = prepare(&view, &snapshot).unwrap();
+    view.apply_prepared_update(&next).unwrap();
+    assert!(
+        view.transcript()
+            .unwrap()
+            .tool_run("header-context")
+            .unwrap()
+            .tool_activity("header-context")
+            .unwrap()
+            .tool_header()
+            .unwrap()
+            .text
+            .ends_with("+2 −0")
+    );
+    assert_eq!(view.composer().editor().input.external_baseline(), baseline);
+    assert_eq!(snapshot, source);
+    REV.store(1, Ordering::SeqCst);
+    assert!(prepare(&view, &snapshot).is_err());
+}
 async fn setup_with_fixture(
     fixture: tekes_agent_ui_demo::fixture::Fixture,
 ) -> (

@@ -1358,3 +1358,119 @@ fn embedded_continuous_tools_move_original_details_across_grouping_changes() {
     assert!(view(&host, root).tool_run("b").is_none());
     assert_eq!(view(&host, root).content_ids().len(), 3);
 }
+
+#[test]
+fn structured_tool_headers_share_report_rules_across_scopes_and_repeated_references() {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use tekes_agent_components_ui::{
+        OutputMessageLabels, ToolHeaderAdapter, TranscriptToolChangeCount,
+        TranscriptToolHeaderRole, TranscriptToolReport, TranscriptToolReportWording,
+        TranscriptToolRowInputs,
+    };
+    static REV: AtomicU64 = AtomicU64::new(1);
+    let labels = OutputMessageLabels {
+        tool_header: Some(ToolHeaderAdapter {
+            revision: |_| REV.load(Ordering::SeqCst),
+            inputs: |scope, _| TranscriptToolRowInputs {
+                report: Some(TranscriptToolReport {
+                    verb: "read".into(),
+                    subject: Some(scope.endpoint_id.clone()),
+                    result_count: None,
+                    result_object: None,
+                    note: None,
+                    added_lines: Some(0),
+                    removed_lines: (scope.endpoint_id == "one").then_some(0),
+                }),
+                workspace_change_count: Some(TranscriptToolChangeCount {
+                    additions: 7,
+                    deletions: 2,
+                }),
+            },
+            name: None,
+            stopped: || "Stopped".into(),
+            report_wording: TranscriptToolReportWording {
+                subject_phrase: |v, s| format!("{s}: {v}"),
+                verb: str::to_owned,
+                magnitude: |n, o| format!("{n} {o}"),
+                join: |a, b| format!("{a} · {b}"),
+            },
+        }),
+        // The structured header wins; the old custom detail hook stays supported.
+        scoped_tool: Some(|_, _| ("legacy title".into(), "legacy body".into())),
+        ..Default::default()
+    };
+    let mut item = item();
+    item.content_blocks = Some(vec![
+        block(
+            0,
+            Block::ToolCall {
+                tool_id: "tool".into(),
+            },
+        ),
+        block(
+            1,
+            Block::ToolCall {
+                tool_id: "tool".into(),
+            },
+        ),
+    ]);
+    for (endpoint, namespace, delta) in [("one", 719, "+0 −0"), ("two", 720, "+7 −2")] {
+        let own = RunScope::main(endpoint, "same-session");
+        let mut call = tool();
+        call.phase = "done".into();
+        let mut message = OutputMessage::with_labels(namespace, own.clone(), labels);
+        message
+            .update(&own, 1, 1, &output(&item), Some(&section(&call)))
+            .unwrap();
+        assert_eq!(message.tool_headers().len(), 2);
+        assert!(
+            message
+                .tool_headers()
+                .iter()
+                .all(|h| h.text == format!("{endpoint}: read    {delta}"))
+        );
+        let root = message.id();
+        let ids = message.content_ids();
+        let mut host = message.into_host().unwrap();
+        assert!(toggle(&mut host, root, ids[0].disclosure.unwrap()));
+        let field = view(&host, root).tool_detail_sections()[0].body;
+        let owner = host.text_surface(field).unwrap() as *const _ as usize;
+        let mut unversioned = call.clone();
+        unversioned.result_meta = Some(json!({"unrelated":true}));
+        REV.store(2, Ordering::SeqCst);
+        assert!(
+            view_mut(&mut host, root)
+                .update(&own, 1, 1, &output(&item), Some(&section(&unversioned)))
+                .is_err()
+        );
+        REV.store(1, Ordering::SeqCst);
+        call.phase = "error".into();
+        call.result = Some(json!({"text":"original failure"}));
+        view_mut(&mut host, root)
+            .update(&own, 2, 1, &output(&item), Some(&section(&call)))
+            .unwrap();
+        for header in view(&host, root).tool_headers() {
+            assert_eq!(header.text, format!("Read · original failure    {delta}"));
+            assert!(
+                header
+                    .spans
+                    .iter()
+                    .all(|s| s.role != TranscriptToolHeaderRole::Secondary)
+            );
+        }
+        assert_eq!(
+            host.text_surface(field).unwrap() as *const _ as usize,
+            owner
+        );
+        for ids in &ids {
+            let label = &host
+                .get(ids.disclosure.unwrap())
+                .unwrap()
+                .component::<tekes_ui_controls::composition::ButtonContent>()
+                .unwrap()
+                .label;
+            assert!(label.contains(delta));
+            assert!(!label.contains("legacy title"));
+        }
+    }
+}

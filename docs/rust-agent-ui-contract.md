@@ -435,3 +435,5 @@ wake scheduling remain host adapters. This does not complete footnote layout par
 [连续工具分组与 API 迁移](rust-agent-ui-tool-run-20261023.md)复用原业务成员控件与 SDK Button/Stack，并区分阅读 wrapper 与原 ToolActivity ID；严格阅读和完整 Source 验收仍开放。
 
 [连续工具 URL 预览](rust-agent-ui-tool-url-20261023.md)修正原路径/主机拼写与 opaque scheme，并增加 61 组无 Swift 的 Foundation 数据对照；非 RFC authority、完整 UI/原生与跨进程验收仍待完成。
+
+[工具行头部与展示修订](rust-agent-ui-tool-header-20261023.md)复用共享报告/计数优先级，捕获单段文本/UTF-16 semantic spans；独立修订不改变 Run 权限版本，并拒绝旧计划/未版本化 tool 数据。语义色仍待 #25，完整工具 UI 未验收。

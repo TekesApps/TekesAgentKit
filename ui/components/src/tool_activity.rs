@@ -34,6 +34,7 @@ pub struct ToolActivity {
     scope: RunScope,
     publication: u64,
     epoch: u64,
+    header_revision: u64,
     tool: Option<TranscriptToolCall>,
     placement: ToolActivityPlacement,
     labels: ToolActivityLabels,
@@ -48,6 +49,7 @@ impl ToolActivity {
             scope,
             publication: 0,
             epoch: 0,
+            header_revision: 0,
             tool: None,
             placement: ToolActivityPlacement::Unplaced,
             labels,
@@ -82,7 +84,7 @@ impl ToolActivity {
         epoch: u64,
         tool: &TranscriptToolCall,
         placement: ToolActivityPlacement,
-    ) -> Result<PartFacts, &'static str> {
+    ) -> Result<(PartFacts, u64), &'static str> {
         if scope != &self.scope {
             return Err("tool activity scope mismatch");
         }
@@ -106,19 +108,29 @@ impl ToolActivity {
         {
             return Err("tool detail namespace exhausted");
         }
+        let header_revision =
+            crate::output_message::tool_header_revision(self.labels.details, scope);
+        if epoch == self.epoch && header_revision < self.header_revision {
+            return Err("stale tool header revision");
+        }
         let facts = self.facts(tool, placement);
+        if header_revision
+            != crate::output_message::tool_header_revision(self.labels.details, scope)
+        {
+            return Err("tool header inputs changed during preparation");
+        }
         crate::output_message::validate_tool_details(&facts)?;
         if publication == self.publication
             && self.children.first().is_some_and(|node| {
-                !node
-                    .component::<OutputPart>()
-                    .unwrap()
-                    .matches_facts(&facts)
+                let part = node.component::<OutputPart>().unwrap();
+                !(part.matches_facts(&facts)
+                    || (header_revision > self.header_revision
+                        && part.matches_header_update(&facts)))
             })
         {
             return Err("conflicting tool detail publication");
         }
-        Ok(facts)
+        Ok((facts, header_revision))
     }
     pub(crate) fn check_update(
         &self,
@@ -139,7 +151,8 @@ impl ToolActivity {
         tool: &TranscriptToolCall,
         placement: ToolActivityPlacement,
     ) -> Result<(), &'static str> {
-        let facts = self.checked_facts(scope, publication, epoch, tool, placement)?;
+        let (facts, header_revision) =
+            self.checked_facts(scope, publication, epoch, tool, placement)?;
         if self.children.is_empty() {
             let id = ComponentId(self.root.0 + 16);
             self.children.push(Content::new(
@@ -157,6 +170,7 @@ impl ToolActivity {
                 *next += 1;
                 id
             });
+        self.header_revision = header_revision;
         self.publication = publication;
         self.epoch = epoch;
         self.tool = Some(tool.clone());
@@ -164,7 +178,7 @@ impl ToolActivity {
         Ok(())
     }
     fn facts(&self, tool: &TranscriptToolCall, placement: ToolActivityPlacement) -> PartFacts {
-        let (title, text) =
+        let (title, text, tool_header) =
             crate::output_message::tool_text(&self.scope, tool, self.labels.details);
         let prefix = match placement {
             ToolActivityPlacement::Call => &self.labels.call,
@@ -172,10 +186,15 @@ impl ToolActivity {
             ToolActivityPlacement::Unplaced => &self.labels.unplaced,
         };
         PartFacts {
+            title: if tool_header.is_some() && placement == ToolActivityPlacement::Call {
+                title
+            } else {
+                format!("{prefix} · {title}")
+            },
+            tool_header,
             tool: crate::output_message::tool_details_facts(&self.scope, tool, self.labels.details),
             slot: Slot::Tool(0, tool.id.clone()),
             kind: OutputContentKind::Tool,
-            title: format!("{prefix} · {title}"),
             text,
         }
     }
@@ -185,6 +204,12 @@ impl ToolActivity {
                 .unwrap()
                 .tool_detail_sections()
         })
+    }
+    pub fn tool_header(&self) -> Option<&tekes_agent_presentation::TranscriptToolHeader> {
+        self.children
+            .first()?
+            .component::<OutputPart>()?
+            .tool_header()
     }
     pub fn copy_action_ids(&self) -> Vec<ComponentId> {
         self.children.first().map_or_else(Vec::new, |node| {

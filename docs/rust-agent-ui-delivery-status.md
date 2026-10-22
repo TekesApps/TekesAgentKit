@@ -47,3 +47,5 @@
 [连续工具分组](rust-agent-ui-tool-run-20261023.md)已接入独立 Transcript 与消息内部，并验证前插/拆分/合并时原控件保留、隐藏复制及第二 consumer；完整 URL/Source 边界和最终源码原生验收仍开放。最新组件验证为根 250、UI 565 通过及 1 项原有忽略；严格 #53 仍失败。
 
 [URL 预览续验与缓存清理](rust-agent-ui-tool-url-20261023.md)：根 251、宿主/第二 consumer 专项 114 通过，61 组 Foundation 数据匹配；本轮未重跑原生。清理旧增量和已被替代 presentation 编译中间产物 127.83 MiB，当前共享 target 与验收程序/WIP 保留。
+
+[工具行报告/计数与独立展示修订](rust-agent-ui-tool-header-20261023.md)已贯通 RunPort、混合 Transcript、消息内工具和第二 consumer；计数变化不伪造 Run 权限版本。完整 UI 571 通过，后续源指纹收尾的相关 118 项与根 254 项通过；同标签语义色仍等待 #25，完整工具视觉未完成。

@@ -909,6 +909,7 @@ fn input_details(item: &TranscriptItem) -> Result<Vec<PartFacts>, &'static str> 
             };
             facts.push(PartFacts {
                 tool: None,
+                tool_header: None,
                 slot: Slot::Block(block.index, kind),
                 kind,
                 title,
@@ -918,6 +919,7 @@ fn input_details(item: &TranscriptItem) -> Result<Vec<PartFacts>, &'static str> 
         if !text_blocks.is_empty() && text_blocks != item.text {
             facts.push(PartFacts {
                 tool: None,
+                tool_header: None,
                 slot: Slot::AggregateBody,
                 kind: OutputContentKind::Unknown,
                 title: "原始文本块（与聚合正文不同）".into(),
@@ -939,6 +941,7 @@ fn input_details(item: &TranscriptItem) -> Result<Vec<PartFacts>, &'static str> 
         }
         facts.push(PartFacts {
             tool: None,
+            tool_header: None,
             slot: Slot::AggregateAttachment(index),
             kind: OutputContentKind::Attachment,
             title: content
@@ -955,6 +958,7 @@ fn input_details(item: &TranscriptItem) -> Result<Vec<PartFacts>, &'static str> 
     if !item.reasoning.is_empty() && !has_reasoning {
         facts.push(PartFacts {
             tool: None,
+            tool_header: None,
             slot: Slot::AggregateReasoning,
             kind: OutputContentKind::Unknown,
             title: "用户消息中的 reasoning 字段".into(),

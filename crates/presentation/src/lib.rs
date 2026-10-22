@@ -18,6 +18,8 @@ mod tool_card;
 pub use tool_card::*;
 mod tool_row;
 pub use tool_row::*;
+mod tool_header;
+pub use tool_header::*;
 mod tool_run;
 mod tool_url;
 pub use tool_run::*;

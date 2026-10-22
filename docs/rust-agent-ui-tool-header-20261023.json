@@ -1,0 +1,119 @@
+{
+  "sourceBase": "bf1e21b6df9e48452f5ad95ed5bb8caa83ad027b",
+  "changedSourceFiles": {
+    "crates/presentation/src/lib.rs": "d0116b677f6bbfeff34b23e25a3a5770baa4017e71f6bff092c5a440ea720e4c",
+    "crates/presentation/src/tool_header.rs": "47c8d9c6e8002f61d1e5ac345dc08a5bde7ae7a57cd17f5997f862c79c7f75ab",
+    "crates/presentation/tests/tool_header.rs": "e8b5ad3ac9ffdd1cdc3951e07089eacca4ec0a2518a7323b47f3796cad002de4",
+    "ui/components/src/input_message.rs": "fad8487ae78b65e3578cb48667038701161f6697c1df49f7196eafc3412a2326",
+    "ui/components/src/lib.rs": "dc1304951f741592b1fb24664b120724cc02848bf79ec89cafb8fa9f569959de",
+    "ui/components/src/output_message.rs": "f162ed2e652383a0fcacc408606da153ba3fd9ab09374483c8b1049812ffc06f",
+    "ui/components/src/run_port.rs": "9da2607af329d064265e1f3f6c42e2c08d3945531d5f7e5d6aede92abd48f6b4",
+    "ui/components/src/tool_activity.rs": "b0806c62618ee6d6fa23417de5f08b22f76c5328cd5a5797595ab71ba62f05bf",
+    "ui/components/src/transcript_content.rs": "3292c9b52ddac958a48201f14a3ef070b3de18a805c25904f93b591a3ef50a54",
+    "ui/consumer/tests/summary_label.rs": "0db1d23affae32586c37209e3624159886afff5e0806257cb7332c7dbbc6a9c2",
+    "ui/consumer/tests/support/tool_header.rs": "58baeffbdcb251f48e88c4cea1ee853dd267c77d35165102433dafca25df8a25",
+    "ui/consumer/tests/support/tool_sections.rs": "2afea8ecac9ebff44106e40958fc7479ee784d235b6cdf2d1181a0a4acc537ce",
+    "ui/demo/tests/output_message.rs": "66cd36a879c3b1de9effbb31706df5fa2953693ce35d9a6fd9662eb6e6dbfc74",
+    "ui/demo/tests/run_reading.rs": "c502677324b8a4532adab1522e73f8de50a908b599c01c53a4218fe5265c6228",
+    "ui/demo/tests/transcript_content.rs": "ff59c44398c358473b8172d0b7344a42144111b5e4398fd2d30eb0f590206e60"
+  },
+  "readOnlyReferences": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/TranscriptRendering/TranscriptMetalActivity.swift": "f08f6e8f34c76a71fb117dd84a46be50145f737a38e21534cf59d518bc2d3e8d",
+    "/Users/frankqin/dev/TekesClientKit/Sources/TranscriptRendering/TranscriptToolRowModel.swift": "76793271a68ca5a7a5ad872f9235a4d88fa8c801c1212e2a2b798043fa021818",
+    "/Users/frankqin/dev/Tekes/Tekes/ClientAgentHostAdapters.swift": "7d907c654ec3df76c7a8b492e32bbc68f1bd4d0b46044cae615aa712b9f67c71"
+  },
+  "validation": {
+    "rootFinal": {
+      "passed": 254,
+      "failed": 0,
+      "ignored": 0
+    },
+    "fullUiBeforeSourceFingerprint": {
+      "passed": 571,
+      "failed": 0,
+      "ignored": 1
+    },
+    "finalRelatedUi": {
+      "passed": 118,
+      "failed": 0,
+      "ignored": 1
+    },
+    "finalExits": {
+      "root-tests-final": 0,
+      "ui-tests-source-fence": 0,
+      "root-clippy-final": 0,
+      "ui-clippy-source-fence": 0,
+      "demo-build-final": 0,
+      "strict-reading": 1
+    },
+    "existingIgnore": "TekesUI #49",
+    "strictReading": {
+      "accepted": false,
+      "parentFollowingAfterInnerUp": true,
+      "parentOffsetBefore": 0,
+      "parentOffsetAfterScroll": 0,
+      "parentOffsetAfterAppend": 634,
+      "innerOffset": 100,
+      "detailVisibleAfterAppend": false
+    }
+  },
+  "toolHeaderScope": "explicit report/workspace input; shared precedence and UTF-16 spans; source DTO fingerprint fences display-only updates",
+  "displayRevision": "separate monotonic callback within connection epoch; same Run publication supports header-only updates; old revisions and prepared plans rejected; providers read one immutable UI-turn snapshot without I/O",
+  "sdkPin": {
+    "date": "2026-10-22T07:30:41Z",
+    "sha": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c"
+  },
+  "semanticRunsRendered": false,
+  "sdkGap": "TekesUI #25 generic styled label/button text attributes; #38/#47 disclosure/glyph remain separate",
+  "nativeCurrentAccepted": false,
+  "realHarnessCurrentAccepted": false,
+  "processContainerAccepted": false,
+  "newTargets": 0,
+  "newAcceptanceProgramCopies": 0,
+  "deletedBytesThisPhase": 0,
+  "remaining": [
+    "SDK semantic foreground/inline styled runs",
+    "full Source tool chrome/layout",
+    "report source host integration; no public SEP report field is inferred",
+    "#53 strict nested-reading gate",
+    "#48 ProcessContainer same/cross-process native acceptance",
+    "current-source Native/Pi/DSH/IME/AX acceptance",
+    "non-RFC authority compatibility from previous phase"
+  ],
+  "evidence": {
+    ".runtime-fixtures/tool-header-20261023/demo-build.log": "60752725ea6f194f20ebc7150276eef9d351f09c52a8c6e784e05f6a10ca45df",
+    ".runtime-fixtures/tool-header-20261023/ui-tests-final.log": "2e58aa94a7cd39773a72c3229e12157543c1bff1b7b9117a86e12da10f957958",
+    ".runtime-fixtures/tool-header-20261023/root-tests.log": "9fdd7b71e6656d945659590cab1473185e27c4b2e2f89c8bab690b099eec0f54",
+    ".runtime-fixtures/tool-header-20261023/strict-reading.json": "c4f70b29538ecacd71995d9a3fc7678cf168834c54e6f348c8c095309b9f1b90",
+    ".runtime-fixtures/tool-header-20261023/validation-exits.json": "fd72a329f05cd99618743cec030f2de7e40285cd52950fec26850497a8d30219",
+    ".runtime-fixtures/tool-header-20261023/revision-tests.log": "c3aa3589efb83e006b153b65c90a69119cd822acaf08e097c8f5ef7d6a86aa1a",
+    ".runtime-fixtures/tool-header-20261023/final-exits.json": "45ea1f696faada1469b4d8a733aeef93e7cd4db02bf405707e8deaafd67a6fdf",
+    ".runtime-fixtures/tool-header-20261023/parent-ci.json": "c67d211b41446adc0bbc02a0360153d89a2f301104f5242749627014b47e411a",
+    ".runtime-fixtures/tool-header-20261023/revision-integration-tests.log": "324ee3b59a8020a646e8ba59520345737d5441bb91ae1767343309d6ef5ef3e4",
+    ".runtime-fixtures/tool-header-20261023/revision-check.log": "5d7541a592b304c5594a3f84aa60146335b060054e7529042312bdee7019654e",
+    ".runtime-fixtures/tool-header-20261023/ui-tests.log": "2b2fabb8e01dd48bf57c45c73c9518de741af6769cdcf5036917c83d7e38e560",
+    ".runtime-fixtures/tool-header-20261023/verified-inputs.json": "9543ade335292f9c7f61944edd341c2fb9297a7c6abc3cf44dc86c1f16bd6ee3",
+    ".runtime-fixtures/tool-header-20261023/ui-metadata.json": "ec15344ff715e68f7c8a8af5a33bbcbb5617aa87b2d388472bf179cab163be5f",
+    ".runtime-fixtures/tool-header-20261023/root-clippy-complete.log": "d7ba34e20b61e9242d2488631b62fd0c0608b42c1b083224644cb867e388fbb5",
+    ".runtime-fixtures/tool-header-20261023/check-fixed.log": "efc9a7cf5a433b71bf8f952e08acf5ebf7c43d53d1eb31fa93f56fec0416dab7",
+    ".runtime-fixtures/tool-header-20261023/public-tekesui.json": "ac88c6b5553ad32377ed0816255e3d28ca5a197b955ef5005707a016d7a80ac8",
+    ".runtime-fixtures/tool-header-20261023/validation-complete-exits.json": "5fd9df1a7780c55410a4f6017147ef52b4ea47a869da244999527a269bc002d6",
+    ".runtime-fixtures/tool-header-20261023/ui-clippy-complete.log": "622e07f64ad2ebc4649ddcbb0b2813a69b13f05d010d84066f81d7c2ed80be2e",
+    ".runtime-fixtures/tool-header-20261023/validation-final-exits.json": "267b52fd0912ecde64da7ba4959d6ce62758db10a74ebc256cae2c0f6961b57a",
+    ".runtime-fixtures/tool-header-20261023/model-tests.log": "4f6963b445c47a67a245e5ee26573fde9a37ec320bfa41e03e28416238ff2ddc",
+    ".runtime-fixtures/tool-header-20261023/ui-clippy.log": "7bfb1854f0e63646eef391b0624df1380a94a598b308d72318590572d2cd38f6",
+    ".runtime-fixtures/tool-header-20261023/demo-build-final.log": "8a10254974bbd1a52574924f2ba6e2e78269a27b8d61c996e00c4498f15edb56",
+    ".runtime-fixtures/tool-header-20261023/parent-failed-steps.json": "b07001652cd9219f134ecb3b23420266a582d3b63333c23bdd8a0d5713d1f744",
+    ".runtime-fixtures/tool-header-20261023/root-clippy-final.log": "cd2fa06460edbc11333bbb19537584ac77c318510c1a906825156bc8461eb65f",
+    ".runtime-fixtures/tool-header-20261023/ui-clippy-source-fence.log": "741d87a58f502f89805e57a6fcad97b490d912113585b4ddcf248285e18a375e",
+    ".runtime-fixtures/tool-header-20261023/root-clippy.log": "a05471776a6735a429566db877f7e1fbd32f9957f08c63c6cf380a66f56d194b",
+    ".runtime-fixtures/tool-header-20261023/public-agentkit.json": "ad304f98b5771826f8822d3c5b9072aad51360131bea49ef63debd6823166b39",
+    ".runtime-fixtures/tool-header-20261023/strict-reading.log": "b30ff30d347232ee0856d09dcc419f41498a76456d299e6d7ec1f1aa6fee30e8",
+    ".runtime-fixtures/tool-header-20261023/ui-clippy-final.log": "8f09fa073c70cfa66273da29fa89f1cfee7294255f719c94a688041a6ad12ea8",
+    ".runtime-fixtures/tool-header-20261023/ui-tests-source-fence.log": "fbe2256d440ba2d9bccafe8f3abd7b07c1a54f1ff28b77dd5ea99ce81ebddb1e",
+    ".runtime-fixtures/tool-header-20261023/root-tests-final.log": "ebedd2d9c6a7012bd860acdc730e91a745afaf9ac7bf0d1b0bcc84760fcca66c",
+    ".runtime-fixtures/tool-header-20261023/check.log": "23253e5a5430310567264ebdf2143ae04d02f97c2d23b2f895114c1d4b70fa7b",
+    ".runtime-fixtures/tool-header-20261023/ui-tests-complete.log": "7b031d1da36db4240c98af060a6ff2a9af40fbf22212ab3de50badfd120168fb",
+    ".runtime-fixtures/tool-header-20261023/ui-tests-full.log": "3ad268210dca9f9ae022e55e8f43d7033241a4a7e33fd5030cd1674c41ec5b7c"
+  }
+}
