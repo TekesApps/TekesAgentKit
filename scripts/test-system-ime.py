@@ -61,7 +61,7 @@ class MacInput:
             time.sleep(0.03)
 
 
-def run(demo):
+def run(demo, *, native_app=None, log=None, observe_frontmost=False):
     if sys.platform != 'darwin':
         raise RuntimeError('macOS is required')
     mac = MacInput()
@@ -71,6 +71,14 @@ def run(demo):
         raise RuntimeError(f'current source is {before}; select Simplified Pinyin before this opt-in test')
     if not mac.cg.CGPreflightPostEventAccess():
         raise RuntimeError('event-post access unavailable; this tool does not request permissions')
+    if native_app is not None:
+        if log is None:
+            raise ValueError('--native-app requires a fresh --log')
+        from native_ime_probe import run_app_ime
+        return run_app_ime(demo, native_app, log, mac, before,
+                           observe_frontmost=observe_frontmost)
+    if log is not None or observe_frontmost:
+        raise ValueError('--log/--observe-frontmost require --native-app')
     process = subprocess.Popen([str(demo), '--components', '--transcript-content',
                                 '--system-ime-selftest'], stdout=subprocess.PIPE,
                                stderr=subprocess.STDOUT, text=True, bufsize=1)
@@ -128,11 +136,18 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--demo', required=True, type=Path)
     parser.add_argument('--receipt', type=Path)
+    parser.add_argument('--native-app', type=Path, help='Exact APPL bundle for a normal LaunchServices run')
+    parser.add_argument('--log', type=Path, help='Fresh native log; existing evidence is never overwritten')
+    parser.add_argument('--observe-frontmost', action='store_true', help='Read-only app-identity trace')
     args = parser.parse_args()
-    result = run(args.demo.resolve(strict=True))
+    if args.receipt and args.receipt.exists():
+        raise ValueError('preserve existing IME receipt; choose a new path')
+    result = run(args.demo.resolve(strict=True), native_app=args.native_app,
+                 log=args.log, observe_frontmost=args.observe_frontmost)
     body = json.dumps(result, ensure_ascii=False, indent=2) + '\n'
     if args.receipt:
-        args.receipt.write_text(body)
+        with args.receipt.open('x') as output:
+            output.write(body)
     print(body, end='')
 
 

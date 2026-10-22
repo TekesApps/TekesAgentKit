@@ -42,6 +42,17 @@ class ImeGuards(unittest.TestCase):
             native.return_value.key.assert_not_called()
             launch.assert_not_called()
 
+    def test_app_mode_without_fresh_log_never_launches_or_injects(self):
+        with patch.object(probe.sys, 'platform', 'darwin'), \
+                patch.object(probe, 'MacInput') as native, \
+                patch.object(probe.subprocess, 'Popen') as launch:
+            native.return_value.source.return_value = 'com.apple.inputmethod.SCIM.ITABC'
+            native.return_value.cg.CGPreflightPostEventAccess.return_value = True
+            with self.assertRaisesRegex(ValueError, 'requires a fresh --log'):
+                probe.run(Path('/not-launched'), native_app=Path('/not-launched.app'))
+            native.return_value.key.assert_not_called()
+            launch.assert_not_called()
+
 
 if __name__ == '__main__':
     unittest.main()

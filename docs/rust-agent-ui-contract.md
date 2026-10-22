@@ -1,8 +1,10 @@
 # Rust Agent UI 组件接入契约
 
-[子 pane 回包隔离](rust-agent-ui-child-open-fencing-20261022.md)现按原 parent/child 的宿主代次拒绝旧/重复结果；关闭后 pending 回包不能复活 tab，新的显式 reopen 可正常创建 owner。原生窗口与只读分页/跨 pane 复制分别留证，系统拼音此前失焦失败及 ProcessContainer 仍未验收。
+[正常 app 系统拼音](rust-agent-ui-system-ime-app-20261022.md)在上一轮同一冻结程序取得一次完整通过：原生 marked text、发送/导航屏障、确认与单次提交；最终 CLI 复验在 `ni` 组字后失焦，逐键 guard 拒绝后续输入，未取得成功收据。新增 LaunchServices 模式核对原 bundle/PID/可执行文件，不切换输入源、重抢焦点或放宽原断言。稳定性尚未通过，不能据此断定失焦根因；实体键盘、候选窗、VoiceOver、真实三端原生 IME 和 ProcessContainer 仍未验收。
 
-[SidePanel 宿主导航](rust-agent-ui-panel-navigation-20261022.md)已修复 Summary 关闭、打开顺序、最后剩余项选择及空文档保留；晚到 SideChat 回包不重选已关闭文档，其关闭确认不清除主 Composer 组字焦点。第二 consumer 验证原关闭回调及旧内容 token 退役，同进程原生验证原控件、Task 编辑器及草稿保留。系统拼音本轮失焦失败、ProcessContainer 与完整 tabs/chrome 仍未完成；不提升整体交付状态。
+[子 pane 回包隔离](rust-agent-ui-child-open-fencing-20261022.md)现按原 parent/child 的宿主代次拒绝旧/重复结果；关闭后 pending 回包不能复活 tab，新的显式 reopen 可正常创建 owner。原生窗口与只读分页/跨 pane 复制分别留证；系统拼音的后续正常 app 通过见上文，跨进程仍未验收。
+
+[SidePanel 宿主导航](rust-agent-ui-panel-navigation-20261022.md)已修复 Summary 关闭、打开顺序、最后剩余项选择及空文档保留；晚到 SideChat 回包不重选已关闭文档，其关闭确认不清除主 Composer 组字焦点。第二 consumer 验证原关闭回调及旧内容 token 退役，同进程原生验证原控件、Task 编辑器及草稿保留。该记录的系统拼音失败保留原归属，后续正常 app 结果见上文；ProcessContainer 与完整 tabs/chrome 仍未完成。
 
 正式组合组件已统一为 **RunPort（原 Rust RunView）**，公开类型、demo、第二 consumer、实时验证脚本和当前文档同步命名。Sidebar、RunPort、SidePanel 的目标宿主边界是 TekesUI **ProcessContainer**；固定公开版本尚缺完整远端交互能力，跟踪 [TekesUI #48](https://github.com/TekesApps/TekesUI/issues/48)。保留现有同进程原 Content 路径，同进程/跨进程证据分别记录；见 [RunPort 迁移与容器契约](rust-agent-ui-run-port-20261022.md)。改名不代表 ProcessContainer 接入完成。
 
