@@ -2698,3 +2698,21 @@ fn independent_summary_consumer_keeps_child_pointer_and_control_across_status_up
         matches!(&intents[..],[SummaryIntent{scope:parent,action:SummaryAction::OpenSubagent{parent:action_parent,child_id}}] if parent==&scope && action_parent==&scope && child_id=="child")
     );
 }
+
+/// Forward a local Activity selection; the Kit owns the selection and its fences.
+pub fn set_run_activity_expansion(
+    view: &mut tekes_agent_components_ui::RunPort,
+    turn: &str,
+    expanded: bool,
+) -> Result<(), &'static str> {
+    view.set_activity_expanded(turn, expanded)
+}
+
+/// Read-only panes use their own local selection and captured history publication.
+pub fn set_readonly_activity_expansion(
+    view: &mut tekes_agent_components_ui::ReadOnlyTranscript,
+    turn: &str,
+    expanded: bool,
+) -> Result<(), &'static str> {
+    view.set_activity_expanded(turn, expanded)
+}

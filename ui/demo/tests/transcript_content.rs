@@ -78,6 +78,18 @@ fn tool() -> TranscriptToolCall {
 fn content() -> TranscriptContent {
     TranscriptContent::new(1000, 1001..2000, scope(), Default::default()).unwrap()
 }
+// These cases inspect historical Activity controls after an explicit user selection.
+fn expand_activity(
+    view: &mut TranscriptContent,
+    source: &TranscriptSnapshot,
+    publication: u64,
+    epoch: u64,
+    available: bool,
+) {
+    view.set_activity_expanded("turn", true).unwrap();
+    view.update(&scope(), publication, epoch, source, available)
+        .unwrap();
+}
 fn root(host: &mut ContentHost, id: ComponentId) -> &mut TranscriptContent {
     host.get_mut(id)
         .unwrap()
@@ -102,6 +114,7 @@ fn rail_targets_reference_actual_turn_rows_and_exclude_blank_turns_and_session_n
     source.items.push(notice);
     let mut view = content();
     view.update(&scope(), 1, 5, &source, false).unwrap();
+    expand_activity(&mut view, &source, 1, 5, false);
     let targets = view.turn_targets().unwrap();
     assert_eq!(targets.len(), 1);
     let target = &targets[0];
@@ -313,10 +326,12 @@ fn journal_events_compose_once_with_a_turn_aside_and_cumulative_tool_result() {
     source.tools.push(tool());
     let mut view = content();
     view.update(&scope(), 1, 1, &source, true).unwrap();
+    expand_activity(&mut view, &source, 1, 1, true);
     assert_eq!(
         view.row_keys(),
         &[
             key("input"),
+            TranscriptContentRowKey::ActivityDisclosure("turn".into()),
             TranscriptContentRowKey::Tool("tool".into()),
             key("output"),
             TranscriptContentRowKey::TurnFootnote("turn".into())
@@ -405,20 +420,13 @@ fn tool_inside_a_message_is_not_rendered_again_as_an_independent_activity() {
             .row_keys()
             .contains(&TranscriptContentRowKey::Tool("tool".into()))
     );
-    let id = view
-        .message_id(TranscriptMessageKey::Item("output"))
-        .unwrap();
-    let host = view.into_host().unwrap();
     assert_eq!(
-        host.get(id)
-            .unwrap()
-            .component::<OutputMessage>()
-            .unwrap()
-            .content_ids()
+        view.message_content_ids(&TranscriptMessageIdentity::Item("output".into()))
             .len(),
         2
     );
 }
+
 #[test]
 fn unknown_call_location_uses_known_result_location_without_fabricating_a_call_order() {
     let mut source = snapshot();
@@ -427,13 +435,15 @@ fn unknown_call_location_uses_known_result_location_without_fabricating_a_call_o
     source.tools.push(call);
     let mut view = content();
     view.update(&scope(), 1, 1, &source, true).unwrap();
+    expand_activity(&mut view, &source, 1, 1, true);
     assert_eq!(
         view.row_keys(),
         &[
             key("input"),
-            key("output"),
+            TranscriptContentRowKey::ActivityDisclosure("turn".into()),
             TranscriptContentRowKey::Tool("tool".into()),
             TranscriptContentRowKey::Unplaced("turn".into()),
+            key("output"),
             TranscriptContentRowKey::TurnFootnote("turn".into())
         ]
     );
@@ -671,6 +681,7 @@ fn session_notices_and_unplaced_preview_never_acquire_a_fake_turn_or_durable_ali
     source.items.push(preview);
     let mut view = content();
     view.update(&scope(), 1, 1, &source, true).unwrap();
+    expand_activity(&mut view, &source, 1, 1, true);
     assert_eq!(view.row_keys()[0], TranscriptContentRowKey::SessionNotices);
     assert!(
         view.message_id(TranscriptMessageKey::Item("notice"))
@@ -703,6 +714,7 @@ fn a_tool_with_no_result_does_not_disappear_when_only_a_result_position_is_prese
     source.tools.push(pending);
     let mut view = content();
     view.update(&scope(), 1, 1, &source, true).unwrap();
+    expand_activity(&mut view, &source, 1, 1, true);
     assert!(
         view.row_id(&TranscriptContentRowKey::Tool("tool".into()))
             .is_some()
@@ -910,6 +922,7 @@ fn explicit_stream_receipt_retains_output_row_text_surface_and_selection() {
     };
     let mut view = content();
     view.update(&scope(), 1, 1, &source, true).unwrap();
+    expand_activity(&mut view, &source, 1, 1, true);
     let original = view
         .message_id(TranscriptMessageKey::Stream("stream-one"))
         .unwrap();
@@ -1113,14 +1126,17 @@ fn sole_aggregate_reasoning_retains_its_disclosure_and_text_owner_when_order_arr
     let mut view = content();
     view.update(&scope(), 1, 1, &source, true).unwrap();
     let row = view
-        .message_id(TranscriptMessageKey::Item("response"))
+        .row_id(&TranscriptContentRowKey::MessageFragment(
+            TranscriptMessageIdentity::Item("response".into()),
+            OutputMessageFragmentKind::Reasoning,
+        ))
         .unwrap();
     let root_id = view.id();
     let mut host = view.into_host().unwrap();
     let ids = host
         .get(row)
         .unwrap()
-        .component::<OutputMessage>()
+        .component::<OutputMessageFragment>()
         .unwrap()
         .content_ids()
         .into_iter()
@@ -1143,7 +1159,7 @@ fn sole_aggregate_reasoning_retains_its_disclosure_and_text_owner_when_order_arr
     let retained = host
         .get(row)
         .unwrap()
-        .component::<OutputMessage>()
+        .component::<OutputMessageFragment>()
         .unwrap()
         .content_ids()[0];
     assert_eq!(retained.root, ids.root);
@@ -1207,6 +1223,7 @@ fn prepared_update_validates_before_publication_and_respects_explicit_aliases() 
     source.items[0].metadata = json!({"nativeStreamId":"live"});
     let mut view = content();
     view.update(&scope(), 1, 1, &source, true).unwrap();
+    expand_activity(&mut view, &source, 1, 1, true);
     let row = view
         .message_id(TranscriptMessageKey::Stream("live"))
         .unwrap();
@@ -1650,6 +1667,7 @@ fn adjacent_tools_keep_original_members_when_prepend_split_and_merge_change_the_
     s.tools = vec![first.clone(), second.clone()];
     let mut view = content();
     view.update(&scope(), 1, 1, &s, true).unwrap();
+    expand_activity(&mut view, &s, 1, 1, true);
     let owner = view.tool_run("first").unwrap().id();
     assert_eq!(view.tool_run("second").unwrap().id(), owner);
     assert!(!view.tool_run("first").unwrap().is_expanded());
@@ -1695,6 +1713,7 @@ fn adjacent_tools_keep_original_members_when_prepend_split_and_merge_change_the_
         Some(toggle)
     );
     s.items = vec![message("prose", TranscriptItemKind::Assistant, 2)];
+    s.items[0].is_final = false;
     root(&mut host, root_id)
         .update(&scope(), 3, 1, &s, true)
         .unwrap();
@@ -1745,6 +1764,7 @@ fn zero_node_assistant_is_transparent_but_unplaced_tools_never_imply_adjacency()
     };
     let mut view = content();
     view.update(&scope(), 1, 1, &s, true).unwrap();
+    expand_activity(&mut view, &s, 1, 1, true);
     assert_eq!(
         view.tool_run("a").unwrap().summary().unwrap().tool_ids,
         ["a", "b"]
@@ -1779,6 +1799,7 @@ fn native_host_transcript_uses_shared_url_projection_in_group_previews() {
     };
     let mut view = content();
     view.update(&scope(), 1, 1, &snapshot, true).unwrap();
+    expand_activity(&mut view, &snapshot, 1, 1, true);
     let group = view.tool_run("fetch-a").unwrap();
     assert_eq!(
         group.summary().unwrap().active_summaries,
@@ -1865,6 +1886,7 @@ fn transcript_routes_one_explicit_header_adapter_to_independent_and_embedded_too
     )
     .unwrap();
     view.update(&scope(), 1, 1, &s, true).unwrap();
+    expand_activity(&mut view, &s, 1, 1, true);
     assert_eq!(
         view.tool_run("tool")
             .unwrap()
@@ -1904,15 +1926,57 @@ fn transcript_routes_one_explicit_header_adapter_to_independent_and_embedded_too
     REV.store(1, Ordering::SeqCst);
     assert!(view.update(&scope(), 1, 1, &s, true).is_err());
     REV.store(2, Ordering::SeqCst);
-    let output = view.row_id(&key("output")).unwrap();
+    let output = view
+        .row_id(&TranscriptContentRowKey::MessageFragment(
+            TranscriptMessageIdentity::Item("output".into()),
+            OutputMessageFragmentKind::Tools,
+        ))
+        .unwrap();
     let host = view.into_host().unwrap();
     assert_eq!(
         host.get(output)
             .unwrap()
-            .component::<OutputMessage>()
+            .component::<OutputMessageFragment>()
             .unwrap()
             .tool_headers()[0]
             .text,
         "a:embedded: read    +2 −0"
     );
+}
+
+#[test]
+fn foreign_message_controller_cannot_borrow_transcript_scope_or_partially_advance_a_plan() {
+    let source = snapshot();
+    let mut view = content();
+    view.update(&scope(), 1, 1, &source, true).unwrap();
+    let plan = view.prepare_update(&scope(), 2, 1, &source, true).unwrap();
+    let keys = view.row_keys().to_vec();
+    let index = keys
+        .iter()
+        .position(|value| value == &key("output"))
+        .unwrap();
+    let id = view.row_id(&key("output")).unwrap();
+    let foreign_scope = RunScope::main("foreign", "other");
+    let mut foreign = OutputMessage::new((id.0 >> 32) as u32, foreign_scope.clone());
+    let doc = TranscriptDocument::read(&source).unwrap();
+    foreign
+        .update(
+            &foreign_scope,
+            1,
+            1,
+            &doc.sections[0].outputs[0],
+            Some(&doc.sections[0]),
+        )
+        .unwrap();
+    let original = std::mem::replace(
+        &mut view.children_mut().unwrap()[index],
+        Content::new(id, foreign),
+    );
+    assert!(view.validate_prepared_update(&plan).is_err());
+    assert!(view.update(&scope(), 2, 1, &source, true).is_err());
+    assert_eq!(view.row_keys(), keys);
+    view.children_mut().unwrap()[index] = original;
+    view.validate_prepared_update(&plan).unwrap();
+    view.apply_prepared_update(&plan).unwrap();
+    assert_eq!(view.row_keys(), keys);
 }

@@ -279,6 +279,21 @@ impl ReadOnlyTranscript {
     ) -> Result<(), &'static str> {
         self.content_mut().set_thinking_display(input)
     }
+    pub fn activity_action_ids(&self) -> Vec<ComponentId> {
+        self.content().activity_action_ids()
+    }
+    /// Same child-scoped local selection and publication fences as the Run path.
+    pub fn set_activity_expanded(
+        &mut self,
+        turn: &str,
+        expanded: bool,
+    ) -> Result<(), &'static str> {
+        self.content_mut().set_activity_expanded(turn, expanded)
+    }
+    /// Returns whether the original read-only frame needs a reading publication.
+    pub fn handle_activity_actions(&mut self, actions: &[ContentAction]) -> bool {
+        self.content_mut().handle_activity_actions(actions)
+    }
     pub fn content(&self) -> &TranscriptContent {
         self.body
             .children

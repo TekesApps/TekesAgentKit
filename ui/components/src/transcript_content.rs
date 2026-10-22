@@ -1,9 +1,10 @@
 //! A canonical mixed message content tree. Scrolling/reading transactions belong
 //! to TekesUI; this component neither invents a scroll state nor adjusts pixels.
 use crate::{
-    FeedbackGesture, FeedbackLabels, InputMessage, OutputMessage, OutputMessageLabels,
-    ToolActivity, ToolActivityLabels, ToolActivityPlacement, ToolRun, ToolRunLabels,
-    TranscriptMessageIdentity, TurnFeedback, TurnFootnote, TurnFootnoteIntent, TurnFootnoteLabels,
+    FeedbackGesture, FeedbackLabels, InputMessage, OutputMessage, OutputMessageFragment,
+    OutputMessageFragmentKind, OutputMessageLabels, ToolActivity, ToolActivityLabels,
+    ToolActivityPlacement, ToolRun, ToolRunLabels, TranscriptMessageIdentity, TurnFeedback,
+    TurnFootnote, TurnFootnoteIntent, TurnFootnoteLabels,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -27,10 +28,13 @@ use tekes_ui_tokens::{Spacing, proposal};
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TranscriptContentRowKey {
     Message(TranscriptMessageIdentity),
+    MessageFragment(TranscriptMessageIdentity, OutputMessageFragmentKind),
     Tool(String),
     TurnFootnote(String),
     /// Passive status of the captured live owner, never a disclosure or action.
     ActivityStatus(String),
+    ActivityDisclosure(String),
+    ActivitySummary(String),
     /// Compatibility lookup for the original nested feedback control. This is
     /// no longer a separate reading row; use feedback_controls() for callbacks.
     TurnFeedback(String),
@@ -55,6 +59,7 @@ pub struct TranscriptContentUpdate<'a> {
     timing: crate::TranscriptFootnoteTiming,
     base_timing: crate::TranscriptFootnoteTiming,
     base_historical_generation: u64,
+    base_activity_generation: u64,
     base_header_revision: (u64, u64),
     header_revision: (u64, u64),
     rows: Vec<(TranscriptContentRowKey, ComponentId)>,
@@ -85,6 +90,7 @@ pub struct TranscriptContentLabels {
     pub notices: String,
     pub stale: String,
     pub activity_working: String,
+    pub activity_settled: fn(&TranscriptTurn) -> String,
     pub input_details: OutputMessageLabels,
     pub input_information: fn(TranscriptDelivery) -> String,
     pub input_copy: String,
@@ -111,6 +117,7 @@ impl Default for TranscriptContentLabels {
             notices: "会话提示".into(),
             stale: "历史待同步".into(),
             activity_working: "Working".into(),
+            activity_settled: settled_activity_text,
             input_details: InputMessage::default_details_labels(),
             input_copy: "复制输入".into(),
             input_information: |delivery| match delivery {
@@ -142,6 +149,9 @@ pub struct TranscriptContent {
     keys: Vec<TranscriptContentRowKey>,
     /// Only unresolved operations survive clipping; not a second session cache.
     detached: BTreeMap<TranscriptContentRowKey, Content>,
+    hidden_rows: BTreeMap<TranscriptContentRowKey, Content>,
+    activity_expansion: BTreeMap<String, bool>,
+    activity_generation: u64,
     start: u32,
     next: u32,
     end: u32,
@@ -212,6 +222,9 @@ impl TranscriptContent {
             },
             keys: vec![],
             detached: BTreeMap::new(),
+            hidden_rows: BTreeMap::new(),
+            activity_expansion: BTreeMap::new(),
+            activity_generation: 0,
             start: row_namespaces.start,
             next: row_namespaces.start,
             end: row_namespaces.end,
@@ -296,7 +309,141 @@ impl TranscriptContent {
                             matches!(&block.content, TranscriptBlockContent::Reasoning { .. })))
                     && (output.item.display_reasoning().trim().is_empty()
                         || frame.display_for(&output.item.id) == Some(crate::TranscriptReasoningDisplay::Hidden))));
-        Ok(group_tools(rows))
+        let rows = group_tools(rows);
+        let mut expanded = vec![];
+        for mut row in rows {
+            if let PlannedContent::Output(output, Some(section)) = &row.content {
+                let presence = OutputMessage::transcript_presence(
+                    &self.scope,
+                    output,
+                    Some(section),
+                    row.thinking.as_ref(),
+                    self.labels.output,
+                )?;
+                let planes = section
+                    .planes(
+                        &self.scope,
+                        &snapshot.thinking_sources,
+                        timing.live_turn_id.as_deref() == Some(section.id),
+                    )
+                    .map_err(|_| "invalid transcript planes")?;
+                let owner = TranscriptMessageIdentity::from(output.key);
+                let turn = output.item.turn_id.as_str();
+                let alias = row.alias.as_ref().and_then(|key| {
+                    if let TranscriptContentRowKey::Message(key) = key {
+                        Some(key.clone())
+                    } else {
+                        None
+                    }
+                });
+                let make = |kind| Planned {
+                    key: TranscriptContentRowKey::MessageFragment(owner.clone(), kind),
+                    alias: alias
+                        .as_ref()
+                        .map(|key| TranscriptContentRowKey::MessageFragment(key.clone(), kind)),
+                    content: PlannedContent::Fragment(owner.clone(), kind, turn),
+                    thinking: None,
+                    hidden: false,
+                    activity: Some(turn),
+                };
+                let reasoning = presence[1].then(|| make(OutputMessageFragmentKind::Reasoning));
+                let tools = presence[2].then(|| make(OutputMessageFragmentKind::Tools));
+                row.hidden = !presence[0];
+                row.activity = (planes.items[&output.item.id].body
+                    != Some(crate::TranscriptPlane::Output))
+                .then_some(turn);
+                if let Some(reasoning) = reasoning {
+                    expanded.push(reasoning);
+                }
+                expanded.push(row);
+                if let Some(tools) = tools {
+                    expanded.push(tools);
+                }
+            } else {
+                if let PlannedContent::Tools(tools) = &row.content {
+                    row.activity = Some(tools[0].0.turn_id.as_str());
+                }
+                expanded.push(row);
+            }
+        }
+        // A committed answer is outside the entire turn Activity, even when its
+        // retained reasoning preceded calls or later narration in source order.
+        let mut result = vec![];
+        let mut final_output = vec![];
+        let mut turn = None;
+        for row in expanded {
+            let next = planned_turn(&row).map(str::to_owned);
+            if next != turn || matches!(row.content, PlannedContent::Footnote(..)) {
+                result.append(&mut final_output);
+            }
+            turn = next;
+            if matches!(&row.content, PlannedContent::Output(_, Some(_))) && row.activity.is_none()
+            {
+                final_output.push(row);
+            } else {
+                result.push(row);
+            }
+        }
+        result.append(&mut final_output);
+        for section in &document.sections {
+            let facts = section
+                .planes(
+                    &self.scope,
+                    &snapshot.thinking_sources,
+                    timing.live_turn_id.as_deref() == Some(section.id),
+                )
+                .map_err(|_| "invalid activity disclosure source")?;
+            let crate::TranscriptActivityPresentation::Settled { default_expanded } =
+                facts.activity
+            else {
+                continue;
+            };
+            let Some(turn) = section.turn else {
+                continue;
+            };
+            let expanded = self
+                .activity_expansion
+                .get(section.id)
+                .copied()
+                .unwrap_or(default_expanded);
+            if facts.has_activity && !expanded {
+                for row in &mut result {
+                    if row.activity == Some(section.id) {
+                        row.hidden = true;
+                    }
+                }
+            }
+            let key = if facts.has_activity {
+                TranscriptContentRowKey::ActivityDisclosure(section.id.into())
+            } else {
+                TranscriptContentRowKey::ActivitySummary(section.id.into())
+            };
+            let text = (self.labels.activity_settled)(turn);
+            let content = if facts.has_activity {
+                PlannedContent::Disclosure { text, expanded }
+            } else {
+                PlannedContent::Label(text)
+            };
+            let position = result
+                .iter()
+                .position(|row| {
+                    planned_turn(row) == Some(section.id)
+                        && !matches!(row.content, PlannedContent::Input(_))
+                })
+                .unwrap_or(result.len());
+            result.insert(
+                position,
+                Planned {
+                    key,
+                    alias: None,
+                    content,
+                    thinking: None,
+                    hidden: false,
+                    activity: None,
+                },
+            );
+        }
+        Ok(group_tools(result))
     }
     pub fn footnote_timing(&self) -> &crate::TranscriptFootnoteTiming {
         &self.timing
@@ -366,13 +513,20 @@ impl TranscriptContent {
                 PlannedContent::Output(output, section) => {
                     section.map(|_| output.item.turn_id.as_str())
                 }
+                PlannedContent::Fragment(_, _, turn) => Some(*turn),
                 PlannedContent::Tools(tools) => {
                     tools.first().map(|(tool, _)| tool.turn_id.as_str())
                 }
                 PlannedContent::Footnote(turn, _, _, _) => Some(turn.id.as_str()),
+                PlannedContent::Disclosure { .. } => match &row.key {
+                    TranscriptContentRowKey::ActivityDisclosure(turn) => Some(turn.as_str()),
+                    _ => None,
+                },
                 PlannedContent::Label(_) => match &row.key {
                     TranscriptContentRowKey::Unplaced(turn)
-                    | TranscriptContentRowKey::ActivityStatus(turn) => Some(turn.as_str()),
+                    | TranscriptContentRowKey::ActivityStatus(turn)
+                    | TranscriptContentRowKey::ActivityDisclosure(turn)
+                    | TranscriptContentRowKey::ActivitySummary(turn) => Some(turn.as_str()),
                     _ => None,
                 },
             };
@@ -466,6 +620,43 @@ impl TranscriptContent {
                 self.timing.live_turn_id.as_deref() == Some(turn_id),
             )
             .map_err(|_| "invalid transcript planes")
+    }
+    /// Local display selection. Republish through the original reading transaction.
+    pub fn set_activity_expanded(
+        &mut self,
+        turn_id: &str,
+        expanded: bool,
+    ) -> Result<(), &'static str> {
+        let facts = self.turn_planes(turn_id)?;
+        let crate::TranscriptActivityPresentation::Settled { default_expanded } = facts.activity
+        else {
+            return Err("activity is not a settled disclosure");
+        };
+        if !facts.has_activity {
+            return Err("activity has no disclosure content");
+        }
+        if self
+            .activity_expansion
+            .get(turn_id)
+            .copied()
+            .unwrap_or(default_expanded)
+            == expanded
+        {
+            return Ok(());
+        }
+        let generation = self
+            .activity_generation
+            .checked_add(1)
+            .ok_or("activity display generation exhausted")?;
+        self.activity_expansion.insert(turn_id.into(), expanded);
+        self.activity_generation = generation;
+        self.controls_dirty = true;
+        self.arranged_revision = None;
+        self.turn_target_owner = std::sync::Arc::new(());
+        Ok(())
+    }
+    pub fn activity_layout_revision(&self) -> u64 {
+        self.activity_generation
     }
     pub fn retained_operation_count(&self) -> usize {
         self.detached.len()
@@ -577,6 +768,7 @@ impl TranscriptContent {
             .zip(old)
             .collect();
         existing.append(&mut self.detached);
+        existing.append(&mut self.hidden_rows);
         let mut members = BTreeMap::new();
         for node in existing.values_mut() {
             if let Some(group) = node.component_mut::<ToolRun>() {
@@ -586,9 +778,14 @@ impl TranscriptContent {
                 }
             }
         }
+        let mut built = BTreeMap::new();
         for (row, retained_key) in plan.iter().zip(retained_keys) {
+            if matches!(row.content, PlannedContent::Fragment(..)) {
+                continue;
+            }
             let mut node = retained_key
-                .and_then(|key| existing.remove(&key))
+                .as_ref()
+                .and_then(|key| existing.remove(key))
                 .unwrap_or_else(|| {
                     let namespace = self.next;
                     self.next += row.namespaces();
@@ -624,11 +821,62 @@ impl TranscriptContent {
                 node.component_mut::<ToolRun>()
                     .unwrap()
                     .install_owned_header(publication, epoch, model, children);
+            } else if let PlannedContent::Output(_, Some(_)) = &row.content {
+                let old_key = retained_key.as_ref().unwrap_or(&row.key);
+                let TranscriptContentRowKey::Message(old_owner) = old_key else {
+                    unreachable!()
+                };
+                let mut reasoning = existing.remove(&TranscriptContentRowKey::MessageFragment(
+                    old_owner.clone(),
+                    OutputMessageFragmentKind::Reasoning,
+                ));
+                let mut tools = existing.remove(&TranscriptContentRowKey::MessageFragment(
+                    old_owner.clone(),
+                    OutputMessageFragmentKind::Tools,
+                ));
+                node.component_mut::<OutputMessage>()
+                    .unwrap()
+                    .rejoin_fragments([
+                        reasoning
+                            .as_mut()
+                            .and_then(|node| node.component_mut::<OutputMessageFragment>()),
+                        tools
+                            .as_mut()
+                            .and_then(|node| node.component_mut::<OutputMessageFragment>()),
+                    ])?;
+                self.update_row(&mut node, row, publication, epoch, available)?;
+                let TranscriptContentRowKey::Message(owner) = &row.key else {
+                    unreachable!()
+                };
+                for fragment in node
+                    .component_mut::<OutputMessage>()
+                    .unwrap()
+                    .split_fragments()
+                {
+                    let kind = fragment
+                        .component::<OutputMessageFragment>()
+                        .unwrap()
+                        .kind();
+                    built.insert(
+                        TranscriptContentRowKey::MessageFragment(owner.clone(), kind),
+                        fragment,
+                    );
+                }
             } else {
                 self.update_row(&mut node, row, publication, epoch, available)?;
             }
-            self.keys.push(row.key.clone());
-            self.rows.children.push(node);
+            built.insert(row.key.clone(), node);
+        }
+        for row in &plan {
+            let node = built
+                .remove(&row.key)
+                .expect("preflighted original message partition");
+            if row.hidden {
+                self.hidden_rows.insert(row.key.clone(), node);
+            } else {
+                self.keys.push(row.key.clone());
+                self.rows.children.push(node);
+            }
         }
         for (key, mut node) in existing {
             if let Some(footer) = node.component_mut::<TurnFootnote>() {
@@ -715,8 +963,9 @@ impl TranscriptContent {
             .collect();
         let mut next = self.next;
         let mut claimed = BTreeSet::new();
-        let rows = planned
+        let normal_ids: BTreeMap<_, _> = planned
             .iter()
+            .filter(|row| !matches!(row.content, PlannedContent::Fragment(..)))
             .map(|row| {
                 let key = self.retained_key(row, &desired, &index, &claimed);
                 if let Some(key) = &key {
@@ -737,6 +986,21 @@ impl TranscriptContent {
                 (row.key.clone(), id)
             })
             .collect();
+        let rows = planned
+            .iter()
+            .filter(|row| !row.hidden)
+            .map(|row| {
+                let id = if let PlannedContent::Fragment(owner, kind, _) = &row.content {
+                    ComponentId(
+                        normal_ids[&TranscriptContentRowKey::Message(owner.clone())].0
+                            + kind.offset(),
+                    )
+                } else {
+                    normal_ids[&row.key]
+                };
+                (row.key.clone(), id)
+            })
+            .collect();
         if header_revision != self.current_header_revision() {
             return Err("tool header inputs changed during preparation");
         }
@@ -753,6 +1017,7 @@ impl TranscriptContent {
             timing: timing.clone(),
             base_timing: self.timing.clone(),
             base_historical_generation: self.historical_generation,
+            base_activity_generation: self.activity_generation,
             base_header_revision: self.header_revision,
             header_revision,
             rows,
@@ -773,6 +1038,7 @@ impl TranscriptContent {
             || self.next != prepared.base_next
             || self.timing != prepared.base_timing
             || self.historical_generation != prepared.base_historical_generation
+            || self.activity_generation != prepared.base_activity_generation
             || self.header_revision != prepared.base_header_revision
             || self.thinking_input != prepared.thinking_input
             || self.applied_thinking != prepared.base_applied_thinking
@@ -907,6 +1173,9 @@ impl TranscriptContent {
         let mut allocations = 0_u64;
         let mut claimed = BTreeSet::new();
         for row in plan {
+            if matches!(row.content, PlannedContent::Fragment(..)) {
+                continue;
+            }
             let original = self.retained_key(row, &desired, &index, &claimed);
             if let Some(key) = &original
                 && !claimed.insert(key.clone())
@@ -933,10 +1202,54 @@ impl TranscriptContent {
         }
         Ok(())
     }
+    fn fragment(
+        &self,
+        owner: ComponentId,
+        kind: OutputMessageFragmentKind,
+    ) -> Option<&OutputMessageFragment> {
+        self.rows
+            .children
+            .iter()
+            .chain(self.hidden_rows.values())
+            .filter_map(|node| node.component::<OutputMessageFragment>())
+            .find(|part| part.id() == ComponentId(owner.0 + kind.offset()))
+    }
+    /// Actual part IDs across body and Activity, including retained folded nodes.
+    pub fn message_content_ids(
+        &self,
+        key: &TranscriptMessageIdentity,
+    ) -> Vec<crate::OutputContentIds> {
+        let keys = [
+            TranscriptContentRowKey::Message(key.clone()),
+            TranscriptContentRowKey::MessageFragment(
+                key.clone(),
+                OutputMessageFragmentKind::Reasoning,
+            ),
+            TranscriptContentRowKey::MessageFragment(key.clone(), OutputMessageFragmentKind::Tools),
+        ];
+        let mut result = vec![];
+        for (row, node) in self
+            .keys
+            .iter()
+            .zip(&self.rows.children)
+            .chain(self.hidden_rows.iter())
+        {
+            if keys.contains(row) {
+                if let Some(view) = node.component::<OutputMessage>() {
+                    result.extend(view.content_ids());
+                }
+                if let Some(view) = node.component::<OutputMessageFragment>() {
+                    result.extend(view.content_ids());
+                }
+            }
+        }
+        result
+    }
     fn find_tool(&self, turn: &str, id: &str) -> Option<&ToolActivity> {
         self.rows
             .children
             .iter()
+            .chain(self.hidden_rows.values())
             .filter_map(|node| node.component::<ToolRun>())
             .filter(|group| group.summary().is_some_and(|m| m.turn_id == turn))
             .find_map(|group| group.tool_activity(id))
@@ -982,6 +1295,7 @@ impl TranscriptContent {
                 .keys
                 .iter()
                 .zip(&self.rows.children)
+                .chain(self.hidden_rows.iter())
                 .find(|(key, node)| {
                     !desired.contains(*key)
                         && !claimed.contains(*key)
@@ -1015,10 +1329,15 @@ impl TranscriptContent {
             .get(key)
             .map(|i| &self.rows.children[*i])
             .or_else(|| self.detached.get(key))
+            .or_else(|| self.hidden_rows.get(key))
     }
     fn new_row(&self, namespace: u32, row: &Planned<'_>) -> Content {
         let root = ComponentId((namespace as u64) << 32);
         match &row.content {
+            PlannedContent::Fragment(..) => unreachable!("fragments retain original message nodes"),
+            PlannedContent::Disclosure { .. } => {
+                Content::new(root, ButtonContent::new("")).preserving_focus()
+            }
             PlannedContent::Input(_) => {
                 let mut view = InputMessage::with_details_labels(
                     namespace,
@@ -1070,18 +1389,37 @@ impl TranscriptContent {
                 let view = node
                     .component::<OutputMessage>()
                     .ok_or("transcript message role changed")?;
-                if let Some(thinking) = &row.thinking {
-                    view.check_update_with_thinking(
+                if view.scope() != &self.scope {
+                    return Err("transcript output scope mismatch");
+                }
+                if section.is_some() {
+                    let fragments = if view.transcript_is_split() {
+                        [
+                            self.fragment(view.id(), OutputMessageFragmentKind::Reasoning),
+                            self.fragment(view.id(), OutputMessageFragmentKind::Tools),
+                        ]
+                    } else {
+                        [None, None]
+                    };
+                    view.check_transcript_update(
                         publication,
                         epoch,
                         output,
                         *section,
-                        thinking,
+                        row.thinking.as_ref(),
+                        fragments,
                     )?;
                 } else {
                     view.check_update(&self.scope, publication, epoch, output, *section)?;
                 }
             }
+            PlannedContent::Fragment(..) => {}
+            PlannedContent::Disclosure { .. } => {
+                if node.component::<ButtonContent>().is_none() {
+                    return Err("activity disclosure role changed");
+                }
+            }
+
             PlannedContent::Tools(tools) => {
                 let model = self.labels.tool_run.summary(
                     &self.scope,
@@ -1139,6 +1477,12 @@ impl TranscriptContent {
         available: bool,
     ) -> Result<(), &'static str> {
         match &row.content {
+            PlannedContent::Disclosure { text, expanded } => {
+                let button = node.component_mut::<ButtonContent>().unwrap();
+                button.label = text.clone();
+                button.button.state.selected = *expanded;
+            }
+            PlannedContent::Fragment(..) => unreachable!("message owns fragment updates"),
             PlannedContent::Input(input) => {
                 let view = node.component_mut::<InputMessage>().unwrap();
                 view.update_with(
@@ -1203,15 +1547,64 @@ impl TranscriptContent {
             footer.has_unresolved_action()
         });
     }
+    /// Mounted original controls for a focus-preserving local reading gesture.
+    pub fn activity_action_ids(&self) -> Vec<ComponentId> {
+        self.keys
+            .iter()
+            .zip(&self.rows.children)
+            .filter_map(|(key, node)| {
+                matches!(key, TranscriptContentRowKey::ActivityDisclosure(_)).then_some(node.id())
+            })
+            .collect()
+    }
+    /// Handle only local Activity selection; republish through the existing reading transaction.
+    /// This never admits endpoint, feedback, page or submission actions.
+    pub fn handle_activity_actions(&mut self, actions: &[ContentAction]) -> bool {
+        let before = self.activity_generation;
+        let toggles: Vec<_> = self
+            .keys
+            .iter()
+            .zip(&self.rows.children)
+            .filter_map(|(key, node)| {
+                let TranscriptContentRowKey::ActivityDisclosure(turn) = key else {
+                    return None;
+                };
+                let count = actions
+                    .iter()
+                    .filter(|action| {
+                        action.target == node.id() && action.kind == ContentActionKind::Activate
+                    })
+                    .count();
+                (count % 2 == 1).then(|| {
+                    (
+                        turn.clone(),
+                        !node
+                            .component::<ButtonContent>()
+                            .unwrap()
+                            .button
+                            .state
+                            .selected,
+                    )
+                })
+            })
+            .collect();
+        for (turn, expanded) in toggles {
+            let _ = self.set_activity_expanded(&turn, expanded);
+        }
+        self.activity_generation != before
+    }
     /// Host forwards the original drained action batch, then renders. Local tool
     /// disclosure is handled here; mutations return immutable original-turn intents.
     pub fn handle_actions(&mut self, actions: &[ContentAction]) -> Vec<TurnFootnoteIntent> {
+        self.handle_activity_actions(actions);
         let mut result = vec![];
         for node in &mut self.rows.children {
             if let Some(input) = node.component_mut::<InputMessage>() {
                 input.handle_actions(actions);
             } else if let Some(output) = node.component_mut::<OutputMessage>() {
                 output.handle_actions(actions);
+            } else if let Some(fragment) = node.component_mut::<OutputMessageFragment>() {
+                fragment.handle_actions(actions);
             } else if let Some(tool) = node.component_mut::<ToolRun>() {
                 tool.handle_actions(actions);
             } else if let Some(footer) = node.component_mut::<TurnFootnote>() {
@@ -1333,6 +1726,8 @@ impl TranscriptContent {
                     input.copy_button_id().into_iter().collect()
                 } else if let Some(output) = node.component::<OutputMessage>() {
                     output.copy_action_ids()
+                } else if let Some(fragment) = node.component::<OutputMessageFragment>() {
+                    fragment.copy_action_ids()
                 } else if let Some(tool) = node.component::<ToolRun>() {
                     tool.copy_action_ids()
                 } else {
@@ -1355,6 +1750,8 @@ impl TranscriptContent {
                     footnote.take_copy_intents(actions)
                 } else if let Some(output) = node.component::<OutputMessage>() {
                     output.take_copy_intents(actions)
+                } else if let Some(fragment) = node.component::<OutputMessageFragment>() {
+                    fragment.take_copy_intents(actions)
                 } else if let Some(tool) = node.component::<ToolRun>() {
                     tool.take_copy_intents(actions)
                 } else {
@@ -1420,10 +1817,14 @@ struct Planned<'a> {
     alias: Option<TranscriptContentRowKey>,
     content: PlannedContent<'a>,
     thinking: Option<crate::TranscriptThinkingFrame>,
+    hidden: bool,
+    activity: Option<&'a str>,
 }
 impl Planned<'_> {
     fn namespaces(&self) -> u32 {
-        if matches!(self.content, PlannedContent::Footnote(..)) {
+        if matches!(self.content, PlannedContent::Fragment(..)) {
+            0
+        } else if matches!(self.content, PlannedContent::Footnote(..)) {
             2
         } else {
             1
@@ -1433,6 +1834,11 @@ impl Planned<'_> {
 enum PlannedContent<'a> {
     Input(TranscriptInput<'a>),
     Output(TranscriptOutput<'a>, Option<&'a TranscriptSection<'a>>),
+    Fragment(
+        TranscriptMessageIdentity,
+        OutputMessageFragmentKind,
+        &'a str,
+    ),
     Tools(Vec<(&'a TranscriptToolCall, ToolActivityPlacement)>),
     Footnote(
         &'a TranscriptTurn,
@@ -1440,13 +1846,67 @@ enum PlannedContent<'a> {
         crate::TurnFootnoteDisplay,
         Option<TurnFeedbackTarget<'a>>,
     ),
+    Disclosure {
+        text: String,
+        expanded: bool,
+    },
     Label(String),
 }
+fn settled_activity_text(turn: &TranscriptTurn) -> String {
+    let (plain, elapsed) = match turn.status.as_str() {
+        "completed" => ("Worked", "Worked for"),
+        "error" | "failed" => ("Failed", "Failed after"),
+        "aborted" | "stopped" | "interrupted" => ("Stopped", "Stopped after"),
+        "max-tokens" => (
+            "Stopped at the token limit",
+            "Stopped at the token limit after",
+        ),
+        "blocked" => ("Blocked", "Blocked after"),
+        _ => ("Ended", "Ended after"),
+    };
+    crate::TurnFootnoteFacts::read(turn)
+        .elapsed_seconds()
+        .filter(|value| *value < u64::MAX as f64)
+        .map_or_else(
+            || plain.into(),
+            |seconds| {
+                format!(
+                    "{} {}",
+                    elapsed,
+                    crate::TurnFootnoteFacts::elapsed_text(seconds.floor() as u64)
+                )
+            },
+        )
+}
+
+fn planned_turn<'r>(row: &'r Planned<'_>) -> Option<&'r str> {
+    match &row.content {
+        PlannedContent::Input(input) => Some(&input.item.turn_id),
+        PlannedContent::Output(_, Some(section)) => Some(section.id),
+        PlannedContent::Fragment(_, _, turn) => Some(turn),
+        PlannedContent::Tools(tools) => Some(&tools[0].0.turn_id),
+        PlannedContent::Footnote(turn, ..) => Some(&turn.id),
+        PlannedContent::Disclosure { .. } => match &row.key {
+            TranscriptContentRowKey::ActivityDisclosure(turn) => Some(turn),
+            _ => None,
+        },
+        PlannedContent::Label(_) => match &row.key {
+            TranscriptContentRowKey::ActivityStatus(turn)
+            | TranscriptContentRowKey::ActivitySummary(turn)
+            | TranscriptContentRowKey::Unplaced(turn) => Some(turn),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
 fn label(key: TranscriptContentRowKey, text: String) -> Planned<'static> {
     Planned {
         key,
         alias: None,
         thinking: None,
+        hidden: false,
+        activity: None,
         content: PlannedContent::Label(text),
     }
 }
@@ -1477,6 +1937,8 @@ fn plan<'a>(
                 key: Key::Message(output.key.into()),
                 alias: None,
                 thinking: None,
+                hidden: false,
+                activity: None,
                 content: PlannedContent::Output(*output, None),
             });
         }
@@ -1557,6 +2019,8 @@ fn plan<'a>(
                 key: Key::TurnFootnote(turn.id.clone()),
                 alias: None,
                 thinking: None,
+                hidden: false,
+                activity: None,
                 content: PlannedContent::Footnote(turn, output, display, target),
             });
         }
@@ -1605,6 +2069,8 @@ fn event_row<'a>(
                 Some(Planned {
                     key: Key::Message(input.key.into()),
                     thinking: None,
+                    hidden: false,
+                    activity: None,
                     alias: input
                         .reconciliation_key()
                         .map(|key| Key::Message(key.into())),
@@ -1619,6 +2085,8 @@ fn event_row<'a>(
                 Some(Planned {
                     key: Key::Message(output.key.into()),
                     thinking: None,
+                    hidden: false,
+                    activity: None,
                     alias: output
                         .reconciliation_key()
                         .map(|key| Key::Message(key.into())),
@@ -1637,6 +2105,8 @@ fn event_row<'a>(
                 key: Key::Tool(tool.id.clone()),
                 alias: None,
                 thinking: None,
+                hidden: false,
+                activity: None,
                 content: PlannedContent::Tools(vec![(
                     tool,
                     if tool.source_position.is_some() {
@@ -1656,6 +2126,8 @@ fn event_row<'a>(
                 key: Key::Tool(tool.id.clone()),
                 alias: None,
                 thinking: None,
+                hidden: false,
+                activity: None,
                 content: PlannedContent::Tools(vec![(
                     tool,
                     if tool.result_position.is_some() {

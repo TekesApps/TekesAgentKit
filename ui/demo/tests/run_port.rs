@@ -314,7 +314,18 @@ async fn a_run_mounts_the_real_components_and_emits_original_destination_intents
             .unwrap()
             .row_keys()
             .len(),
-        30
+        40
+    );
+    assert_eq!(
+        host.get(doc)
+            .unwrap()
+            .component::<TranscriptContent>()
+            .unwrap()
+            .row_keys()
+            .iter()
+            .filter(|key| matches!(key, TranscriptContentRowKey::ActivitySummary(_)))
+            .count(),
+        10
     );
     host.focus(Some(ids().composer.editor), true);
     host.event(&ContentEvent::Commit {

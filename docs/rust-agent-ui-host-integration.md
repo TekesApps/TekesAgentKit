@@ -86,12 +86,22 @@ TranscriptContent/RunPort/只读 pane 已直接消费 `TranscriptSection::displa
 正常宿主无需判断 live-owner。原 `TranscriptFootnoteTiming::for_run` 已复用 presentation 的
 `live_presentation_turn`。Working 被动行随同一发布的 owner 生命周期产生/退休，
 copy 可用 `TranscriptContentLabels.activity_working` 配置；不承担焦点或输入实现。
-分区 facts 不授予动作权限，也尚未完成历史 activity 折叠/物理 plane 布局；
-[API 与当前三端原生验收范围](rust-agent-ui-turn-planes-20261023.md)。
+分区 facts 不授予动作权限；其原始 API 和冻结程序证据见
+[分区事实阶段](rust-agent-ui-turn-planes-20261023.md)。
 
 `TranscriptTurnPlanes.activity` 进一步提供 `TranscriptActivityPresentation`：Working、
 Settled 的默认展开值、回合内追加输入的 BetweenInputs，以及来源不足/直接任务来源的 Direct。
 这套判定由共享 presentation 产生；宿主不要根据运行字符串、正文或输入行下标重复推断。
 默认展开不是受控展开选择，后续 Activity 容器仍须保留用户选择和原控件身份。
-目前只有 live 状态行接入真实布局，settled 折叠与物理分区尚未接入；
-见[本阶段规则与限制](rust-agent-ui-activity-policy-20261023.md)。
+共享判定的来源与限制见[Activity 规则](rust-agent-ui-activity-policy-20261023.md)。
+
+普通回合现已接入实际 Activity/Output 分区与历史折叠，见[最新接入与验收](rust-agent-ui-physical-planes-20261023.md)。
+Message 根保留正文；reasoning/工具由 `MessageFragment` 行的原节点持有。
+查询全消息 part ID 使用 `TranscriptContent::message_content_ids`，查询 Activity 控件使用对应
+`OutputMessageFragment`；宿主必须整体发布 Transcript，不能单独更新已拆分的 Message 根。
+
+`RunPortIntent::TranscriptLayoutChanged { scope }` 只通知本地布局变化。宿主转交同一捕获快照，
+通过原 SDK reading transaction 发布；reading display revision 从当前 token 递增，不复用 provider revision。
+`set_activity_expanded` 的本地选择及旧计划门禁由 Kit 维护，只读 pane 使用自己的历史 publication。
+组字期间只放行 Kit 提供的当前挂载 `activity_action_ids()` 和原复制控件，保留其余 mutation 门禁。
+新增 `TranscriptContentLabels.activity_settled` 为 copy callback；完整字面量需补字段或使用 Default update。

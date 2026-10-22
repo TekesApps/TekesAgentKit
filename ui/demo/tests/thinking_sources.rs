@@ -209,6 +209,18 @@ async fn whole_run_thinking_preflight_fences_old_plans_and_preserves_original_co
         true,
     )
     .unwrap();
+    for turn in &snapshot.transcript.turns {
+        tekes_agent_ui_consumer_check::set_run_activity_expansion(&mut run, &turn.id, true)
+            .unwrap();
+    }
+    run.update(
+        &snapshot,
+        Default::default(),
+        ComposerControlGate::OPEN,
+        paging(&scope, &snapshot),
+        true,
+    )
+    .unwrap();
     let first = tekes_agent_ui_consumer_check::prepare_thinking_run(
         &mut run,
         &snapshot,
@@ -242,18 +254,19 @@ async fn whole_run_thinking_preflight_fences_old_plans_and_preserves_original_co
         .copied()
         .find(|id| {
             host.get(*id).is_some_and(|node| {
-                node.component::<OutputMessage>().is_some_and(|view| {
-                    view.content_ids()
-                        .iter()
-                        .any(|part| part.kind == OutputContentKind::Reasoning)
-                })
+                node.component::<OutputMessageFragment>()
+                    .is_some_and(|view| {
+                        view.content_ids()
+                            .iter()
+                            .any(|part| part.kind == OutputContentKind::Reasoning)
+                    })
             })
         })
         .unwrap();
     let original = host
         .get(output_id)
         .unwrap()
-        .component::<OutputMessage>()
+        .component::<OutputMessageFragment>()
         .unwrap()
         .content_ids();
     assert!(host.focus(Some(editor), true));
@@ -294,7 +307,7 @@ async fn whole_run_thinking_preflight_fences_old_plans_and_preserves_original_co
     assert_eq!(
         host.get(output_id)
             .unwrap()
-            .component::<OutputMessage>()
+            .component::<OutputMessageFragment>()
             .unwrap()
             .content_ids(),
         original
@@ -426,13 +439,13 @@ fn readonly_live_status_ticks_use_child_publication_and_retire_preference_plans(
         .copied()
         .find(|id| {
             host.get(*id)
-                .is_some_and(|node| node.component::<OutputMessage>().is_some())
+                .is_some_and(|node| node.component::<OutputMessageFragment>().is_some())
         })
         .unwrap();
     let parts = host
         .get(row)
         .unwrap()
-        .component::<OutputMessage>()
+        .component::<OutputMessageFragment>()
         .unwrap()
         .content_ids();
     assert_eq!(parts.len(), 1);
@@ -453,7 +466,7 @@ fn readonly_live_status_ticks_use_child_publication_and_retire_preference_plans(
     assert_eq!(
         host.get(row)
             .unwrap()
-            .component::<OutputMessage>()
+            .component::<OutputMessageFragment>()
             .unwrap()
             .content_ids(),
         parts
@@ -473,7 +486,7 @@ fn readonly_live_status_ticks_use_child_publication_and_retire_preference_plans(
     let parts = host
         .get(row)
         .unwrap()
-        .component::<OutputMessage>()
+        .component::<OutputMessageFragment>()
         .unwrap()
         .content_ids();
     assert_eq!(parts.len(), 1);

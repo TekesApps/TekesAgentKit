@@ -36,6 +36,10 @@ pub struct RunPortGeometry {
 }
 #[derive(Debug)]
 pub enum RunPortIntent {
+    /// Local layout changed; republish the captured Run through its original reading transaction.
+    TranscriptLayoutChanged {
+        scope: RunScope,
+    },
     Composer(ComposerIntent),
     LoadEarlier {
         scope: RunScope,
@@ -515,6 +519,14 @@ impl RunPort {
             vec![]
         }
     }
+    pub fn activity_action_ids(&self) -> Vec<ComponentId> {
+        if self.pane_presented {
+            self.transcript()
+                .map_or_else(Vec::new, TranscriptContent::activity_action_ids)
+        } else {
+            vec![]
+        }
+    }
     pub fn is_nonfocusing_navigation_target(&self, id: ComponentId) -> bool {
         self.jump_permits(id)
             || (self.pane_presented
@@ -613,6 +625,16 @@ impl RunPort {
         self.transcript_mut()
             .ok_or("RunPort has no Transcript")?
             .set_thinking_display(input)
+    }
+    /// Controlled local disclosure; the next original reading publication installs it.
+    pub fn set_activity_expanded(
+        &mut self,
+        turn: &str,
+        expanded: bool,
+    ) -> Result<(), &'static str> {
+        self.transcript_mut()
+            .ok_or("transcript is not mounted")?
+            .set_activity_expanded(turn, expanded)
     }
     pub fn transcript(&self) -> Option<&TranscriptContent> {
         self.body
@@ -1143,6 +1165,13 @@ impl RunPort {
                     .into_iter()
                     .map(RunPortIntent::CopyTranscript),
             );
+        }
+        if let Some(content) = self.transcript_mut()
+            && content.handle_activity_actions(actions)
+        {
+            intents.push(RunPortIntent::TranscriptLayoutChanged {
+                scope: content.scope().clone(),
+            });
         }
         if self.composer().is_composing() {
             return intents;

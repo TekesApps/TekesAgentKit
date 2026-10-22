@@ -198,6 +198,20 @@ async fn external_tool_header_revision_refreshes_without_changing_run_authority_
         true,
     )
     .unwrap();
+    tekes_agent_ui_consumer_check::set_run_activity_expansion(
+        &mut view,
+        &snapshot.transcript.tools[0].turn_id,
+        true,
+    )
+    .unwrap();
+    view.update(
+        &snapshot,
+        Default::default(),
+        ComposerControlGate::OPEN,
+        paging(&view, &snapshot),
+        true,
+    )
+    .unwrap();
     let baseline = view.composer().editor().input.external_baseline();
     let old = prepare(&view, &snapshot).unwrap();
     REV.store(2, Ordering::SeqCst);
@@ -306,6 +320,42 @@ fn append(snapshot: &RunSnapshot) -> RunSnapshot {
     next.transcript.items.push(item);
     next
 }
+// Explicit test-user expansion of historical details, via the same SDK transaction.
+fn expand_historical_details(
+    host: &mut ContentHost,
+    root: ComponentId,
+    snapshot: &RunSnapshot,
+    version: &ReadingDocumentVersion,
+    text: &mut Text,
+) -> ReadingDocumentVersion {
+    for turn in &snapshot.transcript.turns {
+        let facts = snapshot.turn_planes(&turn.id).unwrap();
+        if facts.has_activity
+            && matches!(
+                facts.activity,
+                TranscriptActivityPresentation::Settled { .. }
+            )
+        {
+            tekes_agent_ui_consumer_check::set_run_activity_expansion(
+                run_mut(host, root),
+                &turn.id,
+                true,
+            )
+            .unwrap();
+        }
+    }
+    let plan = prepare(run(host, root), snapshot).unwrap();
+    let result = tekes_agent_ui_consumer_check::publish_original_run(
+        host,
+        root,
+        version,
+        version.revision() + 1,
+        &plan,
+    )
+    .unwrap();
+    render(host, text);
+    result
+}
 /// Only AgentKit chooses draft policy. The consumer calls the library check;
 /// no generic validation, editing clone or scroll compensation is copied here.
 fn publish_plan(
@@ -318,7 +368,7 @@ fn publish_plan(
         host,
         root,
         version,
-        plan.publication(),
+        version.revision() + 1,
         plan,
     )
 }
@@ -383,6 +433,7 @@ async fn tool_section_copy_uses_original_run_channel_during_composer_preedit() {
     use tekes_ui_controls::{ScrollRevealOptions, ScrollRevealPlacement, extended::Axis};
     let fixture = tekes_agent_ui_demo::fixture::Fixture::default().with_reading_details();
     let (runtime, mut host, root, snapshot, version, mut text) = setup_with_fixture(fixture).await;
+    let version = expand_historical_details(&mut host, root, &snapshot, &version, &mut text);
     let key = TranscriptContentRowKey::Tool(snapshot.transcript.tools[0].id.clone());
     let row = run(&host, root).transcript().unwrap().row_id(&key).unwrap();
     let activity_id = run(&host, root)
@@ -2404,6 +2455,7 @@ async fn expanded_tool_growth_and_reflow_preserve_reading_and_explicit_collapse_
     let fixture = tekes_agent_ui_demo::fixture::Fixture::default().with_reading_details();
     let (runtime, mut host, root, mut snapshot, version, mut text) =
         setup_with_fixture(fixture).await;
+    let version = expand_historical_details(&mut host, root, &snapshot, &version, &mut text);
     assert!(!snapshot.transcript.tools.is_empty());
     let tool_key = TranscriptContentRowKey::Tool(snapshot.transcript.tools[0].id.clone());
     let tool_row = run(&host, root)
@@ -2436,7 +2488,7 @@ async fn expanded_tool_growth_and_reflow_preserve_reading_and_explicit_collapse_
             let id = run(&host, root).transcript().unwrap().row_id(key).unwrap();
             host.get(id)
                 .unwrap()
-                .component::<OutputMessage>()
+                .component::<OutputMessageFragment>()
                 .and_then(|output| {
                     output
                         .content_ids()
@@ -2734,7 +2786,7 @@ async fn explicit_clock_tick_uses_original_reading_transaction_and_keeps_preedit
 }
 
 #[tokio::test]
-async fn demo_admits_only_original_copy_controls_during_composer_preedit() {
+async fn demo_admits_only_original_local_transcript_controls_during_composer_preedit() {
     use std::{sync::Arc, time::Duration};
     use tekes_agent_session::SessionRuntime;
     use tekes_agent_ui_bindings::RunBinding;
@@ -2744,7 +2796,7 @@ async fn demo_admits_only_original_copy_controls_during_composer_preedit() {
     };
     let runtime = Arc::new(SessionRuntime::spawn(
         "fixture",
-        Arc::new(Fixture::default().with_lifecycle()),
+        Arc::new(Fixture::default().with_lifecycle().with_reading_details()),
     ));
     runtime.wait_ready(Duration::from_secs(3)).await.unwrap();
     let binding = Arc::new(
@@ -2821,6 +2873,51 @@ async fn demo_admits_only_original_copy_controls_during_composer_preedit() {
     );
     assert_eq!(demo.tree.focused(), Some(editor));
     assert!(binding.current_run().unwrap().submissions.is_empty());
+    let activity = run(&demo.tree, root)
+        .activity_action_ids()
+        .into_iter()
+        .rev()
+        .find(|id| {
+            demo.tree
+                .get(*id)
+                .is_some_and(|node| node.visible().is_some())
+        })
+        .unwrap();
+    let point = demo.tree.get(activity).unwrap().visible().unwrap().center();
+    demo.event_with_text(&ContentEvent::PointerDown(point), &mut text)
+        .unwrap();
+    let commands = demo
+        .event_with_text(&ContentEvent::PointerUp(point), &mut text)
+        .unwrap();
+    assert!(
+        commands.is_empty(),
+        "local Activity cannot dispatch endpoint mutations"
+    );
+    assert!(
+        demo.tree
+            .get(activity)
+            .unwrap()
+            .component::<ButtonContent>()
+            .unwrap()
+            .button
+            .state
+            .selected
+    );
+    demo.render(
+        &mut Scene::new(),
+        &mut text,
+        frame,
+        frame,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    assert!(
+        demo.tree.get(activity).unwrap().visible().is_some(),
+        "explicit expansion must keep the original disclosure in view"
+    );
+    assert_eq!(demo.tree.focused(), Some(editor));
+    assert_eq!(demo.editor() as *const _ as usize, owner);
+    assert_eq!(demo.editor().input.external_baseline(), before);
     runtime.stop().await.unwrap();
 }
 
@@ -3336,4 +3433,100 @@ async fn task_and_sidechat_use_their_own_copy_scope_during_another_composers_pre
         assert_eq!(auxiliary.current_run().unwrap().submissions.len(), admitted);
         runtime.stop().await.unwrap();
     }
+}
+
+#[tokio::test]
+async fn local_activity_expansion_publishes_in_original_reading_transaction_and_preserves_preedit_and_upward_anchor()
+ {
+    let (_runtime, mut host, root, first, version, mut text) = setup().await;
+    let mut source = first.clone();
+    source.revision += 1;
+    let turn = source
+        .transcript
+        .turns
+        .iter()
+        .rev()
+        .find(|turn| turn.status == "completed")
+        .unwrap()
+        .id
+        .clone();
+    let item = source
+        .transcript
+        .items
+        .iter_mut()
+        .find(|item| {
+            item.turn_id == turn && item.kind == TranscriptItemKind::Assistant && item.is_final
+        })
+        .unwrap();
+    item.reasoning = "preserved activity\n".repeat(12);
+    if let Some(blocks) = &mut item.content_blocks {
+        for block in blocks.iter_mut() {
+            block.index += 1;
+        }
+        blocks.insert(
+            0,
+            TranscriptContentBlock {
+                index: 0,
+                content: TranscriptBlockContent::Reasoning {
+                    text: item.reasoning.clone(),
+                },
+            },
+        );
+    }
+    let plan = prepare(run(&host, root), &source).unwrap();
+    let version = tekes_agent_ui_consumer_check::publish_original_run(
+        &mut host,
+        root,
+        &version,
+        version.revision() + 1,
+        &plan,
+    )
+    .unwrap();
+    render(&mut host, &mut text);
+    wheel(&mut host, root, 420.);
+    render(&mut host, &mut text);
+    let item = anchor(&host, root);
+    let viewport = run(&host, root).ids().viewport;
+    let y = host.get(item).unwrap().frame().min_y()
+        - host.get(viewport).unwrap().visible().unwrap().min_y();
+    let editor = run(&host, root).ids().composer.editor;
+    assert!(host.focus(Some(editor), true));
+    host.event(&ContentEvent::Preedit {
+        text: "中文组字".into(),
+        selection: 4..4,
+        clauses: vec![],
+        replacement: None,
+    });
+    let baseline = baseline(&host, root);
+    let stale = prepare(run(&host, root), &source).unwrap();
+    tekes_agent_ui_consumer_check::set_run_activity_expansion(
+        run_mut(&mut host, root),
+        &turn,
+        true,
+    )
+    .unwrap();
+    assert!(run(&host, root).validate_prepared_update(&stale).is_err());
+    let plan = prepare(run(&host, root), &source).unwrap();
+    let _version = tekes_agent_ui_consumer_check::publish_original_run(
+        &mut host,
+        root,
+        &version,
+        version.revision() + 1,
+        &plan,
+    )
+    .unwrap();
+    render(&mut host, &mut text);
+    assert_eq!(anchor(&host, root), item);
+    let after = host.get(item).unwrap().frame().min_y()
+        - host.get(viewport).unwrap().visible().unwrap().min_y();
+    assert!(
+        (after - y).abs() < 1.,
+        "original item/local anchor moved: {y} -> {after}"
+    );
+    assert_eq!(host.focused(), Some(editor));
+    assert_eq!(
+        host.text_surface(editor).unwrap().input.external_baseline(),
+        baseline
+    );
+    assert!(run(&host, root).composer().is_composing());
 }

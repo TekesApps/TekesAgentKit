@@ -305,13 +305,16 @@ fn direct_task_source_keeps_original_content_without_a_working_status() {
             .any(|key| matches!(key, TranscriptContentRowKey::ActivityStatus(_)))
     );
     for item in &source.transcript.items {
-        assert!(
-            content
-                .row_id(&TranscriptContentRowKey::Message(
-                    TranscriptMessageIdentity::Item(item.id.clone())
-                ))
-                .is_some()
-        );
+        let owner = TranscriptMessageIdentity::Item(item.id.clone());
+        if item.kind == TranscriptItemKind::User {
+            assert!(
+                content
+                    .row_id(&TranscriptContentRowKey::Message(owner))
+                    .is_some()
+            );
+        } else {
+            assert!(!content.message_content_ids(&owner).is_empty());
+        }
     }
     for tool in &source.transcript.tools {
         assert!(
@@ -321,4 +324,262 @@ fn direct_task_source_keeps_original_content_without_a_working_status() {
                     .is_some()
         );
     }
+}
+
+#[test]
+fn settled_activity_parts_fold_and_restore_original_owners_without_changing_composer_preedit() {
+    let scope = RunScope::main("sep", "s");
+    let mut store = captured_store();
+    let mut presentation = PresentationStore::default();
+    presentation
+        .select(ComposerDestination::run(scope.clone()))
+        .unwrap();
+    let first = presentation.refresh(&store).unwrap();
+    let turn = first.transcript.turns[0].id.clone();
+    let item = first
+        .transcript
+        .items
+        .iter()
+        .find(|row| row.text == "工具之前的说明")
+        .unwrap();
+    let owner = TranscriptMessageIdentity::Item(item.id.clone());
+    let body = TranscriptContentRowKey::Message(owner.clone());
+    let reasoning = TranscriptContentRowKey::MessageFragment(
+        owner.clone(),
+        OutputMessageFragmentKind::Reasoning,
+    );
+    let mut view = RunPort::standard(7000, 7010..7300, scope.clone()).unwrap();
+    view.set_thinking_display(TranscriptThinkingDisplayInput {
+        mode: TranscriptThinkingMode::Compact,
+        display_revision: 1,
+        elapsed_seconds: 0,
+    })
+    .unwrap();
+    view.update(
+        &first,
+        Default::default(),
+        ComposerControlGate::OPEN,
+        paging(&scope),
+        true,
+    )
+    .unwrap();
+    let parts = view.transcript().unwrap().message_content_ids(&owner);
+    assert_eq!(parts.len(), 2);
+    let body_id = view.transcript().unwrap().row_id(&body).unwrap();
+    let reason_id = view.transcript().unwrap().row_id(&reasoning).unwrap();
+    let tool_id = view
+        .transcript()
+        .unwrap()
+        .tool_run(&first.transcript.tools[0].id)
+        .unwrap()
+        .id();
+    let ids = view.ids();
+    let mut host = view.into_host().unwrap();
+    assert!(host.focus(Some(ids.composer.editor), true));
+    host.event(&ContentEvent::Preedit {
+        text: "中文组字".into(),
+        selection: 4..4,
+        clauses: vec![],
+        replacement: None,
+    });
+    let baseline = host
+        .text_surface(ids.composer.editor)
+        .unwrap()
+        .input
+        .external_baseline();
+    store.apply("journal:s",json!({"type":"event","generation":"g","sessionId":"s","entry":{"event":{"type":"turn/end","seq":5,"time":200,"data":{"turn":1,"reason":"completed"}}}})).unwrap();
+    let next = presentation.refresh(&store).unwrap();
+    let run = host
+        .get_mut(ids.root)
+        .unwrap()
+        .component_mut::<RunPort>()
+        .unwrap();
+    run.update(
+        &next,
+        Default::default(),
+        ComposerControlGate::OPEN,
+        paging(&scope),
+        true,
+    )
+    .unwrap();
+    let content = run.transcript().unwrap();
+    assert_eq!(content.row_id(&body), Some(body_id));
+    assert_eq!(content.row_id(&reasoning), None);
+    assert!(content.tool_run(&first.transcript.tools[0].id).is_none());
+    let mut after = content.message_content_ids(&owner);
+    after.sort_by_key(|id| id.root.0);
+    let mut before = parts;
+    before.sort_by_key(|id| id.root.0);
+    assert_eq!(after, before);
+    let disclosure = content
+        .row_id(&TranscriptContentRowKey::ActivityDisclosure(turn.clone()))
+        .unwrap();
+    let plan = run
+        .prepare_update(
+            &next,
+            Default::default(),
+            ComposerControlGate::OPEN,
+            paging(&scope),
+            true,
+        )
+        .unwrap();
+    tekes_agent_ui_consumer_check::set_run_activity_expansion(run, &turn, true).unwrap();
+    assert!(run.validate_prepared_update(&plan).is_err());
+    run.update(
+        &next,
+        Default::default(),
+        ComposerControlGate::OPEN,
+        paging(&scope),
+        true,
+    )
+    .unwrap();
+    let content = run.transcript().unwrap();
+    assert_eq!(content.row_id(&reasoning), Some(reason_id));
+    assert_eq!(
+        content
+            .tool_run(&first.transcript.tools[0].id)
+            .unwrap()
+            .id(),
+        tool_id
+    );
+    let keys = content.row_keys();
+    assert!(
+        keys.iter().position(|key| key == &reasoning).unwrap()
+            < keys.iter().position(|key| key == &body).unwrap()
+    );
+    let tools = TranscriptContentRowKey::Tool(first.transcript.tools[0].id.clone());
+    assert!(
+        keys.iter().position(|key| key == &tools).unwrap()
+            < keys.iter().position(|key| key == &body).unwrap()
+    );
+    assert_eq!(
+        content.row_id(&TranscriptContentRowKey::ActivityDisclosure(turn)),
+        Some(disclosure)
+    );
+    assert_eq!(host.focused(), Some(ids.composer.editor));
+    assert_eq!(
+        host.text_surface(ids.composer.editor)
+            .unwrap()
+            .input
+            .external_baseline(),
+        baseline
+    );
+    assert!(
+        host.accessibility_action(disclosure, None, AccessibilityAction::Press)
+            .activated
+    );
+    let actions = host.drain_actions();
+    let run = host
+        .get_mut(ids.root)
+        .unwrap()
+        .component_mut::<RunPort>()
+        .unwrap();
+    let stale = run
+        .prepare_update(
+            &next,
+            Default::default(),
+            ComposerControlGate::OPEN,
+            paging(&scope),
+            true,
+        )
+        .unwrap();
+    let intents = run.take_intents(&actions);
+    assert!(
+        matches!(intents.as_slice(),[RunPortIntent::TranscriptLayoutChanged{scope:owner}] if owner==&scope)
+    );
+    assert!(run.validate_prepared_update(&stale).is_err());
+    run.update(
+        &next,
+        Default::default(),
+        ComposerControlGate::OPEN,
+        paging(&scope),
+        true,
+    )
+    .unwrap();
+    assert!(run.transcript().unwrap().row_id(&reasoning).is_none());
+    assert_eq!(host.focused(), Some(ids.composer.editor));
+    assert_eq!(
+        host.text_surface(ids.composer.editor)
+            .unwrap()
+            .input
+            .external_baseline(),
+        baseline
+    );
+}
+
+#[test]
+fn abnormal_termination_preserves_visible_activity_and_has_a_selected_original_disclosure() {
+    let scope = RunScope::main("sep", "s");
+    let mut source = captured_run();
+    source.transcript.items.retain(|row| !row.is_provisional);
+    source.transcript.turns[0].status = "error".into();
+    source.transcript.turns[0].ended_at = Some(200.);
+    source.transcript.thinking_sources.live_turn_id = None;
+    let turn = source.transcript.turns[0].id.clone();
+    let mut run = RunPort::standard(7400, 7410..7600, scope.clone()).unwrap();
+    run.update(
+        &source,
+        Default::default(),
+        ComposerControlGate::OPEN,
+        paging(&scope),
+        true,
+    )
+    .unwrap();
+    let content = run.transcript().unwrap();
+    assert!(content.tool_run(&source.transcript.tools[0].id).is_some());
+    let button = content
+        .row_id(&TranscriptContentRowKey::ActivityDisclosure(turn))
+        .unwrap();
+    let host = run.into_host().unwrap();
+    assert!(
+        host.get(button)
+            .unwrap()
+            .component::<ButtonContent>()
+            .unwrap()
+            .button
+            .state
+            .selected
+    );
+}
+
+#[test]
+fn readonly_activity_uses_its_own_publication_and_invalidates_old_plans_without_a_writable_run() {
+    let scope = RunScope::main("sep", "s");
+    let mut store = captured_store();
+    store.apply("journal:s",json!({"type":"event","generation":"g","sessionId":"s","entry":{"event":{"type":"turn/end","seq":5,"time":200,"data":{"turn":1,"reason":"completed"}}}})).unwrap();
+    let mut presentation = PresentationStore::default();
+    presentation
+        .select(ComposerDestination::run(scope.clone()))
+        .unwrap();
+    let source = presentation.refresh(&store).unwrap();
+    let turn = source.transcript.turns[0].id.clone();
+    let mut view =
+        ReadOnlyTranscript::standard(7700, 7710..7900, scope.clone(), Default::default()).unwrap();
+    let input = ReadOnlyTranscriptInput {
+        scope: &scope,
+        publication: 500,
+        connection_epoch: source.connection_epoch,
+        connection: &source.connection,
+        transcript: &source.transcript,
+        frame_current: true,
+        source_ready: true,
+        supports_pagination: false,
+        reading: false,
+        read_error: None,
+    };
+    view.update(input).unwrap();
+    let before = view.prepare_update(input).unwrap();
+    let collapsed = before.item_ids();
+    tekes_agent_ui_consumer_check::set_readonly_activity_expansion(&mut view, &turn, true).unwrap();
+    assert!(view.validate_prepared_update(&before).is_err());
+    let after = view.prepare_update(input).unwrap();
+    assert!(after.item_ids().len() > collapsed.len());
+    view.apply_prepared_update(&after).unwrap();
+    assert_eq!(view.content().footnote_timing().live_turn_id, None);
+    assert!(!view.content().feedback_enabled());
+    assert!(
+        view.content()
+            .tool_run(&source.transcript.tools[0].id)
+            .is_some()
+    );
 }

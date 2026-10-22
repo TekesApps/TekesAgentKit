@@ -1,14 +1,18 @@
 //! Owned protocol history + original disclosure controls and SDK reflow.
 use super::*;
 use tekes_agent_components_ui::{
-    InputMessage, OutputContentIds, OutputContentKind, OutputMessage, RunPort, ToolActivity,
-    TranscriptContentRowKey,
+    InputMessage, OutputContentIds, OutputContentKind, OutputMessageFragment, RunPort,
+    ToolActivity, TranscriptContentRowKey,
 };
-use tekes_ui_controls::composition::ScrollContent;
+use tekes_ui_controls::composition::{ButtonContent, ScrollContent, TextFieldContent};
 use tekes_ui_controls::{ScrollRevealOptions, ScrollRevealPlacement, extended::Axis};
 use tekes_ui_platform_macos::selftest::{Action, run_script};
 pub(super) struct Probe {
     phase: u8,
+    activity: Option<ComponentId>,
+    tool_text: Option<ComponentId>,
+    tool_owner: usize,
+    reason_owner: usize,
     started: Instant,
     tool: Option<OutputContentIds>,
     reason: Option<OutputContentIds>,
@@ -24,6 +28,10 @@ impl Probe {
         run_script(vec![(25000, Action::Close)]);
         Self {
             phase: 0,
+            activity: None,
+            tool_text: None,
+            tool_owner: 0,
+            reason_owner: 0,
             started: Instant::now(),
             tool: None,
             reason: None,
@@ -158,6 +166,33 @@ impl Probe {
                         .content_ids()
                         .map(|tool| (id, tool))
                 }) else {
+                    let Some(button) = content
+                        .row_keys()
+                        .iter()
+                        .rev()
+                        .filter(|key| matches!(key, TranscriptContentRowKey::ActivityDisclosure(_)))
+                        .nth(3)
+                        .and_then(|key| content.row_id(key))
+                    else {
+                        return;
+                    };
+                    assert!(
+                        !host
+                            .view
+                            .tree
+                            .get(button)
+                            .unwrap()
+                            .component::<ButtonContent>()
+                            .unwrap()
+                            .button
+                            .state
+                            .selected,
+                        "normal history starts collapsed"
+                    );
+                    self.activity = Some(button);
+                    Self::reveal(host, button);
+                    self.phase = 100;
+                    window.request_redraw();
                     return;
                 };
                 let (reason_row, reason) = content
@@ -169,18 +204,62 @@ impl Probe {
                             .tree
                             .get(id)
                             .unwrap()
-                            .component::<OutputMessage>()?
+                            .component::<OutputMessageFragment>()?
                             .content_ids()
                             .into_iter()
                             .find(|part| part.kind == OutputContentKind::Reasoning)
                             .map(|part| (id, part))
                     })
                     .expect("owned normalized reasoning block");
+                let tool_member = content
+                    .row_keys()
+                    .iter()
+                    .find_map(|key| {
+                        let TranscriptContentRowKey::Tool(id) = key else {
+                            return None;
+                        };
+                        content.tool_activity_id(id)
+                    })
+                    .unwrap();
+                self.tool_text = Some(
+                    host.view
+                        .tree
+                        .get(tool_member)
+                        .unwrap()
+                        .component::<ToolActivity>()
+                        .unwrap()
+                        .tool_detail_sections()[1]
+                        .body,
+                );
                 self.tool = Some(tool);
                 self.reason = Some(reason);
                 self.tool_row = Some(tool_row);
                 Self::reveal(host, reason_row);
                 self.phase = 1;
+            }
+            100 if window.is_active() => {
+                run_script(vec![(0, Self::click(host, self.activity.unwrap()))]);
+                self.phase = 101;
+            }
+            101 if Self::run(host)
+                .transcript()
+                .unwrap()
+                .row_keys()
+                .iter()
+                .any(|key| matches!(key, TranscriptContentRowKey::Tool(_))) =>
+            {
+                assert!(
+                    host.view
+                        .tree
+                        .get(self.activity.unwrap())
+                        .unwrap()
+                        .component::<ButtonContent>()
+                        .unwrap()
+                        .button
+                        .state
+                        .selected
+                );
+                self.phase = 0;
             }
             1 => {
                 run_script(vec![(
@@ -249,6 +328,20 @@ impl Probe {
             6 if window.is_active() && Self::run(host).composer().is_composing() => {
                 self.baseline = Some(host.view.editor().input.external_baseline());
                 self.editor = host.view.editor() as *const _ as usize;
+                self.tool_owner = host
+                    .view
+                    .tree
+                    .get(self.tool_text.unwrap())
+                    .unwrap()
+                    .component::<TextFieldContent>()
+                    .unwrap() as *const _ as usize;
+                self.reason_owner = host
+                    .view
+                    .tree
+                    .get(self.reason.as_ref().unwrap().body)
+                    .unwrap()
+                    .component::<TextFieldContent>()
+                    .unwrap() as *const _ as usize;
                 self.unchanged(host);
                 self.resized_at = Some(Instant::now());
                 run_script(vec![
@@ -302,8 +395,60 @@ impl Probe {
                         .get(self.reason.as_ref().unwrap().body)
                         .is_some()
                 );
-                run_script(vec![(0, Action::Unmark), (100, Action::Close)]);
+                run_script(vec![(0, Self::click(host, self.activity.unwrap()))]);
                 self.phase = 11;
+            }
+            11 if host.view.tree.get(self.tool_text.unwrap()).is_none()
+                && host
+                    .view
+                    .tree
+                    .get(self.reason.as_ref().unwrap().body)
+                    .is_none() =>
+            {
+                self.unchanged(host);
+                assert!(
+                    !host
+                        .view
+                        .tree
+                        .get(self.activity.unwrap())
+                        .unwrap()
+                        .component::<ButtonContent>()
+                        .unwrap()
+                        .button
+                        .state
+                        .selected
+                );
+                run_script(vec![(0, Self::click(host, self.activity.unwrap()))]);
+                self.phase = 12;
+            }
+            12 if host.view.tree.get(self.tool_text.unwrap()).is_some()
+                && host
+                    .view
+                    .tree
+                    .get(self.reason.as_ref().unwrap().body)
+                    .is_some() =>
+            {
+                self.unchanged(host);
+                assert_eq!(
+                    host.view
+                        .tree
+                        .get(self.tool_text.unwrap())
+                        .unwrap()
+                        .component::<TextFieldContent>()
+                        .unwrap() as *const _ as usize,
+                    self.tool_owner
+                );
+                assert_eq!(
+                    host.view
+                        .tree
+                        .get(self.reason.as_ref().unwrap().body)
+                        .unwrap()
+                        .component::<TextFieldContent>()
+                        .unwrap() as *const _ as usize,
+                    self.reason_owner
+                );
+                run_script(vec![(0, Action::Unmark), (100, Action::Close)]);
+                self.phase = 13;
             }
             _ => {}
         }
@@ -313,7 +458,7 @@ impl Probe {
         }
     }
     pub fn receipt(&self) -> serde_json::Value {
-        assert_eq!(self.phase, 11);
-        serde_json::json!({"nativeWindow":true,"ownedProtocolHistory":true,"originalToolAndReasoningClicks":true,"expandedDetailsRetained":true,"liveResize":true,"typeScaleReflow":true,"readingAnchorPreserved":true,"originalEditorFocusAndChineseMarked":true,"noSubmission":true,"realHarness":false,"physicalIme":false,"physicalResizeDrag":false,"voiceOver":false})
+        assert_eq!(self.phase, 13);
+        serde_json::json!({"nativeWindow":true,"ownedProtocolHistory":true,"originalToolAndReasoningClicks":true,"normalActivityInitiallyCollapsed":true,"activityExpandCollapseReopenClicks":true,"originalToolAndReasoningTextOwnersRetained":true,"expandedDetailsRetained":true,"liveResize":true,"typeScaleReflow":true,"readingAnchorPreserved":true,"originalEditorFocusAndChineseMarked":true,"noSubmission":true,"realHarness":false,"physicalIme":false,"physicalResizeDrag":false,"voiceOver":false})
     }
 }

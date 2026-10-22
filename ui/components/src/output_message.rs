@@ -1,6 +1,8 @@
 //! Agent machine-message composition. TekesUI owns text, controls and geometry.
+mod fragment;
 use crate::TranscriptMessageIdentity as Key;
 use crate::tool_detail_content::{ToolDetailContent, ToolDetailFacts};
+pub use fragment::*;
 use tekes_agent_presentation::{
     RunScope, TranscriptBlockContent, TranscriptItem, TranscriptItemKind, TranscriptOutput,
     TranscriptSection, TranscriptToolCall, TranscriptToolDetailWording, TranscriptToolRowState,
@@ -700,6 +702,7 @@ impl Component for OutputPart {
 #[derive(Debug)]
 pub struct OutputMessage {
     state: OutputMessageState,
+    split_mask: u8,
     rows: StackContent,
 }
 // Canonical identity/provenance and update admission do not own a widget tree.
@@ -747,6 +750,7 @@ impl OutputMessage {
                 bounded_details: false,
                 thinking: None,
             },
+            split_mask: 0,
             rows: StackContent {
                 model: Stack {
                     axis: Axis::Vertical,
@@ -822,21 +826,7 @@ impl OutputMessage {
         part_nodes(&self.rows.children)
     }
     fn visible_part_nodes(&self) -> Vec<&Content> {
-        self.rows
-            .children
-            .iter()
-            .flat_map(|node| {
-                if let Some(group) = node.component::<crate::ToolRun>() {
-                    if group.is_expanded() {
-                        group.member_nodes().collect()
-                    } else {
-                        vec![]
-                    }
-                } else {
-                    vec![node]
-                }
-            })
-            .collect()
+        visible_part_nodes(&self.rows.children)
     }
     pub fn tool_run(&self, tool_id: &str) -> Option<&crate::ToolRun> {
         self.rows
@@ -859,6 +849,9 @@ impl OutputMessage {
         output: &TranscriptOutput<'_>,
         section: Option<&TranscriptSection<'_>>,
     ) -> Result<(), &'static str> {
+        if self.split_mask != 0 {
+            return Err("split output requires its original Transcript fragments");
+        }
         if scope != &self.state.scope {
             return Err("output message scope mismatch");
         }
@@ -882,6 +875,9 @@ impl OutputMessage {
         section: Option<&TranscriptSection<'_>>,
         thinking: &tekes_agent_presentation::TranscriptThinkingFrame,
     ) -> Result<(), &'static str> {
+        if self.split_mask != 0 {
+            return Err("split output requires its original Transcript fragments");
+        }
         let stamp = self
             .state
             .thinking_stamp(publication, epoch, output, thinking)?;
@@ -902,11 +898,14 @@ impl OutputMessage {
         section: Option<&TranscriptSection<'_>>,
         thinking: &tekes_agent_presentation::TranscriptThinkingFrame,
     ) -> Result<(), &'static str> {
+        if self.split_mask != 0 {
+            return Err("split output requires its original Transcript fragments");
+        }
         let stamp = self
             .state
             .thinking_stamp(publication, epoch, output, thinking)?;
         self.state.check_update_display(
-            &self.rows.children,
+            self.rows.children.iter(),
             publication,
             epoch,
             output,
@@ -924,11 +923,14 @@ impl OutputMessage {
         output: &TranscriptOutput<'_>,
         section: Option<&TranscriptSection<'_>>,
     ) -> Result<(Key, Vec<PartFacts>, u64), &'static str> {
+        if self.split_mask != 0 {
+            return Err("split output requires its original Transcript fragments");
+        }
         if scope != &self.state.scope {
             return Err("output message scope mismatch");
         }
         self.state.check_update_display(
-            &self.rows.children,
+            self.rows.children.iter(),
             publication,
             epoch,
             output,
@@ -940,31 +942,7 @@ impl OutputMessage {
     /// UI-local disclosure only. The host drains the original ContentHost action
     /// batch exactly once; retired button IDs cannot target a replacement block.
     pub fn handle_actions(&mut self, actions: &[ContentAction]) -> bool {
-        fn toggle(part: &mut OutputPart, actions: &[ContentAction]) -> bool {
-            let id = part.ids.disclosure;
-            let count = actions
-                .iter()
-                .filter(|a| a.kind == ContentActionKind::Activate && id == Some(a.target))
-                .count();
-            for _ in 0..count {
-                part.toggle();
-            }
-            count > 0
-        }
-        let mut changed = false;
-        for node in &mut self.rows.children {
-            if let Some(group) = node.component_mut::<crate::ToolRun>() {
-                changed |= group.handle_disclosure(actions);
-                if group.is_expanded() {
-                    for node in group.member_nodes_mut() {
-                        changed |= toggle(node.component_mut::<OutputPart>().unwrap(), actions);
-                    }
-                }
-            } else {
-                changed |= toggle(node.component_mut::<OutputPart>().unwrap(), actions);
-            }
-        }
-        changed
+        handle_part_actions(&mut self.rows.children, actions)
     }
 
     pub fn into_host(self) -> Result<ContentHost, CompositionError> {
@@ -1040,7 +1018,7 @@ impl OutputMessageState {
         thinking: Option<ThinkingStamp>,
     ) -> Result<(), &'static str> {
         let (key, facts, header_revision) = self.check_update_display(
-            nodes,
+            nodes.iter(),
             publication,
             epoch,
             output,
@@ -1208,9 +1186,9 @@ impl OutputMessageState {
         self.thinking = thinking;
         Ok(())
     }
-    fn check_update_display(
+    fn check_update_display<'nodes>(
         &self,
-        nodes: &[Content],
+        nodes: impl IntoIterator<Item = &'nodes Content>,
         publication: u64,
         epoch: u64,
         output: &TranscriptOutput<'_>,
@@ -1307,11 +1285,12 @@ impl OutputMessageState {
         {
             return Err("conflicting output message publication");
         }
+        let nodes: Vec<_> = nodes.into_iter().collect();
         for next in facts
             .iter()
             .filter(|part| part.slot == Slot::ThinkingStatus)
         {
-            if part_nodes(nodes)
+            if part_nodes_iter(nodes.iter().copied())
                 .into_iter()
                 .filter_map(|node| node.component::<OutputPart>())
                 .any(|part| {
@@ -1432,9 +1411,57 @@ impl OutputMessageState {
     }
 }
 
-fn part_nodes(nodes: &[Content]) -> Vec<&Content> {
+fn handle_part_actions(nodes: &mut [Content], actions: &[ContentAction]) -> bool {
+    fn toggle(part: &mut OutputPart, actions: &[ContentAction]) -> bool {
+        let id = part.ids.disclosure;
+        let count = actions
+            .iter()
+            .filter(|a| a.kind == ContentActionKind::Activate && id == Some(a.target))
+            .count();
+        for _ in 0..count {
+            part.toggle();
+        }
+        count > 0
+    }
+    let mut changed = false;
+    for node in nodes {
+        if let Some(group) = node.component_mut::<crate::ToolRun>() {
+            changed |= group.handle_disclosure(actions);
+            if group.is_expanded() {
+                for node in group.member_nodes_mut() {
+                    changed |= toggle(node.component_mut::<OutputPart>().unwrap(), actions);
+                }
+            }
+        } else {
+            changed |= toggle(node.component_mut::<OutputPart>().unwrap(), actions);
+        }
+    }
+    changed
+}
+
+fn visible_part_nodes(nodes: &[Content]) -> Vec<&Content> {
     nodes
         .iter()
+        .flat_map(|node| {
+            if let Some(group) = node.component::<crate::ToolRun>() {
+                if group.is_expanded() {
+                    group.member_nodes().collect()
+                } else {
+                    vec![]
+                }
+            } else {
+                vec![node]
+            }
+        })
+        .collect()
+}
+
+fn part_nodes(nodes: &[Content]) -> Vec<&Content> {
+    part_nodes_iter(nodes.iter())
+}
+fn part_nodes_iter<'a>(nodes: impl IntoIterator<Item = &'a Content>) -> Vec<&'a Content> {
+    nodes
+        .into_iter()
         .flat_map(|node| {
             if let Some(group) = node.component::<crate::ToolRun>() {
                 group.member_nodes().collect()

@@ -3821,7 +3821,7 @@ impl ComponentDemo {
     // controls. A feedback/custom editor does not inherit this exception.
     // IDs/visibility are read from mounted Kit controls; SDK owns actual hit,
     // focus, capture and event disposition. Never cache this list across events.
-    fn nonfocusing_copy_ids(&self) -> Vec<ComponentId> {
+    fn nonfocusing_transcript_control_ids(&self) -> Vec<ComponentId> {
         let Some(run) = self.composing_navigation_run() else {
             return vec![];
         };
@@ -3846,6 +3846,7 @@ impl ComponentDemo {
                 .and_then(|node| node.component::<RunPort>())
             {
                 ids.extend(run.copy_action_ids());
+                ids.extend(run.activity_action_ids());
             }
         }
         if let Some(root) = self.bounded_child_content_id()
@@ -3855,6 +3856,7 @@ impl ComponentDemo {
                 .and_then(|node| node.component::<tekes_agent_components_ui::TranscriptContent>())
         {
             ids.extend(content.copy_action_ids());
+            ids.extend(content.activity_action_ids());
         }
         ids.retain(|id| {
             self.tree
@@ -3880,7 +3882,7 @@ impl ComponentDemo {
             _ => None,
         };
         position.is_some_and(|position| {
-            if self.nonfocusing_copy_ids().iter().any(|id| {
+            if self.nonfocusing_transcript_control_ids().iter().any(|id| {
                 self.tree
                     .get(*id)
                     .and_then(|node| node.visible())
@@ -3940,7 +3942,7 @@ impl ComponentDemo {
             })
             && !(matches!(action, AccessibilityAction::Press)
                 && part.is_none()
-                && self.nonfocusing_copy_ids().contains(&target))
+                && self.nonfocusing_transcript_control_ids().contains(&target))
             && !(matches!(action, AccessibilityAction::Press)
                 && part.is_none()
                 && self
@@ -4000,6 +4002,7 @@ impl ComponentDemo {
         for (ids, binding, intent) in routed {
             use tekes_agent_components_ui::RunPortIntent;
             match intent {
+                RunPortIntent::TranscriptLayoutChanged { .. } => {}
                 RunPortIntent::Composer(intent) => intents.push((binding, intent)),
                 RunPortIntent::JumpLatest(intent) => {
                     local_navigation = true;
@@ -4465,9 +4468,9 @@ impl ComponentDemo {
         if let Some(root) = self.bounded_child_content_id() {
             let content = self
                 .tree
-                .get(root)
+                .get_mut(root)
                 .unwrap()
-                .component::<tekes_agent_components_ui::TranscriptContent>()
+                .component_mut::<tekes_agent_components_ui::TranscriptContent>()
                 .unwrap();
             commands.extend(
                 content
@@ -4475,6 +4478,7 @@ impl ComponentDemo {
                     .into_iter()
                     .map(DemoCommand::CopyTranscript),
             );
+            content.handle_activity_actions(&actions);
         }
         if !self.composing()
             && let Some(SidePanelTabKind::Subagent { child_id }) =
