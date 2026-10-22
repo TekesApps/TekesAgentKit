@@ -1,5 +1,7 @@
 # Rust Agent UI 组件接入契约
 
+Latest tool-card data and bridge evidence: [typed facts and exit-status selection](rust-agent-ui-tool-card-20261022.md).
+
 Latest collapsed row evidence: [shared tool-row model](rust-agent-ui-tool-row-20261022.md).
 
 Latest journal lifecycle evidence: [tool closure and late results](rust-agent-ui-tool-lifecycle-20261022.md).

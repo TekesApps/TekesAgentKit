@@ -44,7 +44,7 @@ fn successful_report_is_authoritative_and_stdout_never_replaces_the_action() {
     assert_eq!(t.presentation_row(w).text(), "Shell · echo owned");
 }
 #[test]
-fn explicit_errors_use_result_but_exit_status_only_failure_keeps_action_summary() {
+fn canonical_failures_use_result_including_public_meta_exit_failures() {
     let mut t = tool();
     t.phase = "error".into();
     t.result = Some(json!({"isError":false,"content":[{"text":"output"}]}));
@@ -53,7 +53,7 @@ fn explicit_errors_use_result_but_exit_status_only_failure_keeps_action_summary(
     w.result = Some("failure line\nfull error");
     let row = t.presentation_row(w);
     assert_eq!(row.state, TranscriptToolRowState::Error);
-    assert_eq!(row.text(), "Shell · echo owned");
+    assert_eq!(row.text(), "Shell · failure line");
     for marker in 0..3 {
         t.result_error = None;
         t.result = Some(json!({"isError":false,"content":[]}));
@@ -100,4 +100,39 @@ fn semantic_arguments_encoded_json_and_stable_fallback_match_replay() {
         row
     );
     assert_eq!(t, original);
+}
+#[test]
+fn legacy_shell_exit_marker_is_failed_without_promoting_stdout_to_error_summary() {
+    let mut t = tool();
+    t.phase = "done".into();
+    t.arguments = json!({"command":"test -f owned.rs","description":"检查文件"});
+    t.result = Some(json!({"content":[{"type":"text","text":"ordinary output\n[exit code: 2]"}]}));
+    let w = TranscriptToolRowWording {
+        label: "Shell",
+        title_hint: Some("检查文件"),
+        result: Some("ordinary output\n[exit code: 2]"),
+        ..Default::default()
+    };
+    let row = t.presentation_row(w);
+    assert_eq!(row.state, TranscriptToolRowState::Error);
+    assert_eq!(row.text(), "Shell · 检查文件");
+    assert!(row.error_summary.is_none());
+}
+
+#[test]
+fn legacy_exit_failure_does_not_require_valid_arguments_or_a_persistent_shell_card() {
+    let mut t = tool();
+    t.phase = "done".into();
+    t.arguments = json!({"command":"owned"});
+    t.result = Some(json!({"content":[{"text":"out\n[exit code: 2]"}]}));
+    assert!(t.presentation_card().is_none());
+    assert_eq!(
+        t.presentation_row(wording()).state,
+        TranscriptToolRowState::Error
+    );
+    t.arguments = json!("malformed");
+    assert_eq!(
+        t.presentation_row(wording()).state,
+        TranscriptToolRowState::Error
+    );
 }

@@ -1,0 +1,181 @@
+{
+  "sourceBase": "134d8d6a8e978b7afe569b0bdf6b62c1dcaba3f0",
+  "status": "unpublished-development-input",
+  "completionProven": false,
+  "tekesui": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "validation": {
+    "root-tests": {
+      "passed": 234,
+      "failed": 0,
+      "ignored": 0
+    },
+    "ui-tests": {
+      "passed": 548,
+      "failed": 0,
+      "ignored": 1
+    }
+  },
+  "newCardTests": 11,
+  "newRowTests": 2,
+  "newIndependentConsumerTests": 1,
+  "richCardRendering": false,
+  "native": "deferred-user-away",
+  "crossProcess": "not-accepted",
+  "foundationReference": "data conversion only; no native window or Swift toolchain",
+  "cache": {
+    "target": "/tmp/agentkit-layout-text-292-target",
+    "newTargets": 0,
+    "newAcceptanceProgramCopies": 0,
+    "deletedBytes": 0
+  },
+  "evidence": {
+    ".runtime-fixtures/tool-card-20261022/card-tests.log": {
+      "bytes": 1784,
+      "sha256": "2b40651adf712eaa12336c6132881a14c764544981cd55ad23d3a3754fc6ef29"
+    },
+    ".runtime-fixtures/tool-card-20261022/foundation-number-reference.js": {
+      "bytes": 479,
+      "sha256": "6617e87c33bcf5d52067fb010d285cbc1d699105b16e176d477a13ed773d70ac"
+    },
+    ".runtime-fixtures/tool-card-20261022/foundation-number-reference.json": {
+      "bytes": 698,
+      "sha256": "d945b53aec19e589bd9d256fbdf157eb230e3bbefed3cf767a714e2921d587df"
+    },
+    ".runtime-fixtures/tool-card-20261022/headless-boundaries.log": {
+      "bytes": 48,
+      "sha256": "e9fa1e12a0afd70528040f81fe3199172a3974910d7760c0216bb6d110181081"
+    },
+    ".runtime-fixtures/tool-card-20261022/regression-before.log": {
+      "bytes": 1048,
+      "sha256": "12eb50ad93a9d410ab9d666cb6a56fbdfa02586d6e49ad765c1ca0beb52238da"
+    },
+    ".runtime-fixtures/tool-card-20261022/root-clippy-before-bridge-fix.log": {
+      "bytes": 434,
+      "sha256": "7fa21460be3711b9fe12e7069afa84bc6824f9d8e0661dca75b580dd16747a2c"
+    },
+    ".runtime-fixtures/tool-card-20261022/root-clippy-before-number-reference.log": {
+      "bytes": 434,
+      "sha256": "9189b30354a1b99d96c7895194defd056c2015e3b6cb8112a7cb1b626d88de1d"
+    },
+    ".runtime-fixtures/tool-card-20261022/root-clippy-before-style-fix.log": {
+      "bytes": 1211,
+      "sha256": "1d1d8d00b1787e69b9c48dc5861ef47bdbffc5077a8e7aa910aabb050103ba60"
+    },
+    ".runtime-fixtures/tool-card-20261022/root-clippy.log": {
+      "bytes": 434,
+      "sha256": "2c347aa4a434847551a7506fbe3612bfac8fefcc66a57c21385412ec8bb2e558"
+    },
+    ".runtime-fixtures/tool-card-20261022/root-metadata.json": {
+      "bytes": 1151938,
+      "sha256": "9aaab52256ac26eebf8a1c958bb27e7d4364ad469e8dfb4eeb7528c6355dbc7c"
+    },
+    ".runtime-fixtures/tool-card-20261022/root-tests-before-bridge-fix.log": {
+      "bytes": 28461,
+      "sha256": "10459b96cac7e42222894d5ebc41c65321d560d39d71b1e80b502a4823b5dd6d"
+    },
+    ".runtime-fixtures/tool-card-20261022/root-tests-before-number-reference.log": {
+      "bytes": 28636,
+      "sha256": "a1f6f3af5628801bfac30ae528e7d0acd69363cb901f828e58138c0eb53e90fa"
+    },
+    ".runtime-fixtures/tool-card-20261022/root-tests.log": {
+      "bytes": 28726,
+      "sha256": "234e50f099ee9468cd2b2041d41b40dc39f5ce5337e4f6083c1a382e708441ef"
+    },
+    ".runtime-fixtures/tool-card-20261022/row-tests.log": {
+      "bytes": 939,
+      "sha256": "4c62fda9c10a27c90493e1af1cf01e291255193a24480299e3cfa3f5d5d208bc"
+    },
+    ".runtime-fixtures/tool-card-20261022/source-bridge-regression-before.log": {
+      "bytes": 1811,
+      "sha256": "f8483e3c99f94aad7f602b18e682bdfcb436523a6f88fed1b13fa97c0fdde741"
+    },
+    ".runtime-fixtures/tool-card-20261022/source-row-regression-before.log": {
+      "bytes": 1772,
+      "sha256": "b1a548d6bac7f60776a359a19f5a224003da992ef448555ca2e02714a7cd6667"
+    },
+    ".runtime-fixtures/tool-card-20261022/tekesui-25-comments-before.json": {
+      "bytes": 2036,
+      "sha256": "213e651dd37620eb120e8cf29ab008d6888556820c509b1d709e2c99c5eaa787"
+    },
+    ".runtime-fixtures/tool-card-20261022/ui-boundaries.log": {
+      "bytes": 86,
+      "sha256": "9480cc4382559b9a7a99240226a9f766048e30c8d38bb4bccd1fd8bca56661ad"
+    },
+    ".runtime-fixtures/tool-card-20261022/ui-clippy-before-bridge-fix.log": {
+      "bytes": 430,
+      "sha256": "42760e36bd87673465a6c49f0b2bbfc5b34aa919f2b9aa6ada1f1c3d2438dab0"
+    },
+    ".runtime-fixtures/tool-card-20261022/ui-clippy-before-consumer-exports.log": {
+      "bytes": 2045,
+      "sha256": "fcd0d899b565fd0e3612b81d556e3909b5a1ab588dfc1c1258fe373aa434d397"
+    },
+    ".runtime-fixtures/tool-card-20261022/ui-clippy-before-number-reference.log": {
+      "bytes": 614,
+      "sha256": "521d368c4586fc041197cbe27f36157accbebf6ffddc520265797ce5bef1a766"
+    },
+    ".runtime-fixtures/tool-card-20261022/ui-clippy.log": {
+      "bytes": 614,
+      "sha256": "34d16f0966c640a12af61bcd4f8df0bc1eac70a8d588f0bc6bace79d55835620"
+    },
+    ".runtime-fixtures/tool-card-20261022/ui-inputs.json": {
+      "bytes": 225,
+      "sha256": "9543ade335292f9c7f61944edd341c2fb9297a7c6abc3cf44dc86c1f16bd6ee3"
+    },
+    ".runtime-fixtures/tool-card-20261022/ui-metadata.json": {
+      "bytes": 1608771,
+      "sha256": "1a60580cd0537373e5ca611357a5e51ae2e70f354ae18dbbad83c67730202f45"
+    },
+    ".runtime-fixtures/tool-card-20261022/ui-tests-before-bridge-fix.log": {
+      "bytes": 68842,
+      "sha256": "6a05c3b4ab1190c3f0f9b9a08f2114b23a1f03a5a35a946f8abbc87b0c32570d"
+    },
+    ".runtime-fixtures/tool-card-20261022/ui-tests-before-consumer-exports.log": {
+      "bytes": 2045,
+      "sha256": "070aac055102789b76bd4dd2c1c046e554f3c1f1d302dc7272bcfe924d93e44d"
+    },
+    ".runtime-fixtures/tool-card-20261022/ui-tests-before-number-reference.log": {
+      "bytes": 69026,
+      "sha256": "7082e3366ef25a82f011468f5e6a4251816dc609666a9264c1e4c8cba123b086"
+    },
+    ".runtime-fixtures/tool-card-20261022/ui-tests.log": {
+      "bytes": 69026,
+      "sha256": "3fe785bf8739241ec4dfd9a2031ee3596ceef8d31a0c7f43845612d4f602c3bf"
+    },
+    "crates/presentation/src/tool_card.rs": {
+      "bytes": 18676,
+      "sha256": "4ef9ac06990595497f186848a8f3237e12f54a1989013abbc01997c15196801f"
+    },
+    "crates/presentation/src/tool_row.rs": {
+      "bytes": 5871,
+      "sha256": "72117307c1d6d830506b13ec972cf66f662e84a16a18d328d088915ae6a4f889"
+    },
+    "crates/presentation/tests/tool_card.rs": {
+      "bytes": 13426,
+      "sha256": "4cec1d5537ad407377785834d7d43afe8c426c7f321d60107b19569b8c17a5c7"
+    },
+    "crates/presentation/tests/tool_row.rs": {
+      "bytes": 5210,
+      "sha256": "8e61cfeba0242a639e0e0d00ad725fb650d2f2fb25d9cbd7bee21a2537d838b6"
+    },
+    "ui/components/src/output_message.rs": {
+      "bytes": 28013,
+      "sha256": "28f209007c0083f0b3296c903cd4fff9af7e224497d942a02d6d343584f5c979"
+    },
+    "ui/components/src/lib.rs": {
+      "bytes": 17144,
+      "sha256": "a260c00d62c0747730f7bbf7e6ddc03364081b7cc2b7167589e7ff0641c11ca1"
+    },
+    "ui/consumer/tests/tool_titles.rs": {
+      "bytes": 7048,
+      "sha256": "d1acfb01e57d0d26f1e340c52148f58828832b92b2dd65c3992529cf6123b04f"
+    },
+    "Cargo.lock": {
+      "bytes": 58061,
+      "sha256": "80008a6231bf1ee6750d86f39f674ffcadd3ef2bfa213e856822f91d084fe46e"
+    },
+    "ui/Cargo.lock": {
+      "bytes": 77443,
+      "sha256": "0eb0a586a9c87e15eab63180c066b63535127c4bede2b02529caf7dd5d554e9b"
+    }
+  }
+}

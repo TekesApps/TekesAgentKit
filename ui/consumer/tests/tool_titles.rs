@@ -167,3 +167,36 @@ fn independent_tool_activity_consumes_producer_views_without_losing_focus_select
         Some(ids)
     );
 }
+#[test]
+fn independent_legacy_terminal_card_exposes_exit_failure_without_changing_source_phase() {
+    let scope = RunScope::main("public-consumer", "legacy-terminal");
+    let tool = TranscriptToolCall {
+        id: "legacy-call".into(), turn_id: "turn".into(), name: "shell".into(), phase: "done".into(),
+        arguments: r#"{"command":"test -f owned.rs","description":"检查文件"}"#.parse().unwrap(),
+        call_view: Some(r#"{"for":"call","view":{"card":"terminal","description":"检查文件"}}"#.parse().unwrap()),
+        result: Some(r#"{"isError":false,"content":[{"type":"text","text":"owned output\n[exit code: 2]"}]}"#.parse().unwrap()),
+        result_meta: None, result_error: None, result_view: None, source_position: None, result_position: None,
+    };
+    let original = tool.clone();
+    let Some(TranscriptToolCardModel::Terminal(card)) = tool.presentation_card() else {
+        panic!("missing public terminal facts")
+    };
+    assert!(card.exit_failed());
+    assert_eq!(card.output.as_deref(), Some("owned output"));
+    let mut activity = ToolActivity::new(734, scope.clone(), Default::default());
+    activity
+        .update(&scope, 1, 1, &tool, ToolActivityPlacement::Call)
+        .unwrap();
+    let ids = activity.content_ids().unwrap();
+    let host = activity.into_host().unwrap();
+    let label = &host
+        .get(ids.disclosure.unwrap())
+        .unwrap()
+        .component::<ButtonContent>()
+        .unwrap()
+        .label;
+    assert!(label.contains("Shell · 检查文件 · error"));
+    assert!(!label.contains("owned output"));
+    assert_eq!(tool, original);
+    assert_eq!(tool.phase, "done");
+}

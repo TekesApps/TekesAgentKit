@@ -1,5 +1,5 @@
 {
-  "sourceBase": "d2d9c979bf25d8dfdfcb80e598748e7e093d8afc",
+  "sourceBase": "134d8d6a8e978b7afe569b0bdf6b62c1dcaba3f0",
   "completionProven": false,
   "publicAgentKitRelease": {
     "publishedAt": "2026-10-19T14:25:34Z",
@@ -308,53 +308,52 @@
     }
   ],
   "ciSnapshot": {
-    "headRefOid": "d2d9c979bf25d8dfdfcb80e598748e7e093d8afc",
+    "headRefOid": "134d8d6a8e978b7afe569b0bdf6b62c1dcaba3f0",
     "isDraft": true,
     "reviews": [],
     "statusCheckRollup": [
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-22T12:56:07Z",
+        "completedAt": "2026-10-22T14:20:36Z",
         "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39782214631/job/119836074830",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39794574096/job/119878574638",
         "name": "checks",
-        "startedAt": "2026-10-22T12:54:19Z",
+        "startedAt": "2026-10-22T14:18:46Z",
         "status": "COMPLETED",
         "workflowName": "Rust headless"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-22T12:55:57Z",
+        "completedAt": "2026-10-22T14:20:36Z",
         "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39782206864/job/119836047101",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39794563661/job/119878539575",
         "name": "checks",
-        "startedAt": "2026-10-22T12:54:16Z",
+        "startedAt": "2026-10-22T14:18:42Z",
         "status": "COMPLETED",
         "workflowName": "Rust headless"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-22T12:59:43Z",
+        "completedAt": "2026-10-22T14:24:00Z",
         "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39782214631/job/119836074552",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39794574096/job/119878575689",
         "name": "Rust UI consumer (no native interaction)",
-        "startedAt": "2026-10-22T12:54:20Z",
+        "startedAt": "2026-10-22T14:18:47Z",
         "status": "COMPLETED",
         "workflowName": "Rust headless"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-22T12:59:03Z",
+        "completedAt": "2026-10-22T14:24:37Z",
         "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39782206864/job/119836048609",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39794563661/job/119878540032",
         "name": "Rust UI consumer (no native interaction)",
-        "startedAt": "2026-10-22T12:54:17Z",
+        "startedAt": "2026-10-22T14:18:43Z",
         "status": "COMPLETED",
         "workflowName": "Rust headless"
       }
     ]
   },
-  "newBuilds": 0,
   "newTargets": 0,
   "newProgramCopies": 0,
   "deletedBytes": 0,
@@ -364,16 +363,96 @@
   "importantScope": "Open #22/#26/#28 contain already consumed public capabilities; open issue is not proof of total absence. Historical receipts keep original source/program identity.",
   "documentationUpdatedThisAudit": true,
   "updatedDocumentation": {
-    "README.md": "829c8516dcc8664c961c07ace17bd046c8f45699177d3bd3dc705e0bbd2111e7",
-    "ui/README.md": "1886b8c5321d68209b4a87c97c40a0b63e9efacdc04bafbae68d59df0bdcb4c9",
+    "README.md": "d0dcb8e6548be85610092a17ac2703696872d89feaaa76a90b896cb49e3fd2f7",
+    "ui/README.md": "2dacf5a4726b3f1671f6c8fea0470bdc3bd7348d215f71cfd3df52c931b02627",
     "ui/bindings/README.md": "b1f8fe627e5637ef1942b67ed8134438c4a49bdcfb614db81cdaefb229177501",
-    "docs/rust-agent-ui-contract.md": "2c12146ff528e61ff4cb7cd518f273a57458e3b6866734f7cf35b93e7e72490a",
-    "docs/rust-agent-ui-delivery-status.md": "c8531a5be7d15a6202a1ef23951ff5feb7d2da663fdd609f32baef79b28f339b",
-    "docs/rust-agent-ui-host-integration.md": "a7dbba541e459e2bf96c7e6e4ec63192cf740ab4f21d989e26d1598d62460aa2"
+    "docs/rust-agent-ui-contract.md": "096eda47ec5ba017ca49be0fd70148af8538d276e9f05b8cc4d1760fc0af7bd8",
+    "docs/rust-agent-ui-delivery-status.md": "33976ee43c720aad48c671079bfbfea053e3dee50c29e2335ab43c5437f80cc2",
+    "docs/rust-agent-ui-host-integration.md": "4cc2861a3862a812c73dc7bd6f4353e0a08ec9e536f3945cb126f6919a4b06c6",
+    "docs/rust-agent-ui-tool-card-20261022.md": "a0b0e971460b0c6066e27499f2e0e4631a981e4be429a93b660c8409c3becd3f",
+    "docs/rust-agent-ui-tool-row-20261022.md": "b94d99891ad617d2f25b14ef472fe4dc51f79e53add3eb95f6e071de032c4e30"
   },
-  "localLinkValidationCount": 302,
   "publicProcessContractSources": {
     "crates/tekes-ui-module-runtime/src/container.rs": "b34423866204a1ee7e0346b5609ac3c4e1e278025ef8317962f44c54bb53b5e9",
     "crates/tekes-ui-app-protocol/src/component.rs": "9690f9953b84c69f18e9e88c08b728cbb9c8b7fdcc2a01289cb072c0e1ea368c"
-  }
+  },
+  "supplement": "rust-agent-ui-tool-card-20261022.json",
+  "latestLocalValidation": {
+    "root-tests": {
+      "passed": 234,
+      "failed": 0,
+      "ignored": 0
+    },
+    "ui-tests": {
+      "passed": 548,
+      "failed": 0,
+      "ignored": 1
+    }
+  },
+  "latestVerifiedCiHead": "134d8d6a8e978b7afe569b0bdf6b62c1dcaba3f0",
+  "latestVerifiedCiConclusion": "four-success",
+  "richToolCardRendering": false,
+  "historicalDocumentationAudit": {
+    "sourceBase": "d2d9c979bf25d8dfdfcb80e598748e7e093d8afc",
+    "ciSnapshot": {
+      "headRefOid": "d2d9c979bf25d8dfdfcb80e598748e7e093d8afc",
+      "isDraft": true,
+      "reviews": [],
+      "statusCheckRollup": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-22T12:56:07Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39782214631/job/119836074830",
+          "name": "checks",
+          "startedAt": "2026-10-22T12:54:19Z",
+          "status": "COMPLETED",
+          "workflowName": "Rust headless"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-22T12:55:57Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39782206864/job/119836047101",
+          "name": "checks",
+          "startedAt": "2026-10-22T12:54:16Z",
+          "status": "COMPLETED",
+          "workflowName": "Rust headless"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-22T12:59:43Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39782214631/job/119836074552",
+          "name": "Rust UI consumer (no native interaction)",
+          "startedAt": "2026-10-22T12:54:20Z",
+          "status": "COMPLETED",
+          "workflowName": "Rust headless"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-22T12:59:03Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39782206864/job/119836048609",
+          "name": "Rust UI consumer (no native interaction)",
+          "startedAt": "2026-10-22T12:54:17Z",
+          "status": "COMPLETED",
+          "workflowName": "Rust headless"
+        }
+      ]
+    },
+    "newBuilds": 0,
+    "localLinkValidationCount": 302,
+    "updatedDocumentation": {
+      "README.md": "829c8516dcc8664c961c07ace17bd046c8f45699177d3bd3dc705e0bbd2111e7",
+      "ui/README.md": "1886b8c5321d68209b4a87c97c40a0b63e9efacdc04bafbae68d59df0bdcb4c9",
+      "ui/bindings/README.md": "b1f8fe627e5637ef1942b67ed8134438c4a49bdcfb614db81cdaefb229177501",
+      "docs/rust-agent-ui-contract.md": "2c12146ff528e61ff4cb7cd518f273a57458e3b6866734f7cf35b93e7e72490a",
+      "docs/rust-agent-ui-delivery-status.md": "c8531a5be7d15a6202a1ef23951ff5feb7d2da663fdd609f32baef79b28f339b",
+      "docs/rust-agent-ui-host-integration.md": "a7dbba541e459e2bf96c7e6e4ec63192cf740ab4f21d989e26d1598d62460aa2"
+    }
+  },
+  "validationBuildsPerformed": true,
+  "buildScope": "Cargo tests and Clippy reuse the existing target; supplement identifies receipts and source stages",
+  "localLinkValidationCount": 316
 }

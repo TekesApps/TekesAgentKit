@@ -2,7 +2,7 @@
 use crate::TranscriptMessageIdentity as Key;
 use tekes_agent_presentation::{
     RunScope, TranscriptBlockContent, TranscriptItem, TranscriptItemKind, TranscriptOutput,
-    TranscriptSection, TranscriptToolCall, TranscriptToolRowWording,
+    TranscriptSection, TranscriptToolCall, TranscriptToolRowState, TranscriptToolRowWording,
 };
 use tekes_ui_controls::{
     ButtonTextRenderer, DraftRevision, ExternalSelection, ExternalUndo, ExternalValueResult,
@@ -61,31 +61,7 @@ impl Default for OutputMessageLabels {
             tool: |t| {
                 let producer_title = t.presentation_title();
                 let label = tool_display_name(&t.name);
-                let result = t
-                    .result
-                    .as_ref()
-                    .map(|result| {
-                        result["content"]
-                            .as_array()
-                            .map(|parts| {
-                                parts
-                                    .iter()
-                                    .filter_map(|part| part["text"].as_str())
-                                    .collect::<Vec<_>>()
-                                    .join("\n")
-                            })
-                            .or_else(|| result["text"].as_str().map(String::from))
-                            .unwrap_or_default()
-                    })
-                    .filter(|text| !text.is_empty())
-                    .or_else(|| {
-                        let error = t.result_error.as_ref()?;
-                        Some(format!(
-                            "{}: {}",
-                            error["name"].as_str()?,
-                            error["code"].as_str()?
-                        ))
-                    });
+                let result = t.presentation_result_text();
                 let row = t.presentation_row(TranscriptToolRowWording {
                     label: &label,
                     stopped: "已停止",
@@ -110,7 +86,13 @@ impl Default for OutputMessageLabels {
                 if let Some(error) = t.result_error.as_ref().filter(|value| value.is_object()) {
                     details.push_str(&format!("\n\n结果错误\n{error}"));
                 }
-                (format!("{title} · {}", t.phase), details)
+                let phase = match row.state {
+                    TranscriptToolRowState::Running => "doing",
+                    TranscriptToolRowState::Ok => "done",
+                    TranscriptToolRowState::Error => "error",
+                    TranscriptToolRowState::Stopped => "stopped",
+                };
+                (format!("{title} · {phase}"), details)
             },
         }
     }

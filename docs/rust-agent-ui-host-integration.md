@@ -36,6 +36,8 @@ TextSurfaceHost::shape_label 服务并保留完整 source/AX 文案，AgentKit �
 折叠行使用共享 `TranscriptToolCall::presentation_row(TranscriptToolRowWording)`；宿主通过原
 `OutputMessageLabels.tool` 提供本地化文案或公开 card 的 progress/report，完整规则和未交付范围见
 [工具行接入说明](rust-agent-ui-tool-row-20261022.md)。
+`presentation_card()` 提供共享卡片事实；只在需要展开时派生，未知形状保留通用详情。
+[卡片与桥接说明](rust-agent-ui-tool-card-20261022.md)区分公开失败与旧退出标记；完整 selectable code/diff Content 仍待 #25。
 
 ## 可运行参考与验证
 

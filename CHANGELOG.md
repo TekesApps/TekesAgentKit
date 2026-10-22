@@ -2,6 +2,8 @@
 
 ## Unreleased — experimental Rust Agent UI
 
+- Expose typed tool-card facts and shared textual-result extraction; correct legacy shell exit-marker display and canonical meta-failure fallback through the actual ClientKit projector/View bridge. Rich card rendering remains open.
+
 - Add shared collapsed tool-row selection for progress, action/report, explicit-error and stopped summaries; original embedded and independent disclosures retain their text owners and full details.
 
 - Fence journal tools at turn closure so late unowned results cannot overwrite sealed history; retain result-only paging and explicit new-call admission.

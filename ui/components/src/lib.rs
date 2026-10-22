@@ -470,7 +470,11 @@ pub use tekes_agent_presentation::{
     TranscriptBlockContent, TranscriptContentBlock, TranscriptDelivery, TranscriptDocument,
     TranscriptEventOrder, TranscriptFailure, TranscriptInput, TranscriptItem, TranscriptItemKind,
     TranscriptMessageKey, TranscriptOrderedEvent, TranscriptOutput, TranscriptSection,
-    TranscriptSnapshot, TranscriptSourcePosition, TranscriptToolCall, TranscriptTurn,
+    TranscriptSnapshot, TranscriptSourcePosition, TranscriptToolCall, TranscriptToolCardModel,
+    TranscriptToolDiffHunk, TranscriptToolRead, TranscriptToolReadLine, TranscriptToolRowModel,
+    TranscriptToolRowState, TranscriptToolRowWording, TranscriptToolSearch,
+    TranscriptToolSearchFile, TranscriptToolSearchMatch, TranscriptToolTerminal, TranscriptToolWeb,
+    TranscriptToolWebSource, TranscriptTurn,
 };
 
 mod sidebar_preferences;

@@ -1,5 +1,8 @@
 # 共享工具折叠行模型
 
+> 后续桥接审计校正：公开 meta 的退出失败属于工具 failed；只有旧正文末尾退出标记的显示层失败保留动作摘要。
+> 本页原验证属于 134d8d6，当前规则和补充回归见[卡片与桥接记录](rust-agent-ui-tool-card-20261022.md)。
+
 对照 ClientKit `TranscriptToolRowModel.swift`、`TranscriptToolDisplay.swift` 和
 `TranscriptMetalActivity.swift::toolNode`，新增 renderer-independent 的
 `TranscriptToolRowModel` / `TranscriptToolRowState` / `TranscriptToolRowWording`。
@@ -18,7 +21,8 @@
 - 停止时只显示停止摘要。
 - 运行中 progress 优先；之后为 detail、与工具名/显示名不同的 title_hint、语义参数摘要。
 - 成功时任意结果首行不替代动作。
-- 明确工具错误使用结果首行；仅退出码/signal/超时导致的 error 保留动作摘要。
+- 工具 failed（含公开 meta/result-view 的退出失败）使用结果首行；只有旧正文末尾退出标记的显示层失败保留动作摘要。
+  这是后续桥接审计的校正；134d8d6 的实现/测试对前者的范围过宽。
 - 参数按工具族选择，queries 合并；未知对象按排序后的键回退，encoded JSON 和结构化 JSON 均可读取。
   与 ClientKit 原规则相同，最终 raw 参数回退仍可能是完整输入；不把它描述成安全摘要或截断策略。
 

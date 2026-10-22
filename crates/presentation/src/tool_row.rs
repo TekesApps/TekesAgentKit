@@ -50,16 +50,19 @@ impl TranscriptToolRowModel {
 }
 impl TranscriptToolCall {
     /// Selects the same collapsed title/summary/error precedence as ClientKit's
-    /// TranscriptToolRowModel. `phase` remains canonical; raw result flags only
-    /// distinguish an explicit tool error from an exit-status-only failure.
+    /// TranscriptToolRowModel and its projector/View bridge. Canonical errors
+    /// include public meta exit failures; only a legacy output-marker failure
+    /// leaves the action summary in place. No durable phase is changed.
     pub fn presentation_row(
         &self,
         wording: TranscriptToolRowWording<'_>,
     ) -> TranscriptToolRowModel {
         use TranscriptToolRowState as State;
+        let failed = self.failed_for_presentation();
         let state = match self.phase.as_str() {
             "interrupted" | "stopped" => State::Stopped,
-            "error" => State::Error,
+            _ if failed => State::Error,
+            "done" if self.legacy_terminal_exit_failed() => State::Error,
             "done" => State::Ok,
             _ => State::Running,
         };
@@ -87,17 +90,10 @@ impl TranscriptToolCall {
                 .or(hint)
                 .or_else(|| argument_summary(&self.name, &self.arguments))
         };
-        let explicitly_failed = self.result_error.as_ref().is_some_and(Value::is_object)
-            || self.result.as_ref().is_some_and(|result| {
-                result["isError"] == true
-                    || result["content"]
-                        .as_array()
-                        .is_some_and(|parts| parts.iter().any(|part| part["isError"] == true))
-            });
         TranscriptToolRowModel {
             title: wording.label.into(),
             summary,
-            error_summary: (state == State::Error && explicitly_failed)
+            error_summary: (state == State::Error && failed)
                 .then(|| first_line(wording.result))
                 .flatten(),
             state,
