@@ -1,0 +1,109 @@
+{
+  "sourceBase": "5a8e9e0630207df50ab65a631e091d1c779df85d",
+  "changedSourceFiles": {
+    "Cargo.lock": "e544d7561088562cfa4fe090907bfb77579687921b25a18935cd25e07c799000",
+    "crates/presentation/Cargo.toml": "6695ae0c33e58898e7ec14c444fec9f92fc29453d21a886f72a3aa117323f612",
+    "crates/presentation/src/lib.rs": "6b43457e3ada31c9c84c4c4243b5d8870cdc664a7bca9b48b6e81400a7df3ee2",
+    "crates/presentation/src/tool_row.rs": "82e17001e55eaffc2452d0d18aef21406ff68373344f221456791bdad8037de6",
+    "crates/presentation/src/tool_run.rs": "c4b77e2daf9cb9f3be32d93fb61848e35fb6b5f491c21ec7152a1da344f2ff86",
+    "crates/presentation/tests/tool_run.rs": "53498f091556ebd75ecc548ac4a329218ddb210d2ba25684af9f3f6f1402d4d7",
+    "ui/Cargo.lock": "43d76bd5290672e28e60108e33693083b933cc4feb559232998aca689201ebaa",
+    "ui/components/src/lib.rs": "b26de67849a5310a787af4eea54df69cb4950c734c60492a2240629d513d5cac",
+    "ui/components/src/output_message.rs": "f27626fcfa23f97b8221ff1bff1575c12b81ea7c149b88ceb83a4031bbd7f9dc",
+    "ui/components/src/tool_run.rs": "268adce7ae4710fd3b9d3bcd161fbb2b9cdda115febb6fb9f0ebfa077cf922ff",
+    "ui/components/src/transcript_content.rs": "60088a1ab9f0460b47e79d6188f27b2f0a2c8a0d0ee7a53ca973d1ddc9007070",
+    "ui/consumer/tests/summary_label.rs": "77a3e42450023deb1df8f3f0d86af73d6b6d8572c8b5f6fc727ea93354813002",
+    "ui/consumer/tests/support/tool_run.rs": "abb54e1a442d750f339aa1a60780d6beb0185f65da0b0eadfcaf4c1f62d34c2f",
+    "ui/demo/src/components_native.rs": "779dfaab5ab6ce3123332036853b843f501dbe3cecad813f9a7d2bcd8fcc0bb8",
+    "ui/demo/src/native_disclosure_reading_selftest.rs": "42e4ed598b642bbe284e629456663b3474c1401002dcd0e9a4fc8a60ea268474",
+    "ui/demo/tests/output_message.rs": "63d22764aeb21f396ef759bf9eeb3b40430ffcd186821c804214aade6dccfa2c",
+    "ui/demo/tests/run_reading.rs": "99a5e888cae5ac57b97e0861138a9fe1876f790afa2ca65fd7504fff20441691",
+    "ui/demo/tests/transcript_content.rs": "29a51cffc03d20725d8a2f288fcdf50e63b96b7c95727db2c0cb8e22c99f76da"
+  },
+  "tekesui": {
+    "committed": "2026-10-22T07:30:41Z",
+    "sha": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c"
+  },
+  "validation": {
+    "rootTests": {
+      "passed": 250,
+      "failed": 0
+    },
+    "uiTests": {
+      "passed": 565,
+      "failed": 0,
+      "ignored": 1,
+      "existingIgnore": "TekesUI #49"
+    },
+    "postLintFocusedTests": {
+      "passed": 76,
+      "failed": 0,
+      "ignored": 1
+    },
+    "rootClippyExit": 0,
+    "uiClippyExit": 0,
+    "demoBuildExit": 0,
+    "strictReading": {
+      "exit": 1,
+      "proof": {
+        "accepted": false,
+        "parentFollowingAfterInnerUp": true,
+        "parentOffsetBefore": 0,
+        "parentOffsetAfterScroll": 0,
+        "parentOffsetAfterAppend": 634,
+        "innerOffset": 100,
+        "detailVisibleAfterAppend": false
+      }
+    }
+  },
+  "nativeReceipt": "rust-agent-ui-native-resumed-20261023.json",
+  "currentFinalSourceNativeAccepted": false,
+  "apiMigration": [
+    "Transcript row_id Tool returns reading group owner; tool_activity_id returns original member control",
+    "OutputMessage content_ids and tool_detail_sections flatten original members including collapsed group; copy intentions only exposed members"
+  ],
+  "remaining": [
+    "Foundation relative/special URL normalization edge cases",
+    "complete Source layout and report/count view",
+    "TekesUI #53 strict nested-reading gate",
+    "#54 separator composition",
+    "#48 ProcessContainer and independent cross-process acceptance",
+    "final-source real Native/Pi/DSH native/IME and VoiceOver acceptance"
+  ],
+  "newTargets": 0,
+  "retainedAcceptanceProgramBytes": 76580880,
+  "deletedBytes": 0,
+  "evidence": {
+    ".runtime-fixtures/tool-run-20261023/demo-build.log": "60752725ea6f194f20ebc7150276eef9d351f09c52a8c6e784e05f6a10ca45df",
+    ".runtime-fixtures/tool-run-20261023/reading.log": "5215a22307e2f0d9b48c49dc9c275d4ee09adeb40e2595bde3fccd2cc29fca94",
+    ".runtime-fixtures/tool-run-20261023/ui-tests-final.log": "7a400d0d1bc5b57878901dfaa43fbdff43f84da071d7930b00f3600784448e35",
+    ".runtime-fixtures/tool-run-20261023/root-tests.log": "96968777d2b3efd0a068f1e0e053b63b908b84ae11fca31a4f9953638947a860",
+    ".runtime-fixtures/tool-run-20261023/validation-exits.json": "6cd7963b424b59d3d60b32417039f4240edec6cca1d3047a1e66acef53596966",
+    ".runtime-fixtures/tool-run-20261023/final-exits.json": "d99401f1e100d73e76a01024f07d40d6ed35f34acea7b3ce153984898a38afe4",
+    ".runtime-fixtures/tool-run-20261023/root-metadata.json": "76304e8fe8ac4c334fe27ac4a2519d0e4942ee6c585676b8259ec161524023c4",
+    ".runtime-fixtures/tool-run-20261023/parent-tests.log": "6306f3fdd6eef5285739462ac8d02d22f784bd5fe9368ac0479c3e85c23499bf",
+    ".runtime-fixtures/tool-run-20261023/component-check.log": "16a88f49694aacb2b76014100a38887dda54abb6a056e10a03dde92059e8fbca",
+    ".runtime-fixtures/tool-run-20261023/parent-tests-before-migration.log": "61996729218f664b5eef45b11ac6391375fd61e7a7b56df3926c6811d05a7087",
+    ".runtime-fixtures/tool-run-20261023/ui-tests.log": "047ab0994d6cc6136973247ebfa7b1803fa0551f441767df6c2c14ec8bac6223",
+    ".runtime-fixtures/tool-run-20261023/verified-inputs.json": "9543ade335292f9c7f61944edd341c2fb9297a7c6abc3cf44dc86c1f16bd6ee3",
+    ".runtime-fixtures/tool-run-20261023/sidechat-menu-configured.log": "d199e0c43032878745d78b37448f88a60d129e4f531ed0531db66387fdb7d94a",
+    ".runtime-fixtures/tool-run-20261023/ui-metadata.json": "8f5b3c2d17782ab73aabc6f36ad616bee50a0ac240ecd1d8b344e1b42e117386",
+    ".runtime-fixtures/tool-run-20261023/sidechat-menu.log": "e87ee2195660f68b0bb09883139826339ce63108f5e3ff988c42d8e1368a067c",
+    ".runtime-fixtures/tool-run-20261023/public-tekesui.json": "0d2ba5ba6a529ec6b5870317d04f7548b08b7c4841065a02ab39f4a136889cfc",
+    ".runtime-fixtures/tool-run-20261023/model-tests.log": "8fa7872936462d91b4fc78717091bd02b4648d761af294d4aefac110ab0de533",
+    ".runtime-fixtures/tool-run-20261023/group-tests-after-lint.log": "319de71a817582aafd5476cc21ed55c3a875539b606a319548986d795cf46d09",
+    ".runtime-fixtures/tool-run-20261023/ui-clippy.log": "7bc1aeaf90b4570e95173da0f6c29517860876801e935ab86860162fdb63fd66",
+    ".runtime-fixtures/tool-run-20261023/group-tests.log": "995bd02c21387c5d1a2d7282130e980a70be9220399af09025951045d47fba61",
+    ".runtime-fixtures/tool-run-20261023/transcript-check.log": "dddc1149c4711494fb2a27553a326ca4dc361dbc5bc5c2b4b6c130b66b9fbe39",
+    ".runtime-fixtures/tool-run-20261023/root-clippy.log": "f686281cabfcecfd47ec40848fad77a9d90153cba0c2af9cf763162b3c8e1cf8",
+    ".runtime-fixtures/tool-run-20261023/strict-reading.log": "6e687e19699440bad555c8da5da7bdf0b71499146541b339489dd046195a5e69",
+    ".runtime-fixtures/tool-run-20261023/ui-clippy-final.log": "170c0b44fb0aa2e9ccb8e90e6b621f7a4fbb38bd8ec05e0590eaaa96aed0e993",
+    ".runtime-fixtures/tool-run-20261023/system-ime-cua.log": "d66b31870c687ed29f5071f2890d457d205db2f060920fe344abb0ac87b5e973",
+    ".runtime-fixtures/tool-run-20261023/group-tests-complete.log": "21f625ac187a966452c70c04cc3c66fd54ae91495d22928ee68c1e87564041d5",
+    ".runtime-fixtures/tool-run-20261023/model-tests-final.log": "9a9eb68b86ba25c8b5c6360b68007e8feca93ae522883c9bace5e4ef0b1d12e6",
+    ".runtime-fixtures/tool-run-20261023/native-program.json": "bbcbdf2b46acf16093395c34c84eaddaabd4a70531b8411bcfeea2f1c473e6c2",
+    ".runtime-fixtures/tool-run-20261023/model-check.log": "6ddeea3a4b44fda20c88e25421bb1fe9b53fe5660d0314c214a951a4e0c27708",
+    ".runtime-fixtures/tool-run-20261023/embedded-check.log": "8d8d383e31af94c548b50d85272e719d8fff5716ba0eb3ab7b96505df025701e",
+    ".runtime-fixtures/tool-run-20261023/group-tests-final.log": "c841dec96dc0792f0dc76f0329cc39b2ff5b8007ccccbb2a1fcfd71468fb4a04"
+  }
+}

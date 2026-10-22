@@ -19,12 +19,12 @@
 | 要求 | 当前实现/证据 | 距离完整交付还差什么 |
 | --- | --- | --- |
 | Composer、发送/取消、流式回传 | 原 TekesUI editor + RunBinding/RunController；归档/中断、草稿、请求身份、模型/附件等有组件与宿主用例。 | 本轮源码的完整原生/IME组合；上下文高级入口按源规则逐项验收，缺少宿主能力时通过明确输入/回调接入。 |
-| Transcript：历史/推理/工具/分页/阅读 | 混合 Content、原阅读事务、canonical 身份与只读子历史；公开 page/reveal 已消费，工具关闭边界、共享 row、报告/完整计数选择规则与五类卡片事实有回归。 | 独立 Input/Output/view 原字段与复制通道已接入；默认计数视图/真实报告来源、连续分组、富内容、#54 分隔线和最终 code-header 样式未完成，`rich_content=false`；选中富内容 #25、嵌套阅读意图 #53、新建 Host 的持久 checkpoint #42、当前原生与配对布局。 |
+| Transcript：历史/推理/工具/分页/阅读 | 混合 Content、原阅读事务、canonical 身份与只读子历史；公开 page/reveal 已消费，工具关闭边界、共享 row、报告/完整计数选择规则与五类卡片事实有回归。 | 独立 Input/Output/view 原字段与复制通道已接入；默认计数视图/真实报告来源、连续分组的完整输入/原生验收、富内容、#54 分隔线和最终 code-header 样式未完成，`rich_content=false`；选中富内容 #25、嵌套阅读意图 #53、新建 Host 的持久 checkpoint #42、当前原生与配对布局。 |
 | Input / output / footnote 排版 | 用户气泡/aside 右、机器内容/aside 左；共用列、单行、备注限宽与保留控件有独立 consumer。 | 真实 Pi 目标标签在窄列仍不可见，严格命令退出 1；#47 原 glyph/紧凑动作消费，完整时间/目标/状态可见性。 |
 | Indicators 与回合导航 | 原连接/运行/等待/失败/用量事实、TurnRail/Jump 与原 SDK reveal，非像素估算。 | 完整 hover/selection/chrome、可达性和当前程序原生对照；#46/#5 等。不能把已有单行状态当作完整 rail 的证明。 |
 | RunPort 组合与完整 Views 布局 | 正式 RunPort 组合 Composer/Transcript/Indicators，整帧 preflight/阅读发布；第二 consumer 无需 RunSurface。 | 完整 ClientKit 对应层次/selection/chrome 的逐项同内容对照；当前收据仍明确 `completeRunPort=false`。 |
 | Sidebar 会话/活动/置顶/共享操作 | 受控目录/恢复/搜索/分组、稳定 menu value、原共享 action/CAS、分页/选中补齐和 reveal。 | 非当前行的原上下文菜单 #44、完整当前原生/AX验收；不把 compact toolbar 的缺口套到已经消费的普通 MenuContent 上。 |
-| SidePanel Task/Subagent/SideChat/Summary tabs | 同一 SidePanelInput + SidePanelNavigation；动态 pointer、retained editor、关闭确认和迟到回包门禁有宿主/第二 consumer 用例。 | SideChat 家族原生菜单未通过（最近一次 phase 20 触发启动计时期限；见[续验](rust-agent-ui-native-handled-20261022.md)）；完整窗口 toolbar/Panel chrome 及 #48。 |
+| SidePanel Task/Subagent/SideChat/Summary tabs | 同一 SidePanelInput + SidePanelNavigation；动态 pointer、retained editor、关闭确认和迟到回包门禁有宿主/第二 consumer 用例。 | SideChat 家族菜单的本地协议演示已通过（phase 25；见[原生续验](rust-agent-ui-native-resumed-20261023.md)）；真实三端及最终源码仍待验收；完整窗口 toolbar/Panel chrome 及 #48。 |
 | Task/child 的可写与有界只读来源 | TaskPaneBinding、ChildPaneBinding、SideChatBinding 复用现有 presentation；有界历史无 Composer、不用 parent 正文代替。 | 每种 loading/missing/error/ready 的当前完整原生组合；Native 真实多消息有界路径与 UI-only 验收分别记录。 |
 | Summary sections / rows / actions | 受控 SummaryInput/Context、展开/用量/metadata/宿主 slots、原 intent 与 source ownership。 | #47 状态附件/图标、#25 语义内容、#30/#38/#46 部分焦点/指示/hover组合与最终产品对照。 |
 | 反馈初读/重连/CAS | 自动按来源/epoch读取，普通 aside 无常驻 Refresh；加载失败保留旧记录且不可写，明确刷新恢复。 | 本轮已提交源码的真实故障/原生验证；[最近三端成功证据](rust-agent-ui-feedback-recovery-20261022.md)属于 4097e4f，不转移程序身份。 |
@@ -41,3 +41,7 @@
 
 新宿主的状态输入、回调与焦点责任见[短接入说明](rust-agent-ui-host-integration.md)。
 [审计快照](rust-agent-ui-delivery-status.json)记录源码、依赖、公开 Issue 和证据来源；它是未完成项清单，不是全量验收凭证。
+
+[本轮原生续验](rust-agent-ui-native-resumed-20261023.md)已取得 SideChat、分页/焦点/阅读及系统拼音专项收据；严格限定到所记录的冻结程序，完整交付仍未达到。
+
+[连续工具分组](rust-agent-ui-tool-run-20261023.md)已接入独立 Transcript 与消息内部，并验证前插/拆分/合并时原控件保留、隐藏复制及第二 consumer；完整 URL/Source 边界和最终源码原生验收仍开放。最新组件验证为根 250、UI 565 通过及 1 项原有忽略；严格 #53 仍失败。

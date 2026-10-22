@@ -41,276 +41,276 @@
     {
       "number": 54,
       "state": "OPEN",
-      "title": "[P2][Composition] \u516c\u5f00\u666e\u901a Content \u53ef\u6302\u8f7d\u7684\u901a\u7528 Separator\uff0fDivider"
+      "title": "[P2][Composition] 公开普通 Content 可挂载的通用 Separator／Divider"
     },
     {
       "number": 49,
       "state": "OPEN",
-      "title": "[P1][Composition] \u4ea4\u4ed8\u539f Content \u53ef\u6d88\u8d39\u7684\u4ea4\u4e92\u5f0f Popover \u7ec4\u5408\u5165\u53e3",
+      "title": "[P1][Composition] 交付原 Content 可消费的交互式 Popover 组合入口",
       "updatedAt": "2026-10-22T06:42:05Z"
     },
     {
       "number": 48,
       "state": "OPEN",
-      "title": "[P0][ProcessContainer] \u5b8c\u6574\u4ea4\u4e92\u5f0f Content \u7684\u8fdc\u7aef\u8f93\u5165\u3001\u7126\u70b9\u3001IME\u3001\u6eda\u52a8\u4e0e AX \u5951\u7ea6",
+      "title": "[P0][ProcessContainer] 完整交互式 Content 的远端输入、焦点、IME、滚动与 AX 契约",
       "updatedAt": "2026-10-21T23:55:23Z"
     },
     {
       "number": 47,
       "state": "OPEN",
-      "title": "[P2][Composition] \u63d0\u4f9b\u539f Content \u53ef\u6d88\u8d39\u7684\u88ab\u52a8\u56fe\u6807\u4e0e\u4e0d\u5b9a\u72b6\u6001\u9644\u4ef6",
+      "title": "[P2][Composition] 提供原 Content 可消费的被动图标与不定状态附件",
       "updatedAt": "2026-10-22T12:48:41Z"
     },
     {
       "number": 46,
       "state": "OPEN",
-      "title": "[P1][Composition] \u975e\u4ea4\u4e92 hover preview \u7684\u539f Content \u69fd\u4e0e\u951a\u5b9a/\u5173\u95ed\u751f\u547d\u5468\u671f",
+      "title": "[P1][Composition] 非交互 hover preview 的原 Content 槽与锚定/关闭生命周期",
       "updatedAt": "2026-10-21T17:41:35Z"
     },
     {
       "number": 45,
       "state": "OPEN",
-      "title": "[P1][Composition] \u539f Content \u7684\u8bed\u4e49 Panel \u5bb9\u5668\u3001\u5706\u89d2\u5b50\u6811\u88c1\u5207\u4e0e\u7126\u70b9\u8fb9\u754c",
+      "title": "[P1][Composition] 原 Content 的语义 Panel 容器、圆角子树裁切与焦点边界",
       "updatedAt": "2026-10-21T17:08:46Z"
     },
     {
       "number": 44,
       "state": "OPEN",
-      "title": "[P1][Menu] \u539f Content \u7684\u4e0a\u4e0b\u6587\u83dc\u5355\u89e6\u53d1\u4e0e\u951a\u5b9a\uff0c\u4fdd\u7559 owner\u3001\u4e8b\u4ef6\u8eab\u4efd\u548c IME \u8fb9\u754c",
+      "title": "[P1][Menu] 原 Content 的上下文菜单触发与锚定，保留 owner、事件身份和 IME 边界",
       "updatedAt": "2026-10-21T16:21:07Z"
     },
     {
       "number": 42,
       "state": "OPEN",
-      "title": "[P1][Reading] \u5bfc\u51fa\u5e76\u6062\u590d\u8de8\u65b0\u5efa ContentHost \u7684\u6301\u4e45\u9605\u8bfb\u68c0\u67e5\u70b9",
+      "title": "[P1][Reading] 导出并恢复跨新建 ContentHost 的持久阅读检查点",
       "updatedAt": "2026-10-21T13:02:50Z"
     },
     {
       "number": 41,
       "state": "OPEN",
-      "title": "[P1][Native input] \u5b9a\u4f4d Unicode \u952e\u4e8b\u4ef6\u6ce8\u5165\u4e22\u5931 CJK\uff0c\u8865\u72ec\u7acb\u539f\u751f\u57fa\u7ebf",
+      "title": "[P1][Native input] 定位 Unicode 键事件注入丢失 CJK，补独立原生基线",
       "updatedAt": "2026-10-21T12:01:00Z"
     },
     {
       "number": 38,
       "state": "OPEN",
-      "title": "[P2][Disclosure] \u63d0\u4f9b\u539f\u7ec4\u5408\u89e6\u53d1\u5668\u4e0e\u9ed8\u8ba4\u5c55\u5f00\u6307\u793a\uff0c\u4fdd\u6301\u5355\u4e00\u52a8\u4f5c\u548c\u8bed\u4e49 owner",
+      "title": "[P2][Disclosure] 提供原组合触发器与默认展开指示，保持单一动作和语义 owner",
       "updatedAt": "2026-10-21T05:21:58Z"
     },
     {
       "number": 37,
       "state": "OPEN",
-      "title": "[P1][macOS selftest] \u6709\u6548\u63a7\u5236\u952e\u4e8b\u4ef6\uff1aEscape \u7a7a\u5b57\u7b26\u5408\u6210\u4f1a\u5220\u9664\u7f16\u8f91\u9009\u533a",
+      "title": "[P1][macOS selftest] 有效控制键事件：Escape 空字符合成会删除编辑选区",
       "updatedAt": "2026-10-21T04:37:34Z"
     },
     {
       "number": 36,
       "state": "OPEN",
-      "title": "[P1][Menu] \u6355\u83b7\u7a33\u5b9a\u9009\u4e2d\u503c\uff0c\u5e76\u652f\u6301\u539f\u83dc\u5355\u7684\u5206\u7ec4\u4e0e\u52fe\u9009\u58f0\u660e",
+      "title": "[P1][Menu] 捕获稳定选中值，并支持原菜单的分组与勾选声明",
       "updatedAt": "2026-10-21T15:59:30Z"
     },
     {
       "number": 35,
       "state": "OPEN",
-      "title": "[P1][Composition] \u4e3a\u539f Content \u63d0\u4f9b\u52a8\u6001\u884c\u5e2e\u52a9\u58f0\u660e\u5e76\u590d\u7528\u73b0\u6709 Tooltip",
+      "title": "[P1][Composition] 为原 Content 提供动态行帮助声明并复用现有 Tooltip",
       "updatedAt": "2026-10-21T01:48:17Z"
     },
     {
       "number": 34,
       "state": "OPEN",
-      "title": "[P1][Focus] \u516c\u5f00\u539f\u7559\u767d\u7126\u70b9\u610f\u56fe\u67e5\u8be2\uff0c\u4f9b\u5bbf\u4e3b IME \u5c4f\u969c\u5b89\u5168\u8f6c\u4ea4\u4e8b\u4ef6",
+      "title": "[P1][Focus] 公开原留白焦点意图查询，供宿主 IME 屏障安全转交事件",
       "updatedAt": "2026-10-21T01:05:07Z"
     },
     {
       "number": 33,
       "state": "OPEN",
-      "title": "[P1][Composition] \u4e3a\u59d4\u6258\u539f\u7d27\u51d1 action \u7684\u4e1a\u52a1\u7ec4\u4ef6\u516c\u5f00\u7126\u70b9\u7ed8\u5236\u5c42\u8f6c\u53d1\u63a5\u53e3",
+      "title": "[P1][Composition] 为委托原紧凑 action 的业务组件公开焦点绘制层转发接口",
       "updatedAt": "2026-10-20T23:51:58Z"
     },
     {
       "number": 32,
       "state": "OPEN",
-      "title": "[P1][Reading] \u7a33\u5b9a item reveal \u589e\u52a0\u8d77\u7aef\u5bf9\u9f50\uff0c\u652f\u6301 ClientKit \u666e\u901a\u56de\u5408\u8df3\u8f6c",
+      "title": "[P1][Reading] 稳定 item reveal 增加起端对齐，支持 ClientKit 普通回合跳转",
       "updatedAt": "2026-10-20T23:21:25Z"
     },
     {
       "number": 31,
       "state": "OPEN",
-      "title": "[P2][Typography] \u4e3a Content \u548c\u63a7\u4ef6\u6807\u7b7e\u516c\u5f00\u884c\u6570\u9650\u5236\u4e0e\u5c3e\u90e8\u7701\u7565\u7b56\u7565",
+      "title": "[P2][Typography] 为 Content 和控件标签公开行数限制与尾部省略策略",
       "updatedAt": "2026-10-20T19:23:33Z"
     },
     {
       "number": 30,
       "state": "OPEN",
-      "title": "[P2][Composition] \u63d0\u4f9b\u590d\u5408\u8f93\u5165\u9762\u88c5\u9970\u533a\u57df\u5230\u539f\u7f16\u8f91\u5668\u7684\u7126\u70b9\u8def\u7531\u5951\u7ea6",
+      "title": "[P2][Composition] 提供复合输入面装饰区域到原编辑器的焦点路由契约",
       "updatedAt": "2026-10-21T21:07:34Z"
     },
     {
       "number": 29,
       "state": "OPEN",
-      "title": "[P2][Composition] \u63d0\u4f9b\u7cbe\u786e\u7d27\u51d1 hit frame \u7684\u88c5\u9970 action \u4e0e\u6fc0\u6d3b\u9636\u6bb5\u914d\u7f6e",
+      "title": "[P2][Composition] 提供精确紧凑 hit frame 的装饰 action 与激活阶段配置",
       "updatedAt": "2026-10-20T18:12:38Z"
     },
     {
       "number": 28,
       "state": "OPEN",
-      "title": "[P1][Reading] \u516c\u5f00\u4fdd\u7559\u7f16\u8f91\u7126\u70b9\u7684\u7a33\u5b9a item reveal \u4e0e\u72ec\u7acb\u8f68\u9053\u5bfc\u822a\u547d\u4ee4",
+      "title": "[P1][Reading] 公开保留编辑焦点的稳定 item reveal 与独立轨道导航命令",
       "updatedAt": "2026-10-22T05:31:29Z"
     },
     {
       "number": 27,
       "state": "OPEN",
-      "title": "[P2] ContentHost \u5e03\u5c40\u6fc0\u6d3b\u5b50\u6811\u540e\u7684 TextSurfaceHost \u524d\u7f6e\u6761\u4ef6\u6821\u9a8c",
+      "title": "[P2] ContentHost 布局激活子树后的 TextSurfaceHost 前置条件校验",
       "updatedAt": "2026-10-20T17:45:38Z"
     },
     {
       "number": 26,
       "state": "OPEN",
-      "title": "[P1][Controlled input] \u63d0\u4f9b\u53d7\u63a7\u6587\u672c\u66f4\u65b0\u7684\u65e0\u526f\u4f5c\u7528\u9884\u68c0\uff0c\u652f\u6301\u7ec4\u5408\u9605\u8bfb\u4e8b\u52a1",
+      "title": "[P1][Controlled input] 提供受控文本更新的无副作用预检，支持组合阅读事务",
       "updatedAt": "2026-10-20T16:16:50Z"
     },
     {
       "number": 25,
       "state": "OPEN",
-      "title": "[P1][Content] \u516c\u5f00\u53ef\u9009\u4e2d\u5bcc\u5185\u5bb9\u7ec4\u4ef6\u4e0e\u539f\u751f\u6587\u672c\u6620\u5c04\u63a5\u53e3",
+      "title": "[P1][Content] 公开可选中富内容组件与原生文本映射接口",
       "updatedAt": "2026-10-21T21:24:55Z"
     },
     {
       "number": 23,
       "state": "CLOSED",
-      "title": "[P1][Composition] \u516c\u5f00\u65e0\u8868\u5355\u88c5\u9970\u7684\u53ef\u9009\u4e2d\u6587\u672c\u5185\u5bb9\u7ec4\u4ef6\u6216 presentation \u6a21\u5f0f",
+      "title": "[P1][Composition] 公开无表单装饰的可选中文本内容组件或 presentation 模式",
       "updatedAt": "2026-10-21T23:28:52Z"
     },
     {
       "number": 22,
       "state": "OPEN",
-      "title": "[P1][Reading] \u4e3a\u6df7\u5408 Content \u6587\u6863\u63d0\u4f9b\u7a33\u5b9a\u5b50\u9879\u951a\u70b9\u4e0e\u524d\u63d2/\u91cd\u6392\u9605\u8bfb\u4e8b\u52a1",
+      "title": "[P1][Reading] 为混合 Content 文档提供稳定子项锚点与前插/重排阅读事务",
       "updatedAt": "2026-10-19T08:41:32Z"
     },
     {
       "number": 21,
       "state": "CLOSED",
-      "title": "[P2][TKUI-004] \u5e26\u76ee\u6807\u4e0e\u6765\u6e90\u7684\u63a7\u4ef6\u52a8\u4f5c",
+      "title": "[P2][TKUI-004] 带目标与来源的控件动作",
       "updatedAt": "2026-10-19T07:58:04Z"
     },
     {
       "number": 20,
       "state": "CLOSED",
-      "title": "[P1][TKUI-007] \u53ef\u914d\u7f6e\u6587\u672c\u89c6\u53e3\u4e0e\u591a\u884c\u5c3a\u5bf8\u7ea6\u675f",
+      "title": "[P1][TKUI-007] 可配置文本视口与多行尺寸约束",
       "updatedAt": "2026-10-19T07:57:55Z"
     },
     {
       "number": 19,
       "state": "CLOSED",
-      "title": "[P1][TKUI-006] \u6307\u9488\u9009\u62e9\u5143\u6570\u636e\u900f\u4f20",
+      "title": "[P1][TKUI-006] 指针选择元数据透传",
       "updatedAt": "2026-10-19T07:57:45Z"
     },
     {
       "number": 18,
       "state": "CLOSED",
-      "title": "[P1][TKUI-005] \u53d7\u63a7\u7f16\u8f91\u503c\u540c\u6b65\u4e8b\u52a1",
+      "title": "[P1][TKUI-005] 受控编辑值同步事务",
       "updatedAt": "2026-10-19T07:57:38Z"
     },
     {
       "number": 17,
       "state": "CLOSED",
-      "title": "[P1][TKUI-003] \u6587\u672c\u547d\u4ee4\u3001\u4fee\u9970\u952e\u4e0e IME \u6d88\u8d39\u8bed\u4e49",
+      "title": "[P1][TKUI-003] 文本命令、修饰键与 IME 消费语义",
       "updatedAt": "2026-10-19T07:57:30Z"
     },
     {
       "number": 16,
       "state": "CLOSED",
-      "title": "[P0][TKUI-002] \u5386\u53f2\u524d\u63d2\u9605\u8bfb\u951a\u70b9",
+      "title": "[P0][TKUI-002] 历史前插阅读锚点",
       "updatedAt": "2026-10-19T07:57:22Z"
     },
     {
       "number": 15,
       "state": "CLOSED",
-      "title": "[P0][TKUI-001] \u540e\u53f0\u4e8b\u4ef6\u5524\u9192\u4e0e\u7a97\u53e3\u751f\u547d\u5468\u671f",
+      "title": "[P0][TKUI-001] 后台事件唤醒与窗口生命周期",
       "updatedAt": "2026-10-19T07:57:14Z"
     },
     {
       "number": 14,
       "state": "OPEN",
-      "title": "[P1][Architecture][Audit] \u7edf\u4e00\u7ec4\u4ef6\u6a21\u578b\u4e0e\u7ec4\u5408\u534f\u8bae\uff1a\u63a7\u4ef6\u5185\u5bb9\u7ec4\u5408\u3001\u8bed\u4e49\u89e3\u8026\u4e0e\u7a97\u53e3\u7ea7 Toolbar",
+      "title": "[P1][Architecture][Audit] 统一组件模型与组合协议：控件内容组合、语义解耦与窗口级 Toolbar",
       "updatedAt": "2026-10-22T10:12:05Z"
     },
     {
       "number": 13,
       "state": "OPEN",
-      "title": "[Audit] TekesUI \u8bbe\u8ba1\u7406\u5ff5\u4e0e Design System \u5b8c\u6574\u6027\u5ba1\u8ba1\u603b\u89c8\uff082026-10-17\uff09",
+      "title": "[Audit] TekesUI 设计理念与 Design System 完整性审计总览（2026-10-17）",
       "updatedAt": "2026-10-17T05:28:48Z"
     },
     {
       "number": 12,
       "state": "OPEN",
-      "title": "[P2][Acceptance] \u5b8c\u6210\u5f53\u524d\u6574\u9875\u89c6\u89c9\u4e0e\u539f\u751f\u4ea4\u4e92\u9a8c\u6536\uff0c\u5e76\u8fde\u63a5\u7ec4\u4ef6\u6210\u719f\u5ea6",
+      "title": "[P2][Acceptance] 完成当前整页视觉与原生交互验收，并连接组件成熟度",
       "updatedAt": "2026-10-17T05:28:45Z"
     },
     {
       "number": 11,
       "state": "OPEN",
-      "title": "[P2][Patterns] \u5b9a\u4e49\u6d88\u8d39\u65b9\u8349\u7a3f\u6062\u590d\u4e0e\u7248\u672c\u786e\u8ba4\u534f\u8bae\uff0c\u5e76\u63d0\u4f9b\u771f\u5b9e\u7f16\u8f91\u5668\u793a\u4f8b",
+      "title": "[P2][Patterns] 定义消费方草稿恢复与版本确认协议，并提供真实编辑器示例",
       "updatedAt": "2026-10-17T05:28:44Z"
     },
     {
       "number": 10,
       "state": "OPEN",
-      "title": "[P2][Reading] \u8865\u9f50\u6d41\u5f0f\u8ffd\u52a0\u65f6\u7684\u9605\u8bfb\u4f4d\u7f6e\u4fdd\u62a4\u4e0e\u663e\u5f0f\u56de\u5230\u6700\u65b0",
+      "title": "[P2][Reading] 补齐流式追加时的阅读位置保护与显式回到最新",
       "updatedAt": "2026-10-17T05:28:42Z"
     },
     {
       "number": 9,
       "state": "OPEN",
-      "title": "[P2][Motion] \u8865\u9f50 Menu / Popover / Dialog \u7684\u8fdb\u9000\u573a\u4e0e\u4e2d\u65ad\u751f\u547d\u5468\u671f",
+      "title": "[P2][Motion] 补齐 Menu / Popover / Dialog 的进退场与中断生命周期",
       "updatedAt": "2026-10-17T05:28:40Z"
     },
     {
       "number": 8,
       "state": "OPEN",
-      "title": "[P2][Governance] \u751f\u6210\u5f53\u524d\u6709\u6548\u7684\u7ec4\u4ef6\u80fd\u529b\u6e05\u5355\uff0c\u5e76\u4fee\u6b63\u8fc7\u671f\u673a\u5668\u62a5\u544a",
+      "title": "[P2][Governance] 生成当前有效的组件能力清单，并修正过期机器报告",
       "updatedAt": "2026-10-17T05:28:38Z"
     },
     {
       "number": 7,
       "state": "OPEN",
-      "title": "[P2][API] \u63d0\u4f9b\u6d88\u8d39\u65b9\u81ea\u5df1\u7684 BrandConfig \u5165\u53e3\u4e0e\u72ec\u7acb\u9879\u76ee\u63a5\u5165\u793a\u4f8b",
+      "title": "[P2][API] 提供消费方自己的 BrandConfig 入口与独立项目接入示例",
       "updatedAt": "2026-10-17T05:28:36Z"
     },
     {
       "number": 6,
       "state": "OPEN",
-      "title": "[P2][Quality] \u6821\u9a8c\u54c1\u724c\u751f\u6210\u6295\u5f71\u7684\u5b9e\u9645\u5185\u5bb9\uff0c\u5e76\u628a\u5f53\u524d\u8bbe\u8ba1\u68c0\u67e5\u63a5\u5165 CI",
+      "title": "[P2][Quality] 校验品牌生成投影的实际内容，并把当前设计检查接入 CI",
       "updatedAt": "2026-10-17T05:28:33Z"
     },
     {
       "number": 5,
       "state": "OPEN",
-      "title": "[P1][Accessibility] \u5efa\u7acb\u771f\u5b9e\u63a7\u4ef6\u8bed\u4e49\u6811\u4e0e macOS VoiceOver \u6865\u63a5",
+      "title": "[P1][Accessibility] 建立真实控件语义树与 macOS VoiceOver 桥接",
       "updatedAt": "2026-10-17T05:28:31Z"
     },
     {
       "number": 4,
       "state": "OPEN",
-      "title": "[P2][Interaction] \u7edf\u4e00\u6d6e\u5c42\u8f93\u5165\u7126\u70b9\u751f\u547d\u5468\u671f\uff0c\u4fee\u590d CommandPalette \u5173\u95ed\u540e\u610f\u5916\u91cd\u5f00",
+      "title": "[P2][Interaction] 统一浮层输入焦点生命周期，修复 CommandPalette 关闭后意外重开",
       "updatedAt": "2026-10-17T05:28:30Z"
     },
     {
       "number": 3,
       "state": "OPEN",
-      "title": "[P2][Interaction] \u5c06\u539f\u751f Tab / Shift+Tab \u63a5\u5165\u7edf\u4e00\u7126\u70b9\u904d\u5386",
+      "title": "[P2][Interaction] 将原生 Tab / Shift+Tab 接入统一焦点遍历",
       "updatedAt": "2026-10-17T05:28:27Z"
     },
     {
       "number": 2,
       "state": "CLOSED",
-      "title": "[P1][CI] \u4fee\u590d\u5f53\u524d\u4e3b\u5206\u652f\u7684\u8bbe\u8ba1\u5408\u5e76\u6d4b\u8bd5\u5931\u8d25\uff0c\u6062\u590d\u5b8c\u6574\u68c0\u67e5\u6d41\u7a0b",
+      "title": "[P1][CI] 修复当前主分支的设计合并测试失败，恢复完整检查流程",
       "updatedAt": "2026-10-19T09:17:07Z"
     },
     {
       "number": 1,
       "state": "OPEN",
-      "title": "[P1][Design System] \u5efa\u7acb\u5171\u4eab\u7684\u89c6\u89c9\u5f3a\u8c03\u4e0e\u8fb9\u754c\u5c42\u7ea7\uff0c\u5e76\u8fc1\u79fb\u6240\u6709\u7ec4\u4ef6",
+      "title": "[P1][Design System] 建立共享的视觉强调与边界层级，并迁移所有组件",
       "updatedAt": "2026-10-17T05:28:23Z"
     }
   ],
@@ -384,25 +384,13 @@
   },
   "supplement": "rust-agent-ui-tool-card-20261022.json",
   "latestLocalValidation": {
-    "root-tests": {
-      "passed": 246,
-      "failed": 0,
-      "ignored": 0,
-      "sourceReceipt": "rust-agent-ui-tool-report-20261023.json"
-    },
-    "ui-tests": {
-      "passed": 561,
-      "failed": 0,
-      "ignored": 1,
-      "scope": "Full workspace passed after scoped behavior; alias-only lint refinement followed by final 19 callback tests and all-targets Clippy",
-      "sourceReceipt": "rust-agent-ui-tool-report-20261023.json"
-    },
-    "strict-nested-reading": {
-      "accepted": false,
-      "exitCode": 1,
-      "parentOffsetAfterAppend": 634,
-      "issue": 53
-    }
+    "rootPassed": 250,
+    "uiPassed": 565,
+    "uiIgnored": 1,
+    "rootClippy": true,
+    "uiClippy": true,
+    "demoBuild": true,
+    "strictNestedReading": false
   },
   "latestVerifiedCiHead": "c76278bfb0781338f27e030a1403117cc204c46f",
   "latestVerifiedCiConclusion": "two-success-two-failure; macOS strict nested-reading gate fails",
@@ -475,13 +463,22 @@
     "rust-agent-ui-native-handled-20261022.json",
     "rust-agent-ui-tool-details-20261022.json",
     "rust-agent-ui-tool-section-controls-20261023.json",
-    "rust-agent-ui-tool-report-20261023.json"
+    "rust-agent-ui-tool-report-20261023.json",
+    "rust-agent-ui-tool-run-20261023.json"
   ],
   "boundedDetails": "explicit experiment; standard RunPort/Transcript defaults remain inline",
   "latestNativeAcceptance": {
     "accepted": false,
-    "phase": 20,
-    "receipt": "rust-agent-ui-native-handled-20261022.json"
+    "partialLocalFixtureAccepted": [
+      "sidechat-menu",
+      "paging-reading-focus",
+      "system-pinyin-software-keys"
+    ],
+    "receipt": "rust-agent-ui-native-resumed-20261023.json",
+    "programSha256": "7c531ae04db52752dcb533648f702dda362a687e60eb1a5448e27324f5ab03f4",
+    "currentSourceAccepted": false,
+    "realHarness": false,
+    "processContainer": false
   },
   "toolDetails": "independent original SDK section fields and captured copy intents; rich code/header/divider and bounded reading incomplete",
   "localLinkValidationFiles": [
@@ -502,5 +499,10 @@
     "head": "a8f3572fc451eb193291e9f9a81d3a0825c063ae",
     "conclusion": "four-success"
   },
-  "toolReport": "typed explicit host value and scoped callbacks; default SEP has no independent report; default count view and groups incomplete"
+  "toolReport": "typed explicit host value and scoped callbacks; default SEP has no independent report; default count view and groups incomplete",
+  "toolRun": {
+    "receipt": "rust-agent-ui-tool-run-20261023.json",
+    "semanticGroupingImplemented": true,
+    "fullSourceParityAccepted": false
+  }
 }

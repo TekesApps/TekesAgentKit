@@ -1228,3 +1228,133 @@ fn embedded_tool_formatters_receive_the_original_scope_even_when_ids_repeat() {
         );
     }
 }
+
+#[test]
+fn embedded_continuous_tools_move_original_details_across_grouping_changes() {
+    let mut a = tool();
+    a.id = "a".into();
+    let mut b = a.clone();
+    b.id = "b".into();
+    let section = TranscriptSection {
+        id: "turn",
+        turn: None,
+        inputs: vec![],
+        outputs: vec![],
+        tools: vec![&a, &b],
+    };
+    let mut item = item();
+    item.content_blocks = Some(vec![
+        block(
+            0,
+            Block::ToolCall {
+                tool_id: "a".into(),
+            },
+        ),
+        block(
+            1,
+            Block::ToolCall {
+                tool_id: "b".into(),
+            },
+        ),
+    ]);
+    let mut message = OutputMessage::new(65100, scope());
+    message
+        .update(&scope(), 1, 1, &output(&item), Some(&section))
+        .unwrap();
+    let root = message.id();
+    let group = message.tool_run("a").unwrap().id();
+    assert_eq!(message.tool_run("b").unwrap().id(), group);
+    let old_ids = message.content_ids();
+    let header = message.tool_run("a").unwrap().disclosure_id().unwrap();
+    let mut host = message.into_host().unwrap();
+    assert!(toggle(&mut host, root, header));
+    assert!(toggle(&mut host, root, old_ids[0].disclosure.unwrap()));
+    let bodies = view(&host, root).tool_detail_sections();
+    let field = bodies[0].body;
+    let owner = host.text_surface(field).unwrap() as *const _ as usize;
+    item.content_blocks = Some(vec![
+        block(
+            0,
+            Block::Text {
+                text: "narration".into(),
+            },
+        ),
+        block(
+            1,
+            Block::ToolCall {
+                tool_id: "a".into(),
+            },
+        ),
+        block(
+            2,
+            Block::ToolCall {
+                tool_id: "b".into(),
+            },
+        ),
+    ]);
+    view_mut(&mut host, root)
+        .update(&scope(), 2, 1, &output(&item), Some(&section))
+        .unwrap();
+    assert_eq!(view(&host, root).tool_run("a").unwrap().id(), group);
+    assert!(view(&host, root).tool_run("a").unwrap().is_expanded());
+    assert_eq!(view(&host, root).content_ids()[1], old_ids[0]);
+    assert_eq!(
+        host.text_surface(field).unwrap() as *const _ as usize,
+        owner
+    );
+    item.content_blocks = Some(vec![
+        block(
+            0,
+            Block::ToolCall {
+                tool_id: "a".into(),
+            },
+        ),
+        block(
+            1,
+            Block::Text {
+                text: "break".into(),
+            },
+        ),
+        block(
+            2,
+            Block::ToolCall {
+                tool_id: "b".into(),
+            },
+        ),
+    ]);
+    view_mut(&mut host, root)
+        .update(&scope(), 3, 1, &output(&item), Some(&section))
+        .unwrap();
+    assert!(view(&host, root).tool_run("a").is_none());
+    assert_eq!(view(&host, root).content_ids()[0], old_ids[0]);
+    assert_eq!(
+        host.text_surface(field).unwrap() as *const _ as usize,
+        owner
+    );
+    item.content_blocks = Some(vec![
+        block(
+            0,
+            Block::ToolCall {
+                tool_id: "a".into(),
+            },
+        ),
+        block(
+            1,
+            Block::ToolCall {
+                tool_id: "b".into(),
+            },
+        ),
+        block(
+            2,
+            Block::ToolCall {
+                tool_id: "a".into(),
+            },
+        ),
+    ]);
+    view_mut(&mut host, root)
+        .update(&scope(), 4, 1, &output(&item), Some(&section))
+        .unwrap();
+    assert!(view(&host, root).tool_run("a").is_none());
+    assert!(view(&host, root).tool_run("b").is_none());
+    assert_eq!(view(&host, root).content_ids().len(), 3);
+}

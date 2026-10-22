@@ -145,9 +145,13 @@ impl Probe {
                         return None;
                     }
                     let id = content.row_id(key).unwrap();
+                    let TranscriptContentRowKey::Tool(tool_id) = key else {
+                        return None;
+                    };
+                    let member = content.tool_activity_id(tool_id)?;
                     host.view
                         .tree
-                        .get(id)
+                        .get(member)
                         .unwrap()
                         .component::<ToolActivity>()
                         .unwrap()

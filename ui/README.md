@@ -25,7 +25,7 @@ AgentKit 拥有可复用的 Composer、Transcript、Indicators、RunPort、Sideb
 
 `RunSurface` 仅是现有协议/控件测试宿主，不是标准 RunPort。正式组件契约、App 的 input/output/footnote 布局、基础 Issue 和完整交付账本见 [Rust Agent UI 接入契约](../docs/rust-agent-ui-contract.md)。
 
-可独立挂载的组件包括 Composer、ComposerNotice、ComposerContext、ComposerChoices、AnnotationEditor、ComposerUploads、Indicators、Sidebar、ThreadRename、SidePanel、SidePanelNavigation、SummaryView、InputMessage、OutputMessage、TurnFootnote、TranscriptContent、ReadOnlyTranscript 和 RunPort。它们使用同一套共享 presentation；RunSurface/ComponentDemo 是测试与接入宿主。主会话和可写 pane 已挂载 RunPort，有界子历史使用 ReadOnlyTranscript；完整 Transcript 的阅读锚点、富内容与最终体验验收仍待完成。
+可独立挂载的组件包括 Composer、ComposerNotice、ComposerContext、ComposerChoices、AnnotationEditor、ComposerUploads、Indicators、Sidebar、ThreadRename、SidePanel、SidePanelNavigation、SummaryView、ToolRun、InputMessage、OutputMessage、TurnFootnote、TranscriptContent、ReadOnlyTranscript 和 RunPort。它们使用同一套共享 presentation；RunSurface/ComponentDemo 是测试与接入宿主。主会话和可写 pane 已挂载 RunPort，有界子历史使用 ReadOnlyTranscript；完整 Transcript 的阅读锚点、富内容与最终体验验收仍待完成。
 
 宿主 header 使用 `SidePanelHeaderPlacement::Host` 配合原 `SidePanelNavigation`，二者消费同一 `SidePanelInput`。窗口与 ProcessContainer 注册由宿主/SDK 负责；当前 demo 的 `--panel-navigation-toolbar` 只分配 in-content toolbar 区域，不是原生窗口 toolbar 验收。旧 `InlineDiagnostic` 默认仅用于保留可运行路径。
 
@@ -337,3 +337,5 @@ publication and validation scope; complete inline packing remains unfinished.
 default rows. Titles indent and wrap while trailing metadata stays fixed; changed
 formatting requires a new publication. See [hierarchy contract](../docs/rust-agent-ui-summary-indent-20261022.md)
 for constructor injection, scaling, control/selection retention and native evidence.
+
+连续工具的独立组件、Transcript/消息内组合与 `row_id` / `tool_activity_id` 迁移见[连续工具接入说明](../docs/rust-agent-ui-tool-run-20261023.md)。本地协议演示的原生 SideChat、分页/阅读/焦点与系统拼音续验见[独立程序记录](../docs/rust-agent-ui-native-resumed-20261023.md)；结果不转移到后续源码、真实三端或 ProcessContainer。

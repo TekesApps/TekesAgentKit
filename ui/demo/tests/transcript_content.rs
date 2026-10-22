@@ -324,9 +324,7 @@ fn journal_events_compose_once_with_a_turn_aside_and_cumulative_tool_result() {
     );
     assert!(!view.capabilities().keyed_reading_transactions && !view.capabilities().rich_content);
     let root_id = view.id();
-    let tool_id = view
-        .row_id(&TranscriptContentRowKey::Tool("tool".into()))
-        .unwrap();
+    let tool_id = view.tool_activity_id("tool").unwrap();
     let mut host = view.into_host().unwrap();
     let ids = host
         .get(tool_id)
@@ -1631,5 +1629,130 @@ fn grouped_aside_keeps_one_reading_item_and_rejects_old_feedback_completion_afte
     assert_ne!(
         view.feedback_controls().next().unwrap().1.ids().positive,
         old_positive
+    );
+}
+
+#[test]
+fn adjacent_tools_keep_original_members_when_prepend_split_and_merge_change_the_group() {
+    let mut s = TranscriptSnapshot {
+        turns: vec![turn()],
+        ..Default::default()
+    };
+    let mut first = tool();
+    first.id = "first".into();
+    first.result_position = None;
+    let mut second = first.clone();
+    second.id = "second".into();
+    second.source_position = Some(TranscriptSourcePosition::Journal {
+        sequence: 3,
+        content_index: None,
+    });
+    s.tools = vec![first.clone(), second.clone()];
+    let mut view = content();
+    view.update(&scope(), 1, 1, &s, true).unwrap();
+    let owner = view.tool_run("first").unwrap().id();
+    assert_eq!(view.tool_run("second").unwrap().id(), owner);
+    assert!(!view.tool_run("first").unwrap().is_expanded());
+    let first_id = view.tool_activity_id("first").unwrap();
+    let second_id = view.tool_activity_id("second").unwrap();
+    let toggle = view.tool_run("first").unwrap().disclosure_id().unwrap();
+    let root_id = view.id();
+    let mut host = view.into_host().unwrap();
+    host.accessibility_action(toggle, None, AccessibilityAction::Press);
+    let actions = host.drain_actions();
+    root(&mut host, root_id).handle_actions(&actions);
+    assert!(
+        root(&mut host, root_id)
+            .tool_run("first")
+            .unwrap()
+            .is_expanded()
+    );
+    assert!(host.get(first_id).is_some());
+    assert!(host.get(second_id).is_some());
+    let mut prepended = first.clone();
+    prepended.id = "prepended".into();
+    prepended.source_position = Some(TranscriptSourcePosition::Journal {
+        sequence: 0,
+        content_index: None,
+    });
+    s.tools.insert(0, prepended);
+    root(&mut host, root_id)
+        .update(&scope(), 2, 1, &s, true)
+        .unwrap();
+    assert_eq!(
+        root(&mut host, root_id).tool_run("prepended").unwrap().id(),
+        owner
+    );
+    assert_eq!(
+        root(&mut host, root_id).tool_activity_id("second"),
+        Some(second_id)
+    );
+    assert_ne!(
+        root(&mut host, root_id)
+            .tool_run("first")
+            .unwrap()
+            .disclosure_id(),
+        Some(toggle)
+    );
+    s.items = vec![message("prose", TranscriptItemKind::Assistant, 2)];
+    root(&mut host, root_id)
+        .update(&scope(), 3, 1, &s, true)
+        .unwrap();
+    assert_ne!(
+        root(&mut host, root_id).tool_run("first").unwrap().id(),
+        root(&mut host, root_id).tool_run("second").unwrap().id()
+    );
+    assert_eq!(
+        root(&mut host, root_id).tool_activity_id("first"),
+        Some(first_id)
+    );
+    assert_eq!(
+        root(&mut host, root_id).tool_activity_id("second"),
+        Some(second_id)
+    );
+    s.items.clear();
+    root(&mut host, root_id)
+        .update(&scope(), 4, 1, &s, true)
+        .unwrap();
+    assert_eq!(
+        root(&mut host, root_id).tool_run("second").unwrap().id(),
+        owner
+    );
+    assert_eq!(
+        root(&mut host, root_id).tool_activity_id("second"),
+        Some(second_id)
+    );
+}
+#[test]
+fn zero_node_assistant_is_transparent_but_unplaced_tools_never_imply_adjacency() {
+    let mut a = tool();
+    a.id = "a".into();
+    a.result_position = None;
+    let mut b = a.clone();
+    b.id = "b".into();
+    b.source_position = Some(TranscriptSourcePosition::Journal {
+        sequence: 3,
+        content_index: None,
+    });
+    let mut empty = message("empty", TranscriptItemKind::Assistant, 2);
+    empty.text.clear();
+    empty.content_blocks = Some(vec![]);
+    let mut s = TranscriptSnapshot {
+        tools: vec![a, b],
+        items: vec![empty],
+        turns: vec![turn()],
+        ..Default::default()
+    };
+    let mut view = content();
+    view.update(&scope(), 1, 1, &s, true).unwrap();
+    assert_eq!(
+        view.tool_run("a").unwrap().summary().unwrap().tool_ids,
+        ["a", "b"]
+    );
+    s.tools[1].source_position = None;
+    view.update(&scope(), 2, 1, &s, true).unwrap();
+    assert_ne!(
+        view.tool_run("a").unwrap().id(),
+        view.tool_run("b").unwrap().id()
     );
 }

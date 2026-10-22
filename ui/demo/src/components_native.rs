@@ -4808,7 +4808,7 @@ pub fn run() {
                     }
                     footnotes+=1;
                 }
-                else if node.component::<tekes_agent_components_ui::ToolActivity>().is_some() {assert!((node.frame().min_x()-frame.min_x()).abs()<0.5);tools+=1;}
+                else if let Some(group) = node.component::<tekes_agent_components_ui::ToolRun>() {assert!((node.frame().min_x()-frame.min_x()).abs()<0.5);tools+=group.summary().unwrap().tool_ids.len();}
             }
             assert_eq!(messages, snapshot.transcript.items.iter().filter(|item|item.is_visible).count());
             assert_eq!(output_copies, document.sections.iter().filter(|section|section.final_output().is_some()).count());

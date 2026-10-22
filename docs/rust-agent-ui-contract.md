@@ -429,3 +429,7 @@ wake scheduling remain host adapters. This does not complete footnote layout par
 [独立分区与复制](rust-agent-ui-tool-section-controls-20261023.md)已消费原 SDK 字段/标题/按钮与复制通道；该增量取代上一条的单字段 UI 状态。#53 限高阅读、#54 分隔线和最终富卡片/原生对照仍未完成。
 [报告与计数](rust-agent-ui-tool-report-20261023.md)补共享权威性/选择规则及 scoped 文案/分区回调；当前 SEP 没有报告来源，不从私有 meta 猜测。默认计数视图、连续分组和最终语义样式仍未交付。
 [系统提示处理后的原生续验](rust-agent-ui-native-handled-20261022.md)推进到 phase 20 后期限失败，未完成分页/系统组字。
+
+[本轮原生续验](rust-agent-ui-native-resumed-20261023.md)在单独记录的冻结 WIP 程序上通过 SideChat、分页/阅读/焦点及系统拼音专项；不继承到后续源码或真实三端/跨进程验收。
+
+[连续工具分组与 API 迁移](rust-agent-ui-tool-run-20261023.md)复用原业务成员控件与 SDK Button/Stack，并区分阅读 wrapper 与原 ToolActivity ID；严格阅读和完整 Source 验收仍开放。

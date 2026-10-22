@@ -49,6 +49,16 @@ impl TranscriptToolRowModel {
     }
 }
 impl TranscriptToolCall {
+    pub fn presentation_state(&self) -> TranscriptToolRowState {
+        use TranscriptToolRowState as State;
+        match self.phase.as_str() {
+            "interrupted" | "stopped" => State::Stopped,
+            _ if self.failed_for_presentation() => State::Error,
+            "done" if self.legacy_terminal_exit_failed() => State::Error,
+            "done" => State::Ok,
+            _ => State::Running,
+        }
+    }
     /// Selects the same collapsed title/summary/error precedence as ClientKit's
     /// TranscriptToolRowModel and its projector/View bridge. Canonical errors
     /// include public meta exit failures; only a legacy output-marker failure
@@ -59,13 +69,8 @@ impl TranscriptToolCall {
     ) -> TranscriptToolRowModel {
         use TranscriptToolRowState as State;
         let failed = self.failed_for_presentation();
-        let state = match self.phase.as_str() {
-            "interrupted" | "stopped" => State::Stopped,
-            _ if failed => State::Error,
-            "done" if self.legacy_terminal_exit_failed() => State::Error,
-            "done" => State::Ok,
-            _ => State::Running,
-        };
+        let state = self.presentation_state();
+
         if state == State::Ok
             && let Some(action) = first_line(wording.settled_action)
         {
@@ -100,7 +105,7 @@ impl TranscriptToolCall {
         }
     }
 }
-fn first_line(value: Option<&str>) -> Option<String> {
+pub(crate) fn first_line(value: Option<&str>) -> Option<String> {
     let value = value?.trim();
     let first = value
         .split([

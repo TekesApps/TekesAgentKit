@@ -49,6 +49,7 @@ pub struct OutputMessageLabels {
     /// Pure tool-local formatting; external lookups must use `scoped_tool`.
     pub tool: fn(&TranscriptToolCall) -> (String, String),
     pub scoped_tool: Option<ScopedToolFormatter>,
+    pub tool_run: crate::ToolRunLabels,
     /// Structured expansion. Set None to retain a custom `tool` text body.
     pub tool_sections: Option<
         fn(
@@ -90,6 +91,7 @@ impl Default for OutputMessageLabels {
             },
             tool_sections: Some(default_tool_sections),
             scoped_tool: None,
+            tool_run: Default::default(),
             tool: |t| {
                 let producer_title = t.presentation_title();
                 let label = tool_display_name(&t.name);
@@ -191,7 +193,7 @@ pub(crate) fn validate_tool_details(facts: &PartFacts) -> Result<(), &'static st
     Ok(())
 }
 
-fn tool_display_name(name: &str) -> String {
+pub(crate) fn tool_display_name(name: &str) -> String {
     let action = name
         .starts_with("mcp__")
         .then(|| name.rsplit("__").next())
@@ -661,18 +663,16 @@ impl OutputMessage {
         &self.scope
     }
     pub fn content_ids(&self) -> Vec<OutputContentIds> {
-        self.rows
-            .children
-            .iter()
-            .map(|c| c.component::<OutputPart>().unwrap().ids)
+        self.part_nodes()
+            .into_iter()
+            .map(|node| node.component::<OutputPart>().unwrap().ids)
             .collect()
     }
     /// Structured body groups expose their original section owners here;
     /// `OutputContentIds::body` itself is a group for a structured tool.
     pub fn tool_detail_sections(&self) -> Vec<crate::ToolDetailSectionIds> {
-        self.rows
-            .children
-            .iter()
+        self.part_nodes()
+            .into_iter()
             .flat_map(|node| {
                 node.component::<OutputPart>()
                     .unwrap()
@@ -681,22 +681,61 @@ impl OutputMessage {
             .collect()
     }
     pub fn copy_action_ids(&self) -> Vec<ComponentId> {
-        self.rows
-            .children
-            .iter()
+        self.visible_part_nodes()
+            .into_iter()
             .flat_map(|node| node.component::<OutputPart>().unwrap().copy_ids())
             .collect()
     }
     pub fn take_copy_intents(&self, actions: &[ContentAction]) -> Vec<crate::TranscriptCopyIntent> {
-        self.rows
-            .children
-            .iter()
+        self.visible_part_nodes()
+            .into_iter()
             .flat_map(|node| {
                 node.component::<OutputPart>()
                     .unwrap()
                     .copy_intents(&self.scope, actions)
             })
             .collect()
+    }
+    fn part_nodes(&self) -> Vec<&Content> {
+        self.rows
+            .children
+            .iter()
+            .flat_map(|node| {
+                if let Some(group) = node.component::<crate::ToolRun>() {
+                    group.member_nodes().collect()
+                } else {
+                    vec![node]
+                }
+            })
+            .collect()
+    }
+    fn visible_part_nodes(&self) -> Vec<&Content> {
+        self.rows
+            .children
+            .iter()
+            .flat_map(|node| {
+                if let Some(group) = node.component::<crate::ToolRun>() {
+                    if group.is_expanded() {
+                        group.member_nodes().collect()
+                    } else {
+                        vec![]
+                    }
+                } else {
+                    vec![node]
+                }
+            })
+            .collect()
+    }
+    pub fn tool_run(&self, tool_id: &str) -> Option<&crate::ToolRun> {
+        self.rows
+            .children
+            .iter()
+            .filter_map(|node| node.component::<crate::ToolRun>())
+            .find(|group| {
+                group
+                    .summary()
+                    .is_some_and(|m| m.tool_ids.iter().any(|id| id == tool_id))
+            })
     }
     /// Missing tool DTOs stay unresolved, never resolved through another turn or
     /// the currently selected session. None is valid for a session-wide notice.
@@ -709,7 +748,17 @@ impl OutputMessage {
         section: Option<&TranscriptSection<'_>>,
     ) -> Result<(), &'static str> {
         let (key, facts) = self.check_update(scope, publication, epoch, output, section)?;
-        let mut old = std::mem::take(&mut self.rows.children);
+        let mut old = vec![];
+        let mut old_groups = vec![];
+        for mut node in std::mem::take(&mut self.rows.children) {
+            if let Some(group) = node.component_mut::<crate::ToolRun>() {
+                old.extend(group.take_members());
+                old_groups.push(node);
+            } else {
+                old.push(node);
+            }
+        }
+        let mut installed = vec![];
         for f in &facts {
             let mut content = if let Some(i) = old.iter().position(|c| {
                 self.reuses_part(
@@ -737,7 +786,109 @@ impl OutputMessage {
                 *next += 1;
                 id
             });
-            self.rows.children.push(content);
+            installed.push(content);
+        }
+        let mut pending = installed.into_iter().peekable();
+        while let Some(first) = pending.next() {
+            let mut run = vec![first];
+            if let Some(tool) = run[0]
+                .component::<OutputPart>()
+                .unwrap()
+                .facts
+                .tool
+                .as_ref()
+                && facts
+                    .iter()
+                    .filter(|part| {
+                        part.tool
+                            .as_ref()
+                            .is_some_and(|value| value.tool_id == tool.tool_id)
+                    })
+                    .count()
+                    == 1
+            {
+                while let Some(next) = pending.peek() {
+                    let candidate = next.component::<OutputPart>().unwrap();
+                    if let Some(tool) = candidate.facts.tool.as_ref()
+                        && facts
+                            .iter()
+                            .filter(|part| {
+                                part.tool
+                                    .as_ref()
+                                    .is_some_and(|value| value.tool_id == tool.tool_id)
+                            })
+                            .count()
+                            == 1
+                    {
+                        run.push(pending.next().unwrap());
+                    } else {
+                        break;
+                    }
+                }
+            }
+            if run.len() < 2 {
+                self.rows.children.extend(run);
+                continue;
+            }
+            let ids: Vec<_> = run
+                .iter()
+                .map(|node| {
+                    node.component::<OutputPart>()
+                        .unwrap()
+                        .facts
+                        .tool
+                        .as_ref()
+                        .unwrap()
+                        .tool_id
+                        .as_str()
+                })
+                .collect();
+            let tools = ids
+                .iter()
+                .map(|id| {
+                    section
+                        .unwrap()
+                        .tools
+                        .iter()
+                        .copied()
+                        .find(|tool| tool.id == *id && tool.turn_id == output.item.turn_id)
+                        .unwrap()
+                })
+                .collect::<Vec<_>>();
+            let model = self.labels.tool_run.summary(&self.scope, &tools)?;
+            let retained = old_groups.iter().position(|node| {
+                node.component::<crate::ToolRun>()
+                    .unwrap()
+                    .summary()
+                    .is_some_and(|old| {
+                        old.turn_id == model.turn_id
+                            && old.tool_ids.iter().any(|id| model.tool_ids.contains(id))
+                    })
+            });
+            let mut node = retained
+                .map(|index| old_groups.remove(index))
+                .unwrap_or_else(|| {
+                    let id = ComponentId(self.root.0 + self.next);
+                    self.next += 1;
+                    Content::new(
+                        id,
+                        crate::ToolRun::at_root(id, self.scope.clone(), self.labels.tool_run),
+                    )
+                });
+            let base = self.root.0;
+            let next = &mut self.next;
+            node.component_mut::<crate::ToolRun>().unwrap().install(
+                publication,
+                epoch,
+                model,
+                run,
+                &mut || {
+                    let id = ComponentId(base + *next);
+                    *next += 1;
+                    id
+                },
+            );
+            self.rows.children.push(node);
         }
         self.key = Some(key);
         self.publication = publication;
@@ -788,6 +939,40 @@ impl OutputMessage {
         {
             return Err("conflicting output message publication");
         }
+        let mut tools = vec![];
+        for facts_part in &facts {
+            if let Some(tool) = &facts_part.tool
+                && facts
+                    .iter()
+                    .filter(|part| {
+                        part.tool
+                            .as_ref()
+                            .is_some_and(|other| other.tool_id == tool.tool_id)
+                    })
+                    .count()
+                    == 1
+            {
+                tools.push(
+                    section
+                        .unwrap()
+                        .tools
+                        .iter()
+                        .copied()
+                        .find(|value| {
+                            value.id == tool.tool_id && value.turn_id == output.item.turn_id
+                        })
+                        .unwrap(),
+                );
+                continue;
+            }
+            if tools.len() > 1 {
+                self.labels.tool_run.summary(&self.scope, &tools)?;
+            }
+            tools.clear();
+        }
+        if tools.len() > 1 {
+            self.labels.tool_run.summary(&self.scope, &tools)?;
+        }
         let new_count = facts
             .iter()
             .filter(|f| {
@@ -816,6 +1001,22 @@ impl OutputMessage {
         old: &PartFacts,
         new: &PartFacts,
     ) -> bool {
+        if let (Slot::Tool(_, a), Slot::Tool(_, b)) = (&old.slot, &new.slot)
+            && a == b
+            && self
+                .facts
+                .iter()
+                .filter(|part| matches!(&part.slot,Slot::Tool(_,id) if id==a))
+                .count()
+                == 1
+            && facts
+                .iter()
+                .filter(|part| matches!(&part.slot,Slot::Tool(_,id) if id==b))
+                .count()
+                == 1
+        {
+            return true;
+        }
         if old.slot == new.slot {
             return true;
         }
@@ -848,21 +1049,33 @@ impl OutputMessage {
     /// UI-local disclosure only. The host drains the original ContentHost action
     /// batch exactly once; retired button IDs cannot target a replacement block.
     pub fn handle_actions(&mut self, actions: &[ContentAction]) -> bool {
-        let mut changed = false;
-        for a in actions
-            .iter()
-            .filter(|a| a.kind == ContentActionKind::Activate)
-        {
-            if let Some(part) = self.rows.children.iter_mut().find_map(|c| {
-                let part = c.component_mut::<OutputPart>().unwrap();
-                (part.ids.disclosure == Some(a.target)).then_some(part)
-            }) {
+        fn toggle(part: &mut OutputPart, actions: &[ContentAction]) -> bool {
+            let id = part.ids.disclosure;
+            let count = actions
+                .iter()
+                .filter(|a| a.kind == ContentActionKind::Activate && id == Some(a.target))
+                .count();
+            for _ in 0..count {
                 part.toggle();
-                changed = true;
+            }
+            count > 0
+        }
+        let mut changed = false;
+        for node in &mut self.rows.children {
+            if let Some(group) = node.component_mut::<crate::ToolRun>() {
+                changed |= group.handle_disclosure(actions);
+                if group.is_expanded() {
+                    for node in group.member_nodes_mut() {
+                        changed |= toggle(node.component_mut::<OutputPart>().unwrap(), actions);
+                    }
+                }
+            } else {
+                changed |= toggle(node.component_mut::<OutputPart>().unwrap(), actions);
             }
         }
         changed
     }
+
     pub fn into_host(self) -> Result<ContentHost, CompositionError> {
         let id = self.root;
         {

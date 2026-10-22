@@ -290,8 +290,13 @@ async fn tool_section_copy_uses_original_run_channel_during_composer_preedit() {
     let (runtime, mut host, root, snapshot, version, mut text) = setup_with_fixture(fixture).await;
     let key = TranscriptContentRowKey::Tool(snapshot.transcript.tools[0].id.clone());
     let row = run(&host, root).transcript().unwrap().row_id(&key).unwrap();
+    let activity_id = run(&host, root)
+        .transcript()
+        .unwrap()
+        .tool_activity_id(&snapshot.transcript.tools[0].id)
+        .unwrap();
     let toggle = host
-        .get(row)
+        .get(activity_id)
         .unwrap()
         .component::<ToolActivity>()
         .unwrap()
@@ -303,7 +308,7 @@ async fn tool_section_copy_uses_original_run_channel_during_composer_preedit() {
     assert!(tekes_agent_ui_consumer_check::drain_local_run_actions(&mut host, root).is_empty());
     render(&mut host, &mut text);
     let target = host
-        .get(row)
+        .get(activity_id)
         .unwrap()
         .component::<ToolActivity>()
         .unwrap()
@@ -2312,15 +2317,20 @@ async fn expanded_tool_growth_and_reflow_preserve_reading_and_explicit_collapse_
         .unwrap()
         .row_id(&tool_key)
         .unwrap();
+    let activity_id = run(&host, root)
+        .transcript()
+        .unwrap()
+        .tool_activity_id(&snapshot.transcript.tools[0].id)
+        .unwrap();
     let tool = host
-        .get(tool_row)
+        .get(activity_id)
         .unwrap()
         .component::<ToolActivity>()
         .unwrap()
         .content_ids()
         .unwrap();
     let tool_output = host
-        .get(tool_row)
+        .get(activity_id)
         .unwrap()
         .component::<ToolActivity>()
         .unwrap()

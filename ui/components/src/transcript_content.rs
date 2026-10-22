@@ -2,8 +2,8 @@
 //! to TekesUI; this component neither invents a scroll state nor adjusts pixels.
 use crate::{
     FeedbackGesture, FeedbackLabels, InputMessage, OutputMessage, OutputMessageLabels,
-    ToolActivity, ToolActivityLabels, ToolActivityPlacement, TranscriptMessageIdentity,
-    TurnFeedback, TurnFootnote, TurnFootnoteIntent, TurnFootnoteLabels,
+    ToolActivity, ToolActivityLabels, ToolActivityPlacement, ToolRun, ToolRunLabels,
+    TranscriptMessageIdentity, TurnFeedback, TurnFootnote, TurnFootnoteIntent, TurnFootnoteLabels,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -83,6 +83,7 @@ pub struct TranscriptContentLabels {
     pub input_copy: String,
     pub output: OutputMessageLabels,
     pub tool: ToolActivityLabels,
+    pub tool_run: ToolRunLabels,
     pub footnote: TurnFootnoteLabels,
     pub feedback: Option<FeedbackLabels>,
 }
@@ -101,6 +102,7 @@ impl Default for TranscriptContentLabels {
             },
             output: Default::default(),
             tool: Default::default(),
+            tool_run: Default::default(),
             footnote: Default::default(),
             feedback: None,
         }
@@ -223,6 +225,13 @@ impl TranscriptContent {
             .iter()
             .position(|value| value == key)
             .map(|i| self.rows.children[i].id())
+            .or_else(|| {
+                if let TranscriptContentRowKey::Tool(id) = key {
+                    self.tool_run(id).map(ToolRun::id)
+                } else {
+                    None
+                }
+            })
     }
     pub fn message_id(&self, key: TranscriptMessageKey<'_>) -> Option<ComponentId> {
         self.row_id(&TranscriptContentRowKey::Message(key.into()))
@@ -248,7 +257,9 @@ impl TranscriptContent {
                 PlannedContent::Output(output, section) => {
                     section.map(|_| output.item.turn_id.as_str())
                 }
-                PlannedContent::Tool(tool, _) => Some(tool.turn_id.as_str()),
+                PlannedContent::Tools(tools) => {
+                    tools.first().map(|(tool, _)| tool.turn_id.as_str())
+                }
                 PlannedContent::Footnote(turn, _, _, _) => Some(turn.id.as_str()),
                 PlannedContent::Label(_) => match &row.key {
                     TranscriptContentRowKey::Unplaced(turn) => Some(turn.as_str()),
@@ -399,25 +410,80 @@ impl TranscriptContent {
         self.validate_plan(&plan, publication, epoch, available)?;
         let desired: BTreeSet<_> = plan.iter().map(|row| row.key.clone()).collect();
         // All source/identity/content/namespace checks precede tree mutation.
+        let index: BTreeMap<_, _> = self
+            .keys
+            .iter()
+            .cloned()
+            .enumerate()
+            .map(|(i, key)| (key, i))
+            .collect();
+        let mut claimed = BTreeSet::new();
+        let retained_keys: Vec<_> = plan
+            .iter()
+            .map(|row| {
+                let key = self.retained_key(row, &desired, &index, &claimed);
+                if let Some(key) = &key {
+                    claimed.insert(key.clone());
+                }
+                key
+            })
+            .collect();
         let old = std::mem::take(&mut self.rows.children);
         let mut existing: BTreeMap<_, _> = std::mem::take(&mut self.keys)
             .into_iter()
             .zip(old)
             .collect();
         existing.append(&mut self.detached);
-        for row in &plan {
-            let retained = existing.remove(&row.key).or_else(|| {
-                row.alias
-                    .as_ref()
-                    .filter(|key| !desired.contains(*key))
-                    .and_then(|key| existing.remove(key))
-            });
-            let mut node = retained.unwrap_or_else(|| {
-                let namespace = self.next;
-                self.next += row.namespaces();
-                self.new_row(namespace, row)
-            });
-            self.update_row(&mut node, row, publication, epoch, available)?;
+        let mut members = BTreeMap::new();
+        for node in existing.values_mut() {
+            if let Some(group) = node.component_mut::<ToolRun>() {
+                let model = group.summary().unwrap().clone();
+                for (id, member) in model.tool_ids.into_iter().zip(group.take_members()) {
+                    members.insert((model.turn_id.clone(), id), member);
+                }
+            }
+        }
+        for (row, retained_key) in plan.iter().zip(retained_keys) {
+            let mut node = retained_key
+                .and_then(|key| existing.remove(&key))
+                .unwrap_or_else(|| {
+                    let namespace = self.next;
+                    self.next += row.namespaces();
+                    self.new_row(namespace, row)
+                });
+            if let PlannedContent::Tools(tools) = &row.content {
+                let mut children = vec![];
+                for (tool, placement) in tools {
+                    let mut child = members
+                        .remove(&(tool.turn_id.clone(), tool.id.clone()))
+                        .unwrap_or_else(|| {
+                            let view = ToolActivity::new(
+                                self.next,
+                                self.scope.clone(),
+                                self.labels.tool.clone(),
+                            );
+                            self.next += 1;
+                            Content::new(view.id(), view)
+                        });
+                    child.component_mut::<ToolActivity>().unwrap().update(
+                        &self.scope,
+                        publication,
+                        epoch,
+                        tool,
+                        *placement,
+                    )?;
+                    children.push(child);
+                }
+                let model = self.labels.tool_run.summary(
+                    &self.scope,
+                    &tools.iter().map(|(tool, _)| *tool).collect::<Vec<_>>(),
+                )?;
+                node.component_mut::<ToolRun>()
+                    .unwrap()
+                    .install_owned_header(publication, epoch, model, children);
+            } else {
+                self.update_row(&mut node, row, publication, epoch, available)?;
+            }
             self.keys.push(row.key.clone());
             self.rows.children.push(node);
         }
@@ -495,20 +561,26 @@ impl TranscriptContent {
             .map(|(i, key)| (key, i))
             .collect();
         let mut next = self.next;
+        let mut claimed = BTreeSet::new();
         let rows = planned
             .iter()
             .map(|row| {
-                let retained = self.find(&row.key, &index).or_else(|| {
-                    row.alias
-                        .as_ref()
-                        .filter(|key| !desired.contains(*key))
-                        .and_then(|key| self.find(key, &index))
-                });
+                let key = self.retained_key(row, &desired, &index, &claimed);
+                if let Some(key) = &key {
+                    claimed.insert(key.clone());
+                }
+                let retained = key.and_then(|key| self.find(&key, &index));
                 let id = retained.map(Content::id).unwrap_or_else(|| {
                     let id = ComponentId((next as u64) << 32);
                     next += row.namespaces();
                     id
                 });
+                if let PlannedContent::Tools(tools) = &row.content {
+                    next += tools
+                        .iter()
+                        .filter(|(tool, _)| self.find_tool(&tool.turn_id, &tool.id).is_none())
+                        .count() as u32;
+                }
                 (row.key.clone(), id)
             })
             .collect();
@@ -660,19 +732,13 @@ impl TranscriptContent {
         let mut allocations = 0_u64;
         let mut claimed = BTreeSet::new();
         for row in plan {
-            let original = if self.find(&row.key, &index).is_some() {
-                Some(&row.key)
-            } else {
-                row.alias
-                    .as_ref()
-                    .filter(|key| !desired.contains(*key) && self.find(key, &index).is_some())
-            };
-            if let Some(key) = original
+            let original = self.retained_key(row, &desired, &index, &claimed);
+            if let Some(key) = &original
                 && !claimed.insert(key.clone())
             {
                 return Err("ambiguous transcript reconciliation receipt");
             }
-            match original.and_then(|key| self.find(key, &index)) {
+            match original.as_ref().and_then(|key| self.find(key, &index)) {
                 Some(content) => self.check_row(content, row, publication, epoch, available)?,
                 None => {
                     allocations += u64::from(row.namespaces());
@@ -680,11 +746,90 @@ impl TranscriptContent {
                     self.check_row(&candidate, row, publication, epoch, available)?;
                 }
             }
+            if let PlannedContent::Tools(tools) = &row.content {
+                allocations += tools
+                    .iter()
+                    .filter(|(tool, _)| self.find_tool(&tool.turn_id, &tool.id).is_none())
+                    .count() as u64;
+            }
         }
         if allocations > u64::from(self.end - self.next) {
             return Err("transcript row namespaces exhausted");
         }
         Ok(())
+    }
+    fn find_tool(&self, turn: &str, id: &str) -> Option<&ToolActivity> {
+        self.rows
+            .children
+            .iter()
+            .filter_map(|node| node.component::<ToolRun>())
+            .filter(|group| group.summary().is_some_and(|m| m.turn_id == turn))
+            .find_map(|group| group.tool_activity(id))
+    }
+    pub fn tool_activity_id(&self, id: &str) -> Option<ComponentId> {
+        self.rows
+            .children
+            .iter()
+            .filter_map(|node| node.component::<ToolRun>())
+            .find_map(|group| group.tool_activity(id))
+            .map(ToolActivity::id)
+    }
+    pub fn tool_run(&self, id: &str) -> Option<&ToolRun> {
+        self.rows
+            .children
+            .iter()
+            .filter_map(|node| node.component::<ToolRun>())
+            .find(|group| {
+                group
+                    .summary()
+                    .is_some_and(|m| m.tool_ids.iter().any(|value| value == id))
+            })
+    }
+    fn retained_key(
+        &self,
+        row: &Planned<'_>,
+        desired: &BTreeSet<TranscriptContentRowKey>,
+        index: &BTreeMap<TranscriptContentRowKey, usize>,
+        claimed: &BTreeSet<TranscriptContentRowKey>,
+    ) -> Option<TranscriptContentRowKey> {
+        if let PlannedContent::Tools(tools) = &row.content {
+            let matches = |node: &Content| {
+                node.component::<ToolRun>().is_some_and(|group| {
+                    group
+                        .summary()
+                        .is_some_and(|m| m.turn_id == tools[0].0.turn_id)
+                })
+            };
+            if self.find(&row.key, index).is_some_and(matches) {
+                return Some(row.key.clone());
+            }
+            return self
+                .keys
+                .iter()
+                .zip(&self.rows.children)
+                .find(|(key, node)| {
+                    !desired.contains(*key)
+                        && !claimed.contains(*key)
+                        && matches(node)
+                        && node
+                            .component::<ToolRun>()
+                            .unwrap()
+                            .summary()
+                            .unwrap()
+                            .tool_ids
+                            .iter()
+                            .any(|id| tools.iter().any(|(tool, _)| &tool.id == id))
+                })
+                .map(|(key, _)| key.clone());
+        }
+        if self.find(&row.key, index).is_some() {
+            Some(row.key.clone())
+        } else {
+            row.alias
+                .as_ref()
+                .filter(|key| !desired.contains(*key) && self.find(key, index).is_some())
+                .cloned()
+        }
     }
     fn find<'a>(
         &'a self,
@@ -713,11 +858,10 @@ impl TranscriptContent {
                     OutputMessage::with_labels(namespace, self.scope.clone(), self.labels.output);
                 Content::new(view.id(), view)
             }
-            PlannedContent::Tool(_, _) => {
-                let view =
-                    ToolActivity::new(namespace, self.scope.clone(), self.labels.tool.clone());
-                Content::new(view.id(), view)
-            }
+            PlannedContent::Tools(_) => Content::new(
+                root,
+                ToolRun::at_root(root, self.scope.clone(), self.labels.tool_run),
+            ),
             PlannedContent::Footnote(..) => {
                 let mut view =
                     TurnFootnote::new(namespace, self.scope.clone(), self.labels.footnote.clone());
@@ -752,10 +896,22 @@ impl TranscriptContent {
                     .ok_or("transcript message role changed")?
                     .check_update(&self.scope, publication, epoch, output, *section)?;
             }
-            PlannedContent::Tool(tool, placement) => {
-                node.component::<ToolActivity>()
-                    .ok_or("transcript tool role changed")?
-                    .check_update(&self.scope, publication, epoch, tool, *placement)?;
+            PlannedContent::Tools(tools) => {
+                let model = self.labels.tool_run.summary(
+                    &self.scope,
+                    &tools.iter().map(|(tool, _)| *tool).collect::<Vec<_>>(),
+                )?;
+                node.component::<ToolRun>()
+                    .ok_or("transcript tool run role changed")?
+                    .check_install(&self.scope, publication, epoch, &model)?;
+                for (tool, placement) in tools {
+                    if let Some(member) = self.find_tool(&tool.turn_id, &tool.id) {
+                        member.check_update(&self.scope, publication, epoch, tool, *placement)?;
+                    } else {
+                        ToolActivity::new(0, self.scope.clone(), self.labels.tool.clone())
+                            .check_update(&self.scope, publication, epoch, tool, *placement)?;
+                    }
+                }
             }
             PlannedContent::Footnote(turn, output, display, target) => {
                 let footer = node
@@ -816,10 +972,9 @@ impl TranscriptContent {
                 .component_mut::<OutputMessage>()
                 .unwrap()
                 .update(&self.scope, publication, epoch, output, *section)?,
-            PlannedContent::Tool(tool, placement) => node
-                .component_mut::<ToolActivity>()
-                .unwrap()
-                .update(&self.scope, publication, epoch, tool, *placement)?,
+            PlannedContent::Tools(_) => {
+                unreachable!("parent installs preflighted original tool members")
+            }
             PlannedContent::Footnote(turn, output, display, target) => {
                 let footer = node.component_mut::<TurnFootnote>().unwrap();
                 footer.update_with_turn_copy(
@@ -867,7 +1022,7 @@ impl TranscriptContent {
                 input.handle_actions(actions);
             } else if let Some(output) = node.component_mut::<OutputMessage>() {
                 output.handle_actions(actions);
-            } else if let Some(tool) = node.component_mut::<ToolActivity>() {
+            } else if let Some(tool) = node.component_mut::<ToolRun>() {
                 tool.handle_actions(actions);
             } else if let Some(footer) = node.component_mut::<TurnFootnote>() {
                 result.extend(footer.take_intents(actions));
@@ -988,7 +1143,7 @@ impl TranscriptContent {
                     input.copy_button_id().into_iter().collect()
                 } else if let Some(output) = node.component::<OutputMessage>() {
                     output.copy_action_ids()
-                } else if let Some(tool) = node.component::<ToolActivity>() {
+                } else if let Some(tool) = node.component::<ToolRun>() {
                     tool.copy_action_ids()
                 } else {
                     node.component::<TurnFootnote>()
@@ -1010,7 +1165,7 @@ impl TranscriptContent {
                     footnote.take_copy_intents(actions)
                 } else if let Some(output) = node.component::<OutputMessage>() {
                     output.take_copy_intents(actions)
-                } else if let Some(tool) = node.component::<ToolActivity>() {
+                } else if let Some(tool) = node.component::<ToolRun>() {
                     tool.take_copy_intents(actions)
                 } else {
                     vec![]
@@ -1087,7 +1242,7 @@ impl Planned<'_> {
 enum PlannedContent<'a> {
     Input(TranscriptInput<'a>),
     Output(TranscriptOutput<'a>, Option<&'a TranscriptSection<'a>>),
-    Tool(&'a TranscriptToolCall, ToolActivityPlacement),
+    Tools(Vec<(&'a TranscriptToolCall, ToolActivityPlacement)>),
     Footnote(
         &'a TranscriptTurn,
         Option<crate::TranscriptTurnCopy>,
@@ -1190,7 +1345,28 @@ fn plan<'a>(
             });
         }
     }
-    Ok(result)
+    let mut grouped: Vec<Planned<'a>> = vec![];
+    for row in result {
+        if let PlannedContent::Tools(current) = &row.content
+            && current
+                .iter()
+                .all(|(_, p)| *p != ToolActivityPlacement::Unplaced)
+            && let Some(previous) = grouped.iter_mut().rev().find(|row| !matches!(&row.content,
+                PlannedContent::Output(output, _) if output.item.kind == TranscriptItemKind::Assistant
+                    && output.item.text.is_empty() && output.item.reasoning.is_empty() && output.item.attachments.is_empty()
+                    && output.item.failure_message().is_none() && output.item.content_blocks.as_ref().is_some_and(Vec::is_empty)))
+            && let PlannedContent::Tools(prior) = &mut previous.content
+            && prior
+                .iter()
+                .all(|(_, p)| *p != ToolActivityPlacement::Unplaced)
+            && prior[0].0.turn_id == current[0].0.turn_id
+        {
+            prior.extend(current.iter().copied());
+            continue;
+        }
+        grouped.push(row);
+    }
+    Ok(grouped)
 }
 fn event_row<'a>(
     event: TranscriptOrderedEvent<'a>,
@@ -1239,14 +1415,14 @@ fn event_row<'a>(
             Some(Planned {
                 key: Key::Tool(tool.id.clone()),
                 alias: None,
-                content: PlannedContent::Tool(
+                content: PlannedContent::Tools(vec![(
                     tool,
                     if tool.source_position.is_some() {
                         ToolActivityPlacement::Call
                     } else {
                         ToolActivityPlacement::Unplaced
                     },
-                ),
+                )]),
             })
         }
         TranscriptOrderedEvent::ToolResult(tool)
@@ -1257,14 +1433,14 @@ fn event_row<'a>(
             Some(Planned {
                 key: Key::Tool(tool.id.clone()),
                 alias: None,
-                content: PlannedContent::Tool(
+                content: PlannedContent::Tools(vec![(
                     tool,
                     if tool.result_position.is_some() {
                         ToolActivityPlacement::ResultOnly
                     } else {
                         ToolActivityPlacement::Unplaced
                     },
-                ),
+                )]),
             })
         }
         _ => None,
