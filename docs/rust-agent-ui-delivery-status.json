@@ -33,7 +33,9 @@
     "ui/bindings/src/lib.rs": "ea2c1087e323eee8eef8756d3e127b8335639304a88764234c0070732af37ef3",
     "ui/bindings/src/feedback.rs": "b25168bd05c9d57424af7f4af9fda96af01253ec48f84fcd00fddea9474f0376",
     "ui/demo/src/component_feedback.rs": "60524e1be7a2f6189b043888a02e95c38ffd689241509e1d53da41e8e5ac5105",
-    ".github/workflows/ci.yml": "ccb3e844e65aeafa4348e231b951fb5d59a13bbaa83aae16d67791bf0299ad9c"
+    ".github/workflows/ci.yml": "ccb3e844e65aeafa4348e231b951fb5d59a13bbaa83aae16d67791bf0299ad9c",
+    "crates/presentation/src/tool_card.rs": "4ae201c74a892108bdcdf84870945ca00b4ffb0eac5b738a1f3758d7f5afecd3",
+    "crates/presentation/src/tool_row.rs": "72117307c1d6d830506b13ec972cf66f662e84a16a18d328d088915ae6a4f889"
   },
   "publicIssues": [
     {
@@ -369,7 +371,7 @@
     "docs/rust-agent-ui-contract.md": "096eda47ec5ba017ca49be0fd70148af8538d276e9f05b8cc4d1760fc0af7bd8",
     "docs/rust-agent-ui-delivery-status.md": "33976ee43c720aad48c671079bfbfea053e3dee50c29e2335ab43c5437f80cc2",
     "docs/rust-agent-ui-host-integration.md": "4cc2861a3862a812c73dc7bd6f4353e0a08ec9e536f3945cb126f6919a4b06c6",
-    "docs/rust-agent-ui-tool-card-20261022.md": "a0b0e971460b0c6066e27499f2e0e4631a981e4be429a93b660c8409c3becd3f",
+    "docs/rust-agent-ui-tool-card-20261022.md": "a4cb097850c1c84fbd169a4389b65be41fa424012b53745d914014a950de3839",
     "docs/rust-agent-ui-tool-row-20261022.md": "b94d99891ad617d2f25b14ef472fe4dc51f79e53add3eb95f6e071de032c4e30"
   },
   "publicProcessContractSources": {

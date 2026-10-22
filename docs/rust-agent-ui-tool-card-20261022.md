@@ -34,6 +34,7 @@ Tekes 宿主仍通过 `ClientRunViewController` 消费 ClientKit，未修改 Swi
 严格参数/权限字段验证和其它卡片字段规则按对应 derive 分支执行。
 卡片 NSNumber 数字转换与 SEP 的 Double→精确 Int 规则不同；本轮用不启动窗口的系统 Foundation 数据探针，
 核对 signed/unsigned、浮点截断/饱和和 bool 的原转换；meta 的整数读取仍排除 bool/小数。
+另以 Foundation 原正则核对10种末尾换行边界，补齐 VT/FF 的回归；双换行仍不当作末尾标记。
 这些样例不构成任意原始 JSON 数字词法逐字保真的保证，原结果全文仍保留。
 
 其它变体保留原文件/搜索结果顺序、truncated/total、来源 URL/状态、读取行号与上下界、预期 diff 与实际 diff 的区分。

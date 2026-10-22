@@ -40,6 +40,14 @@ fn terminal_exit_markers_are_anchored_and_keep_stdout_separate_from_signals() {
     for (text, code, signal, output) in [
         ("body\n[exit code: 2]", Some(2), None, "body"),
         ("body\n[exit code: 2]\n", Some(2), None, "body"),
+        ("body\n[exit code: 2]\u{b}", Some(2), None, "body"),
+        ("body\n[exit code: 2]\u{c}", Some(2), None, "body"),
+        (
+            "body\n[killed by signal: SIGTERM]\u{c}",
+            None,
+            Some("SIGTERM"),
+            "body",
+        ),
         (
             "body\n[killed by signal: SIGTERM]",
             None,

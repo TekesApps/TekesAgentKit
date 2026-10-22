@@ -293,8 +293,10 @@ fn parse_exit(value: &str) -> (String, Option<i64>, Option<String>) {
     // ICU's end anchor also accepts a final line terminator; retain the same
     // terminal marker boundary rather than searching arbitrary output lines.
     let signal = SIGNAL.get_or_init(|| {
-        Regex::new(r"\n\[killed by signal: ([^\]\n]+)\](?:\r\n|[\n\r\x{85}\x{2028}\x{2029}])?\z")
-            .expect("static signal regex")
+        Regex::new(
+            r"\n\[killed by signal: ([^\]\n]+)\](?:\r\n|[\n\r\x{b}\x{c}\x{85}\x{2028}\x{2029}])?\z",
+        )
+        .expect("static signal regex")
     });
     if let Some(capture) = signal.captures(value) {
         return (
@@ -304,7 +306,7 @@ fn parse_exit(value: &str) -> (String, Option<i64>, Option<String>) {
         );
     }
     let code = CODE.get_or_init(|| {
-        Regex::new(r"\n\[exit code: (\d+)\](?:\r\n|[\n\r\x{85}\x{2028}\x{2029}])?\z")
+        Regex::new(r"\n\[exit code: (\d+)\](?:\r\n|[\n\r\x{b}\x{c}\x{85}\x{2028}\x{2029}])?\z")
             .expect("static code regex")
     });
     if let Some(capture) = code.captures(value) {

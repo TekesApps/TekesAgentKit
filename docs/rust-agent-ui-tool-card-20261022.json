@@ -1,5 +1,5 @@
 {
-  "sourceBase": "134d8d6a8e978b7afe569b0bdf6b62c1dcaba3f0",
+  "sourceBase": "aabb8578e0d57d4924c2af8fd210dfe17a8bece0",
   "status": "unpublished-development-input",
   "completionProven": false,
   "tekesui": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
@@ -142,16 +142,16 @@
       "sha256": "3fe785bf8739241ec4dfd9a2031ee3596ceef8d31a0c7f43845612d4f602c3bf"
     },
     "crates/presentation/src/tool_card.rs": {
-      "bytes": 18676,
-      "sha256": "4ef9ac06990595497f186848a8f3237e12f54a1989013abbc01997c15196801f"
+      "bytes": 18715,
+      "sha256": "4ae201c74a892108bdcdf84870945ca00b4ffb0eac5b738a1f3758d7f5afecd3"
     },
     "crates/presentation/src/tool_row.rs": {
       "bytes": 5871,
       "sha256": "72117307c1d6d830506b13ec972cf66f662e84a16a18d328d088915ae6a4f889"
     },
     "crates/presentation/tests/tool_card.rs": {
-      "bytes": 13426,
-      "sha256": "4cec1d5537ad407377785834d7d43afe8c426c7f321d60107b19569b8c17a5c7"
+      "bytes": 13692,
+      "sha256": "e0585e86696ee0ea1da4c03bfeb99ba500520985a5cf9152d35898e8489e6150"
     },
     "crates/presentation/tests/tool_row.rs": {
       "bytes": 5210,
@@ -176,6 +176,64 @@
     "ui/Cargo.lock": {
       "bytes": 77443,
       "sha256": "0eb0a586a9c87e15eab63180c066b63535127c4bede2b02529caf7dd5d554e9b"
+    },
+    ".runtime-fixtures/tool-card-20261022/ci-parent.json": {
+      "bytes": 1332,
+      "sha256": "a6c36a543cad48247b09578baeffa643260a64df0c371aa7c099aefc857e3761"
+    },
+    ".runtime-fixtures/tool-card-20261022/final-headless-boundaries.log": {
+      "bytes": 48,
+      "sha256": "e9fa1e12a0afd70528040f81fe3199172a3974910d7760c0216bb6d110181081"
+    },
+    ".runtime-fixtures/tool-card-20261022/final-root-clippy.log": {
+      "bytes": 434,
+      "sha256": "e716864c90baf120f878aa64b84679cc85893eb3b420acf8ef164f7025d37218"
+    },
+    ".runtime-fixtures/tool-card-20261022/final-root-tests.log": {
+      "bytes": 28727,
+      "sha256": "6ca20aceaccc97cf9bd59029671dcd90f80a2fe0b4b33e471cbfd25d34d20acf"
+    },
+    ".runtime-fixtures/tool-card-20261022/final-ui-boundaries.log": {
+      "bytes": 86,
+      "sha256": "9480cc4382559b9a7a99240226a9f766048e30c8d38bb4bccd1fd8bca56661ad"
+    },
+    ".runtime-fixtures/tool-card-20261022/final-ui-clippy.log": {
+      "bytes": 614,
+      "sha256": "a57b144762aca12e8c3e30f6b133478dd231cfdeab336338c947bc697a2f188c"
+    },
+    ".runtime-fixtures/tool-card-20261022/final-ui-tests.log": {
+      "bytes": 69026,
+      "sha256": "2d106965902f9be3d01a61e9cfdfd156ab2a9faea5fec46b46156f15e04a5e77"
+    },
+    ".runtime-fixtures/tool-card-20261022/foundation-exit-boundary-reference.js": {
+      "bytes": 412,
+      "sha256": "a821c7f0dc3ae0a3c82b55c23c8266a0574abe07051788d6d63407a0622bd5d8"
+    },
+    ".runtime-fixtures/tool-card-20261022/foundation-exit-boundary-reference.json": {
+      "bytes": 477,
+      "sha256": "e433ae08cfc05f5405e7a81957a680d9a6568ce0a9b3da185000be186852aad1"
+    },
+    ".runtime-fixtures/tool-card-20261022/pr-body-before.md": {
+      "bytes": 6766,
+      "sha256": "b2983dde39ccefc5cfe7462c45c4880bc89f95a4e98d07724a9754189e9c7c2b"
+    },
+    ".runtime-fixtures/tool-card-20261022/pr-body-final.md": {
+      "bytes": 7689,
+      "sha256": "ee063979281dbeed34a7ca4e9f2cdb65c185ad914f09b4589a30b67b6ff9926f"
+    },
+    ".runtime-fixtures/tool-card-20261022/tekesui-25-code-diff-comment-url.txt": {
+      "bytes": 71,
+      "sha256": "c2337f1a55d55bdbda927766d2a962a0c323dc69cf3c2cbbe5efe7d8061450f6"
+    },
+    ".runtime-fixtures/tool-card-20261022/tekesui-25-code-diff-comment.md": {
+      "bytes": 2447,
+      "sha256": "56b42d143f38a77a2cecf2189a18346442b0f1c1b5ad97db5a7a61c9355b7665"
+    },
+    ".runtime-fixtures/tool-card-20261022/tekesui-issues.json": {
+      "bytes": 7001,
+      "sha256": "d7d1de4831310ff86c9896cb0d1e69d6b8c2846f1fb8ddc18da28eb579763edd"
     }
-  }
+  },
+  "featureBase": "134d8d6a8e978b7afe569b0bdf6b62c1dcaba3f0",
+  "finalBoundaryFix": "Foundation ICU end-anchor includes VT and FF; no durable phase change"
 }
