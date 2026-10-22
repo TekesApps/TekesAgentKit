@@ -243,24 +243,25 @@ impl InputAside {
     }
     fn sizes(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> Vec<MeasuredChild> {
         let mut sizes = Vec::new();
-        // Copy stays at the trailing edge. Read-only information receives the
+        // Actions stay at the trailing edge. Read-only information receives the
         // remaining row width (the 40% rule is for action labels such as
         // feedback notes). The SDK owns the actual single-line ellipsis.
-        let copy = self
-            .children
-            .get_mut(1)
-            .map(|node| node.measure(text, available));
-        let gap = if copy.is_some() {
-            Spacing::Regular.value()
+        let action_width = if self.children.len() > 2 {
+            available.width * 0.4
         } else {
-            0.
+            available.width
         };
+        let actions: Vec<_> = self
+            .children
+            .iter_mut()
+            .skip(1)
+            .map(|node| node.measure(text, Size::new(action_width, available.height)))
+            .collect();
+        let gap = Spacing::Regular.value() * actions.len() as f32;
         let remaining =
-            (available.width - copy.as_ref().map_or(0., |m| m.size.width) - gap).max(0.);
+            (available.width - actions.iter().map(|m| m.size.width).sum::<f32>() - gap).max(0.);
         sizes.push(self.children[0].measure(text, Size::new(remaining, available.height)));
-        if let Some(copy) = copy {
-            sizes.push(copy);
-        }
+        sizes.extend(actions);
         sizes
     }
 }
@@ -323,6 +324,8 @@ pub struct InputMessage {
     detail_labels: OutputMessageLabels,
     copy_id: Option<ComponentId>,
     copy_label: String,
+    historical_control: Option<crate::HistoricalInputControl>,
+    historical_id: Option<ComponentId>,
 }
 impl InputMessage {
     pub fn new(namespace: u32, scope: RunScope) -> Self {
@@ -359,6 +362,8 @@ impl InputMessage {
             detail_labels,
             copy_id: None,
             copy_label: "复制输入".into(),
+            historical_control: None,
+            historical_id: None,
             children: vec![
                 Content::new(
                     ids.bubble,
@@ -523,9 +528,17 @@ impl InputMessage {
             .is_some_and(|old| old.text == input.item.text)
             && self.key.as_ref() == Some(&next)
             && self.epoch == epoch;
+        let old_edit = self
+            .historical_id
+            .and_then(|id| old_aside.iter().position(|node| node.id() == id))
+            .map(|i| old_aside.remove(i));
+        let same_edit = self.last_item.as_ref() == Some(input.item)
+            && self.key.as_ref() == Some(&next)
+            && self.epoch == epoch;
         let old_copy = self
             .copy_id
-            .and_then(|id| old_aside.into_iter().find(|node| node.id() == id));
+            .and_then(|id| old_aside.iter().position(|node| node.id() == id))
+            .map(|i| old_aside.remove(i));
         self.copy_id = None;
         if !input.item.text.is_empty() {
             let node = if same_copy { old_copy } else { None }.unwrap_or_else(|| {
@@ -552,6 +565,7 @@ impl InputMessage {
         self.publication = publication;
         self.epoch = epoch;
         self.delivery = Some(input.footnote);
+        self.refresh_historical_input(if same_edit { old_edit } else { None })?;
         Ok(())
     }
     pub(crate) fn check_update(
@@ -577,7 +591,7 @@ impl InputMessage {
             .count() as u64;
         if self
             .next_detail
-            .checked_add(additions * 3 + 1)
+            .checked_add(additions * 3 + 3)
             .is_none_or(|end| end >= u32::MAX as u64)
         {
             return Err("input details namespace exhausted");
@@ -621,6 +635,92 @@ impl InputMessage {
     }
     pub fn copy_button_id(&self) -> Option<ComponentId> {
         self.copy_id
+    }
+    pub fn historical_input_button_id(&self) -> Option<ComponentId> {
+        self.historical_id
+    }
+    /// Default is hidden. Source capability and handler registration are host
+    /// inputs; neither this display policy nor an ID grants mutation authority.
+    pub fn configure_historical_input(
+        &mut self,
+        control: Option<crate::HistoricalInputControl>,
+    ) -> Result<(), &'static str> {
+        if self.historical_control == control {
+            return Ok(());
+        }
+        if control.is_some() && self.next_detail >= u32::MAX as u64 - 1 {
+            return Err("input details namespace exhausted");
+        }
+        if let Some(id) = self.historical_id.take() {
+            self.children
+                .iter_mut()
+                .find_map(|node| node.component_mut::<InputAside>())
+                .unwrap()
+                .children
+                .retain(|node| node.id() != id);
+        }
+        self.historical_control = control;
+        self.refresh_historical_input(None)
+    }
+    fn refresh_historical_input(&mut self, retained: Option<Content>) -> Result<(), &'static str> {
+        self.historical_id = None;
+        if self.historical_control.is_none()
+            || !matches!(self.delivery, Some(TranscriptDelivery::Recorded { .. }))
+            || self
+                .last_item
+                .as_ref()
+                .is_none_or(|item| item.is_provisional || item.turn_id.is_empty())
+        {
+            return Ok(());
+        }
+        let node = if let Some(node) = retained {
+            node
+        } else {
+            if self.next_detail >= u32::MAX as u64 - 1 {
+                return Err("input details namespace exhausted");
+            }
+            let id = ComponentId(self.ids.root.0 + self.next_detail);
+            self.next_detail += 1;
+            Content::new(
+                id,
+                ButtonContent::new(&self.historical_control.as_ref().unwrap().label),
+            )
+            .with_label_layout(tekes_ui_text::LabelOptions::single_line(
+                tekes_ui_text::LabelOverflow::TailEllipsis,
+            ))
+            .expect("original historical input action label")
+            .preserving_focus()
+        };
+        self.historical_id = Some(node.id());
+        self.children
+            .iter_mut()
+            .find_map(|node| node.component_mut::<InputAside>())
+            .unwrap()
+            .children
+            .insert(1, node);
+        Ok(())
+    }
+    /// Drain the original action batch before changing source/publication.
+    pub fn take_historical_input_intents(
+        &self,
+        actions: &[ContentAction],
+    ) -> Vec<crate::HistoricalInputIntent> {
+        if self.historical_id.is_none()
+            || !actions.iter().any(|a| {
+                Some(a.target) == self.historical_id && a.kind == ContentActionKind::Activate
+            })
+        {
+            return vec![];
+        }
+        vec![crate::HistoricalInputIntent {
+            scope: self.scope.clone(),
+            message: self.key.clone().unwrap(),
+            input: self.last_item.clone().unwrap(),
+            publication: self.publication,
+            epoch: self.epoch,
+            action: self.historical_control.as_ref().unwrap().action,
+            claimed: Arc::new(AtomicBool::new(false)),
+        }]
     }
     pub fn set_copy_label(&mut self, label: impl Into<String>) {
         self.copy_label = label.into();

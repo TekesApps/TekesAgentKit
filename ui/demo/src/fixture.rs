@@ -65,6 +65,7 @@ pub struct Fixture {
     parent_available: Arc<AtomicBool>,
     catalog_fails: Arc<AtomicBool>,
     lifecycle: bool,
+    historical_input: bool,
     summary_usage: bool,
     pending_actionables: Arc<Mutex<BTreeMap<String, Value>>>,
     actionable_sender: broadcast::Sender<Value>,
@@ -196,6 +197,7 @@ impl Default for Fixture {
             parent_available: Arc::new(AtomicBool::new(true)),
             catalog_fails: Arc::new(AtomicBool::new(false)),
             lifecycle: false,
+            historical_input: false,
             summary_usage: false,
             pending_actionables: Arc::new(Mutex::new(BTreeMap::new())),
             actionable_sender: broadcast::channel(256).0,
@@ -224,6 +226,11 @@ impl Default for Fixture {
     }
 }
 impl Fixture {
+    /// Advertises only the historical-input host hook, never an edit RPC.
+    pub fn with_historical_input(mut self) -> Self {
+        self.historical_input = true;
+        self
+    }
     /// Seed one ended, empty-answer history turn with no completed-turn fork
     /// capability. Used before connecting; never rewrites a running journal.
     pub fn with_output_aside_guard(mut self) -> Self {
@@ -719,6 +726,7 @@ impl SessionEndpoint for Endpoint {
     }
     fn capabilities(&self) -> EndpointCapabilities {
         let mut caps = EndpointCapabilities::methods(&["session.prompt", "session.cancel"]);
+        caps.can_edit_historical_input = self.fixture.historical_input;
         if self.fixture.search_enabled {
             caps.methods.insert("session.search".into());
         }

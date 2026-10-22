@@ -117,6 +117,183 @@ fn update(view: &mut RunPort, snapshot: &RunSnapshot) -> Result<(), &'static str
     )
 }
 #[tokio::test]
+async fn historical_input_hook_obeys_original_pane_and_composer_composition_barriers() {
+    let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
+    let snapshot = controller.snapshot();
+    let mut run = view();
+    run.configure_historical_input(Some(HistoricalInputControl {
+        action: HistoricalInputAction::Edit,
+        label: "编辑输入".into(),
+    }))
+    .unwrap();
+    update(&mut run, &snapshot).unwrap();
+    let rows: Vec<_> = run
+        .transcript()
+        .unwrap()
+        .row_keys()
+        .iter()
+        .filter_map(|key| run.transcript().unwrap().row_id(key))
+        .collect();
+    let mut host = run.into_host().unwrap();
+    let button = rows
+        .into_iter()
+        .find_map(|id| {
+            host.get(id)
+                .unwrap()
+                .component::<InputMessage>()
+                .and_then(InputMessage::historical_input_button_id)
+        })
+        .unwrap();
+    host.accessibility_action(button, None, AccessibilityAction::Press);
+    let actions = host.drain_actions();
+    let run = host
+        .get_mut(ids().root)
+        .unwrap()
+        .component_mut::<RunPort>()
+        .unwrap();
+    assert_eq!(run.take_historical_input_intents(&actions).len(), 1);
+    run.configure_historical_input(None).unwrap();
+    assert!(
+        run.take_historical_input_intents(&actions).is_empty(),
+        "unregister before update must retire actions immediately"
+    );
+    run.configure_historical_input(Some(HistoricalInputControl {
+        action: HistoricalInputAction::Edit,
+        label: "编辑输入".into(),
+    }))
+    .unwrap();
+    update(run, &snapshot).unwrap();
+    host.focus(Some(ids().composer.editor), true);
+    host.event(&ContentEvent::Preedit {
+        text: "中文组字".into(),
+        selection: 1..3,
+        clauses: vec![],
+        replacement: None,
+    });
+    let run = host
+        .get_mut(ids().root)
+        .unwrap()
+        .component_mut::<RunPort>()
+        .unwrap();
+    assert!(run.composer().is_composing());
+    assert!(run.take_historical_input_intents(&actions).is_empty());
+    run.configure_historical_input(Some(HistoricalInputControl {
+        action: HistoricalInputAction::Edit,
+        label: "编辑输入".into(),
+    }))
+    .expect("unchanged host input cannot interrupt a composing frame");
+    assert!(run.configure_historical_input(None).is_err());
+    host.event(&ContentEvent::Commit {
+        text: "确认输入".into(),
+        replacement: None,
+    });
+    struct NoText;
+    impl tekes_ui_controls::ButtonTextRenderer for NoText {
+        fn measure(
+            &mut self,
+            _: &str,
+            _: tekes_ui_tokens::proposal::TextRole,
+            _: f32,
+        ) -> tekes_ui_scene::Size {
+            panic!("collapsed Run must not measure text")
+        }
+        fn draw(
+            &mut self,
+            _: &mut tekes_ui_scene::Scene,
+            _: &str,
+            _: tekes_ui_tokens::proposal::TextRole,
+            _: tekes_ui_scene::Rect,
+            _: tekes_ui_controls::ButtonTextAlign,
+            _: tekes_ui_tokens::Rgba,
+        ) {
+            panic!("collapsed Run must not draw text")
+        }
+    }
+    let run = host
+        .get_mut(ids().root)
+        .unwrap()
+        .component_mut::<RunPort>()
+        .unwrap();
+    assert!(!run.composer().is_composing());
+    run.arrange(
+        &mut NoText,
+        tekes_ui_scene::Rect::default(),
+        tekes_ui_scene::Rect::default(),
+    );
+    assert!(!run.is_pane_presented());
+    assert!(run.take_historical_input_intents(&actions).is_empty());
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn historical_input_policy_changes_fence_prepared_frames_and_readonly_actions() {
+    let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
+    let snapshot = controller.snapshot();
+    let scope = RunScope::main("fixture", "a");
+    let mut transcript =
+        TranscriptContent::new(93004, 93005..93200, scope.clone(), Default::default()).unwrap();
+    transcript
+        .update(
+            &scope,
+            snapshot.revision,
+            snapshot.connection_epoch,
+            &snapshot.transcript,
+            true,
+        )
+        .unwrap();
+    let plan = transcript
+        .prepare_update(
+            &scope,
+            snapshot.revision,
+            snapshot.connection_epoch,
+            &snapshot.transcript,
+            true,
+        )
+        .unwrap();
+    transcript
+        .configure_historical_input(Some(HistoricalInputControl {
+            action: HistoricalInputAction::Edit,
+            label: "编辑输入".into(),
+        }))
+        .unwrap();
+    assert!(transcript.validate_prepared_update(&plan).is_err());
+    transcript.configure_historical_input(None).unwrap();
+    assert!(
+        transcript.validate_prepared_update(&plan).is_err(),
+        "configuration ABA is not the same prepared frame"
+    );
+    transcript
+        .configure_historical_input(Some(HistoricalInputControl {
+            action: HistoricalInputAction::Edit,
+            label: "编辑输入".into(),
+        }))
+        .unwrap();
+    transcript
+        .update(
+            &scope,
+            snapshot.revision,
+            snapshot.connection_epoch,
+            &snapshot.transcript,
+            false,
+        )
+        .unwrap();
+    let rows: Vec<_> = transcript
+        .row_keys()
+        .iter()
+        .filter_map(|key| transcript.row_id(key))
+        .collect();
+    let host = transcript.into_host().unwrap();
+    for id in rows {
+        if let Some(input) = host.get(id).unwrap().component::<InputMessage>() {
+            assert!(
+                input.historical_input_button_id().is_none(),
+                "readonly pane cannot expose historical editing"
+            );
+        }
+    }
+    runtime.stop().await.unwrap();
+}
+#[tokio::test]
 async fn a_run_mounts_the_real_components_and_emits_original_destination_intents() {
     let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
     let snapshot = controller.snapshot();

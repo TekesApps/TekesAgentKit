@@ -1,0 +1,69 @@
+{
+  "format": 1,
+  "baseCommit": "cdffa4727339fc8b7ba21701508aea2cd8de8475",
+  "sdk": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "contractRelease": "v0.3.8",
+  "fullSuite": {
+    "passed": 526,
+    "ignored": 1,
+    "knownIgnoredIssue": 49,
+    "beforeFinalCanonicalSourceAndNamespaceHardening": true
+  },
+  "finalFocused": {
+    "passed": 4,
+    "failed": 0
+  },
+  "clippy": true,
+  "demoBuild": true,
+  "fmt": true,
+  "uiBoundaries": true,
+  "publicPinInputs": {
+    "packages": 8,
+    "files": 243,
+    "sha256": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c"
+  },
+  "sourceSha256": {
+    "ui/components/src/historical_input.rs": "e6a5c7f56c446317ece18ee8c532f6ef46e47caa0b898561a76e4c8cde1969d7",
+    "ui/components/src/input_message.rs": "7ac5376619221a6068f71a81c2d695a5c1ed142bb068508494aa0190792388d3",
+    "ui/components/src/transcript_content.rs": "358b4a00c9a9a12b00c81d1887cdfcff49f0a64bf0ecf40eada137fa78222526",
+    "ui/components/src/run_port.rs": "fd853bbf17d03fff4c3b1a1cf1260c0b479b35a1eb948aa5668e682643967eaf",
+    "ui/components/src/lib.rs": "712ff3f82970d53d4eadc4de2ec310ebb25e10ba11c32c7d4949dd8750348bbd",
+    "ui/bindings/src/historical_input.rs": "7a8638bdcaf621a565a1cd41a6f4d27fdfd1d90f5c16fe98c952f559967e4f6f",
+    "ui/bindings/src/lib.rs": "ea2c1087e323eee8eef8756d3e127b8335639304a88764234c0070732af37ef3",
+    "ui/demo/src/fixture.rs": "3726d9655914dffe364eb4f35f60a238902734abee8cab32a22773b1bfade459",
+    "ui/demo/tests/historical_input.rs": "b5a1ecfed9f7d093ae7cf40e999ed8108929b724e2a780fcccbaaec57557173c",
+    "ui/demo/tests/run_port.rs": "50ff3128dbbfdcc3a58bb243e11bc4c404620f25a933f7d746bce2fa0dc54ba7",
+    "ui/consumer/tests/support/input_aside_layout.rs": "875bac128b6accd0360af7f5a7d48acc232dcb38ea6bcb9c651bf60a791afa71"
+  },
+  "referenceSha256": {
+    "TekesClientKit/Sources/TranscriptRendering/TranscriptTurnFootnote.swift": "1acc6380778904620cedcd2a58d8f368d706d51054545f4081fb0005a993ad5e",
+    "TekesClientKit/Sources/TranscriptCoordinator/ThreadTranscriptPresenter.swift": "0a38192a3c1d0beee0b6ced6377332f6574117baa1556030801486088a28eada",
+    "Tekes/Tekes/ClientAgentHostAdapters.swift": "7d907c654ec3df76c7a8b492e32bbc68f1bd4d0b46044cae615aa712b9f67c71"
+  },
+  "logs": {
+    ".runtime-fixtures/historical-input-hook-20261022/build.log": "60752725ea6f194f20ebc7150276eef9d351f09c52a8c6e784e05f6a10ca45df",
+    ".runtime-fixtures/historical-input-hook-20261022/clippy.log": "e51338b5597a41fba4aba493422d00091335074c270469783fe210d83af11edf",
+    ".runtime-fixtures/historical-input-hook-20261022/final-build.log": "1b06c206522a9ad6653edd56b1bb9e19254f4cd592480fbc8b10cbddc2b994e9",
+    ".runtime-fixtures/historical-input-hook-20261022/final-clippy.log": "22b55a5bb6f912c8b2ceb3ca21c3367b23e1b53c688d9267e906e8bdf8ed4ae4",
+    ".runtime-fixtures/historical-input-hook-20261022/final-focused.log": "a4249a863d6c3743eac7957f00630bfecb1f638844f716853fd3be058e656b72",
+    ".runtime-fixtures/historical-input-hook-20261022/final-host-input.log": "2f09c38f06f811daf82c9c9fc644c10f5bd45cef63e1ab111b9c41e198335ba8",
+    ".runtime-fixtures/historical-input-hook-20261022/full-tests.log": "a5f566940ddb918239bafecb8aa32db1279b89992c77b237d2a3ae793ce9616a",
+    ".runtime-fixtures/historical-input-hook-20261022/tests-2.log": "01864977d6eaed3fdfbadceaf401ac7f5351fda1f6f9b0d604db2afce9fe6ec9",
+    ".runtime-fixtures/historical-input-hook-20261022/tests-3.log": "903d3efd7885c1d17eceb6a175709e16df8af8b8e7f184c4463c9938e343e6eb",
+    ".runtime-fixtures/historical-input-hook-20261022/tests-4.log": "8bdb8369b9d32edc47230465a84fb723c29e9acbf92aaac11b642c3ca95ec61b",
+    ".runtime-fixtures/historical-input-hook-20261022/tests.log": "07b8e0c35de6939e81885e6d62f425a7cbf8fd18f54c0e7e34a7e00bb7e04852"
+  },
+  "nativeInteraction": false,
+  "crossProcess": false,
+  "realHarnessHistoryMutation": false,
+  "realHarnessHistoricalEditAdvertised": false,
+  "newTarget": false,
+  "deletedBytes": 0,
+  "finalChecks": {
+    "focusedTests": 4,
+    "clippy": "passed",
+    "demoBuild": "passed",
+    "unchangedHostInputDuringPreedit": "passed",
+    "finalSourceDocumentationOnlyAfterBuild": true
+  }
+}

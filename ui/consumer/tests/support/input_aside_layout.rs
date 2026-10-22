@@ -29,6 +29,151 @@ fn item(text: &str) -> TranscriptItem {
         metadata: Default::default(),
     }
 }
+
+#[test]
+fn historical_input_uses_original_trailing_controls_without_taking_composer_preedit() {
+    for theme in Theme::ALL {
+        for scale in [1., 1.4, 2.] {
+            let scope = RunScope::main("consumer", "historical-input");
+            let source = item("原始输入 👩🏽‍💻，不替换当前草稿");
+            let input = TranscriptInput {
+                key: TranscriptMessageKey::NativeEntry("original-entry"),
+                item: &source,
+                footnote: TranscriptDelivery::Recorded { time: Some(1000.) },
+            };
+            let mut row = InputMessage::new(64211, scope.clone());
+            row.update_with(&scope, 1, 1, &input, |_| INFO.into())
+                .unwrap();
+            assert!(row.historical_input_button_id().is_none());
+            row.configure_historical_input(Some(HistoricalInputControl {
+                action: HistoricalInputAction::Edit,
+                label: "编辑输入".into(),
+            }))
+            .unwrap();
+            let ids = row.ids();
+            let edit = row.historical_input_button_id().unwrap();
+            let copy = row.copy_button_id().unwrap();
+            let composer = tekes_agent_ui_consumer_check::new_composer(64212);
+            let editor = composer.ids().editor;
+            let mut host = ContentHost::new(Content::new(
+                ComponentId(12),
+                StackContent {
+                    model: Stack {
+                        axis: Axis::Vertical,
+                        gap: 0.,
+                    },
+                    flexible_child: None,
+                    children: vec![
+                        Content::new(ids.root, row),
+                        Content::new(composer.ids().root, composer),
+                    ],
+                },
+            ))
+            .unwrap();
+            host.set_action_events(true);
+            let mut text = Text::new(scale, true);
+            let frame = Rect::new(20., 30., 770., 1200.);
+            host.render(&mut Scene::new(), &mut text, frame, frame, theme.into())
+                .unwrap();
+            host.focus(Some(editor), true);
+            host.event(&ContentEvent::Preedit {
+                text: "当前组字".into(),
+                selection: 1..3,
+                clauses: vec![],
+                replacement: None,
+            });
+            let baseline = host.text_surface(editor).unwrap().input.external_baseline();
+            let information_owner = host
+                .get(ids.footnote)
+                .unwrap()
+                .component::<TextContent>()
+                .unwrap() as *const _ as usize;
+            let edit_owner = host
+                .get(edit)
+                .unwrap()
+                .component::<ButtonContent>()
+                .unwrap() as *const _ as usize;
+            for width in [770., 320., 180., 770.] {
+                let frame = Rect::new(20., 30., width, 1200.);
+                host.get_mut(ids.root)
+                    .unwrap()
+                    .component_mut::<InputMessage>()
+                    .unwrap()
+                    .update_with(&scope, 2, 1, &input, |_| INFO.into())
+                    .unwrap();
+                host.render(&mut Scene::new(), &mut text, frame, frame, theme.into())
+                    .unwrap();
+                let info = host.get(ids.footnote).unwrap();
+                assert_eq!(
+                    info.component::<TextContent>().unwrap() as *const _ as usize,
+                    information_owner
+                );
+                assert_eq!(
+                    host.get(edit)
+                        .unwrap()
+                        .component::<ButtonContent>()
+                        .unwrap() as *const _ as usize,
+                    edit_owner
+                );
+                let a = info.frame();
+                let b = host.get(edit).unwrap().frame();
+                let c = host.get(copy).unwrap().frame();
+                assert!(a.max_x() <= b.min_x() + 0.02 && b.max_x() <= c.min_x() + 0.02);
+                assert!(
+                    (a.center().y - b.center().y).abs() < 0.02
+                        && (b.center().y - c.center().y).abs() < 0.02
+                );
+                assert!((c.max_x() - frame.max_x()).abs() < 0.02);
+                assert_eq!(info.component::<TextContent>().unwrap().text, INFO);
+                assert_eq!(host.focused(), Some(editor));
+                assert_eq!(
+                    host.text_surface(editor).unwrap().input.external_baseline(),
+                    baseline
+                );
+            }
+            host.accessibility_action(edit, None, AccessibilityAction::Press);
+            let actions = host.drain_actions();
+            let row = host
+                .get(ids.root)
+                .unwrap()
+                .component::<InputMessage>()
+                .unwrap();
+            let intent = row.take_historical_input_intents(&actions).pop().unwrap();
+            assert_eq!(intent.input(), &source);
+            assert_eq!(intent.turn_id(), "turn");
+            assert_eq!(intent.scope(), &scope);
+            assert_eq!(intent.action(), HistoricalInputAction::Edit);
+            assert_eq!(host.focused(), Some(editor));
+            assert_eq!(
+                host.text_surface(editor).unwrap().input.external_baseline(),
+                baseline
+            );
+            assert!(intent.claim());
+            assert!(!intent.clone().claim());
+            let row = host
+                .get_mut(ids.root)
+                .unwrap()
+                .component_mut::<InputMessage>()
+                .unwrap();
+            row.configure_historical_input(None).unwrap();
+            assert!(row.take_historical_input_intents(&actions).is_empty());
+            row.configure_historical_input(Some(HistoricalInputControl {
+                action: HistoricalInputAction::Rewind,
+                label: "回退到此输入".into(),
+            }))
+            .unwrap();
+            assert_ne!(row.historical_input_button_id(), Some(edit));
+            assert!(row.take_historical_input_intents(&actions).is_empty());
+            let pending = TranscriptInput {
+                footnote: TranscriptDelivery::Pending,
+                ..input
+            };
+            row.update(&scope, 3, 1, &pending).unwrap();
+            assert!(row.historical_input_button_id().is_none());
+            assert_eq!(row.copy_button_id(), Some(copy));
+        }
+    }
+}
 #[test]
 fn input_aside_is_one_external_trailing_band_with_full_source_and_original_copy_owner() {
     let scope = RunScope::main("consumer", "input-aside");

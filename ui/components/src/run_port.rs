@@ -698,6 +698,53 @@ impl RunPort {
         self.publication_generation = generation;
         Ok(())
     }
+    /// Explicit host callback registration plus endpoint capability. The host
+    /// supplies None when either is absent. Update/render before using new IDs.
+    pub fn configure_historical_input(
+        &mut self,
+        control: Option<HistoricalInputControl>,
+    ) -> Result<(), &'static str> {
+        if self
+            .transcript()
+            .ok_or("RunPort has no Transcript")?
+            .historical_input_control()
+            == control.as_ref()
+        {
+            return Ok(());
+        }
+        if self.composer().is_composing() {
+            return Err("finish Composer composition before changing controls");
+        }
+        let generation = self
+            .publication_generation
+            .checked_add(1)
+            .ok_or("RunPort publication generation exhausted")?;
+        self.transcript_mut()
+            .ok_or("RunPort has no Transcript")?
+            .configure_historical_input(control)?;
+        self.publication_generation = generation;
+        Ok(())
+    }
+    /// Separate opt-in host callback channel. Historical editing is excluded
+    /// from copy/navigation exceptions during preedit and from hidden panes.
+    /// Resolve with the original RunBinding::dispatch_historical_input.
+    pub fn take_historical_input_intents(
+        &self,
+        actions: &[ContentAction],
+    ) -> Vec<HistoricalInputIntent> {
+        if !self.pane_presented
+            || !self.gate.entries
+            || self.composer().is_composing()
+            || self
+                .transcript()
+                .is_some_and(|content| content.composing_feedback_editor().is_some())
+        {
+            return vec![];
+        }
+        self.transcript().map_or_else(Vec::new, |content| {
+            content.take_historical_input_intents(actions)
+        })
+    }
     /// Apply one frame, including per-binding read/response authority. The
     /// controls flag only restricts canonical actions; dispatch still revalidates.
     /// Supply a quantized host Unix-ms clock before preparing a reading frame.

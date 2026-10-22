@@ -1,5 +1,12 @@
 # Agent UI runtime bindings (experimental)
 
+Historical input uses the explicit [host-hook contract](../../docs/rust-agent-ui-historical-input-20261022.md).
+Register a handler and check `historical_input_available()` before configuring its control.
+Dispatch through the original binding's `dispatch_historical_input`; it validates
+the actual capability/epoch/canonical whole input and claims the gesture once.
+The callback opens a host editing flow; it does not mutate history or replace a draft.
+Current Native/Pi/DSH capabilities keep the normal demo entry hidden.
+
 `RunBinding` binds one mounted pane to existing `SessionRuntime`, `RunController`,
 `ChildRun` and `SideChatController` authority. It owns observations, not windows or
 another Run state machine. Public RunPort/TranscriptContent/ReadOnlyTranscript are

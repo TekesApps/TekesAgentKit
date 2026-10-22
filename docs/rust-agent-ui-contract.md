@@ -1,5 +1,9 @@
 # Rust Agent UI 组件接入契约
 
+当前增量见[历史输入宿主回调](rust-agent-ui-historical-input-20261022.md)：仅在实际端点能力与宿主 handler 同时存在时显示编辑/回退；当前三端默认隐藏，组件/宿主/独立 consumer 共 526 项回归通过。新增入口没有原生窗口通过声明。
+
+固定 50ec、2696969 程序的[三端原生补验](rust-agent-ui-native-resume-20261022.md)已记录发送/取消/反馈通过与失焦未完成项。下述旧阶段段落保持各自来源与程序范围，不代表当前完整验收；整体仍为实验状态。
+
 [输出只读信息与当前原生复验](rust-agent-ui-output-information-20261022.md)补齐原时间/状态的剩余行宽与SDK单行省略；522项组件/第二consumer通过。最终2696969程序主阅读20→44、只读38→75、正常app系统拼音和三端离屏通过；当前三端原生全套、跨进程和完整视觉仍未完成。
 
 [最新公开 50ec 精确依赖](tekesui-50ec-public-intake-20261022.md)：实际 8 包/243 输入，521 项组件/第二 consumer 通过；原 Composer 新增候选确认上下键回归。新 pin 原生/系统拼音尚未验收，#48/#49 等仍开放。
@@ -165,6 +169,8 @@ AgentKit 定义业务结构、展示语义、组件组合、组件输入及回�
 `Indicators` 实现 Component，可独立挂载。默认 `update` 提供语义文本；产品可用 `update_with(snapshot, formatter)` 本地化同一份事实。组件不带计时器、poll loop、重连或业务 mutation。
 
 ## Transcript 结构与视觉契约
+
+历史输入脚注配置、原始来源捕获和绑定校验使用[明确的宿主回调契约](rust-agent-ui-historical-input-20261022.md)。入口顺序为信息、编辑/回退、复制；Edit 为标准 thread 语义，Rewind 需显式选择。原 RunPort 统一实施组字/pane/gate 屏障，绑定消费真实能力和当前 canonical source，不新增历史修改 RPC。
 
 统一方向规则（与当前 Tekes App 对齐）：机器产生的正文、推理、工具、附件、会话提示及对应 footnote 全部靠左；用户输入、用户附件和用户 footnote 全部靠右。用户 footnote 在气泡外，与气泡尾端对齐；机器 footnote 与正文阅读列左边缘对齐。方向按所属消息 lane 判断，用户的送达/失败状态仍随用户 footnote 靠右，独立机器提示靠左。该规则统一用于主会话、任务、子代理和 SideChat，不能在 pane 中另设一套消息方向。这里约束正式视图；现有只读模型与测试宿主不构成视觉验收。
 

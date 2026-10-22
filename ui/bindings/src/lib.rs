@@ -22,6 +22,7 @@ mod sidebar_selected;
 pub use sidebar_selected::*;
 mod sidebar_search;
 pub use sidebar_search::*;
+mod historical_input;
 mod turn_actions;
 pub use models::*;
 pub use sidebar::*;

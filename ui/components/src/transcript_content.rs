@@ -52,6 +52,7 @@ pub struct TranscriptContentUpdate<'a> {
     available: bool,
     timing: crate::TranscriptFootnoteTiming,
     base_timing: crate::TranscriptFootnoteTiming,
+    base_historical_generation: u64,
     rows: Vec<(TranscriptContentRowKey, ComponentId)>,
 }
 impl TranscriptContentUpdate<'_> {
@@ -130,10 +131,12 @@ pub struct TranscriptContent {
     last: Option<TranscriptSnapshot>,
     labels: TranscriptContentLabels,
     timing: crate::TranscriptFootnoteTiming,
-    feedback_dirty: bool,
+    controls_dirty: bool,
     run_layout: Option<RunTranscriptLayout>,
     arranged_revision: Option<(u64, u64)>,
     turn_target_owner: std::sync::Arc<()>,
+    historical_control: Option<crate::HistoricalInputControl>,
+    historical_generation: u64,
 }
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct RunTranscriptLayout {
@@ -180,10 +183,12 @@ impl TranscriptContent {
             last: None,
             labels,
             timing: Default::default(),
-            feedback_dirty: false,
+            controls_dirty: false,
             run_layout: None,
             arranged_revision: None,
             turn_target_owner: std::sync::Arc::new(()),
+            historical_control: None,
+            historical_generation: 0,
         })
     }
     pub fn id(&self) -> ComponentId {
@@ -365,7 +370,8 @@ impl TranscriptContent {
             return Err("conflicting transcript content publication");
         }
         let available = available && !snapshot.is_stale;
-        if !self.feedback_dirty
+        if !self.controls_dirty
+            && self.historical_control.is_none()
             && self.epoch == epoch
             && self.last.as_ref() == Some(snapshot)
             && &self.timing == timing
@@ -439,7 +445,7 @@ impl TranscriptContent {
         self.last = Some(snapshot.clone());
         self.timing = timing.clone();
         self.arranged_revision = None;
-        self.feedback_dirty = false;
+        self.controls_dirty = false;
         Ok(())
     }
     pub(crate) fn namespaces_disjoint(&self, namespaces: &[u32]) -> bool {
@@ -518,6 +524,7 @@ impl TranscriptContent {
             available,
             timing: timing.clone(),
             base_timing: self.timing.clone(),
+            base_historical_generation: self.historical_generation,
             rows,
         })
     }
@@ -533,6 +540,7 @@ impl TranscriptContent {
             || self.epoch != prepared.base_epoch
             || self.next != prepared.base_next
             || self.timing != prepared.base_timing
+            || self.historical_generation != prepared.base_historical_generation
         {
             return Err("stale or foreign transcript update plan");
         }
@@ -783,13 +791,19 @@ impl TranscriptContent {
     ) -> Result<(), &'static str> {
         match &row.content {
             PlannedContent::Input(input) => {
-                node.component_mut::<InputMessage>().unwrap().update_with(
+                let view = node.component_mut::<InputMessage>().unwrap();
+                view.update_with(
                     &self.scope,
                     publication,
                     epoch,
                     input,
                     self.labels.input_information,
-                )?
+                )?;
+                view.configure_historical_input(if available {
+                    self.historical_control.clone()
+                } else {
+                    None
+                })?;
             }
             PlannedContent::Output(output, section) => node
                 .component_mut::<OutputMessage>()
@@ -858,6 +872,50 @@ impl TranscriptContent {
     pub fn feedback_enabled(&self) -> bool {
         self.labels.feedback.is_some()
     }
+    pub(crate) fn historical_input_control(&self) -> Option<&crate::HistoricalInputControl> {
+        self.historical_control.as_ref()
+    }
+    /// Register a host editing flow only for an advertised source. None is the
+    /// default, including bounded panes. Apply through update before rendering.
+    pub fn configure_historical_input(
+        &mut self,
+        control: Option<crate::HistoricalInputControl>,
+    ) -> Result<(), &'static str> {
+        if self.historical_control == control {
+            return Ok(());
+        }
+        if self.composing_feedback_editor().is_some() {
+            return Err("finish feedback composition before changing controls");
+        }
+        self.historical_generation = self
+            .historical_generation
+            .checked_add(1)
+            .ok_or("historical input generation exhausted")?;
+        self.historical_control = control;
+        self.controls_dirty = true;
+        self.arranged_revision = None;
+        self.turn_target_owner = std::sync::Arc::new(());
+        Ok(())
+    }
+    pub fn take_historical_input_intents(
+        &self,
+        actions: &[ContentAction],
+    ) -> Vec<crate::HistoricalInputIntent> {
+        if self.historical_control.is_none() || self.controls_dirty {
+            return vec![];
+        }
+        self.rows
+            .children
+            .iter()
+            .filter_map(|node| node.component::<InputMessage>())
+            .flat_map(|input| input.take_historical_input_intents(actions))
+            .filter(|intent| {
+                self.historical_control
+                    .as_ref()
+                    .is_some_and(|control| control.action == intent.action())
+            })
+            .collect()
+    }
     pub fn configure_feedback(
         &mut self,
         labels: Option<FeedbackLabels>,
@@ -869,7 +927,7 @@ impl TranscriptContent {
             return Err("finish feedback composition before changing controls");
         }
         self.labels.feedback = labels;
-        self.feedback_dirty = true;
+        self.controls_dirty = true;
         Ok(())
     }
     pub fn take_feedback_intents(
