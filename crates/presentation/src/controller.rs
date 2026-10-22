@@ -41,6 +41,8 @@ fn refreshed_snapshot(
         Ok(snapshot) => snapshot,
         Err(error) => {
             let mut old = previous.clone();
+            // A failed refresh cannot publish retained goal facts as current.
+            old.goal = None;
             let selection = core.selection();
             let endpoint_matches = selection
                 .as_ref()

@@ -2,6 +2,8 @@
 
 日期：2026-10-17。改动只在 TekesAgentKit；ClientKit、Tekes、Kernel、Pi、DSH 作为只读来源和运行时。
 
+2026-10-22 补充：[目标终态只读投影](rust-agent-ui-goal-footnote-20261022.md)从现有公开 goal projection 读取 scope/identity/phase，随原 RunSnapshot 发布；没有新增 RPC、mutation 能力或 harness-private 读取。共享 API 尚未发布，当前三端正常 GPU 回归不等同三端目标专用验收。
+
 ## 契约与路由
 
 `NativeSessionEndpoint`、`PiSessionEndpoint`、`DshSessionEndpoint` 分别实现 `SessionEndpoint`。

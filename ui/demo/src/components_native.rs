@@ -2986,6 +2986,14 @@ pub fn run() {
     let feedback_selftest = args.iter().any(|arg| arg == "--feedback-native-selftest");
     let selftest = args.iter().any(|arg| arg == "--native-selftest");
     let system_ime_selftest = args.iter().any(|arg| arg == "--system-ime-selftest");
+    let goal_footnote_fixture = args.iter().any(|arg| arg == "--goal-footnote-fixture");
+    assert!(
+        !goal_footnote_fixture
+            || (args.iter().any(|arg| arg == "--transcript-content")
+                && args.iter().any(|arg| arg == "--offscreen")
+                && !args.iter().any(|arg| arg == "--endpoint-config")),
+        "goal footnote fixture requires isolated offscreen Transcript"
+    );
     let actions_selftest = args.iter().any(|arg| arg == "--thread-actions-selftest");
     let models_selftest = args.iter().any(|arg| arg == "--model-choices-selftest");
     let context_selftest = args.iter().any(|arg| arg == "--context-selftest");
@@ -3255,6 +3263,11 @@ pub fn run() {
                     .with_lifecycle()
                     .with_presets(false)
                     .with_models();
+                let fixture = if goal_footnote_fixture {
+                    fixture.with_goal_projection("a", serde_json::json!({"goal":{"id":"owned-goal","revision":1,"phase":"complete","objective":"Owned UI goal","maxGoalRounds":2},"createdAt":1,"updatedAt":2,"roundsStarted":1}))
+                } else {
+                    fixture
+                };
                 let fixture = if footnote_time_selftest {
                     let fixture = fixture.with_output_aside_guard().with_timed_turn();
                     footnote_time_fixture = Some(fixture.clone());
@@ -4581,6 +4594,60 @@ pub fn run() {
                 host.palette,
             )
             .unwrap();
+        if goal_footnote_fixture {
+            // The first arranged frame publishes the host's navigation context,
+            // which retires the pre-context gesture lifetime. Arrange that
+            // adopted context before capturing one original gesture; do not
+            // retry a rejected event or relax its lifetime fence.
+            host.scene.clear();
+            host.text.atlas.begin_frame();
+            host.view
+                .render(
+                    &mut host.scene,
+                    &mut host.text,
+                    clip.inset(tekes_agent_ui_demo::component_demo::DEMO_CONTENT_INSET),
+                    clip,
+                    host.palette,
+                )
+                .unwrap();
+            // Use the existing Kit callback and SDK reading transaction to put
+            // the latest footer in view. No pixel offset or alternate scroll state.
+            let run = host
+                .view
+                .tree
+                .get(ComponentId(host.view.ids().root.0 + 16))
+                .unwrap()
+                .component::<tekes_agent_components_ui::RunPort>()
+                .unwrap();
+            if run.jump_is_visible() {
+                let id = run.jump_button_id().unwrap();
+                let commands = host
+                    .view
+                    .accessibility_action(id, None, AccessibilityAction::Press)
+                    .unwrap();
+                assert!(matches!(
+                    commands.as_slice(),
+                    [DemoCommand::JumpLatest { .. }]
+                ));
+                host.commands(Ok(commands));
+                assert!(
+                    host.failures.is_empty(),
+                    "original jump failed: {:?}",
+                    host.failures
+                );
+            }
+            host.scene.clear();
+            host.text.atlas.begin_frame();
+            host.view
+                .render(
+                    &mut host.scene,
+                    &mut host.text,
+                    clip.inset(tekes_agent_ui_demo::component_demo::DEMO_CONTENT_INSET),
+                    clip,
+                    host.palette,
+                )
+                .unwrap();
+        }
         let bytes = Renderer::new_headless()
             .unwrap()
             .render_to_rgba8(
@@ -4764,11 +4831,30 @@ pub fn run() {
             .unwrap()
             .component::<tekes_agent_components_ui::RunPort>()
             .expect("shared RunPort mounted");
+        let goal_footnote_proof = snapshot.goal.as_ref().and_then(|goal| {
+            let turn = goal.terminal_turn_id(&snapshot.transcript)?;
+            let footer = run_port.transcript().and_then(|content| content.row_id(&tekes_agent_components_ui::TranscriptContentRowKey::TurnFootnote(turn.into())))
+                .and_then(|id| host.view.tree.get(id)).and_then(|node| node.component::<tekes_agent_components_ui::TurnFootnote>())?;
+            let label_node = footer.goal_state_id().and_then(|id| host.view.tree.get(id))?;
+            let label_visible = label_node.visible().is_some_and(|frame| frame.size.width > 0. && frame.size.height > 0.);
+            let label = label_node.component::<tekes_ui_controls::composition::TextContent>()?;
+            if goal_footnote_fixture { assert!(label_visible, "original goal label must be in the viewport after original latest callback"); }
+            assert_eq!(footer.facts().unwrap().display.goal_state.as_ref(), Some(&goal.phase));
+            assert_eq!(run_port.displayed_snapshot().unwrap().goal.as_ref(), Some(goal));
+            Some(serde_json::json!({"originalGoalProjection":true,"scope":goal.scope,"goalId":goal.id,"goalRevision":goal.revision,"phase":goal.phase,"turnId":turn,"label":label.text,"labelVisible":label_visible,"originalFooter":true,"sourceMarkerInferred":false,"durationInferred":false,"nativeInteraction":false,"externalEndpoint":args.iter().any(|arg| arg == "--endpoint-config")}))
+        });
+        if goal_footnote_fixture {
+            assert!(
+                goal_footnote_proof.is_some(),
+                "fixture goal must reach original rendered footer"
+            );
+        }
         let run_port_proof = serde_json::json!({"mounted":true,"transcriptMounted":run_port.transcript_id().is_some(),
             "sharedIntents":true,"ownsRuntime":false,"completeRunPort":false,"keyedReadingAcceptance":false});
         println!(
             "{}",
             serde_json::json!({
+                "goalFootnoteProof":goal_footnote_proof,
                 "sidebarSearchProof":sidebar_query_proof,
                 "runPortComposition":run_port_proof,"boundedChildProof":bounded_child_proof,"feedbackReadProof":feedback_read_proof,"feedbackWriteProof":feedback_write_proof,"feedbackControlsProof":feedback_controls_proof,"feedbackTranscriptProof":feedback_transcript_proof,
                 "offscreen": true, "components": true, "nativeInteraction": false,

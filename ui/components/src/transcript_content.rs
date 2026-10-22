@@ -579,6 +579,13 @@ impl TranscriptContent {
         timing: &crate::TranscriptFootnoteTiming,
     ) -> Result<(), &'static str> {
         timing.validate(snapshot)?;
+        if timing
+            .goal
+            .as_ref()
+            .is_some_and(|goal| goal.scope != self.scope)
+        {
+            return Err("footnote goal scope mismatch");
+        }
         if epoch == self.epoch
             && (timing.revision < self.timing.revision
                 || (publication == self.publication
@@ -1094,6 +1101,10 @@ fn plan<'a>(
 ) -> Result<Vec<Planned<'a>>, &'static str> {
     use TranscriptContentRowKey as Key;
     let mut copies = crate::TranscriptTurnCopy::catalog(snapshot);
+    let goal_turn_id = timing
+        .goal
+        .as_ref()
+        .and_then(|goal| goal.terminal_turn_id(snapshot));
     let mut result = vec![];
     if document.is_stale {
         result.push(label(Key::Stale, labels.stale.clone()));
@@ -1155,6 +1166,7 @@ fn plan<'a>(
                                 })
                             }))
                 }),
+                goal_turn_id,
             );
             let feedback_visible =
                 display.shows_aside(turn, output.is_some()) && !display.is_live_owner;

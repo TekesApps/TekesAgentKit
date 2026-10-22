@@ -649,12 +649,15 @@ impl RunPort {
             return Err("RunPort transcript namespace overlap");
         }
         if let Some(snapshot) = &self.last {
-            content.update(
+            // Late installation must seed the same display inputs as a normal
+            // Run publication, including goal facts and the explicit host clock.
+            content.update_with_timing(
                 &self.scope,
                 snapshot.revision,
                 snapshot.connection_epoch,
                 &snapshot.transcript,
                 self.gate.entries && !self.composer().is_composing(),
+                &self.footnote_timing(snapshot),
             )?;
         }
         self.transcript = Some(content.id());
@@ -974,6 +977,12 @@ impl RunPort {
             })
         {
             return Err("stale or conflicting RunPort input");
+        }
+        if let Some(goal) = &snapshot.goal {
+            goal.validate().map_err(|_| "invalid RunPort goal facts")?;
+            if goal.scope != self.scope {
+                return Err("RunPort goal source mismatch");
+            }
         }
         let target = ComposerDestination::run(self.scope.clone());
         if snapshot

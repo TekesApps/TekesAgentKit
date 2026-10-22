@@ -476,6 +476,7 @@ fn source_live_caption_requires_owner_and_clock_and_never_uses_legacy_or_zero_to
         is_live_owner: true,
         has_output: false,
         finished_text: None,
+        goal_state: None,
     };
     let mut facts = TurnFootnoteFacts::read_with_display(&t, display.clone());
     assert_eq!(facts.text(), "1m 5s");
@@ -534,6 +535,7 @@ fn explicit_caption_transition_keeps_information_owner_and_fences_hidden_actions
         is_live_owner: true,
         has_output: false,
         finished_text: None,
+        goal_state: None,
     };
     let f = host
         .get_mut(root)

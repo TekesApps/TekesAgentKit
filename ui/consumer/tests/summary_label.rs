@@ -1217,6 +1217,7 @@ fn transcript_clock_is_a_display_input_and_stale_plans_preserve_the_original_cap
         revision: 1,
         now_ms: Some(75000.),
         live_turn_id: Some("timed-turn".into()),
+        goal: None,
     };
     content
         .update_with_timing(&scope, 1, 1, &snapshot, true, &timing)
@@ -1280,6 +1281,7 @@ fn transcript_clock_is_a_display_input_and_stale_plans_preserve_the_original_cap
         revision: 2,
         now_ms: Some(80000.),
         live_turn_id: None,
+        goal: None,
     };
     assert_eq!(
         host.get_mut(root)

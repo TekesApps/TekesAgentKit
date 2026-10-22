@@ -738,12 +738,11 @@ impl ComponentDemo {
         &mut self,
         ids: ComposerIds,
         binding: &Arc<RunBinding>,
-        snapshot: &tekes_agent_presentation::RunSnapshot,
+        _snapshot: &tekes_agent_presentation::RunSnapshot,
     ) -> Result<()> {
         if !self.document_enabled {
             return Ok(());
         }
-        let available = binding.access() == PaneAccess::Ready && !self.composing();
         if ids.root == self.ids().root {
             self.tree
                 .get_mut(MAIN)
@@ -771,7 +770,7 @@ impl ComponentDemo {
         let end = namespace
             .checked_add(10_000)
             .ok_or_else(|| unsupported("demo document namespace pool exhausted"))?;
-        let mut content = tekes_agent_components_ui::TranscriptContent::new(
+        let content = tekes_agent_components_ui::TranscriptContent::new(
             namespace,
             namespace + 1..end,
             binding.scope().clone(),
@@ -781,15 +780,9 @@ impl ComponentDemo {
             },
         )
         .map_err(unsupported)?;
-        content
-            .update(
-                binding.scope(),
-                snapshot.revision,
-                snapshot.connection_epoch,
-                &snapshot.transcript,
-                available,
-            )
-            .map_err(unsupported)?;
+        // The RunPort seeds its new Transcript from the already controlled
+        // Run frame, including all display inputs. Do not publish a second,
+        // partial footnote frame from the host before installing it.
         let root = content.id();
         self.tree
             .get_mut(ComponentId(ids.root.0 + 16))

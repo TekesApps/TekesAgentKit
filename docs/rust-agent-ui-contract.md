@@ -1,5 +1,7 @@
 # Rust Agent UI 组件接入契约
 
+[目标终态脚注与首次安装](rust-agent-ui-goal-footnote-20261022.md)补充原 goal projection→同帧 RunSnapshot→原 footer 的只读路径；没有来源 turn 或目标耗时就不推断。首次晚安装 Transcript 复用完整显示输入，原生窗口/三端真实目标生命周期仍待专项验收。
+
 [新导航原生补验](rust-agent-ui-native-panel-toolbar-20261022.md)：新 header 的受控原生导航、分页、只读子历史与系统拼音通过；三个真实 harness 的现有布局流式阅读也取得完整收据。窗口截图失败、窗口级 toolbar、SideChat 原生家族菜单及跨进程仍未验收。
 
 [SidePanelNavigation 与宿主 header 接入](rust-agent-ui-side-panel-navigation-20261022.md)已补原 SDK toolbar/menu 业务控件、SideChat 家族与当前关闭回调，面板正文可移除诊断 header 并保留原实例。531 项本地回归、独立公开 consumer、最终三端协议→离屏 GPU 通过；窗口级契约跟踪 TekesUI #14/#36，跨进程 #48、新窗口及完整真实动态 tabs 尚未验收。

@@ -496,3 +496,6 @@ pub use summary_custom::{
 
 mod turn_footnote_timing;
 pub use turn_footnote_timing::*;
+
+// Re-export shared read-only goal facts; the UI does not define another lifecycle.
+pub use tekes_agent_presentation::{GoalFacts, GoalPhase};

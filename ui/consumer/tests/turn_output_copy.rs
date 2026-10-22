@@ -225,3 +225,150 @@ fn standalone_turn_copy_rejects_foreign_turn_and_never_exposes_controls_for_live
         .unwrap();
     assert!(footer.copy_button_id().is_some());
 }
+
+#[test]
+fn terminal_goal_uses_canonical_final_turn_and_retains_original_readout() {
+    use tekes_agent_components_ui::{
+        GoalFacts, GoalPhase, TranscriptContent, TranscriptContentRowKey, TranscriptFootnoteTiming,
+    };
+    use tekes_ui_controls::composition::{Content, ContentHost, TextContent};
+    let snapshot = source();
+    let scope = RunScope::main("consumer", "original");
+    let mut timing = TranscriptFootnoteTiming {
+        goal: Some(GoalFacts {
+            scope: scope.clone(),
+            sequence: 9,
+            id: "g".into(),
+            revision: 1,
+            phase: GoalPhase::Paused,
+        }),
+        ..Default::default()
+    };
+    let mut content =
+        TranscriptContent::new(49200, 49201..49220, scope.clone(), Default::default()).unwrap();
+    content
+        .update_with_timing(&scope, 1, 1, &snapshot, true, &timing)
+        .unwrap();
+    let footer_id = content
+        .row_id(&TranscriptContentRowKey::TurnFootnote("turn".into()))
+        .unwrap();
+    let root = content.id();
+    let mut host = ContentHost::new(Content::new(root, content)).unwrap();
+    let goal_id = host
+        .get(footer_id)
+        .unwrap()
+        .component::<TurnFootnote>()
+        .unwrap()
+        .goal_state_id()
+        .unwrap();
+    assert_eq!(
+        host.get(goal_id)
+            .unwrap()
+            .component::<TextContent>()
+            .unwrap()
+            .text,
+        "目标 paused"
+    );
+    let mount = host.semantic_mount(goal_id);
+    timing.goal.as_mut().unwrap().phase = GoalPhase::Complete;
+    timing.goal.as_mut().unwrap().revision = 2;
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<TranscriptContent>()
+        .unwrap()
+        .update_with_timing(&scope, 2, 1, &snapshot, true, &timing)
+        .unwrap();
+    assert_eq!(
+        host.get(goal_id)
+            .unwrap()
+            .component::<TextContent>()
+            .unwrap()
+            .text,
+        "目标 complete"
+    );
+    assert_eq!(host.semantic_mount(goal_id), mount);
+    // A foreign scope cannot redirect metadata onto this original transcript.
+    let mut foreign = timing.clone();
+    foreign.goal.as_mut().unwrap().scope = RunScope::main("consumer", "other");
+    assert!(
+        host.get_mut(root)
+            .unwrap()
+            .component_mut::<TranscriptContent>()
+            .unwrap()
+            .update_with_timing(&scope, 3, 1, &snapshot, true, &foreign)
+            .is_err()
+    );
+    assert_eq!(
+        host.get(goal_id)
+            .unwrap()
+            .component::<TextContent>()
+            .unwrap()
+            .text,
+        "目标 complete"
+    );
+    timing.goal = None;
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<TranscriptContent>()
+        .unwrap()
+        .update_with_timing(&scope, 3, 1, &snapshot, true, &timing)
+        .unwrap();
+    assert!(host.get(goal_id).is_none());
+}
+
+#[test]
+fn terminal_goal_fallback_ignores_newer_input_tools_hidden_and_provisional_answers() {
+    use tekes_agent_components_ui::{GoalFacts, GoalPhase};
+    let mut snapshot = source();
+    let mut goal = GoalFacts {
+        scope: RunScope::main("consumer", "original"),
+        sequence: 1,
+        id: "g".into(),
+        revision: 1,
+        phase: GoalPhase::Complete,
+    };
+    assert_eq!(goal.terminal_turn_id(&snapshot), Some("turn"));
+    let mut later = snapshot.turns[0].clone();
+    later.id = "later".into();
+    later.status = "running".into();
+    later.input = "new input".into();
+    snapshot.turns.push(later);
+    assert_eq!(goal.terminal_turn_id(&snapshot), Some("turn"));
+    let mut preview = snapshot
+        .items
+        .iter()
+        .find(|item| item.is_final)
+        .unwrap()
+        .clone();
+    preview.id = "preview".into();
+    preview.turn_id = "later".into();
+    preview.is_provisional = true;
+    snapshot.items.push(preview);
+    assert_eq!(goal.terminal_turn_id(&snapshot), Some("turn"));
+    snapshot.items.last_mut().unwrap().is_provisional = false;
+    snapshot.items.last_mut().unwrap().is_visible = false;
+    assert_eq!(goal.terminal_turn_id(&snapshot), Some("turn"));
+    snapshot.items.last_mut().unwrap().is_visible = true;
+    assert_eq!(goal.terminal_turn_id(&snapshot), Some("later"));
+    snapshot.items.last_mut().unwrap().kind = TranscriptItemKind::System;
+    snapshot.tools.push(TranscriptToolCall {
+        id: "new-tool".into(),
+        turn_id: "later".into(),
+        name: "tool".into(),
+        arguments: Default::default(),
+        result: None,
+        phase: "completed".into(),
+        call_view: None,
+        result_view: None,
+        source_position: None,
+        result_position: None,
+    });
+    assert_eq!(goal.terminal_turn_id(&snapshot), Some("turn"));
+    goal.phase = GoalPhase::Active;
+    assert!(goal.terminal_turn_id(&snapshot).is_none());
+    goal.phase = GoalPhase::Other("future".into());
+    assert!(goal.terminal_turn_id(&snapshot).is_none());
+    goal.phase = GoalPhase::Blocked;
+    snapshot.is_stale = true;
+    assert!(goal.terminal_turn_id(&snapshot).is_none());
+}

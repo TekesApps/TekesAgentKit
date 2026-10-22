@@ -165,6 +165,8 @@ pub struct TurnFootnoteLabels {
     pub completed: String,
     pub unknown: String,
     pub information: fn(&TurnFootnoteFacts) -> String,
+    /// Host-localized terminal state label; basic style remains SDK-owned.
+    pub goal_state: fn(tekes_agent_presentation::GoalPhase) -> String,
     /// Calendar/locale adapter. Receives source Unix ms and the explicit display clock.
     pub finished_timestamp: fn(f64, Option<f64>) -> Option<String>,
 }
@@ -176,6 +178,7 @@ impl Default for TurnFootnoteLabels {
             pending: "正在处理回合操作".into(),
             completed: "操作已完成".into(),
             unknown: "操作结果未确认，请先核对；不会自动重试".into(),
+            goal_state: |phase| format!("目标 {}", phase.as_str()),
             information: TurnFootnoteFacts::text,
             finished_timestamp: |_, _| None,
         }
@@ -456,6 +459,10 @@ impl TurnFootnote {
         self.render_actions();
         Ok(())
     }
+    pub fn goal_state_id(&self) -> Option<ComponentId> {
+        (self.shown && !self.display.is_live_owner && self.display.goal_state.is_some())
+            .then_some(ComponentId(self.root.0 + 3))
+    }
     pub fn information_id(&self) -> Option<ComponentId> {
         (self.shown && !self.information_text.is_empty()).then_some(ComponentId(self.root.0 + 1))
     }
@@ -696,6 +703,17 @@ impl TurnFootnote {
             self.information = Some(information);
         } else {
             self.rows.children.push(information);
+        }
+        if let Some(phase) = &self.display.goal_state {
+            let id = ComponentId(self.root.0 + 3);
+            let mut node = previous
+                .iter()
+                .position(|node| node.id() == id)
+                .map(|index| previous.remove(index))
+                .unwrap_or_else(|| aside_information(id, ""));
+            node.component_mut::<TextContent>().unwrap().text =
+                (self.labels.goal_state)(phase.clone());
+            self.rows.children.push(node);
         }
         let notice = if self.pending.is_some() && self.observed.is_none() {
             &self.labels.pending

@@ -337,6 +337,9 @@ pub struct RunSnapshot {
     pub run: Option<RunPresentation>,
     pub transcript: TranscriptSnapshot,
     pub summary: Option<SummaryFacts>,
+    /// Read from the same authority/epoch as this Run and Transcript.
+    #[serde(default)]
+    pub goal: Option<GoalFacts>,
     pub draft: ComposerDraft,
     /// Per-destination content mutation identity. Zero is a legacy/initial value.
     /// Advances on Send/restoration even when the content collections are empty.
@@ -917,6 +920,18 @@ impl PresentationStore {
                 None
             }
         };
+        let goal = match scope
+            .map(|scope| GoalFacts::read(authority, scope))
+            .transpose()
+        {
+            Ok(goal) => goal.flatten(),
+            Err(error) => {
+                transcript
+                    .diagnostics
+                    .push(format!("Goal unavailable: {error}"));
+                None
+            }
+        };
         let revision = self.next_snapshot_revision();
         Ok(RunSnapshot {
             revision,
@@ -926,6 +941,7 @@ impl PresentationStore {
             run: run.clone(),
             transcript,
             summary,
+            goal,
             child_availability,
             draft: selected.as_ref().map(|d| self.draft(d)).unwrap_or_default(),
             draft_context_revision: selected

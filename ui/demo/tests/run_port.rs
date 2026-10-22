@@ -925,3 +925,190 @@ async fn composer_visibility_is_independent_of_admission_and_keeps_original_edit
     }
     runtime.stop().await.unwrap();
 }
+
+#[tokio::test]
+async fn public_goal_projection_flows_to_original_run_footer_without_disturbing_preedit() {
+    use tekes_agent_presentation::GoalPhase;
+    let fixture = tekes_agent_ui_demo::fixture::Fixture::default().with_goal_projection(
+        "a",
+        serde_json::json!({"goal":{"id":"g","revision":1,"phase":"paused","objective":"Owned UI goal","maxGoalRounds":2},"createdAt":1,"updatedAt":1,"roundsStarted":0}),
+    );
+    let (runtime, controller) = tekes_agent_ui_demo::fixture::setup_fixture(fixture)
+        .await
+        .unwrap();
+    let mut snapshot = (*controller.snapshot()).clone();
+    assert_eq!(snapshot.goal.as_ref().unwrap().phase, GoalPhase::Paused);
+    let target = snapshot
+        .goal
+        .as_ref()
+        .unwrap()
+        .terminal_turn_id(&snapshot.transcript)
+        .unwrap()
+        .to_owned();
+    let mut port = view();
+    update(&mut port, &snapshot).unwrap();
+    let footer_id = port
+        .transcript()
+        .unwrap()
+        .row_id(&TranscriptContentRowKey::TurnFootnote(target))
+        .unwrap();
+    let mut host = port.into_host().unwrap();
+    let goal_id = host
+        .get(footer_id)
+        .unwrap()
+        .component::<TurnFootnote>()
+        .unwrap()
+        .goal_state_id()
+        .unwrap();
+    assert_eq!(
+        host.get(goal_id)
+            .unwrap()
+            .component::<TextContent>()
+            .unwrap()
+            .text,
+        "目标 paused"
+    );
+    let original_footer = host.semantic_mount(footer_id);
+    host.focus(Some(ids().composer.editor), true);
+    host.event(&ContentEvent::Preedit {
+        text: "目标更新期间中文组字".into(),
+        selection: 2..4,
+        clauses: vec![],
+        replacement: None,
+    });
+    let baseline = host
+        .text_surface(ids().composer.editor)
+        .unwrap()
+        .input
+        .external_baseline();
+    let editor = host.text_surface(ids().composer.editor).unwrap() as *const _ as usize;
+    snapshot.revision += 1;
+    snapshot.goal.as_mut().unwrap().phase = GoalPhase::Blocked;
+    snapshot.goal.as_mut().unwrap().revision += 1;
+    update(
+        host.get_mut(ids().root)
+            .unwrap()
+            .component_mut::<RunPort>()
+            .unwrap(),
+        &snapshot,
+    )
+    .unwrap();
+    assert_eq!(
+        host.get(goal_id)
+            .unwrap()
+            .component::<TextContent>()
+            .unwrap()
+            .text,
+        "目标 blocked"
+    );
+    assert_eq!(host.semantic_mount(footer_id), original_footer);
+    assert_eq!(
+        host.text_surface(ids().composer.editor)
+            .unwrap()
+            .input
+            .external_baseline(),
+        baseline
+    );
+    assert_eq!(
+        host.text_surface(ids().composer.editor).unwrap() as *const _ as usize,
+        editor
+    );
+    assert_eq!(host.focused(), Some(ids().composer.editor));
+    snapshot.revision += 1;
+    snapshot.transcript.is_stale = true;
+    snapshot.connection.history_is_stale = true;
+    update(
+        host.get_mut(ids().root)
+            .unwrap()
+            .component_mut::<RunPort>()
+            .unwrap(),
+        &snapshot,
+    )
+    .unwrap();
+    assert!(host.get(goal_id).is_none());
+    assert!(controller.snapshot().submissions.is_empty());
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn late_transcript_install_uses_the_same_goal_and_clock_as_the_controlled_run() {
+    let fixture = tekes_agent_ui_demo::fixture::Fixture::default().with_goal_projection(
+        "a",
+        serde_json::json!({"id":"late-goal","revision":1,"phase":"complete","objective":"Owned UI goal","createdAt":1,"updatedAt":1,"maxGoalRounds":2,"roundsStarted":0,"activation":"disarmed"}),
+    );
+    let (runtime, controller) = tekes_agent_ui_demo::fixture::setup_fixture(fixture)
+        .await
+        .unwrap();
+    let snapshot = controller.snapshot();
+    let mut run = RunPort::new(
+        ids(),
+        RunScope::main("fixture", "a"),
+        Composer::new(ids().composer),
+        701,
+        702,
+    )
+    .unwrap();
+    run.set_footnote_clock(Some(1700000000000.)).unwrap();
+    update(&mut run, &snapshot).unwrap();
+    run.install_transcript(
+        TranscriptContent::new(
+            703,
+            704..1000,
+            RunScope::main("fixture", "a"),
+            Default::default(),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let content = run.transcript().unwrap();
+    assert_eq!(content.footnote_timing().goal, snapshot.goal);
+    assert_eq!(content.footnote_timing().now_ms, Some(1700000000000.));
+    let turn = snapshot
+        .goal
+        .as_ref()
+        .unwrap()
+        .terminal_turn_id(&snapshot.transcript)
+        .unwrap();
+    let footer = content
+        .row_id(&TranscriptContentRowKey::TurnFootnote(turn.into()))
+        .unwrap();
+    let host = run.into_host().unwrap();
+    assert!(
+        host.get(footer)
+            .unwrap()
+            .component::<TurnFootnote>()
+            .unwrap()
+            .goal_state_id()
+            .is_some()
+    );
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn invalid_goal_facts_cannot_partially_publish_a_new_composer_frame() {
+    let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
+    let original = controller.snapshot();
+    let mut run = view();
+    update(&mut run, &original).unwrap();
+    let goal = GoalFacts {
+        scope: RunScope::main("fixture", "a"),
+        sequence: 1,
+        id: "g".into(),
+        revision: 1,
+        phase: GoalPhase::Complete,
+    };
+    let mut foreign = goal.clone();
+    foreign.scope.session_id = "b".into();
+    let mut invalid = goal;
+    invalid.revision = 0;
+    for facts in [foreign, invalid] {
+        let mut bad = (*original).clone();
+        bad.revision += 1;
+        bad.goal = Some(facts);
+        bad.draft.text = "不可部分写入".into();
+        assert!(update(&mut run, &bad).is_err());
+        assert_eq!(run.displayed_snapshot(), Some(original.as_ref()));
+        assert_eq!(run.composer().editor().input.text, original.draft.text);
+    }
+    runtime.stop().await.unwrap();
+}

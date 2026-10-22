@@ -246,6 +246,7 @@ impl ReadOnlyTranscript {
             revision: self.footnote_clock_revision,
             now_ms: self.footnote_clock,
             live_turn_id: None,
+            goal: None,
         }
     }
     pub fn ids(&self) -> ReadOnlyTranscriptIds {

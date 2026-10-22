@@ -67,6 +67,7 @@ pub struct Fixture {
     lifecycle: bool,
     historical_input: bool,
     summary_usage: bool,
+    goal_projections: BTreeMap<String, Value>,
     pending_actionables: Arc<Mutex<BTreeMap<String, Value>>>,
     actionable_sender: broadcast::Sender<Value>,
     responses: Arc<Mutex<Vec<Value>>>,
@@ -199,6 +200,7 @@ impl Default for Fixture {
             lifecycle: false,
             historical_input: false,
             summary_usage: false,
+            goal_projections: BTreeMap::new(),
             pending_actionables: Arc::new(Mutex::new(BTreeMap::new())),
             actionable_sender: broadcast::channel(256).0,
             responses: Arc::new(Mutex::new(vec![])),
@@ -631,6 +633,11 @@ impl Fixture {
     }
     /// Opt-in synthetic usage delivered via public control projections. No model
     /// call or inferred usage; ordinary and configured harness demos are untouched.
+    /// Opt-in original public control projection, not a goal mutation driver.
+    pub fn with_goal_projection(mut self, session: &str, value: Value) -> Self {
+        self.goal_projections.insert(session.into(), value);
+        self
+    }
     pub fn with_summary_usage(mut self) -> Self {
         self.summary_usage = true;
         self
@@ -818,15 +825,14 @@ impl SessionEndpoint for Endpoint {
                 return Ok(inventory_stream(baseline, receiver, g.clone()));
             }
             StreamTarget::SessionControl => {
-                let projections: Vec<Value> = if self.fixture.summary_usage {
-                    self.fixture.sessions.lock().unwrap().iter().map(|(id, line)| {
-                        json!({"sessionId":id,"projections":{"asOfSeq":line.rows.len() as i64 - 1,
-                            "values":{"tokenUsage":{"uncachedInputTokens":2000,"cacheReadTokens":1000,
-                                "cacheWriteTokens":0,"outputTokens":1234}}}})
-                    }).collect()
-                } else {
-                    vec![]
-                };
+                let projections: Vec<Value> = self.fixture.sessions.lock().unwrap().iter().filter_map(|(id, line)| {
+                    let mut values = serde_json::Map::new();
+                    if self.fixture.summary_usage {
+                        values.insert("tokenUsage".into(), json!({"uncachedInputTokens":2000,"cacheReadTokens":1000,"cacheWriteTokens":0,"outputTokens":1234}));
+                    }
+                    if let Some(goal) = self.fixture.goal_projections.get(id) { values.insert("goal".into(), goal.clone()); }
+                    (!values.is_empty()).then(|| json!({"sessionId":id,"projections":{"asOfSeq":line.rows.len() as i64 - 1,"values":values}}))
+                }).collect();
                 json!({"type":"baseline","generation":g,"snapshot":{"queues":[],"jobs":[],"projections":projections}})
             }
             StreamTarget::Actionables => {

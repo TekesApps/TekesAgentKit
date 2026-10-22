@@ -12,6 +12,8 @@ pub struct TranscriptFootnoteTiming {
     pub revision: u64,
     pub now_ms: Option<f64>,
     pub live_turn_id: Option<String>,
+    /// Canonical facts from the same Run publication; not a separate goal store.
+    pub goal: Option<tekes_agent_presentation::GoalFacts>,
 }
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TurnFootnoteDisplay {
@@ -23,6 +25,8 @@ pub struct TurnFootnoteDisplay {
     pub has_output: bool,
     /// Host-localized settle time, not an elapsed interval or raw status.
     pub finished_text: Option<String>,
+    /// Terminal goal display only; no inferred origin marker or elapsed duration.
+    pub goal_state: Option<tekes_agent_presentation::GoalPhase>,
 }
 fn candidate(snapshot: &TranscriptSnapshot) -> Option<&TranscriptTurn> {
     if snapshot.is_stale {
@@ -56,6 +60,20 @@ impl TranscriptFootnoteTiming {
                 && (run.can_submit || run.can_cancel)
         });
         Self {
+            goal: snapshot
+                .goal
+                .as_ref()
+                .filter(|goal| {
+                    !snapshot.transcript.is_stale
+                        && snapshot.connection.phase == ConnectionPhase::Connected
+                        && !snapshot.connection.history_is_stale
+                        && snapshot.run.as_ref().is_some_and(|run| {
+                            run.scope == goal.scope
+                                && run.connection.phase == ConnectionPhase::Connected
+                                && !run.connection.history_is_stale
+                        })
+                })
+                .cloned(),
             revision,
             now_ms,
             live_turn_id: can_present
@@ -77,6 +95,9 @@ impl TranscriptFootnoteTiming {
         {
             return Err("invalid footnote live owner");
         }
+        if let Some(goal) = &self.goal {
+            goal.validate().map_err(|_| "invalid footnote goal")?;
+        }
         Ok(())
     }
     pub(crate) fn display(
@@ -84,12 +105,18 @@ impl TranscriptFootnoteTiming {
         turn: &TranscriptTurn,
         labels: &TurnFootnoteLabels,
         has_output: bool,
+        goal_turn_id: Option<&str>,
     ) -> TurnFootnoteDisplay {
         let is_live_owner = self.live_turn_id.as_deref() == Some(turn.id.as_str());
         TurnFootnoteDisplay {
             revision: self.revision,
             now_ms: self.now_ms,
             is_live_owner,
+            goal_state: self
+                .goal
+                .as_ref()
+                .filter(|_| goal_turn_id == Some(turn.id.as_str()))
+                .map(|goal| goal.phase.clone()),
             has_output,
             finished_text: (!is_live_owner)
                 .then_some(turn.ended_at)
@@ -114,6 +141,13 @@ impl TurnFootnoteDisplay {
             || (self.revision == 0 && self.now_ms.is_some())
         {
             return Err("invalid footnote display clock");
+        }
+        if self
+            .goal_state
+            .as_ref()
+            .is_some_and(|phase| !phase.is_terminal())
+        {
+            return Err("nonterminal footnote goal");
         }
         if self.is_live_owner
             && (turn.status != "running" || turn.ended_at.is_some() || self.finished_text.is_some())
