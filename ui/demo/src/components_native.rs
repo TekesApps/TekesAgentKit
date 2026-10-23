@@ -3976,6 +3976,19 @@ pub fn run() {
         } else {
             serde_json::Value::Null
         };
+        let child_run_proof =
+            if let Some(index) = args.iter().position(|arg| arg == "--child-run-proof") {
+                let child = args.get(index + 1).expect("explicit child ID required");
+                host.executor
+                    .block_on(tekes_agent_ui_demo::child_run_proof::run(
+                        &mut host.view,
+                        &host.runtime,
+                        child,
+                    ))
+                    .expect("real independent child proof")
+            } else {
+                serde_json::Value::Null
+            };
         let sidechat_proof = if args.iter().any(|arg| arg == "--sidechat-proof") {
             host.executor
                 .block_on(tekes_agent_ui_demo::sidechat_proof::run(
@@ -4941,6 +4954,7 @@ pub fn run() {
             "annotationProof":annotation_proof,
             "initialPresetProof":preset_proof,
             "uploadProof":upload_proof,
+            "childRunProof":child_run_proof,
             "sideChatProof":sidechat_proof,
             "mixedToolProof":mixed_tool_proof,
             "actionableProof":actionable_proof,

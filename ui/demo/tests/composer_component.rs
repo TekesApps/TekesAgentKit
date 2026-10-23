@@ -438,3 +438,71 @@ async fn delayed_text_intent_cannot_erase_host_settings_or_cross_to_new_selectio
     );
     runtime.stop().await.unwrap();
 }
+
+#[tokio::test]
+async fn primary_stop_preserves_editor_preedit_and_focus_when_send_replaces_it() {
+    use tekes_agent_presentation::RunPhase;
+    let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
+    let mut frame = (*controller.snapshot()).clone();
+    frame.run.as_mut().unwrap().phase = RunPhase::Running;
+    frame.run.as_mut().unwrap().can_cancel = true;
+    frame.can_submit = true;
+    frame.draft.text.clear();
+    tekes_agent_ui_consumer_check::verify_primary_keeps_editor(&frame).unwrap();
+    let ids = ComposerIds::new(9910);
+    let mut view = Composer::new(ids);
+    view.update(&frame, Default::default()).unwrap();
+    let mut host = view.into_host().unwrap();
+    host.focus(Some(ids.editor), true);
+    assert!(
+        deliver(
+            &mut host,
+            ids,
+            ContentEvent::Preedit {
+                text: "取消期间中文组字".into(),
+                selection: 8..8,
+                clauses: vec![],
+                replacement: None,
+            }
+        )
+        .is_empty()
+    );
+    let baseline = host
+        .text_surface(ids.editor)
+        .unwrap()
+        .input
+        .external_baseline();
+    assert!(matches!(
+        activate(&mut host, ids, ids.cancel).as_slice(),
+        [ComposerIntent::Cancel { .. }]
+    ));
+    assert_eq!(
+        host.focused(),
+        Some(ids.editor),
+        "primary Stop must not adopt editor focus"
+    );
+    assert_eq!(
+        host.text_surface(ids.editor)
+            .unwrap()
+            .input
+            .external_baseline(),
+        baseline
+    );
+    frame.revision += 1;
+    frame.run.as_mut().unwrap().phase = RunPhase::Idle;
+    frame.run.as_mut().unwrap().can_cancel = false;
+    composer_mut(&mut host, ids)
+        .update(&frame, Default::default())
+        .unwrap();
+    assert!(host.get(ids.cancel).is_none());
+    assert_eq!(host.focused(), Some(ids.editor));
+    assert_eq!(
+        host.text_surface(ids.editor)
+            .unwrap()
+            .input
+            .external_baseline(),
+        baseline
+    );
+    assert!(activate(&mut host, ids, ids.send).is_empty());
+    runtime.stop().await.unwrap();
+}

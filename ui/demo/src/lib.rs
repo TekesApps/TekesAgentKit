@@ -27,3 +27,5 @@ pub mod feedback_transcript_proof;
 pub mod label_host;
 
 pub mod footnote_host;
+
+pub mod child_run_proof;

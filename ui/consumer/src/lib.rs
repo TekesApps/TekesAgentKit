@@ -2785,3 +2785,54 @@ pub fn retained_tool_control_id(
         .retained_tool_activity(tool)
         .map(|control| control.id())
 }
+
+/// A second host verifies the original primary action through public SDK events.
+/// No application-level focus restoration or duplicate IME state is involved.
+pub fn verify_primary_keeps_editor(
+    frame: &tekes_agent_components_ui::RunSnapshot,
+) -> Result<(), &'static str> {
+    use tekes_agent_components_ui::{
+        Composer, ComposerIds, ComposerIntent, ComposerPrimaryActionKind,
+    };
+    use tekes_ui_controls::composition::{AccessibilityAction, ContentEvent};
+    let ids = ComposerIds::new(65400);
+    let mut composer = Composer::new(ids);
+    composer.update(frame, Default::default())?;
+    if composer.primary_action_kind() != ComposerPrimaryActionKind::Stop {
+        return Err("consumer needs a cancellable empty-draft frame");
+    }
+    let mut host = composer.into_host().map_err(|_| "consumer mount failed")?;
+    host.focus(Some(ids.editor), true);
+    host.event(&ContentEvent::Preedit {
+        text: "第二宿主中文组字".into(),
+        selection: 8..8,
+        clauses: vec![],
+        replacement: None,
+    });
+    host.drain_actions();
+    let baseline = host
+        .text_surface(ids.editor)
+        .unwrap()
+        .input
+        .external_baseline();
+    host.accessibility_action(ids.cancel, None, AccessibilityAction::Press);
+    let actions = host.drain_actions();
+    let intents = host
+        .get_mut(ids.root)
+        .unwrap()
+        .component_mut::<Composer>()
+        .unwrap()
+        .take_intents(&actions);
+    if !matches!(intents.as_slice(), [ComposerIntent::Cancel { .. }])
+        || host.focused() != Some(ids.editor)
+        || host
+            .text_surface(ids.editor)
+            .unwrap()
+            .input
+            .external_baseline()
+            != baseline
+    {
+        return Err("primary action replaced the original editor owner");
+    }
+    Ok(())
+}

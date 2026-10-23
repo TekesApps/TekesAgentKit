@@ -637,7 +637,15 @@ impl Composer {
             } else if let Some(button) = retained.remove(&id) {
                 button
             } else {
-                Content::new(id, ButtonContent::new(label.clone()))
+                let action = Content::new(id, ButtonContent::new(label.clone()));
+                // ClientKit's primary disc refuses ordinary first-responder
+                // adoption. Keep the original editor/marked owner on Press;
+                // the SDK still permits explicit keyboard-route/AX Focus.
+                if id == ids.send || id == ids.cancel {
+                    action.preserving_focus()
+                } else {
+                    action
+                }
             };
             button
                 .component_mut::<ButtonContent>()

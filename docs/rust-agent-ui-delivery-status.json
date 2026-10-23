@@ -929,5 +929,20 @@
     "ui": "failure",
     "failingStep": "Verify nested detail reading intent (strict; no native window)",
     "upstreamIssue": 53
+  },
+  "primaryFocusAndChildRuns": {
+    "receipt": "rust-agent-ui-primary-focus-child-runs-20261023.json",
+    "uiWorkspacePassed": 618,
+    "existingIgnored": 1,
+    "pythonPassed": 74,
+    "realIndependentChildRuns": [
+      "pi",
+      "dsh"
+    ],
+    "nativeSideChat": true,
+    "primaryUsesPublishedPreservingFocus": true,
+    "nativeInteraction": false,
+    "crossProcess": false,
+    "fullGoalCompletion": false
   }
 }

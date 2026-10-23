@@ -17,8 +17,14 @@ fn panel(view: &ComponentDemo) -> &SidePanel {
         .component::<SidePanel>()
         .unwrap()
 }
-async fn press(view: &mut ComponentDemo, id: ComponentId) -> Result<Vec<DemoCommand>> {
+pub(crate) async fn press(view: &mut ComponentDemo, id: ComponentId) -> Result<Vec<DemoCommand>> {
     let commands = view.accessibility_action(id, None, AccessibilityAction::Press)?;
+    metadata(view, commands).await
+}
+pub(crate) async fn metadata(
+    view: &mut ComponentDemo,
+    commands: Vec<DemoCommand>,
+) -> Result<Vec<DemoCommand>> {
     let mut business = vec![];
     for command in commands {
         match command {

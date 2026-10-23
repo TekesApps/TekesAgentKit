@@ -50,7 +50,13 @@ parser.add_argument('--ui-actionables',action='store_true',help='Exercise public
 parser.add_argument('--ui-sidebar-query',action='store_true',help='Read typed public search and explicitly refresh public inventory cursors on owned conversation-history targets; offscreen protocol proof only')
 parser.add_argument('--ui-mixed-tools',action='store_true',help='Offscreen real read tools, reasoning and retained Composer proof')
 parser.add_argument('--ui-sidechat',action='store_true',help='Real ephemeral fork in original SidePanel/RunPort, reconnect and confirmed discard; offscreen only')
+parser.add_argument('--ui-child-run',action='store_true',help='Real Pi/DSH independent child Summary -> original Composer Send/Cancel/reconnect; offscreen only')
 args=parser.parse_args()
+if args.ui_child_run:
+    if args.kernel_root or not (args.ui_demo and args.ui_components and args.ui_transcript_content):
+        parser.error('--ui-child-run requires Pi/DSH UI demo/components/Transcript; Native bounded history is separate')
+    if any(value for key,value in vars(args).items() if key.startswith('ui_') and key not in {'ui_child_run','ui_demo','ui_components','ui_transcript_content','ui_output'}):
+        parser.error('--ui-child-run is an isolated offscreen profile')
 if args.ui_sidechat:
     if not (args.ui_demo and args.ui_components and args.ui_transcript_content):
         parser.error('--ui-sidechat requires UI demo/components/Transcript')
@@ -150,6 +156,7 @@ class Provider(http.server.BaseHTTPRequestHandler):
         body=json.loads(self.rfile.read(int(self.headers['Content-Length'])));requests.append(self.path)
         intent=native_probe_intent(body)
         native_cancel=intent=='ENDPOINT_CANCEL_NATIVE_PROOF'
+        if args.ui_child_run and native_cancel:print('CHILD_CANCEL_PROVIDER_REQUEST '+self.path,flush=True)
         if intent=='ENDPOINT_ERROR_NATIVE_PROOF':
             error=json.dumps({'error':{'message':'ENDPOINT_ERROR_NATIVE_PROOF: controlled invalid request','type':'invalid_request_error','code':'invalid_request_error'}}).encode()
             self.send_response(400);self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(error)));self.end_headers();self.wfile.write(error);return
@@ -248,7 +255,10 @@ class Provider(http.server.BaseHTTPRequestHandler):
             for frame in frames:
                 self.wfile.write(('data: '+json.dumps(frame)+'\n\n').encode());self.wfile.flush()
                 if reading_stream:time.sleep(1.5)
-                if native_cancel:time.sleep(1)
+                # Keep this owned cancellation stream open beyond the UI's
+                # bounded Stop observation deadline; the real harness must
+                # terminate it through its public cancel route.
+                if native_cancel:time.sleep(20 if args.ui_child_run else 1)
                 if 'ENDPOINT_STREAM_IDENTITY_PROOF' in json.dumps(body):time.sleep(0.5)
                 if 'ENDPOINT_STREAM_NATIVE_PROOF' in json.dumps(body):time.sleep(1)
             if not self.path.endswith('/responses'):self.wfile.write(b'data: [DONE]\n\n')
@@ -352,7 +362,7 @@ def run(config):
     print(config['kind'].upper()+'_PANELS_LIVE_OK summary-scope+sidechat-capability+lifecycle-or-catalog')
     print(config['kind'].upper()+'_PRESENTATION_LIVE_OK composer+immediate-echo+identity-reconciliation+final-answer+reconnect')
     return outputs
-def ui_smoke(config, first, bounded_child=None):
+def ui_smoke(config, first, bounded_child=None, independent_child=None):
     history_pages=args.ui_history_pages and bounded_child is None
     if not args.ui_demo:
         return
@@ -445,6 +455,7 @@ def ui_smoke(config, first, bounded_child=None):
     if args.ui_panel_navigation_toolbar:mode+=['--panel-navigation-toolbar']
     if search_query:mode+=['--sidebar-query',search_query,'--sidebar-query-proof']
     if bounded_child:mode+=['--bounded-child-proof','--bounded-child-id',bounded_child]
+    if independent_child:mode+=['--child-run-proof',independent_child]
     if args.ui_feedback_read:mode+=['--feedback-read-proof']
     if args.ui_feedback_write:mode+=['--feedback-write-proof']
     if args.ui_feedback_controls:mode+=['--feedback-controls-proof']
@@ -638,6 +649,10 @@ def ui_smoke(config, first, bounded_child=None):
             proof=receipt['historyPagingProof']
             assert all(proof[key] for key in ('originalScope','extended','frozenCut','otherDraftPreserved','sourceStatusPublished','newEpochHistoryRetained','noDuplicateMessages','oldReceiptInvalidated')),proof
             assert proof['retainedMessages']>=1 and not proof['nativeInteraction'] and not proof['readingAnchorAcceptance'],proof
+        if args.ui_child_run:
+            proof=receipt['childRunProof']
+            assert all(proof[key] for key in ('realHarness','originalSummaryPointer','originalSidePanelRunPort','originalSend','childReply','originalCancel','cancelSettled','publishedStopForOwnInput','primaryKeptEditorFocus','syntheticPreeditBlockedSend','parentHistoryIsolated','draftRestored','freshReconnect','noDuplicateInput','originalLocalClose','oldAuthorityRetired','otherDraftsPreserved')),proof
+            assert not proof['nativeInteraction'] and not proof['physicalIme'] and not proof['crossProcess'] and not proof['readingAnchorAcceptance'],proof
         if args.ui_sidechat:
             proof=receipt['sideChatProof']
             if kind=='dsh':
@@ -718,6 +733,9 @@ try:
             creates=[row['result']['sessionId'] for row in child_outputs if row.get('op')=='childCreate'];assert creates[0]==creates[1],'child create replay duplicated pointer'
             parent_view=next(row['result'] for row in child_outputs if row.get('op')=='presentation')
             assert len(parent_view['summary']['subagents'])==1 and parent_view['summary']['subagents'][0]['title']=='Model child',parent_view['summary']
+            if args.ui_child_run:
+                parent_id=next(row['result']['sessionId'] for row in child_outputs if row.get('op')=='create')
+                ui_smoke(config,parent_id,independent_child=parent_view['summary']['subagents'][0]['sessionId'])
             child_view=next(row['result'] for row in child_outputs if row.get('op')=='childHistory')
             assert 'CHILD_PI_TOOL_PROOF' in json.dumps(child_view),'model child input missing'
             assert 'CHILD_PI_SDK_PROOF' not in json.dumps(child_view) and 'ENDPOINT_PI_CHILD' not in json.dumps(child_view),'parent/sibling history leaked into child'
@@ -836,7 +854,7 @@ try:
             assert 'QUEUED_EDIT_OK' in conversation and 'QUEUED_BEFORE_EDIT' not in conversation and 'QUEUED_TO_REMOVE' not in conversation,'queue edit/remove/drain lost'
             assert not result[-1]['result']['sessions'][queue_id]['queue'],'queue did not settle'
             print('PI_QUEUE_LIVE_OK durable-admission+edit+remove+automatic-drain')
-            ui_smoke(config,next(row['result']['sessionId'] for row in outputs if row.get('op')=='create'))
+            if not args.ui_child_run:ui_smoke(config,next(row['result']['sessionId'] for row in outputs if row.get('op')=='create'))
 
         if args.dsh_root:
             dsh=args.dsh_root.resolve();node=dsh/'node/bin/node';entry=dsh/'node_modules/@deepseek-ai/dsh/lib/bin.js';home=base/'dsh';home.mkdir()
@@ -924,6 +942,12 @@ try:
                 assert any(item['text']=='CHILD_CONTINUATION_PROOF' for item in child_view['transcript']['items']), 'child input missing'
                 assert any(item['text']=='ENDPOINT_REPLY_OK' and item['isFinal'] for item in child_view['transcript']['items']), 'child output missing'
                 print('DSH_CHILD_CONTROL_LIVE_OK catalog+owned-prompt+independent-history+receipt+cancel')
+                if args.ui_child_run:
+                    parent_id=next(row['result']['sessionId'] for row in child_result if row.get('op')=='create')
+                    catalog=next(row['result'] for row in child_result if row.get('op')=='childCatalog')
+                    children=[row['id'] for row in catalog['entries'] if row['kind']=='child' and row.get('mode')=='continuable']
+                    assert len(children)==1,catalog
+                    ui_smoke(config,parent_id,independent_child=children[0])
                 # Public lifecycle calls, with the original session and its fork independently addressable.
                 lifecycle=[{'op':'call','sessionId':session_id,'method':'session.rename','args':{'title':'Endpoint lifecycle proof'}},
                     {'op':'call','sessionId':session_id,'method':'session.fork','args':{'allowMigration':False},'saveAs':'fork'},
@@ -962,7 +986,7 @@ try:
                     assert Path(locator['cwd']).resolve()==cwd.resolve() and Path(locator['workingDirectory']).resolve()==child.resolve(),locator
                     assert 'working-directory/change' in json.dumps(result[-1]),'new required event lost'
                     print('DSH_WORKING_DIRECTORY_LIVE_OK original root + current directory + reconnect')
-                ui_smoke(config,session_id)
+                if not args.ui_child_run:ui_smoke(config,session_id)
             finally:
                 if process.poll() is None:os.killpg(process.pid,signal.SIGTERM)
                 try:process.wait(timeout=15)
