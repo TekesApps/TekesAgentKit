@@ -48,3 +48,16 @@ Task parent 在异步 baseline 中取消后 child 仍可返回。修复后还检
 #47 图标/紧凑动作、#48 交互式 ProcessContainer、#53 严格嵌套阅读继续保留；其他富内容、
 持久 checkpoint、非当前行上下文菜单及最终配对布局仍按交付状态列明。
 没有通过改变布局、伪造来源或放宽 CI 来绕过 SDK 缺口，不合并、不打完成 tag。
+
+## #13 补充：纯展示输入的读取控件
+
+来源权限复核发现 `source: None` 的纯展示输入仍可能启用刷新/分页，再由绑定拒绝无来源请求。
+已在原组件门禁要求非空来源，不新增状态；纯展示输入禁用两项控件且不产生 intent。
+回归明确设定 ready、current、支持分页及有更早记录，避免误把无页禁用当作来源门禁；
+`Some` 假身份仍产生请求并由原绑定拒绝，真实来源读闭环保持。
+主会话协调、subagent 实施，完整 readonly_child 14 项、格式和严格 all-target Clippy 通过。
+日志为原证据目录内 `source-authority-none-*`；这是增量组件/公开 consumer 验证，
+没有重跑三端离屏或完整 UI 628 项，也不将先前冻结程序的身份转移到本次源码。
+两套 9def8e6 CI 已完成：headless/UI 测试/格式/Clippy 通过，均在 #53 严格阅读检查失败；
+原 JSON 收据分别保存在同目录 `ci-push-39930931314/`、`ci-pr-39930940983/`。
+桌面、物理 IME、VoiceOver 与 ProcessContainer 仍未验收。

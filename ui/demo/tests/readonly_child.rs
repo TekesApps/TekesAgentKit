@@ -823,22 +823,84 @@ async fn same_scope_readonly_intent_cannot_cross_instances_or_consume_original_a
     );
     let fabricated = ReadOnlyTranscriptSource::default();
     for source_id in [None, Some(&fabricated)] {
+        let mut display_frame = frame.clone();
+        let PaneSnapshot::ReadOnlyChild { transcript, .. } = &mut display_frame else {
+            panic!("bounded")
+        };
+        transcript.has_more_before = true;
         let mut display = tekes_agent_ui_consumer_check::new_readonly_child(
             4000,
             4003..4200,
             first.binding().scope().clone(),
         )
         .unwrap();
-        let mut input = first.readonly_input(&frame, false, None).unwrap();
+        let mut input = first.readonly_input(&display_frame, false, None).unwrap();
         input.source = source_id;
+        input.supports_pagination = true;
+        assert!(input.source_ready && input.frame_current);
+        assert!(input.supports_pagination && input.transcript.has_more_before);
         display.update(input).unwrap();
-        assert!(
-            first
-                .read_intent(captured_refresh_from_view(display))
-                .await
-                .is_err(),
-            "display-only or freshly generated provenance is not endpoint read authority"
-        );
+        let root = display.ids().root;
+        let mut display_host = display.into_host().unwrap();
+        let refresh = display_host
+            .get(root)
+            .unwrap()
+            .component::<ReadOnlyTranscript>()
+            .unwrap()
+            .ids()
+            .refresh;
+        let page = display_host
+            .get(root)
+            .unwrap()
+            .component::<ReadOnlyTranscript>()
+            .unwrap()
+            .paging_button_id();
+        display_host.accessibility_action(refresh, None, AccessibilityAction::Press);
+        display_host.accessibility_action(page, None, AccessibilityAction::Press);
+        let actions = display_host.drain_actions();
+        let intents = display_host
+            .get_mut(root)
+            .unwrap()
+            .component_mut::<ReadOnlyTranscript>()
+            .unwrap()
+            .take_intents(&actions);
+        if source_id.is_none() {
+            assert!(
+                display_host
+                    .get(refresh)
+                    .unwrap()
+                    .component::<ButtonContent>()
+                    .unwrap()
+                    .button
+                    .state
+                    .disabled,
+                "display-only provenance must disable refresh"
+            );
+            assert!(
+                display_host
+                    .get(page)
+                    .unwrap()
+                    .component::<ButtonContent>()
+                    .unwrap()
+                    .button
+                    .state
+                    .disabled,
+                "display-only provenance must disable paging"
+            );
+            assert!(
+                intents.is_empty(),
+                "display-only provenance must not produce read intents"
+            );
+        } else {
+            assert_eq!(
+                intents.len(),
+                2,
+                "fake provenance still reaches binding admission"
+            );
+            for intent in intents {
+                assert!(first.read_intent(intent).await.is_err());
+            }
+        }
     }
     let intent = captured_original_refresh(&first, &frame);
     first.retire();

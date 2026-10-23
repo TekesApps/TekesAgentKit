@@ -742,3 +742,5 @@ A mounted read-only component cannot silently change source identity; mount a ne
 component for a replacement source. Cloning an original frame retains identity;
 no global counter or scope-derived ID substitutes for that identity.
 See [source authority design](../../docs/rust-agent-ui-source-authority.md).
+
+Display-only `ReadOnlyTranscriptInput` values use `source: None`: Refresh and Earlier remain disabled and emit no read intent, even when the supplied availability facts are ready. A manufactured `Some` identity still grants no endpoint read authority; use the original binding helper for actionable inputs.

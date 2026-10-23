@@ -26,6 +26,7 @@ publication=1。旧视图的 ReadOnlyTranscriptIntent 或 PaneSnapshot 不能交
 1. 每个 RunBinding 有自己的实例身份；只读 snapshot 携带该身份。
 2. ChildPaneBinding::readonly_input 校验 snapshot 的实例身份，再输出原组件输入。
 3. ReadOnlyTranscriptInput 可携带该来源；独立展示输入允许 None，但不能获得 endpoint 读取权限。
+   None 输入的刷新/分页控件必须禁用，也不产生读取 intent；不能等绑定层拒绝后才反馈不可用。
 4. ReadOnlyTranscript 在成功应用原 frame 后保留来源，显式读取 intent 捕获同一来源。
 5. ChildPaneBinding::read_intent 在 claim/IO 前校验实例身份；错投请求不消耗正确来源的原 gesture。
 6. 原 scope、publication、epoch、一次性 claim、分页策略与 SDK reading token 继续分别校验。

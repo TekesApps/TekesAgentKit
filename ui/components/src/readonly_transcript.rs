@@ -438,7 +438,7 @@ impl ReadOnlyTranscript {
             .component_mut::<TextContent>()
             .unwrap()
             .text = plan.status.clone();
-        self.refresh_enabled = input.source_ready && !input.reading;
+        self.refresh_enabled = input.source.is_some() && input.source_ready && !input.reading;
         self.body.children[1]
             .component_mut::<ButtonContent>()
             .unwrap()
@@ -453,7 +453,7 @@ impl ReadOnlyTranscript {
                 supported: input.supports_pagination,
                 has_more_before: input.transcript.has_more_before,
                 is_stale: input.transcript.is_stale || !input.frame_current,
-                source_ready: input.source_ready && input.frame_current,
+                source_ready: input.source.is_some() && input.source_ready && input.frame_current,
                 read: if input.reading {
                     TranscriptPageRead::Loading
                 } else if let Some(error) = input.read_error {
