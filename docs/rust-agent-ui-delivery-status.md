@@ -1,10 +1,10 @@
 # Rust Agent UI：当前接入范围与交付状态
 
-本页以已提交基线 `37ad08f` 与本轮 Task 同目标共享状态修复增量为准，按用户完整目标保留验收范围。
+本页以已提交基线 `d1a0c09` 与本轮 SideChat 同目标重开修复增量为准，按用户完整目标保留验收范围。
 当前可供实验宿主接入，**完整交付尚未达到**。组件存在、离屏通过或单个 Issue 关闭都不能单独证明完整 Views 对齐。
 本阶段增量的证据见[三端离屏覆盖补验](rust-agent-ui-offscreen-coverage-20261023.md)与[固定验收工具链](rust-agent-ui-native-toolchain.md)；不替代本页原阶段的程序身份和原生结论。
-最新本地全 UI 为 622 通过、1 项既有忽略，Python 74 通过，严格 Clippy/格式/边界通过；
-当前源码摘要见[Task 共享状态收据](rust-agent-ui-task-shared-destination-20261023.json)；此前真实程序身份见[主按钮焦点与子 Run 收据](rust-agent-ui-primary-focus-child-runs-20261023.json)；此前[工具组阶段](rust-agent-ui-global-tool-runs-20261023.json)保留原身份。
+最新本地全 UI 为 623 通过、1 项既有忽略，Python 74 通过，严格 Clippy/格式/边界通过；
+当前源码/程序身份见[SideChat 同目标重开收据](rust-agent-ui-sidechat-shared-destination-20261023.json)；此前 Task 与独立子 Run 收据保留各自原身份；此前[工具组阶段](rust-agent-ui-global-tool-runs-20261023.json)保留原身份。
 任务/子代理/SideChat 的本轮源码核对见[SidePanel 契约](rust-agent-ui-sidepanel-contract-audit-20261023.md)。
 Pi 后续验证采用[精确 1.4.0 候选](pi-1.4.0-compat-20261023.md)，保留 1.3.0 基线，旧离屏记录仍按原程序身份解释。
 实际分区的基础实现见[普通回合折叠阶段](rust-agent-ui-physical-planes-20261023.md)：原 reasoning/工具与 final 正文分属实际阅读行，正常完成默认折叠、异常终止默认展开，原控件与本地选择保留。前一阶段组件/CoreText 与三端离屏验证见[frame 阅读范围](rust-agent-ui-narration-frame-reading-20261023.md)，本轮范围见[原工具组物理分区](rust-agent-ui-physical-tool-fragments-20261023.md)；当前程序未做原生验收，历史原生程序 phase 0 失败保留。
@@ -28,6 +28,12 @@ PR #10 的 `ea36946` 远端 CI：checks 成功；UI 在严格 nested-detail-read
 草稿、附件与发送准备共享；Task/SideChat/祖先生命周期、迟到上传与只读门禁仍独立验证。
 本轮没有新真实 harness 或原生验收；622 项 UI/74 项 Python 通过，原三端收据保持原程序身份。
 `37ad08f` 的 PR/push CI 已结束，headless 成功，UI 仍在 #53 严格阅读步骤失败。
+
+[SideChat 同目标重开](rust-agent-ui-sidechat-shared-destination-20261023.md)已修复：
+重复/并发 open 复用原 controller，所有展示句柄卸载后重开仍保留草稿；
+Closing/Unknown 与确认丢弃/不存在沿用原权限，确认关闭释放 owner 持有的 binding。
+最新同一程序在 Native/Pi 的真实原组件离屏闭环通过，DSH 保持不可用门禁。
+`d1a0c09` 的 PR/push CI 已结束：headless 成功，UI 仍在 #53 严格阅读步骤失败。
 
 ## 依赖与运行身份
 
@@ -56,7 +62,7 @@ PR #10 的 `ea36946` 远端 CI：checks 成功；UI 在严格 nested-detail-read
 | 反馈初读/重连/CAS | 自动按来源/epoch读取，普通 aside 无常驻 Refresh；加载失败保留旧记录且不可写，明确刷新恢复。 | 本轮真实三端离屏组合验证见当前续验；真实故障恢复仍属 4097e4f 冻结程序，反馈的当前原生交互仍待验收。 |
 | ProcessContainer 同/跨进程 | 当前没有正式适配；8 包闭包不含 module-runtime/app-protocol。 | #48 固定公开 SDK 中 `new_view` 仍声明无远端 keyboard/IME/AX，V1 的 keyboard/scroll/text_ime/accessibility 为 false；本轮复核公开 50ec49f 仍如此；需 SDK 交付后再接入三个业务容器并独立验收。 |
 | 原生、中文组字、阅读/重连、第二 consumer | 有多个冻结程序的分项成功、失败和完整收据；组件/第二 consumer 在 CI 跑，未打开桌面。 | 同一交付程序的完整 Native/Pi/DSH + 当前系统 IME、最终配对布局；跨进程/VoiceOver 未证明。前一阶段 c90c9f3b 程序已通过三端 stream/stream-reading/public-page、owned 原生 Activity 点击/控件保留和一次系统软件拼音。public-page 不是原生分页按钮，SideChat 旧收据不转移到当前程序；物理键盘、稳定 IME、完整配对布局与跨进程未证明。 |
-| review、CI、合并/tag | PR #10 draft；远端 baa2f55 的 checks x2 成功、UI x2 在严格 nested-detail step 失败。本阶段本地 UI 616 通过/1 既有忽略、Python 68 通过，严格 all-target Clippy/格式/边界通过。Pi 1.4 兼容增量和 310 根测试证据独立记录，不再声称根源码未变。 | 完整 review、全部要求与验收审计、新发布 pin；严格失败仍在，不能合并或打完成 tag。 |
+| review、CI、合并/tag | PR #10 draft；远端 d1a0c09 的 checks x2 成功、UI x2 在严格 nested-detail step 失败。本阶段本地 UI 623 通过/1 既有忽略、Python 74 通过，严格 all-target Clippy/格式/边界通过。根测试仍保留独立收据，本轮未重跑。 | 完整 review、全部要求与验收审计、新发布 pin；严格失败仍在，不能合并或打完成 tag。 |
 
 ## 后续工作顺序
 

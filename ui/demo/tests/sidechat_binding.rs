@@ -438,6 +438,8 @@ async fn interrupted_discard_keeps_readable_draft_and_disables_mutations_until_r
         .await
         .unwrap();
     assert_eq!(binding.access(), PaneAccess::Closing);
+    let while_closing = source.open(&chat).await.unwrap();
+    assert!(Arc::ptr_eq(binding, while_closing.binding()));
     assert!(
         !source.reconcile(&source.snapshot().chats[&chat.scope.session_id], Ok(false)),
         "in-flight close cannot be reconciled out from under its guard"
@@ -460,6 +462,12 @@ async fn interrupted_discard_keeps_readable_draft_and_disables_mutations_until_r
     let unknown = source.snapshot().chats[&chat.scope.session_id].clone();
     assert!(!source.reconcile(&unknown, Err("read offline".into())));
     assert_eq!(binding.access(), PaneAccess::Unknown);
+    let reopened_unknown = source.open(&unknown).await.unwrap();
+    assert!(Arc::ptr_eq(binding, reopened_unknown.binding()));
+    assert_eq!(
+        reopened_unknown.binding().current_run().unwrap().draft.text,
+        "未确认关闭时保留"
+    );
     let input = source
         .input(
             7,
@@ -480,5 +488,82 @@ async fn interrupted_discard_keeps_readable_draft_and_disables_mutations_until_r
     assert!(source.reconcile(&unknown, Ok(false)));
     assert_eq!(binding.access(), PaneAccess::Missing);
     connector.release.notify_one();
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn public_consumer_reopens_one_sidechat_presentation_without_a_host_draft_cache() {
+    use tekes_agent_ui_consumer_check::open_scratch_run;
+    let (runtime, source, view) = setup().await;
+    let parent = view.binding().clone();
+    let chat = source
+        .create(parent.scope().clone(), None, "scratch-reopen")
+        .await
+        .unwrap();
+    let (first, concurrent) = tokio::join!(
+        open_scratch_run(&source, &parent, &chat.scope.session_id),
+        open_scratch_run(&source, &parent, &chat.scope.session_id)
+    );
+    let first = first.unwrap();
+    let concurrent = concurrent.unwrap();
+    assert!(Arc::ptr_eq(first.binding(), concurrent.binding()));
+    drop(concurrent);
+    let destination = ComposerDestination::run(chat.scope.clone());
+    first
+        .binding()
+        .edit_text(&destination, "暂存会话中文草稿".into())
+        .unwrap();
+    let again = open_scratch_run(&source, &parent, &chat.scope.session_id)
+        .await
+        .unwrap();
+    assert_eq!(
+        again.binding().current_run().unwrap().draft.text,
+        "暂存会话中文草稿"
+    );
+    assert!(
+        Arc::ptr_eq(first.binding(), again.binding()),
+        "one owner must not publish two controllers for the same scratch pointer"
+    );
+    let ticket = first
+        .binding()
+        .prepare_send(&destination, PromptMode::Queue)
+        .unwrap();
+    assert!(
+        again
+            .binding()
+            .prepare_send(&destination, PromptMode::Queue)
+            .is_err()
+    );
+    first.binding().cancel_prepared(ticket).unwrap();
+    drop(first);
+    drop(again);
+    let reopened = open_scratch_run(&source, &parent, &chat.scope.session_id)
+        .await
+        .unwrap();
+    assert_eq!(
+        reopened.binding().current_run().unwrap().draft.text,
+        "暂存会话中文草稿"
+    );
+    assert!(parent.current_run().unwrap().draft.text.is_empty());
+    runtime.reconnect().await.unwrap();
+    runtime.wait_ready(Duration::from_secs(3)).await.unwrap();
+    let after_reconnect = open_scratch_run(&source, &parent, &chat.scope.session_id)
+        .await
+        .unwrap();
+    assert!(Arc::ptr_eq(reopened.binding(), after_reconnect.binding()));
+    let weak = Arc::downgrade(reopened.binding());
+    source.close(&chat, "scratch-reopen-close").await.unwrap();
+    assert_eq!(reopened.binding().access(), PaneAccess::Missing);
+    assert!(
+        open_scratch_run(&source, &parent, &chat.scope.session_id)
+            .await
+            .is_err()
+    );
+    drop(reopened);
+    drop(after_reconnect);
+    assert!(
+        weak.upgrade().is_none(),
+        "confirmed discard releases the owner's retained presentation"
+    );
     runtime.stop().await.unwrap();
 }

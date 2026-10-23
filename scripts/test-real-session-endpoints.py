@@ -658,7 +658,7 @@ def ui_smoke(config, first, bounded_child=None, independent_child=None):
             if kind=='dsh':
                 assert all(proof[key] for key in ('realHarness','capabilityUnavailable','originalCreateDisabled','noForkAttempted','parentAndOtherDraftsPreserved')) and not proof['scratchLifecycleAccepted'],proof
             else:
-                assert all(proof[key] for key in ('realHarness','scratchLifecycleAccepted','originalCreate','independentForkScope','originalSidePanelRunPort','originalSend','scratchReply','parentHistoryIsolated','summaryNavigation','originalComposerIdsRetained','scratchDraftRestored','freshReconnect','noDuplicateInput','originalClose','confirmedDiscard','retiredAuthority','parentAndOtherDraftsPreserved')) and not proof['capabilityUnavailable'],proof
+                assert all(proof[key] for key in ('realHarness','scratchLifecycleAccepted','originalCreate','independentForkScope','originalSidePanelRunPort','originalSend','scratchReply','parentHistoryIsolated','summaryNavigation','originalComposerIdsRetained','scratchDraftRestored','canonicalReopen','canonicalReopenAfterReconnect','freshReconnect','noDuplicateInput','originalClose','confirmedDiscard','retiredAuthority','parentAndOtherDraftsPreserved')) and not proof['capabilityUnavailable'],proof
             assert not proof['nativeInteraction'] and not proof['physicalIme'] and not proof['crossProcess'] and not proof['readingAnchorAcceptance'],proof
         if args.ui_mixed_tools:
             proof=receipt['mixedToolProof']

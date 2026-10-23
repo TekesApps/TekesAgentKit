@@ -127,6 +127,13 @@ pub async fn run(
         "SideChat original Transcript missing",
     )?;
     scratch.edit_text(&ComposerDestination::run(chat.scope.clone()), INPUT.into())?;
+    let reopened = owner.open(&chat).await?;
+    require(
+        Arc::ptr_eq(reopened.binding(), &scratch)
+            && reopened.binding().current_run().unwrap().draft.text == INPUT,
+        "reopening real SideChat lost its original presentation/draft",
+    )?;
+    drop(reopened);
     view.sync()?;
     let mut commands = press(view, ids.send).await?;
     if commands.len() != 1 {
@@ -276,6 +283,18 @@ pub async fn run(
     })
     .await
     .map_err(|_| Error::Timeout)??;
+    let reopened_after_reconnect = owner.open(&chat).await?;
+    require(
+        Arc::ptr_eq(reopened_after_reconnect.binding(), &scratch)
+            && reopened_after_reconnect
+                .binding()
+                .current_run()
+                .unwrap()
+                .draft
+                == scratch_draft,
+        "reopening reconnected SideChat replaced presentation/draft",
+    )?;
+    drop(reopened_after_reconnect);
     view.sync()?;
     let close = panel(view).close_id();
     let mut commands = press(view, close).await?;
@@ -309,7 +328,7 @@ pub async fn run(
     Ok(
         json!({"realHarness":true,"capabilityUnavailable":false,"scratchLifecycleAccepted":true,"originalCreate":true,"independentForkScope":true,"scratchScope":chat.scope,
         "originalSidePanelRunPort":true,"originalSend":true,"scratchReply":true,"parentHistoryIsolated":true,
-        "summaryNavigation":true,"originalComposerIdsRetained":true,"scratchDraftRestored":true,
+        "summaryNavigation":true,"originalComposerIdsRetained":true,"scratchDraftRestored":true,"canonicalReopen":true,"canonicalReopenAfterReconnect":true,
         "freshReconnect":true,"noDuplicateInput":true,"originalClose":true,"confirmedDiscard":true,
         "retiredAuthority":true,"parentAndOtherDraftsPreserved":true,"nativeInteraction":false,
         "physicalIme":false,"crossProcess":false,"readingAnchorAcceptance":false}),

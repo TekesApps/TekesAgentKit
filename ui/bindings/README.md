@@ -110,7 +110,16 @@ policy. Unsupported endpoints must not show an enabled create control.
 
 Create with the captured parent and one explicit RPC ID. Open via `open(&chat)`;
 the returned `BoundSideChatRun` proves the binding's role and original pointer
-authority. Do not substitute a main-run cache entry with the same session ID.
+authority. Repeated/concurrent opens of the same parent/scratch scope return the
+same canonical binding from that owner, retaining its existing controller, draft,
+attachments/settings and send admission even if all displayed handles were dropped.
+The original pointer controller remains the sole authority: Closing/Unknown keeps
+the readable presentation with its existing restricted gate, failed existence reads
+retain it, and confirmed discard/absence releases the owner's retained binding.
+A host does not need a separate SideChat draft cache. Direct low-level
+`RunBinding::open_side_chat` construction does not provide this owner-level reuse;
+use the typed `SideChatBinding::open` route for shared panes.
+Do not substitute a main-run cache entry with the same session ID.
 Keep the binding and its Composer instance with that pane, observe both its run
 and the shared owner, and use `binding.access().composer_gate()` when updating
 the Composer. Captured callbacks retain their original binding and destination.

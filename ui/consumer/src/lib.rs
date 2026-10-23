@@ -2848,3 +2848,19 @@ pub async fn open_task_from_original_run(
         .await
         .map_err(|error| error.to_string())
 }
+
+/// Reopen a scratch destination using its owning public pointer authority.
+/// Hosts need not preserve a private per-pane draft cache.
+pub async fn open_scratch_run(
+    source: &tekes_agent_ui_bindings::SideChatBinding,
+    parent: &tekes_agent_ui_bindings::RunBinding,
+    session_id: &str,
+) -> Result<tekes_agent_ui_bindings::BoundSideChatRun, String> {
+    let pointer = source
+        .pointer(parent.scope(), session_id)
+        .map_err(|error| error.to_string())?;
+    source
+        .open(&pointer)
+        .await
+        .map_err(|error| error.to_string())
+}

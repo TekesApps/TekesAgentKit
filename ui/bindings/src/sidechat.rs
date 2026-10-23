@@ -1,6 +1,9 @@
 //! Pane input and mutations over the existing SideChatController authority.
 use crate::RunBinding;
-use std::sync::Arc;
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, Mutex},
+};
 use tekes_agent_components_ui::{SidePanelInput, SidePanelTab, SidePanelTabKind};
 use tekes_agent_contract::{Result, require, unsupported};
 use tekes_agent_presentation::{RunScope, SideChat, SideChatController, SideChatSnapshot};
@@ -26,13 +29,23 @@ impl BoundSideChatRun {
 pub struct SideChatBinding {
     runtime: Arc<SessionRuntime>,
     owner: Arc<SideChatController>,
+    // Retain only existing canonical bindings, not another draft/pointer store.
+    // Parent participates in authority even though the scratch scope is main.
+    runs: Mutex<BTreeMap<(RunScope, RunScope), Arc<RunBinding>>>,
 }
 impl SideChatBinding {
     pub fn new(runtime: Arc<SessionRuntime>) -> Self {
         Self {
             owner: Arc::new(SideChatController::new(runtime.clone())),
             runtime,
+            runs: Mutex::new(BTreeMap::new()),
         }
+    }
+    fn retire_missing_runs(&self) {
+        self.runs
+            .lock()
+            .expect("SideChat runs lock")
+            .retain(|_, run| run.access() != crate::PaneAccess::Missing);
     }
     pub fn owner(&self) -> &Arc<SideChatController> {
         &self.owner
@@ -103,14 +116,38 @@ impl SideChatBinding {
         Ok(chat)
     }
     pub async fn close(&self, expected: &SideChat, rpc_id: &str) -> Result<()> {
-        self.owner.close_owned(expected, rpc_id).await
+        let result = self.owner.close_owned(expected, rpc_id).await;
+        self.retire_missing_runs();
+        result
     }
     pub async fn open(&self, expected: &SideChat) -> Result<BoundSideChatRun> {
         let current = self.pointer(&expected.parent, &expected.scope.session_id)?;
         require(current.scope == expected.scope, "SideChat scope changed")?;
-        let binding = Arc::new(
+        self.retire_missing_runs();
+        let key = (current.parent.clone(), current.scope.clone());
+        let retained = self
+            .runs
+            .lock()
+            .expect("SideChat runs lock")
+            .get(&key)
+            .cloned();
+        if let Some(binding) = retained {
+            return Ok(BoundSideChatRun {
+                chat: current,
+                binding,
+            });
+        }
+        let opened = Arc::new(
             RunBinding::open_side_chat(self.runtime.clone(), self.owner.clone(), &current).await?,
         );
+        // Concurrent opens converge only after the original history baseline;
+        // closing/reconciliation still fences the winner's public controls.
+        let mut runs = self.runs.lock().expect("SideChat runs lock");
+        require(
+            opened.access() != crate::PaneAccess::Missing,
+            "SideChat pointer retired while mounting",
+        )?;
+        let binding = runs.entry(key).or_insert(opened).clone();
         Ok(BoundSideChatRun {
             chat: current,
             binding,
@@ -122,7 +159,9 @@ impl SideChatBinding {
         expected: &SideChat,
         exists: std::result::Result<bool, String>,
     ) -> bool {
-        self.owner.reconcile(expected, exists)
+        let accepted = self.owner.reconcile(expected, exists);
+        self.retire_missing_runs();
+        accepted
     }
     pub fn reconcile_creation(
         &self,
