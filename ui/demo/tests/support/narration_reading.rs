@@ -395,3 +395,316 @@ fn readonly_frame_uses_its_own_publication_and_original_sdk_attachment() {
     assert!(!scroll(&host, ids.viewport).is_following_latest());
     assert!(host.focused().is_none());
 }
+
+#[test]
+fn original_tool_group_reading_point_survives_result_updates_with_composer_preedit() {
+    let mut source = origin_tool_run();
+    let answer = source
+        .transcript
+        .items
+        .iter_mut()
+        .find(|item| item.is_final && item.kind == TranscriptItemKind::Assistant)
+        .unwrap();
+    answer.text = "用于阅读锚点的完整后续回答。".repeat(300);
+    if let TranscriptBlockContent::Text { text } =
+        &mut answer.content_blocks.as_mut().unwrap()[0].content
+    {
+        *text = answer.text.clone();
+    }
+    let scope = RunScope::main("sep", "s");
+    let owners = tool_owners(&source);
+    let (_, inner, before, final_segment) = embedded_segments(&source);
+    let mut run = RunPort::standard(35000, 35010..35500, scope.clone()).unwrap();
+    run.update(
+        &source,
+        Default::default(),
+        ComposerControlGate::OPEN,
+        paging(&scope),
+        true,
+    )
+    .unwrap();
+    for segment in [&before, &final_segment] {
+        run.set_activity_segment_expanded(segment, true).unwrap();
+    }
+    run.update(
+        &source,
+        Default::default(),
+        ComposerControlGate::OPEN,
+        paging(&scope),
+        true,
+    )
+    .unwrap();
+    let ids = run.ids();
+    let fragments = tool_fragments(run.transcript().unwrap(), &owners);
+    assert_eq!(fragments.len(), 2);
+    let target = fragments[1].1;
+    let inner = run
+        .transcript()
+        .unwrap()
+        .row_id(&TranscriptContentRowKey::Message(inner))
+        .unwrap();
+    let items = run
+        .transcript()
+        .unwrap()
+        .row_keys()
+        .iter()
+        .map(|key| run.transcript().unwrap().row_id(key).unwrap())
+        .collect();
+    let mut host = run.into_host().unwrap();
+    let (version, ()) = host
+        .set_scroll_reading_document(ids.viewport, "original-tools", 0, items, |_| ())
+        .unwrap();
+    let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()), 1.);
+    render(&mut host, &mut text);
+    // Actual CoreText/SDK layout, independent from the public row-key assertions.
+    assert!(
+        host.get(fragments[0].1).unwrap().frame().max_y()
+            <= host.get(inner).unwrap().frame().min_y()
+    );
+    assert!(host.get(inner).unwrap().frame().max_y() <= host.get(target).unwrap().frame().min_y());
+    host.reveal_scroll_reading_item(
+        ids.viewport,
+        &version,
+        target,
+        tekes_ui_controls::ScrollRevealOptions {
+            placement: tekes_ui_controls::ScrollRevealPlacement::Start(
+                tekes_ui_controls::extended::Axis::Vertical,
+            ),
+            animated: false,
+            ..Default::default()
+        },
+        &mut text,
+    )
+    .unwrap();
+    let y = host.get(target).unwrap().frame().min_y();
+    let group = host
+        .get(target)
+        .unwrap()
+        .component::<OutputMessageFragment>()
+        .unwrap()
+        .children()[0]
+        .id();
+    let group_owner = host.get(group).unwrap().component::<ToolRun>().unwrap() as *const _ as usize;
+    assert!(host.focus(Some(ids.composer.editor), true));
+    host.event(&ContentEvent::Preedit {
+        text: "保留工具阅读".into(),
+        selection: 6..6,
+        clauses: vec![],
+        replacement: None,
+    });
+    let baseline = host
+        .text_surface(ids.composer.editor)
+        .unwrap()
+        .input
+        .external_baseline();
+    let mut next = source.clone();
+    next.revision += 1;
+    next.transcript.tools[1].phase = "done".into();
+    next.transcript.tools[1].result =
+        Some(serde_json::json!({"content":[{"type":"text","text":"新结果"}]}));
+    let plan = host
+        .get(ids.root)
+        .unwrap()
+        .component::<RunPort>()
+        .unwrap()
+        .prepare_update(
+            &next,
+            Default::default(),
+            ComposerControlGate::OPEN,
+            paging(&scope),
+            true,
+        )
+        .unwrap();
+    assert!(plan.item_ids().contains(&target));
+    let updated = tekes_agent_ui_consumer_check::publish_original_run(
+        &mut host, ids.root, &version, 1, &plan,
+    )
+    .unwrap();
+    render(&mut host, &mut text);
+    assert_eq!(
+        scroll(&host, ids.viewport).reading_result().unwrap().anchor,
+        ContentReadingAnchorUpdate::Preserved(target)
+    );
+    assert!((host.get(target).unwrap().frame().min_y() - y).abs() <= 1.);
+    assert!(!scroll(&host, ids.viewport).is_following_latest());
+    assert_eq!(
+        host.get(group).unwrap().component::<ToolRun>().unwrap() as *const _ as usize,
+        group_owner
+    );
+    assert_eq!(host.focused(), Some(ids.composer.editor));
+    assert_eq!(
+        host.text_surface(ids.composer.editor)
+            .unwrap()
+            .input
+            .external_baseline(),
+        baseline
+    );
+    assert!(
+        host.get(ids.root)
+            .unwrap()
+            .component::<RunPort>()
+            .unwrap()
+            .composer()
+            .is_composing()
+    );
+
+    // Inserting original narration before the calls shifts canonical block
+    // indices and content above the anchor. Sole tool identities and their
+    // existing controls must survive; the SDK compensates the reading position.
+    let original_parts = host
+        .get(target)
+        .unwrap()
+        .component::<OutputMessageFragment>()
+        .unwrap()
+        .content_ids();
+    let mut shifted = next.clone();
+    shifted.revision += 1;
+    let item_id = match &owners[1] {
+        TranscriptMessageIdentity::Item(id) => id,
+        _ => unreachable!(),
+    };
+    let item = shifted
+        .transcript
+        .items
+        .iter_mut()
+        .find(|item| &item.id == item_id)
+        .unwrap();
+    item.text = "新增的原旁白。".repeat(12);
+    let blocks = item.content_blocks.as_mut().unwrap();
+    for block in blocks.iter_mut() {
+        block.index += 1;
+    }
+    blocks.insert(
+        0,
+        TranscriptContentBlock {
+            index: 0,
+            content: TranscriptBlockContent::Text {
+                text: item.text.clone(),
+            },
+        },
+    );
+    for block in blocks {
+        if let TranscriptBlockContent::ToolCall { tool_id } = &block.content
+            && let Some(TranscriptSourcePosition::Journal { content_index, .. }) = &mut shifted
+                .transcript
+                .tools
+                .iter_mut()
+                .find(|tool| &tool.id == tool_id)
+                .unwrap()
+                .source_position
+        {
+            *content_index = Some(block.index);
+        }
+    }
+    let plan = host
+        .get(ids.root)
+        .unwrap()
+        .component::<RunPort>()
+        .unwrap()
+        .prepare_update(
+            &shifted,
+            Default::default(),
+            ComposerControlGate::OPEN,
+            paging(&scope),
+            true,
+        )
+        .unwrap();
+    assert!(
+        tekes_agent_ui_consumer_check::publish_original_run(
+            &mut host, ids.root, &version, 2, &plan
+        )
+        .is_err()
+    );
+    tekes_agent_ui_consumer_check::publish_original_run(&mut host, ids.root, &updated, 2, &plan)
+        .unwrap();
+    render(&mut host, &mut text);
+    assert_eq!(
+        host.get(target)
+            .unwrap()
+            .component::<OutputMessageFragment>()
+            .unwrap()
+            .content_ids(),
+        original_parts
+    );
+    assert_eq!(
+        scroll(&host, ids.viewport).reading_result().unwrap().anchor,
+        ContentReadingAnchorUpdate::Preserved(target)
+    );
+    assert!((host.get(target).unwrap().frame().min_y() - y).abs() <= 1.);
+    assert_eq!(
+        host.get(group).unwrap().component::<ToolRun>().unwrap() as *const _ as usize,
+        group_owner
+    );
+    assert_eq!(host.focused(), Some(ids.composer.editor));
+    assert_eq!(
+        host.text_surface(ids.composer.editor)
+            .unwrap()
+            .input
+            .external_baseline(),
+        baseline
+    );
+}
+
+#[test]
+fn readonly_original_tool_fragments_keep_local_segment_selection_and_publication() {
+    let source = origin_tool_run();
+    let scope = RunScope::main("sep", "s");
+    let owners = tool_owners(&source);
+    let (_, _, before, final_segment) = embedded_segments(&source);
+    let mut pane =
+        ReadOnlyTranscript::standard(36000, 36010..36500, scope.clone(), Default::default())
+            .unwrap();
+    let input = ReadOnlyTranscriptInput {
+        scope: &scope,
+        publication: 900,
+        connection_epoch: source.connection_epoch,
+        connection: &source.connection,
+        transcript: &source.transcript,
+        frame_current: true,
+        source_ready: true,
+        supports_pagination: false,
+        reading: false,
+        read_error: None,
+    };
+    pane.update(input).unwrap();
+    let stale = pane.prepare_update(input).unwrap();
+    for segment in [&before, &final_segment] {
+        pane.set_activity_segment_expanded(segment, true).unwrap();
+    }
+    assert!(pane.validate_prepared_update(&stale).is_err());
+    let plan = pane.prepare_update(input).unwrap();
+    let predicted = plan.item_ids();
+    pane.apply_prepared_update(&plan).unwrap();
+    let fragments = tool_fragments(pane.content(), &owners);
+    assert_eq!(fragments.len(), 2);
+    assert!(fragments.iter().all(|(_, id)| predicted.contains(id)));
+    assert!(!pane.content().feedback_enabled());
+    let ids = pane.ids();
+    let mut host = pane.into_host().unwrap();
+    let (version, ()) = host
+        .set_scroll_reading_document(ids.viewport, "readonly-tools", 0, predicted, |_| ())
+        .unwrap();
+    let next = ReadOnlyTranscriptInput {
+        publication: 901,
+        ..input
+    };
+    let plan = host
+        .get(ids.root)
+        .unwrap()
+        .component::<ReadOnlyTranscript>()
+        .unwrap()
+        .prepare_update(next)
+        .unwrap();
+    tekes_agent_ui_consumer_check::publish_original_readonly(
+        &mut host, ids.root, &version, 1, &plan,
+    )
+    .unwrap();
+    let pane = host
+        .get(ids.root)
+        .unwrap()
+        .component::<ReadOnlyTranscript>()
+        .unwrap();
+    assert_eq!(tool_fragments(pane.content(), &owners), fragments);
+    assert!(pane.prepare_update(input).is_err());
+    assert!(host.focused().is_none());
+}

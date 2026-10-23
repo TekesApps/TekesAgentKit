@@ -1,5 +1,26 @@
 //! Disjoint owners of original message nodes in the Transcript's flat reading tree.
 use super::*;
+/// A message-local original call identity. Duplicate references retain their
+/// actual source block index; a sole call survives block-position changes.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct OutputMessageToolFragmentKey {
+    pub tool_id: String,
+    pub block_index: Option<usize>,
+}
+fn tool_key(facts: &[PartFacts], first: &PartFacts) -> OutputMessageToolFragmentKey {
+    let Slot::Tool(index, id) = &first.slot else {
+        unreachable!("tool source slot");
+    };
+    OutputMessageToolFragmentKey {
+        tool_id: id.clone(),
+        block_index: (facts
+            .iter()
+            .filter(|part| matches!(&part.slot, Slot::Tool(_, other) if other == id))
+            .count()
+            > 1)
+        .then_some(*index),
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum OutputMessageFragmentKind {
@@ -13,13 +34,12 @@ impl OutputMessageFragmentKind {
             Self::Tools => 2,
         }
     }
-    fn bit(self) -> u8 {
-        1 << self.offset()
-    }
 }
 #[derive(Debug)]
 pub struct OutputMessageFragment {
+    id: ComponentId,
     owner: ComponentId,
+    tool_key: Option<OutputMessageToolFragmentKey>,
     scope: RunScope,
     kind: OutputMessageFragmentKind,
     labels: OutputMessageLabels,
@@ -43,7 +63,13 @@ fn kind(node: &Content) -> Option<OutputMessageFragmentKind> {
 }
 impl OutputMessageFragment {
     pub fn id(&self) -> ComponentId {
-        ComponentId(self.owner.0 + self.kind.offset())
+        self.id
+    }
+    pub(crate) fn owner(&self) -> ComponentId {
+        self.owner
+    }
+    pub fn tool_key(&self) -> Option<&OutputMessageToolFragmentKey> {
+        self.tool_key.as_ref()
     }
     pub fn kind(&self) -> OutputMessageFragmentKind {
         self.kind
@@ -126,7 +152,32 @@ impl Component for OutputMessageFragment {
 }
 impl OutputMessage {
     pub(crate) fn transcript_is_split(&self) -> bool {
-        self.split_mask != 0
+        !self.split_fragments.is_empty()
+    }
+    pub(crate) fn transcript_tool_fragments(
+        scope: &RunScope,
+        output: &TranscriptOutput<'_>,
+        section: &TranscriptSection<'_>,
+        thinking: Option<&tekes_agent_presentation::TranscriptThinkingFrame>,
+        labels: OutputMessageLabels,
+    ) -> Result<Vec<OutputMessageToolFragmentKey>, &'static str> {
+        let stamp = thinking.map(|frame| ThinkingStamp {
+            revision: frame.display_revision(),
+            source_fingerprint: frame.source_fingerprint().into(),
+            display: frame
+                .display_for(&output.item.id)
+                .unwrap_or(tekes_agent_presentation::TranscriptReasoningDisplay::Hidden),
+        });
+        let facts = thinking_parts(
+            transcript_parts(scope, output, Some(section), labels)?,
+            stamp.as_ref(),
+            labels,
+        );
+        Ok(tool_part_runs(&facts, Some(section))?
+            .into_iter()
+            .filter(|range| facts[range.start].kind == OutputContentKind::Tool)
+            .map(|range| tool_key(&facts, &facts[range.start]))
+            .collect())
     }
     pub(crate) fn transcript_presence(
         scope: &RunScope,
@@ -143,7 +194,7 @@ impl OutputMessage {
                 .unwrap_or(tekes_agent_presentation::TranscriptReasoningDisplay::Hidden),
         });
         let facts = thinking_parts(
-            parts(scope, output, section, labels)?,
+            transcript_parts(scope, output, section, labels)?,
             stamp.as_ref(),
             labels,
         );
@@ -169,10 +220,10 @@ impl OutputMessage {
         output: &TranscriptOutput<'_>,
         section: Option<&TranscriptSection<'_>>,
         thinking: Option<&tekes_agent_presentation::TranscriptThinkingFrame>,
-        fragments: [Option<&OutputMessageFragment>; 2],
+        fragments: &[&OutputMessageFragment],
     ) -> Result<(), &'static str> {
         self.check_fragments(fragments)?;
-        if self.split_mask == 0
+        if self.split_fragments.is_empty()
             && let Some(thinking) = thinking
         {
             return self.check_update_with_thinking(publication, epoch, output, section, thinking);
@@ -180,12 +231,11 @@ impl OutputMessage {
         let stamp = thinking
             .map(|frame| self.state.thinking_stamp(publication, epoch, output, frame))
             .transpose()?;
-        let nodes = self.rows.children.iter().chain(
-            fragments
-                .into_iter()
-                .flatten()
-                .flat_map(|part| part.rows.children.iter()),
-        );
+        let nodes = self
+            .rows
+            .children
+            .iter()
+            .chain(fragments.iter().flat_map(|part| part.rows.children.iter()));
         self.state.check_update_display(
             nodes,
             publication,
@@ -196,62 +246,87 @@ impl OutputMessage {
         )?;
         Ok(())
     }
-    fn check_fragments(
-        &self,
-        fragments: [Option<&OutputMessageFragment>; 2],
-    ) -> Result<(), &'static str> {
-        let mut mask = 0;
-        for part in fragments.into_iter().flatten() {
-            if part.owner != self.id()
-                || part.scope != self.state.scope
-                || mask & part.kind.bit() != 0
+    fn check_fragments(&self, fragments: &[&OutputMessageFragment]) -> Result<(), &'static str> {
+        let mut seen = std::collections::BTreeSet::new();
+        for part in fragments {
+            if part.owner != self.id() || part.scope != self.state.scope || !seen.insert(part.id())
             {
                 return Err("foreign or duplicate output fragment");
             }
-            mask |= part.kind.bit();
+            let children: Vec<_> = part.rows.children.iter().map(Content::id).collect();
+            if self.split_fragments.get(&part.id()) != Some(&children) {
+                return Err("missing or replaced original output fragment nodes");
+            }
         }
-        if mask != self.split_mask {
+        if seen.len() != self.split_fragments.len() {
             return Err("missing original output fragments");
         }
         Ok(())
     }
     pub(crate) fn rejoin_fragments(
         &mut self,
-        mut fragments: [Option<&mut OutputMessageFragment>; 2],
+        fragments: Vec<&mut OutputMessageFragment>,
     ) -> Result<(), &'static str> {
-        self.check_fragments([fragments[0].as_deref(), fragments[1].as_deref()])?;
-        for fragment in fragments.iter_mut().flatten() {
+        self.check_fragments(&fragments.iter().map(|part| &**part).collect::<Vec<_>>())?;
+        for fragment in fragments {
             self.rows.children.append(&mut fragment.rows.children);
         }
-        self.split_mask = 0;
+        self.split_fragments.clear();
         Ok(())
     }
-    pub(crate) fn split_fragments(&mut self) -> Vec<Content> {
-        assert_eq!(self.split_mask, 0, "rejoin before updating output");
-        let mut fragments = [vec![], vec![]];
-        let nodes = std::mem::take(&mut self.rows.children);
-        for node in nodes {
+    pub(crate) fn split_fragments(
+        &mut self,
+        tools: &[(OutputMessageToolFragmentKey, ComponentId)],
+    ) -> Vec<Content> {
+        assert!(
+            self.split_fragments.is_empty(),
+            "rejoin before updating output"
+        );
+        let mut reasoning = vec![];
+        let mut partitions = vec![];
+        for node in std::mem::take(&mut self.rows.children) {
             match kind(&node) {
-                Some(OutputMessageFragmentKind::Reasoning) => fragments[0].push(node),
-                Some(OutputMessageFragmentKind::Tools) => fragments[1].push(node),
+                Some(OutputMessageFragmentKind::Reasoning) => reasoning.push(node),
+                Some(OutputMessageFragmentKind::Tools) => {
+                    let first = part_nodes(std::slice::from_ref(&node))[0]
+                        .component::<OutputPart>()
+                        .unwrap();
+                    let key = tool_key(&self.state.facts, &first.facts);
+                    let id = tools
+                        .iter()
+                        .find(|(candidate, _)| candidate == &key)
+                        .expect("preflighted original tool partition")
+                        .1;
+                    partitions.push((id, OutputMessageFragmentKind::Tools, Some(key), vec![node]));
+                }
                 None => self.rows.children.push(node),
             }
         }
-        fragments
+        if !reasoning.is_empty() {
+            partitions.insert(
+                0,
+                (
+                    ComponentId(self.id().0 + OutputMessageFragmentKind::Reasoning.offset()),
+                    OutputMessageFragmentKind::Reasoning,
+                    None,
+                    reasoning,
+                ),
+            );
+        }
+        partitions
             .into_iter()
-            .zip([
-                OutputMessageFragmentKind::Reasoning,
-                OutputMessageFragmentKind::Tools,
-            ])
-            .filter_map(|(children, kind)| {
-                if children.is_empty() {
-                    return None;
-                }
-                self.split_mask |= kind.bit();
+            .map(|(id, kind, tool_key, children)| {
+                assert!(
+                    self.split_fragments
+                        .insert(id, children.iter().map(Content::id).collect())
+                        .is_none()
+                );
                 let part = OutputMessageFragment {
+                    id,
                     owner: self.id(),
                     scope: self.state.scope.clone(),
                     kind,
+                    tool_key,
                     labels: self.state.labels,
                     rows: StackContent {
                         model: Stack {
@@ -262,7 +337,7 @@ impl OutputMessage {
                         children,
                     },
                 };
-                Some(Content::new(part.id(), part))
+                Content::new(id, part)
             })
             .collect()
     }

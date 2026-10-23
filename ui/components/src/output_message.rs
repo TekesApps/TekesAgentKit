@@ -708,7 +708,7 @@ impl Component for OutputPart {
 #[derive(Debug)]
 pub struct OutputMessage {
     state: OutputMessageState,
-    split_mask: u8,
+    split_fragments: std::collections::BTreeMap<ComponentId, Vec<ComponentId>>,
     rows: StackContent,
 }
 // Canonical identity/provenance and update admission do not own a widget tree.
@@ -728,6 +728,7 @@ struct OutputMessageState {
     next: u64,
     labels: OutputMessageLabels,
     bounded_details: bool,
+    transcript_partition: bool,
     thinking: Option<ThinkingStamp>,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -737,6 +738,10 @@ struct ThinkingStamp {
     display: tekes_agent_presentation::TranscriptReasoningDisplay,
 }
 impl OutputMessage {
+    pub(crate) fn for_transcript(mut self) -> Self {
+        self.state.transcript_partition = true;
+        self
+    }
     /// Current prose adapter's actual body node text. Rich/opaque content and
     /// failures remain unresolved; never hide their diagnostics by text ranking.
     pub(crate) fn narration_nodes(
@@ -782,9 +787,10 @@ impl OutputMessage {
                 next: 16,
                 labels,
                 bounded_details: false,
+                transcript_partition: false,
                 thinking: None,
             },
-            split_mask: 0,
+            split_fragments: Default::default(),
             rows: StackContent {
                 model: Stack {
                     axis: Axis::Vertical,
@@ -883,7 +889,7 @@ impl OutputMessage {
         output: &TranscriptOutput<'_>,
         section: Option<&TranscriptSection<'_>>,
     ) -> Result<(), &'static str> {
-        if self.split_mask != 0 {
+        if !self.split_fragments.is_empty() {
             return Err("split output requires its original Transcript fragments");
         }
         if scope != &self.state.scope {
@@ -909,7 +915,7 @@ impl OutputMessage {
         section: Option<&TranscriptSection<'_>>,
         thinking: &tekes_agent_presentation::TranscriptThinkingFrame,
     ) -> Result<(), &'static str> {
-        if self.split_mask != 0 {
+        if !self.split_fragments.is_empty() {
             return Err("split output requires its original Transcript fragments");
         }
         let stamp = self
@@ -932,7 +938,7 @@ impl OutputMessage {
         section: Option<&TranscriptSection<'_>>,
         thinking: &tekes_agent_presentation::TranscriptThinkingFrame,
     ) -> Result<(), &'static str> {
-        if self.split_mask != 0 {
+        if !self.split_fragments.is_empty() {
             return Err("split output requires its original Transcript fragments");
         }
         let stamp = self
@@ -957,7 +963,7 @@ impl OutputMessage {
         output: &TranscriptOutput<'_>,
         section: Option<&TranscriptSection<'_>>,
     ) -> Result<(Key, Vec<PartFacts>, u64), &'static str> {
-        if self.split_mask != 0 {
+        if !self.split_fragments.is_empty() {
             return Err("split output requires its original Transcript fragments");
         }
         if scope != &self.state.scope {
@@ -1020,6 +1026,17 @@ impl Component for OutputMessage {
     }
 }
 impl OutputMessageState {
+    fn source_parts(
+        &self,
+        output: &TranscriptOutput<'_>,
+        section: Option<&TranscriptSection<'_>>,
+    ) -> Result<Vec<PartFacts>, &'static str> {
+        if self.transcript_partition {
+            transcript_parts(&self.scope, output, section, self.labels)
+        } else {
+            parts(&self.scope, output, section, self.labels)
+        }
+    }
     fn thinking_stamp(
         &self,
         publication: u64,
@@ -1109,56 +1126,9 @@ impl OutputMessageState {
             });
             installed.push(content);
         }
-        let mut pending = installed.into_iter().peekable();
-        while let Some(first) = pending.next() {
-            let mut run = vec![first];
-            if let Some(tool) = run[0]
-                .component::<OutputPart>()
-                .unwrap()
-                .facts
-                .tool
-                .as_ref()
-                && facts
-                    .iter()
-                    .filter(|part| {
-                        part.tool
-                            .as_ref()
-                            .is_some_and(|value| value.tool_id == tool.tool_id)
-                    })
-                    .count()
-                    == 1
-            {
-                while let Some(next) = pending.peek() {
-                    let candidate = next.component::<OutputPart>().unwrap();
-                    if let Some(tool) = candidate.facts.tool.as_ref()
-                        && facts
-                            .iter()
-                            .filter(|part| {
-                                part.tool
-                                    .as_ref()
-                                    .is_some_and(|value| value.tool_id == tool.tool_id)
-                            })
-                            .count()
-                            == 1
-                    {
-                        let previous = run
-                            .last()
-                            .unwrap()
-                            .component::<OutputPart>()
-                            .unwrap()
-                            .facts
-                            .tool
-                            .as_ref()
-                            .unwrap();
-                        if input_between_tools(section, &previous.tool_id, &tool.tool_id)? {
-                            break;
-                        }
-                        run.push(pending.next().unwrap());
-                    } else {
-                        break;
-                    }
-                }
-            }
+        let mut pending = installed.into_iter();
+        for range in tool_part_runs(&facts, section)? {
+            let run: Vec<_> = pending.by_ref().take(range.len()).collect();
             if run.len() < 2 {
                 nodes.extend(run);
                 continue;
@@ -1285,11 +1255,7 @@ impl OutputMessageState {
         if epoch == self.epoch && header_revision < self.header_revision {
             return Err("stale tool header revision");
         }
-        let facts = thinking_parts(
-            parts(&self.scope, output, section, self.labels)?,
-            thinking,
-            self.labels,
-        );
+        let facts = thinking_parts(self.source_parts(output, section)?, thinking, self.labels);
         let thinking_advanced = thinking.is_some_and(|next| {
             self.thinking
                 .as_ref()
@@ -1297,7 +1263,7 @@ impl OutputMessageState {
         });
         let prior_display = if thinking_advanced {
             Some(thinking_parts(
-                parts(&self.scope, output, section, self.labels)?,
+                self.source_parts(output, section)?,
                 self.thinking.as_ref(),
                 self.labels,
             ))
@@ -1348,44 +1314,23 @@ impl OutputMessageState {
                 return Err("thinking text version exhausted");
             }
         }
-        let mut tools: Vec<&TranscriptToolCall> = vec![];
-        for facts_part in &facts {
-            if let Some(tool) = &facts_part.tool
-                && facts
+        for range in tool_part_runs(&facts, section)? {
+            if range.len() > 1 {
+                let tools = facts[range]
                     .iter()
-                    .filter(|part| {
-                        part.tool
-                            .as_ref()
-                            .is_some_and(|other| other.tool_id == tool.tool_id)
+                    .map(|part| {
+                        let id = &part.tool.as_ref().unwrap().tool_id;
+                        section
+                            .unwrap()
+                            .tools
+                            .iter()
+                            .copied()
+                            .find(|tool| &tool.id == id)
+                            .unwrap()
                     })
-                    .count()
-                    == 1
-            {
-                let tool = section
-                    .unwrap()
-                    .tools
-                    .iter()
-                    .copied()
-                    .find(|value| value.id == tool.tool_id && value.turn_id == output.item.turn_id)
-                    .unwrap();
-                if let Some(previous) = tools.last()
-                    && input_between_tools(section, &previous.id, &tool.id)?
-                {
-                    if tools.len() > 1 {
-                        self.labels.tool_run.summary(&self.scope, &tools)?;
-                    }
-                    tools.clear();
-                }
-                tools.push(tool);
-                continue;
-            }
-            if tools.len() > 1 {
+                    .collect::<Vec<_>>();
                 self.labels.tool_run.summary(&self.scope, &tools)?;
             }
-            tools.clear();
-        }
-        if tools.len() > 1 {
-            self.labels.tool_run.summary(&self.scope, &tools)?;
         }
         let new_count = facts
             .iter()
@@ -1596,6 +1541,97 @@ fn input_between_tools(
             .map(|boundary| boundary == Some(true))
             .map_err(|_| "invalid embedded tool source order")
     })
+}
+// One partition for preflight, original node construction and parent planning.
+fn tool_part_runs(
+    facts: &[PartFacts],
+    section: Option<&TranscriptSection<'_>>,
+) -> Result<Vec<std::ops::Range<usize>>, &'static str> {
+    let unique = |part: &PartFacts| {
+        part.tool.as_ref().is_some_and(|tool| {
+            facts
+                .iter()
+                .filter(|candidate| {
+                    candidate
+                        .tool
+                        .as_ref()
+                        .is_some_and(|value| value.tool_id == tool.tool_id)
+                })
+                .count()
+                == 1
+        })
+    };
+    let mut result = vec![];
+    let mut start = 0;
+    while start < facts.len() {
+        let mut end = start + 1;
+        if unique(&facts[start]) {
+            while end < facts.len() {
+                if !unique(&facts[end]) {
+                    break;
+                }
+                let previous = facts[end - 1].tool.as_ref().unwrap();
+                let next = facts[end].tool.as_ref().unwrap();
+                if input_between_tools(section, &previous.tool_id, &next.tool_id)? {
+                    break;
+                }
+                end += 1;
+            }
+        }
+        result.push(start..end);
+        start = end;
+    }
+    Ok(result)
+}
+pub(crate) fn tool_belongs_to_message(
+    tool: &TranscriptToolCall,
+    item: &TranscriptItem,
+    index: usize,
+) -> bool {
+    use tekes_agent_presentation::TranscriptSourcePosition;
+    match (&tool.source_position, &item.source_position) {
+        (None, _) => true,
+        (
+            Some(TranscriptSourcePosition::Journal {
+                sequence,
+                content_index,
+            }),
+            Some(TranscriptSourcePosition::Journal {
+                sequence: container,
+                ..
+            }),
+        ) => sequence == container && *content_index == Some(index),
+        (
+            Some(TranscriptSourcePosition::Native {
+                entry_id,
+                entry_ordinal,
+                content_index,
+            }),
+            Some(TranscriptSourcePosition::Native {
+                entry_id: container,
+                entry_ordinal: ordinal,
+                ..
+            }),
+        ) => entry_id == container && entry_ordinal == ordinal && *content_index == Some(index),
+        _ => false,
+    }
+}
+fn transcript_parts(
+    scope: &RunScope,
+    output: &TranscriptOutput<'_>,
+    section: Option<&TranscriptSection<'_>>,
+    labels: OutputMessageLabels,
+) -> Result<Vec<PartFacts>, &'static str> {
+    let mut facts = parts(scope, output, section, labels)?;
+    facts.retain(|part| {
+        let Slot::Tool(index, id) = &part.slot else {
+            return true;
+        };
+        section
+            .and_then(|section| section.tools.iter().copied().find(|tool| &tool.id == id))
+            .is_none_or(|tool| tool_belongs_to_message(tool, output.item, *index))
+    });
+    Ok(facts)
 }
 fn parts(
     scope: &RunScope,

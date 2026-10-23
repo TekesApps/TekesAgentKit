@@ -169,6 +169,19 @@ impl TranscriptContent {
                         )
                     })
                 }
+                PlannedContent::ToolFragment(_, key, _) => snapshot
+                    .thinking_sources
+                    .by_id
+                    .get(&key.tool_id)
+                    .map(|source| source.arrival_order)
+                    .or_else(|| {
+                        snapshot
+                            .tools
+                            .iter()
+                            .find(|tool| tool.id == key.tool_id)
+                            .and_then(|tool| raw_order(tool.source_position.as_ref()))
+                    })
+                    .map(|order| (order, 2)),
                 PlannedContent::Tools(tools) => tools
                     .first()
                     .and_then(|(tool, _)| {

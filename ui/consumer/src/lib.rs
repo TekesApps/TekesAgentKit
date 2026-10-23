@@ -2763,3 +2763,28 @@ pub fn embedded_tool_input_boundary(
         .has_input_between_tools(first, second)
         .map_err(|error| error.to_string())
 }
+
+/// Mounted original tool partitions; no cloned tool views or host timeline.
+pub fn message_tool_fragments(
+    content: &tekes_agent_components_ui::TranscriptContent,
+    owner: &tekes_agent_components_ui::TranscriptMessageIdentity,
+) -> Vec<(
+    tekes_agent_components_ui::OutputMessageToolFragmentKey,
+    tekes_ui_controls::composition::ComponentId,
+)> {
+    content
+        .row_keys()
+        .iter()
+        .filter_map(|key| {
+            if let tekes_agent_components_ui::TranscriptContentRowKey::MessageToolFragment(
+                candidate,
+                tool,
+            ) = key
+            {
+                (candidate == owner).then(|| (tool.clone(), content.row_id(key).unwrap()))
+            } else {
+                None
+            }
+        })
+        .collect()
+}

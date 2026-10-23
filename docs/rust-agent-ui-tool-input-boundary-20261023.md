@@ -50,3 +50,5 @@ PR #10 保持 draft，不合并或打完成 tag。本轮复用共享 target，�
 当前拆分机制仍是 Reasoning/Tools 两类 fragment 和 owner-local 固定 offset，
 原消息的 split mask 与 parent preflight 要求两类原控件完整归还。下一步拆工具行必须一起调整
 原节点归还、工具组身份、命名空间预测和借用校验；不能只搬节点而绕过原消息完整性检查。
+
+后续已推进原工具组物理行、完整节点归还和迟到引用去重，见[物理工具分区](rust-agent-ui-physical-tool-fragments-20261023.md)。本页保留原阶段程序与验收范围。

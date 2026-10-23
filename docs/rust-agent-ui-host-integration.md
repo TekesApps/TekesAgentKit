@@ -143,3 +143,9 @@ Run 和只读 pane 的组件/CoreText 验证见[frame 阅读范围](rust-agent-u
 None 保持未知来源；该查询不是完整连续性判定，也不能代替父时间线逐 call 分区。
 原消息级 Tools fragment 的物理拆分仍待完成，见[来源输入边界](rust-agent-ui-tool-input-boundary-20261023.md)。
 该新 API 尚未包含在 v0.3.8 中，开发宿主必须固定包含它的完整 AgentKit revision。
+
+消息内原工具组现在通过 `MessageToolFragment(owner, OutputMessageToolFragmentKey)` 独立挂载，
+每组需要一个 namespace，原 prepared plan 负责容量、身份预测及完整节点归还。旧 `MessageFragment(.., Tools)`
+仅兼容第一个当前分区；穷尽 match 与工具集合遍历应消费新 key。唯一 call 的工具 key 不随 block index 变化。
+有明确较早调用来源的迟到引用，继续使用原 ToolActivity，Transcript 不再重复生成详情；独立 OutputMessage
+仍可展示引用。宿主不处理去重或复制控件。详见[原工具组物理分区](rust-agent-ui-physical-tool-fragments-20261023.md)。

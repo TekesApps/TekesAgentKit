@@ -5,9 +5,9 @@ use narration::{NarrationFrame, source_node, source_node_mut};
 mod segments;
 use crate::{
     FeedbackGesture, FeedbackLabels, InputMessage, OutputMessage, OutputMessageFragment,
-    OutputMessageFragmentKind, OutputMessageLabels, ToolActivity, ToolActivityLabels,
-    ToolActivityPlacement, ToolRun, ToolRunLabels, TranscriptMessageIdentity, TurnFeedback,
-    TurnFootnote, TurnFootnoteIntent, TurnFootnoteLabels,
+    OutputMessageFragmentKind, OutputMessageLabels, OutputMessageToolFragmentKey, ToolActivity,
+    ToolActivityLabels, ToolActivityPlacement, ToolRun, ToolRunLabels, TranscriptMessageIdentity,
+    TurnFeedback, TurnFootnote, TurnFootnoteIntent, TurnFootnoteLabels,
 };
 pub use segments::*;
 use std::{
@@ -17,8 +17,7 @@ use std::{
 use tekes_agent_presentation::{
     RunScope, TranscriptBlockContent, TranscriptDelivery, TranscriptDocument, TranscriptInput,
     TranscriptItemKind, TranscriptMessageKey, TranscriptOrderedEvent, TranscriptOutput,
-    TranscriptSection, TranscriptSnapshot, TranscriptSourcePosition, TranscriptToolCall,
-    TranscriptTurn, TurnFeedbackTarget,
+    TranscriptSection, TranscriptSnapshot, TranscriptToolCall, TranscriptTurn, TurnFeedbackTarget,
 };
 use tekes_ui_controls::{
     ButtonTextRenderer,
@@ -33,6 +32,7 @@ use tekes_ui_tokens::{Spacing, proposal};
 pub enum TranscriptContentRowKey {
     Message(TranscriptMessageIdentity),
     MessageFragment(TranscriptMessageIdentity, OutputMessageFragmentKind),
+    MessageToolFragment(TranscriptMessageIdentity, OutputMessageToolFragmentKey),
     Tool(String),
     TurnFootnote(String),
     /// Passive status of the captured live owner, never a disclosure or action.
@@ -165,6 +165,7 @@ pub struct TranscriptContent {
     detached: BTreeMap<TranscriptContentRowKey, Content>,
     hidden_rows: BTreeMap<TranscriptContentRowKey, Content>,
     narration_frames: BTreeMap<(String, String), ComponentId>,
+    tool_fragment_ids: BTreeMap<TranscriptContentRowKey, ComponentId>,
     activity_expansion: BTreeMap<String, bool>,
     segment_expansion: BTreeMap<TranscriptActivitySegmentKey, bool>,
     activity_generation: u64,
@@ -240,6 +241,7 @@ impl TranscriptContent {
             detached: BTreeMap::new(),
             hidden_rows: BTreeMap::new(),
             narration_frames: BTreeMap::new(),
+            tool_fragment_ids: BTreeMap::new(),
             activity_expansion: BTreeMap::new(),
             segment_expansion: BTreeMap::new(),
             activity_generation: 0,
@@ -366,7 +368,26 @@ impl TranscriptContent {
                     activity: Some(turn),
                 };
                 let reasoning = presence[1].then(|| make(OutputMessageFragmentKind::Reasoning));
-                let tools = presence[2].then(|| make(OutputMessageFragmentKind::Tools));
+                let tools: Vec<_> = OutputMessage::transcript_tool_fragments(
+                    &self.scope,
+                    output,
+                    section,
+                    row.thinking.as_ref(),
+                    self.labels.output,
+                )?
+                .into_iter()
+                .map(|key| Planned {
+                    key: TranscriptContentRowKey::MessageToolFragment(owner.clone(), key.clone()),
+                    alias: alias.as_ref().map(|owner| {
+                        TranscriptContentRowKey::MessageToolFragment(owner.clone(), key.clone())
+                    }),
+                    content: PlannedContent::ToolFragment(owner.clone(), key, turn),
+                    thinking: None,
+                    hidden: false,
+                    narration_frame: None,
+                    activity: Some(turn),
+                })
+                .collect();
                 row.hidden = !presence[0];
                 row.activity = (!matches!(
                     planes.items[&output.item.id].body,
@@ -377,9 +398,7 @@ impl TranscriptContent {
                     expanded.push(reasoning);
                 }
                 expanded.push(row);
-                if let Some(tools) = tools {
-                    expanded.push(tools);
-                }
+                expanded.extend(tools);
             } else {
                 if let PlannedContent::Tools(tools) = &row.content {
                     row.activity = Some(tools[0].0.turn_id.as_str());
@@ -505,6 +524,11 @@ impl TranscriptContent {
                 .find(|footer| footer.facts().is_some_and(|facts| &facts.turn_id == turn))
                 .and_then(TurnFootnote::feedback)
                 .map(|control| control.ids().root);
+        }
+        if let TranscriptContentRowKey::MessageFragment(owner, OutputMessageFragmentKind::Tools) =
+            key
+        {
+            return self.keys.iter().zip(&self.rows.children).find(|(key, _)| matches!(key, TranscriptContentRowKey::MessageToolFragment(candidate, _) if candidate == owner)).map(|(_, node)| node.id());
         }
         self.keys
             .iter()
@@ -762,6 +786,10 @@ impl TranscriptContent {
         if header_revision != self.current_header_revision() {
             return Err("tool header inputs changed during preparation");
         }
+        let mut next = self.next;
+        let tool_fragment_ids = self.predict_tool_fragment_ids(&plan, &mut next)?;
+        self.next = next;
+        self.tool_fragment_ids = tool_fragment_ids;
         let desired: BTreeSet<_> = plan.iter().map(|row| row.key.clone()).collect();
         // All source/identity/content/namespace checks precede tree mutation.
         let index: BTreeMap<_, _> = self
@@ -811,7 +839,10 @@ impl TranscriptContent {
         }
         let mut built = BTreeMap::new();
         for (row, retained_key) in plan.iter().zip(retained_keys) {
-            if matches!(row.content, PlannedContent::Fragment(..)) {
+            if matches!(
+                row.content,
+                PlannedContent::Fragment(..) | PlannedContent::ToolFragment(..)
+            ) {
                 continue;
             }
             let mut node = retained_key
@@ -853,45 +884,55 @@ impl TranscriptContent {
                     .unwrap()
                     .install_owned_header(publication, epoch, model, children);
             } else if let PlannedContent::Output(_, Some(_)) = &row.content {
-                let old_key = retained_key.as_ref().unwrap_or(&row.key);
-                let TranscriptContentRowKey::Message(old_owner) = old_key else {
-                    unreachable!()
-                };
-                let mut reasoning = existing.remove(&TranscriptContentRowKey::MessageFragment(
-                    old_owner.clone(),
-                    OutputMessageFragmentKind::Reasoning,
-                ));
-                let mut tools = existing.remove(&TranscriptContentRowKey::MessageFragment(
-                    old_owner.clone(),
-                    OutputMessageFragmentKind::Tools,
-                ));
+                let owner_id = node.component::<OutputMessage>().unwrap().id();
+                let original_keys: Vec<_> = existing
+                    .iter()
+                    .filter(|(_, node)| {
+                        node.component::<OutputMessageFragment>()
+                            .is_some_and(|part| part.owner() == owner_id)
+                    })
+                    .map(|(key, _)| key.clone())
+                    .collect();
+                let mut originals: Vec<_> = original_keys
+                    .into_iter()
+                    .map(|key| existing.remove(&key).unwrap())
+                    .collect();
                 node.component_mut::<OutputMessage>()
                     .unwrap()
-                    .rejoin_fragments([
-                        reasoning
-                            .as_mut()
-                            .and_then(|node| node.component_mut::<OutputMessageFragment>()),
-                        tools
-                            .as_mut()
-                            .and_then(|node| node.component_mut::<OutputMessageFragment>()),
-                    ])?;
+                    .rejoin_fragments(
+                        originals
+                            .iter_mut()
+                            .map(|node| node.component_mut::<OutputMessageFragment>().unwrap())
+                            .collect(),
+                    )?;
                 self.update_row(&mut node, row, publication, epoch, available)?;
                 let TranscriptContentRowKey::Message(owner) = &row.key else {
                     unreachable!()
                 };
+                let tools: Vec<_> = plan
+                    .iter()
+                    .filter_map(|planned| {
+                        if let PlannedContent::ToolFragment(candidate, key, _) = &planned.content {
+                            (candidate == owner)
+                                .then(|| (key.clone(), self.tool_fragment_ids[&planned.key]))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
                 for fragment in node
                     .component_mut::<OutputMessage>()
                     .unwrap()
-                    .split_fragments()
+                    .split_fragments(&tools)
                 {
-                    let kind = fragment
-                        .component::<OutputMessageFragment>()
-                        .unwrap()
-                        .kind();
-                    built.insert(
-                        TranscriptContentRowKey::MessageFragment(owner.clone(), kind),
-                        fragment,
+                    let part = fragment.component::<OutputMessageFragment>().unwrap();
+                    let key = part.tool_key().map_or_else(
+                        || TranscriptContentRowKey::MessageFragment(owner.clone(), part.kind()),
+                        |key| {
+                            TranscriptContentRowKey::MessageToolFragment(owner.clone(), key.clone())
+                        },
                     );
+                    built.insert(key, fragment);
                 }
             } else {
                 self.update_row(&mut node, row, publication, epoch, available)?;
@@ -1013,10 +1054,16 @@ impl TranscriptContent {
             .map(|(i, key)| (key, i))
             .collect();
         let mut next = self.next;
+        let tool_fragment_ids = self.predict_tool_fragment_ids(&planned, &mut next)?;
         let mut claimed = BTreeSet::new();
         let normal_ids: BTreeMap<_, _> = planned
             .iter()
-            .filter(|row| !matches!(row.content, PlannedContent::Fragment(..)))
+            .filter(|row| {
+                !matches!(
+                    row.content,
+                    PlannedContent::Fragment(..) | PlannedContent::ToolFragment(..)
+                )
+            })
             .map(|row| {
                 let key = self.retained_key(row, &desired, &index, &claimed);
                 if let Some(key) = &key {
@@ -1053,6 +1100,8 @@ impl TranscriptContent {
             .map(|row| {
                 let id = if let Some(key) = &row.narration_frame {
                     frame_ids[key]
+                } else if matches!(row.content, PlannedContent::ToolFragment(..)) {
+                    tool_fragment_ids[&row.key]
                 } else if let PlannedContent::Fragment(owner, kind, _) = &row.content {
                     ComponentId(
                         normal_ids[&TranscriptContentRowKey::Message(owner.clone())].0
@@ -1236,7 +1285,10 @@ impl TranscriptContent {
         let mut allocations = 0_u64;
         let mut claimed = BTreeSet::new();
         for row in plan {
-            if matches!(row.content, PlannedContent::Fragment(..)) {
+            if matches!(
+                row.content,
+                PlannedContent::Fragment(..) | PlannedContent::ToolFragment(..)
+            ) {
                 continue;
             }
             let original = self.retained_key(row, &desired, &index, &claimed);
@@ -1267,22 +1319,56 @@ impl TranscriptContent {
             .iter()
             .filter(|key| !self.narration_frames.contains_key(*key))
             .count() as u64;
+        let mut next = self.next;
+        self.predict_tool_fragment_ids(plan, &mut next)?;
+        allocations += u64::from(next - self.next);
         if allocations > u64::from(self.end - self.next) {
             return Err("transcript row namespaces exhausted");
         }
         Ok(())
     }
-    fn fragment(
-        &self,
-        owner: ComponentId,
-        kind: OutputMessageFragmentKind,
-    ) -> Option<&OutputMessageFragment> {
+    fn fragments(&self, owner: ComponentId) -> Vec<&OutputMessageFragment> {
         self.rows
             .children
             .iter()
             .chain(self.hidden_rows.values())
             .filter_map(|node| node.component::<OutputMessageFragment>())
-            .find(|part| part.id() == ComponentId(owner.0 + kind.offset()))
+            .filter(|part| part.owner() == owner)
+            .collect()
+    }
+    fn predict_tool_fragment_ids(
+        &self,
+        plan: &[Planned<'_>],
+        next: &mut u32,
+    ) -> Result<BTreeMap<TranscriptContentRowKey, ComponentId>, &'static str> {
+        let desired: BTreeSet<_> = plan.iter().map(|row| &row.key).collect();
+        let mut result = BTreeMap::new();
+        let mut claimed = BTreeSet::new();
+        for row in plan
+            .iter()
+            .filter(|row| matches!(row.content, PlannedContent::ToolFragment(..)))
+        {
+            let original = self.tool_fragment_ids.get(&row.key).or_else(|| {
+                row.alias
+                    .as_ref()
+                    .filter(|alias| !desired.contains(alias))
+                    .and_then(|alias| self.tool_fragment_ids.get(alias))
+            });
+            let id = if let Some(id) = original {
+                *id
+            } else {
+                let id = ComponentId(u64::from(*next) << 32);
+                *next = next
+                    .checked_add(1)
+                    .ok_or("tool fragment namespaces exhausted")?;
+                id
+            };
+            if !claimed.insert(id) {
+                return Err("ambiguous tool fragment identity");
+            }
+            result.insert(row.key.clone(), id);
+        }
+        Ok(result)
     }
     /// Actual part IDs across body and Activity, including retained folded nodes.
     pub fn message_content_ids(
@@ -1304,7 +1390,9 @@ impl TranscriptContent {
             .zip(&self.rows.children)
             .chain(self.hidden_rows.iter())
         {
-            if keys.contains(row) {
+            if keys.contains(row)
+                || matches!(row, TranscriptContentRowKey::MessageToolFragment(owner, _) if owner == key)
+            {
                 let node = source_node(node);
                 if let Some(view) = node.component::<OutputMessage>() {
                     result.extend(view.content_ids());
@@ -1406,7 +1494,9 @@ impl TranscriptContent {
     fn new_row(&self, namespace: u32, row: &Planned<'_>) -> Content {
         let root = ComponentId((namespace as u64) << 32);
         match &row.content {
-            PlannedContent::Fragment(..) => unreachable!("fragments retain original message nodes"),
+            PlannedContent::Fragment(..) | PlannedContent::ToolFragment(..) => {
+                unreachable!("fragments retain original message nodes")
+            }
             PlannedContent::Disclosure { .. } => {
                 Content::new(root, ButtonContent::new("")).preserving_focus()
             }
@@ -1421,7 +1511,8 @@ impl TranscriptContent {
             }
             PlannedContent::Output(_, _) => {
                 let view =
-                    OutputMessage::with_labels(namespace, self.scope.clone(), self.labels.output);
+                    OutputMessage::with_labels(namespace, self.scope.clone(), self.labels.output)
+                        .for_transcript();
                 Content::new(view.id(), view)
             }
             PlannedContent::Tools(_) => Content::new(
@@ -1466,12 +1557,9 @@ impl TranscriptContent {
                 }
                 if section.is_some() {
                     let fragments = if view.transcript_is_split() {
-                        [
-                            self.fragment(view.id(), OutputMessageFragmentKind::Reasoning),
-                            self.fragment(view.id(), OutputMessageFragmentKind::Tools),
-                        ]
+                        self.fragments(view.id())
                     } else {
-                        [None, None]
+                        vec![]
                     };
                     view.check_transcript_update(
                         publication,
@@ -1479,13 +1567,13 @@ impl TranscriptContent {
                         output,
                         *section,
                         row.thinking.as_ref(),
-                        fragments,
+                        &fragments,
                     )?;
                 } else {
                     view.check_update(&self.scope, publication, epoch, output, *section)?;
                 }
             }
-            PlannedContent::Fragment(..) => {}
+            PlannedContent::Fragment(..) | PlannedContent::ToolFragment(..) => {}
             PlannedContent::Disclosure { .. } => {
                 if node.component::<ButtonContent>().is_none() {
                     return Err("activity disclosure role changed");
@@ -1554,7 +1642,9 @@ impl TranscriptContent {
                 button.label = text.clone();
                 button.button.state.selected = *expanded;
             }
-            PlannedContent::Fragment(..) => unreachable!("message owns fragment updates"),
+            PlannedContent::Fragment(..) | PlannedContent::ToolFragment(..) => {
+                unreachable!("message owns fragment updates")
+            }
             PlannedContent::Input(input) => {
                 let view = node.component_mut::<InputMessage>().unwrap();
                 view.update_with(
@@ -1915,7 +2005,10 @@ struct Planned<'a> {
 }
 impl Planned<'_> {
     fn namespaces(&self) -> u32 {
-        if matches!(self.content, PlannedContent::Fragment(..)) {
+        if matches!(
+            self.content,
+            PlannedContent::Fragment(..) | PlannedContent::ToolFragment(..)
+        ) {
             0
         } else if matches!(self.content, PlannedContent::Footnote(..)) {
             2
@@ -1927,6 +2020,11 @@ impl Planned<'_> {
 enum PlannedContent<'a> {
     Input(TranscriptInput<'a>),
     Output(TranscriptOutput<'a>, Option<&'a TranscriptSection<'a>>),
+    ToolFragment(
+        TranscriptMessageIdentity,
+        OutputMessageToolFragmentKey,
+        &'a str,
+    ),
     Fragment(
         TranscriptMessageIdentity,
         OutputMessageFragmentKind,
@@ -1982,7 +2080,9 @@ fn planned_turn<'r>(row: &'r Planned<'_>) -> Option<&'r str> {
     match &row.content {
         PlannedContent::Input(input) => Some(&input.item.turn_id),
         PlannedContent::Output(_, Some(section)) => Some(section.id),
-        PlannedContent::Fragment(_, _, turn) => Some(turn),
+        PlannedContent::Fragment(_, _, turn) | PlannedContent::ToolFragment(_, _, turn) => {
+            Some(turn)
+        }
         PlannedContent::Tools(tools) => Some(&tools[0].0.turn_id),
         PlannedContent::Footnote(turn, ..) => Some(&turn.id),
         PlannedContent::Disclosure { .. } => match &row.key {
@@ -2271,36 +2371,8 @@ fn embedded_tools<'a>(section: &'a TranscriptSection<'a>) -> BTreeSet<&'a str> {
             if let TranscriptBlockContent::ToolCall { tool_id } = &block.content
                 && let Some(tool) = section.tool_for_block(block)
             {
-                let covered = match (&tool.source_position, &output.item.source_position) {
-                    (None, _) => true,
-                    (
-                        Some(TranscriptSourcePosition::Journal {
-                            sequence,
-                            content_index,
-                        }),
-                        Some(TranscriptSourcePosition::Journal {
-                            sequence: container,
-                            ..
-                        }),
-                    ) => sequence == container && *content_index == Some(block.index),
-                    (
-                        Some(TranscriptSourcePosition::Native {
-                            entry_id,
-                            entry_ordinal,
-                            content_index,
-                        }),
-                        Some(TranscriptSourcePosition::Native {
-                            entry_id: container,
-                            entry_ordinal: ordinal,
-                            ..
-                        }),
-                    ) => {
-                        entry_id == container
-                            && entry_ordinal == ordinal
-                            && *content_index == Some(block.index)
-                    }
-                    _ => false,
-                };
+                let covered =
+                    crate::output_message::tool_belongs_to_message(tool, output.item, block.index);
                 if covered {
                     result.insert(tool_id.as_str());
                 }
