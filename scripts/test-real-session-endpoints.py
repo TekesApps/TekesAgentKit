@@ -578,7 +578,7 @@ def ui_smoke(config, first, bounded_child=None):
     assert output.read_bytes().startswith(b'\x89PNG\r\n\x1a\n'),kind+' UI image missing'
     if bounded_child:
         bounded=receipt['boundedChildProof']
-        assert all(bounded[key] for key in ['readOnlyComponent','childScope','originalReadIntent','sourceCallReadonlyDetails','retainedWidgets','reconnect','noComposer','sendRejected','parentDraftPreserved']),bounded
+        assert all(bounded[key] for key in ['readOnlyComponent','childScope','originalReadIntent','sourceCallReadonlyDetails','retainedWidgets','reconnect','noComposer','sendRejected','parentDraftPreserved','nonemptyParentDraft','paginationAvailable']),bounded
         assert bounded['messages']>=1 and not bounded['readingAnchorAcceptance'],bounded
         print(kind.upper()+'_UI_BOUNDED_CHILD_OK real-child+source-call+readonly-details+explicit-read+retained-widgets+reconnect+no-composer; reading-anchor=false; native-interaction=false',flush=True)
     if (args.ui_turn_footnote and bounded_child is None):

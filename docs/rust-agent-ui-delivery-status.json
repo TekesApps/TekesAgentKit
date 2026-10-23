@@ -912,5 +912,22 @@
     "failingStep": "Verify nested detail reading intent (strict; no native window)",
     "receipt": ".runtime-fixtures/mixed-tool-runs-20261023/ci-abfc-artifact/agentkit-nested-detail-reading.json",
     "accepted": false
+  },
+  "nativeBoundedCurrentProof": {
+    "receipt": "rust-agent-ui-native-bounded-20261023.json",
+    "kernelVersion": "0.9.3",
+    "boundedPageSize": 1,
+    "nativeInteraction": false,
+    "readingAnchorAcceptance": false,
+    "nonemptyParentDraft": true,
+    "protocolDriverScenarioPassed": true,
+    "kernelAllCapabilitiesProven": false
+  },
+  "3e40ad6CiSnapshot": {
+    "pullRequestRun": 39908587466,
+    "checks": "success",
+    "ui": "failure",
+    "failingStep": "Verify nested detail reading intent (strict; no native window)",
+    "upstreamIssue": 53
   }
 }

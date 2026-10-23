@@ -19,6 +19,8 @@ PR #10 的 `ea36946` 远端 CI：checks 成功；UI 在严格 nested-detail-read
 
 `abfc1c2` 的 pull_request CI 已完成：checks 成功，UI 的格式、Clippy、workspace 测试通过，严格 nested-detail-reading 仍以原始 `accepted:false` 失败；未合并，未豁免 #53。
 
+[Native 有界子历史当前程序补验](rust-agent-ui-native-bounded-20261023.md)已完成：Kernel 0.9.3 实际 task 子历史、原工具参数只读详情、单消息分页、保留行、重连和非空中文父草稿隔离通过。原读取探针已适配独立 ToolActivity/结构化详情与原后台读取回调；未修改组件或 SDK。现有 Native 协议驱动场景本轮也通过，区别于此前明确 UI-only 的记录。
+
 ## 依赖与运行身份
 
 | 输入 | 当前固定值及限制 |
@@ -26,7 +28,7 @@ PR #10 的 `ea36946` 远端 CI：checks 成功；UI 在严格 nested-detail-read
 | 已发布 AgentKit | `v0.3.8`，根 workspace 版本同为 0.3.8；本分支包含尚未发布的共享增量，不能把 UI 当作未修改的 v0.3.8 消费者。 |
 | UI packages | `ui/` 为独立 workspace，0.0.0 / publish=false；开发使用显式仓库内 path，固定整个 AgentKit revision。正式宿主须等待包含所需 API 的新不可变发布 pin。 |
 | TekesUI | 公开 `50ec49f3446924fdbc66b3cff22cd8cfe150fe7c`，Cargo.lock 中 8 包；`ui/tekesui-source.json` 核验 243 输入，清单 SHA `3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c`。 |
-| 原生运行时 | Pi 1.3.0、DSH 0.2.1-rc.2；Native 当前程序实测 Kernel 0.9.3 为明确 UI-only，完整协议/子历史基线与 UI 验证分开，不能据此宣称 0.9.3 全生命周期通过。 |
+| 原生运行时 | Pi 1.4.0 候选（1.3.0 基线保留）、DSH 0.2.1-rc.2；Native 0.9.3 本轮协议驱动场景及有界子历史离屏通过；此前 UI-only 记录范围不变。未证明整个 Kernel 所有能力或当前原生窗口验收。 |
 | 宿主路径 | 当前 Sidebar / RunPort / SidePanel 使用同进程原 ContentHost；未按 ProcessContainer 同/跨进程契约验收。RunSurface/ComponentDemo 是测试宿主。 |
 
 ## 按完整目标核对
