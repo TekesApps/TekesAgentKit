@@ -1,5 +1,7 @@
 # TekesAgentKit
 
+Rust Agent UI 的需求、已做映射与后续工作见 [Issue 驱动交付计划](docs/rust-agent-ui-issue-plan.md) 和 [总追踪 #14](https://github.com/TekesApps/TekesAgentKit/issues/14)。UI 仍为实验接入，完整验收与发布尚未完成。
+
 [![Rust headless](https://github.com/TekesApps/TekesAgentKit/actions/workflows/ci.yml/badge.svg)](https://github.com/TekesApps/TekesAgentKit/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 

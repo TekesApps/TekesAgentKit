@@ -1,5 +1,7 @@
 # Rust Agent UI：当前接入范围与交付状态
 
+需求分配与后续执行以 [Issue 驱动交付计划](rust-agent-ui-issue-plan.md) / [总追踪 #14](https://github.com/TekesApps/TekesAgentKit/issues/14) 为准。下列专题与阶段计数保留各自历史身份；不能据旧表格覆盖最新 Issue 状态。最新实现基线为 `1ef2791`，两套 CI 的 headless/UI 全量测试/格式/Clippy 通过，严格阅读仍因 TekesUI #53 失败。
+
 本页以已提交基线 `6062079` 及本轮派生来源/只读实例修复为准，按用户完整目标保留验收范围。
 当前可供实验宿主接入，**完整交付尚未达到**。组件存在、离屏通过或单个 Issue 关闭都不能单独证明完整 Views 对齐。
 本阶段增量的证据见[三端离屏覆盖补验](rust-agent-ui-offscreen-coverage-20261023.md)与[固定验收工具链](rust-agent-ui-native-toolchain.md)；不替代本页原阶段的程序身份和原生结论。
