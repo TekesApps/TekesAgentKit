@@ -3,6 +3,7 @@
 import argparse, base64, zlib, shutil, uuid, http.server, json, os, re, select, signal, struct, subprocess, tempfile, threading, time, urllib.request, urllib.parse
 from pathlib import Path
 from native_probe_provider import native_probe_intent
+from mixed_tool_provider import frames as mixed_tool_frames
 from runtime_provenance import kernel_programs
 from native_probe_launcher import run_native_probe, validate_bundle
 from goal_footnote_probe import verify_goal_identity, verify_goal_footer, verify_goal_cleared
@@ -47,7 +48,13 @@ parser.add_argument('--ui-message-rows',action='store_true',help='Mount canonica
 parser.add_argument('--ui-history-pages',action='store_true',help='Seed long isolated sessions and verify public page receipts, original scope and fresh reconnect history')
 parser.add_argument('--ui-actionables',action='store_true',help='Exercise public actionable cards on configured Native/Pi/DSH question sources')
 parser.add_argument('--ui-sidebar-query',action='store_true',help='Read typed public search and explicitly refresh public inventory cursors on owned conversation-history targets; offscreen protocol proof only')
+parser.add_argument('--ui-mixed-tools',action='store_true',help='Offscreen real read tools, reasoning and retained Composer proof')
 args=parser.parse_args()
+if args.ui_mixed_tools:
+    if not (args.ui_demo and args.ui_components and args.ui_transcript_content):
+        parser.error('--ui-mixed-tools requires UI demo/components/Transcript')
+    if any(value for key,value in vars(args).items() if key.startswith('ui_') and key not in {'ui_mixed_tools','ui_demo','ui_components','ui_transcript_content','ui_output'}):
+        parser.error('--ui-mixed-tools is an isolated offscreen profile')
 if args.ui_native_app:
     if not args.ui_demo:
         parser.error('--ui-native-app requires --ui-demo')
@@ -142,6 +149,19 @@ class Provider(http.server.BaseHTTPRequestHandler):
             self.send_response(400);self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(error)));self.end_headers();self.wfile.write(error);return
         if 'ENDPOINT_QUEUE_HOLD' in json.dumps(body):time.sleep(0.6)
         self.send_response(200);self.send_header('Content-Type','text/event-stream');self.end_headers()
+        mixed=mixed_tool_frames(body,(cwd/'proof.txt').resolve(),self.path.endswith('/responses')) if args.ui_mixed_tools else None
+        if mixed is not None:
+            history=body.get('input',body.get('messages',[]))
+            print('MIXED_PROVIDER_REQUEST_RECEIPT '+json.dumps({'path':self.path,'inputItems':[
+                {key:item[key] for key in ('type','role','call_id','tool_call_id') if key in item}
+                for item in history if isinstance(item,dict)],'frames':len(mixed)}),flush=True)
+            try:
+                for frame in mixed:
+                    self.wfile.write(('data: '+json.dumps(frame)+'\n\n').encode());self.wfile.flush();time.sleep(0.12)
+                if not self.path.endswith('/responses'):self.wfile.write(b'data: [DONE]\n\n')
+                self.wfile.flush()
+            except (BrokenPipeError,ConnectionResetError):pass
+            return
         if self.path.endswith('/responses'):
             frames=[{'type':'response.completed','response':{'id':'synthetic-response','status':'completed','output':[{'type':'message','role':'assistant','phase':'final_answer','status':'completed','content':[{'type':'output_text','text':'ENDPOINT_REPLY_OK'}]}],'usage':{'input_tokens':10,'output_tokens':4,'total_tokens':14}}}]
             if native_cancel:
@@ -335,6 +355,10 @@ def ui_smoke(config, first, bounded_child=None):
         first=str(uuid.uuid4())
         execute(dict(config,commands=[{'op':'call','method':'session.create','args':{'sessionId':first,'execution':{'cwd':str(cwd),'read_roots':[],'writable_roots':[],'toolchain_roots':[],'network':False,'allowed_tools':['ask_user_questions'],'mcp':[]}}},
             {'op':'call','sessionId':first,'method':'session.selectModel','args':{'provider':providers['providers'][0]['id'],'model':providers['providers'][0]['models'][0]['id']}}]))
+    if kind=='native' and args.ui_mixed_tools:
+        first=str(uuid.uuid4())
+        execute(dict(config,commands=[{'op':'call','method':'session.create','args':{'sessionId':first,'execution':{'cwd':str(cwd),'read_roots':[str(cwd)],'writable_roots':[],'toolchain_roots':[],'network':False,'allowed_tools':['read'],'mcp':[]}}},
+            {'op':'call','sessionId':first,'method':'session.selectModel','args':{'provider':providers['providers'][0]['id'],'model':providers['providers'][0]['models'][0]['id']}}]))
     if history_pages:
         model=next(command['args'] for command in config['commands'] if command.get('method')=='session.selectModel')
         if not (kind=='native' and (args.ui_actionables and bounded_child is None)):
@@ -424,6 +448,7 @@ def ui_smoke(config, first, bounded_child=None):
     if (args.ui_annotation_editor and bounded_child is None):mode+=['--annotation-proof']
     if (args.ui_attachments and bounded_child is None):mode+=['--upload-proof']
     if (args.ui_actionables and bounded_child is None):mode+=['--actionable-proof']
+    if args.ui_mixed_tools:mode+=['--mixed-tool-proof']
     if history_pages:mode+=['--history-page-proof']
     if (args.ui_transcript_content or bounded_child is not None):mode+=['--transcript-content']
     if (args.ui_message_rows and bounded_child is None):mode+=['--input-message-proof','--output-message-proof']
@@ -606,6 +631,10 @@ def ui_smoke(config, first, bounded_child=None):
             proof=receipt['historyPagingProof']
             assert all(proof[key] for key in ('originalScope','extended','frozenCut','otherDraftPreserved','sourceStatusPublished','newEpochHistoryRetained','noDuplicateMessages','oldReceiptInvalidated')),proof
             assert proof['retainedMessages']>=1 and not proof['nativeInteraction'] and not proof['readingAnchorAcceptance'],proof
+        if args.ui_mixed_tools:
+            proof=receipt['mixedToolProof']
+            assert all(proof[key] for key in ('realHarness','realReadResults','reasoningSource','oneContinuousGroup','liveControlsObserved','originalControlsRetained','syntheticPreeditPreserved','focusPreserved','sendBlockedDuringPreedit','otherDraftPreserved','reconnectNoDuplicateInput','reconnectNoDuplicateTools')),proof
+            assert proof['canonicalTools']==3 and not proof['nativeInteraction'] and not proof['physicalIme'] and not proof['readingAnchorAcceptance'],proof
         if (args.ui_actionables and bounded_child is None):
             proof=receipt['actionableProof']
             assert all(proof[key] for key in ('probeConfigured','publicComposer','publicCard','originalScope','oneAttempt','sharedResolved','canonicalAnswerRecord','otherDraftPreserved','freshHistoryAfterReconnect','reconnectNoDuplicateInput')),proof

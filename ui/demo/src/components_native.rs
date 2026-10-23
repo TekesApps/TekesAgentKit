@@ -3976,6 +3976,16 @@ pub fn run() {
         } else {
             serde_json::Value::Null
         };
+        let mixed_tool_proof = if args.iter().any(|arg| arg == "--mixed-tool-proof") {
+            host.executor
+                .block_on(tekes_agent_ui_demo::mixed_tool_proof::run(
+                    &mut host.view,
+                    &host.runtime,
+                ))
+                .expect("real mixed tools proof")
+        } else {
+            serde_json::Value::Null
+        };
         let actionable_proof = if args.iter().any(|arg| arg == "--actionable-proof") {
             host.executor
                 .block_on(tekes_agent_ui_demo::actionable_proof::run(
@@ -4920,6 +4930,7 @@ pub fn run() {
             "annotationProof":annotation_proof,
             "initialPresetProof":preset_proof,
             "uploadProof":upload_proof,
+            "mixedToolProof":mixed_tool_proof,
             "actionableProof":actionable_proof,
             "historyPagingProof":history_page_proof,
             "inputMessageProof":input_message_proof, "outputMessageProof":output_message_proof, "turnFootnoteProof":turn_footnote_proof,"turnForkProof":turn_fork_proof,"transcriptContentProof":transcript_content_proof,

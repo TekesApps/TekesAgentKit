@@ -11,6 +11,10 @@ Pi 后续验证采用[精确 1.4.0 候选](pi-1.4.0-compat-20261023.md)，保留
 共享 [Activity 判定](rust-agent-ui-activity-policy-20261023.md) 与此前 [控制器分离](rust-agent-ui-output-controller-20261023.md) 保留原阶段身份。回合内追加输入的分段折叠已接入，见[输入分段验收](rust-agent-ui-activity-segments-20261023.md)；journal prompt role 已接入，见[来源与显示](rust-agent-ui-system-prompts-20261023.md)；完整富内容/配对布局等仍未完成。
 原生、真实协议、离屏 GPU 和跨进程证据分别记录，不转移冻结程序身份。较早程序的独立记录见[历史续验](rust-agent-ui-current-validation-20261023.md)。
 
+本轮另补[三端真实混合工具离屏闭环](rust-agent-ui-mixed-tools-20261023.md)：Native 0.9.3 UI-only、Pi 1.4.0、DSH 0.2.1-rc.2 均通过。增量 demo 4 项、Python 74 项、严格 demo Clippy/格式/边界通过；原全 UI 616/1 忽略是此前阶段计数，本轮不冒称重跑。固定宿主尚未实际安装/签名，未启动桌面或申请权限。
+
+PR #10 的 `ea36946` 远端 CI：checks 成功；UI 在严格 nested-detail-reading 步骤失败，仍受 TekesUI #53 阻挡，不合并、不放宽门槛。
+
 ## 依赖与运行身份
 
 | 输入 | 当前固定值及限制 |
