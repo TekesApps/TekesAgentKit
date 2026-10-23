@@ -892,5 +892,25 @@
   },
   "sidePanelContractAudit": "rust-agent-ui-sidepanel-contract-audit-20261023.md",
   "nativeToolchain": "rust-agent-ui-native-toolchain.md",
-  "piCompatibility": "pi-1.4.0-compat-20261023.json"
+  "piCompatibility": "pi-1.4.0-compat-20261023.json",
+  "realSideChatOffscreen": {
+    "receipt": "rust-agent-ui-real-sidechat-20261023.json",
+    "acceptedLifecycle": [
+      "native",
+      "pi"
+    ],
+    "unavailableCapability": [
+      "dsh"
+    ],
+    "nativeInteraction": false,
+    "crossProcess": false
+  },
+  "abfc1c2CiSnapshot": {
+    "pullRequestRun": 39907444360,
+    "checks": "success",
+    "ui": "failure",
+    "failingStep": "Verify nested detail reading intent (strict; no native window)",
+    "receipt": ".runtime-fixtures/mixed-tool-runs-20261023/ci-abfc-artifact/agentkit-nested-detail-reading.json",
+    "accepted": false
+  }
 }

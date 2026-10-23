@@ -3976,6 +3976,17 @@ pub fn run() {
         } else {
             serde_json::Value::Null
         };
+        let sidechat_proof = if args.iter().any(|arg| arg == "--sidechat-proof") {
+            host.executor
+                .block_on(tekes_agent_ui_demo::sidechat_proof::run(
+                    &mut host.view,
+                    &host.runtime,
+                    &host.side_chats,
+                ))
+                .expect("real SideChat component proof")
+        } else {
+            serde_json::Value::Null
+        };
         let mixed_tool_proof = if args.iter().any(|arg| arg == "--mixed-tool-proof") {
             host.executor
                 .block_on(tekes_agent_ui_demo::mixed_tool_proof::run(
@@ -4930,6 +4941,7 @@ pub fn run() {
             "annotationProof":annotation_proof,
             "initialPresetProof":preset_proof,
             "uploadProof":upload_proof,
+            "sideChatProof":sidechat_proof,
             "mixedToolProof":mixed_tool_proof,
             "actionableProof":actionable_proof,
             "historyPagingProof":history_page_proof,

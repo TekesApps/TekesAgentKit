@@ -15,6 +15,10 @@ Pi 后续验证采用[精确 1.4.0 候选](pi-1.4.0-compat-20261023.md)，保留
 
 PR #10 的 `ea36946` 远端 CI：checks 成功；UI 在严格 nested-detail-reading 步骤失败，仍受 TekesUI #53 阻挡，不合并、不放宽门槛。
 
+[真实 SideChat 离屏接入](rust-agent-ui-real-sidechat-20261023.md)已补：Native/Pi 的原创建、独立 RunPort、发送、切换草稿、重连与确认丢弃通过；DSH 因公开 runtime 缺少 discard，仅证明原不可用门禁，不宣称其 SideChat 可用。
+
+`abfc1c2` 的 pull_request CI 已完成：checks 成功，UI 的格式、Clippy、workspace 测试通过，严格 nested-detail-reading 仍以原始 `accepted:false` 失败；未合并，未豁免 #53。
+
 ## 依赖与运行身份
 
 | 输入 | 当前固定值及限制 |
@@ -31,12 +35,12 @@ PR #10 的 `ea36946` 远端 CI：checks 成功；UI 在严格 nested-detail-read
 | --- | --- | --- |
 | Composer、发送/取消、流式回传 | 原 TekesUI editor + RunBinding/RunController；归档/中断、草稿、请求身份、模型/附件等有组件与宿主用例。 | 当前原生 phase 0 失败；此前原生/软件 IME 只保留历史身份，完整组合仍待；上下文高级入口按源规则逐项验收，缺少宿主能力时通过明确输入/回调接入。 |
 | Transcript：历史/推理/工具/分页/阅读 | 混合 Content、原阅读事务、canonical 身份与只读子历史；公开 page/reveal 已消费，工具关闭边界、共享 row、报告/完整计数选择规则与五类卡片事实有回归。 | 独立 Input/Output/view 原字段与复制通道已接入；真实报告来源、连续分组的完整输入/原生验收、富内容、#54 分隔线和最终 code-header 样式未完成，`rich_content=false`；选中富内容 #25、嵌套阅读意图 #53、新建 Host 的持久 checkpoint #42、当前原生与配对布局。 |
-| 实时思考模式 | 共享 None/Compact、来源绑定 Frame、独立 OutputMessage 与原归一化来源工厂已实现；Root Run/Transcript/Pane API 和第二 consumer 的 fixture 路径通过。Journal anchor 与 Pi ancestry 按实际 projector 定义，不使用 UI/buffer 下标作身份。 | TranscriptContent/RunPort/只读 pane 整帧输入及 prepared-plan 门禁已接线，demo 显式消费 Compact；reasoning carrier 与单详情/空白行已对齐；消息容器/独立工具的展示顺序、普通回合实际 reasoning/工具/正文分区和整段 Activity 折叠已接入；回合内追加输入分段已接入；journal initial prompt role 已接入；旁白选择/当前 prose 接线已接入；多记录 frame 的组件阅读锚点已通过，当前原生、独立 fallback 来源、富内容节点投影、真实三端 mixed reasoning/tool 全组合和配对布局仍待完成；裁剪/未知来源不能猜补。 |
+| 实时思考模式 | 共享 None/Compact、来源绑定 Frame、独立 OutputMessage 与原归一化来源工厂已实现；Root Run/Transcript/Pane API 和第二 consumer 的 fixture 路径通过。Journal anchor 与 Pi ancestry 按实际 projector 定义，不使用 UI/buffer 下标作身份。 | TranscriptContent/RunPort/只读 pane 整帧输入及 prepared-plan 门禁已接线，demo 显式消费 Compact；reasoning carrier 与单详情/空白行已对齐；消息容器/独立工具的展示顺序、普通回合实际 reasoning/工具/正文分区和整段 Activity 折叠已接入；回合内追加输入分段已接入；journal initial prompt role 已接入；旁白选择/当前 prose 接线已接入；多记录 frame 的组件阅读锚点已通过，当前原生、独立 fallback 来源、富内容节点投影、mixed reasoning/tool 的当前原生全组合和配对布局仍待完成（三端离屏见专项收据）；裁剪/未知来源不能猜补。 |
 | Input / output / footnote 排版 | 用户气泡/aside 右、机器内容/aside 左；共用列、单行、备注限宽与保留控件有独立 consumer。 | 真实 Pi 目标标签在窄列仍不可见，严格命令退出 1；#47 原 glyph/紧凑动作消费，完整时间/目标/状态可见性。 |
 | Indicators 与回合导航 | 原连接/运行/等待/失败/用量事实、TurnRail/Jump 与原 SDK reveal，非像素估算。 | 完整 hover/selection/chrome、可达性和当前程序原生对照；#46/#5 等。不能把已有单行状态当作完整 rail 的证明。 |
 | RunPort 组合与完整 Views 布局 | 正式 RunPort 组合 Composer/Transcript/Indicators，整帧 preflight/阅读发布；第二 consumer 无需 RunSurface。 | 完整 ClientKit 对应层次/selection/chrome 的逐项同内容对照；当前收据仍明确 `completeRunPort=false`。 |
 | Sidebar 会话/活动/置顶/共享操作 | 受控目录/恢复/搜索/分组、稳定 menu value、原共享 action/CAS、分页/选中补齐和 reveal。 | 非当前行的原上下文菜单 #44、完整当前原生/AX验收；不把 compact toolbar 的缺口套到已经消费的普通 MenuContent 上。 |
-| SidePanel Task/Subagent/SideChat/Summary tabs | 同一 SidePanelInput + SidePanelNavigation；动态 pointer、retained editor、关闭确认和迟到回包门禁有宿主/第二 consumer 用例。 | SideChat 家族菜单的本地协议演示已通过（phase 25；见[原生续验](rust-agent-ui-native-resumed-20261023.md)）；真实三端及最终源码仍待验收；完整窗口 toolbar/Panel chrome 及 #48。 |
+| SidePanel Task/Subagent/SideChat/Summary tabs | 同一 SidePanelInput + SidePanelNavigation；动态 pointer、retained editor、关闭确认和迟到回包门禁有宿主/第二 consumer 用例。 | SideChat 家族菜单的本地协议演示已通过（phase 25；见[原生续验](rust-agent-ui-native-resumed-20261023.md)）；Native/Pi 真实 SideChat 离屏闭环已补，DSH 无 discard 能力；Task/子代理的真实组件组合、最终原生、完整窗口 toolbar/Panel chrome 及 #48 仍待。 |
 | Task/child 的可写与有界只读来源 | TaskPaneBinding、ChildPaneBinding、SideChatBinding 复用现有 presentation；有界历史无 Composer、不用 parent 正文代替。 | 每种 loading/missing/error/ready 的当前完整原生组合；Native 真实多消息有界路径与 UI-only 验收分别记录。 |
 | Summary sections / rows / actions | 受控 SummaryInput/Context、展开/用量/metadata/宿主 slots、原 intent 与 source ownership。 | #47 状态附件/图标、#25 语义内容、#30/#38/#46 部分焦点/指示/hover组合与最终产品对照。 |
 | 反馈初读/重连/CAS | 自动按来源/epoch读取，普通 aside 无常驻 Refresh；加载失败保留旧记录且不可写，明确刷新恢复。 | 本轮真实三端离屏组合验证见当前续验；真实故障恢复仍属 4097e4f 冻结程序，反馈的当前原生交互仍待验收。 |

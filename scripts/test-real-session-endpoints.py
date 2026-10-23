@@ -49,7 +49,13 @@ parser.add_argument('--ui-history-pages',action='store_true',help='Seed long iso
 parser.add_argument('--ui-actionables',action='store_true',help='Exercise public actionable cards on configured Native/Pi/DSH question sources')
 parser.add_argument('--ui-sidebar-query',action='store_true',help='Read typed public search and explicitly refresh public inventory cursors on owned conversation-history targets; offscreen protocol proof only')
 parser.add_argument('--ui-mixed-tools',action='store_true',help='Offscreen real read tools, reasoning and retained Composer proof')
+parser.add_argument('--ui-sidechat',action='store_true',help='Real ephemeral fork in original SidePanel/RunPort, reconnect and confirmed discard; offscreen only')
 args=parser.parse_args()
+if args.ui_sidechat:
+    if not (args.ui_demo and args.ui_components and args.ui_transcript_content):
+        parser.error('--ui-sidechat requires UI demo/components/Transcript')
+    if any(value for key,value in vars(args).items() if key.startswith('ui_') and key not in {'ui_sidechat','ui_demo','ui_components','ui_transcript_content','ui_output'}):
+        parser.error('--ui-sidechat is an isolated offscreen profile')
 if args.ui_mixed_tools:
     if not (args.ui_demo and args.ui_components and args.ui_transcript_content):
         parser.error('--ui-mixed-tools requires UI demo/components/Transcript')
@@ -448,6 +454,7 @@ def ui_smoke(config, first, bounded_child=None):
     if (args.ui_annotation_editor and bounded_child is None):mode+=['--annotation-proof']
     if (args.ui_attachments and bounded_child is None):mode+=['--upload-proof']
     if (args.ui_actionables and bounded_child is None):mode+=['--actionable-proof']
+    if args.ui_sidechat:mode+=['--sidechat-proof']
     if args.ui_mixed_tools:mode+=['--mixed-tool-proof']
     if history_pages:mode+=['--history-page-proof']
     if (args.ui_transcript_content or bounded_child is not None):mode+=['--transcript-content']
@@ -631,6 +638,13 @@ def ui_smoke(config, first, bounded_child=None):
             proof=receipt['historyPagingProof']
             assert all(proof[key] for key in ('originalScope','extended','frozenCut','otherDraftPreserved','sourceStatusPublished','newEpochHistoryRetained','noDuplicateMessages','oldReceiptInvalidated')),proof
             assert proof['retainedMessages']>=1 and not proof['nativeInteraction'] and not proof['readingAnchorAcceptance'],proof
+        if args.ui_sidechat:
+            proof=receipt['sideChatProof']
+            if kind=='dsh':
+                assert all(proof[key] for key in ('realHarness','capabilityUnavailable','originalCreateDisabled','noForkAttempted','parentAndOtherDraftsPreserved')) and not proof['scratchLifecycleAccepted'],proof
+            else:
+                assert all(proof[key] for key in ('realHarness','scratchLifecycleAccepted','originalCreate','independentForkScope','originalSidePanelRunPort','originalSend','scratchReply','parentHistoryIsolated','summaryNavigation','originalComposerIdsRetained','scratchDraftRestored','freshReconnect','noDuplicateInput','originalClose','confirmedDiscard','retiredAuthority','parentAndOtherDraftsPreserved')) and not proof['capabilityUnavailable'],proof
+            assert not proof['nativeInteraction'] and not proof['physicalIme'] and not proof['crossProcess'] and not proof['readingAnchorAcceptance'],proof
         if args.ui_mixed_tools:
             proof=receipt['mixedToolProof']
             assert all(proof[key] for key in ('realHarness','realReadResults','reasoningSource','oneContinuousGroup','liveControlsObserved','originalControlsRetained','syntheticPreeditPreserved','focusPreserved','sendBlockedDuringPreedit','otherDraftPreserved','reconnectNoDuplicateInput','reconnectNoDuplicateTools')),proof
