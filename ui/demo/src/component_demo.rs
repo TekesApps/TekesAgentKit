@@ -2585,6 +2585,9 @@ impl ComponentDemo {
             _ => false,
         };
         require(valid, "child snapshot source mismatch")?;
+        if source.layout() == ChildHistoryLayout::SameSession {
+            let _ = source.readonly_input(snapshot, false, None)?;
+        }
         if let PaneSnapshot::ReadOnlyChild { transcript, .. } = snapshot {
             let document = tekes_agent_presentation::TranscriptDocument::read(transcript)?;
             for section in &document.sections {

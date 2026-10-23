@@ -43,10 +43,23 @@ impl Default for ReadOnlyTranscriptLabels {
         }
     }
 }
+/// Instance provenance for a read-only binding, distinct from scope/revision.
+/// Clones retain identity; new values cannot impersonate another source.
+#[derive(Clone, Debug, Default)]
+pub struct ReadOnlyTranscriptSource(std::sync::Arc<()>);
+impl PartialEq for ReadOnlyTranscriptSource {
+    fn eq(&self, other: &Self) -> bool {
+        std::sync::Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+impl Eq for ReadOnlyTranscriptSource {}
+
 /// Canonical frame metadata is separate from transient read/availability facts.
 /// publication is original binding read order, never an endpoint journal cursor.
 #[derive(Clone, Copy, Debug)]
 pub struct ReadOnlyTranscriptInput<'a> {
+    /// None is display-only; endpoint reads require the original binding source.
+    pub source: Option<&'a ReadOnlyTranscriptSource>,
     pub scope: &'a RunScope,
     pub publication: u64,
     pub connection_epoch: u64,
@@ -65,6 +78,7 @@ pub enum ReadOnlyTranscriptRead {
 }
 #[derive(Clone, Debug)]
 pub struct ReadOnlyTranscriptIntent {
+    source: Option<ReadOnlyTranscriptSource>,
     scope: RunScope,
     publication: u64,
     connection_epoch: u64,
@@ -72,6 +86,9 @@ pub struct ReadOnlyTranscriptIntent {
     claimed: std::sync::Arc<std::sync::atomic::AtomicBool>,
 }
 impl ReadOnlyTranscriptIntent {
+    pub fn belongs_to(&self, source: &ReadOnlyTranscriptSource) -> bool {
+        self.source.as_ref() == Some(source)
+    }
     /// Executor admission is once per explicit gesture, including cloned handles.
     /// A failed or abandoned read requires another explicit user activation.
     pub fn claim(&self) -> bool {
@@ -109,6 +126,7 @@ impl ReadOnlyTranscriptUpdate<'_> {
 /// It cannot produce Send, Cancel, actionable responses or completed-turn actions.
 #[derive(Debug)]
 pub struct ReadOnlyTranscript {
+    source: Option<ReadOnlyTranscriptSource>,
     ids: ReadOnlyTranscriptIds,
     scope: RunScope,
     labels: ReadOnlyTranscriptLabels,
@@ -212,6 +230,7 @@ impl ReadOnlyTranscript {
                     Content::new(ids.viewport, viewport),
                 ],
             },
+            source: None,
             publication: 0,
             epoch: 0,
             connection: None,
@@ -328,6 +347,9 @@ impl ReadOnlyTranscript {
         if input.scope != &self.scope {
             return Err("read-only transcript source mismatch");
         }
+        if self.publication > 0 && self.source.as_ref() != input.source {
+            return Err("read-only transcript source instance changed");
+        }
         if input.publication == 0
             || input.publication < self.publication
             || input.connection_epoch < self.epoch
@@ -441,6 +463,7 @@ impl ReadOnlyTranscript {
                 },
             })?;
         self.generation += 1;
+        self.source = input.source.cloned();
         self.publication = input.publication;
         self.epoch = input.connection_epoch;
         self.connection = Some(input.connection.clone());
@@ -471,6 +494,7 @@ impl ReadOnlyTranscript {
         result
             .into_iter()
             .map(|read| ReadOnlyTranscriptIntent {
+                source: self.source.clone(),
                 scope: self.scope.clone(),
                 publication: self.publication,
                 connection_epoch: self.epoch,

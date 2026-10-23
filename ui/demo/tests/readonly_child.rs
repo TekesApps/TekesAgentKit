@@ -753,3 +753,98 @@ async fn explicit_bounded_page_size_is_validated_and_retained_through_refresh_an
     assert!(source.binding().current_run().is_none());
     runtime.stop().await.unwrap();
 }
+
+fn captured_original_refresh(
+    source: &ChildPaneBinding,
+    frame: &PaneSnapshot,
+) -> ReadOnlyTranscriptIntent {
+    let mut view = tekes_agent_ui_consumer_check::new_readonly_child(
+        4000,
+        4003..4200,
+        source.binding().scope().clone(),
+    )
+    .unwrap();
+    tekes_agent_ui_consumer_check::sync_readonly_child(&mut view, source, frame, false, None)
+        .unwrap();
+    captured_refresh_from_view(view)
+}
+fn captured_refresh_from_view(view: ReadOnlyTranscript) -> ReadOnlyTranscriptIntent {
+    let ids = view.ids();
+    let mut host = view.into_host().unwrap();
+    host.accessibility_action(ids.refresh, None, AccessibilityAction::Press);
+    let actions = host.drain_actions();
+    host.get_mut(ids.root)
+        .unwrap()
+        .component_mut::<ReadOnlyTranscript>()
+        .unwrap()
+        .take_intents(&actions)
+        .remove(0)
+}
+
+#[tokio::test]
+async fn same_scope_readonly_frame_cannot_be_relabelled_by_another_binding_instance() {
+    let runtime = runtime().await;
+    let first = source(runtime.clone(), None).await;
+    let second = source(runtime.clone(), None).await;
+    let frame = first.snapshot().await.unwrap();
+    let other = second.snapshot().await.unwrap();
+    assert_eq!(first.binding().scope(), second.binding().scope());
+    assert!(second.readonly_input(&frame, false, None).is_err());
+    let mut view = tekes_agent_ui_consumer_check::new_readonly_child(
+        4000,
+        4003..4200,
+        first.binding().scope().clone(),
+    )
+    .unwrap();
+    tekes_agent_ui_consumer_check::sync_readonly_child(&mut view, &first, &frame, false, None)
+        .unwrap();
+    assert!(
+        tekes_agent_ui_consumer_check::sync_readonly_child(&mut view, &second, &other, false, None)
+            .is_err(),
+        "a mounted original source cannot silently become a different instance"
+    );
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn same_scope_readonly_intent_cannot_cross_instances_or_consume_original_admission() {
+    let runtime = runtime().await;
+    let first = source(runtime.clone(), None).await;
+    let second = source(runtime.clone(), None).await;
+    let frame = first.snapshot().await.unwrap();
+    let _ = second.snapshot().await.unwrap();
+    let intent = captured_original_refresh(&first, &frame);
+    let original = intent.clone();
+    assert!(second.read_intent(intent).await.is_err());
+    first.read_intent(original.clone()).await.unwrap();
+    assert!(
+        first.read_intent(original).await.is_err(),
+        "cloned original gesture is still once only"
+    );
+    let fabricated = ReadOnlyTranscriptSource::default();
+    for source_id in [None, Some(&fabricated)] {
+        let mut display = tekes_agent_ui_consumer_check::new_readonly_child(
+            4000,
+            4003..4200,
+            first.binding().scope().clone(),
+        )
+        .unwrap();
+        let mut input = first.readonly_input(&frame, false, None).unwrap();
+        input.source = source_id;
+        display.update(input).unwrap();
+        assert!(
+            first
+                .read_intent(captured_refresh_from_view(display))
+                .await
+                .is_err(),
+            "display-only or freshly generated provenance is not endpoint read authority"
+        );
+    }
+    let intent = captured_original_refresh(&first, &frame);
+    first.retire();
+    assert!(
+        second.read_intent(intent).await.is_err(),
+        "retired A does not transfer authority to a new same-scope B"
+    );
+    runtime.stop().await.unwrap();
+}

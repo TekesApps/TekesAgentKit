@@ -65,6 +65,19 @@ TranscriptContent、RunPort 和 ReadOnlyTranscript 可用 `set_thinking_display`
 标准 RunPort/Transcript 保持原文档流。嵌套阅读严格检查当前失败，等待 #53；
 见[限高实验说明](rust-agent-ui-bounded-details-20261022.md)，不得用宿主滚动补偿替代 SDK 修复。
 
+## 派生来源与只读 API 字段（#12/#13）
+
+`ChildPaneBinding::for_run` / `TaskPaneBinding::for_run` 保留原 Task/child/SideChat 权限，
+包含不同 scope 与异步 history 返回后的门禁。Missing 不复活，Closing/Unknown 不变成可写；
+主 Run 的 mount 卸载不等于取消远端执行或丢弃共享草稿。
+
+尚未发布的 `PaneSnapshot::ReadOnlyChild` 新增 `source` 实例身份；
+`ReadOnlyTranscriptInput::source` 由原 binding 的 `readonly_input` 提供。
+同 scope/epoch/publication 不代表同一绑定，不能将旧 intent 或 snapshot 转交新来源。
+组件按原来源捕获请求，executor 在 claim/IO 前核对；独立展示可用 None，但不授予 endpoint 读取。
+替换来源时创建新组件，原来源重连/刷新则保留原实例身份和 SDK 阅读事务。
+设计、迁移与验收标准见[来源权限契约](rust-agent-ui-source-authority.md)。
+
 ## 可运行参考与验证
 
 第二 consumer 的[公开组件挂载/整帧发布](../ui/consumer/src/lib.rs)提供

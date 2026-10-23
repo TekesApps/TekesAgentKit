@@ -313,6 +313,7 @@ fn readonly_frame_uses_its_own_publication_and_original_sdk_attachment() {
         publication: u64,
     ) -> ReadOnlyTranscriptInput<'a> {
         ReadOnlyTranscriptInput {
+            source: None,
             scope,
             publication,
             connection_epoch: snapshot.connection_epoch,
@@ -655,6 +656,7 @@ fn readonly_original_tool_fragments_keep_local_segment_selection_and_publication
         ReadOnlyTranscript::standard(36000, 36010..36500, scope.clone(), Default::default())
             .unwrap();
     let input = ReadOnlyTranscriptInput {
+        source: None,
         scope: &scope,
         publication: 900,
         connection_epoch: source.connection_epoch,
@@ -685,6 +687,7 @@ fn readonly_original_tool_fragments_keep_local_segment_selection_and_publication
         .set_scroll_reading_document(ids.viewport, "readonly-tools", 0, predicted, |_| ())
         .unwrap();
     let next = ReadOnlyTranscriptInput {
+        source: None,
         publication: 901,
         ..input
     };

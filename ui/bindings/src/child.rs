@@ -142,6 +142,7 @@ impl ChildPaneBinding {
         read_error: Option<&'a str>,
     ) -> Result<tekes_agent_components_ui::ReadOnlyTranscriptInput<'a>> {
         let PaneSnapshot::ReadOnlyChild {
+            source: source_id,
             scope,
             publication,
             connection_epoch,
@@ -155,6 +156,7 @@ impl ChildPaneBinding {
         };
         tekes_agent_contract::require(
             self.layout == ChildHistoryLayout::SameSession
+                && source_id == &self.run.readonly_source
                 && scope == self.run.scope()
                 && *publication > 0
                 && self.run.access() != crate::PaneAccess::Missing,
@@ -162,6 +164,7 @@ impl ChildPaneBinding {
         )?;
         let ready = self.refresh_key();
         Ok(tekes_agent_components_ui::ReadOnlyTranscriptInput {
+            source: Some(source_id),
             scope,
             publication: *publication,
             connection_epoch: *connection_epoch,
@@ -183,7 +186,8 @@ impl ChildPaneBinding {
     ) -> Result<PaneSnapshot> {
         use tekes_agent_components_ui::ReadOnlyTranscriptRead;
         tekes_agent_contract::require(
-            intent.scope() == self.run.scope()
+            intent.belongs_to(&self.run.readonly_source)
+                && intent.scope() == self.run.scope()
                 && self.layout == ChildHistoryLayout::SameSession
                 && self.run.access() != crate::PaneAccess::Missing
                 && intent.publication() > 0

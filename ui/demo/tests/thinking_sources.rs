@@ -32,6 +32,7 @@ async fn normalized_run_sources_reach_second_consumer_and_survive_reconnect_with
     // Read-only envelopes use their own read-invocation publication, not a
     // fabricated writable Run. This is a value/API check, not a Native SEP proof.
     let readonly = tekes_agent_ui_bindings::PaneSnapshot::ReadOnlyChild {
+        source: tekes_agent_components_ui::ReadOnlyTranscriptSource::default(),
         scope: scope.clone(),
         publication: snapshot.revision + 1000,
         connection_epoch: snapshot.connection_epoch,
@@ -419,6 +420,7 @@ fn readonly_live_status_ticks_use_child_publication_and_retire_preference_plans(
     view.set_thinking_display(display(1, TranscriptThinkingMode::None))
         .unwrap();
     let input = ReadOnlyTranscriptInput {
+        source: None,
         scope: &scope,
         publication: 500,
         connection_epoch: source.connection_epoch,

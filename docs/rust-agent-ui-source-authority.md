@@ -1,6 +1,6 @@
 # 派生 pane 与只读历史的来源契约
 
-状态：开发中；关联 PR #10。只修改 Rust AgentKit；ClientKit/Tekes 作只读行为参照。
+状态：已实现并完成组件/公开 consumer/离屏验证，待 PR 合并；关联 AgentKit #12/#13、PR #10。只修改 Rust AgentKit；ClientKit/Tekes 作只读行为参照。
 TekesUI 的输入、焦点、IME、阅读事务与渲染不变，桌面验收暂缓。
 
 ## 父来源权限（#12）
@@ -45,3 +45,11 @@ readonly_input 统一生成，宿主不用复制身份状态。
 和分页 epoch 门禁不退化。使用共享 target；组件与公开 consumer 检查后执行完整 UI/严格检查。
 
 不声称本轮覆盖原生窗口、物理 IME、VoiceOver 或 ProcessContainer；不放宽 #47/#48/#53 门禁。
+
+## 本轮结果
+
+完整 UI workspace 628 通过、1 项既有忽略；补充 display-only/新建假身份负例后的只读 14 项
+重跑通过。严格 all-target Clippy、格式、边界与 Python 74 项通过。
+同一冻结程序完成三端常规离屏、Native 0.9.3 实际有界子历史/分页/重连及原 SideChat 专项；
+Native/Pi SideChat 正常，DSH 仍为原禁用门禁。故障/跨实例负例用确定性组件测试，不声称是
+真实网络故障或原生输入。证据与完整限制见[本轮核对](rust-agent-ui-non-sdk-review-20261023.md)。

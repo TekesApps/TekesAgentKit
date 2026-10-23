@@ -2084,6 +2084,7 @@ fn readonly_input<'a>(
     loading: bool,
 ) -> ReadOnlyTranscriptInput<'a> {
     ReadOnlyTranscriptInput {
+        source: None,
         scope,
         publication,
         connection_epoch: snapshot.connection_epoch,

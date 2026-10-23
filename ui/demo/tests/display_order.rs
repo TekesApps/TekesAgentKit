@@ -726,6 +726,7 @@ fn readonly_activity_uses_its_own_publication_and_invalidates_old_plans_without_
     let mut view =
         ReadOnlyTranscript::standard(7700, 7710..7900, scope.clone(), Default::default()).unwrap();
     let input = ReadOnlyTranscriptInput {
+        source: None,
         scope: &scope,
         publication: 500,
         connection_epoch: source.connection_epoch,
@@ -1072,6 +1073,7 @@ fn abnormal_input_bounded_history_stays_collapsed_and_readonly_uses_its_own_plan
     let mut view =
         ReadOnlyTranscript::standard(8700, 8710..8900, scope.clone(), Default::default()).unwrap();
     let input = ReadOnlyTranscriptInput {
+        source: None,
         scope: &scope,
         publication: 900,
         connection_epoch: source.connection_epoch,

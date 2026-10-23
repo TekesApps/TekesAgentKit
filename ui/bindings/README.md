@@ -713,9 +713,9 @@ The public RunPort consumes one captured RunSnapshot plus gates and page facts f
 
 ## Read-only child frames and gestures
 
-ReadOnlyChild now includes per-binding snapshot invocation publication and connection_epoch. Allocate order before awaiting; a late older read must not become a newer UI publication. Reads crossing an epoch fail, and a retired source returns Missing. These unpublished UI fields are not SEP journal cursors. ChildPaneBinding::readonly_input lowers page gates when the runtime no longer matches the frame; custom sources retain no Kernel pagination capability.
+ReadOnlyChild now includes a `ReadOnlyTranscriptSource` instance identity as well as per-binding snapshot invocation publication and connection_epoch. Allocate order before awaiting; a late older read must not become a newer UI publication. Reads crossing an epoch fail, and a retired source returns Missing. These unpublished UI fields are not SEP journal cursors. ChildPaneBinding::readonly_input lowers page gates when the runtime no longer matches the frame; custom sources retain no Kernel pagination capability.
 
-Mount ReadOnlyTranscript with an exclusive namespace pool. Route its immutable Refresh/Earlier intents to the original source.read_intent, not a newly selected source. The executor checks scope, liveness, page capability/epoch and one-shot admission before IO. Refresh may explicitly renew an old frame on a ready connection; page gestures cannot cross epochs. Keep failed reads with their original pane/task, retain readable content and retry only on a new gesture. See the [read-only contract](../../docs/rust-agent-ui-readonly-child-20261020.md).
+Mount ReadOnlyTranscript with an exclusive namespace pool. Route its immutable Refresh/Earlier intents to the original source.read_intent, not a newly selected source. The executor checks the original instance identity before claiming the gesture, plus scope, liveness, page capability/epoch and one-shot admission before IO. Two bindings with equal scope/epoch/publication are still different sources; a rejected cross-source call does not consume the original gesture. Refresh may explicitly renew an old frame on a ready connection; page gestures cannot cross epochs. Keep failed reads with their original pane/task, retain readable content and retry only on a new gesture. See the [read-only contract](../../docs/rust-agent-ui-readonly-child-20261020.md).
 
 The Rust composition and intent/update/geometry types are now named RunPort. [Migration and ProcessContainer ownership](../../docs/rust-agent-ui-run-port-20261022.md) distinguish the current same-process path from blocked cross-process UI integration; endpoint IPC is not container acceptance.
 
@@ -724,3 +724,21 @@ single final response. Use `intent.source()` for typed origin, or `message()` on
 when Some; system adapters still write `text()` after `claim()`. Copy eligibility
 does not relax binding feedback/fork/execute checks. The [turn-copy contract](../../docs/rust-agent-ui-turn-output-copy-20261022.md)
 also records the separate latest-turn live display rule.
+
+
+### Derived source and read-only API migration (#12/#13)
+
+`for_run` child/Task sources inherit the original Task/child/SideChat authority,
+including another target scope and late history completion. Missing never revives;
+Closing/Unknown keeps its readable content with the existing closed control gate.
+Low-level `open(runtime, scope, ...)` remains an independent explicit source.
+Original main Run drafts and shared presentation are not discarded on child close.
+
+Unpublished UI API literals must include `PaneSnapshot::ReadOnlyChild::source` and
+`ReadOnlyTranscriptInput::source`. Normal endpoint consumers obtain both from the
+original binding's `snapshot` / `readonly_input`; don't generate a replacement ID.
+Standalone display inputs use `source: None` and cannot issue endpoint reads.
+A mounted read-only component cannot silently change source identity; mount a new
+component for a replacement source. Cloning an original frame retains identity;
+no global counter or scope-derived ID substitutes for that identity.
+See [source authority design](../../docs/rust-agent-ui-source-authority.md).

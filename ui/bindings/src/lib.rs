@@ -78,6 +78,7 @@ pub enum PaneSnapshot {
     },
     /// Native bounded child history has no fabricated main-run Composer state.
     ReadOnlyChild {
+        source: tekes_agent_components_ui::ReadOnlyTranscriptSource,
         scope: RunScope,
         /// Per-binding read invocation order; not a journal sequence or controller revision.
         publication: u64,
@@ -174,6 +175,7 @@ pub struct RunBinding {
     scope: RunScope,
     history_pages: history::HistoryPages,
     readonly_reads: std::sync::atomic::AtomicU64,
+    readonly_source: tekes_agent_components_ui::ReadOnlyTranscriptSource,
     feedback_publications: std::sync::atomic::AtomicU64,
     controller: Option<Arc<RunController>>,
     _lease: Option<SessionHistoryLease>,
@@ -517,6 +519,7 @@ impl RunBinding {
             scope,
             history_pages: history::HistoryPages::default(),
             readonly_reads: std::sync::atomic::AtomicU64::new(0),
+            readonly_source: Default::default(),
             feedback_publications: std::sync::atomic::AtomicU64::new(0),
             controller: Some(controller),
             _lease: Some(lease),
@@ -604,6 +607,7 @@ impl RunBinding {
             scope,
             history_pages: history::HistoryPages::default(),
             readonly_reads: std::sync::atomic::AtomicU64::new(0),
+            readonly_source: Default::default(),
             feedback_publications: std::sync::atomic::AtomicU64::new(0),
             controller,
             _lease: None,
@@ -746,6 +750,7 @@ impl RunBinding {
             section.event_order()?;
         }
         Ok(PaneSnapshot::ReadOnlyChild {
+            source: self.readonly_source.clone(),
             scope: self.scope.clone(),
             publication,
             connection_epoch,

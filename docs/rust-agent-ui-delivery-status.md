@@ -1,10 +1,10 @@
 # Rust Agent UI：当前接入范围与交付状态
 
-本页以已提交基线 `9217824` 与本轮 SideChat 原编辑器验收增量为准，按用户完整目标保留验收范围。
+本页以已提交基线 `6062079` 及本轮派生来源/只读实例修复为准，按用户完整目标保留验收范围。
 当前可供实验宿主接入，**完整交付尚未达到**。组件存在、离屏通过或单个 Issue 关闭都不能单独证明完整 Views 对齐。
 本阶段增量的证据见[三端离屏覆盖补验](rust-agent-ui-offscreen-coverage-20261023.md)与[固定验收工具链](rust-agent-ui-native-toolchain.md)；不替代本页原阶段的程序身份和原生结论。
-基线 `9217824` 完整 UI 为 623 通过、1 项既有忽略；本轮定向组件 7/Python 74 与严格 Clippy/格式/边界通过，未重跑全 UI；
-当前验收源码/程序身份见[SideChat 原编辑器收据](rust-agent-ui-sidechat-original-input-20261023.json)；此前业务修复、Task 与独立子 Run 收据保留各自原身份；此前[工具组阶段](rust-agent-ui-global-tool-runs-20261023.json)保留原身份。
+本轮完整 UI 628 通过、1 项既有忽略，补充负例后只读 14 项通过；Python 74、严格 Clippy/格式/边界通过；
+当前验收源码/程序身份见[不依赖 SDK 缺口的核对收据](rust-agent-ui-non-sdk-review-20261023.json)；此前业务修复、Task 与独立子 Run 收据保留各自原身份；此前[工具组阶段](rust-agent-ui-global-tool-runs-20261023.json)保留原身份。
 任务/子代理/SideChat 的本轮源码核对见[SidePanel 契约](rust-agent-ui-sidepanel-contract-audit-20261023.md)。
 Pi 后续验证采用[精确 1.4.0 候选](pi-1.4.0-compat-20261023.md)，保留 1.3.0 基线，旧离屏记录仍按原程序身份解释。
 实际分区的基础实现见[普通回合折叠阶段](rust-agent-ui-physical-planes-20261023.md)：原 reasoning/工具与 final 正文分属实际阅读行，正常完成默认折叠、异常终止默认展开，原控件与本地选择保留。前一阶段组件/CoreText 与三端离屏验证见[frame 阅读范围](rust-agent-ui-narration-frame-reading-20261023.md)，本轮范围见[原工具组物理分区](rust-agent-ui-physical-tool-fragments-20261023.md)；当前程序未做原生验收，历史原生程序 phase 0 失败保留。
@@ -40,6 +40,12 @@ Native/Pi 真实离屏路径新增原 preedit/commit 与组字不发送门禁，
 本轮组件 7/Python 74 与严格检查通过；完整 UI 623/1 是 `9217824` 基线结果，未冒称重跑。
 另一份已冻结程序的真实 Pi 目标脚注严格复验仍退出 1：数据/清除链通过，目标标签不可见（#47）。
 物理输入、桌面和跨进程未验收，完整 UI 目标仍未完成。
+
+[本轮非 SDK 依赖核对](rust-agent-ui-non-sdk-review-20261023.md)完成 AgentKit #12/#13：
+派生 Task/child 继承原来源权限，并在异步 history 返回后重检；只读 snapshot/input/intent 携带实例身份，
+拒绝同 scope/epoch/publication 的新旧来源串用，错投不消耗原 gesture。
+已同步设计与未发布 API 字段；同一程序三端离屏、Native 完整协议驱动及有界历史、Native/Pi SideChat 通过，
+DSH 保持能力禁用；桌面、物理 IME 和 ProcessContainer 未验收。
 
 ## 依赖与运行身份
 
