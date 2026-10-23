@@ -53,6 +53,171 @@ fn paging(scope: &RunScope) -> TranscriptPagingFacts {
     }
 }
 #[test]
+fn source_proven_opening_input_is_before_activity_even_when_committed_after_a_tool() {
+    let entries = vec![
+        json!({"event":{"type":"turn/start","seq":0,"time":1,"data":{"turn":1}}}),
+        json!({"event":{"type":"tool/call","seq":1,"time":2,"data":{"turn":1,"step":1,"callId":"before-input","name":"read","arguments":{}}}}),
+        json!({"event":{"type":"user/message","seq":2,"time":3,"data":{"turn":1,"id":"opening","text":"first input"}}}),
+        json!({"event":{"type":"turn/end","seq":3,"time":4,"data":{"turn":1,"reason":"completed"}}}),
+    ];
+    let mut store = MemoryProjectionStore::new("sep");
+    store.apply("journal:s",json!({"type":"snapshot","snapshot":{"sessionId":"s","generation":"g","throughSequence":3,"windowLimit":50,"hasMoreBefore":false,"entries":entries}})).unwrap();
+    store.connection = ConnectionState::Ready;
+    store.inventory_ready = true;
+    store.control_ready = true;
+    store.actionables_ready = true;
+    let scope = RunScope::main("sep", "s");
+    let mut presentation = PresentationStore::default();
+    presentation
+        .select(ComposerDestination::run(scope.clone()))
+        .unwrap();
+    let source = presentation.refresh(&store).unwrap();
+    let doc = TranscriptDocument::read(&source.transcript).unwrap();
+    let section = &doc.sections[0];
+    assert_eq!(
+        tekes_agent_ui_consumer_check::input_role_source(section.inputs[0].item),
+        Some(TranscriptInputRole::Opening)
+    );
+    let input = TranscriptContentRowKey::Message(section.inputs[0].key.into());
+    let activity = TranscriptContentRowKey::ActivityDisclosure(section.id.into());
+    let mut view = RunPort::standard(27000, 27010..27200, scope.clone()).unwrap();
+    view.update(
+        &source,
+        Default::default(),
+        ComposerControlGate::OPEN,
+        paging(&scope),
+        true,
+    )
+    .unwrap();
+    let keys = view.transcript().unwrap().row_keys();
+    assert!(
+        keys.iter().position(|key| key == &input).unwrap()
+            < keys.iter().position(|key| key == &activity).unwrap()
+    );
+    assert!(
+        !keys
+            .iter()
+            .any(|key| matches!(key, TranscriptContentRowKey::ActivitySegment(_)))
+    );
+}
+#[tokio::test]
+async fn projected_initial_prompt_remains_before_input_and_preserves_original_disclosure_during_activity_collapse()
+ {
+    let (runtime, controller) = tekes_agent_ui_demo::fixture::setup_fixture(
+        tekes_agent_ui_demo::fixture::Fixture::default()
+            .with_reading_details()
+            .with_system_prompts(),
+    )
+    .await
+    .unwrap();
+    let source = controller.snapshot();
+    let scope = RunScope::main("fixture", "a");
+    let facts = || TranscriptPagingFacts {
+        has_more_before: source.transcript.has_more_before,
+        is_stale: source.transcript.is_stale,
+        ..paging(&scope)
+    };
+    let doc = TranscriptDocument::read(&source.transcript).unwrap();
+    let section = doc.sections.last().unwrap();
+    let prompt = section
+        .outputs
+        .iter()
+        .find(|row| row.item.system_prompt().is_some())
+        .unwrap();
+    assert_eq!(
+        tekes_agent_ui_consumer_check::system_prompt_source(prompt.item)
+            .unwrap()
+            .placement,
+        TranscriptSystemPromptPlacement::Initial
+    );
+    let prompt_key = TranscriptContentRowKey::Message(prompt.key.into());
+    let input_key = TranscriptContentRowKey::Message(section.inputs[0].key.into());
+    let activity_key = TranscriptContentRowKey::ActivityDisclosure(section.id.into());
+    let mut view = RunPort::standard(25000, 25010..25500, scope.clone()).unwrap();
+    view.update(
+        &source,
+        Default::default(),
+        ComposerControlGate::OPEN,
+        facts(),
+        true,
+    )
+    .unwrap();
+    let content = view.transcript().unwrap();
+    let keys = content.row_keys();
+    let position = |key| keys.iter().position(|candidate| candidate == key).unwrap();
+    assert!(
+        position(&prompt_key) < position(&input_key)
+            && position(&input_key) < position(&activity_key)
+    );
+    let row = content.row_id(&prompt_key).unwrap();
+    let parts = content.message_content_ids(&prompt.key.into());
+    assert_eq!(parts.len(), 1);
+    assert_eq!(parts[0].kind, OutputContentKind::SystemPrompt);
+    let part = parts[0];
+    let ids = view.ids();
+    let mut host = view.into_host().unwrap();
+    assert!(host.get(part.body).is_none());
+    host.accessibility_action(part.disclosure.unwrap(), None, AccessibilityAction::Press);
+    let actions = host.drain_actions();
+    host.get_mut(ids.root)
+        .unwrap()
+        .component_mut::<RunPort>()
+        .unwrap()
+        .take_intents(&actions);
+    assert!(host.focus(Some(ids.composer.editor), true));
+    host.event(&ContentEvent::Preedit {
+        text: "提示词组字".into(),
+        selection: 5..5,
+        clauses: vec![],
+        replacement: None,
+    });
+    let baseline = host
+        .text_surface(ids.composer.editor)
+        .unwrap()
+        .input
+        .external_baseline();
+    assert!(host.get(part.body).is_some());
+    let owner = host
+        .get(part.body)
+        .unwrap()
+        .component::<TextFieldContent>()
+        .unwrap() as *const _ as usize;
+    for expanded in [true, false, true] {
+        let run = host
+            .get_mut(ids.root)
+            .unwrap()
+            .component_mut::<RunPort>()
+            .unwrap();
+        tekes_agent_ui_consumer_check::set_run_activity_expansion(run, section.id, expanded)
+            .unwrap();
+        run.update(
+            &source,
+            Default::default(),
+            ComposerControlGate::OPEN,
+            facts(),
+            true,
+        )
+        .unwrap();
+        assert_eq!(run.transcript().unwrap().row_id(&prompt_key), Some(row));
+        assert_eq!(
+            host.get(part.body)
+                .unwrap()
+                .component::<TextFieldContent>()
+                .unwrap() as *const _ as usize,
+            owner
+        );
+        assert_eq!(host.focused(), Some(ids.composer.editor));
+        assert_eq!(
+            host.text_surface(ids.composer.editor)
+                .unwrap()
+                .input
+                .external_baseline(),
+            baseline
+        );
+    }
+    runtime.stop().await.unwrap();
+}
+#[test]
 fn shared_display_order_drives_original_run_rows_tools_reading_keys_and_retained_composer() {
     let scope = RunScope::main("sep", "s");
     let source = captured_run();

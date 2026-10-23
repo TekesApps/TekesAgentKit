@@ -6,6 +6,29 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use tekes_agent_contract::{Error, Result, require};
 use tekes_agent_session::SessionProjection;
+mod prompt;
+
+/// Explicit projector role and display anchor, independent of the record's
+/// actual source sequence. Unknown legacy system records have no such evidence.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum TranscriptSystemPromptPlacement {
+    Initial,
+    Update,
+    Inline,
+}
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct TranscriptSystemPrompt {
+    pub placement: TranscriptSystemPromptPlacement,
+    pub anchor_sequence: i64,
+}
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum TranscriptInputRole {
+    Opening,
+    Inner,
+}
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -68,6 +91,25 @@ pub struct TranscriptItem {
     pub metadata: Value,
 }
 impl TranscriptItem {
+    /// Scoped identity binding from the dialect projector, never text equality.
+    pub fn input_role(&self) -> Option<TranscriptInputRole> {
+        let source = &self.metadata["inputPresentation"];
+        if self.kind != TranscriptItemKind::User
+            || source["itemId"] != self.id
+            || source["turnId"] != self.turn_id
+        {
+            return None;
+        }
+        serde_json::from_value(source["role"].clone()).ok()
+    }
+    pub fn system_prompt(&self) -> Option<TranscriptSystemPrompt> {
+        if self.kind != TranscriptItemKind::System {
+            return None;
+        }
+        serde_json::from_value::<TranscriptSystemPrompt>(self.metadata["systemPrompt"].clone())
+            .ok()
+            .filter(|source| source.anchor_sequence >= 0)
+    }
     /// Canonical reasoning text for display policy. Proven block content owns
     /// the value when present; aggregate text is only the legacy fallback.
     /// Keep original whitespace/source bytes here; views trim the outer detail.
@@ -385,6 +427,9 @@ fn settle(
     }
     Ok(())
 }
+fn set_input_role(row: &mut TranscriptItem, role: TranscriptInputRole) {
+    row.metadata["inputPresentation"] = json!({"itemId":row.id,"turnId":row.turn_id,"role":role});
+}
 fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSnapshot> {
     let mut out = TranscriptSnapshot::default();
     let mut current = 0;
@@ -397,6 +442,7 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
     let mut sealed_responses = std::collections::BTreeSet::new();
     let mut authoritative_output = BTreeMap::new();
     let mut opening_inputs = std::collections::BTreeSet::new();
+    let mut prompts = prompt::PromptFold::default();
     for entry in session.entries.values() {
         let event = &entry.event;
         let data = &event.data;
@@ -408,6 +454,13 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
         }
         let seq = Some(event.seq);
         let time = Some(event.time);
+        let prompt_card = prompts.apply(scope, entry);
+        if event.kind == "request/header" {
+            if let Some(row) = prompt_card {
+                upsert(&mut out, row);
+            }
+            continue;
+        }
         // Account independently of surface visibility: model-only messages still consumed tokens.
         if matches!(
             event.kind.as_str(),
@@ -560,16 +613,33 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
                         row.metadata["hidden"] = json!(true);
                         row.is_visible = false;
                     }
-                    if authored
+                    let opening = authored
                         && data["source"]["mode"] != "steer"
-                        && opening_inputs.insert(turn_id.clone())
-                    {
+                        && opening_inputs.insert(turn_id.clone());
+                    if authored {
+                        set_input_role(
+                            &mut row,
+                            if opening {
+                                TranscriptInputRole::Opening
+                            } else {
+                                TranscriptInputRole::Inner
+                            },
+                        );
+                    }
+                    if opening {
                         turn(&mut out, &turn_id, time).input = row.text.clone();
                     }
                 } else if event.kind == "response/error" {
                     row.text = data["message"].as_str().unwrap_or("").into();
                     row.content_blocks =
                         content_blocks(scope, &data["message"], ContentDialect::Journal);
+                } else if event.kind == "system/message" {
+                    if let Some(card) = prompt_card {
+                        row = card;
+                    } else {
+                        row.is_visible = false;
+                        row.metadata["hidden"] = json!(true);
+                    }
                 } else {
                     row.text = body(&data["message"]["content"]);
                     row.content_blocks =
@@ -982,7 +1052,19 @@ fn native(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSna
                 {
                     row.reconciliation_id = Some(ids.remove(0));
                 }
-                if turn(&mut out, &current, time).input.is_empty() {
+                let opening = !out
+                    .items
+                    .iter()
+                    .any(|item| item.turn_id == current && item.kind == TranscriptItemKind::User);
+                set_input_role(
+                    &mut row,
+                    if opening {
+                        TranscriptInputRole::Opening
+                    } else {
+                        TranscriptInputRole::Inner
+                    },
+                );
+                if opening {
                     turn(&mut out, &current, time).input = row.text.clone();
                 }
                 out.items.push(row);

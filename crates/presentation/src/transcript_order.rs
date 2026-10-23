@@ -161,7 +161,13 @@ impl<'a> TranscriptSection<'a> {
                 TranscriptOrderedEvent::ToolCall(tool) => sources.by_id.get(&tool.id),
                 _ => None,
             };
-            let order = if let Some(source) = source {
+            let prompt = match event {
+                TranscriptOrderedEvent::Message(item) => item.system_prompt(),
+                _ => None,
+            };
+            let order = if let Some(prompt) = prompt {
+                Some(prompt.anchor_sequence)
+            } else if let Some(source) = source {
                 require(
                     source.arrival_order >= 0,
                     "negative Transcript presentation order",
@@ -185,8 +191,9 @@ impl<'a> TranscriptSection<'a> {
                     {
                         0
                     }
-                    TranscriptOrderedEvent::Message(_) => 1,
-                    _ => 2,
+                    TranscriptOrderedEvent::Message(item) if item.system_prompt().is_some() => 1,
+                    TranscriptOrderedEvent::Message(_) => 2,
+                    _ => 3,
                 };
                 known.push((order, rank, index, event));
             } else {
@@ -197,7 +204,15 @@ impl<'a> TranscriptSection<'a> {
             (left.0, left.1).cmp(&(right.0, right.1)).then_with(|| {
                 match (left.3, right.3) {
                     (TranscriptOrderedEvent::Message(a), TranscriptOrderedEvent::Message(b)) => {
-                        a.id.cmp(&b.id)
+                        if a.system_prompt().is_some() && b.system_prompt().is_some() {
+                            // ClientKit orders equal prompt anchors by source
+                            // version before ID. An anchor is not the sink order.
+                            a.source_sequence
+                                .cmp(&b.source_sequence)
+                                .then_with(|| a.id.cmp(&b.id))
+                        } else {
+                            a.id.cmp(&b.id)
+                        }
                     }
                     // Same-record calls retain proven content/call order rather
                     // than alphabetical tool IDs. Results keep their own sink.

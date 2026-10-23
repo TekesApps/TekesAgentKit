@@ -12,6 +12,10 @@ pub(super) struct Probe {
     activity: Option<ComponentId>,
     opening_input: Option<ComponentId>,
     segmented_history: bool,
+    prompt_history: bool,
+    prompt_stage: u8,
+    prompt: Option<OutputContentIds>,
+    prompt_owner: usize,
     tool_text: Option<ComponentId>,
     tool_owner: usize,
     reason_owner: usize,
@@ -26,13 +30,17 @@ pub(super) struct Probe {
     resized_at: Option<Instant>,
 }
 impl Probe {
-    pub fn new() -> Self {
+    pub fn new(prompt_history: bool) -> Self {
         run_script(vec![(25000, Action::Close)]);
         Self {
             phase: 0,
             activity: None,
             opening_input: None,
             segmented_history: false,
+            prompt_history,
+            prompt_stage: 0,
+            prompt: None,
+            prompt_owner: 0,
             tool_text: None,
             tool_owner: 0,
             reason_owner: 0,
@@ -112,6 +120,18 @@ impl Probe {
                 .min_y()
     }
     fn unchanged(&self, host: &Host) {
+        if self.prompt_history {
+            assert_eq!(self.prompt_stage, 3);
+            assert_eq!(
+                host.view
+                    .tree
+                    .get(self.prompt.unwrap().body)
+                    .unwrap()
+                    .component::<TextFieldContent>()
+                    .unwrap() as *const _ as usize,
+                self.prompt_owner
+            );
+        }
         use tekes_ui_controls::composition::ContentReadingAnchorUpdate;
         match Self::viewport(host).reading_result().unwrap().anchor {
             ContentReadingAnchorUpdate::Preserved(id)
@@ -146,6 +166,65 @@ impl Probe {
             self.phase
         );
         let old = self.phase;
+        if self.prompt_history && self.prompt_stage < 3 {
+            if !window.is_active() {
+                return;
+            }
+            match self.prompt_stage {
+                0 => {
+                    let run = Self::run(host);
+                    let Some(content) = run.transcript() else {
+                        return;
+                    };
+                    let snapshot = run.displayed_snapshot().unwrap();
+                    let doc =
+                        tekes_agent_components_ui::TranscriptDocument::read(&snapshot.transcript)
+                            .unwrap();
+                    let section = doc.sections.iter().rev().nth(3).unwrap();
+                    let prompt = section.outputs.iter().find(|row| row.item.system_prompt().is_some_and(|source| source.placement == tekes_agent_components_ui::TranscriptSystemPromptPlacement::Initial)).unwrap();
+                    let prompt_key = TranscriptContentRowKey::Message(prompt.key.into());
+                    let input_key = TranscriptContentRowKey::Message(section.inputs[0].key.into());
+                    let position = |key| {
+                        content
+                            .row_keys()
+                            .iter()
+                            .position(|row| row == key)
+                            .unwrap()
+                    };
+                    assert!(position(&prompt_key) < position(&input_key));
+                    let row = content.row_id(&prompt_key).unwrap();
+                    let part = content
+                        .message_content_ids(&prompt.key.into())
+                        .into_iter()
+                        .find(|part| part.kind == OutputContentKind::SystemPrompt)
+                        .unwrap();
+                    assert!(host.view.tree.get(part.body).is_none());
+                    self.prompt = Some(part);
+                    Self::reveal(host, row);
+                    self.prompt_stage = 1;
+                }
+                1 => {
+                    let button = self.prompt.unwrap().disclosure.unwrap();
+                    if host.view.tree.get(button).unwrap().visible().is_none() {
+                        window.request_redraw();
+                        return;
+                    }
+                    run_script(vec![(0, Self::click(host, button))]);
+                    self.prompt_stage = 2;
+                }
+                2 => {
+                    let Some(node) = host.view.tree.get(self.prompt.unwrap().body) else {
+                        return;
+                    };
+                    self.prompt_owner =
+                        node.component::<TextFieldContent>().unwrap() as *const _ as usize;
+                    self.prompt_stage = 3;
+                }
+                _ => unreachable!(),
+            }
+            window.request_redraw();
+            return;
+        }
         match self.phase {
             0 if window.is_active() => {
                 let run = Self::run(host);
@@ -463,6 +542,6 @@ impl Probe {
     }
     pub fn receipt(&self) -> serde_json::Value {
         assert_eq!(self.phase, 13);
-        serde_json::json!({"nativeWindow":true,"ownedProtocolHistory":true,"originalToolAndReasoningClicks":true,"normalActivityInitiallyCollapsed":true,"inputBoundedHistory":self.segmented_history,"activityExpandCollapseReopenClicks":true,"originalToolAndReasoningTextOwnersRetained":true,"expandedDetailsRetained":true,"liveResize":true,"typeScaleReflow":true,"readingAnchorPreserved":true,"originalEditorFocusAndChineseMarked":true,"noSubmission":true,"realHarness":false,"physicalIme":false,"physicalResizeDrag":false,"voiceOver":false})
+        serde_json::json!({"nativeWindow":true,"ownedProtocolHistory":true,"originalToolAndReasoningClicks":true,"normalActivityInitiallyCollapsed":true,"inputBoundedHistory":self.segmented_history,"initialPromptBeforeInputAndOriginalDisclosure":self.prompt_history && self.prompt_stage == 3,"activityExpandCollapseReopenClicks":true,"originalToolAndReasoningTextOwnersRetained":true,"expandedDetailsRetained":true,"liveResize":true,"typeScaleReflow":true,"readingAnchorPreserved":true,"originalEditorFocusAndChineseMarked":true,"noSubmission":true,"realHarness":false,"physicalIme":false,"physicalResizeDrag":false,"voiceOver":false})
     }
 }

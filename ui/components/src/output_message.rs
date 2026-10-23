@@ -28,6 +28,8 @@ pub enum OutputMessageText {
     Unknown,
     AggregateOrder,
     System,
+    SystemPrompt,
+    SystemPromptUpdate,
     Error,
     Notice,
     Empty,
@@ -95,6 +97,8 @@ impl Default for OutputMessageLabels {
                     OutputMessageText::Unknown => "未支持的内容类型（原始数据）",
                     OutputMessageText::AggregateOrder => "来源仅提供聚合内容，未提供块间顺序",
                     OutputMessageText::System => "系统消息",
+                    OutputMessageText::SystemPrompt => "系统提示词",
+                    OutputMessageText::SystemPromptUpdate => "系统提示词更新",
                     OutputMessageText::Error => "错误",
                     OutputMessageText::Notice => "会话提示",
                     OutputMessageText::Empty => "来源未提供可显示正文",
@@ -278,6 +282,7 @@ pub(crate) enum Slot {
     AggregateReasoning,
     ThinkingStatus,
     AggregateBody,
+    SystemPrompt,
     AggregateAttachment(usize),
     MessageKind,
     Failure,
@@ -286,6 +291,7 @@ pub(crate) enum Slot {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OutputContentKind {
+    SystemPrompt,
     Text,
     Reasoning,
     Tool,
@@ -1542,6 +1548,24 @@ fn parts(
 ) -> Result<Vec<PartFacts>, &'static str> {
     let item = output.item;
     let mut result = vec![];
+    if let Some(prompt) = item.system_prompt() {
+        return Ok(vec![PartFacts {
+            tool: None,
+            tool_header: None,
+            slot: Slot::SystemPrompt,
+            kind: OutputContentKind::SystemPrompt,
+            title: (labels.text)(
+                if prompt.placement
+                    == tekes_agent_presentation::TranscriptSystemPromptPlacement::Update
+                {
+                    OutputMessageText::SystemPromptUpdate
+                } else {
+                    OutputMessageText::SystemPrompt
+                },
+            ),
+            text: item.text.clone(),
+        }]);
+    }
     let status = match item.kind {
         TranscriptItemKind::System => Some(OutputMessageText::System),
         TranscriptItemKind::Error => Some(OutputMessageText::Error),

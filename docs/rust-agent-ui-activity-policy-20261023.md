@@ -13,7 +13,7 @@
 
 规则对照 ClientKit 的 `TranscriptMetalActivity.remainingNodes`、`defaultExpandedDisclosureTargets`、`TranscriptTurnPresentationPolicy.defaultsActivityExpandedAfterTermination` 和 Tekes 现有共享 Kit 宿主接法。正常/异常默认展开直接采用 `status != completed` 的源规则，不自行枚举一份“失败状态”。输入位置使用原 `display_order`，不改协议序号、身份或阅读锚点。
 
-当前 Rust DTO 尚无 ClientKit 的 `systemPromptBeforeInput` 角色，不能仅凭 system 文本猜出 initial prompt。保守的 Direct 路径保留内容；完整 source-role 对齐仍属 AgentKit 后续工作，不是 TekesUI 控件缺口。
+该阶段 Rust DTO 尚无 ClientKit 的 `systemPromptBeforeInput` 角色，因此保留 Direct 路径而不猜正文。当前 journal prompt 和开场输入的显式来源接线见[来源与显示](rust-agent-ui-system-prompts-20261023.md)；旧 DTO 无事实时仍保留原路径。这属于 AgentKit 业务契约，不是 TekesUI 控件缺口。
 
 本次真正改变的控件行为只有 direct task-source 不再额外插入 Working；原消息、工具和编辑器仍在原树中。**尚未**物理拆分 OutputMessage 的 reasoning/activity 与 final body，也没有接入 settled disclosure 按钮。要完成布局，必须让原 Content 仅有一个 owner，在结算/折叠/展开时保留原 editor、选择区、焦点、局部阅读位置和 prepared-plan 门禁，不能复制 widget、增加影子状态机或用坐标重叠代替分区。
 

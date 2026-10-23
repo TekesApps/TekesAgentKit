@@ -114,3 +114,17 @@ Previous 计数按连续工具分组后的语义条目计算，使用 `Transcrip
 连续输入之间没有空 Previous 按钮；末段总有状态，空末段为被动标签。包括异常结束在内的分段默认折叠，
 原正文最终输出独立保留。与普通 Activity 相同，本地选择使旧计划失效，随后仍整体发布同一捕获快照；
 不要在宿主复制折叠状态机。当前分段验收见[输入分段](rust-agent-ui-activity-segments-20261023.md)。
+
+System prompt 来源由共享 projector 提供，消费 `TranscriptItem::system_prompt()` 的
+`TranscriptSystemPrompt { placement, anchor_sequence }`，不要从 System 正文或行位置猜角色。
+原 source sequence 仍是记录位置；显示 anchor 仅用于当前投影排版，不能当 session pointer 或 durable key。
+`TranscriptPlane::InitialPrompt` 独立于 Activity/Output，必须在用户输入之前保留；Update/Inline 属于时间线。
+`OutputContentKind::SystemPrompt` 沿用原消息 disclosure；copy hook 新增
+`OutputMessageText::{SystemPrompt,SystemPromptUpdate}`，穷尽 match 的开发消费者需同步。
+无 turn 的 header prompt 属于 session notices，不创建运行回合。详见
+[来源与显示规则](rust-agent-ui-system-prompts-20261023.md)。这些 API 尚未发布，宿主仍须固定完整 AgentKit revision。
+
+开场输入消费 `TranscriptItem::input_role()` 与 `TranscriptInputRole::{Opening,Inner}`，
+该事实绑定当前 item/turn 身份；旧 DTO 无事实时保持 None，不按正文、时钟或行下标补造。
+Kit 负责 Initial prompt → 已证明的开场输入 → Activity 的原控件布局，
+追加输入即使前面没有机器内容，也走输入间分段。角色事实不授予导航、读取或提交权限。

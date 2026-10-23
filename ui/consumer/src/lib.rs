@@ -2732,3 +2732,15 @@ pub fn set_readonly_activity_segment(
 ) -> Result<(), &'static str> {
     view.set_activity_segment_expanded(key, expanded)
 }
+
+/// Consume the projector's explicit role; never infer it from system prose.
+pub fn system_prompt_source(
+    item: &tekes_agent_components_ui::TranscriptItem,
+) -> Option<tekes_agent_components_ui::TranscriptSystemPrompt> {
+    item.system_prompt()
+}
+pub fn input_role_source(
+    item: &tekes_agent_components_ui::TranscriptItem,
+) -> Option<tekes_agent_components_ui::TranscriptInputRole> {
+    item.input_role()
+}

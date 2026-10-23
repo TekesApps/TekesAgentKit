@@ -78,7 +78,10 @@ impl TranscriptContent {
                 if planned_turn(&row) != Some(section.id) {
                     return Err("foreign activity history row");
                 }
-                if let PlannedContent::Input(input) = &row.content {
+                if matches!(&row.content, PlannedContent::Output(output, _) if initial_prompt(output))
+                {
+                    result.push(row);
+                } else if let PlannedContent::Input(input) = &row.content {
                     self.flush_segment(
                         &mut result,
                         &mut pending,

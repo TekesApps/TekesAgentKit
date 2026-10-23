@@ -222,7 +222,9 @@ impl<'a> TranscriptDocument<'a> {
                 _ => submission.unwrap_or(source_key),
             };
             require(keys.insert(key), "ambiguous Transcript message identity")?;
-            if item.kind == TranscriptItemKind::Notice && item.turn_id.is_empty() {
+            if item.turn_id.is_empty()
+                && (item.kind == TranscriptItemKind::Notice || item.system_prompt().is_some())
+            {
                 session_notices.push(TranscriptOutput { key, item });
                 continue;
             }

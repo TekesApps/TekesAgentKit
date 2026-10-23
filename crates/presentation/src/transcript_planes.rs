@@ -5,6 +5,7 @@ use tekes_agent_contract::{Result, require};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TranscriptPlane {
+    InitialPrompt,
     Activity,
     Output,
 }
@@ -52,6 +53,14 @@ impl TranscriptSection<'_> {
         is_live_owner: bool,
     ) -> Result<TranscriptTurnPlanes> {
         scope.validate()?;
+        require(
+            self.inputs
+                .iter()
+                .filter(|row| row.item.input_role() == Some(TranscriptInputRole::Opening))
+                .count()
+                <= 1,
+            "ambiguous opening input source",
+        )?;
         require(!self.id.is_empty(), "empty transcript plane turn")?;
         require(
             self.turn.is_none_or(|turn| turn.id == self.id),
@@ -103,7 +112,13 @@ impl TranscriptSection<'_> {
                 None => !row.text.is_empty() || !row.attachments.is_empty(),
             };
             let body = has_body.then_some(
-                if row.kind == TranscriptItemKind::Assistant && row.is_final && !row.is_provisional
+                if row.system_prompt().is_some_and(|prompt| {
+                    prompt.placement == TranscriptSystemPromptPlacement::Initial
+                }) {
+                    TranscriptPlane::InitialPrompt
+                } else if row.kind == TranscriptItemKind::Assistant
+                    && row.is_final
+                    && !row.is_provisional
                 {
                     TranscriptPlane::Output
                 } else {
@@ -182,6 +197,14 @@ impl TranscriptSection<'_> {
         for event in order.ordered {
             match event {
                 TranscriptOrderedEvent::Message(item) if item.kind == TranscriptItemKind::User => {
+                    match item.input_role() {
+                        Some(TranscriptInputRole::Opening) => {
+                            input_seen = true;
+                            continue;
+                        }
+                        Some(TranscriptInputRole::Inner) => return Ok(Presentation::BetweenInputs),
+                        None => {}
+                    }
                     if machine_seen {
                         return Ok(Presentation::BetweenInputs);
                     }
@@ -190,10 +213,12 @@ impl TranscriptSection<'_> {
                 TranscriptOrderedEvent::Message(item)
                     if item.kind == TranscriptItemKind::System && !input_seen =>
                 {
-                    // The current canonical DTO has no systemPromptBeforeInput
-                    // role. Do not hide a possible initial prompt in Activity or
-                    // misclassify its following opening input as an inner input.
-                    return Ok(Presentation::Direct);
+                    match item.system_prompt() {
+                        Some(prompt)
+                            if prompt.placement == TranscriptSystemPromptPlacement::Initial => {}
+                        Some(_) => machine_seen = true,
+                        None => return Ok(Presentation::Direct),
+                    }
                 }
                 _ => machine_seen = true,
             }

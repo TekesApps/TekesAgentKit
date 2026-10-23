@@ -363,8 +363,10 @@ impl TranscriptContent {
                 let reasoning = presence[1].then(|| make(OutputMessageFragmentKind::Reasoning));
                 let tools = presence[2].then(|| make(OutputMessageFragmentKind::Tools));
                 row.hidden = !presence[0];
-                row.activity = (planes.items[&output.item.id].body
-                    != Some(crate::TranscriptPlane::Output))
+                row.activity = (!matches!(
+                    planes.items[&output.item.id].body,
+                    Some(crate::TranscriptPlane::Output | crate::TranscriptPlane::InitialPrompt)
+                ))
                 .then_some(turn);
                 if let Some(reasoning) = reasoning {
                     expanded.push(reasoning);
@@ -380,6 +382,15 @@ impl TranscriptContent {
                 expanded.push(row);
             }
         }
+        // Source-proven opening input is outside Activity, after initial prompt
+        // cards. Never recover this identity by comparing text with turn.input.
+        for section in &document.sections {
+            if let Some(index) = expanded.iter().position(|row| matches!(&row.content, PlannedContent::Input(input) if input.item.turn_id == section.id && input.item.input_role() == Some(crate::TranscriptInputRole::Opening))) {
+                let opening = expanded.remove(index);
+                let before = expanded.iter().position(|row| planned_turn(row) == Some(section.id) && !matches!(&row.content, PlannedContent::Output(output, _) if initial_prompt(output))).unwrap_or(index.min(expanded.len()));
+                expanded.insert(before, opening);
+            }
+        }
         // A committed answer is outside the entire turn Activity, even when its
         // retained reasoning preceded calls or later narration in source order.
         let mut result = vec![];
@@ -391,7 +402,8 @@ impl TranscriptContent {
                 result.append(&mut final_output);
             }
             turn = next;
-            if matches!(&row.content, PlannedContent::Output(_, Some(_))) && row.activity.is_none()
+            if matches!(&row.content, PlannedContent::Output(output, Some(_)) if !initial_prompt(output))
+                && row.activity.is_none()
             {
                 final_output.push(row);
             } else {
@@ -443,6 +455,7 @@ impl TranscriptContent {
                 .position(|row| {
                     planned_turn(row) == Some(section.id)
                         && !matches!(row.content, PlannedContent::Input(_))
+                        && !matches!(&row.content, PlannedContent::Output(output, _) if initial_prompt(output))
                 })
                 .unwrap_or(result.len());
             result.insert(
@@ -1889,6 +1902,12 @@ fn settled_activity_text(turn: &TranscriptTurn) -> String {
         )
 }
 
+fn initial_prompt(output: &TranscriptOutput<'_>) -> bool {
+    output
+        .item
+        .system_prompt()
+        .is_some_and(|prompt| prompt.placement == crate::TranscriptSystemPromptPlacement::Initial)
+}
 fn planned_turn<'r>(row: &'r Planned<'_>) -> Option<&'r str> {
     match &row.content {
         PlannedContent::Input(input) => Some(&input.item.turn_id),
@@ -1988,7 +2007,7 @@ fn plan<'a>(
         if planes.activity == crate::TranscriptActivityPresentation::Working {
             let before = result[section_start..]
                 .iter()
-                .position(|row| !matches!(row.content, PlannedContent::Input(_)))
+                .position(|row| !matches!(row.content, PlannedContent::Input(_)) && !matches!(&row.content, PlannedContent::Output(output, _) if initial_prompt(output)))
                 .map_or(result.len(), |index| section_start + index);
             result.insert(
                 before,

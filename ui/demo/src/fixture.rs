@@ -417,6 +417,29 @@ impl Fixture {
         }
         self
     }
+    /// Explicit journal prompt provenance, not a UI-injected message role.
+    pub fn with_system_prompts(self) -> Self {
+        for line in self.sessions.lock().unwrap().values_mut() {
+            let old = std::mem::take(&mut line.rows);
+            for row in old {
+                let mut value = serde_json::to_value(row).unwrap();
+                let user = (value["event"]["type"] == "user/message")
+                    .then(|| value["event"]["data"]["turn"].as_u64().unwrap());
+                value["event"]["seq"] = json!(line.rows.len());
+                value["event"]["time"] = json!(line.rows.len() + 1);
+                line.rows.push(serde_json::from_value(value).unwrap());
+                if let Some(turn) = user {
+                    append(line, "step/start", json!({"turn":turn,"step":1}));
+                    append(
+                        line,
+                        "system/message",
+                        json!({"turn":turn,"step":1,"message":{"content":[{"type":"text","text":"公开日志中的初始系统提示词。\n".repeat(8)}]}}),
+                    );
+                }
+            }
+        }
+        self
+    }
     /// Owned public journal fixture: a later input in the same turn, followed by
     /// a separate final response frame. No real tool, file or provider is used.
     pub fn with_input_bounded_history(self) -> Self {

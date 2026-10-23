@@ -3122,10 +3122,14 @@ pub fn run() {
         !summary_context_selftest || args.iter().any(|arg| arg == "--transcript-content"),
         "workspace Summary requires formal host"
     );
+    let prompt_history_selftest = args
+        .iter()
+        .any(|arg| arg == "--prompt-history-native-selftest");
     let segmented_history_selftest = args
         .iter()
         .any(|arg| arg == "--segmented-history-native-selftest");
-    let disclosure_reading_selftest = segmented_history_selftest
+    let disclosure_reading_selftest = prompt_history_selftest
+        || segmented_history_selftest
         || args
             .iter()
             .any(|arg| arg == "--disclosure-reading-native-selftest");
@@ -3315,6 +3319,11 @@ pub fn run() {
                 };
                 let fixture = if segmented_history_selftest {
                     fixture.with_input_bounded_history()
+                } else {
+                    fixture
+                };
+                let fixture = if prompt_history_selftest {
+                    fixture.with_system_prompts()
                 } else {
                     fixture
                 };
@@ -3689,7 +3698,7 @@ pub fn run() {
         panel_projection_probe: panel_projection_selftest.then(panel_projection_probe::Probe::new),
         composer_notice_probe: composer_notice_selftest.then(composer_notice_probe::Probe::new),
         disclosure_reading_probe: disclosure_reading_selftest
-            .then(disclosure_reading_probe::Probe::new),
+            .then(|| disclosure_reading_probe::Probe::new(prompt_history_selftest)),
         readonly_reading_probe: (readonly_reading_selftest || harness_readonly_reading_selftest)
             .then(|| readonly_reading_probe::Probe::new(bounded_probe_child)),
         reading_probe: if reading_selftest || harness_reading_selftest {

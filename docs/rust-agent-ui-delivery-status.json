@@ -22,11 +22,11 @@
   "tekesuiInputDigest": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
   "richToolCardRendering": false,
   "crossProcessAccepted": false,
-  "sourceBase": "f6471003867dbb3a67f8eb2ef124b2ee157b3f2e",
-  "sourceStage": "plus canonical input-bounded Activity segments, semantic entry counts, passive empty-final status, retained original controls and scoped local generation; initial prompt role, narration differences, rich/paired Views and formal ProcessContainer remain incomplete",
+  "sourceBase": "42575eff33683ae5dce2894f3b7fe59898f553fa",
+  "sourceStage": "plus explicit journal prompt/effective surface replay, header de-duplication, bound Journal/native opening-input roles, initial/opening/Activity physical composition, prompt disclosures and source-version tie ordering; remaining narration differences, rich/paired Views and formal ProcessContainer are incomplete",
   "sourcesRead": {
     "ui/components/src/run_port.rs": "bc7e40abf784b1bae366e55f229e81f14123853faba428534c023d8d1b181ab3",
-    "ui/components/src/transcript_content.rs": "4c73d3a537380e448342037d28d05e89f79cf9d25ec7f85cf5a9ef39f64773e7",
+    "ui/components/src/transcript_content.rs": "a457ee344420a723e0622b0c86a31c14d6c58dcc18597c005d0df5f695091f5c",
     "ui/components/src/indicators.rs": "0e14f0615bbf6984faa21de8ff949407bff5f39cbc8d9132554e256d26b10706",
     "ui/components/src/sidebar.rs": "cc6ffe52644de133e634a1a49462e997bd26952357b2548d12fdea09667be566",
     "ui/components/src/side_panel.rs": "2e6a1a102e24856da8532c174e1d8700976e61caee1c80af75c3145499253094",
@@ -40,30 +40,33 @@
     "crates/presentation/src/tool_card.rs": "f30ee76b29a6c8c7ad74b5d9fb12765ed998b60f8a78be8c7511d3a05c5e5a16",
     "crates/presentation/src/tool_row.rs": "82e17001e55eaffc2452d0d18aef21406ff68373344f221456791bdad8037de6",
     "crates/presentation/src/transcript_thinking.rs": "eff3e794fff186a140b33888825dfae65cab32d6f0cc9bcefebb55570b2595a3",
-    "ui/components/src/output_message.rs": "a7d3411a78a7f8066b0e0fd8d2af63b09078d0db1707f042c470c6817a118c97",
+    "ui/components/src/output_message.rs": "6a870e6180031043e55a309c061259bd014b93d214aab21112e14c58eb120f59",
     "crates/presentation/src/transcript_thinking_sources.rs": "fcf19dd90e6c5f7f42bf33a11562a0452e52769f4541a89b0361e6639f487134",
     "crates/session/src/native_assistant.rs": "0ddd4556c5df20782ca2378d4899f42777f0f76e6ed0a71647669ff2c72dd9ec",
     "ui/components/src/readonly_transcript.rs": "7552c781dbda48829b194f639caedf03c2c1eef450ad183cdd70e8f3dba9ed07",
     "ui/demo/src/component_demo.rs": "2fb4264a3a01a5be187e9d37019298ece712211cdfd1d0e3a44535bbea22e8c9",
-    "ui/consumer/src/lib.rs": "0667e9caff41f268a96932ff5ba2e1f7f3afe65e58584c0adf141bf7c4ba35e6",
+    "ui/consumer/src/lib.rs": "b768ea9973d1e2e96f18985cd8645847146608d9f4d6b40790b2bd50586fe689",
     "ui/demo/tests/thinking_sources.rs": "b5f35fd9e0c2605dd83cd67b1eaf5f43caa19d6c7949c97fbf7b7e3a13a0d613",
-    "crates/presentation/src/transcript.rs": "fb0da1616c1db12c9647c14093e36279239f42fc01b7707a6bb5f53a0000da16",
+    "crates/presentation/src/transcript.rs": "3fe37e19ab37ae2d8d1b4ef4d3c433be3b8edbcecb65a98a3ef2ac6db32877ec",
     "crates/presentation/tests/thinking_sources.rs": "b0bc26463c7848cf07852c9d5926e01d3dcfd721d92b11325826b6958d126459",
     "ui/demo/tests/output_message.rs": "4a5eb9658732a00755c8636c7a37515f32a54e8736fac78f31f8819774a1251a",
-    "crates/presentation/src/transcript_order.rs": "43515cabe7da31d93888c922ac97447d9a23bfee6957951c206f427408a37c04",
+    "crates/presentation/src/transcript_order.rs": "244918b06a0441c7596fb285f35d46f06a638dcf50a3a1db8f38868163a317e8",
     "crates/presentation/tests/transcript_order.rs": "513cef92e8aa1b88268e6b43fe395cffaa89a18d59567289976c71bdd62039e7",
-    "ui/components/src/lib.rs": "65bd63f8024f92e085521a7c0ba9e551d1c73c3a6c4d0c3508f247d9a0835c29",
-    "ui/demo/tests/display_order.rs": "b578f697e94b41ffa4880f9febcf9b1bb64cc21718c0a339a62e22d05407d5e5",
+    "ui/components/src/lib.rs": "1d23aad128a7f99ec96815ec8a639a0eea1a092aa9463bb310e95a1f507d8682",
+    "ui/demo/tests/display_order.rs": "77d04f5870a5e3e37c5062dc01e32cae2cb1fef9a6192b00597dc96e75d83b7a",
     "ui/demo/tests/run_reading.rs": "ea1fb4ed3f0c4219edc9e4cd1509fc24f9163236b8bcda2a03d80ff0263d4c44",
     "crates/presentation/src/lib.rs": "90580d75101ffe730527972bad49929a764fbfe14ea939e6f2d2b64a94969572",
-    "crates/presentation/src/transcript_planes.rs": "58ccc16507e5f438f944d196eea748c5b38a923f1599f015dc0450946f7036e2",
+    "crates/presentation/src/transcript_planes.rs": "f8332f5d1d907d5308404c4778e6e942b0103d4842780837843800e05d22330b",
     "crates/presentation/tests/transcript_planes.rs": "207d1f8a2ef5298b07741066041edf365df40c8e56efdf4a35f7ed1007ed4ce7",
     "ui/demo/src/native_stream_selftest.rs": "0b49ed42f72090a64fa8566ed8bf60356cc3b607c87b94f526584f0fa03a5ef7",
     "ui/components/src/turn_footnote_timing.rs": "5cbded0aeadbd59f62ebbf2a08c7d13143b0d9a40a4d5f18232d21a6f19c0277",
-    "ui/components/src/transcript_content/segments.rs": "ced7152684b24d782748b6cbb1bd8e8010e6ee6b3b3a4bee94f147d1da07340b",
-    "ui/demo/src/components_native.rs": "73cb806a406bfda91ea60b81069007c7d6004cf154205e43499a7464406b7756",
-    "ui/demo/src/fixture.rs": "93398037685be786344cac3ced786511c0364fc57c5ca96017d66e1555d31b32",
-    "ui/demo/src/native_disclosure_reading_selftest.rs": "9d7564465b1ebc89129f771352af4fc0fc40dee9fc228cd975d575a351cbae4b"
+    "ui/components/src/transcript_content/segments.rs": "3b5954b391f519d618437490283293660abdcac96f7d9fdecc6b47e9b2cd9396",
+    "ui/demo/src/components_native.rs": "cd98cf54e0517432b4173662c3a2093b47e02293171e6501bc58a82497f42bfb",
+    "ui/demo/src/fixture.rs": "d66d7a60802a4ed16b9670446c0c8d7cd2ffa2241b9b4e89ffde3fad8a2a7838",
+    "ui/demo/src/native_disclosure_reading_selftest.rs": "c8a04a86b812818d94389f06663b7c0e1d0cedf54f9e8957261a5e65915a0dae",
+    "crates/presentation/src/transcript/prompt.rs": "2e5986884e2a6fefe07d0af7ef4b30ab83369240beb5e6978f1e3763812515f2",
+    "crates/presentation/src/transcript_document.rs": "cf93176f97c5d8c586b17ba1c23b9ccf78fd42cd81b1d5c1061327165384a452",
+    "crates/presentation/tests/system_prompt.rs": "4b5b64048fec5d4d821c53dc0f71f022f9cfdfb9c5c6560a4fb0184e0995e94b"
   },
   "publicIssues": [
     {
@@ -408,26 +411,31 @@
       }
     ]
   },
-  "latestVerifiedCiHead": "f6471003867dbb3a67f8eb2ef124b2ee157b3f2e",
-  "latestVerifiedCiConclusion": "checks x2 SUCCESS; UI x2 FAILURE at strict nested-detail reading (official job API); new segment-head CI pending separately",
+  "latestVerifiedCiHead": "42575eff33683ae5dce2894f3b7fe59898f553fa",
+  "latestVerifiedCiConclusion": "checks x2 SUCCESS; UI x2 FAILURE at strict nested-detail reading, both official job steps verified; new source-head CI pending separately",
   "knownFailure": "Nested detail scroll leaves parent following; strict gate remains required",
-  "currentValidation": "rust-agent-ui-activity-segments-20261023.json",
+  "currentValidation": "rust-agent-ui-system-prompts-20261023.json",
   "currentSourceNativeAccepted": false,
   "latestNativeAcceptance": {
-    "sourceBase": "f6471003867dbb3a67f8eb2ef124b2ee157b3f2e",
+    "sourceBase": "42575eff33683ae5dce2894f3b7fe59898f553fa",
     "sourceSha256": {
-      "ui/components/src/readonly_transcript.rs": "7552c781dbda48829b194f639caedf03c2c1eef450ad183cdd70e8f3dba9ed07",
-      "ui/components/src/run_port.rs": "bc7e40abf784b1bae366e55f229e81f14123853faba428534c023d8d1b181ab3",
-      "ui/components/src/transcript_content.rs": "4c73d3a537380e448342037d28d05e89f79cf9d25ec7f85cf5a9ef39f64773e7",
-      "ui/components/src/transcript_content/segments.rs": "ced7152684b24d782748b6cbb1bd8e8010e6ee6b3b3a4bee94f147d1da07340b",
-      "ui/consumer/src/lib.rs": "0667e9caff41f268a96932ff5ba2e1f7f3afe65e58584c0adf141bf7c4ba35e6",
-      "ui/demo/src/components_native.rs": "73cb806a406bfda91ea60b81069007c7d6004cf154205e43499a7464406b7756",
-      "ui/demo/src/fixture.rs": "93398037685be786344cac3ced786511c0364fc57c5ca96017d66e1555d31b32",
-      "ui/demo/src/native_disclosure_reading_selftest.rs": "9d7564465b1ebc89129f771352af4fc0fc40dee9fc228cd975d575a351cbae4b",
-      "ui/demo/tests/display_order.rs": "b578f697e94b41ffa4880f9febcf9b1bb64cc21718c0a339a62e22d05407d5e5",
-      "ui/demo/tests/run_reading.rs": "ea1fb4ed3f0c4219edc9e4cd1509fc24f9163236b8bcda2a03d80ff0263d4c44"
+      "crates/presentation/src/transcript.rs": "3fe37e19ab37ae2d8d1b4ef4d3c433be3b8edbcecb65a98a3ef2ac6db32877ec",
+      "crates/presentation/src/transcript/prompt.rs": "2e5986884e2a6fefe07d0af7ef4b30ab83369240beb5e6978f1e3763812515f2",
+      "crates/presentation/src/transcript_document.rs": "cf93176f97c5d8c586b17ba1c23b9ccf78fd42cd81b1d5c1061327165384a452",
+      "crates/presentation/src/transcript_order.rs": "244918b06a0441c7596fb285f35d46f06a638dcf50a3a1db8f38868163a317e8",
+      "crates/presentation/src/transcript_planes.rs": "f8332f5d1d907d5308404c4778e6e942b0103d4842780837843800e05d22330b",
+      "crates/presentation/tests/system_prompt.rs": "4b5b64048fec5d4d821c53dc0f71f022f9cfdfb9c5c6560a4fb0184e0995e94b",
+      "ui/components/src/lib.rs": "1d23aad128a7f99ec96815ec8a639a0eea1a092aa9463bb310e95a1f507d8682",
+      "ui/components/src/output_message.rs": "6a870e6180031043e55a309c061259bd014b93d214aab21112e14c58eb120f59",
+      "ui/components/src/transcript_content.rs": "a457ee344420a723e0622b0c86a31c14d6c58dcc18597c005d0df5f695091f5c",
+      "ui/components/src/transcript_content/segments.rs": "3b5954b391f519d618437490283293660abdcac96f7d9fdecc6b47e9b2cd9396",
+      "ui/consumer/src/lib.rs": "b768ea9973d1e2e96f18985cd8645847146608d9f4d6b40790b2bd50586fe689",
+      "ui/demo/src/components_native.rs": "cd98cf54e0517432b4173662c3a2093b47e02293171e6501bc58a82497f42bfb",
+      "ui/demo/src/fixture.rs": "d66d7a60802a4ed16b9670446c0c8d7cd2ffa2241b9b4e89ffde3fad8a2a7838",
+      "ui/demo/src/native_disclosure_reading_selftest.rs": "c8a04a86b812818d94389f06663b7c0e1d0cedf54f9e8957261a5e65915a0dae",
+      "ui/demo/tests/display_order.rs": "77d04f5870a5e3e37c5062dc01e32cae2cb1fef9a6192b00597dc96e75d83b7a"
     },
-    "programSha256": "cb3b3aa319db68c9bc8859654c4f26ec7cb42e0eed6ec7f4aa5dfcd76897c362",
+    "programSha256": "6a3a49e75020042f00d47561bfec46a2cfafe33754de15d8225517f9c9684ec7",
     "realHarness": true,
     "realHarnessProfiles": {
       "pi": {
@@ -657,9 +665,30 @@
       }
     },
     "ownedHistoryProfiles": {
+      "prompt": {
+        "activityExpandCollapseReopenClicks": true,
+        "expandedDetailsRetained": true,
+        "initialPromptBeforeInputAndOriginalDisclosure": true,
+        "inputBoundedHistory": false,
+        "liveResize": true,
+        "nativeWindow": true,
+        "noSubmission": true,
+        "normalActivityInitiallyCollapsed": true,
+        "originalEditorFocusAndChineseMarked": true,
+        "originalToolAndReasoningClicks": true,
+        "originalToolAndReasoningTextOwnersRetained": true,
+        "ownedProtocolHistory": true,
+        "physicalIme": false,
+        "physicalResizeDrag": false,
+        "readingAnchorPreserved": true,
+        "realHarness": false,
+        "typeScaleReflow": true,
+        "voiceOver": false
+      },
       "segmented": {
         "activityExpandCollapseReopenClicks": true,
         "expandedDetailsRetained": true,
+        "initialPromptBeforeInputAndOriginalDisclosure": false,
         "inputBoundedHistory": true,
         "liveResize": true,
         "nativeWindow": true,
@@ -679,6 +708,7 @@
       "ordinary": {
         "activityExpandCollapseReopenClicks": true,
         "expandedDetailsRetained": true,
+        "initialPromptBeforeInputAndOriginalDisclosure": false,
         "inputBoundedHistory": false,
         "liveResize": true,
         "nativeWindow": true,
@@ -704,19 +734,19 @@
       "profile": "launch-services-app",
       "applicationExitCode": null,
       "launcherExitCode": 0,
-      "pid": 81873,
+      "pid": 33774,
       "sourceBefore": "com.apple.inputmethod.SCIM.ITABC",
       "sourceAfter": "com.apple.inputmethod.SCIM.ITABC",
-      "binarySha256": "cb3b3aa319db68c9bc8859654c4f26ec7cb42e0eed6ec7f4aa5dfcd76897c362"
+      "binarySha256": "6a3a49e75020042f00d47561bfec46a2cfafe33754de15d8225517f9c9684ec7"
     },
     "completeUiAccepted": false,
     "processContainer": false,
     "currentSourcePartialAccepted": true,
-    "evidence": "rust-agent-ui-activity-segments-20261023.json"
+    "evidence": "rust-agent-ui-system-prompts-20261023.json"
   },
   "latestLocalValidation": {
-    "rootTests": 289,
-    "fullUiTests": 600,
+    "rootTests": 301,
+    "fullUiTests": 602,
     "uiIgnored": 1,
     "newSourceTests": 11,
     "newFixtureConsumerPipelineTests": 1,
@@ -741,6 +771,13 @@
       "format": true,
       "boundaries": true,
       "root": "unchanged-root independent prior evidence"
+    },
+    "systemPrompts": {
+      "sourceTests": 12,
+      "newComponentConsumerTests": 2,
+      "rootAndUiTestsRerun": true,
+      "rootAndUiStrictClippy": true,
+      "rootHeadlessRebuilt": true
     }
   },
   "publicProcessContractSources": {
@@ -749,7 +786,7 @@
   },
   "processContainer": "Reviewed at exact public 50ec49f; new_view keyboard/IME/AX unavailable; V1 keyboard/scroll/text_ime/accessibility false; #48 remains required",
   "newTargets": 0,
-  "deletedBytes": 0,
+  "deletedBytes": null,
   "historicalEvidence": [
     "rust-agent-ui-feedback-recovery-20261022.json",
     "rust-agent-ui-native-resumed-20261023.json",
@@ -786,5 +823,7 @@
   "outputController": "rust-agent-ui-output-controller-20261023.json",
   "currentSourceNativeAcceptedMeans": "Complete UI acceptance remains unproven; exact current-source partial native profiles are recorded separately",
   "physicalPlanes": "rust-agent-ui-physical-planes-20261023.json",
-  "activitySegments": "rust-agent-ui-activity-segments-20261023.json"
+  "activitySegments": "rust-agent-ui-activity-segments-20261023.json",
+  "systemPrompts": "rust-agent-ui-system-prompts-20261023.json",
+  "removedUniqueFileAllocatedBytes": 429838336
 }
