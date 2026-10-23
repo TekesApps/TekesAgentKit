@@ -1,11 +1,11 @@
 //! Opt-in owned-session native host probe; no alternate renderer or state machine.
 use super::*;
+use crate::acceptance_script::{Action, run_script};
 use tekes_agent_components_ui::{
     OutputContentKind, OutputMessage, TranscriptContent, TranscriptContentRowKey,
     TranscriptMessageIdentity,
 };
 use tekes_agent_presentation::{RunSnapshot, TranscriptDocument, TranscriptItemKind};
-use tekes_ui_platform_macos::selftest::{Action, run_script};
 
 pub(super) const INPUT: &str = "ENDPOINT_STREAM_NATIVE_PROOF";
 const OTHER_DRAFT: &str = "另一会话保留草稿";

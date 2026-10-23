@@ -1,11 +1,11 @@
 //! Explicit workspace Summary over the original shared component. No fake Run.
 use super::*;
+use crate::acceptance_script::{Action, run_script};
 use serde_json::json;
 use tekes_agent_components_ui::{
     SummaryContextInput, SummaryOwner, SummaryRow, SummarySection, SummaryView,
 };
 use tekes_ui_controls::ButtonTextRenderer;
-use tekes_ui_platform_macos::selftest::{Action, run_script};
 const SECTION: &str = "host:workspace";
 pub(super) struct Probe {
     phase: u8,

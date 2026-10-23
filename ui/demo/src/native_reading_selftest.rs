@@ -1,9 +1,9 @@
 //! Actual native/GPU layout over an owned local SEP. Wheel and preedit are
 //! synthetic; the page travels through the public binding and original request.
 use super::*;
+use crate::acceptance_script::{Action, run_script};
 use tekes_agent_components_ui::RunPort;
 use tekes_ui_controls::composition::{ContentReadingAnchorUpdate, ScrollContent};
-use tekes_ui_platform_macos::selftest::{Action, run_script};
 
 pub(super) struct Probe {
     gate: Option<Arc<tokio::sync::Semaphore>>,

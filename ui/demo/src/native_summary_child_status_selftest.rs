@@ -1,8 +1,8 @@
 //! Public SEP inventory -> existing presentation -> retained original native Summary.
 use super::*;
+use crate::acceptance_script::{Action, run_script};
 use tekes_agent_components_ui::{SummaryActionRow, SummarySubagentIndicator, SummaryView};
 use tekes_agent_ui_demo::fixture::Fixture;
-use tekes_ui_platform_macos::selftest::{Action, run_script};
 const CHILD: &str = "b437cf34-5661-45e2-a674-113b27c92f89";
 pub(super) struct Probe {
     fixture: Fixture,

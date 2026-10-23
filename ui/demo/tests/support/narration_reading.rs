@@ -435,7 +435,7 @@ fn original_tool_group_reading_point_survives_result_updates_with_composer_preed
     )
     .unwrap();
     let ids = run.ids();
-    let fragments = tool_fragments(run.transcript().unwrap(), &owners);
+    let fragments = tool_rows(run.transcript().unwrap());
     assert_eq!(fragments.len(), 2);
     let target = fragments[1].1;
     let inner = run
@@ -477,13 +477,7 @@ fn original_tool_group_reading_point_survives_result_updates_with_composer_preed
     )
     .unwrap();
     let y = host.get(target).unwrap().frame().min_y();
-    let group = host
-        .get(target)
-        .unwrap()
-        .component::<OutputMessageFragment>()
-        .unwrap()
-        .children()[0]
-        .id();
+    let group = target;
     let group_owner = host.get(group).unwrap().component::<ToolRun>().unwrap() as *const _ as usize;
     assert!(host.focus(Some(ids.composer.editor), true));
     host.event(&ContentEvent::Preedit {
@@ -551,12 +545,15 @@ fn original_tool_group_reading_point_survives_result_updates_with_composer_preed
     // Inserting original narration before the calls shifts canonical block
     // indices and content above the anchor. Sole tool identities and their
     // existing controls must survive; the SDK compensates the reading position.
-    let original_parts = host
-        .get(target)
-        .unwrap()
-        .component::<OutputMessageFragment>()
-        .unwrap()
-        .content_ids();
+    let original_parts = canonical_parts(
+        host.get(ids.root)
+            .unwrap()
+            .component::<RunPort>()
+            .unwrap()
+            .transcript()
+            .unwrap(),
+        &fragments[1].0,
+    );
     let mut shifted = next.clone();
     shifted.revision += 1;
     let item_id = match &owners[1] {
@@ -619,11 +616,15 @@ fn original_tool_group_reading_point_survives_result_updates_with_composer_preed
         .unwrap();
     render(&mut host, &mut text);
     assert_eq!(
-        host.get(target)
-            .unwrap()
-            .component::<OutputMessageFragment>()
-            .unwrap()
-            .content_ids(),
+        canonical_parts(
+            host.get(ids.root)
+                .unwrap()
+                .component::<RunPort>()
+                .unwrap()
+                .transcript()
+                .unwrap(),
+            &fragments[1].0
+        ),
         original_parts
     );
     assert_eq!(
@@ -649,7 +650,6 @@ fn original_tool_group_reading_point_survives_result_updates_with_composer_preed
 fn readonly_original_tool_fragments_keep_local_segment_selection_and_publication() {
     let source = origin_tool_run();
     let scope = RunScope::main("sep", "s");
-    let owners = tool_owners(&source);
     let (_, _, before, final_segment) = embedded_segments(&source);
     let mut pane =
         ReadOnlyTranscript::standard(36000, 36010..36500, scope.clone(), Default::default())
@@ -675,7 +675,7 @@ fn readonly_original_tool_fragments_keep_local_segment_selection_and_publication
     let plan = pane.prepare_update(input).unwrap();
     let predicted = plan.item_ids();
     pane.apply_prepared_update(&plan).unwrap();
-    let fragments = tool_fragments(pane.content(), &owners);
+    let fragments = tool_rows(pane.content());
     assert_eq!(fragments.len(), 2);
     assert!(fragments.iter().all(|(_, id)| predicted.contains(id)));
     assert!(!pane.content().feedback_enabled());
@@ -704,7 +704,7 @@ fn readonly_original_tool_fragments_keep_local_segment_selection_and_publication
         .unwrap()
         .component::<ReadOnlyTranscript>()
         .unwrap();
-    assert_eq!(tool_fragments(pane.content(), &owners), fragments);
+    assert_eq!(tool_rows(pane.content()), fragments);
     assert!(pane.prepare_update(input).is_err());
     assert!(host.focused().is_none());
 }

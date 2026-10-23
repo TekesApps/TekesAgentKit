@@ -1,8 +1,8 @@
 //! Owned-fixture native pointer proof of the original Menu and preference store.
 use super::*;
+use crate::acceptance_script::{Action, run_script};
 use tekes_agent_components_ui::{SidebarOptions, SidebarSort};
 use tekes_ui_controls::composition::{ButtonContent, MenuContent, PointerPhase};
-use tekes_ui_platform_macos::selftest::{Action, run_script};
 pub(super) struct Probe {
     phase: u8,
     session_menu: bool,

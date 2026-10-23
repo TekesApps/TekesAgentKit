@@ -27,6 +27,9 @@ class NativeLaunchTests(unittest.TestCase):
             plistlib.dump({'CFBundleExecutable': 'Probe', 'CFBundlePackageType': 'APPL'}, out)
         self.log = self.base / 'native.log'
         self.marker = 'NATIVE_RECEIPT '
+        lease = patch('native_probe_launcher.host_lease', return_value=contextlib.nullcontext())
+        lease.start()
+        self.addCleanup(lease.stop)
 
     def launch(self, *, text='NATIVE_RECEIPT {}\n', status=0, timeout=False):
         def run(command, **kwargs):
@@ -81,12 +84,20 @@ class NativeLaunchTests(unittest.TestCase):
         self.assertNotIn('TEKES_SELFTEST', str(error.exception))
         self.assertIn('original native stderr', self.log.read_text())
 
-    def test_direct_launch_still_requires_original_application_zero_exit(self):
-        def run(command, **kwargs):
-            kwargs['stdout'].write('NATIVE_RECEIPT {}\n')
-            return subprocess.CompletedProcess(command, -6)
-        with patch('native_probe_launcher.subprocess.run', side_effect=run), contextlib.redirect_stdout(io.StringIO()), self.assertRaises(AssertionError):
-            run_native_probe(self.program, [], {}, self.log, self.marker)
+    def test_direct_historical_launch_is_rejected_without_execution(self):
+        with patch('native_probe_launcher.subprocess.run') as execute:
+            with self.assertRaisesRegex(ValueError, 'fixed signed host'):
+                run_native_probe(self.program, [], {}, self.log, self.marker)
+            execute.assert_not_called()
+
+    def test_existing_evidence_is_never_overwritten(self):
+        original = Path(str(self.log) + '.stderr')
+        original.write_text('historical evidence')
+        with patch('native_probe_launcher.subprocess.run') as execute:
+            with self.assertRaisesRegex(ValueError, 'preserve existing'):
+                run_native_probe(self.program, [], {}, self.log, self.marker, bundle=self.bundle)
+            execute.assert_not_called()
+        self.assertEqual(original.read_text(), 'historical evidence')
 
     def test_frontmost_trace_only_queries_identity(self):
         with patch('native_frontmost_trace.subprocess.check_output', side_effect=['ASN:0x0-0x123:\n', '"pid"=1234\n"CFBundleIdentifier"="app.probe"\n']) as query:

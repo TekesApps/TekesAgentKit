@@ -1,10 +1,10 @@
 //! Original Summary label, native CoreText rendering and resident Composer.
 use super::*;
+use crate::acceptance_script::{Action, run_script};
 use tekes_agent_components_ui::{
     SummaryContextInput, SummaryOwner, SummaryRow, SummarySection, SummaryView,
 };
 use tekes_ui_controls::composition::TextContent;
-use tekes_ui_platform_macos::selftest::{Action, run_script};
 const TITLE: &str = "工作区 Summary 👩🏽‍💻 e\u{301} · repository/非常长的分支名称与完整状态标题 · 历史与工具输出 · 完整源标题不可丢失";
 pub(super) struct Probe {
     phase: u8,

@@ -1423,7 +1423,7 @@ fn handle_part_actions(nodes: &mut [Content], actions: &[ContentAction]) -> bool
     for node in nodes {
         if let Some(group) = node.component_mut::<crate::ToolRun>() {
             changed |= group.handle_disclosure(actions);
-            if group.is_expanded() {
+            if group.members_visible() {
                 for node in group.member_nodes_mut() {
                     changed |= toggle(node.component_mut::<OutputPart>().unwrap(), actions);
                 }
@@ -1440,7 +1440,7 @@ fn visible_part_nodes(nodes: &[Content]) -> Vec<&Content> {
         .iter()
         .flat_map(|node| {
             if let Some(group) = node.component::<crate::ToolRun>() {
-                if group.is_expanded() {
+                if group.members_visible() {
                     group.member_nodes().collect()
                 } else {
                     vec![]
@@ -1583,39 +1583,6 @@ fn tool_part_runs(
     }
     Ok(result)
 }
-pub(crate) fn tool_belongs_to_message(
-    tool: &TranscriptToolCall,
-    item: &TranscriptItem,
-    index: usize,
-) -> bool {
-    use tekes_agent_presentation::TranscriptSourcePosition;
-    match (&tool.source_position, &item.source_position) {
-        (None, _) => true,
-        (
-            Some(TranscriptSourcePosition::Journal {
-                sequence,
-                content_index,
-            }),
-            Some(TranscriptSourcePosition::Journal {
-                sequence: container,
-                ..
-            }),
-        ) => sequence == container && *content_index == Some(index),
-        (
-            Some(TranscriptSourcePosition::Native {
-                entry_id,
-                entry_ordinal,
-                content_index,
-            }),
-            Some(TranscriptSourcePosition::Native {
-                entry_id: container,
-                entry_ordinal: ordinal,
-                ..
-            }),
-        ) => entry_id == container && entry_ordinal == ordinal && *content_index == Some(index),
-        _ => false,
-    }
-}
 fn transcript_parts(
     scope: &RunScope,
     output: &TranscriptOutput<'_>,
@@ -1624,12 +1591,12 @@ fn transcript_parts(
 ) -> Result<Vec<PartFacts>, &'static str> {
     let mut facts = parts(scope, output, section, labels)?;
     facts.retain(|part| {
-        let Slot::Tool(index, id) = &part.slot else {
+        let Slot::Tool(_, id) = &part.slot else {
             return true;
         };
-        section
-            .and_then(|section| section.tools.iter().copied().find(|tool| &tool.id == id))
-            .is_none_or(|tool| tool_belongs_to_message(tool, output.item, *index))
+        // Canonical calls have one independent ToolActivity across message
+        // updates. Only unresolved references remain message-owned content.
+        !section.is_some_and(|section| section.tools.iter().any(|tool| &tool.id == id))
     });
     Ok(facts)
 }

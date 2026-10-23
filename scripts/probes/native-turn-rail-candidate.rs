@@ -7,7 +7,7 @@ use tekes_ui_controls::{
     ReadingDocumentVersion, ScrollRevealOptions, ScrollRevealPlacement,
     composition::{ContentRevealStatus, ScrollContent},
 };
-use tekes_ui_platform_macos::selftest::{Action, run_script};
+use crate::acceptance_script::{Action, run_script};
 // CANDIDATE_ORDINARY_TURN_MODE
 fn ordinary_turn_mode() -> bool {
     false

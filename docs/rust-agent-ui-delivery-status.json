@@ -22,11 +22,11 @@
   "tekesuiInputDigest": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
   "richToolCardRendering": false,
   "crossProcessAccepted": false,
-  "sourceBase": "7903f24be152469b24405abf2bb5418af7164887",
-  "sourceStage": "plus original tool-group physical rows, complete fragment child-ID manifests, predicted namespaces and canonical late-reference ownership; global cross-owner grouping, paired layout, native acceptance and ProcessContainer remain incomplete",
+  "sourceBase": "baa2f55ba74e9616e458c930ebed2169e214c966",
+  "sourceStage": "Development increment: canonical ToolActivity ownership, cross-owner continuous display groups, retained hidden controls, cumulative frame and preedit regression, external-only capture requests and fixed-host validation. Current full UI 616 passed/1 existing ignore and Python 68 passed; native/ProcessContainer/paired Views acceptance remain incomplete.",
   "sourcesRead": {
     "ui/components/src/run_port.rs": "bc7e40abf784b1bae366e55f229e81f14123853faba428534c023d8d1b181ab3",
-    "ui/components/src/transcript_content.rs": "9e2d69d88d24978ae41727b7c69a41f60c1fdb480ac4e9de3465045b1dc1f5d0",
+    "ui/components/src/transcript_content.rs": "fad9d8481f357d93084a7793db75a7f54c2140064fe843562812b5bd8849d92f",
     "ui/components/src/indicators.rs": "0e14f0615bbf6984faa21de8ff949407bff5f39cbc8d9132554e256d26b10706",
     "ui/components/src/sidebar.rs": "cc6ffe52644de133e634a1a49462e997bd26952357b2548d12fdea09667be566",
     "ui/components/src/side_panel.rs": "2e6a1a102e24856da8532c174e1d8700976e61caee1c80af75c3145499253094",
@@ -40,12 +40,12 @@
     "crates/presentation/src/tool_card.rs": "f30ee76b29a6c8c7ad74b5d9fb12765ed998b60f8a78be8c7511d3a05c5e5a16",
     "crates/presentation/src/tool_row.rs": "82e17001e55eaffc2452d0d18aef21406ff68373344f221456791bdad8037de6",
     "crates/presentation/src/transcript_thinking.rs": "eff3e794fff186a140b33888825dfae65cab32d6f0cc9bcefebb55570b2595a3",
-    "ui/components/src/output_message.rs": "434280f4b2c9c03b316269d198360a93f16c9ace8c85615c9ab6f8c69dbed91e",
+    "ui/components/src/output_message.rs": "eba08aa1c319f1c2ef77302ebaa111357e9a01a8dee7991f5c4d4befedcf89e3",
     "crates/presentation/src/transcript_thinking_sources.rs": "fcf19dd90e6c5f7f42bf33a11562a0452e52769f4541a89b0361e6639f487134",
     "crates/session/src/native_assistant.rs": "0ddd4556c5df20782ca2378d4899f42777f0f76e6ed0a71647669ff2c72dd9ec",
     "ui/components/src/readonly_transcript.rs": "7552c781dbda48829b194f639caedf03c2c1eef450ad183cdd70e8f3dba9ed07",
     "ui/demo/src/component_demo.rs": "2fb4264a3a01a5be187e9d37019298ece712211cdfd1d0e3a44535bbea22e8c9",
-    "ui/consumer/src/lib.rs": "20caee3235b7aea72b2123584501772a24b0d74f2e813338ae5bb6b65dd94681",
+    "ui/consumer/src/lib.rs": "48e5a2e8f20bcb9bb69a7365c42581eb6d08c7c6004e7d2e56bc92ffc716c44a",
     "ui/demo/tests/thinking_sources.rs": "b5f35fd9e0c2605dd83cd67b1eaf5f43caa19d6c7949c97fbf7b7e3a13a0d613",
     "crates/presentation/src/transcript.rs": "3fe37e19ab37ae2d8d1b4ef4d3c433be3b8edbcecb65a98a3ef2ac6db32877ec",
     "crates/presentation/tests/thinking_sources.rs": "b0bc26463c7848cf07852c9d5926e01d3dcfd721d92b11325826b6958d126459",
@@ -53,17 +53,17 @@
     "crates/presentation/src/transcript_order.rs": "b254c88b440210fec3156de14da26af74122568acd47f89c32e9224f979e4b65",
     "crates/presentation/tests/transcript_order.rs": "e69c86eb243d1277607f9d1f47f192133d58c0223165fc20215afd41148cea1e",
     "ui/components/src/lib.rs": "60176578f5fe011e5fcf1075d2e3ba74cf10baff868751424327b37de60a5a50",
-    "ui/demo/tests/display_order.rs": "1570308878c5102a7006a1774087bcb665632160209f7878d43766738bbc1e95",
+    "ui/demo/tests/display_order.rs": "bc0509fbe1cc8ae6c78b4918d5b45296ffc0674e026b287240f649ae87c23ce3",
     "ui/demo/tests/run_reading.rs": "ea1fb4ed3f0c4219edc9e4cd1509fc24f9163236b8bcda2a03d80ff0263d4c44",
     "crates/presentation/src/lib.rs": "594f881cd6bf9e059c840b9a15264ff462db5f308e78ddbe6c333201b6dcb522",
     "crates/presentation/src/transcript_planes.rs": "f8332f5d1d907d5308404c4778e6e942b0103d4842780837843800e05d22330b",
     "crates/presentation/tests/transcript_planes.rs": "207d1f8a2ef5298b07741066041edf365df40c8e56efdf4a35f7ed1007ed4ce7",
-    "ui/demo/src/native_stream_selftest.rs": "0b49ed42f72090a64fa8566ed8bf60356cc3b607c87b94f526584f0fa03a5ef7",
+    "ui/demo/src/native_stream_selftest.rs": "390249d0097f3da2190d1bc95453c64d1692d0ca47a8c74ee62fd13999560088",
     "ui/components/src/turn_footnote_timing.rs": "5cbded0aeadbd59f62ebbf2a08c7d13143b0d9a40a4d5f18232d21a6f19c0277",
-    "ui/components/src/transcript_content/segments.rs": "3a3a5c6b3e1a3ccf22502aa0064c82033ea7594a9150f570cb1801c8a89eb20b",
-    "ui/demo/src/components_native.rs": "cd98cf54e0517432b4173662c3a2093b47e02293171e6501bc58a82497f42bfb",
+    "ui/components/src/transcript_content/segments.rs": "c46c56d9fa2b56314fe02b8d077e7d3bdb29ea83bf01feb4925038b6ec46d18a",
+    "ui/demo/src/components_native.rs": "f44c5ddd53e341c97e9dad2b5c62ea55f11e0592f9252bf8f7ca3bcdfd70d9b2",
     "ui/demo/src/fixture.rs": "d66d7a60802a4ed16b9670446c0c8d7cd2ffa2241b9b4e89ffde3fad8a2a7838",
-    "ui/demo/src/native_disclosure_reading_selftest.rs": "c8a04a86b812818d94389f06663b7c0e1d0cedf54f9e8957261a5e65915a0dae",
+    "ui/demo/src/native_disclosure_reading_selftest.rs": "2038be7db03bc9b5b18c7b7bda63112eccc017e04fa535bc826e08c15b95aa32",
     "crates/presentation/src/transcript/prompt.rs": "2e5986884e2a6fefe07d0af7ef4b30ab83369240beb5e6978f1e3763812515f2",
     "crates/presentation/src/transcript_document.rs": "cf93176f97c5d8c586b17ba1c23b9ccf78fd42cd81b1d5c1061327165384a452",
     "crates/presentation/tests/system_prompt.rs": "4b5b64048fec5d4d821c53dc0f71f022f9cfdfb9c5c6560a4fb0184e0995e94b",
@@ -72,10 +72,10 @@
     "crates/presentation/src/transcript_narration.rs": "7ee8ac193470f31b495526a5b1c3274c61349bf095449d02563a9108fed9909a",
     "crates/presentation/tests/narration.rs": "b62ef95f278dbc38ce4216f99dd1d0b8ce29765d933c9939bb72d99ec1c409b4",
     "ui/Cargo.lock": "8790cacd3395460c518f71240052a0bde27a25dbe7e18acda12753c53653d9d1",
-    "ui/components/src/transcript_content/narration.rs": "4b098016a4b9e0dedc22c3e48520648b2dc05c9785c4dba306514b62fdc8b0fd",
-    "ui/demo/tests/support/narration_reading.rs": "3df509cd1a97af26b1726cf5681c66e55eebc60ff7f0ea57d3fc0a196927741b",
+    "ui/components/src/transcript_content/narration.rs": "80ac4a3f1c4f7fcc6b1b15a4c8a94510a744a386781295feadae3dbd2bd98350",
+    "ui/demo/tests/support/narration_reading.rs": "7ca346c5dc4573f9d2b6cb24a1d064a2f1fdce360af82db3a8082337527f66ee",
     "crates/presentation/tests/fixtures/tool-input-boundary-20261023.json": "ef29da01fb04e9aef5cc1233c4103ac0850ee1b51b978caef1c19df40ce23b08",
-    "ui/components/src/output_message/fragment.rs": "45b2cdc493608703c485c98901e741f4f2a487ba5a5874f0da34136dfa44c22b",
+    "ui/components/src/output_message/fragment.rs": "d1b035a25501a8d63e541f4d1d22ef69a538ee8c0a09de1e760d7e147dc91cd8",
     "crates/presentation/tests/fixtures/tool-origin-input-boundary-20261023.json": "940fc6be8b3dcf516396fe0d58f3b2eb029af53d6fabe4055ebd1e29b2923c3d"
   },
   "publicIssues": [
@@ -376,55 +376,55 @@
   ],
   "publicIssuesCheckedAt": "2026-10-23",
   "ciSnapshot": {
-    "headRefOid": "f5dfd8e083d001b3ebc7ff20942ca194391308ef",
+    "headRefOid": "baa2f55ba74e9616e458c930ebed2169e214c966",
     "isDraft": true,
     "statusCheckRollup": [
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-22T19:59:33Z",
+        "completedAt": "2026-10-23T03:37:38Z",
         "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39844572473/job/120054342501",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39895860721/job/120226041232",
         "name": "checks",
-        "startedAt": "2026-10-22T19:57:13Z",
+        "startedAt": "2026-10-23T03:35:55Z",
         "status": "COMPLETED",
         "workflowName": "Rust headless"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-22T19:59:38Z",
+        "completedAt": "2026-10-23T03:37:50Z",
         "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39844564811/job/120054315302",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39895854841/job/120226022567",
         "name": "checks",
-        "startedAt": "2026-10-22T19:57:10Z",
+        "startedAt": "2026-10-23T03:35:51Z",
         "status": "COMPLETED",
         "workflowName": "Rust headless"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-22T20:03:05Z",
+        "completedAt": "2026-10-23T03:40:12Z",
         "conclusion": "FAILURE",
-        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39844572473/job/120054341676",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39895860721/job/120226041200",
         "name": "Rust UI consumer (no native interaction)",
-        "startedAt": "2026-10-22T19:57:13Z",
+        "startedAt": "2026-10-23T03:35:55Z",
         "status": "COMPLETED",
         "workflowName": "Rust headless"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-22T20:02:47Z",
+        "completedAt": "2026-10-23T03:40:05Z",
         "conclusion": "FAILURE",
-        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39844564811/job/120054315679",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39895854841/job/120226022142",
         "name": "Rust UI consumer (no native interaction)",
-        "startedAt": "2026-10-22T19:57:14Z",
+        "startedAt": "2026-10-23T03:35:51Z",
         "status": "COMPLETED",
         "workflowName": "Rust headless"
       }
     ]
   },
-  "latestVerifiedCiHead": "7903f24be152469b24405abf2bb5418af7164887",
-  "latestVerifiedCiConclusion": "checks x2 SUCCESS; UI x2 FAILURE at strict nested-detail step; official API for both jobs",
+  "latestVerifiedCiHead": "baa2f55ba74e9616e458c930ebed2169e214c966",
+  "latestVerifiedCiConclusion": "checks x2 SUCCESS; UI x2 FAILURE at strict nested-detail gate; snapshot before this development increment was pushed",
   "knownFailure": "Nested detail scroll leaves parent following; strict gate remains required",
-  "currentValidation": "rust-agent-ui-physical-tool-fragments-20261023.json",
+  "currentValidation": "rust-agent-ui-global-tool-runs-20261023.json",
   "currentSourceNativeAccepted": false,
   "latestNativeAcceptance": {
     "programSha256": "0c3219f41cde7be2278db39e5e1f15a0050c75f1f7b816d458bae30f5e724506",
@@ -837,8 +837,8 @@
     "evidence": "rust-agent-ui-system-prompts-20261023.json"
   },
   "currentProgram": {
-    "program": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/physical-tool-fragments-20261023/AgentKitToolPartitions.app/Contents/MacOS/tekes-agent-ui-demo",
-    "sha256": "e766a33c09fcbfd971ade5c64dc3d35cffa14b06ececb509a2fd27bb8c59663a"
+    "program": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/pi-1.4.0-compat-20261023/tekes-agent-ui-demo",
+    "sha256": "9eb5003afa9eb2efcec16a48281d6e9573b39dec2fc9908256b48684a2eefe34"
   },
   "historicalValidationBeforeNarrationFrames": {
     "rootTests": 308,
@@ -885,5 +885,12 @@
   },
   "narrationFrameReading": "rust-agent-ui-narration-frame-reading-20261023.json",
   "toolInputBoundary": "rust-agent-ui-tool-input-boundary-20261023.json",
-  "physicalToolFragments": "rust-agent-ui-physical-tool-fragments-20261023.json"
+  "physicalToolFragments": "rust-agent-ui-physical-tool-fragments-20261023.json",
+  "historicalProgramBeforeGlobalToolRuns": {
+    "program": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/physical-tool-fragments-20261023/AgentKitToolPartitions.app/Contents/MacOS/tekes-agent-ui-demo",
+    "sha256": "e766a33c09fcbfd971ade5c64dc3d35cffa14b06ececb509a2fd27bb8c59663a"
+  },
+  "sidePanelContractAudit": "rust-agent-ui-sidepanel-contract-audit-20261023.md",
+  "nativeToolchain": "rust-agent-ui-native-toolchain.md",
+  "piCompatibility": "pi-1.4.0-compat-20261023.json"
 }

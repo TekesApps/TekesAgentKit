@@ -1,4 +1,6 @@
 #[cfg(target_os = "macos")]
+mod acceptance_script;
+#[cfg(target_os = "macos")]
 mod components_native;
 #[cfg(target_os = "macos")]
 mod native;

@@ -161,6 +161,7 @@ impl TranscriptContent {
                 content,
                 thinking: None,
                 hidden: false,
+                group_owner: None,
                 narration_frame: None,
                 activity: None,
             });

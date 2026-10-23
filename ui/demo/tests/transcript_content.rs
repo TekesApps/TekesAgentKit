@@ -332,7 +332,10 @@ fn journal_events_compose_once_with_a_turn_aside_and_cumulative_tool_result() {
         &[
             key("input"),
             TranscriptContentRowKey::ActivityDisclosure("turn".into()),
-            TranscriptContentRowKey::Tool("tool".into()),
+            TranscriptContentRowKey::ContinuousTools {
+                turn_id: "turn".into(),
+                first_tool_id: "tool".into()
+            },
             key("output"),
             TranscriptContentRowKey::TurnFootnote("turn".into())
         ]
@@ -391,7 +394,7 @@ fn journal_events_compose_once_with_a_turn_aside_and_cumulative_tool_result() {
     );
 }
 #[test]
-fn tool_inside_a_message_is_not_rendered_again_as_an_independent_activity() {
+fn message_tool_reference_uses_one_original_canonical_activity() {
     let mut source = snapshot();
     source.items[1].content_blocks = Some(vec![
         TranscriptContentBlock {
@@ -423,7 +426,18 @@ fn tool_inside_a_message_is_not_rendered_again_as_an_independent_activity() {
     assert_eq!(
         view.message_content_ids(&TranscriptMessageIdentity::Item("output".into()))
             .len(),
-        2
+        1
+    );
+    assert!(
+        view.message_tool_fragment_ids(&TranscriptMessageIdentity::Item("output".into()))
+            .is_empty()
+    );
+    let original = view.retained_tool_activity("tool").unwrap().id();
+    expand_activity(&mut view, &source, 1, 1, true);
+    assert_eq!(view.tool_activity_id("tool"), Some(original));
+    assert_eq!(
+        view.tool_run("tool").unwrap().summary().unwrap().tool_ids,
+        vec!["tool"]
     );
 }
 
@@ -1697,10 +1711,10 @@ fn adjacent_tools_keep_original_members_when_prepend_split_and_merge_change_the_
     root(&mut host, root_id)
         .update(&scope(), 2, 1, &s, true)
         .unwrap();
-    assert_eq!(
-        root(&mut host, root_id).tool_run("prepended").unwrap().id(),
-        owner
-    );
+    // ClientKit keys the display group by its first call. Prepending changes
+    // that display identity, while the original business controls survive.
+    let prepended_owner = root(&mut host, root_id).tool_run("prepended").unwrap().id();
+    assert_ne!(prepended_owner, owner);
     assert_eq!(
         root(&mut host, root_id).tool_activity_id("second"),
         Some(second_id)
@@ -1735,7 +1749,7 @@ fn adjacent_tools_keep_original_members_when_prepend_split_and_merge_change_the_
         .unwrap();
     assert_eq!(
         root(&mut host, root_id).tool_run("second").unwrap().id(),
-        owner
+        prepended_owner
     );
     assert_eq!(
         root(&mut host, root_id).tool_activity_id("second"),
@@ -1897,7 +1911,7 @@ fn transcript_routes_one_explicit_header_adapter_to_independent_and_embedded_too
             .text,
         "a:tool: read    +0 −0"
     );
-    assert!(view.tool_run("embedded").is_none());
+    assert!(view.retained_tool_activity("embedded").is_some());
     let old = view.prepare_update(&scope(), 1, 1, &s, true).unwrap();
     REV.store(2, Ordering::SeqCst);
     assert!(view.apply_prepared_update(&old).is_err());
@@ -1926,19 +1940,15 @@ fn transcript_routes_one_explicit_header_adapter_to_independent_and_embedded_too
     REV.store(1, Ordering::SeqCst);
     assert!(view.update(&scope(), 1, 1, &s, true).is_err());
     REV.store(2, Ordering::SeqCst);
-    let output = view
-        .row_id(&TranscriptContentRowKey::MessageFragment(
-            TranscriptMessageIdentity::Item("output".into()),
-            OutputMessageFragmentKind::Tools,
-        ))
-        .unwrap();
-    let host = view.into_host().unwrap();
+    assert!(
+        view.message_tool_fragment_ids(&TranscriptMessageIdentity::Item("output".into()))
+            .is_empty()
+    );
     assert_eq!(
-        host.get(output)
+        view.retained_tool_activity("embedded")
             .unwrap()
-            .component::<OutputMessageFragment>()
+            .tool_header()
             .unwrap()
-            .tool_headers()[0]
             .text,
         "a:embedded: read    +2 −0"
     );
@@ -1979,4 +1989,37 @@ fn foreign_message_controller_cannot_borrow_transcript_scope_or_partially_advanc
     view.validate_prepared_update(&plan).unwrap();
     view.apply_prepared_update(&plan).unwrap();
     assert_eq!(view.row_keys(), keys);
+}
+
+#[test]
+fn offscreen_coverage_excludes_only_proven_empty_bodies_and_rejects_hidden_unknown_content() {
+    let mut source = snapshot();
+    source.items[1].text.clear();
+    source.items[1].content_blocks = Some(vec![]);
+    let mut view = content();
+    view.update(&scope(), 1, 1, &source, true).unwrap();
+    let document = TranscriptDocument::read(&source).unwrap();
+    assert_eq!(
+        tekes_agent_ui_demo::transcript_coverage::verify(&view, &document).unwrap(),
+        (1, 1)
+    );
+    for block in [
+        TranscriptBlockContent::Unknown {
+            content: json!({"unhandled":"retained"}),
+        },
+        TranscriptBlockContent::ToolCall {
+            tool_id: "unresolved".into(),
+        },
+        TranscriptBlockContent::Text {
+            text: "must remain visible".into(),
+        },
+    ] {
+        let mut changed = source.clone();
+        changed.items[1].content_blocks = Some(vec![TranscriptContentBlock {
+            index: 0,
+            content: block,
+        }]);
+        let document = TranscriptDocument::read(&changed).unwrap();
+        assert!(tekes_agent_ui_demo::transcript_coverage::verify(&view, &document).is_err());
+    }
 }

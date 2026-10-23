@@ -1,10 +1,10 @@
 //! Owned-session native Send/Cancel/provider-error/recovery probe, normal callbacks only.
 use super::*;
+use crate::acceptance_script::{Action, run_script};
 use tekes_agent_components_ui::{
     IndicatorFacts, Indicators, OutputContentKind, OutputMessage, TranscriptContent,
 };
 use tekes_agent_presentation::{RunSnapshot, TranscriptItemKind};
-use tekes_ui_platform_macos::selftest::{Action, run_script};
 pub(super) const CANCEL: &str = "ENDPOINT_CANCEL_NATIVE_PROOF";
 const ERROR: &str = "ENDPOINT_ERROR_NATIVE_PROOF";
 const RECOVER: &str = "ENDPOINT_RECOVER_NATIVE_PROOF";

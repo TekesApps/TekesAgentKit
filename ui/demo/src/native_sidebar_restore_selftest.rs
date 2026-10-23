@@ -1,9 +1,9 @@
 //! Native rendering probe of public inventory publications. Owned fixture only;
 //! injected observation failures do not simulate a real harness outage.
 use super::*;
+use crate::acceptance_script::{Action, run_script};
 use tekes_agent_ui_bindings::SidebarPublication;
 use tekes_ui_controls::composition::ButtonContent;
-use tekes_ui_platform_macos::selftest::{Action, run_script};
 const FAILURE: &str = "Sidebar 观察失败：保留最近可读列表";
 pub(super) struct Probe {
     phase: u8,

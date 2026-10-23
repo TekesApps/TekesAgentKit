@@ -1,9 +1,9 @@
 //! Owned-fixture native Summary disclosure probe; normal pointer callbacks and
 //! a real presentation publication, without endpoint mutation or a UI mirror.
 use super::*;
+use crate::acceptance_script::{Action, run_script};
 use tekes_agent_components_ui::{SummaryUsageRowIds, SummaryView};
 use tekes_ui_controls::composition::{ButtonContent, TextContent, TextFieldContent};
-use tekes_ui_platform_macos::selftest::{Action, run_script};
 const DRAFT: &str = "Summary 折叠期间的新草稿";
 pub(super) struct Probe {
     started: Instant,

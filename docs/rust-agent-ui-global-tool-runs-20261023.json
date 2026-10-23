@@ -1,0 +1,100 @@
+{
+  "completionProven": false,
+  "sourceBase": "baa2f55ba74e9616e458c930ebed2169e214c966",
+  "uncommitted": true,
+  "uiTests": {
+    "passed": 616,
+    "failed": 0,
+    "ignored": 1,
+    "ignoredReason": "existing TekesUI #49"
+  },
+  "pythonTests": {
+    "passed": 68,
+    "failed": 0,
+    "signingMocked": true
+  },
+  "strictUiAllTargetsClippy": true,
+  "tekesui": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "nativeInteraction": false,
+  "crossProcessAccepted": false,
+  "actualHostSigningPerformed": false,
+  "nativeHostInstalled": false,
+  "cacheReleasedBytes": 0,
+  "newTargets": 0,
+  "currentProgram": {
+    "program": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/pi-1.4.0-compat-20261023/tekes-agent-ui-demo",
+    "sha256": "9eb5003afa9eb2efcec16a48281d6e9573b39dec2fc9908256b48684a2eefe34"
+  },
+  "sidePanelAudit": "rust-agent-ui-sidepanel-contract-audit-20261023.md",
+  "offscreenEvidence": "rust-agent-ui-offscreen-coverage-20261023.md",
+  "nativeToolchain": "rust-agent-ui-native-toolchain.md",
+  "selectedPiRuntime": "/Users/frankqin/Library/Caches/TekesAgentKit/runtimes/pi-1.4.0",
+  "baselinePiRuntime": "/Users/frankqin/Library/Caches/TekesAgentKit/runtimes/pi-1.3.0",
+  "piEvidence": "pi-1.4.0-compat-20261023.json",
+  "ciSnapshot": {
+    "headRefOid": "baa2f55ba74e9616e458c930ebed2169e214c966",
+    "isDraft": true,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-23T03:37:38Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39895860721/job/120226041232",
+        "name": "checks",
+        "startedAt": "2026-10-23T03:35:55Z",
+        "status": "COMPLETED",
+        "workflowName": "Rust headless"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-23T03:37:50Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39895854841/job/120226022567",
+        "name": "checks",
+        "startedAt": "2026-10-23T03:35:51Z",
+        "status": "COMPLETED",
+        "workflowName": "Rust headless"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-23T03:40:12Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39895860721/job/120226041200",
+        "name": "Rust UI consumer (no native interaction)",
+        "startedAt": "2026-10-23T03:35:55Z",
+        "status": "COMPLETED",
+        "workflowName": "Rust headless"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-23T03:40:05Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39895854841/job/120226022142",
+        "name": "Rust UI consumer (no native interaction)",
+        "startedAt": "2026-10-23T03:35:51Z",
+        "status": "COMPLETED",
+        "workflowName": "Rust headless"
+      }
+    ]
+  },
+  "evidenceSha256": {
+    "review-ui-tests.log": "2d8127ec7544d73648b633dad98f77fd5232077b832b2bd362352b561ff70202",
+    "review-ui-clippy.log": "783526866207ae49b6c0735fbcdb3de4122ea727aa5c41c781f078bd34e84b70",
+    "host-repeated-upgrade-before.log": "3df2da49dc783c45c6f7890041f8c01ac9991826ed627068220ffef7e505c777",
+    "host-repeated-upgrade-after.log": "8ba9fd876b6ae63ec4b3c70ed3040ad7a53fce4ed5456c3721ada69f009f5e57",
+    "offscreen-coverage-summary.json": "f38218388cbaa4c4982ebb4de539b990d725d82b05f39ab3dc0389ade917d3a4",
+    "cumulative-frame-receipt.json": "67ea356d9680455f314c64c410927adaa00b242fd379b92697f384c835211ba5"
+  },
+  "sourceSha256": {
+    "ui/components/src/transcript_content.rs": "fad9d8481f357d93084a7793db75a7f54c2140064fe843562812b5bd8849d92f",
+    "ui/components/src/transcript_content/timeline_tools.rs": "053a034822c08a1fe864d29fe6dd56e94d4f217ef5887c198814e919ee550548",
+    "ui/components/src/tool_run.rs": "0b295e409918a0a62b57aa248ee904813e7dca2068fce4fc8eadeaa2343fd06e",
+    "ui/components/src/output_message.rs": "eba08aa1c319f1c2ef77302ebaa111357e9a01a8dee7991f5c4d4befedcf89e3",
+    "ui/demo/src/acceptance_script.rs": "c57b1f487b0e00525f3a2ca8dca7daf2dc8acf5ef6dc5c63d1c2c201c7b7194b",
+    "ui/demo/src/transcript_coverage.rs": "4af85eda7a637d0800477cc4d8d476fdc04dd2021c8987432c30fe604b514ffe",
+    "scripts/native_acceptance_host.py": "2b670d2a68d6f6a4bf538a3c11eb23a886a26356f5e68cd5ba41d84a129e3355",
+    "scripts/native_probe_launcher.py": "25fc3ba5fe448dd6e0a43a97b2205f40c60423fd63cc026cd618607cd1f595b4",
+    "scripts/tests/test_native_acceptance_host.py": "88ff736cfa9f9de1d42ff04e86dd1a0d43a7fd74781768dc93efa5465744e0ed",
+    "crates/endpoint-pi/src/lib.rs": "e13e40542551b4858481ced6fbb5ca9d59614cad4b9a47ca94d1b5b1f1e4d8cd"
+  }
+}

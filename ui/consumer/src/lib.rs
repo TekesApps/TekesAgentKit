@@ -2772,19 +2772,16 @@ pub fn message_tool_fragments(
     tekes_agent_components_ui::OutputMessageToolFragmentKey,
     tekes_ui_controls::composition::ComponentId,
 )> {
+    content.message_tool_fragment_ids(owner)
+}
+
+/// Original control identity remains queryable while history is folded. This
+/// does not claim that the control is mounted or supply an SDK reading target.
+pub fn retained_tool_control_id(
+    content: &tekes_agent_components_ui::TranscriptContent,
+    tool: &str,
+) -> Option<tekes_ui_controls::composition::ComponentId> {
     content
-        .row_keys()
-        .iter()
-        .filter_map(|key| {
-            if let tekes_agent_components_ui::TranscriptContentRowKey::MessageToolFragment(
-                candidate,
-                tool,
-            ) = key
-            {
-                (candidate == owner).then(|| (tool.clone(), content.row_id(key).unwrap()))
-            } else {
-                None
-            }
-        })
-        .collect()
+        .retained_tool_activity(tool)
+        .map(|control| control.id())
 }

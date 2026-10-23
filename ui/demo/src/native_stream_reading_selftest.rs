@@ -1,12 +1,12 @@
 //! Real harness streaming while reading old content; no alternate UI/scroll state.
 use super::*;
+use crate::acceptance_script::{Action, run_script};
 use tekes_agent_components_ui::RunPort;
 use tekes_agent_presentation::{RunSnapshot, TranscriptDocument, TranscriptItemKind};
 use tekes_ui_controls::{
     TextEditBaseline,
     composition::{ContentReadingAnchorUpdate, ScrollContent},
 };
-use tekes_ui_platform_macos::selftest::{Action, run_script};
 const INPUT: &str = "ENDPOINT_READING_STREAM_PROOF";
 const DRAFT: &str = "流式期间中文草稿";
 const OTHER: &str = "另一会话独立草稿";

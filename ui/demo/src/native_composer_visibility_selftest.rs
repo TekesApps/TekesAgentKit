@@ -1,8 +1,8 @@
 //! Local fixture lifecycle through the normal runtime and retained native Run.
 use super::*;
+use crate::acceptance_script::{Action, run_script};
 use tekes_agent_components_ui::{Composer, RunPort};
 use tekes_agent_presentation::RunPhase;
-use tekes_ui_platform_macos::selftest::{Action, run_script};
 const PREEDIT: &str = "中文归档草稿";
 pub(super) struct Probe {
     failure_fixture: Option<tekes_agent_ui_demo::fixture::Fixture>,

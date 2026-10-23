@@ -1,11 +1,11 @@
 //! Owned UI publication probe. Search protocol/aggregation is not implemented by
 //! this test adapter; it only captures the ordinary public Retry callback.
 use super::*;
+use crate::acceptance_script::{Action, run_script};
 use tekes_agent_components_ui::{
     SidebarSearchInput, SidebarSearchIntent, SidebarSearchKey, SidebarSearchPhase,
 };
 use tekes_ui_controls::composition::ButtonContent;
-use tekes_ui_platform_macos::selftest::{Action, run_script};
 pub(super) struct Probe {
     phase: u8,
     started: Instant,

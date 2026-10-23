@@ -1,9 +1,9 @@
 //! Native original Summary controls over public owned SEP input.
 use super::*;
+use crate::acceptance_script::{Action, run_script};
 use tekes_agent_components_ui::{SummaryActionRow, SummaryDefaultRowIds, SummaryView};
 use tekes_agent_ui_demo::fixture::Fixture;
 use tekes_ui_controls::{ButtonTextRenderer, composition::TextContent};
-use tekes_ui_platform_macos::selftest::{Action, run_script};
 use tekes_ui_tokens::{Spacing, proposal};
 const CHILD: &str = "b437cf34-5661-45e2-a674-113b27c92f89";
 pub(super) const METADATA: &str = "12 files";

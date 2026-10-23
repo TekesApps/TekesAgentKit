@@ -1,12 +1,12 @@
 //! Native test host only. Advances on actual widget/committed state, never a
 //! guessed network delay; every mutation still enters normal UI callbacks.
 use super::*;
+use crate::acceptance_script::{Action, run_script};
 use tekes_agent_components_ui::{
     TranscriptContent, TranscriptContentRowKey, TurnFeedback, TurnFootnote,
 };
 use tekes_agent_presentation::{RunSnapshot, TranscriptItemKind};
 use tekes_ui_controls::composition::{ComponentId, ContentHost};
-use tekes_ui_platform_macos::selftest::{Action, run_script};
 
 // Editor tickets can change when a new controlled draft publication is
 // acknowledged. Observe semantic state, not equality of an old authority token.

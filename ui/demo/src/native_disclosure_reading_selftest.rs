@@ -1,12 +1,12 @@
 //! Owned protocol history + original disclosure controls and SDK reflow.
 use super::*;
+use crate::acceptance_script::{Action, run_script};
 use tekes_agent_components_ui::{
     OutputContentIds, OutputContentKind, OutputMessageFragment, RunPort, ToolActivity,
     TranscriptActivitySegmentEnd, TranscriptContentRowKey,
 };
 use tekes_ui_controls::composition::{ButtonContent, ScrollContent, TextFieldContent};
 use tekes_ui_controls::{ScrollRevealOptions, ScrollRevealPlacement, extended::Axis};
-use tekes_ui_platform_macos::selftest::{Action, run_script};
 pub(super) struct Probe {
     phase: u8,
     activity: Option<ComponentId>,

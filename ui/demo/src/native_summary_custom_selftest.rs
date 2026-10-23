@@ -1,5 +1,6 @@
 //! Owned host row fixture; SDK controls carry events, Summary admits their source.
 use super::*;
+use crate::acceptance_script::{Action, run_script};
 use serde_json::json;
 use std::rc::Rc;
 use tekes_agent_components_ui::{
@@ -15,7 +16,6 @@ use tekes_ui_controls::{
     ButtonTextRenderer,
     extended::{Axis, Stack},
 };
-use tekes_ui_platform_macos::selftest::{Action, run_script};
 const SECTION: &str = "host:repository";
 const ROW: &str = "controls";
 #[derive(Debug)]

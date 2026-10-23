@@ -62,6 +62,13 @@ fn kind(node: &Content) -> Option<OutputMessageFragmentKind> {
     }
 }
 impl OutputMessageFragment {
+    pub(crate) fn set_tools_flattened(&mut self, flattened: bool) {
+        for node in &mut self.rows.children {
+            if let Some(group) = node.component_mut::<crate::ToolRun>() {
+                group.set_flattened(flattened);
+            }
+        }
+    }
     pub fn id(&self) -> ComponentId {
         self.id
     }
@@ -160,7 +167,7 @@ impl OutputMessage {
         section: &TranscriptSection<'_>,
         thinking: Option<&tekes_agent_presentation::TranscriptThinkingFrame>,
         labels: OutputMessageLabels,
-    ) -> Result<Vec<OutputMessageToolFragmentKey>, &'static str> {
+    ) -> Result<Vec<(OutputMessageToolFragmentKey, Vec<String>)>, &'static str> {
         let stamp = thinking.map(|frame| ThinkingStamp {
             revision: frame.display_revision(),
             source_fingerprint: frame.source_fingerprint().into(),
@@ -176,7 +183,19 @@ impl OutputMessage {
         Ok(tool_part_runs(&facts, Some(section))?
             .into_iter()
             .filter(|range| facts[range.start].kind == OutputContentKind::Tool)
-            .map(|range| tool_key(&facts, &facts[range.start]))
+            .map(|range| {
+                let key = tool_key(&facts, &facts[range.start]);
+                let ids = facts[range]
+                    .iter()
+                    .map(|part| {
+                        let Slot::Tool(_, id) = &part.slot else {
+                            unreachable!();
+                        };
+                        id.clone()
+                    })
+                    .collect();
+                (key, ids)
+            })
             .collect())
     }
     pub(crate) fn transcript_presence(

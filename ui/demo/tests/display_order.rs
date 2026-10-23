@@ -276,7 +276,10 @@ fn shared_display_order_drives_original_run_rows_tools_reading_keys_and_retained
     let tool = TranscriptContentRowKey::Tool(first.id.clone());
     assert!(
         keys.iter().position(|key| key == &message).unwrap()
-            < keys.iter().position(|key| key == &tool).unwrap()
+            < keys
+                .iter()
+                .position(|key| content.row_id(key) == content.row_id(&tool))
+                .unwrap()
     );
     assert!(
         !keys
@@ -614,7 +617,9 @@ fn settled_activity_parts_fold_and_restore_original_owners_without_changing_comp
     );
     let tools = TranscriptContentRowKey::Tool(first.transcript.tools[0].id.clone());
     assert!(
-        keys.iter().position(|key| key == &tools).unwrap()
+        keys.iter()
+            .position(|key| content.row_id(key) == content.row_id(&tools))
+            .unwrap()
             < keys.iter().position(|key| key == &body).unwrap()
     );
     assert_eq!(
@@ -1210,7 +1215,12 @@ fn narration_carrier_keeps_original_bodies_and_independent_reasoning_owner_throu
     let tool = content
         .row_keys()
         .iter()
-        .position(|key| matches!(key, TranscriptContentRowKey::Tool(_)))
+        .position(|key| {
+            matches!(
+                key,
+                TranscriptContentRowKey::Tool(_) | TranscriptContentRowKey::ContinuousTools { .. }
+            )
+        })
         .unwrap();
     let position = |id| {
         content
@@ -1551,11 +1561,39 @@ fn embedded_segments(
     )
 }
 
+fn canonical_parts(content: &TranscriptContent, first: &str) -> Vec<OutputContentIds> {
+    let group = content.tool_run(first).unwrap();
+    group
+        .summary()
+        .unwrap()
+        .tool_ids
+        .iter()
+        .map(|id| group.tool_activity(id).unwrap().content_ids().unwrap())
+        .collect()
+}
+fn canonical_owners(
+    content: &TranscriptContent,
+    source: &RunSnapshot,
+) -> Vec<(ComponentId, usize)> {
+    source
+        .transcript
+        .tools
+        .iter()
+        .map(|tool| {
+            let control = content.retained_tool_activity(&tool.id).unwrap();
+            assert_eq!(
+                tekes_agent_ui_consumer_check::retained_tool_control_id(content, &tool.id),
+                Some(control.id())
+            );
+            (control.id(), control as *const _ as usize)
+        })
+        .collect()
+}
 #[test]
-fn original_embedded_groups_are_physical_rows_in_their_own_input_segments() {
+fn canonical_call_controls_are_physical_rows_in_their_own_input_segments() {
     let source = origin_tool_run();
     let scope = RunScope::main("sep", "s");
-    let (_owner, inner, before, final_segment) = embedded_segments(&source);
+    let (_, inner, before, final_segment) = embedded_segments(&source);
     let mut run = RunPort::standard(32000, 32010..32500, scope.clone()).unwrap();
     run.update(
         &source,
@@ -1565,12 +1603,13 @@ fn original_embedded_groups_are_physical_rows_in_their_own_input_segments() {
         true,
     )
     .unwrap();
-    let owners = tool_owners(&source);
-    let parts: Vec<_> = owners
-        .iter()
-        .flat_map(|owner| run.transcript().unwrap().message_content_ids(owner))
-        .collect();
-    assert_eq!(parts.len(), 3);
+    let original = canonical_owners(run.transcript().unwrap(), &source);
+    assert!(tool_owners(&source).iter().all(|owner| {
+        run.transcript()
+            .unwrap()
+            .message_content_ids(owner)
+            .is_empty()
+    }));
     let before_id = run
         .transcript()
         .unwrap()
@@ -1583,7 +1622,6 @@ fn original_embedded_groups_are_physical_rows_in_their_own_input_segments() {
             final_segment.clone(),
         ))
         .unwrap();
-    assert!(tool_fragments(run.transcript().unwrap(), &owners).is_empty());
     let ids = run.ids();
     let mut host = run.into_host().unwrap();
     assert_eq!(
@@ -1620,9 +1658,9 @@ fn original_embedded_groups_are_physical_rows_in_their_own_input_segments() {
             true,
         )
         .unwrap();
-    run.set_activity_segment_expanded(&before, true).unwrap();
-    run.set_activity_segment_expanded(&final_segment, true)
-        .unwrap();
+    for segment in [&before, &final_segment] {
+        run.set_activity_segment_expanded(segment, true).unwrap();
+    }
     assert!(run.validate_prepared_update(&stale).is_err());
     let plan = run
         .prepare_update(
@@ -1636,9 +1674,9 @@ fn original_embedded_groups_are_physical_rows_in_their_own_input_segments() {
     let predicted = plan.item_ids();
     run.apply_prepared_update(&plan).unwrap();
     let content = run.transcript().unwrap();
-    let fragments = tool_fragments(content, &owners);
-    assert_eq!(fragments.len(), 2);
-    assert!(fragments.iter().all(|(_, id)| predicted.contains(id)));
+    let rows = tool_rows(content);
+    assert_eq!(rows.len(), 2);
+    assert!(rows.iter().all(|(_, id)| predicted.contains(id)));
     let position = |id| {
         content
             .row_keys()
@@ -1649,47 +1687,20 @@ fn original_embedded_groups_are_physical_rows_in_their_own_input_segments() {
     let inner_id = content
         .row_id(&TranscriptContentRowKey::Message(inner))
         .unwrap();
-    assert!(position(fragments[0].1) < position(inner_id));
-    assert!(position(inner_id) < position(fragments[1].1));
-    assert!(position(final_id) < position(fragments[1].1));
-    assert_eq!(
-        owners
-            .iter()
-            .flat_map(|owner| content.message_content_ids(owner))
-            .collect::<Vec<_>>(),
-        parts
-    );
-    let first_part = host
-        .get(fragments[0].1)
-        .unwrap()
-        .component::<OutputMessageFragment>()
-        .unwrap();
-    let first_button = first_part.content_ids()[0].disclosure.unwrap();
-    assert_eq!(first_part.content_ids().len(), 1);
-    let second_part = host
-        .get(fragments[1].1)
-        .unwrap()
-        .component::<OutputMessageFragment>()
-        .unwrap();
-    assert_eq!(second_part.content_ids().len(), 2);
-    let group_id = second_part.children()[0].id();
-    let group_owner =
-        host.get(group_id).unwrap().component::<ToolRun>().unwrap() as *const _ as usize;
-    let button_owner = host
-        .get(first_button)
-        .unwrap()
-        .component::<ButtonContent>()
-        .unwrap() as *const _ as usize;
+    assert!(position(rows[0].1) < position(inner_id));
+    assert!(position(inner_id) < position(rows[1].1));
+    assert!(position(final_id) < position(rows[1].1));
+    assert_eq!(canonical_owners(content, &source), original);
     let run = host
         .get_mut(ids.root)
         .unwrap()
         .component_mut::<RunPort>()
         .unwrap();
     for expanded in [false, true] {
-        run.set_activity_segment_expanded(&before, expanded)
-            .unwrap();
-        run.set_activity_segment_expanded(&final_segment, expanded)
-            .unwrap();
+        for segment in [&before, &final_segment] {
+            run.set_activity_segment_expanded(segment, expanded)
+                .unwrap();
+        }
         run.update(
             &source,
             Default::default(),
@@ -1699,27 +1710,15 @@ fn original_embedded_groups_are_physical_rows_in_their_own_input_segments() {
         )
         .unwrap();
     }
+    assert_eq!(tool_rows(run.transcript().unwrap()), rows);
     assert_eq!(
-        tool_fragments(run.transcript().unwrap(), &owners),
-        fragments
+        canonical_owners(run.transcript().unwrap(), &source),
+        original
     );
-    assert_eq!(
-        host.get(group_id).unwrap().component::<ToolRun>().unwrap() as *const _ as usize,
-        group_owner
-    );
-    assert_eq!(
-        host.get(first_button)
-            .unwrap()
-            .component::<ButtonContent>()
-            .unwrap() as *const _ as usize,
-        button_owner
-    );
-    // A prepared publication must borrow every original node, including hidden
-    // details. Losing one partition cannot silently rebuild a replacement.
     let stolen = host
-        .get_mut(fragments[0].1)
+        .get_mut(rows[0].1)
         .unwrap()
-        .component_mut::<OutputMessageFragment>()
+        .component_mut::<ToolRun>()
         .unwrap()
         .children_mut()
         .unwrap()
@@ -1739,9 +1738,9 @@ fn original_embedded_groups_are_physical_rows_in_their_own_input_segments() {
             )
             .is_err()
     );
-    host.get_mut(fragments[0].1)
+    host.get_mut(rows[0].1)
         .unwrap()
-        .component_mut::<OutputMessageFragment>()
+        .component_mut::<ToolRun>()
         .unwrap()
         .children_mut()
         .unwrap()
@@ -1769,7 +1768,6 @@ fn original_embedded_groups_are_physical_rows_in_their_own_input_segments() {
         baseline
     );
 }
-
 fn origin_tool_run() -> RunSnapshot {
     let snapshot: serde_json::Value = serde_json::from_str(include_str!(
         "../../../crates/presentation/tests/fixtures/tool-origin-input-boundary-20261023.json"
@@ -1802,22 +1800,18 @@ fn tool_owners(source: &RunSnapshot) -> Vec<TranscriptMessageIdentity> {
         .map(|output| output.key.into())
         .collect()
 }
-fn tool_fragments(
-    content: &TranscriptContent,
-    owners: &[TranscriptMessageIdentity],
-) -> Vec<(OutputMessageToolFragmentKey, ComponentId)> {
-    let mut fragments = owners
+fn tool_rows(content: &TranscriptContent) -> Vec<(String, ComponentId)> {
+    content
+        .row_keys()
         .iter()
-        .flat_map(|owner| tekes_agent_ui_consumer_check::message_tool_fragments(content, owner))
-        .collect::<Vec<_>>();
-    fragments.sort_by_key(|(_, id)| {
-        content
-            .row_keys()
-            .iter()
-            .position(|key| content.row_id(key) == Some(*id))
-            .unwrap()
-    });
-    fragments
+        .filter_map(|key| {
+            if let TranscriptContentRowKey::ContinuousTools { first_tool_id, .. } = key {
+                Some((first_tool_id.clone(), content.row_id(key).unwrap()))
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 #[test]
@@ -1922,7 +1916,12 @@ fn late_message_references_leave_the_original_independent_tool_owners_in_place()
             .unwrap();
         assert_eq!((tool.id(), tool as *const _ as usize), expected);
     }
-    assert!(tool_fragments(run.transcript().unwrap(), &tool_owners(&next)).is_empty());
+    assert!(tool_owners(&next).iter().all(|owner| {
+        run.transcript()
+            .unwrap()
+            .message_tool_fragment_ids(owner)
+            .is_empty()
+    }));
     let before_id = run
         .transcript()
         .unwrap()
@@ -1940,48 +1939,10 @@ fn late_message_references_leave_the_original_independent_tool_owners_in_place()
 }
 
 #[test]
-fn controlled_thinking_repartitions_all_original_tool_nodes_before_namespace_commit() {
-    let mut source = origin_tool_run();
-    let owner = tool_owners(&source)[1].clone();
-    let owner_id = match &owner {
-        TranscriptMessageIdentity::Item(id) => id.clone(),
-        _ => unreachable!(),
-    };
-    let item = source
-        .transcript
-        .items
-        .iter_mut()
-        .find(|item| item.id == owner_id)
-        .unwrap();
-    item.reasoning = "保留原思考".into();
-    let blocks = item.content_blocks.as_mut().unwrap();
-    blocks[1].index = 2;
-    let last_call = match &blocks[1].content {
-        TranscriptBlockContent::ToolCall { tool_id } => tool_id.clone(),
-        _ => unreachable!(),
-    };
-    blocks.insert(
-        1,
-        TranscriptContentBlock {
-            index: 1,
-            content: TranscriptBlockContent::Reasoning {
-                text: item.reasoning.clone(),
-            },
-        },
-    );
-    if let Some(TranscriptSourcePosition::Journal { content_index, .. }) = &mut source
-        .transcript
-        .tools
-        .iter_mut()
-        .find(|tool| tool.id == last_call)
-        .unwrap()
-        .source_position
-    {
-        *content_index = Some(2);
-    }
+fn controlled_thinking_repartitions_global_runs_without_replacing_canonical_calls() {
+    let source = cross_owner_tool_run(false);
     let scope = RunScope::main("sep", "s");
     let mut run = RunPort::standard(34000, 34010..34500, scope.clone()).unwrap();
-    let (_, _, before, final_segment) = embedded_segments(&source);
     run.update(
         &source,
         Default::default(),
@@ -1990,10 +1951,7 @@ fn controlled_thinking_repartitions_all_original_tool_nodes_before_namespace_com
         true,
     )
     .unwrap();
-    for segment in [&before, &final_segment] {
-        run.set_activity_segment_expanded(segment, true).unwrap();
-    }
-    let mut original = None;
+    let original = canonical_owners(run.transcript().unwrap(), &source);
     for (index, mode) in [
         TranscriptThinkingMode::None,
         TranscriptThinkingMode::Compact,
@@ -2028,16 +1986,305 @@ fn controlled_thinking_repartitions_all_original_tool_nodes_before_namespace_com
                 .collect::<Vec<_>>(),
             predicted
         );
-        let mut tools = content
-            .message_content_ids(&owner)
-            .into_iter()
-            .filter(|part| part.kind == OutputContentKind::Tool)
-            .collect::<Vec<_>>();
-        tools.sort_by_key(|part| part.root);
-        if let Some(original) = &original {
-            assert_eq!(&tools, original);
-        } else {
-            original = Some(tools);
+        assert_eq!(
+            tool_rows(content).len(),
+            if mode == TranscriptThinkingMode::Compact {
+                2
+            } else {
+                1
+            },
+            "mode={mode:?}, rows={:?}",
+            content.row_keys()
+        );
+        assert_eq!(canonical_owners(content, &source), original);
+    }
+}
+#[test]
+fn settled_tool_history_retains_reasoning_even_when_live_thinking_is_hidden() {
+    let source = cross_owner_tool_run(true);
+    let scope = RunScope::main("sep", "s");
+    let mut run = RunPort::standard(35000, 35010..35500, scope.clone()).unwrap();
+    run.update(
+        &source,
+        Default::default(),
+        ComposerControlGate::OPEN,
+        paging(&scope),
+        true,
+    )
+    .unwrap();
+    let original = canonical_owners(run.transcript().unwrap(), &source);
+    run.set_activity_expanded(&source.transcript.turns[0].id, true)
+        .unwrap();
+    for (index, mode) in [
+        TranscriptThinkingMode::Compact,
+        TranscriptThinkingMode::None,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        run.set_thinking_display(TranscriptThinkingDisplayInput {
+            mode,
+            display_revision: index as u64 + 1,
+            elapsed_seconds: 0,
+        })
+        .unwrap();
+        run.update(
+            &source,
+            Default::default(),
+            ComposerControlGate::OPEN,
+            paging(&scope),
+            true,
+        )
+        .unwrap();
+        let content = run.transcript().unwrap();
+        assert_eq!(tool_rows(content).len(), 2);
+        assert!(content.row_keys().iter().any(|key| matches!(
+            key,
+            TranscriptContentRowKey::MessageFragment(_, OutputMessageFragmentKind::Reasoning)
+        )));
+        assert_eq!(canonical_owners(content, &source), original);
+    }
+}
+
+fn cross_owner_tool_run(settled: bool) -> RunSnapshot {
+    let mut snapshot: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../crates/presentation/tests/fixtures/tool-origin-input-boundary-20261023.json"
+    ))
+    .unwrap();
+    snapshot["entries"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|entry| entry["event"]["seq"] != 3);
+    if !settled {
+        snapshot["entries"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|entry| entry["event"]["seq"].as_i64().unwrap() < 8);
+        snapshot["throughSequence"] = json!(5);
+    }
+    let content = snapshot["entries"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|entry| entry["event"]["seq"] == 4)
+        .unwrap()["event"]["data"]["message"]["content"]
+        .as_array_mut()
+        .unwrap();
+    content.insert(0, json!({"type":"reasoning", "text":"保留原思考"}));
+    let mut store = MemoryProjectionStore::new("sep");
+    store
+        .apply(
+            "journal:s",
+            serde_json::json!({"type":"snapshot","snapshot":snapshot}),
+        )
+        .unwrap();
+    store.connection = ConnectionState::Ready;
+    let mut presentation = PresentationStore::default();
+    presentation
+        .select(ComposerDestination::run(RunScope::main("sep", "s")))
+        .unwrap();
+    presentation.refresh(&store).unwrap()
+}
+
+#[test]
+fn cumulative_frame_upsert_keeps_original_calls_header_and_composer_preedit() {
+    let mut snapshot: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../crates/presentation/tests/fixtures/tool-origin-input-boundary-20261023.json"
+    ))
+    .unwrap();
+    snapshot["throughSequence"] = json!(4);
+    snapshot["entries"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|entry| entry["event"]["seq"].as_i64().unwrap() <= 4);
+    let mut store = MemoryProjectionStore::new("sep");
+    store
+        .apply("journal:s", json!({"type":"snapshot","snapshot":snapshot}))
+        .unwrap();
+    store.connection = ConnectionState::Ready;
+    let scope = RunScope::main("sep", "s");
+    let mut presentation = PresentationStore::default();
+    presentation
+        .select(ComposerDestination::run(scope.clone()))
+        .unwrap();
+    let first = presentation.refresh(&store).unwrap();
+    assert_eq!(first.transcript.tools.len(), 3);
+    let old_positions: Vec<_> = first
+        .transcript
+        .tools
+        .iter()
+        .map(|call| (call.id.clone(), call.source_position.clone()))
+        .collect();
+    let b = first
+        .transcript
+        .tools
+        .iter()
+        .find(|call| call.arguments["path"] == "b")
+        .unwrap()
+        .id
+        .clone();
+    let frame = TranscriptDocument::read(&first.transcript)
+        .unwrap()
+        .sections[0]
+        .outputs
+        .iter()
+        .find(|output| {
+            output.item.content_blocks.as_ref().is_some_and(|blocks| {
+                blocks.iter().any(|block|
+            matches!(&block.content, TranscriptBlockContent::ToolCall { tool_id } if tool_id == &b))
+            })
+        })
+        .unwrap()
+        .item
+        .clone();
+    let mut run = RunPort::standard(36000, 36010..36500, scope.clone()).unwrap();
+    run.update(
+        &first,
+        Default::default(),
+        ComposerControlGate::OPEN,
+        paging(&scope),
+        true,
+    )
+    .unwrap();
+    let owners = canonical_owners(run.transcript().unwrap(), &first);
+    let header = run
+        .transcript()
+        .unwrap()
+        .tool_run(&b)
+        .unwrap()
+        .disclosure_id()
+        .unwrap();
+    let header_owner = run.transcript().unwrap().tool_run(&b).unwrap().id();
+    let stale = run
+        .prepare_update(
+            &first,
+            Default::default(),
+            ComposerControlGate::OPEN,
+            paging(&scope),
+            true,
+        )
+        .unwrap();
+    let ids = run.ids();
+    let mut host = run.into_host().unwrap();
+    let header_widget = host
+        .get(header)
+        .unwrap()
+        .component::<ButtonContent>()
+        .unwrap() as *const _ as usize;
+    assert!(host.focus(Some(ids.composer.editor), true));
+    host.event(&ContentEvent::Preedit {
+        text: "连续工具更新".into(),
+        selection: 6..6,
+        clauses: vec![],
+        replacement: None,
+    });
+    let baseline = host
+        .text_surface(ids.composer.editor)
+        .unwrap()
+        .input
+        .external_baseline();
+    let events = [
+        json!({"type":"tool/result","seq":5,"time":95,"data":{"turn":1,"message":{"source":{"callId":"a"},"content":[{"type":"text","text":"a result"}]}}}),
+        json!({"type":"assistant/message","seq":6,"time":94,"data":{"turn":1,"step":2,"message":{"id":"bc-origin","content":[
+            {"type":"tool-call","id":"b","name":"read","arguments":{"path":"b"}},
+            {"type":"tool-call","id":"c","name":"read","arguments":{"path":"c"}},
+            {"type":"tool-call","id":"d","name":"read","arguments":{"path":"d"}}
+        ]}}}),
+        json!({"type":"tool/result","seq":7,"time":93,"data":{"turn":1,"message":{"source":{"callId":"b"},"content":[{"type":"text","text":"b result"}]}}}),
+        json!({"type":"tool/result","seq":8,"time":92,"data":{"turn":1,"message":{"source":{"callId":"c"},"content":[{"type":"text","text":"c result"}]}}}),
+        json!({"type":"tool/result","seq":9,"time":91,"data":{"turn":1,"message":{"source":{"callId":"d"},"content":[{"type":"text","text":"d result"}]}}}),
+        json!({"type":"assistant/message","seq":10,"time":90,"data":{"turn":1,"step":3,"sessionFinal":true,"message":{"id":"final","content":[{"type":"text","text":"完成"}]}}}),
+        json!({"type":"turn/end","seq":11,"time":89,"data":{"turn":1,"reason":"completed"}}),
+    ];
+    for (index, event) in events.into_iter().enumerate() {
+        store
+            .apply(
+                "journal:s",
+                json!({"type":"event","generation":"g","sessionId":"s","entry":{"event":event}}),
+            )
+            .unwrap();
+        let next = presentation.refresh(&store).unwrap();
+        for (id, position) in &old_positions {
+            assert_eq!(
+                &next
+                    .transcript
+                    .tools
+                    .iter()
+                    .find(|call| &call.id == id)
+                    .unwrap()
+                    .source_position,
+                position
+            );
         }
+        if index >= 1 {
+            assert_eq!(next.transcript.tools.len(), 4);
+            let changed_frame = next
+                .transcript
+                .items
+                .iter()
+                .find(|item| item.id == frame.id)
+                .unwrap();
+            assert_ne!(
+                changed_frame.source_position, frame.source_position,
+                "the message frame really moved while old calls retained their source"
+            );
+        }
+        let run = host
+            .get_mut(ids.root)
+            .unwrap()
+            .component_mut::<RunPort>()
+            .unwrap();
+        run.update(
+            &next,
+            Default::default(),
+            ComposerControlGate::OPEN,
+            paging(&scope),
+            true,
+        )
+        .unwrap();
+        if index == 6 {
+            let (_, _, before, final_segment) = embedded_segments(&next);
+            for segment in [&before, &final_segment] {
+                run.set_activity_segment_expanded(segment, true).unwrap();
+            }
+            run.update(
+                &next,
+                Default::default(),
+                ComposerControlGate::OPEN,
+                paging(&scope),
+                true,
+            )
+            .unwrap();
+        }
+        assert!(run.validate_prepared_update(&stale).is_err());
+        let content = run.transcript().unwrap();
+        assert_eq!(canonical_owners(content, &first), owners);
+        let group = content.tool_run(&b).unwrap();
+        assert_eq!(group.id(), header_owner);
+        assert_eq!(group.disclosure_id(), Some(header));
+        assert_eq!(
+            group.summary().unwrap().tool_ids.len(),
+            if index == 0 { 2 } else { 3 }
+        );
+        assert!(
+            tool_owners(&next)
+                .iter()
+                .all(|owner| content.message_tool_fragment_ids(owner).is_empty())
+        );
+        assert_eq!(
+            host.get(header)
+                .unwrap()
+                .component::<ButtonContent>()
+                .unwrap() as *const _ as usize,
+            header_widget
+        );
+        assert_eq!(host.focused(), Some(ids.composer.editor));
+        assert_eq!(
+            host.text_surface(ids.composer.editor)
+                .unwrap()
+                .input
+                .external_baseline(),
+            baseline
+        );
     }
 }

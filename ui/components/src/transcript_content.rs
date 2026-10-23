@@ -3,6 +3,7 @@
 mod narration;
 use narration::{NarrationFrame, source_node, source_node_mut};
 mod segments;
+mod timeline_tools;
 use crate::{
     FeedbackGesture, FeedbackLabels, InputMessage, OutputMessage, OutputMessageFragment,
     OutputMessageFragmentKind, OutputMessageLabels, OutputMessageToolFragmentKey, ToolActivity,
@@ -34,6 +35,10 @@ pub enum TranscriptContentRowKey {
     MessageFragment(TranscriptMessageIdentity, OutputMessageFragmentKind),
     MessageToolFragment(TranscriptMessageIdentity, OutputMessageToolFragmentKey),
     Tool(String),
+    ContinuousTools {
+        turn_id: String,
+        first_tool_id: String,
+    },
     TurnFootnote(String),
     /// Passive status of the captured live owner, never a disclosure or action.
     ActivityStatus(String),
@@ -65,6 +70,7 @@ pub struct TranscriptContentUpdate<'a> {
     timing: crate::TranscriptFootnoteTiming,
     base_timing: crate::TranscriptFootnoteTiming,
     base_historical_generation: u64,
+    base_group_revision: u64,
     base_activity_generation: u64,
     base_header_revision: (u64, u64),
     header_revision: (u64, u64),
@@ -166,6 +172,8 @@ pub struct TranscriptContent {
     hidden_rows: BTreeMap<TranscriptContentRowKey, Content>,
     narration_frames: BTreeMap<(String, String), ComponentId>,
     tool_fragment_ids: BTreeMap<TranscriptContentRowKey, ComponentId>,
+    group_members: BTreeMap<TranscriptContentRowKey, Vec<(TranscriptContentRowKey, ComponentId)>>,
+    group_revision: u64,
     activity_expansion: BTreeMap<String, bool>,
     segment_expansion: BTreeMap<TranscriptActivitySegmentKey, bool>,
     activity_generation: u64,
@@ -242,6 +250,8 @@ impl TranscriptContent {
             hidden_rows: BTreeMap::new(),
             narration_frames: BTreeMap::new(),
             tool_fragment_ids: BTreeMap::new(),
+            group_members: BTreeMap::new(),
+            group_revision: 0,
             activity_expansion: BTreeMap::new(),
             segment_expansion: BTreeMap::new(),
             activity_generation: 0,
@@ -329,7 +339,6 @@ impl TranscriptContent {
                             matches!(&block.content, TranscriptBlockContent::Reasoning { .. })))
                     && (output.item.display_reasoning().trim().is_empty()
                         || frame.display_for(&output.item.id) == Some(crate::TranscriptReasoningDisplay::Hidden))));
-        let rows = group_tools(rows);
         let mut expanded = vec![];
         for mut row in rows {
             if let PlannedContent::Output(output, Some(section)) = &row.content {
@@ -364,6 +373,7 @@ impl TranscriptContent {
                     content: PlannedContent::Fragment(owner.clone(), kind, turn),
                     thinking: None,
                     hidden: false,
+                    group_owner: None,
                     narration_frame: None,
                     activity: Some(turn),
                 };
@@ -376,14 +386,15 @@ impl TranscriptContent {
                     self.labels.output,
                 )?
                 .into_iter()
-                .map(|key| Planned {
+                .map(|(key, tool_ids)| Planned {
                     key: TranscriptContentRowKey::MessageToolFragment(owner.clone(), key.clone()),
                     alias: alias.as_ref().map(|owner| {
                         TranscriptContentRowKey::MessageToolFragment(owner.clone(), key.clone())
                     }),
-                    content: PlannedContent::ToolFragment(owner.clone(), key, turn),
+                    content: PlannedContent::ToolFragment(owner.clone(), key, turn, tool_ids),
                     thinking: None,
                     hidden: false,
+                    group_owner: None,
                     narration_frame: None,
                     activity: Some(turn),
                 })
@@ -436,6 +447,7 @@ impl TranscriptContent {
             }
         }
         result.append(&mut final_output);
+        let mut result = self.group_timeline_tools(result, snapshot, document)?;
         for section in &document.sections {
             let facts = section
                 .planes(
@@ -491,12 +503,13 @@ impl TranscriptContent {
                     content,
                     thinking: None,
                     hidden: false,
+                    group_owner: None,
                     narration_frame: None,
                     activity: None,
                 },
             );
         }
-        self.segment_history(group_tools(result), snapshot, document, timing)
+        self.segment_history(result, snapshot, document, timing)
     }
     pub fn footnote_timing(&self) -> &crate::TranscriptFootnoteTiming {
         &self.timing
@@ -528,12 +541,13 @@ impl TranscriptContent {
         if let TranscriptContentRowKey::MessageFragment(owner, OutputMessageFragmentKind::Tools) =
             key
         {
-            return self.keys.iter().zip(&self.rows.children).find(|(key, _)| matches!(key, TranscriptContentRowKey::MessageToolFragment(candidate, _) if candidate == owner)).map(|(_, node)| node.id());
+            return self.original_rows().into_iter().find(|(key, _)| matches!(key, TranscriptContentRowKey::MessageToolFragment(candidate, _) if candidate == owner)).and_then(|(key, _)| self.row_id(key));
         }
         self.keys
             .iter()
             .position(|value| value == key)
             .map(|i| self.rows.children[i].id())
+            .or_else(|| self.original_reading_row(key))
             .or_else(|| {
                 if let TranscriptContentRowKey::Tool(id) = key {
                     self.tool_run(id).map(ToolRun::id)
@@ -817,6 +831,15 @@ impl TranscriptContent {
             .collect();
         existing.append(&mut self.detached);
         existing.append(&mut self.hidden_rows);
+        for (key, members) in &self.group_members {
+            if let Some(group) = existing.get_mut(key) {
+                let nodes = group.component_mut::<ToolRun>().unwrap().take_members();
+                for ((member_key, _), mut node) in members.iter().zip(nodes) {
+                    timeline_tools::flatten(&mut node, false);
+                    existing.insert(member_key.clone(), node);
+                }
+            }
+        }
         for node in existing.values_mut() {
             if node.component::<NarrationFrame>().is_some() {
                 let body = node
@@ -853,6 +876,10 @@ impl TranscriptContent {
                     self.next += row.namespaces();
                     self.new_row(namespace, row)
                 });
+            if matches!(row.content, PlannedContent::ContinuousTools { .. }) {
+                built.insert(row.key.clone(), node);
+                continue;
+            }
             if let PlannedContent::Tools(tools) = &row.content {
                 let mut children = vec![];
                 for (tool, placement) in tools {
@@ -912,7 +939,8 @@ impl TranscriptContent {
                 let tools: Vec<_> = plan
                     .iter()
                     .filter_map(|planned| {
-                        if let PlannedContent::ToolFragment(candidate, key, _) = &planned.content {
+                        if let PlannedContent::ToolFragment(candidate, key, _, _) = &planned.content
+                        {
                             (candidate == owner)
                                 .then(|| (key.clone(), self.tool_fragment_ids[&planned.key]))
                         } else {
@@ -939,6 +967,34 @@ impl TranscriptContent {
             }
             built.insert(row.key.clone(), node);
         }
+        let group_revision = self.next_group_revision()?;
+        let mut group_members = BTreeMap::new();
+        for row in &plan {
+            if let PlannedContent::ContinuousTools { members, tools } = &row.content {
+                let mut group = built.remove(&row.key).unwrap();
+                let mut owned = vec![];
+                let mut identities = vec![];
+                for key in members {
+                    let mut node = built
+                        .remove(key)
+                        .expect("preflighted original timeline member");
+                    identities.push((key.clone(), node.id()));
+                    timeline_tools::flatten(&mut node, true);
+                    owned.push(node);
+                }
+                group
+                    .component_mut::<ToolRun>()
+                    .unwrap()
+                    .install_owned_header(
+                        group_revision,
+                        epoch,
+                        self.labels.tool_run.summary(&self.scope, tools)?,
+                        owned,
+                    );
+                group_members.insert(row.key.clone(), identities);
+                built.insert(row.key.clone(), group);
+            }
+        }
         let frame_keys: BTreeSet<_> = plan
             .iter()
             .filter_map(|row| row.narration_frame.clone())
@@ -956,6 +1012,9 @@ impl TranscriptContent {
             }
         }
         for row in &plan {
+            if row.group_owner.is_some() {
+                continue;
+            }
             let mut node = built
                 .remove(&row.key)
                 .expect("preflighted original message partition");
@@ -979,6 +1038,8 @@ impl TranscriptContent {
                 }
             }
         }
+        self.group_members = group_members;
+        self.group_revision = group_revision;
         self.publication = publication;
         self.epoch = epoch;
         if snapshot.is_stale {
@@ -1129,6 +1190,7 @@ impl TranscriptContent {
             timing: timing.clone(),
             base_timing: self.timing.clone(),
             base_historical_generation: self.historical_generation,
+            base_group_revision: self.group_revision,
             base_activity_generation: self.activity_generation,
             base_header_revision: self.header_revision,
             header_revision,
@@ -1150,6 +1212,7 @@ impl TranscriptContent {
             || self.next != prepared.base_next
             || self.timing != prepared.base_timing
             || self.historical_generation != prepared.base_historical_generation
+            || self.group_revision != prepared.base_group_revision
             || self.activity_generation != prepared.base_activity_generation
             || self.header_revision != prepared.base_header_revision
             || self.thinking_input != prepared.thinking_input
@@ -1262,6 +1325,8 @@ impl TranscriptContent {
             .enumerate()
             .map(|(i, key)| (key, i))
             .collect();
+        self.check_group_members()?;
+        self.next_group_revision()?;
         let desired: BTreeSet<_> = plan.iter().map(|row| row.key.clone()).collect();
         if desired.len() != plan.len() {
             return Err("duplicate transcript content row");
@@ -1328,11 +1393,9 @@ impl TranscriptContent {
         Ok(())
     }
     fn fragments(&self, owner: ComponentId) -> Vec<&OutputMessageFragment> {
-        self.rows
-            .children
-            .iter()
-            .chain(self.hidden_rows.values())
-            .filter_map(|node| node.component::<OutputMessageFragment>())
+        self.original_rows()
+            .into_iter()
+            .filter_map(|(_, node)| node.component::<OutputMessageFragment>())
             .filter(|part| part.owner() == owner)
             .collect()
     }
@@ -1384,12 +1447,7 @@ impl TranscriptContent {
             TranscriptContentRowKey::MessageFragment(key.clone(), OutputMessageFragmentKind::Tools),
         ];
         let mut result = vec![];
-        for (row, node) in self
-            .keys
-            .iter()
-            .zip(&self.rows.children)
-            .chain(self.hidden_rows.iter())
-        {
+        for (row, node) in self.original_rows() {
             if keys.contains(row)
                 || matches!(row, TranscriptContentRowKey::MessageToolFragment(owner, _) if owner == key)
             {
@@ -1405,12 +1463,19 @@ impl TranscriptContent {
         result
     }
     fn find_tool(&self, turn: &str, id: &str) -> Option<&ToolActivity> {
-        self.rows
-            .children
-            .iter()
-            .chain(self.hidden_rows.values())
+        self.original_rows()
+            .into_iter()
+            .map(|(_, node)| node)
             .filter_map(|node| node.component::<ToolRun>())
             .filter(|group| group.summary().is_some_and(|m| m.turn_id == turn))
+            .find_map(|group| group.tool_activity(id))
+    }
+    /// Original business control, including collapsed history. Its ID is not
+    /// necessarily mounted or a visible reading item; use row_id for reading.
+    pub fn retained_tool_activity(&self, id: &str) -> Option<&ToolActivity> {
+        self.original_rows()
+            .into_iter()
+            .filter_map(|(_, node)| node.component::<ToolRun>())
             .find_map(|group| group.tool_activity(id))
     }
     pub fn tool_activity_id(&self, id: &str) -> Option<ComponentId> {
@@ -1451,10 +1516,8 @@ impl TranscriptContent {
                 return Some(row.key.clone());
             }
             return self
-                .keys
-                .iter()
-                .zip(&self.rows.children)
-                .chain(self.hidden_rows.iter())
+                .original_rows()
+                .into_iter()
                 .find(|(key, node)| {
                     !desired.contains(*key)
                         && !claimed.contains(*key)
@@ -1489,6 +1552,12 @@ impl TranscriptContent {
             .map(|i| &self.rows.children[*i])
             .or_else(|| self.detached.get(key))
             .or_else(|| self.hidden_rows.get(key))
+            .or_else(|| {
+                self.original_rows()
+                    .into_iter()
+                    .find(|(candidate, _)| *candidate == key)
+                    .map(|(_, node)| node)
+            })
             .map(source_node)
     }
     fn new_row(&self, namespace: u32, row: &Planned<'_>) -> Content {
@@ -1515,7 +1584,7 @@ impl TranscriptContent {
                         .for_transcript();
                 Content::new(view.id(), view)
             }
-            PlannedContent::Tools(_) => Content::new(
+            PlannedContent::Tools(_) | PlannedContent::ContinuousTools { .. } => Content::new(
                 root,
                 ToolRun::at_root(root, self.scope.clone(), self.labels.tool_run),
             ),
@@ -1580,6 +1649,12 @@ impl TranscriptContent {
                 }
             }
 
+            PlannedContent::ContinuousTools { tools, .. } => {
+                let model = self.labels.tool_run.summary(&self.scope, tools)?;
+                node.component::<ToolRun>()
+                    .ok_or("timeline group role changed")?
+                    .check_install(&self.scope, self.next_group_revision()?, epoch, &model)?;
+            }
             PlannedContent::Tools(tools) => {
                 let model = self.labels.tool_run.summary(
                     &self.scope,
@@ -1668,6 +1743,7 @@ impl TranscriptContent {
                     view.update(&self.scope, publication, epoch, output, *section)?;
                 }
             }
+            PlannedContent::ContinuousTools { .. } => {}
             PlannedContent::Tools(_) => {
                 unreachable!("parent installs preflighted original tool members")
             }
@@ -2000,6 +2076,7 @@ struct Planned<'a> {
     content: PlannedContent<'a>,
     thinking: Option<crate::TranscriptThinkingFrame>,
     hidden: bool,
+    group_owner: Option<TranscriptContentRowKey>,
     narration_frame: Option<(String, String)>,
     activity: Option<&'a str>,
 }
@@ -2024,6 +2101,7 @@ enum PlannedContent<'a> {
         TranscriptMessageIdentity,
         OutputMessageToolFragmentKey,
         &'a str,
+        Vec<String>,
     ),
     Fragment(
         TranscriptMessageIdentity,
@@ -2031,6 +2109,10 @@ enum PlannedContent<'a> {
         &'a str,
     ),
     Tools(Vec<(&'a TranscriptToolCall, ToolActivityPlacement)>),
+    ContinuousTools {
+        members: Vec<TranscriptContentRowKey>,
+        tools: Vec<&'a TranscriptToolCall>,
+    },
     Footnote(
         &'a TranscriptTurn,
         Option<crate::TranscriptTurnCopy>,
@@ -2080,10 +2162,11 @@ fn planned_turn<'r>(row: &'r Planned<'_>) -> Option<&'r str> {
     match &row.content {
         PlannedContent::Input(input) => Some(&input.item.turn_id),
         PlannedContent::Output(_, Some(section)) => Some(section.id),
-        PlannedContent::Fragment(_, _, turn) | PlannedContent::ToolFragment(_, _, turn) => {
+        PlannedContent::Fragment(_, _, turn) | PlannedContent::ToolFragment(_, _, turn, _) => {
             Some(turn)
         }
         PlannedContent::Tools(tools) => Some(&tools[0].0.turn_id),
+        PlannedContent::ContinuousTools { tools, .. } => Some(&tools[0].turn_id),
         PlannedContent::Footnote(turn, ..) => Some(&turn.id),
         PlannedContent::Disclosure { .. } => match &row.key {
             TranscriptContentRowKey::ActivityDisclosure(turn) => Some(turn),
@@ -2107,6 +2190,7 @@ fn label(key: TranscriptContentRowKey, text: String) -> Planned<'static> {
         alias: None,
         thinking: None,
         hidden: false,
+        group_owner: None,
         narration_frame: None,
         activity: None,
         content: PlannedContent::Label(text),
@@ -2140,6 +2224,7 @@ fn plan<'a>(
                 alias: None,
                 thinking: None,
                 hidden: false,
+                group_owner: None,
                 narration_frame: None,
                 activity: None,
                 content: PlannedContent::Output(*output, None),
@@ -2158,10 +2243,9 @@ fn plan<'a>(
         let order = section
             .display_order(scope, &snapshot.thinking_sources)
             .map_err(|_| "invalid transcript display order")?;
-        let embedded = embedded_tools(section);
         let mut tools = BTreeSet::new();
         for event in &order.ordered {
-            if let Some(row) = event_row(*event, section, &embedded, &mut tools)? {
+            if let Some(row) = event_row(*event, section, &mut tools)? {
                 result.push(row);
             }
         }
@@ -2172,7 +2256,7 @@ fn plan<'a>(
             ));
         }
         for event in &order.unplaced {
-            if let Some(row) = event_row(*event, section, &embedded, &mut tools)? {
+            if let Some(row) = event_row(*event, section, &mut tools)? {
                 result.push(row);
             }
         }
@@ -2223,57 +2307,18 @@ fn plan<'a>(
                 alias: None,
                 thinking: None,
                 hidden: false,
+                group_owner: None,
                 narration_frame: None,
                 activity: None,
                 content: PlannedContent::Footnote(turn, output, display, target),
             });
         }
     }
-    Ok(group_tools(result))
-}
-fn tool_run_boundary(row: &Planned<'_>) -> bool {
-    match &row.content {
-        PlannedContent::Output(..) if row.hidden => false,
-        PlannedContent::Output(output, _) => {
-            !(output.item.kind == TranscriptItemKind::Assistant
-                && output.item.text.is_empty()
-                && output.item.reasoning.is_empty()
-                && output.item.attachments.is_empty()
-                && output.item.failure_message().is_none()
-                && output
-                    .item
-                    .content_blocks
-                    .as_ref()
-                    .is_some_and(Vec::is_empty))
-        }
-        _ => true,
-    }
-}
-fn group_tools<'a>(result: Vec<Planned<'a>>) -> Vec<Planned<'a>> {
-    let mut grouped: Vec<Planned<'a>> = vec![];
-    for row in result {
-        if let PlannedContent::Tools(current) = &row.content
-            && current
-                .iter()
-                .all(|(_, p)| *p != ToolActivityPlacement::Unplaced)
-            && let Some(previous) = grouped.iter_mut().rev().find(|row| tool_run_boundary(row))
-            && let PlannedContent::Tools(prior) = &mut previous.content
-            && prior
-                .iter()
-                .all(|(_, p)| *p != ToolActivityPlacement::Unplaced)
-            && prior[0].0.turn_id == current[0].0.turn_id
-        {
-            prior.extend(current.iter().copied());
-            continue;
-        }
-        grouped.push(row);
-    }
-    grouped
+    Ok(result)
 }
 fn event_row<'a>(
     event: TranscriptOrderedEvent<'a>,
     section: &'a TranscriptSection<'a>,
-    embedded: &BTreeSet<&str>,
     tools: &mut BTreeSet<String>,
 ) -> Result<Option<Planned<'a>>, &'static str> {
     use TranscriptContentRowKey as Key;
@@ -2289,6 +2334,7 @@ fn event_row<'a>(
                     key: Key::Message(input.key.into()),
                     thinking: None,
                     hidden: false,
+                    group_owner: None,
                     narration_frame: None,
                     activity: None,
                     alias: input
@@ -2306,6 +2352,7 @@ fn event_row<'a>(
                     key: Key::Message(output.key.into()),
                     thinking: None,
                     hidden: false,
+                    group_owner: None,
                     narration_frame: None,
                     activity: None,
                     alias: output
@@ -2316,10 +2363,9 @@ fn event_row<'a>(
             }
         }
         TranscriptOrderedEvent::ToolCall(tool)
-            if !embedded.contains(tool.id.as_str())
-                && (tool.source_position.is_some()
-                    || tool.result_position.is_none()
-                    || tool.result.is_none())
+            if (tool.source_position.is_some()
+                || tool.result_position.is_none()
+                || tool.result.is_none())
                 && tools.insert(tool.id.clone()) =>
         {
             Some(Planned {
@@ -2327,6 +2373,7 @@ fn event_row<'a>(
                 alias: None,
                 thinking: None,
                 hidden: false,
+                group_owner: None,
                 narration_frame: None,
                 activity: None,
                 content: PlannedContent::Tools(vec![(
@@ -2340,15 +2387,14 @@ fn event_row<'a>(
             })
         }
         TranscriptOrderedEvent::ToolResult(tool)
-            if !embedded.contains(tool.id.as_str())
-                && tool.source_position.is_none()
-                && tools.insert(tool.id.clone()) =>
+            if tool.source_position.is_none() && tools.insert(tool.id.clone()) =>
         {
             Some(Planned {
                 key: Key::Tool(tool.id.clone()),
                 alias: None,
                 thinking: None,
                 hidden: false,
+                group_owner: None,
                 narration_frame: None,
                 activity: None,
                 content: PlannedContent::Tools(vec![(
@@ -2363,21 +2409,4 @@ fn event_row<'a>(
         }
         _ => None,
     })
-}
-fn embedded_tools<'a>(section: &'a TranscriptSection<'a>) -> BTreeSet<&'a str> {
-    let mut result = BTreeSet::new();
-    for output in &section.outputs {
-        for block in output.item.content_blocks.as_ref().into_iter().flatten() {
-            if let TranscriptBlockContent::ToolCall { tool_id } = &block.content
-                && let Some(tool) = section.tool_for_block(block)
-            {
-                let covered =
-                    crate::output_message::tool_belongs_to_message(tool, output.item, block.index);
-                if covered {
-                    result.insert(tool_id.as_str());
-                }
-            }
-        }
-    }
-    result
 }

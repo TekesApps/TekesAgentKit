@@ -1,10 +1,10 @@
 //! Owned fixture: retiring/rebuilding panel UI leaves the real Run/draft alive.
 use super::*;
+use crate::acceptance_script::{Action, run_script};
 use tekes_agent_components_ui::{
     Composer, ComposerIds, PanelContentToken, RunPort, SidePanelTabKind,
 };
 use tekes_ui_controls::{ReadingDocumentVersion, TextEditBaseline, composition::ScrollContent};
-use tekes_ui_platform_macos::selftest::{Action, run_script};
 const DRAFT: &str = "面板独立草稿";
 pub(super) struct Probe {
     phase: u8,

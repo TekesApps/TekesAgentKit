@@ -651,7 +651,7 @@ impl WindowHandler for Host {
             Event::Created => {
                 assert!(w.set_text_key_events(true));
                 if std::env::var_os("TEKESUI_AX_PROTOCOL_AUDIT").is_some() {
-                    use tekes_ui_platform_macos::selftest::{Action, run_script};
+                    use crate::acceptance_script::{Action, run_script};
                     run_script(vec![
                         (
                             1000,
@@ -924,8 +924,8 @@ pub fn run() {
     );
 }
 fn native_script(surface: &RunSurface) {
+    use crate::acceptance_script::{Action, run_script};
     use tekes_agent_components_ui::{CANCEL, EARLIER, RECONNECT, SEND, SESSION_A, SESSION_B};
-    use tekes_ui_platform_macos::selftest::{Action, run_script};
     let click = |id| {
         let p = surface.tree.get(id).unwrap().frame().center();
         Action::Click {

@@ -11,6 +11,7 @@ import plistlib
 import subprocess
 import sys
 from native_frontmost_trace import FrontmostTrace
+from native_acceptance_host import host_lease
 
 
 def validate_bundle(program, bundle):
@@ -30,6 +31,17 @@ def validate_bundle(program, bundle):
 
 
 def run_native_probe(program, arguments, environment, log, marker, *, bundle=None, timeout=55, observe_frontmost=False):
+    if bundle is None:
+        raise ValueError('native acceptance requires the fixed signed host, never a direct historical executable')
+    for suffix in ('', '.stdout', '.stderr', '.launcher', '.frontmost.jsonl'):
+        if Path(str(log) + suffix).exists():
+            raise ValueError('preserve existing native evidence; choose a new log')
+    with host_lease(program, bundle):
+        return _run_native_probe(program, arguments, environment, log, marker,
+                                bundle=bundle, timeout=timeout, observe_frontmost=observe_frontmost)
+
+
+def _run_native_probe(program, arguments, environment, log, marker, *, bundle=None, timeout=55, observe_frontmost=False):
     """Return original native log after checking launch, crash and receipt gates.
 
     A LaunchServices app is not a subprocess child: its OS exit status is unknown.
@@ -74,7 +86,8 @@ def run_native_probe(program, arguments, environment, log, marker, *, bundle=Non
             log.write_text(stderr_log.read_text() + '\n' + stdout_log.read_text())
         Path(str(log) + '.launcher').write_text((result.stdout or '') + '\n' + (result.stderr or ''))
         proof = {'profile': 'launch-services-app', 'applicationExitCode': None,
-                 'launcherExitCode': result.returncode, 'binarySha256': digest}
+                 'launcherExitCode': result.returncode, 'binarySha256': digest,
+                 'screenCapturePerformed': False}
     print('NATIVE_PROBE_LAUNCH_RECEIPT ' + json.dumps(proof, sort_keys=True), flush=True)
     text = log.read_text()
     if result.returncode != 0:

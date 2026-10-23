@@ -169,7 +169,7 @@ impl TranscriptContent {
                         )
                     })
                 }
-                PlannedContent::ToolFragment(_, key, _) => snapshot
+                PlannedContent::ToolFragment(_, key, _, _) => snapshot
                     .thinking_sources
                     .by_id
                     .get(&key.tool_id)

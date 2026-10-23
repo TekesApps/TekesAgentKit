@@ -1,6 +1,8 @@
 # Rust Agent UI：宿主短接入说明
 
 当前为显式开发接入；版本和完整未完成项以[交付状态](rust-agent-ui-delivery-status.md)为准。
+原生验收须遵循[固定宿主与外部截图入口](rust-agent-ui-native-toolchain.md)，历史程序仅归档。
+任务、子代理和 SideChat 的来源/宿主边界见[SidePanel 契约核对](rust-agent-ui-sidepanel-contract-audit-20261023.md)。
 AgentKit 拥有业务组件/状态；TekesUI 拥有通用控件、输入、焦点、IME、阅读和进程能力；宿主负责窗口、整体布局、导航与系统适配。
 颜色、字体、圆角和语义间距随 TekesUI defaults/tokens；机器内容/footnote 靠左，用户气泡和外置 footnote 靠右。
 

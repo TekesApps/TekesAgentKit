@@ -5,9 +5,9 @@ use super::*;
 mod folders;
 #[path = "native_sidebar_pin_query_selftest.rs"]
 mod pin_query;
+use crate::acceptance_script::{Action, run_script};
 use tekes_agent_components_ui::{SidebarSearchIntent, SidebarSearchKey, SidebarSearchPhase};
 use tekes_ui_controls::composition::ButtonContent;
-use tekes_ui_platform_macos::selftest::{Action, run_script};
 pub(super) struct Probe {
     fixture: tekes_agent_ui_demo::fixture::Fixture,
     started: Instant,

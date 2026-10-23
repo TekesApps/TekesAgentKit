@@ -90,6 +90,7 @@ pub struct ToolRun {
     header: Option<Content>,
     header_id: Option<ComponentId>,
     expanded: bool,
+    flattened: bool,
     header_text: String,
     namespaces: Option<Range<u32>>,
     next: u32,
@@ -137,12 +138,40 @@ impl ToolRun {
             header: None,
             header_id: None,
             expanded: false,
+            flattened: false,
             header_text: String::new(),
             namespaces: None,
             next: 0,
             next_header: 16,
             last_tools: vec![],
         }
+    }
+    pub(crate) fn members_visible(&self) -> bool {
+        self.flattened || !self.grouped() || self.expanded
+    }
+    pub(crate) fn set_flattened(&mut self, flattened: bool) {
+        if flattened == self.flattened {
+            return;
+        }
+        let members = self.take_members();
+        self.flattened = flattened;
+        if !self.grouped() {
+            self.rows.children = members;
+            return;
+        }
+        if flattened {
+            self.rows.children = members;
+        } else {
+            self.rows
+                .children
+                .push(self.header.take().expect("retained original tool header"));
+            if self.expanded {
+                self.rows.children.extend(members);
+            } else {
+                self.hidden = members;
+            }
+        }
+        self.refresh_header();
     }
     pub fn id(&self) -> ComponentId {
         self.root
@@ -154,7 +183,9 @@ impl ToolRun {
         self.expanded
     }
     pub fn disclosure_id(&self) -> Option<ComponentId> {
-        self.grouped().then_some(self.header_id).flatten()
+        (self.grouped() && !self.flattened)
+            .then_some(self.header_id)
+            .flatten()
     }
     fn grouped(&self) -> bool {
         self.model
@@ -165,11 +196,11 @@ impl ToolRun {
         self.rows
             .children
             .iter()
-            .skip(usize::from(self.grouped()))
+            .skip(usize::from(self.grouped() && !self.flattened))
             .chain(&self.hidden)
     }
     pub(crate) fn member_nodes_mut(&mut self) -> impl Iterator<Item = &mut Content> {
-        let skip = usize::from(self.grouped());
+        let skip = usize::from(self.grouped() && !self.flattened);
         self.rows
             .children
             .iter_mut()
@@ -177,7 +208,7 @@ impl ToolRun {
             .chain(&mut self.hidden)
     }
     pub(crate) fn take_members(&mut self) -> Vec<Content> {
-        if self.grouped() && !self.rows.children.is_empty() {
+        if self.grouped() && !self.flattened && !self.rows.children.is_empty() {
             self.header = Some(self.rows.children.remove(0));
         }
         let mut members = std::mem::take(&mut self.rows.children);
@@ -244,11 +275,16 @@ impl ToolRun {
                     .expect("original group header")
                     .preserving_focus()
             });
-            self.rows.children.push(header);
-            if self.expanded {
+            if self.flattened {
+                self.header = Some(header);
                 self.rows.children.extend(members);
             } else {
-                self.hidden = members;
+                self.rows.children.push(header);
+                if self.expanded {
+                    self.rows.children.extend(members);
+                } else {
+                    self.hidden = members;
+                }
             }
             self.refresh_header();
         } else {
@@ -276,9 +312,12 @@ impl ToolRun {
             return;
         }
         let title = &self.header_text;
-        let button = self.rows.children[0]
-            .component_mut::<ButtonContent>()
-            .unwrap();
+        let header = if self.flattened {
+            self.header.as_mut().unwrap()
+        } else {
+            &mut self.rows.children[0]
+        };
+        let button = header.component_mut::<ButtonContent>().unwrap();
         button.label = format!(
             "{} · {title}",
             (self.labels.text)(if self.expanded {
@@ -290,7 +329,7 @@ impl ToolRun {
         button.button.state.selected = self.expanded;
     }
     pub(crate) fn handle_disclosure(&mut self, actions: &[ContentAction]) -> bool {
-        if !self.grouped() {
+        if !self.grouped() || self.flattened {
             return false;
         }
         let mut changed = false;
@@ -316,7 +355,14 @@ impl ToolRun {
             .tool_ids
             .iter()
             .position(|value| value == id)?;
-        self.member_nodes().nth(index)?.component::<ToolActivity>()
+        self.member_nodes()
+            .nth(index)
+            .and_then(|node| node.component::<ToolActivity>())
+            .or_else(|| {
+                self.member_nodes()
+                    .filter_map(|node| node.component::<ToolRun>())
+                    .find_map(|group| group.tool_activity(id))
+            })
     }
     pub fn update(
         &mut self,
@@ -395,31 +441,54 @@ impl ToolRun {
     }
     pub fn handle_actions(&mut self, actions: &[ContentAction]) -> bool {
         let mut changed = self.handle_disclosure(actions);
-        if !self.grouped() || self.expanded {
+        if self.members_visible() {
             for node in self.member_nodes_mut() {
                 if let Some(tool) = node.component_mut::<ToolActivity>() {
                     changed |= tool.handle_actions(actions);
+                } else if let Some(group) = node.component_mut::<ToolRun>() {
+                    changed |= group.handle_actions(actions);
+                } else if let Some(fragment) = node.component_mut::<crate::OutputMessageFragment>()
+                {
+                    changed |= fragment.handle_actions(actions);
                 }
             }
         }
         changed
     }
     pub fn copy_action_ids(&self) -> Vec<ComponentId> {
-        if self.grouped() && !self.expanded {
+        if !self.members_visible() {
             return vec![];
         }
         self.member_nodes()
-            .filter_map(|node| node.component::<ToolActivity>())
-            .flat_map(ToolActivity::copy_action_ids)
+            .flat_map(|node| {
+                if let Some(tool) = node.component::<ToolActivity>() {
+                    tool.copy_action_ids()
+                } else if let Some(group) = node.component::<ToolRun>() {
+                    group.copy_action_ids()
+                } else if let Some(fragment) = node.component::<crate::OutputMessageFragment>() {
+                    fragment.copy_action_ids()
+                } else {
+                    vec![]
+                }
+            })
             .collect()
     }
     pub fn take_copy_intents(&self, actions: &[ContentAction]) -> Vec<TranscriptCopyIntent> {
-        if self.grouped() && !self.expanded {
+        if !self.members_visible() {
             return vec![];
         }
         self.member_nodes()
-            .filter_map(|node| node.component::<ToolActivity>())
-            .flat_map(|tool| tool.take_copy_intents(actions))
+            .flat_map(|node| {
+                if let Some(tool) = node.component::<ToolActivity>() {
+                    tool.take_copy_intents(actions)
+                } else if let Some(group) = node.component::<ToolRun>() {
+                    group.take_copy_intents(actions)
+                } else if let Some(fragment) = node.component::<crate::OutputMessageFragment>() {
+                    fragment.take_copy_intents(actions)
+                } else {
+                    vec![]
+                }
+            })
             .collect()
     }
     pub fn into_host(self) -> Result<ContentHost, CompositionError> {
@@ -445,13 +514,13 @@ impl Component for ToolRun {
     fn semantics(&self) -> ContentSemantics {
         let mut value = ContentSemantics::new(
             ContentRole::Group,
-            if self.grouped() {
+            if self.grouped() && !self.flattened {
                 (self.labels.text)(ToolRunText::Group)
             } else {
                 String::new()
             },
         );
-        if self.grouped() {
+        if self.grouped() && !self.flattened {
             value.expanded = Some(self.expanded);
         }
         value

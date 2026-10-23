@@ -1,9 +1,9 @@
 //! Owned SEP facts -> original presentation/RunPort -> native temporal aside.
 use super::*;
+use crate::acceptance_script::{Action, run_script};
 use tekes_agent_components_ui::{OutputUsage, RunPort, TranscriptContentRowKey, TurnFootnote};
 use tekes_agent_ui_demo::fixture::Fixture;
 use tekes_ui_controls::composition::TextContent;
-use tekes_ui_platform_macos::selftest::{Action, run_script};
 pub(super) struct Probe {
     fixture: Fixture,
     phase: u8,

@@ -1,10 +1,10 @@
 //! Owned native host navigation through the original SidePanel controls and
 //! TaskPaneBinding. Never cancels an execution or invents a task state machine.
 use super::*;
+use crate::acceptance_script::{Action, run_script};
 use tekes_agent_components_ui::{RunPort, SidePanelNavigation, SidePanelTabKind};
 use tekes_agent_presentation::AgentTask;
 use tekes_agent_ui_bindings::TaskPaneBinding;
-use tekes_ui_platform_macos::selftest::{Action, run_script};
 
 struct ChildOpenFixture {
     old_request: PanelRequest,

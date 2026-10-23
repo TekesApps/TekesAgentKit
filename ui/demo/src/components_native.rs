@@ -1378,7 +1378,7 @@ impl Host {
             self.sidebar_restore_probe = Some(probe);
         }
         if let Some(script) = self.scripted_sidebar_action.take() {
-            use tekes_ui_platform_macos::selftest::{Action, run_script};
+            use crate::acceptance_script::{Action, run_script};
             let menu = self
                 .view
                 .tree
@@ -1513,7 +1513,7 @@ impl Host {
         }
 
         if self.annotation_selftest {
-            use tekes_ui_platform_macos::selftest::{Action, run_script};
+            use crate::acceptance_script::{Action, run_script};
             if self.annotation_stage == 0 && self.view.annotation_editor_ids().is_some() {
                 self.annotation_stage = 1;
                 let ids = self.view.annotation_editor_ids().unwrap();
@@ -1612,7 +1612,7 @@ impl Host {
             }
         }
         if self.creation_selftest {
-            use tekes_ui_platform_macos::selftest::{Action, run_script};
+            use crate::acceptance_script::{Action, run_script};
             if self.creation_stage == 0 && self.view.initial_preset_choice_id("coding").is_some() {
                 self.creation_stage = 1;
                 let p = self
@@ -1722,17 +1722,17 @@ impl Host {
                     .unwrap()
                     .frame()
                     .center();
-                tekes_ui_platform_macos::selftest::run_script(vec![
+                crate::acceptance_script::run_script(vec![
                     (
                         100,
-                        tekes_ui_platform_macos::selftest::Action::Click {
+                        crate::acceptance_script::Action::Click {
                             x: send.x as f64,
                             y: send.y as f64,
                         },
                     ),
                     (
                         400,
-                        tekes_ui_platform_macos::selftest::Action::Click {
+                        crate::acceptance_script::Action::Click {
                             x: b.x as f64,
                             y: b.y as f64,
                         },
@@ -1757,15 +1757,15 @@ impl Host {
                     .unwrap()
                     .frame()
                     .center();
-                tekes_ui_platform_macos::selftest::run_script(vec![
+                crate::acceptance_script::run_script(vec![
                     (
                         100,
-                        tekes_ui_platform_macos::selftest::Action::Click {
+                        crate::acceptance_script::Action::Click {
                             x: a.x as f64,
                             y: a.y as f64,
                         },
                     ),
-                    (500, tekes_ui_platform_macos::selftest::Action::Close),
+                    (500, crate::acceptance_script::Action::Close),
                 ]);
             }
         }
@@ -1777,34 +1777,31 @@ impl Host {
                 let point = self.view.tree.get(target).unwrap().frame().center();
                 let mut script = vec![];
                 if let Ok(path) = std::env::var("AGENT_MODEL_CHOICES_CAPTURE") {
-                    script.push((
-                        100,
-                        tekes_ui_platform_macos::selftest::Action::Capture { path },
-                    ));
+                    script.push((100, crate::acceptance_script::Action::Capture { path }));
                 }
                 script.push((
                     300,
-                    tekes_ui_platform_macos::selftest::Action::Click {
+                    crate::acceptance_script::Action::Click {
                         x: point.x as f64,
                         y: point.y as f64,
                     },
                 ));
-                tekes_ui_platform_macos::selftest::run_script(script);
+                crate::acceptance_script::run_script(script);
             } else if self.model_test_stage == 1 && self.view.model_choice_request().is_none() {
                 self.model_test_stage = 2;
                 let ids = self.view.ids();
                 let click = |id| {
                     let p = self.view.tree.get(id).unwrap().frame().center();
-                    tekes_ui_platform_macos::selftest::Action::Click {
+                    crate::acceptance_script::Action::Click {
                         x: p.x as f64,
                         y: p.y as f64,
                     }
                 };
-                tekes_ui_platform_macos::selftest::run_script(vec![
+                crate::acceptance_script::run_script(vec![
                     (100, click(ids.editor)),
                     (
                         200,
-                        tekes_ui_platform_macos::selftest::Action::Text("模型选择后的消息".into()),
+                        crate::acceptance_script::Action::Text("模型选择后的消息".into()),
                     ),
                     (500, click(ids.send)),
                 ]);
@@ -1820,9 +1817,9 @@ impl Host {
                 })
             {
                 self.model_test_stage = 3;
-                tekes_ui_platform_macos::selftest::run_script(vec![(
+                crate::acceptance_script::run_script(vec![(
                     200,
-                    tekes_ui_platform_macos::selftest::Action::Close,
+                    crate::acceptance_script::Action::Close,
                 )]);
             }
         }
@@ -1875,9 +1872,9 @@ impl Host {
                         .footnote_actions[0];
                     let button = footer.action_id(&action.id).unwrap();
                     let point = self.view.tree.get(button).unwrap().frame().center();
-                    tekes_ui_platform_macos::selftest::run_script(vec![(
+                    crate::acceptance_script::run_script(vec![(
                         200,
-                        tekes_ui_platform_macos::selftest::Action::Click {
+                        crate::acceptance_script::Action::Click {
                             x: point.x as f64,
                             y: point.y as f64,
                         },
@@ -2758,9 +2755,9 @@ impl WindowHandler for Host {
                 if self.selftest {
                     click_thread_action_script(self, "pin");
                     self.native_script_waiting_for_pin = true;
-                    tekes_ui_platform_macos::selftest::run_script(vec![(
+                    crate::acceptance_script::run_script(vec![(
                         30000,
-                        tekes_ui_platform_macos::selftest::Action::Close,
+                        crate::acceptance_script::Action::Close,
                     )]);
                 }
                 if self.system_ime_selftest {
@@ -2768,23 +2765,23 @@ impl WindowHandler for Host {
                 }
                 if self.actions_selftest {
                     click_thread_action_script(self, "rename");
-                    tekes_ui_platform_macos::selftest::run_script(vec![(
+                    crate::acceptance_script::run_script(vec![(
                         30000,
-                        tekes_ui_platform_macos::selftest::Action::Close,
+                        crate::acceptance_script::Action::Close,
                     )]);
                 }
                 if self.models_selftest {
                     let target = self.view.ids().model;
                     let p = self.view.tree.get(target).unwrap().frame().center();
-                    tekes_ui_platform_macos::selftest::run_script(vec![
+                    crate::acceptance_script::run_script(vec![
                         (
                             100,
-                            tekes_ui_platform_macos::selftest::Action::Click {
+                            crate::acceptance_script::Action::Click {
                                 x: p.x as f64,
                                 y: p.y as f64,
                             },
                         ),
-                        (15000, tekes_ui_platform_macos::selftest::Action::Close),
+                        (15000, crate::acceptance_script::Action::Close),
                     ]);
                 }
                 if self.creation_selftest {
@@ -2795,15 +2792,15 @@ impl WindowHandler for Host {
                         .unwrap()
                         .frame()
                         .center();
-                    tekes_ui_platform_macos::selftest::run_script(vec![
+                    crate::acceptance_script::run_script(vec![
                         (
                             100,
-                            tekes_ui_platform_macos::selftest::Action::Click {
+                            crate::acceptance_script::Action::Click {
                                 x: p.x as f64,
                                 y: p.y as f64,
                             },
                         ),
-                        (20000, tekes_ui_platform_macos::selftest::Action::Close),
+                        (20000, crate::acceptance_script::Action::Close),
                     ]);
                 }
                 if self.annotation_selftest {
@@ -2826,15 +2823,15 @@ impl WindowHandler for Host {
                         )
                         .unwrap();
                     let p = self.view.tree.get(target).unwrap().frame().center();
-                    tekes_ui_platform_macos::selftest::run_script(vec![
+                    crate::acceptance_script::run_script(vec![
                         (
                             100,
-                            tekes_ui_platform_macos::selftest::Action::Click {
+                            crate::acceptance_script::Action::Click {
                                 x: p.x as f64,
                                 y: p.y as f64,
                             },
                         ),
-                        (20000, tekes_ui_platform_macos::selftest::Action::Close),
+                        (20000, crate::acceptance_script::Action::Close),
                     ]);
                 }
                 if self.context_selftest {
@@ -4830,7 +4827,10 @@ pub fn run() {
                 }
                 else if let Some(group) = node.component::<tekes_agent_components_ui::ToolRun>() {assert!((node.frame().min_x()-frame.min_x()).abs()<0.5);tools+=group.summary().unwrap().tool_ids.len();}
             }
-            assert_eq!(messages, snapshot.transcript.items.iter().filter(|item|item.is_visible).count());
+            let (canonical_visible, hidden_empty) = tekes_agent_ui_demo::transcript_coverage::verify(content, &document).expect("all canonical content must be accounted for");
+            assert!(messages <= canonical_visible);
+            messages = canonical_visible;
+            known_empty += hidden_empty;
             assert_eq!(output_copies, document.sections.iter().filter(|section|section.final_output().is_some()).count());
             serde_json::json!({"renderer":true,"rows":content.row_keys().len(),"knownEmptyContainersHidden":known_empty,"outputCopyControls":output_copies,"feedbackRows":feedback_rows,"messages":messages,"footnotes":footnotes,"independentTools":tools,"userTrailing":true,"machineLeading":true,"genericViewport":true,"keyedReadingAcceptance":false,"richContent":false,"completeTranscript":false,"nativeInteraction":false})
         });
@@ -4954,8 +4954,8 @@ pub fn run() {
     );
 }
 fn context_script(view: &ComponentDemo) {
+    use crate::acceptance_script::{Action, run_script};
     use tekes_agent_components_ui::{Composer, ComposerContextAction, ComposerContextItem};
-    use tekes_ui_platform_macos::selftest::{Action, run_script};
     let ids = view.ids();
     let attachment = view.binding().current_run().unwrap().draft.artifacts[0].clone();
     let remove = view
@@ -5021,7 +5021,7 @@ fn context_script(view: &ComponentDemo) {
 /// Opt-in integration probe. The caller must verify the active macOS Simplified
 /// Pinyin source; no Preedit/Text injection and no global input-source changes.
 fn system_ime_script(view: &ComponentDemo) {
-    use tekes_ui_platform_macos::selftest::{Action, run_script};
+    use crate::acceptance_script::{Action, run_script};
     let click = |id| {
         let point = view.tree.get(id).unwrap().frame().center();
         Action::Click {
@@ -5088,7 +5088,7 @@ fn system_ime_script(view: &ComponentDemo) {
     ]);
 }
 fn native_script(view: &ComponentDemo) {
-    use tekes_ui_platform_macos::selftest::{Action, run_script};
+    use crate::acceptance_script::{Action, run_script};
     let click = |id| {
         let point = view.tree.get(id).unwrap().frame().center();
         Action::Click {
@@ -5171,7 +5171,7 @@ fn native_script(view: &ComponentDemo) {
     run_script(script);
 }
 fn side_chat_script(view: &ComponentDemo) {
-    use tekes_ui_platform_macos::selftest::{Action, run_script};
+    use crate::acceptance_script::{Action, run_script};
     let click = |id| {
         let point = view.tree.get(id).unwrap().frame().center();
         Action::Click {
@@ -5200,7 +5200,7 @@ fn side_chat_script(view: &ComponentDemo) {
     run_script(script);
 }
 fn task_script(view: &ComponentDemo) {
-    use tekes_ui_platform_macos::selftest::{Action, run_script};
+    use crate::acceptance_script::{Action, run_script};
     let click = |id| {
         let point = view.tree.get(id).unwrap().frame().center();
         Action::Click {
@@ -5232,7 +5232,7 @@ fn task_script(view: &ComponentDemo) {
     run_script(script);
 }
 fn child_script(view: &ComponentDemo) {
-    use tekes_ui_platform_macos::selftest::{Action, run_script};
+    use crate::acceptance_script::{Action, run_script};
     let click = |id| {
         let point = view.tree.get(id).unwrap().frame().center();
         Action::Click {
@@ -5263,7 +5263,7 @@ fn child_script(view: &ComponentDemo) {
     run_script(script);
 }
 fn bounded_script(view: &ComponentDemo) {
-    use tekes_ui_platform_macos::selftest::{Action, run_script};
+    use crate::acceptance_script::{Action, run_script};
     let click = |id| {
         let point = view.tree.get(id).unwrap().frame().center();
         Action::Click {
@@ -5294,7 +5294,7 @@ struct ScriptedSidebarAction {
     label: String,
 }
 fn click_thread_action_script(host: &mut Host, action: &str) {
-    use tekes_ui_platform_macos::selftest::{Action, run_script};
+    use crate::acceptance_script::{Action, run_script};
     let view = &host.view;
     let binding = view.current_binding().expect("selected action target");
     let address = tekes_agent_contract::SessionAddress {
@@ -5351,7 +5351,7 @@ fn click_thread_action_script(host: &mut Host, action: &str) {
     )]);
 }
 fn rename_actions_script(view: &ComponentDemo) {
-    use tekes_ui_platform_macos::selftest::{Action, run_script};
+    use crate::acceptance_script::{Action, run_script};
     let ids = view.rename_ids().unwrap();
     let field = view
         .tree
@@ -5395,7 +5395,7 @@ fn rename_actions_script(view: &ComponentDemo) {
     ]);
 }
 fn restore_selection_script(view: &ComponentDemo) {
-    use tekes_ui_platform_macos::selftest::{Action, run_script};
+    use crate::acceptance_script::{Action, run_script};
     assert!(view.current_binding().is_none());
     let point = view
         .tree
