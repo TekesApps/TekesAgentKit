@@ -143,7 +143,8 @@ Run 和只读 pane 的组件/CoreText 验证见[frame 阅读范围](rust-agent-u
 
 嵌入工具的连续组现在先检查 `TranscriptSection::has_input_between_tools` 的已证明输入边界。
 None 保持未知来源；该查询不是完整连续性判定，也不能代替父时间线逐 call 分区。
-原消息级 Tools fragment 的物理拆分仍待完成，见[来源输入边界](rust-agent-ui-tool-input-boundary-20261023.md)。
+原消息级 Tools fragment 的物理拆分现已接入，见下文与[原工具组物理分区](rust-agent-ui-physical-tool-fragments-20261023.md)。
+[来源输入边界](rust-agent-ui-tool-input-boundary-20261023.md)保留此前阶段范围，不作为当前“尚未拆分”的接入结论。
 该新 API 尚未包含在 v0.3.8 中，开发宿主必须固定包含它的完整 AgentKit revision。
 
 消息内原工具组现在通过 `MessageToolFragment(owner, OutputMessageToolFragmentKey)` 独立挂载，

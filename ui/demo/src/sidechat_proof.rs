@@ -7,7 +7,9 @@ use tekes_agent_contract::{Error, Result, require, unsupported};
 use tekes_agent_presentation::{ComposerDestination, RunPhase, TranscriptItemKind};
 use tekes_agent_session::SessionRuntime;
 use tekes_agent_ui_bindings::{ModelSelectionPreparation, PaneAccess, SideChatBinding};
-use tekes_ui_controls::composition::{AccessibilityAction, ButtonContent, ComponentId};
+use tekes_ui_controls::composition::{
+    AccessibilityAction, ButtonContent, ComponentId, ContentEvent,
+};
 
 const INPUT: &str = "AGENTKIT_REAL_SIDECHAT_OWNED_INPUT";
 fn panel(view: &ComponentDemo) -> &SidePanel {
@@ -126,7 +128,36 @@ pub async fn run(
         view.transcript_content_id(ids).is_some(),
         "SideChat original Transcript missing",
     )?;
-    scratch.edit_text(&ComposerDestination::run(chat.scope.clone()), INPUT.into())?;
+    require(
+        view.tree.focused() == Some(ids.editor),
+        "SideChat editor did not receive its original mount focus",
+    )?;
+    let commands = view.event(&ContentEvent::Preedit {
+        text: "中文组字".into(),
+        selection: 4..4,
+        clauses: vec![],
+        replacement: None,
+    })?;
+    require(
+        metadata(view, commands).await?.is_empty() && view.composing(),
+        "SideChat preedit emitted a business command or lost composition",
+    )?;
+    require(
+        press(view, ids.send).await?.is_empty()
+            && view.tree.focused() == Some(ids.editor)
+            && view.composing(),
+        "SideChat sent or changed editor ownership during preedit",
+    )?;
+    let commands = view.event(&ContentEvent::Commit {
+        text: INPUT.into(),
+        replacement: None,
+    })?;
+    require(
+        metadata(view, commands).await?.is_empty()
+            && !view.composing()
+            && scratch.current_run().unwrap().draft.text == INPUT,
+        "SideChat original editor commit did not reach its destination",
+    )?;
     let reopened = owner.open(&chat).await?;
     require(
         Arc::ptr_eq(reopened.binding(), &scratch)
@@ -327,7 +358,7 @@ pub async fn run(
     )?;
     Ok(
         json!({"realHarness":true,"capabilityUnavailable":false,"scratchLifecycleAccepted":true,"originalCreate":true,"independentForkScope":true,"scratchScope":chat.scope,
-        "originalSidePanelRunPort":true,"originalSend":true,"scratchReply":true,"parentHistoryIsolated":true,
+        "originalSidePanelRunPort":true,"originalEditorInput":true,"syntheticPreeditBlockedSend":true,"originalEditorFocusRetained":true,"originalSend":true,"scratchReply":true,"parentHistoryIsolated":true,
         "summaryNavigation":true,"originalComposerIdsRetained":true,"scratchDraftRestored":true,"canonicalReopen":true,"canonicalReopenAfterReconnect":true,
         "freshReconnect":true,"noDuplicateInput":true,"originalClose":true,"confirmedDiscard":true,
         "retiredAuthority":true,"parentAndOtherDraftsPreserved":true,"nativeInteraction":false,
