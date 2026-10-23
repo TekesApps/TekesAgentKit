@@ -1,4 +1,4 @@
-//! Pi 1.3 native stdio RPC adapter. Native session-tree records never masquerade as journal events.
+//! Pi 1.3/1.4 native stdio RPC adapter. Native session-tree records never masquerade as journal events.
 mod attachments;
 mod extensions;
 mod files;
@@ -50,7 +50,7 @@ impl PiConfiguration {
             data_root,
             extensions: Vec::new(),
             session_roots: Vec::new(),
-            supported_versions: ["1.3.0".into()].into(),
+            supported_versions: ["1.3.0".into(), "1.4.0".into()].into(),
         }
     }
 }

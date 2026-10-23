@@ -14,10 +14,12 @@
 | Endpoint | 验证版本 | 权威数据路径 |
 |---|---|---|
 | `NativeSessionEndpoint` | Kernel **0.9.1 / v4** 协议/子历史基线；**0.9.3** 已作明确 **UI-only** 验证 | bearer HTTP、WebSocket mux、journal 与 frozen-cut history |
-| `PiSessionEndpoint` | Pi **1.3.0** | 每会话原生 stdio RPC、native entry tree 活动分支 |
+| `PiSessionEndpoint` | Pi **1.4.0**；保留 **1.3.0** 回归基线 | 每会话原生 stdio RPC、native entry tree 活动分支 |
 | `DshSessionEndpoint` | DSH **0.2.1-rc.2**，兼容 **0.2.0-rc.2** | 认证 Remote HTTP/mux、journal/page、multipart 文件 |
 
 Kernel 0.9.3 的 UI-only 收据不包括完整生命周期与 child 协议验收；兼容范围和完整协议基线见[SEP 契约](docs/session-endpoints.md)。
+
+Pi 1.4.0 的独立精确安装、版本对照、截断恢复及离屏证据见[兼容升级记录](docs/pi-1.4.0-compat-20261023.md)。
 
 已实现会话地址/指针、历史恢复、文件读取/观察、附件、交互回传和显式能力检查；独立 presentation 层提供 Run、Transcript、Composer 和连接状态。Pi 保留原生 entry ID，不伪造 journal sequence。DSH 官方未提供的 ephemeral fork/discard 明确返回 Unsupported。
 
