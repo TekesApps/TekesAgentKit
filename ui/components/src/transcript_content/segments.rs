@@ -161,6 +161,7 @@ impl TranscriptContent {
                 content,
                 thinking: None,
                 hidden: false,
+                narration_frame: None,
                 activity: None,
             });
             if !expanded {

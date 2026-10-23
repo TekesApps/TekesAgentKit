@@ -1,6 +1,7 @@
 //! A canonical mixed message content tree. Scrolling/reading transactions belong
 //! to TekesUI; this component neither invents a scroll state nor adjusts pixels.
 mod narration;
+use narration::{NarrationFrame, source_node, source_node_mut};
 mod segments;
 use crate::{
     FeedbackGesture, FeedbackLabels, InputMessage, OutputMessage, OutputMessageFragment,
@@ -163,6 +164,7 @@ pub struct TranscriptContent {
     /// Only unresolved operations survive clipping; not a second session cache.
     detached: BTreeMap<TranscriptContentRowKey, Content>,
     hidden_rows: BTreeMap<TranscriptContentRowKey, Content>,
+    narration_frames: BTreeMap<(String, String), ComponentId>,
     activity_expansion: BTreeMap<String, bool>,
     segment_expansion: BTreeMap<TranscriptActivitySegmentKey, bool>,
     activity_generation: u64,
@@ -237,6 +239,7 @@ impl TranscriptContent {
             keys: vec![],
             detached: BTreeMap::new(),
             hidden_rows: BTreeMap::new(),
+            narration_frames: BTreeMap::new(),
             activity_expansion: BTreeMap::new(),
             segment_expansion: BTreeMap::new(),
             activity_generation: 0,
@@ -359,6 +362,7 @@ impl TranscriptContent {
                     content: PlannedContent::Fragment(owner.clone(), kind, turn),
                     thinking: None,
                     hidden: false,
+                    narration_frame: None,
                     activity: Some(turn),
                 };
                 let reasoning = presence[1].then(|| make(OutputMessageFragmentKind::Reasoning));
@@ -468,6 +472,7 @@ impl TranscriptContent {
                     content,
                     thinking: None,
                     hidden: false,
+                    narration_frame: None,
                     activity: None,
                 },
             );
@@ -488,6 +493,8 @@ impl TranscriptContent {
             structured_user_content: true,
         }
     }
+    /// Mounted reading row. Narration may be a stable frame span containing the
+    /// current canonical body; use message_id for the original message control.
     pub fn row_id(&self, key: &TranscriptContentRowKey) -> Option<ComponentId> {
         if let TranscriptContentRowKey::TurnFeedback(turn) = key {
             return self
@@ -511,8 +518,13 @@ impl TranscriptContent {
                 }
             })
     }
+    /// Original visible canonical message control, independently retained when
+    /// its narration frame changes carriers. Hidden peers are not mounted.
     pub fn message_id(&self, key: TranscriptMessageKey<'_>) -> Option<ComponentId> {
-        self.row_id(&TranscriptContentRowKey::Message(key.into()))
+        self.keys
+            .iter()
+            .position(|row| row == &TranscriptContentRowKey::Message(key.into()))
+            .map(|i| source_node(&self.rows.children[i]).id())
     }
     pub fn row_keys(&self) -> &[TranscriptContentRowKey] {
         &self.keys
@@ -777,6 +789,17 @@ impl TranscriptContent {
             .collect();
         existing.append(&mut self.detached);
         existing.append(&mut self.hidden_rows);
+        for node in existing.values_mut() {
+            if node.component::<NarrationFrame>().is_some() {
+                let body = node
+                    .component_mut::<NarrationFrame>()
+                    .unwrap()
+                    .rows
+                    .children
+                    .remove(0);
+                *node = body;
+            }
+        }
         let mut members = BTreeMap::new();
         for node in existing.values_mut() {
             if let Some(group) = node.component_mut::<ToolRun>() {
@@ -875,10 +898,30 @@ impl TranscriptContent {
             }
             built.insert(row.key.clone(), node);
         }
+        let frame_keys: BTreeSet<_> = plan
+            .iter()
+            .filter_map(|row| row.narration_frame.clone())
+            .collect();
+        self.narration_frames
+            .retain(|key, _| frame_keys.contains(key));
+        // Allocate after all original row/member namespaces, matching preparation.
         for row in &plan {
-            let node = built
+            if let Some(key) = &row.narration_frame {
+                self.narration_frames.entry(key.clone()).or_insert_with(|| {
+                    let id = ComponentId((self.next as u64) << 32);
+                    self.next += 1;
+                    id
+                });
+            }
+        }
+        for row in &plan {
+            let mut node = built
                 .remove(&row.key)
                 .expect("preflighted original message partition");
+            if let Some(key) = &row.narration_frame {
+                let root = self.narration_frames[key];
+                node = Content::new(root, NarrationFrame::new(node));
+            }
             if row.hidden {
                 self.hidden_rows.insert(row.key.clone(), node);
             } else {
@@ -994,11 +1037,23 @@ impl TranscriptContent {
                 (row.key.clone(), id)
             })
             .collect();
+        let mut frame_ids = self.narration_frames.clone();
+        for row in &planned {
+            if let Some(key) = &row.narration_frame {
+                frame_ids.entry(key.clone()).or_insert_with(|| {
+                    let id = ComponentId((next as u64) << 32);
+                    next += 1;
+                    id
+                });
+            }
+        }
         let rows = planned
             .iter()
             .filter(|row| !row.hidden)
             .map(|row| {
-                let id = if let PlannedContent::Fragment(owner, kind, _) = &row.content {
+                let id = if let Some(key) = &row.narration_frame {
+                    frame_ids[key]
+                } else if let PlannedContent::Fragment(owner, kind, _) = &row.content {
                     ComponentId(
                         normal_ids[&TranscriptContentRowKey::Message(owner.clone())].0
                             + kind.offset(),
@@ -1205,6 +1260,13 @@ impl TranscriptContent {
                     .count() as u64;
             }
         }
+        allocations += plan
+            .iter()
+            .filter_map(|row| row.narration_frame.as_ref())
+            .collect::<BTreeSet<_>>()
+            .iter()
+            .filter(|key| !self.narration_frames.contains_key(*key))
+            .count() as u64;
         if allocations > u64::from(self.end - self.next) {
             return Err("transcript row namespaces exhausted");
         }
@@ -1243,6 +1305,7 @@ impl TranscriptContent {
             .chain(self.hidden_rows.iter())
         {
             if keys.contains(row) {
+                let node = source_node(node);
                 if let Some(view) = node.component::<OutputMessage>() {
                     result.extend(view.content_ids());
                 }
@@ -1338,6 +1401,7 @@ impl TranscriptContent {
             .map(|i| &self.rows.children[*i])
             .or_else(|| self.detached.get(key))
             .or_else(|| self.hidden_rows.get(key))
+            .map(source_node)
     }
     fn new_row(&self, namespace: u32, row: &Planned<'_>) -> Content {
         let root = ComponentId((namespace as u64) << 32);
@@ -1624,6 +1688,7 @@ impl TranscriptContent {
         self.handle_activity_actions(actions);
         let mut result = vec![];
         for node in &mut self.rows.children {
+            let node = source_node_mut(node);
             if let Some(input) = node.component_mut::<InputMessage>() {
                 input.handle_actions(actions);
             } else if let Some(output) = node.component_mut::<OutputMessage>() {
@@ -1747,6 +1812,7 @@ impl TranscriptContent {
             .children
             .iter()
             .flat_map(|node| {
+                let node = source_node(node);
                 if let Some(input) = node.component::<InputMessage>() {
                     input.copy_button_id().into_iter().collect()
                 } else if let Some(output) = node.component::<OutputMessage>() {
@@ -1769,6 +1835,7 @@ impl TranscriptContent {
             .children
             .iter()
             .flat_map(|node| {
+                let node = source_node(node);
                 if let Some(input) = node.component::<InputMessage>() {
                     input.take_copy_intents(actions)
                 } else if let Some(footnote) = node.component::<TurnFootnote>() {
@@ -1843,6 +1910,7 @@ struct Planned<'a> {
     content: PlannedContent<'a>,
     thinking: Option<crate::TranscriptThinkingFrame>,
     hidden: bool,
+    narration_frame: Option<(String, String)>,
     activity: Option<&'a str>,
 }
 impl Planned<'_> {
@@ -1939,6 +2007,7 @@ fn label(key: TranscriptContentRowKey, text: String) -> Planned<'static> {
         alias: None,
         thinking: None,
         hidden: false,
+        narration_frame: None,
         activity: None,
         content: PlannedContent::Label(text),
     }
@@ -1971,6 +2040,7 @@ fn plan<'a>(
                 alias: None,
                 thinking: None,
                 hidden: false,
+                narration_frame: None,
                 activity: None,
                 content: PlannedContent::Output(*output, None),
             });
@@ -2053,6 +2123,7 @@ fn plan<'a>(
                 alias: None,
                 thinking: None,
                 hidden: false,
+                narration_frame: None,
                 activity: None,
                 content: PlannedContent::Footnote(turn, output, display, target),
             });
@@ -2118,6 +2189,7 @@ fn event_row<'a>(
                     key: Key::Message(input.key.into()),
                     thinking: None,
                     hidden: false,
+                    narration_frame: None,
                     activity: None,
                     alias: input
                         .reconciliation_key()
@@ -2134,6 +2206,7 @@ fn event_row<'a>(
                     key: Key::Message(output.key.into()),
                     thinking: None,
                     hidden: false,
+                    narration_frame: None,
                     activity: None,
                     alias: output
                         .reconciliation_key()
@@ -2154,6 +2227,7 @@ fn event_row<'a>(
                 alias: None,
                 thinking: None,
                 hidden: false,
+                narration_frame: None,
                 activity: None,
                 content: PlannedContent::Tools(vec![(
                     tool,
@@ -2175,6 +2249,7 @@ fn event_row<'a>(
                 alias: None,
                 thinking: None,
                 hidden: false,
+                narration_frame: None,
                 activity: None,
                 content: PlannedContent::Tools(vec![(
                     tool,

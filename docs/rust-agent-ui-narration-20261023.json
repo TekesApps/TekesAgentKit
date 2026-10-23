@@ -69,7 +69,15 @@
     "failureLog": ".runtime-fixtures/narration-carrier-20261023/final/native-driver.log",
     "systemIme": "not run",
     "streamReading": "not run",
-    "pageReading": "not run"
+    "pageReading": "not run",
+    "desktopResumedAttempt": {
+      "accepted": false,
+      "phase": 0,
+      "observed": "COMPONENT_FOCUS active=false; original completion assertion 0 != 13",
+      "evidence": ".runtime-fixtures/narration-carrier-20261023/desktop-resumed/result.json",
+      "programSha256": "0c3219f41cde7be2278db39e5e1f15a0050c75f1f7b816d458bae30f5e724506",
+      "remainingOwnedDemoProcesses": 0
+    }
   },
   "realHarnessOffscreen": {
     "pi": {

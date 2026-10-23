@@ -134,4 +134,7 @@ Kit 负责 Initial prompt → 已证明的开场输入 → Activity 的原控件
 BetweenInputs 使用 running 时间线路径。当前 prose 适配由 Kit 读取原 OutputMessage part facts，
 未知富内容或无 frame 来源时保留原正文；宿主不要另写 carrier 或补造 group fallback。
 规范等价比较新增精确依赖 `unicode-normalization =0.1.25`，SDK pin 不变。
-多记录切换的稳定 frame 阅读锚点、富内容和逐 call 分区尚未验收，见[旁白阶段范围](rust-agent-ui-narration-20261023.md)。
+多记录切换由 Kit 的真实 NarrationFrame 根控件作为 SDK reading item；`row_id` 是阅读行，
+`message_id` 是原 canonical 控件，两者可能不同。不要用阅读 span 代替复制/来源身份。
+Run 和只读 pane 的组件/CoreText 验证见[frame 阅读范围](rust-agent-ui-narration-frame-reading-20261023.md)；
+当前原生、富内容和逐 call 分区仍未验收。

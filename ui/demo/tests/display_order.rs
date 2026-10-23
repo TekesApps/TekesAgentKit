@@ -1402,3 +1402,7 @@ fn unresolved_rich_body_or_unowned_frame_preserves_each_source_body_instead_of_g
         );
     }
 }
+
+#[cfg(target_os = "macos")]
+#[path = "support/narration_reading.rs"]
+mod narration_reading;

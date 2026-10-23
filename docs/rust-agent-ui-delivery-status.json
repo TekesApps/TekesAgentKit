@@ -22,11 +22,11 @@
   "tekesuiInputDigest": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
   "richToolCardRendering": false,
   "crossProcessAccepted": false,
-  "sourceBase": "bf179f394608996c6cf8f4962f3911b63834087b",
-  "sourceStage": "plus captured-node narration carrier/fallback policy, prose-body parent composition and retained original hidden controllers; stable NarrationFrame reading span, rich/paired Views, call-level composition and formal ProcessContainer remain incomplete",
+  "sourceBase": "480433e6c66fc34681a8cb2dd208abd4746ac09d",
+  "sourceStage": "plus real stable NarrationFrame reading span, original canonical controllers and Run/read-only CoreText consumer transactions; native, rich/paired Views, call-level composition and formal ProcessContainer remain incomplete",
   "sourcesRead": {
     "ui/components/src/run_port.rs": "bc7e40abf784b1bae366e55f229e81f14123853faba428534c023d8d1b181ab3",
-    "ui/components/src/transcript_content.rs": "47cc2ed7fe6301d58bbbaecb1d5234cfd81e3506e8e136db7c2fb6e69173d143",
+    "ui/components/src/transcript_content.rs": "621564ff4f66bb1dbbdbcdc0fc99a57be46966b704377537b8625122844d7516",
     "ui/components/src/indicators.rs": "0e14f0615bbf6984faa21de8ff949407bff5f39cbc8d9132554e256d26b10706",
     "ui/components/src/sidebar.rs": "cc6ffe52644de133e634a1a49462e997bd26952357b2548d12fdea09667be566",
     "ui/components/src/side_panel.rs": "2e6a1a102e24856da8532c174e1d8700976e61caee1c80af75c3145499253094",
@@ -53,14 +53,14 @@
     "crates/presentation/src/transcript_order.rs": "244918b06a0441c7596fb285f35d46f06a638dcf50a3a1db8f38868163a317e8",
     "crates/presentation/tests/transcript_order.rs": "513cef92e8aa1b88268e6b43fe395cffaa89a18d59567289976c71bdd62039e7",
     "ui/components/src/lib.rs": "60176578f5fe011e5fcf1075d2e3ba74cf10baff868751424327b37de60a5a50",
-    "ui/demo/tests/display_order.rs": "4930c923d7a3d3390c67b5c7643d1108d8250924e11ccf736a5faa9f5f8dd744",
+    "ui/demo/tests/display_order.rs": "5ba03d08d930f1ff14951f9802669ec16b941d466e4a269e53a118fe7817420f",
     "ui/demo/tests/run_reading.rs": "ea1fb4ed3f0c4219edc9e4cd1509fc24f9163236b8bcda2a03d80ff0263d4c44",
     "crates/presentation/src/lib.rs": "594f881cd6bf9e059c840b9a15264ff462db5f308e78ddbe6c333201b6dcb522",
     "crates/presentation/src/transcript_planes.rs": "f8332f5d1d907d5308404c4778e6e942b0103d4842780837843800e05d22330b",
     "crates/presentation/tests/transcript_planes.rs": "207d1f8a2ef5298b07741066041edf365df40c8e56efdf4a35f7ed1007ed4ce7",
     "ui/demo/src/native_stream_selftest.rs": "0b49ed42f72090a64fa8566ed8bf60356cc3b607c87b94f526584f0fa03a5ef7",
     "ui/components/src/turn_footnote_timing.rs": "5cbded0aeadbd59f62ebbf2a08c7d13143b0d9a40a4d5f18232d21a6f19c0277",
-    "ui/components/src/transcript_content/segments.rs": "3b5954b391f519d618437490283293660abdcac96f7d9fdecc6b47e9b2cd9396",
+    "ui/components/src/transcript_content/segments.rs": "3a3a5c6b3e1a3ccf22502aa0064c82033ea7594a9150f570cb1801c8a89eb20b",
     "ui/demo/src/components_native.rs": "cd98cf54e0517432b4173662c3a2093b47e02293171e6501bc58a82497f42bfb",
     "ui/demo/src/fixture.rs": "d66d7a60802a4ed16b9670446c0c8d7cd2ffa2241b9b4e89ffde3fad8a2a7838",
     "ui/demo/src/native_disclosure_reading_selftest.rs": "c8a04a86b812818d94389f06663b7c0e1d0cedf54f9e8957261a5e65915a0dae",
@@ -72,7 +72,8 @@
     "crates/presentation/src/transcript_narration.rs": "7ee8ac193470f31b495526a5b1c3274c61349bf095449d02563a9108fed9909a",
     "crates/presentation/tests/narration.rs": "b62ef95f278dbc38ce4216f99dd1d0b8ce29765d933c9939bb72d99ec1c409b4",
     "ui/Cargo.lock": "8790cacd3395460c518f71240052a0bde27a25dbe7e18acda12753c53653d9d1",
-    "ui/components/src/transcript_content/narration.rs": "3b3ee6d8af59a32d854d45d37d9ba28d6fc054407609b5823571ba001ff167e3"
+    "ui/components/src/transcript_content/narration.rs": "70e28805192db6bfb547858c3214b5ceca8deda4df32f474c4b2c2db30493763",
+    "ui/demo/tests/support/narration_reading.rs": "17ccc2124e3e8d036efec8ca929ce8900b5d8279bc7dd204c5089830426c7d0f"
   },
   "publicIssues": [
     {
@@ -417,10 +418,10 @@
       }
     ]
   },
-  "latestVerifiedCiHead": "bf179f394608996c6cf8f4962f3911b63834087b",
+  "latestVerifiedCiHead": "480433e6c66fc34681a8cb2dd208abd4746ac09d",
   "latestVerifiedCiConclusion": "checks x2 SUCCESS; UI x2 FAILURE at strict nested-detail step; official API for both jobs",
   "knownFailure": "Nested detail scroll leaves parent following; strict gate remains required",
-  "currentValidation": "rust-agent-ui-narration-20261023.json",
+  "currentValidation": "rust-agent-ui-narration-frame-reading-20261023.json",
   "currentSourceNativeAccepted": false,
   "latestNativeAcceptance": {
     "programSha256": "0c3219f41cde7be2278db39e5e1f15a0050c75f1f7b816d458bae30f5e724506",
@@ -439,50 +440,23 @@
       "streamReading": "not run",
       "pageReading": "not run"
     },
-    "evidence": "rust-agent-ui-narration-20261023.json"
+    "evidence": "rust-agent-ui-narration-20261023.json",
+    "appliesToCurrentSource": false,
+    "note": "Historical 0c3219 program phase0 failures only; current 66963bf program not launched"
   },
   "latestLocalValidation": {
     "rootTests": 308,
-    "fullUiTests": 604,
+    "rootValidationReusedFrom": "480433e narration-carrier final root 308 + strict Clippy; root sources and lock unchanged",
+    "fullUiTests": 606,
     "uiIgnored": 1,
-    "newSourceTests": 11,
-    "newFixtureConsumerPipelineTests": 1,
-    "rootAndUiStrictAllTargetsClippy": true,
-    "currentFullUiSuiteRerun": true,
-    "strictReadingExitCode": 1,
-    "newNativeAcceptance": "Current c90c9f3b: owned native Activity clicks/retained text owners + Pi/DSH/Native stream, stream-reading, public page + one software system Pinyin probe; full UI/cross-process/physical/VoiceOver false",
-    "finalThinkingSourceTests": 5,
-    "newReadonlyLiveTestAfterFullSuite": 0,
-    "displayOrderTests": 14,
-    "readonlyReadingTests": 37,
-    "planeTests": 8,
-    "activityPolicyDemoTests": 3,
-    "rootValidationReusedFrom": "Unchanged root source: prior d2a5568 activity-policy receipt; root tests/Clippy were not rerun for this UI-only refactor",
-    "physicalPlanesDisplayTests": 6,
-    "originalReadingTests": 38,
-    "foreignMessageScopeGuard": true,
-    "activitySegments": {
-      "componentTests": 3,
-      "newReadingTransactionTest": 1,
-      "clippy": true,
-      "format": true,
-      "boundaries": true,
-      "root": "unchanged-root independent prior evidence"
-    },
-    "systemPrompts": {
-      "sourceTests": 12,
-      "newComponentConsumerTests": 2,
-      "rootAndUiTestsRerun": true,
-      "rootAndUiStrictClippy": true,
-      "rootHeadlessRebuilt": true
-    },
-    "narration": {
-      "policyTests": 7,
-      "newComponentConsumerTests": 2,
-      "strictRootUiClippy": true,
-      "nativeAccepted": false,
-      "threeHarnessOffscreen": true
-    }
+    "uiStrictAllTargetsClippy": true,
+    "formatAndRustBoundaries": true,
+    "displayOrderTests": 15,
+    "newCoreTextReadingTests": 2,
+    "secondPublicApiConsumerRunAndReadonly": true,
+    "threeHarnessOffscreen": true,
+    "currentProgramNativeAttempted": false,
+    "currentProgramNativeAccepted": false
   },
   "publicProcessContractSources": {
     "crates/tekes-ui-module-runtime/src/container.rs": "b34423866204a1ee7e0346b5609ac3c4e1e278025ef8317962f44c54bb53b5e9",
@@ -858,5 +832,53 @@
     "processContainer": false,
     "currentSourcePartialAccepted": true,
     "evidence": "rust-agent-ui-system-prompts-20261023.json"
-  }
+  },
+  "currentProgram": {
+    "program": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/narration-frame-reading-20261023/AgentKitNarrationFrame.app/Contents/MacOS/tekes-agent-ui-demo",
+    "sha256": "66963bf80b83783a95c8942c8bb93ea5820b249d6dffc9f211b2a751c7b78184"
+  },
+  "historicalValidationBeforeNarrationFrames": {
+    "rootTests": 308,
+    "fullUiTests": 604,
+    "uiIgnored": 1,
+    "newSourceTests": 11,
+    "newFixtureConsumerPipelineTests": 1,
+    "rootAndUiStrictAllTargetsClippy": true,
+    "currentFullUiSuiteRerun": true,
+    "strictReadingExitCode": 1,
+    "newNativeAcceptance": "Current c90c9f3b: owned native Activity clicks/retained text owners + Pi/DSH/Native stream, stream-reading, public page + one software system Pinyin probe; full UI/cross-process/physical/VoiceOver false",
+    "finalThinkingSourceTests": 5,
+    "newReadonlyLiveTestAfterFullSuite": 0,
+    "displayOrderTests": 14,
+    "readonlyReadingTests": 37,
+    "planeTests": 8,
+    "activityPolicyDemoTests": 3,
+    "rootValidationReusedFrom": "Unchanged root source: prior d2a5568 activity-policy receipt; root tests/Clippy were not rerun for this UI-only refactor",
+    "physicalPlanesDisplayTests": 6,
+    "originalReadingTests": 38,
+    "foreignMessageScopeGuard": true,
+    "activitySegments": {
+      "componentTests": 3,
+      "newReadingTransactionTest": 1,
+      "clippy": true,
+      "format": true,
+      "boundaries": true,
+      "root": "unchanged-root independent prior evidence"
+    },
+    "systemPrompts": {
+      "sourceTests": 12,
+      "newComponentConsumerTests": 2,
+      "rootAndUiTestsRerun": true,
+      "rootAndUiStrictClippy": true,
+      "rootHeadlessRebuilt": true
+    },
+    "narration": {
+      "policyTests": 7,
+      "newComponentConsumerTests": 2,
+      "strictRootUiClippy": true,
+      "nativeAccepted": false,
+      "threeHarnessOffscreen": true
+    }
+  },
+  "narrationFrameReading": "rust-agent-ui-narration-frame-reading-20261023.json"
 }

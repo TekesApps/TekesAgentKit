@@ -69,3 +69,13 @@ Native Kernel 为 0.9.3 UI-only。
 此前 6a3a49e7 的原生/IME 结果只属于历史程序，不转移到本轮。
 `bf179f3` 的两次基础 CI 成功、两次 UI 在 #53 严格 nested-detail 步骤失败（官方 job API），门禁未改变。
 本阶段没有新建 target，也未删除失败验收程序或共享缓存。
+
+用户确认系统提示已处理后，复用同一冻结程序再次进行原生 prompt 验收，
+记录在 `.runtime-fixtures/narration-carrier-20261023/desktop-resumed/`。
+该次仍为 phase 0：`COMPONENT_FOCUS active=false`，前台身份轨迹只有 Codex，
+最终原完成断言 0≠13；不作为分页、焦点或 IME 通过证据。
+后续 CUA 窗口 Raise/标题栏点击未建立激活证据；检查时原 probe 已退出，
+重新出现的默认演示已用 Cmd-Q 关闭，并核实无该程序残留进程。
+保留两次原始失败、冻结程序与来源证据；本次没有编译、新建 target 或删除缓存。
+
+后续真实 frame 容器及组件阅读验证已推进，见[frame 阅读范围](rust-agent-ui-narration-frame-reading-20261023.md)。本页保留本阶段程序和失败的原始身份。

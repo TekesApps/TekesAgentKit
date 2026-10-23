@@ -84,9 +84,54 @@ impl TranscriptContent {
                             row.hidden = true;
                         } else {
                             anchors.insert(output.key.into(), earliest);
+                            row.narration_frame = Some((section.id.into(), input.frame_id.into()));
                         }
                     }
                 }
+            }
+        }
+        // Settlement can move an original body out of Activity without changing
+        // its source. Keep that body's already-mounted span; never transfer it
+        // to a final/unsupported peer or register the same span twice.
+        let mut assigned: BTreeSet<_> = rows
+            .iter()
+            .filter_map(|row| row.narration_frame.clone())
+            .collect();
+        for row in rows.iter_mut() {
+            if row.narration_frame.is_some() {
+                continue;
+            }
+            let PlannedContent::Output(output, Some(section)) = &row.content else {
+                continue;
+            };
+            let previous = self
+                .keys
+                .iter()
+                .zip(&self.rows.children)
+                .chain(self.hidden_rows.iter())
+                .find(|(key, _)| *key == &row.key)
+                .map(|(_, node)| node);
+            let Some(previous) =
+                previous.filter(|node| node.component::<NarrationFrame>().is_some())
+            else {
+                continue;
+            };
+            let Some((key, _)) = self
+                .narration_frames
+                .iter()
+                .find(|(_, id)| **id == previous.id())
+            else {
+                continue;
+            };
+            if key.0 == section.id
+                && snapshot
+                    .thinking_sources
+                    .by_id
+                    .get(&output.item.id)
+                    .is_some_and(|source| source.response_frame_id == key.1)
+                && assigned.insert(key.clone())
+            {
+                row.narration_frame = Some(key.clone());
             }
         }
         // Split reasoning/text/tools are semantic entries. At a shared sink
@@ -184,5 +229,55 @@ fn raw_order(position: Option<&crate::TranscriptSourcePosition>) -> Option<i64> 
         crate::TranscriptSourcePosition::Native { entry_ordinal, .. } => {
             i64::try_from(*entry_ordinal).ok()
         }
+    }
+}
+
+/// A real mounted span, independent of the selected canonical message controller.
+/// Geometry, focus, input and anchor compensation stay in the public SDK.
+#[derive(Debug)]
+pub(super) struct NarrationFrame {
+    pub(super) rows: StackContent,
+}
+impl NarrationFrame {
+    pub(super) fn new(body: Content) -> Self {
+        Self {
+            rows: StackContent {
+                model: Stack {
+                    axis: Axis::Vertical,
+                    gap: 0.,
+                },
+                children: vec![body],
+                flexible_child: None,
+            },
+        }
+    }
+}
+impl Component for NarrationFrame {
+    fn children(&self) -> &[Content] {
+        &self.rows.children
+    }
+    fn children_mut(&mut self) -> Option<&mut Vec<Content>> {
+        Some(&mut self.rows.children)
+    }
+    fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        self.rows.measure(text, available)
+    }
+    fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        self.rows.arrange(text, frame, clip);
+    }
+}
+pub(super) fn source_node(node: &Content) -> &Content {
+    node.component::<NarrationFrame>()
+        .map_or(node, |frame| &frame.rows.children[0])
+}
+pub(super) fn source_node_mut(node: &mut Content) -> &mut Content {
+    if node.component::<NarrationFrame>().is_some() {
+        &mut node
+            .component_mut::<NarrationFrame>()
+            .unwrap()
+            .rows
+            .children[0]
+    } else {
+        node
     }
 }
