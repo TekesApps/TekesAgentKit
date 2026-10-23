@@ -1107,3 +1107,298 @@ fn abnormal_input_bounded_history_stays_collapsed_and_readonly_uses_its_own_plan
     );
     assert_eq!(view.content().footnote_timing().live_turn_id, None);
 }
+
+fn narration_overlap() -> (RunSnapshot, String, String) {
+    let mut source = captured_run();
+    source.revision += 1;
+    let original = source
+        .transcript
+        .items
+        .iter_mut()
+        .find(|row| row.kind == TranscriptItemKind::Assistant && !row.text.is_empty())
+        .unwrap();
+    let first = original.id.clone();
+    original.text = "完整旁白内容".repeat(6);
+    original.reasoning = "短思考".into();
+    original.content_blocks = Some(vec![
+        TranscriptContentBlock {
+            index: 0,
+            content: TranscriptBlockContent::Reasoning {
+                text: original.reasoning.clone(),
+            },
+        },
+        TranscriptContentBlock {
+            index: 1,
+            content: TranscriptBlockContent::Text {
+                text: original.text.clone(),
+            },
+        },
+    ]);
+    let mut overlap = original.clone();
+    overlap.id = "z-overlapping-source-record".into();
+    overlap.record_id = Some("overlap-record".into());
+    overlap.reconciliation_id = None;
+    overlap.source_sequence = None;
+    overlap.source_position = None;
+    overlap.text = "短旁白".into();
+    overlap.reasoning = "另一个载体中更完整的思考".repeat(6);
+    overlap.content_blocks = Some(vec![
+        TranscriptContentBlock {
+            index: 0,
+            content: TranscriptBlockContent::Reasoning {
+                text: overlap.reasoning.clone(),
+            },
+        },
+        TranscriptContentBlock {
+            index: 1,
+            content: TranscriptBlockContent::Text {
+                text: overlap.text.clone(),
+            },
+        },
+    ]);
+    let second = overlap.id.clone();
+    let provenance = source.transcript.thinking_sources.by_id[&first].clone();
+    source
+        .transcript
+        .thinking_sources
+        .by_id
+        .insert(second.clone(), provenance);
+    source.transcript.items.push(overlap);
+    (source, first, second)
+}
+fn narration_view(source: &RunSnapshot, thinking: bool) -> RunPort {
+    let scope = RunScope::main("sep", "s");
+    let mut view = RunPort::standard(29000, 29010..29400, scope.clone()).unwrap();
+    if thinking {
+        view.set_thinking_display(TranscriptThinkingDisplayInput {
+            mode: TranscriptThinkingMode::Compact,
+            display_revision: 1,
+            elapsed_seconds: 0,
+        })
+        .unwrap();
+    }
+    view.update(
+        source,
+        Default::default(),
+        ComposerControlGate::OPEN,
+        paging(&scope),
+        true,
+    )
+    .unwrap();
+    view
+}
+#[test]
+fn narration_carrier_keeps_original_bodies_and_independent_reasoning_owner_through_source_handoff()
+{
+    let (source, first, second) = narration_overlap();
+    let untouched = source.clone();
+    let first_owner = TranscriptMessageIdentity::Item(first.clone());
+    let second_owner = TranscriptMessageIdentity::Item(second.clone());
+    let first_key = TranscriptContentRowKey::Message(first_owner.clone());
+    let second_key = TranscriptContentRowKey::Message(second_owner.clone());
+    let reason_key = TranscriptContentRowKey::MessageFragment(
+        second_owner.clone(),
+        OutputMessageFragmentKind::Reasoning,
+    );
+    let view = narration_view(&source, true);
+    let ids = view.ids();
+    let content = view.transcript().unwrap();
+    assert!(content.row_id(&first_key).is_some());
+    assert!(content.row_id(&second_key).is_none());
+    let reason = content.row_id(&reason_key).unwrap();
+    let body = content.row_id(&first_key).unwrap();
+    let tool = content
+        .row_keys()
+        .iter()
+        .position(|key| matches!(key, TranscriptContentRowKey::Tool(_)))
+        .unwrap();
+    let position = |id| {
+        content
+            .row_keys()
+            .iter()
+            .position(|key| content.row_id(key) == Some(id))
+            .unwrap()
+    };
+    assert!(position(reason) < position(body) && position(body) < tool);
+    let first_parts = content.message_content_ids(&first_owner);
+    let second_parts = content.message_content_ids(&second_owner);
+    let text = first_parts
+        .iter()
+        .find(|part| part.kind == OutputContentKind::Text)
+        .unwrap()
+        .body;
+    let mut host = view.into_host().unwrap();
+    let owner = host
+        .get(text)
+        .unwrap()
+        .component::<TextFieldContent>()
+        .unwrap() as *const _ as usize;
+    assert!(host.focus(Some(ids.composer.editor), true));
+    host.event(&ContentEvent::Preedit {
+        text: "旁白组字".into(),
+        selection: 4..4,
+        clauses: vec![],
+        replacement: None,
+    });
+    let baseline = host
+        .text_surface(ids.composer.editor)
+        .unwrap()
+        .input
+        .external_baseline();
+    let first_nodes = vec![
+        source
+            .transcript
+            .items
+            .iter()
+            .find(|row| row.id == first)
+            .unwrap()
+            .text
+            .clone(),
+    ];
+    let second_nodes = vec!["短旁白".into()];
+    let policy = tekes_agent_ui_consumer_check::narration_policy(
+        TranscriptNarrationTimeline::Running,
+        &[
+            TranscriptNarrationItem {
+                item_id: &first,
+                frame_id: "captured-frame",
+                node_texts: &first_nodes,
+                canonical_narration: false,
+            },
+            TranscriptNarrationItem {
+                item_id: &second,
+                frame_id: "captured-frame",
+                node_texts: &second_nodes,
+                canonical_narration: false,
+            },
+        ],
+        &[],
+    )
+    .unwrap();
+    assert_eq!(
+        policy.choice_for("captured-frame"),
+        Some(&TranscriptNarrationChoice::Item {
+            item_id: first.clone()
+        })
+    );
+    let mut next = source.clone();
+    next.revision += 1;
+    let candidate = next
+        .transcript
+        .items
+        .iter_mut()
+        .find(|row| row.id == second)
+        .unwrap();
+    candidate.text = "比原载体更完整的新旁白".repeat(20);
+    if let TranscriptBlockContent::Text { text } =
+        &mut candidate.content_blocks.as_mut().unwrap()[1].content
+    {
+        *text = candidate.text.clone();
+    }
+    let run = host
+        .get_mut(ids.root)
+        .unwrap()
+        .component_mut::<RunPort>()
+        .unwrap();
+    let stale = run
+        .prepare_update(
+            &source,
+            Default::default(),
+            ComposerControlGate::OPEN,
+            paging(&RunScope::main("sep", "s")),
+            true,
+        )
+        .unwrap();
+    run.update(
+        &next,
+        Default::default(),
+        ComposerControlGate::OPEN,
+        paging(&RunScope::main("sep", "s")),
+        true,
+    )
+    .unwrap();
+    assert!(run.validate_prepared_update(&stale).is_err());
+    assert!(run.transcript().unwrap().row_id(&first_key).is_none());
+    assert!(run.transcript().unwrap().row_id(&second_key).is_some());
+    assert_eq!(
+        run.transcript().unwrap().message_content_ids(&first_owner),
+        first_parts
+    );
+    assert_eq!(
+        run.transcript().unwrap().message_content_ids(&second_owner),
+        second_parts
+    );
+    let mut restored = source.clone();
+    restored.revision = next.revision + 1;
+    host.get_mut(ids.root)
+        .unwrap()
+        .component_mut::<RunPort>()
+        .unwrap()
+        .update(
+            &restored,
+            Default::default(),
+            ComposerControlGate::OPEN,
+            paging(&RunScope::main("sep", "s")),
+            true,
+        )
+        .unwrap();
+    assert_eq!(
+        host.get(text)
+            .unwrap()
+            .component::<TextFieldContent>()
+            .unwrap() as *const _ as usize,
+        owner
+    );
+    assert_eq!(host.focused(), Some(ids.composer.editor));
+    assert_eq!(
+        host.text_surface(ids.composer.editor)
+            .unwrap()
+            .input
+            .external_baseline(),
+        baseline
+    );
+    assert_eq!(source, untouched);
+}
+#[test]
+fn unresolved_rich_body_or_unowned_frame_preserves_each_source_body_instead_of_guessing() {
+    let (mut source, first, second) = narration_overlap();
+    source.transcript.thinking_sources.scope = None;
+    let view = narration_view(&source, false);
+    for id in [&first, &second] {
+        assert!(
+            view.transcript()
+                .unwrap()
+                .row_id(&TranscriptContentRowKey::Message(
+                    TranscriptMessageIdentity::Item(id.clone())
+                ))
+                .is_some()
+        );
+    }
+    source.transcript.thinking_sources.scope = Some(RunScope::main("sep", "s"));
+    let item = source
+        .transcript
+        .items
+        .iter_mut()
+        .find(|row| row.id == first)
+        .unwrap();
+    item.content_blocks
+        .as_mut()
+        .unwrap()
+        .push(TranscriptContentBlock {
+            index: 2,
+            content: TranscriptBlockContent::Unknown {
+                content: json!({"value":"keep"}),
+            },
+        });
+    let view = narration_view(&source, true);
+    for id in [&first, &second] {
+        assert!(
+            view.transcript()
+                .unwrap()
+                .row_id(&TranscriptContentRowKey::Message(
+                    TranscriptMessageIdentity::Item(id.clone())
+                ))
+                .is_some()
+        );
+    }
+}

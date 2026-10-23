@@ -1,8 +1,8 @@
 # Rust Agent UI：当前接入范围与交付状态
 
-本页以已提交基线 `42575ef` 与本轮 system prompt 来源和显示增量为准，按用户完整目标保留验收范围。
+本页以已提交基线 `bf179f3` 与本轮旁白选择和组合增量为准，按用户完整目标保留验收范围。
 当前可供实验宿主接入，**完整交付尚未达到**。组件存在、离屏通过或单个 Issue 关闭都不能单独证明完整 Views 对齐。
-实际分区的基础实现见[普通回合折叠阶段](rust-agent-ui-physical-planes-20261023.md)：原 reasoning/工具与 final 正文分属实际阅读行，正常完成默认折叠、异常终止默认展开，原控件与本地选择保留。本轮当前程序验证见[system prompt 与开场输入](rust-agent-ui-system-prompts-20261023.md)。
+实际分区的基础实现见[普通回合折叠阶段](rust-agent-ui-physical-planes-20261023.md)：原 reasoning/工具与 final 正文分属实际阅读行，正常完成默认折叠、异常终止默认展开，原控件与本地选择保留。本轮当前程序验证见[旁白载体与范围](rust-agent-ui-narration-20261023.md)，原生 phase 0 失败保留。
 共享 [Activity 判定](rust-agent-ui-activity-policy-20261023.md) 与此前 [控制器分离](rust-agent-ui-output-controller-20261023.md) 保留原阶段身份。回合内追加输入的分段折叠已接入，见[输入分段验收](rust-agent-ui-activity-segments-20261023.md)；journal prompt role 已接入，见[来源与显示](rust-agent-ui-system-prompts-20261023.md)；完整富内容/配对布局等仍未完成。
 原生、真实协议、离屏 GPU 和跨进程证据分别记录，不转移冻结程序身份。较早程序的独立记录见[历史续验](rust-agent-ui-current-validation-20261023.md)。
 
@@ -20,9 +20,9 @@
 
 | 要求 | 当前实现/证据 | 距离完整交付还差什么 |
 | --- | --- | --- |
-| Composer、发送/取消、流式回传 | 原 TekesUI editor + RunBinding/RunController；归档/中断、草稿、请求身份、模型/附件等有组件与宿主用例。 | 本轮分项原生/软件 IME 记录见输入分段验收，完整原生/IME组合仍待；上下文高级入口按源规则逐项验收，缺少宿主能力时通过明确输入/回调接入。 |
+| Composer、发送/取消、流式回传 | 原 TekesUI editor + RunBinding/RunController；归档/中断、草稿、请求身份、模型/附件等有组件与宿主用例。 | 当前原生 phase 0 失败；此前原生/软件 IME 只保留历史身份，完整组合仍待；上下文高级入口按源规则逐项验收，缺少宿主能力时通过明确输入/回调接入。 |
 | Transcript：历史/推理/工具/分页/阅读 | 混合 Content、原阅读事务、canonical 身份与只读子历史；公开 page/reveal 已消费，工具关闭边界、共享 row、报告/完整计数选择规则与五类卡片事实有回归。 | 独立 Input/Output/view 原字段与复制通道已接入；真实报告来源、连续分组的完整输入/原生验收、富内容、#54 分隔线和最终 code-header 样式未完成，`rich_content=false`；选中富内容 #25、嵌套阅读意图 #53、新建 Host 的持久 checkpoint #42、当前原生与配对布局。 |
-| 实时思考模式 | 共享 None/Compact、来源绑定 Frame、独立 OutputMessage 与原归一化来源工厂已实现；Root Run/Transcript/Pane API 和第二 consumer 的 fixture 路径通过。Journal anchor 与 Pi ancestry 按实际 projector 定义，不使用 UI/buffer 下标作身份。 | TranscriptContent/RunPort/只读 pane 整帧输入及 prepared-plan 门禁已接线，demo 显式消费 Compact；reasoning carrier 与单详情/空白行已对齐；消息容器/独立工具的展示顺序、普通回合实际 reasoning/工具/正文分区和整段 Activity 折叠已接入；回合内追加输入分段已接入；journal initial prompt role 已接入；剩余 narration 载体/fallback 来源差异、真实三端 mixed reasoning/tool 全组合和配对布局仍待完成；裁剪/未知来源不能猜补。 |
+| 实时思考模式 | 共享 None/Compact、来源绑定 Frame、独立 OutputMessage 与原归一化来源工厂已实现；Root Run/Transcript/Pane API 和第二 consumer 的 fixture 路径通过。Journal anchor 与 Pi ancestry 按实际 projector 定义，不使用 UI/buffer 下标作身份。 | TranscriptContent/RunPort/只读 pane 整帧输入及 prepared-plan 门禁已接线，demo 显式消费 Compact；reasoning carrier 与单详情/空白行已对齐；消息容器/独立工具的展示顺序、普通回合实际 reasoning/工具/正文分区和整段 Activity 折叠已接入；回合内追加输入分段已接入；journal initial prompt role 已接入；旁白选择/当前 prose 接线已接入；多记录 frame 阅读锚点、独立 fallback 来源、富内容节点投影、真实三端 mixed reasoning/tool 全组合和配对布局仍待完成；裁剪/未知来源不能猜补。 |
 | Input / output / footnote 排版 | 用户气泡/aside 右、机器内容/aside 左；共用列、单行、备注限宽与保留控件有独立 consumer。 | 真实 Pi 目标标签在窄列仍不可见，严格命令退出 1；#47 原 glyph/紧凑动作消费，完整时间/目标/状态可见性。 |
 | Indicators 与回合导航 | 原连接/运行/等待/失败/用量事实、TurnRail/Jump 与原 SDK reveal，非像素估算。 | 完整 hover/selection/chrome、可达性和当前程序原生对照；#46/#5 等。不能把已有单行状态当作完整 rail 的证明。 |
 | RunPort 组合与完整 Views 布局 | 正式 RunPort 组合 Composer/Transcript/Indicators，整帧 preflight/阅读发布；第二 consumer 无需 RunSurface。 | 完整 ClientKit 对应层次/selection/chrome 的逐项同内容对照；当前收据仍明确 `completeRunPort=false`。 |
@@ -33,7 +33,7 @@
 | 反馈初读/重连/CAS | 自动按来源/epoch读取，普通 aside 无常驻 Refresh；加载失败保留旧记录且不可写，明确刷新恢复。 | 本轮真实三端离屏组合验证见当前续验；真实故障恢复仍属 4097e4f 冻结程序，反馈的当前原生交互仍待验收。 |
 | ProcessContainer 同/跨进程 | 当前没有正式适配；8 包闭包不含 module-runtime/app-protocol。 | #48 固定公开 SDK 中 `new_view` 仍声明无远端 keyboard/IME/AX，V1 的 keyboard/scroll/text_ime/accessibility 为 false；本轮复核公开 50ec49f 仍如此；需 SDK 交付后再接入三个业务容器并独立验收。 |
 | 原生、中文组字、阅读/重连、第二 consumer | 有多个冻结程序的分项成功、失败和完整收据；组件/第二 consumer 在 CI 跑，未打开桌面。 | 同一交付程序的完整 Native/Pi/DSH + 当前系统 IME、最终配对布局；跨进程/VoiceOver 未证明。前一阶段 c90c9f3b 程序已通过三端 stream/stream-reading/public-page、owned 原生 Activity 点击/控件保留和一次系统软件拼音。public-page 不是原生分页按钮，SideChat 旧收据不转移到当前程序；物理键盘、稳定 IME、完整配对布局与跨进程未证明。 |
-| review、CI、合并/tag | PR #10 draft；42575ef 基础 CI x2 成功、UI x2 在严格 nested-detail step 失败（job API）。本轮完整根 301、UI 602 通过/1 原有忽略，UI strict Clippy、格式/边界通过；本轮根与 UI 的严格 all-target Clippy 均通过，headless 重新编译。 | 完整 review、全部要求与验收审计、新发布 pin；严格失败仍在，不能合并或打完成 tag。 |
+| review、CI、合并/tag | PR #10 draft；bf179f3 基础 CI x2 成功、UI x2 在严格 nested-detail step 失败（job API）。本轮完整根 308、UI 604 通过/1 原有忽略，UI strict Clippy、格式/边界通过；本轮根与 UI 的严格 all-target Clippy 均通过，headless 重新编译。 | 完整 review、全部要求与验收审计、新发布 pin；严格失败仍在，不能合并或打完成 tag。 |
 
 ## 后续工作顺序
 
@@ -68,3 +68,5 @@
 [当前输入分段阶段](rust-agent-ui-activity-segments-20261023.md)：cb3b3aa3 冻结程序与源码、原生控件/阅读/软件组字及三端证据单独记录，完整 UI 交付仍未证明。
 
 [当前 system prompt 阶段](rust-agent-ui-system-prompts-20261023.md)：6a3a49e7 冻结程序的来源、控件、三个 owned 原生专项、三端 native stream/reading/page 和一次系统软件拼音分别记录，完整 UI 交付仍未证明。
+
+[当前旁白阶段](rust-agent-ui-narration-20261023.md)：0c3219f4 程序根 308、UI 604/1 忽略、严格 Clippy 与三端离屏通过；原生窗口未激活而失败，不转移此前程序的通过记录。多记录 frame 阅读容器是下一步业务工作。

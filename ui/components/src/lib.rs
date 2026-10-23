@@ -2,6 +2,10 @@
 mod sidebar_visibility;
 mod tool_run;
 pub use tekes_agent_presentation::{
+    TranscriptNarrationChoice, TranscriptNarrationFallback, TranscriptNarrationItem,
+    TranscriptNarrationPolicy, TranscriptNarrationTimeline,
+};
+pub use tekes_agent_presentation::{
     TranscriptReasoningDisclosure, TranscriptReasoningDisplay, TranscriptThinkingCall,
     TranscriptThinkingDisplayInput, TranscriptThinkingFrame, TranscriptThinkingInput,
     TranscriptThinkingItem, TranscriptThinkingMode, TranscriptThinkingNarration,

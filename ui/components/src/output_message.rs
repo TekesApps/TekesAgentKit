@@ -737,6 +737,34 @@ struct ThinkingStamp {
     display: tekes_agent_presentation::TranscriptReasoningDisplay,
 }
 impl OutputMessage {
+    /// Current prose adapter's actual body node text. Rich/opaque content and
+    /// failures remain unresolved; never hide their diagnostics by text ranking.
+    pub(crate) fn narration_nodes(
+        scope: &RunScope,
+        output: &TranscriptOutput<'_>,
+        section: &TranscriptSection<'_>,
+        labels: OutputMessageLabels,
+    ) -> Result<Option<Vec<String>>, &'static str> {
+        if output.item.failure_message().is_some()
+            || !output.item.attachments.is_empty()
+            || output.item.content_blocks.iter().flatten().any(|block| {
+                matches!(
+                    block.content,
+                    TranscriptBlockContent::Attachment { .. }
+                        | TranscriptBlockContent::Unknown { .. }
+                )
+            })
+        {
+            return Ok(None);
+        }
+        Ok(Some(
+            parts(scope, output, Some(section), labels)?
+                .into_iter()
+                .filter(|part| part.kind == OutputContentKind::Text)
+                .map(|part| part.text)
+                .collect(),
+        ))
+    }
     pub fn new(namespace: u32, scope: RunScope) -> Self {
         Self::with_labels(namespace, scope, OutputMessageLabels::default())
     }

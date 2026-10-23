@@ -10,6 +10,7 @@ repository.workspace = true
 [dependencies]
 regex = "=1.13.1"
 unicode-segmentation = "=1.13.3"
+unicode-normalization = "=0.1.25"
 url = "=2.5.8"
 iri-string = "=0.7.14"
 percent-encoding = "=2.3.2"

@@ -2744,3 +2744,12 @@ pub fn input_role_source(
 ) -> Option<tekes_agent_components_ui::TranscriptInputRole> {
     item.input_role()
 }
+
+pub fn narration_policy(
+    timeline: tekes_agent_components_ui::TranscriptNarrationTimeline,
+    items: &[tekes_agent_components_ui::TranscriptNarrationItem<'_>],
+    fallbacks: &[tekes_agent_components_ui::TranscriptNarrationFallback<'_>],
+) -> Result<tekes_agent_components_ui::TranscriptNarrationPolicy, String> {
+    tekes_agent_components_ui::TranscriptNarrationPolicy::read(timeline, items, fallbacks)
+        .map_err(|error| error.to_string())
+}

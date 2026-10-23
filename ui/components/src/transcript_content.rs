@@ -1,5 +1,6 @@
 //! A canonical mixed message content tree. Scrolling/reading transactions belong
 //! to TekesUI; this component neither invents a scroll state nor adjusts pixels.
+mod narration;
 mod segments;
 use crate::{
     FeedbackGesture, FeedbackLabels, InputMessage, OutputMessage, OutputMessageFragment,
@@ -382,6 +383,7 @@ impl TranscriptContent {
                 expanded.push(row);
             }
         }
+        self.arrange_narration(&mut expanded, snapshot, document, timing)?;
         // Source-proven opening input is outside Activity, after initial prompt
         // cards. Never recover this identity by comparing text with turn.input.
         for section in &document.sections {
@@ -2058,6 +2060,24 @@ fn plan<'a>(
     }
     Ok(group_tools(result))
 }
+fn tool_run_boundary(row: &Planned<'_>) -> bool {
+    match &row.content {
+        PlannedContent::Output(..) if row.hidden => false,
+        PlannedContent::Output(output, _) => {
+            !(output.item.kind == TranscriptItemKind::Assistant
+                && output.item.text.is_empty()
+                && output.item.reasoning.is_empty()
+                && output.item.attachments.is_empty()
+                && output.item.failure_message().is_none()
+                && output
+                    .item
+                    .content_blocks
+                    .as_ref()
+                    .is_some_and(Vec::is_empty))
+        }
+        _ => true,
+    }
+}
 fn group_tools<'a>(result: Vec<Planned<'a>>) -> Vec<Planned<'a>> {
     let mut grouped: Vec<Planned<'a>> = vec![];
     for row in result {
@@ -2065,10 +2085,7 @@ fn group_tools<'a>(result: Vec<Planned<'a>>) -> Vec<Planned<'a>> {
             && current
                 .iter()
                 .all(|(_, p)| *p != ToolActivityPlacement::Unplaced)
-            && let Some(previous) = grouped.iter_mut().rev().find(|row| !matches!(&row.content,
-                PlannedContent::Output(output, _) if output.item.kind == TranscriptItemKind::Assistant
-                    && output.item.text.is_empty() && output.item.reasoning.is_empty() && output.item.attachments.is_empty()
-                    && output.item.failure_message().is_none() && output.item.content_blocks.as_ref().is_some_and(Vec::is_empty)))
+            && let Some(previous) = grouped.iter_mut().rev().find(|row| tool_run_boundary(row))
             && let PlannedContent::Tools(prior) = &mut previous.content
             && prior
                 .iter()

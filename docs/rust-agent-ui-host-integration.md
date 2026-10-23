@@ -128,3 +128,10 @@ System prompt 来源由共享 projector 提供，消费 `TranscriptItem::system_
 该事实绑定当前 item/turn 身份；旧 DTO 无事实时保持 None，不按正文、时钟或行下标补造。
 Kit 负责 Initial prompt → 已证明的开场输入 → Activity 的原控件布局，
 追加输入即使前面没有机器内容，也走输入间分段。角色事实不授予导航、读取或提交权限。
+
+旁白跨记录选择使用共享 `TranscriptNarrationPolicy`，输入必须是捕获的实际可见正文 node texts，
+不是工具结果、reasoning、JSON 长度或全文字节数。`TranscriptNarrationTimeline` 的选择来自共享 Activity facts；
+BetweenInputs 使用 running 时间线路径。当前 prose 适配由 Kit 读取原 OutputMessage part facts，
+未知富内容或无 frame 来源时保留原正文；宿主不要另写 carrier 或补造 group fallback。
+规范等价比较新增精确依赖 `unicode-normalization =0.1.25`，SDK pin 不变。
+多记录切换的稳定 frame 阅读锚点、富内容和逐 call 分区尚未验收，见[旁白阶段范围](rust-agent-ui-narration-20261023.md)。

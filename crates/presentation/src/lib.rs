@@ -83,3 +83,5 @@ pub use goal::*;
 
 mod transcript_planes;
 pub use transcript_planes::*;
+mod transcript_narration;
+pub use transcript_narration::*;
