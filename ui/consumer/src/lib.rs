@@ -2836,3 +2836,15 @@ pub fn verify_primary_keeps_editor(
     }
     Ok(())
 }
+
+/// A host can supply an already mounted destination without cloning its state.
+/// The shared binding retains task authority and validates exact scope/runtime.
+pub async fn open_task_from_original_run(
+    source: &tekes_agent_ui_bindings::TaskPaneBinding,
+    target: &tekes_agent_ui_bindings::RunBinding,
+) -> Result<Option<std::sync::Arc<tekes_agent_ui_bindings::RunBinding>>, String> {
+    source
+        .open_resolved_from(target)
+        .await
+        .map_err(|error| error.to_string())
+}

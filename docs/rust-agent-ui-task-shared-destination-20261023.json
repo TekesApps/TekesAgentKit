@@ -1,0 +1,66 @@
+{
+  "baseCommit": "37ad08f4391cb9085cd370ab1560137115394db0",
+  "tekesui": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "referenceClientKit": "c289bc9d33edcd83a782ac17927a8c65a027eccd",
+  "sourceSha256": {
+    "ui/bindings/src/lib.rs": "5f85916c272071a07e83eea0cbdf4c14f8ead4046b0bcc4a029fe8515b8882fa",
+    "ui/bindings/src/task.rs": "0c4490b53fa6a9245cbcac343355d9bef17461e6cc00e80dd4c8e946a23edbea",
+    "ui/consumer/src/lib.rs": "d6ca90a27eb25a7433328ae5b63b4bed367960db54f5551cfe825a2304e1ae2d",
+    "ui/demo/tests/task_binding.rs": "0cd884b5f1a0be324f709d001e9ac036db478ae82a3bc140a588ced6904ff05c",
+    "ui/demo/tests/pane_uploads.rs": "7f16d652b89d3224c3322a50530811b57d80aba81bb977c91f5065227dd28a1a",
+    "ui/bindings/README.md": "dbdd523bd1bb67bd0d1f83297c3315de8f23cd95fd5d2330a5da9cb50d132ae3",
+    "ui/Cargo.toml": "fec7bfc0ff96b220ff17ec33b39be35f90ad50b231aaa52a2f48a4e5e1857d6e",
+    "ui/Cargo.lock": "8790cacd3395460c518f71240052a0bde27a25dbe7e18acda12753c53653d9d1"
+  },
+  "referenceSourceSha256": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/ComposerSurfaceContext.swift": "2133b0c468cd5d63d72c53174b719f92ab08f8a6c65803371959a903fe523f12",
+    "/Users/frankqin/dev/Tekes/TekesTests/RunUserControlsGraphTests.swift": "ec6e2a9bd9bf61545919e3b32929e32384cb1bea49469d39800e04330ac770aa"
+  },
+  "evidenceRoot": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/task-shared-destination-20261023",
+  "validation": {
+    "uiWorkspace": {
+      "passed": 622,
+      "ignored": 1,
+      "failed": 0
+    },
+    "taskTests": 9,
+    "paneUploadTests": 7,
+    "python": 74,
+    "strictClippy": true,
+    "fmt": true,
+    "uiBoundaries": true,
+    "nativeInteraction": false,
+    "physicalIme": false,
+    "realHarnessRerun": false,
+    "crossProcess": false,
+    "hostInstalledOrSigned": false,
+    "screenCapture": false
+  },
+  "logs": {
+    "workspace-tests-final.log": "7c63029b3c73f8a5fb0494ec19e45d35d39dde84de6b7cdd01554f9ded987a67",
+    "attachment-tests.log": "32b9b1003d80c691ea23a25206380eb9469a41dc03a45886de9e8f47e4483275",
+    "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "red.log": "bbe1c969521be4da976b64d902d5f7b333de2ecc8bc29351ad32fe6a53dac6a9",
+    "green.log": "aeb26cff2b39b384a79954fe70efb55a1edf40d3da74c5e4fada8d2ee3a5601a",
+    "clippy.log": "54f44e9a6ad8d69da4cd50989b69f9bc8a9ee3a111790c1f4213803aa5744926",
+    "boundaries.log": "9480cc4382559b9a7a99240226a9f766048e30c8d38bb4bccd1fd8bca56661ad",
+    "python-tests.log": "be0ac66f18033926c558cda8be5a5a26d7755a1c6485bccead0429d1ba938eff",
+    "workspace-tests.log": "8316867e9ebbb2bbda8cc5160d2cc50736410ac67df7b52481e1a6fb49ef362c"
+  },
+  "target": "/tmp/agentkit-layout-text-292-target",
+  "newTargetCreated": false,
+  "cleanupBytesFreed": 0,
+  "priorCi": {
+    "head": "37ad08f4391cb9085cd370ab1560137115394db0",
+    "runs": [
+      39920085720,
+      39920076796
+    ],
+    "headless": "success",
+    "ui": "failure at required nested-detail-reading; TekesUI #53"
+  },
+  "upstreamBlockers": [
+    48,
+    53
+  ]
+}

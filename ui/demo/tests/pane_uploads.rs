@@ -268,6 +268,10 @@ async fn same_scope_task_replacement_uses_distinct_authority_and_keeps_old_recei
     assert_eq!(report.outcome, AttachmentOutcome::Detached);
     view.complete_file_selection(&request, vec![file()], Ok(Some(report)))
         .unwrap();
+    assert!(
+        parent.current_run().unwrap().draft.artifacts.is_empty(),
+        "retired role must not attach its late receipt to the shared destination"
+    );
     let report = newer.upload(&[file()]).await.unwrap();
     assert_eq!(report.outcome, AttachmentOutcome::Attached);
     view.complete_file_selection(&newer, vec![file()], Ok(Some(report)))
@@ -289,7 +293,7 @@ async fn same_scope_task_replacement_uses_distinct_authority_and_keeps_old_recei
         AttachmentOutcome::Attached
     );
     assert_eq!(replacement.current_run().unwrap().draft.artifacts.len(), 1);
-    assert!(parent.current_run().unwrap().draft.artifacts.is_empty());
+    assert_eq!(parent.current_run().unwrap().draft.artifacts.len(), 1);
     runtime.stop().await.unwrap();
 }
 struct Bounded;
@@ -363,7 +367,7 @@ async fn independent_child_uses_its_own_upload_and_bounded_child_never_gets_a_pi
 }
 
 #[tokio::test]
-async fn main_and_task_with_the_same_address_can_hold_independent_upload_operations() {
+async fn main_and_task_share_attachments_while_each_upload_keeps_its_original_context_fence() {
     let (runtime, _, mut view) = setup(fixture()).await;
     let parent = view.binding().clone();
     let source = Arc::new(TaskPaneBinding::for_run(&parent));
@@ -380,8 +384,13 @@ async fn main_and_task_with_the_same_address_can_hold_independent_upload_operati
     view.complete_file_selection(&main_request, vec![file()], Ok(Some(report)))
         .unwrap();
     assert!(!view.upload_pending(&parent) && view.upload_pending(&run));
-    assert!(run.current_run().unwrap().draft.artifacts.is_empty());
+    assert_eq!(run.current_run().unwrap().draft.artifacts.len(), 1);
     let report = pane_request.upload(&[file()]).await.unwrap();
+    assert_eq!(
+        report.outcome,
+        AttachmentOutcome::Detached,
+        "original context baseline must not overwrite a newer shared attachment"
+    );
     view.complete_file_selection(&pane_request, vec![file()], Ok(Some(report)))
         .unwrap();
     let main = view

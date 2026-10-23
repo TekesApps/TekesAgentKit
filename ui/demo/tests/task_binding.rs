@@ -246,7 +246,7 @@ async fn public_task_source_mounts_real_controls_keeps_drafts_and_rejects_main_r
     use tekes_agent_ui_bindings::RunBinding;
     use tekes_agent_ui_demo::component_demo::{ComponentDemo, DemoCommand, SELECT_A, SELECT_B};
     use tekes_ui_controls::composition::*;
-    let (runtime, source) = setup().await;
+    let (runtime, _) = setup().await;
     let a = Arc::new(
         RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "a"))
             .await
@@ -257,6 +257,7 @@ async fn public_task_source_mounts_real_controls_keeps_drafts_and_rejects_main_r
             .await
             .unwrap(),
     );
+    let source = Arc::new(TaskPaneBinding::for_run(&a));
     let mut view = ComponentDemo::new([a.clone(), b]).unwrap();
     let token = source.begin(a.scope().clone(), "task").unwrap();
     source.commit(&token, Ok(Some(row("a"))));
@@ -287,14 +288,14 @@ async fn public_task_source_mounts_real_controls_keeps_drafts_and_rejects_main_r
     view.tree.focus(Some(ids.editor), true);
     assert!(
         view.event(&ContentEvent::Commit {
-            text: "任务独立草稿".into(),
+            text: "同一目标共享草稿".into(),
             replacement: None
         })
         .unwrap()
         .is_empty()
     );
-    assert_eq!(run.current_run().unwrap().draft.text, "任务独立草稿");
-    assert_eq!(a.current_run().unwrap().draft.text, "");
+    assert_eq!(run.current_run().unwrap().draft.text, "同一目标共享草稿");
+    assert_eq!(a.current_run().unwrap().draft.text, "同一目标共享草稿");
     let press = |view: &mut ComponentDemo, target| {
         view.accessibility_action(target, None, AccessibilityAction::Press)
             .unwrap()
@@ -396,4 +397,250 @@ async fn slow_history_baseline_from_an_old_load_cannot_install_after_same_task_i
         assert!(!source.commit(&first, Ok(None)));
         runtime.stop().await.unwrap();
     }
+}
+
+#[tokio::test]
+async fn same_destination_task_shares_parent_draft_admission_and_survives_parent_mount_drop() {
+    use tekes_agent_ui_bindings::RunBinding;
+    let (runtime, _) = setup().await;
+    let parent = Arc::new(
+        RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "a"))
+            .await
+            .unwrap(),
+    );
+    let destination = ComposerDestination::run(parent.scope().clone());
+    parent
+        .edit_text(&destination, "同一目标的原草稿".into())
+        .unwrap();
+    let source = TaskPaneBinding::for_run(&parent);
+    let token = source.begin(parent.scope().clone(), "task").unwrap();
+    assert!(source.commit(&token, Ok(Some(row("a")))));
+    let task = source.open_resolved().await.unwrap().unwrap();
+    assert_eq!(task.current_run().unwrap().draft.text, "同一目标的原草稿");
+    task.edit_text(&destination, "Task 编辑同步给原 Run".into())
+        .unwrap();
+    assert_eq!(
+        parent.current_run().unwrap().draft.text,
+        "Task 编辑同步给原 Run"
+    );
+    let ticket = task.prepare_send(&destination, PromptMode::Queue).unwrap();
+    assert!(
+        parent
+            .prepare_send(&destination, PromptMode::Queue)
+            .is_err()
+    );
+    task.cancel_prepared(ticket).unwrap();
+    assert_eq!(
+        parent.current_run().unwrap().draft.text,
+        "Task 编辑同步给原 Run"
+    );
+    let old_epoch = task.current_run().unwrap().connection_epoch;
+    let mut reconnect_changes = task.subscribe_run().unwrap();
+    drop(parent);
+    runtime.reconnect().await.unwrap();
+    runtime.wait_ready(Duration::from_secs(3)).await.unwrap();
+    // Observe the retained controller directly: no UI refresh may repair it.
+    tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            let frame = reconnect_changes.borrow_and_update().clone();
+            if frame.connection_epoch > old_epoch && !frame.connection.history_is_stale {
+                assert_eq!(frame.draft.text, "Task 编辑同步给原 Run");
+                break;
+            }
+            reconnect_changes.changed().await.unwrap();
+        }
+    })
+    .await
+    .unwrap();
+    task.send_with(&destination, PromptMode::Queue, &Prepare)
+        .await
+        .unwrap();
+    let mut changes = task.subscribe_run().unwrap();
+    tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            let frame = changes.borrow_and_update().clone();
+            if frame
+                .transcript
+                .items
+                .iter()
+                .any(|item| item.text == "Task 编辑同步给原 Run")
+            {
+                break;
+            }
+            changes.changed().await.unwrap();
+        }
+    })
+    .await
+    .unwrap();
+    source.cancel();
+    assert_eq!(task.access(), PaneAccess::Missing);
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn public_consumer_reuses_exact_task_target_without_replacing_its_presentation() {
+    use tekes_agent_ui_bindings::RunBinding;
+    use tekes_agent_ui_consumer_check::open_task_from_original_run;
+    let runtime = Arc::new(SessionRuntime::spawn(
+        "fixture",
+        Arc::new(Fixture::default().with_children()),
+    ));
+    runtime.wait_ready(Duration::from_secs(3)).await.unwrap();
+    let source = TaskPaneBinding::new(runtime.clone());
+    let canonical = RunBinding::open_task(runtime.clone(), &row("child-a"))
+        .await
+        .unwrap();
+    canonical.refresh_child_catalog().await.unwrap();
+    let destination = ComposerDestination::run(canonical.scope().clone());
+    canonical
+        .edit_text(&destination, "目标 B 已有草稿".into())
+        .unwrap();
+    let token = source
+        .begin(RunScope::main("fixture", "a"), "task")
+        .unwrap();
+    source.commit(&token, Ok(Some(row("child-a"))));
+    let wrong = RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "child-a"))
+        .await
+        .unwrap();
+    assert!(
+        open_task_from_original_run(&source, &wrong).await.is_err(),
+        "session alone is not full scope"
+    );
+    let foreign_runtime = Arc::new(SessionRuntime::spawn(
+        "fixture",
+        Arc::new(Fixture::default().with_children()),
+    ));
+    foreign_runtime
+        .wait_ready(Duration::from_secs(3))
+        .await
+        .unwrap();
+    let foreign = RunBinding::open_task(foreign_runtime.clone(), &row("child-a"))
+        .await
+        .unwrap();
+    assert!(
+        open_task_from_original_run(&source, &foreign)
+            .await
+            .is_err()
+    );
+    let task = open_task_from_original_run(&source, &canonical)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(task.current_run().unwrap().draft.text, "目标 B 已有草稿");
+    let other = RunBinding::open_task(runtime.clone(), &row("child-a"))
+        .await
+        .unwrap();
+    assert!(
+        open_task_from_original_run(&source, &other).await.is_err(),
+        "live mount must not silently switch draft owner"
+    );
+    task.edit_text(&destination, "共享后的草稿".into()).unwrap();
+    assert_eq!(canonical.current_run().unwrap().draft.text, "共享后的草稿");
+    let ticket = task.prepare_send(&destination, PromptMode::Queue).unwrap();
+    source.cancel();
+    assert_eq!(task.access(), PaneAccess::Missing);
+    assert!(task.dispatch_prepared_with(ticket, &Prepare).await.is_err());
+    assert_eq!(canonical.access(), PaneAccess::Ready);
+    assert_eq!(canonical.current_run().unwrap().draft.text, "共享后的草稿");
+    let next = canonical
+        .prepare_send(&destination, PromptMode::Queue)
+        .unwrap();
+    canonical.cancel_prepared(next).unwrap();
+    foreign_runtime.stop().await.unwrap();
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn shared_parent_pointer_aba_keeps_draft_and_nested_task_retains_ancestor_authority() {
+    use tekes_agent_ui_bindings::RunBinding;
+    let (runtime, _) = setup().await;
+    let parent = RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "a"))
+        .await
+        .unwrap();
+    let destination = ComposerDestination::run(parent.scope().clone());
+    parent.edit_text(&destination, "父目标草稿".into()).unwrap();
+    let source = TaskPaneBinding::for_run(&parent);
+    let token = source.begin(parent.scope().clone(), "task").unwrap();
+    source.commit(&token, Ok(Some(row("a"))));
+    let first = source.open_resolved().await.unwrap().unwrap();
+    let nested_source = TaskPaneBinding::for_run(&first);
+    let nested_token = nested_source.begin(parent.scope().clone(), "task").unwrap();
+    nested_source.commit(&nested_token, Ok(Some(row("a"))));
+    let nested = nested_source.open_resolved().await.unwrap().unwrap();
+    source.commit(&token, Ok(Some(row("b"))));
+    let other = source.open_resolved().await.unwrap().unwrap();
+    assert_eq!(other.current_run().unwrap().draft.text, "");
+    assert_eq!(nested.access(), PaneAccess::Missing);
+    assert!(nested.edit_text(&destination, "禁止旧控制".into()).is_err());
+    source.commit(&token, Ok(Some(row("a"))));
+    let restored = source.open_resolved().await.unwrap().unwrap();
+    assert_eq!(first.access(), PaneAccess::Missing);
+    assert_eq!(nested.access(), PaneAccess::Missing);
+    assert_eq!(restored.current_run().unwrap().draft.text, "父目标草稿");
+    source.cancel();
+    assert_eq!(parent.access(), PaneAccess::Ready);
+    assert_eq!(parent.current_run().unwrap().draft.text, "父目标草稿");
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn task_alias_retains_sidechat_lifetime_and_never_promotes_bounded_history() {
+    use tekes_agent_presentation::ChildHistoryLayout;
+    use tekes_agent_ui_bindings::{ChildPaneBinding, RunBinding, SideChatBinding};
+    let runtime = Arc::new(SessionRuntime::spawn(
+        "fixture",
+        Arc::new(Fixture::default().with_children().with_side_chats()),
+    ));
+    runtime.wait_ready(Duration::from_secs(3)).await.unwrap();
+    let parent = RunScope::main("fixture", "a");
+    let chats = SideChatBinding::new(runtime.clone());
+    let pointer = chats
+        .create(parent.clone(), None, "task-alias-chat")
+        .await
+        .unwrap();
+    let scratch = chats.open(&pointer).await.unwrap();
+    let task_row = AgentTask {
+        scope: scratch.binding().scope().clone(),
+        ..row("a")
+    };
+    let source = TaskPaneBinding::for_run(scratch.binding());
+    let token = source.begin(task_row.scope.clone(), "task").unwrap();
+    source.commit(&token, Ok(Some(task_row)));
+    let alias = source.open_resolved().await.unwrap().unwrap();
+    assert_eq!(alias.access(), PaneAccess::Ready);
+    chats.close(&pointer, "task-alias-close").await.unwrap();
+    assert_eq!(alias.access(), PaneAccess::Missing);
+    assert!(
+        source
+            .open_resolved_from(scratch.binding())
+            .await
+            .unwrap()
+            .unwrap()
+            .current_run()
+            .is_none()
+    );
+    let bounded = ChildPaneBinding::open(
+        runtime.clone(),
+        parent,
+        "child-a",
+        ChildHistoryLayout::SameSession,
+        None,
+    )
+    .await
+    .unwrap();
+    let source = TaskPaneBinding::for_run(bounded.binding());
+    let token = source
+        .begin(bounded.binding().scope().clone(), "task")
+        .unwrap();
+    source.commit(&token, Ok(Some(row("child-a"))));
+    assert!(
+        source.open_resolved().await.is_err(),
+        "read-only source cannot become an empty writable Task"
+    );
+    // Main source stays unaffected by alias retirement.
+    let main = RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "a"))
+        .await
+        .unwrap();
+    assert_eq!(main.access(), PaneAccess::Ready);
+    runtime.stop().await.unwrap();
 }

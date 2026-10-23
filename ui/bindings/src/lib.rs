@@ -115,12 +115,49 @@ pub struct RunBinding {
     history_pages: history::HistoryPages,
     readonly_reads: std::sync::atomic::AtomicU64,
     feedback_publications: std::sync::atomic::AtomicU64,
-    controller: Option<RunController>,
+    controller: Option<Arc<RunController>>,
     _lease: Option<SessionHistoryLease>,
     child: Option<ChildRun>,
     side_chat: Option<(Arc<SideChatController>, SideChat)>,
     task: Option<task::TaskRunGuard>,
+    task_ancestors: Vec<task::TaskRunGuard>,
     child_owner: Option<std::sync::Weak<std::sync::atomic::AtomicBool>>,
+}
+/// An existing canonical presentation, not another draft or admission store.
+#[derive(Clone)]
+pub(crate) struct RunPresentationAlias {
+    runtime: Arc<SessionRuntime>,
+    scope: RunScope,
+    controller: Arc<RunController>,
+    side_chat: Option<(Arc<SideChatController>, SideChat)>,
+    child_owner: Option<std::sync::Weak<std::sync::atomic::AtomicBool>>,
+    task_ancestors: Vec<task::TaskRunGuard>,
+}
+impl RunPresentationAlias {
+    pub(crate) fn matches(&self, run: &RunBinding) -> bool {
+        run.scope == self.scope
+            && run
+                .controller
+                .as_ref()
+                .is_some_and(|controller| Arc::ptr_eq(controller, &self.controller))
+    }
+    pub(crate) async fn open(&self) -> Result<RunBinding> {
+        let lease = self.runtime.acquire_history(&self.scope.session_id).await?;
+        let mut binding = RunBinding::session_binding(
+            self.runtime.clone(),
+            self.scope.clone(),
+            self.controller.clone(),
+            lease,
+        );
+        binding.side_chat = self.side_chat.clone();
+        binding.child_owner = self.child_owner.clone();
+        binding.task_ancestors = self.task_ancestors.clone();
+        require(
+            binding.access() != PaneAccess::Missing,
+            "original task presentation authority retired",
+        )?;
+        Ok(binding)
+    }
 }
 /// Captures the original controller and its selection generation for an async
 /// settings/catalog gesture. Commit never looks up a newer visible binding.
@@ -402,7 +439,20 @@ impl RunBinding {
         let lease = runtime.acquire_history(&scope.session_id).await?;
         let controller = RunController::new(runtime.clone())?;
         controller.select(ComposerDestination::run(scope.clone()))?;
-        Ok(Self {
+        Ok(Self::session_binding(
+            runtime,
+            scope,
+            Arc::new(controller),
+            lease,
+        ))
+    }
+    fn session_binding(
+        runtime: Arc<SessionRuntime>,
+        scope: RunScope,
+        controller: Arc<RunController>,
+        lease: SessionHistoryLease,
+    ) -> Self {
+        Self {
             runtime,
             scope,
             history_pages: history::HistoryPages::default(),
@@ -413,7 +463,20 @@ impl RunBinding {
             child: None,
             side_chat: None,
             task: None,
+            task_ancestors: vec![],
             child_owner: None,
+        }
+    }
+    pub(crate) fn presentation_alias(&self) -> Option<RunPresentationAlias> {
+        let mut task_ancestors = self.task_ancestors.clone();
+        task_ancestors.extend(self.task.clone());
+        Some(RunPresentationAlias {
+            runtime: self.runtime.clone(),
+            scope: self.scope.clone(),
+            controller: self.controller.clone()?,
+            side_chat: self.side_chat.clone(),
+            child_owner: self.child_owner.clone(),
+            task_ancestors,
         })
     }
 
@@ -459,11 +522,11 @@ impl RunBinding {
             ..parent.clone()
         };
         let controller = if layout == ChildHistoryLayout::IndependentSessions {
-            Some(RunController::for_child(
+            Some(Arc::new(RunController::for_child(
                 runtime.clone(),
                 &parent,
                 child_id,
-            )?)
+            )?))
         } else {
             None
         };
@@ -478,6 +541,7 @@ impl RunBinding {
             child: Some(child),
             side_chat: None,
             task: None,
+            task_ancestors: vec![],
             child_owner: None,
         })
     }
@@ -524,7 +588,11 @@ impl RunBinding {
     /// bodies have no Composer snapshot and must not become a blank new run.
     pub fn current_run(&self) -> Option<Arc<RunSnapshot>> {
         (self.access() != PaneAccess::Missing)
-            .then(|| self.controller.as_ref().map(RunController::snapshot))
+            .then(|| {
+                self.controller
+                    .as_ref()
+                    .map(|controller| controller.snapshot())
+            })
             .flatten()
     }
     pub fn access(&self) -> PaneAccess {
@@ -535,7 +603,9 @@ impl RunBinding {
         }) {
             return PaneAccess::Missing;
         }
-        if self.task.as_ref().is_some_and(|task| !task.live()) {
+        if self.task.as_ref().is_some_and(|task| !task.live())
+            || self.task_ancestors.iter().any(|task| !task.live())
+        {
             return PaneAccess::Missing;
         }
         self.side_chat
@@ -548,7 +618,9 @@ impl RunBinding {
         self.runtime.subscribe()
     }
     pub fn subscribe_run(&self) -> Option<watch::Receiver<Arc<RunSnapshot>>> {
-        self.controller.as_ref().map(RunController::subscribe)
+        self.controller
+            .as_ref()
+            .map(|controller| controller.subscribe())
     }
     pub fn subscribe_side_chat(&self) -> Option<watch::Receiver<SideChatSnapshot>> {
         self.side_chat.as_ref().map(|(owner, _)| owner.subscribe())

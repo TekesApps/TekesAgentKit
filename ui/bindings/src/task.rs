@@ -1,5 +1,5 @@
 //! Task row resolution retains the existing TaskPanelState generation fences.
-use crate::RunBinding;
+use crate::{RunBinding, RunPresentationAlias};
 use std::sync::{Arc, Mutex, Weak};
 use tekes_agent_components_ui::SidePanelTab;
 use tekes_agent_contract::{Result, unsupported};
@@ -12,6 +12,7 @@ struct MountedTask {
     source_generation: u64,
     run: Option<Arc<RunBinding>>,
 }
+#[derive(Clone)]
 pub(crate) struct TaskRunGuard {
     owner: Weak<Mutex<MountedTask>>,
     generation: u64,
@@ -36,12 +37,17 @@ impl TaskRunGuard {
 /// first session forever. Host reads commit explicitly; failures are not absence.
 pub struct TaskPaneBinding {
     runtime: Arc<SessionRuntime>,
+    parent_scope: Option<RunScope>,
+    parent_presentation: Option<RunPresentationAlias>,
     state: Arc<Mutex<MountedTask>>,
     changes: watch::Sender<TaskPanelState>,
 }
 impl TaskPaneBinding {
     pub fn for_run(parent: &RunBinding) -> Self {
-        Self::new(parent.runtime.clone())
+        let mut source = Self::new(parent.runtime.clone());
+        source.parent_scope = Some(parent.scope().clone());
+        source.parent_presentation = parent.presentation_alias();
+        source
     }
     pub fn uses_run(&self, parent: &RunBinding) -> bool {
         Arc::ptr_eq(&self.runtime, &parent.runtime)
@@ -50,6 +56,8 @@ impl TaskPaneBinding {
         let projection = TaskPanelState::default();
         Self {
             runtime,
+            parent_scope: None,
+            parent_presentation: None,
             changes: watch::channel(projection.clone()).0,
             state: Arc::new(Mutex::new(MountedTask {
                 projection,
@@ -137,11 +145,18 @@ impl TaskPaneBinding {
     /// Loading/missing/error has no RunBinding. A slow history baseline cannot
     /// install after the task resolves to another source or another load starts.
     pub async fn open_resolved(&self) -> Result<Option<Arc<RunBinding>>> {
-        let (task, generation) = {
+        self.open_using(None).await
+    }
+    /// Reuse an already-owned canonical Run for the exact authoritative task
+    /// scope. This returns a separately guarded task role, never the main Arc.
+    /// A different live presentation cannot replace an existing task mount;
+    /// begin a new resolution explicitly before changing its source.
+    pub async fn open_resolved_from(&self, target: &RunBinding) -> Result<Option<Arc<RunBinding>>> {
+        self.open_using(Some(target)).await
+    }
+    async fn open_using(&self, target: Option<&RunBinding>) -> Result<Option<Arc<RunBinding>>> {
+        let (task, generation, alias) = {
             let state = self.state.lock().expect("task pane lock");
-            if let Some(run) = &state.run {
-                return Ok(Some(run.clone()));
-            }
             let Some(task) = state
                 .projection
                 .value
@@ -150,9 +165,36 @@ impl TaskPaneBinding {
             else {
                 return Ok(None);
             };
-            (task.clone(), state.source_generation)
+            let alias =
+                if let Some(target) = target {
+                    tekes_agent_contract::require(
+                        self.uses_run(target) && target.scope() == &task.scope,
+                        "task presentation source mismatch",
+                    )?;
+                    Some(target.presentation_alias().ok_or_else(|| {
+                        unsupported("task source has no writable Run presentation")
+                    })?)
+                } else if self.parent_scope.as_ref() == Some(&task.scope) {
+                    Some(self.parent_presentation.clone().ok_or_else(|| {
+                        unsupported("task parent has no writable Run presentation")
+                    })?)
+                } else {
+                    None
+                };
+            if let Some(run) = &state.run {
+                tekes_agent_contract::require(
+                    alias.as_ref().is_none_or(|alias| alias.matches(run)),
+                    "task already owns another canonical presentation",
+                )?;
+                return Ok(Some(run.clone()));
+            }
+            (task.clone(), state.source_generation, alias)
         };
-        let result = RunBinding::open_task(self.runtime.clone(), &task).await;
+        let result = if let Some(alias) = &alias {
+            alias.open().await
+        } else {
+            RunBinding::open_task(self.runtime.clone(), &task).await
+        };
         let mut state = self.state.lock().expect("task pane lock");
         if state.source_generation != generation
             || state.projection.value.as_ref().map(|task| &task.scope) != Some(&task.scope)
@@ -160,6 +202,10 @@ impl TaskPaneBinding {
             return Ok(None);
         }
         if let Some(run) = &state.run {
+            tekes_agent_contract::require(
+                alias.as_ref().is_none_or(|alias| alias.matches(run)),
+                "task already owns another canonical presentation",
+            )?;
             return Ok(Some(run.clone()));
         }
         // Fence failed baselines as well: an old source's transport error must

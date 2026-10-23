@@ -1,10 +1,10 @@
 # Rust Agent UI：当前接入范围与交付状态
 
-本页以已提交基线 `378c631` 与本轮主按钮焦点修复、真实可继续子 Run 验收增量为准，按用户完整目标保留验收范围。
+本页以已提交基线 `37ad08f` 与本轮 Task 同目标共享状态修复增量为准，按用户完整目标保留验收范围。
 当前可供实验宿主接入，**完整交付尚未达到**。组件存在、离屏通过或单个 Issue 关闭都不能单独证明完整 Views 对齐。
 本阶段增量的证据见[三端离屏覆盖补验](rust-agent-ui-offscreen-coverage-20261023.md)与[固定验收工具链](rust-agent-ui-native-toolchain.md)；不替代本页原阶段的程序身份和原生结论。
-最新本地全 UI 为 618 通过、1 项既有忽略，Python 74 通过，严格 Clippy/格式/边界通过；
-当前源码和程序身份见[主按钮焦点与子 Run 收据](rust-agent-ui-primary-focus-child-runs-20261023.json)；此前[工具组阶段](rust-agent-ui-global-tool-runs-20261023.json)保留原身份。
+最新本地全 UI 为 622 通过、1 项既有忽略，Python 74 通过，严格 Clippy/格式/边界通过；
+当前源码摘要见[Task 共享状态收据](rust-agent-ui-task-shared-destination-20261023.json)；此前真实程序身份见[主按钮焦点与子 Run 收据](rust-agent-ui-primary-focus-child-runs-20261023.json)；此前[工具组阶段](rust-agent-ui-global-tool-runs-20261023.json)保留原身份。
 任务/子代理/SideChat 的本轮源码核对见[SidePanel 契约](rust-agent-ui-sidepanel-contract-audit-20261023.md)。
 Pi 后续验证采用[精确 1.4.0 候选](pi-1.4.0-compat-20261023.md)，保留 1.3.0 基线，旧离屏记录仍按原程序身份解释。
 实际分区的基础实现见[普通回合折叠阶段](rust-agent-ui-physical-planes-20261023.md)：原 reasoning/工具与 final 正文分属实际阅读行，正常完成默认折叠、异常终止默认展开，原控件与本地选择保留。前一阶段组件/CoreText 与三端离屏验证见[frame 阅读范围](rust-agent-ui-narration-frame-reading-20261023.md)，本轮范围见[原工具组物理分区](rust-agent-ui-physical-tool-fragments-20261023.md)；当前程序未做原生验收，历史原生程序 phase 0 失败保留。
@@ -22,6 +22,12 @@ PR #10 的 `ea36946` 远端 CI：checks 成功；UI 在严格 nested-detail-read
 [Native 有界子历史当前程序补验](rust-agent-ui-native-bounded-20261023.md)已完成：Kernel 0.9.3 实际 task 子历史、原工具参数只读详情、单消息分页、保留行、重连和非空中文父草稿隔离通过。原读取探针已适配独立 ToolActivity/结构化详情与原后台读取回调；未修改组件或 SDK。现有 Native 协议驱动场景本轮也通过，区别于此前明确 UI-only 的记录。
 
 [主按钮焦点与真实可继续子 Run](rust-agent-ui-primary-focus-child-runs-20261023.md)：Send/Stop 通过原 SDK `preserving_focus()` 保留编辑器；独立 consumer 和红/绿回归已验证。Pi/DSH 从原 Summary 进入子 Run，发送/取消、合成组字门禁、草稿切换、重连和旧控制权失效通过；DSH 同程序两次独立会话通过，当前 Native SideChat 另通过。Task 仍只消费权威行的真实 pointer，不从工具调用猜造独立会话。
+
+[Task 同目标状态共享](rust-agent-ui-task-shared-destination-20261023.md)已修复：
+`for_run` 对精确同 scope 复用原 controller，另有 `open_resolved_from` 接受宿主已有目标。
+草稿、附件与发送准备共享；Task/SideChat/祖先生命周期、迟到上传与只读门禁仍独立验证。
+本轮没有新真实 harness 或原生验收；622 项 UI/74 项 Python 通过，原三端收据保持原程序身份。
+`37ad08f` 的 PR/push CI 已结束，headless 成功，UI 仍在 #53 严格阅读步骤失败。
 
 ## 依赖与运行身份
 

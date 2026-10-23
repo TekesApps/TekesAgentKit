@@ -153,6 +153,24 @@ submission and after async host preparation. A→B→A cannot revive old callbac
 same session ID. Cache the returned binding with its pane, not with a task's first
 session ID forever. Subscribe to task publications as well as run/runtime changes.
 
+`for_run(parent)` retains the parent's existing presentation when the authoritative
+row resolves to that **exact full RunScope**. Main/split/full-panel presentation does
+not create a second draft, attachment/settings store or send admission. The task
+still receives its own guarded binding and history lease; closing it revokes task
+callbacks without revoking the original Run. The controller remains observed when
+the original mount drops. A→B→A restores the parent's same-scope draft but never
+revives A's old task callbacks.
+
+For another destination already owned by the host, call
+`open_resolved_from(&original_run).await`: full scope and runtime identity must match
+the resolved row. It returns a separate task role sharing that controller, not the
+main binding Arc. A live mount cannot silently adopt a different presentation;
+begin a new resolution first. `new(runtime)` is the standalone loader when no
+original presentation exists. Do not use it to duplicate an already mounted
+same-destination Run. Read-only bounded history has no writable presentation and
+cannot be promoted through either reuse route. SideChat/child/task source guards
+are retained by an alias, including ancestor task revocation.
+
 This adapter consumes an explicitly resolved ordinary task run. Independent child
 control remains subject to the existing catalog/continuation policy. Native
 bounded subagent history must use `RunBinding::open_child` with explicit layout;
