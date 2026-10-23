@@ -611,13 +611,8 @@ async fn task_alias_retains_sidechat_lifetime_and_never_promotes_bounded_history
     chats.close(&pointer, "task-alias-close").await.unwrap();
     assert_eq!(alias.access(), PaneAccess::Missing);
     assert!(
-        source
-            .open_resolved_from(scratch.binding())
-            .await
-            .unwrap()
-            .unwrap()
-            .current_run()
-            .is_none()
+        source.open_resolved_from(scratch.binding()).await.is_err(),
+        "a retired parent cannot reopen a task"
     );
     let bounded = ChildPaneBinding::open(
         runtime.clone(),
@@ -642,5 +637,44 @@ async fn task_alias_retains_sidechat_lifetime_and_never_promotes_bounded_history
         .await
         .unwrap();
     assert_eq!(main.access(), PaneAccess::Ready);
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn child_open_cannot_install_after_its_task_parent_retires_during_history_baseline() {
+    use tekes_agent_presentation::ChildHistoryLayout;
+    use tekes_agent_ui_bindings::ChildPaneBinding;
+    let connector = SlowHistory {
+        fixture: Fixture::default(),
+        entered: Arc::new(Notify::new()),
+        release: Arc::new(Notify::new()),
+        fail_baseline: false,
+    };
+    let runtime = Arc::new(SessionRuntime::spawn(
+        "fixture",
+        Arc::new(connector.clone()),
+    ));
+    runtime.wait_ready(Duration::from_secs(3)).await.unwrap();
+    let source = TaskPaneBinding::new(runtime.clone());
+    let token = source
+        .begin(RunScope::main("fixture", "a"), "task")
+        .unwrap();
+    source.commit(&token, Ok(Some(row("a"))));
+    let parent = source.open_resolved().await.unwrap().unwrap();
+    let opening = tokio::spawn(async move {
+        ChildPaneBinding::for_run(&parent, "b", ChildHistoryLayout::IndependentSessions, None).await
+    });
+    tokio::time::timeout(Duration::from_secs(3), connector.entered.notified())
+        .await
+        .unwrap();
+    source.cancel();
+    connector.release.notify_one();
+    assert!(
+        tokio::time::timeout(Duration::from_secs(3), opening)
+            .await
+            .unwrap()
+            .unwrap()
+            .is_err()
+    );
     runtime.stop().await.unwrap();
 }

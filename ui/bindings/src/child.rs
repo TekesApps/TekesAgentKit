@@ -82,14 +82,22 @@ impl ChildPaneBinding {
             parent.access() != crate::PaneAccess::Missing,
             "child parent pane retired",
         )?;
-        Self::open(
+        let authority = parent.authority();
+        let mut child = Self::open(
             parent.runtime.clone(),
             parent.scope().clone(),
             child_id,
             layout,
             source,
         )
-        .await
+        .await?;
+        let run = Arc::get_mut(&mut child.run).expect("unpublished child binding");
+        run.ancestors.inherit(&authority);
+        tekes_agent_contract::require(
+            run.access() != crate::PaneAccess::Missing,
+            "child parent pane retired during history read",
+        )?;
+        Ok(child)
     }
     pub fn parent(&self) -> &RunScope {
         &self.parent

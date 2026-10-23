@@ -53,6 +53,14 @@ pub enum PaneAccess {
     Missing,
 }
 impl PaneAccess {
+    fn restrict(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::Missing, _) | (_, Self::Missing) => Self::Missing,
+            (Self::Unknown, _) | (_, Self::Unknown) => Self::Unknown,
+            (Self::Closing, _) | (_, Self::Closing) => Self::Closing,
+            _ => Self::Ready,
+        }
+    }
     pub fn composer_gate(self) -> ComposerControlGate {
         if self == Self::Ready {
             ComposerControlGate::OPEN
@@ -107,6 +115,58 @@ impl PaneSnapshot {
     }
 }
 
+/// Captured source fences only: no draft, task projection or lifecycle state.
+/// Weak pane/task owners revoke derived callbacks without retaining old views.
+#[derive(Clone, Default)]
+pub(crate) struct PaneAuthority {
+    tasks: Vec<task::TaskRunGuard>,
+    children: Vec<std::sync::Weak<std::sync::atomic::AtomicBool>>,
+    chats: Vec<(Arc<SideChatController>, SideChat)>,
+}
+impl PaneAuthority {
+    pub(crate) fn access(&self) -> PaneAccess {
+        if self.tasks.iter().any(|task| !task.live())
+            || self.children.iter().any(|child| {
+                !child
+                    .upgrade()
+                    .is_some_and(|alive| alive.load(std::sync::atomic::Ordering::Acquire))
+            })
+        {
+            return PaneAccess::Missing;
+        }
+        self.chats
+            .iter()
+            .fold(PaneAccess::Ready, |access, (owner, chat)| {
+                access.restrict(RunBinding::chat_access(owner, chat))
+            })
+    }
+    pub(crate) fn inherit(&mut self, other: &Self) {
+        for task in &other.tasks {
+            if !self.tasks.iter().any(|old| old.same_source(task)) {
+                self.tasks.push(task.clone());
+            }
+        }
+        for child in &other.children {
+            if !self
+                .children
+                .iter()
+                .any(|old| std::sync::Weak::ptr_eq(old, child))
+            {
+                self.children.push(child.clone());
+            }
+        }
+        for (owner, chat) in &other.chats {
+            if !self.chats.iter().any(|(old_owner, old)| {
+                Arc::ptr_eq(old_owner, owner)
+                    && old.parent == chat.parent
+                    && old.scope == chat.scope
+            }) {
+                self.chats.push((owner.clone(), chat.clone()));
+            }
+        }
+    }
+}
+
 /// One mount owns its own history lease. Dropping it never cancels an agent or
 /// discards a SideChat. Mount tokens in SidePanel fence installation of this value.
 pub struct RunBinding {
@@ -120,7 +180,7 @@ pub struct RunBinding {
     child: Option<ChildRun>,
     side_chat: Option<(Arc<SideChatController>, SideChat)>,
     task: Option<task::TaskRunGuard>,
-    task_ancestors: Vec<task::TaskRunGuard>,
+    ancestors: PaneAuthority,
     child_owner: Option<std::sync::Weak<std::sync::atomic::AtomicBool>>,
 }
 /// An existing canonical presentation, not another draft or admission store.
@@ -131,7 +191,7 @@ pub(crate) struct RunPresentationAlias {
     controller: Arc<RunController>,
     side_chat: Option<(Arc<SideChatController>, SideChat)>,
     child_owner: Option<std::sync::Weak<std::sync::atomic::AtomicBool>>,
-    task_ancestors: Vec<task::TaskRunGuard>,
+    ancestors: PaneAuthority,
 }
 impl RunPresentationAlias {
     pub(crate) fn matches(&self, run: &RunBinding) -> bool {
@@ -151,7 +211,7 @@ impl RunPresentationAlias {
         );
         binding.side_chat = self.side_chat.clone();
         binding.child_owner = self.child_owner.clone();
-        binding.task_ancestors = self.task_ancestors.clone();
+        binding.ancestors = self.ancestors.clone();
         require(
             binding.access() != PaneAccess::Missing,
             "original task presentation authority retired",
@@ -463,20 +523,29 @@ impl RunBinding {
             child: None,
             side_chat: None,
             task: None,
-            task_ancestors: vec![],
+            ancestors: PaneAuthority::default(),
             child_owner: None,
         }
     }
+    pub(crate) fn authority(&self) -> PaneAuthority {
+        let mut authority = self.ancestors.clone();
+        authority.inherit(&PaneAuthority {
+            tasks: self.task.iter().cloned().collect(),
+            children: self.child_owner.iter().cloned().collect(),
+            chats: self.side_chat.iter().cloned().collect(),
+        });
+        authority
+    }
     pub(crate) fn presentation_alias(&self) -> Option<RunPresentationAlias> {
-        let mut task_ancestors = self.task_ancestors.clone();
-        task_ancestors.extend(self.task.clone());
+        let mut ancestors = self.ancestors.clone();
+        ancestors.tasks.extend(self.task.clone());
         Some(RunPresentationAlias {
             runtime: self.runtime.clone(),
             scope: self.scope.clone(),
             controller: self.controller.clone()?,
             side_chat: self.side_chat.clone(),
             child_owner: self.child_owner.clone(),
-            task_ancestors,
+            ancestors,
         })
     }
 
@@ -541,7 +610,7 @@ impl RunBinding {
             child: Some(child),
             side_chat: None,
             task: None,
-            task_ancestors: vec![],
+            ancestors: PaneAuthority::default(),
             child_owner: None,
         })
     }
@@ -603,16 +672,16 @@ impl RunBinding {
         }) {
             return PaneAccess::Missing;
         }
-        if self.task.as_ref().is_some_and(|task| !task.live())
-            || self.task_ancestors.iter().any(|task| !task.live())
-        {
+        if self.task.as_ref().is_some_and(|task| !task.live()) {
             return PaneAccess::Missing;
         }
-        self.side_chat
-            .as_ref()
-            .map_or(PaneAccess::Ready, |(owner, chat)| {
-                Self::chat_access(owner, chat)
-            })
+        self.ancestors.access().restrict(
+            self.side_chat
+                .as_ref()
+                .map_or(PaneAccess::Ready, |(owner, chat)| {
+                    Self::chat_access(owner, chat)
+                }),
+        )
     }
     pub fn subscribe_runtime(&self) -> ProjectionSubscription {
         self.runtime.subscribe()

@@ -427,6 +427,32 @@ async fn interrupted_discard_keeps_readable_draft_and_disables_mutations_until_r
         .unwrap();
     let run = source.open(&chat).await.unwrap();
     let binding = run.binding();
+    let child = tekes_agent_ui_bindings::ChildPaneBinding::for_run(
+        binding,
+        "b",
+        tekes_agent_presentation::ChildHistoryLayout::IndependentSessions,
+        None,
+    )
+    .await
+    .unwrap();
+    let tasks = tekes_agent_ui_bindings::TaskPaneBinding::for_run(binding);
+    let token = tasks
+        .begin(binding.scope().clone(), "derived-task")
+        .unwrap();
+    tasks.commit(
+        &token,
+        Ok(Some(tekes_agent_presentation::AgentTask {
+            id: "derived-task".into(),
+            scope: RunScope {
+                session_id: "b".into(),
+                ..binding.scope().clone()
+            },
+            name: "Derived".into(),
+            status: "running".into(),
+            kind: "task".into(),
+        })),
+    );
+    let task = tasks.open_resolved().await.unwrap().unwrap();
     let target = ComposerDestination::run(chat.scope.clone());
     binding
         .edit_text(&target, "未确认关闭时保留".into())
@@ -438,6 +464,8 @@ async fn interrupted_discard_keeps_readable_draft_and_disables_mutations_until_r
         .await
         .unwrap();
     assert_eq!(binding.access(), PaneAccess::Closing);
+    assert_eq!(child.binding().access(), PaneAccess::Closing);
+    assert_eq!(task.access(), PaneAccess::Closing);
     let while_closing = source.open(&chat).await.unwrap();
     assert!(Arc::ptr_eq(binding, while_closing.binding()));
     assert!(
@@ -447,6 +475,9 @@ async fn interrupted_discard_keeps_readable_draft_and_disables_mutations_until_r
     closing.abort();
     assert!(closing.await.unwrap_err().is_cancelled());
     assert_eq!(binding.access(), PaneAccess::Unknown);
+    assert_eq!(child.binding().access(), PaneAccess::Unknown);
+    assert_eq!(task.access(), PaneAccess::Unknown);
+    assert!(!task.access().composer_gate().send);
     assert_eq!(
         binding.current_run().unwrap().draft.text,
         "未确认关闭时保留"
@@ -462,6 +493,9 @@ async fn interrupted_discard_keeps_readable_draft_and_disables_mutations_until_r
     let unknown = source.snapshot().chats[&chat.scope.session_id].clone();
     assert!(!source.reconcile(&unknown, Err("read offline".into())));
     assert_eq!(binding.access(), PaneAccess::Unknown);
+    assert_eq!(child.binding().access(), PaneAccess::Unknown);
+    assert_eq!(task.access(), PaneAccess::Unknown);
+    assert!(!task.access().composer_gate().send);
     let reopened_unknown = source.open(&unknown).await.unwrap();
     assert!(Arc::ptr_eq(binding, reopened_unknown.binding()));
     assert_eq!(
@@ -487,6 +521,8 @@ async fn interrupted_discard_keeps_readable_draft_and_disables_mutations_until_r
     // stands for an authoritative existence query, never inventory absence.
     assert!(source.reconcile(&unknown, Ok(false)));
     assert_eq!(binding.access(), PaneAccess::Missing);
+    assert_eq!(child.binding().access(), PaneAccess::Missing);
+    assert_eq!(task.access(), PaneAccess::Missing);
     connector.release.notify_one();
     runtime.stop().await.unwrap();
 }

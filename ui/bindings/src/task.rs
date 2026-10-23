@@ -1,5 +1,5 @@
 //! Task row resolution retains the existing TaskPanelState generation fences.
-use crate::{RunBinding, RunPresentationAlias};
+use crate::{PaneAccess, PaneAuthority, RunBinding, RunPresentationAlias};
 use std::sync::{Arc, Mutex, Weak};
 use tekes_agent_components_ui::SidePanelTab;
 use tekes_agent_contract::{Result, unsupported};
@@ -19,6 +19,11 @@ pub(crate) struct TaskRunGuard {
     scope: RunScope,
 }
 impl TaskRunGuard {
+    pub(crate) fn same_source(&self, other: &Self) -> bool {
+        self.generation == other.generation
+            && self.scope == other.scope
+            && Weak::ptr_eq(&self.owner, &other.owner)
+    }
     pub(crate) fn live(&self) -> bool {
         self.owner.upgrade().is_some_and(|owner| {
             let state = owner.lock().expect("task pane lock");
@@ -38,6 +43,7 @@ impl TaskRunGuard {
 pub struct TaskPaneBinding {
     runtime: Arc<SessionRuntime>,
     parent_scope: Option<RunScope>,
+    parent_authority: PaneAuthority,
     parent_presentation: Option<RunPresentationAlias>,
     state: Arc<Mutex<MountedTask>>,
     changes: watch::Sender<TaskPanelState>,
@@ -46,6 +52,7 @@ impl TaskPaneBinding {
     pub fn for_run(parent: &RunBinding) -> Self {
         let mut source = Self::new(parent.runtime.clone());
         source.parent_scope = Some(parent.scope().clone());
+        source.parent_authority = parent.authority();
         source.parent_presentation = parent.presentation_alias();
         source
     }
@@ -57,6 +64,7 @@ impl TaskPaneBinding {
         Self {
             runtime,
             parent_scope: None,
+            parent_authority: PaneAuthority::default(),
             parent_presentation: None,
             changes: watch::channel(projection.clone()).0,
             state: Arc::new(Mutex::new(MountedTask {
@@ -165,6 +173,10 @@ impl TaskPaneBinding {
             else {
                 return Ok(None);
             };
+            tekes_agent_contract::require(
+                self.parent_authority.access() != PaneAccess::Missing,
+                "task parent pane retired",
+            )?;
             let alias =
                 if let Some(target) = target {
                     tekes_agent_contract::require(
@@ -201,6 +213,10 @@ impl TaskPaneBinding {
         {
             return Ok(None);
         }
+        tekes_agent_contract::require(
+            self.parent_authority.access() != PaneAccess::Missing,
+            "task parent pane retired during history read",
+        )?;
         if let Some(run) = &state.run {
             tekes_agent_contract::require(
                 alias.as_ref().is_none_or(|alias| alias.matches(run)),
@@ -211,6 +227,7 @@ impl TaskPaneBinding {
         // Fence failed baselines as well: an old source's transport error must
         // not replace the current pane's loading/error presentation.
         let mut binding = result?;
+        binding.ancestors.inherit(&self.parent_authority);
         binding.task = Some(TaskRunGuard {
             owner: Arc::downgrade(&self.state),
             generation,

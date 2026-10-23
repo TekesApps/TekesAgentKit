@@ -30,3 +30,10 @@ ProcessContainer 同/跨进程仍是未完成项，不能从这份核对推导�
 本轮额外修复了验收工具链的重复升级归档冲突，见[固定宿主说明](rust-agent-ui-native-toolchain.md)。
 Pi 1.4.0 兼容交接独立保留在 [Pi 兼容证据](pi-1.4.0-compat-20261023.md)，
 不覆盖此前六份 Pi 1.3/DSH/Native 离屏程序的来源身份。
+
+## 派生来源补充（AgentKit #12/#13）
+
+ChildPaneBinding::for_run 与 TaskPaneBinding::for_run 继承原父来源门禁，异步 history 返回后
+再次检查。不同 scope 不豁免来源继承；父 Task/child 退休或 SideChat 消失后旧回调失效，
+Closing/Unknown 不获得控制权限。主 Run 的 mount 卸载不等于远端取消，草稿共享仍按目标身份。
+设计与只读实例身份后续变更见[来源契约](rust-agent-ui-source-authority.md)。

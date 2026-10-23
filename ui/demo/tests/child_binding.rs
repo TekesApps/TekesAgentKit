@@ -438,3 +438,125 @@ async fn late_child_open_caches_original_parent_without_stealing_selection_and_o
     assert_eq!(run.access(), PaneAccess::Missing);
     runtime.stop().await.unwrap();
 }
+
+#[tokio::test]
+async fn nested_child_inherits_retirement_of_its_original_parent_pane() {
+    let (_, runtime) = setup().await;
+    let main = RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "a"))
+        .await
+        .unwrap();
+    let main_destination = ComposerDestination::run(main.scope().clone());
+    main.edit_text(&main_destination, "原主 Run 草稿".into())
+        .unwrap();
+    let parent = ChildPaneBinding::for_run(
+        &main,
+        "child-a",
+        ChildHistoryLayout::IndependentSessions,
+        None,
+    )
+    .await
+    .unwrap();
+    let child = ChildPaneBinding::for_run(
+        parent.binding(),
+        "nested-a",
+        ChildHistoryLayout::IndependentSessions,
+        None,
+    )
+    .await
+    .unwrap();
+    child.refresh_controls().await.unwrap();
+    let destination = ComposerDestination::run(child.binding().scope().clone());
+    child
+        .binding()
+        .edit_text(&destination, "嵌套子代理草稿".into())
+        .unwrap();
+    assert!(tekes_agent_ui_consumer_check::pane_is_present(
+        child.binding()
+    ));
+    let ticket = child
+        .binding()
+        .prepare_send(&destination, tekes_agent_contract::PromptMode::Queue)
+        .unwrap();
+    let tail = runtime.inspect(|state| state.sessions["nested-a"].tail_sequence);
+    parent.retire();
+    assert_eq!(child.binding().access(), PaneAccess::Missing);
+    assert!(!tekes_agent_ui_consumer_check::pane_is_present(
+        child.binding()
+    ));
+    assert!(
+        child
+            .binding()
+            .dispatch_prepared_with(ticket, &Prepare)
+            .await
+            .is_err()
+    );
+    assert_eq!(
+        runtime.inspect(|state| state.sessions["nested-a"].tail_sequence),
+        tail
+    );
+    assert!(
+        child
+            .binding()
+            .edit_text(&destination, "旧回调".into())
+            .is_err()
+    );
+    assert!(child.refresh_controls().await.is_err());
+    assert_eq!(main.access(), PaneAccess::Ready);
+    assert_eq!(main.current_run().unwrap().draft.text, "原主 Run 草稿");
+    let replacement = ChildPaneBinding::for_run(
+        &main,
+        "child-a",
+        ChildHistoryLayout::IndependentSessions,
+        None,
+    )
+    .await
+    .unwrap();
+    assert_eq!(replacement.binding().access(), PaneAccess::Ready);
+    assert_eq!(
+        child.binding().access(),
+        PaneAccess::Missing,
+        "reopening A cannot revive the old descendant"
+    );
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn task_to_another_scope_inherits_its_original_child_parent_authority() {
+    use tekes_agent_presentation::AgentTask;
+    use tekes_agent_ui_bindings::TaskPaneBinding;
+    let (_, runtime) = setup().await;
+    let main = RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "a"))
+        .await
+        .unwrap();
+    let parent = ChildPaneBinding::for_run(
+        &main,
+        "child-a",
+        ChildHistoryLayout::IndependentSessions,
+        None,
+    )
+    .await
+    .unwrap();
+    let task = TaskPaneBinding::for_run(parent.binding());
+    let token = task
+        .begin(parent.binding().scope().clone(), "nested-task")
+        .unwrap();
+    assert!(task.commit(
+        &token,
+        Ok(Some(AgentTask {
+            id: "nested-task".into(),
+            scope: RunScope {
+                session_id: "nested-a".into(),
+                ..parent.binding().scope().clone()
+            },
+            name: "Nested".into(),
+            status: "running".into(),
+            kind: "task".into()
+        }))
+    ));
+    let mounted = task.open_resolved().await.unwrap().unwrap();
+    assert_eq!(mounted.access(), PaneAccess::Ready);
+    parent.retire();
+    assert_eq!(mounted.access(), PaneAccess::Missing);
+    assert!(task.open_resolved().await.is_err());
+    runtime.stop().await.unwrap();
+}
