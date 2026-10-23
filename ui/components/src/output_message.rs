@@ -1141,6 +1141,18 @@ impl OutputMessageState {
                             .count()
                             == 1
                     {
+                        let previous = run
+                            .last()
+                            .unwrap()
+                            .component::<OutputPart>()
+                            .unwrap()
+                            .facts
+                            .tool
+                            .as_ref()
+                            .unwrap();
+                        if input_between_tools(section, &previous.tool_id, &tool.tool_id)? {
+                            break;
+                        }
                         run.push(pending.next().unwrap());
                     } else {
                         break;
@@ -1336,7 +1348,7 @@ impl OutputMessageState {
                 return Err("thinking text version exhausted");
             }
         }
-        let mut tools = vec![];
+        let mut tools: Vec<&TranscriptToolCall> = vec![];
         for facts_part in &facts {
             if let Some(tool) = &facts_part.tool
                 && facts
@@ -1349,17 +1361,22 @@ impl OutputMessageState {
                     .count()
                     == 1
             {
-                tools.push(
-                    section
-                        .unwrap()
-                        .tools
-                        .iter()
-                        .copied()
-                        .find(|value| {
-                            value.id == tool.tool_id && value.turn_id == output.item.turn_id
-                        })
-                        .unwrap(),
-                );
+                let tool = section
+                    .unwrap()
+                    .tools
+                    .iter()
+                    .copied()
+                    .find(|value| value.id == tool.tool_id && value.turn_id == output.item.turn_id)
+                    .unwrap();
+                if let Some(previous) = tools.last()
+                    && input_between_tools(section, &previous.id, &tool.id)?
+                {
+                    if tools.len() > 1 {
+                        self.labels.tool_run.summary(&self.scope, &tools)?;
+                    }
+                    tools.clear();
+                }
+                tools.push(tool);
                 continue;
             }
             if tools.len() > 1 {
@@ -1567,6 +1584,18 @@ fn thinking_parts(
     };
     result.insert(0, part);
     result
+}
+fn input_between_tools(
+    section: Option<&TranscriptSection<'_>>,
+    first: &str,
+    second: &str,
+) -> Result<bool, &'static str> {
+    section.map_or(Ok(false), |section| {
+        section
+            .has_input_between_tools(first, second)
+            .map(|boundary| boundary == Some(true))
+            .map_err(|_| "invalid embedded tool source order")
+    })
 }
 fn parts(
     scope: &RunScope,

@@ -2753,3 +2753,13 @@ pub fn narration_policy(
     tekes_agent_components_ui::TranscriptNarrationPolicy::read(timeline, items, fallbacks)
         .map_err(|error| error.to_string())
 }
+/// Original source ordering only; not a session pointer or a new Agent timeline.
+pub fn embedded_tool_input_boundary(
+    section: &tekes_agent_components_ui::TranscriptSection<'_>,
+    first: &str,
+    second: &str,
+) -> Result<Option<bool>, String> {
+    section
+        .has_input_between_tools(first, second)
+        .map_err(|error| error.to_string())
+}

@@ -50,6 +50,33 @@ pub struct TranscriptEventOrder<'a> {
     pub unplaced: Vec<TranscriptOrderedEvent<'a>>,
 }
 impl<'a> TranscriptSection<'a> {
+    /// Whether a positioned user input separates two original calls. None means
+    /// a call has no public position; it does not grant ordering authority.
+    /// Result events, clocks and enclosing message/block order are not inputs.
+    pub fn has_input_between_tools(&self, first: &str, second: &str) -> Result<Option<bool>> {
+        require(first != second, "tool boundary requires distinct calls")?;
+        let order = self.event_order()?;
+        let locate = |id: &str| -> Result<Option<usize>> {
+            let matches: Vec<_> = order
+                .ordered
+                .iter()
+                .enumerate()
+                .filter_map(|(index, event)| {
+                    matches!(event, TranscriptOrderedEvent::ToolCall(tool) if tool.id == id)
+                        .then_some(index)
+                })
+                .collect();
+            require(matches.len() <= 1, "ambiguous tool boundary identity")?;
+            Ok(matches.first().copied())
+        };
+        let (Some(first), Some(second)) = (locate(first)?, locate(second)?) else {
+            return Ok(None);
+        };
+        let (start, end) = (first.min(second), first.max(second));
+        Ok(Some(order.ordered[start + 1..end].iter().any(|event| {
+            matches!(event, TranscriptOrderedEvent::Message(item) if item.kind == crate::TranscriptItemKind::User)
+        })))
+    }
     pub fn event_order(&self) -> Result<TranscriptEventOrder<'a>> {
         let mut events: Vec<_> = self
             .inputs

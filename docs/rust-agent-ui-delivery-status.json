@@ -22,8 +22,8 @@
   "tekesuiInputDigest": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
   "richToolCardRendering": false,
   "crossProcessAccepted": false,
-  "sourceBase": "480433e6c66fc34681a8cb2dd208abd4746ac09d",
-  "sourceStage": "plus real stable NarrationFrame reading span, original canonical controllers and Run/read-only CoreText consumer transactions; native, rich/paired Views, call-level composition and formal ProcessContainer remain incomplete",
+  "sourceBase": "7bfa0ba16f4419c2e615da3f42c79591b5f6916d",
+  "sourceStage": "plus shared positioned-input boundary checks for original embedded ToolRun construction; physical per-call rows, rich/paired Views, native acceptance and formal ProcessContainer remain incomplete",
   "sourcesRead": {
     "ui/components/src/run_port.rs": "bc7e40abf784b1bae366e55f229e81f14123853faba428534c023d8d1b181ab3",
     "ui/components/src/transcript_content.rs": "621564ff4f66bb1dbbdbcdc0fc99a57be46966b704377537b8625122844d7516",
@@ -40,20 +40,20 @@
     "crates/presentation/src/tool_card.rs": "f30ee76b29a6c8c7ad74b5d9fb12765ed998b60f8a78be8c7511d3a05c5e5a16",
     "crates/presentation/src/tool_row.rs": "82e17001e55eaffc2452d0d18aef21406ff68373344f221456791bdad8037de6",
     "crates/presentation/src/transcript_thinking.rs": "eff3e794fff186a140b33888825dfae65cab32d6f0cc9bcefebb55570b2595a3",
-    "ui/components/src/output_message.rs": "0cda5ce877537473e4e5bca0c98908705fe6a52336ef71390776693ecec45d35",
+    "ui/components/src/output_message.rs": "8871eba0612f2ef03edabf758570eba8d51a1ecd7a4ee1406211e0e1bc7f430a",
     "crates/presentation/src/transcript_thinking_sources.rs": "fcf19dd90e6c5f7f42bf33a11562a0452e52769f4541a89b0361e6639f487134",
     "crates/session/src/native_assistant.rs": "0ddd4556c5df20782ca2378d4899f42777f0f76e6ed0a71647669ff2c72dd9ec",
     "ui/components/src/readonly_transcript.rs": "7552c781dbda48829b194f639caedf03c2c1eef450ad183cdd70e8f3dba9ed07",
     "ui/demo/src/component_demo.rs": "2fb4264a3a01a5be187e9d37019298ece712211cdfd1d0e3a44535bbea22e8c9",
-    "ui/consumer/src/lib.rs": "01dafdb7b4c2eab083d7b40156d0d9c609e3a2cfa72dd2369a25be9772643c05",
+    "ui/consumer/src/lib.rs": "a97b1765c4817517dd8b4584ea1fe2142015bf3eca553e45d32f0fbcb5dbc6aa",
     "ui/demo/tests/thinking_sources.rs": "b5f35fd9e0c2605dd83cd67b1eaf5f43caa19d6c7949c97fbf7b7e3a13a0d613",
     "crates/presentation/src/transcript.rs": "3fe37e19ab37ae2d8d1b4ef4d3c433be3b8edbcecb65a98a3ef2ac6db32877ec",
     "crates/presentation/tests/thinking_sources.rs": "b0bc26463c7848cf07852c9d5926e01d3dcfd721d92b11325826b6958d126459",
     "ui/demo/tests/output_message.rs": "4a5eb9658732a00755c8636c7a37515f32a54e8736fac78f31f8819774a1251a",
-    "crates/presentation/src/transcript_order.rs": "244918b06a0441c7596fb285f35d46f06a638dcf50a3a1db8f38868163a317e8",
-    "crates/presentation/tests/transcript_order.rs": "513cef92e8aa1b88268e6b43fe395cffaa89a18d59567289976c71bdd62039e7",
+    "crates/presentation/src/transcript_order.rs": "b254c88b440210fec3156de14da26af74122568acd47f89c32e9224f979e4b65",
+    "crates/presentation/tests/transcript_order.rs": "e69c86eb243d1277607f9d1f47f192133d58c0223165fc20215afd41148cea1e",
     "ui/components/src/lib.rs": "60176578f5fe011e5fcf1075d2e3ba74cf10baff868751424327b37de60a5a50",
-    "ui/demo/tests/display_order.rs": "5ba03d08d930f1ff14951f9802669ec16b941d466e4a269e53a118fe7817420f",
+    "ui/demo/tests/display_order.rs": "803efc3d7ba1dedd9caef5fac1a7369e8eed0d827adb544a91b155c28ebd616c",
     "ui/demo/tests/run_reading.rs": "ea1fb4ed3f0c4219edc9e4cd1509fc24f9163236b8bcda2a03d80ff0263d4c44",
     "crates/presentation/src/lib.rs": "594f881cd6bf9e059c840b9a15264ff462db5f308e78ddbe6c333201b6dcb522",
     "crates/presentation/src/transcript_planes.rs": "f8332f5d1d907d5308404c4778e6e942b0103d4842780837843800e05d22330b",
@@ -73,7 +73,8 @@
     "crates/presentation/tests/narration.rs": "b62ef95f278dbc38ce4216f99dd1d0b8ce29765d933c9939bb72d99ec1c409b4",
     "ui/Cargo.lock": "8790cacd3395460c518f71240052a0bde27a25dbe7e18acda12753c53653d9d1",
     "ui/components/src/transcript_content/narration.rs": "70e28805192db6bfb547858c3214b5ceca8deda4df32f474c4b2c2db30493763",
-    "ui/demo/tests/support/narration_reading.rs": "17ccc2124e3e8d036efec8ca929ce8900b5d8279bc7dd204c5089830426c7d0f"
+    "ui/demo/tests/support/narration_reading.rs": "17ccc2124e3e8d036efec8ca929ce8900b5d8279bc7dd204c5089830426c7d0f",
+    "crates/presentation/tests/fixtures/tool-input-boundary-20261023.json": "ef29da01fb04e9aef5cc1233c4103ac0850ee1b51b978caef1c19df40ce23b08"
   },
   "publicIssues": [
     {
@@ -418,10 +419,10 @@
       }
     ]
   },
-  "latestVerifiedCiHead": "480433e6c66fc34681a8cb2dd208abd4746ac09d",
+  "latestVerifiedCiHead": "7bfa0ba16f4419c2e615da3f42c79591b5f6916d",
   "latestVerifiedCiConclusion": "checks x2 SUCCESS; UI x2 FAILURE at strict nested-detail step; official API for both jobs",
   "knownFailure": "Nested detail scroll leaves parent following; strict gate remains required",
-  "currentValidation": "rust-agent-ui-narration-frame-reading-20261023.json",
+  "currentValidation": "rust-agent-ui-tool-input-boundary-20261023.json",
   "currentSourceNativeAccepted": false,
   "latestNativeAcceptance": {
     "programSha256": "0c3219f41cde7be2278db39e5e1f15a0050c75f1f7b816d458bae30f5e724506",
@@ -442,21 +443,21 @@
     },
     "evidence": "rust-agent-ui-narration-20261023.json",
     "appliesToCurrentSource": false,
-    "note": "Historical 0c3219 program phase0 failures only; current 66963bf program not launched"
+    "note": "Historical 0c3219 program phase0 failures only; current cd6e9b7 program not launched"
   },
   "latestLocalValidation": {
-    "rootTests": 308,
-    "rootValidationReusedFrom": "480433e narration-carrier final root 308 + strict Clippy; root sources and lock unchanged",
-    "fullUiTests": 606,
+    "rootTests": 310,
+    "fullUiTests": 607,
     "uiIgnored": 1,
-    "uiStrictAllTargetsClippy": true,
+    "rootAndUiStrictAllTargetsClippy": true,
     "formatAndRustBoundaries": true,
-    "displayOrderTests": 15,
-    "newCoreTextReadingTests": 2,
-    "secondPublicApiConsumerRunAndReadonly": true,
-    "threeHarnessOffscreen": true,
+    "displayOrderTests": 16,
+    "sourceOrderTests": 16,
+    "newSourceBoundaryTests": 2,
+    "newComponentAndSecondConsumerTests": 1,
     "currentProgramNativeAttempted": false,
-    "currentProgramNativeAccepted": false
+    "currentProgramNativeAccepted": false,
+    "threeHarnessOffscreen": true
   },
   "publicProcessContractSources": {
     "crates/tekes-ui-module-runtime/src/container.rs": "b34423866204a1ee7e0346b5609ac3c4e1e278025ef8317962f44c54bb53b5e9",
@@ -834,8 +835,8 @@
     "evidence": "rust-agent-ui-system-prompts-20261023.json"
   },
   "currentProgram": {
-    "program": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/narration-frame-reading-20261023/AgentKitNarrationFrame.app/Contents/MacOS/tekes-agent-ui-demo",
-    "sha256": "66963bf80b83783a95c8942c8bb93ea5820b249d6dffc9f211b2a751c7b78184"
+    "program": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/tool-input-boundary-20261023/AgentKitToolInputBoundary.app/Contents/MacOS/tekes-agent-ui-demo",
+    "sha256": "cd6e9b76810b0b8a2227882de8634d239a02070e7d933ce53cdfb37fb2a974fe"
   },
   "historicalValidationBeforeNarrationFrames": {
     "rootTests": 308,
@@ -880,5 +881,6 @@
       "threeHarnessOffscreen": true
     }
   },
-  "narrationFrameReading": "rust-agent-ui-narration-frame-reading-20261023.json"
+  "narrationFrameReading": "rust-agent-ui-narration-frame-reading-20261023.json",
+  "toolInputBoundary": "rust-agent-ui-tool-input-boundary-20261023.json"
 }

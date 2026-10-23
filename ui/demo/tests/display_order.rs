@@ -1406,3 +1406,102 @@ fn unresolved_rich_body_or_unowned_frame_preserves_each_source_body_instead_of_g
 #[cfg(target_os = "macos")]
 #[path = "support/narration_reading.rs"]
 mod narration_reading;
+
+#[test]
+fn embedded_original_tool_controls_do_not_group_across_source_input_but_results_do_not_split_a_run()
+{
+    let snapshot: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../crates/presentation/tests/fixtures/tool-input-boundary-20261023.json"
+    ))
+    .unwrap();
+    let mut store = MemoryProjectionStore::new("sep");
+    store
+        .apply("journal:s", json!({"type":"snapshot","snapshot":snapshot}))
+        .unwrap();
+    let mut presentation = PresentationStore::default();
+    let scope = RunScope::main("sep", "s");
+    presentation
+        .select(ComposerDestination::run(scope.clone()))
+        .unwrap();
+    let source = presentation.refresh(&store).unwrap();
+    let document = TranscriptDocument::read(&source.transcript).unwrap();
+    let section = &document.sections[0];
+    let output = section
+        .outputs
+        .iter()
+        .find(|output| {
+            output.item.content_blocks.as_ref().is_some_and(|blocks| {
+                blocks
+                    .iter()
+                    .filter(|block| {
+                        matches!(block.content, TranscriptBlockContent::ToolCall { .. })
+                    })
+                    .count()
+                    == 3
+            })
+        })
+        .unwrap();
+    let calls: Vec<_> = section.tools.iter().map(|tool| tool.id.clone()).collect();
+    assert_eq!(
+        tekes_agent_ui_consumer_check::embedded_tool_input_boundary(section, &calls[0], &calls[1])
+            .unwrap(),
+        Some(true)
+    );
+    assert_eq!(
+        tekes_agent_ui_consumer_check::embedded_tool_input_boundary(section, &calls[1], &calls[2])
+            .unwrap(),
+        Some(false)
+    );
+    let mut view = OutputMessage::new(31000, scope.clone());
+    view.update(&scope, 1, source.connection_epoch, output, Some(section))
+        .unwrap();
+    assert!(
+        view.tool_run(&calls[0]).is_none(),
+        "first call stays its original standalone part"
+    );
+    let group = view.tool_run(&calls[1]).unwrap();
+    assert_eq!(group.summary().unwrap().tool_ids, calls[1..]);
+    assert_eq!(view.tool_run(&calls[2]).unwrap().id(), group.id());
+    let original_parts = view.content_ids();
+    assert_eq!(
+        original_parts
+            .iter()
+            .filter(|part| part.kind == OutputContentKind::Tool)
+            .count(),
+        3
+    );
+    let root = view.id();
+    let mut host = view.into_host().unwrap();
+    let original = original_parts
+        .iter()
+        .find(|part| part.kind == OutputContentKind::Tool)
+        .unwrap()
+        .disclosure
+        .unwrap();
+    let owner = host
+        .get(original)
+        .unwrap()
+        .component::<ButtonContent>()
+        .unwrap() as *const _ as usize;
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<OutputMessage>()
+        .unwrap()
+        .update(&scope, 2, source.connection_epoch, output, Some(section))
+        .unwrap();
+    assert_eq!(
+        host.get(original)
+            .unwrap()
+            .component::<ButtonContent>()
+            .unwrap() as *const _ as usize,
+        owner
+    );
+    assert_eq!(
+        host.get(root)
+            .unwrap()
+            .component::<OutputMessage>()
+            .unwrap()
+            .content_ids(),
+        original_parts
+    );
+}

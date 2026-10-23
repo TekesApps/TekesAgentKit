@@ -2,6 +2,85 @@ use serde_json::{Value, json};
 use tekes_agent_contract::*;
 use tekes_agent_presentation::*;
 use tekes_agent_session::*;
+
+#[test]
+fn original_call_positions_keep_input_boundaries_despite_late_embedded_commit_and_results() {
+    let snapshot: JournalSnapshot =
+        serde_json::from_str(include_str!("fixtures/tool-input-boundary-20261023.json")).unwrap();
+    let mut session = SessionProjection::default();
+    session.apply_snapshot(snapshot).unwrap();
+    let transcript = TranscriptSnapshot::read(&RunScope::main("e", "s"), &session).unwrap();
+    let document = TranscriptDocument::read(&transcript).unwrap();
+    let section = &document.sections[0];
+    let calls: Vec<_> = section.tools.iter().map(|tool| tool.id.as_str()).collect();
+    assert_eq!(calls.len(), 3);
+    assert_eq!(
+        section.has_input_between_tools(calls[0], calls[1]).unwrap(),
+        Some(true)
+    );
+    assert_eq!(
+        section.has_input_between_tools(calls[1], calls[2]).unwrap(),
+        Some(false),
+        "a result is not a user input"
+    );
+    assert_eq!(
+        section.has_input_between_tools(calls[2], calls[0]).unwrap(),
+        Some(true)
+    );
+    assert_eq!(
+        section
+            .has_input_between_tools(calls[0], "not-loaded")
+            .unwrap(),
+        None
+    );
+    assert!(section.has_input_between_tools(calls[0], calls[0]).is_err());
+    assert!(
+        section
+            .outputs
+            .iter()
+            .any(|output| output
+                .item
+                .content_blocks
+                .as_ref()
+                .is_some_and(|blocks| blocks
+                    .iter()
+                    .filter(|block| matches!(
+                        block.content,
+                        TranscriptBlockContent::ToolCall { .. }
+                    ))
+                    .count()
+                    == 3))
+    );
+}
+
+#[test]
+fn tool_input_boundaries_use_native_ancestry_and_leave_unpositioned_calls_unknown() {
+    let mut entries = native_entries();
+    entries[1]["message"]["content"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"type":"toolCall","id":"d","name":"read","arguments":{}}));
+    let transcript = native(entries, None);
+    let document = TranscriptDocument::read(&transcript).unwrap();
+    let section = &document.sections[0];
+    assert_eq!(section.tools.len(), 2);
+    assert_eq!(
+        section
+            .has_input_between_tools(&section.tools[0].id, &section.tools[1].id)
+            .unwrap(),
+        Some(false)
+    );
+    let mut unknown = transcript.clone();
+    unknown.tools[0].source_position = None;
+    let document = TranscriptDocument::read(&unknown).unwrap();
+    let section = &document.sections[0];
+    assert_eq!(
+        section
+            .has_input_between_tools(&section.tools[0].id, &section.tools[1].id)
+            .unwrap(),
+        None
+    );
+}
 fn journal() -> TranscriptSnapshot {
     let rows = vec![
         ("turn/start", json!({"turn":1})),
