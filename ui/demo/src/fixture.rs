@@ -417,6 +417,33 @@ impl Fixture {
         }
         self
     }
+    /// Owned public journal fixture: a later input in the same turn, followed by
+    /// a separate final response frame. No real tool, file or provider is used.
+    pub fn with_input_bounded_history(self) -> Self {
+        for line in self.sessions.lock().unwrap().values_mut() {
+            let old = std::mem::take(&mut line.rows);
+            for row in old {
+                let mut value = serde_json::to_value(row).unwrap();
+                if value["event"]["type"] == "turn/end" {
+                    let turn = value["event"]["data"]["turn"].as_u64().unwrap();
+                    append(
+                        line,
+                        "user/message",
+                        json!({"turn":turn,"id":format!("later-input-{turn}"),"content":[{"type":"text","text":format!("同回合追加输入 {turn}")}]}),
+                    );
+                    append(
+                        line,
+                        "assistant/message",
+                        json!({"turn":turn,"step":2,"sessionFinal":true,"message":{"id":format!("later-response-{turn}"),"content":[{"type":"reasoning","text":"追加输入后的思考内容。"},{"type":"text","text":format!("追加输入后的最终回答 {turn}。")}]}}),
+                    );
+                }
+                value["event"]["seq"] = json!(line.rows.len());
+                value["event"]["time"] = json!(line.rows.len() + 1);
+                line.rows.push(serde_json::from_value(value).unwrap());
+            }
+        }
+        self
+    }
     pub fn with_history_page_gate(mut self, gate: Arc<tokio::sync::Semaphore>) -> Self {
         self.history_page_gate = Some(gate);
         self

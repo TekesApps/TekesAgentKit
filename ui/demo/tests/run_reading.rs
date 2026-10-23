@@ -3435,10 +3435,17 @@ async fn task_and_sidechat_use_their_own_copy_scope_during_another_composers_pre
     }
 }
 
-#[tokio::test]
-async fn local_activity_expansion_publishes_in_original_reading_transaction_and_preserves_preedit_and_upward_anchor()
- {
-    let (_runtime, mut host, root, first, version, mut text) = setup().await;
+async fn verify_local_activity_reading(segmented: bool) {
+    let (_runtime, mut host, root, first, version, mut text) = if segmented {
+        setup_with_fixture(
+            tekes_agent_ui_demo::fixture::Fixture::default()
+                .with_reading_details()
+                .with_input_bounded_history(),
+        )
+        .await
+    } else {
+        setup().await
+    };
     let mut source = first.clone();
     source.revision += 1;
     let turn = source
@@ -3460,18 +3467,27 @@ async fn local_activity_expansion_publishes_in_original_reading_transaction_and_
         .unwrap();
     item.reasoning = "preserved activity\n".repeat(12);
     if let Some(blocks) = &mut item.content_blocks {
-        for block in blocks.iter_mut() {
-            block.index += 1;
-        }
-        blocks.insert(
-            0,
-            TranscriptContentBlock {
-                index: 0,
-                content: TranscriptBlockContent::Reasoning {
-                    text: item.reasoning.clone(),
+        if let Some(block) = blocks
+            .iter_mut()
+            .find(|block| matches!(block.content, TranscriptBlockContent::Reasoning { .. }))
+        {
+            block.content = TranscriptBlockContent::Reasoning {
+                text: item.reasoning.clone(),
+            };
+        } else {
+            for block in blocks.iter_mut() {
+                block.index += 1;
+            }
+            blocks.insert(
+                0,
+                TranscriptContentBlock {
+                    index: 0,
+                    content: TranscriptBlockContent::Reasoning {
+                        text: item.reasoning.clone(),
+                    },
                 },
-            },
-        );
+            );
+        }
     }
     let plan = prepare(run(&host, root), &source).unwrap();
     let version = tekes_agent_ui_consumer_check::publish_original_run(
@@ -3499,12 +3515,24 @@ async fn local_activity_expansion_publishes_in_original_reading_transaction_and_
     });
     let baseline = baseline(&host, root);
     let stale = prepare(run(&host, root), &source).unwrap();
-    tekes_agent_ui_consumer_check::set_run_activity_expansion(
-        run_mut(&mut host, root),
-        &turn,
-        true,
-    )
-    .unwrap();
+    if segmented {
+        tekes_agent_ui_consumer_check::set_run_activity_segment(
+            run_mut(&mut host, root),
+            &TranscriptActivitySegmentKey {
+                turn_id: turn.clone(),
+                end: TranscriptActivitySegmentEnd::Final,
+            },
+            true,
+        )
+        .unwrap();
+    } else {
+        tekes_agent_ui_consumer_check::set_run_activity_expansion(
+            run_mut(&mut host, root),
+            &turn,
+            true,
+        )
+        .unwrap();
+    }
     assert!(run(&host, root).validate_prepared_update(&stale).is_err());
     let plan = prepare(run(&host, root), &source).unwrap();
     let _version = tekes_agent_ui_consumer_check::publish_original_run(
@@ -3529,4 +3557,15 @@ async fn local_activity_expansion_publishes_in_original_reading_transaction_and_
         baseline
     );
     assert!(run(&host, root).composer().is_composing());
+}
+
+#[tokio::test]
+async fn local_activity_expansion_publishes_in_original_reading_transaction_and_preserves_preedit_and_upward_anchor()
+ {
+    verify_local_activity_reading(false).await;
+}
+#[tokio::test]
+async fn input_bounded_segment_uses_original_reading_transaction_and_preserves_preedit_and_upward_anchor()
+ {
+    verify_local_activity_reading(true).await;
 }

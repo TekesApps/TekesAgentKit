@@ -3122,9 +3122,13 @@ pub fn run() {
         !summary_context_selftest || args.iter().any(|arg| arg == "--transcript-content"),
         "workspace Summary requires formal host"
     );
-    let disclosure_reading_selftest = args
+    let segmented_history_selftest = args
         .iter()
-        .any(|arg| arg == "--disclosure-reading-native-selftest");
+        .any(|arg| arg == "--segmented-history-native-selftest");
+    let disclosure_reading_selftest = segmented_history_selftest
+        || args
+            .iter()
+            .any(|arg| arg == "--disclosure-reading-native-selftest");
     assert!(
         !disclosure_reading_selftest || args.iter().any(|arg| arg == "--transcript-content"),
         "reflow probe requires formal Transcript"
@@ -3306,6 +3310,11 @@ pub fn run() {
                 };
                 let fixture = if disclosure_reading_selftest {
                     fixture.with_reading_details()
+                } else {
+                    fixture
+                };
+                let fixture = if segmented_history_selftest {
+                    fixture.with_input_bounded_history()
                 } else {
                     fixture
                 };

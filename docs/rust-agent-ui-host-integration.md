@@ -105,3 +105,12 @@ Message 根保留正文；reasoning/工具由 `MessageFragment` 行的原节点�
 `set_activity_expanded` 的本地选择及旧计划门禁由 Kit 维护，只读 pane 使用自己的历史 publication。
 组字期间只放行 Kit 提供的当前挂载 `activity_action_ids()` 和原复制控件，保留其余 mutation 门禁。
 新增 `TranscriptContentLabels.activity_settled` 为 copy callback；完整字面量需补字段或使用 Default update。
+
+回合内追加输入使用 `TranscriptActivitySegmentKey { turn_id, end }`，其中
+`BeforeInput(TranscriptMessageIdentity)` 是原输入身份，`Final` 是末段；不要用行下标、正文或时间生成键。
+`set_activity_segment_expanded` 同时提供在 TranscriptContent、RunPort 与 ReadOnlyTranscript，
+只接受本 view 当前已安装的非空可交互段。只读 pane 继续使用自己的 publication；段键不授予会话访问权限。
+Previous 计数按连续工具分组后的语义条目计算，使用 `TranscriptContentLabels.activity_previous` 配置文案。
+连续输入之间没有空 Previous 按钮；末段总有状态，空末段为被动标签。包括异常结束在内的分段默认折叠，
+原正文最终输出独立保留。与普通 Activity 相同，本地选择使旧计划失效，随后仍整体发布同一捕获快照；
+不要在宿主复制折叠状态机。当前分段验收见[输入分段](rust-agent-ui-activity-segments-20261023.md)。

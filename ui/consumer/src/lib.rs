@@ -2716,3 +2716,19 @@ pub fn set_readonly_activity_expansion(
 ) -> Result<(), &'static str> {
     view.set_activity_expanded(turn, expanded)
 }
+
+/// Forward one canonical input-bounded segment choice; Kit owns defaults/fences.
+pub fn set_run_activity_segment(
+    view: &mut tekes_agent_components_ui::RunPort,
+    key: &tekes_agent_components_ui::TranscriptActivitySegmentKey,
+    expanded: bool,
+) -> Result<(), &'static str> {
+    view.set_activity_segment_expanded(key, expanded)
+}
+pub fn set_readonly_activity_segment(
+    view: &mut tekes_agent_components_ui::ReadOnlyTranscript,
+    key: &tekes_agent_components_ui::TranscriptActivitySegmentKey,
+    expanded: bool,
+) -> Result<(), &'static str> {
+    view.set_activity_segment_expanded(key, expanded)
+}

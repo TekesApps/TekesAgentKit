@@ -294,6 +294,14 @@ impl ReadOnlyTranscript {
     pub fn handle_activity_actions(&mut self, actions: &[ContentAction]) -> bool {
         self.content_mut().handle_activity_actions(actions)
     }
+    pub fn set_activity_segment_expanded(
+        &mut self,
+        key: &crate::TranscriptActivitySegmentKey,
+        expanded: bool,
+    ) -> Result<(), &'static str> {
+        self.content_mut()
+            .set_activity_segment_expanded(key, expanded)
+    }
     pub fn content(&self) -> &TranscriptContent {
         self.body
             .children

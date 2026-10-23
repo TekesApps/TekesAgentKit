@@ -583,3 +583,362 @@ fn readonly_activity_uses_its_own_publication_and_invalidates_old_plans_without_
             .is_some()
     );
 }
+
+fn segmented_run(reason: &str, final_reasoning: bool, consecutive: bool) -> RunSnapshot {
+    let mut store = captured_store();
+    let mut seq = 5;
+    let mut publish = |kind: &str, data: serde_json::Value| {
+        store.apply("journal:s",json!({"type":"event","generation":"g","sessionId":"s","entry":{"event":{"type":kind,"seq":seq,"time":200+seq,"data":data}}})).unwrap();
+        seq += 1;
+    };
+    publish(
+        "user/message",
+        json!({"turn":1,"id":"inner","content":[{"type":"text","text":"追加输入"}]}),
+    );
+    if consecutive {
+        publish(
+            "user/message",
+            json!({"turn":1,"id":"inner-again","content":[{"type":"text","text":"连续追加输入"}]}),
+        );
+    }
+    let mut content = vec![];
+    if final_reasoning {
+        content.push(json!({"type":"reasoning","text":"后段思考"}));
+    }
+    content.push(json!({"type":"text","text":"最终回答"}));
+    publish(
+        "assistant/message",
+        json!({"turn":1,"step":2,"sessionFinal":true,"message":{"id":"final","content":content}}),
+    );
+    publish("turn/end", json!({"turn":1,"reason":reason}));
+    let mut presentation = PresentationStore::default();
+    presentation
+        .select(ComposerDestination::run(RunScope::main("sep", "s")))
+        .unwrap();
+    presentation.refresh(&store).unwrap()
+}
+fn segment_keys(
+    source: &RunSnapshot,
+) -> (TranscriptActivitySegmentKey, TranscriptActivitySegmentKey) {
+    let document = TranscriptDocument::read(&source.transcript).unwrap();
+    let section = &document.sections[0];
+    (
+        TranscriptActivitySegmentKey {
+            turn_id: section.id.into(),
+            end: TranscriptActivitySegmentEnd::BeforeInput(section.inputs[1].key.into()),
+        },
+        TranscriptActivitySegmentKey {
+            turn_id: section.id.into(),
+            end: TranscriptActivitySegmentEnd::Final,
+        },
+    )
+}
+#[test]
+fn input_bounded_history_counts_semantic_entries_and_preserves_original_parts_and_preedit() {
+    let source = segmented_run("completed", true, false);
+    let scope = RunScope::main("sep", "s");
+    let (before, final_segment) = segment_keys(&source);
+    assert_eq!(
+        source.turn_planes(&before.turn_id).unwrap().activity,
+        TranscriptActivityPresentation::BetweenInputs
+    );
+    let mut view = RunPort::standard(8000, 8010..8300, scope.clone()).unwrap();
+    view.set_thinking_display(TranscriptThinkingDisplayInput {
+        mode: TranscriptThinkingMode::Compact,
+        display_revision: 1,
+        elapsed_seconds: 0,
+    })
+    .unwrap();
+    view.update(
+        &source,
+        Default::default(),
+        ComposerControlGate::OPEN,
+        paging(&scope),
+        true,
+    )
+    .unwrap();
+    let content = view.transcript().unwrap();
+    let button = content
+        .row_id(&TranscriptContentRowKey::ActivitySegment(before.clone()))
+        .unwrap();
+    let final_button = content
+        .row_id(&TranscriptContentRowKey::ActivitySegment(
+            final_segment.clone(),
+        ))
+        .unwrap();
+    let doc = TranscriptDocument::read(&source.transcript).unwrap();
+    for input in &doc.sections[0].inputs {
+        assert!(content.message_id(input.key).is_some());
+    }
+    assert!(content.tool_run(&source.transcript.tools[0].id).is_none());
+    let item = &doc.sections[0].outputs[0];
+    let owner = TranscriptMessageIdentity::from(item.key);
+    let original = content.message_content_ids(&owner);
+    assert_eq!(original.len(), 2);
+    let ids = view.ids();
+    let mut host = view.into_host().unwrap();
+    assert_eq!(
+        host.get(button)
+            .unwrap()
+            .component::<ButtonContent>()
+            .unwrap()
+            .label,
+        "Previous 3 messages"
+    );
+    assert!(
+        !host
+            .get(final_button)
+            .unwrap()
+            .component::<ButtonContent>()
+            .unwrap()
+            .button
+            .state
+            .selected
+    );
+    assert!(host.focus(Some(ids.composer.editor), true));
+    host.event(&ContentEvent::Preedit {
+        text: "分段组字".into(),
+        selection: 4..4,
+        clauses: vec![],
+        replacement: None,
+    });
+    let baseline = host
+        .text_surface(ids.composer.editor)
+        .unwrap()
+        .input
+        .external_baseline();
+    let view = host
+        .get_mut(ids.root)
+        .unwrap()
+        .component_mut::<RunPort>()
+        .unwrap();
+    let stale = view
+        .prepare_update(
+            &source,
+            Default::default(),
+            ComposerControlGate::OPEN,
+            paging(&scope),
+            true,
+        )
+        .unwrap();
+    tekes_agent_ui_consumer_check::set_run_activity_segment(view, &before, true).unwrap();
+    assert!(view.validate_prepared_update(&stale).is_err());
+    view.update(
+        &source,
+        Default::default(),
+        ComposerControlGate::OPEN,
+        paging(&scope),
+        true,
+    )
+    .unwrap();
+    let content = view.transcript().unwrap();
+    assert!(content.tool_run(&source.transcript.tools[0].id).is_some());
+    let mut retained = content.message_content_ids(&owner);
+    retained.sort_by_key(|part| part.root.0);
+    let mut expected = original;
+    expected.sort_by_key(|part| part.root.0);
+    assert_eq!(retained, expected);
+    assert_eq!(
+        content.row_id(&TranscriptContentRowKey::ActivitySegment(before.clone())),
+        Some(button)
+    );
+    let final_row = source
+        .transcript
+        .items
+        .iter()
+        .find(|row| row.text == "最终回答")
+        .unwrap();
+    let final_body = content
+        .row_id(&TranscriptContentRowKey::Message(
+            TranscriptMessageIdentity::Item(final_row.id.clone()),
+        ))
+        .unwrap();
+    let keys = content.row_keys();
+    let positions = |id| {
+        keys.iter()
+            .position(|key| content.row_id(key) == Some(id))
+            .unwrap()
+    };
+    assert!(
+        positions(button) < positions(final_button)
+            && positions(final_button) < positions(final_body)
+    );
+    assert_eq!(host.focused(), Some(ids.composer.editor));
+    assert_eq!(
+        host.text_surface(ids.composer.editor)
+            .unwrap()
+            .input
+            .external_baseline(),
+        baseline
+    );
+    host.accessibility_action(button, None, AccessibilityAction::Press);
+    let actions = host.drain_actions();
+    let view = host
+        .get_mut(ids.root)
+        .unwrap()
+        .component_mut::<RunPort>()
+        .unwrap();
+    assert!(matches!(
+        view.take_intents(&actions).as_slice(),
+        [RunPortIntent::TranscriptLayoutChanged { .. }]
+    ));
+    view.update(
+        &source,
+        Default::default(),
+        ComposerControlGate::OPEN,
+        paging(&scope),
+        true,
+    )
+    .unwrap();
+    assert!(
+        view.transcript()
+            .unwrap()
+            .tool_run(&source.transcript.tools[0].id)
+            .is_none()
+    );
+    assert_eq!(
+        host.text_surface(ids.composer.editor)
+            .unwrap()
+            .input
+            .external_baseline(),
+        baseline
+    );
+    let mut prefix = source.clone();
+    prefix.revision += 1;
+    let mut older = prefix
+        .transcript
+        .items
+        .iter()
+        .find(|item| item.kind == TranscriptItemKind::Assistant)
+        .unwrap()
+        .clone();
+    older.id = "explicit-prefix-fixture".into();
+    older.kind = TranscriptItemKind::Notice;
+    older.record_id = None;
+    older.reconciliation_id = None;
+    older.is_final = false;
+    older.is_provisional = false;
+    older.text = "前缀历史".into();
+    older.reasoning.clear();
+    older.attachments.clear();
+    older.content_blocks = Some(vec![TranscriptContentBlock {
+        index: 0,
+        content: TranscriptBlockContent::Text {
+            text: older.text.clone(),
+        },
+    }]);
+    older.source_sequence = Some(0);
+    older.source_position = Some(TranscriptSourcePosition::Journal {
+        sequence: 0,
+        content_index: None,
+    });
+    prefix.transcript.items.push(older);
+    let view = host
+        .get_mut(ids.root)
+        .unwrap()
+        .component_mut::<RunPort>()
+        .unwrap();
+    view.update(
+        &prefix,
+        Default::default(),
+        ComposerControlGate::OPEN,
+        paging(&scope),
+        true,
+    )
+    .unwrap();
+    assert_eq!(
+        view.transcript()
+            .unwrap()
+            .row_id(&TranscriptContentRowKey::ActivitySegment(before)),
+        Some(button)
+    );
+}
+#[test]
+fn consecutive_inputs_do_not_invent_an_empty_previous_segment_and_final_empty_status_is_passive() {
+    let source = segmented_run("completed", false, true);
+    let scope = RunScope::main("sep", "s");
+    let (before, final_segment) = segment_keys(&source);
+    let mut view = RunPort::standard(8400, 8410..8600, scope.clone()).unwrap();
+    view.update(
+        &source,
+        Default::default(),
+        ComposerControlGate::OPEN,
+        paging(&scope),
+        true,
+    )
+    .unwrap();
+    let doc = TranscriptDocument::read(&source.transcript).unwrap();
+    let empty = TranscriptActivitySegmentKey {
+        turn_id: before.turn_id.clone(),
+        end: TranscriptActivitySegmentEnd::BeforeInput(doc.sections[0].inputs[2].key.into()),
+    };
+    let content = view.transcript().unwrap();
+    assert!(
+        content
+            .row_id(&TranscriptContentRowKey::ActivitySegment(empty.clone()))
+            .is_none()
+    );
+    assert!(
+        content
+            .row_id(&TranscriptContentRowKey::ActivitySegmentSummary(
+                final_segment.clone()
+            ))
+            .is_some()
+    );
+    assert!(view.set_activity_segment_expanded(&empty, true).is_err());
+    assert!(
+        view.set_activity_segment_expanded(&final_segment, true)
+            .is_err()
+    );
+    let mut foreign = before.clone();
+    foreign.turn_id = "other".into();
+    assert!(view.set_activity_segment_expanded(&foreign, true).is_err());
+}
+#[test]
+fn abnormal_input_bounded_history_stays_collapsed_and_readonly_uses_its_own_plan_generation() {
+    let source = segmented_run("error", true, false);
+    let scope = RunScope::main("sep", "s");
+    let (before, final_segment) = segment_keys(&source);
+    let mut view =
+        ReadOnlyTranscript::standard(8700, 8710..8900, scope.clone(), Default::default()).unwrap();
+    let input = ReadOnlyTranscriptInput {
+        scope: &scope,
+        publication: 900,
+        connection_epoch: source.connection_epoch,
+        connection: &source.connection,
+        transcript: &source.transcript,
+        frame_current: true,
+        source_ready: true,
+        supports_pagination: false,
+        reading: false,
+        read_error: None,
+    };
+    view.update(input).unwrap();
+    let button = view
+        .content()
+        .row_id(&TranscriptContentRowKey::ActivitySegment(final_segment))
+        .unwrap();
+    let id = view.ids().root;
+    let mut host = view.into_host().unwrap();
+    let control = host
+        .get(button)
+        .unwrap()
+        .component::<ButtonContent>()
+        .unwrap();
+    assert!(!control.button.state.selected && control.label.starts_with("Failed"));
+    let view = host
+        .get_mut(id)
+        .unwrap()
+        .component_mut::<ReadOnlyTranscript>()
+        .unwrap();
+    let old = view.prepare_update(input).unwrap();
+    tekes_agent_ui_consumer_check::set_readonly_activity_segment(view, &before, true).unwrap();
+    assert!(view.validate_prepared_update(&old).is_err());
+    view.update(input).unwrap();
+    assert!(
+        view.content()
+            .tool_run(&source.transcript.tools[0].id)
+            .is_some()
+    );
+    assert_eq!(view.content().footnote_timing().live_turn_id, None);
+}

@@ -1,11 +1,13 @@
 //! A canonical mixed message content tree. Scrolling/reading transactions belong
 //! to TekesUI; this component neither invents a scroll state nor adjusts pixels.
+mod segments;
 use crate::{
     FeedbackGesture, FeedbackLabels, InputMessage, OutputMessage, OutputMessageFragment,
     OutputMessageFragmentKind, OutputMessageLabels, ToolActivity, ToolActivityLabels,
     ToolActivityPlacement, ToolRun, ToolRunLabels, TranscriptMessageIdentity, TurnFeedback,
     TurnFootnote, TurnFootnoteIntent, TurnFootnoteLabels,
 };
+pub use segments::*;
 use std::{
     collections::{BTreeMap, BTreeSet},
     ops::Range,
@@ -35,6 +37,8 @@ pub enum TranscriptContentRowKey {
     ActivityStatus(String),
     ActivityDisclosure(String),
     ActivitySummary(String),
+    ActivitySegment(TranscriptActivitySegmentKey),
+    ActivitySegmentSummary(TranscriptActivitySegmentKey),
     /// Compatibility lookup for the original nested feedback control. This is
     /// no longer a separate reading row; use feedback_controls() for callbacks.
     TurnFeedback(String),
@@ -91,6 +95,7 @@ pub struct TranscriptContentLabels {
     pub stale: String,
     pub activity_working: String,
     pub activity_settled: fn(&TranscriptTurn) -> String,
+    pub activity_previous: fn(usize) -> String,
     pub input_details: OutputMessageLabels,
     pub input_information: fn(TranscriptDelivery) -> String,
     pub input_copy: String,
@@ -118,6 +123,13 @@ impl Default for TranscriptContentLabels {
             stale: "历史待同步".into(),
             activity_working: "Working".into(),
             activity_settled: settled_activity_text,
+            activity_previous: |count| {
+                if count == 1 {
+                    "Previous 1 message".into()
+                } else {
+                    format!("Previous {count} messages")
+                }
+            },
             input_details: InputMessage::default_details_labels(),
             input_copy: "复制输入".into(),
             input_information: |delivery| match delivery {
@@ -151,6 +163,7 @@ pub struct TranscriptContent {
     detached: BTreeMap<TranscriptContentRowKey, Content>,
     hidden_rows: BTreeMap<TranscriptContentRowKey, Content>,
     activity_expansion: BTreeMap<String, bool>,
+    segment_expansion: BTreeMap<TranscriptActivitySegmentKey, bool>,
     activity_generation: u64,
     start: u32,
     next: u32,
@@ -224,6 +237,7 @@ impl TranscriptContent {
             detached: BTreeMap::new(),
             hidden_rows: BTreeMap::new(),
             activity_expansion: BTreeMap::new(),
+            segment_expansion: BTreeMap::new(),
             activity_generation: 0,
             start: row_namespaces.start,
             next: row_namespaces.start,
@@ -443,7 +457,7 @@ impl TranscriptContent {
                 },
             );
         }
-        Ok(group_tools(result))
+        self.segment_history(group_tools(result), snapshot, document, timing)
     }
     pub fn footnote_timing(&self) -> &crate::TranscriptFootnoteTiming {
         &self.timing
@@ -508,28 +522,7 @@ impl TranscriptContent {
         let mounted: BTreeMap<_, _> = self.keys.iter().zip(&self.rows.children).collect();
         let mut rows: BTreeMap<&str, (Vec<ComponentId>, bool)> = BTreeMap::new();
         for row in &planned {
-            let turn = match &row.content {
-                PlannedContent::Input(input) => Some(input.item.turn_id.as_str()),
-                PlannedContent::Output(output, section) => {
-                    section.map(|_| output.item.turn_id.as_str())
-                }
-                PlannedContent::Fragment(_, _, turn) => Some(*turn),
-                PlannedContent::Tools(tools) => {
-                    tools.first().map(|(tool, _)| tool.turn_id.as_str())
-                }
-                PlannedContent::Footnote(turn, _, _, _) => Some(turn.id.as_str()),
-                PlannedContent::Disclosure { .. } => match &row.key {
-                    TranscriptContentRowKey::ActivityDisclosure(turn) => Some(turn.as_str()),
-                    _ => None,
-                },
-                PlannedContent::Label(_) => match &row.key {
-                    TranscriptContentRowKey::Unplaced(turn)
-                    | TranscriptContentRowKey::ActivityStatus(turn)
-                    | TranscriptContentRowKey::ActivityDisclosure(turn)
-                    | TranscriptContentRowKey::ActivitySummary(turn) => Some(turn.as_str()),
-                    _ => None,
-                },
-            };
+            let turn = planned_turn(row);
             if let Some(turn) = turn
                 && let Some(node) = mounted.get(&row.key)
             {
@@ -1553,7 +1546,12 @@ impl TranscriptContent {
             .iter()
             .zip(&self.rows.children)
             .filter_map(|(key, node)| {
-                matches!(key, TranscriptContentRowKey::ActivityDisclosure(_)).then_some(node.id())
+                matches!(
+                    key,
+                    TranscriptContentRowKey::ActivityDisclosure(_)
+                        | TranscriptContentRowKey::ActivitySegment(_)
+                )
+                .then_some(node.id())
             })
             .collect()
     }
@@ -1566,9 +1564,13 @@ impl TranscriptContent {
             .iter()
             .zip(&self.rows.children)
             .filter_map(|(key, node)| {
-                let TranscriptContentRowKey::ActivityDisclosure(turn) = key else {
+                if !matches!(
+                    key,
+                    TranscriptContentRowKey::ActivityDisclosure(_)
+                        | TranscriptContentRowKey::ActivitySegment(_)
+                ) {
                     return None;
-                };
+                }
                 let count = actions
                     .iter()
                     .filter(|action| {
@@ -1577,7 +1579,7 @@ impl TranscriptContent {
                     .count();
                 (count % 2 == 1).then(|| {
                     (
-                        turn.clone(),
+                        key.clone(),
                         !node
                             .component::<ButtonContent>()
                             .unwrap()
@@ -1588,8 +1590,16 @@ impl TranscriptContent {
                 })
             })
             .collect();
-        for (turn, expanded) in toggles {
-            let _ = self.set_activity_expanded(&turn, expanded);
+        for (key, expanded) in toggles {
+            match key {
+                TranscriptContentRowKey::ActivityDisclosure(turn) => {
+                    let _ = self.set_activity_expanded(&turn, expanded);
+                }
+                TranscriptContentRowKey::ActivitySegment(key) => {
+                    let _ = self.set_activity_segment_expanded(&key, expanded);
+                }
+                _ => unreachable!(),
+            }
         }
         self.activity_generation != before
     }
@@ -1888,9 +1898,11 @@ fn planned_turn<'r>(row: &'r Planned<'_>) -> Option<&'r str> {
         PlannedContent::Footnote(turn, ..) => Some(&turn.id),
         PlannedContent::Disclosure { .. } => match &row.key {
             TranscriptContentRowKey::ActivityDisclosure(turn) => Some(turn),
+            TranscriptContentRowKey::ActivitySegment(key) => Some(&key.turn_id),
             _ => None,
         },
         PlannedContent::Label(_) => match &row.key {
+            TranscriptContentRowKey::ActivitySegmentSummary(key) => Some(&key.turn_id),
             TranscriptContentRowKey::ActivityStatus(turn)
             | TranscriptContentRowKey::ActivitySummary(turn)
             | TranscriptContentRowKey::Unplaced(turn) => Some(turn),

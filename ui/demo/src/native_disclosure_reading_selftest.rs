@@ -1,8 +1,8 @@
 //! Owned protocol history + original disclosure controls and SDK reflow.
 use super::*;
 use tekes_agent_components_ui::{
-    InputMessage, OutputContentIds, OutputContentKind, OutputMessageFragment, RunPort,
-    ToolActivity, TranscriptContentRowKey,
+    OutputContentIds, OutputContentKind, OutputMessageFragment, RunPort, ToolActivity,
+    TranscriptActivitySegmentEnd, TranscriptContentRowKey,
 };
 use tekes_ui_controls::composition::{ButtonContent, ScrollContent, TextFieldContent};
 use tekes_ui_controls::{ScrollRevealOptions, ScrollRevealPlacement, extended::Axis};
@@ -10,6 +10,8 @@ use tekes_ui_platform_macos::selftest::{Action, run_script};
 pub(super) struct Probe {
     phase: u8,
     activity: Option<ComponentId>,
+    opening_input: Option<ComponentId>,
+    segmented_history: bool,
     tool_text: Option<ComponentId>,
     tool_owner: usize,
     reason_owner: usize,
@@ -29,6 +31,8 @@ impl Probe {
         Self {
             phase: 0,
             activity: None,
+            opening_input: None,
+            segmented_history: false,
             tool_text: None,
             tool_owner: 0,
             reason_owner: 0,
@@ -166,16 +170,29 @@ impl Probe {
                         .content_ids()
                         .map(|tool| (id, tool))
                 }) else {
-                    let Some(button) = content
-                        .row_keys()
-                        .iter()
-                        .rev()
-                        .filter(|key| matches!(key, TranscriptContentRowKey::ActivityDisclosure(_)))
-                        .nth(3)
-                        .and_then(|key| content.row_id(key))
-                    else {
-                        return;
+                    let Some(key)=content.row_keys().iter().rev().filter(|key| matches!(key,TranscriptContentRowKey::ActivityDisclosure(_)) || matches!(key,TranscriptContentRowKey::ActivitySegment(segment) if matches!(segment.end,TranscriptActivitySegmentEnd::BeforeInput(_)))).nth(3).cloned() else {return;};
+                    let button = content.row_id(&key).unwrap();
+                    let turn = match &key {
+                        TranscriptContentRowKey::ActivityDisclosure(turn) => turn.as_str(),
+                        TranscriptContentRowKey::ActivitySegment(segment) => {
+                            self.segmented_history = true;
+                            segment.turn_id.as_str()
+                        }
+                        _ => unreachable!(),
                     };
+                    let snapshot = run.displayed_snapshot().unwrap();
+                    let doc =
+                        tekes_agent_components_ui::TranscriptDocument::read(&snapshot.transcript)
+                            .unwrap();
+                    let input = doc
+                        .sections
+                        .iter()
+                        .find(|section| section.id == turn)
+                        .unwrap()
+                        .inputs
+                        .first()
+                        .unwrap();
+                    self.opening_input = content.message_id(input.key);
                     assert!(
                         !host
                             .view
@@ -290,22 +307,9 @@ impl Probe {
                 .get(self.tool.as_ref().unwrap().body)
                 .is_some() =>
             {
-                let content = Self::run(host).transcript().unwrap();
-                let target = content
-                    .row_keys()
-                    .iter()
-                    .rev()
-                    .filter_map(|key| {
-                        let id = content.row_id(key).unwrap();
-                        host.view
-                            .tree
-                            .get(id)
-                            .unwrap()
-                            .component::<InputMessage>()
-                            .map(|_| id)
-                    })
-                    .nth(3)
-                    .expect("enough owned history for unclamped reflow");
+                let target = self
+                    .opening_input
+                    .expect("original opening input for selected history");
                 self.target = Some(target);
                 Self::reveal(host, target);
                 self.phase = 5;
@@ -459,6 +463,6 @@ impl Probe {
     }
     pub fn receipt(&self) -> serde_json::Value {
         assert_eq!(self.phase, 13);
-        serde_json::json!({"nativeWindow":true,"ownedProtocolHistory":true,"originalToolAndReasoningClicks":true,"normalActivityInitiallyCollapsed":true,"activityExpandCollapseReopenClicks":true,"originalToolAndReasoningTextOwnersRetained":true,"expandedDetailsRetained":true,"liveResize":true,"typeScaleReflow":true,"readingAnchorPreserved":true,"originalEditorFocusAndChineseMarked":true,"noSubmission":true,"realHarness":false,"physicalIme":false,"physicalResizeDrag":false,"voiceOver":false})
+        serde_json::json!({"nativeWindow":true,"ownedProtocolHistory":true,"originalToolAndReasoningClicks":true,"normalActivityInitiallyCollapsed":true,"inputBoundedHistory":self.segmented_history,"activityExpandCollapseReopenClicks":true,"originalToolAndReasoningTextOwnersRetained":true,"expandedDetailsRetained":true,"liveResize":true,"typeScaleReflow":true,"readingAnchorPreserved":true,"originalEditorFocusAndChineseMarked":true,"noSubmission":true,"realHarness":false,"physicalIme":false,"physicalResizeDrag":false,"voiceOver":false})
     }
 }

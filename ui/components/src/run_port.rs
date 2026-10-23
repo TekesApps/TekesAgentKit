@@ -636,6 +636,15 @@ impl RunPort {
             .ok_or("transcript is not mounted")?
             .set_activity_expanded(turn, expanded)
     }
+    pub fn set_activity_segment_expanded(
+        &mut self,
+        key: &crate::TranscriptActivitySegmentKey,
+        expanded: bool,
+    ) -> Result<(), &'static str> {
+        self.transcript_mut()
+            .ok_or("transcript is not mounted")?
+            .set_activity_segment_expanded(key, expanded)
+    }
     pub fn transcript(&self) -> Option<&TranscriptContent> {
         self.body
             .children
