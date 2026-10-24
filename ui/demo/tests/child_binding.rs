@@ -440,6 +440,88 @@ async fn late_child_open_caches_original_parent_without_stealing_selection_and_o
 }
 
 #[tokio::test]
+async fn late_child_read_error_cannot_pollute_a_replacement_source() {
+    use tekes_agent_presentation::ChildHistoryLayout;
+
+    let (_, runtime) = setup().await;
+    let a = Arc::new(
+        RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "a"))
+            .await
+            .unwrap(),
+    );
+    let b = Arc::new(
+        RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "b"))
+            .await
+            .unwrap(),
+    );
+    let mut view = ComponentDemo::new([a, b.clone()]).unwrap();
+    view.select(1).unwrap();
+
+    let old = Arc::new(
+        ChildPaneBinding::open(
+            runtime.clone(),
+            b.scope().clone(),
+            "bounded-b",
+            ChildHistoryLayout::SameSession,
+            None,
+        )
+        .await
+        .unwrap(),
+    );
+    let request = view.begin_child_open(b.scope()).unwrap();
+    assert!(
+        view.install_child_source(
+            request,
+            old.clone(),
+            "Bounded child".into(),
+            old.snapshot().await.unwrap(),
+        )
+        .unwrap()
+    );
+    let _ = view.take_background_commands();
+
+    let current = Arc::new(
+        ChildPaneBinding::open(
+            runtime.clone(),
+            b.scope().clone(),
+            "bounded-b",
+            ChildHistoryLayout::SameSession,
+            None,
+        )
+        .await
+        .unwrap(),
+    );
+    let replacement = view.begin_child_open(b.scope()).unwrap();
+    assert!(
+        view.install_child_source(
+            replacement,
+            current.clone(),
+            "Bounded child".into(),
+            current.snapshot().await.unwrap(),
+        )
+        .unwrap()
+    );
+
+    view.child_read_failed(b.scope(), &old, "late error from retired source".into())
+        .unwrap();
+    assert!(!view.tree.semantics().iter().any(|node| {
+        node.semantics
+            .name
+            .contains("late error from retired source")
+    }));
+
+    view.child_read_failed(b.scope(), &current, "current source read error".into())
+        .unwrap();
+    assert!(
+        view.tree
+            .semantics()
+            .iter()
+            .any(|node| node.semantics.name.contains("current source read error"))
+    );
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
 async fn nested_child_inherits_retirement_of_its_original_parent_pane() {
     let (_, runtime) = setup().await;
     let main = RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "a"))

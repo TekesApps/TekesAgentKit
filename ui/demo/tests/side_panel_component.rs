@@ -678,6 +678,112 @@ fn task_identity_is_stable_while_shared_resolution_retires_changed_or_missing_se
     );
 }
 
+#[test]
+fn task_status_error_and_missing_retire_ready_content_and_stale_mount_tokens() {
+    let parent = RunScope::main("native", "parent");
+    let task = |session: &str| AgentTask {
+        id: "task".into(),
+        scope: RunScope {
+            endpoint_id: "native".into(),
+            thread_id: "parent".into(),
+            session_id: session.into(),
+        },
+        name: "Task".into(),
+        status: "running".into(),
+        kind: "agent".into(),
+    };
+    let mut state = TaskPanelState::default();
+    let first = state.begin(parent.clone(), "task").unwrap();
+    assert!(state.commit(&first, Ok(Some(task("session-a")))));
+    let tab = SidePanelTab::task_from_state(&state, "Loading task").unwrap();
+    let mut model = input(parent.clone());
+    model.tabs.push(tab.clone());
+    model.selected = Some(tab.kind.clone());
+    let mut panel = SidePanel::new(77, SidePanelLabels::default(), 4);
+    panel.update(&model).unwrap();
+    let root = panel.id();
+    let ready_token = panel.content_token(&tab.kind).unwrap();
+    panel
+        .install_content(
+            &ready_token,
+            Content::new(ComponentId(5400), TextContent::new("ready Task body")),
+        )
+        .unwrap();
+    let mut host = panel.into_host().unwrap();
+
+    let loading = state.begin(parent.clone(), "task").unwrap();
+    model.revision += 1;
+    model.tabs[1] = SidePanelTab::task_from_state(&state, "Loading task").unwrap();
+    panel_mut(&mut host, root).update(&model).unwrap();
+    assert!(host.get(ComponentId(5400)).is_none());
+    assert!(
+        mounted_panel(&host, root)
+            .content_token(&tab.kind)
+            .is_none()
+    );
+    assert!(
+        host.semantics()
+            .iter()
+            .any(|node| { node.semantics.name == SidePanelLabels::default().loading_task })
+    );
+
+    assert!(state.commit(&loading, Err("task row read failed".into())));
+    model.revision += 1;
+    model.tabs[1] = SidePanelTab::task_from_state(&state, "Loading task").unwrap();
+    panel_mut(&mut host, root).update(&model).unwrap();
+    assert!(
+        mounted_panel(&host, root)
+            .content_token(&tab.kind)
+            .is_none()
+    );
+    assert!(
+        host.semantics()
+            .iter()
+            .any(|node| node.semantics.name == "task row read failed")
+    );
+    assert!(
+        panel_mut(&mut host, root)
+            .install_content(
+                &ready_token,
+                Content::new(ComponentId(5401), TextContent::new("stale ready body")),
+            )
+            .is_err()
+    );
+
+    let missing = state.begin(parent.clone(), "task").unwrap();
+    assert!(state.commit(&missing, Ok(None)));
+    model.revision += 1;
+    model.tabs[1] = SidePanelTab::task_from_state(&state, "Loading task").unwrap();
+    panel_mut(&mut host, root).update(&model).unwrap();
+    assert!(
+        host.semantics()
+            .iter()
+            .any(|node| { node.semantics.name == SidePanelLabels::default().missing_task })
+    );
+
+    let ready = state.begin(parent, "task").unwrap();
+    assert!(state.commit(&ready, Ok(Some(task("session-b")))));
+    model.revision += 1;
+    model.tabs[1] = SidePanelTab::task_from_state(&state, "Loading task").unwrap();
+    panel_mut(&mut host, root).update(&model).unwrap();
+    let fresh_token = mounted_panel(&host, root).content_token(&tab.kind).unwrap();
+    assert!(
+        panel_mut(&mut host, root)
+            .install_content(
+                &ready_token,
+                Content::new(ComponentId(5402), TextContent::new("revived old body")),
+            )
+            .is_err()
+    );
+    panel_mut(&mut host, root)
+        .install_content(
+            &fresh_token,
+            Content::new(ComponentId(5403), TextContent::new("fresh ready body")),
+        )
+        .unwrap();
+    assert!(host.get(ComponentId(5403)).is_some());
+}
+
 struct PanelText;
 impl tekes_ui_controls::ButtonTextRenderer for PanelText {
     fn measure(
