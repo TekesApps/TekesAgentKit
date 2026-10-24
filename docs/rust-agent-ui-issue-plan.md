@@ -550,3 +550,7 @@ Native后续切片：复用既有feature headless与已安装Kernel0.9.3，真�
 ### #17 / #23 / #27：实际原始子 pane 运行与失败来源
 
 [结果](rust-agent-ui-live-child-pane-source-results-20261024.md)补齐默认关闭 demo feature 与原 FamilyCatalog/OpenChild/HostResult/Composer/close 路径。真实 Pi16/DSH13 seed 命令、16 次合成请求通过，两端同 epoch 原 running→error、父非空草稿/选择保留、旧 witness 退休拒绝；不再以 primary child Run 替代。Python255、默认UI752/0/1、feature643、最终CLI2/1、严格检查、默认/feature独立consumer与精确SHA双端闭环通过。04481a7 两份 CI 已核对，独立consumer/opt-in通过，唯一失败仍 #53；新head另核对。实际宿主 scope-only child factory 的祖先权限捕获列为 #23 下一项；Native有界witness、pane重连/分页、完整桌面/IME/AX未完成，相关Issue不关闭，不合并发布。SSD共享target未新增，本轮删除0字节。
+
+### #23：实际 dispatcher 捕获原父权限
+
+[本轮结果](rust-agent-ui-child-host-parent-authority-results-20261024.md)将 Summary/FamilyCatalog 原 parent Arc 带入实际异步 child factory，复用同host helper与原for_run权限继承、页大小校验、缓存/安装父身份。主会话修正相同scope Task抢占根producer的候选歧义并红绿验证；祖先退休/迟到拒绝、A→B→A、页大小7和只读行为通过。默认UI757/0/1、feature648、定向27、严格检查/独立consumer与当前精确程序真实Pi/DSH原子pane闭环通过。3b2两份CI opt-in/consumer绿、唯一#53红已归档；新head单独核对。当前UI没有嵌套入口，不以helper合成祖先测试冒称真实嵌套UI。Native原有界sourceCall.error/stopped被合成turn标completed的独立差异已确认，下一切片按#17/#23修正，其他未验收边界和#53仍开放。

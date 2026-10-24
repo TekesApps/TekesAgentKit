@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "baseCommit": "3b2c89ea8680fdea63470ced27c585f52ee54134",
+  "issue": 23,
+  "pullRequest": 10,
+  "scope": "original-parent-authority-in-actual-host-child-factory",
+  "tekesUiPin": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "validation": {
+    "ui-tests": {
+      "passed": 757,
+      "failed": 0,
+      "ignored": 1
+    },
+    "ui-feature-tests": {
+      "passed": 648,
+      "failed": 0,
+      "ignored": 0
+    },
+    "focusedFeaturePassed": 27,
+    "redCandidate": "selected scope-equal task priority fails exact original-producer test; source restored before final checks",
+    "strictClippyDefaultAndFeature": "passed",
+    "defaultAndFeatureDemoBuild": "passed",
+    "independentPublicConsumerDefaultAndFeature": "executed-public-API-type-checks-passed",
+    "boundariesAndMatrix": "passed",
+    "python": "unchanged; prior 255/0 and current 3b2 CI reused"
+  },
+  "profiles": {
+    "pi": {
+      "accepted": true,
+      "evidenceScope": "real-independent-child-pane-original-source",
+      "parent": {
+        "endpointId": "pi",
+        "threadId": "c04d8b95-63d0-4d3a-872b-d02673158286",
+        "sessionId": "c04d8b95-63d0-4d3a-872b-d02673158286"
+      },
+      "childScope": {
+        "endpointId": "pi",
+        "threadId": "c04d8b95-63d0-4d3a-872b-d02673158286",
+        "sessionId": "723144c9-34d6-4a54-a4bd-ea5012340d61"
+      },
+      "connectionEpoch": 2,
+      "pair": {
+        "sameChild": true,
+        "sameEpoch": true,
+        "sameAuthoredInput": true,
+        "sameOpaqueTurnId": true,
+        "runningRevision": 22,
+        "failedRevision": 30,
+        "serverTransactionalFreshnessProven": false
+      },
+      "nativeInteraction": false,
+      "physicalIme": false,
+      "serverTransactionalFreshnessProven": false,
+      "endpoint": "pi",
+      "gate": {
+        "requestCount": 1,
+        "entered": true,
+        "explicitlyReleased": true,
+        "aborted": false,
+        "timedOut": false
+      },
+      "demoExit": 0
+    },
+    "dsh": {
+      "accepted": true,
+      "evidenceScope": "real-independent-child-pane-original-source",
+      "parent": {
+        "endpointId": "dsh",
+        "threadId": "session-666c24c8-5fb8-4f4a-a15d-25fb42f29f28",
+        "sessionId": "session-666c24c8-5fb8-4f4a-a15d-25fb42f29f28"
+      },
+      "childScope": {
+        "endpointId": "dsh",
+        "threadId": "session-666c24c8-5fb8-4f4a-a15d-25fb42f29f28",
+        "sessionId": "9fb8866c-cf94-453c-a8ff-923145633af2"
+      },
+      "connectionEpoch": 2,
+      "pair": {
+        "sameChild": true,
+        "sameEpoch": true,
+        "sameAuthoredInput": true,
+        "sameOpaqueTurnId": true,
+        "runningRevision": 36,
+        "failedRevision": 71,
+        "serverTransactionalFreshnessProven": false
+      },
+      "nativeInteraction": false,
+      "physicalIme": false,
+      "serverTransactionalFreshnessProven": false,
+      "endpoint": "dsh",
+      "gate": {
+        "requestCount": 1,
+        "entered": true,
+        "explicitlyReleased": true,
+        "aborted": false,
+        "timedOut": false
+      },
+      "demoExit": 0
+    }
+  },
+  "programs": {
+    "headless": {
+      "path": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/tekes-agent-headless",
+      "sha256": "6aad53eb9910cb190ed5e887d27b1dd28169fea3245c1ed8f5eb27cb46a1215a",
+      "archiveOnly": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/child-host-parent-authority-20261024/live-pane/programs/tekes-agent-headless"
+    },
+    "demo": {
+      "path": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/tekes-agent-ui-demo",
+      "sha256": "dad457305f58851004e283f1707936026ffbfc132594047d154bb4a7747712e2",
+      "archiveOnly": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/child-host-parent-authority-20261024/live-pane/programs/tekes-agent-ui-demo"
+    }
+  },
+  "archivedTestAndConsumerPrograms": [
+    {
+      "path": ".runtime-fixtures/child-host-parent-authority-20261024/programs/child_binding-b5fe8b9c7f2c02ee",
+      "sha256": "8a0e871e7ef24e2ffd462b4d02269309e6a71930cc06218d01c1d24d78bd31c6"
+    },
+    {
+      "path": ".runtime-fixtures/child-host-parent-authority-20261024/programs/panel_navigation-e55a50f50f70bd82",
+      "sha256": "107ec5c39e90d643c987f01477a7ebebce05e26131df33692174037c7019249d"
+    },
+    {
+      "path": ".runtime-fixtures/child-host-parent-authority-20261024/programs/panel_navigation-38ce502a3fea868c",
+      "sha256": "f43546818c6a3655deca61ca6f4bec868b9a7eb1fd1aa3b0bc32d0edf6d0c254"
+    },
+    {
+      "path": ".runtime-fixtures/child-host-parent-authority-20261024/programs/child_binding-1738507bb81c2caa",
+      "sha256": "a7cd3d8bbb3ccc120310ab0a82c9f10d2c4bcdaf5ac0ebd6a9307a0ff79b39b8"
+    },
+    {
+      "path": ".runtime-fixtures/child-host-parent-authority-20261024/programs/panel_navigation-68f33f70224c037f",
+      "sha256": "4837f94072a827076219fd60598d0d222948f6a04ab35968b5fb4f9192b9b50f"
+    }
+  ],
+  "runtimeSourceHashes": {
+    "ui/bindings/src/child.rs": "84075bcacfc2895f06f4d7754f3d2df6f2fb127b0e9318d7bf809578adbcb0ec",
+    "ui/demo/src/component_demo.rs": "d75a26707d6753513c31f4d3b2ffa61d30e0d0ca0ef3b8fbb85c5bd0f902a7cc",
+    "ui/demo/src/components_native.rs": "b10bdd7305f87fe36725dc55054f966cebeb25fc10e5221534bbf38fcb71ab5d",
+    "ui/demo/src/lib.rs": "0c23bd2320958f821364a6c26dbf0e52573486445af67a27448a4b6320ba4473",
+    "ui/demo/tests/child_binding.rs": "ba1766e802ee80f58d7729614cc6b779c082629ebbfad283fa5508af3f655744",
+    "ui/demo/tests/panel_navigation.rs": "a472fb49b9e5091447794e84325d1ad65b42fe1bb41d5df364e9ee925e70db00",
+    "ui/demo/src/child_pane_host.rs": "090dbbd0793bbc73cf9b81c6a990328dcc96656bf6184b7e0a37e13a35f67394"
+  },
+  "seedCommands": {
+    "pi": 16,
+    "dsh": 13
+  },
+  "syntheticProviderRequests": 16,
+  "notRun": [
+    "actual nested UI entry (not present)",
+    "Native bounded source witness and terminal mapping (next audited gap)",
+    "child-pane reconnect/pagination source acceptance",
+    "dynamic Task pointer",
+    "desktop/physical IME/OS AX/ProcessContainer/full ClientKit parity"
+  ],
+  "ciNewHead": "pending-push",
+  "previous3b2CiEvidence": ".runtime-fixtures/live-child-pane-source-20261024/ci-terminal-evidence.json",
+  "evidenceRoot": ".runtime-fixtures/child-host-parent-authority-20261024",
+  "cacheBytesDeletedInThisSlice": 0,
+  "newTarget": false,
+  "mergeTagRelease": false,
+  "issueClosed": false
+}

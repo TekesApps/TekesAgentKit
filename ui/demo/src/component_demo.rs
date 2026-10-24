@@ -134,6 +134,7 @@ pub enum DemoCommand {
     OpenChild {
         request: PanelRequest,
         direct_parent: RunScope,
+        parent_binding: Arc<RunBinding>,
         child_id: String,
         title: String,
         layout: ChildHistoryLayout,
@@ -2843,6 +2844,35 @@ impl ComponentDemo {
             })
             .map(|pane| pane.source.clone())
     }
+    pub fn cached_child_source_for_binding(
+        &self,
+        panel_parent: &RunScope,
+        direct_parent: &RunScope,
+        child_id: &str,
+        layout: ChildHistoryLayout,
+        parent_binding: &Arc<RunBinding>,
+    ) -> Option<Arc<ChildPaneBinding>> {
+        self.child_panes
+            .get(&(panel_parent.clone(), child_id.into()))
+            .filter(|pane| {
+                pane.source.parent() == direct_parent
+                    && pane.source.layout() == layout
+                    && pane.source.authorized_by(parent_binding)
+            })
+            .map(|pane| pane.source.clone())
+    }
+    /// Capture the original main Run producer for the currently supported
+    /// Summary and FamilyCatalog entry points. A matching panel scope is not
+    /// proof that its binding produced this intent. Future nested entry points
+    /// must carry their own original binding rather than infer it from scope.
+    pub fn capture_child_parent(&self, scope: &RunScope) -> Result<Arc<RunBinding>> {
+        let parent = self.binding();
+        require(
+            parent.scope() == scope && parent.access() != PaneAccess::Missing,
+            "child parent producer changed or was retired",
+        )?;
+        Ok(parent.clone())
+    }
     pub fn install_child_source(
         &mut self,
         request: PanelRequest,
@@ -2867,7 +2897,8 @@ impl ComponentDemo {
             .find(|binding| binding.scope() == &panel_parent)
             .ok_or_else(|| unsupported("child panel parent not mounted"))?;
         require(
-            source.uses_run(parent) && source.parent().thread_id == panel_parent.thread_id,
+            source.accepts_parent_binding(parent)
+                && source.parent().thread_id == panel_parent.thread_id,
             "child source authority mismatch",
         )?;
         Self::validate_child_snapshot(&source, &snapshot)?;
@@ -4745,9 +4776,11 @@ impl ComponentDemo {
                         .ok_or_else(|| unsupported("family catalog needs an endpoint host"))?
                         .child_history_layout(&intent.parent.endpoint_id)?;
                     let request = self.begin_child_open(&intent.parent)?;
+                    let parent_binding = self.capture_child_parent(&intent.parent)?;
                     commands.push(DemoCommand::OpenChild {
                         request,
                         direct_parent: intent.parent,
+                        parent_binding,
                         title: intent.child_id.clone(),
                         child_id: intent.child_id,
                         layout,

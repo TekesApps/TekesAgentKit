@@ -135,8 +135,72 @@
     "full ClientKit parity"
   ],
   "ci": {
-    "newHead": "pending-push",
-    "previous04481a7": "PR 40100645177 and push 40100642243 terminal; consumer and opt-in step passed; only strict nested reading #53 failed"
+    "newHead": "3b2c89e-terminal-only-strict-nested-reading-53-failed",
+    "previous04481a7": "PR 40100645177 and push 40100642243 terminal; consumer and opt-in step passed; only strict nested reading #53 failed",
+    "terminal3b2c89e": {
+      "head": "3b2c89ea8680fdea63470ced27c585f52ee54134",
+      "prMergeParentVerified": true,
+      "runs": [
+        {
+          "id": 40103591762,
+          "checkout": "3b2c89ea8680fdea63470ced27c585f52ee54134",
+          "conclusion": "failure",
+          "consumerSha256": "e216110c5e2c26b279f832c9c2cbfa596f004f640b23cf6560b0acfb743e4466",
+          "consumerFiles": 137,
+          "matchesImmutableHead": true,
+          "sdk": {
+            "commit": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+            "local_packages": 11,
+            "native_interaction": false,
+            "reviewed_files": 243,
+            "sha256": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
+            "ui_packages": 8
+          },
+          "optInWitness": "success",
+          "independentConsumer": "success",
+          "rawReading": {
+            "accepted": false,
+            "parentFollowingAfterInnerUp": true,
+            "parentOffsetBefore": 0,
+            "parentOffsetAfterScroll": 0,
+            "parentOffsetAfterAppend": 634,
+            "innerOffset": 100,
+            "detailVisibleAfterAppend": false
+          },
+          "artifactSha256": "bf1e096e22759ceb8de172322a9d5f63d503807219cdc7ac81fc695a8ff7440c",
+          "originalJobLogSha256": "b05d1a0143c13bd3bc9a87485fc469bab7fbe2034ab34a11ff690b8bafb04562"
+        },
+        {
+          "id": 40103596776,
+          "checkout": "20fdda5e1bdf3377f90c80e54c46d1fa9654d944",
+          "conclusion": "failure",
+          "consumerSha256": "e216110c5e2c26b279f832c9c2cbfa596f004f640b23cf6560b0acfb743e4466",
+          "consumerFiles": 137,
+          "matchesImmutableHead": true,
+          "sdk": {
+            "commit": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+            "local_packages": 11,
+            "native_interaction": false,
+            "reviewed_files": 243,
+            "sha256": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
+            "ui_packages": 8
+          },
+          "optInWitness": "success",
+          "independentConsumer": "success",
+          "rawReading": {
+            "accepted": false,
+            "parentFollowingAfterInnerUp": true,
+            "parentOffsetBefore": 0,
+            "parentOffsetAfterScroll": 0,
+            "parentOffsetAfterAppend": 634,
+            "innerOffset": 100,
+            "detailVisibleAfterAppend": false
+          },
+          "artifactSha256": "6e660ea0584fb84fc33d281e52f082e4dd43ef1a5f88606c94fcc1c1de57c558",
+          "originalJobLogSha256": "2656334f17bf8f13f5cd98270208e731acfb387b03d72c8bed9d5502986ebe25"
+        }
+      ]
+    }
   },
   "defaultFeatureEnabled": false,
   "desktop": false,

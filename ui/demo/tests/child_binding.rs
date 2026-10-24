@@ -144,6 +144,307 @@ async fn nested_child_uses_direct_parent_and_existing_catalog_policy_without_cha
     ));
     runtime.stop().await.unwrap();
 }
+
+#[tokio::test]
+async fn host_child_open_captures_parent_cache_identity_and_preserves_a_b_a_sources() {
+    use tekes_agent_ui_demo::child_pane_host::open_child_for_parent;
+
+    let (_, runtime) = setup().await;
+    let a = Arc::new(
+        RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "a"))
+            .await
+            .unwrap(),
+    );
+    let b = Arc::new(
+        RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "b"))
+            .await
+            .unwrap(),
+    );
+    let (source_a, _) = open_child_for_parent(
+        a.clone(),
+        a.scope(),
+        "child-a",
+        ChildHistoryLayout::IndependentSessions,
+        50,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+    let (source_b, _) = open_child_for_parent(
+        b.clone(),
+        b.scope(),
+        "child-a",
+        ChildHistoryLayout::IndependentSessions,
+        50,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+    assert!(source_a.authorized_by(&a));
+    assert!(source_b.authorized_by(&b));
+    assert!(!source_a.authorized_by(&b));
+    let mut navigation = ComponentDemo::new([a.clone(), b.clone()]).unwrap();
+    let request = navigation.begin_child_open(a.scope()).unwrap();
+    assert!(
+        navigation
+            .install_child_source(
+                request,
+                source_a.clone(),
+                "A child".into(),
+                source_a.snapshot().await.unwrap(),
+            )
+            .unwrap()
+    );
+    navigation.select(1).unwrap();
+    navigation.select(0).unwrap();
+    let cached_a = navigation
+        .cached_child_source_for_binding(
+            a.scope(),
+            a.scope(),
+            "child-a",
+            ChildHistoryLayout::IndependentSessions,
+            &a,
+        )
+        .expect("A selection away and back preserves A's exact child owner");
+    assert!(Arc::ptr_eq(&source_a, &cached_a));
+
+    let (returned_a, _) = open_child_for_parent(
+        a.clone(),
+        a.scope(),
+        "child-a",
+        ChildHistoryLayout::IndependentSessions,
+        50,
+        Some(source_a.clone()),
+        None,
+    )
+    .await
+    .unwrap();
+    assert!(
+        Arc::ptr_eq(&source_a, &returned_a),
+        "A to B to A keeps A's owner"
+    );
+    assert!(!Arc::ptr_eq(&source_b, &returned_a));
+
+    // A scope-equal replacement is still a different captured pane authority.
+    let replacement = Arc::new(
+        RunBinding::open_main(runtime.clone(), a.scope().clone())
+            .await
+            .unwrap(),
+    );
+    let (replaced, _) = open_child_for_parent(
+        replacement.clone(),
+        replacement.scope(),
+        "child-a",
+        ChildHistoryLayout::IndependentSessions,
+        50,
+        Some(source_a.clone()),
+        None,
+    )
+    .await
+    .unwrap();
+    assert!(!Arc::ptr_eq(&replaced, &source_a));
+    assert!(replaced.authorized_by(&replacement));
+    assert!(!source_a.authorized_by(&replacement));
+    let mut replacement_view = ComponentDemo::new([replacement.clone(), b.clone()]).unwrap();
+    let request = replacement_view
+        .begin_child_open(replacement.scope())
+        .unwrap();
+    assert!(
+        replacement_view
+            .install_child_source(
+                request,
+                source_a.clone(),
+                "wrong parent cache".into(),
+                source_a.snapshot().await.unwrap(),
+            )
+            .is_err()
+    );
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn host_child_open_inherits_parent_retirement_and_rejects_bad_page_size() {
+    use tekes_agent_ui_demo::child_pane_host::open_child_for_parent;
+
+    let (_, runtime) = setup().await;
+    let root = Arc::new(
+        RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "a"))
+            .await
+            .unwrap(),
+    );
+    let (parent, _) = open_child_for_parent(
+        root.clone(),
+        root.scope(),
+        "child-a",
+        ChildHistoryLayout::IndependentSessions,
+        50,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+    let (descendant, _) = open_child_for_parent(
+        parent.binding().clone(),
+        parent.binding().scope(),
+        "nested-a",
+        ChildHistoryLayout::IndependentSessions,
+        50,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+    let destination = ComposerDestination::run(descendant.binding().scope().clone());
+    descendant
+        .binding()
+        .edit_text(&destination, "must remain unsent".into())
+        .unwrap();
+    parent.retire();
+    assert_eq!(descendant.binding().access(), PaneAccess::Missing);
+    assert!(
+        descendant
+            .binding()
+            .prepare_send(&destination, PromptMode::Queue)
+            .is_err()
+    );
+    #[cfg(feature = "acceptance-source-witness")]
+    assert!(descendant.binding().refresh_with_source_witness().is_err());
+
+    let invalid = open_child_for_parent(
+        root.clone(),
+        root.scope(),
+        "bad-page",
+        ChildHistoryLayout::IndependentSessions,
+        0,
+        None,
+        None,
+    )
+    .await;
+    assert!(
+        invalid.is_err(),
+        "cache misses cannot bypass page-size validation"
+    );
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn host_child_open_preserves_custom_same_session_page_size_and_readonly_role() {
+    use tekes_agent_ui_demo::child_pane_host::open_child_for_parent;
+
+    let (_, runtime) = setup().await;
+    let parent = Arc::new(
+        RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "a"))
+            .await
+            .unwrap(),
+    );
+    let (source, snapshot) = open_child_for_parent(
+        parent.clone(),
+        parent.scope(),
+        "child-a",
+        ChildHistoryLayout::SameSession,
+        7,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+    assert!(source.supports_pagination());
+    let positions = |frame: &PaneSnapshot| {
+        let PaneSnapshot::ReadOnlyChild { transcript, .. } = frame else {
+            panic!("expected original readonly frame")
+        };
+        transcript
+            .items
+            .iter()
+            .filter_map(|item| match item.source_position {
+                Some(tekes_agent_presentation::TranscriptSourcePosition::Journal {
+                    sequence,
+                    ..
+                }) => Some(sequence),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(positions(&snapshot), vec![113, 114, 117, 118]);
+    assert!(
+        source
+            .binding()
+            .prepare_send(
+                &ComposerDestination::run(source.binding().scope().clone()),
+                PromptMode::Queue
+            )
+            .is_err()
+    );
+    assert!(source.load_earlier().await.unwrap());
+    assert_eq!(
+        positions(&source.snapshot().await.unwrap()),
+        vec![106, 109, 110, 113, 114, 117, 118]
+    );
+    runtime.stop().await.unwrap();
+}
+
+#[derive(Default)]
+struct DelayedHostHistory {
+    entered: tokio::sync::Notify,
+    release: tokio::sync::Notify,
+}
+#[async_trait::async_trait]
+impl tekes_agent_presentation::ChildHistorySource for DelayedHostHistory {
+    async fn read(
+        &self,
+        _: &RunScope,
+        _: &str,
+    ) -> Result<tekes_agent_presentation::TranscriptSnapshot> {
+        self.entered.notify_one();
+        self.release.notified().await;
+        Ok(Default::default())
+    }
+}
+
+#[tokio::test]
+async fn host_child_open_does_not_return_a_history_read_after_parent_retirement() {
+    use tekes_agent_ui_demo::child_pane_host::open_child_for_parent;
+
+    let (_, runtime) = setup().await;
+    let root = Arc::new(
+        RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "a"))
+            .await
+            .unwrap(),
+    );
+    let (parent, _) = open_child_for_parent(
+        root.clone(),
+        root.scope(),
+        "child-a",
+        ChildHistoryLayout::IndependentSessions,
+        50,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+    let delayed = Arc::new(DelayedHostHistory::default());
+    let waiting = delayed.clone();
+    let parent_binding = parent.binding().clone();
+    let open = tokio::spawn(async move {
+        open_child_for_parent(
+            parent_binding.clone(),
+            parent_binding.scope(),
+            "nested-bounded",
+            ChildHistoryLayout::SameSession,
+            50,
+            None,
+            Some(waiting),
+        )
+        .await
+    });
+    delayed.entered.notified().await;
+    parent.retire();
+    delayed.release.notify_one();
+    assert!(open.await.unwrap().is_err());
+    runtime.stop().await.unwrap();
+}
 #[tokio::test]
 async fn builtin_bounded_history_pages_only_child_content_and_mounts_without_a_composer() {
     let (_, runtime) = setup().await;

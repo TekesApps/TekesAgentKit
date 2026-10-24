@@ -32,3 +32,5 @@
 实际 demo 的 OpenChild factory 仍按 scope 调用 `open_with_page_size`，没有捕获原 parent binding 的祖先 authority；现有 `for_run` 合成测试不证明该宿主路径。当前 UI 只提供一层子 pane，不能据静态工厂差异声称用户已能触发嵌套入口；下一切片在 #23 修正宿主构造并验证退休、迟到和 A→B→A 的不同语义。
 
 Native 有界 source witness、子 pane 重连/分页来源、动态 Task pointer、完整窗口/布局/物理 IME/AX/ProcessContainer 和全量 ClientKit 对齐仍未完成。#17/#23/#27 保持 open；#53 门槛不豁免，不合并、不打 tag、不发布。
+
+3b2c89e 的终态补录：push40103591762、PR40103596776 的checks、默认UI、bindings/demo opt-in和独立consumer均通过，唯一失败仍#53严格阅读。原日志/artifact已保存并核对137/243来源闭包及PR merge父关系；不能代替后续父权限修复CI。

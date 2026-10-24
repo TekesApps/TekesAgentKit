@@ -17,6 +17,7 @@ pub struct ChildPaneBinding {
     child_id: String,
     layout: ChildHistoryLayout,
     run: Arc<RunBinding>,
+    parent_binding: Option<std::sync::Weak<RunBinding>>,
     alive: Arc<AtomicBool>,
     paging: bool,
 }
@@ -68,6 +69,7 @@ impl ChildPaneBinding {
             child_id,
             layout,
             run: Arc::new(run),
+            parent_binding: None,
             alive,
             paging,
         })
@@ -78,19 +80,62 @@ impl ChildPaneBinding {
         layout: ChildHistoryLayout,
         source: Option<Arc<dyn ChildHistorySource>>,
     ) -> Result<Self> {
+        Self::for_run_with_page_size(parent, child_id, layout, source, 50).await
+    }
+    /// Open a child through an existing parent binding with the same bounded
+    /// history size as `open_with_page_size`. The parent lifetime is inherited
+    /// across the history read, and is rechecked before returning.
+    pub async fn for_run_with_page_size(
+        parent: &RunBinding,
+        child_id: impl Into<String>,
+        layout: ChildHistoryLayout,
+        source: Option<Arc<dyn ChildHistorySource>>,
+        page_size: usize,
+    ) -> Result<Self> {
+        Self::for_run_inner(parent, None, child_id, layout, source, page_size).await
+    }
+    /// Host variant that also binds cache reuse to this exact parent object.
+    /// It must be called with the binding captured before asynchronous work.
+    pub async fn for_run_with_captured_parent(
+        parent: &Arc<RunBinding>,
+        child_id: impl Into<String>,
+        layout: ChildHistoryLayout,
+        source: Option<Arc<dyn ChildHistorySource>>,
+        page_size: usize,
+    ) -> Result<Self> {
+        Self::for_run_inner(
+            parent,
+            Some(Arc::downgrade(parent)),
+            child_id,
+            layout,
+            source,
+            page_size,
+        )
+        .await
+    }
+    async fn for_run_inner(
+        parent: &RunBinding,
+        parent_binding: Option<std::sync::Weak<RunBinding>>,
+        child_id: impl Into<String>,
+        layout: ChildHistoryLayout,
+        source: Option<Arc<dyn ChildHistorySource>>,
+        page_size: usize,
+    ) -> Result<Self> {
         tekes_agent_contract::require(
             parent.access() != crate::PaneAccess::Missing,
             "child parent pane retired",
         )?;
         let authority = parent.authority();
-        let mut child = Self::open(
+        let mut child = Self::open_with_page_size(
             parent.runtime.clone(),
             parent.scope().clone(),
             child_id,
             layout,
             source,
+            page_size,
         )
         .await?;
+        child.parent_binding = parent_binding;
         let run = Arc::get_mut(&mut child.run).expect("unpublished child binding");
         run.ancestors.inherit(&authority);
         tekes_agent_contract::require(
@@ -215,6 +260,24 @@ impl ChildPaneBinding {
     }
     pub fn uses_run(&self, parent: &RunBinding) -> bool {
         Arc::ptr_eq(&self.run.runtime, &parent.runtime)
+    }
+    /// True only for the exact parent authority captured by the host open.
+    pub fn authorized_by(&self, parent: &Arc<RunBinding>) -> bool {
+        self.parent_binding
+            .as_ref()
+            .is_some_and(|captured| captured.ptr_eq(&Arc::downgrade(parent)))
+            && parent.access() != crate::PaneAccess::Missing
+            && self.run.access() != crate::PaneAccess::Missing
+    }
+    /// Validate install ownership. Legacy sources created through `for_run`
+    /// retain their runtime-scoped compatibility; host-captured sources require
+    /// the exact parent object and cannot cross a replacement binding.
+    pub fn accepts_parent_binding(&self, parent: &Arc<RunBinding>) -> bool {
+        if self.parent_binding.is_some() {
+            self.authorized_by(parent)
+        } else {
+            self.uses_run(parent) && parent.access() != crate::PaneAccess::Missing
+        }
     }
     /// Host read scheduling only; this does not grant continuation authority.
     /// Consumers observe runtime notifications and coalesce unchanged keys.

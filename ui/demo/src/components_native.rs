@@ -441,9 +441,17 @@ impl Host {
                         continue;
                     }
                 };
+                let parent_binding = match self.view.capture_child_parent(parent) {
+                    Ok(binding) => binding,
+                    Err(error) => {
+                        self.failure(format!("Child parent capture rejected: {error:?}"));
+                        continue;
+                    }
+                };
                 DemoCommand::OpenChild {
                     request,
                     direct_parent: parent.clone(),
+                    parent_binding,
                     child_id: child_id.clone(),
                     title: child_id.clone(),
                     layout: match self.sidebar.child_history_layout(&parent.endpoint_id) {
@@ -476,14 +484,16 @@ impl Host {
                 DemoCommand::OpenChild {
                     request,
                     direct_parent,
+                    parent_binding,
                     child_id,
                     layout,
                     ..
-                } => self.view.cached_child_source(
+                } => self.view.cached_child_source_for_binding(
                     request.parent(),
                     direct_parent,
                     child_id,
                     *layout,
+                    parent_binding,
                 ),
                 _ => None,
             };
@@ -684,39 +694,26 @@ impl Host {
                     DemoCommand::OpenChild {
                         request,
                         direct_parent,
+                        parent_binding,
                         child_id,
                         title,
                         layout,
                     } => {
                         let result = async {
-                            let runtime = sidebar
-                                .runtime_for(&direct_parent.endpoint_id)
-                                .ok_or_else(|| {
-                                    tekes_agent_contract::unsupported(
-                                        "child parent endpoint is not registered in this host",
-                                    )
-                                })?;
-                            let source = if let Some(source) = cached_child {
-                                source
-                            } else {
-                                Arc::new(
-                                    ChildPaneBinding::open_with_page_size(
-                                        runtime.clone(),
-                                        direct_parent,
-                                        child_id,
-                                        layout,
-                                        None,
-                                        if layout == ChildHistoryLayout::SameSession {
-                                            child_history_page_size
-                                        } else {
-                                            50
-                                        },
-                                    )
-                                    .await?,
-                                )
-                            };
-                            let snapshot = source.snapshot().await?;
-                            Ok::<_, tekes_agent_contract::Error>((source, snapshot))
+                            tekes_agent_ui_demo::child_pane_host::open_child_for_parent(
+                                parent_binding,
+                                &direct_parent,
+                                &child_id,
+                                layout,
+                                if layout == ChildHistoryLayout::SameSession {
+                                    child_history_page_size
+                                } else {
+                                    50
+                                },
+                                cached_child,
+                                None,
+                            )
+                            .await
                         }
                         .await
                         .map_err(|error| error.to_string());
@@ -2142,10 +2139,12 @@ impl Host {
     }
     fn open_fixture_child(&mut self, child_id: &str, layout: ChildHistoryLayout) {
         let parent = self.view.binding().scope().clone();
+        let parent_binding = self.view.binding().clone();
         let request = self.view.begin_child_open(&parent).unwrap();
         self.commands(Ok(vec![DemoCommand::OpenChild {
             request,
             direct_parent: parent,
+            parent_binding,
             child_id: child_id.into(),
             title: child_id.into(),
             layout,

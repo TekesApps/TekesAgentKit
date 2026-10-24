@@ -8,6 +8,7 @@ pub mod transcript_coverage;
 
 pub mod actionable_proof;
 pub mod attachment_files;
+pub mod child_pane_host;
 pub mod component_demo;
 pub mod file_preview_host;
 pub mod notifications;

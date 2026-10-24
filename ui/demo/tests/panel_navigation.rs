@@ -1180,3 +1180,25 @@ mod native_text {
         runtime.stop().await.unwrap();
     }
 }
+
+#[tokio::test]
+async fn child_parent_capture_uses_original_main_producer_when_task_scope_overlaps() {
+    let (runtime, parent, _, mut view) = setup().await;
+    let task_run = task(&mut view, &parent, "same-scope-task", "a").await;
+    assert_eq!(task_run.scope(), parent.scope());
+    assert!(!Arc::ptr_eq(&task_run, &parent));
+    let captured = view.capture_child_parent(parent.scope()).unwrap();
+    assert!(
+        Arc::ptr_eq(&captured, &parent),
+        "the root producer cannot be replaced by a selected scope-equal task"
+    );
+    assert!(
+        view.capture_child_parent(&RunScope::main("fixture", "b"))
+            .is_err()
+    );
+    assert!(
+        view.capture_child_parent(&RunScope::main("fixture", "unmounted"))
+            .is_err()
+    );
+    runtime.stop().await.unwrap();
+}
