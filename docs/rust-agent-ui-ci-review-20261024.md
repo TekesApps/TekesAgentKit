@@ -30,3 +30,9 @@ PR checkout 是 GitHub 合并测试提交 `35969c3639582d870d5724de052ec144d8eaa
 PR [40054890642](https://github.com/TekesApps/TekesAgentKit/actions/runs/40054890642) 与 push [40054887302](https://github.com/TekesApps/TekesAgentKit/actions/runs/40054887302) 均已完成。headless、UI fmt/严格 Clippy/完整 suite、新增独立 public consumer 全部成功；仍仅严格 nested detail reading 失败，后续 demo build 跳过。独立 consumer 已包含新搜索状态子组件。
 
 PR 下载原始 `agentkit-nested-detail-reading.json` 仍为 `accepted=false`、`parentFollowingAfterInnerUp=true`、父追加 offset 634、inner offset 100、`detailVisibleAfterAppend=false`。原始 artifact 和两套 jobs 归档于 `.runtime-fixtures/sidebar-host-20261024/ci-40054890642/`、`ci-df5429f-{pr,push}-final-jobs.json`；仍跟踪 TekesUI #53，不放宽门槛、不据此合并或打稳定 tag。后续 SideChat 源码不借用本次 head 的 CI 结果。
+
+## 多端 SideChat fa9c158 的最终 CI
+
+PR [40055941110](https://github.com/TekesApps/TekesAgentKit/actions/runs/40055941110) 和 push [40055938134](https://github.com/TekesApps/TekesAgentKit/actions/runs/40055938134) 均完成：headless 与 UI 格式/严格 Clippy/完整 suite、独立 consumer 成功，仅严格 nested detail reading 失败，demo build 后续跳过。完整 jobs 元数据保留为 `ci-fa9c158-{pr,push}-final-jobs.json`。
+
+该 head 的 raw artifact 下载遇到网络 EOF，未取得本次原始阅读 JSON；上述结论依据实际 steps，未把 df5429f 的数值当成本次重新测得的数据。仍保留严格门槛，跟踪 TekesUI #53；后续 observer API 提交另看自己的 CI。

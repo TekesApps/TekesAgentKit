@@ -2,6 +2,8 @@
 
 基线：`52288a0`，PR #10；遵循本仓库 AGENTS.md 的 Issue 驱动流程。本文是工作分配，不是验收完成声明。
 
+以下保留历史批次的分工。当前轮次使用新的独立子会话，不联系已停止的旧会话；历史“复用”措辞不作为后续派工指令。主会话继续集中审查和串行构建。
+
 | 工作 | 负责人 | 本轮可独立交付范围 | 文件写入范围 |
 | --- | --- | --- | --- |
 | #22 Sidebar | Sidebar 子会话（复用 issue15_contract） | 按既有设计增加固定多 endpoint 聚合、来源路由与非桌面回归 | 新 sidebar_multi binding/test，selected-read 复用，bindings module/export |
@@ -33,8 +35,12 @@
 
 ## 本批交回与审查
 
-三个子会话均已交回产物，由主会话完成审查、必要修正和集中验证；实际提交、测试、独立 consumer、Pi/DSH 非桌面补验以及剩余工作见[本批统一收据](rust-agent-ui-parallel-results-20261024.md)。分工表不代表 Issue 已关闭；后续可继续复用这三个子会话，各自文件范围不交叉。
+三个子会话均已交回产物，由主会话完成审查、必要修正和集中验证；实际提交、测试、独立 consumer、Pi/DSH 非桌面补验以及剩余工作见[本批统一收据](rust-agent-ui-parallel-results-20261024.md)。分工表不代表 Issue 已关闭；当前新派工使用新的独立子会话，各自文件范围不交叉。
 
 ## Sidebar 宿主接入续批（ddc49c7 基线）
 
 继续复用以上三个独立子会话：#22 改 demo host adapter、`component_demo.rs`、`components_native.rs` 及专属测试；#23 只新增 SidePanel/child 回归与专属审计；#25 修改 presentation Summary 校验及专属回归/审计。主会话拥有 Sidebar pending 退休公开 API、consumer 生成器、共享文档/索引、集中构建、审查与 Issue 回填。构建仍串行使用原共享 target；桌面验收暂停。新宿主接入不代表跨端搜索或真实三 harness 同窗已验收。
+
+## 当前轮次结果与后续
+
+#22 的新子会话分别处理共享搜索、投影、状态子组件和多 connector 配置，主会话审查集成，见[多端搜索收据](rust-agent-ui-multi-search-results-20261024.md)。#23/#25 新只读子会话复核没有确认新的独立业务缺陷，已分别回填 Issue。#24 新子会话分别处理 BoundSideChatRun owner 证明和双端 fixture，主会话处理固定 registry、native dispatch 与验证，见[SideChat 收据](rust-agent-ui-sidechat-multi-endpoint-20261024.md)。后续 #22 observer 恢复先由新 scout 聚焦只读定位，明确 source/epoch 与动作票据门禁后再实施；不重复探索已完成子项。

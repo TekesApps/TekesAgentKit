@@ -285,17 +285,22 @@
       ],
       "progress": {
         "date": "2026-10-24",
-        "evidence": "docs/rust-agent-ui-multi-search-results-20261024.md",
+        "evidence": "docs/rust-agent-ui-sidebar-observer-recovery-20261024.md",
         "verified": [
           "固定端多搜索 controller 与原端 retry",
           "公开 inventory join、状态组件与 demo 多 connector 接线",
-          "presentation234/0/0，UI653/0/1，第二公开 consumers，双端成功及局部失败离屏"
+          "presentation234/0/0，UI653/0/1，第二公开 consumers，双端成功及局部失败离屏",
+          "Same-instance explicit observer retry; original watch and running anchor retained",
+          "Failed endpoint generation retires only original action/selected receipts; host callbacks run outside lifecycle lock",
+          "UI664/0/1 existing ignore; strict Clippy; external observer API consumer; normal demo build"
         ],
         "notVerified": [
           "Mirror FTS/pins parity",
           "多端 SideChat",
-          "真实多 harness、桌面、物理中文 IME、像素 reveal"
-        ]
+          "真实多 harness、桌面、物理中文 IME、像素 reveal",
+          "Demo user-triggered observer retry UI and real failure acceptance"
+        ],
+        "commit": "3d594a8"
       }
     },
     {

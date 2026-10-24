@@ -1,5 +1,7 @@
 # Sidebar 多 endpoint 聚合设计草案
 
+原切片“终态后替换整个 binding”的限制已由 `3d594a8` 的显式同实例 observer API 补齐；见[恢复契约与证据](rust-agent-ui-sidebar-observer-recovery-20261024.md)。demo 用户重试入口仍未接线；下文旧限制保留历史范围，不代表当前 API 能力。
+
 状态：Issue #22 的 additive binding slice 已提交 `6c700e9`；主会话完成本批统一验证，完整 Issue 仍未完成。本文只界定 Rust AgentKit 的多 endpoint 数据与路由边界；不修改 TekesUI、SDK、现有单 endpoint API 或 Sidebar 状态机。
 
 ## 背景与边界

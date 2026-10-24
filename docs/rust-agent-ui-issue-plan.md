@@ -427,3 +427,5 @@
 ## 多端 SideChat 续批
 
 #24 的非首端 SideChat 继续由主会话集成、新子会话负责 owner 证明与隔离测试。固定 canonical binding 按捕获 parent 路由，原端 pointer 与返回 Run owner 双重校验；每端单独清理面板，不影响另一端草稿、附件或 prepared ticket。设计和最终验证范围见[多端 SideChat 契约](rust-agent-ui-sidechat-multi-endpoint-20261024.md)。既有真实 Native/Pi 收据仍属于原程序；DSH 无公开 discard 不提升能力，桌面/IME/AX 仍未验收。
+
+#22 `3d594a8` 补齐共享 binding 的显式同实例 observer 恢复，按端退旧代，保留原 subscriber、旧行和 running anchor；健康端 action/selected 凭据不受影响。最终 UI664/0/1、严格 Clippy、独立公开 API consumer 与普通 demo build 通过，见[恢复契约/收据](rust-agent-ui-sidebar-observer-recovery-20261024.md)。demo 用户重试入口仍待接线，真实故障/桌面验收未运行。
