@@ -1,0 +1,296 @@
+{
+  "format": 1,
+  "accepted": true,
+  "evidenceScope": "actual-native-paged-child-original-intents",
+  "sourceBase": "4f2c02b4e54de35eb0f13557e067fefce428e456",
+  "sourceState": "next-slice source frozen before final execution; exact Git binding recorded after commit separately",
+  "compiledInputs": {
+    "manifest": ".runtime-fixtures/acceptance-refresh-20261025/native-paged-source-manifest-final-2.json",
+    "sha256": "12b8e652f1069915981aebe16813bd8b3b6bae9e93e83aaa06ff66132a566ad1",
+    "count": 590
+  },
+  "kernel": {
+    "supervisor": "/Users/frankqin/dev/Tekes/.build/kernel-0.9.3-installed/BuiltInKernel/tekes-supervisor",
+    "supervisorSha256": "365eca9385f36d5897a81ba398e7f34b4b9819896d6a1b78c618a7710b14380f",
+    "worker": "/Users/frankqin/dev/Tekes/.build/kernel-0.9.3-installed/BuiltInKernel/tekes-worker",
+    "workerSha256": "1284014bd0a8d3cb711c0512b10762322a19af4beabc1f9e681bacb1e28fa64d",
+    "build": {
+      "format": 1,
+      "identifier": "com.tekes.kernel.supervisor",
+      "source_revision": "09508a9083c24c7accefc99516739f279b85913e",
+      "version": "0.9.3"
+    }
+  },
+  "programs": {
+    "headless": {
+      "path": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/tekes-agent-headless",
+      "sha256": "5ffabdf4aef23bfc32c1ffe3cb6af0003234702837169f3195e0dd00b2d7cd5a"
+    },
+    "demo": {
+      "path": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/tekes-agent-ui-demo",
+      "sha256": "94a379b17aaf6137c9f20c0d718d06708aa26b173c66f275bf4afb84460942e9"
+    }
+  },
+  "sdkPin": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "acceptance": {
+    "accepted": true,
+    "evidenceScope": "actual-native-paged-child-original-intents",
+    "parent": {
+      "endpointId": "native",
+      "sessionId": "0ae257e0-0fdc-4165-aae0-2a374d0bb047",
+      "threadId": "0ae257e0-0fdc-4165-aae0-2a374d0bb047"
+    },
+    "childId": "b13dcd06-a0c4-51ea-a649-a214c015cc01",
+    "sourceInstance": "0xa20cd4470",
+    "phaseCount": 4,
+    "earlierReadCount": 1,
+    "publicPagePlanMatched": true,
+    "groundtruthEntries": 22,
+    "desktopInteraction": false,
+    "physicalIme": false,
+    "readingAnchorAcceptance": false,
+    "kernelVersion": "0.9.3",
+    "providerStepCount": 4,
+    "privateHistoryRead": false,
+    "requestBodiesPersisted": false,
+    "ownedServicesExited": true
+  },
+  "frames": [
+    {
+      "phase": "running_head",
+      "publication": 3,
+      "epoch": 2,
+      "cut": 21,
+      "entries": 21,
+      "receipts": 4,
+      "mountedRows": 12
+    },
+    {
+      "phase": "reconnected_refresh",
+      "publication": 5,
+      "epoch": 5,
+      "cut": 21,
+      "entries": 21,
+      "receipts": 6,
+      "mountedRows": 12
+    },
+    {
+      "phase": "reconnected_page_1",
+      "publication": 6,
+      "epoch": 5,
+      "cut": 21,
+      "entries": 22,
+      "receipts": 8,
+      "mountedRows": 12
+    },
+    {
+      "phase": "settled_refresh",
+      "publication": 8,
+      "epoch": 5,
+      "cut": 24,
+      "entries": 25,
+      "receipts": 12,
+      "mountedRows": 15
+    }
+  ],
+  "testResults": {
+    "native-paged-demo-tests-final.log": [
+      626,
+      0,
+      0
+    ]
+  },
+  "pythonTests": {
+    "passed": 330,
+    "failed": 0
+  },
+  "independentConsumers": {
+    "actualRunExit": [
+      0,
+      0
+    ],
+    "featureCompiledInputsUnchanged": 191,
+    "newWitnessFuturesPolledByConsumer": false,
+    "defaultCompiledInputsUnchanged": 138,
+    "defaultSourceDigest": "55ef8ec33049649e74b9d0494df5f56cbe75c2e944de6351e85efe569868426b"
+  },
+  "artifactFiles": {
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/accepted.json": {
+      "sha256": "5ed095c95409512cfccf78d48b40f9fef634e7c3013cae1c1b1f76aba03ee006",
+      "bytes": 682
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/catalog-commands.json": {
+      "sha256": "d40bc6da0ee72218e0ca4d4197934d61bc981b6ce1b0238c46494eff7864fe1c",
+      "bytes": 94
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/catalog-exit.json": {
+      "sha256": "f61b19574fc02bb93f33a4b41d6c348fa39e76f340f164c74e5f7fd2dd955c5e",
+      "bytes": 22
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/catalog.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/catalog.stdout": {
+      "sha256": "cbadb2a31b52c19b37b2b1a72adfa4aee7eceea6ebc28638eda34da10044a256",
+      "bytes": 390
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/demo-command.json": {
+      "sha256": "a112ea012a33ae685132050fb58384ce19847e4b942a4a04f747806c67035364",
+      "bytes": 784
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/demo-process.json": {
+      "sha256": "bd726aa8c65499ddee8039ca0108cf831eaa38de533aea688987fff217c05556",
+      "bytes": 120
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/demo.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/demo.stdout": {
+      "sha256": "817dc9500f07baaad653435b5b62a8799c7a1c028e5273b9e93fd7c6cccef9ae",
+      "bytes": 345820
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/endpoints.json": {
+      "sha256": "f8b67a88abcdf8df3b95bc314e885a019e1fb5ac3e1c9532a748c53539520664",
+      "bytes": 310
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/frame-1-running_head.json": {
+      "sha256": "44b7ea7bc8fa257ed891bac5b437f1b4672893a06b9164a8e1baecfe7ff8644f",
+      "bytes": 131314
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/frame-2-reconnected_refresh.json": {
+      "sha256": "c321d03ff4d08011f34bdcb4c23bacae2b083641f9877062eab018bbfe6c5a3b",
+      "bytes": 165725
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/frame-3-reconnected_page_1.json": {
+      "sha256": "ab678c27858af76ef7eb38d5d3608c61dd00ec02b48b3149b71422f80552b22e",
+      "bytes": 184918
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/frame-4-settled_refresh.json": {
+      "sha256": "a352dda9110344458116f3e5725cd228f280533070d79432979415e85ea35a73",
+      "bytes": 260848
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/gate-final.json": {
+      "sha256": "200f207011a31bc80cba48dc94242cd03b962f936f5b2ef380d5f33ab2d15daf",
+      "bytes": 114
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/host-receipt.json": {
+      "sha256": "484abc9d2e4a82bf99bd02af27ce17474c524cbea8642dbf4627cd441e6c2f54",
+      "bytes": 838
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/kernel-diagnostics.log": {
+      "sha256": "8d489f0c45a4ad9a96c07883e9a3d73f0b010e9f0bc5946422a7ef1d56131d49",
+      "bytes": 1960
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/native-paged-pane.png": {
+      "sha256": "4b2d75aff29f45e5b7250bae96f4ac4f0cec7f8695ad22754bc338ac10959a5a",
+      "bytes": 155549
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/owned-demo-process.json": {
+      "sha256": "b92bedf8badb1e9383ee14de51fb49f7b4c429d22c78ee044d32f7d1ce8cea34",
+      "bytes": 93
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/owned-services-exit.json": {
+      "sha256": "9fef59195d439e5f9912be8bdd30b8344eec144d1cd738ba8d763c6ad5c6a0b5",
+      "bytes": 129
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/pane-manifest.json": {
+      "sha256": "6032adee38fb9e37552f1b0eaaed402116bbdbe651d5b6e7f52c82ae9f43cd1b",
+      "bytes": 307
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/provider-receipt.json": {
+      "sha256": "507b002f36388c6612b830751a77c4d783ae133a91f58e7a51d2331878a60a7e",
+      "bytes": 1758
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/public-earlier-1-commands.json": {
+      "sha256": "7c28c3a79692a87680f5dec01e88d23933d35a6d53e941adcd4f64cc5e844a1c",
+      "bytes": 386
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/public-earlier-1-exit.json": {
+      "sha256": "f61b19574fc02bb93f33a4b41d6c348fa39e76f340f164c74e5f7fd2dd955c5e",
+      "bytes": 22
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/public-earlier-1.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/public-earlier-1.stdout": {
+      "sha256": "cae1e0653b3dce7ec1bcefddcb1f2afc77826079dcd3dff3b024384a24dd6d2f",
+      "bytes": 752
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/public-groundtruth-commands.json": {
+      "sha256": "a0ce5b448327421b8e2067c673934bb3410322b7c28ee6f5b0402abbe5455b7e",
+      "bytes": 473
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/public-groundtruth-exit.json": {
+      "sha256": "f61b19574fc02bb93f33a4b41d6c348fa39e76f340f164c74e5f7fd2dd955c5e",
+      "bytes": 22
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/public-groundtruth.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/public-groundtruth.stdout": {
+      "sha256": "866997aa061e300d726ab3241d4b5657a3bf2354741e34d5cafeb1b08ab2e4a5",
+      "bytes": 12621
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/public-history-groundtruth.json": {
+      "sha256": "4a63c6200b6d7825209ca74bd078631bf258066f9bbab04427ebd35be09e9b92",
+      "bytes": 37555
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/seed-commands.json": {
+      "sha256": "22f494f6eee8bc901a13c11c40af5e16e2cdc2f7c81ff7282aa5b21ad53fb4e6",
+      "bytes": 1817
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/seed-exit.json": {
+      "sha256": "f61b19574fc02bb93f33a4b41d6c348fa39e76f340f164c74e5f7fd2dd955c5e",
+      "bytes": 22
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/seed-receipt.json": {
+      "sha256": "88f3740c4abb11f63a1f59bfbbf3cae769a5a1b9188756d6b5991a383b185388",
+      "bytes": 2093
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/seed.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/seed.stdout": {
+      "sha256": "07dea108d0d3b63bb17724f6a059dc7d791520967c0c636bc5bd080ac9ad2a0a",
+      "bytes": 400
+    },
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/source-receipt.json": {
+      "sha256": "bfd62d77b32614ce626b306f8492c888a7d29fd50aab881a4629845713fdd118",
+      "bytes": 3193
+    }
+  },
+  "ownedServices": {
+    "providerThreadStopped": true,
+    "providerServerClosed": true,
+    "supervisor": {
+      "pid": 50711,
+      "exitStatus": 0
+    }
+  },
+  "ownedProbe": {
+    "pid": 50774,
+    "exitStatus": 0,
+    "processGroup": 50774,
+    "startNewSession": true,
+    "processGroupExited": true
+  },
+  "notProven": [
+    "three-or-more real Earlier merges",
+    "Earlier adds visible messages",
+    "reading anchor or position",
+    "desktop or physical IME or OS AX",
+    "complete Views/ProcessContainer",
+    "Kernel algorithm independently correct",
+    "performance"
+  ],
+  "cacheCleanup": {
+    "deletedBytes": 0,
+    "newTarget": false,
+    "reason": "shared target required by upcoming validation; evidence programs and failed attempts retained"
+  }
+}

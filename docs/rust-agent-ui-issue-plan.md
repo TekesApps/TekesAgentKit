@@ -4,9 +4,9 @@
 
 本轮新增 [三端 Sidebar 真实连接关闭与恢复](rust-agent-ui-sidebar-transport-recovery-results-20261025.md)：#22/#27 的真实 transport 故障与恢复通过，含 Pi close 流窄修和 pending-stream 红/绿回归；不等于 observer Retry、桌面或完整 Issue 验收。新 head CI 单独核对。
 
-本次完成[原owner最后入队前复核](rust-agent-ui-submission-last-admission-20261025.md)，独立记录受控竞态回归与本次新源码的真实三端恢复。[1026格矩阵](rust-agent-ui-acceptance-matrix-20261025.md)固定功能基线，不将旧程序证据转成新提交通过。继续按[Native累计分页来源契约](rust-agent-ui-native-paged-pane-source-contract-20261025.md)推进 #17/#23；接口实施与后续真实闭环分开，不代表累计分页或重连已验收。
+本次完成[原owner最后入队前复核](rust-agent-ui-submission-last-admission-20261025.md)，独立记录受控竞态回归与本次新源码的真实三端恢复。[1026格矩阵](rust-agent-ui-acceptance-matrix-20261025.md)固定功能基线，不将旧程序证据转成新提交通过。继续按[Native累计分页来源契约](rust-agent-ui-native-paged-pane-source-contract-20261025.md)推进 #17/#23；接口实施、真实协议与阅读锚点分别记录。
 
-该切片的[presentation/原分页意图接口与受控验证](rust-agent-ui-native-paged-binding-results-20261025.md)现已完成：root404、presentation feature301、UI784/1、UI feature674及两种独立consumer通过；真实Native累计分页/重连/阅读位置仍待下一步，不升级固定矩阵或关闭Issue。
+该切片的[presentation/原分页意图接口与受控验证](rust-agent-ui-native-paged-binding-results-20261025.md)现已完成：root404、presentation feature301、UI784/1、UI feature674及两种独立consumer通过；后续[真实Native分页执行契约](rust-agent-ui-native-paged-live-contract-20261025.md)与[实际分项收据](rust-agent-ui-native-paged-live-results-20261025.json)已覆盖原只读pane按公开两页计划的一次Earlier至EOF、同source重连拒绝旧intent、错误追加和逐段prefix验证；实际三次Earlier、前插可见消息及阅读锚点仍未覆盖，不升级固定矩阵或关闭Issue。
 
 ## 执行规则
 
@@ -284,7 +284,9 @@
 
 证据：[rust-agent-ui-sidepanel-contract-audit-20261023.md](rust-agent-ui-sidepanel-contract-audit-20261023.md)、[rust-agent-ui-task-shared-destination-20261023.md](rust-agent-ui-task-shared-destination-20261023.md)、[rust-agent-ui-native-bounded-20261023.md](rust-agent-ui-native-bounded-20261023.md)、[rust-agent-ui-source-authority.md](rust-agent-ui-source-authority.md)。
 
-本次推进：`8b5d45b` 的[SidePanel 定向审计](rust-agent-ui-sidepanel-issue23-audit-20261024.md)未发现确定产品缺陷；四套 demo 测试 41 项通过。当前窗口/chrome、明确列出的状态组合仍待验收。
+本次推进：真实Native原FamilyCatalog/OpenChild→ReadOnlyTranscript Refresh/Earlier→Close已按公开pagePlan跑通，22条初始历史累计为25条错误终态，父draft/selection保留，进程退出后才accepted。见[执行契约](rust-agent-ui-native-paged-live-contract-20261025.md)与[分项收据](rust-agent-ui-native-paged-live-results-20261025.json)。同turn因果组首屏已含四条助手消息，Earlier仅补turn/start；不称为三次分页或可见消息前插。
+
+此前：`8b5d45b` 的[SidePanel 定向审计](rust-agent-ui-sidepanel-issue23-audit-20261024.md)未发现确定产品缺陷；四套 demo 测试 41 项通过。当前窗口/chrome、明确列出的状态组合仍待验收。
 
 ### [#24](https://github.com/TekesApps/TekesAgentKit/issues/24) — [P1][SideChat] 临时分支生命周期、重开与能力门禁
 

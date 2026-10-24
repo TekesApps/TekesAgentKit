@@ -3139,6 +3139,15 @@ impl WindowHandler for Host {
 pub fn run() {
     let args: Vec<_> = std::env::args().collect();
     let child_pane_source_proof = args.iter().any(|arg| arg == "--child-pane-source-proof");
+    let child_pane_paged_source = args.iter().any(|arg| arg == "--child-pane-paged-source");
+    if child_pane_paged_source {
+        assert!(
+            child_pane_source_proof,
+            "paged source requires original child pane source proof"
+        );
+        #[cfg(not(feature = "acceptance-source-witness"))]
+        panic!("paged source requires acceptance-source-witness");
+    }
     if child_pane_source_proof {
         assert!(
             args.iter().any(|arg| arg == "--components")
@@ -4033,7 +4042,7 @@ pub fn run() {
         bounded_test_started: false,
         test_child_source: None,
         test_bounded_source: None,
-        child_history_page_size: if harness_readonly_reading_selftest {
+        child_history_page_size: if harness_readonly_reading_selftest || child_pane_paged_source {
             1
         } else {
             50
@@ -4141,6 +4150,11 @@ pub fn run() {
                 .expect("child pane source manifest"),
             )
             .expect("child pane source manifest JSON");
+            assert_eq!(
+                manifest["profile"] == "native-paged",
+                child_pane_paged_source,
+                "native-paged manifest requires explicit paged source flag"
+            );
             let receipt = child_pane_source::run(&mut host, &manifest);
             let receipt_index = args
                 .iter()

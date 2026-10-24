@@ -13,6 +13,9 @@ use tekes_agent_ui_bindings::{ChildPaneBinding, PaneAccess, RunBinding};
 use tekes_agent_ui_demo::component_demo::FAMILY_REFRESH;
 use tekes_ui_controls::composition::{AccessibilityAction, ComponentId, ContentEvent};
 
+#[path = "native_child_paged_source.rs"]
+mod paged;
+
 fn tick(host: &mut Host) {
     host.executor.block_on(async {
         tokio::time::sleep(Duration::from_millis(10)).await;
@@ -307,6 +310,9 @@ pub(super) fn run(host: &mut Host, manifest: &Value) -> Value {
     assert_eq!(child_scope.session_id, child_id);
 
     if parent.endpoint_id == "native" {
+        if manifest["profile"] == "native-paged" {
+            return paged::run(host, manifest, parent_binding, parent_draft, source);
+        }
         return run_native_readonly(
             host,
             parent,

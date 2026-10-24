@@ -26,3 +26,7 @@ binding新增 `snapshot_with_bounded_paged_source_witness`，沿原snapshot路�
 **尚未完成：本次真实Native同一pane累计分页、重连与阅读位置收据。** 当前原组件产生intent与异步读取的结果来自受控fixture；两个独立程序的构造/API检查不是完整行为验收。桌面、物理IME、OS AX、ProcessContainer、完整View parity及性能仍未验收。现有矩阵继续固定91129d7，不自动把旧协议或本次接口测试升级为新代码的真实协议通过；#17/#23/#27保持开放，#53与Kernel#86不豁免，不合并/tag/发布。
 
 审计提交9396293的push40137200156/PR40137204158已终态核验，唯一失败仍#53；这是前一份审计代码CI，不是本实现的新head CI。
+
+实现提交4f2c02b的精确CI已结束并下载核验：push [40139176236](https://github.com/TekesApps/TekesAgentKit/actions/runs/40139176236)、PR [40139178635](https://github.com/TekesApps/TekesAgentKit/actions/runs/40139178635)。root/default UI/feature witness/独立consumer步骤均通过；两条run唯一失败仍为TekesUI #53严格嵌套reading。原始结果accepted=false、parentFollowingAfterInnerUp=true、parentOffsetAfterAppend=634、detailVisibleAfterAppend=false，不算整条CI通过。两份consumer digest均为`55ef8ec33049649e74b9d0494df5f56cbe75c2e944de6351e85efe569868426b`，138输入已核对精确Git对象，SDK8包/243文件和PR merge parent均验证；原artifact、完整job logs及各自SHA保留于SSD `paged-ci/`。
+
+后续实际Native分项已另完成，见[原控件分页实跑](rust-agent-ui-native-paged-live-results-20261025.md)。此历史接口报告仍保留4f2c02b当时的验证边界；实际一次Earlier至EOF不代表三次累计、可见消息前插或阅读位置已验证。
