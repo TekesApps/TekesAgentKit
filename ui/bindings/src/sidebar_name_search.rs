@@ -8,14 +8,10 @@ use std::collections::BTreeMap;
 use rusqlite::{Connection, params};
 use tekes_agent_contract::{Error, Result, SessionAddress, require};
 
-use tekes_agent_presentation::SidebarObserverSourceKey;
+use tekes_agent_presentation::{SidebarNameCorpus, SidebarObserverSourceKey};
 
-/// One canonical inventory title, addressed across all connected endpoints.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SidebarNameDocument {
-    pub address: SessionAddress,
-    pub title: String,
-}
+/// Keep the historical binding path while sharing the canonical DTO.
+pub use tekes_agent_presentation::SidebarNameDocument;
 
 /// A rebuildable SQLite FTS5 index of titles from one inventory source.
 pub struct SidebarNameIndex {
@@ -23,6 +19,7 @@ pub struct SidebarNameIndex {
     source: Option<SidebarObserverSourceKey>,
     revision: Option<u64>,
     snapshot: BTreeMap<SessionAddress, String>,
+    corpus_metadata: Option<(BTreeMap<String, u64>, Vec<String>, bool)>,
 }
 
 impl SidebarNameIndex {
@@ -49,6 +46,7 @@ impl SidebarNameIndex {
             source: None,
             revision: None,
             snapshot: BTreeMap::new(),
+            corpus_metadata: None,
         })
     }
 
@@ -62,6 +60,48 @@ impl SidebarNameIndex {
         source: &SidebarObserverSourceKey,
         revision: u64,
         documents: &[SidebarNameDocument],
+    ) -> Result<()> {
+        self.replace_snapshot_inner(source, revision, documents, None)
+    }
+
+    /// Atomically replace the canonical retained-name corpus and its fencing metadata.
+    pub fn replace_corpus_snapshot(
+        &mut self,
+        source: &SidebarObserverSourceKey,
+        revision: u64,
+        corpus: &SidebarNameCorpus,
+    ) -> Result<()> {
+        corpus.validate()?;
+        let epochs = BTreeMap::from([(corpus.endpoint_id.clone(), corpus.connection_epoch)]);
+        self.replace_ranked_snapshot(
+            source,
+            revision,
+            &corpus.documents,
+            epochs,
+            corpus.endpoint_domain.clone(),
+            corpus.inventory_ready,
+        )
+    }
+
+    pub(crate) fn replace_ranked_snapshot(
+        &mut self,
+        source: &SidebarObserverSourceKey,
+        revision: u64,
+        documents: &[SidebarNameDocument],
+        epochs: BTreeMap<String, u64>,
+        domain: Vec<String>,
+        ready: bool,
+    ) -> Result<()> {
+        let metadata = Some((epochs, domain, ready));
+        self.replace_snapshot_inner(source, revision, documents, metadata)
+    }
+
+    fn replace_snapshot_inner(
+        &mut self,
+        source: &SidebarObserverSourceKey,
+        revision: u64,
+        documents: &[SidebarNameDocument],
+        metadata: Option<(BTreeMap<String, u64>, Vec<String>, bool)>,
     ) -> Result<()> {
         require(
             revision > 0,
@@ -94,8 +134,8 @@ impl SidebarNameIndex {
             )?;
             if revision == current_revision {
                 require(
-                    next_snapshot == self.snapshot,
-                    "sidebar name snapshot conflicts at the same revision",
+                    next_snapshot == self.snapshot && metadata == self.corpus_metadata,
+                    "sidebar name snapshot or metadata conflicts at the same revision",
                 )?;
                 return Ok(());
             }
@@ -103,6 +143,7 @@ impl SidebarNameIndex {
             // Advancing only the watermark is safe when the canonical dataset
             // is unchanged, and avoids rewriting an identical FTS table.
             if next_snapshot == self.snapshot {
+                self.corpus_metadata = metadata;
                 self.revision = Some(revision);
                 return Ok(());
             }
@@ -134,6 +175,7 @@ impl SidebarNameIndex {
         self.source = Some(source.clone());
         self.revision = Some(revision);
         self.snapshot = next_snapshot;
+        self.corpus_metadata = metadata;
         Ok(())
     }
 
@@ -144,6 +186,15 @@ impl SidebarNameIndex {
     /// always passed as a SQL parameter; operators and quotes remain literal
     /// input to the FTS parser.
     pub fn matches(&self, query: &str) -> Result<Vec<SessionAddress>> {
+        Ok(self
+            .matches_with_scores(query)?
+            .into_iter()
+            .map(|(address, _)| address)
+            .collect())
+    }
+
+    /// Return matches with SQLite FTS5 bm25 values (lower values rank first).
+    pub fn matches_with_scores(&self, query: &str) -> Result<Vec<(SessionAddress, f64)>> {
         require(
             self.revision.is_some(),
             "sidebar name index has no published snapshot",
@@ -161,18 +212,21 @@ impl SidebarNameIndex {
         let mut statement = self
             .connection
             .prepare(
-                "SELECT endpoint_id, session_id
+                "SELECT endpoint_id, session_id, bm25(sidebar_title_fts)
                  FROM sidebar_title_fts
                  WHERE sidebar_title_fts MATCH ?1
-                 ORDER BY endpoint_id, session_id",
+                 ORDER BY bm25(sidebar_title_fts), endpoint_id, session_id",
             )
             .map_err(|error| Error::Protocol(format!("prepare Sidebar title query: {error}")))?;
         let rows = statement
             .query_map([expression], |row| {
-                Ok(SessionAddress {
-                    endpoint_id: row.get(0)?,
-                    session_id: row.get(1)?,
-                })
+                Ok((
+                    SessionAddress {
+                        endpoint_id: row.get(0)?,
+                        session_id: row.get(1)?,
+                    },
+                    row.get::<_, f64>(2)?,
+                ))
             })
             .map_err(|error| Error::Protocol(format!("query Sidebar titles: {error}")))?;
         rows.map(|row| {
@@ -180,4 +234,15 @@ impl SidebarNameIndex {
         })
         .collect()
     }
+}
+
+pub(crate) fn legacy_documents(
+    rows: &[tekes_agent_components_ui::SidebarRow],
+) -> Vec<SidebarNameDocument> {
+    rows.iter()
+        .map(|row| SidebarNameDocument {
+            address: row.address.clone(),
+            title: row.title.clone(),
+        })
+        .collect()
 }

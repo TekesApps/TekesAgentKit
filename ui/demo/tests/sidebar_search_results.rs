@@ -34,6 +34,7 @@ fn inventory() -> SidebarPublication {
     SidebarPublication {
         observation: Default::default(),
         activity_at: Default::default(),
+        name_corpus: None,
         revision: 1,
         loaded: true,
         error: None,

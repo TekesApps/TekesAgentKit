@@ -6,6 +6,7 @@ use tekes_agent_contract::{
     Result, SessionAddress, ThreadActionDefinition, ThreadActionOutcome, ThreadActionRequest,
     ThreadActionsPresentation, require, unsupported,
 };
+use tekes_agent_presentation::SidebarNameCorpus;
 use tekes_agent_web::{SharedAgent, SharedEndpoint};
 use tokio::sync::{mpsc, watch};
 
@@ -87,6 +88,8 @@ pub struct SidebarPublication {
     pub rows: Vec<SidebarRow>,
     /// Canonical effective activity for the full inventory, before display transforms.
     pub activity_at: std::collections::BTreeMap<SessionAddress, f64>,
+    /// Retained-name source captured from this exact inventory frame.
+    pub name_corpus: Option<SidebarNameCorpus>,
     pub loaded: bool,
     pub error: Option<String>,
 }
@@ -175,6 +178,7 @@ impl SidebarBinding {
             observation: SidebarObservation::default(),
             rows: vec![],
             activity_at: Default::default(),
+            name_corpus: None,
             loaded: false,
             error: None,
         }));
@@ -441,6 +445,30 @@ fn publish_inventory_frame(
     // Thread-action host callbacks may inspect this binding. Never invoke them
     // under its lifecycle lock; recheck authority before committing the frame.
     let rows = candidate.read(agent, endpoint, frame)?;
+    let frame_inventory_ready = frame["inventoryReady"].as_bool().unwrap_or(false);
+    let endpoint_id = endpoint.runtime.inspect(|store| store.endpoint_id.clone());
+    let name_corpus = match frame.get("nameCorpus").filter(|value| !value.is_null()) {
+        Some(value) => {
+            let corpus: SidebarNameCorpus = serde_json::from_value(value.clone())?;
+            corpus.validate()?;
+            require(
+                corpus.endpoint_id == endpoint_id,
+                "Sidebar name corpus endpoint mismatch",
+            )?;
+            require(
+                frame["connectionEpoch"].as_u64() == Some(corpus.connection_epoch),
+                "Sidebar name corpus connection epoch mismatch",
+            )?;
+            require(
+                corpus.inventory_ready == frame_inventory_ready,
+                "Sidebar name corpus readiness mismatch",
+            )?;
+            Some(corpus)
+        }
+        // A newer inventory without a corpus is a legacy membership source,
+        // not authority to combine new rows with an older ranking corpus.
+        None => None,
+    };
     let mut state = state.lock().expect("Sidebar observation lock");
     if state.generation != generation || state.failed || state.sender.is_none() {
         return Ok(false);
@@ -452,7 +480,7 @@ fn publish_inventory_frame(
     }
     let revision = state.next_revision()?;
     state.inventory = candidate;
-    let loaded = previous.loaded || frame["inventoryReady"].as_bool().unwrap_or(false);
+    let loaded = previous.loaded || frame_inventory_ready;
     let activity_at = rows
         .iter()
         .map(|row| {
@@ -476,6 +504,7 @@ fn publish_inventory_frame(
             observation,
             rows,
             activity_at,
+            name_corpus,
             loaded,
             error: None,
         }));
@@ -612,24 +641,8 @@ pub(crate) fn inventory_row(
     })
 }
 fn inventory_title(item: &Value, _id: &str) -> String {
-    // Presence is authoritative, including null/empty clears. Never resurrect an
-    // older summary title when the reconciled projection explicitly clears it.
     let canonical = item.get("projections").and_then(|p| p.get("title"));
-    let projected = canonical.or_else(|| item["summary"]["projections"]["values"].get("title"));
-    match projected {
-        Some(value) => trimmed_title(value).unwrap_or("New conversation"),
-        None => trimmed_title(&item["summary"]["title"])
-            .or_else(|| trimmed_title(&item["summary"]["name"]))
-            .unwrap_or("New conversation"),
-    }
-    .to_owned()
-}
-
-fn trimmed_title(value: &Value) -> Option<&str> {
-    value
-        .as_str()
-        .map(str::trim)
-        .filter(|title| !title.is_empty())
+    tekes_agent_presentation::canonical_session_title(&item["summary"], canonical)
 }
 
 #[cfg(test)]

@@ -81,6 +81,7 @@ impl SidebarHostPublication {
         let valid = source.revision >= self.revision
             && source.observation == self.observation
             && source.activity_at == self.activity_at
+            && source.name_corpus == self.name_corpus
             && source.rows.iter().all(|row| {
                 seen.insert(row.address.clone())
                     && self.rows.iter().any(|original| {
@@ -315,6 +316,7 @@ impl SidebarHostBinding {
                 error: source.error.clone(),
                 rows: source.rows.clone(),
                 activity_at: source.activity_at.clone(),
+                name_corpus: None,
             },
             endpoint_count: source.endpoints.len(),
             multi: Some(source.clone()),

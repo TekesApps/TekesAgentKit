@@ -2518,6 +2518,7 @@ impl ComponentDemo {
                 revision: source.revision,
                 rows: source.rows.clone(),
                 activity_at: source.activity_at.clone(),
+                name_corpus: source.name_corpus.clone(),
                 loaded: source.loaded,
                 error: source.error.clone(),
             })
@@ -3242,6 +3243,15 @@ impl ComponentDemo {
     }
     fn sync_sidebar(&mut self) -> Result<()> {
         if let Some(source) = self.sidebar_projection() {
+            let sort = self
+                .tree
+                .get(self.sidebar_id())
+                .expect("Sidebar")
+                .component::<Sidebar>()
+                .expect("Sidebar")
+                .preferences()
+                .preferences
+                .sort;
             let selected = self.current_binding().map(|binding| SessionAddress {
                 endpoint_id: binding.scope().endpoint_id.clone(),
                 session_id: binding.scope().session_id.clone(),
@@ -3280,7 +3290,14 @@ impl ComponentDemo {
                 let endpoint_id = self.binding().scope().endpoint_id.clone();
                 next = self
                     .sidebar_search_projector
-                    .project_for_display(&source_key, &source, &endpoint_id, search, &next)
+                    .project_for_display_with_sort(
+                        &source_key,
+                        &source,
+                        &endpoint_id,
+                        search,
+                        &next,
+                        sort,
+                    )
                     .map_err(unsupported)?
                     .input;
             }
@@ -3299,7 +3316,13 @@ impl ComponentDemo {
                     .clone();
                 let projected = self
                     .sidebar_search_projector
-                    .project_multi_for_display(&source_key, &inventory, search, &next)
+                    .project_multi_for_display_with_sort(
+                        &source_key,
+                        &inventory,
+                        search,
+                        &next,
+                        sort,
+                    )
                     .map_err(unsupported)?;
                 next = projected.input.clone();
                 Some(projected)

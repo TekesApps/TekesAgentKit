@@ -308,6 +308,7 @@ async fn folder_publications_and_filter_preserve_composition_while_header_naviga
     let source = SidebarPublication {
         observation: Default::default(),
         activity_at: Default::default(),
+        name_corpus: None,
         revision: 1,
         loaded: true,
         error: None,

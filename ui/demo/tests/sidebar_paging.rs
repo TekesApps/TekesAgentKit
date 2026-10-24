@@ -104,7 +104,7 @@ fn ordinary_refresh_invalidates_page_callback_and_does_not_reset_requested_count
     assert_eq!(sidebar.paging().limit, 5);
 }
 #[test]
-fn search_is_not_repaged_or_supplemented_and_folder_filter_applies_to_pins() {
+fn search_is_bounded_without_selection_supplement_and_folder_filter_applies_to_pins() {
     let input = input();
     let prefs = SidebarPreferences::default();
     let (out, facts) = sidebar_paged_outline(
@@ -117,8 +117,8 @@ fn search_is_not_repaged_or_supplemented_and_folder_filter_applies_to_pins() {
         true,
     )
     .unwrap();
-    assert_eq!(out.sessions.len(), 12);
-    assert!(!facts.has_more);
+    assert_eq!(out.sessions.len(), 5);
+    assert!(facts.has_more);
     assert!(!facts.selected_supplemented);
     let key = SidebarFolderKey {
         endpoint_id: "fixture".into(),
@@ -329,6 +329,7 @@ async fn demo_repeated_filter_resets_page_without_touching_chinese_preedit_or_fo
     view.set_sidebar_source(Arc::new(SidebarPublication {
         observation: Default::default(),
         activity_at: Default::default(),
+        name_corpus: None,
         revision: 1,
         loaded: true,
         error: None,

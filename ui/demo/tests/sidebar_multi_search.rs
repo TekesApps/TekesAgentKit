@@ -640,3 +640,114 @@ async fn multi_name_fts_preserves_full_addresses_when_every_provider_is_unsuppor
     assert!(mounted.row_id(&address("endpoint-a", "a")).is_some());
     assert!(mounted.row_id(&address("endpoint-b", "a")).is_some());
 }
+
+#[tokio::test]
+async fn retained_multi_inventory_ranks_globally_before_paging_and_preserves_partial_membership() {
+    use tekes_agent_components_ui::SidebarSort;
+    let (agent, inventory, search, fixture_a, fixture_b) = setup(true, true).await;
+    fixture_a
+        .publish_inventory_summary(
+            json!({"sessionId":"a","title":"needle","updatedAt":1,"status":"active","running":false,"blank":false}),
+        )
+        .unwrap();
+    fixture_b.publish_inventory_summary(json!({"sessionId":"a","title":"needle many other words","updatedAt":10000,"status":"active","running":false,"blank":false})).unwrap();
+    fixture_a.install_unannounced_session("hidden-child", "needle retained child");
+    fixture_a.publish_inventory_summary(json!({"sessionId":"hidden-child","title":"needle retained child","origin":"subagent","updatedAt":20000,"status":"active","running":false,"blank":false})).unwrap();
+    let mut changes = inventory.subscribe();
+    tokio::time::timeout(Duration::from_secs(4), async {
+        loop {
+            let snapshot = inventory.snapshot();
+            if snapshot
+                .name_corpora
+                .get("endpoint-a")
+                .is_some_and(|corpus| {
+                    corpus
+                        .documents
+                        .iter()
+                        .any(|doc| doc.address.session_id == "hidden-child")
+                })
+                && snapshot.rows.iter().any(|row| {
+                    row.address == address("endpoint-b", "a")
+                        && row.title == "needle many other words"
+                })
+            {
+                break;
+            }
+            changes.changed().await.unwrap();
+        }
+    })
+    .await
+    .unwrap();
+    for fixture in [&fixture_a, &fixture_b] {
+        fixture.set_search_result(
+            "needle",
+            json!({"items":[{"sessionId":"b","snippet":"body-only"}],"hasMore":false}),
+        );
+    }
+    search.set_query("needle").unwrap();
+    wait_search(&search, complete).await;
+    let snapshot = inventory.snapshot();
+    let projected = snapshot
+        .project_multi_search_for_display_with_sort(
+            &search.snapshot(),
+            &snapshot.input(None),
+            SidebarSort::RecentActivity,
+        )
+        .unwrap();
+    let ids: Vec<_> = projected
+        .input
+        .rows
+        .iter()
+        .map(|row| row.address.clone())
+        .collect();
+    assert_eq!(
+        &ids[..2],
+        &[address("endpoint-a", "a"), address("endpoint-b", "a")]
+    );
+    assert_eq!(ids.len(), 4);
+    assert!(
+        !ids.iter()
+            .any(|address| address.session_id == "hidden-child")
+    );
+    assert!(projected.help.local_results_ready);
+    let (page, facts) = tekes_agent_components_ui::sidebar_paged_outline(
+        &projected.input.rows,
+        &Default::default(),
+        None,
+        None,
+        None,
+        1,
+        true,
+    )
+    .unwrap();
+    assert_eq!(page.sessions[0].address, address("endpoint-a", "a"));
+    assert!(facts.has_more);
+    let mut partial = snapshot.as_ref().clone();
+    partial.revision += 1;
+    partial.name_corpora.remove("endpoint-b");
+    let partial = partial
+        .project_multi_search_for_display_with_sort(
+            &search.snapshot(),
+            &partial.input(None),
+            SidebarSort::RecentActivity,
+        )
+        .unwrap();
+    assert!(!partial.help.local_results_ready);
+    assert!(
+        partial
+            .input
+            .rows
+            .iter()
+            .any(|row| row.address == address("endpoint-b", "a")),
+        "known local title still matches while global ranking is incomplete"
+    );
+    for endpoint in ["endpoint-a", "endpoint-b"] {
+        agent
+            .endpoint(endpoint)
+            .unwrap()
+            .runtime
+            .stop()
+            .await
+            .unwrap();
+    }
+}

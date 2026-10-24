@@ -531,6 +531,7 @@ async fn actual_demo_navigation_uses_existing_revision_and_never_turns_sync_into
     let mut source = SidebarPublication {
         observation: Default::default(),
         activity_at: Default::default(),
+        name_corpus: None,
         revision: 1,
         loaded: true,
         error: None,

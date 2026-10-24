@@ -26,6 +26,8 @@ pub use sidebar_multi::*;
 pub use sidebar_multi_search::*;
 pub use sidebar_selected::*;
 mod sidebar_name_search;
+#[cfg(test)]
+mod sidebar_ranked_search_tests;
 pub use sidebar_name_search::*;
 mod sidebar_search;
 pub use sidebar_search::*;

@@ -11,6 +11,7 @@ pub use tekes_agent_presentation::{
     SidebarMultiSearchInput, SidebarMultiSearchIntent, SidebarMultiSearchKey,
     SidebarMultiSearchPublication,
 };
+use tekes_agent_presentation::{SidebarNameDocument, SidebarSort};
 
 /// One child keeps its original single-endpoint state and aggregate query key.
 #[derive(Clone, Debug, PartialEq)]
@@ -41,12 +42,27 @@ impl SidebarMultiPublication {
         search: &SidebarMultiSearchPublication,
         display: &SidebarInput,
     ) -> Result<SidebarMultiSearchProjection, &'static str> {
+        self.project_multi_search_for_display_with_sort(
+            search,
+            display,
+            // Preserve the historical membership-only convenience API.
+            SidebarSort::TitleAscending,
+        )
+    }
+
+    pub fn project_multi_search_for_display_with_sort(
+        &self,
+        search: &SidebarMultiSearchPublication,
+        display: &SidebarInput,
+        sort: SidebarSort,
+    ) -> Result<SidebarMultiSearchProjection, &'static str> {
         let owner = std::sync::Arc::new(());
-        SidebarSearchProjector::default().project_multi_for_display(
+        SidebarSearchProjector::default().project_multi_for_display_with_sort(
             &SidebarObserverSourceKey::from_owner(&owner),
             self,
             search,
             display,
+            sort,
         )
     }
 }
@@ -58,6 +74,24 @@ impl SidebarSearchProjector {
         search: &SidebarMultiSearchPublication,
         display: &SidebarInput,
     ) -> Result<SidebarMultiSearchProjection, &'static str> {
+        self.project_multi_for_display_with_sort(
+            source,
+            inventory,
+            search,
+            display,
+            // Preserve the historical membership-only convenience API.
+            SidebarSort::TitleAscending,
+        )
+    }
+
+    pub fn project_multi_for_display_with_sort(
+        &mut self,
+        source: &SidebarObserverSourceKey,
+        inventory: &SidebarMultiPublication,
+        search: &SidebarMultiSearchPublication,
+        display: &SidebarInput,
+        sort: SidebarSort,
+    ) -> Result<SidebarMultiSearchProjection, &'static str> {
         if inventory.revision == 0 || display.revision == 0 {
             return Err("invalid multi-search display source");
         }
@@ -68,14 +102,100 @@ impl SidebarSearchProjector {
         validate_multi_search(search, &inventory.endpoints)?;
 
         let endpoint_ids: BTreeSet<_> = inventory.endpoints.keys().cloned().collect();
-        let local =
-            self.local_matches(source, inventory.revision, &inventory.rows, &search.query)?;
+        let mut documents = Vec::<SidebarNameDocument>::new();
+        let mut epochs = BTreeMap::new();
+        let mut common_domain: Option<Vec<String>> = None;
+        let mut all_corpora_ready = !inventory.name_corpora.is_empty();
+        for (endpoint_id, corpus) in &inventory.name_corpora {
+            corpus
+                .validate()
+                .map_err(|_| "invalid multi-endpoint Sidebar name corpus")?;
+            if &corpus.endpoint_id != endpoint_id {
+                return Err("Sidebar name corpus endpoint key mismatch");
+            }
+            if let Some(domain) = &common_domain {
+                if *domain != corpus.endpoint_domain {
+                    return Err("Sidebar name corpus domains conflict");
+                }
+            } else {
+                common_domain = Some(corpus.endpoint_domain.clone());
+            }
+            epochs.insert(endpoint_id.clone(), corpus.connection_epoch);
+            all_corpora_ready &= corpus.inventory_ready;
+            documents.extend(corpus.documents.iter().cloned());
+        }
+        if inventory
+            .name_corpora
+            .keys()
+            .any(|id| !endpoint_ids.contains(id))
+        {
+            return Err("Sidebar name corpus escaped the inventory domain");
+        }
+        // Legacy/missing children still contribute their known row names to
+        // membership. Their partial corpus is never used for global ranking.
+        documents.extend(crate::sidebar_name_search::legacy_documents(
+            &inventory
+                .rows
+                .iter()
+                .filter(|row| {
+                    !inventory
+                        .name_corpora
+                        .contains_key(&row.address.endpoint_id)
+                })
+                .cloned()
+                .collect::<Vec<_>>(),
+        ));
+        let expected_domain: Vec<_> = endpoint_ids.iter().cloned().collect();
+        let rank_ready = all_corpora_ready
+            && inventory.name_corpora.len() == endpoint_ids.len()
+            && common_domain.as_ref() == Some(&expected_domain)
+            && epochs.keys().cloned().collect::<BTreeSet<_>>() == endpoint_ids;
+        let local_scores = if inventory.name_corpora.is_empty() {
+            let documents = crate::sidebar_name_search::legacy_documents(&inventory.rows);
+            if self.index.is_none() {
+                self.index = Some(
+                    crate::SidebarNameIndex::new()
+                        .map_err(|_| "cannot create Sidebar title FTS index")?,
+                );
+            }
+            let index = self.index.as_mut().unwrap();
+            index
+                .replace_snapshot(source, inventory.revision, &documents)
+                .map_err(|_| "invalid Sidebar title index snapshot")?;
+            index
+                .matches_with_scores(&search.query)
+                .map_err(|_| "cannot query Sidebar title FTS index")?
+        } else {
+            if self.index.is_none() {
+                self.index = Some(
+                    crate::SidebarNameIndex::new()
+                        .map_err(|_| "cannot create Sidebar title FTS index")?,
+                );
+            }
+            let index = self.index.as_mut().unwrap();
+            index
+                .replace_ranked_snapshot(
+                    source,
+                    inventory.revision,
+                    &documents,
+                    epochs,
+                    common_domain.unwrap_or_default(),
+                    all_corpora_ready,
+                )
+                .map_err(|_| "invalid Sidebar retained-name corpus")?;
+            index
+                .matches_with_scores(&search.query)
+                .map_err(|_| "cannot query Sidebar title FTS index")?
+        };
+        let scores: BTreeMap<_, _> = local_scores.iter().cloned().collect();
+        let local: BTreeSet<_> = scores.keys().cloned().collect();
         let mut local_results_ready = true;
         let mut results_ready = true;
         let mut permitted = BTreeSet::new();
         let mut snippets = BTreeMap::new();
         let mut unresolved = Vec::new();
         let mut children = BTreeMap::new();
+        let mut provider_only = BTreeSet::new();
 
         for child in &search.children {
             let endpoint_id = child.endpoint_id.as_str();
@@ -94,6 +214,7 @@ impl SidebarSearchProjector {
                     .filter(|(address, _)| address.endpoint_id == endpoint_id)
                     .map(|(address, activity)| (address.clone(), *activity))
                     .collect(),
+                name_corpus: inventory.name_corpora.get(endpoint_id).cloned(),
                 loaded: inventory.endpoints[endpoint_id].loaded,
                 error: inventory.endpoints[endpoint_id].error.clone(),
             };
@@ -104,6 +225,19 @@ impl SidebarSearchProjector {
                 display,
                 &local,
             )?;
+            if matches!(
+                child.publication.input.phase,
+                tekes_agent_components_ui::SidebarSearchPhase::Complete { .. }
+            ) {
+                provider_only.extend(
+                    child
+                        .publication
+                        .hits
+                        .iter()
+                        .filter(|hit| !scores.contains_key(&hit.address))
+                        .map(|hit| hit.address.clone()),
+                );
+            }
             if let Some(help) = &projection.input.search_help {
                 local_results_ready &= help.local_results_ready;
                 results_ready &= help.results_ready;
@@ -129,6 +263,17 @@ impl SidebarSearchProjector {
         input.revision = display.revision;
         input.folder_filter = display.folder_filter.clone();
         input.rows.retain(|row| permitted.contains(&row.address));
+        if sort == SidebarSort::RecentActivity && rank_ready {
+            crate::sidebar_search::order_recent(
+                &mut input.rows,
+                &inventory.activity_at,
+                &scores,
+                &provider_only,
+            );
+        }
+        if !inventory.name_corpora.is_empty() {
+            local_results_ready &= rank_ready;
+        }
         input.search_help = None;
 
         // Guard against malformed aggregate inventory rows/activity omitted

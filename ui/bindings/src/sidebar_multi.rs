@@ -11,6 +11,7 @@ use std::{
 };
 use tekes_agent_components_ui::{SidebarFolderOption, SidebarInput, SidebarRow};
 use tekes_agent_contract::{Result, SessionAddress, ThreadActionDefinition, require, unsupported};
+use tekes_agent_presentation::SidebarNameCorpus;
 use tekes_agent_web::SharedAgent;
 use tokio::{
     sync::{mpsc, watch},
@@ -46,6 +47,8 @@ pub struct SidebarMultiPublication {
     pub revision: u64,
     pub rows: Vec<SidebarRow>,
     pub activity_at: BTreeMap<SessionAddress, f64>,
+    /// Retained-name corpus from each original child endpoint publication.
+    pub name_corpora: BTreeMap<String, SidebarNameCorpus>,
     /// Initial aggregation has converged when every endpoint published once or
     /// reached a terminal observer error; inspect endpoint status for health.
     pub loaded: bool,
@@ -463,7 +466,16 @@ fn aggregate_publication(
     let mut activity_at = BTreeMap::new();
     let mut addresses = BTreeSet::new();
     let mut endpoints = BTreeMap::new();
+    let mut name_corpora = BTreeMap::new();
     for (endpoint_id, source) in endpoint_ids.iter().zip(sources) {
+        if let Some(corpus) = &source.name_corpus {
+            require(
+                corpus.endpoint_id == *endpoint_id,
+                "Sidebar name corpus escaped its endpoint partition",
+            )?;
+            corpus.validate()?;
+            name_corpora.insert(endpoint_id.clone(), corpus.clone());
+        }
         let observer_stale = source.observation.phase != SidebarObserverPhase::Observing;
         for row in &source.rows {
             require(
@@ -517,6 +529,7 @@ fn aggregate_publication(
         revision,
         rows,
         activity_at,
+        name_corpora,
         loaded,
         error: (!errors.is_empty()).then(|| errors.join("; ")),
         endpoints,
@@ -580,6 +593,7 @@ mod tests {
             revision,
             rows,
             activity_at,
+            name_corpus: None,
             loaded,
             error: error.map(str::to_owned),
             observation: SidebarObservation {
@@ -601,6 +615,7 @@ mod tests {
             revision,
             rows: vec![row],
             activity_at,
+            name_corpus: None,
             loaded: false,
             error: Some("previous observer failed".into()),
             observation: SidebarObservation {

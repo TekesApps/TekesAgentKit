@@ -42,6 +42,42 @@ fn active_inventory(state: &MemoryProjectionStore) -> Vec<Value> {
         .collect()
 }
 
+/// Builds the retained name corpus from the same canonical store snapshot as inventory rows.
+/// Display membership, archive status, and session classifications do not filter this source.
+pub fn retained_name_corpus(
+    state: &MemoryProjectionStore,
+    endpoint_domain: impl IntoIterator<Item = String>,
+) -> Result<tekes_agent_presentation::SidebarNameCorpus> {
+    let mut endpoint_domain: Vec<_> = endpoint_domain.into_iter().collect();
+    endpoint_domain.sort();
+    let mut documents = Vec::new();
+    for (session_id, session) in &state.sessions {
+        if let Some(summary) = session.summary.as_ref() {
+            require(
+                summary.is_object(),
+                &format!("invalid retained session summary for {session_id}"),
+            )?;
+            let projected_title = session.projections.get("title").map(|value| &value.value);
+            documents.push(tekes_agent_presentation::SidebarNameDocument {
+                address: SessionAddress {
+                    endpoint_id: state.endpoint_id.clone(),
+                    session_id: session_id.clone(),
+                },
+                title: tekes_agent_presentation::canonical_session_title(summary, projected_title),
+            });
+        }
+    }
+    let corpus = tekes_agent_presentation::SidebarNameCorpus {
+        endpoint_id: state.endpoint_id.clone(),
+        connection_epoch: state.connection_epoch,
+        inventory_ready: state.inventory_ready,
+        endpoint_domain,
+        documents,
+    };
+    corpus.validate()?;
+    Ok(corpus)
+}
+
 /// Typed public read projection; the durable original text is retained for other consumers.
 pub fn present_annotations(transcript: &mut Value) {
     if let Some(items) = transcript.get_mut("items").and_then(Value::as_array_mut) {
@@ -150,6 +186,211 @@ mod tests {
             active_inventory(&store)[0]["projections"]["title"],
             Value::Null
         );
+    }
+
+    #[test]
+    fn retained_name_corpus_keeps_hidden_names_without_changing_inventory_membership() {
+        let mut store = MemoryProjectionStore::new("one");
+        store.connection_epoch = 7;
+        store.inventory_ready = true;
+        store.archived_session_ids.push("archived".into());
+        for (id, summary) in [
+            (
+                "visible",
+                json!({"sessionId":"visible","title":"old visible"}),
+            ),
+            (
+                "archived",
+                json!({"sessionId":"archived","status":"archived","title":"Archive name"}),
+            ),
+            (
+                "child",
+                json!({"sessionId":"child","origin":"subagent","title":"Child name"}),
+            ),
+            (
+                "ephemeral",
+                json!({"sessionId":"ephemeral","ephemeral":true,"title":"Temporary name"}),
+            ),
+        ] {
+            store.sessions.insert(
+                id.into(),
+                SessionProjection {
+                    summary: Some(summary),
+                    ..Default::default()
+                },
+            );
+        }
+        store
+            .sessions
+            .insert("no-summary".into(), SessionProjection::default());
+        store
+            .sessions
+            .get_mut("visible")
+            .unwrap()
+            .projections
+            .insert(
+                "title".into(),
+                tekes_agent_session::VersionedValue {
+                    sequence: 1,
+                    value: json!("Renamed"),
+                },
+            );
+
+        let rows = active_inventory(&store);
+        assert_eq!(rows.len(), 3, "existing API membership remains unchanged");
+        let corpus = retained_name_corpus(&store, ["two".into(), "one".into()]).unwrap();
+        assert_eq!(corpus.connection_epoch, 7);
+        assert!(corpus.inventory_ready);
+        assert_eq!(corpus.endpoint_domain, vec!["one", "two"]);
+        assert_eq!(corpus.documents.len(), 4);
+        let titles: BTreeMap<_, _> = corpus
+            .documents
+            .iter()
+            .map(|d| (d.address.session_id.as_str(), d.title.as_str()))
+            .collect();
+        assert_eq!(titles["visible"], "Renamed");
+        assert_eq!(titles["archived"], "Archive name");
+        assert_eq!(titles["child"], "Child name");
+        assert_eq!(titles["ephemeral"], "Temporary name");
+        assert!(!titles.contains_key("no-summary"));
+    }
+
+    #[test]
+    fn retained_corpus_tracks_canonical_clear_and_actual_deletion() {
+        let mut store = MemoryProjectionStore::new("one");
+        store.sessions.insert(
+            "same-id".into(),
+            SessionProjection {
+                summary: Some(json!({"title":"legacy title","name":"legacy name"})),
+                ..Default::default()
+            },
+        );
+        let domain = ["one".to_owned()];
+        assert_eq!(
+            retained_name_corpus(&store, domain.clone())
+                .unwrap()
+                .documents[0]
+                .title,
+            "legacy title"
+        );
+
+        store
+            .sessions
+            .get_mut("same-id")
+            .unwrap()
+            .projections
+            .insert(
+                "title".into(),
+                tekes_agent_session::VersionedValue {
+                    sequence: 2,
+                    value: Value::Null,
+                },
+            );
+        assert_eq!(
+            retained_name_corpus(&store, domain.clone())
+                .unwrap()
+                .documents[0]
+                .title,
+            "New conversation"
+        );
+        store.sessions.remove("same-id");
+        assert!(
+            retained_name_corpus(&store, domain)
+                .unwrap()
+                .documents
+                .is_empty()
+        );
+
+        let other_endpoint = MemoryProjectionStore::new("two");
+        let mut other_endpoint = other_endpoint;
+        other_endpoint.sessions.insert(
+            "same-id".into(),
+            SessionProjection {
+                summary: Some(json!({"title":"other endpoint"})),
+                ..Default::default()
+            },
+        );
+        let mut first_endpoint = MemoryProjectionStore::new("one");
+        first_endpoint.sessions.insert(
+            "same-id".into(),
+            SessionProjection {
+                summary: Some(json!({"title":"first endpoint"})),
+                ..Default::default()
+            },
+        );
+        let one = retained_name_corpus(&first_endpoint, ["one".into(), "two".into()]).unwrap();
+        let two = retained_name_corpus(&other_endpoint, ["one".into(), "two".into()]).unwrap();
+        assert!(
+            one.validate().is_ok() && two.validate().is_ok(),
+            "same session IDs are scoped by endpoint"
+        );
+        assert_ne!(one.documents[0].address, two.documents[0].address);
+    }
+
+    #[tokio::test]
+    async fn public_inventory_frame_pairs_rows_and_retained_corpus_from_one_snapshot() {
+        let mut agent = SharedAgent::default();
+        agent
+            .register("one".into(), "test".into(), "One".into(), Arc::new(Offline))
+            .unwrap();
+        agent
+            .register("two".into(), "test".into(), "Two".into(), Arc::new(Offline))
+            .unwrap();
+        let shared = agent.endpoints.get("one").unwrap();
+
+        let mut store = MemoryProjectionStore::new("one");
+        store.connection_epoch = 9;
+        store.inventory_ready = true;
+        store.archived_session_ids.push("archived".into());
+        store.sessions.insert(
+            "visible".into(),
+            SessionProjection {
+                summary: Some(json!({"sessionId":"visible","title":"Visible"})),
+                ..Default::default()
+            },
+        );
+        store.sessions.insert(
+            "archived".into(),
+            SessionProjection {
+                summary: Some(json!({"sessionId":"archived","title":"Hidden name"})),
+                ..Default::default()
+            },
+        );
+
+        let frame = agent.inventory(shared, &store).unwrap();
+        assert_eq!(frame["sessions"].as_array().unwrap().len(), 1);
+        assert_eq!(frame["inventoryReady"], true);
+        assert_eq!(frame["nameCorpus"]["endpointId"], "one");
+        assert_eq!(frame["nameCorpus"]["connectionEpoch"], 9);
+        assert_eq!(frame["nameCorpus"]["endpointDomain"], json!(["one", "two"]));
+        assert_eq!(
+            frame["nameCorpus"]["documents"].as_array().unwrap().len(),
+            2
+        );
+        assert!(
+            frame["nameCorpus"]["documents"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|document| document["address"]["session_id"] == "archived"
+                    && document["title"] == "Hidden name")
+        );
+    }
+
+    #[test]
+    fn retained_corpus_rejects_invalid_summaries_and_unregistered_source() {
+        let mut store = MemoryProjectionStore::new("one");
+        store.sessions.insert(
+            "bad".into(),
+            SessionProjection {
+                summary: Some(Value::Null),
+                ..Default::default()
+            },
+        );
+        assert!(retained_name_corpus(&store, ["one".into()]).is_err());
+
+        store.sessions.clear();
+        assert!(retained_name_corpus(&store, ["two".into()]).is_err());
     }
 }
 
@@ -260,12 +501,15 @@ impl SharedAgent {
         self.invalidate_thread_inventory();
         Ok(())
     }
-    fn inventory(&self, shared: &SharedEndpoint, state: &MemoryProjectionStore) -> Value {
+    fn inventory(&self, shared: &SharedEndpoint, state: &MemoryProjectionStore) -> Result<Value> {
         let sessions: Vec<Value> = active_inventory(state)
             .into_iter()
             .map(|row| self.decorate_inventory_row(state, row))
             .collect();
-        json!({"description":shared.description(),"sessions":sessions,"inventoryReady":state.inventory_ready})
+        let name_corpus = retained_name_corpus(state, self.endpoints.keys().cloned())?;
+        Ok(
+            json!({"description":shared.description(),"sessions":sessions,"inventoryReady":state.inventory_ready,"connectionEpoch":state.connection_epoch,"nameCorpus":name_corpus}),
+        )
     }
     fn decorate_inventory_row(&self, state: &MemoryProjectionStore, row: Value) -> Value {
         let id = row["sessionId"].as_str().expect("inventory identity");
@@ -670,7 +914,7 @@ impl SharedAgent {
                     present_annotations(&mut transcript);
                     json!({"endpoint":state.endpoint_id,"sessionId":id,"run":RunPresentation::read(&state,&scope,true),"transcript":transcript})
                 } else {
-                    self.inventory(&shared, &state)
+                    self.inventory(&shared, &state)?
                 };
                 if output.send(value).await.is_err() {
                     break;

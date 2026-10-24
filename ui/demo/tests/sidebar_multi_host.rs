@@ -83,6 +83,21 @@ async fn component_demo_uses_multi_inventory_action_routing_and_owner_fences() {
         Arc::new(SidebarHostBinding::new(agent.clone(), ["endpoint-a", "endpoint-b"]).unwrap());
     loaded(&host).await;
     let first_publication = host.snapshot();
+    let corpora = first_publication
+        .as_multi_publication()
+        .unwrap()
+        .name_corpora;
+    assert_eq!(corpora.len(), 2);
+    for (endpoint_id, corpus) in &corpora {
+        assert_eq!(&corpus.endpoint_id, endpoint_id);
+        assert_eq!(corpus.endpoint_domain, ["endpoint-a", "endpoint-b"]);
+        assert!(
+            corpus
+                .documents
+                .iter()
+                .all(|document| &document.address.endpoint_id == endpoint_id)
+        );
+    }
     let mut forged = first_publication.as_publication();
     forged.revision += 1;
     forged.rows[0].title = "forged source row".into();

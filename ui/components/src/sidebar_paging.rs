@@ -43,11 +43,7 @@ pub fn sidebar_paged_outline<'a>(
                 && filter.is_none_or(|key| key == &r.folder_key())
         })
         .collect();
-    let mut members: BTreeSet<_> = ordinary
-        .iter()
-        .take(if searching { usize::MAX } else { limit })
-        .map(|r| &r.address)
-        .collect();
+    let mut members: BTreeSet<_> = ordinary.iter().take(limit).map(|r| &r.address).collect();
     let supplement = !searching
         && selected
             .is_some_and(|id| !members.contains(id) && ordinary.iter().any(|r| &r.address == id));
@@ -65,7 +61,7 @@ pub fn sidebar_paged_outline<'a>(
         SidebarPagingFacts {
             limit,
             ordinary_count: ordinary.len(),
-            has_more: !searching && ordinary.len() > limit,
+            has_more: ordinary.len() > limit,
             selected_supplemented: supplement,
         },
     ))

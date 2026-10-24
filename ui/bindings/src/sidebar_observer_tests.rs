@@ -594,3 +594,79 @@ async fn display_packet_keys_cannot_be_reminted_or_reused_for_a_later_failure() 
             .is_ok()
     );
 }
+
+#[tokio::test]
+async fn inventory_corpus_is_atomic_validated_and_not_reused_for_legacy_frames() {
+    let (agent, _, binding) = setup().await;
+    let original = binding.snapshot();
+    let corpus = original
+        .name_corpus
+        .as_ref()
+        .expect("production inventory corpus");
+    assert_eq!(corpus.endpoint_id, "owned-observer-fixture");
+    assert_eq!(corpus.documents.len(), 1);
+    let generation = binding.observer_generation();
+    let mut frame = json!({
+        "description":{"id":"owned-observer-fixture"},
+        "sessions":[],"inventoryReady":true,
+        "connectionEpoch":corpus.connection_epoch,
+        "nameCorpus":corpus
+    });
+    frame["nameCorpus"]["connectionEpoch"] = json!(corpus.connection_epoch + 1);
+    assert!(
+        publish_inventory_frame(
+            &binding.observation,
+            &agent,
+            &binding.endpoint,
+            generation,
+            &frame
+        )
+        .is_err()
+    );
+    assert_eq!(
+        binding.snapshot(),
+        original,
+        "invalid paired source does not publish rows"
+    );
+    frame["nameCorpus"]["connectionEpoch"] = json!(corpus.connection_epoch);
+    frame["nameCorpus"]["inventoryReady"] = json!(false);
+    assert!(
+        publish_inventory_frame(
+            &binding.observation,
+            &agent,
+            &binding.endpoint,
+            generation,
+            &frame
+        )
+        .is_err()
+    );
+    assert_eq!(binding.snapshot(), original);
+    frame["nameCorpus"]["inventoryReady"] = json!(true);
+    assert!(
+        publish_inventory_frame(
+            &binding.observation,
+            &agent,
+            &binding.endpoint,
+            generation,
+            &frame
+        )
+        .unwrap()
+    );
+    assert_eq!(binding.snapshot().name_corpus.as_ref(), Some(corpus));
+    frame.as_object_mut().unwrap().remove("nameCorpus");
+    assert!(
+        publish_inventory_frame(
+            &binding.observation,
+            &agent,
+            &binding.endpoint,
+            generation,
+            &frame
+        )
+        .unwrap()
+    );
+    assert!(
+        binding.snapshot().name_corpus.is_none(),
+        "new legacy rows cannot reuse an old corpus"
+    );
+    binding.runtime().stop().await.unwrap();
+}

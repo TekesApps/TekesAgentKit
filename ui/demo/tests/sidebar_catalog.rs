@@ -37,6 +37,7 @@ fn source() -> SidebarPublication {
         revision: 1,
         rows,
         activity_at,
+        name_corpus: None,
         loaded: true,
         error: None,
     }
