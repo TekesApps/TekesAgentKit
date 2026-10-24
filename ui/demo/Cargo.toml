@@ -36,4 +36,5 @@ objc2-foundation = { version = "=0.3.2", default-features = false, features = ["
 rfd = { version = "=0.17.2", default-features = false }
 
 [dev-dependencies]
+sha2 = "=0.10.9"
 tekes-agent-ui-consumer-check.workspace = true

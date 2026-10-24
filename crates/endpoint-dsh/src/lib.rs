@@ -2,6 +2,7 @@
 mod extensions;
 mod history;
 mod multipart;
+mod queue;
 mod remote;
 use async_trait::async_trait;
 use futures_util::{StreamExt, stream};
@@ -146,6 +147,7 @@ struct FollowState {
 }
 impl FollowState {
     async fn normalize(&mut self, value: Value) -> Result<()> {
+        queue::reject_reserved_anywhere(&value)?;
         let generation = &self.generation;
         match &self.target {
             StreamTarget::WorkspaceInventory => {
@@ -192,6 +194,12 @@ impl FollowState {
                         require(!self.began, "duplicate DSH journal snapshot")?;
                         self.began = true;
                         let entries = decode_records(array(&value, "records")?)?;
+                        let projections = value
+                            .get("projections")
+                            .filter(|v| !v.is_null())
+                            .map(queue::normalize_projection)
+                            .transpose()?
+                            .flatten();
                         let snapshot = JournalSnapshot {
                             session_id: id.clone(),
                             generation: generation.clone(),
@@ -199,11 +207,7 @@ impl FollowState {
                             window_limit: *max_messages,
                             entries,
                             has_more_before: boolean(&value, "hasMore")?,
-                            projections: value
-                                .get("projections")
-                                .filter(|v| !v.is_null())
-                                .map(|v| serde_json::from_value(v.clone()))
-                                .transpose()?,
+                            projections: projections.map(serde_json::from_value).transpose()?,
                             history_revision: None,
                         };
                         snapshot.validate()?;
@@ -223,7 +227,11 @@ impl FollowState {
                     }
                     "projection" => {
                         require(self.began, "DSH projection before snapshot")?;
-                        self.pending.push_back(json!({"type":"projection","generation":generation,"frame":{"sessionId":id,"key":value["key"],"value":value["value"],"seq":value["seq"]}}));
+                        let seq = integer(&value, "seq")?;
+                        let key = string(&value, "key")?;
+                        let projections =
+                            queue::normalize_projection_delta(key, &value["value"], seq)?;
+                        self.pending.push_back(json!({"type":"projection-block","generation":generation,"sessionId":id,"projections":projections}));
                     }
                     "assistant-stream" => {
                         require(self.began, "assistant stream before snapshot")?;
@@ -251,7 +259,22 @@ impl FollowState {
                             .map(|(id, value)| json!({"sessionId":id,field:value}))
                             .collect())
                     };
-                    self.pending.push_back(json!({"type":"baseline","generation":generation,"snapshot":{"queues":states("queues","items")?,"jobs":states("jobs","jobs")?,"projections":states("projections","projections")?}}));
+                    let projection_states = || -> Result<Vec<Value>> {
+                        let Some(values) = baseline.get("projections") else {
+                            return Ok(Vec::new());
+                        };
+                        let map = values.as_object().ok_or_else(|| {
+                            Error::Protocol("invalid DSH control projection map".into())
+                        })?;
+                        let mut states = Vec::new();
+                        for (id, value) in map {
+                            if let Some(projections) = queue::normalize_projection(value)? {
+                                states.push(json!({"sessionId":id,"projections":projections}));
+                            }
+                        }
+                        Ok(states)
+                    };
+                    self.pending.push_back(json!({"type":"baseline","generation":generation,"snapshot":{"queues":states("queues","items")?,"jobs":states("jobs","jobs")?,"projections":projection_states()?}}));
                 }
                 "queue" | "jobs" => {
                     require(self.began, "control delta before baseline")?;
@@ -261,7 +284,12 @@ impl FollowState {
                 }
                 "projection" => {
                     require(self.began, "projection before baseline")?;
-                    self.pending.push_back(json!({"type":"projection","generation":generation,"state":{"sessionId":value["sessionId"],"projections":{"asOfSeq":value["seq"],"values":{string(&value,"key")?:value["value"]}}}}));
+                    let projections = queue::normalize_projection_delta(
+                        string(&value, "key")?,
+                        &value["value"],
+                        integer(&value, "seq")?,
+                    )?;
+                    self.pending.push_back(json!({"type":"projection","generation":generation,"state":{"sessionId":value["sessionId"],"projections":projections}}));
                 }
                 _ => return Err(Error::Protocol("unknown DSH control frame".into())),
             },
@@ -276,6 +304,7 @@ impl FollowState {
                                 .remote
                                 .call("session/list", json!({"_request":{}}), &rpc())
                                 .await?;
+                            queue::reject_reserved_anywhere(&snapshot)?;
                             let mut cursor = snapshot
                                 .get("nextCursor")
                                 .and_then(Value::as_str)
@@ -291,6 +320,7 @@ impl FollowState {
                                         &rpc(),
                                     )
                                     .await?;
+                                queue::reject_reserved_anywhere(&page)?;
                                 snapshot["items"]
                                     .as_array_mut()
                                     .ok_or_else(|| Error::Protocol("invalid inventory".into()))?
@@ -300,6 +330,7 @@ impl FollowState {
                                     .and_then(Value::as_str)
                                     .map(String::from);
                             }
+                            queue::normalize_inventory_snapshot(&mut snapshot)?;
                             self.pending.push_back(json!({"type":"baseline","generation":generation,"snapshot":snapshot}));
                         } else {
                             self.pending
@@ -312,9 +343,13 @@ impl FollowState {
                             let args = array(&value, "args")?;
                             let event = string(&value, "event")?;
                             let frame = match (event, args.as_slice()) {
-                                ("api-session/added", [session]) => Some(
-                                    json!({"type":"upsert","generation":generation,"session":session}),
-                                ),
+                                ("api-session/added", [session]) => {
+                                    let mut session = session.clone();
+                                    queue::normalize_inventory_row(&mut session)?;
+                                    Some(
+                                        json!({"type":"upsert","generation":generation,"session":session}),
+                                    )
+                                }
                                 ("api-session/removed", [id]) => Some(
                                     json!({"type":"remove","generation":generation,"sessionId":id}),
                                 ),
@@ -426,6 +461,9 @@ impl SessionEndpoint for DshSessionEndpoint {
     fn supports_events(&self) -> bool {
         true
     }
+    fn sequenced_queue_projection_key(&self) -> Option<&'static str> {
+        Some(SEQUENCED_QUEUE_PROJECTION_KEY)
+    }
     async fn events(&self) -> Result<FrameStream> {
         let raw = self.remote.open("$events", json!({})).await?;
         let generation = self.generation.clone();
@@ -434,6 +472,7 @@ impl SessionEndpoint for DshSessionEndpoint {
             (raw, None::<String>, generation, remote),
             |(mut raw, mut client, generation, remote)| async move {
                 let value = raw.next().await.ok_or(Error::Disconnected)??;
+                queue::reject_reserved_anywhere(&value)?;
                 let frame = if client.is_none() {
                     require(value["type"] == "ready", "endpoint events need readiness")?;
                     client = Some(string(&value, "clientId")?.into());
@@ -511,6 +550,7 @@ impl SessionEndpoint for DshSessionEndpoint {
             .remote
             .call("session/page", json!({"request":query}), &rpc())
             .await?;
+        queue::reject_reserved_anywhere(&result)?;
         let page = HistoryPage {
             session_id: request.session_id.clone(),
             through_sequence: request.through_sequence,
@@ -542,6 +582,7 @@ impl SessionEndpoint for DshSessionEndpoint {
         let mut seen = BTreeSet::new();
         let row = loop {
             let result=self.remote.call("session/list",json!({"_request":cursor.as_ref().map(|c|json!({"cursor":c})).unwrap_or(json!({}))}),&rpc()).await?;
+            queue::reject_reserved_anywhere(&result)?;
             if let Some(row) = array(&result, "items")?
                 .iter()
                 .find(|row| row["sessionId"] == id)
@@ -562,6 +603,7 @@ impl SessionEndpoint for DshSessionEndpoint {
                 &rpc(),
             )
             .await?;
+        queue::reject_remote_projection(&projections)?;
         let working_directory = sequenced_working_directory(&projections)?;
         Ok(SessionLocator {
             address: SessionAddress {
@@ -711,6 +753,7 @@ impl SessionEndpoint for DshSessionEndpoint {
                             rpc_id,
                         )
                         .await?;
+                    queue::reject_remote_projection(&value)?;
                     let limits = &value["values"]["imageLimits"];
                     if value["kind"] != "migration-required" && limits.is_object() {
                         policy = json!({"inlineMediaTypes":limits["mediaTypes"],"maxAttachmentBytes":limits["maxImageBytes"],"maxAttachmentsPerMessage":limits["maxImagesPerMessage"],"maxMessageAttachmentBytes":limits["maxMessageImageBytes"],"maxImagePixels":limits["maxImagePixels"],"maxImageDimension":limits["maxImageDimension"]});
@@ -769,6 +812,7 @@ impl SessionEndpoint for DshSessionEndpoint {
                             rpc_id,
                         )
                         .await?;
+                    queue::reject_remote_projection(&projections)?;
                     let next = &projections["values"]["modelSelection"]["next"];
                     if projections["kind"] != "migration-required" && next.is_object() {
                         current = next.clone();
@@ -862,6 +906,7 @@ impl DshSessionEndpoint {
         let mut seen = BTreeSet::new();
         loop {
             let page = self.remote.call("session/list", json!({"_request":cursor.as_ref().map(|c|json!({"cursor":c})).unwrap_or(json!({}))}), &rpc()).await?;
+            queue::reject_reserved_anywhere(&page)?;
             if let Some(row) = array(&page, "items")?.iter().find(|r| r["sessionId"] == id) {
                 if let Some(parent) = row["parentSessionId"]
                     .as_str()
@@ -895,6 +940,7 @@ impl DshSessionEndpoint {
                 rpc_id,
             )
             .await?;
+        queue::reject_remote_projection(&projection)?;
         require(
             projection["kind"] == "sequenced"
                 || (self.host.product.version == "0.2.0-rc.2"
@@ -921,6 +967,7 @@ impl DshSessionEndpoint {
         let mut seen = BTreeSet::new();
         let available = loop {
             let page = self.remote.call("session/list", json!({"_request":cursor.as_ref().map(|c|json!({"cursor":c})).unwrap_or(json!({}))}), rpc_id).await?;
+            queue::reject_reserved_anywhere(&page)?;
             if let Some(row) = array(&page, "items")?
                 .iter()
                 .find(|r| r["sessionId"] == parent)

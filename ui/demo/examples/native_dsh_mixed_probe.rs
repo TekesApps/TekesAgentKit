@@ -10,7 +10,9 @@
 //! copied to the receipt. The receipt contains captured image and file bytes.
 
 use async_trait::async_trait;
+use futures_util::StreamExt;
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use std::{
     env, fs,
     io::Write,
@@ -31,6 +33,7 @@ use tekes_agent_ui_bindings::{
 use tekes_agent_ui_demo::endpoint_config::EndpointConfiguration;
 
 const EXPECTED_REPLY: &str = "ENDPOINT_REPLY_OK";
+const BUSY_HOLD_TEXT: &str = "NATIVE_DSH_BUSY_HOLD";
 const FILE_NAME: &str = "中文混合.txt";
 const FILE_BYTES: &[u8] = b"AgentKit Pi mixed file proof\n";
 const WAIT: Duration = Duration::from_secs(180);
@@ -164,6 +167,218 @@ fn decoded_base64_len(encoded: &str) -> usize {
 
 fn public_item(item: &TranscriptItem) -> Value {
     json!(item)
+}
+
+async fn wait_committed_user(target: &Target, rpc_id: &str) -> Result<TranscriptItem> {
+    let started = Instant::now();
+    let mut diagnostic_count = 0;
+    loop {
+        let snapshot = fresh_run(target).await?;
+        if diagnostic_count < 3 && started.elapsed().as_secs() >= diagnostic_count * 5 {
+            diagnostic_count += 1;
+            let public_state = target.runtime.inspect(|state| state.sessions.get(&target.scope.session_id).map(|session| json!({
+                "runOpen":session.run_open,"summary":session.summary,
+                "entryCount":session.entries.len(),"nativeConversation":session.native_conversation.is_some(),
+                "eventKinds":session.entries.values().map(|entry| entry.event.kind.clone()).collect::<Vec<_>>(),
+            })));
+            eprintln!(
+                "NATIVE_DSH_BUSY_PUBLIC_HOLD_STATE {}",
+                json!({"rpcId":rpc_id,"run":snapshot.run,"items":snapshot.transcript.items,"state":public_state})
+            );
+        }
+        if let Some(input) = snapshot.transcript.items.iter().find(|item| {
+            item.kind == TranscriptItemKind::User
+                && item.reconciliation_id.as_deref() == Some(rpc_id)
+                && !item.is_provisional
+                && (item.source_position.is_some() || item.source_sequence.is_some())
+        }) {
+            require(
+                !input.id.is_empty() && !input.turn_id.is_empty() && input.text == BUSY_HOLD_TEXT,
+                "busy hold input identity or content differs",
+            )?;
+            let running = target.runtime.inspect(|state| {
+                state
+                    .sessions
+                    .get(&target.scope.session_id)
+                    .is_some_and(|session| session.run_open)
+            });
+            if running {
+                return Ok(input.clone());
+            }
+        }
+        if started.elapsed() >= WAIT {
+            return Err(Error::Timeout);
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+}
+
+fn queue_source_rpc<'a>(kind: &str, fact: &'a Value) -> Option<&'a str> {
+    let message = if kind == "native" {
+        fact.get("message")?
+    } else {
+        fact
+    };
+    message.get("source")?.get("rpcId")?.as_str()
+}
+
+struct BusyQueueContext<'a> {
+    rpc_id: &'a str,
+    authored_text: &'a str,
+    prepared: &'a Value,
+    upload: &'a Value,
+    images: &'a [Value],
+    image_bytes: [&'a [u8]; 2],
+    hold_rpc_id: &'a str,
+    hold_input: &'a TranscriptItem,
+}
+
+fn matches_public_queue_content(
+    kind: &str,
+    message: &Value,
+    context: &BusyQueueContext<'_>,
+) -> Result<()> {
+    let content = message["content"]
+        .as_array()
+        .ok_or_else(|| Error::Protocol("public queued message content missing".into()))?;
+    require(
+        content.len() == 4 && content[0] == json!({"type":"text","text":context.authored_text}),
+        "public queued authored text or block count differs",
+    )?;
+    let first_id = image_attachment_id(kind, &content[1], &context.images[0])?;
+    let last_id = image_attachment_id(kind, &content[3], &context.images[1])?;
+    require(
+        first_id != last_id
+            && first_id == format!("sha256:{:x}", Sha256::digest(context.image_bytes[0]))
+            && last_id == format!("sha256:{:x}", Sha256::digest(context.image_bytes[1])),
+        "public queued images differ from original captured PNG bytes",
+    )?;
+    let mut expected_file = json!({"type":"file","attachment":context.upload["file"]});
+    if kind == "native" {
+        expected_file["mediaType"] = json!("text/plain");
+    }
+    require(
+        content[2] == expected_file,
+        "public queued file differs from original upload",
+    )?;
+    // The independent runner repeats this check before releasing its provider hold.
+    Ok(())
+}
+
+async fn wait_busy_queue(target: &Target, context: &BusyQueueContext<'_>) -> Result<Value> {
+    let rpc_id = context.rpc_id;
+    let prepared = context.prepared;
+    let upload = context.upload;
+    let images = context.images;
+    let hold_rpc_id = context.hold_rpc_id;
+    let started = Instant::now();
+    let mut diagnostic_count = 0;
+    loop {
+        let snapshot = fresh_run(target).await?;
+        if diagnostic_count < 3 && started.elapsed().as_secs() >= diagnostic_count * 5 {
+            diagnostic_count += 1;
+            eprintln!(
+                "NATIVE_DSH_BUSY_PUBLIC_QUEUE_STATE {}",
+                json!({"scope":target.scope,"epoch":snapshot.connection_epoch,"revision":snapshot.revision,"run":snapshot.run,"submissions":snapshot.submissions})
+            );
+        }
+        let observed = target.runtime.inspect(|state| {
+            let session = state.sessions.get(&target.scope.session_id)?;
+            let native_run = snapshot.run.as_ref()?;
+            let epoch = state.connection_epoch;
+            match target.kind {
+                "native" => native_run.queue
+                    .iter()
+                    .find(|item| queue_source_rpc("native", item) == Some(rpc_id))
+                    .map(|item| {
+                        let item = item.clone();
+                        (epoch, snapshot.revision, None, item.clone(), json!({"kind":"control","items":native_run.queue}), item["message"].clone())
+                    }),
+                "dsh" => session.projections.get("inbox").and_then(|projection| {
+                    projection.value["next-turn"].as_array()?.iter().find(|message| {
+                        queue_source_rpc("dsh", message) == Some(rpc_id)
+                    }).map(|message| {
+                        let value = projection.value.clone();
+                        let message = message.clone();
+                        (epoch, snapshot.revision, Some(projection.sequence), message.clone(), json!({"kind":"inbox","projection":{"sequence":projection.sequence,"value":value}}), message)
+                    })
+                }),
+                _ => None,
+            }
+        });
+        if let Some((
+            epoch,
+            snapshot_revision,
+            _projection_sequence,
+            queue_fact,
+            queue_witness,
+            message,
+        )) = observed
+        {
+            require(
+                snapshot
+                    .run
+                    .as_ref()
+                    .is_some_and(|run| run.scope == target.scope),
+                "queue witness scope differs",
+            )?;
+            let common_queue = &snapshot.run.as_ref().ok_or(Error::Disconnected)?.queue;
+            let expected_common = if target.kind == "native" {
+                queue_fact.clone()
+            } else {
+                json!({"id":queue_fact["id"],"placement":"queued","target":"next-turn","message":queue_fact})
+            };
+            let submission = snapshot
+                .submissions
+                .iter()
+                .find(|submission| submission.id == rpc_id);
+            if !common_queue.contains(&expected_common)
+                || !submission.is_some_and(|submission| submission.reconciled)
+                || snapshot.transcript.items.iter().any(|item| {
+                    item.is_provisional && item.reconciliation_id.as_deref() == Some(rpc_id)
+                })
+            {
+                if started.elapsed() >= WAIT {
+                    return Err(Error::Protocol(
+                        "common queue did not reconcile the original ticket".into(),
+                    ));
+                }
+                tokio::time::sleep(Duration::from_millis(100)).await;
+                continue;
+            }
+            require(
+                queue_source_rpc(target.kind, &queue_fact) == Some(rpc_id)
+                    && message["role"] == "user"
+                    && message["source"]["kind"] == "user"
+                    && (target.kind != "native" || queue_fact["placement"] == "queued")
+                    && snapshot.connection_epoch == epoch,
+                "public queue fact RPC, role, placement, or epoch differs",
+            )?;
+            matches_public_queue_content(target.kind, &message, context)?;
+            return Ok(json!({
+                "status":"queued",
+                "endpointKind":target.kind,
+                "scope":target.scope,
+                "rpcId":rpc_id,
+                "ticketId":rpc_id,
+                "snapshotRevision":snapshot_revision,
+                "connectionEpoch":epoch,
+                "queueFact":queue_fact,
+                "queueWitness":queue_witness,
+                "commonQueue":common_queue,
+                "submission":submission,
+                "prepared":prepared,
+                "uploadReceipt":upload,
+                "imageInputs":images,
+                "holdRpcId":hold_rpc_id,
+                "holdInput":public_item(context.hold_input),
+            }));
+        }
+        if started.elapsed() >= WAIT {
+            return Err(Error::Timeout);
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
 }
 
 fn baseline(binding: &RunBinding) -> Vec<String> {
@@ -389,7 +604,13 @@ fn image_attachment_id(kind: &str, raw: &Value, expected: &Value) -> Result<Stri
             let digest = asset
                 .strip_prefix("sha256-")
                 .ok_or_else(|| Error::Protocol("Native public image asset ID malformed".into()))?;
-            require(digest.len() == 64, "Native public image digest malformed")?;
+            require(
+                digest.len() == 64
+                    && digest
+                        .bytes()
+                        .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()),
+                "Native public image digest malformed",
+            )?;
             Ok(format!("sha256:{digest}"))
         }
         "dsh" => {
@@ -633,6 +854,173 @@ async fn run_scenario(
     }))
 }
 
+async fn run_busy_scenario(
+    runtime: &Arc<SessionRuntime>,
+    kind: &'static str,
+    scope: RunScope,
+    scenario: &Scenario,
+) -> Result<(Value, Value)> {
+    eprintln!("NATIVE_DSH_MIXED_PHASE open-busy-scenario");
+    let binding = Arc::new(RunBinding::open_main(runtime.clone(), scope.clone()).await?);
+    require(
+        binding.supports_inline_images() && binding.supports_attachments(),
+        "busy mixed attachments unavailable",
+    )?;
+    let target = Target {
+        runtime: runtime.clone(),
+        kind,
+        scope: scope.clone(),
+        binding,
+    };
+    let destination = ComposerDestination::run(scope.clone());
+    let initial = target.binding.current_run().ok_or(Error::Disconnected)?;
+    require(
+        initial.draft.text.is_empty() && initial.draft.artifacts.is_empty(),
+        "busy scenario Composer draft must start empty",
+    )?;
+    let excluded_ids = baseline(&target.binding);
+    target
+        .binding
+        .edit_text(&destination, BUSY_HOLD_TEXT.to_owned())?;
+    let hold_ticket = target
+        .binding
+        .prepare_send(&destination, PromptMode::Queue)?;
+    let hold_rpc_id = hold_ticket.id().to_owned();
+    target
+        .binding
+        .dispatch_prepared_with(hold_ticket, &NO_PREPARATION)
+        .await?;
+    eprintln!("NATIVE_DSH_MIXED_PHASE wait-held-running");
+    let hold_input = wait_committed_user(&target, &hold_rpc_id).await?;
+
+    let first_bytes = encode_png(scenario.first_rgb)?;
+    let last_bytes = encode_png(scenario.last_rgb)?;
+    require(
+        first_bytes != last_bytes,
+        "mixed image fixtures must be different",
+    )?;
+    target
+        .binding
+        .edit_text(&destination, scenario.authored_text.to_owned())?;
+    let first_data = attach_image(&target, scenario.first_name, &first_bytes).await?;
+    let first = canonical_image(&target, &first_data, scenario.first_name)?;
+    eprintln!("NATIVE_DSH_MIXED_PHASE busy-upload");
+    let upload = upload_file(&target).await?;
+    let last_data = attach_image(&target, scenario.last_name, &last_bytes).await?;
+    let last = canonical_image(&target, &last_data, scenario.last_name)?;
+    let images = vec![
+        json!({"type":"image","mediaType":"image/png","name":scenario.first_name,"data":first_data,"byteCount":first_bytes.len(),"width":2,"height":2}),
+        json!({"type":"image","mediaType":"image/png","name":scenario.last_name,"data":last_data,"byteCount":last_bytes.len(),"width":2,"height":2}),
+    ];
+    eprintln!("NATIVE_DSH_MIXED_PHASE busy-prepare");
+    let ticket = target
+        .binding
+        .prepare_send(&destination, PromptMode::Queue)?;
+    let rpc_id = ticket.id().to_owned();
+    let prepared = prepared_receipt(&ticket, scenario.authored_text, &first, &upload, &last)?;
+    target
+        .binding
+        .dispatch_prepared_with(ticket, &NO_PREPARATION)
+        .await?;
+    eprintln!("NATIVE_DSH_MIXED_PHASE wait-public-queue-fact");
+    let queue_ready = wait_busy_queue(
+        &target,
+        &BusyQueueContext {
+            rpc_id: &rpc_id,
+            authored_text: scenario.authored_text,
+            prepared: &prepared,
+            upload: &upload,
+            images: &images,
+            image_bytes: [&first_bytes, &last_bytes],
+            hold_rpc_id: &hold_rpc_id,
+            hold_input: &hold_input,
+        },
+    )
+    .await?;
+    let mut line = serde_json::to_string(&queue_ready)
+        .map_err(|_| Error::Protocol("busy queue readiness JSON encoding failed".into()))?;
+    line.insert_str(0, "AGENTKIT_NATIVE_DSH_BUSY_QUEUE_READY ");
+    println!("{line}");
+    std::io::stdout()
+        .flush()
+        .map_err(|_| Error::Protocol("busy queue readiness flush failed".into()))?;
+
+    eprintln!("NATIVE_DSH_MIXED_PHASE wait-held-final");
+    let (held_user, hold_assistant) = wait_round_trip(&target, &hold_rpc_id, &excluded_ids).await?;
+    require(
+        same_identity(&hold_input, &held_user),
+        "held input identity changed before final",
+    )?;
+    eprintln!("NATIVE_DSH_MIXED_PHASE wait-queued-final");
+    let mut queue_excluded = excluded_ids;
+    queue_excluded.push(held_user.id.clone());
+    let (input, assistant) = wait_round_trip(&target, &rpc_id, &queue_excluded).await?;
+    require(
+        input.text == scenario.authored_text,
+        "queued mixed input text differs",
+    )?;
+    eprintln!("NATIVE_DSH_MIXED_PHASE busy-image-reads");
+    let image_reads = verify_images(&target, &input, &images, &upload).await?;
+    eprintln!("NATIVE_DSH_MIXED_PHASE busy-file-read");
+    let file_read = file_read(&target, &upload).await?;
+    let round_trip = json!({
+        "scope":scope,
+        "rpcId":rpc_id,
+        "authoredText":scenario.authored_text,
+        "prepared":prepared,
+        "uploadReceipt":upload,
+        "imageInputs":images,
+        "input":public_item(&input),
+        "assistant":public_item(&assistant),
+        "imageReads":image_reads,
+        "fileRead":file_read,
+    });
+    let drained = wait_queue_drained(&target).await?;
+    let busy = json!({
+        "drained":drained,
+        "recoveredDrained":null,
+        "holdRpcId":hold_rpc_id,
+        "holdInput":public_item(&held_user),
+        "holdAssistant":public_item(&hold_assistant),
+        "queueReady":queue_ready,
+        "recoveredHoldInput":null,
+        "recoveredHoldAssistant":null,
+    });
+    Ok((round_trip, busy))
+}
+
+async fn wait_queue_drained(target: &Target) -> Result<Value> {
+    let started = Instant::now();
+    loop {
+        let snapshot = fresh_run(target).await?;
+        let common_empty = snapshot
+            .run
+            .as_ref()
+            .is_some_and(|run| run.queue.is_empty());
+        let witness = target.runtime.inspect(|state| {
+            if state.connection_epoch != snapshot.connection_epoch { return None; }
+            let session = state.sessions.get(&target.scope.session_id)?;
+            if target.kind == "dsh" {
+                let projection = session.projections.get("inbox")?;
+                if !["next-turn", "next-step"].iter().all(|key| projection.value[*key].as_array().is_some_and(Vec::is_empty)) { return None; }
+                Some(json!({"kind":"inbox","projection":{"sequence":projection.sequence,"value":projection.value}}))
+            } else if session.queue.is_empty() {
+                Some(json!({"kind":"control","items":session.queue}))
+            } else { None }
+        });
+        if common_empty && let Some(witness) = witness {
+            return Ok(
+                json!({"scope":target.scope,"connectionEpoch":snapshot.connection_epoch,"snapshotRevision":snapshot.revision,"commonQueue":[],"publicQueue":witness}),
+            );
+        }
+        require(
+            started.elapsed() < WAIT,
+            "consumed busy queue did not drain",
+        )?;
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+}
+
 async fn verify_recovered(
     runtime: &Arc<SessionRuntime>,
     kind: &'static str,
@@ -678,11 +1066,19 @@ async fn verify_recovered(
 }
 
 async fn execute(config_path: &Path) -> Result<Value> {
-    let config: Value = serde_json::from_slice(
+    let mut config: Value = serde_json::from_slice(
         &fs::read(config_path)
             .map_err(|_| Error::Protocol("endpoint config read failed".into()))?,
     )
     .map_err(|_| Error::Protocol("endpoint config JSON invalid".into()))?;
+    let busy_queue = match config
+        .as_object_mut()
+        .and_then(|object| object.remove("busyQueue"))
+    {
+        None => false,
+        Some(Value::Bool(enabled)) => enabled,
+        Some(_) => return Err(Error::Protocol("busyQueue must be boolean".into())),
+    };
     let configuration = EndpointConfiguration::parse(&config, |name| env::var(name).ok())?;
     let configured = configuration.into_connector().await?;
     require(
@@ -695,6 +1091,36 @@ async fn execute(config_path: &Path) -> Result<Value> {
         scopes[0].session_id != scopes[1].session_id,
         "two distinct sessions required",
     )?;
+    let observer_endpoint = if busy_queue && kind == "native" {
+        Some(configured.connector.connect().await?)
+    } else {
+        None
+    };
+    let observer_task = if let Some(endpoint) = &observer_endpoint {
+        let mut frames = endpoint
+            .follow(tekes_agent_contract::StreamTarget::SessionControl)
+            .await?;
+        Some(tokio::spawn(async move {
+            while let Some(frame) = frames.next().await {
+                match frame {
+                    Ok(frame) if frame["type"] == "baseline" => eprintln!(
+                        "NATIVE_BUSY_PUBLIC_CONTROL_FRAME {}",
+                        json!({"type":"baseline","generation":frame["generation"],"queues":frame["snapshot"]["queues"]})
+                    ),
+                    Ok(frame) if frame["type"] == "queue" => {
+                        eprintln!("NATIVE_BUSY_PUBLIC_CONTROL_FRAME {frame}")
+                    }
+                    Ok(_) => {}
+                    Err(_) => {
+                        eprintln!("NATIVE_BUSY_PUBLIC_CONTROL_OBSERVER_ERROR");
+                        break;
+                    }
+                }
+            }
+        }))
+    } else {
+        None
+    };
     let runtime = Arc::new(SessionRuntime::spawn(
         &scopes[0].endpoint_id,
         configured.connector,
@@ -715,7 +1141,13 @@ async fn execute(config_path: &Path) -> Result<Value> {
             last_name: "空正文第二张.png",
             last_rgb: [212, 42, 174],
         };
-        let round_trip_a = run_scenario(&runtime, kind, scopes[0].clone(), &first).await?;
+        let (round_trip_a, mut busy_evidence) = if busy_queue {
+            let (round_trip, evidence) =
+                run_busy_scenario(&runtime, kind, scopes[0].clone(), &first).await?;
+            (round_trip, Some(evidence))
+        } else {
+            (run_scenario(&runtime, kind, scopes[0].clone(), &first).await?, None)
+        };
         let round_trip_b = run_scenario(&runtime, kind, scopes[1].clone(), &second).await?;
         let epoch_before = runtime.inspect(|state| state.connection_epoch);
         eprintln!("NATIVE_DSH_MIXED_PHASE reconnect");
@@ -740,7 +1172,43 @@ async fn execute(config_path: &Path) -> Result<Value> {
             epoch_after,
         )
         .await?;
-        Ok(json!({
+        if let Some(evidence) = &mut busy_evidence {
+            let original_input: TranscriptItem = serde_json::from_value(evidence["holdInput"].clone())?;
+            let original_assistant: TranscriptItem = serde_json::from_value(evidence["holdAssistant"].clone())?;
+            let hold_input = find_by_id(
+                &Target {
+                    runtime: runtime.clone(),
+                    kind,
+                    scope: scopes[0].clone(),
+                    binding: Arc::new(RunBinding::open_main(runtime.clone(), scopes[0].clone()).await?),
+                },
+                &original_input.id,
+            )
+            .await?;
+            let hold_assistant = find_by_id(
+                &Target {
+                    runtime: runtime.clone(),
+                    kind,
+                    scope: scopes[0].clone(),
+                    binding: Arc::new(RunBinding::open_main(runtime.clone(), scopes[0].clone()).await?),
+                },
+                &original_assistant.id,
+            )
+            .await?;
+            require(
+                same_identity(&original_input, &hold_input)
+                    && same_identity(&original_assistant, &hold_assistant),
+                "reconnected busy hold identity changed",
+            )?;
+            evidence["recoveredHoldInput"] = public_item(&hold_input);
+            evidence["recoveredHoldAssistant"] = public_item(&hold_assistant);
+            let recovered_target = Target {
+                runtime: runtime.clone(), kind, scope: scopes[0].clone(),
+                binding: Arc::new(RunBinding::open_main(runtime.clone(), scopes[0].clone()).await?),
+            };
+            evidence["recoveredDrained"] = wait_queue_drained(&recovered_target).await?;
+        }
+        let mut receipt = json!({
             "status":"completed",
             "endpointKind":kind,
             "roundTrips":[round_trip_a,round_trip_b],
@@ -751,10 +1219,21 @@ async fn execute(config_path: &Path) -> Result<Value> {
             },
             "providerObservation":"not observed by this consumer; verify independently at the provider",
             "desktop":"not run",
-        }))
+        });
+        if let Some(evidence) = busy_evidence {
+            receipt["busyQueue"] = evidence;
+        }
+        Ok(receipt)
     }
     .await;
     let stopped = runtime.stop().await;
+    if let Some(task) = observer_task {
+        task.abort();
+        let _ = task.await;
+    }
+    if let Some(endpoint) = observer_endpoint {
+        endpoint.close().await;
+    }
     match (execution, stopped) {
         (Ok(receipt), Ok(())) => Ok(receipt),
         (Err(error), _) => Err(error),

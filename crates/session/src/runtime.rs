@@ -555,10 +555,20 @@ async fn run(
                     Err(Error::Protocol(
                         "connector endpoint identity mismatch".into(),
                     ))
+                } else if endpoint
+                    .sequenced_queue_projection_key()
+                    .is_some_and(|key| key != SEQUENCED_QUEUE_PROJECTION_KEY)
+                {
+                    endpoint.close().await;
+                    Err(Error::Protocol(
+                        "unsupported sequenced queue projection key".into(),
+                    ))
                 } else {
+                    let queue_projection_key = endpoint.sequenced_queue_projection_key();
                     epoch += 1;
                     store.update(|s| {
                         s.begin_connection(endpoint.host().clone());
+                        s.configure_sequenced_queue_projection(queue_projection_key);
                         s.endpoint_capabilities = endpoint.capabilities();
                     });
                     let result =

@@ -165,3 +165,10 @@ ask_user_question → public actionable sync → runtime 用共享 session envel
 | DSH 0.2.1-rc.2 / 0.2.0-rc.2 | 固定官方源码 `687f282…` / `639ed015…`；SessionSummary、在线/冷会话 summary、listFields | 显式 header.origin=subagent 原样透传，parent-only fork 不推造 origin；旧/迁移行的缺失仍非独立身份权限证明 | 两版公开 SessionSummary 没有该字段；临时 fork/discard 仍按既有能力明确 Unsupported，不补 ephemeral=false |
 
 Native 公开来源：[固定规范](https://github.com/TekesApps/TekesKernel/blob/09508a9083c24c7accefc99516739f279b85913e/spec/session-endpoint.md#read-routes)、[固定 producer](https://github.com/TekesApps/TekesKernel/blob/09508a9083c24c7accefc99516739f279b85913e/crates/supervisor/src/endpoint_carrier.rs)。DSH 公开来源：[0.2.1 list producer](https://github.com/deepseek-ai/deepseek-harness/blob/687f282e8625c6b8d11ff58211a90524be2e4317/packages/api/session-controller/src/list.ts)、[其 SessionSummary](https://github.com/deepseek-ai/deepseek-harness/blob/687f282e8625c6b8d11ff58211a90524be2e4317/packages/api/session-controller/src/types.ts)、[0.2.0 list producer](https://github.com/deepseek-ai/deepseek-harness/blob/639ed015397290b3745d163aafe02ffee4aa3f84/packages/api/session-controller/src/list.ts)。精确版本、Git blob 哈希与协议回归分层记录在各 wire 专题；源码核对和本地协议 mock 不能替代已安装 runtime 身份或真实 harness 整体验收。
+
+
+## DSH 公共 inbox 的通用队列消费（2026-10-25）
+
+DSH adapter 将公共 inbox 的 `next-turn` / `next-step` 转为同序号的本地标准投影，供 Run.queue 与 Composer 使用；原 inbox、message/source、原 item.id 仍保留。缺失 key 不当空，明确双空才清空；source.rpcId 仅用于原用户提交确认，不替代队列动作身份。适配器授权默认关闭，Native/Pi 原 control 队列不受启用；详见[契约](rust-agent-ui-dsh-queue-projection-contract-20261025.md)及[分层结果](rust-agent-ui-native-dsh-busy-queue-results-20261025.md)。
+
+Native 0.9.3 的 busy queue 可见性本轮仍未通过：流式 hold 时第二个 prompt 已 admitted，公开 control 却持续空，独立读者同样观测到；上游跟踪 [Kernel #86](https://github.com/TekesApps/TekesKernel/issues/86)。这不否定此前空闲 Queue 的 mixed 发送/回传/公开回读和重连，但也不能以其代替运行中队列验收。未修改 Kernel 或 TekesUI。

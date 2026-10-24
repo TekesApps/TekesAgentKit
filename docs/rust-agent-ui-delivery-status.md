@@ -4,8 +4,10 @@
 
 三端原pane来源见证的最近核对基线为 `9969f8f274c17193024eec74a78aae2eabe15fae`（2026-10-25核对），[PR #10](https://github.com/TekesApps/TekesAgentKit/pull/10)仍为draft。UI仍是 `0.0.0` / `publish=false`，不是已发布v0.3.8的一部分；完整交付尚未达到。最近文档提交不会改变这些功能证据的适用revision。
 
+- 新增[Native/DSH mixed](rust-agent-ui-native-dsh-mixed-results-20261025.md)：空闲 Queue 模式下原图/文件/图、回传、公开回读与重连已通过；3bda2f6 的 push/PR CI 共享包和独立 consumer 通过，严格 UI 唯一失败仍为 TekesUI #53。
+- 本轮[运行中队列](rust-agent-ui-native-dsh-busy-queue-results-20261025.md)：DSH 公共 inbox 已接入通用 Run 队列和 Composer 原提交确认；Native 0.9.3 的 busy control 空队列另留未通过项。新提交的精确验证与 CI 将单独记录。
 - 新增[三端公开图片字节回读](rust-agent-ui-dsh-image-read-results-20261025.md)：纠正旧probe将DSH误标unsupported；三端图文/纯图在重连前后共12次原公开读取通过，Python289通过，未改生产组件/SDK。
-- 新增[Pi mixed 文件来源与真实队列闭环](rust-agent-ui-pi-mixed-file-results-20261025.md)：原上传→inputReceipt→文件投影→公开历史/字节回读与重连通过；Root388/UI781（1既有忽略）、Python285/Node14与独立consumer通过。Native/DSH mixed、位图UI和桌面仍待；当前严格#53仍失败。
+- 新增[Pi mixed 文件来源与真实队列闭环](rust-agent-ui-pi-mixed-file-results-20261025.md)：原上传→inputReceipt→文件投影→公开历史/字节回读与重连通过；Root388/UI781（1既有忽略）、Python285/Node14与独立consumer通过。Native/DSH mixed 的后续空闲闭环见上项；位图UI和桌面仍待，当前严格#53仍失败。
 - 新增[原RunBinding真实三端图片协议](rust-agent-ui-inline-image-live-results-20261025.md)：Native0.9.3/Pi1.3.0/DSH0.2.1-rc.2 同程序图文/纯图、公开历史和重连通过；六次图片输入与一次DSH标题请求分别核对，Native/Pi公开字节read通过，DSH只证明公开引用。Python274、严格demo Clippy/example构建通过；系统输入/位图UI/真实模型理解与mixed file/image仍未验收。
 - 新增[原RunBinding无UI图片输入](rust-agent-ui-inline-image-binding-results-20261025.md)：原capture/CAS与host准备后ticket复核、本地SEP fixture通过，Root380/UI777（1既有忽略）；真实三端后续协议结果见上一项，图片UI仍未验收，#16/#17开放。
 - 新增[原rail hover与实际viewport](rust-agent-ui-turn-rail-hover-results-20261025.md)：UI763/0/1、feature RunPort19/bindings39、独立consumer和最终Python262通过；当前严格reading仍失败，不覆盖原三端来源证据，新head CI另核对。

@@ -398,6 +398,51 @@ fn echo_retires_only_by_rpc_identity_and_late_failure_does_not_restore_acknowled
     assert!(store.draft(&a).text.is_empty());
 }
 #[test]
+fn native_queued_user_source_retires_only_its_scoped_submission_echo() {
+    let mut store = PresentationStore::default();
+    let mut authority = authority();
+    let a = destination("a");
+    store.select(a.clone()).unwrap();
+    store.edit(&a, text("queued native input")).unwrap();
+    let ticket = store.prepare(&a, PromptMode::Queue, &authority).unwrap();
+    store.mark_dispatched(&ticket).unwrap();
+    let queued = json!({"id":"input:42","placement":"queued","message":{
+        "id":"input-42","role":"user","content":[{"type":"text","text":"queued native input"}],
+        "source":{"kind":"user","rpcId":ticket.id()}}});
+    // Another session carrying the same request text/identity cannot settle this owner.
+    authority.sessions.get_mut("b").unwrap().queue = vec![queued.clone()];
+    assert!(!store.refresh(&authority).unwrap().submissions[0].reconciled);
+    for (role, kind) in [("assistant", "user"), ("user", "tool")] {
+        let mut foreign = queued.clone();
+        foreign["message"]["role"] = json!(role);
+        foreign["message"]["source"]["kind"] = json!(kind);
+        authority.sessions.get_mut("a").unwrap().queue = vec![foreign];
+        assert!(!store.refresh(&authority).unwrap().submissions[0].reconciled);
+    }
+    let mut other_request = queued.clone();
+    other_request["message"]["source"]["rpcId"] = json!("another-request");
+    authority.sessions.get_mut("a").unwrap().queue = vec![other_request];
+    assert!(!store.refresh(&authority).unwrap().submissions[0].reconciled);
+    authority.sessions.get_mut("a").unwrap().queue = vec![queued];
+    let accepted = store.refresh(&authority).unwrap();
+    assert!(accepted.submissions[0].reconciled);
+    assert!(
+        !accepted
+            .transcript
+            .items
+            .iter()
+            .any(|item| item.is_provisional
+                && item.reconciliation_id.as_deref() == Some(ticket.id()))
+    );
+    // A late failed ACK must not resurrect input already admitted by the public queue.
+    store
+        .finish(ticket.id(), Err("late transport failure".into()))
+        .unwrap();
+    assert!(store.draft(&a).text.is_empty());
+    store.edit(&a, text("next explicit input")).unwrap();
+    store.prepare(&a, PromptMode::Queue, &authority).unwrap();
+}
+#[test]
 fn new_thread_materialization_moves_draft_and_echo_without_touching_selected_other_run() {
     let mut store = PresentationStore::default();
     let authority = authority();

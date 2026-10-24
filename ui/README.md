@@ -384,3 +384,5 @@ for constructor injection, scaling, control/selection retention and native evide
 测试宿主 `--components --endpoint-config <配置> --family-catalog` 可显式组合目录；读取按钮不自动重试。`--family-seed-manifest` 与 `--family-delivery-receipt` 必须配合显式端点和 `--offscreen`，只作为真实公开来源的断言 oracle，不能安装 Task 或更改 pointer。Native 父 scope Task 保持普通不可导航 Summary 行；其 bounded child 通过目录进入原只读 Transcript。Pi/DSH 仍走原独立 child binding。这里的离屏节点挂载不代表桌面可见、物理 IME 或系统 AX 验收。
 
 [公开图片字节回读修正](../docs/rust-agent-ui-dsh-image-read-results-20261025.md)：DSH 同样通过原 session.attachment 读取；三端重连前后均已验证。旧 probe 的 DSH unsupported 标记不是能力结论，位图 UI 仍待 SDK #117。
+
+运行中队列的协议边界、DSH 通用投影与 Native 未通过项见 [busy queue 结果](../docs/rust-agent-ui-native-dsh-busy-queue-results-20261025.md)。UI 继续保持试验状态。

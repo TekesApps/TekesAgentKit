@@ -594,3 +594,10 @@ Native后续切片：复用既有feature headless与已安装Kernel0.9.3，真�
 ### #16/#17/#28：Native / DSH mixed 非桌面闭环（2026-10-25）
 
 [契约](rust-agent-ui-native-dsh-mixed-contract-20261025.md)与[结果](rust-agent-ui-native-dsh-mixed-results-20261025.md)：两端各有正文/无正文image-file-image，原RPC和source身份保留，重连前后16次图片公开read及4次Native文件read通过；DSH仅公开文件引用/句柄，不伪造通用下载。4个业务provider请求+1个标题，无重试，owned服务退出0。Python296、严格example Clippy/build/fmt与边界/矩阵通过；只补验收工具/文档，未改生产状态机。#53/#117、桌面及完整UI仍开放。源边界中止候选另行保留并排除；不合并/tag/关闭完整Issue。
+
+
+## 2026-10-25：运行中队列的增量与外部缺口
+
+#16/#27 继续按[busy 契约](rust-agent-ui-native-dsh-busy-queue-contract-20261025.md)与[DSH 通用投影契约](rust-agent-ui-dsh-queue-projection-contract-20261025.md)推进。原混合附件的空闲 Queue 与本轮真实运行中排队分开计证。DSH 公共 inbox 已通过原 Run/Composer 消费与真实 provider 门禁；Native 0.9.3 的 admitted RPC / 空 control queue 已转交 [Kernel #86](https://github.com/TekesApps/TekesKernel/issues/86)，不改上游、不绕过原公开接口。
+
+#15 适用新增默认关闭的 endpoint 投影授权 hook、HostedEndpoint 透传与独立 consumer 验证；#17 保留原消息/附件/source 和重连，不将 admitted 当历史恢复。实现、最终程序与 CI 另绑定本批提交；[分层结果](rust-agent-ui-native-dsh-busy-queue-results-20261025.md)持续记录实际通过与未通过项。#28 不因该局部闭环关闭，PR #10 保持 draft，桌面验收仍 not_run。

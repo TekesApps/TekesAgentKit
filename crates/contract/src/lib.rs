@@ -432,12 +432,19 @@ impl GenerationValidator {
     }
 }
 
+/// Adapter-owned versioned queue value; remote projections may not impersonate it.
+pub const SEQUENCED_QUEUE_PROJECTION_KEY: &str = "agentkit.queue.v1";
+
 #[async_trait]
 pub trait SessionEndpoint: Send + Sync {
     fn identity(&self) -> &str;
     fn host(&self) -> &HostDescription;
     fn capabilities(&self) -> EndpointCapabilities {
         EndpointCapabilities::default()
+    }
+    /// Explicit local adapter authority, never inferred from an opaque remote key.
+    fn sequenced_queue_projection_key(&self) -> Option<&'static str> {
+        None
     }
     fn content_kind(&self) -> SessionContentKind {
         SessionContentKind::Journal

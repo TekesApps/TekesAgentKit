@@ -2127,6 +2127,7 @@ dependencies = [
  "png 0.17.16",
  "rfd",
  "serde_json",
+ "sha2 0.10.9",
  "tekes-agent-components-ui",
  "tekes-agent-contract",
  "tekes-agent-endpoint-dsh",

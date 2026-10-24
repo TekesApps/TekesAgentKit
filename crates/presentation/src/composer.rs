@@ -838,6 +838,16 @@ impl PresentationStore {
                         q["rpcId"]
                             .as_str()
                             .or_else(|| q["message"]["rpcId"].as_str())
+                            .or_else(|| {
+                                // Native queued inputs retain the imported user source.
+                                let message = &q["message"];
+                                if message["role"] == "user" && message["source"]["kind"] == "user"
+                                {
+                                    message["source"]["rpcId"].as_str()
+                                } else {
+                                    None
+                                }
+                            })
                     })
                     .map(String::from),
             );

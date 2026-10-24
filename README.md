@@ -147,3 +147,5 @@ The reusable Rust composition is now **RunPort** (formerly Rust RunView). Sideba
 Real Native/Pi/DSH Sidebar classification, archive recovery and canonical history retention: [source-bound offscreen results](docs/rust-agent-ui-real-sidebar-classification-results-20261024.md). Unknown classification stays unknown; this does not imply desktop acceptance.
 
 Real multi-endpoint SideChat (Pi remains second): [original dispatcher, runtime cancellation and recovery](docs/rust-agent-ui-real-multi-sidechat-results-20261024.md). Desktop and ProcessContainer acceptance remain separate.
+
+运行中队列的协议边界、DSH 通用投影与 Native 未通过项见 [busy queue 结果](docs/rust-agent-ui-native-dsh-busy-queue-results-20261025.md)。UI 继续保持试验状态。

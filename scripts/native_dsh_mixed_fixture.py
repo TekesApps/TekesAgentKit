@@ -15,6 +15,7 @@ from inline_image_live_fixture import decode_image_with_imageio
 
 EXPECTED_REPLY = "ENDPOINT_REPLY_OK"
 TEXT_PROMPT = "NATIVE_DSH_MIXED"
+BUSY_HOLD_TEXT = "NATIVE_DSH_BUSY_HOLD"
 FILE_NAME = "中文混合.txt"
 FILE_BYTES = b"AgentKit Pi mixed file proof\n"
 IMAGE_NAMES = (
@@ -208,11 +209,155 @@ def _validate_file_read(kind: str, row: dict) -> None:
         _fail("Native public file read differs from the original uploaded bytes")
 
 
-def validate_probe_receipt(receipt: object, kind: str, session_ids: list[str]) -> dict:
+def _validate_busy_user(value: object, rpc_id: str, label: str, text: str) -> dict:
+    item = _object(value, label)
+    if (item.get("kind") != "user" or item.get("text") != text
+            or item.get("isProvisional") is not False or item.get("isFinal") is not False
+            or item.get("reconciliationId") != rpc_id
+            or not _nonempty_string(item.get("id"), label + " id")
+            or not _nonempty_string(item.get("recordId"), label + " recordId")
+            or not _nonempty_string(item.get("turnId"), label + " turnId")
+            or item.get("attachments") != [] or not _has_source_position(item)):
+        _fail(label + " is not the original committed sourced user RPC")
+    return item
+
+
+def _busy_public_content(kind: str, text: str, images: list[dict], image_bytes: list[bytes],
+                        upload: dict) -> list[dict]:
+    blocks = [{"type": "text", "text": text}] if text else []
+    file_attachment = {"attachmentId": upload["file"]["attachmentId"],
+                       "name": FILE_NAME, "bytes": len(FILE_BYTES)}
+    for index, image in enumerate(images):
+        if kind == "native":
+            blocks.append({"type": "image", "asset": "sha256-" + _image_id(image_bytes[index])[7:],
+                           "mime": "image/png", "name": image["name"]})
+        else:
+            blocks.append({"type": "image", "attachment": {
+                "attachmentId": _image_id(image_bytes[index]), "mediaType": "image/png",
+                "name": image["name"], "bytes": len(image_bytes[index]), "width": 2, "height": 2}})
+        if index == 0:
+            blocks.append({"type": "file", "attachment": file_attachment,
+                           **({"mediaType": "text/plain"} if kind == "native" else {})})
+    return blocks
+
+
+def validate_busy_queue_ready(ready_value: object, kind: str, session_id: str,
+                             hold_rpc_id: str) -> dict:
+    """Validate the public queue event before the runner releases its provider hold."""
+    ready = _object(ready_value, "busy queueReady")
+    expected_fields = {"status", "endpointKind", "scope", "rpcId", "ticketId",
+                       "snapshotRevision", "connectionEpoch", "queueFact", "queueWitness",
+                       "prepared", "uploadReceipt", "imageInputs", "holdRpcId", "holdInput", "commonQueue", "submission"}
+    if set(ready) != expected_fields:
+        _fail("busy queueReady differs from the frozen public schema")
+    scope = {"endpointId": kind, "sessionId": session_id, "threadId": session_id}
+    if ready.get("status") != "queued" or ready.get("endpointKind") != kind or ready.get("scope") != scope:
+        _fail("busy queueReady status, endpoint, or selected session scope differs")
+    rpc_id = _nonempty_string(ready.get("rpcId"), "busy queueReady rpcId")
+    if ready.get("ticketId") != rpc_id or rpc_id == hold_rpc_id:
+        _fail("busy queueReady ticket is not the queued submission RPC")
+    if type(ready.get("snapshotRevision")) is not int or ready["snapshotRevision"] <= 0:
+        _fail("busy queueReady snapshot revision is missing")
+    if type(ready.get("connectionEpoch")) is not int or ready["connectionEpoch"] < 0:
+        _fail("busy queueReady connection epoch is missing")
+    _nonempty_string(hold_rpc_id, "busy holdRpcId")
+    if ready.get("holdRpcId") != hold_rpc_id:
+        _fail("busy queueReady hold RPC identity differs")
+    _validate_busy_user(ready.get("holdInput"), hold_rpc_id, "busy queueReady holdInput", BUSY_HOLD_TEXT)
+
+    prepared = _object(ready.get("prepared"), "busy queueReady prepared")
+    if set(prepared) != {"content", "displayText"} or prepared.get("displayText") != TEXT_PROMPT:
+        _fail("busy queued prepared submission lost its authored text")
+    content = _array(prepared.get("content"), "busy queued prepared.content")
+    if (len(content) != 4 or content[0] != {"type": "text", "text": TEXT_PROMPT}
+            or [part.get("type") if isinstance(part, dict) else None for part in content]
+            != ["text", "image", "file", "image"]):
+        _fail("busy queue content does not preserve text,image,file,image order")
+    upload = _object(ready.get("uploadReceipt"), "busy queue uploadReceipt")
+    if set(upload) != {"receiptId", "file"}:
+        _fail("busy queue upload receipt differs from the public DTO")
+    receipt_id = _nonempty_string(upload.get("receiptId"), "busy queue receiptId")
+    file = _object(upload.get("file"), "busy queue file receipt")
+    if file != {"attachmentId": "sha256:" + hashlib.sha256(FILE_BYTES).hexdigest(),
+                "name": FILE_NAME, "bytes": len(FILE_BYTES)}:
+        _fail("busy queue file receipt differs from the original upload")
+    if content[2] != {"type": "file", "receiptId": receipt_id}:
+        _fail("busy queue prepared file does not reference its upload receipt")
+    images = [_image_input(item, index) for index, item in
+              enumerate(_array(ready.get("imageInputs"), "busy queue imageInputs"))]
+    if len(images) != 2 or [entry[0]["name"] for entry in images] != list(IMAGE_NAMES[0]):
+        _fail("busy queue image inputs differ from the frozen first scenario")
+    image_docs = [entry[0] for entry in images]
+    image_bytes = [entry[1] for entry in images]
+    if content[1] != {key: image_docs[0][key] for key in ("type", "mediaType", "name", "data")} or \
+            content[3] != {key: image_docs[1][key] for key in ("type", "mediaType", "name", "data")}:
+        _fail("busy queue prepared images differ from their canonical source bytes")
+
+    expected_public_content = _busy_public_content(kind, TEXT_PROMPT, image_docs, image_bytes, upload)
+    fact = _object(ready.get("queueFact"), "busy queueFact")
+    if kind == "native":
+        if set(fact) != {"id", "placement", "message"}:
+            _fail("Native queue fact differs from the public control.queue item schema")
+        message = _object(fact.get("message"), "Native queueFact message")
+        if (fact.get("placement") != "queued" or set(message) != {"id", "role", "content", "source"}
+                or message.get("role") != "user" or message.get("content") != expected_public_content):
+            _fail("Native queue fact does not preserve the materialized public blocks")
+        queue_id = _nonempty_string(fact.get("id"), "Native queue item id")
+        if not re.fullmatch(r"input:[1-9][0-9]*", queue_id) or message.get("id") != "input-" + queue_id[6:]:
+            _fail("Native queue item and imported user message identities differ")
+    else:
+        if set(fact) != {"id", "role", "content", "source"} or fact.get("role") != "user":
+            _fail("DSH queue fact differs from the original inbox message schema")
+        message = fact
+        if message.get("content") != expected_public_content:
+            _fail("DSH queue fact does not preserve the original public history descriptors")
+    if (not _nonempty_string(fact.get("id"), "busy queueFact id")
+            or _object(message.get("source"), "busy queueFact source").get("rpcId") != rpc_id
+            or message["source"].get("kind") != "user"):
+        _fail("public queue fact does not preserve its original RPC identity")
+    witness = _object(ready.get("queueWitness"), "busy queueWitness")
+    if kind == "native":
+        if set(witness) != {"kind", "items"} or witness.get("kind") != "control" or witness.get("items") != [fact]:
+            _fail("Native queue witness is not the exact public control.queue item")
+    else:
+        if set(witness) != {"kind", "projection"} or witness.get("kind") != "inbox":
+            _fail("DSH queue witness is not the public inbox projection")
+        projection = _object(witness.get("projection"), "DSH inbox projection")
+        if set(projection) != {"sequence", "value"}:
+            _fail("DSH inbox projection differs from its public sequence/value schema")
+        value = _object(projection.get("value"), "DSH inbox projection value")
+        if set(value) != {"next-turn", "next-step"}:
+            _fail("DSH inbox projection value differs from its public wire schema")
+        next_turn = _array(value.get("next-turn"), "DSH inbox next-turn")
+        next_step = _array(value.get("next-step"), "DSH inbox next-step")
+        if (type(projection.get("sequence")) is not int or projection["sequence"] <= 0
+                or next_turn != [fact] or next_step):
+            _fail("DSH public inbox projection does not contain the exact next-turn queue fact")
+    expected_common = fact if kind == "native" else {
+        "id": fact["id"], "placement": "queued", "target": "next-turn", "message": fact}
+    if ready.get("commonQueue") != [expected_common]:
+        _fail("common queue did not preserve the exact original queue occurrence")
+    submission = _object(ready.get("submission"), "common queue submission")
+    if (submission.get("id") != rpc_id or submission.get("reconciled") is not True
+            or submission.get("phase") != "admitted"
+            or submission.get("destination") != {"kind": "run", "scope": scope}
+            or submission.get("resolvedScope") != scope):
+        _fail("common queue did not reconcile the admitted original scoped submission")
+    return {"ready": ready, "rpcId": rpc_id, "scope": scope, "queueFact": fact,
+            "uploadReceipt": upload, "images": (image_docs, image_bytes)}
+
+
+def validate_probe_receipt(receipt: object, kind: str, session_ids: list[str],
+                           *, busy_queue: bool = False) -> dict:
     """Validate the frozen public probe receipt and recovered source identities."""
     value = _object(receipt, "probe receipt")
     if value.get("status") != "completed" or value.get("endpointKind") != kind:
         _fail("probe receipt is not completed for the selected endpoint")
+    allowed = {"status", "endpointKind", "roundTrips", "reconnect", "desktop", "providerObservation"}
+    if busy_queue:
+        allowed.add("busyQueue")
+    if busy_queue and set(value) != allowed:
+        _fail("probe receipt differs from its selected idle or busy schema")
     rows = _array(value.get("roundTrips"), "roundTrips")
     if len(rows) != 2 or len(session_ids) != 2 or session_ids[0] == session_ids[1]:
         _fail("probe receipt must contain exactly two distinct public sessions")
@@ -300,7 +445,67 @@ def validate_probe_receipt(receipt: object, kind: str, session_ids: list[str]) -
         _validate_image_reads(kind, recovered_row, recovered_user, image_docs, image_bytes)
         _validate_file_read(kind, recovered_row)
         validated_images.append((image_docs, image_bytes))
-    return {"receipt": value, "images": validated_images, "epochBefore": before, "epochAfter": after}
+    result = {"receipt": value, "images": validated_images, "epochBefore": before, "epochAfter": after}
+    if busy_queue:
+        busy = _object(value.get("busyQueue"), "busyQueue")
+        busy_fields = {"holdRpcId", "holdInput", "holdAssistant", "queueReady",
+                       "recoveredHoldInput", "recoveredHoldAssistant", "drained", "recoveredDrained"}
+        if set(busy) != busy_fields:
+            _fail("busyQueue differs from the frozen public receipt schema")
+        hold_rpc_id = _nonempty_string(busy.get("holdRpcId"), "busyQueue.holdRpcId")
+        hold_input = _validate_busy_user(busy.get("holdInput"), hold_rpc_id,
+                                         "busyQueue.holdInput", BUSY_HOLD_TEXT)
+        hold_assistant = _object(busy.get("holdAssistant"), "busyQueue.holdAssistant")
+        if (hold_assistant.get("kind") != "assistant" or hold_assistant.get("text") != EXPECTED_REPLY
+                or hold_assistant.get("isFinal") is not True or hold_assistant.get("isProvisional") is not False
+                or hold_assistant.get("turnId") != hold_input.get("turnId")
+                or not _nonempty_string(hold_assistant.get("id"), "busy hold assistant id")
+                or not _nonempty_string(hold_assistant.get("recordId"), "busy hold assistant recordId")
+                or not _has_source_position(hold_assistant)):
+            _fail("busy hold assistant is not the fixed sourced final response")
+        if busy.get("recoveredHoldInput") != hold_input or busy.get("recoveredHoldAssistant") != hold_assistant:
+            _fail("reconnect changed the original hold user or final assistant identity")
+        ready = validate_busy_queue_ready(busy.get("queueReady"), kind, session_ids[0], hold_rpc_id)
+        for field, epoch in (("drained", before), ("recoveredDrained", after)):
+            drained = _object(busy.get(field), "busy " + field)
+            if (set(drained) != {"scope", "connectionEpoch", "snapshotRevision", "commonQueue", "publicQueue"}
+                    or drained.get("scope") != ready["ready"]["scope"]
+                    or drained.get("connectionEpoch") != epoch
+                    or type(drained.get("snapshotRevision")) is not int or drained["snapshotRevision"] < 1
+                    or drained.get("commonQueue") != []):
+                _fail("busy consumed common queue did not drain in its original scope/epoch")
+            public = drained.get("publicQueue")
+            if kind == "native":
+                if public != {"kind": "control", "items": []}:
+                    _fail("busy consumed public control queue did not drain")
+            else:
+                public = _object(public, "busy drained publicQueue")
+                projection = _object(public.get("projection"), "busy drained inbox")
+                if (set(public) != {"kind", "projection"} or public["kind"] != "inbox"
+                        or set(projection) != {"sequence", "value"}
+                        or type(projection.get("sequence")) is not int
+                        or projection["sequence"] <= ready["ready"]["queueWitness"]["projection"]["sequence"]
+                        or projection.get("value") != {"next-turn": [], "next-step": []}):
+                    _fail("busy consumed public inbox did not drain at a newer sequence")
+        queued = rows[0]
+        if (ready["rpcId"] != queued.get("rpcId") or ready["uploadReceipt"] != queued.get("uploadReceipt")
+                or ready["ready"].get("prepared") != queued.get("prepared")
+                or ready["ready"].get("imageInputs") != queued.get("imageInputs")
+                or ready["images"][0] != validated_images[0][0]
+                or ready["images"][1] != validated_images[0][1]
+                or ready["queueFact"].get("message", ready["queueFact"]).get("content")
+                   != _busy_public_content(kind, TEXT_PROMPT, queued["imageInputs"],
+                        validated_images[0][1], queued["uploadReceipt"])):
+            _fail("completed queued mixed round trip differs from its pre-release queue witness")
+        original_message = ready["queueFact"].get("message", ready["queueFact"])
+        if (queued["input"]["recordId"] != original_message.get("id")
+                or ready["ready"]["holdInput"] != hold_input
+                or hold_input["id"] == queued["input"]["id"]
+                or hold_input["recordId"] == queued["input"]["recordId"]
+                or hold_input["turnId"] == queued["input"]["turnId"]):
+            _fail("queued input did not preserve its occurrence identity or separate held turn")
+        result["busyQueue"] = ready
+    return result
 
 
 def _data_uri(value: object, label: str) -> tuple[str, bytes]:
@@ -394,14 +599,61 @@ def strip_dsh_context_suffixes(messages: list[dict]) -> tuple[list[dict], list[s
     return remaining, list(reversed(suffixes))
 
 
+def strip_provider_hold_request(kind: str, request: dict, held_request: dict) -> dict:
+    """Remove only the exact recorded held user/context prefix and its fixed final."""
+    field = "input" if kind == "native" else "messages"
+    history = _array(request.get(field), "queued provider history")
+    held_history = _array(held_request.get(field), "original held provider history")
+    held_users = _user_messages(held_request, field)
+    if kind == "dsh":
+        held_users, _ = strip_dsh_context_suffixes(held_users)
+    if len(held_users) != 1 or held_users[0].get("content") not in (
+            BUSY_HOLD_TEXT, [{"type": "input_text", "text": BUSY_HOLD_TEXT}],
+            [{"type": "text", "text": BUSY_HOLD_TEXT}]):
+        _fail("original held provider history lacks its one exact human input")
+    held_window = [item for item in held_history if item.get("role") in ("user", "assistant")]
+    if any(item.get("role") == "assistant" for item in held_window):
+        _fail("original held provider request already contains an assistant")
+    indexed = [(index, item) for index, item in enumerate(history)
+               if item.get("role") in ("user", "assistant")]
+    if [item for _, item in indexed[:len(held_window)]] != held_window or len(indexed) < len(held_window) + 2:
+        _fail("provider history does not preserve the exact recorded held prefix")
+    assistant_index, assistant = indexed[len(held_window)]
+    if (assistant.get("role") != "assistant" or assistant.get("content") not in (
+            EXPECTED_REPLY, [{"type": "output_text", "text": EXPECTED_REPLY}],
+            [{"type": "text", "text": EXPECTED_REPLY}])
+            or sum(item.get("role") == "assistant" for item in history) != 1):
+        _fail("provider history assistant differs from the exact fixed final hold response")
+    removed = {index for index, _ in indexed[:len(held_window)]} | {assistant_index}
+    return dict(request, **{field: [item for index, item in enumerate(history) if index not in removed]})
+
+
 def inspect_provider_request(kind: str, body: object, *, expected_text: str,
                              images: list[dict], image_bytes: list[bytes], upload_receipt: dict,
-                             input_item: dict, dsh_home: str) -> dict:
+                             input_item: dict, dsh_home: str,
+                             preceding_turn: tuple[dict, dict] | None = None,
+                             preceding_request: dict | None = None) -> dict:
     """Verify one actual provider user message and return non-sensitive evidence."""
     request = _object(body, "provider request")
     file_id = upload_receipt["file"]["attachmentId"]
+    def without_verified_hold(history: list[dict], field: str) -> list[dict]:
+        if preceding_turn is None:
+            return history
+        hold_input, hold_assistant = preceding_turn
+        if (hold_input.get("kind") != "user" or hold_input.get("text") != BUSY_HOLD_TEXT
+                or hold_input.get("isProvisional") is not False
+                or hold_assistant.get("kind") != "assistant"
+                or hold_assistant.get("text") != EXPECTED_REPLY
+                or hold_assistant.get("isFinal") is not True):
+            _fail("preceding hold evidence is not the fixed committed public turn")
+        if preceding_request is None:
+            _fail("actual held provider request is required to bind prior contexts")
+        return strip_provider_hold_request(kind, {field: history}, preceding_request)[field]
+
     if kind == "native":
-        users = _user_messages(request, "input")
+        history = _array(request.get("input"), "Native Responses input")
+        users = without_verified_hold([_object(item, "Native input history item") for item in history], "input")
+        users = [item for item in users if item.get("role") == "user"]
         if len(users) != 1:
             _fail("Native Responses request must contain exactly the one original human input")
         user = users[0]
@@ -436,7 +688,9 @@ def inspect_provider_request(kind: str, body: object, *, expected_text: str,
                     "byteCount": len(FILE_BYTES), "sha256": hashlib.sha256(FILE_BYTES).hexdigest()},
                 "hostContextSuffixes": []}
 
-    users = _user_messages(request, "messages")
+    history = _array(request.get("messages"), "DSH messages")
+    users = without_verified_hold([_object(item, "DSH provider history item") for item in history], "messages")
+    users = [item for item in users if item.get("role") == "user"]
     human_messages, context_suffixes = strip_dsh_context_suffixes(users)
     if len(human_messages) != 1:
         _fail("DSH request has unknown, duplicate, or missing human input")
@@ -515,3 +769,26 @@ def record_imageio_evidence(observations: list[dict], image_data: list[bytes], d
     if index != len(image_data):
         _fail("ImageIO did not process every original provider image byte sequence")
     return rows
+
+
+def busy_hold_stream_frames(kind: str) -> tuple[list[dict], list[dict]]:
+    """Start a real incomplete response before waiting for independent queue evidence."""
+    from inline_image_live_fixture import stream_response
+    complete = stream_response("/responses" if kind == "native" else "/chat/completions", {})
+    if kind == "native":
+        item_id = "busy-hold-message"
+        prefix = [
+            {"type": "response.created", "response": {"id": "inline-image-probe", "status": "in_progress", "output": []}},
+            {"type": "response.output_item.added", "output_index": 0, "item": {
+                "id": item_id, "type": "message", "role": "assistant", "phase": "final_answer", "status": "in_progress", "content": []}},
+            {"type": "response.output_text.delta", "item_id": item_id, "output_index": 0, "content_index": 0, "delta": "ENDPOINT_"},
+        ]
+        complete[0]["response"]["output"][0]["id"] = item_id
+        return prefix, [{"type": "response.output_text.delta", "item_id": item_id, "output_index": 0, "content_index": 0, "delta": "REPLY_OK"}] + complete
+    if kind == "dsh":
+        first = complete[0]
+        first["choices"][0]["delta"]["content"] = "ENDPOINT_"
+        rest = {key: value for key, value in first.items() if key != "choices"}
+        rest["choices"] = [{"index": 0, "delta": {"content": "REPLY_OK"}, "finish_reason": None}]
+        return [first], [rest, complete[1]]
+    _fail("busy stream endpoint must be Native or DSH")

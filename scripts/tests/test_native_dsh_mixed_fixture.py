@@ -108,7 +108,55 @@ def receipt_for(kind):
     rows = [row_for(kind, index)[0] for index in range(2)]
     recovered = [dict(copy.deepcopy(row), epochBefore=4, epochAfter=6) for row in rows]
     return {"status": "completed", "endpointKind": kind, "roundTrips": rows,
-            "reconnect": {"epochBefore": 4, "epochAfter": 6, "recovered": recovered}}
+            "reconnect": {"epochBefore": 4, "epochAfter": 6, "recovered": recovered},
+            "desktop": "not run", "providerObservation": "not observed by this consumer"}
+
+
+def busy_receipt_for(kind):
+    receipt = receipt_for(kind)
+    row = receipt["roundTrips"][0]
+    hold_rpc = "hold-rpc-" + row["scope"]["sessionId"]
+    hold_user = item(kind, row["scope"]["sessionId"], "user", fixture.BUSY_HOLD_TEXT, [])
+    hold_user["reconciliationId"] = hold_rpc
+    hold_user["id"] = json.dumps([kind, row["scope"]["sessionId"], "held-user"])
+    hold_user["recordId"] = "held-user-" + row["scope"]["sessionId"]
+    hold_user["turnId"] = "held-turn-" + row["scope"]["sessionId"]
+    hold_assistant = item(kind, row["scope"]["sessionId"], "assistant", fixture.EXPECTED_REPLY, [], final=True)
+    hold_assistant["id"] = json.dumps([kind, row["scope"]["sessionId"], "held-assistant"])
+    hold_assistant["recordId"] = "held-assistant-" + row["scope"]["sessionId"]
+    hold_assistant["turnId"] = hold_user["turnId"]
+    public_content = [{"type": "text", "text": fixture.TEXT_PROMPT}]
+    public_content.extend(copy.deepcopy(row["input"]["attachments"]))
+    if kind == "native":
+        fact = {"id": "input:42", "placement": "queued",
+            "message": {"id": "input-42", "role": "user", "source": {"kind": "user", "rpcId": row["rpcId"]},
+                        "content": public_content}}
+        witness = {"kind": "control", "items": [copy.deepcopy(fact)]}
+    else:
+        fact = {"id": "queue-item-1", "role": "user", "source": {"kind": "user", "rpcId": row["rpcId"]},
+                "content": public_content}
+        witness = {"kind": "inbox", "projection": {"sequence": 12,
+            "value": {"next-turn": [copy.deepcopy(fact)], "next-step": []}}}
+    row["input"]["recordId"] = fact["message"]["id"] if kind == "native" else fact["id"]
+    receipt["reconnect"]["recovered"][0]["input"] = copy.deepcopy(row["input"])
+    common = fact if kind == "native" else {"id": fact["id"], "placement": "queued", "target": "next-turn", "message": fact}
+    ready = {"status": "queued", "endpointKind": kind, "scope": row["scope"],
+        "rpcId": row["rpcId"], "ticketId": row["rpcId"], "snapshotRevision": 8,
+        "connectionEpoch": 3, "queueFact": fact, "queueWitness": witness,
+        "prepared": copy.deepcopy(row["prepared"]), "uploadReceipt": copy.deepcopy(row["uploadReceipt"]),
+        "imageInputs": copy.deepcopy(row["imageInputs"]), "holdRpcId": hold_rpc,
+        "holdInput": copy.deepcopy(hold_user), "commonQueue": [copy.deepcopy(common)],
+        "submission": {"id": row["rpcId"], "phase": "admitted", "reconciled": True,
+            "destination": {"kind": "run", "scope": row["scope"]}, "resolvedScope": row["scope"]}}
+    receipt["busyQueue"] = {"holdRpcId": hold_rpc, "holdInput": hold_user,
+        "holdAssistant": hold_assistant, "queueReady": ready,
+        "recoveredHoldInput": copy.deepcopy(hold_user),
+        "recoveredHoldAssistant": copy.deepcopy(hold_assistant)}
+    for field, epoch in (("drained", receipt["reconnect"]["epochBefore"]), ("recoveredDrained", receipt["reconnect"]["epochAfter"])):
+        receipt["busyQueue"][field] = {"scope": copy.deepcopy(row["scope"]), "connectionEpoch": epoch,
+            "snapshotRevision": 10, "commonQueue": [], "publicQueue": ({"kind": "control", "items": []}
+            if kind == "native" else {"kind": "inbox", "projection": {"sequence": 20, "value": {"next-turn": [], "next-step": []}}})}
+    return receipt
 
 
 def native_provider_body(row, image_data):
@@ -225,6 +273,24 @@ class NativeDshMixedFixtureTests(unittest.TestCase):
             self.assertEqual(result["attemptCount"], 2)
             self.assertEqual([row["authoredText"] for row in result["requests"]], [fixture.TEXT_PROMPT, ""])
             self.assertEqual(result["retryCount"], 0)
+            # A queued turn retains the old runtime/time context between held user
+            # and assistant. Only the actually recorded held prefix may be removed.
+            held = {"messages": [{"role": "user", "content": fixture.BUSY_HOLD_TEXT}] + copy.deepcopy(bodies[0]["messages"][1:])}
+            queued = {"messages": copy.deepcopy(held["messages"]) + [
+                {"role": "assistant", "content": fixture.EXPECTED_REPLY}, copy.deepcopy(bodies[0]["messages"][0])]}
+            busy_provider = runner.MixedProvider("dsh", busy_queue=True)
+            for body in (held, queued, bodies[1]):
+                busy_provider.observe("/dsh/v1/chat/completions", body)
+            busy_receipt = busy_receipt_for("dsh")
+            with patch.object(runner, "record_imageio_evidence", side_effect=lambda observations, *_: observations):
+                accepted = busy_provider.validate(busy_receipt,
+                    [entry["scope"]["sessionId"] for entry in busy_receipt["roundTrips"]], home, Path(home) / "busy-images")
+            self.assertEqual(accepted["requestCount"], 3)
+            self.assertFalse(busy_provider.errors)
+            altered = copy.deepcopy(queued)
+            altered["messages"][1]["content"] += "\nunknown injected human text"
+            with self.assertRaisesRegex(ValueError, "exact recorded held prefix"):
+                fixture.strip_provider_hold_request("dsh", altered, held)
 
     def test_rejects_durable_native_file_in_place_of_public_projection(self):
         receipt = receipt_for("native")
@@ -233,6 +299,51 @@ class NativeDshMixedFixtureTests(unittest.TestCase):
             "mime": "text/plain", "name": fixture.FILE_NAME, "bytes": len(fixture.FILE_BYTES)}
         with self.assertRaisesRegex(ValueError, "project_content_blocks DTO"):
             fixture.validate_probe_receipt(receipt, "native", [entry["scope"]["sessionId"] for entry in receipt["roundTrips"]])
+
+    def test_busy_provider_emits_incomplete_stream_before_waiting_for_queue_release(self):
+        import importlib.util
+        import http.client
+        import threading
+        spec = importlib.util.spec_from_file_location("mixed_runner", Path(__file__).parents[1] / "test-real-native-dsh-mixed-files.py")
+        runner = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(runner)
+        for kind in ("native", "dsh"):
+            provider = runner.MixedProvider(kind, busy_queue=True)
+            runner.ProviderHandler.providers = {kind: provider}
+            server = runner.http.server.ThreadingHTTPServer(("127.0.0.1", 0), runner.ProviderHandler)
+            thread = threading.Thread(target=server.serve_forever)
+            thread.start()
+            connection = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=3)
+            field = "input" if kind == "native" else "messages"
+            part_type = "input_text" if kind == "native" else "text"
+            body = {field: [{"role": "user", "content": [{"type": part_type, "text": fixture.BUSY_HOLD_TEXT}]}]}
+            route = "/native/v1/responses" if kind == "native" else "/dsh/v1/chat/completions"
+            try:
+                connection.request("POST", route, body=json.dumps(body), headers={"Content-Type": "application/json"})
+                response = connection.getresponse()
+                self.assertEqual(response.status, 200)
+                self.assertTrue(provider.hold_entered.wait(timeout=2))
+                self.assertFalse(provider.release_hold.is_set())
+                prefix = []
+                while True:
+                    line = response.readline()
+                    self.assertTrue(line)
+                    prefix.append(line)
+                    if b"ENDPOINT_" in line:
+                        break
+                self.assertNotIn(b"ENDPOINT_REPLY_OK", b"".join(prefix))
+                provider.release_hold.set()
+                suffix = response.read()
+                self.assertIn(b"REPLY_OK", suffix)
+                self.assertEqual(provider.attempts, 1)
+                self.assertFalse(provider.errors)
+            finally:
+                provider.release_hold.set()
+                connection.close()
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=3)
+                self.assertFalse(thread.is_alive())
 
     def test_dsh_title_is_accepted_only_in_published_one_message_json_shape(self):
         body = {"messages": [
@@ -248,6 +359,66 @@ class NativeDshMixedFixtureTests(unittest.TestCase):
         body["messages"][1]["content"] = fixture.TITLE_PREFIX + "not JSON"
         with self.assertRaisesRegex(ValueError, "malformed published JSON"):
             fixture.classify_dsh_request(body)
+
+    def test_busy_receipt_requires_exact_native_control_or_dsh_inbox_witness(self):
+        for kind in ("native", "dsh"):
+            value = busy_receipt_for(kind)
+            self.assertTrue(fixture.validate_probe_receipt(value, kind,
+                [row["scope"]["sessionId"] for row in value["roundTrips"]], busy_queue=True)["busyQueue"])
+            bad = copy.deepcopy(value)
+            bad["busyQueue"]["queueReady"]["scope"]["sessionId"] = "another-session"
+            with self.assertRaisesRegex(ValueError, "scope"):
+                fixture.validate_probe_receipt(bad, kind,
+                    [row["scope"]["sessionId"] for row in value["roundTrips"]], busy_queue=True)
+            bad = copy.deepcopy(value)
+            fact = bad["busyQueue"]["queueReady"]["queueFact"]
+            message = fact.get("message", fact)
+            message["source"]["rpcId"] = "other-rpc"
+            with self.assertRaisesRegex(ValueError, "queue fact"):
+                fixture.validate_probe_receipt(bad, kind,
+                    [row["scope"]["sessionId"] for row in value["roundTrips"]], busy_queue=True)
+            bad_common = copy.deepcopy(value)
+            bad_common["busyQueue"]["queueReady"]["commonQueue"] = []
+            with self.assertRaisesRegex(ValueError, "common queue"):
+                fixture.validate_probe_receipt(bad_common, kind,
+                    [row["scope"]["sessionId"] for row in value["roundTrips"]], busy_queue=True)
+            bad_drained = copy.deepcopy(value)
+            bad_drained["busyQueue"]["recoveredDrained"]["commonQueue"] = ["stale"]
+            with self.assertRaisesRegex(ValueError, "drain"):
+                fixture.validate_probe_receipt(bad_drained, kind,
+                    [row["scope"]["sessionId"] for row in value["roundTrips"]], busy_queue=True)
+            bad = copy.deepcopy(value)
+            bad["busyQueue"]["recoveredHoldInput"]["reconciliationId"] = "other-hold"
+            with self.assertRaisesRegex(ValueError, "reconnect changed"):
+                fixture.validate_probe_receipt(bad, kind,
+                    [row["scope"]["sessionId"] for row in value["roundTrips"]], busy_queue=True)
+
+    def test_busy_provider_inspection_removes_only_exact_committed_hold_turn(self):
+        receipt = busy_receipt_for("native")
+        row = receipt["roundTrips"][0]
+        _, image_bytes = row_for("native", 0)
+        content = [{"type": "input_text", "text": fixture.TEXT_PROMPT},
+            {"type": "input_image", "image_url": "data:image/png;base64," + row["imageInputs"][0]["data"]},
+            {"type": "input_file", "filename": fixture.FILE_NAME,
+             "file_data": "data:text/plain;base64," + base64.b64encode(fixture.FILE_BYTES).decode()},
+            {"type": "input_image", "image_url": "data:image/png;base64," + row["imageInputs"][1]["data"]}]
+        body = {"input": [
+            {"role": "user", "content": [{"type": "input_text", "text": fixture.BUSY_HOLD_TEXT}]},
+            {"role": "assistant", "content": [{"type": "output_text", "text": fixture.EXPECTED_REPLY}]},
+            {"role": "user", "content": content}]}
+        observed = fixture.inspect_provider_request("native", body, expected_text=fixture.TEXT_PROMPT,
+            images=row["imageInputs"], image_bytes=image_bytes, upload_receipt=row["uploadReceipt"],
+            input_item=row["input"], dsh_home="/tmp/owned-dsh",
+            preceding_turn=(receipt["busyQueue"]["holdInput"], receipt["busyQueue"]["holdAssistant"]),
+            preceding_request={"input": [body["input"][0]]})
+        self.assertEqual(observed["authoredText"], fixture.TEXT_PROMPT)
+        body["input"].insert(1, {"role": "user", "content": "unrelated human"})
+        with self.assertRaisesRegex(ValueError, "exact fixed final hold response"):
+            fixture.inspect_provider_request("native", body, expected_text=fixture.TEXT_PROMPT,
+                images=row["imageInputs"], image_bytes=image_bytes, upload_receipt=row["uploadReceipt"],
+                input_item=row["input"], dsh_home="/tmp/owned-dsh",
+                preceding_turn=(receipt["busyQueue"]["holdInput"], receipt["busyQueue"]["holdAssistant"]),
+                preceding_request={"input": [body["input"][0]]})
 
 
 if __name__ == "__main__":
