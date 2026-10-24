@@ -478,6 +478,129 @@ async fn same_destination_task_shares_parent_draft_admission_and_survives_parent
 }
 
 #[tokio::test]
+async fn replacing_task_source_for_same_parent_and_task_rejects_old_ready_run() {
+    use tekes_agent_components_ui::SidePanel;
+    use tekes_agent_ui_bindings::RunBinding;
+    use tekes_agent_ui_demo::component_demo::ComponentDemo;
+    use tekes_ui_controls::composition::*;
+
+    let (runtime, _) = setup().await;
+    let parent = Arc::new(
+        RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "a"))
+            .await
+            .unwrap(),
+    );
+    let parent_destination = ComposerDestination::run(parent.scope().clone());
+    parent
+        .edit_text(&parent_destination, "父会话草稿保持独立".into())
+        .unwrap();
+    let mut view = ComponentDemo::new([parent.clone()]).unwrap();
+
+    let old_source = Arc::new(TaskPaneBinding::for_run(&parent));
+    let old_token = old_source.begin(parent.scope().clone(), "task").unwrap();
+    assert!(old_source.commit(&old_token, Ok(Some(row("b")))));
+    view.open_task_source(old_source.clone()).unwrap();
+    let mut commands = view.take_background_commands();
+    assert_eq!(commands.len(), 1);
+    let tekes_agent_ui_demo::component_demo::DemoCommand::OpenTask {
+        parent: command_parent,
+        task_id: command_task,
+        source: command_source,
+    } = commands.remove(0)
+    else {
+        panic!("expected original task loader")
+    };
+    assert_eq!(&command_parent, parent.scope());
+    assert_eq!(command_task, "task");
+    assert!(Arc::ptr_eq(&command_source, &old_source));
+    let old_run = old_source.open_resolved().await.unwrap().unwrap();
+    assert_eq!(old_run.scope(), &row("b").scope);
+    assert!(
+        view.install_task_run(parent.scope().clone(), "task".into(), old_run.clone())
+            .unwrap()
+    );
+    let old_ids = view.panel_composer_ids().unwrap();
+    assert!(view.tree.get(old_ids.root).is_some());
+
+    let new_source = Arc::new(TaskPaneBinding::for_run(&parent));
+    let new_token = new_source.begin(parent.scope().clone(), "task").unwrap();
+    assert!(new_source.commit(&new_token, Ok(Some(row("b")))));
+    view.open_task_source(new_source.clone()).unwrap();
+    let mut commands = view.take_background_commands();
+    assert_eq!(commands.len(), 1);
+    let tekes_agent_ui_demo::component_demo::DemoCommand::OpenTask {
+        parent: command_parent,
+        task_id: command_task,
+        source: command_source,
+    } = commands.remove(0)
+    else {
+        panic!("expected replacement task loader")
+    };
+    assert_eq!(&command_parent, parent.scope());
+    assert_eq!(command_task, "task");
+    assert!(Arc::ptr_eq(&command_source, &new_source));
+
+    assert_eq!(old_run.access(), PaneAccess::Missing);
+    assert!(view.tree.get(old_ids.root).is_none());
+    assert!(
+        !view
+            .install_task_run(parent.scope().clone(), "task".into(), old_run.clone())
+            .unwrap()
+    );
+    assert!(view.tree.get(old_ids.root).is_none());
+
+    let new_run = new_source.open_resolved().await.unwrap().unwrap();
+    assert_eq!(new_run.scope(), old_run.scope());
+    assert!(!Arc::ptr_eq(&old_run, &new_run));
+    assert_eq!(old_run.access(), PaneAccess::Missing);
+    assert!(
+        view.install_task_run(parent.scope().clone(), "task".into(), new_run.clone())
+            .unwrap()
+    );
+    let new_ids = view.panel_composer_ids().unwrap();
+    assert_ne!(new_ids, old_ids);
+    assert!(view.tree.get(new_ids.root).is_some());
+    assert!(view.tree.get(old_ids.root).is_none());
+
+    view.tree.focus(Some(new_ids.editor), true);
+    assert!(
+        view.event(&ContentEvent::Commit {
+            text: "新任务草稿".into(),
+            replacement: None,
+        })
+        .unwrap()
+        .is_empty()
+    );
+    // A late completion must also fail after the replacement is fully ready.
+    assert!(
+        !view
+            .install_task_run(parent.scope().clone(), "task".into(), old_run.clone())
+            .unwrap()
+    );
+    assert_eq!(old_run.access(), PaneAccess::Missing);
+    assert_eq!(view.panel_composer_ids(), Some(new_ids));
+    assert!(view.tree.get(old_ids.root).is_none());
+    assert!(view.tree.get(new_ids.root).is_some());
+    assert_eq!(new_run.current_run().unwrap().draft.text, "新任务草稿");
+    assert_eq!(
+        parent.current_run().unwrap().draft.text,
+        "父会话草稿保持独立"
+    );
+
+    let close = view
+        .tree
+        .get(view.panel_id())
+        .unwrap()
+        .component::<SidePanel>()
+        .unwrap()
+        .close_id();
+    view.accessibility_action(close, None, AccessibilityAction::Press)
+        .unwrap();
+    assert_eq!(new_run.access(), PaneAccess::Missing);
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
 async fn public_consumer_reuses_exact_task_target_without_replacing_its_presentation() {
     use tekes_agent_ui_bindings::RunBinding;
     use tekes_agent_ui_consumer_check::open_task_from_original_run;

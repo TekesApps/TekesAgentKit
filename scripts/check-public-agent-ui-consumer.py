@@ -200,6 +200,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         side_chats: SideChatSnapshot::default(),
         supports_side_chat: None,
     })?;
+    let old_content = side_panel.content_token(&SidePanelTabKind::Summary).unwrap();
+    side_panel.retire_content(&old_content)?;
+    assert!(side_panel.retire_content(&old_content).is_err());
+    let fresh_content = side_panel.content_token(&SidePanelTabKind::Summary).unwrap();
+    side_panel.retire_content(&fresh_content)?;
     let _side_panel_host = side_panel.into_host()?;
 
     Ok(())

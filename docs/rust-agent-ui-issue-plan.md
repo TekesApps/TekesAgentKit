@@ -611,3 +611,8 @@ Native后续切片：复用既有feature headless与已安装Kernel0.9.3，真�
 #16/#27 继续按[busy 契约](rust-agent-ui-native-dsh-busy-queue-contract-20261025.md)与[DSH 通用投影契约](rust-agent-ui-dsh-queue-projection-contract-20261025.md)推进。原混合附件的空闲 Queue 与本轮真实运行中排队分开计证。DSH 公共 inbox 已通过原 Run/Composer 消费与真实 provider 门禁；Native 0.9.3 的 admitted RPC / 空 control queue 已转交 [Kernel #86](https://github.com/TekesApps/TekesKernel/issues/86)，不改上游、不绕过原公开接口。
 
 #15 适用新增默认关闭的 endpoint 投影授权 hook、HostedEndpoint 透传与独立 consumer 验证；#17 保留原消息/附件/source 和重连，不将 admitted 当历史恢复。实现、最终程序与 CI 另绑定本批提交；[分层结果](rust-agent-ui-native-dsh-busy-queue-results-20261025.md)持续记录实际通过与未通过项。#28 不因该局部闭环关闭，PR #10 保持 draft，桌面验收仍 not_run。
+
+
+### #23：同 scope Task owner 更换的控件退休（2026-10-25）
+
+[设计](rust-agent-ui-task-content-retirement-contract-20261025.md)与[结果](rust-agent-ui-task-content-retirement-results-20261025.md)补齐旧 source 已取消但旧 Composer 仍 mounted 的实证缺陷。新增 SidePanel 目标内容退休 API、精确实例 token，demo 在 source owner 更换时先清焦点/退休 UI 再撤销旧 source。最终默认/feature 定向各15项、UI790/0/1、严格检查与独立consumer实际执行通过；592输入冻结。三端权威Task来源、完整窗口/chrome/IME/AX未扩报，#23不关闭；当前代码CI另核。bd5e前一两轮CI已核验，仅#53失败。

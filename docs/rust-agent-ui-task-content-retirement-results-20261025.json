@@ -1,0 +1,169 @@
+{
+  "format": 1,
+  "accepted": true,
+  "evidenceScope": "task-owner-replacement-public-component-memory-sep",
+  "sourceBase": "bd5e7f53633c6daf288bc71a47fc457923539e27",
+  "frozenInputs": {
+    "count": 592,
+    "manifest": ".runtime-fixtures/acceptance-refresh-20261025/task-content-retirement-source-manifest.json",
+    "sha256": "f86562783f90108dadd7cc240463f70856f38b0574cf81a73bb4be2b2b9c7298"
+  },
+  "sdkPin": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "checks": [
+    {
+      "name": "focused-final",
+      "command": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "ui/Cargo.toml",
+        "--locked",
+        "-p",
+        "tekes-agent-ui-demo",
+        "--test",
+        "task_binding",
+        "--test",
+        "side_panel_retirement",
+        "--",
+        "--nocapture"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "focused-feature",
+      "command": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "ui/Cargo.toml",
+        "--locked",
+        "-p",
+        "tekes-agent-ui-demo",
+        "--test",
+        "task_binding",
+        "--test",
+        "side_panel_retirement",
+        "--features",
+        "acceptance-source-witness",
+        "--",
+        "--nocapture"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--manifest-path",
+        "ui/Cargo.toml",
+        "--workspace",
+        "--all-targets",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "clippy-feature",
+      "command": [
+        "cargo",
+        "clippy",
+        "--manifest-path",
+        "ui/Cargo.toml",
+        "--locked",
+        "-p",
+        "tekes-agent-ui-demo",
+        "--all-targets",
+        "--features",
+        "acceptance-source-witness",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "consumer-lock",
+      "command": [
+        "cargo",
+        "generate-lockfile",
+        "--manifest-path",
+        ".runtime-fixtures/acceptance-refresh-20261025/task-content-retirement-public-consumer-final/Cargo.toml",
+        "--offline"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "consumer-run",
+      "command": [
+        "cargo",
+        "run",
+        "--manifest-path",
+        ".runtime-fixtures/acceptance-refresh-20261025/task-content-retirement-public-consumer-final/Cargo.toml",
+        "--locked",
+        "--offline"
+      ],
+      "exit": 0
+    }
+  ],
+  "workspaceTests": {
+    "passed": 790,
+    "failed": 0,
+    "ignored": 1
+  },
+  "defaultFocused": 15,
+  "featureFocused": 15,
+  "pythonConsumerTests": 3,
+  "programs": [
+    {
+      "path": ".runtime-fixtures/acceptance-refresh-20261025/task-content-retirement/programs/focused-final-side_panel_retirement",
+      "sha256": "b37c65db9c9bd90b6cd332299091a990a80ac09c9fef619ea6730813f748b13b",
+      "source": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/deps/side_panel_retirement-69ff630e4dce9004",
+      "bytes": 2880368
+    },
+    {
+      "path": ".runtime-fixtures/acceptance-refresh-20261025/task-content-retirement/programs/focused-final-task_binding",
+      "sha256": "6efebb214e4090259b9218534848cfaeb566ec1b10e346ea9a5de36892e19dd9",
+      "source": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/deps/task_binding-c3d07ef50234b919",
+      "bytes": 36827360
+    },
+    {
+      "path": ".runtime-fixtures/acceptance-refresh-20261025/task-content-retirement/programs/focused-feature-side_panel_retirement",
+      "sha256": "398df258a0e8c41f8bc62fe36b84948730e0454e853f2b05b1216a582f67e9ed",
+      "source": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/deps/side_panel_retirement-c3ecff11cb4b1f62",
+      "bytes": 2880336
+    },
+    {
+      "path": ".runtime-fixtures/acceptance-refresh-20261025/task-content-retirement/programs/focused-feature-task_binding",
+      "sha256": "bb8c5e91d9c3d4356fdcd77e641ba4acacfc5ff570e690cf3533713ad7fb5123",
+      "source": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/deps/task_binding-53448cf2124b3cd6",
+      "bytes": 36825376
+    },
+    {
+      "path": ".runtime-fixtures/acceptance-refresh-20261025/task-content-retirement/programs/public-consumer",
+      "sha256": "fffc7d6666fff781ab4750200b427b8ad2eb0fe4880c977e47ba6ba991b3f65b",
+      "bytes": 16566144
+    }
+  ],
+  "logSha256": {
+    "task-content-retirement-clippy.log": "af932184d217c5fd8fa42573fc4bb36b961ed684ac1a8f2c2415f69580511bad",
+    "task-content-retirement-focused.log": "fa7f023d671b906dee05627a7db9d702b42e702d5f95a36463df60afb10d490a",
+    "task-content-retirement-workspace.log": "7241ebb86cc097a67a5e04e9a293f07a050467195f66dba63a0681e9fa623ed0",
+    "task-content-retirement-focused-final.log": "af6e883c6524c3e34418586ba5c2ad4c7b02c5e25d4d4f9f56e72ccb70014e5d",
+    "task-content-retirement-python.log": "eacc122b2b70407e8c85c4ff6fb76ee5a3bab6702ee6aee881bc251fb3271ca9",
+    "task-content-retirement-focused-feature.log": "d9f0e7691f57d16a7cff3792819b77f6ba8287c77ef3fbf1c6c72889f5fa2a98",
+    "task-content-retirement-consumer-lock.log": "96a0661a1ef3aee015d3f05e2034dbb53191d0e7eb1f9a6a827cca9ccbef1e4d",
+    "task-content-retirement-clippy-feature.log": "fa20c327a6eb87c100962803698eb96bb545d9d8bf3d9015c5e15a2892efae34",
+    "task-content-retirement-focused-2.log": "e7fc54fe452c3c0be0b07c8738aad6b4a69c0213ad2d967e8fe1f462e592e1b9",
+    "task-content-retirement-consumer-run.log": "b7a085ab7f30a14640b26249f29a99fad7763edcb7e22f72d2547aab064c0467"
+  },
+  "desktop": false,
+  "physicalIme": false,
+  "osAx": false,
+  "realTaskProducer": false,
+  "issueClosed": false,
+  "cacheDeletedBytes": 0
+}

@@ -3,7 +3,10 @@ use crate::{
     SidePanelLauncher, SidePanelLauncherInput, SidePanelLauncherIntent, SidePanelLauncherOwner,
     SidePanelLayout, SidePanelLayoutGeometry, side_panel_layout::AgentPanelBody,
 };
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::{
+    collections::{BTreeMap, BTreeSet, VecDeque},
+    sync::Arc,
+};
 use tekes_agent_presentation::{AgentTask, ChildHistoryLayout, RunScope, TaskPanelState};
 pub use tekes_agent_presentation::{SideChat, SideChatPhase, SideChatSnapshot};
 use tekes_ui_controls::{
@@ -205,6 +208,7 @@ impl TabMount {
 /// UI mount lifetime only. Async payloads must first pass existing TaskPanelState/child fences.
 #[derive(Clone, Debug)]
 pub struct PanelContentToken {
+    owner: Arc<()>,
     key: Key,
     context: u64,
     mount: u64,
@@ -216,6 +220,7 @@ pub struct PanelContentToken {
 /// Same-thread tab changes retain instances; changing endpoint/thread evicts UI.
 #[derive(Debug)]
 pub struct SidePanel {
+    content_owner: Arc<()>,
     root: ComponentId,
     body: StackContent,
     detached_chrome: Option<Vec<Content>>,
@@ -246,6 +251,7 @@ impl SidePanel {
         let mut create = ButtonContent::new(&labels.create_side_chat);
         create.button.state.disabled = true;
         Self {
+            content_owner: Arc::new(()),
             root: ComponentId(base),
             launcher: None,
             launcher_root: None,
@@ -842,6 +848,7 @@ impl SidePanel {
             return None;
         }
         Some(PanelContentToken {
+            owner: self.content_owner.clone(),
             key,
             context: self.context,
             mount: mount.epoch,
@@ -853,18 +860,7 @@ impl SidePanel {
         token: &PanelContentToken,
         content: Content,
     ) -> Result<(), &'static str> {
-        if self.context != token.context
-            || self
-                .input
-                .as_ref()
-                .is_none_or(|input| !input.projection_ready || input.parent != token.key.parent)
-            || self
-                .mounts
-                .get(&token.key)
-                .is_none_or(|mount| mount.epoch != token.mount)
-        {
-            return Err("retired Agent pane content token");
-        }
+        self.validate_content_token(token)?;
         if content.id().0 >> 32 == self.root.0 >> 32 {
             return Err("pane content must use its own component namespace");
         }
@@ -876,6 +872,53 @@ impl SidePanel {
             self.retained.insert(token.key.clone(), content);
         }
         Ok(())
+    }
+    fn validate_content_token(&self, token: &PanelContentToken) -> Result<(), &'static str> {
+        if !Arc::ptr_eq(&self.content_owner, &token.owner)
+            || self.context != token.context
+            || self
+                .input
+                .as_ref()
+                .is_none_or(|input| !input.projection_ready || input.parent != token.key.parent)
+            || self
+                .mounts
+                .get(&token.key)
+                .is_none_or(|mount| mount.epoch != token.mount)
+        {
+            return Err("retired Agent pane content token");
+        }
+        Ok(())
+    }
+    /// Retire one producer's mounted or retained UI when its owner changes,
+    /// even if the next producer resolves the same logical tab and Run scope.
+    /// Ordinary facts updates should use `update` and retain their controls.
+    /// Hosts must finish composition and clear affected focus before this call.
+    /// This UI token does not replace binding/producer admission checks.
+    pub fn retire_content(&mut self, token: &PanelContentToken) -> Result<(), &'static str> {
+        self.validate_content_token(token)?;
+        let epoch = self
+            .epoch
+            .checked_add(1)
+            .ok_or("panel mount epoch exhausted")?;
+        let input = self.input.as_ref().expect("validated panel input").clone();
+        if self.mounted.as_ref() == Some(&token.key) {
+            // Drop immediately. Stashing would let the retired producer return
+            // on the next tab selection with the same logical scope.
+            self.slot().children.clear();
+            self.slot().flexible_child = None;
+            self.mounted_custom = false;
+        }
+        self.retained.remove(&token.key);
+        self.mounts
+            .get_mut(&token.key)
+            .expect("validated mount")
+            .epoch = epoch;
+        self.epoch = epoch;
+        self.geometry = None;
+        // The unchanged, previously validated input needs no new IDs,
+        // context, or mount epochs, so update cannot fail a fresh allocation
+        // preflight after this target-only retirement.
+        self.update(&input)
     }
     pub fn take_intents(&self, actions: &[ContentAction]) -> Vec<SidePanelIntent> {
         let mut intents: Vec<_> = actions

@@ -3157,7 +3157,35 @@ impl ComponentDemo {
         if let Some(old) = self.task_sources.get(&key)
             && !Arc::ptr_eq(&old.source, &source)
         {
-            old.source.cancel();
+            let old_source = old.source.clone();
+            // A new producer can resolve the exact same scope. Scope equality
+            // must not keep the retired producer's Composer in the UI slot.
+            let panel_id = self.panel_id();
+            let token = self
+                .tree
+                .get(panel_id)
+                .and_then(|node| node.component::<SidePanel>())
+                .filter(|panel| {
+                    panel
+                        .displayed_input()
+                        .is_some_and(|input| input.parent == parent)
+                })
+                .and_then(|panel| {
+                    panel.content_token(&SidePanelTabKind::Task {
+                        task_id: task_id.clone(),
+                    })
+                });
+            self.tree.focus(None, false);
+            if let Some(token) = token {
+                self.tree
+                    .get_mut(panel_id)
+                    .unwrap()
+                    .component_mut::<SidePanel>()
+                    .unwrap()
+                    .retire_content(&token)
+                    .map_err(unsupported)?;
+            }
+            old_source.cancel();
             self.task_runs.remove(&key);
         }
         self.task_sources.insert(
