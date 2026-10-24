@@ -551,11 +551,13 @@ impl InventoryRows {
                 _ => updated,
             };
             activity.insert(id.to_owned(), (running, effective));
-            rows.push(inventory_row(
-                &endpoint_id,
-                item,
-                agent.thread_actions(endpoint, id)?,
-            )?);
+            if sidebar_row_is_member(item) {
+                rows.push(inventory_row(
+                    &endpoint_id,
+                    item,
+                    agent.thread_actions(endpoint, id)?,
+                )?);
+            }
         }
         rows.sort_by(|a, b| {
             activity[&b.address.session_id]
@@ -568,6 +570,13 @@ impl InventoryRows {
         Ok(rows)
     }
 }
+/// Sidebar membership uses only normalized facts explicitly present in the
+/// public inventory item. Missing or unknown classification stays visible for
+/// compatibility and is not evidence that a row is a main thread.
+pub(crate) fn sidebar_row_is_member(item: &Value) -> bool {
+    item["summary"]["origin"] != "subagent" && item["summary"]["ephemeral"] != true
+}
+
 pub(crate) fn inventory_row(
     endpoint: &str,
     item: &Value,
@@ -685,3 +694,28 @@ mod inventory_title_tests {
 #[cfg(test)]
 #[path = "sidebar_observer_tests.rs"]
 mod observer_recovery_tests;
+
+#[cfg(test)]
+mod membership_tests {
+    use super::sidebar_row_is_member;
+    use serde_json::json;
+
+    #[test]
+    fn membership_excludes_only_explicit_subagents_and_ephemeral_rows() {
+        for (summary, expected) in [
+            (json!({"origin":"main","ephemeral":false}), true),
+            (json!({"origin":"subagent"}), false),
+            (json!({"ephemeral":true}), false),
+            (json!({"parentSessionId":"parent"}), true),
+            (json!({}), true),
+            (json!({"origin":null,"ephemeral":null}), true),
+            (json!({"origin":"unknown","ephemeral":"true"}), true),
+        ] {
+            assert_eq!(
+                sidebar_row_is_member(&json!({"summary":summary})),
+                expected,
+                "summary classification: {summary}"
+            );
+        }
+    }
+}

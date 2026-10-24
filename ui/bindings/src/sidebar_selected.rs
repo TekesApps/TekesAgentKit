@@ -1,7 +1,8 @@
 //! Selected conversation is read independently of the displayed inventory page.
 use crate::sidebar::SidebarObserverOwner;
 use crate::{
-    SidebarBinding, SidebarMultiEndpointBinding, SidebarMultiOwner, sidebar::inventory_row,
+    SidebarBinding, SidebarMultiEndpointBinding, SidebarMultiOwner,
+    sidebar::{inventory_row, sidebar_row_is_member},
 };
 use std::sync::Arc;
 use tekes_agent_components_ui::{SidebarInput, SidebarRow};
@@ -42,9 +43,10 @@ impl SidebarBinding {
             .agent
             .read_thread_inventory(&self.endpoint, &address.session_id)?;
         let row = match (&facts.item, &facts.actions) {
-            (Some(item), Some(actions)) => {
+            (Some(item), Some(actions)) if sidebar_row_is_member(item) => {
                 Some(inventory_row(&address.endpoint_id, item, actions.clone())?)
             }
+            (Some(_), Some(_)) => None,
             (None, None) => None,
             _ => {
                 return Err(tekes_agent_contract::unsupported(
