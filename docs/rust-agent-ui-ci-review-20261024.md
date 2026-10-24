@@ -20,3 +20,7 @@ PR checkout 是 GitHub 合并测试提交 `35969c3639582d870d5724de052ec144d8eaa
 证据及哈希见[机器收据](rust-agent-ui-ci-review-20261024.json)。两套 job 元数据、生成器收据、consumer 清单/锁/源码、严格阅读原始 JSON 已归档到 `.runtime-fixtures/issue-batch-20261024/ci-40044117789*` 与 `ci-40044114325*`。生成器的 `prepared-not-built` 是步骤开始时的准备收据，实际编译运行结论取对应 CI step，保留原文件不改写。
 
 本轮未启动桌面、截图、系统权限、签名安装或原生窗口；没有创建 target，也没有删除缓存，释放空间为 0。
+
+## Sidebar 宿主接入前的再次复核（ddc49c7）
+
+新基线 `ddc49c75bcd2cf4be4dd17152db7d595e6ed65da` 的 PR [40048515783](https://github.com/TekesApps/TekesAgentKit/actions/runs/40048515783) 与 push [40048512623](https://github.com/TekesApps/TekesAgentKit/actions/runs/40048512623) 均已完成：headless、UI workspace/格式/Clippy、独立 consumer 全通过；只有严格 nested-detail reading 失败，后续 demo build 被跳过。两份原始 JSON 的失败值与上表同型，没有新增失败或豁免门槛。精确 jobs/steps、原始失败哈希见[本批 CI 收据](rust-agent-ui-sidebar-host-ci-20261024.json)。这些结果只适用于 ddc49c7；随后新提交须等各自 CI，不能借用此前绿色步骤。

@@ -41,6 +41,12 @@ TekesUI `ContentHost` 提供当前同进程挂载路径。固定公开 TekesUI r
 组件的 `take_intents` / 专用 page/preference 接口，不能改为轮询当前菜单状态。完整 public constructor
 consumer 和精确开发路径见 [独立 consumer](../ui/consumer/README.md)。
 
+## Sidebar reader 生命周期
+
+当宿主显式替换 Sidebar inventory owner 时，先调用公开 `Sidebar::clear_pending_actions()` 退休旧 owner 的本地动作门禁，再安装新源；这不取消远端操作。异步结果仍须携带原 owner，并在应用 notice、导航或清除 pending 前核对，防止旧完成回执清掉新 owner 的同地址动作。普通同源 publication 更新无需清 pending。
+
+本轮 demo 的 Single/Multi adapter 和限制见[多端宿主接线](rust-agent-ui-sidebar-host-20261024.md)：它是测试宿主适配，不是新的标准业务组件；底层 inventory、selected-read、action 策略继续由公开 bindings 持有。跨端全局搜索未实现，不能用单端 query 冒充。
+
 ## 状态输入与回调
 
 | 组件 | 输入/所有权 | 宿主回调责任 |

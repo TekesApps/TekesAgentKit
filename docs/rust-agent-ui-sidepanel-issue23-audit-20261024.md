@@ -60,3 +60,5 @@ cargo test --manifest-path ui/Cargo.toml -p tekes-agent-ui-demo --test panel_nav
 ## 续批主会话已运行
 
 新增两项已实际通过：`child_binding` 6 项、`side_panel_component` 12 项，共 18 passed / 0 failed。日志 `.runtime-fixtures/sidebar-host-20261024/ui-targeted-tests-pass2.log` 中这两个 suite 成功；该命令最后另一个 Sidebar suite 的失败属于当时测试 fixture/动作入口问题，不能把整条命令写成通过。Sidebar 后续修正与完整 UI workspace 收据由主会话统一记录。没有运行桌面、真实窗口/IME，也没有新增 native ChildOpened(Err) notice dispatch 证据。
+
+本批完整 UI workspace 随后通过 637/0/1 原有忽略，包含本文件新增测试，日志 `.runtime-fixtures/sidebar-host-20261024/ui-workspace-tests.log`；后续 #22 publication 可变性收紧不修改这些测试与 SidePanel 实现。

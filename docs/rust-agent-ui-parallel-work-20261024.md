@@ -34,3 +34,7 @@
 ## 本批交回与审查
 
 三个子会话均已交回产物，由主会话完成审查、必要修正和集中验证；实际提交、测试、独立 consumer、Pi/DSH 非桌面补验以及剩余工作见[本批统一收据](rust-agent-ui-parallel-results-20261024.md)。分工表不代表 Issue 已关闭；后续可继续复用这三个子会话，各自文件范围不交叉。
+
+## Sidebar 宿主接入续批（ddc49c7 基线）
+
+继续复用以上三个独立子会话：#22 改 demo host adapter、`component_demo.rs`、`components_native.rs` 及专属测试；#23 只新增 SidePanel/child 回归与专属审计；#25 修改 presentation Summary 校验及专属回归/审计。主会话拥有 Sidebar pending 退休公开 API、consumer 生成器、共享文档/索引、集中构建、审查与 Issue 回填。构建仍串行使用原共享 target；桌面验收暂停。新宿主接入不代表跨端搜索或真实三 harness 同窗已验收。

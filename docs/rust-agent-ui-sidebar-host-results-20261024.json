@@ -1,0 +1,83 @@
+{
+  "kind": "agentkit-sidebar-host-batch",
+  "source_commit": "4967d15279542a048c44a4eed6681f560e3519ad",
+  "implementation_commits": {
+    "22": "4967d15",
+    "23": "9d7c00d",
+    "25": "7bfdd61"
+  },
+  "pull_request": "https://github.com/TekesApps/TekesAgentKit/pull/10",
+  "tekesui_rev": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "validation": {
+    "presentation_before_alias": {
+      "passed": 226,
+      "failed": 0
+    },
+    "final_panels": {
+      "passed": 16,
+      "failed": 0
+    },
+    "ui_before_immutable_publication": {
+      "passed": 637,
+      "failed": 0,
+      "ignored": 1
+    },
+    "final_sidebar_host": {
+      "passed": 1,
+      "failed": 0
+    },
+    "strict_clippy": "presentation and UI workspace all targets passed",
+    "public_consumer": "compiled and ran; SDK 243 source files verified",
+    "python_generator_tests": 3,
+    "format_boundaries": "passed",
+    "desktop": "not_run",
+    "real_harness_this_batch": "not_run"
+  },
+  "logs": [
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/presentation-tests.log",
+      "sha256": "8314ffaa11a254101a67746f7fbbf59aa2060c071d214f2b02e71f87268e8ffc"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/presentation-panels-final.log",
+      "sha256": "968e31e8ac4a5475a0bf6d546f7da6132844dc7e9e47e11d30bbc472b3f9cfee"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/presentation-clippy-final.log",
+      "sha256": "161370ac4b4a1807fbcf9feb903ab92677ab1e5b9f3c0ea014c1939cbb8bc338"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/ui-workspace-tests.log",
+      "sha256": "e53d1e523053362199662ec3c332dafd5d0c8c31facdbff3d1ff19aa83bb8b54"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/sidebar-host-final-immutable-tests.log",
+      "sha256": "eefebcd8e8844486bb2254da61da18c313b77d28738e54419cf3d40e1036fd52"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/ui-clippy-final.log",
+      "sha256": "b4ca5cc47f87d04e047001361d8215d2348ac5da5f5df831bd5d409e5badf253"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/public-consumer-run.log",
+      "sha256": "917d39d08982fff27ef77a6a352dce28c55707703f1dbfa5d776dc47c5904eb7"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/public-consumer-result.json",
+      "sha256": "6fa4262e8e492805c5ff53c7f9eec4a1a6a7998b2adf38d05cd0d9c3f6fafde6"
+    }
+  ],
+  "remaining": [
+    "cross-endpoint global search",
+    "external multi-harness configuration and native desktop acceptance",
+    "full filter/paging/reveal combinations",
+    "observer same-instance recovery",
+    "non-primary endpoint SideChat disabled",
+    "TekesUI #53 strict nested reading failure"
+  ],
+  "disk": {
+    "target_directory": "/tmp/agentkit-layout-text-292-target",
+    "new_target": false,
+    "deleted_bytes": 0
+  }
+}

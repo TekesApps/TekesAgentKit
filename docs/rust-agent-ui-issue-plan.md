@@ -251,7 +251,7 @@
 
 证据：[rust-agent-ui-sidebar-navigation-20261021.md](rust-agent-ui-sidebar-navigation-20261021.md)、[rust-agent-ui-sidebar-paging-20261021.md](rust-agent-ui-sidebar-paging-20261021.md)、[rust-agent-ui-sidebar-preferences-20261021.md](rust-agent-ui-sidebar-preferences-20261021.md)、[rust-agent-ui-sidebar-session-menu-20261022.md](rust-agent-ui-sidebar-session-menu-20261022.md)。
 
-本次交付：[多 endpoint 聚合](rust-agent-ui-sidebar-multi-endpoint-20261024.md) `6c700e9` 完成可复用 binding 和 5 项新回归，支持完整 address 的 selected-read/action 原端点路由、旧 owner 拒绝和局部终态故障保留。demo 仍只观察首端；宿主接线、跨端全局搜索与过滤分页整体组合、终态 observer 同实例恢复尚未完成。详见[三子会话本批收据](rust-agent-ui-parallel-results-20261024.md)，不据 binding 测试关闭 Issue。
+本次交付：[多 endpoint 聚合](rust-agent-ui-sidebar-multi-endpoint-20261024.md) `6c700e9` 完成可复用 binding 和 5 项新回归，支持完整 address 的 selected-read/action 原端点路由、旧 owner 拒绝和局部终态故障保留。后续 `4967d15` 已接入 demo 宿主并补齐旧 owner 隔离、按 endpoint 路由与非匹配 SideChat 禁用；跨端全局搜索、真实多 harness 配置与过滤分页整体组合、终态 observer 同实例恢复仍未完成。详见[三子会话本批收据](rust-agent-ui-parallel-results-20261024.md)，不据 binding 测试关闭 Issue。
 
 ### [#23](https://github.com/TekesApps/TekesAgentKit/issues/23) — [P1][SidePanel] Task/子代理 tabs、pointer 与有界历史闭环
 
@@ -415,3 +415,7 @@
 #12/#13有原始实现/验证评论，新工作项的已勾列表是历史实现，不等于整个Issue已完成。14个新工作项保持OPEN，只有全部本项验收且实现已合并可核验后关闭。#28最后审计完整目标；PR #10当前不会自动关闭这些功能票。
 
 新任务可使用 `.github/ISSUE_TEMPLATE/agent-ui.md`；机器索引为 `rust-agent-ui-issues.json`。本次仅梳理设计/Issue/工作流程，没有重编译、启动桌面、修改上游或产生新target。
+
+## Sidebar 宿主续批交付
+
+#22 `4967d15`、#23 `9d7c00d`、#25 `7bfdd61` 的本批实现、分层验证和未验收项见[统一收据](rust-agent-ui-sidebar-host-results-20261024.md)。UI637/0/1 原有忽略、最终宿主定向、公开 consumer 和严格检查通过；准确源码顺序以收据为准，未做桌面/真实多 harness 同窗验收，Issue 仍开放。

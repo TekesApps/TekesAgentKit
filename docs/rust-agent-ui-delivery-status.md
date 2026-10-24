@@ -4,6 +4,8 @@
 
 本批按主/子会话并行推进 #22/#23/#25：[统一结果与未验收项](rust-agent-ui-parallel-results-20261024.md)。新增多端 binding 和 Summary pointer 门禁，主会话验证 presentation225/UI634（1原有忽略）及 Pi/DSH 原 Summary→子 Run 非桌面闭环；完整交付仍未达到。
 
+本次续批：#22 demo 多端宿主接线与 owner 退休、#23 状态回归、#25 公开 facts 校验已提交；分层测试与保留范围见[新收据](rust-agent-ui-sidebar-host-results-20261024.md)。这份收据补充下列历史记录，不覆盖原生未验收结论。
+
 本页以已提交基线 `6062079` 及本轮派生来源/只读实例修复为准，按用户完整目标保留验收范围。
 当前可供实验宿主接入，**完整交付尚未达到**。组件存在、离屏通过或单个 Issue 关闭都不能单独证明完整 Views 对齐。
 本阶段增量的证据见[三端离屏覆盖补验](rust-agent-ui-offscreen-coverage-20261023.md)与[固定验收工具链](rust-agent-ui-native-toolchain.md)；不替代本页原阶段的程序身份和原生结论。
