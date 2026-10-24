@@ -52,3 +52,7 @@ cargo test --manifest-path ui/Cargo.toml -p tekes-agent-ui-demo --test panel_nav
 ```
 
 通过以上 headless/component suite 只能证明对应 Rust 状态和回调边界；不能声明三端真实 harness、全窗口布局、原生输入、辅助功能或完整 ClientKit parity 已验收。原生桌面仍未运行。
+
+## 主会话本批运行结果
+
+主会话完整 UI workspace 回归通过：634 passed、0 failed、1 项原有忽略（TekesUI #49）。其中 demo package 的 `task_binding` 10、`child_binding` 5、`side_panel_component` 11、`panel_navigation` 15 项均通过（41 项）；同名 consumer 测试文件另计，不混淆。完整日志 `.runtime-fixtures/parallel-issues-20261024/ui-tests-complete.log` 保留。严格 Clippy/格式通过。以上仍是组件/夹具运行；没有真实窗口、系统 IME 或全排列组合验收声明。

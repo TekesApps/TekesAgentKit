@@ -202,3 +202,26 @@ None 保持未知来源；该查询不是完整连续性判定，也不能代替
 仅兼容第一个当前分区；穷尽 match 与工具集合遍历应消费新 key。唯一 call 的工具 key 不随 block index 变化。
 有明确较早调用来源的迟到引用，继续使用原 ToolActivity，Transcript 不再重复生成详情；独立 OutputMessage
 仍可展示引用。宿主不处理去重或复制控件。详见[原工具组物理分区](rust-agent-ui-physical-tool-fragments-20261023.md)。
+
+## 未发布增量：多 endpoint Sidebar 与 Summary pointer 门禁
+
+现有 `SidebarBinding::new(agent, endpoint_id)` 保持单端含义。多端宿主可在原 async runtime 中显式创建
+`SidebarMultiEndpointBinding::new(agent, ["native", "pi", "dsh"])`，集合中的 ID 必须已由同一 SharedAgent 注册。
+构造不会安装 harness、创建会话或猜测来源。消费 `snapshot()` / `subscribe()` 和 publication 的 `input(selected)`，
+将完整 `SessionAddress` 作为行身份；相同 session_id 在不同 endpoint 中保留不同的行。
+`publication.endpoints` 给出各端 loaded/error/terminal_error；聚合 loaded 表示首轮已收敛，不能据此宣称所有端健康。
+
+选中补读用聚合 `read_selected(address, selection_generation)`，回执的 `project_into` 同时检查原聚合实例、
+原 endpoint 事实及现有过滤/搜索限制。行动作先 `capture_action(address, definition)`，再将一次性票据交给
+`perform_action(ticket, title, rpc_id)`；替换聚合实例后旧票据被拒绝，不能按当前选中行重新猜 endpoint。
+返回结果仍属于原 address；宿主按原导航请求身份处理完成，不因异步结果抢走后来选中的会话。
+
+本阶段复用单端 observer：其终态错误会保留最后 rows/stale 与端点错误；恢复需显式替换整个聚合 binding。
+尚未接 demo 的首端 Sidebar 装配，也没有跨端全局查询 API；既有单端 `project_search` 不能直接接多端 publication。
+完整范围及后续门槛见[多端设计](rust-agent-ui-sidebar-multi-endpoint-20261024.md)。
+
+Summary 的 `SummaryFacts::read` 无已知会话事实，因此从工具结果提取出的 UUID 只生成被动行。
+需要可导航子代理时使用 `read_with_store`：候选必须精确匹配同端 store 中的已知 session，或唯一匹配其既有
+`:<uuid>` 后缀；父自身（包括带前缀的父 ID）、unknown 与歧义都拒绝。不合成 ID、不推断家族关系，也不自动加载 child。
+宿主显式输入 `SummaryFacts`/sections 时仍负责其事实来源和权限，组件不代替宿主验证外部数据。
+这属于未发布行为收紧；旧 v0.3.8 或历史程序的验收不因此改变。见[Summary 审计](rust-agent-ui-summary-issue25-audit-20261024.md)。

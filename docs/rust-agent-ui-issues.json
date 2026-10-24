@@ -259,12 +259,13 @@
       "status": "部分已实现；待补齐/验收",
       "implemented": [
         "已有目录/搜索/分组/分页、恢复与选中补齐、稳定 action value/reveal。",
-        "活动状态、置顶/偏好/共享 CAS 及捕获来源、旧请求门禁已有回归。"
+        "活动状态、置顶/偏好/共享 CAS 及捕获来源、旧请求门禁已有回归。",
+        "6c700e9 固定多端聚合/原地址路由/owner票据与5项新回归已完成。"
       ],
       "remaining": [
         "消费非当前行上下文菜单公开契约，核对原生/AX 操作及窄宽布局。",
         "复验跨端点、过滤分页和导航后操作的来源归属；宿主只负责导航。",
-        "按多endpoint设计聚合各端inventory，并按原SessionAddress路由selected-read/action；增加重复session_id、局部失败与过滤分页的非桌面回归。"
+        "多端binding接demo宿主；定约全局query并验证过滤分页/全局偏好与多端整体组合；终态observer恢复策略后续再扩展。"
       ],
       "acceptance": [
         "非当前会话右键不错误改变目标；pin/share/rename/archive 作用于原捕获 item。",
@@ -276,22 +277,27 @@
         "docs/rust-agent-ui-sidebar-paging-20261021.md",
         "docs/rust-agent-ui-sidebar-preferences-20261021.md",
         "docs/rust-agent-ui-sidebar-session-menu-20261022.md",
-        "docs/rust-agent-ui-sidebar-multi-endpoint-20261024.md"
+        "docs/rust-agent-ui-sidebar-multi-endpoint-20261024.md",
+        "docs/rust-agent-ui-parallel-results-20261024.md"
       ],
       "dependencies": [
         "TekesUI#44"
       ],
       "progress": {
         "date": "2026-10-24",
+        "commit": "6c700e9",
         "verified": [
-          "定向只读核对：已有分页/过滤旧请求门禁，单端API合法",
-          "明确demo首端装配范围并完成多端聚合设计草案"
+          "固定多端binding、完整地址、聚合owner读取与动作票据",
+          "2项聚合+3项双端夹具；UI workspace634/1原有忽略",
+          "独立binding API consumer编译及错误配置拒绝；两端实际行为另由夹具证明"
         ],
         "notVerified": [
-          "多端聚合/路由尚未实施",
-          "多端fixture回归未运行",
-          "原生/AX/跨进程菜单未验收"
-        ]
+          "demo宿主接线",
+          "跨端全局查询与过滤分页整体组合",
+          "终态observer同实例恢复",
+          "原生/AX/ProcessContainer"
+        ],
+        "evidence": "docs/rust-agent-ui-parallel-results-20261024.md"
       }
     },
     {
@@ -316,13 +322,27 @@
         "docs/rust-agent-ui-sidepanel-contract-audit-20261023.md",
         "docs/rust-agent-ui-task-shared-destination-20261023.md",
         "docs/rust-agent-ui-native-bounded-20261023.md",
-        "docs/rust-agent-ui-source-authority.md"
+        "docs/rust-agent-ui-source-authority.md",
+        "docs/rust-agent-ui-parallel-results-20261024.md"
       ],
       "dependencies": [
         "#12",
         "#13",
         "reading"
-      ]
+      ],
+      "progress": {
+        "date": "2026-10-24",
+        "commit": "8b5d45b",
+        "verified": [
+          "状态/pointer/父导航定向审计，无确定产品缺陷",
+          "四套demo相关测试41项通过"
+        ],
+        "notVerified": [
+          "文档列出的状态/导航组合",
+          "当前原生窗口/chrome和三端完整布局"
+        ],
+        "evidence": "docs/rust-agent-ui-parallel-results-20261024.md"
+      }
     },
     {
       "key": "sidechat",
@@ -359,7 +379,8 @@
       "status": "部分已实现；待补齐/验收",
       "implemented": [
         "已有受控 SummaryInput/Context、sections/rows、展开/用量/metadata/宿主 slots 与 source-owned actions。",
-        "行布局/缩进/label/context/child 状态等有专题收据和第二 consumer。"
+        "行布局/缩进/label/context/child 状态等有专题收据和第二 consumer。",
+        "9a62950 已知session授权门禁：无store/unknown/歧义/父UUID保持被动；Pi/DSH原Summary pointer补验通过。"
       ],
       "remaining": [
         "消费状态附件/图标、语义可选内容；核对 focus/hover/selection 与最终同内容布局。",
@@ -374,7 +395,8 @@
         "docs/rust-agent-ui-summary-context-20261022.md",
         "docs/rust-agent-ui-summary-sections-20261021.md",
         "docs/rust-agent-ui-summary-row-layout-20261022.md",
-        "docs/rust-agent-ui-summary-child-status-20261022.md"
+        "docs/rust-agent-ui-summary-child-status-20261022.md",
+        "docs/rust-agent-ui-parallel-results-20261024.md"
       ],
       "dependencies": [
         "TekesUI#47",
@@ -382,7 +404,22 @@
         "TekesUI#30",
         "TekesUI#38",
         "TekesUI#46"
-      ]
+      ],
+      "progress": {
+        "date": "2026-10-24",
+        "commit": "9a62950",
+        "verified": [
+          "无store被动、同端精确/唯一已知session授权，拒绝父/unknown/歧义",
+          "presentation225、UI634/1原有忽略、严格Clippy/格式",
+          "当前冻结程序Pi1.4.0/DSHrc.2原Summary至独立子Run非桌面闭环"
+        ],
+        "notVerified": [
+          "Native当前程序实际来源重跑",
+          "SDK图标/富内容、完整布局与AX",
+          "系统IME/桌面/ProcessContainer"
+        ],
+        "evidence": "docs/rust-agent-ui-parallel-results-20261024.md"
+      }
     },
     {
       "key": "process",

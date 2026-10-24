@@ -1,6 +1,6 @@
 # Sidebar 多 endpoint 聚合设计草案
 
-状态：Issue #22 的 additive binding slice 已实现于工作树，Cargo 验证待主会话串行执行。本文只界定 Rust AgentKit 的多 endpoint 数据与路由边界；不修改 TekesUI、SDK、现有单 endpoint API 或 Sidebar 状态机。
+状态：Issue #22 的 additive binding slice 已提交 `6c700e9`；主会话完成本批统一验证，完整 Issue 仍未完成。本文只界定 Rust AgentKit 的多 endpoint 数据与路由边界；不修改 TekesUI、SDK、现有单 endpoint API 或 Sidebar 状态机。
 
 ## 背景与边界
 
@@ -60,8 +60,8 @@ Issue #22 中与 TekesUI #44 无依赖的多端聚合闭环，至少验证：
 
 ## 验证边界与当前状态
 
-当前实现新增 `SidebarMultiEndpointBinding` 和 `SidebarMultiPublication`，构造时固定并校验 endpoint 集合，组合原单端 observer publication；原 `SidebarBinding` API 与实现保持不变。selected read 复用单端 `SidebarSelectedRead` 并增加聚合 owner token。Action 先捕获完整 address/action definition 与 owner，再以 endpoint 当前 action catalog 复核并路由到原 child binding。全局搜索未实现，也不将现有 `SidebarSearchBinding` 的结果解释为多端搜索。原生 demo 仍只将 `scopes[0]` 接入 Sidebar，宿主装配不在本 issue slice 内。Issue #22 的公开 consumer 和 workspace build 仍待主会话验证。
+当前实现新增 `SidebarMultiEndpointBinding` 和 `SidebarMultiPublication`，构造时固定并校验 endpoint 集合，组合原单端 observer publication；原 `SidebarBinding` API 与实现保持不变。selected read 复用单端 `SidebarSelectedRead` 并增加聚合 owner token。Action 先捕获完整 address/action definition 与 owner，再以 endpoint 当前 action catalog 复核并路由到原 child binding。全局搜索未实现，也不将现有 `SidebarSearchBinding` 的结果解释为多端搜索。原生 demo 仍只将 `scopes[0]` 接入 Sidebar，宿主装配不在本 issue slice 内。公开 API 独立 consumer 与完整 UI workspace 验证已通过；前者仅编译 API 与运行错误配置门禁，不证明双端行为。
 
-新增 `ui/demo/tests/sidebar_multi.rs` 覆盖固定集合校验、两个隔离 endpoint 的同 session ID 双行、非首 endpoint selected read、aggregate owner 与 selection generation fencing、rename action 路由、row 移除后旧 action ticket 拒绝及旧 owner ticket 拒绝。`ui/bindings/src/sidebar_multi.rs` 的纯聚合单测覆盖首轮 terminal failure 的收敛语义、已加载端点故障后的 last rows/stale 保留，以及同 activity 下完整 address 稳定排序。上述测试代码本轮尚未由此子会话运行；主会话负责统一 Cargo 验证。
+新增 `ui/demo/tests/sidebar_multi.rs` 覆盖固定集合校验、两个隔离 endpoint 的同 session ID 双行、非首 endpoint selected read、aggregate owner 与 selection generation fencing、rename action 路由、row 移除后旧 action ticket 拒绝及旧 owner ticket 拒绝。`ui/bindings/src/sidebar_multi.rs` 的纯聚合单测覆盖首轮 terminal failure 的收敛语义、已加载端点故障后的 last rows/stale 保留，以及同 activity 下完整 address 稳定排序。子会话交付静态代码后，主会话已完成 2 项聚合单测和 3 项双端夹具测试，完整 UI 634 passed / 1 项原有忽略，严格 Clippy/格式通过。具体证据与未验收项见[本批收据](rust-agent-ui-parallel-results-20261024.md)。
 
 Issue #22 的这一部分应以组件/绑定测试、AgentKit workspace 验证和公开 API 第二 consumer 验证为验收依据；本阶段不要求桌面验收，也不因未跑桌面而阻断这些无 UI 数据和路由契约。TekesUI #44 仍保持独立依赖关系；若其基础组件缺少实现所需事件或属性，应另行报告并提 issue，不在 AgentKit 里 fork TekesUI。

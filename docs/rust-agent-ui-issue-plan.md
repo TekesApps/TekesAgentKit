@@ -29,6 +29,10 @@
 | Native/Pi/DSH、第二consumer、原生/系统IME/AX | #15、#27 |
 | review、CI、merge/tag与磁盘/WIP | #27、#28 |
 
+## 当前主/子会话并行安排
+
+见[文件范围、负责人及串行集成门槛](rust-agent-ui-parallel-work-20261024.md)。本批并行推进 #22 多端 Sidebar、#23 Task/child 契约核对、#25 Summary 来源动作；主会话集中处理 CI、公共接口、构建与回填。#17/#21 共享组合链暂不同时写入；SDK 依赖和桌面验收仍按具体子项等待。
+
 ## 执行顺序
 
 1. 可先推进 #15 的API/文档/依赖审计、#19的公开producer契约、#27的验收矩阵；这些准备不要求启动桌面。
@@ -247,7 +251,7 @@
 
 证据：[rust-agent-ui-sidebar-navigation-20261021.md](rust-agent-ui-sidebar-navigation-20261021.md)、[rust-agent-ui-sidebar-paging-20261021.md](rust-agent-ui-sidebar-paging-20261021.md)、[rust-agent-ui-sidebar-preferences-20261021.md](rust-agent-ui-sidebar-preferences-20261021.md)、[rust-agent-ui-sidebar-session-menu-20261022.md](rust-agent-ui-sidebar-session-menu-20261022.md)。
 
-本次发现与设计：[多 endpoint 聚合](rust-agent-ui-sidebar-multi-endpoint-20261024.md)。现有单端 API 合法，demo 只观察首端；多端汇总与路由尚未实施，可按 #22 推进且不依赖 #44。跨端同名 ID、局部故障/旧读、过滤分页和动作路由需新增非桌面回归，不能据已有单端测试勾选完成。
+本次交付：[多 endpoint 聚合](rust-agent-ui-sidebar-multi-endpoint-20261024.md) `6c700e9` 完成可复用 binding 和 5 项新回归，支持完整 address 的 selected-read/action 原端点路由、旧 owner 拒绝和局部终态故障保留。demo 仍只观察首端；宿主接线、跨端全局搜索与过滤分页整体组合、终态 observer 同实例恢复尚未完成。详见[三子会话本批收据](rust-agent-ui-parallel-results-20261024.md)，不据 binding 测试关闭 Issue。
 
 ### [#23](https://github.com/TekesApps/TekesAgentKit/issues/23) — [P1][SidePanel] Task/子代理 tabs、pointer 与有界历史闭环
 
@@ -273,6 +277,8 @@
 - [ ] 真实 Task pointer 与家族导航来源可追溯；所有状态/空态和 tab 切换均有明确验收。
 
 证据：[rust-agent-ui-sidepanel-contract-audit-20261023.md](rust-agent-ui-sidepanel-contract-audit-20261023.md)、[rust-agent-ui-task-shared-destination-20261023.md](rust-agent-ui-task-shared-destination-20261023.md)、[rust-agent-ui-native-bounded-20261023.md](rust-agent-ui-native-bounded-20261023.md)、[rust-agent-ui-source-authority.md](rust-agent-ui-source-authority.md)。
+
+本次推进：`8b5d45b` 的[SidePanel 定向审计](rust-agent-ui-sidepanel-issue23-audit-20261024.md)未发现确定产品缺陷；四套 demo 测试 41 项通过。当前窗口/chrome、明确列出的状态组合仍待验收。
 
 ### [#24](https://github.com/TekesApps/TekesAgentKit/issues/24) — [P1][SideChat] 临时分支生命周期、重开与能力门禁
 
@@ -322,6 +328,8 @@
 - [ ] 窄宽/字号/主题下行与图标/label 语义正确；完整当前原生与可达性单独有收据。
 
 证据：[rust-agent-ui-summary-context-20261022.md](rust-agent-ui-summary-context-20261022.md)、[rust-agent-ui-summary-sections-20261021.md](rust-agent-ui-summary-sections-20261021.md)、[rust-agent-ui-summary-row-layout-20261022.md](rust-agent-ui-summary-row-layout-20261022.md)、[rust-agent-ui-summary-child-status-20261022.md](rust-agent-ui-summary-child-status-20261022.md)。
+
+本次推进：`9a62950` 修复 Summary 子代理 pointer 的已知 session 授权门禁，阻止未知/歧义/父 UUID 重定向；presentation 225、UI 634/1 原有忽略通过，当前程序 Pi/DSH 原 Summary→子 Run 非桌面闭环通过。见[Summary 审计](rust-agent-ui-summary-issue25-audit-20261024.md)及[统一收据](rust-agent-ui-parallel-results-20261024.md)；不等于视觉/Native/系统 IME 验收。
 
 ### [#26](https://github.com/TekesApps/TekesAgentKit/issues/26) — [P0][ProcessContainer] 三个业务容器的同进程与跨进程宿主接入
 
