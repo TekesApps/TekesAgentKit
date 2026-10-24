@@ -534,3 +534,7 @@ Native后续切片：复用既有feature headless与已安装Kernel0.9.3，真�
 ### #17 / #21：Native 显式结算边界
 
 [边界契约](rust-agent-ui-native-run-boundaries-contract-20261024.md)和[结果](rust-agent-ui-native-run-boundaries-results-20261024.md)记录已修复差异：非streaming不替代matching settled，迟到或未知run ID不再结束当前run，空marker不造rail目标，消息/工具/fork边界跟随原run。新worker与主会话10项红绿、独立源码复核、root371、feature279、headless4、UI750/0/1、严格Clippy/格式/边界/矩阵、普通demo和新独立consumer通过；新程序Pi/DSH共39命令/15合成请求的running→failed真实协议回归accepted。错ID/缺结算/迟到交错仅有合成证据，完整窗口/IME/AX仍未验收。公开SDK指定缺口仍无新版本，不升级原精确pin，相关Issue不关闭。
+
+### #17 / #27：子 Run 原 Transcript 来源
+
+[验收契约](rust-agent-ui-child-transcript-source-contract-20261024.md)与[结果](rust-agent-ui-child-transcript-source-results-20261024.md)补齐父Summary之外的原子Run运行/失败两帧。Python21定向/242全量通过，复用精确SHA程序的真实Pi/DSH共43命令/15合成请求accepted：同scope/epoch/原User来源/opaque turnId，子Run running→error且revision递增；父Summary仍running→failed。真实DSH child库存摘要可缺省，原数据保持None，仅对应profile显式处理，默认父/Pi严格规则不变。不同publication分开，不靠childHistory终态或同文本猜来源；Rust/UI输入不变，本轮无Cargo/新target/桌面。源码、失败和最终原帧已封存，完整恢复/分页/布局/IME/AX仍开放。

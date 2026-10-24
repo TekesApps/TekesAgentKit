@@ -309,7 +309,21 @@
     "full-Transcript-parity"
   ],
   "python": "not-rerun: no Python source changes; 6318bf6 CI separately passed221",
-  "ci": "pending-new-head",
+  "ci": {
+    "headSha": "f7fe185acc2eba239936b8e6968f9cac44f7aa1f",
+    "status": "completed",
+    "prRun": 40096979427,
+    "pushRun": 40096974552,
+    "rootPassed": 371,
+    "featurePresentationPassed": 279,
+    "featureHeadlessPassed": 4,
+    "uiPassed": 750,
+    "uiIgnored": 1,
+    "pythonPassed": 221,
+    "standaloneConsumer": "success-both-runs",
+    "onlyFailure": "TekesUI #53 strict nested detail reading",
+    "receipt": ".runtime-fixtures/native-run-boundaries-20261024/ci-terminal-evidence.json"
+  },
   "issueClosed": false,
   "mergeTagRelease": false,
   "cacheBytesDeletedInThisSlice": 0,

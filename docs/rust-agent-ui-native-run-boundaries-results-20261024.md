@@ -15,3 +15,5 @@
 证据位于SSD `.runtime-fixtures/native-run-boundaries-20261024/`：1070文件源码输入、lint修正增量、候选补丁、红/绿与Clippy失败日志、最终测试程序/独立consumer、真实协议程序及隔离数据完整保留。最终定向程序SHA256 `3250c95862e86156354e35279e7050a54589df116a7c526657fb1cad109184ca`；otool只有系统dylib，归档程序不创建桌面宿主身份。所有构建串行复用SSD共享target，本轮删除0 bytes。
 
 公开TekesUI仍固定50ec49f。核查时main7c13ec0只新增无关图标调整，#47/#48/#49/#53/#54尚无对应的新公开交付；不升级依赖或修改SDK。6318bf6的两条CI终态已回填原收据：root/UI/独立consumer通过，唯一失败仍为#53严格阅读；新提交CI另核对。#17/#21/#27保持开放，严格门不豁免，不合并/tag/发布。
+
+CI终态补记（f7fe185）：PR40096979427 / push40096974552均结束，root371、feature279+headless4、UI750/0/1、Python221与独立consumer通过。两份原artifact/log核对137文件closure与f7fe185提交一致，SDK243文件closure不变，合成merge父含f7fe185。唯一失败仍是#53严格阅读（accepted=false / parentOffsetAfterAppend634 / detailVisibleAfterAppendfalse），CI demo构建被跳过，本地demo另通过；不豁免门槛。

@@ -14,13 +14,17 @@ def _text(content):
                    and isinstance(item.get('text'), str))
 
 
-def validate_transition_child(child, *, endpoint, child_id, phase, marker, actionables):
+def validate_transition_child(child, *, endpoint, child_id, phase, marker, actionables,
+                              allow_absent_dsh_inventory=False):
     if endpoint not in ('pi', 'dsh') or phase not in ('running', 'failed') or not isinstance(marker, str) or not marker:
         raise ValueError('unsupported transition profile')
-    summary = child['summary']
+    summary = child.get('summary')
+    if not isinstance(summary, dict) and not (
+            allow_absent_dsh_inventory and endpoint == 'dsh' and summary is None):
+        raise ValueError('child inventory summary absent or malformed')
     if (child.get('journal_ready') is not True or child.get('journal_error') is not None
-            or summary.get('runState') == 'parked'
-            or summary.get('status') in ('waitingForInput', 'waiting_for_input')
+            or (summary is not None and (summary.get('runState') == 'parked'
+                                        or summary.get('status') in ('waitingForInput', 'waiting_for_input')))
             or any(isinstance(value, dict) and value.get('sessionId') == child_id for value in actionables.values())):
         raise ValueError('child source is unreadable, queued or waiting')
     queue = child.get('queue')
@@ -35,7 +39,7 @@ def validate_transition_child(child, *, endpoint, child_id, phase, marker, actio
             raise ValueError('queued work is not the captured dispatching input')
     if child.get('run_open') is not (phase == 'running'):
         raise ValueError('child run_open disagrees with the required phase')
-    if phase == 'failed' and summary.get('running') is not False:
+    if phase == 'failed' and summary is not None and summary.get('running') is not False:
         raise ValueError('child inventory has not left running')
     proof = _native(child, child_id, phase, marker) if endpoint == 'pi' else _journal(child, phase, marker)
     proof['capturedDispatchingQueueCount'] = len(queue)

@@ -22,6 +22,7 @@ from dsh_owned_fixture import owned_dsh
 from pi_owned_fixture import prepare_pi
 from summary_source_fixture import validate_witness
 from summary_transition_provider import HeldFailureGate, provider_with_failure_gates
+from transcript_source_fixture import validate_transcript_pair, validate_transcript_source
 from task_family_fixture import dsh_subagent_seed_commands
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -34,7 +35,7 @@ def write_json(path, value):
         stream.write('\n')
 
 
-def commands_for(kind, workspace, marker):
+def commands_for(kind, workspace, marker, child_transcript_source=False):
     if kind == 'pi':
         commands = [
             {'op': 'create', 'cwd': str(workspace), 'saveAs': 'parent'},
@@ -53,7 +54,7 @@ def commands_for(kind, workspace, marker):
         minimum_turn = 3
     else:
         raise ValueError('unsupported endpoint')
-    return commands + [
+    commands += [
         {'op': 'open', 'sessionId': 'parent'},
         {'op': 'presentationSource', 'sessionId': 'parent'},
         {'op': 'open', 'sessionId': 'child'},
@@ -61,14 +62,22 @@ def commands_for(kind, workspace, marker):
          'content': [{'type': 'text', 'text': marker}]},
         {'op': 'waitSourceRunOpen', 'sessionId': 'child', 'inputText': marker},
         {'op': 'presentationSource', 'sessionId': 'parent'},
+    ]
+    if child_transcript_source:
+        commands.append({'op': 'presentationSource', 'sessionId': 'child'})
+    commands += [
         {'op': 'waitSettled', 'sessionId': 'child', 'minimumTurn': minimum_turn},
         *([{'op': 'childRead', 'sessionId': 'parent', 'childSessionId': 'child'}] if kind == 'pi' else []),
         {'op': 'presentationSource', 'sessionId': 'parent'},
-        {'op': 'childHistory', 'sessionId': 'parent', 'childSessionId': 'child'}]
+    ]
+    if child_transcript_source:
+        commands.append({'op': 'presentationSource', 'sessionId': 'child'})
+    commands.append({'op': 'childHistory', 'sessionId': 'parent', 'childSessionId': 'child'})
+    return commands
 
 
-def run_profile(kind, config, commands, program, workspace, output, env, gate):
-    lines, rows, sources, receipts = [], [], [], []
+def run_profile(kind, config, commands, program, workspace, output, env, gate, child_transcript_source=False):
+    lines, rows, sources, receipts, child_sources, child_receipts = [], [], [], [], [], []
     events = queue.Queue()
     process = None
     write_json(output / 'commands.json', commands)
@@ -112,6 +121,34 @@ def run_profile(kind, config, commands, program, workspace, output, env, gate):
                 if row.get('op') != 'presentationSource':
                     continue
                 witness = row['result']
+                command = commands[index - 1]
+                if child_transcript_source and command.get('sessionId') == 'child':
+                    phase = 'running' if not child_sources else 'failed'
+                    if len(child_sources) >= 2 or len(receipts) != (1 if phase == 'running' else 2):
+                        raise ValueError('child Transcript source arrived outside its parent publication pair')
+                    parent_receipt = receipts[0] if phase == 'running' else receipts[1]
+                    proof = validate_transcript_source(
+                        witness, endpoint=kind, child_id=parent_receipt['childSessionId'],
+                        phase=phase, marker=gate.marker,
+                        expected_epoch=sources[1 if phase == 'running' else 2]['snapshot']['connectionEpoch'],
+                        expected_scope={'endpointId': kind, 'threadId': parent_receipt['childSessionId'],
+                                        'sessionId': parent_receipt['childSessionId']})
+                    if proof['childSessionId'] != parent_receipt['childSessionId']:
+                        raise ValueError('child Transcript proof does not use the parent publication child pointer')
+                    child_sources.append(witness)
+                    child_receipts.append(proof)
+                    write_json(output / ('transcript-' + phase + '.json'), witness)
+                    write_json(output / ('transcript-' + phase + '-receipt.json'), proof)
+                    if phase == 'running':
+                        gate.release_after_capture()
+                    if phase == 'failed':
+                        child_pair = validate_transcript_pair(child_receipts[0], proof)
+                        write_json(output / 'transcript-pair-receipt.json', child_pair)
+                        if (proof['connectionEpoch'] != child_receipts[0]['connectionEpoch']
+                                or proof['authoredInput'] != child_receipts[0]['authoredInput']
+                                or proof['turnId'] != child_receipts[0]['turnId']):
+                            raise ValueError('child Transcript transition changed its public source identity')
+                    continue
                 sources.append(witness)
                 write_json(output / ('witness-' + str(len(sources)) + '.json'), witness)
                 if len(sources) in (2, 3):
@@ -126,7 +163,8 @@ def run_profile(kind, config, commands, program, workspace, output, env, gate):
                         # The provider remains held until this original source is
                         # validated; no fixed delay is used as proof of running.
                         write_json(output / 'running-receipt.json', receipt)
-                        gate.release_after_capture()
+                        if not child_transcript_source:
+                            gate.release_after_capture()
                     else:
                         before = receipts[0]
                         if any(receipt[key] != before[key] for key in ('parentSessionId', 'childSessionId', 'sourceIdentity')):
@@ -140,13 +178,17 @@ def run_profile(kind, config, commands, program, workspace, output, env, gate):
                     receipts.append(receipt)
             exit_status = process.wait(timeout=10)
             thread.join(timeout=5)
-            if exit_status != 0 or len(rows) != len(commands) + 1 or len(sources) != 3 or len(receipts) != 2:
+            if (exit_status != 0 or len(rows) != len(commands) + 1 or len(sources) != 3 or len(receipts) != 2
+                    or (child_transcript_source and (len(child_sources) != 2 or len(child_receipts) != 2))):
                 raise ValueError(kind + ' incomplete source exchange')
             state = gate.receipt()
             if (state['requestCount'] < 1 or not state['explicitlyReleased'] or state['aborted'] or state['timedOut']):
                 raise ValueError('controlled failure was not explicitly released after capture')
             return {'endpoint': kind, 'version': config['expectedVersion'], 'commandCount': len(commands),
-                    'processExit': exit_status, 'running': receipts[0], 'failed': receipts[1], 'gate': state}
+                    'processExit': exit_status, 'running': receipts[0], 'failed': receipts[1], 'gate': state,
+                    **({'childTranscript': {'running': child_receipts[0], 'failed': child_receipts[1],
+                                           'pair': validate_transcript_pair(child_receipts[0], child_receipts[1])}}
+                       if child_transcript_source else {})}
     finally:
         gate.abort()
         if process is not None:
@@ -164,6 +206,8 @@ def main():
     for name in ('headless-program', 'pi-root', 'dsh-root', 'output'):
         parser.add_argument('--' + name, required=True, type=Path)
     parser.add_argument('--program-archive', type=Path, help='Existing exact-SHA archive reference; never executed or modified')
+    parser.add_argument('--child-transcript-source', action='store_true',
+                        help='Also capture and validate distinct child-scoped Transcript running/error publications')
     args = parser.parse_args()
     output = args.output.absolute()
     if output.exists() or not output.resolve().is_relative_to(SSD.resolve(strict=True)):
@@ -192,7 +236,9 @@ def main():
                                        'archiveReference': str(archived)})
     paths = [Path(__file__).resolve(), ROOT / 'crates/headless/src/main.rs',
              ROOT / 'crates/presentation/src/thread_activity.rs', ROOT / 'crates/presentation/src/summary.rs',
+             ROOT / 'crates/presentation/src/transcript.rs',
              ROOT / 'scripts/summary_transition_provider.py', ROOT / 'scripts/summary_transition_fixture.py',
+             ROOT / 'scripts/transcript_source_fixture.py',
              ROOT / 'scripts/summary_source_fixture.py', ROOT / 'scripts/owned_endpoint_provider.py',
              ROOT / 'scripts/pi_owned_fixture.py', ROOT / 'scripts/dsh_owned_fixture.py', ROOT / 'scripts/task_family_fixture.py']
     write_json(output / 'source-hashes.json', {str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest() for path in paths})
@@ -206,11 +252,12 @@ def main():
     try:
         for kind in ('pi', 'dsh'):
             case = output / kind; case.mkdir()
-            commands = commands_for(kind, workspace, gates[kind].marker)
+            commands = commands_for(kind, workspace, gates[kind].marker,
+                                    child_transcript_source=args.child_transcript_source)
             try:
                 if kind == 'pi':
                     config = prepare_pi(args.pi_root, case / 'data', case / 'home', provider_url, strict_environment=True)
-                    results[kind] = run_profile(kind, dict(config, expectedVersion='1.3.0'), commands, program, workspace, case, env, gates[kind])
+                    results[kind] = run_profile(kind, dict(config, expectedVersion='1.3.0'), commands, program, workspace, case, env, gates[kind], child_transcript_source=args.child_transcript_source)
                 else:
                     dsh_home = case / 'home'
                     dsh_env = dict(env, HOME=str(dsh_home), DSH_HOME=str(dsh_home), DSH_AGENTS_HOME=str(dsh_home / 'agents'),
@@ -219,7 +266,7 @@ def main():
                         dsh_process = dsh.process
                         if dsh.version != '0.2.1-rc.2':
                             raise ValueError('unexpected DSH version')
-                        results[kind] = run_profile(kind, dict(dsh.connector_config([]), expectedVersion=dsh.version), commands, program, workspace, case, env, gates[kind])
+                        results[kind] = run_profile(kind, dict(dsh.connector_config([]), expectedVersion=dsh.version), commands, program, workspace, case, env, gates[kind], child_transcript_source=args.child_transcript_source)
                     write_json(case / 'owned-dsh-exit.json', {'pid': dsh_process.pid, 'exitStatus': dsh_process.poll()})
             except (OSError, ValueError, RuntimeError, KeyError, StopIteration, subprocess.SubprocessError) as error:
                 failures[kind] = type(error).__name__ + ': ' + str(error)
@@ -239,7 +286,8 @@ def main():
         'providerRequestCount': len(requests), 'ownedDshExitStatus': dsh_process.poll(),
         'programSha256': digest, 'desktopInteraction': False, 'paidModel': False,
         'privateHarnessHistoryRead': False, 'serverTransactionalFreshnessProven': False})
-    print('SUMMARY_TRANSITIONS_ACCEPTED pi+dsh; running-source -> controlled-failure-source; desktop=false')
+    suffix = '; child Transcript source paired' if args.child_transcript_source else ''
+    print('SUMMARY_TRANSITIONS_ACCEPTED pi+dsh; running-source -> controlled-failure-source' + suffix + '; desktop=false')
     return 0
 
 
