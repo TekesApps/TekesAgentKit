@@ -1,4 +1,9 @@
 use crate::transcript_content::{ContentDialect, content_blocks};
+use crate::transcript_files::{
+    AdmittedFileReceipt, NativeInputReceipt, TranscriptAdmittedFile,
+    TranscriptAttachmentDisplayItem, display_order as attachment_display_order,
+    image_count as attachment_image_count, validate_files as validate_admitted_files,
+};
 use crate::{RunScope, TranscriptContentBlock, TranscriptSourcePosition};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -91,6 +96,49 @@ pub struct TranscriptItem {
     pub metadata: Value,
 }
 impl TranscriptItem {
+    /// Returns receipt-backed files only when the complete metadata group and
+    /// its receipt provenance still pass validation. Native content is untouched.
+    pub fn admitted_file_attachments(&self) -> Vec<TranscriptAdmittedFile> {
+        let Some(TranscriptSourcePosition::Native { entry_id, .. }) = &self.source_position else {
+            return Vec::new();
+        };
+        if self.kind != TranscriptItemKind::User
+            || self.is_provisional
+            || self.record_id.as_deref() != Some(entry_id.as_str())
+            || self
+                .reconciliation_id
+                .as_deref()
+                .is_none_or(|id| id.trim().is_empty())
+        {
+            return Vec::new();
+        }
+        let Some(receipt) = serde_json::from_value::<AdmittedFileReceipt>(
+            self.metadata["admittedFileReceipt"].clone(),
+        )
+        .ok() else {
+            return Vec::new();
+        };
+        if receipt.entry_id.trim().is_empty()
+            || !matches!(
+                receipt.custom_type.as_str(),
+                "agentkit.inputReceipt.v1" | "tekes.inputReceipt.v1"
+            )
+        {
+            return Vec::new();
+        }
+        let Some(files) = self.metadata.get("admittedFileAttachments") else {
+            return Vec::new();
+        };
+        validate_admitted_files(files, attachment_image_count(&self.attachments))
+            .unwrap_or_default()
+    }
+
+    /// Attachment-only relative order. It does not claim full native text-block order.
+    pub fn attachment_display_order(&self) -> Vec<TranscriptAttachmentDisplayItem> {
+        let files = self.admitted_file_attachments();
+        attachment_display_order(&self.attachments, &files)
+    }
+
     /// Scoped identity binding from the dialect projector, never text equality.
     pub fn input_role(&self) -> Option<TranscriptInputRole> {
         let source = &self.metadata["inputPresentation"];
@@ -949,23 +997,13 @@ fn native(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSna
     let mut out = TranscriptSnapshot::default();
     let mut current = scoped(scope, "native:partial");
     let mut occurrences = BTreeMap::<String, usize>::new();
-    let mut receipts = BTreeMap::<String, Vec<String>>::new();
+    let mut receipts = BTreeMap::<String, Vec<NativeInputReceipt>>::new();
     let mut current_explicit_run: Option<String> = None;
     let mut explicit_turns = BTreeMap::<String, String>::new();
     let run_facts = native_run_facts(&snapshot.entries);
     for entry in &snapshot.entries {
-        if matches!(
-            entry["customType"].as_str(),
-            Some("agentkit.inputReceipt.v1" | "tekes.inputReceipt.v1")
-        ) && let (Some(timestamp), Some(hash), Some(id)) = (
-            entry["data"]["timestamp"].as_f64(),
-            entry["data"]["hash"].as_str(),
-            entry["data"]["rpcId"].as_str(),
-        ) {
-            receipts
-                .entry(format!("{:x}:{hash}", timestamp.to_bits()))
-                .or_default()
-                .push(id.into());
+        if let Some(receipt) = NativeInputReceipt::from_entry(entry) {
+            receipts.entry(receipt.key()).or_default().push(receipt);
         }
     }
     for (entry_ordinal, entry) in snapshot.entries.iter().enumerate() {
@@ -1031,10 +1069,19 @@ fn native(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSna
                             .as_bytes()
                     )
                 );
-                if let Some(ids) = receipts.get_mut(&key)
-                    && !ids.is_empty()
+                if let Some(matched_receipts) = receipts.get_mut(&key)
+                    && !matched_receipts.is_empty()
                 {
-                    row.reconciliation_id = Some(ids.remove(0));
+                    let receipt = matched_receipts.remove(0);
+                    row.reconciliation_id = Some(receipt.rpc_id.clone());
+                    if let Some((files, provenance)) =
+                        receipt.admitted_files(attachment_image_count(&row.attachments))
+                    {
+                        row.metadata["admittedFileAttachments"] =
+                            serde_json::to_value(files).unwrap_or(Value::Null);
+                        row.metadata["admittedFileReceipt"] =
+                            serde_json::to_value(provenance).unwrap_or(Value::Null);
+                    }
                 }
                 let opening = !out
                     .items

@@ -107,6 +107,7 @@ python3 scripts/install-dsh-runtime.py \
 - [Headless JSON 配置与命令](docs/headless-cli.md)
 - [三端能力、session pointer 与验收](docs/session-endpoints.md)
 - [Run / Transcript / Composer / 连接状态](docs/headless-presentation.md)
+- [Pi 混合文件/图片的真实队列与历史恢复](docs/rust-agent-ui-pi-mixed-file-results-20261025.md)
 - [实验 UI：Pi 实时预览与落盘阅读身份](docs/rust-agent-ui-stream-identity-20261020.md)
 - [实验 UI：三端流式原生窗口验收](docs/rust-agent-ui-stream-native-20261020.md)
 - [实验 UI：三端取消、错误与显式恢复](docs/rust-agent-ui-run-controls-20261020.md)

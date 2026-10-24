@@ -494,7 +494,8 @@ impl RunSurface {
 }
 
 pub use tekes_agent_presentation::{
-    TranscriptActivityPresentation, TranscriptBlockContent, TranscriptContentBlock,
+    TranscriptActivityPresentation, TranscriptAdmittedFile, TranscriptAdmittedFileInfo,
+    TranscriptAttachmentDisplayItem, TranscriptBlockContent, TranscriptContentBlock,
     TranscriptDelivery, TranscriptDisplayOrder, TranscriptDocument, TranscriptEventOrder,
     TranscriptFailure, TranscriptInput, TranscriptInputRole, TranscriptItem, TranscriptItemKind,
     TranscriptItemPlanes, TranscriptMessageKey, TranscriptOrderedEvent, TranscriptOutput,

@@ -205,7 +205,7 @@ Kit从真实bytes检测PNG/JPEG/GIF/WebP、限额与完整首帧，解码在bloc
 
 通过RunBinding的共享发送仍使用原prepare/dispatch。含image的冻结ticket在host模型准备之后重读policy，混合file/image总量使用同票据冻结file facts与真实image bytes；失败走原恢复并保留新输入，纯文字/纯file不新增该查询。policy与后续prompt不是原子操作，最终并发变更仍由SEP校验。[接入契约与当前验证范围](../docs/rust-agent-ui-inline-image-contract-20261025.md)区分本地fixture和真实三端结果。
 
-[非桌面三端图片闭环](../docs/rust-agent-ui-inline-image-live-results-20261025.md)已通过原 RunBinding 图文/纯图、provider观测、公开历史与重连；显式入口为 `ui/demo/examples/inline_image_probe.rs` 与 `scripts/test-real-inline-images.py`，只消费现有程序/固定runtime。尚未接图片专用picker/粘贴/拖放UI或预览，真实三端mixed file/image和真实模型理解仍未验收。Composer/Transcript位图展示消费等待中的 [TekesUI #117](https://github.com/TekesApps/TekesUI/issues/117)；不复制基础渲染/资源生命周期，不把一般附件卡片计为图片UI完成。
+[非桌面三端图片闭环](../docs/rust-agent-ui-inline-image-live-results-20261025.md)已通过原 RunBinding 图文/纯图、provider观测、公开历史与重连；显式入口为 `ui/demo/examples/inline_image_probe.rs` 与 `scripts/test-real-inline-images.py`，只消费现有程序/固定runtime。尚未接图片专用picker/粘贴/拖放UI或预览，[Pi mixed 文件/图片 direct 与真实 queued](../docs/rust-agent-ui-pi-mixed-file-results-20261025.md)已补公开 receipt、字节回读和重连；Native/DSH mixed 与真实模型理解仍未验收。Composer/Transcript位图展示消费等待中的 [TekesUI #117](https://github.com/TekesApps/TekesUI/issues/117)；不复制基础渲染/资源生命周期，不把一般附件卡片计为图片UI完成。
 
 ## 文件附件接入与三端验收
 

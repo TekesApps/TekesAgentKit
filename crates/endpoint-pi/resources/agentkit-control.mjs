@@ -1,6 +1,7 @@
 import { Type } from '@sinclair/typebox';
 import { createHash, randomUUID } from 'node:crypto';
 import { createAssistantReading } from './agentkit-reading.mjs';
+import { inputReceiptPayload, snapshotInputFiles } from './agentkit-input-files.mjs';
 // Host control over Pi's public extension API; never adds private RPC commands or parses logs.
 export default function (pi) {
   const digest = text => createHash('sha256').update(text).digest('hex');
@@ -33,7 +34,9 @@ export default function (pi) {
     if (index < 0) index = admitted.findIndex(item => item.hasImages && text.startsWith(item.text + '\n\n'));
     if (index >= 0) {
       const item = admitted.splice(index, 1)[0];
-      pi.appendEntry('agentkit.inputReceipt.v1', { timestamp: event.message.timestamp, hash, rpcId: item.id, mode: item.mode });
+      pi.appendEntry('agentkit.inputReceipt.v1', inputReceiptPayload(
+        { timestamp: event.message.timestamp, hash, rpcId: item.id, mode: item.mode }, item.files,
+      ));
     }
   });
   pi.on('agent_start', async () => {
@@ -113,9 +116,10 @@ export default function (pi) {
           }
           case 'input.prepare': {
             if (prepared.length + admitted.length >= 256) throw new Error('Input receipt limit');
-            const { id, text, hasImages } = request.params;
+            const { id, text, hasImages, files } = request.params;
             if (typeof id !== 'string' || !id || typeof text !== 'string') throw new Error('Invalid input receipt');
-            prepared.push({ id, text, hash: digest(text), hasImages: hasImages === true }); data = null; break;
+            const fileSnapshot = snapshotInputFiles(files);
+            prepared.push({ id, text, hash: digest(text), hasImages: hasImages === true, files: fileSnapshot }); data = null; break;
           }
           case 'reading.identities': data = reading.identities(ctx.sessionManager.getEntries()); break;
           case 'settings.get': data = pi.getSettings(); break;

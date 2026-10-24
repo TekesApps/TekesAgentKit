@@ -1,7 +1,7 @@
 //! User prose lane; generic text/selection/IME/painting remain in TekesUI.
 use tekes_agent_presentation::{
-    RunScope, TranscriptBlockContent, TranscriptDelivery, TranscriptInput, TranscriptItem,
-    TranscriptItemKind,
+    RunScope, TranscriptAttachmentDisplayItem, TranscriptBlockContent, TranscriptDelivery,
+    TranscriptInput, TranscriptItem, TranscriptItemKind,
 };
 use tekes_ui_controls::{
     ButtonTextRenderer, DraftRevision, ExternalSelection, ExternalUndo, ExternalValueResult,
@@ -859,6 +859,7 @@ impl Component for InputMessage {
 fn input_details(item: &TranscriptItem) -> Result<Vec<PartFacts>, &'static str> {
     let mut facts = vec![];
     let mut canonical_attachments = vec![];
+    let mut canonical_slots = vec![];
     let mut text_blocks = String::new();
     let mut has_reasoning = false;
     if let Some(blocks) = &item.content_blocks {
@@ -875,6 +876,7 @@ fn input_details(item: &TranscriptItem) -> Result<Vec<PartFacts>, &'static str> 
                 }
                 TranscriptBlockContent::Attachment { content } => {
                     canonical_attachments.push(content);
+                    canonical_slots.push(Slot::Block(block.index, OutputContentKind::Attachment));
                     (
                         OutputContentKind::Attachment,
                         content
@@ -930,6 +932,7 @@ fn input_details(item: &TranscriptItem) -> Result<Vec<PartFacts>, &'static str> 
     // Both fields represent the same message content. Match occurrences, so two
     // identical attachments remain two attachments rather than a value-set dedup.
     let mut matched = vec![false; canonical_attachments.len()];
+    let mut attachment_slots = vec![];
     for (index, content) in item.attachments.iter().enumerate() {
         if let Some(i) = canonical_attachments
             .iter()
@@ -937,8 +940,10 @@ fn input_details(item: &TranscriptItem) -> Result<Vec<PartFacts>, &'static str> 
             .position(|(i, value)| !matched[i] && **value == *content)
         {
             matched[i] = true;
+            attachment_slots.push(canonical_slots[i].clone());
             continue;
         }
+        attachment_slots.push(Slot::AggregateAttachment(index));
         facts.push(PartFacts {
             tool: None,
             tool_header: None,
@@ -954,6 +959,38 @@ fn input_details(item: &TranscriptItem) -> Result<Vec<PartFacts>, &'static str> 
                 ),
             text: content.to_string(),
         });
+    }
+    let admitted_files = item.admitted_file_attachments();
+    let display_order = item.attachment_display_order();
+    for (position, entry) in display_order.iter().enumerate() {
+        let TranscriptAttachmentDisplayItem::AdmittedFile { file_index } = entry else {
+            continue;
+        };
+        let file = &admitted_files[*file_index];
+        let before = display_order[position + 1..]
+            .iter()
+            .find_map(|next| {
+                let TranscriptAttachmentDisplayItem::MessageAttachment { attachment_index } = next
+                else {
+                    return None;
+                };
+                let slot = attachment_slots.get(*attachment_index)?;
+                facts.iter().position(|fact| &fact.slot == slot)
+            })
+            .unwrap_or(facts.len());
+        facts.insert(
+            before,
+            PartFacts {
+                tool: None,
+                tool_header: None,
+                slot: Slot::AdmittedFile(file.content_index),
+                kind: OutputContentKind::Attachment,
+                title: format!("附件 · {}", file.file.name),
+                text: file
+                    .display_metadata(&item.metadata["admittedFileReceipt"])
+                    .to_string(),
+            },
+        );
     }
     if !item.reasoning.is_empty() && !has_reasoning {
         facts.push(PartFacts {

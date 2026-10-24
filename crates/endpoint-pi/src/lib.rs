@@ -160,6 +160,12 @@ impl PiConnector {
         .await
         .map_err(io_error)?;
         tokio::fs::write(
+            config.data_root.join("agentkit-input-files.mjs"),
+            include_str!("../resources/agentkit-input-files.mjs"),
+        )
+        .await
+        .map_err(io_error)?;
+        tokio::fs::write(
             config.data_root.join("agentkit-control.mjs"),
             include_str!("../resources/agentkit-control.mjs"),
         )
@@ -1411,6 +1417,12 @@ mod tests {
         .await
         .unwrap();
         let root = connector.context.config.data_root.clone();
+        assert_eq!(
+            tokio::fs::read_to_string(root.join("agentkit-input-files.mjs"))
+                .await
+                .unwrap(),
+            include_str!("../resources/agentkit-input-files.mjs")
+        );
         let mut row: Row = serde_json::from_value(json!({"id":uuid::Uuid::new_v4().to_string(),"cwd":root,
             "file":root.join("sessions/native.jsonl"),"archived":false,"ephemeral":false,"receipts":{}})).unwrap();
         connector.context.validate_pointer(&row).await.unwrap();

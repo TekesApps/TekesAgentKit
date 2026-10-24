@@ -284,6 +284,8 @@ pub(crate) enum Slot {
     AggregateBody,
     SystemPrompt,
     AggregateAttachment(usize),
+    /// Receipt attachment position, never a native content-block index.
+    AdmittedFile(usize),
     MessageKind,
     Failure,
     Empty,

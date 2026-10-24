@@ -30,11 +30,15 @@ pub use tool_details::*;
 mod tool_title;
 mod tool_view;
 mod transcript;
+mod transcript_files;
 pub use composer::*;
 pub use controller::*;
 pub use run::*;
 pub use scope::*;
 pub use transcript::*;
+pub use transcript_files::{
+    TranscriptAdmittedFile, TranscriptAdmittedFileInfo, TranscriptAttachmentDisplayItem,
+};
 
 mod child;
 mod sidechat;
