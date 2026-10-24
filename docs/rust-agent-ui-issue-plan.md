@@ -546,3 +546,7 @@ Native后续切片：复用既有feature headless与已安装Kernel0.9.3，真�
 ### #17 / #23 / #27：实际子 pane 来源接口
 
 [第一步结果](rust-agent-ui-child-pane-witness-results-20261024.md)增加默认关闭的bindings验收透传，调用原for_child controller，保留scope与pane/祖先权限，不重建投影。原watch Arc、嵌套scope、父草稿、不可变authority、退休/只读拒绝和降级标记均由2项组件回归验证；feature bindings35/0、UI750/0/1、严格检查、普通demo构建及默认/feature独立公开consumer通过。新增CI opt-in步骤。真实demo source捕获、pane重连/分页仍待第二步；桌面/IME/AX和#53保持开放。
+
+### #17 / #23 / #27：实际原始子 pane 运行与失败来源
+
+[结果](rust-agent-ui-live-child-pane-source-results-20261024.md)补齐默认关闭 demo feature 与原 FamilyCatalog/OpenChild/HostResult/Composer/close 路径。真实 Pi16/DSH13 seed 命令、16 次合成请求通过，两端同 epoch 原 running→error、父非空草稿/选择保留、旧 witness 退休拒绝；不再以 primary child Run 替代。Python255、默认UI752/0/1、feature643、最终CLI2/1、严格检查、默认/feature独立consumer与精确SHA双端闭环通过。04481a7 两份 CI 已核对，独立consumer/opt-in通过，唯一失败仍 #53；新head另核对。实际宿主 scope-only child factory 的祖先权限捕获列为 #23 下一项；Native有界witness、pane重连/分页、完整桌面/IME/AX未完成，相关Issue不关闭，不合并发布。SSD共享target未新增，本轮删除0字节。

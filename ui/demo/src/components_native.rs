@@ -35,6 +35,9 @@ use tekes_ui_tokens::{Palette, Theme};
 
 #[path = "native_child_error_dispatch.rs"]
 mod child_error_dispatch;
+#[cfg(feature = "acceptance-source-witness")]
+#[path = "native_child_pane_source.rs"]
+mod child_pane_source;
 #[path = "native_composer_notice_selftest.rs"]
 mod composer_notice_probe;
 #[path = "native_disclosure_reading_selftest.rs"]
@@ -3136,6 +3139,17 @@ impl WindowHandler for Host {
 }
 pub fn run() {
     let args: Vec<_> = std::env::args().collect();
+    let child_pane_source_proof = args.iter().any(|arg| arg == "--child-pane-source-proof");
+    if child_pane_source_proof {
+        assert!(
+            args.iter().any(|arg| arg == "--components")
+                && args.iter().any(|arg| arg == "--offscreen")
+                && args.iter().any(|arg| arg == "--endpoint-config")
+                && args.iter().any(|arg| arg == "--child-pane-source-proof")
+                && args.iter().any(|arg| arg == "--child-pane-source-receipt"),
+            "child pane source proof requires components, explicit offscreen endpoints, manifest, and receipt"
+        );
+    }
     if args
         .iter()
         .any(|arg| arg == "--multi-sidechat-delivery-receipt")
@@ -4113,6 +4127,43 @@ pub fn run() {
             host.view
                 .complete_initial_feedback(completion)
                 .expect("initial feedback metadata");
+        }
+
+        #[cfg(feature = "acceptance-source-witness")]
+        if let Some(index) = args
+            .iter()
+            .position(|arg| arg == "--child-pane-source-proof")
+        {
+            let manifest: serde_json::Value = serde_json::from_slice(
+                &std::fs::read(
+                    args.get(index + 1)
+                        .expect("child pane source manifest path"),
+                )
+                .expect("child pane source manifest"),
+            )
+            .expect("child pane source manifest JSON");
+            let receipt = child_pane_source::run(&mut host, &manifest);
+            let receipt_index = args
+                .iter()
+                .position(|arg| arg == "--child-pane-source-receipt")
+                .expect("child pane source receipt path required");
+            let path = std::path::Path::new(
+                args.get(receipt_index + 1)
+                    .expect("child pane source receipt path"),
+            );
+            assert!(
+                path.is_absolute(),
+                "child pane source receipt path must be absolute"
+            );
+            use std::io::Write;
+            let mut file = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(path)
+                .expect("new child pane source receipt file");
+            file.write_all(serde_json::to_string_pretty(&receipt).unwrap().as_bytes())
+                .unwrap();
+            file.write_all(b"\n").unwrap();
         }
 
         if let Some(index) = args

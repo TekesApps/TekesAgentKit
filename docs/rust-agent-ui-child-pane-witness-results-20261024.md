@@ -8,4 +8,6 @@
 
 CI增加专门的 opt-in bindings Clippy/test 步骤；第二consumer的实际fixture源码、锁文件和日志封存。SDK公开243文件闭包不变，root实现及Python未改，复用bd98bd0相关证据。本轮新提交CI另验。使用共享SSDtarget，4份定向测试/consumer程序仅归档，输入1085文件manifest与源码增量保留于 `.runtime-fixtures/child-pane-witness-20261024/`，见[机器收据](rust-agent-ui-child-pane-witness-results-20261024.json)。没有新target，缓存删除0 bytes；不删除当前仍依赖的默认/feature编译缓存。
 
+04481a7 的 [PR40100645177](https://github.com/TekesApps/TekesAgentKit/actions/runs/40100645177) 与 [push40100642243](https://github.com/TekesApps/TekesAgentKit/actions/runs/40100642243) 已终态核对：checks、UI750、显式bindings witness步骤与独立consumer通过，唯一失败仍为#53严格阅读，CI demo跳过。原logs/artifact、consumer/SDK闭包及PR synthetic merge父提交已保留；该证据不适用于后续真实demo来源切片。
+
 这只是接口与合成原pane来源验证。实际Pi/DSH的demo feature透传、真实子pane来源捕获、失败重连/分页和pane草稿生命周期仍待第二步；不追认此前 primary-child-run-only 的成功。桌面/物理IME/OS AX/ProcessContainer、最终布局与完整ClientKit对齐未完成，#17/#23/#27保持open，#53严格门仍保留，不合并/tag/发布。

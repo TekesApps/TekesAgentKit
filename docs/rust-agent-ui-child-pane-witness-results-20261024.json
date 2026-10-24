@@ -68,5 +68,44 @@
   "newTarget": false,
   "issueClosed": false,
   "mergeTagRelease": false,
-  "evidenceRoot": ".runtime-fixtures/child-pane-witness-20261024"
+  "evidenceRoot": ".runtime-fixtures/child-pane-witness-20261024",
+  "ci": {
+    "head": "04481a71661da43fd12b188cd02199f0c20d8639",
+    "runs": [
+      {
+        "id": 40100645177,
+        "conclusion": "failure",
+        "checkout": "542db5931ba1298e69f9635d95d1a6b5b9b39e1e",
+        "rawReading": {
+          "accepted": false,
+          "parentFollowingAfterInnerUp": true,
+          "parentOffsetBefore": 0,
+          "parentOffsetAfterScroll": 0,
+          "parentOffsetAfterAppend": 634,
+          "innerOffset": 100,
+          "detailVisibleAfterAppend": false
+        },
+        "consumerSource": "e216110c5e2c26b279f832c9c2cbfa596f004f640b23cf6560b0acfb743e4466",
+        "sdkSource": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
+        "archiveSha256": "09774b57ad895c218c1b24a6c51bdf928784943cd97b1c8bf8d1058035f6803b"
+      },
+      {
+        "id": 40100642243,
+        "conclusion": "failure",
+        "checkout": "04481a71661da43fd12b188cd02199f0c20d8639",
+        "rawReading": {
+          "accepted": false,
+          "parentFollowingAfterInnerUp": true,
+          "parentOffsetBefore": 0,
+          "parentOffsetAfterScroll": 0,
+          "parentOffsetAfterAppend": 634,
+          "innerOffset": 100,
+          "detailVisibleAfterAppend": false
+        },
+        "consumerSource": "e216110c5e2c26b279f832c9c2cbfa596f004f640b23cf6560b0acfb743e4466",
+        "sdkSource": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
+        "archiveSha256": "bc4b81d8898788c51621f955c6d912476f7b85101cef6637371e30af1be02816"
+      }
+    ]
+  }
 }

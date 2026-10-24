@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 publish.workspace = true
 license.workspace = true
+
+[features]
+acceptance-source-witness = ["tekes-agent-ui-bindings/acceptance-source-witness"]
+
 [dependencies]
 tekes-agent-ui-bindings.workspace = true
 tekes-agent-web.workspace = true
