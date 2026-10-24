@@ -566,3 +566,7 @@ Native后续切片：复用既有feature headless与已安装Kernel0.9.3，真�
 ### #17 / #23：真实 Native 原只读 pane 与三端同程序来源
 
 [契约](rust-agent-ui-native-child-pane-source-contract-20261024.md)与[结果](rust-agent-ui-native-child-pane-source-results-20261024.md)补齐原FamilyCatalog/OpenChild/ChildRead的Native head-only running→error，原mounted source/cache/epoch/pub及父草稿和关闭退休均核对；相同最终demo二进制同时通过Pi/DSH原子pane，未以primary child Run替代。首次真实运行发现最终离屏报告读live snapshot和旧树跨帧，已改用原RunPort.displayed_snapshot，严格coverage不放宽，失败程序/证据保留。Python262、报告修复前UI757/0/1与feature652、末次RunPort19/19、严格检查/两配置构建和独立consumer通过。79727f4两份CI来源/日志核实，唯一#53红；新head另核对。累计分页来源、pane重连/阅读、完整窗口/IME/AX等仍开放，Issue不关闭，不合并发布。全部复用SSD target，删除0字节。
+
+### #16 / #17：Pi inline image 校验与显示依赖
+
+[契约与窄修结果](rust-agent-ui-inline-image-contract-20261025.md)对齐当前 ClientKit：Pi policy/原 materialize 使用 8192 单边和 33,554,432 pixels，限制后真实解码首帧，保留原始 bytes/MIME/SHA。Pi19项、严格Clippy通过，内部入口原数据/损坏不落盘验证通过；无真实provider/桌面。通用位图控件缺口已去重提交TekesUI#117，#16/#17仍开放；RunBinding图片选择、host准备后policy重验、真实三端图片闭环与完整UI仍待补。只消费固定SDK，未变更依赖、新建target或删除缓存。
