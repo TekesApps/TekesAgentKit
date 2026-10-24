@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 1,
+  "issue": 19,
+  "pullRequest": 10,
+  "capturedAt": "2026-10-24",
+  "repositories": {
+    "agentkit": {
+      "path": "/Users/frankqin/dev/TekesAgentKit",
+      "revision": "58521a1bc581ef14c3c63c9a7bc698bbd01d9ab3"
+    },
+    "clientKit": {
+      "path": "/Users/frankqin/dev/TekesClientKit",
+      "revision": "c289bc9d33edcd83a782ac17927a8c65a027eccd",
+      "worktreeHasUnrelatedWip": true
+    },
+    "tekesHost": {
+      "path": "/Users/frankqin/dev/Tekes",
+      "revision": "8858ccd9d46590852ec7a0949aee289fc6798d70",
+      "worktreeHasUnrelatedWip": true
+    }
+  },
+  "conclusion": {
+    "toolReport": "unknown_no_public_producer_found",
+    "groupNarrationFallback": "unknown_no_public_producer_found",
+    "workspaceCurrentDiff": "host_producer_present",
+    "dshNativeConversation": "explicitly_unsupported",
+    "harnessesStarted": false,
+    "desktopAcceptanceRun": false,
+    "testsRunForThisDocument": false,
+    "integrationFixturesComplete": false
+  },
+  "sourceFiles": [
+    {"repository":"agentkit","path":"crates/endpoint-kernel/src/lib.rs","sha256":"6ffabc0f9aa017609f06e8be4f60227cca1643daf7662356dc2d924fd65f4e0a"},
+    {"repository":"agentkit","path":"crates/endpoint-pi/src/lib.rs","sha256":"e13e40542551b4858481ced6fbb5ca9d59614cad4b9a47ca94d1b5b1f1e4d8cd"},
+    {"repository":"agentkit","path":"crates/endpoint-pi/src/reading.rs","sha256":"4ba0d66ff91d7afaf386bf1deab570b3d7202cc9012d249a8bace862d2451d1f"},
+    {"repository":"agentkit","path":"crates/endpoint-dsh/src/lib.rs","sha256":"f8941906ec8bedb82020f84224c87f3acf2220725b2a1055a10ff8d019b8adcf"},
+    {"repository":"agentkit","path":"crates/endpoint-dsh/src/history.rs","sha256":"b77d6e54b812617a208baae5292c68fc4c1b787acaf6dd9e64e43bd3931bc7cf"},
+    {"repository":"agentkit","path":"crates/session/src/projection.rs","sha256":"ccc22f20e137acaee0ad75b87dfa3fe7234054ee6b3ad7b3a25598780030b17c"},
+    {"repository":"agentkit","path":"crates/presentation/src/transcript.rs","sha256":"3fe37e19ab37ae2d8d1b4ef4d3c433be3b8edbcecb65a98a3ef2ac6db32877ec"},
+    {"repository":"agentkit","path":"crates/contract/src/capabilities.rs","sha256":"bf34af4a8abdac93d629f769e0e33874e0e9f32e5fb1f4e6e03f2a7a597daf29"},
+    {"repository":"agentkit","path":"crates/presentation/src/tool_report.rs","sha256":"fbecf46f42b612f06245721a59418182438c52ee0a3f38ca38a0d34f4b430447"},
+    {"repository":"agentkit","path":"crates/presentation/src/tool_header.rs","sha256":"47c8d9c6e8002f61d1e5ac345dc08a5bde7ae7a57cd17f5997f862c79c7f75ab"},
+    {"repository":"agentkit","path":"crates/presentation/src/transcript_narration.rs","sha256":"7ee8ac193470f31b495526a5b1c3274c61349bf095449d02563a9108fed9909a"},
+    {"repository":"agentkit","path":"ui/components/src/output_message.rs","sha256":"eba08aa1c319f1c2ef77302ebaa111357e9a01a8dee7991f5c4d4befedcf89e3"},
+    {"repository":"agentkit","path":"ui/components/src/transcript_content.rs","sha256":"fad9d8481f357d93084a7793db75a7f54c2140064fe843562812b5bd8849d92f"},
+    {"repository":"clientKit","path":"Sources/Contract/SessionEndpoint/SessionProjectionValues.swift","sha256":"4a7835084cfadbe0ced59dcf2771607641f1828e1b4d86fa91a494ecd1f56e77"},
+    {"repository":"clientKit","path":"Sources/Session/SessionEndpoint/Client/SessionEventProjector.swift","sha256":"e7a2ccc9e211f04f819e0a1866388420b7b15f0a25ea80a7777a3408414dd515"},
+    {"repository":"clientKit","path":"Sources/Session/SessionEndpoint/PI/PITranscriptProjection.swift","sha256":"59d54b14cdbf8a9aaebd75fad95cc526ba1fad98839d4b874e8bf98d1473b001"},
+    {"repository":"clientKit","path":"Sources/Session/SessionEndpoint/DSH/DSHHostEndpoint.swift","sha256":"2610775859483a486ea1755ebe266c09a75e19a1391bc81a588cf6c9657f5290"},
+    {"repository":"clientKit","path":"Sources/Session/SessionEndpoint/Client/SessionEndpointRuntime.swift","sha256":"c58136a14874ddd1ab01991efa4cc01f45540b42d9a6d2b2cc271aec1ae7151b"},
+    {"repository":"clientKit","path":"Sources/Session/Sync/ClientSQLiteSessionStore.swift","sha256":"547e4359102a638c1c791275149f1d6d5b5f5ebe7897b8b5453895a536f44cc6"},
+    {"repository":"clientKit","path":"Sources/TranscriptCoordinator/TranscriptTransientToolFeed.swift","sha256":"e0048955e1b0317972fd8036159431b6adf983c61d278f8593833abab48e4071"},
+    {"repository":"clientKit","path":"Sources/TranscriptCoordinator/TranscriptValues+Mirror.swift","sha256":"1dc80d46ad7a891236f42983e8c6557daf98996b2f6b254fbc9055581169a072"},
+    {"repository":"clientKit","path":"Sources/TranscriptRendering/TranscriptMetalActivity.swift","sha256":"f08f6e8f34c76a71fb117dd84a46be50145f737a38e21534cf59d518bc2d3e8d"},
+    {"repository":"clientKit","path":"Sources/TranscriptRendering/TranscriptToolVocabulary.swift","sha256":"f9f539dfac029cce57c012ce0437ccdaf4ea6868d0d79bd6bb43c64ef228f176"},
+    {"repository":"clientKit","path":"Sources/TranscriptRendering/TranscriptMetalAppBridges.swift","sha256":"aced6682f06d2c5c6313e9bbb0e429a217ab05f5a7cacc181ce3af8a2bdb0d1c"},
+    {"repository":"clientKit","path":"Sources/TranscriptRendering/WorkspaceGitDiffSnapshot.swift","sha256":"76b1c5a3b3246a003ec8931fd7d1796bbb72dacfeba0449ce3d89f66a2e39362"},
+    {"repository":"tekesHost","path":"Tekes/ClientAgentHostAdapters.swift","sha256":"7d907c654ec3df76c7a8b492e32bbc68f1bd4d0b46044cae615aa712b9f67c71"},
+    {"repository":"tekesHost","path":"Tekes/ClientAgentSummaryHostAdapter.swift","sha256":"4e7875ae43ab06901a981077f81a4504c754e88f2c019a470dc67222b917714a"}
+  ],
+  "sourceFacts": [
+    {
+      "subject":"AgentKit Native report/narration",
+      "classification":"unknown_no_public_producer_found",
+      "evidence":["crates/endpoint-kernel/src/lib.rs:315-377","crates/presentation/src/transcript.rs:652-690","crates/presentation/src/transcript.rs:1140-1163"],
+      "details":"Native capabilities list has no report/group-text capability; tool result metadata is retained on the tool DTO without a typed report field. Absence from this adapter is not declared unsupported."
+    },
+    {
+      "subject":"AgentKit Pi report/narration",
+      "classification":"unknown_no_public_producer_found",
+      "evidence":["crates/endpoint-pi/src/lib.rs:618-730","crates/endpoint-pi/src/reading.rs:10-68"],
+      "details":"Pi declares public lifecycle/RPC methods; tool report and separate group fallback are not typed. streamId fences a partial assistant message and is not group-narration data."
+    },
+    {
+      "subject":"AgentKit DSH report/narration",
+      "classification":"unknown_no_public_producer_found",
+      "evidence":["crates/endpoint-dsh/src/lib.rs:385-478","crates/endpoint-dsh/src/history.rs:1-70","crates/presentation/src/transcript.rs:1140-1163"],
+      "details":"DSH tool meta is forwarded as opaque result_meta; packed text/reasoning chunks normalize to assistant message content. No separate report or group-text source is defined."
+    },
+    {
+      "subject":"AgentKit DSH native conversation streaming",
+      "classification":"explicitly_unsupported",
+      "evidence":["crates/endpoint-dsh/src/lib.rs:453-478"],
+      "details":"StreamTarget::SessionConversation returns Unsupported for DSH. This explicit capability boundary must not be conflated with absent report/narration fields."
+    },
+    {
+      "subject":"Historical input edit capability state (cross-check example)",
+      "classification":"dsh_explicit_unsupported_native_pi_unknown",
+      "evidence":["Sources/Session/SessionEndpoint/DSH/DSHHostEndpoint.swift:16","Sources/Session/SessionEndpoint/Client/SessionEndpointRuntime.swift:127","crates/contract/src/capabilities.rs:8-16"],
+      "details":"ClientKit DSH explicitly returns false for canEditHistoricalInput. No corresponding declaration was found in Native/Pi implementations, so classify those as unknown rather than unsupported. AgentKit EndpointCapabilities models this as a default-false bool, which collapses the distinction and should be considered in #15."
+    },
+    {
+      "subject":"ClientKit durable report and group narration bridge",
+      "classification":"typed_renderer_no_producer_in_inspected_normal_bridge",
+      "evidence":["Sources/Session/Sync/ClientSQLiteSessionStore.swift:818-853","Sources/TranscriptCoordinator/TranscriptTransientToolFeed.swift:31-61","Sources/TranscriptCoordinator/TranscriptValues+Mirror.swift:47-94"],
+      "details":"Normal durable bridge sets group narration to empty string and callReportJSON to nil; transient preview supplies empty narration and nil callReport. The renderer has a typed call-report input, but this path does not publish one."
+    },
+    {
+      "subject":"ClientKit report vocabulary rendering",
+      "classification":"consumer_contract_only",
+      "evidence":["Sources/TranscriptRendering/TranscriptToolVocabulary.swift:1-75","Sources/TranscriptRendering/TranscriptMetalActivity.swift:298-308"],
+      "details":"Renderer consumes a typed report value. The inspected source closure does not establish a producer. Opaque resultMetaJSON is not promoted to an AgentKit report."
+    },
+    {
+      "subject":"Tekes host current workspace diff",
+      "classification":"host_producer_present",
+      "evidence":["Tekes/ClientAgentHostAdapters.swift:24-30","Sources/TranscriptRendering/WorkspaceGitDiffSnapshot.swift:1-30","Sources/TranscriptRendering/TranscriptMetalAppBridges.swift:219-250"],
+      "details":"Host supplies displayed WorkspaceGitDiffSnapshot plus revision. It is current path-scoped workspace state, not the historical result of a tool call."
+    },
+    {
+      "subject":"Tekes host report and group narration",
+      "classification":"unknown_no_provider_found",
+      "evidence":["Tekes/ClientAgentHostAdapters.swift:24-30","ui/components/src/output_message.rs:49-65","ui/components/src/transcript_content.rs:116-123"],
+      "details":"No report or separately captured group narration provider was found. Existing ToolHeaderAdapter is already an explicit seam for a future host source."
+    }
+  ],
+  "requiredFutureContract": {
+    "reportIdentity": ["endpointId", "sessionId", "threadId", "producerId", "schemaVersion", "toolCallId", "turnId", "generation", "revisionOrEventSeq"],
+    "narrationIdentity": ["endpointId", "sessionId", "threadId", "producerId", "schemaVersion", "frameId", "generation", "revisionOrEventSeq"],
+    "presenceStates": ["unknown", "present", "authoritativelyAbsentOrTombstoned", "unsupported"],
+    "reportShape": ["verb", "subject?", "resultCount?", "resultObject?", "note?", "addedLines?", "removedLines?"],
+    "updateSemantics": ["immutableSnapshot", "monotonicRevisionWithinGeneration", "definedAppendReplaceFinalBehavior", "staleUpdateRejected"],
+    "workspaceDiffSeparateFromCallReport": true
+  },
+  "verification": {
+    "performed": ["static source inspection", "SHA-256 capture for referenced source files", "parent-run shared presentation policy regressions: 26 passed (.runtime-fixtures/issue-batch-20261024/source-policy-tests.log)"],
+    "notPerformed": ["cargo", "harness launch", "desktop acceptance", "screenshot", "integration fixture"],
+    "sharedPresentationRegression": "parent-run receipt: .runtime-fixtures/issue-batch-20261024/source-policy-tests.log; 26 tests passed; tests validate policy only, not live producer availability"
+  }
+}
