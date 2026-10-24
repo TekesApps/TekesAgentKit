@@ -43,6 +43,6 @@ ClientKit PIHostEndpoint 与 PIImageStore 限制单图 4 MiB、每消息 8 附�
 
 ## 真实端非桌面验收补充
 
-[三端结果](rust-agent-ui-inline-image-live-results-20261025.md)已通过原 RunBinding 的图文/纯图发送、公开历史和重连。Native 保留 asset/mime 引用，经 session.attachment 读取；Pi 保留 mimeType/data，名称从公开 attachment 读取；DSH 保留完整 attachment 描述符，当前 SEP 无图片 byte-read。不能要求所有历史都回显同一种 canonical 输入 JSON，也不能把 Native source ordinal 替代永久 entry/message 身份。
+[三端结果](rust-agent-ui-inline-image-live-results-20261025.md)已通过原 RunBinding 的图文/纯图发送、公开历史和重连。Native 保留 asset/mime 引用，经 session.attachment 读取；Pi 保留 mimeType/data，名称从公开 attachment 读取；DSH 保留完整 attachment 描述符；[后续实际字节回读](rust-agent-ui-dsh-image-read-results-20261025.md)已通过原公开 session.attachment，旧 probe 的 unsupported 标记已纠正。不能要求所有历史都回显同一种 canonical 输入 JSON，也不能把 Native source ordinal 替代永久 entry/message 身份。
 
 provider 按 endpoint 独立 URL 路由并统计全部请求：本次图片输入共六次，DSH 另有一次公开 first-prompt title；已知 runtime/time suffix 和图片 handle 与用户文本分别记录，普通后来 human 输入不可跳过。只声明原输入送达/状态恢复，不声明模型理解图片、完整 UI 或真实三端 mixed file/image 已完成。固定 DSH 测试模型的 image capability 是显式 fixture 输入，默认 helper 行为保持。

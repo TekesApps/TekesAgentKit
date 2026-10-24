@@ -203,55 +203,65 @@ async fn verify_image(target: &Target, input: &Value, phase: &str) -> Result<Val
         )));
     }
     let raw = &attachments[0];
-    if target.kind == "native" || target.kind == "pi" {
-        let id = if target.kind == "native" {
+    let id = match target.kind {
+        "native" => {
             if raw["asset"] != format!("sha256-{DIGEST}")
                 || raw["mime"] != "image/png"
                 || raw["name"] != IMAGE_NAME
             {
-                return Err(Error::Protocol(format!(
-                    "Native public asset reference differs: {raw}"
-                )));
+                return Err(Error::Protocol(
+                    "Native public asset reference differs".into(),
+                ));
             }
             format!("sha256:{DIGEST}")
-        } else {
+        }
+        "pi" => {
             if raw["mimeType"] != "image/png" || raw["data"] != IMAGE_DATA {
-                return Err(Error::Protocol(format!(
-                    "Pi public inline image differs: {raw}"
-                )));
+                return Err(Error::Protocol("Pi public inline image differs".into()));
             }
             DIGEST.to_owned()
-        };
-        let read = target
-            .runtime
-            .call(
-                "session.attachment",
-                json!({
-                    "sessionId":target.scope.session_id, "attachmentId":id
-                }),
-                &format!("image-probe-read-{phase}-{}", target.scope.session_id),
-            )
-            .await?;
-        if read["data"] != IMAGE_DATA
-            || read["attachment"]["mediaType"] != "image/png"
-            || (target.kind == "pi" && read["attachment"]["name"] != IMAGE_NAME)
-            || read["attachment"]["bytes"] != ONE_PIXEL_PNG.len()
-        {
-            return Err(Error::Protocol(format!(
-                "public attachment read differs: {read}"
-            )));
         }
-        return Ok(
-            json!({"rawTranscriptAttachment": raw, "publicByteRead":true,
-            "attachmentId":id, "read":read}),
-        );
+        "dsh" => {
+            let descriptor = &raw["attachment"];
+            if descriptor["attachmentId"] != format!("sha256:{DIGEST}")
+                || descriptor["mediaType"] != "image/png"
+                || descriptor["name"] != IMAGE_NAME
+                || descriptor["bytes"] != ONE_PIXEL_PNG.len()
+                || descriptor["width"] != 1
+                || descriptor["height"] != 1
+            {
+                return Err(Error::Protocol(
+                    "DSH public image descriptor differs".into(),
+                ));
+            }
+            descriptor["attachmentId"]
+                .as_str()
+                .ok_or_else(|| Error::Protocol("DSH image ID missing".into()))?
+                .to_owned()
+        }
+        _ => return Err(Error::Unsupported("unknown image endpoint".into())),
+    };
+    let read = target
+        .runtime
+        .call(
+            "session.attachment",
+            json!({"sessionId":target.scope.session_id,"attachmentId":id}),
+            &format!("image-probe-read-{phase}-{}", target.scope.session_id),
+        )
+        .await?;
+    if read["data"] != IMAGE_DATA
+        || read["attachment"]["attachmentId"] != id
+        || read["attachment"]["mediaType"] != "image/png"
+        || (target.kind != "native" && read["attachment"]["name"] != IMAGE_NAME)
+        || read["attachment"]["bytes"] != ONE_PIXEL_PNG.len()
+        || read["attachment"]["width"] != 1
+        || read["attachment"]["height"] != 1
+    {
+        return Err(Error::Protocol(
+            "public attachment read differs from source bytes and metadata".into(),
+        ));
     }
-    // DSH currently has no public image-byte read capability in this adapter.
-    // Keep its actual public reference; the independent provider observes bytes.
-    Ok(
-        json!({"rawTranscriptAttachment":raw, "publicByteRead":false,
-        "publicByteReadStatus":"unsupported by DSH SEP"}),
-    )
+    Ok(json!({"rawTranscriptAttachment":raw,"publicByteRead":true,"attachmentId":id,"read":read}))
 }
 
 async fn send_one(target: &Target, text: &str, label: &str) -> Result<Value> {

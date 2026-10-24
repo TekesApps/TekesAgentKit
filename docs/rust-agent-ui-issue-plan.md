@@ -581,8 +581,12 @@ Native后续切片：复用既有feature headless与已安装Kernel0.9.3，真�
 
 ### #16：真实三端原图片输入/公开历史与重连
 
-[结果](rust-agent-ui-inline-image-live-results-20261025.md)新增不启动桌面的公开demo example和owned runner。Native0.9.3/Pi1.3.0/DSH0.2.1-rc.2 同程序各完成图文/纯图发送与原history/source身份恢复；provider六次图片与DSH一次标题分别记录，Native/Pi公开附件字节read通过，DSH描述符保留且byte-read明确unsupported。Python274、严格demo全targets Clippy和example构建/静态边界通过，542源码输入及最终程序/收据/原失败封存在SSD。只补验收入口/fixture，未改production组件或SDK；mixed file/image/系统输入/位图UI/窗口等仍未完成。#16/#17开放；78b7392两份CI只有#53实际失败，新head另核对，不合并/tag。
+[结果](rust-agent-ui-inline-image-live-results-20261025.md)新增不启动桌面的公开demo example和owned runner。Native0.9.3/Pi1.3.0/DSH0.2.1-rc.2 同程序各完成图文/纯图发送与原history/source身份恢复；provider六次图片与DSH一次标题分别记录，Native/Pi公开附件字节read通过，DSH描述符保留；当轮probe误标byte-read unsupported，已由后续实际公开读取结果更正。Python274、严格demo全targets Clippy和example构建/静态边界通过，542源码输入及最终程序/收据/原失败封存在SSD。只补验收入口/fixture，未改production组件或SDK；mixed file/image/系统输入/位图UI/窗口等仍未完成。#16/#17开放；78b7392两份CI只有#53实际失败，新head另核对，不合并/tag。
 
 ### #16：Pi mixed file/image 来源修复与真实队列闭环
 
 [契约](rust-agent-ui-pi-mixed-file-contract-20261025.md)补齐已核实的 Pi file receipt 差异：materialize 真实同session文件facts/混合预算→原JS inputReceipt→保留native source的附加文件投影与附件顺序。[结果](rust-agent-ui-pi-mixed-file-results-20261025.md)：主会话统一串行Cargo与真实 direct/queued 验证通过；Root388、UI781/0/1、feature299/667、Python285、Node14与独立consumer通过。最终公开history/文件回读/assistant身份重连保留，三端原图片回归通过。严格#53仍失败，桌面/位图UI/Native和DSH mixed仍未验收；不扩大Child/commands或SDK范围，不关闭Issue、不合并/tag。
+
+### #17：纠正 DSH 图片 byte-read 门禁
+
+[结果](rust-agent-ui-dsh-image-read-results-20261025.md)：原公开路由本已存在，移除probe硬编码unsupported，三端图文/纯图在重连前后12次公开read通过；Python289（新增4项门禁）、严格example Clippy/构建通过。原错误标记只作历史记录，当前#53/#117与完整UI仍开放，未改上游/生产组件。

@@ -1,11 +1,14 @@
 """Focused tests for independent real-provider image observation."""
 import base64
+import copy
+import hashlib
 from pathlib import Path
 import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from inline_image_live_fixture import InlineImageProvider, inspect_user_request
+from inline_image_live_fixture import (InlineImageProvider, inspect_user_request,
+    validate_public_image_read)
 
 PNG = bytes([
     137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82,0,0,0,1,0,0,0,1,8,2,0,0,0,144,119,83,222,
@@ -123,6 +126,55 @@ class InlineImageLiveFixtureTests(unittest.TestCase):
                 {'role': 'assistant', 'content': 'old image attached'},
                 {'role': 'user', 'content': 'new prompt without attachment'}]})
         self.assertEqual(provider.requests, [])
+
+
+    def public_read(self, kind='dsh'):
+        digest = hashlib.sha256(PNG).hexdigest()
+        attachment_id = digest if kind == 'pi' else 'sha256:' + digest
+        info = {'attachmentId': attachment_id, 'mediaType': 'image/png',
+                'bytes': len(PNG), 'width': 1, 'height': 1}
+        if kind != 'native':
+            info['name'] = '中文图片.png'
+        raw = {'type': 'image', 'attachment': copy.deepcopy(info)} if kind == 'dsh' else {'type': 'image'}
+        evidence = {'publicByteRead': True, 'attachmentId': attachment_id,
+                    'rawTranscriptAttachment': copy.deepcopy(raw),
+                    'read': {'attachment': info, 'data': base64.b64encode(PNG).decode()}}
+        return evidence, raw
+
+    def test_all_three_public_byte_read_dtos_keep_their_original_id_forms(self):
+        for kind in ('native', 'pi', 'dsh'):
+            evidence, raw = self.public_read(kind)
+            validate_public_image_read(kind, evidence, raw, PNG, '中文图片.png')
+
+    def test_dsh_unsupported_or_unobserved_byte_read_is_not_accepted(self):
+        for flag in (False, None):
+            evidence, raw = self.public_read()
+            evidence['publicByteRead'] = flag
+            with self.assertRaisesRegex(ValueError, 'source binding'):
+                validate_public_image_read('dsh', evidence, raw, PNG, '中文图片.png')
+
+    def test_dsh_wrong_bytes_mime_id_dimensions_and_name_fail(self):
+        for field, wrong in (('attachmentId', 'other-id'), ('mediaType', 'image/jpeg'),
+                             ('bytes', len(PNG) + 1), ('width', 2), ('height', 2),
+                             ('name', 'other.png')):
+            evidence, raw = self.public_read()
+            evidence['read']['attachment'][field] = wrong
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                validate_public_image_read('dsh', evidence, raw, PNG, '中文图片.png')
+        evidence, raw = self.public_read()
+        evidence['read']['data'] = base64.b64encode(b'wrong bytes').decode()
+        with self.assertRaises(ValueError):
+            validate_public_image_read('dsh', evidence, raw, PNG, '中文图片.png')
+
+    def test_byte_read_cannot_substitute_another_raw_source_or_endpoint(self):
+        evidence, raw = self.public_read()
+        changed = copy.deepcopy(raw)
+        changed['attachment']['attachmentId'] = 'another-source'
+        with self.assertRaises(ValueError):
+            validate_public_image_read('dsh', evidence, changed, PNG, '中文图片.png')
+        with self.assertRaises(ValueError):
+            validate_public_image_read('unknown', evidence, raw, PNG, '中文图片.png')
+
 
 
 if __name__ == '__main__':

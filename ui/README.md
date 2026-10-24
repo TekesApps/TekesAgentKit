@@ -382,3 +382,5 @@ for constructor injection, scaling, control/selection retention and native evide
 `FamilyCatalog` 是 AgentKit 高层控件，输入 `FamilyCatalogInput`，组合固定 TekesUI 的 Stack/Text/Button。每个 `FamilyCatalogBinding::for_run` 为原父 Run 分配独立 `FamilyCatalogSourceKey`，复用既有 `ChildCatalogState` 显式只读刷新公开 catalog。输入中的 source key 必须原样转发，不能每帧重建；独立 parent/source 的计数不互相比较。先用控件 `accepts` 核对原点击，再用原 binding `accepts` 核对来源；之后仍由原 `ChildPaneBinding` 检查能力，它不授予发送权。
 
 测试宿主 `--components --endpoint-config <配置> --family-catalog` 可显式组合目录；读取按钮不自动重试。`--family-seed-manifest` 与 `--family-delivery-receipt` 必须配合显式端点和 `--offscreen`，只作为真实公开来源的断言 oracle，不能安装 Task 或更改 pointer。Native 父 scope Task 保持普通不可导航 Summary 行；其 bounded child 通过目录进入原只读 Transcript。Pi/DSH 仍走原独立 child binding。这里的离屏节点挂载不代表桌面可见、物理 IME 或系统 AX 验收。
+
+[公开图片字节回读修正](../docs/rust-agent-ui-dsh-image-read-results-20261025.md)：DSH 同样通过原 session.attachment 读取；三端重连前后均已验证。旧 probe 的 DSH unsupported 标记不是能力结论，位图 UI 仍待 SDK #117。

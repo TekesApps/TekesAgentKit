@@ -227,3 +227,26 @@ def stream_response(path, body):
         'content': 'ENDPOINT_REPLY_OK'}, 'finish_reason': None}]),
         dict(base, choices=[{'index': 0, 'delta': {}, 'finish_reason': 'stop'}],
              usage={'prompt_tokens': 1, 'completion_tokens': 1, 'total_tokens': 2})]
+
+
+def validate_public_image_read(kind, evidence, raw, original, name):
+    """The fixed PNG probe requires public bytes before and after reconnect on every SEP."""
+    if kind not in ('native', 'pi', 'dsh') or not isinstance(evidence, dict):
+        raise ValueError('unknown image endpoint or missing byte-read evidence')
+    digest = hashlib.sha256(original).hexdigest()
+    attachment_id = digest if kind == 'pi' else 'sha256:' + digest
+    expected_data = base64.b64encode(original).decode('ascii')
+    if (evidence.get('publicByteRead') is not True
+            or evidence.get('rawTranscriptAttachment') != raw
+            or evidence.get('attachmentId') != attachment_id):
+        raise ValueError(kind + ' public image read/source binding is missing')
+    read = evidence.get('read')
+    info = read.get('attachment') if isinstance(read, dict) else None
+    if (not isinstance(info, dict) or read.get('data') != expected_data
+            or info.get('attachmentId') != attachment_id
+            or info.get('mediaType') != 'image/png' or info.get('bytes') != len(original)
+            or info.get('width') != 1 or info.get('height') != 1
+            or (kind != 'native' and info.get('name') != name)):
+        raise ValueError(kind + ' public image bytes or metadata differ')
+    if kind == 'dsh' and (not isinstance(raw, dict) or raw.get('attachment') != info):
+        raise ValueError('DSH read metadata differs from its original descriptor')

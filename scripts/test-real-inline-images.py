@@ -20,7 +20,7 @@ import uuid
 
 from dsh_owned_fixture import owned_dsh
 from inline_image_live_fixture import (InlineImageProvider, decode_image_with_imageio,
-    inspect_user_request, stream_response)
+    inspect_user_request, stream_response, validate_public_image_read)
 from native_owned_fixture import owned_native
 from pi_owned_fixture import prepare_pi
 from runtime_provenance import kernel_programs
@@ -203,14 +203,7 @@ def run_probe(kind, endpoint, ids, image_program, env, workspace, case, provider
                 or attachments[0].get('type') != 'image'
                 or evidence.get('rawTranscriptAttachment') != attachments[0]):
             raise ValueError(kind + ' public image source evidence is missing')
-        if kind in ('native', 'pi'):
-            read = evidence.get('read', {})
-            if (evidence.get('publicByteRead') is not True
-                    or read.get('data') != ONE_PIXEL_DATA
-                    or read.get('attachment', {}).get('mediaType') != 'image/png'
-                    or (kind == 'pi' and read.get('attachment', {}).get('name') != '中文图片.png')
-                    or read.get('attachment', {}).get('bytes') != len(ONE_PIXEL_PNG)):
-                raise ValueError(kind + ' public session attachment read lost original data')
+        validate_public_image_read(kind, evidence, attachments[0], ONE_PIXEL_PNG, '中文图片.png')
         if row.get('image', {}).get('byteCount') != len(ONE_PIXEL_PNG):
             raise ValueError(kind + ' receipt lost original image byte count')
         scope = row.get('scope', {})
@@ -222,6 +215,7 @@ def run_probe(kind, endpoint, ids, image_program, env, workspace, case, provider
                 or recovered.get('input', {}).get('attachments') != attachments
                 or recovered.get('imageEvidence', {}).get('rawTranscriptAttachment') != attachments[0]):
             raise ValueError(kind + ' reconnect did not recover the original public source identities')
+        validate_public_image_read(kind, recovered.get('imageEvidence'), attachments[0], ONE_PIXEL_PNG, '中文图片.png')
     observed = provider.receipt()
     for index, request in enumerate(observed['requests']):
         image = provider.images[index]

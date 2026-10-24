@@ -1,5 +1,7 @@
 # #16：原 RunBinding 的真实三端图片协议闭环
 
+**更正**：当轮 DSH unsupported 来自 probe 硬编码，没有实际调用图片 read，不能作为缺少能力的证据。[后续三端公开字节回读](rust-agent-ui-dsh-image-read-results-20261025.md)已补实际调用及重连；本页与旧 JSON 的计数仍仅适用原程序。
+
 起点 `78b7392`，设计见[图片接入契约](rust-agent-ui-inline-image-contract-20261025.md)，机器结果见[JSON](rust-agent-ui-inline-image-live-results-20261025.json)。只消费固定 TekesUI，不改 Kernel/ClientKit/DSH/Pi，不启动桌面。
 
 `ui/demo/examples/inline_image_probe.rs` 读取显式 endpoint 配置文件，两个既有普通会话分别通过原 `begin_inline_images` / Composer / `prepare_send` / `dispatch_prepared_with` 发送中文图文和纯图。每次只使用一个活动会话；原 runtime 重连后重新打开两条会话，要求非 stale、非 provisional 的公开输入及同 turn final 回复，核对原消息 ID 和附件。Native 的 source position 是公开 entry 身份与 ordinal，不能强行要求 numeric sequence，也不把 ordinal 当永久身份。
@@ -10,7 +12,7 @@
 | --- | --- | --- | --- |
 | Native | Kernel 0.9.3 | 2 / 2 | 原 `asset` / `mime` / 中文名称；`session.attachment` 读回原 bytes、MIME、尺寸。读取 DTO 不提供名称，名称由原历史引用证明。 |
 | Pi | 1.3.0 独立基线 | 2 / 2 | 原 `mimeType` / base64；`session.attachment` 读回原 bytes、名称、MIME、尺寸。没有替换并行保留的 1.4.0 candidate。 |
-| DSH | 0.2.1-rc.2 | 2 / 3 | 原 `attachment` 描述符、SHA、69 bytes、1×1、中文名称。当前 SEP 不提供图片字节 read；不读取私有库补齐。 |
+| DSH | 0.2.1-rc.2 | 2 / 3 | 原 `attachment` 描述符、SHA、69 bytes、1×1、中文名称。当轮 probe 未调用公开图片 read，误标 unsupported；能力结论已按上方更正。 |
 
 六次图片输入均到达 provider，MIME 为 image/png、SHA 为 `c47dd9465c00e9a0c8b85e9ea58d3034a0d23b9cf926113602f3460752a4eb96`，内容顺序和图文/纯图语义正确；重连后未新增图片 prompt。DSH 另一次为已由公开包源码确认的 first-prompt title，独立记录，不计作图片发送或隐藏重试。其公开 runtime/time 上下文后缀和 image handle 也单列，不能从历史里任取一张图冒充当前输入。普通后来 human 输入、任意无图请求、重复图片/标题请求均有拒绝回归。
 
