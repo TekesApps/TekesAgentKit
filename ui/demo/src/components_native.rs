@@ -33,6 +33,8 @@ use tekes_ui_scene::{GlyphAtlas, Rect, Scene};
 use tekes_ui_text::coretext::{CoreTextFonts, CoreTextRasterizer, CoreTextShaper};
 use tekes_ui_tokens::{Palette, Theme};
 
+#[path = "native_child_error_dispatch.rs"]
+mod child_error_dispatch;
 #[path = "native_composer_notice_selftest.rs"]
 mod composer_notice_probe;
 #[path = "native_disclosure_reading_selftest.rs"]
@@ -1152,7 +1154,9 @@ impl Host {
                     result: Err(error),
                     ..
                 } => {
-                    if self.view.child_request_current(&request) {
+                    if let Some(error) =
+                        child_error_dispatch::current_child_open_error(&self.view, &request, error)
+                    {
                         self.failure(error);
                     }
                 }
