@@ -538,3 +538,7 @@ Native后续切片：复用既有feature headless与已安装Kernel0.9.3，真�
 ### #17 / #27：子 Run 原 Transcript 来源
 
 [验收契约](rust-agent-ui-child-transcript-source-contract-20261024.md)与[结果](rust-agent-ui-child-transcript-source-results-20261024.md)补齐父Summary之外的原子Run运行/失败两帧。Python21定向/242全量通过，复用精确SHA程序的真实Pi/DSH共43命令/15合成请求accepted：同scope/epoch/原User来源/opaque turnId，子Run running→error且revision递增；父Summary仍running→failed。真实DSH child库存摘要可缺省，原数据保持None，仅对应profile显式处理，默认父/Pi严格规则不变。不同publication分开，不靠childHistory终态或同文本猜来源；Rust/UI输入不变，本轮无Cargo/新target/桌面。源码、失败和最终原帧已封存，完整恢复/分页/布局/IME/AX仍开放。
+
+### #17 / #27：失败后新连接与新 pointer 恢复
+
+[本轮结果](rust-agent-ui-child-reconnect-results-20261024.md)补齐 child 主 Run 的失败后 reconnect→新父 pointer→公开 open→父/子来源→childHistory。真实Pi27/DSH30命令、15合成请求通过，epoch2→5与5→8，原输入/错误/结算内容恢复；发现帧与可读来源帧分开，Pi临时stream标记不当持久字段。Python249/0、定向7项、边界/矩阵通过，复用原程序且无Cargo/新target/桌面。ba076cc两份CI已终态核对，consumer通过、#53严格门仍失败。实际SidePanel子pane的parent-thread scope/原controller/祖先权限捕获和分页仍待补，不以primary-child-run成功替代；#17/#27不关闭。

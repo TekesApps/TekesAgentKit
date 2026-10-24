@@ -16,4 +16,6 @@
 
 f7fe185的PR40096979427/push40096974552终态原artifact/log已核对并回填旧结果：root/UI/consumer/Python221通过，唯一失败仍为TekesUI#53严格阅读，后续CI demo跳过；新提交Python242与CI另验。精确TekesUI50ec49f不变，不豁免门槛。
 
+ba076cc 的两份新 head CI 现已结束，详见[终态收据](rust-agent-ui-ci-ba076cc-20261024.md)：checks、UI 与独立 consumer 通过，唯一失败仍是 #53，CI demo 跳过。该结果不自动适用于后续提交。
+
 证据在SSD `.runtime-fixtures/child-transcript-source-20261024/`：1075文件输入、可选库存修正增量、候选/失败/最终原帧、运行时输入和二进制复用收据完整保留。缓存删除0 bytes。只证明同帧内存来源一致和同次运行的时间顺序，不证明服务端多流事务一致或producer防伪；也不代替失败后恢复/分页、Native新生命周期、原生子pane操作/草稿、最终布局/glyph、桌面/物理IME/OS AX/ProcessContainer。#17/#27继续开放，不合并/tag/发布。

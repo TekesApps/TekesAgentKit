@@ -382,7 +382,14 @@
     "server-transactional-freshness-or-producer-fabrication-resistance",
     "full-Transcript-or-ClientKit-parity"
   ],
-  "ci": "pending-new-head; f7fe185 terminal receipt separately recorded",
+  "ci": {
+    "head": "ba076cc35f1a8c75d23bfa8cf19023f7824e498c",
+    "terminalReceipt": "rust-agent-ui-ci-ba076cc-20261024.json",
+    "checks": "passed",
+    "uiWorkspaceAndStandaloneConsumer": "passed",
+    "strictReading": "failed-TekesUI-53",
+    "demoBuild": "skipped"
+  },
   "issueClosed": false,
   "mergeTagRelease": false,
   "cacheBytesDeletedInThisSlice": 0,

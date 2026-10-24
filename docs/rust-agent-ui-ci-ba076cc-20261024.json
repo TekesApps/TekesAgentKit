@@ -1,0 +1,71 @@
+{
+  "headSha": "ba076cc35f1a8c75d23bfa8cf19023f7824e498c",
+  "runs": [
+    {
+      "id": 40098659285,
+      "url": "https://github.com/TekesApps/TekesAgentKit/actions/runs/40098659285",
+      "conclusion": "failure",
+      "checkout": "0dc0654fb49a413aab24d707940d3222de846ccc",
+      "consumer": "success",
+      "strictReading": "failure",
+      "rawReading": {
+        "accepted": false,
+        "parentFollowingAfterInnerUp": true,
+        "parentOffsetBefore": 0,
+        "parentOffsetAfterScroll": 0,
+        "parentOffsetAfterAppend": 634,
+        "innerOffset": 100,
+        "detailVisibleAfterAppend": false
+      },
+      "consumerSourceFiles": 137,
+      "consumerSourceSha256": "e216110c5e2c26b279f832c9c2cbfa596f004f640b23cf6560b0acfb743e4466",
+      "sdk": {
+        "commit": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+        "local_packages": 11,
+        "native_interaction": false,
+        "reviewed_files": 243,
+        "sha256": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
+        "ui_packages": 8
+      },
+      "artifactHashes": {
+        "agentkit-public-consumer-prepare.json": "66a2a2a268dbbde0ab5cb4efb18b0691646af0c31a5820c8fe8d5660816e9f92",
+        "agentkit-nested-detail-reading.json": "c4f70b29538ecacd71995d9a3fc7678cf168834c54e6f348c8c095309b9f1b90",
+        "agentkit-ui-metadata.json": "c3bbda95c33c8050c1f3ffe0227524ee65adcae614824694348109b478bbd2a7",
+        "agentkit-ui-inputs.json": "9543ade335292f9c7f61944edd341c2fb9297a7c6abc3cf44dc86c1f16bd6ee3"
+      }
+    },
+    {
+      "id": 40098655443,
+      "url": "https://github.com/TekesApps/TekesAgentKit/actions/runs/40098655443",
+      "conclusion": "failure",
+      "checkout": "ba076cc35f1a8c75d23bfa8cf19023f7824e498c",
+      "consumer": "success",
+      "strictReading": "failure",
+      "rawReading": {
+        "accepted": false,
+        "parentFollowingAfterInnerUp": true,
+        "parentOffsetBefore": 0,
+        "parentOffsetAfterScroll": 0,
+        "parentOffsetAfterAppend": 634,
+        "innerOffset": 100,
+        "detailVisibleAfterAppend": false
+      },
+      "consumerSourceFiles": 137,
+      "consumerSourceSha256": "e216110c5e2c26b279f832c9c2cbfa596f004f640b23cf6560b0acfb743e4466",
+      "sdk": {
+        "commit": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+        "local_packages": 11,
+        "native_interaction": false,
+        "reviewed_files": 243,
+        "sha256": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
+        "ui_packages": 8
+      },
+      "artifactHashes": {
+        "agentkit-public-consumer-prepare.json": "9523e6551a48b1ba8c20094a95f833bf93156ba7325e7fcaeb16a57bef26a670",
+        "agentkit-nested-detail-reading.json": "c4f70b29538ecacd71995d9a3fc7678cf168834c54e6f348c8c095309b9f1b90",
+        "agentkit-ui-metadata.json": "c3bbda95c33c8050c1f3ffe0227524ee65adcae614824694348109b478bbd2a7",
+        "agentkit-ui-inputs.json": "9543ade335292f9c7f61944edd341c2fb9297a7c6abc3cf44dc86c1f16bd6ee3"
+      }
+    }
+  ]
+}
