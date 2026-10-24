@@ -99,10 +99,18 @@ impl SummaryFacts {
         })?;
         let mut facts = Self::read(scope, session, transcript)?;
         for child in &mut facts.subagents {
+            let candidate = transcript
+                .tools
+                .iter()
+                .find(|tool| tool.id == child.id)
+                .and_then(|tool| tool.result.as_ref())
+                .and_then(subagent_result_candidate);
+            child.session_id = candidate
+                .as_deref()
+                .and_then(|id| known_child_session_id(store, scope, id));
             child.status = child
                 .session_id
                 .as_deref()
-                .filter(|id| *id != scope.session_id)
                 .map(|id| child_session_status(store, id))
                 .unwrap_or_default();
         }
@@ -203,11 +211,10 @@ impl SummaryFacts {
                 facts.subagents.push(SummarySubagent {
                     id: tool.id.clone(),
                     title: title.into(),
-                    session_id: tool
-                        .result
-                        .as_ref()
-                        .and_then(subagent_result_id)
-                        .filter(|id| id != &scope.session_id),
+                    // A UUID-shaped value in result text is only a candidate. Without a store
+                    // inventory this projection cannot authorize navigation; read_with_store
+                    // validates candidates against the same endpoint's known sessions.
+                    session_id: None,
                     status: String::new(),
                 });
             }
@@ -387,9 +394,28 @@ fn child_session_status(store: &MemoryProjectionStore, id: &str) -> String {
         status
     }
 }
-// ClientKit resolves the first native startup UUID in the tool result. Keep it raw here: endpoint
-// identity is a separate scope, never a synthetic storage prefix.
-fn subagent_result_id(value: &Value) -> Option<String> {
+// ClientKit resolves the first native startup UUID in the tool result. This is only a raw
+// candidate; authorization may return a matching inventory key, never a synthesized prefix.
+fn known_child_session_id(
+    store: &MemoryProjectionStore,
+    scope: &RunScope,
+    candidate: &str,
+) -> Option<String> {
+    let suffix = format!(":{candidate}");
+    if scope.session_id == candidate || scope.session_id.ends_with(&suffix) {
+        return None;
+    }
+    if store.sessions.contains_key(candidate) {
+        return Some(candidate.to_owned());
+    }
+    let mut matches = store
+        .sessions
+        .keys()
+        .filter(|id| id.ends_with(&suffix) && *id != &scope.session_id);
+    let only = matches.next()?.clone();
+    matches.next().is_none().then_some(only)
+}
+fn subagent_result_candidate(value: &Value) -> Option<String> {
     fn texts(value: &Value, out: &mut String) {
         match value {
             Value::Array(values) => {

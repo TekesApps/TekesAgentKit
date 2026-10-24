@@ -142,6 +142,14 @@ fn task_titles_never_use_result_brief_and_subagents_resolve_native_startup_uuid(
     let facts = SummaryFacts::read(&scope("p"), &session, &transcript).unwrap();
     assert_eq!(facts.tasks[0].name, "producer name");
     assert_eq!(facts.subagents[0].title, "audit child");
+    assert_eq!(facts.subagents[0].session_id, None);
+
+    let mut store = MemoryProjectionStore::new("e");
+    store.sessions.insert("p".into(), session);
+    store
+        .sessions
+        .insert(id.into(), SessionProjection::default());
+    let facts = SummaryFacts::read_with_store(&scope("p"), &store, &transcript).unwrap();
     assert_eq!(facts.subagents[0].session_id.as_deref(), Some(id));
 }
 #[test]
@@ -443,4 +451,82 @@ fn summary_never_resolves_the_parent_result_uuid_as_a_child() {
             .action
             .is_none()
     );
+}
+
+#[test]
+fn summary_subagent_pointer_requires_a_unique_same_endpoint_session() {
+    let parent = scope("p");
+    let child = "b437cf34-5661-45e2-a674-113b27c92f89";
+    let mut store = summary_child_store();
+    let transcript = TranscriptSnapshot::read(&parent, &store.sessions["p"]).unwrap();
+
+    // Exact raw identity wins even if other inventory keys share its suffix.
+    store
+        .sessions
+        .insert(format!("dsh:session:{child}"), SessionProjection::default());
+    store.sessions.insert(
+        format!("native:session:{child}"),
+        SessionProjection::default(),
+    );
+    let exact = SummaryFacts::read_with_store(&parent, &store, &transcript).unwrap();
+    assert_eq!(exact.subagents[0].session_id.as_deref(), Some(child));
+
+    // A UUID in arbitrary result text is not itself authority to navigate.
+    store.sessions.remove(child);
+    store.sessions.remove(&format!("dsh:session:{child}"));
+    store.sessions.remove(&format!("native:session:{child}"));
+    let unknown = SummaryFacts::read_with_store(&parent, &store, &transcript).unwrap();
+    assert_eq!(unknown.subagents[0].session_id, None);
+    assert!(summary_subagent_rows(&unknown, &parent)[0].action.is_none());
+
+    // Endpoint-qualified identities are accepted only when the raw UUID suffix is unique.
+    let qualified = format!("dsh:session:{child}");
+    store
+        .sessions
+        .insert(qualified.clone(), SessionProjection::default());
+    let unique = SummaryFacts::read_with_store(&parent, &store, &transcript).unwrap();
+    assert_eq!(
+        unique.subagents[0].session_id.as_deref(),
+        Some(qualified.as_str())
+    );
+    assert!(summary_subagent_rows(&unique, &parent)[0].action.is_some());
+
+    store.sessions.insert(
+        format!("native:session:{child}"),
+        SessionProjection::default(),
+    );
+    let ambiguous = SummaryFacts::read_with_store(&parent, &store, &transcript).unwrap();
+    assert_eq!(ambiguous.subagents[0].session_id, None);
+    assert!(
+        summary_subagent_rows(&ambiguous, &parent)[0]
+            .action
+            .is_none()
+    );
+}
+
+fn summary_subagent_rows(facts: &SummaryFacts, scope: &RunScope) -> Vec<SummaryRow> {
+    facts
+        .sections(scope)
+        .into_iter()
+        .find(|section| section.id == "subagents")
+        .expect("subagent section")
+        .rows
+}
+
+#[test]
+fn summary_does_not_redirect_namespaced_parent_uuid_to_another_session() {
+    let raw_id = "b437cf34-5661-45e2-a674-113b27c92f89";
+    let parent_id = format!("dsh:session:{raw_id}");
+    let mut store = summary_child_store();
+    let parent_session = store.sessions.remove("p").unwrap();
+    store.sessions.insert(parent_id.clone(), parent_session);
+    store.sessions.insert(
+        format!("native:session:{raw_id}"),
+        SessionProjection::default(),
+    );
+    let parent = scope(&parent_id);
+    let transcript = TranscriptSnapshot::read(&parent, &store.sessions[&parent_id]).unwrap();
+    let facts = SummaryFacts::read_with_store(&parent, &store, &transcript).unwrap();
+    assert_eq!(facts.subagents[0].session_id, None);
+    assert!(summary_subagent_rows(&facts, &parent)[0].action.is_none());
 }

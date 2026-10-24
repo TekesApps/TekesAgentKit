@@ -499,7 +499,35 @@ fn pi_only_child_creation_is_a_summary_subagent() {
     assert_eq!(transcript.tools[1].name, "tekes_subagent");
     let facts = SummaryFacts::read(&scope("a"), &projection, &transcript).unwrap();
     assert_eq!(facts.subagents.len(), 1);
+    assert_eq!(facts.subagents[0].session_id, None);
+    assert!(
+        facts
+            .sections(&scope("a"))
+            .into_iter()
+            .find(|section| section.id == "subagents")
+            .unwrap()
+            .rows[0]
+            .action
+            .is_none()
+    );
+
+    let mut store = MemoryProjectionStore::new("e");
+    store.sessions.insert("a".into(), projection);
+    store
+        .sessions
+        .insert(child.into(), SessionProjection::default());
+    let facts = SummaryFacts::read_with_store(&scope("a"), &store, &transcript).unwrap();
     assert_eq!(facts.subagents[0].session_id.as_deref(), Some(child));
+    assert!(
+        facts
+            .sections(&scope("a"))
+            .into_iter()
+            .find(|section| section.id == "subagents")
+            .unwrap()
+            .rows[0]
+            .action
+            .is_some()
+    );
 }
 
 #[test]
