@@ -277,12 +277,26 @@ pub struct SubmissionState {
     pub reconciled: bool,
 }
 #[derive(Clone, Debug)]
+pub struct PreparedAttachmentFacts {
+    artifact_id: String,
+    facts: Option<AttachmentFacts>,
+}
+impl PreparedAttachmentFacts {
+    pub fn artifact_id(&self) -> &str {
+        &self.artifact_id
+    }
+    pub fn facts(&self) -> Option<&AttachmentFacts> {
+        self.facts.as_ref()
+    }
+}
+#[derive(Clone, Debug)]
 pub struct PreparedSubmission {
     pub(crate) id: String,
     pub(crate) destination: ComposerDestination,
     pub(crate) plan: SubmissionPlan,
     pub(crate) mode: PromptMode,
     pub(crate) settings: BTreeMap<String, Value>,
+    attachment_facts: Vec<PreparedAttachmentFacts>,
 }
 impl PreparedSubmission {
     pub fn id(&self) -> &str {
@@ -297,12 +311,16 @@ impl PreparedSubmission {
     pub fn settings(&self) -> &BTreeMap<String, Value> {
         &self.settings
     }
+    pub fn attachment_facts(&self) -> &[PreparedAttachmentFacts] {
+        &self.attachment_facts
+    }
 }
 #[derive(Clone)]
 struct SubmissionRecord {
     state: SubmissionState,
     draft: ComposerDraft,
     plan: SubmissionPlan,
+    attachment_facts: Vec<PreparedAttachmentFacts>,
     claimed: bool,
 }
 #[derive(Default)]
@@ -539,6 +557,17 @@ impl PresentationStore {
             authority.endpoint_capabilities.supports("commands/run")
                 || authority.endpoint_capabilities.supports("commands.execute"),
         )?;
+        let attachment_facts: Vec<_> = draft
+            .artifacts
+            .iter()
+            .filter_map(|artifact| match artifact {
+                ComposerArtifact::Attachment { id, facts, .. } => Some(PreparedAttachmentFacts {
+                    artifact_id: id.clone(),
+                    facts: facts.clone(),
+                }),
+                _ => None,
+            })
+            .collect();
         require(
             match &plan {
                 SubmissionPlan::Prompt { .. } => {
@@ -569,9 +598,16 @@ impl PresentationStore {
                 state: state.clone(),
                 draft,
                 plan: plan.clone(),
+                attachment_facts,
                 claimed: false,
             },
         );
+        let attachment_facts = self
+            .submissions
+            .get(&id)
+            .expect("newly prepared submission")
+            .attachment_facts
+            .clone();
         let settings = self.draft(&destination).settings;
         self.drafts.insert(
             destination.clone(),
@@ -588,6 +624,7 @@ impl PresentationStore {
             plan,
             mode,
             settings,
+            attachment_facts,
         })
     }
     pub(crate) fn claim(&mut self, ticket: &PreparedSubmission) -> Result<()> {
@@ -957,5 +994,165 @@ impl PresentationStore {
             submissions,
             events: self.events.iter().cloned().collect(),
         })
+    }
+}
+
+#[cfg(test)]
+mod prepared_attachment_facts_tests {
+    use super::*;
+    use tekes_agent_contract::EndpointCapabilities;
+    use tekes_agent_session::{ConnectionState, SessionProjection};
+
+    fn destination() -> ComposerDestination {
+        ComposerDestination::run(RunScope::main("facts-endpoint", "facts-session"))
+    }
+
+    fn authority() -> MemoryProjectionStore {
+        let mut authority = MemoryProjectionStore::new("facts-endpoint");
+        authority.connection = ConnectionState::Ready;
+        authority.connection_epoch = 3;
+        authority.inventory_ready = true;
+        authority.workspace_ready = true;
+        authority.control_ready = true;
+        authority.actionables_ready = true;
+        authority.endpoint_capabilities =
+            EndpointCapabilities::methods(&["session.prompt", "commands/run"]);
+        authority.sessions.insert(
+            "facts-session".into(),
+            SessionProjection {
+                summary: Some(json!({"sessionId":"facts-session","status":"active"})),
+                journal_ready: true,
+                ..Default::default()
+            },
+        );
+        authority
+    }
+
+    fn attachment(id: &str, content: Value, facts: Option<AttachmentFacts>) -> ComposerArtifact {
+        ComposerArtifact::Attachment {
+            id: id.into(),
+            name: format!("{id}.bin"),
+            content,
+            facts,
+        }
+    }
+
+    fn facts(byte_count: u64) -> Option<AttachmentFacts> {
+        Some(AttachmentFacts {
+            byte_count,
+            attachment_id: None,
+            media_type: None,
+        })
+    }
+
+    #[test]
+    fn prompt_ticket_freezes_ordered_facts_and_failure_restores_through_original_completion() {
+        let destination = destination();
+        let file = json!({"type":"file","receiptId":"file-r"});
+        let image = json!({"type":"image","mediaType":"image/png","data":"YWJj"});
+        let legacy_file = json!({"type":"file","receiptId":"legacy-r"});
+        let original = ComposerDraft {
+            text: "original prompt".into(),
+            artifacts: vec![
+                attachment("file-a", file.clone(), facts(12)),
+                attachment("image-b", image.clone(), facts(3)),
+                attachment("legacy-c", legacy_file.clone(), None),
+            ],
+            ..Default::default()
+        };
+        let mut core = PresentationStore::default();
+        core.select(destination.clone()).unwrap();
+        core.edit(&destination, original.clone()).unwrap();
+        let ticket = core
+            .prepare(&destination, PromptMode::Queue, &authority())
+            .unwrap();
+
+        match ticket.plan() {
+            SubmissionPlan::Prompt { content, .. } => {
+                assert_eq!(content[0]["type"], "text");
+                assert_eq!(&content[1..], &[file, image, legacy_file]);
+            }
+            _ => panic!("expected prompt plan"),
+        }
+        let prepared = ticket.attachment_facts();
+        assert_eq!(
+            prepared
+                .iter()
+                .map(PreparedAttachmentFacts::artifact_id)
+                .collect::<Vec<_>>(),
+            ["file-a", "image-b", "legacy-c"]
+        );
+        assert_eq!(prepared[0].facts().unwrap().byte_count, 12);
+        assert_eq!(prepared[1].facts().unwrap().byte_count, 3);
+        assert!(
+            prepared[2].facts().is_none(),
+            "legacy missing facts stay missing"
+        );
+
+        core.edit(
+            &destination,
+            ComposerDraft {
+                text: "newer text survives failure".into(),
+                artifacts: vec![attachment(
+                    "later-image",
+                    json!({"type":"image","mediaType":"image/webp","data":"eHl6"}),
+                    facts(3),
+                )],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(ticket.attachment_facts()[0].artifact_id(), "file-a");
+        assert_eq!(ticket.attachment_facts()[0].facts().unwrap().byte_count, 12);
+
+        core.finish(&ticket.id, Err("host preparation failed".into()))
+            .unwrap();
+        let restored = core.draft(&destination);
+        assert_eq!(restored.text, "newer text survives failure");
+        assert!(restored.artifacts.iter().any(|a| a.id() == "later-image"));
+        assert!(restored.artifacts.iter().any(|a| a.id() == "file-a"));
+        assert!(restored.artifacts.iter().any(|a| a.id() == "image-b"));
+    }
+
+    #[test]
+    fn command_ticket_keeps_attachment_facts_in_plan_order() {
+        let destination = destination();
+        let first = json!({"type":"image","mediaType":"image/jpeg","data":"Zmlyc3Q="});
+        let second = json!({"type":"file","receiptId":"second-r"});
+        let mut core = PresentationStore::default();
+        core.select(destination.clone()).unwrap();
+        core.edit(
+            &destination,
+            ComposerDraft {
+                text: "arguments".into(),
+                artifacts: vec![
+                    ComposerArtifact::Command {
+                        id: "command".into(),
+                        name: "inspect".into(),
+                        supports_attachments: true,
+                    },
+                    attachment("first", first.clone(), facts(5)),
+                    attachment("second", second.clone(), None),
+                ],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let ticket = core
+            .prepare(&destination, PromptMode::Queue, &authority())
+            .unwrap();
+
+        match ticket.plan() {
+            SubmissionPlan::Command { attachments, .. } => {
+                assert_eq!(attachments, &[first, second]);
+            }
+            _ => panic!("expected command plan"),
+        }
+        let prepared = ticket.attachment_facts();
+        assert_eq!(prepared.len(), 2);
+        assert_eq!(prepared[0].artifact_id(), "first");
+        assert_eq!(prepared[0].facts().unwrap().byte_count, 5);
+        assert_eq!(prepared[1].artifact_id(), "second");
+        assert!(prepared[1].facts().is_none());
     }
 }

@@ -215,7 +215,7 @@ class Checks(unittest.TestCase):
         (ui / 'tekesui-source.json').write_text(json.dumps(public))
         for name, dependencies in {
             'components': ['tekes-agent-contract', 'tekes-agent-presentation', 'tekes-ui-controls', 'tekes-ui-scene', 'tekes-ui-tokens', 'tekes-ui-text', 'tekes-ui-motion', 'unicode-segmentation'],
-            'bindings': ['tekes-agent-components-ui', 'tekes-agent-contract', 'tekes-agent-presentation', 'tekes-agent-session', 'tekes-agent-web', 'serde_json', 'tokio', 'async-trait', 'uuid', 'base64'],
+            'bindings': ['tekes-agent-components-ui', 'tekes-agent-contract', 'tekes-agent-presentation', 'tekes-agent-session', 'tekes-agent-web', 'serde_json', 'tokio', 'async-trait', 'uuid', 'base64', 'image'],
             'consumer': ['tekes-agent-components-ui', 'tekes-agent-ui-bindings', 'tekes-ui-controls'],
         }.items():
             (ui / name).mkdir()

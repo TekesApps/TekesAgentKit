@@ -6,7 +6,7 @@ Sidebar 的共享 binding 提供显式同实例 observer 恢复 API，按原 end
 
 当前 UI 为 `0.0.0` / `publish=false`，PR #10 保持 draft；不能把局部组件或离屏通过当作完整 ClientKit Views、窗口级 toolbar 或 ProcessContainer 验收。AgentKit 已发布基线为 v0.3.8，本 UI 明确消费同仓库开发路径和未发布的共享增量；正式宿主需固定最终发布的新不可变版本。
 
-最近功能基线 `9969f8f` 的[三端同程序原子面板来源](../docs/rust-agent-ui-native-child-pane-source-results-20261024.md)与[当前交付入口](../docs/rust-agent-ui-delivery-status.md)记录精确程序、CI和未验收范围。两轮CI仅TekesUI#53严格阅读失败，未合并/tag；下列旧阶段证据不转移到新程序。
+三端来源见证基线 `9969f8f` 的[三端同程序原子面板来源](../docs/rust-agent-ui-native-child-pane-source-results-20261024.md)与[当前交付入口](../docs/rust-agent-ui-delivery-status.md)记录精确程序、CI和未验收范围。两轮CI仅TekesUI#53严格阅读失败，未合并/tag；下列旧阶段证据不转移到新程序。
 
 当前接入与证据：
 
@@ -189,6 +189,23 @@ Sidebar 重命名、分叉和归档通过共享 dispatcher 接入，归档后显
 `--components --creation-selftest` 使用隔离 fixture 验证交互式新会话、公开预设选择、组字屏障和正常 Composer 发送，保留原草稿。真实 endpoint 窗口需显式提供 `--create-cwd ABSOLUTE_PATH` 才启用新会话入口。创建失败保留 session/RPC 身份并阻止替代点击；专用失败对账 UI 尚未实现。见 [新会话接入记录](../docs/rust-agent-ui-creation-20261020.md)。
 
 `--components --annotation-selftest` 验证已有批注评论的原生编辑、组字屏障和共享发送。真实三端脚本可加 `--ui-annotation-editor`，自动包含 context 证明；它不提供来源高亮或结构化历史卡片。公共 AnnotationEditor、原 binding 写入与快照确认流程见 [评论编辑接入](../docs/rust-agent-ui-annotation-editor-20261020.md)。
+
+## 无 UI 的图片输入
+
+`RunBinding::begin_inline_images` 在宿主打开选择器/剪贴板读取前捕获原destination、context与epoch；`InlineImageInput`只接收basename与宿主有界读取的 `Arc<[u8]>`。`supports_inline_images` 表示可读取policy，不代表模型vision能力，policy仍可拒绝所有格式。
+
+```rust,ignore
+let selection = binding.begin_inline_images(&destination)?;
+// 宿主在此异步选择、确认文件权限并有界读取，提供以下两个值。
+let input = InlineImageInput::new(selected_basename, selected_bytes)?;
+let outcome = selection.attach(&[input]).await?;
+```
+
+Kit从真实bytes检测PNG/JPEG/GIF/WebP、限额与完整首帧，解码在blocking worker内，原context CAS一次加入整批；错误/迟到不部分添加，取消只能claim尚未开始的选择，不自动重试。该路径不调用uploadFile，也不产生上传回执。原一般文件按钮继续走file路径，不根据MIME偷偷转换为image。
+
+通过RunBinding的共享发送仍使用原prepare/dispatch。含image的冻结ticket在host模型准备之后重读policy，混合file/image总量使用同票据冻结file facts与真实image bytes；失败走原恢复并保留新输入，纯文字/纯file不新增该查询。policy与后续prompt不是原子操作，最终并发变更仍由SEP校验。[接入契约与当前验证范围](../docs/rust-agent-ui-inline-image-contract-20261025.md)区分本地fixture和真实三端结果。
+
+尚未接图片专用picker/粘贴/拖放UI或预览，也未验证真实三端图片provider闭环。Composer/Transcript位图展示消费等待中的 [TekesUI #117](https://github.com/TekesApps/TekesUI/issues/117)；不复制基础渲染/资源生命周期，不把一般附件卡片计为图片UI完成。
 
 ## 文件附件接入与三端验收
 

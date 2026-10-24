@@ -7,6 +7,8 @@ pub use feedback_controls::*;
 mod history;
 pub use history::*;
 mod attachments;
+mod inline_images;
+pub use inline_images::*;
 mod file_preview;
 pub use file_preview::*;
 mod feedback;
@@ -293,10 +295,14 @@ impl SubmissionPreparation for ScopedPreparation<'_> {
         scope: &RunScope,
     ) -> Result<()> {
         self.binding.require_controls(ticket.destination())?;
+        let epoch = runtime.inspect(|state| state.connection_epoch);
         self.host.prepare(runtime, ticket, scope).await?;
         // Host preparation may await model/auth/settings work. A pane that closed
         // in that interval cannot admit its earlier click after the await.
-        self.binding.require_controls(ticket.destination())
+        self.binding.require_controls(ticket.destination())?;
+        self.binding
+            .validate_inline_submission(ticket, scope, epoch)
+            .await
     }
 }
 impl RunBinding {

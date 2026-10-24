@@ -28,6 +28,7 @@ tekes-ui-platform-macos = { git = "https://github.com/TekesApps/TekesUI.git", re
 tokio = { version = "1", features = ["rt-multi-thread", "time", "sync", "macros"] }
 serde_json = "1"
 base64 = "0.22"
+image = { version = "=0.25.10", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
 async-trait = "0.1"
 uuid = { version = "1", features = ["v4"] }
 unicode-segmentation = "=1.13.3"

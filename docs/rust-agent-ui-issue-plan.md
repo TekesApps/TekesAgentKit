@@ -574,3 +574,7 @@ Native后续切片：复用既有feature headless与已安装Kernel0.9.3，真�
 ### #21 / #28：原 rail hover 与 SDK viewport 边距
 
 [契约](rust-agent-ui-turn-rail-hover-contract-20261025.md)和[结果](rust-agent-ui-turn-rail-hover-results-20261025.md)补齐原 pointer/motion 消费与连续tick反馈，并修复SDK焦点边距使26pt长tick被压成16pt的真实布局问题。RunPort/refresh使用同一actual-scale几何；独立CoreText consumer的Scene/clip、缩放/窄列/正常publication/原焦点和一次导航通过。UI763/0/1、feature RunPort19/bindings39、严格Clippy/两配置构建/standalone consumer、Python最终262通过，原失败保留。当前strict reading仍exit1/accepted=false，#53/#46与完整桌面/IME/AX等开放，不关闭Issue、不合并发布；复用SSDtarget，删除0字节。
+
+### #16：原 RunBinding 图片输入与冻结 ticket 复核
+
+[结果](rust-agent-ui-inline-image-binding-results-20261025.md)补齐一次性image capture/CAS和host准备后policy重验，file facts与plan同源冻结，image从真实bytes检测/解码，不需upload、不新建提交状态机；plain text/file原路径不新增查询。Root380、presentation feature289、UI777/0/1、feature RunPort19/bindings44、严格检查/两配置构建/standalone、Python262通过，新增core2/图片policy与decoder5/原公开binding集成9。旧image无facts追加也按真实data计量，Root源码不变、兼容修正后另重跑UI；初始失败/实际RPC尝试观测修正、538个source与程序用途已封存。当前strict仍#53失败；真实三端图片、picker/粘贴/拖放/预览/桌面等未验收，SDK显示缺口#117仍开放，不关闭Issue、不合并发布。
