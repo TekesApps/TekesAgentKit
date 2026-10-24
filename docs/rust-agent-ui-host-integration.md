@@ -6,6 +6,41 @@
 AgentKit 拥有业务组件/状态；TekesUI 拥有通用控件、输入、焦点、IME、阅读和进程能力；宿主负责窗口、整体布局、导航与系统适配。
 颜色、字体、圆角和语义间距随 TekesUI defaults/tokens；机器内容/footnote 靠左，用户气泡和外置 footnote 靠右。
 
+## 当前公开接入基线（Issue #15）
+
+本审计基于 AgentKit 源码 HEAD `58521a1bc581ef14c3c63c9a7bc698bbd01d9ab3`，TekesUI 固定公开 revision
+`50ec49f3446924fdbc66b3cff22cd8cfe150fe7c`。UI workspace (`ui/`) 的包仍为 `0.0.0` 且
+`publish = false`；已发布的 AgentKit `v0.3.8` 不包含当前 UI 组件及其所需的共享 presentation 增量。
+因此当前只能用明确的 AgentKit 仓库开发路径和 `ui/Cargo.lock` 做验证输入，不能把它描述成可供外部用户安装的
+已发布 AgentKit UI 契约。正式宿主接入需等包含所需 API 的不可变 AgentKit 发布版本；不得把活动 branch、path override
+或 TekesUI 的公开 pin 当作 AgentKit UI 发布版本。
+
+稳定的组件命名是 `RunPort`（Composer + Transcript + Indicators 组合），不是旧的 `RunView` 名称，也不是
+`RunSurface`。`RunSurface` 和 `ComponentDemo` 是协议/控件测试宿主，不是复用组件 API。三个业务组件均由
+`tekes-agent-components-ui` 导出；可用公开 `RunPort::standard(namespace, rows, scope)`、
+`Sidebar::new(namespace, labels)`、`SidePanel::new(namespace, labels, retained_parent_limit)` 构造，
+并分别用 `into_host()` 安装到 TekesUI `ContentHost`。独立 consumer 的构造示例、显式 path 和验证命令见
+[consumer README](../ui/consumer/README.md)；机器可读的当前核对结果见[契约审计](rust-agent-ui-api-contract-audit-20261024.md)。
+
+AgentKit 组件持有领域展示规则、publication 验证、原 pointer/source 权限和类型化意图；宿主持有运行时订阅、窗口与
+导航、输入参数、工具/路径/安装/凭据/系统权限 adapter，以及把捕获意图送回原 dispatcher/controller 的职责。
+TekesUI `ContentHost` 提供当前同进程挂载路径。固定公开 TekesUI revision 不包含可验收的 `ProcessContainer`
+同进程/跨进程适配契约；当前三个容器尚未完成该集成，不能以 `into_host()` 或组件离屏测试代替。
+缺少的基础能力继续跟踪 TekesUI #48/#64，等公开精确版本具备所需能力后消费。
+
+公开业务输入/回调的字段责任如下；这些组件仍是当前未发布 UI workspace 的实验 API：
+
+| 组件 | 宿主发布的状态 | Kit 发出的业务事件 | 宿主处理 |
+| --- | --- | --- | --- |
+| `RunPort` | 固定 `RunScope` 与独占 ID namespace/row pool；每帧传入原 `RunSnapshot`、`ComposerAffordances`、`ComposerControlGate`、匹配的 `TranscriptPagingFacts` 和 actionable 可用事实。 | `RunPortIntent`（Composer send/cancel/edit、load earlier、actionable、footnote/copy、reading/layout/navigation）；`prepare_update` 保留同一帧来源。 | 立即 drain 原 SDK action；按 intent 捕获的 scope/来源和原 binding dispatch。不得从当前选中会话重定向旧事件，也不得自动重试未知发送。 |
+| `Sidebar` | 单调 `SidebarInput.revision`、inventory loaded/error、canonical rows、selected address；排序/分组结果、偏好和搜索来源由既有 store/query 提供。 | Select/Action、分页请求、偏好/搜索、visibility/reveal intent。 | 将动作交回现有导航、共享 action dispatcher、偏好 store 或搜索查询，复核原 address/definition/token 后再执行；Kit 不另存 inventory、pin 或偏好。 |
+| `SidePanel` | 单调 `SidePanelInput.revision`、parent、`projection_ready`、ordered tabs/selected、同一 controller 的 `SideChatSnapshot` 与 `supports_side_chat`。 | Select/Close/CreateSideChat/Launch；每个内容安装携带原 `PanelContentToken`。 | 从原 task/child/chat binding 安装内容，并在异步返回时重新验证 parent/tab/token。关闭临时 chat 要等原 discard 成功；旧回包不能重选、复活内容或变成新 Run。 |
+
+这些输入分别由 `RunPort::update` / `prepare_update`、`Sidebar::update` 与 preference/search API、
+`SidePanel::update` 承载；三者都公开 `into_host()` 生成现有 `ContentHost`。`ContentAction` 必须先交给原
+组件的 `take_intents` / 专用 page/preference 接口，不能改为轮询当前菜单状态。完整 public constructor
+consumer 和精确开发路径见 [独立 consumer](../ui/consumer/README.md)。
+
 ## 状态输入与回调
 
 | 组件 | 输入/所有权 | 宿主回调责任 |
@@ -71,7 +106,7 @@ TranscriptContent、RunPort 和 ReadOnlyTranscript 可用 `set_thinking_display`
 包含不同 scope 与异步 history 返回后的门禁。Missing 不复活，Closing/Unknown 不变成可写；
 主 Run 的 mount 卸载不等于取消远端执行或丢弃共享草稿。
 
-尚未发布的 `PaneSnapshot::ReadOnlyChild` 新增 `source` 实例身份；
+当前分支的未发布 UI API 中，`PaneSnapshot::ReadOnlyChild` 带 `source` 实例身份；
 `ReadOnlyTranscriptInput::source` 由原 binding 的 `readonly_input` 提供。
 同 scope/epoch/publication 不代表同一绑定，不能将旧 intent 或 snapshot 转交新来源。
 组件按原来源捕获请求，executor 在 claim/IO 前核对；独立展示可用 None，但不授予 endpoint 读取。
@@ -80,8 +115,10 @@ TranscriptContent、RunPort 和 ReadOnlyTranscript 可用 `set_thinking_display`
 
 ## 可运行参考与验证
 
-第二 consumer 的[公开组件挂载/整帧发布](../ui/consumer/src/lib.rs)提供
-`new_agent_run_port`、`publish_original_run` 和 `publish_original_readonly`；组件包负责实际业务实现。
+仓库内的第二 consumer 包 `tekes-agent-ui-consumer-check` 只依赖公开 AgentKit UI 包并提供针对性 API 探针；它不是
+干净的外部产品依赖路径。Issue #15 增加的独立 package 样例直接依赖 `tekes-agent-components-ui`，构造并挂载
+`RunPort`、`Sidebar`、`SidePanel`，不导入 demo、RunSurface 或 consumer-check。两种验证的证据层级分别记录，
+未执行的外部 Cargo 构建不能记为通过。组件包负责实际业务实现。
 默认 demo 使用[原宿主绑定](../ui/demo/src/component_demo.rs)和[反馈调度](../ui/demo/src/component_feedback.rs)。
 
 构建方式与显式 SEP 配置见 [UI README](../ui/README.md)。沿用已有 CARGO_TARGET_DIR，固定 manifest/lock/SDK 输入；
