@@ -106,6 +106,7 @@ def prepare(root: Path, output: Path) -> dict[str, object]:
     source = '''use tekes_agent_components_ui::{
     RunPort, RunScope, SidePanel, SidePanelInput, SidePanelLabels, SidePanelTab,
     SidePanelTabKind, SideChatSnapshot, Sidebar, SidebarInput, SidebarLabels,
+    SidebarMultiSearchStatus, SidebarSearchLabels,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -126,6 +127,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     })?;
     sidebar.clear_pending_actions();
     let _sidebar_host = sidebar.into_host()?;
+    let _search_status_host = SidebarMultiSearchStatus::new(0x8400, SidebarSearchLabels::default()).into_host()?;
 
     let mut side_panel = SidePanel::new(0x8300, SidePanelLabels::default(), 4);
     side_panel.update(&SidePanelInput {
@@ -169,6 +171,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "agentkit_ui_publish": False,
         "explicit_development_path": str(component_path),
         "consumer_direct_dependencies": ["tekes-agent-components-ui"],
+        "components": ["RunPort", "Sidebar", "SidePanel"],
+        "status_children": ["SidebarMultiSearchStatus"],
         "forbidden_wrappers": [
             "tekes-agent-ui-consumer-check",
             "RunSurface",

@@ -31,6 +31,13 @@ pub struct ConfiguredConnector {
     pub scopes: [RunScope; 2],
 }
 
+/// The demo host's explicitly configured endpoint set. This owns independent
+/// endpoint configurations and never duplicates one connector across identities.
+pub struct HostEndpointConfiguration {
+    endpoints: Vec<EndpointConfiguration>,
+    scopes: Vec<RunScope>,
+}
+
 fn invalid(field: &str) -> Error {
     Error::Protocol(format!("invalid endpoint configuration: {field}"))
 }
@@ -243,5 +250,56 @@ impl EndpointConfiguration {
                 Err(error)
             }
         }
+    }
+}
+
+impl HostEndpointConfiguration {
+    /// Accept the original single-endpoint shape or a strict `{ "endpoints": [...] }` host.
+    /// This phase validates all entries and resolves explicit environment authority without
+    /// opening an endpoint or launching a harness. Constructing the Native
+    /// connector value performs only its existing pure URL/credential validation.
+    pub fn parse(value: &Value, env: impl Fn(&str) -> Option<String>) -> Result<Self> {
+        let configs: Vec<&Value> = match value {
+            Value::Object(object) if object.contains_key("endpoints") => {
+                require(
+                    object.len() == 1,
+                    "multi-endpoint configuration only accepts endpoints",
+                )?;
+                let Value::Array(items) = &object["endpoints"] else {
+                    return Err(invalid("endpoints must be an array"));
+                };
+                require(!items.is_empty(), "at least one endpoint required")?;
+                items.iter().collect()
+            }
+            Value::Object(_) => vec![value],
+            _ => return Err(invalid("host configuration must be an object")),
+        };
+
+        let mut endpoints = Vec::with_capacity(configs.len());
+        let mut scopes = Vec::with_capacity(configs.len() * 2);
+        let mut ids = std::collections::BTreeSet::new();
+        for config in configs {
+            let endpoint = EndpointConfiguration::parse(config, &env)?;
+            let endpoint_id = &endpoint.scopes()[0].endpoint_id;
+            require(ids.insert(endpoint_id.clone()), "duplicate endpoint ID")?;
+            scopes.extend(endpoint.scopes().iter().cloned());
+            endpoints.push(endpoint);
+        }
+        Ok(Self { endpoints, scopes })
+    }
+
+    /// Scopes flattened in endpoint configuration order, retaining each endpoint's
+    /// original two session scopes and their order.
+    pub fn scopes(&self) -> &[RunScope] {
+        &self.scopes
+    }
+
+    /// Transfer every independently configured endpoint into its own connector.
+    pub async fn into_connectors(self) -> Result<Vec<ConfiguredConnector>> {
+        let mut connectors = Vec::with_capacity(self.endpoints.len());
+        for endpoint in self.endpoints {
+            connectors.push(endpoint.into_connector().await?);
+        }
+        Ok(connectors)
     }
 }

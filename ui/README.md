@@ -92,6 +92,8 @@ ui/target/debug/tekes-agent-ui-demo
 按钮提供发送、停止、历史分页、回到最新、重连、切换 A/B。候选 Composer 已消费公共多行 Grow 视口；Enter 换行，业务发送仍仅通过显式按钮。
 宿主订阅已有 `RunController::subscribe()`，通过公开 `WindowWake` 投递通知；异步操作结果入队后同样 wake。没有业务 frame pump；原控件的有限过渡仍按需请求动画帧。
 
+`--components --endpoint-config` 还可接收严格多端对象 `{"endpoints":[nativeConfig, piConfig, dshConfig]}`。每项沿用下述单端字段与两个已有 session；endpointId 必须唯一，顺序决定初始 Run tabs。宿主分别注册每端自己的 connector/kind/runtime；原无 `--components` 旧路径仍只接受单端配置。多端模式不运行单端专属 `*-proof`/`*-selftest`，不将首端验收收据扩报为多端。SideChat 目前只为原首端 controller 启用，其他端明确禁用；多端 provider 查询已通过共享 SidebarMultiSearchBinding 接通。配置层与限制见[Sidebar 宿主说明](../docs/rust-agent-ui-sidebar-host-20261024.md)。本批未启动真实多端窗口。
+
 真实 Native、Pi、DSH 都通过 `--endpoint-config` 接收宿主显式 JSON。A/B 对应所选 endpoint 的两个已有 session，必须互不相同；宿主负责模型/执行参数。demo 启动不创建真实会话或修改模型；`--components` 中显式点击新建 SideChat 会在支持的 endpoint 创建临时 fork，关闭操作会取消并丢弃该临时会话：
 
 ```json
@@ -244,7 +246,7 @@ ui/target/debug/tekes-agent-ui-demo --components --transcript-content --offscree
 
 [Summary metadata 语义色](../docs/rust-agent-ui-summary-ink-20261022.md)修正原标签意外继承 Primary 的问题；普通 metadata 固定跟随当前库 SecondaryText，公开查询 ID/动作/owner 不变，不要求新业务 revision 才响应主题变化。完整状态附件、change-count runs 与配对视觉仍单独验收。
 
-`SidebarSearchBinding` 复用无渲染器的 `presentation::SidebarSearchController`，接收宿主 query，拥有 250ms 去抖、来源/epoch/代数、只读请求撤销和显式 Retry。首次安装用 `replace_search_source`，后续用 `update_search_from`；切换 binding 不沿用旧来源的 revision 或动作 ID。`--sidebar-query <text>` 与显式 endpoint 配置组合使用；`--components --transcript-content --sidebar-query-selftest` 是 owned fixture 的原生指针重试探针。公开接入、Pi/DSH 搜索限制与分层证据见 [Sidebar 共享查询控制器](../docs/rust-agent-ui-sidebar-query-controller-20261021.md)。完整搜索结果列表和多 endpoint 聚合仍待补齐。
+`SidebarSearchBinding` 复用无渲染器的 `presentation::SidebarSearchController`，接收宿主 query，拥有 250ms 去抖、来源/epoch/代数、只读请求撤销和显式 Retry。首次安装用 `replace_search_source`，后续用 `update_search_from`；切换 binding 不沿用旧来源的 revision 或动作 ID。`--sidebar-query <text>` 与显式 endpoint 配置组合使用；`--components --transcript-content --sidebar-query-selftest` 是 owned fixture 的原生指针重试探针。公开接入、Pi/DSH 搜索限制与分层证据见 [Sidebar 共享查询控制器](../docs/rust-agent-ui-sidebar-query-controller-20261021.md)。多 endpoint provider 聚合和状态子组件已接入 demo，见[多端搜索契约](../docs/rust-agent-ui-sidebar-multi-search-20261024.md)；Mirror FTS/pins 对齐与完整窗口验收仍待补齐。
 
 Summary 的六项用量行使用左标题、右数值的两个 TekesUI 文本槽；`SummaryLabels::usage_row` 负责本地化，`SummaryUsageRowText::read` 提供默认格式，`SummaryView::usage_row_ids` 提供原控件身份。完整接入与验证边界见[用量行记录](../docs/rust-agent-ui-summary-usage-20261021.md)。
 

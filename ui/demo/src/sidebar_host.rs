@@ -21,6 +21,7 @@ pub struct SidebarHostPublication {
     owner: Arc<()>,
     publication: SidebarPublication,
     endpoint_count: usize,
+    multi: Option<Arc<SidebarMultiPublication>>,
 }
 // Read-only field access preserves the host's publication API without exposing
 // mutable source facts under an owner token. There is deliberately no DerefMut.
@@ -36,6 +37,16 @@ impl SidebarHostPublication {
     }
     pub fn endpoint_count(&self) -> usize {
         self.endpoint_count
+    }
+    /// Preserve per-endpoint inventory status for shared multi-search joins.
+    pub fn as_multi_publication(&self) -> Option<SidebarMultiPublication> {
+        let mut source = self.multi.as_ref()?.as_ref().clone();
+        source.revision = self.revision;
+        source.rows = self.rows.clone();
+        source.activity_at = self.activity_at.clone();
+        source.loaded = self.loaded;
+        source.error = self.error.clone();
+        Some(source)
     }
     /// Owned restore fixture only: status/revision may change, rows may be
     /// hidden or marked stale, but their original identities and actions cannot
@@ -59,6 +70,7 @@ impl SidebarHostPublication {
             owner: self.owner.clone(),
             publication: source.clone(),
             endpoint_count: self.endpoint_count,
+            multi: self.multi.clone(),
         })
     }
     pub fn folder_catalog(&self) -> Result<tekes_agent_ui_bindings::SidebarFolderCatalog> {
@@ -244,6 +256,7 @@ impl SidebarHostBinding {
             owner: owner.clone(),
             publication: source.clone(),
             endpoint_count: 1,
+            multi: None,
         }
     }
     fn from_multi(owner: &Arc<()>, source: &SidebarMultiPublication) -> SidebarHostPublication {
@@ -257,6 +270,7 @@ impl SidebarHostBinding {
                 activity_at: source.activity_at.clone(),
             },
             endpoint_count: source.endpoints.len(),
+            multi: Some(Arc::new(source.clone())),
         }
     }
     pub fn snapshot(&self) -> Arc<SidebarHostPublication> {
@@ -276,6 +290,19 @@ impl SidebarHostBinding {
     }
     pub fn runtime_for(&self, endpoint_id: &str) -> Option<&Arc<SessionRuntime>> {
         self.runtimes.get(endpoint_id)
+    }
+    /// The demo knows the explicitly configured harness family. A parent's
+    /// layout must never follow whichever endpoint happened to be listed first.
+    pub fn child_history_layout(
+        &self,
+        endpoint_id: &str,
+    ) -> Result<tekes_agent_presentation::ChildHistoryLayout> {
+        use tekes_agent_presentation::ChildHistoryLayout;
+        match self.agent.endpoint(endpoint_id)?.kind.as_str() {
+            "native" => Ok(ChildHistoryLayout::SameSession),
+            "pi" | "dsh" => Ok(ChildHistoryLayout::IndependentSessions),
+            _ => Err(unsupported("unknown demo child history layout")),
+        }
     }
     pub fn turn_action_dispatcher(&self) -> TurnActionDispatcher {
         TurnActionDispatcher::new(self.agent.clone())

@@ -285,19 +285,17 @@
       ],
       "progress": {
         "date": "2026-10-24",
-        "commit": "6c700e9",
+        "evidence": "docs/rust-agent-ui-multi-search-results-20261024.md",
         "verified": [
-          "固定多端binding、完整地址、聚合owner读取与动作票据",
-          "2项聚合+3项双端夹具；UI workspace634/1原有忽略",
-          "独立binding API consumer编译及错误配置拒绝；两端实际行为另由夹具证明"
+          "固定端多搜索 controller 与原端 retry",
+          "公开 inventory join、状态组件与 demo 多 connector 接线",
+          "presentation234/0/0，UI653/0/1，第二公开 consumers，双端成功及局部失败离屏"
         ],
         "notVerified": [
-          "demo宿主接线",
-          "跨端全局查询与过滤分页整体组合",
-          "终态observer同实例恢复",
-          "原生/AX/ProcessContainer"
-        ],
-        "evidence": "docs/rust-agent-ui-parallel-results-20261024.md"
+          "Mirror FTS/pins parity",
+          "多端 SideChat",
+          "真实多 harness、桌面、物理中文 IME、像素 reveal"
+        ]
       }
     },
     {

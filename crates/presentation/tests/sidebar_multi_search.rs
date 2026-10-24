@@ -157,6 +157,7 @@ async fn wait_for(
     tokio::time::timeout(Duration::from_secs(3), async {
         loop {
             let snapshot = controller.snapshot();
+            snapshot.validate().unwrap();
             if predicate(&snapshot) {
                 return snapshot;
             }

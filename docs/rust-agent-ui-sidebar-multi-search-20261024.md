@@ -22,7 +22,7 @@ Retry intent必须携带原aggregate key和原child key，派发前同时验证�
 
 `SidebarMultiPublication::project_multi_search_for_display(search, display)` 接收真实 aggregate publication 与原 display revision/filter/selected，先按固定 endpoint status 拆出原单端 inventory，调用原 `project_search`，再按原全局 inventory order合并完整地址。输出独立 `SidebarMultiSearchProjection`，包含 SidebarInput、snippet、unresolved与逐端原状态/aggregate key；不能把多端伪造成一个 single `search_help.source`。partial/pending/error和hasMore继续独立可见，只有当前已返回且已join的结果可展示；没有凭snippet构造rows/actions。清query恢复全inventory，旧query/未知endpoint/重复child/source mismatch结构拒绝。
 
-该层先提供可复用公开投影和定向验证，再由组件消费aggregate状态；投影通过不等于控件/宿主已接通。
+该层提供公开投影，已由组件及 demo 消费；投影和离屏通过不等于真实多 harness 或桌面验收。
 
 ## 第一阶段实施与已运行验证
 
@@ -30,4 +30,16 @@ Retry intent必须携带原aggregate key和原child key，派发前同时验证�
 
 7项真实SessionEndpoint协议fixture测试通过：同ID跨端保留、相同query一次读取、ABA用provider call identity确认旧A不能填新A、清空与迟到回包、Drop后不复活、单失败端retry/旧owner拒绝、unsupported端不抹其他结果、单端重连不重读另一端。完整presentation234 passed / 0 failed / 0 ignored，严格all-target Clippy通过。日志 `.runtime-fixtures/sidebar-host-20261024/presentation-with-multi-search-tests.log`、`presentation-multi-search-clippy-final.log`。没有假造成功publication替代reader，也没有运行真实harness/桌面。
 
-bindings、组件和demo跨端query接线仍是后续阶段；第一阶段通过不代表完整Sidebar搜索验收或Issue关闭。
+后续 bindings、组件和 demo 接线也已完成，见下面的集成结果；完整 Sidebar 验收与 Issue 关闭仍有独立门槛。
+
+## 多端状态控件与 Sidebar 组合
+
+Kit新增 `SidebarMultiSearchStatus` 业务子组件，消费原 `SidebarMultiSearchPublication`，逐端显示Searching/Failed/hasMore等状态；Retry intent保留aggregate key和原child key，不转成全局single retry。结构校验复用publication.validate；owner替换和query/attempt更换退休原控件ID，同端同attempt的其他端更新可保留retry控件，但不能解除已捕获的本地pending。采用原SDK Text/Button和默认token/layout，不创建通用输入/滚动/渲染实现。它是Sidebar组成内容，不是新的搜索controller。
+
+Sidebar将其装入既有footer布局：多端状态与single search互斥切换，旧raw事件不能转投新源。Sidebar原namespace的末段预留给此子组件，独立使用仍提供显式namespace；不共用其他组件ID。宿主仅向Kit传原projection/publication和typedretry，不解析hits或合成single key。snippets与结果完整性保持原来源；实际reveal通过原SDK事务，不能由目标身份断言扩报成像素可见。
+
+## 集成结果
+
+HostEndpointConfiguration 接收多个独立 connector；组件宿主按固定端集合安装公开 SidebarMultiSearchBinding，逐端原 inventory join 与状态控件直接消费共享投影。正常更新保留同 attempt 控件与 pending；query/source 更换退休旧 ID，Single→Multi→Single 不回收历史 Retry ID。结构验证集中在原 aggregate publication.validate，display revision 不能重新接纳更旧 query generation 或 child epoch。
+
+最终 presentation 234/0/0、UI workspace 653/0/1（既有 #49 忽略）、两边严格 all-target Clippy 通过。公开 component consumer 实际挂载三个业务组件及搜索状态子组件；独立 binding consumer 编译公开 API 并验证无效配置拒绝，成功 IO 由真实协议 fixture 证明。双端成功/局部失败的自有离屏 renderer 均运行并检查 PNG，另挂载 TranscriptContent；失败端有原 Retry，另一端结果保留。没有桌面、系统中文 IME、真实多 harness 或完整富内容证明。精确输入、日志与边界见[本批收据](rust-agent-ui-multi-search-results-20261024.md)。

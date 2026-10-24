@@ -153,6 +153,11 @@ pub struct Sidebar {
     revision: u64,
     displayed: Option<SidebarInput>,
     search: Option<SidebarSearchInput>,
+    multi_search_next: u64,
+    multi_search_help: Option<(
+        tekes_agent_presentation::SidebarMultiSearchInput,
+        BTreeMap<SessionAddress, String>,
+    )>,
     search_owner: Option<String>,
     search_labels: SidebarSearchLabels,
     search_retry: Option<(SidebarSearchKey, ComponentId)>,
@@ -234,10 +239,13 @@ impl Sidebar {
             labels,
             ids: BTreeMap::new(),
             next: base + 16,
-            end: base | u32::MAX as u64,
+            // Reserve the final range for the multi-search status subtree.
+            end: base | 0xFEFF_FFFF,
             revision: 0,
             displayed: None,
             search: None,
+            multi_search_next: base + 0xFF00_0000,
+            multi_search_help: None,
             search_owner: None,
             search_labels,
             search_retry: None,
@@ -584,12 +592,121 @@ impl Sidebar {
     pub fn displayed_search(&self) -> Option<&SidebarSearchInput> {
         self.search.as_ref()
     }
+    fn multi_search_status(&self) -> Option<&crate::SidebarMultiSearchStatus> {
+        self.body.children[1].component::<crate::SidebarMultiSearchStatus>()
+    }
+    fn multi_search_active(&self) -> bool {
+        self.multi_search_status()
+            .and_then(|status| status.displayed())
+            .is_some_and(|source| source.input.key.is_some())
+    }
+    pub fn displayed_multi_search(
+        &self,
+    ) -> Option<&tekes_agent_presentation::SidebarMultiSearchPublication> {
+        self.multi_search_status()?.displayed()
+    }
+    pub fn replace_multi_search_source(
+        &mut self,
+        owner: &str,
+        source: &tekes_agent_presentation::SidebarMultiSearchPublication,
+    ) -> Result<(), &'static str> {
+        if let Some(status) =
+            self.body.children[1].component_mut::<crate::SidebarMultiSearchStatus>()
+        {
+            status.replace_source(owner, source)?;
+        } else {
+            let mut status = crate::SidebarMultiSearchStatus::from_id_range(
+                ComponentId(self.root.0 + 8),
+                self.multi_search_next,
+                self.root.0 | u32::MAX as u64,
+                self.search_labels.clone(),
+            )?;
+            status.replace_source(owner, source)?;
+            self.body.children[1] = Content::new(status.id(), status);
+        }
+        self.multi_search_next = self.multi_search_status().unwrap().next_id();
+        self.search = None;
+        self.search_owner = None;
+        self.search_retry = None;
+        self.search_pending = false;
+        self.multi_search_help = None;
+        if let Some(input) = self.displayed.clone() {
+            self.update(&input)?;
+        }
+        Ok(())
+    }
+    pub fn update_multi_search_from(
+        &mut self,
+        owner: &str,
+        source: &tekes_agent_presentation::SidebarMultiSearchPublication,
+    ) -> Result<(), &'static str> {
+        self.body.children[1]
+            .component_mut::<crate::SidebarMultiSearchStatus>()
+            .ok_or("multi-search source is not installed")?
+            .update_from(owner, source)?;
+        self.multi_search_next = self.multi_search_status().unwrap().next_id();
+        if self
+            .multi_search_help
+            .as_ref()
+            .is_some_and(|(old, _)| old != &source.input)
+        {
+            self.multi_search_help = None;
+        }
+        if let Some(input) = self.displayed.clone() {
+            self.update(&input)?;
+        }
+        Ok(())
+    }
+    pub fn set_multi_search_help(
+        &mut self,
+        source: &tekes_agent_presentation::SidebarMultiSearchInput,
+        snippets: &BTreeMap<SessionAddress, String>,
+    ) -> Result<(), &'static str> {
+        let current = self
+            .displayed_multi_search()
+            .ok_or("multi-search source is not installed")?;
+        if &current.input != source || (source.key.is_none() && !snippets.is_empty()) {
+            return Err("stale multi-search row help");
+        }
+        for (address, text) in snippets {
+            if !current.children.iter().any(|child| {
+                child.endpoint_id == address.endpoint_id
+                    && child
+                        .publication
+                        .hits
+                        .iter()
+                        .any(|hit| &hit.address == address && &hit.hit.snippet == text)
+            }) {
+                return Err("row help is outside the original multi-search result");
+            }
+        }
+        self.multi_search_help = Some((source.clone(), snippets.clone()));
+        Ok(())
+    }
+    pub fn take_multi_search_intents(
+        &mut self,
+        actions: &[ContentAction],
+    ) -> Vec<tekes_agent_presentation::SidebarMultiSearchIntent> {
+        self.body.children[1]
+            .component_mut::<crate::SidebarMultiSearchStatus>()
+            .map_or_else(Vec::new, |status| status.take_intents(actions))
+    }
     /// Accepted current-query metadata. The SDK owns visibility, dwell, clipping
     /// and semantic help on the original row; metadata alone is not UI support.
     pub fn search_snippet(&self, address: &SessionAddress) -> Option<&str> {
         let input = self.displayed.as_ref()?;
         if !input.loaded {
             return None;
+        }
+        if let Some(current) = self.displayed_multi_search() {
+            let (source, snippets) = self.multi_search_help.as_ref()?;
+            if source != &current.input
+                || source.key.is_none()
+                || !input.rows.iter().any(|row| &row.address == address)
+            {
+                return None;
+            }
+            return snippets.get(address).map(String::as_str);
         }
         let help = input.search_help.as_ref()?;
         if !help.results_ready || self.search.as_ref() != Some(&help.source) {
@@ -617,12 +734,27 @@ impl Sidebar {
     /// Product copy is a host input; all paint and sizing remain library defaults.
     pub fn set_search_labels(&mut self, labels: SidebarSearchLabels) -> Result<(), &'static str> {
         self.search_labels = labels;
+        if let Some(status) =
+            self.body.children[1].component_mut::<crate::SidebarMultiSearchStatus>()
+        {
+            status.set_labels(self.search_labels.clone())?;
+        }
         if let Some(input) = self.search.clone() {
             self.apply_search(&input)?;
         }
         Ok(())
     }
     fn search_footer_mut(&mut self) -> &mut SearchFooter {
+        if self.body.children[1].component::<SearchFooter>().is_none() {
+            if let Some(status) = self.multi_search_status() {
+                self.multi_search_next = status.next_id();
+            }
+            self.body.children[1] = Content::new(
+                ComponentId(self.root.0 + 8),
+                SearchFooter::new(self.search_labels.name.clone()),
+            );
+            self.multi_search_help = None;
+        }
         self.body.children[1]
             .component_mut::<SearchFooter>()
             .unwrap()
@@ -630,7 +762,7 @@ impl Sidebar {
     /// Search is independent from inventory restoration. Every displayed result
     /// belongs to its exact query attempt; no old raw Retry gesture is retargeted.
     pub fn update_search(&mut self, input: &SidebarSearchInput) -> Result<(), &'static str> {
-        if self.search_owner.is_some() {
+        if self.search_owner.is_some() || self.multi_search_status().is_some() {
             return Err("bound sidebar search requires original source");
         }
         self.apply_search(input)
@@ -936,6 +1068,7 @@ impl Sidebar {
             input.selected.as_ref(),
             page_limit,
             self.search.as_ref().is_some_and(|s| s.key.is_some())
+                || self.multi_search_active()
                 || input
                     .search_help
                     .as_ref()
@@ -1281,6 +1414,22 @@ impl Sidebar {
                                 .is_none_or(|help| help.results_ready)
                             && self.search.as_ref().is_some_and(|search| {
                                 matches!(search.phase, crate::SidebarSearchPhase::Complete { .. })
+                            })
+                        {
+                            &self.search_labels.no_results
+                        } else {
+                            &self.search_labels.pending_results
+                        }
+                    } else if self.multi_search_active() {
+                        if input.loaded
+                            && self.displayed_multi_search().is_some_and(|source| {
+                                source.children.iter().all(|child| {
+                                    child.publication.unresolved.is_empty()
+                                        && matches!(
+                                            child.publication.input.phase,
+                                            crate::SidebarSearchPhase::Complete { has_more: false }
+                                        )
+                                })
                             })
                         {
                             &self.search_labels.no_results

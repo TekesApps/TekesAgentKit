@@ -51,6 +51,86 @@ pub struct SidebarMultiSearchPublication {
     pub children: Vec<SidebarMultiSearchChild>,
 }
 
+impl SidebarMultiSearchPublication {
+    /// Structural source coherence for consumers. Endpoint authority and retry
+    /// admission are still checked by the original live controllers.
+    pub fn validate(&self) -> Result<()> {
+        require(
+            !self.input.owner.trim().is_empty()
+                && self.input.revision > 0
+                && !self.children.is_empty(),
+            "invalid multi-search identity",
+        )?;
+        match &self.input.key {
+            Some(key) => require(
+                key.owner == self.input.owner
+                    && key.generation > 0
+                    && key.generation == self.input.generation
+                    && key.query == self.query
+                    && !key.query.trim().is_empty(),
+                "invalid aggregate search key",
+            )?,
+            None => require(
+                self.query.trim().is_empty(),
+                "cleared aggregate retains query",
+            )?,
+        }
+        let mut endpoints = BTreeSet::new();
+        for child in &self.children {
+            let source = &child.publication;
+            require(
+                !child.endpoint_id.trim().is_empty()
+                    && endpoints.insert(&child.endpoint_id)
+                    && source.input.revision > 0
+                    && source.query == self.query,
+                "invalid multi-search child identity",
+            )?;
+            if self.input.key.is_some() {
+                let key = source
+                    .input
+                    .key
+                    .as_ref()
+                    .ok_or_else(|| unsupported("active child has no source key"))?;
+                require(
+                    !key.owner.trim().is_empty()
+                        && key.endpoint_id == child.endpoint_id
+                        && key.generation > 0
+                        && key.query == self.query
+                        && source.input.phase != SidebarSearchPhase::Idle,
+                    "invalid multi-search child key",
+                )?;
+            } else {
+                require(
+                    source.input.key.is_none()
+                        && source.input.phase == SidebarSearchPhase::Idle
+                        && source.hits.is_empty()
+                        && source.unresolved.is_empty()
+                        && source.result.is_none(),
+                    "cleared child retains results",
+                )?;
+            }
+            let mut hits = BTreeSet::new();
+            for hit in &source.hits {
+                require(
+                    hit.address.endpoint_id == child.endpoint_id
+                        && !hit.address.session_id.is_empty()
+                        && hit.address.session_id == hit.hit.session_id
+                        && hits.insert(&hit.address),
+                    "invalid multi-search child hit",
+                )?;
+            }
+            require(
+                source
+                    .unresolved
+                    .iter()
+                    .all(|address| hits.contains(address)),
+                "invalid unresolved search identity",
+            )?;
+        }
+        Ok(())
+    }
+}
+
 /// Retry is fenced by both the aggregate query and the original child attempt.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]

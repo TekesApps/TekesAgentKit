@@ -84,6 +84,7 @@ pub use feedback::{
 pub enum DemoCommand {
     SidebarPreferences(tekes_agent_components_ui::SidebarPreferenceChange),
     SidebarSearch(tekes_agent_components_ui::SidebarSearchIntent),
+    SidebarMultiSearch(tekes_agent_presentation::SidebarMultiSearchIntent),
     Feedback(Box<FeedbackDemoRequest>),
     ReadInitialFeedback(Box<FeedbackInitialRequest>),
     CopyTranscript(tekes_agent_components_ui::TranscriptCopyIntent),
@@ -193,6 +194,9 @@ pub struct ComponentDemo {
     sidebar_folder_filter: Option<tekes_agent_components_ui::SidebarFolderKey>,
     sidebar_search_publication: Option<tekes_agent_ui_bindings::SidebarSearchPublication>,
     sidebar_search_presented: Option<tekes_agent_components_ui::SidebarSearchInput>,
+    sidebar_multi_search_publication:
+        Option<tekes_agent_presentation::SidebarMultiSearchPublication>,
+    sidebar_multi_search_presented: Option<tekes_agent_presentation::SidebarMultiSearchInput>,
     sidebar_presented: Option<SidebarInput>,
     panel_revision: u64,
     workspace_summary: Option<tekes_agent_components_ui::SummaryContextInput>,
@@ -571,6 +575,8 @@ impl ComponentDemo {
             sidebar_folder_filter: None,
             sidebar_search_publication: None,
             sidebar_search_presented: None,
+            sidebar_multi_search_publication: None,
+            sidebar_multi_search_presented: None,
             sidebar_presented: None,
             panel_revision: 0,
             workspace_summary: None,
@@ -2239,6 +2245,8 @@ impl ComponentDemo {
         self.check_sidebar_search_publication(publication)?;
         self.bind_sidebar_search_source(owner, &publication.input)?;
         self.sidebar_search_publication = Some(publication.clone());
+        self.sidebar_multi_search_publication = None;
+        self.sidebar_multi_search_presented = None;
         self.sync_sidebar()
     }
     pub fn update_sidebar_search_publication(
@@ -2254,6 +2262,58 @@ impl ComponentDemo {
         self.check_sidebar_search_publication(publication)?;
         self.update_sidebar_search_source(owner, &publication.input)?;
         self.sidebar_search_publication = Some(publication.clone());
+        self.sidebar_multi_search_publication = None;
+        self.sidebar_multi_search_presented = None;
+        self.sync_sidebar()
+    }
+    fn check_sidebar_multi_search_publication(
+        &self,
+        publication: &tekes_agent_presentation::SidebarMultiSearchPublication,
+    ) -> Result<()> {
+        let inventory = self
+            .sidebar_host_source
+            .as_ref()
+            .and_then(|source| source.as_multi_publication())
+            .ok_or_else(|| {
+                unsupported("multi-search requires the original multi-endpoint inventory")
+            })?;
+        inventory
+            .project_multi_search_for_display(publication, &inventory.input(None))
+            .map_err(unsupported)?;
+        Ok(())
+    }
+    pub fn bind_sidebar_multi_search_publication(
+        &mut self,
+        owner: &str,
+        publication: &tekes_agent_presentation::SidebarMultiSearchPublication,
+    ) -> Result<()> {
+        self.check_sidebar_multi_search_publication(publication)?;
+        self.tree
+            .get_mut(self.sidebar_id())
+            .unwrap()
+            .component_mut::<Sidebar>()
+            .unwrap()
+            .replace_multi_search_source(owner, publication)
+            .map_err(unsupported)?;
+        self.sidebar_search_publication = None;
+        self.sidebar_search_presented = None;
+        self.sidebar_multi_search_publication = Some(publication.clone());
+        self.sync_sidebar()
+    }
+    pub fn update_sidebar_multi_search_publication(
+        &mut self,
+        owner: &str,
+        publication: &tekes_agent_presentation::SidebarMultiSearchPublication,
+    ) -> Result<()> {
+        self.check_sidebar_multi_search_publication(publication)?;
+        self.tree
+            .get_mut(self.sidebar_id())
+            .unwrap()
+            .component_mut::<Sidebar>()
+            .unwrap()
+            .update_multi_search_from(owner, publication)
+            .map_err(unsupported)?;
+        self.sidebar_multi_search_publication = Some(publication.clone());
         self.sync_sidebar()
     }
     fn check_sidebar_search_publication(
@@ -2335,6 +2395,8 @@ impl ComponentDemo {
         self.sidebar_source = None;
         self.sidebar_search_publication = None;
         self.sidebar_search_presented = None;
+        self.sidebar_multi_search_publication = None;
+        self.sidebar_multi_search_presented = None;
         Ok(())
     }
     pub fn set_sidebar_host_reader(&mut self, source: Arc<SidebarHostBinding>) -> Result<()> {
@@ -2352,6 +2414,8 @@ impl ComponentDemo {
         self.sidebar_search_publication = None;
         self.sidebar_search_presented = None;
         self.sidebar_host_reader = Some(source);
+        self.sidebar_multi_search_publication = None;
+        self.sidebar_multi_search_presented = None;
         Ok(())
     }
     fn retire_sidebar_owner(&mut self) -> Result<()> {
@@ -2441,6 +2505,10 @@ impl ComponentDemo {
             if display.rows.iter().any(|row| &row.address == address)
                 || self
                     .sidebar_search_publication
+                    .as_ref()
+                    .is_some_and(|s| s.input.key.is_some())
+                || self
+                    .sidebar_multi_search_publication
                     .as_ref()
                     .is_some_and(|s| s.input.key.is_some())
             {
@@ -3130,6 +3198,24 @@ impl ComponentDemo {
                     .map_err(unsupported)?
                     .input;
             }
+            let multi_projection = if let Some(search) = &self.sidebar_multi_search_publication {
+                let inventory = self
+                    .sidebar_host_source
+                    .as_ref()
+                    .and_then(|source| source.as_multi_publication())
+                    .ok_or_else(|| unsupported("multi-search inventory source was replaced"))?;
+                let projected = inventory
+                    .project_multi_search_for_display(search, &next)
+                    .map_err(unsupported)?;
+                next = projected.input.clone();
+                Some(projected)
+            } else {
+                None
+            };
+            let multi_input = self
+                .sidebar_multi_search_publication
+                .as_ref()
+                .map(|source| source.input.clone());
             let search_input = self
                 .sidebar_search_publication
                 .as_ref()
@@ -3142,6 +3228,7 @@ impl ComponentDemo {
                     || old.search_help != next.search_help
                     || old.folder_filter != next.folder_filter
             }) || self.sidebar_search_presented != search_input
+                || self.sidebar_multi_search_presented != multi_input
             {
                 let id = self.sidebar_id();
                 self.tree
@@ -3153,6 +3240,16 @@ impl ComponentDemo {
                     .map_err(unsupported)?;
                 self.sidebar_presented = Some(next);
                 self.sidebar_search_presented = search_input;
+                self.sidebar_multi_search_presented = multi_input;
+            }
+            if let Some(projection) = multi_projection {
+                self.tree
+                    .get_mut(self.sidebar_id())
+                    .unwrap()
+                    .component_mut::<Sidebar>()
+                    .unwrap()
+                    .set_multi_search_help(&projection.aggregate_input, &projection.snippets)
+                    .map_err(unsupported)?;
             }
         }
         Ok(())
@@ -4340,6 +4437,16 @@ impl ComponentDemo {
                     }
                 }
             }
+        }
+        if !composing {
+            let intents = self
+                .tree
+                .get_mut(self.sidebar_id())
+                .unwrap()
+                .component_mut::<Sidebar>()
+                .unwrap()
+                .take_multi_search_intents(&actions);
+            commands.extend(intents.into_iter().map(DemoCommand::SidebarMultiSearch));
         }
         let summary_intents = self
             .tree

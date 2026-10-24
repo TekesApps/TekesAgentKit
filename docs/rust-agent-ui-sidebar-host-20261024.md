@@ -2,6 +2,8 @@
 
 Issue #22 的非桌面宿主接线说明。宿主仅组合公开 `SidebarBinding` / `SidebarMultiEndpointBinding`，不复制 inventory、selected-read 或 action 状态机。
 
+以下初批说明保留其历史范围；当前多端配置和 provider 搜索已接通，见文末及[集成收据](rust-agent-ui-multi-search-results-20261024.md)。
+
 ## 宿主适配
 
 `SidebarHostBinding::new(agent, endpoint_ids)` 从同一个 `SharedAgent` 取 endpoint/runtime。一个 endpoint 使用既有单端 `SidebarBinding`；多个 endpoint 使用固定集合 `SidebarMultiEndpointBinding`。适配器只归一化 publication、保留 owner 身份并把选中读取/动作调用交回对应原 binding。更换 reader 会提升 `ComponentDemo` owner epoch、清除本地 pending gestures 和旧搜索状态；publication 必须属于当前 adapter owner，旧 owner 即使 revision 重启到 1 也不能覆盖新 source。view 自身的 Sidebar revision 持续递增，不因 owner replacement 回退。
@@ -38,3 +40,19 @@ publication owner 现为不可变封装：公开读取仅提供 `Deref`，没有
 ## 主会话运行结果
 
 UI workspace 全套 637 passed / 0 failed / 1 项原有忽略（TekesUI #49），日志 `.runtime-fixtures/sidebar-host-20261024/ui-workspace-tests.log`。随后仅收紧 publication 的可变性并保留只读字段访问，最终源码的多端宿主定向测试再次通过（1 项），日志 `sidebar-host-final-immutable-tests.log`；严格 all-target Clippy、格式/边界和公开 consumer 由统一收据记录。没有把全套测试扩报为不可变封装之后的再次全套执行。
+
+## 后续设计：实际多端配置入口（Issue #22）
+
+现有 `EndpointConfiguration` 保持单端/两会话兼容；demo host 增加显式 `HostEndpointConfiguration`，接收原单端对象或仅含 `endpoints` 数组的对象。先纯解析全部配置并拒绝空数组、重复 endpoint ID、额外顶层字段和坏子项，再依次构造各自 connector；每个 endpoint 使用自己的 kind/connector/runtime，不把同一个 connector 克隆为多个后端。每端原有两个 session scope 的顺序与 ID 保留，host 按配置顺序组合初始 tabs，选中补读/动作沿用原多端 binding。配置/凭据不实现 Debug、不写日志，不自动创建 session或重试 mutation；未授权桌面启动。
+
+主会话集成 native dispatch；新配置子会话只改配置解析/connector transfer 与专属单元测试，集中构建仍由主会话负责。真实多个 harness 配置运行与原生验收将单列证据，不能由纯解析测试推断。跨端搜索另经共享 binding 设计，不加入宿主投影补丁。
+
+## 实际多端配置入口实施
+
+`HostEndpointConfiguration` 保留原 `EndpointConfiguration` 的纯校验和单端API；没有把 Native URL 校验转交 DSH，也没有新增连接期兼容规则。原生组件入口接受多端配置并逐端消费自己的 `ConfiguredConnector`，原顺序展开所有scope；单端专属proof/selftest拒绝聚合配置，避免主端统计被误报为多端证据。Summary打开子代理按原parent endpoint选择Native有界/其他独立历史布局，不再使用首端family。默认单端模式、共享偏好与首端SideChat限制保留。
+
+配置解析5项、原单端6项、pane uploads7项、多端宿主1项通过（此前日志 `host-config-tests.log`）；Native Backend随后恢复为原纯构造API，最终校验另记。不运行桌面或创建真实session；纯配置和编译不能证明真实三harness同窗。
+
+## 当前多端 provider 搜索接线
+
+多端配置入口与 SidebarMultiSearchBinding 已接通原生组件 demo；--sidebar-query 为固定端集合创建共享 reader，原 typed Retry 只发回原失败端。宿主不合并 hit、不伪造全局 single publication。双端 fixture 已做独立协议、ComponentDemo、第二 consumer 和自有 renderer 离屏验证；这里的“原生入口接通”不代表启动过窗口或真实多 harness 运行。首端 SideChat 能力限制仍然存在；Mirror FTS/pins 差异、实际像素 reveal、observer 恢复与远端搜索续页继续单列。

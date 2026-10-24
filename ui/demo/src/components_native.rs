@@ -103,6 +103,7 @@ mod footnote_time_probe;
 struct Host {
     scripted_sidebar_action: Option<ScriptedSidebarAction>,
     sidebar_query: Option<Arc<tekes_agent_ui_bindings::SidebarSearchBinding>>,
+    sidebar_multi_query: Option<Arc<tekes_agent_ui_bindings::SidebarMultiSearchBinding>>,
     sidebar_query_probe: Option<sidebar_query_probe::Probe>,
     sidebar_search_probe: Option<sidebar_search_probe::Probe>,
     sidebar_restore_probe: Option<sidebar_restore_probe::Probe>,
@@ -155,7 +156,6 @@ struct Host {
     side_chat_test_session: Option<String>,
     task_test_requested: bool,
     task_test_started: bool,
-    child_layout: ChildHistoryLayout,
     child_history_page_size: usize,
     child_test_requested: bool,
     child_test_started: bool,
@@ -316,6 +316,14 @@ impl Host {
             }
         };
         for command in commands {
+            if let DemoCommand::SidebarMultiSearch(intent) = &command
+                && let Some(source) = &self.sidebar_multi_query
+            {
+                if let Err(error) = source.retry(intent) {
+                    self.failure(error.to_string());
+                }
+                continue;
+            }
             if let DemoCommand::SidebarSearch(intent) = &command
                 && let Some(source) = &self.sidebar_query
             {
@@ -411,7 +419,13 @@ impl Host {
                     direct_parent: parent.clone(),
                     child_id: child_id.clone(),
                     title: child_id.clone(),
-                    layout: self.child_layout,
+                    layout: match self.sidebar.child_history_layout(&parent.endpoint_id) {
+                        Ok(layout) => layout,
+                        Err(error) => {
+                            self.failure(error.to_string());
+                            continue;
+                        }
+                    },
                 }
             } else {
                 command
@@ -849,9 +863,11 @@ impl Host {
                             .set_preferences(&change)
                             .map_err(|error| error.to_string()),
                     ),
-                    DemoCommand::SidebarSearch(_) => HostResult::Operation(Err(
-                        "此实验宿主尚未安装 Sidebar 搜索数据源适配器".into(),
-                    )),
+                    DemoCommand::SidebarSearch(_) | DemoCommand::SidebarMultiSearch(_) => {
+                        HostResult::Operation(Err(
+                            "此实验宿主尚未安装 Sidebar 搜索数据源适配器".into()
+                        ))
+                    }
                     DemoCommand::Sidebar(SidebarIntent::Select { .. }) => {
                         HostResult::Operation(Err("unexpected unbound navigation".into()))
                     }
@@ -894,6 +910,7 @@ impl Host {
                             | DemoCommand::SelectFiles { .. }
                             | DemoCommand::SidebarPreferences(_)
                             | DemoCommand::SidebarSearch(_)
+                            | DemoCommand::SidebarMultiSearch(_)
                             | DemoCommand::Sidebar(_)
                             | DemoCommand::TurnAction { .. }
                             | DemoCommand::ReadInitialFeedback(_)
@@ -1246,6 +1263,13 @@ impl Host {
             && let Err(error) = self
                 .view
                 .update_sidebar_search_publication(source.owner(), &source.snapshot())
+        {
+            self.failure(error.to_string());
+        }
+        if let Some(source) = &self.sidebar_multi_query
+            && let Err(error) = self
+                .view
+                .update_sidebar_multi_search_publication(source.owner(), &source.snapshot())
         {
             self.failure(error.to_string());
         }
@@ -2787,6 +2811,17 @@ impl WindowHandler for Host {
                         ),
                     ));
                 }
+                if let Some(source) = &self.sidebar_multi_query {
+                    let search_wake = wake.clone();
+                    self.observers.push(self.executor.spawn(
+                        tekes_agent_ui_demo::notifications::forward(
+                            source.subscribe(),
+                            move || {
+                                search_wake.wake() != tekes_ui_platform_macos::WakeResult::Closed
+                            },
+                        ),
+                    ));
+                }
                 let sidebar_wake = wake.clone();
                 self.observers.push(self.executor.spawn(
                     tekes_agent_ui_demo::notifications::forward(
@@ -3291,12 +3326,32 @@ pub fn run() {
     let mut summary_child_fixture = None;
     let mut summary_row_fixture = None;
     let mut footnote_time_fixture = None;
-    let (connector, kind, scopes, fixture): (
-        Arc<dyn tekes_agent_contract::EndpointConnector>,
-        _,
-        _,
-        _,
-    ) = if let Some(index) = args.iter().position(|arg| arg == "--endpoint-config") {
+    let configurations: Vec<tekes_agent_ui_demo::endpoint_config::ConfiguredConnector> = if args
+        .iter()
+        .any(|arg| arg == "--multi-sidebar-fixture")
+    {
+        assert!(
+            args.iter().any(|arg| arg == "--offscreen")
+                && !args.iter().any(|arg| arg == "--endpoint-config"
+                    || arg.ends_with("-proof")
+                    || arg.ends_with("-selftest")),
+            "multi-sidebar fixture is an isolated offscreen scenario"
+        );
+        ["fixture-a", "fixture-b"].into_iter().map(|endpoint| {
+                let source = tekes_agent_ui_demo::fixture::Fixture::default()
+                    .with_endpoint_id(endpoint).with_lifecycle().with_session_search();
+                if let Some(index) = args.iter().position(|arg| arg == "--sidebar-query") {
+                    let query = args.get(index + 1).expect("query text");
+                    source.set_search_result(query, serde_json::json!({"items":[{"sessionId":"a","snippet":format!("{endpoint}: owned fixture hit")}],"hasMore":false}));
+                }
+                if endpoint == "fixture-b" && args.iter().any(|arg| arg == "--multi-sidebar-failure-fixture") {
+                    source.set_search_failure(true);
+                }
+                tekes_agent_ui_demo::endpoint_config::ConfiguredConnector {
+                    connector: Arc::new(source), kind: "native", scopes: [RunScope::main(endpoint, "a"),RunScope::main(endpoint, "b")]
+                }
+            }).collect()
+    } else if let Some(index) = args.iter().position(|arg| arg == "--endpoint-config") {
         assert!(
             !selftest
                 && !system_ime_selftest
@@ -3311,18 +3366,17 @@ pub fn run() {
             &std::fs::read(args.get(index + 1).expect("config path")).expect("explicit config"),
         )
         .expect("config JSON");
-        let configured =
-            tekes_agent_ui_demo::endpoint_config::EndpointConfiguration::parse(&value, |name| {
-                std::env::var(name).ok()
-            })
-            .expect("explicit endpoint configuration");
-        let parts = executor
-            .block_on(configured.into_connector())
-            .expect("configured connector");
-        (parts.connector, parts.kind, parts.scopes, false)
+        let configured = tekes_agent_ui_demo::endpoint_config::HostEndpointConfiguration::parse(
+            &value,
+            |name| std::env::var(name).ok(),
+        )
+        .expect("explicit endpoint configuration");
+        executor
+            .block_on(configured.into_connectors())
+            .expect("configured connectors")
     } else {
-        (
-            Arc::new({
+        vec![tekes_agent_ui_demo::endpoint_config::ConfiguredConnector {
+            connector: Arc::new({
                 let fixture = tekes_agent_ui_demo::fixture::Fixture::default()
                     .with_demo_summary()
                     .with_side_chats()
@@ -3408,14 +3462,28 @@ pub fn run() {
                     fixture
                 }
             }),
-            "native",
-            [
+            kind: "native",
+            scopes: [
                 RunScope::main("fixture", "a"),
                 RunScope::main("fixture", "b"),
             ],
-            true,
-        )
+        }]
     };
+    // Existing endpoint-specific acceptance profiles measure one configured
+    // harness; an aggregate host must not relabel those receipts as multi-endpoint.
+    assert!(
+        configurations.len() == 1
+            || !args
+                .iter()
+                .any(|arg| arg.ends_with("-proof") || arg.ends_with("-selftest")),
+        "endpoint-specific proof/selftest requires a single configured endpoint"
+    );
+    let kind = configurations[0].kind;
+    let scopes: Vec<_> = configurations
+        .iter()
+        .flat_map(|part| part.scopes.iter().cloned())
+        .collect();
+    let fixture = !args.iter().any(|arg| arg == "--endpoint-config");
     let mut agent = SharedAgent::default();
     agent.set_session_url_scheme("tekes-demo").unwrap();
     let mut owned_preferences = None;
@@ -3435,20 +3503,18 @@ pub fn run() {
             .unwrap();
         owned_preferences = Some(directory);
     }
-    let registered_endpoint_ids: Vec<String> = scopes
+    let registered_endpoint_ids: Vec<String> = configurations
         .iter()
-        .map(|scope| scope.endpoint_id.clone())
-        .collect::<std::collections::BTreeSet<_>>()
-        .into_iter()
+        .map(|part| part.scopes[0].endpoint_id.clone())
         .collect();
     let registration = executor.enter();
-    for endpoint_id in &registered_endpoint_ids {
+    for part in configurations {
         agent
             .register(
-                endpoint_id.clone(),
-                kind.into(),
+                part.scopes[0].endpoint_id.clone(),
+                part.kind.into(),
                 "AgentKit demo".into(),
-                connector.clone(),
+                part.connector,
             )
             .unwrap();
     }
@@ -3514,20 +3580,31 @@ pub fn run() {
             .position(|arg| arg == "--sidebar-query")
             .map(|index| args.get(index + 1).expect("sidebar query text").clone())
     };
-    let has_query = query_text.is_some();
-    let multi_endpoint_sidebar = sidebar.endpoint_ids().len() > 1;
-    let sidebar_query = query_text.filter(|_| !multi_endpoint_sidebar).map(|query| {
-        executor.block_on(async {
-            let source = Arc::new(
-                tekes_agent_ui_bindings::SidebarSearchBinding::new(runtime.clone()).unwrap(),
-            );
-            source.set_query(query).unwrap();
-            source
-        })
+    let (sidebar_query, sidebar_multi_query) = executor.block_on(async {
+        match query_text {
+            Some(query) if registered_endpoint_ids.len() > 1 => {
+                let source = Arc::new(
+                    tekes_agent_ui_bindings::SidebarMultiSearchBinding::new(
+                        registered_endpoint_ids
+                            .iter()
+                            .map(|id| runtimes[id].clone())
+                            .collect(),
+                    )
+                    .unwrap(),
+                );
+                source.set_query(query).unwrap();
+                (None, Some(source))
+            }
+            Some(query) => {
+                let source = Arc::new(
+                    tekes_agent_ui_bindings::SidebarSearchBinding::new(runtime.clone()).unwrap(),
+                );
+                source.set_query(query).unwrap();
+                (Some(source), None)
+            }
+            None => (None, None),
+        }
     });
-    if has_query && multi_endpoint_sidebar {
-        eprintln!("Sidebar query disabled: this demo host has no cross-endpoint search source");
-    }
     let summary_indent_level =
         summary_context_selftest.then(|| Arc::new(std::sync::atomic::AtomicU32::new(0)));
     let mut view = if let Some(level) = summary_indent_level.clone() {
@@ -3717,6 +3794,10 @@ pub fn run() {
         view.bind_sidebar_search_publication(source.owner(), &source.snapshot())
             .unwrap();
     }
+    if let Some(source) = &sidebar_multi_query {
+        view.bind_sidebar_multi_search_publication(source.owner(), &source.snapshot())
+            .unwrap();
+    }
     view.sync().unwrap();
     if args.iter().any(|arg| arg == "--transcript-content") {
         assert!(
@@ -3766,6 +3847,7 @@ pub fn run() {
     let mut host = Host {
         scripted_sidebar_action: None,
         sidebar_query,
+        sidebar_multi_query,
         sidebar_query_probe: query_fixture.map(sidebar_query_probe::Probe::new),
         sidebar_search_probe: sidebar_search_selftest.then(sidebar_search_probe::Probe::new),
         sidebar_restore_probe: sidebar_restore_selftest.then(sidebar_restore_probe::Probe::new),
@@ -3816,11 +3898,6 @@ pub fn run() {
         side_chat_test_session: None,
         task_test_requested: false,
         task_test_started: false,
-        child_layout: if kind == "native" {
-            ChildHistoryLayout::SameSession
-        } else {
-            ChildHistoryLayout::IndependentSessions
-        },
         child_test_requested: false,
         child_test_started: false,
         bounded_test_requested: false,
@@ -3913,6 +3990,45 @@ pub fn run() {
                 .expect("initial feedback metadata");
         }
 
+        let multi_sidebar_search = if let Some(source) = &host.sidebar_multi_query {
+            let publication = host.executor.block_on(async {
+                let mut changes = source.subscribe();
+                tokio::time::timeout(Duration::from_secs(20), async {
+                    loop {
+                        let snapshot = source.snapshot();
+                        if snapshot.children.iter().all(|child| {
+                            !matches!(
+                                child.publication.input.phase,
+                                tekes_agent_components_ui::SidebarSearchPhase::Searching
+                            )
+                        }) {
+                            break snapshot;
+                        }
+                        changes.changed().await.expect("multi-search source ended");
+                    }
+                })
+                .await
+                .expect("multi-search offscreen read deadline")
+            });
+            host.view
+                .set_sidebar_host_source(host.sidebar.snapshot())
+                .unwrap();
+            host.view
+                .update_sidebar_multi_search_publication(source.owner(), &publication)
+                .unwrap();
+            let children: Vec<_> = publication.children.iter().map(|child| {
+                let (phase, has_more) = match &child.publication.input.phase {
+                    tekes_agent_components_ui::SidebarSearchPhase::Idle => ("idle", false),
+                    tekes_agent_components_ui::SidebarSearchPhase::Searching => ("searching", false),
+                    tekes_agent_components_ui::SidebarSearchPhase::Complete { has_more } => ("complete", *has_more),
+                    tekes_agent_components_ui::SidebarSearchPhase::Failed { has_more, .. } => ("failed", *has_more),
+                };
+                serde_json::json!({"endpoint":child.endpoint_id,"phase":phase,"hasMore":has_more,"hits":child.publication.hits.len(),"unresolved":child.publication.unresolved.len()})
+            }).collect();
+            serde_json::json!({"queryActive":publication.input.key.is_some(),"generation":publication.input.generation,"children":children,"nativeInteraction":false,"physicalIme":false,"realHarnessAcceptance":false})
+        } else {
+            serde_json::Value::Null
+        };
         let sidebar_query_proof = if args.iter().any(|arg| arg == "--sidebar-query-proof") {
             let source = host.sidebar_query.as_ref().unwrap();
             let state = host.executor.block_on(async {
@@ -5011,6 +5127,7 @@ pub fn run() {
             serde_json::json!({
                 "goalFootnoteProof":goal_footnote_proof,
                 "sidebarSearchProof":sidebar_query_proof,
+                "multiSidebarSearch": multi_sidebar_search,
                 "runPortComposition":run_port_proof,"boundedChildProof":bounded_child_proof,"feedbackReadProof":feedback_read_proof,"feedbackWriteProof":feedback_write_proof,"feedbackControlsProof":feedback_controls_proof,"feedbackTranscriptProof":feedback_transcript_proof,
                 "offscreen": true, "components": true, "nativeInteraction": false,
                 "transcriptView": false, "isStale": snapshot.transcript.is_stale,

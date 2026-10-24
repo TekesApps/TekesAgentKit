@@ -419,3 +419,7 @@
 ## Sidebar 宿主续批交付
 
 #22 `4967d15`、#23 `9d7c00d`、#25 `7bfdd61` 的本批实现、分层验证和未验收项见[统一收据](rust-agent-ui-sidebar-host-results-20261024.md)。UI637/0/1 原有忽略、最终宿主定向、公开 consumer 和严格检查通过；准确源码顺序以收据为准，未做桌面/真实多 harness 同窗验收，Issue 仍开放。
+
+## 多端 provider 搜索续批
+
+#22 已补齐固定端集合 query/ABA/clear/drop/reconnect/retry、逐端原 inventory join、Sidebar 状态子组件、实际多 connector 配置与 demo 接线。最终 presentation234/0/0、UI653/0/1、第二公开 consumers 及双端成功/局部失败离屏通过；精确边界见[收据](rust-agent-ui-multi-search-results-20261024.md)。此前“跨端全局搜索未实现”描述仅适用于当时批次；本批不涵盖 Mirror FTS/pins、远端 cursor、真实多 harness、桌面或多端 SideChat。Issue 继续开放。
