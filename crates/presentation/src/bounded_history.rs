@@ -176,10 +176,11 @@ impl BoundedHistory {
                 0,
                 TranscriptTurn {
                     id: id.clone(),
-                    status: if phase == "running" {
-                        "running"
-                    } else {
-                        "completed"
+                    status: match phase {
+                        "running" => "running",
+                        "error" => "error",
+                        "stopped" => "aborted",
+                        _ => "completed",
                     }
                     .into(),
                     input: String::new(),

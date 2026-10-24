@@ -591,6 +591,125 @@ async fn bounded_child_pages_preserve_verified_prefix_and_reset_changed_history(
     runtime.stop().await.unwrap();
 }
 
+fn bounded_source_page(phase: &str) -> Value {
+    json!({
+        "parentSessionId":"a",
+        "childSessionId":"bounded",
+        "throughSequence":5,
+        "historyRevision":"e".repeat(64),
+        "entries":[{
+            "event":{"seq":5,"time":100,"type":"assistant/message","data":{
+                "turn":1,"step":6,"message":{"id":"history-entry","content":[{"type":"text","text":"independent history"}]}
+            }}
+        }],
+        "hasMoreBefore":false,
+        "runOpen":false,
+        "sourceCall":{"callId":"task-source-7","name":"task","arguments":{"task_name":"audit","mode":"bounded"},"phase":phase}
+    })
+}
+
+#[tokio::test]
+async fn bounded_source_call_phases_and_identity_are_projected_through_public_child_run() {
+    let (connector, runtime, _) = setup().await;
+    connector.bounded.store(true, Ordering::SeqCst);
+
+    let cases = [
+        ("error", "error"),
+        ("stopped", "aborted"),
+        ("running", "running"),
+        ("done", "completed"),
+        ("future-phase", "completed"),
+    ];
+    let mut pages = Vec::new();
+    for (phase, _) in cases {
+        // ChildRun::open reads the initial page; transcript() then refreshes through
+        // the same public RPC path while the revision and history remain unchanged.
+        pages.extend([bounded_source_page(phase), bounded_source_page(phase)]);
+    }
+    connector.pages.lock().unwrap().extend(pages);
+
+    for (phase, expected_status) in cases {
+        let child = ChildRun::open(
+            runtime.clone(),
+            RunScope::main("test", "a"),
+            "bounded",
+            ChildHistoryLayout::SameSession,
+            None,
+        )
+        .await
+        .unwrap();
+        let transcript = child.transcript().await.unwrap();
+
+        let expected_turn_id =
+            json!(["test", "bounded", "task-source", "task-source-7"]).to_string();
+        assert_eq!(transcript.turns[0].id, expected_turn_id);
+        assert_eq!(transcript.turns[0].status, expected_status, "phase {phase}");
+        assert_eq!(transcript.tools[0].turn_id, transcript.turns[0].id);
+        assert_eq!(
+            transcript.tools[0].id,
+            format!("{}:call", transcript.turns[0].id)
+        );
+        assert_eq!(transcript.tools[0].name, "task");
+        assert_eq!(
+            transcript.tools[0].arguments,
+            json!({"task_name":"audit","mode":"bounded"})
+        );
+        assert_eq!(transcript.tools[0].phase, phase);
+        assert_eq!(transcript.items.len(), 1);
+        assert_eq!(transcript.items[0].text, "independent history");
+    }
+
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn bounded_source_call_running_to_terminal_keeps_identity_and_history_entries() {
+    let (connector, runtime, _) = setup().await;
+    connector.bounded.store(true, Ordering::SeqCst);
+
+    for (terminal_phase, expected_status) in [("error", "error"), ("stopped", "aborted")] {
+        connector.pages.lock().unwrap().extend([
+            bounded_source_page("running"),
+            bounded_source_page("running"),
+            bounded_source_page(terminal_phase),
+        ]);
+        let child = ChildRun::open(
+            runtime.clone(),
+            RunScope::main("test", "a"),
+            "bounded",
+            ChildHistoryLayout::SameSession,
+            None,
+        )
+        .await
+        .unwrap();
+
+        let running = child.transcript().await.unwrap();
+        assert_eq!(running.turns[0].status, "running");
+        let running_turn_id = running.turns[0].id.clone();
+        let running_tool_id = running.tools[0].id.clone();
+        let running_items = running.items.clone();
+
+        let terminal = child.transcript().await.unwrap();
+        assert_eq!(terminal.turns[0].id, running_turn_id);
+        assert_eq!(
+            terminal.turns[0].status, expected_status,
+            "phase {terminal_phase}"
+        );
+        assert_eq!(terminal.tools[0].id, running_tool_id);
+        assert_eq!(terminal.tools[0].turn_id, running_turn_id);
+        assert_eq!(terminal.tools[0].phase, terminal_phase);
+        assert_eq!(terminal.tools[0].name, "task");
+        assert_eq!(
+            terminal.tools[0].arguments,
+            json!({"task_name":"audit","mode":"bounded"})
+        );
+        assert_eq!(terminal.items, running_items);
+        assert_eq!(terminal.items[0].text, "independent history");
+    }
+
+    runtime.stop().await.unwrap();
+}
+
 #[tokio::test]
 async fn attachment_context_commit_checks_epoch_with_authority_and_preserves_typing() {
     let (_, runtime, controller) = setup().await;

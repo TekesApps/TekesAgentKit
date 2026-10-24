@@ -554,3 +554,7 @@ Native后续切片：复用既有feature headless与已安装Kernel0.9.3，真�
 ### #23：实际 dispatcher 捕获原父权限
 
 [本轮结果](rust-agent-ui-child-host-parent-authority-results-20261024.md)将 Summary/FamilyCatalog 原 parent Arc 带入实际异步 child factory，复用同host helper与原for_run权限继承、页大小校验、缓存/安装父身份。主会话修正相同scope Task抢占根producer的候选歧义并红绿验证；祖先退休/迟到拒绝、A→B→A、页大小7和只读行为通过。默认UI757/0/1、feature648、定向27、严格检查/独立consumer与当前精确程序真实Pi/DSH原子pane闭环通过。3b2两份CI opt-in/consumer绿、唯一#53红已归档；新head单独核对。当前UI没有嵌套入口，不以helper合成祖先测试冒称真实嵌套UI。Native原有界sourceCall.error/stopped被合成turn标completed的独立差异已确认，下一切片按#17/#23修正，其他未验收边界和#53仍开放。
+
+### #17 / #23：Native 有界 Task-source 错误/取消
+
+[本轮结果](rust-agent-ui-native-bounded-terminal-results-20261024.md)按已发布Kernel0.9.3原reader修正sourceCall.error/stopped被合成turn误标completed，现为error/aborted；原tool.phase、身份/参数和历史不变，未知fallback兼容。新worker公开ChildRun回归原2红，主会话修复后通过；Root373、feature281、UI757/0/1、严格检查、两种demo构建及137文件独立public consumer执行通过。真实Native原pane来源转换见证仍待下一切片，不把公开fixture当真实协议/桌面验收；相关Issue与#53仍开放，不合并发布。全部复用SSDtarget，删除0字节。
