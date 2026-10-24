@@ -8,6 +8,7 @@ from runtime_provenance import kernel_programs
 from native_probe_launcher import run_native_probe, validate_bundle
 from goal_footnote_probe import verify_goal_identity, verify_goal_footer, verify_goal_cleared
 from cargo_program import cargo_program
+from kernel_lifecycle_diagnostics import KernelLifecycleDiagnostics
 ROOT=Path(__file__).resolve().parent.parent
 parser=argparse.ArgumentParser()
 parser.add_argument('--headless-program',type=Path,help='Explicit existing headless executable; hash it and skip compilation')
@@ -18,6 +19,7 @@ parser.add_argument('--kernel-target-dir',type=Path)
 parser.add_argument('--kernel-supervisor',type=Path,help='Explicit existing Kernel supervisor, paired with --kernel-worker; no rebuild or copy')
 parser.add_argument('--kernel-worker',type=Path)
 parser.add_argument('--kernel-expected-version',help='Require this exact build description and public host handshake version')
+parser.add_argument('--kernel-lifecycle-diagnostics',type=Path,help='Opt-in bounded read-only lsof sampling of this run-owned Kernel state; Native headless only, never changes lifecycle assertions')
 parser.add_argument('--kernel-ui-only',action='store_true',help='Explicit independent UI acceptance, excluding Kernel lifecycle/child protocol proof; never an automatic fallback')
 parser.add_argument('--ui-demo',type=Path,help='Optional already-built AgentKit UI consumer for each supplied harness history-to-GPU acceptance')
 parser.add_argument('--ui-native-app',type=Path,help='Opt-in normal LaunchServices native launch of the exact --ui-demo APPL bundle; offscreen remains direct, no activation retries')
@@ -52,6 +54,11 @@ parser.add_argument('--ui-mixed-tools',action='store_true',help='Offscreen real 
 parser.add_argument('--ui-sidechat',action='store_true',help='Real ephemeral fork in original SidePanel/RunPort, reconnect and confirmed discard; offscreen only')
 parser.add_argument('--ui-child-run',action='store_true',help='Real Pi/DSH independent child Summary -> original Composer Send/Cancel/reconnect; offscreen only')
 args=parser.parse_args()
+if args.kernel_lifecycle_diagnostics:
+    if not args.kernel_root or args.pi_root or args.dsh_root or any(
+        value for key,value in vars(args).items() if key.startswith('ui_')
+    ) or args.kernel_ui_only:
+        parser.error('--kernel-lifecycle-diagnostics requires an isolated Kernel headless profile with no UI/Pi/DSH inputs')
 if args.ui_child_run:
     if args.kernel_root or not (args.ui_demo and args.ui_components and args.ui_transcript_content):
         parser.error('--ui-child-run requires Pi/DSH UI demo/components/Transcript; Native bounded history is separate')
@@ -1002,10 +1009,15 @@ try:
             env=dict(os.environ,HOME=str(home));env.pop('TEKES_KERNEL_ENDPOINT_TOKEN',None);env.pop('AGENTKIT_SYNTHETIC_KEY',None)
             process=subprocess.Popen([str(kernel_supervisor),'--built-in',str(launch)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=env)
             kernel_errors=[]
+            lifecycle_diagnostics=None
             threading.Thread(target=lambda:kernel_errors.extend(iter(process.stderr.readline,b'')),daemon=True).start()
             try:
                 token=os.urandom(32);payload=json.dumps({'endpointToken':token.hex(),'credentials':{'openai-main':'synthetic-key'}}).encode();process.stdin.write(b'TEKES-KERNEL-BOOTSTRAP/1\n'+struct.pack('!I',len(payload))+payload);process.stdin.flush()
                 assert select.select([process.stdout],[],[],15)[0],'Kernel readiness timeout';readiness=process.stdout.readline();assert readiness,b''.join(kernel_errors).decode(errors='replace');ready=json.loads(readiness)
+                if args.kernel_lifecycle_diagnostics:
+                    lifecycle_diagnostics=KernelLifecycleDiagnostics(base/'kernel',args.kernel_lifecycle_diagnostics.resolve())
+                    lifecycle_diagnostics.start()
+                    lifecycle_diagnostics.mark('kernel-ready-before-native-lifecycle')
                 config={'kind':'native','url':ready['url'],'bearer':base64.urlsafe_b64encode(token).decode().rstrip('='),'commands':commands(cwd,providers['providers'][0]['id'],providers['providers'][0]['models'][0]['id'])}
                 if args.kernel_expected_version:config['expectedVersion']=args.kernel_expected_version
                 if args.kernel_ui_only:
@@ -1030,7 +1042,9 @@ try:
                         {'op':'call','sessionId':native_id,'method':'session.archive'},
                         {'op':'call','sessionId':native_id,'method':'session.unarchive'},
                         {'op':'open','sessionId':native_id},{'op':'snapshot'}]
+                    if lifecycle_diagnostics:lifecycle_diagnostics.mark('before-native-lifecycle-batch')
                     result=execute(dict(config,commands=native))
+                    if lifecycle_diagnostics:lifecycle_diagnostics.mark('native-lifecycle-batch-returned')
                     assert any(row.get('op')=='call' and isinstance(row.get('result'),dict) and row['result'].get('data')==base64.b64encode(b'Native upload proof').decode() for row in result),'native upload round trip lost'
                     caps=next(row['result'] for row in result if row.get('op')=='call' and isinstance(row.get('result'),dict) and 'methods' in row['result'])
                     if args.ui_bounded_child:assert 'subagents.history' in caps['methods'],'Native endpoint does not publish bounded child history'
@@ -1057,7 +1071,14 @@ try:
                     print('NATIVE_COMPLETE_LIFECYCLE_LIVE_OK models+commands+skills+settings+presets+upload+scratch-discard+rename+archive')
                 ui_smoke(config,native_id)
 
+            except BaseException:
+                if lifecycle_diagnostics:lifecycle_diagnostics.mark('native-acceptance-raised')
+                raise
             finally:
+                if lifecycle_diagnostics:
+                    lifecycle_diagnostics.mark('before-owned-supervisor-shutdown')
+                    diagnostic_receipt=lifecycle_diagnostics.stop()
+                    print('KERNEL_LIFECYCLE_DIAGNOSTICS_RECEIPT '+json.dumps(diagnostic_receipt,sort_keys=True),flush=True)
                 process.stdin.close()
                 try:process.wait(timeout=15)
                 except subprocess.TimeoutExpired:process.terminate();process.wait(timeout=10)

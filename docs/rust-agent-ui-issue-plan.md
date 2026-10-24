@@ -471,3 +471,9 @@
 ### #22 / #29：活动 inventory knownness 与混合成员分页
 
 已复现并修复 provider 命中隐藏但已知的 child/ephemeral 时误报 unresolved 的缺陷。复用同帧完整 activity_at，不把 retained archives 当 active，也不制造行/摘要/reveal。补齐混合 main/child/ephemeral/parent-only fork、跨端同ID、目录/搜索/分页/selected/reveal及canonical history 保留的实际 fixture-runtime 回归；统一标题/置顶 fallback 的持久身份排序和菜单边界用例。最终 UI713/0/1、presentation246/0/0、定向50/0/0、严格检查、普通demo build与独立public consumer执行通过，见[契约和收据](rust-agent-ui-sidebar-active-knownness-20261024.md)。本批全程复用SSD共享target；真实harness、桌面/IME/AX与TekesUI #53门槛仍开放，#22/#29不关闭。#23/#25只读复核没有新的独立实现缺陷，不重复已有交付。
+
+### #15 / #18 / #27：当前 consumer CI 与 Native 无窗口诊断
+
+`a2feb19` 的 push/PR CI 均完成：headless通过，UI workspace/严格Clippy/独立consumer执行通过，仅严格嵌套阅读失败；已下载两份原始artifact并核对PR synthetic merge与源closure，见[CI收据](rust-agent-ui-ci-a2feb19-20261024.md)。不以consumer通过放行#18/#28。
+
+#27新增opt-in的隔离Kernel文件占用/锁观察采样，不改变归档行为或默认断言；Python101/0通过。冻结脚本源与当前headless程序后，有采样和无采样的两次独立Native0.9.3协议生命周期、真实Task来源与有界子历史均通过，见[诊断设计/结果](rust-agent-ui-native-lifecycle-diagnostics-20261024.md)。旧session-running未复现，原因和已修复均未证明；lsof锁字段为空，部分观察不证明锁可用性。未运行UI/桌面/IME/AX，也不升级三端同一窗口验收结论；Kernel/SDK/ClientKit只读，继续复用SSD共享target。#19真实producer仍未公开确认，#23/#25其余完整窗口/SDK子项继续保留。

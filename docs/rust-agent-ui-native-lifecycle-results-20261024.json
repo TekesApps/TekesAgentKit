@@ -1,0 +1,128 @@
+{
+  "issues": [
+    27,
+    23
+  ],
+  "rustSourceBaseCommit": "a2feb1974d5809f551a7650c5228a09129c93fb6",
+  "developmentScriptSources": {
+    "scripts/test-real-session-endpoints.py": "ee1ea8e01a7eac4a9f2bfb82b931f77df0ca380f062706f176390efd2e02ba74",
+    "scripts/kernel_lifecycle_diagnostics.py": "1b20f127c93f27258615d9aa8b8b6969f9a7421e689c5dce06885c854dc7c2cb",
+    "scripts/cargo_program.py": "ce20e3478abdb37d2ecf5ed671f10ba880053b43826acc718860302cf945991c",
+    "scripts/goal_footnote_probe.py": "0dbc41b45eb8d9c2f9c5fd9ea5730df94eadf8e25a3e5c4fb9a822f346212dbd",
+    "scripts/native_probe_launcher.py": "25fc3ba5fe448dd6e0a43a97b2205f40c60423fd63cc026cd618607cd1f595b4",
+    "scripts/native_acceptance_host.py": "2b670d2a68d6f6a4bf538a3c11eb23a886a26356f5e68cd5ba41d84a129e3355",
+    "scripts/native_frontmost_trace.py": "803cd40c71ec07b9bf4e4075a0dd33b3d09b4cfd430d99522758432033789d49",
+    "scripts/runtime_provenance.py": "a6466c807705490154b76af7c6c55443489590b3f506be95e289c6cc1dc4f046",
+    "scripts/mixed_tool_provider.py": "3fa8ca5fc0fb1f384f8908eec11ac0ded199a191ed468d7cb685f5a03eb63591",
+    "scripts/native_probe_provider.py": "0e6e1c209767d4ff2c57fad4ac266dc33c478b6de80ddfc2aec5089b6542ced1"
+  },
+  "client": {
+    "path": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/tekes-agent-headless",
+    "sha256": "87b54fe157a367ed462333e6781e839b5454cc88e1bb9543c8e1faf3a532e8ad",
+    "archive": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/native-lifecycle-diagnostics-20261024/programs/accepted-headless-87b54fe157a367ed462333e6781e839b5454cc88e1bb9543c8e1faf3a532e8ad"
+  },
+  "kernel": {
+    "supervisor": "/Users/frankqin/dev/Tekes/.build/kernel-0.9.3-installed/BuiltInKernel/tekes-supervisor",
+    "supervisorSha256": "365eca9385f36d5897a81ba398e7f34b4b9819896d6a1b78c618a7710b14380f",
+    "worker": "/Users/frankqin/dev/Tekes/.build/kernel-0.9.3-installed/BuiltInKernel/tekes-worker",
+    "workerSha256": "1284014bd0a8d3cb711c0512b10762322a19af4beabc1f9e681bacb1e28fa64d",
+    "build": {
+      "format": 1,
+      "identifier": "com.tekes.kernel.supervisor",
+      "source_revision": "09508a9083c24c7accefc99516739f279b85913e",
+      "version": "0.9.3"
+    },
+    "fixtureConfig": {
+      "path": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/native-lifecycle-diagnostics-20261024/kernel-input/fixtures/config/providers.canonical.json",
+      "sourceRevision": "09508a9083c24c7accefc99516739f279b85913e",
+      "sha256": "0caac12724fd6d982fc51123ea4546f2a023d6a9258da4cde63d1d27eabcaa6a"
+    },
+    "lsofPath": "/usr/sbin/lsof"
+  },
+  "execution": [
+    {
+      "name": "instrumented-final",
+      "returncode": 0,
+      "startedAt": 1792823120.155147,
+      "finishedAt": 1792823123.494263,
+      "command": [
+        "/Users/frankqin/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "scripts/test-real-session-endpoints.py",
+        "--headless-program",
+        "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/tekes-agent-headless",
+        "--kernel-root",
+        "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/native-lifecycle-diagnostics-20261024/kernel-input",
+        "--kernel-supervisor",
+        "/Users/frankqin/dev/Tekes/.build/kernel-0.9.3-installed/BuiltInKernel/tekes-supervisor",
+        "--kernel-worker",
+        "/Users/frankqin/dev/Tekes/.build/kernel-0.9.3-installed/BuiltInKernel/tekes-worker",
+        "--kernel-expected-version",
+        "0.9.3",
+        "--kernel-lifecycle-diagnostics",
+        "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/native-lifecycle-diagnostics-20261024/lsof-final"
+      ],
+      "logSha256": "7ba01a8124130e5794c36cb206935d181577d5ba53f59b822d23cf87b673786a"
+    },
+    {
+      "name": "uninstrumented-final",
+      "returncode": 0,
+      "startedAt": 1792823123.494633,
+      "finishedAt": 1792823129.203843,
+      "command": [
+        "/Users/frankqin/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "scripts/test-real-session-endpoints.py",
+        "--headless-program",
+        "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/tekes-agent-headless",
+        "--kernel-root",
+        "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/native-lifecycle-diagnostics-20261024/kernel-input",
+        "--kernel-supervisor",
+        "/Users/frankqin/dev/Tekes/.build/kernel-0.9.3-installed/BuiltInKernel/tekes-supervisor",
+        "--kernel-worker",
+        "/Users/frankqin/dev/Tekes/.build/kernel-0.9.3-installed/BuiltInKernel/tekes-worker",
+        "--kernel-expected-version",
+        "0.9.3"
+      ],
+      "logSha256": "586611eb16d852354c1c125af04d07d2e63cbafb98cb07c325da0a91aac7d5ad"
+    }
+  ],
+  "pythonRegression": {
+    "passed": 101,
+    "failed": 0,
+    "logSha256": "9e6b38ab5ed7a33dd0f6a6bd7c1937d5cf9977f11df966f297377194a1811372"
+  },
+  "sampler": {
+    "samples": 11,
+    "truncated": false,
+    "warnings": 11,
+    "allObservedLockFields": "blank; no lock mode proven",
+    "fileReferencesObserved": [
+      "tekes-supervisor",
+      "tekes-worker"
+    ],
+    "lockAvailabilityProven": false,
+    "absenceOfHolderProven": false,
+    "metadataSha256": "f654f560131a86e075e63099ff92d364b6934ce409de5c9937b8c25d0499bb07",
+    "samplesSha256": "e5941bfdb0052eb4f52fa50de5241831574e36eab42291241abb3069b50293bf"
+  },
+  "historicalArchiveFailure": {
+    "reproduced": false,
+    "fixed": false,
+    "causalExplanationProven": false,
+    "evidencePreserved": true
+  },
+  "scope": {
+    "desktop": false,
+    "physicalIME": false,
+    "AX": false,
+    "UIComponentsExercised": false,
+    "paidModel": false,
+    "kernelChanged": false,
+    "newTargetCreated": false,
+    "ownedKernelProcessesRemaining": false,
+    "preexistingKernelPidUnchanged": 97755,
+    "temporaryFixtureStateRemovedByOriginalScript": true
+  },
+  "evidenceRoot": ".runtime-fixtures/native-lifecycle-diagnostics-20261024",
+  "cacheDeletedBytes": 0,
+  "recordedAt": 1792823240.870263
+}
