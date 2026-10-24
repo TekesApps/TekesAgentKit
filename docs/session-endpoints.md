@@ -147,3 +147,15 @@ ask_user_question → public actionable sync → runtime 用共享 session envel
 ## 2026-10-22：当前运行版本与原生UI证据
 
 见[三端原生验收](rust-agent-ui-three-real-20261022.md)：Kernel0.9.3、Pi1.3.0、DSH0.2.1-rc.2在固定09b SDK及同一冻结UI程序下通过公开分页、流式阅读、合成中文预编辑、取消/错误恢复和重连。Native0.9.3完整协议流程的archive返回session-running，仍未完成其全量生命周期验收；独立UI模式不代替这项失败。脚本现在支持明确supervisor/worker路径、build哈希及精确版本/握手检查，旧target中的0.9.0开发程序不再被按目录名计作发布版。能力声明与单次运行验收结果保持区分。
+
+## Sidebar 分类事实（#29，2026-10-24）
+
+分类只决定 Sidebar 成员，不授予子会话继续运行或历史读取权限。当前 shared predicate 排除明确 origin=subagent 或 ephemeral=true，parentSessionId 单独存在不排除 fork。缺失/未知数据保持兼容，但不能从兼容显示反推已确认 main。
+
+| 来源 | 已核实的公开 producer | origin / parent | ephemeral |
+| --- | --- | --- | --- |
+| Native SEP v4 / Kernel v0.9.3 | 公开 tag 解引用 `09508a9083c24c7accefc99516739f279b85913e`；规范与 supervisor inventory_row | 完成的 fork 报 origin=fork 与 parent；普通行省略，不合成 subagent | genesis flag 为 true 才报告，否则按该固定规范省略 |
+| Pi | 本仓 `endpoint-pi::summary` 的规范化公开 producer | subagent_parent 产生 subagent；普通 parent 只保留 lineage | 规范化 row.ephemeral 布尔值 |
+| DSH 0.2.1-rc.2 / 0.2.0-rc.2 | 固定官方源码 `687f282…` / `639ed015…`；SessionSummary、在线/冷会话 summary、listFields | 显式 header.origin=subagent 原样透传，parent-only fork 不推造 origin；旧/迁移行的缺失仍非独立身份权限证明 | 两版公开 SessionSummary 没有该字段；临时 fork/discard 仍按既有能力明确 Unsupported，不补 ephemeral=false |
+
+Native 公开来源：[固定规范](https://github.com/TekesApps/TekesKernel/blob/09508a9083c24c7accefc99516739f279b85913e/spec/session-endpoint.md#read-routes)、[固定 producer](https://github.com/TekesApps/TekesKernel/blob/09508a9083c24c7accefc99516739f279b85913e/crates/supervisor/src/endpoint_carrier.rs)。DSH 公开来源：[0.2.1 list producer](https://github.com/deepseek-ai/deepseek-harness/blob/687f282e8625c6b8d11ff58211a90524be2e4317/packages/api/session-controller/src/list.ts)、[其 SessionSummary](https://github.com/deepseek-ai/deepseek-harness/blob/687f282e8625c6b8d11ff58211a90524be2e4317/packages/api/session-controller/src/types.ts)、[0.2.0 list producer](https://github.com/deepseek-ai/deepseek-harness/blob/639ed015397290b3745d163aafe02ffee4aa3f84/packages/api/session-controller/src/list.ts)。精确版本、Git blob 哈希与协议回归分层记录在各 wire 专题；源码核对和本地协议 mock 不能替代已安装 runtime 身份或真实 harness 整体验收。

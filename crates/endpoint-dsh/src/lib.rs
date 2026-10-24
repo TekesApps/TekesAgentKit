@@ -1001,6 +1001,237 @@ fn sequenced_working_directory(projections: &Value) -> Result<Option<String>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures_util::{SinkExt, StreamExt};
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        net::{TcpListener, TcpStream},
+    };
+    use tokio_tungstenite::{accept_async, tungstenite::Message};
+
+    async fn read_http_request(stream: &mut TcpStream) -> (String, Vec<u8>) {
+        let mut bytes = Vec::new();
+        while !bytes.ends_with(b"\r\n\r\n") {
+            let mut byte = [0];
+            stream.read_exact(&mut byte).await.unwrap();
+            bytes.push(byte[0]);
+        }
+        let header_end = bytes.len();
+        let headers = String::from_utf8(bytes.clone()).unwrap();
+        let content_length = headers
+            .lines()
+            .find_map(|line| {
+                let (name, value) = line.split_once(':')?;
+                name.eq_ignore_ascii_case("content-length")
+                    .then(|| value.trim().parse::<usize>().unwrap())
+            })
+            .unwrap_or_default();
+        bytes.resize(header_end + content_length, 0);
+        stream.read_exact(&mut bytes[header_end..]).await.unwrap();
+        let request_line = headers.lines().next().unwrap().to_owned();
+        (request_line, bytes[header_end..].to_vec())
+    }
+
+    async fn serve_http(mut stream: TcpStream, baseline: Value) {
+        let (request_line, body) = read_http_request(&mut stream).await;
+        let (status, value) = if request_line.starts_with("GET /api/tekes/harness-version ") {
+            (
+                "200 OK",
+                json!({"product":"@deepseek-ai/dsh","source":"@deepseek-ai/dsh-app-boot#getDshRuntimeVersion","version":"0.2.1-rc.2"}),
+            )
+        } else if request_line.starts_with("POST /api/session/list ") {
+            let request: Value = serde_json::from_slice(&body).unwrap();
+            (
+                "200 OK",
+                json!({"type":"server-response","rpcId":request["rpcId"],"result":{"ok":true,"value":baseline}}),
+            )
+        } else {
+            ("404 Not Found", json!({"error":"unexpected request"}))
+        };
+        let body = value.to_string();
+        let response = format!(
+            "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        );
+        stream.write_all(response.as_bytes()).await.unwrap();
+    }
+
+    async fn serve_events(stream: TcpStream, added: Value) {
+        let Ok(mut socket) = accept_async(stream).await else {
+            return;
+        };
+        while let Some(Ok(Message::Text(text))) = socket.next().await {
+            let Ok(frame) = serde_json::from_str::<Value>(&text) else {
+                return;
+            };
+            if frame["type"] == "open" && frame["endpoint"] == "$events" {
+                let stream_id = frame["streamId"].as_str().unwrap();
+                for value in [
+                    json!({"type":"ready","clientId":"mock-client"}),
+                    json!({"type":"emit","event":"api-session/added","args":[added]}),
+                ] {
+                    let outgoing = json!({"type":"item","streamId":stream_id,"value":value});
+                    if socket
+                        .send(Message::Text(outgoing.to_string().into()))
+                        .await
+                        .is_err()
+                    {
+                        return;
+                    }
+                }
+            } else if frame["type"] == "cancel" {
+                return;
+            }
+        }
+    }
+
+    async fn serve_mock(baseline: Value, added: Value) -> (String, tokio::task::JoinHandle<()>) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let task = tokio::spawn(async move {
+            loop {
+                let Ok((stream, _)) = listener.accept().await else {
+                    return;
+                };
+                let mut prefix = [0; 128];
+                let request = tokio::time::timeout(Duration::from_secs(2), async {
+                    loop {
+                        let count = stream.peek(&mut prefix).await.unwrap_or_default();
+                        let request = String::from_utf8_lossy(&prefix[..count]);
+                        if request.contains("\r\n") {
+                            break request.into_owned();
+                        }
+                        tokio::task::yield_now().await;
+                    }
+                })
+                .await
+                .expect("mock request line arrives");
+                let baseline = baseline.clone();
+                let added = added.clone();
+                if request.starts_with("GET /api/remote.mux ") {
+                    tokio::spawn(serve_events(stream, added));
+                } else {
+                    tokio::spawn(serve_http(stream, baseline));
+                }
+            }
+        });
+        (format!("http://{address}/"), task)
+    }
+
+    #[tokio::test]
+    async fn pinned_dsh_session_summaries_survive_rpc_baseline_and_added_event() {
+        let child = json!({
+            "sessionId":"child",
+            "updatedAt":1700000000100_i64,
+            "agentAvailable":false,
+            "formatStatus":"current",
+            "running":false,
+            "blank":false,
+            "parentSessionId":"parent",
+            "origin":"subagent",
+            "cwd":"/work/child",
+            "projections":{"kind":"sequenced","asOfSeq":12,"values":{"sessionListMetadata":{"blank":false,"lastPromptAt":1700000000100_i64}}}
+        });
+        let parent_only_fork = json!({
+            "sessionId":"fork-without-origin",
+            "updatedAt":1700000000200_i64,
+            "agentAvailable":false,
+            "running":false,
+            "blank":false,
+            "parentSessionId":"parent",
+            "cwd":"/work/fork"
+        });
+        let no_origin = json!({
+            "sessionId":"ordinary",
+            "updatedAt":1700000000300_i64,
+            "agentAvailable":true,
+            "running":true,
+            "blank":false,
+            "cwd":"/work"
+        });
+        // The supported 0.2.0-rc.2 public summary has no formatStatus field.
+        // Exercise that actual shape, rather than merely relabeling a mock runtime version.
+        let legacy_child = json!({
+            "sessionId":"legacy-child", "updatedAt":1700000000050_i64,
+            "agentAvailable":false, "running":false, "blank":false,
+            "parentSessionId":"parent", "origin":"subagent", "cwd":"/work/legacy-child"
+        });
+        let baseline = json!({"items":[child.clone(),legacy_child.clone(),parent_only_fork.clone(),no_origin.clone()]});
+        let added = json!({
+            "sessionId":"live-child",
+            "updatedAt":1700000000400_i64,
+            "agentAvailable":true,
+            "formatStatus":"current",
+            "running":true,
+            "blank":false,
+            "parentSessionId":"parent",
+            "origin":"subagent",
+            "cwd":"/work/live-child",
+            "projections":{"kind":"sequenced","asOfSeq":19,"values":{"sessionListMetadata":{"blank":false,"lastPromptAt":1700000000400_i64}}}
+        });
+        let (url, server) = serve_mock(baseline, added.clone()).await;
+        let mut config = DshConfiguration::new("dsh-test", &url).unwrap();
+        config.timeout = Duration::from_secs(2);
+        let remote = Arc::new(Remote::connect(config).await.unwrap());
+        let (resolved, _) = broadcast::channel(8);
+        let endpoint = DshSessionEndpoint {
+            identity: "dsh-test".into(),
+            host: HostDescription {
+                protocol_version: 3,
+                product: Product {
+                    name: "DeepSeek Harness".into(),
+                    version: "0.2.1-rc.2".into(),
+                },
+                capabilities: BTreeSet::new(),
+                cwd: "/work".into(),
+                home: "/work".into(),
+                provider: None,
+                model: None,
+                attached_sessions: 0,
+                can_open_path: false,
+            },
+            remote,
+            generation: "wire-test-generation".into(),
+            actionables: Arc::new(Mutex::new(BTreeMap::new())),
+            resolved,
+            child_addresses: Mutex::new(BTreeMap::new()),
+        };
+        let mut frames = endpoint
+            .follow(StreamTarget::SessionInventory)
+            .await
+            .unwrap();
+        let first = tokio::time::timeout(Duration::from_secs(2), frames.next())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert_eq!(first["type"], "baseline");
+        assert_eq!(
+            first["snapshot"]["items"],
+            json!([child, legacy_child, parent_only_fork, no_origin])
+        );
+        let second = tokio::time::timeout(Duration::from_secs(2), frames.next())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert_eq!(second["type"], "upsert");
+        assert_eq!(second["session"], added);
+        assert!(second["session"].get("ephemeral").is_none());
+        assert!(first["snapshot"]["items"][1].get("formatStatus").is_none());
+        assert!(first["snapshot"]["items"][3].get("origin").is_none());
+        assert!(first["snapshot"]["items"][2].get("origin").is_none());
+        assert!(
+            first["snapshot"]["items"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|item| item.get("ephemeral").is_none())
+        );
+        drop(frames);
+        drop(endpoint);
+        server.abort();
+    }
+
     #[test]
     fn actionable_responses_unwrap_shared_envelopes_by_registered_kind() {
         let answer = json!({"answers":[{"id":"q","selected":["继续"],"custom":""}]});
