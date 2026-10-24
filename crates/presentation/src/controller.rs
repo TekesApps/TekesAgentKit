@@ -15,6 +15,19 @@ pub trait SubmissionPreparation: Send + Sync {
         ticket: &PreparedSubmission,
         scope: &RunScope,
     ) -> Result<()>;
+
+    /// Synchronous, side-effect-free authority check immediately before dispatch.
+    /// Implementations may fence a captured owner that was retired while the
+    /// controller awaited session setup or a child catalog. This hook must not
+    /// perform another preparation step or remote request.
+    fn validate_dispatch(
+        &self,
+        _runtime: &SessionRuntime,
+        _ticket: &PreparedSubmission,
+        _scope: &RunScope,
+    ) -> Result<()> {
+        Ok(())
+    }
 }
 struct NoPreparation;
 #[async_trait]
@@ -491,15 +504,17 @@ impl RunController {
             host.prepare(&self.shared.runtime,&ticket,&scope).await?;
             self.shared.runtime.open_session(&scope.session_id).await?;
             let child_parent = self.shared.child_parent(&scope)?;
-            if let Some(parent) = child_parent {
+            if child_parent.is_some() {
                 require(matches!(ticket.plan, SubmissionPlan::Prompt { .. }), "child commands unavailable")?;
-                self.shared.runtime.subagent_catalog(parent).await?.require_continuable(&scope.session_id)?;
             }
-            self.shared.core.lock().expect("presentation lock poisoned").mark_dispatched(&ticket)?;
+            let admit = || {
+                host.validate_dispatch(&self.shared.runtime, &ticket, &scope)?;
+                self.shared.core.lock().expect("presentation lock poisoned").mark_dispatched(&ticket)
+            };
             let value=match &ticket.plan {
-                SubmissionPlan::Prompt{content,..} if child_parent.is_some() => self.shared.runtime.prompt_child(child_parent.expect("child owner"), &scope.session_id, ticket.mode, content.clone(), &ticket.id).await?,
-                SubmissionPlan::Prompt{content,..}=>self.shared.runtime.submit(PromptRequest{session_id:scope.session_id.clone(),mode:ticket.mode,content:content.clone(),client_time_zone:None},&ticket.id).await?,
-                SubmissionPlan::Command{name,arguments,attachments}=>self.shared.runtime.call_optional("commands/run",json!({"sessionId":scope.session_id,"name":name,"arguments":arguments,"attachments":attachments}),&ticket.id).await?,
+                SubmissionPlan::Prompt{content,..} if child_parent.is_some() => self.shared.runtime.prompt_child_with_validation(child_parent.expect("child owner"), &scope.session_id, ticket.mode, content.clone(), &ticket.id, admit).await?,
+                SubmissionPlan::Prompt{content,..}=>self.shared.runtime.submit_with_validation(PromptRequest{session_id:scope.session_id.clone(),mode:ticket.mode,content:content.clone(),client_time_zone:None},&ticket.id, admit).await?,
+                SubmissionPlan::Command{name,arguments,attachments}=>self.shared.runtime.call_optional_with_validation("commands/run",json!({"sessionId":scope.session_id,"name":name,"arguments":arguments,"attachments":attachments}),&ticket.id, admit).await?,
             };
             if matches!(ticket.plan,SubmissionPlan::Prompt{..}) {require(value["accepted"]==true,"prompt admission was not confirmed")?;}
             Ok(value)

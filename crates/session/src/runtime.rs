@@ -23,6 +23,20 @@ fn rpc_id() -> String {
     )
 }
 
+/// Wait for bounded-channel capacity before the caller's final local admission.
+/// The synchronous check and enqueue have no intervening await; this does not
+/// retract an already enqueued operation when a host owner later closes.
+async fn enqueue_after_validation<T: Send>(
+    sender: &mpsc::Sender<T>,
+    command: T,
+    validate: impl FnOnce() -> Result<()> + Send,
+) -> Result<()> {
+    let permit = sender.reserve().await.map_err(|_| Error::Disconnected)?;
+    validate()?;
+    permit.send(command);
+    Ok(())
+}
+
 type HistoryOwners =
     std::sync::Mutex<std::collections::BTreeMap<String, Arc<tokio::sync::Mutex<BTreeSet<String>>>>>;
 type Reply<T> = oneshot::Sender<Result<T>>;
@@ -389,6 +403,28 @@ impl SessionRuntime {
     }
     pub async fn call(&self, method: &str, payload: Value, rpc_id: &str) -> Result<Value> {
         self.call_context(None, method, payload, rpc_id).await
+    }
+    pub(crate) async fn call_with_validation(
+        &self,
+        method: &str,
+        payload: Value,
+        rpc_id: &str,
+        validate: impl FnOnce() -> Result<()> + Send,
+    ) -> Result<Value> {
+        let (reply, result) = oneshot::channel();
+        enqueue_after_validation(
+            &self.commands,
+            Command::Call {
+                method: method.into(),
+                payload,
+                rpc_id: rpc_id.into(),
+                expected_epoch: None,
+                reply,
+            },
+            validate,
+        )
+        .await?;
+        result.await.map_err(|_| Error::Disconnected)?
     }
     /// Fence at actor dispatch, not just at the caller's earlier snapshot check.
     /// A queued operation cannot cross a reconnect and target the new endpoint.
@@ -1010,5 +1046,64 @@ impl Drop for SessionHistoryLease {
                 let _ = runtime.release_history(&id, &owner).await;
             });
         }
+    }
+}
+
+#[cfg(test)]
+mod admission_tests {
+    use super::*;
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+    #[tokio::test]
+    async fn revoked_owner_is_checked_after_channel_backpressure_without_enqueue() {
+        let (sender, mut receiver) = mpsc::channel(1);
+        sender.send(1_u8).await.unwrap();
+        let alive = AtomicBool::new(true);
+        let checks = AtomicUsize::new(0);
+        let pending = enqueue_after_validation(&sender, 2, || {
+            checks.fetch_add(1, Ordering::SeqCst);
+            require(alive.load(Ordering::SeqCst), "owner retired")
+        });
+        tokio::pin!(pending);
+        assert!(
+            tokio::time::timeout(Duration::from_millis(20), &mut pending)
+                .await
+                .is_err()
+        );
+        assert_eq!(checks.load(Ordering::SeqCst), 0);
+        alive.store(false, Ordering::SeqCst);
+        assert_eq!(receiver.recv().await, Some(1));
+        assert!(pending.await.is_err());
+        assert_eq!(checks.load(Ordering::SeqCst), 1);
+        assert!(receiver.try_recv().is_err());
+        sender.try_send(3).unwrap();
+        assert_eq!(
+            receiver.recv().await,
+            Some(3),
+            "rejected owner releases its reserved slot"
+        );
+    }
+
+    #[tokio::test]
+    async fn accepted_owner_is_validated_once_and_closed_channel_never_validates() {
+        let (sender, mut receiver) = mpsc::channel(1);
+        let checks = AtomicUsize::new(0);
+        enqueue_after_validation(&sender, 7_u8, || {
+            checks.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        })
+        .await
+        .unwrap();
+        assert_eq!(receiver.recv().await, Some(7));
+        drop(receiver);
+        assert!(
+            enqueue_after_validation(&sender, 8, || {
+                checks.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            })
+            .await
+            .is_err()
+        );
+        assert_eq!(checks.load(Ordering::SeqCst), 1);
     }
 }

@@ -304,6 +304,20 @@ impl SubmissionPreparation for ScopedPreparation<'_> {
             .validate_inline_submission(ticket, scope, epoch)
             .await
     }
+
+    fn validate_dispatch(
+        &self,
+        runtime: &SessionRuntime,
+        ticket: &PreparedSubmission,
+        scope: &RunScope,
+    ) -> Result<()> {
+        self.binding.require_controls(ticket.destination())?;
+        require(
+            ticket.destination() == &ComposerDestination::run(scope.clone()),
+            "prepared submission scope changed",
+        )?;
+        self.host.validate_dispatch(runtime, ticket, scope)
+    }
 }
 impl RunBinding {
     /// Source identity for a host adapter; equal endpoint strings are insufficient.
