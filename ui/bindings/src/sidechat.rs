@@ -15,6 +15,7 @@ use tokio::sync::watch;
 pub struct BoundSideChatRun {
     chat: SideChat,
     binding: Arc<RunBinding>,
+    owner: Arc<SideChatController>,
 }
 impl BoundSideChatRun {
     pub fn chat(&self) -> &SideChat {
@@ -56,6 +57,14 @@ impl SideChatBinding {
     /// Endpoint whose SideChat pointer/controller this binding owns.
     pub fn endpoint_id(&self) -> &str {
         &self.endpoint_id
+    }
+    /// A run is accepted only by the controller that opened it while that
+    /// controller still owns the exact pointer captured by the run.
+    pub fn owns_run(&self, run: &BoundSideChatRun) -> bool {
+        Arc::ptr_eq(&self.owner, &run.owner)
+            && self
+                .pointer(&run.chat.parent, &run.chat.scope.session_id)
+                .is_ok_and(|current| current == run.chat)
     }
     pub fn snapshot(&self) -> SideChatSnapshot {
         self.owner.snapshot()
@@ -142,6 +151,7 @@ impl SideChatBinding {
             return Ok(BoundSideChatRun {
                 chat: current,
                 binding,
+                owner: self.owner.clone(),
             });
         }
         let opened = Arc::new(
@@ -158,6 +168,7 @@ impl SideChatBinding {
         Ok(BoundSideChatRun {
             chat: current,
             binding,
+            owner: self.owner.clone(),
         })
     }
     /// Host input must be an authoritative read result. Errors do not mean absence.

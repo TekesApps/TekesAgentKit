@@ -79,7 +79,7 @@ impl ComponentDemo {
         match self.panel_selections.get(parent) {
             Some(SidePanelTabKind::SideChat { session_id }) => self
                 .side_chats
-                .as_ref()
+                .get(&parent.endpoint_id)
                 .and_then(|s| s.snapshot().chats.get(session_id).map(|c| c.title.clone()))
                 .unwrap_or_else(|| "SideChat".into()),
             Some(SidePanelTabKind::Task { task_id }) => self

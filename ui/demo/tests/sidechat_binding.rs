@@ -22,6 +22,7 @@ use tokio::sync::Notify;
 #[derive(Clone)]
 struct InterruptedDiscard {
     fixture: Fixture,
+    blocked_method: &'static str,
     entered: Arc<Notify>,
     release: Arc<Notify>,
 }
@@ -60,7 +61,7 @@ impl SessionEndpoint for InterruptedEndpoint {
     }
     async fn call(&self, method: &str, params: Value, rpc: &str) -> Result<Value> {
         let value = self.inner.call(method, params, rpc).await?;
-        if method == "session.discard" {
+        if method == self.connector.blocked_method {
             // Server performed the mutation, but its reply has not arrived.
             self.connector.entered.notify_one();
             self.connector.release.notified().await;
@@ -262,6 +263,64 @@ async fn late_creation_keeps_its_parent_and_never_steals_another_sessions_panel(
 }
 
 #[tokio::test]
+async fn a_sidechat_run_is_bound_to_its_controller_and_live_full_pointer() {
+    let (runtime, source, _view) = setup().await;
+    let parent = RunScope::main("fixture", "a");
+    let chat = source
+        .create(parent.clone(), Some("Owned"), "owner-create")
+        .await
+        .unwrap();
+    let run = source.open(&chat).await.unwrap();
+    assert!(source.owns_run(&run));
+
+    let entered = Arc::new(Notify::new());
+    let other_runtime = Arc::new(SessionRuntime::spawn(
+        "fixture",
+        Arc::new(InterruptedDiscard {
+            fixture: Fixture::default().with_side_chats(),
+            blocked_method: "session.fork",
+            entered: entered.clone(),
+            release: Arc::new(Notify::new()),
+        }),
+    ));
+    other_runtime
+        .wait_ready(Duration::from_secs(3))
+        .await
+        .unwrap();
+    let other = Arc::new(SideChatBinding::new(other_runtime.clone()));
+    let creating = {
+        let other = other.clone();
+        let parent = parent.clone();
+        tokio::spawn(async move { other.create(parent, None, "other-create").await })
+    };
+    tokio::time::timeout(Duration::from_secs(3), entered.notified())
+        .await
+        .unwrap();
+    creating.abort();
+    let _ = creating.await;
+
+    // The second controller has the same endpoint and is explicitly given the
+    // exact pointer through its existing unknown-creation reconciliation path.
+    other
+        .reconcile_creation(&parent, Some(chat.clone()))
+        .unwrap();
+    assert_eq!(
+        other.pointer(&parent, &chat.scope.session_id).unwrap(),
+        chat
+    );
+    assert!(!other.owns_run(&run));
+
+    source.close(&chat, "owner-close").await.unwrap();
+    assert!(
+        !source.owns_run(&run),
+        "retired pointers cannot authorize a run"
+    );
+    assert!(!other.owns_run(&run));
+    other_runtime.stop().await.unwrap();
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
 async fn scratch_composer_ime_send_and_close_use_its_own_run_without_touching_parent_drafts() {
     let (runtime, source, mut view) = setup().await;
     let parent = view.binding().clone();
@@ -411,6 +470,7 @@ async fn stale_callbacks_and_failed_reads_preserve_pointer_until_authoritative_a
 #[tokio::test]
 async fn interrupted_discard_keeps_readable_draft_and_disables_mutations_until_reconciled() {
     let connector = InterruptedDiscard {
+        blocked_method: "session.discard",
         fixture: Fixture::default().with_side_chats(),
         entered: Arc::new(Notify::new()),
         release: Arc::new(Notify::new()),

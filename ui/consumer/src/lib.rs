@@ -2859,8 +2859,12 @@ pub async fn open_scratch_run(
     let pointer = source
         .pointer(parent.scope(), session_id)
         .map_err(|error| error.to_string())?;
-    source
+    let run = source
         .open(&pointer)
         .await
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string())?;
+    if !source.owns_run(&run) {
+        return Err("SideChat returned a retired or foreign run".into());
+    }
+    Ok(run)
 }

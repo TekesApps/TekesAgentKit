@@ -9,7 +9,12 @@ use tekes_agent_ui_demo::{
 };
 use tekes_ui_controls::composition::AccessibilityAction;
 
-async fn setup() -> (Arc<SessionRuntime>, Arc<RunBinding>, ComponentDemo) {
+async fn setup() -> (
+    Arc<SessionRuntime>,
+    Arc<RunBinding>,
+    Arc<SideChatBinding>,
+    ComponentDemo,
+) {
     let runtime = Arc::new(SessionRuntime::spawn(
         "fixture",
         Arc::new(Fixture::default().with_children().with_side_chats()),
@@ -26,9 +31,10 @@ async fn setup() -> (Arc<SessionRuntime>, Arc<RunBinding>, ComponentDemo) {
             .unwrap(),
     );
     let mut view = ComponentDemo::new([parent.clone(), other]).unwrap();
-    view.set_side_chat_binding(Arc::new(SideChatBinding::new(runtime.clone())));
+    let owner = Arc::new(SideChatBinding::new(runtime.clone()));
+    view.set_side_chat_binding(owner.clone());
     view.sync().unwrap();
-    (runtime, parent, view)
+    (runtime, parent, owner, view)
 }
 fn input(view: &ComponentDemo) -> SidePanelInput {
     view.tree
@@ -75,7 +81,7 @@ fn launcher_id(
 async fn host_toolbar_uses_existing_panel_navigation_and_keeps_original_body_and_preedit() {
     use tekes_agent_components_ui::{SidePanelHeaderPlacement, SidePanelNavigation, SummaryView};
     use tekes_ui_controls::composition::ContentEvent;
-    let (runtime, parent, mut view) = setup().await;
+    let (runtime, parent, _, mut view) = setup().await;
     let summary = view.summary_id();
     let owner = view
         .tree
@@ -177,7 +183,7 @@ async fn host_toolbar_uses_existing_panel_navigation_and_keeps_original_body_and
 #[tokio::test]
 async fn empty_panel_launcher_opens_summary_through_the_original_callback() {
     use tekes_agent_components_ui::SidePanelDestination;
-    let (runtime, parent, mut view) = setup().await;
+    let (runtime, parent, _, mut view) = setup().await;
     close(&mut view);
     let id = launcher_id(&view, SidePanelDestination::Summary);
     let commands = view
@@ -194,9 +200,7 @@ async fn empty_panel_launcher_opens_summary_through_the_original_callback() {
 #[tokio::test]
 async fn empty_panel_launcher_creates_one_actual_scratch_pointer_through_the_existing_binding() {
     use tekes_agent_components_ui::SidePanelDestination;
-    let (runtime, parent, mut view) = setup().await;
-    let owner = Arc::new(SideChatBinding::new(runtime.clone()));
-    view.set_side_chat_binding(owner.clone());
+    let (runtime, parent, owner, mut view) = setup().await;
     view.sync().unwrap();
     close(&mut view);
     let id = launcher_id(&view, SidePanelDestination::SideChat);
@@ -257,7 +261,7 @@ async fn task(
 
 #[tokio::test]
 async fn closing_last_summary_does_not_recreate_it_or_touch_the_main_draft() {
-    let (runtime, parent, mut view) = setup().await;
+    let (runtime, parent, _, mut view) = setup().await;
     parent
         .edit_text(
             &ComposerDestination::run(parent.scope().clone()),
@@ -288,7 +292,7 @@ async fn closing_last_summary_does_not_recreate_it_or_touch_the_main_draft() {
 
 #[tokio::test]
 async fn closing_a_task_selects_the_last_remaining_open_tab() {
-    let (runtime, parent, mut view) = setup().await;
+    let (runtime, parent, _, mut view) = setup().await;
     task(&mut view, &parent, "z-first", "child-a").await;
     task(&mut view, &parent, "a-second", "child-b").await;
     let first = SidePanelTabKind::Task {
@@ -323,9 +327,7 @@ async fn closing_a_task_selects_the_last_remaining_open_tab() {
 
 #[tokio::test]
 async fn late_scratch_open_keeps_the_pointer_without_selecting_a_closed_document() {
-    let (runtime, parent, mut view) = setup().await;
-    let owner = Arc::new(SideChatBinding::new(runtime.clone()));
-    view.set_side_chat_binding(owner.clone());
+    let (runtime, parent, owner, mut view) = setup().await;
     view.sync().unwrap();
     let id = view
         .tree
@@ -378,7 +380,7 @@ async fn late_scratch_open_keeps_the_pointer_without_selecting_a_closed_document
 async fn closing_a_subagent_returns_to_the_last_task_without_retiring_its_binding() {
     use tekes_agent_presentation::ChildHistoryLayout;
     use tekes_agent_ui_bindings::{ChildPaneBinding, PaneAccess};
-    let (runtime, parent, mut view) = setup().await;
+    let (runtime, parent, _, mut view) = setup().await;
     let task_run = task(&mut view, &parent, "task", "child-a").await;
     let child = Arc::new(
         ChildPaneBinding::for_run(
@@ -417,7 +419,7 @@ async fn closing_a_subagent_returns_to_the_last_task_without_retiring_its_bindin
 async fn late_child_open_cannot_replace_a_newer_owner_of_the_same_tab() {
     use tekes_agent_presentation::ChildHistoryLayout;
     use tekes_agent_ui_bindings::{ChildPaneBinding, PaneAccess};
-    let (runtime, parent, mut view) = setup().await;
+    let (runtime, parent, _, mut view) = setup().await;
     let old_request = view.begin_child_open(parent.scope()).unwrap();
     let old = Arc::new(
         ChildPaneBinding::for_run(
@@ -494,7 +496,7 @@ async fn late_child_open_cannot_replace_a_newer_owner_of_the_same_tab() {
 async fn closing_a_child_fences_a_never_installed_older_open_result() {
     use tekes_agent_presentation::ChildHistoryLayout;
     use tekes_agent_ui_bindings::ChildPaneBinding;
-    let (runtime, parent, mut view) = setup().await;
+    let (runtime, parent, _, mut view) = setup().await;
     let new_request = view.begin_child_open(parent.scope()).unwrap();
     let new = Arc::new(
         ChildPaneBinding::for_run(
@@ -580,7 +582,7 @@ async fn closing_a_child_fences_a_never_installed_older_open_result() {
 #[tokio::test]
 async fn inactive_task_navigation_cannot_retire_old_owner_or_blur_current_parent() {
     use tekes_agent_ui_bindings::PaneAccess;
-    let (runtime, a, mut view) = setup().await;
+    let (runtime, a, _, mut view) = setup().await;
     let original = task(&mut view, &a, "task", "child-a").await;
     let original_ids = view.panel_composer_ids().unwrap();
     original
@@ -632,7 +634,7 @@ async fn inactive_task_navigation_cannot_retire_old_owner_or_blur_current_parent
 
 #[tokio::test]
 async fn original_task_completion_can_cache_after_parent_switch_without_navigating() {
-    let (runtime, a, mut view) = setup().await;
+    let (runtime, a, _, mut view) = setup().await;
     let source = Arc::new(TaskPaneBinding::for_run(&a));
     let token = source.begin(a.scope().clone(), "pending-task").unwrap();
     assert!(source.commit(
@@ -780,9 +782,7 @@ mod native_text {
     }
     #[tokio::test]
     async fn scratch_close_ack_selects_the_last_task_without_blurring_main_preedit() {
-        let (runtime, parent, mut view) = setup().await;
-        let owner = Arc::new(SideChatBinding::new(runtime.clone()));
-        view.set_side_chat_binding(owner.clone());
+        let (runtime, parent, owner, mut view) = setup().await;
         task(&mut view, &parent, "last-task", "child-a").await;
         let create = view
             .tree
@@ -874,7 +874,7 @@ mod native_text {
 
     #[tokio::test]
     async fn original_task_completion_preserves_another_parents_actual_preedit() {
-        let (runtime, a, mut view) = setup().await;
+        let (runtime, a, _, mut view) = setup().await;
         view.enable_transcript_content().unwrap();
         let source = Arc::new(TaskPaneBinding::for_run(&a));
         let token = source.begin(a.scope().clone(), "pending-task").unwrap();
@@ -943,7 +943,7 @@ mod native_text {
 
     #[tokio::test]
     async fn explicit_summary_destination_is_visible_and_disabled_during_composition() {
-        let (runtime, _, mut view) = setup().await;
+        let (runtime, _, _, mut view) = setup().await;
         let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()));
         for width in [1000., 1200., 1600.] {
             let frame = Rect::new(0., 0., width, 760.);
@@ -1048,9 +1048,7 @@ mod native_text {
             view.accessibility_action(id, Some(items[index].index), AccessibilityAction::Press)
                 .unwrap()
         }
-        let (runtime, parent, mut view) = setup().await;
-        let owner = Arc::new(SideChatBinding::new(runtime.clone()));
-        view.set_side_chat_binding(owner.clone());
+        let (runtime, parent, owner, mut view) = setup().await;
         parent
             .edit_text(
                 &ComposerDestination::run(parent.scope().clone()),

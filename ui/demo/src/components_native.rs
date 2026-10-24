@@ -139,6 +139,7 @@ struct Host {
     runtime: Arc<SessionRuntime>,
     sidebar: Arc<SidebarHostBinding>,
     side_chats: Arc<SideChatBinding>,
+    side_chat_sources: std::collections::BTreeMap<String, Arc<SideChatBinding>>,
     sender: mpsc::Sender<HostResult>,
     results: mpsc::Receiver<HostResult>,
     wake: Option<tekes_ui_platform_macos::WindowWake>,
@@ -238,6 +239,10 @@ enum HostResult {
     SideChatOpened {
         request: PanelRequest,
         result: std::result::Result<BoundSideChatRun, String>,
+    },
+    SideChatClosed {
+        request: Option<PanelRequest>,
+        result: std::result::Result<(), String>,
     },
     Operation(std::result::Result<(), String>),
     Sidebar {
@@ -438,7 +443,13 @@ impl Host {
                 .current_binding()
                 .and_then(|binding| sidebar.runtime_for(&binding.scope().endpoint_id))
                 .cloned();
-            let side_chats = self.side_chats.clone();
+            let side_chat_sources = self.side_chat_sources.clone();
+            let side_chat_close_request = match &command {
+                DemoCommand::CloseSideChat(chat) => {
+                    self.view.side_chat_completion_request(&chat.parent)
+                }
+                _ => None,
+            };
             let cached_child = match &command {
                 DemoCommand::OpenChild {
                     request,
@@ -775,11 +786,13 @@ impl Host {
                                 .as_nanos()
                         );
                         let result = async {
-                            if side_chats.endpoint_id() != request.parent().endpoint_id.as_str() {
-                                return Err(tekes_agent_contract::unsupported(
-                                    "SideChat is disabled for this endpoint in the demo host",
-                                ));
-                            }
+                            let side_chats = side_chat_sources
+                                .get(&request.parent().endpoint_id)
+                                .ok_or_else(|| {
+                                tekes_agent_contract::unsupported(
+                                    "SideChat endpoint is not registered",
+                                )
+                            })?;
                             let chat = side_chats
                                 .create(request.parent().clone(), title.as_deref(), &rpc)
                                 .await?;
@@ -791,13 +804,15 @@ impl Host {
                     }
                     DemoCommand::OpenSideChat { request, chat } => HostResult::SideChatOpened {
                         request,
-                        result: if side_chats.endpoint_id() == chat.parent.endpoint_id.as_str() {
+                        result: if let Some(side_chats) =
+                            side_chat_sources.get(&chat.parent.endpoint_id)
+                        {
                             side_chats
                                 .open(&chat)
                                 .await
                                 .map_err(|error| error.to_string())
                         } else {
-                            Err("SideChat is disabled for this endpoint in the demo host".into())
+                            Err("SideChat endpoint is not registered".into())
                         },
                     },
                     DemoCommand::CloseSideChat(expected) => {
@@ -809,17 +824,19 @@ impl Host {
                                 .unwrap()
                                 .as_nanos()
                         );
-                        HostResult::Operation(
-                            if side_chats.endpoint_id() == expected.parent.endpoint_id.as_str() {
+                        HostResult::SideChatClosed {
+                            request: side_chat_close_request,
+                            result: if let Some(side_chats) =
+                                side_chat_sources.get(&expected.parent.endpoint_id)
+                            {
                                 side_chats
                                     .close(&expected, &rpc)
                                     .await
                                     .map_err(|error| error.to_string())
                             } else {
-                                Err("SideChat is disabled for this endpoint in the demo host"
-                                    .into())
+                                Err("SideChat endpoint is not registered".into())
                             },
-                        )
+                        }
                     }
                     DemoCommand::OpenSession(request) => {
                         let address = request.address();
@@ -1192,9 +1209,10 @@ impl Host {
                     result: Ok(run),
                 } => {
                     let new = !self.view.has_side_chat_run(run.chat());
+                    let chat = run.chat().clone();
                     let binding = run.binding().clone();
                     match self.view.install_side_chat_run(request, run) {
-                        Ok(_) if new && binding.current_run().is_some() => {
+                        Ok(_) if new && self.view.has_side_chat_run_binding(&chat, &binding) => {
                             self.observe(&binding, window)
                         }
                         Ok(_) => {}
@@ -1202,8 +1220,22 @@ impl Host {
                     }
                 }
                 HostResult::SideChatOpened {
-                    result: Err(error), ..
-                } => self.failure(error),
+                    request,
+                    result: Err(error),
+                } => {
+                    if self.view.side_chat_request_current(&request) {
+                        self.failure(error);
+                    }
+                }
+                HostResult::SideChatClosed { request, result } => {
+                    if request
+                        .as_ref()
+                        .is_some_and(|request| self.view.side_chat_request_current(request))
+                        && let Err(error) = result
+                    {
+                        self.failure(error);
+                    }
+                }
                 HostResult::Operation(Err(error))
                 | HostResult::Opened {
                     binding: Err(error),
@@ -2829,12 +2861,17 @@ impl WindowHandler for Host {
                         move || sidebar_wake.wake() != tekes_ui_platform_macos::WakeResult::Closed,
                     ),
                 ));
-                self.observers.push(self.executor.spawn(
-                    tekes_agent_ui_demo::notifications::forward(
-                        self.side_chats.subscribe(),
-                        move || wake.wake() != tekes_ui_platform_macos::WakeResult::Closed,
-                    ),
-                ));
+                for source in self.side_chat_sources.values() {
+                    let side_chat_wake = wake.clone();
+                    self.observers.push(self.executor.spawn(
+                        tekes_agent_ui_demo::notifications::forward(
+                            source.subscribe(),
+                            move || {
+                                side_chat_wake.wake() != tekes_ui_platform_macos::WakeResult::Closed
+                            },
+                        ),
+                    ));
+                }
                 self.draw(window);
                 if self.selftest {
                     eprintln!("COMPONENT_FOCUS after-draw={:?}", self.view.tree.focused());
@@ -3780,8 +3817,15 @@ pub fn run() {
     if run_controls_selftest {
         run_controls_probe::Probe::prepare(&view);
     }
-    let side_chats = Arc::new(SideChatBinding::new(runtime.clone()));
-    view.set_side_chat_binding(side_chats.clone());
+    let side_chat_sources: std::collections::BTreeMap<_, _> = runtimes
+        .iter()
+        .map(|(id, runtime)| (id.clone(), Arc::new(SideChatBinding::new(runtime.clone()))))
+        .collect();
+    for source in side_chat_sources.values() {
+        view.register_side_chat_binding(source.clone()).unwrap();
+    }
+    // Existing single-endpoint probes use their original primary source only.
+    let side_chats = side_chat_sources[&runtime.inspect(|state| state.endpoint_id.clone())].clone();
     view.set_sidebar_host_reader(sidebar.clone()).unwrap();
     view.set_sidebar_host_source(sidebar.snapshot()).unwrap();
     let preferences = sidebar.preferences();
@@ -3892,6 +3936,7 @@ pub fn run() {
         view,
         sidebar,
         side_chats,
+        side_chat_sources,
         _owned_preferences: owned_preferences,
         sidebar_error: None,
         side_chat_test_started: false,

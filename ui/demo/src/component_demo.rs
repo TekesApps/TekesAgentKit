@@ -200,7 +200,7 @@ pub struct ComponentDemo {
     sidebar_presented: Option<SidebarInput>,
     panel_revision: u64,
     workspace_summary: Option<tekes_agent_components_ui::SummaryContextInput>,
-    side_chats: Option<Arc<SideChatBinding>>,
+    side_chats: BTreeMap<String, Arc<SideChatBinding>>,
     panel_selections: BTreeMap<RunScope, SidePanelTabKind>,
     // Host navigation document only. Execution/pointers/drafts remain in the
     // original bindings; map ordering is not the user's tab opening order.
@@ -580,7 +580,7 @@ impl ComponentDemo {
             sidebar_presented: None,
             panel_revision: 0,
             workspace_summary: None,
-            side_chats: None,
+            side_chats: BTreeMap::new(),
             panel_selections: BTreeMap::new(),
             panel_order: BTreeMap::new(),
             panel_parent_projection: BTreeMap::new(),
@@ -2561,7 +2561,22 @@ impl ComponentDemo {
         &self.bindings
     }
     pub fn set_side_chat_binding(&mut self, binding: Arc<SideChatBinding>) {
-        self.side_chats = Some(binding);
+        self.register_side_chat_binding(binding)
+            .expect("SideChat endpoint already has a different canonical owner");
+    }
+    /// Fixed canonical owners for this host lifetime. A repeated identical Arc is
+    /// idempotent; replacing an endpoint's controller requires a new host.
+    pub fn register_side_chat_binding(&mut self, binding: Arc<SideChatBinding>) -> Result<()> {
+        let endpoint = binding.endpoint_id().to_owned();
+        if let Some(old) = self.side_chats.get(&endpoint) {
+            require(
+                Arc::ptr_eq(old, &binding),
+                "SideChat owner replacement rejected",
+            )?;
+        } else {
+            self.side_chats.insert(endpoint, binding);
+        }
+        Ok(())
     }
     /// Explicit host destination. Reopening an existing tab selects it without
     /// reordering; a closed Summary appends like ClientSidePanelState.open.
@@ -3101,6 +3116,26 @@ impl ComponentDemo {
         self.panel_runs
             .contains_key(&(chat.parent.clone(), chat.scope.session_id.clone()))
     }
+    pub fn has_side_chat_run_binding(&self, chat: &SideChat, binding: &Arc<RunBinding>) -> bool {
+        self.panel_runs
+            .get(&(chat.parent.clone(), chat.scope.session_id.clone()))
+            .is_some_and(|run| Arc::ptr_eq(&run.binding, binding))
+    }
+    pub fn side_chat_request_current(&self, request: &PanelRequest) -> bool {
+        self.side_chats.contains_key(&request.parent.endpoint_id)
+            && self.child_request_current(request)
+    }
+    /// Capture an already admitted close command without advancing navigation.
+    pub fn side_chat_completion_request(&self, parent: &RunScope) -> Option<PanelRequest> {
+        self.side_chats
+            .contains_key(&parent.endpoint_id)
+            .then(|| PanelRequest {
+                parent: parent.clone(),
+                main_revision: self.navigation_revision,
+                panel_revision: self.panel_navigation_revision,
+                projection_generation: self.panel_projection_generation(parent),
+            })
+    }
     pub fn install_side_chat_run(
         &mut self,
         request: PanelRequest,
@@ -3108,14 +3143,14 @@ impl ComponentDemo {
     ) -> Result<bool> {
         let owner = self
             .side_chats
-            .as_ref()
+            .get(&request.parent.endpoint_id)
             .ok_or_else(|| unsupported("SideChat owner unavailable"))?;
         let chat = run.chat();
         require(
             chat.parent == request.parent,
             "SideChat result parent mismatch",
         )?;
-        if owner.pointer(&chat.parent, &chat.scope.session_id).is_err() {
+        if !owner.owns_run(&run) {
             return Ok(false);
         }
         let key = (chat.parent.clone(), chat.scope.session_id.clone());
@@ -3461,30 +3496,17 @@ impl ComponentDemo {
             .or_else(|| initial_document.then_some(SidePanelTabKind::Summary));
         let had_selection = wanted.is_some();
         self.panel_revision += 1;
-        let mut input = if let Some(owner) = &self.side_chats {
-            if owner.endpoint_id() == parent.endpoint_id.as_str() {
-                let snapshot = owner.snapshot();
-                self.panel_runs.retain(|(parent, id), _| {
-                    snapshot
-                        .chats
-                        .get(id)
-                        .is_some_and(|chat| &chat.parent == parent)
-                });
-                owner.input(self.panel_revision, &parent, tabs, wanted)?
-            } else {
-                // The demo host installs one SideChat owner. Never apply that
-                // controller to a different endpoint's parent session.
-                let selected = wanted.filter(|wanted| tabs.iter().any(|tab| &tab.kind == wanted));
-                SidePanelInput {
-                    revision: self.panel_revision,
-                    parent: parent.clone(),
-                    projection_ready: true,
-                    tabs,
-                    selected,
-                    side_chats: SideChatSnapshot::default(),
-                    supports_side_chat: Some(false),
-                }
-            }
+        // Each pane is reconciled only with its original endpoint authority.
+        // An empty A snapshot must never evict B's retained canonical Run.
+        self.panel_runs.retain(|(parent, id), run| {
+            self.side_chats
+                .get(&parent.endpoint_id)
+                .is_some_and(|owner| {
+                    owner.pointer(parent, id).is_ok() && run.binding.access() != PaneAccess::Missing
+                })
+        });
+        let mut input = if let Some(owner) = self.side_chats.get(&parent.endpoint_id) {
+            owner.input(self.panel_revision, &parent, tabs, wanted)?
         } else {
             let selected = wanted.filter(|wanted| tabs.iter().any(|tab| &tab.kind == wanted));
             SidePanelInput {
@@ -3494,7 +3516,11 @@ impl ComponentDemo {
                 tabs,
                 selected,
                 side_chats: SideChatSnapshot::default(),
-                supports_side_chat: None,
+                supports_side_chat: if self.side_chats.is_empty() {
+                    None
+                } else {
+                    Some(false)
+                },
             }
         };
         let order = self
@@ -4638,7 +4664,7 @@ impl ComponentDemo {
                     self.panel_navigation_revision += 1;
                     commands.push(DemoCommand::CloseSideChat(
                         self.side_chats
-                            .as_ref()
+                            .get(&parent.endpoint_id)
                             .ok_or_else(|| unsupported("SideChat owner unavailable"))?
                             .pointer(&parent, &session_id)?,
                     ));
@@ -4701,7 +4727,7 @@ impl ComponentDemo {
                     if let SidePanelTabKind::SideChat { session_id } = tab.kind {
                         let chat = self
                             .side_chats
-                            .as_ref()
+                            .get(&parent.endpoint_id)
                             .ok_or_else(|| unsupported("SideChat owner unavailable"))?
                             .pointer(&parent, &session_id)?;
                         if !self.has_side_chat_run(&chat) {
