@@ -124,6 +124,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         rows: Vec::new(),
         selected: None,
     })?;
+    sidebar.clear_pending_actions();
     let _sidebar_host = sidebar.into_host()?;
 
     let mut side_panel = SidePanel::new(0x8300, SidePanelLabels::default(), 4);

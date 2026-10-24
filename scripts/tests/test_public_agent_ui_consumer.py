@@ -37,6 +37,7 @@ class PublicAgentUiConsumerTests(unittest.TestCase):
             self.assertEqual(receipt["consumer_direct_dependencies"], ["tekes-agent-components-ui"])
             self.assertIn("RunPort::standard", source)
             self.assertIn("Sidebar::new", source)
+            self.assertIn("sidebar.clear_pending_actions()", source)
             self.assertIn("SidePanel::new", source)
             self.assertEqual(source.count(".into_host()?"), 3)
             self.assertNotIn("RunSurface", source)

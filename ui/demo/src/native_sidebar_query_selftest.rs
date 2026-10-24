@@ -315,7 +315,7 @@ impl Probe {
                         .find(|action| action.id == "pin")
                         .unwrap();
                     host.executor
-                        .block_on(host.sidebar.perform(
+                        .block_on(host.sidebar.perform_action(
                             &row.address,
                             action,
                             None,
@@ -352,7 +352,7 @@ impl Probe {
                             .find(|action| action.id == "pin")
                             .unwrap();
                         host.executor
-                            .block_on(host.sidebar.perform(
+                            .block_on(host.sidebar.perform_action(
                                 &row.address,
                                 action,
                                 None,

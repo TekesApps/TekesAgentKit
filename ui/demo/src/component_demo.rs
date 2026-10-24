@@ -1,5 +1,6 @@
 //! Host window/navigation adapters around shared Agent components.
 //! RunPort is experimental; generic reading belongs to the published SDK.
+use crate::sidebar_host::{SidebarHostBinding, SidebarHostPublication};
 use std::{collections::BTreeMap, sync::Arc};
 use tekes_agent_components_ui::{
     AnnotationEditor, AnnotationEditorIds, AnnotationEditorIntent, Composer, ComposerAffordances,
@@ -186,6 +187,9 @@ pub struct ComponentDemo {
     navigation_revision: u64,
     sidebar_source: Option<Arc<SidebarPublication>>,
     sidebar_reader: Option<Arc<SidebarBinding>>,
+    sidebar_host_source: Option<Arc<SidebarHostPublication>>,
+    sidebar_host_reader: Option<Arc<SidebarHostBinding>>,
+    sidebar_owner_revision: u64,
     sidebar_folder_filter: Option<tekes_agent_components_ui::SidebarFolderKey>,
     sidebar_search_publication: Option<tekes_agent_ui_bindings::SidebarSearchPublication>,
     sidebar_search_presented: Option<tekes_agent_components_ui::SidebarSearchInput>,
@@ -293,6 +297,7 @@ pub struct SidebarActionToken {
     address: SessionAddress,
     action: String,
     revision: u64,
+    sidebar_owner_revision: u64,
 }
 impl NavigationRequest {
     pub fn address(&self) -> &SessionAddress {
@@ -560,6 +565,9 @@ impl ComponentDemo {
             navigation_revision: 0,
             sidebar_source: None,
             sidebar_reader: None,
+            sidebar_host_source: None,
+            sidebar_host_reader: None,
+            sidebar_owner_revision: 0,
             sidebar_folder_filter: None,
             sidebar_search_publication: None,
             sidebar_search_presented: None,
@@ -1906,9 +1914,13 @@ impl ComponentDemo {
             address,
             action,
             revision: self.navigation_revision,
+            sidebar_owner_revision: self.sidebar_owner_revision,
         }
     }
     pub fn finish_sidebar_action(&mut self, token: &SidebarActionToken) {
+        if token.sidebar_owner_revision != self.sidebar_owner_revision {
+            return;
+        }
         let id = self.sidebar_id();
         self.tree
             .get_mut(id)
@@ -1922,6 +1934,9 @@ impl ComponentDemo {
         token: &SidebarActionToken,
         outcome: &ThreadActionOutcome,
     ) -> Result<Option<NavigationRequest>> {
+        if token.sidebar_owner_revision != self.sidebar_owner_revision {
+            return Ok(None);
+        }
         if let Some(warning) = &outcome.warning {
             self.set_notice(warning);
         }
@@ -2158,6 +2173,12 @@ impl ComponentDemo {
         owner: &str,
         input: &tekes_agent_components_ui::SidebarSearchInput,
     ) -> Result<()> {
+        require(
+            self.sidebar_host_reader
+                .as_ref()
+                .is_none_or(|source| source.endpoint_ids().len() == 1),
+            "Sidebar search is unavailable for a multi-endpoint inventory",
+        )?;
         self.tree
             .get_mut(self.sidebar_id())
             .unwrap()
@@ -2173,6 +2194,12 @@ impl ComponentDemo {
         owner: &str,
         input: &tekes_agent_components_ui::SidebarSearchInput,
     ) -> Result<()> {
+        require(
+            self.sidebar_host_reader
+                .as_ref()
+                .is_none_or(|source| source.endpoint_ids().len() == 1),
+            "Sidebar search is unavailable for a multi-endpoint inventory",
+        )?;
         self.tree
             .get_mut(self.sidebar_id())
             .unwrap()
@@ -2187,6 +2214,12 @@ impl ComponentDemo {
         &mut self,
         input: &tekes_agent_components_ui::SidebarSearchInput,
     ) -> Result<()> {
+        require(
+            self.sidebar_host_reader
+                .as_ref()
+                .is_none_or(|source| source.endpoint_ids().len() == 1),
+            "Sidebar search is unavailable for a multi-endpoint inventory",
+        )?;
         self.tree
             .get_mut(self.sidebar_id())
             .unwrap()
@@ -2227,7 +2260,13 @@ impl ComponentDemo {
         &self,
         publication: &tekes_agent_ui_bindings::SidebarSearchPublication,
     ) -> Result<()> {
-        self.sidebar_source
+        require(
+            self.sidebar_host_source
+                .as_ref()
+                .is_none_or(|source| source.endpoint_count() == 1),
+            "Sidebar search is unavailable for a multi-endpoint inventory",
+        )?;
+        self.sidebar_projection()
             .as_ref()
             .ok_or_else(|| unsupported("sidebar inventory not installed"))?
             .project_search(&self.binding().scope().endpoint_id, publication, None, 1)
@@ -2245,6 +2284,9 @@ impl ComponentDemo {
     pub fn sidebar_folder_catalog(
         &self,
     ) -> Result<Option<tekes_agent_ui_bindings::SidebarFolderCatalog>> {
+        if let Some(source) = &self.sidebar_host_source {
+            return source.folder_catalog().map(Some);
+        }
         self.sidebar_source
             .as_ref()
             .map(|source| source.folder_catalog().map_err(unsupported))
@@ -2279,10 +2321,138 @@ impl ComponentDemo {
                 .is_some_and(|b| b.shares_runtime(source.runtime())),
             "Sidebar selected reader belongs to another runtime",
         )?;
+        if self
+            .sidebar_reader
+            .as_ref()
+            .is_some_and(|old| Arc::ptr_eq(old, &source))
+        {
+            return Ok(());
+        }
+        self.retire_sidebar_owner()?;
         self.sidebar_reader = Some(source);
+        self.sidebar_host_reader = None;
+        self.sidebar_host_source = None;
+        self.sidebar_source = None;
+        self.sidebar_search_publication = None;
+        self.sidebar_search_presented = None;
         Ok(())
     }
+    pub fn set_sidebar_host_reader(&mut self, source: Arc<SidebarHostBinding>) -> Result<()> {
+        if self
+            .sidebar_host_reader
+            .as_ref()
+            .is_some_and(|old| Arc::ptr_eq(old, &source))
+        {
+            return Ok(());
+        }
+        self.retire_sidebar_owner()?;
+        self.sidebar_reader = None;
+        self.sidebar_source = None;
+        self.sidebar_host_source = None;
+        self.sidebar_search_publication = None;
+        self.sidebar_search_presented = None;
+        self.sidebar_host_reader = Some(source);
+        Ok(())
+    }
+    fn retire_sidebar_owner(&mut self) -> Result<()> {
+        let next_owner_revision = self
+            .sidebar_owner_revision
+            .checked_add(1)
+            .ok_or_else(|| unsupported("Sidebar owner revision exhausted"))?;
+        let next_navigation_revision = self
+            .navigation_revision
+            .checked_add(1)
+            .ok_or_else(|| unsupported("navigation revision exhausted"))?;
+        let sidebar_id = self.sidebar_id();
+        let search_owner = format!("agentkit-sidebar-owner-{next_owner_revision}");
+        let next_search_revision = self
+            .tree
+            .get(sidebar_id)
+            .and_then(|content| content.component::<Sidebar>())
+            .and_then(|sidebar| sidebar.displayed_search())
+            .map_or(0, |search| search.revision)
+            .checked_add(1)
+            .ok_or_else(|| unsupported("Sidebar search revision exhausted"))?;
+        if let Some(sidebar) = self
+            .tree
+            .get_mut(sidebar_id)
+            .and_then(|content| content.component_mut::<Sidebar>())
+        {
+            sidebar.clear_pending_actions();
+            sidebar
+                .replace_search_source(
+                    &search_owner,
+                    &tekes_agent_components_ui::SidebarSearchInput {
+                        revision: next_search_revision,
+                        key: None,
+                        phase: Default::default(),
+                    },
+                )
+                .map_err(unsupported)?;
+        }
+        self.sidebar_owner_revision = next_owner_revision;
+        self.navigation_revision = next_navigation_revision;
+        Ok(())
+    }
+    pub fn set_sidebar_host_source(&mut self, source: Arc<SidebarHostPublication>) -> Result<()> {
+        let current = self
+            .sidebar_host_reader
+            .as_ref()
+            .ok_or_else(|| unsupported("Sidebar host reader not installed"))?;
+        require(
+            source.belongs_to(current),
+            "stale Sidebar host publication owner",
+        )?;
+        require(
+            self.sidebar_host_source.as_ref().is_none_or(|old| {
+                source.revision >= old.revision
+                    && (source.revision != old.revision
+                        || (source.rows == old.rows
+                            && source.activity_at == old.activity_at
+                            && source.error == old.error
+                            && source.loaded == old.loaded))
+            }),
+            "stale or conflicting Sidebar host publication",
+        )?;
+        self.sidebar_host_source = Some(source);
+        Ok(())
+    }
+    fn sidebar_projection(&self) -> Option<SidebarPublication> {
+        self.sidebar_host_source
+            .as_ref()
+            .map(|source| SidebarPublication {
+                revision: source.revision,
+                rows: source.rows.clone(),
+                activity_at: source.activity_at.clone(),
+                loaded: source.loaded,
+                error: source.error.clone(),
+            })
+            .or_else(|| {
+                self.sidebar_source
+                    .as_ref()
+                    .map(|source| source.as_ref().clone())
+            })
+    }
     fn supplement_sidebar_selection(&self, display: &mut SidebarInput) -> Result<bool> {
+        if let Some(source) = &self.sidebar_host_reader {
+            let Some(address) = display.selected.as_ref() else {
+                return Ok(false);
+            };
+            if display.rows.iter().any(|row| &row.address == address)
+                || self
+                    .sidebar_search_publication
+                    .as_ref()
+                    .is_some_and(|s| s.input.key.is_some())
+            {
+                return Ok(false);
+            }
+            let generation = self
+                .navigation_revision
+                .checked_add(1)
+                .ok_or_else(|| unsupported("Sidebar selected generation exhausted"))?;
+            let read = source.read_selected(address, generation)?;
+            return Ok(read.project_into(source, display, generation));
+        }
         let Some(source) = &self.sidebar_reader else {
             return Ok(false);
         };
@@ -2305,6 +2475,11 @@ impl ComponentDemo {
         Ok(read.project_into(source, display, generation))
     }
     pub fn set_sidebar_source(&mut self, source: Arc<SidebarPublication>) -> Result<()> {
+        require(
+            self.sidebar_host_reader.is_none(),
+            "single Sidebar publication cannot replace host source",
+        )?;
+        self.sidebar_host_source = None;
         require(
             self.sidebar_source.as_ref().is_none_or(|old| {
                 source.revision > old.revision || source.as_ref() == old.as_ref()
@@ -2926,7 +3101,7 @@ impl ComponentDemo {
             .text = text.into();
     }
     fn sync_sidebar(&mut self) -> Result<()> {
-        if let Some(source) = &self.sidebar_source {
+        if let Some(source) = self.sidebar_projection() {
             let selected = self.current_binding().map(|binding| SessionAddress {
                 endpoint_id: binding.scope().endpoint_id.clone(),
                 session_id: binding.scope().session_id.clone(),
@@ -2944,7 +3119,12 @@ impl ComponentDemo {
                 selected,
             };
             self.supplement_sidebar_selection(&mut next)?;
-            if let Some(search) = &self.sidebar_search_publication {
+            if let Some(search) = &self.sidebar_search_publication
+                && self
+                    .sidebar_host_source
+                    .as_ref()
+                    .is_none_or(|source| source.endpoint_count() == 1)
+            {
                 next = source
                     .project_search_for_display(&self.binding().scope().endpoint_id, search, &next)
                     .map_err(unsupported)?
@@ -3185,14 +3365,29 @@ impl ComponentDemo {
         let had_selection = wanted.is_some();
         self.panel_revision += 1;
         let mut input = if let Some(owner) = &self.side_chats {
-            let snapshot = owner.snapshot();
-            self.panel_runs.retain(|(parent, id), _| {
-                snapshot
-                    .chats
-                    .get(id)
-                    .is_some_and(|chat| &chat.parent == parent)
-            });
-            owner.input(self.panel_revision, &parent, tabs, wanted)?
+            if owner.endpoint_id() == parent.endpoint_id.as_str() {
+                let snapshot = owner.snapshot();
+                self.panel_runs.retain(|(parent, id), _| {
+                    snapshot
+                        .chats
+                        .get(id)
+                        .is_some_and(|chat| &chat.parent == parent)
+                });
+                owner.input(self.panel_revision, &parent, tabs, wanted)?
+            } else {
+                // The demo host installs one SideChat owner. Never apply that
+                // controller to a different endpoint's parent session.
+                let selected = wanted.filter(|wanted| tabs.iter().any(|tab| &tab.kind == wanted));
+                SidePanelInput {
+                    revision: self.panel_revision,
+                    parent: parent.clone(),
+                    projection_ready: true,
+                    tabs,
+                    selected,
+                    side_chats: SideChatSnapshot::default(),
+                    supports_side_chat: Some(false),
+                }
+            }
         } else {
             let selected = wanted.filter(|wanted| tabs.iter().any(|tab| &tab.kind == wanted));
             SidePanelInput {
@@ -3740,7 +3935,7 @@ impl ComponentDemo {
                 == &RunScope::main(&request.address.endpoint_id, &request.address.session_id),
             "navigation result target mismatch",
         )?;
-        let mut disappeared = self.sidebar_source.as_ref().is_some_and(|source| {
+        let mut disappeared = self.sidebar_projection().is_some_and(|source| {
             source.loaded
                 && source.error.is_none()
                 && !source.rows.iter().any(|row| row.address == request.address)
@@ -3755,6 +3950,24 @@ impl ComponentDemo {
             )?;
         }
         if let Some(reader) = &self.sidebar_reader {
+            let generation = self
+                .navigation_revision
+                .checked_add(1)
+                .ok_or_else(|| unsupported("Sidebar selected generation exhausted"))?;
+            disappeared = !reader
+                .read_selected(&request.address, generation)?
+                .has_active_row(reader);
+        }
+        if let Some(reader) = &self.sidebar_host_reader {
+            let runtime = reader
+                .runtime_for(&request.address.endpoint_id)
+                .ok_or_else(|| {
+                    unsupported("navigation endpoint is outside the Sidebar host binding")
+                })?;
+            require(
+                binding.shares_runtime(runtime),
+                "navigation binding belongs to another Sidebar endpoint",
+            )?;
             let generation = self
                 .navigation_revision
                 .checked_add(1)
@@ -4228,7 +4441,7 @@ impl ComponentDemo {
                     }
                     if definition.interaction == "rename" {
                         let title = self
-                            .sidebar_source
+                            .sidebar_projection()
                             .as_ref()
                             .and_then(|source| {
                                 source.rows.iter().find(|row| &row.address == address)

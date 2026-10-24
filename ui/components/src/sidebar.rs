@@ -843,6 +843,14 @@ impl Sidebar {
     pub fn is_pending(&self, address: &SessionAddress, action: &str) -> bool {
         self.pending.contains(&(address.clone(), action.into()))
     }
+    /// Retire local action admission when the host replaces its inventory owner.
+    /// This does not cancel remote operations; their completions must still be
+    /// fenced by the host's original owner token.
+    pub fn clear_pending_actions(&mut self) {
+        for (address, action) in std::mem::take(&mut self.pending) {
+            self.set_pending(&address, &action, false);
+        }
+    }
     pub fn into_host(self) -> Result<ContentHost, CompositionError> {
         let mut host = ContentHost::new(Content::new(self.root, self))?;
         host.set_action_events(true);

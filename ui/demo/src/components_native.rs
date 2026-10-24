@@ -16,12 +16,13 @@ use tekes_agent_session::SessionRuntime;
 use tekes_agent_ui_bindings::{
     BoundSideChatRun, ChildPaneBinding, InitialPresetChoices, ModelChoices,
     ModelSelectionPreparation, PaneAccess, PaneSnapshot, RunBinding, SideChatBinding,
-    SidebarActionOutcome, SidebarBinding,
+    SidebarActionOutcome,
 };
 use tekes_agent_ui_demo::component_demo::{
     ComponentDemo, CreateSessionCommand, DemoCommand, NavigationRequest, PanelRequest, RECONNECT,
     SidebarActionToken,
 };
+use tekes_agent_ui_demo::sidebar_host::SidebarHostBinding;
 use tekes_agent_web::SharedAgent;
 use tekes_ui_controls::composition::{AccessibilityAction, Component, ComponentId, ContentEvent};
 use tekes_ui_platform_macos::{
@@ -135,7 +136,7 @@ struct Host {
     gpu: Option<Renderer>,
     executor: tokio::runtime::Runtime,
     runtime: Arc<SessionRuntime>,
-    sidebar: Arc<SidebarBinding>,
+    sidebar: Arc<SidebarHostBinding>,
     side_chats: Arc<SideChatBinding>,
     sender: mpsc::Sender<HostResult>,
     results: mpsc::Receiver<HostResult>,
@@ -417,8 +418,12 @@ impl Host {
             };
             let sender = self.sender.clone();
             let wake = self.wake.clone();
-            let runtime = self.runtime.clone();
             let sidebar = self.sidebar.clone();
+            let active_runtime = self
+                .view
+                .current_binding()
+                .and_then(|binding| sidebar.runtime_for(&binding.scope().endpoint_id))
+                .cloned();
             let side_chats = self.side_chats.clone();
             let cached_child = match &command {
                 DemoCommand::OpenChild {
@@ -589,14 +594,24 @@ impl Host {
                     DemoCommand::ReadInitialPresets { request } => {
                         let rpc =
                             format!("{rename_rpc_prefix}:initial-presets:{}", request.generation);
-                        let result = InitialPresetChoices::load(&runtime, 1, &rpc)
-                            .await
-                            .map_err(|e| e.to_string());
+                        let result = match sidebar.runtime_for(request.destination.endpoint_id()) {
+                            Some(runtime) => InitialPresetChoices::load(runtime, 1, &rpc)
+                                .await
+                                .map_err(|e| e.to_string()),
+                            None => Err("Composer endpoint is not registered in this host".into()),
+                        };
                         HostResult::InitialPresets { request, result }
                     }
                     DemoCommand::CreateSession(request) => {
                         let result = async {
-                            let created = request.creation().execute(&runtime).await?;
+                            let runtime = sidebar
+                                .runtime_for(request.creation().endpoint_id())
+                                .ok_or_else(|| {
+                                    tekes_agent_contract::unsupported(
+                                        "session creation endpoint is not registered in this host",
+                                    )
+                                })?;
+                            let created = request.creation().execute(runtime.as_ref()).await?;
                             RunBinding::open_main(
                                 runtime.clone(),
                                 RunScope::main(
@@ -625,7 +640,7 @@ impl Host {
                             ticket.generation, ticket.attempt
                         );
                         let result = sidebar
-                            .perform(
+                            .perform_action(
                                 &ticket.address,
                                 &ticket.definition,
                                 Some(ticket.title.clone()),
@@ -643,6 +658,13 @@ impl Host {
                         layout,
                     } => {
                         let result = async {
+                            let runtime = sidebar
+                                .runtime_for(&direct_parent.endpoint_id)
+                                .ok_or_else(|| {
+                                    tekes_agent_contract::unsupported(
+                                        "child parent endpoint is not registered in this host",
+                                    )
+                                })?;
                             let source = if let Some(source) = cached_child {
                                 source
                             } else {
@@ -739,6 +761,11 @@ impl Host {
                                 .as_nanos()
                         );
                         let result = async {
+                            if side_chats.endpoint_id() != request.parent().endpoint_id.as_str() {
+                                return Err(tekes_agent_contract::unsupported(
+                                    "SideChat is disabled for this endpoint in the demo host",
+                                ));
+                            }
                             let chat = side_chats
                                 .create(request.parent().clone(), title.as_deref(), &rpc)
                                 .await?;
@@ -750,10 +777,14 @@ impl Host {
                     }
                     DemoCommand::OpenSideChat { request, chat } => HostResult::SideChatOpened {
                         request,
-                        result: side_chats
-                            .open(&chat)
-                            .await
-                            .map_err(|error| error.to_string()),
+                        result: if side_chats.endpoint_id() == chat.parent.endpoint_id.as_str() {
+                            side_chats
+                                .open(&chat)
+                                .await
+                                .map_err(|error| error.to_string())
+                        } else {
+                            Err("SideChat is disabled for this endpoint in the demo host".into())
+                        },
                     },
                     DemoCommand::CloseSideChat(expected) => {
                         let rpc = format!(
@@ -765,21 +796,31 @@ impl Host {
                                 .as_nanos()
                         );
                         HostResult::Operation(
-                            side_chats
-                                .close(&expected, &rpc)
-                                .await
-                                .map_err(|error| error.to_string()),
+                            if side_chats.endpoint_id() == expected.parent.endpoint_id.as_str() {
+                                side_chats
+                                    .close(&expected, &rpc)
+                                    .await
+                                    .map_err(|error| error.to_string())
+                            } else {
+                                Err("SideChat is disabled for this endpoint in the demo host"
+                                    .into())
+                            },
                         )
                     }
                     DemoCommand::OpenSession(request) => {
                         let address = request.address();
-                        let binding = RunBinding::open_main(
-                            runtime.clone(),
-                            RunScope::main(&address.endpoint_id, &address.session_id),
-                        )
-                        .await
-                        .map(Arc::new)
-                        .map_err(|error| error.to_string());
+                        let binding = match sidebar.runtime_for(&address.endpoint_id) {
+                            Some(runtime) => RunBinding::open_main(
+                                runtime.clone(),
+                                RunScope::main(&address.endpoint_id, &address.session_id),
+                            )
+                            .await
+                            .map(Arc::new)
+                            .map_err(|error| error.to_string()),
+                            None => {
+                                Err("Sidebar target endpoint is not registered in this host".into())
+                            }
+                        };
                         HostResult::Opened { request, binding }
                     }
                     DemoCommand::Sidebar(SidebarIntent::Action {
@@ -798,7 +839,7 @@ impl Host {
                         HostResult::Sidebar {
                             token: sidebar_token.expect("captured sidebar gesture"),
                             result: sidebar
-                                .perform(&address, &definition, None, &rpc_id)
+                                .perform_action(&address, &definition, None, &rpc_id)
                                 .await
                                 .map_err(|error| error.to_string()),
                         }
@@ -828,9 +869,14 @@ impl Host {
                                 binding,
                                 destination,
                             } => binding.cancel(&destination).await,
-                            DemoCommand::Reconnect => match runtime.reconnect().await {
-                                Ok(()) => runtime.wait_ready(Duration::from_secs(5)).await,
-                                Err(error) => Err(error),
+                            DemoCommand::Reconnect => match active_runtime {
+                                Some(runtime) => match runtime.reconnect().await {
+                                    Ok(()) => runtime.wait_ready(Duration::from_secs(5)).await,
+                                    Err(error) => Err(error),
+                                },
+                                None => Err(tekes_agent_contract::unsupported(
+                                    "current run endpoint is not registered in this host",
+                                )),
                             },
                             DemoCommand::OpenEntry { .. } => {
                                 Err(tekes_agent_contract::unsupported(
@@ -1165,17 +1211,23 @@ impl Host {
             }
         }
         let source = self.sidebar.snapshot();
-        let source = self
-            .sidebar_restore_probe
-            .as_mut()
-            .map_or_else(|| source.clone(), |probe| probe.source(source.clone()));
+        let source = if let Some(probe) = &mut self.sidebar_restore_probe {
+            let projection = probe.source(Arc::new(source.as_publication()));
+            Arc::new(
+                source
+                    .with_restore_fixture_projection(&projection)
+                    .expect("restore fixture may only restrict original Sidebar rows"),
+            )
+        } else {
+            source
+        };
         if self.sidebar_restore_probe.is_none() && source.error != self.sidebar_error {
             self.sidebar_error = source.error.clone();
             if let Some(error) = &source.error {
                 self.failure(error.clone());
             }
         }
-        if let Err(error) = self.view.set_sidebar_source(source) {
+        if let Err(error) = self.view.set_sidebar_host_source(source) {
             self.failure(error.to_string());
         }
         let preferences = self.sidebar.preferences();
@@ -3383,15 +3435,23 @@ pub fn run() {
             .unwrap();
         owned_preferences = Some(directory);
     }
+    let registered_endpoint_ids: Vec<String> = scopes
+        .iter()
+        .map(|scope| scope.endpoint_id.clone())
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect();
     let registration = executor.enter();
-    agent
-        .register(
-            scopes[0].endpoint_id.clone(),
-            kind.into(),
-            "AgentKit demo".into(),
-            connector,
-        )
-        .unwrap();
+    for endpoint_id in &registered_endpoint_ids {
+        agent
+            .register(
+                endpoint_id.clone(),
+                kind.into(),
+                "AgentKit demo".into(),
+                connector.clone(),
+            )
+            .unwrap();
+    }
     drop(registration);
     let agent = Arc::new(agent);
     let runtime = agent
@@ -3399,19 +3459,36 @@ pub fn run() {
         .unwrap()
         .runtime
         .clone();
+    let runtimes: std::collections::BTreeMap<_, _> = registered_endpoint_ids
+        .iter()
+        .map(|id| {
+            (
+                id.clone(),
+                agent
+                    .endpoint(id)
+                    .expect("registered endpoint")
+                    .runtime
+                    .clone(),
+            )
+        })
+        .collect();
     let (bindings, sidebar) = executor.block_on(async {
-        runtime.wait_ready(Duration::from_secs(30)).await.unwrap();
-        let a = Arc::new(
-            RunBinding::open_main(runtime.clone(), scopes[0].clone())
-                .await
-                .unwrap(),
-        );
-        let b = Arc::new(
-            RunBinding::open_main(runtime.clone(), scopes[1].clone())
-                .await
-                .unwrap(),
-        );
-        let sidebar = Arc::new(SidebarBinding::new(agent, &scopes[0].endpoint_id).unwrap());
+        for runtime in runtimes.values() {
+            runtime.wait_ready(Duration::from_secs(30)).await.unwrap();
+        }
+        let mut bindings = Vec::with_capacity(scopes.len());
+        for scope in &scopes {
+            let endpoint_runtime = runtimes
+                .get(&scope.endpoint_id)
+                .expect("scope endpoint runtime");
+            bindings.push(Arc::new(
+                RunBinding::open_main(endpoint_runtime.clone(), scope.clone())
+                    .await
+                    .unwrap(),
+            ));
+        }
+        let sidebar =
+            Arc::new(SidebarHostBinding::new(agent.clone(), &registered_endpoint_ids).unwrap());
         let mut changes = sidebar.subscribe();
         tokio::time::timeout(Duration::from_secs(10), async {
             while !sidebar.snapshot().loaded && sidebar.snapshot().error.is_none() {
@@ -3424,7 +3501,7 @@ pub fn run() {
             sidebar.snapshot().error.is_none(),
             "inventory observation failed"
         );
-        ([a, b], sidebar)
+        (bindings, sidebar)
     });
     assert!(
         !visibility_selftest || fixture,
@@ -3437,7 +3514,9 @@ pub fn run() {
             .position(|arg| arg == "--sidebar-query")
             .map(|index| args.get(index + 1).expect("sidebar query text").clone())
     };
-    let sidebar_query = query_text.map(|query| {
+    let has_query = query_text.is_some();
+    let multi_endpoint_sidebar = sidebar.endpoint_ids().len() > 1;
+    let sidebar_query = query_text.filter(|_| !multi_endpoint_sidebar).map(|query| {
         executor.block_on(async {
             let source = Arc::new(
                 tekes_agent_ui_bindings::SidebarSearchBinding::new(runtime.clone()).unwrap(),
@@ -3446,6 +3525,9 @@ pub fn run() {
             source
         })
     });
+    if has_query && multi_endpoint_sidebar {
+        eprintln!("Sidebar query disabled: this demo host has no cross-endpoint search source");
+    }
     let summary_indent_level =
         summary_context_selftest.then(|| Arc::new(std::sync::atomic::AtomicU32::new(0)));
     let mut view = if let Some(level) = summary_indent_level.clone() {
@@ -3623,8 +3705,8 @@ pub fn run() {
     }
     let side_chats = Arc::new(SideChatBinding::new(runtime.clone()));
     view.set_side_chat_binding(side_chats.clone());
-    view.set_sidebar_reader(sidebar.clone()).unwrap();
-    view.set_sidebar_source(sidebar.snapshot()).unwrap();
+    view.set_sidebar_host_reader(sidebar.clone()).unwrap();
+    view.set_sidebar_host_source(sidebar.snapshot()).unwrap();
     let preferences = sidebar.preferences();
     view.set_sidebar_preferences(
         &preferences.clone().unwrap_or_default(),
@@ -3917,7 +3999,7 @@ pub fn run() {
                 .await
                 .expect("search inventory join deadline")
             });
-            host.view.set_sidebar_source(inventory).unwrap();
+            host.view.set_sidebar_host_source(inventory).unwrap();
             host.view
                 .update_sidebar_search_publication(source.owner(), &state)
                 .unwrap();
@@ -4936,7 +5018,7 @@ pub fn run() {
                 "documentProjection": {"sections":document.sections.len(),"visibleMessages":document_messages,"sessionNotices":document.session_notices.len(),"toolCalls":document_tools,"hasMoreBefore":document.has_more_before,"isStale":document.is_stale,"renderer":false,"structuredMessages":structured_messages,"aggregateMessages":aggregate_messages,"contentBlocks":content_block_count,"unresolvedToolBlocks":unresolved_tool_blocks,"unknownBlocks":unknown_blocks,"positionedEvents":positioned_events,"unplacedEvents":unplaced_events,"unplacedFacts":unplaced_facts},
                 "finalAssistantItems": snapshot.transcript.items.iter().filter(|item| item.kind == tekes_agent_presentation::TranscriptItemKind::Assistant && item.is_final).count(),
             "inventoryRows": host.sidebar.snapshot().rows.len(),
-            "sharedRuntime": Arc::ptr_eq(host.sidebar.runtime(), &host.runtime),
+            "sharedRuntime": host.sidebar.runtime_for(&host.runtime.inspect(|state| state.endpoint_id.clone())).is_some_and(|runtime| Arc::ptr_eq(runtime, &host.runtime)),
             "sidebarMounted": host.view.tree.get(host.view.sidebar_id()).is_some(),
             "summaryMounted": host.view.tree.get(host.view.summary_id()).is_some(),
             "hostPanelNavigation": host.view.panel_navigation_id().is_some(),

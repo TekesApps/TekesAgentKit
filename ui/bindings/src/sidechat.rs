@@ -28,6 +28,7 @@ impl BoundSideChatRun {
 /// Own one per endpoint runtime, not per tab. No second pointer/mutation store.
 pub struct SideChatBinding {
     runtime: Arc<SessionRuntime>,
+    endpoint_id: String,
     owner: Arc<SideChatController>,
     // Retain only existing canonical bindings, not another draft/pointer store.
     // Parent participates in authority even though the scratch scope is main.
@@ -35,9 +36,11 @@ pub struct SideChatBinding {
 }
 impl SideChatBinding {
     pub fn new(runtime: Arc<SessionRuntime>) -> Self {
+        let endpoint_id = runtime.inspect(|state| state.endpoint_id.clone());
         Self {
             owner: Arc::new(SideChatController::new(runtime.clone())),
             runtime,
+            endpoint_id,
             runs: Mutex::new(BTreeMap::new()),
         }
     }
@@ -49,6 +52,10 @@ impl SideChatBinding {
     }
     pub fn owner(&self) -> &Arc<SideChatController> {
         &self.owner
+    }
+    /// Endpoint whose SideChat pointer/controller this binding owns.
+    pub fn endpoint_id(&self) -> &str {
+        &self.endpoint_id
     }
     pub fn snapshot(&self) -> SideChatSnapshot {
         self.owner.snapshot()
