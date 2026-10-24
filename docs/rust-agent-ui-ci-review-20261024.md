@@ -47,3 +47,8 @@ PR [40057616124](https://github.com/TekesApps/TekesAgentKit/actions/runs/4005761
 ## Observer Retry UI 开发前的 2341748 CI
 
 PR [40058315999](https://github.com/TekesApps/TekesAgentKit/actions/runs/40058315999) 已完成，headless、UI fmt/Clippy/workspace tests、独立 consumer 成功，严格 nested detail reading 失败，后续 demo build 跳过。元数据归档 `ci-2341748-pr-jobs.json`。未取得本 run raw 阅读 JSON，不复用旧数值；后续 `be4fc58` 用户入口实现另看自己的 CI。
+
+
+## Observer 用户入口 9b1d263 CI
+
+PR [40059408663](https://github.com/TekesApps/TekesAgentKit/actions/runs/40059408663) 完成，headless、UI 格式/严格 Clippy/完整 suite、独立 consumer 成功，严格 nested detail reading 失败；后续 demo build 跳过。元数据 `ci-9b1d263-pr-final-jobs.json` 保留，没有本次 raw 阅读 JSON，未借用旧数值。后续 query/folder membership 的 `147642b` 另看自己的 CI。

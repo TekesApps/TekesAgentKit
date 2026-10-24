@@ -345,3 +345,6 @@ for constructor injection, scaling, control/selection retention and native evide
 连续工具的独立组件、Transcript/消息内组合与 `row_id` / `tool_activity_id` 迁移见[连续工具接入说明](../docs/rust-agent-ui-tool-run-20261023.md)。本地协议演示的原生 SideChat、分页/阅读/焦点与系统拼音续验见[独立程序记录](../docs/rust-agent-ui-native-resumed-20261023.md)；结果不转移到后续源码、真实三端或 ProcessContainer。
 
 工具行显式 report/workspace counts、`ToolHeaderAdapter`、同一 Run publication 的独立展示修订与只读 header getter，见[接入说明](../docs/rust-agent-ui-tool-header-20261023.md)。当前只消费原 SDK 单色标签，semantic runs 的实际颜色仍待 TekesUI #25。
+
+
+当前会话 Sidebar 的 pins 与普通会话共用 provider query/folder 成员条件；置顶是展示分区，不是筛选例外。隐藏不删除 pin 偏好或草稿。未完成/失败 provider 查询仍保留诊断，不将原库存当作查询结果；本地名称 FTS 和排名尚未实现。见[成员关系设计与范围](../docs/rust-agent-ui-sidebar-query-membership-20261024.md)及[交付收据](../docs/rust-agent-ui-sidebar-query-membership-results-20261024.md)。

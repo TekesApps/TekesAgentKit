@@ -434,3 +434,8 @@
 ## Observer 用户重试入口续批
 
 #22 `be4fc58` 已接通 coherent observer packet、默认控件状态 footer、来源/代数绑定的用户 Retry 和 demo 原端路由；同源重绑及健康端更新不清 pending，旧 raw ID 不复用。分层验证为 UI675/0/1、最终组件10/0/0、presentation240/0/0、严格 Clippy、普通 demo build 和独立 consumer，见[交付收据](rust-agent-ui-sidebar-observer-retry-results-20261024.md)。前文“用户入口未接线”仅指当时历史批次；真实窗口/断流/IME 与完整 Sidebar 验收仍开放。
+
+
+## 查询成员关系续批
+
+#22 `147642b` 对齐当前 ClientKit 会话 Sidebar 的共同 query/folder predicate，过滤未匹配 pins，保留 canonical 偏好/草稿及诊断，补齐 hasMore 空首页与 failed-ready 校验。UI677/0/1、严格 Clippy、普通 demo build 和独立 consumer 通过，见[收据](rust-agent-ui-sidebar-query-membership-results-20261024.md)。旧“独立 pins 不受筛选”解释已标成历史；本地名称 FTS、排名与真实窗口仍未完成，不关闭 Issue。
