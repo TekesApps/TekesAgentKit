@@ -6,7 +6,7 @@ use std::{env, fs};
 use tekes_agent_components_ui::{
     RunSnapshot, SummaryActionRow, SummaryInput, SummarySubagentIndicator, SummaryView,
 };
-use tekes_ui_controls::composition::ContentHost;
+use tekes_ui_controls::composition::{ContentHost, TextFieldContent};
 
 fn fail(message: impl AsRef<str>) -> ! {
     eprintln!("summary_source: {}", message.as_ref());
@@ -14,9 +14,16 @@ fn fail(message: impl AsRef<str>) -> ! {
 }
 
 fn main() {
-    let path = env::args_os().nth(1).unwrap_or_else(|| {
-        fail("usage: cargo run -p tekes-agent-ui-consumer-check --example summary_source -- <presentationSource.json>")
+    let mut args = env::args_os().skip(1);
+    let path = args.next().unwrap_or_else(|| {
+        fail("usage: summary_source <presentationSource.json> [--passive-tasks]")
     });
+    let passive_tasks = match args.next() {
+        None => false,
+        Some(flag) if flag == "--passive-tasks" => true,
+        _ => fail("unexpected consumer mode"),
+    };
+    require(args.next().is_none(), "unexpected trailing argument");
     let source: serde_json::Value = serde_json::from_slice(
         &fs::read(path).unwrap_or_else(|error| fail(format!("read input: {error}"))),
     )
@@ -173,10 +180,55 @@ fn main() {
             .all(|row| row["actionScopeMatches"] == true),
         "mounted child action scope differs from original facts",
     );
-    require(
-        !child_rows.is_empty(),
-        "no actionable child row was mounted",
-    );
+    let mut task_rows = Vec::new();
+    if passive_tasks {
+        require(
+            input.scope.endpoint_id == "native",
+            "passive Task profile requires Native",
+        );
+        for task in &facts.tasks {
+            require(
+                task.scope == input.scope && task.independent_run().is_none(),
+                "same-session Task must not gain an independent Run pointer",
+            );
+            let expected = expected_rows
+                .iter()
+                .find(|section| section.id == "tasks")
+                .and_then(|section| section.rows.iter().find(|row| row.id == task.id))
+                .unwrap_or_else(|| fail("original Task row is missing"));
+            require(
+                expected.action.is_none() && mounted.action_id("tasks", &task.id).is_none(),
+                "passive Task gained a navigation action",
+            );
+            let field_id = mounted
+                .passive_text_id("tasks", &task.id)
+                .unwrap_or_else(|| fail("original passive Task title is missing"));
+            let field = host
+                .get(field_id)
+                .and_then(|node| node.component::<TextFieldContent>())
+                .unwrap_or_else(|| fail("original read-only SDK field is not mounted"));
+            require(
+                field.field.label == expected.title,
+                "Task title differs from original facts",
+            );
+            require(
+                expected.value == task.canonical_status(),
+                "Task status differs from original policy",
+            );
+            task_rows.push(serde_json::json!({"id":task.id, "title":field.field.label,
+                "sourceStatus":task.status,"canonicalStatus":expected.value,
+                "passiveTitleMounted":true,"navigationAction":false,"statusGlyphRendered":false}));
+        }
+        require(
+            task_rows.len() == 1 && child_rows.is_empty(),
+            "expected one passive Native Task",
+        );
+    } else {
+        require(
+            !child_rows.is_empty(),
+            "no actionable child row was mounted",
+        );
+    }
     let receipt = serde_json::json!({
         "result": "mounted",
         "snapshotRevision": snapshot.revision,
@@ -185,6 +237,8 @@ fn main() {
         "summaryInputMatchesCapturedFacts": true,
         "summarySections": mounted.section_order(),
         "childRows": child_rows,
+        "passiveTaskProfile": passive_tasks,
+        "taskRows": task_rows,
         "nativeInteraction": false,
         "physicalIme": false,
         "desktopVisibility": false,

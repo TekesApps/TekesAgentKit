@@ -333,6 +333,8 @@
 
 本次新增：显式验收 feature 在原 RunController 发布边界捕获 Snapshot 与同次内存输入；真实 Pi 模型子代理经公开等待/childHistory/重连后，同帧 Summary 的 idle 来源及原 Summary 组件挂载已验证。没有显式 raw status 时不填造 completed；running/failure 转换、父草稿与完整 UI 验收未由本切片补齐。见[契约](rust-agent-ui-summary-source-witness-contract-20261024.md)和[结果](rust-agent-ui-summary-source-witness-results-20261024.md)。#25 仍开放。
 
+Native后续切片：复用既有feature headless与已安装Kernel0.9.3，真实Task及公开bounded history/重连、同次Summary/Journal来源、原Summary被动行挂载通过；不授予独立Task pointer。见[Native收据](rust-agent-ui-native-summary-source-results-20261024.md)。同Task动态pointer、running/failure、完整UI/桌面等仍未验收。
+
 ### [#26](https://github.com/TekesApps/TekesAgentKit/issues/26) — [P0][ProcessContainer] 三个业务容器的同进程与跨进程宿主接入
 
 当前：等待完整交互式 ProcessContainer 公开交付。

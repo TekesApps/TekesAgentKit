@@ -34,3 +34,5 @@ cargo build -p tekes-agent-headless --locked --features acceptance-source-witnes
 真实 Pi runner `scripts/test-real-pi-summary-source.py` 只接收已构建程序和固定 Pi 安装，不调用 Cargo。它从原模型工具创建子会话，公开等待子输入结算、读取 childHistory、重连，再在同一次原 publication 中捕获父 Summary 和来源。Pi 的 resultPosition 是原 NativeConversation entryId/ordinal，不能当 Journal seq，也不能拆 opaque rowId 获取 callId。校验器按原位置核对原 message，严格区分显式子 status 与本轮已观察的 idle fallback。其他 fallback 不在该验收 profile 内。
 
 公开 consumer example `summary_source` 只把见证中的原 Snapshot.summary 交给 SummaryView，挂载 ContentHost 并核对原 action row/title/scope/indicator policy；没有重建 Summary 算法，也没有渲染/窗口。只证明挂载和指标语义，glyph/hover/布局仍未验收。
+
+Native Task复用同一feature与发布边界，具体Journal来源和原Summary被动行消费见[Native契约](rust-agent-ui-native-summary-source-contract-20261024.md)及[分层结果](rust-agent-ui-native-summary-source-results-20261024.md)。不把Native bounded child历史权限变成Summary Task独立导航权。
