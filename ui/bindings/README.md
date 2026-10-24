@@ -274,6 +274,25 @@ than trusting stale `copy_text`. Rename passes the host's explicitly collected t
 Apply returned navigation/clear-selection/warnings in the host; the binding never
 changes selection itself and never retries a mutation.
 
+`SidebarPublication.observation` identifies the original reader generation and
+`Observing`/`Restarting`/`Failed` phase. On terminal failure, capture a one-shot
+`SidebarObserverRetry` and explicitly pass it to `restart_observer`; multi-endpoint
+bindings expose the same API with an explicit endpoint at capture. This reopens
+only `SharedAgent.follow(state)` and preserves the existing watch subscription,
+rows and activity anchors. It does not reconnect transport or retry a mutation.
+Success means restart admission; wait for a fresh complete publication before
+claiming recovery. Use the phase rather than retained diagnostic text to decide
+whether Retry remains available. Counter exhaustion closes the publisher and
+requires replacement; never assume a closed watch is a healthy unchanged source.
+
+Selected reads bind both the reader instance and its generation. Multi action
+tickets also capture the original endpoint generation: retrying A retires A's old
+credentials while B's remain valid. Keep the original `selection_generation`
+separate. Forward original observation metadata when constructing projections;
+`Default` metadata is for owned synthetic fixtures, not a substitute for source
+authority. See the [recovery contract](../../docs/rust-agent-ui-sidebar-observer-recovery-20261024.md)
+for private failure injection, verification levels and remaining demo UI work.
+
 Install shared preferences through `SharedAgent::open_thread_preferences(path,
 scope)` or an explicit shared host adapter before wrapping the service in Arc.
 There is no UI pin database. The unreleased shared-service fix makes custom

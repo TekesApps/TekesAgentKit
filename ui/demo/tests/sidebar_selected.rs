@@ -128,8 +128,14 @@ async fn selected_memory_read_is_independent_of_view_membership_and_does_not_ope
 }
 #[tokio::test]
 async fn selected_read_rejects_selection_aba_foreign_owner_and_reconnect() {
-    let (_agent, source, _fixture) = setup().await;
+    let (agent, source, _fixture) = setup().await;
     let read = source.read_selected(&address("a"), 1).unwrap();
+    assert!(read.is_current(&source));
+    let same_endpoint_other_binding = SidebarBinding::new(agent, "fixture").unwrap();
+    assert!(
+        !read.is_current(&same_endpoint_other_binding),
+        "a selected read belongs to its originating SidebarBinding observer"
+    );
     let original = missing(&source, "a");
     let mut input = original.clone();
     assert!(!read.project_into(&source, &mut input, 3));

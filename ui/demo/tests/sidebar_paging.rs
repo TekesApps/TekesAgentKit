@@ -327,6 +327,7 @@ async fn demo_repeated_filter_resets_page_without_touching_chinese_preedit_or_fo
     let input = input();
     let filter = Some(row(1, false).folder_key());
     view.set_sidebar_source(Arc::new(SidebarPublication {
+        observation: Default::default(),
         activity_at: Default::default(),
         revision: 1,
         loaded: true,

@@ -33,6 +33,7 @@ fn source() -> SidebarPublication {
         .map(|(i, r)| (r.address.clone(), i as f64))
         .collect();
     SidebarPublication {
+        observation: Default::default(),
         revision: 1,
         rows,
         activity_at,

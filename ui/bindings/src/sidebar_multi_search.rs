@@ -57,6 +57,7 @@ impl SidebarMultiPublication {
         for child in &search.children {
             let endpoint_id = child.endpoint_id.as_str();
             let inventory = SidebarPublication {
+                observation: self.endpoints[endpoint_id].observation,
                 revision: self.revision,
                 rows: self
                     .rows

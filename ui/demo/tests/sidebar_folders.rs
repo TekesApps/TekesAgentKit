@@ -238,6 +238,7 @@ async fn folder_publications_and_filter_preserve_composition_while_header_naviga
     );
     let mut view = ComponentDemo::new([binding]).unwrap();
     let source = SidebarPublication {
+        observation: Default::default(),
         activity_at: Default::default(),
         revision: 1,
         loaded: true,

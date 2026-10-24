@@ -2048,6 +2048,7 @@ version = "0.0.0"
 dependencies = [
  "async-trait",
  "base64",
+ "futures-util",
  "serde_json",
  "tekes-agent-components-ui",
  "tekes-agent-contract",

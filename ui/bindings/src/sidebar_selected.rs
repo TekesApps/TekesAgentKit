@@ -1,4 +1,5 @@
 //! Selected conversation is read independently of the displayed inventory page.
+use crate::sidebar::SidebarObserverOwner;
 use crate::{
     SidebarBinding, SidebarMultiEndpointBinding, SidebarMultiOwner, sidebar::inventory_row,
 };
@@ -11,6 +12,8 @@ use tekes_agent_web::{SharedAgent, SharedEndpoint, ThreadInventoryRead};
 pub struct SidebarSelectedRead {
     agent: Arc<SharedAgent>,
     endpoint: Arc<SharedEndpoint>,
+    observer_owner: Arc<SidebarObserverOwner>,
+    observer_generation: u64,
     generation: u64,
     facts: ThreadInventoryRead,
     row: Option<SidebarRow>,
@@ -33,6 +36,8 @@ impl SidebarBinding {
                 .inspect(|s| s.endpoint_id == address.endpoint_id),
             "Sidebar selection endpoint mismatch",
         )?;
+        let observer_owner = self.observer_owner();
+        let observer_generation = self.observer_generation();
         let facts = self
             .agent
             .read_thread_inventory(&self.endpoint, &address.session_id)?;
@@ -50,6 +55,8 @@ impl SidebarBinding {
         Ok(SidebarSelectedRead {
             agent: self.agent.clone(),
             endpoint: self.endpoint.clone(),
+            observer_owner,
+            observer_generation,
             generation: selection_generation,
             facts,
             row,
@@ -66,6 +73,7 @@ impl SidebarSelectedRead {
     pub fn is_current(&self, source: &SidebarBinding) -> bool {
         Arc::ptr_eq(&self.endpoint, &source.endpoint)
             && Arc::ptr_eq(&self.agent, &source.agent)
+            && source.owns_observer(&self.observer_owner, self.observer_generation)
             && source
                 .agent
                 .read_thread_inventory(&source.endpoint, &self.facts.address.session_id)

@@ -92,6 +92,13 @@ async fn component_demo_uses_multi_inventory_action_routing_and_owner_fences() {
             .is_err()
     );
     let mut restricted = first_publication.as_publication();
+    restricted.observation.generation += 1;
+    assert!(
+        first_publication
+            .with_restore_fixture_projection(&restricted)
+            .is_err()
+    );
+    restricted.observation = first_publication.observation;
     restricted.revision += 1;
     restricted.loaded = false;
     restricted.rows[0].activity.is_stale = true;

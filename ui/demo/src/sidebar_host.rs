@@ -54,6 +54,7 @@ impl SidebarHostPublication {
     pub fn with_restore_fixture_projection(&self, source: &SidebarPublication) -> Result<Self> {
         let mut seen = std::collections::BTreeSet::new();
         let valid = source.revision >= self.revision
+            && source.observation == self.observation
             && source.activity_at == self.activity_at
             && source.rows.iter().all(|row| {
                 seen.insert(row.address.clone())
@@ -263,6 +264,9 @@ impl SidebarHostBinding {
         SidebarHostPublication {
             owner: owner.clone(),
             publication: SidebarPublication {
+                // The facade has no single observer; recovery uses the retained
+                // per-endpoint publication and opaque original source token.
+                observation: Default::default(),
                 revision: source.revision,
                 loaded: source.loaded,
                 error: source.error.clone(),

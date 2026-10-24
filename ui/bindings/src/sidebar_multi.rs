@@ -1,7 +1,10 @@
 //! Fixed-set multi-endpoint projection over the existing Sidebar observers.
 //! This module merges publications and routes captured requests; it owns no
 //! endpoint transport, search state, or second Sidebar mutation policy.
-use crate::{SidebarActionOutcome, SidebarBinding, SidebarPublication};
+use crate::{
+    SidebarActionOutcome, SidebarBinding, SidebarObservation, SidebarObserverPhase,
+    SidebarObserverRetry, SidebarPublication,
+};
 use std::{
     collections::{BTreeMap, BTreeSet},
     sync::Arc,
@@ -28,11 +31,12 @@ pub struct SidebarEndpointStatus {
     pub revision: u64,
     /// True only after this endpoint published its own initial inventory.
     pub loaded: bool,
-    /// True when a previously loaded last publication is retained after its
-    /// observer terminates with an error.
+    /// Observer generation and lifecycle for this endpoint's own binding.
+    pub observation: SidebarObservation,
+    /// True when rows are retained while this endpoint's observer is not
+    /// currently observing.
     pub stale: bool,
-    /// Terminal observer error. Recovery in this slice requires replacing the
-    /// fixed-set aggregate binding.
+    /// True only after this endpoint's observer enters its terminal phase.
     pub terminal_error: bool,
     pub error: Option<String>,
 }
@@ -85,6 +89,7 @@ pub struct SidebarMultiActionTicket {
     owner: Arc<SidebarMultiOwner>,
     address: SessionAddress,
     definition: ThreadActionDefinition,
+    observer_generation: u64,
 }
 impl SidebarMultiActionTicket {
     pub fn address(&self) -> &SessionAddress {
@@ -93,6 +98,14 @@ impl SidebarMultiActionTicket {
     pub fn definition(&self) -> &ThreadActionDefinition {
         &self.definition
     }
+}
+
+/// One-shot recovery request fixed to one child endpoint and aggregate owner.
+/// Aggregate revisions do not invalidate it; the child token fences recovery
+/// against replacement of that endpoint observer.
+pub struct SidebarMultiObserverRetry {
+    owner: Arc<SidebarMultiOwner>,
+    inner: SidebarObserverRetry,
 }
 
 struct EndpointUpdate {
@@ -247,6 +260,31 @@ impl SidebarMultiEndpointBinding {
         self.owner.clone()
     }
 
+    /// Capture recovery for one endpoint in this fixed set. The resulting
+    /// token remains bound to that endpoint even as other partitions advance.
+    pub fn capture_observer_retry(&self, endpoint_id: &str) -> Result<SidebarMultiObserverRetry> {
+        let binding = self
+            .binding_for(endpoint_id)
+            .ok_or_else(|| unsupported("Sidebar endpoint is outside the fixed set"))?;
+        Ok(SidebarMultiObserverRetry {
+            owner: self.owner.clone(),
+            inner: binding.capture_observer_retry()?,
+        })
+    }
+
+    /// Restart only the endpoint named by the captured child token.
+    pub fn restart_observer(&self, retry: SidebarMultiObserverRetry) -> Result<()> {
+        require(
+            self.owns(&retry.owner),
+            "Sidebar observer retry belongs to a replaced aggregate binding",
+        )?;
+        let endpoint_id = retry.inner.endpoint_id();
+        let binding = self
+            .binding_for(endpoint_id)
+            .ok_or_else(|| unsupported("Sidebar endpoint is outside the fixed set"))?;
+        binding.restart_observer(retry.inner)
+    }
+
     /// Capture a currently advertised action from this aggregate publication.
     /// Stale endpoint rows and forged or changed action definitions are rejected.
     pub fn capture_action(
@@ -257,11 +295,20 @@ impl SidebarMultiEndpointBinding {
         let binding = self
             .binding_for(&address.endpoint_id)
             .ok_or_else(|| unsupported("Sidebar endpoint is outside the fixed set"))?;
-        validate_action_publication(&binding.snapshot(), address, definition)?;
+        let publication = binding.snapshot();
+        validate_action_publication(&publication, address, definition)?;
+        require(
+            binding.owns_observer(
+                &binding.observer_owner(),
+                publication.observation.generation,
+            ),
+            "Sidebar observer is retired",
+        )?;
         Ok(SidebarMultiActionTicket {
             owner: self.owner.clone(),
             address: address.clone(),
             definition: definition.clone(),
+            observer_generation: publication.observation.generation,
         })
     }
 
@@ -281,10 +328,16 @@ impl SidebarMultiEndpointBinding {
         let binding = self
             .binding_for(&ticket.address.endpoint_id)
             .ok_or_else(|| unsupported("Sidebar endpoint is outside the fixed set"))?;
+        let publication = binding.snapshot();
+        require(
+            publication.observation.generation == ticket.observer_generation
+                && binding.owns_observer(&binding.observer_owner(), ticket.observer_generation),
+            "Sidebar action belongs to an older observer generation",
+        )?;
         // A ticket is tied to the aggregate instance, but its endpoint may
         // have advanced or failed since capture. Recheck the original child
         // publication before consulting SharedAgent's live action catalog.
-        validate_action_publication(&binding.snapshot(), &ticket.address, &ticket.definition)?;
+        validate_action_publication(&publication, &ticket.address, &ticket.definition)?;
         let current = self
             .agent
             .thread_actions(&binding.endpoint, &ticket.address.session_id)?;
@@ -354,6 +407,7 @@ fn aggregate_publication(
     let mut addresses = BTreeSet::new();
     let mut endpoints = BTreeMap::new();
     for (endpoint_id, source) in endpoint_ids.iter().zip(sources) {
+        let observer_stale = source.observation.phase != SidebarObserverPhase::Observing;
         for row in &source.rows {
             require(
                 row.address.endpoint_id == *endpoint_id,
@@ -370,16 +424,21 @@ fn aggregate_publication(
                 .ok_or_else(|| unsupported("Sidebar activity missing for address"))?;
             require(activity.is_finite(), "invalid Sidebar activity value")?;
             activity_at.insert(row.address.clone(), activity);
-            rows.push(row.clone());
+            let mut row = row.clone();
+            if observer_stale {
+                row.activity.is_stale = true;
+            }
+            rows.push(row);
         }
-        let terminal_error = source.error.is_some();
+        let terminal_error = source.observation.phase == SidebarObserverPhase::Failed;
         endpoints.insert(
             endpoint_id.clone(),
             SidebarEndpointStatus {
                 endpoint_id: endpoint_id.clone(),
                 revision: source.revision,
                 loaded: source.loaded,
-                stale: source.loaded && terminal_error,
+                observation: source.observation,
+                stale: observer_stale && !source.rows.is_empty(),
                 terminal_error,
                 error: source.error.clone(),
             },
@@ -391,8 +450,8 @@ fn aggregate_publication(
             .then_with(|| a.address.cmp(&b.address))
     });
     let loaded = endpoints
-        .values()
-        .all(|status| status.loaded || status.terminal_error);
+        .iter()
+        .all(|(_, status)| status.loaded || status.observation.converged);
     let errors: Vec<_> = endpoints
         .iter()
         .filter_map(|(id, status)| status.error.as_ref().map(|error| format!("{id}: {error}")))
@@ -449,6 +508,11 @@ mod tests {
         error: Option<&str>,
         activity: f64,
     ) -> Arc<SidebarPublication> {
+        let phase = if error.is_some() {
+            SidebarObserverPhase::Failed
+        } else {
+            SidebarObserverPhase::Observing
+        };
         let mut rows = Vec::new();
         let mut activity_at = BTreeMap::new();
         if let Some(row) = row {
@@ -461,6 +525,32 @@ mod tests {
             activity_at,
             loaded,
             error: error.map(str::to_owned),
+            observation: SidebarObservation {
+                generation: 1,
+                phase,
+                converged: loaded || error.is_some(),
+            },
+        })
+    }
+
+    fn restarting_publication(
+        revision: u64,
+        row: SidebarRow,
+        activity: f64,
+    ) -> Arc<SidebarPublication> {
+        let mut activity_at = BTreeMap::new();
+        activity_at.insert(row.address.clone(), activity);
+        Arc::new(SidebarPublication {
+            revision,
+            rows: vec![row],
+            activity_at,
+            loaded: false,
+            error: Some("previous observer failed".into()),
+            observation: SidebarObservation {
+                generation: 2,
+                phase: SidebarObserverPhase::Restarting,
+                converged: true,
+            },
         })
     }
 
@@ -524,5 +614,57 @@ mod tests {
         assert_eq!(merged.rows.len(), 2);
         assert_eq!(merged.rows[0].address.endpoint_id, "endpoint-a");
         assert_eq!(merged.rows[1].address.endpoint_id, "endpoint-b");
+    }
+
+    #[test]
+    fn restarting_unloaded_partition_keeps_rows_and_convergence_without_losing_healthy_partition() {
+        let ids = vec!["endpoint-b".to_owned(), "endpoint-a".to_owned()];
+        let merged = aggregate_publication(
+            4,
+            &ids,
+            &[
+                restarting_publication(7, row("endpoint-b", "kept", false), 2.0),
+                publication(
+                    9,
+                    Some(row("endpoint-a", "healthy", false)),
+                    true,
+                    None,
+                    1.0,
+                ),
+            ],
+        )
+        .unwrap();
+
+        assert!(
+            merged.loaded,
+            "restart preserves the initial convergence state"
+        );
+        assert_eq!(merged.rows.len(), 2);
+        let restarting = &merged.endpoints["endpoint-b"];
+        assert!(!restarting.loaded);
+        assert!(restarting.observation.converged);
+        assert_eq!(restarting.observation.generation, 2);
+        assert_eq!(
+            restarting.observation.phase,
+            SidebarObserverPhase::Restarting
+        );
+        assert!(!restarting.terminal_error);
+        assert!(restarting.stale);
+        assert!(
+            merged
+                .rows
+                .iter()
+                .find(|r| r.address.endpoint_id == "endpoint-b")
+                .unwrap()
+                .activity
+                .is_stale
+        );
+        assert!(!merged.endpoints["endpoint-a"].stale);
+        assert!(
+            merged
+                .rows
+                .iter()
+                .any(|r| r.address.endpoint_id == "endpoint-a")
+        );
     }
 }
