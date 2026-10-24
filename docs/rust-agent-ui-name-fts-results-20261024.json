@@ -223,5 +223,12 @@
       "path": ".runtime-fixtures/sidebar-host-20261024/name-fts-acceptance-check.log",
       "sha256": "0463c4386bb552440b43468709adb196df1585d1f11a360492b0986e9b6eeadf"
     }
+  },
+  "sidepanel_current_demo_suites": {
+    "task_binding": 10,
+    "child_binding": 6,
+    "side_panel_component": 12,
+    "panel_navigation": 15,
+    "total": 43
   }
 }

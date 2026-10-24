@@ -5,7 +5,7 @@
 ## 实现
 
 - #22 `051d7f0`：UI bindings 的真实内存 SQLite FTS5 索引、精确依赖和原 source/revision 围栏；demo 持续复用 projector，多端一次索引全库存、按完整地址与已知 Complete provider hits 合并。未知命中不挡其他已知命中，provider 失败/不支持保留本地名称结果和诊断。显式清除标题不恢复旧 summary，也不把未命名 ID 当名称。local/provider 就绪与有限空态分开，后到库存无需重发 query 可恢复。根 headless/presentation 没有 SQLite，原门禁不变；UI 仅允许审核后的精确 bundled 配置。
-- #23 `6b28136`：[定向审查](rust-agent-ui-sidepanel-followup-20261024.md)未发现确定产品缺陷，未修改状态机；当前 demo 的 Task 10、child 6、SidePanel 12、panel navigation 13，共 41 项通过。native ChildOpened(Err) dispatch 的直接运行证据和完整三端/窗口组合仍缺。
+- #23 `6b28136`：[定向审查](rust-agent-ui-sidepanel-followup-20261024.md)未发现确定产品缺陷，未修改状态机；当前 demo 的 Task 10、child 6、SidePanel 12、panel navigation 15，共 43 项通过。native ChildOpened(Err) dispatch 的直接运行证据和完整三端/窗口组合仍缺。
 - #25 `6420876`：[缺失用量修复](rust-agent-ui-summary-followup-20261024.md)保留六条不可用值，区别于已知零和整个 Summary 不可用；Summary 13 项组件测试通过。来源动作和正式 slots 未发现确定缺陷，未声称最终视觉/AX 已验收。
 - 去重新增 [#29](https://github.com/TekesApps/TekesAgentKit/issues/29) 跟踪明确的 main/subagent/ephemeral 事实与 Sidebar/selected-read 一致性；缺字段不当作已确认 main，不修改 canonical 全局 child/history。
 
