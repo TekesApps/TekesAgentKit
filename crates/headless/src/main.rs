@@ -236,6 +236,33 @@ async fn main() -> Result<()> {
                 }
                 value
             }
+            #[cfg(feature = "acceptance-source-witness")]
+            "waitSourceRunOpen" => {
+                let id = id.ok_or_else(|| unsupported("sessionId required"))?;
+                // Subscribe before reading the baseline so an opening transition cannot be
+                // lost between the initial projection read and the first notification wait.
+                let mut changes = runtime.subscribe();
+                let expected_epoch = changes.inspect(source_run_open_epoch)?;
+                tokio::time::timeout(Duration::from_secs(15), async {
+                    loop {
+                        let opened = changes.inspect(|store| {
+                            Ok::<_, Error>(
+                                source_run_open_observed(store, id, expected_epoch)?
+                                    && command["inputText"].as_str().is_none_or(|text| {
+                                        source_run_input_observed(store, id, text)
+                                    }),
+                            )
+                        })?;
+                        if opened {
+                            return Ok::<_, Error>(());
+                        }
+                        changes.changed().await.map_err(|_| Error::Disconnected)?;
+                    }
+                })
+                .await
+                .map_err(|_| Error::Timeout)??;
+                json!({"sessionId":id,"connectionEpoch":expected_epoch,"runOpen":true})
+            }
             "presentation" => {
                 presentation.select(ComposerDestination::run(RunScope::main(
                     identity,
@@ -588,6 +615,54 @@ fn resolve_variables(mut value: Value, variables: &BTreeMap<String, Value>) -> R
     Ok(value)
 }
 
+#[cfg(feature = "acceptance-source-witness")]
+fn source_run_open_epoch(store: &tekes_agent_session::MemoryProjectionStore) -> Result<u64> {
+    if store.connection == tekes_agent_session::ConnectionState::Ready {
+        Ok(store.connection_epoch)
+    } else {
+        Err(Error::Disconnected)
+    }
+}
+
+#[cfg(feature = "acceptance-source-witness")]
+fn source_run_open_observed(
+    store: &tekes_agent_session::MemoryProjectionStore,
+    session_id: &str,
+    expected_epoch: u64,
+) -> Result<bool> {
+    if store.connection != tekes_agent_session::ConnectionState::Ready
+        || store.connection_epoch != expected_epoch
+    {
+        return Err(Error::Disconnected);
+    }
+    Ok(store
+        .sessions
+        .get(session_id)
+        .is_some_and(|session| session.run_open))
+}
+
+#[cfg(feature = "acceptance-source-witness")]
+fn source_run_input_observed(
+    store: &tekes_agent_session::MemoryProjectionStore,
+    session_id: &str,
+    text: &str,
+) -> bool {
+    store.sessions.get(session_id).is_some_and(|session| {
+        tekes_agent_presentation::TranscriptSnapshot::read(
+            &RunScope::main(&store.endpoint_id, session_id),
+            session,
+        )
+        .is_ok_and(|snapshot| {
+            !snapshot.is_stale
+                && snapshot.items.iter().any(|item| {
+                    item.kind == tekes_agent_presentation::TranscriptItemKind::User
+                        && !item.is_provisional
+                        && item.text == text
+                })
+        })
+    })
+}
+
 /// Match the latest exact authored input, never an absolute count in a clipped window.
 fn settled_reply_after(
     snapshot: &tekes_agent_presentation::TranscriptSnapshot,
@@ -677,6 +752,79 @@ mod settled_tests {
                 false
             ),
             "target"
+        ));
+    }
+}
+
+#[cfg(all(test, feature = "acceptance-source-witness"))]
+mod source_run_open_tests {
+    use super::*;
+
+    fn ready_store() -> tekes_agent_session::MemoryProjectionStore {
+        let mut store = tekes_agent_session::MemoryProjectionStore::default();
+        store.connection = tekes_agent_session::ConnectionState::Ready;
+        store.connection_epoch = 7;
+        store
+    }
+
+    #[test]
+    fn optional_running_input_requires_the_original_authored_user_in_a_ready_projection() {
+        let mut store = ready_store();
+        let session = tekes_agent_session::SessionProjection {
+            native_conversation: Some(serde_json::from_value(json!({
+            "sessionId":"child","generation":"g","leafId":null,"hasMoreBefore":false,
+            "isStreaming":true,"state":{},"entries":[
+                {"id":"assistant","type":"message","message":{"role":"assistant","content":[{"type":"text","text":"marker"}]}}
+            ]
+        })).unwrap()),
+            journal_ready: true,
+            ..Default::default()
+        };
+        store.sessions.insert("child".into(), session);
+        assert!(!source_run_input_observed(&store, "child", "marker"));
+        store.sessions.get_mut("child").unwrap().native_conversation.as_mut().unwrap().entries.push(
+            json!({"id":"user","type":"message","message":{"role":"user","content":[{"type":"text","text":"marker"}]}}));
+        assert!(source_run_input_observed(&store, "child", "marker"));
+        assert!(!source_run_input_observed(&store, "other", "marker"));
+        store.sessions.get_mut("child").unwrap().journal_ready = false;
+        assert!(!source_run_input_observed(&store, "child", "marker"));
+    }
+
+    #[test]
+    fn source_run_open_requires_ready_projection_and_the_original_epoch() {
+        let mut store = ready_store();
+        assert_eq!(source_run_open_epoch(&store).unwrap(), 7);
+        assert!(!source_run_open_observed(&store, "child", 7).unwrap());
+
+        store.sessions.insert(
+            "child".into(),
+            tekes_agent_session::SessionProjection::default(),
+        );
+        assert!(!source_run_open_observed(&store, "child", 7).unwrap());
+        store.sessions.insert(
+            "child".into(),
+            tekes_agent_session::SessionProjection {
+                run_open: true,
+                ..Default::default()
+            },
+        );
+        assert!(source_run_open_observed(&store, "child", 7).unwrap());
+
+        store.connection = tekes_agent_session::ConnectionState::Connecting;
+        assert!(matches!(
+            source_run_open_observed(&store, "child", 7),
+            Err(Error::Disconnected)
+        ));
+        assert!(matches!(
+            source_run_open_epoch(&store),
+            Err(Error::Disconnected)
+        ));
+
+        store.connection = tekes_agent_session::ConnectionState::Ready;
+        store.connection_epoch = 8;
+        assert!(matches!(
+            source_run_open_observed(&store, "child", 7),
+            Err(Error::Disconnected)
         ));
     }
 }

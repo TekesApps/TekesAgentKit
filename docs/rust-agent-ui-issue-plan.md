@@ -521,3 +521,8 @@ Native后续切片：复用既有feature headless与已安装Kernel0.9.3，真�
 ### #16：实际宿主附件操作与离屏验收共用
 
 [本轮结果](rust-agent-ui-attachment-host-operation-results-20261024.md)提取demo真实paths/read/upload/typed completion，保留原request身份、Kit门禁和原恢复状态，RFD构造仍在主UI线程。真实Native0.9.3/Pi1.3.0/DSH0.2.1-rc.2在同一当前程序逐端完成原附件policy/receipt/两类Send/草稿隔离/公开历史与新epoch重连；DSH不冒称通用文件回读。26项附件fixture、UI750/0/1、Python207、严格UI Clippy/格式/边界/矩阵、普通demo及复用的独立consumer执行通过。OS picker与原生HostResult消息循环、完整布局/焦点/桌面/物理IME/OS AX/ProcessContainer仍not_run，#16保持开放，不以共用逻辑代替桌面验收。全程SSD共享target，未改TekesUI基础组件。
+
+
+### #25 / #27：真实子会话运行与失败转换
+
+[本轮结果](rust-agent-ui-summary-transitions-results-20261024.md)补齐 Pi1.3.0/DSH0.2.1-rc.2 同 child 原父 Summary running→failed 来源。真实发现 Pi 当前 Native error 被 blank 库存遮蔽，增加只读当前 run 失败/取消选择器；不改 raw status/blank 或旧显式终态优先级。最终 39 条公开命令、15 次合成请求、四份原 Summary 挂载通过；Pi 原 dispatching 通过公开 childRead 自然退休后才捕获终态。root354、feature262、headless4、UI750/0/1、Python221、严格Clippy/格式/边界/矩阵、普通demo和新137文件独立consumer通过。历史失败与程序/输入快照保留，初诊 binary 未归档的限制明确记录。桌面/物理IME/AX、完整Transcript与跨来源 raw终态一致性未证明，#25/#27和#53保持开放，不合并发布。

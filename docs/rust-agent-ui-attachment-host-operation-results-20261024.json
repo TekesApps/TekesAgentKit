@@ -181,5 +181,20 @@
   "issueClosed": false,
   "mergeTagRelease": false,
   "cacheBytesDeletedInThisSlice": 0,
-  "evidenceRoot": ".runtime-fixtures/attachment-host-operation-20261024"
+  "evidenceRoot": ".runtime-fixtures/attachment-host-operation-20261024",
+  "ciTerminalAttestation": {
+    "headSha": "4495f3593c8c2060dd6091e37b6f2e157f354d6c",
+    "prRun": 40092397118,
+    "pushRun": 40092394154,
+    "status": "completed",
+    "onlyFailure": "strict nested detail reading (TekesUI #53)",
+    "standaloneConsumer": "passed-both-runs",
+    "demoBuild": "skipped-after-strict-gate; local evidence separate",
+    "defaultRootPassed": 346,
+    "optInPassed": 254,
+    "uiPassed": 750,
+    "uiIgnored": 1,
+    "pythonPassed": 207,
+    "receipt": ".runtime-fixtures/attachment-host-operation-20261024/ci-terminal-evidence.json"
+  }
 }

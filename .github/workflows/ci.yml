@@ -22,6 +22,7 @@ jobs:
         run: |
           cargo clippy --workspace --all-targets --locked --features tekes-agent-headless/acceptance-source-witness -- -D warnings
           cargo test -p tekes-agent-presentation --locked --features acceptance-source-witness
+          cargo test -p tekes-agent-headless --locked --features acceptance-source-witness
       - run: python3 scripts/check-headless-boundaries.py
       - uses: actions/setup-python@v5
         with:

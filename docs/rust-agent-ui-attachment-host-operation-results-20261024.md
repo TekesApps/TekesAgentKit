@@ -21,3 +21,5 @@ SSD `.runtime-fixtures/attachment-host-operation-20261024/` 保留verified/final
 本轮证明真实宿主与验收共用的materialize/上传/完成逻辑；**没有运行系统文件选择器或原生窗口HostResult消息循环**，也未完成桌面/物理IME/OS AX、完整布局/焦点或ProcessContainer。此项只补#16的非桌面部分，Issue仍开放，#53严格门保留，不合并/tag/发布。新提交CI需另核对。
 
 全部构建复用SSD共享target并关闭增量编译，本切片删除缓存0字节；没有打断其他任务、创建新的应用身份或触发Screen Recording。
+
+CI后续核对：4495f35的PR40092397118/push40092394154均终态。root346/0、opt-in254/0、UI750/0/1、Python207与独立consumer实际步骤通过；唯一失败仍为严格#53（accepted=false，父追加offset634、detail不可见），CI普通demo步骤因此跳过，本轮本地构建证据独立保留。两份原artifact/log、1055提交输入以及137/243文件闭包已核对，PR merge02c02b42父包含4495。此证据只属于4495，不替代后续提交CI。

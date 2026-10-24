@@ -38,3 +38,5 @@ cargo build -p tekes-agent-headless --locked --features acceptance-source-witnes
 Native Task复用同一feature与发布边界，具体Journal来源和原Summary被动行消费见[Native契约](rust-agent-ui-native-summary-source-contract-20261024.md)及[分层结果](rust-agent-ui-native-summary-source-results-20261024.md)。不把Native bounded child历史权限变成Summary Task独立导航权。
 
 DSH字符串参数的局部解析、原producer标题fallback与完成journal的显式验收profile见[DSH契约](rust-agent-ui-dsh-summary-source-contract-20261024.md)。原Transcript/history的JSON类型和缺省status不重写；Pi默认profile不扩大。
+
+Pi/DSH 的真实 running→failed、显式 provider 保持/释放、只读 Native 当前 run 终态选择及其边界见[转换契约](rust-agent-ui-summary-transitions-contract-20261024.md)和[最终结果](rust-agent-ui-summary-transitions-results-20261024.md)。转换 profile 显式 opt-in，不扩大原默认验收 profile。

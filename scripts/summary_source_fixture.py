@@ -21,7 +21,8 @@ def _dict(value: Any, label: str) -> dict[str, Any]:
 
 
 def validate_witness(
-    witness: Any, *, endpoint: str = "pi", completed_journal: bool = False
+    witness: Any, *, endpoint: str = "pi", completed_journal: bool = False,
+    transition_phase: str | None = None, authored_marker: str | None = None
 ) -> dict[str, Any]:
     """Match the published parent Summary to its same-frame memory authority.
 
@@ -32,6 +33,13 @@ def validate_witness(
         raise SummarySourceEvidenceError("completed_journal must be an explicit boolean")
     if completed_journal and endpoint != "dsh":
         raise SummarySourceEvidenceError("completed journal evidence is DSH-only")
+
+    if transition_phase is not None:
+        if (completed_journal or transition_phase not in ("running", "failed")
+                or endpoint not in ("pi", "dsh") or not isinstance(authored_marker, str) or not authored_marker):
+            raise SummarySourceEvidenceError("unsupported transition source profile")
+    elif authored_marker is not None:
+        raise SummarySourceEvidenceError("authored marker requires an explicit transition profile")
 
     root = _dict(witness, "witness")
     if root.get("evidenceScope") != "original-publication-and-same-memory-input":
@@ -128,7 +136,19 @@ def validate_witness(
                 continue
             raw_status = child_summary.get("status")
             status_basis = "explicit-child-status"
-            if completed_journal:
+            transition_source = None
+            if transition_phase is not None:
+                if row.get("status") != transition_phase:
+                    raise SummarySourceEvidenceError("Summary does not match the requested transition phase")
+                from summary_transition_fixture import validate_transition_child
+                try:
+                    transition_source = validate_transition_child(
+                        child, endpoint=endpoint, child_id=child_id, phase=transition_phase,
+                        marker=authored_marker, actionables=authority.get("actionables", {}))
+                except ValueError as error:
+                    raise SummarySourceEvidenceError(str(error)) from error
+                status_basis = transition_source["basis"]
+            elif completed_journal:
                 if endpoint != "dsh" or "status" in child_summary or row.get("status") != "completed":
                     raise SummarySourceEvidenceError("DSH completed journal fallback requires an omitted child status and completed row")
                 if not _latest_completed_dsh_turn(child, child_id):
@@ -162,10 +182,10 @@ def validate_witness(
                 status_basis = "public-idle-inputs-no-explicit-child-status"
             elif raw_status != row.get("status"):
                 raise SummarySourceEvidenceError("Summary status differs from same-frame child authority")
-            matches.append((row, source_identity, child, status_basis))
+            matches.append((row, source_identity, child, status_basis, transition_source))
     if len(matches) != 1:
         raise SummarySourceEvidenceError("expected exactly one Summary row matched to an owned source child")
-    row, source_identity, child, status_basis = matches[0]
+    row, source_identity, child, status_basis, transition_source = matches[0]
     expected_indicator = "running" if row.get("status") in ("running", "in_progress", "working") else (
         "failed" if row.get("status") in ("failed", "interrupted") else None)
     return {
@@ -182,6 +202,7 @@ def validate_witness(
         "serverTransactionalFreshnessProven": False,
         "evidenceScope": "single-publication-same-memory-authority",
         "fabricationResistance": "not-proven-by-json-validation",
+        **({"transitionSource": transition_source} if transition_source is not None else {}),
     }
 
 

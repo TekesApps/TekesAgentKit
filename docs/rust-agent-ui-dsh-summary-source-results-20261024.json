@@ -196,5 +196,19 @@
   "mergeTagRelease": false,
   "cacheBytesDeletedInThisSlice": 0,
   "evidenceRoot": ".runtime-fixtures/dsh-summary-source-20261024",
-  "witnessSha256": "d3a370e4e7c46ea5aa06cdc8d2344bbe5462823cc250eac57b943bc8d050d528"
+  "witnessSha256": "d3a370e4e7c46ea5aa06cdc8d2344bbe5462823cc250eac57b943bc8d050d528",
+  "ciTerminalAttestation": {
+    "headSha": "0cbced7618b851164373d6bd4ad7567e1dd8f482",
+    "prRun": 40091738819,
+    "pushRun": 40091735325,
+    "status": "completed",
+    "onlyFailure": "strict nested detail reading (TekesUI #53)",
+    "standaloneConsumer": "passed-both-runs",
+    "defaultRootPassed": 346,
+    "optInPassed": 254,
+    "uiPassed": 747,
+    "uiIgnored": 1,
+    "pythonPassed": 204,
+    "receipt": ".runtime-fixtures/dsh-summary-source-20261024/ci-terminal-evidence.json"
+  }
 }

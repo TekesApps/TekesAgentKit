@@ -1,0 +1,387 @@
+{
+  "schemaVersion": 1,
+  "issueNumbers": [
+    25,
+    27
+  ],
+  "pullRequest": 10,
+  "baseCommit": "4495f3593c8c2060dd6091e37b6f2e157f354d6c",
+  "sdkRevision": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "run": {
+    "accepted": true,
+    "endpoints": {
+      "pi": {
+        "endpoint": "pi",
+        "version": "1.3.0",
+        "commandCount": 18,
+        "processExit": 0,
+        "running": {
+          "endpoint": "pi",
+          "parentSessionId": "4b375695-a645-40b3-9c95-ee694e7dae23",
+          "childSessionId": "3decce42-d84d-446d-8255-32bb0b95cf02",
+          "summaryRow": {
+            "id": "[\"pi\",\"4b375695-a645-40b3-9c95-ee694e7dae23\",\"tool:pi-child-0\"]",
+            "sessionId": "3decce42-d84d-446d-8255-32bb0b95cf02",
+            "status": "running",
+            "title": "Model child"
+          },
+          "sourceIdentity": {
+            "kind": "native",
+            "entryId": "59f37ab9",
+            "entryOrdinal": 8
+          },
+          "rawChildStatus": null,
+          "childStatus": "running",
+          "statusBasis": "public-native-run-open-and-authored-input",
+          "indicator": "running",
+          "projectionSucceeded": true,
+          "serverTransactionalFreshnessProven": false,
+          "evidenceScope": "single-publication-same-memory-authority",
+          "fabricationResistance": "not-proven-by-json-validation",
+          "transitionSource": {
+            "basis": "public-native-run-open-and-authored-input",
+            "authoredInput": {
+              "kind": "native",
+              "entryId": "0484b47f",
+              "entryOrdinal": 12
+            },
+            "capturedDispatchingQueueCount": 1
+          }
+        },
+        "failed": {
+          "endpoint": "pi",
+          "parentSessionId": "4b375695-a645-40b3-9c95-ee694e7dae23",
+          "childSessionId": "3decce42-d84d-446d-8255-32bb0b95cf02",
+          "summaryRow": {
+            "id": "[\"pi\",\"4b375695-a645-40b3-9c95-ee694e7dae23\",\"tool:pi-child-0\"]",
+            "sessionId": "3decce42-d84d-446d-8255-32bb0b95cf02",
+            "status": "failed",
+            "title": "Model child"
+          },
+          "sourceIdentity": {
+            "kind": "native",
+            "entryId": "59f37ab9",
+            "entryOrdinal": 8
+          },
+          "rawChildStatus": null,
+          "childStatus": "failed",
+          "statusBasis": "native-current-run-error",
+          "indicator": "failed",
+          "projectionSucceeded": true,
+          "serverTransactionalFreshnessProven": false,
+          "evidenceScope": "single-publication-same-memory-authority",
+          "fabricationResistance": "not-proven-by-json-validation",
+          "transitionSource": {
+            "basis": "native-current-run-error",
+            "authoredInput": {
+              "kind": "native",
+              "entryId": "0484b47f",
+              "entryOrdinal": 12
+            },
+            "terminal": {
+              "kind": "native",
+              "entryId": "e09cacba",
+              "entryOrdinal": 13,
+              "stopReason": "error",
+              "runId": "cf61c8db-f30b-4cdc-a304-2dcc481bf6c9",
+              "startedEntryId": "1c8032e3",
+              "settledEntryId": "c9392880"
+            },
+            "capturedDispatchingQueueCount": 0
+          }
+        },
+        "gate": {
+          "requestCount": 1,
+          "entered": true,
+          "explicitlyReleased": true,
+          "aborted": false,
+          "timedOut": false
+        }
+      },
+      "dsh": {
+        "endpoint": "dsh",
+        "version": "0.2.1-rc.2",
+        "commandCount": 21,
+        "processExit": 0,
+        "running": {
+          "endpoint": "dsh",
+          "parentSessionId": "session-1aced64d-e1bd-4fac-893c-742a99ceaedb",
+          "childSessionId": "1cbce454-2008-4222-8c1c-3df3e022559b",
+          "summaryRow": {
+            "id": "[\"dsh\",\"session-1aced64d-e1bd-4fac-893c-742a99ceaedb\",\"tool:child-call\"]",
+            "sessionId": "1cbce454-2008-4222-8c1c-3df3e022559b",
+            "status": "running",
+            "title": "Catalog proof child"
+          },
+          "sourceIdentity": {
+            "kind": "journal",
+            "sequence": 19
+          },
+          "rawChildStatus": null,
+          "childStatus": "running",
+          "statusBasis": "public-journal-turn-start-and-authored-input",
+          "indicator": "running",
+          "projectionSucceeded": true,
+          "serverTransactionalFreshnessProven": false,
+          "evidenceScope": "single-publication-same-memory-authority",
+          "fabricationResistance": "not-proven-by-json-validation",
+          "transitionSource": {
+            "basis": "public-journal-turn-start-and-authored-input",
+            "authoredInput": {
+              "kind": "journal",
+              "sequence": 32
+            },
+            "capturedDispatchingQueueCount": 0
+          }
+        },
+        "failed": {
+          "endpoint": "dsh",
+          "parentSessionId": "session-1aced64d-e1bd-4fac-893c-742a99ceaedb",
+          "childSessionId": "1cbce454-2008-4222-8c1c-3df3e022559b",
+          "summaryRow": {
+            "id": "[\"dsh\",\"session-1aced64d-e1bd-4fac-893c-742a99ceaedb\",\"tool:child-call\"]",
+            "sessionId": "1cbce454-2008-4222-8c1c-3df3e022559b",
+            "status": "failed",
+            "title": "Catalog proof child"
+          },
+          "sourceIdentity": {
+            "kind": "journal",
+            "sequence": 19
+          },
+          "rawChildStatus": null,
+          "childStatus": "failed",
+          "statusBasis": "latest-child-journal-error",
+          "indicator": "failed",
+          "projectionSucceeded": true,
+          "serverTransactionalFreshnessProven": false,
+          "evidenceScope": "single-publication-same-memory-authority",
+          "fabricationResistance": "not-proven-by-json-validation",
+          "transitionSource": {
+            "basis": "latest-child-journal-error",
+            "authoredInput": {
+              "kind": "journal",
+              "sequence": 32
+            },
+            "terminal": {
+              "kind": "journal",
+              "sequence": 36,
+              "reasonKind": "error",
+              "turn": 3
+            },
+            "capturedDispatchingQueueCount": 0
+          }
+        },
+        "gate": {
+          "requestCount": 1,
+          "entered": true,
+          "explicitlyReleased": true,
+          "aborted": false,
+          "timedOut": false
+        }
+      }
+    },
+    "provider": "synthetic-loopback",
+    "providerRequestCount": 15,
+    "ownedDshExitStatus": 0,
+    "programSha256": "9ccd461ebc95850fac2dbd659229bd48d3d1610aa87de8592fa646552c7a0b3f",
+    "desktopInteraction": false,
+    "paidModel": false,
+    "privateHarnessHistoryRead": false,
+    "serverTransactionalFreshnessProven": false
+  },
+  "components": {
+    "pi-running": {
+      "childRows": [
+        {
+          "actionMounted": true,
+          "actionScopeMatches": true,
+          "glyphRendered": false,
+          "id": "[\"pi\",\"4b375695-a645-40b3-9c95-ee694e7dae23\",\"tool:pi-child-0\"]",
+          "indicatorPolicy": "running",
+          "label": "Model child",
+          "status": "running",
+          "title": "Model child"
+        }
+      ],
+      "connectionEpoch": 2,
+      "desktopVisibility": false,
+      "nativeInteraction": false,
+      "passiveTaskProfile": false,
+      "physicalIme": false,
+      "rendered": false,
+      "result": "mounted",
+      "scope": {
+        "endpointId": "pi",
+        "sessionId": "4b375695-a645-40b3-9c95-ee694e7dae23",
+        "threadId": "4b375695-a645-40b3-9c95-ee694e7dae23"
+      },
+      "snapshotRevision": 43,
+      "summaryInputMatchesCapturedFacts": true,
+      "summarySections": [
+        "subagents",
+        "usage"
+      ],
+      "taskRows": []
+    },
+    "pi-failed": {
+      "childRows": [
+        {
+          "actionMounted": true,
+          "actionScopeMatches": true,
+          "glyphRendered": false,
+          "id": "[\"pi\",\"4b375695-a645-40b3-9c95-ee694e7dae23\",\"tool:pi-child-0\"]",
+          "indicatorPolicy": "failed",
+          "label": "Model child",
+          "status": "failed",
+          "title": "Model child"
+        }
+      ],
+      "connectionEpoch": 2,
+      "desktopVisibility": false,
+      "nativeInteraction": false,
+      "passiveTaskProfile": false,
+      "physicalIme": false,
+      "rendered": false,
+      "result": "mounted",
+      "scope": {
+        "endpointId": "pi",
+        "sessionId": "4b375695-a645-40b3-9c95-ee694e7dae23",
+        "threadId": "4b375695-a645-40b3-9c95-ee694e7dae23"
+      },
+      "snapshotRevision": 52,
+      "summaryInputMatchesCapturedFacts": true,
+      "summarySections": [
+        "subagents",
+        "usage"
+      ],
+      "taskRows": []
+    },
+    "dsh-running": {
+      "childRows": [
+        {
+          "actionMounted": true,
+          "actionScopeMatches": true,
+          "glyphRendered": false,
+          "id": "[\"dsh\",\"session-1aced64d-e1bd-4fac-893c-742a99ceaedb\",\"tool:child-call\"]",
+          "indicatorPolicy": "running",
+          "label": "Catalog proof child",
+          "status": "running",
+          "title": "Catalog proof child"
+        }
+      ],
+      "connectionEpoch": 5,
+      "desktopVisibility": false,
+      "nativeInteraction": false,
+      "passiveTaskProfile": false,
+      "physicalIme": false,
+      "rendered": false,
+      "result": "mounted",
+      "scope": {
+        "endpointId": "dsh",
+        "sessionId": "session-1aced64d-e1bd-4fac-893c-742a99ceaedb",
+        "threadId": "session-1aced64d-e1bd-4fac-893c-742a99ceaedb"
+      },
+      "snapshotRevision": 78,
+      "summaryInputMatchesCapturedFacts": true,
+      "summarySections": [
+        "subagents",
+        "usage"
+      ],
+      "taskRows": []
+    },
+    "dsh-failed": {
+      "childRows": [
+        {
+          "actionMounted": true,
+          "actionScopeMatches": true,
+          "glyphRendered": false,
+          "id": "[\"dsh\",\"session-1aced64d-e1bd-4fac-893c-742a99ceaedb\",\"tool:child-call\"]",
+          "indicatorPolicy": "failed",
+          "label": "Catalog proof child",
+          "status": "failed",
+          "title": "Catalog proof child"
+        }
+      ],
+      "connectionEpoch": 5,
+      "desktopVisibility": false,
+      "nativeInteraction": false,
+      "passiveTaskProfile": false,
+      "physicalIme": false,
+      "rendered": false,
+      "result": "mounted",
+      "scope": {
+        "endpointId": "dsh",
+        "sessionId": "session-1aced64d-e1bd-4fac-893c-742a99ceaedb",
+        "threadId": "session-1aced64d-e1bd-4fac-893c-742a99ceaedb"
+      },
+      "snapshotRevision": 84,
+      "summaryInputMatchesCapturedFacts": true,
+      "summarySections": [
+        "subagents",
+        "usage"
+      ],
+      "taskRows": []
+    }
+  },
+  "validation": {
+    "root": {
+      "passed": 354,
+      "failed": 0,
+      "ignored": 0
+    },
+    "featurePresentation": {
+      "passed": 262,
+      "failed": 0,
+      "ignored": 0
+    },
+    "featureHeadless": {
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0
+    },
+    "ui": {
+      "passed": 750,
+      "failed": 0,
+      "ignored": 1
+    },
+    "python": {
+      "passed": 221,
+      "failed": 0,
+      "log": "python-tests-sealed.log"
+    },
+    "strictClippy": "passed-root-feature-and-ui",
+    "formatBoundariesMatrix": "passed",
+    "ordinaryDemoBuild": "passed",
+    "standalonePublicConsumer": {
+      "sha256": "bbf8e983c009a09841320fe1b70002d4ca544bbfdd382ecd839e8a45c92399da",
+      "fileCount": 137,
+      "matchesPreparedSource": true,
+      "exitCode": 0,
+      "stdoutEmpty": true,
+      "log": "public-consumer.log"
+    }
+  },
+  "sourceSnapshot": {
+    "directory": "source-runtime",
+    "files": 1062,
+    "finalDocumentationSealedSeparately": true
+  },
+  "notRun": [
+    "desktop-window-glyph-hover-layout",
+    "physical-IME-OS-AX-ProcessContainer",
+    "server-transactional-freshness",
+    "full-Transcript-parity",
+    "real-parent-draft-isolation-in-this-profile"
+  ],
+  "limitations": [
+    "Initial audit binary was overwritten before archival; SHA/logs and marked source reconstruction remain. Later execution archives are retained.",
+    "Single public publication and same-memory authority do not prove server transactional freshness or resist producer fabrication.",
+    "Current default-feature-off boundary runtime program predates the final Native fix; current default root tests separately pass.",
+    "Existing explicit raw terminal precedence and Journal-only behavior are unchanged; stale cross-source raw terminal behavior is not proven."
+  ],
+  "ci": "pending-new-head",
+  "issueClosed": false,
+  "mergeTagRelease": false,
+  "cacheBytesDeletedInThisSlice": 0,
+  "evidenceRoot": ".runtime-fixtures/summary-source-transitions-20261024"
+}

@@ -24,3 +24,5 @@ SSD `.runtime-fixtures/dsh-summary-source-20261024/` 保留旧baseline、首次�
 真实 running/failure 转换、此profile父草稿隔离、最终glyph/hover/主题布局、桌面/物理IME/OS AX/ProcessContainer仍未验收，#25/#27不整体关闭。上一提交7e9383b两条CI已核实仅#53严格阅读门失败；本提交CI需独立检查，不能借旧CI称通过。不合并/tag/发布。
 
 全部构建复用SSD共享target，无新增target，本切片删除缓存0字节；历史196.4MiB清理不重复计入。没有读私有harness历史、付费模型或修改上游，保留其他任务进程与WIP。
+
+CI后续核对：0cbced7的PR40091738819/push40091735325均终态，仅严格#53失败（accepted=false，父追加offset634、detail不可见）。默认root346/0、opt-in254/0、UI747/0/1、Python204与独立consumer通过，原artifact/log及137/243文件闭包一致；PR merge59a1634父提交包含0cbced。该证据只属于0cbced，不扩报为4495f35及后续提交通过。
