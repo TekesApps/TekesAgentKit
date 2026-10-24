@@ -92,7 +92,7 @@ ui/target/debug/tekes-agent-ui-demo
 按钮提供发送、停止、历史分页、回到最新、重连、切换 A/B。候选 Composer 已消费公共多行 Grow 视口；Enter 换行，业务发送仍仅通过显式按钮。
 宿主订阅已有 `RunController::subscribe()`，通过公开 `WindowWake` 投递通知；异步操作结果入队后同样 wake。没有业务 frame pump；原控件的有限过渡仍按需请求动画帧。
 
-`--components --endpoint-config` 还可接收严格多端对象 `{"endpoints":[nativeConfig, piConfig, dshConfig]}`。每项沿用下述单端字段与两个已有 session；endpointId 必须唯一，顺序决定初始 Run tabs。宿主分别注册每端自己的 connector/kind/runtime；原无 `--components` 旧路径仍只接受单端配置。多端模式不运行单端专属 `*-proof`/`*-selftest`，不将首端验收收据扩报为多端。SideChat 目前只为原首端 controller 启用，其他端明确禁用；多端 provider 查询已通过共享 SidebarMultiSearchBinding 接通。配置层与限制见[Sidebar 宿主说明](../docs/rust-agent-ui-sidebar-host-20261024.md)。本批未启动真实多端窗口。
+`--components --endpoint-config` 还可接收严格多端对象 `{"endpoints":[nativeConfig, piConfig, dshConfig]}`。每项沿用下述单端字段与两个已有 session；endpointId 必须唯一，顺序决定初始 Run tabs。宿主分别注册每端自己的 connector/kind/runtime；原无 `--components` 旧路径仍只接受单端配置。多端模式不运行单端专属 `*-proof`/`*-selftest`，不将首端验收收据扩报为多端。SideChat 按 endpoint 保留 canonical controller，支持状态仍由原能力决定；未注册端禁用，同端换 owner 明确拒绝。多端 provider 查询通过共享 SidebarMultiSearchBinding 接通。配置层与限制见[Sidebar 宿主说明](../docs/rust-agent-ui-sidebar-host-20261024.md)和[多端 SideChat 契约](../docs/rust-agent-ui-sidechat-multi-endpoint-20261024.md)。本批未启动真实多端窗口。
 
 真实 Native、Pi、DSH 都通过 `--endpoint-config` 接收宿主显式 JSON。A/B 对应所选 endpoint 的两个已有 session，必须互不相同；宿主负责模型/执行参数。demo 启动不创建真实会话或修改模型；`--components` 中显式点击新建 SideChat 会在支持的 endpoint 创建临时 fork，关闭操作会取消并丢弃该临时会话：
 

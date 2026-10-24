@@ -56,3 +56,5 @@ UI workspace 全套 637 passed / 0 failed / 1 项原有忽略（TekesUI #49）�
 ## 当前多端 provider 搜索接线
 
 多端配置入口与 SidebarMultiSearchBinding 已接通原生组件 demo；--sidebar-query 为固定端集合创建共享 reader，原 typed Retry 只发回原失败端。宿主不合并 hit、不伪造全局 single publication。双端 fixture 已做独立协议、ComponentDemo、第二 consumer 和自有 renderer 离屏验证；这里的“原生入口接通”不代表启动过窗口或真实多 harness 运行。首端 SideChat 能力限制仍然存在；Mirror FTS/pins 差异、实际像素 reveal、observer 恢复与远端搜索续页继续单列。
+
+上述首端 SideChat 限制随后由 `c7104ac` 的按端 canonical owner 接线补齐；实际能力仍由原 endpoint 决定，未知端禁用。双端 fixture 与公开 consumer 结果见[SideChat 契约与收据](rust-agent-ui-sidechat-multi-endpoint-20261024.md)，不扩报真实多 harness 或桌面验收。

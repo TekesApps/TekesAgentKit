@@ -423,3 +423,7 @@
 ## 多端 provider 搜索续批
 
 #22 已补齐固定端集合 query/ABA/clear/drop/reconnect/retry、逐端原 inventory join、Sidebar 状态子组件、实际多 connector 配置与 demo 接线。最终 presentation234/0/0、UI653/0/1、第二公开 consumers 及双端成功/局部失败离屏通过；精确边界见[收据](rust-agent-ui-multi-search-results-20261024.md)。此前“跨端全局搜索未实现”描述仅适用于当时批次；本批不涵盖 Mirror FTS/pins、远端 cursor、真实多 harness、桌面或多端 SideChat。Issue 继续开放。
+
+## 多端 SideChat 续批
+
+#24 的非首端 SideChat 继续由主会话集成、新子会话负责 owner 证明与隔离测试。固定 canonical binding 按捕获 parent 路由，原端 pointer 与返回 Run owner 双重校验；每端单独清理面板，不影响另一端草稿、附件或 prepared ticket。设计和最终验证范围见[多端 SideChat 契约](rust-agent-ui-sidechat-multi-endpoint-20261024.md)。既有真实 Native/Pi 收据仍属于原程序；DSH 无公开 discard 不提升能力，桌面/IME/AX 仍未验收。

@@ -24,3 +24,9 @@ PR checkout 是 GitHub 合并测试提交 `35969c3639582d870d5724de052ec144d8eaa
 ## Sidebar 宿主接入前的再次复核（ddc49c7）
 
 新基线 `ddc49c75bcd2cf4be4dd17152db7d595e6ed65da` 的 PR [40048515783](https://github.com/TekesApps/TekesAgentKit/actions/runs/40048515783) 与 push [40048512623](https://github.com/TekesApps/TekesAgentKit/actions/runs/40048512623) 均已完成：headless、UI workspace/格式/Clippy、独立 consumer 全通过；只有严格 nested-detail reading 失败，后续 demo build 被跳过。两份原始 JSON 的失败值与上表同型，没有新增失败或豁免门槛。精确 jobs/steps、原始失败哈希见[本批 CI 收据](rust-agent-ui-sidebar-host-ci-20261024.json)。这些结果只适用于 ddc49c7；随后新提交须等各自 CI，不能借用此前绿色步骤。
+
+## 多端搜索接线 df5429f 的最终 CI
+
+PR [40054890642](https://github.com/TekesApps/TekesAgentKit/actions/runs/40054890642) 与 push [40054887302](https://github.com/TekesApps/TekesAgentKit/actions/runs/40054887302) 均已完成。headless、UI fmt/严格 Clippy/完整 suite、新增独立 public consumer 全部成功；仍仅严格 nested detail reading 失败，后续 demo build 跳过。独立 consumer 已包含新搜索状态子组件。
+
+PR 下载原始 `agentkit-nested-detail-reading.json` 仍为 `accepted=false`、`parentFollowingAfterInnerUp=true`、父追加 offset 634、inner offset 100、`detailVisibleAfterAppend=false`。原始 artifact 和两套 jobs 归档于 `.runtime-fixtures/sidebar-host-20261024/ci-40054890642/`、`ci-df5429f-{pr,push}-final-jobs.json`；仍跟踪 TekesUI #53，不放宽门槛、不据此合并或打稳定 tag。后续 SideChat 源码不借用本次 head 的 CI 结果。

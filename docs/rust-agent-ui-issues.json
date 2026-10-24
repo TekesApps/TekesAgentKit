@@ -369,7 +369,21 @@
         "#12",
         "composer",
         "taskchild"
-      ]
+      ],
+      "progress": {
+        "date": "2026-10-24",
+        "commit": "c7104ac",
+        "evidence": "docs/rust-agent-ui-sidechat-multi-endpoint-20261024.md",
+        "verified": [
+          "Per-endpoint canonical owners, original controller and pointer identity",
+          "Same session ID cross-endpoint AX commands, drafts/uploads/prepared ticket retention",
+          "UI657/0/1 existing ignore; strict Clippy; public consumers; normal demo build"
+        ],
+        "notVerified": [
+          "Real multi-harness integration",
+          "Desktop, physical IME, native close confirmation, AX and ProcessContainer"
+        ]
+      }
     },
     {
       "key": "summary",

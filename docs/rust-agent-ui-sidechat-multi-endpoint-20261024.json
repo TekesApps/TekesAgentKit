@@ -1,0 +1,55 @@
+{
+  "implementation_commit": "c7104ac2ec500e2a6d0649088459e42d686e687f",
+  "pr": "https://github.com/TekesApps/TekesAgentKit/pull/10",
+  "issue": 24,
+  "sdk_revision": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "ui_tests": {
+    "passed": 657,
+    "failed": 0,
+    "ignored": 1,
+    "ignored_issue": "TekesUI#49"
+  },
+  "strict_clippy": true,
+  "normal_demo_build": true,
+  "public_binding_api_compiled": true,
+  "external_consumer_valid_io": false,
+  "workspace_public_consumer_valid_fixture_io": true,
+  "desktop": false,
+  "physical_ime": false,
+  "real_multi_harness": false,
+  "new_target": false,
+  "deleted_bytes": 0,
+  "logs": [
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/sidechat-multi-clippy.log",
+      "sha256": "e8c82901f034d0846cabc78c32c02ab7eb4505d36e9cab156caa7c8494879368"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/sidechat-multi-workspace-tests.log",
+      "sha256": "cc5710729c665648dfd0ff84ebb12c5a695a467c78a625412d614765da65c23f"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/sidechat-multi-and-owner-final-tests.log",
+      "sha256": "d3f805b85ee5ffbfdd6a5d3e383eece483158e74aee396308d62a1418a63a6e8"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/public-sidechat-consumer-run.log",
+      "sha256": "fe7739b53d56e1eaaae04aa4c3635aec08a03d6e7bd833f342720ca645cc0b9c"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/sidechat-multi-demo-build.log",
+      "sha256": "f694a9e074374d315f58b8a63ce849858b1b8708cf56b3d194218605bd2a9d6e"
+    }
+  ],
+  "source_manifest": ".runtime-fixtures/sidebar-host-20261024/sidechat-multi-source-manifest.json",
+  "binaries": [
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/agentkit-multi-sidechat-demo",
+      "sha256": "b082fe548d8c23c9a2befac5123987d50fcdad7390a6ad06360685d68d97fafd"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/agentkit-public-sidechat-consumer",
+      "sha256": "ebe42110d9322ac66adb159637735317da37cf66b14d1860bd734f6d0d589a8b"
+    }
+  ]
+}
