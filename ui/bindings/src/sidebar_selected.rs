@@ -1,5 +1,7 @@
 //! Selected conversation is read independently of the displayed inventory page.
-use crate::{SidebarBinding, sidebar::inventory_row};
+use crate::{
+    SidebarBinding, SidebarMultiEndpointBinding, SidebarMultiOwner, sidebar::inventory_row,
+};
 use std::sync::Arc;
 use tekes_agent_components_ui::{SidebarInput, SidebarRow};
 use tekes_agent_contract::{Result, SessionAddress, require};
@@ -115,5 +117,73 @@ impl SidebarSelectedRead {
         }
         display.rows.push(row.clone());
         true
+    }
+}
+
+/// Selected read tied to one aggregate Sidebar instance. The inner single-endpoint
+/// receipt retains its original agent/endpoint/facts freshness checks; the owner
+/// token adds the aggregate-instance fence that those checks cannot express.
+pub struct SidebarMultiSelectedRead {
+    inner: SidebarSelectedRead,
+    owner: Arc<SidebarMultiOwner>,
+}
+impl SidebarMultiEndpointBinding {
+    /// Read from the endpoint named by the complete address, never from the
+    /// first or currently selected endpoint.
+    pub fn read_selected(
+        &self,
+        address: &SessionAddress,
+        selection_generation: u64,
+    ) -> Result<SidebarMultiSelectedRead> {
+        let source = self.binding_for(&address.endpoint_id).ok_or_else(|| {
+            tekes_agent_contract::unsupported("selected endpoint is outside the fixed set")
+        })?;
+        let inner = source.read_selected(address, selection_generation)?;
+        Ok(SidebarMultiSelectedRead {
+            inner,
+            owner: self.owner(),
+        })
+    }
+}
+impl SidebarMultiSelectedRead {
+    pub fn address(&self) -> &SessionAddress {
+        self.inner.address()
+    }
+    pub fn selection_generation(&self) -> u64 {
+        self.inner.selection_generation()
+    }
+    pub fn is_current(&self, source: &SidebarMultiEndpointBinding) -> bool {
+        if !source.owns(&self.owner) {
+            return false;
+        }
+        source
+            .binding_for(&self.address().endpoint_id)
+            .is_some_and(|binding| self.inner.is_current(binding))
+    }
+    pub fn has_active_row(&self, source: &SidebarMultiEndpointBinding) -> bool {
+        if !source.owns(&self.owner) {
+            return false;
+        }
+        source
+            .binding_for(&self.address().endpoint_id)
+            .is_some_and(|binding| self.inner.has_active_row(binding))
+    }
+    /// Projects with the existing endpoint-local freshness/filter checks, after
+    /// verifying this read belongs to the same fixed-set aggregate instance.
+    pub fn project_into(
+        &self,
+        source: &SidebarMultiEndpointBinding,
+        display: &mut SidebarInput,
+        selection_generation: u64,
+    ) -> bool {
+        if !source.owns(&self.owner) {
+            return false;
+        }
+        source
+            .binding_for(&self.address().endpoint_id)
+            .is_some_and(|binding| {
+                self.inner
+                    .project_into(binding, display, selection_generation)
+            })
     }
 }

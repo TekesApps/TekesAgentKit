@@ -48,6 +48,7 @@ pub fn composer_context_fixture() -> (
 type MutationReceipts = BTreeMap<String, (String, Value, Value)>;
 #[derive(Clone)]
 pub struct Fixture {
+    endpoint_id: String,
     sessions: Arc<Mutex<BTreeMap<String, Line>>>,
     search_enabled: bool,
     search_results: Arc<Mutex<BTreeMap<String, Value>>>,
@@ -181,6 +182,7 @@ impl Default for Fixture {
             sessions.insert(id.into(), line);
         }
         Self {
+            endpoint_id: "fixture".into(),
             sessions: Arc::new(Mutex::new(sessions)),
             search_enabled: false,
             search_results: Arc::new(Mutex::new(BTreeMap::new())),
@@ -228,6 +230,12 @@ impl Default for Fixture {
     }
 }
 impl Fixture {
+    /// Separate fixture authorities may share session IDs while retaining their
+    /// own endpoint identity. Configure before registering/connecting.
+    pub fn with_endpoint_id(mut self, endpoint_id: impl Into<String>) -> Self {
+        self.endpoint_id = endpoint_id.into();
+        self
+    }
     /// Advertises only the historical-input host hook, never an edit RPC.
     pub fn with_historical_input(mut self) -> Self {
         self.historical_input = true;
@@ -776,7 +784,7 @@ impl EndpointConnector for Fixture {
 #[async_trait]
 impl SessionEndpoint for Endpoint {
     fn identity(&self) -> &str {
-        "fixture"
+        &self.fixture.endpoint_id
     }
     fn host(&self) -> &HostDescription {
         &self.host
