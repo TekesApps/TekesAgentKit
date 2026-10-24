@@ -5,8 +5,8 @@
   "sourceBase": "4f2c02b4e54de35eb0f13557e067fefce428e456",
   "sourceState": "next-slice source frozen before final execution; exact Git binding recorded after commit separately",
   "compiledInputs": {
-    "manifest": ".runtime-fixtures/acceptance-refresh-20261025/native-paged-source-manifest-final-2.json",
-    "sha256": "12b8e652f1069915981aebe16813bd8b3b6bae9e93e83aaa06ff66132a566ad1",
+    "manifest": ".runtime-fixtures/acceptance-refresh-20261025/native-paged-source-manifest-final-3.json",
+    "sha256": "1a077597485b35f67cc1c8171cf0a5939fe3b4458dc7b063ccd63f6333ad864c",
     "count": 590
   },
   "kernel": {
@@ -37,11 +37,11 @@
     "evidenceScope": "actual-native-paged-child-original-intents",
     "parent": {
       "endpointId": "native",
-      "sessionId": "0ae257e0-0fdc-4165-aae0-2a374d0bb047",
-      "threadId": "0ae257e0-0fdc-4165-aae0-2a374d0bb047"
+      "sessionId": "18fb6acc-9311-4ab1-b5e8-97b08c216f47",
+      "threadId": "18fb6acc-9311-4ab1-b5e8-97b08c216f47"
     },
-    "childId": "b13dcd06-a0c4-51ea-a649-a214c015cc01",
-    "sourceInstance": "0xa20cd4470",
+    "childId": "9df9d176-bc0c-5676-b5a3-ef8743019929",
+    "sourceInstance": "0xbf31d4330",
     "phaseCount": 4,
     "earlierReadCount": 1,
     "publicPagePlanMatched": true,
@@ -89,7 +89,7 @@
       "epoch": 5,
       "cut": 24,
       "entries": 25,
-      "receipts": 12,
+      "receipts": 11,
       "mountedRows": 15
     }
   ],
@@ -115,152 +115,152 @@
     "defaultSourceDigest": "55ef8ec33049649e74b9d0494df5f56cbe75c2e944de6351e85efe569868426b"
   },
   "artifactFiles": {
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/accepted.json": {
-      "sha256": "5ed095c95409512cfccf78d48b40f9fef634e7c3013cae1c1b1f76aba03ee006",
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/accepted.json": {
+      "sha256": "40ee5bfc04d0d4408b36a10b2634725b5bfda108140d111e5409b4dd834dc106",
       "bytes": 682
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/catalog-commands.json": {
-      "sha256": "d40bc6da0ee72218e0ca4d4197934d61bc981b6ce1b0238c46494eff7864fe1c",
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/catalog-commands.json": {
+      "sha256": "873061a600cec4fb9546cfb5490f7b3499deebae920e426802fa62f209c7d723",
       "bytes": 94
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/catalog-exit.json": {
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/catalog-exit.json": {
       "sha256": "f61b19574fc02bb93f33a4b41d6c348fa39e76f340f164c74e5f7fd2dd955c5e",
       "bytes": 22
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/catalog.stderr": {
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/catalog.stderr": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "bytes": 0
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/catalog.stdout": {
-      "sha256": "cbadb2a31b52c19b37b2b1a72adfa4aee7eceea6ebc28638eda34da10044a256",
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/catalog.stdout": {
+      "sha256": "74acc24618c2dbffb7890f6b8d0aba40b2d51a1663582222c9df7299f48335aa",
       "bytes": 390
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/demo-command.json": {
-      "sha256": "a112ea012a33ae685132050fb58384ce19847e4b942a4a04f747806c67035364",
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/demo-command.json": {
+      "sha256": "044641210159ea8cd7d864c02364fb50338c28e3f93c1cbdbc2cbc1411214680",
       "bytes": 784
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/demo-process.json": {
-      "sha256": "bd726aa8c65499ddee8039ca0108cf831eaa38de533aea688987fff217c05556",
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/demo-process.json": {
+      "sha256": "3b2ec94b6bd7577a3d30adc424dc294f35ddb0052f462537067cfc8a8aca4844",
       "bytes": 120
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/demo.stderr": {
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/demo.stderr": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "bytes": 0
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/demo.stdout": {
-      "sha256": "817dc9500f07baaad653435b5b62a8799c7a1c028e5273b9e93fd7c6cccef9ae",
-      "bytes": 345820
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/demo.stdout": {
+      "sha256": "fc9c3d80ab81a101a27ebe96417eda2f1f20f14a6cb131d8b453a596bb5a8199",
+      "bytes": 338873
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/endpoints.json": {
-      "sha256": "f8b67a88abcdf8df3b95bc314e885a019e1fb5ac3e1c9532a748c53539520664",
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/endpoints.json": {
+      "sha256": "9b9d9f507f2145370d70469eda8a0047bdf2397b21184df68d3cbf42fe98c609",
       "bytes": 310
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/frame-1-running_head.json": {
-      "sha256": "44b7ea7bc8fa257ed891bac5b437f1b4672893a06b9164a8e1baecfe7ff8644f",
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/frame-1-running_head.json": {
+      "sha256": "192cb97918aa26735f86ec361e83cf526ae0622386e5861374afd6d39e4deb2a",
       "bytes": 131314
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/frame-2-reconnected_refresh.json": {
-      "sha256": "c321d03ff4d08011f34bdcb4c23bacae2b083641f9877062eab018bbfe6c5a3b",
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/frame-2-reconnected_refresh.json": {
+      "sha256": "3257373e7d5b31fe75b1d149d486226d6a6ef994914da49a7b05b45f262aeb43",
       "bytes": 165725
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/frame-3-reconnected_page_1.json": {
-      "sha256": "ab678c27858af76ef7eb38d5d3608c61dd00ec02b48b3149b71422f80552b22e",
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/frame-3-reconnected_page_1.json": {
+      "sha256": "2636fc6ae26f36f81115c4e9c88b9a0ed0330c400e3bc623a3e0ca8a49bf81d8",
       "bytes": 184918
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/frame-4-settled_refresh.json": {
-      "sha256": "a352dda9110344458116f3e5725cd228f280533070d79432979415e85ea35a73",
-      "bytes": 260848
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/frame-4-settled_refresh.json": {
+      "sha256": "1fae54c63f9faa2ec650ebc1f9221614554ff6f9eab1a2bf6bfff77cde83aabb",
+      "bytes": 242535
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/gate-final.json": {
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/gate-final.json": {
       "sha256": "200f207011a31bc80cba48dc94242cd03b962f936f5b2ef380d5f33ab2d15daf",
       "bytes": 114
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/host-receipt.json": {
-      "sha256": "484abc9d2e4a82bf99bd02af27ce17474c524cbea8642dbf4627cd441e6c2f54",
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/host-receipt.json": {
+      "sha256": "4bb46279e3db6a65699a0b3d6a2765b9dfa2ccc435eb35601e2679b909e48456",
       "bytes": 838
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/kernel-diagnostics.log": {
-      "sha256": "8d489f0c45a4ad9a96c07883e9a3d73f0b010e9f0bc5946422a7ef1d56131d49",
-      "bytes": 1960
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/kernel-diagnostics.log": {
+      "sha256": "b798f328c2937d724be5c3a9d7b745f0402d7c5e4e631830373afb3b824d37c5",
+      "bytes": 1953
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/native-paged-pane.png": {
-      "sha256": "4b2d75aff29f45e5b7250bae96f4ac4f0cec7f8695ad22754bc338ac10959a5a",
-      "bytes": 155549
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/native-paged-pane.png": {
+      "sha256": "5e2b907aed4c03fe1eee152bf3fadb02cf1dfc899c3833f33466d665d8a5d820",
+      "bytes": 162543
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/owned-demo-process.json": {
-      "sha256": "b92bedf8badb1e9383ee14de51fb49f7b4c429d22c78ee044d32f7d1ce8cea34",
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/owned-demo-process.json": {
+      "sha256": "9a504abdd1ccae1c289745c1bedf28b0865550bb7c9648eabe2ab4f6a47d44a8",
       "bytes": 93
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/owned-services-exit.json": {
-      "sha256": "9fef59195d439e5f9912be8bdd30b8344eec144d1cd738ba8d763c6ad5c6a0b5",
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/owned-services-exit.json": {
+      "sha256": "e6e6ec58d3a561f2affb22857f77816f120df4962bbb0148da1f02713e1ac998",
       "bytes": 129
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/pane-manifest.json": {
-      "sha256": "6032adee38fb9e37552f1b0eaaed402116bbdbe651d5b6e7f52c82ae9f43cd1b",
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/pane-manifest.json": {
+      "sha256": "995ca6a6f03e3f02ca87c2b3dfa3e43d61ea312533e6fe3ee28ee2098e833479",
       "bytes": 307
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/provider-receipt.json": {
-      "sha256": "507b002f36388c6612b830751a77c4d783ae133a91f58e7a51d2331878a60a7e",
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/provider-receipt.json": {
+      "sha256": "9b14ed20bfe5037430d9927556e11f29110c40211ed206baf8466a307eb3ac3c",
       "bytes": 1758
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/public-earlier-1-commands.json": {
-      "sha256": "7c28c3a79692a87680f5dec01e88d23933d35a6d53e941adcd4f64cc5e844a1c",
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/public-earlier-1-commands.json": {
+      "sha256": "25169cd34f1aba425244a0d63ed61d144d4a8b54e9db0eed12173a9d1ebcd3c0",
       "bytes": 386
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/public-earlier-1-exit.json": {
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/public-earlier-1-exit.json": {
       "sha256": "f61b19574fc02bb93f33a4b41d6c348fa39e76f340f164c74e5f7fd2dd955c5e",
       "bytes": 22
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/public-earlier-1.stderr": {
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/public-earlier-1.stderr": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "bytes": 0
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/public-earlier-1.stdout": {
-      "sha256": "cae1e0653b3dce7ec1bcefddcb1f2afc77826079dcd3dff3b024384a24dd6d2f",
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/public-earlier-1.stdout": {
+      "sha256": "c5b94b141b440b82221e045fd421b8975d3ac8272c0e2ffb7277a81bef1e6e39",
       "bytes": 752
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/public-groundtruth-commands.json": {
-      "sha256": "a0ce5b448327421b8e2067c673934bb3410322b7c28ee6f5b0402abbe5455b7e",
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/public-groundtruth-commands.json": {
+      "sha256": "e9fa94c2225481a8c9130a4095bb1dd03d64bdbb86f588f1a0e6eca69e8826f7",
       "bytes": 473
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/public-groundtruth-exit.json": {
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/public-groundtruth-exit.json": {
       "sha256": "f61b19574fc02bb93f33a4b41d6c348fa39e76f340f164c74e5f7fd2dd955c5e",
       "bytes": 22
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/public-groundtruth.stderr": {
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/public-groundtruth.stderr": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "bytes": 0
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/public-groundtruth.stdout": {
-      "sha256": "866997aa061e300d726ab3241d4b5657a3bf2354741e34d5cafeb1b08ab2e4a5",
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/public-groundtruth.stdout": {
+      "sha256": "9728b1bcd80b4f6807ac13d9955998a50fb124b2f46acc8ea1cb780b60e7567f",
       "bytes": 12621
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/public-history-groundtruth.json": {
-      "sha256": "4a63c6200b6d7825209ca74bd078631bf258066f9bbab04427ebd35be09e9b92",
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/public-history-groundtruth.json": {
+      "sha256": "51ec1495ce2daf4ca4701ed0e01ad4be375fbccdf2a8441bf6bd2bf5b43f4d40",
       "bytes": 37555
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/seed-commands.json": {
-      "sha256": "22f494f6eee8bc901a13c11c40af5e16e2cdc2f7c81ff7282aa5b21ad53fb4e6",
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/seed-commands.json": {
+      "sha256": "9dc9de3cf6dbd05151d2b125a8fdbcc85b2c8456d68cfd4a260eced004c443c7",
       "bytes": 1817
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/seed-exit.json": {
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/seed-exit.json": {
       "sha256": "f61b19574fc02bb93f33a4b41d6c348fa39e76f340f164c74e5f7fd2dd955c5e",
       "bytes": 22
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/seed-receipt.json": {
-      "sha256": "88f3740c4abb11f63a1f59bfbbf3cae769a5a1b9188756d6b5991a383b185388",
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/seed-receipt.json": {
+      "sha256": "e5ba1c647103289474c9e0b93c250ba10d2882ef94ec771fb2e2008ffc77c4b2",
       "bytes": 2093
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/seed.stderr": {
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/seed.stderr": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "bytes": 0
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/seed.stdout": {
-      "sha256": "07dea108d0d3b63bb17724f6a059dc7d791520967c0c636bc5bd080ac9ad2a0a",
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/seed.stdout": {
+      "sha256": "f74d79d7d84028b1c14751a27907464561993fc17818c497a60a338437820f2f",
       "bytes": 400
     },
-    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-2/source-receipt.json": {
-      "sha256": "bfd62d77b32614ce626b306f8492c888a7d29fd50aab881a4629845713fdd118",
+    ".runtime-fixtures/acceptance-refresh-20261025/native-paged-live-final-3/source-receipt.json": {
+      "sha256": "90f2d9ef8549cfb7c839593420d664894f75373dd0065d1c8eae65428e7e7fe4",
       "bytes": 3193
     }
   },
@@ -268,14 +268,14 @@
     "providerThreadStopped": true,
     "providerServerClosed": true,
     "supervisor": {
-      "pid": 50711,
+      "pid": 52225,
       "exitStatus": 0
     }
   },
   "ownedProbe": {
-    "pid": 50774,
+    "pid": 52281,
     "exitStatus": 0,
-    "processGroup": 50774,
+    "processGroup": 52281,
     "startNewSession": true,
     "processGroupExited": true
   },

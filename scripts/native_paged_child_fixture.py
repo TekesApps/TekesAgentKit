@@ -744,4 +744,3 @@ def _compare_entries(actual: object, expected: object) -> None:
     normalized_expected = [normalized_entry(entry) for entry in expected]
     _require(normalized_actual == normalized_expected,
              'typed projected entries differ from independent public raw history')
-

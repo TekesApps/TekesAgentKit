@@ -8,7 +8,7 @@
 
 实际provider通过四次公开read(proof.txt)正常执行并确认真实回传，第五次请求等待独立validator；全部pre-gate帧与独立公开full head/逐页请求响应一致后才返回HTTP400。原Refresh捕获错误新增事件及未合并PrefixValidation；中间head可能分批增长，每个prefix须绑定紧邻旧cut/revision。prefix的hasMoreBefore/runOpen与旧cut一致，sourceCall身份不变，但phase反映当前parent任务状态，可由running推进为error。盲目冻结旧phase或只允许一次head增长都会误判合法协议。
 
-最终新运行`native-paged-live-final-2`的四帧全部通过，demo exit0/所属process group消失、provider线程停止、supervisor exit0后才写accepted。全部590项源码/脚本/锁输入在最终运行前冻结、结束后逐项核对；程序和原始回执存SSD `.runtime-fixtures/acceptance-refresh-20261025/`。未读私有journal，无请求body/凭证落盘，无桌面操作。
+最终新运行`native-paged-live-final-3`的四帧全部通过，demo exit0/所属process group消失、provider线程停止、supervisor exit0后才写accepted。全部590项源码/脚本/锁输入在最终运行前冻结、结束后逐项核对；程序和原始回执存SSD `.runtime-fixtures/acceptance-refresh-20261025/`。未读私有journal，无请求body/凭证落盘，无桌面操作。
 
 验证：demo feature626/0/0，Python全套330/0（新增12项，含错误元数据与中间cut回归），默认/feature严格Clippy、格式和Rust边界通过。两个既有独立consumer归档程序本次实际执行exit0；其默认138项源码digest与feature191项compiled输入逐项未变，SDK精确50ec49f和依赖锁未变。它们只构造/挂载及公开API类型检查，实际SEP方法由本profile另证。
 
