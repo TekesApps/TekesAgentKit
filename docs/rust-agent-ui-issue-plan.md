@@ -1,6 +1,6 @@
 # Rust Agent UI 的 Issue 驱动交付计划
 
-日期：2026-10-24。基线：`1ef2791`，PR #10。完整目标保持不变；本计划将既有实现与剩余验收映射为工作项，不能把拆票视为交付完成。
+创建日期：2026-10-24，建票基线 `1ef2791`。最近功能基线 `9969f8f`（2026-10-25核对），PR #10。完整目标保持不变；本计划将历史实现与剩余验收映射为工作项，后续专题按各自不可变提交/程序解释，不能把拆票或分项通过视为完整交付。
 
 ## 执行规则
 
@@ -97,7 +97,7 @@
 
 证据：[rust-agent-ui-primary-focus-child-runs-20261023.md](rust-agent-ui-primary-focus-child-runs-20261023.md)、[rust-agent-ui-sidechat-original-input-20261023.md](rust-agent-ui-sidechat-original-input-20261023.md)、[rust-agent-ui-composer-visibility-20261021.md](rust-agent-ui-composer-visibility-20261021.md)、[rust-agent-ui-context-preflight-20261020.md](rust-agent-ui-context-preflight-20261020.md)。
 
-本次推进：[Composer 核对](rust-agent-ui-composer-issue16-audit-20261024.md)未发现确定实现缺陷，新增带正向控制的旧回调/能力撤销回归；3 个套件共 16 项通过，严格 Clippy/格式通过。实际宿主附件 materialize、完整布局/焦点、系统 IME/AX 尚未验收。
+本次推进：[Composer核对](rust-agent-ui-composer-issue16-audit-20261024.md)保留原回调/能力撤销回归；后续[实际宿主附件operation](rust-agent-ui-attachment-host-operation-results-20261024.md)已完成选择结果→受限读文件→一次上传→原来源回填的三端协议路径及取消/读失败/导航迟到回归。通用文件闭环不能代表inline image/历史图片预览已实现；这些仍属Composer完整目标。OS选择器/窗口HostResult循环、完整布局/焦点与系统IME/AX仍未验收。
 
 ### [#17](https://github.com/TekesApps/TekesAgentKit/issues/17) — [P1][Transcript] 完整内容、思考工具分区与富内容对齐
 
@@ -251,7 +251,7 @@
 
 证据：[rust-agent-ui-sidebar-navigation-20261021.md](rust-agent-ui-sidebar-navigation-20261021.md)、[rust-agent-ui-sidebar-paging-20261021.md](rust-agent-ui-sidebar-paging-20261021.md)、[rust-agent-ui-sidebar-preferences-20261021.md](rust-agent-ui-sidebar-preferences-20261021.md)、[rust-agent-ui-sidebar-session-menu-20261022.md](rust-agent-ui-sidebar-session-menu-20261022.md)。
 
-本次交付：[多 endpoint 聚合](rust-agent-ui-sidebar-multi-endpoint-20261024.md) `6c700e9` 完成可复用 binding 和 5 项新回归，支持完整 address 的 selected-read/action 原端点路由、旧 owner 拒绝和局部终态故障保留。后续 `4967d15` 已接入 demo 宿主并补齐旧 owner 隔离、按 endpoint 路由与非匹配 SideChat 禁用；跨端全局搜索、真实多 harness 配置与过滤分页整体组合、终态 observer 同实例恢复仍未完成。详见[三子会话本批收据](rust-agent-ui-parallel-results-20261024.md)，不据 binding 测试关闭 Issue。
+本次交付：[多endpoint聚合](rust-agent-ui-sidebar-multi-endpoint-20261024.md)与后续宿主接线已完成原端点路由和owner隔离；[真实三端Sidebar组合](rust-agent-ui-real-multi-sidebar-results-20261024.md)、[排名搜索](rust-agent-ui-sidebar-ranked-results-20261024.md)、[同实例observer恢复](rust-agent-ui-sidebar-observer-recovery-20261024.md)补齐了原初始批次尚未完成的全局搜索、本地过滤分页、终态观察显式恢复及旧代拒绝。这些不证明缺公开cursor契约的远端搜索续页、真实harness断流后的原生恢复、非当前行菜单或完整桌面/AX可见性，#22继续开放；历史批次记录保留原范围。
 
 ### [#23](https://github.com/TekesApps/TekesAgentKit/issues/23) — [P1][SidePanel] Task/子代理 tabs、pointer 与有界历史闭环
 
@@ -395,8 +395,8 @@ Native后续切片：复用既有feature headless与已安装Kernel0.9.3，真�
 
 已做：
 
-- [x] PR #10 draft，最新代码 1ef2791；#12/#13 已实施但尚未合并。
-- [x] 1ef2791 两套 CI 的 headless/UI测试/格式/Clippy 通过，严格 #53 reading 失败，两份JSON已归档。
+- [x] PR #10 draft，最近功能基线9969f8f；#12/#13已实施但尚未合并。
+- [x] 9969f8f的push40109889043/PR40109892909两轮checks、默认UI、feature见证、独立consumer通过，唯一#53严格阅读失败；原日志/artifact、137/243来源闭包及PR merge父关系已核对。1ef2791等历史CI按原记录保留。
 - [x] 设计/迁移/接入和专题证据已有；当前 UI 0.0.0/publish=false，不是 v0.3.8 中已发布 UI。
 
 待做：

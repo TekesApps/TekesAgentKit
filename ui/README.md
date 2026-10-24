@@ -6,6 +6,8 @@ Sidebar 的共享 binding 提供显式同实例 observer 恢复 API，按原 end
 
 当前 UI 为 `0.0.0` / `publish=false`，PR #10 保持 draft；不能把局部组件或离屏通过当作完整 ClientKit Views、窗口级 toolbar 或 ProcessContainer 验收。AgentKit 已发布基线为 v0.3.8，本 UI 明确消费同仓库开发路径和未发布的共享增量；正式宿主需固定最终发布的新不可变版本。
 
+最近功能基线 `9969f8f` 的[三端同程序原子面板来源](../docs/rust-agent-ui-native-child-pane-source-results-20261024.md)与[当前交付入口](../docs/rust-agent-ui-delivery-status.md)记录精确程序、CI和未验收范围。两轮CI仅TekesUI#53严格阅读失败，未合并/tag；下列旧阶段证据不转移到新程序。
+
 当前接入与证据：
 
 - [工具结算状态与元数据](../docs/rust-agent-ui-tool-result-status-20261022.md)：显式失败/停止事实与可选原 meta/error；不重算父回合结算，旧快照兼容。
@@ -64,7 +66,7 @@ Composer 的真实输入胶囊公开为 `ComposerIds::input_band`；现在保留
 - 旧e4 manifest、lockfile、消费适配和188依赖另有备份；旧 `.deps/tekesui` 原样保留但不参与当前构建。无需从兄弟工作树复制代码，`prepare-tekesui-demo.py` 在公开pin模式拒绝path/capture。
 - UI包继续 `0.0.0` / `publish=false`；公开 TekesUI pin 不代表 AgentKit UI 已发布或稳定。当前依赖见 [50ec公开接收](../docs/tekesui-50ec-public-intake-20261022.md)，原生验收范围见[三端补验](../docs/rust-agent-ui-native-resume-20261022.md)；旧阶段记录按各自程序解释。
 
-最新正式组件进展：[原生 Jump/回到最新](../docs/rust-agent-ui-jump-latest-20261021.md)；仍为实验 API，未代表完整 ClientKit Views 验收。
+正式组件仍为实验API，进展按[Issue计划](../docs/rust-agent-ui-issue-plan.md)和[当前交付入口](../docs/rust-agent-ui-delivery-status.md)核对；[原生Jump/回到最新](../docs/rust-agent-ui-jump-latest-20261021.md)保留其历史程序范围，不能代表当前完整ClientKit Views验收。
 
 只读子历史宿主请使用[完整pane阅读事务](../docs/rust-agent-ui-readonly-reading-20261021.md)，不要在已声明SDK reading document后直接替换正文。
 

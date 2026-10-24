@@ -1,16 +1,24 @@
 # Rust Agent UI：当前接入范围与交付状态
 
-需求分配与后续执行以 [Issue 驱动交付计划](rust-agent-ui-issue-plan.md) / [总追踪 #14](https://github.com/TekesApps/TekesAgentKit/issues/14) 为准。下列专题与阶段计数保留各自历史身份；不能据旧表格覆盖最新 Issue 状态。本页较早 CI 复核基线为 `32986d4`：两套 headless/UI 测试/格式/Clippy 及新增独立 consumer 均通过，严格阅读仍因 TekesUI #53 失败。详见[最新 CI 收据](rust-agent-ui-ci-review-20261024.md)。
+需求分配与后续执行以 [Issue 驱动交付计划](rust-agent-ui-issue-plan.md) / [总追踪 #14](https://github.com/TekesApps/TekesAgentKit/issues/14) 为准。
 
-最新SideChat增量：[非首端Pi真实闭环](rust-agent-ui-real-multi-sidechat-results-20261024.md)补齐同一三端宿主的原Create/Send/运行取消/重连/确认discard与跨端迟到，未改变产品焦点策略。#22/#24/#27完整验收仍开放；新提交CI与历史CI分开。
+当前功能基线为 `9969f8f274c17193024eec74a78aae2eabe15fae`（2026-10-25核对），[PR #10](https://github.com/TekesApps/TekesAgentKit/pull/10)仍为draft。UI仍是 `0.0.0` / `publish=false`，不是已发布v0.3.8的一部分；完整交付尚未达到。最近文档提交不会改变这些功能证据的适用revision。
 
-最新增量：[真实三端分类与历史保留](rust-agent-ui-real-sidebar-classification-results-20261024.md)已完成15个公开生命周期样本、当前Pi实例scratch、同帧classification与原selected-read/历史恢复；原六组家族与九会话Sidebar离屏回归通过。UI747/0/1、root340/0/0、Python170、独立consumer执行通过；最后probe增量另经严格Clippy、普通demo构建与实际三端运行。历史CI基线分别保留；PR #10 当前新提交CI需另核对。#53、桌面/IME/AX、Task动态pointer和完整交付仍未完成。
+- [三端同程序原子面板来源](rust-agent-ui-native-child-pane-source-results-20261024.md)：Native原只读head running→error，Pi/DSH可继续子pane，同一最终demo SHA `2ff35842…`；父草稿/选择保留与关闭退休均通过。仅离屏/原公开协议证据，不是累计分页来源或完整窗口验收。
+- 精确功能head的[push CI40109889043](https://github.com/TekesApps/TekesAgentKit/actions/runs/40109889043)和[PR CI40109892909](https://github.com/TekesApps/TekesAgentKit/actions/runs/40109892909)已终态核对：checks、默认UI、feature来源见证与独立consumer通过，唯一失败仍为TekesUI#53严格嵌套阅读；未合并/tag。原日志/artifact、137个consumer来源及243个SDK输入闭包已核对。
+- 仍缺：Task动态行的权威producer、真实报告/独立旁白producer；SDK #42新Host checkpoint、#53嵌套阅读及其余具体控件/容器能力；完整桌面/系统IME/OS AX/ProcessContainer与Views/性能验收。已接通原树分页与阅读不代表跨新树恢复。
+
+以下专题、程序和计数是各阶段的历史证据，不覆盖上述当前入口。较早 `32986d4` 的[CI收据](rust-agent-ui-ci-review-20261024.md)按其原head保留。
+
+已交付的SideChat增量：[非首端Pi真实闭环](rust-agent-ui-real-multi-sidechat-results-20261024.md)补齐同一三端宿主的原Create/Send/运行取消/重连/确认discard与跨端迟到，未改变产品焦点策略。#22/#24/#27完整验收仍开放；新提交CI与历史CI分开。
+
+已交付增量：[真实三端分类与历史保留](rust-agent-ui-real-sidebar-classification-results-20261024.md)已完成15个公开生命周期样本、当前Pi实例scratch、同帧classification与原selected-read/历史恢复；原六组家族与九会话Sidebar离屏回归通过。UI747/0/1、root340/0/0、Python170、独立consumer执行通过；最后probe增量另经严格Clippy、普通demo构建与实际三端运行。历史CI基线分别保留；PR #10 当前新提交CI需另核对。#53、桌面/IME/AX、Task动态pointer和完整交付仍未完成。
 
 本批按主/子会话并行推进 #22/#23/#25：[统一结果与未验收项](rust-agent-ui-parallel-results-20261024.md)。新增多端 binding 和 Summary pointer 门禁，主会话验证 presentation225/UI634（1原有忽略）及 Pi/DSH 原 Summary→子 Run 非桌面闭环；完整交付仍未达到。
 
 本次续批：#22 demo 多端宿主接线与 owner 退休、#23 状态回归、#25 公开 facts 校验已提交；分层测试与保留范围见[新收据](rust-agent-ui-sidebar-host-results-20261024.md)。这份收据补充下列历史记录，不覆盖原生未验收结论。
 
-本页以已提交基线 `6062079` 及本轮派生来源/只读实例修复为准，按用户完整目标保留验收范围。
+以下较早专题起于 `6062079` 及对应派生来源/只读实例修复；它们的原始程序、计数与未验收范围保留，不作为当前全量验证。
 当前可供实验宿主接入，**完整交付尚未达到**。组件存在、离屏通过或单个 Issue 关闭都不能单独证明完整 Views 对齐。
 本阶段增量的证据见[三端离屏覆盖补验](rust-agent-ui-offscreen-coverage-20261023.md)与[固定验收工具链](rust-agent-ui-native-toolchain.md)；不替代本页原阶段的程序身份和原生结论。
 本轮完整 UI 628 通过、1 项既有忽略，补充负例后只读 14 项通过；Python 74、严格 Clippy/格式/边界通过；
@@ -42,7 +50,7 @@ PR #10 的 `ea36946` 远端 CI：checks 成功；UI 在严格 nested-detail-read
 [SideChat 同目标重开](rust-agent-ui-sidechat-shared-destination-20261023.md)已修复：
 重复/并发 open 复用原 controller，所有展示句柄卸载后重开仍保留草稿；
 Closing/Unknown 与确认丢弃/不存在沿用原权限，确认关闭释放 owner 持有的 binding。
-最新同一程序在 Native/Pi 的真实原组件离屏闭环通过，DSH 保持不可用门禁。
+该阶段同一程序在 Native/Pi 的真实原组件离屏闭环通过，DSH 保持不可用门禁。
 `d1a0c09` 的 PR/push CI 已结束：headless 成功，UI 仍在 #53 严格阅读步骤失败。
 
 [SideChat 原编辑器输入与目标脚注复验](rust-agent-ui-sidechat-original-input-20261023.md)：
@@ -66,7 +74,7 @@ DSH 保持能力禁用；桌面、物理 IME 和 ProcessContainer 未验收。
 | 已发布 AgentKit | `v0.3.8`，根 workspace 版本同为 0.3.8；本分支包含尚未发布的共享增量，不能把 UI 当作未修改的 v0.3.8 消费者。 |
 | UI packages | `ui/` 为独立 workspace，0.0.0 / publish=false；开发使用显式仓库内 path，固定整个 AgentKit revision。正式宿主须等待包含所需 API 的新不可变发布 pin。 |
 | TekesUI | 公开 `50ec49f3446924fdbc66b3cff22cd8cfe150fe7c`，Cargo.lock 中 8 包；`ui/tekesui-source.json` 核验 243 输入，清单 SHA `3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c`。 |
-| 原生运行时 | Pi 1.4.0 候选（1.3.0 基线保留）、DSH 0.2.1-rc.2；Native 0.9.3 本轮协议驱动场景及有界子历史离屏通过；此前 UI-only 记录范围不变。未证明整个 Kernel 所有能力或当前原生窗口验收。 |
+| 已验证运行时 | 最近同程序子pane验证使用 Native0.9.3、Pi1.3.0、DSH0.2.1-rc.2。Pi1.4.0兼容候选另有独立记录，未替换1.3.0基线。历史程序/版本不转移验收；不证明整个Kernel、当前完整窗口或全部版本。 |
 | 宿主路径 | 当前 Sidebar / RunPort / SidePanel 使用同进程原 ContentHost；未按 ProcessContainer 同/跨进程契约验收。RunSurface/ComponentDemo 是测试宿主。 |
 
 ## 按完整目标核对
@@ -86,7 +94,7 @@ DSH 保持能力禁用；桌面、物理 IME 和 ProcessContainer 未验收。
 | 反馈初读/重连/CAS | 自动按来源/epoch读取，普通 aside 无常驻 Refresh；加载失败保留旧记录且不可写，明确刷新恢复。 | 本轮真实三端离屏组合验证见当前续验；真实故障恢复仍属 4097e4f 冻结程序，反馈的当前原生交互仍待验收。 |
 | ProcessContainer 同/跨进程 | 当前没有正式适配；8 包闭包不含 module-runtime/app-protocol。 | #48 固定公开 SDK 中 `new_view` 仍声明无远端 keyboard/IME/AX，V1 的 keyboard/scroll/text_ime/accessibility 为 false；本轮复核公开 50ec49f 仍如此；需 SDK 交付后再接入三个业务容器并独立验收。 |
 | 原生、中文组字、阅读/重连、第二 consumer | 有多个冻结程序的分项成功、失败和完整收据；组件/第二 consumer 在 CI 跑，未打开桌面。 | 同一交付程序的完整 Native/Pi/DSH + 当前系统 IME、最终配对布局；跨进程/VoiceOver 未证明。前一阶段 c90c9f3b 程序已通过三端 stream/stream-reading/public-page、owned 原生 Activity 点击/控件保留和一次系统软件拼音。public-page 不是原生分页按钮，SideChat 旧收据不转移到当前程序；物理键盘、稳定 IME、完整配对布局与跨进程未证明。 |
-| review、CI、合并/tag | PR #10 draft；远端 d1a0c09 的 checks x2 成功、UI x2 在严格 nested-detail step 失败。本阶段本地 UI 623 通过/1 既有忽略、Python 74 通过，严格 all-target Clippy/格式/边界通过。根测试仍保留独立收据，本轮未重跑。 | 完整 review、全部要求与验收审计、新发布 pin；严格失败仍在，不能合并或打完成 tag。 |
+| review、CI、合并/tag | PR #10 draft；功能基线9969f8f的push/PR两轮checks、默认UI、feature见证与独立consumer通过，严格#53步骤失败。运行/源码/闭包与分层计数见当前入口及专题，旧623/74等计数仍仅适用历史程序。 | 完整review、全部要求和适用验收、新发布pin；严格失败仍在，不能合并或打完成tag。 |
 
 ## 后续工作顺序
 
@@ -96,7 +104,7 @@ DSH 保持能力禁用；桌面、物理 IME 和 ProcessContainer 未验收。
 4. **固定程序交付**：ClientKit 同内容/尺寸/主题/scale 对照、第二 consumer、同进程及跨进程分别留证；通过完整要求审计后再 review、合并、发布不可变 tag。优先复用 target，保留程序/日志/截图和 WIP。
 
 新宿主的状态输入、回调与焦点责任见[短接入说明](rust-agent-ui-host-integration.md)。
-[审计快照](rust-agent-ui-delivery-status.json)记录源码、依赖、公开 Issue 和证据来源；它是未完成项清单，不是全量验收凭证。
+[历史审计快照](rust-agent-ui-delivery-status.json)保留当时源码、依赖、公开Issue和证据来源，不覆写为新head；当前状态按本页顶部、Issue和各不可变程序收据解释，均不是完整交付凭证。
 
 ## 证据入口
 
