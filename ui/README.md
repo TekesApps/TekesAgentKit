@@ -348,3 +348,11 @@ for constructor injection, scaling, control/selection retention and native evide
 
 
 当前会话 Sidebar 的 pins 与普通会话共用 provider query/folder 成员条件；置顶是展示分区，不是筛选例外。隐藏不删除 pin 偏好或草稿。未完成/失败 provider 查询仍保留诊断，不将原库存当作查询结果；本地名称 FTS 和排名尚未实现。见[成员关系设计与范围](../docs/rust-agent-ui-sidebar-query-membership-20261024.md)及[交付收据](../docs/rust-agent-ui-sidebar-query-membership-results-20261024.md)。
+
+### Sidebar 本地名称与 provider 搜索（#22）
+
+宿主复用 `SidebarSearchProjector`，传入原 observer source key、完整库存 publication、原 search publication 与显示输入；多端调用 `project_multi_for_display`，一次索引全量地址后逐端投影。demo 已使用此路径。不要对已过滤的 rows 建索引，也不要将 display revision 当成库存 revision。旧 publication convenience 方法保留，但每次创建短生命周期派生索引。
+
+本地名称 FTS 与已知 Complete provider hits 取并集；provider 失败或不支持时本地名称仍能匹配，原状态/Retry 保留。`SidebarSearchHelp.local_results_ready` 与 provider `results_ready` 分开；多端投影的 `help` 通过 `set_multi_search_projection_help` 原样消费。旧 `set_multi_search_help` 保守地不声明结果完整。空态区分本地名称无匹配与完整查询无结果，未知 provider hit 不遮住其他已知行。
+
+派生 SQLite 索引仅为 UI bindings 的可再生内存实现，不是持久 Mirror、不读取 harness 私库；headless contract/session/presentation 的 SQLite 禁令保持不变。bm25 排名与远端续页仍未实现，桌面验收未运行。

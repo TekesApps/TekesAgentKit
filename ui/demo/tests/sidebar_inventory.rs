@@ -129,7 +129,7 @@ async fn reconciled_titles_and_recent_activity_reach_host_and_independent_consum
     until(&source, |s| {
         s.rows
             .iter()
-            .any(|r| r.address.session_id == "a" && r.title == "a")
+            .any(|r| r.address.session_id == "a" && r.title == "New conversation")
     })
     .await;
     view.set_sidebar_source(source.snapshot()).unwrap();

@@ -221,6 +221,8 @@ class Checks(unittest.TestCase):
             (ui / name).mkdir()
             text = '[package]\npublish.workspace=true\n[dependencies]\n'
             text += ''.join(f'{d}.workspace=true\n' for d in dependencies)
+            if name == 'bindings':
+                text += 'rusqlite={version="=0.40.2",default-features=false,features=["bundled"]}\n'
             if name == 'consumer':
                 text += '[dev-dependencies]\n' + ''.join(
                     f'{d}.workspace=true\n' for d in ('tekes-ui-text', 'tekes-ui-scene', 'tekes-ui-tokens'))
@@ -256,6 +258,15 @@ class Checks(unittest.TestCase):
                                          '--root', str(self.root)], capture_output=True)
                 self.assertNotEqual(result.returncode, 0)
         consumer.write_text(accepted)
+        bindings = ui / 'bindings/Cargo.toml'
+        accepted = bindings.read_text()
+        for old, wrong in [('=0.40.2', '0.40'), ('default-features=false', 'default-features=true'), ('features=["bundled"]', 'features=[]')]:
+            with self.subTest(wrong_sqlite=wrong):
+                bindings.write_text(accepted.replace(old, wrong))
+                result = subprocess.run([sys.executable, str(SCRIPTS / 'check-ui-boundaries.py'),
+                                         '--root', str(self.root)], capture_output=True)
+                self.assertNotEqual(result.returncode, 0)
+        bindings.write_text(accepted)
 
     def test_capture_is_disabled_for_a_published_pin(self):
         scripts = self.root / 'scripts'

@@ -28,7 +28,9 @@ assert set(components) == {'tekes-agent-contract', 'tekes-agent-presentation', '
 bindings = tomllib.loads((ui / 'bindings/Cargo.toml').read_text())['dependencies']
 # uuid allocates immutable session/create and attachment-operation identities;
 # bindings still cannot import a renderer, platform backend or harness adapter.
-assert set(bindings) == {'tekes-agent-components-ui', 'tekes-agent-contract', 'tekes-agent-presentation', 'tekes-agent-session', 'tekes-agent-web', 'serde_json', 'tokio', 'async-trait', 'uuid', 'base64'}
+assert set(bindings) == {'tekes-agent-components-ui', 'tekes-agent-contract', 'tekes-agent-presentation', 'tekes-agent-session', 'tekes-agent-web', 'serde_json', 'tokio', 'async-trait', 'uuid', 'base64', 'rusqlite'}
+# UI-only, rebuildable title FTS; never permit it in headless/presentation.
+assert bindings['rusqlite'] == {'version': '=0.40.2', 'default-features': False, 'features': ['bundled']}
 consumer = tomllib.loads((ui / 'consumer/Cargo.toml').read_text())['dependencies']
 # Public reveal consumption needs the SDK's original token, options and text-host trait.
 # Controls are permitted; renderer/platform/harness dependencies remain excluded.

@@ -5,6 +5,7 @@ edition.workspace = true
 publish.workspace = true
 license.workspace = true
 [dependencies]
+rusqlite = { version = "=0.40.2", default-features = false, features = ["bundled"] }
 tekes-agent-components-ui.workspace = true
 tekes-agent-contract.workspace = true
 tekes-agent-presentation.workspace = true

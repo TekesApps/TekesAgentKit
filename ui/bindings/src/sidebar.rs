@@ -602,23 +602,84 @@ pub(crate) fn inventory_row(
         actions,
     })
 }
-fn inventory_title(item: &Value, id: &str) -> String {
+fn inventory_title(item: &Value, _id: &str) -> String {
     // Presence is authoritative, including null/empty clears. Never resurrect an
     // older summary title when the reconciled projection explicitly clears it.
     let canonical = item.get("projections").and_then(|p| p.get("title"));
     let projected = canonical.or_else(|| item["summary"]["projections"]["values"].get("title"));
     match projected {
-        Some(value) => value
-            .as_str()
-            .filter(|s| !s.trim().is_empty())
-            .unwrap_or(id),
-        None => item["summary"]["title"]
-            .as_str()
-            .or_else(|| item["summary"]["name"].as_str())
-            .filter(|s| !s.trim().is_empty())
-            .unwrap_or(id),
+        Some(value) => trimmed_title(value).unwrap_or("New conversation"),
+        None => trimmed_title(&item["summary"]["title"])
+            .or_else(|| trimmed_title(&item["summary"]["name"]))
+            .unwrap_or("New conversation"),
     }
     .to_owned()
+}
+
+fn trimmed_title(value: &Value) -> Option<&str> {
+    value
+        .as_str()
+        .map(str::trim)
+        .filter(|title| !title.is_empty())
+}
+
+#[cfg(test)]
+mod inventory_title_tests {
+    use super::inventory_title;
+    use serde_json::json;
+
+    #[test]
+    fn canonical_clear_uses_default_without_resurrecting_summary_or_session_id() {
+        for cleared_title in [json!(null), json!(""), json!(" \t\n ")] {
+            let item = json!({
+                "summary": {"title": "old title", "name": "old name"},
+                "projections": {"title": cleared_title}
+            });
+            assert_eq!(inventory_title(&item, "session-id"), "New conversation");
+        }
+    }
+
+    #[test]
+    fn canonical_clear_in_summary_projection_is_also_authoritative() {
+        let item = json!({
+            "summary": {
+                "title": "old title",
+                "projections": {"values": {"title": "  "}}
+            }
+        });
+        assert_eq!(inventory_title(&item, "session-id"), "New conversation");
+    }
+
+    #[test]
+    fn canonical_and_legacy_titles_are_trimmed_and_legacy_name_is_supported() {
+        assert_eq!(
+            inventory_title(&json!({"projections":{"title":"  explicit title  "}}), "id"),
+            "explicit title"
+        );
+        assert_eq!(
+            inventory_title(&json!({"summary":{"title":"  legacy title  "}}), "id"),
+            "legacy title"
+        );
+        assert_eq!(
+            inventory_title(
+                &json!({"summary":{"title":"  ","name":"  legacy name  "}}),
+                "id"
+            ),
+            "legacy name"
+        );
+    }
+
+    #[test]
+    fn unnamed_legacy_uses_default_but_explicit_id_title_is_valid() {
+        assert_eq!(
+            inventory_title(&json!({"summary":{}}), "session-id"),
+            "New conversation"
+        );
+        assert_eq!(
+            inventory_title(&json!({"projections":{"title":"session-id"}}), "session-id"),
+            "session-id"
+        );
+    }
 }
 
 #[cfg(test)]

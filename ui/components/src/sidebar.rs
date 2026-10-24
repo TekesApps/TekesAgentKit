@@ -5,9 +5,10 @@ use crate::sidebar_navigation::{
 };
 use crate::summary_section::{Expansion, SectionHeaderKind, SummarySectionView};
 use crate::{
-    SidebarFolderKey, SidebarObserverLabels, SidebarPreferenceChange, SidebarPreferencesSnapshot,
-    SidebarSearchInput, SidebarSearchIntent, SidebarSearchKey, SidebarSearchLabels, SidebarSort,
-    SidebarTitleComparator, ordered_sidebar_rows, sidebar_folder_title,
+    SidebarFolderKey, SidebarMultiSearchHelp, SidebarObserverLabels, SidebarPreferenceChange,
+    SidebarPreferencesSnapshot, SidebarSearchInput, SidebarSearchIntent, SidebarSearchKey,
+    SidebarSearchLabels, SidebarSort, SidebarTitleComparator, ordered_sidebar_rows,
+    sidebar_folder_title,
     sidebar_search::{SearchFooter, SearchInputView},
 };
 use std::cell::{Cell, RefCell};
@@ -154,10 +155,7 @@ pub struct Sidebar {
     displayed: Option<SidebarInput>,
     search: Option<SidebarSearchInput>,
     multi_search_next: u64,
-    multi_search_help: Option<(
-        tekes_agent_presentation::SidebarMultiSearchInput,
-        BTreeMap<SessionAddress, String>,
-    )>,
+    multi_search_help: Option<SidebarMultiSearchHelp>,
     search_owner: Option<String>,
     search_labels: SidebarSearchLabels,
     search_retry: Option<(SidebarSearchKey, ComponentId)>,
@@ -743,7 +741,7 @@ impl Sidebar {
         if self
             .multi_search_help
             .as_ref()
-            .is_some_and(|(old, _)| old != &source.input)
+            .is_some_and(|help| help.source != source.input)
         {
             self.multi_search_help = None;
         }
@@ -757,25 +755,63 @@ impl Sidebar {
         source: &tekes_agent_presentation::SidebarMultiSearchInput,
         snippets: &BTreeMap<SessionAddress, String>,
     ) -> Result<(), &'static str> {
+        self.set_multi_search_projection_help(&SidebarMultiSearchHelp {
+            source: source.clone(),
+            snippets: snippets.clone(),
+            local_results_ready: false,
+            results_ready: false,
+        })
+    }
+    /// Supply help and readiness derived from the complete original inventory
+    /// and the current aggregate publication.
+    pub fn set_multi_search_projection_help(
+        &mut self,
+        help: &SidebarMultiSearchHelp,
+    ) -> Result<(), &'static str> {
         let current = self
             .displayed_multi_search()
             .ok_or("multi-search source is not installed")?;
-        if &current.input != source || (source.key.is_none() && !snippets.is_empty()) {
+        if help.source != current.input || (help.source.key.is_none() && !help.snippets.is_empty())
+        {
             return Err("stale multi-search row help");
         }
-        for (address, text) in snippets {
-            if !current.children.iter().any(|child| {
-                child.endpoint_id == address.endpoint_id
-                    && child
-                        .publication
-                        .hits
-                        .iter()
-                        .any(|hit| &hit.address == address && &hit.hit.snippet == text)
-            }) {
+        if help.results_ready
+            && current.children.iter().any(|child| {
+                !matches!(
+                    child.publication.input.phase,
+                    crate::SidebarSearchPhase::Complete { .. }
+                )
+            })
+        {
+            return Err("multi-search readiness exceeds provider publication");
+        }
+        for (address, text) in &help.snippets {
+            if !self
+                .displayed
+                .as_ref()
+                .is_some_and(|input| input.rows.iter().any(|row| &row.address == address))
+                || !current.children.iter().any(|child| {
+                    child.endpoint_id == address.endpoint_id
+                        && matches!(
+                            child.publication.input.phase,
+                            crate::SidebarSearchPhase::Complete { .. }
+                        )
+                        && child
+                            .publication
+                            .hits
+                            .iter()
+                            .any(|hit| &hit.address == address && &hit.hit.snippet == text)
+                })
+            {
                 return Err("row help is outside the original multi-search result");
             }
         }
-        self.multi_search_help = Some((source.clone(), snippets.clone()));
+        if self.multi_search_help.as_ref() != Some(help) {
+            self.multi_search_help = Some(help.clone());
+            if let Some(input) = self.displayed.clone() {
+                self.update(&input)?;
+            }
+        }
         Ok(())
     }
     pub fn take_multi_search_intents(
@@ -794,17 +830,26 @@ impl Sidebar {
             return None;
         }
         if let Some(current) = self.displayed_multi_search() {
-            let (source, snippets) = self.multi_search_help.as_ref()?;
-            if source != &current.input
-                || source.key.is_none()
+            let help = self.multi_search_help.as_ref()?;
+            if help.source != current.input
+                || help.source.key.is_none()
                 || !input.rows.iter().any(|row| &row.address == address)
             {
                 return None;
             }
-            return snippets.get(address).map(String::as_str);
+            let complete = current.children.iter().any(|child| {
+                child.endpoint_id == address.endpoint_id
+                    && matches!(
+                        child.publication.input.phase,
+                        crate::SidebarSearchPhase::Complete { .. }
+                    )
+            });
+            return complete
+                .then(|| help.snippets.get(address).map(String::as_str))
+                .flatten();
         }
         let help = input.search_help.as_ref()?;
-        if !help.results_ready || self.search.as_ref() != Some(&help.source) {
+        if self.search.as_ref() != Some(&help.source) || !single_snippet_ready(&help.source) {
             return None;
         }
         help.snippets.get(address).map(String::as_str)
@@ -1237,14 +1282,13 @@ impl Sidebar {
                 .ok_or("Sidebar help has no query source")?;
             if key.query.trim().is_empty()
                 || help.source.phase == crate::SidebarSearchPhase::Idle
-                || (!help.results_ready && !help.snippets.is_empty())
-                || (help.results_ready
-                    && !matches!(
-                        help.source.phase,
-                        crate::SidebarSearchPhase::Complete { .. }
-                    ))
+                || !search_readiness_is_valid(&help.source, help.results_ready)
                 || help.snippets.keys().any(|address| {
                     address.endpoint_id != key.endpoint_id
+                        || !matches!(
+                            help.source.phase,
+                            crate::SidebarSearchPhase::Complete { .. }
+                        )
                         || !input.rows.iter().any(|row| &row.address == address)
                 })
             {
@@ -1507,38 +1551,19 @@ impl Sidebar {
                         .as_ref()
                         .is_some_and(|search| search.key.is_some())
                     {
-                        if input.loaded
-                            && input
-                                .search_help
-                                .as_ref()
-                                .is_none_or(|help| help.results_ready)
-                            && self.search.as_ref().is_some_and(|search| {
-                                matches!(
-                                    search.phase,
-                                    crate::SidebarSearchPhase::Complete { has_more: false }
-                                )
-                            })
-                        {
-                            &self.search_labels.no_results
-                        } else {
-                            &self.search_labels.pending_results
-                        }
+                        single_search_empty_label(
+                            input.loaded,
+                            input.search_help.as_ref(),
+                            self.search.as_ref(),
+                            &self.search_labels,
+                        )
                     } else if self.multi_search_active() {
-                        if input.loaded
-                            && self.displayed_multi_search().is_some_and(|source| {
-                                source.children.iter().all(|child| {
-                                    child.publication.unresolved.is_empty()
-                                        && matches!(
-                                            child.publication.input.phase,
-                                            crate::SidebarSearchPhase::Complete { has_more: false }
-                                        )
-                                })
-                            })
-                        {
-                            &self.search_labels.no_results
-                        } else {
-                            &self.search_labels.pending_results
-                        }
+                        multi_search_empty_label(
+                            input.loaded,
+                            self.displayed_multi_search(),
+                            self.multi_search_help.as_ref(),
+                            &self.search_labels,
+                        )
                     } else if input.loaded {
                         &self.labels.empty
                     } else {
@@ -1761,6 +1786,78 @@ impl Sidebar {
             .collect()
     }
 }
+
+fn single_search_empty_label<'a>(
+    inventory_loaded: bool,
+    help: Option<&'a crate::SidebarSearchHelp>,
+    source: Option<&crate::SidebarSearchInput>,
+    labels: &'a SidebarSearchLabels,
+) -> &'a str {
+    let Some(source) = source else {
+        return &labels.pending_results;
+    };
+    let Some(key) = &source.key else {
+        return &labels.pending_results;
+    };
+    let local_ready = inventory_loaded
+        && help.is_some_and(|help| help.source == *source && help.local_results_ready);
+    if !local_ready {
+        return &labels.pending_results;
+    }
+    let provider_ready = help.is_some_and(|help| help.source == *source && help.results_ready);
+    if provider_ready
+        && matches!(
+            source.phase,
+            crate::SidebarSearchPhase::Complete { has_more: false }
+        )
+    {
+        &labels.no_results
+    } else if key.query.trim().is_empty() {
+        &labels.pending_results
+    } else {
+        &labels.local_no_results
+    }
+}
+
+fn single_snippet_ready(source: &crate::SidebarSearchInput) -> bool {
+    matches!(source.phase, crate::SidebarSearchPhase::Complete { .. })
+}
+
+fn search_readiness_is_valid(source: &crate::SidebarSearchInput, ready: bool) -> bool {
+    !ready || single_snippet_ready(source)
+}
+
+fn multi_search_empty_label<'a>(
+    inventory_loaded: bool,
+    source: Option<&tekes_agent_presentation::SidebarMultiSearchPublication>,
+    help: Option<&'a SidebarMultiSearchHelp>,
+    labels: &'a SidebarSearchLabels,
+) -> &'a str {
+    let Some(source) = source else {
+        return &labels.pending_results;
+    };
+    let local_ready = inventory_loaded
+        && help.is_some_and(|help| help.source == source.input && help.local_results_ready);
+    if !local_ready {
+        return &labels.pending_results;
+    }
+    let provider_complete_empty = help.is_some_and(|help| {
+        help.source == source.input
+            && help.results_ready
+            && source.children.iter().all(|child| {
+                matches!(
+                    child.publication.input.phase,
+                    crate::SidebarSearchPhase::Complete { has_more: false }
+                )
+            })
+    });
+    if provider_complete_empty {
+        &labels.no_results
+    } else {
+        &labels.local_no_results
+    }
+}
+
 impl Component for Sidebar {
     fn children(&self) -> &[Content] {
         &self.body.children
@@ -1809,5 +1906,109 @@ impl Component for Sidebar {
     }
     fn semantics(&self) -> ContentSemantics {
         ContentSemantics::new(ContentRole::Group, &self.labels.name)
+    }
+}
+
+#[cfg(test)]
+mod search_readiness_tests {
+    use super::*;
+    use crate::SidebarSearchHelp;
+
+    fn source(phase: crate::SidebarSearchPhase) -> crate::SidebarSearchInput {
+        crate::SidebarSearchInput {
+            revision: 1,
+            key: Some(crate::SidebarSearchKey {
+                owner: "owner".into(),
+                endpoint_id: "endpoint".into(),
+                connection_epoch: 1,
+                generation: 1,
+                query: "needle".into(),
+            }),
+            phase,
+        }
+    }
+
+    fn help(source: crate::SidebarSearchInput, local: bool, provider: bool) -> SidebarSearchHelp {
+        SidebarSearchHelp {
+            local_results_ready: local,
+            results_ready: provider,
+            source,
+            snippets: BTreeMap::new(),
+        }
+    }
+
+    #[test]
+    fn local_empty_state_keeps_provider_uncertainty_separate() {
+        let labels = SidebarSearchLabels::default();
+        let failed = source(crate::SidebarSearchPhase::Failed {
+            message: "provider unavailable".into(),
+            has_more: false,
+            retryable: true,
+        });
+        assert_eq!(
+            single_search_empty_label(
+                true,
+                Some(&help(failed.clone(), true, false)),
+                Some(&failed),
+                &labels
+            ),
+            labels.local_no_results
+        );
+
+        let searching = source(crate::SidebarSearchPhase::Searching);
+        assert_eq!(
+            single_search_empty_label(
+                true,
+                Some(&help(searching.clone(), true, false)),
+                Some(&searching),
+                &labels
+            ),
+            labels.local_no_results
+        );
+
+        let complete = source(crate::SidebarSearchPhase::Complete { has_more: false });
+        assert_eq!(
+            single_search_empty_label(
+                true,
+                Some(&help(complete.clone(), true, true)),
+                Some(&complete),
+                &labels
+            ),
+            labels.no_results
+        );
+        assert_eq!(
+            single_search_empty_label(
+                true,
+                Some(&help(complete.clone(), true, false)),
+                Some(&complete),
+                &labels
+            ),
+            labels.local_no_results
+        );
+        assert_eq!(
+            single_search_empty_label(
+                true,
+                Some(&help(complete.clone(), false, true)),
+                Some(&complete),
+                &labels
+            ),
+            labels.pending_results
+        );
+    }
+
+    #[test]
+    fn completed_partial_search_can_supply_snippets_and_failed_search_cannot() {
+        let complete = source(crate::SidebarSearchPhase::Complete { has_more: false });
+        assert!(single_snippet_ready(&complete));
+        assert!(search_readiness_is_valid(&complete, false));
+        assert!(search_readiness_is_valid(&complete, true));
+
+        let failed = source(crate::SidebarSearchPhase::Failed {
+            message: "provider unavailable".into(),
+            has_more: false,
+            retryable: true,
+        });
+        assert!(!single_snippet_ready(&failed));
+        assert!(!search_readiness_is_valid(&failed, true));
     }
 }

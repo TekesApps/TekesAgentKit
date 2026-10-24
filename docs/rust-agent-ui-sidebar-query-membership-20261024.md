@@ -31,3 +31,17 @@ AgentKit 自己拥有 Rust 的可重建内存派生索引，输入仅为原公�
 ## 后续依赖只读预审
 
 尚未修改 Cargo 依赖。下一切片候选精确 `rusqlite = "=0.40.2"`，拟关闭 default features，仅启用 `bundled`；是否采用仍须通过实际构建和 FTS5/查询语义测试。该 tag 的 [Cargo.toml](https://github.com/rusqlite/rusqlite/blob/v0.40.2/Cargo.toml) 将 bundled 转给 libsqlite3-sys 并启用 modern_sqlite；其 [bundled 构建源码](https://github.com/rusqlite/rusqlite/blob/v0.40.2/libsqlite3-sys/build.rs#L138-L159) 明确启用 FTS5。这里只证明上游源声明，不代表当前 AgentKit 已编译/启用 FTS5，也不代表所有部署目标已经通过。
+
+## 2026-10-24 第二切片实施契约
+
+现采用精确 `rusqlite = "=0.40.2"`（关闭默认 features，仅 `bundled`），依赖只进入 UI workspace 的锁文件，根 workspace 继续不依赖 SQLite。实际 SQLite FTS5 的七项索引回归已经执行通过；不再把上面的“尚未引入”历史阶段描述当作当前依赖状态。
+
+UI bindings 的 `SidebarNameIndex` 以完整库存地址/名称构建可再生内存索引。bindings 的 `SidebarSearchProjector` 持有索引，demo 复用它并传入原 observer source key、库存 revision；多端一次索引完整聚合库存，再按完整地址划分各端结果。相同 source/revision 的不同名称和逆序 revision 被拒绝，新 source 重新建立版本序列。公开 convenience projection 保持兼容，使用短生命周期索引；宿主接线使用持久 projector。source key 只标记派生缓存的来源，不认证任意调用方提供的库存。
+
+当前行集合为本地名称 FTS 命中与已知 Complete provider 命中的并集；单个未知 provider hit 不再遮蔽其他已知行。provider 正在查询、失败或不支持时，本地命中仍可用，原诊断及 Retry 保留。`local_results_ready` 与 provider `results_ready` 分开：只有库存已恢复且 observer 正在观察，才确认本地空集；只有 provider 完成、所有结果可 join 且 has_more=false，才能显示完整无结果。其余就绪本地空集只声明“没有匹配的本地会话名称”。多端使用本次库存重新 join 后的 typed help，不从旧 publication.unresolved 推导当前就绪状态。
+
+canonical title 的显式 null/空白清除不再回退到旧 summary；未命名会话使用 `New conversation`，路由 session ID 不会作为隐含名称索引。合法的显式名称即使恰好等于 ID 仍保留。
+
+仍未完成：recentActivity/bm25 展示排名、远端 continuation/cursor、所有 harness 的 main/ephemeral 分类公开事实，以及真实原生/物理 IME/AX/完整像素 reveal。此切片不改这些边界，不关闭 #22，不绕过 TekesUI 严格详情阅读门禁。
+
+落点经本轮独立 advisor 复核：原 headless 文档与依赖门禁明确禁止 presentation 依赖 SQLite，因此索引及其七项测试移至 ui/bindings，不改变门禁、不使用 optional feature 绕过，也不新增反向 UI 依赖。先前未提交落点的运行日志保留；最终证据以迁移后的 suite 为准。

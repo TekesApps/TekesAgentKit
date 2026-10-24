@@ -2028,6 +2028,7 @@ fn second_product_consumes_current_row_help_without_a_tooltip_or_query_state_mac
         }],
         folder_filter: None,
         search_help: Some(SidebarSearchHelp {
+            local_results_ready: true,
             results_ready: true,
             source: source.clone(),
             snippets: [(address.clone(), "当前查询的摘要".into())].into(),
@@ -2121,7 +2122,7 @@ fn independent_product_hides_unmatched_pins_without_erasing_preferences_or_pendi
         .map(|node| node.semantics.name)
         .collect();
     assert!(!names.iter().any(|name| name == "原置顶会话"));
-    assert!(names.iter().any(|name| name == "搜索结果尚未就绪"));
+    assert!(names.iter().any(|name| name == "没有匹配的本地会话名称"));
     assert!(!names.iter().any(|name| name == "没有匹配的会话"));
 }
 

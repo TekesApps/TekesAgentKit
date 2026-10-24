@@ -322,6 +322,39 @@ async fn unresolved_hits_are_reported_without_fabricated_rows_and_clear_restores
             .any(|row| { row.address == address("endpoint-b", "b") })
     );
 
+    // A later canonical inventory can join an originally unresolved provider
+    // hit without rewriting that original search publication's unresolved list.
+    let original_search = search.snapshot();
+    let mut joined = snapshot.as_ref().clone();
+    joined.revision += 1;
+    let mut outside = joined
+        .rows
+        .iter()
+        .find(|row| row.address == address("endpoint-a", "a"))
+        .unwrap()
+        .clone();
+    outside.address = address("endpoint-a", "outside");
+    outside.actions.session_id = "outside".into();
+    joined.activity_at.insert(outside.address.clone(), 0.0);
+    joined.rows.push(outside);
+    let recovered = joined
+        .project_multi_search_for_display(&original_search, &joined.input(None))
+        .unwrap();
+    assert!(recovered.unresolved.is_empty());
+    assert!(recovered.help.results_ready);
+    let mut sidebar = tekes_agent_components_ui::Sidebar::new(9992, Default::default());
+    sidebar
+        .replace_multi_search_source(search.owner(), &original_search)
+        .unwrap();
+    sidebar.update(&recovered.input).unwrap();
+    sidebar
+        .set_multi_search_projection_help(&recovered.help)
+        .unwrap();
+    assert_eq!(
+        sidebar.search_snippet(&address("endpoint-a", "outside")),
+        Some("unknown")
+    );
+
     search.set_query("").unwrap();
     let cleared = search.snapshot();
     assert!(cleared.input.key.is_none());
@@ -517,4 +550,93 @@ async fn demo_consumes_aggregate_query_and_dispatches_original_failed_endpoint_r
             .search_snippet(&address("endpoint-b", "b"))
             .is_none()
     );
+}
+
+#[tokio::test]
+async fn multi_name_fts_preserves_full_addresses_when_every_provider_is_unsupported() {
+    use tekes_agent_components_ui::{Sidebar, SidebarLabels};
+    let (agent, inventory, search, fixture_a, fixture_b) = setup(false, false).await;
+    for fixture in [&fixture_a, &fixture_b] {
+        fixture.publish_inventory_summary(json!({"sessionId":"a","title":"Café design 中文","updatedAt":1000,"running":false,"blank":false})).unwrap();
+    }
+    let mut changes = inventory.subscribe();
+    tokio::time::timeout(Duration::from_secs(4), async {
+        while inventory
+            .snapshot()
+            .rows
+            .iter()
+            .filter(|row| row.title == "Café design 中文")
+            .count()
+            != 2
+        {
+            changes.changed().await.unwrap();
+        }
+    })
+    .await
+    .unwrap();
+    search.set_query("cafe des").unwrap();
+    wait_search(&search, complete).await;
+    let snapshot = inventory.snapshot();
+    let publication = search.snapshot();
+    let projected = snapshot
+        .project_multi_search_for_display(&publication, &snapshot.input(None))
+        .unwrap();
+    let addresses: std::collections::BTreeSet<_> = projected
+        .input
+        .rows
+        .iter()
+        .map(|row| row.address.clone())
+        .collect();
+    assert_eq!(
+        addresses,
+        [address("endpoint-a", "a"), address("endpoint-b", "a")].into()
+    );
+    assert!(projected.help.local_results_ready);
+    assert!(!projected.help.results_ready);
+    assert!(projected.snippets.is_empty());
+    let mut sidebar = Sidebar::new(9991, SidebarLabels::default());
+    sidebar
+        .replace_multi_search_source(&publication.input.key.as_ref().unwrap().owner, &publication)
+        .unwrap();
+    sidebar.update(&projected.input).unwrap();
+    sidebar
+        .set_multi_search_projection_help(&projected.help)
+        .unwrap();
+    for address in addresses {
+        assert!(sidebar.row_id(&address).is_some());
+    }
+    use tekes_agent_ui_bindings::RunBinding;
+    use tekes_agent_ui_demo::{component_demo::ComponentDemo, sidebar_host::SidebarHostBinding};
+    let run = Arc::new(
+        RunBinding::open_main(
+            agent.endpoint("endpoint-a").unwrap().runtime.clone(),
+            tekes_agent_presentation::RunScope::main("endpoint-a", "a"),
+        )
+        .await
+        .unwrap(),
+    );
+    let host = Arc::new(SidebarHostBinding::new(agent, ["endpoint-a", "endpoint-b"]).unwrap());
+    let mut updates = host.subscribe();
+    tokio::time::timeout(Duration::from_secs(4), async {
+        while !host.snapshot().loaded {
+            updates.changed().await.unwrap();
+        }
+    })
+    .await
+    .unwrap();
+    let mut view = ComponentDemo::new([run]).unwrap();
+    view.set_sidebar_host_reader(host.clone()).unwrap();
+    view.set_sidebar_host_source(host.snapshot()).unwrap();
+    view.bind_sidebar_multi_search_publication(search.owner(), &publication)
+        .unwrap();
+    view.sync().unwrap();
+    let mounted = view
+        .tree
+        .get(view.sidebar_id())
+        .unwrap()
+        .component::<Sidebar>()
+        .unwrap();
+    assert_eq!(mounted.displayed_input().unwrap().rows.len(), 2);
+    assert!(mounted.row_id(&address("endpoint-a", "a")).is_some());
+    assert!(mounted.row_id(&address("endpoint-b", "a")).is_some());
 }

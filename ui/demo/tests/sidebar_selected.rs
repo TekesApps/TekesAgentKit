@@ -182,7 +182,7 @@ async fn canonical_update_clear_archive_and_absence_do_not_resurrect_old_selecte
             .snapshot()
             .rows
             .iter()
-            .all(|r| r.address != address("a") || r.title != "a")
+            .all(|r| r.address != address("a") || r.title != "New conversation")
         {
             assert!(
                 source.snapshot().error.is_none(),
@@ -197,7 +197,7 @@ async fn canonical_update_clear_archive_and_absence_do_not_resurrect_old_selecte
     assert!(!old.project_into(&source, &mut input, 1));
     let fresh = source.read_selected(&address("a"), 1).unwrap();
     assert!(fresh.project_into(&source, &mut input, 1));
-    assert_eq!(input.rows.last().unwrap().title, "a");
+    assert_eq!(input.rows.last().unwrap().title, "New conversation");
     assert_eq!(
         input.rows.last().unwrap().folder_path.as_deref(),
         Some("/current")
@@ -252,6 +252,7 @@ async fn selected_lookup_respects_filter_restoration_and_does_not_change_selecti
     assert_eq!(input, original);
     input.folder_filter = None;
     input.search_help = Some(SidebarSearchHelp {
+        local_results_ready: true,
         results_ready: true,
         snippets: Default::default(),
         source: SidebarSearchInput {

@@ -215,7 +215,7 @@ async fn demo_projects_full_publications_and_clearing_restores_inventory_without
         view.tree
             .semantics()
             .iter()
-            .any(|node| node.semantics.name == "搜索结果尚未就绪")
+            .any(|node| node.semantics.name == "没有匹配的本地会话名称")
     );
     result.input.revision += 1;
     result.input.phase = SidebarSearchPhase::Complete { has_more: true };
@@ -303,7 +303,12 @@ fn help_is_an_atomic_query_scoped_part_of_the_row_publication() {
         .as_mut()
         .unwrap()
         .results_ready = false;
-    assert!(sidebar.update(&pending_with_help).is_err());
+    // Known Complete snippets remain usable while other provider hits await inventory.
+    let mut partial_sidebar = Sidebar::new(995, SidebarLabels::default());
+    partial_sidebar
+        .replace_search_source("search-reader", &publication.input)
+        .unwrap();
+    assert!(partial_sidebar.update(&pending_with_help).is_ok());
     assert_eq!(sidebar.displayed_input(), Some(&original));
     let mut failed_ready = original.clone();
     failed_ready.revision += 1;
@@ -382,7 +387,11 @@ fn provider_membership_filters_pins_only_after_complete_and_joinable_results() {
     result.hits[0].hit.session_id = "unknown".into();
     let unresolved = source.project_search("fixture", &result, None, 4).unwrap();
     assert_eq!(unresolved.unresolved, vec![address("unknown")]);
-    assert!(unresolved.input.rows.is_empty());
+    assert_eq!(unresolved.input.rows, vec![row("a")]);
+    assert_eq!(
+        unresolved.snippets.get(&address("a")).map(String::as_str),
+        Some("a 的正文摘要")
+    );
     assert!(unresolved.input.loaded);
     assert!(!unresolved.input.search_help.unwrap().results_ready);
     result.hits = search().hits;
@@ -491,7 +500,7 @@ async fn query_hides_unmatched_pin_without_changing_pin_preference_or_composer_s
         view.tree
             .semantics()
             .iter()
-            .any(|node| node.semantics.name == "搜索结果尚未就绪")
+            .any(|node| node.semantics.name == "没有匹配的本地会话名称")
     );
 
     // A current provider hit cannot be mounted until the original public
@@ -581,4 +590,98 @@ async fn query_hides_unmatched_pin_without_changing_pin_preference_or_composer_s
     assert_eq!(view.selected(), 0);
     assert!(view.binding().current_run().unwrap().submissions.is_empty());
     runtime.stop().await.unwrap();
+}
+
+#[test]
+fn local_name_matches_survive_provider_failure_and_union_with_known_partial_hits() {
+    let mut source = inventory();
+    source.rows[1].title = "Café 中文 design".into();
+    let mut result = search();
+    result.query = "cafe des".into();
+    result.input.key.as_mut().unwrap().query = result.query.clone();
+    result.input.phase = SidebarSearchPhase::Failed {
+        message: "unsupported provider".into(),
+        has_more: false,
+        retryable: false,
+    };
+    result.hits.clear();
+    let failed = source.project_search("fixture", &result, None, 1).unwrap();
+    assert_eq!(failed.input.rows, vec![source.rows[1].clone()]);
+    assert!(
+        failed
+            .input
+            .search_help
+            .as_ref()
+            .unwrap()
+            .local_results_ready
+    );
+    assert!(!failed.input.search_help.as_ref().unwrap().results_ready);
+    assert!(failed.snippets.is_empty());
+    result.input.phase = SidebarSearchPhase::Complete { has_more: false };
+    result.hits = search().hits;
+    result.hits[0].address = address("unknown");
+    result.hits[0].hit.session_id = "unknown".into();
+    let partial = source.project_search("fixture", &result, None, 2).unwrap();
+    assert_eq!(
+        partial.input.rows,
+        vec![source.rows[0].clone(), source.rows[1].clone()]
+    );
+    assert_eq!(partial.unresolved, vec![address("unknown")]);
+    assert_eq!(partial.snippets.len(), 1);
+}
+
+#[test]
+fn persistent_name_projector_rejects_same_revision_rewrites_and_old_source_reuse() {
+    use tekes_agent_presentation::SidebarObserverSourceKey;
+    use tekes_agent_ui_bindings::SidebarSearchProjector;
+    let owner = Arc::new(());
+    let key = SidebarObserverSourceKey::from_owner(&owner);
+    let mut projector = SidebarSearchProjector::default();
+    let mut source = inventory();
+    let mut result = search();
+    result.query = "unrelated".into();
+    result.input.key.as_mut().unwrap().query = result.query.clone();
+    result.hits.clear();
+    let display = source.input(None);
+    assert_eq!(
+        projector
+            .project_for_display(&key, &source, "fixture", &result, &display)
+            .unwrap()
+            .input
+            .rows
+            .len(),
+        3
+    );
+    source.rows[0].title = "Renamed".into();
+    assert!(
+        projector
+            .project_for_display(&key, &source, "fixture", &result, &display)
+            .is_err()
+    );
+    source.revision += 1;
+    assert_eq!(
+        projector
+            .project_for_display(&key, &source, "fixture", &result, &display)
+            .unwrap()
+            .input
+            .rows
+            .len(),
+        2
+    );
+    source.revision -= 1;
+    assert!(
+        projector
+            .project_for_display(&key, &source, "fixture", &result, &display)
+            .is_err()
+    );
+    let replacement = SidebarObserverSourceKey::from_owner(&Arc::new(()));
+    assert_eq!(
+        projector
+            .project_for_display(&replacement, &source, "fixture", &result, &display)
+            .unwrap()
+            .input
+            .rows
+            .len(),
+        2
+    );
 }

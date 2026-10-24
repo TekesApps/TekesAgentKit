@@ -193,6 +193,7 @@ pub struct ComponentDemo {
     sidebar_host_reader: Option<Arc<SidebarHostBinding>>,
     sidebar_owner_revision: u64,
     sidebar_folder_filter: Option<tekes_agent_components_ui::SidebarFolderKey>,
+    sidebar_search_projector: tekes_agent_ui_bindings::SidebarSearchProjector,
     sidebar_search_publication: Option<tekes_agent_ui_bindings::SidebarSearchPublication>,
     sidebar_search_presented: Option<tekes_agent_components_ui::SidebarSearchInput>,
     sidebar_multi_search_publication:
@@ -575,6 +576,7 @@ impl ComponentDemo {
             sidebar_host_reader: None,
             sidebar_owner_revision: 0,
             sidebar_folder_filter: None,
+            sidebar_search_projector: Default::default(),
             sidebar_search_publication: None,
             sidebar_search_presented: None,
             sidebar_multi_search_publication: None,
@@ -3266,8 +3268,19 @@ impl ComponentDemo {
                     .as_ref()
                     .is_none_or(|source| source.endpoint_count() == 1)
             {
-                next = source
-                    .project_search_for_display(&self.binding().scope().endpoint_id, search, &next)
+                let source_key = self
+                    .sidebar_host_source
+                    .as_ref()
+                    .map(|packet| packet.observer_status().source.clone())
+                    .unwrap_or_else(|| {
+                        tekes_agent_presentation::SidebarObserverSourceKey::from_owner(
+                            self.sidebar_source.as_ref().expect("legacy Sidebar source"),
+                        )
+                    });
+                let endpoint_id = self.binding().scope().endpoint_id.clone();
+                next = self
+                    .sidebar_search_projector
+                    .project_for_display(&source_key, &source, &endpoint_id, search, &next)
                     .map_err(unsupported)?
                     .input;
             }
@@ -3277,8 +3290,16 @@ impl ComponentDemo {
                     .as_ref()
                     .and_then(|source| source.as_multi_publication())
                     .ok_or_else(|| unsupported("multi-search inventory source was replaced"))?;
-                let projected = inventory
-                    .project_multi_search_for_display(search, &next)
+                let source_key = self
+                    .sidebar_host_source
+                    .as_ref()
+                    .unwrap()
+                    .observer_status()
+                    .source
+                    .clone();
+                let projected = self
+                    .sidebar_search_projector
+                    .project_multi_for_display(&source_key, &inventory, search, &next)
                     .map_err(unsupported)?;
                 next = projected.input.clone();
                 Some(projected)
@@ -3321,7 +3342,7 @@ impl ComponentDemo {
                     .unwrap()
                     .component_mut::<Sidebar>()
                     .unwrap()
-                    .set_multi_search_help(&projection.aggregate_input, &projection.snippets)
+                    .set_multi_search_projection_help(&projection.help)
                     .map_err(unsupported)?;
             }
         }

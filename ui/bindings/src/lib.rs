@@ -25,6 +25,8 @@ pub(crate) use sidebar_multi::SidebarMultiOwner;
 pub use sidebar_multi::*;
 pub use sidebar_multi_search::*;
 pub use sidebar_selected::*;
+mod sidebar_name_search;
+pub use sidebar_name_search::*;
 mod sidebar_search;
 pub use sidebar_search::*;
 mod historical_input;

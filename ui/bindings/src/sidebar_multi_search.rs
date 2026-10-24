@@ -1,9 +1,10 @@
 //! Renderer-independent multi-endpoint search projection over the original
 //! aggregate inventory. Search publications remain endpoint-owned.
-use crate::{SidebarMultiPublication, SidebarPublication};
+use crate::{SidebarMultiPublication, SidebarPublication, SidebarSearchProjector};
 use std::collections::{BTreeMap, BTreeSet};
 use tekes_agent_components_ui::SidebarInput;
 use tekes_agent_contract::SessionAddress;
+use tekes_agent_presentation::SidebarObserverSourceKey;
 use tekes_agent_presentation::SidebarSearchPublication;
 pub use tekes_agent_presentation::{
     SidebarMultiSearchChild, SidebarMultiSearchController as SidebarMultiSearchBinding,
@@ -28,6 +29,7 @@ pub struct SidebarMultiSearchProjection {
     pub query: String,
     pub children: BTreeMap<String, SidebarMultiSearchChildProjection>,
     pub snippets: BTreeMap<SessionAddress, String>,
+    pub help: tekes_agent_components_ui::SidebarMultiSearchHelp,
     pub unresolved: Vec<SessionAddress>,
 }
 
@@ -39,16 +41,37 @@ impl SidebarMultiPublication {
         search: &SidebarMultiSearchPublication,
         display: &SidebarInput,
     ) -> Result<SidebarMultiSearchProjection, &'static str> {
-        if self.revision == 0 || display.revision == 0 {
+        let owner = std::sync::Arc::new(());
+        SidebarSearchProjector::default().project_multi_for_display(
+            &SidebarObserverSourceKey::from_owner(&owner),
+            self,
+            search,
+            display,
+        )
+    }
+}
+impl SidebarSearchProjector {
+    pub fn project_multi_for_display(
+        &mut self,
+        source: &SidebarObserverSourceKey,
+        inventory: &SidebarMultiPublication,
+        search: &SidebarMultiSearchPublication,
+        display: &SidebarInput,
+    ) -> Result<SidebarMultiSearchProjection, &'static str> {
+        if inventory.revision == 0 || display.revision == 0 {
             return Err("invalid multi-search display source");
         }
         if let Some(key) = &display.folder_filter {
             key.validate()
                 .map_err(|_| "invalid Sidebar folder filter")?;
         }
-        validate_multi_search(search, &self.endpoints)?;
+        validate_multi_search(search, &inventory.endpoints)?;
 
-        let endpoint_ids: BTreeSet<_> = self.endpoints.keys().cloned().collect();
+        let endpoint_ids: BTreeSet<_> = inventory.endpoints.keys().cloned().collect();
+        let local =
+            self.local_matches(source, inventory.revision, &inventory.rows, &search.query)?;
+        let mut local_results_ready = true;
+        let mut results_ready = true;
         let mut permitted = BTreeSet::new();
         let mut snippets = BTreeMap::new();
         let mut unresolved = Vec::new();
@@ -56,26 +79,38 @@ impl SidebarMultiPublication {
 
         for child in &search.children {
             let endpoint_id = child.endpoint_id.as_str();
-            let inventory = SidebarPublication {
-                observation: self.endpoints[endpoint_id].observation,
-                revision: self.revision,
-                rows: self
+            let child_inventory = SidebarPublication {
+                observation: inventory.endpoints[endpoint_id].observation,
+                revision: inventory.revision,
+                rows: inventory
                     .rows
                     .iter()
                     .filter(|row| row.address.endpoint_id == endpoint_id)
                     .cloned()
                     .collect(),
-                activity_at: self
+                activity_at: inventory
                     .activity_at
                     .iter()
                     .filter(|(address, _)| address.endpoint_id == endpoint_id)
                     .map(|(address, activity)| (address.clone(), *activity))
                     .collect(),
-                loaded: self.endpoints[endpoint_id].loaded,
-                error: self.endpoints[endpoint_id].error.clone(),
+                loaded: inventory.endpoints[endpoint_id].loaded,
+                error: inventory.endpoints[endpoint_id].error.clone(),
             };
-            let projection =
-                inventory.project_search_for_display(endpoint_id, &child.publication, display)?;
+            let projection = crate::sidebar_search::project_with_local(
+                &child_inventory,
+                endpoint_id,
+                &child.publication,
+                display,
+                &local,
+            )?;
+            if let Some(help) = &projection.input.search_help {
+                local_results_ready &= help.local_results_ready;
+                results_ready &= help.results_ready;
+            } else {
+                local_results_ready = false;
+                results_ready = false;
+            }
             permitted.extend(projection.input.rows.iter().map(|row| row.address.clone()));
             snippets.extend(projection.snippets);
             unresolved.extend(projection.unresolved);
@@ -90,7 +125,7 @@ impl SidebarMultiPublication {
 
         // The global inventory is authoritative for sorting and full address
         // identity. Endpoint projections only decide membership and snippets.
-        let mut input = self.input(display.selected.clone());
+        let mut input = inventory.input(display.selected.clone());
         input.revision = display.revision;
         input.folder_filter = display.folder_filter.clone();
         input.rows.retain(|row| permitted.contains(&row.address));
@@ -99,9 +134,9 @@ impl SidebarMultiPublication {
         // Guard against malformed aggregate inventory rows/activity omitted
         // from their endpoint partition rather than silently reordering them.
         if endpoint_ids.is_empty()
-            || self.rows.iter().any(|row| {
+            || inventory.rows.iter().any(|row| {
                 !endpoint_ids.contains(&row.address.endpoint_id)
-                    || !self.activity_at.contains_key(&row.address)
+                    || !inventory.activity_at.contains_key(&row.address)
             })
         {
             return Err("invalid multi-endpoint Sidebar inventory");
@@ -112,6 +147,12 @@ impl SidebarMultiPublication {
             aggregate_input: search.input.clone(),
             query: search.query.clone(),
             children,
+            help: tekes_agent_components_ui::SidebarMultiSearchHelp {
+                source: search.input.clone(),
+                snippets: snippets.clone(),
+                local_results_ready,
+                results_ready,
+            },
             snippets,
             unresolved,
         })
