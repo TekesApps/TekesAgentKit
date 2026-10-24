@@ -467,3 +467,7 @@
 ### #22 全语料排名与 #23 错误分发的后续交付
 
 `3aaee78` 已接通 retained-name 来源、Single/Multi 原始 packet、全局 bm25、demo sort 偏好与分页消费；修正搜索无限展开为 bounded page。此前“来源层进行中/排名未实施”只适用于原阶段。`adbb7f3` 补上 #23 native ChildOpened 错误当前/迟到分发回归，#25 复核没有新增独立实现缺陷。UI706/0/1、presentation+web258/0/0、Python92、严格检查、普通 demo 与独立排名 consumer 通过，准确边界见[本批收据](rust-agent-ui-sidebar-ranked-results-20261024.md)。新 head CI 独立跟踪，真实保留生命周期/远端 cursor/桌面等不宣称完成；原 Issue 和 #53 严格门槛保留。
+
+### #22 / #29：活动 inventory knownness 与混合成员分页
+
+已复现并修复 provider 命中隐藏但已知的 child/ephemeral 时误报 unresolved 的缺陷。复用同帧完整 activity_at，不把 retained archives 当 active，也不制造行/摘要/reveal。补齐混合 main/child/ephemeral/parent-only fork、跨端同ID、目录/搜索/分页/selected/reveal及canonical history 保留的实际 fixture-runtime 回归；统一标题/置顶 fallback 的持久身份排序和菜单边界用例。最终 UI713/0/1、presentation246/0/0、定向50/0/0、严格检查、普通demo build与独立public consumer执行通过，见[契约和收据](rust-agent-ui-sidebar-active-knownness-20261024.md)。本批全程复用SSD共享target；真实harness、桌面/IME/AX与TekesUI #53门槛仍开放，#22/#29不关闭。#23/#25只读复核没有新的独立实现缺陷，不重复已有交付。

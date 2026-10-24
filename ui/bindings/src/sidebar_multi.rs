@@ -462,12 +462,20 @@ fn aggregate_publication(
         endpoint_ids.len() == sources.len(),
         "Sidebar source count differs from fixed endpoint set",
     )?;
+    require(
+        endpoint_ids.iter().collect::<BTreeSet<_>>().len() == endpoint_ids.len(),
+        "duplicate endpoint in fixed Sidebar set",
+    )?;
     let mut rows = Vec::new();
     let mut activity_at = BTreeMap::new();
     let mut addresses = BTreeSet::new();
     let mut endpoints = BTreeMap::new();
     let mut name_corpora = BTreeMap::new();
     for (endpoint_id, source) in endpoint_ids.iter().zip(sources) {
+        require(
+            !endpoint_id.is_empty(),
+            "empty endpoint in fixed Sidebar set",
+        )?;
         if let Some(corpus) = &source.name_corpus {
             require(
                 corpus.endpoint_id == *endpoint_id,
@@ -477,10 +485,32 @@ fn aggregate_publication(
             name_corpora.insert(endpoint_id.clone(), corpus.clone());
         }
         let observer_stale = source.observation.phase != SidebarObserverPhase::Observing;
+        // Preserve the complete active-inventory activity catalog from each
+        // original publication. It records known sessions that are excluded
+        // from display rows; it must never synthesize those rows.
+        for (address, activity) in &source.activity_at {
+            require(
+                address.endpoint_id == *endpoint_id,
+                "Sidebar activity escaped its endpoint partition",
+            )?;
+            require(
+                !address.session_id.is_empty(),
+                "empty session identity in Sidebar activity",
+            )?;
+            require(activity.is_finite(), "invalid Sidebar activity value")?;
+            require(
+                activity_at.insert(address.clone(), *activity).is_none(),
+                "duplicate full Sidebar activity address across endpoint sources",
+            )?;
+        }
         for row in &source.rows {
             require(
                 row.address.endpoint_id == *endpoint_id,
                 "Sidebar row escaped its endpoint partition",
+            )?;
+            require(
+                !row.address.session_id.is_empty(),
+                "empty session identity in Sidebar row",
             )?;
             require(
                 addresses.insert(row.address.clone()),
@@ -492,7 +522,6 @@ fn aggregate_publication(
                 .copied()
                 .ok_or_else(|| unsupported("Sidebar activity missing for address"))?;
             require(activity.is_finite(), "invalid Sidebar activity value")?;
-            activity_at.insert(row.address.clone(), activity);
             let mut row = row.clone();
             if observer_stale {
                 row.activity.is_stale = true;
@@ -686,6 +715,59 @@ mod tests {
         assert_eq!(merged.rows.len(), 2);
         assert_eq!(merged.rows[0].address.endpoint_id, "endpoint-a");
         assert_eq!(merged.rows[1].address.endpoint_id, "endpoint-b");
+    }
+
+    #[test]
+    fn aggregate_keeps_known_hidden_activity_without_creating_rows() {
+        let ids = vec!["endpoint-a".to_owned()];
+        let visible = publication(1, Some(row("endpoint-a", "main", false)), true, None, 2.0);
+        let mut source = (*visible).clone();
+        let hidden = SessionAddress {
+            endpoint_id: "endpoint-a".into(),
+            session_id: "classified-child".into(),
+        };
+        source.activity_at.insert(hidden.clone(), 1.0);
+
+        let merged = aggregate_publication(2, &ids, &[Arc::new(source)]).unwrap();
+
+        assert_eq!(merged.activity_at.get(&hidden), Some(&1.0));
+        assert_eq!(merged.rows.len(), 1);
+        assert_eq!(merged.rows[0].address.session_id, "main");
+    }
+
+    #[test]
+    fn aggregate_rejects_activity_outside_endpoint_or_without_valid_identity() {
+        let ids = vec!["endpoint-a".to_owned()];
+        let source = publication(1, Some(row("endpoint-a", "main", false)), true, None, 2.0);
+        let mut wrong_endpoint = (*source).clone();
+        wrong_endpoint.activity_at.insert(
+            SessionAddress {
+                endpoint_id: "endpoint-b".into(),
+                session_id: "hidden".into(),
+            },
+            1.0,
+        );
+        assert!(aggregate_publication(2, &ids, &[Arc::new(wrong_endpoint)]).is_err());
+
+        let mut empty_identity = (*source).clone();
+        empty_identity.activity_at.insert(
+            SessionAddress {
+                endpoint_id: "endpoint-a".into(),
+                session_id: String::new(),
+            },
+            1.0,
+        );
+        assert!(aggregate_publication(2, &ids, &[Arc::new(empty_identity)]).is_err());
+
+        let mut nonfinite = (*source).clone();
+        nonfinite.activity_at.insert(
+            SessionAddress {
+                endpoint_id: "endpoint-a".into(),
+                session_id: "hidden".into(),
+            },
+            f64::NAN,
+        );
+        assert!(aggregate_publication(2, &ids, &[Arc::new(nonfinite)]).is_err());
     }
 
     #[test]

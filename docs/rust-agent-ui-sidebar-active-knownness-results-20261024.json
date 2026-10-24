@@ -1,0 +1,83 @@
+{
+  "issues": [
+    22,
+    29
+  ],
+  "pr": "https://github.com/TekesApps/TekesAgentKit/pull/10",
+  "tekesuiRevision": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "target": "/Volumes/HP P900/dev/TekesAgentKit/shared-target",
+  "newTargetCreated": false,
+  "logs": {
+    "ui-workspace-verified.log": {
+      "sha256": "2b78ab19442f18e1ec0d202ca6000b8d3907ee7ca0af7359fd77cf124ec2335d",
+      "bytes": 89118
+    },
+    "knownness-green-tests.log": {
+      "sha256": "094994393679a03235a18d9a21128be33eee24e9e29493bb4a99407d8b371df9",
+      "bytes": 6704
+    },
+    "presentation-verified.log": {
+      "sha256": "8dcbd9011c0277f9bae608a5647512ac00ebfb03d62efde00352596d18519262",
+      "bytes": 27568
+    },
+    "root-clippy.log": {
+      "sha256": "44f4f2e25a99235c39394de63b09ade08d2d2bd6046583396964c4cbebd435cb",
+      "bytes": 434
+    },
+    "ui-clippy.log": {
+      "sha256": "218291782bc0a78d6e1d9b16c15e4508af9b1011eb8ff0280ea5168073f2f697",
+      "bytes": 615
+    },
+    "demo-build-verified.log": {
+      "sha256": "2634d6bec047c4b96747f1a3f5477692a2fcb9c070b23938b5095ce219b2e697",
+      "bytes": 60
+    },
+    "public-consumer.log": {
+      "sha256": "0852ce022d33c157b66008ea3441a9d78af19bf960f02f8e5553d7a0283b009a",
+      "bytes": 600
+    },
+    "knownness-red-test.log": {
+      "sha256": "f014f13d7f6c7841c142828a5ff931671da62ef11bb90d3ef77cd2a874a342e7",
+      "bytes": 1167
+    },
+    "ui-workspace-final.log": {
+      "sha256": "ddf0eb7aec853dffd6ffae1c1c2e57ebec0151b8576e9a7ab3b5217baf753b75",
+      "bytes": 76644
+    }
+  },
+  "validation": {
+    "ui-workspace-verified.log": {
+      "groups": 101,
+      "passed": 713,
+      "failed": 0,
+      "ignored": 1
+    },
+    "knownness-green-tests.log": {
+      "groups": 5,
+      "passed": 50,
+      "failed": 0,
+      "ignored": 0
+    },
+    "presentation-verified.log": {
+      "groups": 25,
+      "passed": 246,
+      "failed": 0,
+      "ignored": 0
+    },
+    "rootClippy": "passed",
+    "uiClippy": "passed",
+    "rootUiFmt": "passed",
+    "headlessUiBoundaries": "passed",
+    "normalDemoBuild": "passed, not launched",
+    "independentPublicConsumer": "passed; 5 scenario functions executed"
+  },
+  "notRun": [
+    "desktop",
+    "physical IME",
+    "AX",
+    "real harness lifecycle",
+    "strict reading gate rerun locally"
+  ],
+  "strictReadingGate": "unchanged; prior head CI fails upstream #53",
+  "migrationReceipt": "/Volumes/HP P900/dev/TekesAgentKit/migration-20261024/receipt.json"
+}

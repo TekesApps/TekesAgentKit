@@ -102,6 +102,13 @@ impl SidebarSearchProjector {
         validate_multi_search(search, &inventory.endpoints)?;
 
         let endpoint_ids: BTreeSet<_> = inventory.endpoints.keys().cloned().collect();
+        if inventory.activity_at.iter().any(|(address, activity)| {
+            !endpoint_ids.contains(&address.endpoint_id)
+                || address.session_id.is_empty()
+                || !activity.is_finite()
+        }) {
+            return Err("invalid multi-search active inventory facts");
+        }
         let mut documents = Vec::<SidebarNameDocument>::new();
         let mut epochs = BTreeMap::new();
         let mut common_domain: Option<Vec<String>> = None;

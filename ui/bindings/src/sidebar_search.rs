@@ -11,6 +11,7 @@ use tekes_agent_contract::SessionAddress;
 pub use tekes_agent_contract::{SessionSearchHit, SessionSearchResults};
 use tekes_agent_presentation::{
     SidebarNameCorpus, SidebarObserverPhase, SidebarObserverSourceKey, SidebarSort,
+    compare_sidebar_identity,
 };
 
 /// Display projection of provider search hits joined to the original inventory.
@@ -222,25 +223,8 @@ pub(crate) fn order_recent(
                     .unwrap_or(0.0)
                     .total_cmp(&activity.get(&left.address).copied().unwrap_or(0.0))
             })
-            .then_with(|| {
-                client_sidebar_identity(&left.address).cmp(&client_sidebar_identity(&right.address))
-            })
+            .then_with(|| compare_sidebar_identity(&left.address, &right.address))
     });
-}
-
-// ClientMirrorStore's final SQL tie is the durable thread ID, not a tuple
-// ordered by endpoint spelling. Keep the Rust address public; only compare the
-// equivalent key here (SessionEndpointStorageIdentity.thread).
-fn client_sidebar_identity(address: &SessionAddress) -> String {
-    if address.endpoint_id == "legacy-tekes-appserver" {
-        return address.session_id.clone();
-    }
-    format!(
-        "{}:{}7:session{}",
-        address.endpoint_id.len(),
-        address.endpoint_id,
-        address.session_id
-    )
 }
 
 pub(crate) fn project_with_local(
@@ -262,6 +246,11 @@ pub(crate) fn project_with_local(
             .rows
             .iter()
             .any(|row| row.address.endpoint_id != endpoint)
+        || inventory.activity_at.iter().any(|(address, activity)| {
+            address.endpoint_id != endpoint
+                || address.session_id.is_empty()
+                || !activity.is_finite()
+        })
     {
         return Err("invalid sidebar search inventory source");
     }
@@ -319,8 +308,15 @@ pub(crate) fn project_with_local(
     {
         return Err("invalid unresolved sidebar search hit");
     }
-    // Determine coherence against the full original inventory before filtering.
-    let known: BTreeSet<_> = input.rows.iter().map(|row| row.address.clone()).collect();
+    // The activity facts cover the canonical active inventory, including known
+    // children/ephemeral sessions excluded from Sidebar membership. Retained
+    // names also include archives and cannot establish active knownness.
+    let visible: BTreeSet<_> = input.rows.iter().map(|row| row.address.clone()).collect();
+    let known: BTreeSet<_> = visible
+        .iter()
+        .chain(inventory.activity_at.keys())
+        .cloned()
+        .collect();
     let unresolved: Vec<_> = search
         .hits
         .iter()
@@ -333,7 +329,7 @@ pub(crate) fn project_with_local(
     input.rows.retain(|row| {
         local.contains(&row.address) || (provider_complete && snippets.contains_key(&row.address))
     });
-    snippets.retain(|address, _| provider_complete && known.contains(address));
+    snippets.retain(|address, _| provider_complete && visible.contains(address));
     input.loaded = inventory.loaded;
     input.search_help = Some(tekes_agent_components_ui::SidebarSearchHelp {
         local_results_ready: inventory.loaded
@@ -347,34 +343,4 @@ pub(crate) fn project_with_local(
         snippets,
         unresolved,
     })
-}
-
-#[cfg(test)]
-mod identity_tests {
-    use super::*;
-
-    #[test]
-    fn recent_rank_tie_uses_client_storage_identity_instead_of_endpoint_tuple() {
-        let address = |endpoint: &str, session: &str| SessionAddress {
-            endpoint_id: endpoint.into(),
-            session_id: session.into(),
-        };
-        assert_eq!(
-            client_sidebar_identity(&address("ab", "s")),
-            "2:ab7:sessions"
-        );
-        assert_eq!(
-            client_sidebar_identity(&address("中", "s")),
-            "3:中7:sessions"
-        );
-        assert_eq!(
-            client_sidebar_identity(&address("legacy-tekes-appserver", "native-id")),
-            "native-id"
-        );
-        assert!(address("ab", "s") < address("z", "s"));
-        assert!(
-            client_sidebar_identity(&address("z", "s"))
-                < client_sidebar_identity(&address("ab", "s"))
-        );
-    }
 }

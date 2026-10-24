@@ -41,6 +41,66 @@ fn inventory() -> SidebarPublication {
         rows: vec![row("a"), row("c"), row("b")],
     }
 }
+
+#[test]
+fn active_hidden_hits_are_known_without_rows_or_snippets_and_replacement_forgets_them() {
+    let mut source = inventory();
+    let result = search();
+    source.rows.retain(|row| row.address != address("b"));
+    source.activity_at.insert(address("b"), 42.0);
+    let projection = source.project_search("fixture", &result, None, 1).unwrap();
+    assert!(projection.unresolved.is_empty());
+    assert!(projection.input.search_help.as_ref().unwrap().results_ready);
+    assert!(
+        projection
+            .input
+            .rows
+            .iter()
+            .all(|row| row.address != address("b"))
+    );
+    assert!(!projection.snippets.contains_key(&address("b")));
+
+    // Retained names alone cannot turn an archived/removed identity into an
+    // active hit. A replacement inventory must forget its old activity facts.
+    source.activity_at.clear();
+    source.revision += 1;
+    source.name_corpus = Some(tekes_agent_presentation::SidebarNameCorpus {
+        endpoint_id: "fixture".into(),
+        connection_epoch: 1,
+        inventory_ready: true,
+        endpoint_domain: vec!["fixture".into()],
+        documents: vec![tekes_agent_presentation::SidebarNameDocument {
+            address: address("b"),
+            title: "正文命中".into(),
+        }],
+    });
+    let next = source.project_search("fixture", &result, None, 2).unwrap();
+    assert_eq!(next.unresolved, vec![address("b")]);
+    assert!(!next.input.search_help.as_ref().unwrap().results_ready);
+}
+
+#[test]
+fn rejects_invalid_active_inventory_facts_even_when_no_visible_row_uses_them() {
+    for (endpoint, id, activity) in [
+        ("other", "b", 1.0),
+        ("fixture", "", 1.0),
+        ("fixture", "hidden", f64::NAN),
+    ] {
+        let mut source = inventory();
+        source.activity_at.insert(
+            SessionAddress {
+                endpoint_id: endpoint.into(),
+                session_id: id.into(),
+            },
+            activity,
+        );
+        assert!(
+            source
+                .project_search("fixture", &search(), None, 1)
+                .is_err()
+        );
+    }
+}
 fn search() -> SidebarSearchPublication {
     SidebarSearchPublication {
         input: SidebarSearchInput {

@@ -481,15 +481,11 @@ fn publish_inventory_frame(
     let revision = state.next_revision()?;
     state.inventory = candidate;
     let loaded = previous.loaded || frame_inventory_ready;
-    let activity_at = rows
-        .iter()
-        .map(|row| {
-            (
-                row.address.clone(),
-                state.inventory.activity[&row.address.session_id].1,
-            )
-        })
-        .collect();
+    // Keep canonical activity for every active inventory item from this same
+    // validated frame. Display membership may omit subagents and ephemeral
+    // sessions, but search still needs to distinguish those known sessions
+    // from genuinely missing inventory entries.
+    let activity_at = inventory_activity_at(&endpoint_id, &state.inventory.activity);
     let observation = SidebarObservation {
         generation,
         phase: SidebarObserverPhase::Observing,
@@ -542,6 +538,23 @@ fn publish_observer_failure(
 #[derive(Clone, Default)]
 struct InventoryRows {
     activity: std::collections::BTreeMap<String, (bool, f64)>,
+}
+fn inventory_activity_at(
+    endpoint_id: &str,
+    activity: &std::collections::BTreeMap<String, (bool, f64)>,
+) -> std::collections::BTreeMap<SessionAddress, f64> {
+    activity
+        .iter()
+        .map(|(session_id, (_, effective))| {
+            (
+                SessionAddress {
+                    endpoint_id: endpoint_id.to_owned(),
+                    session_id: session_id.clone(),
+                },
+                *effective,
+            )
+        })
+        .collect()
 }
 impl InventoryRows {
     fn read(
@@ -710,8 +723,10 @@ mod observer_recovery_tests;
 
 #[cfg(test)]
 mod membership_tests {
-    use super::sidebar_row_is_member;
+    use super::{inventory_activity_at, sidebar_row_is_member};
     use serde_json::json;
+    use std::collections::BTreeMap;
+    use tekes_agent_contract::SessionAddress;
 
     #[test]
     fn membership_excludes_only_explicit_subagents_and_ephemeral_rows() {
@@ -730,5 +745,28 @@ mod membership_tests {
                 "summary classification: {summary}"
             );
         }
+    }
+
+    #[test]
+    fn activity_publication_keeps_known_sessions_outside_display_membership() {
+        let activity = BTreeMap::from([
+            ("main".to_owned(), (false, 2.0)),
+            ("child".to_owned(), (true, 1.0)),
+            ("ephemeral".to_owned(), (false, 0.5)),
+        ]);
+        let published = inventory_activity_at("endpoint-a", &activity);
+
+        assert_eq!(published.len(), 3);
+        assert_eq!(
+            published[&SessionAddress {
+                endpoint_id: "endpoint-a".into(),
+                session_id: "child".into(),
+            }],
+            1.0
+        );
+        assert!(!published.contains_key(&SessionAddress {
+            endpoint_id: "endpoint-b".into(),
+            session_id: "child".into(),
+        }));
     }
 }

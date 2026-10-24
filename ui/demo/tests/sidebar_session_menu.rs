@@ -132,12 +132,14 @@ fn pin_order_commands_capture_original_preferences_keep_boundaries_and_do_not_re
             .action_id(&input().rows[0].address, "copy")
             .is_none()
     );
-    let record = choose(&mut host, "上移置顶");
+    // The durable identity starts with the endpoint's UTF-8 length. Thus
+    // `2:pi...` precedes `6:native...`; selected native is the final pin.
+    let record = choose(&mut host, "下移置顶");
     assert!(
         sidebar(&host).take_menu_intents(&record).is_empty(),
         "ClientKit boundary command is a no-op"
     );
-    let record = choose(&mut host, "下移置顶");
+    let record = choose(&mut host, "上移置顶");
     let intents =
         tekes_agent_ui_consumer_check::sidebar_session_menu_intents(sidebar(&host), &record);
     let [SidebarSessionMenuIntent::Preferences(change)] = intents.as_slice() else {
@@ -147,8 +149,8 @@ fn pin_order_commands_capture_original_preferences_keep_boundaries_and_do_not_re
     assert_eq!(
         change.value.pin_order,
         [
-            input().rows[1].address.clone(),
-            input().rows[0].address.clone()
+            input().rows[0].address.clone(),
+            input().rows[1].address.clone()
         ]
     );
     assert!(

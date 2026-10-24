@@ -75,6 +75,9 @@ pub use sidebar_search::*;
 mod sidebar_names;
 pub use sidebar_names::*;
 
+mod sidebar_identity;
+pub use sidebar_identity::*;
+
 mod sidebar_multi_search;
 pub use sidebar_multi_search::*;
 
