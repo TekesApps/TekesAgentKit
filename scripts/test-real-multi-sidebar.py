@@ -21,6 +21,7 @@ from native_owned_fixture import owned_native
 from owned_endpoint_provider import provider_handler
 from pi_owned_fixture import prepare_pi
 from runtime_provenance import kernel_programs
+from multi_sidechat_fixture import validate_multi_sidechat_delivery
 from sidebar_classification_fixture import classification_commands, parse_classification_exchange, validate_classification_delivery
 from task_family_fixture import native_task_seed_commands, pi_subagent_seed_commands, dsh_subagent_seed_commands, parse_family_exchange
 
@@ -128,7 +129,10 @@ def main():
         parser.add_argument('--'+name, type=Path, required=True)
     parser.add_argument('--task-family', action='store_true', help='Use real public Task/child seeds and original family navigation receipt; separate from Sidebar acceptance')
     parser.add_argument('--classification-proof', action='store_true', help='Add actual public fork/ephemeral/archive and history retention to the family profile')
+    parser.add_argument('--multi-sidechat', action='store_true', help='Original three-endpoint SideChat dispatcher lifecycle, including non-first Pi; offscreen only')
     args = parser.parse_args()
+    if args.multi_sidechat and (args.task_family or args.classification_proof):
+        parser.error('multi-sidechat uses ordinary parents, separate from Task/classification profiles')
     if args.classification_proof and not args.task_family:
         parser.error('classification-proof requires task-family source seeds')
     output = args.output.resolve()
@@ -148,7 +152,8 @@ def main():
                                                         worker=args.kernel_worker, expected_version='0.9.3')
     write_json(output/'programs.json', {'headless': headless_identity, 'demo': demo_identity, 'kernel': kernel_identity})
     requests = []
-    server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), provider_handler(workspace=lambda:workspace, requests=requests))
+    server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), provider_handler(workspace=lambda:workspace, requests=requests,
+        cancel_hold_seconds=3 if args.multi_sidechat else None))
     threading.Thread(target=server.serve_forever, daemon=True).start()
     marker = 'agentkit-multi-'+uuid.uuid4().hex
     seeds = []
@@ -166,7 +171,7 @@ def main():
                            DSH_AGENTS_HOME=str(dsh_home/'agents'), DSH_TELEMETRY_DISABLED='1',
                            AGENTKIT_SYNTHETIC_KEY='synthetic-key')
             dsh = stack.enter_context(owned_dsh(args.dsh_root, output/'dsh-data', dsh_home,
-                                              workspace, provider_url, dsh_env, query_sqlite=not args.task_family))
+                                              workspace, provider_url, dsh_env, query_sqlite=not (args.task_family or args.multi_sidechat)))
             assert dsh.version == '0.2.1-rc.2', 'unexpected DSH package'
             pi = prepare_pi(args.pi_root, output/'pi-data', output/'pi-home', provider_url, strict_environment=True)
             # Pi inherits the demo process environment in the public connector.
@@ -254,7 +259,11 @@ def main():
             if args.classification_proof: write_json(output/'classification-seeds.json', classification_seeds)
             write_json(output/'endpoints.json', {'endpoints':endpoints})
             demo_env = dict(environment, **{NATIVE_AUTH:native['bearer'], DSH_AUTH:dsh.cookie})
-            if args.task_family:
+            if args.multi_sidechat:
+                command = [str(demo),'--components','--transcript-content','--endpoint-config',str(output/'endpoints.json'),
+                           '--multi-sidechat-delivery-receipt',str(output/'delivery.json'),
+                           '--offscreen',str(output/'multi-sidechat.png')]
+            elif args.task_family:
                 command = [str(demo),'--components','--transcript-content','--endpoint-config',str(output/'endpoints.json'),
                            '--family-seed-manifest',str(output/'seeds.json'),
                            '--family-delivery-receipt',str(output/'delivery.json'),
@@ -270,7 +279,8 @@ def main():
             (output/'demo.stderr').write_text(result.stderr)
             assert result.returncode == 0, 'offscreen host failed; inspect owned logs/partial receipt'
             delivery = json.loads((output/'delivery.json').read_text())
-            accepted = validate_family_delivery(delivery, seeds) if args.task_family else validate_delivery(delivery, seeds)
+            accepted = (validate_multi_sidechat_delivery(delivery, seeds) if args.multi_sidechat else
+                        validate_family_delivery(delivery, seeds) if args.task_family else validate_delivery(delivery, seeds))
             if args.classification_proof:
                 accepted['classification'] = validate_classification_delivery(delivery, classification_seeds)
             accepted.update(startedAt=started, finishedAt=time.time(), providerRequestPaths=requests)

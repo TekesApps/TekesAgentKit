@@ -143,3 +143,5 @@ Retained A/B reading, native pages and reconnect across all three harnesses: [re
 The reusable Rust composition is now **RunPort** (formerly Rust RunView). Sidebar, RunPort and SidePanel target the TekesUI ProcessContainer host contract; current same-process Content remains runnable while remote input/IME/scroll/AX delivery is tracked in [TekesUI #48](https://github.com/TekesApps/TekesUI/issues/48). See the [API migration and separate execution-mode matrix](docs/rust-agent-ui-run-port-20261022.md).
 
 Real Native/Pi/DSH Sidebar classification, archive recovery and canonical history retention: [source-bound offscreen results](docs/rust-agent-ui-real-sidebar-classification-results-20261024.md). Unknown classification stays unknown; this does not imply desktop acceptance.
+
+Real multi-endpoint SideChat (Pi remains second): [original dispatcher, runtime cancellation and recovery](docs/rust-agent-ui-real-multi-sidechat-results-20261024.md). Desktop and ProcessContainer acceptance remain separate.

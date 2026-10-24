@@ -500,3 +500,10 @@
 ### #29：同帧分类与真实三端生命周期
 
 [本轮结果](rust-agent-ui-real-sidebar-classification-results-20261024.md)补齐原 summary 字段的 Missing/Known/Unknown、同帧 publication 与搜索/宿主透传、同源归档事实、严格收据拒绝和原历史保留。真实 Native0.9.3/Pi1.3.0/DSH0.2.1-rc.2 的15个生命周期样本、当前Pi实例内新建scratch、原22个selected reads及六组家族导航通过；九会话Sidebar分页/焦点/reveal回归另通过。UI747/0/1、root340/0/0、Python170、严格Clippy/格式/边界与独立consumer执行通过；最后probe补充由普通demo构建和真实三端离屏运行另验。Pi scratch跨实例退休与Native无workspace归档事实单独记录，不制造main或archive authority。#29待新headCI及对应验收复核；#23动态Task pointer、桌面/IME/AX、#53仍开放，不合并发布。
+
+
+### #22 / #24 / #27：真实非首端 Pi SideChat
+
+[本轮结果](rust-agent-ui-real-multi-sidechat-results-20261024.md)用同一Native→Pi→DSH当前离屏demo的原控件/Host dispatcher，补齐Native/Pi实际Send、运行取消aborted、重连/重开/确认discard，Pi Create/后台Send/Close迟到跨端不抢选择或焦点，六个父Run草稿与历史隔离；DSH原入口保持disabled。11项定向、Python177、严格UI Clippy/格式/边界/矩阵、普通demo与独立consumer执行通过；源码522文件与最终程序SHA冻结。只读metadata和显式SDK编辑器Focus照原路径处理，不声称自动回焦/系统IME。完整#22/#24/#27、picker/附件、桌面/AX/ProcessContainer和#53仍开放，不能据本轮关闭整体Issue或合并发布。
+
+#17的旧physical-planes文档已在d00f226标明BetweenInputs待办由42575ef交付取代，保留原阶段/收据身份，没有重新运行历史原生验收。#25另发现可补真实Summary子行status来源帧的验证：双读不能当同帧；已有一次性原构建边界见证的只读advisor建议，尚未实施或验证，不把它算作完成。

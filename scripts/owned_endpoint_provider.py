@@ -11,12 +11,15 @@ from mixed_tool_provider import frames as mixed_tool_frames
 
 
 def provider_handler(*, workspace, requests, child_run=False, mixed_tools=False,
-                     native_readonly=False, native_child_reply='ENDPOINT_REPLY_OK'):
+                     native_readonly=False, native_child_reply='ENDPOINT_REPLY_OK', cancel_hold_seconds=None):
     """Return the original handler with profile inputs bound once.
 
     workspace is a getter because the legacy runner starts its server before
     allocating the owned work directory. Requests records paths only, not bodies.
     """
+    if cancel_hold_seconds is not None and (type(cancel_hold_seconds) not in (int,float)
+                                           or not 0 < cancel_hold_seconds <= 30):
+        raise ValueError('cancel_hold_seconds must be a positive bounded duration')
     class Provider(http.server.BaseHTTPRequestHandler):
         def log_message(self,*_):pass
         def do_POST(self):
@@ -125,7 +128,7 @@ def provider_handler(*, workspace, requests, child_run=False, mixed_tools=False,
                     # Keep this owned cancellation stream open beyond the UI's
                     # bounded Stop observation deadline; the real harness must
                     # terminate it through its public cancel route.
-                    if native_cancel:time.sleep(20 if child_run else 1)
+                    if native_cancel:time.sleep(cancel_hold_seconds if cancel_hold_seconds is not None else (20 if child_run else 1))
                     if 'ENDPOINT_STREAM_IDENTITY_PROOF' in json.dumps(body):time.sleep(0.5)
                     if 'ENDPOINT_STREAM_NATIVE_PROOF' in json.dumps(body):time.sleep(1)
                 if not self.path.endswith('/responses'):self.wfile.write(b'data: [DONE]\n\n')

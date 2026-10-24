@@ -43,6 +43,8 @@ mod disclosure_reading_probe;
 mod family_delivery;
 #[path = "native_feedback_selftest.rs"]
 mod feedback_probe;
+#[path = "native_multi_sidechat_delivery.rs"]
+mod multi_sidechat_delivery;
 #[path = "native_panel_launcher_selftest.rs"]
 mod panel_launcher_probe;
 #[path = "native_panel_navigation_selftest.rs"]
@@ -3167,6 +3169,16 @@ pub fn run() {
     let args: Vec<_> = std::env::args().collect();
     if args
         .iter()
+        .any(|arg| arg == "--multi-sidechat-delivery-receipt")
+    {
+        assert!(
+            args.iter().any(|arg| arg == "--offscreen")
+                && args.iter().any(|arg| arg == "--endpoint-config"),
+            "multi SideChat delivery requires explicit owned offscreen endpoints"
+        );
+    }
+    if args
+        .iter()
         .any(|arg| arg == "--sidebar-classification-proof")
     {
         assert!(
@@ -4134,6 +4146,21 @@ pub fn run() {
                 .expect("initial feedback metadata");
         }
 
+        if let Some(index) = args
+            .iter()
+            .position(|arg| arg == "--multi-sidechat-delivery-receipt")
+        {
+            assert!(
+                registered_endpoint_ids.len() == 3 && !fixture,
+                "multi SideChat delivery requires the three actual configured endpoints"
+            );
+            let receipt = multi_sidechat_delivery::run(&mut host);
+            std::fs::write(
+                args.get(index + 1).expect("multi SideChat receipt path"),
+                serde_json::to_vec_pretty(&receipt).unwrap(),
+            )
+            .unwrap();
+        }
         if let Some(index) = args.iter().position(|arg| arg == "--family-seed-manifest") {
             let manifests: serde_json::Value = serde_json::from_slice(
                 &std::fs::read(args.get(index + 1).expect("family manifest path")).unwrap(),
