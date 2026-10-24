@@ -137,5 +137,19 @@
   "issueClosed": false,
   "mergeTagRelease": false,
   "cacheBytesDeletedInThisSlice": 0,
-  "evidenceRoot": ".runtime-fixtures/native-summary-source-20261024"
+  "evidenceRoot": ".runtime-fixtures/native-summary-source-20261024",
+  "ciTerminalAttestation": {
+    "headSha": "7e9383bf95f2641e0020606f752c5847dd9d3391",
+    "prRun": 40090137271,
+    "pushRun": 40090134330,
+    "status": "completed",
+    "onlyFailure": "strict nested detail reading (TekesUI #53)",
+    "standaloneConsumer": "passed-both-runs",
+    "defaultRootPassed": 341,
+    "optInPassed": 249,
+    "uiPassed": 747,
+    "uiIgnored": 1,
+    "pythonPassed": 197,
+    "receipt": ".runtime-fixtures/native-summary-source-20261024/ci-terminal-evidence.json"
+  }
 }

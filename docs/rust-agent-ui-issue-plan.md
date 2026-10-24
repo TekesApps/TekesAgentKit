@@ -511,3 +511,9 @@ Native后续切片：复用既有feature headless与已安装Kernel0.9.3，真�
 [本轮结果](rust-agent-ui-real-multi-sidechat-results-20261024.md)用同一Native→Pi→DSH当前离屏demo的原控件/Host dispatcher，补齐Native/Pi实际Send、运行取消aborted、重连/重开/确认discard，Pi Create/后台Send/Close迟到跨端不抢选择或焦点，六个父Run草稿与历史隔离；DSH原入口保持disabled。11项定向、Python177、严格UI Clippy/格式/边界/矩阵、普通demo与独立consumer执行通过；源码522文件与最终程序SHA冻结。只读metadata和显式SDK编辑器Focus照原路径处理，不声称自动回焦/系统IME。完整#22/#24/#27、picker/附件、桌面/AX/ProcessContainer和#53仍开放，不能据本轮关闭整体Issue或合并发布。
 
 #17的旧physical-planes文档已在d00f226标明BetweenInputs待办由42575ef交付取代，保留原阶段/收据身份，没有重新运行历史原生验收。#25另发现可补真实Summary子行status来源帧的验证：双读不能当同帧；已有一次性原构建边界见证的只读advisor建议，尚未实施或验证，不把它算作完成。
+
+### #25 / #27：DSH 原参数标题与同帧完成来源
+
+[本轮结果](rust-agent-ui-dsh-summary-source-results-20261024.md)修复真实DSH JSON字符串arguments丢失description标题的问题，按ClientKit解析一层且复用producer标题fallback，不改原Transcript/history或pointer/status权限。真实DSH0.2.1-rc.2的17条公开命令/7次合成请求、call seq16与result seq19配对、重连epoch2→5/原child pointer、公开子历史及原Summary挂载通过；raw inventory没有status，最新child turn/end seq26证明completed，未填造字段。root346/0、opt-in254/0、UI747/0/1、Python204、严格Clippy/格式/边界/矩阵、普通demo与独立公开consumer通过，均复用SSDtarget。#25/#27其余真实转换/草稿、完整布局/桌面/IME/AX及#53保持开放。
+
+7e9383b的PR40090137271/push40090134330已结束：独立consumer/root341/feature249/UI747通过，唯一失败仍为#53严格阅读；原artifact/log及137/243文件闭包已核对。该终态不能替代DSH新提交CI。#16另继续实际宿主附件materialize共享路径；不把已有三端手工验收路径重复计为真实宿主回调完成。

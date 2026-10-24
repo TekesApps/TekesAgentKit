@@ -1,4 +1,9 @@
-"""Conservative validator for a single Pi presentation-source witness."""
+"""Conservative validator for a same-publication Summary source witness.
+
+The default remains the Pi contract. DSH may explicitly opt into one narrow
+completed-child case where its public inventory omits a child ``status`` and
+the captured public journal proves the latest child turn ended completed.
+"""
 
 from __future__ import annotations
 
@@ -15,12 +20,19 @@ def _dict(value: Any, label: str) -> dict[str, Any]:
     return value
 
 
-def validate_witness(witness: Any, *, endpoint: str = "pi") -> dict[str, Any]:
+def validate_witness(
+    witness: Any, *, endpoint: str = "pi", completed_journal: bool = False
+) -> dict[str, Any]:
     """Match the published parent Summary to its same-frame memory authority.
 
     This checks consistency and provenance fields in the captured JSON. It does
     not claim protection against a producer that fabricates the entire witness.
     """
+    if type(completed_journal) is not bool:
+        raise SummarySourceEvidenceError("completed_journal must be an explicit boolean")
+    if completed_journal and endpoint != "dsh":
+        raise SummarySourceEvidenceError("completed journal evidence is DSH-only")
+
     root = _dict(witness, "witness")
     if root.get("evidenceScope") != "original-publication-and-same-memory-input":
         raise SummarySourceEvidenceError("unsupported evidence scope")
@@ -116,7 +128,26 @@ def validate_witness(witness: Any, *, endpoint: str = "pi") -> dict[str, Any]:
                 continue
             raw_status = child_summary.get("status")
             status_basis = "explicit-child-status"
-            if raw_status in (None, "", "active", "archived"):
+            if completed_journal:
+                if endpoint != "dsh" or "status" in child_summary or row.get("status") != "completed":
+                    raise SummarySourceEvidenceError("DSH completed journal fallback requires an omitted child status and completed row")
+                if not _latest_completed_dsh_turn(child, child_id):
+                    raise SummarySourceEvidenceError("DSH child journal does not prove its latest turn completed")
+                idle_inputs = (
+                    child_summary.get("running") is False
+                    and child_summary.get("blank") is False
+                    and child.get("run_open") is False
+                    and child.get("queue") == []
+                    and child_summary.get("runState") not in ("running", "parked")
+                    and not any(
+                        isinstance(action, dict) and action.get("sessionId") == child_id
+                        for action in authority.get("actionables", {}).values()
+                    )
+                )
+                if not idle_inputs:
+                    raise SummarySourceEvidenceError("DSH completed child still has running, queued, blank, or actionable state")
+                status_basis = "latest-child-journal-turn-completed"
+            elif raw_status in (None, "", "active", "archived"):
                 # This profile admits only the narrow public idle fallback,
                 # not a second implementation of the general activity policy.
                 idle_inputs = (child_summary.get("running") is False
@@ -152,3 +183,42 @@ def validate_witness(witness: Any, *, endpoint: str = "pi") -> dict[str, Any]:
         "evidenceScope": "single-publication-same-memory-authority",
         "fabricationResistance": "not-proven-by-json-validation",
     }
+
+
+def _latest_completed_dsh_turn(child: dict[str, Any], child_id: str) -> bool:
+    """Read the latest public DSH turn boundary by numeric journal sequence.
+
+    This is deliberately a narrow acceptance predicate, not a general
+    activity-state model. A later turn/start invalidates an older completion.
+    """
+    if child.get("journal_ready") is not True:
+        return False
+    entries = child.get("entries")
+    if not isinstance(entries, dict):
+        return False
+    boundaries: list[tuple[int, str, dict[str, Any]]] = []
+    for key, entry_value in entries.items():
+        if not isinstance(key, str) or not key.isdecimal() or not isinstance(entry_value, dict):
+            continue
+        event = entry_value.get("event")
+        if not isinstance(event, dict):
+            continue
+        seq = event.get("seq")
+        if type(seq) is not int or seq != int(key):
+            continue
+        event_type = event.get("type")
+        if event_type not in ("turn/start", "turn/end"):
+            continue
+        if event.get("sessionId") not in (None, child_id):
+            continue
+        data = event.get("data")
+        if not isinstance(data, dict):
+            continue
+        turn = data.get("turn")
+        if type(turn) is not int or turn <= 0:
+            continue
+        boundaries.append((seq, event_type, data))
+    if not boundaries:
+        return False
+    _seq, event_type, data = max(boundaries, key=lambda item: item[0])
+    return event_type == "turn/end" and data.get("reason") == {"kind": "completed"}

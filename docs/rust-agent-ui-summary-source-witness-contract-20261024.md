@@ -36,3 +36,5 @@ cargo build -p tekes-agent-headless --locked --features acceptance-source-witnes
 公开 consumer example `summary_source` 只把见证中的原 Snapshot.summary 交给 SummaryView，挂载 ContentHost 并核对原 action row/title/scope/indicator policy；没有重建 Summary 算法，也没有渲染/窗口。只证明挂载和指标语义，glyph/hover/布局仍未验收。
 
 Native Task复用同一feature与发布边界，具体Journal来源和原Summary被动行消费见[Native契约](rust-agent-ui-native-summary-source-contract-20261024.md)及[分层结果](rust-agent-ui-native-summary-source-results-20261024.md)。不把Native bounded child历史权限变成Summary Task独立导航权。
+
+DSH字符串参数的局部解析、原producer标题fallback与完成journal的显式验收profile见[DSH契约](rust-agent-ui-dsh-summary-source-contract-20261024.md)。原Transcript/history的JSON类型和缺省status不重写；Pi默认profile不扩大。

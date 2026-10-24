@@ -1,6 +1,7 @@
 use crate::{AgentTask, RunScope, TranscriptSnapshot};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::borrow::Cow;
 use std::collections::BTreeSet;
 use tekes_agent_contract::{Result, require};
 use tekes_agent_session::{MemoryProjectionStore, SessionProjection};
@@ -184,8 +185,13 @@ impl SummaryFacts {
             usage.is_cost_complete = usage.total_tokens() == 0;
         }
         for tool in &transcript.tools {
+            if !matches!(tool.name.as_str(), "task" | "subagent" | "subagents") {
+                continue;
+            }
+            let arguments = summary_arguments(&tool.arguments);
             if tool.name == "task"
-                && let Some(name) = tool.arguments["task_name"]
+                && let Some(arguments) = arguments.as_deref()
+                && let Some(name) = arguments["task_name"]
                     .as_str()
                     .filter(|s| !s.trim().is_empty())
             {
@@ -202,15 +208,17 @@ impl SummaryFacts {
                 let title = ["brief", "description"]
                     .into_iter()
                     .find_map(|key| {
-                        tool.arguments[key]
-                            .as_str()
+                        arguments
+                            .as_deref()
+                            .and_then(|arguments| arguments[key].as_str())
                             .map(str::trim)
                             .filter(|s| !s.is_empty())
+                            .map(str::to_owned)
                     })
-                    .unwrap_or("Subagent");
+                    .unwrap_or_else(|| tool.presentation_title());
                 facts.subagents.push(SummarySubagent {
                     id: tool.id.clone(),
-                    title: title.into(),
+                    title,
                     // A UUID-shaped value in result text is only a candidate. Without a store
                     // inventory this projection cannot authorize navigation; read_with_store
                     // validates candidates against the same endpoint's known sessions.
@@ -400,6 +408,18 @@ pub struct SummaryRow {
 pub struct SummarySection {
     pub id: String,
     pub rows: Vec<SummaryRow>,
+}
+/// Summary reads one decoded object while leaving the transcript's original arguments intact.
+/// Some harnesses publish tool-call arguments as a single JSON-encoded object string.
+fn summary_arguments(arguments: &Value) -> Option<Cow<'_, Value>> {
+    match arguments {
+        Value::Object(_) => Some(Cow::Borrowed(arguments)),
+        Value::String(encoded) => serde_json::from_str::<Value>(encoded)
+            .ok()
+            .filter(Value::is_object)
+            .map(Cow::Owned),
+        _ => None,
+    }
 }
 /// Host sections (for example Git) are explicit additions in caller order, with empty sections omitted.
 pub fn append_summary_sections(

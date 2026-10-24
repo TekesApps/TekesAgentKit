@@ -20,4 +20,4 @@ Kernel诊断保留了未配置DeepSeek模型导致的自动标题细化失败；
 
 本切片没有增加target或重跑桌面，只复用SSD共享target；新运行目录是小型验收证据，保留。本切片新增删除0字节；前一来源切片清理的196.4MiB增量缓存不重复计入。上游和其他任务WIP、进程均未更改。
 
-上一提交858a63c的PR40089263375/push40089261151原日志与artifact已核实：默认root341/0、opt-in249/0、UI747/0/1忽略与独立consumer执行成功；唯一失败为严格#53（accepted=false，父offset追加后634、detail不可见）。它验证858a63c，不能作为本Native切片新CI；本切片CI待推送后运行。
+上一提交858a63c的PR40089263375/push40089261151原日志与artifact已核实：默认root341/0、opt-in249/0、UI747/0/1忽略与独立consumer执行成功；唯一失败为严格#53（accepted=false，父offset追加后634、detail不可见）。它验证858a63c，不能作为本Native切片新CI；本切片7e9383b的PR40090137271/push40090134330现均结束：默认root341/0、opt-in249/0、UI747/0/1和独立consumer步骤通过，唯一失败仍为同一严格#53。两份原始artifact/log及137/243文件闭包均已核对；PR实际merge checkout b43f4a3的父提交包含7e9383b。原CI收据保存在本切片证据目录ci-terminal-evidence.json中。这是7e9383b的CI结果，不扩报为后续提交通过。
