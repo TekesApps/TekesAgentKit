@@ -36,3 +36,9 @@ PR 下载原始 `agentkit-nested-detail-reading.json` 仍为 `accepted=false`、
 PR [40055941110](https://github.com/TekesApps/TekesAgentKit/actions/runs/40055941110) 和 push [40055938134](https://github.com/TekesApps/TekesAgentKit/actions/runs/40055938134) 均完成：headless 与 UI 格式/严格 Clippy/完整 suite、独立 consumer 成功，仅严格 nested detail reading 失败，demo build 后续跳过。完整 jobs 元数据保留为 `ci-fa9c158-{pr,push}-final-jobs.json`。
 
 该 head 的 raw artifact 下载遇到网络 EOF，未取得本次原始阅读 JSON；上述结论依据实际 steps，未把 df5429f 的数值当成本次重新测得的数据。仍保留严格门槛，跟踪 TekesUI #53；后续 observer API 提交另看自己的 CI。
+
+## Observer 恢复 532dd50 的最终 PR CI
+
+PR [40057616124](https://github.com/TekesApps/TekesAgentKit/actions/runs/40057616124) 已完成：headless checks、UI 格式/严格 Clippy/workspace tests、独立 public API consumer 成功；严格 nested detail reading 失败，后续 demo build 跳过。完整 jobs/steps 归档为 `.runtime-fixtures/sidebar-host-20261024/ci-532dd50-pr-final-jobs.json`。
+
+这是 `532dd50` 本身的 step 结论，未取得该 run 原始阅读 JSON，不能沿用此前 head 的 offset 数值作为本次观测。UI job 整体仍失败，保持 TekesUI #53 的严格门槛，不合并或打稳定 tag；本地普通 demo build 和 reader 生命周期测试与 CI/桌面验收分别记录。
