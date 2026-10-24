@@ -262,7 +262,8 @@
         "活动状态、置顶/偏好/共享 CAS 及捕获来源、旧请求门禁已有回归。",
         "6c700e9 固定多端聚合/原地址路由/owner票据与5项新回归已完成。",
         "be4fc58 coherent observer packet、用户 Retry footer、demo 原端路由已实现；真实窗口/断流验收仍开放。",
-        "本地名称查询使用 UI bindings 内存 SQLite FTS5，与已知 Complete provider hits 合并；demo复用原来源/库存版本索引，分别呈现本地与provider就绪状态；canonical标题清除不恢复旧summary。"
+        "本地名称查询使用 UI bindings 内存 SQLite FTS5，与已知 Complete provider hits 合并；demo复用原来源/库存版本索引，分别呈现本地与provider就绪状态；canonical标题清除不恢复旧summary。",
+        "be6e50e: Sidebar与selected补读共同排除显式subagent/ephemeral，保留parent-only fork和未分类兼容显示，canonical child/history不删除；UI695/0/1。"
       ],
       "remaining": [
         "消费非当前行上下文菜单公开契约，核对原生/AX 操作及窄宽布局。",
@@ -283,7 +284,8 @@
         "docs/rust-agent-ui-parallel-results-20261024.md",
         "docs/rust-agent-ui-sidebar-observer-retry-results-20261024.md",
         "docs/rust-agent-ui-sidebar-query-membership-20261024.md",
-        "docs/rust-agent-ui-name-fts-results-20261024.md"
+        "docs/rust-agent-ui-name-fts-results-20261024.md",
+        "docs/rust-agent-ui-sidebar-membership-results-20261024.json"
       ],
       "dependencies": [
         "TekesUI#44"

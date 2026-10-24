@@ -451,3 +451,7 @@
 本批实现提交与分层验证见 [693/241/92 结果收据](rust-agent-ui-name-fts-results-20261024.md)；这些子项完成不等于关闭各 Issue 或允许合并 PR #10。77a9ed8 CI 的独立 consumer 已通过，严格详情阅读仍失败，详见 [CI 复核](rust-agent-ui-ci-review-20261024.md)。
 
 本批去重新增 [#29 会话分类事实](https://github.com/TekesApps/TekesAgentKit/issues/29)，关联 #22：Pi 已有显式分类事实可先补 Sidebar 规则；Native/DSH 的完整公开来源仍须确认。只在 Sidebar 投影/选中补读应用明确排除规则，不能删除 canonical 全局 child/history，也不以 parentSessionId 判断子代理。Kernel 实现仍在范围外。
+
+### #29 已有明确事实的实施切片
+
+`be6e50e` 已完成 Sidebar 列表与 selected 补读的同一显式 predicate：origin=subagent 或 ephemeral=true 排除，parent-only fork/未知分类保持兼容。canonical 全局 inventory/child/history 完整保留，旧 selected facts 被分类更新撤销；多端同 ID 和 aggregate/selected 路径有回归。UI695/0/1、严格UI Clippy/格式/边界、普通demo及复用独立组件consumer通过，精确记录见[分类契约](rust-agent-ui-sidebar-membership-20261024.md)与[机器收据](rust-agent-ui-sidebar-membership-results-20261024.json)。Native/DSH 分类producer与缺字段语义仍未证明，#29不关闭，桌面仍未运行。

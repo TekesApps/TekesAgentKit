@@ -58,3 +58,9 @@ PR [40059408663](https://github.com/TekesApps/TekesAgentKit/actions/runs/4005940
 PR [40060479178](https://github.com/TekesApps/TekesAgentKit/actions/runs/40060479178) 与 push [40060475986](https://github.com/TekesApps/TekesAgentKit/actions/runs/40060475986) 均完成；最新 PR head 为 `77a9ed8d7c7dfe86b43679a16e94167c7b8ebf6f`。headless 通过；UI 的边界/pin/fmt/严格 Clippy/workspace tests/独立 public consumer 通过，仍只有严格 nested detail reading 失败，后续 demo build 跳过。
 
 push run 完整 jobs 元数据与 failed log 存于 `.runtime-fixtures/sidebar-host-20261024/ci-77a9ed8-40060475986-*`。PR REST 抓取和 artifact 下载遇到 EOF，未成功归档有效 PR jobs JSON 或本 run 原始阅读结果；不能拿旧 head 的 offset 数值补齐。失败日志显示阅读程序编译并启动后退出 1，暂不能确定本次哪条数值断言不满足。该 gate 早于 77a9ed8 已失败，不据此归因到本轮成员关系修改，也不豁免检查。后续本地名称 FTS 与 Summary 修改的 CI 必须按新 head 分别跟踪。
+
+## 名称 FTS 与 Summary 932572f 的最终 PR CI
+
+PR [40062281181](https://github.com/TekesApps/TekesAgentKit/actions/runs/40062281181) 完成：headless checks、UI 格式/严格 Clippy/完整 workspace tests、独立 public API consumer 全部成功；仍只有严格 nested detail reading 失败，后续 demo build 跳过。元数据保存为 `.runtime-fixtures/sidebar-host-20261024/ci-932572f-pr-latest-jobs.json`。这证明新 FTS 依赖落点和 UI 白名单改动没有引入新的 CI 失败。
+
+本段未取得该 run raw 阅读 JSON，不把本地 inner/parent offset 数值当作 CI 观测。保持 TekesUI #53 门禁，PR仍试验状态；后续 #29 Sidebar membership 的 WIP 须以新提交自己的 CI 为准。
