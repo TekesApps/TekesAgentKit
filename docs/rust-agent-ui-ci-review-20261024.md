@@ -42,3 +42,8 @@ PR [40055941110](https://github.com/TekesApps/TekesAgentKit/actions/runs/4005594
 PR [40057616124](https://github.com/TekesApps/TekesAgentKit/actions/runs/40057616124) 已完成：headless checks、UI 格式/严格 Clippy/workspace tests、独立 public API consumer 成功；严格 nested detail reading 失败，后续 demo build 跳过。完整 jobs/steps 归档为 `.runtime-fixtures/sidebar-host-20261024/ci-532dd50-pr-final-jobs.json`。
 
 这是 `532dd50` 本身的 step 结论，未取得该 run 原始阅读 JSON，不能沿用此前 head 的 offset 数值作为本次观测。UI job 整体仍失败，保持 TekesUI #53 的严格门槛，不合并或打稳定 tag；本地普通 demo build 和 reader 生命周期测试与 CI/桌面验收分别记录。
+
+
+## Observer Retry UI 开发前的 2341748 CI
+
+PR [40058315999](https://github.com/TekesApps/TekesAgentKit/actions/runs/40058315999) 已完成，headless、UI fmt/Clippy/workspace tests、独立 consumer 成功，严格 nested detail reading 失败，后续 demo build 跳过。元数据归档 `ci-2341748-pr-jobs.json`。未取得本 run raw 阅读 JSON，不复用旧数值；后续 `be4fc58` 用户入口实现另看自己的 CI。

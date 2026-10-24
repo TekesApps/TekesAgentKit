@@ -429,3 +429,8 @@
 #24 的非首端 SideChat 继续由主会话集成、新子会话负责 owner 证明与隔离测试。固定 canonical binding 按捕获 parent 路由，原端 pointer 与返回 Run owner 双重校验；每端单独清理面板，不影响另一端草稿、附件或 prepared ticket。设计和最终验证范围见[多端 SideChat 契约](rust-agent-ui-sidechat-multi-endpoint-20261024.md)。既有真实 Native/Pi 收据仍属于原程序；DSH 无公开 discard 不提升能力，桌面/IME/AX 仍未验收。
 
 #22 `3d594a8` 补齐共享 binding 的显式同实例 observer 恢复，按端退旧代，保留原 subscriber、旧行和 running anchor；健康端 action/selected 凭据不受影响。最终 UI664/0/1、严格 Clippy、独立公开 API consumer 与普通 demo build 通过，见[恢复契约/收据](rust-agent-ui-sidebar-observer-recovery-20261024.md)。demo 用户重试入口仍待接线，真实故障/桌面验收未运行。
+
+
+## Observer 用户重试入口续批
+
+#22 `be4fc58` 已接通 coherent observer packet、默认控件状态 footer、来源/代数绑定的用户 Retry 和 demo 原端路由；同源重绑及健康端更新不清 pending，旧 raw ID 不复用。分层验证为 UI675/0/1、最终组件10/0/0、presentation240/0/0、严格 Clippy、普通 demo build 和独立 consumer，见[交付收据](rust-agent-ui-sidebar-observer-retry-results-20261024.md)。前文“用户入口未接线”仅指当时历史批次；真实窗口/断流/IME 与完整 Sidebar 验收仍开放。
