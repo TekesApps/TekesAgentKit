@@ -979,15 +979,19 @@ fn native(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSna
                 );
                 running_marker = true;
             } else if data["phase"] == "settled" {
-                let reason = if data["aborted"] == true {
+                // ClientKit accumulates explicit failure/cancellation within a
+                // run. Read those retained facts only at the settled boundary;
+                // an assistant stop alone must not end a still-streaming turn.
+                let has_stop = |reason: &str| {
+                    out.items.iter().any(|item| {
+                        item.turn_id == current
+                            && item.kind == TranscriptItemKind::Assistant
+                            && item.metadata["stopReason"] == reason
+                    })
+                };
+                let reason = if data["aborted"] == true || has_stop("aborted") {
                     "aborted"
-                } else if out
-                    .items
-                    .iter()
-                    .rev()
-                    .find(|i| i.turn_id == current && i.kind == TranscriptItemKind::Assistant)
-                    .is_some_and(|i| i.metadata["stopReason"] == "error")
-                {
+                } else if has_stop("error") {
                     "error"
                 } else {
                     "completed"

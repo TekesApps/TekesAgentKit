@@ -379,7 +379,22 @@
     "Current default-feature-off boundary runtime program predates the final Native fix; current default root tests separately pass.",
     "Existing explicit raw terminal precedence and Journal-only behavior are unchanged; stale cross-source raw terminal behavior is not proven."
   ],
-  "ci": "pending-new-head",
+  "ci": {
+    "status": "completed",
+    "headSha": "1d6cc7e4a62b60993fee0b838c20b625c973eca7",
+    "prRun": 40094689268,
+    "pushRun": 40094685938,
+    "rootPassed": 354,
+    "featurePresentationPassed": 262,
+    "featureHeadlessPassed": 4,
+    "uiPassed": 750,
+    "uiIgnored": 1,
+    "pythonPassed": 221,
+    "standaloneConsumer": "success-both-runs",
+    "onlyFailure": "TekesUI #53 strict nested detail reading",
+    "demoBuild": "skipped-after-strict-failure; local-build-separately-passed",
+    "receipt": ".runtime-fixtures/summary-source-transitions-20261024/ci-terminal-evidence.json"
+  },
   "issueClosed": false,
   "mergeTagRelease": false,
   "cacheBytesDeletedInThisSlice": 0,

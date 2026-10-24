@@ -526,3 +526,7 @@ Native后续切片：复用既有feature headless与已安装Kernel0.9.3，真�
 ### #25 / #27：真实子会话运行与失败转换
 
 [本轮结果](rust-agent-ui-summary-transitions-results-20261024.md)补齐 Pi1.3.0/DSH0.2.1-rc.2 同 child 原父 Summary running→failed 来源。真实发现 Pi 当前 Native error 被 blank 库存遮蔽，增加只读当前 run 失败/取消选择器；不改 raw status/blank 或旧显式终态优先级。最终 39 条公开命令、15 次合成请求、四份原 Summary 挂载通过；Pi 原 dispatching 通过公开 childRead 自然退休后才捕获终态。root354、feature262、headless4、UI750/0/1、Python221、严格Clippy/格式/边界/矩阵、普通demo和新137文件独立consumer通过。历史失败与程序/输入快照保留，初诊 binary 未归档的限制明确记录。桌面/物理IME/AX、完整Transcript与跨来源 raw终态一致性未证明，#25/#27和#53保持开放，不合并发布。
+
+### #17：Native 显式 run 失败累计
+
+[契约](rust-agent-ui-native-run-terminal-contract-20261024.md)与[结果](rust-agent-ui-native-run-terminal-results-20261024.md)记录已修复的确定差异：同run error不再被后续正常assistant覆盖，取消优先且后继run隔离。新worker补4项红/绿，主会话新增流式不提前结算回归发现并替换候选；最终7/0。root361、feature269、headless4、UI750/0/1、严格Clippy/格式/边界/矩阵、普通demo和新独立公开consumer通过；不改legacy/Journal、SDK或桌面验收边界。原始失败、程序与源码快照保留，#17完整内容/富内容/桌面标准仍开放，新headCI另核对。

@@ -17,3 +17,5 @@ Pi 当前 error assistant ordinal13 与 run 边界配对；DSH 当前 authored i
 只读复核没有发现新 Native 选择器内部复活旧失败的确定性问题。既有显式 raw terminal 优先级和 Journal-only 规则保持不变；producer 是否可能在新输入后残留旧 raw terminal 的跨来源一致性尚未证明，本轮不能据此宣称修复全部旧状态风险。
 
 本轮未验证服务端多流事务一致性、producer 防伪、完整 Transcript 对齐、父草稿完整生命周期、最终布局/hover、桌面、物理 IME、OS AX 或 ProcessContainer。#25/#27 保持开放，TekesUI #53 严格门仍未放行，不合并、tag 或发布。本轮删除缓存 **0 bytes**，所有验证复用 SSD 共享 target。
+
+CI 终态补记（1d6cc7e）：PR40094689268 / push40094685938 均已结束；root354、feature presentation262 + headless4、UI750/0/1、Python221 和独立 consumer 均通过。两份原 artifact/log 核对 consumer137文件 closure 与该提交源码一致，SDK243文件 closure不变，PR synthetic merge 父含1d6cc7e。唯一失败仍为严格嵌套阅读：accepted=false、parentOffsetAfterAppend=634、detailVisibleAfterAppend=false；后续 demo build 被跳过，本地普通 demo 构建另通过。严格门不豁免。
