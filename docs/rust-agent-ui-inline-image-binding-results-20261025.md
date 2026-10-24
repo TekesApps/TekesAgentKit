@@ -13,3 +13,5 @@
 当前strict reading仍exit1/accepted=false，#53不豁免。真实Native/Pi/DSH provider图片/历史/重连、系统选择/粘贴/拖放、位图预览和窗口/物理IME/OS AX/GPU像素仍not_run；显示基础能力等待TekesUI#117。#16/#17继续开放，PR #10仍draft，不合并/tag/发布。67b20e6两份CI已核对，唯一实际失败#53；本切片新head CI另核对，不能移用旧结论。
 
 证据在SSD `.runtime-fixtures/inline-image-binding-20261025/`：538个source输入、原失败与最终日志、原strict JSON、最终三份程序/SHA及用途、兼容修正前的原程序/收据、独立consumer来源/lock。demo仅构建，9项图片闭环执行的是fixture集成程序；没有把归档程序当真实harness/窗口证据。复用共享target，未新建target，删除缓存0字节。
+
+后续[真实三端图片协议结果](rust-agent-ui-inline-image-live-results-20261025.md)已独立完成图文/纯图、provider观测、公开历史和重连；上文本切片的not_run按原538输入阶段保留，不把后续结果倒灌到旧程序。78b7392两份CI终态也已核对，唯一实际失败仍#53。

@@ -578,3 +578,7 @@ Native后续切片：复用既有feature headless与已安装Kernel0.9.3，真�
 ### #16：原 RunBinding 图片输入与冻结 ticket 复核
 
 [结果](rust-agent-ui-inline-image-binding-results-20261025.md)补齐一次性image capture/CAS和host准备后policy重验，file facts与plan同源冻结，image从真实bytes检测/解码，不需upload、不新建提交状态机；plain text/file原路径不新增查询。Root380、presentation feature289、UI777/0/1、feature RunPort19/bindings44、严格检查/两配置构建/standalone、Python262通过，新增core2/图片policy与decoder5/原公开binding集成9。旧image无facts追加也按真实data计量，Root源码不变、兼容修正后另重跑UI；初始失败/实际RPC尝试观测修正、538个source与程序用途已封存。当前strict仍#53失败；真实三端图片、picker/粘贴/拖放/预览/桌面等未验收，SDK显示缺口#117仍开放，不关闭Issue、不合并发布。
+
+### #16：真实三端原图片输入/公开历史与重连
+
+[结果](rust-agent-ui-inline-image-live-results-20261025.md)新增不启动桌面的公开demo example和owned runner。Native0.9.3/Pi1.3.0/DSH0.2.1-rc.2 同程序各完成图文/纯图发送与原history/source身份恢复；provider六次图片与DSH一次标题分别记录，Native/Pi公开附件字节read通过，DSH描述符保留且byte-read明确unsupported。Python274、严格demo全targets Clippy和example构建/静态边界通过，542源码输入及最终程序/收据/原失败封存在SSD。只补验收入口/fixture，未改production组件或SDK；mixed file/image/系统输入/位图UI/窗口等仍未完成。#16/#17开放；78b7392两份CI只有#53实际失败，新head另核对，不合并/tag。

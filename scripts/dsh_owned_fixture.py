@@ -101,7 +101,7 @@ class DshFixture:
 
 @contextmanager
 def owned_dsh(root, data_root, home, cwd, base_url, environment, *,
-              query_sqlite=False, readiness_timeout=60, shutdown_timeout=15,
+              query_sqlite=False, image_input=False, readiness_timeout=60, shutdown_timeout=15,
               opener_factory=None, popen_factory=None, monotonic=time.monotonic,
               sleep=time.sleep):
     """Prepare and run isolated DSH, yielding a :class:`DshFixture`.
@@ -146,6 +146,9 @@ def owned_dsh(root, data_root, home, cwd, base_url, environment, *,
     if not isinstance(shutdown_timeout, (int, float)) or shutdown_timeout <= 0:
         raise ValueError("shutdown_timeout must be positive")
 
+    if type(image_input) is not bool:
+        raise ValueError("image_input must be boolean")
+
     data.mkdir(mode=0o700)
     owned_home.mkdir(mode=0o700)
     sessions = data / "dsh-sessions"
@@ -167,7 +170,8 @@ def owned_dsh(root, data_root, home, cwd, base_url, environment, *,
         {"id": "agent-default-model", "config": {"provider": "endpoint-test", "model": "endpoint-test"}},
         {"id": "llm-pi-ai", "config": {"providers": {"endpoint-test": {
             "api": "openai-completions", "apiKeyEnv": "AGENTKIT_SYNTHETIC_KEY",
-            "baseURL": endpoint, "models": [{"id": "endpoint-test", "contextWindow": 32768, "maxTokens": 1024}],
+            "baseURL": endpoint, "models": [{"id": "endpoint-test", "contextWindow": 32768, "maxTokens": 1024,
+                **({"input": ["text", "image"]} if image_input else {})}],
         }}}},
         {"id": "session-persistence-jsonl", "config": {"root": str(sessions), "compression": "none"}},
     ]

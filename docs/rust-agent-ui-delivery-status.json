@@ -944,5 +944,24 @@
     "nativeInteraction": false,
     "crossProcess": false,
     "fullGoalCompletion": false
+  },
+  "inlineImagesPublicRunBindingLive": {
+    "receipt": "rust-agent-ui-inline-image-live-results-20261025.json",
+    "endpoints": [
+      "native",
+      "pi",
+      "dsh"
+    ],
+    "imagePrompts": 6,
+    "wireRequests": 7,
+    "auxiliaryDshTitles": 1,
+    "publicImageByteReads": [
+      "native",
+      "pi"
+    ],
+    "dshByteRead": "unsupported",
+    "pythonPassed": 274,
+    "nativeInteraction": false,
+    "fullGoalCompletion": false
   }
 }

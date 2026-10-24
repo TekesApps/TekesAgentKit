@@ -99,6 +99,19 @@ class DshOwnedFixtureTests(unittest.TestCase):
             patch_value = json.loads(fixture.patch_file.read_text())
             self.assertFalse(any(row.get("id") == "session-query-sqlite" for row in patch_value))
 
+    def test_image_model_capability_is_an_explicit_fixture_input(self):
+        with self.invoke(image_input=True) as fixture:
+            patch_value = json.loads(fixture.patch_file.read_text())
+            provider = next(row for row in patch_value if row.get("id") == "llm-pi-ai")
+            model = provider["config"]["providers"]["endpoint-test"]["models"][0]
+            self.assertEqual(model["input"], ["text", "image"])
+
+    def test_image_capability_rejects_non_boolean_before_writing_data(self):
+        with self.assertRaisesRegex(ValueError, "image_input must be boolean"):
+            with self.invoke(image_input="yes"):
+                self.fail("invalid fixture input was accepted")
+        self.assertFalse(self.data.exists())
+
     def test_readiness_and_connector_logs_redact_launch_and_credentials(self):
         with self.invoke() as fixture:
             tail = fixture.diagnostic_tail()
