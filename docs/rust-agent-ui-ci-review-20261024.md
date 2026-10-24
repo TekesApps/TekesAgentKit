@@ -64,3 +64,10 @@ push run 完整 jobs 元数据与 failed log 存于 `.runtime-fixtures/sidebar-h
 PR [40062281181](https://github.com/TekesApps/TekesAgentKit/actions/runs/40062281181) 完成：headless checks、UI 格式/严格 Clippy/完整 workspace tests、独立 public API consumer 全部成功；仍只有严格 nested detail reading 失败，后续 demo build 跳过。元数据保存为 `.runtime-fixtures/sidebar-host-20261024/ci-932572f-pr-latest-jobs.json`。这证明新 FTS 依赖落点和 UI 白名单改动没有引入新的 CI 失败。
 
 本段未取得该 run raw 阅读 JSON，不把本地 inner/parent offset 数值当作 CI 观测。保持 TekesUI #53 门禁，PR仍试验状态；后续 #29 Sidebar membership 的 WIP 须以新提交自己的 CI 为准。
+
+
+## Explicit membership 532150e 的最终 CI
+
+PR [40062929124](https://github.com/TekesApps/TekesAgentKit/actions/runs/40062929124) 与 push [40062924713](https://github.com/TekesApps/TekesAgentKit/actions/runs/40062924713) 均完成：headless、UI fmt/严格 Clippy/workspace tests、独立 consumer 全部成功；仅严格 nested detail reading 失败，后续 demo build 跳过。完整元数据保存在 `.runtime-fixtures/sidebar-host-20261024/ci-532150e-{pr,push}-final-jobs.json`。没有取得这两次 run 的 raw 阅读 JSON，未借用历史 offset 数值。
+
+TekesUI #53 门槛保持原样，PR #10 仍试验状态、不合并；当前未推送的后续 source/wire/corpus 改动不借用这次 CI。
