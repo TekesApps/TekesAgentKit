@@ -5,11 +5,14 @@ Requires explicit existing programs. No build, installation, private history wri
 ambient credentials, native-window launch or Screen Recording entry point.
 """
 import argparse
+import copy
 from contextlib import ExitStack
 import hashlib
 import http.server
 import json
 import os
+import shutil
+import signal
 from pathlib import Path
 import subprocess
 import threading
@@ -22,6 +25,7 @@ from owned_endpoint_provider import provider_handler
 from pi_owned_fixture import prepare_pi
 from runtime_provenance import kernel_programs
 from multi_sidechat_fixture import validate_multi_sidechat_delivery
+from sidebar_transport_recovery_fixture import validate_transport_recovery
 from sidebar_classification_fixture import classification_commands, parse_classification_exchange, validate_classification_delivery
 from task_family_fixture import native_task_seed_commands, pi_subagent_seed_commands, dsh_subagent_seed_commands, parse_family_exchange
 
@@ -35,6 +39,46 @@ def write_json(path, value):
     with os.fdopen(descriptor, 'w') as stream:
         json.dump(value, stream, indent=2, ensure_ascii=False)
         stream.write('\n')
+
+
+def run_recovery_probe(command, environment, output, *, timeout=120):
+    """Own a separate process session; retain logs and teardown evidence on failure."""
+    write_json(output/'probe-command.json', command)  # No credentials in argv.
+    with (output/'demo.stdout').open('w') as stdout, (output/'demo.stderr').open('w') as stderr:
+        process = subprocess.Popen(command, env=environment, stdout=stdout, stderr=stderr,
+                                   start_new_session=True, close_fds=True)
+        timed_out = False
+        try:
+            process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            timed_out = True
+        finally:
+            # Only this new session belongs to us. Close leftover Pi RPC children
+            # even when the probe exited before its Runtime::stop cleanup.
+            for sig in (signal.SIGTERM, signal.SIGKILL):
+                try:
+                    os.killpg(process.pid, sig)
+                except ProcessLookupError:
+                    break
+                try:
+                    process.wait(timeout=4)
+                except subprocess.TimeoutExpired:
+                    pass
+            process.wait(timeout=4)
+            deadline = time.monotonic()+3
+            group_exited = False
+            while time.monotonic() < deadline:
+                try:
+                    os.killpg(process.pid, 0)
+                except ProcessLookupError:
+                    group_exited = True
+                    break
+                time.sleep(0.05)
+            write_json(output/'probe-exit.json', dict(pid=process.pid, exitCode=process.returncode,
+                       timedOut=timed_out, groupExited=group_exited))
+    assert not timed_out and process.returncode == 0 and group_exited, 'recovery probe failed; inspect retained logs/exit receipt'
+    return subprocess.CompletedProcess(command, process.returncode,
+                                      (output/'demo.stdout').read_text(), (output/'demo.stderr').read_text())
 
 
 def address(value):
@@ -124,13 +168,27 @@ def validate_family_delivery(delivery, seeds):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    for name in ['headless-program', 'ui-demo', 'pi-root', 'dsh-root', 'kernel-root',
+    for name in ['headless-program', 'pi-root', 'dsh-root', 'kernel-root',
                  'kernel-supervisor', 'kernel-worker', 'output']:
         parser.add_argument('--'+name, type=Path, required=True)
+    parser.add_argument('--ui-demo', type=Path, help='Existing ordinary demo executable (required outside recovery opt-in)')
     parser.add_argument('--task-family', action='store_true', help='Use real public Task/child seeds and original family navigation receipt; separate from Sidebar acceptance')
     parser.add_argument('--classification-proof', action='store_true', help='Add actual public fork/ephemeral/archive and history retention to the family profile')
     parser.add_argument('--multi-sidechat', action='store_true', help='Original three-endpoint SideChat dispatcher lifecycle, including non-first Pi; offscreen only')
+    parser.add_argument('--transport-recovery-probe', type=Path, help='Opt in to the existing sidebar_transport_recovery_probe executable')
+    parser.add_argument('--recovery-endpoint', action='append', choices=['native', 'pi', 'dsh'], default=[],
+                        help='Fault endpoint case to run; repeat to select a subset (default: all three)')
     args = parser.parse_args()
+    recovery = args.transport_recovery_probe is not None
+    if not recovery and args.ui_demo is None:
+        parser.error('--ui-demo is required outside transport-recovery-probe mode')
+    if recovery and (args.task_family or args.classification_proof or args.multi_sidechat):
+        parser.error('transport-recovery-probe is a separate profile')
+    if not recovery and args.recovery_endpoint:
+        parser.error('recovery-endpoint requires transport-recovery-probe')
+    if len(args.recovery_endpoint) != len(set(args.recovery_endpoint)):
+        parser.error('recovery-endpoint values must be unique')
+    recovery_endpoints = args.recovery_endpoint or ['native', 'pi', 'dsh']
     if args.multi_sidechat and (args.task_family or args.classification_proof):
         parser.error('multi-sidechat uses ordinary parents, separate from Task/classification profiles')
     if args.classification_proof and not args.task_family:
@@ -147,9 +205,20 @@ def main():
     environment = {'PATH': '/usr/bin:/bin:/usr/sbin:/sbin', 'HOME': str(home),
                    'TMPDIR': str(tmp), 'LANG': 'en_US.UTF-8', 'LC_ALL': 'en_US.UTF-8'}
     headless, headless_identity = cargo_program(ROOT, 'tekes-agent-headless', 'tekes-agent-headless', existing=args.headless_program)
-    demo, demo_identity = cargo_program(ROOT/'ui', 'tekes-agent-ui-demo', 'tekes-agent-ui-demo', existing=args.ui_demo)
+    if recovery:
+        demo, demo_identity = cargo_program(ROOT/'ui', 'tekes-agent-ui-demo', 'sidebar_transport_recovery_probe',
+                                            kind='example', existing=args.transport_recovery_probe)
+    else:
+        demo, demo_identity = cargo_program(ROOT/'ui', 'tekes-agent-ui-demo', 'tekes-agent-ui-demo', existing=args.ui_demo)
     supervisor, worker, kernel_identity = kernel_programs(args.kernel_root, supervisor=args.kernel_supervisor,
                                                         worker=args.kernel_worker, expected_version='0.9.3')
+    if recovery:
+        archives = output/'programs'; archives.mkdir(mode=0o700)
+        for name, program, identity in [('headless', headless, headless_identity), ('probe', demo, demo_identity)]:
+            archive = archives/name
+            shutil.copy2(program, archive)
+            assert hashlib.sha256(archive.read_bytes()).hexdigest() == identity['sha256'], 'program archive hash mismatch'
+            identity['archiveOnly'] = str(archive)
     write_json(output/'programs.json', {'headless': headless_identity, 'demo': demo_identity, 'kernel': kernel_identity})
     requests = []
     server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), provider_handler(workspace=lambda:workspace, requests=requests,
@@ -174,6 +243,18 @@ def main():
                                               workspace, provider_url, dsh_env, query_sqlite=not (args.task_family or args.multi_sidechat)))
             assert dsh.version == '0.2.1-rc.2', 'unexpected DSH package'
             pi = prepare_pi(args.pi_root, output/'pi-data', output/'pi-home', provider_url, strict_environment=True)
+            if recovery:
+                # Only public runtime entry files; never inspect harness sessions.
+                public_inputs = {
+                    'piNode': Path(pi['executable']),
+                    'piCli': Path(pi['arguments'][0]),
+                    'dshNode': dsh.node,
+                    'dshEntry': dsh.entry,
+                    'providerFixture': args.kernel_root/'fixtures/config/providers.canonical.json',
+                }
+                write_json(output/'runtime-inputs.json', {
+                    name: {'path': str(path.resolve()), 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
+                    for name, path in public_inputs.items()})
             # Pi inherits the demo process environment in the public connector.
             # Explicitly blank our other harness auth keys rather than claiming
             # that PiConfiguration.environment clears all inherited variables.
@@ -259,7 +340,12 @@ def main():
             if args.classification_proof: write_json(output/'classification-seeds.json', classification_seeds)
             write_json(output/'endpoints.json', {'endpoints':endpoints})
             demo_env = dict(environment, **{NATIVE_AUTH:native['bearer'], DSH_AUTH:dsh.cookie})
-            if args.multi_sidechat:
+            if recovery:
+                command = [str(demo), '--endpoint-config', str((output/'endpoints.json').resolve()),
+                           '--receipt', str((output/'transport-recovery-receipt.json').resolve())]
+                for endpoint_id in recovery_endpoints:
+                    command.extend(['--endpoint', endpoint_id])
+            elif args.multi_sidechat:
                 command = [str(demo),'--components','--transcript-content','--endpoint-config',str(output/'endpoints.json'),
                            '--multi-sidechat-delivery-receipt',str(output/'delivery.json'),
                            '--offscreen',str(output/'multi-sidechat.png')]
@@ -274,19 +360,48 @@ def main():
                            '--offscreen',str(output/'sidebar.png')]
             if args.classification_proof:
                 command.extend(['--sidebar-classification-proof',str(output/'classification-seeds.json')])
-            result = subprocess.run(command, env=demo_env, text=True, capture_output=True, timeout=120)
-            (output/'demo.stdout').write_text(result.stdout)
-            (output/'demo.stderr').write_text(result.stderr)
+            requests_before_probe = copy.deepcopy(requests) if recovery else None
+            if recovery:
+                result = run_recovery_probe(command, demo_env, output)
+            else:
+                result = subprocess.run(command, env=demo_env, text=True, capture_output=True, timeout=120)
+                (output/'demo.stdout').write_text(result.stdout)
+                (output/'demo.stderr').write_text(result.stderr)
             assert result.returncode == 0, 'offscreen host failed; inspect owned logs/partial receipt'
-            delivery = json.loads((output/'delivery.json').read_text())
-            accepted = (validate_multi_sidechat_delivery(delivery, seeds) if args.multi_sidechat else
-                        validate_family_delivery(delivery, seeds) if args.task_family else validate_delivery(delivery, seeds))
-            if args.classification_proof:
-                accepted['classification'] = validate_classification_delivery(delivery, classification_seeds)
-            accepted.update(startedAt=started, finishedAt=time.time(), providerRequestPaths=requests)
+            if recovery:
+                assert (output/'transport-recovery-receipt.json').is_file(), 'probe did not write its public receipt'
+                # Final acceptance is delayed until ExitStack has shut down both owned services.
+                pending_recovery = json.loads((output/'transport-recovery-receipt.json').read_text())
+                pending_requests = requests_before_probe
+                pending_command = command
+                pending_result = result
+                pending_native, pending_dsh = native, dsh
+            else:
+                delivery = json.loads((output/'delivery.json').read_text())
+                accepted = (validate_multi_sidechat_delivery(delivery, seeds) if args.multi_sidechat else
+                            validate_family_delivery(delivery, seeds) if args.task_family else validate_delivery(delivery, seeds))
+                if args.classification_proof:
+                    accepted['classification'] = validate_classification_delivery(delivery, classification_seeds)
+                accepted.update(startedAt=started, finishedAt=time.time(), providerRequestPaths=requests)
+                write_json(output/'acceptance.json', accepted)
+                print(json.dumps(accepted))
+        if recovery:
+            exits = {'native': pending_native['process'].poll(), 'dsh': pending_dsh.process.poll()}
+            write_json(output/'owned-service-exits.json', exits)
+            assert exits == {'native': 0, 'dsh': 0}, 'owned service exit status is not clean'
+            accepted = validate_transport_recovery(pending_recovery, seeds, recovery_endpoints,
+                                                   pending_requests, requests)
+            accepted.update(startedAt=started, finishedAt=time.time(), command=pending_command,
+                            stdout=pending_result.stdout, stderr=pending_result.stderr, exitCode=pending_result.returncode,
+                            endpointProgram=demo_identity, ownedServiceExits=exits, providerRequestPathsBefore=pending_requests,
+                            providerRequestPathsAfter=requests, seeds=seeds)
             write_json(output/'acceptance.json', accepted)
             print(json.dumps(accepted))
     except BaseException as error:
+        if recovery and not (output/'owned-service-exits.json').exists():
+            write_json(output/'owned-service-exits.json', {
+                'native': native['process'].poll() if 'native' in locals() else 'not-started',
+                'dsh': dsh.process.poll() if 'dsh' in locals() else 'not-started'})
         if 'native' in locals():
             (output/'native-diagnostic-tail.log').write_text(native['diagnostic_tail']())
         write_json(output/'failure.json', {'accepted':False,'errorType':type(error).__name__,

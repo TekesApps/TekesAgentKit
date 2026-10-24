@@ -3,11 +3,40 @@ import copy
 import importlib.util
 from pathlib import Path
 import sys
+import json
+import os
+import tempfile
 import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 spec = importlib.util.spec_from_file_location('real_multi_sidebar', Path(__file__).resolve().parents[1]/'test-real-multi-sidebar.py')
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
+
+
+class RecoveryProcessOwnership(unittest.TestCase):
+    def test_success_retains_logs_and_proves_owned_session_exit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            result = module.run_recovery_probe([sys.executable, '-c', 'print("owned probe")'],
+                                               {'PATH': '/usr/bin:/bin'}, output, timeout=5)
+            self.assertEqual(result.returncode, 0)
+            self.assertIn('owned probe', (output/'demo.stdout').read_text())
+            self.assertTrue(json.loads((output/'probe-exit.json').read_text())['groupExited'])
+
+    def test_timeout_closes_owned_descendant_and_retains_exit_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            script = ('import subprocess,sys,time; '
+                      'child=subprocess.Popen([sys.executable,"-c","import time; time.sleep(60)"]); '
+                      'print(child.pid,flush=True); time.sleep(60)')
+            with self.assertRaisesRegex(AssertionError, 'recovery probe failed'):
+                module.run_recovery_probe([sys.executable, '-c', script],
+                                          {'PATH': '/usr/bin:/bin'}, output, timeout=0.5)
+            receipt = json.loads((output/'probe-exit.json').read_text())
+            self.assertTrue(receipt['timedOut'])
+            self.assertTrue(receipt['groupExited'])
+            with self.assertRaises(ProcessLookupError):
+                os.kill(int((output/'demo.stdout').read_text().strip()), 0)
 
 
 class MultiSidebarAcceptance(unittest.TestCase):

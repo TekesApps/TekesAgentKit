@@ -172,3 +172,5 @@ Native 公开来源：[固定规范](https://github.com/TekesApps/TekesKernel/bl
 DSH adapter 将公共 inbox 的 `next-turn` / `next-step` 转为同序号的本地标准投影，供 Run.queue 与 Composer 使用；原 inbox、message/source、原 item.id 仍保留。缺失 key 不当空，明确双空才清空；source.rpcId 仅用于原用户提交确认，不替代队列动作身份。适配器授权默认关闭，Native/Pi 原 control 队列不受启用；详见[契约](rust-agent-ui-dsh-queue-projection-contract-20261025.md)及[分层结果](rust-agent-ui-native-dsh-busy-queue-results-20261025.md)。
 
 Native 0.9.3 的 busy queue 可见性本轮仍未通过：流式 hold 时第二个 prompt 已 admitted，公开 control 却持续空，独立读者同样观测到；上游跟踪 [Kernel #86](https://github.com/TekesApps/TekesKernel/issues/86)。这不否定此前空闲 Queue 的 mixed 发送/回传/公开回读和重连，但也不能以其代替运行中队列验收。未修改 Kernel 或 TekesUI。
+
+Pi endpoint 的既有 lifetime 现覆盖所有自有 FrameStream：close 唤醒已等待的流，单次 Disconnected 后结束，并拒绝关闭后的新订阅。真实 Native0.9.3/Pi1.3.0/DSH0.2.1-rc.2 的客户端关闭、失败预算及原宿主显式重连见 [恢复结果](rust-agent-ui-sidebar-transport-recovery-results-20261025.md)；不等同服务器重启或 observer 终态 Retry。

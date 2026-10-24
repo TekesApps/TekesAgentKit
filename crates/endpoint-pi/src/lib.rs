@@ -620,6 +620,35 @@ pub fn active_branch(result: &Value, max_messages: usize) -> Result<(Vec<Value>,
     let start = messages[messages.len() - max_messages];
     Ok((branch[start..].to_vec(), true))
 }
+fn close_on_lifetime(
+    frames: FrameStream,
+    lifetime: tokio::sync::watch::Receiver<bool>,
+) -> FrameStream {
+    Box::pin(stream::unfold(
+        (frames, lifetime, false),
+        |(mut frames, mut lifetime, finished)| async move {
+            if finished {
+                return None;
+            }
+            loop {
+                if *lifetime.borrow() {
+                    return Some((Err(Error::Disconnected), (frames, lifetime, true)));
+                }
+                tokio::select! {
+                    biased;
+                    changed = lifetime.changed() => {
+                        if changed.is_err() || *lifetime.borrow() {
+                            return Some((Err(Error::Disconnected), (frames, lifetime, true)));
+                        }
+                    }
+                    frame = frames.next() => {
+                        return frame.map(|frame| (frame, (frames, lifetime, false)));
+                    }
+                }
+            }
+        },
+    ))
+}
 #[async_trait]
 impl SessionEndpoint for PiSessionEndpoint {
     fn identity(&self) -> &str {
@@ -705,6 +734,7 @@ impl SessionEndpoint for PiSessionEndpoint {
         true
     }
     async fn events(&self) -> Result<FrameStream> {
+        require(!*self.lifetime.borrow(), "endpoint is closed")?;
         let events = self.context.notifications.subscribe();
         let generation = self.generation.clone();
         let baseline = json!({"type":"baseline","generation":generation,"snapshot":{}});
@@ -739,9 +769,8 @@ impl SessionEndpoint for PiSessionEndpoint {
                 }
             },
         );
-        Ok(Box::pin(
-            stream::once(async { Ok(baseline) }).chain(updates),
-        ))
+        let frames: FrameStream = Box::pin(stream::once(async { Ok(baseline) }).chain(updates));
+        Ok(close_on_lifetime(frames, self.lifetime.subscribe()))
     }
     async fn follow(&self, target: StreamTarget) -> Result<FrameStream> {
         require(!*self.lifetime.borrow(), "endpoint is closed")?;
@@ -813,9 +842,9 @@ impl SessionEndpoint for PiSessionEndpoint {
                         Some((value, (events, rpc, id, generation, windows)))
                     },
                 );
-                Ok(Box::pin(
-                    stream::once(async { Ok(baseline) }).chain(updates),
-                ))
+                let frames: FrameStream =
+                    Box::pin(stream::once(async { Ok(baseline) }).chain(updates));
+                Ok(close_on_lifetime(frames, self.lifetime.subscribe()))
             }
             target => {
                 let events = self.context.notifications.subscribe();
@@ -913,9 +942,9 @@ impl SessionEndpoint for PiSessionEndpoint {
                         }
                     },
                 );
-                Ok(Box::pin(
-                    stream::iter(initial.into_iter().map(Ok)).chain(updates),
-                ))
+                let frames: FrameStream =
+                    Box::pin(stream::iter(initial.into_iter().map(Ok)).chain(updates));
+                Ok(close_on_lifetime(frames, self.lifetime.subscribe()))
             }
         }
     }
@@ -964,8 +993,10 @@ impl SessionEndpoint for PiSessionEndpoint {
         })
     }
     async fn observe_files(&self, id: &str, path: &str) -> Result<FrameStream> {
+        require(!*self.lifetime.borrow(), "endpoint is closed")?;
         let row = self.context.row(id).await?;
-        files::observe(row.cwd, path, self.lifetime.subscribe()).await
+        let frames = files::observe(row.cwd, path, self.lifetime.subscribe()).await?;
+        Ok(close_on_lifetime(frames, self.lifetime.subscribe()))
     }
     async fn file_stat(&self, id: &str, path: &str) -> Result<SessionFileStat> {
         let row = self.context.row(id).await?;
@@ -1460,6 +1491,95 @@ mod tests {
             .await
             .unwrap_err();
         assert!(error.to_string().contains("closed"));
+        drop(endpoint);
+        drop(connector);
+        tokio::fs::remove_dir_all(root).await.unwrap();
+    }
+    #[tokio::test]
+    async fn closing_endpoint_disconnects_pending_owned_streams_and_rejects_new_subscriptions() {
+        let root = std::env::temp_dir().join(format!("agentkit-close-{}", uuid::Uuid::new_v4()));
+        let connector = PiConnector::new(PiConfiguration::new(
+            PathBuf::from("/bin/false"),
+            root.clone(),
+        ))
+        .await
+        .unwrap();
+        let root = connector.context.config.data_root.clone();
+        let endpoint = PiSessionEndpoint {
+            context: connector.context.clone(),
+            generation: "test-close".into(),
+            host: serde_json::from_value(json!({
+                "protocolVersion":3,
+                "product":{"name":"Pi","version":"1.3.0"},
+                "capabilities":[],"cwd":root,"home":root,
+                "attachedSessions":0,"canOpenPath":false
+            }))
+            .unwrap(),
+            windows: Arc::new(Mutex::new(BTreeMap::new())),
+            lifetime: tokio::sync::watch::channel(false).0,
+        };
+
+        let mut streams = vec![endpoint.events().await.unwrap()];
+        for target in [
+            StreamTarget::WorkspaceInventory,
+            StreamTarget::SessionInventory,
+            StreamTarget::SessionControl,
+            StreamTarget::Actionables,
+        ] {
+            streams.push(endpoint.follow(target).await.unwrap());
+        }
+        for stream in &mut streams {
+            assert!(
+                tokio::time::timeout(Duration::from_secs(1), stream.next())
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .is_ok()
+            );
+        }
+
+        let nexts = streams
+            .iter_mut()
+            .map(|stream| Box::pin(stream.next()))
+            .collect::<Vec<_>>();
+        let mut pending = futures_util::future::join_all(nexts);
+        assert!(
+            tokio::time::timeout(Duration::from_millis(50), &mut pending)
+                .await
+                .is_err()
+        );
+
+        endpoint.close().await;
+        endpoint.close().await;
+        let disconnected = tokio::time::timeout(Duration::from_secs(1), &mut pending)
+            .await
+            .expect("close must wake all pending endpoint streams");
+        drop(pending);
+        assert_eq!(disconnected.len(), streams.len());
+        for item in disconnected {
+            assert!(
+                item.expect("closed streams yield one terminal error")
+                    .is_err()
+            );
+        }
+        for stream in &mut streams {
+            assert!(
+                tokio::time::timeout(Duration::from_secs(1), stream.next())
+                    .await
+                    .unwrap()
+                    .is_none()
+            );
+        }
+        assert!(endpoint.events().await.is_err());
+        for target in [
+            StreamTarget::WorkspaceInventory,
+            StreamTarget::SessionInventory,
+            StreamTarget::SessionControl,
+            StreamTarget::Actionables,
+        ] {
+            assert!(endpoint.follow(target).await.is_err());
+        }
+
         drop(endpoint);
         drop(connector);
         tokio::fs::remove_dir_all(root).await.unwrap();

@@ -2,6 +2,8 @@
 
 创建日期：2026-10-24，建票基线 `1ef2791`。最近功能基线 `9969f8f`（2026-10-25核对），PR #10。完整目标保持不变；本计划将历史实现与剩余验收映射为工作项，后续专题按各自不可变提交/程序解释，不能把拆票或分项通过视为完整交付。
 
+本轮新增 [三端 Sidebar 真实连接关闭与恢复](rust-agent-ui-sidebar-transport-recovery-results-20261025.md)：#22/#27 的真实 transport 故障与恢复通过，含 Pi close 流窄修和 pending-stream 红/绿回归；不等于 observer Retry、桌面或完整 Issue 验收。新 head CI 单独核对。
+
 ## 执行规则
 
 - GitHub Issue 负责需求、优先级、依赖、状态与关闭标准；本文件是需求覆盖索引，专题文档是设计/证据，不为每次验证另开 Issue。

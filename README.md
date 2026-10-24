@@ -149,3 +149,5 @@ Real Native/Pi/DSH Sidebar classification, archive recovery and canonical histor
 Real multi-endpoint SideChat (Pi remains second): [original dispatcher, runtime cancellation and recovery](docs/rust-agent-ui-real-multi-sidechat-results-20261024.md). Desktop and ProcessContainer acceptance remain separate.
 
 运行中队列的协议边界、DSH 通用投影与 Native 未通过项见 [busy queue 结果](docs/rust-agent-ui-native-dsh-busy-queue-results-20261025.md)。UI 继续保持试验状态。
+
+三端客户端连接关闭、故障预算及原 Reconnect 的实际验证与 Pi 流关闭修复见 [Sidebar transport recovery](docs/rust-agent-ui-sidebar-transport-recovery-results-20261025.md)。仅无窗口组件/协议证据，UI继续保持试验状态。

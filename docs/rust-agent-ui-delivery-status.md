@@ -4,6 +4,7 @@
 
 三端原pane来源见证的最近核对基线为 `9969f8f274c17193024eec74a78aae2eabe15fae`（2026-10-25核对），[PR #10](https://github.com/TekesApps/TekesAgentKit/pull/10)仍为draft。UI仍是 `0.0.0` / `publish=false`，不是已发布v0.3.8的一部分；完整交付尚未达到。最近文档提交不会改变这些功能证据的适用revision。
 
+- 新增[三端 Sidebar 真实连接关闭与恢复](rust-agent-ui-sidebar-transport-recovery-results-20261025.md)：修复Pi关闭后库存/控制流未结束的问题；Native/Pi/DSH真实close→Failed→原Reconnect→新库存/历史均通过。Root402、UI781（1既有忽略）、Python307；桌面与完整交付仍未验收。
 - 新增[Native/DSH mixed](rust-agent-ui-native-dsh-mixed-results-20261025.md)：空闲 Queue 模式下原图/文件/图、回传、公开回读与重连已通过；3bda2f6 的 push/PR CI 共享包和独立 consumer 通过，严格 UI 唯一失败仍为 TekesUI #53。
 - 本轮[运行中队列](rust-agent-ui-native-dsh-busy-queue-results-20261025.md)：DSH 公共 inbox 已接入通用 Run 队列和 Composer 原提交确认；Native 0.9.3 的 busy control 空队列另留未通过项。新提交的精确验证与 CI 将单独记录。
 - 新增[三端公开图片字节回读](rust-agent-ui-dsh-image-read-results-20261025.md)：纠正旧probe将DSH误标unsupported；三端图文/纯图在重连前后共12次原公开读取通过，Python289通过，未改生产组件/SDK。
