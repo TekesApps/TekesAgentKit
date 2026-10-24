@@ -151,3 +151,5 @@ Real multi-endpoint SideChat (Pi remains second): [original dispatcher, runtime 
 运行中队列的协议边界、DSH 通用投影与 Native 未通过项见 [busy queue 结果](docs/rust-agent-ui-native-dsh-busy-queue-results-20261025.md)。UI 继续保持试验状态。
 
 三端客户端连接关闭、故障预算及原 Reconnect 的实际验证与 Pi 流关闭修复见 [Sidebar transport recovery](docs/rust-agent-ui-sidebar-transport-recovery-results-20261025.md)。仅无窗口组件/协议证据，UI继续保持试验状态。
+
+当前功能基线与分层验收见 [1026 格矩阵](docs/rust-agent-ui-acceptance-matrix-20261025.md)。矩阵区分当前源码、各次历史程序与真实协议/UI证据；[Composer 最后入队前 owner 复核](docs/rust-agent-ui-submission-last-admission-20261025.md)保留原提交目的地和 RPC，不自动重发。

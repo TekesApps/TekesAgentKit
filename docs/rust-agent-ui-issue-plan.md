@@ -1,8 +1,10 @@
 # Rust Agent UI 的 Issue 驱动交付计划
 
-创建日期：2026-10-24，建票基线 `1ef2791`。最近功能基线 `9969f8f`（2026-10-25核对），PR #10。完整目标保持不变；本计划将历史实现与剩余验收映射为工作项，后续专题按各自不可变提交/程序解释，不能把拆票或分项通过视为完整交付。
+创建日期：2026-10-24，建票基线 `1ef2791`。最近功能基线 `91129d7`（2026-10-25核对），PR #10。完整目标保持不变；本计划将历史实现与剩余验收映射为工作项，后续专题按各自不可变提交/程序解释，不能把拆票或分项通过视为完整交付。
 
 本轮新增 [三端 Sidebar 真实连接关闭与恢复](rust-agent-ui-sidebar-transport-recovery-results-20261025.md)：#22/#27 的真实 transport 故障与恢复通过，含 Pi close 流窄修和 pending-stream 红/绿回归；不等于 observer Retry、桌面或完整 Issue 验收。新 head CI 单独核对。
+
+本次完成[原owner最后入队前复核](rust-agent-ui-submission-last-admission-20261025.md)，独立记录受控竞态回归与本次新源码的真实三端恢复。[1026格矩阵](rust-agent-ui-acceptance-matrix-20261025.md)固定功能基线，不将旧程序证据转成新提交通过。下一切片按[Native累计分页来源契约](rust-agent-ui-native-paged-pane-source-contract-20261025.md)推进 #17/#23；该契约是待实施设计，不是累计分页或重连已验收。
 
 ## 执行规则
 
@@ -363,7 +365,7 @@ Native后续切片：复用既有feature headless与已安装Kernel0.9.3，真�
 
 ### [#27](https://github.com/TekesApps/TekesAgentKit/issues/27) — [P0][Acceptance] 固定宿主的三端、IME、阅读与布局验收矩阵
 
-当前：非桌面矩阵与本轮三端离屏已完成；系统 IME、窗口、阅读锚点及容器验收待补。
+当前：固定基线的[1026格矩阵](rust-agent-ui-acceptance-matrix-20261025.md)与本次三端无窗口协议恢复已完成；系统 IME、窗口、阅读锚点及容器验收待补。旧离屏程序按原来源保留。
 
 依赖/关联：#21、#22、#23、#24、#25、#26。上游关联按具体子项适用。
 
@@ -375,7 +377,8 @@ Native后续切片：复用既有feature headless与已安装Kernel0.9.3，真�
 
 待做：
 
-- [ ] 建立逐需求×harness×同/跨进程×验证层级矩阵，先复核组件/第二 consumer/离屏，再做必要原生。
+- [x] 建立逐需求×harness×同/跨进程×验证层级矩阵，保留原快照，明确当前、历史和协议/UI的证据范围。
+- [ ] 按矩阵逐项补齐同一交付程序的适用行为验收；构造 consumer 和共享组件单测不替代整项要求。
 - [ ] 继续遵守用户“桌面验收先不跑”；获安排后用固定宿主与已授权固定截图工具，历史程序仅归档。
 - [ ] 同一交付程序补系统中文组字/草稿/发送取消/stream/向上阅读/原生分页/reconnect 及配对布局/AX。
 
@@ -387,7 +390,7 @@ Native后续切片：复用既有feature headless与已安装Kernel0.9.3，真�
 
 证据：[session-endpoints.md](session-endpoints.md)、[rust-agent-ui-non-sdk-review-20261023.md](rust-agent-ui-non-sdk-review-20261023.md)、[rust-agent-ui-native-toolchain.md](rust-agent-ui-native-toolchain.md)、[rust-agent-ui-offscreen-coverage-20261023.md](rust-agent-ui-offscreen-coverage-20261023.md)。
 
-本轮推进：见[720格分层矩阵](rust-agent-ui-acceptance-matrix-20261024.md)及[本轮非桌面实跑](rust-agent-ui-non-desktop-results-20261024.md)。程序/源码身份独立保留，不把矩阵检查成功或离屏结果当作完整验收。
+本轮推进：见[1026格分层矩阵](rust-agent-ui-acceptance-matrix-20261025.md)及[原owner派发修复](rust-agent-ui-submission-last-admission-20261025.md)。[720格矩阵](rust-agent-ui-acceptance-matrix-20261024.md)与[早期非桌面实跑](rust-agent-ui-non-desktop-results-20261024.md)保留为历史快照。程序/源码身份独立保留，不把矩阵检查成功或离屏结果当作完整验收。
 
 ### [#28](https://github.com/TekesApps/TekesAgentKit/issues/28) — [P0][Delivery] 完整要求审计、review、CI、合并与阶段 tag
 
@@ -397,7 +400,7 @@ Native后续切片：复用既有feature headless与已安装Kernel0.9.3，真�
 
 已做：
 
-- [x] PR #10 draft，最近功能基线9969f8f；#12/#13已实施但尚未合并。
+- [x] PR #10 draft，最近功能基线91129d7；#12/#13已实施但尚未合并。
 - [x] 9969f8f的push40109889043/PR40109892909两轮checks、默认UI、feature见证、独立consumer通过，唯一#53严格阅读失败；原日志/artifact、137/243来源闭包及PR merge父关系已核对。1ef2791等历史CI按原记录保留。
 - [x] 设计/迁移/接入和专题证据已有；当前 UI 0.0.0/publish=false，不是 v0.3.8 中已发布 UI。
 

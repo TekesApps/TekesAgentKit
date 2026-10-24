@@ -2,7 +2,9 @@
 
 需求分配与后续执行以 [Issue 驱动交付计划](rust-agent-ui-issue-plan.md) / [总追踪 #14](https://github.com/TekesApps/TekesAgentKit/issues/14) 为准。
 
-三端原pane来源见证的最近核对基线为 `9969f8f274c17193024eec74a78aae2eabe15fae`（2026-10-25核对），[PR #10](https://github.com/TekesApps/TekesAgentKit/pull/10)仍为draft。UI仍是 `0.0.0` / `publish=false`，不是已发布v0.3.8的一部分；完整交付尚未达到。最近文档提交不会改变这些功能证据的适用revision。
+最近功能基线为 `91129d701fbd2721cf3415b86d227900715ec353`（2026-10-25核对），[PR #10](https://github.com/TekesApps/TekesAgentKit/pull/10)仍为draft。当前证据入口为[1026格矩阵](rust-agent-ui-acceptance-matrix-20261025.md)；三端原pane来源见证等历史专题仍按各自原提交/程序解释。UI仍是 `0.0.0` / `publish=false`，不是已发布v0.3.8的一部分；完整交付尚未达到。文档提交不会改变这些功能证据的适用revision。
+
+- 本次[原owner最后入队复核](rust-agent-ui-submission-last-admission-20261025.md)已修复 child catalog/背压等待期间的退休窗口；Root404/0/0、UI784/0/1、严格Clippy和第二公开consumer通过。同份新源码实际三端恢复回归通过；[精确来源/程序/收据](rust-agent-ui-owner-admission-results-20261025.json)独立记录。受控fixture的owner竞态与真实三端恢复是两项不同验证。
 
 - 新增[三端 Sidebar 真实连接关闭与恢复](rust-agent-ui-sidebar-transport-recovery-results-20261025.md)：修复Pi关闭后库存/控制流未结束的问题；Native/Pi/DSH真实close→Failed→原Reconnect→新库存/历史均通过。Root402、UI781（1既有忽略）、Python307；桌面与完整交付仍未验收。
 - 新增[Native/DSH mixed](rust-agent-ui-native-dsh-mixed-results-20261025.md)：空闲 Queue 模式下原图/文件/图、回传、公开回读与重连已通过；3bda2f6 的 push/PR CI 共享包和独立 consumer 通过，严格 UI 唯一失败仍为 TekesUI #53。
@@ -103,7 +105,7 @@ DSH 保持能力禁用；桌面、物理 IME 和 ProcessContainer 未验收。
 | 反馈初读/重连/CAS | 自动按来源/epoch读取，普通 aside 无常驻 Refresh；加载失败保留旧记录且不可写，明确刷新恢复。 | 本轮真实三端离屏组合验证见当前续验；真实故障恢复仍属 4097e4f 冻结程序，反馈的当前原生交互仍待验收。 |
 | ProcessContainer 同/跨进程 | 当前没有正式适配；8 包闭包不含 module-runtime/app-protocol。 | #48 固定公开 SDK 中 `new_view` 仍声明无远端 keyboard/IME/AX，V1 的 keyboard/scroll/text_ime/accessibility 为 false；本轮复核公开 50ec49f 仍如此；需 SDK 交付后再接入三个业务容器并独立验收。 |
 | 原生、中文组字、阅读/重连、第二 consumer | 有多个冻结程序的分项成功、失败和完整收据；组件/第二 consumer 在 CI 跑，未打开桌面。 | 同一交付程序的完整 Native/Pi/DSH + 当前系统 IME、最终配对布局；跨进程/VoiceOver 未证明。前一阶段 c90c9f3b 程序已通过三端 stream/stream-reading/public-page、owned 原生 Activity 点击/控件保留和一次系统软件拼音。public-page 不是原生分页按钮，SideChat 旧收据不转移到当前程序；物理键盘、稳定 IME、完整配对布局与跨进程未证明。 |
-| review、CI、合并/tag | PR #10 draft；功能基线9969f8f的push/PR两轮checks、默认UI、feature见证与独立consumer通过，严格#53步骤失败。运行/源码/闭包与分层计数见当前入口及专题，旧623/74等计数仍仅适用历史程序。 | 完整review、全部要求和适用验收、新发布pin；严格失败仍在，不能合并或打完成tag。 |
+| review、CI、合并/tag | PR #10 draft；当前功能源码和精确CI见1026格矩阵。9969f8f等旧CI和旧623/74等计数仍仅适用历史程序。 | 完整review、全部要求和适用验收、新发布pin；严格失败仍在，不能合并或打完成tag。 |
 
 ## 后续工作顺序
 

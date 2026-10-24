@@ -19,7 +19,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_MATRIX = ROOT / "docs/rust-agent-ui-acceptance-matrix-20261024.json"
+DEFAULT_MATRIX = ROOT / "docs/rust-agent-ui-acceptance-matrix-20261025.json"
 STATUSES = {"unsupported", "blocked", "failed", "not_run", "passed"}
 TOPOLOGIES = {"in_process", "cross_process"}
 REQUIRED_LAYERS = {
@@ -32,6 +32,8 @@ REQUIRED_LAYERS = {
     "accessibility",
     "process_container",
 }
+REQUIRED_LAYERS_V2 = REQUIRED_LAYERS | {"protocol_integration"}
+ALLOWED_HARNESSES = {"Native", "Pi", "DSH"}
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 HEX40 = re.compile(r"^[0-9a-f]{40}$")
 REQUIRED_REQUIREMENTS = {
@@ -39,6 +41,14 @@ REQUIRED_REQUIREMENTS = {
     "reading_append", "pagination_anchor", "reconnect_no_duplicate",
     "views_layout", "sidebar_operations", "task", "subagent", "sidechat",
     "summary", "system_ime", "accessibility",
+}
+REQUIRED_REQUIREMENTS_V2 = REQUIRED_REQUIREMENTS | {
+    "transport_recovery", "image_payload_roundtrip", "mixed_attachment_order",
+    "busy_queue_submission_identity",
+}
+PROTOCOL_REQUIREMENTS_V2 = {
+    "transport_recovery", "image_payload_roundtrip", "mixed_attachment_order",
+    "busy_queue_submission_identity",
 }
 REQUIRED_OBSERVED_GATE_KINDS = {"strict_reading_append", "dsh_sidechat_capability"}
 
@@ -129,13 +139,15 @@ def verify_report_identity(evidence) -> None:
     re-hash the referenced local artifacts.
     """
     report = evidence["report"]
-    if "path" not in report:
+    if "path" not in report and evidence.get("sourceReport") is None:
         return  # External CI record: the immutable run/job URL is its identity.
-    report_path = ROOT / safe_relative(report["path"])
-    require(report_path.is_file(), f"missing evidence report: {report['path']}")
-    require(digest(report_path) == report["sha256"],
-            f"evidence report hash mismatch: {report['path']}")
-    report_data = load_json(report_path)
+    report_data = None
+    if "path" in report:
+        report_path = ROOT / safe_relative(report["path"])
+        require(report_path.is_file(), f"missing evidence report: {report['path']}")
+        require(digest(report_path) == report["sha256"],
+                f"evidence report hash mismatch: {report['path']}")
+        report_data = load_json(report_path)
     program = evidence.get("program")
     if program is not None:
         pair = (program["reportedPath"], program["sha256"])
@@ -143,6 +155,74 @@ def verify_report_identity(evidence) -> None:
                 f"program/source report identity mismatch: {evidence['id']}")
         require(evidence["sourceCommit"] in set(report_commits(report_data)),
                 f"program source revision mismatch: {evidence['id']}")
+    source_report = evidence.get("sourceReport")
+    if source_report is not None:
+        require(isinstance(report_data, dict),
+                f"source report binding requires a local binder report: {evidence['id']}")
+        require(isinstance(source_report, dict),
+                f"invalid source report binding: {evidence['id']}")
+        source_path = safe_relative(source_report.get("path"))
+        source_sha = source_report.get("sha256")
+        require(isinstance(source_sha, str) and HEX64.fullmatch(source_sha),
+                f"invalid source report SHA256: {evidence['id']}")
+        source_report_path = ROOT / source_path
+        require(source_report_path.is_file(),
+                f"missing bound source report: {source_report['path']}")
+        require(digest(source_report_path) == source_sha,
+                f"bound source report hash mismatch: {evidence['id']}")
+        binder = report_data
+        require(binder.get("sourceReport") == source_report,
+                f"bound source report declaration mismatch: {evidence['id']}")
+        require(binder.get("sourceCommit") == evidence["sourceCommit"],
+                f"bound source report revision mismatch: {evidence['id']}")
+        source_files = binder.get("sourceFiles")
+        require(isinstance(source_files, dict) and bool(source_files),
+                f"bound source report requires sourceFiles: {evidence['id']}")
+        for name, sha in source_files.items():
+            safe_relative(name)
+            require(isinstance(sha, str) and HEX64.fullmatch(sha),
+                    f"invalid bound source file hash: {evidence['id']}:{name}")
+        evidence_sources = evidence.get("sourceFiles", {})
+        require(isinstance(evidence_sources, dict),
+                f"invalid evidence sourceFiles: {evidence['id']}")
+        for name, sha in evidence_sources.items():
+            require(name not in source_files or source_files[name] == sha,
+                    f"bound source file hash mismatch: {evidence['id']}:{name}")
+
+
+def evidence_covers(item, requirement, harness, topology, layer, schema_version):
+    return (
+        requirement in item.get("requirements", [])
+        and layer in item.get("layers", [])
+        and item.get("topology") == topology
+        and ("harnesses" not in item or harness in item["harnesses"])
+        and (schema_version == 1 or harness in item.get("harnesses", []))
+    )
+
+
+def protocol_claim(report_data, evidence_id, claim_path, harness, requirement,
+                   topology, layer, assessment=None):
+    require(isinstance(claim_path, list) and claim_path
+            and all(isinstance(key, str) and key for key in claim_path),
+            f"invalid protocol reportClaimPath: {evidence_id}")
+    require(claim_path == ["claims", harness, requirement],
+            f"protocol reportClaimPath scope mismatch: {evidence_id}")
+    claim = report_data
+    for key in claim_path:
+        require(isinstance(claim, dict) and key in claim,
+                f"protocol report claim is missing: {evidence_id}")
+        claim = claim[key]
+    require(isinstance(claim, dict), f"invalid protocol report claim: {evidence_id}")
+    require(claim.get("harness") == harness
+            and claim.get("requirement") == requirement
+            and claim.get("topology") == topology
+            and claim.get("layer") == layer,
+            f"protocol report claim scope mismatch: {evidence_id}")
+    require(claim.get("assessment") in {"passed", "failed", "partial"},
+            f"invalid protocol report claim assessment: {evidence_id}")
+    if assessment is not None:
+        require(claim["assessment"] == assessment,
+                f"protocol report claim assessment mismatch: {evidence_id}")
 
 
 def verify_local_evidence(evidence, verify_sources: bool) -> None:
@@ -168,7 +248,15 @@ def verify_local_evidence(evidence, verify_sources: bool) -> None:
         exists = subprocess.run(["git", "cat-file", "-e", f"{revision}^{{commit}}"],
                                 cwd=ROOT, capture_output=True)
         require(exists.returncode == 0, f"source revision is unavailable: {revision}")
-        for name, expected in evidence.get("sourceFiles", {}).items():
+        source_files = dict(evidence.get("sourceFiles", {}))
+        source_report = evidence.get("sourceReport")
+        if source_report is not None:
+            binder = load_json(ROOT / safe_relative(report["path"]))
+            for name, expected in binder.get("sourceFiles", {}).items():
+                require(name not in source_files or source_files[name] == expected,
+                        f"bound source file hash mismatch: {evidence['id']}:{name}")
+                source_files[name] = expected
+        for name, expected in source_files.items():
             path = safe_relative(name)
             result = subprocess.run(["git", "show", f"{revision}:{path.as_posix()}"],
                                     cwd=ROOT, capture_output=True)
@@ -179,8 +267,9 @@ def verify_local_evidence(evidence, verify_sources: bool) -> None:
 
 
 def validate(matrix, verify_local=False) -> dict:
-    require(isinstance(matrix, dict) and matrix.get("schemaVersion") == 1,
+    require(isinstance(matrix, dict) and matrix.get("schemaVersion") in {1, 2},
             "unsupported matrix schema")
+    schema_version = matrix["schemaVersion"]
     dimensions = matrix.get("dimensions")
     require(isinstance(dimensions, dict), "missing dimensions")
     requirements = dimensions.get("requirements")
@@ -197,14 +286,18 @@ def validate(matrix, verify_local=False) -> dict:
     require(all(isinstance(value, str) and value for value in req_ids),
             "invalid requirement id")
     require(set(topologies) == TOPOLOGIES, "unknown or missing process topology")
-    require(set(layers) == REQUIRED_LAYERS, "unknown or missing verification layer")
-    require(set(harnesses) == {"Native", "Pi", "DSH"}, "unknown or missing harness")
-    require(set(req_ids) == REQUIRED_REQUIREMENTS,
+    expected_layers = REQUIRED_LAYERS if schema_version == 1 else REQUIRED_LAYERS_V2
+    expected_requirements = (REQUIRED_REQUIREMENTS if schema_version == 1
+                             else REQUIRED_REQUIREMENTS_V2)
+    require(set(layers) == expected_layers, "unknown or missing verification layer")
+    require(set(harnesses) == ALLOWED_HARNESSES, "unknown or missing harness")
+    require(set(req_ids) == expected_requirements,
             "unknown or missing required acceptance requirement id")
 
     catalog = matrix.get("evidenceCatalog")
     require(isinstance(catalog, list), "missing evidence catalog")
     evidence_by_id = {}
+    report_data_by_id = {}
     for item in catalog:
         require(isinstance(item, dict), "invalid evidence entry")
         evidence_id = item.get("id")
@@ -226,9 +319,28 @@ def validate(matrix, verify_local=False) -> dict:
         require(isinstance(item.get("requirements"), list)
                 and set(item["requirements"]).issubset(set(req_ids)),
                 f"unknown/missing evidence requirement scope: {evidence_id}")
+        require(len(item["requirements"]) == len(set(item["requirements"])),
+                f"duplicate evidence requirement scope: {evidence_id}")
         require(isinstance(item.get("layers"), list)
-                and set(item["layers"]).issubset(REQUIRED_LAYERS),
+                and set(item["layers"]).issubset(expected_layers),
                 f"unknown/missing evidence layer scope: {evidence_id}")
+        require(len(item["layers"]) == len(set(item["layers"])),
+                f"duplicate evidence layer scope: {evidence_id}")
+        evidence_harnesses = item.get("harnesses")
+        if schema_version == 2 or "harnesses" in item:
+            require(isinstance(evidence_harnesses, list) and evidence_harnesses
+                    and set(evidence_harnesses).issubset(ALLOWED_HARNESSES),
+                    f"invalid/missing evidence harness scope: {evidence_id}")
+            require(len(evidence_harnesses) == len(set(evidence_harnesses)),
+                    f"duplicate evidence harness scope: {evidence_id}")
+        require(item.get("topology") in {None, *TOPOLOGIES},
+                f"unknown evidence topology: {evidence_id}")
+        run = item.get("run")
+        if isinstance(run, dict) and "headSha" in run:
+            require(isinstance(run["headSha"], str) and HEX40.fullmatch(run["headSha"]),
+                    f"invalid evidence run head SHA: {evidence_id}")
+            require(run["headSha"] == source_commit,
+                    f"evidence run head/source revision mismatch: {evidence_id}")
         if item.get("program") is not None:
             program = item["program"]
             require(isinstance(program, dict) and HEX64.fullmatch(str(program.get("sha256", ""))),
@@ -237,6 +349,9 @@ def validate(matrix, verify_local=False) -> dict:
             require(isinstance(program.get("reportedPath"), str),
                     f"missing report program path in {evidence_id}")
             require(item.get("contract") in {"ContentHost", "ProcessContainer", "none"},
+                    f"unknown process contract in {evidence_id}")
+        elif "contract" in item:
+            require(item["contract"] in {"ContentHost", "ProcessContainer", "none"},
                     f"unknown process contract in {evidence_id}")
         if "path" in report:
             # The checked-in report is small and tracked, so default CI mode
@@ -247,11 +362,50 @@ def validate(matrix, verify_local=False) -> dict:
                     and HEX64.fullmatch(str(artifact.get("sha256", ""))),
                     f"invalid raw artifact identity in {evidence_id}")
             safe_relative(artifact.get("path"))
-        for name, sha in item.get("sourceFiles", {}).items():
+        source_files = item.get("sourceFiles", {})
+        require(isinstance(source_files, dict),
+                f"invalid source file hashes in {evidence_id}")
+        for name, sha in source_files.items():
             safe_relative(name)
             require(isinstance(sha, str) and HEX64.fullmatch(sha),
                     f"invalid source file hash in {evidence_id}: {name}")
+        relevant_protocol_requirements = (set(item["requirements"])
+                                          & PROTOCOL_REQUIREMENTS_V2)
+        needs_protocol_claim = (schema_version == 2
+                                and "protocol_integration" in item["layers"]
+                                and bool(relevant_protocol_requirements))
+        claim_path = item.get("reportClaimPath")
+        require(not needs_protocol_claim or claim_path is not None,
+                f"missing protocol reportClaimPath: {evidence_id}")
+        if claim_path is not None:
+            require(isinstance(report, dict) and "path" in report,
+                    f"protocol report claim requires a tracked binder report: {evidence_id}")
+            require(len(relevant_protocol_requirements) == 1,
+                    f"protocol report claim must cover one protocol requirement: {evidence_id}")
+            report_data = load_json(ROOT / safe_relative(report["path"]))
+            protocol_requirement = next(iter(relevant_protocol_requirements))
+            require(isinstance(evidence_harnesses, list) and len(evidence_harnesses) == 1,
+                    f"protocol report claim must cover one harness: {evidence_id}")
+            protocol_claim(report_data, evidence_id, claim_path, evidence_harnesses[0],
+                           protocol_requirement, item.get("topology"),
+                           "protocol_integration")
+            report_data_by_id[evidence_id] = report_data
         evidence_by_id[evidence_id] = item
+
+    def check_protocol_assessment(evidence_id, requirement, harness, topology, layer,
+                                  assessment):
+        if (schema_version == 2 and requirement in PROTOCOL_REQUIREMENTS_V2
+                and layer == "protocol_integration"):
+            protocol_claim(report_data_by_id[evidence_id], evidence_id,
+                           evidence_by_id[evidence_id]["reportClaimPath"], harness,
+                           requirement, topology, layer, assessment)
+
+    local_verified = set()
+
+    def verify_local_once(evidence_id):
+        if evidence_id not in local_verified:
+            verify_local_evidence(evidence_by_id[evidence_id], verify_sources=True)
+            local_verified.add(evidence_id)
 
     expected_keys = set(itertools.product(req_ids, harnesses, topologies, layers))
     rules = matrix.get("rules")
@@ -307,15 +461,32 @@ def validate(matrix, verify_local=False) -> dict:
         if status in {"blocked", "unsupported", "not_run"}:
             require(explanation.strip(), f"missing status reason: {key}")
 
+        if status in {"passed", "failed"}:
+            baseline_commit = matrix.get("baseline", {}).get("agentkitCommit")
+            require(isinstance(baseline_commit, str) and HEX40.fullmatch(baseline_commit),
+                    "invalid baseline AgentKit commit")
+            for evidence_id in evidence_ids:
+                item = evidence_by_id[evidence_id]
+                require(evidence_covers(item, cell["requirement"], cell["harness"],
+                                        cell["topology"], cell["layer"], schema_version),
+                        f"evidence scope mismatch in {key}: {evidence_id}")
+                require(not item.get("historicalOnly", False),
+                        f"historical evidence cannot satisfy current {status} cell: {key}")
+                require(item["sourceCommit"] == baseline_commit,
+                        f"current evidence revision differs from matrix baseline: {key}/{evidence_id}")
+                check_protocol_assessment(evidence_id, cell["requirement"], cell["harness"],
+                                          cell["topology"], cell["layer"], status)
+            for evidence_id in history_ids:
+                item = evidence_by_id[evidence_id]
+                require(evidence_covers(item, cell["requirement"], cell["harness"],
+                                        cell["topology"], cell["layer"], schema_version),
+                        f"historical evidence scope mismatch in {key}: {evidence_id}")
+
         if status == "passed":
             for evidence_id in evidence_ids:
                 item = evidence_by_id[evidence_id]
                 require(not item.get("historicalOnly", False),
                         f"historical evidence cannot satisfy current passed cell: {key}")
-                require(cell["layer"] in item.get("layers", []),
-                        f"evidence layer mismatch in {key}: {evidence_id}")
-                require(cell["requirement"] in item.get("requirements", []),
-                        f"evidence requirement mismatch in {key}: {evidence_id}")
                 contract = item.get("contract", "none")
                 if cell["layer"] == "process_container":
                     require(contract == "ProcessContainer",
@@ -325,6 +496,13 @@ def validate(matrix, verify_local=False) -> dict:
                 if cell["topology"] == "cross_process":
                     require(contract == "ProcessContainer",
                             f"non-ProcessContainer evidence cannot pass cross-process: {key}")
+                else:
+                    require(item.get("topology") == "in_process",
+                            f"evidence topology mismatch in in-process cell: {key}")
+                if cell["layer"] == "protocol_integration":
+                    require(cell["topology"] == "in_process"
+                            and contract in {"none", "ContentHost"},
+                            f"protocol integration cannot prove process or UI acceptance: {key}")
                 if cell["layer"] == "system_ime":
                     ime = item.get("ime", {})
                     require(item.get("nativeWindow") is True
@@ -338,7 +516,7 @@ def validate(matrix, verify_local=False) -> dict:
 
         if verify_local:
             for evidence_id in set(evidence_ids + history_ids):
-                verify_local_evidence(evidence_by_id[evidence_id], verify_sources=True)
+                verify_local_once(evidence_id)
         actual[key] = status
         resolved_cells.append(cell)
 
@@ -369,6 +547,8 @@ def validate(matrix, verify_local=False) -> dict:
         require(isinstance(harnesses_for_gate, list) and harnesses_for_gate
                 and set(harnesses_for_gate).issubset(set(harnesses)),
                 f"unknown observed gate harnesses: {kind}")
+        require(len(harnesses_for_gate) == len(set(harnesses_for_gate)),
+                f"duplicate observed gate harnesses: {kind}")
         status = gate.get("status")
         require(status in STATUSES, f"unknown observed gate status: {kind}")
         evidence_ids = gate.get("evidence")
@@ -378,12 +558,21 @@ def validate(matrix, verify_local=False) -> dict:
             require(evidence_id in evidence_by_id,
                     f"unknown observed gate evidence {evidence_id!r}: {kind}")
             item = evidence_by_id[evidence_id]
-            require(requirement in item.get("requirements", [])
-                    and layer in item.get("layers", []),
+            require(all(evidence_covers(item, requirement, harness, topology, layer,
+                                        schema_version)
+                        for harness in harnesses_for_gate),
                     f"observed gate evidence scope mismatch: {kind}/{evidence_id}")
             if status == "passed":
                 require(not item.get("historicalOnly", False),
                         f"historical evidence cannot satisfy a current passed gate: {kind}")
+            if status in {"passed", "failed"} and not item.get("historicalOnly", False):
+                baseline_commit = matrix.get("baseline", {}).get("agentkitCommit")
+                require(item["sourceCommit"] == baseline_commit,
+                        f"current observed gate evidence revision differs from baseline: {kind}/{evidence_id}")
+            if status in {"passed", "failed"}:
+                for harness in harnesses_for_gate:
+                    check_protocol_assessment(evidence_id, requirement, harness, topology,
+                                              layer, status)
         matched = [cell for cell in resolved_cells
                    if cell["requirement"] == requirement
                    and cell["topology"] == topology and cell["layer"] == layer
@@ -415,11 +604,18 @@ def validate(matrix, verify_local=False) -> dict:
                 {"partial", "passed", "failed", "unsupported"},
                 f"invalid historical assessment: {key}")
         item = evidence_by_id[evidence_id]
-        require(key[0] in item.get("requirements", []) and key[3] in item.get("layers", []),
+        require(evidence_covers(item, key[0], key[1], key[2], key[3], schema_version),
                 f"historical evidence scope mismatch: {key}")
+        check_protocol_assessment(evidence_id, key[0], key[1], key[2], key[3],
+                                  observation["assessment"])
         if observation["assessment"] == "passed":
-            require(key[2] == "in_process" and item.get("contract") == "ContentHost",
-                    f"historical ContentHost result cannot pass cross-process/ProcessContainer: {key}")
+            if key[3] == "protocol_integration":
+                require(key[2] == "in_process"
+                        and item.get("contract", "none") in {"none", "ContentHost"},
+                        f"historical protocol result cannot prove process/UI acceptance: {key}")
+            else:
+                require(key[2] == "in_process" and item.get("contract") == "ContentHost",
+                        f"historical ContentHost result cannot pass cross-process/ProcessContainer: {key}")
             if key[3] == "native_window":
                 require(item.get("nativeWindow") is True,
                         f"historical native-window pass lacks nativeWindow=true evidence: {key}")
@@ -439,11 +635,11 @@ def validate(matrix, verify_local=False) -> dict:
                     and ime.get("commitObserved") is True,
                     f"historical system IME pass lacks native input-method evidence: {key}")
         if verify_local:
-            verify_local_evidence(item, verify_sources=True)
+            verify_local_once(evidence_id)
 
     if verify_local:
-        for evidence in evidence_by_id.values():
-            verify_local_evidence(evidence, verify_sources=True)
+        for evidence_id in evidence_by_id:
+            verify_local_once(evidence_id)
 
     totals = {status: sum(value == status for value in actual.values()) for status in sorted(STATUSES)}
     return {"cells": expected_count, "statusCounts": totals,
