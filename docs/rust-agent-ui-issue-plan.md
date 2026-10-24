@@ -530,3 +530,7 @@ Native后续切片：复用既有feature headless与已安装Kernel0.9.3，真�
 ### #17：Native 显式 run 失败累计
 
 [契约](rust-agent-ui-native-run-terminal-contract-20261024.md)与[结果](rust-agent-ui-native-run-terminal-results-20261024.md)记录已修复的确定差异：同run error不再被后续正常assistant覆盖，取消优先且后继run隔离。新worker补4项红/绿，主会话新增流式不提前结算回归发现并替换候选；最终7/0。root361、feature269、headless4、UI750/0/1、严格Clippy/格式/边界/矩阵、普通demo和新独立公开consumer通过；不改legacy/Journal、SDK或桌面验收边界。原始失败、程序与源码快照保留，#17完整内容/富内容/桌面标准仍开放，新headCI另核对。
+
+### #17 / #21：Native 显式结算边界
+
+[边界契约](rust-agent-ui-native-run-boundaries-contract-20261024.md)和[结果](rust-agent-ui-native-run-boundaries-results-20261024.md)记录已修复差异：非streaming不替代matching settled，迟到或未知run ID不再结束当前run，空marker不造rail目标，消息/工具/fork边界跟随原run。新worker与主会话10项红绿、独立源码复核、root371、feature279、headless4、UI750/0/1、严格Clippy/格式/边界/矩阵、普通demo和新独立consumer通过；新程序Pi/DSH共39命令/15合成请求的running→failed真实协议回归accepted。错ID/缺结算/迟到交错仅有合成证据，完整窗口/IME/AX仍未验收。公开SDK指定缺口仍无新版本，不升级原精确pin，相关Issue不关闭。

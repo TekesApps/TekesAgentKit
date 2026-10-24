@@ -950,7 +950,9 @@ fn native(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSna
     let mut current = scoped(scope, "native:partial");
     let mut occurrences = BTreeMap::<String, usize>::new();
     let mut receipts = BTreeMap::<String, Vec<String>>::new();
-    let mut running_marker = false;
+    let mut current_explicit_run: Option<String> = None;
+    let mut explicit_turns = BTreeMap::<String, String>::new();
+    let run_facts = native_run_facts(&snapshot.entries);
     for entry in &snapshot.entries {
         if matches!(
             entry["customType"].as_str(),
@@ -972,37 +974,15 @@ fn native(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSna
             Some("agentkit.run.v1" | "tekes.run.v1")
         ) {
             let data = &entry["data"];
-            if data["phase"] == "started" {
-                current = scoped(
-                    scope,
-                    &format!("native-run:{}", data["id"].as_str().unwrap_or("partial")),
-                );
-                running_marker = true;
-            } else if data["phase"] == "settled" {
-                // ClientKit accumulates explicit failure/cancellation within a
-                // run. Read those retained facts only at the settled boundary;
-                // an assistant stop alone must not end a still-streaming turn.
-                let has_stop = |reason: &str| {
-                    out.items.iter().any(|item| {
-                        item.turn_id == current
-                            && item.kind == TranscriptItemKind::Assistant
-                            && item.metadata["stopReason"] == reason
-                    })
-                };
-                let reason = if data["aborted"] == true || has_stop("aborted") {
-                    "aborted"
-                } else if has_stop("error") {
-                    "error"
-                } else {
-                    "completed"
-                };
-                settle(&mut out, &current, reason, data["timestamp"].as_f64(), None)?;
-                if let Some(entry_id) = entry["id"].as_str() {
-                    turn(&mut out, &current, None).fork_boundary =
-                        Some(json!({"entryId":entry_id}));
-                }
-                running_marker = false;
+            if data["phase"] == "started"
+                && let Some(run_id) = data["id"].as_str()
+            {
+                current = scoped(scope, &format!("native-run:{run_id}"));
+                current_explicit_run = Some(run_id.to_owned());
+                explicit_turns.insert(run_id.to_owned(), current.clone());
             }
+            // Settlements are applied after projection, using run identity rather
+            // than whichever run happened to be current at this record.
             continue;
         }
         if entry["type"] != "message" {
@@ -1011,7 +991,7 @@ fn native(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSna
         let message = &entry["message"];
         let role = message["role"].as_str().unwrap_or("");
         let record = entry["id"].as_str().unwrap_or("");
-        if role == "user" && !running_marker {
+        if role == "user" && current_explicit_run.is_none() {
             current = scoped(scope, &format!("native-turn:{record}"));
         }
         let time = message["timestamp"].as_f64();
@@ -1170,9 +1150,40 @@ fn native(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSna
             _ => {}
         }
     }
+    // An explicit run remains running until its own durable settlement. Facts
+    // are pre-scanned so a settlement may precede its matching start in the
+    // retained branch, and repeated settlements use their final boundary.
+    for (run_id, turn_id) in &explicit_turns {
+        // ClientKit publishes a turn only when it owns retained messages. Run
+        // markers alone must not add an empty rail/navigation target.
+        if !out.turns.iter().any(|turn| turn.id == *turn_id) {
+            continue;
+        }
+        let Some(facts) = run_facts
+            .get(run_id)
+            .filter(|facts| facts.started && facts.settlement.is_some())
+        else {
+            continue;
+        };
+        let (settlement_time, boundary_id) = facts.settlement.as_ref().expect("filtered");
+        let reason = if facts.settled_aborted || facts.assistant_aborted {
+            "aborted"
+        } else if facts.assistant_error {
+            "error"
+        } else {
+            "completed"
+        };
+        settle(&mut out, turn_id, reason, *settlement_time, None)?;
+        if let Some(entry_id) = boundary_id {
+            turn(&mut out, turn_id, None).fork_boundary = Some(json!({"entryId":entry_id}));
+        }
+    }
     // A following user message establishes that the preceding native turn is no longer active.
     let ids: Vec<_> = out.turns.iter().map(|t| t.id.clone()).collect();
     for id in &ids {
+        if explicit_turns.values().any(|explicit_id| explicit_id == id) {
+            continue;
+        }
         if (id != &current || !snapshot.is_streaming)
             && out
                 .turns
@@ -1261,6 +1272,53 @@ fn native(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSna
         }
     }
     Ok(out)
+}
+
+#[derive(Default)]
+struct NativeRunFacts {
+    started: bool,
+    settlement: Option<(Option<f64>, Option<String>)>,
+    settled_aborted: bool,
+    assistant_aborted: bool,
+    assistant_error: bool,
+}
+
+fn native_run_facts(entries: &[Value]) -> BTreeMap<String, NativeRunFacts> {
+    let mut facts = BTreeMap::<String, NativeRunFacts>::new();
+    let mut active_run: Option<String> = None;
+    for entry in entries {
+        if matches!(
+            entry["customType"].as_str(),
+            Some("agentkit.run.v1" | "tekes.run.v1")
+        ) {
+            let data = &entry["data"];
+            match (data["phase"].as_str(), data["id"].as_str()) {
+                (Some("started"), Some(run_id)) => {
+                    active_run = Some(run_id.to_owned());
+                    facts.entry(run_id.to_owned()).or_default().started = true;
+                }
+                (Some("settled"), Some(run_id)) => {
+                    let run = facts.entry(run_id.to_owned()).or_default();
+                    run.settlement = Some((
+                        data["timestamp"].as_f64(),
+                        entry["id"].as_str().map(str::to_owned),
+                    ));
+                    run.settled_aborted |= data["aborted"] == true;
+                }
+                _ => {}
+            }
+            continue;
+        }
+        if entry["type"] == "message"
+            && entry["message"]["role"] == "assistant"
+            && let Some(run_id) = active_run.as_ref()
+        {
+            let run = facts.entry(run_id.clone()).or_default();
+            run.assistant_aborted |= entry["message"]["stopReason"] == "aborted";
+            run.assistant_error |= entry["message"]["stopReason"] == "error";
+        }
+    }
+    facts
 }
 
 fn native_tool_semantic(name: &str, mut arguments: Value) -> (String, Value) {

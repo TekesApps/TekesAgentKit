@@ -13,3 +13,5 @@
 证据 `.runtime-fixtures/transcript-run-terminal-20261024/` 在 SSD：1066 文件输入快照、红/绿日志、候选补丁、最终测试程序和独立 consumer 归档。最终定向测试程序 SHA256 `f36b47494a3af4a958cfc6a4d5fc00adbb68f5549c7e67129e442406c2759afa`，otool 仅引用系统 dylib；归档不用作新的桌面应用宿主。全部构建串行复用共享 target，没有新建 target，本轮删除0 bytes。
 
 本轮是原投影的合成 Native 历史回归、编译和公开 consumer 证据，没有新增真实 harness 生命周期、窗口/glyph/布局、物理 IME、OS AX 或 ProcessContainer 验收。richContent/completeTranscript 标志未变，#17保持开放；#53严格门不豁免，不合并、tag或发布。
+
+CI终态补记（6318bf6）：PR40095410230 / push40095406743均结束；root361、feature269+headless4、UI750/0/1、Python221和独立consumer均通过。两份原artifact/log已核对consumer137文件closure与提交源码一致，SDK243文件closure不变，PR合成merge父含6318bf6。唯一失败仍为#53严格阅读（accepted=false / parentOffsetAfterAppend634 / detailVisibleAfterAppendfalse）；CI demo构建被跳过，本地demo另通过。不能据此合并或发布。
