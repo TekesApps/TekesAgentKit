@@ -230,16 +230,22 @@ impl SummaryFacts {
             .tasks
             .iter()
             .filter(|t| {
-                t.scope.endpoint_id == current.endpoint_id && t.scope.thread_id == current.thread_id
+                !t.id.trim().is_empty()
+                    && t.scope.validate().is_ok()
+                    && t.scope.endpoint_id == current.endpoint_id
+                    && t.scope.thread_id == current.thread_id
             })
             .map(|task| SummaryRow {
                 id: task.id.clone(),
                 title: task.name.clone(),
                 value: Value::String(task.canonical_status().into()),
-                action: task.independent_run().map(|scope| SummaryAction::OpenTask {
-                    task_id: task.id.clone(),
-                    scope,
-                }),
+                action: task
+                    .independent_run()
+                    .filter(|scope| scope.validate().is_ok())
+                    .map(|scope| SummaryAction::OpenTask {
+                        task_id: task.id.clone(),
+                        scope,
+                    }),
             })
             .collect();
         sections.push(SummarySection {
@@ -251,6 +257,7 @@ impl SummaryFacts {
             rows: self
                 .subagents
                 .iter()
+                .filter(|s| !s.id.trim().is_empty())
                 .map(|s| SummaryRow {
                     id: s.id.clone(),
                     title: s.title.clone(),
@@ -262,6 +269,11 @@ impl SummaryFacts {
                     action: s
                         .session_id
                         .as_ref()
+                        .filter(|child| {
+                            !child.trim().is_empty()
+                                && *child != &current.session_id
+                                && !current.session_id.ends_with(&format!(":{child}"))
+                        })
                         .map(|child| SummaryAction::OpenSubagent {
                             parent: current.clone(),
                             child_id: child.clone(),
@@ -294,7 +306,7 @@ impl SummaryFacts {
             rows: self
                 .artifacts
                 .iter()
-                .filter(|a| seen.insert(&a.id))
+                .filter(|a| !a.id.trim().is_empty() && seen.insert(&a.id))
                 .map(|a| SummaryRow {
                     id: a.id.clone(),
                     title: a.id.rsplit('/').next().unwrap_or(&a.id).into(),
@@ -335,10 +347,22 @@ impl SummaryFacts {
         self.scope.validate()?;
         require(
             self.tasks.iter().all(|t| {
-                t.scope.endpoint_id == self.scope.endpoint_id
+                !t.id.trim().is_empty()
+                    && t.scope.validate().is_ok()
+                    && t.scope.endpoint_id == self.scope.endpoint_id
                     && t.scope.thread_id == self.scope.thread_id
             }),
-            "foreign task scope",
+            "invalid or foreign summary task",
+        )?;
+        require(
+            self.subagents.iter().all(|s| !s.id.trim().is_empty()),
+            "invalid summary subagent identity",
+        )?;
+        require(
+            self.artifacts
+                .iter()
+                .all(|artifact| !artifact.id.trim().is_empty()),
+            "invalid summary artifact identity",
         )
     }
 }

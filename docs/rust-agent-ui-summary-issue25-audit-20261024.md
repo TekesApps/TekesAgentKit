@@ -30,7 +30,7 @@
 - TekesClientKit `Sources/Composer/Agent/ClientAgentSummaryView.swift` — `5632d920bd21d44d6b68d49779e9f7746c9bc1ec4ad9e7bc1d01ab58b85f9154`
 - TekesClientKit `Sources/Composer/Agent/ClientAgentSummaryEnvironment.swift` — `d325617e6b56472231a06b41152a8acde9ac85161fd588bec63e4e462e6186ad`
 - Tekes host `Tekes/ClientAgentSummaryHostAdapter.swift` — `4e7875ae43ab06901a981077f81a4504c754e88f2c019a470dc67222b917714a`
-- AgentKit `crates/presentation/src/summary.rs` after this change — `7545efff1524342c4b6e1c391ca181dfae28d91a52bdbc3bdf13d639ea89026f`
+- AgentKit `crates/presentation/src/summary.rs` at this audit checkpoint — `c463bf79399567c40d607fb8455e666d778e94dff7979c844700fb482822717b`
 
 以上为当前 checkout 的静态代码证据，不代表运行中的应用版本，也不证明所有 harness 的 producer 都产生了完整 Summary 数据。缺失的 producer facts 继续保持 unknown；未发现需要补造 SDK/TekesUI API 的阻塞。
 
@@ -45,3 +45,23 @@
 ## 主会话集成验证
 
 主会话已完成 presentation 全套测试：225 passed / 0 failed / 0 ignored，日志保留在 `.runtime-fixtures/parallel-issues-20261024/presentation-tests-final.log`。首轮发现的旧 fixture 预期和 section 下标问题已修正；独立审查发现的带前缀父 ID 碰撞已新增回归并通过。UI、公开 consumer 与真实 harness 的本批结果由主会话集中收据另记，不把此前冻结程序的结果转移到本修复。
+
+## Issue #25 后续边界审查（ddc49c7 基线）
+
+新增发现：`SummaryFacts::validate` 原先只检查顶层 scope 和 task endpoint/thread；公开构造的空 task/subagent/artifact identity 可以通过 `SummaryState::commit`。纯 `sections()` 也可能直接生成空 row ID、空 artifact path action，或从无效 task scope 生成无效 `OpenTask`。UI `prepare_context` 后续虽会拒绝部分结构，但 headless presentation 已经暴露了无效行/动作。
+
+修复后，`sections()` 逐行过滤空白 task/subagent identity、无效 task RunScope 与空白 artifact path；空白 subagent `session_id` 只让该行保持被动。空白 task name/subagent title 是可缺失的显示 metadata：有效身份仍显示原值，不补默认文案也不重写。有效 sibling 行仍保留，合法路径原样保留。`SummaryFacts::validate` 用于异步提交时拒绝整份包含非法 identity/scope 的 facts；逐行保留有效 sibling 是纯 `sections()` 的行为，两者不能混同。测试覆盖有效 sibling、空白显示 metadata、坏 task scope/identity、空白 artifact、空白 pointer、负数/NaN 费用隐藏，以及同 scope 新请求开始后旧结果不能污染当前状态。
+
+复查 `ui/demo/tests/summary_custom.rs` 已覆盖 source token 在 revision、owner、折叠 ABA、content-key 替换、unmount/remount 后失效；`SummaryView` 的 action identity 包含 owner 与完整 action，owner切换会分配新 identity，action 变化也不能复用旧 row ID。此轮未发现需要新增状态机或修改组件的 source-owned action/custom slot fencing 缺口。上述 UI 测试为既有静态源码证据，本轮未重跑。
+
+`SummaryFacts::validate` 现拒绝空白 task/subagent row identity、无效 task scope 与空白 artifact ID，但允许空白 task name/subagent title，因为显示 metadata 缺失不构成身份或权限失败。`sections()` 独立过滤非法 task scope/row identity/路径，因此一个坏 row 不会抹掉可显示的有效 sibling。显示文字与合法输入路径不做 trim 重写。空白 subagent session ID 保持 unknown 并且无导航动作。用量已知费用仍需 finite、non-negative、cost-complete；回归覆盖负数与 NaN 不作为已知费用。
+
+本轮变更文件：`crates/presentation/src/summary.rs`、`crates/presentation/tests/panels.rs` 和本审计文档。静态 `rustfmt --edition 2024 --check crates/presentation/src/summary.rs` 与 `git diff --check` 通过；验证仍由主会话集中执行，本子会话未运行 Cargo、桌面或 harness。
+
+## 本轮主会话验证（Sidebar 宿主接入批次）
+
+补 alias 防护前完整 presentation suite：226 passed / 0 failed / 0 ignored；严格 all-target Clippy 通过。日志分别为 `.runtime-fixtures/sidebar-host-20261024/presentation-tests.log`、`presentation-clippy.log`。这些是 headless Rust 证据；没有重新运行真实 harness、桌面、IME 或视觉验收。
+
+## namespaced parent alias 防自导航
+
+公开 host-projected `SummaryFacts` 也可能携带 `session_id=<uuid>`，而当前 parent identity 为 `dsh:session:<uuid>`。`sections()` 现将 `current.session_id` 以 `:<candidate>` 结尾视为 parent alias，不发出 `OpenSubagent`；合法 row 保留为被动行，`validate()` 不会仅因未知 pointer 拒绝整份 facts。新增 panel regression 覆盖该 host facts 情况；source hash 已同步到上方本审计 checkpoint。最终 alias 修复由主会话运行 panels：16 passed / 0 failed，并通过严格 presentation all-target Clippy；日志为 `.runtime-fixtures/sidebar-host-20261024/presentation-panels-final.log`、`presentation-clippy-final.log`。没有把此前全套测试扩报为最终源码的重新全套执行；本子会话不运行 Cargo。

@@ -183,7 +183,7 @@ fn summary_provider_order_scope_dedup_and_unknown_cost_match_clientkit() {
                 source: Some("a".into()),
             },
         ],
-        usage: Some(usage),
+        usage: Some(usage.clone()),
     };
     assert!(facts.sections(&scope("other")).is_empty());
     let sections = facts.sections(&scope("p"));
@@ -202,6 +202,25 @@ fn summary_provider_order_scope_dedup_and_unknown_cost_match_clientkit() {
     assert_eq!(sections[3].rows.len(), 1);
     assert_eq!(sections[3].rows[0].title, "a.rs");
     assert_eq!(sections[4].rows[5].value, serde_json::Value::Null);
+    assert_eq!(usage.known_cost_usd(), None);
+    assert_eq!(
+        SummaryUsage {
+            cost_usd: Some(-0.01),
+            is_cost_complete: true,
+            ..usage.clone()
+        }
+        .known_cost_usd(),
+        None
+    );
+    assert_eq!(
+        SummaryUsage {
+            cost_usd: Some(f64::NAN),
+            is_cost_complete: true,
+            ..usage.clone()
+        }
+        .known_cost_usd(),
+        None
+    );
     let mut state = SummaryState::default();
     let old = state.begin(scope("p"));
     state.begin(scope("other"));
@@ -210,6 +229,127 @@ fn summary_provider_order_scope_dedup_and_unknown_cost_match_clientkit() {
     assert!(state.commit(&new, Ok(facts)));
     assert!(state.commit(&new, Err("failed query".into())));
     assert!(state.sections(&scope("p")).is_empty());
+}
+
+#[test]
+fn summary_projection_skips_invalid_rows_and_rejects_invalid_facts_without_losing_siblings() {
+    let parent = scope("p");
+    let mut invalid_task_scope = task("");
+    invalid_task_scope.id = "invalid-scope".into();
+    let mut blank_task_id = task("c");
+    blank_task_id.id = "  ".into();
+    let mut blank_task_name = task("c");
+    blank_task_name.id = "blank-name".into();
+    blank_task_name.name = " \t ".into();
+    let mut valid_sibling = task("c");
+    valid_sibling.id = "valid-sibling".into();
+    let mut blank_pointer = SummarySubagent {
+        id: "known-call".into(),
+        title: "Known subagent".into(),
+        session_id: Some("  \t".into()),
+        status: String::new(),
+    };
+    blank_pointer.status = "running".into();
+    let blank_title = SummarySubagent {
+        id: "blank-title".into(),
+        title: " \t ".into(),
+        session_id: Some("c".into()),
+        status: String::new(),
+    };
+    let invalid_facts = SummaryFacts {
+        scope: parent.clone(),
+        tasks: vec![
+            valid_sibling,
+            invalid_task_scope,
+            blank_task_id,
+            blank_task_name.clone(),
+        ],
+        subagents: vec![
+            blank_pointer,
+            blank_title,
+            SummarySubagent {
+                id: " \t".into(),
+                title: "Invalid identity".into(),
+                session_id: Some("c".into()),
+                status: String::new(),
+            },
+        ],
+        artifacts: vec![
+            SummaryArtifact {
+                id: "".into(),
+                source: Some("empty path".into()),
+            },
+            SummaryArtifact {
+                id: " \t".into(),
+                source: Some("blank path".into()),
+            },
+            SummaryArtifact {
+                id: "src/valid.rs".into(),
+                source: None,
+            },
+        ],
+        usage: None,
+    };
+
+    let sections = invalid_facts.sections(&parent);
+    let task_rows = &sections
+        .iter()
+        .find(|section| section.id == "tasks")
+        .unwrap()
+        .rows;
+    let subagent_rows = &sections
+        .iter()
+        .find(|section| section.id == "subagents")
+        .unwrap()
+        .rows;
+    let artifact_rows = &sections
+        .iter()
+        .find(|section| section.id == "artifacts")
+        .unwrap()
+        .rows;
+    assert_eq!(task_rows.len(), 2);
+    assert_eq!(task_rows[0].id, "valid-sibling");
+    assert!(matches!(
+        task_rows[0].action.as_ref(),
+        Some(SummaryAction::OpenTask { .. })
+    ));
+    assert_eq!(task_rows[1].id, "blank-name");
+    assert_eq!(task_rows[1].title, " \t ");
+    assert!(matches!(
+        task_rows[1].action.as_ref(),
+        Some(SummaryAction::OpenTask { .. })
+    ));
+    assert_eq!(subagent_rows.len(), 2);
+    assert_eq!(subagent_rows[0].id, "known-call");
+    assert!(subagent_rows[0].action.is_none());
+    assert_eq!(subagent_rows[1].id, "blank-title");
+    assert_eq!(subagent_rows[1].title, " \t ");
+    assert!(subagent_rows[1].action.is_some());
+    assert_eq!(artifact_rows.len(), 1);
+    assert_eq!(artifact_rows[0].id, "src/valid.rs");
+    assert!(matches!(
+        artifact_rows[0].action.as_ref(),
+        Some(SummaryAction::OpenArtifact { path, .. }) if path == "src/valid.rs"
+    ));
+    assert!(invalid_facts.validate().is_err());
+
+    let mut state = SummaryState::default();
+    let old = state.begin(parent.clone());
+    let current = state.begin(parent.clone());
+    let mut valid_old_result = invalid_facts.clone();
+    valid_old_result.tasks = vec![task("c"), blank_task_name];
+    valid_old_result.subagents = vec![SummarySubagent {
+        id: "blank-title".into(),
+        title: " \t ".into(),
+        session_id: Some("c".into()),
+        status: String::new(),
+    }];
+    valid_old_result.artifacts = vec![];
+    assert!(valid_old_result.validate().is_ok());
+    assert!(!state.commit(&old, Ok(valid_old_result)));
+    assert!(!state.commit(&current, Ok(invalid_facts)));
+    assert!(state.facts.is_none());
+    assert!(state.sections(&parent).is_empty());
 }
 #[test]
 fn confirmed_discard_prevents_late_failure_from_resurrecting_drafts() {
@@ -529,4 +669,27 @@ fn summary_does_not_redirect_namespaced_parent_uuid_to_another_session() {
     let facts = SummaryFacts::read_with_store(&parent, &store, &transcript).unwrap();
     assert_eq!(facts.subagents[0].session_id, None);
     assert!(summary_subagent_rows(&facts, &parent)[0].action.is_none());
+}
+
+#[test]
+fn host_projected_summary_keeps_namespaced_parent_alias_as_a_passive_row() {
+    let raw_id = "b437cf34-5661-45e2-a674-113b27c92f89";
+    let parent = scope(&format!("dsh:session:{raw_id}"));
+    let facts = SummaryFacts {
+        scope: parent.clone(),
+        tasks: vec![],
+        subagents: vec![SummarySubagent {
+            id: "child-call".into(),
+            title: "Known child".into(),
+            session_id: Some(raw_id.into()),
+            status: String::new(),
+        }],
+        artifacts: vec![],
+        usage: None,
+    };
+    assert!(facts.validate().is_ok());
+    let rows = summary_subagent_rows(&facts, &parent);
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].title, "Known child");
+    assert!(rows[0].action.is_none());
 }
