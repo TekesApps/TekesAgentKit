@@ -164,8 +164,8 @@
 
 待做：
 
-- [ ] 针对每个 harness/宿主确认可核验的报告与 group narration producer、身份和更新语义。
-- [ ] 若公开 producer 缺失，记录具体契约缺口/依赖；仅在明确来源后接入原投影与组件。
+- [x] 针对三端和宿主完成公开来源审计；三端 producer 尚未确认，记录 unknown，不等于已接入。
+- [x] 已记录 producer 缺失及所需身份/更新契约；实际接入仍待明确公开来源。
 - [ ] 补真实协议来源 fixture 和回传/恢复证据；不以手造字符串或显示正文代替来源。
 
 验收：
@@ -590,3 +590,7 @@ Native后续切片：复用既有feature headless与已安装Kernel0.9.3，真�
 ### #17：纠正 DSH 图片 byte-read 门禁
 
 [结果](rust-agent-ui-dsh-image-read-results-20261025.md)：原公开路由本已存在，移除probe硬编码unsupported，三端图文/纯图在重连前后12次公开read通过；Python289（新增4项门禁）、严格example Clippy/构建通过。原错误标记只作历史记录，当前#53/#117与完整UI仍开放，未改上游/生产组件。
+
+### #16/#17/#28：Native / DSH mixed 非桌面闭环（2026-10-25）
+
+[契约](rust-agent-ui-native-dsh-mixed-contract-20261025.md)与[结果](rust-agent-ui-native-dsh-mixed-results-20261025.md)：两端各有正文/无正文image-file-image，原RPC和source身份保留，重连前后16次图片公开read及4次Native文件read通过；DSH仅公开文件引用/句柄，不伪造通用下载。4个业务provider请求+1个标题，无重试，owned服务退出0。Python296、严格example Clippy/build/fmt与边界/矩阵通过；只补验收工具/文档，未改生产状态机。#53/#117、桌面及完整UI仍开放。源边界中止候选另行保留并排除；不合并/tag/关闭完整Issue。
