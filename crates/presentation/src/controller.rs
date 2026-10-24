@@ -37,8 +37,16 @@ fn refreshed_snapshot(
     authority: &tekes_agent_session::MemoryProjectionStore,
     previous: &RunSnapshot,
 ) -> RunSnapshot {
+    refreshed_snapshot_outcome(core, authority, previous).0
+}
+
+fn refreshed_snapshot_outcome(
+    core: &mut PresentationStore,
+    authority: &tekes_agent_session::MemoryProjectionStore,
+    previous: &RunSnapshot,
+) -> (RunSnapshot, bool) {
     match core.refresh(authority) {
-        Ok(snapshot) => snapshot,
+        Ok(snapshot) => (snapshot, true),
         Err(error) => {
             let mut old = previous.clone();
             // A failed refresh cannot publish retained goal facts as current.
@@ -100,8 +108,31 @@ fn refreshed_snapshot(
                 }
                 run.actionables.clear();
             }
-            old
+            (old, false)
         }
+    }
+}
+
+/// Explicit acceptance-only input witness for one original publication.
+/// It does not confer navigation authority or service-side transactional freshness.
+#[cfg(feature = "acceptance-source-witness")]
+#[derive(Clone, Debug)]
+pub struct RunSourceWitness {
+    snapshot: Arc<RunSnapshot>,
+    authority: tekes_agent_session::MemoryProjectionStore,
+    projection_succeeded: bool,
+}
+#[cfg(feature = "acceptance-source-witness")]
+impl RunSourceWitness {
+    pub fn snapshot(&self) -> &Arc<RunSnapshot> {
+        &self.snapshot
+    }
+    pub fn authority(&self) -> &tekes_agent_session::MemoryProjectionStore {
+        &self.authority
+    }
+    /// False when the existing degraded path published retained content.
+    pub fn projection_succeeded(&self) -> bool {
+        self.projection_succeeded
     }
 }
 
@@ -215,6 +246,31 @@ impl RunController {
     pub fn snapshot(&self) -> Arc<RunSnapshot> {
         self.shared.snapshots.borrow().clone()
     }
+    /// Refresh and publish through the original projection, capturing its exact
+    /// immutable input inside the same runtime read. No later watch revision or
+    /// runtime snapshot is joined to this publication. Normal refreshes do not
+    /// clone the authority. Use only in explicit acceptance tooling.
+    #[cfg(feature = "acceptance-source-witness")]
+    pub fn refresh_with_source_witness(&self) -> RunSourceWitness {
+        let mut core = self.shared.core.lock().expect("presentation lock poisoned");
+        let (snapshot, projection_succeeded, authority) =
+            self.shared.runtime.inspect(|authority| {
+                let (snapshot, succeeded) = refreshed_snapshot_outcome(
+                    &mut core,
+                    authority,
+                    &self.shared.snapshots.borrow(),
+                );
+                (snapshot, succeeded, authority.clone())
+            });
+        let snapshot = Arc::new(snapshot);
+        self.shared.snapshots.send_replace(snapshot.clone());
+        RunSourceWitness {
+            snapshot,
+            authority,
+            projection_succeeded,
+        }
+    }
+
     pub fn select(&self, destination: ComposerDestination) -> Result<SelectionToken> {
         self.shared.validate_destination(&destination)?;
         require(

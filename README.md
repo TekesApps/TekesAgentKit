@@ -124,7 +124,7 @@ python3 scripts/install-dsh-runtime.py \
 
 [MIT](LICENSE)，Copyright © 2026 TekesApps。Kernel、Pi、DSH、ClientKit 参考实现和第三方依赖分别保留各自的许可证；本仓库的 MIT License 不替代它们的授权。
 
-Tasks、Subagents、SideChat 与 Summary 的无 UI 状态、宿主输入及能力边界见 [headless-agent-panels](docs/headless-agent-panels.md)。
+Tasks、Subagents、SideChat 与 Summary 的无 UI 状态、宿主输入及能力边界见 [headless-agent-panels](docs/headless-agent-panels.md)。 隔离验收可显式开启 [Summary 来源见证 feature](docs/rust-agent-ui-summary-source-witness-contract-20261024.md)，将原发布帧与同次内存输入绑定；默认构建不采样，也不把该入口作为 UI API。
 
 Sidebar bounded paging and visibility contract: [2026-10-21 report](docs/rust-agent-ui-sidebar-paging-20261021.md).
 

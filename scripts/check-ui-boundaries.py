@@ -35,9 +35,10 @@ consumer = tomllib.loads((ui / 'consumer/Cargo.toml').read_text())['dependencies
 # Public reveal consumption needs the SDK's original token, options and text-host trait.
 # Controls are permitted; renderer/platform/harness dependencies remain excluded.
 assert set(consumer) == {'tekes-agent-components-ui', 'tekes-agent-ui-bindings', 'tekes-ui-controls'}
-# Independent label-host tests use only fixed SDK text/scene/token primitives.
+# Independent label-host tests use fixed SDK text/scene/token primitives;
+# the source-witness example decodes captured public JSON without a runtime adapter.
 assert tomllib.loads((ui / 'consumer/Cargo.toml').read_text()).get('dev-dependencies', {}) == {
-    name: {'workspace': True} for name in ('tekes-ui-text', 'tekes-ui-scene', 'tekes-ui-tokens')}
+    name: {'workspace': True} for name in ('tekes-ui-text', 'tekes-ui-scene', 'tekes-ui-tokens', 'serde_json')}
 for source in (ui / 'components/src').rglob('*.rs'):
     assert 'tekes_ui_text::coretext' not in source.read_text(), 'native font adapters belong to the host'
 # Direct dependencies must go through the reviewed workspace or crates.io; no host sibling fallback.

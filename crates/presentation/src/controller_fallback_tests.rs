@@ -167,3 +167,22 @@ fn failed_epoch_refresh_uses_current_authority_epoch_without_reusing_child_catal
     assert_eq!(next.run.as_ref().unwrap().phase, RunPhase::Archived);
     assert_eq!(next.transcript.items, previous.transcript.items);
 }
+
+#[test]
+fn source_outcome_never_marks_retained_history_as_a_fresh_projection() {
+    let mut authority = authority();
+    let (mut core, original) = selected(&authority);
+    history(&mut authority, "a", true);
+    let (retained, succeeded) = refreshed_snapshot_outcome(&mut core, &authority, &original);
+    assert!(!succeeded);
+    assert_closed(&retained);
+    assert_eq!(retained.transcript.items, original.transcript.items);
+    assert!(retained.revision > original.revision);
+
+    history(&mut authority, "a", false);
+    let (recovered, succeeded) = refreshed_snapshot_outcome(&mut core, &authority, &retained);
+    assert!(succeeded);
+    assert!(!recovered.transcript.is_stale);
+    assert_eq!(recovered.connection_epoch, authority.connection_epoch);
+    assert_eq!(recovered.selection, core.selection());
+}

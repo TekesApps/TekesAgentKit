@@ -214,6 +214,28 @@ async fn main() -> Result<()> {
                     .await?;
                 json!({"cancelled":true})
             }
+            #[cfg(feature = "acceptance-source-witness")]
+            "presentationSource" => {
+                presentation.select(ComposerDestination::run(RunScope::main(
+                    identity,
+                    id.ok_or_else(|| unsupported("sessionId required"))?,
+                )))?;
+                let witness = presentation.refresh_with_source_witness();
+                let value = json!({"snapshot":witness.snapshot().as_ref(),"authority":witness.authority(),
+                    "projectionSucceeded":witness.projection_succeeded(),
+                    "evidenceScope":"original-publication-and-same-memory-input",
+                    "serverTransactionalFreshnessProven":false});
+                if let Some(name) = command["saveAs"].as_str() {
+                    variables.insert(
+                        name.into(),
+                        value
+                            .pointer(string(command, "savePointer")?)
+                            .cloned()
+                            .ok_or_else(|| unsupported("source witness save pointer missing"))?,
+                    );
+                }
+                value
+            }
             "presentation" => {
                 presentation.select(ComposerDestination::run(RunScope::main(
                     identity,

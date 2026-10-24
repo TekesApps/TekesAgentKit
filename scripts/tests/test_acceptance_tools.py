@@ -225,7 +225,7 @@ class Checks(unittest.TestCase):
                 text += 'rusqlite={version="=0.40.2",default-features=false,features=["bundled"]}\n'
             if name == 'consumer':
                 text += '[dev-dependencies]\n' + ''.join(
-                    f'{d}.workspace=true\n' for d in ('tekes-ui-text', 'tekes-ui-scene', 'tekes-ui-tokens'))
+                    f'{d}.workspace=true\n' for d in ('tekes-ui-text', 'tekes-ui-scene', 'tekes-ui-tokens', 'serde_json'))
             (ui / name / 'Cargo.toml').write_text(text)
         header = '[workspace]\n[workspace.package]\npublish=false\nversion="0.0.0"\n[workspace.dependencies]\nunicode-segmentation="=1.13.3"\n'
         for dependency, valid in [

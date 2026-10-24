@@ -331,6 +331,8 @@
 
 本次推进：`9a62950` 修复 Summary 子代理 pointer 的已知 session 授权门禁，阻止未知/歧义/父 UUID 重定向；presentation 225、UI 634/1 原有忽略通过，当前程序 Pi/DSH 原 Summary→子 Run 非桌面闭环通过。见[Summary 审计](rust-agent-ui-summary-issue25-audit-20261024.md)及[统一收据](rust-agent-ui-parallel-results-20261024.md)；不等于视觉/Native/系统 IME 验收。
 
+本次新增：显式验收 feature 在原 RunController 发布边界捕获 Snapshot 与同次内存输入；真实 Pi 模型子代理经公开等待/childHistory/重连后，同帧 Summary 的 idle 来源及原 Summary 组件挂载已验证。没有显式 raw status 时不填造 completed；running/failure 转换、父草稿与完整 UI 验收未由本切片补齐。见[契约](rust-agent-ui-summary-source-witness-contract-20261024.md)和[结果](rust-agent-ui-summary-source-witness-results-20261024.md)。#25 仍开放。
+
 ### [#26](https://github.com/TekesApps/TekesAgentKit/issues/26) — [P0][ProcessContainer] 三个业务容器的同进程与跨进程宿主接入
 
 当前：等待完整交互式 ProcessContainer 公开交付。

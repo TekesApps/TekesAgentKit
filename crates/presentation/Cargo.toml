@@ -7,6 +7,9 @@ publish.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+acceptance-source-witness = []
+
 [dependencies]
 regex = "=1.13.1"
 unicode-segmentation = "=1.13.3"

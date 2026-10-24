@@ -2106,6 +2106,7 @@ dependencies = [
 name = "tekes-agent-ui-consumer-check"
 version = "0.0.0"
 dependencies = [
+ "serde_json",
  "tekes-agent-components-ui",
  "tekes-agent-ui-bindings",
  "tekes-ui-controls",

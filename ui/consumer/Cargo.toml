@@ -11,6 +11,7 @@ tekes-agent-ui-bindings.workspace = true
 tekes-ui-controls.workspace = true
 
 [dev-dependencies]
+serde_json.workspace = true
 tekes-ui-text.workspace = true
 tekes-ui-scene.workspace = true
 tekes-ui-tokens.workspace = true
