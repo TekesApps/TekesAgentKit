@@ -327,15 +327,53 @@ async fn multi_retry_preserves_healthy_tickets_and_retires_only_the_failed_parti
     let read_b = source.read_selected(&address_b, 4).unwrap();
     let mut subscriber = source.subscribe();
     fail(a);
+    let displayed = tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            let packet = source.observer_snapshot().unwrap();
+            if packet.status().endpoints.iter().any(|e| {
+                e.key.endpoint_id() == "endpoint-a"
+                    && e.observation.phase == SidebarObserverPhase::Failed
+            }) {
+                break packet;
+            }
+            subscriber.changed().await.unwrap();
+        }
+    })
+    .await
+    .unwrap();
+    let display_key = displayed
+        .status()
+        .endpoints
+        .iter()
+        .find(|e| e.key.endpoint_id() == "endpoint-a")
+        .unwrap()
+        .key
+        .clone();
+    assert_eq!(
+        displayed.publication().revision,
+        displayed.status().revision
+    );
+    for endpoint in &displayed.status().endpoints {
+        assert_eq!(
+            displayed.publication().endpoints[endpoint.key.endpoint_id()].observation,
+            endpoint.observation
+        );
+    }
     let wrong_owner_token = source.capture_observer_retry("endpoint-a").unwrap();
     let replacement =
         SidebarMultiEndpointBinding::new(agent.clone(), ["endpoint-a", "endpoint-b"]).unwrap();
     assert!(replacement.restart_observer(wrong_owner_token).is_err());
-    let retry = source.capture_observer_retry("endpoint-a").unwrap();
+    assert!(
+        replacement
+            .capture_observer_retry_for(&display_key)
+            .is_err()
+    );
+    let retry = source.capture_observer_retry_for(&display_key).unwrap();
     let previous_b = b.snapshot().revision;
     agent.invalidate_thread_inventory();
     wait_for(b, |p| p.revision > previous_b).await;
     source.restart_observer(retry).unwrap();
+    assert!(source.capture_observer_retry_for(&display_key).is_err());
     assert!(!read_a.is_current(&source));
     assert!(read_b.is_current(&source));
     wait_for(a, |p| {
@@ -497,4 +535,62 @@ async fn inventory_host_callbacks_can_read_observer_state_without_reentering_its
     assert!(host.observed.load(Ordering::SeqCst));
     assert!(!host.locked.load(Ordering::SeqCst));
     binding.runtime().stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn display_packet_keys_cannot_be_reminted_or_reused_for_a_later_failure() {
+    use tekes_agent_presentation::SidebarObserverKey;
+    let (agent, _, binding) = setup().await;
+    let initial = binding.observer_snapshot().unwrap();
+    assert_eq!(initial.publication().revision, initial.status().revision);
+    assert_eq!(
+        initial.publication().observation,
+        initial.status().endpoints[0].observation
+    );
+    assert!(
+        binding
+            .capture_observer_retry_for(&initial.status().endpoints[0].key)
+            .is_err()
+    );
+    fail(&binding);
+    let displayed = binding.observer_snapshot().unwrap();
+    let key = displayed.status().endpoints[0].key.clone();
+    assert_eq!(
+        key.generation(),
+        displayed.publication().observation.generation
+    );
+    let replacement = SidebarBinding::new(agent, "owned-observer-fixture").unwrap();
+    assert!(replacement.capture_observer_retry_for(&key).is_err());
+    let fake_owner = Arc::new(9u8);
+    let forged = SidebarObserverKey::from_owners(
+        &fake_owner,
+        &fake_owner,
+        key.endpoint_id(),
+        key.generation(),
+    )
+    .unwrap();
+    assert!(binding.capture_observer_retry_for(&forged).is_err());
+    // Mutating a public copy does not mint a new key or change the packet.
+    let mut edited = displayed.publication().as_ref().clone();
+    edited.observation.generation += 1;
+    assert_ne!(
+        edited.observation,
+        displayed.status().endpoints[0].observation
+    );
+    binding
+        .restart_observer(binding.capture_observer_retry_for(&key).unwrap())
+        .unwrap();
+    wait_for(&binding, |p| {
+        p.observation.phase == SidebarObserverPhase::Observing
+    })
+    .await;
+    fail(&binding);
+    assert!(binding.capture_observer_retry_for(&key).is_err());
+    let next = binding.observer_snapshot().unwrap();
+    assert!(next.status().endpoints[0].key.generation() > key.generation());
+    assert!(
+        binding
+            .capture_observer_retry_for(&next.status().endpoints[0].key)
+            .is_ok()
+    );
 }

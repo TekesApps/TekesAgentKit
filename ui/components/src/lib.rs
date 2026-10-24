@@ -74,6 +74,8 @@ mod sidebar_session_menu;
 pub use sidebar_session_menu::*;
 mod sidebar_search;
 pub use sidebar_search::*;
+mod sidebar_observer_status;
+pub use sidebar_observer_status::*;
 mod summary;
 mod summary_action_row;
 mod summary_row_layout;
@@ -533,3 +535,8 @@ pub use tekes_agent_presentation::{GoalFacts, GoalPhase};
 
 mod sidebar_multi_search_status;
 pub use sidebar_multi_search_status::*;
+
+pub use tekes_agent_presentation::{
+    SidebarObservation, SidebarObserverEndpointInput, SidebarObserverIntent, SidebarObserverKey,
+    SidebarObserverPhase, SidebarObserverSourceKey, SidebarObserverStatusInput,
+};

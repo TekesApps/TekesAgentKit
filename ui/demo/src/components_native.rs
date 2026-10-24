@@ -321,6 +321,18 @@ impl Host {
             }
         };
         for command in commands {
+            if let DemoCommand::SidebarObserver(
+                tekes_agent_presentation::SidebarObserverIntent::Retry { key },
+            ) = &command
+            {
+                if let Err(error) = self.sidebar.restart_observer_for(key) {
+                    self.failure(error.to_string());
+                }
+                if let Some(wake) = &self.wake {
+                    wake.wake();
+                }
+                continue;
+            }
             if let DemoCommand::SidebarMultiSearch(intent) = &command
                 && let Some(source) = &self.sidebar_multi_query
             {
@@ -518,6 +530,9 @@ impl Host {
                 let special = match command {
                     DemoCommand::TurnNavigation { .. } | DemoCommand::JumpLatest { .. } => {
                         unreachable!("local navigation is dispatched synchronously")
+                    }
+                    DemoCommand::SidebarObserver(_) => {
+                        unreachable!("Sidebar observer retry is dispatched synchronously")
                     }
                     DemoCommand::ReadHistoryPage(request) => {
                         // Success and failure are published only on the original
@@ -928,6 +943,7 @@ impl Host {
                             | DemoCommand::SidebarPreferences(_)
                             | DemoCommand::SidebarSearch(_)
                             | DemoCommand::SidebarMultiSearch(_)
+                            | DemoCommand::SidebarObserver(_)
                             | DemoCommand::Sidebar(_)
                             | DemoCommand::TurnAction { .. }
                             | DemoCommand::ReadInitialFeedback(_)

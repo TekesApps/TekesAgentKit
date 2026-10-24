@@ -106,7 +106,9 @@ def prepare(root: Path, output: Path) -> dict[str, object]:
     source = '''use tekes_agent_components_ui::{
     RunPort, RunScope, SidePanel, SidePanelInput, SidePanelLabels, SidePanelTab,
     SidePanelTabKind, SideChatSnapshot, Sidebar, SidebarInput, SidebarLabels,
-    SidebarMultiSearchStatus, SidebarSearchLabels,
+    SidebarMultiSearchStatus, SidebarSearchLabels, SidebarObserverStatus, SidebarObserverLabels,
+    SidebarObservation, SidebarObserverEndpointInput, SidebarObserverKey, SidebarObserverPhase,
+    SidebarObserverSourceKey, SidebarObserverStatusInput,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -126,6 +128,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         selected: None,
     })?;
     sidebar.clear_pending_actions();
+    // Synthetic owner identity is only a presentation fixture. It cannot
+    // authorize recovery against a real binding's private owner allocations.
+    let source = std::sync::Arc::new(1u8);
+    let child = std::sync::Arc::new(2u8);
+    let observer = SidebarObserverStatusInput {
+        source: SidebarObserverSourceKey::from_owner(&source),
+        revision: 1,
+        endpoints: vec![SidebarObserverEndpointInput {
+            key: SidebarObserverKey::from_owners(&source, &child, "native", 1)?,
+            revision: 1,
+            observation: SidebarObservation {
+                generation: 1, phase: SidebarObserverPhase::Failed, converged: true,
+            },
+            error: Some("synthetic observer fixture".into()),
+        }],
+    };
+    observer.validate()?;
+    sidebar.bind_observer_source(&observer, SidebarObserverLabels::default())?;
+    assert!(sidebar.observer_retry_id("native").is_some());
+    sidebar.update_observer_source(&observer)?;
+    let mut observer_status = SidebarObserverStatus::new(0x8500, SidebarObserverLabels::default());
+    observer_status.replace_source(&observer)?;
+    let _observer_host = observer_status.into_host()?;
     let _sidebar_host = sidebar.into_host()?;
     let _search_status_host = SidebarMultiSearchStatus::new(0x8400, SidebarSearchLabels::default()).into_host()?;
 
@@ -172,7 +197,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "explicit_development_path": str(component_path),
         "consumer_direct_dependencies": ["tekes-agent-components-ui"],
         "components": ["RunPort", "Sidebar", "SidePanel"],
-        "status_children": ["SidebarMultiSearchStatus"],
+        "status_children": ["SidebarMultiSearchStatus", "SidebarObserverStatus"],
         "forbidden_wrappers": [
             "tekes-agent-ui-consumer-check",
             "RunSurface",

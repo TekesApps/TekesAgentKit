@@ -12,7 +12,7 @@ Restarting 保留 loaded、旧 rows、activity anchor 和错误诊断并标 stal
 
 库存转换中的宿主动作回调在生命周期锁外执行；提交前重新检查 generation/failed/publisher。Drop 先关闭本地发布资格并取消最新任务，不能仅靠 abort 阻止正在执行的旧回调发帧。计数耗尽关闭 publisher，调用者须把 watch closed 当终态；不循环复用 revision。
 
-当前阶段提供共享公开 API 和来源门禁，demo 的用户触发恢复入口仍须另行接线。公开 API 验证不代表已经有原生重试按钮或完成真实断流验收。
+`3d594a8` 阶段提供共享公开 API 和来源门禁，当时 demo 的用户触发恢复入口仍须另行接线。公开 API 验证不代表已经有原生重试按钮或完成真实断流验收。
 
 ## 实现与验证
 
@@ -29,3 +29,8 @@ Restarting 保留 loaded、旧 rows、activity anchor 和错误诊断并标 stal
 全部构建复用共享 target。确认没有编译进程、候选文件无占用后，只用现有 Cargo 锁的单一非阻塞 exclusive flock，清理被新测试替代的旧 binding 单测程序和 dep-info 两个文件；target/deps 的 du 实测减少 **1,474,560 bytes**。源码/WIP 核对一致，当前测试程序、验收程序、固定快照与日志保留；其它归属不明的共享产物未删，未整删 target。清理明细见机器收据及本地 observer-cleanup-receipt.json。
 
 demo 用户重试入口、真实多 harness 故障组合、Mirror FTS/pins、远端 cursor、分页/reveal 像素、桌面/中文物理输入/AX/ProcessContainer 继续开放；本批不关闭 #22、不合并或打稳定 tag。
+
+
+## 后续用户入口
+
+后续实现按[observer Retry UI 契约](rust-agent-ui-sidebar-observer-retry-ui.md)接通原始 packet、状态子组件及 demo 路由；上述 664 项历史收据仍只适用于 `3d594a8`。新实现的源码与验证单独记录，不倒填旧程序或旧收据为新 UI 验收。

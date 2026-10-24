@@ -33,7 +33,7 @@ opaque key 仅能由绑定层从真实 binding owner、endpoint 和该次发布�
 - `crates/presentation/src/sidebar_observer.rs`（新增）与 `crates/presentation/src/lib.rs`：只读展示 DTO、opaque source/retry key 与 typed intent；键字段私有、不可序列化，generation 由原 reader packet 产生。
 - `ui/bindings/src/sidebar.rs`、`ui/bindings/src/sidebar_multi.rs`：单端/多端 coherent observation packet；按展示 key 捕获 retry 的校验入口；复用现有 retry/restart token 与 owner 检查。
 - `ui/demo/src/sidebar_host.rs`：把原 binding 的 publication 与 key 作为同一个只读 packet 送到宿主；Single/Multi 路由保留原 child 来源，不从 facade 伪造来源。
-- `ui/components/src/sidebar_observer_status.rs`（新增）、`ui/components/src/lib.rs`、`ui/components/src/sidebar.rs`：默认控件状态子组件、typed intents、并排 search/observer footer、动态 ID 区间和高度布局。
+- `ui/components/src/sidebar_observer_status.rs`（新增）、`ui/components/src/lib.rs`、`ui/components/src/sidebar.rs`：默认控件状态子组件、typed intents、上下排列 search/observer footer、动态 ID 区间和高度布局。
 - `ui/demo/src/component_demo.rs`、`ui/demo/src/native.rs`：消费 observer packet，处理 Retry intent 并把结果状态继续从原 binding 投影回来；不新增恢复状态机。
 - `ui/consumer/tests/`、`scripts/check-public-agent-ui-consumer.py`：workspace consumer 做来源隔离覆盖，独立外部 package 实际编译并运行其公开构造/门禁路径；不把编译当作有效恢复 IO 验收。
 - `docs/rust-agent-ui-sidebar-observer-recovery-20261024.md`、`docs/rust-agent-ui-issue-plan.md`：实现后回填 #22 链接与验证范围；不以 UI 接线完成为由关闭仍含桌面验收的宽 Issue。
@@ -49,3 +49,12 @@ opaque key 仅能由绑定层从真实 binding owner、endpoint 和该次发布�
 5. UI workspace tests、严格 all-target Clippy、demo build、独立 public consumer 和来源边界检查通过；为本次 head 查 PR #10 CI。自有离屏 renderer 可补状态截图，但不得称为桌面验收。
 
 桌面窗口、Screen Recording、物理中文 IME、AX、真实 Native/Pi/DSH 断流与窗口尺寸验收仍未验证，也不属于本设计阶段。Issue #22 的分页 continuation、目标行像素可见性和 TekesUI #53 nested detail 失败仍各自保持开放。
+
+
+## 实施审查补充
+
+- 原 publication 与 key 由 binding 的 `observer_snapshot` 一次取得；多端从同一不可变 aggregate 的原 child status 推导，不读取较新的 child 快照。
+- observer 类型迁至 presentation，bindings 保持 re-export。公开键工厂仅能自建无匹配资格的 owner；真实 owner allocation 没有 getter。
+- Search 固定文本使用 `root + 14`：`+9` 是 observer root，`+12/+13` 已由 session menu 占用。单端和多端 Search 共用其专用 ID 高水位。
+- 通用 Sidebar 不因独立安装 observer 状态而吞掉 `SidebarInput.error`。demo 仅在同一原 packet 的原错误由 active observer diagnostics 覆盖时去重；fixture 的新投影错误继续显示。
+- 健康且已收敛的 Observing 不占 footer 高度；Failed/Restarting 保留诊断。极小窗口的多 footer 仍按 pane clip 裁切；72px 用例验证完整 Retry 按钮可见，不扩报为任意高度、全部端点或真实桌面可达性。

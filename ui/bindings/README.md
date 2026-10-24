@@ -763,3 +763,21 @@ no global counter or scope-derived ID substitutes for that identity.
 See [source authority design](../../docs/rust-agent-ui-source-authority.md).
 
 Display-only `ReadOnlyTranscriptInput` values use `source: None`: Refresh and Earlier remain disabled and emit no read intent, even when the supplied availability facts are ready. A manufactured `Some` identity still grants no endpoint read authority; use the original binding helper for actionable inputs.
+
+
+### Sidebar observer packets and explicit recovery (#22)
+
+Use `SidebarBinding::observer_snapshot()` or the multi binding equivalent to read
+one immutable publication paired with its `SidebarObserverStatusInput`. A cloned
+public publication cannot mint a replacement key. Carry the displayed
+`SidebarObserverIntent::Retry { key }` to the original binding's
+`capture_observer_retry_for(&key)` and then `restart_observer(token)`. Both stages
+check the original private owner allocations and failed generation. An unrelated
+endpoint update does not invalidate the key; replacing the binding or advancing
+its observer generation does. This is observer-only recovery, not transport
+reconnect or mutation retry.
+
+The demo forwards these packets and routes Retry on the original Single/Multi
+binding. Component tests use synthetic owners only for display; those keys have
+no authority over real bindings. Desktop and real harness fault acceptance remain
+open. See the [UI contract](../../docs/rust-agent-ui-sidebar-observer-retry-ui.md).

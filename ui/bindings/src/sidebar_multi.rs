@@ -272,6 +272,63 @@ impl SidebarMultiEndpointBinding {
         })
     }
 
+    /// Admit only the exact original aggregate/child attempt displayed by the
+    /// UI. Unrelated endpoint publications do not invalidate this key.
+    pub fn capture_observer_retry_for(
+        &self,
+        key: &tekes_agent_presentation::SidebarObserverKey,
+    ) -> Result<SidebarMultiObserverRetry> {
+        let binding = self
+            .binding_for(key.endpoint_id())
+            .ok_or_else(|| unsupported("Sidebar endpoint is outside the fixed set"))?;
+        Ok(SidebarMultiObserverRetry {
+            owner: self.owner.clone(),
+            inner: binding.capture_observer_retry_for_owner(key, &self.owner)?,
+        })
+    }
+    /// The aggregate publication already retains each original child's status.
+    /// Derive keys from that single immutable publication and fixed owners;
+    /// never join it with newer child snapshots or the flattened host facade.
+    pub fn observer_snapshot(
+        &self,
+    ) -> Result<crate::SidebarObservationPacket<SidebarMultiPublication>> {
+        use tekes_agent_presentation::{
+            SidebarObserverEndpointInput, SidebarObserverKey, SidebarObserverSourceKey,
+            SidebarObserverStatusInput,
+        };
+        let publication = self.snapshot();
+        let endpoints = self
+            .endpoint_ids
+            .iter()
+            .map(|endpoint_id| {
+                let child = publication
+                    .endpoints
+                    .get(endpoint_id)
+                    .ok_or_else(|| unsupported("missing original Sidebar endpoint status"))?;
+                let binding = self
+                    .binding_for(endpoint_id)
+                    .ok_or_else(|| unsupported("missing original Sidebar endpoint binding"))?;
+                Ok(SidebarObserverEndpointInput {
+                    key: SidebarObserverKey::from_owners(
+                        &self.owner,
+                        &binding.observer_owner(),
+                        endpoint_id,
+                        child.observation.generation,
+                    )?,
+                    revision: child.revision,
+                    observation: child.observation,
+                    error: child.error.clone(),
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let status = SidebarObserverStatusInput {
+            source: SidebarObserverSourceKey::from_owner(&self.owner),
+            revision: publication.revision,
+            endpoints,
+        };
+        status.validate()?;
+        Ok(crate::SidebarObservationPacket::new(publication, status))
+    }
     /// Restart only the endpoint named by the captured child token.
     pub fn restart_observer(&self, retry: SidebarMultiObserverRetry) -> Result<()> {
         require(

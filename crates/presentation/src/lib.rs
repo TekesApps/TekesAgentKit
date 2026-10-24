@@ -75,6 +75,9 @@ pub use sidebar_search::*;
 mod sidebar_multi_search;
 pub use sidebar_multi_search::*;
 
+mod sidebar_observer;
+pub use sidebar_observer::*;
+
 mod sidebar_preferences;
 pub use sidebar_preferences::*;
 

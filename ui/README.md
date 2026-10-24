@@ -2,7 +2,7 @@
 
 AgentKit 拥有可复用的 Composer、Transcript、Indicators、RunPort、Sidebar、SidePanel 和业务状态；TekesUI 拥有通用控件、文字、输入/焦点/IME、滚动、渲染及进程基础能力。宿主拥有窗口、整体布局、导航与系统适配。RunSurface 和 demo 窗口是测试宿主，不是标准 RunPort。
 
-Sidebar 的共享 binding 提供显式同实例 observer 恢复 API，按原 endpoint 退旧代，不重连 transport 或重发 mutation；保留原 subscriber 与 stale rows。demo 用户重试入口仍未接线，详见[恢复契约](../docs/rust-agent-ui-sidebar-observer-recovery-20261024.md)。
+Sidebar 的共享 binding 提供显式同实例 observer 恢复 API，按原 endpoint 退旧代，不重连 transport 或重发 mutation；保留原 subscriber 与 stale rows。demo 已消费原始 observer packet 并接入逐端显式 Retry；不从可编辑的 publication 或当前代数重新生成旧点击，详见[恢复契约](../docs/rust-agent-ui-sidebar-observer-recovery-20261024.md)。
 
 当前 UI 为 `0.0.0` / `publish=false`，PR #10 保持 draft；不能把局部组件或离屏通过当作完整 ClientKit Views、窗口级 toolbar 或 ProcessContainer 验收。AgentKit 已发布基线为 v0.3.8，本 UI 明确消费同仓库开发路径和未发布的共享增量；正式宿主需固定最终发布的新不可变版本。
 

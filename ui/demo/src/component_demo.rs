@@ -9,8 +9,8 @@ use tekes_agent_components_ui::{
     ComposerLabels, RenameFailure, RenameIds, RenameIntent, RenameLabels, RenameSubmission,
     RunPort, RunPortIds, SidePanel, SidePanelDestination, SidePanelDestinationItem, SidePanelInput,
     SidePanelIntent, SidePanelLabels, SidePanelLauncherInput, SidePanelLauncherOwner, SidePanelTab,
-    SidePanelTabKind, Sidebar, SidebarInput, SidebarIntent, SidebarLabels, SummaryInput,
-    SummaryIntent, SummaryLabels, SummaryView, ThreadRename,
+    SidePanelTabKind, Sidebar, SidebarInput, SidebarIntent, SidebarLabels, SidebarObserverLabels,
+    SummaryInput, SummaryIntent, SummaryLabels, SummaryView, ThreadRename,
 };
 use tekes_agent_contract::{
     PromptMode, Result, SessionAddress, ThreadActionOutcome, require, unsupported,
@@ -85,6 +85,7 @@ pub enum DemoCommand {
     SidebarPreferences(tekes_agent_components_ui::SidebarPreferenceChange),
     SidebarSearch(tekes_agent_components_ui::SidebarSearchIntent),
     SidebarMultiSearch(tekes_agent_presentation::SidebarMultiSearchIntent),
+    SidebarObserver(tekes_agent_presentation::SidebarObserverIntent),
     Feedback(Box<FeedbackDemoRequest>),
     ReadInitialFeedback(Box<FeedbackInitialRequest>),
     CopyTranscript(tekes_agent_components_ui::TranscriptCopyIntent),
@@ -197,6 +198,7 @@ pub struct ComponentDemo {
     sidebar_multi_search_publication:
         Option<tekes_agent_presentation::SidebarMultiSearchPublication>,
     sidebar_multi_search_presented: Option<tekes_agent_presentation::SidebarMultiSearchInput>,
+    sidebar_observer_presented: Option<tekes_agent_presentation::SidebarObserverStatusInput>,
     sidebar_presented: Option<SidebarInput>,
     panel_revision: u64,
     workspace_summary: Option<tekes_agent_components_ui::SummaryContextInput>,
@@ -577,6 +579,7 @@ impl ComponentDemo {
             sidebar_search_presented: None,
             sidebar_multi_search_publication: None,
             sidebar_multi_search_presented: None,
+            sidebar_observer_presented: None,
             sidebar_presented: None,
             panel_revision: 0,
             workspace_summary: None,
@@ -2397,6 +2400,7 @@ impl ComponentDemo {
         self.sidebar_search_presented = None;
         self.sidebar_multi_search_publication = None;
         self.sidebar_multi_search_presented = None;
+        self.sidebar_observer_presented = None;
         Ok(())
     }
     pub fn set_sidebar_host_reader(&mut self, source: Arc<SidebarHostBinding>) -> Result<()> {
@@ -2416,6 +2420,7 @@ impl ComponentDemo {
         self.sidebar_host_reader = Some(source);
         self.sidebar_multi_search_publication = None;
         self.sidebar_multi_search_presented = None;
+        self.sidebar_observer_presented = None;
         Ok(())
     }
     fn retire_sidebar_owner(&mut self) -> Result<()> {
@@ -2443,6 +2448,7 @@ impl ComponentDemo {
             .and_then(|content| content.component_mut::<Sidebar>())
         {
             sidebar.clear_pending_actions();
+            sidebar.clear_observer_source().map_err(unsupported)?;
             sidebar
                 .replace_search_source(
                     &search_owner,
@@ -2474,10 +2480,31 @@ impl ComponentDemo {
                         || (source.rows == old.rows
                             && source.activity_at == old.activity_at
                             && source.error == old.error
-                            && source.loaded == old.loaded))
+                            && source.loaded == old.loaded
+                            && source.observer_status() == old.observer_status()))
             }),
             "stale or conflicting Sidebar host publication",
         )?;
+        let observer = source.observer_status();
+        let same_observer_source = self
+            .sidebar_observer_presented
+            .as_ref()
+            .is_some_and(|old| old.source == observer.source);
+        let sidebar = self
+            .tree
+            .get_mut(self.sidebar_id())
+            .and_then(|content| content.component_mut::<Sidebar>())
+            .ok_or_else(|| unsupported("Sidebar is not mounted"))?;
+        if same_observer_source {
+            sidebar
+                .update_observer_source(observer)
+                .map_err(unsupported)?;
+        } else {
+            sidebar
+                .bind_observer_source(observer, SidebarObserverLabels::default())
+                .map_err(unsupported)?;
+        }
+        self.sidebar_observer_presented = Some(observer.clone());
         self.sidebar_host_source = Some(source);
         Ok(())
     }
@@ -2549,6 +2576,13 @@ impl ComponentDemo {
             "single Sidebar publication cannot replace host source",
         )?;
         self.sidebar_host_source = None;
+        self.sidebar_observer_presented = None;
+        self.tree
+            .get_mut(self.sidebar_id())
+            .and_then(|content| content.component_mut::<Sidebar>())
+            .ok_or_else(|| unsupported("Sidebar is not mounted"))?
+            .clear_observer_source()
+            .map_err(unsupported)?;
         require(
             self.sidebar_source.as_ref().is_none_or(|old| {
                 source.revision > old.revision || source.as_ref() == old.as_ref()
@@ -3218,7 +3252,10 @@ impl ComponentDemo {
                     .as_ref()
                     .map_or(1, |old| old.revision + 1),
                 loaded: source.loaded,
-                error: source.error.clone(),
+                error: self.sidebar_host_source.as_ref().map_or_else(
+                    || source.error.clone(),
+                    |packet| packet.inventory_error_for_display(),
+                ),
                 rows: source.rows.clone(),
                 selected,
             };
@@ -4474,6 +4511,14 @@ impl ComponentDemo {
                 .unwrap()
                 .take_multi_search_intents(&actions);
             commands.extend(intents.into_iter().map(DemoCommand::SidebarMultiSearch));
+            let intents = self
+                .tree
+                .get_mut(self.sidebar_id())
+                .unwrap()
+                .component_mut::<Sidebar>()
+                .unwrap()
+                .take_observer_intents(&actions);
+            commands.extend(intents.into_iter().map(DemoCommand::SidebarObserver));
         }
         let summary_intents = self
             .tree

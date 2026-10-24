@@ -22,6 +22,8 @@ pub struct SidebarHostPublication {
     publication: SidebarPublication,
     endpoint_count: usize,
     multi: Option<Arc<SidebarMultiPublication>>,
+    observer: tekes_agent_presentation::SidebarObserverStatusInput,
+    observed_error: Option<String>,
 }
 // Read-only field access preserves the host's publication API without exposing
 // mutable source facts under an owner token. There is deliberately no DerefMut.
@@ -34,6 +36,29 @@ impl std::ops::Deref for SidebarHostPublication {
 impl SidebarHostPublication {
     pub fn as_publication(&self) -> SidebarPublication {
         self.publication.clone()
+    }
+    pub fn observer_status(&self) -> &tekes_agent_presentation::SidebarObserverStatusInput {
+        &self.observer
+    }
+    /// Deduplicate only diagnostics from this exact original packet. A fixture
+    /// display projection or a separate Sidebar input cannot hide a new error.
+    pub fn inventory_error_for_display(&self) -> Option<String> {
+        let errors: Vec<_> = self
+            .observer
+            .endpoints
+            .iter()
+            .filter(|e| e.error.is_some())
+            .collect();
+        let represented = self.publication.error == self.observed_error
+            && !errors.is_empty()
+            && errors.iter().all(|e| {
+                e.observation.phase != tekes_agent_presentation::SidebarObserverPhase::Observing
+            });
+        if represented {
+            None
+        } else {
+            self.publication.error.clone()
+        }
     }
     pub fn endpoint_count(&self) -> usize {
         self.endpoint_count
@@ -72,6 +97,8 @@ impl SidebarHostPublication {
             publication: source.clone(),
             endpoint_count: self.endpoint_count,
             multi: self.multi.clone(),
+            observer: self.observer.clone(),
+            observed_error: self.observed_error.clone(),
         })
     }
     pub fn folder_catalog(&self) -> Result<tekes_agent_ui_bindings::SidebarFolderCatalog> {
@@ -206,43 +233,49 @@ impl SidebarHostBinding {
         let executor = tokio::runtime::Handle::try_current()
             .map_err(|_| unsupported("Sidebar host binding requires an async runtime"))?;
         let owner = Arc::new(());
-        let (initial, receivers): (SidebarHostPublication, Vec<_>) = match &source {
+        let (initial, receiver) = match &source {
             Source::Single(binding) => {
                 let mut receiver = binding.subscribe();
-                let publication = receiver.borrow_and_update().clone();
-                let initial = Self::from_single(&owner, &publication);
-                (initial, vec![WatchSource::Single(receiver)])
+                receiver.borrow_and_update();
+                let initial = Self::from_single(&owner, &binding.observer_snapshot()?);
+                (initial, WatchSource::Single(receiver))
             }
             Source::Multi(binding) => {
                 let mut receiver = binding.subscribe();
-                let publication = receiver.borrow_and_update().clone();
-                let initial = Self::from_multi(&owner, &publication);
-                (initial, vec![WatchSource::Multi(receiver)])
+                receiver.borrow_and_update();
+                let initial = Self::from_multi(&owner, &binding.observer_snapshot()?);
+                (initial, WatchSource::Multi(receiver))
             }
         };
         let (sender, publications) = watch::channel(Arc::new(initial));
-        let mut bridges = Vec::new();
-        for receiver in receivers {
-            let tx = sender.clone();
-            let owner = owner.clone();
-            bridges.push(match receiver {
-                WatchSource::Single(mut receiver) => executor.spawn(async move {
+        // Notifications only wake this bridge. Each forwarded value is one
+        // authentic packet, never a publication joined with a second snapshot.
+        let original = source.clone();
+        let bridge_owner = owner.clone();
+        let bridge = executor.spawn(async move {
+            match (receiver, original) {
+                (WatchSource::Single(mut receiver), Source::Single(binding)) => {
                     while receiver.changed().await.is_ok() {
-                        let publication = receiver.borrow_and_update().clone();
-                        let value = Self::from_single(&owner, &publication);
-                        tx.send_replace(Arc::new(value));
+                        receiver.borrow_and_update();
+                        let Ok(packet) = binding.observer_snapshot() else {
+                            break;
+                        };
+                        sender.send_replace(Arc::new(Self::from_single(&bridge_owner, &packet)));
                     }
-                }),
-                WatchSource::Multi(mut receiver) => executor.spawn(async move {
+                }
+                (WatchSource::Multi(mut receiver), Source::Multi(binding)) => {
                     while receiver.changed().await.is_ok() {
-                        let publication = receiver.borrow_and_update().clone();
-                        let value = Self::from_multi(&owner, &publication);
-                        tx.send_replace(Arc::new(value));
+                        receiver.borrow_and_update();
+                        let Ok(packet) = binding.observer_snapshot() else {
+                            break;
+                        };
+                        sender.send_replace(Arc::new(Self::from_multi(&bridge_owner, &packet)));
                     }
-                }),
-            });
-        }
-        drop(sender);
+                }
+                _ => unreachable!("Sidebar bridge source is fixed"),
+            }
+        });
+        let bridges = vec![bridge];
         Ok(Self {
             source,
             owner,
@@ -252,15 +285,25 @@ impl SidebarHostBinding {
             bridges,
         })
     }
-    fn from_single(owner: &Arc<()>, source: &SidebarPublication) -> SidebarHostPublication {
+    fn from_single(
+        owner: &Arc<()>,
+        packet: &tekes_agent_ui_bindings::SidebarObservationPacket<SidebarPublication>,
+    ) -> SidebarHostPublication {
+        let source = packet.publication();
         SidebarHostPublication {
             owner: owner.clone(),
-            publication: source.clone(),
+            publication: source.as_ref().clone(),
             endpoint_count: 1,
             multi: None,
+            observer: packet.status().clone(),
+            observed_error: source.error.clone(),
         }
     }
-    fn from_multi(owner: &Arc<()>, source: &SidebarMultiPublication) -> SidebarHostPublication {
+    fn from_multi(
+        owner: &Arc<()>,
+        packet: &tekes_agent_ui_bindings::SidebarObservationPacket<SidebarMultiPublication>,
+    ) -> SidebarHostPublication {
+        let source = packet.publication();
         SidebarHostPublication {
             owner: owner.clone(),
             publication: SidebarPublication {
@@ -274,7 +317,9 @@ impl SidebarHostBinding {
                 activity_at: source.activity_at.clone(),
             },
             endpoint_count: source.endpoints.len(),
-            multi: Some(Arc::new(source.clone())),
+            multi: Some(source.clone()),
+            observer: packet.status().clone(),
+            observed_error: source.error.clone(),
         }
     }
     pub fn snapshot(&self) -> Arc<SidebarHostPublication> {
@@ -282,6 +327,23 @@ impl SidebarHostBinding {
     }
     pub fn subscribe(&self) -> watch::Receiver<Arc<SidebarHostPublication>> {
         self.publications.clone()
+    }
+    /// This is observer-only recovery. The key is captured by the displayed
+    /// packet; a click never substitutes current generation or default endpoint.
+    pub fn restart_observer_for(
+        &self,
+        key: &tekes_agent_presentation::SidebarObserverKey,
+    ) -> Result<()> {
+        match &self.source {
+            Source::Single(binding) => {
+                let token = binding.capture_observer_retry_for(key)?;
+                binding.restart_observer(token)
+            }
+            Source::Multi(binding) => {
+                let token = binding.capture_observer_retry_for(key)?;
+                binding.restart_observer(token)
+            }
+        }
     }
     pub fn same_owner(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.owner, &other.owner)

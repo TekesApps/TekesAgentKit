@@ -9,29 +9,34 @@ use tekes_agent_contract::{
 use tekes_agent_web::{SharedAgent, SharedEndpoint};
 use tokio::sync::{mpsc, watch};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SidebarObserverPhase {
-    Observing,
-    Restarting,
-    Failed,
+pub use tekes_agent_presentation::{SidebarObservation, SidebarObserverPhase};
+use tekes_agent_presentation::{
+    SidebarObserverEndpointInput, SidebarObserverKey, SidebarObserverSourceKey,
+    SidebarObserverStatusInput,
+};
+
+/// Original immutable publication paired with its observer provenance. Hosts
+/// cannot attach private binding authority to a caller-edited publication.
+#[derive(Clone, Debug)]
+pub struct SidebarObservationPacket<P> {
+    publication: Arc<P>,
+    status: SidebarObserverStatusInput,
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct SidebarObservation {
-    pub generation: u64,
-    pub phase: SidebarObserverPhase,
-    /// Once a baseline or terminal failure settled initial observation, retry
-    /// cannot roll aggregate convergence back to an initial loading state.
-    pub converged: bool,
-}
-impl Default for SidebarObservation {
-    fn default() -> Self {
+impl<P> SidebarObservationPacket<P> {
+    pub(crate) fn new(publication: Arc<P>, status: SidebarObserverStatusInput) -> Self {
         Self {
-            generation: 1,
-            phase: SidebarObserverPhase::Observing,
-            converged: false,
+            publication,
+            status,
         }
     }
+    pub fn publication(&self) -> &Arc<P> {
+        &self.publication
+    }
+    pub fn status(&self) -> &SidebarObserverStatusInput {
+        &self.status
+    }
 }
+
 #[derive(Debug)]
 pub(crate) struct SidebarObserverOwner {
     _identity: u8,
@@ -222,6 +227,61 @@ impl SidebarBinding {
             endpoint_id: self.endpoint.runtime.inspect(|s| s.endpoint_id.clone()),
             generation: state.generation,
         })
+    }
+    /// Capture only the failed attempt represented by a previously displayed
+    /// original packet. Never substitute the latest generation at click time.
+    pub fn capture_observer_retry_for(
+        &self,
+        key: &SidebarObserverKey,
+    ) -> Result<SidebarObserverRetry> {
+        self.capture_observer_retry_for_owner(key, &self.observer_owner)
+    }
+    pub(crate) fn capture_observer_retry_for_owner<S: std::any::Any + Send + Sync>(
+        &self,
+        key: &SidebarObserverKey,
+        source_owner: &Arc<S>,
+    ) -> Result<SidebarObserverRetry> {
+        let state = self.observation.lock().expect("Sidebar observation lock");
+        let endpoint_id = self.endpoint.runtime.inspect(|s| s.endpoint_id.clone());
+        require(
+            state.failed
+                && state.sender.is_some()
+                && key.matches_owners(
+                    source_owner,
+                    &self.observer_owner,
+                    &endpoint_id,
+                    state.generation,
+                ),
+            "stale Sidebar observer display key",
+        )?;
+        Ok(SidebarObserverRetry {
+            owner: self.observer_owner.clone(),
+            endpoint_id,
+            generation: state.generation,
+        })
+    }
+    /// Read one authentic immutable publication, then derive both display and
+    /// key from it. No externally supplied publication or generation is accepted.
+    pub fn observer_snapshot(&self) -> Result<SidebarObservationPacket<SidebarPublication>> {
+        let publication = self.snapshot();
+        let endpoint_id = self.endpoint.runtime.inspect(|s| s.endpoint_id.clone());
+        let status = SidebarObserverStatusInput {
+            source: SidebarObserverSourceKey::from_owner(&self.observer_owner),
+            revision: publication.revision,
+            endpoints: vec![SidebarObserverEndpointInput {
+                key: SidebarObserverKey::from_owners(
+                    &self.observer_owner,
+                    &self.observer_owner,
+                    &endpoint_id,
+                    publication.observation.generation,
+                )?,
+                revision: publication.revision,
+                observation: publication.observation,
+                error: publication.error.clone(),
+            }],
+        };
+        status.validate()?;
+        Ok(SidebarObservationPacket::new(publication, status))
     }
     /// Explicitly re-open only the existing state follow. No transport or RPC retry.
     pub fn restart_observer(&self, retry: SidebarObserverRetry) -> Result<()> {

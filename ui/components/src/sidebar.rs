@@ -5,8 +5,8 @@ use crate::sidebar_navigation::{
 };
 use crate::summary_section::{Expansion, SectionHeaderKind, SummarySectionView};
 use crate::{
-    SidebarFolderKey, SidebarPreferenceChange, SidebarPreferencesSnapshot, SidebarSearchInput,
-    SidebarSearchIntent, SidebarSearchKey, SidebarSearchLabels, SidebarSort,
+    SidebarFolderKey, SidebarObserverLabels, SidebarPreferenceChange, SidebarPreferencesSnapshot,
+    SidebarSearchInput, SidebarSearchIntent, SidebarSearchKey, SidebarSearchLabels, SidebarSort,
     SidebarTitleComparator, ordered_sidebar_rows, sidebar_folder_title,
     sidebar_search::{SearchFooter, SearchInputView},
 };
@@ -163,6 +163,8 @@ pub struct Sidebar {
     search_retry: Option<(SidebarSearchKey, ComponentId)>,
     search_pending: bool,
     search_seen: BTreeMap<(String, String), (u64, u64)>,
+    observer_next: u64,
+    observer_labels: SidebarObserverLabels,
     bindings: BTreeMap<ComponentId, SidebarIntent>,
     pending: BTreeSet<(SessionAddress, String)>,
     session_menu: bool,
@@ -210,6 +212,16 @@ impl Sidebar {
                     ComponentId(base + 8),
                     SearchFooter::new(search_labels.name.clone()),
                 ),
+                Content::new(
+                    ComponentId(base + 9),
+                    crate::SidebarObserverStatus::from_id_range(
+                        ComponentId(base + 9),
+                        base + 0xFE00_0000,
+                        base + 0xFF00_0000,
+                        SidebarObserverLabels::default(),
+                    )
+                    .expect("observer ID range is valid"),
+                ),
             ],
         };
         Self {
@@ -239,8 +251,8 @@ impl Sidebar {
             labels,
             ids: BTreeMap::new(),
             next: base + 16,
-            // Reserve the final range for the multi-search status subtree.
-            end: base | 0xFEFF_FFFF,
+            // Ordinary controls end before the observer and search status ranges.
+            end: base | 0xFDFF_FFFF,
             revision: 0,
             displayed: None,
             search: None,
@@ -251,6 +263,8 @@ impl Sidebar {
             search_retry: None,
             search_pending: false,
             search_seen: BTreeMap::new(),
+            observer_next: base + 0xFE00_0000,
+            observer_labels: SidebarObserverLabels::default(),
             bindings: BTreeMap::new(),
             pending: BTreeSet::new(),
             session_menu: true,
@@ -589,6 +603,87 @@ impl Sidebar {
     pub fn search_footer_id(&self) -> ComponentId {
         ComponentId(self.root.0 + 8)
     }
+    pub fn observer_footer_id(&self) -> ComponentId {
+        ComponentId(self.root.0 + 9)
+    }
+    fn observer_status(&self) -> &crate::SidebarObserverStatus {
+        self.body.children[2]
+            .component::<crate::SidebarObserverStatus>()
+            .expect("Sidebar observer footer")
+    }
+    fn observer_status_mut(&mut self) -> &mut crate::SidebarObserverStatus {
+        self.body.children[2]
+            .component_mut::<crate::SidebarObserverStatus>()
+            .expect("Sidebar observer footer")
+    }
+    /// Install a coherent observer packet as a new source lifetime. The
+    /// component's dynamic action high-water mark survives source replacement.
+    pub fn bind_observer_source(
+        &mut self,
+        source: &tekes_agent_presentation::SidebarObserverStatusInput,
+        labels: SidebarObserverLabels,
+    ) -> Result<(), &'static str> {
+        if self
+            .observer_status()
+            .displayed()
+            .is_some_and(|old| old.source == source.source)
+        {
+            if self.observer_labels != labels {
+                return Err("Sidebar observer labels changed within the same source");
+            }
+            return self.update_observer_source(source);
+        }
+        let next = self.observer_status().next_id().max(self.observer_next);
+        let mut status = crate::SidebarObserverStatus::from_id_range(
+            self.observer_footer_id(),
+            next,
+            self.root.0 + 0xFF00_0000,
+            labels.clone(),
+        )?;
+        status.replace_source(source)?;
+        self.observer_next = status.next_id();
+        self.observer_labels = labels;
+        self.body.children[2] = Content::new(status.id(), status);
+        if let Some(input) = self.displayed.clone() {
+            self.update(&input)?;
+        }
+        Ok(())
+    }
+    /// Update the current observer source without changing its identity.
+    pub fn update_observer_source(
+        &mut self,
+        source: &tekes_agent_presentation::SidebarObserverStatusInput,
+    ) -> Result<(), &'static str> {
+        self.observer_status_mut().update_from(source)?;
+        self.observer_next = self.observer_status().next_id();
+        Ok(())
+    }
+    /// Retire the observer source and all of its raw actions immediately.
+    /// The next source starts beyond every ID allocated by the retired source.
+    pub fn clear_observer_source(&mut self) -> Result<(), &'static str> {
+        let next = self.observer_status().next_id().max(self.observer_next);
+        let status = crate::SidebarObserverStatus::from_id_range(
+            self.observer_footer_id(),
+            next,
+            self.root.0 + 0xFF00_0000,
+            self.observer_labels.clone(),
+        )?;
+        self.observer_next = next;
+        self.body.children[2] = Content::new(status.id(), status);
+        if let Some(input) = self.displayed.clone() {
+            self.update(&input)?;
+        }
+        Ok(())
+    }
+    pub fn take_observer_intents(
+        &mut self,
+        actions: &[ContentAction],
+    ) -> Vec<tekes_agent_presentation::SidebarObserverIntent> {
+        self.observer_status_mut().take_intents(actions)
+    }
+    pub fn observer_retry_id(&self, endpoint: &str) -> Option<ComponentId> {
+        self.observer_status().retry_id(endpoint)
+    }
     pub fn displayed_search(&self) -> Option<&SidebarSearchInput> {
         self.search.as_ref()
     }
@@ -842,21 +937,22 @@ impl Sidebar {
             .filter(|(key, _)| Some(key) == retry.as_ref())
             .cloned();
         let next = if retry.is_some() && retained.is_none() {
-            self.next
+            self.multi_search_next
                 .checked_add(1)
-                .filter(|next| *next <= self.end)
-                .ok_or("sidebar ID namespace exhausted")?
+                .filter(|next| *next <= (self.root.0 | u32::MAX as u64))
+                .ok_or("sidebar search ID range exhausted")?
         } else {
-            self.next
+            self.multi_search_next
         };
-        let target = retry.map(|key| retained.unwrap_or((key, ComponentId(self.next))));
+        let target =
+            retry.map(|key| retained.unwrap_or((key, ComponentId(self.multi_search_next))));
         if target != self.search_retry {
             self.search_pending = false;
         }
         let pending = self.search_pending;
         let text = input.notice(&self.search_labels);
         let labels = self.search_labels.clone();
-        let text_id = ComponentId(self.root.0 + 9);
+        let text_id = ComponentId(self.root.0 + 14);
         let footer = self.search_footer_mut();
         let old = std::mem::take(&mut footer.body.children);
         let mut old: BTreeMap<_, _> = old.into_iter().map(|node| (node.id(), node)).collect();
@@ -878,7 +974,7 @@ impl Sidebar {
         }
         footer.name = labels.name;
         footer.visible = text.is_some();
-        self.next = next;
+        self.multi_search_next = next;
         self.search_retry = target;
         if let Some(key) = &input.key {
             self.search_seen.insert(
@@ -1673,26 +1769,36 @@ impl Component for Sidebar {
         ))
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
-        // ClientKit anchors the search footer to the bottom even when its
-        // preferred height exceeds the pane. The list then has zero height;
-        // the footer's Retry stays reachable while its top is ancestor-clipped.
-        let footer = self.body.children[1].measure(text, frame.size).size.height;
+        // Keep both footers in a stable bottom stack. The observer footer is
+        // last and is anchored to the pane bottom. Oversized footers are
+        // clipped by the pane; this does not prove all actions are reachable
+        // at arbitrary tiny window heights.
+        let search_height = self.body.children[1].measure(text, frame.size).size.height;
+        let observer_height = self.body.children[2].measure(text, frame.size).size.height;
+        let footer_height = search_height + observer_height;
         let body = Rect::new(
             frame.min_x(),
             frame.min_y(),
             frame.size.width,
-            (frame.size.height - footer).max(0.),
+            (frame.size.height - footer_height).max(0.),
         );
-        let footer = Rect::new(
+        let search = Rect::new(
             frame.min_x(),
-            frame.max_y() - footer,
+            frame.max_y() - footer_height,
             frame.size.width,
-            footer,
+            search_height,
+        );
+        let observer = Rect::new(
+            frame.min_x(),
+            frame.max_y() - observer_height,
+            frame.size.width,
+            observer_height,
         );
         let pane_clip = frame.intersection(&clip).unwrap_or_default();
         let body_clip = body.intersection(&pane_clip).unwrap_or_default();
         self.body.children[0].arrange(text, body, body_clip);
-        self.body.children[1].arrange(text, footer, pane_clip);
+        self.body.children[1].arrange(text, search, pane_clip);
+        self.body.children[2].arrange(text, observer, pane_clip);
     }
     fn semantics(&self) -> ContentSemantics {
         ContentSemantics::new(ContentRole::Group, &self.labels.name)
