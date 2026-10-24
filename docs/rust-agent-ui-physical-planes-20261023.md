@@ -28,7 +28,9 @@
 
 ## 范围与剩余项
 
-本阶段落实普通回合的实际分区和整段 disclosure，**不是完整 ClientKit Views 对齐或完整 UI 交付**。`BetweenInputs` 目前保留已知时间线，ClientKit 的回合内追加输入分段折叠仍待补；没有 prompt role 的 initial System 继续 Direct，避免猜测和隐藏内容。narration carrier/fallback 的剩余来源差异、富内容/选择、glyph/disclosure chrome、最终配对布局和完整 AX 验收仍开放。
+本段记录的是 `c04efc6` 阶段：当时 `BetweenInputs` 保留已知时间线，回合内追加输入的分段折叠尚未交付。该状态已由后续提交 [`42575ef`（Complete input-bounded activity segments and native validation）](https://github.com/TekesApps/TekesAgentKit/commit/42575eff33683ae5dce2894f3b7fe59898f553fa) 取代；当前已提交实现按输入身份折叠历史 Activity 分段，规则、实现和该交付自己的验证收据见 [输入边界 Activity 分段交付记录](rust-agent-ui-activity-segments-20261023.md) 及 [机器记录](rust-agent-ui-activity-segments-20261023.json)。这里引用的是既有交付及其收据，不代表本次重新运行协议或原生验收。
+
+本阶段落实普通回合的实际分区和整段 disclosure，**不是完整 ClientKit Views 对齐或完整 UI 交付**。没有 prompt role 的 initial System 继续 Direct，避免猜测和隐藏内容。narration carrier/fallback 的剩余来源差异、富内容/选择、glyph/disclosure chrome、最终配对布局和完整 AX 验收仍开放。
 
 TekesUI #48 的正式交互式 ProcessContainer 同/跨进程、#53 的严格嵌套阅读等上游门槛未解决。标准详情仍用原 inline 路径；未放宽严格 CI，未复制基础能力。已发布 AgentKit 仍为 v0.3.8，本分支增量需未来不可变发布 pin。
 
