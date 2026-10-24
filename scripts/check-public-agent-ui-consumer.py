@@ -104,6 +104,7 @@ def prepare(root: Path, output: Path) -> dict[str, object]:
         f"tekes-agent-components-ui = {{ path = {json.dumps(str(component_path))} }}\n"
     )
     source = '''use tekes_agent_components_ui::{
+    FamilyCatalog, FamilyCatalogInput, FamilyCatalogLabels,
     RunPort, RunScope, SidePanel, SidePanelInput, SidePanelLabels, SidePanelTab,
     SidePanelTabKind, SideChatSnapshot, Sidebar, SidebarInput, SidebarLabels,
     SidebarMultiSearchStatus, SidebarSearchLabels, SidebarObserverStatus, SidebarObserverLabels,
@@ -174,6 +175,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _sidebar_host = sidebar.into_host()?;
     let _search_status_host = SidebarMultiSearchStatus::new(0x8400, SidebarSearchLabels::default()).into_host()?;
 
+    let mut family = FamilyCatalog::new(0x8600, FamilyCatalogLabels::default());
+    let mut family_input = FamilyCatalogInput {
+        source: Default::default(),
+        parent: scope.clone(), connection_epoch: 1, generation: 1, revision: 1,
+        refreshing: false, catalog: None, error: None,
+    };
+    family.update(&family_input)?;
+    // Parent-owned sources have independent counters. Returning to an earlier
+    // parent must rotate control captures even when source versions coincide.
+    family_input.parent = RunScope::main("pi", "other-parent");
+    family.update(&family_input)?;
+    family_input.parent = scope.clone();
+    family.update(&family_input)?;
+    let _family_host = family.into_host()?;
+
     let mut side_panel = SidePanel::new(0x8300, SidePanelLabels::default(), 4);
     side_panel.update(&SidePanelInput {
         revision: 1,
@@ -216,7 +232,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "agentkit_ui_publish": False,
         "explicit_development_path": str(component_path),
         "consumer_direct_dependencies": ["tekes-agent-components-ui"],
-        "components": ["RunPort", "Sidebar", "SidePanel"],
+        "components": ["RunPort", "Sidebar", "SidePanel", "FamilyCatalog"],
         "status_children": ["SidebarMultiSearchStatus", "SidebarObserverStatus"],
         "membership_checks": ["folderFiltersPinnedRows", "clearRestoresPinnedRows"],
         "forbidden_wrappers": [

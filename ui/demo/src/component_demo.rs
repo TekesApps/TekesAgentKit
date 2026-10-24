@@ -63,6 +63,10 @@ const REASONING_NAMESPACE: u32 = 46;
 const SIDEBAR_OPTIONS_NAMESPACE: u32 = 47;
 const PANEL_LAUNCHER_NAMESPACE: u32 = 48;
 const PANEL_NAVIGATION_NAMESPACE: u32 = 49;
+const FAMILY_NAMESPACE: u32 = 50;
+const FAMILY_ROOT: ComponentId = ComponentId((FAMILY_NAMESPACE as u64) << 32);
+const FAMILY_HOST: ComponentId = ComponentId(16);
+pub const FAMILY_REFRESH: ComponentId = ComponentId(106);
 pub const SELECT_A: ComponentId = ComponentId(100);
 pub const SELECT_B: ComponentId = ComponentId(101);
 pub const RECONNECT: ComponentId = ComponentId(102);
@@ -82,6 +86,7 @@ pub use feedback::{
     FeedbackDemoCompletion, FeedbackDemoRequest, FeedbackInitialCompletion, FeedbackInitialRequest,
 };
 pub enum DemoCommand {
+    ReadFamilyCatalog(Arc<tekes_agent_ui_bindings::FamilyCatalogBinding>),
     SidebarPreferences(tekes_agent_components_ui::SidebarPreferenceChange),
     SidebarSearch(tekes_agent_components_ui::SidebarSearchIntent),
     SidebarMultiSearch(tekes_agent_presentation::SidebarMultiSearchIntent),
@@ -169,6 +174,8 @@ pub enum DemoCommand {
 }
 
 pub struct ComponentDemo {
+    family_catalog_enabled: bool,
+    family_catalog_sources: BTreeMap<RunScope, Arc<tekes_agent_ui_bindings::FamilyCatalogBinding>>,
     summary_labels: SummaryLabels,
     feedback_panes: BTreeMap<ComponentId, feedback::FeedbackPane>,
     feedback_completions: Vec<FeedbackDemoCompletion>,
@@ -290,6 +297,11 @@ pub struct PanelRequest {
     projection_generation: u64,
 }
 impl PanelRequest {
+    /// Original host delivery fence; read-only evidence, not a new request.
+    pub fn delivery_receipt(&self) -> serde_json::Value {
+        serde_json::json!({"parent":self.parent,"mainRevision":self.main_revision,
+            "panelRevision":self.panel_revision,"projectionGeneration":self.projection_generation})
+    }
     pub fn parent(&self) -> &RunScope {
         &self.parent
     }
@@ -558,6 +570,8 @@ impl ComponentDemo {
         tree.set_action_events(true);
         let retained = (0..bindings.len()).map(|_| None).collect();
         let mut view = Self {
+            family_catalog_enabled: false,
+            family_catalog_sources: BTreeMap::new(),
             file_preview_available: false,
             preview_gesture: None,
             summary_labels,
@@ -2836,6 +2850,16 @@ impl ComponentDemo {
         snapshot: PaneSnapshot,
     ) -> Result<bool> {
         let panel_parent = request.parent.clone();
+        let key = (panel_parent.clone(), source.child_id().to_owned());
+        // A closed/replaced tab's tombstone is checked before inspecting its
+        // retired source. Ignoring old delivery must not become a current-pane error.
+        if self
+            .child_open_revisions
+            .get(&key)
+            .is_some_and(|revision| request.panel_revision <= *revision)
+        {
+            return Ok(false);
+        }
         let parent = self
             .bindings
             .iter()
@@ -2846,7 +2870,6 @@ impl ComponentDemo {
             "child source authority mismatch",
         )?;
         Self::validate_child_snapshot(&source, &snapshot)?;
-        let key = (panel_parent.clone(), source.child_id().to_owned());
         if self.composing()
             && self.binding().scope() == &panel_parent
             && self.panel_selections.get(&panel_parent)
@@ -2857,13 +2880,6 @@ impl ComponentDemo {
                 .child_panes
                 .get(&key)
                 .is_some_and(|pane| !Arc::ptr_eq(&pane.source, &source))
-        {
-            return Ok(false);
-        }
-        if self
-            .child_open_revisions
-            .get(&key)
-            .is_some_and(|revision| request.panel_revision <= *revision)
         {
             return Ok(false);
         }
@@ -3424,7 +3440,91 @@ impl ComponentDemo {
         }
         Ok(())
     }
+    /// Explicit host composition of the reusable catalog. Reads are user actions,
+    /// not a per-frame fetch; pane ownership stays in the original child binding.
+    pub fn enable_family_catalog(&mut self) -> Result<()> {
+        if self.family_catalog_enabled {
+            return Ok(());
+        }
+        let catalog =
+            tekes_agent_components_ui::FamilyCatalog::new(FAMILY_NAMESPACE, Default::default());
+        let column = self
+            .tree
+            .get_mut(PANEL_UPLOAD_HOST)
+            .unwrap()
+            .component_mut::<StackContent>()
+            .unwrap();
+        column.children.insert(
+            0,
+            Content::new(
+                FAMILY_HOST,
+                StackContent {
+                    model: Stack {
+                        axis: Axis::Vertical,
+                        gap: Spacing::Tight.value(),
+                    },
+                    flexible_child: None,
+                    children: vec![
+                        Content::new(FAMILY_REFRESH, ButtonContent::new("读取关联会话"))
+                            .preserving_focus(),
+                        Content::new(catalog.id(), catalog),
+                    ],
+                },
+            ),
+        );
+        self.family_catalog_enabled = true;
+        self.sync_family_catalog()
+    }
+    pub fn current_family_catalog_source(
+        &self,
+    ) -> Option<Arc<tekes_agent_ui_bindings::FamilyCatalogBinding>> {
+        let parent = self.current_binding()?.scope();
+        self.family_catalog_sources.get(parent).cloned()
+    }
+    pub fn family_catalog_id(&self) -> Option<ComponentId> {
+        self.family_catalog_enabled.then_some(FAMILY_ROOT)
+    }
+    fn sync_family_catalog(&mut self) -> Result<()> {
+        if !self.family_catalog_enabled {
+            return Ok(());
+        }
+        let binding = self.current_binding().cloned();
+        let composing = self.composing();
+        self.tree
+            .get_mut(FAMILY_REFRESH)
+            .unwrap()
+            .component_mut::<ButtonContent>()
+            .unwrap()
+            .button
+            .state
+            .disabled = binding.is_none() || composing;
+        let Some(binding) = binding else {
+            return Ok(());
+        };
+        let source = self
+            .family_catalog_sources
+            .entry(binding.scope().clone())
+            .or_insert_with(|| {
+                Arc::new(tekes_agent_ui_bindings::FamilyCatalogBinding::for_run(
+                    &binding,
+                ))
+            });
+        if !source.belongs_to(&binding) {
+            *source = Arc::new(tekes_agent_ui_bindings::FamilyCatalogBinding::for_run(
+                &binding,
+            ));
+        }
+        let input = source.snapshot();
+        self.tree
+            .get_mut(FAMILY_ROOT)
+            .unwrap()
+            .component_mut::<tekes_agent_components_ui::FamilyCatalog>()
+            .unwrap()
+            .update(&input)
+            .map_err(unsupported)
+    }
     pub fn sync(&mut self) -> Result<()> {
+        self.sync_family_catalog()?;
         self.sync_file_preview();
         self.sync_upload_status()?;
         self.sync_annotation()?;
@@ -4616,6 +4716,43 @@ impl ComponentDemo {
                 .unwrap()
                 .take_observer_intents(&actions);
             commands.extend(intents.into_iter().map(DemoCommand::SidebarObserver));
+        }
+        if self.family_catalog_enabled && !composing {
+            if actions.iter().any(|action| {
+                action.target == FAMILY_REFRESH && action.kind == ContentActionKind::Activate
+            }) && let Some(source) = self.current_family_catalog_source()
+            {
+                commands.push(DemoCommand::ReadFamilyCatalog(source));
+            }
+            let intents = self
+                .tree
+                .get(FAMILY_ROOT)
+                .and_then(|node| node.component::<tekes_agent_components_ui::FamilyCatalog>())
+                .map(|catalog| catalog.take_intents(&actions))
+                .unwrap_or_default();
+            for intent in intents {
+                let valid_widget = self
+                    .tree
+                    .get(FAMILY_ROOT)
+                    .and_then(|node| node.component::<tekes_agent_components_ui::FamilyCatalog>())
+                    .is_some_and(|catalog| catalog.accepts(&intent));
+                let source = self.current_family_catalog_source();
+                if valid_widget && source.is_some_and(|source| source.accepts(&intent)) {
+                    let layout = self
+                        .sidebar_host_reader
+                        .as_ref()
+                        .ok_or_else(|| unsupported("family catalog needs an endpoint host"))?
+                        .child_history_layout(&intent.parent.endpoint_id)?;
+                    let request = self.begin_child_open(&intent.parent)?;
+                    commands.push(DemoCommand::OpenChild {
+                        request,
+                        direct_parent: intent.parent,
+                        title: intent.child_id.clone(),
+                        child_id: intent.child_id,
+                        layout,
+                    });
+                }
+            }
         }
         let summary_intents = self
             .tree

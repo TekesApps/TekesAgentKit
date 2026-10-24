@@ -27,7 +27,7 @@ Sidebar 的共享 binding 提供显式同实例 observer 恢复 API，按原 end
 
 `RunSurface` 仅是现有协议/控件测试宿主，不是标准 RunPort。正式组件契约、App 的 input/output/footnote 布局、基础 Issue 和完整交付账本见 [Rust Agent UI 接入契约](../docs/rust-agent-ui-contract.md)。
 
-可独立挂载的组件包括 Composer、ComposerNotice、ComposerContext、ComposerChoices、AnnotationEditor、ComposerUploads、Indicators、Sidebar、ThreadRename、SidePanel、SidePanelNavigation、SummaryView、ToolRun、InputMessage、OutputMessage、TurnFootnote、TranscriptContent、ReadOnlyTranscript 和 RunPort。它们使用同一套共享 presentation；RunSurface/ComponentDemo 是测试与接入宿主。主会话和可写 pane 已挂载 RunPort，有界子历史使用 ReadOnlyTranscript；完整 Transcript 的阅读锚点、富内容与最终体验验收仍待完成。
+可独立挂载的组件包括 Composer、ComposerNotice、ComposerContext、ComposerChoices、AnnotationEditor、ComposerUploads、Indicators、Sidebar、ThreadRename、FamilyCatalog、SidePanel、SidePanelNavigation、SummaryView、ToolRun、InputMessage、OutputMessage、TurnFootnote、TranscriptContent、ReadOnlyTranscript 和 RunPort。它们使用同一套共享 presentation；RunSurface/ComponentDemo 是测试与接入宿主。主会话和可写 pane 已挂载 RunPort，有界子历史使用 ReadOnlyTranscript；完整 Transcript 的阅读锚点、富内容与最终体验验收仍待完成。
 
 宿主 header 使用 `SidePanelHeaderPlacement::Host` 配合原 `SidePanelNavigation`，二者消费同一 `SidePanelInput`。窗口与 ProcessContainer 注册由宿主/SDK 负责；当前 demo 的 `--panel-navigation-toolbar` 只分配 in-content toolbar 区域，不是原生窗口 toolbar 验收。旧 `InlineDiagnostic` 默认仅用于保留可运行路径。
 
@@ -356,3 +356,10 @@ for constructor injection, scaling, control/selection retention and native evide
 本地名称 FTS 与已知 Complete provider hits 取并集；provider 失败或不支持时本地名称仍能匹配，原状态/Retry 保留。`SidebarSearchHelp.local_results_ready` 与 provider `results_ready` 分开；多端投影的 `help` 通过 `set_multi_search_projection_help` 原样消费。旧 `set_multi_search_help` 保守地不声明结果完整。空态区分本地名称无匹配与完整查询无结果，未知 provider hit 不遮住其他已知行。
 
 派生 SQLite 索引仅为 UI bindings 的可再生内存实现，不是持久 Mirror、不读取 harness 私库；headless contract/session/presentation 的 SQLite 禁令保持不变。bm25 排名与远端续页仍未实现，桌面验收未运行。
+
+
+### 关联会话目录（实验）
+
+`FamilyCatalog` 是 AgentKit 高层控件，输入 `FamilyCatalogInput`，组合固定 TekesUI 的 Stack/Text/Button。每个 `FamilyCatalogBinding::for_run` 为原父 Run 分配独立 `FamilyCatalogSourceKey`，复用既有 `ChildCatalogState` 显式只读刷新公开 catalog。输入中的 source key 必须原样转发，不能每帧重建；独立 parent/source 的计数不互相比较。先用控件 `accepts` 核对原点击，再用原 binding `accepts` 核对来源；之后仍由原 `ChildPaneBinding` 检查能力，它不授予发送权。
+
+测试宿主 `--components --endpoint-config <配置> --family-catalog` 可显式组合目录；读取按钮不自动重试。`--family-seed-manifest` 与 `--family-delivery-receipt` 必须配合显式端点和 `--offscreen`，只作为真实公开来源的断言 oracle，不能安装 Task 或更改 pointer。Native 父 scope Task 保持普通不可导航 Summary 行；其 bounded child 通过目录进入原只读 Transcript。Pi/DSH 仍走原独立 child binding。这里的离屏节点挂载不代表桌面可见、物理 IME 或系统 AX 验收。

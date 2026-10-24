@@ -21,6 +21,7 @@ from native_owned_fixture import owned_native
 from owned_endpoint_provider import provider_handler
 from pi_owned_fixture import prepare_pi
 from runtime_provenance import kernel_programs
+from task_family_fixture import native_task_seed_commands, pi_subagent_seed_commands, dsh_subagent_seed_commands, parse_family_exchange
 
 ROOT = Path(__file__).resolve().parents[1]
 NATIVE_AUTH = 'AGENTKIT_MULTI_NATIVE_BEARER'
@@ -89,11 +90,42 @@ def validate_delivery(delivery, seeds):
             'sameSessionIdCollisionProven': False}
 
 
+def validate_family_delivery(delivery, seeds):
+    assert delivery['accepted'] is True and delivery['nativeInteraction'] is False
+    assert len(delivery['cases']) == len(seeds) == 6
+    expected = {(row['endpoint'], row['parent']['scope']['sessionId']): row for row in seeds}
+    actual = {(row['endpointId'], row['parent']['sessionId']): row for row in delivery['cases']}
+    assert len(actual) == len(expected) and actual.keys() == expected.keys(), 'family source domain differs from actual seeds'
+    for key, row in actual.items():
+        seed = expected[key]
+        assert row['parent'] == seed['parent']['scope'], 'family parent scope mismatch'
+        assert row['childId'] == seed['child']['address']['sessionId'], 'family child mismatch'
+        assert row['childScope']['endpointId'] == key[0] and row['childScope']['sessionId'] == row['childId'], 'child scope mismatch'
+        assert row['childScope']['threadId'] == row['parent']['threadId'], 'child thread mismatch'
+        assert all(row[name] is True for name in ['canonicalSourceMatched','openedViaOriginalControl',
+            'returnedViaOriginalTab','closedViaOriginalControl','lateParentResultDidNotStealSelection','lateClosedResultRejected',
+            'parentDraftPreserved','childContentMounted']), 'original family path incomplete'
+        assert row['historyItems'] > 0, 'actual child history missing'
+        assert row['readOnly'] is (key[0] == 'native'), 'bounded mode changed'
+        frame = row['catalogFrame']
+        assert frame['parent'] == row['parent'] and frame['epoch'] > 0 and frame['generation'] > 0 and frame['revision'] > 0
+        assert frame['entry'] == seed['child']['catalogEntry'], 'catalog changed before UI admission'
+        assert row['parentTaskRowMountedWithoutOpenAction'] is (key[0] == 'native')
+        if key[0] == 'native':
+            assert row['canonicalTask'] == seed['task']['row'], 'canonical Task row mismatch'
+        else:
+            assert row['canonicalTask'] is None, 'invented independent Task'
+    return {'accepted': True, 'evidenceScope':'real-family-original-controls-and-dispatch',
+            'nativeInteraction':False, 'physicalIme':False,
+            'sameTaskRowDynamicPointerProven':False}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ['headless-program', 'ui-demo', 'pi-root', 'dsh-root', 'kernel-root',
                  'kernel-supervisor', 'kernel-worker', 'output']:
         parser.add_argument('--'+name, type=Path, required=True)
+    parser.add_argument('--task-family', action='store_true', help='Use real public Task/child seeds and original family navigation receipt; separate from Sidebar acceptance')
     args = parser.parse_args()
     output = args.output.resolve()
     if output.exists():
@@ -129,7 +161,7 @@ def main():
                            DSH_AGENTS_HOME=str(dsh_home/'agents'), DSH_TELEMETRY_DISABLED='1',
                            AGENTKIT_SYNTHETIC_KEY='synthetic-key')
             dsh = stack.enter_context(owned_dsh(args.dsh_root, output/'dsh-data', dsh_home,
-                                              workspace, provider_url, dsh_env, query_sqlite=True))
+                                              workspace, provider_url, dsh_env, query_sqlite=not args.task_family))
             assert dsh.version == '0.2.1-rc.2', 'unexpected DSH package'
             pi = prepare_pi(args.pi_root, output/'pi-data', output/'pi-home', provider_url, strict_environment=True)
             # Pi inherits the demo process environment in the public connector.
@@ -143,34 +175,58 @@ def main():
                 ('dsh', dsh.connector_config([]), 'endpoint-test', 'endpoint-test')]
             endpoints = []
             for endpoint_id, config, provider, model in configs:
-                commands = []
-                for index in range(3):
-                    alias = 'seed-'+str(index)
-                    title = marker+' '+endpoint_id+' '+str(index)
-                    text = marker+' input '+endpoint_id+' '+str(index)
-                    commands.extend([
-                        {'op':'create','cwd':str(workspace),'saveAs':alias},
-                        {'op':'call','sessionId':alias,'method':'session.selectModel','args':{'provider':provider,'model':model}},
-                        {'op':'call','sessionId':alias,'method':'session.rename','args':{'title':title}},
-                        {'op':'open','sessionId':alias}, {'op':'compose','sessionId':alias,'text':text},
-                        {'op':'waitSettled','sessionId':alias}])
-                commands.append({'op':'snapshot'})
-                result = subprocess.run([str(headless)], input=json.dumps(dict(config, commands=commands)),
-                                        text=True, capture_output=True, env=environment, timeout=120)
-                # Config contains credentials; never persist it or echo command input.
-                (output/(endpoint_id+'-seed.stdout')).write_text(result.stdout)
-                (output/(endpoint_id+'-seed.stderr')).write_text(result.stderr)
-                assert result.returncode == 0, endpoint_id+' public seeding failed; inspect owned logs'
-                rows = [json.loads(line) for line in result.stdout.splitlines()]
-                assert rows[0]['version'] == config['expectedVersion'], 'actual runtime handshake mismatch'
-                ids = [row['result']['sessionId'] for row in rows if row.get('op') == 'create']
-                assert len(ids) == 3 and len(set(ids)) == 3
-                snapshot = next(row['result'] for row in reversed(rows) if row.get('op') == 'snapshot')
-                for index, session_id in enumerate(ids):
-                    state = json.dumps(snapshot['sessions'][session_id], ensure_ascii=False)
-                    assert marker+' input '+endpoint_id+' '+str(index) in state and 'ENDPOINT_REPLY_OK' in state, 'input/reply missing'
-                    seeds.append({'endpointId':endpoint_id,'sessionId':session_id,
-                                  'title':marker+' '+endpoint_id+' '+str(index),'cwd':str(workspace)})
+                if args.task_family:
+                    ids = []
+                    for index in range(2):
+                        if endpoint_id == 'native':
+                            parent_id = str(uuid.uuid4())
+                            commands = native_task_seed_commands(parent_id, workspace, provider, model)
+                        else:
+                            parent_id = None
+                            builder = pi_subagent_seed_commands if endpoint_id == 'pi' else dsh_subagent_seed_commands
+                            commands = builder('parent', workspace, provider, model)
+                        write_json(output/(endpoint_id+'-family-'+str(index)+'-commands.json'), commands)
+                        result = subprocess.run([str(headless)], input=json.dumps(dict(config, commands=commands)),
+                                                text=True, capture_output=True, env=environment, timeout=120)
+                        (output/(endpoint_id+'-family-'+str(index)+'.stdout')).write_text(result.stdout)
+                        (output/(endpoint_id+'-family-'+str(index)+'.stderr')).write_text(result.stderr)
+                        assert result.returncode == 0, endpoint_id+' family public seed failed'
+                        rows = [json.loads(line) for line in result.stdout.splitlines()]
+                        assert rows[0]['version'] == config['expectedVersion']
+                        if parent_id is None:
+                            parent_id = next(row['result']['sessionId'] for row in rows if row.get('op')=='create')
+                        manifest = parse_family_exchange(endpoint_id, commands, rows, parent_id, workspace)
+                        seeds.append(manifest)
+                        ids.append(parent_id)
+                else:
+                    commands = []
+                    for index in range(3):
+                        alias = 'seed-'+str(index)
+                        title = marker+' '+endpoint_id+' '+str(index)
+                        text = marker+' input '+endpoint_id+' '+str(index)
+                        commands.extend([
+                            {'op':'create','cwd':str(workspace),'saveAs':alias},
+                            {'op':'call','sessionId':alias,'method':'session.selectModel','args':{'provider':provider,'model':model}},
+                            {'op':'call','sessionId':alias,'method':'session.rename','args':{'title':title}},
+                            {'op':'open','sessionId':alias}, {'op':'compose','sessionId':alias,'text':text},
+                            {'op':'waitSettled','sessionId':alias}])
+                    commands.append({'op':'snapshot'})
+                    result = subprocess.run([str(headless)], input=json.dumps(dict(config, commands=commands)),
+                                            text=True, capture_output=True, env=environment, timeout=120)
+                    # Config contains credentials; never persist it or echo command input.
+                    (output/(endpoint_id+'-seed.stdout')).write_text(result.stdout)
+                    (output/(endpoint_id+'-seed.stderr')).write_text(result.stderr)
+                    assert result.returncode == 0, endpoint_id+' public seeding failed; inspect owned logs'
+                    rows = [json.loads(line) for line in result.stdout.splitlines()]
+                    assert rows[0]['version'] == config['expectedVersion'], 'actual runtime handshake mismatch'
+                    ids = [row['result']['sessionId'] for row in rows if row.get('op') == 'create']
+                    assert len(ids) == 3 and len(set(ids)) == 3
+                    snapshot = next(row['result'] for row in reversed(rows) if row.get('op') == 'snapshot')
+                    for index, session_id in enumerate(ids):
+                        state = json.dumps(snapshot['sessions'][session_id], ensure_ascii=False)
+                        assert marker+' input '+endpoint_id+' '+str(index) in state and 'ENDPOINT_REPLY_OK' in state, 'input/reply missing'
+                        seeds.append({'endpointId':endpoint_id,'sessionId':session_id,
+                                      'title':marker+' '+endpoint_id+' '+str(index),'cwd':str(workspace)})
                 endpoint = {key:value for key,value in config.items()
                             if key not in ('bearer','cookie','expectedVersion','commands')}
                 endpoint.update(endpointId=endpoint_id,sessions=ids[:2])
@@ -180,14 +236,21 @@ def main():
             write_json(output/'seeds.json', seeds)
             write_json(output/'endpoints.json', {'endpoints':endpoints})
             demo_env = dict(environment, **{NATIVE_AUTH:native['bearer'], DSH_AUTH:dsh.cookie})
-            command = [str(demo),'--components','--endpoint-config',str(output/'endpoints.json'),
-                       '--sidebar-query',marker,'--sidebar-delivery-receipt',str(output/'delivery.json'),
-                       '--offscreen',str(output/'sidebar.png')]
+            if args.task_family:
+                command = [str(demo),'--components','--transcript-content','--endpoint-config',str(output/'endpoints.json'),
+                           '--family-seed-manifest',str(output/'seeds.json'),
+                           '--family-delivery-receipt',str(output/'delivery.json'),
+                           '--offscreen',str(output/'family.png')]
+            else:
+                command = [str(demo),'--components','--endpoint-config',str(output/'endpoints.json'),
+                           '--sidebar-query',marker,'--sidebar-delivery-receipt',str(output/'delivery.json'),
+                           '--offscreen',str(output/'sidebar.png')]
             result = subprocess.run(command, env=demo_env, text=True, capture_output=True, timeout=120)
             (output/'demo.stdout').write_text(result.stdout)
             (output/'demo.stderr').write_text(result.stderr)
             assert result.returncode == 0, 'offscreen host failed; inspect owned logs/partial receipt'
-            accepted = validate_delivery(json.loads((output/'delivery.json').read_text()), seeds)
+            delivery = json.loads((output/'delivery.json').read_text())
+            accepted = validate_family_delivery(delivery, seeds) if args.task_family else validate_delivery(delivery, seeds)
             accepted.update(startedAt=started, finishedAt=time.time(), providerRequestPaths=requests)
             write_json(output/'acceptance.json', accepted)
             print(json.dumps(accepted))

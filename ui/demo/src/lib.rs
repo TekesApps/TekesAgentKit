@@ -31,3 +31,5 @@ pub mod label_host;
 pub mod footnote_host;
 
 pub mod child_run_proof;
+
+pub mod family_seed_manifest;

@@ -74,3 +74,67 @@ class MultiSidebarAcceptance(unittest.TestCase):
     def test_replacing_an_existing_row_id_during_paging_is_a_failure(self):
         self.delivery['stages'][1]['receipt']['host']['mountedRows'][1]['rowId'] = 999
         with self.assertRaisesRegex(AssertionError,'identity'): self.validate()
+
+
+class FamilyDeliveryAcceptance(unittest.TestCase):
+    """Refusal checks only; synthetic DTOs never establish real harness acceptance."""
+    def setUp(self):
+        self.seeds = []
+        self.delivery = dict(accepted=True, nativeInteraction=False, cases=[])
+        for endpoint in ['native', 'pi', 'dsh']:
+            for index in range(2):
+                parent = dict(endpointId=endpoint, threadId='parent'+str(index), sessionId='parent'+str(index))
+                child = 'child'+str(index)
+                entry = dict(kind='child', id=child, mode='bounded' if endpoint == 'native' else 'continuable')
+                task = dict(row=dict(id='task'+str(index), scope=parent)) if endpoint == 'native' else None
+                self.seeds.append(dict(endpoint=endpoint, parent=dict(scope=parent),
+                    child=dict(address=dict(endpointId=endpoint,sessionId=child),catalogEntry=entry),task=task))
+                row = dict(endpointId=endpoint,parent=parent,childId=child,
+                    childScope=dict(endpointId=endpoint,threadId=parent['threadId'],sessionId=child),
+                    historyItems=1,readOnly=endpoint == 'native',
+                    catalogFrame=dict(parent=parent,epoch=1,generation=1,revision=2,entry=entry),
+                    parentTaskRowMountedWithoutOpenAction=endpoint == 'native',
+                    canonicalTask=task['row'] if task else None)
+                row.update({key:True for key in ['canonicalSourceMatched','openedViaOriginalControl',
+                    'returnedViaOriginalTab','closedViaOriginalControl','lateParentResultDidNotStealSelection','lateClosedResultRejected',
+                    'parentDraftPreserved','childContentMounted']})
+                self.delivery['cases'].append(row)
+
+    def validate(self):
+        return module.validate_family_delivery(self.delivery, self.seeds)
+
+    def test_complete_fixture_has_conservative_acceptance_scope(self):
+        result = self.validate()
+        self.assertFalse(result['nativeInteraction'])
+        self.assertFalse(result['sameTaskRowDynamicPointerProven'])
+
+    def test_mismatched_parent_child_or_catalog_is_rejected(self):
+        for field in ['parent', 'childScope', 'catalogFrame']:
+            saved = copy.deepcopy(self.delivery)
+            if field == 'catalogFrame':
+                self.delivery['cases'][0][field]['entry'] = dict(id='foreign-child')
+            else:
+                self.delivery['cases'][0][field] = dict(endpointId='foreign',threadId='foreign',sessionId='foreign')
+            with self.assertRaises(AssertionError): self.validate()
+            self.delivery = saved
+
+    def test_duplicate_parent_cannot_replace_a_missing_case(self):
+        self.delivery['cases'][1] = copy.deepcopy(self.delivery['cases'][0])
+        with self.assertRaises(AssertionError): self.validate()
+
+    def test_original_dispatch_draft_and_mount_checks_are_required(self):
+        for field in ['lateParentResultDidNotStealSelection','lateClosedResultRejected','parentDraftPreserved','childContentMounted']:
+            self.delivery['cases'][0][field] = False
+            with self.assertRaisesRegex(AssertionError, 'incomplete'): self.validate()
+            self.delivery['cases'][0][field] = True
+
+    def test_empty_history_or_native_composer_is_rejected(self):
+        self.delivery['cases'][0]['historyItems'] = 0
+        with self.assertRaisesRegex(AssertionError, 'history'): self.validate()
+        self.delivery['cases'][0]['historyItems'] = 1
+        self.delivery['cases'][0]['readOnly'] = False
+        with self.assertRaisesRegex(AssertionError, 'bounded'): self.validate()
+
+    def test_non_native_task_cannot_be_invented(self):
+        self.delivery['cases'][2]['canonicalTask'] = dict(id='invented')
+        with self.assertRaisesRegex(AssertionError, 'invented'): self.validate()

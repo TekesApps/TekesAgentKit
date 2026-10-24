@@ -39,6 +39,8 @@ mod child_error_dispatch;
 mod composer_notice_probe;
 #[path = "native_disclosure_reading_selftest.rs"]
 mod disclosure_reading_probe;
+#[path = "native_family_delivery.rs"]
+mod family_delivery;
 #[path = "native_feedback_selftest.rs"]
 mod feedback_probe;
 #[path = "native_panel_launcher_selftest.rs"]
@@ -188,6 +190,9 @@ struct Host {
     annotation_stage: u8,
 }
 enum HostResult {
+    FamilyCatalogRead {
+        source: Arc<tekes_agent_ui_bindings::FamilyCatalogBinding>,
+    },
     Feedback(Box<tekes_agent_ui_demo::component_demo::FeedbackDemoCompletion>),
     InitialFeedback(Box<tekes_agent_ui_demo::component_demo::FeedbackInitialCompletion>),
     TurnAction {
@@ -692,6 +697,12 @@ impl Host {
                             .map_err(|error| RenameFailure::from_error(&error));
                         HostResult::Renamed { ticket, result }
                     }
+                    DemoCommand::ReadFamilyCatalog(source) => {
+                        // The original source owns read failures and stale-read fencing.
+                        // Never publish a superseded read as a global current-pane error.
+                        let _ = source.refresh().await;
+                        HostResult::FamilyCatalogRead { source }
+                    }
                     DemoCommand::OpenChild {
                         request,
                         direct_parent,
@@ -939,6 +950,7 @@ impl Host {
                                 ))
                             }
                             DemoCommand::RespondActionable { .. }
+                            | DemoCommand::ReadFamilyCatalog(_)
                             | DemoCommand::ReadHistoryPage(_)
                             | DemoCommand::ReadFilePreview { .. }
                             | DemoCommand::SelectFiles { .. }
@@ -982,6 +994,322 @@ impl Host {
         self.view.set_notice(&error);
         self.failures.push(error);
     }
+    // Both native draw and the owned offscreen acceptance pump deliver the
+    // original HostResult through this handler. Window is only the native
+    // notification/clipboard capability, never a separate pane authority.
+    fn apply_result(&mut self, result: HostResult, window: Option<&Window>) {
+        match result {
+            HostResult::FamilyCatalogRead { source } => {
+                if self
+                    .view
+                    .current_family_catalog_source()
+                    .is_some_and(|current| Arc::ptr_eq(&current, &source))
+                    && let Err(error) = self.view.sync()
+                {
+                    self.failure(error.to_string());
+                }
+            }
+            HostResult::InitialFeedback(result) => {
+                if let Err(error) = self.view.complete_initial_feedback(*result) {
+                    self.failure(error.to_string());
+                }
+            }
+            HostResult::Feedback(result) => {
+                if let Err(error) = self.view.complete_feedback(*result) {
+                    self.failure(error.to_string());
+                }
+            }
+            HostResult::TurnAction { token, result } => {
+                if let Ok(outcome) = result
+                    && let Ok(Some(request)) = self.view.apply_turn_action_outcome(&token, &outcome)
+                {
+                    self.commands(Ok(vec![DemoCommand::OpenSession(request)]));
+                }
+            }
+            HostResult::Actionable {
+                ids,
+                intent,
+                result,
+            } => {
+                if let Err(error) = self.view.complete_actionable(ids, &intent, result) {
+                    self.failure(error.to_string());
+                }
+            }
+            HostResult::FilePreview { request, result } => {
+                let error = result.as_ref().err().map(String::as_str);
+                match self.view.complete_file_preview(&request, error) {
+                    Ok(true) => {
+                        if let Ok(staged) = result {
+                            match std::process::Command::new("/usr/bin/qlmanage")
+                                .arg("-p")
+                                .arg(staged.path())
+                                .stdin(std::process::Stdio::null())
+                                .stdout(std::process::Stdio::null())
+                                .stderr(std::process::Stdio::null())
+                                .spawn()
+                            {
+                                Ok(child) => {
+                                    self.file_viewer = Some(OwnedFilePreview {
+                                        child,
+                                        _staged: staged,
+                                    })
+                                }
+                                Err(error) => {
+                                    self.view.set_notice(format!("系统预览无法打开：{error}"))
+                                }
+                            }
+                        }
+                    }
+                    Ok(false) => {}
+                    Err(error) => self.failure(error.to_string()),
+                }
+            }
+            HostResult::Files {
+                request,
+                files,
+                result,
+            } => {
+                if let Err(error) = self.view.complete_file_selection(&request, files, result) {
+                    self.failure(error.to_string());
+                }
+            }
+            HostResult::InitialPresets { request, result } => {
+                if let Err(error) = self.view.complete_initial_presets(&request, result) {
+                    self.failure(error.to_string());
+                }
+            }
+            HostResult::Created { request, result } => {
+                let binding = result.as_ref().ok().cloned();
+                match self.view.complete_creation(&request, result) {
+                    Ok(true) => {
+                        if let Some(binding) = binding
+                            && let Some(window) = window
+                        {
+                            self.observe(&binding, window);
+                        }
+                    }
+                    Ok(false) => {}
+                    Err(error) => self.failure(error.to_string()),
+                }
+            }
+            HostResult::ModelCatalog { request, result } => {
+                if let Err(error) = self.view.complete_model_catalog(&request, result) {
+                    self.failure(error.to_string());
+                }
+            }
+            HostResult::Renamed { ticket, result } => {
+                if let Err(error) = self.view.complete_rename(&ticket, result.map(|_| ())) {
+                    self.failure(error.to_string());
+                }
+            }
+            HostResult::Sidebar { token, result } => {
+                self.view.finish_sidebar_action(&token);
+                match result {
+                    Err(error) => self.failure(error),
+                    Ok(SidebarActionOutcome::Copy { text, .. }) => {
+                        if let Some(window) = window {
+                            window.set_clipboard_text(&text);
+                        } else {
+                            self.failure("clipboard action requires a native window".into());
+                        }
+                    }
+                    Ok(SidebarActionOutcome::Mutation { outcome, .. }) => {
+                        match self.view.apply_sidebar_outcome(&token, &outcome) {
+                            Ok(Some(request)) => {
+                                self.commands(Ok(vec![DemoCommand::OpenSession(request)]))
+                            }
+                            Ok(None) => {}
+                            Err(error) => self.failure(error.to_string()),
+                        }
+                    }
+                }
+            }
+            HostResult::ChildOpened {
+                request,
+                title,
+                result: Ok((source, snapshot)),
+            } => {
+                if self.selftest {
+                    if source.child_id() == "child-b" {
+                        self.test_child_source = Some(source.clone());
+                    }
+                    if source.child_id() == "bounded-b" {
+                        self.test_bounded_source = Some(source.clone());
+                        if let PaneSnapshot::ReadOnlyChild { transcript, .. } = &snapshot {
+                            self.bounded_initial_items = transcript.items.len();
+                            self.bounded_max_items = transcript.items.len();
+                        }
+                    }
+                }
+                let parent = request.parent().clone();
+                match self
+                    .view
+                    .install_child_source(request, source.clone(), title, snapshot)
+                {
+                    Ok(_) => {
+                        // false may mean cached-but-not-selected or rejected.
+                        // Only an admitted original owner gets a subscription.
+                        if self
+                            .view
+                            .cached_child_source(
+                                &parent,
+                                source.parent(),
+                                source.child_id(),
+                                source.layout(),
+                            )
+                            .is_some_and(|current| Arc::ptr_eq(&current, &source))
+                        {
+                            if let Some(window) = window {
+                                self.observe(source.binding(), window);
+                            }
+                            self.verify_bounded_content();
+                        }
+                    }
+                    Err(error) => self.failure(error.to_string()),
+                }
+            }
+            HostResult::ChildOpened {
+                request,
+                result: Err(error),
+                ..
+            } => {
+                if let Some(error) =
+                    child_error_dispatch::current_child_open_error(&self.view, &request, error)
+                {
+                    self.failure(error);
+                }
+            }
+            HostResult::ChildRead {
+                panel_parent,
+                source,
+                result,
+                catalog_error,
+            } => {
+                if source.binding().access() != PaneAccess::Missing {
+                    let active = self
+                        .view
+                        .child_pane_active(&panel_parent, source.child_id());
+                    if let Some(error) = catalog_error
+                        && active
+                    {
+                        self.view.set_notice(error);
+                    }
+                    match result {
+                        Ok(snapshot) => {
+                            if self.selftest
+                                && source.child_id() == "bounded-b"
+                                && let PaneSnapshot::ReadOnlyChild { transcript, .. } = &snapshot
+                            {
+                                self.bounded_max_items =
+                                    self.bounded_max_items.max(transcript.items.len());
+                            }
+                            if let Err(error) =
+                                self.view
+                                    .update_child_snapshot(&panel_parent, &source, snapshot)
+                            {
+                                self.failure(error.to_string());
+                            }
+                            self.verify_bounded_content();
+                        }
+                        Err(error) => {
+                            if let Err(reset) =
+                                self.view
+                                    .child_read_failed(&panel_parent, &source, error.clone())
+                            {
+                                self.failure(reset.to_string());
+                            }
+                            if active {
+                                self.failure(error);
+                            }
+                        }
+                    }
+                }
+            }
+            HostResult::TaskOpened {
+                parent,
+                task_id,
+                result: Ok(Some(binding)),
+            } => match self.view.install_task_run(parent, task_id, binding.clone()) {
+                Ok(true) => {
+                    if let Some(window) = window {
+                        self.observe(&binding, window)
+                    }
+                }
+                Ok(false) => {}
+                Err(error) => self.failure(error.to_string()),
+            },
+            HostResult::TaskOpened {
+                result: Ok(None), ..
+            } => {}
+            HostResult::TaskOpened {
+                result: Err(error), ..
+            } => self.failure(error),
+            HostResult::SideChatOpened {
+                request,
+                result: Ok(run),
+            } => {
+                let new = !self.view.has_side_chat_run(run.chat());
+                let chat = run.chat().clone();
+                let binding = run.binding().clone();
+                match self.view.install_side_chat_run(request, run) {
+                    Ok(_) if new && self.view.has_side_chat_run_binding(&chat, &binding) => {
+                        if let Some(window) = window {
+                            self.observe(&binding, window)
+                        }
+                    }
+                    Ok(_) => {}
+                    Err(error) => self.failure(error.to_string()),
+                }
+            }
+            HostResult::SideChatOpened {
+                request,
+                result: Err(error),
+            } => {
+                if self.view.side_chat_request_current(&request) {
+                    self.failure(error);
+                }
+            }
+            HostResult::SideChatClosed { request, result } => {
+                if request
+                    .as_ref()
+                    .is_some_and(|request| self.view.side_chat_request_current(request))
+                    && let Err(error) = result
+                {
+                    self.failure(error);
+                }
+            }
+            HostResult::Operation(Err(error))
+            | HostResult::Opened {
+                binding: Err(error),
+                ..
+            } => self.failure(error),
+            HostResult::Opened {
+                request,
+                binding: Ok(binding),
+            } => {
+                let new = !self
+                    .view
+                    .bindings()
+                    .iter()
+                    .any(|old| old.scope() == binding.scope());
+                match self.view.complete_navigation(request, binding.clone()) {
+                    Ok(true) if new => {
+                        if let Some(window) = window {
+                            self.observe(&binding, window)
+                        }
+                    }
+                    Ok(_) => {}
+                    Err(error) => self.failure(error.to_string()),
+                }
+            }
+            HostResult::Operation(Ok(())) | HostResult::HistoryPageCompleted => {}
+        }
+    }
+    fn drain_results(&mut self, window: Option<&Window>) {
+        while let Ok(result) = self.results.try_recv() {
+            self.apply_result(result, window);
+        }
+    }
     fn draw(&mut self, window: &Window) {
         for intent in self.clipboard_writes.drain(..) {
             if intent.claim() {
@@ -995,290 +1323,7 @@ impl Host {
         {
             self.file_viewer = None;
         }
-        while let Ok(result) = self.results.try_recv() {
-            match result {
-                HostResult::InitialFeedback(result) => {
-                    if let Err(error) = self.view.complete_initial_feedback(*result) {
-                        self.failure(error.to_string());
-                    }
-                }
-                HostResult::Feedback(result) => {
-                    if let Err(error) = self.view.complete_feedback(*result) {
-                        self.failure(error.to_string());
-                    }
-                }
-                HostResult::TurnAction { token, result } => {
-                    if let Ok(outcome) = result
-                        && let Ok(Some(request)) =
-                            self.view.apply_turn_action_outcome(&token, &outcome)
-                    {
-                        self.commands(Ok(vec![DemoCommand::OpenSession(request)]));
-                    }
-                }
-                HostResult::Actionable {
-                    ids,
-                    intent,
-                    result,
-                } => {
-                    if let Err(error) = self.view.complete_actionable(ids, &intent, result) {
-                        self.failure(error.to_string());
-                    }
-                }
-                HostResult::FilePreview { request, result } => {
-                    let error = result.as_ref().err().map(String::as_str);
-                    match self.view.complete_file_preview(&request, error) {
-                        Ok(true) => {
-                            if let Ok(staged) = result {
-                                match std::process::Command::new("/usr/bin/qlmanage")
-                                    .arg("-p")
-                                    .arg(staged.path())
-                                    .stdin(std::process::Stdio::null())
-                                    .stdout(std::process::Stdio::null())
-                                    .stderr(std::process::Stdio::null())
-                                    .spawn()
-                                {
-                                    Ok(child) => {
-                                        self.file_viewer = Some(OwnedFilePreview {
-                                            child,
-                                            _staged: staged,
-                                        })
-                                    }
-                                    Err(error) => {
-                                        self.view.set_notice(format!("系统预览无法打开：{error}"))
-                                    }
-                                }
-                            }
-                        }
-                        Ok(false) => {}
-                        Err(error) => self.failure(error.to_string()),
-                    }
-                }
-                HostResult::Files {
-                    request,
-                    files,
-                    result,
-                } => {
-                    if let Err(error) = self.view.complete_file_selection(&request, files, result) {
-                        self.failure(error.to_string());
-                    }
-                }
-                HostResult::InitialPresets { request, result } => {
-                    if let Err(error) = self.view.complete_initial_presets(&request, result) {
-                        self.failure(error.to_string());
-                    }
-                }
-                HostResult::Created { request, result } => {
-                    let binding = result.as_ref().ok().cloned();
-                    match self.view.complete_creation(&request, result) {
-                        Ok(true) => {
-                            if let Some(binding) = binding {
-                                self.observe(&binding, window);
-                            }
-                        }
-                        Ok(false) => {}
-                        Err(error) => self.failure(error.to_string()),
-                    }
-                }
-                HostResult::ModelCatalog { request, result } => {
-                    if let Err(error) = self.view.complete_model_catalog(&request, result) {
-                        self.failure(error.to_string());
-                    }
-                }
-                HostResult::Renamed { ticket, result } => {
-                    if let Err(error) = self.view.complete_rename(&ticket, result.map(|_| ())) {
-                        self.failure(error.to_string());
-                    }
-                }
-                HostResult::Sidebar { token, result } => {
-                    self.view.finish_sidebar_action(&token);
-                    match result {
-                        Err(error) => self.failure(error),
-                        Ok(SidebarActionOutcome::Copy { text, .. }) => {
-                            window.set_clipboard_text(&text);
-                        }
-                        Ok(SidebarActionOutcome::Mutation { outcome, .. }) => {
-                            match self.view.apply_sidebar_outcome(&token, &outcome) {
-                                Ok(Some(request)) => {
-                                    self.commands(Ok(vec![DemoCommand::OpenSession(request)]))
-                                }
-                                Ok(None) => {}
-                                Err(error) => self.failure(error.to_string()),
-                            }
-                        }
-                    }
-                }
-                HostResult::ChildOpened {
-                    request,
-                    title,
-                    result: Ok((source, snapshot)),
-                } => {
-                    if self.selftest {
-                        if source.child_id() == "child-b" {
-                            self.test_child_source = Some(source.clone());
-                        }
-                        if source.child_id() == "bounded-b" {
-                            self.test_bounded_source = Some(source.clone());
-                            if let PaneSnapshot::ReadOnlyChild { transcript, .. } = &snapshot {
-                                self.bounded_initial_items = transcript.items.len();
-                                self.bounded_max_items = transcript.items.len();
-                            }
-                        }
-                    }
-                    let parent = request.parent().clone();
-                    match self
-                        .view
-                        .install_child_source(request, source.clone(), title, snapshot)
-                    {
-                        Ok(_) => {
-                            // false may mean cached-but-not-selected or rejected.
-                            // Only an admitted original owner gets a subscription.
-                            if self
-                                .view
-                                .cached_child_source(
-                                    &parent,
-                                    source.parent(),
-                                    source.child_id(),
-                                    source.layout(),
-                                )
-                                .is_some_and(|current| Arc::ptr_eq(&current, &source))
-                            {
-                                self.observe(source.binding(), window);
-                                self.verify_bounded_content();
-                            }
-                        }
-                        Err(error) => self.failure(error.to_string()),
-                    }
-                }
-                HostResult::ChildOpened {
-                    request,
-                    result: Err(error),
-                    ..
-                } => {
-                    if let Some(error) =
-                        child_error_dispatch::current_child_open_error(&self.view, &request, error)
-                    {
-                        self.failure(error);
-                    }
-                }
-                HostResult::ChildRead {
-                    panel_parent,
-                    source,
-                    result,
-                    catalog_error,
-                } => {
-                    if source.binding().access() != PaneAccess::Missing {
-                        let active = self
-                            .view
-                            .child_pane_active(&panel_parent, source.child_id());
-                        if let Some(error) = catalog_error
-                            && active
-                        {
-                            self.view.set_notice(error);
-                        }
-                        match result {
-                            Ok(snapshot) => {
-                                if self.selftest
-                                    && source.child_id() == "bounded-b"
-                                    && let PaneSnapshot::ReadOnlyChild { transcript, .. } =
-                                        &snapshot
-                                {
-                                    self.bounded_max_items =
-                                        self.bounded_max_items.max(transcript.items.len());
-                                }
-                                if let Err(error) = self.view.update_child_snapshot(
-                                    &panel_parent,
-                                    &source,
-                                    snapshot,
-                                ) {
-                                    self.failure(error.to_string());
-                                }
-                                self.verify_bounded_content();
-                            }
-                            Err(error) => {
-                                if let Err(reset) = self.view.child_read_failed(
-                                    &panel_parent,
-                                    &source,
-                                    error.clone(),
-                                ) {
-                                    self.failure(reset.to_string());
-                                }
-                                if active {
-                                    self.failure(error);
-                                }
-                            }
-                        }
-                    }
-                }
-                HostResult::TaskOpened {
-                    parent,
-                    task_id,
-                    result: Ok(Some(binding)),
-                } => match self.view.install_task_run(parent, task_id, binding.clone()) {
-                    Ok(true) => self.observe(&binding, window),
-                    Ok(false) => {}
-                    Err(error) => self.failure(error.to_string()),
-                },
-                HostResult::TaskOpened {
-                    result: Ok(None), ..
-                } => {}
-                HostResult::TaskOpened {
-                    result: Err(error), ..
-                } => self.failure(error),
-                HostResult::SideChatOpened {
-                    request,
-                    result: Ok(run),
-                } => {
-                    let new = !self.view.has_side_chat_run(run.chat());
-                    let chat = run.chat().clone();
-                    let binding = run.binding().clone();
-                    match self.view.install_side_chat_run(request, run) {
-                        Ok(_) if new && self.view.has_side_chat_run_binding(&chat, &binding) => {
-                            self.observe(&binding, window)
-                        }
-                        Ok(_) => {}
-                        Err(error) => self.failure(error.to_string()),
-                    }
-                }
-                HostResult::SideChatOpened {
-                    request,
-                    result: Err(error),
-                } => {
-                    if self.view.side_chat_request_current(&request) {
-                        self.failure(error);
-                    }
-                }
-                HostResult::SideChatClosed { request, result } => {
-                    if request
-                        .as_ref()
-                        .is_some_and(|request| self.view.side_chat_request_current(request))
-                        && let Err(error) = result
-                    {
-                        self.failure(error);
-                    }
-                }
-                HostResult::Operation(Err(error))
-                | HostResult::Opened {
-                    binding: Err(error),
-                    ..
-                } => self.failure(error),
-                HostResult::Opened {
-                    request,
-                    binding: Ok(binding),
-                } => {
-                    let new = !self
-                        .view
-                        .bindings()
-                        .iter()
-                        .any(|old| old.scope() == binding.scope());
-                    match self.view.complete_navigation(request, binding.clone()) {
-                        Ok(true) if new => self.observe(&binding, window),
-                        Ok(_) => {}
-                        Err(error) => self.failure(error.to_string()),
-                    }
-                }
-                HostResult::Operation(Ok(())) | HostResult::HistoryPageCompleted => {}
-            }
-        }
+        self.drain_results(Some(window));
         let source = self.sidebar.snapshot();
         let source = if let Some(probe) = &mut self.sidebar_restore_probe {
             let projection = probe.source(Arc::new(source.as_publication()));
@@ -3120,6 +3165,18 @@ impl WindowHandler for Host {
 }
 pub fn run() {
     let args: Vec<_> = std::env::args().collect();
+    if args
+        .iter()
+        .any(|arg| arg == "--family-seed-manifest" || arg == "--family-delivery-receipt")
+    {
+        assert!(
+            args.iter().any(|arg| arg == "--offscreen")
+                && args.iter().any(|arg| arg == "--endpoint-config")
+                && args.iter().any(|arg| arg == "--family-seed-manifest")
+                && args.iter().any(|arg| arg == "--family-delivery-receipt"),
+            "family delivery requires paired manifests/receipt and explicit offscreen endpoint configuration"
+        );
+    }
     let run_controls_selftest = args
         .iter()
         .any(|arg| arg == "--run-controls-native-selftest");
@@ -4039,6 +4096,15 @@ pub fn run() {
         failures: vec![],
         focus_before_deactivate: None,
     };
+    if args.iter().any(|arg| arg == "--family-catalog") {
+        assert!(
+            args.iter().any(|arg| arg == "--endpoint-config"),
+            "family catalog needs an explicit endpoint host"
+        );
+        host.view
+            .enable_family_catalog()
+            .expect("family catalog component composition");
+    }
     if args.iter().any(|arg| arg == "--sidebar-query-proof") {
         assert!(
             args.iter().any(|arg| arg == "--offscreen")
@@ -4057,6 +4123,24 @@ pub fn run() {
                 .expect("initial feedback metadata");
         }
 
+        if let Some(index) = args.iter().position(|arg| arg == "--family-seed-manifest") {
+            let manifests: serde_json::Value = serde_json::from_slice(
+                &std::fs::read(args.get(index + 1).expect("family manifest path")).unwrap(),
+            )
+            .unwrap();
+            let seeds = tekes_agent_ui_demo::family_seed_manifest::parse_family_seeds(&manifests)
+                .expect("conservative family seed manifest");
+            let receipt = family_delivery::run(&mut host, &seeds);
+            let index = args
+                .iter()
+                .position(|arg| arg == "--family-delivery-receipt")
+                .expect("family delivery receipt required");
+            std::fs::write(
+                args.get(index + 1).expect("family receipt path"),
+                serde_json::to_vec_pretty(&receipt).unwrap(),
+            )
+            .unwrap();
+        }
         let mut sidebar_delivery_stages = Vec::new();
         if args.iter().any(|arg| arg == "--sidebar-delivery-receipt") {
             assert!(

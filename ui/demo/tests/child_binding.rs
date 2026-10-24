@@ -642,3 +642,62 @@ async fn task_to_another_scope_inherits_its_original_child_parent_authority() {
     assert!(task.open_resolved().await.is_err());
     runtime.stop().await.unwrap();
 }
+
+#[tokio::test]
+async fn closed_child_tombstone_discards_late_open_before_validating_retired_source() {
+    let (_, runtime) = setup().await;
+    let a = Arc::new(
+        RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "a"))
+            .await
+            .unwrap(),
+    );
+    let b = Arc::new(
+        RunBinding::open_main(runtime.clone(), RunScope::main("fixture", "b"))
+            .await
+            .unwrap(),
+    );
+    let source = Arc::new(
+        ChildPaneBinding::for_run(&a, "child-a", ChildHistoryLayout::IndependentSessions, None)
+            .await
+            .unwrap(),
+    );
+    let mut view = ComponentDemo::new([a.clone(), b]).unwrap();
+    let first = view.begin_child_open(a.scope()).unwrap();
+    view.install_child_source(
+        first,
+        source.clone(),
+        "Child A".into(),
+        source.snapshot().await.unwrap(),
+    )
+    .unwrap();
+    let late = view.begin_child_open(a.scope()).unwrap();
+    let snapshot = source.snapshot().await.unwrap();
+    let close = view
+        .tree
+        .get(view.panel_id())
+        .unwrap()
+        .component::<tekes_agent_components_ui::SidePanel>()
+        .unwrap()
+        .close_id();
+    view.accessibility_action(close, None, AccessibilityAction::Press)
+        .unwrap();
+    assert_eq!(source.binding().access(), PaneAccess::Missing);
+    // An already retired completion is an ignored delivery, not an error on
+    // the parent's current pane, and cannot remount the closed child.
+    assert!(
+        !view
+            .install_child_source(late, source.clone(), "Child A".into(), snapshot)
+            .unwrap()
+    );
+    assert!(!view.child_pane_active(a.scope(), "child-a"));
+    assert!(
+        view.cached_child_source(
+            a.scope(),
+            a.scope(),
+            "child-a",
+            ChildHistoryLayout::IndependentSessions
+        )
+        .is_none()
+    );
+    runtime.stop().await.unwrap();
+}

@@ -489,3 +489,9 @@
 [真实家族来源预检](rust-agent-ui-real-task-family-source-results-20261024.md)已核对三端实际公开返回：Native父scope canonical Task与原始bounded页，Pi canonical Summary subagent与parent-bound history，DSH catalog与child presentation；源解析不授予pane/control authority。Python155通过，无Cargo/桌面。后续同一demo原intent/dispatch/挂载、受控迟到、A→B→A家族导航仍需完成；同Task row动态pointer公开producer未找到，#23不关闭。
 
 [9b9ec1f CI收据](rust-agent-ui-ci-9b9ec1f-20261024.md)已下载PR/push两份原始artifact：headless/工作区/独立consumer通过，唯一失败仍是#53严格阅读。新提交的CI不得沿用该结果。
+
+### #23：真实关联目录与原 child 分发完成本轮离屏闭环
+
+[结果与限制](rust-agent-ui-real-task-family-results-20261024.md)记录三端各两个真实 parent/child 的目录控件→原 OpenChild/HostResult→原子历史绑定、A→B→A、正文节点、返回/关闭和父草稿保留。新增 FamilyCatalog 复用原 ChildCatalogState，使用不透明 owner key 防止同地址/同计数的新绑定复活旧意图；Native Task 保持非独立 Summary 行，bounded child 只读。关闭后旧结果错误已用红/绿回归修复，父切换时的合法缓存语义保留。UI734/0/1、Python161、严格Clippy、普通demo和六挂载独立consumer通过，全程使用SSD共享target。
+
+同Task row真实动态pointer、完整窗口/chrome、物理IME/AX及#53仍开放，不能据本轮关闭#23或合并/发布。新增家族入口属于AgentKit高层控件，没有修改TekesUI基础组件。新head CI单独核对。

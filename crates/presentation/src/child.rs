@@ -38,6 +38,12 @@ pub struct ChildCatalogState {
     pub refreshing: bool,
 }
 impl ChildCatalogState {
+    /// Observation generation for adapters; tokens and commit authority remain
+    /// owned by this existing model.
+    pub fn generation(&self) -> u64 {
+        self.generation
+    }
+
     pub fn begin(&mut self, parent: RunScope, connected: bool) -> Option<ChildCatalogToken> {
         self.generation += 1;
         self.catalog = None;

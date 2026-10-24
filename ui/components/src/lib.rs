@@ -540,3 +540,6 @@ pub use tekes_agent_presentation::{
     SidebarObservation, SidebarObserverEndpointInput, SidebarObserverIntent, SidebarObserverKey,
     SidebarObserverPhase, SidebarObserverSourceKey, SidebarObserverStatusInput,
 };
+
+mod family_catalog;
+pub use family_catalog::*;
