@@ -133,7 +133,7 @@
 
 ### [#18](https://github.com/TekesApps/TekesAgentKit/issues/18) — [P0][Reading] 分页、reveal、嵌套阅读与恢复锚点闭环
 
-当前：等待公开 SDK；严格 CI 失败已复现。
+当前：同一只读pane的可见前插/重连CPU阅读验证通过；新Host checkpoint与嵌套严格阅读仍分别等待公开SDK #42/#53。
 
 依赖/关联：#13、[TekesUI #53](https://github.com/TekesApps/TekesUI/issues/53)、[TekesUI #42](https://github.com/TekesApps/TekesUI/issues/42)。上游关联按具体子项适用。
 
@@ -142,6 +142,7 @@
 - [x] 已消费公开 #22/#26/#28 的锚点/preflight/reveal，标准文档流不使用像素估算。
 - [x] 已有前插/重排/整帧事务、只读有界分页/epoch/错误保留，以及 #13 实例身份。
 - [x] 当前严格门禁实证失败：内层向上读后父容器仍跟随追加，详情移出视口。
+- [x] [同pane只读CPU阅读回归](rust-agent-ui-readonly-paged-reading-results-20261025.md)：原Earlier/Refresh、24→48可见消息行、同anchor及相对Y、following=false、原按钮/更新后editor焦点与父草稿/selection，默认及feature分别通过；不是桌面或新Host恢复。
 
 待做：
 
