@@ -178,7 +178,7 @@ fn collapse_preference_survives_absence_and_scope_changes_but_old_row_actions_do
 }
 
 #[test]
-fn conflicting_publications_preserve_disclosure_and_empty_is_distinct_from_unavailable() {
+fn conflicting_publications_preserve_disclosure_and_missing_usage_is_distinct_from_unavailable() {
     let scope = RunScope::main("native", "status");
     let input = SummaryInput {
         revision: 1,
@@ -228,10 +228,19 @@ fn conflicting_publications_preserve_disclosure_and_empty_is_distinct_from_unava
         .unwrap()
         .update(&empty)
         .unwrap();
-    assert!(
+    assert_eq!(
         host.semantics()
             .iter()
-            .any(|node| node.semantics.name == "暂无 Summary 内容")
+            .filter(|node| node.semantics.name == "不可用")
+            .count(),
+        6,
+        "loaded Summary retains all six missing usage values"
+    );
+    assert!(
+        !host
+            .semantics()
+            .iter()
+            .any(|node| node.semantics.name == "Summary 暂不可用")
     );
     let unavailable = SummaryInput {
         revision: 3,
@@ -524,6 +533,9 @@ fn usage_formatting_matches_source_precision_and_preserves_integer_and_unknown_f
         ("hit-rate", serde_json::json!(0.123456), "12.3%"),
         ("hit-rate", serde_json::json!(0), "0.0%"),
         ("hit-rate", serde_json::Value::Null, "—"),
+        ("output", serde_json::json!("unavailable"), "不可用"),
+        ("hit-rate", serde_json::json!("unavailable"), "不可用"),
+        ("cost", serde_json::json!("unavailable"), "不可用"),
         ("cost", serde_json::json!(0), "US$0.00"),
         ("cost", serde_json::json!(0.1234567), "US$0.123457"),
         ("cost", serde_json::json!(12.34), "US$12.34"),

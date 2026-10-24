@@ -318,8 +318,8 @@ impl SummaryFacts {
                 })
                 .collect(),
         });
-        if let Some(usage) = &self.usage {
-            let rows = [
+        let rows = if let Some(usage) = &self.usage {
+            [
                 ("total", serde_json::json!(usage.total_tokens())),
                 ("input", serde_json::json!(usage.input_tokens)),
                 ("output", serde_json::json!(usage.output_tokens)),
@@ -334,12 +334,24 @@ impl SummaryFacts {
                 value,
                 action: None,
             })
-            .collect();
-            sections.push(SummarySection {
-                id: "usage".into(),
-                rows,
-            });
-        }
+            .collect()
+        } else {
+            // ClientKit keeps the usage section visible for a loaded Summary and
+            // renders Unavailable for all six fields when the mirror has no row.
+            ["total", "input", "output", "cache", "hit-rate", "cost"]
+                .into_iter()
+                .map(|id| SummaryRow {
+                    id: id.into(),
+                    title: id.into(),
+                    value: Value::String("unavailable".into()),
+                    action: None,
+                })
+                .collect()
+        };
+        sections.push(SummarySection {
+            id: "usage".into(),
+            rows,
+        });
         sections.retain(|s| !s.rows.is_empty());
         sections
     }

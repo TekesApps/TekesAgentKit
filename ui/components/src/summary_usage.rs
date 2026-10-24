@@ -37,34 +37,38 @@ impl SummaryUsageRowText {
             _ => &row.title,
         }
         .to_owned();
-        let value = match row.id.as_str() {
-            "total" | "input" | "output" | "cache" => row.value.as_u64().map(grouped_count),
-            "hit-rate" if row.value.is_null() => Some("—".into()),
-            "hit-rate" => row
-                .value
-                .as_f64()
-                .filter(|v| v.is_finite() && (0.0..=1.0).contains(v))
-                .map(|v| format!("{:.1}%", v * 100.)),
-            "cost" => row
-                .value
-                .as_f64()
-                .filter(|v| v.is_finite() && *v >= 0.)
-                .map(|v| {
-                    let v = if v == 0. { 0. } else { v };
-                    let mut value = format!("{v:.6}");
-                    while value.ends_with('0') && value.len() - value.find('.').unwrap() > 3 {
-                        value.pop();
-                    }
-                    let (integer, fraction) = value.split_once('.').unwrap();
-                    format!("US${}.{}", grouped_digits(integer), fraction)
-                }),
-            _ if row.value.is_null() => None,
-            _ => Some(
-                row.value
-                    .as_str()
-                    .map(str::to_owned)
-                    .unwrap_or_else(|| row.value.to_string()),
-            ),
+        let value = if row.value.as_str() == Some("unavailable") {
+            Some("不可用".into())
+        } else {
+            match row.id.as_str() {
+                "total" | "input" | "output" | "cache" => row.value.as_u64().map(grouped_count),
+                "hit-rate" if row.value.is_null() => Some("—".into()),
+                "hit-rate" => row
+                    .value
+                    .as_f64()
+                    .filter(|v| v.is_finite() && (0.0..=1.0).contains(v))
+                    .map(|v| format!("{:.1}%", v * 100.)),
+                "cost" => row
+                    .value
+                    .as_f64()
+                    .filter(|v| v.is_finite() && *v >= 0.)
+                    .map(|v| {
+                        let v = if v == 0. { 0. } else { v };
+                        let mut value = format!("{v:.6}");
+                        while value.ends_with('0') && value.len() - value.find('.').unwrap() > 3 {
+                            value.pop();
+                        }
+                        let (integer, fraction) = value.split_once('.').unwrap();
+                        format!("US${}.{}", grouped_digits(integer), fraction)
+                    }),
+                _ if row.value.is_null() => None,
+                _ => Some(
+                    row.value
+                        .as_str()
+                        .map(str::to_owned)
+                        .unwrap_or_else(|| row.value.to_string()),
+                ),
+            }
         }
         .unwrap_or_else(|| "未知".into());
         Self { title, value }

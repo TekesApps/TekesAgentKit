@@ -232,6 +232,37 @@ fn summary_provider_order_scope_dedup_and_unknown_cost_match_clientkit() {
 }
 
 #[test]
+fn loaded_summary_without_usage_projection_keeps_unavailable_usage_rows() {
+    let facts = SummaryFacts {
+        scope: scope("p"),
+        tasks: vec![],
+        subagents: vec![],
+        artifacts: vec![],
+        usage: None,
+    };
+
+    let sections = facts.sections(&scope("p"));
+    let usage = sections
+        .iter()
+        .find(|section| section.id == "usage")
+        .unwrap();
+    assert_eq!(
+        usage
+            .rows
+            .iter()
+            .map(|row| row.id.as_str())
+            .collect::<Vec<_>>(),
+        ["total", "input", "output", "cache", "hit-rate", "cost"]
+    );
+    assert!(
+        usage
+            .rows
+            .iter()
+            .all(|row| { row.action.is_none() && row.value == json!("unavailable") })
+    );
+}
+
+#[test]
 fn summary_projection_skips_invalid_rows_and_rejects_invalid_facts_without_losing_siblings() {
     let parent = scope("p");
     let mut invalid_task_scope = task("");
