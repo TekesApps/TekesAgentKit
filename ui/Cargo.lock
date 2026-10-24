@@ -2100,6 +2100,7 @@ dependencies = [
  "tekes-agent-presentation",
  "tekes-agent-session",
  "tekes-agent-web",
+ "tekes-ui-controls",
  "tokio",
  "uuid",
 ]

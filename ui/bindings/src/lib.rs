@@ -109,10 +109,29 @@ pub struct BoundedChildPaneWitness {
     pub source: tekes_agent_presentation::BoundedChildSourceWitness,
 }
 
+/// Acceptance-only proof that a read-only pane publication contains the exact
+/// cumulative bounded child pages retained by its original presentation.
+#[cfg(feature = "acceptance-source-witness")]
+#[derive(Clone)]
+pub struct BoundedChildPagedPaneWitness {
+    pub snapshot: PaneSnapshot,
+    pub source: tekes_agent_presentation::BoundedChildPagedSourceWitness,
+}
+
+#[cfg(feature = "acceptance-source-witness")]
+#[derive(Clone, Copy)]
+enum SnapshotCapture {
+    None,
+    Head,
+    Paged,
+}
+
 struct SnapshotRead {
     snapshot: PaneSnapshot,
     #[cfg(feature = "acceptance-source-witness")]
     bounded_source: Option<tekes_agent_presentation::BoundedChildSourceWitness>,
+    #[cfg(feature = "acceptance-source-witness")]
+    bounded_paged_source: Option<tekes_agent_presentation::BoundedChildPagedSourceWitness>,
 }
 impl SnapshotRead {
     fn plain(snapshot: PaneSnapshot) -> Self {
@@ -120,6 +139,8 @@ impl SnapshotRead {
             snapshot,
             #[cfg(feature = "acceptance-source-witness")]
             bounded_source: None,
+            #[cfg(feature = "acceptance-source-witness")]
+            bounded_paged_source: None,
         }
     }
 }
@@ -219,6 +240,8 @@ pub struct RunBinding {
     task: Option<task::TaskRunGuard>,
     ancestors: PaneAuthority,
     child_owner: Option<std::sync::Weak<std::sync::atomic::AtomicBool>>,
+    #[cfg(feature = "acceptance-source-witness")]
+    bounded_parent_scope: Option<RunScope>,
 }
 /// An existing canonical presentation, not another draft or admission store.
 #[derive(Clone)]
@@ -581,6 +604,8 @@ impl RunBinding {
             task: None,
             ancestors: PaneAuthority::default(),
             child_owner: None,
+            #[cfg(feature = "acceptance-source-witness")]
+            bounded_parent_scope: None,
         }
     }
     pub(crate) fn authority(&self) -> PaneAuthority {
@@ -669,6 +694,8 @@ impl RunBinding {
             task: None,
             ancestors: PaneAuthority::default(),
             child_owner: None,
+            #[cfg(feature = "acceptance-source-witness")]
+            bounded_parent_scope: Some(parent),
         })
     }
 
@@ -775,7 +802,7 @@ impl RunBinding {
     }
     pub async fn snapshot(&self) -> Result<PaneSnapshot> {
         #[cfg(feature = "acceptance-source-witness")]
-        let read = self.read_snapshot(false).await?;
+        let read = self.read_snapshot(SnapshotCapture::None).await?;
         #[cfg(not(feature = "acceptance-source-witness"))]
         let read = self.read_snapshot().await?;
         Ok(read.snapshot)
@@ -789,7 +816,7 @@ impl RunBinding {
             self.controller.is_none(),
             "bounded source witness requires a read-only child",
         )?;
-        let read = self.read_snapshot(true).await?;
+        let read = self.read_snapshot(SnapshotCapture::Head).await?;
         require(
             self.access() != PaneAccess::Missing,
             "child pane retired during source read",
@@ -808,9 +835,52 @@ impl RunBinding {
             source,
         })
     }
+    /// Capture cumulative built-in bounded child pages from this same read and
+    /// publication. Custom and independent child sources remain unsupported.
+    #[cfg(feature = "acceptance-source-witness")]
+    pub async fn snapshot_with_bounded_paged_source_witness(
+        &self,
+    ) -> Result<BoundedChildPagedPaneWitness> {
+        require(
+            self.controller.is_none(),
+            "bounded paged source witness requires a read-only child",
+        )?;
+        let read = self.read_snapshot(SnapshotCapture::Paged).await?;
+        require(
+            self.access() != PaneAccess::Missing,
+            "child pane retired during paged source read",
+        )?;
+        let source = read
+            .bounded_paged_source
+            .ok_or_else(|| unsupported("bounded paged child source unavailable"))?;
+        require(
+            source.child_id == self.scope.session_id
+                && self.bounded_parent_scope.as_ref() == Some(&source.parent_scope),
+            "bounded paged child source origin mismatch",
+        )?;
+        let PaneSnapshot::ReadOnlyChild {
+            connection_epoch, ..
+        } = &read.snapshot
+        else {
+            return Err(unsupported(
+                "bounded paged source requires a child publication",
+            ));
+        };
+        require(
+            *connection_epoch == source.connection_epoch
+                && self
+                    .runtime
+                    .inspect(|store| store.connection_epoch == source.connection_epoch),
+            "bounded paged source publication epoch mismatch",
+        )?;
+        Ok(BoundedChildPagedPaneWitness {
+            snapshot: read.snapshot,
+            source,
+        })
+    }
     async fn read_snapshot(
         &self,
-        #[cfg(feature = "acceptance-source-witness")] capture_bounded_source: bool,
+        #[cfg(feature = "acceptance-source-witness")] capture: SnapshotCapture,
     ) -> Result<SnapshotRead> {
         let access = self.access();
         if access == PaneAccess::Missing {
@@ -841,11 +911,17 @@ impl RunBinding {
             .as_ref()
             .ok_or_else(|| unsupported("missing child source"))?;
         #[cfg(feature = "acceptance-source-witness")]
-        let (mut transcript, bounded_source) = if capture_bounded_source {
-            let (transcript, source) = child.transcript_with_bounded_source_witness().await?;
-            (transcript, Some(source))
-        } else {
-            (child.transcript().await?, None)
+        let (mut transcript, bounded_source, bounded_paged_source) = match capture {
+            SnapshotCapture::None => (child.transcript().await?, None, None),
+            SnapshotCapture::Head => {
+                let (transcript, source) = child.transcript_with_bounded_source_witness().await?;
+                (transcript, Some(source), None)
+            }
+            SnapshotCapture::Paged => {
+                let (transcript, source) =
+                    child.transcript_with_bounded_paged_source_witness().await?;
+                (transcript, None, Some(source))
+            }
         };
         #[cfg(not(feature = "acceptance-source-witness"))]
         let mut transcript = child.transcript().await?;
@@ -880,6 +956,8 @@ impl RunBinding {
             },
             #[cfg(feature = "acceptance-source-witness")]
             bounded_source,
+            #[cfg(feature = "acceptance-source-witness")]
+            bounded_paged_source,
         })
     }
     /// Reuse the existing catalog authority. A failed query leaves history readable

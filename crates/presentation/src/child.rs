@@ -117,6 +117,61 @@ pub struct BoundedChildSourceWitness {
     pub server_transactional_freshness_proven: bool,
 }
 
+/// The bounded-history operation that produced one page or prefix-validation response.
+#[cfg(feature = "acceptance-source-witness")]
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum BoundedChildPagedSourceOperation {
+    InitialHead,
+    RefreshHead,
+    Earlier,
+    PrefixValidation,
+}
+
+/// A successful typed bounded-history read tied to the connection epoch in which it was read.
+/// Prefix-validation receipts retain their page but never contribute entries to the projection.
+#[cfg(feature = "acceptance-source-witness")]
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BoundedChildPagedSourceReceipt {
+    pub operation: BoundedChildPagedSourceOperation,
+    pub read_epoch: u64,
+    pub request: BoundedChildHistoryRequest,
+    pub response: BoundedChildPagedSourceResponse,
+    pub reset: bool,
+    pub merged: bool,
+    pub effective_has_more_before: bool,
+}
+
+#[cfg(feature = "acceptance-source-witness")]
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase", tag = "kind", content = "value")]
+pub enum BoundedChildPagedSourceResponse {
+    Page(BoundedChildHistoryPage),
+    RemoteError(serde_json::Value),
+}
+
+/// Opt-in source chain for the exact cumulative Native child projection returned with this value.
+/// Cached pages retain the epoch of their original reads across reconnects.
+#[cfg(feature = "acceptance-source-witness")]
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BoundedChildPagedSourceWitness {
+    pub parent_scope: RunScope,
+    pub child_id: String,
+    pub page_size: usize,
+    pub connection_epoch: u64,
+    pub receipts: Vec<BoundedChildPagedSourceReceipt>,
+    pub projected_entries: Vec<tekes_agent_contract::HistoryEntry>,
+    pub through_sequence: i64,
+    pub history_revision: String,
+    pub has_more_before: bool,
+    pub run_open: bool,
+    pub source_call: Option<serde_json::Value>,
+    pub evidence_scope: &'static str,
+    pub server_transactional_freshness_proven: bool,
+}
+
 /// One mounted child run owns a history lease. Same-session lines require an explicit projection
 /// source when the endpoint lacks built-in bounded history; parent history is never a child fallback.
 pub struct ChildRun {
@@ -228,6 +283,24 @@ impl ChildRun {
             )
         })?;
         bounded.lock().await.refresh_with_source_witness().await
+    }
+    /// Refresh the original bounded pane and freeze its accumulated typed page receipts. This is
+    /// explicitly opt-in; ordinary transcript refreshes do not copy or replay the receipt chain.
+    #[cfg(feature = "acceptance-source-witness")]
+    pub async fn transcript_with_bounded_paged_source_witness(
+        &self,
+    ) -> tekes_agent_contract::Result<(crate::TranscriptSnapshot, BoundedChildPagedSourceWitness)>
+    {
+        let bounded = self.bounded.as_ref().ok_or_else(|| {
+            tekes_agent_contract::unsupported(
+                "bounded paged source witness requires built-in same-session history",
+            )
+        })?;
+        bounded
+            .lock()
+            .await
+            .refresh_with_paged_source_witness()
+            .await
     }
     pub async fn load_earlier(&self) -> tekes_agent_contract::Result<bool> {
         if let Some(bounded) = &self.bounded {

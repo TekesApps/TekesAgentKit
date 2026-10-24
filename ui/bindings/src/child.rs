@@ -229,6 +229,24 @@ impl ChildPaneBinding {
         &self,
         intent: tekes_agent_components_ui::ReadOnlyTranscriptIntent,
     ) -> Result<PaneSnapshot> {
+        self.admit_read_intent(intent).await?;
+        self.snapshot().await
+    }
+    /// Execute the original read gesture and capture the accumulated bounded
+    /// source from that same pane publication. This is acceptance-only and
+    /// does not issue an additional refresh or page request.
+    #[cfg(feature = "acceptance-source-witness")]
+    pub async fn read_intent_with_paged_source_witness(
+        &self,
+        intent: tekes_agent_components_ui::ReadOnlyTranscriptIntent,
+    ) -> Result<crate::BoundedChildPagedPaneWitness> {
+        self.admit_read_intent(intent).await?;
+        self.run.snapshot_with_bounded_paged_source_witness().await
+    }
+    async fn admit_read_intent(
+        &self,
+        intent: tekes_agent_components_ui::ReadOnlyTranscriptIntent,
+    ) -> Result<()> {
         use tekes_agent_components_ui::ReadOnlyTranscriptRead;
         tekes_agent_contract::require(
             intent.belongs_to(&self.run.readonly_source)
@@ -250,7 +268,7 @@ impl ChildPaneBinding {
             )?;
             self.load_earlier().await?;
         }
-        self.snapshot().await
+        Ok(())
     }
     pub async fn snapshot(&self) -> Result<PaneSnapshot> {
         self.run.snapshot().await

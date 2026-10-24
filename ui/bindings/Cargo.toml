@@ -21,3 +21,4 @@ base64.workspace = true
 image.workspace = true
 [dev-dependencies]
 futures-util = "0.3"
+tekes-ui-controls.workspace = true

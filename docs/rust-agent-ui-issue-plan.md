@@ -4,7 +4,9 @@
 
 本轮新增 [三端 Sidebar 真实连接关闭与恢复](rust-agent-ui-sidebar-transport-recovery-results-20261025.md)：#22/#27 的真实 transport 故障与恢复通过，含 Pi close 流窄修和 pending-stream 红/绿回归；不等于 observer Retry、桌面或完整 Issue 验收。新 head CI 单独核对。
 
-本次完成[原owner最后入队前复核](rust-agent-ui-submission-last-admission-20261025.md)，独立记录受控竞态回归与本次新源码的真实三端恢复。[1026格矩阵](rust-agent-ui-acceptance-matrix-20261025.md)固定功能基线，不将旧程序证据转成新提交通过。下一切片按[Native累计分页来源契约](rust-agent-ui-native-paged-pane-source-contract-20261025.md)推进 #17/#23；该契约是待实施设计，不是累计分页或重连已验收。
+本次完成[原owner最后入队前复核](rust-agent-ui-submission-last-admission-20261025.md)，独立记录受控竞态回归与本次新源码的真实三端恢复。[1026格矩阵](rust-agent-ui-acceptance-matrix-20261025.md)固定功能基线，不将旧程序证据转成新提交通过。继续按[Native累计分页来源契约](rust-agent-ui-native-paged-pane-source-contract-20261025.md)推进 #17/#23；接口实施与后续真实闭环分开，不代表累计分页或重连已验收。
+
+该切片的[presentation/原分页意图接口与受控验证](rust-agent-ui-native-paged-binding-results-20261025.md)现已完成：root404、presentation feature301、UI784/1、UI feature674及两种独立consumer通过；真实Native累计分页/重连/阅读位置仍待下一步，不升级固定矩阵或关闭Issue。
 
 ## 执行规则
 

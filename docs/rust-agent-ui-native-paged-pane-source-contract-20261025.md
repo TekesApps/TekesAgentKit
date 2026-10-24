@@ -24,6 +24,8 @@
 
 presentation实现者负责 bounded_history.rs、child.rs、导出与专属测试；bindings实现者随后负责新见证接口与publication/owner测试。主会话串行整合原demo的Earlier/ChildRead、真实Native runner/验收器、构建和Issue回填；子会话不运行Cargo，避免共享target并发。
 
+原控件的验收执行入口为feature-only `ChildPaneBinding::read_intent_with_paged_source_witness`；它与普通read_intent共享admission/claim和Earlier执行，随后直接取同次累计见证，不能先普通snapshot再另读来源。8 MiB指保留的编码记录量，不承诺单页捕获/编码时的瞬时内存峰值。
+
 先完成公开fixture回归：累计Earlier成功且head-only仍拒绝；无额外RPC；增量重叠/prefix验证；gap/stale reset；epoch等待拒绝与跨epoch缓存明确标记；owner退休/迟到拒绝；来源不完整/超限只拒绝见证而普通snapshot与缓存可用。定向通过后主会话再跑适用root/UI默认与feature、严格检查及第二公开consumer。
 
 再由同一原Native pane执行真实多页、显式重连和恢复；把原typed请求/响应、source/scope、epoch、publication、frozen cut、mounted transcript及父草稿/选择配对，保留原程序/SHA/失败/收据。验证结果按实际范围回填 #17/#23/#27，不以合成回归替代真实harness，不以CPU挂载替代桌面或滚动视觉验收；#18阅读主线、SDK #53/#42及完整交付仍独立开放。
