@@ -4,6 +4,8 @@ version.workspace = true
 edition.workspace = true
 publish.workspace = true
 license.workspace = true
+[features]
+acceptance-source-witness = ["tekes-agent-presentation/acceptance-source-witness"]
 [dependencies]
 rusqlite = { version = "=0.40.2", default-features = false, features = ["bundled"] }
 tekes-agent-components-ui.workspace = true

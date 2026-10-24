@@ -448,5 +448,67 @@
   "issueClosed": false,
   "mergeTagRelease": false,
   "cacheBytesDeletedInThisSlice": 0,
-  "evidenceRoot": ".runtime-fixtures/child-reconnect-20261024"
+  "evidenceRoot": ".runtime-fixtures/child-reconnect-20261024",
+  "ci": {
+    "head": "bd98bd07988d168c40ef83b2f19e3559b134c46d",
+    "runs": [
+      {
+        "id": 40099886323,
+        "checkout": "ad0fa83ac5e24a65264a5f072f60b1e814893924",
+        "consumer": "success",
+        "onlyFailure": "Verify nested detail reading intent (strict; no native window)",
+        "raw": {
+          "accepted": false,
+          "parentFollowingAfterInnerUp": true,
+          "parentOffsetBefore": 0,
+          "parentOffsetAfterScroll": 0,
+          "parentOffsetAfterAppend": 634,
+          "innerOffset": 100,
+          "detailVisibleAfterAppend": false
+        },
+        "artifactZipSha256": "31561d045b659fdbafe63b41135757336d6b86810b4c29ce977a5af27d651616",
+        "rawLogsDownloaded": true,
+        "mergeParentVerified": true,
+        "checksRustTestTotals": [
+          654,
+          0,
+          0
+        ],
+        "pythonPassed": 249,
+        "uiRustTestTotals": [
+          750,
+          0,
+          1
+        ]
+      },
+      {
+        "id": 40099883437,
+        "checkout": "bd98bd07988d168c40ef83b2f19e3559b134c46d",
+        "consumer": "success",
+        "onlyFailure": "Verify nested detail reading intent (strict; no native window)",
+        "raw": {
+          "accepted": false,
+          "parentFollowingAfterInnerUp": true,
+          "parentOffsetBefore": 0,
+          "parentOffsetAfterScroll": 0,
+          "parentOffsetAfterAppend": 634,
+          "innerOffset": 100,
+          "detailVisibleAfterAppend": false
+        },
+        "artifactZipSha256": "bc28890ab3a67bc4648e0ccc68e4e837aa4c2f96ab4e55ba61cac72e57eda726",
+        "rawLogsDownloaded": true,
+        "checksRustTestTotals": [
+          654,
+          0,
+          0
+        ],
+        "pythonPassed": 249,
+        "uiRustTestTotals": [
+          750,
+          0,
+          1
+        ]
+      }
+    ]
+  }
 }

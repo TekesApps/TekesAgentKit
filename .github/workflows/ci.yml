@@ -51,6 +51,10 @@ jobs:
       - run: cargo fmt --manifest-path ui/Cargo.toml --all --check
       - run: cargo clippy --manifest-path ui/Cargo.toml --workspace --all-targets --locked -- -D warnings
       - run: cargo test --manifest-path ui/Cargo.toml --workspace --locked
+      - name: Child pane source witness (opt-in, no native window)
+        run: |
+          cargo clippy --manifest-path ui/Cargo.toml --locked -p tekes-agent-ui-bindings --all-targets --features acceptance-source-witness -- -D warnings
+          cargo test --manifest-path ui/Cargo.toml --locked -p tekes-agent-ui-bindings --features acceptance-source-witness
       - name: Run standalone public API consumer (no native window)
         env:
           CARGO_TARGET_DIR: ${{ github.workspace }}/ui/target

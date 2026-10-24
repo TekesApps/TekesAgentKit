@@ -696,6 +696,28 @@ impl RunBinding {
                 }),
         )
     }
+    /// Capture source evidence through this binding's existing presentation.
+    /// Acceptance-only: pane lifetime and runtime authority have separate lock
+    /// domains, so the before/after access checks are fences, not a transaction.
+    #[cfg(feature = "acceptance-source-witness")]
+    pub fn refresh_with_source_witness(
+        &self,
+    ) -> Result<tekes_agent_presentation::RunSourceWitness> {
+        require(
+            self.access() != PaneAccess::Missing,
+            "pane pointer missing or changed",
+        )?;
+        let controller = self
+            .controller
+            .as_ref()
+            .ok_or_else(|| unsupported("read-only bounded child"))?;
+        let witness = controller.refresh_with_source_witness();
+        require(
+            self.access() != PaneAccess::Missing,
+            "pane pointer missing or changed",
+        )?;
+        Ok(witness)
+    }
     pub fn subscribe_runtime(&self) -> ProjectionSubscription {
         self.runtime.subscribe()
     }

@@ -542,3 +542,7 @@ Native后续切片：复用既有feature headless与已安装Kernel0.9.3，真�
 ### #17 / #27：失败后新连接与新 pointer 恢复
 
 [本轮结果](rust-agent-ui-child-reconnect-results-20261024.md)补齐 child 主 Run 的失败后 reconnect→新父 pointer→公开 open→父/子来源→childHistory。真实Pi27/DSH30命令、15合成请求通过，epoch2→5与5→8，原输入/错误/结算内容恢复；发现帧与可读来源帧分开，Pi临时stream标记不当持久字段。Python249/0、定向7项、边界/矩阵通过，复用原程序且无Cargo/新target/桌面。ba076cc两份CI已终态核对，consumer通过、#53严格门仍失败。实际SidePanel子pane的parent-thread scope/原controller/祖先权限捕获和分页仍待补，不以primary-child-run成功替代；#17/#27不关闭。
+
+### #17 / #23 / #27：实际子 pane 来源接口
+
+[第一步结果](rust-agent-ui-child-pane-witness-results-20261024.md)增加默认关闭的bindings验收透传，调用原for_child controller，保留scope与pane/祖先权限，不重建投影。原watch Arc、嵌套scope、父草稿、不可变authority、退休/只读拒绝和降级标记均由2项组件回归验证；feature bindings35/0、UI750/0/1、严格检查、普通demo构建及默认/feature独立公开consumer通过。新增CI opt-in步骤。真实demo source捕获、pane重连/分页仍待第二步；桌面/IME/AX和#53保持开放。

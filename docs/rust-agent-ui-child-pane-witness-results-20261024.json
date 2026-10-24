@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "issues": [
+    17,
+    23,
+    27
+  ],
+  "pullRequest": 10,
+  "baseCommit": "bd98bd07988d168c40ef83b2f19e3559b134c46d",
+  "scope": "acceptance-interface-and-synthetic-original-child-pane-publication",
+  "tekesUiPin": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "defaultFeatureEnabled": false,
+  "validation": {
+    "focusedBindingPassed": 2,
+    "bindingFeaturePassed": 35,
+    "uiWorkspacePassed": 750,
+    "uiWorkspaceFailed": 0,
+    "uiWorkspaceIgnored": 1,
+    "strictClippyDefaultAndFeature": "passed",
+    "fmt": "passed",
+    "ordinaryDemoBuild": "passed-not-launched",
+    "independentPublicConsumerDefault": "executed-passed",
+    "independentPublicConsumerFeature": "executed-passed-public-method-type",
+    "defaultConsumerFeatureTree": "acceptance-source-witness-absent",
+    "boundariesAndMatrix": "passed",
+    "rootAndPython": "unchanged-reused-bd98bd0-CI-and-249-Python-tests"
+  },
+  "sourceInventoryFiles": 1085,
+  "programs": [
+    {
+      "path": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/deps/child_pane_source_witness-1f2d32aedfd3567c",
+      "archiveOnly": ".runtime-fixtures/child-pane-witness-20261024/programs/child_pane_source_witness-1f2d32aedfd3567c",
+      "sha256": "665d22d626608db5c8009c537d959ea530705ed4a28a34495bb70414b25aa597"
+    },
+    {
+      "path": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/deps/child_pane_source_witness-f70100bcd07c3657",
+      "archiveOnly": ".runtime-fixtures/child-pane-witness-20261024/programs/child_pane_source_witness-f70100bcd07c3657",
+      "sha256": "87b51c6451dc7fa387d4b82eeb25aae17605c69ec01059579e9c919d0bf654cd"
+    },
+    {
+      "path": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/deps/agentkit_child_pane_public_consumer-242fe2b27e29b705",
+      "archiveOnly": ".runtime-fixtures/child-pane-witness-20261024/programs/agentkit_child_pane_public_consumer-242fe2b27e29b705",
+      "sha256": "60621b78396c18d7a767d2ffc7c4cd67b010244d1a4ab132a911753ce44ae6db"
+    },
+    {
+      "path": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/deps/agentkit_child_pane_public_consumer-9f7d637067577739",
+      "archiveOnly": ".runtime-fixtures/child-pane-witness-20261024/programs/agentkit_child_pane_public_consumer-9f7d637067577739",
+      "sha256": "1dba4917f113beaf17bcaf9c2b20fc5022e77272666f499751d52d9fe3df37c0"
+    }
+  ],
+  "sdkInputs": {
+    "commit": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 243,
+    "sha256": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
+    "ui_packages": 8
+  },
+  "ciNewStep": "Child pane source witness (opt-in, no native window)",
+  "notRun": [
+    "real-Pi-DSH-independent-pane-source-capture",
+    "demo-feature-proof-integration",
+    "pane-reconnect-and-pagination-source-acceptance",
+    "desktop-physical-IME-OS-AX-ProcessContainer",
+    "full-ClientKit-or-Transcript-parity"
+  ],
+  "cacheBytesDeletedInThisSlice": 0,
+  "newTarget": false,
+  "issueClosed": false,
+  "mergeTagRelease": false,
+  "evidenceRoot": ".runtime-fixtures/child-pane-witness-20261024"
+}
