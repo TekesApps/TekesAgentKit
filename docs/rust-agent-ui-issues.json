@@ -54,11 +54,12 @@
       "implemented": [
         "使用原 TekesUI editor；已接发送/取消、模型/附件/上下文/notice 与受控选择。",
         "已有目的地草稿隔离、准备票据、迟到回调门禁和 no-auto-retry；Send/Stop preserving_focus 已消费。",
-        "Native/Pi SideChat 原 preedit/commit 合成门禁已验证，不等于系统物理 IME。"
+        "Native/Pi SideChat 原 preedit/commit 合成门禁已验证，不等于系统物理 IME。",
+        "逐项核对 Composer Views 层次、可见性、上下文和设置回调；不得把宿主能力猜成可用。"
       ],
       "remaining": [
-        "逐项核对 Composer Views 层次、可见性、上下文和设置回调；不得把宿主能力猜成可用。",
-        "补完整同内容布局/焦点路径和系统中文组字验收；应用样式仅延展 SDK tokens。"
+        "补完整同内容布局/焦点路径和系统中文组字验收；应用样式仅延展 SDK tokens。",
+        "通过明确宿主回调验证附件选择/materialize；不以组件门禁测试代替系统文件访问。"
       ],
       "acceptance": [
         "组字 Enter 不发送，commit 后一次显式发送；取消遵循原请求身份。",
@@ -69,13 +70,27 @@
         "docs/rust-agent-ui-primary-focus-child-runs-20261023.md",
         "docs/rust-agent-ui-sidechat-original-input-20261023.md",
         "docs/rust-agent-ui-composer-visibility-20261021.md",
-        "docs/rust-agent-ui-context-preflight-20261020.md"
+        "docs/rust-agent-ui-context-preflight-20261020.md",
+        "docs/rust-agent-ui-composer-issue16-audit-20261024.md"
       ],
       "dependencies": [
         "contract",
         "TekesUI#30",
         "TekesUI#48"
-      ]
+      ],
+      "progress": {
+        "date": "2026-10-24",
+        "verified": [
+          "ClientKit/宿主职责只读核对；未发现确定的Rust实现缺陷",
+          "新增带正向控制的能力撤销与旧回调回归，三个套件16项通过",
+          "严格Clippy/格式/diff检查通过"
+        ],
+        "notVerified": [
+          "完整RunView布局/焦点",
+          "系统中文IME/AX",
+          "真实宿主附件materialize"
+        ]
+      }
     },
     {
       "key": "transcript",
@@ -248,7 +263,8 @@
       ],
       "remaining": [
         "消费非当前行上下文菜单公开契约，核对原生/AX 操作及窄宽布局。",
-        "复验跨端点、过滤分页和导航后操作的来源归属；宿主只负责导航。"
+        "复验跨端点、过滤分页和导航后操作的来源归属；宿主只负责导航。",
+        "按多endpoint设计聚合各端inventory，并按原SessionAddress路由selected-read/action；增加重复session_id、局部失败与过滤分页的非桌面回归。"
       ],
       "acceptance": [
         "非当前会话右键不错误改变目标；pin/share/rename/archive 作用于原捕获 item。",
@@ -259,11 +275,24 @@
         "docs/rust-agent-ui-sidebar-navigation-20261021.md",
         "docs/rust-agent-ui-sidebar-paging-20261021.md",
         "docs/rust-agent-ui-sidebar-preferences-20261021.md",
-        "docs/rust-agent-ui-sidebar-session-menu-20261022.md"
+        "docs/rust-agent-ui-sidebar-session-menu-20261022.md",
+        "docs/rust-agent-ui-sidebar-multi-endpoint-20261024.md"
       ],
       "dependencies": [
         "TekesUI#44"
-      ]
+      ],
+      "progress": {
+        "date": "2026-10-24",
+        "verified": [
+          "定向只读核对：已有分页/过滤旧请求门禁，单端API合法",
+          "明确demo首端装配范围并完成多端聚合设计草案"
+        ],
+        "notVerified": [
+          "多端聚合/路由尚未实施",
+          "多端fixture回归未运行",
+          "原生/AX/跨进程菜单未验收"
+        ]
+      }
     },
     {
       "key": "taskchild",

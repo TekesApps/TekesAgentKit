@@ -82,7 +82,7 @@
 
 待做：
 
-- [ ] 逐项核对 Composer Views 层次、可见性、上下文和设置回调；不得把宿主能力猜成可用。
+- [x] 逐项核对 Composer Views 层次、可见性、上下文和设置回调；不得把宿主能力猜成可用。
 - [ ] 补完整同内容布局/焦点路径和系统中文组字验收；应用样式仅延展 SDK tokens。
 
 验收：
@@ -92,6 +92,8 @@
 - [ ] 背景回传/按钮/切换/重连不误夺焦点或重复提交；组件和第二 consumer 有回归，桌面项留给 acceptance。
 
 证据：[rust-agent-ui-primary-focus-child-runs-20261023.md](rust-agent-ui-primary-focus-child-runs-20261023.md)、[rust-agent-ui-sidechat-original-input-20261023.md](rust-agent-ui-sidechat-original-input-20261023.md)、[rust-agent-ui-composer-visibility-20261021.md](rust-agent-ui-composer-visibility-20261021.md)、[rust-agent-ui-context-preflight-20261020.md](rust-agent-ui-context-preflight-20261020.md)。
+
+本次推进：[Composer 核对](rust-agent-ui-composer-issue16-audit-20261024.md)未发现确定实现缺陷，新增带正向控制的旧回调/能力撤销回归；3 个套件共 16 项通过，严格 Clippy/格式通过。实际宿主附件 materialize、完整布局/焦点、系统 IME/AX 尚未验收。
 
 ### [#17](https://github.com/TekesApps/TekesAgentKit/issues/17) — [P1][Transcript] 完整内容、思考工具分区与富内容对齐
 
@@ -244,6 +246,8 @@
 - [ ] 活动状态不猜运行中；菜单/键盘/AX 语义与稳定ID在同进程和后续容器验收中一致。
 
 证据：[rust-agent-ui-sidebar-navigation-20261021.md](rust-agent-ui-sidebar-navigation-20261021.md)、[rust-agent-ui-sidebar-paging-20261021.md](rust-agent-ui-sidebar-paging-20261021.md)、[rust-agent-ui-sidebar-preferences-20261021.md](rust-agent-ui-sidebar-preferences-20261021.md)、[rust-agent-ui-sidebar-session-menu-20261022.md](rust-agent-ui-sidebar-session-menu-20261022.md)。
+
+本次发现与设计：[多 endpoint 聚合](rust-agent-ui-sidebar-multi-endpoint-20261024.md)。现有单端 API 合法，demo 只观察首端；多端汇总与路由尚未实施，可按 #22 推进且不依赖 #44。跨端同名 ID、局部故障/旧读、过滤分页和动作路由需新增非桌面回归，不能据已有单端测试勾选完成。
 
 ### [#23](https://github.com/TekesApps/TekesAgentKit/issues/23) — [P1][SidePanel] Task/子代理 tabs、pointer 与有界历史闭环
 

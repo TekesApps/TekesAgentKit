@@ -225,6 +225,82 @@ async fn send_readiness_uses_shared_compiler_for_empty_and_artifact_only_drafts(
 }
 
 #[tokio::test]
+async fn host_affordance_and_run_authority_both_gate_composer_callbacks() {
+    use tekes_agent_components_ui::ComposerControlGate;
+
+    let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
+    until(&controller, |snapshot| snapshot.can_submit).await;
+    let ids = ComposerIds::new(9200);
+    let mut snapshot = (*controller.snapshot()).clone();
+    snapshot.draft.text = "受控回调".into();
+    let affordances = ComposerAffordances {
+        attachment: true,
+        model: true,
+        preset: true,
+    };
+    let mut view = Composer::new(ids);
+    view.update_gated(&snapshot, affordances, ComposerControlGate::OPEN)
+        .unwrap();
+    let mut host = view.into_host().unwrap();
+
+    // Actions queued under an earlier open publication cannot outlive a pane
+    // authority change, even when the host had advertised every entry.
+    host.accessibility_action(ids.send, None, AccessibilityAction::Press);
+    host.accessibility_action(ids.model, None, AccessibilityAction::Press);
+    let stale = host.drain_actions();
+    assert_eq!(stale.len(), 2, "both original controls must emit actions");
+    snapshot.revision += 1;
+    composer_mut(&mut host, ids)
+        .update_gated(&snapshot, affordances, ComposerControlGate::CLOSED)
+        .unwrap();
+    assert!(composer_mut(&mut host, ids).take_intents(&stale).is_empty());
+    assert!(activate(&mut host, ids, ids.send).is_empty());
+    assert!(activate(&mut host, ids, ids.model).is_empty());
+
+    // A host may keep the composer mounted while withdrawing a specific
+    // capability. A stale or synthetic model activation must not recreate it.
+    snapshot.revision += 1;
+    composer_mut(&mut host, ids)
+        .update_gated(&snapshot, affordances, ComposerControlGate::OPEN)
+        .unwrap();
+    assert!(matches!(
+        activate(&mut host, ids, ids.model).as_slice(),
+        [ComposerIntent::OpenEntry {
+            entry: ComposerEntry::Model,
+            ..
+        }]
+    ));
+    host.accessibility_action(ids.model, None, AccessibilityAction::Press);
+    let stale_model = host.drain_actions();
+    assert_eq!(stale_model.len(), 1);
+    snapshot.revision += 1;
+    let attachment_only = ComposerAffordances {
+        attachment: true,
+        model: false,
+        preset: false,
+    };
+    composer_mut(&mut host, ids)
+        .update_gated(&snapshot, attachment_only, ComposerControlGate::OPEN)
+        .unwrap();
+    assert!(
+        composer_mut(&mut host, ids)
+            .take_intents(&stale_model)
+            .is_empty()
+    );
+    assert!(activate(&mut host, ids, ids.model).is_empty());
+
+    // Host UI capability does not override canonical Run admission authority.
+    snapshot.revision += 1;
+    snapshot.can_submit = false;
+    snapshot.run.as_mut().unwrap().can_submit = false;
+    composer_mut(&mut host, ids)
+        .update_gated(&snapshot, affordances, ComposerControlGate::OPEN)
+        .unwrap();
+    assert!(activate(&mut host, ids, ids.send).is_empty());
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
 async fn standalone_composer_send_receipt_preserves_later_input_and_scoped_entries() {
     let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
     until(&controller, |s| s.can_submit).await;
