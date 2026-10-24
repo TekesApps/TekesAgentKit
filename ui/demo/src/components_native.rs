@@ -5235,7 +5235,15 @@ pub fn run() {
             .unwrap()
             .write_image_data(&bytes)
             .unwrap();
-        let snapshot = host.view.binding().current_run().expect("main snapshot");
+        // Compare coverage with the publication installed in this rendered
+        // Run tree. A live binding can advance while the GPU writes the PNG.
+        let snapshot = host
+            .view
+            .tree
+            .get(ComponentId(host.view.ids().root.0 + 16))
+            .and_then(|node| node.component::<tekes_agent_components_ui::RunPort>())
+            .and_then(|run| run.displayed_snapshot())
+            .expect("rendered main Run publication");
         let document = tekes_agent_presentation::TranscriptDocument::read(&snapshot.transcript)
             .expect("canonical Transcript lanes");
         let document_messages: usize = document.session_notices.len()

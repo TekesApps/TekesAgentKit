@@ -30,3 +30,7 @@
 ## 未证明的范围
 
 这是接口、合成公开协议和组件输入的验证，**还没有真实Native同一原pane的running→failed双帧**。累计分页来源、完整恢复/布局、桌面/物理IME/OS AX/ProcessContainer、完整ClientKit和性能仍未验收。下一步在原demo/owned Kernel路径消费此接口，使用原控制与原数据回传；#17/#23保持open，#53不豁免，不合并/tag/发布。
+
+## 本提交 CI 终态回填
+
+`79727f4` 的 push40108315461 与 PR40108318581 均结束：checks、bindings/demo opt-in、独立 consumer 通过；唯一失败仍是 #53 严格嵌套阅读，CI demo 构建被门禁跳过。原日志及 artifact 已保存，137 个 consumer 来源文件的闭包 `27cda9319e66c8389ef3ae581c42571274541644a065e03de810f6492937197a` 与不可变提交逐字节核对，243 个 SDK 输入与既定 pin 闭包一致，PR merge checkout 的父提交关系核实。严格原始结果仍 accepted=false、parentFollowingAfterInnerUp=true、detailVisibleAfterAppend=false；不豁免。

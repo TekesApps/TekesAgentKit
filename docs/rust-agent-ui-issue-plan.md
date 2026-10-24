@@ -562,3 +562,7 @@ Native后续切片：复用既有feature headless与已安装Kernel0.9.3，真�
 ### #17 / #23：原有界head-only来源与原publication接口
 
 [本轮结果](rust-agent-ui-native-bounded-head-witness-results-20261024.md)在默认关闭feature内复用原bounded读取/投影及绑定snapshot路径，保存未聚合typed head，拒绝把累计旧页/增量伪装成head。原source/pub/epoch/权限共用，普通refresh无新增全量历史复制、不清缓存。新presentation6、bindings新增4、Root373/feature287、UI757/0/1、feature652、严格检查/两配置demo构建/独立公开consumer通过。20b4与9039两轮CI原证据已核对，opt-in/consumer绿、唯一#53红。实际Native同原pane运行→失败仍待后续demo/owned Kernel闭环，累计分页来源与桌面等仍not_run，不关闭Issue、不合并发布。
+
+### #17 / #23：真实 Native 原只读 pane 与三端同程序来源
+
+[契约](rust-agent-ui-native-child-pane-source-contract-20261024.md)与[结果](rust-agent-ui-native-child-pane-source-results-20261024.md)补齐原FamilyCatalog/OpenChild/ChildRead的Native head-only running→error，原mounted source/cache/epoch/pub及父草稿和关闭退休均核对；相同最终demo二进制同时通过Pi/DSH原子pane，未以primary child Run替代。首次真实运行发现最终离屏报告读live snapshot和旧树跨帧，已改用原RunPort.displayed_snapshot，严格coverage不放宽，失败程序/证据保留。Python262、报告修复前UI757/0/1与feature652、末次RunPort19/19、严格检查/两配置构建和独立consumer通过。79727f4两份CI来源/日志核实，唯一#53红；新head另核对。累计分页来源、pane重连/阅读、完整窗口/IME/AX等仍开放，Issue不关闭，不合并发布。全部复用SSD target，删除0字节。

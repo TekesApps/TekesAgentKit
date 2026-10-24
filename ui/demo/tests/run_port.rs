@@ -1123,3 +1123,45 @@ async fn invalid_goal_facts_cannot_partially_publish_a_new_composer_frame() {
     }
     runtime.stop().await.unwrap();
 }
+
+#[tokio::test]
+async fn offscreen_coverage_uses_installed_run_when_live_binding_advances_after_render() {
+    let fixture = tekes_agent_ui_demo::fixture::Fixture::default().with_timed_turn();
+    let (runtime, controller) = tekes_agent_ui_demo::fixture::setup_fixture(fixture.clone())
+        .await
+        .unwrap();
+    let original = controller.snapshot();
+    let mut run = view();
+    update(&mut run, &original).unwrap();
+    fixture.publish_timed_output().unwrap();
+    let live = tokio::time::timeout(std::time::Duration::from_secs(3), async {
+        loop {
+            let snapshot = controller.snapshot();
+            if snapshot
+                .transcript
+                .items
+                .iter()
+                .any(|item| item.text == "正式回复第二段")
+            {
+                break snapshot;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .unwrap();
+    assert!(live.revision > original.revision);
+    assert_eq!(run.displayed_snapshot(), Some(original.as_ref()));
+    let displayed =
+        TranscriptDocument::read(&run.displayed_snapshot().unwrap().transcript).unwrap();
+    let newer = TranscriptDocument::read(&live.transcript).unwrap();
+    let content = run.transcript().unwrap();
+    assert!(tekes_agent_ui_demo::transcript_coverage::verify(content, &displayed).is_ok());
+    assert!(tekes_agent_ui_demo::transcript_coverage::verify(content, &newer).is_err());
+    update(&mut run, &live).unwrap();
+    assert_eq!(run.displayed_snapshot(), Some(live.as_ref()));
+    assert!(
+        tekes_agent_ui_demo::transcript_coverage::verify(run.transcript().unwrap(), &newer).is_ok()
+    );
+    runtime.stop().await.unwrap();
+}

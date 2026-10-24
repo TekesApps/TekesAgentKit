@@ -85,5 +85,68 @@
   "cacheBytesDeletedInThisSlice": 0,
   "newTarget": false,
   "issueClosed": false,
-  "mergeTagRelease": false
+  "mergeTagRelease": false,
+  "ci": {
+    "head": "79727f48d1eb9a7ebb87a697341e96a0b75799f7",
+    "immutableClosureVerified": true,
+    "prMergeParentVerified": true,
+    "runs": [
+      {
+        "id": 40108315461,
+        "checkout": "79727f48d1eb9a7ebb87a697341e96a0b75799f7",
+        "conclusion": "failure",
+        "consumerSource": "27cda9319e66c8389ef3ae581c42571274541644a065e03de810f6492937197a",
+        "consumerFiles": 137,
+        "sdk": {
+          "commit": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+          "local_packages": 11,
+          "native_interaction": false,
+          "reviewed_files": 243,
+          "sha256": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
+          "ui_packages": 8
+        },
+        "rawReading": {
+          "accepted": false,
+          "parentFollowingAfterInnerUp": true,
+          "parentOffsetBefore": 0,
+          "parentOffsetAfterScroll": 0,
+          "parentOffsetAfterAppend": 634,
+          "innerOffset": 100,
+          "detailVisibleAfterAppend": false
+        },
+        "artifactSha256": "fdbf2c9a846c567e4f79dce09a8ea12f75bb5a055ec18dd9be4af88b507f119c",
+        "jobLogSha256": "21d7295672216f0c8824d6892571c0cf41341355a615520f7dde449998f278c9",
+        "optInWitness": "success",
+        "independentConsumer": "success"
+      },
+      {
+        "id": 40108318581,
+        "checkout": "f6baf759d62efc3c225766c342d7a7555fb36267",
+        "conclusion": "failure",
+        "consumerSource": "27cda9319e66c8389ef3ae581c42571274541644a065e03de810f6492937197a",
+        "consumerFiles": 137,
+        "sdk": {
+          "commit": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+          "local_packages": 11,
+          "native_interaction": false,
+          "reviewed_files": 243,
+          "sha256": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
+          "ui_packages": 8
+        },
+        "rawReading": {
+          "accepted": false,
+          "parentFollowingAfterInnerUp": true,
+          "parentOffsetBefore": 0,
+          "parentOffsetAfterScroll": 0,
+          "parentOffsetAfterAppend": 634,
+          "innerOffset": 100,
+          "detailVisibleAfterAppend": false
+        },
+        "artifactSha256": "8335e1169112ae39ac442432bef7a55561c61716df694f6d2d6e7cc994a6acdf",
+        "jobLogSha256": "71aeaba1a37c7aa4fc4c66df27913f7a62454f73f310a50e5187b062007a4c1c",
+        "optInWitness": "success",
+        "independentConsumer": "success"
+      }
+    ]
+  }
 }

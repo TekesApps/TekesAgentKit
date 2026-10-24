@@ -2828,6 +2828,19 @@ impl ComponentDemo {
                     child_id: child.into(),
                 })
     }
+    /// Acceptance-only inspection of the currently mounted child source and
+    /// exact cached pane publication. This exposes no mutable UI or runtime API.
+    #[cfg(feature = "acceptance-source-witness")]
+    pub fn acceptance_child_pane_snapshot(
+        &self,
+        panel_parent: &RunScope,
+        child: &str,
+    ) -> Option<(&Arc<ChildPaneBinding>, &PaneSnapshot)> {
+        let pane = self
+            .child_panes
+            .get(&(panel_parent.clone(), child.into()))?;
+        Some((&pane.source, &pane.snapshot))
+    }
     pub fn cached_child_source(
         &self,
         panel_parent: &RunScope,
