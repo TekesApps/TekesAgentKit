@@ -96,6 +96,48 @@ impl SessionEndpoint for Endpoint {
     async fn close(&self) {}
 }
 #[tokio::test]
+async fn epoch_fenced_calls_cannot_reach_a_reconnected_endpoint() {
+    let connector = Connector {
+        connects: Arc::new(AtomicUsize::new(0)),
+        prompts: Arc::new(AtomicUsize::new(0)),
+    };
+    let runtime = SessionRuntime::spawn("k", Arc::new(connector.clone()));
+    runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
+    let old = runtime.snapshot().connection_epoch;
+    runtime.reconnect().await.unwrap();
+    let current = runtime.snapshot().connection_epoch;
+    assert!(current > old);
+    assert!(
+        runtime
+            .call_at_epoch(
+                old,
+                "session.prompt",
+                json!({"sessionId":"s"}),
+                "stale-epoch"
+            )
+            .await
+            .is_err()
+    );
+    assert_eq!(connector.prompts.load(Ordering::SeqCst), 0);
+    assert!(
+        runtime
+            .call_at_epoch(
+                current,
+                "session.prompt",
+                json!({"sessionId":"s"}),
+                "current-epoch"
+            )
+            .await
+            .is_err()
+    );
+    assert_eq!(
+        connector.prompts.load(Ordering::SeqCst),
+        1,
+        "current-epoch call reached the endpoint exactly once, which deliberately returned Timeout"
+    );
+    runtime.stop().await.unwrap();
+}
+#[tokio::test]
 async fn automatic_reconnect_restores_open_journal_without_retrying_mutation() {
     let connector = Connector {
         connects: Arc::new(AtomicUsize::new(0)),
@@ -388,5 +430,132 @@ async fn missing_pointer_and_exhausted_session_stream_do_not_reconnect_healthy_s
     );
     // Explicit retry still reaches the failed pointer rather than treating it as already open.
     assert!(runtime.open_session("lost").await.is_err());
+    runtime.stop().await.unwrap();
+}
+
+#[derive(Clone)]
+struct NativeWindowConnector {
+    requests: Arc<std::sync::Mutex<Vec<usize>>>,
+}
+struct NativeWindowEndpoint {
+    base: Endpoint,
+    requests: Arc<std::sync::Mutex<Vec<usize>>>,
+    limit: AtomicUsize,
+    frames: tokio::sync::broadcast::Sender<Value>,
+}
+fn native_window_frame(kind: &str, limit: usize) -> Value {
+    let count = limit.min(120);
+    let entries:Vec<_>=(120-count..120).map(|i|json!({"id":format!("entry-{i}"),"type":"message","message":{"role":"user","content":format!("message {i}"),"timestamp":i}})).collect();
+    json!({"type":kind,"generation":"g","snapshot":{"sessionId":"s","generation":"g","leafId":"entry-119","entries":entries,"hasMoreBefore":count<120,"isStreaming":false,"state":{}}})
+}
+#[async_trait]
+impl EndpointConnector for NativeWindowConnector {
+    async fn connect(&self) -> Result<Arc<dyn SessionEndpoint>> {
+        let host=serde_json::from_value(json!({"protocolVersion":4,"product":{"name":"native-window","version":"test"},"capabilities":["session-journal","actionable-sync","session-control-sync","session-inventory-sync"],"cwd":"/work","home":"/home","attachedSessions":0,"canOpenPath":false})).unwrap();
+        Ok(Arc::new(NativeWindowEndpoint {
+            base: Endpoint {
+                attempt: 1,
+                host,
+                prompts: Arc::new(AtomicUsize::new(0)),
+            },
+            requests: self.requests.clone(),
+            limit: AtomicUsize::new(50),
+            frames: tokio::sync::broadcast::channel(16).0,
+        }))
+    }
+}
+#[async_trait]
+impl SessionEndpoint for NativeWindowEndpoint {
+    fn identity(&self) -> &str {
+        "native-window"
+    }
+    fn host(&self) -> &HostDescription {
+        &self.base.host
+    }
+    fn content_kind(&self) -> SessionContentKind {
+        SessionContentKind::NativeConversation
+    }
+    async fn follow(&self, target: StreamTarget) -> Result<FrameStream> {
+        if let StreamTarget::SessionConversation { max_messages, .. } = target {
+            self.requests.lock().unwrap().push(max_messages);
+            self.limit.store(max_messages, Ordering::SeqCst);
+            let receiver = self.frames.subscribe();
+            let updates = stream::unfold(receiver, |mut receiver| async move {
+                Some((
+                    receiver.recv().await.map_err(|_| Error::Disconnected),
+                    receiver,
+                ))
+            });
+            Ok(Box::pin(
+                stream::once(async move { Ok(native_window_frame("conversation", max_messages)) })
+                    .chain(updates),
+            ))
+        } else {
+            self.base.follow(target).await
+        }
+    }
+    async fn load_earlier_conversation(&self, _: &str, count: usize) -> Result<bool> {
+        let previous = self.limit.fetch_add(count, Ordering::SeqCst);
+        self.frames
+            .send(native_window_frame("conversation-update", previous + count))
+            .unwrap();
+        Ok(true)
+    }
+    async fn history_page(&self, _: HistoryRequest) -> Result<HistoryPage> {
+        unreachable!()
+    }
+    async fn call(&self, _: &str, _: Value, _: &str) -> Result<Value> {
+        unreachable!()
+    }
+    async fn respond(&self, _: &str, _: i64, _: Value) -> Result<()> {
+        unreachable!()
+    }
+    async fn close(&self) {}
+}
+#[tokio::test]
+async fn reconnect_refetches_the_loaded_native_window_instead_of_shrinking_it() {
+    let requests = Arc::new(std::sync::Mutex::new(vec![]));
+    let runtime = SessionRuntime::spawn(
+        "native-window",
+        Arc::new(NativeWindowConnector {
+            requests: requests.clone(),
+        }),
+    );
+    runtime.wait_ready(Duration::from_secs(3)).await.unwrap();
+    runtime.open_session("s").await.unwrap();
+    assert!(runtime.load_earlier("s").await.unwrap());
+    let old_epoch = runtime.inspect(|s| s.connection_epoch);
+    assert_eq!(
+        runtime.inspect(|s| s.sessions["s"]
+            .native_conversation
+            .as_ref()
+            .unwrap()
+            .entries
+            .len()),
+        100
+    );
+    runtime.reconnect().await.unwrap();
+    let mut changes = runtime.subscribe();
+    tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            if changes.inspect(|s| s.connection_epoch != old_epoch && s.sessions["s"].journal_ready)
+            {
+                break;
+            }
+            changes.changed().await.unwrap();
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(*requests.lock().unwrap(), vec![50, 100]);
+    assert_eq!(
+        runtime.inspect(|s| s.sessions["s"]
+            .native_conversation
+            .as_ref()
+            .unwrap()
+            .entries
+            .len()),
+        100
+    );
     runtime.stop().await.unwrap();
 }

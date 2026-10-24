@@ -1,0 +1,149 @@
+{
+  "sourceCommit": "3aaee780cd560bc0794ecf002cf1df69054ab775",
+  "issue22": "implemented slice; acceptance remains open",
+  "issue23Commit": "adbb7f3",
+  "tekesuiPin": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "validation": {
+    "ui": {
+      "passed": 706,
+      "failed": 0,
+      "ignored": 1,
+      "resultGroups": 100
+    },
+    "presentationAndWeb": {
+      "passed": 258,
+      "failed": 0,
+      "ignored": 0
+    },
+    "focused": {
+      "passed": 21,
+      "failed": 0,
+      "ignored": 0
+    },
+    "python": {
+      "passed": 92
+    },
+    "strictClippy": [
+      "root workspace all targets",
+      "UI workspace all targets"
+    ],
+    "normalDemoBuild": "passed, not launched",
+    "independentConsumer": "compiled and executed four public projection/component assertions"
+  },
+  "notVerified": [
+    "desktop/physical IME/AX/ProcessContainer",
+    "real multi-harness fault recovery",
+    "provider cursor (not public)",
+    "actual retained-store lifecycle parity",
+    "all pin/title durable-ID and Unicode tie behavior"
+  ],
+  "ci": {
+    "observedHead": "532150ec2e0e1cc842324e703b135151bc01dc6c",
+    "independentConsumer": "passed",
+    "strictNestedReading": "failed",
+    "currentSourceCi": "not yet pushed"
+  },
+  "disk": {
+    "newTargets": 0,
+    "deletedBytes": 0,
+    "sharedTarget": "/tmp/agentkit-layout-text-292-target",
+    "programArchive": "APFS clone; historical programs are archival only; no new desktop identity"
+  },
+  "evidence": [
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/retained-rank-ui-final-tests.log",
+      "bytes": 87280,
+      "sha256": "75b77cc0228e43c5c41d95c21c6114e5a8a8c4bb0c9b8cb94aad4fb1db421bdb"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/retained-corpus-root-final-tests.log",
+      "bytes": 29204,
+      "sha256": "0aa431fd56b61044be8358954cab7e830a2ea58216d0b8471bed37156c9cd5b2"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/retained-rank-focused-final-tests.log",
+      "bytes": 2961,
+      "sha256": "7155257fb721bb0264f51a20bf4f6ea63cf49f5b9af57feaddd6ea0ea84fc43d"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/retained-rank-python-tests.log",
+      "bytes": 226,
+      "sha256": "20eea3f997c0717d4256a59bdc66f0b144240045698dcf1de446ac9ff8cd7a8f"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/retained-rank-root-final-clippy.log",
+      "bytes": 434,
+      "sha256": "ba67107f1ef9feb83f8732a6e842921efbb17049895b812542887c2c13b92460"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/retained-rank-ui-final-clippy.log",
+      "bytes": 334,
+      "sha256": "15f18cdb388d71fc218f0ef0ba3db048821473cf01ce5da975ceae27f6fb0a93"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/retained-rank-demo-build.log",
+      "bytes": 60,
+      "sha256": "8a10254974bbd1a52574924f2ba6e2e78269a27b8d61c996e00c4498f15edb56"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/retained-rank-public-lock.log",
+      "bytes": 120,
+      "sha256": "ccdc0587222a7ddfdf28296fd6155f96fcb2710d774c1f6cade06f49addc8d6f"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/retained-rank-public-run.log",
+      "bytes": 864,
+      "sha256": "2ce0ad8a054c4a9acb4924950d09b80e95bd5fd8ea8dabf3525be1a393cadf08"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/retained-rank-headless-boundaries.log",
+      "bytes": 48,
+      "sha256": "e9fa1e12a0afd70528040f81fe3199172a3974910d7760c0216bb6d110181081"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/retained-rank-ui-boundaries.log",
+      "bytes": 86,
+      "sha256": "9480cc4382559b9a7a99240226a9f766048e30c8d38bb4bccd1fd8bca56661ad"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/ranked-search-acceptance-programs/agentkit-ranked-sidebar-public-consumer",
+      "bytes": 3499680,
+      "sha256": "1576ddc20873541d866417f219c872b8048225d8d0b716204d7f9a337a277c77"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/ranked-search-acceptance-programs/tekes-agent-ui-demo.dylibs.txt",
+      "bytes": 1354,
+      "sha256": "721d04ee1b40eaa1e4ed0bd80c8d32b6420202e71cf0f729beb2cad44b425b98"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/ranked-search-acceptance-programs/consumer.dylibs.txt",
+      "bytes": 670,
+      "sha256": "8e99e2b870982dce13ca4b5e525a5b0ef88a87f040bdf68dc4e2f8650f5850a6"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/ranked-search-acceptance-programs/tekes-agent-ui-demo",
+      "bytes": 85359776,
+      "sha256": "badb8c454056845aeef2fde504804ef03a4dbd1f0cf74d8ec1866e3d25742b20"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/ranked-sidebar-public-consumer/Cargo.toml",
+      "bytes": 485,
+      "sha256": "b7ec8945dd3ba71acc8e4b4ca3e9cd505346e29c2e6d02ad20ca5b65bfd3cda9"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/ranked-sidebar-public-consumer/Cargo.lock.seed",
+      "bytes": 79405,
+      "sha256": "4f350ba9cb66878f3faaaad459e3519bbcac9921a844dd274554b858c0ce0722"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/ranked-sidebar-public-consumer/Cargo.lock",
+      "bytes": 64293,
+      "sha256": "9b16288eba9d6be1b762ecb1d2e4664d2a562e29cd3cfb244b70b19b08be4e4f"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/ranked-sidebar-public-consumer/src/main.rs",
+      "bytes": 8622,
+      "sha256": "0fcb1e25ac2171c19892f20913d2a3d963f1cd2ccc32da5c10bd0f27793c77a2"
+    }
+  ]
+}

@@ -1,0 +1,88 @@
+{
+  "format": 1,
+  "accepted": true,
+  "evidenceScope": "same-mounted-readonly-fixture-cpu-reading",
+  "sourceBase": "b0fa6e501c3cd3e0292786f0a0102a51e8ddff94",
+  "frozenInputs": {
+    "count": 591,
+    "manifest": ".runtime-fixtures/acceptance-refresh-20261025/readonly-paged-reading-source-manifest.json",
+    "sha256": "e92849388c4b01022304d22d7c5fac7a54c2473c827e56aa66491d45a76a2a67"
+  },
+  "sdkPin": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "defaultAndFeatureReceiptEqual": true,
+  "receipt": {
+    "accepted": true,
+    "anchorItem": 30107866773848064,
+    "documentKey": "agentkit-readonly:{\"kind\":\"run\",\"scope\":{\"endpointId\":\"fixture\",\"threadId\":\"b\",\"sessionId\":\"bounded-b\"}}",
+    "evidenceScope": "same-mounted-readonly-fixture-cpu-reading",
+    "followsLatest": false,
+    "messageRowsAfter": 48,
+    "messageRowsBefore": 24,
+    "nativeInteraction": false,
+    "nestedScrollAcceptance": false,
+    "newHostCheckpoint": false,
+    "newerParentEditorFocusPreserved": true,
+    "offsetAfterPage": 3130.0,
+    "offsetAfterReconnect": 3130.0,
+    "offsetBeforeUp": 1330.0,
+    "pageButtonFocusPreserved": true,
+    "paneRoot": 214748364800016,
+    "parentDraftAndSelectionPreserved": true,
+    "physicalIme": false,
+    "readingOffset": 1150.0,
+    "readingYAfterPage": -22.0,
+    "readingYAfterReconnect": -22.0,
+    "readingYBefore": -22.0,
+    "revisions": [
+      1,
+      3,
+      7
+    ],
+    "sourceScope": {
+      "endpointId": "fixture",
+      "sessionId": "bounded-b",
+      "threadId": "b"
+    },
+    "viewport": 214748364800021
+  },
+  "programs": [
+    {
+      "mode": "default",
+      "archive": ".runtime-fixtures/acceptance-refresh-20261025/readonly-paged-reading/programs/default",
+      "sha256": "9d4b09f5ba127c7782ffc04e1f2a5bfa505cfbd56bc4cbddb16802afa8e15427",
+      "bytes": 33549696,
+      "exitStatus": 0,
+      "log": ".runtime-fixtures/acceptance-refresh-20261025/readonly-paged-reading-final.log",
+      "logSha256": "eb142d512e5380ae2bf4484022b01cb604ef2cc159f367f07feb8fb7c9cf5bf6"
+    },
+    {
+      "mode": "feature",
+      "archive": ".runtime-fixtures/acceptance-refresh-20261025/readonly-paged-reading/programs/feature",
+      "sha256": "e34411898099cc9a9d3dda22cf1599bbc736f1f0c705985ba16c9db7f8a3e70b",
+      "bytes": 33632176,
+      "exitStatus": 0,
+      "log": ".runtime-fixtures/acceptance-refresh-20261025/readonly-paged-reading-feature.log",
+      "logSha256": "b59ca2274ef6bab6d3bdfb44f7929512deadbe467192ca282fbf353777f3d95f"
+    }
+  ],
+  "clientKitReference": {
+    "head": "c289bc9d33edcd83a782ac17927a8c65a027eccd",
+    "source": "Sources/TranscriptCoordinator/ThreadTranscriptPresenter+Scroll.swift:575-620",
+    "behavior": "pin visible turn and item-local offset, release only for original owner"
+  },
+  "notProven": [
+    "new Host checkpoint #42",
+    "nested inner scroll parent notification #53",
+    "actual Native visible-message prepend",
+    "physical IME or OS AX or desktop",
+    "full Views/ProcessContainer",
+    "performance"
+  ],
+  "archiveDedup": {
+    "receipt": ".runtime-fixtures/acceptance-refresh-20261025/native-paged-archive-dedup-receipt.json",
+    "files": 13,
+    "observedAvailableIncreaseBytes": 736432128,
+    "allPathsAndHashesRetained": true,
+    "sharedTargetModified": false
+  }
+}

@@ -5,7 +5,12 @@ edition.workspace = true
 publish.workspace = true
 license.workspace = true
 [dependencies]
+tekes-agent-contract.workspace = true
 tekes-agent-presentation.workspace = true
 tekes-ui-controls.workspace = true
 tekes-ui-scene.workspace = true
 tekes-ui-tokens.workspace = true
+unicode-segmentation.workspace = true
+
+tekes-ui-text.workspace = true
+tekes-ui-motion.workspace = true

@@ -1,0 +1,213 @@
+{
+  "schemaVersion": 1,
+  "issues": [
+    22,
+    27,
+    28
+  ],
+  "pullRequest": "https://github.com/TekesApps/TekesAgentKit/pull/10",
+  "baseline": "29ea2e1d7e48c4073289fdc7387520282bd5aa1b",
+  "scope": "real-client-transport-close-runtime-reconnect",
+  "accepted": true,
+  "evidenceRoot": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/sidebar-transport-recovery-20261025",
+  "finalDirectory": "final",
+  "frozenSourceInputs": 584,
+  "sourceManifestSha256": "efcf78f4d992eb486f0f5a622f4c74031bdb6a80b2a1ac0a4d829960deb86da9",
+  "programs": {
+    "headless": {
+      "program": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/tekes-agent-headless",
+      "sha256": "7c10485cab7a4ed6fa4dd2865a9dcc83db8cf9a03d6742723d7f814d012b3247",
+      "bytes": 29464016,
+      "origin": "explicit-existing",
+      "archiveOnly": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/sidebar-transport-recovery-20261025/final/programs/headless"
+    },
+    "demo": {
+      "program": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/examples/sidebar_transport_recovery_probe",
+      "sha256": "a4c255435ace8066ea0c76ef3dd2c138fa01a243deaa05054cbf4d0f7315d096",
+      "bytes": 54711472,
+      "origin": "explicit-existing",
+      "archiveOnly": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/sidebar-transport-recovery-20261025/final/programs/probe"
+    },
+    "kernel": {
+      "supervisor": "/Users/frankqin/dev/Tekes/.build/kernel-0.9.3-installed/BuiltInKernel/tekes-supervisor",
+      "supervisorSha256": "365eca9385f36d5897a81ba398e7f34b4b9819896d6a1b78c618a7710b14380f",
+      "worker": "/Users/frankqin/dev/Tekes/.build/kernel-0.9.3-installed/BuiltInKernel/tekes-worker",
+      "workerSha256": "1284014bd0a8d3cb711c0512b10762322a19af4beabc1f9e681bacb1e28fa64d",
+      "build": {
+        "format": 1,
+        "identifier": "com.tekes.kernel.supervisor",
+        "source_revision": "09508a9083c24c7accefc99516739f279b85913e",
+        "version": "0.9.3"
+      }
+    }
+  },
+  "runtimeInputs": {
+    "piNode": {
+      "path": "/Users/frankqin/Library/Application Support/Tekes/Harnesses/pi-1.3.0-node-24.20.0/node/bin/node",
+      "sha256": "9d050fd455b56426e25d4d603c7c501cbb2630348e836cf221dcce748e90588a"
+    },
+    "piCli": {
+      "path": "/Users/frankqin/.codex/pi-task-backups/01a101dc/pi-130-upgrade-20261017/runtime/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js",
+      "sha256": "e79626f2dd6f94aa45d30f3fa63cd84319a6eefcd150b353cfaf274366926774"
+    },
+    "dshNode": {
+      "path": "/Users/frankqin/Library/Application Support/Tekes/Harnesses/pi-1.3.0-node-24.20.0/node/bin/node",
+      "sha256": "9d050fd455b56426e25d4d603c7c501cbb2630348e836cf221dcce748e90588a"
+    },
+    "dshEntry": {
+      "path": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/dsh-0.2.1-rc.2-sidebar-20261019/node_modules/@deepseek-ai/dsh/lib/bin.js",
+      "sha256": "80112efe368efb1a39720c7ada0af00442e5131fb2744edaaff8a3e8bb499e6f"
+    },
+    "providerFixture": {
+      "path": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/native-lifecycle-diagnostics-20261024/kernel-input/fixtures/config/providers.canonical.json",
+      "sha256": "0caac12724fd6d982fc51123ea4546f2a023d6a9258da4cde63d1d27eabcaa6a"
+    }
+  },
+  "protocolReceiptSha256": "9c1db9e77c41b6443c4f2364e6c697f148f7b36f2d090b383a23fd2d1abb1740",
+  "acceptanceReceiptSha256": "2eefb5e76a3f5b2aae55aa2e7da92b570d0fb6dd061d22a82d9911401a791ff2",
+  "cases": [
+    {
+      "endpoint": "native",
+      "epochs": [
+        2,
+        11,
+        13
+      ],
+      "observerGeneration": 1,
+      "explicitGateCloses": 1,
+      "rejectedConnections": 4,
+      "successfulConnections": 2,
+      "mountedRows": 9,
+      "draftsPreserved": 6,
+      "oldFaultSelectedReadRejected": true,
+      "healthySelectedReadsAccepted": {
+        "dsh": true,
+        "pi": true
+      },
+      "originalReconnectCommands": 1
+    },
+    {
+      "endpoint": "pi",
+      "epochs": [
+        2,
+        11,
+        13
+      ],
+      "observerGeneration": 1,
+      "explicitGateCloses": 1,
+      "rejectedConnections": 4,
+      "successfulConnections": 2,
+      "mountedRows": 9,
+      "draftsPreserved": 6,
+      "oldFaultSelectedReadRejected": true,
+      "healthySelectedReadsAccepted": {
+        "dsh": true,
+        "native": true
+      },
+      "originalReconnectCommands": 1
+    },
+    {
+      "endpoint": "dsh",
+      "epochs": [
+        2,
+        11,
+        13
+      ],
+      "observerGeneration": 1,
+      "explicitGateCloses": 1,
+      "rejectedConnections": 4,
+      "successfulConnections": 2,
+      "mountedRows": 9,
+      "draftsPreserved": 6,
+      "oldFaultSelectedReadRejected": true,
+      "healthySelectedReadsAccepted": {
+        "native": true,
+        "pi": true
+      },
+      "originalReconnectCommands": 1
+    }
+  ],
+  "bootstrap": {
+    "mountedCount": 9,
+    "pageActions": 1
+  },
+  "providerRequestPathsBefore": [
+    "/v1/responses",
+    "/v1/responses",
+    "/v1/responses",
+    "/v1/chat/completions",
+    "/v1/chat/completions",
+    "/v1/chat/completions",
+    "/v1/chat/completions",
+    "/v1/chat/completions",
+    "/v1/chat/completions"
+  ],
+  "providerRequestPathsAfter": [
+    "/v1/responses",
+    "/v1/responses",
+    "/v1/responses",
+    "/v1/chat/completions",
+    "/v1/chat/completions",
+    "/v1/chat/completions",
+    "/v1/chat/completions",
+    "/v1/chat/completions",
+    "/v1/chat/completions"
+  ],
+  "probeExit": {
+    "pid": 64075,
+    "exitCode": 0,
+    "timedOut": false,
+    "groupExited": true
+  },
+  "ownedServiceExits": {
+    "native": 0,
+    "dsh": 0
+  },
+  "tests": {
+    "root": {
+      "passed": 402,
+      "failed": 0,
+      "ignored": 0
+    },
+    "ui": {
+      "passed": 781,
+      "failed": 0,
+      "ignored": 1
+    },
+    "python": {
+      "passed": 307,
+      "failed": 0
+    },
+    "strictClippy": "root and UI workspace all-targets passed",
+    "red": "pi-red-2.log: actual pending stream timeout",
+    "green": "pi-green.log: same regression passed",
+    "independentConsumer": "138 inputs unchanged from prior actually executed 29ea2e1 consumer; not rerun locally"
+  },
+  "notRun": [
+    "desktop",
+    "physical IME",
+    "OS accessibility",
+    "server restart",
+    "network partition",
+    "observer terminal Retry",
+    "unknown mutation outcome retry",
+    "new local strict reading run"
+  ],
+  "openGates": [
+    "TekesUI #53 strict nested reading",
+    "Kernel #86 Native busy queue",
+    "complete Views/ProcessContainer and other issue-scoped gates"
+  ],
+  "disk": {
+    "newTargetDirectories": 0,
+    "cacheBytesDeletedThisBatch": 0,
+    "sharedTarget": "/Volumes/HP P900/dev/TekesAgentKit/shared-target"
+  },
+  "history": [
+    "first-native: import preflight failed before services started",
+    "second-native: Native complete; verifier rejected address serialization",
+    "three-endpoints: original Pi close defect, failed at Pi; DSH case not reached",
+    "release: all transports completed; verifier incorrectly expected observer stale at transport failure; retained as unaccepted",
+    "final: all three cases independently accepted"
+  ]
+}

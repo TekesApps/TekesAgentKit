@@ -1,0 +1,26 @@
+{
+  "sdk": {
+    "rev": "1294987dacabb33c0e411c13ee5ea544a1123f8e",
+    "tag": "remediation-checkpoint-20261021",
+    "issue22": "open; source delivered",
+    "issue28": "open; source delivered"
+  },
+  "uiTests": 411,
+  "secondConsumerTests": 42,
+  "runReadingTests": 9,
+  "pythonTests": 26,
+  "nativeReading": "owned local SEP; native GPU; synthetic wheel/preedit; passed",
+  "systemIme": "Cua discrete system keys; marked, Enter no-send, Chinese commit passed; full A/B run production identical before probe-only change",
+  "harnessNativeReceipts": [
+    "PI",
+    "DSH",
+    "NATIVE"
+  ],
+  "allHarnessHistoryAnchors": false,
+  "fullUiParity": false,
+  "uiExperimental": true,
+  "evidence": ".runtime-fixtures/agentkit-continuous-reading-evidence",
+  "programSha256": "a026bf14108de4895469ce9f83cb4b21e29205b9b8e0d70fc01af931fc37fad8",
+  "newTargetDirectories": 0,
+  "newCacheDeletionBytes": 0
+}

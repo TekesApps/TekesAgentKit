@@ -1,0 +1,2143 @@
+{
+  "schemaVersion": 2,
+  "title": "Rust Agent UI acceptance matrix / fixed functional source baseline / 2026-10-25",
+  "issue": {
+    "number": 27,
+    "url": "https://github.com/TekesApps/TekesAgentKit/issues/27",
+    "pr": "https://github.com/TekesApps/TekesAgentKit/pull/10"
+  },
+  "baseline": {
+    "agentkitCommit": "91129d701fbd2721cf3415b86d227900715ec353",
+    "agentkitPublished": "v0.3.8",
+    "tekesuiCommit": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+    "tekesuiLockPackages": 8,
+    "scope": "Fixed verified functional baseline, not an automatic claim for future HEAD. Protocol, UI and historical evidence are separate."
+  },
+  "dimensions": {
+    "requirements": [
+      {
+        "id": "composer_ime",
+        "title": "Composer 组字期间不误发送",
+        "ownerIssue": 16
+      },
+      {
+        "id": "draft_isolation",
+        "title": "按会话隔离并恢复草稿",
+        "ownerIssue": 16
+      },
+      {
+        "id": "send_cancel",
+        "title": "发送/取消与原请求身份一致",
+        "ownerIssue": 16
+      },
+      {
+        "id": "stream",
+        "title": "流式回传与最终结算一致",
+        "ownerIssue": 21
+      },
+      {
+        "id": "reading_append",
+        "title": "向上阅读时追加不拉走当前阅读位置",
+        "ownerIssue": 18
+      },
+      {
+        "id": "pagination_anchor",
+        "title": "历史分页前插保持锚点",
+        "ownerIssue": 18
+      },
+      {
+        "id": "reconnect_no_duplicate",
+        "title": "重连不重复提交/回放",
+        "ownerIssue": 27
+      },
+      {
+        "id": "views_layout",
+        "title": "RunPort、Transcript、Composer、Indicators 布局对齐 ClientKit",
+        "ownerIssue": 21
+      },
+      {
+        "id": "sidebar_operations",
+        "title": "Sidebar 会话导航、活动态、置顶和共享操作",
+        "ownerIssue": 22
+      },
+      {
+        "id": "task",
+        "title": "SidePanel Task 内容与导航",
+        "ownerIssue": 23
+      },
+      {
+        "id": "subagent",
+        "title": "SidePanel 子代理内容与来源隔离",
+        "ownerIssue": 23
+      },
+      {
+        "id": "sidechat",
+        "title": "SidePanel SideChat 生命周期与草稿",
+        "ownerIssue": 24
+      },
+      {
+        "id": "summary",
+        "title": "SidePanel Summary 内容与操作",
+        "ownerIssue": 25
+      },
+      {
+        "id": "system_ime",
+        "title": "真实系统中文 IME 组字/候选窗/commit",
+        "ownerIssue": 27
+      },
+      {
+        "id": "accessibility",
+        "title": "VoiceOver/AX 读序与操作",
+        "ownerIssue": 27
+      },
+      {
+        "id": "transport_recovery",
+        "label": "客户端真实关闭、Failed、原Reconnect、新库存与原历史恢复"
+      },
+      {
+        "id": "image_payload_roundtrip",
+        "label": "原图片字节输入、provider、公有回读和重连"
+      },
+      {
+        "id": "mixed_attachment_order",
+        "label": "原mixed内容顺序与历史身份；文件字节下载按实际能力另述"
+      },
+      {
+        "id": "busy_queue_submission_identity",
+        "label": "运行中公开queue/item/RPC、通用队列与原提交确认/消费"
+      }
+    ],
+    "harnesses": [
+      "Native",
+      "Pi",
+      "DSH"
+    ],
+    "topologies": [
+      "in_process",
+      "cross_process"
+    ],
+    "verificationLayers": [
+      "component_tests",
+      "public_consumer",
+      "offscreen_harness",
+      "strict_ci",
+      "native_window",
+      "system_ime",
+      "accessibility",
+      "process_container",
+      "protocol_integration"
+    ]
+  },
+  "statusVocabulary": {
+    "passed": "该维度组合有直接、同身份的当前证据。",
+    "failed": "直接验收执行且失败；不能被历史通过覆盖。",
+    "blocked": "所需上游公开能力未交付。",
+    "unsupported": "该 harness 明确不提供该能力，或该验证层不适用于该拓扑。",
+    "not_run": "未执行/未证明；历史记录另列。"
+  },
+  "cellCount": 1026,
+  "rules": [
+    {
+      "priority": 0,
+      "status": "not_run",
+      "reason": "截至 AgentKit 91129d7 基线，未在本轮重新运行该组合；仅可引用下方逐项列出的历史证据。"
+    },
+    {
+      "priority": 10,
+      "topology": "cross_process",
+      "layer": "component_tests",
+      "status": "unsupported",
+      "reason": "组件单测不执行宿主跨进程拓扑。"
+    },
+    {
+      "priority": 10,
+      "topology": "cross_process",
+      "layer": "public_consumer",
+      "status": "unsupported",
+      "reason": "第二公开 consumer 的 API 测试不构成跨进程容器验收。"
+    },
+    {
+      "priority": 10,
+      "topology": "cross_process",
+      "layer": "strict_ci",
+      "status": "unsupported",
+      "reason": "当前 CI 的 strict reading runner 不执行跨进程 ProcessContainer。"
+    },
+    {
+      "priority": 10,
+      "topology": "cross_process",
+      "layer": "*",
+      "status": "blocked",
+      "reason": "正式跨进程 Agent UI 容器依赖公开 ProcessContainer 能力；TekesUI #48 在固定 pin 下未交付。",
+      "evidence": [
+        "tekesui-48-process-container-gate"
+      ]
+    },
+    {
+      "priority": 20,
+      "layer": "process_container",
+      "status": "blocked",
+      "reason": "尚无基于固定公开 TekesUI #48 契约的正式 ProcessContainer 适配与同进程/跨进程验证。",
+      "evidence": [
+        "tekesui-48-process-container-gate"
+      ]
+    },
+    {
+      "priority": 30,
+      "topology": "in_process",
+      "layer": "component_tests",
+      "requirement": "*",
+      "status": "passed",
+      "reason": "91129d7 对应 CI 的 UI workspace 单测通过；这是共享组件行为，不是某个 harness 的独立运行记录。",
+      "evidence": [
+        "ci-current-ui-tests"
+      ]
+    },
+    {
+      "priority": 30,
+      "topology": "in_process",
+      "layer": "public_consumer",
+      "requirement": "*",
+      "status": "passed",
+      "reason": "91129d7 对应 CI 的公开 API consumer 测试通过；结果按共享 consumer 标注，不代表三个 harness 分别运行。",
+      "evidence": [
+        "ci-current-ui-tests"
+      ]
+    },
+    {
+      "priority": 35,
+      "topology": "in_process",
+      "layer": "component_tests",
+      "requirement": "views_layout",
+      "status": "not_run",
+      "reason": "组件测试不证明与 ClientKit 配对的完整 Views 布局和显示逻辑。"
+    },
+    {
+      "priority": 35,
+      "topology": "in_process",
+      "layer": "public_consumer",
+      "requirement": "views_layout",
+      "status": "not_run",
+      "reason": "公开 API consumer 编译/行为测试不证明 ClientKit 同内容配对布局。"
+    },
+    {
+      "priority": 35,
+      "topology": "in_process",
+      "layer": "component_tests",
+      "requirement": "system_ime",
+      "status": "not_run",
+      "reason": "组件层合成 Preedit 门禁不等于 macOS 系统中文输入法验收。"
+    },
+    {
+      "priority": 35,
+      "topology": "in_process",
+      "layer": "public_consumer",
+      "requirement": "system_ime",
+      "status": "not_run",
+      "reason": "公开 consumer 未运行系统输入法候选窗/物理键盘验收。"
+    },
+    {
+      "priority": 35,
+      "topology": "in_process",
+      "layer": "component_tests",
+      "requirement": "accessibility",
+      "status": "not_run",
+      "reason": "组件测试未完成 VoiceOver/AX 完整读序和操作验收。"
+    },
+    {
+      "priority": 35,
+      "topology": "in_process",
+      "layer": "public_consumer",
+      "requirement": "accessibility",
+      "status": "not_run",
+      "reason": "公开 consumer 未完成 VoiceOver/AX 完整读序和操作验收。"
+    },
+    {
+      "priority": 40,
+      "topology": "in_process",
+      "layer": "strict_ci",
+      "requirement": "reading_append",
+      "status": "failed",
+      "reason": "固定基线 CI 91129d7 的严格 #53 嵌套阅读检查复现父容器跟随追加，内层详情离开视口。",
+      "evidence": [
+        "ci-current-strict-53-failure"
+      ]
+    },
+    {
+      "priority": 40,
+      "topology": "in_process",
+      "layer": "strict_ci",
+      "status": "not_run",
+      "reason": "该 strict CI 层只给出 #53 阅读门禁结果；不得把组件测试通过解释成每个需求的独立 strict gate。"
+    },
+    {
+      "priority": 50,
+      "topology": "in_process",
+      "layer": "offscreen_harness",
+      "harness": "DSH",
+      "requirement": "sidechat",
+      "status": "unsupported",
+      "reason": "DSH 当前 SEP 未提供可确认销毁的 SideChat 能力；旧收据明确 capabilityUnavailable=true。",
+      "historicalEvidence": [
+        "history-real-sidechat"
+      ]
+    },
+    {
+      "priority": 50,
+      "topology": "in_process",
+      "layer": "offscreen_harness",
+      "status": "not_run",
+      "reason": "本轮未在 91129d7 冻结程序上重跑 Native/Pi/DSH 离屏 harness；历史程序和报告仅保留为历史。"
+    },
+    {
+      "priority": 50,
+      "topology": "in_process",
+      "layer": "native_window",
+      "status": "not_run",
+      "reason": "用户要求本轮不做桌面验收；历史窗口程序不转移为当前 91129d7 接受。"
+    },
+    {
+      "priority": 50,
+      "topology": "in_process",
+      "layer": "system_ime",
+      "status": "not_run",
+      "reason": "本轮未启动桌面/系统输入法；旧软件输入事件与合成 Preedit 均不能替代当前物理系统 IME 验收。"
+    },
+    {
+      "priority": 50,
+      "topology": "in_process",
+      "layer": "accessibility",
+      "status": "not_run",
+      "reason": "本轮未运行 VoiceOver/AX 桌面验收。"
+    },
+    {
+      "priority": 40,
+      "topology": "in_process",
+      "layer": "public_consumer",
+      "requirement": "*",
+      "status": "not_run",
+      "reason": "本快照的 CI workspace suite 不是独立 standalone public consumer 步骤；外部 ContentHost 构造收据仅证明组件可构造/挂载，不覆盖这些行为要求。"
+    },
+    {
+      "priority": 60,
+      "requirement": "transport_recovery",
+      "topology": "in_process",
+      "layer": "component_tests",
+      "status": "not_run",
+      "reason": "共享组件单测不是该完整真实协议要求的验收。"
+    },
+    {
+      "priority": 60,
+      "requirement": "image_payload_roundtrip",
+      "topology": "in_process",
+      "layer": "component_tests",
+      "status": "not_run",
+      "reason": "共享组件单测不是该完整真实协议要求的验收。"
+    },
+    {
+      "priority": 60,
+      "requirement": "mixed_attachment_order",
+      "topology": "in_process",
+      "layer": "component_tests",
+      "status": "not_run",
+      "reason": "共享组件单测不是该完整真实协议要求的验收。"
+    },
+    {
+      "priority": 60,
+      "requirement": "busy_queue_submission_identity",
+      "topology": "in_process",
+      "layer": "component_tests",
+      "status": "not_run",
+      "reason": "共享组件单测不是该完整真实协议要求的验收。"
+    },
+    {
+      "priority": 30,
+      "topology": "cross_process",
+      "layer": "protocol_integration",
+      "status": "unsupported",
+      "reason": "纯SEP协议运行不是跨进程UI容器拓扑验收。"
+    },
+    {
+      "priority": 100,
+      "requirement": "transport_recovery",
+      "harness": "Native",
+      "topology": "in_process",
+      "layer": "protocol_integration",
+      "status": "passed",
+      "reason": "actual new-code client close -> Failed -> original Reconnect -> fresh public inventory/journals; 9 row mounts/6 drafts retained; no uncertain-mutation replay or desktop claim",
+      "evidence": [
+        "sidebar-recovery-91129d7-native-transport_recovery"
+      ]
+    },
+    {
+      "priority": 100,
+      "requirement": "transport_recovery",
+      "harness": "Pi",
+      "topology": "in_process",
+      "layer": "protocol_integration",
+      "status": "passed",
+      "reason": "actual new-code client close -> Failed -> original Reconnect -> fresh public inventory/journals; 9 row mounts/6 drafts retained; no uncertain-mutation replay or desktop claim",
+      "evidence": [
+        "sidebar-recovery-91129d7-pi-transport_recovery"
+      ]
+    },
+    {
+      "priority": 100,
+      "requirement": "transport_recovery",
+      "harness": "DSH",
+      "topology": "in_process",
+      "layer": "protocol_integration",
+      "status": "passed",
+      "reason": "actual new-code client close -> Failed -> original Reconnect -> fresh public inventory/journals; 9 row mounts/6 drafts retained; no uncertain-mutation replay or desktop claim",
+      "evidence": [
+        "sidebar-recovery-91129d7-dsh-transport_recovery"
+      ]
+    }
+  ],
+  "evidenceCatalog": [
+    {
+      "id": "ci-current-ui-tests",
+      "historicalOnly": false,
+      "sourceCommit": "91129d701fbd2721cf3415b86d227900715ec353",
+      "report": {
+        "url": "https://github.com/TekesApps/TekesAgentKit/actions/runs/40136150914/job/120997971800"
+      },
+      "run": {
+        "headSha": "91129d701fbd2721cf3415b86d227900715ec353",
+        "job": "Rust UI consumer (no native interaction)",
+        "result": "passed",
+        "scope": "UI workspace tests, formatter, strict Clippy, public pin and consumer tests completed before the separate strict #53 step failed."
+      },
+      "contract": "none",
+      "topology": "in_process",
+      "layers": [
+        "component_tests"
+      ],
+      "requirements": [
+        "composer_ime",
+        "draft_isolation",
+        "send_cancel",
+        "stream",
+        "reading_append",
+        "pagination_anchor",
+        "reconnect_no_duplicate",
+        "sidebar_operations",
+        "task",
+        "subagent",
+        "sidechat",
+        "summary"
+      ],
+      "artifacts": [],
+      "voiceOverAccepted": false,
+      "note": "Shared UI workspace test evidence. It is not a new standalone consumer execution and is not three per-harness runs.",
+      "nativeWindow": false,
+      "ime": {
+        "route": "synthetic_or_none",
+        "markedTextObserved": false,
+        "commitObserved": false,
+        "candidateWindowObserved": false,
+        "physicalKeyboard": false
+      },
+      "harnesses": [
+        "DSH",
+        "Native",
+        "Pi"
+      ]
+    },
+    {
+      "id": "ci-current-strict-53-failure",
+      "historicalOnly": false,
+      "sourceCommit": "91129d701fbd2721cf3415b86d227900715ec353",
+      "report": {
+        "url": "https://github.com/TekesApps/TekesAgentKit/actions/runs/40136150914/job/120997971800"
+      },
+      "run": {
+        "headSha": "91129d701fbd2721cf3415b86d227900715ec353",
+        "job": "Verify nested detail reading intent (strict; no native window)",
+        "result": "failed",
+        "receipt": {
+          "accepted": false,
+          "parentFollowingAfterInnerUp": true,
+          "parentOffsetBefore": 0,
+          "parentOffsetAfterScroll": 0,
+          "parentOffsetAfterAppend": 634,
+          "innerOffset": 100,
+          "detailVisibleAfterAppend": false
+        }
+      },
+      "contract": "none",
+      "topology": "in_process",
+      "layers": [
+        "strict_ci"
+      ],
+      "requirements": [
+        "reading_append"
+      ],
+      "artifacts": [],
+      "voiceOverAccepted": false,
+      "note": "The head SHA and strict CI job are authoritative; failure is a shared nested-reading regression, not per-harness execution.",
+      "nativeWindow": false,
+      "ime": {
+        "route": "not_tested",
+        "markedTextObserved": false,
+        "commitObserved": false,
+        "candidateWindowObserved": false,
+        "physicalKeyboard": null
+      },
+      "harnesses": [
+        "DSH",
+        "Native",
+        "Pi"
+      ]
+    },
+    {
+      "id": "tekesui-48-process-container-gate",
+      "historicalOnly": false,
+      "sourceCommit": "91129d701fbd2721cf3415b86d227900715ec353",
+      "report": {
+        "url": "https://github.com/TekesApps/TekesUI/issues/48"
+      },
+      "upstreamRevision": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+      "run": {
+        "result": "blocked",
+        "reason": "The pinned public ProcessContainer contract lacks the required Agent UI transport/input/accessibility surface; issue #48 remains open."
+      },
+      "contract": "none",
+      "topology": null,
+      "layers": [
+        "offscreen_harness",
+        "native_window",
+        "system_ime",
+        "accessibility",
+        "process_container"
+      ],
+      "requirements": [
+        "composer_ime",
+        "draft_isolation",
+        "send_cancel",
+        "stream",
+        "reading_append",
+        "pagination_anchor",
+        "reconnect_no_duplicate",
+        "views_layout",
+        "sidebar_operations",
+        "task",
+        "subagent",
+        "sidechat",
+        "summary",
+        "system_ime",
+        "accessibility"
+      ],
+      "artifacts": [],
+      "voiceOverAccepted": false,
+      "nativeWindow": false,
+      "ime": {
+        "route": "not_tested",
+        "markedTextObserved": false,
+        "commitObserved": false,
+        "candidateWindowObserved": false,
+        "physicalKeyboard": null
+      },
+      "harnesses": [
+        "DSH",
+        "Native",
+        "Pi"
+      ]
+    },
+    {
+      "id": "history-readonly-source-authority",
+      "historicalOnly": true,
+      "sourceCommit": "f6cd5317284eaf67be3ffb973e0a39cb262a02a3",
+      "report": {
+        "path": "docs/rust-agent-ui-non-sdk-review-20261023.json",
+        "sha256": "e77dd62d47282e685ca4ce0201f4ae588bac5deb4104dadb44dbc1cae4da7983"
+      },
+      "program": {
+        "path": ".runtime-fixtures/readonly-source-identity-20261023/tekes-agent-ui-demo",
+        "reportedPath": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/readonly-source-identity-20261023/tekes-agent-ui-demo",
+        "sha256": "8f13b993a77bd2556871e10d17b88b33501d3b30354e5e2354bf38d0cba882ae"
+      },
+      "contract": "ContentHost",
+      "topology": "in_process",
+      "layers": [
+        "offscreen_harness"
+      ],
+      "requirements": [
+        "pagination_anchor",
+        "sidechat"
+      ],
+      "artifacts": [],
+      "voiceOverAccepted": false,
+      "nativeWindow": false,
+      "ime": {
+        "route": "not_tested",
+        "markedTextObserved": false,
+        "commitObserved": false,
+        "candidateWindowObserved": false,
+        "physicalKeyboard": null
+      },
+      "harnesses": [
+        "Native"
+      ]
+    },
+    {
+      "id": "history-real-sidechat",
+      "historicalOnly": true,
+      "sourceCommit": "abfc1c2732d2659c3f43f128dbf50d9d03126598",
+      "report": {
+        "path": "docs/rust-agent-ui-real-sidechat-20261023.json",
+        "sha256": "17fc3c36d4d63461a8c77c6547a8fe4099f42a3374a5e3bdf8ad007d8dc40cf6"
+      },
+      "program": {
+        "path": ".runtime-fixtures/real-sidechat-ui-20261023/tekes-agent-ui-demo-v5",
+        "reportedPath": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/real-sidechat-ui-20261023/tekes-agent-ui-demo-v5",
+        "sha256": "a68e9c8c86fb0fabc5711af33384fa5292f9e733fc95e3b714de96267bdcda0b"
+      },
+      "contract": "ContentHost",
+      "topology": "in_process",
+      "layers": [
+        "offscreen_harness"
+      ],
+      "requirements": [
+        "draft_isolation",
+        "send_cancel",
+        "reconnect_no_duplicate",
+        "sidechat",
+        "summary"
+      ],
+      "artifacts": [],
+      "voiceOverAccepted": false,
+      "nativeWindow": false,
+      "ime": {
+        "route": "not_tested",
+        "markedTextObserved": false,
+        "commitObserved": false,
+        "candidateWindowObserved": false,
+        "physicalKeyboard": null
+      },
+      "harnesses": [
+        "DSH",
+        "Native",
+        "Pi"
+      ]
+    },
+    {
+      "id": "history-native-bounded",
+      "historicalOnly": true,
+      "sourceCommit": "3e40ad67283a797e8fe9e58bdd1824c345b2ed3c",
+      "report": {
+        "path": "docs/rust-agent-ui-native-bounded-20261023.json",
+        "sha256": "1d2e54e5b91bbc55c2d8139240d4118dbad518e2c723fdef5dfe134b6097679b"
+      },
+      "program": {
+        "path": ".runtime-fixtures/native-bounded-ui-20261023/tekes-agent-ui-demo-v5",
+        "reportedPath": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/native-bounded-ui-20261023/tekes-agent-ui-demo-v5",
+        "sha256": "9463e851103f2329a785f2cf869f6ea8ae1c825c999646041570457172e50e2f"
+      },
+      "contract": "ContentHost",
+      "topology": "in_process",
+      "layers": [
+        "offscreen_harness"
+      ],
+      "requirements": [
+        "pagination_anchor",
+        "draft_isolation",
+        "reconnect_no_duplicate"
+      ],
+      "artifacts": [],
+      "voiceOverAccepted": false,
+      "nativeWindow": false,
+      "ime": {
+        "route": "not_tested",
+        "markedTextObserved": false,
+        "commitObserved": false,
+        "candidateWindowObserved": false,
+        "physicalKeyboard": null
+      },
+      "harnesses": [
+        "Native"
+      ]
+    },
+    {
+      "id": "history-activity-segments",
+      "historicalOnly": true,
+      "sourceCommit": "f6471003867dbb3a67f8eb2ef124b2ee157b3f2e",
+      "report": {
+        "path": "docs/rust-agent-ui-activity-segments-20261023.json",
+        "sha256": "fdcbf8f869c3e77d7a3115ff9a4f412ddfbee6ef8db1563660c5c5ab5d9f2c7d"
+      },
+      "program": {
+        "path": ".runtime-fixtures/activity-segments-20261023/final/AgentKitActivitySegments.app/Contents/MacOS/tekes-agent-ui-demo",
+        "reportedPath": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/activity-segments-20261023/final/AgentKitActivitySegments.app/Contents/MacOS/tekes-agent-ui-demo",
+        "sha256": "cb3b3aa319db68c9bc8859654c4f26ec7cb42e0eed6ec7f4aa5dfcd76897c362"
+      },
+      "contract": "ContentHost",
+      "topology": "in_process",
+      "layers": [
+        "native_window"
+      ],
+      "requirements": [
+        "stream",
+        "reading_append",
+        "pagination_anchor",
+        "reconnect_no_duplicate",
+        "draft_isolation"
+      ],
+      "artifacts": [],
+      "voiceOverAccepted": false,
+      "nativeWindow": true,
+      "ime": {
+        "route": "not_tested",
+        "markedTextObserved": false,
+        "commitObserved": false,
+        "candidateWindowObserved": false,
+        "physicalKeyboard": null
+      },
+      "nativeWindowReportScopes": [
+        "nativeOwnedHistory",
+        "realHarnessNativeProfiles"
+      ],
+      "harnesses": [
+        "DSH",
+        "Native",
+        "Pi"
+      ]
+    },
+    {
+      "id": "history-turn-output-copy",
+      "historicalOnly": true,
+      "sourceCommit": "d0c82b235e50447548a5c3926ef3fc2a1e88f7c5",
+      "report": {
+        "path": "docs/rust-agent-ui-turn-output-copy-20261022.json",
+        "sha256": "33d0215595ea2b7944be0e0cdf7daee9c0a9d70717b2b4685eb81b8b2368f8c2"
+      },
+      "program": {
+        "path": ".runtime-fixtures/AgentKitTurnOutputCopyFinal.app/Contents/MacOS/AgentKitTurnOutputCopyFinal",
+        "reportedPath": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/AgentKitTurnOutputCopyFinal.app/Contents/MacOS/AgentKitTurnOutputCopyFinal",
+        "sha256": "842bb1eb253388113ccca6050c004ffcd40d8693711572aca8a68656636350ec"
+      },
+      "contract": "ContentHost",
+      "topology": "in_process",
+      "layers": [
+        "native_window",
+        "system_ime"
+      ],
+      "requirements": [
+        "composer_ime",
+        "views_layout",
+        "pagination_anchor",
+        "system_ime"
+      ],
+      "artifacts": [],
+      "voiceOverAccepted": false,
+      "nativeWindow": true,
+      "ime": {
+        "route": "software_injected",
+        "markedTextObserved": false,
+        "commitObserved": false,
+        "candidateWindowObserved": false,
+        "physicalKeyboard": false
+      },
+      "harnesses": [
+        "DSH",
+        "Native",
+        "Pi"
+      ]
+    },
+    {
+      "id": "pi-mixed-06c0908-pi-image_payload_roundtrip",
+      "historicalOnly": true,
+      "sourceCommit": "06c0908a9492e5dc408ffc24baf3582517680a25",
+      "report": {
+        "path": "docs/evidence-bindings-20261025/pi-mixed-06c0908.json",
+        "sha256": "d9cb8437c5fb51647915cf74c29667af734f5d72d0c5ffe3fa7f4831e21d76d9"
+      },
+      "sourceReport": {
+        "path": "docs/rust-agent-ui-pi-mixed-file-results-20261025.json",
+        "sha256": "ded2ed1b3db810be85849d438edc8dc5ec19b7fded72bfbb7ad16d4fc5d65b28"
+      },
+      "program": {
+        "path": ".runtime-fixtures/pi-mixed-files-20261025/final-programs/pi_mixed_file_probe",
+        "reportedPath": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/pi-mixed-files-20261025/final-programs/pi_mixed_file_probe",
+        "sha256": "5baacea72987a248dc512576318736c04d9d100aa9c0cfb020ae0dac79b0db8d"
+      },
+      "contract": "none",
+      "topology": "in_process",
+      "layers": [
+        "protocol_integration"
+      ],
+      "requirements": [
+        "image_payload_roundtrip"
+      ],
+      "harnesses": [
+        "Pi"
+      ],
+      "artifacts": [
+        {
+          "path": ".runtime-fixtures/pi-mixed-files-20261025/final/accepted-receipt.json",
+          "sha256": "0bc862099c4f9aa8b6344f306dfada431c996d5109accc11dbeff3196bc43a8d"
+        },
+        {
+          "path": ".runtime-fixtures/pi-mixed-files-20261025/final/queue-ready-validated.json",
+          "sha256": "b4996bb09e5b5dfdc93dcc3a26a20fca5114a79562743f3850c785d11fd47b65"
+        },
+        {
+          "path": ".runtime-fixtures/pi-mixed-files-20261025/commit-binding.json",
+          "sha256": "10f0cda705636a277d348a82fa811dbb33596dc1b0705cea1f3da29a8fe13df3"
+        },
+        {
+          "path": ".runtime-fixtures/pi-mixed-files-20261025/final-source-hashes.json",
+          "sha256": "94690c35fe79beef9584eecf709d21713e99f4d76b0070be0820dc4ee2cbe23b"
+        }
+      ],
+      "reportClaimPath": [
+        "claims",
+        "Pi",
+        "image_payload_roundtrip"
+      ],
+      "nativeWindow": false,
+      "voiceOverAccepted": false,
+      "ime": {
+        "route": "not_tested",
+        "markedTextObserved": false,
+        "commitObserved": false,
+        "candidateWindowObserved": false,
+        "physicalKeyboard": null
+      },
+      "note": "original mixed image bytes/provider/public read/reconnect"
+    },
+    {
+      "id": "pi-mixed-06c0908-pi-mixed_attachment_order",
+      "historicalOnly": true,
+      "sourceCommit": "06c0908a9492e5dc408ffc24baf3582517680a25",
+      "report": {
+        "path": "docs/evidence-bindings-20261025/pi-mixed-06c0908.json",
+        "sha256": "d9cb8437c5fb51647915cf74c29667af734f5d72d0c5ffe3fa7f4831e21d76d9"
+      },
+      "sourceReport": {
+        "path": "docs/rust-agent-ui-pi-mixed-file-results-20261025.json",
+        "sha256": "ded2ed1b3db810be85849d438edc8dc5ec19b7fded72bfbb7ad16d4fc5d65b28"
+      },
+      "program": {
+        "path": ".runtime-fixtures/pi-mixed-files-20261025/final-programs/pi_mixed_file_probe",
+        "reportedPath": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/pi-mixed-files-20261025/final-programs/pi_mixed_file_probe",
+        "sha256": "5baacea72987a248dc512576318736c04d9d100aa9c0cfb020ae0dac79b0db8d"
+      },
+      "contract": "none",
+      "topology": "in_process",
+      "layers": [
+        "protocol_integration"
+      ],
+      "requirements": [
+        "mixed_attachment_order"
+      ],
+      "harnesses": [
+        "Pi"
+      ],
+      "artifacts": [
+        {
+          "path": ".runtime-fixtures/pi-mixed-files-20261025/final/accepted-receipt.json",
+          "sha256": "0bc862099c4f9aa8b6344f306dfada431c996d5109accc11dbeff3196bc43a8d"
+        },
+        {
+          "path": ".runtime-fixtures/pi-mixed-files-20261025/final/queue-ready-validated.json",
+          "sha256": "b4996bb09e5b5dfdc93dcc3a26a20fca5114a79562743f3850c785d11fd47b65"
+        },
+        {
+          "path": ".runtime-fixtures/pi-mixed-files-20261025/commit-binding.json",
+          "sha256": "10f0cda705636a277d348a82fa811dbb33596dc1b0705cea1f3da29a8fe13df3"
+        },
+        {
+          "path": ".runtime-fixtures/pi-mixed-files-20261025/final-source-hashes.json",
+          "sha256": "94690c35fe79beef9584eecf709d21713e99f4d76b0070be0820dc4ee2cbe23b"
+        }
+      ],
+      "reportClaimPath": [
+        "claims",
+        "Pi",
+        "mixed_attachment_order"
+      ],
+      "nativeWindow": false,
+      "voiceOverAccepted": false,
+      "ime": {
+        "route": "not_tested",
+        "markedTextObserved": false,
+        "commitObserved": false,
+        "candidateWindowObserved": false,
+        "physicalKeyboard": null
+      },
+      "note": "original image/file/image order, upload receipt, public file bytes and reconnect"
+    },
+    {
+      "id": "pi-mixed-06c0908-pi-busy_queue_submission_identity",
+      "historicalOnly": true,
+      "sourceCommit": "06c0908a9492e5dc408ffc24baf3582517680a25",
+      "report": {
+        "path": "docs/evidence-bindings-20261025/pi-mixed-06c0908.json",
+        "sha256": "d9cb8437c5fb51647915cf74c29667af734f5d72d0c5ffe3fa7f4831e21d76d9"
+      },
+      "sourceReport": {
+        "path": "docs/rust-agent-ui-pi-mixed-file-results-20261025.json",
+        "sha256": "ded2ed1b3db810be85849d438edc8dc5ec19b7fded72bfbb7ad16d4fc5d65b28"
+      },
+      "program": {
+        "path": ".runtime-fixtures/pi-mixed-files-20261025/final-programs/pi_mixed_file_probe",
+        "reportedPath": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/pi-mixed-files-20261025/final-programs/pi_mixed_file_probe",
+        "sha256": "5baacea72987a248dc512576318736c04d9d100aa9c0cfb020ae0dac79b0db8d"
+      },
+      "contract": "none",
+      "topology": "in_process",
+      "layers": [
+        "protocol_integration"
+      ],
+      "requirements": [
+        "busy_queue_submission_identity"
+      ],
+      "harnesses": [
+        "Pi"
+      ],
+      "artifacts": [
+        {
+          "path": ".runtime-fixtures/pi-mixed-files-20261025/final/accepted-receipt.json",
+          "sha256": "0bc862099c4f9aa8b6344f306dfada431c996d5109accc11dbeff3196bc43a8d"
+        },
+        {
+          "path": ".runtime-fixtures/pi-mixed-files-20261025/final/queue-ready-validated.json",
+          "sha256": "b4996bb09e5b5dfdc93dcc3a26a20fca5114a79562743f3850c785d11fd47b65"
+        },
+        {
+          "path": ".runtime-fixtures/pi-mixed-files-20261025/commit-binding.json",
+          "sha256": "10f0cda705636a277d348a82fa811dbb33596dc1b0705cea1f3da29a8fe13df3"
+        },
+        {
+          "path": ".runtime-fixtures/pi-mixed-files-20261025/final-source-hashes.json",
+          "sha256": "94690c35fe79beef9584eecf709d21713e99f4d76b0070be0820dc4ee2cbe23b"
+        }
+      ],
+      "reportClaimPath": [
+        "claims",
+        "Pi",
+        "busy_queue_submission_identity"
+      ],
+      "nativeWindow": false,
+      "voiceOverAccepted": false,
+      "ime": {
+        "route": "not_tested",
+        "markedTextObserved": false,
+        "commitObserved": false,
+        "candidateWindowObserved": false,
+        "physicalKeyboard": null
+      },
+      "note": "held public queue RPC/item and scoped original submission; subsequent drain"
+    },
+    {
+      "id": "release-dsh-29ea2e1-dsh-busy_queue_submission_identity",
+      "historicalOnly": true,
+      "sourceCommit": "29ea2e1d7e48c4073289fdc7387520282bd5aa1b",
+      "report": {
+        "path": "docs/evidence-bindings-20261025/release-dsh-29ea2e1.json",
+        "sha256": "f25adadfb957210873fd8c9474c5f914f02d6adfd63f9babe39597f5422e9aa7"
+      },
+      "sourceReport": {
+        "path": "docs/rust-agent-ui-native-dsh-busy-queue-results-20261025.json",
+        "sha256": "fbdee65cf2263eaa69b6705af3caad7a6637a6b172014dd7152a4dc94f02d25f"
+      },
+      "program": {
+        "path": ".runtime-fixtures/native-dsh-busy-queue-20261025/release-dsh/programs/owned-image-native_dsh_mixed_probe",
+        "reportedPath": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/examples/native_dsh_mixed_probe",
+        "sha256": "fc44d6dd875e2a7b4053b875fbec561c38ce4b0f21d3906b14901e0ffcbd0638"
+      },
+      "contract": "none",
+      "topology": "in_process",
+      "layers": [
+        "protocol_integration"
+      ],
+      "requirements": [
+        "busy_queue_submission_identity"
+      ],
+      "harnesses": [
+        "DSH"
+      ],
+      "artifacts": [
+        {
+          "path": ".runtime-fixtures/native-dsh-busy-queue-20261025/commit-binding.json",
+          "sha256": "8a1607d7970c3634b459d05b9576b6abe3be578ba0112e48a1fe6a0bed4ed47c"
+        },
+        {
+          "path": ".runtime-fixtures/native-dsh-busy-queue-20261025/release-dsh/run-receipt.json",
+          "sha256": "d6e136bbad436c850c2fc50d92cecdeb52096c6797b8a5278c445721c4da5f59"
+        },
+        {
+          "path": ".runtime-fixtures/native-dsh-busy-queue-20261025/release-dsh-source-hashes.json",
+          "sha256": "78caa45519e0fd6f2ed1b53eca8d0a8d7f971d34dd7a240ba5f40c42a524d2a4"
+        }
+      ],
+      "reportClaimPath": [
+        "claims",
+        "DSH",
+        "busy_queue_submission_identity"
+      ],
+      "nativeWindow": false,
+      "voiceOverAccepted": false,
+      "ime": {
+        "route": "not_tested",
+        "markedTextObserved": false,
+        "commitObserved": false,
+        "candidateWindowObserved": false,
+        "physicalKeyboard": null
+      },
+      "note": "held original inbox, common queue and reconciled submission; explicit drain/reconnect emptiness"
+    },
+    {
+      "id": "release-idle-29ea2e1-native-image_payload_roundtrip",
+      "historicalOnly": true,
+      "sourceCommit": "29ea2e1d7e48c4073289fdc7387520282bd5aa1b",
+      "report": {
+        "path": "docs/evidence-bindings-20261025/release-idle-29ea2e1.json",
+        "sha256": "30564a36385aefdf5ac453c1bcda76b8969ac5ada25ed4d41d4b98b1dbd1e1e9"
+      },
+      "sourceReport": {
+        "path": "docs/rust-agent-ui-native-dsh-busy-queue-results-20261025.json",
+        "sha256": "fbdee65cf2263eaa69b6705af3caad7a6637a6b172014dd7152a4dc94f02d25f"
+      },
+      "program": {
+        "path": ".runtime-fixtures/native-dsh-busy-queue-20261025/release-idle/programs/owned-image-native_dsh_mixed_probe",
+        "reportedPath": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/examples/native_dsh_mixed_probe",
+        "sha256": "fc44d6dd875e2a7b4053b875fbec561c38ce4b0f21d3906b14901e0ffcbd0638"
+      },
+      "contract": "none",
+      "topology": "in_process",
+      "layers": [
+        "protocol_integration"
+      ],
+      "requirements": [
+        "image_payload_roundtrip"
+      ],
+      "harnesses": [
+        "Native"
+      ],
+      "artifacts": [
+        {
+          "path": ".runtime-fixtures/native-dsh-busy-queue-20261025/commit-binding.json",
+          "sha256": "8a1607d7970c3634b459d05b9576b6abe3be578ba0112e48a1fe6a0bed4ed47c"
+        },
+        {
+          "path": ".runtime-fixtures/native-dsh-busy-queue-20261025/release-idle/run-receipt.json",
+          "sha256": "eb373ac57bb34d3968ff9f714f4f8e45ea2bc1d2e498c2e2304f8bf831cbe45f"
+        },
+        {
+          "path": ".runtime-fixtures/native-dsh-busy-queue-20261025/release-idle-source-hashes.json",
+          "sha256": "78caa45519e0fd6f2ed1b53eca8d0a8d7f971d34dd7a240ba5f40c42a524d2a4"
+        }
+      ],
+      "reportClaimPath": [
+        "claims",
+        "Native",
+        "image_payload_roundtrip"
+      ],
+      "nativeWindow": false,
+      "voiceOverAccepted": false,
+      "ime": {
+        "route": "not_tested",
+        "markedTextObserved": false,
+        "commitObserved": false,
+        "candidateWindowObserved": false,
+        "physicalKeyboard": null
+      },
+      "note": "original image bytes/provider/public read and reconnect"
+    },
+    {
+      "id": "release-idle-29ea2e1-native-mixed_attachment_order",
+      "historicalOnly": true,
+      "sourceCommit": "29ea2e1d7e48c4073289fdc7387520282bd5aa1b",
+      "report": {
+        "path": "docs/evidence-bindings-20261025/release-idle-29ea2e1.json",
+        "sha256": "30564a36385aefdf5ac453c1bcda76b8969ac5ada25ed4d41d4b98b1dbd1e1e9"
+      },
+      "sourceReport": {
+        "path": "docs/rust-agent-ui-native-dsh-busy-queue-results-20261025.json",
+        "sha256": "fbdee65cf2263eaa69b6705af3caad7a6637a6b172014dd7152a4dc94f02d25f"
+      },
+      "program": {
+        "path": ".runtime-fixtures/native-dsh-busy-queue-20261025/release-idle/programs/owned-image-native_dsh_mixed_probe",
+        "reportedPath": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/examples/native_dsh_mixed_probe",
+        "sha256": "fc44d6dd875e2a7b4053b875fbec561c38ce4b0f21d3906b14901e0ffcbd0638"
+      },
+      "contract": "none",
+      "topology": "in_process",
+      "layers": [
+        "protocol_integration"
+      ],
+      "requirements": [
+        "mixed_attachment_order"
+      ],
+      "harnesses": [
+        "Native"
+      ],
+      "artifacts": [
+        {
+          "path": ".runtime-fixtures/native-dsh-busy-queue-20261025/commit-binding.json",
+          "sha256": "8a1607d7970c3634b459d05b9576b6abe3be578ba0112e48a1fe6a0bed4ed47c"
+        },
+        {
+          "path": ".runtime-fixtures/native-dsh-busy-queue-20261025/release-idle/run-receipt.json",
+          "sha256": "eb373ac57bb34d3968ff9f714f4f8e45ea2bc1d2e498c2e2304f8bf831cbe45f"
+        },
+        {
+          "path": ".runtime-fixtures/native-dsh-busy-queue-20261025/release-idle-source-hashes.json",
+          "sha256": "78caa45519e0fd6f2ed1b53eca8d0a8d7f971d34dd7a240ba5f40c42a524d2a4"
+        }
+      ],
+      "reportClaimPath": [
+        "claims",
+        "Native",
+        "mixed_attachment_order"
+      ],
+      "nativeWindow": false,
+      "voiceOverAccepted": false,
+      "ime": {
+        "route": "not_tested",
+        "markedTextObserved": false,
+        "commitObserved": false,
+        "candidateWindowObserved": false,
+        "physicalKeyboard": null
+      },
+      "note": "original image/file/image order and public history; DSH file provider handle is not generic file download"
+    },
+    {
+      "id": "release-idle-29ea2e1-dsh-image_payload_roundtrip",
+      "historicalOnly": true,
+      "sourceCommit": "29ea2e1d7e48c4073289fdc7387520282bd5aa1b",
+      "report": {
+        "path": "docs/evidence-bindings-20261025/release-idle-29ea2e1.json",
+        "sha256": "30564a36385aefdf5ac453c1bcda76b8969ac5ada25ed4d41d4b98b1dbd1e1e9"
+      },
+      "sourceReport": {
+        "path": "docs/rust-agent-ui-native-dsh-busy-queue-results-20261025.json",
+        "sha256": "fbdee65cf2263eaa69b6705af3caad7a6637a6b172014dd7152a4dc94f02d25f"
+      },
+      "program": {
+        "path": ".runtime-fixtures/native-dsh-busy-queue-20261025/release-idle/programs/owned-image-native_dsh_mixed_probe",
+        "reportedPath": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/examples/native_dsh_mixed_probe",
+        "sha256": "fc44d6dd875e2a7b4053b875fbec561c38ce4b0f21d3906b14901e0ffcbd0638"
+      },
+      "contract": "none",
+      "topology": "in_process",
+      "layers": [
+        "protocol_integration"
+      ],
+      "requirements": [
+        "image_payload_roundtrip"
+      ],
+      "harnesses": [
+        "DSH"
+      ],
+      "artifacts": [
+        {
+          "path": ".runtime-fixtures/native-dsh-busy-queue-20261025/commit-binding.json",
+          "sha256": "8a1607d7970c3634b459d05b9576b6abe3be578ba0112e48a1fe6a0bed4ed47c"
+        },
+        {
+          "path": ".runtime-fixtures/native-dsh-busy-queue-20261025/release-idle/run-receipt.json",
+          "sha256": "eb373ac57bb34d3968ff9f714f4f8e45ea2bc1d2e498c2e2304f8bf831cbe45f"
+        },
+        {
+          "path": ".runtime-fixtures/native-dsh-busy-queue-20261025/release-idle-source-hashes.json",
+          "sha256": "78caa45519e0fd6f2ed1b53eca8d0a8d7f971d34dd7a240ba5f40c42a524d2a4"
+        }
+      ],
+      "reportClaimPath": [
+        "claims",
+        "DSH",
+        "image_payload_roundtrip"
+      ],
+      "nativeWindow": false,
+      "voiceOverAccepted": false,
+      "ime": {
+        "route": "not_tested",
+        "markedTextObserved": false,
+        "commitObserved": false,
+        "candidateWindowObserved": false,
+        "physicalKeyboard": null
+      },
+      "note": "original image bytes/provider/public read and reconnect"
+    },
+    {
+      "id": "release-idle-29ea2e1-dsh-mixed_attachment_order",
+      "historicalOnly": true,
+      "sourceCommit": "29ea2e1d7e48c4073289fdc7387520282bd5aa1b",
+      "report": {
+        "path": "docs/evidence-bindings-20261025/release-idle-29ea2e1.json",
+        "sha256": "30564a36385aefdf5ac453c1bcda76b8969ac5ada25ed4d41d4b98b1dbd1e1e9"
+      },
+      "sourceReport": {
+        "path": "docs/rust-agent-ui-native-dsh-busy-queue-results-20261025.json",
+        "sha256": "fbdee65cf2263eaa69b6705af3caad7a6637a6b172014dd7152a4dc94f02d25f"
+      },
+      "program": {
+        "path": ".runtime-fixtures/native-dsh-busy-queue-20261025/release-idle/programs/owned-image-native_dsh_mixed_probe",
+        "reportedPath": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/examples/native_dsh_mixed_probe",
+        "sha256": "fc44d6dd875e2a7b4053b875fbec561c38ce4b0f21d3906b14901e0ffcbd0638"
+      },
+      "contract": "none",
+      "topology": "in_process",
+      "layers": [
+        "protocol_integration"
+      ],
+      "requirements": [
+        "mixed_attachment_order"
+      ],
+      "harnesses": [
+        "DSH"
+      ],
+      "artifacts": [
+        {
+          "path": ".runtime-fixtures/native-dsh-busy-queue-20261025/commit-binding.json",
+          "sha256": "8a1607d7970c3634b459d05b9576b6abe3be578ba0112e48a1fe6a0bed4ed47c"
+        },
+        {
+          "path": ".runtime-fixtures/native-dsh-busy-queue-20261025/release-idle/run-receipt.json",
+          "sha256": "eb373ac57bb34d3968ff9f714f4f8e45ea2bc1d2e498c2e2304f8bf831cbe45f"
+        },
+        {
+          "path": ".runtime-fixtures/native-dsh-busy-queue-20261025/release-idle-source-hashes.json",
+          "sha256": "78caa45519e0fd6f2ed1b53eca8d0a8d7f971d34dd7a240ba5f40c42a524d2a4"
+        }
+      ],
+      "reportClaimPath": [
+        "claims",
+        "DSH",
+        "mixed_attachment_order"
+      ],
+      "nativeWindow": false,
+      "voiceOverAccepted": false,
+      "ime": {
+        "route": "not_tested",
+        "markedTextObserved": false,
+        "commitObserved": false,
+        "candidateWindowObserved": false,
+        "physicalKeyboard": null
+      },
+      "note": "original image/file/image order and public history; DSH file provider handle is not generic file download"
+    },
+    {
+      "id": "release-native-29ea2e1-native-busy_queue_submission_identity",
+      "historicalOnly": true,
+      "sourceCommit": "29ea2e1d7e48c4073289fdc7387520282bd5aa1b",
+      "report": {
+        "path": "docs/evidence-bindings-20261025/release-native-29ea2e1.json",
+        "sha256": "e32756d482b6766b051047e99322fc5bc6e888db337db6c82e2812b7eb958822"
+      },
+      "sourceReport": {
+        "path": "docs/rust-agent-ui-native-dsh-busy-queue-results-20261025.json",
+        "sha256": "fbdee65cf2263eaa69b6705af3caad7a6637a6b172014dd7152a4dc94f02d25f"
+      },
+      "program": {
+        "path": ".runtime-fixtures/native-dsh-busy-queue-20261025/release-native/programs/owned-image-native_dsh_mixed_probe",
+        "reportedPath": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/examples/native_dsh_mixed_probe",
+        "sha256": "fc44d6dd875e2a7b4053b875fbec561c38ce4b0f21d3906b14901e0ffcbd0638"
+      },
+      "contract": "none",
+      "topology": "in_process",
+      "layers": [
+        "protocol_integration"
+      ],
+      "requirements": [
+        "busy_queue_submission_identity"
+      ],
+      "harnesses": [
+        "Native"
+      ],
+      "artifacts": [
+        {
+          "path": ".runtime-fixtures/native-dsh-busy-queue-20261025/commit-binding.json",
+          "sha256": "8a1607d7970c3634b459d05b9576b6abe3be578ba0112e48a1fe6a0bed4ed47c"
+        },
+        {
+          "path": ".runtime-fixtures/native-dsh-busy-queue-20261025/release-native/native/probe.stdout.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": ".runtime-fixtures/native-dsh-busy-queue-20261025/release-native/native/probe.exit.json",
+          "sha256": "08e41a78f6387025e879cd0007a7a79f5e3832646725e62a5700645b39924ac3"
+        },
+        {
+          "path": ".runtime-fixtures/native-dsh-busy-queue-20261025/release-native-source-hashes.json",
+          "sha256": "78caa45519e0fd6f2ed1b53eca8d0a8d7f971d34dd7a240ba5f40c42a524d2a4"
+        }
+      ],
+      "reportClaimPath": [
+        "claims",
+        "Native",
+        "busy_queue_submission_identity"
+      ],
+      "nativeWindow": false,
+      "voiceOverAccepted": false,
+      "ime": {
+        "route": "not_tested",
+        "markedTextObserved": false,
+        "commitObserved": false,
+        "candidateWindowObserved": false,
+        "physicalKeyboard": null
+      },
+      "note": "Kernel 0.9.3 admits queued RPC but original public control stays empty; Kernel #86; cleanup is not acceptance"
+    },
+    {
+      "id": "sidebar-recovery-4d3b1e1-native-transport_recovery",
+      "historicalOnly": true,
+      "sourceCommit": "4d3b1e14dfeeafd99d37c993c03e6e1c255353ac",
+      "report": {
+        "path": "docs/evidence-bindings-20261025/sidebar-recovery-4d3b1e1.json",
+        "sha256": "316050c0a63e20b38d08bba593087a5a7ed35307af451790b60ab3b0d7d325d4"
+      },
+      "sourceReport": {
+        "path": "docs/rust-agent-ui-sidebar-transport-recovery-results-20261025.json",
+        "sha256": "657e352c84917b7977a706222e4c37c73e4a39efbddea30e27c2967cb6725169"
+      },
+      "program": {
+        "path": ".runtime-fixtures/sidebar-transport-recovery-20261025/final/programs/probe",
+        "reportedPath": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/examples/sidebar_transport_recovery_probe",
+        "sha256": "a4c255435ace8066ea0c76ef3dd2c138fa01a243deaa05054cbf4d0f7315d096"
+      },
+      "contract": "ContentHost",
+      "topology": "in_process",
+      "layers": [
+        "protocol_integration"
+      ],
+      "requirements": [
+        "transport_recovery"
+      ],
+      "harnesses": [
+        "Native"
+      ],
+      "artifacts": [
+        {
+          "path": ".runtime-fixtures/sidebar-transport-recovery-20261025/final/transport-recovery-receipt.json",
+          "sha256": "9c1db9e77c41b6443c4f2364e6c697f148f7b36f2d090b383a23fd2d1abb1740"
+        },
+        {
+          "path": ".runtime-fixtures/sidebar-transport-recovery-20261025/final/acceptance.json",
+          "sha256": "2eefb5e76a3f5b2aae55aa2e7da92b570d0fb6dd061d22a82d9911401a791ff2"
+        },
+        {
+          "path": ".runtime-fixtures/sidebar-transport-recovery-20261025/commit-binding.json",
+          "sha256": "c3e0352f42e773eb69026e8a99b8608f940b63f9fee57014cb725ecbccb64678"
+        },
+        {
+          "path": ".runtime-fixtures/sidebar-transport-recovery-20261025/final-source/manifest.json",
+          "sha256": "efcf78f4d992eb486f0f5a622f4c74031bdb6a80b2a1ac0a4d829960deb86da9"
+        }
+      ],
+      "reportClaimPath": [
+        "claims",
+        "Native",
+        "transport_recovery"
+      ],
+      "nativeWindow": false,
+      "voiceOverAccepted": false,
+      "ime": {
+        "route": "not_tested",
+        "markedTextObserved": false,
+        "commitObserved": false,
+        "candidateWindowObserved": false,
+        "physicalKeyboard": null
+      },
+      "note": "actual client close -> Failed -> original Reconnect -> fresh inventory/journals; no claim of uncertain mutation replay or observer terminal Retry"
+    },
+    {
+      "id": "sidebar-recovery-4d3b1e1-pi-transport_recovery",
+      "historicalOnly": true,
+      "sourceCommit": "4d3b1e14dfeeafd99d37c993c03e6e1c255353ac",
+      "report": {
+        "path": "docs/evidence-bindings-20261025/sidebar-recovery-4d3b1e1.json",
+        "sha256": "316050c0a63e20b38d08bba593087a5a7ed35307af451790b60ab3b0d7d325d4"
+      },
+      "sourceReport": {
+        "path": "docs/rust-agent-ui-sidebar-transport-recovery-results-20261025.json",
+        "sha256": "657e352c84917b7977a706222e4c37c73e4a39efbddea30e27c2967cb6725169"
+      },
+      "program": {
+        "path": ".runtime-fixtures/sidebar-transport-recovery-20261025/final/programs/probe",
+        "reportedPath": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/examples/sidebar_transport_recovery_probe",
+        "sha256": "a4c255435ace8066ea0c76ef3dd2c138fa01a243deaa05054cbf4d0f7315d096"
+      },
+      "contract": "ContentHost",
+      "topology": "in_process",
+      "layers": [
+        "protocol_integration"
+      ],
+      "requirements": [
+        "transport_recovery"
+      ],
+      "harnesses": [
+        "Pi"
+      ],
+      "artifacts": [
+        {
+          "path": ".runtime-fixtures/sidebar-transport-recovery-20261025/final/transport-recovery-receipt.json",
+          "sha256": "9c1db9e77c41b6443c4f2364e6c697f148f7b36f2d090b383a23fd2d1abb1740"
+        },
+        {
+          "path": ".runtime-fixtures/sidebar-transport-recovery-20261025/final/acceptance.json",
+          "sha256": "2eefb5e76a3f5b2aae55aa2e7da92b570d0fb6dd061d22a82d9911401a791ff2"
+        },
+        {
+          "path": ".runtime-fixtures/sidebar-transport-recovery-20261025/commit-binding.json",
+          "sha256": "c3e0352f42e773eb69026e8a99b8608f940b63f9fee57014cb725ecbccb64678"
+        },
+        {
+          "path": ".runtime-fixtures/sidebar-transport-recovery-20261025/final-source/manifest.json",
+          "sha256": "efcf78f4d992eb486f0f5a622f4c74031bdb6a80b2a1ac0a4d829960deb86da9"
+        }
+      ],
+      "reportClaimPath": [
+        "claims",
+        "Pi",
+        "transport_recovery"
+      ],
+      "nativeWindow": false,
+      "voiceOverAccepted": false,
+      "ime": {
+        "route": "not_tested",
+        "markedTextObserved": false,
+        "commitObserved": false,
+        "candidateWindowObserved": false,
+        "physicalKeyboard": null
+      },
+      "note": "actual client close -> Failed -> original Reconnect -> fresh inventory/journals; no claim of uncertain mutation replay or observer terminal Retry"
+    },
+    {
+      "id": "sidebar-recovery-4d3b1e1-dsh-transport_recovery",
+      "historicalOnly": true,
+      "sourceCommit": "4d3b1e14dfeeafd99d37c993c03e6e1c255353ac",
+      "report": {
+        "path": "docs/evidence-bindings-20261025/sidebar-recovery-4d3b1e1.json",
+        "sha256": "316050c0a63e20b38d08bba593087a5a7ed35307af451790b60ab3b0d7d325d4"
+      },
+      "sourceReport": {
+        "path": "docs/rust-agent-ui-sidebar-transport-recovery-results-20261025.json",
+        "sha256": "657e352c84917b7977a706222e4c37c73e4a39efbddea30e27c2967cb6725169"
+      },
+      "program": {
+        "path": ".runtime-fixtures/sidebar-transport-recovery-20261025/final/programs/probe",
+        "reportedPath": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/examples/sidebar_transport_recovery_probe",
+        "sha256": "a4c255435ace8066ea0c76ef3dd2c138fa01a243deaa05054cbf4d0f7315d096"
+      },
+      "contract": "ContentHost",
+      "topology": "in_process",
+      "layers": [
+        "protocol_integration"
+      ],
+      "requirements": [
+        "transport_recovery"
+      ],
+      "harnesses": [
+        "DSH"
+      ],
+      "artifacts": [
+        {
+          "path": ".runtime-fixtures/sidebar-transport-recovery-20261025/final/transport-recovery-receipt.json",
+          "sha256": "9c1db9e77c41b6443c4f2364e6c697f148f7b36f2d090b383a23fd2d1abb1740"
+        },
+        {
+          "path": ".runtime-fixtures/sidebar-transport-recovery-20261025/final/acceptance.json",
+          "sha256": "2eefb5e76a3f5b2aae55aa2e7da92b570d0fb6dd061d22a82d9911401a791ff2"
+        },
+        {
+          "path": ".runtime-fixtures/sidebar-transport-recovery-20261025/commit-binding.json",
+          "sha256": "c3e0352f42e773eb69026e8a99b8608f940b63f9fee57014cb725ecbccb64678"
+        },
+        {
+          "path": ".runtime-fixtures/sidebar-transport-recovery-20261025/final-source/manifest.json",
+          "sha256": "efcf78f4d992eb486f0f5a622f4c74031bdb6a80b2a1ac0a4d829960deb86da9"
+        }
+      ],
+      "reportClaimPath": [
+        "claims",
+        "DSH",
+        "transport_recovery"
+      ],
+      "nativeWindow": false,
+      "voiceOverAccepted": false,
+      "ime": {
+        "route": "not_tested",
+        "markedTextObserved": false,
+        "commitObserved": false,
+        "candidateWindowObserved": false,
+        "physicalKeyboard": null
+      },
+      "note": "actual client close -> Failed -> original Reconnect -> fresh inventory/journals; no claim of uncertain mutation replay or observer terminal Retry"
+    },
+    {
+      "id": "sidebar-recovery-91129d7-native-transport_recovery",
+      "historicalOnly": false,
+      "sourceCommit": "91129d701fbd2721cf3415b86d227900715ec353",
+      "report": {
+        "path": "docs/evidence-bindings-20261025/sidebar-recovery-91129d7.json",
+        "sha256": "4852252044b5f480d291c718c9cbe3e7e77d99b29907d61ca0e921091e58997a"
+      },
+      "sourceReport": {
+        "path": "docs/rust-agent-ui-owner-admission-results-20261025.json",
+        "sha256": "b2b460e8a3893b0bbcb1e1f459f4fd2bde633e0c0961a6f44e320107ed95439b"
+      },
+      "program": {
+        "path": ".runtime-fixtures/acceptance-refresh-20261025/owner-recovery-final/programs/probe",
+        "reportedPath": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/examples/sidebar_transport_recovery_probe",
+        "sha256": "13217d9ad4c8cbe285ae0aef8e09390002b1c9a23a9ab1d93e93ce9a85a02df9"
+      },
+      "contract": "ContentHost",
+      "topology": "in_process",
+      "layers": [
+        "protocol_integration"
+      ],
+      "requirements": [
+        "transport_recovery"
+      ],
+      "harnesses": [
+        "Native"
+      ],
+      "artifacts": [
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/owner-recovery-final/transport-recovery-receipt.json",
+          "sha256": "2a846c69a14d794ac69f999f4cec70c6bbcebc0633828847dc1e28dc3a1543db"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/owner-recovery-final/acceptance.json",
+          "sha256": "2a496ef3d403282cc93c5d82c46432b888c2bd13576c181f6bf3e6b339a492d0"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/owner-recovery-final/probe-exit.json",
+          "sha256": "bb6ec69a8f84a3d4ea1a716284422a60f204a0c67c7643b68aced24d56b04d84"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/owner-recovery-final/owned-service-exits.json",
+          "sha256": "ba13aae621d76073ce98106e7293658195cabd329d0af9b34a97922f16f5c48e"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/owner-commit-binding.json",
+          "sha256": "36b4cbe2fca5fa417b7c9dcc5efc1c603c2335280f9ea66fa1db95845ce147fa"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/owner-red-2.log",
+          "sha256": "678c581c8ea0c5b4693f6aa33403deb419ecb3dd0effa165a1b8329eaffd0723"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/owner-green-2.log",
+          "sha256": "494ace5dbdef2fcafccc5ea01c2a4f32ff6a534e4b44ad36474bddf131d1ac59"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/channel-validation-tests.log",
+          "sha256": "55c696058746b3bdd9aeb63ba27966c89ba4cdda72b69c5bc8eb9124bf06a575"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/root-tests.log",
+          "sha256": "3fc2081a6ec4aab9ef5fb493b98cfa1e612e995a1407c18d5981299a9d3c3a91"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/ui-tests.log",
+          "sha256": "d70d862e8c3af175508d0a25a02971bbe31a483d632cd528b0fc392a12414c96"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/root-clippy.log",
+          "sha256": "3de7bac97d8214d4c64f774463831c3d4309c32079115260f59fae218d209bb4"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/ui-clippy.log",
+          "sha256": "45aa858615e8fd628415603589eace85eff81987df5d49d9304102e105f66b77"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/consumer-inputs.json",
+          "sha256": "43e03699d4c4a48681c6848dd59c229c6b07648c9a803cc3bece432d53deca44"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/consumer-program.json",
+          "sha256": "8adc9dc9871be8898f25c0f91f80304c51bcffe6ea5d96f75b85b5c6b05705c8"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/independent-consumer.log",
+          "sha256": "3d5e88e426a669b3d1ab2b746aaa4ff07fd3b478faaf436b0d3098e36df8d166"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/owner-source-manifest.json",
+          "sha256": "2156805dc5607d9287847223d5d50b5b49778cb1d30875b3591131a9e9b9f9f9"
+        }
+      ],
+      "reportClaimPath": [
+        "claims",
+        "Native",
+        "transport_recovery"
+      ],
+      "nativeWindow": false,
+      "voiceOverAccepted": false,
+      "ime": {
+        "route": "not_tested",
+        "markedTextObserved": false,
+        "commitObserved": false,
+        "candidateWindowObserved": false,
+        "physicalKeyboard": null
+      },
+      "note": "actual new-code client close -> Failed -> original Reconnect -> fresh public inventory/journals; 9 row mounts/6 drafts retained; no uncertain-mutation replay or desktop claim"
+    },
+    {
+      "id": "sidebar-recovery-91129d7-pi-transport_recovery",
+      "historicalOnly": false,
+      "sourceCommit": "91129d701fbd2721cf3415b86d227900715ec353",
+      "report": {
+        "path": "docs/evidence-bindings-20261025/sidebar-recovery-91129d7.json",
+        "sha256": "4852252044b5f480d291c718c9cbe3e7e77d99b29907d61ca0e921091e58997a"
+      },
+      "sourceReport": {
+        "path": "docs/rust-agent-ui-owner-admission-results-20261025.json",
+        "sha256": "b2b460e8a3893b0bbcb1e1f459f4fd2bde633e0c0961a6f44e320107ed95439b"
+      },
+      "program": {
+        "path": ".runtime-fixtures/acceptance-refresh-20261025/owner-recovery-final/programs/probe",
+        "reportedPath": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/examples/sidebar_transport_recovery_probe",
+        "sha256": "13217d9ad4c8cbe285ae0aef8e09390002b1c9a23a9ab1d93e93ce9a85a02df9"
+      },
+      "contract": "ContentHost",
+      "topology": "in_process",
+      "layers": [
+        "protocol_integration"
+      ],
+      "requirements": [
+        "transport_recovery"
+      ],
+      "harnesses": [
+        "Pi"
+      ],
+      "artifacts": [
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/owner-recovery-final/transport-recovery-receipt.json",
+          "sha256": "2a846c69a14d794ac69f999f4cec70c6bbcebc0633828847dc1e28dc3a1543db"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/owner-recovery-final/acceptance.json",
+          "sha256": "2a496ef3d403282cc93c5d82c46432b888c2bd13576c181f6bf3e6b339a492d0"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/owner-recovery-final/probe-exit.json",
+          "sha256": "bb6ec69a8f84a3d4ea1a716284422a60f204a0c67c7643b68aced24d56b04d84"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/owner-recovery-final/owned-service-exits.json",
+          "sha256": "ba13aae621d76073ce98106e7293658195cabd329d0af9b34a97922f16f5c48e"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/owner-commit-binding.json",
+          "sha256": "36b4cbe2fca5fa417b7c9dcc5efc1c603c2335280f9ea66fa1db95845ce147fa"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/owner-red-2.log",
+          "sha256": "678c581c8ea0c5b4693f6aa33403deb419ecb3dd0effa165a1b8329eaffd0723"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/owner-green-2.log",
+          "sha256": "494ace5dbdef2fcafccc5ea01c2a4f32ff6a534e4b44ad36474bddf131d1ac59"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/channel-validation-tests.log",
+          "sha256": "55c696058746b3bdd9aeb63ba27966c89ba4cdda72b69c5bc8eb9124bf06a575"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/root-tests.log",
+          "sha256": "3fc2081a6ec4aab9ef5fb493b98cfa1e612e995a1407c18d5981299a9d3c3a91"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/ui-tests.log",
+          "sha256": "d70d862e8c3af175508d0a25a02971bbe31a483d632cd528b0fc392a12414c96"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/root-clippy.log",
+          "sha256": "3de7bac97d8214d4c64f774463831c3d4309c32079115260f59fae218d209bb4"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/ui-clippy.log",
+          "sha256": "45aa858615e8fd628415603589eace85eff81987df5d49d9304102e105f66b77"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/consumer-inputs.json",
+          "sha256": "43e03699d4c4a48681c6848dd59c229c6b07648c9a803cc3bece432d53deca44"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/consumer-program.json",
+          "sha256": "8adc9dc9871be8898f25c0f91f80304c51bcffe6ea5d96f75b85b5c6b05705c8"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/independent-consumer.log",
+          "sha256": "3d5e88e426a669b3d1ab2b746aaa4ff07fd3b478faaf436b0d3098e36df8d166"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/owner-source-manifest.json",
+          "sha256": "2156805dc5607d9287847223d5d50b5b49778cb1d30875b3591131a9e9b9f9f9"
+        }
+      ],
+      "reportClaimPath": [
+        "claims",
+        "Pi",
+        "transport_recovery"
+      ],
+      "nativeWindow": false,
+      "voiceOverAccepted": false,
+      "ime": {
+        "route": "not_tested",
+        "markedTextObserved": false,
+        "commitObserved": false,
+        "candidateWindowObserved": false,
+        "physicalKeyboard": null
+      },
+      "note": "actual new-code client close -> Failed -> original Reconnect -> fresh public inventory/journals; 9 row mounts/6 drafts retained; no uncertain-mutation replay or desktop claim"
+    },
+    {
+      "id": "sidebar-recovery-91129d7-dsh-transport_recovery",
+      "historicalOnly": false,
+      "sourceCommit": "91129d701fbd2721cf3415b86d227900715ec353",
+      "report": {
+        "path": "docs/evidence-bindings-20261025/sidebar-recovery-91129d7.json",
+        "sha256": "4852252044b5f480d291c718c9cbe3e7e77d99b29907d61ca0e921091e58997a"
+      },
+      "sourceReport": {
+        "path": "docs/rust-agent-ui-owner-admission-results-20261025.json",
+        "sha256": "b2b460e8a3893b0bbcb1e1f459f4fd2bde633e0c0961a6f44e320107ed95439b"
+      },
+      "program": {
+        "path": ".runtime-fixtures/acceptance-refresh-20261025/owner-recovery-final/programs/probe",
+        "reportedPath": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/examples/sidebar_transport_recovery_probe",
+        "sha256": "13217d9ad4c8cbe285ae0aef8e09390002b1c9a23a9ab1d93e93ce9a85a02df9"
+      },
+      "contract": "ContentHost",
+      "topology": "in_process",
+      "layers": [
+        "protocol_integration"
+      ],
+      "requirements": [
+        "transport_recovery"
+      ],
+      "harnesses": [
+        "DSH"
+      ],
+      "artifacts": [
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/owner-recovery-final/transport-recovery-receipt.json",
+          "sha256": "2a846c69a14d794ac69f999f4cec70c6bbcebc0633828847dc1e28dc3a1543db"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/owner-recovery-final/acceptance.json",
+          "sha256": "2a496ef3d403282cc93c5d82c46432b888c2bd13576c181f6bf3e6b339a492d0"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/owner-recovery-final/probe-exit.json",
+          "sha256": "bb6ec69a8f84a3d4ea1a716284422a60f204a0c67c7643b68aced24d56b04d84"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/owner-recovery-final/owned-service-exits.json",
+          "sha256": "ba13aae621d76073ce98106e7293658195cabd329d0af9b34a97922f16f5c48e"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/owner-commit-binding.json",
+          "sha256": "36b4cbe2fca5fa417b7c9dcc5efc1c603c2335280f9ea66fa1db95845ce147fa"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/owner-red-2.log",
+          "sha256": "678c581c8ea0c5b4693f6aa33403deb419ecb3dd0effa165a1b8329eaffd0723"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/owner-green-2.log",
+          "sha256": "494ace5dbdef2fcafccc5ea01c2a4f32ff6a534e4b44ad36474bddf131d1ac59"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/channel-validation-tests.log",
+          "sha256": "55c696058746b3bdd9aeb63ba27966c89ba4cdda72b69c5bc8eb9124bf06a575"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/root-tests.log",
+          "sha256": "3fc2081a6ec4aab9ef5fb493b98cfa1e612e995a1407c18d5981299a9d3c3a91"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/ui-tests.log",
+          "sha256": "d70d862e8c3af175508d0a25a02971bbe31a483d632cd528b0fc392a12414c96"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/root-clippy.log",
+          "sha256": "3de7bac97d8214d4c64f774463831c3d4309c32079115260f59fae218d209bb4"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/ui-clippy.log",
+          "sha256": "45aa858615e8fd628415603589eace85eff81987df5d49d9304102e105f66b77"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/consumer-inputs.json",
+          "sha256": "43e03699d4c4a48681c6848dd59c229c6b07648c9a803cc3bece432d53deca44"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/consumer-program.json",
+          "sha256": "8adc9dc9871be8898f25c0f91f80304c51bcffe6ea5d96f75b85b5c6b05705c8"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/independent-consumer.log",
+          "sha256": "3d5e88e426a669b3d1ab2b746aaa4ff07fd3b478faaf436b0d3098e36df8d166"
+        },
+        {
+          "path": ".runtime-fixtures/acceptance-refresh-20261025/owner-source-manifest.json",
+          "sha256": "2156805dc5607d9287847223d5d50b5b49778cb1d30875b3591131a9e9b9f9f9"
+        }
+      ],
+      "reportClaimPath": [
+        "claims",
+        "DSH",
+        "transport_recovery"
+      ],
+      "nativeWindow": false,
+      "voiceOverAccepted": false,
+      "ime": {
+        "route": "not_tested",
+        "markedTextObserved": false,
+        "commitObserved": false,
+        "candidateWindowObserved": false,
+        "physicalKeyboard": null
+      },
+      "note": "actual new-code client close -> Failed -> original Reconnect -> fresh public inventory/journals; 9 row mounts/6 drafts retained; no uncertain-mutation replay or desktop claim"
+    }
+  ],
+  "historicalObservations": [
+    {
+      "requirement": "sidechat",
+      "harness": "Native",
+      "topology": "in_process",
+      "layer": "offscreen_harness",
+      "evidence": "history-real-sidechat",
+      "assessment": "passed",
+      "note": "原程序的真实 SEP SideChat create/input/send/discard/reconnect；nativeInteraction=false，属于离屏/content-host分项。"
+    },
+    {
+      "requirement": "sidechat",
+      "harness": "Pi",
+      "topology": "in_process",
+      "layer": "offscreen_harness",
+      "evidence": "history-real-sidechat",
+      "assessment": "passed",
+      "note": "原程序的真实 SEP SideChat create/input/send/discard/reconnect；nativeInteraction=false，属于离屏/content-host分项。"
+    },
+    {
+      "requirement": "sidechat",
+      "harness": "DSH",
+      "topology": "in_process",
+      "layer": "offscreen_harness",
+      "evidence": "history-real-sidechat",
+      "assessment": "unsupported",
+      "note": "DSH profile capabilityUnavailable=true；未尝试 fork。"
+    },
+    {
+      "requirement": "stream",
+      "harness": "Native",
+      "topology": "in_process",
+      "layer": "native_window",
+      "evidence": "history-activity-segments",
+      "assessment": "passed",
+      "note": "旧程序 native window 的 real-harness stream：oneSubmission、settlement 与 reconnectNoReplay 为 true；不转移到当前版本。"
+    },
+    {
+      "requirement": "draft_isolation",
+      "harness": "Native",
+      "topology": "in_process",
+      "layer": "native_window",
+      "evidence": "history-activity-segments",
+      "assessment": "passed",
+      "note": "旧程序 native window profile 记录 sessionDraftIsolation=true；不转移到当前版本。"
+    },
+    {
+      "requirement": "reconnect_no_duplicate",
+      "harness": "Native",
+      "topology": "in_process",
+      "layer": "native_window",
+      "evidence": "history-activity-segments",
+      "assessment": "passed",
+      "note": "旧程序 native window profile 记录 reconnectNoReplay=true；不转移到当前版本。"
+    },
+    {
+      "requirement": "reading_append",
+      "harness": "Native",
+      "topology": "in_process",
+      "layer": "native_window",
+      "evidence": "history-activity-segments",
+      "assessment": "partial",
+      "note": "旧程序只覆盖 stream-reading 的局部锚点场景；后续 58521a1 严格 #53 CI 仍失败。"
+    },
+    {
+      "requirement": "pagination_anchor",
+      "harness": "Native",
+      "topology": "in_process",
+      "layer": "native_window",
+      "evidence": "history-activity-segments",
+      "assessment": "partial",
+      "note": "旧程序 pageReading 锚点字段成功，但原生 paging control/focus 组合并未完全通过。"
+    },
+    {
+      "requirement": "system_ime",
+      "harness": "Native",
+      "topology": "in_process",
+      "layer": "system_ime",
+      "evidence": "history-turn-output-copy",
+      "assessment": "partial",
+      "note": "旧程序接收软件定向事件，physicalKeyboard=false、candidateWindow=false；不是物理系统中文 IME 验收。"
+    },
+    {
+      "requirement": "stream",
+      "harness": "Pi",
+      "topology": "in_process",
+      "layer": "native_window",
+      "evidence": "history-activity-segments",
+      "assessment": "passed",
+      "note": "旧程序 native window 的 real-harness stream：oneSubmission、settlement 与 reconnectNoReplay 为 true；不转移到当前版本。"
+    },
+    {
+      "requirement": "draft_isolation",
+      "harness": "Pi",
+      "topology": "in_process",
+      "layer": "native_window",
+      "evidence": "history-activity-segments",
+      "assessment": "passed",
+      "note": "旧程序 native window profile 记录 sessionDraftIsolation=true；不转移到当前版本。"
+    },
+    {
+      "requirement": "reconnect_no_duplicate",
+      "harness": "Pi",
+      "topology": "in_process",
+      "layer": "native_window",
+      "evidence": "history-activity-segments",
+      "assessment": "passed",
+      "note": "旧程序 native window profile 记录 reconnectNoReplay=true；不转移到当前版本。"
+    },
+    {
+      "requirement": "reading_append",
+      "harness": "Pi",
+      "topology": "in_process",
+      "layer": "native_window",
+      "evidence": "history-activity-segments",
+      "assessment": "partial",
+      "note": "旧程序只覆盖 stream-reading 的局部锚点场景；后续 58521a1 严格 #53 CI 仍失败。"
+    },
+    {
+      "requirement": "pagination_anchor",
+      "harness": "Pi",
+      "topology": "in_process",
+      "layer": "native_window",
+      "evidence": "history-activity-segments",
+      "assessment": "partial",
+      "note": "旧程序 pageReading 锚点字段成功，但原生 paging control/focus 组合并未完全通过。"
+    },
+    {
+      "requirement": "system_ime",
+      "harness": "Pi",
+      "topology": "in_process",
+      "layer": "system_ime",
+      "evidence": "history-turn-output-copy",
+      "assessment": "partial",
+      "note": "旧程序接收软件定向事件，physicalKeyboard=false、candidateWindow=false；不是物理系统中文 IME 验收。"
+    },
+    {
+      "requirement": "stream",
+      "harness": "DSH",
+      "topology": "in_process",
+      "layer": "native_window",
+      "evidence": "history-activity-segments",
+      "assessment": "passed",
+      "note": "旧程序 native window 的 real-harness stream：oneSubmission、settlement 与 reconnectNoReplay 为 true；不转移到当前版本。"
+    },
+    {
+      "requirement": "draft_isolation",
+      "harness": "DSH",
+      "topology": "in_process",
+      "layer": "native_window",
+      "evidence": "history-activity-segments",
+      "assessment": "passed",
+      "note": "旧程序 native window profile 记录 sessionDraftIsolation=true；不转移到当前版本。"
+    },
+    {
+      "requirement": "reconnect_no_duplicate",
+      "harness": "DSH",
+      "topology": "in_process",
+      "layer": "native_window",
+      "evidence": "history-activity-segments",
+      "assessment": "passed",
+      "note": "旧程序 native window profile 记录 reconnectNoReplay=true；不转移到当前版本。"
+    },
+    {
+      "requirement": "reading_append",
+      "harness": "DSH",
+      "topology": "in_process",
+      "layer": "native_window",
+      "evidence": "history-activity-segments",
+      "assessment": "partial",
+      "note": "旧程序只覆盖 stream-reading 的局部锚点场景；后续 58521a1 严格 #53 CI 仍失败。"
+    },
+    {
+      "requirement": "pagination_anchor",
+      "harness": "DSH",
+      "topology": "in_process",
+      "layer": "native_window",
+      "evidence": "history-activity-segments",
+      "assessment": "partial",
+      "note": "旧程序 pageReading 锚点字段成功，但原生 paging control/focus 组合并未完全通过。"
+    },
+    {
+      "requirement": "system_ime",
+      "harness": "DSH",
+      "topology": "in_process",
+      "layer": "system_ime",
+      "evidence": "history-turn-output-copy",
+      "assessment": "partial",
+      "note": "旧程序接收软件定向事件，physicalKeyboard=false、candidateWindow=false；不是物理系统中文 IME 验收。"
+    },
+    {
+      "requirement": "image_payload_roundtrip",
+      "harness": "Pi",
+      "topology": "in_process",
+      "layer": "protocol_integration",
+      "evidence": "pi-mixed-06c0908-pi-image_payload_roundtrip",
+      "assessment": "passed",
+      "note": "原程序/源码独立历史证据；不提升为当前功能基线或UI验收。 original mixed image bytes/provider/public read/reconnect"
+    },
+    {
+      "requirement": "mixed_attachment_order",
+      "harness": "Pi",
+      "topology": "in_process",
+      "layer": "protocol_integration",
+      "evidence": "pi-mixed-06c0908-pi-mixed_attachment_order",
+      "assessment": "passed",
+      "note": "原程序/源码独立历史证据；不提升为当前功能基线或UI验收。 original image/file/image order, upload receipt, public file bytes and reconnect"
+    },
+    {
+      "requirement": "busy_queue_submission_identity",
+      "harness": "Pi",
+      "topology": "in_process",
+      "layer": "protocol_integration",
+      "evidence": "pi-mixed-06c0908-pi-busy_queue_submission_identity",
+      "assessment": "passed",
+      "note": "原程序/源码独立历史证据；不提升为当前功能基线或UI验收。 held public queue RPC/item and scoped original submission; subsequent drain"
+    },
+    {
+      "requirement": "busy_queue_submission_identity",
+      "harness": "DSH",
+      "topology": "in_process",
+      "layer": "protocol_integration",
+      "evidence": "release-dsh-29ea2e1-dsh-busy_queue_submission_identity",
+      "assessment": "passed",
+      "note": "原程序/源码独立历史证据；不提升为当前功能基线或UI验收。 held original inbox, common queue and reconciled submission; explicit drain/reconnect emptiness"
+    },
+    {
+      "requirement": "image_payload_roundtrip",
+      "harness": "Native",
+      "topology": "in_process",
+      "layer": "protocol_integration",
+      "evidence": "release-idle-29ea2e1-native-image_payload_roundtrip",
+      "assessment": "passed",
+      "note": "原程序/源码独立历史证据；不提升为当前功能基线或UI验收。 original image bytes/provider/public read and reconnect"
+    },
+    {
+      "requirement": "mixed_attachment_order",
+      "harness": "Native",
+      "topology": "in_process",
+      "layer": "protocol_integration",
+      "evidence": "release-idle-29ea2e1-native-mixed_attachment_order",
+      "assessment": "passed",
+      "note": "原程序/源码独立历史证据；不提升为当前功能基线或UI验收。 original image/file/image order and public history; DSH file provider handle is not generic file download"
+    },
+    {
+      "requirement": "image_payload_roundtrip",
+      "harness": "DSH",
+      "topology": "in_process",
+      "layer": "protocol_integration",
+      "evidence": "release-idle-29ea2e1-dsh-image_payload_roundtrip",
+      "assessment": "passed",
+      "note": "原程序/源码独立历史证据；不提升为当前功能基线或UI验收。 original image bytes/provider/public read and reconnect"
+    },
+    {
+      "requirement": "mixed_attachment_order",
+      "harness": "DSH",
+      "topology": "in_process",
+      "layer": "protocol_integration",
+      "evidence": "release-idle-29ea2e1-dsh-mixed_attachment_order",
+      "assessment": "passed",
+      "note": "原程序/源码独立历史证据；不提升为当前功能基线或UI验收。 original image/file/image order and public history; DSH file provider handle is not generic file download"
+    },
+    {
+      "requirement": "busy_queue_submission_identity",
+      "harness": "Native",
+      "topology": "in_process",
+      "layer": "protocol_integration",
+      "evidence": "release-native-29ea2e1-native-busy_queue_submission_identity",
+      "assessment": "failed",
+      "note": "原程序/源码独立历史证据；不提升为当前功能基线或UI验收。 Kernel 0.9.3 admits queued RPC but original public control stays empty; Kernel #86; cleanup is not acceptance"
+    },
+    {
+      "requirement": "transport_recovery",
+      "harness": "Native",
+      "topology": "in_process",
+      "layer": "protocol_integration",
+      "evidence": "sidebar-recovery-4d3b1e1-native-transport_recovery",
+      "assessment": "passed",
+      "note": "原程序/源码独立历史证据；不提升为当前功能基线或UI验收。 actual client close -> Failed -> original Reconnect -> fresh inventory/journals; no claim of uncertain mutation replay or observer terminal Retry"
+    },
+    {
+      "requirement": "transport_recovery",
+      "harness": "Pi",
+      "topology": "in_process",
+      "layer": "protocol_integration",
+      "evidence": "sidebar-recovery-4d3b1e1-pi-transport_recovery",
+      "assessment": "passed",
+      "note": "原程序/源码独立历史证据；不提升为当前功能基线或UI验收。 actual client close -> Failed -> original Reconnect -> fresh inventory/journals; no claim of uncertain mutation replay or observer terminal Retry"
+    },
+    {
+      "requirement": "transport_recovery",
+      "harness": "DSH",
+      "topology": "in_process",
+      "layer": "protocol_integration",
+      "evidence": "sidebar-recovery-4d3b1e1-dsh-transport_recovery",
+      "assessment": "passed",
+      "note": "原程序/源码独立历史证据；不提升为当前功能基线或UI验收。 actual client close -> Failed -> original Reconnect -> fresh inventory/journals; no claim of uncertain mutation replay or observer terminal Retry"
+    }
+  ],
+  "guardrails": [
+    "In-process ContentHost results are component/harness results only; they never satisfy formal ProcessContainer acceptance.",
+    "Direct synthetic Preedit/commit and software-injected text do not prove macOS system IME routing. A system-IME pass requires a native window receipt of the macOS input-method route, marked text, and commit; physical keyboard use is recorded separately.",
+    "Observed gates preserve this snapshot's strict #53 failure and DSH SideChat capability status by linking each outcome to evidence; newer evidence may update the outcome and matching cells.",
+    "The current run performed no desktop interaction, system IME, VoiceOver or new Native/Pi/DSH harness run."
+  ],
+  "observedGates": [
+    {
+      "kind": "strict_reading_append",
+      "match": {
+        "requirement": "reading_append",
+        "harnesses": [
+          "Native",
+          "Pi",
+          "DSH"
+        ],
+        "topology": "in_process",
+        "layer": "strict_ci"
+      },
+      "status": "failed",
+      "evidence": [
+        "ci-current-strict-53-failure"
+      ],
+      "note": "本快照的 strict #53 结果；更新状态时必须同时更新匹配的格子并提供新基线证据。"
+    },
+    {
+      "kind": "dsh_sidechat_capability",
+      "match": {
+        "requirement": "sidechat",
+        "harnesses": [
+          "DSH"
+        ],
+        "topology": "in_process",
+        "layer": "offscreen_harness"
+      },
+      "status": "unsupported",
+      "evidence": [
+        "history-real-sidechat"
+      ],
+      "note": "冻结 profile 标记 capabilityUnavailable；若 DSH 能力变化，需用新 DSH 证据更新门禁与格子。"
+    }
+  ]
+}

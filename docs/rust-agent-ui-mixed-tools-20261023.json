@@ -1,0 +1,101 @@
+{
+  "baseCommit": "ea36946af5fd5e3e413cf283e7ad55ccc3779c6a",
+  "scope": "isolated real harness + synthetic local provider + offscreen original components",
+  "program": {
+    "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/mixed-tool-runs-20261023/tekes-agent-ui-demo-v6",
+    "sha256": "f701c210e17d9d978849b458e5583654587917f14cd2c030c657ea17d992e76e"
+  },
+  "sourceSha256": {
+    "scripts/mixed_tool_provider.py": "3fa8ca5fc0fb1f384f8908eec11ac0ded199a191ed468d7cb685f5a03eb63591",
+    "scripts/tests/test_mixed_tool_provider.py": "b64cb3259be5f34e4c0e45526ef8a047e53a068540d95e5291b10e046d338bc7",
+    "scripts/test-real-session-endpoints.py": "a9d79ba5033ae135b5b6b737a44dea0c2d0eeef10ff18b990fbb07ae4b06b723",
+    "ui/demo/src/mixed_tool_proof.rs": "7016c38857855c549eb571545aa806b33a1adb5738e1537a43979693e97b6856",
+    "ui/demo/src/components_native.rs": "cb5bb74673c227d8e0b15f3ca6259ef05bbd2af973a549269f586582ab8a1ae8",
+    "ui/demo/src/lib.rs": "2f50d9e7bf7720abdb2266942ce56471bdb4cf7c82799a3a03b890d0474def06"
+  },
+  "profiles": {
+    "native": {
+      "receipt": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/mixed-tool-runs-20261023/mixed-v9-native.consumer.json",
+      "sha256": "74662bd457acfe23c39d614133616d6c0b10efd8d2e29547f94db0c672244859",
+      "proof": {
+        "canonicalTools": 3,
+        "focusPreserved": true,
+        "liveControlsObserved": true,
+        "nativeInteraction": false,
+        "oneContinuousGroup": true,
+        "originalControlsRetained": true,
+        "otherDraftPreserved": true,
+        "physicalIme": false,
+        "readingAnchorAcceptance": false,
+        "realHarness": true,
+        "realReadResults": true,
+        "reasoningSource": true,
+        "reconnectNoDuplicateInput": true,
+        "reconnectNoDuplicateTools": true,
+        "sendBlockedDuringPreedit": true,
+        "syntheticPreeditPreserved": true
+      }
+    },
+    "pi": {
+      "receipt": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/mixed-tool-runs-20261023/final-pi.consumer.json",
+      "sha256": "e10249e06b75812cbc19f6f5341796dfbe11f916d70d05f456ed546683b60f9c",
+      "proof": {
+        "canonicalTools": 3,
+        "focusPreserved": true,
+        "liveControlsObserved": true,
+        "nativeInteraction": false,
+        "oneContinuousGroup": true,
+        "originalControlsRetained": true,
+        "otherDraftPreserved": true,
+        "physicalIme": false,
+        "readingAnchorAcceptance": false,
+        "realHarness": true,
+        "realReadResults": true,
+        "reasoningSource": true,
+        "reconnectNoDuplicateInput": true,
+        "reconnectNoDuplicateTools": true,
+        "sendBlockedDuringPreedit": true,
+        "syntheticPreeditPreserved": true
+      }
+    },
+    "dsh": {
+      "receipt": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/mixed-tool-runs-20261023/final-dsh.consumer.json",
+      "sha256": "ad4eafebf3357100eb91a507152cbce1f615c3a03dadf2926b044431f6d9868c",
+      "proof": {
+        "canonicalTools": 3,
+        "focusPreserved": true,
+        "liveControlsObserved": true,
+        "nativeInteraction": false,
+        "oneContinuousGroup": true,
+        "originalControlsRetained": true,
+        "otherDraftPreserved": true,
+        "physicalIme": false,
+        "readingAnchorAcceptance": false,
+        "realHarness": true,
+        "realReadResults": true,
+        "reasoningSource": true,
+        "reconnectNoDuplicateInput": true,
+        "reconnectNoDuplicateTools": true,
+        "sendBlockedDuringPreedit": true,
+        "syntheticPreeditPreserved": true
+      }
+    }
+  },
+  "runtimeVersions": {
+    "native": "0.9.3; UI-only; lifecycle/child excluded",
+    "pi": "1.4.0",
+    "dsh": "0.2.1-rc.2"
+  },
+  "tests": {
+    "python": 74,
+    "demoLib": 4,
+    "strictDemoClippy": true,
+    "fmt": true,
+    "staticBoundary": true
+  },
+  "nativeInteraction": false,
+  "physicalIme": false,
+  "readingAnchorAcceptance": false,
+  "completionProven": false,
+  "failureEvidencePreserved": true
+}

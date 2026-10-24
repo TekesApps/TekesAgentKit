@@ -1,0 +1,330 @@
+{
+  "checked_at": "2026-10-21T23:21:18.671606+00:00",
+  "base_commit": "565eaf99767ba56d64aa42ff0a54e4b0dd95e172",
+  "program": {
+    "program": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/AgentKitFeedbackAsideVerified.app/Contents/MacOS/AgentKitFeedbackAsideVerified",
+    "sha256": "3a7beaebfcf4fbc32ad46ad4a9cffa42831ee0e2732f3b4d1c6ac448fd33c41a",
+    "sdk": "09b4bab44b6dfa65487250ea816b610b9df59095"
+  },
+  "intermediate_program": {
+    "program": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/AgentKitFeedbackAside.app/Contents/MacOS/AgentKitFeedbackAside",
+    "sha256": "ff75b0ed2675d427841ebd7107664929ec0f28d5856c630be162939521b18a84",
+    "sdk": "09b4bab44b6dfa65487250ea816b610b9df59095"
+  },
+  "headless_driver": {
+    "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/feedback-aside-20261022/tekes-agent-headless",
+    "sha256": "8e758e48d4a088e10899eab9106721884379f0549bfe8af3cf4267055d43f8c4"
+  },
+  "source_hashes": {
+    "docs/rust-agent-ui-contract.md": "dc385e0341eb87e5986f9b372012fdf9a0369d6a1fb452ada72166ce72d2d6b8",
+    "docs/rust-agent-ui-feedback-aside-20261022.md": "d0a697eed6d50212e08c83d801939397949059e9933308bfc16e97f25adb96e8",
+    "scripts/test-real-session-endpoints.py": "a4617a609b8d3c8008856369c8f39ab714d0082dbb0857247a26ea28add2d1f2",
+    "ui/README.md": "cb92e655f26674e1295e12ff17794f585b050c5137694357d6823740953ba0b3",
+    "ui/components/src/feedback.rs": "9b4a01031301f682a1220122544cbab8863878c6c236dd2294a1dce24fba6e73",
+    "ui/components/src/input_message.rs": "7d604991fbe97dd6e1b02a44f055505d1cd2a757a9210e69719d3119b04886c3",
+    "ui/components/src/transcript_content.rs": "43f29e863f41d4fa2058f01a46305c6b9c31e0974349e5e2699984b3738c218a",
+    "ui/components/src/turn_footnote.rs": "69d1ec11b7cd4a337edff40e03fc5094a54c52e48c5271b3c93302f6dbb62238",
+    "ui/components/src/turn_footnote_timing.rs": "b5b898fa5821fe003e6f1a90e6d9788ce85a81ce2b865c615e7fe61099b2baf9",
+    "ui/consumer/tests/summary_label.rs": "bf2a07f29991707290a4024749c54ca9f1fa134e90c5adab30b45a049b3fbd65",
+    "ui/demo/src/native_feedback_selftest.rs": "4180156119f6932fa87f1fd2971661493f9e97316f62f1317cd6c8d3e0df932c",
+    "ui/demo/tests/transcript_content.rs": "838e0b0c942bcb0b57013de42b37495b00cd0dc7e370edd83418911a881c8c6e"
+  },
+  "read_only_references": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/TranscriptRendering/TranscriptTurnFootnote.swift": "1acc6380778904620cedcd2a58d8f368d706d51054545f4081fb0005a993ad5e",
+    "/Users/frankqin/dev/Tekes/Tekes/ClientAgentHostAdapters.swift": "7d907c654ec3df76c7a8b492e32bbc68f1bd4d0b46044cae615aa712b9f67c71",
+    "/Users/frankqin/.cargo/git/checkouts/tekesui-d66ba5efbf6c8866/09b4bab/crates/tekes-ui-controls/src/composition.rs": "a55bdfba8f2e13f74643c1f0a7032a9c66f365a3018c94dfd3bdbe89b84aeb41",
+    "/Users/frankqin/.cargo/git/checkouts/tekesui-d66ba5efbf6c8866/09b4bab/crates/tekes-ui-controls/src/text_input/external.rs": "872c6a58fc112c17f7711ce3fe88c868a6ecb0e2ee32fc394ed8877fa30626ca"
+  },
+  "consumer_inputs": {
+    "commit": "09b4bab44b6dfa65487250ea816b610b9df59095",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 241,
+    "sha256": "44b3174022584d3c099a45b86892d17dbf948905476c0f038be104df12aefe46",
+    "ui_packages": 8
+  },
+  "tests": {
+    "ui": 489,
+    "scripts": 31,
+    "strict_ui_all_targets_clippy": true,
+    "fmt": true,
+    "boundaries": true,
+    "scope": "UI489 covers final business/consumer tree; subsequent native-probe observation/capture changes pass strict Clippy/build and native program; final commit CI checked separately"
+  },
+  "real_native_feedback": {
+    "Pi": {
+      "log": ".runtime-fixtures/feedback-aside-20261022/verified-real-pi.native-feedback.log",
+      "proof": {
+        "auxiliaryFocusPreserved": true,
+        "committedNoteLabel": true,
+        "composerContentsAndOwnerPreserved": true,
+        "draftsPreserved": true,
+        "freshReadAfterDelete": true,
+        "imeSendAndNavigationBlocked": true,
+        "nativeInteraction": true,
+        "nativePointer": true,
+        "nativeTextServices": true,
+        "noPromptSubmitted": true,
+        "nonemptyComposerDrafts": true,
+        "noteReopened": true,
+        "opaqueBaselinePreserved": false,
+        "physicalIme": false,
+        "readingAnchorAcceptance": false,
+        "retainedAcrossSessionSwitch": true,
+        "sameRatingDeletes": true,
+        "savedChineseNote": true,
+        "sendEnabledBeforeComposition": true,
+        "stateDrivenCallbacks": true,
+        "syntheticPreedit": true,
+        "unratedNoteHidden": true,
+        "voiceOver": false
+      },
+      "version": "1.3.0"
+    },
+    "DSH": {
+      "log": ".runtime-fixtures/feedback-aside-20261022/isolated-real-dsh.native-feedback.log",
+      "proof": {
+        "auxiliaryFocusPreserved": true,
+        "committedNoteLabel": true,
+        "composerContentsAndOwnerPreserved": true,
+        "draftsPreserved": true,
+        "freshReadAfterDelete": true,
+        "imeSendAndNavigationBlocked": true,
+        "nativeInteraction": true,
+        "nativePointer": true,
+        "nativeTextServices": true,
+        "noPromptSubmitted": true,
+        "nonemptyComposerDrafts": true,
+        "noteReopened": true,
+        "opaqueBaselinePreserved": false,
+        "physicalIme": false,
+        "readingAnchorAcceptance": false,
+        "retainedAcrossSessionSwitch": true,
+        "sameRatingDeletes": true,
+        "savedChineseNote": true,
+        "sendEnabledBeforeComposition": true,
+        "stateDrivenCallbacks": true,
+        "syntheticPreedit": true,
+        "unratedNoteHidden": true,
+        "voiceOver": false
+      },
+      "version": "0.2.1-rc.2"
+    },
+    "Native": {
+      "log": ".runtime-fixtures/feedback-aside-20261022/seeded-native.native-feedback.log",
+      "proof": {
+        "auxiliaryFocusPreserved": true,
+        "committedNoteLabel": true,
+        "composerContentsAndOwnerPreserved": true,
+        "draftsPreserved": true,
+        "freshReadAfterDelete": true,
+        "imeSendAndNavigationBlocked": true,
+        "nativeInteraction": true,
+        "nativePointer": true,
+        "nativeTextServices": true,
+        "noPromptSubmitted": true,
+        "nonemptyComposerDrafts": true,
+        "noteReopened": true,
+        "opaqueBaselinePreserved": false,
+        "physicalIme": false,
+        "readingAnchorAcceptance": false,
+        "retainedAcrossSessionSwitch": true,
+        "sameRatingDeletes": true,
+        "savedChineseNote": true,
+        "sendEnabledBeforeComposition": true,
+        "stateDrivenCallbacks": true,
+        "syntheticPreedit": true,
+        "unratedNoteHidden": true,
+        "voiceOver": false
+      },
+      "version": "0.9.3"
+    }
+  },
+  "local_native": {
+    "footnote-time-native-selftest": {
+      "compactPositiveTokens": true,
+      "displayClockWithoutDomainPublication": true,
+      "emptyHistoricalOutputAsideHidden": true,
+      "focusAndMarkedBaseline": true,
+      "fullFootnoteLayoutParity": false,
+      "nativeWindow": true,
+      "noSubmission": true,
+      "onlyLiveOwnerTicks": true,
+      "originalInformationAndComposer": true,
+      "ownedSepBackhaul": true,
+      "ownedWakeRetired": true,
+      "physicalIme": false,
+      "realHarness": false,
+      "settledCalendarTimestamp": true,
+      "syntheticPreedit": true,
+      "timestampDoesNotInventOutput": true,
+      "voiceOver": false,
+      "zeroTokensOmitted": true
+    },
+    "reading-native-selftest": {
+      "draftIsolation": true,
+      "focusAndEditorBaselinePreserved": true,
+      "focusAndMarkedBaselinePreserved": true,
+      "focusAndTextStatePreserved": true,
+      "hoverPreviewVisible": false,
+      "independentBReadingRestored": true,
+      "jumpHasNoHistory": true,
+      "jumpLatestControl": true,
+      "loadedItemsAfter": 44,
+      "loadedItemsBefore": 20,
+      "markedTextPreserved": true,
+      "nativePagingControl": true,
+      "nativeWindow": true,
+      "navigationPreeditPreserved": true,
+      "noSubmission": true,
+      "opaqueBaselinePreserved": true,
+      "originalTurnNavigation": true,
+      "physicalIme": false,
+      "prependAnchorPreserved": true,
+      "previewFactsDuringPreedit": true,
+      "publicHistoryPage": true,
+      "publicPageRequest": true,
+      "readingAnchorAcceptance": true,
+      "realHarness": false,
+      "reconnectReadingRestored": true,
+      "retainedSessionReadingRestored": true,
+      "sameEditorOwner": true,
+      "samePublicationRefresh": true,
+      "syntheticPreedit": true,
+      "syntheticWheel": true,
+      "turnStartAndLatest": true,
+      "upwardReadingPreserved": true,
+      "voiceOver": false
+    },
+    "readonly-reading-native-selftest": {
+      "boundedPublicSep": true,
+      "gpu": true,
+      "historyExhausted": false,
+      "mainDraftPreserved": true,
+      "nativeWindow": true,
+      "noSubmission": true,
+      "originalPageAndRefreshControls": true,
+      "pageSize": 50,
+      "physicalIme": false,
+      "prependAnchorPreserved": true,
+      "readOnlyNoComposer": true,
+      "realHarness": false,
+      "refreshAnchorPreserved": true,
+      "rowCountAfter": 75,
+      "rowCountBefore": 38,
+      "visibleRowsExtended": true,
+      "voiceOver": false
+    },
+    "sidebar-restore-selftest": {
+      "canonicalSelectedSupplement": true,
+      "explicitNativeReveal": true,
+      "failureRetainsRows": true,
+      "fullLayoutParity": false,
+      "markedBaselineAndFocusPreserved": true,
+      "nativeWindow": true,
+      "noSubmission": true,
+      "physicalIme": false,
+      "realHarnessOutage": false,
+      "restoringNotEmpty": true,
+      "retiredIdsNotReused": true,
+      "voiceOver": false
+    }
+  },
+  "original_native_fixture": {
+    "passed": true,
+    "log": ".runtime-fixtures/feedback-aside-20261022/local-native-selftest.log"
+  },
+  "system_ime": {
+    "softwareIme": true,
+    "pidTargetedEvents": true,
+    "physicalKeyboard": false,
+    "candidateWindow": false,
+    "sourceBefore": "com.apple.inputmethod.SCIM.ITABC",
+    "sourceAfter": "com.apple.inputmethod.SCIM.ITABC",
+    "binarySha256": "3a7beaebfcf4fbc32ad46ad4a9cffa42831ee0e2732f3b4d1c6ac448fd33c41a"
+  },
+  "runtime_inputs": {
+    "@earendil-works/pi-coding-agent": {
+      "version": "1.3.0",
+      "package": "/Users/frankqin/.codex/pi-task-backups/01a101dc/pi-130-upgrade-20261017/runtime/node_modules/@earendil-works/pi-coding-agent/package.json",
+      "sha256": "83c3bb7619f590c213cc96a24216eb29a819a3ef6dc548607cc037ed276e8dc5",
+      "node": "/Users/frankqin/Library/Application Support/Tekes/Harnesses/pi-1.3.0-node-24.20.0/node/bin/node"
+    },
+    "@deepseek-ai/dsh": {
+      "version": "0.2.1-rc.2",
+      "package": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/dsh-0.2.1-rc.2-sidebar-20261019/node_modules/@deepseek-ai/dsh/package.json",
+      "sha256": "bea4288aa88eb54efe829686553100a75fdf09d11c5e3bf6b329badb9a0368dd",
+      "node": "/Users/frankqin/Library/Application Support/Tekes/Harnesses/pi-1.3.0-node-24.20.0/node/bin/node"
+    },
+    "Kernel": {
+      "build": {
+        "format": 1,
+        "identifier": "com.tekes.kernel.supervisor",
+        "source_revision": "09508a9083c24c7accefc99516739f279b85913e",
+        "version": "0.9.3"
+      },
+      "supervisor": "/Users/frankqin/dev/Tekes/.build/kernel-0.9.3-installed/BuiltInKernel/tekes-supervisor",
+      "worker": "/Users/frankqin/dev/Tekes/.build/kernel-0.9.3-installed/BuiltInKernel/tekes-worker",
+      "supervisorSha256": "365eca9385f36d5897a81ba398e7f34b4b9819896d6a1b78c618a7710b14380f",
+      "workerSha256": "1284014bd0a8d3cb711c0512b10762322a19af4beabc1f9e681bacb1e28fa64d"
+    },
+    "headless": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/target/debug/tekes-agent-headless",
+      "sha256": "4c0fbdf01ddc6d1c62fff0a07b390123e04fbe70c9f219549aabb93140184b99",
+      "sha256_after_runner_build": "8e758e48d4a088e10899eab9106721884379f0549bfe8af3cf4267055d43f8c4"
+    },
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)"
+  },
+  "runner_scopes": {
+    "pi_dsh": {
+      "path": ".runtime-fixtures/feedback-aside-20261022/runner-before-feedback-seed.py",
+      "sha256": "7b896014943dbd9c39ab044dac5ef57e7e3b279a76bde4cb9e54dc75e9f1a656"
+    },
+    "native_seeded": {
+      "path": "scripts/test-real-session-endpoints.py",
+      "sha256": "a4617a609b8d3c8008856369c8f39ab714d0082dbb0857247a26ea28add2d1f2"
+    },
+    "difference": "only Native independent UI feedback without an existing seeded answer gets a normal public prompt before probe snapshots"
+  },
+  "screenshots": {
+    "dsh-ui-feedback-note.png": "5c77a2ba1b74726445001583ce13d3ff0e36c3b562ce870a2b5136796f30bc0c",
+    "native-ui-feedback-note.png": "3928285eccee6e5631cf566358f407d7dad3f12745e6121cbf52ba32a9a2545f",
+    "pi-ui-feedback-note.png": "5c5073d300869a99b53e66974321037cc45fbe9ed5acd791cfec0a3b85fc6644"
+  },
+  "screenshot_scope": "Pi/DSH committed-note entry; Native save/editor transition; all inspected; no paired ClientKit visual proof",
+  "retained_failures": [
+    {
+      "log": ".runtime-fixtures/feedback-aside-20261022/real-pi.native-feedback.log",
+      "program": "intermediate",
+      "reason": "probe conflated editor authority epoch with semantic draft state; corrected per exact SDK external acknowledgement semantics"
+    },
+    {
+      "log": ".runtime-fixtures/feedback-aside-20261022/verified-real-dsh.native-feedback.log",
+      "program": "final",
+      "reason": "unexpected Composer input not present in probe actions; unchanged strict content assertion stopped; isolated same-program retry passed; cause unassigned"
+    },
+    {
+      "log": ".runtime-fixtures/feedback-aside-20261022/isolated-real.native-feedback.log",
+      "program": "final",
+      "reason": "Native independent UI fixture was blank; no response target; runner now seeds one real public response before snapshots"
+    }
+  ],
+  "remaining": [
+    "single-row output-aside composition/order",
+    "glyphs/hover/goal-memory accessories",
+    "aggregate output copy parity",
+    "physical keyboard/candidate window",
+    "VoiceOver",
+    "paired full UI layout",
+    "Native full lifecycle/archive acceptance"
+  ],
+  "disk": {
+    "ui_target": "/tmp/agentkit-layout-text-292-target",
+    "headless_target": "/Users/frankqin/dev/TekesAgentKit/target",
+    "new_target": false,
+    "released_bytes": 0,
+    "deleted_paths": [],
+    "retained": "source/WIP/fixed inputs/logs/failures/screenshots/acceptance programs; shared variants of current or uncertain ownership preserved"
+  },
+  "status": "experimental; PR10 draft; goal incomplete; no merge/tag"
+}

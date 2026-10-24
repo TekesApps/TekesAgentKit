@@ -1,0 +1,96 @@
+{
+  "format": "agentkit-composer-visibility/1",
+  "date": "2026-10-21",
+  "verified_at_utc": "2026-10-20T16:59:39.011572+00:00",
+  "published_agentkit": "v0.3.8",
+  "source": {
+    "ui/components/src/composer.rs": "eb90a011c0f1ec593f57b78b2c6c3695fef72308771e3fd2618a2adf43e4d04b",
+    "ui/components/src/run_view.rs": "e58e9b542318cec9bf13f179978275997477e60bf1fd91c8ef3e63bbab0e2351",
+    "ui/consumer/src/lib.rs": "edf4024751a321059bfccff961a94b5240f966ff955a519ef00a771b64c6b4d4",
+    "ui/demo/src/components_native.rs": "89f6db0de645c83f704847efde0c62c01b26c2228b0bc1aa0aa8ef0582687388",
+    "ui/demo/src/native_composer_visibility_selftest.rs": "83d34902a51cb3e3d10c633aa27014bc08030892029617f745b3cd27babe4ff0",
+    "ui/demo/tests/run_view.rs": "1e28f361cebe7c85b048ed358a6034cba5f9b0c835368ac4fc788fbd6af2d867",
+    "ui/demo/tests/run_column.rs": "c980687be00bf04f3843396608d2e3d3fcca17328a0e85bfdc35572d72eda397"
+  },
+  "reference_sources": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/TranscriptRendering/ThreadStatusPolicy.swift": "20257f99a496f0c84711ddf0a401b1095afe2c3ea61ac3fdb1510f1d9f13b417",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Run/RunView.swift": "4453b67fb8e4e6cabe4a9653ce378bffb939a9a01188a7df9a4bb89f0bd7674e",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Agent/ClientEmbeddedRunView.swift": "15cfb89a05c307470940c47401c1bc5c453efcd461d1ed8f95a3411de5629958",
+    "/Users/frankqin/dev/Tekes/Tekes/ClientAgentHostAdapters.swift": "7d907c654ec3df76c7a8b492e32bbc68f1bd4d0b46044cae615aa712b9f67c71"
+  },
+  "default_inputs": {
+    "commit": "8cf0840790334ba224afc0595897c74231c712e6",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 199,
+    "sha256": "f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f",
+    "ui_packages": 8
+  },
+  "validation": {
+    "default_ui_tests": 301,
+    "strict_clippy": true,
+    "fmt": true,
+    "second_public_consumer_tests": 27,
+    "candidate_formal_run_tests": 7,
+    "candidate_strict_clippy": true,
+    "candidate_source_unchanged": true,
+    "candidate_agentkit_inputs_match": true,
+    "native_visibility": {
+      "draftIsolation": true,
+      "focusReconciledByLibrary": true,
+      "formalRunView": true,
+      "fullLayoutParity": false,
+      "hiddenFromAccessibility": true,
+      "nativeSyntheticMarkedText": true,
+      "nativeWindow": true,
+      "noHiddenLayoutSlot": true,
+      "noSubmission": true,
+      "physicalIme": false,
+      "realHarness": false,
+      "runtimeArchiveUnarchive": true,
+      "sameEditorRetained": true,
+      "voiceOver": false
+    },
+    "native_component_regression": true
+  },
+  "candidate_identity": "2b16eaa6200fecdde9a0c615166064effb9446249cde05087d5d7c288d81d4ec",
+  "candidate_receipt_sha256": "4948718e8a44b6304b9c8f1cecc77f5dccb6de035f7f69da0394f222c691fa78",
+  "binary_sha256": "095073f3401d25864e9c517e86647bb9a1d8287276655f60adff512fc3344f67",
+  "logs": {
+    "/tmp/agentkit-visibility-all-tests.log": "9c80ae5d0e0b3cb40237642462f17dc6c72291d8d669a7fe79c993196505d276",
+    "/tmp/agentkit-visibility-clippy.log": "5abc517d8dde41fb46932a5e9ed4f48eb09d1ade28c55baa5f571ef35e5fe6ca",
+    "/tmp/agentkit-composer-visibility-native7-20261021.log": "c612eef898b07c94f0270c08b2aa5bc6b86654744df633c520fa4ca25c61d34c",
+    "/tmp/agentkit-visibility-native-regression-20261021.log": "4fb430a2824d9a161aee7721f6c05548e19391dfb7ba38fb85682a3af16eff7f",
+    ".runtime-fixtures/agentkit-visibility-preflight-20261021/tests.log": "6ca2a98022cee36b654319861a6ed7479f58f68766aaa0822d8edf22f866fe6c",
+    ".runtime-fixtures/agentkit-visibility-preflight-20261021/clippy.log": "d184cc6cd93ca681a9d358a5b2511947a595fa384595b6e1eb779c041738a008",
+    "/tmp/agentkit-visibility-targeted.log": "0d394666a50e23fc8cbb38c71f75204b4fa5f429f6b08a34cd99606a6d49c620",
+    "/tmp/agentkit-visibility-targeted2.log": "47c9dc7a5a2dd2f7eb6e1d33d4b88cb541b47f8e62b0621dd8701d5d9c03eb4d",
+    "/tmp/agentkit-visibility-targeted3.log": "9fba605e0a2d28c646b254a2435547d6ea52ed007e39173467b05c6814b7555e",
+    "/tmp/agentkit-visibility-targeted4.log": "1cbe0e36072506235f0949c03692917ec92f66a2d91f25b13b0f5ec4739b66d0",
+    "/tmp/agentkit-composer-visibility-native-20261021.log": "b7bd56e9e7b912d9ec0bbecd0ddcf946fc52301e51e4afe3fcf3d468d29ff289",
+    "/tmp/agentkit-composer-visibility-native2-20261021.log": "62582c6392800b5a5e937c8b9137e950c7380fff1540e0670313ecef02e05f5c",
+    "/tmp/agentkit-composer-visibility-native3-20261021.log": "8a08aa88759f99b5bcf8eed2b9de790348eb876e9b5398dbf2717f3796d4d3e1",
+    "/tmp/agentkit-composer-visibility-native4-20261021.log": "c72e43ccbe4ca781ed38f10e0d88c820b1d764163bf82df35255554433ad785d",
+    "/tmp/agentkit-composer-visibility-native5-20261021.log": "5993493623aaecded6987b6bc246f576c88e644108aa9fb62767129f578cca5d",
+    "/tmp/agentkit-composer-visibility-native6-20261021.log": "d0b49822d06af9d25221b975eaab1e92d298512826565f668cb5793e5ed318bf"
+  },
+  "retained_failures": [
+    "Initial test used boolean negation on ContentResponse; corrected to activated field.",
+    "Test incorrectly equated opaque edit baseline across canonical reacknowledgements; asserts original instance instead. A broad replacement briefly changed an existing preflight test; restored its original baseline assertions.",
+    "Native geometry used total viewport height despite concurrent paging-status growth; lower-edge release is the native invariant, full height remains asserted with fixed component inputs.",
+    "Native probe compared a newer binding snapshot to the earlier rendered tree; now uses displayed_snapshot.",
+    "Unarchive-only probe waited for can_submit while archive had closed its journal; explicitly reacquires/releases a public history lease."
+  ],
+  "remaining": [
+    "projection failure fallback can overwrite a known Archived phase with Unavailable; requires controller regression/fix",
+    "Run document/Composer/chrome/selection overlay and complete rail",
+    "per-pane loading/missing/error display parity",
+    "default/native reading and rich selection integration",
+    "actual three-harness reading/paging",
+    "physical IME and VoiceOver",
+    "complete final View parity review and CI/merge/stage tag"
+  ],
+  "pin_promoted": false,
+  "merged": false,
+  "tagged": false
+}

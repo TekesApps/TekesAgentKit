@@ -1,0 +1,177 @@
+{
+  "schemaVersion": 1,
+  "issues": [
+    22,
+    24,
+    27
+  ],
+  "baseHead": "d00f2265a6cd5a15da4d8312b5096e2735ce1a31",
+  "evidenceScope": "real-three-endpoint-original-sidechat-dispatch-and-lifecycle",
+  "accepted": true,
+  "endpointOrder": [
+    "native",
+    "pi",
+    "dsh"
+  ],
+  "hostFirstEndpoint": "native",
+  "cases": [
+    {
+      "automaticTabRefocusProven": false,
+      "cancelInputCount": 1,
+      "cancelTurnStatus": "aborted",
+      "canonicalReopen": true,
+      "capabilityUnavailable": false,
+      "confirmedDiscard": true,
+      "endpointId": "native",
+      "explicitSdkEditorFocus": true,
+      "freshReconnect": true,
+      "lateCloseDeliveryDidNotAffectCurrent": false,
+      "lateCreateDeliveryDidNotStealSelection": false,
+      "lateSendDeliveryDidNotStealSelection": false,
+      "newEpoch": 5,
+      "noDuplicateInput": true,
+      "oldEpoch": 2,
+      "originalClose": true,
+      "originalComposerIdsRetained": true,
+      "originalCreate": true,
+      "originalHostDispatch": true,
+      "originalSend": true,
+      "parentAndOtherDraftsPreserved": true,
+      "parentHistoryIsolated": true,
+      "parentScope": {
+        "endpointId": "native",
+        "sessionId": "01a16d83-a58e-77da-83d8-d203aa146f11",
+        "threadId": "01a16d83-a58e-77da-83d8-d203aa146f11"
+      },
+      "retiredAuthority": true,
+      "runtimeCancelObserved": true,
+      "scratchDraftRestored": true,
+      "scratchInputCount": 1,
+      "scratchScope": {
+        "endpointId": "native",
+        "sessionId": "01a16d83-b390-7ae0-acfc-e9d73afaea8c",
+        "threadId": "01a16d83-b390-7ae0-acfc-e9d73afaea8c"
+      },
+      "sendCompletedWhileOtherEndpointSelected": false,
+      "summaryNavigation": true,
+      "uniqueInput": "AGENTKIT_MULTI_SIDECHAT_NATIVE_INPUT"
+    },
+    {
+      "automaticTabRefocusProven": false,
+      "cancelInputCount": 1,
+      "cancelTurnStatus": "aborted",
+      "canonicalReopen": true,
+      "capabilityUnavailable": false,
+      "confirmedDiscard": true,
+      "endpointId": "pi",
+      "explicitSdkEditorFocus": true,
+      "freshReconnect": true,
+      "lateCloseDeliveryDidNotAffectCurrent": true,
+      "lateCreateDeliveryDidNotStealSelection": true,
+      "lateSendDeliveryDidNotStealSelection": true,
+      "newEpoch": 5,
+      "noDuplicateInput": true,
+      "oldEpoch": 2,
+      "originalClose": true,
+      "originalComposerIdsRetained": true,
+      "originalCreate": true,
+      "originalHostDispatch": true,
+      "originalSend": true,
+      "parentAndOtherDraftsPreserved": true,
+      "parentHistoryIsolated": true,
+      "parentScope": {
+        "endpointId": "pi",
+        "sessionId": "e55be634-28ee-44ff-81fb-83650ea04ae5",
+        "threadId": "e55be634-28ee-44ff-81fb-83650ea04ae5"
+      },
+      "retiredAuthority": true,
+      "runtimeCancelObserved": true,
+      "scratchDraftRestored": true,
+      "scratchInputCount": 1,
+      "scratchScope": {
+        "endpointId": "pi",
+        "sessionId": "d0b610dc-047e-4835-8ebf-f72c3e2ae1fe",
+        "threadId": "d0b610dc-047e-4835-8ebf-f72c3e2ae1fe"
+      },
+      "sendCompletedWhileOtherEndpointSelected": true,
+      "summaryNavigation": true,
+      "uniqueInput": "AGENTKIT_MULTI_SIDECHAT_PI_INPUT ENDPOINT_QUEUE_HOLD"
+    },
+    {
+      "capabilityUnavailable": true,
+      "endpointId": "dsh",
+      "noForkAttempted": true,
+      "originalCreateDisabled": true,
+      "parentAndOtherDraftsPreserved": true,
+      "parentScope": {
+        "endpointId": "dsh",
+        "sessionId": "session-33ea4b10-d5f4-45f5-9933-5e08cd6bb475",
+        "threadId": "session-33ea4b10-d5f4-45f5-9933-5e08cd6bb475"
+      },
+      "scratchScope": null
+    }
+  ],
+  "providerRequestCount": 13,
+  "cancelProviderHoldSeconds": 3,
+  "sourceFiles": 522,
+  "sourceInputsUnchangedAfterRun": true,
+  "programSha256": {
+    "headless": "935ec6b61fc277927bff460b6a29d4074ae348f1215b97b8f759583879694d3a",
+    "demo": "4be2543bf4aaf6adf1ebd5ac2c3ea92182bd546ec7de154dbd83d667c7be4ebf"
+  },
+  "kernel": {
+    "supervisor": "/Users/frankqin/dev/Tekes/.build/kernel-0.9.3-installed/BuiltInKernel/tekes-supervisor",
+    "supervisorSha256": "365eca9385f36d5897a81ba398e7f34b4b9819896d6a1b78c618a7710b14380f",
+    "worker": "/Users/frankqin/dev/Tekes/.build/kernel-0.9.3-installed/BuiltInKernel/tekes-worker",
+    "workerSha256": "1284014bd0a8d3cb711c0512b10762322a19af4beabc1f9e681bacb1e28fa64d",
+    "build": {
+      "format": 1,
+      "identifier": "com.tekes.kernel.supervisor",
+      "source_revision": "09508a9083c24c7accefc99516739f279b85913e",
+      "version": "0.9.3"
+    }
+  },
+  "validation": {
+    "focusedSidechatTests": {
+      "passed": 11,
+      "failed": 0
+    },
+    "pythonTests": {
+      "passed": 177,
+      "failed": 0
+    },
+    "strictUiClippy": true,
+    "ordinaryDemoBuild": true,
+    "standalonePublicConsumerExecuted": true,
+    "standaloneComponentMounts": 6,
+    "uiBoundary": true,
+    "headlessBoundary": true,
+    "acceptanceMatrix": true
+  },
+  "nativeInteraction": false,
+  "physicalIme": false,
+  "desktopVisibilityProven": false,
+  "crossProcess": false,
+  "automaticTabRefocusProven": false,
+  "merged": false,
+  "released": false,
+  "cacheDeletedBytes": 0,
+  "sharedTarget": "/Volumes/HP P900/dev/TekesAgentKit/shared-target",
+  "localEvidenceDirectory": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/real-multi-sidechat-20261024",
+  "finalEvidenceDirectory": "verified6",
+  "historicalEvidenceNotPromoted": true,
+  "failedOrSupersededRuns": [
+    "attempt1",
+    "attempt2",
+    "attempt3",
+    "attempt4",
+    "verified"
+  ],
+  "remaining": [
+    "full window/chrome and rich layout",
+    "physical IME and OS AX",
+    "SideChat real host file picker/attachment acceptance",
+    "ProcessContainer",
+    "TekesUI #53 strict reading"
+  ]
+}

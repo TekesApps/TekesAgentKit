@@ -1,0 +1,157 @@
+{
+  "schemaVersion": 1,
+  "baseCommit": "20b4c44ec61777717be5dd51d58cb2279a511675",
+  "issues": [
+    17,
+    23
+  ],
+  "pullRequest": 10,
+  "scope": "bounded-source-call-phase-to-synthetic-turn-status",
+  "mapping": {
+    "running": "running",
+    "done": "completed",
+    "error": "error",
+    "stopped": "aborted",
+    "other": "completed-existing-fallback"
+  },
+  "preFixKernelAudit": {
+    "kernelCommit": "09508a9083c24c7accefc99516739f279b85913e",
+    "path": "crates/supervisor/src/bounded_child_history.rs",
+    "sha256": "52f2a7239d64cfca87e02d4cdf8d9197293ba5763dfd6921ba1d2131b9d0e9de",
+    "sourceCallPhaseMap": {
+      "completed": "done",
+      "interrupted": "stopped",
+      "other-settle": "error",
+      "no-settle": "running"
+    },
+    "agentKitCurrentTurnMap": "running => running; all others => completed",
+    "nextWork": "preserve failed and cancelled synthetic source turn status using original phase; do not infer child entries or change Kernel"
+  },
+  "validation": {
+    "root-tests": {
+      "passed": 373,
+      "failed": 0,
+      "ignored": 0
+    },
+    "root-feature-tests": {
+      "passed": 281,
+      "failed": 0,
+      "ignored": 0
+    },
+    "ui-tests": {
+      "passed": 757,
+      "failed": 0,
+      "ignored": 1
+    },
+    "focusedRedFailed": 2,
+    "focusedGreenPassed": 2,
+    "rootStrictClippyDefaultAndFeature": "passed",
+    "uiStrictClippy": "passed",
+    "fmt": "passed",
+    "defaultAndFeatureDemoBuild": "passed-not-launched",
+    "independentConsumer": "executed-passed",
+    "consumerSourceDigest": "ec0787e887c7af9641f8ae7811ddef90dd570810c55a38278a2addee5dfa2a5a",
+    "consumerSourceFiles": 137,
+    "boundariesAndMatrix": "passed",
+    "python": "unchanged; prior255/0 evidence reused"
+  },
+  "runtimeAndTestSourceHashes": {
+    "crates/presentation/src/bounded_history.rs": "42e8f3028429181b9f35a63e243084e1bcf62eedee8787b2da38f04202c9ffe5",
+    "crates/presentation/tests/controller.rs": "80cf458c1042577aea9574431fca11bc6eb28d38dba5f3ead25814984cbc8033"
+  },
+  "programs": [
+    {
+      "path": ".runtime-fixtures/native-bounded-terminal-20261024/controller-root-tests",
+      "sha256": "f944003c208e445746682882ae9472982cef1ea103169beae6dd18b6bae23db3"
+    },
+    {
+      "path": ".runtime-fixtures/native-bounded-terminal-20261024/controller-root-feature-tests",
+      "sha256": "0ab85e74bdcd5bb67173c8631dd1ebec7f06d041ddf02df17430b7961c619bac"
+    },
+    {
+      "path": ".runtime-fixtures/native-bounded-terminal-20261024/tekes-agent-ui-demo-archive",
+      "sha256": "902a7a4cfc5900f62ee9321e698c0ca0cb8400914cb8476be6e05fbe5939de53",
+      "scope": "built-feature-demo-not-launched"
+    },
+    {
+      "path": ".runtime-fixtures/native-bounded-terminal-20261024/agentkit-public-ui-consumer-archive",
+      "sha256": "7e728368aa98ba4815db9c9d2a22bf720c18745a4b5dd7ea25d4931ba75025a7",
+      "scope": "executed-independent-CPU-consumer"
+    }
+  ],
+  "tekesUiPin": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "notRun": [
+    "real Native same-pane running-to-failed source witness",
+    "actual native UI/desktop/IME/OS AX/ProcessContainer",
+    "full ClientKit parity"
+  ],
+  "ci": "9039d5f-terminal-only-strict-nested-reading-53-failed",
+  "cacheBytesDeletedInThisSlice": 0,
+  "newTarget": false,
+  "issueClosed": false,
+  "mergeTagRelease": false,
+  "evidenceRoot": ".runtime-fixtures/native-bounded-terminal-20261024",
+  "ci9039d5f": {
+    "head": "9039d5fcc12ce2cd8576b5ed947a2cd79bf29db5",
+    "immutableClosureVerified": true,
+    "prMergeParentVerified": true,
+    "runs": [
+      {
+        "id": 40105849539,
+        "checkout": "9039d5fcc12ce2cd8576b5ed947a2cd79bf29db5",
+        "conclusion": "failure",
+        "consumerSource": "ec0787e887c7af9641f8ae7811ddef90dd570810c55a38278a2addee5dfa2a5a",
+        "consumerFiles": 137,
+        "sdk": {
+          "commit": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+          "local_packages": 11,
+          "native_interaction": false,
+          "reviewed_files": 243,
+          "sha256": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
+          "ui_packages": 8
+        },
+        "rawReading": {
+          "accepted": false,
+          "parentFollowingAfterInnerUp": true,
+          "parentOffsetBefore": 0,
+          "parentOffsetAfterScroll": 0,
+          "parentOffsetAfterAppend": 634,
+          "innerOffset": 100,
+          "detailVisibleAfterAppend": false
+        },
+        "artifactSha256": "168fe5756614728c5c604f1086b967b972f86bae03feabc9ba990d2722960fe4",
+        "jobLogSha256": "357fa33594e757e01d63060f8d7b655c2ad7d0aa63c9deb172b3d419da769cdc",
+        "optInWitness": "success",
+        "independentConsumer": "success"
+      },
+      {
+        "id": 40105854722,
+        "checkout": "c87930bc896f8f4bb02466ff0b32f4d1ed0fbb71",
+        "conclusion": "failure",
+        "consumerSource": "ec0787e887c7af9641f8ae7811ddef90dd570810c55a38278a2addee5dfa2a5a",
+        "consumerFiles": 137,
+        "sdk": {
+          "commit": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+          "local_packages": 11,
+          "native_interaction": false,
+          "reviewed_files": 243,
+          "sha256": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
+          "ui_packages": 8
+        },
+        "rawReading": {
+          "accepted": false,
+          "parentFollowingAfterInnerUp": true,
+          "parentOffsetBefore": 0,
+          "parentOffsetAfterScroll": 0,
+          "parentOffsetAfterAppend": 634,
+          "innerOffset": 100,
+          "detailVisibleAfterAppend": false
+        },
+        "artifactSha256": "3e503c18af54a25d80207daada8c8f00c5819b1744789e8a2f6b083c11d750cd",
+        "jobLogSha256": "c94e73fda8ac290552aee21902a5f2cc2953e5893dc3c66cb0425e9be2920212",
+        "optInWitness": "success",
+        "independentConsumer": "success"
+      }
+    ]
+  }
+}

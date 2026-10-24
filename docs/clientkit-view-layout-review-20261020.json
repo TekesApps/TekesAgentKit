@@ -1,0 +1,31 @@
+{
+  "date": "2026-10-20",
+  "scope": "Reference mapping and initial source audit; not full layout or native acceptance",
+  "reference_head": "c289bc9d33edcd83a782ac17927a8c65a027eccd",
+  "reference_files": {
+    "Sources/Composer/ThreadComposerView.swift": "ff139c1af2f33f8b89dad462fa71cfd7851a800f06f99462adf8bd2b5a2d4e38",
+    "Sources/Composer/ComposerControlsLayout.swift": "31febc1f6f41ae61de82bbe6033e8a7334b8c57d82ca5c4ce272529119aa7d96",
+    "Sources/Composer/ComposerCardView.swift": "ddbb73703d867fb214f2ed44a2db13e358566c68e165acdc5cd583ecd9c3f5db",
+    "Sources/Composer/UserControlsView.swift": "0c3dc171d9f2961ee92ee6c98d607179c0e84f2a03ec6d7a5ce64134b61516c9",
+    "Sources/TranscriptCoordinator/TranscriptNativeSurface.swift": "4ec7314e93bc0702ece6a14c98dc4915179023882c1ece00dbbd6f3e9a73bffd",
+    "Sources/TranscriptCoordinator/ThreadTranscriptPresenter+Scroll.swift": "cc61572c9f79290b4ecd609b451d3f7f3b890ea6d3b3e3e292857638932f81e7",
+    "Sources/TranscriptRendering/TranscriptTurnFootnote.swift": "1acc6380778904620cedcd2a58d8f368d706d51054545f4081fb0005a993ad5e",
+    "Sources/TranscriptRendering/FeedbackNoteEditorView.swift": "7c0e5dd597c82a6805e0c65a532816ee9170eee3f2f15996edd1ac693a638d1b",
+    "Sources/TranscriptRendering/TranscriptIndicatorRailView.swift": "0a710cf6be24f8caa08e2e030db20caf3fb0001048ebbd8b9fb8c15dc53df487",
+    "Sources/Composer/Agent/AppServerHealthView.swift": "0c8ab5c957e69c1eea592d174be45ac2670e29bdb5751727b8a0a7e7b97d77e1",
+    "Sources/Composer/Run/RunView.swift": "4453b67fb8e4e6cabe4a9653ce378bffb939a9a01188a7df9a4bb89f0bd7674e",
+    "Sources/Composer/Run/RunNativeController.swift": "20258b354edc74c730002654c5edde815eb93d7a6f68870f55e77dbe2ecbd99d",
+    "Sources/Composer/Run/RunOverlay.swift": "32c27a8488dd313f356b720752cb51a5b92eeb3caeb8d9399bc28ec6f93acf26",
+    "Sources/Composer/Run/RunChrome.swift": "bf910e3af84119cc17e504a752e4055082e3217ddaeb9245b22068f978889a68",
+    "Sources/ToolPanels/ClientSidePanelHostView.swift": "435bb049951e5419a583b844d127dfac63ca4bcca98b2dc889713c246cfb65fb",
+    "Sources/Composer/Agent/ClientAgentTaskView.swift": "a8a98f9a5566c2ea2ca661f9d6e060d2d4069da1d7ea672098eef8d82c9e9cb5",
+    "Sources/Composer/Agent/ClientEmbeddedRunView.swift": "15cfb89a05c307470940c47401c1bc5c453efcd461d1ed8f95a3411de5629958",
+    "Sources/Composer/Agent/ClientSideChatRunView.swift": "aaa201e4a8e1f8c1fb39749914288bd1806349bb33ba9d3698cc9c76ca35a829",
+    "Sources/Composer/Agent/ClientAgentSummaryView.swift": "5632d920bd21d44d6b68d49779e9f7746c9bc1ec4ad9e7bc1d01ab58b85f9154",
+    "Sources/Composer/Agent/ClientAgentSidebarListView.swift": "c29c80b8726f8ac6b5988ed6c9ad3e7902d09e8f656ac745eba4f5ee0bb70069"
+  },
+  "reference_has_wip": true,
+  "reference_modified": false,
+  "full_layout_parity": false,
+  "tekesui_default_pin_changed": false
+}

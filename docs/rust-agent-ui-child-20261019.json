@@ -1,0 +1,102 @@
+{
+  "date": "2026-10-19",
+  "publishedBaseline": "v0.3.7",
+  "tekesui": {
+    "commit": "431093786de47b48cd566d0d9c0eafa088b10d68",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 188,
+    "sha256": "03721866a362b1d31261ebbbc86140eb07e9e23320871c325234a5212591213d",
+    "ui_packages": 8
+  },
+  "tests": {
+    "root": 104,
+    "ui": 83,
+    "tools": 18
+  },
+  "strictClippy": {
+    "rootAllTargets": true,
+    "uiAllTargets": true
+  },
+  "nativeFixture": {
+    "marker": "NATIVE_AGENT_CHILD_SELFTEST_OK",
+    "physicalIme": false,
+    "formalTranscript": false,
+    "fullRunView": false,
+    "checks": [
+      "direct-parent",
+      "independent-composer",
+      "single-child-admission",
+      "same-turn-assistant",
+      "interrupted-settlement",
+      "unsent-child-draft",
+      "parent-draft-isolation",
+      "bounded-read-only-no-composer",
+      "bounded-pagination-growth",
+      "local-role-retirement"
+    ]
+  },
+  "nativeFirstAttempt": {
+    "passed": false,
+    "observedExtraText": "ui hua",
+    "unexpectedTextSource": "unverified",
+    "sameBinaryCleanRerunPassed": true
+  },
+  "realEndpoints": {
+    "NATIVE": {
+      "components": true,
+      "finalAssistantItems": 1,
+      "inventoryRows": 4,
+      "isStale": false,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 2,
+      "transcriptView": false
+    },
+    "PI": {
+      "components": true,
+      "finalAssistantItems": 2,
+      "inventoryRows": 13,
+      "isStale": false,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 5,
+      "transcriptView": false
+    },
+    "DSH": {
+      "components": true,
+      "finalAssistantItems": 1,
+      "inventoryRows": 8,
+      "isStale": false,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 5,
+      "transcriptView": false
+    }
+  },
+  "realChildPaneNativeInteraction": false,
+  "upstreamOpenIssues": [
+    22,
+    23
+  ],
+  "screenshots": {
+    "child-native.png": "caaaabfc7545d82885d507aba377d4d36180756fdd142e6e9b2b78737f39a547",
+    "bounded-child-native.png": "e5b588c43fbb438b3274945bc2f97627f9f8663b0d181b99b7e598a1afd751c9"
+  },
+  "remaining": [
+    "formal Transcript/RunView and child Transcript",
+    "complete Composer capability UI and remaining host actions",
+    "physical IME/reading/paging acceptance",
+    "real three-harness child-pane native interaction",
+    "independent review/latest CI/merge/stage tag"
+  ]
+}

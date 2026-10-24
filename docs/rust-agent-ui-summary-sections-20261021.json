@@ -1,0 +1,98 @@
+{
+  "format": "agentkit-summary-sections/1",
+  "verified_at_utc": "2026-10-20T19:32:26.878148+00:00",
+  "based_on": "b1279ac16968a5d4697ba679399efc4f6cd54081",
+  "published_contract_baseline": "v0.3.8",
+  "source": {
+    "ui/components/src/lib.rs": "2a158f080093201d8347a4a051e0d5091b30886410d24140e054fb14f212063a",
+    "ui/components/src/summary.rs": "40a629059045f1e5ea6a0ed8fd24b5200275617e0236d6b38feaa0540737d871",
+    "ui/components/src/summary_section.rs": "4c20b8c134df3967d05bf613c17acb03b36e7c14f83aea24eaa358f2385aecdc",
+    "ui/consumer/src/lib.rs": "cfbe9d06b0e2bfe0338e25a67ca91fab6af961c46e99ab008665442b27d6f6df",
+    "ui/demo/src/components_native.rs": "14c073f2c078252bcb34c2f90d0dbe3beba72019060dc49f432357c751308783",
+    "ui/demo/src/native_summary_sections_selftest.rs": "bf709503930487253de4c2d870792556776d5d31548d2e2b94ed7b840e7fe1d5",
+    "ui/demo/tests/run_column.rs": "35cd9fd38f8a6d50dc66b026904f60c43362d4d7a9bef1fd0a3b6892a4a63c9c",
+    "ui/demo/tests/summary_component.rs": "663bcacb98b12a195bb187ee566e5e6763aa412ad49837151b70f94c0cc3c0e3"
+  },
+  "reference_sources": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Agent/ClientAgentSummaryView.swift": "5632d920bd21d44d6b68d49779e9f7746c9bc1ec4ad9e7bc1d01ab58b85f9154",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Agent/SummaryProviders.swift": "1f2eb4048c30bfde58edd72bd2e50b8e22d211272c609c9d2108c53b6bddf663",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Agent/SummaryStyle.swift": "425a47ff6cb531fdf300dab56a656011e5cae6dffcc3c9f3d28a4ca8bc3fbb31",
+    "/Users/frankqin/dev/Tekes/Tekes/ClientAgentSummaryHostAdapter.swift": "4e7875ae43ab06901a981077f81a4504c754e88f2c019a470dc67222b917714a",
+    "/Users/frankqin/dev/TekesMetalTextKit/Sources/TekesMetalTextKit/Design/TekesListMetrics.swift": "0395c4860151c97243e10fdbdcad4d864c312223637c782e27ff6de6b93c0d92"
+  },
+  "default_inputs": {
+    "commit": "8cf0840790334ba224afc0595897c74231c712e6",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 199,
+    "sha256": "f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f",
+    "ui_packages": 8
+  },
+  "validation": {
+    "ui_tests": 318,
+    "second_public_consumer_tests": 31,
+    "coretext_summary_matrix_combinations": 12,
+    "host_sections_first": true,
+    "disclosure_state_and_original_rows_retained": true,
+    "scope_and_action_pointer_fences": true,
+    "conflicting_publication_rejected": true,
+    "empty_and_unavailable_distinct": true,
+    "no_stale_partial_layouts": true,
+    "strict_clippy": true,
+    "fmt": true,
+    "boundaries": true,
+    "candidate_run_tests": 8,
+    "candidate_strict_clippy": true,
+    "candidate_current_inputs_match": true,
+    "native_summary_fixture": {
+      "collapsedCanonicalUpdate": true,
+      "fullLayoutParity": false,
+      "hiddenFromAccessibility": true,
+      "nativeWindow": true,
+      "noSubmission": true,
+      "originalRowsRetained": true,
+      "physicalIme": false,
+      "pointerCollapseExpand": true,
+      "realHarness": false,
+      "runtimeDraft": true,
+      "voiceOver": false
+    },
+    "native_component_fixture_regression": true
+  },
+  "candidate_identity": "2b16eaa6200fecdde9a0c615166064effb9446249cde05087d5d7c288d81d4ec",
+  "binary_sha256": "be7f1cdb3aaf04a9d825e06510911f52f0619942d42171f60e87dc0b7f413d3f",
+  "screenshot": {
+    "path": "docs/evidence/summary-sections-collapsed-20261021.png",
+    "sha256": "d221e54afde8b8e82aaecae73e085f483c5c0d30a6a389d8c6adbc1cab4bffe7",
+    "width": 2136,
+    "height": 1584,
+    "inspected": true,
+    "scope": "owned local fixture with collapsed Summary; not paired ClientKit visual acceptance"
+  },
+  "logs": {
+    "/tmp/agentkit-summary-sections-ui-tests.log": "61ed7a0e07c73553a57a1feb6ec413785e27203e295a5b007500771e71fd00f9",
+    "/tmp/agentkit-summary-sections-clippy-final.log": "60db5f2e2478d57fa278f0438e9f6c57095241f0f7f3e9f2ce00dc040990b752",
+    "/tmp/agentkit-summary-sections-build.log": "3a28f461ab51012509621bdb78a12fb27d0f95cb6591dcddd4d537df66b3714a",
+    "/tmp/agentkit-summary-sections-native-20261021.log": "b6754c16baec24a9e0aa63dec1e6ab5d11dc6e1c45f681a56d11401d36e238ea",
+    "/tmp/agentkit-summary-sections-native-regression-20261021.log": "7d5dfb0c9f5d023ee16fb4c5a2bc0abebb9e081546b840b88feb26e4bc038cb5",
+    "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-summary-sections-preflight-20261021-01/receipt.json": "5405934d25e59e72e04adeb653f50d1fd34f0964ef9a42746726619ede10968e",
+    "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-summary-sections-preflight-20261021-01/tests.log": "d100c01fe28e0cee7bac7e539bd7ed79e6ae376af5c92303ee4e656b3a18e6e1",
+    "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-summary-sections-preflight-20261021-01/clippy.log": "5fe401e0248a9522db702aab510b0bc498e1e5412d3717a85a36970856e5f5dd"
+  },
+  "not_claimed": [
+    "full_summary_layout_parity",
+    "single_line_tail_ellipsis",
+    "hover_chevron",
+    "custom_repository_rows",
+    "workspace_only_summary_owner",
+    "paired_ClientKit_visual_acceptance",
+    "real_harness_reading_paging",
+    "physical_ime",
+    "voiceover",
+    "merged",
+    "tagged"
+  ],
+  "issues": [
+    "https://github.com/TekesApps/TekesUI/issues/31"
+  ]
+}

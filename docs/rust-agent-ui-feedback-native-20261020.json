@@ -1,0 +1,193 @@
+{
+  "date": "2026-10-20",
+  "status": "three-harness-native-feedback-verified",
+  "agentKitBaseCommit": "c7c0bb5542ef687e84567bd1b9d8ab7e9a2163b8",
+  "publishedAgentKitBaseline": "v0.3.8",
+  "productionBusinessUiChanged": false,
+  "experimentalTestHostOnly": true,
+  "tests": {
+    "uiWorkspace": 277,
+    "publicConsumerIncluded": true,
+    "scripts": 21,
+    "strictUiClippy": true,
+    "rootUnchangedBaseline": {
+      "tests": 158,
+      "receipt": "rust-agent-ui-feedback-cas-20261020.json"
+    }
+  },
+  "resolvedTekesui": {
+    "rev": "8cf0840790334ba224afc0595897c74231c712e6",
+    "packages": 8,
+    "inputs": 199,
+    "sha256": "f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f"
+  },
+  "binarySha256": "346efc1807cc4dc8af34c3bd03069f98eaec58d1c7379e7f5c511bf449e64c26",
+  "sourceSha256": {
+    "ui/demo/src/components_native.rs": "964c2a57f105f0a8acc3ebab743ab1dd6d1345252814f31ff338ee8c8349ace7",
+    "ui/demo/src/native_feedback_selftest.rs": "88e7f77064e4fdb5e46a28025f8767b77af602913e926d2692a604bde306a038",
+    "scripts/test-real-session-endpoints.py": "13370264b1c591faac9cf443cfe62f4d24c594bdb7d2ab2eef15156b86e76cca"
+  },
+  "reference": {
+    "clientKitHead": "c289bc9d33edcd83a782ac17927a8c65a027eccd",
+    "otherClientKitComposerWipUntouched": true,
+    "feedbackFiles": {
+      "Sources/TranscriptRendering/TranscriptTurnFootnote.swift": "1acc6380778904620cedcd2a58d8f368d706d51054545f4081fb0005a993ad5e",
+      "Sources/TranscriptRendering/FeedbackNoteEditorState.swift": "8102f119ae66216b0c307dea5629fb50065545c1d81d7c358dd7ffe5dca686b8"
+    },
+    "kernelFixtureHead": "ae5d6fdf32290207b646b8c99b96f2a002902cb3",
+    "kernelImplementationChanged": false
+  },
+  "nativeReceipts": {
+    "PI": {
+      "draftsPreserved": true,
+      "freshReadAfterDelete": true,
+      "imeSendAndNavigationBlocked": true,
+      "nativeInteraction": true,
+      "nativePointer": true,
+      "nativeTextServices": true,
+      "noPromptSubmitted": true,
+      "nonemptyComposerDrafts": true,
+      "noteReopened": true,
+      "physicalIme": false,
+      "readingAnchorAcceptance": false,
+      "retainedAcrossSessionSwitch": true,
+      "sameRatingDeletes": true,
+      "savedChineseNote": true,
+      "sendEnabledBeforeComposition": true,
+      "stateDrivenCallbacks": true,
+      "syntheticPreedit": true,
+      "voiceOver": false
+    },
+    "DSH": {
+      "draftsPreserved": true,
+      "freshReadAfterDelete": true,
+      "imeSendAndNavigationBlocked": true,
+      "nativeInteraction": true,
+      "nativePointer": true,
+      "nativeTextServices": true,
+      "noPromptSubmitted": true,
+      "nonemptyComposerDrafts": true,
+      "noteReopened": true,
+      "physicalIme": false,
+      "readingAnchorAcceptance": false,
+      "retainedAcrossSessionSwitch": true,
+      "sameRatingDeletes": true,
+      "savedChineseNote": true,
+      "sendEnabledBeforeComposition": true,
+      "stateDrivenCallbacks": true,
+      "syntheticPreedit": true,
+      "voiceOver": false
+    },
+    "NATIVE": {
+      "draftsPreserved": true,
+      "freshReadAfterDelete": true,
+      "imeSendAndNavigationBlocked": true,
+      "nativeInteraction": true,
+      "nativePointer": true,
+      "nativeTextServices": true,
+      "noPromptSubmitted": true,
+      "nonemptyComposerDrafts": true,
+      "noteReopened": true,
+      "physicalIme": false,
+      "readingAnchorAcceptance": false,
+      "retainedAcrossSessionSwitch": true,
+      "sameRatingDeletes": true,
+      "savedChineseNote": true,
+      "sendEnabledBeforeComposition": true,
+      "stateDrivenCallbacks": true,
+      "syntheticPreedit": true,
+      "voiceOver": false
+    }
+  },
+  "receiptSourceLogs": {
+    "PI": "/tmp/agentkit-feedback-native-reviewed-real.log",
+    "DSH": "/tmp/agentkit-feedback-native-reviewed-real.log",
+    "NATIVE": "/tmp/agentkit-feedback-native-reviewed-native-real.log"
+  },
+  "nativePhases": {
+    "PI": {
+      "log": "/tmp/agentkit-feedback-native-reviewed-pi.native-feedback.log",
+      "lastPhase": 12,
+      "elapsedMsAtPhase12": 2045,
+      "nativeComposerTextQueriesPassed": true
+    },
+    "DSH": {
+      "log": "/tmp/agentkit-feedback-native-reviewed-dsh.native-feedback.log",
+      "lastPhase": 12,
+      "elapsedMsAtPhase12": 2041,
+      "nativeComposerTextQueriesPassed": true
+    },
+    "NATIVE": {
+      "log": "/tmp/agentkit-feedback-native-reviewed-native.native-feedback.log",
+      "lastPhase": 12,
+      "elapsedMsAtPhase12": 1647,
+      "nativeComposerTextQueriesPassed": true
+    }
+  },
+  "inputEvidence": {
+    "automatedAppKitMouseEvents": true,
+    "nativeTextInputClient": true,
+    "syntheticMarkedText": true,
+    "nonemptyCanonicalDrafts": true,
+    "sendEnabledBeforeComposition": true,
+    "nativeComposerTextQueriesOnBothDestinations": true,
+    "physicalPointer": false,
+    "physicalIme": false,
+    "candidateWindow": false,
+    "voiceOver": false
+  },
+  "probePolicy": {
+    "stateDrivenProtocolWaits": true,
+    "localActionDelayMs": 0,
+    "forcesContinuousRedraw": false,
+    "deadlineSeconds": 45,
+    "outerProcessTimeoutSeconds": 55,
+    "automaticMutationRetries": false
+  },
+  "retainedEarlierRuns": [
+    {
+      "log": "/tmp/agentkit-feedback-native.native-feedback.log",
+      "result": "timeout at phase 8",
+      "forcedProbeRedraws": true,
+      "actionSleeps": true
+    },
+    {
+      "log": "/tmp/agentkit-feedback-native-diagnostic.native-feedback.log",
+      "result": "timeout at phase 8; a planned click was delayed",
+      "forcedProbeRedraws": true,
+      "underlyingSchedulerMechanismConfirmed": false
+    },
+    {
+      "log": "/tmp/agentkit-feedback-native-immediate.native-feedback.log",
+      "result": "passed with delayed actions",
+      "forcedProbeRedraws": true,
+      "actionSleeps": false
+    },
+    {
+      "log": "/tmp/agentkit-feedback-native-reactive.native-feedback.log",
+      "result": "passed without forced redraws",
+      "actionSleeps": false,
+      "performanceBenchmark": false
+    }
+  ],
+  "broaderLifecycleFailure": {
+    "log": "/tmp/agentkit-feedback-native-reviewed-real.log",
+    "harness": "Native",
+    "stage": "session.archive before the native UI window",
+    "serverCode": "session-running",
+    "nativeUiStartedInThatRun": false,
+    "causeConfirmed": false,
+    "laterIsolatedNativeRunPassed": true,
+    "kernelModified": false,
+    "automaticWriteRetryAdded": false
+  },
+  "logs": {
+    "ui": "/tmp/agentkit-feedback-native-ui.log",
+    "clippy": "/tmp/agentkit-feedback-native-clippy-reviewed.log",
+    "scripts": "/tmp/agentkit-feedback-native-scripts-reviewed.log"
+  },
+  "fullNativeRunTranscriptUx": false,
+  "readingAnchorAcceptance": false,
+  "richContentAcceptance": false,
+  "completeGoal": false
+}

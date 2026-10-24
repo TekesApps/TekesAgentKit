@@ -1,0 +1,157 @@
+{
+  "baseCommit": "d1a0c09ac99eb8b39a2132d0319f64d394df20cd",
+  "publishedAgentKit": "v0.3.8",
+  "tekesui": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "referenceClientKit": "c289bc9d33edcd83a782ac17927a8c65a027eccd",
+  "referenceSourceSha256": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/ComposerSurfaceContext.swift": "2133b0c468cd5d63d72c53174b719f92ab08f8a6c65803371959a903fe523f12",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Agent/ClientSideChatRunView.swift": "aaa201e4a8e1f8c1fb39749914288bd1806349bb33ba9d3698cc9c76ca35a829",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Agent/ClientSideChatCoordinator.swift": "0faa9e8caaa78a8c3ee2ed46d7c3ac86e310d7c1ccef71d3eb0079ff2275c85d",
+    "/Users/frankqin/dev/Tekes/TekesTests/RunUserControlsGraphTests.swift": "ec6e2a9bd9bf61545919e3b32929e32384cb1bea49469d39800e04330ac770aa"
+  },
+  "sourceSha256": {
+    "ui/bindings/src/sidechat.rs": "564fee6482f7659f9c8a563b0f4a2d29cd9ec147a4f5f53bca9f5ca5363de919",
+    "ui/bindings/README.md": "f0f8985b73dbfe8a9197ad7d2e8117015d2535205892b95faf010b09be64d0f6",
+    "ui/consumer/src/lib.rs": "81c7513b7263ed88742dbdc6012b5779ac7359364d7f4f54dfe65888f96b71d0",
+    "ui/demo/src/sidechat_proof.rs": "3d468d03d207affd04345d664bcf054a969654a961dda6a5a07123949a0aca98",
+    "ui/demo/tests/sidechat_binding.rs": "480ac647092ce33b3299b9b2ce2c3ed3625df4874c8968e8b5a61269ca656d81",
+    "scripts/test-real-session-endpoints.py": "396d0f59c247ee073cf7020e2fd3b89e1c1c60474edf3b8e3ed6865f6e8b7ea3",
+    "ui/Cargo.toml": "fec7bfc0ff96b220ff17ec33b39be35f90ad50b231aaa52a2f48a4e5e1857d6e",
+    "ui/Cargo.lock": "8790cacd3395460c518f71240052a0bde27a25dbe7e18acda12753c53653d9d1"
+  },
+  "program": {
+    "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/sidechat-shared-destination-20261023/tekes-agent-ui-demo",
+    "sha256": "656ff2392177118d7f2431540897ea600ed39c2c3b7175e2ba7b3be05dc76c6d",
+    "bytes": 80760816,
+    "nativeInteraction": false,
+    "signed": false
+  },
+  "profiles": {
+    "native": {
+      "receipt": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/sidechat-shared-destination-20261023/real.consumer.json",
+      "sha256": "cc45beb7d7c4705a73aa15d15d36712e9355c909a87dbae273cc9ae357b7357c",
+      "proof": {
+        "canonicalReopen": true,
+        "canonicalReopenAfterReconnect": true,
+        "capabilityUnavailable": false,
+        "confirmedDiscard": true,
+        "crossProcess": false,
+        "freshReconnect": true,
+        "independentForkScope": true,
+        "nativeInteraction": false,
+        "noDuplicateInput": true,
+        "originalClose": true,
+        "originalComposerIdsRetained": true,
+        "originalCreate": true,
+        "originalSend": true,
+        "originalSidePanelRunPort": true,
+        "parentAndOtherDraftsPreserved": true,
+        "parentHistoryIsolated": true,
+        "physicalIme": false,
+        "readingAnchorAcceptance": false,
+        "realHarness": true,
+        "retiredAuthority": true,
+        "scratchDraftRestored": true,
+        "scratchLifecycleAccepted": true,
+        "scratchReply": true,
+        "scratchScope": {
+          "endpointId": "native-ui",
+          "sessionId": "01a167d6-a609-7622-81b6-74185a156ecf",
+          "threadId": "01a167d6-a609-7622-81b6-74185a156ecf"
+        },
+        "summaryNavigation": true
+      }
+    },
+    "pi": {
+      "receipt": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/sidechat-shared-destination-20261023/real-pi.consumer.json",
+      "sha256": "4d43ac621ff634668d014286877d27ff4ce0ac105ea50bb3954bc72318e44607",
+      "proof": {
+        "canonicalReopen": true,
+        "canonicalReopenAfterReconnect": true,
+        "capabilityUnavailable": false,
+        "confirmedDiscard": true,
+        "crossProcess": false,
+        "freshReconnect": true,
+        "independentForkScope": true,
+        "nativeInteraction": false,
+        "noDuplicateInput": true,
+        "originalClose": true,
+        "originalComposerIdsRetained": true,
+        "originalCreate": true,
+        "originalSend": true,
+        "originalSidePanelRunPort": true,
+        "parentAndOtherDraftsPreserved": true,
+        "parentHistoryIsolated": true,
+        "physicalIme": false,
+        "readingAnchorAcceptance": false,
+        "realHarness": true,
+        "retiredAuthority": true,
+        "scratchDraftRestored": true,
+        "scratchLifecycleAccepted": true,
+        "scratchReply": true,
+        "scratchScope": {
+          "endpointId": "pi-ui",
+          "sessionId": "5b64782d-e0bd-4357-b828-65d4e64d4280",
+          "threadId": "5b64782d-e0bd-4357-b828-65d4e64d4280"
+        },
+        "summaryNavigation": true
+      }
+    },
+    "dsh": {
+      "receipt": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/sidechat-shared-destination-20261023/real-dsh.consumer.json",
+      "sha256": "bc4e0efde97291b3364676837f784d8be0085b1fbf76ce7dfd470df3e499bd8b",
+      "proof": {
+        "capabilityUnavailable": true,
+        "crossProcess": false,
+        "nativeInteraction": false,
+        "noForkAttempted": true,
+        "originalCreateDisabled": true,
+        "parentAndOtherDraftsPreserved": true,
+        "physicalIme": false,
+        "readingAnchorAcceptance": false,
+        "realHarness": true,
+        "scratchLifecycleAccepted": false
+      }
+    }
+  },
+  "validation": {
+    "uiWorkspacePassed": 623,
+    "existingIgnored": 1,
+    "pythonTests": 74,
+    "strictClippy": true,
+    "fmt": true,
+    "uiBoundaries": true,
+    "nativeInteraction": false,
+    "physicalIme": false,
+    "crossProcess": false,
+    "readingAnchorAcceptance": false,
+    "kernelFullLifecycleRerun": false,
+    "newTargetCreated": false,
+    "cleanupBytesFreed": 0
+  },
+  "logs": {
+    "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "red.log": "6fe687faa06691eebd518b60e3e2e07f9f49258d8d7af5eda78471b41c6f51f5",
+    "green.log": "32979f63e92c3b79f4e221fdb8b1112895fb592b1ba347c821875e13c03f1abc",
+    "clippy.log": "a66a775fc9ed039adf29503d3f10e370c7e80b4fd44b0045cd75ed8f2ed8485a",
+    "boundaries.log": "9480cc4382559b9a7a99240226a9f766048e30c8d38bb4bccd1fd8bca56661ad",
+    "real.log": "fb2bb8cba094d7e35adfd9080279372d25ccff07928ff75d2837cfd956339c0e",
+    "python-tests.log": "0c443f4063f5d65a16b7fa099ba6a7873555dff0231a1950401e3d73a910711f",
+    "lifetime-tests.log": "27a76df6e0a3b2415bae139214a3dd7175bcf6d4ba2b8e0cd08c0076339bd87b",
+    "workspace-tests.log": "f0daf5cf38d3042ee8e16c8960cdbdceab7d2d9daefc684fe8bb3418768f2fd2",
+    "build.log": "b2a942f6cae2fa0f0ae3c285aaa8112c387eb576277f240bceff2f2ae1a49eae"
+  },
+  "priorCi": {
+    "head": "d1a0c09ac99eb8b39a2132d0319f64d394df20cd",
+    "runs": [
+      39922979466,
+      39922970920
+    ],
+    "headless": "success",
+    "ui": "required nested-detail-reading failure (#53)"
+  },
+  "upstreamBlockers": [
+    48,
+    53
+  ]
+}

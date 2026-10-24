@@ -1,0 +1,808 @@
+{
+  "format": "agentkit-layout-text-candidate/1",
+  "verified_at_utc": "2026-10-20T22:45:49.233511+00:00",
+  "based_on": "6a428c61d5fcd7fa74ccb4d1489b4cc82c0544f4",
+  "candidate": {
+    "identity": "292f5fe65195af66624cb28413868eb46db6ab1a81ef1294ab19c8efbd45b0f4",
+    "base_identity": "545ef8d70d89404f11d916f05e417404277507b07dea808aac051339544431a1",
+    "archive_sha256": "e9a816c5e34681f92d6632e1abe5995329f52a6d0757cf243df75aaf554fea76",
+    "manifest_sha256": "3786de3139fafd64d7f6aeb3d39289ad67ee80756d009373c981be8709fc3370",
+    "source_files": 479,
+    "changed_paths": [
+      "crates/tekes-ui-controls/src/composition.rs",
+      "design/source/interaction-contracts.json",
+      "design/tokens.json",
+      "docs/design/layout-text-preflight-20261021.md",
+      "examples/composition-consumer/examples/native.rs",
+      "examples/composition-consumer/src/layout_activation.rs",
+      "examples/composition-consumer/src/lib.rs",
+      "examples/composition-consumer/tests/layout_text_services.rs"
+    ],
+    "source_locks_and_prior_545_unchanged": true,
+    "tokens_sets_api_unchanged": true
+  },
+  "sources": {
+    "scripts/test-reading-candidate.py": "af377ea013e8c5cd3ab82e1c56a04f8d7ea9a2e75a5ce8a0d79deaf474dda22b",
+    "scripts/probes/agentkit-layout-text-candidate.rs": "736a1a21ab29458304bf087a9c34c75531ff46d8d1bf41b517d8ced948e7fc5a",
+    "scripts/probes/tekesui-active-layout-preflight.rs": "06bdf9282a81e27b1078a44d318afd3f8743a46231bb04bbd9a96f186cc716a3",
+    "scripts/probes/agentkit-run-preflight-candidate.rs": "a2b5fa61a461bc0c1bf0f7cc55b726851371d71de23a7e5adb06d8c1b19cc320",
+    "ui/components/src/run_view.rs": "5c6169360e92e230dbb935803c574fe4f1ad40d107d58d8fa0247e506bb29346"
+  },
+  "references": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Agent/ClientEmbeddedRunView.swift": "15cfb89a05c307470940c47401c1bc5c453efcd461d1ed8f95a3411de5629958",
+    "/Users/frankqin/dev/Tekes/Tekes/ClientAgentPanelHostAdapters.swift": "44b2b5ee2d3292bfe31527de9c8f9bb21cdab32fc41546155774b5cbcc7d1b52"
+  },
+  "default_pin_unchanged": {
+    "revision": "8cf0840790334ba224afc0595897c74231c712e6",
+    "manifest_sha256": "a1635227bb475630ae44a60d87f9fe0ea363d2b07984f7515e82f48fcf95a2bd",
+    "cargo_toml_sha256": "4f29c69e31ce09a70cc2a6bb8eb959761b3dfa0702880de5a13a946a615f75ef",
+    "cargo_lock_sha256": "b7482a1f87e3dce648458484e10b7151e83163674064a19eb3d5e6500da485ed"
+  },
+  "negative_controls": {
+    "old_545_original_probe": {
+      "tests_passed": 1,
+      "meaning": "Old known-boundary assertion remains true; not feature acceptance"
+    },
+    "candidate_292_original_probe": {
+      "expected_assertion_failures": 1,
+      "observed": "MissingTextServices(ComponentId(11))",
+      "log_sha256": "ee7a08de805083637838f4a3575c9b2485f41c8433a2f0895edd876eb26c52aa",
+      "meaning": "Unchanged old gap assertion intentionally fails because dependency validation now rejects reactivation"
+    }
+  },
+  "cli": {
+    "sdk_controls": 388,
+    "sdk_text_cpu": 48,
+    "sdk_text_gpu_tests": 2,
+    "sdk_consumer": 181,
+    "sdk_all_target_strict_clippy": true,
+    "agentkit_ui_workspace": {
+      "tests": 350,
+      "shared_existing_tests": 341,
+      "appended_probe_tests": 9,
+      "scope": "run-final snapshot, before additive cross-width probe expansion; production inputs unchanged"
+    },
+    "agentkit_latest_run_probe": {
+      "tests": 10,
+      "base_transactions": 8,
+      "new_tests": 2,
+      "same_width_failure_recovery_cases": 12,
+      "cross_width_failure_recovery_cases": 6,
+      "strict_clippy": true
+    },
+    "agentkit_summary_probe": {
+      "tests": 14,
+      "matrix_cases": 54,
+      "independent_consumer_tests": 33,
+      "strict_clippy_and_native_build": true
+    },
+    "agentkit_all_target_clippy": true
+  },
+  "receiver_snapshots": {
+    "run-final": {
+      "sha256": "330c0240881d6867ebfb753d6f08ec4583333562aea50ec35c161f20449f65b4",
+      "snapshot": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-layout-text-292-run-final/agentkit",
+      "agentkit_inputs_sha256": "4ef6d17d24809fcaed35471510d802a24a540410b53f907e44e8fca037aa2235",
+      "overrides": {
+        "ui/Cargo.toml": "6285f1b64e22162440a7b9ed341e94553a076961686d17eaf33d57873952f002",
+        "ui/Cargo.lock": "938166f51219783042537cd97a1b708269340b4080df7e6d1ba1fae533c99a62",
+        "ui/demo/src/native.rs": "0c91f56503b7dbd04374d82e65bbdfa6d2027820693a0df79b914707345a8f01"
+      },
+      "probe_sha256": "37ee85a7568efe451cfcbe310af191c8769837d331d2ec9b36b6a21c0e6f6b5c",
+      "probe_base_sha256": "a2b5fa61a461bc0c1bf0f7cc55b726851371d71de23a7e5adb06d8c1b19cc320",
+      "prepared_probe_sha256": "93f0a6dab7a2f1e62a63a0f4a31a28531fba98549e5fbe7b56e17e89b5e629d2",
+      "checks": [
+        {
+          "check": "tests",
+          "exit_code": 0
+        },
+        {
+          "check": "clippy",
+          "exit_code": 0
+        }
+      ]
+    },
+    "cross-width": {
+      "sha256": "e4166a55289e010b1cf90e7cd2f6bc472b6e78e8d7d2e238691f985e4e4b75b6",
+      "snapshot": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-layout-text-292-cross-width/agentkit",
+      "agentkit_inputs_sha256": "4ef6d17d24809fcaed35471510d802a24a540410b53f907e44e8fca037aa2235",
+      "overrides": {
+        "ui/Cargo.toml": "6285f1b64e22162440a7b9ed341e94553a076961686d17eaf33d57873952f002",
+        "ui/Cargo.lock": "938166f51219783042537cd97a1b708269340b4080df7e6d1ba1fae533c99a62",
+        "ui/demo/src/native.rs": "0c91f56503b7dbd04374d82e65bbdfa6d2027820693a0df79b914707345a8f01"
+      },
+      "probe_sha256": "736a1a21ab29458304bf087a9c34c75531ff46d8d1bf41b517d8ced948e7fc5a",
+      "probe_base_sha256": "a2b5fa61a461bc0c1bf0f7cc55b726851371d71de23a7e5adb06d8c1b19cc320",
+      "prepared_probe_sha256": "7cda3deb9639187f0444ab754b57196ddd8853f0264ad990fd16a85cc7e73f27",
+      "checks": [
+        {
+          "check": "tests",
+          "exit_code": 0
+        },
+        {
+          "check": "clippy",
+          "exit_code": 0
+        }
+      ]
+    },
+    "summary": {
+      "sha256": "d4062ea84a736ed5f31ff4c1ee910000e38c9c71499b52a66ea7f14000519ccb",
+      "snapshot": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-layout-text-292-summary/agentkit",
+      "agentkit_inputs_sha256": "4ef6d17d24809fcaed35471510d802a24a540410b53f907e44e8fca037aa2235",
+      "overrides": {
+        "ui/Cargo.toml": "6285f1b64e22162440a7b9ed341e94553a076961686d17eaf33d57873952f002",
+        "ui/Cargo.lock": "033bacb7bc4d643f889616a871a901ca3dc70da0a8979861d83474cfea68a143",
+        "ui/demo/src/native.rs": "c0c9488dfa61ad4976836701079893cc7e2be94955eb786b60b2bf9386c1bfdb",
+        "ui/components/Cargo.toml": "68b082017dff2e721eb5194b920998ae33574220d7f2c4edd9e9f4f3674a1558",
+        "ui/components/src/summary.rs": "64d57e96b5f560a06348cadfd651c7983231dc72d02a487bf9bcb10357f4db80",
+        "ui/components/src/summary_section.rs": "2b8ef593544c9c00f2485f5b390ebf6c09899437d40e112d8ab97fa790b9724a",
+        "ui/demo/src/component_demo.rs": "3fd839336632351c04d5b68a5bf0e2e936b3d588523d69bd2674d829e427d952",
+        "ui/demo/tests/agentkit-reading-candidate.rs": "3a3ef23b6000742e0d2a32adbdb540ce5b337d03e188f0e13795efcece80a147",
+        "ui/demo/tests/agentkit-run-preflight-candidate.rs": "a2b5fa61a461bc0c1bf0f7cc55b726851371d71de23a7e5adb06d8c1b19cc320",
+        "ui/demo/src/fixture.rs": "e5d0c351ec515905b466a709dc3040eb0ecd0b7a86785d57c6aa317a57883c00",
+        "ui/demo/src/native_summary_sections_selftest.rs": "ebb396eb1d67f337a87b48f2a22322162e2c10155b441e00f881a7f0aac5474f"
+      },
+      "probe_sha256": "ec022d5a3b9c1c29f503832816a7aeb34d072ca79e89236956f42c3f3dd0ac1b",
+      "probe_base_sha256": null,
+      "prepared_probe_sha256": "ec022d5a3b9c1c29f503832816a7aeb34d072ca79e89236956f42c3f3dd0ac1b",
+      "checks": [
+        {
+          "check": "tests",
+          "exit_code": 0
+        },
+        {
+          "check": "clippy",
+          "exit_code": 0
+        },
+        {
+          "check": "public-consumer",
+          "exit_code": 0
+        },
+        {
+          "check": "native-build",
+          "exit_code": 0
+        }
+      ]
+    }
+  },
+  "gpu": {
+    "tail_cases": 288,
+    "hard_line_cases": 144,
+    "frames": 864,
+    "result_sha256": "c5a0ca96df9d5240ad7feb7b6d6b41b37c8a8e4436a7ac80bc7491ad3665908e",
+    "hard_lines_sha256": "2fed5eb52bcf619a0f06180d98889907d58b749a585213b31799c5beb59a7fb9",
+    "scope": "Independent native glyph label oracle; not #27 failure/recovery GPU matrix"
+  },
+  "native_sdk": {
+    "identity": "292f5fe65195af66624cb28413868eb46db6ab1a81ef1294ab19c8efbd45b0f4",
+    "app_bundle": "com.tekes.agentkit.layout-text-292-review",
+    "binary_sha256": "68fc4463ebf931e2fdc5290ec7e39c9b75b515db25e56ae9bd204f5b1d5f9c67",
+    "unmodified_sdk_example_with_bundle_wrapper": true,
+    "checkpoints": {
+      "00-initial": {
+        "layout_review": {
+          "collapsed": true,
+          "error": null,
+          "focus": null,
+          "original_baseline_retained": true,
+          "original_value": "keep😀value",
+          "pane_active": false,
+          "paragraph_present": false,
+          "services_enabled": false,
+          "type_scale": 1.0
+        },
+        "mode": "layout",
+        "nodes": [],
+        "screen": {
+          "builtin": false,
+          "name": "U2790B",
+          "scale": 2.0
+        },
+        "text_input": null,
+        "window_active": true
+      },
+      "01-arrange-rejected": {
+        "layout_review": {
+          "collapsed": false,
+          "error": "MissingTextServices(ComponentId(9911))",
+          "focus": null,
+          "original_baseline_retained": true,
+          "original_value": "keep😀value",
+          "pane_active": true,
+          "paragraph_present": false,
+          "services_enabled": false,
+          "type_scale": 1.0
+        },
+        "mode": "layout",
+        "nodes": [],
+        "screen": {
+          "builtin": false,
+          "name": "U2790B",
+          "scale": 2.0
+        },
+        "text_input": null,
+        "window_active": true
+      },
+      "02-failed-input-fenced": {
+        "layout_review": {
+          "collapsed": false,
+          "error": "MissingTextServices(ComponentId(9911))",
+          "focus": null,
+          "original_baseline_retained": true,
+          "original_value": "keep😀value",
+          "pane_active": true,
+          "paragraph_present": false,
+          "services_enabled": false,
+          "type_scale": 1.0
+        },
+        "mode": "layout",
+        "nodes": [],
+        "screen": {
+          "builtin": false,
+          "name": "U2790B",
+          "scale": 2.0
+        },
+        "text_input": null,
+        "window_active": true
+      },
+      "03-recovered-no-focus": {
+        "layout_review": {
+          "collapsed": false,
+          "error": null,
+          "focus": null,
+          "original_baseline_retained": true,
+          "original_value": "keep😀value",
+          "pane_active": true,
+          "paragraph_present": true,
+          "services_enabled": true,
+          "type_scale": 1.0
+        },
+        "mode": "layout",
+        "nodes": [
+          {
+            "component": 9910,
+            "enabled": true,
+            "focused": false,
+            "frame": {
+              "height": 624.0,
+              "width": 704.0,
+              "x": 8.0,
+              "y": 8.0
+            },
+            "label": "",
+            "part": null,
+            "required": false,
+            "role": "Group",
+            "value": null
+          },
+          {
+            "component": 9911,
+            "enabled": true,
+            "focused": false,
+            "frame": {
+              "height": 32.0,
+              "width": 704.0,
+              "x": 8.0,
+              "y": 28.0
+            },
+            "label": "field",
+            "part": null,
+            "required": false,
+            "role": "TextField",
+            "value": "keep😀value"
+          }
+        ],
+        "screen": {
+          "builtin": false,
+          "name": "U2790B",
+          "scale": 2.0
+        },
+        "text_input": null,
+        "window_active": true
+      },
+      "04-tab-focused": {
+        "layout_review": {
+          "collapsed": false,
+          "error": null,
+          "focus": 9911,
+          "original_baseline_retained": true,
+          "original_value": "keep😀value",
+          "pane_active": true,
+          "paragraph_present": true,
+          "services_enabled": true,
+          "type_scale": 1.0
+        },
+        "mode": "layout",
+        "nodes": [
+          {
+            "component": 9910,
+            "enabled": true,
+            "focused": false,
+            "frame": {
+              "height": 624.0,
+              "width": 704.0,
+              "x": 8.0,
+              "y": 8.0
+            },
+            "label": "",
+            "part": null,
+            "required": false,
+            "role": "Group",
+            "value": null
+          },
+          {
+            "component": 9911,
+            "enabled": true,
+            "focused": true,
+            "frame": {
+              "height": 32.0,
+              "width": 704.0,
+              "x": 8.0,
+              "y": 28.0
+            },
+            "label": "field",
+            "part": null,
+            "required": false,
+            "role": "TextField",
+            "value": "keep😀value"
+          }
+        ],
+        "screen": {
+          "builtin": false,
+          "name": "U2790B",
+          "scale": 2.0
+        },
+        "text_input": {
+          "marked": null,
+          "selection": [
+            0,
+            0
+          ],
+          "text": "keep😀value"
+        },
+        "window_active": true
+      },
+      "05-active-service-loss": {
+        "layout_review": {
+          "collapsed": false,
+          "error": "MissingTextServices(ComponentId(9911))",
+          "focus": null,
+          "original_baseline_retained": true,
+          "original_value": "keep😀value",
+          "pane_active": true,
+          "paragraph_present": true,
+          "services_enabled": false,
+          "type_scale": 1.0
+        },
+        "mode": "layout",
+        "nodes": [],
+        "screen": {
+          "builtin": false,
+          "name": "U2790B",
+          "scale": 2.0
+        },
+        "text_input": null,
+        "window_active": true
+      },
+      "06-recovered-original-value": {
+        "layout_review": {
+          "collapsed": false,
+          "error": null,
+          "focus": null,
+          "original_baseline_retained": true,
+          "original_value": "keep😀value",
+          "pane_active": true,
+          "paragraph_present": true,
+          "services_enabled": true,
+          "type_scale": 1.0
+        },
+        "mode": "layout",
+        "nodes": [
+          {
+            "component": 9910,
+            "enabled": true,
+            "focused": false,
+            "frame": {
+              "height": 624.0,
+              "width": 704.0,
+              "x": 8.0,
+              "y": 8.0
+            },
+            "label": "",
+            "part": null,
+            "required": false,
+            "role": "Group",
+            "value": null
+          },
+          {
+            "component": 9911,
+            "enabled": true,
+            "focused": false,
+            "frame": {
+              "height": 32.0,
+              "width": 704.0,
+              "x": 8.0,
+              "y": 28.0
+            },
+            "label": "field",
+            "part": null,
+            "required": false,
+            "role": "TextField",
+            "value": "keep😀value"
+          }
+        ],
+        "screen": {
+          "builtin": false,
+          "name": "U2790B",
+          "scale": 2.0
+        },
+        "text_input": null,
+        "window_active": true
+      },
+      "07-second-tab-focused": {
+        "layout_review": {
+          "collapsed": false,
+          "error": null,
+          "focus": 9911,
+          "original_baseline_retained": true,
+          "original_value": "keep😀value",
+          "pane_active": true,
+          "paragraph_present": true,
+          "services_enabled": true,
+          "type_scale": 1.0
+        },
+        "mode": "layout",
+        "nodes": [
+          {
+            "component": 9910,
+            "enabled": true,
+            "focused": false,
+            "frame": {
+              "height": 624.0,
+              "width": 704.0,
+              "x": 8.0,
+              "y": 8.0
+            },
+            "label": "",
+            "part": null,
+            "required": false,
+            "role": "Group",
+            "value": null
+          },
+          {
+            "component": 9911,
+            "enabled": true,
+            "focused": true,
+            "frame": {
+              "height": 32.0,
+              "width": 704.0,
+              "x": 8.0,
+              "y": 28.0
+            },
+            "label": "field",
+            "part": null,
+            "required": false,
+            "role": "TextField",
+            "value": "keep😀value"
+          }
+        ],
+        "screen": {
+          "builtin": false,
+          "name": "U2790B",
+          "scale": 2.0
+        },
+        "text_input": {
+          "marked": null,
+          "selection": [
+            0,
+            0
+          ],
+          "text": "keep😀value"
+        },
+        "window_active": true
+      },
+      "08-valid-collapse": {
+        "layout_review": {
+          "collapsed": true,
+          "error": null,
+          "focus": null,
+          "original_baseline_retained": true,
+          "original_value": "keep😀value",
+          "pane_active": false,
+          "paragraph_present": true,
+          "services_enabled": true,
+          "type_scale": 1.0
+        },
+        "mode": "layout",
+        "nodes": [],
+        "screen": {
+          "builtin": false,
+          "name": "U2790B",
+          "scale": 2.0
+        },
+        "text_input": null,
+        "window_active": true
+      },
+      "09-repeat-arrange-rejected": {
+        "layout_review": {
+          "collapsed": false,
+          "error": "MissingTextServices(ComponentId(9911))",
+          "focus": null,
+          "original_baseline_retained": true,
+          "original_value": "keep😀value",
+          "pane_active": true,
+          "paragraph_present": true,
+          "services_enabled": false,
+          "type_scale": 1.0
+        },
+        "mode": "layout",
+        "nodes": [],
+        "screen": {
+          "builtin": false,
+          "name": "U2790B",
+          "scale": 2.0
+        },
+        "text_input": null,
+        "window_active": true
+      },
+      "10-scale-change-rejected": {
+        "layout_review": {
+          "collapsed": false,
+          "error": "MissingTextServices(ComponentId(9911))",
+          "focus": null,
+          "original_baseline_retained": true,
+          "original_value": "keep😀value",
+          "pane_active": true,
+          "paragraph_present": true,
+          "services_enabled": false,
+          "type_scale": 1.5
+        },
+        "mode": "layout",
+        "nodes": [],
+        "screen": {
+          "builtin": false,
+          "name": "U2790B",
+          "scale": 2.0
+        },
+        "text_input": null,
+        "window_active": true
+      },
+      "11-large-recovered": {
+        "layout_review": {
+          "collapsed": false,
+          "error": null,
+          "focus": null,
+          "original_baseline_retained": true,
+          "original_value": "keep😀value",
+          "pane_active": true,
+          "paragraph_present": true,
+          "services_enabled": true,
+          "type_scale": 1.5
+        },
+        "mode": "layout",
+        "nodes": [
+          {
+            "component": 9910,
+            "enabled": true,
+            "focused": false,
+            "frame": {
+              "height": 624.0,
+              "width": 704.0,
+              "x": 8.0,
+              "y": 8.0
+            },
+            "label": "",
+            "part": null,
+            "required": false,
+            "role": "Group",
+            "value": null
+          },
+          {
+            "component": 9911,
+            "enabled": true,
+            "focused": false,
+            "frame": {
+              "height": 39.0,
+              "width": 704.0,
+              "x": 8.0,
+              "y": 35.0
+            },
+            "label": "field",
+            "part": null,
+            "required": false,
+            "role": "TextField",
+            "value": "keep😀value"
+          }
+        ],
+        "screen": {
+          "builtin": false,
+          "name": "U2790B",
+          "scale": 2.0
+        },
+        "text_input": null,
+        "window_active": true
+      },
+      "12-large-tab-focused": {
+        "layout_review": {
+          "collapsed": false,
+          "error": null,
+          "focus": 9911,
+          "original_baseline_retained": true,
+          "original_value": "keep😀value",
+          "pane_active": true,
+          "paragraph_present": true,
+          "services_enabled": true,
+          "type_scale": 1.5
+        },
+        "mode": "layout",
+        "nodes": [
+          {
+            "component": 9910,
+            "enabled": true,
+            "focused": false,
+            "frame": {
+              "height": 624.0,
+              "width": 704.0,
+              "x": 8.0,
+              "y": 8.0
+            },
+            "label": "",
+            "part": null,
+            "required": false,
+            "role": "Group",
+            "value": null
+          },
+          {
+            "component": 9911,
+            "enabled": true,
+            "focused": true,
+            "frame": {
+              "height": 39.0,
+              "width": 704.0,
+              "x": 8.0,
+              "y": 35.0
+            },
+            "label": "field",
+            "part": null,
+            "required": false,
+            "role": "TextField",
+            "value": "keep😀value"
+          }
+        ],
+        "screen": {
+          "builtin": false,
+          "name": "U2790B",
+          "scale": 2.0
+        },
+        "text_input": {
+          "marked": null,
+          "selection": [
+            0,
+            0
+          ],
+          "text": "keep😀value"
+        },
+        "window_active": true
+      },
+      "13-scale-return-focus-retained": {
+        "layout_review": {
+          "collapsed": false,
+          "error": null,
+          "focus": 9911,
+          "original_baseline_retained": true,
+          "original_value": "keep😀value",
+          "pane_active": true,
+          "paragraph_present": true,
+          "services_enabled": true,
+          "type_scale": 1.0
+        },
+        "mode": "layout",
+        "nodes": [
+          {
+            "component": 9910,
+            "enabled": true,
+            "focused": false,
+            "frame": {
+              "height": 624.0,
+              "width": 704.0,
+              "x": 8.0,
+              "y": 8.0
+            },
+            "label": "",
+            "part": null,
+            "required": false,
+            "role": "Group",
+            "value": null
+          },
+          {
+            "component": 9911,
+            "enabled": true,
+            "focused": true,
+            "frame": {
+              "height": 32.0,
+              "width": 704.0,
+              "x": 8.0,
+              "y": 28.0
+            },
+            "label": "field",
+            "part": null,
+            "required": false,
+            "role": "TextField",
+            "value": "keep😀value"
+          }
+        ],
+        "screen": {
+          "builtin": false,
+          "name": "U2790B",
+          "scale": 2.0
+        },
+        "text_input": {
+          "marked": null,
+          "selection": [
+            0,
+            0
+          ],
+          "text": "keep😀value"
+        },
+        "window_active": true
+      }
+    },
+    "native_tab_entries": 3,
+    "screenshots": "Failed and recovered windows inspected inline through CUA; no versioned PNG claimed",
+    "cleanup": "Original process exited 0; one default list process relaunched by post-close observation was closed and excluded",
+    "physical_ime": false,
+    "voice_over": false
+  },
+  "native_agentkit": {
+    "normal_snapshot": "run-final",
+    "normal_binary_sha256": "246f7e30cde0f231b017097f8b95461699a3bfffb4ab5399ebe83f5a56230175",
+    "normal_component_selftest": true,
+    "summary_snapshot": "summary",
+    "summary_binary_sha256": "a08d9206bfb8471aa385dba16e4d2eac04681598e03768f22c267d3e6390e9cb",
+    "summary_receipt": {
+      "collapsedCanonicalUpdate": true,
+      "fullLayoutParity": false,
+      "hiddenFromAccessibility": true,
+      "nativeWindow": true,
+      "noSubmission": true,
+      "originalRowsRetained": true,
+      "physicalIme": false,
+      "pointerCollapseExpand": true,
+      "realHarness": false,
+      "runtimeDraft": true,
+      "voiceOver": false
+    },
+    "scope": "Owned fixtures with actual valid text backend; not native broken-backend diagnosis or real-harness reading acceptance"
+  },
+  "logs": {
+    "/tmp/agentkit-layout-text-292-sdk-controls.log": "1eb432740fde2d9a86f2a30f2776cf8e410237bf93344639d2448296a0b6187f",
+    "/tmp/agentkit-layout-text-292-sdk-text-cpu.log": "7ce2bd5630221244b6c98b5de57158063d13cd6eb2396866efab4409deb4f505",
+    "/tmp/agentkit-layout-text-292-sdk-consumer.log": "5c6bda2857715a410b3cf5a0495d95e7c3f6fa4b7071323f37fe7cd6c2f9fbb2",
+    "/tmp/agentkit-layout-text-292-sdk-native-build.log": "da617cec9cb409cc7d90040e129ad90b46ac0d3bfc0d87a5184fe72f43403805",
+    "/tmp/agentkit-layout-text-292-sdk-clippy.log": "09c2225fdc243b3d7f3e113c3a01fe80edae5567c05ecabdc8093ad29ac643ae",
+    "/tmp/agentkit-layout-text-292-sdk-consumer-clippy.log": "3b0e2f9fdab7b9e788e518355033d054ea44b9b1b9ca8f5d3acb0d19ab83d9d2",
+    "/tmp/agentkit-layout-text-292-sdk-gpu.log": "4e6f8c1aaf0cbbf7dc0fe334ee88c59097ff4fb430b745757ebac4c6ca87720f",
+    "/tmp/agentkit-layout-text-292-agentkit-ui-all.log": "c80c691c764eb6f98a5a21948ec70e211221d996f0e21ce3344d07bc0db7fddd",
+    "/tmp/agentkit-layout-text-292-agentkit-ui-clippy.log": "2ddcfa9b952f4a460e302b981c72d4b7927d53320184d2a6def10e23fb82cd59",
+    "/tmp/agentkit-layout-text-292-agentkit-native-rebuilt.log": "deedef46bdcd5dafabecc66aacae9cc4b23675be006ce01d84e2d5c131ef5ad5",
+    "/tmp/agentkit-layout-text-292-native-sdk.log": "eff9bfa8ba2990858348d999f029054ee8bf3a1766b91801e62f48a27f6658f9",
+    "/tmp/agentkit-layout-text-292-agentkit-native.log": "82c40a79f040726193dee84d3cc198bba0d95fc958110a5739a661727ac39d0f",
+    "/tmp/agentkit-layout-text-292-agentkit-summary-native.log": "986d4ddccf111c875d87be451d00c567ba0eca82ff66373a4c960bd8f2ed3261"
+  },
+  "assessment": {
+    "receiver_contract_pass": true,
+    "recommend_development_freeze_input": true,
+    "promotion_performed": false,
+    "public_pin_promoted": false,
+    "issue_closed": false,
+    "limitations": [
+      "Default public 8cf still has the known boundary",
+      "No #27-specific 48-case failure/recovery GPU matrix claimed for isolated 292",
+      "Physical IME, VoiceOver, paired ClientKit/Gold7 visuals and full Agent UI acceptance remain open",
+      "Native SDK mode covers one screen/window configuration and two type scales; broad geometry matrix is component evidence",
+      "Native SDK diagnostic Pane is not a reusable AgentKit component"
+    ]
+  },
+  "merged": false,
+  "tag_created": false
+}

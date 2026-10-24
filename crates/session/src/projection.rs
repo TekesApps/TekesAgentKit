@@ -2,6 +2,23 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
 use tekes_agent_contract::*;
+type InventoryRows = BTreeMap<String, (Value, Option<ProjectionBlock>)>;
+fn inventory_rows(frame: &Value) -> Result<InventoryRows> {
+    let mut rows = BTreeMap::new();
+    for item in array(&frame["snapshot"], "items")? {
+        let id = validate_summary(item)?.to_owned();
+        let block = item
+            .get("projections")
+            .filter(|v| !v.is_null())
+            .map(|v| serde_json::from_value::<ProjectionBlock>(v.clone()))
+            .transpose()?;
+        require(
+            rows.insert(id, (item.clone(), block)).is_none(),
+            "duplicate inventory identity",
+        )?;
+    }
+    Ok(rows)
+}
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 pub enum ConnectionState {
@@ -25,13 +42,22 @@ pub struct LivePreview {
     /// Latest provider report for this step. None means unavailable, not zero.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output_tokens: Option<u64>,
+    /// Dialect presentation anchor, not the transient transport's seq. For
+    /// transient chunks this is the last durable cursor + 1 at receipt time.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub presentation_order: Option<i64>,
 }
 /// A headless read model; journal entries remain lossless. UI surface folding is out of scope.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SessionProjection {
     pub summary: Option<Value>,
     pub native_conversation: Option<NativeConversationSnapshot>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub native_reading_identities: Vec<NativeMessageReadingIdentity>,
     pub native_events: std::collections::VecDeque<Value>,
+    /// None permits legacy event-only snapshots. Idle is an explicit retirement.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub native_assistant: Option<crate::NativeAssistantProjection>,
     pub agent_error: Option<String>,
     pub entries: BTreeMap<i64, HistoryEntry>,
     pub previews: BTreeMap<String, LivePreview>,
@@ -52,7 +78,9 @@ impl Default for SessionProjection {
         Self {
             summary: None,
             native_conversation: None,
+            native_reading_identities: vec![],
             native_events: std::collections::VecDeque::new(),
+            native_assistant: None,
             agent_error: None,
             entries: BTreeMap::new(),
             previews: BTreeMap::new(),
@@ -71,10 +99,52 @@ impl Default for SessionProjection {
     }
 }
 impl SessionProjection {
-    fn block(&mut self, block: ProjectionBlock) {
+    fn push_native_event(&mut self, event: Value) {
+        if let Some(next) =
+            crate::NativeAssistantProjection::receive(self.native_assistant.as_ref(), &event)
+        {
+            self.native_assistant = Some(next);
+        }
+        if self.native_events.len() >= 256 {
+            self.native_events.pop_front();
+        }
+        self.native_events.push_back(event);
+    }
+    fn has_ordered_queue(&self, key: Option<&str>) -> bool {
+        key.is_some_and(|key| self.projections.contains_key(key))
+    }
+    fn validate_block(&self, block: &ProjectionBlock, queue_key: Option<&str>) -> Result<()> {
+        // Validate every value before changing any projection.
+        for (key, value) in &block.values {
+            if Some(key.as_str()) == queue_key
+                && let Some(old) = self.projections.get(key)
+                && block.as_of_seq == old.sequence
+            {
+                require(
+                    old.value == *value,
+                    "conflicting projection at same sequence",
+                )?;
+            }
+            if Some(key.as_str()) == queue_key {
+                validate_queue_projection(value)?;
+            }
+        }
+        Ok(())
+    }
+    fn block(&mut self, block: ProjectionBlock, queue_key: Option<&str>) -> Result<()> {
+        self.validate_block(&block, queue_key)?;
         for (key, value) in block.values {
-            let old = self.projections.get(&key);
-            if old.is_none_or(|v| block.as_of_seq >= v.sequence) {
+            let accepted = self.projections.get(&key).is_none_or(|old| {
+                block.as_of_seq > old.sequence
+                    || (Some(key.as_str()) != queue_key && block.as_of_seq == old.sequence)
+            });
+            if accepted {
+                if Some(key.as_str()) == queue_key {
+                    self.queue = value["items"]
+                        .as_array()
+                        .expect("validated queue items")
+                        .clone();
+                }
                 self.projections.insert(
                     key,
                     VersionedValue {
@@ -84,9 +154,20 @@ impl SessionProjection {
                 );
             }
         }
+        Ok(())
     }
     pub fn apply_snapshot(&mut self, snapshot: JournalSnapshot) -> Result<()> {
+        self.apply_snapshot_with_queue(snapshot, None)
+    }
+    fn apply_snapshot_with_queue(
+        &mut self,
+        snapshot: JournalSnapshot,
+        queue_key: Option<&str>,
+    ) -> Result<()> {
         snapshot.validate()?;
+        if let Some(block) = &snapshot.projections {
+            self.validate_block(block, queue_key)?;
+        }
         let base = snapshot.entries.first().map(|e| e.event.seq).unwrap_or(-1);
         let preserve = snapshot.history_revision == self.history_revision
             && base >= 0
@@ -121,7 +202,7 @@ impl SessionProjection {
         self.journal_ready = true;
         self.journal_error = None;
         if let Some(block) = snapshot.projections {
-            self.block(block);
+            self.block(block, queue_key)?;
         }
         self.refold();
         Ok(())
@@ -136,6 +217,9 @@ impl SessionProjection {
         }
     }
     fn fold(&mut self, event: &SessionEvent) {
+        self.fold_at(event, event.seq);
+    }
+    fn fold_at(&mut self, event: &SessionEvent, presentation_order: i64) {
         match event.kind.as_str() {
             "turn/start" => self.run_open = true,
             "turn/end" => {
@@ -173,17 +257,19 @@ impl SessionProjection {
                     return;
                 }
                 let p = self.previews.entry(preview_key(event)).or_default();
+                p.presentation_order = Some(presentation_order);
+                let kind = event.data["chunk"]["type"].as_str().unwrap_or("");
+                if kind == "reasoning-end" || kind.starts_with("text") {
+                    p.reasoning_ended = true;
+                } else if kind.starts_with("reasoning") {
+                    p.reasoning_ended = false;
+                }
                 if let Some(presentation) = event.data.get("presentation") {
                     p.text = presentation["text"].as_str().unwrap_or("").into();
                     p.reasoning = presentation["reasoning"].as_str().unwrap_or("").into();
                 } else {
                     let chunk = &event.data["chunk"];
                     let kind = chunk["type"].as_str().unwrap_or("");
-                    if kind == "reasoning-end" || kind.starts_with("text") {
-                        p.reasoning_ended = true;
-                    } else if kind.starts_with("reasoning") {
-                        p.reasoning_ended = false;
-                    }
                     let delta = chunk["text"]
                         .as_str()
                         .or_else(|| chunk["delta"].as_str())
@@ -272,6 +358,9 @@ pub struct MemoryProjectionStore {
     pub workspace_ready: bool,
     pub control_ready: bool,
     pub actionables_ready: bool,
+    /// Local adapter authorization. Remote projection keys never configure this value.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sequenced_queue_projection_key: Option<String>,
     #[serde(skip)]
     validators: BTreeMap<String, GenerationValidator>,
 }
@@ -281,6 +370,22 @@ impl MemoryProjectionStore {
             endpoint_id: endpoint_id.into(),
             ..Self::default()
         }
+    }
+    pub(crate) fn configure_sequenced_queue_projection(&mut self, key: Option<&str>) {
+        if self.sequenced_queue_projection_key.as_deref() != key {
+            // Retained opaque remote values cannot acquire local authority when
+            // the connector changes its adapter configuration.
+            for session in self.sessions.values_mut() {
+                if let Some(old) = self.sequenced_queue_projection_key.as_deref() {
+                    session.projections.remove(old);
+                }
+                if let Some(new) = key {
+                    session.projections.remove(new);
+                }
+                session.queue.clear();
+            }
+        }
+        self.sequenced_queue_projection_key = key.map(str::to_owned);
     }
     pub fn begin_connection(&mut self, host: HostDescription) {
         self.disconnect();
@@ -300,6 +405,8 @@ impl MemoryProjectionStore {
             session.journal_ready = false;
             session.previews.clear();
             session.native_events.clear();
+            session.native_assistant = None;
+            session.native_reading_identities.clear();
         }
         self.connection = ConnectionState::Connecting;
     }
@@ -309,6 +416,8 @@ impl MemoryProjectionStore {
             s.journal_ready = false;
             s.previews.clear();
             s.native_events.clear();
+            s.native_assistant = None;
+            s.native_reading_identities.clear();
         }
     }
     pub fn ready(&self) -> bool {
@@ -325,6 +434,57 @@ impl MemoryProjectionStore {
         (address.endpoint_id == self.endpoint_id)
             .then(|| self.sessions.get(&address.session_id))
             .flatten()
+    }
+    /// Replace fresh reader baselines in one publication, without cloning any
+    /// journal, preview or history. Parse every summary/projection before commit.
+    pub(crate) fn replace_inventory_baselines(
+        &mut self,
+        workspace: Option<Value>,
+        mut inventory: Value,
+    ) -> Result<()> {
+        require(
+            inventory["type"] == "baseline",
+            "inventory refresh requires baseline",
+        )?;
+        let generation = string(&inventory, "generation")?.to_owned();
+        let mut validator = GenerationValidator::default();
+        validator.accept(&generation, true)?;
+        normalize_title(&mut inventory);
+        let rows = inventory_rows(&inventory)?;
+        self.validate_inventory_blocks(&rows)?;
+        let expects_workspace = self
+            .host
+            .as_ref()
+            .is_some_and(|h| h.capabilities.contains("workspace-sync"));
+        require(
+            workspace.is_some() == expects_workspace,
+            "inventory refresh workspace capability mismatch",
+        )?;
+        let workspace = workspace
+            .map(|frame| -> Result<Self> {
+                require(
+                    frame["type"] == "baseline" && frame["generation"] == generation,
+                    "incoherent workspace/inventory refresh generation",
+                )?;
+                let mut staged = Self::new(self.endpoint_id.clone());
+                staged.apply("workspace", frame)?;
+                Ok(staged)
+            })
+            .transpose()?;
+        if let Some(staged) = workspace {
+            self.workspaces = staged.workspaces;
+            self.archived_session_ids = staged.archived_session_ids;
+            self.pinned_session_ids = staged.pinned_session_ids;
+            self.workspace_ready = true;
+            self.validators
+                .insert("workspace".into(), validator.clone());
+        }
+        self.commit_inventory(rows)?;
+        self.validators.insert("inventory".into(), validator);
+        if self.ready() {
+            self.connection = ConnectionState::Ready;
+        }
+        Ok(())
     }
     pub fn apply(&mut self, stream: &str, mut frame: Value) -> Result<()> {
         if matches!(stream, "inventory" | "control") {
@@ -447,23 +607,8 @@ impl MemoryProjectionStore {
     fn inventory(&mut self, kind: &str, frame: &Value) -> Result<()> {
         match kind {
             "baseline" => {
-                let items = array(&frame["snapshot"], "items")?;
-                let mut summaries = BTreeMap::new();
-                for item in items {
-                    let id = validate_summary(item)?;
-                    require(
-                        summaries.insert(id.to_owned(), item.clone()).is_none(),
-                        "duplicate inventory identity",
-                    )?;
-                }
-                // Retain readable history for removed/archived sessions, but retire inventory authority.
-                for session in self.sessions.values_mut() {
-                    session.summary = None;
-                }
-                for (id, value) in summaries {
-                    self.upsert_summary(&id, value)?;
-                }
-                self.inventory_ready = true;
+                let rows = inventory_rows(frame)?;
+                self.commit_inventory(rows)?;
             }
             "upsert" => {
                 let value = frame["session"].clone();
@@ -479,6 +624,12 @@ impl MemoryProjectionStore {
                 let id = string(frame, "sessionId")?;
                 let running = boolean(frame, "running")?;
                 if let Some(s) = self.sessions.get_mut(id) {
+                    // Operational errors belong to the preceding execution.
+                    // Only an ordered live inventory start clears them; replaying
+                    // turn/start from snapshots or pagination must not do so.
+                    if running {
+                        s.agent_error = None;
+                    }
                     if let Some(summary) = &mut s.summary {
                         summary["running"] = Value::Bool(running);
                     }
@@ -510,13 +661,55 @@ impl MemoryProjectionStore {
             .filter(|v| !v.is_null())
             .map(|v| serde_json::from_value::<ProjectionBlock>(v.clone()))
             .transpose()?;
+        self.commit_summary(id, value, block)?;
+        Ok(())
+    }
+    fn commit_inventory(&mut self, rows: InventoryRows) -> Result<()> {
+        self.validate_inventory_blocks(&rows)?;
+        // Missing membership retires authority, never a reader's retained history.
+        for session in self.sessions.values_mut() {
+            session.summary = None;
+        }
+        for (id, (value, block)) in rows {
+            self.commit_summary(&id, value, block)?;
+        }
+        self.inventory_ready = true;
+        Ok(())
+    }
+    fn validate_inventory_blocks(&self, rows: &InventoryRows) -> Result<()> {
+        let queue_key = self.sequenced_queue_projection_key.as_deref();
+        for (id, (_, block)) in rows {
+            if let Some(block) = block {
+                if let Some(session) = self.sessions.get(id) {
+                    session.validate_block(block, queue_key)?;
+                } else {
+                    SessionProjection::default().validate_block(block, queue_key)?;
+                }
+            }
+        }
+        Ok(())
+    }
+    fn commit_summary(
+        &mut self,
+        id: &str,
+        value: Value,
+        block: Option<ProjectionBlock>,
+    ) -> Result<()> {
+        let queue_key = self.sequenced_queue_projection_key.clone();
+        if let Some(block) = &block {
+            if let Some(session) = self.sessions.get(id) {
+                session.validate_block(block, queue_key.as_deref())?;
+            } else {
+                SessionProjection::default().validate_block(block, queue_key.as_deref())?;
+            }
+        }
         let session = self.sessions.entry(id.into()).or_default();
         if !session.journal_ready {
             session.run_open = value["running"].as_bool().unwrap_or(false);
         }
         session.summary = Some(value);
         if let Some(block) = block {
-            session.block(block);
+            session.block(block, queue_key.as_deref())?;
         }
         Ok(())
     }
@@ -537,18 +730,34 @@ impl MemoryProjectionStore {
                         "duplicate projection identity",
                     )?;
                 }
+                let queue_key = self.sequenced_queue_projection_key.as_deref();
+                for (id, block) in &projections {
+                    if let Some(session) = self.sessions.get(id) {
+                        session.validate_block(block, queue_key)?;
+                    } else {
+                        SessionProjection::default().validate_block(block, queue_key)?;
+                    }
+                }
                 for session in self.sessions.values_mut() {
-                    session.queue.clear();
+                    if !session.has_ordered_queue(queue_key) {
+                        session.queue.clear();
+                    }
                     session.jobs.clear();
                 }
                 for (id, items) in queues {
-                    self.sessions.entry(id).or_default().queue = items;
+                    let session = self.sessions.entry(id).or_default();
+                    if !session.has_ordered_queue(queue_key) {
+                        session.queue = items;
+                    }
                 }
                 for (id, jobs) in jobs {
                     self.sessions.entry(id).or_default().jobs = jobs;
                 }
                 for (id, block) in projections {
-                    self.sessions.entry(id).or_default().block(block);
+                    self.sessions
+                        .entry(id)
+                        .or_default()
+                        .block(block, queue_key)?;
                 }
                 self.control_ready = true;
             }
@@ -558,7 +767,9 @@ impl MemoryProjectionStore {
                 let items = array(state, if kind == "queue" { "items" } else { "jobs" })?.clone();
                 let s = self.sessions.entry(id).or_default();
                 if kind == "queue" {
-                    s.queue = items;
+                    if !s.has_ordered_queue(self.sequenced_queue_projection_key.as_deref()) {
+                        s.queue = items;
+                    }
                 } else {
                     s.jobs = items;
                 }
@@ -567,7 +778,10 @@ impl MemoryProjectionStore {
                 let state = &frame["state"];
                 let id = string(state, "sessionId")?.to_owned();
                 let block: ProjectionBlock = serde_json::from_value(state["projections"].clone())?;
-                self.sessions.entry(id).or_default().block(block);
+                self.sessions
+                    .entry(id)
+                    .or_default()
+                    .block(block, self.sequenced_queue_projection_key.as_deref())?;
             }
             _ => return Err(Error::Protocol("wrong control frame".into())),
         }
@@ -626,12 +840,20 @@ impl MemoryProjectionStore {
                         "conversation generation mismatch",
                     )?;
                 }
+                let identities: Vec<NativeMessageReadingIdentity> = frame
+                    .get("readingIdentities")
+                    .map(|value| serde_json::from_value(value.clone()))
+                    .transpose()?
+                    .unwrap_or_default();
+                validate_native_reading_identities(&snapshot, &identities)?;
                 let session = self.sessions.entry(id.into()).or_default();
                 session.run_open = snapshot.is_streaming;
+                session.native_reading_identities = identities;
                 session.native_conversation = Some(snapshot);
                 session.journal_ready = true;
                 session.journal_error = None;
                 session.native_events.clear();
+                session.native_assistant = Some(crate::NativeAssistantProjection::Idle);
             }
             "conversation-update" => {
                 let snapshot: NativeConversationSnapshot =
@@ -644,9 +866,43 @@ impl MemoryProjectionStore {
                         "conversation generation mismatch",
                     )?;
                 }
+                let event = frame
+                    .get("event")
+                    .map(|event| {
+                        require(
+                            !string(event, "type")?.is_empty(),
+                            "empty native event type",
+                        )?;
+                        Ok::<_, Error>(event.clone())
+                    })
+                    .transpose()?;
+                let identities: Vec<NativeMessageReadingIdentity> = frame
+                    .get("readingIdentities")
+                    .map(|value| serde_json::from_value(value.clone()))
+                    .transpose()?
+                    .unwrap_or_default();
+                validate_native_reading_identities(&snapshot, &identities)?;
                 let session = self.sessions.entry(id.into()).or_default();
                 session.run_open = snapshot.is_streaming;
+                session.native_reading_identities = identities;
                 session.native_conversation = Some(snapshot);
+                if let Some(event) = event {
+                    session.push_native_event(event);
+                }
+                let committed = match &session.native_assistant {
+                    Some(crate::NativeAssistantProjection::Message { event, .. }) => {
+                        event["agentkitStreamId"].as_str().is_some_and(|stream| {
+                            session
+                                .native_reading_identities
+                                .iter()
+                                .any(|identity| identity.stream_id == stream)
+                        })
+                    }
+                    _ => false,
+                };
+                if !session.run_open || committed {
+                    session.native_assistant = Some(crate::NativeAssistantProjection::Idle);
+                }
             }
             "native-event" => {
                 require(
@@ -658,18 +914,27 @@ impl MemoryProjectionStore {
                     .ok_or_else(|| Error::Protocol("missing native event".into()))?
                     .clone();
                 let session = self.sessions.entry(id.into()).or_default();
-                if session.native_events.len() >= 256 {
-                    session.native_events.pop_front();
-                }
-                session.native_events.push_back(event);
+                session.push_native_event(event);
             }
             "snapshot" => {
                 let snapshot: JournalSnapshot = serde_json::from_value(frame["snapshot"].clone())?;
                 require(snapshot.session_id == id, "snapshot session mismatch")?;
+                let queue_key = self.sequenced_queue_projection_key.clone();
                 self.sessions
                     .entry(id.into())
                     .or_default()
-                    .apply_snapshot(snapshot)?;
+                    .apply_snapshot_with_queue(snapshot, queue_key.as_deref())?;
+            }
+            "projection-block" => {
+                require(
+                    string(&frame, "sessionId")? == id,
+                    "projection session mismatch",
+                )?;
+                let block: ProjectionBlock = serde_json::from_value(frame["projections"].clone())?;
+                self.sessions
+                    .entry(id.into())
+                    .or_default()
+                    .block(block, self.sequenced_queue_projection_key.as_deref())?;
             }
             "event" | "transient" => {
                 require(
@@ -688,7 +953,11 @@ impl MemoryProjectionStore {
                     require(event.kind == "assistant/chunk", "invalid transient event")?;
                     integer(&event.data, "turn")?;
                     integer(&event.data, "step")?;
-                    self.sessions.entry(id.into()).or_default().fold(&event);
+                    let session = self.sessions.entry(id.into()).or_default();
+                    let order = session.tail_sequence.checked_add(1).ok_or_else(|| {
+                        Error::Protocol("preview presentation order exhausted".into())
+                    })?;
+                    session.fold_at(&event, order);
                 }
             }
             "projection" => {
@@ -700,13 +969,13 @@ impl MemoryProjectionStore {
                     .get("value")
                     .ok_or_else(|| Error::Protocol("missing projection value".into()))?
                     .clone();
-                self.sessions
-                    .entry(id.into())
-                    .or_default()
-                    .block(ProjectionBlock {
+                self.sessions.entry(id.into()).or_default().block(
+                    ProjectionBlock {
                         as_of_seq: seq,
                         values: [(key, value)].into(),
-                    });
+                    },
+                    self.sequenced_queue_projection_key.as_deref(),
+                )?;
             }
             _ => return Err(Error::Protocol("wrong journal frame".into())),
         }
@@ -731,5 +1000,66 @@ fn validate_summary(value: &Value) -> Result<&str> {
     if let Some(block) = value.get("projections").filter(|v| !v.is_null()) {
         let _: ProjectionBlock = serde_json::from_value(block.clone())?;
     }
-    string(value, "sessionId")
+    let id = string(value, "sessionId")?;
+    require(!id.is_empty(), "empty inventory session identity")?;
+    Ok(id)
+}
+
+fn validate_queue_projection(value: &Value) -> Result<()> {
+    require(
+        value.as_object().is_some_and(|object| object.len() == 1) && value["items"].is_array(),
+        "invalid sequenced queue projection",
+    )
+}
+
+#[cfg(test)]
+mod queue_authority_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn adapter_switch_never_promotes_retained_opaque_queue_and_same_adapter_reconnect_retains_cut()
+    {
+        let mut store = MemoryProjectionStore::new("fixed-connector");
+        let session = store.sessions.entry("s".into()).or_default();
+        session.projections.insert(
+            SEQUENCED_QUEUE_PROJECTION_KEY.into(),
+            VersionedValue {
+                sequence: 99,
+                value: json!({"items":["untrusted"]}),
+            },
+        );
+        store.configure_sequenced_queue_projection(Some(SEQUENCED_QUEUE_PROJECTION_KEY));
+        assert!(
+            !store.sessions["s"]
+                .projections
+                .contains_key(SEQUENCED_QUEUE_PROJECTION_KEY)
+        );
+        store
+            .sessions
+            .get_mut("s")
+            .unwrap()
+            .block(
+                ProjectionBlock {
+                    as_of_seq: 20,
+                    values: [(
+                        SEQUENCED_QUEUE_PROJECTION_KEY.into(),
+                        json!({"items":["current"]}),
+                    )]
+                    .into(),
+                },
+                Some(SEQUENCED_QUEUE_PROJECTION_KEY),
+            )
+            .unwrap();
+        store.disconnect();
+        store.configure_sequenced_queue_projection(Some(SEQUENCED_QUEUE_PROJECTION_KEY));
+        assert_eq!(store.sessions["s"].queue, vec![json!("current")]);
+        store.configure_sequenced_queue_projection(None);
+        assert!(store.sessions["s"].queue.is_empty());
+        assert!(
+            !store.sessions["s"]
+                .projections
+                .contains_key(SEQUENCED_QUEUE_PROJECTION_KEY)
+        );
+    }
 }

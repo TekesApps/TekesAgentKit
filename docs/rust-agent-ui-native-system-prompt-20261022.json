@@ -1,0 +1,30 @@
+{
+  "sourceCommit": "5652f547143e5077232f92ecdfa0392e0aeedc16",
+  "programReusedFrom": "goal-footnote-20261022/program-contract-final.json",
+  "programSha256": "649350a778988f59d03ef6c125846c7c356c7f663ce12014675d729635fcbd28",
+  "tekesui": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "nativeAccepted": false,
+  "completedPhase": 14,
+  "requiredPhase": 25,
+  "launcherExitCode": 0,
+  "applicationExitCode": null,
+  "wrapperExitCode": 1,
+  "frontmostObserved": "com.apple.UserNotificationCenter",
+  "cause": "unknown; no active demo window observed",
+  "systemPromptContents": "unavailable; CUA access denied",
+  "automaticRetry": false,
+  "focusOverride": false,
+  "paginationThisRun": "not run",
+  "systemImeThisRun": "not run",
+  "newTargets": 0,
+  "newProgramCopies": 0,
+  "deletedBytes": 0,
+  "evidence": {
+    ".runtime-fixtures/native-resume-20261022/ci-current.json": "b89ad9f851fa819c7407d2a844353bc829cbce9a2546bc1cf3849835b68bd3f1",
+    ".runtime-fixtures/native-resume-20261022/sidechat-menu.log": "333e1dd9b7cb4cd6b19505f535a4517aa7d040a869acd320313b1ec95bdf6f58",
+    ".runtime-fixtures/native-resume-20261022/sidechat-menu.log.frontmost.jsonl": "d39997fe4b101dfdc9d55e67962447099a02fd524a27afe49632065725122e2f",
+    ".runtime-fixtures/native-resume-20261022/sidechat-menu.log.launcher": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    ".runtime-fixtures/native-resume-20261022/sidechat-menu.log.stderr": "a52edcc64c081757b1eb890c9015f58aa4494937b41a998be8b2694bdf5dd8e6",
+    ".runtime-fixtures/native-resume-20261022/sidechat-menu.log.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

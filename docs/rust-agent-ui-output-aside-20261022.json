@@ -1,0 +1,179 @@
+{
+  "checked_at": "2026-10-21T22:49:06.926396+00:00",
+  "base_commit": "1acd9e846dcc97c5b977a46a5577322ee5b6a081",
+  "program": {
+    "program": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/AgentKitOutputAside.app/Contents/MacOS/AgentKitOutputAside",
+    "sha256": "c3e7f91bec6cffa80de455b1c4c97b8fff10533bc4bf1c7f1dbc25fedb8d5a05",
+    "sdk": "09b4bab44b6dfa65487250ea816b610b9df59095"
+  },
+  "source_hashes": {
+    "docs/rust-agent-ui-contract.md": "2b6a23b4eae636cbd7f92e07749a217c99484073fb87fa1b2be766e2478e3291",
+    "docs/rust-agent-ui-output-aside-20261022.md": "8d1c177188823b4ab9902f58b13c18a2908939537cdc871ff49af1e513f14553",
+    "ui/README.md": "4d23131eacaf0c26fca320ee68db41e22bb37c682267ca4d8beee2f751a270cc",
+    "ui/components/src/transcript_content.rs": "aebe11ea4e312b843989fe0e2e791848c9c1b8e6691d6bd498084e09cd7b29a9",
+    "ui/components/src/turn_footnote.rs": "70a51258404d4068a7e5e2a899ebff0ab32fd2d00724f477919cb80266166963",
+    "ui/components/src/turn_footnote_timing.rs": "545b9d294959ed5e15a0d19de5b8182b6e3cf17b22ba0b0008bda7a6bc023d72",
+    "ui/consumer/tests/summary_label.rs": "91c650656dc5d91a65c5f4dfc3eb6195f5f3029a5d55f2080b1ad8a1b1e313b9",
+    "ui/demo/src/components_native.rs": "b460febb952cf13ca1e8314b3182a4013f3f73ba2baeae268037a655c4284818",
+    "ui/demo/src/fixture.rs": "911fad75868eb9f630db89a52f7d9474fadf0e7242ab7a7b2a95d3f65f080251",
+    "ui/demo/src/native_footnote_time_selftest.rs": "605b8e9be648016a6938e2303bd4ff067267f77b55eab126e5b2347537db4e58",
+    "ui/demo/tests/transcript_content.rs": "85ba48dca4effea029ccf51beaebd8471a8d075046750f862aa8de5b2c6d0045",
+    "ui/demo/tests/turn_footnote.rs": "a9ee68e1403a5bc0413b7a4019b7435388425e3b020cfd8e9fa8cc407a83527a"
+  },
+  "read_only_references": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/TranscriptRendering/TranscriptTurnFootnote.swift": "1acc6380778904620cedcd2a58d8f368d706d51054545f4081fb0005a993ad5e",
+    "/Users/frankqin/dev/TekesClientKit/Sources/TranscriptRendering/TranscriptMetalSnapshotBuilder.swift": "8ee9227ce3af575935ddf35865864bf2abb341badc03f15605e79fcf123469ab",
+    "/Users/frankqin/dev/TekesClientKit/Sources/TranscriptRendering/TranscriptMetalAppBridges.swift": "aced6682f06d2c5c6313e9bbb0e429a217ab05f5a7cacc181ce3af8a2bdb0d1c",
+    "/Users/frankqin/dev/TekesClientKit/Sources/TranscriptRendering/TranscriptValues.swift": "f64395082f288738ce869fb2bf68b7949bcece20cb4f85142dcc25020b5a1a94",
+    "/Users/frankqin/dev/Tekes/Tekes/ClientAgentHostAdapters.swift": "7d907c654ec3df76c7a8b492e32bbc68f1bd4d0b46044cae615aa712b9f67c71"
+  },
+  "tests": {
+    "ui": 486,
+    "business_scope": "complete UI suite on final component source; final native host fixture/assertions additionally covered by targeted footer/Transcript/independent consumer tests and native executable",
+    "strict_all_targets_clippy": true,
+    "build": true,
+    "boundaries": true,
+    "new_matrix_cases": 40
+  },
+  "consumer_inputs": {
+    "commit": "09b4bab44b6dfa65487250ea816b610b9df59095",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 241,
+    "sha256": "44b3174022584d3c099a45b86892d17dbf948905476c0f038be104df12aefe46",
+    "ui_packages": 8
+  },
+  "native_receipts": {
+    "footnote-time-native-selftest.log": {
+      "compactPositiveTokens": true,
+      "displayClockWithoutDomainPublication": true,
+      "emptyHistoricalOutputAsideHidden": true,
+      "focusAndMarkedBaseline": true,
+      "fullFootnoteLayoutParity": false,
+      "nativeWindow": true,
+      "noSubmission": true,
+      "onlyLiveOwnerTicks": true,
+      "originalInformationAndComposer": true,
+      "ownedSepBackhaul": true,
+      "ownedWakeRetired": true,
+      "physicalIme": false,
+      "realHarness": false,
+      "settledCalendarTimestamp": true,
+      "syntheticPreedit": true,
+      "timestampDoesNotInventOutput": true,
+      "voiceOver": false,
+      "zeroTokensOmitted": true
+    },
+    "isolated-reading-native-selftest.log": {
+      "draftIsolation": true,
+      "focusAndEditorBaselinePreserved": true,
+      "focusAndMarkedBaselinePreserved": true,
+      "focusAndTextStatePreserved": true,
+      "hoverPreviewVisible": false,
+      "independentBReadingRestored": true,
+      "jumpHasNoHistory": true,
+      "jumpLatestControl": true,
+      "loadedItemsAfter": 44,
+      "loadedItemsBefore": 20,
+      "markedTextPreserved": true,
+      "nativePagingControl": true,
+      "nativeWindow": true,
+      "navigationPreeditPreserved": true,
+      "noSubmission": true,
+      "opaqueBaselinePreserved": true,
+      "originalTurnNavigation": true,
+      "physicalIme": false,
+      "prependAnchorPreserved": true,
+      "previewFactsDuringPreedit": true,
+      "publicHistoryPage": true,
+      "publicPageRequest": true,
+      "readingAnchorAcceptance": true,
+      "realHarness": false,
+      "reconnectReadingRestored": true,
+      "retainedSessionReadingRestored": true,
+      "sameEditorOwner": true,
+      "samePublicationRefresh": true,
+      "syntheticPreedit": true,
+      "syntheticWheel": true,
+      "turnStartAndLatest": true,
+      "upwardReadingPreserved": true,
+      "voiceOver": false
+    },
+    "isolated-readonly-reading-native-selftest.log": {
+      "boundedPublicSep": true,
+      "gpu": true,
+      "historyExhausted": false,
+      "mainDraftPreserved": true,
+      "nativeWindow": true,
+      "noSubmission": true,
+      "originalPageAndRefreshControls": true,
+      "pageSize": 50,
+      "physicalIme": false,
+      "prependAnchorPreserved": true,
+      "readOnlyNoComposer": true,
+      "realHarness": false,
+      "refreshAnchorPreserved": true,
+      "rowCountAfter": 75,
+      "rowCountBefore": 38,
+      "visibleRowsExtended": true,
+      "voiceOver": false
+    },
+    "isolated-sidebar-restore-selftest.log": {
+      "canonicalSelectedSupplement": true,
+      "explicitNativeReveal": true,
+      "failureRetainsRows": true,
+      "fullLayoutParity": false,
+      "markedBaselineAndFocusPreserved": true,
+      "nativeWindow": true,
+      "noSubmission": true,
+      "physicalIme": false,
+      "realHarnessOutage": false,
+      "restoringNotEmpty": true,
+      "retiredIdsNotReused": true,
+      "voiceOver": false
+    }
+  },
+  "owned_fixture_send_stream_cancel_reconnect": {
+    "passed": true,
+    "log": ".runtime-fixtures/turn-footnote-visibility-20261022/isolated-native-selftest.log",
+    "reading_anchor_claim": false
+  },
+  "system_ime": {
+    "softwareIme": true,
+    "pidTargetedEvents": true,
+    "physicalKeyboard": false,
+    "candidateWindow": false,
+    "sourceBefore": "com.apple.inputmethod.SCIM.ITABC",
+    "sourceAfter": "com.apple.inputmethod.SCIM.ITABC",
+    "binarySha256": "c3e7f91bec6cffa80de455b1c4c97b8fff10533bc4bf1c7f1dbc25fedb8d5a05"
+  },
+  "screenshot": ".runtime-fixtures/turn-footnote-visibility-20261022/native-output-aside.png",
+  "retained_failed_runs": {
+    "initial_reading": {
+      "log": ".runtime-fixtures/turn-footnote-visibility-20261022/reading-native-selftest-stderr.log",
+      "reason_observed": "window activation and focus became false/None immediately before final focus assertion",
+      "exit": -6,
+      "isolated_same_binary_retry": "passed without source/assertion changes"
+    },
+    "early_compile_failures": [
+      ".runtime-fixtures/turn-footnote-visibility-check.log",
+      ".runtime-fixtures/turn-footnote-visibility-20261022/targeted.log",
+      ".runtime-fixtures/turn-footnote-visibility-20261022/targeted-verified.log"
+    ]
+  },
+  "unverified": [
+    "physical keyboard",
+    "candidate window",
+    "VoiceOver",
+    "new real Native/Pi/DSH",
+    "full footnote layout parity"
+  ],
+  "disk": {
+    "target": "/tmp/agentkit-layout-text-292-target",
+    "new_target": false,
+    "deleted_paths": [],
+    "released_bytes": 0,
+    "retained": "source/WIP, fixed inputs, logs/failure records, screenshots and acceptance executables; shared build variants of uncertain/current ownership"
+  },
+  "status": "experimental; PR10 draft; overall goal incomplete"
+}

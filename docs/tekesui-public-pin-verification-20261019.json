@@ -1,0 +1,1499 @@
+{
+  "date": "2026-10-19",
+  "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+  "repository": "https://github.com/TekesApps/TekesUI.git",
+  "reviewed_snapshot": "03721866a362b1d31261ebbbc86140eb07e9e23320871c325234a5212591213d",
+  "comparison": {
+    "kind": "reviewed-snapshot-public-pin-comparison",
+    "status": "matching-inputs",
+    "repository": "https://github.com/TekesApps/TekesUI.git",
+    "commit": "431093786de47b48cd566d0d9c0eafa088b10d68",
+    "reviewed_snapshot": "03721866a362b1d31261ebbbc86140eb07e9e23320871c325234a5212591213d",
+    "manifest_sha256": "04163d5365444912c6aa6705d6204292a01d75e9742fa5cf73d07bf5f30674c7",
+    "checked_at": "2026-10-19T07:43:56.579816+00:00",
+    "promotion": false,
+    "release_authorized": false,
+    "anonymous_public_commit_verified": true,
+    "diff": {
+      "changed": [],
+      "missing": [],
+      "unsupported": [],
+      "added_in_consumed_crates": [],
+      "matches": true
+    }
+  },
+  "resolved_packages": [
+    {
+      "name": "tekes-ui-controls",
+      "source": "git+https://github.com/TekesApps/TekesUI.git?rev=431093786de47b48cd566d0d9c0eafa088b10d68#431093786de47b48cd566d0d9c0eafa088b10d68",
+      "manifest_path": "/Users/frankqin/.cargo/git/checkouts/tekesui-d66ba5efbf6c8866/4310937/crates/tekes-ui-controls/Cargo.toml"
+    },
+    {
+      "name": "tekes-ui-design-export",
+      "source": "git+https://github.com/TekesApps/TekesUI.git?rev=431093786de47b48cd566d0d9c0eafa088b10d68#431093786de47b48cd566d0d9c0eafa088b10d68",
+      "manifest_path": "/Users/frankqin/.cargo/git/checkouts/tekesui-d66ba5efbf6c8866/4310937/crates/tekes-ui-design-export/Cargo.toml"
+    },
+    {
+      "name": "tekes-ui-motion",
+      "source": "git+https://github.com/TekesApps/TekesUI.git?rev=431093786de47b48cd566d0d9c0eafa088b10d68#431093786de47b48cd566d0d9c0eafa088b10d68",
+      "manifest_path": "/Users/frankqin/.cargo/git/checkouts/tekesui-d66ba5efbf6c8866/4310937/crates/tekes-ui-motion/Cargo.toml"
+    },
+    {
+      "name": "tekes-ui-platform-macos",
+      "source": "git+https://github.com/TekesApps/TekesUI.git?rev=431093786de47b48cd566d0d9c0eafa088b10d68#431093786de47b48cd566d0d9c0eafa088b10d68",
+      "manifest_path": "/Users/frankqin/.cargo/git/checkouts/tekesui-d66ba5efbf6c8866/4310937/crates/tekes-ui-platform-macos/Cargo.toml"
+    },
+    {
+      "name": "tekes-ui-render",
+      "source": "git+https://github.com/TekesApps/TekesUI.git?rev=431093786de47b48cd566d0d9c0eafa088b10d68#431093786de47b48cd566d0d9c0eafa088b10d68",
+      "manifest_path": "/Users/frankqin/.cargo/git/checkouts/tekesui-d66ba5efbf6c8866/4310937/crates/tekes-ui-render/Cargo.toml"
+    },
+    {
+      "name": "tekes-ui-scene",
+      "source": "git+https://github.com/TekesApps/TekesUI.git?rev=431093786de47b48cd566d0d9c0eafa088b10d68#431093786de47b48cd566d0d9c0eafa088b10d68",
+      "manifest_path": "/Users/frankqin/.cargo/git/checkouts/tekesui-d66ba5efbf6c8866/4310937/crates/tekes-ui-scene/Cargo.toml"
+    },
+    {
+      "name": "tekes-ui-text",
+      "source": "git+https://github.com/TekesApps/TekesUI.git?rev=431093786de47b48cd566d0d9c0eafa088b10d68#431093786de47b48cd566d0d9c0eafa088b10d68",
+      "manifest_path": "/Users/frankqin/.cargo/git/checkouts/tekesui-d66ba5efbf6c8866/4310937/crates/tekes-ui-text/Cargo.toml"
+    },
+    {
+      "name": "tekes-ui-tokens",
+      "source": "git+https://github.com/TekesApps/TekesUI.git?rev=431093786de47b48cd566d0d9c0eafa088b10d68#431093786de47b48cd566d0d9c0eafa088b10d68",
+      "manifest_path": "/Users/frankqin/.cargo/git/checkouts/tekesui-d66ba5efbf6c8866/4310937/crates/tekes-ui-tokens/Cargo.toml"
+    }
+  ],
+  "git_source_root": "/Users/frankqin/.cargo/git/checkouts/tekesui-d66ba5efbf6c8866/4310937",
+  "tests": {
+    "ui": 30,
+    "public": 131,
+    "headless": 76,
+    "shared": 287
+  },
+  "tools_tests": 16,
+  "native_sep_integration": "passed with isolated Kernel0.9.1 and synthetic local provider; native-interaction=false",
+  "gpu_png_sha256": "819c3c0d9415b7c17eacec9b47825dfd19c897e817c241e6b4a396d48ac05fc5",
+  "native_sep_png_sha256": "a0f0a2b31abf540a284b234a3c33f1a5b207baa2f1f97ae0c205939456c197cc",
+  "logs_sha256": {
+    "agentkit-formal-pin-ui-build.log": "4f27ac380b22e1d975eee20ce727fa8cbc09061177f6253af0777fd4de7b7506",
+    "agentkit-formal-pin-ui-clippy.log": "641073b817cfdbb25338f5c5d383532cd860d5d979df8f897e87003f248447e6",
+    "agentkit-formal-pin-headless-tests.log": "1402f7e92b7dc30d5e130124d046f0f41274ab44de9fead1e6796cf83c22c2b6",
+    "agentkit-formal-pin-headless-clippy.log": "41275bd4a687b06bab4a525f895d0f2f320a1ad9bbb2a0611b32f1ca08e93e57",
+    "agentkit-formal-pin-ui-tests.log": "a2ec4d9ea033dfc0233b7593366315c060e5cc94816237c4207278b79b1d49ed",
+    "agentkit-formal-pin-tools-tests.log": "e12c7e81bbe2f0ed803bbcec729736afddb74f9888196f22e9aeb4f5de4301f2",
+    "agentkit-formal-pin-native-sep.log": "ccb872a0b33d87867f78b0bd42d38e53a4c706c84305ba88b759dabd82d12cd6",
+    "agentkit-formal-pin-gpu.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "agentkit-formal-pin-shared-tests.log": "14257abda12782077222af96ac044c8a3e581547b4ee6ab1461b00837138e838",
+    "agentkit-formal-pin-public-clippy.log": "71edaa1a4c7afb56ba9de76d6e6b7f161e411a44a4d18c1cd4b802ce05be806b",
+    "agentkit-formal-pin-public-tests.log": "da31ab06201620ff690673f86b366a235d5040a0f8461c98f8ebcea8c059c474"
+  },
+  "rollback": {
+    "directory": "/Users/frankqin/.codex/artifacts/agentkit-pin-backups/20261019-4310937-ilyqo2ud",
+    "old_snapshot": "e4c6cb6f725ff9df5ec4688927dd265d64dbbdb2380572d963c5b1017dde5bbc",
+    "old_deps_intact": true,
+    "backup_deps_intact": true
+  },
+  "dependency_change": "6 direct Git rev declarations; 8 resolved TekesUI source IDs; all other lockfile content unchanged",
+  "production_state_machine_changed": false,
+  "ui_package": "0.0.0/publish=false",
+  "upstream_ci": {
+    "run_id": 39217768350,
+    "commit": "431093786de47b48cd566d0d9c0eafa088b10d68",
+    "status": "failure",
+    "url": "https://github.com/TekesApps/TekesUI/actions/runs/39217768350",
+    "failing_test": "gallery::snapshot::tests::original_three_page_content_matches_the_committed_proposal_review",
+    "detail": "primitives-light@2x.png pixel(652,145) [252,252,251,255] -> [242,242,241,255]",
+    "gallery_result": "287 passed / 1 failed / 1 ignored",
+    "boundary": "Not counted as passed or presumed harmless. Unchanged Gallery golden test outside #15–#21 scoped consumer criteria; root cause remains with upstream. Original issue acceptance is supported by targeted shared287 and independent public/AgentKit consumers.",
+    "failure_log": {
+      "path": "/tmp/tekesui-pin-4310937-ci-failure.log",
+      "sha256": "30b698f5a1da557ba4d6ac46148d05b43f13ada12dec84047e27e9e92c2a63ba"
+    }
+  },
+  "rows": [
+    {
+      "issue": 15,
+      "criterion": 1,
+      "section": "functional",
+      "text": "禁用 `set_animating(true)`，窗口静止时，工作线程更新共享数据并 wake；无需鼠标/键盘输入，下一次事件循环处理即显示新状态。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/p0-live-windows-20261019.md",
+        "design/reviews/p0-live-windows-20261019/acceptance-matrix.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 15,
+      "criterion": 2,
+      "section": "functional",
+      "text": "多线程突发请求可合并，最终数据必可见；覆盖“UI 清除 pending 的同时后台再次请求”竞态，不能丢失最后通知。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/p0-live-windows-20261019.md",
+        "design/reviews/p0-live-windows-20261019/acceptance-matrix.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 15,
+      "criterion": 3,
+      "section": "functional",
+      "text": "窗口关闭后继续调用所有代理不会 panic、访问已释放对象或重新创建窗口；代理只唤醒目标窗口/宿主。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/p0-live-windows-20261019.md",
+        "design/reviews/p0-live-windows-20261019/acceptance-matrix.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 15,
+      "criterion": 4,
+      "section": "functional",
+      "text": "提供事件/帧计数证据：稳定无输入、无动画、无后台变更时，不存在用于轮询数据的周期性唤醒。正常系统重绘不算失败，不要求机器 CPU 绝对为零。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/p0-live-windows-20261019.md",
+        "design/reviews/p0-live-windows-20261019/acceptance-matrix.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 15,
+      "criterion": 5,
+      "section": "functional",
+      "text": "AgentKit demo 移除持续 frame pump 后，流式文本、取消结果、连接状态变化均能主动显示。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/p0-live-windows-20261019.md",
+        "design/reviews/p0-live-windows-20261019/acceptance-matrix.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 15,
+      "criterion": 6,
+      "section": "delivery",
+      "text": "公开 Rust API、行为/迁移文档、确定性回归、独立公开 API consumer 和变更说明。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/p0-live-windows-20261019.md",
+        "design/reviews/p0-live-windows-20261019/acceptance-matrix.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 15,
+      "criterion": 7,
+      "section": "delivery",
+      "text": "提供可公开获取的不可变 commit/tag，供 AgentKit 从开发快照切换至正式 pin。",
+      "owner": "发布授权及TekesUI发布负责人",
+      "evidence": [
+        "docs/design/p0-live-windows-20261019.md",
+        "design/reviews/p0-live-windows-20261019/acceptance-matrix.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "需要另行明确授权后发布公开不可变pin；本轮禁止提交/推送/tag。",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "被依赖阻塞",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "blocked_missing_public_pin",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 15,
+      "criterion": 8,
+      "section": "delivery",
+      "text": "与消费方完成相关 UI workspace、demo host、第二 consumer 回归，默认 headless 构建不受影响。",
+      "owner": "AgentKit消费会话：用交付包独立构建并确认提升；本会话已备妥输入",
+      "evidence": [
+        "docs/design/p0-live-windows-20261019.md",
+        "design/reviews/p0-live-windows-20261019/acceptance-matrix.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "本地独立包及两个consumer、headless复跑通过；AgentKit会话尚未正式接收/提升冻结候选。",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已实现待验收",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 15,
+      "criterion": 9,
+      "section": "delivery",
+      "text": "自动测试、原生交互、物理中文 IME、VoiceOver、性能分别记录通过/未测，合成事件或离屏 PNG 不替代原生体验验收。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/p0-live-windows-20261019.md",
+        "design/reviews/p0-live-windows-20261019/acceptance-matrix.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 16,
+      "criterion": 1,
+      "section": "functional",
+      "text": "在长文档中段向上阅读，前插一页后，同一 item 的同一文本位置仍在原视口位置；固定字体/宽度下误差不超过 1 个逻辑像素。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/p0-live-windows-20261019.md",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-ui.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/native-anchor-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 16,
+      "criterion": 2,
+      "section": "functional",
+      "text": "连续两次前插、前插与尾追加同批发生均保持阅读位置，不跳到底部；普通尾追加与显式“回到最新”的既有行为不回归。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/p0-live-windows-20261019.md",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-ui.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/native-anchor-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 16,
+      "criterion": 3,
+      "section": "functional",
+      "text": "前插同时改变宽度/文字缩放时保留逻辑文本位置；重排后维持该位置可见，遇边界允许合法 clamp。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/p0-live-windows-20261019.md",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-ui.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/native-anchor-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 16,
+      "criterion": 4,
+      "section": "functional",
+      "text": "A→B→A、锚点项被删除、旧文档版本回调均有测试；不能套用其他文档锚点或恢复到过期偏移。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/p0-live-windows-20261019.md",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-ui.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/native-anchor-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 16,
+      "criterion": 5,
+      "section": "functional",
+      "text": "不抢 Composer 焦点；已有选区按明确的文本映射策略保留或显式报告失效，不静默选择另一段文字。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/p0-live-windows-20261019.md",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-ui.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/native-anchor-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 16,
+      "criterion": 6,
+      "section": "functional",
+      "text": "用真实布局结果验收并提供原生窗口分页演示；数据页正确不等于锚点验收通过。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/p0-live-windows-20261019.md",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-ui.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/native-anchor-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 16,
+      "criterion": 7,
+      "section": "delivery",
+      "text": "公开 Rust API、行为/迁移文档、确定性回归、独立公开 API consumer 和变更说明。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/p0-live-windows-20261019.md",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-ui.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/native-anchor-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 16,
+      "criterion": 8,
+      "section": "delivery",
+      "text": "提供可公开获取的不可变 commit/tag，供 AgentKit 从开发快照切换至正式 pin。",
+      "owner": "发布授权及TekesUI发布负责人",
+      "evidence": [
+        "docs/design/p0-live-windows-20261019.md",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-ui.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/native-anchor-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "需要另行明确授权后发布公开不可变pin；本轮禁止提交/推送/tag。",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "被依赖阻塞",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "blocked_missing_public_pin",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 16,
+      "criterion": 9,
+      "section": "delivery",
+      "text": "与消费方完成相关 UI workspace、demo host、第二 consumer 回归，默认 headless 构建不受影响。",
+      "owner": "AgentKit消费会话：用交付包独立构建并确认提升；本会话已备妥输入",
+      "evidence": [
+        "docs/design/p0-live-windows-20261019.md",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-ui.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/native-anchor-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "本地独立包及两个consumer、headless复跑通过；AgentKit会话尚未正式接收/提升冻结候选。",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已实现待验收",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 16,
+      "criterion": 10,
+      "section": "delivery",
+      "text": "自动测试、原生交互、物理中文 IME、VoiceOver、性能分别记录通过/未测，合成事件或离屏 PNG 不替代原生体验验收。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/p0-live-windows-20261019.md",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-ui.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/native-anchor-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 17,
+      "criterion": 1,
+      "section": "functional",
+      "text": "合成事件覆盖单行、多行、修饰键和重复键；同一个原生按键链最多产生一次编辑或提交结果，不双换行、不双提交。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/physical-ime-voiceover-20261019.md",
+        "design/reviews/physical-ime-voiceover-20261019/physical-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 17,
+      "criterion": 2,
+      "section": "functional",
+      "text": "系统中文拼音输入法现场验证：候选确认 Enter 仅确认组字；组字期间 Tab/Escape 按文本服务语义处理，不意外跳焦点、发送或关闭窗口。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/physical-ime-voiceover-20261019.md",
+        "design/reviews/physical-ime-voiceover-20261019/physical-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 17,
+      "criterion": 3,
+      "section": "functional",
+      "text": "非组字下，配置的换行/提交快捷键按约定工作；不配置提交策略时不产生业务发送动作。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/physical-ime-voiceover-20261019.md",
+        "design/reviews/physical-ime-voiceover-20261019/physical-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 17,
+      "criterion": 4,
+      "section": "functional",
+      "text": "既有 Tab/Shift-Tab 焦点导航保留，插入 Tab 模式不被 host fallback 提前截获；通过公开 API 的独立 consumer 可重现。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/physical-ime-voiceover-20261019.md",
+        "design/reviews/physical-ime-voiceover-20261019/physical-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 17,
+      "criterion": 5,
+      "section": "functional",
+      "text": "原生物理 IME 结果单独记录，合成事件通过不能替代它。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/physical-ime-voiceover-20261019.md",
+        "design/reviews/physical-ime-voiceover-20261019/physical-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 17,
+      "criterion": 6,
+      "section": "delivery",
+      "text": "公开 Rust API、行为/迁移文档、确定性回归、独立公开 API consumer 和变更说明。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/physical-ime-voiceover-20261019.md",
+        "design/reviews/physical-ime-voiceover-20261019/physical-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 17,
+      "criterion": 7,
+      "section": "delivery",
+      "text": "提供可公开获取的不可变 commit/tag，供 AgentKit 从开发快照切换至正式 pin。",
+      "owner": "发布授权及TekesUI发布负责人",
+      "evidence": [
+        "docs/design/physical-ime-voiceover-20261019.md",
+        "design/reviews/physical-ime-voiceover-20261019/physical-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "需要另行明确授权后发布公开不可变pin；本轮禁止提交/推送/tag。",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "被依赖阻塞",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "blocked_missing_public_pin",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 17,
+      "criterion": 8,
+      "section": "delivery",
+      "text": "与消费方完成相关 UI workspace、demo host、第二 consumer 回归，默认 headless 构建不受影响。",
+      "owner": "AgentKit消费会话：用交付包独立构建并确认提升；本会话已备妥输入",
+      "evidence": [
+        "docs/design/physical-ime-voiceover-20261019.md",
+        "design/reviews/physical-ime-voiceover-20261019/physical-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "本地独立包及两个consumer、headless复跑通过；AgentKit会话尚未正式接收/提升冻结候选。",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已实现待验收",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 17,
+      "criterion": 9,
+      "section": "delivery",
+      "text": "自动测试、原生交互、物理中文 IME、VoiceOver、性能分别记录通过/未测，合成事件或离屏 PNG 不替代原生体验验收。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/physical-ime-voiceover-20261019.md",
+        "design/reviews/physical-ime-voiceover-20261019/physical-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 18,
+      "criterion": 1,
+      "section": "functional",
+      "text": "同 key/revision/value 重复同步无变化，选区、caret、undo 和 preedit 均不被重置。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/composing-viewport-fix-20261019.md",
+        "design/reviews/composing-viewport-fix-20261019/physical-native-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 18,
+      "criterion": 2,
+      "section": "functional",
+      "text": "同文档的合法增量按策略映射选区；确认发送后的清空形成明确编辑事务；新文档重置不继承上一文档 undo。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/composing-viewport-fix-20261019.md",
+        "design/reviews/composing-viewport-fix-20261019/physical-native-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 18,
+      "criterion": 3,
+      "section": "functional",
+      "text": "preedit 期间外部值按策略 defer/reject；之后发生本地编辑或更高 revision，旧请求不能覆盖新内容，必须返回/通知冲突或失效。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/composing-viewport-fix-20261019.md",
+        "design/reviews/composing-viewport-fix-20261019/physical-native-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 18,
+      "criterion": 4,
+      "section": "functional",
+      "text": "A→B→A 草稿与编辑器实例隔离；晚到 A 的回填不能修改 B，也不能意外恢复已发送的旧文本。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/composing-viewport-fix-20261019.md",
+        "design/reviews/composing-viewport-fix-20261019/physical-native-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 18,
+      "criterion": 5,
+      "section": "functional",
+      "text": "中文、emoji、组合字符的 UTF-16 选区映射不产生非法边界；文档注明 undo 后能否恢复清空前内容及原因。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/composing-viewport-fix-20261019.md",
+        "design/reviews/composing-viewport-fix-20261019/physical-native-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 18,
+      "criterion": 6,
+      "section": "delivery",
+      "text": "公开 Rust API、行为/迁移文档、确定性回归、独立公开 API consumer 和变更说明。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/composing-viewport-fix-20261019.md",
+        "design/reviews/composing-viewport-fix-20261019/physical-native-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 18,
+      "criterion": 7,
+      "section": "delivery",
+      "text": "提供可公开获取的不可变 commit/tag，供 AgentKit 从开发快照切换至正式 pin。",
+      "owner": "发布授权及TekesUI发布负责人",
+      "evidence": [
+        "docs/design/composing-viewport-fix-20261019.md",
+        "design/reviews/composing-viewport-fix-20261019/physical-native-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "需要另行明确授权后发布公开不可变pin；本轮禁止提交/推送/tag。",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "被依赖阻塞",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "blocked_missing_public_pin",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 18,
+      "criterion": 8,
+      "section": "delivery",
+      "text": "与消费方完成相关 UI workspace、demo host、第二 consumer 回归，默认 headless 构建不受影响。",
+      "owner": "AgentKit消费会话：用交付包独立构建并确认提升；本会话已备妥输入",
+      "evidence": [
+        "docs/design/composing-viewport-fix-20261019.md",
+        "design/reviews/composing-viewport-fix-20261019/physical-native-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "本地独立包及两个consumer、headless复跑通过；AgentKit会话尚未正式接收/提升冻结候选。",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已实现待验收",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 18,
+      "criterion": 9,
+      "section": "delivery",
+      "text": "自动测试、原生交互、物理中文 IME、VoiceOver、性能分别记录通过/未测，合成事件或离屏 PNG 不替代原生体验验收。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/composing-viewport-fix-20261019.md",
+        "design/reviews/composing-viewport-fix-20261019/physical-native-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 19,
+      "criterion": 1,
+      "section": "functional",
+      "text": "单击插入 caret；Shift-click 从原 anchor 扩展选区；双击/三击遵循 TextSurface 定义并文档化的词/段落选择规则。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/pointer-action-native-20261019.md",
+        "docs/design/held-pointer-cancel-20261019.md",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 19,
+      "criterion": 2,
+      "section": "functional",
+      "text": "中文、emoji、组合字符选择保持合法边界；拖选超出视口时沿用原有 capture/自动滚动行为。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/pointer-action-native-20261019.md",
+        "docs/design/held-pointer-cancel-20261019.md",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 19,
+      "criterion": 3,
+      "section": "functional",
+      "text": "次按钮点击不移动 caret、不提交、不激活普通按钮（除非组件显式定义该操作）；窗口失焦/取消后无残留拖选。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/pointer-action-native-20261019.md",
+        "docs/design/held-pointer-cancel-20261019.md",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 19,
+      "criterion": 4,
+      "section": "functional",
+      "text": "平台事件转译测试验证字段不丢失，原生窗口实际 Shift-click、双击、三击单独验收。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/pointer-action-native-20261019.md",
+        "docs/design/held-pointer-cancel-20261019.md",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 19,
+      "criterion": 5,
+      "section": "delivery",
+      "text": "公开 Rust API、行为/迁移文档、确定性回归、独立公开 API consumer 和变更说明。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/pointer-action-native-20261019.md",
+        "docs/design/held-pointer-cancel-20261019.md",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 19,
+      "criterion": 6,
+      "section": "delivery",
+      "text": "提供可公开获取的不可变 commit/tag，供 AgentKit 从开发快照切换至正式 pin。",
+      "owner": "发布授权及TekesUI发布负责人",
+      "evidence": [
+        "docs/design/pointer-action-native-20261019.md",
+        "docs/design/held-pointer-cancel-20261019.md",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "需要另行明确授权后发布公开不可变pin；本轮禁止提交/推送/tag。",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "被依赖阻塞",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "blocked_missing_public_pin",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 19,
+      "criterion": 7,
+      "section": "delivery",
+      "text": "与消费方完成相关 UI workspace、demo host、第二 consumer 回归，默认 headless 构建不受影响。",
+      "owner": "AgentKit消费会话：用交付包独立构建并确认提升；本会话已备妥输入",
+      "evidence": [
+        "docs/design/pointer-action-native-20261019.md",
+        "docs/design/held-pointer-cancel-20261019.md",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "本地独立包及两个consumer、headless复跑通过；AgentKit会话尚未正式接收/提升冻结候选。",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已实现待验收",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 19,
+      "criterion": 8,
+      "section": "delivery",
+      "text": "自动测试、原生交互、物理中文 IME、VoiceOver、性能分别记录通过/未测，合成事件或离屏 PNG 不替代原生体验验收。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/pointer-action-native-20261019.md",
+        "docs/design/held-pointer-cancel-20261019.md",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 20,
+      "criterion": 1,
+      "section": "functional",
+      "text": "纵向 Stack 中 Transcript 填满余量；Composer 在最小/最大高度间随内容增长，达到上限后内部滚动，发送按钮仍可见。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/composing-viewport-fix-20261019.md",
+        "design/reviews/composing-viewport-fix-20261019/physical-native-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/copy-round.json",
+        "design/reviews/agentkit-final-acceptance-20261019/voiceover-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 20,
+      "criterion": 2,
+      "section": "functional",
+      "text": "宽度变化、中英混排、长行、换行、文字缩放下无文字溢出/裁剪错位；read-only 仍可选择复制但不能编辑。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/composing-viewport-fix-20261019.md",
+        "design/reviews/composing-viewport-fix-20261019/physical-native-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/copy-round.json",
+        "design/reviews/agentkit-final-acceptance-20261019/voiceover-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 20,
+      "criterion": 3,
+      "section": "functional",
+      "text": "非零窗口原点、祖先 clip、不同 backing scale 下命中位置、caret 与候选窗 rect、AX frame 与最终 viewport 一致。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/composing-viewport-fix-20261019.md",
+        "design/reviews/composing-viewport-fix-20261019/physical-native-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/copy-round.json",
+        "design/reviews/agentkit-final-acceptance-20261019/voiceover-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 20,
+      "criterion": 4,
+      "section": "functional",
+      "text": "改变视口高度不丢失组字/选区/undo，不抢焦点；Transcript 继续遵循 [TKUI-002](https://github.com/TekesApps/TekesUI/issues/16) 阅读锚点。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/composing-viewport-fix-20261019.md",
+        "design/reviews/composing-viewport-fix-20261019/physical-native-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/copy-round.json",
+        "design/reviews/agentkit-final-acceptance-20261019/voiceover-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 20,
+      "criterion": 5,
+      "section": "functional",
+      "text": "原有单行表单的默认尺寸和布局不回归；公开组合 API consumer 无需重写 Component::arrange 即可配置上述两种文本视口。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/composing-viewport-fix-20261019.md",
+        "design/reviews/composing-viewport-fix-20261019/physical-native-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/copy-round.json",
+        "design/reviews/agentkit-final-acceptance-20261019/voiceover-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 20,
+      "criterion": 6,
+      "section": "delivery",
+      "text": "公开 Rust API、行为/迁移文档、确定性回归、独立公开 API consumer 和变更说明。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/composing-viewport-fix-20261019.md",
+        "design/reviews/composing-viewport-fix-20261019/physical-native-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/copy-round.json",
+        "design/reviews/agentkit-final-acceptance-20261019/voiceover-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 20,
+      "criterion": 7,
+      "section": "delivery",
+      "text": "提供可公开获取的不可变 commit/tag，供 AgentKit 从开发快照切换至正式 pin。",
+      "owner": "发布授权及TekesUI发布负责人",
+      "evidence": [
+        "docs/design/composing-viewport-fix-20261019.md",
+        "design/reviews/composing-viewport-fix-20261019/physical-native-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/copy-round.json",
+        "design/reviews/agentkit-final-acceptance-20261019/voiceover-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "需要另行明确授权后发布公开不可变pin；本轮禁止提交/推送/tag。",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "被依赖阻塞",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "blocked_missing_public_pin",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 20,
+      "criterion": 8,
+      "section": "delivery",
+      "text": "与消费方完成相关 UI workspace、demo host、第二 consumer 回归，默认 headless 构建不受影响。",
+      "owner": "AgentKit消费会话：用交付包独立构建并确认提升；本会话已备妥输入",
+      "evidence": [
+        "docs/design/composing-viewport-fix-20261019.md",
+        "design/reviews/composing-viewport-fix-20261019/physical-native-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/copy-round.json",
+        "design/reviews/agentkit-final-acceptance-20261019/voiceover-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "本地独立包及两个consumer、headless复跑通过；AgentKit会话尚未正式接收/提升冻结候选。",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已实现待验收",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 20,
+      "criterion": 9,
+      "section": "delivery",
+      "text": "自动测试、原生交互、物理中文 IME、VoiceOver、性能分别记录通过/未测，合成事件或离屏 PNG 不替代原生体验验收。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/composing-viewport-fix-20261019.md",
+        "design/reviews/composing-viewport-fix-20261019/physical-native-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/copy-round.json",
+        "design/reviews/agentkit-final-acceptance-20261019/voiceover-result.json",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 21,
+      "criterion": 1,
+      "section": "functional",
+      "text": "指针点击、Space/Enter、AX press 各自产生且只产生一次带正确 ID/source 的激活；disabled 控件不产生动作。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/pointer-action-native-20261019.md",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-ui.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 21,
+      "criterion": 2,
+      "section": "functional",
+      "text": "嵌套组件与多动作事件保持定义顺序；空 drain 不重复通知，移除/重建同 ID 控件不重放旧激活。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/pointer-action-native-20261019.md",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-ui.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 21,
+      "criterion": 3,
+      "section": "functional",
+      "text": "handler 中触发重绘/结构变更时无重入借用崩溃；文档明确允许的回调行为，必要时使用事件队列交付。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/pointer-action-native-20261019.md",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-ui.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 21,
+      "criterion": 4,
+      "section": "functional",
+      "text": "AgentKit 可移除 activations 计数轮询；A 画面产生的发送/取消/分页意图在切换 B 后仍携带原 A scope，且不被新选择重定向。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/pointer-action-native-20261019.md",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-ui.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 21,
+      "criterion": 5,
+      "section": "delivery",
+      "text": "公开 Rust API、行为/迁移文档、确定性回归、独立公开 API consumer 和变更说明。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/pointer-action-native-20261019.md",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-ui.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 21,
+      "criterion": 6,
+      "section": "delivery",
+      "text": "提供可公开获取的不可变 commit/tag，供 AgentKit 从开发快照切换至正式 pin。",
+      "owner": "发布授权及TekesUI发布负责人",
+      "evidence": [
+        "docs/design/pointer-action-native-20261019.md",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-ui.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "需要另行明确授权后发布公开不可变pin；本轮禁止提交/推送/tag。",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "被依赖阻塞",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "blocked_missing_public_pin",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 21,
+      "criterion": 7,
+      "section": "delivery",
+      "text": "与消费方完成相关 UI workspace、demo host、第二 consumer 回归，默认 headless 构建不受影响。",
+      "owner": "AgentKit消费会话：用交付包独立构建并确认提升；本会话已备妥输入",
+      "evidence": [
+        "docs/design/pointer-action-native-20261019.md",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-ui.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "本地独立包及两个consumer、headless复跑通过；AgentKit会话尚未正式接收/提升冻结候选。",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已实现待验收",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    },
+    {
+      "issue": 21,
+      "criterion": 8,
+      "section": "delivery",
+      "text": "自动测试、原生交互、物理中文 IME、VoiceOver、性能分别记录通过/未测，合成事件或离屏 PNG 不替代原生体验验收。",
+      "owner": "TekesUI本会话：公共实现、隔离消费者适配与验收证据",
+      "evidence": [
+        "docs/design/pointer-action-native-20261019.md",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-ui.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-independent.log",
+        "design/reviews/agentkit-final-acceptance-20261019/replay-results.json"
+      ],
+      "remaining": "",
+      "pass_condition": "按正文行为在绑定源码的相应层级通过；性能未测并明确记录，不计功能失败。",
+      "upstream_claim": "已完成",
+      "consumer_evidence_boundary": "independent automated/build/metadata/GPU replay plus reviewed supplied native evidence at its original source identity; not a new physical/native run",
+      "prior_consumer_verdict": "accepted_for_development_candidate",
+      "consumer_verdict": "satisfied_in_original_issue_scope",
+      "public_pin": "431093786de47b48cd566d0d9c0eafa088b10d68",
+      "native_boundary": "existing 037 source-bound evidence accepted; receiver reran automatic/GPU/integration checks, no new physical/VO run"
+    }
+  ],
+  "issues": [
+    {
+      "issue": 15,
+      "all_original_conditions_met": true,
+      "close_recommended": true,
+      "scope": "original #15–#21 contract, not full TekesUI/Gold7/CI maturity",
+      "receiver_closed_issue": false,
+      "upstream_ci_caveat": "gallery::snapshot::tests::original_three_page_content_matches_the_committed_proposal_review"
+    },
+    {
+      "issue": 16,
+      "all_original_conditions_met": true,
+      "close_recommended": true,
+      "scope": "original #15–#21 contract, not full TekesUI/Gold7/CI maturity",
+      "receiver_closed_issue": false,
+      "upstream_ci_caveat": "gallery::snapshot::tests::original_three_page_content_matches_the_committed_proposal_review"
+    },
+    {
+      "issue": 17,
+      "all_original_conditions_met": true,
+      "close_recommended": true,
+      "scope": "original #15–#21 contract, not full TekesUI/Gold7/CI maturity",
+      "receiver_closed_issue": false,
+      "upstream_ci_caveat": "gallery::snapshot::tests::original_three_page_content_matches_the_committed_proposal_review"
+    },
+    {
+      "issue": 18,
+      "all_original_conditions_met": true,
+      "close_recommended": true,
+      "scope": "original #15–#21 contract, not full TekesUI/Gold7/CI maturity",
+      "receiver_closed_issue": false,
+      "upstream_ci_caveat": "gallery::snapshot::tests::original_three_page_content_matches_the_committed_proposal_review"
+    },
+    {
+      "issue": 19,
+      "all_original_conditions_met": true,
+      "close_recommended": true,
+      "scope": "original #15–#21 contract, not full TekesUI/Gold7/CI maturity",
+      "receiver_closed_issue": false,
+      "upstream_ci_caveat": "gallery::snapshot::tests::original_three_page_content_matches_the_committed_proposal_review"
+    },
+    {
+      "issue": 20,
+      "all_original_conditions_met": true,
+      "close_recommended": true,
+      "scope": "original #15–#21 contract, not full TekesUI/Gold7/CI maturity",
+      "receiver_closed_issue": false,
+      "upstream_ci_caveat": "gallery::snapshot::tests::original_three_page_content_matches_the_committed_proposal_review"
+    },
+    {
+      "issue": 21,
+      "all_original_conditions_met": true,
+      "close_recommended": true,
+      "scope": "original #15–#21 contract, not full TekesUI/Gold7/CI maturity",
+      "receiver_closed_issue": false,
+      "upstream_ci_caveat": "gallery::snapshot::tests::original_three_page_content_matches_the_committed_proposal_review"
+    }
+  ],
+  "git_mutations": "No AgentKit commit/push/tag and no upstream issue edits; caller authorized primary pin transition and public fetch only.",
+  "protection": {
+    "prior_file_count": 137,
+    "unchanged_count": 123,
+    "changed_allowlisted": [
+      "docs/tekesui-acceptance-tools.md",
+      "scripts/tests/test_acceptance_tools.py",
+      "ui/demo/tests/text_viewport.rs",
+      "README.md",
+      "docs/tekesui-development-tasks.md",
+      "docs/tekesui-gaps.md",
+      "docs/tekesui-integration-contract.md",
+      "scripts/check-ui-boundaries.py",
+      "scripts/prepare-tekesui-demo.py",
+      "ui/Cargo.lock",
+      "ui/Cargo.toml",
+      "ui/README.md",
+      "ui/demo/src/native.rs",
+      "ui/tekesui-source.json"
+    ],
+    "old_and_backup_188_unchanged": true
+  }
+}

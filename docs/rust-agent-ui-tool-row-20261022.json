@@ -1,0 +1,80 @@
+{
+  "baseline": "f66137d5bfa1e8427ed6330af5b44458e514fe4f",
+  "status": "unpublished-development-input",
+  "tekesui": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "validation": {
+    "root-tests": {
+      "passed": 221,
+      "failed": 0,
+      "ignored": 0
+    },
+    "ui-tests": {
+      "passed": 547,
+      "failed": 0,
+      "ignored": 1
+    }
+  },
+  "new_model_tests": 4,
+  "native": "deferred-user-away",
+  "cross_process": "not-accepted",
+  "cache": {
+    "target": "/tmp/agentkit-layout-text-292-target",
+    "new_targets": 0,
+    "new_acceptance_program_copies": 0,
+    "deleted_bytes": 0
+  },
+  "evidence": {
+    ".runtime-fixtures/tool-row-20261022/headless-boundaries.log": {
+      "bytes": 48,
+      "sha256": "e9fa1e12a0afd70528040f81fe3199172a3974910d7760c0216bb6d110181081"
+    },
+    ".runtime-fixtures/tool-row-20261022/regression.log": {
+      "bytes": 720,
+      "sha256": "39f7225d0ebf13dd5ba2be0b20df3fd1653e28835bd0156476535d20a0a658f5"
+    },
+    ".runtime-fixtures/tool-row-20261022/root-clippy.log": {
+      "bytes": 434,
+      "sha256": "9eb3946b0ba4d80e4dca13e1209f751c38b7de959f8d7d918f00a0b956df89dd"
+    },
+    ".runtime-fixtures/tool-row-20261022/root-tests.log": {
+      "bytes": 27398,
+      "sha256": "5a7a7118af0b98f563495a4b510ccbaccd8ec202d9e393cea228da411600d78e"
+    },
+    ".runtime-fixtures/tool-row-20261022/ui-boundaries.log": {
+      "bytes": 86,
+      "sha256": "9480cc4382559b9a7a99240226a9f766048e30c8d38bb4bccd1fd8bca56661ad"
+    },
+    ".runtime-fixtures/tool-row-20261022/ui-clippy.log": {
+      "bytes": 144,
+      "sha256": "245279b10d013b6f797eab40e9cb6647aeb3b383eb035845d05400cf75a598b6"
+    },
+    ".runtime-fixtures/tool-row-20261022/ui-tests-before-label-expectation.log": {
+      "bytes": 32348,
+      "sha256": "fca96204871ae1961a7cfa817b9087122fba2bb02a0bf8e0cbbe7b881e3a5483"
+    },
+    ".runtime-fixtures/tool-row-20261022/ui-tests.log": {
+      "bytes": 68458,
+      "sha256": "05048c8243ccd9e0f7b7857c7f73a6774d7c85446284d0b0a145d0af188fc991"
+    },
+    "crates/presentation/src/tool_row.rs": {
+      "bytes": 6056,
+      "sha256": "b17f44f8900febdc9b8b4d86c282a7cc18636ebcb5f18d86087343533a85725e"
+    },
+    "crates/presentation/tests/tool_row.rs": {
+      "bytes": 3931,
+      "sha256": "78f8c0ed7900b8c7de861a661300e23f09c8d287270d180fba67be7b0a5fc495"
+    },
+    "ui/components/src/output_message.rs": {
+      "bytes": 28701,
+      "sha256": "da9759a407cea050b1396b2ea2842cad7c83e172b245ec397146bcab05e79970"
+    },
+    "ui/consumer/tests/tool_titles.rs": {
+      "bytes": 5399,
+      "sha256": "74553a825da15b8d4ada40c6493c0eaa03a9f49f7a72a0aa342b948be63e65d5"
+    },
+    "ui/demo/tests/output_message.rs": {
+      "bytes": 23457,
+      "sha256": "a20149df6cef491886433a45c904bd36c4a39b9d235c4ed814754ad453509aa7"
+    }
+  }
+}

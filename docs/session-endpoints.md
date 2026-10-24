@@ -2,6 +2,8 @@
 
 日期：2026-10-17。改动只在 TekesAgentKit；ClientKit、Tekes、Kernel、Pi、DSH 作为只读来源和运行时。
 
+2026-10-22 补充：[目标终态只读投影](rust-agent-ui-goal-footnote-20261022.md)从现有公开 goal projection 读取 scope/identity/phase，随原 RunSnapshot 发布；没有新增 RPC、mutation 能力或 harness-private 读取。共享 API 尚未发布，当前三端正常 GPU 回归不等同三端目标专用验收。
+
 ## 契约与路由
 
 `NativeSessionEndpoint`、`PiSessionEndpoint`、`DshSessionEndpoint` 分别实现 `SessionEndpoint`。
@@ -9,6 +11,8 @@ Native 要求 Kernel 0.9 的 v4 wire；Pi/DSH 的标准化 HostDescription 保�
 连接身份、transport locality、harness、cache policy 相互独立。
 
 `SessionEndpointRegistry` 注册显式 connector。`SessionAddress { endpoint_id, session_id }` 是跨 harness 的稳定路由键。
+
+2026-10-20 补充：[评价读取与身份契约](rust-agent-ui-feedback-read-20261020.md)统一三端 committed feedback 数据。DSH 的公共 feedback.list/put/delete 现在在适配器中解包成功结果、将内层失败作为错误返回，并保留 CAS conflict current；使用这些公共别名的调用方不应再次按 DSH value 解包。该修正已有适配器单测和真实三端只读验证。后续[CAS 写入验证](rust-agent-ui-feedback-cas-20261020.md)补齐三端真实评分/备注/冲突/删除闭环；评价写入控件仍未开放。
 `SessionLocator` 给出该地址、cwd、nativeSessionId、可用时的 nativeSessionFile，以及 historySource。
 `cwd` 保留原始工作区根，`workingDirectory` 是有权威投影时的当前执行目录；两者可以不同，文件相对路径仍遵循各服务端的 scope。
 原生文件指针是定位证据；历史读取仍通过对应 harness 的公开协议，不解析私有数据库或把远端路径当成本机路径。
@@ -38,9 +42,11 @@ Native 要求 Kernel 0.9 的 v4 wire；Pi/DSH 的标准化 HostDescription 保�
 | Session 工作区文件 | session.files.* | cwd 内 capability 限定只读文件 | workspaceFiles，二进制 multipart |
 | fork / discard | 原生普通/临时 fork、临时 discard | 原生克隆/精确 entry fork；临时分支及 discard | 普通 fork；临时 fork/discard 明确 Unsupported |
 | 工作区 | v4 未声明 workspace-sync | 宿主工作区与移动/重命名、会话关联 | 原生 workspace/follow，replace/reorder/archive/pin |
-| 附件 | 原生策略/上传/读取 | 限额校验、图片/文件上传、会话隔离及历史附件读取 | 原生策略、raw binary 上传和读取 |
+| 附件 | 原生策略、文件上传及会话内字节读取 | 限额校验、图片/文件上传、会话隔离及历史附件读取；普通文件在 prompt 中转为路径引用 | 原生策略和 raw binary 文件上传；历史保留文件元数据；公开 attachment 只读图片，无通用文件下载 |
 | 文件观察 | 认证 WS changes | 有界轮询 ready/change/absent | workspaceFiles/changes |
 | 扩展 | 服务端公开方法 | 模型/命令/skills/tools/settings 读取、Goal/反馈 CAS | ClientKit 对应公开服务路由及规范化参数 |
+
+Pi 的关键事件刷新在同一 `conversation-update` 帧中携带 `snapshot` 和可选的原始 `event` 原因。投影先验证两者，再一次发布；`message_end` 可以结束 assistant 临时预览，而不把仍在工具阶段的整个 Agent 标为完成。旧的无 event 帧仍可读取；新字段不生成 journal seq 或伪造消息 entry ID。相同 timestamp 不再作为临时回复覆盖持久消息的依据；完整 native 流/记录阅读身份迁移仍另行验收。
 | 子代理 | 原生 catalog；扩展只读子历史；bounded child 控制不可用 | create/list/prompt/read/cancel，官方扩展模型工具 | projection catalog + 父拥有的 prompt/cancel；child 地址历史与重连 |
 | 产品服务 | 服务端或显式宿主能力 | 显式 HostServices | 服务端部署或显式 HostServices |
 
@@ -109,3 +115,62 @@ Pi 1.3.0 和 Native Kernel 0.9.0 的原验收也重新通过。上述模型输�
 ## 2026-10-18 对照复查
 
 当前 ClientKit 的 SEP 参考文件哈希均与基准一致（HEAD `c289bc9`）。复查修复了 Pi 原生文件缺失/替换后的恢复保护、ClientKit `atSeq` 完整 entry 顺序及已完成 turn 校验、失效 pointer 的单会话隔离，以及 Native/Pi 在无文件观察者时的 close 状态持久化。详情及验证边界见 [复查记录](sep-review-2026-10-18.md)。
+
+附件组件的三端闭环收据见 [上传绑定验收](rust-agent-ui-upload-three-20261020.md)。Native/Pi 的通用文件字节回读及跨会话拒绝已验证；DSH 普通文件只验证上传、历史元数据与发送回传，不将图片接口或 workspace 文件 API 冒充任意上传附件下载。
+
+## DSH actionable 回答信封对齐（2026-10-20）
+
+只读对照当前 ClientKit `DSHHostEndpoint.remoteOutcome` 与
+`TekesClientRuntime.respondWithReceipt`，修正 Rust DSH 将共享回答信封直接交给
+waterfall handler 的差异。Actionable correlation 保留注册 kind：question 的
+`{sessionId, answer}` 只提取 answer；approval 的 `{sessionId, approvalId, outcome}`
+只提取 outcome 词。已是原生 DSH 形状或未知 kind 的值保持原样，不按 UI 文案猜类型。
+
+独立 DSH 0.2.1-rc.2、本地合成 provider 和临时数据根验证：模型实际调用
+ask_user_question → public actionable sync → runtime 用共享 session envelope 回答 →
+答案进入无错误的 tool/result → settle、actionables 清空。脚本检查返回给模型的结果，
+不只检查 RPC 返回。DSH 其他生命周期/历史/文件/工作目录回归同轮通过。
+
+审批两种词及 native/unknown/wrong-kind 的无损行为有单元测试；本轮未触发真实审批、
+未做原生 actionable UI。后续 UI 必须消费共享回答契约，适配差异留在 SEP。
+
+本轮本地 gates：root workspace 108 tests、DSH 9 tests（包含在 root 总数）、18 项工具测试、DSH all-targets strict Clippy、fmt 与 headless 依赖边界通过。此为协议增量，不作为 UI/物理 IME 的新证据。
+
+
+## 共享只读会话搜索
+
+`SessionRuntime::search_sessions_at_epoch` 基于真实方法能力调用 `session.search`，并在请求入场和回复时校验连接代数。typed `SessionSearchResults` 要求 items/sessionId/snippet/hasMore，保留未知扩展字段，不将缺少 hasMore 当成已穷尽。Pi 返回至多 100 个匹配并以第 101 个匹配证明 hasMore；引用候选接口仍为 20 条。DSH 全文索引由部署决定，默认关闭时保持明确失败，AgentKit 不自动打开它。读取取消只撤销 search reader，不取消远程 Agent 执行。组件、shared presentation 和分项证据见[接入记录](rust-agent-ui-sidebar-query-controller-20261021.md)。
+
+
+搜索遇到未知库存身份时，共享运行时通过 `refresh_inventory_at_epoch` 重读公开 session/workspace cursor 的原子 baseline 对；原连接 epoch、已加载 journal/preview 和分页 cut 保持，旧 cursor 被淘汰。刷新失败保留原库存并向搜索传播失败，不伪造空命中或偷偷重连。实现与验收范围见 [Sidebar 库存恢复](rust-agent-ui-sidebar-inventory-refresh-20261021.md)。
+
+## 2026-10-22：当前运行版本与原生UI证据
+
+见[三端原生验收](rust-agent-ui-three-real-20261022.md)：Kernel0.9.3、Pi1.3.0、DSH0.2.1-rc.2在固定09b SDK及同一冻结UI程序下通过公开分页、流式阅读、合成中文预编辑、取消/错误恢复和重连。Native0.9.3完整协议流程的archive返回session-running，仍未完成其全量生命周期验收；独立UI模式不代替这项失败。脚本现在支持明确supervisor/worker路径、build哈希及精确版本/握手检查，旧target中的0.9.0开发程序不再被按目录名计作发布版。能力声明与单次运行验收结果保持区分。
+
+## 2026-10-24：无窗口协议与真实聚合 Sidebar 后续
+
+上述 2026-10-22 的 Native `session-running` 是保留的历史失败。后续冻结 Native0.9.3 程序的有/无诊断运行，以及共享启动器提取后的全量无 UI 协议运行均通过，含 archive/unarchive 和有界子历史；旧失败未复现，原因及已修复仍未证明，见[诊断结果](rust-agent-ui-native-lifecycle-diagnostics-20261024.md)。
+
+同一当前离屏 demo 也已连接隔离的 Native0.9.3、Pi1.3.0、DSH0.2.1-rc.2，验证九个真实会话的聚合库存、公开搜索、原分页动作和已挂载 reveal 目标；这是离屏组件/协议证据，不替代桌面、物理 IME、AX 或 Task 家族来源验收，见[聚合 Sidebar 收据](rust-agent-ui-real-multi-sidebar-results-20261024.md)。DSH 的 SQLite 查询仅由该隔离 profile 显式启用，用户部署默认值未变。
+
+## Sidebar 分类事实（#29，2026-10-24）
+
+分类只决定 Sidebar 成员，不授予子会话继续运行或历史读取权限。当前 shared predicate 排除明确 origin=subagent 或 ephemeral=true，parentSessionId 单独存在不排除 fork。缺失/未知数据保持兼容，但不能从兼容显示反推已确认 main。
+
+| 来源 | 已核实的公开 producer | origin / parent | ephemeral |
+| --- | --- | --- | --- |
+| Native SEP v4 / Kernel v0.9.3 | 公开 tag 解引用 `09508a9083c24c7accefc99516739f279b85913e`；规范与 supervisor inventory_row | 完成的 fork 报 origin=fork 与 parent；普通行省略，不合成 subagent | genesis flag 为 true 才报告，否则按该固定规范省略 |
+| Pi | 本仓 `endpoint-pi::summary` 的规范化公开 producer | subagent_parent 产生 subagent；普通 parent 只保留 lineage | 规范化 row.ephemeral 布尔值 |
+| DSH 0.2.1-rc.2 / 0.2.0-rc.2 | 固定官方源码 `687f282…` / `639ed015…`；SessionSummary、在线/冷会话 summary、listFields | 显式 header.origin=subagent 原样透传，parent-only fork 不推造 origin；旧/迁移行的缺失仍非独立身份权限证明 | 两版公开 SessionSummary 没有该字段；临时 fork/discard 仍按既有能力明确 Unsupported，不补 ephemeral=false |
+
+Native 公开来源：[固定规范](https://github.com/TekesApps/TekesKernel/blob/09508a9083c24c7accefc99516739f279b85913e/spec/session-endpoint.md#read-routes)、[固定 producer](https://github.com/TekesApps/TekesKernel/blob/09508a9083c24c7accefc99516739f279b85913e/crates/supervisor/src/endpoint_carrier.rs)。DSH 公开来源：[0.2.1 list producer](https://github.com/deepseek-ai/deepseek-harness/blob/687f282e8625c6b8d11ff58211a90524be2e4317/packages/api/session-controller/src/list.ts)、[其 SessionSummary](https://github.com/deepseek-ai/deepseek-harness/blob/687f282e8625c6b8d11ff58211a90524be2e4317/packages/api/session-controller/src/types.ts)、[0.2.0 list producer](https://github.com/deepseek-ai/deepseek-harness/blob/639ed015397290b3745d163aafe02ffee4aa3f84/packages/api/session-controller/src/list.ts)。精确版本、Git blob 哈希与协议回归分层记录在各 wire 专题；源码核对和本地协议 mock 不能替代已安装 runtime 身份或真实 harness 整体验收。
+
+
+## DSH 公共 inbox 的通用队列消费（2026-10-25）
+
+DSH adapter 将公共 inbox 的 `next-turn` / `next-step` 转为同序号的本地标准投影，供 Run.queue 与 Composer 使用；原 inbox、message/source、原 item.id 仍保留。缺失 key 不当空，明确双空才清空；source.rpcId 仅用于原用户提交确认，不替代队列动作身份。适配器授权默认关闭，Native/Pi 原 control 队列不受启用；详见[契约](rust-agent-ui-dsh-queue-projection-contract-20261025.md)及[分层结果](rust-agent-ui-native-dsh-busy-queue-results-20261025.md)。
+
+Native 0.9.3 的 busy queue 可见性本轮仍未通过：流式 hold 时第二个 prompt 已 admitted，公开 control 却持续空，独立读者同样观测到；上游跟踪 [Kernel #86](https://github.com/TekesApps/TekesKernel/issues/86)。这不否定此前空闲 Queue 的 mixed 发送/回传/公开回读和重连，但也不能以其代替运行中队列验收。未修改 Kernel 或 TekesUI。
+
+Pi endpoint 的既有 lifetime 现覆盖所有自有 FrameStream：close 唤醒已等待的流，单次 Disconnected 后结束，并拒绝关闭后的新订阅。真实 Native0.9.3/Pi1.3.0/DSH0.2.1-rc.2 的客户端关闭、失败预算及原宿主显式重连见 [恢复结果](rust-agent-ui-sidebar-transport-recovery-results-20261025.md)；不等同服务器重启或 observer 终态 Retry。

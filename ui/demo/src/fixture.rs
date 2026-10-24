@@ -14,10 +14,84 @@ use tekes_agent_contract::*;
 use tekes_agent_presentation::{RunController, RunScope};
 use tekes_agent_session::SessionRuntime;
 use tokio::sync::broadcast;
+/// Display-only receipt is removed before prompt admission in the native proof.
+/// No filesystem/upload authority is implied by this isolated fixture.
+pub fn composer_context_fixture() -> (
+    Vec<tekes_agent_presentation::ComposerArtifact>,
+    Vec<tekes_agent_presentation::ComposerAnnotation>,
+) {
+    use tekes_agent_presentation::{ComposerAnnotation, ComposerArtifact};
+    (
+        vec![
+            ComposerArtifact::Attachment {
+                id: "fixture-file".into(),
+                name: "草稿附件.png".into(),
+                content: json!({"type":"file","receiptId":"DISPLAY_ONLY_NOT_UPLOADED"}),
+                facts: None,
+            },
+            ComposerArtifact::Reference {
+                id: "fixture-reference".into(),
+                mention: Some("上下文引用说明".into()),
+                path: None,
+                excerpt: Some("这段引用随草稿保留".into()),
+            },
+        ],
+        vec![ComposerAnnotation {
+            id: "fixture-annotation".into(),
+            source: "回答 · turn 1".into(),
+            excerpt: "中文引用 👩🏽‍💻".into(),
+            comment: "请解释这段内容".into(),
+            source_locator: None,
+        }],
+    )
+}
+type MutationReceipts = BTreeMap<String, (String, Value, Value)>;
 #[derive(Clone)]
 pub struct Fixture {
+    endpoint_id: String,
     sessions: Arc<Mutex<BTreeMap<String, Line>>>,
+    search_enabled: bool,
+    search_results: Arc<Mutex<BTreeMap<String, Value>>>,
+    search_calls: Arc<AtomicUsize>,
+    search_active: Arc<AtomicUsize>,
+    search_fails: Arc<AtomicBool>,
+    search_gate: Option<Arc<tokio::sync::Semaphore>>,
+    inventory_reads: Arc<AtomicUsize>,
+    inventory_refresh_gate: Option<Arc<tokio::sync::Semaphore>>,
+    inventory_refresh_fails: Arc<AtomicBool>,
     connects: Arc<AtomicUsize>,
+    forks: Arc<AtomicUsize>,
+    side_chats: bool,
+    children: Arc<Mutex<BTreeMap<String, (String, String)>>>,
+    parent_available: Arc<AtomicBool>,
+    catalog_fails: Arc<AtomicBool>,
+    lifecycle: bool,
+    historical_input: bool,
+    summary_usage: bool,
+    goal_projections: BTreeMap<String, Value>,
+    pending_actionables: Arc<Mutex<BTreeMap<String, Value>>>,
+    actionable_sender: broadcast::Sender<Value>,
+    responses: Arc<Mutex<Vec<Value>>>,
+    response_calls: Arc<AtomicUsize>,
+    response_gate: Option<Arc<tokio::sync::Semaphore>>,
+    history_page_gate: Option<Arc<tokio::sync::Semaphore>>,
+    history_page_calls: Arc<AtomicUsize>,
+    history_page_fails: Arc<AtomicBool>,
+    response_fails: Arc<AtomicBool>,
+    models: bool,
+    model_read_gate: Option<Arc<tokio::sync::Semaphore>>,
+    model_read_calls: Arc<AtomicUsize>,
+    uploads: bool,
+    upload_calls: Arc<AtomicUsize>,
+    upload_gate: Option<Arc<tokio::sync::Semaphore>>,
+    upload_fail_at: Option<usize>,
+    file_read_calls: Arc<AtomicUsize>,
+    file_read_gate: Option<Arc<tokio::sync::Semaphore>>,
+    file_read_override: Option<Value>,
+    presets: Option<bool>,
+    inventory_sender: broadcast::Sender<Value>,
+    workspace_sender: broadcast::Sender<Value>,
+    mutations: Arc<Mutex<MutationReceipts>>,
 }
 struct Line {
     rows: Vec<HistoryEntry>,
@@ -25,6 +99,11 @@ struct Line {
     cancel: Arc<AtomicBool>,
     busy: bool,
     turn: i64,
+    ephemeral: bool,
+    title: String,
+    archived: bool,
+    history_revision: Option<String>,
+    model_selection: Value,
 }
 fn entry(seq: i64, kind: &str, data: Value) -> HistoryEntry {
     serde_json::from_value(json!({"event":{"seq":seq,"time":seq+1,"type":kind,"data":data}}))
@@ -34,6 +113,36 @@ fn append(line: &mut Line, kind: &str, data: Value) {
     let row = entry(line.rows.len() as i64, kind, data);
     line.rows.push(row.clone());
     let _ = line.sender.send(json!({"type":"event","entry":row}));
+}
+fn append_now(line: &mut Line, kind: &str, data: Value) {
+    let mut row = entry(line.rows.len() as i64, kind, data);
+    row.event.time = crate::footnote_host::now_ms();
+    line.rows.push(row.clone());
+    let _ = line.sender.send(json!({"type":"event","entry":row}));
+}
+fn summary(id: &str, line: &Line) -> Value {
+    json!({"sessionId":id,"cwd":"/fixture","title":line.title,"status":if line.archived {"archived"} else {"active"},"running":line.busy,"blank":line.rows.is_empty(),"updatedAt":line.rows.len()})
+}
+fn inventory_stream(
+    baseline: Value,
+    receiver: broadcast::Receiver<Value>,
+    generation: String,
+) -> FrameStream {
+    let updates = stream::unfold(receiver, move |mut receiver| {
+        let generation = generation.clone();
+        async move {
+            let result = receiver
+                .recv()
+                .await
+                .map(|mut value| {
+                    value["generation"] = json!(generation);
+                    value
+                })
+                .map_err(|_| Error::Disconnected);
+            Some((result, receiver))
+        }
+    });
+    Box::pin(stream::once(async { Ok(baseline) }).chain(updates))
 }
 impl Default for Fixture {
     fn default() -> Self {
@@ -46,6 +155,11 @@ impl Default for Fixture {
                 cancel: Arc::new(AtomicBool::new(false)),
                 busy: false,
                 turn: 30,
+                ephemeral: false,
+                title: format!("会话 {id}"),
+                archived: false,
+                history_revision: None,
+                model_selection: json!({"provider":"fixture","model":"initial"}),
             };
             for n in 1..=30 {
                 append(&mut line, "turn/start", json!({"turn":n}));
@@ -68,50 +182,730 @@ impl Default for Fixture {
             sessions.insert(id.into(), line);
         }
         Self {
+            endpoint_id: "fixture".into(),
             sessions: Arc::new(Mutex::new(sessions)),
+            search_enabled: false,
+            search_results: Arc::new(Mutex::new(BTreeMap::new())),
+            search_calls: Arc::new(AtomicUsize::new(0)),
+            search_active: Arc::new(AtomicUsize::new(0)),
+            search_fails: Arc::new(AtomicBool::new(false)),
+            search_gate: None,
+            inventory_reads: Arc::new(AtomicUsize::new(0)),
+            inventory_refresh_gate: None,
+            inventory_refresh_fails: Arc::new(AtomicBool::new(false)),
             connects: Arc::new(AtomicUsize::new(0)),
+            forks: Arc::new(AtomicUsize::new(0)),
+            side_chats: false,
+            children: Arc::new(Mutex::new(BTreeMap::new())),
+            parent_available: Arc::new(AtomicBool::new(true)),
+            catalog_fails: Arc::new(AtomicBool::new(false)),
+            lifecycle: false,
+            historical_input: false,
+            summary_usage: false,
+            goal_projections: BTreeMap::new(),
+            pending_actionables: Arc::new(Mutex::new(BTreeMap::new())),
+            actionable_sender: broadcast::channel(256).0,
+            responses: Arc::new(Mutex::new(vec![])),
+            response_calls: Arc::new(AtomicUsize::new(0)),
+            response_gate: None,
+            history_page_gate: None,
+            history_page_calls: Arc::new(AtomicUsize::new(0)),
+            history_page_fails: Arc::new(AtomicBool::new(false)),
+            response_fails: Arc::new(AtomicBool::new(false)),
+            models: false,
+            model_read_gate: None,
+            model_read_calls: Arc::new(AtomicUsize::new(0)),
+            uploads: false,
+            upload_calls: Arc::new(AtomicUsize::new(0)),
+            upload_gate: None,
+            upload_fail_at: None,
+            file_read_calls: Arc::new(AtomicUsize::new(0)),
+            file_read_gate: None,
+            file_read_override: None,
+            presets: None,
+            inventory_sender: broadcast::channel(256).0,
+            workspace_sender: broadcast::channel(256).0,
+            mutations: Arc::new(Mutex::new(BTreeMap::new())),
         }
+    }
+}
+impl Fixture {
+    /// Separate fixture authorities may share session IDs while retaining their
+    /// own endpoint identity. Configure before registering/connecting.
+    pub fn with_endpoint_id(mut self, endpoint_id: impl Into<String>) -> Self {
+        self.endpoint_id = endpoint_id.into();
+        self
+    }
+    /// Advertises only the historical-input host hook, never an edit RPC.
+    pub fn with_historical_input(mut self) -> Self {
+        self.historical_input = true;
+        self
+    }
+    /// Seed one ended, empty-answer history turn with no completed-turn fork
+    /// capability. Used before connecting; never rewrites a running journal.
+    pub fn with_output_aside_guard(mut self) -> Self {
+        self.lifecycle = false;
+        {
+            let mut sessions = self.sessions.lock().unwrap();
+            let line = sessions.get_mut("a").unwrap();
+            for row in &mut line.rows {
+                if row.event.kind == "assistant/message" && row.event.data["turn"] == 30 {
+                    row.event.data["message"]["content"] = json!([]);
+                }
+            }
+        }
+        self
+    }
+    /// Owned clock/usage fixture; no model request or user submission.
+    pub fn with_timed_turn(self) -> Self {
+        let mut sessions = self.sessions.lock().unwrap();
+        let line = sessions.get_mut("a").unwrap();
+        line.turn += 1;
+        line.busy = true;
+        let start = crate::footnote_host::now_ms() - 65000.;
+        for (kind, data) in [
+            ("turn/start", json!({"turn":line.turn})),
+            (
+                "user/message",
+                json!({"turn":line.turn,"id":"timed-input","content":[{"type":"text","text":"计时验证输入"}]}),
+            ),
+        ] {
+            let mut row = entry(line.rows.len() as i64, kind, data);
+            row.event.time = start;
+            line.rows.push(row);
+        }
+        drop(sessions);
+        self
+    }
+    pub fn publish_timed_usage(&self, tokens: u64) -> Result<()> {
+        let sessions = self.sessions.lock().unwrap();
+        let line = sessions.get("a").unwrap();
+        require(line.busy && line.turn == 31, "timed fixture only")?;
+        line.sender.send(json!({"type":"transient","event":{"seq":0,"time":crate::footnote_host::now_ms(),"type":"assistant/chunk","data":{"turn":line.turn,"step":1,"chunk":{"type":"usage","usage":{"outputTokens":tokens}}}}})).map_err(|_| Error::Disconnected)?;
+        Ok(())
+    }
+    /// Two public formal assistant records before turn/end. The UI must retain
+    /// live presentation until settlement and later copy the complete source turn.
+    pub fn publish_timed_output(&self) -> Result<()> {
+        let mut sessions = self.sessions.lock().unwrap();
+        let line = sessions.get_mut("a").unwrap();
+        require(line.busy && line.turn == 31, "timed fixture only")?;
+        require(
+            !line
+                .rows
+                .iter()
+                .any(|row| row.event.kind == "assistant/message" && row.event.data["turn"] == 31),
+            "timed output already published",
+        )?;
+        for (step, text) in [(1, "计时结束前的第一段"), (2, "正式回复第二段")] {
+            let mut row = entry(
+                line.rows.len() as i64,
+                "assistant/message",
+                json!({"turn":line.turn,"step":step,"message":{"id":format!("timed-output-{step}"),"content":[{"type":"text","text":text}],"usage":{"inputTokens":10,"outputTokens":1200}}}),
+            );
+            row.event.time = crate::footnote_host::now_ms();
+            line.rows.push(row.clone());
+            let _ = line.sender.send(json!({"type":"event","entry":row}));
+        }
+        Ok(())
+    }
+    pub fn finish_timed_turn(&self) -> Result<()> {
+        let mut sessions = self.sessions.lock().unwrap();
+        let line = sessions.get_mut("a").unwrap();
+        require(line.busy && line.turn == 31, "timed fixture only")?;
+        let mut row = entry(
+            line.rows.len() as i64,
+            "turn/end",
+            json!({"turn":line.turn,"reason":"completed"}),
+        );
+        row.event.time = crate::footnote_host::now_ms();
+        line.rows.push(row.clone());
+        let _ = line.sender.send(json!({"type":"event","entry":row}));
+        line.busy = false;
+        Ok(())
+    }
+    /// Controlled public inventory notification for display regression fixtures.
+    /// Does not edit the harness's stored title or submit a model request.
+    pub fn publish_inventory_summary(&self, summary: Value) -> Result<()> {
+        let id = string(&summary, "sessionId")?;
+        require(
+            self.sessions.lock().unwrap().contains_key(id),
+            "unknown fixture session",
+        )?;
+        self.inventory_sender
+            .send(json!({"type":"upsert","session":summary}))
+            .map_err(|_| Error::Disconnected)?;
+        Ok(())
+    }
+    pub fn with_inventory_refresh_gate(mut self, gate: Arc<tokio::sync::Semaphore>) -> Self {
+        self.inventory_refresh_gate = Some(gate);
+        self
+    }
+    pub fn set_inventory_refresh_failure(&self, failed: bool) {
+        self.inventory_refresh_fails.store(failed, Ordering::SeqCst);
+    }
+    pub fn inventory_reads(&self) -> usize {
+        self.inventory_reads.load(Ordering::SeqCst)
+    }
+    /// Authority-only fixture setup: model a search finding a native session
+    /// before an inventory delta arrives. Never install this row in the client.
+    pub fn install_unannounced_session(&self, id: &str, title: &str) {
+        let mut sessions = self.sessions.lock().unwrap();
+        assert!(!id.is_empty() && !sessions.contains_key(id));
+        sessions.insert(
+            id.into(),
+            Line {
+                rows: vec![],
+                sender: broadcast::channel(256).0,
+                cancel: Arc::new(AtomicBool::new(false)),
+                busy: false,
+                turn: 0,
+                ephemeral: false,
+                title: title.into(),
+                archived: false,
+                history_revision: None,
+                model_selection: json!({"provider":"fixture","model":"initial"}),
+            },
+        );
+    }
+    pub fn with_session_search(mut self) -> Self {
+        self.search_enabled = true;
+        self
+    }
+    pub fn with_search_gate(mut self, gate: Arc<tokio::sync::Semaphore>) -> Self {
+        self.search_gate = Some(gate);
+        self
+    }
+    pub fn set_search_result(&self, query: &str, value: Value) {
+        self.search_results
+            .lock()
+            .unwrap()
+            .insert(query.into(), value);
+    }
+    pub fn set_search_failure(&self, value: bool) {
+        self.search_fails.store(value, Ordering::SeqCst);
+    }
+    pub fn search_calls(&self) -> usize {
+        self.search_calls.load(Ordering::SeqCst)
+    }
+    pub fn active_searches(&self) -> usize {
+        self.search_active.load(Ordering::SeqCst)
+    }
+
+    /// Opt-in owned protocol history for disclosure/reflow acceptance. No tool runs.
+    pub fn with_reading_details(self) -> Self {
+        for line in self.sessions.lock().unwrap().values_mut() {
+            let old = std::mem::take(&mut line.rows);
+            for row in old {
+                let mut value = serde_json::to_value(row).unwrap();
+                let event = &mut value["event"];
+                let details = (event["type"] == "assistant/message").then(|| {
+                    let turn = event["data"]["turn"].as_u64().unwrap();
+                    let call = format!("reading-tool-{turn}");
+                    let content = event["data"]["message"]["content"].as_array_mut().unwrap();
+                    content.insert(0, json!({"type":"reasoning","text":"只读验收推理内容，验证展开后的中文换行。\n".repeat(8)}));
+                    (turn, call)
+                });
+                event["seq"] = json!(line.rows.len());
+                event["time"] = json!(line.rows.len() + 1);
+                line.rows.push(serde_json::from_value(value).unwrap());
+                if let Some((turn, call)) = details {
+                    append(
+                        line,
+                        "tool/call",
+                        json!({"turn":turn,"step":1,"callId":call,"name":"fixture_read","arguments":{"path":"/fixture/reading-only.txt"}}),
+                    );
+                    append(
+                        line,
+                        "tool/result",
+                        json!({"turn":turn,"step":1,"message":{"source":{"callId":call},"content":[{"type":"text","text":"只读验收工具结果，不读取真实文件。\n".repeat(12)}]}}),
+                    );
+                }
+            }
+        }
+        self
+    }
+    /// Explicit journal prompt provenance, not a UI-injected message role.
+    pub fn with_system_prompts(self) -> Self {
+        for line in self.sessions.lock().unwrap().values_mut() {
+            let old = std::mem::take(&mut line.rows);
+            for row in old {
+                let mut value = serde_json::to_value(row).unwrap();
+                let user = (value["event"]["type"] == "user/message")
+                    .then(|| value["event"]["data"]["turn"].as_u64().unwrap());
+                value["event"]["seq"] = json!(line.rows.len());
+                value["event"]["time"] = json!(line.rows.len() + 1);
+                line.rows.push(serde_json::from_value(value).unwrap());
+                if let Some(turn) = user {
+                    append(line, "step/start", json!({"turn":turn,"step":1}));
+                    append(
+                        line,
+                        "system/message",
+                        json!({"turn":turn,"step":1,"message":{"content":[{"type":"text","text":"公开日志中的初始系统提示词。\n".repeat(8)}]}}),
+                    );
+                }
+            }
+        }
+        self
+    }
+    /// Owned public journal fixture: a later input in the same turn, followed by
+    /// a separate final response frame. No real tool, file or provider is used.
+    pub fn with_input_bounded_history(self) -> Self {
+        for line in self.sessions.lock().unwrap().values_mut() {
+            let old = std::mem::take(&mut line.rows);
+            for row in old {
+                let mut value = serde_json::to_value(row).unwrap();
+                if value["event"]["type"] == "turn/end" {
+                    let turn = value["event"]["data"]["turn"].as_u64().unwrap();
+                    append(
+                        line,
+                        "user/message",
+                        json!({"turn":turn,"id":format!("later-input-{turn}"),"content":[{"type":"text","text":format!("同回合追加输入 {turn}")}]}),
+                    );
+                    append(
+                        line,
+                        "assistant/message",
+                        json!({"turn":turn,"step":2,"sessionFinal":true,"message":{"id":format!("later-response-{turn}"),"content":[{"type":"reasoning","text":"追加输入后的思考内容。"},{"type":"text","text":format!("追加输入后的最终回答 {turn}。")}]}}),
+                    );
+                }
+                value["event"]["seq"] = json!(line.rows.len());
+                value["event"]["time"] = json!(line.rows.len() + 1);
+                line.rows.push(serde_json::from_value(value).unwrap());
+            }
+        }
+        self
+    }
+    pub fn with_history_page_gate(mut self, gate: Arc<tokio::sync::Semaphore>) -> Self {
+        self.history_page_gate = Some(gate);
+        self
+    }
+    pub fn history_page_calls(&self) -> usize {
+        self.history_page_calls.load(Ordering::SeqCst)
+    }
+    pub fn set_history_page_fails(&self, fails: bool) {
+        self.history_page_fails.store(fails, Ordering::SeqCst);
+    }
+    /// Public event fixture; a session notice deliberately has no turn.
+    pub fn with_session_notice(self) -> Self {
+        {
+            let mut sessions = self.sessions.lock().unwrap();
+            append(
+                sessions.get_mut("a").unwrap(),
+                "session/notice",
+                json!({"classification":"worker_launch","severity":"error","message":"Local worker launch notice fixture"}),
+            );
+        }
+        self
+    }
+    pub fn with_uploads(mut self) -> Self {
+        self.uploads = true;
+        self
+    }
+    pub fn with_upload_gate(mut self, gate: Arc<tokio::sync::Semaphore>) -> Self {
+        self.upload_gate = Some(gate);
+        self
+    }
+    pub fn with_upload_failure(mut self, index: usize) -> Self {
+        self.upload_fail_at = Some(index);
+        self
+    }
+    pub fn upload_calls(&self) -> usize {
+        self.upload_calls.load(Ordering::SeqCst)
+    }
+    pub fn with_file_read_gate(mut self, gate: Arc<tokio::sync::Semaphore>) -> Self {
+        self.file_read_gate = Some(gate);
+        self
+    }
+    pub fn with_file_read_override(mut self, value: Value) -> Self {
+        self.file_read_override = Some(value);
+        self
+    }
+    pub fn file_read_calls(&self) -> usize {
+        self.file_read_calls.load(Ordering::SeqCst)
+    }
+    pub fn with_presets(mut self, legacy_roster: bool) -> Self {
+        self.presets = Some(legacy_roster);
+        self
+    }
+    pub fn creation_receipts(&self) -> Vec<Value> {
+        self.mutations
+            .lock()
+            .unwrap()
+            .values()
+            .filter(|(method, _, _)| method == "session.create")
+            .map(|(_, payload, _)| payload.clone())
+            .collect()
+    }
+    pub fn publish_actionable(&self, value: Value) {
+        self.pending_actionables
+            .lock()
+            .unwrap()
+            .insert(value["id"].as_str().unwrap().into(), value.clone());
+        let _ = self
+            .actionable_sender
+            .send(json!({"type":"upsert","actionable":value}));
+    }
+    pub fn resolve_actionable(&self, id: &str, revision: i64) {
+        self.pending_actionables.lock().unwrap().remove(id);
+        let _ = self
+            .actionable_sender
+            .send(json!({"type":"resolved","actionableId":id,"revision":revision}));
+    }
+    pub fn with_response_gate(mut self, gate: Arc<tokio::sync::Semaphore>) -> Self {
+        self.response_gate = Some(gate);
+        self
+    }
+    pub fn set_response_fails(&self, value: bool) {
+        self.response_fails.store(value, Ordering::SeqCst);
+    }
+    pub fn response_calls(&self) -> usize {
+        self.response_calls.load(Ordering::SeqCst)
+    }
+    pub fn responses(&self) -> Vec<Value> {
+        self.responses.lock().unwrap().clone()
+    }
+    pub fn with_model_read_gate(mut self, gate: Arc<tokio::sync::Semaphore>) -> Self {
+        self.model_read_gate = Some(gate);
+        self
+    }
+    pub fn model_read_calls(&self) -> usize {
+        self.model_read_calls.load(Ordering::SeqCst)
+    }
+    pub fn with_models(mut self) -> Self {
+        self.models = true;
+        self
+    }
+    pub fn mutation_receipts(&self) -> BTreeMap<String, (String, Value, Value)> {
+        self.mutations.lock().unwrap().clone()
+    }
+    /// Deliberately invalid semantic history in the owned local test endpoint.
+    /// The journal remains protocol-valid so controller fallback is exercised.
+    pub fn publish_projection_failure(&self, id: &str) -> Result<()> {
+        let mut sessions = self.sessions.lock().unwrap();
+        let line = sessions
+            .get_mut(id)
+            .ok_or_else(|| unsupported("fixture session"))?;
+        require(!line.busy, "settled fixture required")?;
+        append(
+            line,
+            "turn/end",
+            json!({"turn":line.turn+1,"reason":"completed",
+            "promotedMessageID":"fixture-missing-projection-output"}),
+        );
+        Ok(())
+    }
+    /// Repair is consumed through a new public journal baseline, never by editing
+    /// the consumer's projection. Changing historyRevision retires the bad tail.
+    pub fn repair_projection_failure(&self, id: &str) -> Result<()> {
+        let mut sessions = self.sessions.lock().unwrap();
+        let line = sessions
+            .get_mut(id)
+            .ok_or_else(|| unsupported("fixture session"))?;
+        require(
+            line.rows.last().is_some_and(|row| {
+                row.event.data["promotedMessageID"] == "fixture-missing-projection-output"
+            }),
+            "no owned projection failure",
+        )?;
+        line.rows.pop();
+        line.history_revision = Some(format!(
+            "{}:repaired",
+            line.history_revision.as_deref().unwrap_or("fixture")
+        ));
+        Ok(())
+    }
+    pub fn with_lifecycle(mut self) -> Self {
+        self.lifecycle = true;
+        self
+    }
+    fn record(&self, method: &str, payload: &Value, rpc: &str, value: Value) -> Value {
+        self.mutations
+            .lock()
+            .unwrap()
+            .insert(rpc.into(), (method.into(), payload.clone(), value.clone()));
+        value
+    }
+    pub fn with_children(self) -> Self {
+        let mut children = self.children.lock().unwrap();
+        let mut sessions = self.sessions.lock().unwrap();
+        for (id, parent, mode) in [
+            ("child-a", "a", "continuable"),
+            ("child-b", "b", "continuable"),
+            ("nested-a", "child-a", "continuable"),
+            ("bounded-b", "b", "one-shot"),
+        ] {
+            let mut line = Line {
+                rows: vec![],
+                sender: broadcast::channel(256).0,
+                cancel: Arc::new(AtomicBool::new(false)),
+                busy: false,
+                turn: 30,
+                ephemeral: false,
+                title: format!("会话 {id}"),
+                archived: false,
+                history_revision: None,
+                model_selection: json!({"provider":"fixture","model":"initial"}),
+            };
+            for turn in 1..=30 {
+                append(&mut line, "turn/start", json!({"turn":turn}));
+                append(
+                    &mut line,
+                    "user/message",
+                    json!({"turn":turn,"id":format!("{id}-u{turn}"),"content":[{"type":"text","text":format!("{id} · 子历史 {turn}")}]}),
+                );
+                append(
+                    &mut line,
+                    "assistant/message",
+                    json!({"turn":turn,"step":1,"message":{"id":format!("{id}-m{turn}"),"content":[{"type":"text","text":"子代理历史回答"}]}}),
+                );
+                append(
+                    &mut line,
+                    "turn/end",
+                    json!({"turn":turn,"reason":"completed"}),
+                );
+            }
+            children.insert(id.into(), (parent.into(), mode.into()));
+            sessions.insert(id.into(), line);
+        }
+        drop(sessions);
+        drop(children);
+        self
+    }
+    pub fn set_child_mode(&self, id: &str, mode: &str) {
+        self.children
+            .lock()
+            .unwrap()
+            .get_mut(id)
+            .expect("fixture child")
+            .1 = mode.into();
+    }
+    pub fn set_parent_available(&self, available: bool) {
+        self.parent_available.store(available, Ordering::SeqCst);
+    }
+    pub fn set_catalog_fails(&self, fails: bool) {
+        self.catalog_fails.store(fails, Ordering::SeqCst);
+    }
+    pub fn with_side_chats(mut self) -> Self {
+        self.side_chats = true;
+        self
+    }
+    /// Opt-in synthetic usage delivered via public control projections. No model
+    /// call or inferred usage; ordinary and configured harness demos are untouched.
+    /// Opt-in original public control projection, not a goal mutation driver.
+    pub fn with_goal_projection(mut self, session: &str, value: Value) -> Self {
+        self.goal_projections.insert(session.into(), value);
+        self
+    }
+    pub fn with_summary_usage(mut self) -> Self {
+        self.summary_usage = true;
+        self
+    }
+    /// A completed parent call whose child's status arrives independently via inventory.
+    pub fn with_summary_subagent(self) -> Self {
+        self.with_summary_subagent_title("独立子会话状态")
+    }
+    pub fn with_summary_subagent_title(self, title: &str) -> Self {
+        let child = "b437cf34-5661-45e2-a674-113b27c92f89";
+        self.install_unannounced_session(child, "Summary child");
+        let mut sessions = self.sessions.lock().unwrap();
+        let line = sessions.get_mut("a").unwrap();
+        line.turn += 1;
+        let turn = line.turn;
+        append(line, "turn/start", json!({"turn":turn}));
+        append(
+            line,
+            "tool/call",
+            json!({"turn":turn,"step":1,"callId":"summary-child-call","name":"subagent","arguments":{"brief":title}}),
+        );
+        append(
+            line,
+            "tool/result",
+            json!({"turn":turn,"step":1,"message":{"source":{"callId":"summary-child-call"},"content":[{"type":"text","text":format!("Started child {child}")}]}}),
+        );
+        append(line, "turn/end", json!({"turn":turn,"reason":"completed"}));
+        drop(sessions);
+        self
+    }
+    pub fn with_summary_row_layout(self) -> Self {
+        let fixture = self
+            .with_summary_subagent_title(&"动作行 · 中文 English é 路径／".repeat(5))
+            .with_summary_usage();
+        let mut sessions = fixture.sessions.lock().unwrap();
+        append(
+            sessions.get_mut("a").unwrap(),
+            "todo/write",
+            json!({"todos":[{"content":"静态行 · 中文 English é 路径／".repeat(3),"status":"pending"}]}),
+        );
+        drop(sessions);
+        fixture
+    }
+    /// Explicit owned demo data, emitted through the same journal contract.
+    pub fn with_demo_summary(self) -> Self {
+        {
+            let mut sessions = self.sessions.lock().unwrap();
+            for (id, line) in sessions.iter_mut() {
+                append(
+                    line,
+                    "todo/write",
+                    json!({"todos":[
+                        {"content":format!("验证会话 {id} 的数据回传"),"status":"completed"},
+                        {"content":"接入正式 Transcript","status":"pending"}
+                    ]}),
+                );
+            }
+        }
+        self
     }
 }
 struct Endpoint {
     fixture: Fixture,
     host: HostDescription,
     generation: String,
+    inventory_reads: AtomicUsize,
 }
 #[async_trait]
 impl EndpointConnector for Fixture {
     async fn connect(&self) -> Result<Arc<dyn SessionEndpoint>> {
         tokio::time::sleep(Duration::from_millis(100)).await;
-        Ok(Arc::new(Endpoint {
+        let mut endpoint = Endpoint {
             fixture: self.clone(),
+            inventory_reads: AtomicUsize::new(0),
             generation: format!("fixture-{}", self.connects.fetch_add(1, Ordering::SeqCst)),
             host: serde_json::from_value(
                 json!({"protocolVersion":4,"product":{"name":"Local SEP fixture","version":"1"},"capabilities":["session-journal","session-inventory-sync","session-control-sync","actionable-sync"],"cwd":"/fixture","home":"/fixture","attachedSessions":0,"canOpenPath":false}),
             )?,
-        }))
+        };
+        if self.lifecycle {
+            endpoint.host.capabilities.insert("workspace-sync".into());
+        }
+        Ok(Arc::new(endpoint))
     }
 }
 #[async_trait]
 impl SessionEndpoint for Endpoint {
     fn identity(&self) -> &str {
-        "fixture"
+        &self.fixture.endpoint_id
     }
     fn host(&self) -> &HostDescription {
         &self.host
     }
     fn capabilities(&self) -> EndpointCapabilities {
-        EndpointCapabilities::methods(&["session.prompt", "session.cancel"])
+        let mut caps = EndpointCapabilities::methods(&["session.prompt", "session.cancel"]);
+        caps.can_edit_historical_input = self.fixture.historical_input;
+        if self.fixture.search_enabled {
+            caps.methods.insert("session.search".into());
+        }
+        if self.fixture.uploads {
+            caps.methods.extend([
+                "session.uploadFile".into(),
+                "attachments.policy".into(),
+                "session.fileAttachment".into(),
+            ]);
+        }
+        if let Some(legacy) = self.fixture.presets {
+            caps.methods.extend([
+                "session.create".into(),
+                if legacy {
+                    "presets.list"
+                } else {
+                    "session.initialPresets"
+                }
+                .into(),
+            ]);
+        }
+        if self.fixture.models {
+            caps.methods
+                .extend(["session.models".into(), "session.selectModel".into()]);
+        }
+        if self.fixture.side_chats {
+            caps.methods
+                .extend(["session.fork".into(), "session.discard".into()]);
+            caps.supports_ephemeral_fork = true;
+        }
+        if !self.fixture.children.lock().unwrap().is_empty() {
+            caps.methods.extend([
+                "subagents.list".into(),
+                "subagents.prompt".into(),
+                "subagents.cancel".into(),
+                "subagents.history".into(),
+            ]);
+        }
+        if self.fixture.lifecycle {
+            caps.can_fork_completed_turn = true;
+            caps.supports_archive_session = true;
+            caps.supports_unarchive_session = true;
+            caps.methods.extend([
+                "session.rename".into(),
+                "session.fork".into(),
+                "session.archive".into(),
+                "session.unarchive".into(),
+            ]);
+        }
+        caps
     }
     async fn follow(&self, target: StreamTarget) -> Result<FrameStream> {
         let g = &self.generation;
         let baseline = match target {
             StreamTarget::SessionInventory => {
-                json!({"type":"baseline","generation":g,"snapshot":{"items":[]}})
+                let previous = self.inventory_reads.fetch_add(1, Ordering::SeqCst);
+                self.fixture.inventory_reads.fetch_add(1, Ordering::SeqCst);
+                if previous > 0 {
+                    if let Some(gate) = &self.fixture.inventory_refresh_gate {
+                        gate.acquire()
+                            .await
+                            .map_err(|_| unsupported("inventory read gate closed"))?
+                            .forget();
+                    }
+                    require(
+                        !self.fixture.inventory_refresh_fails.load(Ordering::SeqCst),
+                        "owned inventory refresh failure",
+                    )?;
+                }
+                let sessions = self.fixture.sessions.lock().unwrap();
+                let receiver = self.fixture.inventory_sender.subscribe();
+                let items: Vec<_> = sessions
+                    .iter()
+                    .filter(|(_, line)| !line.ephemeral)
+                    .map(|(id, line)| summary(id, line))
+                    .collect();
+                let baseline = json!({"type":"baseline","generation":g,"snapshot":{"items":items}});
+                return Ok(inventory_stream(baseline, receiver, g.clone()));
+            }
+            StreamTarget::WorkspaceInventory if self.fixture.lifecycle => {
+                let sessions = self.fixture.sessions.lock().unwrap();
+                let receiver = self.fixture.workspace_sender.subscribe();
+                let ids: Vec<_> = sessions
+                    .iter()
+                    .filter(|(_, line)| line.archived)
+                    .map(|(id, _)| id)
+                    .collect();
+                let baseline = json!({"type":"baseline","generation":g,"snapshot":{"items":[],"archivedSessionIds":ids}});
+                return Ok(inventory_stream(baseline, receiver, g.clone()));
             }
             StreamTarget::SessionControl => {
-                json!({"type":"baseline","generation":g,"snapshot":{"queues":[],"jobs":[],"projections":[]}})
+                let projections: Vec<Value> = self.fixture.sessions.lock().unwrap().iter().filter_map(|(id, line)| {
+                    let mut values = serde_json::Map::new();
+                    if self.fixture.summary_usage {
+                        values.insert("tokenUsage".into(), json!({"uncachedInputTokens":2000,"cacheReadTokens":1000,"cacheWriteTokens":0,"outputTokens":1234}));
+                    }
+                    if let Some(goal) = self.fixture.goal_projections.get(id) { values.insert("goal".into(), goal.clone()); }
+                    (!values.is_empty()).then(|| json!({"sessionId":id,"projections":{"asOfSeq":line.rows.len() as i64 - 1,"values":values}}))
+                }).collect();
+                json!({"type":"baseline","generation":g,"snapshot":{"queues":[],"jobs":[],"projections":projections}})
             }
-            StreamTarget::Actionables => json!({"type":"reset","generation":g}),
+            StreamTarget::Actionables => {
+                let pending = self.fixture.pending_actionables.lock().unwrap();
+                let receiver = self.fixture.actionable_sender.subscribe();
+                let mut frames = vec![Ok(json!({"type":"reset","generation":g}))];
+                frames.extend(
+                    pending.values().map(|value| {
+                        Ok(json!({"type":"upsert","generation":g,"actionable":value}))
+                    }),
+                );
+                return Ok(Box::pin(stream::iter(frames).chain(
+                    inventory_stream(Value::Null, receiver, g.clone()).skip(1),
+                )));
+            }
             StreamTarget::SessionJournal { address, .. } => {
                 let sessions = self.fixture.sessions.lock().unwrap();
                 let line = sessions
@@ -119,7 +913,7 @@ impl SessionEndpoint for Endpoint {
                     .ok_or_else(|| unsupported("fixture session"))?;
                 let receiver = line.sender.subscribe();
                 let start = line.rows.len().saturating_sub(40);
-                let baseline = json!({"type":"snapshot","snapshot":{"sessionId":address.session_id,"generation":g,"throughSequence":line.rows.len() as i64-1,"windowLimit":40,"entries":line.rows[start..],"hasMoreBefore":start>0}});
+                let baseline = json!({"type":"snapshot","snapshot":{"sessionId":address.session_id,"generation":g,"throughSequence":line.rows.len() as i64-1,"windowLimit":40,"entries":line.rows[start..],"hasMoreBefore":start>0,"historyRevision":line.history_revision}});
                 let id = address.session_id;
                 let generation = g.clone();
                 let updates = stream::unfold(receiver, move |mut receiver| {
@@ -150,6 +944,19 @@ impl SessionEndpoint for Endpoint {
     }
     async fn history_page(&self, r: HistoryRequest) -> Result<HistoryPage> {
         r.validate()?;
+        self.fixture
+            .history_page_calls
+            .fetch_add(1, Ordering::SeqCst);
+        if let Some(gate) = &self.fixture.history_page_gate {
+            gate.acquire()
+                .await
+                .map_err(|_| Error::Disconnected)?
+                .forget();
+        }
+        require(
+            !self.fixture.history_page_fails.load(Ordering::SeqCst),
+            "fixture history read failed",
+        )?;
         let sessions = self.fixture.sessions.lock().unwrap();
         let line = sessions
             .get(&r.session_id)
@@ -164,15 +971,401 @@ impl SessionEndpoint for Endpoint {
             has_more_before: start > 0,
         })
     }
-    async fn respond(&self, _: &str, _: i64, _: Value) -> Result<()> {
-        Err(unsupported("fixture actionable"))
+    async fn respond(&self, id: &str, revision: i64, outcome: Value) -> Result<()> {
+        self.fixture.response_calls.fetch_add(1, Ordering::SeqCst);
+        if let Some(gate) = &self.fixture.response_gate {
+            gate.acquire()
+                .await
+                .map_err(|_| unsupported("response gate closed"))?
+                .forget();
+        }
+        self.fixture
+            .responses
+            .lock()
+            .unwrap()
+            .push(json!({"id":id,"revision":revision,"outcome":outcome}));
+        if self.fixture.response_fails.load(Ordering::SeqCst) {
+            return Err(Error::Transport("fixture response outcome unknown".into()));
+        }
+        {
+            let mut pending = self.fixture.pending_actionables.lock().unwrap();
+            require(
+                pending
+                    .get(id)
+                    .is_some_and(|value| value["revision"] == revision),
+                "fixture actionable revision changed",
+            )?;
+            pending.remove(id);
+        }
+        let _ = self
+            .fixture
+            .actionable_sender
+            .send(json!({"type":"resolved","actionableId":id,"revision":revision}));
+        Ok(())
     }
     async fn call(&self, method: &str, p: Value, rpc: &str) -> Result<Value> {
+        if self.fixture.search_enabled && method == "session.search" {
+            struct Active(Arc<AtomicUsize>);
+            impl Drop for Active {
+                fn drop(&mut self) {
+                    self.0.fetch_sub(1, Ordering::SeqCst);
+                }
+            }
+            self.fixture.search_calls.fetch_add(1, Ordering::SeqCst);
+            self.fixture.search_active.fetch_add(1, Ordering::SeqCst);
+            let _active = Active(self.fixture.search_active.clone());
+            let value = self
+                .fixture
+                .search_results
+                .lock()
+                .unwrap()
+                .get(string(&p, "query")?)
+                .cloned()
+                .unwrap_or_else(|| json!({"items":[],"hasMore":false}));
+            let failed = self.fixture.search_fails.load(Ordering::SeqCst);
+            if let Some(gate) = &self.fixture.search_gate {
+                gate.acquire()
+                    .await
+                    .map_err(|_| unsupported("search read gate closed"))?
+                    .forget();
+            }
+            if failed {
+                return Err(Error::Transport("owned search failure".into()));
+            }
+            return Ok(value);
+        }
+        if self.fixture.models && method == "session.models" {
+            self.fixture.model_read_calls.fetch_add(1, Ordering::SeqCst);
+            if let Some(gate) = &self.fixture.model_read_gate {
+                gate.acquire()
+                    .await
+                    .map_err(|_| unsupported("model read gate closed"))?
+                    .forget();
+            }
+        }
+
+        if self.fixture.uploads && method == "session.fileAttachment" {
+            self.fixture.file_read_calls.fetch_add(1, Ordering::SeqCst);
+            if let Some(gate) = &self.fixture.file_read_gate {
+                gate.acquire()
+                    .await
+                    .map_err(|_| unsupported("read gate closed"))?
+                    .forget();
+            }
+            if let Some(value) = &self.fixture.file_read_override {
+                return Ok(value.clone());
+            }
+            return self.fixture.mutations.lock().unwrap().values().find_map(|(method,payload,result)| {
+                (method=="session.uploadFile" && payload["sessionId"]==p["sessionId"] && result["file"]["attachmentId"]==p["attachmentId"])
+                    .then(||json!({"attachment":{"attachmentId":result["file"]["attachmentId"],"name":result["file"]["name"],"bytes":result["file"]["bytes"],"mediaType":payload["mediaType"]},"data":payload["data"]}))
+            }).ok_or_else(||unsupported("file unavailable in this session"));
+        }
+        if self.fixture.uploads && method == "attachments.policy" {
+            return Ok(json!({"inlineMediaTypes":[],"maxAttachmentBytes":8388608,
+                "maxAttachmentsPerMessage":4,"maxMessageAttachmentBytes":16777216}));
+        }
+        if self.fixture.uploads && method == "session.uploadFile" {
+            let index = self.fixture.upload_calls.fetch_add(1, Ordering::SeqCst);
+            if let Some(gate) = &self.fixture.upload_gate {
+                gate.acquire()
+                    .await
+                    .map_err(|_| unsupported("upload gate closed"))?
+                    .forget();
+            }
+            if self.fixture.upload_fail_at == Some(index) {
+                return Err(unsupported("fixture upload outcome unknown"));
+            }
+            let data = string(&p, "data")?;
+            // Fixture computes decoded length of transport-produced base64 only.
+            let bytes = data.len() / 4 * 3 - data.bytes().rev().take_while(|c| *c == b'=').count();
+            return Ok(self.fixture.record(
+                method,
+                &p,
+                rpc,
+                json!({
+                "receiptId":format!("receipt-{index}"),"file":{
+                    "attachmentId":format!("file-{index}"),"name":p["name"],"bytes":bytes}}),
+            ));
+        }
+        if let Some(legacy) = self.fixture.presets {
+            if method
+                == if legacy {
+                    "presets.list"
+                } else {
+                    "session.initialPresets"
+                }
+            {
+                require(
+                    !self.fixture.catalog_fails.load(Ordering::SeqCst),
+                    "fixture preset catalog unavailable",
+                )?;
+                return Ok(if legacy {
+                    json!({"presets":[{"id":"coding","name":"编程","isDefault":true},{"id":"broken","name":"不可用","broken":"缺少配置"}]})
+                } else {
+                    json!({"presets":[{"id":"coding","title":"编程","configurationText":"SOURCE_NOT_PROMPT"},{"id":"broken","title":"不可用","unavailableReason":"缺少配置"}],"defaultID":"coding"})
+                });
+            }
+            if method == "session.create" {
+                if let Some((old_method, old_payload, result)) =
+                    self.fixture.mutations.lock().unwrap().get(rpc)
+                {
+                    require(
+                        old_method == method && old_payload == &p,
+                        "fixture create identity changed",
+                    )?;
+                    return Ok(result.clone());
+                }
+                let id = string(&p, "sessionId")?;
+                require(
+                    p["agentPreset"].is_null() || p["agentPreset"] == "coding",
+                    "fixture initial preset unavailable",
+                )?;
+                let mut sessions = self.fixture.sessions.lock().unwrap();
+                require(
+                    !sessions.contains_key(id),
+                    "fixture create identity collision",
+                )?;
+                let line = Line {
+                    rows: vec![],
+                    sender: broadcast::channel(256).0,
+                    cancel: Arc::new(AtomicBool::new(false)),
+                    busy: false,
+                    turn: 0,
+                    ephemeral: false,
+                    title: "预设新会话".into(),
+                    archived: false,
+                    history_revision: None,
+                    model_selection: json!({"provider":"fixture","model":"initial"}),
+                };
+                let _ = self
+                    .fixture
+                    .inventory_sender
+                    .send(json!({"type":"upsert","session":summary(id,&line)}));
+                sessions.insert(id.into(), line);
+                return Ok(self
+                    .fixture
+                    .record(method, &p, rpc, json!({"sessionId":id})));
+            }
+        }
+        if method == "subagents.list" {
+            if self.fixture.catalog_fails.load(Ordering::SeqCst) {
+                return Err(Error::Transport("fixture catalog unavailable".into()));
+            }
+            let parent = string(&p, "parentSessionId")?;
+            let entries: Vec<_> = self
+                .fixture
+                .children
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|(_, (owner, _))| owner == parent)
+                .map(|(id, (_, mode))| json!({"kind":"child","id":id,"mode":mode}))
+                .collect();
+            let available = self.fixture.parent_available.load(Ordering::SeqCst)
+                && self
+                    .fixture
+                    .sessions
+                    .lock()
+                    .unwrap()
+                    .get(parent)
+                    .is_some_and(|line| !line.archived);
+            return Ok(json!({"entries":entries,"parentAvailable":available}));
+        }
+        if method == "subagents.history" {
+            let request: BoundedChildHistoryRequest = serde_json::from_value(p)?;
+            request.validate()?;
+            require(
+                self.fixture
+                    .children
+                    .lock()
+                    .unwrap()
+                    .get(&request.child_session_id)
+                    .is_some_and(|(owner, _)| owner == &request.parent_session_id),
+                "bounded child owner mismatch",
+            )?;
+            let sessions = self.fixture.sessions.lock().unwrap();
+            let child = &sessions[&request.child_session_id];
+            let cut = request
+                .through_sequence
+                .unwrap_or(child.rows.len() as i64 - 1);
+            require(cut < child.rows.len() as i64, "bounded fixture cut")?;
+            let revision = format!("{:064x}", cut + 1);
+            if request
+                .history_revision
+                .as_ref()
+                .is_some_and(|expected| expected != &revision)
+            {
+                return Err(Error::Remote(json!({"code":"history-stale"})));
+            }
+            let end = request
+                .before_sequence
+                .unwrap_or(cut + 1)
+                .min(cut + 1)
+                .max(0) as usize;
+            let start = end.saturating_sub(request.max_messages);
+            return Ok(serde_json::to_value(BoundedChildHistoryPage {
+                parent_session_id: request.parent_session_id,
+                child_session_id: request.child_session_id,
+                through_sequence: cut,
+                history_revision: revision,
+                entries: child.rows[start..end].to_vec(),
+                has_more_before: start > 0,
+                run_open: child.busy,
+                source_call: None,
+            })?);
+        }
+        let (method, p) = if matches!(method, "subagents.prompt" | "subagents.cancel") {
+            let parent = string(&p, "parentSessionId")?;
+            let child = string(&p, "childSessionId")?;
+            require(
+                self.fixture.parent_available.load(Ordering::SeqCst)
+                    && self
+                        .fixture
+                        .children
+                        .lock()
+                        .unwrap()
+                        .get(child)
+                        .is_some_and(|(owner, mode)| owner == parent && mode == "continuable"),
+                "child control ownership or continuation unavailable",
+            )?;
+            let mut payload = p.clone();
+            payload["sessionId"] = json!(child);
+            (
+                if method == "subagents.prompt" {
+                    "session.prompt"
+                } else {
+                    "session.cancel"
+                },
+                payload,
+            )
+        } else {
+            (method, p)
+        };
         let id = string(&p, "sessionId")?.to_owned();
         let mut sessions = self.fixture.sessions.lock().unwrap();
+        if self.fixture.lifecycle
+            && matches!(
+                method,
+                "session.rename" | "session.fork" | "session.archive" | "session.unarchive"
+            )
+            && let Some((old_method, old_payload, result)) =
+                self.fixture.mutations.lock().unwrap().get(rpc)
+        {
+            require(
+                old_method == method && old_payload == &p,
+                "fixture RPC identity payload changed",
+            )?;
+            return Ok(result.clone());
+        }
         let line = sessions
             .get_mut(&id)
             .ok_or_else(|| unsupported("fixture session"))?;
+        if method == "session.models" && self.fixture.models {
+            return Ok(
+                json!({"current":line.model_selection,"routable":true,"routableProviders":["fixture"],"groups":[{"id":"fixture","name":"Fixture provider","models":[{"id":"initial","name":"初始模型","reasoning":{"efforts":[{"id":"low","name":"低"},{"id":"high","name":"高"}],"defaultEffort":"low"}},{"id":"chosen","name":"显式选择模型","reasoning":{"efforts":[{"id":"low","name":"低"},{"id":"high","name":"高"}],"defaultEffort":"low"}}]},{"id":"unroutable","name":"不可路由","models":[{"id":"disabled","name":"不可用模型"}]}],"failures":[]}),
+            );
+        }
+        if method == "session.selectModel" && self.fixture.models {
+            require(
+                p["provider"] == "fixture"
+                    && matches!(p["model"].as_str(), Some("initial" | "chosen")),
+                "fixture model unavailable",
+            )?;
+            line.model_selection = json!({"provider":p["provider"],"model":p["model"]});
+            if let Some(effort) = p["reasoningEffort"].as_str() {
+                line.model_selection["reasoningEffort"] = json!(effort);
+            }
+            let selection = line.model_selection.clone();
+            append(line, "model/selection", selection.clone());
+            return Ok(json!({"selected":selection}));
+        }
+        if method == "session.rename" && self.fixture.lifecycle {
+            let title = string(&p, "title")?.trim();
+            require(!title.is_empty(), "empty fixture title")?;
+            line.title = title.into();
+            if !line.ephemeral {
+                let _ = self
+                    .fixture
+                    .inventory_sender
+                    .send(json!({"type":"upsert","session":summary(&id,line)}));
+            }
+            return Ok(self.fixture.record(method, &p, rpc, json!({"title":title})));
+        }
+        if matches!(method, "session.archive" | "session.unarchive") && self.fixture.lifecycle {
+            require(!line.busy, "fixture archive requires settled run")?;
+            line.archived = method == "session.archive";
+            let _ = self
+                .fixture
+                .inventory_sender
+                .send(json!({"type":"upsert","session":summary(&id,line)}));
+            let ids: Vec<_> = sessions
+                .iter()
+                .filter(|(_, line)| line.archived)
+                .map(|(id, _)| id)
+                .collect();
+            let _ = self
+                .fixture
+                .workspace_sender
+                .send(json!({"type":"archived","sessionIds":ids}));
+            return Ok(self.fixture.record(method, &p, rpc, json!({"ok":true})));
+        }
+        if method == "session.fork" && (self.fixture.side_chats || self.fixture.lifecycle) {
+            let ephemeral = p["ephemeral"].as_bool().unwrap_or(false);
+            let end = if let Some(sequence) = p["atSeq"].as_u64() {
+                (sequence as usize + 1).min(line.rows.len())
+            } else if line.busy {
+                line.rows
+                    .iter()
+                    .rposition(|row| row.event.kind == "turn/end")
+                    .map_or(0, |index| index + 1)
+            } else {
+                line.rows.len()
+            };
+            let rows = line.rows[..end].to_vec();
+            let turn = line.turn;
+            let title = line.title.clone();
+            let next = self.fixture.forks.fetch_add(1, Ordering::SeqCst) + 1;
+            let child = format!("{}-{next}", if ephemeral { "scratch" } else { "fork" });
+            require(
+                !sessions.contains_key(&child),
+                "fixture fork identity collision",
+            )?;
+            sessions.insert(
+                child.clone(),
+                Line {
+                    rows,
+                    sender: broadcast::channel(256).0,
+                    cancel: Arc::new(AtomicBool::new(false)),
+                    busy: false,
+                    turn,
+                    ephemeral,
+                    title,
+                    archived: false,
+                    history_revision: None,
+                    model_selection: json!({"provider":"fixture","model":"initial"}),
+                },
+            );
+            if !ephemeral {
+                let _ = self
+                    .fixture
+                    .inventory_sender
+                    .send(json!({"type":"upsert","session":summary(&child,&sessions[&child])}));
+            }
+            let result = json!({"sessionId":child});
+            return Ok(if self.fixture.lifecycle {
+                self.fixture.record(method, &p, rpc, result)
+            } else {
+                result
+            });
+        }
+        if method == "session.discard" && self.fixture.side_chats {
+            require(line.ephemeral, "fixture only discards ephemeral sessions")?;
+            if line.busy {
+                return Err(Error::Remote(json!({"code":"session-running"})));
+            }
+            sessions.remove(&id);
+            return Ok(json!({"discarded":true}));
+        }
         if method == "session.cancel" {
             line.cancel.store(true, Ordering::SeqCst);
             return Ok(json!({"cancelled":true}));
@@ -185,8 +1378,8 @@ impl SessionEndpoint for Endpoint {
         line.cancel = Arc::new(AtomicBool::new(false));
         let cancel = line.cancel.clone();
         let turn = line.turn;
-        append(line, "turn/start", json!({"turn":turn}));
-        append(
+        append_now(line, "turn/start", json!({"turn":turn}));
+        append_now(
             line,
             "user/message",
             json!({"turn":turn,"id":rpc,"source":{"kind":"user","rpcId":rpc},"content":content}),
@@ -210,16 +1403,16 @@ impl SessionEndpoint for Endpoint {
                 text.push_str(chunk);
                 let sessions = fixture.sessions.lock().unwrap();
                 let line = &sessions[&id];
-                let _=line.sender.send(json!({"type":"transient","event":{"seq":0,"time":1,"type":"assistant/chunk","data":{"turn":turn,"step":1,"chunk":{"type":"text-delta","text":chunk}}}}));
+                let _=line.sender.send(json!({"type":"transient","event":{"seq":0,"time":crate::footnote_host::now_ms(),"type":"assistant/chunk","data":{"turn":turn,"step":1,"chunk":{"type":"text-delta","text":chunk}}}}));
             }
             let mut sessions = fixture.sessions.lock().unwrap();
             let line = sessions.get_mut(&id).unwrap();
-            append(
+            append_now(
                 line,
                 "assistant/message",
                 json!({"turn":turn,"step":1,"message":{"id":format!("{id}-m{turn}"),"content":[{"type":"text","text":text}]}}),
             );
-            append(
+            append_now(
                 line,
                 "turn/end",
                 json!({"turn":turn,"reason":if cancel.load(Ordering::SeqCst){"interrupted"}else{"completed"}}),
@@ -231,10 +1424,10 @@ impl SessionEndpoint for Endpoint {
     async fn close(&self) {}
 }
 pub async fn setup() -> Result<(Arc<SessionRuntime>, Arc<RunController>)> {
-    let runtime = Arc::new(SessionRuntime::spawn(
-        "fixture",
-        Arc::new(Fixture::default()),
-    ));
+    setup_fixture(Fixture::default()).await
+}
+pub async fn setup_fixture(fixture: Fixture) -> Result<(Arc<SessionRuntime>, Arc<RunController>)> {
+    let runtime = Arc::new(SessionRuntime::spawn("fixture", Arc::new(fixture)));
     runtime.wait_ready(Duration::from_secs(3)).await?;
     let controller = Arc::new(RunController::new(runtime.clone())?);
     controller.open(RunScope::main("fixture", "a")).await?;

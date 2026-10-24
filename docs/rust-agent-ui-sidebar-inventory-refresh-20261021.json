@@ -1,0 +1,247 @@
+{
+  "format": "agentkit-sidebar-inventory-refresh/1",
+  "verified_at_utc": "2026-10-20T22:08:29.016936+00:00",
+  "based_on": "026aeec068a56a573f373134dce4c968873e49db",
+  "published_agentkit": "v0.3.8",
+  "default_inputs": {
+    "commit": "8cf0840790334ba224afc0595897c74231c712e6",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 199,
+    "sha256": "f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f",
+    "ui_packages": 8
+  },
+  "sources": {
+    "crates/session/src/lib.rs": "4bcdd967c672044c3ed54d5b0e87e4ff1d92b44b1d9222eebcc34f27d1949987",
+    "crates/session/src/inventory_refresh.rs": "67314852e59d9b143e666a02e319191f674ba8c4f65948a1bd3200895834b24d",
+    "crates/session/src/runtime.rs": "780bb4b87c1cae3b88223baff0406602b3c8af6550353cb0f38f26851954fe85",
+    "crates/session/src/projection.rs": "6c0a6445d092b3b6ab5f4fcde3785478aea4eba1027ca8155f2bd98602ec551f",
+    "crates/session/tests/inventory_refresh.rs": "2384f1852f44acb0205e61c87e54103af8c47e6a39f0b24bd2cc78091c58a85b",
+    "ui/demo/src/fixture.rs": "d9986506990ac5d6d6544db5271b15bfa926ab58a55c537cf9b5d824a6c8b9c4",
+    "ui/demo/src/native_sidebar_query_selftest.rs": "d8f4a501cb0c7a3027b74bb110f08aea73dfe6dc17169a0e98139c0384d06233",
+    "ui/demo/src/components_native.rs": "1368a5702f86655564dc676f70850ad56538f3f77af3c1d91ff8e18a0948bfb6",
+    "ui/demo/tests/sidebar_query.rs": "3ea5a777a4733a08aced618a39de051a0f27a1abcaea9382b8970b0032f2dbf8",
+    "scripts/test-real-session-endpoints.py": "78af265b752a410798cff7e185ca242e1a3aa52ecec37472366c6897c54db25a"
+  },
+  "references": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/Session/SessionEndpoint/Client/SessionEndpointRuntime.swift": "c58136a14874ddd1ab01991efa4cc01f45540b42d9a6d2b2cc271aec1ae7151b",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Agent/ClientAgentSidebarModel.swift": "82c1bbb6519b9cb9573b9963f565eeee8d297702250a00f9243b5c1e66a1ddc9",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Session/Persistence/ClientMirrorStore.swift": "506f9e6886f244859e43cfcbda57d683c3f0b4fb22ec2e9841851cb104abb761",
+    "/Users/frankqin/dev/Tekes/Tekes/ClientAgentSidebarHostAdapter.swift": "e932b300763674511f17ceb28fa3bfc83bcb924f7e661082134d5efd79d9bf19"
+  },
+  "reference_heads": {
+    "/Users/frankqin/dev/TekesClientKit": "c289bc9d33edcd83a782ac17927a8c65a027eccd",
+    "/Users/frankqin/dev/Tekes": "8858ccd9d46590852ec7a0949aee289fc6798d70",
+    "/Users/frankqin/dev/TekesKernel-child-history": "ae5d6fdf32290207b646b8c99b96f2a002902cb3"
+  },
+  "validation": {
+    "root_tests": 180,
+    "inventory_refresh_integration_tests": 5,
+    "invalid_baseline_cases": 6,
+    "ui_tests": 341,
+    "ui_query_tests": 11,
+    "independent_public_consumer_tests": 33,
+    "unknown_hit_public_consumer_integration": 1,
+    "fmt_and_boundaries": true,
+    "strict_root_and_ui_clippy": true,
+    "native_unknown_hit_refresh": {
+      "clearRevokesResult": true,
+      "draftRetained": true,
+      "fullSidebarParity": false,
+      "inventoryControlsRetained": true,
+      "inventoryReads": 2,
+      "nativeWindow": true,
+      "noSubmission": true,
+      "originalQueryCaptured": true,
+      "ownedFixture": true,
+      "physicalIme": false,
+      "pointerRetry": true,
+      "publicSearchRPC": true,
+      "realHarness": false,
+      "retiredRetryRejected": true,
+      "sameConnectionEpoch": true,
+      "searchReads": 2,
+      "sharedPresentationController": true,
+      "unknownHitRefresh": true,
+      "voiceOver": false
+    },
+    "native_general_components": true,
+    "three_real_harnesses": {
+      "pi": {
+        "search": {
+          "expectedTargetFound": true,
+          "fullSidebarParity": false,
+          "hasMore": false,
+          "hits": 1,
+          "inventoryRefresh": {
+            "historyUnchanged": true,
+            "publicCursors": true,
+            "realUnknownRace": false,
+            "sameConnectionEpoch": true,
+            "searchResultRetained": true
+          },
+          "nativeInteraction": false,
+          "noSubmission": true,
+          "originalEndpoint": "pi-ui",
+          "publicTypedSearch": true,
+          "sharedController": true,
+          "unresolved": 0
+        },
+        "transcript": {
+          "completeTranscript": false,
+          "feedbackRows": 3,
+          "footnotes": 3,
+          "genericViewport": true,
+          "independentTools": 0,
+          "keyedReadingAcceptance": false,
+          "knownEmptyContainersHidden": 0,
+          "machineLeading": true,
+          "messages": 7,
+          "nativeInteraction": false,
+          "outputCopyControls": 3,
+          "renderer": true,
+          "richContent": false,
+          "rows": 13,
+          "userTrailing": true
+        },
+        "offscreen": true,
+        "nativeInteraction": false
+      },
+      "dsh": {
+        "search": {
+          "expectedTargetFound": true,
+          "fullSidebarParity": false,
+          "hasMore": false,
+          "hits": 1,
+          "inventoryRefresh": {
+            "historyUnchanged": true,
+            "publicCursors": true,
+            "realUnknownRace": false,
+            "sameConnectionEpoch": true,
+            "searchResultRetained": true
+          },
+          "nativeInteraction": false,
+          "noSubmission": true,
+          "originalEndpoint": "dsh-ui",
+          "publicTypedSearch": true,
+          "sharedController": true,
+          "unresolved": 0
+        },
+        "transcript": {
+          "completeTranscript": false,
+          "feedbackRows": 3,
+          "footnotes": 3,
+          "genericViewport": true,
+          "independentTools": 0,
+          "keyedReadingAcceptance": false,
+          "knownEmptyContainersHidden": 0,
+          "machineLeading": true,
+          "messages": 7,
+          "nativeInteraction": false,
+          "outputCopyControls": 3,
+          "renderer": true,
+          "richContent": false,
+          "rows": 13,
+          "userTrailing": true
+        },
+        "offscreen": true,
+        "nativeInteraction": false
+      },
+      "native": {
+        "search": {
+          "expectedTargetFound": true,
+          "fullSidebarParity": false,
+          "hasMore": false,
+          "hits": 1,
+          "inventoryRefresh": {
+            "historyUnchanged": true,
+            "publicCursors": true,
+            "realUnknownRace": false,
+            "sameConnectionEpoch": true,
+            "searchResultRetained": true
+          },
+          "nativeInteraction": false,
+          "noSubmission": true,
+          "originalEndpoint": "native-ui",
+          "publicTypedSearch": true,
+          "sharedController": true,
+          "unresolved": 0
+        },
+        "transcript": {
+          "completeTranscript": false,
+          "feedbackRows": 2,
+          "footnotes": 2,
+          "genericViewport": true,
+          "independentTools": 0,
+          "keyedReadingAcceptance": false,
+          "knownEmptyContainersHidden": 0,
+          "machineLeading": true,
+          "messages": 4,
+          "nativeInteraction": false,
+          "outputCopyControls": 2,
+          "renderer": true,
+          "richContent": false,
+          "rows": 8,
+          "userTrailing": true
+        },
+        "offscreen": true,
+        "nativeInteraction": false
+      }
+    },
+    "review_scope": "Local ownership/protocol/concurrency review; no external PR approval claimed"
+  },
+  "binary_sha256": "a08d9d1b2d42190759457508e232af5dd6fb2a539d478b4d0b21c8f97bac528f",
+  "screenshot": {
+    "path": "docs/evidence/sidebar-inventory-refresh-20261021.png",
+    "sha256": "314e7bba2cef904d163b3807ce291244809a90750fa3a6ebd3097767e9aac1db",
+    "width": 2136,
+    "height": 1584,
+    "inspected": true,
+    "scope": "Owned native fixture after query clear; late canonical inventory row and original Chinese draft; not final filtered search-list or paired ClientKit visual acceptance"
+  },
+  "runtimes": {
+    "kernel": {
+      "version": "0.9.1",
+      "commit": "ae5d6fdf32290207b646b8c99b96f2a002902cb3",
+      "clean_readonly_source": true
+    },
+    "pi": {
+      "version": "1.3.0",
+      "cli_sha256": "e79626f2dd6f94aa45d30f3fa63cd84319a6eefcd150b353cfaf274366926774"
+    },
+    "dsh": {
+      "version": "0.2.1-rc.2",
+      "owned_index_only": {
+        "path": ":memory:",
+        "openAt": "first-search"
+      },
+      "installed_default_unchanged": true
+    }
+  },
+  "logs": {
+    "/tmp/agentkit-inventory-refresh-root-final.log": "101d353a73fee9acf2698f1e2d760e2a7df776c2e492702546151d0cb8e80d1b",
+    "/tmp/agentkit-inventory-refresh-root-clippy.log": "5ce9d87f08a903ca3df920e270b79f518b3ff472e0d9c4033c8eb4026701b1fb",
+    "/tmp/agentkit-inventory-refresh-root-build.log": "d94edda6c2d2927c1ee86b8b262b1c08e325fccee5bccdcc289a8b11b77b31e0",
+    "/tmp/agentkit-inventory-refresh-ui-targeted.log": "d18462e72f208e4d8051ee8e1dd97705271e3cadc766f0133bed48568215c2d9",
+    "/tmp/agentkit-inventory-refresh-ui-final.log": "df38462336dabf848775f371a323793d8ceb84d6f4baaa8d33a8ff07acce0831",
+    "/tmp/agentkit-inventory-refresh-ui-clippy.log": "a532301866d00032dbb56cd573c48d4a0eb3714bea1e34affbc68e69fed568ab",
+    "/tmp/agentkit-inventory-refresh-ui-build.log": "f765d96507d8d68b604b7c04798a0ad2d07abedaac5d2b53410cbe295979f74b",
+    "/tmp/agentkit-inventory-refresh-native.log": "a7f58fe3de0b3c0aea00ef51be7eb27cf8e2c60379729f74aff774d63af3642d",
+    "/tmp/agentkit-inventory-refresh-native-regression.log": "12db8d3cee028d2911c45582bf0c6cf8980a6715624971ddcbb98282c69fb4ca",
+    "/tmp/agentkit-inventory-refresh-three-real.log": "9fb943c86b9577700cd4092e7aaf9df4bc6b855af009abf2506d1040d19d1b6a"
+  },
+  "limitations": [
+    "Unknown result refresh completes a canonical inventory path, not the full Sidebar search membership/layout",
+    "FTS prefix OR host membership, sorting/filtering, snippets/help/header/count, multi-endpoint aggregation and full outline remain open",
+    "Real three-harness checks explicitly refresh known sessions; the unknown-session race is proved only by controlled protocol/native fixtures",
+    "Physical IME, VoiceOver, paired ClientKit/Gold7 visuals and real three-harness reading/paging anchors are not proved here"
+  ],
+  "candidate_queue": {
+    "545_evidence_scope": "Prior recorded snapshot only; not replayed for this runtime stage",
+    "292_received": "292f5fe65195af66624cb28413868eb46db6ab1a81ef1294ab19c8efbd45b0f4",
+    "292_evaluated": false,
+    "default_pin_or_development_freeze_promoted": false
+  },
+  "merged": false,
+  "tag_created": false
+}

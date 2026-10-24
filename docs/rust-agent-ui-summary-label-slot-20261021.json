@@ -1,0 +1,143 @@
+{
+  "format": "agentkit-summary-label-slot/1",
+  "verified_at_utc": "2026-10-20T21:40:05.874164+00:00",
+  "based_on": "8fd36d8c70379a4cdd2e59576012c275e4e5f35d",
+  "published_agentkit": "v0.3.8",
+  "default_inputs": {
+    "commit": "8cf0840790334ba224afc0595897c74231c712e6",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 199,
+    "sha256": "f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f",
+    "ui_packages": 8
+  },
+  "sources": {
+    "ui/components/src/summary.rs": "41b42012bbe9133695844a1c437c51a3545e42759528f0476a15fec6502bb644",
+    "ui/components/src/summary_section.rs": "d47e7a433b43c024dd728e27d8b398b58c0e3b11e1c3c369358e67c726ce53d9",
+    "ui/demo/tests/summary_component.rs": "d332939e6c492f6952dc7ac38c09cdeb5e16ab1b6f5433d68e1adcbe948f066e",
+    "scripts/test-reading-candidate.py": "7d37c04f736fc885cc31051709daacabae940891e8ec38f331fcc8bbeaab74c7",
+    "scripts/probes/agentkit-summary-label-candidate.rs": "ec022d5a3b9c1c29f503832816a7aeb34d072ca79e89236956f42c3f3dd0ac1b"
+  },
+  "references": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Agent/ClientAgentSummaryView.swift": "5632d920bd21d44d6b68d49779e9f7746c9bc1ec4ad9e7bc1d01ab58b85f9154",
+    "/Users/frankqin/dev/Tekes/Tekes/ClientAgentSummaryHostAdapter.swift": "4e7875ae43ab06901a981077f81a4504c754e88f2c019a470dc67222b917714a"
+  },
+  "validation": {
+    "default_ui_tests": 338,
+    "default_public_consumer_tests": 33,
+    "default_strict_clippy": true,
+    "default_fmt_and_boundaries": true,
+    "root_tests": "175 at 8fd36d8; root sources unchanged by this stage",
+    "default_native_summary": {
+      "collapsedCanonicalUpdate": true,
+      "fullLayoutParity": false,
+      "hiddenFromAccessibility": true,
+      "nativeWindow": true,
+      "noSubmission": true,
+      "originalRowsRetained": true,
+      "physicalIme": false,
+      "pointerCollapseExpand": true,
+      "realHarness": false,
+      "runtimeDraft": true,
+      "voiceOver": false
+    },
+    "default_native_components_regression": true,
+    "default_binary_sha256": "c4ca4d6295e03eb4ba08fb7b24c8f12e46f02a9034681705782ea8541647d5b2"
+  },
+  "candidate": {
+    "identity": "545ef8d70d89404f11d916f05e417404277507b07dea808aac051339544431a1",
+    "files": 476,
+    "archive_sha256": "6d00adbd7a975823ad772a2fef22d925e4756f4c28c3dc036115abb5d3313630",
+    "manifest_sha256": "648fa468834a454a8e1569a1d0957ada498a4e3c475f6667abfc327e00d1799e",
+    "source_unchanged_after_native": true,
+    "receiver_receipt_path": ".runtime-fixtures/agentkit-label-545ef8d70d89-final/receipt.json",
+    "receiver_receipt_sha256": "bba77705efd41675000ee3e9a6364dfd4725c8fc30e6ea87eebf01fbe3eba5cc",
+    "snapshot": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-label-545ef8d70d89-final/agentkit",
+    "agentkit_input_hashes_sha256": "4b4fdc616c3b9c5bf62d8e2e97c52d9dea0035487dd9751eff569c3e953f396b",
+    "overrides": {
+      "ui/Cargo.toml": "321420405637e83002e9ec714e5b1e4ec8efcb0518fad9a5ebad2f8cfcb52e76",
+      "ui/Cargo.lock": "033bacb7bc4d643f889616a871a901ca3dc70da0a8979861d83474cfea68a143",
+      "ui/demo/src/native.rs": "c0c9488dfa61ad4976836701079893cc7e2be94955eb786b60b2bf9386c1bfdb",
+      "ui/components/Cargo.toml": "68b082017dff2e721eb5194b920998ae33574220d7f2c4edd9e9f4f3674a1558",
+      "ui/components/src/summary.rs": "64d57e96b5f560a06348cadfd651c7983231dc72d02a487bf9bcb10357f4db80",
+      "ui/components/src/summary_section.rs": "2b8ef593544c9c00f2485f5b390ebf6c09899437d40e112d8ab97fa790b9724a",
+      "ui/demo/src/component_demo.rs": "3fd839336632351c04d5b68a5bf0e2e936b3d588523d69bd2674d829e427d952",
+      "ui/demo/tests/agentkit-reading-candidate.rs": "3a3ef23b6000742e0d2a32adbdb540ce5b337d03e188f0e13795efcece80a147",
+      "ui/demo/tests/agentkit-run-preflight-candidate.rs": "a2b5fa61a461bc0c1bf0f7cc55b726851371d71de23a7e5adb06d8c1b19cc320",
+      "ui/demo/src/fixture.rs": "d69964a3b9a2d3e7460878caf0db2b5911fb5b88b279f3bfe4ea94fc05a8e759",
+      "ui/demo/src/native_summary_sections_selftest.rs": "ebb396eb1d67f337a87b48f2a22322162e2c10155b441e00f881a7f0aac5474f"
+    },
+    "adaptations": [
+      "AX required forwarded from public semantics",
+      "Original Summary row Content opts into single-line tail ellipsis",
+      "Existing native TextBackend delegates shape_label to its original CoreTextShaper",
+      "Owned native Summary fixture supplies long mixed-language titles; existing pointer probe checks full AX names and row bounds"
+    ],
+    "tests": {
+      "summary_label_tests": 2,
+      "summary_matrix_combinations": 54,
+      "transcript_transactions": 4,
+      "runview_transactions": 8,
+      "public_consumer_tests": 33,
+      "targeted_strict_clippy": true
+    },
+    "native_summary": {
+      "collapsedCanonicalUpdate": true,
+      "fullLayoutParity": false,
+      "hiddenFromAccessibility": true,
+      "nativeWindow": true,
+      "noSubmission": true,
+      "originalRowsRetained": true,
+      "physicalIme": false,
+      "pointerCollapseExpand": true,
+      "realHarness": false,
+      "runtimeDraft": true,
+      "voiceOver": false
+    },
+    "native_long_title_assertions": [
+      "Original full header/row AX name >300 scalars",
+      "Header and row stay within a single line box",
+      "Pointer collapse/expand and canonical draft refresh retain original row widgets"
+    ],
+    "binary_sha256": "bf9e551b4f3564c2883b31526451fe7ed0cd65e35f8e5283e5a7286f6da751ef",
+    "default_pin_promoted": false,
+    "development_freeze_promoted": false
+  },
+  "screenshot": {
+    "path": "docs/evidence/summary-label-candidate-20261021.png",
+    "sha256": "0aa535609a59ebefc2b44cc3d774939ca3da0177feaeafb485b6c28cd8861dfd",
+    "width": 2136,
+    "height": 1584,
+    "inspected": true,
+    "scope": "Exact 545 candidate + recorded AgentKit snapshot; owned fixture long header and row; not paired ClientKit visual acceptance"
+  },
+  "logs": {
+    "/tmp/agentkit-summary-slot-ui-tests.log": "a2e68118c2f935ac2446b4ad11ba3764a51363b24b90eb5014161d9bb5518320",
+    "/tmp/agentkit-summary-slot-ui-clippy.log": "6cd19c67ada91039a98acfe622d7a7d92fad40407a56f09c48dc668d7f17601a",
+    "/tmp/agentkit-summary-slot-ui-build.log": "9a30d54c8b16d7e49510b182028079bca120aeebb7d662e88f8566e6196a49f6",
+    "/tmp/agentkit-summary-slot-native-default.log": "4e8282153d0dc7a94ce3f48a033f0b46aa707703fc8c8cca296468d388d2fdc8",
+    "/tmp/agentkit-summary-slot-native-candidate.log": "5e804aee2738a29c00ed4cf1d7086bb27b66a5f81cfc6a59364abb758a2447a8",
+    "/tmp/agentkit-summary-slot-native-regression.log": "2c950d1bbaa892d322562f0ca96c4612dfa78d4b0414429ab59f12876e7610b8",
+    ".runtime-fixtures/agentkit-label-545ef8d70d89-final/tests.log": "fd1cde4b7d0f4456879c983529f4f68be7295afc58bc945ac393aaba65c2d44a",
+    ".runtime-fixtures/agentkit-label-545ef8d70d89-final/clippy.log": "8c5a1db629e5c43c9051417f143c2b7661924b345308c6cc19084556e653cfb9",
+    ".runtime-fixtures/agentkit-label-545ef8d70d89-final/public-consumer.log": "de7efeea6511be1c874aa16994b84bc19524e63f8e3a10b88228d827c9a451aa",
+    ".runtime-fixtures/agentkit-label-545ef8d70d89-final/native-build.log": "1094a36867300c1838cdc4ee40efe961d83bac574665f8ee57a40d5b1e88698c"
+  },
+  "prior_attempts": {
+    "attempt1": "Receiver setup missed components direct text dependency; no library failure inferred",
+    "attempt2": "Receiver probe used the wrong TextRole variant; corrected to UiBody",
+    "attempt3": "Row-only receiver acceptance; header not yet covered",
+    "attempt4": "Row-only native acceptance; superseded by final header+row snapshot",
+    "attempt5": "Header+row replay before final runner explicit-probe guard/metadata field; final replay retains both"
+  },
+  "limitations": [
+    "Default public pin still lacks single-line ellipsis API",
+    "Candidate is unpublished development input; #31 remains open, no merge/tag/pin promotion",
+    "54 measurement cases and native fixture do not prove independent glyph/ellipsis pixel quality or every grapheme boundary",
+    "Only one native window size/type scale in this stage; 3 text/width/type-scale and both themes are component measurements",
+    "No physical IME, VoiceOver, paired ClientKit/Gold7 acceptance or real three-harness reading/paging proof",
+    "Header divider/hover chevron, Summary column/custom row slots and other corresponding View layout gaps remain open"
+  ],
+  "merged": false,
+  "tag_created": false
+}

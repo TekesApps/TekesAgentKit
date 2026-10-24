@@ -1,0 +1,92 @@
+{
+  "status": "partial-components-draft-not-release",
+  "agentkit_published_baseline": "v0.3.7",
+  "tekesui_commit": "431093786de47b48cd566d0d9c0eafa088b10d68",
+  "tekesui_reviewed_files": 188,
+  "tests": {
+    "root": 104,
+    "ui": 69,
+    "acceptance_tools": 18
+  },
+  "local_strict_clippy_and_fmt": true,
+  "actual_cargo_input_verification": {
+    "commit": "431093786de47b48cd566d0d9c0eafa088b10d68",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 188,
+    "sha256": "03721866a362b1d31261ebbbc86140eb07e9e23320871c325234a5212591213d",
+    "ui_packages": 8
+  },
+  "native_window": {
+    "marker": "NATIVE_AGENT_SIDEBAR_SUMMARY_SELFTEST_OK",
+    "passed": true,
+    "synthetic_text_services": true,
+    "physical_ime": false,
+    "voiceover": false,
+    "full_run_view": false,
+    "screenshot": "../ui/docs/sidebar-summary-native.png",
+    "screenshot_sha256": "edf541adfca0eb29330c193f093eba60455460109c2fe1c2fc1be10125baa72a"
+  },
+  "real_harness_offscreen": {
+    "pi": {
+      "components": true,
+      "finalAssistantItems": 2,
+      "inventoryRows": 13,
+      "isStale": false,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 5,
+      "transcriptView": false
+    },
+    "dsh": {
+      "components": true,
+      "finalAssistantItems": 1,
+      "inventoryRows": 8,
+      "isStale": false,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 5,
+      "transcriptView": false
+    },
+    "native": {
+      "components": true,
+      "finalAssistantItems": 1,
+      "inventoryRows": 4,
+      "isStale": false,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 2,
+      "transcriptView": false
+    }
+  },
+  "dsh_restored_exact_version": {
+    "version": "0.2.1-rc.2",
+    "node": "v24.20.0",
+    "package_lock_sha256": "d7c54df04c10a2d69f5a26f9563e91482aa05c5ad652d1dd7d0c285299f31f06",
+    "runtime_committed": false
+  },
+  "core_pin_regression": {
+    "old_initial_custom_pin_badge_was_missing": true,
+    "initial_custom_pin_badge_fixed": true,
+    "host_mutation_notifies": true,
+    "external_invalidation_notifies": true,
+    "harness_rpc_required": false
+  },
+  "remote_ci_verified": false,
+  "remaining": [
+    "Transcript and RunView",
+    "task/subagent/SideChat Run body UI",
+    "remaining host action interactions",
+    "physical IME and full reading/paging native acceptance",
+    "delivery review, CI, merge and stage tag"
+  ]
+}

@@ -1,0 +1,153 @@
+{
+  "format": "agentkit-sidebar-inventory/1",
+  "base_commit": "07486c44c4c19665bd062c5e4c16682025a37112",
+  "reference_heads": {
+    "TekesClientKit": "c289bc9d33edcd83a782ac17927a8c65a027eccd",
+    "Tekes": "8858ccd9d46590852ec7a0949aee289fc6798d70"
+  },
+  "default_ui_pin": "8cf0840790334ba224afc0595897c74231c712e6",
+  "source_hashes": {
+    "crates/web/src/lib.rs": "d2b06524954ebd37551d236a293d0c1108f5f4b6e635fb6fd4faa7aece0ba957",
+    "ui/bindings/src/sidebar.rs": "2e2aa9bfa2e9ba1ac75fcc29c7f539483ddc936dc0faad5cb6d909069c2f842e",
+    "ui/demo/src/fixture.rs": "4f773ef9e206f36877c5bd01687a8b7ca123099226bbf43565e090a44e7fdcc8",
+    "ui/demo/src/native_sidebar_query_selftest.rs": "14b31fb3dc15d44d1b2cfac6dd1d9143f3ca35f5b1c7e086adf752e849677bee",
+    "ui/demo/tests/sidebar_inventory.rs": "68fa30c89e713ceb2951dfefe45bf674bc45a0c4f0ae261556bccfdfc1f3cf62"
+  },
+  "checks": {
+    "workspace": {
+      "passed": 357,
+      "exit_code": 0,
+      "log": "/tmp/agentkit-sidebar-inventory-workspace.log",
+      "sha256": "10296c312e079bdf9e15b9d3a576d1f26a1abfaf30d32ee760e6024cae392bc1"
+    },
+    "web": {
+      "passed": 9,
+      "exit_code": 0,
+      "log": "/tmp/agentkit-sidebar-inventory-web.log",
+      "sha256": "22011d40ec8a8535b59f5d618f014bd3c066d5c16751f34fcc0c390d28a0c096"
+    },
+    "clippy": {
+      "exit_code": 0,
+      "log": "/tmp/agentkit-sidebar-inventory-clippy.log",
+      "sha256": "567f6978073650b7af2e11a65c5cc3f9ac185fbb934f25ae1223c298f96f9bb9"
+    },
+    "web-clippy": {
+      "exit_code": 0,
+      "log": "/tmp/agentkit-sidebar-inventory-web-clippy.log",
+      "sha256": "80f95f10eccbaef89a7adf55e84d53bb5e1789644172a5ee97adc8e380ed73ae"
+    },
+    "build": {
+      "exit_code": 0,
+      "log": "/tmp/agentkit-sidebar-inventory-build.log",
+      "sha256": "e1cd1fe1281915fbbce8668e2a425fd04ce9f4761930a7ba2a21306bb6260737"
+    }
+  },
+  "independent_consumer_checks": 36,
+  "native_fixture": {
+    "canonicalTitle": true,
+    "draftRetained": true,
+    "nativeRunningFreeze": false,
+    "noSubmission": true,
+    "ownedFixture": true,
+    "physicalIme": false,
+    "recentActivityOrder": true,
+    "retainedOriginalButton": true,
+    "selectionRetained": true,
+    "exit_code": 0,
+    "log": "/tmp/agentkit-sidebar-inventory-native.log",
+    "log_sha256": "a0dfc79ae7caaf75c64403e9344f90e69635a41ab55b3bbdba53d5f7efb4da47",
+    "binary": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-inventory-native-demo",
+    "binary_sha256": "b43007c7d49b213623cb670a0248280e015e71fbc2e6e675eb1564f08eff41a0",
+    "screenshot": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-inventory-current.png",
+    "screenshot_sha256": "268bb8619080411103a49af03e5513b5f4c8141f586c006f8b7c2b43b3cc8ad3",
+    "pixels_inspected": true
+  },
+  "real_endpoints_offscreen": {
+    "pi": {
+      "expectedTargetFound": true,
+      "fullSidebarParity": false,
+      "hasMore": false,
+      "hits": 1,
+      "inventoryRefresh": {
+        "historyUnchanged": true,
+        "publicCursors": true,
+        "realUnknownRace": false,
+        "sameConnectionEpoch": true,
+        "searchResultRetained": true
+      },
+      "inventorySortRetained": true,
+      "nativeInteraction": false,
+      "noSubmission": true,
+      "originalEndpoint": "pi-ui",
+      "publicTypedSearch": true,
+      "queryScopedSnippetMetadata": true,
+      "resultMembership": true,
+      "sharedController": true,
+      "unresolved": 0
+    },
+    "dsh": {
+      "expectedTargetFound": true,
+      "fullSidebarParity": false,
+      "hasMore": false,
+      "hits": 1,
+      "inventoryRefresh": {
+        "historyUnchanged": true,
+        "publicCursors": true,
+        "realUnknownRace": false,
+        "sameConnectionEpoch": true,
+        "searchResultRetained": true
+      },
+      "inventorySortRetained": true,
+      "nativeInteraction": false,
+      "noSubmission": true,
+      "originalEndpoint": "dsh-ui",
+      "publicTypedSearch": true,
+      "queryScopedSnippetMetadata": true,
+      "resultMembership": true,
+      "sharedController": true,
+      "unresolved": 0
+    },
+    "native": {
+      "expectedTargetFound": true,
+      "fullSidebarParity": false,
+      "hasMore": false,
+      "hits": 1,
+      "inventoryRefresh": {
+        "historyUnchanged": true,
+        "publicCursors": true,
+        "realUnknownRace": false,
+        "sameConnectionEpoch": true,
+        "searchResultRetained": true
+      },
+      "inventorySortRetained": true,
+      "nativeInteraction": false,
+      "noSubmission": true,
+      "originalEndpoint": "native-ui",
+      "publicTypedSearch": true,
+      "queryScopedSnippetMetadata": true,
+      "resultMembership": true,
+      "sharedController": true,
+      "unresolved": 0
+    }
+  },
+  "real_log": {
+    "path": "/tmp/agentkit-sidebar-inventory-three-real.log",
+    "sha256": "d35afaf3c24ebb47e828faf791490645825f3df56fbaedaa37e1cd46e0816890",
+    "exit_code": 0
+  },
+  "cleanup": {
+    "receipt": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/build-cache-cleanup-sidebar-inventory-20261021.json",
+    "deleted_files": 112,
+    "freed_allocated_bytes": 207114240,
+    "source_and_acceptance_artifacts_preserved": true
+  },
+  "limits": [
+    "activity position is memory-only and per binding lifecycle",
+    "title sort, pinned section/order, folder outline and multi-endpoint aggregation remain",
+    "local FTS OR/BM25 remains",
+    "native continuous-running position/physical IME and real-harness native paging are not accepted",
+    "candidate a30 not rerun or promoted this phase",
+    "review CI merge and tag remain"
+  ],
+  "full_goal_complete": false
+}

@@ -1,0 +1,152 @@
+{
+  "sessionId": "s",
+  "generation": "g",
+  "throughSequence": 9,
+  "windowLimit": 50,
+  "hasMoreBefore": false,
+  "entries": [
+    {
+      "event": {
+        "type": "turn/start",
+        "seq": 0,
+        "time": 100,
+        "data": {
+          "turn": 1
+        }
+      }
+    },
+    {
+      "event": {
+        "type": "user/message",
+        "seq": 1,
+        "time": 99,
+        "data": {
+          "turn": 1,
+          "id": "opening",
+          "text": "开始"
+        }
+      }
+    },
+    {
+      "event": {
+        "type": "assistant/message",
+        "seq": 2,
+        "time": 98,
+        "data": {
+          "turn": 1,
+          "step": 1,
+          "message": {
+            "id": "a-origin",
+            "content": [
+              {
+                "type": "tool-call",
+                "id": "a",
+                "name": "read",
+                "arguments": {
+                  "path": "a"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "event": {
+        "type": "user/message",
+        "seq": 3,
+        "time": 97,
+        "data": {
+          "turn": 1,
+          "id": "inner",
+          "text": "追加要求"
+        }
+      }
+    },
+    {
+      "event": {
+        "type": "assistant/message",
+        "seq": 4,
+        "time": 96,
+        "data": {
+          "turn": 1,
+          "step": 2,
+          "message": {
+            "id": "bc-origin",
+            "content": [
+              {
+                "type": "tool-call",
+                "id": "b",
+                "name": "read",
+                "arguments": {
+                  "path": "b"
+                }
+              },
+              {
+                "type": "tool-call",
+                "id": "c",
+                "name": "read",
+                "arguments": {
+                  "path": "c"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "event": {
+        "type": "tool/result",
+        "seq": 5,
+        "time": 95,
+        "data": {
+          "turn": 1,
+          "message": {
+            "source": {
+              "callId": "a"
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "a result"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "event": {
+        "type": "assistant/message",
+        "seq": 8,
+        "time": 92,
+        "data": {
+          "turn": 1,
+          "step": 3,
+          "sessionFinal": true,
+          "message": {
+            "id": "final",
+            "content": [
+              {
+                "type": "text",
+                "text": "完成"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "event": {
+        "type": "turn/end",
+        "seq": 9,
+        "time": 91,
+        "data": {
+          "turn": 1,
+          "reason": "completed"
+        }
+      }
+    }
+  ]
+}

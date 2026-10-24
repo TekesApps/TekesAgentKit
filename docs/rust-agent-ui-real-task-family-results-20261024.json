@@ -1,0 +1,488 @@
+{
+  "issue": 23,
+  "pr": "https://github.com/TekesApps/TekesAgentKit/pull/10",
+  "status": "experimental-offscreen-family-delivery-accepted",
+  "baseHead": "c0bc1e25ba92115be8d310b84a84c213d3b93cea",
+  "sourceWorktreeDirtyAtVerification": true,
+  "sourceFileCount": 460,
+  "sourceFileListSha256": "3cd3b5c0f75a56615d5d660668e51c87935e690194f1eac140fae3271e93497d",
+  "tekesuiPin": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "versions": {
+    "native": "0.9.3",
+    "pi": "1.3.0",
+    "dsh": "0.2.1-rc.2"
+  },
+  "validation": {
+    "uiPassed": 734,
+    "uiFailed": 0,
+    "uiIgnored": 1,
+    "pythonPassed": 161,
+    "strictClippy": true,
+    "normalDemoBuild": true,
+    "standaloneConsumerExecuted": true,
+    "standaloneMountCount": 6,
+    "standalonePathSourceSha256": "b596b61403f87419ad191c60c5f5ab25dc163bc55c4fbbb9f4d5edf34409c250"
+  },
+  "programs": {
+    "headless": {
+      "program": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/tekes-agent-headless",
+      "sha256": "87b54fe157a367ed462333e6781e839b5454cc88e1bb9543c8e1faf3a532e8ad",
+      "bytes": 29118576,
+      "origin": "explicit-existing"
+    },
+    "demo": {
+      "program": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/tekes-agent-ui-demo",
+      "sha256": "b38f2bc491295f173a39b1cbe897d1c6558a42f0148dd04873f21d09fc7c385c",
+      "bytes": 86345968,
+      "origin": "explicit-existing"
+    },
+    "kernel": {
+      "supervisor": "/Users/frankqin/dev/Tekes/.build/kernel-0.9.3-installed/BuiltInKernel/tekes-supervisor",
+      "supervisorSha256": "365eca9385f36d5897a81ba398e7f34b4b9819896d6a1b78c618a7710b14380f",
+      "worker": "/Users/frankqin/dev/Tekes/.build/kernel-0.9.3-installed/BuiltInKernel/tekes-worker",
+      "workerSha256": "1284014bd0a8d3cb711c0512b10762322a19af4beabc1f9e681bacb1e28fa64d",
+      "build": {
+        "format": 1,
+        "identifier": "com.tekes.kernel.supervisor",
+        "source_revision": "09508a9083c24c7accefc99516739f279b85913e",
+        "version": "0.9.3"
+      }
+    }
+  },
+  "delivery": {
+    "accepted": true,
+    "cases": [
+      {
+        "canonicalSourceMatched": true,
+        "canonicalSummarySubagentId": null,
+        "canonicalTask": {
+          "id": "[\"native\",\"9621a585-189e-4bfe-8188-47998ec11796\",\"tool:native-child-proof\"]",
+          "kind": "task",
+          "name": "Bounded child proof",
+          "scope": {
+            "endpointId": "native",
+            "sessionId": "9621a585-189e-4bfe-8188-47998ec11796",
+            "threadId": "9621a585-189e-4bfe-8188-47998ec11796"
+          },
+          "status": "done"
+        },
+        "catalogFrame": {
+          "entry": {
+            "hasChildren": false,
+            "id": "9f458543-a19c-51c2-9c90-53b0c35efe57",
+            "kind": "child",
+            "label": "task",
+            "mode": "bounded",
+            "plane": null,
+            "reason": null
+          },
+          "epoch": 2,
+          "generation": 1,
+          "parent": {
+            "endpointId": "native",
+            "sessionId": "9621a585-189e-4bfe-8188-47998ec11796",
+            "threadId": "9621a585-189e-4bfe-8188-47998ec11796"
+          },
+          "revision": 2
+        },
+        "childContentMounted": true,
+        "childId": "9f458543-a19c-51c2-9c90-53b0c35efe57",
+        "childScope": {
+          "endpointId": "native",
+          "sessionId": "9f458543-a19c-51c2-9c90-53b0c35efe57",
+          "threadId": "9621a585-189e-4bfe-8188-47998ec11796"
+        },
+        "closedViaOriginalControl": true,
+        "endpointId": "native",
+        "heldClosedDelivery": {
+          "mainRevision": 4,
+          "panelRevision": 5,
+          "parent": {
+            "endpointId": "native",
+            "sessionId": "9621a585-189e-4bfe-8188-47998ec11796",
+            "threadId": "9621a585-189e-4bfe-8188-47998ec11796"
+          },
+          "projectionGeneration": 0
+        },
+        "heldParentDelivery": {
+          "mainRevision": 2,
+          "panelRevision": 1,
+          "parent": {
+            "endpointId": "native",
+            "sessionId": "9621a585-189e-4bfe-8188-47998ec11796",
+            "threadId": "9621a585-189e-4bfe-8188-47998ec11796"
+          },
+          "projectionGeneration": 0
+        },
+        "historyItems": 1,
+        "lateClosedResultRejected": true,
+        "lateParentResultDidNotStealSelection": true,
+        "openedViaOriginalControl": true,
+        "parent": {
+          "endpointId": "native",
+          "sessionId": "9621a585-189e-4bfe-8188-47998ec11796",
+          "threadId": "9621a585-189e-4bfe-8188-47998ec11796"
+        },
+        "parentDraftPreserved": true,
+        "parentTaskRowMountedWithoutOpenAction": true,
+        "readOnly": true,
+        "returnedViaOriginalTab": true
+      },
+      {
+        "canonicalSourceMatched": true,
+        "canonicalSummarySubagentId": null,
+        "canonicalTask": {
+          "id": "[\"native\",\"d66272ad-fd01-4acb-b171-a958f7e63f16\",\"tool:native-child-proof\"]",
+          "kind": "task",
+          "name": "Bounded child proof",
+          "scope": {
+            "endpointId": "native",
+            "sessionId": "d66272ad-fd01-4acb-b171-a958f7e63f16",
+            "threadId": "d66272ad-fd01-4acb-b171-a958f7e63f16"
+          },
+          "status": "done"
+        },
+        "catalogFrame": {
+          "entry": {
+            "hasChildren": false,
+            "id": "321e9e17-5f48-5553-976c-89ef63d20f6b",
+            "kind": "child",
+            "label": "task",
+            "mode": "bounded",
+            "plane": null,
+            "reason": null
+          },
+          "epoch": 2,
+          "generation": 1,
+          "parent": {
+            "endpointId": "native",
+            "sessionId": "d66272ad-fd01-4acb-b171-a958f7e63f16",
+            "threadId": "d66272ad-fd01-4acb-b171-a958f7e63f16"
+          },
+          "revision": 2
+        },
+        "childContentMounted": true,
+        "childId": "321e9e17-5f48-5553-976c-89ef63d20f6b",
+        "childScope": {
+          "endpointId": "native",
+          "sessionId": "321e9e17-5f48-5553-976c-89ef63d20f6b",
+          "threadId": "d66272ad-fd01-4acb-b171-a958f7e63f16"
+        },
+        "closedViaOriginalControl": true,
+        "endpointId": "native",
+        "heldClosedDelivery": {
+          "mainRevision": 7,
+          "panelRevision": 11,
+          "parent": {
+            "endpointId": "native",
+            "sessionId": "d66272ad-fd01-4acb-b171-a958f7e63f16",
+            "threadId": "d66272ad-fd01-4acb-b171-a958f7e63f16"
+          },
+          "projectionGeneration": 0
+        },
+        "heldParentDelivery": {
+          "mainRevision": 5,
+          "panelRevision": 7,
+          "parent": {
+            "endpointId": "native",
+            "sessionId": "d66272ad-fd01-4acb-b171-a958f7e63f16",
+            "threadId": "d66272ad-fd01-4acb-b171-a958f7e63f16"
+          },
+          "projectionGeneration": 0
+        },
+        "historyItems": 1,
+        "lateClosedResultRejected": true,
+        "lateParentResultDidNotStealSelection": true,
+        "openedViaOriginalControl": true,
+        "parent": {
+          "endpointId": "native",
+          "sessionId": "d66272ad-fd01-4acb-b171-a958f7e63f16",
+          "threadId": "d66272ad-fd01-4acb-b171-a958f7e63f16"
+        },
+        "parentDraftPreserved": true,
+        "parentTaskRowMountedWithoutOpenAction": true,
+        "readOnly": true,
+        "returnedViaOriginalTab": true
+      },
+      {
+        "canonicalSourceMatched": true,
+        "canonicalSummarySubagentId": "[\"pi\",\"2c9d5d8a-b6fc-4980-83f0-b88a58e05d93\",\"tool:pi-child-0\"]",
+        "canonicalTask": null,
+        "catalogFrame": {
+          "entry": {
+            "hasChildren": false,
+            "id": "fb6b7ce8-fb2b-46ca-832d-8c4a8c23a214",
+            "kind": "child",
+            "label": "Model child",
+            "mode": "continuable",
+            "plane": null,
+            "reason": null
+          },
+          "epoch": 2,
+          "generation": 1,
+          "parent": {
+            "endpointId": "pi",
+            "sessionId": "2c9d5d8a-b6fc-4980-83f0-b88a58e05d93",
+            "threadId": "2c9d5d8a-b6fc-4980-83f0-b88a58e05d93"
+          },
+          "revision": 2
+        },
+        "childContentMounted": true,
+        "childId": "fb6b7ce8-fb2b-46ca-832d-8c4a8c23a214",
+        "childScope": {
+          "endpointId": "pi",
+          "sessionId": "fb6b7ce8-fb2b-46ca-832d-8c4a8c23a214",
+          "threadId": "2c9d5d8a-b6fc-4980-83f0-b88a58e05d93"
+        },
+        "closedViaOriginalControl": true,
+        "endpointId": "pi",
+        "heldClosedDelivery": {
+          "mainRevision": 10,
+          "panelRevision": 17,
+          "parent": {
+            "endpointId": "pi",
+            "sessionId": "2c9d5d8a-b6fc-4980-83f0-b88a58e05d93",
+            "threadId": "2c9d5d8a-b6fc-4980-83f0-b88a58e05d93"
+          },
+          "projectionGeneration": 0
+        },
+        "heldParentDelivery": {
+          "mainRevision": 8,
+          "panelRevision": 13,
+          "parent": {
+            "endpointId": "pi",
+            "sessionId": "2c9d5d8a-b6fc-4980-83f0-b88a58e05d93",
+            "threadId": "2c9d5d8a-b6fc-4980-83f0-b88a58e05d93"
+          },
+          "projectionGeneration": 0
+        },
+        "historyItems": 2,
+        "lateClosedResultRejected": true,
+        "lateParentResultDidNotStealSelection": true,
+        "openedViaOriginalControl": true,
+        "parent": {
+          "endpointId": "pi",
+          "sessionId": "2c9d5d8a-b6fc-4980-83f0-b88a58e05d93",
+          "threadId": "2c9d5d8a-b6fc-4980-83f0-b88a58e05d93"
+        },
+        "parentDraftPreserved": true,
+        "parentTaskRowMountedWithoutOpenAction": false,
+        "readOnly": false,
+        "returnedViaOriginalTab": true
+      },
+      {
+        "canonicalSourceMatched": true,
+        "canonicalSummarySubagentId": "[\"pi\",\"ae13e9f0-29bd-4624-a9b2-477bc057ac38\",\"tool:pi-child-0\"]",
+        "canonicalTask": null,
+        "catalogFrame": {
+          "entry": {
+            "hasChildren": false,
+            "id": "e8c4a4b8-e800-44c0-a84f-a335554a4435",
+            "kind": "child",
+            "label": "Model child",
+            "mode": "continuable",
+            "plane": null,
+            "reason": null
+          },
+          "epoch": 2,
+          "generation": 1,
+          "parent": {
+            "endpointId": "pi",
+            "sessionId": "ae13e9f0-29bd-4624-a9b2-477bc057ac38",
+            "threadId": "ae13e9f0-29bd-4624-a9b2-477bc057ac38"
+          },
+          "revision": 2
+        },
+        "childContentMounted": true,
+        "childId": "e8c4a4b8-e800-44c0-a84f-a335554a4435",
+        "childScope": {
+          "endpointId": "pi",
+          "sessionId": "e8c4a4b8-e800-44c0-a84f-a335554a4435",
+          "threadId": "ae13e9f0-29bd-4624-a9b2-477bc057ac38"
+        },
+        "closedViaOriginalControl": true,
+        "endpointId": "pi",
+        "heldClosedDelivery": {
+          "mainRevision": 13,
+          "panelRevision": 23,
+          "parent": {
+            "endpointId": "pi",
+            "sessionId": "ae13e9f0-29bd-4624-a9b2-477bc057ac38",
+            "threadId": "ae13e9f0-29bd-4624-a9b2-477bc057ac38"
+          },
+          "projectionGeneration": 0
+        },
+        "heldParentDelivery": {
+          "mainRevision": 11,
+          "panelRevision": 19,
+          "parent": {
+            "endpointId": "pi",
+            "sessionId": "ae13e9f0-29bd-4624-a9b2-477bc057ac38",
+            "threadId": "ae13e9f0-29bd-4624-a9b2-477bc057ac38"
+          },
+          "projectionGeneration": 0
+        },
+        "historyItems": 2,
+        "lateClosedResultRejected": true,
+        "lateParentResultDidNotStealSelection": true,
+        "openedViaOriginalControl": true,
+        "parent": {
+          "endpointId": "pi",
+          "sessionId": "ae13e9f0-29bd-4624-a9b2-477bc057ac38",
+          "threadId": "ae13e9f0-29bd-4624-a9b2-477bc057ac38"
+        },
+        "parentDraftPreserved": true,
+        "parentTaskRowMountedWithoutOpenAction": false,
+        "readOnly": false,
+        "returnedViaOriginalTab": true
+      },
+      {
+        "canonicalSourceMatched": true,
+        "canonicalSummarySubagentId": null,
+        "canonicalTask": null,
+        "catalogFrame": {
+          "entry": {
+            "hasChildren": null,
+            "id": "7cc24e5a-f795-4e76-9a34-453bcfe8f009",
+            "kind": "child",
+            "label": "Catalog proof child",
+            "mode": "continuable",
+            "plane": null,
+            "reason": null
+          },
+          "epoch": 2,
+          "generation": 1,
+          "parent": {
+            "endpointId": "dsh",
+            "sessionId": "session-1779c36f-a0f4-4c24-80c7-91ad34f32d2a",
+            "threadId": "session-1779c36f-a0f4-4c24-80c7-91ad34f32d2a"
+          },
+          "revision": 2
+        },
+        "childContentMounted": true,
+        "childId": "7cc24e5a-f795-4e76-9a34-453bcfe8f009",
+        "childScope": {
+          "endpointId": "dsh",
+          "sessionId": "7cc24e5a-f795-4e76-9a34-453bcfe8f009",
+          "threadId": "session-1779c36f-a0f4-4c24-80c7-91ad34f32d2a"
+        },
+        "closedViaOriginalControl": true,
+        "endpointId": "dsh",
+        "heldClosedDelivery": {
+          "mainRevision": 16,
+          "panelRevision": 29,
+          "parent": {
+            "endpointId": "dsh",
+            "sessionId": "session-1779c36f-a0f4-4c24-80c7-91ad34f32d2a",
+            "threadId": "session-1779c36f-a0f4-4c24-80c7-91ad34f32d2a"
+          },
+          "projectionGeneration": 0
+        },
+        "heldParentDelivery": {
+          "mainRevision": 14,
+          "panelRevision": 25,
+          "parent": {
+            "endpointId": "dsh",
+            "sessionId": "session-1779c36f-a0f4-4c24-80c7-91ad34f32d2a",
+            "threadId": "session-1779c36f-a0f4-4c24-80c7-91ad34f32d2a"
+          },
+          "projectionGeneration": 0
+        },
+        "historyItems": 8,
+        "lateClosedResultRejected": true,
+        "lateParentResultDidNotStealSelection": true,
+        "openedViaOriginalControl": true,
+        "parent": {
+          "endpointId": "dsh",
+          "sessionId": "session-1779c36f-a0f4-4c24-80c7-91ad34f32d2a",
+          "threadId": "session-1779c36f-a0f4-4c24-80c7-91ad34f32d2a"
+        },
+        "parentDraftPreserved": true,
+        "parentTaskRowMountedWithoutOpenAction": false,
+        "readOnly": false,
+        "returnedViaOriginalTab": true
+      },
+      {
+        "canonicalSourceMatched": true,
+        "canonicalSummarySubagentId": null,
+        "canonicalTask": null,
+        "catalogFrame": {
+          "entry": {
+            "hasChildren": null,
+            "id": "d6687a2e-9d93-47ff-ad4d-61403a9398f7",
+            "kind": "child",
+            "label": "Catalog proof child",
+            "mode": "continuable",
+            "plane": null,
+            "reason": null
+          },
+          "epoch": 2,
+          "generation": 1,
+          "parent": {
+            "endpointId": "dsh",
+            "sessionId": "session-46bb8f12-7357-478a-a8d2-d1727c52133c",
+            "threadId": "session-46bb8f12-7357-478a-a8d2-d1727c52133c"
+          },
+          "revision": 2
+        },
+        "childContentMounted": true,
+        "childId": "d6687a2e-9d93-47ff-ad4d-61403a9398f7",
+        "childScope": {
+          "endpointId": "dsh",
+          "sessionId": "d6687a2e-9d93-47ff-ad4d-61403a9398f7",
+          "threadId": "session-46bb8f12-7357-478a-a8d2-d1727c52133c"
+        },
+        "closedViaOriginalControl": true,
+        "endpointId": "dsh",
+        "heldClosedDelivery": {
+          "mainRevision": 19,
+          "panelRevision": 35,
+          "parent": {
+            "endpointId": "dsh",
+            "sessionId": "session-46bb8f12-7357-478a-a8d2-d1727c52133c",
+            "threadId": "session-46bb8f12-7357-478a-a8d2-d1727c52133c"
+          },
+          "projectionGeneration": 0
+        },
+        "heldParentDelivery": {
+          "mainRevision": 17,
+          "panelRevision": 31,
+          "parent": {
+            "endpointId": "dsh",
+            "sessionId": "session-46bb8f12-7357-478a-a8d2-d1727c52133c",
+            "threadId": "session-46bb8f12-7357-478a-a8d2-d1727c52133c"
+          },
+          "projectionGeneration": 0
+        },
+        "historyItems": 8,
+        "lateClosedResultRejected": true,
+        "lateParentResultDidNotStealSelection": true,
+        "openedViaOriginalControl": true,
+        "parent": {
+          "endpointId": "dsh",
+          "sessionId": "session-46bb8f12-7357-478a-a8d2-d1727c52133c",
+          "threadId": "session-46bb8f12-7357-478a-a8d2-d1727c52133c"
+        },
+        "parentDraftPreserved": true,
+        "parentTaskRowMountedWithoutOpenAction": false,
+        "readOnly": false,
+        "returnedViaOriginalTab": true
+      }
+    ],
+    "desktopVisibilityProven": false,
+    "nativeInteraction": false,
+    "physicalIme": false,
+    "sameTaskRowDynamicPointerProven": false
+  },
+  "evidenceRoot": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/real-multi-sidebar-20261024",
+  "excluded": [
+    "same-task-row-dynamic-pointer-public-producer",
+    "native-window",
+    "physical-IME",
+    "OS-accessibility",
+    "desktop-visibility",
+    "SDK-53-strict-reading-pass",
+    "merge-tag-release"
+  ],
+  "cacheDeletedBytes": 0
+}

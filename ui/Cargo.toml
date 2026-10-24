@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["components", "demo", "consumer"]
+members = ["components", "bindings", "demo", "consumer"]
 exclude = [".deps/tekesui"]
 [workspace.package]
 version = "0.0.0"
@@ -9,15 +9,26 @@ publish = false
 license = "MIT"
 [workspace.dependencies]
 tekes-agent-endpoint-kernel = { path = "../crates/endpoint-kernel" }
+tekes-agent-endpoint-pi = { path = "../crates/endpoint-pi" }
+tekes-agent-endpoint-dsh = { path = "../crates/endpoint-dsh" }
+tekes-agent-web = { path = "../crates/web" }
 tekes-agent-contract = { path = "../crates/contract" }
 tekes-agent-session = { path = "../crates/session" }
 tekes-agent-presentation = { path = "../crates/presentation" }
 tekes-agent-components-ui = { path = "components" }
-tekes-ui-controls = { path = ".deps/tekesui/crates/tekes-ui-controls" }
-tekes-ui-scene = { path = ".deps/tekesui/crates/tekes-ui-scene" }
-tekes-ui-tokens = { path = ".deps/tekesui/crates/tekes-ui-tokens" }
-tekes-ui-text = { path = ".deps/tekesui/crates/tekes-ui-text" }
-tekes-ui-render = { path = ".deps/tekesui/crates/tekes-ui-render" }
-tekes-ui-platform-macos = { path = ".deps/tekesui/crates/tekes-ui-platform-macos" }
+tekes-agent-ui-bindings = { path = "bindings" }
+tekes-agent-ui-consumer-check = { path = "consumer" }
+tekes-ui-controls = { git = "https://github.com/TekesApps/TekesUI.git", rev = "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c" }
+tekes-ui-scene = { git = "https://github.com/TekesApps/TekesUI.git", rev = "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c" }
+tekes-ui-tokens = { git = "https://github.com/TekesApps/TekesUI.git", rev = "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c" }
+tekes-ui-text = { git = "https://github.com/TekesApps/TekesUI.git", rev = "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c" }
+tekes-ui-motion = { git = "https://github.com/TekesApps/TekesUI.git", rev = "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c" }
+tekes-ui-render = { git = "https://github.com/TekesApps/TekesUI.git", rev = "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c" }
+tekes-ui-platform-macos = { git = "https://github.com/TekesApps/TekesUI.git", rev = "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c" }
 tokio = { version = "1", features = ["rt-multi-thread", "time", "sync", "macros"] }
 serde_json = "1"
+base64 = "0.22"
+image = { version = "=0.25.10", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
+async-trait = "0.1"
+uuid = { version = "1", features = ["v4"] }
+unicode-segmentation = "=1.13.3"

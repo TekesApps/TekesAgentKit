@@ -1,0 +1,101 @@
+{
+  "implementation_commit": "147642bf1e3a4f7b9ef60b13dff54b4ca8b6c5df",
+  "issue": 22,
+  "pr": "https://github.com/TekesApps/TekesAgentKit/pull/10",
+  "sdk_revision": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "ui_tests": {
+    "passed": 677,
+    "failed": 0,
+    "ignored": 1,
+    "groups": 96
+  },
+  "strict_clippy": true,
+  "normal_demo_build": true,
+  "public_consumer_ran": true,
+  "public_consumer_scope": [
+    "folder filters pinned row",
+    "clear filter restores pinned row",
+    "canonical pin facts retained",
+    "construct and mount shared controls"
+  ],
+  "query_scope": "provider candidates only, full inventory join; pending/failed/unresolved remain diagnostic, not unfiltered query results",
+  "local_name_fts_implemented": false,
+  "fts_ranking_implemented": false,
+  "remote_continuation_implemented": false,
+  "native_selftests_source_updated_and_compiled": true,
+  "native_selftests_executed": false,
+  "desktop": false,
+  "physical_ime": false,
+  "real_harness_acceptance": false,
+  "source_manifest": ".runtime-fixtures/sidebar-host-20261024/query-membership-source-manifest.json",
+  "source_manifest_sha256": "6b3e8f91b1010164742ea3e4da4bcc865484b25019f79ff164654ed54a74ab66",
+  "prepared_wip_hash_matches_committed_source": true,
+  "logs": [
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/query-membership-reviewed-workspace-tests.log",
+      "sha256": "f0fb1f846d587409a9154ef4a8f0ee93470eb62a223b837b0b919973ab397df6"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/query-membership-clippy.log",
+      "sha256": "0e021c2b6fde430eb53185004ef96dac0bdc1d36a2577b209812283b428f2eb7"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/query-membership-demo-build.log",
+      "sha256": "e11b7ae7a807d6e30c2f776cd209fe9404e808629d69624dc0a9aa16c83db096"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/query-membership-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/query-membership-root-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/query-membership-public-consumer-run.log",
+      "sha256": "4b3197919049c2809e1f99d424ab8be86e0c30a813d6ca83e47101724b9f88c8"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/query-membership-generator-tests.log",
+      "sha256": "b098bae81a28681c1649c835a2dac32d5166daac52f145d047947d79f1640fb0"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/query-membership-boundaries.log",
+      "sha256": "9480cc4382559b9a7a99240226a9f766048e30c8d38bb4bccd1fd8bca56661ad"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/query-membership-sdk-inputs.json",
+      "sha256": "9543ade335292f9c7f61944edd341c2fb9297a7c6abc3cf44dc86c1f16bd6ee3"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/query-membership-acceptance-records.log",
+      "sha256": "0463c4386bb552440b43468709adb196df1585d1f11a360492b0986e9b6eeadf"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/ci-9b1d263-pr-final-jobs.json",
+      "sha256": "e36b995a750ca504ba61b145fc5b783e1c85d3ad9ad19a3ac41220b72373c214"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/query-membership-demo-dependencies.log",
+      "sha256": "8815b51c1c6b57d63130ed9eb712dd3bf0747f94cfbb11588a39d5ef9ee6c32f"
+    }
+  ],
+  "binaries": [
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/agentkit-sidebar-membership-demo",
+      "sha256": "14f298eba1ff1a3f0b3391ed35b19db64ce77041ac27a5f954673c67d11beb4e",
+      "bytes": 83013792
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/agentkit-public-sidebar-membership-consumer",
+      "sha256": "83766ea96f8572793844d4358afcceef5521617c04b065c9da312f01e2b2ea8b",
+      "bytes": 16277472
+    }
+  ],
+  "cleanup": {
+    "deleted_paths": [],
+    "actual_released_bytes": 0,
+    "readonly_audit": "Old unit-test feature variants lack sufficient replacement proof; preserved. Active Cargo was not interrupted.",
+    "new_target_created": false
+  }
+}

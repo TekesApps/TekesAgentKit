@@ -1,0 +1,215 @@
+{
+  "kind": "machine-message-content-consumer",
+  "date": "2026-10-20",
+  "sourceBaseCommit": "2c3c42d51a0b045cabc77809947f967b47cfdb7d",
+  "implementationFileSha256": {
+    "ui/components/src/output_message.rs": "8940b4eb9e9cda5efc72e220d6d314fa22e6ac34e400aa0c64d861c931e3ea00",
+    "ui/components/src/input_message.rs": "b7ecd9661e16bca5b241d621c96adefa5152ca8858485e1b527b300b391370c0",
+    "ui/components/src/lib.rs": "a4b7684e40fe85b036546a0838c3e4650e81d9fb6d89fb4ecb793f3c6a292817",
+    "ui/demo/tests/output_message.rs": "ea1d2d7a09d49d771ca302209cf50620dd0320f5f410cf72733dee6ebb51ce23",
+    "ui/consumer/src/lib.rs": "ed92f06ede3817cdec8fa5c8f68f4924e3309f27ec4c04be7e0c1424a68ee668",
+    "ui/demo/src/component_demo.rs": "90b6e6a47e016b81ad68ab890b972d7b432a992c741f52122341f3b0903d1566",
+    "ui/demo/src/components_native.rs": "b3ee35dd77fb69e813b39c754ea02bb34d06c9e5b79750083f629a2f08f599ef",
+    "scripts/test-real-session-endpoints.py": "e60676666ade3f5294ec89eb95f02cafd4256d6f4087f2a65a88730ba3bc300f"
+  },
+  "demoBinarySha256": "92954f030bb07cf3fedea1408b7927cfd75581bd8a27753909cb58d2bdeb1835",
+  "tekesUI": {
+    "rev": "8cf0840790334ba224afc0595897c74231c712e6",
+    "files": 199,
+    "sha256": "f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f"
+  },
+  "agentKitPublishedBaseline": {
+    "publishedAt": "2026-10-19T14:25:34Z",
+    "tagName": "v0.3.8"
+  },
+  "validation": {
+    "uiTests": 195,
+    "newComponentTests": 8,
+    "scriptTests": 18,
+    "strictClippy": true,
+    "fmt": true,
+    "dependencyBoundaries": true,
+    "secondPublicConsumer": true
+  },
+  "realEndpoints": {
+    "pi": {
+      "inputMessageProof": {
+        "bubbleWidth": 214.0,
+        "completeTranscript": false,
+        "externalRightFootnote": true,
+        "nativeInteraction": false,
+        "plainReadonlyContent": true,
+        "rightBubble": true,
+        "rowWidth": 532.0
+      },
+      "outputMessageProof": {
+        "completeTranscript": false,
+        "leadingContent": true,
+        "nativeInteraction": false,
+        "parts": 1
+      },
+      "historyPagingProof": {
+        "extended": true,
+        "frozenCut": true,
+        "nativeInteraction": false,
+        "newEpochHistoryRetained": true,
+        "noDuplicateMessages": true,
+        "oldReceiptInvalidated": true,
+        "originalScope": true,
+        "otherDraftPreserved": true,
+        "readingAnchorAcceptance": false,
+        "retainedMessages": 56,
+        "sourceKind": "nativeConversation",
+        "sourceStatusPublished": true
+      },
+      "documentProjection": {
+        "aggregateMessages": 0,
+        "contentBlocks": 56,
+        "hasMoreBefore": false,
+        "isStale": false,
+        "positionedEvents": 56,
+        "renderer": false,
+        "sections": 28,
+        "sessionNotices": 0,
+        "structuredMessages": 56,
+        "toolCalls": 0,
+        "unknownBlocks": 0,
+        "unplacedEvents": 0,
+        "unplacedFacts": [],
+        "unresolvedToolBlocks": 0,
+        "visibleMessages": 56
+      },
+      "imageSha256": "096f98c81921190a02c9f27c17b075dc8dc3fdee17e7fa8da1b18a8042740e7e"
+    },
+    "dsh": {
+      "inputMessageProof": {
+        "bubbleWidth": 214.0,
+        "completeTranscript": false,
+        "externalRightFootnote": true,
+        "nativeInteraction": false,
+        "plainReadonlyContent": true,
+        "rightBubble": true,
+        "rowWidth": 532.0
+      },
+      "outputMessageProof": {
+        "completeTranscript": false,
+        "leadingContent": true,
+        "nativeInteraction": false,
+        "parts": 1
+      },
+      "historyPagingProof": {
+        "extended": true,
+        "frozenCut": true,
+        "nativeInteraction": false,
+        "newEpochHistoryRetained": true,
+        "noDuplicateMessages": true,
+        "oldReceiptInvalidated": true,
+        "originalScope": true,
+        "otherDraftPreserved": true,
+        "readingAnchorAcceptance": false,
+        "retainedMessages": 56,
+        "sourceKind": "journal",
+        "sourceStatusPublished": true
+      },
+      "documentProjection": {
+        "aggregateMessages": 0,
+        "contentBlocks": 56,
+        "hasMoreBefore": false,
+        "isStale": false,
+        "positionedEvents": 56,
+        "renderer": false,
+        "sections": 28,
+        "sessionNotices": 0,
+        "structuredMessages": 56,
+        "toolCalls": 0,
+        "unknownBlocks": 0,
+        "unplacedEvents": 0,
+        "unplacedFacts": [],
+        "unresolvedToolBlocks": 0,
+        "visibleMessages": 56
+      },
+      "imageSha256": "d6988bea2e52a46424bae9fecf2c653fcae0e0f1df2a30721c14ac6c18c57cfa"
+    },
+    "native": {
+      "inputMessageProof": {
+        "bubbleWidth": 214.0,
+        "completeTranscript": false,
+        "externalRightFootnote": true,
+        "nativeInteraction": false,
+        "plainReadonlyContent": true,
+        "rightBubble": true,
+        "rowWidth": 532.0
+      },
+      "outputMessageProof": {
+        "completeTranscript": false,
+        "leadingContent": true,
+        "nativeInteraction": false,
+        "parts": 1
+      },
+      "historyPagingProof": {
+        "extended": true,
+        "frozenCut": true,
+        "nativeInteraction": false,
+        "newEpochHistoryRetained": true,
+        "noDuplicateMessages": true,
+        "oldReceiptInvalidated": true,
+        "originalScope": true,
+        "otherDraftPreserved": true,
+        "readingAnchorAcceptance": false,
+        "retainedMessages": 56,
+        "sourceKind": "journal",
+        "sourceStatusPublished": true
+      },
+      "documentProjection": {
+        "aggregateMessages": 0,
+        "contentBlocks": 56,
+        "hasMoreBefore": false,
+        "isStale": false,
+        "positionedEvents": 56,
+        "renderer": false,
+        "sections": 28,
+        "sessionNotices": 0,
+        "structuredMessages": 56,
+        "toolCalls": 0,
+        "unknownBlocks": 0,
+        "unplacedEvents": 0,
+        "unplacedFacts": [],
+        "unresolvedToolBlocks": 0,
+        "visibleMessages": 56
+      },
+      "imageSha256": "cfdd314f7b43aaa804e2df45286ae2c7027d72b612ab088e64ef82bc08f7a56f"
+    }
+  },
+  "nativeFixture": {
+    "markers": [
+      "NATIVE_AGENT_SIDEBAR_SUMMARY_SELFTEST_OK shared-inventory+shared-pin+sidebar-selection+summary-facts; full-run-view=false; physical-ime=false",
+      "NATIVE_AGENT_SIDECHAT_SELFTEST_OK owned-create+separate-composer+send+stream+draft+cancel-discard+parent-isolation; transcript=false; physical-ime=false",
+      "NATIVE_AGENT_CHILD_SELFTEST_OK direct-parent+independent-composer+single-admission+stream+cancel+isolated-drafts+bounded-read-only+paging+local-retirement; formal-transcript=false; physical-ime=false",
+      "NATIVE_AGENT_TASK_SELFTEST_OK resolved-task+independent-composer+single-admission+stream+cancel+parent-draft-isolation+close; transcript=false; physical-ime=false",
+      "NATIVE_AGENT_COMPONENTS_SELFTEST_OK composer+indicators+run-binding+synthetic-text-services+send+stream+cancel+draft-isolation+reconnect; physical-ime=false; transcript=false; reading-anchor=false"
+    ],
+    "physicalIME": false,
+    "completeTranscript": false,
+    "readingAnchorAcceptance": false
+  },
+  "logSha256": {
+    "agentkit-output-message-workspace-final.log": "e73cf7473182deacc8dbc313fdbc41e0669cb3cdb6e2501acbff9ea0f02fcf9a",
+    "agentkit-output-message-clippy-final.log": "618fc844aeeff7ab77f547486a15b5b3f9cf3537f282dfd5b6698bea068d4909",
+    "agentkit-output-message-tools.log": "01606fa628b8f46ea7581c150be6a6cc3765ee00ac3da2744335dc290ba64faa",
+    "agentkit-real-message-rows-final.log": "f1ad41ccf3afa18afce8163926a3ebfb0c4528251ef883680df7bf89d8f52433",
+    "agentkit-output-message-native-final.log": "10e1af4db4c0d7d744b48094dec9eee6923defed5ec61b09c445aa6e3adb0667"
+  },
+  "upstream": {
+    "mixedReadingIssue": "https://github.com/TekesApps/TekesUI/issues/22",
+    "selectableRichContentIssue": "https://github.com/TekesApps/TekesUI/issues/25"
+  },
+  "evidenceBoundary": {
+    "provider": "isolated owned sessions with synthetic local provider",
+    "realEndpointUI": "restored-history rows and paging/reconnect data plus offscreen GPU; not native interactive three-harness UX",
+    "messageStreaming": "component controlled-update tests; endpoint protocol stream separately exercised",
+    "richContent": false,
+    "completeTranscript": false,
+    "runView": false,
+    "turnFootnote": false
+  }
+}

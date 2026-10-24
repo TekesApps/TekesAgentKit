@@ -1,0 +1,190 @@
+{
+  "kind": "agentkit-public-ui-api-contract-audit",
+  "audited_date": "2026-10-24",
+  "issue": "https://github.com/TekesApps/TekesAgentKit/issues/15",
+  "overall_issue": "https://github.com/TekesApps/TekesAgentKit/issues/14",
+  "pull_request": {
+    "url": "https://github.com/TekesApps/TekesAgentKit/pull/10",
+    "state": "OPEN",
+    "draft": true,
+    "head": "58521a1bc581ef14c3c63c9a7bc698bbd01d9ab3"
+  },
+  "agentkit": {
+    "head": "58521a1bc581ef14c3c63c9a7bc698bbd01d9ab3",
+    "published_baseline": "v0.3.8",
+    "ui_workspace_version": "0.0.0",
+    "ui_workspace_publish": false,
+    "ui_lock_sha256": "8790cacd3395460c518f71240052a0bde27a25dbe7e18acda12753c53653d9d1",
+    "public_component_package": "tekes-agent-components-ui",
+    "path_dependency_sources": {
+      "sha256": "63d36cd67cf242862ed13984ba4d371c3a2b110d9f44cd78399d3efd8aed8ba9",
+      "file_count": 128,
+      "git_status": "",
+      "matches_head": true,
+      "inputs": [
+        "ui/components/Cargo.toml and ui/components/src/**/*.rs",
+        "crates/contract/Cargo.toml and crates/contract/src/**/*.rs",
+        "crates/presentation/Cargo.toml and crates/presentation/src/**/*.rs",
+        "crates/session/Cargo.toml and crates/session/src/**/*.rs",
+        "ui/Cargo.lock",
+        "ui/tekesui-source.json"
+      ]
+    }
+  },
+  "tekesui": {
+    "consumer_pinned_revision": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+    "public_main_reported_by_issue_48": "7c13ec0909601ac1e8a7b4a0a67f6e086d2307b7",
+    "public_issue_48": {
+      "state": "OPEN",
+      "url": "https://github.com/TekesApps/TekesUI/issues/48",
+      "updated_at": "2026-10-23T23:42:35Z"
+    },
+    "public_issue_64": {
+      "state": "OPEN",
+      "url": "https://github.com/TekesApps/TekesUI/issues/64",
+      "updated_at": "2026-10-23T23:36:54Z"
+    },
+    "source_manifest_sha256": "54e52a85c444f6eaf1d7e53ab332036cb5b37732646cdddfe4361d1dcac73666",
+    "reviewed_closure_manifest_sha256": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
+    "reviewed_input_count": 243,
+    "locked_packages": [
+      "tekes-ui-controls@0.1.0",
+      "tekes-ui-design-export@0.1.0",
+      "tekes-ui-motion@0.1.0",
+      "tekes-ui-platform-macos@0.1.0",
+      "tekes-ui-render@0.1.0",
+      "tekes-ui-scene@0.1.0",
+      "tekes-ui-text@0.1.0",
+      "tekes-ui-tokens@0.1.0"
+    ],
+    "process_container_acceptance": "not_available_in_fixed_consumer_closure"
+  },
+  "public_apis": {
+    "run": {
+      "name": "RunPort",
+      "constructor": "RunPort::standard(namespace, rows, scope)",
+      "source": "ui/components/src/run_port.rs",
+      "into_host": true,
+      "scope_retargetable": false
+    },
+    "sidebar": {
+      "constructor": "Sidebar::new(namespace, labels)",
+      "input": "SidebarInput",
+      "events": "SidebarIntent plus dedicated page/preference/search/visibility intents",
+      "source": "ui/components/src/sidebar.rs",
+      "into_host": true
+    },
+    "side_panel": {
+      "constructor": "SidePanel::new(namespace, labels, retained_parent_limit)",
+      "input": "SidePanelInput",
+      "events": "SidePanelIntent with captured parent and PanelContentToken for content installs",
+      "source": "ui/components/src/side_panel.rs",
+      "into_host": true
+    },
+    "test_only": [
+      "RunSurface",
+      "ComponentDemo"
+    ]
+  },
+  "standalone_consumer": {
+    "prepared_fixture_directory": ".runtime-fixtures/issue15-contract-20261024/external-consumer-58521a1-63d36cd67c",
+    "prepared_status": "prepared-not-built",
+    "executed_fixture_directory": ".runtime-fixtures/issue15-contract-20261024/verified-consumer",
+    "run_receipt": ".runtime-fixtures/issue-batch-20261024/public-consumer-run-receipt.json",
+    "input_receipt": ".runtime-fixtures/issue-batch-20261024/public-consumer-inputs.json",
+    "status": "compiled-and-ran",
+    "direct_dependency": "tekes-agent-components-ui",
+    "uses_explicit_development_path": true,
+    "uses_independent_workspace": true,
+    "seeds_lock_from": "ui/Cargo.lock",
+    "seed_lock_sha256": "8790cacd3395460c518f71240052a0bde27a25dbe7e18acda12753c53653d9d1",
+    "sample_manifest_sha256": "53179f7b3806e74d78bd75828b3e8940aea749cc7ff78fb03ff40eb52ff4d7ef",
+    "sample_source_sha256": "d829c664f9cf659002472bc57aa0902a983341048722d4b90e1205d0cbdc66dd",
+    "cargo_invoked_by_preparer": false,
+    "target_created_by_preparer": false,
+    "cargo_command": "cargo run --locked --offline",
+    "cargo_exit_code": 0,
+    "resolved_local_packages": [
+      "agentkit-public-ui-consumer",
+      "tekes-agent-components-ui",
+      "tekes-agent-contract",
+      "tekes-agent-presentation",
+      "tekes-agent-session"
+    ],
+    "resolved_tekesui_packages": [
+      "tekes-ui-controls@0.1.0",
+      "tekes-ui-design-export@0.1.0",
+      "tekes-ui-motion@0.1.0",
+      "tekes-ui-scene@0.1.0",
+      "tekes-ui-text@0.1.0",
+      "tekes-ui-tokens@0.1.0"
+    ],
+    "resolved_tekesui_revision": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+    "sdk_source_verified_inputs": 243,
+    "execution_input_count": 131,
+    "execution_source_fingerprint": "b6300987b478db6a3b63bee88abd2c2676b06a2706475913c0a7ce451827d589",
+    "sources_unchanged_after_run": true,
+    "archived_executable_sha256": "fc812429a2912043b9dc4c5f197e8bcc79738c20145e4b04da4fc071a7842718",
+    "archived_executable_size_bytes": 15850080,
+    "claims": [
+      "independent package compile",
+      "RunPort, Sidebar, and SidePanel constructed",
+      "all three mounted into ContentHost"
+    ],
+    "not_claimed": [
+      "rendered/native window",
+      "ProcessContainer same-process/cross-process integration",
+      "IME/accessibility",
+      "complete ClientKit View parity"
+    ],
+    "run_receipt_sha256": "22f79779a096f8c6edc584b6085c537e806330698c1ac64261f537e4c01a7865",
+    "input_receipt_sha256": "814b6e40decab040f4fe1c40cc2371c14dcfd6a7d3df211ddf7e486023f23a3e",
+    "consumer_lock_sha256": "2c64ec1c18e60040563bdd632e6a903aa16c171510bda31dd6274ae5354b8dd5"
+  },
+  "clientkit_comparison": {
+    "repository_head": "c289bc9d33edcd83a782ac17927a8c65a027eccd",
+    "files": [
+      {
+        "path": "Sources/Composer/Agent/ClientEmbeddedRunView.swift",
+        "sha256": "15cfb89a05c307470940c47401c1bc5c453efcd461d1ed8f95a3411de5629958"
+      },
+      {
+        "path": "Sources/Composer/Agent/ClientAgentTaskView.swift",
+        "sha256": "a8a98f9a5566c2ea2ca661f9d6e060d2d4069da1d7ea672098eef8d82c9e9cb5"
+      },
+      {
+        "path": "Sources/Composer/Agent/TaskRunPanelProjectionState.swift",
+        "sha256": "267b03eea842cd84e452c45833b8a96b0bbc312c587e7dfc77b43d802b7a502e"
+      },
+      {
+        "path": "Sources/Composer/ComposerSurfaceContext.swift",
+        "sha256": "2133b0c468cd5d63d72c53174b719f92ab08f8a6c65803371959a903fe523f12"
+      }
+    ],
+    "source_worktree_changes_for_referenced_files": false
+  },
+  "tekes_host_comparison": {
+    "repository_head": "8858ccd9d46590852ec7a0949aee289fc6798d70",
+    "file": "TekesTests/RunUserControlsGraphTests.swift",
+    "sha256": "ec6e2a9bd9bf61545919e3b32929e32384cb1bea49469d39800e04330ac770aa",
+    "source_worktree_changes_for_referenced_file": false
+  },
+  "local_validation": {
+    "python_tests": {
+      "command": "PYTHONDONTWRITEBYTECODE=1 bundled-python -m unittest scripts.tests.test_public_agent_ui_consumer -v",
+      "result": "3 passed"
+    },
+    "cargo_build_or_run": "independent consumer run succeeded using the shared target; receipt linked above",
+    "desktop_acceptance": "not_run",
+    "boundaries": {
+      "headless": "passed",
+      "ui": "passed"
+    }
+  },
+  "unverified": [
+    "full Views parity",
+    "ProcessContainer same-process/cross-process integration",
+    "native window and IME/accessibility interaction",
+    "AgentKit immutable UI release pin"
+  ]
+}

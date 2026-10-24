@@ -1,10 +1,12 @@
 //! Shared AgentKit service. Hosts own its authentication, listener and process lifetime.
 //! A disconnected view drops only its history lease; it never stops a runtime or Harness.
+mod sidebar;
 use async_trait::async_trait;
 use futures_util::StreamExt;
 use serde_json::{Value, json};
+pub use sidebar::*;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     sync::{Arc, RwLock},
 };
 use tekes_agent_contract::*;
@@ -12,18 +14,86 @@ use tekes_agent_presentation::{RunPresentation, RunScope, TranscriptSnapshot};
 use tekes_agent_session::{ConnectionState, MemoryProjectionStore, SessionRuntime};
 use tokio::sync::mpsc;
 
+fn inventory_summary(state: &MemoryProjectionStore, id: &str) -> Option<Value> {
+    if state
+        .archived_session_ids
+        .iter()
+        .any(|archived| archived == id)
+    {
+        return None;
+    }
+    let session = state.sessions.get(id)?;
+    let summary = session.summary.as_ref()?;
+    if summary["status"] == "archived" {
+        return None;
+    }
+    let projections: BTreeMap<_, _> = session
+        .projections
+        .iter()
+        .map(|(key, value)| (key, &value.value))
+        .collect();
+    Some(json!({"sessionId":id,"summary":summary,"projections":projections}))
+}
 fn active_inventory(state: &MemoryProjectionStore) -> Vec<Value> {
     state
         .sessions
+        .keys()
+        .filter_map(|id| inventory_summary(state, id))
+        .collect()
+}
+
+/// Raw archive facts from the exact store snapshot used by active_inventory.
+/// Retained values do not become current confirmation while readiness is false.
+fn inventory_archive_facts(state: &MemoryProjectionStore) -> Value {
+    let statuses: BTreeMap<_, _> = state
+        .sessions
         .iter()
-        .filter(|(id, _)| !state.archived_session_ids.contains(*id))
         .filter_map(|(id, session)| {
             session
                 .summary
-                .as_ref()
-                .map(|summary| json!({"sessionId":id,"summary":summary}))
+                .as_ref()?
+                .get("status")
+                .map(|value| (id.clone(), value.clone()))
         })
-        .collect()
+        .collect();
+    json!({"workspaceReady":state.workspace_ready,"archivedSessionIds":state.archived_session_ids,
+        "retainedSummaryStatuses":statuses})
+}
+
+/// Builds the retained name corpus from the same canonical store snapshot as inventory rows.
+/// Display membership, archive status, and session classifications do not filter this source.
+pub fn retained_name_corpus(
+    state: &MemoryProjectionStore,
+    endpoint_domain: impl IntoIterator<Item = String>,
+) -> Result<tekes_agent_presentation::SidebarNameCorpus> {
+    let mut endpoint_domain: Vec<_> = endpoint_domain.into_iter().collect();
+    endpoint_domain.sort();
+    let mut documents = Vec::new();
+    for (session_id, session) in &state.sessions {
+        if let Some(summary) = session.summary.as_ref() {
+            require(
+                summary.is_object(),
+                &format!("invalid retained session summary for {session_id}"),
+            )?;
+            let projected_title = session.projections.get("title").map(|value| &value.value);
+            documents.push(tekes_agent_presentation::SidebarNameDocument {
+                address: SessionAddress {
+                    endpoint_id: state.endpoint_id.clone(),
+                    session_id: session_id.clone(),
+                },
+                title: tekes_agent_presentation::canonical_session_title(summary, projected_title),
+            });
+        }
+    }
+    let corpus = tekes_agent_presentation::SidebarNameCorpus {
+        endpoint_id: state.endpoint_id.clone(),
+        connection_epoch: state.connection_epoch,
+        inventory_ready: state.inventory_ready,
+        endpoint_domain,
+        documents,
+    };
+    corpus.validate()?;
+    Ok(corpus)
 }
 
 /// Typed public read projection; the durable original text is retained for other consumers.
@@ -96,11 +166,249 @@ mod tests {
         store.archived_session_ids.push("archived".into());
         assert_eq!(
             active_inventory(&store),
-            vec![json!({"sessionId":"active","summary":{"sessionId":"active"}})]
+            vec![json!({"sessionId":"active","summary":{"sessionId":"active"},"projections":{}})]
         );
         assert!(store.sessions["archived"].summary.is_some());
         store.archived_session_ids.clear();
         assert_eq!(active_inventory(&store).len(), 2);
+    }
+
+    #[test]
+    fn inventory_publishes_reconciled_projection_without_mutating_older_summary() {
+        let mut store = MemoryProjectionStore::new("pi");
+        let summary = json!({"sessionId":"a","projections":{"asOfSeq":1,"values":{"title":"old"}}});
+        let mut session = SessionProjection {
+            summary: Some(summary.clone()),
+            ..Default::default()
+        };
+        session.projections.insert(
+            "title".into(),
+            tekes_agent_session::VersionedValue {
+                sequence: 2,
+                value: json!("当前中文标题"),
+            },
+        );
+        store.sessions.insert("a".into(), session);
+        let rows = active_inventory(&store);
+        assert_eq!(rows[0]["projections"]["title"], "当前中文标题");
+        assert_eq!(rows[0]["summary"], summary);
+        store
+            .sessions
+            .get_mut("a")
+            .unwrap()
+            .projections
+            .get_mut("title")
+            .unwrap()
+            .value = Value::Null;
+        assert_eq!(
+            active_inventory(&store)[0]["projections"]["title"],
+            Value::Null
+        );
+    }
+
+    #[test]
+    fn retained_name_corpus_keeps_hidden_names_without_changing_inventory_membership() {
+        let mut store = MemoryProjectionStore::new("one");
+        store.connection_epoch = 7;
+        store.inventory_ready = true;
+        store.archived_session_ids.push("archived".into());
+        for (id, summary) in [
+            (
+                "visible",
+                json!({"sessionId":"visible","title":"old visible"}),
+            ),
+            (
+                "archived",
+                json!({"sessionId":"archived","status":"archived","title":"Archive name"}),
+            ),
+            (
+                "child",
+                json!({"sessionId":"child","origin":"subagent","title":"Child name"}),
+            ),
+            (
+                "ephemeral",
+                json!({"sessionId":"ephemeral","ephemeral":true,"title":"Temporary name"}),
+            ),
+        ] {
+            store.sessions.insert(
+                id.into(),
+                SessionProjection {
+                    summary: Some(summary),
+                    ..Default::default()
+                },
+            );
+        }
+        store
+            .sessions
+            .insert("no-summary".into(), SessionProjection::default());
+        store
+            .sessions
+            .get_mut("visible")
+            .unwrap()
+            .projections
+            .insert(
+                "title".into(),
+                tekes_agent_session::VersionedValue {
+                    sequence: 1,
+                    value: json!("Renamed"),
+                },
+            );
+
+        let rows = active_inventory(&store);
+        assert_eq!(rows.len(), 3, "existing API membership remains unchanged");
+        let corpus = retained_name_corpus(&store, ["two".into(), "one".into()]).unwrap();
+        assert_eq!(corpus.connection_epoch, 7);
+        assert!(corpus.inventory_ready);
+        assert_eq!(corpus.endpoint_domain, vec!["one", "two"]);
+        assert_eq!(corpus.documents.len(), 4);
+        let titles: BTreeMap<_, _> = corpus
+            .documents
+            .iter()
+            .map(|d| (d.address.session_id.as_str(), d.title.as_str()))
+            .collect();
+        assert_eq!(titles["visible"], "Renamed");
+        assert_eq!(titles["archived"], "Archive name");
+        assert_eq!(titles["child"], "Child name");
+        assert_eq!(titles["ephemeral"], "Temporary name");
+        assert!(!titles.contains_key("no-summary"));
+    }
+
+    #[test]
+    fn retained_corpus_tracks_canonical_clear_and_actual_deletion() {
+        let mut store = MemoryProjectionStore::new("one");
+        store.sessions.insert(
+            "same-id".into(),
+            SessionProjection {
+                summary: Some(json!({"title":"legacy title","name":"legacy name"})),
+                ..Default::default()
+            },
+        );
+        let domain = ["one".to_owned()];
+        assert_eq!(
+            retained_name_corpus(&store, domain.clone())
+                .unwrap()
+                .documents[0]
+                .title,
+            "legacy title"
+        );
+
+        store
+            .sessions
+            .get_mut("same-id")
+            .unwrap()
+            .projections
+            .insert(
+                "title".into(),
+                tekes_agent_session::VersionedValue {
+                    sequence: 2,
+                    value: Value::Null,
+                },
+            );
+        assert_eq!(
+            retained_name_corpus(&store, domain.clone())
+                .unwrap()
+                .documents[0]
+                .title,
+            "New conversation"
+        );
+        store.sessions.remove("same-id");
+        assert!(
+            retained_name_corpus(&store, domain)
+                .unwrap()
+                .documents
+                .is_empty()
+        );
+
+        let other_endpoint = MemoryProjectionStore::new("two");
+        let mut other_endpoint = other_endpoint;
+        other_endpoint.sessions.insert(
+            "same-id".into(),
+            SessionProjection {
+                summary: Some(json!({"title":"other endpoint"})),
+                ..Default::default()
+            },
+        );
+        let mut first_endpoint = MemoryProjectionStore::new("one");
+        first_endpoint.sessions.insert(
+            "same-id".into(),
+            SessionProjection {
+                summary: Some(json!({"title":"first endpoint"})),
+                ..Default::default()
+            },
+        );
+        let one = retained_name_corpus(&first_endpoint, ["one".into(), "two".into()]).unwrap();
+        let two = retained_name_corpus(&other_endpoint, ["one".into(), "two".into()]).unwrap();
+        assert!(
+            one.validate().is_ok() && two.validate().is_ok(),
+            "same session IDs are scoped by endpoint"
+        );
+        assert_ne!(one.documents[0].address, two.documents[0].address);
+    }
+
+    #[tokio::test]
+    async fn public_inventory_frame_pairs_rows_and_retained_corpus_from_one_snapshot() {
+        let mut agent = SharedAgent::default();
+        agent
+            .register("one".into(), "test".into(), "One".into(), Arc::new(Offline))
+            .unwrap();
+        agent
+            .register("two".into(), "test".into(), "Two".into(), Arc::new(Offline))
+            .unwrap();
+        let shared = agent.endpoints.get("one").unwrap();
+
+        let mut store = MemoryProjectionStore::new("one");
+        store.connection_epoch = 9;
+        store.inventory_ready = true;
+        store.archived_session_ids.push("archived".into());
+        store.sessions.insert(
+            "visible".into(),
+            SessionProjection {
+                summary: Some(json!({"sessionId":"visible","title":"Visible"})),
+                ..Default::default()
+            },
+        );
+        store.sessions.insert(
+            "archived".into(),
+            SessionProjection {
+                summary: Some(json!({"sessionId":"archived","title":"Hidden name"})),
+                ..Default::default()
+            },
+        );
+
+        let frame = agent.inventory(shared, &store).unwrap();
+        assert_eq!(frame["sessions"].as_array().unwrap().len(), 1);
+        assert_eq!(frame["inventoryReady"], true);
+        assert_eq!(frame["nameCorpus"]["endpointId"], "one");
+        assert_eq!(frame["nameCorpus"]["connectionEpoch"], 9);
+        assert_eq!(frame["nameCorpus"]["endpointDomain"], json!(["one", "two"]));
+        assert_eq!(
+            frame["nameCorpus"]["documents"].as_array().unwrap().len(),
+            2
+        );
+        assert!(
+            frame["nameCorpus"]["documents"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|document| document["address"]["session_id"] == "archived"
+                    && document["title"] == "Hidden name")
+        );
+    }
+
+    #[test]
+    fn retained_corpus_rejects_invalid_summaries_and_unregistered_source() {
+        let mut store = MemoryProjectionStore::new("one");
+        store.sessions.insert(
+            "bad".into(),
+            SessionProjection {
+                summary: Some(Value::Null),
+                ..Default::default()
+            },
+        );
+        assert!(retained_name_corpus(&store, ["one".into()]).is_err());
+
+        store.sessions.clear();
+        assert!(retained_name_corpus(&store, ["two".into()]).is_err());
     }
 }
 
@@ -151,8 +459,26 @@ pub struct SharedAgent {
     thread_action_host: Option<Arc<dyn ThreadActionHost>>,
     session_url_scheme: Option<String>,
     thread_preferences: Option<Arc<tekes_agent_presentation::ThreadPreferences>>,
+    inventory_changes: InventoryChanges,
+}
+struct ThreadActionInputs {
+    capabilities: EndpointCapabilities,
+    connected: bool,
+    host_methods: BTreeSet<String>,
+    pin: Option<ThreadPinState>,
+}
+struct InventoryChanges(tokio::sync::watch::Sender<()>);
+impl Default for InventoryChanges {
+    fn default() -> Self {
+        Self(tokio::sync::watch::channel(()).0)
+    }
 }
 impl SharedAgent {
+    /// Host adapters call this after an external inventory-affecting local change.
+    /// It publishes existing authority again; it never edits a session or a pin.
+    pub fn invalidate_thread_inventory(&self) {
+        self.inventory_changes.0.send_replace(());
+    }
     pub fn set_session_url_scheme(&mut self, scheme: &str) -> Result<()> {
         require(
             !scheme.is_empty()
@@ -168,89 +494,130 @@ impl SharedAgent {
         self.session_url_scheme = Some(scheme.into());
         Ok(())
     }
+    pub fn sidebar_preferences(
+        &self,
+    ) -> Option<tekes_agent_presentation::SidebarPreferencesSnapshot> {
+        self.thread_preferences
+            .as_ref()
+            .map(|store| store.sidebar_preferences())
+    }
+    pub fn set_sidebar_preferences(
+        &self,
+        change: &tekes_agent_presentation::SidebarPreferenceChange,
+    ) -> Result<()> {
+        self.thread_preferences
+            .as_ref()
+            .ok_or_else(|| unsupported("Sidebar preference store not installed"))?
+            .set_sidebar_preferences(change)
+    }
     pub fn open_thread_preferences(&mut self, path: &std::path::Path, scope: &str) -> Result<()> {
         let store = Arc::new(tekes_agent_presentation::ThreadPreferences::open(
             path, scope,
         )?);
         self.thread_action_host = Some(store.clone());
         self.thread_preferences = Some(store);
+        self.invalidate_thread_inventory();
         Ok(())
     }
-    fn inventory(&self, shared: &SharedEndpoint, state: &MemoryProjectionStore) -> Value {
-        let pins = self
-            .thread_preferences
-            .as_ref()
-            .map(|p| p.pins())
-            .unwrap_or_default();
+    fn inventory(&self, shared: &SharedEndpoint, state: &MemoryProjectionStore) -> Result<Value> {
         let sessions: Vec<Value> = active_inventory(state)
             .into_iter()
-            .map(|mut row| {
-                if pins
-                    .iter()
-                    .any(|p| p.endpoint == state.endpoint_id && row["sessionId"] == p.session_id)
-                {
-                    row["pin"] = json!(ThreadPinPresentation { pinned: true });
-                }
-                let id = row["sessionId"].as_str().expect("inventory identity");
-                row["activity"] =
-                    serde_json::to_value(tekes_agent_presentation::thread_activity(state, id))
-                        .expect("thread activity");
-                row
-            })
+            .map(|row| self.decorate_inventory_row(state, row))
             .collect();
-        json!({"description":shared.description(),"sessions":sessions})
+        let name_corpus = retained_name_corpus(state, self.endpoints.keys().cloned())?;
+        Ok(
+            json!({"description":shared.description(),"sessions":sessions,"inventoryReady":state.inventory_ready,"connectionEpoch":state.connection_epoch,"nameCorpus":name_corpus,"archiveFacts":inventory_archive_facts(state)}),
+        )
+    }
+    fn decorate_inventory_row(&self, state: &MemoryProjectionStore, row: Value) -> Value {
+        let id = row["sessionId"].as_str().expect("inventory identity");
+        let pin = self
+            .thread_action_host
+            .as_ref()
+            .and_then(|host| host.pin_state(&state.endpoint_id, id));
+        self.decorate_inventory_row_with_pin(state, row, pin.as_ref())
+    }
+    fn decorate_inventory_row_with_pin(
+        &self,
+        state: &MemoryProjectionStore,
+        mut row: Value,
+        pin: Option<&ThreadPinState>,
+    ) -> Value {
+        let id = row["sessionId"]
+            .as_str()
+            .expect("inventory identity")
+            .to_owned();
+        if pin.is_some_and(|pin| pin.pinned) {
+            row["pin"] = json!(ThreadPinPresentation { pinned: true });
+        }
+        row["activity"] =
+            serde_json::to_value(tekes_agent_presentation::thread_activity(state, &id))
+                .expect("thread activity");
+        row
     }
     pub fn install_thread_action_host(&mut self, host: Arc<dyn ThreadActionHost>) {
         self.thread_action_host = Some(host);
+        self.invalidate_thread_inventory();
     }
     pub fn thread_actions(
         &self,
         shared: &SharedEndpoint,
         id: &str,
     ) -> Result<ThreadActionsPresentation> {
-        let state = shared.runtime.snapshot();
+        let inputs = self.thread_action_inputs(shared, id);
+        shared
+            .runtime
+            .inspect(|state| self.thread_actions_in_state(shared, id, state, &inputs))
+    }
+    // Host callbacks run before acquiring the projection read lock. An adapter
+    // may inspect runtime facts; no external callback is invoked under it.
+    fn thread_action_inputs(&self, shared: &SharedEndpoint, id: &str) -> ThreadActionInputs {
+        let endpoint = shared.connected().ok();
+        let endpoint_id = shared.runtime.inspect(|s| s.endpoint_id.clone());
+        ThreadActionInputs {
+            capabilities: endpoint
+                .as_ref()
+                .map(|e| e.capabilities())
+                .unwrap_or_default(),
+            connected: endpoint.is_some(),
+            host_methods: self
+                .thread_action_host
+                .as_ref()
+                .map(|h| h.methods())
+                .unwrap_or_default(),
+            pin: self
+                .thread_action_host
+                .as_ref()
+                .and_then(|h| h.pin_state(&endpoint_id, id)),
+        }
+    }
+    fn thread_actions_in_state(
+        &self,
+        shared: &SharedEndpoint,
+        id: &str,
+        state: &MemoryProjectionStore,
+        inputs: &ThreadActionInputs,
+    ) -> Result<ThreadActionsPresentation> {
         let session = state
             .sessions
             .get(id)
             .ok_or_else(|| unsupported("unknown thread"))?;
-        let endpoint = shared.connected().ok();
-        let capabilities = endpoint
-            .as_ref()
-            .map(|e| e.capabilities())
-            .unwrap_or_default();
-        let host_methods = self
-            .thread_action_host
-            .as_ref()
-            .map(|h| h.methods())
-            .unwrap_or_default();
-        let pin = self
-            .thread_action_host
-            .as_ref()
-            .and_then(|h| h.pin_state(&state.endpoint_id, id));
         let summary = session.summary.as_ref();
         let archived = state.archived_session_ids.iter().any(|s| s == id)
             || summary.is_some_and(|s| s["status"] == "archived");
-        let running = session.run_open
-            || !session.queue.is_empty()
-            || summary.is_some_and(|s| {
-                s["running"] == true
-                    || matches!(
-                        s["status"].as_str(),
-                        Some("running" | "waitingForInput" | "cancelling")
-                    )
-            });
+        let running = tekes_agent_presentation::session_has_active_work(session);
         Ok(tekes_agent_presentation::thread_actions(
             &tekes_agent_presentation::ThreadActionContext {
                 endpoint: &state.endpoint_id,
                 session_id: id,
                 kind: &shared.kind,
                 url_scheme: self.session_url_scheme.as_deref().unwrap_or("agent"),
-                capabilities: &capabilities,
-                ready: state.connection == ConnectionState::Ready && endpoint.is_some(),
+                capabilities: &inputs.capabilities,
+                ready: state.connection == ConnectionState::Ready && inputs.connected,
                 running,
                 archived,
-                pin: pin.as_ref(),
-                host_methods: &host_methods,
+                pin: inputs.pin.as_ref(),
+                host_methods: &inputs.host_methods,
             },
         ))
     }
@@ -265,24 +632,19 @@ impl SharedAgent {
             .ok()
             .map(|e| e.capabilities())
             .unwrap_or_default();
-        let fork = self
-            .thread_actions(shared, id)?
-            .items
-            .into_iter()
-            .find(|a| a.id == "fork");
-        for turn in &mut transcript.turns {
-            turn.footnote_actions.clear();
-            if caps.can_fork_completed_turn
-                && turn.fork_boundary.is_some()
-                && !transcript.is_stale
-                && !matches!(turn.status.as_str(), "running" | "waitingForInput")
-                && let Some(mut action) = fork.clone()
-            {
-                action.id = format!("forkTurn:{}", turn.id);
-                action.label = "从此回合分叉".into();
-                turn.footnote_actions.push(action);
-            }
-        }
+        let state = shared.runtime.snapshot();
+        let session = state
+            .sessions
+            .get(id)
+            .ok_or_else(|| unsupported("unknown thread"))?;
+        tekes_agent_presentation::present_turn_actions(
+            &tekes_agent_presentation::TurnActionContext {
+                capabilities: &caps,
+                ready: state.connection == ConnectionState::Ready && shared.connected().is_ok(),
+                running: tekes_agent_presentation::session_has_active_work(session),
+            },
+            transcript,
+        );
         Ok(())
     }
     async fn perform_thread_action(
@@ -403,12 +765,14 @@ impl SharedAgent {
                 outcome.clear_selection = archive;
             }
             ThreadActionCommand::Host => {
-                return self
+                let result = self
                     .thread_action_host
                     .as_ref()
                     .ok_or_else(|| unsupported("thread action host unavailable"))?
                     .perform(&presentation.endpoint, &request, rpc_id)
                     .await;
+                self.invalidate_thread_inventory();
+                return result;
             }
         }
         Ok(outcome)
@@ -551,6 +915,7 @@ impl SharedAgent {
             if let Some(store) = &self.thread_preferences {
                 preferences = store.subscribe();
             }
+            let mut local_changes = self.inventory_changes.0.subscribe();
             loop {
                 let state = runtime.snapshot();
                 let value = if let Some(id) = session {
@@ -567,12 +932,12 @@ impl SharedAgent {
                     present_annotations(&mut transcript);
                     json!({"endpoint":state.endpoint_id,"sessionId":id,"run":RunPresentation::read(&state,&scope,true),"transcript":transcript})
                 } else {
-                    self.inventory(&shared, &state)
+                    self.inventory(&shared, &state)?
                 };
                 if output.send(value).await.is_err() {
                     break;
                 }
-                tokio::select! { result = preferences.changed() => {if result.is_err(){break}}, result = observer.changed() => {if result.is_err(){break}}, _ = output.closed() => break }
+                tokio::select! { result = local_changes.changed() => {if result.is_err(){break}}, result = preferences.changed() => {if result.is_err(){break}}, result = observer.changed() => {if result.is_err(){break}}, _ = output.closed() => break }
             }
         } else {
             let mut stream = shared
@@ -587,5 +952,39 @@ impl SharedAgent {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod archive_facts_tests {
+    use super::*;
+    #[test]
+    fn archive_facts_preserve_readiness_and_raw_status_without_promoting_missing() {
+        let mut store = MemoryProjectionStore::new("fixture");
+        store.archived_session_ids = vec!["retained".into()];
+        for (id, summary) in [
+            ("retained", json!({"status":"archived"})),
+            ("missing", json!({})),
+            ("null", json!({"status":null})),
+            ("future", json!({"status":{"future":true}})),
+        ] {
+            store.sessions.entry(id.into()).or_default().summary = Some(summary);
+        }
+        let facts = inventory_archive_facts(&store);
+        assert_eq!(facts["workspaceReady"], false);
+        assert_eq!(facts["archivedSessionIds"], json!(["retained"]));
+        assert!(facts["retainedSummaryStatuses"].get("missing").is_none());
+        assert_eq!(facts["retainedSummaryStatuses"]["null"], Value::Null);
+        assert_eq!(
+            facts["retainedSummaryStatuses"]["future"],
+            json!({"future":true})
+        );
+        store.workspace_ready = true;
+        let confirmed = inventory_archive_facts(&store);
+        assert_eq!(confirmed["workspaceReady"], true);
+        assert_eq!(
+            confirmed["retainedSummaryStatuses"],
+            facts["retainedSummaryStatuses"]
+        );
     }
 }

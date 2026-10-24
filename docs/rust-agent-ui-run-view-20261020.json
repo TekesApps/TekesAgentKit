@@ -1,0 +1,249 @@
+{
+  "kind": "experimental-public-run-view-composition",
+  "date": "2026-10-20",
+  "sourceBaseCommit": "43e758eba6821236309e0ed7b8967b325f4a62c7",
+  "implementationFileSha256": {
+    "ui/components/src/run_view.rs": "7a2d029c313b8aec2af934098f1c6b9e0b851399394410380a71a38665ff352a",
+    "ui/components/src/actionable.rs": "425a9876672ff687bf1e1586073acc793af9027ed57e20530976ac01b38a230d",
+    "ui/components/src/transcript_content.rs": "ebe2f4adbee29337766685370f0620381a957ec6b88df3b0de6a753d9ae13c93",
+    "ui/components/src/lib.rs": "251d826a316748d54f5183a4132cd556d373a97454757098bcecdeb2a9d01d87",
+    "ui/consumer/src/lib.rs": "29ffdd422d36525bb3ea7e6396b76bd36488f28178eb585f6387bb9fd2e95b33",
+    "ui/demo/src/component_demo.rs": "dfc9302bcb2960ca7380449fa494a53e7c1b1b78041e09e6d58646a7af0de0b8",
+    "ui/demo/src/components_native.rs": "83e113e45e748b73e5b976f99a208e3c25d343c71cd22b8dd0a38727351235ec",
+    "ui/demo/tests/run_view.rs": "51e333f20d18c301fd00450aa4b7e97c9da850388acffb5ad5d5ee6cfaf67d07",
+    "scripts/test-real-session-endpoints.py": "9b62db6414d4d3a1b364457b86cfb956a0bd8cafae9fb3f2ca11360bd8b556da"
+  },
+  "demoBinarySha256": "d199811b9849d9a65894ab85302ce37439fdfb4b865dce782d85cc95e7c50f2f",
+  "agentKitPublishedBaseline": "v0.3.8",
+  "tekesUI": {
+    "commit": "8cf0840790334ba224afc0595897c74231c712e6",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 199,
+    "sha256": "f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f",
+    "ui_packages": 8
+  },
+  "validation": {
+    "uiTests": 228,
+    "scriptTests": 18,
+    "strictUIClippy": true,
+    "fmt": true,
+    "secondPublicConsumer": true,
+    "rootBehaviorChanged": false,
+    "rootTestsRerun": false
+  },
+  "realEndpoints": {
+    "pi": {
+      "runViewComposition": {
+        "completeRunView": false,
+        "keyedReadingAcceptance": false,
+        "mounted": true,
+        "ownsRuntime": false,
+        "sharedIntents": true,
+        "transcriptMounted": true
+      },
+      "transcriptContentProof": {
+        "completeTranscript": false,
+        "footnotes": 30,
+        "genericViewport": true,
+        "independentTools": 0,
+        "keyedReadingAcceptance": false,
+        "machineLeading": true,
+        "messages": 60,
+        "nativeInteraction": false,
+        "renderer": true,
+        "richContent": false,
+        "rows": 90,
+        "userTrailing": true
+      },
+      "historyPagingProof": {
+        "extended": true,
+        "frozenCut": true,
+        "nativeInteraction": false,
+        "newEpochHistoryRetained": true,
+        "noDuplicateMessages": true,
+        "oldReceiptInvalidated": true,
+        "originalScope": true,
+        "otherDraftPreserved": true,
+        "readingAnchorAcceptance": false,
+        "retainedMessages": 56,
+        "sourceKind": "nativeConversation",
+        "sourceStatusPublished": true
+      },
+      "uploadProof": {
+        "attachmentOnlyInputCount": 1,
+        "attachmentOnlySend": true,
+        "attachmentOnlyVisible": true,
+        "componentSend": true,
+        "durableInputCount": 1,
+        "foreignSessionReadRejected": true,
+        "freshJournalAfterReconnect": true,
+        "historyFileMetadata": false,
+        "historyFileReference": true,
+        "hostBoundedFileRead": true,
+        "inlineImage": false,
+        "nativeInteraction": false,
+        "oneShotUpload": true,
+        "originalDraft": true,
+        "otherDraftPreserved": true,
+        "promptSettled": true,
+        "publicByteRead": true,
+        "publicEntry": true,
+        "readUnavailable": false,
+        "receiptValidated": true,
+        "reconnectNoDuplicate": true
+      }
+    },
+    "dsh": {
+      "runViewComposition": {
+        "completeRunView": false,
+        "keyedReadingAcceptance": false,
+        "mounted": true,
+        "ownsRuntime": false,
+        "sharedIntents": true,
+        "transcriptMounted": true
+      },
+      "transcriptContentProof": {
+        "completeTranscript": false,
+        "footnotes": 30,
+        "genericViewport": true,
+        "independentTools": 0,
+        "keyedReadingAcceptance": false,
+        "machineLeading": true,
+        "messages": 60,
+        "nativeInteraction": false,
+        "renderer": true,
+        "richContent": false,
+        "rows": 90,
+        "userTrailing": true
+      },
+      "historyPagingProof": {
+        "extended": true,
+        "frozenCut": true,
+        "nativeInteraction": false,
+        "newEpochHistoryRetained": true,
+        "noDuplicateMessages": true,
+        "oldReceiptInvalidated": true,
+        "originalScope": true,
+        "otherDraftPreserved": true,
+        "readingAnchorAcceptance": false,
+        "retainedMessages": 56,
+        "sourceKind": "journal",
+        "sourceStatusPublished": true
+      },
+      "uploadProof": {
+        "attachmentOnlyInputCount": 1,
+        "attachmentOnlySend": true,
+        "attachmentOnlyVisible": true,
+        "componentSend": true,
+        "durableInputCount": 1,
+        "foreignSessionReadRejected": null,
+        "freshJournalAfterReconnect": true,
+        "historyFileMetadata": true,
+        "historyFileReference": false,
+        "hostBoundedFileRead": true,
+        "inlineImage": false,
+        "nativeInteraction": false,
+        "oneShotUpload": true,
+        "originalDraft": true,
+        "otherDraftPreserved": true,
+        "promptSettled": true,
+        "publicByteRead": false,
+        "publicEntry": true,
+        "readUnavailable": true,
+        "receiptValidated": true,
+        "reconnectNoDuplicate": true
+      }
+    },
+    "native": {
+      "runViewComposition": {
+        "completeRunView": false,
+        "keyedReadingAcceptance": false,
+        "mounted": true,
+        "ownsRuntime": false,
+        "sharedIntents": true,
+        "transcriptMounted": true
+      },
+      "transcriptContentProof": {
+        "completeTranscript": false,
+        "footnotes": 30,
+        "genericViewport": true,
+        "independentTools": 0,
+        "keyedReadingAcceptance": false,
+        "machineLeading": true,
+        "messages": 60,
+        "nativeInteraction": false,
+        "renderer": true,
+        "richContent": false,
+        "rows": 90,
+        "userTrailing": true
+      },
+      "historyPagingProof": {
+        "extended": true,
+        "frozenCut": true,
+        "nativeInteraction": false,
+        "newEpochHistoryRetained": true,
+        "noDuplicateMessages": true,
+        "oldReceiptInvalidated": true,
+        "originalScope": true,
+        "otherDraftPreserved": true,
+        "readingAnchorAcceptance": false,
+        "retainedMessages": 56,
+        "sourceKind": "journal",
+        "sourceStatusPublished": true
+      },
+      "uploadProof": {
+        "attachmentOnlyInputCount": 1,
+        "attachmentOnlySend": true,
+        "attachmentOnlyVisible": true,
+        "componentSend": true,
+        "durableInputCount": 1,
+        "foreignSessionReadRejected": true,
+        "freshJournalAfterReconnect": true,
+        "historyFileMetadata": true,
+        "historyFileReference": false,
+        "hostBoundedFileRead": true,
+        "inlineImage": false,
+        "nativeInteraction": false,
+        "oneShotUpload": true,
+        "originalDraft": true,
+        "otherDraftPreserved": true,
+        "promptSettled": true,
+        "publicByteRead": true,
+        "publicEntry": true,
+        "readUnavailable": false,
+        "receiptValidated": true,
+        "reconnectNoDuplicate": true
+      }
+    }
+  },
+  "nativeFixture": {
+    "runViewMode": true,
+    "regressionMarkers": 5,
+    "contentFooterPointerForkArchiveMarkers": 2,
+    "syntheticTextServices": true,
+    "physicalIME": false
+  },
+  "logSha256": {
+    "agentkit-run-view-ui-frame-final.log": "ba7d77155568f6a4009cff1ff03852a4d838a32dff3b054c6374db36adc33729",
+    "agentkit-run-view-clippy-frame-final.log": "fc8398ef4be50d6fceebb20847d3a4861a5d5e236ac5e8a0d9c9fbef113feaa9",
+    "agentkit-run-view-frame-verified.log": "78ef17e5380ea00320230c37a7f2bbcb71ee25512bc236ff85b438c3bc5a902e",
+    "agentkit-run-view-real-frame-final.log": "2bb7900811c8bf013aef08a3583b9fafe59d2d2f96b72bf37e1a91fc53d6456e",
+    "agentkit-run-view-native-frame-final.log": "0b458daeb07399a0ba55d6f783a2e395c3b954086914f30a9f077486b2d95a7c",
+    "agentkit-run-view-fork-frame-final.log": "7a3d79ca1222269c5e437efca0133db85453ab8efda47c6a4226d40400f617b0",
+    "agentkit-run-view-tools.log": "42e8b028f465680f7f0fa572cc48db6fafab62757e151951f8a0572baeb3be9f"
+  },
+  "remaining": {
+    "completeTranscript": false,
+    "completeRunView": false,
+    "boundedChildMessageTree": false,
+    "keyedReadingAcceptance": false,
+    "richSelectableContent": false,
+    "physicalIME": false,
+    "completeThreeHarnessNativeUX": false,
+    "upstreamIssues": [
+      "https://github.com/TekesApps/TekesUI/issues/22",
+      "https://github.com/TekesApps/TekesUI/issues/25"
+    ]
+  }
+}

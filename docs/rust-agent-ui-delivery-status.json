@@ -1,0 +1,967 @@
+{
+  "completionProven": false,
+  "publicAgentKitRelease": {
+    "publishedAt": "2026-10-19T14:25:34Z",
+    "tagName": "v0.3.8",
+    "url": "https://github.com/TekesApps/TekesAgentKit/releases/tag/v0.3.8"
+  },
+  "agentKitPublicMain": "f1daa0ffcf6ced41e21f351e22845455ca78006c",
+  "uiVersion": "0.0.0; publish=false; development paths include unpublished shared additions",
+  "tekesui": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "tekesuiPackages": [
+    "tekes-ui-controls",
+    "tekes-ui-design-export",
+    "tekes-ui-motion",
+    "tekes-ui-platform-macos",
+    "tekes-ui-render",
+    "tekes-ui-scene",
+    "tekes-ui-text",
+    "tekes-ui-tokens"
+  ],
+  "tekesuiInputCount": 243,
+  "tekesuiInputDigest": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
+  "richToolCardRendering": false,
+  "crossProcessAccepted": false,
+  "sourceBase": "baa2f55ba74e9616e458c930ebed2169e214c966",
+  "sourceStage": "Development increment: canonical ToolActivity ownership, cross-owner continuous display groups, retained hidden controls, cumulative frame and preedit regression, external-only capture requests and fixed-host validation. Current full UI 616 passed/1 existing ignore and Python 68 passed; native/ProcessContainer/paired Views acceptance remain incomplete.",
+  "sourcesRead": {
+    "ui/components/src/run_port.rs": "bc7e40abf784b1bae366e55f229e81f14123853faba428534c023d8d1b181ab3",
+    "ui/components/src/transcript_content.rs": "fad9d8481f357d93084a7793db75a7f54c2140064fe843562812b5bd8849d92f",
+    "ui/components/src/indicators.rs": "0e14f0615bbf6984faa21de8ff949407bff5f39cbc8d9132554e256d26b10706",
+    "ui/components/src/sidebar.rs": "cc6ffe52644de133e634a1a49462e997bd26952357b2548d12fdea09667be566",
+    "ui/components/src/side_panel.rs": "2e6a1a102e24856da8532c174e1d8700976e61caee1c80af75c3145499253094",
+    "ui/components/src/side_panel_navigation.rs": "10d4754ccc07669b4c71d8fd2405e468f9b41af26dd83f018c42ee73435c43ea",
+    "ui/components/src/summary.rs": "69057fbd7f39b24bab994cfd01935a9c86c31a2737cd1b6a003492e2808c5305",
+    "ui/components/src/feedback.rs": "58a0d12f7a9304384669a135f34ed823b767498245aed641afe2c3ba3f542178",
+    "ui/bindings/src/lib.rs": "7b7276a17bd51cbae0a62d1ea264076a3d97434ef589401a6c0e74717eabf0d1",
+    "ui/bindings/src/feedback.rs": "b25168bd05c9d57424af7f4af9fda96af01253ec48f84fcd00fddea9474f0376",
+    "ui/demo/src/component_feedback.rs": "60524e1be7a2f6189b043888a02e95c38ffd689241509e1d53da41e8e5ac5105",
+    ".github/workflows/ci.yml": "fcb395c890de150e7d178bd6f3087ec92c127f4aa9975fa6513ba4a169bd74e5",
+    "crates/presentation/src/tool_card.rs": "f30ee76b29a6c8c7ad74b5d9fb12765ed998b60f8a78be8c7511d3a05c5e5a16",
+    "crates/presentation/src/tool_row.rs": "82e17001e55eaffc2452d0d18aef21406ff68373344f221456791bdad8037de6",
+    "crates/presentation/src/transcript_thinking.rs": "eff3e794fff186a140b33888825dfae65cab32d6f0cc9bcefebb55570b2595a3",
+    "ui/components/src/output_message.rs": "eba08aa1c319f1c2ef77302ebaa111357e9a01a8dee7991f5c4d4befedcf89e3",
+    "crates/presentation/src/transcript_thinking_sources.rs": "fcf19dd90e6c5f7f42bf33a11562a0452e52769f4541a89b0361e6639f487134",
+    "crates/session/src/native_assistant.rs": "0ddd4556c5df20782ca2378d4899f42777f0f76e6ed0a71647669ff2c72dd9ec",
+    "ui/components/src/readonly_transcript.rs": "7552c781dbda48829b194f639caedf03c2c1eef450ad183cdd70e8f3dba9ed07",
+    "ui/demo/src/component_demo.rs": "2fb4264a3a01a5be187e9d37019298ece712211cdfd1d0e3a44535bbea22e8c9",
+    "ui/consumer/src/lib.rs": "48e5a2e8f20bcb9bb69a7365c42581eb6d08c7c6004e7d2e56bc92ffc716c44a",
+    "ui/demo/tests/thinking_sources.rs": "b5f35fd9e0c2605dd83cd67b1eaf5f43caa19d6c7949c97fbf7b7e3a13a0d613",
+    "crates/presentation/src/transcript.rs": "3fe37e19ab37ae2d8d1b4ef4d3c433be3b8edbcecb65a98a3ef2ac6db32877ec",
+    "crates/presentation/tests/thinking_sources.rs": "b0bc26463c7848cf07852c9d5926e01d3dcfd721d92b11325826b6958d126459",
+    "ui/demo/tests/output_message.rs": "4a5eb9658732a00755c8636c7a37515f32a54e8736fac78f31f8819774a1251a",
+    "crates/presentation/src/transcript_order.rs": "b254c88b440210fec3156de14da26af74122568acd47f89c32e9224f979e4b65",
+    "crates/presentation/tests/transcript_order.rs": "e69c86eb243d1277607f9d1f47f192133d58c0223165fc20215afd41148cea1e",
+    "ui/components/src/lib.rs": "60176578f5fe011e5fcf1075d2e3ba74cf10baff868751424327b37de60a5a50",
+    "ui/demo/tests/display_order.rs": "bc0509fbe1cc8ae6c78b4918d5b45296ffc0674e026b287240f649ae87c23ce3",
+    "ui/demo/tests/run_reading.rs": "ea1fb4ed3f0c4219edc9e4cd1509fc24f9163236b8bcda2a03d80ff0263d4c44",
+    "crates/presentation/src/lib.rs": "594f881cd6bf9e059c840b9a15264ff462db5f308e78ddbe6c333201b6dcb522",
+    "crates/presentation/src/transcript_planes.rs": "f8332f5d1d907d5308404c4778e6e942b0103d4842780837843800e05d22330b",
+    "crates/presentation/tests/transcript_planes.rs": "207d1f8a2ef5298b07741066041edf365df40c8e56efdf4a35f7ed1007ed4ce7",
+    "ui/demo/src/native_stream_selftest.rs": "390249d0097f3da2190d1bc95453c64d1692d0ca47a8c74ee62fd13999560088",
+    "ui/components/src/turn_footnote_timing.rs": "5cbded0aeadbd59f62ebbf2a08c7d13143b0d9a40a4d5f18232d21a6f19c0277",
+    "ui/components/src/transcript_content/segments.rs": "c46c56d9fa2b56314fe02b8d077e7d3bdb29ea83bf01feb4925038b6ec46d18a",
+    "ui/demo/src/components_native.rs": "f44c5ddd53e341c97e9dad2b5c62ea55f11e0592f9252bf8f7ca3bcdfd70d9b2",
+    "ui/demo/src/fixture.rs": "d66d7a60802a4ed16b9670446c0c8d7cd2ffa2241b9b4e89ffde3fad8a2a7838",
+    "ui/demo/src/native_disclosure_reading_selftest.rs": "2038be7db03bc9b5b18c7b7bda63112eccc017e04fa535bc826e08c15b95aa32",
+    "crates/presentation/src/transcript/prompt.rs": "2e5986884e2a6fefe07d0af7ef4b30ab83369240beb5e6978f1e3763812515f2",
+    "crates/presentation/src/transcript_document.rs": "cf93176f97c5d8c586b17ba1c23b9ccf78fd42cd81b1d5c1061327165384a452",
+    "crates/presentation/tests/system_prompt.rs": "4b5b64048fec5d4d821c53dc0f71f022f9cfdfb9c5c6560a4fb0184e0995e94b",
+    "Cargo.lock": "705895534b9a5d26ba0a9d3d749ba52eb6986dc4e6bf95032c00a807f2188850",
+    "crates/presentation/Cargo.toml": "e54d97d0a76f9d6de58bf82e1652f921622efb30a5cd9dcdb3510980552e766a",
+    "crates/presentation/src/transcript_narration.rs": "7ee8ac193470f31b495526a5b1c3274c61349bf095449d02563a9108fed9909a",
+    "crates/presentation/tests/narration.rs": "b62ef95f278dbc38ce4216f99dd1d0b8ce29765d933c9939bb72d99ec1c409b4",
+    "ui/Cargo.lock": "8790cacd3395460c518f71240052a0bde27a25dbe7e18acda12753c53653d9d1",
+    "ui/components/src/transcript_content/narration.rs": "80ac4a3f1c4f7fcc6b1b15a4c8a94510a744a386781295feadae3dbd2bd98350",
+    "ui/demo/tests/support/narration_reading.rs": "7ca346c5dc4573f9d2b6cb24a1d064a2f1fdce360af82db3a8082337527f66ee",
+    "crates/presentation/tests/fixtures/tool-input-boundary-20261023.json": "ef29da01fb04e9aef5cc1233c4103ac0850ee1b51b978caef1c19df40ce23b08",
+    "ui/components/src/output_message/fragment.rs": "d1b035a25501a8d63e541f4d1d22ef69a538ee8c0a09de1e760d7e147dc91cd8",
+    "crates/presentation/tests/fixtures/tool-origin-input-boundary-20261023.json": "940fc6be8b3dcf516396fe0d58f3b2eb029af53d6fabe4055ebd1e29b2923c3d"
+  },
+  "publicIssues": [
+    {
+      "number": 56,
+      "state": "OPEN",
+      "title": "[P1][Components] 组件能力体系总规划：公共交互、组合、进程容器与分层验收",
+      "updatedAt": "2026-10-22T18:13:36Z"
+    },
+    {
+      "number": 55,
+      "state": "OPEN",
+      "title": "[P1][Design System] 视觉主题体系总规划：Theme Schema、Surface 语义与组件迁移",
+      "updatedAt": "2026-10-22T17:45:05Z"
+    },
+    {
+      "number": 54,
+      "state": "OPEN",
+      "title": "[P2][Composition] 公开普通 Content 可挂载的通用 Separator／Divider",
+      "updatedAt": "2026-10-22T16:11:49Z"
+    },
+    {
+      "number": 53,
+      "state": "OPEN",
+      "title": "[P1][Reading] 嵌套只读视口向上阅读时通知父阅读容器，避免跟随追加消息且不重复滚动",
+      "updatedAt": "2026-10-22T15:44:44Z"
+    },
+    {
+      "number": 49,
+      "state": "OPEN",
+      "title": "[P1][Composition] 交付原 Content 可消费的交互式 Popover 组合入口",
+      "updatedAt": "2026-10-22T06:42:05Z"
+    },
+    {
+      "number": 48,
+      "state": "OPEN",
+      "title": "[P0][ProcessContainer] 完整交互式 Content 的远端输入、焦点、IME、滚动与 AX 契约",
+      "updatedAt": "2026-10-21T23:55:23Z"
+    },
+    {
+      "number": 47,
+      "state": "OPEN",
+      "title": "[P2][Composition] 提供原 Content 可消费的被动图标与不定状态附件",
+      "updatedAt": "2026-10-22T12:48:41Z"
+    },
+    {
+      "number": 46,
+      "state": "OPEN",
+      "title": "[P1][Composition] 非交互 hover preview 的原 Content 槽与锚定/关闭生命周期",
+      "updatedAt": "2026-10-21T17:41:35Z"
+    },
+    {
+      "number": 45,
+      "state": "OPEN",
+      "title": "[P1][Composition] 原 Content 的语义 Panel 容器、圆角子树裁切与焦点边界",
+      "updatedAt": "2026-10-21T17:08:46Z"
+    },
+    {
+      "number": 44,
+      "state": "OPEN",
+      "title": "[P1][Menu] 原 Content 的上下文菜单触发与锚定，保留 owner、事件身份和 IME 边界",
+      "updatedAt": "2026-10-21T16:21:07Z"
+    },
+    {
+      "number": 42,
+      "state": "OPEN",
+      "title": "[P1][Reading] 导出并恢复跨新建 ContentHost 的持久阅读检查点",
+      "updatedAt": "2026-10-21T13:02:50Z"
+    },
+    {
+      "number": 41,
+      "state": "OPEN",
+      "title": "[P1][Native input] 定位 Unicode 键事件注入丢失 CJK，补独立原生基线",
+      "updatedAt": "2026-10-21T12:01:00Z"
+    },
+    {
+      "number": 38,
+      "state": "OPEN",
+      "title": "[P2][Disclosure] 提供原组合触发器与默认展开指示，保持单一动作和语义 owner",
+      "updatedAt": "2026-10-21T05:21:58Z"
+    },
+    {
+      "number": 37,
+      "state": "OPEN",
+      "title": "[P1][macOS selftest] 有效控制键事件：Escape 空字符合成会删除编辑选区",
+      "updatedAt": "2026-10-21T04:37:34Z"
+    },
+    {
+      "number": 36,
+      "state": "OPEN",
+      "title": "[P1][Menu] 捕获稳定选中值，并支持原菜单的分组与勾选声明",
+      "updatedAt": "2026-10-21T15:59:30Z"
+    },
+    {
+      "number": 35,
+      "state": "OPEN",
+      "title": "[P1][Composition] 为原 Content 提供动态行帮助声明并复用现有 Tooltip",
+      "updatedAt": "2026-10-21T01:48:17Z"
+    },
+    {
+      "number": 34,
+      "state": "OPEN",
+      "title": "[P1][Focus] 公开原留白焦点意图查询，供宿主 IME 屏障安全转交事件",
+      "updatedAt": "2026-10-21T01:05:07Z"
+    },
+    {
+      "number": 33,
+      "state": "OPEN",
+      "title": "[P1][Composition] 为委托原紧凑 action 的业务组件公开焦点绘制层转发接口",
+      "updatedAt": "2026-10-20T23:51:58Z"
+    },
+    {
+      "number": 32,
+      "state": "OPEN",
+      "title": "[P1][Reading] 稳定 item reveal 增加起端对齐，支持 ClientKit 普通回合跳转",
+      "updatedAt": "2026-10-20T23:21:25Z"
+    },
+    {
+      "number": 31,
+      "state": "OPEN",
+      "title": "[P2][Typography] 为 Content 和控件标签公开行数限制与尾部省略策略",
+      "updatedAt": "2026-10-20T19:23:33Z"
+    },
+    {
+      "number": 30,
+      "state": "OPEN",
+      "title": "[P2][Composition] 提供复合输入面装饰区域到原编辑器的焦点路由契约",
+      "updatedAt": "2026-10-21T21:07:34Z"
+    },
+    {
+      "number": 29,
+      "state": "OPEN",
+      "title": "[P2][Composition] 提供精确紧凑 hit frame 的装饰 action 与激活阶段配置",
+      "updatedAt": "2026-10-20T18:12:38Z"
+    },
+    {
+      "number": 28,
+      "state": "OPEN",
+      "title": "[P1][Reading] 公开保留编辑焦点的稳定 item reveal 与独立轨道导航命令",
+      "updatedAt": "2026-10-22T05:31:29Z"
+    },
+    {
+      "number": 27,
+      "state": "OPEN",
+      "title": "[P2] ContentHost 布局激活子树后的 TextSurfaceHost 前置条件校验",
+      "updatedAt": "2026-10-20T17:45:38Z"
+    },
+    {
+      "number": 26,
+      "state": "OPEN",
+      "title": "[P1][Controlled input] 提供受控文本更新的无副作用预检，支持组合阅读事务",
+      "updatedAt": "2026-10-20T16:16:50Z"
+    },
+    {
+      "number": 25,
+      "state": "OPEN",
+      "title": "[P1][Content] 公开可选中富内容组件与原生文本映射接口",
+      "updatedAt": "2026-10-22T18:40:25Z"
+    },
+    {
+      "number": 23,
+      "state": "CLOSED",
+      "title": "[P1][Composition] 公开无表单装饰的可选中文本内容组件或 presentation 模式",
+      "updatedAt": "2026-10-21T23:28:52Z"
+    },
+    {
+      "number": 22,
+      "state": "OPEN",
+      "title": "[P1][Reading] 为混合 Content 文档提供稳定子项锚点与前插/重排阅读事务",
+      "updatedAt": "2026-10-19T08:41:32Z"
+    },
+    {
+      "number": 21,
+      "state": "CLOSED",
+      "title": "[P2][TKUI-004] 带目标与来源的控件动作",
+      "updatedAt": "2026-10-19T07:58:04Z"
+    },
+    {
+      "number": 20,
+      "state": "CLOSED",
+      "title": "[P1][TKUI-007] 可配置文本视口与多行尺寸约束",
+      "updatedAt": "2026-10-19T07:57:55Z"
+    },
+    {
+      "number": 19,
+      "state": "CLOSED",
+      "title": "[P1][TKUI-006] 指针选择元数据透传",
+      "updatedAt": "2026-10-19T07:57:45Z"
+    },
+    {
+      "number": 18,
+      "state": "CLOSED",
+      "title": "[P1][TKUI-005] 受控编辑值同步事务",
+      "updatedAt": "2026-10-19T07:57:38Z"
+    },
+    {
+      "number": 17,
+      "state": "CLOSED",
+      "title": "[P1][TKUI-003] 文本命令、修饰键与 IME 消费语义",
+      "updatedAt": "2026-10-19T07:57:30Z"
+    },
+    {
+      "number": 16,
+      "state": "CLOSED",
+      "title": "[P0][TKUI-002] 历史前插阅读锚点",
+      "updatedAt": "2026-10-19T07:57:22Z"
+    },
+    {
+      "number": 15,
+      "state": "CLOSED",
+      "title": "[P0][TKUI-001] 后台事件唤醒与窗口生命周期",
+      "updatedAt": "2026-10-19T07:57:14Z"
+    },
+    {
+      "number": 14,
+      "state": "OPEN",
+      "title": "[P1][Architecture][Audit] 统一组件模型与组合协议：控件内容组合、语义解耦与窗口级 Toolbar",
+      "updatedAt": "2026-10-22T10:12:05Z"
+    },
+    {
+      "number": 13,
+      "state": "OPEN",
+      "title": "[Audit] TekesUI 设计理念与 Design System 完整性审计总览（2026-10-17）",
+      "updatedAt": "2026-10-22T18:13:38Z"
+    },
+    {
+      "number": 12,
+      "state": "OPEN",
+      "title": "[P2][Acceptance] 完成当前整页视觉与原生交互验收，并连接组件成熟度",
+      "updatedAt": "2026-10-17T05:28:45Z"
+    },
+    {
+      "number": 11,
+      "state": "OPEN",
+      "title": "[P2][Patterns] 定义消费方草稿恢复与版本确认协议，并提供真实编辑器示例",
+      "updatedAt": "2026-10-17T05:28:44Z"
+    },
+    {
+      "number": 10,
+      "state": "OPEN",
+      "title": "[P2][Reading] 补齐流式追加时的阅读位置保护与显式回到最新",
+      "updatedAt": "2026-10-17T05:28:42Z"
+    },
+    {
+      "number": 9,
+      "state": "OPEN",
+      "title": "[P2][Motion] 补齐 Menu / Popover / Dialog 的进退场与中断生命周期",
+      "updatedAt": "2026-10-17T05:28:40Z"
+    },
+    {
+      "number": 8,
+      "state": "OPEN",
+      "title": "[P2][Governance] 生成当前有效的组件能力清单，并修正过期机器报告",
+      "updatedAt": "2026-10-17T05:28:38Z"
+    },
+    {
+      "number": 7,
+      "state": "OPEN",
+      "title": "[P2][API] 提供消费方自己的 BrandConfig 入口与独立项目接入示例",
+      "updatedAt": "2026-10-17T05:28:36Z"
+    },
+    {
+      "number": 6,
+      "state": "OPEN",
+      "title": "[P2][Quality] 校验品牌生成投影的实际内容，并把当前设计检查接入 CI",
+      "updatedAt": "2026-10-17T05:28:33Z"
+    },
+    {
+      "number": 5,
+      "state": "OPEN",
+      "title": "[P1][Accessibility] 建立真实控件语义树与 macOS VoiceOver 桥接",
+      "updatedAt": "2026-10-17T05:28:31Z"
+    },
+    {
+      "number": 4,
+      "state": "OPEN",
+      "title": "[P2][Interaction] 统一浮层输入焦点生命周期，修复 CommandPalette 关闭后意外重开",
+      "updatedAt": "2026-10-17T05:28:30Z"
+    },
+    {
+      "number": 3,
+      "state": "OPEN",
+      "title": "[P2][Interaction] 将原生 Tab / Shift+Tab 接入统一焦点遍历",
+      "updatedAt": "2026-10-17T05:28:27Z"
+    },
+    {
+      "number": 2,
+      "state": "CLOSED",
+      "title": "[P1][CI] 修复当前主分支的设计合并测试失败，恢复完整检查流程",
+      "updatedAt": "2026-10-19T09:17:07Z"
+    },
+    {
+      "number": 1,
+      "state": "OPEN",
+      "title": "[P1][Design System] 建立共享的视觉强调与边界层级，并迁移所有组件",
+      "updatedAt": "2026-10-17T05:28:23Z"
+    }
+  ],
+  "publicIssuesCheckedAt": "2026-10-23",
+  "ciSnapshot": {
+    "headRefOid": "baa2f55ba74e9616e458c930ebed2169e214c966",
+    "isDraft": true,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-23T03:37:38Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39895860721/job/120226041232",
+        "name": "checks",
+        "startedAt": "2026-10-23T03:35:55Z",
+        "status": "COMPLETED",
+        "workflowName": "Rust headless"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-23T03:37:50Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39895854841/job/120226022567",
+        "name": "checks",
+        "startedAt": "2026-10-23T03:35:51Z",
+        "status": "COMPLETED",
+        "workflowName": "Rust headless"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-23T03:40:12Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39895860721/job/120226041200",
+        "name": "Rust UI consumer (no native interaction)",
+        "startedAt": "2026-10-23T03:35:55Z",
+        "status": "COMPLETED",
+        "workflowName": "Rust headless"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-23T03:40:05Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39895854841/job/120226022142",
+        "name": "Rust UI consumer (no native interaction)",
+        "startedAt": "2026-10-23T03:35:51Z",
+        "status": "COMPLETED",
+        "workflowName": "Rust headless"
+      }
+    ]
+  },
+  "latestVerifiedCiHead": "baa2f55ba74e9616e458c930ebed2169e214c966",
+  "latestVerifiedCiConclusion": "checks x2 SUCCESS; UI x2 FAILURE at strict nested-detail gate; snapshot before this development increment was pushed",
+  "knownFailure": "Nested detail scroll leaves parent following; strict gate remains required",
+  "currentValidation": "rust-agent-ui-global-tool-runs-20261023.json",
+  "currentSourceNativeAccepted": false,
+  "latestNativeAcceptance": {
+    "programSha256": "0c3219f41cde7be2278db39e5e1f15a0050c75f1f7b816d458bae30f5e724506",
+    "currentSourcePartialAccepted": false,
+    "completeUiAccepted": false,
+    "phase": 0,
+    "failure": {
+      "attempted": true,
+      "accepted": false,
+      "phase": 0,
+      "observed": "native window never active; frontmost trace only com.openai.codex; Close triggers original phase13 completion assertion",
+      "retry": false,
+      "programSha256": "0c3219f41cde7be2278db39e5e1f15a0050c75f1f7b816d458bae30f5e724506",
+      "failureLog": ".runtime-fixtures/narration-carrier-20261023/final/native-driver.log",
+      "systemIme": "not run",
+      "streamReading": "not run",
+      "pageReading": "not run"
+    },
+    "evidence": "rust-agent-ui-narration-20261023.json",
+    "appliesToCurrentSource": false,
+    "note": "Historical 0c3219 program phase0 failures only; current e766a33 program not launched"
+  },
+  "latestLocalValidation": {
+    "rootTests": 310,
+    "rootValidationReusedFrom": "7903f24: Root Rust/TOML/lock hashes unchanged; previous root tests/strict Clippy and frozen headless retained",
+    "fullUiTests": 612,
+    "uiIgnored": 1,
+    "uiStrictAllTargetsClippy": true,
+    "formatAndRustBoundaries": true,
+    "displayOrderTests": 21,
+    "newOriginalToolCompositionTests": 5,
+    "secondPublicConsumerRunAndReadonly": true,
+    "threeHarnessOffscreen": true,
+    "currentProgramNativeAttempted": false,
+    "currentProgramNativeAccepted": false
+  },
+  "publicProcessContractSources": {
+    "crates/tekes-ui-module-runtime/src/container.rs": "b34423866204a1ee7e0346b5609ac3c4e1e278025ef8317962f44c54bb53b5e9",
+    "crates/tekes-ui-app-protocol/src/component.rs": "9690f9953b84c69f18e9e88c08b728cbb9c8b7fdcc2a01289cb072c0e1ea368c"
+  },
+  "processContainer": "Reviewed at exact public 50ec49f; new_view keyboard/IME/AX unavailable; V1 keyboard/scroll/text_ime/accessibility false; #48 remains required",
+  "newTargets": 0,
+  "deletedBytes": 0,
+  "historicalEvidence": [
+    "rust-agent-ui-feedback-recovery-20261022.json",
+    "rust-agent-ui-native-resumed-20261023.json",
+    "rust-agent-ui-tool-run-20261023.json",
+    "rust-agent-ui-tool-url-20261023.json",
+    "rust-agent-ui-tool-header-20261023.json",
+    "rust-agent-ui-current-validation-20261023.json",
+    "rust-agent-ui-output-controller-20261023.json"
+  ],
+  "importantScope": "Current native local-fixture checks and real protocol/offscreen checks are separate identities; Native 0.9.3 UI-only is not lifecycle or bounded child-history acceptance. No full UI/cross-process/physical keyboard/VoiceOver acceptance.",
+  "thinkingPolicy": "rust-agent-ui-thinking-policy-20261023.json",
+  "thinkingOutput": "rust-agent-ui-thinking-output-20261023.json",
+  "thinkingSource": "rust-agent-ui-thinking-source-20261023.json",
+  "thinkingParent": "rust-agent-ui-thinking-parent-20261023.json",
+  "reasoningCarrier": "rust-agent-ui-reasoning-carrier-20261023.json",
+  "displayOrder": "rust-agent-ui-display-order-20261023.json",
+  "systemImeStableAcceptanceProven": false,
+  "systemImeDiagnostic": "https://github.com/TekesApps/TekesUI/issues/41#issuecomment-6351744540",
+  "turnPlanes": "rust-agent-ui-turn-planes-20261023.json",
+  "sameProcessNativeThreeHarnessProfiles": false,
+  "physicalPlaneLayoutComplete": false,
+  "activityPolicy": "rust-agent-ui-activity-policy-20261023.json",
+  "historicalNativeAcceptanceBeforeTurnPlanes": {
+    "partialLocalFixtureAccepted": [
+      "paging-reading-focus",
+      "system-pinyin-software-keys",
+      "sidechat-menu"
+    ],
+    "programSha256": "708f1d932de8b067d78237dbf59ac42c60fd8d2de53d0591e2246fe0d5c8a063",
+    "completeUiAccepted": false,
+    "realHarness": false,
+    "processContainer": false
+  },
+  "outputController": "rust-agent-ui-output-controller-20261023.json",
+  "currentSourceNativeAcceptedMeans": "Complete UI acceptance remains unproven; exact current-source partial native profiles are recorded separately",
+  "physicalPlanes": "rust-agent-ui-physical-planes-20261023.json",
+  "activitySegments": "rust-agent-ui-activity-segments-20261023.json",
+  "systemPrompts": "rust-agent-ui-system-prompts-20261023.json",
+  "removedUniqueFileAllocatedBytes": 0,
+  "narration": "rust-agent-ui-narration-20261023.json",
+  "historicalNativeBeforeNarration": {
+    "sourceBase": "42575eff33683ae5dce2894f3b7fe59898f553fa",
+    "sourceSha256": {
+      "crates/presentation/src/transcript.rs": "3fe37e19ab37ae2d8d1b4ef4d3c433be3b8edbcecb65a98a3ef2ac6db32877ec",
+      "crates/presentation/src/transcript/prompt.rs": "2e5986884e2a6fefe07d0af7ef4b30ab83369240beb5e6978f1e3763812515f2",
+      "crates/presentation/src/transcript_document.rs": "cf93176f97c5d8c586b17ba1c23b9ccf78fd42cd81b1d5c1061327165384a452",
+      "crates/presentation/src/transcript_order.rs": "244918b06a0441c7596fb285f35d46f06a638dcf50a3a1db8f38868163a317e8",
+      "crates/presentation/src/transcript_planes.rs": "f8332f5d1d907d5308404c4778e6e942b0103d4842780837843800e05d22330b",
+      "crates/presentation/tests/system_prompt.rs": "4b5b64048fec5d4d821c53dc0f71f022f9cfdfb9c5c6560a4fb0184e0995e94b",
+      "ui/components/src/lib.rs": "1d23aad128a7f99ec96815ec8a639a0eea1a092aa9463bb310e95a1f507d8682",
+      "ui/components/src/output_message.rs": "6a870e6180031043e55a309c061259bd014b93d214aab21112e14c58eb120f59",
+      "ui/components/src/transcript_content.rs": "a457ee344420a723e0622b0c86a31c14d6c58dcc18597c005d0df5f695091f5c",
+      "ui/components/src/transcript_content/segments.rs": "3b5954b391f519d618437490283293660abdcac96f7d9fdecc6b47e9b2cd9396",
+      "ui/consumer/src/lib.rs": "b768ea9973d1e2e96f18985cd8645847146608d9f4d6b40790b2bd50586fe689",
+      "ui/demo/src/components_native.rs": "cd98cf54e0517432b4173662c3a2093b47e02293171e6501bc58a82497f42bfb",
+      "ui/demo/src/fixture.rs": "d66d7a60802a4ed16b9670446c0c8d7cd2ffa2241b9b4e89ffde3fad8a2a7838",
+      "ui/demo/src/native_disclosure_reading_selftest.rs": "c8a04a86b812818d94389f06663b7c0e1d0cedf54f9e8957261a5e65915a0dae",
+      "ui/demo/tests/display_order.rs": "77d04f5870a5e3e37c5062dc01e32cae2cb1fef9a6192b00597dc96e75d83b7a"
+    },
+    "programSha256": "6a3a49e75020042f00d47561bfec46a2cfafe33754de15d8225517f9c9684ec7",
+    "realHarness": true,
+    "realHarnessProfiles": {
+      "pi": {
+        "stream": {
+          "activePreview": true,
+          "activityStatusRetired": true,
+          "focusRetainedDuringSettlement": true,
+          "liveActivityStatus": true,
+          "nativeAxSelection": true,
+          "nativePointer": true,
+          "nativeTextServices": true,
+          "nativeWindow": true,
+          "oneSubmission": true,
+          "physicalIme": false,
+          "readingAnchorAcceptance": false,
+          "reconnectNoReplay": true,
+          "sameOutputRow": true,
+          "sameTextOwner": true,
+          "selectionRetained": true,
+          "sessionDraftIsolation": true,
+          "stateDrivenCallbacks": true,
+          "voiceOver": false
+        },
+        "streamReading": {
+          "activeStreamingBeforeReading": true,
+          "appendsObserved": 3,
+          "draftIsolation": true,
+          "markedTextAndFocusPreserved": true,
+          "nativeWindow": true,
+          "oneSubmission": true,
+          "originalEditorPreserved": true,
+          "originalItemAndLocalAnchorPreserved": true,
+          "physicalIme": false,
+          "realHarness": true,
+          "reconnectNoReplay": true,
+          "retainedReadingAfterSessionSwitch": true,
+          "streamFinalTextExact": true,
+          "syntheticPreedit": true,
+          "syntheticWheel": true,
+          "voiceOver": false
+        },
+        "pageReading": {
+          "draftIsolation": true,
+          "focusAndEditorBaselinePreserved": false,
+          "focusAndMarkedBaselinePreserved": false,
+          "focusAndTextStatePreserved": true,
+          "hoverPreviewVisible": false,
+          "independentBReadingRestored": true,
+          "jumpHasNoHistory": false,
+          "jumpLatestControl": false,
+          "loadedItemsAfter": 56,
+          "loadedItemsBefore": 50,
+          "markedTextPreserved": false,
+          "nativePagingControl": false,
+          "nativeWindow": true,
+          "navigationPreeditPreserved": false,
+          "noSubmission": true,
+          "opaqueBaselinePreserved": false,
+          "originalTurnNavigation": false,
+          "physicalIme": false,
+          "prependAnchorPreserved": true,
+          "previewFactsDuringPreedit": false,
+          "publicHistoryPage": true,
+          "publicPageRequest": true,
+          "readingAnchorAcceptance": true,
+          "realHarness": true,
+          "reconnectReadingRestored": true,
+          "retainedSessionReadingRestored": true,
+          "sameEditorOwner": true,
+          "samePublicationRefresh": true,
+          "syntheticPreedit": false,
+          "syntheticWheel": true,
+          "turnStartAndLatest": false,
+          "upwardReadingPreserved": true,
+          "voiceOver": false
+        }
+      },
+      "dsh": {
+        "stream": {
+          "activePreview": true,
+          "activityStatusRetired": true,
+          "focusRetainedDuringSettlement": true,
+          "liveActivityStatus": true,
+          "nativeAxSelection": true,
+          "nativePointer": true,
+          "nativeTextServices": true,
+          "nativeWindow": true,
+          "oneSubmission": true,
+          "physicalIme": false,
+          "readingAnchorAcceptance": false,
+          "reconnectNoReplay": true,
+          "sameOutputRow": true,
+          "sameTextOwner": true,
+          "selectionRetained": true,
+          "sessionDraftIsolation": true,
+          "stateDrivenCallbacks": true,
+          "voiceOver": false
+        },
+        "streamReading": {
+          "activeStreamingBeforeReading": true,
+          "appendsObserved": 3,
+          "draftIsolation": true,
+          "markedTextAndFocusPreserved": true,
+          "nativeWindow": true,
+          "oneSubmission": true,
+          "originalEditorPreserved": true,
+          "originalItemAndLocalAnchorPreserved": true,
+          "physicalIme": false,
+          "realHarness": true,
+          "reconnectNoReplay": true,
+          "retainedReadingAfterSessionSwitch": true,
+          "streamFinalTextExact": true,
+          "syntheticPreedit": true,
+          "syntheticWheel": true,
+          "voiceOver": false
+        },
+        "pageReading": {
+          "draftIsolation": true,
+          "focusAndEditorBaselinePreserved": false,
+          "focusAndMarkedBaselinePreserved": false,
+          "focusAndTextStatePreserved": true,
+          "hoverPreviewVisible": false,
+          "independentBReadingRestored": true,
+          "jumpHasNoHistory": false,
+          "jumpLatestControl": false,
+          "loadedItemsAfter": 59,
+          "loadedItemsBefore": 50,
+          "markedTextPreserved": false,
+          "nativePagingControl": false,
+          "nativeWindow": true,
+          "navigationPreeditPreserved": false,
+          "noSubmission": true,
+          "opaqueBaselinePreserved": false,
+          "originalTurnNavigation": false,
+          "physicalIme": false,
+          "prependAnchorPreserved": true,
+          "previewFactsDuringPreedit": false,
+          "publicHistoryPage": true,
+          "publicPageRequest": true,
+          "readingAnchorAcceptance": true,
+          "realHarness": true,
+          "reconnectReadingRestored": true,
+          "retainedSessionReadingRestored": true,
+          "sameEditorOwner": true,
+          "samePublicationRefresh": true,
+          "syntheticPreedit": false,
+          "syntheticWheel": true,
+          "turnStartAndLatest": false,
+          "upwardReadingPreserved": true,
+          "voiceOver": false
+        }
+      },
+      "native": {
+        "stream": {
+          "activePreview": true,
+          "activityStatusRetired": true,
+          "focusRetainedDuringSettlement": true,
+          "liveActivityStatus": true,
+          "nativeAxSelection": true,
+          "nativePointer": true,
+          "nativeTextServices": true,
+          "nativeWindow": true,
+          "oneSubmission": true,
+          "physicalIme": false,
+          "readingAnchorAcceptance": false,
+          "reconnectNoReplay": true,
+          "sameOutputRow": true,
+          "sameTextOwner": true,
+          "selectionRetained": true,
+          "sessionDraftIsolation": true,
+          "stateDrivenCallbacks": true,
+          "voiceOver": false
+        },
+        "streamReading": {
+          "activeStreamingBeforeReading": true,
+          "appendsObserved": 3,
+          "draftIsolation": true,
+          "markedTextAndFocusPreserved": true,
+          "nativeWindow": true,
+          "oneSubmission": true,
+          "originalEditorPreserved": true,
+          "originalItemAndLocalAnchorPreserved": true,
+          "physicalIme": false,
+          "realHarness": true,
+          "reconnectNoReplay": true,
+          "retainedReadingAfterSessionSwitch": true,
+          "streamFinalTextExact": true,
+          "syntheticPreedit": true,
+          "syntheticWheel": true,
+          "voiceOver": false
+        },
+        "pageReading": {
+          "draftIsolation": true,
+          "focusAndEditorBaselinePreserved": false,
+          "focusAndMarkedBaselinePreserved": false,
+          "focusAndTextStatePreserved": true,
+          "hoverPreviewVisible": false,
+          "independentBReadingRestored": true,
+          "jumpHasNoHistory": false,
+          "jumpLatestControl": false,
+          "loadedItemsAfter": 56,
+          "loadedItemsBefore": 50,
+          "markedTextPreserved": false,
+          "nativePagingControl": false,
+          "nativeWindow": true,
+          "navigationPreeditPreserved": false,
+          "noSubmission": true,
+          "opaqueBaselinePreserved": false,
+          "originalTurnNavigation": false,
+          "physicalIme": false,
+          "prependAnchorPreserved": true,
+          "previewFactsDuringPreedit": false,
+          "publicHistoryPage": true,
+          "publicPageRequest": true,
+          "readingAnchorAcceptance": true,
+          "realHarness": true,
+          "reconnectReadingRestored": true,
+          "retainedSessionReadingRestored": true,
+          "sameEditorOwner": true,
+          "samePublicationRefresh": true,
+          "syntheticPreedit": false,
+          "syntheticWheel": true,
+          "turnStartAndLatest": false,
+          "upwardReadingPreserved": true,
+          "voiceOver": false
+        }
+      }
+    },
+    "ownedHistoryProfiles": {
+      "prompt": {
+        "activityExpandCollapseReopenClicks": true,
+        "expandedDetailsRetained": true,
+        "initialPromptBeforeInputAndOriginalDisclosure": true,
+        "inputBoundedHistory": false,
+        "liveResize": true,
+        "nativeWindow": true,
+        "noSubmission": true,
+        "normalActivityInitiallyCollapsed": true,
+        "originalEditorFocusAndChineseMarked": true,
+        "originalToolAndReasoningClicks": true,
+        "originalToolAndReasoningTextOwnersRetained": true,
+        "ownedProtocolHistory": true,
+        "physicalIme": false,
+        "physicalResizeDrag": false,
+        "readingAnchorPreserved": true,
+        "realHarness": false,
+        "typeScaleReflow": true,
+        "voiceOver": false
+      },
+      "segmented": {
+        "activityExpandCollapseReopenClicks": true,
+        "expandedDetailsRetained": true,
+        "initialPromptBeforeInputAndOriginalDisclosure": false,
+        "inputBoundedHistory": true,
+        "liveResize": true,
+        "nativeWindow": true,
+        "noSubmission": true,
+        "normalActivityInitiallyCollapsed": true,
+        "originalEditorFocusAndChineseMarked": true,
+        "originalToolAndReasoningClicks": true,
+        "originalToolAndReasoningTextOwnersRetained": true,
+        "ownedProtocolHistory": true,
+        "physicalIme": false,
+        "physicalResizeDrag": false,
+        "readingAnchorPreserved": true,
+        "realHarness": false,
+        "typeScaleReflow": true,
+        "voiceOver": false
+      },
+      "ordinary": {
+        "activityExpandCollapseReopenClicks": true,
+        "expandedDetailsRetained": true,
+        "initialPromptBeforeInputAndOriginalDisclosure": false,
+        "inputBoundedHistory": false,
+        "liveResize": true,
+        "nativeWindow": true,
+        "noSubmission": true,
+        "normalActivityInitiallyCollapsed": true,
+        "originalEditorFocusAndChineseMarked": true,
+        "originalToolAndReasoningClicks": true,
+        "originalToolAndReasoningTextOwnersRetained": true,
+        "ownedProtocolHistory": true,
+        "physicalIme": false,
+        "physicalResizeDrag": false,
+        "readingAnchorPreserved": true,
+        "realHarness": false,
+        "typeScaleReflow": true,
+        "voiceOver": false
+      }
+    },
+    "softwareIme": {
+      "softwareIme": true,
+      "pidTargetedEvents": true,
+      "physicalKeyboard": false,
+      "candidateWindow": false,
+      "profile": "launch-services-app",
+      "applicationExitCode": null,
+      "launcherExitCode": 0,
+      "pid": 33774,
+      "sourceBefore": "com.apple.inputmethod.SCIM.ITABC",
+      "sourceAfter": "com.apple.inputmethod.SCIM.ITABC",
+      "binarySha256": "6a3a49e75020042f00d47561bfec46a2cfafe33754de15d8225517f9c9684ec7"
+    },
+    "completeUiAccepted": false,
+    "processContainer": false,
+    "currentSourcePartialAccepted": true,
+    "evidence": "rust-agent-ui-system-prompts-20261023.json"
+  },
+  "currentProgram": {
+    "program": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/pi-1.4.0-compat-20261023/tekes-agent-ui-demo",
+    "sha256": "9eb5003afa9eb2efcec16a48281d6e9573b39dec2fc9908256b48684a2eefe34"
+  },
+  "historicalValidationBeforeNarrationFrames": {
+    "rootTests": 308,
+    "fullUiTests": 604,
+    "uiIgnored": 1,
+    "newSourceTests": 11,
+    "newFixtureConsumerPipelineTests": 1,
+    "rootAndUiStrictAllTargetsClippy": true,
+    "currentFullUiSuiteRerun": true,
+    "strictReadingExitCode": 1,
+    "newNativeAcceptance": "Current c90c9f3b: owned native Activity clicks/retained text owners + Pi/DSH/Native stream, stream-reading, public page + one software system Pinyin probe; full UI/cross-process/physical/VoiceOver false",
+    "finalThinkingSourceTests": 5,
+    "newReadonlyLiveTestAfterFullSuite": 0,
+    "displayOrderTests": 14,
+    "readonlyReadingTests": 37,
+    "planeTests": 8,
+    "activityPolicyDemoTests": 3,
+    "rootValidationReusedFrom": "Unchanged root source: prior d2a5568 activity-policy receipt; root tests/Clippy were not rerun for this UI-only refactor",
+    "physicalPlanesDisplayTests": 6,
+    "originalReadingTests": 38,
+    "foreignMessageScopeGuard": true,
+    "activitySegments": {
+      "componentTests": 3,
+      "newReadingTransactionTest": 1,
+      "clippy": true,
+      "format": true,
+      "boundaries": true,
+      "root": "unchanged-root independent prior evidence"
+    },
+    "systemPrompts": {
+      "sourceTests": 12,
+      "newComponentConsumerTests": 2,
+      "rootAndUiTestsRerun": true,
+      "rootAndUiStrictClippy": true,
+      "rootHeadlessRebuilt": true
+    },
+    "narration": {
+      "policyTests": 7,
+      "newComponentConsumerTests": 2,
+      "strictRootUiClippy": true,
+      "nativeAccepted": false,
+      "threeHarnessOffscreen": true
+    }
+  },
+  "narrationFrameReading": "rust-agent-ui-narration-frame-reading-20261023.json",
+  "toolInputBoundary": "rust-agent-ui-tool-input-boundary-20261023.json",
+  "physicalToolFragments": "rust-agent-ui-physical-tool-fragments-20261023.json",
+  "historicalProgramBeforeGlobalToolRuns": {
+    "program": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/physical-tool-fragments-20261023/AgentKitToolPartitions.app/Contents/MacOS/tekes-agent-ui-demo",
+    "sha256": "e766a33c09fcbfd971ade5c64dc3d35cffa14b06ececb509a2fd27bb8c59663a"
+  },
+  "sidePanelContractAudit": "rust-agent-ui-sidepanel-contract-audit-20261023.md",
+  "nativeToolchain": "rust-agent-ui-native-toolchain.md",
+  "piCompatibility": "pi-1.4.0-compat-20261023.json",
+  "realSideChatOffscreen": {
+    "receipt": "rust-agent-ui-real-sidechat-20261023.json",
+    "acceptedLifecycle": [
+      "native",
+      "pi"
+    ],
+    "unavailableCapability": [
+      "dsh"
+    ],
+    "nativeInteraction": false,
+    "crossProcess": false
+  },
+  "abfc1c2CiSnapshot": {
+    "pullRequestRun": 39907444360,
+    "checks": "success",
+    "ui": "failure",
+    "failingStep": "Verify nested detail reading intent (strict; no native window)",
+    "receipt": ".runtime-fixtures/mixed-tool-runs-20261023/ci-abfc-artifact/agentkit-nested-detail-reading.json",
+    "accepted": false
+  },
+  "nativeBoundedCurrentProof": {
+    "receipt": "rust-agent-ui-native-bounded-20261023.json",
+    "kernelVersion": "0.9.3",
+    "boundedPageSize": 1,
+    "nativeInteraction": false,
+    "readingAnchorAcceptance": false,
+    "nonemptyParentDraft": true,
+    "protocolDriverScenarioPassed": true,
+    "kernelAllCapabilitiesProven": false
+  },
+  "3e40ad6CiSnapshot": {
+    "pullRequestRun": 39908587466,
+    "checks": "success",
+    "ui": "failure",
+    "failingStep": "Verify nested detail reading intent (strict; no native window)",
+    "upstreamIssue": 53
+  },
+  "primaryFocusAndChildRuns": {
+    "receipt": "rust-agent-ui-primary-focus-child-runs-20261023.json",
+    "uiWorkspacePassed": 618,
+    "existingIgnored": 1,
+    "pythonPassed": 74,
+    "realIndependentChildRuns": [
+      "pi",
+      "dsh"
+    ],
+    "nativeSideChat": true,
+    "primaryUsesPublishedPreservingFocus": true,
+    "nativeInteraction": false,
+    "crossProcess": false,
+    "fullGoalCompletion": false
+  },
+  "inlineImagesPublicRunBindingLive": {
+    "receipt": "rust-agent-ui-inline-image-live-results-20261025.json",
+    "endpoints": [
+      "native",
+      "pi",
+      "dsh"
+    ],
+    "imagePrompts": 6,
+    "wireRequests": 7,
+    "auxiliaryDshTitles": 1,
+    "publicImageByteReads": [
+      "native",
+      "pi"
+    ],
+    "dshByteRead": "unsupported",
+    "pythonPassed": 274,
+    "nativeInteraction": false,
+    "fullGoalCompletion": false
+  }
+}

@@ -1,0 +1,127 @@
+{
+  "checked_at": "2026-10-21T23:52:14.812018+00:00",
+  "sdk_revision": "09b4bab44b6dfa65487250ea816b610b9df59095",
+  "dependency_change_required": false,
+  "public_refs": "09b4bab44b6dfa65487250ea816b610b9df59095\tHEAD\n09b4bab44b6dfa65487250ea816b610b9df59095\trefs/heads/main\nbfd94fe7585d286e3069dea530c31c5764de02f4\trefs/tags/remediation-toolbar-checkpoint-20261021\n09b4bab44b6dfa65487250ea816b610b9df59095\trefs/tags/remediation-toolbar-checkpoint-20261021^{}\n",
+  "issues": [
+    {
+      "closedAt": null,
+      "number": 22,
+      "state": "OPEN",
+      "title": "[P1][Reading] 为混合 Content 文档提供稳定子项锚点与前插/重排阅读事务",
+      "url": "https://github.com/TekesApps/TekesUI/issues/22"
+    },
+    {
+      "closedAt": null,
+      "number": 28,
+      "state": "OPEN",
+      "title": "[P1][Reading] 公开保留编辑焦点的稳定 item reveal 与独立轨道导航命令",
+      "url": "https://github.com/TekesApps/TekesUI/issues/28"
+    }
+  ],
+  "consumer_inputs": {
+    "commit": "09b4bab44b6dfa65487250ea816b610b9df59095",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 241,
+    "sha256": "44b3174022584d3c099a45b86892d17dbf948905476c0f038be104df12aefe46",
+    "ui_packages": 8
+  },
+  "program": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/AgentKitSummaryIndentVerified.app/Contents/MacOS/AgentKitSummaryIndentVerified",
+  "program_sha256": "2e3287042217a395c37c66987ecab4af4e20cab453edd5ff6d731cf5302d97b9",
+  "native_receipts": {
+    "reading-native-selftest": {
+      "draftIsolation": true,
+      "focusAndEditorBaselinePreserved": true,
+      "focusAndMarkedBaselinePreserved": true,
+      "focusAndTextStatePreserved": true,
+      "hoverPreviewVisible": false,
+      "independentBReadingRestored": true,
+      "jumpHasNoHistory": true,
+      "jumpLatestControl": true,
+      "loadedItemsAfter": 44,
+      "loadedItemsBefore": 20,
+      "markedTextPreserved": true,
+      "nativePagingControl": true,
+      "nativeWindow": true,
+      "navigationPreeditPreserved": true,
+      "noSubmission": true,
+      "opaqueBaselinePreserved": true,
+      "originalTurnNavigation": true,
+      "physicalIme": false,
+      "prependAnchorPreserved": true,
+      "previewFactsDuringPreedit": true,
+      "publicHistoryPage": true,
+      "publicPageRequest": true,
+      "readingAnchorAcceptance": true,
+      "realHarness": false,
+      "reconnectReadingRestored": true,
+      "retainedSessionReadingRestored": true,
+      "sameEditorOwner": true,
+      "samePublicationRefresh": true,
+      "syntheticPreedit": true,
+      "syntheticWheel": true,
+      "turnStartAndLatest": true,
+      "upwardReadingPreserved": true,
+      "voiceOver": false
+    },
+    "readonly-reading-native-selftest": {
+      "boundedPublicSep": true,
+      "gpu": true,
+      "historyExhausted": false,
+      "mainDraftPreserved": true,
+      "nativeWindow": true,
+      "noSubmission": true,
+      "originalPageAndRefreshControls": true,
+      "pageSize": 50,
+      "physicalIme": false,
+      "prependAnchorPreserved": true,
+      "readOnlyNoComposer": true,
+      "realHarness": false,
+      "refreshAnchorPreserved": true,
+      "rowCountAfter": 75,
+      "rowCountBefore": 38,
+      "visibleRowsExtended": true,
+      "voiceOver": false
+    },
+    "sidebar-restore-selftest": {
+      "canonicalSelectedSupplement": true,
+      "explicitNativeReveal": true,
+      "failureRetainsRows": true,
+      "fullLayoutParity": false,
+      "markedBaselineAndFocusPreserved": true,
+      "nativeWindow": true,
+      "noSubmission": true,
+      "physicalIme": false,
+      "realHarnessOutage": false,
+      "restoringNotEmpty": true,
+      "retiredIdsNotReused": true,
+      "voiceOver": false
+    }
+  },
+  "system_ime": {
+    "softwareIme": true,
+    "pidTargetedEvents": true,
+    "physicalKeyboard": false,
+    "candidateWindow": false,
+    "sourceBefore": "com.apple.inputmethod.SCIM.ITABC",
+    "sourceAfter": "com.apple.inputmethod.SCIM.ITABC",
+    "binarySha256": "2e3287042217a395c37c66987ecab4af4e20cab453edd5ff6d731cf5302d97b9"
+  },
+  "scope": {
+    "native_window": true,
+    "owned_fixture": true,
+    "real_harness_rerun": false,
+    "physical_keyboard": false,
+    "candidate_window": false,
+    "voice_over": false,
+    "new_target": false,
+    "recompiled": false,
+    "deleted_bytes": 0,
+    "unrelated_wip_preserved": true
+  },
+  "previous_interrupted_attempts_preserved": [
+    ".runtime-fixtures/summary-indent-20261022/verified-reading-native-selftest-stderr.log",
+    ".runtime-fixtures/summary-indent-20261022/isolated-footnote-time-native-selftest-stderr.log"
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "checked_at": "2026-10-22T03:38:14.778871+00:00",
+  "sdk_revision": "09b4bab44b6dfa65487250ea816b610b9df59095",
+  "dependency_change_required": false,
+  "program": {
+    "program": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/AgentKitRevealCurrent20261022.app/Contents/MacOS/AgentKitRevealCurrent20261022",
+    "sha256": "b1092549757381b3df33d65ddf377590acdc0402225e912f6135cf5f0deb647a",
+    "base_commit": "bd1b9ea438ca294cbac61e32f4acc7e12108ffac",
+    "sdk": "09b4bab44b6dfa65487250ea816b610b9df59095",
+    "wip": {
+      "ui/demo/src/native_panel_navigation_selftest.rs": "c1423d01a1bee70093fd154de354fcee6f76372b6615745c1e55896fea1f2105",
+      "ui/demo/tests/panel_navigation.rs": "f489b45e970f897a7b8adc0d72df238ad321ac6ad642fcd475360e9eabcf2c6a",
+      "ui/demo/src/component_demo.rs": "c0ecb03aa70ad3ad44920da0f4ea5765495b8d1533d453f97f48448f14b300fa",
+      "ui/demo/src/components_native.rs": "2121e9da5acdfe1fa9d6b728d2916b761a3832a4b4bd5adb15c85992d94a04e8"
+    }
+  },
+  "consumer_inputs": {
+    "commit": "09b4bab44b6dfa65487250ea816b610b9df59095",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 241,
+    "sha256": "44b3174022584d3c099a45b86892d17dbf948905476c0f038be104df12aefe46",
+    "ui_packages": 8
+  },
+  "tests": {
+    "passed": 502,
+    "failed": 0,
+    "ignored": 1,
+    "ignored_reason": "existing upstream Popover intake gate #49"
+  },
+  "strict_all_target_clippy": true,
+  "ui_boundaries": true,
+  "native": {
+    "reading": "incomplete: phase 0, window never active",
+    "sidebar": "reveal Completed; focus assertion failed after foreground changed from demo to Codex",
+    "system_ime": "preedit ni hao observed; lost focus before assertion, exit 3; no complete receipt",
+    "accepted": false,
+    "physical_keyboard": false,
+    "voice_over": false,
+    "real_harness": false
+  },
+  "new_target": false,
+  "deleted_bytes": 0,
+  "unrelated_wip_preserved": true,
+  "evidence_directory": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/reveal-current-20261022",
+  "hashes": {
+    "consumer-inputs.json": "cdc58abe6ba1a4ca2a3ae00fa2a73cb6481b9ba29e542c88359a5e8e330c6605",
+    "reading-native.log.launcher": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "sidebar-native.log.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reading-native.log.stderr": "4abd81b9bf268e56b0804008511114497cc112e3cdf4b909460e374b4d07b1bc",
+    "reading-native.log.frontmost.jsonl": "49e7a8b91327cbe6d662df9005dead92dd7eab91ced6b96bc972b3ac52e26b78",
+    "program.json": "1c6d21b17bcf75f16c6bc5e26a2bd5fe0cfff5e8088f0ede0e7aae50c9688d07",
+    "clippy.log": "80c4fa95541b148cf881bce37bd9df15f8f407d831ba9c579ba0e9b11f57dc84",
+    "metadata.json": "67d47e32551516569f919e3099bebc54c481df300332237ac9268317a31337b7",
+    "sidebar-launch.log": "70044215cb58071c37e0622eb12e76b12e0902ca196cf9055a201aaf73c7f8a7",
+    "system-ime.log": "9d98efc0734dcfa121012c54643f16a71101d2cc5b1c240d9840c55f3bc43833",
+    "public-content-reading.rs": "043eb142fc958925024b1cca1d4c473f4be2c73c792df0de9f803ebee2c46b7e",
+    "reading-native.log.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reading-native.log": "681a4128e8fc7bf7533bb6b0db066458221defdc6968eb35ea1e5aecc6c86e06",
+    "sidebar-native.log.frontmost.jsonl": "71829d64423536e1b17603654eaba4090b3163079104d52a0da34173a6b67830",
+    "public-heads.txt": "16c66309410557ef0fc221fc0ca64a07f9e2f5c1142ef00a46f9ab057ddd015d",
+    "sidebar-native.log.stderr": "1a9070d55c0750766276bfeb51afa33903e24a367e553f029dd07ab9dbebec17",
+    "boundaries.log": "9480cc4382559b9a7a99240226a9f766048e30c8d38bb4bccd1fd8bca56661ad",
+    "sidebar-native.log.launcher": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "issue22.json": "aa02807e606df1607e6f5f94bf48174b7ed6ff418cbd1062a610ba3a154662c3",
+    "tests.log": "d398043a09dd722897beef29f8b03861215344e6580732c7d9961f52867e902a",
+    "sidebar-native.log": "fae4c9a6ef03f42779fa9f13522c856ee221e80223d95cb9d8c88c821653bb00",
+    "reading-launch.log": "e1d8c41a701e1b595891d22061bcb8a4f2d7d27a885c19bfdd2bd052a633c888",
+    "issue28.json": "504a47b4c8f27ebfc37084367d154ddaec7f2ff2e26d6ce5c08ce401a69ba98b",
+    "public-content-reveal.rs": "be8033d7ef4db46dc4de526214dfc261d70a8c1ce4e685e814d8198a75941450",
+    "public-releases.json": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+    "public-refs.txt": "8225500aa1c021bf208bb5c8124df652ea42d7518c27c68851f305079a2db8a9",
+    "build.log": "93e65aaeaeca0d12fb3d1c5d308d108732cfd015f70e16e3500718ff1a8cff5d"
+  }
+}

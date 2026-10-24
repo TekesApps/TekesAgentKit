@@ -1,0 +1,75 @@
+{
+  "format": "agentkit-run-column/1",
+  "date": "2026-10-20",
+  "source": {
+    "ui/components/src/run_column.rs": "0968ed1947821628f1d3211d6b55203a6c0c0f6aca7513e57ee04f5d1f135ded",
+    "ui/components/src/run_view.rs": "244973c3ce28307fbc209f87b57f2556349dd1d293582cd84053efe37f2e1a45",
+    "ui/components/src/lib.rs": "c975c1f1b8956d0ece96e367bc471766cd315ece4ce9d456909b1028c5c5a815",
+    "ui/consumer/src/lib.rs": "d09c93940ceaa34a49003672d779706d8f8f02fc83e18453d42e0e4f2185a5a7",
+    "ui/demo/tests/run_column.rs": "04c741b59e5ef058cec4689a894db347213cabd728e93c72004a2596ca3af344",
+    "ui/demo/src/components_native.rs": "9314f4c1c058fb8626ef9d4297b005dfddc1131f0be7e5e04e2ce31c2f83c2ef"
+  },
+  "references": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Run/RunOverlay.swift": "32c27a8488dd313f356b720752cb51a5b92eeb3caeb8d9399bc28ec6f93acf26",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/RunUserControlsGraph.swift": "aecc2c5012d25a1e4c0072d1bfef013d99bdf6d48961a2c5d8dca186120d1227",
+    "/Users/frankqin/dev/TekesMetalTextKit/Sources/TekesMetalTextKit/Shared/WorkspaceLayoutMetrics.swift": "8e271f774ffb741f4fb959ff1fbfe8d44d26d97f34522b48ef209770ebfa3da0"
+  },
+  "clientkit_head": "c289bc9d33edcd83a782ac17927a8c65a027eccd",
+  "default_pin": {
+    "commit": "8cf0840790334ba224afc0595897c74231c712e6",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 199,
+    "sha256": "f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f",
+    "ui_packages": 8
+  },
+  "validation": {
+    "ui_workspace_tests": 291,
+    "column_geometry_tests": 1,
+    "column_geometry_cases": 36,
+    "second_public_api_consumer": true,
+    "strict_ui_clippy": true,
+    "fmt": true,
+    "dependency_boundaries": true,
+    "native_formal_runview_context": true,
+    "native_column_image_inspected": true,
+    "full_overlay_layout": false,
+    "full_indicator_rail": false,
+    "actual_sep_reading": false,
+    "physical_ime": false,
+    "full_clientkit_layout_parity": false,
+    "default_pin_changed": false,
+    "merged": false,
+    "tagged": false
+  },
+  "demo_binary": {
+    "path": "ui/target/debug/tekes-agent-ui-demo",
+    "sha256": "db49cf54b3f86624dfec47e6033a6397fca601a221a23d87969f5296c93096b5"
+  },
+  "logs": {
+    "/tmp/agentkit-column-run-view-tests.log": "31e66afea0e8877390dcaacdf007adbf0798a9c942903c2d475128edfbdf03fe",
+    "/tmp/agentkit-column-geometry.log": "6f4cb644b9b29f5062be825209e0911a7cf474328ef87e443d04ca283005b3c8",
+    "/tmp/agentkit-column-geometry2.log": "076ce5f7a9adaca8acc26c1d0ade815444ca601fb9ddfae1b6f434303444e918",
+    "/tmp/agentkit-column-ui-tests.log": "bdfb6a0504b2733ea01f510aca35ec6070f8901fbd314b55194cf8e525f619ea",
+    "/tmp/agentkit-column-ui-clippy.log": "9a3799dcbe8c5ea5b61eba55723dba991dab8f3dbe406dcbab2cd45585eadf0a",
+    "/tmp/agentkit-column-ui-clippy2.log": "a6a30eed1bab8d28f5bed0a904eb9374b1f578e55db2a73a4c91802175b44093",
+    "/tmp/agentkit-column-demo-build2.log": "866b56c7af4b917116d1d03609d2797fa34f1e10a1916562b202a04fb05d215c",
+    "/tmp/agentkit-column-native-formal.log": "0ec433ccd7f004efbdfe76910d9bd217c204224d8b8d31156c573058d1d71d50",
+    "/tmp/agentkit-column-native-formal2.log": "ebb752f2c01e113c699d56f2cf05dbf16632102a57d8722da6e1acc2f741e56e"
+  },
+  "native_image": {
+    "path": "/tmp/agentkit-column-native-formal2.png",
+    "sha256": "fc457079837bf42a656ac0b974074b7ad4579fee58bdc2cf9870af542e1c1f6e"
+  },
+  "retained_failures": [
+    {
+      "path": "/tmp/agentkit-column-geometry.log",
+      "reason": "Initial new test omitted its RunSnapshot import; fixed test and reran"
+    },
+    {
+      "path": "/tmp/agentkit-column-native-formal.png",
+      "sha256": "9e4fd259a0440ba42a0ed860bd8d24b6bfdf20edb81c94222a713f67ed493860",
+      "reason": "Initial100ms capture was blank before window activation/presentation; native assertions passed. Consumer test-host capture moved after marked-text assertions, original action/assertion times preserved."
+    }
+  ]
+}

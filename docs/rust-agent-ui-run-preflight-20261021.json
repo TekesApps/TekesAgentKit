@@ -1,0 +1,107 @@
+{
+  "format": "agentkit-run-frame-preflight/1",
+  "date": "2026-10-21",
+  "verified_at_utc": "2026-10-20T16:12:35Z",
+  "latest_release": {
+    "publishedAt": "2026-10-19T14:25:34Z",
+    "tagName": "v0.3.8"
+  },
+  "source": {
+    "ui/components/src/composer.rs": "863bf626c3458e7a5842a848caee21ce970a0b11b5171d202a8ffaa754b15939",
+    "ui/components/src/editor.rs": "70cacfde72929dabb76fbbefa8c6a8e3ad9088932576eb9b1a2173f6a13c6f65",
+    "ui/components/src/indicators.rs": "0e14f0615bbf6984faa21de8ff949407bff5f39cbc8d9132554e256d26b10706",
+    "ui/components/src/lib.rs": "6650e106d97d4bbfa10aa435753dcd9fff6d74cf3cda98c506ff730411f75b7b",
+    "ui/components/src/run_view.rs": "fe5954c79886464877690bdb85e0d9c7ba887a9fc3453d19bb684a2325c5204c",
+    "ui/consumer/src/lib.rs": "c1cda7dc30820869c7bc5af20bb78c919aea562232bc24183aae84f857ee1e12",
+    "ui/demo/tests/run_view.rs": "ec35f55680e494acf21988284e9627ad1d5136284bcafecbc32489fbda80fc05",
+    "scripts/test-reading-candidate.py": "99725a135c3acb9dc8b04a683251d94fd5ed3280d70f7d0bbb8c075038d0b274",
+    "scripts/probes/agentkit-run-preflight-candidate.rs": "ae187b89e77b491202932c6c53a62eeabf6c498840af82a670ed1979ee373ea4"
+  },
+  "default_pin": {
+    "commit": "8cf0840790334ba224afc0595897c74231c712e6",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 199,
+    "sha256": "f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f",
+    "ui_packages": 8
+  },
+  "candidate": {
+    "identity": "2b16eaa6200fecdde9a0c615166064effb9446249cde05087d5d7c288d81d4ec",
+    "files": 463,
+    "manifest_sha256": "07f02b0f235a150d84412c1049b5b35f2112d5b084bb77c12bccb1493bcfe04c",
+    "probe_sha256": "ae187b89e77b491202932c6c53a62eeabf6c498840af82a670ed1979ee373ea4",
+    "receiver_receipt_sha256": "b2f7b25a4c3f4c67ba72eec718d77d4f1986fae3bb9099d24793822bc6dd3dbf",
+    "metadata_sha256": "e502ddd5d89a8297f07afcb26b4cc20d42c6293428557e3bf83d9f62174f217f",
+    "source_unchanged": true,
+    "production_agentkit_code_matches_receiver_snapshot": true,
+    "tests": 7,
+    "strict_clippy": true
+  },
+  "validation": {
+    "default_ui_tests": 296,
+    "python_script_tests": 26,
+    "second_public_api_consumer": true,
+    "strict_default_ui_clippy": true,
+    "fmt": true,
+    "default_resolved_pin": true,
+    "native_default_context": true,
+    "native_default_component_regression": true,
+    "native_context_image_inspected": true,
+    "candidate_api_geometry_state_integration": true,
+    "candidate_native_reading_acceptance": false,
+    "candidate_agentkit_gpu_pixel_acceptance": false,
+    "actual_three_sep_reading_acceptance": false,
+    "physical_ime": false,
+    "strict_clientkit_layout_parity": false,
+    "default_pin_promoted": false,
+    "merged": false,
+    "tagged": false
+  },
+  "demo_binary": {
+    "path": "ui/target/debug/tekes-agent-ui-demo",
+    "sha256": "175c801ce6eb9188929403e150179d6bd320cb6ddc61fa7cccadf4b2ddf8a7ba"
+  },
+  "native_image": {
+    "path": "/tmp/agentkit-run-preflight-native-context-20261021.png",
+    "sha256": "fc457079837bf42a656ac0b974074b7ad4579fee58bdc2cf9870af542e1c1f6e"
+  },
+  "logs": {
+    "/tmp/agentkit-run-preflight-component-initial.log": "c849764de5158b568113f150927cfb4cad6826e06caffb6620ee42ccb405cac8",
+    "/tmp/agentkit-run-preflight-components.log": "e351f08aa3c4249b6e6d9e8e8ae2bc5a0b4628767e2b6f0c82600bbd4e0b9633",
+    "/tmp/agentkit-run-preflight-default-tests.log": "58ecc75a5e1c8f8edff4a81cefb9cbec4bf2731522a5171d1ec210a785273b95",
+    "/tmp/agentkit-run-preflight-default-tests5.log": "235e330af8a6f2ec5cb618b20c40cbb82a241a79fb2a4d45fdc0e954a06acbf4",
+    "/tmp/agentkit-run-preflight-default-clippy5.log": "0025aa30cd41ebb1e959ba30737105f02136ab3dc69966cb03f60b79324bb378",
+    "/tmp/agentkit-run-preflight-demo-build5.log": "3e43b255d4b20a7b309afeb5012d5088aa471e53c75606d9df8a98bab335f40e",
+    "/tmp/agentkit-run-preflight-scripts.log": "3f51c6321fd8d654072f655618bfa3d520c79de3ae5f3097bad93408e9421f73",
+    "/tmp/agentkit-run-preflight-ui-boundaries.log": "9480cc4382559b9a7a99240226a9f766048e30c8d38bb4bccd1fd8bca56661ad",
+    "/tmp/agentkit-run-preflight-headless-boundaries.log": "e9fa1e12a0afd70528040f81fe3199172a3974910d7760c0216bb6d110181081",
+    "/tmp/agentkit-run-preflight-native-context-20261021.log": "bffaf2d2b110b245e3e7dff2da1b89106a60162869d478cef45bdf35745b9023",
+    "/tmp/agentkit-run-preflight-native-regression-20261021.log": "f9bf8719f5be5b222a604787799d599ec263f439417e4b845c7cc8e45c14bef0",
+    ".runtime-fixtures/agentkit-run-preflight-2b-replay-06/tests.log": "432132050a5d125c11e77830d94b36eb411e3fc406e60eae514ccb6c1d61a3b7",
+    ".runtime-fixtures/agentkit-run-preflight-2b-replay-06/clippy.log": "c37e5cf2dac5c442cb43aea7fee8934f7257384d705744ce69ce0d60aa18d092",
+    ".runtime-fixtures/agentkit-run-preflight-2b-replay-02/tests.log": "353b0dbfc478d59f42708451ab0f0dfcc34fb1bb0429525c1658797f16ec6394"
+  },
+  "retained_failures": [
+    {
+      "gate": "initial component command",
+      "reason": "Selected nonexistent native_editor test target; corrected to controlled_editor"
+    },
+    {
+      "gate": "first whole UI check",
+      "reason": "New public consumer helper omitted PaneSnapshot::Missing; made absence explicit and added regression"
+    },
+    {
+      "gate": "candidate replay02",
+      "reason": "Synthetic prepend omitted its canonical turn and correctly landed as unplaced; supplied complete turn+item without weakening position assertions"
+    }
+  ],
+  "strict_layout_required_remaining": [
+    "ClientKit320min/770max column and derived rail clearance",
+    "source-equivalent fractional margin normalization",
+    "Run document/Composer/chrome/selection overlay and Jump",
+    "complete per-turn indicator rail",
+    "source-equivalent visibility including archived/interrupted",
+    "SidePanel/Summary/Sidebar final view-by-view native parity"
+  ],
+  "upstream_issue": "https://github.com/TekesApps/TekesUI/issues/26"
+}

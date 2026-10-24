@@ -1,0 +1,70 @@
+{
+  "defaultExactTekesUi": "8cf0840790334ba224afc0595897c74231c712e6",
+  "checks": [
+    {
+      "name": "fmt",
+      "exit": 0
+    },
+    {
+      "name": "boundaries",
+      "exit": 0
+    },
+    {
+      "name": "headless-boundaries",
+      "exit": 0
+    },
+    {
+      "name": "metadata",
+      "exit": 0
+    },
+    {
+      "name": "inputs",
+      "exit": 0
+    },
+    {
+      "name": "clippy",
+      "exit": 0
+    },
+    {
+      "name": "workspace",
+      "exit": 0
+    },
+    {
+      "name": "native-build",
+      "exit": 0
+    }
+  ],
+  "uiTestsPassed": 401,
+  "secondConsumerTestsPassed": 42,
+  "newCatalogTestsPassed": 5,
+  "nativeBuild": true,
+  "nativeWindowThisPhase": false,
+  "physicalIme": false,
+  "voiceOver": false,
+  "defaultAutomaticReveal": false,
+  "privateCandidateRevalidatedThisPhase": false,
+  "headlessImplementationChanged": false,
+  "newTargetDirectories": [],
+  "deletedBytes": 0,
+  "logs": {
+    ".runtime-fixtures/agentkit-sidebar-catalog-evidence/source-hashes.json": "da92f06d65d4123169a08321528b06ba3d3527c97cfa4f7f25ae38677df2f478",
+    ".runtime-fixtures/agentkit-sidebar-catalog-evidence/fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    ".runtime-fixtures/agentkit-sidebar-catalog-evidence/headless-boundaries.log": "e9fa1e12a0afd70528040f81fe3199172a3974910d7760c0216bb6d110181081",
+    ".runtime-fixtures/agentkit-sidebar-catalog-evidence/clippy.log": "4fdf8d99af5c9f33acd26ab47d27536fda48307be9ce37a662a9563590351f43",
+    ".runtime-fixtures/agentkit-sidebar-catalog-evidence/workspace.log": "66fe90e0552a141b5d6af0e45b9c52316f4e905872ce53570204ebd42a1c0997",
+    ".runtime-fixtures/agentkit-sidebar-catalog-evidence/initial-clippy.log": "23435b35499c9ba927a8080d5e5ab84578599a2996291b84d75bef6a7702b922",
+    ".runtime-fixtures/agentkit-sidebar-catalog-evidence/boundaries.log": "9480cc4382559b9a7a99240226a9f766048e30c8d38bb4bccd1fd8bca56661ad",
+    ".runtime-fixtures/agentkit-sidebar-catalog-evidence/checks.json": "07101305cec1ed38c3eab6dc971a8e42f4e008f30e087a842c8d9950de6d54c9",
+    ".runtime-fixtures/agentkit-sidebar-catalog-evidence/initial-checks.json": "4635345cdf86a0a60b99ec63383fa9fa870a14279df3f3ea1b433c7bea53294f",
+    ".runtime-fixtures/agentkit-sidebar-catalog-evidence/inputs.log": "8a8e6f786e5a4fb57110e2f331b248f99fe8dad47a38e5bc642de1aa021324f8",
+    ".runtime-fixtures/agentkit-sidebar-catalog-evidence/initial-metadata.log": "361ef5635fcffbf257c3a3d405496466e51f079320842d7c973896c058865b19",
+    ".runtime-fixtures/agentkit-sidebar-catalog-evidence/metadata.log": "361ef5635fcffbf257c3a3d405496466e51f079320842d7c973896c058865b19",
+    ".runtime-fixtures/agentkit-sidebar-catalog-evidence/initial-headless-boundaries.log": "e9fa1e12a0afd70528040f81fe3199172a3974910d7760c0216bb6d110181081",
+    ".runtime-fixtures/agentkit-sidebar-catalog-evidence/initial-inputs.log": "8a8e6f786e5a4fb57110e2f331b248f99fe8dad47a38e5bc642de1aa021324f8",
+    ".runtime-fixtures/agentkit-sidebar-catalog-evidence/agentkit-folder-catalog-targeted.log": "ccac008d65cec055c2b267d59af9929b4182234c15e205df65ee17049f8e9895",
+    ".runtime-fixtures/agentkit-sidebar-catalog-evidence/agentkit-folder-catalog-targeted-final.log": "c849b1cfd8bd91dffb2fb316ee9541a0377a26f48e8d8a7154e9fbc27f25e335",
+    ".runtime-fixtures/agentkit-sidebar-catalog-evidence/initial-fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    ".runtime-fixtures/agentkit-sidebar-catalog-evidence/native-build.log": "0c640d3e6056e973186018eb9b5813373e71f3ed6be436183c1506ae0042300e",
+    ".runtime-fixtures/agentkit-sidebar-catalog-evidence/initial-boundaries.log": "9480cc4382559b9a7a99240226a9f766048e30c8d38bb4bccd1fd8bca56661ad"
+  }
+}

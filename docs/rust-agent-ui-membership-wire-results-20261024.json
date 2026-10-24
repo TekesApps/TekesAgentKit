@@ -1,0 +1,47 @@
+{
+  "sourceCommit": "36f0668",
+  "nativeMux": {
+    "passed": 6,
+    "failed": 0,
+    "ignored": 0
+  },
+  "dsh": {
+    "passed": 14,
+    "failed": 0,
+    "ignored": 0
+  },
+  "rootStrictClippy": "passed",
+  "evidenceLayer": [
+    "pinned-public-source",
+    "synthetic-wire",
+    "memory-projection"
+  ],
+  "notRun": [
+    "installed harness",
+    "desktop",
+    "physical IME",
+    "AX"
+  ],
+  "evidence": [
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/membership-wire-native-final-tests.log",
+      "sha256": "2ffd95071af0e029f6993577dceacf425edd8a589645a10f5c2865a23150b80e"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/membership-wire-dsh-reviewed-tests.log",
+      "sha256": "153d1efdcd508732335f7e200064072f863871b02ae770662dd984818bead969"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/membership-wire-reviewed-root-clippy.log",
+      "sha256": "a0a1542c4c9faf57cc07c4ebb4a2c982bc9281bd1c72cc07e40de0ea48bd5200"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/membership-wire-headless-boundaries.log",
+      "sha256": "e9fa1e12a0afd70528040f81fe3199172a3974910d7760c0216bb6d110181081"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/membership-wire-ui-boundaries.log",
+      "sha256": "9480cc4382559b9a7a99240226a9f766048e30c8d38bb4bccd1fd8bca56661ad"
+    }
+  ]
+}

@@ -1,0 +1,1050 @@
+{
+  "format": "agentkit-sidebar-help-acceptance/1",
+  "baseline_commit": "8c0b28440ed3457c48d665a25746c36f1e853ac3",
+  "source_files": {
+    "scripts/test-reading-candidate.py": "52a44f4da6a1bd647f8da21136215393a684639fd668da7e79ed17a8aec27ffc",
+    "ui/bindings/src/sidebar.rs": "d873c3cae536c442e31da04a26d6024587f69bfd7402e4892099e1a820533d9c",
+    "ui/bindings/src/sidebar_search.rs": "32248ba2fea95632ae3a6a83ae90756f912908b5175f31948c4eb46a86469f0d",
+    "ui/components/src/sidebar.rs": "40cf07c1b843c760fc47b9080b29ed29fabcc53087f4b6ee8e72a5cea69e5945",
+    "ui/components/src/sidebar_search.rs": "8767b5210346c57c6cc629d82e0faa35e7162cc631bcb5cb5754aa194653f8d8",
+    "ui/consumer/src/lib.rs": "1a9f90700fd47feb97136f93c7c60137247b0491eae98005428ff758d2b7fa33",
+    "ui/demo/src/component_demo.rs": "7e636b5d0522d2fbd9384fbccef8f82011be5cadacc0a09a0f4dae7098264e3a",
+    "ui/demo/src/fixture.rs": "d30450b37707d1aef00116502c82a06346ba133b5aabda6a0fb59fe657c3fbaf",
+    "ui/demo/src/native_sidebar_query_selftest.rs": "27463aedcc772165e9fe527c19e918e07002b892db714e8ad8aeb588bba8544d",
+    "ui/demo/tests/sidebar_component.rs": "8da999bc3001e3ec248084601167d696b8a54ac8ea00aa561e7b81b4fa1e5216",
+    "ui/demo/tests/sidebar_inventory.rs": "e9b13bfd89131640867da1a36d4a92dba528224769b9c361062db38aba5b497a",
+    "ui/demo/tests/sidebar_preferences.rs": "aa307e634cb6145e6e5283b151d1f1ee8e32ee5141b39bedab5e6a689fff84c6",
+    "ui/demo/tests/sidebar_search.rs": "df4cfc05cfa2340daf2f94d94d50e09aa97585871ff422bc4c9effbe5ffe977c",
+    "ui/demo/tests/sidebar_search_results.rs": "bbb0ec10919c850cbbff2918fb939c0070c3b22e4ccf630c6facc6ba3351ac49",
+    "scripts/probes/agentkit-sidebar-help-candidate.rs": "9c46dbbf93058484b9f4c8a876e922c0e244b145e596dcc5e71a444bd05954f3",
+    "scripts/probes/agentkit-sidebar-help-native.rs": "7051c4e270e0bb840110d6ca4396d636f13663e621db538f7d64e45a3c74eb51"
+  },
+  "read_only_references": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Agent/ClientAgentSidebarListView.swift": "c29c80b8726f8ac6b5988ed6c9ad3e7902d09e8f656ac745eba4f5ee0bb70069",
+    "/Users/frankqin/dev/Tekes/Tekes/SidebarColumnController.swift": "cc01190f2e25192aed25c7ee53d7d1adc621d24b93da62a034824a10fd770f6d"
+  },
+  "read_only_reference_heads": {
+    "TekesClientKit": "c289bc9d33edcd83a782ac17927a8c65a027eccd",
+    "Tekes": "8858ccd9d46590852ec7a0949aee289fc6798d70"
+  },
+  "default_pin": "8cf0840790334ba224afc0595897c74231c712e6",
+  "default_packages": 8,
+  "default_verified_files": 199,
+  "default_row_help_supported": false,
+  "default_pin_promoted": false,
+  "published_headless_baseline": "v0.3.8",
+  "candidate": {
+    "identity": "3366559a1a524909f562fa2fdd1c8646d762b5ba0eb1294b5480c39d9e9c37ef",
+    "files": 503,
+    "archive_sha256": "de2ee991aaa61912b8b6b03d183b244f6a7fd8884f8ed3b9448ce04e389c8ce2",
+    "receiver_receipt": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-3366559a/receipt.json",
+      "sha256": "6630209b1086320b4f13c65f11d14c16f2ca7391dfb14082751c59ecd5975375"
+    },
+    "source_verified_unchanged": true,
+    "candidate_overrides_verified": true,
+    "withdrawn_e5b30ac0_built": false
+  },
+  "checks": [
+    {
+      "stage": "default",
+      "check": "workspace",
+      "exit_code": 0,
+      "log": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-3366559a/final-default-workspace.log",
+      "sha256": "83dcc1e0b4b082745379cbac5a7156bfa7f5d24eaf63ffc8dca8d0a47dd94404",
+      "passed": 364
+    },
+    {
+      "stage": "default",
+      "check": "clippy",
+      "exit_code": 0,
+      "log": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-3366559a/final-default-clippy.log",
+      "sha256": "733d59b24cdb045b772f77d516525bf59088ef79fd4e07ad7d7e40ba6a8f63d5"
+    },
+    {
+      "stage": "default",
+      "check": "build",
+      "exit_code": 0,
+      "log": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-3366559a/final-default-build.log",
+      "sha256": "73a65a88f17a6051c2673ec9eecfc56f51ac5685531a39b438d704d6f3b1a9f9"
+    },
+    {
+      "stage": "candidate",
+      "check": "workspace",
+      "exit_code": 0,
+      "log": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-3366559a/final-candidate-workspace.log",
+      "sha256": "02c2b2b4475f895d3d3a65cc6a768c0669c29cd943b0bbb2460dd5ded579e345",
+      "passed": 391
+    },
+    {
+      "stage": "candidate",
+      "check": "clippy",
+      "exit_code": 0,
+      "log": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-3366559a/final-candidate-clippy.log",
+      "sha256": "f6f8d2a2f17f9ee4322ff49571b63f812f184d47900706b5ba398730b8886f7d"
+    },
+    {
+      "stage": "candidate",
+      "check": "build",
+      "exit_code": 0,
+      "log": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-3366559a/final-candidate-build.log",
+      "sha256": "0c640d3e6056e973186018eb9b5813373e71f3ed6be436183c1506ae0042300e"
+    }
+  ],
+  "independent_public_consumer_checks": 38,
+  "python_tests": {
+    "exit_code": 0,
+    "passed": 26,
+    "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-3366559a/python-tests.log",
+    "sha256": "0b5c28dc6ecb5f64f93a2846c417961a798936566e7a8db40d8081c4cd0b3686"
+  },
+  "native": {
+    "exit_code": 0,
+    "canonicalRunAcknowledgementMayAdvanceEpoch": true,
+    "explicitUnmarkCommitted": true,
+    "freshHoverCycle": true,
+    "imeBlockedRowActivation": true,
+    "nativeCancelOperationSurvivesMetadata": true,
+    "nativePointerEvents": 4,
+    "nativeWindow": true,
+    "noSubmission": true,
+    "originalActionAfterUnmark": 1,
+    "originalTooltip": true,
+    "physicalEscape": false,
+    "physicalIme": false,
+    "preeditSelectionAndBaselinePreservedDuringHelp": true,
+    "queryLoadingRetiresAndRebindsOwner": true,
+    "queryUpdateAndPathFallback": true,
+    "realHarness": false,
+    "sameOwnerPathMetadataRetained": true,
+    "syntheticKeyIssue": 37,
+    "typedSemanticHelp": true,
+    "voiceOver": false,
+    "windowActive": true,
+    "log": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-3366559a/native-v9.log",
+      "sha256": "1b058a3a1313449992d7e8a69dbe9633bca05da0075fe2b1a80446beb9755054"
+    },
+    "binary": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-3366559a/native-demo",
+      "sha256": "05d86e60e0634ec01f8b0e39771f7548e47b78afb69ddfe0444e0ef60a3d88ea"
+    },
+    "final_build_binary_identical": true,
+    "screenshots": [
+      {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-v9-a.png",
+        "sha256": "24d1991fbf19e72aa89e1f75cc81390b9defdaf3f924be707dbb9a069bce1365",
+        "pixels_inspected": true
+      },
+      {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-v9-b.png",
+        "sha256": "64c71d8b3ccaa4042d72f315b2d7e1b77248aa9da0f079022205a6f999826999",
+        "pixels_inspected": true
+      },
+      {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-v9-path.png",
+        "sha256": "30c78ac97bc6ff1fafc70daae56edaa22481b8551dae245559a9777f4d3afeac",
+        "pixels_inspected": true
+      },
+      {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-v9-path-updated.png",
+        "sha256": "66238bee61026218a840f6f57a4de15a9674d89c1cbae9473fc5ea60467067fc",
+        "pixels_inspected": true
+      }
+    ],
+    "full_ui_acceptance": false
+  },
+  "three_real": {
+    "exit_code": 0,
+    "versions": {
+      "Native": "Kernel0.9.1",
+      "Pi": "1.3.0",
+      "DSH": "0.2.1-rc.2"
+    },
+    "offscreen_only": true,
+    "isolated_local_providers": true,
+    "real_harness": true,
+    "native_interaction": false,
+    "log": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-3366559a/final-three-real.log",
+      "sha256": "195eea149c9373c1ecff831bfca01a0dd94011e957e9fa3de483bb4eaa7e0f8c"
+    },
+    "binary": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-final-default-demo",
+      "sha256": "2fb1cd0ba17fd00792f3cd1425758ea16e670fe19cc7d9fe51821b5cf04298f1"
+    }
+  },
+  "cleanup": {
+    "format": "obsolete-intermediate-target-cleanup/1",
+    "target": "/tmp/agentkit-layout-text-292-target",
+    "obsolete_sources": [
+      "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-rail-c779-native-v2/agentkit/",
+      "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-rail-c779-native-v4/agentkit/",
+      "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-rail-c779-native-v6/agentkit/"
+    ],
+    "exclusive_cargo_target_lock": true,
+    "lsof_open_files": 0,
+    "process_inventory_checked": true,
+    "current_metadata_and_native_dep_guard": [
+      "/tmp/agentkit-sidebar-help-final-default-metadata.json",
+      "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-3366559a/metadata.json",
+      "/tmp/agentkit-layout-text-292-target/debug/tekes-agent-ui-demo.d"
+    ],
+    "acceptance_executables_unchanged": {
+      "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-rail-c779-native-v2/native-demo": "993ad242adff36d588f5b36be47f14cda1d0bdcb4ff8f3f7c3e93d4acd39140f",
+      "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-rail-c779-native-v4/native-demo": "21a9ac8ae0a810efabf3ef51e5d0b70ded9e4850ae84c0621c0b52c5f05916b0",
+      "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-rail-c779-native-v6/native-demo": "c9443dfa04df9e8b0f7e1e001d2f177fe53871a1f9846d9860b165e17ac05bb8",
+      "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-3366559a/native-demo": "05d86e60e0634ec01f8b0e39771f7548e47b78afb69ddfe0444e0ef60a3d88ea",
+      "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-final-default-demo": "2fb1cd0ba17fd00792f3cd1425758ea16e670fe19cc7d9fe51821b5cf04298f1"
+    },
+    "deleted_files": [
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_contract-1acea67b216ae529.rmeta",
+        "bytes": 1164635,
+        "allocated_bytes": 1167360
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_contract-21e55d02e326b151.rmeta",
+        "bytes": 1164635,
+        "allocated_bytes": 1167360
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_contract-4a7a6d4b1b4f9052.rlib",
+        "bytes": 3585960,
+        "allocated_bytes": 3588096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_contract-4a7a6d4b1b4f9052.rmeta",
+        "bytes": 2345869,
+        "allocated_bytes": 2347008
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_contract-a9b5766c130b929d.rlib",
+        "bytes": 3585584,
+        "allocated_bytes": 3588096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_contract-a9b5766c130b929d.rmeta",
+        "bytes": 2345869,
+        "allocated_bytes": 2347008
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_contract-b009bcc5f00707c0.rlib",
+        "bytes": 3586496,
+        "allocated_bytes": 3588096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_contract-b009bcc5f00707c0.rmeta",
+        "bytes": 2345869,
+        "allocated_bytes": 2347008
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_contract-dbc3ae7fef4aa193.rmeta",
+        "bytes": 1164635,
+        "allocated_bytes": 1167360
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_dsh-38ed2bfe4e4a5536.rmeta",
+        "bytes": 827070,
+        "allocated_bytes": 827392
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_dsh-42b66ce83e40a8e5.rlib",
+        "bytes": 3934048,
+        "allocated_bytes": 3936256
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_dsh-42b66ce83e40a8e5.rmeta",
+        "bytes": 930101,
+        "allocated_bytes": 933888
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_dsh-6325c4159d04ac7d.rlib",
+        "bytes": 3933096,
+        "allocated_bytes": 3936256
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_dsh-6325c4159d04ac7d.rmeta",
+        "bytes": 930101,
+        "allocated_bytes": 933888
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_dsh-78b8810849c5f61d.rlib",
+        "bytes": 3931152,
+        "allocated_bytes": 3932160
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_dsh-78b8810849c5f61d.rmeta",
+        "bytes": 930027,
+        "allocated_bytes": 933888
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_dsh-afad85a85abd5fa0.rmeta",
+        "bytes": 827070,
+        "allocated_bytes": 827392
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_dsh-c4fe65845dfc102a.rlib",
+        "bytes": 3931728,
+        "allocated_bytes": 3932160
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_dsh-c4fe65845dfc102a.rmeta",
+        "bytes": 930027,
+        "allocated_bytes": 933888
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_dsh-caa930dc1d0b6088.rlib",
+        "bytes": 3929264,
+        "allocated_bytes": 3932160
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_dsh-caa930dc1d0b6088.rmeta",
+        "bytes": 930027,
+        "allocated_bytes": 933888
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_dsh-cf199f0bf573202d.rmeta",
+        "bytes": 827070,
+        "allocated_bytes": 827392
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_dsh-fd1922de02f539bc.rlib",
+        "bytes": 3929752,
+        "allocated_bytes": 3932160
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_dsh-fd1922de02f539bc.rmeta",
+        "bytes": 930101,
+        "allocated_bytes": 933888
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_kernel-04f1f801b4cc2b5a.rlib",
+        "bytes": 2487776,
+        "allocated_bytes": 2490368
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_kernel-04f1f801b4cc2b5a.rmeta",
+        "bytes": 393552,
+        "allocated_bytes": 397312
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_kernel-37b25e00d3dadbf2.rlib",
+        "bytes": 2488456,
+        "allocated_bytes": 2490368
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_kernel-37b25e00d3dadbf2.rmeta",
+        "bytes": 393608,
+        "allocated_bytes": 397312
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_kernel-63eef5a7bf764a51.rlib",
+        "bytes": 2488272,
+        "allocated_bytes": 2490368
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_kernel-63eef5a7bf764a51.rmeta",
+        "bytes": 393552,
+        "allocated_bytes": 397312
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_kernel-9a2749661025b611.rmeta",
+        "bytes": 309766,
+        "allocated_bytes": 311296
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_kernel-9a87aea13ccd6028.rmeta",
+        "bytes": 309766,
+        "allocated_bytes": 311296
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_kernel-a9d4cf0cfe500d62.rlib",
+        "bytes": 2487912,
+        "allocated_bytes": 2490368
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_kernel-a9d4cf0cfe500d62.rmeta",
+        "bytes": 393608,
+        "allocated_bytes": 397312
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_kernel-c02df169b2a1fa5c.rlib",
+        "bytes": 2487824,
+        "allocated_bytes": 2490368
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_kernel-c02df169b2a1fa5c.rmeta",
+        "bytes": 393552,
+        "allocated_bytes": 397312
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_kernel-c0baa9d4bcd38f30.rlib",
+        "bytes": 2488160,
+        "allocated_bytes": 2490368
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_kernel-c0baa9d4bcd38f30.rmeta",
+        "bytes": 393608,
+        "allocated_bytes": 397312
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_kernel-c7114d930e5f0d13.rmeta",
+        "bytes": 309766,
+        "allocated_bytes": 311296
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_pi-09a8257a4b894185.rlib",
+        "bytes": 12103488,
+        "allocated_bytes": 12103680
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_pi-09a8257a4b894185.rmeta",
+        "bytes": 2495418,
+        "allocated_bytes": 2498560
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_pi-1577c785b7cc6a2a.rmeta",
+        "bytes": 2046175,
+        "allocated_bytes": 2048000
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_pi-6a5b7f613a4eb206.rlib",
+        "bytes": 12100736,
+        "allocated_bytes": 12103680
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_pi-6a5b7f613a4eb206.rmeta",
+        "bytes": 2495474,
+        "allocated_bytes": 2498560
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_pi-700546ef3313efef.rlib",
+        "bytes": 12102896,
+        "allocated_bytes": 12103680
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_pi-700546ef3313efef.rmeta",
+        "bytes": 2495418,
+        "allocated_bytes": 2498560
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_pi-71e41cf191a9ca5d.rmeta",
+        "bytes": 2046175,
+        "allocated_bytes": 2048000
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_pi-73b1ad84741569f5.rlib",
+        "bytes": 12102392,
+        "allocated_bytes": 12103680
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_pi-73b1ad84741569f5.rmeta",
+        "bytes": 2495418,
+        "allocated_bytes": 2498560
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_pi-9b6ba59f5287062c.rlib",
+        "bytes": 12100416,
+        "allocated_bytes": 12103680
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_pi-9b6ba59f5287062c.rmeta",
+        "bytes": 2495474,
+        "allocated_bytes": 2498560
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_pi-b5447e3b27643981.rmeta",
+        "bytes": 2046175,
+        "allocated_bytes": 2048000
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_pi-bd1d85eb9e50add8.rlib",
+        "bytes": 12099984,
+        "allocated_bytes": 12103680
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_endpoint_pi-bd1d85eb9e50add8.rmeta",
+        "bytes": 2495474,
+        "allocated_bytes": 2498560
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_presentation-404755c104f1e943.rmeta",
+        "bytes": 1717069,
+        "allocated_bytes": 1720320
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_presentation-6ca1b83f7886ad8c.rmeta",
+        "bytes": 1717069,
+        "allocated_bytes": 1720320
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_presentation-6fe3dd4f47aecc60.rlib",
+        "bytes": 8496072,
+        "allocated_bytes": 8499200
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_presentation-6fe3dd4f47aecc60.rmeta",
+        "bytes": 3214293,
+        "allocated_bytes": 3215360
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_presentation-88a6dfcacf43b78d.rlib",
+        "bytes": 8496248,
+        "allocated_bytes": 8499200
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_presentation-88a6dfcacf43b78d.rmeta",
+        "bytes": 3214293,
+        "allocated_bytes": 3215360
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_presentation-951dc94642c1020c.rmeta",
+        "bytes": 1717069,
+        "allocated_bytes": 1720320
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_presentation-dbfcb6ccc8199e97.rlib",
+        "bytes": 8496456,
+        "allocated_bytes": 8499200
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_presentation-dbfcb6ccc8199e97.rmeta",
+        "bytes": 3214293,
+        "allocated_bytes": 3215360
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_session-3e2ea32dfa0c7991.rmeta",
+        "bytes": 837903,
+        "allocated_bytes": 839680
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_session-4942913e32913869.rlib",
+        "bytes": 3456312,
+        "allocated_bytes": 3457024
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_session-4942913e32913869.rmeta",
+        "bytes": 1171373,
+        "allocated_bytes": 1171456
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_session-498f98553377f50a.rlib",
+        "bytes": 3459432,
+        "allocated_bytes": 3461120
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_session-498f98553377f50a.rmeta",
+        "bytes": 1171373,
+        "allocated_bytes": 1171456
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_session-52a53073b8627909.rmeta",
+        "bytes": 837903,
+        "allocated_bytes": 839680
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_session-a0a692342fc51727.rlib",
+        "bytes": 3456776,
+        "allocated_bytes": 3457024
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_session-a0a692342fc51727.rmeta",
+        "bytes": 1171373,
+        "allocated_bytes": 1171456
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_session-d0b3463f652cdfd4.rmeta",
+        "bytes": 837903,
+        "allocated_bytes": 839680
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_web-0f9ff1c82ba75b5f.rlib",
+        "bytes": 3176568,
+        "allocated_bytes": 3178496
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_web-0f9ff1c82ba75b5f.rmeta",
+        "bytes": 325409,
+        "allocated_bytes": 327680
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_web-6cc0f68ec3286ee6.rmeta",
+        "bytes": 201168,
+        "allocated_bytes": 204800
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_web-72328f302964f445.rmeta",
+        "bytes": 201168,
+        "allocated_bytes": 204800
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_web-744850cc5f1d7012.rmeta",
+        "bytes": 201168,
+        "allocated_bytes": 204800
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_web-bd948bf567919926.rlib",
+        "bytes": 3176856,
+        "allocated_bytes": 3178496
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_web-bd948bf567919926.rmeta",
+        "bytes": 325409,
+        "allocated_bytes": 327680
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_web-c3e1872cf73cbae6.rlib",
+        "bytes": 3175480,
+        "allocated_bytes": 3178496
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_web-c3e1872cf73cbae6.rmeta",
+        "bytes": 325409,
+        "allocated_bytes": 327680
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_web-caf3f03743e8cc35.rlib",
+        "bytes": 3175520,
+        "allocated_bytes": 3178496
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_web-caf3f03743e8cc35.rmeta",
+        "bytes": 325409,
+        "allocated_bytes": 327680
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_web-d1b75cf5d2ae33fc.rlib",
+        "bytes": 3176344,
+        "allocated_bytes": 3178496
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_web-d1b75cf5d2ae33fc.rmeta",
+        "bytes": 325409,
+        "allocated_bytes": 327680
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_web-ee61bdd751a29d3a.rlib",
+        "bytes": 3176456,
+        "allocated_bytes": 3178496
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_web-ee61bdd751a29d3a.rmeta",
+        "bytes": 325409,
+        "allocated_bytes": 327680
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_contract-1acea67b216ae529.d",
+        "bytes": 4264,
+        "allocated_bytes": 8192
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_contract-21e55d02e326b151.d",
+        "bytes": 4264,
+        "allocated_bytes": 8192
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_contract-4a7a6d4b1b4f9052.d",
+        "bytes": 5718,
+        "allocated_bytes": 8192
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_contract-a9b5766c130b929d.d",
+        "bytes": 5718,
+        "allocated_bytes": 8192
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_contract-b009bcc5f00707c0.d",
+        "bytes": 5718,
+        "allocated_bytes": 8192
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_contract-dbc3ae7fef4aa193.d",
+        "bytes": 4264,
+        "allocated_bytes": 8192
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_endpoint_dsh-38ed2bfe4e4a5536.d",
+        "bytes": 2091,
+        "allocated_bytes": 4096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_endpoint_dsh-42b66ce83e40a8e5.d",
+        "bytes": 2824,
+        "allocated_bytes": 4096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_endpoint_dsh-6325c4159d04ac7d.d",
+        "bytes": 2824,
+        "allocated_bytes": 4096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_endpoint_dsh-78b8810849c5f61d.d",
+        "bytes": 2824,
+        "allocated_bytes": 4096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_endpoint_dsh-afad85a85abd5fa0.d",
+        "bytes": 2091,
+        "allocated_bytes": 4096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_endpoint_dsh-c4fe65845dfc102a.d",
+        "bytes": 2824,
+        "allocated_bytes": 4096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_endpoint_dsh-caa930dc1d0b6088.d",
+        "bytes": 2824,
+        "allocated_bytes": 4096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_endpoint_dsh-cf199f0bf573202d.d",
+        "bytes": 2091,
+        "allocated_bytes": 4096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_endpoint_dsh-fd1922de02f539bc.d",
+        "bytes": 2824,
+        "allocated_bytes": 4096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_endpoint_kernel-04f1f801b4cc2b5a.d",
+        "bytes": 825,
+        "allocated_bytes": 4096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_endpoint_kernel-37b25e00d3dadbf2.d",
+        "bytes": 825,
+        "allocated_bytes": 4096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_endpoint_kernel-63eef5a7bf764a51.d",
+        "bytes": 825,
+        "allocated_bytes": 4096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_endpoint_kernel-9a2749661025b611.d",
+        "bytes": 590,
+        "allocated_bytes": 4096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_endpoint_kernel-9a87aea13ccd6028.d",
+        "bytes": 590,
+        "allocated_bytes": 4096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_endpoint_kernel-a9d4cf0cfe500d62.d",
+        "bytes": 825,
+        "allocated_bytes": 4096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_endpoint_kernel-c02df169b2a1fa5c.d",
+        "bytes": 825,
+        "allocated_bytes": 4096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_endpoint_kernel-c0baa9d4bcd38f30.d",
+        "bytes": 825,
+        "allocated_bytes": 4096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_endpoint_kernel-c7114d930e5f0d13.d",
+        "bytes": 590,
+        "allocated_bytes": 4096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_endpoint_pi-09a8257a4b894185.d",
+        "bytes": 7466,
+        "allocated_bytes": 8192
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_endpoint_pi-1577c785b7cc6a2a.d",
+        "bytes": 5575,
+        "allocated_bytes": 8192
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_endpoint_pi-6a5b7f613a4eb206.d",
+        "bytes": 7466,
+        "allocated_bytes": 8192
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_endpoint_pi-700546ef3313efef.d",
+        "bytes": 7466,
+        "allocated_bytes": 8192
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_endpoint_pi-71e41cf191a9ca5d.d",
+        "bytes": 5575,
+        "allocated_bytes": 8192
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_endpoint_pi-73b1ad84741569f5.d",
+        "bytes": 7466,
+        "allocated_bytes": 8192
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_endpoint_pi-9b6ba59f5287062c.d",
+        "bytes": 7466,
+        "allocated_bytes": 8192
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_endpoint_pi-b5447e3b27643981.d",
+        "bytes": 5575,
+        "allocated_bytes": 8192
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_endpoint_pi-bd1d85eb9e50add8.d",
+        "bytes": 7466,
+        "allocated_bytes": 8192
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_presentation-404755c104f1e943.d",
+        "bytes": 9132,
+        "allocated_bytes": 12288
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_presentation-6ca1b83f7886ad8c.d",
+        "bytes": 9132,
+        "allocated_bytes": 12288
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_presentation-6fe3dd4f47aecc60.d",
+        "bytes": 12206,
+        "allocated_bytes": 12288
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_presentation-88a6dfcacf43b78d.d",
+        "bytes": 12206,
+        "allocated_bytes": 12288
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_presentation-951dc94642c1020c.d",
+        "bytes": 9132,
+        "allocated_bytes": 12288
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_presentation-dbfcb6ccc8199e97.d",
+        "bytes": 12206,
+        "allocated_bytes": 12288
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_session-3e2ea32dfa0c7991.d",
+        "bytes": 2394,
+        "allocated_bytes": 4096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_session-4942913e32913869.d",
+        "bytes": 3226,
+        "allocated_bytes": 4096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_session-498f98553377f50a.d",
+        "bytes": 3226,
+        "allocated_bytes": 4096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_session-52a53073b8627909.d",
+        "bytes": 2394,
+        "allocated_bytes": 4096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_session-a0a692342fc51727.d",
+        "bytes": 3226,
+        "allocated_bytes": 4096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_session-d0b3463f652cdfd4.d",
+        "bytes": 2394,
+        "allocated_bytes": 4096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_web-0f9ff1c82ba75b5f.d",
+        "bytes": 741,
+        "allocated_bytes": 4096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_web-6cc0f68ec3286ee6.d",
+        "bytes": 530,
+        "allocated_bytes": 4096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_web-72328f302964f445.d",
+        "bytes": 530,
+        "allocated_bytes": 4096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_web-744850cc5f1d7012.d",
+        "bytes": 530,
+        "allocated_bytes": 4096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_web-bd948bf567919926.d",
+        "bytes": 741,
+        "allocated_bytes": 4096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_web-c3e1872cf73cbae6.d",
+        "bytes": 741,
+        "allocated_bytes": 4096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_web-caf3f03743e8cc35.d",
+        "bytes": 741,
+        "allocated_bytes": 4096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_web-d1b75cf5d2ae33fc.d",
+        "bytes": 741,
+        "allocated_bytes": 4096
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_web-ee61bdd751a29d3a.d",
+        "bytes": 741,
+        "allocated_bytes": 4096
+      }
+    ],
+    "freed_allocated_bytes": 243707904,
+    "deleted_count": 141,
+    "volume_free_before": 67138117632,
+    "volume_free_after": 67381243904,
+    "new_independent_targets": 0,
+    "preserved": "all sources, fixed dependency snapshots, WIP, logs, receipts, screenshots, acceptance executables, current/future build dependency closure; ambiguous caches retained"
+  },
+  "retained_native_failures": [
+    {
+      "directory": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-3366559a/native-attempt-01",
+      "log": {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-3366559a/native-attempt-01/native.log",
+        "sha256": "9b8449b084a376e9aea7e9628c4a505b018916f2dcd82ce1f0b728ef52d13448"
+      },
+      "accepted": false
+    },
+    {
+      "directory": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-3366559a/native-attempt-02",
+      "log": {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-3366559a/native-attempt-02/native.log",
+        "sha256": "a58e9e88a633bfa653623f198f9ea4a73c1a28e7457087775875262786c95842"
+      },
+      "accepted": false
+    },
+    {
+      "directory": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-3366559a/native-attempt-03",
+      "log": {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-3366559a/native-attempt-03/native.log",
+        "sha256": "51ca45005d270beed68703932cb7e1a06f02b237c58bceb2c27fbd5b808f0846"
+      },
+      "accepted": false
+    },
+    {
+      "directory": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-3366559a/native-attempt-04",
+      "log": {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-3366559a/native-attempt-04/native.log",
+        "sha256": "13e4dbc476ec6e41644b141080709e65ed2da0556bc95e31826c0db1e19ae637"
+      },
+      "accepted": false
+    },
+    {
+      "directory": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-3366559a/native-attempt-05",
+      "log": {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-3366559a/native-attempt-05/native.log",
+        "sha256": "3d02b86480c96cff63ed7e7f863ad51ba7da27997d283cb2ef99a768e5ad45b3"
+      },
+      "accepted": false
+    },
+    {
+      "directory": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-3366559a/native-attempt-06",
+      "log": {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-3366559a/native-attempt-06/native.log",
+        "sha256": "98b9fcbe781e13e368fa558948a9d4b48d5f375734a03309dd8d0ac6469ba26b"
+      },
+      "accepted": false
+    },
+    {
+      "directory": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-3366559a/native-attempt-07",
+      "log": {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-3366559a/native-attempt-07/native.log",
+        "sha256": "415fdbfea0c447ae4d36d3c160d45c125d056e7624a1385ed6d2bf455f07b046"
+      },
+      "accepted": false
+    },
+    {
+      "directory": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-3366559a/native-attempt-08",
+      "log": {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-3366559a/native-attempt-08/native.log",
+        "sha256": "d80dd1661defa7885653f836b29211b65c9dde4b976b54ba1ac66d220ea82be6"
+      },
+      "accepted": false
+    }
+  ],
+  "issues": {
+    "row_help": 35,
+    "menu": 36,
+    "synthetic_control_key": 37
+  },
+  "remaining": [
+    "published fixed SDK promotion",
+    "physical IME/Escape and VoiceOver",
+    "SideChat/window lifecycle for help",
+    "full Transcript/rich content and reading/paging anchors",
+    "host navigation integration and whole-page ClientKit visual parity",
+    "native Sort/Group/Move Pin menus",
+    "Primary Folder/catalog and folder outline",
+    "multi-endpoint aggregation",
+    "local FTS OR/BM25",
+    "persistent activity clock",
+    "final review/CI/merge/stage tag"
+  ],
+  "complete": false,
+  "generator_replay": {
+    "exit_code": 0,
+    "receipt": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-help-3366559a-replay/receipt.json",
+      "sha256": "be7190d07b53244fd81773a707aad2e3af476c888fbf15fb893172b885ab58cd"
+    },
+    "checks": [
+      {
+        "check": "tests",
+        "exit_code": 0
+      },
+      {
+        "check": "clippy",
+        "exit_code": 0
+      },
+      {
+        "check": "actual-wrapper",
+        "exit_code": 0
+      },
+      {
+        "check": "public-consumer",
+        "exit_code": 0
+      },
+      {
+        "check": "native-build",
+        "exit_code": 0
+      }
+    ],
+    "code_overrides_match_native_accepted_snapshot": true,
+    "command": [
+      "scripts/test-reading-candidate.py",
+      "--source",
+      ".runtime-fixtures/tekesui-content-help-3366559a1a52/source",
+      "--manifest",
+      ".runtime-fixtures/tekesui-content-help-3366559a1a52/portable-manifest.json",
+      "--probe",
+      "scripts/probes/agentkit-sidebar-help-candidate.rs",
+      "--append-run-probe",
+      "--append-rail-probe",
+      "--append-start-probe",
+      "--turn-rail",
+      "--forwarded-focus",
+      "--composer-padding",
+      "--append-padding-intent-probe",
+      "--sidebar-help",
+      "--workdir",
+      "<fresh-source-snapshot-directory>",
+      "--target-dir",
+      "/tmp/agentkit-layout-text-292-target"
+    ]
+  }
+}

@@ -1,16 +1,20 @@
 // Text bridge follows TekesUI's MIT-licensed public consumer example; no Gallery internals.
-use std::{rc::Rc, sync::Arc, time::Instant};
+#[path = "native_key.rs"]
+pub(super) mod native_key;
+#[path = "native_pointer.rs"]
+pub(super) mod native_pointer;
+use std::{io::Write, rc::Rc, sync::Arc, time::Instant};
 use tekes_agent_components_ui::{COMPOSER, Intent, RunSurface};
 use tekes_agent_contract::PromptMode;
 use tekes_agent_presentation::{ComposerDestination, RunController, RunScope};
 use tekes_agent_session::SessionRuntime;
 use tekes_ui_controls::{
-    ButtonTextAlign, ButtonTextRenderer, ControlKey, ControlMotionContext, TextSurfaceHost,
+    ButtonTextAlign, ButtonTextRenderer, ControlMotionContext, TextSurfaceHost,
     TextSurfaceTextRenderer, composition::ContentEvent,
 };
 use tekes_ui_platform_macos::{
-    App, AppConfig, Event, KeyEventKind, MenuBar, MouseEventKind, ScrollPhase, Size, Window,
-    WindowConfig, WindowHandler,
+    App, AppConfig, Event, KeyEventKind, MenuBar, ScrollPhase, Size, Window, WindowConfig,
+    WindowHandler,
 };
 use tekes_ui_render::Renderer;
 use tekes_ui_scene::{GlyphAtlas, Point, Rect, Scene, Size as SSize};
@@ -18,30 +22,103 @@ use tekes_ui_text::{
     coretext::{CoreTextFonts, CoreTextRasterizer, CoreTextShaper},
     model::{Paragraph, ShapeOptions},
     push::push_paragraph_visible,
-    style::TextStyle,
     traits::Shaper,
 };
 use tekes_ui_tokens::{Palette, Theme, proposal};
-struct TextBackend {
-    shaper: CoreTextShaper,
-    rasterizer: CoreTextRasterizer,
-    scale: f32,
-    type_scale: f32,
-    atlas: GlyphAtlas,
-    started: std::time::Instant,
-    frame_requested: bool,
-    reduced_motion: bool,
-    caret_on: bool,
+pub(super) fn window_renderer(window: &Window) -> Renderer {
+    // SAFETY: the public platform window owns a live CAMetalLayer for this renderer.
+    unsafe {
+        Renderer::new_for_metal_layer(
+            window.metal_layer(),
+            window.drawable_size(),
+            window.scale() as f32,
+        )
+    }
+    .expect("Metal renderer")
+}
+/// Common public-platform event adapter for both the legacy harness and formal
+/// component demo. Text editing and native text-key ownership remain in TekesUI.
+pub(super) fn input_event(
+    e: Event,
+    w: &Window,
+    tree: &tekes_ui_controls::composition::ContentHost,
+) -> Option<ContentEvent> {
+    Some(match e {
+        Event::Mouse(mouse) => native_pointer::translate(mouse),
+        Event::TextKey(report) => native_key::translate(report),
+        Event::Scroll(scroll) => ContentEvent::Scroll {
+            position: Point::new(scroll.position.x as f32, scroll.position.y as f32),
+            delta: Point::new(-scroll.delta.x as f32, -scroll.delta.y as f32),
+            precise: scroll.precise,
+            begin: matches!(scroll.phase, ScrollPhase::Began | ScrollPhase::MayBegin),
+            end: matches!(scroll.phase, ScrollPhase::Ended | ScrollPhase::Cancelled),
+            momentum: scroll.momentum_phase != ScrollPhase::None,
+            time: scroll.timestamp,
+        },
+        Event::TextCommit { text, replacement } => ContentEvent::Commit { text, replacement },
+        Event::TextPreedit {
+            text,
+            selection,
+            clauses,
+            replacement,
+        } => ContentEvent::Preedit {
+            text,
+            selection,
+            clauses,
+            replacement,
+        },
+        Event::TextUnmark => ContentEvent::Unmark,
+        Event::TextCommand(command) => {
+            if command == "copy:" {
+                if let Some(surface) = tree.focused_text() {
+                    w.set_clipboard_text(&surface.input.selected_text());
+                }
+                return None;
+            }
+            if command == "paste:" {
+                return w.clipboard_text().map(|text| ContentEvent::Commit {
+                    text,
+                    replacement: None,
+                });
+            }
+            ContentEvent::TextCommand(command)
+        }
+        Event::Key(key) => {
+            if key.kind == KeyEventKind::Down && key.modifiers.command {
+                let command = match key.key_code {
+                    0 => Some("selectAll:"),
+                    6 if key.modifiers.shift => Some("redo:"),
+                    6 => Some("undo:"),
+                    8 => Some("copy:"),
+                    9 => Some("paste:"),
+                    _ => None,
+                };
+                if let Some(command) = command {
+                    return input_event(Event::TextCommand(command.into()), w, tree);
+                }
+            }
+            ContentEvent::KeyInput(native_key::key(key))
+        }
+        Event::Focus(false) => ContentEvent::Cancel,
+        _ => return None,
+    })
+}
+pub(super) struct TextBackend {
+    pub(super) shaper: CoreTextShaper,
+    pub(super) rasterizer: CoreTextRasterizer,
+    pub(super) scale: f32,
+    pub(super) type_scale: f32,
+    pub(super) atlas: GlyphAtlas,
+    pub(super) started: std::time::Instant,
+    pub(super) frame_requested: bool,
+    pub(super) reduced_motion: bool,
+    pub(super) caret_on: bool,
+    pub(super) recent_labels: Vec<Rc<tekes_ui_text::LabelLayout>>,
+    pub(super) recent_label_ink: Vec<(Rc<tekes_ui_text::LabelLayout>, tekes_ui_tokens::Rgba)>,
 }
 impl TextBackend {
     fn shape(&mut self, text: &str, role: proposal::TextRole, width: Option<f32>) -> Rc<Paragraph> {
-        let m = role.style();
-        let style = if proposal::text_family(role.id()) == Some("mono") {
-            TextStyle::named("Menlo", m.size * self.type_scale)
-        } else {
-            TextStyle::system(m.size * self.type_scale)
-        }
-        .with_weight(m.weight);
+        let style = tekes_agent_ui_demo::label_host::text_style(role, self.type_scale);
         Rc::new(self.shaper.shape(
             text,
             &style,
@@ -80,10 +157,44 @@ impl TextSurfaceTextRenderer for TextBackend {
         c: tekes_ui_tokens::Rgba,
         clip: Rect,
     ) {
+        if let Some(label) = self
+            .recent_labels
+            .iter()
+            .rev()
+            .find(|label| std::ptr::eq(label.paragraph(), p))
+        {
+            if self.recent_label_ink.len() == 128 {
+                self.recent_label_ink.remove(0);
+            }
+            self.recent_label_ink.push((label.clone(), c));
+        }
         self.push(s, p, o, c, clip)
     }
 }
 impl TextSurfaceHost for TextBackend {
+    fn shape_label(
+        &mut self,
+        text: &str,
+        role: proposal::TextRole,
+        width: f32,
+        options: tekes_ui_text::LabelOptions,
+    ) -> Option<Rc<tekes_ui_text::LabelLayout>> {
+        let layout = tekes_agent_ui_demo::label_host::shape_label(
+            &mut self.shaper,
+            text,
+            role,
+            width,
+            self.type_scale,
+            options,
+        );
+        // Bounded diagnostic receipts from the original SDK label service.
+        if self.recent_labels.len() == 64 {
+            self.recent_labels.remove(0);
+        }
+        self.recent_labels.push(layout.clone());
+        Some(layout)
+    }
+
     fn shape_surface(&mut self, s: &str, r: proposal::TextRole, w: Option<f32>) -> Rc<Paragraph> {
         self.shape(s, r, w)
     }
@@ -145,103 +256,158 @@ struct Host {
     results: std::sync::mpsc::Receiver<Result<(), String>>,
     sender: std::sync::mpsc::Sender<Result<(), String>>,
     selftest: bool,
+    wake: Option<tekes_ui_platform_macos::WindowWake>,
+    notifications: Option<tokio::task::JoinHandle<()>>,
     scopes: [RunScope; 2],
 }
-impl Host {
-    fn publish(&self, w: &Window) {
-        w.set_text_input_state(self.surface.tree.focused_text().map(|s| {
-            let r = s.caret();
-            let origin = s.origin();
-            tekes_ui_platform_macos::TextInputState {
-                caret_index: s.input.caret,
-                text: s.input.text.clone(),
-                selection: s.input.selection(),
-                marked: s.input.marked.clone(),
-                caret_origin: tekes_ui_platform_macos::Point {
-                    x: r.min_x() as f64,
-                    y: r.min_y() as f64,
-                },
-                caret_size: Size {
-                    width: r.size.width as f64,
-                    height: r.size.height as f64,
-                },
-                read_only: s.input.read_only,
-                carets: s
-                    .paragraph
-                    .as_ref()
-                    .map(|p| {
-                        p.lines
-                            .iter()
-                            .flat_map(|l| {
-                                l.carets.iter().map(move |(index, x)| {
-                                    (
-                                        *index,
-                                        tekes_ui_platform_macos::Point {
-                                            x: f64::from(origin.x) + x,
-                                            y: f64::from(origin.y) + l.top,
-                                        },
-                                        Size {
-                                            width: 1.,
-                                            height: l.height,
-                                        },
-                                    )
-                                })
-                            })
-                            .collect()
+pub(super) fn text_state(
+    s: &tekes_ui_controls::TextSurface,
+) -> tekes_ui_platform_macos::TextInputState {
+    let r = s.caret();
+    let origin = s.origin();
+    tekes_ui_platform_macos::TextInputState {
+        caret_index: s.input.caret,
+        text: s.input.text.clone(),
+        selection: s.input.selection(),
+        marked: s.input.marked.clone(),
+        caret_origin: tekes_ui_platform_macos::Point {
+            x: r.min_x() as f64,
+            y: r.min_y() as f64,
+        },
+        caret_size: Size {
+            width: r.size.width as f64,
+            height: r.size.height as f64,
+        },
+        read_only: s.input.read_only,
+        carets: s
+            .paragraph
+            .as_ref()
+            .map(|p| {
+                p.lines
+                    .iter()
+                    .flat_map(|l| {
+                        l.carets.iter().map(move |(index, x)| {
+                            (
+                                *index,
+                                tekes_ui_platform_macos::Point {
+                                    x: f64::from(origin.x) + x,
+                                    y: f64::from(origin.y) + l.top,
+                                },
+                                Size {
+                                    width: 1.,
+                                    height: l.height,
+                                },
+                            )
+                        })
                     })
-                    .unwrap_or_default(),
-            }
-        }));
-        use tekes_ui_controls::composition::ContentRole as R;
-        use tekes_ui_platform_macos::{
-            AccessibilityKey as K, AccessibilityNode as N, AccessibilityRole as A,
-        };
-        let nodes = self
-            .surface
-            .tree
-            .semantics()
+                    .collect()
+            })
+            .unwrap_or_default(),
+    }
+}
+pub(super) fn publish_content(tree: &tekes_ui_controls::composition::ContentHost, w: &Window) {
+    w.set_text_input_state(tree.focused_text().map(text_state));
+    use tekes_ui_controls::composition::ContentRole as R;
+    use tekes_ui_platform_macos::{
+        AccessibilityKey as K, AccessibilityNode as N, AccessibilityRole as A,
+    };
+    let nodes = tree
+        .semantics()
+        .into_iter()
+        .filter_map(|n| {
+            let frame = n.visible?;
+            let text = tree.text_surface(n.id);
+            Some(N {
+                key: K {
+                    component: n.id.0,
+                    part: None,
+                },
+                parent: n.parent.map(|p| K {
+                    component: p.0,
+                    part: None,
+                }),
+                role: match n.semantics.role {
+                    R::TextInput if text.is_some_and(|s| s.input.multiline) => A::TextArea,
+                    R::TextInput => A::TextField,
+                    R::Button => A::Button,
+                    R::Text => A::StaticText,
+                    _ => A::Group,
+                },
+                frame: tekes_ui_platform_macos::Rect {
+                    origin: tekes_ui_platform_macos::Point {
+                        x: frame.min_x() as f64,
+                        y: frame.min_y() as f64,
+                    },
+                    size: Size {
+                        width: frame.size.width as f64,
+                        height: frame.size.height as f64,
+                    },
+                },
+                label: n.semantics.name,
+                value: n.semantics.value,
+                description: n.semantics.description,
+                enabled: !n.semantics.disabled,
+                focused: n.focused && w.is_active(),
+                selected: n.semantics.selected,
+                expanded: n.semantics.expanded,
+                invalid: n.semantics.invalid,
+                required: n.semantics.required,
+                text_selection: text.map(|s| s.input.selection()),
+                read_only: text.is_some_and(|s| s.input.read_only),
+            })
+        })
+        .collect();
+    w.set_accessibility_text_layouts(
+        tree.semantics()
             .into_iter()
-            .map(|n| {
-                let text = self.surface.tree.text_surface(n.id);
-                N {
-                    key: K {
+            .filter_map(|n| {
+                let surface = tree.text_surface(n.id)?;
+                let paragraph = surface.paragraph.as_ref()?;
+                Some((
+                    K {
                         component: n.id.0,
                         part: None,
                     },
-                    parent: n.parent.map(|p| K {
-                        component: p.0,
-                        part: None,
-                    }),
-                    role: match n.semantics.role {
-                        R::TextInput => A::TextField,
-                        R::Button => A::Button,
-                        R::Text => A::StaticText,
-                        _ => A::Group,
+                    tekes_ui_platform_macos::AccessibilityTextLayout {
+                        state: text_state(surface),
+                        lines: paragraph.lines.iter().map(|l| l.utf16.clone()).collect(),
                     },
-                    frame: tekes_ui_platform_macos::Rect {
-                        origin: tekes_ui_platform_macos::Point {
-                            x: n.frame.min_x() as f64,
-                            y: n.frame.min_y() as f64,
-                        },
-                        size: Size {
-                            width: n.frame.size.width as f64,
-                            height: n.frame.size.height as f64,
-                        },
-                    },
-                    label: n.semantics.name,
-                    value: n.semantics.value,
-                    description: n.semantics.description,
-                    enabled: !n.semantics.disabled,
-                    focused: n.focused,
-                    selected: n.semantics.selected,
-                    expanded: n.semantics.expanded,
-                    invalid: n.semantics.invalid,
-                    text_selection: text.map(|s| s.input.selection()),
-                    read_only: text.is_some_and(|s| s.input.read_only),
-                }
+                ))
             })
-            .collect();
-        w.set_accessibility_nodes(nodes);
+            .collect(),
+    );
+    w.set_accessibility_nodes(nodes);
+}
+impl Host {
+    fn publish(&self, w: &Window) {
+        publish_content(&self.surface.tree, w);
+        // Opt-in review evidence only; no timer or additional redraw is started.
+        if let Some(dir) = std::env::var_os("TEKESUI_COMPONENT_EVIDENCE") {
+            let dir = std::path::PathBuf::from(dir);
+            std::fs::create_dir_all(&dir).expect("review evidence directory");
+            let snapshot = self.controller.snapshot();
+            let surface = &self.surface.transcript().field.surface;
+            let anchor = surface.hit(surface.inner.origin);
+            let receipt = serde_json::json!({
+                "elapsed_ms": self.text.started.elapsed().as_millis(),
+                "redraw_count": w.redraw_count(), "animation_frames": w.animation_frame_count(),
+                "animating": w.is_animating(),
+                "active": w.is_active(), "focused": self.surface.tree.focused().map(|id| id.0),
+                "screen": w.screen_info().map(|s| serde_json::json!({"name":s.name,"builtin":s.builtin,"scale":s.scale})),
+                "draft": snapshot.draft.text, "items": snapshot.transcript.items.len(),
+                "connection": format!("{:?}", snapshot.connection),
+                "transcript_offset": surface.scroll.offset.y,
+                "anchor_index": anchor, "anchor_y": anchor.map(|i| surface.caret_doc(i).min_y() + surface.origin().y),
+                "anchor_tail": anchor.map(|i| surface.input.text.encode_utf16().skip(i).take(80).collect::<Vec<_>>()),
+                "selection": surface.input.selection(),
+            });
+            let mut file = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(dir.join("frames.jsonl"))
+                .expect("review frames");
+            writeln!(file, "{receipt}").expect("review frame receipt");
+        }
     }
     fn draw(&mut self, w: &Window) {
         while let Ok(result) = self.results.try_recv() {
@@ -263,6 +429,7 @@ impl Host {
                 .push_str(&format!(" · {notice}"));
         }
         self.text.scale = w.scale() as f32;
+        self.text.frame_requested = false;
         self.text.atlas.begin_frame();
         self.scene.clear();
         let clip = Rect::new(0., 0., w.size().width as f32, w.size().height as f32);
@@ -284,6 +451,8 @@ impl Host {
             )
             .expect("render Agent scene");
         }
+        // Only finite control transitions request display-link frames.
+        w.set_animating(self.text.frame_requested);
     }
     fn close(&mut self, w: &Window) {
         if self.selftest {
@@ -333,8 +502,21 @@ impl Host {
                 "NATIVE_AGENT_UI_SELFTEST_OK synthetic-text-services+button-send+stream+cancel+draft-switch+reconnect+history-data; physical-ime=false; prepend-anchor=false"
             );
         }
+        if let Some(task) = self.notifications.take() {
+            task.abort();
+        }
         w.set_animating(false);
         w.close();
+        if std::env::var_os("TEKESUI_COMPONENT_EVIDENCE").is_some()
+            && let Some(wake) = &self.wake
+        {
+            assert_eq!(wake.wake(), tekes_ui_platform_macos::WakeResult::Closed);
+            assert_eq!(
+                wake.clone().wake(),
+                tekes_ui_platform_macos::WakeResult::Closed
+            );
+            eprintln!("AGENT_REVIEW_CLOSED original+clone=Closed");
+        }
     }
     fn maybe_finish_selftest(&mut self, w: &Window) {
         if !self.selftest || self.text.started.elapsed() < std::time::Duration::from_secs(8) {
@@ -353,6 +535,7 @@ impl Host {
             let controller = self.controller.clone();
             let runtime = self.runtime.clone();
             let sender = self.sender.clone();
+            let wake = self.wake.clone();
             match intent {
                 Intent::Edit { destination, text } => {
                     let snapshot = controller.snapshot();
@@ -373,6 +556,13 @@ impl Host {
                 Intent::Send { destination } => {
                     match controller.prepare(&destination, PromptMode::Queue) {
                         Ok(ticket) => {
+                            // The existing synchronous prepare owns the frozen
+                            // draft and authoritative clear. Apply its versioned
+                            // transaction before accepting another native input.
+                            if let Err(error) = self.surface.sync(&controller.snapshot()) {
+                                self.notice = Some(error.into());
+                            }
+
                             self.executor.spawn(async move {
                                 let result = controller
                                     .dispatch(ticket, None)
@@ -380,6 +570,9 @@ impl Host {
                                     .map(|_| ())
                                     .map_err(|e| e.to_string());
                                 let _ = sender.send(result);
+                                if let Some(wake) = wake {
+                                    wake.wake();
+                                }
                             });
                         }
                         Err(e) => self.notice = Some(e.to_string()),
@@ -389,6 +582,9 @@ impl Host {
                     self.executor.spawn(async move {
                         let _ =
                             sender.send(controller.cancel(&scope).await.map_err(|e| e.to_string()));
+                        if let Some(wake) = wake {
+                            wake.wake();
+                        }
                     });
                 }
                 Intent::Earlier { scope } => {
@@ -400,6 +596,9 @@ impl Host {
                                 .map(|_| ())
                                 .map_err(|e| e.to_string()),
                         );
+                        if let Some(wake) = wake {
+                            wake.wake();
+                        }
                     });
                 }
                 Intent::Reconnect => {
@@ -410,6 +609,9 @@ impl Host {
                         }
                         .await;
                         let _ = sender.send(r.map_err(|e| e.to_string()));
+                        if let Some(wake) = wake {
+                            wake.wake();
+                        }
                     });
                 }
                 Intent::Select(id) => {
@@ -422,6 +624,9 @@ impl Host {
                                 let _ = sender.send(
                                     runtime.open_session(&id).await.map_err(|e| e.to_string()),
                                 );
+                                if let Some(wake) = wake {
+                                    wake.wake();
+                                }
                             });
                         }
                         Err(e) => self.notice = Some(e.to_string()),
@@ -431,125 +636,52 @@ impl Host {
         }
     }
     fn dispatch(&mut self, e: Event, w: &Window) {
-        let event = match e {
-            Event::Mouse(m) => {
-                if matches!(m.kind,MouseEventKind::Down{button,..}|MouseEventKind::Up{button,..}|MouseEventKind::Dragged{button} if button!=tekes_ui_platform_macos::MouseButton::Left)
-                {
-                    return;
-                }
-                let p = Point::new(m.position.x as f32, m.position.y as f32);
-                match m.kind {
-                    MouseEventKind::Down { .. } => ContentEvent::PointerDown(p),
-                    MouseEventKind::Up { .. } => ContentEvent::PointerUp(p),
-                    MouseEventKind::Exited => ContentEvent::PointerMove(Point::new(-1., -1.)),
-                    _ => ContentEvent::PointerMove(p),
-                }
-            }
-            Event::Scroll(s) => ContentEvent::Scroll {
-                position: Point::new(s.position.x as f32, s.position.y as f32),
-                delta: Point::new(-s.delta.x as f32, -s.delta.y as f32),
-                precise: s.precise,
-                begin: matches!(s.phase, ScrollPhase::Began | ScrollPhase::MayBegin),
-                end: matches!(s.phase, ScrollPhase::Ended | ScrollPhase::Cancelled),
-                momentum: s.momentum_phase != ScrollPhase::None,
-                time: s.timestamp,
-            },
-            Event::TextCommit { text, replacement } => ContentEvent::Commit { text, replacement },
-            Event::TextPreedit {
-                text,
-                selection,
-                clauses,
-                replacement,
-            } => ContentEvent::Preedit {
-                text,
-                selection,
-                clauses,
-                replacement,
-            },
-            Event::TextUnmark => ContentEvent::Unmark,
-            Event::TextCommand(c) => {
-                if c == "copy:" {
-                    if let Some(s) = self.surface.tree.focused_text() {
-                        w.set_clipboard_text(&s.input.selected_text());
-                    }
-                    return;
-                }
-                if c == "paste:" {
-                    if let Some(text) = w.clipboard_text() {
-                        let actions = self.surface.event(&ContentEvent::Commit {
-                            text,
-                            replacement: None,
-                        });
-                        self.intents(actions);
-                    }
-                    return;
-                }
-                ContentEvent::TextCommand(c)
-            }
-            Event::Key(k) => {
-                if k.kind == KeyEventKind::Down && k.modifiers.command {
-                    let c = match k.key_code {
-                        0 => Some("selectAll:"),
-                        6 if k.modifiers.shift => Some("redo:"),
-                        6 => Some("undo:"),
-                        8 => Some("copy:"),
-                        9 => Some("paste:"),
-                        _ => None,
-                    };
-                    if let Some(c) = c {
-                        return self.dispatch(Event::TextCommand(c.into()), w);
-                    }
-                }
-                let key = match k.key_code {
-                    36 | 76 => ControlKey::Enter,
-                    49 => ControlKey::Space,
-                    48 => ControlKey::Tab {
-                        reverse: k.modifiers.shift,
-                    },
-                    53 => ControlKey::Escape,
-                    123 => ControlKey::Left,
-                    124 => ControlKey::Right,
-                    125 => ControlKey::Down,
-                    126 => ControlKey::Up,
-                    _ => return,
-                };
-                ContentEvent::Key {
-                    key,
-                    down: k.kind == KeyEventKind::Down,
-                }
-            }
-            Event::Focus(false) => ContentEvent::Cancel,
-            _ => return,
+        let Some(event) = input_event(e, w, &self.surface.tree) else {
+            return;
         };
-        let actions = self.surface.event(&event);
-        self.intents(actions);
+        match self.surface.event_with_text(&event, &mut self.text) {
+            Ok(actions) => self.intents(actions),
+            Err(error) => self.notice = Some(format!("text input layout: {error:?}")),
+        }
     }
 }
 impl WindowHandler for Host {
     fn handle(&mut self, e: Event, w: &mut Window) {
         match e {
             Event::Created => {
-                // SAFETY: the public platform window owns a live CAMetalLayer for this renderer.
-                self.gpu = Some(
-                    unsafe {
-                        Renderer::new_for_metal_layer(
-                            w.metal_layer(),
-                            w.drawable_size(),
-                            w.scale() as f32,
-                        )
-                    }
-                    .expect("Metal renderer"),
-                );
+                assert!(w.set_text_key_events(true));
+                if std::env::var_os("TEKESUI_AX_PROTOCOL_AUDIT").is_some() {
+                    use crate::acceptance_script::{Action, run_script};
+                    run_script(vec![
+                        (
+                            1000,
+                            Action::AuditAXText(tekes_agent_components_ui::TRANSCRIPT.0),
+                        ),
+                        (1200, Action::AuditAXText(COMPOSER.0)),
+                    ]);
+                }
+                self.gpu = Some(window_renderer(w));
                 self.surface.sync(&self.controller.snapshot()).unwrap();
                 self.surface.tree.focus(Some(COMPOSER), true);
                 self.draw(w);
-                // Explicit development-only frame pump: TKUI-001, not a production wake bridge.
-                assert!(
-                    w.set_animating(true),
-                    "development frame pump needs macOS 14+"
-                );
+                let wake = w.wake_proxy();
+                self.wake = Some(wake.clone());
+                self.notifications = Some(self.executor.spawn(
+                    tekes_agent_ui_demo::notifications::forward(
+                        self.controller.subscribe(),
+                        move || wake.wake() != tekes_ui_platform_macos::WakeResult::Closed,
+                    ),
+                ));
                 if self.selftest {
                     native_script(&self.surface);
+                    let wake = self.wake.clone().unwrap();
+                    self.executor.spawn(async move {
+                        tokio::time::sleep(std::time::Duration::from_secs(9)).await;
+                        wake.wake();
+                        // One bounded failure deadline for this opt-in selftest only.
+                        tokio::time::sleep(std::time::Duration::from_secs(12)).await;
+                        wake.wake();
+                    });
                 }
             }
             Event::Resized {
@@ -566,6 +698,15 @@ impl WindowHandler for Host {
                 self.draw(w);
                 self.maybe_finish_selftest(w);
             }
+            Event::Wake => {
+                eprintln!(
+                    "AGENT_REVIEW_WAKE elapsed_ms={}",
+                    self.text.started.elapsed().as_millis()
+                );
+                // No polling timer: publication/completion notifications invalidate the UI.
+                w.request_redraw();
+                self.maybe_finish_selftest(w);
+            }
             Event::Redraw => self.draw(w),
             Event::CaretBlink => {
                 self.text.caret_on = !self.text.caret_on;
@@ -576,11 +717,18 @@ impl WindowHandler for Host {
                 self.draw(w);
             }
             Event::Accessibility { target, action } => {
+                if !w.is_active() {
+                    return;
+                }
                 if self.surface.composing() && target.component != COMPOSER.0 {
                     return;
                 }
                 use tekes_ui_controls::composition::{AccessibilityAction as A, ComponentId};
                 let action = match action {
+                    // This host mounts no Tree; disclosure is never a button action.
+                    tekes_ui_platform_macos::AccessibilityAction::SetExpanded(_) => return,
+                    tekes_ui_platform_macos::AccessibilityAction::Increment => A::Increment,
+                    tekes_ui_platform_macos::AccessibilityAction::Decrement => A::Decrement,
                     tekes_ui_platform_macos::AccessibilityAction::Focus => A::Focus,
                     tekes_ui_platform_macos::AccessibilityAction::Press => A::Press,
                     tekes_ui_platform_macos::AccessibilityAction::SetValue(v) => A::SetValue(v),
@@ -591,16 +739,21 @@ impl WindowHandler for Host {
                         A::ReplaceSelectedText(v)
                     }
                 };
-                self.surface.tree.accessibility_action(
+                let intents = self.surface.accessibility_action(
                     ComponentId(target.component),
                     target.part,
                     action,
                 );
-                let intents = self
-                    .surface
-                    .event(&ContentEvent::PointerMove(Point::new(-1., -1.)));
                 self.intents(intents);
                 self.draw(w);
+            }
+            Event::Focus(active) => {
+                if !active {
+                    self.surface.event(&ContentEvent::Cancel);
+                    self.surface.tree.focus(None, false);
+                }
+                self.publish(w);
+                w.request_redraw();
             }
             Event::CloseRequested => self.close(w),
             Event::SystemAppearanceChanged {
@@ -634,10 +787,6 @@ pub fn run() {
         .iter()
         .position(|a| a == "--offscreen")
         .map(|i| args.get(i + 1).expect("--offscreen needs a path").clone());
-    assert!(
-        offscreen.is_some() || args.iter().any(|a| a == "--frame-pump"),
-        "TKUI-001: native development demo requires explicit --frame-pump"
-    );
     let executor = tokio::runtime::Runtime::new().unwrap();
     let (runtime, controller, scopes) = if let Some(i) =
         args.iter().position(|a| a == "--endpoint-config")
@@ -650,43 +799,15 @@ pub fn run() {
             &std::fs::read(args.get(i + 1).expect("config path")).expect("read explicit config"),
         )
         .expect("config JSON");
-        let id = tekes_agent_contract::string(&config, "endpointId").expect("endpointId");
-        let bearer =
-            std::env::var(tekes_agent_contract::string(&config, "bearerEnv").expect("bearerEnv"))
-                .expect("explicit bearer env missing");
-        let connector = tekes_agent_endpoint_kernel::KernelConnector::new(
-            id,
-            tekes_agent_contract::string(&config, "url").expect("url"),
-            bearer,
-        )
-        .expect("Native connector config");
-        let sessions = config["sessions"]
-            .as_array()
-            .filter(|v| v.len() == 2)
-            .expect("two explicit sessions");
-        let scopes = [
-            RunScope::main(id, sessions[0].as_str().expect("session ID")),
-            RunScope::main(id, sessions[1].as_str().expect("session ID")),
-        ];
-        let (runtime, controller) = executor
-            .block_on(async {
-                let runtime = Arc::new(SessionRuntime::spawn(id, Arc::new(connector)));
-                runtime
-                    .wait_ready(std::time::Duration::from_secs(10))
-                    .await?;
-                let controller = Arc::new(RunController::new(runtime.clone())?);
-                controller.open(scopes[0].clone()).await?;
-                tokio::time::timeout(std::time::Duration::from_secs(5), async {
-                    while controller.snapshot().transcript.is_stale {
-                        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-                    }
-                })
-                .await
-                .map_err(|_| tekes_agent_contract::Error::Timeout)?;
-                Ok::<_, tekes_agent_contract::Error>((runtime, controller))
+        let configured =
+            tekes_agent_ui_demo::endpoint_config::EndpointConfiguration::parse(&config, |name| {
+                std::env::var(name).ok()
             })
-            .expect("Native baseline");
-        (runtime, controller, scopes)
+            .expect("explicit endpoint configuration");
+        let connected = executor
+            .block_on(configured.connect())
+            .expect("endpoint baseline");
+        (connected.runtime, connected.controller, connected.scopes)
     } else {
         let (runtime, controller) = executor
             .block_on(tekes_agent_ui_demo::fixture::setup())
@@ -715,6 +836,8 @@ pub fn run() {
             frame_requested: false,
             reduced_motion: false,
             caret_on: true,
+            recent_labels: Vec::new(),
+            recent_label_ink: Vec::new(),
         },
         scene: Scene::new(),
         palette: Palette::from(Theme::LIGHT),
@@ -724,6 +847,8 @@ pub fn run() {
         notice: None,
         results,
         sender,
+        wake: None,
+        notifications: None,
         selftest: args.iter().any(|a| a == "--native-selftest"),
         scopes,
     };
@@ -761,6 +886,19 @@ pub fn run() {
             .unwrap()
             .write_image_data(&bytes)
             .unwrap();
+        let snapshot = host.controller.snapshot();
+        println!(
+            "{}",
+            serde_json::json!({
+                "offscreen": true,
+                "nativeInteraction": false,
+                "isStale": snapshot.transcript.is_stale,
+                "transcriptItems": snapshot.transcript.items.len(),
+                "finalAssistantItems": snapshot.transcript.items.iter().filter(|item|
+                    item.kind == tekes_agent_presentation::TranscriptItemKind::Assistant && item.is_final
+                ).count(),
+            })
+        );
         host.executor.block_on(host.runtime.stop()).unwrap();
         return;
     }
@@ -771,6 +909,10 @@ pub fn run() {
     .run(
         WindowConfig {
             title: "AgentKit · 本地协议演示".into(),
+            placement: tekes_ui_platform_macos::WindowPlacement::Auto {
+                need_120hz: false,
+                size_check: false,
+            },
             size: Size {
                 width: 1000.,
                 height: 760.,
@@ -782,8 +924,8 @@ pub fn run() {
     );
 }
 fn native_script(surface: &RunSurface) {
+    use crate::acceptance_script::{Action, run_script};
     use tekes_agent_components_ui::{CANCEL, EARLIER, RECONNECT, SEND, SESSION_A, SESSION_B};
-    use tekes_ui_platform_macos::selftest::{Action, run_script};
     let click = |id| {
         let p = surface.tree.get(id).unwrap().frame().center();
         Action::Click {

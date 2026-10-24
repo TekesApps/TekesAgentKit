@@ -1,0 +1,207 @@
+{
+  "date": "2026-10-20",
+  "publishedBaseline": "v0.3.8",
+  "tekesui": {
+    "rev": "431093786de47b48cd566d0d9c0eafa088b10d68",
+    "packages": 8,
+    "inputs": 188,
+    "sha256": "03721866a362b1d31261ebbbc86140eb07e9e23320871c325234a5212591213d"
+  },
+  "tests": {
+    "UI": 115,
+    "newAnnotationCases": 5,
+    "secondConsumerNewMount": 1,
+    "tools": 18,
+    "root": "unchanged; previous 105 tests not rerun"
+  },
+  "gates": [
+    "UI strict all-targets Clippy",
+    "fmt",
+    "build",
+    "dependency boundary",
+    "actual public Cargo source bytes"
+  ],
+  "sourceSha256": {
+    "ui/components/src/annotation_editor.rs": "936e518b57defe013a2baf8714f224c7fa578acb114f4db0d0d6bf7aecb1041a",
+    "ui/components/src/lib.rs": "415824b217afe6acea97932c086b34970bec5af4825c620383602cd0264b1e87",
+    "ui/bindings/src/lib.rs": "5c2618f955d300d113ec526dd21c30c4b94aa16286a1f9cd2edad09ef1a818d9",
+    "ui/demo/src/component_demo.rs": "929962d8dd45648ca6d7d6d29e5bd47dd9ab8f04dc0f732eca2d2e9172e4c3b8",
+    "ui/demo/src/components_native.rs": "0d1688a624d64d87a4fa70fbe3009e34697ee67d860818bb63299f7e95b71f7c",
+    "ui/demo/tests/annotation_editor.rs": "422ad2611b1fb6b7be573f4f608794ba63dbe3390097217031522d78fc9db2fa",
+    "ui/consumer/src/lib.rs": "61d2b86a41ca4a127fc04a726e8023f654aa4e16f29904acd26e114abc8d4754",
+    "scripts/test-real-session-endpoints.py": "ba3be8adfb3b1534a9361324aa043c53895fb0dcd8027b4a326317697a020e38"
+  },
+  "binarySha256": "8fb3b095e7c51956e4a72c1a8a4759b128301da6a2b0c5f56b2e9b957a0e86ec",
+  "screenshot": {
+    "path": "ui/docs/annotation-editor-native.png",
+    "sha256": "43adb24afae687319e653ef7c9aabb0607d879658414c4ca62cf05d2de2e6dfe"
+  },
+  "nativeMarkers": {
+    "annotation": [
+      "NATIVE_AGENT_ANNOTATION_SELFTEST_OK public-editor+committed-comment+synthetic-ime-barrier+shared-draft+shared-compilation+single-admission+stream+destination-isolation; physical-ime=false; source-highlight=false; formal-transcript=false"
+    ],
+    "context": [
+      "NATIVE_AGENT_CONTEXT_SELFTEST_OK public-cards+ime-barrier+remove-before-send+shared-compilation+single-admission+stream+destination-isolation; file-upload=false; annotation-editor=false; physical-ime=false"
+    ],
+    "full": [
+      "NATIVE_AGENT_SIDEBAR_SUMMARY_SELFTEST_OK shared-inventory+shared-pin+sidebar-selection+summary-facts; full-run-view=false; physical-ime=false",
+      "NATIVE_AGENT_SIDECHAT_SELFTEST_OK owned-create+separate-composer+send+stream+draft+cancel-discard+parent-isolation; transcript=false; physical-ime=false",
+      "NATIVE_AGENT_CHILD_SELFTEST_OK direct-parent+independent-composer+single-admission+stream+cancel+isolated-drafts+bounded-read-only+paging+local-retirement; formal-transcript=false; physical-ime=false",
+      "NATIVE_AGENT_TASK_SELFTEST_OK resolved-task+independent-composer+single-admission+stream+cancel+parent-draft-isolation+close; transcript=false; physical-ime=false",
+      "NATIVE_AGENT_COMPONENTS_SELFTEST_OK composer+indicators+run-binding+synthetic-text-services+send+stream+cancel+draft-isolation+reconnect; physical-ime=false; transcript=false; reading-anchor=false"
+    ]
+  },
+  "realEndpoints": {
+    "PI": {
+      "annotationProof": {
+        "committedComment": true,
+        "componentEditor": true,
+        "nativeInteraction": false,
+        "physicalIME": false,
+        "promptSettled": true,
+        "sharedCompilation": true,
+        "sourceHighlight": false,
+        "sourceRetained": true
+      },
+      "components": true,
+      "contextProof": {
+        "annotationReturned": true,
+        "clearedDraft": true,
+        "explicitRemoval": true,
+        "fileUpload": false,
+        "mountedCards": true,
+        "nativeInteraction": false,
+        "promptSettled": true,
+        "referenceReturned": true,
+        "structuredTranscript": false
+      },
+      "finalAssistantItems": 3,
+      "initialPresetProof": null,
+      "inventoryRows": 13,
+      "isStale": false,
+      "modelChoiceProof": null,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 7,
+      "transcriptView": false
+    },
+    "DSH": {
+      "annotationProof": {
+        "committedComment": true,
+        "componentEditor": true,
+        "nativeInteraction": false,
+        "physicalIME": false,
+        "promptSettled": true,
+        "sharedCompilation": true,
+        "sourceHighlight": false,
+        "sourceRetained": true
+      },
+      "components": true,
+      "contextProof": {
+        "annotationReturned": true,
+        "clearedDraft": true,
+        "explicitRemoval": true,
+        "fileUpload": false,
+        "mountedCards": true,
+        "nativeInteraction": false,
+        "promptSettled": true,
+        "referenceReturned": true,
+        "structuredTranscript": false
+      },
+      "finalAssistantItems": 2,
+      "initialPresetProof": null,
+      "inventoryRows": 8,
+      "isStale": false,
+      "modelChoiceProof": null,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 7,
+      "transcriptView": false
+    },
+    "NATIVE": {
+      "annotationProof": {
+        "committedComment": true,
+        "componentEditor": true,
+        "nativeInteraction": false,
+        "physicalIME": false,
+        "promptSettled": true,
+        "sharedCompilation": true,
+        "sourceHighlight": false,
+        "sourceRetained": true
+      },
+      "components": true,
+      "contextProof": {
+        "annotationReturned": true,
+        "clearedDraft": true,
+        "explicitRemoval": true,
+        "fileUpload": false,
+        "mountedCards": true,
+        "nativeInteraction": false,
+        "promptSettled": true,
+        "referenceReturned": true,
+        "structuredTranscript": false
+      },
+      "finalAssistantItems": 2,
+      "initialPresetProof": null,
+      "inventoryRows": 4,
+      "isStale": false,
+      "modelChoiceProof": null,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 4,
+      "transcriptView": false
+    }
+  },
+  "provider": "owned isolated state and local synthetic provider; no paid model",
+  "logSha256": {
+    "/tmp/agentkit-annotation-ui-shipping.log": "25843f84d8e30158c667340e7450c2d6b29ec673e63d0ddda1a3fdec75472ab4",
+    "/tmp/agentkit-annotation-clippy-native-fix.log": "856696a1116b481e55c700660aeec50fc0d660e23982db7be046c8af6a68883e",
+    "/tmp/agentkit-annotation-build-native-fix.log": "3a5f022e6a522467d4715140a940228ccb6acbbb5cb60fea5556e4e684a801ec",
+    "/tmp/agentkit-annotation-old-publication-repro.log": "89fb4afae971c0d287a56b5ccfafbe547fdac440457582e34087a2b0e98abf24",
+    "/tmp/agentkit-annotation-tests-fixed.log": "fc37a4191044cad08a263b289ddeeef36fb71d85e2751f0f43995c6acebd354a",
+    "/tmp/agentkit-annotation-native.log": "2524adb372e1d059c1dceff9386a48ef3bb29743cf6684a9f36398e2c69b69f2",
+    "/tmp/agentkit-annotation-native-pass.log": "466b222fd053f331ed83d4b01c6a4d9082eb18cc2d134515ded0ce5e156c9651",
+    "/tmp/agentkit-annotation-context-regression-pass.log": "4c121275e5ec6efd0eea83d5bf6dac7359efc0f4bf5f5e176a2bf500417e6685",
+    "/tmp/agentkit-annotation-native-regression-pass.log": "fc93f378b2fa4e9ca423a4f8959205dcedf286d1d288a9a8125377e89ffc1f09",
+    "/tmp/agentkit-annotation-real-final.log": "0a2423f8feb8afe0d3de9395c445d1f431aa9af6ad9ae5b700b29d7ba07000e5",
+    "/tmp/agentkit-annotation-tools.log": "c3ed2249adcb0b081ca153ab7948257f82fe60228ee6457daa06dd92fb28e1a0"
+  },
+  "review": {
+    "oldPublicationReproduction": "failed targeted case; acknowledgement now carries original controller RunSnapshot and publication revision",
+    "sourceFidelity": "only comment changes; original excerpt/source/locator and newer prose/settings retained; whitespace preserved",
+    "nativeFirstAttempt": "failed exit134 stage1 after multi-line commit; reused old Close y304; corrected script reads fresh y318 after exact state/layout",
+    "nativeCorrection": "test stages only; no relaxed input/composition assertion, product event filter or manual pixel compensation",
+    "noAutomaticRetry": "ABA/permission/stale/error keeps local field and invalidates capture; successful acknowledgement can drain newer authored typing"
+  },
+  "evidenceLimits": {
+    "physicalIME": false,
+    "voiceOver": false,
+    "performance": false,
+    "sourceHighlight": false,
+    "sourceIndependentlyVerified": false,
+    "realSourceLocatorFixture": "None; draft unit test separately checks nonempty typed locator preservation",
+    "structuredHistoricalCards": false,
+    "formalTranscript": false,
+    "formalRunView": false,
+    "threeHarnessNativeUX": false
+  },
+  "remaining": [
+    "file picker/upload/preview adapter",
+    "selection-to-annotation capture and source reveal/highlights",
+    "context remove undo",
+    "other Composer capability entries and creation reconciliation UI",
+    "formal Transcript/RunView; mixed-artifact historical structured recovery; TekesUI #22/#23 public gates",
+    "complete SidePanel bodies",
+    "physical IME and reading/paging acceptance",
+    "review CI merge tag"
+  ]
+}

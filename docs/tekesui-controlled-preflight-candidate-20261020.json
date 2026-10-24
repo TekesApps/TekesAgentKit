@@ -1,0 +1,59 @@
+{
+  "identity": "2b16eaa6200fecdde9a0c615166064effb9446249cde05087d5d7c288d81d4ec",
+  "archive_sha256": "f9b2be424a66ce25c9d725340e46406490bd1dd64e69fd6bfe2320d9618e44d3",
+  "manifest_sha256": "07f02b0f235a150d84412c1049b5b35f2112d5b084bb77c12bccb1493bcfe04c",
+  "files": 463,
+  "changed_from_bd3": [
+    "crates/tekes-ui-controls/src/text_input/external.rs",
+    "crates/tekes-ui-controls/src/text_surface.rs",
+    "crates/tekes-ui-controls/tests/external_preflight.rs",
+    "design/gallery/capabilities.json",
+    "design/gallery/component-coverage.json",
+    "design/gallery/public-api-surface.json",
+    "design/gallery/workbench.json",
+    "design/imports/v0.3.0-proposal1/upstream/TekesUI-Design-System-v0.3.0-proposal1/design/registry/state-profiles.json",
+    "design/reviews/controlled-preflight-20261020/host/Cargo.lock",
+    "design/reviews/controlled-preflight-20261020/host/Cargo.toml",
+    "design/reviews/controlled-preflight-20261020/host/src/lib.rs",
+    "design/reviews/controlled-preflight-20261020/host/src/text_backend.rs",
+    "design/reviews/controlled-preflight-20261020/host/tests/preflight_gpu.rs",
+    "docs/design/controlled-preflight-20261020.md",
+    "examples/composition-consumer/src/controlled_reading.rs",
+    "examples/composition-consumer/src/lib.rs",
+    "examples/composition-consumer/tests/controlled_reading.rs"
+  ],
+  "removed_from_bd3": [],
+  "default_pin_changed": false,
+  "independent_build": true,
+  "agentkit_runview_integration": false,
+  "native_acceptance": false,
+  "initial_archive_reader_rejected_source_directory_prefix": true,
+  "independent_replay": {
+    "controls_tests": 388,
+    "consumer_tests": 168,
+    "controls_strict_clippy": true,
+    "consumer_strict_clippy": true,
+    "gpu_tests": 1,
+    "gpu_cases": 48,
+    "gpu_frames": 192,
+    "locked_offline": true,
+    "source_files_unchanged_after_gates": 463,
+    "local_dependencies_inside_package": true
+  },
+  "test_data_scope": "Two design/gallery JSON files are contract-binding-fixture/1 test projections, not runtime capability inventory or native acceptance",
+  "public_git_pin": false,
+  "issue_closed": false,
+  "logs": {
+    "/tmp/agentkit-preflight2b-controls.log": "e51a282caee2fed8d93210645e6be47e921e96cb7ae482817928e9bd4daa0457",
+    "/tmp/agentkit-preflight2b-consumer.log": "334788a8c69ff96606f87b8f711719db402bf53a5f0635544bd9703527528aee",
+    "/tmp/agentkit-preflight2b-controls-clippy.log": "996b97b728b8f9600a9ba3e28313a48c29b20dcbed54af3665708055185f1cf1",
+    "/tmp/agentkit-preflight2b-consumer-clippy.log": "06c670d66dddd821da95a245e7309a9b0e14f76f610faaa348013895f7ac4f30",
+    "/tmp/agentkit-preflight2b-gpu.log": "ee393bb5d4ec56fc5f6d4bb36d07ceda47ec9ba9c44605771bafbc774171c456"
+  },
+  "metadata": {
+    "/tmp/agentkit-preflight2b-controls-metadata.json": "847d427bcbce4563f9297ada9032ee85d14788d70c3bc2bc4d46b596be6d37d9",
+    "/tmp/agentkit-preflight2b-consumer-metadata.json": "8b2465acb8edbe7de0c8551e3893ce34fff51c40b938ceed01c6b63bf714e6b7",
+    "/tmp/agentkit-preflight2b-gpu-metadata.json": "5801d9729cc72cfbd643a366a3c5edb24562e4debf276ea880ca741e13185476"
+  },
+  "gpu_receipt_sha256": "177e16c08c0570e7decb6339e9e07cc0390c59fab78b434f0a7d59374087887b"
+}

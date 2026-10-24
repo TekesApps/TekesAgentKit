@@ -1,0 +1,185 @@
+{
+  "sourceBase": "06d86f8",
+  "completionProven": false,
+  "sourceSha256": {
+    "crates/presentation/src/transcript_order.rs": "43515cabe7da31d93888c922ac97447d9a23bfee6957951c206f427408a37c04",
+    "crates/presentation/tests/transcript_order.rs": "513cef92e8aa1b88268e6b43fe395cffaa89a18d59567289976c71bdd62039e7",
+    "ui/components/src/lib.rs": "9b4e336530aee6697d5dbcf8fcd1e3f35db02e1071e16a9fbda251a16b7f2a70",
+    "ui/components/src/transcript_content.rs": "e336e4302562d1b3e12c0b33f75e83428879833f4fbcc3cd16ad458aa9d4ba93",
+    "ui/consumer/src/lib.rs": "4ae9b24cd315930392850e6f40a0974860a2e2ae842038e50eb292f8bc9254b2",
+    "ui/demo/tests/display_order.rs": "520830e560ae69b93bca07d0adac21d20b21872a4ab80ba47cd2c46f1ab58a87",
+    "ui/demo/tests/run_reading.rs": "e3421d9ea14dd7e72724ae0ef13f504f1a7c53b9569093c9d6dd2d6d3f81eec4"
+  },
+  "referenceSha256": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/TranscriptRendering/TranscriptMetalActivity.swift": "f08f6e8f34c76a71fb117dd84a46be50145f737a38e21534cf59d518bc2d3e8d",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Session/SessionEndpoint/Client/SessionEventProjector.swift": "e7a2ccc9e211f04f819e0a1866388420b7b15f0a25ea80a7777a3408414dd515",
+    "/Users/frankqin/dev/Tekes/Tekes/Settings/SettingsRootController.swift": "6a1670eb8de8842c5d624d52a7a1972f1abbdae5bf739c589acfd51e621330ca"
+  },
+  "tests": {
+    "root": 281,
+    "ui": 589,
+    "failed": 0,
+    "uiIgnored": 1,
+    "ignoredReason": "existing #49",
+    "finalDisplayOrderTests": 14,
+    "readonlyReadingTests": 37,
+    "rootAndUiStrictAllTargetsClippy": true,
+    "finalSourceTestOnlyLintRefinement": true
+  },
+  "nativeProgram": {
+    "sourceBase": "06d86f8",
+    "program": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/thinking-source-20261023/AgentKitDisplayOrder.app/Contents/MacOS/tekes-agent-ui-demo",
+    "binarySha256": "f4dbd88fceb79702ddc71df81b7219067c8dea3833c5357e72b483153e3aad2d",
+    "sourceSha256": {
+      "crates/presentation/src/transcript_order.rs": "43515cabe7da31d93888c922ac97447d9a23bfee6957951c206f427408a37c04",
+      "crates/presentation/tests/transcript_order.rs": "513cef92e8aa1b88268e6b43fe395cffaa89a18d59567289976c71bdd62039e7",
+      "ui/components/src/lib.rs": "9b4e336530aee6697d5dbcf8fcd1e3f35db02e1071e16a9fbda251a16b7f2a70",
+      "ui/components/src/transcript_content.rs": "e336e4302562d1b3e12c0b33f75e83428879833f4fbcc3cd16ad458aa9d4ba93",
+      "ui/consumer/src/lib.rs": "4ae9b24cd315930392850e6f40a0974860a2e2ae842038e50eb292f8bc9254b2",
+      "ui/demo/tests/display_order.rs": "520830e560ae69b93bca07d0adac21d20b21872a4ab80ba47cd2c46f1ab58a87",
+      "ui/demo/tests/run_reading.rs": "e3421d9ea14dd7e72724ae0ef13f504f1a7c53b9569093c9d6dd2d6d3f81eec4"
+    }
+  },
+  "nativeReading": {
+    "draftIsolation": true,
+    "focusAndEditorBaselinePreserved": true,
+    "focusAndMarkedBaselinePreserved": true,
+    "focusAndTextStatePreserved": true,
+    "hoverPreviewVisible": false,
+    "independentBReadingRestored": true,
+    "jumpHasNoHistory": true,
+    "jumpLatestControl": true,
+    "loadedItemsAfter": 44,
+    "loadedItemsBefore": 20,
+    "markedTextPreserved": true,
+    "nativePagingControl": true,
+    "nativeWindow": true,
+    "navigationPreeditPreserved": true,
+    "noSubmission": true,
+    "opaqueBaselinePreserved": true,
+    "originalTurnNavigation": true,
+    "physicalIme": false,
+    "prependAnchorPreserved": true,
+    "previewFactsDuringPreedit": true,
+    "publicHistoryPage": true,
+    "publicPageRequest": true,
+    "readingAnchorAcceptance": true,
+    "realHarness": false,
+    "reconnectReadingRestored": true,
+    "retainedSessionReadingRestored": true,
+    "sameEditorOwner": true,
+    "samePublicationRefresh": true,
+    "syntheticPreedit": true,
+    "syntheticWheel": true,
+    "turnStartAndLatest": true,
+    "upwardReadingPreserved": true,
+    "voiceOver": false
+  },
+  "systemIme": {
+    "stableAcceptanceProven": false,
+    "firstAttempt": {
+      "exitCode": 1,
+      "observedText": "n i好",
+      "earlyFirstKeyCommit": "n",
+      "foregroundStayedCorrect": true
+    },
+    "previousFrozenProgramControl": {
+      "softwareIme": true,
+      "pidTargetedEvents": true,
+      "physicalKeyboard": false,
+      "candidateWindow": false,
+      "profile": "launch-services-app",
+      "applicationExitCode": null,
+      "launcherExitCode": 0,
+      "pid": 32295,
+      "sourceBefore": "com.apple.inputmethod.SCIM.ITABC",
+      "sourceAfter": "com.apple.inputmethod.SCIM.ITABC",
+      "binarySha256": "6a3f043eee05a7d057019c5a10b4ce70af4c239ba3690b4ad60564238ca5f370"
+    },
+    "sameProgramUnmodifiedRepeat": {
+      "softwareIme": true,
+      "pidTargetedEvents": true,
+      "physicalKeyboard": false,
+      "candidateWindow": false,
+      "profile": "launch-services-app",
+      "applicationExitCode": null,
+      "launcherExitCode": 0,
+      "pid": 32649,
+      "sourceBefore": "com.apple.inputmethod.SCIM.ITABC",
+      "sourceAfter": "com.apple.inputmethod.SCIM.ITABC",
+      "binarySha256": "f4dbd88fceb79702ddc71df81b7219067c8dea3833c5357e72b483153e3aad2d"
+    },
+    "rootCause": "unresolved; not attributed to SDK/AppKit/injection or current change",
+    "upstreamDiagnostic": "https://github.com/TekesApps/TekesUI/issues/41#issuecomment-6351744540"
+  },
+  "scope": {
+    "containerDisplayOrder": true,
+    "protocolPositionsUnchanged": true,
+    "previewNotDurable": true,
+    "sameProcessContentHost": true,
+    "realHarnessThisSource": false,
+    "completePlaneSplittingOrNarrationParity": false,
+    "formalProcessContainer": false,
+    "crossProcess": false,
+    "physicalKeyboard": false,
+    "voiceOver": false
+  },
+  "previousHeadCI": [
+    {
+      "link": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39855908628/job/120093935825",
+      "name": "checks",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39855908628/job/120093936243",
+      "name": "Rust UI consumer (no native interaction)",
+      "state": "FAILURE"
+    },
+    {
+      "link": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39855901313/job/120093910752",
+      "name": "checks",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39855901313/job/120093911130",
+      "name": "Rust UI consumer (no native interaction)",
+      "state": "FAILURE"
+    }
+  ],
+  "evidenceSha256": {
+    ".runtime-fixtures/thinking-source-20261023/display-root.log": "3fdc98a9142404ea320fd60e658e7c15f64f22ea4ca109fab5a015bbb3e7b7c2",
+    ".runtime-fixtures/thinking-source-20261023/display-ui-checked.log": "ed2633982625b76d6a14a924319f51e037de20d59ab5e64a8226f5ef48dbd932",
+    ".runtime-fixtures/thinking-source-20261023/display-tests-final.log": "01cf0957a4045773370f94e898e971fe0ce17c5de2ad23f8b6b3cd94b45948a9",
+    ".runtime-fixtures/thinking-source-20261023/display-reading-checked.log": "ccc822ab77cc800723965391b8d78cd871cf96eeb1611a171ff292ff562f7a0d",
+    ".runtime-fixtures/thinking-source-20261023/display-root-clippy-final.log": "6b3336f0acf2d98c74314a0ebe798a3305fdd1587d33e0774c2e20f25077328d",
+    ".runtime-fixtures/thinking-source-20261023/display-ui-clippy.log": "eead36c880a80fe4751f54d36828260a216947a22d4462c26452fe8d0b320404",
+    ".runtime-fixtures/thinking-source-20261023/display-sdk-inputs.json": "9543ade335292f9c7f61944edd341c2fb9297a7c6abc3cf44dc86c1f16bd6ee3",
+    ".runtime-fixtures/thinking-source-20261023/display-native-build.log": "9ae36bb22d8f0f810a77044760863f70b81405396a32cce477ec08eecd4e6d59",
+    ".runtime-fixtures/thinking-source-20261023/display-native-program.json": "644fb3e4173d9dc1be8b92be7408738f21562ca825b69fb8a8c7349174da4343",
+    ".runtime-fixtures/thinking-source-20261023/display-native-driver.log": "ae260713eabb29d77aeaa6df898fddb22277ef39c35816c69dbac94ee288e476",
+    ".runtime-fixtures/thinking-source-20261023/display-native-reading.json": "cec957c17517a4794dfeed1a790d3649ab8928db275c26609f5cb4b5a46edc51",
+    ".runtime-fixtures/thinking-source-20261023/display-native-reading.log": "a09bc271e3f4aa5af1a5c53592212554daefbc9ce343fd152ffcc3c54d66e913",
+    ".runtime-fixtures/thinking-source-20261023/display-native-reading.log.frontmost.jsonl": "9ce06c43a5af7f4064aa86c61b723782d1201c90d8a632c001a5ddd3ddfa08af",
+    ".runtime-fixtures/thinking-source-20261023/display-native-ime-driver.log": "e81e61af455c3968d139c07de9b4ca6ce5d0f8b9e2649dbe6b98f07311805d9b",
+    ".runtime-fixtures/thinking-source-20261023/display-native-ime.log": "ba0c2d00703077aa78a3f2b58d0f50df8786411fcb1da553cb08f9e1059bd40f",
+    ".runtime-fixtures/thinking-source-20261023/display-native-ime.log.frontmost.jsonl": "e5d174d29ebea7a21c157410241db8b969a9535c6f32d31a354ad8bd4c24dfaa",
+    ".runtime-fixtures/thinking-source-20261023/display-native-ime-repeat.json": "0824229d7228f9eb3b01a8d7cf25b9e98b88648d948b1b93602083b34db77e43",
+    ".runtime-fixtures/thinking-source-20261023/display-native-ime-repeat.log": "ea35e222e266bd8d49f7a72d62fe4a7e843d917d02c226bbb24f31a5beea403b",
+    ".runtime-fixtures/thinking-source-20261023/display-native-ime-repeat.log.frontmost.jsonl": "17cbec4f6024fa5c8dc183d775158e6d34dda5cb9a28b175cae4e55a42804315",
+    ".runtime-fixtures/thinking-source-20261023/display-ime-baseline.json": "fadaf868aaac99eb8da4fc2811543694a836726e43dba7e735bb5278f24b3636",
+    ".runtime-fixtures/thinking-source-20261023/display-ime-baseline.log": "01be302b7978f2f89c18df62d1c408e2d824419a20d0c8e2255230b2fee6b708",
+    ".runtime-fixtures/thinking-source-20261023/display-ime-baseline.log.frontmost.jsonl": "185c7f1c7b39faf81d0b74d9ed13d84c61f7a3fc876dc69a7f508314b28d0a79",
+    ".runtime-fixtures/thinking-source-20261023/display-ime-issue-comment.md": "5ce076f5cec380c09736dce9ab665ddac3a1381fc17bac5e82e0fd1b28f5c193",
+    ".runtime-fixtures/thinking-source-20261023/display-ime-issue-url.txt": "704ce84f568b44fa64f8f44d938628d1b3721d86035703a25c3bed1af6cafdb6",
+    ".runtime-fixtures/thinking-source-20261023/ci-06d86f8-final.json": "865b404869a547a09b4a13593bd0c9b2a622882ea21e20dc65582331704dd1f3",
+    ".runtime-fixtures/thinking-source-20261023/ci-06d86f8-macos.log": "2cfd865b779326494de2d96202c4a149710b44dbd43bd79e118fc354b40ad688",
+    ".runtime-fixtures/thinking-source-20261023/display-ui.log": "3db518c6b98d373cd038ea2990315ac67647f8cb421c772d7df1613fad1e925d",
+    ".runtime-fixtures/thinking-source-20261023/display-root-clippy.log": "ffd012cdf132eb29a49d66a742268967c32e14f672aee4f18bb28e59a9197873",
+    ".runtime-fixtures/thinking-source-20261023/display-tests.log": "d0f489687c9607a80c4f3d6571fbaaab7825ca76238826128b177cff7d851d77"
+  },
+  "disk": {
+    "newTargets": 0,
+    "executableRetention": "hardlink",
+    "deletedBytes": 0
+  }
+}

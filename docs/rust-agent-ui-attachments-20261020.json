@@ -1,0 +1,65 @@
+{
+  "status": "shared-upload-binding-only",
+  "baseline": "AgentKit v0.3.8",
+  "tekesui_rev": "431093786de47b48cd566d0d9c0eafa088b10d68",
+  "tests": {
+    "root": 107,
+    "ui": 126,
+    "context_card": 4
+  },
+  "tools_tests": 18,
+  "validation": {
+    "root_ui_strict_clippy": true,
+    "root_ui_fmt": true,
+    "dependency_boundary": true,
+    "resolved_ui_packages": 8,
+    "reviewed_ui_files": 188,
+    "ui_input_sha256": "03721866a362b1d31261ebbbc86140eb07e9e23320871c325234a5212591213d"
+  },
+  "evidence": {
+    "root": {
+      "path": "/tmp/agentkit-attachments-root-final.log",
+      "sha256": "ab1373604e609e49a729921e8c0b370d439bd895b76020793d85c6686e8dc18e"
+    },
+    "ui": {
+      "path": "/tmp/agentkit-attachments-ui-final.log",
+      "sha256": "ef7b0c9375d4b1649c38ebff5c885f21f79cab7eefa935fea63be9af352b955a"
+    },
+    "context_card": {
+      "path": "/tmp/agentkit-attachments-card-final.log",
+      "sha256": "b4851c6df8bbc553b6da755ef54c6bf7e03ce0ffe22dc16de98aeeef77472107"
+    }
+  },
+  "native_system_picker": false,
+  "native_upload_ui": false,
+  "actual_three_harness_upload_binding": false,
+  "formal_transcript_runview": false,
+  "remaining": [
+    "host picker and bounded file read",
+    "upload status and pending controls",
+    "preview and explicit failure reconciliation",
+    "inline images",
+    "actual Native/Pi/DSH upload-to-send",
+    "native window and physical IME",
+    "formal Transcript and RunView with upstream #22/#23 gates",
+    "review and latest CI before merge/tag"
+  ],
+  "commands": [
+    "cargo +1.95.0 test --workspace --locked",
+    "cargo +1.95.0 test --manifest-path ui/Cargo.toml --workspace --locked",
+    "cargo +1.95.0 test --manifest-path ui/Cargo.toml -p tekes-agent-ui-demo --test composer_context --locked",
+    "cargo +1.95.0 clippy --workspace --all-targets --locked -- -D warnings",
+    "cargo +1.95.0 clippy --manifest-path ui/Cargo.toml --workspace --all-targets --locked -- -D warnings",
+    "cargo +1.95.0 fmt --all -- --check",
+    "cargo +1.95.0 fmt --manifest-path ui/Cargo.toml --all -- --check",
+    "python3 scripts/check-ui-boundaries.py",
+    "cargo +1.95.0 metadata --manifest-path ui/Cargo.toml --format-version 1 --locked > /tmp/agentkit-attachments-metadata.json",
+    "python3 scripts/check-ui-consumer-inputs.py --metadata /tmp/agentkit-attachments-metadata.json",
+    "python3 -m unittest discover -s scripts/tests"
+  ],
+  "command_environment": {
+    "CARGO_TARGET_DIR": "/tmp/agentkit-final-receive-target",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "python3": "/Users/frankqin/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3"
+  }
+}

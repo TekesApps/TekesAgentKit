@@ -1,0 +1,331 @@
+{
+  "schemaVersion": 1,
+  "issues": [
+    17,
+    21,
+    27
+  ],
+  "pullRequest": 10,
+  "baseCommit": "6318bf6621bfd0d173e7535c1cc2106becde67fa",
+  "clientKitReference": "c289bc9d33edcd83a782ac17927a8c65a027eccd",
+  "tekesReference": "8858ccd9d46590852ec7a0949aee289fc6798d70",
+  "tekesUiPin": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "publicUiMainChecked": "7c13ec0909601ac1e8a7b4a0a67f6e086d2307b7",
+  "implementationScope": "Native explicit run identity, settlement and message ownership; no runtime state machine added; legacy unchanged",
+  "redGreen": {
+    "baseline": "red-test.log:1 passed,6 failed",
+    "workerCandidate": "green-test.log:8 passed",
+    "mainReview": "marker-only-red.log:8 passed,1 failed; candidate published empty marker-only turns",
+    "final": "final-focused-green.log:10 passed",
+    "strictClippy": "before-lint-fix-root-clippy.log failed collapsible_if; equivalent let-chain fixed and all checks rerun"
+  },
+  "validation": {
+    "root-tests": {
+      "passed": 371,
+      "failed": 0,
+      "ignored": 0
+    },
+    "feature-tests": {
+      "passed": 279,
+      "failed": 0,
+      "ignored": 0
+    },
+    "feature-headless-tests": {
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0
+    },
+    "ui-tests": {
+      "passed": 750,
+      "failed": 0,
+      "ignored": 1
+    },
+    "final-focused-green": {
+      "passed": 10,
+      "failed": 0,
+      "ignored": 0
+    },
+    "strictClippy": "root-feature-and-ui-passed",
+    "format": "root-and-ui-passed",
+    "boundaries": "passed",
+    "acceptanceMatrix": "passed",
+    "ordinaryDemoBuild": "passed",
+    "standaloneConsumer": {
+      "sha256": "e216110c5e2c26b279f832c9c2cbfa596f004f640b23cf6560b0acfb743e4466",
+      "fileCount": 137,
+      "matchesPreparedSource": true,
+      "exitCode": 0,
+      "stdoutEmpty": true,
+      "log": "public-consumer.log"
+    },
+    "sdkCompiledInputs": {
+      "commit": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+      "local_packages": 11,
+      "native_interaction": false,
+      "reviewed_files": 243,
+      "sha256": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
+      "ui_packages": 8
+    }
+  },
+  "realProtocolRegression": {
+    "accepted": true,
+    "endpoints": {
+      "pi": {
+        "endpoint": "pi",
+        "version": "1.3.0",
+        "commandCount": 18,
+        "processExit": 0,
+        "running": {
+          "endpoint": "pi",
+          "parentSessionId": "e3431f5d-f252-45eb-94b3-bde140450289",
+          "childSessionId": "36178b1d-7764-49a9-b1d2-73d14592e089",
+          "summaryRow": {
+            "id": "[\"pi\",\"e3431f5d-f252-45eb-94b3-bde140450289\",\"tool:pi-child-0\"]",
+            "sessionId": "36178b1d-7764-49a9-b1d2-73d14592e089",
+            "status": "running",
+            "title": "Model child"
+          },
+          "sourceIdentity": {
+            "kind": "native",
+            "entryId": "58639969",
+            "entryOrdinal": 8
+          },
+          "rawChildStatus": null,
+          "childStatus": "running",
+          "statusBasis": "public-native-run-open-and-authored-input",
+          "indicator": "running",
+          "projectionSucceeded": true,
+          "serverTransactionalFreshnessProven": false,
+          "evidenceScope": "single-publication-same-memory-authority",
+          "fabricationResistance": "not-proven-by-json-validation",
+          "transitionSource": {
+            "basis": "public-native-run-open-and-authored-input",
+            "authoredInput": {
+              "kind": "native",
+              "entryId": "adb9b42a",
+              "entryOrdinal": 12
+            },
+            "capturedDispatchingQueueCount": 1
+          }
+        },
+        "failed": {
+          "endpoint": "pi",
+          "parentSessionId": "e3431f5d-f252-45eb-94b3-bde140450289",
+          "childSessionId": "36178b1d-7764-49a9-b1d2-73d14592e089",
+          "summaryRow": {
+            "id": "[\"pi\",\"e3431f5d-f252-45eb-94b3-bde140450289\",\"tool:pi-child-0\"]",
+            "sessionId": "36178b1d-7764-49a9-b1d2-73d14592e089",
+            "status": "failed",
+            "title": "Model child"
+          },
+          "sourceIdentity": {
+            "kind": "native",
+            "entryId": "58639969",
+            "entryOrdinal": 8
+          },
+          "rawChildStatus": null,
+          "childStatus": "failed",
+          "statusBasis": "native-current-run-error",
+          "indicator": "failed",
+          "projectionSucceeded": true,
+          "serverTransactionalFreshnessProven": false,
+          "evidenceScope": "single-publication-same-memory-authority",
+          "fabricationResistance": "not-proven-by-json-validation",
+          "transitionSource": {
+            "basis": "native-current-run-error",
+            "authoredInput": {
+              "kind": "native",
+              "entryId": "adb9b42a",
+              "entryOrdinal": 12
+            },
+            "terminal": {
+              "kind": "native",
+              "entryId": "fe868c30",
+              "entryOrdinal": 13,
+              "stopReason": "error",
+              "runId": "b3f9479c-070f-4768-83ad-d019e6868051",
+              "startedEntryId": "89e2fa33",
+              "settledEntryId": "620fbec7"
+            },
+            "capturedDispatchingQueueCount": 0
+          }
+        },
+        "gate": {
+          "requestCount": 1,
+          "entered": true,
+          "explicitlyReleased": true,
+          "aborted": false,
+          "timedOut": false
+        }
+      },
+      "dsh": {
+        "endpoint": "dsh",
+        "version": "0.2.1-rc.2",
+        "commandCount": 21,
+        "processExit": 0,
+        "running": {
+          "endpoint": "dsh",
+          "parentSessionId": "session-953bd01f-b239-46f7-b34f-e03f4dcee0f4",
+          "childSessionId": "af311990-6f80-4a65-8988-a2fcfe1de73f",
+          "summaryRow": {
+            "id": "[\"dsh\",\"session-953bd01f-b239-46f7-b34f-e03f4dcee0f4\",\"tool:child-call\"]",
+            "sessionId": "af311990-6f80-4a65-8988-a2fcfe1de73f",
+            "status": "running",
+            "title": "Catalog proof child"
+          },
+          "sourceIdentity": {
+            "kind": "journal",
+            "sequence": 19
+          },
+          "rawChildStatus": null,
+          "childStatus": "running",
+          "statusBasis": "public-journal-turn-start-and-authored-input",
+          "indicator": "running",
+          "projectionSucceeded": true,
+          "serverTransactionalFreshnessProven": false,
+          "evidenceScope": "single-publication-same-memory-authority",
+          "fabricationResistance": "not-proven-by-json-validation",
+          "transitionSource": {
+            "basis": "public-journal-turn-start-and-authored-input",
+            "authoredInput": {
+              "kind": "journal",
+              "sequence": 32
+            },
+            "capturedDispatchingQueueCount": 0
+          }
+        },
+        "failed": {
+          "endpoint": "dsh",
+          "parentSessionId": "session-953bd01f-b239-46f7-b34f-e03f4dcee0f4",
+          "childSessionId": "af311990-6f80-4a65-8988-a2fcfe1de73f",
+          "summaryRow": {
+            "id": "[\"dsh\",\"session-953bd01f-b239-46f7-b34f-e03f4dcee0f4\",\"tool:child-call\"]",
+            "sessionId": "af311990-6f80-4a65-8988-a2fcfe1de73f",
+            "status": "failed",
+            "title": "Catalog proof child"
+          },
+          "sourceIdentity": {
+            "kind": "journal",
+            "sequence": 19
+          },
+          "rawChildStatus": null,
+          "childStatus": "failed",
+          "statusBasis": "latest-child-journal-error",
+          "indicator": "failed",
+          "projectionSucceeded": true,
+          "serverTransactionalFreshnessProven": false,
+          "evidenceScope": "single-publication-same-memory-authority",
+          "fabricationResistance": "not-proven-by-json-validation",
+          "transitionSource": {
+            "basis": "latest-child-journal-error",
+            "authoredInput": {
+              "kind": "journal",
+              "sequence": 32
+            },
+            "terminal": {
+              "kind": "journal",
+              "sequence": 36,
+              "reasonKind": "error",
+              "turn": 3
+            },
+            "capturedDispatchingQueueCount": 0
+          }
+        },
+        "gate": {
+          "requestCount": 1,
+          "entered": true,
+          "explicitlyReleased": true,
+          "aborted": false,
+          "timedOut": false
+        }
+      }
+    },
+    "provider": "synthetic-loopback",
+    "providerRequestCount": 15,
+    "ownedDshExitStatus": 0,
+    "programSha256": "6aad53eb9910cb190ed5e887d27b1dd28169fea3245c1ed8f5eb27cb46a1215a",
+    "desktopInteraction": false,
+    "paidModel": false,
+    "privateHarnessHistoryRead": false,
+    "serverTransactionalFreshnessProven": false
+  },
+  "runtimeInputsAfter": {
+    "matchesBefore": true,
+    "runtimes": {
+      "pi": {
+        "root": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/pi-1.3.0-query-20261021",
+        "version": "1.3.0",
+        "files": {
+          "node/bin/node": "9d050fd455b56426e25d4d603c7c501cbb2630348e836cf221dcce748e90588a",
+          "node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js": "e79626f2dd6f94aa45d30f3fa63cd84319a6eefcd150b353cfaf274366926774",
+          "node_modules/@earendil-works/pi-coding-agent/package.json": "83c3bb7619f590c213cc96a24216eb29a819a3ef6dc548607cc037ed276e8dc5"
+        }
+      },
+      "dsh": {
+        "root": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/dsh-0.2.1-rc.2-sidebar-20261019",
+        "version": "0.2.1-rc.2",
+        "files": {
+          "node/bin/node": "9d050fd455b56426e25d4d603c7c501cbb2630348e836cf221dcce748e90588a",
+          "node_modules/@deepseek-ai/dsh/lib/bin.js": "80112efe368efb1a39720c7ada0af00442e5131fb2744edaaff8a3e8bb499e6f",
+          "node_modules/@deepseek-ai/dsh/package.json": "bea4288aa88eb54efe829686553100a75fdf09d11c5e3bf6b329badb9a0368dd",
+          "node_modules/@deepseek-ai/dsh-app-boot/lib/index.js": "5135179ac810e4f626f32ec3bdc3293dc7d2028e8aa92e5e0c006f1a33b78e76",
+          "package-lock.json": "d7c54df04c10a2d69f5a26f9563e91482aa05c5ad652d1dd7d0c285299f31f06"
+        }
+      }
+    }
+  },
+  "programs": {
+    "focusedTests": {
+      "source": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/deps/native_run_boundaries-fb0e7e874cf06016",
+      "archive": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/native-run-boundaries-20261024/programs/native-run-boundaries-tests",
+      "sha256": "3250c95862e86156354e35279e7050a54589df116a7c526657fb1cad109184ca",
+      "archiveOnly": true
+    },
+    "standaloneConsumer": {
+      "source": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/agentkit-public-ui-consumer",
+      "archive": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/native-run-boundaries-20261024/programs/public-ui-consumer",
+      "sha256": "4afad2a368c93ed2036e8807bf75eca6b867c53d5c515c17c7e324cbd89acf07",
+      "archiveOnly": true
+    },
+    "headless": {
+      "path": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/tekes-agent-headless",
+      "sha256": "6aad53eb9910cb190ed5e887d27b1dd28169fea3245c1ed8f5eb27cb46a1215a",
+      "archiveOnly": true,
+      "archiveReference": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/native-run-boundaries-20261024/real-transitions/programs/tekes-agent-headless"
+    }
+  },
+  "sourceSnapshot": {
+    "directory": "source-runtime",
+    "files": 1070,
+    "lintFixOverride": "source-lint-fix",
+    "finalDocumentationSealedSeparately": true
+  },
+  "notRun": [
+    "real-producer-missing-settlement-non-streaming-interleaving",
+    "real-producer-cross-run-late-settlement-interleaving",
+    "matching-settlement-live-preview-interleaving",
+    "new-native-kernel-protocol-lifecycle-in-this-slice",
+    "desktop-window-glyph-layout-physical-IME-OS-AX-ProcessContainer",
+    "full-Transcript-parity"
+  ],
+  "python": "not-rerun: no Python source changes; 6318bf6 CI separately passed221",
+  "ci": {
+    "headSha": "f7fe185acc2eba239936b8e6968f9cac44f7aa1f",
+    "status": "completed",
+    "prRun": 40096979427,
+    "pushRun": 40096974552,
+    "rootPassed": 371,
+    "featurePresentationPassed": 279,
+    "featureHeadlessPassed": 4,
+    "uiPassed": 750,
+    "uiIgnored": 1,
+    "pythonPassed": 221,
+    "standaloneConsumer": "success-both-runs",
+    "onlyFailure": "TekesUI #53 strict nested detail reading",
+    "receipt": ".runtime-fixtures/native-run-boundaries-20261024/ci-terminal-evidence.json"
+  },
+  "issueClosed": false,
+  "mergeTagRelease": false,
+  "cacheBytesDeletedInThisSlice": 0,
+  "evidenceRoot": ".runtime-fixtures/native-run-boundaries-20261024"
+}

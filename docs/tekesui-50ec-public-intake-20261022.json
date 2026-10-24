@@ -1,0 +1,51 @@
+{
+  "date": "2026-10-22",
+  "experimental": true,
+  "provenance": {
+    "public_commit": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+    "public_git_tree": "a246629a32248111c6d56f7dc4f63762bde56b8f",
+    "anonymous_commit_tree": true,
+    "anonymous_raw_changed": [
+      "crates/tekes-ui-controls/src/composition.rs",
+      "crates/tekes-ui-controls/src/composition/adapters.rs",
+      "crates/tekes-ui-controls/src/composition/help.rs",
+      "crates/tekes-ui-controls/src/composition/key.rs",
+      "crates/tekes-ui-controls/src/composition/number.rs",
+      "crates/tekes-ui-controls/src/lib.rs",
+      "crates/tekes-ui-controls/src/text_surface.rs",
+      "crates/tekes-ui-controls/src/widgets.rs",
+      "crates/tekes-ui-controls/tests/component_registry_api.rs"
+    ],
+    "consumed_files": 243,
+    "packages": 8,
+    "manifest_sha256": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
+    "source": "/Users/frankqin/.cargo/git/checkouts/tekesui-d66ba5efbf6c8866/50ec49f",
+    "archive_downloaded": false,
+    "reason": "verify minimal closure against anonymous committed blob IDs; retain fixed sources without duplicating full repository archives",
+    "anonymous_root_tree_verified": true
+  },
+  "upstream_ci": {
+    "run": 39740998580,
+    "conclusion": "success"
+  },
+  "local": {
+    "tests_passed": 521,
+    "ignored": 1,
+    "strict_clippy": true,
+    "demo_build": true,
+    "native_interaction": false,
+    "physical_ime": false
+  },
+  "popover_gate": {
+    "exit_code": 101,
+    "expected": 51002,
+    "actual": 51003,
+    "issue": 49
+  },
+  "agentkit_contract": "v0.3.8",
+  "cache": {
+    "new_target": false,
+    "full_archive_downloaded": false,
+    "deleted_bytes": 0
+  }
+}

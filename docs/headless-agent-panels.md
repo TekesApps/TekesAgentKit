@@ -18,6 +18,8 @@ projection cut 优先于更早的历史页，null/空数组可清空成员。普
 session 的存在；宿主若有权威 task pointer 查询，可通过 `TaskPanelState` 和 `SummaryFacts`
 输入规范化记录。这里没有把 fork provenance、team/task 或 job 伪装成 task 子会话。
 
+当前开发分支的 `SummaryFacts::read_with_store` 已接入 Run presentation，按同 endpoint 的 child session 事实提供 `SummarySubagent.status`；parent-only `read` 对此保持未知。生命周期 active/archived 通过既有 child execution 投影解释，工具 phase 不再冒充子执行态。`indicator()` 不增加成功点或控制权限。该修正尚未包含在已发布 v0.3.8 中，详见[子代理状态来源](rust-agent-ui-summary-child-status-20261022.md)。
+
 ## 子代理与历史
 
 `SubagentCatalog` / `SubagentEntry` 与 ClientKit 的 entries / parentAvailable 契约对齐。

@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "issue": 17,
+  "pullRequest": 10,
+  "baseCommit": "1d6cc7e4a62b60993fee0b838c20b625c973eca7",
+  "clientKitReference": "c289bc9d33edcd83a782ac17927a8c65a027eccd",
+  "tekesReference": "8858ccd9d46590852ec7a0949aee289fc6798d70",
+  "tekesUiPin": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "implementationScope": "Native explicit settled run only; accumulated assistant error/aborted, cancellation first; streaming status and legacy/Journal untouched",
+  "redGreen": {
+    "baseline": "red-test.log:4 failed",
+    "rejectedCandidate": "worker-candidate.patch and live-boundary-red.log:4 passed,1 failed; candidate could prematurely end streaming run",
+    "final": "final-focused-green.log:7 passed"
+  },
+  "validation": {
+    "root-tests": {
+      "passed": 361,
+      "failed": 0,
+      "ignored": 0
+    },
+    "feature-tests": {
+      "passed": 269,
+      "failed": 0,
+      "ignored": 0
+    },
+    "feature-headless-tests": {
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0
+    },
+    "ui-tests": {
+      "passed": 750,
+      "failed": 0,
+      "ignored": 1
+    },
+    "final-focused-green": {
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0
+    },
+    "strictClippy": "root-feature-and-ui-passed",
+    "format": "root-and-ui-passed",
+    "boundaries": "passed",
+    "acceptanceMatrix": {
+      "result": "passed",
+      "log": "acceptance-matrix-corrected.log",
+      "initialInvocationError": "wrong-script-name-exit-2; original-log-retained"
+    },
+    "ordinaryDemoBuild": "passed",
+    "standaloneConsumer": {
+      "sha256": "c808063f7d046183a1979145fe201efc8334118969e8390ef1115e258a675823",
+      "fileCount": 137,
+      "matchesPreparedSource": true,
+      "exitCode": 0,
+      "stdoutEmpty": true,
+      "log": "public-consumer.log"
+    }
+  },
+  "programs": {
+    "focusedTests": {
+      "source": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/deps/native_run_terminal-b87a4441d5867b7c",
+      "archive": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/transcript-run-terminal-20261024/programs/native-run-terminal-tests",
+      "sha256": "f36b47494a3af4a958cfc6a4d5fc00adbb68f5549c7e67129e442406c2759afa",
+      "archiveOnly": true
+    },
+    "standaloneConsumer": {
+      "source": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/agentkit-public-ui-consumer",
+      "archive": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/transcript-run-terminal-20261024/programs/public-ui-consumer",
+      "sha256": "c06192a05ec3400d4744c2b5a50fe8886a7af8989c4acbcc3e2303c39d7252e6",
+      "archiveOnly": true
+    }
+  },
+  "sourceSnapshot": {
+    "directory": "source-runtime",
+    "files": 1066,
+    "finalDocumentationSealedSeparately": true
+  },
+  "notRun": [
+    "new-real-harness-lifecycle-for-this-slice",
+    "desktop-window-glyph-layout",
+    "physical-IME-OS-AX-ProcessContainer",
+    "full-Transcript-parity"
+  ],
+  "python": "not-rerun: this slice changes no Python; preceding 1d6cc7e CI separately passed221",
+  "ci": {
+    "headSha": "6318bf6621bfd0d173e7535c1cc2106becde67fa",
+    "status": "completed",
+    "prRun": 40095410230,
+    "pushRun": 40095406743,
+    "rootPassed": 361,
+    "featurePresentationPassed": 269,
+    "featureHeadlessPassed": 4,
+    "uiPassed": 750,
+    "uiIgnored": 1,
+    "pythonPassed": 221,
+    "standaloneConsumer": "success-both-runs",
+    "onlyFailure": "TekesUI #53 strict nested detail reading",
+    "receipt": ".runtime-fixtures/transcript-run-terminal-20261024/ci-terminal-evidence.json"
+  },
+  "issueClosed": false,
+  "mergeTagRelease": false,
+  "cacheBytesDeletedInThisSlice": 0,
+  "evidenceRoot": ".runtime-fixtures/transcript-run-terminal-20261024"
+}

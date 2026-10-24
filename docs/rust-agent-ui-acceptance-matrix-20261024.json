@@ -1,0 +1,853 @@
+{
+  "schemaVersion": 1,
+  "title": "AgentKit Rust UI acceptance matrix",
+  "issue": {
+    "number": 27,
+    "url": "https://github.com/TekesApps/TekesAgentKit/issues/27",
+    "pr": "https://github.com/TekesApps/TekesAgentKit/pull/10"
+  },
+  "baseline": {
+    "agentkitCommit": "58521a1bc581ef14c3c63c9a7bc698bbd01d9ab3",
+    "agentkitPublished": "v0.3.8",
+    "tekesuiCommit": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+    "tekesuiLockPackages": 8,
+    "scope": "Current CI/contract baseline only. Historical programs remain bound to their own commits and SHA-256."
+  },
+  "dimensions": {
+    "requirements": [
+      {
+        "id": "composer_ime",
+        "title": "Composer 组字期间不误发送",
+        "ownerIssue": 16
+      },
+      {
+        "id": "draft_isolation",
+        "title": "按会话隔离并恢复草稿",
+        "ownerIssue": 16
+      },
+      {
+        "id": "send_cancel",
+        "title": "发送/取消与原请求身份一致",
+        "ownerIssue": 16
+      },
+      {
+        "id": "stream",
+        "title": "流式回传与最终结算一致",
+        "ownerIssue": 21
+      },
+      {
+        "id": "reading_append",
+        "title": "向上阅读时追加不拉走当前阅读位置",
+        "ownerIssue": 18
+      },
+      {
+        "id": "pagination_anchor",
+        "title": "历史分页前插保持锚点",
+        "ownerIssue": 18
+      },
+      {
+        "id": "reconnect_no_duplicate",
+        "title": "重连不重复提交/回放",
+        "ownerIssue": 27
+      },
+      {
+        "id": "views_layout",
+        "title": "RunPort、Transcript、Composer、Indicators 布局对齐 ClientKit",
+        "ownerIssue": 21
+      },
+      {
+        "id": "sidebar_operations",
+        "title": "Sidebar 会话导航、活动态、置顶和共享操作",
+        "ownerIssue": 22
+      },
+      {
+        "id": "task",
+        "title": "SidePanel Task 内容与导航",
+        "ownerIssue": 23
+      },
+      {
+        "id": "subagent",
+        "title": "SidePanel 子代理内容与来源隔离",
+        "ownerIssue": 23
+      },
+      {
+        "id": "sidechat",
+        "title": "SidePanel SideChat 生命周期与草稿",
+        "ownerIssue": 24
+      },
+      {
+        "id": "summary",
+        "title": "SidePanel Summary 内容与操作",
+        "ownerIssue": 25
+      },
+      {
+        "id": "system_ime",
+        "title": "真实系统中文 IME 组字/候选窗/commit",
+        "ownerIssue": 27
+      },
+      {
+        "id": "accessibility",
+        "title": "VoiceOver/AX 读序与操作",
+        "ownerIssue": 27
+      }
+    ],
+    "harnesses": [
+      "Native",
+      "Pi",
+      "DSH"
+    ],
+    "topologies": [
+      "in_process",
+      "cross_process"
+    ],
+    "verificationLayers": [
+      "component_tests",
+      "public_consumer",
+      "offscreen_harness",
+      "strict_ci",
+      "native_window",
+      "system_ime",
+      "accessibility",
+      "process_container"
+    ]
+  },
+  "statusVocabulary": {
+    "passed": "该维度组合有直接、同身份的当前证据。",
+    "failed": "直接验收执行且失败；不能被历史通过覆盖。",
+    "blocked": "所需上游公开能力未交付。",
+    "unsupported": "该 harness 明确不提供该能力，或该验证层不适用于该拓扑。",
+    "not_run": "未执行/未证明；历史记录另列。"
+  },
+  "cellCount": 720,
+  "rules": [
+    {
+      "priority": 0,
+      "status": "not_run",
+      "reason": "截至 AgentKit 58521a1 基线，未在本轮重新运行该组合；仅可引用下方逐项列出的历史证据。"
+    },
+    {
+      "priority": 10,
+      "topology": "cross_process",
+      "layer": "component_tests",
+      "status": "unsupported",
+      "reason": "组件单测不执行宿主跨进程拓扑。"
+    },
+    {
+      "priority": 10,
+      "topology": "cross_process",
+      "layer": "public_consumer",
+      "status": "unsupported",
+      "reason": "第二公开 consumer 的 API 测试不构成跨进程容器验收。"
+    },
+    {
+      "priority": 10,
+      "topology": "cross_process",
+      "layer": "strict_ci",
+      "status": "unsupported",
+      "reason": "当前 CI 的 strict reading runner 不执行跨进程 ProcessContainer。"
+    },
+    {
+      "priority": 10,
+      "topology": "cross_process",
+      "layer": "*",
+      "status": "blocked",
+      "reason": "正式跨进程 Agent UI 容器依赖公开 ProcessContainer 能力；TekesUI #48 在固定 pin 下未交付。",
+      "evidence": [
+        "tekesui-48-process-container-gate"
+      ]
+    },
+    {
+      "priority": 20,
+      "layer": "process_container",
+      "status": "blocked",
+      "reason": "尚无基于固定公开 TekesUI #48 契约的正式 ProcessContainer 适配与同进程/跨进程验证。",
+      "evidence": [
+        "tekesui-48-process-container-gate"
+      ]
+    },
+    {
+      "priority": 30,
+      "topology": "in_process",
+      "layer": "component_tests",
+      "requirement": "*",
+      "status": "passed",
+      "reason": "58521a1 对应 CI 的 UI workspace 单测通过；这是共享组件行为，不是某个 harness 的独立运行记录。",
+      "evidence": [
+        "ci-current-ui-tests"
+      ]
+    },
+    {
+      "priority": 30,
+      "topology": "in_process",
+      "layer": "public_consumer",
+      "requirement": "*",
+      "status": "passed",
+      "reason": "58521a1 对应 CI 的公开 API consumer 测试通过；结果按共享 consumer 标注，不代表三个 harness 分别运行。",
+      "evidence": [
+        "ci-current-ui-tests"
+      ]
+    },
+    {
+      "priority": 35,
+      "topology": "in_process",
+      "layer": "component_tests",
+      "requirement": "views_layout",
+      "status": "not_run",
+      "reason": "组件测试不证明与 ClientKit 配对的完整 Views 布局和显示逻辑。"
+    },
+    {
+      "priority": 35,
+      "topology": "in_process",
+      "layer": "public_consumer",
+      "requirement": "views_layout",
+      "status": "not_run",
+      "reason": "公开 API consumer 编译/行为测试不证明 ClientKit 同内容配对布局。"
+    },
+    {
+      "priority": 35,
+      "topology": "in_process",
+      "layer": "component_tests",
+      "requirement": "system_ime",
+      "status": "not_run",
+      "reason": "组件层合成 Preedit 门禁不等于 macOS 系统中文输入法验收。"
+    },
+    {
+      "priority": 35,
+      "topology": "in_process",
+      "layer": "public_consumer",
+      "requirement": "system_ime",
+      "status": "not_run",
+      "reason": "公开 consumer 未运行系统输入法候选窗/物理键盘验收。"
+    },
+    {
+      "priority": 35,
+      "topology": "in_process",
+      "layer": "component_tests",
+      "requirement": "accessibility",
+      "status": "not_run",
+      "reason": "组件测试未完成 VoiceOver/AX 完整读序和操作验收。"
+    },
+    {
+      "priority": 35,
+      "topology": "in_process",
+      "layer": "public_consumer",
+      "requirement": "accessibility",
+      "status": "not_run",
+      "reason": "公开 consumer 未完成 VoiceOver/AX 完整读序和操作验收。"
+    },
+    {
+      "priority": 40,
+      "topology": "in_process",
+      "layer": "strict_ci",
+      "requirement": "reading_append",
+      "status": "failed",
+      "reason": "最新 PR CI 58521a1 的严格 #53 嵌套阅读检查复现父容器跟随追加，内层详情离开视口。",
+      "evidence": [
+        "ci-current-strict-53-failure"
+      ]
+    },
+    {
+      "priority": 40,
+      "topology": "in_process",
+      "layer": "strict_ci",
+      "status": "not_run",
+      "reason": "该 strict CI 层只给出 #53 阅读门禁结果；不得把组件测试通过解释成每个需求的独立 strict gate。"
+    },
+    {
+      "priority": 50,
+      "topology": "in_process",
+      "layer": "offscreen_harness",
+      "harness": "DSH",
+      "requirement": "sidechat",
+      "status": "unsupported",
+      "reason": "DSH 当前 SEP 未提供可确认销毁的 SideChat 能力；旧收据明确 capabilityUnavailable=true。",
+      "historicalEvidence": [
+        "history-real-sidechat"
+      ]
+    },
+    {
+      "priority": 50,
+      "topology": "in_process",
+      "layer": "offscreen_harness",
+      "status": "not_run",
+      "reason": "本轮未在 58521a1 冻结程序上重跑 Native/Pi/DSH 离屏 harness；历史程序和报告仅保留为历史。"
+    },
+    {
+      "priority": 50,
+      "topology": "in_process",
+      "layer": "native_window",
+      "status": "not_run",
+      "reason": "用户要求本轮不做桌面验收；历史窗口程序不转移为当前 58521a1 接受。"
+    },
+    {
+      "priority": 50,
+      "topology": "in_process",
+      "layer": "system_ime",
+      "status": "not_run",
+      "reason": "本轮未启动桌面/系统输入法；旧软件输入事件与合成 Preedit 均不能替代当前物理系统 IME 验收。"
+    },
+    {
+      "priority": 50,
+      "topology": "in_process",
+      "layer": "accessibility",
+      "status": "not_run",
+      "reason": "本轮未运行 VoiceOver/AX 桌面验收。"
+    },
+    {
+      "priority": 40,
+      "topology": "in_process",
+      "layer": "public_consumer",
+      "requirement": "*",
+      "status": "not_run",
+      "reason": "本快照的 CI workspace suite 不是独立 standalone public consumer 步骤；外部 ContentHost 构造收据仅证明组件可构造/挂载，不覆盖这些行为要求。"
+    }
+  ],
+  "evidenceCatalog": [
+    {
+      "id": "ci-current-ui-tests",
+      "historicalOnly": false,
+      "sourceCommit": "58521a1bc581ef14c3c63c9a7bc698bbd01d9ab3",
+      "report": {
+        "url": "https://github.com/TekesApps/TekesAgentKit/actions/runs/40041872629/job/120714589859"
+      },
+      "run": {
+        "headSha": "58521a1bc581ef14c3c63c9a7bc698bbd01d9ab3",
+        "job": "Rust UI consumer (no native interaction)",
+        "result": "passed",
+        "scope": "UI workspace tests, formatter, strict Clippy, public pin and consumer tests completed before the separate strict #53 step failed."
+      },
+      "contract": "none",
+      "topology": "in_process",
+      "layers": [
+        "component_tests"
+      ],
+      "requirements": [
+        "composer_ime",
+        "draft_isolation",
+        "send_cancel",
+        "stream",
+        "reading_append",
+        "pagination_anchor",
+        "reconnect_no_duplicate",
+        "sidebar_operations",
+        "task",
+        "subagent",
+        "sidechat",
+        "summary"
+      ],
+      "artifacts": [],
+      "voiceOverAccepted": false,
+      "note": "Shared UI workspace test evidence. It is not a new standalone consumer execution and is not three per-harness runs.",
+      "nativeWindow": false,
+      "ime": {
+        "route": "synthetic_or_none",
+        "markedTextObserved": false,
+        "commitObserved": false,
+        "candidateWindowObserved": false,
+        "physicalKeyboard": false
+      }
+    },
+    {
+      "id": "ci-current-strict-53-failure",
+      "historicalOnly": false,
+      "sourceCommit": "58521a1bc581ef14c3c63c9a7bc698bbd01d9ab3",
+      "report": {
+        "url": "https://github.com/TekesApps/TekesAgentKit/actions/runs/40041872629/job/120714589859"
+      },
+      "run": {
+        "headSha": "58521a1bc581ef14c3c63c9a7bc698bbd01d9ab3",
+        "job": "Verify nested detail reading intent (strict; no native window)",
+        "result": "failed",
+        "receipt": {
+          "accepted": false,
+          "parentFollowingAfterInnerUp": true,
+          "parentOffsetBefore": 0,
+          "parentOffsetAfterScroll": 0,
+          "parentOffsetAfterAppend": 634,
+          "innerOffset": 100,
+          "detailVisibleAfterAppend": false
+        }
+      },
+      "contract": "none",
+      "topology": "in_process",
+      "layers": [
+        "strict_ci"
+      ],
+      "requirements": [
+        "reading_append"
+      ],
+      "artifacts": [],
+      "voiceOverAccepted": false,
+      "note": "The head SHA and strict CI job are authoritative; failure is a shared nested-reading regression, not per-harness execution.",
+      "nativeWindow": false,
+      "ime": {
+        "route": "not_tested",
+        "markedTextObserved": false,
+        "commitObserved": false,
+        "candidateWindowObserved": false,
+        "physicalKeyboard": null
+      }
+    },
+    {
+      "id": "tekesui-48-process-container-gate",
+      "historicalOnly": false,
+      "sourceCommit": "58521a1bc581ef14c3c63c9a7bc698bbd01d9ab3",
+      "report": {
+        "url": "https://github.com/TekesApps/TekesUI/issues/48"
+      },
+      "upstreamRevision": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+      "run": {
+        "result": "blocked",
+        "reason": "The pinned public ProcessContainer contract lacks the required Agent UI transport/input/accessibility surface; issue #48 remains open."
+      },
+      "contract": "none",
+      "topology": null,
+      "layers": [
+        "offscreen_harness",
+        "native_window",
+        "system_ime",
+        "accessibility",
+        "process_container"
+      ],
+      "requirements": [
+        "composer_ime",
+        "draft_isolation",
+        "send_cancel",
+        "stream",
+        "reading_append",
+        "pagination_anchor",
+        "reconnect_no_duplicate",
+        "views_layout",
+        "sidebar_operations",
+        "task",
+        "subagent",
+        "sidechat",
+        "summary",
+        "system_ime",
+        "accessibility"
+      ],
+      "artifacts": [],
+      "voiceOverAccepted": false,
+      "nativeWindow": false,
+      "ime": {
+        "route": "not_tested",
+        "markedTextObserved": false,
+        "commitObserved": false,
+        "candidateWindowObserved": false,
+        "physicalKeyboard": null
+      }
+    },
+    {
+      "id": "history-readonly-source-authority",
+      "historicalOnly": true,
+      "sourceCommit": "f6cd5317284eaf67be3ffb973e0a39cb262a02a3",
+      "report": {
+        "path": "docs/rust-agent-ui-non-sdk-review-20261023.json",
+        "sha256": "e77dd62d47282e685ca4ce0201f4ae588bac5deb4104dadb44dbc1cae4da7983"
+      },
+      "program": {
+        "path": ".runtime-fixtures/readonly-source-identity-20261023/tekes-agent-ui-demo",
+        "reportedPath": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/readonly-source-identity-20261023/tekes-agent-ui-demo",
+        "sha256": "8f13b993a77bd2556871e10d17b88b33501d3b30354e5e2354bf38d0cba882ae"
+      },
+      "contract": "ContentHost",
+      "topology": "in_process",
+      "layers": [
+        "offscreen_harness"
+      ],
+      "requirements": [
+        "pagination_anchor",
+        "sidechat"
+      ],
+      "artifacts": [],
+      "voiceOverAccepted": false,
+      "nativeWindow": false,
+      "ime": {
+        "route": "not_tested",
+        "markedTextObserved": false,
+        "commitObserved": false,
+        "candidateWindowObserved": false,
+        "physicalKeyboard": null
+      }
+    },
+    {
+      "id": "history-real-sidechat",
+      "historicalOnly": true,
+      "sourceCommit": "abfc1c2732d2659c3f43f128dbf50d9d03126598",
+      "report": {
+        "path": "docs/rust-agent-ui-real-sidechat-20261023.json",
+        "sha256": "17fc3c36d4d63461a8c77c6547a8fe4099f42a3374a5e3bdf8ad007d8dc40cf6"
+      },
+      "program": {
+        "path": ".runtime-fixtures/real-sidechat-ui-20261023/tekes-agent-ui-demo-v5",
+        "reportedPath": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/real-sidechat-ui-20261023/tekes-agent-ui-demo-v5",
+        "sha256": "a68e9c8c86fb0fabc5711af33384fa5292f9e733fc95e3b714de96267bdcda0b"
+      },
+      "contract": "ContentHost",
+      "topology": "in_process",
+      "layers": [
+        "offscreen_harness"
+      ],
+      "requirements": [
+        "draft_isolation",
+        "send_cancel",
+        "reconnect_no_duplicate",
+        "sidechat",
+        "summary"
+      ],
+      "artifacts": [],
+      "voiceOverAccepted": false,
+      "nativeWindow": false,
+      "ime": {
+        "route": "not_tested",
+        "markedTextObserved": false,
+        "commitObserved": false,
+        "candidateWindowObserved": false,
+        "physicalKeyboard": null
+      }
+    },
+    {
+      "id": "history-native-bounded",
+      "historicalOnly": true,
+      "sourceCommit": "3e40ad67283a797e8fe9e58bdd1824c345b2ed3c",
+      "report": {
+        "path": "docs/rust-agent-ui-native-bounded-20261023.json",
+        "sha256": "1d2e54e5b91bbc55c2d8139240d4118dbad518e2c723fdef5dfe134b6097679b"
+      },
+      "program": {
+        "path": ".runtime-fixtures/native-bounded-ui-20261023/tekes-agent-ui-demo-v5",
+        "reportedPath": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/native-bounded-ui-20261023/tekes-agent-ui-demo-v5",
+        "sha256": "9463e851103f2329a785f2cf869f6ea8ae1c825c999646041570457172e50e2f"
+      },
+      "contract": "ContentHost",
+      "topology": "in_process",
+      "layers": [
+        "offscreen_harness"
+      ],
+      "requirements": [
+        "pagination_anchor",
+        "draft_isolation",
+        "reconnect_no_duplicate"
+      ],
+      "artifacts": [],
+      "voiceOverAccepted": false,
+      "nativeWindow": false,
+      "ime": {
+        "route": "not_tested",
+        "markedTextObserved": false,
+        "commitObserved": false,
+        "candidateWindowObserved": false,
+        "physicalKeyboard": null
+      }
+    },
+    {
+      "id": "history-activity-segments",
+      "historicalOnly": true,
+      "sourceCommit": "f6471003867dbb3a67f8eb2ef124b2ee157b3f2e",
+      "report": {
+        "path": "docs/rust-agent-ui-activity-segments-20261023.json",
+        "sha256": "fdcbf8f869c3e77d7a3115ff9a4f412ddfbee6ef8db1563660c5c5ab5d9f2c7d"
+      },
+      "program": {
+        "path": ".runtime-fixtures/activity-segments-20261023/final/AgentKitActivitySegments.app/Contents/MacOS/tekes-agent-ui-demo",
+        "reportedPath": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/activity-segments-20261023/final/AgentKitActivitySegments.app/Contents/MacOS/tekes-agent-ui-demo",
+        "sha256": "cb3b3aa319db68c9bc8859654c4f26ec7cb42e0eed6ec7f4aa5dfcd76897c362"
+      },
+      "contract": "ContentHost",
+      "topology": "in_process",
+      "layers": [
+        "native_window"
+      ],
+      "requirements": [
+        "stream",
+        "reading_append",
+        "pagination_anchor",
+        "reconnect_no_duplicate",
+        "draft_isolation"
+      ],
+      "artifacts": [],
+      "voiceOverAccepted": false,
+      "nativeWindow": true,
+      "ime": {
+        "route": "not_tested",
+        "markedTextObserved": false,
+        "commitObserved": false,
+        "candidateWindowObserved": false,
+        "physicalKeyboard": null
+      },
+      "nativeWindowReportScopes": [
+        "nativeOwnedHistory",
+        "realHarnessNativeProfiles"
+      ]
+    },
+    {
+      "id": "history-turn-output-copy",
+      "historicalOnly": true,
+      "sourceCommit": "d0c82b235e50447548a5c3926ef3fc2a1e88f7c5",
+      "report": {
+        "path": "docs/rust-agent-ui-turn-output-copy-20261022.json",
+        "sha256": "33d0215595ea2b7944be0e0cdf7daee9c0a9d70717b2b4685eb81b8b2368f8c2"
+      },
+      "program": {
+        "path": ".runtime-fixtures/AgentKitTurnOutputCopyFinal.app/Contents/MacOS/AgentKitTurnOutputCopyFinal",
+        "reportedPath": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/AgentKitTurnOutputCopyFinal.app/Contents/MacOS/AgentKitTurnOutputCopyFinal",
+        "sha256": "842bb1eb253388113ccca6050c004ffcd40d8693711572aca8a68656636350ec"
+      },
+      "contract": "ContentHost",
+      "topology": "in_process",
+      "layers": [
+        "native_window",
+        "system_ime"
+      ],
+      "requirements": [
+        "composer_ime",
+        "views_layout",
+        "pagination_anchor",
+        "system_ime"
+      ],
+      "artifacts": [],
+      "voiceOverAccepted": false,
+      "nativeWindow": true,
+      "ime": {
+        "route": "software_injected",
+        "markedTextObserved": false,
+        "commitObserved": false,
+        "candidateWindowObserved": false,
+        "physicalKeyboard": false
+      }
+    }
+  ],
+  "historicalObservations": [
+    {
+      "requirement": "sidechat",
+      "harness": "Native",
+      "topology": "in_process",
+      "layer": "offscreen_harness",
+      "evidence": "history-real-sidechat",
+      "assessment": "passed",
+      "note": "原程序的真实 SEP SideChat create/input/send/discard/reconnect；nativeInteraction=false，属于离屏/content-host分项。"
+    },
+    {
+      "requirement": "sidechat",
+      "harness": "Pi",
+      "topology": "in_process",
+      "layer": "offscreen_harness",
+      "evidence": "history-real-sidechat",
+      "assessment": "passed",
+      "note": "原程序的真实 SEP SideChat create/input/send/discard/reconnect；nativeInteraction=false，属于离屏/content-host分项。"
+    },
+    {
+      "requirement": "sidechat",
+      "harness": "DSH",
+      "topology": "in_process",
+      "layer": "offscreen_harness",
+      "evidence": "history-real-sidechat",
+      "assessment": "unsupported",
+      "note": "DSH profile capabilityUnavailable=true；未尝试 fork。"
+    },
+    {
+      "requirement": "stream",
+      "harness": "Native",
+      "topology": "in_process",
+      "layer": "native_window",
+      "evidence": "history-activity-segments",
+      "assessment": "passed",
+      "note": "旧程序 native window 的 real-harness stream：oneSubmission、settlement 与 reconnectNoReplay 为 true；不转移到当前版本。"
+    },
+    {
+      "requirement": "draft_isolation",
+      "harness": "Native",
+      "topology": "in_process",
+      "layer": "native_window",
+      "evidence": "history-activity-segments",
+      "assessment": "passed",
+      "note": "旧程序 native window profile 记录 sessionDraftIsolation=true；不转移到当前版本。"
+    },
+    {
+      "requirement": "reconnect_no_duplicate",
+      "harness": "Native",
+      "topology": "in_process",
+      "layer": "native_window",
+      "evidence": "history-activity-segments",
+      "assessment": "passed",
+      "note": "旧程序 native window profile 记录 reconnectNoReplay=true；不转移到当前版本。"
+    },
+    {
+      "requirement": "reading_append",
+      "harness": "Native",
+      "topology": "in_process",
+      "layer": "native_window",
+      "evidence": "history-activity-segments",
+      "assessment": "partial",
+      "note": "旧程序只覆盖 stream-reading 的局部锚点场景；后续 58521a1 严格 #53 CI 仍失败。"
+    },
+    {
+      "requirement": "pagination_anchor",
+      "harness": "Native",
+      "topology": "in_process",
+      "layer": "native_window",
+      "evidence": "history-activity-segments",
+      "assessment": "partial",
+      "note": "旧程序 pageReading 锚点字段成功，但原生 paging control/focus 组合并未完全通过。"
+    },
+    {
+      "requirement": "system_ime",
+      "harness": "Native",
+      "topology": "in_process",
+      "layer": "system_ime",
+      "evidence": "history-turn-output-copy",
+      "assessment": "partial",
+      "note": "旧程序接收软件定向事件，physicalKeyboard=false、candidateWindow=false；不是物理系统中文 IME 验收。"
+    },
+    {
+      "requirement": "stream",
+      "harness": "Pi",
+      "topology": "in_process",
+      "layer": "native_window",
+      "evidence": "history-activity-segments",
+      "assessment": "passed",
+      "note": "旧程序 native window 的 real-harness stream：oneSubmission、settlement 与 reconnectNoReplay 为 true；不转移到当前版本。"
+    },
+    {
+      "requirement": "draft_isolation",
+      "harness": "Pi",
+      "topology": "in_process",
+      "layer": "native_window",
+      "evidence": "history-activity-segments",
+      "assessment": "passed",
+      "note": "旧程序 native window profile 记录 sessionDraftIsolation=true；不转移到当前版本。"
+    },
+    {
+      "requirement": "reconnect_no_duplicate",
+      "harness": "Pi",
+      "topology": "in_process",
+      "layer": "native_window",
+      "evidence": "history-activity-segments",
+      "assessment": "passed",
+      "note": "旧程序 native window profile 记录 reconnectNoReplay=true；不转移到当前版本。"
+    },
+    {
+      "requirement": "reading_append",
+      "harness": "Pi",
+      "topology": "in_process",
+      "layer": "native_window",
+      "evidence": "history-activity-segments",
+      "assessment": "partial",
+      "note": "旧程序只覆盖 stream-reading 的局部锚点场景；后续 58521a1 严格 #53 CI 仍失败。"
+    },
+    {
+      "requirement": "pagination_anchor",
+      "harness": "Pi",
+      "topology": "in_process",
+      "layer": "native_window",
+      "evidence": "history-activity-segments",
+      "assessment": "partial",
+      "note": "旧程序 pageReading 锚点字段成功，但原生 paging control/focus 组合并未完全通过。"
+    },
+    {
+      "requirement": "system_ime",
+      "harness": "Pi",
+      "topology": "in_process",
+      "layer": "system_ime",
+      "evidence": "history-turn-output-copy",
+      "assessment": "partial",
+      "note": "旧程序接收软件定向事件，physicalKeyboard=false、candidateWindow=false；不是物理系统中文 IME 验收。"
+    },
+    {
+      "requirement": "stream",
+      "harness": "DSH",
+      "topology": "in_process",
+      "layer": "native_window",
+      "evidence": "history-activity-segments",
+      "assessment": "passed",
+      "note": "旧程序 native window 的 real-harness stream：oneSubmission、settlement 与 reconnectNoReplay 为 true；不转移到当前版本。"
+    },
+    {
+      "requirement": "draft_isolation",
+      "harness": "DSH",
+      "topology": "in_process",
+      "layer": "native_window",
+      "evidence": "history-activity-segments",
+      "assessment": "passed",
+      "note": "旧程序 native window profile 记录 sessionDraftIsolation=true；不转移到当前版本。"
+    },
+    {
+      "requirement": "reconnect_no_duplicate",
+      "harness": "DSH",
+      "topology": "in_process",
+      "layer": "native_window",
+      "evidence": "history-activity-segments",
+      "assessment": "passed",
+      "note": "旧程序 native window profile 记录 reconnectNoReplay=true；不转移到当前版本。"
+    },
+    {
+      "requirement": "reading_append",
+      "harness": "DSH",
+      "topology": "in_process",
+      "layer": "native_window",
+      "evidence": "history-activity-segments",
+      "assessment": "partial",
+      "note": "旧程序只覆盖 stream-reading 的局部锚点场景；后续 58521a1 严格 #53 CI 仍失败。"
+    },
+    {
+      "requirement": "pagination_anchor",
+      "harness": "DSH",
+      "topology": "in_process",
+      "layer": "native_window",
+      "evidence": "history-activity-segments",
+      "assessment": "partial",
+      "note": "旧程序 pageReading 锚点字段成功，但原生 paging control/focus 组合并未完全通过。"
+    },
+    {
+      "requirement": "system_ime",
+      "harness": "DSH",
+      "topology": "in_process",
+      "layer": "system_ime",
+      "evidence": "history-turn-output-copy",
+      "assessment": "partial",
+      "note": "旧程序接收软件定向事件，physicalKeyboard=false、candidateWindow=false；不是物理系统中文 IME 验收。"
+    }
+  ],
+  "guardrails": [
+    "In-process ContentHost results are component/harness results only; they never satisfy formal ProcessContainer acceptance.",
+    "Direct synthetic Preedit/commit and software-injected text do not prove macOS system IME routing. A system-IME pass requires a native window receipt of the macOS input-method route, marked text, and commit; physical keyboard use is recorded separately.",
+    "Observed gates preserve this snapshot's strict #53 failure and DSH SideChat capability status by linking each outcome to evidence; newer evidence may update the outcome and matching cells.",
+    "The current run performed no desktop interaction, system IME, VoiceOver or new Native/Pi/DSH harness run."
+  ],
+  "observedGates": [
+    {
+      "kind": "strict_reading_append",
+      "match": {
+        "requirement": "reading_append",
+        "harnesses": [
+          "Native",
+          "Pi",
+          "DSH"
+        ],
+        "topology": "in_process",
+        "layer": "strict_ci"
+      },
+      "status": "failed",
+      "evidence": [
+        "ci-current-strict-53-failure"
+      ],
+      "note": "本快照的 strict #53 结果；更新状态时必须同时更新匹配的格子并提供新基线证据。"
+    },
+    {
+      "kind": "dsh_sidechat_capability",
+      "match": {
+        "requirement": "sidechat",
+        "harnesses": [
+          "DSH"
+        ],
+        "topology": "in_process",
+        "layer": "offscreen_harness"
+      },
+      "status": "unsupported",
+      "evidence": [
+        "history-real-sidechat"
+      ],
+      "note": "冻结 profile 标记 capabilityUnavailable；若 DSH 能力变化，需用新 DSH 证据更新门禁与格子。"
+    }
+  ]
+}

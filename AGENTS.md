@@ -27,7 +27,19 @@ does not make that Swift checker a Rust ownership test; add a suitable Rust depe
 
 Report static, replay, integration, native UI, IME/accessibility and performance evidence separately.
 Native/Pi/DSH implement independent headless paths. Run/Transcript/Composer/connection presentation
-is implemented without a renderer; components remain scaffolding. Preserve submission identity,
+is implemented independently of rendering; Rust UI components remain experimental and full View parity is unproven. Preserve submission identity,
 destination isolation, stale-read fencing and no-automatic-retry semantics when adding hosts.
 Keep the capability matrix in docs/session-endpoints.md accurate. Do not claim full ClientKit or UI
 parity from headless builds and tests.
+
+# Issue-driven delivery
+
+Track the complete Rust Agent UI scope in GitHub issue #14 and
+`docs/rust-agent-ui-issue-plan.md`. Reuse an existing matching issue before creating one.
+A small change follows issue → implementation → verification; complex work first updates its
+design and splits linked issues. The main chat coordinates; an independent child chat can own
+implementation, with subagents used as needed. Small changes may be completed directly.
+Record completed implementation separately from acceptance and merge/release status.
+Before closing an issue, backfill implementation commits, applicable validation, unverified scope
+and PR links. Design changes update both the design and the issue. Do not auto-close every
+workstream when a broad experimental PR merges; each issue has its own acceptance criteria.

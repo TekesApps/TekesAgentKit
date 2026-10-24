@@ -1,0 +1,249 @@
+{
+  "format": "agentkit-turn-navigation/1",
+  "verified_at_utc": "2026-10-20T23:35:07.366115+00:00",
+  "based_on": "ac06339e3ad414b87c47c23248f51a2544d70d3f",
+  "published_contract": "v0.3.8",
+  "default_public_tekesui": {
+    "commit": "8cf0840790334ba224afc0595897c74231c712e6",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 199,
+    "sha256": "f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f",
+    "ui_packages": 8
+  },
+  "references": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/TranscriptCoordinator/ThreadTranscriptPresenter+Scroll.swift": "cc61572c9f79290b4ecd609b451d3f7f3b890ea6d3b3e3e292857638932f81e7",
+    "/Users/frankqin/dev/TekesClientKit/Sources/TranscriptRendering/TranscriptIndicatorRailView.swift": "0a710cf6be24f8caa08e2e030db20caf3fb0001048ebbd8b9fb8c15dc53df487",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Run/RunView.swift": "4453b67fb8e4e6cabe4a9653ce378bffb939a9a01188a7df9a4bb89f0bd7674e"
+  },
+  "source_files": {
+    "scripts/probes/agentkit-item-navigation-candidate.rs": "1f893df2873673ebb6a847551f272624024e192cb4e9eaad083e3d19f2e76885",
+    "scripts/probes/native-item-navigation-candidate.rs": "3593b2fc4e5056d2b0724c4e332070d037783749009baf4c3838aa4b8cc28acc",
+    "scripts/test-reading-candidate.py": "cfa6de510c78a9a43fd5b8acdede5017dba8ced01b53ef28912482fe2773ea42",
+    "ui/components/src/run_view.rs": "fed971038c93576b14d46b5ce58785c346d21db18f403aa314762321f921c7fa",
+    "ui/components/src/turn_rail.rs": "2eaa1e238e41e69e6cfd61cd2963ee81091eb2216b139eec5f02828ab6ccf3f0",
+    "ui/consumer/src/lib.rs": "14e9d5fd89bba59e0a940b298cc61e543776add472f674e5f83e241e787a613c",
+    "ui/demo/tests/run_column.rs": "9fef505eaf6a871ead460b37b3a439fb9e989da719eddfea33d9248798a97ad0"
+  },
+  "business_api": {
+    "capture": "RunView::prepare_turn_navigation",
+    "dispatch": "RunView::claim_turn_navigation",
+    "kinds": [
+      "TurnStart(ContentId)",
+      "Latest"
+    ],
+    "nonfocusing_preedit_allowed": true,
+    "clone_one_dispatch": true,
+    "pane_aba_fenced": true,
+    "actual_turn_start_executor_supported": false
+  },
+  "candidate": {
+    "identity": "10b5f2354f76a1c250143ef15ea7f7337f7be632e0b979ff00feb569338b5481",
+    "archive_sha256": "361318c1ee6995dc08b3ca7a489340616e43dbc823a032821e43756d168b04f9",
+    "portable_manifest_sha256": "2d94a56cc0ab909b89165c2b157471346af35a166420f89ba096b77b5957d821",
+    "files": 486,
+    "delta_paths": [
+      "crates/tekes-ui-controls/src/composition.rs",
+      "crates/tekes-ui-controls/src/composition/content_reading.rs",
+      "crates/tekes-ui-controls/src/composition/content_reveal.rs",
+      "crates/tekes-ui-controls/src/lib.rs",
+      "crates/tekes-ui-controls/src/reading.rs",
+      "crates/tekes-ui-controls/src/scroll_view.rs",
+      "crates/tekes-ui-controls/src/scroll_view/reveal.rs",
+      "crates/tekes-ui-controls/tests/component_registry_api.rs",
+      "design/gallery/public-api-surface.json",
+      "design/source/interaction-contracts.json",
+      "design/tokens.json",
+      "docs/design/content-item-reveal-20261021.md",
+      "docs/design/stable-item-reveal-20261021.md",
+      "examples/composition-consumer/examples/native.rs",
+      "examples/composition-consumer/src/item_navigation.rs",
+      "examples/composition-consumer/src/lib.rs",
+      "examples/composition-consumer/tests/item_navigation.rs",
+      "examples/composition-consumer/tests/scroll_reveal.rs"
+    ],
+    "base_292_unchanged": true,
+    "source_and_locks_unchanged": true,
+    "all_consumed_local_ui_packages_in_extraction": true,
+    "tokens_sets_api_unchanged": true,
+    "receiver_receipt": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-item-10b5-run-capture/receipt.json",
+    "receiver_receipt_sha256": "98d48069700afb12574d7cef2cae96e2b70aea09798cbf3e2a293d83f57c6c6f",
+    "overrides": {
+      "ui/Cargo.toml": "ad6e5af89c53e5f3cb5fa41c43f0aa98672012fee68f0aa96bfe7693cbbb2ea6",
+      "ui/Cargo.lock": "938166f51219783042537cd97a1b708269340b4080df7e6d1ba1fae533c99a62",
+      "ui/demo/src/native.rs": "0c91f56503b7dbd04374d82e65bbdfa6d2027820693a0df79b914707345a8f01",
+      "ui/demo/src/native_item_navigation_candidate.rs": "3593b2fc4e5056d2b0724c4e332070d037783749009baf4c3838aa4b8cc28acc",
+      "ui/demo/src/components_native.rs": "873dd8ec3d2a0e198082cf139e1833160fffdca430599f9aae9f336fd7bc558b"
+    }
+  },
+  "checks": {
+    "default_ui": 346,
+    "default_ui_scope": "Before public enum naming was clarified to TurnStart; final affected 11, independent 34 and all-target Clippy/build passed afterward.",
+    "final_default_affected": 11,
+    "second_consumer": 34,
+    "candidate_entire_ui": 359,
+    "candidate_run_probe": 13,
+    "original_run_transaction_tests_in_probe": 8,
+    "new_run_navigation_tests_in_probe": 5,
+    "sdk_targeted_item_and_viewport": 25,
+    "sdk_controls": 388,
+    "sdk_text_executed": 49,
+    "sdk_text_filtered": 1,
+    "sdk_text_scope": "--skip gpu filters one named test; the hard-lines GPU test still executes. No complete new GPU matrix claimed.",
+    "sdk_consumer": 206,
+    "sdk_native_example_build": true,
+    "strict_all_targets_clippy_default_and_candidate_ui": true,
+    "strict_all_targets_clippy_sdk_three_packages": true,
+    "fmt": true,
+    "ui_boundary": true
+  },
+  "native_candidate": {
+    "actualRunView": true,
+    "clientkitTurnStartAlignment": false,
+    "initialAndExplicitLatest": true,
+    "interactiveRail": false,
+    "nativeWindow": true,
+    "noSubmission": true,
+    "originalBackend": true,
+    "originalEditorAndBaseline": true,
+    "physicalIme": false,
+    "programmaticItemNavigation": true,
+    "realHarness": false,
+    "secondPublicConsumer": false,
+    "syntheticAppKitPreeditPreserved": true,
+    "voiceOver": false
+  },
+  "native_default_general_pass": true,
+  "native_apps_closed": true,
+  "voiceover_running_after": false,
+  "binary_sha256": {
+    "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-item-10b5-run-capture/native-demo": "0b97378087341d3a67332655401323e6ae3a29e0927b48691a470d14b314a033",
+    "/Users/frankqin/dev/TekesAgentKit/ui/target/debug/tekes-agent-ui-demo": "6909e4150ea39a057b226a02c1bd766e22fb5f98ea2d3d205fdf8f92cb32f678"
+  },
+  "screenshots": {
+    "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-item-10b5-native-centered-marked.png": {
+      "sha256": "f78b83808d95b3614ad213177848374878ba40cba2e74aac8d9737e3648d4bea",
+      "size_px": [
+        2136,
+        1584
+      ],
+      "visually_inspected": true
+    },
+    "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-item-10b5-native-latest-marked.png": {
+      "sha256": "ef1803b6b42ef7d09108492b91907a1cc5759889bd6c7f0906fba5fe08455bb8",
+      "size_px": [
+        2136,
+        1584
+      ],
+      "visually_inspected": true
+    }
+  },
+  "diagnostic_attempts": [
+    {
+      "fixture": "agentkit-item-10b5-run-initial",
+      "result": "10 pass/1 fail",
+      "cause": "Probe compared controlled baseline epochs across an ordinary canonical acknowledgement. Strengthened final test to preserve active preedit across append/prepend."
+    },
+    {
+      "fixture": "agentkit-item-10b5-run-native",
+      "result": "compile failure",
+      "cause": "Native bin cannot import a dev-only second-consumer dependency. Native uses public Kit directly; CLI exercises second consumer."
+    },
+    {
+      "fixture": "agentkit-item-10b5-run-nested",
+      "result": "compile failure",
+      "cause": "Probe used a nonexistent ScrollArea content field; corrected to public document_size()."
+    },
+    {
+      "fixture": "agentkit-item-10b5-run-geometry",
+      "result": "11 pass/2 fail",
+      "cause": "ContentHost root is not removable. Construct original Run once inside the host pane instead."
+    },
+    {
+      "fixture": "agentkit-item-10b5-run-final",
+      "result": "11 pass/2 fail",
+      "cause": "Initially fully clipped reading owner has no recorded item mount, returns UnlaidOut. Final valid-ancestor fixture first lays owner out partially visible; no SDK patch or forced offset."
+    },
+    {
+      "log": "agentkit-item-10b5-native.log",
+      "result": "native passed, first screenshot showed latest due asynchronous capture",
+      "cause": "Diagnostic-only frame hold added; final two captures independently show original first loaded turn and latest with preedit."
+    }
+  ],
+  "gap": {
+    "issue": "https://github.com/TekesApps/TekesUI/issues/32",
+    "parent_issue_addendum": "https://github.com/TekesApps/TekesUI/issues/28#issuecomment-6304084232",
+    "required": "Vertical Start at actual visible content start, horizontal offset retained, default margins zero, explicit clamp. Latest stays business-selected.",
+    "current_centered_probe_is_product_implementation": false
+  },
+  "freeze_recommendation": "Continue as an optional controlled API-validation input only. Do not promote current freeze/public pin based on this result; formal turn start and interactive rail remain unaccepted.",
+  "not_proven": [
+    "ClientKit TurnStart alignment",
+    "interactive rail/hover/follow dedup",
+    "fully clipped owner first-layout navigation",
+    "real Native/Pi/DSH UI reading/paging",
+    "physical Chinese IME",
+    "VoiceOver",
+    "paired product visuals",
+    "full Agent UI goal",
+    "merge or stage tag"
+  ],
+  "logs": {
+    "agentkit-item-navigation-ui-all": {
+      "path": "/tmp/agentkit-item-navigation-ui-all.log",
+      "sha256": "174d9907a587382131c413c61da70dfcb9178e67eaeb5ac476610aa77a77b5b1"
+    },
+    "agentkit-item-navigation-ui-clippy": {
+      "path": "/tmp/agentkit-item-navigation-ui-clippy.log",
+      "sha256": "7bb4242c4be36eeec8c1e2802bc0d5e1677d87d8e8ca3272b9759c5501f8d12b"
+    },
+    "agentkit-item-navigation-final-targeted": {
+      "path": "/tmp/agentkit-item-navigation-final-targeted.log",
+      "sha256": "e44435714b18782637189eea1af2b88a5dc5881a46903a9c16f43b981429ad95"
+    },
+    "agentkit-item-navigation-final-consumer": {
+      "path": "/tmp/agentkit-item-navigation-final-consumer.log",
+      "sha256": "cd855144012d136e69a9f121b74adee01eac9f6ecee7a3e9a38b06032cd67f35"
+    },
+    "agentkit-item-10b5-sdk-targeted": {
+      "path": "/tmp/agentkit-item-10b5-sdk-targeted.log",
+      "sha256": "21198d02520fd11089d54b5e634257febe0df2a52c8458d3f663d3990b657d5f"
+    },
+    "agentkit-item-10b5-sdk-controls-text": {
+      "path": "/tmp/agentkit-item-10b5-sdk-controls-text.log",
+      "sha256": "0499067151237737ff3a3d8ff97e249adb1bedd68a93b5cc4234577496c4c02b"
+    },
+    "agentkit-item-10b5-sdk-consumer": {
+      "path": "/tmp/agentkit-item-10b5-sdk-consumer.log",
+      "sha256": "58a24c019419e78ffeb2e27b8c479e52fa3ac76fc5acae51478884a22cc872e7"
+    },
+    "agentkit-item-10b5-sdk-clippy": {
+      "path": "/tmp/agentkit-item-10b5-sdk-clippy.log",
+      "sha256": "7109e01a0e9cbd00a7343c5a1b25ccfe5b995c7e16033bbad7e9d5817afc16a5"
+    },
+    "agentkit-item-10b5-sdk-consumer-clippy": {
+      "path": "/tmp/agentkit-item-10b5-sdk-consumer-clippy.log",
+      "sha256": "3450fd281de37e5fd8822ac6614927979cf710c53553bd89b366fa052f5c13ee"
+    },
+    "agentkit-item-10b5-ui-all": {
+      "path": "/tmp/agentkit-item-10b5-ui-all.log",
+      "sha256": "cba56a71815a263a2c84b7c4048c34a4874d07f4acfb03811724a2296fbcd328"
+    },
+    "agentkit-item-10b5-ui-clippy": {
+      "path": "/tmp/agentkit-item-10b5-ui-clippy.log",
+      "sha256": "6d85f0782cd48b340c4979031b41b2e1e41e23837f6565b6d40c94b592fec84a"
+    },
+    "agentkit-item-10b5-native-final": {
+      "path": "/tmp/agentkit-item-10b5-native-final.log",
+      "sha256": "f3b9470960a2a04d9a324af6f3d2b287cbfe587a732d648546543523299b9674"
+    },
+    "agentkit-item-navigation-native-default": {
+      "path": "/tmp/agentkit-item-navigation-native-default.log",
+      "sha256": "3d71a2c95592f68bf78a48c63b917a2586b42ce59d0b618558bb39027b7ad802"
+    },
+    "agentkit-item-10b5-sdk-native-build": {
+      "path": "/tmp/agentkit-item-10b5-sdk-native-build.log",
+      "sha256": "dceef31526f6991c341e6d843a6bc58b305b74b6a4caefe04e0e8edef35351e8"
+    }
+  }
+}

@@ -1,0 +1,543 @@
+{
+  "kind": "agentkit-parallel-issue-batch",
+  "source_commit": "8b5d45b9d043b503664006724961032be846699b",
+  "issues": [
+    22,
+    23,
+    25
+  ],
+  "pull_request": 10,
+  "implementation_commits": {
+    "summary": "9a62950",
+    "sidebar": "6c700e9",
+    "sidepanel_audit": "8b5d45b"
+  },
+  "tests": {
+    "presentation": {
+      "passed": 225,
+      "failed": 0,
+      "ignored": 0,
+      "log": ".runtime-fixtures/parallel-issues-20261024/presentation-tests-final.log",
+      "sha256": "5fd5e40b92c59a395e57f8bbd851295edb2bd9caf1269445f124fad8ff074707"
+    },
+    "ui": {
+      "passed": 634,
+      "failed": 0,
+      "ignored": 1,
+      "log": ".runtime-fixtures/parallel-issues-20261024/ui-tests-complete.log",
+      "sha256": "fc103b75a54c0de1398abf655e9eec04b5b81a8d0221556d32feae1d4e0df04f"
+    }
+  },
+  "strict_clippy": [
+    "UI workspace all targets",
+    "presentation all targets"
+  ],
+  "format": "root and UI workspace passed",
+  "boundaries": "UI and headless passed",
+  "historical_matrix_local_check": "passed; historical cells not promoted",
+  "public_consumers": [
+    {
+      "consumer": "component",
+      "status": "compiled-and-ran",
+      "exit_code": 0,
+      "scope": "RunPort/Sidebar/SidePanel constructors and ContentHost mounting",
+      "target_directory": "/tmp/agentkit-layout-text-292-target",
+      "sdk_packages": [
+        {
+          "name": "tekes-ui-controls",
+          "source": "git+https://github.com/TekesApps/TekesUI.git?rev=50ec49f3446924fdbc66b3cff22cd8cfe150fe7c#50ec49f3446924fdbc66b3cff22cd8cfe150fe7c"
+        },
+        {
+          "name": "tekes-ui-design-export",
+          "source": "git+https://github.com/TekesApps/TekesUI.git?rev=50ec49f3446924fdbc66b3cff22cd8cfe150fe7c#50ec49f3446924fdbc66b3cff22cd8cfe150fe7c"
+        },
+        {
+          "name": "tekes-ui-motion",
+          "source": "git+https://github.com/TekesApps/TekesUI.git?rev=50ec49f3446924fdbc66b3cff22cd8cfe150fe7c#50ec49f3446924fdbc66b3cff22cd8cfe150fe7c"
+        },
+        {
+          "name": "tekes-ui-scene",
+          "source": "git+https://github.com/TekesApps/TekesUI.git?rev=50ec49f3446924fdbc66b3cff22cd8cfe150fe7c#50ec49f3446924fdbc66b3cff22cd8cfe150fe7c"
+        },
+        {
+          "name": "tekes-ui-text",
+          "source": "git+https://github.com/TekesApps/TekesUI.git?rev=50ec49f3446924fdbc66b3cff22cd8cfe150fe7c#50ec49f3446924fdbc66b3cff22cd8cfe150fe7c"
+        },
+        {
+          "name": "tekes-ui-tokens",
+          "source": "git+https://github.com/TekesApps/TekesUI.git?rev=50ec49f3446924fdbc66b3cff22cd8cfe150fe7c#50ec49f3446924fdbc66b3cff22cd8cfe150fe7c"
+        }
+      ],
+      "sdk_reviewed_files_checked": 243,
+      "sdk_review_sha256": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
+      "files": [
+        {
+          "path": ".runtime-fixtures/parallel-issues-20261024/public-component-consumer/Cargo.toml",
+          "sha256": "53179f7b3806e74d78bd75828b3e8940aea749cc7ff78fb03ff40eb52ff4d7ef"
+        },
+        {
+          "path": ".runtime-fixtures/parallel-issues-20261024/public-component-consumer/Cargo.lock.seed",
+          "sha256": "8790cacd3395460c518f71240052a0bde27a25dbe7e18acda12753c53653d9d1"
+        },
+        {
+          "path": ".runtime-fixtures/parallel-issues-20261024/public-component-consumer/Cargo.lock",
+          "sha256": "2c64ec1c18e60040563bdd632e6a903aa16c171510bda31dd6274ae5354b8dd5"
+        },
+        {
+          "path": ".runtime-fixtures/parallel-issues-20261024/public-component-consumer/src/main.rs",
+          "sha256": "d829c664f9cf659002472bc57aa0902a983341048722d4b90e1205d0cbdc66dd"
+        }
+      ]
+    },
+    {
+      "consumer": "bindings",
+      "status": "compiled-and-ran",
+      "exit_code": 0,
+      "scope": "Public binding API compilation and invalid endpoint configuration guards only; two-endpoint behavior is separate fixture evidence",
+      "target_directory": "/tmp/agentkit-layout-text-292-target",
+      "sdk_packages": [
+        {
+          "name": "tekes-ui-controls",
+          "source": "git+https://github.com/TekesApps/TekesUI.git?rev=50ec49f3446924fdbc66b3cff22cd8cfe150fe7c#50ec49f3446924fdbc66b3cff22cd8cfe150fe7c"
+        },
+        {
+          "name": "tekes-ui-design-export",
+          "source": "git+https://github.com/TekesApps/TekesUI.git?rev=50ec49f3446924fdbc66b3cff22cd8cfe150fe7c#50ec49f3446924fdbc66b3cff22cd8cfe150fe7c"
+        },
+        {
+          "name": "tekes-ui-motion",
+          "source": "git+https://github.com/TekesApps/TekesUI.git?rev=50ec49f3446924fdbc66b3cff22cd8cfe150fe7c#50ec49f3446924fdbc66b3cff22cd8cfe150fe7c"
+        },
+        {
+          "name": "tekes-ui-scene",
+          "source": "git+https://github.com/TekesApps/TekesUI.git?rev=50ec49f3446924fdbc66b3cff22cd8cfe150fe7c#50ec49f3446924fdbc66b3cff22cd8cfe150fe7c"
+        },
+        {
+          "name": "tekes-ui-text",
+          "source": "git+https://github.com/TekesApps/TekesUI.git?rev=50ec49f3446924fdbc66b3cff22cd8cfe150fe7c#50ec49f3446924fdbc66b3cff22cd8cfe150fe7c"
+        },
+        {
+          "name": "tekes-ui-tokens",
+          "source": "git+https://github.com/TekesApps/TekesUI.git?rev=50ec49f3446924fdbc66b3cff22cd8cfe150fe7c#50ec49f3446924fdbc66b3cff22cd8cfe150fe7c"
+        }
+      ],
+      "sdk_reviewed_files_checked": 243,
+      "sdk_review_sha256": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
+      "files": [
+        {
+          "path": ".runtime-fixtures/parallel-issues-20261024/public-bindings-consumer/Cargo.toml",
+          "sha256": "74d96665e8d6780628f166ccac2524fdf9f104a35c29c4513a923806c05bcb4e"
+        },
+        {
+          "path": ".runtime-fixtures/parallel-issues-20261024/public-bindings-consumer/Cargo.lock.seed",
+          "sha256": "8790cacd3395460c518f71240052a0bde27a25dbe7e18acda12753c53653d9d1"
+        },
+        {
+          "path": ".runtime-fixtures/parallel-issues-20261024/public-bindings-consumer/Cargo.lock",
+          "sha256": "7652c4e980ddcc31d3b9312f41b33c19841bb61567cf01af10122c2902775989"
+        },
+        {
+          "path": ".runtime-fixtures/parallel-issues-20261024/public-bindings-consumer/src/main.rs",
+          "sha256": "ddd2c0b9b8cd4ab042c517f08c211b0736b57924b9961f3760e4ce10d00e0acd"
+        }
+      ]
+    }
+  ],
+  "source_inventory": {
+    "scope": "Tracked Rust, Cargo manifests/locks and reviewed SDK source manifest; a conservative inventory, not a compiler input trace. Consumer fixture sources/locks recorded separately.",
+    "count": 390,
+    "receipt": ".runtime-fixtures/parallel-issues-20261024/current-programs.json",
+    "receipt_sha256": "a6d3bd2ba96ea1ffc562cc469753cc9165b4b96354745450651394abd95bffa3",
+    "rehash_after_harness_runs": "all unchanged"
+  },
+  "programs": {
+    "tekes-agent-ui-demo": {
+      "path": ".runtime-fixtures/parallel-issues-20261024/tekes-agent-ui-demo",
+      "sha256": "290fb2e128ec30a29498c5ad22e2fb81435acab20bdcc5f54326a4eba1953c9e",
+      "bytes": 80830768,
+      "copy_method": "APFS_clone"
+    },
+    "tekes-agent-headless": {
+      "path": ".runtime-fixtures/parallel-issues-20261024/tekes-agent-headless",
+      "sha256": "9d2525149a3dd1c65962d8e8eca2c081958c76b5e0f11abce106ca90f6006d7d",
+      "bytes": 29118416,
+      "copy_method": "APFS_clone"
+    },
+    "agentkit-public-ui-consumer": {
+      "path": ".runtime-fixtures/parallel-issues-20261024/agentkit-public-ui-consumer",
+      "sha256": "63a48410522c67b8cd3e4bf866142e9a2212736703495e15976d9b34370eb19b",
+      "bytes": 15850240,
+      "copy_method": "APFS_clone"
+    },
+    "agentkit-public-multi-sidebar-consumer": {
+      "path": ".runtime-fixtures/parallel-issues-20261024/agentkit-public-multi-sidebar-consumer",
+      "sha256": "a94f6e90991357744e42cf57ad03631f773a80f6d3ae82de00233de640b2d1c2",
+      "bytes": 6461408,
+      "copy_method": "APFS_clone"
+    }
+  },
+  "harness_profile": {
+    "exit_code": 0,
+    "scope": "Pi 1.4.0 and DSH 0.2.1-rc.2 isolated real protocols and original Summary to independent child Run; synthetic local providers",
+    "native_kernel_current_batch": "not_run",
+    "log": ".runtime-fixtures/parallel-issues-20261024/child-run.log",
+    "log_sha256": "37b32d5e064e6f1eeaba211ec912446ae47628a53138595de2bdf240f0b74af4",
+    "evidence": [
+      {
+        "harness": "pi",
+        "receipt": ".runtime-fixtures/parallel-issues-20261024/child-run-pi.consumer.json",
+        "receipt_sha256": "897b3b92cf6fc465383858fe3dcb93ec9117004a64097cab3cad4e42e8ff4c3d",
+        "child_run_proof": {
+          "cancelSettled": true,
+          "childReply": true,
+          "crossProcess": false,
+          "draftRestored": true,
+          "freshReconnect": true,
+          "nativeInteraction": false,
+          "noDuplicateInput": true,
+          "oldAuthorityRetired": true,
+          "originalCancel": true,
+          "originalLocalClose": true,
+          "originalSend": true,
+          "originalSidePanelRunPort": true,
+          "originalSummaryPointer": true,
+          "otherDraftsPreserved": true,
+          "parentHistoryIsolated": true,
+          "physicalIme": false,
+          "primaryKeptEditorFocus": true,
+          "publishedStopForOwnInput": true,
+          "readingAnchorAcceptance": false,
+          "realHarness": true,
+          "scope": {
+            "endpointId": "pi-ui",
+            "sessionId": "ccff53da-ed42-4625-8d21-29cb5d11627d",
+            "threadId": "2a68c556-7bca-4af8-a915-b77f4cb45deb"
+          },
+          "syntheticPreeditBlockedSend": true
+        },
+        "run_port": {
+          "completeRunPort": false,
+          "keyedReadingAcceptance": false,
+          "mounted": true,
+          "ownsRuntime": false,
+          "sharedIntents": true,
+          "transcriptMounted": true
+        },
+        "transcript": {
+          "completeTranscript": false,
+          "feedbackRows": 1,
+          "footnotes": 1,
+          "genericViewport": true,
+          "independentTools": 0,
+          "keyedReadingAcceptance": false,
+          "knownEmptyContainersHidden": 3,
+          "machineLeading": true,
+          "messages": 2,
+          "nativeInteraction": false,
+          "outputCopyControls": 1,
+          "renderer": true,
+          "richContent": false,
+          "rows": 4,
+          "userTrailing": true
+        },
+        "png": {
+          "path": ".runtime-fixtures/parallel-issues-20261024/child-run-pi.png",
+          "sha256": "6237adde83ec89343b93702c0ffb5e99e7a990426d55ee9087794d8132e4aa35",
+          "width": 1068,
+          "height": 760,
+          "kind": "offscreen-own-render"
+        }
+      },
+      {
+        "harness": "dsh",
+        "receipt": ".runtime-fixtures/parallel-issues-20261024/child-run-dsh.consumer.json",
+        "receipt_sha256": "e0a0618ba6f89a95f57674129eb66431d02b06d3b0439613be7dc27162eb975a",
+        "child_run_proof": {
+          "cancelSettled": true,
+          "childReply": true,
+          "crossProcess": false,
+          "draftRestored": true,
+          "freshReconnect": true,
+          "nativeInteraction": false,
+          "noDuplicateInput": true,
+          "oldAuthorityRetired": true,
+          "originalCancel": true,
+          "originalLocalClose": true,
+          "originalSend": true,
+          "originalSidePanelRunPort": true,
+          "originalSummaryPointer": true,
+          "otherDraftsPreserved": true,
+          "parentHistoryIsolated": true,
+          "physicalIme": false,
+          "primaryKeptEditorFocus": true,
+          "publishedStopForOwnInput": true,
+          "readingAnchorAcceptance": false,
+          "realHarness": true,
+          "scope": {
+            "endpointId": "dsh-ui",
+            "sessionId": "af40f93b-30fc-4ec4-9411-f1b5698409bf",
+            "threadId": "session-c446bc6e-fade-41e5-82d0-cd6f8c59e567"
+          },
+          "syntheticPreeditBlockedSend": true
+        },
+        "run_port": {
+          "completeRunPort": false,
+          "keyedReadingAcceptance": false,
+          "mounted": true,
+          "ownsRuntime": false,
+          "sharedIntents": true,
+          "transcriptMounted": true
+        },
+        "transcript": {
+          "completeTranscript": false,
+          "feedbackRows": 5,
+          "footnotes": 5,
+          "genericViewport": true,
+          "independentTools": 0,
+          "keyedReadingAcceptance": false,
+          "knownEmptyContainersHidden": 1,
+          "machineLeading": true,
+          "messages": 7,
+          "nativeInteraction": false,
+          "outputCopyControls": 5,
+          "renderer": true,
+          "richContent": false,
+          "rows": 17,
+          "userTrailing": true
+        },
+        "png": {
+          "path": ".runtime-fixtures/parallel-issues-20261024/child-run-dsh.png",
+          "sha256": "1431acaa5bf7e84ca3e5d63dee0127b02a6729d7cb84004aff80741f556c837f",
+          "width": 1068,
+          "height": 760,
+          "kind": "offscreen-own-render"
+        }
+      }
+    ]
+  },
+  "prior_head_ci": {
+    "kind": "prior-head-ci-review",
+    "runs": [
+      {
+        "run_id": "40046605891",
+        "head_sha": "52288a08bf77b9071547497992e5c20294f706b4",
+        "conclusion": "failure",
+        "checkout_sha": "534ec0ea7f66bb1e19e5bf321ad345ef5f1e6ed1",
+        "strict_reading": {
+          "accepted": false,
+          "parentFollowingAfterInnerUp": true,
+          "parentOffsetBefore": 0,
+          "parentOffsetAfterScroll": 0,
+          "parentOffsetAfterAppend": 634,
+          "innerOffset": 100,
+          "detailVisibleAfterAppend": false
+        },
+        "jobs": [
+          {
+            "name": "Rust UI consumer (no native interaction)",
+            "conclusion": "failure",
+            "steps": [
+              {
+                "name": "Run cargo fmt --manifest-path ui/Cargo.toml --all --check",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run cargo clippy --manifest-path ui/Cargo.toml --workspace --all-targets --locked -- -D warnings",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run cargo test --manifest-path ui/Cargo.toml --workspace --locked",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run standalone public API consumer (no native window)",
+                "conclusion": "success"
+              },
+              {
+                "name": "Verify nested detail reading intent (strict; no native window)",
+                "conclusion": "failure"
+              }
+            ]
+          },
+          {
+            "name": "checks",
+            "conclusion": "success",
+            "steps": [
+              {
+                "name": "Run cargo clippy --workspace --all-targets --locked -- -D warnings",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run cargo test --workspace --locked",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run python3 scripts/check-headless-boundaries.py",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run actions/setup-python@v5",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run python3 scripts/check-ui-boundaries.py",
+                "conclusion": "success"
+              }
+            ]
+          }
+        ],
+        "artifact_files": [
+          {
+            "path": ".runtime-fixtures/parallel-issues-20261024/ci-40046605891/agentkit-nested-detail-reading.json",
+            "sha256": "c4f70b29538ecacd71995d9a3fc7678cf168834c54e6f348c8c095309b9f1b90"
+          },
+          {
+            "path": ".runtime-fixtures/parallel-issues-20261024/ci-40046605891/agentkit-public-consumer/Cargo.lock",
+            "sha256": "2c64ec1c18e60040563bdd632e6a903aa16c171510bda31dd6274ae5354b8dd5"
+          },
+          {
+            "path": ".runtime-fixtures/parallel-issues-20261024/ci-40046605891/agentkit-public-consumer/Cargo.lock.seed",
+            "sha256": "8790cacd3395460c518f71240052a0bde27a25dbe7e18acda12753c53653d9d1"
+          },
+          {
+            "path": ".runtime-fixtures/parallel-issues-20261024/ci-40046605891/agentkit-public-consumer/Cargo.toml",
+            "sha256": "a9a03cf3feda204459209d66372eb82c7c957907c85f63f99d9d33a6c8e4f540"
+          },
+          {
+            "path": ".runtime-fixtures/parallel-issues-20261024/ci-40046605891/agentkit-public-consumer/src/main.rs",
+            "sha256": "d829c664f9cf659002472bc57aa0902a983341048722d4b90e1205d0cbdc66dd"
+          },
+          {
+            "path": ".runtime-fixtures/parallel-issues-20261024/ci-40046605891/agentkit-public-consumer-prepare.json",
+            "sha256": "83a91b821b6008078abcfdd21a01a23845a965284a3c1558370151865288f202"
+          },
+          {
+            "path": ".runtime-fixtures/parallel-issues-20261024/ci-40046605891/agentkit-ui-inputs.json",
+            "sha256": "9543ade335292f9c7f61944edd341c2fb9297a7c6abc3cf44dc86c1f16bd6ee3"
+          },
+          {
+            "path": ".runtime-fixtures/parallel-issues-20261024/ci-40046605891/agentkit-ui-metadata.json",
+            "sha256": "94b3666be07bf8d96a0aa507158b89315036834fa6150b0e9cfb010ea4907e69"
+          }
+        ]
+      },
+      {
+        "run_id": "40046600843",
+        "head_sha": "52288a08bf77b9071547497992e5c20294f706b4",
+        "conclusion": "failure",
+        "checkout_sha": "52288a08bf77b9071547497992e5c20294f706b4",
+        "strict_reading": {
+          "accepted": false,
+          "parentFollowingAfterInnerUp": true,
+          "parentOffsetBefore": 0,
+          "parentOffsetAfterScroll": 0,
+          "parentOffsetAfterAppend": 634,
+          "innerOffset": 100,
+          "detailVisibleAfterAppend": false
+        },
+        "jobs": [
+          {
+            "name": "Rust UI consumer (no native interaction)",
+            "conclusion": "failure",
+            "steps": [
+              {
+                "name": "Run cargo fmt --manifest-path ui/Cargo.toml --all --check",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run cargo clippy --manifest-path ui/Cargo.toml --workspace --all-targets --locked -- -D warnings",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run cargo test --manifest-path ui/Cargo.toml --workspace --locked",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run standalone public API consumer (no native window)",
+                "conclusion": "success"
+              },
+              {
+                "name": "Verify nested detail reading intent (strict; no native window)",
+                "conclusion": "failure"
+              }
+            ]
+          },
+          {
+            "name": "checks",
+            "conclusion": "success",
+            "steps": [
+              {
+                "name": "Run cargo clippy --workspace --all-targets --locked -- -D warnings",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run cargo test --workspace --locked",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run python3 scripts/check-headless-boundaries.py",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run actions/setup-python@v5",
+                "conclusion": "success"
+              },
+              {
+                "name": "Run python3 scripts/check-ui-boundaries.py",
+                "conclusion": "success"
+              }
+            ]
+          }
+        ],
+        "artifact_files": [
+          {
+            "path": ".runtime-fixtures/parallel-issues-20261024/ci-40046600843/agentkit-nested-detail-reading.json",
+            "sha256": "c4f70b29538ecacd71995d9a3fc7678cf168834c54e6f348c8c095309b9f1b90"
+          },
+          {
+            "path": ".runtime-fixtures/parallel-issues-20261024/ci-40046600843/agentkit-public-consumer/Cargo.lock",
+            "sha256": "2c64ec1c18e60040563bdd632e6a903aa16c171510bda31dd6274ae5354b8dd5"
+          },
+          {
+            "path": ".runtime-fixtures/parallel-issues-20261024/ci-40046600843/agentkit-public-consumer/Cargo.lock.seed",
+            "sha256": "8790cacd3395460c518f71240052a0bde27a25dbe7e18acda12753c53653d9d1"
+          },
+          {
+            "path": ".runtime-fixtures/parallel-issues-20261024/ci-40046600843/agentkit-public-consumer/Cargo.toml",
+            "sha256": "a9a03cf3feda204459209d66372eb82c7c957907c85f63f99d9d33a6c8e4f540"
+          },
+          {
+            "path": ".runtime-fixtures/parallel-issues-20261024/ci-40046600843/agentkit-public-consumer/src/main.rs",
+            "sha256": "d829c664f9cf659002472bc57aa0902a983341048722d4b90e1205d0cbdc66dd"
+          },
+          {
+            "path": ".runtime-fixtures/parallel-issues-20261024/ci-40046600843/agentkit-public-consumer-prepare.json",
+            "sha256": "d6774c7d93baebc933937af004652099458606bb5a933f482b0142ae16c42615"
+          },
+          {
+            "path": ".runtime-fixtures/parallel-issues-20261024/ci-40046600843/agentkit-ui-inputs.json",
+            "sha256": "9543ade335292f9c7f61944edd341c2fb9297a7c6abc3cf44dc86c1f16bd6ee3"
+          },
+          {
+            "path": ".runtime-fixtures/parallel-issues-20261024/ci-40046600843/agentkit-ui-metadata.json",
+            "sha256": "94b3666be07bf8d96a0aa507158b89315036834fa6150b0e9cfb010ea4907e69"
+          }
+        ]
+      }
+    ]
+  },
+  "not_verified": [
+    "multi-endpoint demo host wiring",
+    "multi-endpoint global query semantics/integration",
+    "same-instance terminal observer recovery",
+    "native desktop, OS IME, VoiceOver, ProcessContainer",
+    "full ClientKit layout/behavior parity"
+  ],
+  "disk": {
+    "new_target_directories": 0,
+    "cache_deletions": [],
+    "space_released_bytes": 0,
+    "preserved": "shared target, source, WIP, SDK/lock snapshots, all earlier evidence and archived current executables/receipts/offscreen PNGs"
+  },
+  "overall_complete": false
+}

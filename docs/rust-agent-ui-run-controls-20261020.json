@@ -1,0 +1,203 @@
+{
+  "date": "2026-10-20",
+  "completeGoal": false,
+  "uiReleaseAccepted": false,
+  "baselineCommit": "8f05c55868b2ca8a00d8d96c2f6943e741ddbaf6",
+  "baselineRelease": "v0.3.8",
+  "defaultTekesui": {
+    "commit": "8cf0840790334ba224afc0595897c74231c712e6",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 199,
+    "sha256": "f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f",
+    "ui_packages": 8
+  },
+  "binary": {
+    "path": "/tmp/agentkit-run-controls10-20261020",
+    "sha256": "85634d1ffa9b621341a5c936c74a4ef1351fa92d24d38792856ba885f5510027"
+  },
+  "sourceSha256": {
+    "crates/presentation/src/transcript.rs": "fcf8649191772be316d5139628c026b5a2ce99a7efa45b4eed59484d0a18e8b7",
+    "crates/session/src/projection.rs": "1ce1f58230d9e364d3f60885eac19ab72938d92379bc63386b05950a52376a7e",
+    "ui/components/src/indicators.rs": "156c2f6c2ff54d0da14ce474fef8a7990d4ccc61d3951d1effcfde531a96e5ef",
+    "ui/components/src/output_message.rs": "2c2d6777b971d938ba4a5aa44e25f99ef2e0448de67cdc0ffa2b6960f2384f45",
+    "ui/components/src/lib.rs": "2008f753bb6c78f9e54653ff25086a992627de70b31bdfa956a89edb9a84c174",
+    "ui/demo/src/components_native.rs": "a5043d9e33062cdeef5b72f22fd860a677d0610c60aef1eee15b3bcaec15f47d",
+    "ui/demo/src/native_run_controls_selftest.rs": "836e07b1202d66e280424bb7439a789cbe61cf296d4904bf2f8abf32743941ed",
+    "ui/consumer/src/lib.rs": "44817def172b0129966d5bad4b86be419e5acd6fb7dd4de99ddb7988b7bc1c1d",
+    "scripts/test-real-session-endpoints.py": "56a02b2d9850da9ef901dacc3091b884aa4374a7834dc0cd891a20547195d41d",
+    "scripts/native_probe_provider.py": "0e6e1c209767d4ff2c57fad4ac266dc33c478b6de80ddfc2aec5089b6542ced1"
+  },
+  "nativeReceipts": {
+    "pi": {
+      "activePreviewBeforeCancel": true,
+      "authoritativeAbortedTurn": true,
+      "cancelReconnectNoReplay": true,
+      "draftIsolation": true,
+      "explicitRecovery": true,
+      "nativeFailureTextQuery": true,
+      "nativePointer": true,
+      "nativeTextServices": true,
+      "nativeWindow": true,
+      "normalCancelCallback": true,
+      "oneSubmissionPerSend": true,
+      "physicalIme": false,
+      "priorFailureCleared": true,
+      "providerFailureInIndicators": true,
+      "providerFailureInTranscript": true,
+      "readingAnchorAcceptance": false,
+      "recoveryReconnectNoReplay": true,
+      "reportedError": "400: {\"message\":\"ENDPOINT_ERROR_NATIVE_PROOF: controlled invalid request\",\"type\":\"invalid_request_error\",\"code\":\"invalid_request_error\"}",
+      "stateDrivenCallbacks": true,
+      "syntheticPreedit": false,
+      "voiceOver": false
+    },
+    "dsh": {
+      "activePreviewBeforeCancel": true,
+      "authoritativeAbortedTurn": true,
+      "cancelReconnectNoReplay": true,
+      "draftIsolation": true,
+      "explicitRecovery": true,
+      "nativeFailureTextQuery": true,
+      "nativePointer": true,
+      "nativeTextServices": true,
+      "nativeWindow": true,
+      "normalCancelCallback": true,
+      "oneSubmissionPerSend": true,
+      "physicalIme": false,
+      "priorFailureCleared": true,
+      "providerFailureInIndicators": true,
+      "providerFailureInTranscript": true,
+      "readingAnchorAcceptance": false,
+      "recoveryReconnectNoReplay": true,
+      "reportedError": "400: {\"message\":\"ENDPOINT_ERROR_NATIVE_PROOF: controlled invalid request\",\"type\":\"invalid_request_error\",\"code\":\"invalid_request_error\"}",
+      "stateDrivenCallbacks": true,
+      "syntheticPreedit": false,
+      "voiceOver": false
+    },
+    "native": {
+      "activePreviewBeforeCancel": true,
+      "authoritativeAbortedTurn": true,
+      "cancelReconnectNoReplay": true,
+      "draftIsolation": true,
+      "explicitRecovery": true,
+      "nativeFailureTextQuery": true,
+      "nativePointer": true,
+      "nativeTextServices": true,
+      "nativeWindow": true,
+      "normalCancelCallback": true,
+      "oneSubmissionPerSend": true,
+      "physicalIme": false,
+      "priorFailureCleared": true,
+      "providerFailureInIndicators": true,
+      "providerFailureInTranscript": true,
+      "readingAnchorAcceptance": false,
+      "recoveryReconnectNoReplay": true,
+      "reportedError": "The provider ended the response with an error.",
+      "stateDrivenCallbacks": true,
+      "syntheticPreedit": false,
+      "voiceOver": false
+    }
+  },
+  "logs": {
+    "realThree": {
+      "path": "/tmp/agentkit-run-controls10-three-real.log",
+      "sha256": "f7e814cf83e0630172696bb61c575906380ca995d2a8454f5fa9914ed42f8bf9"
+    },
+    "native": {
+      "path": "/tmp/agentkit-run-controls10-20261020.native-run-controls.log",
+      "sha256": "c41d60522bcc6f093712d243a4102f6129bd3bc55f21fa08f8964be3e82d6c52"
+    },
+    "pi": {
+      "path": "/tmp/agentkit-run-controls10-20261020-pi.native-run-controls.log",
+      "sha256": "105881daf29694554d3c5590de352366c97806f6e2d5e9176d328387f6477782"
+    },
+    "dsh": {
+      "path": "/tmp/agentkit-run-controls10-20261020-dsh.native-run-controls.log",
+      "sha256": "972a1b4e212b731e1cc082c565ee34dc7a007db73f058cc92a081978911b1b9a"
+    },
+    "rootTests": {
+      "path": "/tmp/agentkit-run-controls-root-final.log",
+      "sha256": "9a4f7e57e3f9775cfc33d2ef4d1c8b54e20e4419a0a4d914d4b33afec1c50d09"
+    },
+    "rootClippy": {
+      "path": "/tmp/agentkit-run-controls-root-clippy-final.log",
+      "sha256": "46e8fb89d24e0447af42d01296bb7c5cd7813daa87472656f917f5bf8bd6ac74"
+    },
+    "uiTests": {
+      "path": "/tmp/agentkit-run-controls-ui-final.log",
+      "sha256": "875034fa83651b37b72d85c9324ee7b27afa9defeb7312a7b2d0d36b9793a04c"
+    },
+    "uiClippy": {
+      "path": "/tmp/agentkit-run-controls-ui-clippy-final.log",
+      "sha256": "292fd6385e761fd6469cd00dfd39e6bfadee92cb56cfbb141fe8932156691e53"
+    },
+    "python": {
+      "path": "/tmp/agentkit-run-controls-scripts-final2.log",
+      "sha256": "a291bf7e22b0d40a389903a0217d9c1bddfc714f0185c407d7c24638a32cfcb6"
+    },
+    "node": {
+      "path": "/tmp/agentkit-run-controls-node-final.log",
+      "sha256": "09f12d137f4d2522255379dfc796eb7114342df7099df24669e04af7f8570844"
+    },
+    "normalizationBefore": {
+      "path": "/tmp/agentkit-provider-error-root-before.log",
+      "sha256": "207e8e87239957aa5e1e811b7b2543a485728d6cd2af1621b4f45f7d40149c2f"
+    },
+    "uiBefore": {
+      "path": "/tmp/agentkit-provider-error-ui-before2.log",
+      "sha256": "569a5b223b4e0db617077fe0a50ac0de963226ee2d668a9a9d61598fcbfeab46"
+    },
+    "operationalBefore": {
+      "path": "/tmp/agentkit-operational-error-before.log",
+      "sha256": "3cd3288b84744b48db6f36dde73a89d8a5f286ac80a0b9b81cf08577d7bed565"
+    },
+    "operationalAfter": {
+      "path": "/tmp/agentkit-operational-error-after.log",
+      "sha256": "2fcd10ac9196feec6cf8789f2d9690f3e98dd416e06f3cbd66090558ae7a3da2"
+    }
+  },
+  "gates": {
+    "rootTests": 166,
+    "uiWorkspaceTests": 285,
+    "pythonTests": 26,
+    "nodeTests": 5,
+    "rootStrictClippy": true,
+    "uiStrictClippy": true,
+    "fmt": true,
+    "boundaries": true,
+    "resolvedDefaultInputs": true
+  },
+  "failedNativeLogs": [
+    "/tmp/agentkit-run-controls1-20261020-pi.native-run-controls.log",
+    "/tmp/agentkit-run-controls2-20261020-pi.native-run-controls.log",
+    "/tmp/agentkit-run-controls3-20261020-dsh.native-run-controls.log",
+    "/tmp/agentkit-run-controls4-20261020-pi.native-run-controls.log",
+    "/tmp/agentkit-run-controls5-20261020-dsh.native-run-controls.log",
+    "/tmp/agentkit-run-controls6-20261020.native-run-controls.log",
+    "/tmp/agentkit-run-controls7-20261020.native-run-controls.log",
+    "/tmp/agentkit-run-controls8-20261020.native-run-controls.log",
+    "/tmp/agentkit-run-controls9-20261020-pi.native-run-controls.log"
+  ],
+  "interruptedDiagnostic": "run-controls8 was intentionally stopped with SIGINT after confirming a remaining fixture marker predicate; it is not a passing run",
+  "evidenceScope": {
+    "nativeWindow": true,
+    "appKitSyntheticPointer": true,
+    "nativeTextServices": true,
+    "nativeAxFailureQuery": true,
+    "physicalIme": false,
+    "voiceOver": false,
+    "readingAnchorAcceptance": false,
+    "paidProvider": false,
+    "allErrorCategories": false,
+    "toolOrQueueCancellation": false
+  },
+  "nativeErrorBoundary": "Kernel only exposes its sanitized public failure; no raw provider payload was read or added to Kernel",
+  "remaining": [
+    "reading/paging anchors with independently accepted TekesUI #22 candidate and published pin",
+    "selectable rich content #25",
+    "Chinese composition/IME integration with final UI inputs",
+    "remaining component/API parity review",
+    "PR review, CI, merge and phase tag"
+  ]
+}

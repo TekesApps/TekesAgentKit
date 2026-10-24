@@ -1,0 +1,78 @@
+{
+  "implementation_commit": "3d594a855ff19db8c47f9165ec9b47cdbe1ec2a6",
+  "pr": "https://github.com/TekesApps/TekesAgentKit/pull/10",
+  "issue": 22,
+  "sdk_revision": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "sdk_packages": 6,
+  "sdk_files_verified": 243,
+  "ui_tests": {
+    "passed": 664,
+    "failed": 0,
+    "ignored": 1,
+    "ignored_issue": "TekesUI#49"
+  },
+  "strict_clippy": true,
+  "normal_demo_build": true,
+  "public_observer_api_compiled": true,
+  "external_consumer_valid_recovery_io": false,
+  "unit_fixture_valid_follow_recovery": true,
+  "terminal_failure_injection": "private cfg(test) only",
+  "demo_retry_ui_wired": false,
+  "desktop": false,
+  "physical_ime": false,
+  "real_harness_failure_acceptance": false,
+  "logs": [
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/sidebar-observer-final-workspace-tests.log",
+      "sha256": "e9e82c3472ad844b7132b3c6814b5ab669beae97a314ea91bf6fcb56341b29f6"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/sidebar-observer-reentry-clippy.log",
+      "sha256": "1ed1553cf418def7c620854e9b15d032b31ca8c32c53e77ff8b12cdae022bd01"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/public-observer-consumer-run.log",
+      "sha256": "2da51042a01791534dd44e4dc6e0aa50261ad34cea34dd4d31382de92e0df3d8"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/sidebar-observer-demo-build.log",
+      "sha256": "40108eb5c2e432741fc7f36afdf5c793ec02b19e7b1ce5e51bdd2ba377bd26cb"
+    }
+  ],
+  "source_manifest": ".runtime-fixtures/sidebar-host-20261024/sidebar-observer-source-manifest.json",
+  "binaries": [
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/agentkit-sidebar-observer-demo",
+      "sha256": "e090c8a5469507d3068ca4d5da6d894197b73644d6b0c86b5bc2ddcd53188e23"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/agentkit-public-observer-consumer",
+      "sha256": "dfc282de6ced8ba6a9d4864ce49759e4b628877049fe2914fa42704aebfc3637"
+    }
+  ],
+  "cache_cleanup": {
+    "deleted": [
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_ui_bindings-2f553181dc0d3d1b",
+        "size": 1468816,
+        "allocated_bytes": 1470464,
+        "sha256": "fa12f26e785971dbfdab4c45d91df321fb88eaed2d7c2ed4fd654f06e1df3304"
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/tekes_agent_ui_bindings-2f553181dc0d3d1b.d",
+        "size": 1854,
+        "allocated_bytes": 4096,
+        "sha256": "c46188e4257f6227d2eed948a585c7c4ab183f9566389f79aea870fc2aff32ce"
+      }
+    ],
+    "measured_target_du_reduction_bytes": 1474560,
+    "removed_unique_inode_allocated_bytes": 1474560,
+    "mechanism": "single nonblocking exclusive flock on existing debug/.cargo-lock, held through verification",
+    "current_source_commit": "3d594a855ff19db8c47f9165ec9b47cdbe1ec2a6",
+    "current_test_executables_preserved": 90,
+    "wip_unchanged": true,
+    "whole_target_deleted": false,
+    "new_target": false,
+    "preserved": "source/WIP, fixed snapshots, logs/receipts/PNGs, archived demo and consumer executables, all other target variants of uncertain ownership"
+  }
+}

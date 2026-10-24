@@ -1,0 +1,59 @@
+{
+  "source_commit": "be6e50ec0d68da0d0bae8c4026637829eed83dec",
+  "issues": [
+    22,
+    29
+  ],
+  "pr": "https://github.com/TekesApps/TekesAgentKit/pull/10",
+  "ui": {
+    "passed": 695,
+    "failed": 0,
+    "ignored": 1,
+    "groups": 98
+  },
+  "clippy": "UI workspace all targets passed",
+  "normal_demo": "built; archived, not launched",
+  "public_consumer": "reused existing components-only standalone project and shared target; compiled/ran; no new target",
+  "program": {
+    "path": ".runtime-fixtures/sidebar-host-20261024/membership-acceptance-programs/tekes-agent-ui-demo",
+    "sha256": "80503b1c842c12a4d2727ad00c3db84534eeaa1be3d2546772b47510a8aeac5d",
+    "size": 85021760
+  },
+  "evidence": {
+    "membership-ui-final-test.log": {
+      "path": ".runtime-fixtures/sidebar-host-20261024/membership-ui-final-test.log",
+      "sha256": "2fe7725cd964040e469a1425e7ac3f6413aeff750b2bea564fee1e8c2f1a4ae0"
+    },
+    "membership-ui-clippy.log": {
+      "path": ".runtime-fixtures/sidebar-host-20261024/membership-ui-clippy.log",
+      "sha256": "c226c5feb514dd6a456448abddc2da102c10c8083796a732a4af4a76922c8b03"
+    },
+    "membership-demo-build.log": {
+      "path": ".runtime-fixtures/sidebar-host-20261024/membership-demo-build.log",
+      "sha256": "f1d0e587f4eaf9c5f6803d3e9210c0e1b536942252f03191c763f7b78b97cc4a"
+    },
+    "membership-public-consumer-run.log": {
+      "path": ".runtime-fixtures/sidebar-host-20261024/membership-public-consumer-run.log",
+      "sha256": "0726620cb3dd961196046bf55d0ac956bde2ffd8e2923e00782ad41db5d5e388"
+    },
+    "membership-headless-boundaries.log": {
+      "path": ".runtime-fixtures/sidebar-host-20261024/membership-headless-boundaries.log",
+      "sha256": "e9fa1e12a0afd70528040f81fe3199172a3974910d7760c0216bb6d110181081"
+    },
+    "membership-ui-boundaries.log": {
+      "path": ".runtime-fixtures/sidebar-host-20261024/membership-ui-boundaries.log",
+      "sha256": "9480cc4382559b9a7a99240226a9f766048e30c8d38bb4bccd1fd8bca56661ad"
+    }
+  },
+  "unchanged_headless": "root code/manifest/lock unchanged; original SQLite prohibition passed",
+  "tekesui_pin": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "canonical_data": "not filtered or deleted; explicit classification is a Sidebar rule only",
+  "not_proven": [
+    "Native/DSH full classification facts",
+    "live Pi/harness acceptance",
+    "desktop/physical IME/AX/ProcessContainer"
+  ],
+  "strict_reading": "unchanged failed upstream gate; do not waive or merge",
+  "cleanup": "no additional deletion; preceding 39,043,072-byte allocation decrease remains the only deletion in this turn",
+  "new_head_ci": "inspect after push; do not borrow 932572f results"
+}

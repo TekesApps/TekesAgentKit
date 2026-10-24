@@ -1,5 +1,21 @@
 # TekesUI 消费侧缺口
 
+2026-10-21 实际 #28 消费补充：[TekesUI #32](https://github.com/TekesApps/TekesUI/issues/32) 请求普通回合的纵向起端对齐、横轴保留和实际 clip/margin/clamp 语义，已[补充回原 #28](https://github.com/TekesApps/TekesUI/issues/28#issuecomment-6304084232)。10b5 的 nearest/centered 只计基础能力接入，不作为 ClientKit 回合跳转对齐。见[接入记录](rust-agent-ui-turn-navigation-20261021.md)。
+
+2026-10-21 Summary 对照新增：[TekesUI #31](https://github.com/TekesApps/TekesUI/issues/31)请求基础标签的行数限制与尾部省略，保留完整 AX name，并由库处理 CJK/emoji/fallback/RTL 的测量与绘制。当前 Summary 的顺序/折叠可用现有组合完成，但不能据短标题用例宣称 Source 的单行截断也已支持；详见[Summary section 记录](rust-agent-ui-summary-sections-20261021.md)。
+
+2026-10-21 Composer 对照新增：[TekesUI #30](https://github.com/TekesApps/TekesUI/issues/30)请求复合输入面的装饰区到原编辑器的通用焦点路由。只读候选探针确认未聚焦时点留白不获取焦点，但已有焦点/组字保持安全；不报告成 IME 回归。准确复现与证据边界见[Composer 输入行记录](rust-agent-ui-composer-band-20261021.md)。
+
+2026-10-21 rail 对照新增：[TekesUI #28](https://github.com/TekesApps/TekesUI/issues/28)要求按真实 item、保留原编辑焦点的 reveal 与独立轨道导航；[#29](https://github.com/TekesApps/TekesUI/issues/29)要求显式紧凑 action 的准确 hit/AX frame、装饰 slot 和激活阶段。已分别写明公开 pin 证据、所需接口及第二 consumer 验收。AgentKit 的目标/可见范围/槽位输入已推进，但尚无可交互 rail；见[范围与未完成项](rust-agent-ui-turn-rail-20261021.md)。
+
+2026-10-20 当前状态：实验 UI workspace 已消费固定公开 8cf0840 的纯文本 Content API；#23 不再阻塞纯文本消息行。混合阅读仍待 [#22](https://github.com/TekesApps/TekesUI/issues/22)，可选中富内容与原生映射已提 [#25](https://github.com/TekesApps/TekesUI/issues/25)。现有 MarkdownView 是被动有界绘制，不在 AgentKit 复制其解析/选择/字形逻辑。以下早期七项与旧候选记录按时间保留；当前依据为 [正式契约](rust-agent-ui-contract.md)。
+
+2026-10-19 正式pin更新：已固定公开4310937并完成独立消费复验；原始缺口/旧阻塞记录作为历史保留。最新逐Issue关闭结论与上游CI边界见 [正式pin复验](tekesui-public-pin-verification-20261019.md)。
+
+最新候选消费状态见 [独立复验](tekesui-consumer-verification-20261018.md)：UI27/headless76、真实 Native SEP 到 GPU 通过，尚非原生窗口或正式发布验收。
+
+2026-10-18 更新：TKUI-001/002 已消费最新全部 WIP 的 WindowWake / 版本化 ReadingController；下文保留原始需求基线，当前实现、通过证据与未验收边界以 [P0 联调记录](tekesui-p0-closeout-20261018.md) 为准。正式 pin 与原生最终体验尚未完成。
+
 可直接交给 TekesUI 开发的优先级、接口需求和验收标准见 [七项开发任务](tekesui-development-tasks.md)。
 
 只列需求与证据，不修改 TekesUI，不在 AgentKit 内补通用实现。基准是 ui/tekesui-source.json 的冻结开发快照。
@@ -17,3 +33,25 @@
 已有能力不列为缺失：TextInput 的 preedit/UTF-16、选择、undo/redo；ContentHost focus；TextInputState 原生候选位置；ReadingController 尾追加保护；AX 节点/动作桥接。它们存在不等于真实物理输入法、VoiceOver 或性能已经验收。
 
 不在本轮扩展：富 Markdown/工具卡片/附件、任务/子代理/SideChat/Summary UI；正式虚拟化、大历史增量投影、生产 launcher。先完成基础 Run 可验证部分，再以缺口清单协调 TekesUI。
+
+TKUI-006 更新：公共完整指针入口、AgentText转交及原生demo适配已实现；共享双击字素/三击段落修复与消费者回归已通过。Gallery原生证据与AgentKit未验收边界见 [记录](tekesui-pointer-metadata-20261018.md)。表格保留初始缺口基线，不代表当前仍未实现。
+
+
+2026-10-21后续观察：[TekesUI #27](https://github.com/TekesApps/TekesUI/issues/27)记录layout中inactive→active对缺失TextSurfaceHost的诊断时序；通用最小探针在只读2b16候选复现。它不替代原七项清单，也不是有效backend原生恢复的失败。生产宿主每帧必须提供文本服务，消费侧不补通用校验；证据见[Run叠层记录](rust-agent-ui-overlay-20261021.md)。
+
+
+#27 后续收到精确 292 开发候选；正式 RunView 的 12 次失败/恢复与原 8 项事务已有 receiver 检查，见 [独立候选消费](tekesui-layout-text-candidate-20261021.md)。原默认 pin 与历史 known-boundary 仍按原身份保留，不能把新候选结果当默认公开版本已修复。
+
+2026-10-21 输入胶囊后续：[TekesUI #34](https://github.com/TekesApps/TekesUI/issues/34) 请求无副作用的原留白焦点意图查询，供宿主 IME 屏障安全转交。实际 Composer 子树已消费固定 #30/#33 候选进行组件验证；正式宿主的组字转交仍待此接口，详见[接收记录](rust-agent-ui-composer-padding-20261021.md)。
+
+2026-10-21 #34 固定输入接收：原查询已在隔离候选中接入实际 Composer 门禁，主输入及 SideChat 的真实窗口合成组字/选区查询通过。默认公开pin不变，物理IME与完整体验仍未完成；见[实际IME门禁记录](rust-agent-ui-padding-ime-20261021.md)，不把private接入视为Issue关闭。
+
+2026-10-21 Sidebar行帮助：[TekesUI #35](https://github.com/TekesApps/TekesUI/issues/35)请求原Content动态声明与统一Tooltip路由。已有description/AX help映射继续复用；Kit先保存按query隔离的snippet，不添加摘要行或复制hover/定位。见[结果投影记录](rust-agent-ui-sidebar-search-results-20261021.md)。
+
+2026-10-21 Sidebar菜单：[TekesUI #36](https://github.com/TekesApps/TekesUI/issues/36)请求原激活时稳定选中值及子菜单/勾选/disabled声明。Kit已推进公开偏好、置顶区与原回调，不回读最后selected冒充原事件，不复制菜单引擎；原生排序/分组与pin移动菜单仍未完成，见[偏好记录](rust-agent-ui-sidebar-preferences-20261021.md)。
+
+2026-10-21 #35独立接收：固定336包已在实际Sidebar上消费原Content帮助声明，默认公开pin未提升。当前查询摘要/目录回退、原owner退休和重绑定、关闭保持、原生合成组字与原点击通过；默认364/候选391项、第二consumer38项及三端离屏复验通过。其余窗口/SideChat/物理IME/VoiceOver和发布验收仍分开，见[查询帮助记录](rust-agent-ui-sidebar-help-20261021.md)。
+
+2026-10-21 原生控制键测试：[TekesUI #37](https://github.com/TekesApps/TekesUI/issues/37)记录SDK `Action::Key`以空字符构造Escape时，编辑器聚焦且选区非空可回传空Commit并删除选区；它不能代表有效的Escape验收，尚未证明物理按键有同样问题。Kit不自行合成基础键盘事件。当前原生场景用现有`cancelOperation:`回调验证关闭，原失败及修复任务保留。
+
+2026-10-21 Disclosure组合：[TekesUI #38](https://github.com/TekesApps/TekesUI/issues/38)请求原组合触发器、默认展开指示、单一动作/语义owner和外部状态确认后的焦点连续性。Kit已用原CompoundButton/Disclosure模型完成[文件夹分组、持久折叠和筛选](rust-agent-ui-sidebar-folders-20261021.md)，未自行画箭头或补焦点。当前仅功能闭环，不代表标准disclosure或完整原生体验已验收；基础事件时记录可复用#36。默认公开pin未提升。

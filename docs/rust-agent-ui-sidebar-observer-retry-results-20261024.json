@@ -1,0 +1,123 @@
+{
+  "implementation_commit": "be4fc58b54fd65b4408e8f150eac842322948e40",
+  "issue": 22,
+  "pr": "https://github.com/TekesApps/TekesAgentKit/pull/10",
+  "sdk_revision": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "ui_workspace_tests": {
+    "passed": 675,
+    "failed": 0,
+    "ignored": 1,
+    "groups": 96
+  },
+  "ui_suite_scope_note": "full suite before semantics-preserving Clippy collapsed-if and test-helper argument refactor; final component library rerun below",
+  "final_component_library_tests": {
+    "passed": 10,
+    "failed": 0,
+    "ignored": 0,
+    "groups": 1
+  },
+  "presentation_tests": {
+    "passed": 240,
+    "failed": 0,
+    "ignored": 0,
+    "groups": 25
+  },
+  "strict_ui_clippy": true,
+  "strict_presentation_clippy": true,
+  "normal_demo_build": true,
+  "public_consumer_compiled_and_ran": true,
+  "public_consumer_scope": "construct synthetic observer input, update Sidebar, construct and mount controls; no valid binding recovery IO",
+  "prepared_wip_source_hash_matches_committed_source": true,
+  "component_retry_intents_tested": true,
+  "binding_valid_recovery_tested": true,
+  "failure_injection": "private cfg(test) only",
+  "demo_retry_ui_wired": true,
+  "native_retry_click_acceptance": false,
+  "desktop": false,
+  "physical_ime": false,
+  "real_harness_failure_acceptance": false,
+  "full_tiny_window_action_reachability": false,
+  "source_manifest": ".runtime-fixtures/sidebar-host-20261024/observer-ui-source-manifest.json",
+  "source_manifest_sha256": "8d0af7f29ee183d7209218285b417a1450ad02f98ccf10526414f2d002317282",
+  "logs": [
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/observer-ui-final-workspace-tests.log",
+      "sha256": "4b5555e2bf611f009c561719333b67f7c63dbe6dc05f3058a33d73d912a3ce5c"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/observer-ui-final-component-lib-tests.log",
+      "sha256": "7744165a9b73c01f6c3d12d712a6b2870aee5483257622d2d90dbe4e5596127a"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/observer-ui-final-clippy.log",
+      "sha256": "12aa04f0d6d53826a940d27d279dd961b97b1dc73c1a34d9e5b028f639d434c3"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/observer-ui-presentation-tests.log",
+      "sha256": "aba90568ab21676a69d3fb67cd4646177c9581626b14b54efe56c32074a9de61"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/observer-ui-presentation-clippy.log",
+      "sha256": "8f1b21bfe95dcd0b81e157c9e73be2410e71150b6b1eb115d7ccdab574734ad9"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/observer-ui-demo-build.log",
+      "sha256": "dc7027bf877f51eb1738e1aa2955d502a987fc715a0646dbfefad1889493a3d4"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/observer-ui-public-consumer-run.log",
+      "sha256": "c0fb9a6d31afad2b9d91584787ae691b52f280f24dff1276c3760266dc26d6a4"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/observer-ui-generator-tests.log",
+      "sha256": "8e848ec8066f2e4ce1dbb18e2a884f1ab4dfc093ca5c1f5d5a4ee75cae97716f"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/observer-ui-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/observer-ui-root-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/observer-ui-final-boundaries.log",
+      "sha256": "9480cc4382559b9a7a99240226a9f766048e30c8d38bb4bccd1fd8bca56661ad"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/observer-ui-sdk-inputs.json",
+      "sha256": "9543ade335292f9c7f61944edd341c2fb9297a7c6abc3cf44dc86c1f16bd6ee3"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/ci-2341748-pr-jobs.json",
+      "sha256": "eb96d164586e812e19398615df749e9b8ecc8b5f037c90566e521d1483555cf1"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/observer-ui-demo-dependencies.log",
+      "sha256": "c8f64d4c27113a3ef1cb7a23c96ac5b5b841cf3906bd1258ddf4c41d9af41abd"
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/observer-ui-acceptance-records.log",
+      "sha256": "0463c4386bb552440b43468709adb196df1585d1f11a360492b0986e9b6eeadf"
+    }
+  ],
+  "binaries": [
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/agentkit-sidebar-observer-ui-demo",
+      "sha256": "65719d58bc002048a244b544734d920773f74ac77dcd5e7e26079e699235c2de",
+      "bytes": 82995712
+    },
+    {
+      "path": ".runtime-fixtures/sidebar-host-20261024/agentkit-public-observer-ui-consumer",
+      "sha256": "2097a0dcd45d008b3f1a9e28399744a1c4df1a9fd8f11637ecac5d967dd44d08",
+      "bytes": 16274592
+    }
+  ],
+  "cleanup": {
+    "deleted_paths": [],
+    "actual_released_bytes": 0,
+    "target_reused": "/tmp/agentkit-layout-text-292-target",
+    "note": "No independently allocated target; current build artifacts and uncertain shared variants retained."
+  },
+  "acceptance_records_validated_without_gate_waiver": true
+}

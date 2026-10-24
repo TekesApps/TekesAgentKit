@@ -1,0 +1,153 @@
+{
+  "format": "agentkit-sidebar-paging-visibility/1",
+  "baseline_commit": "d6447ba",
+  "complete_clientkit_ui_alignment": false,
+  "default_pin_promoted": false,
+  "default_pin": "8cf0840790334ba224afc0595897c74231c712e6",
+  "candidate_identity": "3366559a1a524909f562fa2fdd1c8646d762b5ba0eb1294b5480c39d9e9c37ef",
+  "candidate_files": 503,
+  "candidate_inputs_unchanged": true,
+  "sdk_files_verified": true,
+  "source_files": {
+    "scripts/probes/agentkit-sidebar-visibility-candidate.rs": "5e1e0830efeb194f8fd466efa93b2ebbcf0df44be28fa6cc51fde60b6f3fbc53",
+    "ui/components/src/lib.rs": "5c030897359c10890e9366b7f8d51545bec049c9b47528b07ec605b3d3080321",
+    "ui/components/src/sidebar.rs": "e9c4efa9bfe0d4cf19b24ca29f4caa993468da4fdce920c0142868adb52c70fb",
+    "ui/components/src/sidebar_paging.rs": "239892fa5f59dde0853631a934f1b4a5eb57ecd2018fbba108fb5676af6e1d0a",
+    "ui/components/src/sidebar_visibility.rs": "51c816c85382077294a6242b7afc495b7e422ea490b46458b43b631c642c7c49",
+    "ui/consumer/src/lib.rs": "a6e183df2757dc997359377b4f16a7a4ada78952d92d2886a1c252f0a17a3092",
+    "ui/demo/src/component_demo.rs": "99b2f9fb4c9d0d457050e965817bf478503b93fc791f8ff69117dd7ed86f74c8",
+    "ui/demo/tests/sidebar_paging.rs": "6855728b4469f191cd02cf40087712548c93ec2d524387a5f20516f32c84e18f"
+  },
+  "checks": [
+    {
+      "check": "default-workspace",
+      "exit_code": 0,
+      "log": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-paging-evidence/agentkit-sidebar-paging-default-workspace.log",
+      "sha256": "5ea34446f3be668445d11d866933edd50e2e4dbafec275dd617523b669882c07",
+      "passed": 386
+    },
+    {
+      "check": "default-clippy",
+      "exit_code": 0,
+      "log": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-paging-evidence/agentkit-sidebar-paging-default-clippy.log",
+      "sha256": "4319a7bdb0a438323913e317ccb4530cd41b00c222c74fd99b644fd7c35fe1ab"
+    },
+    {
+      "check": "default-build",
+      "exit_code": 0,
+      "log": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-paging-evidence/agentkit-sidebar-paging-default-build.log",
+      "sha256": "0785775b449423ce25bd50fe1c2919acf342356de5efea3a6074479939364d73"
+    },
+    {
+      "check": "candidate-replay",
+      "exit_code": 0,
+      "log": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-paging-evidence/agentkit-sidebar-paging-candidate-replay.log",
+      "sha256": "96fde2f064dd8d93a43ddd443d9bcd76caf77a5903b866fa33d6e8321ca966dd"
+    },
+    {
+      "check": "candidate-workspace",
+      "exit_code": 0,
+      "log": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-paging-evidence/agentkit-sidebar-paging-candidate-workspace.log",
+      "sha256": "d83c1a4c57c8fd1449bb844fe3dd1f328bc7b96707a81afee59f0df6ad61a164",
+      "passed": 414
+    },
+    {
+      "check": "candidate-clippy",
+      "exit_code": 0,
+      "log": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-paging-evidence/agentkit-sidebar-paging-candidate-clippy.log",
+      "sha256": "1f7a3bc2e0a26801a34c4defd4a09164cc38ba161141cb1fed3d2a67f63e12fa"
+    },
+    {
+      "check": "final-default-workspace",
+      "exit_code": 0,
+      "log": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-paging-evidence/agentkit-sidebar-paging-final-default-workspace.log",
+      "sha256": "4f340ef8a3b2cf01deaaf1544ed312be70125b7da4e12edf326e39a81b452ef3",
+      "passed": 386
+    },
+    {
+      "check": "final-default-clippy",
+      "exit_code": 0,
+      "log": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-paging-evidence/agentkit-sidebar-paging-final-default-clippy.log",
+      "sha256": "bd78efc584786aedeff4a2938ba22269233ac68fe183a1ecbdd47ccc783b7a43"
+    },
+    {
+      "check": "final-default-build",
+      "exit_code": 0,
+      "log": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-paging-evidence/agentkit-sidebar-paging-final-default-build.log",
+      "sha256": "1b06c206522a9ad6653edd56b1bb9e19254f4cd592480fbc8b10cbddc2b994e9"
+    }
+  ],
+  "fixed_candidate_checks": [
+    {
+      "check": "tests",
+      "exit_code": 0
+    },
+    {
+      "check": "clippy",
+      "exit_code": 0
+    },
+    {
+      "check": "actual-wrapper",
+      "exit_code": 0
+    },
+    {
+      "check": "public-consumer",
+      "exit_code": 0
+    },
+    {
+      "check": "native-build",
+      "exit_code": 0
+    }
+  ],
+  "fixed_candidate_public_consumer": 42,
+  "fixed_candidate_reading_regressions": 27,
+  "default_native_program": {
+    "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-paging-final-default-demo",
+    "sha256": "db317d0e66a84292f9c7df13d68a856a75e55090304692c1e8411e082e947214"
+  },
+  "static_boundaries": {
+    "rust_only": true,
+    "no_sdk_edits": true,
+    "no_new_target": true,
+    "no_swift_or_external_repo_changes": true
+  },
+  "core_changed": false,
+  "three_real_harnesses_rerun": false,
+  "physical_ime_acceptance": false,
+  "voiceover_acceptance": false,
+  "native_window_acceptance": false,
+  "candidate_measured_layout": {
+    "original_sdk_reveal": true,
+    "initial_target_offscreen": true,
+    "final_target_visible": true,
+    "editor_focus_baseline_marked_text_retained": true,
+    "second_consumer_claim": true
+  },
+  "remaining": [
+    "selected row absent from public inventory requires independent public read",
+    "published SDK lacks original focus-preserving item API; existing TekesUI #28/#22",
+    "native host persistent reading document/layout and user scroll arbitration integration",
+    "physical IME, VoiceOver and three harness native paging acceptance"
+  ],
+  "read_only_references": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Agent/ClientAgentSidebarModel.swift": "82c1bbb6519b9cb9573b9963f565eeee8d297702250a00f9243b5c1e66a1ddc9",
+    "/Users/frankqin/dev/Tekes/Tekes/SidebarColumnController.swift": "cc01190f2e25192aed25c7ee53d7d1adc621d24b93da62a034824a10fd770f6d"
+  },
+  "cleanup": {
+    "scope": [
+      "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-navigation-3366559a/agentkit/",
+      "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-paging-visibility-3366559a/agentkit/"
+    ],
+    "deleted_files": 280,
+    "allocated_bytes_released": 213417984,
+    "du_reduction_bytes": 213417984,
+    "single_exclusive_cargo_lock": true,
+    "other_target_handles": [],
+    "protected_program_sha256": {
+      "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-paging-final-default-demo": "db317d0e66a84292f9c7df13d68a856a75e55090304692c1e8411e082e947214",
+      "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-navigation-final-demo": "39053bed7c48a545487bfab14960db0d6f29a7f1d6bef416c58f38f13f6322c3",
+      "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-navigation-native-v2-demo": "39053bed7c48a545487bfab14960db0d6f29a7f1d6bef416c58f38f13f6322c3"
+    },
+    "new_target_created": false
+  }
+}

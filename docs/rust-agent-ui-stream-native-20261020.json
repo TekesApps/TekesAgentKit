@@ -1,0 +1,181 @@
+{
+  "date": "2026-10-20",
+  "completeGoal": false,
+  "baselineCommit": "254afde0055f384b45a4516865042b61ffbdd5e9",
+  "baselineRelease": "v0.3.8",
+  "uiReleaseAccepted": false,
+  "tekesui": {
+    "commit": "8cf0840790334ba224afc0595897c74231c712e6",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 199,
+    "sha256": "f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f",
+    "ui_packages": 8
+  },
+  "binary": {
+    "path": "/tmp/agentkit-native-stream8-20261020",
+    "sha256": "e52a6c2e97d2f07dd6be89a815fea5569f8b32ac49642cf700f2fd2ca6b515b8"
+  },
+  "sourceSha256": {
+    "ui/components/src/output_message.rs": "0270cc39047a8d35874e05047fbc71a2b107a596b56ca388527efda88e6079f0",
+    "ui/demo/src/components_native.rs": "1976c19051168ab519d14f622178fc4ff0caf98a78acd2fbb2b40ebec8284da2",
+    "ui/demo/src/native_stream_selftest.rs": "424a065ffd2e47102d2061fd749f3440eb0ff8b26c9ab423547c72ff4b0c4438",
+    "ui/consumer/src/lib.rs": "8b584ea16f45c7e23ebff10118d6ff2237f15d9cc29a9efca1191defa47a7164",
+    "ui/demo/tests/transcript_content.rs": "ad27fc9190862c5e1d65302c9dadec09d284fac133e50fe07c1298ff509d8bfb",
+    "scripts/test-real-session-endpoints.py": "daba208140cf008e6cb5618e2fe034bd9db519b47caad973879127e5c8efc7ae"
+  },
+  "nativeReceipts": {
+    "pi": {
+      "activePreview": true,
+      "focusRetainedDuringSettlement": true,
+      "nativeAxSelection": true,
+      "nativePointer": true,
+      "nativeTextServices": true,
+      "nativeWindow": true,
+      "oneSubmission": true,
+      "physicalIme": false,
+      "readingAnchorAcceptance": false,
+      "reconnectNoReplay": true,
+      "sameOutputRow": true,
+      "sameTextOwner": true,
+      "selectionRetained": true,
+      "sessionDraftIsolation": true,
+      "stateDrivenCallbacks": true,
+      "voiceOver": false
+    },
+    "dsh": {
+      "activePreview": true,
+      "focusRetainedDuringSettlement": true,
+      "nativeAxSelection": true,
+      "nativePointer": true,
+      "nativeTextServices": true,
+      "nativeWindow": true,
+      "oneSubmission": true,
+      "physicalIme": false,
+      "readingAnchorAcceptance": false,
+      "reconnectNoReplay": true,
+      "sameOutputRow": true,
+      "sameTextOwner": true,
+      "selectionRetained": true,
+      "sessionDraftIsolation": true,
+      "stateDrivenCallbacks": true,
+      "voiceOver": false
+    },
+    "native": {
+      "activePreview": true,
+      "focusRetainedDuringSettlement": true,
+      "nativeAxSelection": true,
+      "nativePointer": true,
+      "nativeTextServices": true,
+      "nativeWindow": true,
+      "oneSubmission": true,
+      "physicalIme": false,
+      "readingAnchorAcceptance": false,
+      "reconnectNoReplay": true,
+      "sameOutputRow": true,
+      "sameTextOwner": true,
+      "selectionRetained": true,
+      "sessionDraftIsolation": true,
+      "stateDrivenCallbacks": true,
+      "voiceOver": false
+    }
+  },
+  "logs": {
+    "realThree": {
+      "path": "/tmp/agentkit-native-stream8-three-real.log",
+      "sha256": "7cc81a10fc12443b6eef3189c432a7a23868814a990e909e59eb95a75310a73d"
+    },
+    "native": {
+      "path": "/tmp/agentkit-native-stream8-20261020.native-stream.log",
+      "sha256": "df53fe1ebad1ef95961aa1b41e4f938bd2e0d06495c724b717f578665141d299"
+    },
+    "pi": {
+      "path": "/tmp/agentkit-native-stream8-20261020-pi.native-stream.log",
+      "sha256": "1d56a59d2efcb86ae4d0466c663d1ea9c21a5c759db0491322a705a8ba373118"
+    },
+    "dsh": {
+      "path": "/tmp/agentkit-native-stream8-20261020-dsh.native-stream.log",
+      "sha256": "1c197a36752688c711a920053586d5b9f4be59e0f982173b1c7252464cd485e2"
+    },
+    "regressionBefore": {
+      "path": "/tmp/agentkit-native-stream-aggregate-before.log",
+      "sha256": "aaf2af5599c1ecc2b3e0970225b7df711d9e1743e392abf0d6592900ccf4105b"
+    },
+    "regressionAfter": {
+      "path": "/tmp/agentkit-native-stream-aggregate-after.log",
+      "sha256": "93d9a6e39bca70bae4e956654807a8ea692c75b69fbf133cb0a60d94353b6863"
+    },
+    "uiTests": {
+      "path": "/tmp/agentkit-native-stream-ui-final.log",
+      "sha256": "f4b097e4b7b3aa0bbe7b731729d77143ca1286b2681edffcf5e2bf15baa24130"
+    },
+    "uiClippy": {
+      "path": "/tmp/agentkit-native-stream-ui-clippy-final.log",
+      "sha256": "bc3781175bc3c10cbf1335d3e99f94af582c5b142ff819110fed11c2f42116cb"
+    },
+    "fmt": {
+      "path": "/tmp/agentkit-native-stream-ui-fmt-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "scripts": {
+      "path": "/tmp/agentkit-native-stream-scripts-final.log",
+      "sha256": "d98eba4d669e08f8dd3421797bdddd381630f10afe899c617fe70b3bcbbd8fd9"
+    }
+  },
+  "failedNativeLogs": [
+    "/tmp/agentkit-native-stream-pi-20261020-pi.native-stream.log",
+    "/tmp/agentkit-native-stream2-20261020-pi.native-stream.log",
+    "/tmp/agentkit-native-stream3-20261020-dsh.native-stream.log",
+    "/tmp/agentkit-native-stream4-20261020-dsh.native-stream.log",
+    "/tmp/agentkit-native-stream5-20261020-dsh.native-stream.log",
+    "/tmp/agentkit-native-stream6-20261020-dsh.native-stream.log"
+  ],
+  "productionFix": "Within an already validated stable assistant message, reuse its sole body/reasoning control across aggregate/structured encoding changes. Multiple blocks never acquire guessed aliases. Preflight and actual reuse use the same predicate.",
+  "dshInputEvidence": {
+    "authored": {
+      "kind": "user",
+      "visible": true,
+      "provisional": false
+    },
+    "injectedHidden": [
+      "runtime-context",
+      "time-context"
+    ],
+    "countRule": "kind User and source.kind absent or user; include provisional echoes"
+  },
+  "evidenceScope": {
+    "nativeWindow": true,
+    "appKitSyntheticPointer": true,
+    "nativeAxSelection": true,
+    "nativeTextServices": true,
+    "paidProvider": false,
+    "physicalInput": false,
+    "voiceOver": false,
+    "readingAnchorAcceptance": false,
+    "fullThreeHarnessUx": false
+  },
+  "remaining": [
+    "TekesUI #22 reading/paging anchors",
+    "TekesUI #25 selectable rich content",
+    "full three-harness cancel/error/IME interaction acceptance",
+    "remaining ClientKit entry/footnote review",
+    "PR review, current CI, merge and phase tag"
+  ],
+  "gates": {
+    "uiWorkspaceTests": 282,
+    "pythonScriptTests": 21,
+    "strictUiClippy": true,
+    "fmt": true,
+    "boundaries": true,
+    "resolvedInputs": true,
+    "headlessUnchanged": true,
+    "priorHeadlessTests": 164
+  },
+  "runtimeVersions": {
+    "pi": "1.3.0",
+    "node": "24.20.0",
+    "dsh": "0.2.1-rc.2",
+    "kernelFixtureCommit": "ae5d6fdf32290207b646b8c99b96f2a002902cb3",
+    "kernelFixtureClean": true
+  }
+}

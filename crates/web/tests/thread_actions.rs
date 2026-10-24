@@ -187,6 +187,7 @@ async fn fork_preserves_created_pointer_if_followup_rename_fails_and_never_retri
 }
 struct Host {
     calls: Mutex<Vec<String>>,
+    pinned: AtomicBool,
 }
 #[async_trait]
 impl ThreadActionHost for Host {
@@ -194,7 +195,9 @@ impl ThreadActionHost for Host {
         ["thread.setPinned".into()].into()
     }
     fn pin_state(&self, _: &str, _: &str) -> Option<ThreadPinState> {
-        Some(ThreadPinState { pinned: true })
+        Some(ThreadPinState {
+            pinned: self.pinned.load(Ordering::SeqCst),
+        })
     }
     async fn perform(
         &self,
@@ -206,6 +209,8 @@ impl ThreadActionHost for Host {
             "{endpoint}:{}:{}:{id}",
             request.session_id, request.action_id
         ));
+        self.pinned
+            .store(request.action_id == "pin", Ordering::SeqCst);
         Ok(ThreadActionOutcome::default())
     }
 }
@@ -214,6 +219,7 @@ async fn pin_authority_is_an_explicit_shared_host_callback() {
     let (mut agent, connector) = setup().await;
     let host = Arc::new(Host {
         calls: Mutex::new(vec![]),
+        pinned: AtomicBool::new(true),
     });
     agent.install_thread_action_host(host.clone());
     let menu = agent
@@ -221,12 +227,52 @@ async fn pin_authority_is_an_explicit_shared_host_callback() {
         .unwrap();
     assert_eq!(menu.items[0].id, "unpin");
     assert!(menu.items[0].enabled);
+    let agent = Arc::new(agent);
+    let (tx, mut rx) = tokio::sync::mpsc::channel(8);
+    let observed = agent.clone();
+    let task = tokio::spawn(async move {
+        observed
+            .follow(&json!({"endpoint":"test","target":"state"}), tx)
+            .await
+    });
+    let baseline = tokio::time::timeout(Duration::from_secs(2), rx.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        baseline["sessions"][0]["pin"]["pinned"], true,
+        "custom shared pin authority must be in the inventory too"
+    );
     agent.request(&request("unpin")).await.unwrap();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            let view = rx.recv().await.unwrap();
+            if view["sessions"][0]["pin"]["pinned"] != true {
+                break;
+            }
+        }
+    })
+    .await
+    .expect("successful host mutation wakes inventory observers");
+    host.pinned.store(true, Ordering::SeqCst);
+    agent.invalidate_thread_inventory();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            let view = rx.recv().await.unwrap();
+            if view["sessions"][0]["pin"]["pinned"] == true {
+                break;
+            }
+        }
+    })
+    .await
+    .expect("explicit host invalidation rereads the same pin authority");
     assert_eq!(
         *host.calls.lock().unwrap(),
         vec!["test:source:unpin:stable"]
     );
     assert!(connector.calls.lock().unwrap().is_empty());
+    drop(rx);
+    task.await.unwrap().unwrap();
 }
 
 #[tokio::test]

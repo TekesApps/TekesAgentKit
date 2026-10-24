@@ -12,6 +12,7 @@ import struct
 import subprocess
 import tempfile
 import threading
+from cargo_program import cargo_program
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--kernel-root', type=Path, required=True)
@@ -22,7 +23,8 @@ binaries = kernel / 'target/debug'
 for name in ('tekes-supervisor', 'tekes-worker', 'tekes-helper', 'tekes-workspace-service'):
     if not (binaries/name).is_file():
         raise SystemExit(f'Missing built Kernel binary: {name}')
-subprocess.run(['cargo','build','--locked','-p','tekes-agent-endpoint-kernel','--example','kernel_headless'], cwd=root, check=True)
+client_program, client_identity = cargo_program(root, 'tekes-agent-endpoint-kernel', 'kernel_headless', kind='example')
+print('HEADLESS_PROGRAM_RECEIPT ' + json.dumps(client_identity,sort_keys=True),flush=True)
 requests = []
 class Provider(http.server.BaseHTTPRequestHandler):
     def log_message(self, *_): pass
@@ -70,7 +72,7 @@ try:
             assert ready['type']=='ready' and ready['protocolVersion']==4, ready
             connection = {'url':ready['url'],'bearer':base64.urlsafe_b64encode(token).decode().rstrip('='),
                 'cwd':str(cwd),'provider':config['providers'][0]['id'],'model':config['providers'][0]['models'][0]['id']}
-            run = subprocess.run([str(root/'target/debug/examples/kernel_headless')],input=json.dumps(connection),
+            run = subprocess.run([str(client_program)],input=json.dumps(connection),
                 text=True,capture_output=True,timeout=60)
             print(run.stdout,end='')
             if run.returncode:

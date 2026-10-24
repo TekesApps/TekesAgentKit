@@ -88,7 +88,9 @@ impl Rpc {
         let event_sender = events.clone();
         let alive = Arc::new(AtomicBool::new(true));
         let running = alive.clone();
+        let reading_token = control_token.clone();
         let task = tokio::spawn(async move {
+            let mut reading = crate::reading::ReadingTracker::default();
             let mut pending = HashMap::<String, oneshot::Sender<Result<Value>>>::new();
             loop {
                 tokio::select! {
@@ -110,6 +112,7 @@ impl Rpc {
                             Some(Ok(line)) => match serde_json::from_str(&line) { Ok(v) => v, Err(_) => break },
                             _ => break,
                         };
+                        let value=match reading.receive(value,&reading_token){Ok(Some(value))=>value,Ok(None)=>continue,Err(_)=>break};
                         if value["type"] == "response" {
                             if let Some(id) = value["id"].as_str() && let Some(reply) = pending.remove(id) {
                                 let result = match value["success"].as_bool() {
