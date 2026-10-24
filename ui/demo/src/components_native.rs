@@ -213,9 +213,7 @@ enum HostResult {
             std::result::Result<tekes_agent_ui_demo::file_preview_host::StagedFilePreview, String>,
     },
     Files {
-        request: Arc<tekes_agent_ui_bindings::AttachmentSelection>,
-        files: Vec<tekes_agent_ui_bindings::AttachmentFile>,
-        result: std::result::Result<Option<tekes_agent_ui_bindings::AttachmentReport>, String>,
+        completion: tekes_agent_ui_demo::attachment_files::AttachmentHostCompletion,
     },
     InitialPresets {
         request: tekes_agent_components_ui::ComposerChoiceRequest,
@@ -574,43 +572,18 @@ impl Host {
                     }
                     DemoCommand::SelectFiles { request } => {
                         let selected = picker.expect("captured file picker").await;
-                        let (files, result) = if let Some(handles) = selected {
-                            let paths = handles
+                        let selected_paths = selected.map(|handles| {
+                            handles
                                 .iter()
                                 .map(|file| file.path().to_path_buf())
-                                .collect::<Vec<_>>();
-                            match tokio::task::spawn_blocking(move || {
-                                tekes_agent_ui_demo::attachment_files::read_selected_files(&paths)
-                            })
-                            .await
-                            {
-                                Ok(Ok(files)) => {
-                                    let result = request
-                                        .upload(&files)
-                                        .await
-                                        .map(Some)
-                                        .map_err(|e| e.to_string());
-                                    (files, result)
-                                }
-                                result => {
-                                    let message = match result {
-                                        Ok(Err(error)) => error.to_string(),
-                                        Err(error) => error.to_string(),
-                                        _ => unreachable!(),
-                                    };
-                                    request.fail_selection(message.clone());
-                                    (vec![], Err(message))
-                                }
-                            }
-                        } else {
-                            request.cancel_selection();
-                            (vec![], Ok(None))
-                        };
-                        HostResult::Files {
+                                .collect::<Vec<_>>()
+                        });
+                        let completion = tekes_agent_ui_demo::attachment_files::select_and_upload(
                             request,
-                            files,
-                            result,
-                        }
+                            selected_paths,
+                        )
+                        .await;
+                        HostResult::Files { completion }
                     }
                     DemoCommand::ReadInitialFeedback(request) => {
                         HostResult::InitialFeedback(Box::new(request.execute().await))
@@ -1066,12 +1039,8 @@ impl Host {
                     Err(error) => self.failure(error.to_string()),
                 }
             }
-            HostResult::Files {
-                request,
-                files,
-                result,
-            } => {
-                if let Err(error) = self.view.complete_file_selection(&request, files, result) {
+            HostResult::Files { completion } => {
+                if let Err(error) = completion.apply(&mut self.view) {
                     self.failure(error.to_string());
                 }
             }

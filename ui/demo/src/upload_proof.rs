@@ -1,7 +1,7 @@
 //! Explicit acceptance probe using the real public UI/binding path. No private
 //! harness files, credentials, paid providers or system-dialog emulation.
 use crate::{
-    attachment_files::read_selected_files,
+    attachment_files::select_and_upload,
     component_demo::{ComponentDemo, DemoCommand},
 };
 use serde_json::{Value, json};
@@ -207,11 +207,14 @@ pub async fn run(view: &mut ComponentDemo, runtime: &Arc<SessionRuntime>) -> Res
     )?;
     // This is a host file provider for offscreen acceptance, not the OS picker.
     let owned = OwnedFile::create()?;
-    let files = read_selected_files(std::slice::from_ref(&owned.0))?;
     a.edit_text(&destination, MARKER.into())?;
     view.select(1)?;
     b.edit_text(&other, "Other session upload-proof draft".into())?;
-    let report = request.upload(&files).await?;
+    let completion = select_and_upload(request.clone(), Some(vec![owned.0.clone()])).await;
+    let report = completion
+        .report()
+        .ok_or_else(|| tekes_agent_contract::unsupported("host upload did not return a report"))?
+        .clone();
     require(
         report.outcome == AttachmentOutcome::Attached && report.receipts.len() == 1,
         "upload did not attach exactly once",
@@ -222,11 +225,14 @@ pub async fn run(view: &mut ComponentDemo, runtime: &Arc<SessionRuntime>) -> Res
         "file metadata mismatch",
     )?;
     require(
-        request.upload(&files).await.is_err(),
+        request.upload(completion.files()).await.is_err(),
         "upload capture repeated a mutation",
     )?;
     let receipt = report.receipts[0].clone();
-    view.complete_file_selection(&request, files, Ok(Some(report)))?;
+    require(
+        completion.apply(view)?,
+        "original upload completion was not applied",
+    )?;
     require(
         view.selected() == 1 && b.current_run().unwrap().draft.artifacts.is_empty(),
         "late upload retargeted another session",
@@ -317,13 +323,19 @@ pub async fn run(view: &mut ComponentDemo, runtime: &Arc<SessionRuntime>) -> Res
             "wrong second attachment command",
         ));
     };
-    let files = read_selected_files(std::slice::from_ref(&owned.0))?;
-    let report = request.upload(&files).await?;
+    let completion = select_and_upload(request.clone(), Some(vec![owned.0.clone()])).await;
+    let report = completion
+        .report()
+        .ok_or_else(|| tekes_agent_contract::unsupported("host upload did not return a report"))?
+        .clone();
     require(
         report.outcome == AttachmentOutcome::Attached && report.receipts.len() == 1,
         "attachment-only upload failed",
     )?;
-    view.complete_file_selection(&request, files, Ok(Some(report)))?;
+    require(
+        completion.apply(view)?,
+        "attachment-only completion was not applied",
+    )?;
     require(
         a.current_run().unwrap().draft.text.is_empty()
             && a.current_run().unwrap().draft.artifacts.len() == 1,
@@ -409,6 +421,6 @@ pub async fn run(view: &mut ComponentDemo, runtime: &Arc<SessionRuntime>) -> Res
     )?;
     view.sync()?;
     Ok(
-        json!({"publicEntry":true,"hostBoundedFileRead":true,"receiptValidated":true,"originalDraft":true,"otherDraftPreserved":true,"oneShotUpload":true,"componentSend":true,"promptSettled":true,"durableInputCount":1,"historyFileMetadata":restored_file,"historyFileReference":restored_reference,"publicByteRead":can_read,"foreignSessionReadRejected":can_read.then_some(true),"readUnavailable":!can_read,"attachmentOnlySend":true,"attachmentOnlyVisible":true,"attachmentOnlyInputCount":1,"freshJournalAfterReconnect":true,"reconnectNoDuplicate":true,"nativeInteraction":false,"inlineImage":false}),
+        json!({"publicEntry":true,"sharedHostSelectionOperation":true,"hostCompletionApplied":true,"systemPickerExercised":false,"hostBoundedFileRead":true,"receiptValidated":true,"originalDraft":true,"otherDraftPreserved":true,"oneShotUpload":true,"componentSend":true,"promptSettled":true,"durableInputCount":1,"historyFileMetadata":restored_file,"historyFileReference":restored_reference,"publicByteRead":can_read,"foreignSessionReadRejected":can_read.then_some(true),"readUnavailable":!can_read,"attachmentOnlySend":true,"attachmentOnlyVisible":true,"attachmentOnlyInputCount":1,"freshJournalAfterReconnect":true,"reconnectNoDuplicate":true,"nativeInteraction":false,"inlineImage":false}),
     )
 }

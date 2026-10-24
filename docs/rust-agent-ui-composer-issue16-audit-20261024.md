@@ -125,3 +125,10 @@ and `composer_context` (4) passed: 16 tests, zero failed/ignored. Targeted stric
 Clippy, workspace format check and diff check passed. Logs are retained in
 `.runtime-fixtures/issue-batch-20261024/issue16-composer-tests.log` and
 `issue16-clippy.log`. No product Rust implementation or SDK revision changed.
+
+## Later completion of the non-desktop host operation
+
+The later [shared host operation result](rust-agent-ui-attachment-host-operation-results-20261024.md)
+extracts the production demo paths/read/upload/typed-completion operation and executes it in the
+owned Native/Pi/DSH offscreen proof. This supersedes the materialize-logic gap above, without
+claiming OS picker, native window event-loop, physical IME or full layout acceptance.

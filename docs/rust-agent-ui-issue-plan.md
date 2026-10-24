@@ -517,3 +517,7 @@ Native后续切片：复用既有feature headless与已安装Kernel0.9.3，真�
 [本轮结果](rust-agent-ui-dsh-summary-source-results-20261024.md)修复真实DSH JSON字符串arguments丢失description标题的问题，按ClientKit解析一层且复用producer标题fallback，不改原Transcript/history或pointer/status权限。真实DSH0.2.1-rc.2的17条公开命令/7次合成请求、call seq16与result seq19配对、重连epoch2→5/原child pointer、公开子历史及原Summary挂载通过；raw inventory没有status，最新child turn/end seq26证明completed，未填造字段。root346/0、opt-in254/0、UI747/0/1、Python204、严格Clippy/格式/边界/矩阵、普通demo与独立公开consumer通过，均复用SSDtarget。#25/#27其余真实转换/草稿、完整布局/桌面/IME/AX及#53保持开放。
 
 7e9383b的PR40090137271/push40090134330已结束：独立consumer/root341/feature249/UI747通过，唯一失败仍为#53严格阅读；原artifact/log及137/243文件闭包已核对。该终态不能替代DSH新提交CI。#16另继续实际宿主附件materialize共享路径；不把已有三端手工验收路径重复计为真实宿主回调完成。
+
+### #16：实际宿主附件操作与离屏验收共用
+
+[本轮结果](rust-agent-ui-attachment-host-operation-results-20261024.md)提取demo真实paths/read/upload/typed completion，保留原request身份、Kit门禁和原恢复状态，RFD构造仍在主UI线程。真实Native0.9.3/Pi1.3.0/DSH0.2.1-rc.2在同一当前程序逐端完成原附件policy/receipt/两类Send/草稿隔离/公开历史与新epoch重连；DSH不冒称通用文件回读。26项附件fixture、UI750/0/1、Python207、严格UI Clippy/格式/边界/矩阵、普通demo及复用的独立consumer执行通过。OS picker与原生HostResult消息循环、完整布局/焦点/桌面/物理IME/OS AX/ProcessContainer仍not_run，#16保持开放，不以共用逻辑代替桌面验收。全程SSD共享target，未改TekesUI基础组件。
