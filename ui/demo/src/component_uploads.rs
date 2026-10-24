@@ -57,7 +57,7 @@ impl ComponentDemo {
     fn upload_source(&self, binding: &Arc<RunBinding>) -> String {
         if Arc::ptr_eq(binding, self.binding()) {
             return self
-                .sidebar_source
+                .sidebar_projection()
                 .as_ref()
                 .and_then(|source| {
                     source
