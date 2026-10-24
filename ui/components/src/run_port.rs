@@ -115,6 +115,7 @@ pub struct RunPort {
     navigation_mounted: bool,
     navigation_origin: Option<(u64, Option<String>)>,
     geometry: Option<RunPortGeometry>,
+    rail_backing_scale: f32,
     footnote_clock: Option<f64>,
     footnote_clock_revision: u64,
 }
@@ -208,6 +209,7 @@ impl RunPort {
             navigation_mounted: false,
             navigation_origin: None,
             geometry: None,
+            rail_backing_scale: 1.,
             footnote_clock: None,
             footnote_clock_revision: 0,
             body: StackContent {
@@ -588,7 +590,8 @@ impl RunPort {
             })
             .collect();
         let pane = self.geometry.map_or_else(Rect::default, |g| g.pane);
-        let geometry = TurnRailGeometry::for_run(pane, self.column, count);
+        let geometry =
+            TurnRailGeometry::for_run_at_scale(pane, self.column, count, self.rail_backing_scale);
         let rail = self.turn_rail_mut().unwrap();
         rail.refresh(prototypes, geometry)?;
         if !arranged {
@@ -1318,6 +1321,7 @@ impl Component for RunPort {
             }
             return;
         } // Preserve prior child geometry, as RunOverlay does.
+        self.rail_backing_scale = text.backing_scale();
         let pane_clip = frame.intersection(&clip).unwrap_or_default();
         let column = self.column.frame(frame);
         let composer = if self.composer().is_presented() {
@@ -1412,7 +1416,7 @@ impl Component for RunPort {
             visible_document: document_clip,
             document_top_clearance: top_clearance,
             document_bottom_clearance: bottom_clearance,
-            turn_rail: TurnRailGeometry::for_run(
+            turn_rail: TurnRailGeometry::for_run_at_scale(
                 frame,
                 self.column,
                 self.last.as_ref().map_or(0, |snapshot| {
@@ -1423,6 +1427,7 @@ impl Component for RunPort {
                         .filter(|turn| !turn.input.trim().is_empty())
                         .count()
                 }),
+                self.rail_backing_scale,
             ),
         });
         if self.rail.is_some() {

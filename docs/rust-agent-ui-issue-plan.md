@@ -570,3 +570,7 @@ Native后续切片：复用既有feature headless与已安装Kernel0.9.3，真�
 ### #16 / #17：Pi inline image 校验与显示依赖
 
 [契约与窄修结果](rust-agent-ui-inline-image-contract-20261025.md)对齐当前 ClientKit：Pi policy/原 materialize 使用 8192 单边和 33,554,432 pixels，限制后真实解码首帧，保留原始 bytes/MIME/SHA。Pi19项、严格Clippy通过，内部入口原数据/损坏不落盘验证通过；无真实provider/桌面。通用位图控件缺口已去重提交TekesUI#117，#16/#17仍开放；RunBinding图片选择、host准备后policy重验、真实三端图片闭环与完整UI仍待补。只消费固定SDK，未变更依赖、新建target或删除缓存。
+
+### #21 / #28：原 rail hover 与 SDK viewport 边距
+
+[契约](rust-agent-ui-turn-rail-hover-contract-20261025.md)和[结果](rust-agent-ui-turn-rail-hover-results-20261025.md)补齐原 pointer/motion 消费与连续tick反馈，并修复SDK焦点边距使26pt长tick被压成16pt的真实布局问题。RunPort/refresh使用同一actual-scale几何；独立CoreText consumer的Scene/clip、缩放/窄列/正常publication/原焦点和一次导航通过。UI763/0/1、feature RunPort19/bindings39、严格Clippy/两配置构建/standalone consumer、Python最终262通过，原失败保留。当前strict reading仍exit1/accepted=false，#53/#46与完整桌面/IME/AX等开放，不关闭Issue、不合并发布；复用SSDtarget，删除0字节。

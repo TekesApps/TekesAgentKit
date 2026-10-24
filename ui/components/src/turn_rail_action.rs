@@ -1,13 +1,24 @@
 //! Agent tick decoration and immutable gesture capture. Original CompoundButton
 //! retains pointer arm/cancel, keyboard, focus, AX, chrome and slot ownership.
 use crate::{RunTurnNavigation, TurnRailGeometry};
+use std::sync::{Arc, Mutex};
 use tekes_ui_controls::{
     ButtonTextRenderer, composition::*, layout::MeasuredChild, paint::ButtonVariant,
 };
 use tekes_ui_scene::{Quad, Rect, Scene, Size};
 #[derive(Debug)]
 pub(crate) struct Tick {
+    pub index: usize,
     pub centers: bool,
+    pub turn_id: Option<String>,
+    pub visible: bool,
+    pub hover: Arc<Mutex<HoverVisual>>,
+}
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(crate) struct HoverVisual {
+    pub displayed_position: Option<f32>,
+    pub influence: f32,
+    pub hovered_turn_id: Option<String>,
 }
 impl Component for Tick {
     fn measure(&mut self, _: &mut dyn ButtonTextRenderer, a: Size) -> MeasuredChild {
@@ -27,14 +38,54 @@ impl Component for Tick {
             document_size: Size::new(f.size.width, TurnRailGeometry::ROW_HEIGHT),
             centers_ticks: self.centers,
         };
-        if let Some(ink) = geometry.tick_rect(0, TurnRailGeometry::RESTING_LENGTH) {
+        let hover = self
+            .hover
+            .lock()
+            .expect("turn rail hover lock poisoned")
+            .clone();
+        let requested_length = tick_length(self.index, &hover);
+        if let Some(ink) = geometry.tick_rect(0, requested_length) {
+            let opacity = if hover.hovered_turn_id.is_some() {
+                if hover.hovered_turn_id.as_deref() == self.turn_id.as_deref() {
+                    0.8
+                } else {
+                    0.3
+                }
+            } else if self.visible {
+                0.8
+            } else {
+                0.3
+            };
+            let color = t
+                .foreground
+                .unwrap_or_else(|| t.palette.color("primary-text").expect("library text role"));
             s.push_quad(Quad::new(
                 ink.offset(f.min_x(), f.min_y()),
-                t.foreground
-                    .unwrap_or_else(|| t.palette.color("primary-text").expect("library text role")),
+                color.with_alpha(color.a * opacity),
             ));
         }
     }
+}
+pub(crate) fn tick_length(index: usize, hover: &HoverVisual) -> f32 {
+    let Some(position) = hover.displayed_position.filter(|_| hover.influence > 0.) else {
+        return TurnRailGeometry::RESTING_LENGTH;
+    };
+    let distance = (index as f32 - position).abs();
+    let lower = distance.floor() as usize;
+    let progress = distance - lower as f32;
+    let eased = progress * progress * (3. - 2. * progress);
+    let lengths = [26., 20., 14., 8., TurnRailGeometry::RESTING_LENGTH];
+    let lower_length = lengths
+        .get(lower)
+        .copied()
+        .unwrap_or(TurnRailGeometry::RESTING_LENGTH);
+    let upper_length = lengths
+        .get(lower.saturating_add(1))
+        .copied()
+        .unwrap_or(TurnRailGeometry::RESTING_LENGTH);
+    let hovered = lower_length + (upper_length - lower_length) * eased;
+    TurnRailGeometry::RESTING_LENGTH
+        + (hovered - TurnRailGeometry::RESTING_LENGTH) * hover.influence
 }
 #[derive(Debug)]
 pub(crate) struct TurnRailAction {
@@ -43,10 +94,21 @@ pub(crate) struct TurnRailAction {
     pub pending: Vec<RunTurnNavigation>,
 }
 impl TurnRailAction {
-    pub fn new(decoration: ComponentId) -> Self {
-        let mut button =
-            CompoundButton::new("回合", Content::new(decoration, Tick { centers: false }))
-                .expect("one passive Agent tick");
+    pub fn new(decoration: ComponentId, hover: Arc<Mutex<HoverVisual>>) -> Self {
+        let mut button = CompoundButton::new(
+            "回合",
+            Content::new(
+                decoration,
+                Tick {
+                    index: 0,
+                    centers: false,
+                    turn_id: None,
+                    visible: false,
+                    hover,
+                },
+            ),
+        )
+        .expect("one passive Agent tick");
         button.action.variant = ButtonVariant::Quiet;
         button.action.button.frame_policy = tekes_ui_controls::ButtonFramePolicy::Exact;
         button.action.pointer_activation_phase = ButtonActivationPhase::Press;
@@ -132,7 +194,7 @@ mod forwarded_focus_tests {
 
     #[test]
     fn actual_turn_rail_delegates_library_focus_decoration_state() {
-        let mut action = TurnRailAction::new(ComponentId(999));
+        let mut action = TurnRailAction::new(ComponentId(999), Arc::new(Mutex::default()));
         action.button.action.button.frame_policy = tekes_ui_controls::ButtonFramePolicy::Exact;
         assert!(!action.focus_decoration_above_siblings());
         action.set_focus(true, true);

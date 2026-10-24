@@ -40,9 +40,12 @@ mod tool_run;
 mod tool_sections;
 #[path = "support/toolbar_intake.rs"]
 mod toolbar_intake;
+#[path = "support/turn_rail_hover.rs"]
+mod turn_rail_hover;
 struct Text {
     shaper: CoreTextShaper,
     scale: f32,
+    backing_scale: f32,
     labels: Vec<(LabelOptions, Rc<LabelLayout>)>,
     label_service: bool,
     drawn_paragraphs: Vec<(usize, Rgba)>,
@@ -52,6 +55,7 @@ impl Text {
         Self {
             shaper: CoreTextShaper::new(CoreTextFonts::new()),
             scale,
+            backing_scale: 1.,
             labels: vec![],
             label_service,
             drawn_paragraphs: vec![],
@@ -132,6 +136,9 @@ impl TextSurfaceHost for Text {
     }
 }
 impl ButtonTextRenderer for Text {
+    fn backing_scale(&self) -> f32 {
+        self.backing_scale
+    }
     fn measure(&mut self, source: &str, role: proposal::TextRole, width: f32) -> Size {
         let p = self.shape_surface(source, role, Some(width));
         Size::new(p.width as f32, p.height as f32)

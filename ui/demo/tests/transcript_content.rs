@@ -182,7 +182,7 @@ fn rail_layout_uses_source_track_gutter_and_document_coordinates() {
     let pane = Rect::new(20., 40., 900., 900.);
     let regular = TurnRailGeometry::for_run(pane, RunColumnLayout::default(), 3);
     assert_eq!(regular.rail, Rect::new(20., 40., 65., 900.));
-    assert_eq!(regular.track, Rect::new(28., 475., 42., 30.));
+    assert_eq!(regular.track, Rect::new(23., 470., 52., 40.));
     assert!(!regular.centers_ticks);
     assert_eq!(
         regular.tick_rect(0, TurnRailGeometry::RESTING_LENGTH),
@@ -195,7 +195,7 @@ fn rail_layout_uses_source_track_gutter_and_document_coordinates() {
     assert_eq!(regular.tick_rect(3, 6.), None);
     let overflow = TurnRailGeometry::for_run(pane, RunColumnLayout::default(), 100);
     assert_eq!(overflow.document_size.height, 1000.);
-    assert_eq!(overflow.track, Rect::new(28., 175., 42., 630.));
+    assert_eq!(overflow.track, Rect::new(23., 175., 52., 630.));
     let narrow = TurnRailGeometry::for_run(
         Rect::new(0., 0., 400., 100.),
         RunColumnLayout::document_pane(0.01, Some(0.45)),
@@ -203,7 +203,7 @@ fn rail_layout_uses_source_track_gutter_and_document_coordinates() {
     );
     assert_eq!(narrow.rail.size.width, 4.);
     assert!(narrow.centers_ticks);
-    assert_eq!(narrow.tick_rect(0, 26.), Some(Rect::new(0., 4., 4., 2.)));
+    assert_eq!(narrow.tick_rect(0, 26.), Some(Rect::new(0., 4., 0., 2.)));
     assert_eq!(narrow.tick_rect(0, f32::NAN).unwrap().size.width, 0.);
     let full = TurnRailGeometry::for_run(
         Rect::new(0., 0., 1600., 900.),

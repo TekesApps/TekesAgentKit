@@ -1,0 +1,71 @@
+{
+  "base": "ddcd94aefc8b2d9c84762065343c260728f6584b",
+  "issues": [
+    21,
+    28
+  ],
+  "sdk": {
+    "commit": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 243,
+    "sha256": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
+    "ui_packages": 8
+  },
+  "checks": {
+    "ui": {
+      "passed": 763,
+      "failed": 0,
+      "ignored": 1
+    },
+    "featureRunPort": 19,
+    "featureBindings": 39,
+    "python": 262,
+    "defaultClippy": true,
+    "featureClippy": true,
+    "defaultDemoBuild": true,
+    "featureDemoBuild": true,
+    "independentConsumerRun": true
+  },
+  "strictReading": {
+    "exit": 1,
+    "raw": {
+      "accepted": false,
+      "parentFollowingAfterInnerUp": true,
+      "parentOffsetBefore": 0,
+      "parentOffsetAfterScroll": 0,
+      "parentOffsetAfterAppend": 634,
+      "innerOffset": 100,
+      "detailVisibleAfterAppend": false
+    }
+  },
+  "programs": {
+    "demo-feature": {
+      "path": ".runtime-fixtures/turn-rail-hover-20261025/programs/demo-feature",
+      "bytes": 87543488,
+      "sha256": "1474773eea1ef9b86ff83b26097f61da548dbd24f530e2834c3595247e540cc9"
+    },
+    "standalone": {
+      "path": ".runtime-fixtures/turn-rail-hover-20261025/programs/standalone",
+      "bytes": 16449504,
+      "sha256": "810a89eb2141522310baf7d56e156994c7b2f01feab3d2046018602fff4995a6"
+    }
+  },
+  "evidence": {
+    "sourceInputs": 536,
+    "initialFailuresPreserved": true,
+    "pythonFixtureFix": "allow the already pinned motion dependency in boundary test input",
+    "provenanceTimeout": "initial 10s timeout; unchanged provenance test targeted 5/0 and final full Python262/0"
+  },
+  "notRun": [
+    "desktop",
+    "GPU pixels",
+    "physical IME",
+    "OS AX",
+    "real harness hover interaction",
+    "anchored preview"
+  ],
+  "newTargetDirectories": 0,
+  "deletedCacheBytes": 0,
+  "releaseGatePassed": false
+}

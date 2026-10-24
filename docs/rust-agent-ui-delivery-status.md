@@ -2,8 +2,10 @@
 
 需求分配与后续执行以 [Issue 驱动交付计划](rust-agent-ui-issue-plan.md) / [总追踪 #14](https://github.com/TekesApps/TekesAgentKit/issues/14) 为准。
 
-当前功能基线为 `9969f8f274c17193024eec74a78aae2eabe15fae`（2026-10-25核对），[PR #10](https://github.com/TekesApps/TekesAgentKit/pull/10)仍为draft。UI仍是 `0.0.0` / `publish=false`，不是已发布v0.3.8的一部分；完整交付尚未达到。最近文档提交不会改变这些功能证据的适用revision。
+三端原pane来源见证的最近核对基线为 `9969f8f274c17193024eec74a78aae2eabe15fae`（2026-10-25核对），[PR #10](https://github.com/TekesApps/TekesAgentKit/pull/10)仍为draft。UI仍是 `0.0.0` / `publish=false`，不是已发布v0.3.8的一部分；完整交付尚未达到。最近文档提交不会改变这些功能证据的适用revision。
 
+- 新增[原rail hover与实际viewport](rust-agent-ui-turn-rail-hover-results-20261025.md)：UI763/0/1、feature RunPort19/bindings39、独立consumer和最终Python262通过；当前严格reading仍失败，不覆盖原三端来源证据，新head CI另核对。
+- 新增[Pi图片输入校验与接入契约](rust-agent-ui-inline-image-contract-20261025.md)：`ddcd94a`原policy/解码窄修通过Pi19与严格Clippy；通用选择/提交前policy重验/真实三端图片和UI显示仍未完成，显示基础能力归TekesUI#117。
 - [三端同程序原子面板来源](rust-agent-ui-native-child-pane-source-results-20261024.md)：Native原只读head running→error，Pi/DSH可继续子pane，同一最终demo SHA `2ff35842…`；父草稿/选择保留与关闭退休均通过。仅离屏/原公开协议证据，不是累计分页来源或完整窗口验收。
 - 精确功能head的[push CI40109889043](https://github.com/TekesApps/TekesAgentKit/actions/runs/40109889043)和[PR CI40109892909](https://github.com/TekesApps/TekesAgentKit/actions/runs/40109892909)已终态核对：checks、默认UI、feature来源见证与独立consumer通过，唯一失败仍为TekesUI#53严格嵌套阅读；未合并/tag。原日志/artifact、137个consumer来源及243个SDK输入闭包已核对。
 - 仍缺：Task动态行的权威producer、真实报告/独立旁白producer；SDK #42新Host checkpoint、#53嵌套阅读及其余具体控件/容器能力；完整桌面/系统IME/OS AX/ProcessContainer与Views/性能验收。已接通原树分页与阅读不代表跨新树恢复。

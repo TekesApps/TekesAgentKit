@@ -1986,6 +1986,7 @@ dependencies = [
  "tekes-agent-contract",
  "tekes-agent-presentation",
  "tekes-ui-controls",
+ "tekes-ui-motion",
  "tekes-ui-scene",
  "tekes-ui-text",
  "tekes-ui-tokens",

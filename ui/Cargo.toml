@@ -22,6 +22,7 @@ tekes-ui-controls = { git = "https://github.com/TekesApps/TekesUI.git", rev = "5
 tekes-ui-scene = { git = "https://github.com/TekesApps/TekesUI.git", rev = "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c" }
 tekes-ui-tokens = { git = "https://github.com/TekesApps/TekesUI.git", rev = "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c" }
 tekes-ui-text = { git = "https://github.com/TekesApps/TekesUI.git", rev = "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c" }
+tekes-ui-motion = { git = "https://github.com/TekesApps/TekesUI.git", rev = "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c" }
 tekes-ui-render = { git = "https://github.com/TekesApps/TekesUI.git", rev = "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c" }
 tekes-ui-platform-macos = { git = "https://github.com/TekesApps/TekesUI.git", rev = "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c" }
 tokio = { version = "1", features = ["rt-multi-thread", "time", "sync", "macros"] }

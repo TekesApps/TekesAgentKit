@@ -66,13 +66,30 @@ impl TurnRailGeometry {
     pub const ROW_HEIGHT: f32 = 10.;
     pub const RESTING_LENGTH: f32 = 6.;
     pub const MAXIMUM_LENGTH: f32 = 26.;
+    /// 1x convenience for static proposals. Mounted hosts use their actual scale.
     pub fn minimum_regular_width() -> f32 {
-        Spacing::Regular.value()
+        Self::minimum_regular_width_at_scale(1.)
+    }
+    pub fn minimum_regular_width_at_scale(backing_scale: f32) -> f32 {
+        let gutter = focus_gutter(backing_scale);
+        Spacing::Regular.value().max(gutter)
             + RunColumnLayout::rail_width().max(Spacing::Loose.value() + Self::MAXIMUM_LENGTH)
+            + gutter
+    }
+    /// 1x convenience for static proposals; track is the SDK scroll viewport,
+    /// document_size is the tick rows excluding the SDK's focus gutter.
+    pub fn for_run(pane: Rect, column: RunColumnLayout, count: usize) -> Self {
+        Self::for_run_at_scale(pane, column, count, 1.)
     }
     /// RunChrome uses the leading fraction, independently of full-width body
-    /// mode and trailing fraction. No explicit fraction means default reading.
-    pub fn for_run(pane: Rect, column: RunColumnLayout, count: usize) -> Self {
+    /// mode and trailing fraction. Reserve the public SDK focus bleed using the
+    /// actual host scale; its backing-pixel guard is not a product constant.
+    pub fn for_run_at_scale(
+        pane: Rect,
+        column: RunColumnLayout,
+        count: usize,
+        backing_scale: f32,
+    ) -> Self {
         let width = finite(pane.size.width);
         let height = finite(pane.size.height);
         let rail_column = match column {
@@ -82,19 +99,29 @@ impl TurnRailGeometry {
             _ => RunColumnLayout::default(),
         };
         let available = rail_column.geometry(width).leading.clamp(0., width);
-        let regular = available >= Self::minimum_regular_width();
+        let gutter = focus_gutter(backing_scale);
+        let regular = available >= Self::minimum_regular_width_at_scale(backing_scale);
         let x = if regular {
-            Spacing::Regular.value()
+            Spacing::Regular.value().max(gutter) - gutter
         } else {
             0.
         };
+        let document_width = if regular {
+            RunColumnLayout::rail_width().max(Spacing::Loose.value() + Self::MAXIMUM_LENGTH)
+        } else {
+            (available - 2. * gutter).max(0.)
+        };
         let track_width = if regular {
-            Self::minimum_regular_width() - x
+            document_width + 2. * gutter
         } else {
             available
         };
         let content_height = count as f32 * Self::ROW_HEIGHT;
-        let visible_height = content_height.min(height * 0.7);
+        let visible_height = if count == 0 {
+            0.
+        } else {
+            (content_height + 2. * gutter).min(height * 0.7)
+        };
         Self {
             rail: Rect::new(pane.min_x(), pane.min_y(), available, height),
             track: Rect::new(
@@ -103,7 +130,7 @@ impl TurnRailGeometry {
                 track_width,
                 visible_height,
             ),
-            document_size: Size::new(track_width, content_height),
+            document_size: Size::new(document_width, content_height),
             centers_ticks: !regular,
         }
     }
@@ -131,6 +158,12 @@ impl TurnRailGeometry {
             thickness,
         ))
     }
+}
+fn focus_gutter(backing_scale: f32) -> f32 {
+    let frame = Rect::new(0., 0., 1., 1.);
+    let bounds =
+        tekes_ui_controls::extended::ControlFrame::new(frame, None).focus_bounds(backing_scale);
+    (frame.min_x() - bounds.min_x()).max(0.)
 }
 fn finite(value: f32) -> f32 {
     if value.is_finite() { value.max(0.) } else { 0. }
