@@ -1,5 +1,7 @@
 # Issue #23 SidePanel 状态路径续审（2026-10-24）
 
+> 后续更正：本报告记录 `77a9ed8` 的只读审计。`adbb7f3` 已补齐文中当时缺少的 Native `ChildOpened(Err)` current/迟到错误分发回归，见[交付收据](rust-agent-ui-sidepanel-issue23-child-error-20261024.md)。该窄缺口已完成；三端真实 Task 家族来源和完整窗口组合仍未验收。
+
 ## 结论与基线
 
 按主会话分工续审 Task/子代理 pointer、父关闭、A→B→A、只读有界 pane 与异步迟到路径。AgentKit 检查基线为 `77a9ed8d7c7dfe86b43679a16e94167c7b8ebf6f`；ClientKit 只读基线为 `c289bc9d33edcd83a782ac17927a8c65a027eccd`，Tekes 宿主只读基线为 `8858ccd9d46590852ec7a0949aee289fc6798d70`。未修改实现代码；未运行 Cargo、桌面、真实 harness 或截图。
@@ -15,7 +17,7 @@
 | Task tab 关闭 | SidePanel close 先更新本地导航；随后对已打开的 `TaskPaneBinding` 调用 `cancel` 并移除 pane Run 与本地 attempt。 | 取消使当前 load token 失效，撤销已捕获 Run callbacks；这段路径没有对远端 Agent task 发 cancel RPC。关闭 Task tab 属于本地导航操作。 | `panel_navigation.rs`: `closing_a_task_selects_the_last_remaining_open_tab`；`task_binding.rs`: cancel/guard 断言包含在 A→B→A 与 loading/missing/error 覆盖中。关闭与所有 Task 状态的组合没有穷举。 |
 | 子代理打开和只读有界历史 | `ChildPaneBinding::for_run` 在读取前后检查 direct parent authority，并把祖先 authority 传入 child Run。SameSession 才能构造只读 child source；内建分页需显式 intent、同 source/scope、已发布帧和当前 connection epoch，且不挂 Composer。自定义 history source 不会误显示内建分页按钮。 | `retire` 撤销 child owner；父 pane 缺失会让 child `PaneAccess` 变 Missing。分页 intent 先 claim，再复核来源与 epoch；断连只会降低当前页操作资格，显式 refresh 才能建立新 epoch。 | `child_binding.rs`: `builtin_bounded_history_pages_only_child_content_and_mounts_without_a_composer`、`nested_child_inherits_retirement_of_its_original_parent_pane`、`late_child_read_error_cannot_pollute_a_replacement_source`；`readonly_child.rs` 覆盖刷新、分页和帧来源门禁。 |
 | 父导航、关闭与 child-open 迟到 | `PanelRequest` 绑定父 scope、主导航 revision、SidePanel revision、父 projection generation。安装 child source 前校验请求仍 current；同 child ID 的旧 owner revision 不能替换较新 owner。关闭 child 会递增 revision 并留下 tombstone，然后 retire pane。 | A→B→A 中 revision 单调递增；即使业务 scope 返回 A，旧请求仍然失效。子代理 tab 关闭只撤销本地 pane，不取消 child 远端运行。 | `panel_navigation.rs`: `closing_a_child_fences_a_never_installed_older_open_result`、`late_child_open_cannot_replace_a_newer_owner_of_the_same_tab`、`closing_a_subagent_returns_to_the_last_task_without_retiring_its_binding`；`child_binding.rs`: late-open/owner-drop 和迟到 read error 用例。 |
-| native child-open 错误回调 | `HostResult::ChildOpened(Err)` 只有在 `child_request_current` 成立时才显示 notice；成功结果仍经 `install_child_source` 做 scope、revision、owner 与 snapshot 校验。 | 父已切换、关闭或新导航发生后，旧错误不污染当前 pane 的 notice；错误成功路径均不自动重试。 | 当前没有直接针对 `ChildOpened(Err)` notice dispatch 的回归。本次只静态核对 `ui/demo/src/components_native.rs` 分支；完整 host dispatch 运行仍由主会话验收。 |
+| native child-open 错误回调 | `HostResult::ChildOpened(Err)` 只有在 `child_request_current` 成立时才显示 notice；成功结果仍经 `install_child_source` 做 scope、revision、owner 与 snapshot 校验。 | 父已切换、关闭或新导航发生后，旧错误不污染当前 pane 的 notice；错误成功路径均不自动重试。 | 本审计基线当时没有直接针对 `ChildOpened(Err)` notice dispatch 的回归；后续 `adbb7f3` 已补齐。本次只静态核对 `ui/demo/src/components_native.rs` 分支；完整 host dispatch 运行仍由主会话验收。 |
 
 ## ClientKit 与 Tekes 对照
 
@@ -25,7 +27,7 @@ Tekes 的 `SidePanelHostView` 委托 ClientKit `ClientSidePanelHostView`、Task 
 
 ## 尚未证明的范围与主会话验证建议
 
-未覆盖内容仍包括完整窗口/chrome 的各状态组合、三端真实 harness 对同一 Task pointer 与家庭导航的可追溯来源、Task 状态与 parent A→B→A 的全交错组合、native `ChildOpened(Err)` notice dispatch 回归，以及物理 IME/焦点/辅助功能。现有测试是状态与回调层证据，不代表这些验收已完成。
+未覆盖内容仍包括完整窗口/chrome 的各状态组合、三端真实 harness 对同一 Task pointer 与家庭导航的可追溯来源、Task 状态与 parent A→B→A 的全交错组合，以及物理 IME/焦点/辅助功能。现有测试是状态与回调层证据，不代表这些验收已完成。
 
 本子会话未执行验证。主会话如需本轮复核，建议串行运行现有最小 Rust suite：
 
@@ -36,4 +38,4 @@ cargo test --manifest-path ui/Cargo.toml -p tekes-agent-ui-demo --test side_pane
 cargo test --manifest-path ui/Cargo.toml -p tekes-agent-ui-demo --test panel_navigation
 ```
 
-如需补齐可自动验证的窄缺口，优先为 native `ChildOpened(Err)` 加一个 current request 显示 notice、已过期 request 不显示 notice 的 host dispatch 回归；本次没有因单纯缺少该用例就改生产分支。PR #10 的合并、Issue 回填和状态由主会话统一处理。
+后续 `adbb7f3` 已为 native `ChildOpened(Err)` 补齐一个 current request 显示 notice、已过期 request 不显示 notice 的 host dispatch 回归；本次没有因单纯缺少该用例就改生产分支。PR #10 的合并、Issue 回填和状态由主会话统一处理。

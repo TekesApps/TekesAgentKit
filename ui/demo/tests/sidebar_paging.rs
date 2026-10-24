@@ -392,3 +392,39 @@ async fn demo_repeated_filter_resets_page_without_touching_chinese_preedit_or_fo
         assert!(view.binding().current_run().unwrap().submissions.is_empty());
     }
 }
+
+#[test]
+fn original_page_activation_keeps_the_existing_keyboard_owner() {
+    let mut sidebar = Sidebar::new(799, Default::default());
+    sidebar.update(&input()).unwrap();
+    let root = sidebar.id();
+    let owner = sidebar.row_id(&row(0, true).address).unwrap();
+    let more = sidebar.page_button_id().unwrap();
+    let mut host = sidebar.into_host().unwrap();
+    assert!(host.focus(Some(owner), true));
+    host.accessibility_action(more, None, AccessibilityAction::Press);
+    assert_eq!(
+        host.focused(),
+        Some(owner),
+        "auxiliary pagination must preserve keyboard/IME owner"
+    );
+    let actions = host.drain_actions();
+    let request = host
+        .get(root)
+        .unwrap()
+        .component::<Sidebar>()
+        .unwrap()
+        .take_page_requests(&actions)
+        .pop()
+        .unwrap();
+    assert!(
+        host.get_mut(root)
+            .unwrap()
+            .component_mut::<Sidebar>()
+            .unwrap()
+            .load_more(&request)
+            .unwrap()
+    );
+    assert_eq!(host.focused(), Some(owner));
+    assert!(host.get(owner).is_some());
+}

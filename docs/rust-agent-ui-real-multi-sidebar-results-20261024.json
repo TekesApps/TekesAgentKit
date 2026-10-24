@@ -1,0 +1,159 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-24",
+  "issues": [
+    22,
+    29,
+    27
+  ],
+  "pr": "https://github.com/TekesApps/TekesAgentKit/pull/10",
+  "source": "uncommitted worktree on 3ebf7de63ff4b8c5a1e8dd4ce43deb98cd422b2c; exact file identities below",
+  "tekesuiCommit": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "evidenceRoot": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/real-multi-sidebar-20261024",
+  "verification": {
+    "uiWorkspace": {
+      "passed": 717,
+      "failed": 0,
+      "ignored": 1,
+      "ignore": "existing #49"
+    },
+    "python": {
+      "passed": 143,
+      "failed": 0
+    },
+    "strictUiClippy": true,
+    "normalDemoBuild": true,
+    "publicConsumerExecuted": true,
+    "publicConsumerScenarios": 5,
+    "sequentialThreeHarnessProtocol": true,
+    "realMultiSidebar": {
+      "accepted": true,
+      "realHarnessAcceptance": true,
+      "endpointCount": 3,
+      "evidenceScope": "actual-inventory-query-pagination-and-mounted-reveal-target",
+      "mountedRevealTargetProven": true,
+      "componentFocusPreserved": true,
+      "seedCount": 9,
+      "mountedBefore": 6,
+      "mountedAfter": 9,
+      "nativeInteraction": false,
+      "physicalIme": false,
+      "desktopVisibilityProven": false,
+      "sameSessionIdCollisionProven": false,
+      "startedAt": 1792826142.955009,
+      "finishedAt": 1792826156.011074,
+      "providerRequestPaths": [
+        "/v1/responses",
+        "/v1/responses",
+        "/v1/responses",
+        "/v1/chat/completions",
+        "/v1/chat/completions",
+        "/v1/chat/completions",
+        "/v1/chat/completions",
+        "/v1/chat/completions",
+        "/v1/chat/completions"
+      ]
+    }
+  },
+  "programs": {
+    "headless": {
+      "program": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/tekes-agent-headless",
+      "sha256": "87b54fe157a367ed462333e6781e839b5454cc88e1bb9543c8e1faf3a532e8ad",
+      "bytes": 29118576,
+      "origin": "explicit-existing"
+    },
+    "demo": {
+      "program": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/tekes-agent-ui-demo",
+      "sha256": "8d053c0f198ff28cb8111cd881eff388da33cba9132e0e9e9fac005f3bd36a7c",
+      "bytes": 85823088,
+      "origin": "explicit-existing"
+    },
+    "kernel": {
+      "supervisor": "/Users/frankqin/dev/Tekes/.build/kernel-0.9.3-installed/BuiltInKernel/tekes-supervisor",
+      "supervisorSha256": "365eca9385f36d5897a81ba398e7f34b4b9819896d6a1b78c618a7710b14380f",
+      "worker": "/Users/frankqin/dev/Tekes/.build/kernel-0.9.3-installed/BuiltInKernel/tekes-worker",
+      "workerSha256": "1284014bd0a8d3cb711c0512b10762322a19af4beabc1f9e681bacb1e28fa64d",
+      "build": {
+        "format": 1,
+        "identifier": "com.tekes.kernel.supervisor",
+        "source_revision": "09508a9083c24c7accefc99516739f279b85913e",
+        "version": "0.9.3"
+      }
+    }
+  },
+  "postcheck": {
+    "checkedAt": 1792826330.017995,
+    "sourceHashesUnchanged": true,
+    "runtimeEntrypointHashesUnchanged": true,
+    "archivedDemo": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/real-multi-sidebar-20261024/programs/tekes-agent-ui-demo-offscreen-verified",
+    "archivedDemoSha256": "8d053c0f198ff28cb8111cd881eff388da33cba9132e0e9e9fac005f3bd36a7c",
+    "cacheDeletedBytes": 0,
+    "sharedTarget": "/Volumes/HP P900/dev/TekesAgentKit/shared-target",
+    "lsof": {
+      "returncode": 1,
+      "stdoutEmpty": true,
+      "stderrEmpty": true
+    },
+    "unrelatedPriorSupervisorStillPresent": true
+  },
+  "sourceHashes": {
+    "scripts/test-real-session-endpoints.py": "4cc5a339f7c63d6e5d1a602c66eae6fbfe97ed053a2293aa7f0c9307fa7de733",
+    "scripts/owned_endpoint_provider.py": "d85111fbed71623c4c1fe0192ccb76840d460ef70e3f8b7404c6a6577a505d7f",
+    "scripts/native_owned_fixture.py": "41a33188f5715ecfd4102f0114cf14436eb522c0499c739239455f31a38617ad",
+    "scripts/dsh_owned_fixture.py": "e9fd2409290f016d2a5661e4c22d07c8e8b0c9bbd233b9b750ea3c46e89c2e34",
+    "scripts/pi_owned_fixture.py": "0b98abf9f480a40da217291d453f95478b98cb90bf8d5316ce194644f5039110",
+    "scripts/native_probe_provider.py": "13629c7a0904e948f5a6f717026581e9908234ed4f30cdd182fb0a6c99666c71",
+    "scripts/mixed_tool_provider.py": "3fa8ca5fc0fb1f384f8908eec11ac0ded199a191ed468d7cb685f5a03eb63591",
+    "scripts/kernel_lifecycle_diagnostics.py": "1b20f127c93f27258615d9aa8b8b6969f9a7421e689c5dce06885c854dc7c2cb",
+    "scripts/runtime_provenance.py": "a6466c807705490154b76af7c6c55443489590b3f506be95e289c6cc1dc4f046",
+    "scripts/cargo_program.py": "ce20e3478abdb37d2ecf5ed671f10ba880053b43826acc718860302cf945991c",
+    "scripts/native_probe_launcher.py": "25fc3ba5fe448dd6e0a43a97b2205f40c60423fd63cc026cd618607cd1f595b4",
+    "scripts/native_acceptance_host.py": "2b670d2a68d6f6a4bf538a3c11eb23a886a26356f5e68cd5ba41d84a129e3355",
+    "scripts/native_frontmost_trace.py": "803cd40c71ec07b9bf4e4075a0dd33b3d09b4cfd430d99522758432033789d49",
+    "scripts/goal_footnote_probe.py": "0dbc41b45eb8d9c2f9c5fd9ea5730df94eadf8e25a3e5c4fb9a822f346212dbd",
+    "scripts/test-real-multi-sidebar.py": "10fb310c1dc1aaeb1c25f4eb9ae6a085179e734da7985cdffc132a27ee8970e8",
+    "ui/demo/src/components_native.rs": "e012f9f4353d4b98a03c8a50b46fc2b4d942177f7ede48db0c822b77ea04a05b",
+    "ui/demo/src/component_demo.rs": "fe20902c41ff93b5a930e358da0806975f3ba125e7437ba3a676f563f400fbd8",
+    "ui/demo/src/sidebar_delivery_receipt.rs": "e88573996bdf017addbfbe4987d1a5d19df1fb5df9a0407b8c09795fc5c9d016",
+    "ui/demo/src/lib.rs": "a3993fb47523e71d5a5f48db784ea4c17b3d6b9c2f553390ea9250750262d149",
+    "ui/demo/tests/sidebar_delivery_receipt.rs": "080af0fa74d8bc16fb213c198b4a3f1606a76ea978bf7712fa8252bf20c7c4c4",
+    "scripts/tests/test_real_multi_sidebar.py": "6ec3365a026f15d6745dc8c368f3485b3bccbd4829b199c5dca1faad2d81d36c",
+    "ui/components/src/sidebar.rs": "e2dac8cb964d1dd487c3f8d8d2153b878724a4530665c46c87bb5a3150441cdd",
+    "ui/demo/tests/sidebar_paging.rs": "94946b2e7098da274e82513fc5fe7d89f57963d3e19a4c0aea2326b53622ee20",
+    "scripts/tests/test_native_owned_fixture.py": "fe92bf46b6edd5f8580a94cb6372a1aa807058e4e4e5c65e9582e4feb05bfd8f"
+  },
+  "artifacts": {
+    "verified-source-identity.json": "0c6ed570333de6a644e8248c5ad79708217e0b29dd8f30c6b330e6efbe2c1fa1",
+    "verified-cargo-checks.json": "562d235e487c284616e44a31dd29d75629ce028c26a56876408a1ab8d5a36eb2",
+    "verified-runtime-checks.json": "35ea7e40ab988df7db5962eabc8dfd51dde7e57650eaad08f1855b7582264bf1",
+    "verified-postcheck.json": "af9d71c850103c0a84e84f4de15d6e97e76048953970f50b20076a6699397217",
+    "preflight-baseline.json": "81d1ebe199a92c601f69777b77c9e681031c040c646bde2438e2b8aff59b8c9d",
+    "python-verified-final.log": "c5abd3ae2f50a185b13c1b188d7446fd13a6f070cf5028206d7639f26e938289",
+    "verified-ui-workspace.log": "cb255708ae6d3a967a4e14fffc64bf8f763bfda0a5ef3ee393c00cef95965af5",
+    "verified-ui-clippy.log": "37f056cf4290259af72e42a66a3ee8dac418f0530e35b9fda03da28d61f7b9ea",
+    "verified-demo-build.log": "661da8b8caaccac419f4800ccb28357681229cf3c42cda4aa5176b9e56497a3f",
+    "verified-public-consumer.log": "ea65c967d6f297f6b81edda5d1d6710f4383f419a471db4f6585373944cfde1b",
+    "aggregate-verified.log": "7a04aab9ba8db976ba327f36ae857fd0d75bae82ee54ed56106785a074d4c0c6",
+    "aggregate-verified/acceptance.json": "0f4ab2233c479c871862dd71b3f6f5de6458c6004b813f7f9b5e2269421e5a0b",
+    "aggregate-verified/delivery.json": "55c36a7eb8d10f1ce65416a5f12e3b8d05b3a2d281f874e6053c84f3cfeb05e2",
+    "aggregate-verified/seeds.json": "98bb7670e8696027ffe148bf31c6676a076ed5f416955bb3ac654b90f58d507e",
+    "aggregate-verified/programs.json": "a8083547e40ff8ee568000642ea7046f1cfc1186a59afd0fc88c9a8599541e4a",
+    "aggregate-verified/sidebar.png": "5b1c5154bce3f940fbd94d11f4848b1f0908961c1a1dbb65b20f20677d628155",
+    "all-protocol-verified.log": "0f702a61554c1f734b12b4679e68136e22b982eab854e4b7c4a2eb5a484d15c7",
+    "page-focus-red.log": "e1ab5ea7902ff6754dc8d4b07293593aed1e385c5a18ed9fe5d7e91b5a5c219a",
+    "page-focus-green.log": "43b024ae4c369312405ffc3ae6a3ca12220a73caebb1d5a9f6b99d9431763017",
+    "aggregate-final/delivery.json": "59afc2b71de21aca4b837d35dc646f0124047e49f86245891d55f01ee05f471c",
+    "aggregate-final/failure.json": "951cbf60a8ce752b62bde3e2c133fe2f3e740b9e41d31746e76605d50cd6cd3a",
+    "pi-dsh-protocol-baseline.log": "4275313916305605b76641c8a91729c2b81384238992dbcc1dcd38e0bd7d347b",
+    "dsh-ssd-path-verified.log": "2ea96c7d6e1ae43ab8600285d769190a54acde9a94458e1c7b63ef5d30ff1cf9"
+  },
+  "notVerified": [
+    "desktop window, pixel visibility and real reveal scroll",
+    "physical Chinese IME and OS accessibility",
+    "real Task-family navigation in this aggregate host (#23)",
+    "complete classification producer coverage and actual cross-harness same-ID collision (#29)",
+    "real network failure/retry and ProcessContainer",
+    "full ClientKit UI parity and MIT UI release"
+  ],
+  "requiredGate": "TekesUI #53 strict reading remains failed; no merge/tag/release approval"
+}

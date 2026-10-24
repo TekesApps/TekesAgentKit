@@ -477,3 +477,9 @@
 `a2feb19` 的 push/PR CI 均完成：headless通过，UI workspace/严格Clippy/独立consumer执行通过，仅严格嵌套阅读失败；已下载两份原始artifact并核对PR synthetic merge与源closure，见[CI收据](rust-agent-ui-ci-a2feb19-20261024.md)。不以consumer通过放行#18/#28。
 
 #27新增opt-in的隔离Kernel文件占用/锁观察采样，不改变归档行为或默认断言；Python101/0通过。冻结脚本源与当前headless程序后，有采样和无采样的两次独立Native0.9.3协议生命周期、真实Task来源与有界子历史均通过，见[诊断设计/结果](rust-agent-ui-native-lifecycle-diagnostics-20261024.md)。旧session-running未复现，原因和已修复均未证明；lsof锁字段为空，部分观察不证明锁可用性。未运行UI/桌面/IME/AX，也不升级三端同一窗口验收结论；Kernel/SDK/ClientKit只读，继续复用SSD共享target。#19真实producer仍未公开确认，#23/#25其余完整窗口/SDK子项继续保留。
+
+### #22 / #29 / #27：真实三端同宿主 Sidebar 与共享验收工具
+
+[最终收据](rust-agent-ui-real-multi-sidebar-results-20261024.md)记录 Native0.9.3、Pi1.3.0、DSH0.2.1-rc.2 在同一当前离屏 demo 的九个真实会话：逐端健康与库存/title/cwd，原分页 limit5→10/挂载6→9/原行ID稳定，三端查询完成、实际 display projection 无 unresolved，以及原导航 reveal 目标的 ContentHost 挂载。严格运行发现并修复分页抢焦点，直接消费 SDK 已有 preserving_focus 属性；合成预编辑与真实桌面验证分开。共享 Pi/Native/DSH/provider 工具接回旧协议脚本后，全三端原断言再通过；SSD空格路径 provider 修复与旧失败保留。最终 UI717/0/1、Python143、严格Clippy、普通demo和独立公开consumer通过，所有构建复用SSD共享target。
+
+该交付不覆盖真实 Task-family（#23）、完整分类 producer（#29）、实际跨端同ID、真实故障/远端cursor、桌面/物理IME/AX或ProcessContainer。#23旧文档已注明 child-open 错误回归由 adbb7f3 完成。#12/#13 定向证据齐备但正文要求PR合并，仍保持open；#25 无新增可独立实施的状态缺陷。#53严格阅读门槛仍失败，不合并/打tag/发布；新head CI单独核对。

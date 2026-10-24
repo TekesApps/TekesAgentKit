@@ -148,6 +148,12 @@ ask_user_question → public actionable sync → runtime 用共享 session envel
 
 见[三端原生验收](rust-agent-ui-three-real-20261022.md)：Kernel0.9.3、Pi1.3.0、DSH0.2.1-rc.2在固定09b SDK及同一冻结UI程序下通过公开分页、流式阅读、合成中文预编辑、取消/错误恢复和重连。Native0.9.3完整协议流程的archive返回session-running，仍未完成其全量生命周期验收；独立UI模式不代替这项失败。脚本现在支持明确supervisor/worker路径、build哈希及精确版本/握手检查，旧target中的0.9.0开发程序不再被按目录名计作发布版。能力声明与单次运行验收结果保持区分。
 
+## 2026-10-24：无窗口协议与真实聚合 Sidebar 后续
+
+上述 2026-10-22 的 Native `session-running` 是保留的历史失败。后续冻结 Native0.9.3 程序的有/无诊断运行，以及共享启动器提取后的全量无 UI 协议运行均通过，含 archive/unarchive 和有界子历史；旧失败未复现，原因及已修复仍未证明，见[诊断结果](rust-agent-ui-native-lifecycle-diagnostics-20261024.md)。
+
+同一当前离屏 demo 也已连接隔离的 Native0.9.3、Pi1.3.0、DSH0.2.1-rc.2，验证九个真实会话的聚合库存、公开搜索、原分页动作和已挂载 reveal 目标；这是离屏组件/协议证据，不替代桌面、物理 IME、AX 或 Task 家族来源验收，见[聚合 Sidebar 收据](rust-agent-ui-real-multi-sidebar-results-20261024.md)。DSH 的 SQLite 查询仅由该隔离 profile 显式启用，用户部署默认值未变。
+
 ## Sidebar 分类事实（#29，2026-10-24）
 
 分类只决定 Sidebar 成员，不授予子会话继续运行或历史读取权限。当前 shared predicate 排除明确 origin=subagent 或 ephemeral=true，parentSessionId 单独存在不排除 fork。缺失/未知数据保持兼容，但不能从兼容显示反推已确认 main。

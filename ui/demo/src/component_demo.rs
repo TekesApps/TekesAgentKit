@@ -199,6 +199,7 @@ pub struct ComponentDemo {
     sidebar_multi_search_publication:
         Option<tekes_agent_presentation::SidebarMultiSearchPublication>,
     sidebar_multi_search_presented: Option<tekes_agent_presentation::SidebarMultiSearchInput>,
+    sidebar_applied_multi_projection: Option<tekes_agent_ui_bindings::SidebarMultiSearchProjection>,
     sidebar_observer_presented: Option<tekes_agent_presentation::SidebarObserverStatusInput>,
     sidebar_presented: Option<SidebarInput>,
     panel_revision: u64,
@@ -581,6 +582,7 @@ impl ComponentDemo {
             sidebar_search_presented: None,
             sidebar_multi_search_publication: None,
             sidebar_multi_search_presented: None,
+            sidebar_applied_multi_projection: None,
             sidebar_observer_presented: None,
             sidebar_presented: None,
             panel_revision: 0,
@@ -2053,6 +2055,55 @@ impl ComponentDemo {
     pub fn sidebar_options_id(&self) -> ComponentId {
         ComponentId((SIDEBAR_OPTIONS_NAMESPACE as u64) << 32)
     }
+    /// Read the exact packet retained by this host and the original mounted
+    /// component. No runtime re-snapshot, provider request or UI mutation.
+    pub fn sidebar_delivery_receipt(&self) -> Result<serde_json::Value> {
+        let source = self
+            .sidebar_host_source
+            .as_ref()
+            .ok_or_else(|| unsupported("Sidebar has no applied host source"))?;
+        let sidebar = self
+            .tree
+            .get(self.sidebar_id())
+            .and_then(|node| node.component::<Sidebar>())
+            .ok_or_else(|| unsupported("Sidebar is not mounted"))?;
+        let mut receipt = crate::sidebar_delivery_receipt::sidebar_delivery_receipt(
+            source,
+            sidebar,
+            self.sidebar_multi_search_publication.as_ref(),
+        )
+        .map_err(unsupported)?;
+        let mounted: Vec<_> = sidebar
+            .displayed_input()
+            .into_iter()
+            .flat_map(|input| &input.rows)
+            .filter_map(|row| {
+                sidebar.row_id(&row.address).map(|id| {
+                    serde_json::json!({
+                        "address": row.address, "rowId": id.0,
+                        "presentInContentHost": self.tree.get(id).is_some()
+                    })
+                })
+            })
+            .collect();
+        receipt["host"] = serde_json::json!({
+            "evidenceScope": "applied-packet-and-content-host-membership",
+            "desktopVisibilityProven": false,
+            "focusedComponentId": self.tree.focused().map(|id| id.0),
+            "visibilityTargetPresentInContentHost": sidebar.visibility_target().is_some_and(|target| self.tree.get(target.item()).is_some()),
+            "mountedRows": mounted,
+            "appliedSearchProjection": self.sidebar_applied_multi_projection.as_ref().map(|projection| {
+                serde_json::json!({
+                    "query": projection.query,
+                    "localResultsReady": projection.help.local_results_ready,
+                    "resultsReady": projection.help.results_ready,
+                    "unresolved": projection.unresolved,
+                    "snippetAddresses": projection.snippets.keys().collect::<Vec<_>>()
+                })
+            })
+        });
+        Ok(receipt)
+    }
     pub fn sidebar_id(&self) -> ComponentId {
         ComponentId((SIDEBAR_NAMESPACE as u64) << 32)
     }
@@ -3359,6 +3410,7 @@ impl ComponentDemo {
                 self.sidebar_search_presented = search_input;
                 self.sidebar_multi_search_presented = multi_input;
             }
+            self.sidebar_applied_multi_projection = None;
             if let Some(projection) = multi_projection {
                 self.tree
                     .get_mut(self.sidebar_id())
@@ -3367,6 +3419,7 @@ impl ComponentDemo {
                     .unwrap()
                     .set_multi_search_projection_help(&projection.help)
                     .map_err(unsupported)?;
+                self.sidebar_applied_multi_projection = Some(projection);
             }
         }
         Ok(())

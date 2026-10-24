@@ -268,7 +268,7 @@
       "remaining": [
         "消费非当前行上下文菜单公开契约，核对原生/AX 操作及窄宽布局。",
         "复验跨端点、过滤分页和导航后操作的来源归属；宿主只负责导航。",
-        "对齐当前 sessionSidebarSnapshot 的 query/folder 共同成员关系后的 bm25 排名和三端 main/ephemeral 分类事实（#29）；验证过滤分页/全局偏好、真实多端故障与窗口整体组合。"
+        "名称FTS/bm25、活动knownness与真实三端同宿主基本库存/搜索/分页已分批实现验收；仍须验证实际保留域与ClientKit等价、provider cursor、#29完整分类事实、真实多端故障以及窗口/AX整体组合。"
       ],
       "acceptance": [
         "非当前会话右键不错误改变目标；pin/share/rename/archive 作用于原捕获 item。",
@@ -285,7 +285,8 @@
         "docs/rust-agent-ui-sidebar-observer-retry-results-20261024.md",
         "docs/rust-agent-ui-sidebar-query-membership-20261024.md",
         "docs/rust-agent-ui-name-fts-results-20261024.md",
-        "docs/rust-agent-ui-sidebar-membership-results-20261024.json"
+        "docs/rust-agent-ui-sidebar-membership-results-20261024.json",
+        "docs/rust-agent-ui-real-multi-sidebar-results-20261024.json"
       ],
       "dependencies": [
         "TekesUI#44"
@@ -354,6 +355,23 @@
           "provider cursor protocol",
           "all historical pin/title identity tie semantics"
         ]
+      },
+      "realMultiSidebar": {
+        "date": "2026-10-24",
+        "evidence": "docs/rust-agent-ui-real-multi-sidebar-results-20261024.md",
+        "actualEndpoints": [
+          "Native0.9.3",
+          "Pi1.3.0",
+          "DSH0.2.1-rc.2"
+        ],
+        "actualSeedCount": 9,
+        "offscreenInventoryQueryPagingMountedTarget": true,
+        "componentFocusPreserved": true,
+        "desktop": false,
+        "physicalIme": false,
+        "taskFamily": false,
+        "fullClassificationFacts": false,
+        "strictReadingGate": "failed #53"
       }
     },
     {
@@ -566,7 +584,8 @@
         "docs/rust-agent-ui-non-sdk-review-20261023.md",
         "docs/rust-agent-ui-native-toolchain.md",
         "docs/rust-agent-ui-offscreen-coverage-20261023.md",
-        "docs/rust-agent-ui-ci-review-20261024.md"
+        "docs/rust-agent-ui-ci-review-20261024.md",
+        "docs/rust-agent-ui-real-multi-sidebar-results-20261024.json"
       ],
       "dependencies": [
         "runport",
@@ -594,6 +613,23 @@
           "ProcessContainer同/跨进程",
           "DSH完整SideChat（当前仅正确禁用）"
         ]
+      },
+      "realMultiSidebar": {
+        "date": "2026-10-24",
+        "evidence": "docs/rust-agent-ui-real-multi-sidebar-results-20261024.md",
+        "actualEndpoints": [
+          "Native0.9.3",
+          "Pi1.3.0",
+          "DSH0.2.1-rc.2"
+        ],
+        "actualSeedCount": 9,
+        "offscreenInventoryQueryPagingMountedTarget": true,
+        "componentFocusPreserved": true,
+        "desktop": false,
+        "physicalIme": false,
+        "taskFamily": false,
+        "fullClassificationFacts": false,
+        "strictReadingGate": "failed #53"
       }
     },
     {

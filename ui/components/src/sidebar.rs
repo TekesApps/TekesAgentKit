@@ -1533,7 +1533,9 @@ impl Sidebar {
         }
         let page_request = if show_more {
             let control = ids[&more_key];
-            children.push(Content::new(control, ButtonContent::new(&self.labels.more)));
+            children.push(
+                Content::new(control, ButtonContent::new(&self.labels.more)).preserving_focus(),
+            );
             Some(crate::SidebarPageRequest {
                 owner: self.page_owner.clone(),
                 control,

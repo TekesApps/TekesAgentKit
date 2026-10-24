@@ -1,0 +1,201 @@
+#!/usr/bin/env python3
+"""One owned, simultaneous Native/Pi/DSH offscreen host; never desktop input.
+
+Requires explicit existing programs. No build, installation, private history write,
+ambient credentials, native-window launch or Screen Recording entry point.
+"""
+import argparse
+from contextlib import ExitStack
+import hashlib
+import http.server
+import json
+import os
+from pathlib import Path
+import subprocess
+import threading
+import time
+import uuid
+from cargo_program import cargo_program
+from dsh_owned_fixture import owned_dsh
+from native_owned_fixture import owned_native
+from owned_endpoint_provider import provider_handler
+from pi_owned_fixture import prepare_pi
+from runtime_provenance import kernel_programs
+
+ROOT = Path(__file__).resolve().parents[1]
+NATIVE_AUTH = 'AGENTKIT_MULTI_NATIVE_BEARER'
+DSH_AUTH = 'AGENTKIT_MULTI_DSH_COOKIE'
+
+
+def write_json(path, value):
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, 'w') as stream:
+        json.dump(value, stream, indent=2, ensure_ascii=False)
+        stream.write('\n')
+
+
+def address(value):
+    return (value.get('endpointId', value.get('endpoint_id')),
+            value.get('sessionId', value.get('session_id')))
+
+
+def validate_delivery(delivery, seeds):
+    stages = {row['stage']: row['receipt'] for row in delivery['stages']}
+    assert set(stages) == {'baseline', 'after-original-page-action', 'query'}, 'missing stage'
+    expected = {(seed['endpointId'], seed['sessionId']): seed for seed in seeds}
+    for receipt in stages.values():
+        source = receipt['source']
+        assert source['endpointCount'] == 3 and source['loaded'] and not source['errorPresent']
+        statuses = source['observer']
+        assert {row['endpointId'] for row in statuses} == {'native', 'pi', 'dsh'}
+        assert all(row['loaded'] and not row['stale'] and not row['errorPresent']
+                   and row['observation']['phase'] == 'observing'
+                   and row['observation']['converged'] for row in statuses), 'endpoint not healthy'
+        rows = {address(row['address']): row for row in source['rows']}
+        assert set(rows) == set(expected), 'actual public inventory differs from owned seeds'
+        for key, seed in expected.items():
+            assert rows[key]['title'] == seed['title'], 'canonical title mismatch'
+            assert rows[key]['folderPath'] == seed['cwd'], 'canonical cwd mismatch'
+        for row in receipt['display']['rows']:
+            key = address(row['address'])
+            assert key in rows and row['title'] == rows[key]['title'], 'display/source mismatch'
+        assert all(row['presentInContentHost'] for row in receipt['host']['mountedRows']), 'row node absent'
+        target = receipt['display']['visibilityTarget']
+        assert target and address(target['address']) in expected, 'original reveal target absent'
+        assert receipt['host']['visibilityTargetPresentInContentHost'], 'reveal target node absent'
+        assert target['itemId'] in {row['rowId'] for row in receipt['host']['mountedRows']}, 'reveal row mismatch'
+    before, after = (stages[name] for name in ['baseline', 'after-original-page-action'])
+    assert before['display']['paging']['hasMore'], 'no positive pagination baseline'
+    assert after['display']['paging']['limit'] > before['display']['paging']['limit']
+    before_ids = {address(row['address']): row['rowId'] for row in before['host']['mountedRows']}
+    after_ids = {address(row['address']): row['rowId'] for row in after['host']['mountedRows']}
+    assert after['host']['focusedComponentId'] == before['host']['focusedComponentId'], 'paging changed focus'
+    assert len(after_ids) > len(before_ids), 'original page action did not mount more rows'
+    assert all(after_ids.get(key) == value for key, value in before_ids.items()), 'row identity changed'
+    query = stages['query']
+    assert {address(row['address']) for row in query['display']['rows']} == set(expected)
+    assert query['host']['focusedComponentId'] == before['host']['focusedComponentId'], 'query changed focus'
+    projection = query['host']['appliedSearchProjection']
+    assert projection and projection['localResultsReady'] and projection['resultsReady']
+    assert not projection['unresolved'], 'display projection still has unresolved hits'
+    children = query['display']['multiSearch']['children']
+    assert {child['endpointId'] for child in children} == {'native', 'pi', 'dsh'}
+    assert all(child['phase']['state'] == 'complete' for child in children), 'provider search not complete'
+    return {'accepted': True, 'realHarnessAcceptance': True, 'endpointCount': 3,
+            'evidenceScope': 'actual-inventory-query-pagination-and-mounted-reveal-target',
+            'mountedRevealTargetProven': True, 'componentFocusPreserved': True,
+            'seedCount': len(seeds), 'mountedBefore': len(before_ids), 'mountedAfter': len(after_ids),
+            'nativeInteraction': False, 'physicalIme': False, 'desktopVisibilityProven': False,
+            'sameSessionIdCollisionProven': False}
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    for name in ['headless-program', 'ui-demo', 'pi-root', 'dsh-root', 'kernel-root',
+                 'kernel-supervisor', 'kernel-worker', 'output']:
+        parser.add_argument('--'+name, type=Path, required=True)
+    args = parser.parse_args()
+    output = args.output.resolve()
+    if output.exists():
+        parser.error('output must be a new owned directory')
+    if not str(output).startswith('/Volumes/HP P900/dev/TekesAgentKit/'):
+        parser.error('output must stay under the existing AgentKit SSD project directory')
+    output.mkdir(mode=0o700)
+    workspace = output/'workspace'; workspace.mkdir(mode=0o700)
+    tmp = output/'tmp'; tmp.mkdir(mode=0o700)
+    home = output/'host-home'; home.mkdir(mode=0o700)
+    environment = {'PATH': '/usr/bin:/bin:/usr/sbin:/sbin', 'HOME': str(home),
+                   'TMPDIR': str(tmp), 'LANG': 'en_US.UTF-8', 'LC_ALL': 'en_US.UTF-8'}
+    headless, headless_identity = cargo_program(ROOT, 'tekes-agent-headless', 'tekes-agent-headless', existing=args.headless_program)
+    demo, demo_identity = cargo_program(ROOT/'ui', 'tekes-agent-ui-demo', 'tekes-agent-ui-demo', existing=args.ui_demo)
+    supervisor, worker, kernel_identity = kernel_programs(args.kernel_root, supervisor=args.kernel_supervisor,
+                                                        worker=args.kernel_worker, expected_version='0.9.3')
+    write_json(output/'programs.json', {'headless': headless_identity, 'demo': demo_identity, 'kernel': kernel_identity})
+    requests = []
+    server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), provider_handler(workspace=lambda:workspace, requests=requests))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    marker = 'agentkit-multi-'+uuid.uuid4().hex
+    seeds = []
+    started = time.time()
+    try:
+        with ExitStack() as stack:
+            stack.callback(server.server_close)
+            stack.callback(server.shutdown)
+            provider_url = 'http://127.0.0.1:'+str(server.server_port)+'/v1'
+            providers = json.loads((args.kernel_root/'fixtures/config/providers.canonical.json').read_text())
+            native = stack.enter_context(owned_native(supervisor, worker, providers, provider_url, output, environment))
+            dsh_home = output/'dsh-home'
+            dsh_env = dict(environment, HOME=str(dsh_home), DSH_HOME=str(dsh_home),
+                           DSH_AGENTS_HOME=str(dsh_home/'agents'), DSH_TELEMETRY_DISABLED='1',
+                           AGENTKIT_SYNTHETIC_KEY='synthetic-key')
+            dsh = stack.enter_context(owned_dsh(args.dsh_root, output/'dsh-data', dsh_home,
+                                              workspace, provider_url, dsh_env, query_sqlite=True))
+            assert dsh.version == '0.2.1-rc.2', 'unexpected DSH package'
+            pi = prepare_pi(args.pi_root, output/'pi-data', output/'pi-home', provider_url, strict_environment=True)
+            # Pi inherits the demo process environment in the public connector.
+            # Explicitly blank our other harness auth keys rather than claiming
+            # that PiConfiguration.environment clears all inherited variables.
+            pi['environment'].update({NATIVE_AUTH: '', DSH_AUTH: ''})
+            configs = [
+                ('native', {'kind':'native', 'url':native['url'], 'bearer':native['bearer'], 'expectedVersion':'0.9.3'},
+                 native['providers']['providers'][0]['id'], native['providers']['providers'][0]['models'][0]['id']),
+                ('pi', dict(pi, expectedVersion='1.3.0'), 'endpoint-test', 'endpoint-test'),
+                ('dsh', dsh.connector_config([]), 'endpoint-test', 'endpoint-test')]
+            endpoints = []
+            for endpoint_id, config, provider, model in configs:
+                commands = []
+                for index in range(3):
+                    alias = 'seed-'+str(index)
+                    title = marker+' '+endpoint_id+' '+str(index)
+                    text = marker+' input '+endpoint_id+' '+str(index)
+                    commands.extend([
+                        {'op':'create','cwd':str(workspace),'saveAs':alias},
+                        {'op':'call','sessionId':alias,'method':'session.selectModel','args':{'provider':provider,'model':model}},
+                        {'op':'call','sessionId':alias,'method':'session.rename','args':{'title':title}},
+                        {'op':'open','sessionId':alias}, {'op':'compose','sessionId':alias,'text':text},
+                        {'op':'waitSettled','sessionId':alias}])
+                commands.append({'op':'snapshot'})
+                result = subprocess.run([str(headless)], input=json.dumps(dict(config, commands=commands)),
+                                        text=True, capture_output=True, env=environment, timeout=120)
+                # Config contains credentials; never persist it or echo command input.
+                (output/(endpoint_id+'-seed.stdout')).write_text(result.stdout)
+                (output/(endpoint_id+'-seed.stderr')).write_text(result.stderr)
+                assert result.returncode == 0, endpoint_id+' public seeding failed; inspect owned logs'
+                rows = [json.loads(line) for line in result.stdout.splitlines()]
+                assert rows[0]['version'] == config['expectedVersion'], 'actual runtime handshake mismatch'
+                ids = [row['result']['sessionId'] for row in rows if row.get('op') == 'create']
+                assert len(ids) == 3 and len(set(ids)) == 3
+                snapshot = next(row['result'] for row in reversed(rows) if row.get('op') == 'snapshot')
+                for index, session_id in enumerate(ids):
+                    state = json.dumps(snapshot['sessions'][session_id], ensure_ascii=False)
+                    assert marker+' input '+endpoint_id+' '+str(index) in state and 'ENDPOINT_REPLY_OK' in state, 'input/reply missing'
+                    seeds.append({'endpointId':endpoint_id,'sessionId':session_id,
+                                  'title':marker+' '+endpoint_id+' '+str(index),'cwd':str(workspace)})
+                endpoint = {key:value for key,value in config.items()
+                            if key not in ('bearer','cookie','expectedVersion','commands')}
+                endpoint.update(endpointId=endpoint_id,sessions=ids[:2])
+                if endpoint_id == 'native': endpoint['bearerEnv'] = NATIVE_AUTH
+                if endpoint_id == 'dsh': endpoint['cookieEnv'] = DSH_AUTH
+                endpoints.append(endpoint)
+            write_json(output/'seeds.json', seeds)
+            write_json(output/'endpoints.json', {'endpoints':endpoints})
+            demo_env = dict(environment, **{NATIVE_AUTH:native['bearer'], DSH_AUTH:dsh.cookie})
+            command = [str(demo),'--components','--endpoint-config',str(output/'endpoints.json'),
+                       '--sidebar-query',marker,'--sidebar-delivery-receipt',str(output/'delivery.json'),
+                       '--offscreen',str(output/'sidebar.png')]
+            result = subprocess.run(command, env=demo_env, text=True, capture_output=True, timeout=120)
+            (output/'demo.stdout').write_text(result.stdout)
+            (output/'demo.stderr').write_text(result.stderr)
+            assert result.returncode == 0, 'offscreen host failed; inspect owned logs/partial receipt'
+            accepted = validate_delivery(json.loads((output/'delivery.json').read_text()), seeds)
+            accepted.update(startedAt=started, finishedAt=time.time(), providerRequestPaths=requests)
+            write_json(output/'acceptance.json', accepted)
+            print(json.dumps(accepted))
+    except BaseException as error:
+        write_json(output/'failure.json', {'accepted':False,'errorType':type(error).__name__,
+                   'startedAt':started,'finishedAt':time.time(),'seedCount':len(seeds)})
+        raise
+
+
+if __name__ == '__main__':
+    main()

@@ -3858,7 +3858,9 @@ pub fn run() {
         view.bind_sidebar_search_publication(source.owner(), &source.snapshot())
             .unwrap();
     }
-    if let Some(source) = &sidebar_multi_query {
+    if let Some(source) = &sidebar_multi_query
+        && !args.iter().any(|arg| arg == "--sidebar-delivery-receipt")
+    {
         view.bind_sidebar_multi_search_publication(source.owner(), &source.snapshot())
             .unwrap();
     }
@@ -4055,6 +4057,53 @@ pub fn run() {
                 .expect("initial feedback metadata");
         }
 
+        let mut sidebar_delivery_stages = Vec::new();
+        if args.iter().any(|arg| arg == "--sidebar-delivery-receipt") {
+            assert!(
+                registered_endpoint_ids.len() > 1 && !fixture,
+                "Sidebar delivery receipt requires explicit multi-endpoint configuration"
+            );
+            // Original host navigation issues the same selection/reveal event
+            // as ordinary session navigation, without OS input or native focus.
+            host.view
+                .select(0)
+                .expect("initial owned session navigation");
+            host.view.sync().expect("baseline Sidebar sync");
+            sidebar_delivery_stages.push(serde_json::json!({
+                "stage": "baseline", "receipt": host.view.sidebar_delivery_receipt().unwrap()
+            }));
+            let more = host
+                .view
+                .tree
+                .get(host.view.sidebar_id())
+                .unwrap()
+                .component::<Sidebar>()
+                .unwrap()
+                .page_button_id()
+                .expect("real inventory must exceed the ordinary Sidebar page limit");
+            assert!(
+                host.view.tree.get(more).is_some(),
+                "page control not mounted"
+            );
+            let commands = host
+                .view
+                .accessibility_action(
+                    more,
+                    None,
+                    tekes_ui_controls::composition::AccessibilityAction::Press,
+                )
+                .unwrap();
+            assert!(
+                commands.is_empty(),
+                "local Sidebar paging must not dispatch endpoint commands"
+            );
+            host.view.sync().unwrap();
+            sidebar_delivery_stages.push(serde_json::json!({
+                "stage": "after-original-page-action", "receipt": host.view.sidebar_delivery_receipt().unwrap(),
+                "actionScope": "in-process-component-semantic-press", "osAccessibilityProven": false
+            }));
+        }
+
         let multi_sidebar_search = if let Some(source) = &host.sidebar_multi_query {
             let publication = host.executor.block_on(async {
                 let mut changes = source.subscribe();
@@ -4078,9 +4127,19 @@ pub fn run() {
             host.view
                 .set_sidebar_host_source(host.sidebar.snapshot())
                 .unwrap();
-            host.view
-                .update_sidebar_multi_search_publication(source.owner(), &publication)
-                .unwrap();
+            if args.iter().any(|arg| arg == "--sidebar-delivery-receipt") {
+                host.view
+                    .bind_sidebar_multi_search_publication(source.owner(), &publication)
+                    .unwrap();
+                host.view.sync().unwrap();
+                sidebar_delivery_stages.push(serde_json::json!({
+                    "stage": "query", "receipt": host.view.sidebar_delivery_receipt().unwrap()
+                }));
+            } else {
+                host.view
+                    .update_sidebar_multi_search_publication(source.owner(), &publication)
+                    .unwrap();
+            }
             let children: Vec<_> = publication.children.iter().map(|child| {
                 let (phase, has_more) = match &child.publication.input.phase {
                     tekes_agent_components_ui::SidebarSearchPhase::Idle => ("idle", false),
@@ -4094,6 +4153,28 @@ pub fn run() {
         } else {
             serde_json::Value::Null
         };
+        if let Some(index) = args
+            .iter()
+            .position(|arg| arg == "--sidebar-delivery-receipt")
+        {
+            use std::io::Write;
+            let path = std::path::Path::new(args.get(index + 1).expect("Sidebar receipt path"));
+            assert!(path.is_absolute(), "Sidebar receipt path must be absolute");
+            let mut file = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(path)
+                .expect("new Sidebar receipt file");
+            let receipt = serde_json::json!({
+                "schemaVersion": 1, "stages": sidebar_delivery_stages,
+                "realHarnessAcceptance": false,
+                "note": "Runner must compare actual seed IDs and replies with these source facts",
+                "nativeInteraction": false, "physicalIme": false
+            });
+            file.write_all(serde_json::to_string_pretty(&receipt).unwrap().as_bytes())
+                .unwrap();
+            file.write_all(b"\n").unwrap();
+        }
         let sidebar_query_proof = if args.iter().any(|arg| arg == "--sidebar-query-proof") {
             let source = host.sidebar_query.as_ref().unwrap();
             let state = host.executor.block_on(async {

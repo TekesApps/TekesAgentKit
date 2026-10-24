@@ -11,6 +11,7 @@ pub mod attachment_files;
 pub mod component_demo;
 pub mod file_preview_host;
 pub mod notifications;
+pub mod sidebar_delivery_receipt;
 pub mod sidebar_host;
 pub mod upload_proof;
 
