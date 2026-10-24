@@ -38,7 +38,8 @@ def locked_tekesui_packages(cargo_lock: str, revision: str) -> list[str]:
 
 
 def source_fingerprint(root: Path) -> tuple[str, list[str], str]:
-    paths = [root / "ui/components/Cargo.toml", root / "crates/contract/Cargo.toml",
+    paths = [root / "Cargo.toml", root / "ui/Cargo.toml",
+             root / "ui/components/Cargo.toml", root / "crates/contract/Cargo.toml",
              root / "crates/presentation/Cargo.toml", root / "crates/session/Cargo.toml",
              root / "ui/Cargo.lock",
              root / "ui/tekesui-source.json"]
@@ -58,7 +59,7 @@ def source_fingerprint(root: Path) -> tuple[str, list[str], str]:
     status = subprocess.check_output(
         ["git", "-C", str(root), "status", "--porcelain", "--untracked-files=all", "--",
          "ui/components", "crates/contract", "crates/presentation", "ui/Cargo.lock",
-         "crates/session", "ui/tekesui-source.json"], text=True
+         "crates/session", "ui/tekesui-source.json", "Cargo.toml", "ui/Cargo.toml"], text=True
     ).strip()
     return digest.hexdigest(), names, status
 

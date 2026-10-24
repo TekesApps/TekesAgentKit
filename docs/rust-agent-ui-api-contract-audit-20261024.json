@@ -172,7 +172,7 @@
   "local_validation": {
     "python_tests": {
       "command": "PYTHONDONTWRITEBYTECODE=1 bundled-python -m unittest scripts.tests.test_public_agent_ui_consumer -v",
-      "result": "2 passed"
+      "result": "3 passed"
     },
     "cargo_build_or_run": "independent consumer run succeeded using the shared target; receipt linked above",
     "desktop_acceptance": "not_run",

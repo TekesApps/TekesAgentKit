@@ -40,7 +40,7 @@
 
 ### [#15](https://github.com/TekesApps/TekesAgentKit/issues/15) — [P1][API] 固定公开依赖、宿主接入契约与第二 consumer
 
-当前：部分已实现；待补齐/验收。
+当前：非 SDK 审计与独立 consumer 已完成；正式 UI 发行 pin 与容器契约待交付。
 
 依赖/关联：[TekesUI #64](https://github.com/TekesApps/TekesUI/issues/64)。上游关联按具体子项适用。
 
@@ -63,6 +63,8 @@
 - [ ] 共享包+Rust demo+第二 consumer 适用检查通过；没有 Swift、私有 SDK 或新状态机。
 
 证据：[session-endpoints.md](session-endpoints.md)、[rust-agent-ui-host-integration.md](rust-agent-ui-host-integration.md)、[rust-agent-ui-contract.md](rust-agent-ui-contract.md)。
+
+本轮推进：本轮实现 `8335231`：公开构造与宿主状态/回调审计、独立 package 实际构造/挂载三组件、依赖/源码身份核验已完成。详见[契约审计](rust-agent-ui-api-contract-audit-20261024.md)。不代表正式 UI 发布或原生/ProcessContainer 通过。
 
 ### [#16](https://github.com/TekesApps/TekesAgentKit/issues/16) — [P1][Composer] 输入面、草稿与发送取消对齐 ClientKit
 
@@ -142,7 +144,7 @@
 
 ### [#19](https://github.com/TekesApps/TekesAgentKit/issues/19) — [P1][Sources] 明确工具报告与独立旁白 fallback 的公开来源
 
-当前：需要公开 producer/契约确认；不是 SDK 渲染缺口。
+当前：公开来源审计完成；真实 report/group fallback producer 未确认，集成仍待来源。
 
 依赖/关联：先确认公开 producer，无已知 SDK 硬依赖。上游关联按具体子项适用。
 
@@ -165,6 +167,8 @@
 - [ ] 每项标明支持/不支持的实际 harness；缺公开数据时保留阻塞，不猜私有数据库或 stdout。
 
 证据：[rust-agent-ui-tool-header-20261023.md](rust-agent-ui-tool-header-20261023.md)、[rust-agent-ui-narration-20261023.md](rust-agent-ui-narration-20261023.md)、[rust-agent-ui-thinking-source-20261023.md](rust-agent-ui-thinking-source-20261023.md)。
+
+本轮推进：本轮实现 `29c2f37`：27个来源文件逐哈希核对，26项策略与3项公开 consumer 回归通过。详见[公开来源矩阵](rust-agent-ui-public-sources-20261024.md)。三端 report/group fallback 为 unknown/no public producer；不猜造真实 fixture。
 
 ### [#20](https://github.com/TekesApps/TekesAgentKit/issues/20) — [P1][Footnote] 紧凑动作、目标与评价信息的单行排版
 
@@ -339,7 +343,7 @@
 
 ### [#27](https://github.com/TekesApps/TekesAgentKit/issues/27) — [P0][Acceptance] 固定宿主的三端、IME、阅读与布局验收矩阵
 
-当前：部分已实现；待补齐/验收。
+当前：非桌面矩阵与本轮三端离屏已完成；系统 IME、窗口、阅读锚点及容器验收待补。
 
 依赖/关联：#21、#22、#23、#24、#25、#26。上游关联按具体子项适用。
 
@@ -362,6 +366,8 @@
 - [ ] 保留源码/WIP/固定快照/日志/截图/程序，复用共享 target；清缓存先核对进程/依赖并报告实际释放。
 
 证据：[session-endpoints.md](session-endpoints.md)、[rust-agent-ui-non-sdk-review-20261023.md](rust-agent-ui-non-sdk-review-20261023.md)、[rust-agent-ui-native-toolchain.md](rust-agent-ui-native-toolchain.md)、[rust-agent-ui-offscreen-coverage-20261023.md](rust-agent-ui-offscreen-coverage-20261023.md)。
+
+本轮推进：见[720格分层矩阵](rust-agent-ui-acceptance-matrix-20261024.md)及[本轮非桌面实跑](rust-agent-ui-non-desktop-results-20261024.md)。程序/源码身份独立保留，不把矩阵检查成功或离屏结果当作完整验收。
 
 ### [#28](https://github.com/TekesApps/TekesAgentKit/issues/28) — [P0][Delivery] 完整要求审计、review、CI、合并与阶段 tag
 

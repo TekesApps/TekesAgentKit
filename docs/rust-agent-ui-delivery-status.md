@@ -49,6 +49,8 @@ Native/Pi 真实离屏路径新增原 preedit/commit 与组字不发送门禁，
 已同步设计与未发布 API 字段；同一程序三端离屏、Native 完整协议驱动及有界历史、Native/Pi SideChat 通过，
 DSH 保持能力禁用；桌面、物理 IME 和 ProcessContainer 未验收。
 
+[#15/#19/#27 非桌面推进](rust-agent-ui-non-desktop-results-20261024.md)：公开API/宿主责任与独立package构造已核对；报告/独立旁白来源明确unknown；720格验收矩阵与校验器已建。当前冻结程序三端常规协议/离屏、Native有界与Native/Pi SideChat补验通过；DSH SideChat仍仅禁用门禁。92项Python、26项来源策略、3项工具consumer回归通过；没有桌面/系统IME/VoiceOver/容器验收，#53严格失败保留。
+
 ## 依赖与运行身份
 
 | 输入 | 当前固定值及限制 |

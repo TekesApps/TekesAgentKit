@@ -5,7 +5,7 @@
     {
       "key": "contract",
       "title": "[P1][API] 固定公开依赖、宿主接入契约与第二 consumer",
-      "status": "部分已实现；待补齐/验收",
+      "status": "非 SDK 审计与独立 consumer 已完成；正式 UI 发行 pin 与容器契约待交付",
       "implemented": [
         "Rust-only 根契约/SessionEndpointRegistry、RunScope 和 presentation 已建立；已发布基线 v0.3.8，UI 增量仍未发布。",
         "三 SEP 已有 pointer/locator、历史恢复、只读文件和能力矩阵；本地与远端 cache 策略独立。",
@@ -28,7 +28,22 @@
       ],
       "dependencies": [
         "TekesUI#64"
-      ]
+      ],
+      "progress": {
+        "date": "2026-10-24",
+        "commit": "8335231",
+        "evidence": "docs/rust-agent-ui-api-contract-audit-20261024.md",
+        "verified": [
+          "独立 package 三组件构造和 ContentHost 挂载，exit 0",
+          "实际5个本地包+6个SDK包，243个审查输入与131个源码/Cargo输入核验",
+          "生成器3项回归（含工作区manifest）、静态依赖边界"
+        ],
+        "notVerified": [
+          "正式 AgentKit UI 发布",
+          "ProcessContainer 同/跨进程",
+          "原生窗口、系统 IME、VoiceOver"
+        ]
+      }
     },
     {
       "key": "composer",
@@ -124,7 +139,7 @@
     {
       "key": "sources",
       "title": "[P1][Sources] 明确工具报告与独立旁白 fallback 的公开来源",
-      "status": "需要公开 producer/契约确认；不是 SDK 渲染缺口",
+      "status": "公开来源审计完成；真实 report/group fallback producer 未确认，集成仍待来源",
       "implemented": [
         "已有 ToolHeaderAdapter、报告/计数选择和 narration fallback 纯规则及显式输入。",
         "标准 RunPort 的公开 new(...).with_transcript(..., labels) 已能消费宿主 adapter，无需重复 API。",
@@ -145,7 +160,21 @@
         "docs/rust-agent-ui-narration-20261023.md",
         "docs/rust-agent-ui-thinking-source-20261023.md"
       ],
-      "dependencies": []
+      "dependencies": [],
+      "progress": {
+        "date": "2026-10-24",
+        "commit": "29c2f37",
+        "evidence": "docs/rust-agent-ui-public-sources-20261024.md",
+        "verified": [
+          "27个只读来源文件哈希及提交一致",
+          "26项共享策略+3项公开consumer回归通过",
+          "区分 unknown/明确 unsupported/权威 absence；保留 opaque metadata"
+        ],
+        "notVerified": [
+          "真实 report 或独立 narration producer",
+          "新增真实协议 fixture 与回传恢复"
+        ]
+      }
     },
     {
       "key": "footnote",
@@ -353,7 +382,7 @@
     {
       "key": "acceptance",
       "title": "[P0][Acceptance] 固定宿主的三端、IME、阅读与布局验收矩阵",
-      "status": "部分已实现；待补齐/验收",
+      "status": "非桌面矩阵与本轮三端离屏已完成；系统 IME、窗口、阅读锚点及容器验收待补",
       "implemented": [
         "Native/Pi/DSH 独立 SEP、session pointer/历史/数据回传与 headless 路径已实现并有 v0.3.8 基线。",
         "已有多个冻结程序的真实协议/离屏/部分原生分项收据，范围不能互相转移。",
@@ -382,7 +411,25 @@
         "sidechat",
         "summary",
         "process"
-      ]
+      ],
+      "progress": {
+        "date": "2026-10-24",
+        "evidence": [
+          "docs/rust-agent-ui-acceptance-matrix-20261024.md",
+          "docs/rust-agent-ui-non-desktop-results-20261024.md"
+        ],
+        "verified": [
+          "720格需求/三端/拓扑/分层矩阵，15项校验回归",
+          "矩阵默认/本地证据哈希检查、92项Python测试",
+          "8335231冻结程序三端协议/离屏与Native有界、Native/Pi SideChat专项"
+        ],
+        "notVerified": [
+          "系统 IME/VoiceOver/原生窗口与配对布局",
+          "阅读追加/分页锚点完整验收",
+          "ProcessContainer同/跨进程",
+          "DSH完整SideChat（当前仅正确禁用）"
+        ]
+      }
     },
     {
       "key": "release",

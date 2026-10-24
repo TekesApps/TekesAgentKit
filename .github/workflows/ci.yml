@@ -23,6 +23,8 @@ jobs:
         with:
           python-version: "3.12"
       - run: python3 scripts/check-ui-boundaries.py
+      - name: Validate acceptance records (does not waive failed gates)
+        run: python3 scripts/check-agent-ui-acceptance-matrix.py
       - run: python3 -m unittest discover -s scripts/tests -v
   ui-consumer:
     name: Rust UI consumer (no native interaction)
@@ -44,6 +46,14 @@ jobs:
       - run: cargo fmt --manifest-path ui/Cargo.toml --all --check
       - run: cargo clippy --manifest-path ui/Cargo.toml --workspace --all-targets --locked -- -D warnings
       - run: cargo test --manifest-path ui/Cargo.toml --workspace --locked
+      - name: Run standalone public API consumer (no native window)
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/ui/target
+        run: |
+          python3 scripts/check-public-agent-ui-consumer.py --output "$RUNNER_TEMP/agentkit-public-consumer" > "$RUNNER_TEMP/agentkit-public-consumer-prepare.json"
+          cp "$RUNNER_TEMP/agentkit-public-consumer/Cargo.lock.seed" "$RUNNER_TEMP/agentkit-public-consumer/Cargo.lock"
+          cargo generate-lockfile --manifest-path "$RUNNER_TEMP/agentkit-public-consumer/Cargo.toml" --offline
+          cargo run --manifest-path "$RUNNER_TEMP/agentkit-public-consumer/Cargo.toml" --locked --offline
       - name: Verify nested detail reading intent (strict; no native window)
         run: cargo run --manifest-path ui/Cargo.toml --locked -p tekes-agent-ui-consumer-check --example bounded_detail_reading > "$RUNNER_TEMP/agentkit-nested-detail-reading.json"
       - run: cargo build --manifest-path ui/Cargo.toml --locked -p tekes-agent-ui-demo
@@ -55,4 +65,9 @@ jobs:
             ${{ runner.temp }}/agentkit-ui-inputs.json
             ${{ runner.temp }}/agentkit-ui-metadata.json
             ${{ runner.temp }}/agentkit-nested-detail-reading.json
+            ${{ runner.temp }}/agentkit-public-consumer-prepare.json
+            ${{ runner.temp }}/agentkit-public-consumer/Cargo.toml
+            ${{ runner.temp }}/agentkit-public-consumer/Cargo.lock.seed
+            ${{ runner.temp }}/agentkit-public-consumer/Cargo.lock
+            ${{ runner.temp }}/agentkit-public-consumer/src/main.rs
           if-no-files-found: warn

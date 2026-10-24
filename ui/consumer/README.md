@@ -1,5 +1,8 @@
 # Standalone public Agent UI consumer
 
+Toolchain: Rust `1.95.0` and Python `3.11+` (`3.12` used for this audit). In the commands below,
+`python3` must select that interpreter; the older macOS system Python does not provide `tomllib`.
+
 This fixture is a separate Cargo package that exercises the component crate's public constructors
 without importing `tekes-agent-ui-consumer-check`, `RunSurface`, or `ComponentDemo`. It demonstrates
 mounting the current experimental `RunPort`, `Sidebar`, and `SidePanel` APIs in a TekesUI

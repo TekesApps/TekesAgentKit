@@ -1,4 +1,5 @@
 import json
+import importlib.util
 from pathlib import Path
 import subprocess
 import sys
@@ -44,6 +45,37 @@ class PublicAgentUiConsumerTests(unittest.TestCase):
             self.assertIn("path = ", manifest)
             self.assertIn("[[package]]", seed)
             self.assertIn("[workspace]", manifest)
+
+    def test_workspace_manifests_change_provenance_and_report_dirty_state(self):
+        spec = importlib.util.spec_from_file_location("public_consumer", SCRIPT)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _, inputs, _ = module.source_fingerprint(ROOT)
+        with tempfile.TemporaryDirectory(prefix="agentkit-consumer-source-") as directory:
+            root = Path(directory)
+            for name in inputs:
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes((ROOT / name).read_bytes())
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+            subprocess.run([
+                "git", "-C", str(root), "-c", "commit.gpgsign=false",
+                "-c", "core.hooksPath=/dev/null", "-c", "user.name=consumer-test",
+                "-c", "user.email=consumer-test@example.invalid", "commit", "-qm", "fixture",
+            ], check=True)
+            original, names, status = module.source_fingerprint(root)
+            self.assertEqual(status, "")
+            self.assertIn("Cargo.toml", names)
+            self.assertIn("ui/Cargo.toml", names)
+            for name in ["Cargo.toml", "ui/Cargo.toml"]:
+                path = root / name
+                before = path.read_bytes()
+                path.write_bytes(before + b"\n# changed dependency declaration\n")
+                changed, _, status = module.source_fingerprint(root)
+                self.assertNotEqual(original, changed)
+                self.assertIn(name, status)
+                path.write_bytes(before)
 
     def test_refuses_overwriting_fixture_with_different_content(self):
         with tempfile.TemporaryDirectory(prefix="agentkit-public-consumer-") as directory:

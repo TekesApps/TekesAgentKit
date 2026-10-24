@@ -118,8 +118,8 @@ This proves independent compile and constructor/ContentHost execution against th
 closure. It does not prove a rendered/native window, ProcessContainer same-/cross-process behavior,
 IME/accessibility, or complete ClientKit View parity.
 
-The fixture generator is `scripts/check-public-agent-ui-consumer.py`; its two Python tests confirm
-it prepares a direct external package without invoking Cargo and refuses to overwrite unrelated WIP.
+The fixture generator is `scripts/check-public-agent-ui-consumer.py`; its three Python tests confirm
+it prepares a direct external package without invoking Cargo and refuses to overwrite unrelated WIP and includes both workspace manifests in source provenance.
 
 ## Remaining work for #15
 
