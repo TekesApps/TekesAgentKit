@@ -9,12 +9,12 @@
       "implemented": [
         "Rust-only 根契约/SessionEndpointRegistry、RunScope 和 presentation 已建立；已发布基线 v0.3.8，UI 增量仍未发布。",
         "三 SEP 已有 pointer/locator、历史恢复、只读文件和能力矩阵；本地与远端 cache 策略独立。",
-        "已提供 RunPort、Sidebar、SidePanel、显式宿主回调、第二公开 consumer 和 UI 边界检查。"
+        "已提供 RunPort、Sidebar、SidePanel、显式宿主回调、第二公开 consumer 和 UI 边界检查。",
+        "逐项核对公开类型、RunView→RunPort 命名、组件所有权与状态/事件输入。",
+        "修正过期状态说明；将文档示例与真实公开 API 对照，保留显式开发依赖与正式精确 pin 的区别。"
       ],
       "remaining": [
-        "逐项核对公开类型、RunView→RunPort 命名、组件所有权与状态/事件输入。",
-        "为最终接入 revision 固定 AgentKit/TekesUI 闭包，核对安装、路径、模型/附件/设置等宿主职责。",
-        "修正过期状态说明；将文档示例与真实公开 API 对照，保留显式开发依赖与正式精确 pin 的区别。"
+        "为最终接入 revision 固定 AgentKit/TekesUI 闭包，核对安装、路径、模型/附件/设置等宿主职责。"
       ],
       "acceptance": [
         "干净外部 consumer 仅使用公开 API，构造三个业务组件；不依赖 RunSurface/ComponentDemo。",
@@ -24,7 +24,8 @@
       "evidence": [
         "docs/session-endpoints.md",
         "docs/rust-agent-ui-host-integration.md",
-        "docs/rust-agent-ui-contract.md"
+        "docs/rust-agent-ui-contract.md",
+        "docs/rust-agent-ui-ci-review-20261024.md"
       ],
       "dependencies": [
         "TekesUI#64"
@@ -36,7 +37,8 @@
         "verified": [
           "独立 package 三组件构造和 ContentHost 挂载，exit 0",
           "实际5个本地包+6个SDK包，243个审查输入与131个源码/Cargo输入核验",
-          "生成器3项回归（含工作区manifest）、静态依赖边界"
+          "生成器3项回归（含工作区manifest）、静态依赖边界",
+          "32986d4 PR/push CI：新增独立consumer及UI workspace测试通过；严格#53仍失败"
         ],
         "notVerified": [
           "正式 AgentKit UI 发布",
@@ -402,7 +404,8 @@
         "docs/session-endpoints.md",
         "docs/rust-agent-ui-non-sdk-review-20261023.md",
         "docs/rust-agent-ui-native-toolchain.md",
-        "docs/rust-agent-ui-offscreen-coverage-20261023.md"
+        "docs/rust-agent-ui-offscreen-coverage-20261023.md",
+        "docs/rust-agent-ui-ci-review-20261024.md"
       ],
       "dependencies": [
         "runport",
@@ -421,7 +424,8 @@
         "verified": [
           "720格需求/三端/拓扑/分层矩阵，15项校验回归",
           "矩阵默认/本地证据哈希检查、92项Python测试",
-          "8335231冻结程序三端协议/离屏与Native有界、Native/Pi SideChat专项"
+          "8335231冻结程序三端协议/离屏与Native有界、Native/Pi SideChat专项",
+          "32986d4 PR/push CI：新增独立consumer及UI workspace测试通过；严格#53仍失败"
         ],
         "notVerified": [
           "系统 IME/VoiceOver/原生窗口与配对布局",
@@ -453,7 +457,8 @@
       "evidence": [
         "docs/rust-agent-ui-delivery-status.md",
         "docs/rust-agent-ui-non-sdk-review-20261023.md",
-        "docs/rust-agent-ui-source-authority.md"
+        "docs/rust-agent-ui-source-authority.md",
+        "docs/rust-agent-ui-ci-review-20261024.md"
       ],
       "dependencies": [
         "contract",

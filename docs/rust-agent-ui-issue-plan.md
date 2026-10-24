@@ -52,19 +52,21 @@
 
 待做：
 
-- [ ] 逐项核对公开类型、RunView→RunPort 命名、组件所有权与状态/事件输入。
+- [x] 逐项核对公开类型、RunView→RunPort 命名、组件所有权与状态/事件输入。
 - [ ] 为最终接入 revision 固定 AgentKit/TekesUI 闭包，核对安装、路径、模型/附件/设置等宿主职责。
-- [ ] 修正过期状态说明；将文档示例与真实公开 API 对照，保留显式开发依赖与正式精确 pin 的区别。
+- [x] 修正过期状态说明；将文档示例与真实公开 API 对照，保留显式开发依赖与正式精确 pin 的区别。
 
 验收：
 
-- [ ] 干净外部 consumer 仅使用公开 API，构造三个业务组件；不依赖 RunSurface/ComponentDemo。
-- [ ] 文档列明版本、所有权、状态输入、事件回调、焦点/IME/滚动责任及迁移。
+- [x] 干净外部 consumer 仅使用公开 API，构造三个业务组件；不依赖 RunSurface/ComponentDemo。
+- [x] 文档列明版本、所有权、状态输入、事件回调、焦点/IME/滚动责任及迁移。
 - [ ] 共享包+Rust demo+第二 consumer 适用检查通过；没有 Swift、私有 SDK 或新状态机。
 
 证据：[session-endpoints.md](session-endpoints.md)、[rust-agent-ui-host-integration.md](rust-agent-ui-host-integration.md)、[rust-agent-ui-contract.md](rust-agent-ui-contract.md)。
 
 本轮推进：本轮实现 `8335231`：公开构造与宿主状态/回调审计、独立 package 实际构造/挂载三组件、依赖/源码身份核验已完成。详见[契约审计](rust-agent-ui-api-contract-audit-20261024.md)。不代表正式 UI 发布或原生/ProcessContainer 通过。
+
+本次 CI 复核：`32986d4` 的 PR/push 两套新增独立 consumer 均成功；UI 测试、格式和 Clippy 成功，整体仍在 #53 严格阅读失败。见[CI 收据](rust-agent-ui-ci-review-20261024.md)。
 
 ### [#16](https://github.com/TekesApps/TekesAgentKit/issues/16) — [P1][Composer] 输入面、草稿与发送取消对齐 ClientKit
 

@@ -1,0 +1,180 @@
+{
+  "kind": "agentkit-pr10-ui-ci-review",
+  "date": "2026-10-24",
+  "issue_numbers": [
+    15,
+    18,
+    27,
+    28
+  ],
+  "runs": [
+    {
+      "run_id": "40044117789",
+      "url": "https://github.com/TekesApps/TekesAgentKit/actions/runs/40044117789",
+      "event": "pull_request",
+      "head_sha": "32986d4d000ac1fa4470029e42a44c1878b70fd9",
+      "checkout_sha": "35969c3639582d870d5724de052ec144d8eaaeb2",
+      "conclusion": "failure",
+      "ui_steps": [
+        {
+          "name": "Resolve and verify the compiled public pin",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run cargo fmt --manifest-path ui/Cargo.toml --all --check",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run cargo clippy --manifest-path ui/Cargo.toml --workspace --all-targets --locked -- -D warnings",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run cargo test --manifest-path ui/Cargo.toml --workspace --locked",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run standalone public API consumer (no native window)",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify nested detail reading intent (strict; no native window)",
+          "conclusion": "failure"
+        },
+        {
+          "name": "Run cargo build --manifest-path ui/Cargo.toml --locked -p tekes-agent-ui-demo",
+          "conclusion": "skipped"
+        }
+      ],
+      "strict_reading": {
+        "accepted": false,
+        "parentFollowingAfterInnerUp": true,
+        "parentOffsetBefore": 0,
+        "parentOffsetAfterScroll": 0,
+        "parentOffsetAfterAppend": 634,
+        "innerOffset": 100,
+        "detailVisibleAfterAppend": false
+      },
+      "artifacts": [
+        {
+          "path": ".runtime-fixtures/issue-batch-20261024/ci-40044117789/agentkit-nested-detail-reading.json",
+          "sha256": "c4f70b29538ecacd71995d9a3fc7678cf168834c54e6f348c8c095309b9f1b90"
+        },
+        {
+          "path": ".runtime-fixtures/issue-batch-20261024/ci-40044117789/agentkit-public-consumer/Cargo.lock",
+          "sha256": "2c64ec1c18e60040563bdd632e6a903aa16c171510bda31dd6274ae5354b8dd5"
+        },
+        {
+          "path": ".runtime-fixtures/issue-batch-20261024/ci-40044117789/agentkit-public-consumer/Cargo.lock.seed",
+          "sha256": "8790cacd3395460c518f71240052a0bde27a25dbe7e18acda12753c53653d9d1"
+        },
+        {
+          "path": ".runtime-fixtures/issue-batch-20261024/ci-40044117789/agentkit-public-consumer/Cargo.toml",
+          "sha256": "a9a03cf3feda204459209d66372eb82c7c957907c85f63f99d9d33a6c8e4f540"
+        },
+        {
+          "path": ".runtime-fixtures/issue-batch-20261024/ci-40044117789/agentkit-public-consumer/src/main.rs",
+          "sha256": "d829c664f9cf659002472bc57aa0902a983341048722d4b90e1205d0cbdc66dd"
+        },
+        {
+          "path": ".runtime-fixtures/issue-batch-20261024/ci-40044117789/agentkit-public-consumer-prepare.json",
+          "sha256": "57b14fbdce835f8ca350c97054654d56deab0ba0f4ec401b2d6d2d9365e8067e"
+        },
+        {
+          "path": ".runtime-fixtures/issue-batch-20261024/ci-40044117789/agentkit-ui-inputs.json",
+          "sha256": "9543ade335292f9c7f61944edd341c2fb9297a7c6abc3cf44dc86c1f16bd6ee3"
+        },
+        {
+          "path": ".runtime-fixtures/issue-batch-20261024/ci-40044117789/agentkit-ui-metadata.json",
+          "sha256": "94b3666be07bf8d96a0aa507158b89315036834fa6150b0e9cfb010ea4907e69"
+        }
+      ]
+    },
+    {
+      "run_id": "40044114325",
+      "url": "https://github.com/TekesApps/TekesAgentKit/actions/runs/40044114325",
+      "event": "push",
+      "head_sha": "32986d4d000ac1fa4470029e42a44c1878b70fd9",
+      "checkout_sha": "32986d4d000ac1fa4470029e42a44c1878b70fd9",
+      "conclusion": "failure",
+      "ui_steps": [
+        {
+          "name": "Resolve and verify the compiled public pin",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run cargo fmt --manifest-path ui/Cargo.toml --all --check",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run cargo clippy --manifest-path ui/Cargo.toml --workspace --all-targets --locked -- -D warnings",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run cargo test --manifest-path ui/Cargo.toml --workspace --locked",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run standalone public API consumer (no native window)",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify nested detail reading intent (strict; no native window)",
+          "conclusion": "failure"
+        },
+        {
+          "name": "Run cargo build --manifest-path ui/Cargo.toml --locked -p tekes-agent-ui-demo",
+          "conclusion": "skipped"
+        }
+      ],
+      "strict_reading": {
+        "accepted": false,
+        "parentFollowingAfterInnerUp": true,
+        "parentOffsetBefore": 0,
+        "parentOffsetAfterScroll": 0,
+        "parentOffsetAfterAppend": 634,
+        "innerOffset": 100,
+        "detailVisibleAfterAppend": false
+      },
+      "artifacts": [
+        {
+          "path": ".runtime-fixtures/issue-batch-20261024/ci-40044114325/agentkit-nested-detail-reading.json",
+          "sha256": "c4f70b29538ecacd71995d9a3fc7678cf168834c54e6f348c8c095309b9f1b90"
+        },
+        {
+          "path": ".runtime-fixtures/issue-batch-20261024/ci-40044114325/agentkit-public-consumer/Cargo.lock",
+          "sha256": "2c64ec1c18e60040563bdd632e6a903aa16c171510bda31dd6274ae5354b8dd5"
+        },
+        {
+          "path": ".runtime-fixtures/issue-batch-20261024/ci-40044114325/agentkit-public-consumer/Cargo.lock.seed",
+          "sha256": "8790cacd3395460c518f71240052a0bde27a25dbe7e18acda12753c53653d9d1"
+        },
+        {
+          "path": ".runtime-fixtures/issue-batch-20261024/ci-40044114325/agentkit-public-consumer/Cargo.toml",
+          "sha256": "a9a03cf3feda204459209d66372eb82c7c957907c85f63f99d9d33a6c8e4f540"
+        },
+        {
+          "path": ".runtime-fixtures/issue-batch-20261024/ci-40044114325/agentkit-public-consumer/src/main.rs",
+          "sha256": "d829c664f9cf659002472bc57aa0902a983341048722d4b90e1205d0cbdc66dd"
+        },
+        {
+          "path": ".runtime-fixtures/issue-batch-20261024/ci-40044114325/agentkit-public-consumer-prepare.json",
+          "sha256": "2de458ddbab348998ae919c295db23172e3cdb5d61afe75ba6e520dbb58bfa40"
+        },
+        {
+          "path": ".runtime-fixtures/issue-batch-20261024/ci-40044114325/agentkit-ui-inputs.json",
+          "sha256": "9543ade335292f9c7f61944edd341c2fb9297a7c6abc3cf44dc86c1f16bd6ee3"
+        },
+        {
+          "path": ".runtime-fixtures/issue-batch-20261024/ci-40044114325/agentkit-ui-metadata.json",
+          "sha256": "94b3666be07bf8d96a0aa507158b89315036834fa6150b0e9cfb010ea4907e69"
+        }
+      ]
+    }
+  ],
+  "new_standalone_consumer_passed_both": true,
+  "introduced_failure_found": false,
+  "known_blocker": "TekesUI#53",
+  "desktop_acceptance": "not_run",
+  "merge_ready": false,
+  "scope": "Constructor/update/ContentHost public consumer; does not prove rendering, system IME or behavior parity. PR uses synthetic merge checkout; push uses actual head."
+}
