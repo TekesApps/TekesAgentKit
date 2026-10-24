@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use futures_util::{StreamExt, stream};
 use serde_json::{Value, json};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, VecDeque},
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -27,6 +27,9 @@ const READ_ONLY_CHILD: &str = "50000000-0000-4000-8000-000000000005";
 struct Fixture {
     inventory: Arc<Mutex<Option<mpsc::UnboundedSender<Value>>>>,
     journals: Arc<Mutex<BTreeMap<String, mpsc::UnboundedSender<Value>>>>,
+    bounded_pages: Arc<Mutex<VecDeque<Value>>>,
+    bounded_requests: Arc<Mutex<Vec<BoundedChildHistoryRequest>>>,
+    bounded_gate: Arc<Mutex<Option<Arc<BoundedReadGate>>>>,
 }
 
 struct Endpoint {
@@ -59,7 +62,7 @@ impl SessionEndpoint for Endpoint {
         &self.host
     }
     fn capabilities(&self) -> EndpointCapabilities {
-        EndpointCapabilities::methods(&["session.prompt"])
+        EndpointCapabilities::methods(&["session.prompt", "subagents.history"])
     }
     async fn follow(&self, target: StreamTarget) -> Result<FrameStream> {
         let journal_id = match &target {
@@ -123,7 +126,27 @@ impl SessionEndpoint for Endpoint {
     async fn respond(&self, _: &str, _: i64, _: Value) -> Result<()> {
         Ok(())
     }
-    async fn call(&self, _: &str, _: Value, _: &str) -> Result<Value> {
+    async fn call(&self, method: &str, payload: Value, _: &str) -> Result<Value> {
+        if method == "subagents.history" {
+            let request: BoundedChildHistoryRequest = serde_json::from_value(payload)?;
+            self.fixture.bounded_requests.lock().unwrap().push(request);
+            let page = self
+                .fixture
+                .bounded_pages
+                .lock()
+                .unwrap()
+                .pop_front()
+                .ok_or_else(|| Error::Protocol("unexpected bounded fixture read".into()))?;
+            let gate = self.fixture.bounded_gate.lock().unwrap().take();
+            if let Some(gate) = gate {
+                gate.entered.notify_one();
+                gate.release.notified().await;
+            }
+            if page["error"] == true {
+                return Err(Error::Remote(json!({"code":"history-stale"})));
+            }
+            return Ok(page);
+        }
         Ok(json!({"accepted":true}))
     }
     async fn close(&self) {}
@@ -324,4 +347,240 @@ async fn pane_witness_preserves_original_projection_failure() {
     assert!(!witness.projection_succeeded());
     assert!(witness.snapshot().transcript.is_stale);
     assert!(!witness.snapshot().can_submit);
+}
+
+#[derive(Default)]
+struct BoundedReadGate {
+    entered: tokio::sync::Notify,
+    release: tokio::sync::Notify,
+}
+fn bounded_page(phase: &str) -> Value {
+    json!({
+        "parentSessionId":THREAD,"childSessionId":READ_ONLY_CHILD,
+        "throughSequence":0,"historyRevision":"a".repeat(64),
+        "entries":[{"event":{"seq":0,"time":1,"type":"assistant/message","data":{
+            "turn":7,"step":1,"message":{"id":"bounded-original-message","content":[{"type":"text","text":"只读子历史"}]}
+        }}}],
+        "hasMoreBefore":false,"runOpen":false,
+        "sourceCall":{"callId":"original-bounded-call","name":"task","arguments":{"task_name":"只读来源"},"phase":phase}
+    })
+}
+
+#[tokio::test]
+async fn bounded_pane_witness_is_the_original_read_and_component_publication() {
+    use tekes_agent_ui_bindings::PaneSnapshot;
+    let (fixture, runtime, root) = setup().await;
+    root.edit_text(&ComposerDestination::run(main_scope()), "验收父草稿".into())
+        .unwrap();
+    fixture.bounded_pages.lock().unwrap().extend([
+        bounded_page("running"),
+        bounded_page("running"),
+        bounded_page("error"),
+        bounded_page("stopped"),
+    ]);
+    let child = ChildPaneBinding::for_run(
+        &root,
+        READ_ONLY_CHILD,
+        ChildHistoryLayout::SameSession,
+        None,
+    )
+    .await
+    .unwrap();
+    let before = child.snapshot().await.unwrap();
+    let PaneSnapshot::ReadOnlyChild {
+        source: original_source,
+        publication: before_publication,
+        ..
+    } = &before
+    else {
+        panic!("readonly source")
+    };
+    let requests_before = fixture.bounded_requests.lock().unwrap().len();
+    let witness = child
+        .binding()
+        .snapshot_with_bounded_source_witness()
+        .await
+        .unwrap();
+    assert_eq!(
+        fixture.bounded_requests.lock().unwrap().len(),
+        requests_before + 1,
+        "witness cannot perform a second history query"
+    );
+    let PaneSnapshot::ReadOnlyChild {
+        source,
+        scope,
+        publication,
+        connection_epoch,
+        transcript,
+        ..
+    } = &witness.snapshot
+    else {
+        panic!("original readonly publication")
+    };
+    assert_eq!(source, original_source);
+    assert_eq!(scope, &nested_scope(READ_ONLY_CHILD));
+    assert_eq!(*publication, before_publication + 1);
+    assert!(*connection_epoch > 0);
+    assert_eq!(transcript.turns[0].status, "error");
+    assert_eq!(transcript.tools[0].phase, "error");
+    assert_eq!(transcript.items[0].text, "只读子历史");
+    assert_eq!(witness.source.parent_scope, main_scope());
+    assert_eq!(witness.source.child_id, READ_ONLY_CHILD);
+    assert_eq!(witness.source.page_size, 50);
+    assert_eq!(
+        witness.source.raw_head.source_call.as_ref().unwrap()["phase"],
+        "error"
+    );
+    assert_eq!(
+        witness.source.raw_head.source_call.as_ref().unwrap()["arguments"],
+        json!({"task_name":"只读来源"})
+    );
+    let input = child
+        .readonly_input(&witness.snapshot, false, None)
+        .unwrap();
+    assert_eq!(input.publication, *publication);
+    assert!(
+        std::ptr::eq(input.transcript, transcript),
+        "component input must borrow this returned publication"
+    );
+    assert!(child.binding().current_run().is_none());
+    assert!(
+        child.binding().refresh_with_source_witness().is_err(),
+        "controller witness must still reject readonly sources"
+    );
+    let next = child.snapshot().await.unwrap();
+    let PaneSnapshot::ReadOnlyChild {
+        publication: next_publication,
+        transcript: next_transcript,
+        ..
+    } = next
+    else {
+        panic!("ordinary readonly read")
+    };
+    assert_eq!(next_publication, publication + 1);
+    assert_eq!(next_transcript.turns[0].status, "aborted");
+    assert_eq!(root.current_run().unwrap().draft.text, "验收父草稿");
+    assert!(fixture.bounded_pages.lock().unwrap().is_empty());
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn bounded_pane_witness_rejects_wrong_source_and_retired_pane_without_io() {
+    let (fixture, runtime, root) = setup().await;
+    assert!(root.snapshot_with_bounded_source_witness().await.is_err());
+    let independent =
+        ChildPaneBinding::for_run(&root, CHILD, ChildHistoryLayout::IndependentSessions, None)
+            .await
+            .unwrap();
+    assert!(
+        independent
+            .binding()
+            .snapshot_with_bounded_source_witness()
+            .await
+            .is_err()
+    );
+    let custom = ChildPaneBinding::for_run(
+        &root,
+        READ_ONLY_CHILD,
+        ChildHistoryLayout::SameSession,
+        Some(Arc::new(EmptyChildSource)),
+    )
+    .await
+    .unwrap();
+    assert!(
+        custom
+            .binding()
+            .snapshot_with_bounded_source_witness()
+            .await
+            .is_err()
+    );
+    fixture
+        .bounded_pages
+        .lock()
+        .unwrap()
+        .push_back(bounded_page("done"));
+    let builtin = ChildPaneBinding::for_run(
+        &root,
+        READ_ONLY_CHILD,
+        ChildHistoryLayout::SameSession,
+        None,
+    )
+    .await
+    .unwrap();
+    let calls = fixture.bounded_requests.lock().unwrap().len();
+    builtin.retire();
+    assert!(
+        builtin
+            .binding()
+            .snapshot_with_bounded_source_witness()
+            .await
+            .is_err()
+    );
+    assert_eq!(fixture.bounded_requests.lock().unwrap().len(), calls);
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn bounded_pane_witness_cannot_publish_after_retirement_during_read() {
+    let (fixture, runtime, root) = setup().await;
+    fixture
+        .bounded_pages
+        .lock()
+        .unwrap()
+        .extend([bounded_page("running"), bounded_page("error")]);
+    let child = Arc::new(
+        ChildPaneBinding::for_run(
+            &root,
+            READ_ONLY_CHILD,
+            ChildHistoryLayout::SameSession,
+            None,
+        )
+        .await
+        .unwrap(),
+    );
+    let gate = Arc::new(BoundedReadGate::default());
+    *fixture.bounded_gate.lock().unwrap() = Some(gate.clone());
+    let binding = child.binding().clone();
+    let pending = tokio::spawn(async move { binding.snapshot_with_bounded_source_witness().await });
+    tokio::time::timeout(Duration::from_secs(2), gate.entered.notified())
+        .await
+        .unwrap();
+    child.retire();
+    gate.release.notify_one();
+    assert!(
+        tokio::time::timeout(Duration::from_secs(2), pending)
+            .await
+            .unwrap()
+            .unwrap()
+            .is_err()
+    );
+    assert_eq!(child.binding().access(), PaneAccess::Missing);
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn bounded_pane_witness_rejects_read_error_instead_of_reusing_previous_head() {
+    let (fixture, runtime, root) = setup().await;
+    fixture
+        .bounded_pages
+        .lock()
+        .unwrap()
+        .extend([bounded_page("done"), json!({"error":true})]);
+    let child = ChildPaneBinding::for_run(
+        &root,
+        READ_ONLY_CHILD,
+        ChildHistoryLayout::SameSession,
+        None,
+    )
+    .await
+    .unwrap();
+    assert!(
+        child
+            .binding()
+            .snapshot_with_bounded_source_witness()
+            .await
+            .is_err()
+    );
+    assert!(fixture.bounded_pages.lock().unwrap().is_empty());
+    runtime.stop().await.unwrap();
 }

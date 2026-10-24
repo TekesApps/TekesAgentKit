@@ -558,3 +558,7 @@ Native后续切片：复用既有feature headless与已安装Kernel0.9.3，真�
 ### #17 / #23：Native 有界 Task-source 错误/取消
 
 [本轮结果](rust-agent-ui-native-bounded-terminal-results-20261024.md)按已发布Kernel0.9.3原reader修正sourceCall.error/stopped被合成turn误标completed，现为error/aborted；原tool.phase、身份/参数和历史不变，未知fallback兼容。新worker公开ChildRun回归原2红，主会话修复后通过；Root373、feature281、UI757/0/1、严格检查、两种demo构建及137文件独立public consumer执行通过。真实Native原pane来源转换见证仍待下一切片，不把公开fixture当真实协议/桌面验收；相关Issue与#53仍开放，不合并发布。全部复用SSDtarget，删除0字节。
+
+### #17 / #23：原有界head-only来源与原publication接口
+
+[本轮结果](rust-agent-ui-native-bounded-head-witness-results-20261024.md)在默认关闭feature内复用原bounded读取/投影及绑定snapshot路径，保存未聚合typed head，拒绝把累计旧页/增量伪装成head。原source/pub/epoch/权限共用，普通refresh无新增全量历史复制、不清缓存。新presentation6、bindings新增4、Root373/feature287、UI757/0/1、feature652、严格检查/两配置demo构建/独立公开consumer通过。20b4与9039两轮CI原证据已核对，opt-in/consumer绿、唯一#53红。实际Native同原pane运行→失败仍待后续demo/owned Kernel闭环，累计分页来源与桌面等仍not_run，不关闭Issue、不合并发布。

@@ -1,6 +1,8 @@
 use crate::RunScope;
 use serde::{Deserialize, Serialize};
 use tekes_agent_contract::SubagentCatalog;
+#[cfg(feature = "acceptance-source-witness")]
+use tekes_agent_contract::{BoundedChildHistoryPage, BoundedChildHistoryRequest};
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum ChildComposerAvailability {
@@ -98,6 +100,21 @@ pub trait ChildHistorySource: Send + Sync {
         parent: &RunScope,
         child: &str,
     ) -> tekes_agent_contract::Result<crate::TranscriptSnapshot>;
+}
+
+/// Read-only evidence tying a native same-session child transcript to the exact bounded head
+/// response used for its projection. This proves the local read only, not server transactionality.
+#[cfg(feature = "acceptance-source-witness")]
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BoundedChildSourceWitness {
+    pub parent_scope: RunScope,
+    pub child_id: String,
+    pub page_size: usize,
+    pub head_request: BoundedChildHistoryRequest,
+    pub raw_head: BoundedChildHistoryPage,
+    pub evidence_scope: &'static str,
+    pub server_transactional_freshness_proven: bool,
 }
 
 /// One mounted child run owns a history lease. Same-session lines require an explicit projection
@@ -198,6 +215,19 @@ impl ChildRun {
                 crate::ConnectionPresentation::read(s, Some(&self.child), false).history_is_stale;
             Ok(snapshot)
         })
+    }
+    /// Refresh and project a bounded Native same-session head while retaining the typed response
+    /// from that exact read. Custom and independent history sources have distinct ownership.
+    #[cfg(feature = "acceptance-source-witness")]
+    pub async fn transcript_with_bounded_source_witness(
+        &self,
+    ) -> tekes_agent_contract::Result<(crate::TranscriptSnapshot, BoundedChildSourceWitness)> {
+        let bounded = self.bounded.as_ref().ok_or_else(|| {
+            tekes_agent_contract::unsupported(
+                "bounded source witness requires built-in same-session history",
+            )
+        })?;
+        bounded.lock().await.refresh_with_source_witness().await
     }
     pub async fn load_earlier(&self) -> tekes_agent_contract::Result<bool> {
         if let Some(bounded) = &self.bounded {

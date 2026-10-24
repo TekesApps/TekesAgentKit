@@ -22,3 +22,5 @@
 `.runtime-fixtures/native-bounded-terminal-20261024/` 保留原Kernel参考文本、失败程序/日志、最终2文件哈希及程序、测试/构建/consumer日志、固定锁与输入，见[机器收据](rust-agent-ui-native-bounded-terminal-results-20261024.json)。Cargo串行复用SSD shared-target，无新target、删除0字节；源码、WIP、验收程序和现用缓存保留。
 
 本轮没有真实Native同一原pane的running→failed来源捕获，也没有桌面/物理IME/OS AX/ProcessContainer或完整ClientKit验收。前轮Pi/DSH actual child pane证明自己的路径，不能替代Native。下一切片在原有界读取及原publication上补只读来源见证，避免二次查询拼帧。#17/#23保持open，#53严格嵌套阅读仍未通过；新head CI另验，不合并/打tag/发布。
+
+9039d5f CI终态补录：push40105849539、PR40105854722的checks、bindings/demo opt-in与独立consumer通过，唯一失败仍#53严格阅读，CI demo跳过。两份原日志/artifact、137/243闭包和PR merge父关系已核对；不能代替后续head来源见证CI。

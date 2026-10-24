@@ -10,6 +10,8 @@ pub(crate) struct BoundedHistory {
     page_size: usize,
     page: BoundedChildHistoryPage,
     entries: BTreeMap<i64, HistoryEntry>,
+    #[cfg(feature = "acceptance-source-witness")]
+    latest_head: Option<(BoundedChildHistoryRequest, BoundedChildHistoryPage)>,
 }
 impl BoundedHistory {
     pub(crate) async fn open(
@@ -18,9 +20,10 @@ impl BoundedHistory {
         child: String,
         page_size: usize,
     ) -> Result<Self> {
-        let page = runtime
-            .bounded_child_history(Self::request(&parent, &child, None, None, None, page_size))
-            .await?;
+        let head_request = Self::request(&parent, &child, None, None, None, page_size);
+        #[cfg(feature = "acceptance-source-witness")]
+        let initial_head_request = head_request.clone();
+        let page = runtime.bounded_child_history(head_request).await?;
         let entries = page
             .entries
             .iter()
@@ -31,6 +34,8 @@ impl BoundedHistory {
             parent,
             child,
             page_size,
+            #[cfg(feature = "acceptance-source-witness")]
+            latest_head: Some((initial_head_request, page.clone())),
             page,
             entries,
         })
@@ -53,18 +58,45 @@ impl BoundedHistory {
         }
     }
     pub(crate) async fn refresh(&mut self) -> Result<TranscriptSnapshot> {
+        #[cfg(feature = "acceptance-source-witness")]
+        let snapshot = self.refresh_inner(false).await?;
+        #[cfg(not(feature = "acceptance-source-witness"))]
+        let snapshot = self.refresh_inner().await?;
+        Ok(snapshot)
+    }
+
+    #[cfg(feature = "acceptance-source-witness")]
+    pub(crate) async fn refresh_with_source_witness(
+        &mut self,
+    ) -> Result<(TranscriptSnapshot, crate::BoundedChildSourceWitness)> {
+        let snapshot = self.refresh_inner(true).await?;
+        let (head_request, raw_head) = self.latest_head.clone().ok_or_else(|| {
+            Error::Protocol("bounded head source witness was not retained".into())
+        })?;
+        Ok((
+            snapshot,
+            crate::BoundedChildSourceWitness {
+                parent_scope: self.parent.clone(),
+                child_id: self.child.clone(),
+                page_size: self.page_size,
+                head_request,
+                raw_head,
+                evidence_scope: "built-in-bounded-head-only-same-local-read",
+                server_transactional_freshness_proven: false,
+            },
+        ))
+    }
+
+    async fn refresh_inner(
+        &mut self,
+        #[cfg(feature = "acceptance-source-witness")] require_head_only: bool,
+    ) -> Result<TranscriptSnapshot> {
         let epoch = self.runtime.inspect(|s| s.connection_epoch);
-        let next = self
-            .runtime
-            .bounded_child_history(Self::request(
-                &self.parent,
-                &self.child,
-                None,
-                None,
-                None,
-                self.page_size,
-            ))
-            .await?;
+        let head_request =
+            Self::request(&self.parent, &self.child, None, None, None, self.page_size);
+        #[cfg(feature = "acceptance-source-witness")]
+        let original_head_request = head_request.clone();
+        let next = self.runtime.bounded_child_history(head_request).await?;
         // Retain loaded older pages only after the server re-verifies the previous frozen prefix.
         let same = self.page.through_sequence == next.through_sequence
             && self.page.history_revision == next.history_revision;
@@ -112,14 +144,41 @@ impl BoundedHistory {
         } else {
             next.has_more_before
         };
+        #[cfg(feature = "acceptance-source-witness")]
+        if require_head_only {
+            // New head rows overwrite every overlap during the original merge.
+            // Extra retained keys are the only possible rows outside that head.
+            // Validate without cloning the accumulated history on normal reads.
+            let has_extra_retained_rows = prefix_preserved
+                && self.entries.keys().any(|sequence| {
+                    next.entries
+                        .binary_search_by_key(sequence, |entry| entry.event.seq)
+                        .is_err()
+                });
+            if has_extra_retained_rows || more != next.has_more_before {
+                return Err(unsupported(
+                    "bounded source witness requires an unaggregated head-only projection",
+                ));
+            }
+        }
+        #[cfg(feature = "acceptance-source-witness")]
+        let raw_head = next.clone();
         if !prefix_preserved {
             self.entries.clear();
         }
-        self.entries
-            .extend(next.entries.iter().map(|e| (e.event.seq, e.clone())));
+        self.entries.extend(
+            next.entries
+                .iter()
+                .map(|entry| (entry.event.seq, entry.clone())),
+        );
         self.page = next;
         self.page.has_more_before = more;
-        self.transcript()
+        let snapshot = self.transcript()?;
+        #[cfg(feature = "acceptance-source-witness")]
+        {
+            self.latest_head = Some((original_head_request, raw_head));
+        }
+        Ok(snapshot)
     }
     pub(crate) async fn load_earlier(&mut self) -> Result<bool> {
         if !self.page.has_more_before {

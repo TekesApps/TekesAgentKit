@@ -98,6 +98,30 @@ pub enum PaneSnapshot {
     /// An absent/changed task or ephemeral pointer must not become a new conversation.
     Missing { scope: RunScope },
 }
+/// Acceptance-only built-in bounded head and the original pane publication
+/// constructed from that same local read. This is not a server transaction.
+#[cfg(feature = "acceptance-source-witness")]
+#[derive(Clone)]
+pub struct BoundedChildPaneWitness {
+    pub snapshot: PaneSnapshot,
+    pub source: tekes_agent_presentation::BoundedChildSourceWitness,
+}
+
+struct SnapshotRead {
+    snapshot: PaneSnapshot,
+    #[cfg(feature = "acceptance-source-witness")]
+    bounded_source: Option<tekes_agent_presentation::BoundedChildSourceWitness>,
+}
+impl SnapshotRead {
+    fn plain(snapshot: PaneSnapshot) -> Self {
+        Self {
+            snapshot,
+            #[cfg(feature = "acceptance-source-witness")]
+            bounded_source: None,
+        }
+    }
+}
+
 impl PaneSnapshot {
     /// Forward this pane's captured publication. Read-only children never borrow
     /// parent Run authority or a separately sampled connection epoch.
@@ -730,17 +754,55 @@ impl RunBinding {
         self.side_chat.as_ref().map(|(owner, _)| owner.subscribe())
     }
     pub async fn snapshot(&self) -> Result<PaneSnapshot> {
+        #[cfg(feature = "acceptance-source-witness")]
+        let read = self.read_snapshot(false).await?;
+        #[cfg(not(feature = "acceptance-source-witness"))]
+        let read = self.read_snapshot().await?;
+        Ok(read.snapshot)
+    }
+    /// Capture only a built-in bounded head, sharing the original publication,
+    /// read, projection, epoch and pane-lifetime fences with `snapshot()`.
+    /// Cumulative history and custom/independent sources are unsupported.
+    #[cfg(feature = "acceptance-source-witness")]
+    pub async fn snapshot_with_bounded_source_witness(&self) -> Result<BoundedChildPaneWitness> {
+        require(
+            self.controller.is_none(),
+            "bounded source witness requires a read-only child",
+        )?;
+        let read = self.read_snapshot(true).await?;
+        require(
+            self.access() != PaneAccess::Missing,
+            "child pane retired during source read",
+        )?;
+        let source = read
+            .bounded_source
+            .ok_or_else(|| unsupported("bounded child source unavailable"))?;
+        require(
+            source.child_id == self.scope.session_id
+                && source.parent_scope.endpoint_id == self.scope.endpoint_id
+                && source.parent_scope.thread_id == self.scope.thread_id,
+            "bounded child source origin mismatch",
+        )?;
+        Ok(BoundedChildPaneWitness {
+            snapshot: read.snapshot,
+            source,
+        })
+    }
+    async fn read_snapshot(
+        &self,
+        #[cfg(feature = "acceptance-source-witness")] capture_bounded_source: bool,
+    ) -> Result<SnapshotRead> {
         let access = self.access();
         if access == PaneAccess::Missing {
-            return Ok(PaneSnapshot::Missing {
+            return Ok(SnapshotRead::plain(PaneSnapshot::Missing {
                 scope: self.scope.clone(),
-            });
+            }));
         }
         if let Some(controller) = &self.controller {
-            return Ok(PaneSnapshot::Run {
+            return Ok(SnapshotRead::plain(PaneSnapshot::Run {
                 snapshot: controller.snapshot(),
                 access,
-            });
+            }));
         }
         // Stamp invocation order before awaiting a custom/bounded source. A late
         // older read must not become a newer UI publication by completion time.
@@ -754,16 +816,23 @@ impl RunBinding {
             .map_err(|_| unsupported("read-only child publication exhausted"))?
             + 1;
         let epoch = self.runtime.inspect(|store| store.connection_epoch);
-        let mut transcript = self
+        let child = self
             .child
             .as_ref()
-            .ok_or_else(|| unsupported("missing child source"))?
-            .transcript()
-            .await?;
+            .ok_or_else(|| unsupported("missing child source"))?;
+        #[cfg(feature = "acceptance-source-witness")]
+        let (mut transcript, bounded_source) = if capture_bounded_source {
+            let (transcript, source) = child.transcript_with_bounded_source_witness().await?;
+            (transcript, Some(source))
+        } else {
+            (child.transcript().await?, None)
+        };
+        #[cfg(not(feature = "acceptance-source-witness"))]
+        let mut transcript = child.transcript().await?;
         if self.access() == PaneAccess::Missing {
-            return Ok(PaneSnapshot::Missing {
+            return Ok(SnapshotRead::plain(PaneSnapshot::Missing {
                 scope: self.scope.clone(),
-            });
+            }));
         }
         let (connection_epoch, connection) = self.runtime.inspect(|store| {
             (
@@ -780,13 +849,17 @@ impl RunBinding {
         for section in &document.sections {
             section.event_order()?;
         }
-        Ok(PaneSnapshot::ReadOnlyChild {
-            source: self.readonly_source.clone(),
-            scope: self.scope.clone(),
-            publication,
-            connection_epoch,
-            connection,
-            transcript,
+        Ok(SnapshotRead {
+            snapshot: PaneSnapshot::ReadOnlyChild {
+                source: self.readonly_source.clone(),
+                scope: self.scope.clone(),
+                publication,
+                connection_epoch,
+                connection,
+                transcript,
+            },
+            #[cfg(feature = "acceptance-source-witness")]
+            bounded_source,
         })
     }
     /// Reuse the existing catalog authority. A failed query leaves history readable

@@ -21,6 +21,9 @@ struct Connector {
     reject_discard: Arc<AtomicBool>,
     hold_fork: Arc<AtomicBool>,
     bounded: Arc<AtomicBool>,
+    hold_bounded: Arc<AtomicBool>,
+    bounded_entered: Arc<Notify>,
+    release_bounded: Arc<Notify>,
     pages: Arc<std::sync::Mutex<std::collections::VecDeque<Value>>>,
     catalog_owner: Arc<std::sync::Mutex<Option<String>>>,
 }
@@ -107,6 +110,10 @@ impl SessionEndpoint for Endpoint {
             );
         }
         if method == "subagents.history" {
+            if self.connector.hold_bounded.load(Ordering::SeqCst) {
+                self.connector.bounded_entered.notify_one();
+                self.connector.release_bounded.notified().await;
+            }
             let page = self
                 .connector
                 .pages
@@ -707,6 +714,312 @@ async fn bounded_source_call_running_to_terminal_keeps_identity_and_history_entr
         assert_eq!(terminal.items[0].text, "independent history");
     }
 
+    runtime.stop().await.unwrap();
+}
+
+#[cfg(feature = "acceptance-source-witness")]
+#[tokio::test]
+async fn bounded_head_witness_pairs_one_projection_with_the_exact_raw_response() {
+    let (connector, runtime, _) = setup().await;
+    connector.bounded.store(true, Ordering::SeqCst);
+    for phase in ["error", "stopped"] {
+        connector
+            .pages
+            .lock()
+            .unwrap()
+            .extend([bounded_source_page(phase), bounded_source_page(phase)]);
+        let child = ChildRun::open(
+            runtime.clone(),
+            RunScope::main("test", "a"),
+            "bounded",
+            ChildHistoryLayout::SameSession,
+            None,
+        )
+        .await
+        .unwrap();
+        let before = connector
+            .requests
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(method, _)| method == "subagents.history")
+            .count();
+
+        let (transcript, witness) = child
+            .transcript_with_bounded_source_witness()
+            .await
+            .unwrap();
+        let after = connector
+            .requests
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(method, _)| method == "subagents.history")
+            .count();
+        let wire_head_request = connector
+            .requests
+            .lock()
+            .unwrap()
+            .iter()
+            .rfind(|(method, _)| method == "subagents.history")
+            .unwrap()
+            .1
+            .clone();
+
+        assert_eq!(after, before + 1, "witness must not perform a second read");
+        assert!(connector.pages.lock().unwrap().is_empty());
+        assert_eq!(witness.parent_scope, RunScope::main("test", "a"));
+        assert_eq!(witness.child_id, "bounded");
+        assert_eq!(witness.page_size, 50);
+        assert_eq!(witness.head_request.parent_session_id, "a");
+        assert_eq!(witness.head_request.child_session_id, "bounded");
+        assert_eq!(witness.head_request.through_sequence, None);
+        assert_eq!(witness.head_request.before_sequence, None);
+        assert_eq!(
+            wire_head_request,
+            serde_json::to_value(&witness.head_request).unwrap()
+        );
+        assert_eq!(
+            witness.raw_head.source_call.as_ref().unwrap()["phase"],
+            phase
+        );
+        assert_eq!(
+            witness.evidence_scope,
+            "built-in-bounded-head-only-same-local-read"
+        );
+        assert!(!witness.server_transactional_freshness_proven);
+        assert_eq!(transcript.items.len(), 1);
+        assert_eq!(transcript.items[0].text, "independent history");
+        assert_eq!(
+            transcript.turns[0].status,
+            if phase == "error" { "error" } else { "aborted" }
+        );
+    }
+    runtime.stop().await.unwrap();
+}
+
+#[cfg(feature = "acceptance-source-witness")]
+#[tokio::test]
+async fn bounded_head_witness_rejects_other_owners_without_falling_back() {
+    struct CustomSource;
+    #[async_trait]
+    impl ChildHistorySource for CustomSource {
+        async fn read(&self, _: &RunScope, _: &str) -> Result<TranscriptSnapshot> {
+            Ok(TranscriptSnapshot::default())
+        }
+    }
+
+    let (connector, runtime, _) = setup().await;
+    connector.bounded.store(true, Ordering::SeqCst);
+    let custom = ChildRun::open(
+        runtime.clone(),
+        RunScope::main("test", "a"),
+        "bounded",
+        ChildHistoryLayout::SameSession,
+        Some(Arc::new(CustomSource)),
+    )
+    .await
+    .unwrap();
+    assert!(
+        custom
+            .transcript_with_bounded_source_witness()
+            .await
+            .is_err()
+    );
+
+    let independent = ChildRun::open(
+        runtime.clone(),
+        RunScope::main("test", "a"),
+        "child",
+        ChildHistoryLayout::IndependentSessions,
+        None,
+    )
+    .await
+    .unwrap();
+    assert!(
+        independent
+            .transcript_with_bounded_source_witness()
+            .await
+            .is_err()
+    );
+    assert!(connector.pages.lock().unwrap().is_empty());
+    assert!(
+        !connector
+            .requests
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|(method, _)| method == "subagents.history")
+    );
+    runtime.stop().await.unwrap();
+}
+
+#[cfg(feature = "acceptance-source-witness")]
+#[tokio::test]
+async fn bounded_head_witness_rejects_aggregated_pages_and_retains_the_projection() {
+    fn page(entries: Vec<Value>, more: bool) -> Value {
+        json!({"parentSessionId":"a","childSessionId":"bounded","throughSequence":5,
+            "historyRevision":"f".repeat(64),"entries":entries,"hasMoreBefore":more,
+            "runOpen":false,"sourceCall":null})
+    }
+    fn message(seq: i64, text: &str) -> Value {
+        json!({"event":{"seq":seq,"time":100,"type":"assistant/message","data":{
+            "turn":1,"step":seq+1,"message":{"id":format!("m{seq}"),"content":[{"type":"text","text":text}]}}}})
+    }
+
+    let (connector, runtime, _) = setup().await;
+    connector.bounded.store(true, Ordering::SeqCst);
+    let head = page(vec![message(5, "new")], false);
+    connector.pages.lock().unwrap().extend([
+        page(vec![message(5, "new")], true),
+        page(vec![message(1, "old")], true),
+        head.clone(),
+        head,
+    ]);
+    let child = ChildRun::open(
+        runtime.clone(),
+        RunScope::main("test", "a"),
+        "bounded",
+        ChildHistoryLayout::SameSession,
+        None,
+    )
+    .await
+    .unwrap();
+    assert!(child.load_earlier().await.unwrap());
+    assert!(
+        child
+            .transcript_with_bounded_source_witness()
+            .await
+            .is_err()
+    );
+
+    // A normal read still sees the untouched cumulative cache and its aggregated pagination bit.
+    let retained = child.transcript().await.unwrap();
+    assert_eq!(
+        retained
+            .items
+            .iter()
+            .map(|item| item.text.as_str())
+            .collect::<Vec<_>>(),
+        ["old", "new"]
+    );
+    assert!(retained.has_more_before);
+    assert!(connector.pages.lock().unwrap().is_empty());
+    runtime.stop().await.unwrap();
+}
+
+#[cfg(feature = "acceptance-source-witness")]
+#[tokio::test]
+async fn bounded_head_witness_rejects_a_natural_increment_that_retains_old_entries() {
+    fn page(cut: i64, revision: &str, seq: i64, text: &str) -> Value {
+        json!({"parentSessionId":"a","childSessionId":"bounded","throughSequence":cut,
+            "historyRevision":revision.repeat(64),"entries":[{"event":{"seq":seq,"time":100,
+                "type":"assistant/message","data":{"turn":1,"step":seq+1,"message":{
+                    "id":format!("m{seq}"),"content":[{"type":"text","text":text}]}}}}],
+            "hasMoreBefore":false,"runOpen":false,"sourceCall":null})
+    }
+
+    let (connector, runtime, _) = setup().await;
+    connector.bounded.store(true, Ordering::SeqCst);
+    let old_head = page(5, "a", 5, "old head");
+    let new_head = page(6, "b", 6, "new head");
+    let verified_prefix = page(5, "a", 5, "old head");
+    connector.pages.lock().unwrap().extend([
+        old_head,
+        new_head.clone(),
+        verified_prefix.clone(),
+        new_head,
+        verified_prefix,
+    ]);
+    let child = ChildRun::open(
+        runtime.clone(),
+        RunScope::main("test", "a"),
+        "bounded",
+        ChildHistoryLayout::SameSession,
+        None,
+    )
+    .await
+    .unwrap();
+    assert!(
+        child
+            .transcript_with_bounded_source_witness()
+            .await
+            .is_err()
+    );
+
+    let retained = child.transcript().await.unwrap();
+    assert_eq!(
+        retained
+            .items
+            .iter()
+            .map(|item| item.text.as_str())
+            .collect::<Vec<_>>(),
+        ["old head", "new head"]
+    );
+    assert!(connector.pages.lock().unwrap().is_empty());
+    runtime.stop().await.unwrap();
+}
+
+#[cfg(feature = "acceptance-source-witness")]
+#[tokio::test]
+async fn bounded_head_witness_propagates_read_failure_without_returning_stale_proof() {
+    let (connector, runtime, _) = setup().await;
+    connector.bounded.store(true, Ordering::SeqCst);
+    connector
+        .pages
+        .lock()
+        .unwrap()
+        .extend([bounded_source_page("running"), json!({"error":true})]);
+    let child = ChildRun::open(
+        runtime.clone(),
+        RunScope::main("test", "a"),
+        "bounded",
+        ChildHistoryLayout::SameSession,
+        None,
+    )
+    .await
+    .unwrap();
+    assert!(
+        child
+            .transcript_with_bounded_source_witness()
+            .await
+            .is_err()
+    );
+    assert!(connector.pages.lock().unwrap().is_empty());
+    runtime.stop().await.unwrap();
+}
+
+#[cfg(feature = "acceptance-source-witness")]
+#[tokio::test]
+async fn bounded_head_witness_rejects_a_response_crossing_connection_epochs() {
+    let (connector, runtime, _) = setup().await;
+    connector.bounded.store(true, Ordering::SeqCst);
+    connector
+        .pages
+        .lock()
+        .unwrap()
+        .push_back(bounded_source_page("running"));
+    let child = Arc::new(
+        ChildRun::open(
+            runtime.clone(),
+            RunScope::main("test", "a"),
+            "bounded",
+            ChildHistoryLayout::SameSession,
+            None,
+        )
+        .await
+        .unwrap(),
+    );
+    connector.hold_bounded.store(true, Ordering::SeqCst);
+    let reading = {
+        let child = child.clone();
+        tokio::spawn(async move { child.transcript_with_bounded_source_witness().await })
+    };
+    connector.bounded_entered.notified().await;
+
+    runtime.reconnect().await.unwrap();
+    connector.release_bounded.notify_one();
+    assert!(reading.await.unwrap().is_err());
     runtime.stop().await.unwrap();
 }
 

@@ -85,10 +85,73 @@
     "actual native UI/desktop/IME/OS AX/ProcessContainer",
     "full ClientKit parity"
   ],
-  "ci": "new-head-pending-push",
+  "ci": "9039d5f-terminal-only-strict-nested-reading-53-failed",
   "cacheBytesDeletedInThisSlice": 0,
   "newTarget": false,
   "issueClosed": false,
   "mergeTagRelease": false,
-  "evidenceRoot": ".runtime-fixtures/native-bounded-terminal-20261024"
+  "evidenceRoot": ".runtime-fixtures/native-bounded-terminal-20261024",
+  "ci9039d5f": {
+    "head": "9039d5fcc12ce2cd8576b5ed947a2cd79bf29db5",
+    "immutableClosureVerified": true,
+    "prMergeParentVerified": true,
+    "runs": [
+      {
+        "id": 40105849539,
+        "checkout": "9039d5fcc12ce2cd8576b5ed947a2cd79bf29db5",
+        "conclusion": "failure",
+        "consumerSource": "ec0787e887c7af9641f8ae7811ddef90dd570810c55a38278a2addee5dfa2a5a",
+        "consumerFiles": 137,
+        "sdk": {
+          "commit": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+          "local_packages": 11,
+          "native_interaction": false,
+          "reviewed_files": 243,
+          "sha256": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
+          "ui_packages": 8
+        },
+        "rawReading": {
+          "accepted": false,
+          "parentFollowingAfterInnerUp": true,
+          "parentOffsetBefore": 0,
+          "parentOffsetAfterScroll": 0,
+          "parentOffsetAfterAppend": 634,
+          "innerOffset": 100,
+          "detailVisibleAfterAppend": false
+        },
+        "artifactSha256": "168fe5756614728c5c604f1086b967b972f86bae03feabc9ba990d2722960fe4",
+        "jobLogSha256": "357fa33594e757e01d63060f8d7b655c2ad7d0aa63c9deb172b3d419da769cdc",
+        "optInWitness": "success",
+        "independentConsumer": "success"
+      },
+      {
+        "id": 40105854722,
+        "checkout": "c87930bc896f8f4bb02466ff0b32f4d1ed0fbb71",
+        "conclusion": "failure",
+        "consumerSource": "ec0787e887c7af9641f8ae7811ddef90dd570810c55a38278a2addee5dfa2a5a",
+        "consumerFiles": 137,
+        "sdk": {
+          "commit": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+          "local_packages": 11,
+          "native_interaction": false,
+          "reviewed_files": 243,
+          "sha256": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
+          "ui_packages": 8
+        },
+        "rawReading": {
+          "accepted": false,
+          "parentFollowingAfterInnerUp": true,
+          "parentOffsetBefore": 0,
+          "parentOffsetAfterScroll": 0,
+          "parentOffsetAfterAppend": 634,
+          "innerOffset": 100,
+          "detailVisibleAfterAppend": false
+        },
+        "artifactSha256": "3e503c18af54a25d80207daada8c8f00c5819b1744789e8a2f6b083c11d750cd",
+        "jobLogSha256": "c94e73fda8ac290552aee21902a5f2cc2953e5893dc3c66cb0425e9be2920212",
+        "optInWitness": "success",
+        "independentConsumer": "success"
+      }
+    ]
+  }
 }

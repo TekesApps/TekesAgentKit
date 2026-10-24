@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "baseCommit": "9039d5fcc12ce2cd8576b5ed947a2cd79bf29db5",
+  "issues": [
+    17,
+    23
+  ],
+  "pullRequest": 10,
+  "scope": "built-in-bounded-head-only-same-local-read-and-original-pane-publication",
+  "defaultFeatureEnabled": false,
+  "validation": {
+    "root-tests": {
+      "passed": 373,
+      "failed": 0,
+      "ignored": 0
+    },
+    "root-feature-tests": {
+      "passed": 287,
+      "failed": 0,
+      "ignored": 0
+    },
+    "ui-tests": {
+      "passed": 757,
+      "failed": 0,
+      "ignored": 1
+    },
+    "ui-feature-tests": {
+      "passed": 652,
+      "failed": 0,
+      "ignored": 0
+    },
+    "rootFocusedNewPassed": 6,
+    "bindingsFocusedTotalPassed": 6,
+    "bindingsFocusedNewPassed": 4,
+    "strictClippyDefaultAndFeature": "passed",
+    "fmt": "passed",
+    "defaultAndFeatureDemoBuild": "passed-not-launched",
+    "independentConsumerDefaultAndFeature": "executed-public-API-type-checks-passed",
+    "boundariesAndMatrix": "passed",
+    "python": "unchanged; prior255/0 evidence reused"
+  },
+  "runtimeAndTestSourceHashes": {
+    "crates/presentation/src/bounded_history.rs": "ca9390d7b7f9a8a5c83ab98ac5c4c637718b5ac4e694a700eef12a0cfad433f3",
+    "crates/presentation/src/child.rs": "f0fa2b5654d3089f279f4eedd08ef555128f56477a516b0452ce43bf45a09665",
+    "crates/presentation/tests/controller.rs": "1245cc0dbffa684e30eaeb60e3f64d592f9a1a63c2749f86b5cc7ae088c4f0d2",
+    "ui/bindings/src/lib.rs": "656b740258826736e8bf0e96fb584e642cde47d72e6e3b3275039633854ca044",
+    "ui/bindings/tests/child_pane_source_witness.rs": "c1705226faa2d34074b0817c1722a2aace43eaff940ab08787407abf70ab0231"
+  },
+  "programs": [
+    {
+      "path": ".runtime-fixtures/native-bounded-head-witness-20261024/programs/controller-083c0ba16f686d9e",
+      "sha256": "d47928bd54692e4c2202c9e3ced1a83c1312c3774b0b218f92acd8ee72a8db5e"
+    },
+    {
+      "path": ".runtime-fixtures/native-bounded-head-witness-20261024/programs/controller-fea276806b1d7a0c",
+      "sha256": "e324a78455178a776836e00fd60cd31a495928b8130e554004e4d915d49d971e"
+    },
+    {
+      "path": ".runtime-fixtures/native-bounded-head-witness-20261024/programs/child_pane_source_witness-c7fd7de745d41eca",
+      "sha256": "48a0849be063cd4c41868054b45774b35c3d4d42e0958040da3619854daf23f7"
+    },
+    {
+      "path": ".runtime-fixtures/native-bounded-head-witness-20261024/programs/tekes-agent-ui-demo-feature",
+      "sha256": "5bdcfa9db9b6e8f6df969948471da36cd3daf9fd8bef0e4e3b8af8afff3bbc1a",
+      "scope": "built-not-launched"
+    }
+  ],
+  "tekesUiPin": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "sourceReadRules": {
+    "extraRpcForCapture": false,
+    "serverTransactionalFreshnessProven": false,
+    "typedResponseNotWireBytes": true,
+    "cumulativeHistorySupported": false,
+    "ordinaryCacheClearedToPass": false,
+    "defaultRefreshCopiesAccumulatedHistory": false
+  },
+  "notRun": [
+    "real Native original-pane running-to-failed source acceptance",
+    "cumulative pagination provenance",
+    "desktop physical IME OS AX ProcessContainer",
+    "full ClientKit parity and performance benchmarks"
+  ],
+  "evidenceRoot": ".runtime-fixtures/native-bounded-head-witness-20261024",
+  "ciNewHead": "pending-push",
+  "cacheBytesDeletedInThisSlice": 0,
+  "newTarget": false,
+  "issueClosed": false,
+  "mergeTagRelease": false
+}

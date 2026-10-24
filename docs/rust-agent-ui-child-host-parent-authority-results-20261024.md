@@ -33,3 +33,5 @@ bindings 的 `for_run` 默认50保持兼容，新增显式页大小入口及捕�
 ## 未完成
 
 Native有界来源见证、实际子pane恢复/分页来源、动态Task pointer、完整窗口/物理IME/OS AX/ProcessContainer与完整ClientKit对齐仍开放。另只读核对Kernel **v0.9.3 tag `09508a9`** 发现 `sourceCall.phase` 明确为 running/done/stopped/error，而当前 AgentKit 将非running合成turn全标completed，列为下一独立小修；不改Kernel，不把该问题计作已修。#23不关闭，#53不豁免，不合并/打tag/发布。
+
+20b4c44 CI终态补录：push40104896916、PR40104900090 的checks、新bindings/demo opt-in及独立consumer全部通过，唯一失败仍#53，CI demo跳过。两份原日志/artifact、137/243闭包及PR merge父关系已核对；不代替后续Native终态或head见证CI。
