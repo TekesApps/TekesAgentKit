@@ -439,3 +439,15 @@
 ## 查询成员关系续批
 
 #22 `147642b` 对齐当前 ClientKit 会话 Sidebar 的共同 query/folder predicate，过滤未匹配 pins，保留 canonical 偏好/草稿及诊断，补齐 hasMore 空首页与 failed-ready 校验。UI677/0/1、严格 Clippy、普通 demo build 和独立 consumer 通过，见[收据](rust-agent-ui-sidebar-query-membership-results-20261024.md)。旧“独立 pins 不受筛选”解释已标成历史；本地名称 FTS、排名与真实窗口仍未完成，不关闭 Issue。
+
+## 2026-10-24：#22/#23/#25 并行续批
+
+主会话继续负责 #22 的真实本地名称 FTS/provider 并集、demo 索引来源和逐端就绪接线；独立子会话分别负责 #23 SidePanel 状态路径、#25 Summary 缺失字段与来源动作；另有独立只读 CI 与集成审查。全部 Cargo 验证由主会话串行执行，继续共享已有 target；桌面/截图/权限操作均不运行。
+
+- #22：新增真实内存 SQLite FTS5 派生索引、canonical title 清除修正、persistent projector 与 Single/Multi demo 接线。精确依赖/缓存来源/空态语义见[查询契约](rust-agent-ui-sidebar-query-membership-20261024.md)。bm25 排序、公开远端 cursor、完整 main/ephemeral 分类事实和真实多 harness/窗口验收仍开放。
+- #23：[状态路径续审](rust-agent-ui-sidepanel-followup-20261024.md)未发现确定实现缺陷，保留既有状态机；指明 native ChildOpened(Err) dispatch 的直接运行证据与完整窗口/三端来源尚缺，不以静态审查代替执行。
+- #25：[Summary 续审](rust-agent-ui-summary-followup-20261024.md)修复 loaded Summary 无 usage projection 时隐藏整个用量区的问题，保留六条不可用值，区分已知零值和整个 Summary 不可用。来源动作与 slots 未发现确定缺陷。
+
+本批实现提交与分层验证见 [693/241/92 结果收据](rust-agent-ui-name-fts-results-20261024.md)；这些子项完成不等于关闭各 Issue 或允许合并 PR #10。77a9ed8 CI 的独立 consumer 已通过，严格详情阅读仍失败，详见 [CI 复核](rust-agent-ui-ci-review-20261024.md)。
+
+本批去重新增 [#29 会话分类事实](https://github.com/TekesApps/TekesAgentKit/issues/29)，关联 #22：Pi 已有显式分类事实可先补 Sidebar 规则；Native/DSH 的完整公开来源仍须确认。只在 Sidebar 投影/选中补读应用明确排除规则，不能删除 canonical 全局 child/history，也不以 parentSessionId 判断子代理。Kernel 实现仍在范围外。

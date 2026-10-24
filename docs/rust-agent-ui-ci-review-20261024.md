@@ -52,3 +52,9 @@ PR [40058315999](https://github.com/TekesApps/TekesAgentKit/actions/runs/4005831
 ## Observer 用户入口 9b1d263 CI
 
 PR [40059408663](https://github.com/TekesApps/TekesAgentKit/actions/runs/40059408663) 完成，headless、UI 格式/严格 Clippy/完整 suite、独立 consumer 成功，严格 nested detail reading 失败；后续 demo build 跳过。元数据 `ci-9b1d263-pr-final-jobs.json` 保留，没有本次 raw 阅读 JSON，未借用旧数值。后续 query/folder membership 的 `147642b` 另看自己的 CI。
+
+## Query/folder membership 77a9ed8 CI
+
+PR [40060479178](https://github.com/TekesApps/TekesAgentKit/actions/runs/40060479178) 与 push [40060475986](https://github.com/TekesApps/TekesAgentKit/actions/runs/40060475986) 均完成；最新 PR head 为 `77a9ed8d7c7dfe86b43679a16e94167c7b8ebf6f`。headless 通过；UI 的边界/pin/fmt/严格 Clippy/workspace tests/独立 public consumer 通过，仍只有严格 nested detail reading 失败，后续 demo build 跳过。
+
+push run 完整 jobs 元数据与 failed log 存于 `.runtime-fixtures/sidebar-host-20261024/ci-77a9ed8-40060475986-*`。PR REST 抓取和 artifact 下载遇到 EOF，未成功归档有效 PR jobs JSON 或本 run 原始阅读结果；不能拿旧 head 的 offset 数值补齐。失败日志显示阅读程序编译并启动后退出 1，暂不能确定本次哪条数值断言不满足。该 gate 早于 77a9ed8 已失败，不据此归因到本轮成员关系修改，也不豁免检查。后续本地名称 FTS 与 Summary 修改的 CI 必须按新 head 分别跟踪。

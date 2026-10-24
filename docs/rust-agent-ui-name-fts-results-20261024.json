@@ -1,0 +1,227 @@
+{
+  "date": "2026-10-24",
+  "source_commit": "6b28136974013ef688d034b3583a40524442cfcb",
+  "implementation_commits": {
+    "summary": "6420876",
+    "sidebar": "051d7f0",
+    "sidepanel_audit": "6b28136"
+  },
+  "pr": "https://github.com/TekesApps/TekesAgentKit/pull/10",
+  "issues": [
+    22,
+    23,
+    25,
+    29
+  ],
+  "ui": {
+    "passed": 693,
+    "failed": 0,
+    "ignored": 1,
+    "groups": 97
+  },
+  "final_component_lib_after_lint_only_test_module_move": {
+    "passed": 12,
+    "failed": 0,
+    "ignored": 0,
+    "groups": 1
+  },
+  "presentation": {
+    "passed": 241,
+    "failed": 0,
+    "ignored": 0,
+    "groups": 25
+  },
+  "python": {
+    "passed": 92,
+    "failed": 0
+  },
+  "clippy": {
+    "root_workspace_all_targets": "passed",
+    "ui_workspace_all_targets": "passed"
+  },
+  "normal_demo_build": "passed; archived, not launched",
+  "standalone_public_consumer": "compiled and ran without native window; components only, not full FTS or harness acceptance",
+  "headless_sqlite_dependency": "absent; original gate unchanged",
+  "tekesui_pin": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "reviewed_tekesui_files": 243,
+  "strict_nested_reading": {
+    "status": "failed",
+    "exit": 1,
+    "result": {
+      "accepted": false,
+      "parentFollowingAfterInnerUp": true,
+      "parentOffsetBefore": 0,
+      "parentOffsetAfterScroll": 0,
+      "parentOffsetAfterAppend": 634,
+      "innerOffset": 100,
+      "detailVisibleAfterAppend": false
+    },
+    "upstream_issue": "https://github.com/TekesApps/TekesUI/issues/53",
+    "scope": "local same-process/CoreText/no window; not CI raw artifact"
+  },
+  "ci_reviewed": {
+    "head": "77a9ed8d7c7dfe86b43679a16e94167c7b8ebf6f",
+    "push_run": 40060475986,
+    "headless": "passed",
+    "ui_tests_clippy_standalone_consumer": "passed",
+    "strict_reading": "failed",
+    "demo": "skipped",
+    "raw_reading_artifact": "unavailable: EOF; no reused old values"
+  },
+  "new_head_ci": "must inspect new push separately",
+  "not_run": [
+    "desktop",
+    "physical IME",
+    "AX/VoiceOver acceptance",
+    "real three-harness acceptance",
+    "ProcessContainer",
+    "performance"
+  ],
+  "open": [
+    "bm25 ranking",
+    "remote continuation/cursor",
+    "Native/DSH full canonical main/ephemeral facts (#29)",
+    "strict nested reading (#53)"
+  ],
+  "cleanup": {
+    "time": "2026-10-24T12:23:44+0800",
+    "deleted": [
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_presentation-808cf6d3fe4e8d43.rlib",
+        "inode": 414923403,
+        "size": 14195416,
+        "mtime_ns": 1792814937877213435,
+        "allocated": 14196736,
+        "fingerprint": "/tmp/agentkit-layout-text-292-target/debug/.fingerprint/tekes-agent-presentation-808cf6d3fe4e8d43/lib-tekes_agent_presentation.json"
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_presentation-808cf6d3fe4e8d43.rmeta",
+        "inode": 414923383,
+        "size": 5319634,
+        "mtime_ns": 1792814937384589347,
+        "allocated": 5320704,
+        "fingerprint": "/tmp/agentkit-layout-text-292-target/debug/.fingerprint/tekes-agent-presentation-808cf6d3fe4e8d43/lib-tekes_agent_presentation.json"
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_presentation-a61fef1e203f1002.rlib",
+        "inode": 414925877,
+        "size": 14198944,
+        "mtime_ns": 1792814998330135999,
+        "allocated": 14200832,
+        "fingerprint": "/tmp/agentkit-layout-text-292-target/debug/.fingerprint/tekes-agent-presentation-a61fef1e203f1002/lib-tekes_agent_presentation.json"
+      },
+      {
+        "path": "/tmp/agentkit-layout-text-292-target/debug/deps/libtekes_agent_presentation-a61fef1e203f1002.rmeta",
+        "inode": 414925818,
+        "size": 5321982,
+        "mtime_ns": 1792814997561648854,
+        "allocated": 5324800,
+        "fingerprint": "/tmp/agentkit-layout-text-292-target/debug/.fingerprint/tekes-agent-presentation-a61fef1e203f1002/lib-tekes_agent_presentation.json"
+      }
+    ],
+    "single_lock": "/tmp/agentkit-layout-text-292-target/debug/.cargo-lock",
+    "mechanism": "fcntl.flock LOCK_EX|LOCK_NB only; held through unlink and verification",
+    "allocated_deleted_bytes": 39043072,
+    "deps_du_before_bytes": 42386182144,
+    "deps_du_after_bytes": 42347139072,
+    "deps_du_decrease_bytes": 39043072,
+    "volume_physical_reclaim": "not attributed; APFS sharing and other tasks may affect volume free space",
+    "preserved_programs": [
+      {
+        "source": "/tmp/agentkit-layout-text-292-target/debug/tekes-agent-ui-demo",
+        "archive": ".runtime-fixtures/sidebar-host-20261024/name-fts-acceptance-programs/tekes-agent-ui-demo",
+        "sha256": "1d648d9318cc50b3e35acb1ca74b628647c27a2880d56fca01d89d6096491764",
+        "size": 85021664
+      },
+      {
+        "source": "/tmp/agentkit-layout-text-292-target/debug/agentkit-public-ui-consumer",
+        "archive": ".runtime-fixtures/sidebar-host-20261024/name-fts-acceptance-programs/agentkit-public-ui-consumer",
+        "sha256": "994fba4dc86c639c5bd0cda0e664eb706094d341aa9cb851a8242474e562cec8",
+        "size": 16294768
+      },
+      {
+        "source": "/tmp/agentkit-layout-text-292-target/debug/examples/bounded_detail_reading",
+        "archive": ".runtime-fixtures/sidebar-host-20261024/name-fts-acceptance-programs/bounded_detail_reading",
+        "sha256": "8875bb65eaaf7aa76b99fadd72a256eed78a70939e74f104d0dd8dff284cbb19",
+        "size": 9444656
+      }
+    ],
+    "wip_sha256": {
+      "/Users/frankqin/dev/TekesAgentKit/docs/rust-agent-ui-ci-review-20261024.md": "456bead560154a3ac23e65a46bcf89ea76ec2c0bb99757652933abeb0d2984a1",
+      "/Users/frankqin/dev/TekesAgentKit/docs/rust-agent-ui-issue-plan.md": "3b412b072c34733c482cdbc97dbefc49c3335ff21045093d19e8e22a8dd5ded0",
+      "/Users/frankqin/dev/TekesAgentKit/docs/rust-agent-ui-issues.json": "786ac35b438fd0b8cc830b806840fc1fafce46d6c76df73858d4886ac993ec58"
+    },
+    "other_cache": "retained; no whole target cleanup"
+  },
+  "source_manifest_files": 482,
+  "evidence": {
+    "name-fts-ui-moved-final-test.log": {
+      "path": ".runtime-fixtures/sidebar-host-20261024/name-fts-ui-moved-final-test.log",
+      "sha256": "c29026175cffeb40c22bf19662e014144df243ad19ba42429c6c258b2257a746"
+    },
+    "name-fts-components-final-test.log": {
+      "path": ".runtime-fixtures/sidebar-host-20261024/name-fts-components-final-test.log",
+      "sha256": "ffb269215b1bef2e6e49d560c25aad6f2bbfd8155e426e1c829842c6ea8d62fd"
+    },
+    "name-fts-presentation-final-test.log": {
+      "path": ".runtime-fixtures/sidebar-host-20261024/name-fts-presentation-final-test.log",
+      "sha256": "bf923d1f557fcef8eec2a894a6ae9afec3458d7016589d48e05f51e9dae2d77a"
+    },
+    "name-fts-root-clippy.log": {
+      "path": ".runtime-fixtures/sidebar-host-20261024/name-fts-root-clippy.log",
+      "sha256": "86df607f20fcce9b49b6915dc8203e85923e4fe06ef7eb1c549d100f1a341b30"
+    },
+    "name-fts-ui-clippy-final.log": {
+      "path": ".runtime-fixtures/sidebar-host-20261024/name-fts-ui-clippy-final.log",
+      "sha256": "57910614d6ef35a97fe497459eab088dcc115deec97e833e04fea403dc633246"
+    },
+    "name-fts-demo-build.log": {
+      "path": ".runtime-fixtures/sidebar-host-20261024/name-fts-demo-build.log",
+      "sha256": "b4199eca53afdf1694226fcbc9f006fcc0f0888d1ea070b1a66ba720c7ff9bcc"
+    },
+    "name-fts-python-test.log": {
+      "path": ".runtime-fixtures/sidebar-host-20261024/name-fts-python-test.log",
+      "sha256": "317848db006479a84bc9b39484874b5f80b02b2220607cffff3bdde717cb0484"
+    },
+    "name-fts-public-consumer-run.log": {
+      "path": ".runtime-fixtures/sidebar-host-20261024/name-fts-public-consumer-run.log",
+      "sha256": "71a06c2291462bc6b1ca3ac8827ce99cec437a56b8046d0a19551ce2e84aa509"
+    },
+    "name-fts-nested-detail-reading.json": {
+      "path": ".runtime-fixtures/sidebar-host-20261024/name-fts-nested-detail-reading.json",
+      "sha256": "c4f70b29538ecacd71995d9a3fc7678cf168834c54e6f348c8c095309b9f1b90"
+    },
+    "name-fts-cleanup-receipt.json": {
+      "path": ".runtime-fixtures/sidebar-host-20261024/name-fts-cleanup-receipt.json",
+      "sha256": "5241248ec2eb1a77bfd7240df1d4a6090bd63f97e4c0170653e826db88cb1901"
+    },
+    "name-fts-source-manifest.json": {
+      "path": ".runtime-fixtures/sidebar-host-20261024/name-fts-source-manifest.json",
+      "sha256": "691b4cad5bd77be70915aca129b5f1fe7badea5d85fde73ed41c427bbab110f3"
+    },
+    "name-fts-public-consumer-prepare.json": {
+      "path": ".runtime-fixtures/sidebar-host-20261024/name-fts-public-consumer-prepare.json",
+      "sha256": "9c78e43937b314dbc3c68a097f93e32edc2ea99077fbed2b39f98dee04f31720"
+    },
+    "name-fts-root-final-metadata.json": {
+      "path": ".runtime-fixtures/sidebar-host-20261024/name-fts-root-final-metadata.json",
+      "sha256": "e67ef5fcfb7203202f9aa626e5a761e77af3f4a3468509226f061eae67bbf5c0"
+    },
+    "name-fts-ui-final-metadata.json": {
+      "path": ".runtime-fixtures/sidebar-host-20261024/name-fts-ui-final-metadata.json",
+      "sha256": "00cb9e61e45655007bd7051b398f62ae2a34c95787da6aed41f988e432c8e595"
+    },
+    "name-fts-headless-boundaries.log": {
+      "path": ".runtime-fixtures/sidebar-host-20261024/name-fts-headless-boundaries.log",
+      "sha256": "e9fa1e12a0afd70528040f81fe3199172a3974910d7760c0216bb6d110181081"
+    },
+    "name-fts-ui-boundaries.log": {
+      "path": ".runtime-fixtures/sidebar-host-20261024/name-fts-ui-boundaries.log",
+      "sha256": "9480cc4382559b9a7a99240226a9f766048e30c8d38bb4bccd1fd8bca56661ad"
+    },
+    "name-fts-acceptance-check.log": {
+      "path": ".runtime-fixtures/sidebar-host-20261024/name-fts-acceptance-check.log",
+      "sha256": "0463c4386bb552440b43468709adb196df1585d1f11a360492b0986e9b6eeadf"
+    }
+  }
+}

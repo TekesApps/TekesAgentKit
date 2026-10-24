@@ -261,12 +261,13 @@
         "已有目录/搜索/分组/分页、恢复与选中补齐、稳定 action value/reveal。",
         "活动状态、置顶/偏好/共享 CAS 及捕获来源、旧请求门禁已有回归。",
         "6c700e9 固定多端聚合/原地址路由/owner票据与5项新回归已完成。",
-        "be4fc58 coherent observer packet、用户 Retry footer、demo 原端路由已实现；真实窗口/断流验收仍开放。"
+        "be4fc58 coherent observer packet、用户 Retry footer、demo 原端路由已实现；真实窗口/断流验收仍开放。",
+        "本地名称查询使用 UI bindings 内存 SQLite FTS5，与已知 Complete provider hits 合并；demo复用原来源/库存版本索引，分别呈现本地与provider就绪状态；canonical标题清除不恢复旧summary。"
       ],
       "remaining": [
         "消费非当前行上下文菜单公开契约，核对原生/AX 操作及窄宽布局。",
         "复验跨端点、过滤分页和导航后操作的来源归属；宿主只负责导航。",
-        "对齐当前 sessionSidebarSnapshot 的 query/folder 共同成员关系及本地名称 FTS；验证过滤分页/全局偏好、真实多端故障与窗口整体组合。"
+        "对齐当前 sessionSidebarSnapshot 的 query/folder 共同成员关系后的 bm25 排名和三端 main/ephemeral 分类事实（#29）；验证过滤分页/全局偏好、真实多端故障与窗口整体组合。"
       ],
       "acceptance": [
         "非当前会话右键不错误改变目标；pin/share/rename/archive 作用于原捕获 item。",
@@ -281,7 +282,8 @@
         "docs/rust-agent-ui-sidebar-multi-endpoint-20261024.md",
         "docs/rust-agent-ui-parallel-results-20261024.md",
         "docs/rust-agent-ui-sidebar-observer-retry-results-20261024.md",
-        "docs/rust-agent-ui-sidebar-query-membership-20261024.md"
+        "docs/rust-agent-ui-sidebar-query-membership-20261024.md",
+        "docs/rust-agent-ui-name-fts-results-20261024.md"
       ],
       "dependencies": [
         "TekesUI#44"
@@ -358,7 +360,8 @@
         "docs/rust-agent-ui-task-shared-destination-20261023.md",
         "docs/rust-agent-ui-native-bounded-20261023.md",
         "docs/rust-agent-ui-source-authority.md",
-        "docs/rust-agent-ui-parallel-results-20261024.md"
+        "docs/rust-agent-ui-parallel-results-20261024.md",
+        "docs/rust-agent-ui-name-fts-results-20261024.md"
       ],
       "dependencies": [
         "#12",
@@ -429,7 +432,8 @@
       "implemented": [
         "已有受控 SummaryInput/Context、sections/rows、展开/用量/metadata/宿主 slots 与 source-owned actions。",
         "行布局/缩进/label/context/child 状态等有专题收据和第二 consumer。",
-        "9a62950 已知session授权门禁：无store/unknown/歧义/父UUID保持被动；Pi/DSH原Summary pointer补验通过。"
+        "9a62950 已知session授权门禁：无store/unknown/歧义/父UUID保持被动；Pi/DSH原Summary pointer补验通过。",
+        "已加载但缺usage projection保留六条不可用值；source-owned actions与正式slots再次静态核对，未发现确定缺陷。"
       ],
       "remaining": [
         "消费状态附件/图标、语义可选内容；核对 focus/hover/selection 与最终同内容布局。",
@@ -445,7 +449,9 @@
         "docs/rust-agent-ui-summary-sections-20261021.md",
         "docs/rust-agent-ui-summary-row-layout-20261022.md",
         "docs/rust-agent-ui-summary-child-status-20261022.md",
-        "docs/rust-agent-ui-parallel-results-20261024.md"
+        "docs/rust-agent-ui-parallel-results-20261024.md",
+        "docs/rust-agent-ui-summary-followup-20261024.md",
+        "docs/rust-agent-ui-name-fts-results-20261024.md"
       ],
       "dependencies": [
         "TekesUI#47",
@@ -646,6 +652,10 @@
     "release": {
       "number": 28,
       "url": "https://github.com/TekesApps/TekesAgentKit/issues/28"
+    },
+    "session-membership": {
+      "number": 29,
+      "url": "https://github.com/TekesApps/TekesAgentKit/issues/29"
     }
   }
 }
