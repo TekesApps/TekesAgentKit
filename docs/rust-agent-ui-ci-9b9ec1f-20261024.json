@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "head": "9b9ec1fbb06bd02809d72a338dec02b5b6c4d520",
+  "runs": [
+    {
+      "runId": 40073869211,
+      "event": "pull_request",
+      "url": "https://github.com/TekesApps/TekesAgentKit/actions/runs/40073869211",
+      "checks": "success",
+      "ui": "failure",
+      "failedSteps": [
+        "Verify nested detail reading intent (strict; no native window)"
+      ],
+      "standaloneConsumerExecuted": "success",
+      "checkoutCommit": "3b1d189a483b581ff0185e565a111b14f75a6cb4",
+      "consumerSourceFiles": 136,
+      "consumerSourceSha256": "ca4730ce8af3bc488c8e3c3862e45380387b09486b747a6b070b56cb902293f3",
+      "sourceMatchesGitHead": true,
+      "rawReading": {
+        "accepted": false,
+        "parentFollowingAfterInnerUp": true,
+        "parentOffsetBefore": 0,
+        "parentOffsetAfterScroll": 0,
+        "parentOffsetAfterAppend": 634,
+        "innerOffset": 100,
+        "detailVisibleAfterAppend": false
+      },
+      "artifacts": {
+        "ci-40073869211-artifacts/rust-ui-consumer-inputs/agentkit-public-consumer-prepare.json": "43c6e0aa37b61386c7d7d63b53d78ed225fb51513573b356c065853a934f9c5e",
+        "ci-40073869211-artifacts/rust-ui-consumer-inputs/agentkit-nested-detail-reading.json": "c4f70b29538ecacd71995d9a3fc7678cf168834c54e6f348c8c095309b9f1b90",
+        "ci-40073869211-artifacts/rust-ui-consumer-inputs/agentkit-ui-metadata.json": "de4f07d6c84bfd573d50767fe5ad18f2e55710ee586efb77426f2d587353b740",
+        "ci-40073869211-artifacts/rust-ui-consumer-inputs/agentkit-ui-inputs.json": "9543ade335292f9c7f61944edd341c2fb9297a7c6abc3cf44dc86c1f16bd6ee3",
+        "ci-40073869211-artifacts/rust-ui-consumer-inputs/agentkit-public-consumer/Cargo.toml": "a9a03cf3feda204459209d66372eb82c7c957907c85f63f99d9d33a6c8e4f540",
+        "ci-40073869211-artifacts/rust-ui-consumer-inputs/agentkit-public-consumer/Cargo.lock": "2c64ec1c18e60040563bdd632e6a903aa16c171510bda31dd6274ae5354b8dd5",
+        "ci-40073869211-artifacts/rust-ui-consumer-inputs/agentkit-public-consumer/Cargo.lock.seed": "4f350ba9cb66878f3faaaad459e3519bbcac9921a844dd274554b858c0ce0722",
+        "ci-40073869211-artifacts/rust-ui-consumer-inputs/agentkit-public-consumer/src/main.rs": "9453d6fd5924e70d0aa4941d06e7e5f57d6a29c1a30dfa8f0f314a2edd7f910e"
+      }
+    },
+    {
+      "runId": 40073865859,
+      "event": "push",
+      "url": "https://github.com/TekesApps/TekesAgentKit/actions/runs/40073865859",
+      "checks": "success",
+      "ui": "failure",
+      "failedSteps": [
+        "Verify nested detail reading intent (strict; no native window)"
+      ],
+      "standaloneConsumerExecuted": "success",
+      "checkoutCommit": "9b9ec1fbb06bd02809d72a338dec02b5b6c4d520",
+      "consumerSourceFiles": 136,
+      "consumerSourceSha256": "ca4730ce8af3bc488c8e3c3862e45380387b09486b747a6b070b56cb902293f3",
+      "sourceMatchesGitHead": true,
+      "rawReading": {
+        "accepted": false,
+        "parentFollowingAfterInnerUp": true,
+        "parentOffsetBefore": 0,
+        "parentOffsetAfterScroll": 0,
+        "parentOffsetAfterAppend": 634,
+        "innerOffset": 100,
+        "detailVisibleAfterAppend": false
+      },
+      "artifacts": {
+        "ci-40073865859-artifacts/rust-ui-consumer-inputs/agentkit-public-consumer-prepare.json": "bc39e199fcd2350cb7389092207bc9d3eefcf25321957b02bfbcddebcbed7e80",
+        "ci-40073865859-artifacts/rust-ui-consumer-inputs/agentkit-nested-detail-reading.json": "c4f70b29538ecacd71995d9a3fc7678cf168834c54e6f348c8c095309b9f1b90",
+        "ci-40073865859-artifacts/rust-ui-consumer-inputs/agentkit-ui-metadata.json": "de4f07d6c84bfd573d50767fe5ad18f2e55710ee586efb77426f2d587353b740",
+        "ci-40073865859-artifacts/rust-ui-consumer-inputs/agentkit-ui-inputs.json": "9543ade335292f9c7f61944edd341c2fb9297a7c6abc3cf44dc86c1f16bd6ee3",
+        "ci-40073865859-artifacts/rust-ui-consumer-inputs/agentkit-public-consumer/Cargo.toml": "a9a03cf3feda204459209d66372eb82c7c957907c85f63f99d9d33a6c8e4f540",
+        "ci-40073865859-artifacts/rust-ui-consumer-inputs/agentkit-public-consumer/Cargo.lock": "2c64ec1c18e60040563bdd632e6a903aa16c171510bda31dd6274ae5354b8dd5",
+        "ci-40073865859-artifacts/rust-ui-consumer-inputs/agentkit-public-consumer/Cargo.lock.seed": "4f350ba9cb66878f3faaaad459e3519bbcac9921a844dd274554b858c0ce0722",
+        "ci-40073865859-artifacts/rust-ui-consumer-inputs/agentkit-public-consumer/src/main.rs": "9453d6fd5924e70d0aa4941d06e7e5f57d6a29c1a30dfa8f0f314a2edd7f910e"
+      }
+    }
+  ]
+}

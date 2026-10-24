@@ -483,3 +483,9 @@
 [最终收据](rust-agent-ui-real-multi-sidebar-results-20261024.md)记录 Native0.9.3、Pi1.3.0、DSH0.2.1-rc.2 在同一当前离屏 demo 的九个真实会话：逐端健康与库存/title/cwd，原分页 limit5→10/挂载6→9/原行ID稳定，三端查询完成、实际 display projection 无 unresolved，以及原导航 reveal 目标的 ContentHost 挂载。严格运行发现并修复分页抢焦点，直接消费 SDK 已有 preserving_focus 属性；合成预编辑与真实桌面验证分开。共享 Pi/Native/DSH/provider 工具接回旧协议脚本后，全三端原断言再通过；SSD空格路径 provider 修复与旧失败保留。最终 UI717/0/1、Python143、严格Clippy、普通demo和独立公开consumer通过，所有构建复用SSD共享target。
 
 该交付不覆盖真实 Task-family（#23）、完整分类 producer（#29）、实际跨端同ID、真实故障/远端cursor、桌面/物理IME/AX或ProcessContainer。#23旧文档已注明 child-open 错误回归由 adbb7f3 完成。#12/#13 定向证据齐备但正文要求PR合并，仍保持open；#25 无新增可独立实施的状态缺陷。#53严格阅读门槛仍失败，不合并/打tag/发布；新head CI单独核对。
+
+### #23 来源准备与 9b CI 回填
+
+[真实家族来源预检](rust-agent-ui-real-task-family-source-results-20261024.md)已核对三端实际公开返回：Native父scope canonical Task与原始bounded页，Pi canonical Summary subagent与parent-bound history，DSH catalog与child presentation；源解析不授予pane/control authority。Python155通过，无Cargo/桌面。后续同一demo原intent/dispatch/挂载、受控迟到、A→B→A家族导航仍需完成；同Task row动态pointer公开producer未找到，#23不关闭。
+
+[9b9ec1f CI收据](rust-agent-ui-ci-9b9ec1f-20261024.md)已下载PR/push两份原始artifact：headless/工作区/独立consumer通过，唯一失败仍是#53严格阅读。新提交的CI不得沿用该结果。
