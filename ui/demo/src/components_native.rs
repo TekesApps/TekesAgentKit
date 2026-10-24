@@ -3167,6 +3167,16 @@ pub fn run() {
     let args: Vec<_> = std::env::args().collect();
     if args
         .iter()
+        .any(|arg| arg == "--sidebar-classification-proof")
+    {
+        assert!(
+            args.iter().any(|arg| arg == "--offscreen")
+                && args.iter().any(|arg| arg == "--family-seed-manifest"),
+            "classification probe requires owned offscreen family sources"
+        );
+    }
+    if args
+        .iter()
         .any(|arg| arg == "--family-seed-manifest" || arg == "--family-delivery-receipt")
     {
         assert!(
@@ -3589,7 +3599,8 @@ pub fn run() {
         configurations.len() == 1
             || !args
                 .iter()
-                .any(|arg| arg.ends_with("-proof") || arg.ends_with("-selftest")),
+                .any(|arg| arg != "--sidebar-classification-proof"
+                    && (arg.ends_with("-proof") || arg.ends_with("-selftest"))),
         "endpoint-specific proof/selftest requires a single configured endpoint"
     );
     let kind = configurations[0].kind;
@@ -4130,7 +4141,17 @@ pub fn run() {
             .unwrap();
             let seeds = tekes_agent_ui_demo::family_seed_manifest::parse_family_seeds(&manifests)
                 .expect("conservative family seed manifest");
-            let receipt = family_delivery::run(&mut host, &seeds);
+            let classification_oracle: Option<serde_json::Value> = args
+                .iter()
+                .position(|arg| arg == "--sidebar-classification-proof")
+                .map(|index| {
+                    serde_json::from_slice(
+                        &std::fs::read(args.get(index + 1).expect("classification oracle path"))
+                            .unwrap(),
+                    )
+                    .expect("public classification oracle JSON")
+                });
+            let receipt = family_delivery::run(&mut host, &seeds, classification_oracle.as_ref());
             let index = args
                 .iter()
                 .position(|arg| arg == "--family-delivery-receipt")

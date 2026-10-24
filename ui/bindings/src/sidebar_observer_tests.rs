@@ -134,6 +134,8 @@ async fn original_subscriber_recovers_and_old_frames_receipts_and_retry_tokens_a
     let mut original_subscriber = binding.subscribe();
     let baseline = binding.snapshot();
     assert_eq!(baseline.rows.len(), 1);
+    let original_classification = baseline.classification.clone();
+    assert!(original_classification.is_some());
     let address = baseline.rows[0].address.clone();
     let old_read = binding.read_selected(&address, 7).unwrap();
     assert!(old_read.is_current(&binding));
@@ -148,6 +150,7 @@ async fn original_subscriber_recovers_and_old_frames_receipts_and_retry_tokens_a
         SidebarObserverPhase::Failed
     );
     assert!(binding.snapshot().rows[0].activity.is_stale);
+    assert_eq!(binding.snapshot().classification, original_classification);
     let before = binding.snapshot().revision;
     binding.restart_observer(retry).unwrap();
     let pending = binding.snapshot();
@@ -156,6 +159,7 @@ async fn original_subscriber_recovers_and_old_frames_receipts_and_retry_tokens_a
     assert!(pending.loaded && pending.observation.converged);
     assert_eq!(pending.rows.len(), baseline.rows.len());
     assert_eq!(pending.activity_at, baseline.activity_at);
+    assert_eq!(pending.classification, original_classification);
     assert!(!old_read.is_current(&binding));
     assert!(binding.restart_observer(duplicate).is_err());
     let old = pending.observation.generation - 1;

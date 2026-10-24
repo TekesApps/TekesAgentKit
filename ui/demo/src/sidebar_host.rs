@@ -82,6 +82,7 @@ impl SidebarHostPublication {
             && source.observation == self.observation
             && source.activity_at == self.activity_at
             && source.name_corpus == self.name_corpus
+            && source.classification == self.classification
             && source.rows.iter().all(|row| {
                 seen.insert(row.address.clone())
                     && self.rows.iter().any(|original| {
@@ -308,6 +309,7 @@ impl SidebarHostBinding {
         SidebarHostPublication {
             owner: owner.clone(),
             publication: SidebarPublication {
+                classification: None,
                 // The facade has no single observer; recovery uses the retained
                 // per-endpoint publication and opaque original source token.
                 observation: Default::default(),

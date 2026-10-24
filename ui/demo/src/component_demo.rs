@@ -2579,6 +2579,7 @@ impl ComponentDemo {
         self.sidebar_host_source
             .as_ref()
             .map(|source| SidebarPublication {
+                classification: source.classification.clone(),
                 observation: source.observation,
                 revision: source.revision,
                 rows: source.rows.clone(),

@@ -90,6 +90,8 @@ pub struct SidebarPublication {
     pub activity_at: std::collections::BTreeMap<SessionAddress, f64>,
     /// Retained-name source captured from this exact inventory frame.
     pub name_corpus: Option<SidebarNameCorpus>,
+    /// Complete classification facts from the same original inventory frame.
+    pub classification: Option<crate::SidebarClassificationPublication>,
     pub loaded: bool,
     pub error: Option<String>,
 }
@@ -179,6 +181,7 @@ impl SidebarBinding {
             rows: vec![],
             activity_at: Default::default(),
             name_corpus: None,
+            classification: None,
             loaded: false,
             error: None,
         }));
@@ -491,6 +494,17 @@ fn publish_inventory_frame(
         phase: SidebarObserverPhase::Observing,
         converged: previous.observation.converged || loaded,
     };
+    let classification = frame["connectionEpoch"].as_u64().map(|connection_epoch| {
+        crate::SidebarClassificationPublication {
+            endpoint_id: endpoint_id.clone(),
+            source_revision: revision,
+            connection_epoch,
+            observer_generation: generation,
+            inventory_ready: frame_inventory_ready,
+            archive_facts: frame.get("archiveFacts").cloned(),
+            records: state.inventory.classification.clone(),
+        }
+    });
     state
         .sender
         .as_ref()
@@ -501,6 +515,7 @@ fn publish_inventory_frame(
             rows,
             activity_at,
             name_corpus,
+            classification,
             loaded,
             error: None,
         }));
@@ -538,6 +553,7 @@ fn publish_observer_failure(
 #[derive(Clone, Default)]
 struct InventoryRows {
     activity: std::collections::BTreeMap<String, (bool, f64)>,
+    classification: std::collections::BTreeMap<SessionAddress, crate::SidebarClassificationRecord>,
 }
 fn inventory_activity_at(
     endpoint_id: &str,
@@ -573,6 +589,7 @@ impl InventoryRows {
             .ok_or_else(|| unsupported("invalid inventory rows"))?;
         let mut addresses = std::collections::BTreeSet::new();
         let mut activity = std::collections::BTreeMap::new();
+        let mut classification = std::collections::BTreeMap::new();
         let mut rows = Vec::new();
         for item in items {
             let id = tekes_agent_contract::string(item, "sessionId")?;
@@ -581,6 +598,16 @@ impl InventoryRows {
                 "duplicate or empty inventory identity",
             )?;
             let summary = &item["summary"];
+            let facts =
+                crate::SidebarClassificationFacts::from_summary(summary).map_err(unsupported)?;
+            let included = sidebar_row_is_member(item);
+            classification.insert(
+                SessionAddress {
+                    endpoint_id: endpoint_id.clone(),
+                    session_id: id.to_owned(),
+                },
+                crate::SidebarClassificationRecord { facts, included },
+            );
             let updated = summary["updatedAt"]
                 .as_f64()
                 .filter(|v| v.is_finite())
@@ -593,7 +620,7 @@ impl InventoryRows {
                 _ => updated,
             };
             activity.insert(id.to_owned(), (running, effective));
-            if sidebar_row_is_member(item) {
+            if included {
                 rows.push(inventory_row(
                     &endpoint_id,
                     item,
@@ -609,6 +636,7 @@ impl InventoryRows {
         });
         // Commit only after every row and action source was accepted.
         self.activity = activity;
+        self.classification = classification;
         Ok(rows)
     }
 }

@@ -495,3 +495,8 @@
 [结果与限制](rust-agent-ui-real-task-family-results-20261024.md)记录三端各两个真实 parent/child 的目录控件→原 OpenChild/HostResult→原子历史绑定、A→B→A、正文节点、返回/关闭和父草稿保留。新增 FamilyCatalog 复用原 ChildCatalogState，使用不透明 owner key 防止同地址/同计数的新绑定复活旧意图；Native Task 保持非独立 Summary 行，bounded child 只读。关闭后旧结果错误已用红/绿回归修复，父切换时的合法缓存语义保留。UI734/0/1、Python161、严格Clippy、普通demo和六挂载独立consumer通过，全程使用SSD共享target。
 
 同Task row真实动态pointer、完整窗口/chrome、物理IME/AX及#53仍开放，不能据本轮关闭#23或合并/发布。新增家族入口属于AgentKit高层控件，没有修改TekesUI基础组件。新head CI单独核对。
+
+
+### #29：同帧分类与真实三端生命周期
+
+[本轮结果](rust-agent-ui-real-sidebar-classification-results-20261024.md)补齐原 summary 字段的 Missing/Known/Unknown、同帧 publication 与搜索/宿主透传、同源归档事实、严格收据拒绝和原历史保留。真实 Native0.9.3/Pi1.3.0/DSH0.2.1-rc.2 的15个生命周期样本、当前Pi实例内新建scratch、原22个selected reads及六组家族导航通过；九会话Sidebar分页/焦点/reveal回归另通过。UI747/0/1、root340/0/0、Python170、严格Clippy/格式/边界与独立consumer执行通过；最后probe补充由普通demo构建和真实三端离屏运行另验。Pi scratch跨实例退休与Native无workspace归档事实单独记录，不制造main或archive authority。#29待新headCI及对应验收复核；#23动态Task pointer、桌面/IME/AX、#53仍开放，不合并发布。

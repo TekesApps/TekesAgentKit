@@ -49,6 +49,8 @@ pub struct SidebarMultiPublication {
     pub activity_at: BTreeMap<SessionAddress, f64>,
     /// Retained-name corpus from each original child endpoint publication.
     pub name_corpora: BTreeMap<String, SidebarNameCorpus>,
+    /// Lossless classification snapshots keyed by their original endpoint.
+    pub classification: BTreeMap<String, crate::SidebarClassificationPublication>,
     /// Initial aggregation has converged when every endpoint published once or
     /// reached a terminal observer error; inspect endpoint status for health.
     pub loaded: bool,
@@ -471,6 +473,7 @@ fn aggregate_publication(
     let mut addresses = BTreeSet::new();
     let mut endpoints = BTreeMap::new();
     let mut name_corpora = BTreeMap::new();
+    let mut classifications = BTreeMap::new();
     for (endpoint_id, source) in endpoint_ids.iter().zip(sources) {
         require(
             !endpoint_id.is_empty(),
@@ -483,6 +486,39 @@ fn aggregate_publication(
             )?;
             corpus.validate()?;
             name_corpora.insert(endpoint_id.clone(), corpus.clone());
+        }
+        if let Some(classification) = &source.classification {
+            require(
+                classification.endpoint_id == *endpoint_id,
+                "Sidebar classification escaped its endpoint partition",
+            )?;
+            require(
+                classification.source_revision > 0
+                    && classification.source_revision <= source.revision
+                    && classification.observer_generation > 0
+                    && classification.observer_generation <= source.observation.generation,
+                "Sidebar classification source is newer than its endpoint publication",
+            )?;
+            if source.observation.phase == SidebarObserverPhase::Observing {
+                require(
+                    classification.source_revision == source.revision
+                        && classification.observer_generation == source.observation.generation,
+                    "observing Sidebar classification is not from its current frame",
+                )?;
+            }
+            if let Some(corpus) = &source.name_corpus {
+                require(
+                    classification.connection_epoch == corpus.connection_epoch,
+                    "Sidebar classification epoch differs from retained-name corpus",
+                )?;
+            }
+            for address in classification.records.keys() {
+                require(
+                    address.endpoint_id == *endpoint_id && !address.session_id.is_empty(),
+                    "Sidebar classification escaped its endpoint partition",
+                )?;
+            }
+            classifications.insert(endpoint_id.clone(), classification.clone());
         }
         let observer_stale = source.observation.phase != SidebarObserverPhase::Observing;
         // Preserve the complete active-inventory activity catalog from each
@@ -559,6 +595,7 @@ fn aggregate_publication(
         rows,
         activity_at,
         name_corpora,
+        classification: classifications,
         loaded,
         error: (!errors.is_empty()).then(|| errors.join("; ")),
         endpoints,
@@ -623,6 +660,7 @@ mod tests {
             rows,
             activity_at,
             name_corpus: None,
+            classification: None,
             loaded,
             error: error.map(str::to_owned),
             observation: SidebarObservation {
@@ -645,6 +683,7 @@ mod tests {
             rows: vec![row],
             activity_at,
             name_corpus: None,
+            classification: None,
             loaded: false,
             error: Some("previous observer failed".into()),
             observation: SidebarObservation {
@@ -820,5 +859,52 @@ mod tests {
                 .iter()
                 .any(|r| r.address.endpoint_id == "endpoint-a")
         );
+    }
+
+    #[test]
+    fn aggregate_preserves_original_classification_source_on_restarting_child() {
+        let ids = vec!["endpoint-a".to_owned()];
+        let mut source =
+            (*restarting_publication(9, row("endpoint-a", "parent", false), 2.0)).clone();
+        let address = SessionAddress {
+            endpoint_id: "endpoint-a".into(),
+            session_id: "hidden-child".into(),
+        };
+        let classification = crate::SidebarClassificationPublication {
+            endpoint_id: "endpoint-a".into(),
+            source_revision: 7,
+            connection_epoch: 4,
+            observer_generation: 1,
+            inventory_ready: true,
+            archive_facts: Some(
+                serde_json::json!({"workspaceReady":false,"archivedSessionIds":["old"]}),
+            ),
+            records: BTreeMap::from([(
+                address.clone(),
+                crate::SidebarClassificationRecord {
+                    facts: crate::SidebarClassificationFacts {
+                        origin: crate::SidebarClassificationFact::Known(
+                            crate::SidebarClassificationOrigin::Subagent,
+                        ),
+                        parent_session_id: crate::SidebarClassificationFact::Known("parent".into()),
+                        ephemeral: crate::SidebarClassificationFact::Known(false),
+                    },
+                    included: false,
+                },
+            )]),
+        };
+        source.classification = Some(classification.clone());
+
+        let merged = aggregate_publication(3, &ids, &[Arc::new(source)]).unwrap();
+
+        assert_eq!(
+            merged.classification.get("endpoint-a"),
+            Some(&classification)
+        );
+        assert!(
+            !merged.activity_at.contains_key(&address),
+            "classification does not synthesize activity or rows"
+        );
+        assert!(merged.rows.iter().all(|row| row.address != address));
     }
 }

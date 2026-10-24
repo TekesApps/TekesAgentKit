@@ -42,6 +42,24 @@ fn active_inventory(state: &MemoryProjectionStore) -> Vec<Value> {
         .collect()
 }
 
+/// Raw archive facts from the exact store snapshot used by active_inventory.
+/// Retained values do not become current confirmation while readiness is false.
+fn inventory_archive_facts(state: &MemoryProjectionStore) -> Value {
+    let statuses: BTreeMap<_, _> = state
+        .sessions
+        .iter()
+        .filter_map(|(id, session)| {
+            session
+                .summary
+                .as_ref()?
+                .get("status")
+                .map(|value| (id.clone(), value.clone()))
+        })
+        .collect();
+    json!({"workspaceReady":state.workspace_ready,"archivedSessionIds":state.archived_session_ids,
+        "retainedSummaryStatuses":statuses})
+}
+
 /// Builds the retained name corpus from the same canonical store snapshot as inventory rows.
 /// Display membership, archive status, and session classifications do not filter this source.
 pub fn retained_name_corpus(
@@ -508,7 +526,7 @@ impl SharedAgent {
             .collect();
         let name_corpus = retained_name_corpus(state, self.endpoints.keys().cloned())?;
         Ok(
-            json!({"description":shared.description(),"sessions":sessions,"inventoryReady":state.inventory_ready,"connectionEpoch":state.connection_epoch,"nameCorpus":name_corpus}),
+            json!({"description":shared.description(),"sessions":sessions,"inventoryReady":state.inventory_ready,"connectionEpoch":state.connection_epoch,"nameCorpus":name_corpus,"archiveFacts":inventory_archive_facts(state)}),
         )
     }
     fn decorate_inventory_row(&self, state: &MemoryProjectionStore, row: Value) -> Value {
@@ -934,5 +952,39 @@ impl SharedAgent {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod archive_facts_tests {
+    use super::*;
+    #[test]
+    fn archive_facts_preserve_readiness_and_raw_status_without_promoting_missing() {
+        let mut store = MemoryProjectionStore::new("fixture");
+        store.archived_session_ids = vec!["retained".into()];
+        for (id, summary) in [
+            ("retained", json!({"status":"archived"})),
+            ("missing", json!({})),
+            ("null", json!({"status":null})),
+            ("future", json!({"status":{"future":true}})),
+        ] {
+            store.sessions.entry(id.into()).or_default().summary = Some(summary);
+        }
+        let facts = inventory_archive_facts(&store);
+        assert_eq!(facts["workspaceReady"], false);
+        assert_eq!(facts["archivedSessionIds"], json!(["retained"]));
+        assert!(facts["retainedSummaryStatuses"].get("missing").is_none());
+        assert_eq!(facts["retainedSummaryStatuses"]["null"], Value::Null);
+        assert_eq!(
+            facts["retainedSummaryStatuses"]["future"],
+            json!({"future":true})
+        );
+        store.workspace_ready = true;
+        let confirmed = inventory_archive_facts(&store);
+        assert_eq!(confirmed["workspaceReady"], true);
+        assert_eq!(
+            confirmed["retainedSummaryStatuses"],
+            facts["retainedSummaryStatuses"]
+        );
     }
 }

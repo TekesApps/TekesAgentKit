@@ -13,7 +13,11 @@ use tekes_agent_presentation::{
     SidebarObserverSourceKey, SidebarObserverStatusInput, SidebarSearchInput, SidebarSearchKey,
     SidebarSearchMatch, SidebarSearchPhase, SidebarSearchPublication,
 };
-use tekes_agent_ui_bindings::{SidebarEndpointStatus, SidebarMultiPublication, SidebarPublication};
+use tekes_agent_ui_bindings::{
+    SidebarClassificationFact, SidebarClassificationFacts, SidebarClassificationOrigin,
+    SidebarClassificationPublication, SidebarClassificationRecord, SidebarEndpointStatus,
+    SidebarMultiPublication, SidebarPublication,
+};
 use tekes_agent_ui_demo::sidebar_delivery_receipt::sidebar_delivery_receipt_from_facts;
 
 fn address(endpoint: &str, session: &str) -> SessionAddress {
@@ -126,6 +130,7 @@ fn facts(
         })
         .collect();
     let multi = SidebarMultiPublication {
+        classification: Default::default(),
         revision: 7,
         rows: rows.clone(),
         activity_at: activity_at.clone(),
@@ -135,6 +140,7 @@ fn facts(
         endpoints: endpoint_statuses,
     };
     let publication = SidebarPublication {
+        classification: None,
         revision: 7,
         observation: tekes_agent_presentation::SidebarObservation::default(),
         rows,
@@ -144,6 +150,77 @@ fn facts(
         error: None,
     };
     (publication, multi)
+}
+
+fn classification_source(
+    endpoint: &str,
+    rows: &[SidebarRow],
+    archive_facts: Option<serde_json::Value>,
+) -> SidebarClassificationPublication {
+    use SidebarClassificationFact as Fact;
+
+    SidebarClassificationPublication {
+        endpoint_id: endpoint.into(),
+        source_revision: 7,
+        connection_epoch: 42,
+        observer_generation: 3,
+        inventory_ready: true,
+        archive_facts,
+        records: rows
+            .iter()
+            .filter(|row| row.address.endpoint_id == endpoint)
+            .map(|row| {
+                (
+                    row.address.clone(),
+                    SidebarClassificationRecord {
+                        facts: SidebarClassificationFacts {
+                            origin: Fact::Known(SidebarClassificationOrigin::Fork),
+                            parent_session_id: Fact::Missing,
+                            ephemeral: Fact::Known(false),
+                        },
+                        included: true,
+                    },
+                )
+            })
+            .collect(),
+    }
+}
+
+fn classified_multi_facts(
+    archive_facts: Option<serde_json::Value>,
+) -> (SidebarPublication, SidebarMultiPublication) {
+    let rows = vec![row("endpoint-a", "a-1", 0), row("endpoint-b", "b-1", 1)];
+    let (mut publication, mut multi) = facts(rows, &["endpoint-a", "endpoint-b"]);
+    publication.observation = tekes_agent_presentation::SidebarObservation {
+        generation: 3,
+        phase: SidebarObserverPhase::Observing,
+        converged: true,
+    };
+    for status in multi.endpoints.values_mut() {
+        status.observation = publication.observation;
+    }
+    multi.classification.insert(
+        "endpoint-a".into(),
+        classification_source("endpoint-a", &publication.rows, archive_facts),
+    );
+    (publication, multi)
+}
+
+fn classified_receipt(
+    publication: &SidebarPublication,
+    multi: &SidebarMultiPublication,
+) -> Result<serde_json::Value, &'static str> {
+    let mut sidebar = Sidebar::new(85, SidebarLabels::default());
+    sidebar.update(&publication.input(None)).unwrap();
+    sidebar_delivery_receipt_from_facts(
+        publication,
+        &observer(&["endpoint-a", "endpoint-b"]),
+        2,
+        Some(multi),
+        &multi.folder_catalog().unwrap(),
+        &sidebar,
+        None,
+    )
 }
 
 fn search(endpoints: &[&str], hit_addresses: &[SessionAddress]) -> SidebarMultiSearchPublication {
@@ -389,4 +466,102 @@ fn rejects_an_address_outside_the_original_endpoint_domain() {
         )
         .is_err()
     );
+}
+
+#[test]
+fn rejects_classification_from_another_revision_generation_or_endpoint() {
+    let (publication, mut multi) = classified_multi_facts(None);
+    let source = multi.classification.get_mut("endpoint-a").unwrap();
+    source.source_revision = 6;
+    assert!(classified_receipt(&publication, &multi).is_err());
+
+    let (publication, mut multi) = classified_multi_facts(None);
+    let source = multi.classification.get_mut("endpoint-a").unwrap();
+    source.observer_generation = 2;
+    assert!(classified_receipt(&publication, &multi).is_err());
+
+    let (publication, mut multi) = classified_multi_facts(None);
+    let mut source = multi.classification.remove("endpoint-a").unwrap();
+    source.endpoint_id = "retired-endpoint".into();
+    multi
+        .classification
+        .insert("retired-endpoint".into(), source);
+    assert!(classified_receipt(&publication, &multi).is_err());
+}
+
+#[test]
+fn rejects_classification_records_that_do_not_match_source_rows_and_activity_keys() {
+    let (publication, mut multi) = classified_multi_facts(None);
+    multi
+        .classification
+        .get_mut("endpoint-a")
+        .unwrap()
+        .records
+        .clear();
+    assert!(classified_receipt(&publication, &multi).is_err());
+
+    let (publication, mut multi) = classified_multi_facts(None);
+    multi
+        .classification
+        .get_mut("endpoint-a")
+        .unwrap()
+        .records
+        .values_mut()
+        .next()
+        .unwrap()
+        .included = false;
+    assert!(classified_receipt(&publication, &multi).is_err());
+
+    let (mut publication, multi) = classified_multi_facts(None);
+    publication
+        .activity_at
+        .remove(&address("endpoint-a", "a-1"));
+    assert!(classified_receipt(&publication, &multi).is_err());
+}
+
+#[test]
+fn classification_receipt_preserves_raw_archive_fact_values() {
+    let (publication, multi) = classified_multi_facts(Some(serde_json::json!(false)));
+    let receipt = classified_receipt(&publication, &multi).unwrap();
+    assert_eq!(
+        receipt["source"]["classification"][0]["archiveFacts"],
+        serde_json::json!(false)
+    );
+
+    let raw = serde_json::json!({
+        "workspaceReady": false,
+        "archivedSessionIds": ["raw-id"],
+        "retainedSummaryStatuses": {"raw-id": null, "future-id": {"state": "future"}}
+    });
+    let (publication, multi) = classified_multi_facts(Some(raw.clone()));
+    let receipt = classified_receipt(&publication, &multi).unwrap();
+    assert_eq!(receipt["source"]["classification"][0]["archiveFacts"], raw);
+}
+
+#[test]
+fn classification_receipt_distinguishes_missing_archive_facts_from_raw_null() {
+    let (publication, multi) = classified_multi_facts(None);
+    let missing = classified_receipt(&publication, &multi).unwrap();
+    let (publication, multi) = classified_multi_facts(Some(serde_json::Value::Null));
+    let explicit_null = classified_receipt(&publication, &multi).unwrap();
+
+    assert_eq!(
+        missing["source"]["classification"][0]["archiveFacts"],
+        serde_json::Value::Null
+    );
+    assert_eq!(
+        explicit_null["source"]["classification"][0]["archiveFacts"],
+        serde_json::Value::Null
+    );
+    assert!(
+        missing["source"]["classification"][0]
+            .get("archiveFacts")
+            .is_none()
+    );
+    assert!(
+        explicit_null["source"]["classification"][0]
+            .get("archiveFacts")
+            .is_some()
+    );
+    assert_ne!(missing, explicit_null);
 }

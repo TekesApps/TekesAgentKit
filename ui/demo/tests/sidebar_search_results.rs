@@ -32,6 +32,7 @@ fn row(id: &str) -> SidebarRow {
 }
 fn inventory() -> SidebarPublication {
     SidebarPublication {
+        classification: None,
         observation: Default::default(),
         activity_at: Default::default(),
         name_corpus: None,

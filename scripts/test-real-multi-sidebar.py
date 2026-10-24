@@ -21,6 +21,7 @@ from native_owned_fixture import owned_native
 from owned_endpoint_provider import provider_handler
 from pi_owned_fixture import prepare_pi
 from runtime_provenance import kernel_programs
+from sidebar_classification_fixture import classification_commands, parse_classification_exchange, validate_classification_delivery
 from task_family_fixture import native_task_seed_commands, pi_subagent_seed_commands, dsh_subagent_seed_commands, parse_family_exchange
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -126,7 +127,10 @@ def main():
                  'kernel-supervisor', 'kernel-worker', 'output']:
         parser.add_argument('--'+name, type=Path, required=True)
     parser.add_argument('--task-family', action='store_true', help='Use real public Task/child seeds and original family navigation receipt; separate from Sidebar acceptance')
+    parser.add_argument('--classification-proof', action='store_true', help='Add actual public fork/ephemeral/archive and history retention to the family profile')
     args = parser.parse_args()
+    if args.classification_proof and not args.task_family:
+        parser.error('classification-proof requires task-family source seeds')
     output = args.output.resolve()
     if output.exists():
         parser.error('output must be a new owned directory')
@@ -148,6 +152,7 @@ def main():
     threading.Thread(target=server.serve_forever, daemon=True).start()
     marker = 'agentkit-multi-'+uuid.uuid4().hex
     seeds = []
+    classification_seeds = []
     started = time.time()
     try:
         with ExitStack() as stack:
@@ -227,6 +232,18 @@ def main():
                         assert marker+' input '+endpoint_id+' '+str(index) in state and 'ENDPOINT_REPLY_OK' in state, 'input/reply missing'
                         seeds.append({'endpointId':endpoint_id,'sessionId':session_id,
                                       'title':marker+' '+endpoint_id+' '+str(index),'cwd':str(workspace)})
+                if args.classification_proof:
+                    child_ids = [seed['child']['address']['sessionId'] for seed in seeds if seed['endpoint'] == endpoint_id]
+                    commands, samples = classification_commands(endpoint_id, ids[0], child_ids, native_source=dict(cwd=workspace, provider=provider, model=model))
+                    write_json(output/(endpoint_id+'-classification-commands.json'), commands)
+                    result = subprocess.run([str(headless)], input=json.dumps(dict(config, commands=commands)),
+                                            text=True, capture_output=True, env=environment, timeout=120)
+                    (output/(endpoint_id+'-classification.stdout')).write_text(result.stdout)
+                    (output/(endpoint_id+'-classification.stderr')).write_text(result.stderr)
+                    assert result.returncode == 0, endpoint_id+' public classification seed failed'
+                    outputs = [json.loads(line) for line in result.stdout.splitlines()]
+                    assert outputs[0]['version'] == config['expectedVersion'], 'classification runtime version mismatch'
+                    classification_seeds.append(parse_classification_exchange(endpoint_id, commands, outputs, samples))
                 endpoint = {key:value for key,value in config.items()
                             if key not in ('bearer','cookie','expectedVersion','commands')}
                 endpoint.update(endpointId=endpoint_id,sessions=ids[:2])
@@ -234,6 +251,7 @@ def main():
                 if endpoint_id == 'dsh': endpoint['cookieEnv'] = DSH_AUTH
                 endpoints.append(endpoint)
             write_json(output/'seeds.json', seeds)
+            if args.classification_proof: write_json(output/'classification-seeds.json', classification_seeds)
             write_json(output/'endpoints.json', {'endpoints':endpoints})
             demo_env = dict(environment, **{NATIVE_AUTH:native['bearer'], DSH_AUTH:dsh.cookie})
             if args.task_family:
@@ -245,16 +263,22 @@ def main():
                 command = [str(demo),'--components','--endpoint-config',str(output/'endpoints.json'),
                            '--sidebar-query',marker,'--sidebar-delivery-receipt',str(output/'delivery.json'),
                            '--offscreen',str(output/'sidebar.png')]
+            if args.classification_proof:
+                command.extend(['--sidebar-classification-proof',str(output/'classification-seeds.json')])
             result = subprocess.run(command, env=demo_env, text=True, capture_output=True, timeout=120)
             (output/'demo.stdout').write_text(result.stdout)
             (output/'demo.stderr').write_text(result.stderr)
             assert result.returncode == 0, 'offscreen host failed; inspect owned logs/partial receipt'
             delivery = json.loads((output/'delivery.json').read_text())
             accepted = validate_family_delivery(delivery, seeds) if args.task_family else validate_delivery(delivery, seeds)
+            if args.classification_proof:
+                accepted['classification'] = validate_classification_delivery(delivery, classification_seeds)
             accepted.update(startedAt=started, finishedAt=time.time(), providerRequestPaths=requests)
             write_json(output/'acceptance.json', accepted)
             print(json.dumps(accepted))
     except BaseException as error:
+        if 'native' in locals():
+            (output/'native-diagnostic-tail.log').write_text(native['diagnostic_tail']())
         write_json(output/'failure.json', {'accepted':False,'errorType':type(error).__name__,
                    'startedAt':started,'finishedAt':time.time(),'seedCount':len(seeds)})
         raise

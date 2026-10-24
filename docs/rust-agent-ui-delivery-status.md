@@ -1,6 +1,8 @@
 # Rust Agent UI：当前接入范围与交付状态
 
-需求分配与后续执行以 [Issue 驱动交付计划](rust-agent-ui-issue-plan.md) / [总追踪 #14](https://github.com/TekesApps/TekesAgentKit/issues/14) 为准。下列专题与阶段计数保留各自历史身份；不能据旧表格覆盖最新 Issue 状态。最新 CI 复核基线为 `32986d4`：两套 headless/UI 测试/格式/Clippy 及新增独立 consumer 均通过，严格阅读仍因 TekesUI #53 失败。详见[最新 CI 收据](rust-agent-ui-ci-review-20261024.md)。
+需求分配与后续执行以 [Issue 驱动交付计划](rust-agent-ui-issue-plan.md) / [总追踪 #14](https://github.com/TekesApps/TekesAgentKit/issues/14) 为准。下列专题与阶段计数保留各自历史身份；不能据旧表格覆盖最新 Issue 状态。本页较早 CI 复核基线为 `32986d4`：两套 headless/UI 测试/格式/Clippy 及新增独立 consumer 均通过，严格阅读仍因 TekesUI #53 失败。详见[最新 CI 收据](rust-agent-ui-ci-review-20261024.md)。
+
+最新增量：[真实三端分类与历史保留](rust-agent-ui-real-sidebar-classification-results-20261024.md)已完成15个公开生命周期样本、当前Pi实例scratch、同帧classification与原selected-read/历史恢复；原六组家族与九会话Sidebar离屏回归通过。UI747/0/1、root340/0/0、Python170、独立consumer执行通过；最后probe增量另经严格Clippy、普通demo构建与实际三端运行。历史CI基线分别保留；PR #10 当前新提交CI需另核对。#53、桌面/IME/AX、Task动态pointer和完整交付仍未完成。
 
 本批按主/子会话并行推进 #22/#23/#25：[统一结果与未验收项](rust-agent-ui-parallel-results-20261024.md)。新增多端 binding 和 Summary pointer 门禁，主会话验证 presentation225/UI634（1原有忽略）及 Pi/DSH 原 Summary→子 Run 非桌面闭环；完整交付仍未达到。
 

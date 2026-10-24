@@ -145,6 +145,7 @@ fn serialize_delivery_receipt(
             "endpointCount": endpoint_count,
             "rows": raw_rows,
             "activityAt": activity_at,
+            "classification": classification_json(publication, multi)?,
             "nameCorpus": name_corpus,
             "nameCorpora": multi.map(multi_name_corpora_json).unwrap_or(Value::Null),
             "multiEndpoints": multi.map(multi_endpoints_json).unwrap_or(Value::Null),
@@ -490,4 +491,99 @@ fn search_phase_json(phase: &SidebarSearchPhase) -> Value {
             "retryable": retryable
         }),
     }
+}
+
+fn fact_json<T>(
+    fact: &tekes_agent_ui_bindings::SidebarClassificationFact<T>,
+    known: impl Fn(&T) -> Value,
+) -> Value {
+    use tekes_agent_ui_bindings::SidebarClassificationFact::*;
+    match fact {
+        Missing => json!({"state":"missing"}),
+        Known(value) => json!({"state":"known","value":known(value)}),
+        Unknown(value) => json!({"state":"unknown","value":value}),
+    }
+}
+
+/// No runtime read: all facts are from the original inventory packet.
+fn classification_json(
+    publication: &SidebarPublication,
+    multi: Option<&SidebarMultiPublication>,
+) -> Result<Value, &'static str> {
+    let sources: Vec<_> = match multi {
+        Some(multi) => multi.classification.values().collect(),
+        None => publication.classification.iter().collect(),
+    };
+    let mut evidence = Vec::new();
+    for source in sources {
+        let endpoint = &source.endpoint_id;
+        let (current_revision, observation) = match multi {
+            Some(multi) => {
+                let status = multi
+                    .endpoints
+                    .get(endpoint)
+                    .ok_or("classification endpoint missing")?;
+                (status.revision, status.observation)
+            }
+            None => (publication.revision, publication.observation),
+        };
+        if source.source_revision == 0
+            || source.source_revision > current_revision
+            || source.observer_generation == 0
+            || source.observer_generation > observation.generation
+        {
+            return Err("classification source fence is newer than original packet");
+        }
+        if observation.phase == SidebarObserverPhase::Observing
+            && (source.source_revision != current_revision
+                || source.observer_generation != observation.generation)
+        {
+            return Err("classification belongs to a different inventory frame");
+        }
+        let active: BTreeSet<_> = publication
+            .activity_at
+            .keys()
+            .filter(|key| &key.endpoint_id == endpoint)
+            .collect();
+        let recorded: BTreeSet<_> = source.records.keys().collect();
+        if active != recorded {
+            return Err("classification does not cover original active inventory");
+        }
+        let included: BTreeSet<_> = source
+            .records
+            .iter()
+            .filter(|(_, value)| value.included)
+            .map(|(key, _)| key)
+            .collect();
+        let displayed: BTreeSet<_> = publication
+            .rows
+            .iter()
+            .filter(|row| &row.address.endpoint_id == endpoint)
+            .map(|row| &row.address)
+            .collect();
+        if included != displayed {
+            return Err("classification membership differs from original rows");
+        }
+        let records: Vec<_> = source.records.iter().map(|(address, record)| {
+            let facts = &record.facts;
+            json!({"address":address_json(address),"included":record.included,
+                "origin":fact_json(&facts.origin, |origin| match origin {
+                    tekes_agent_ui_bindings::SidebarClassificationOrigin::Fork => json!("fork"),
+                    tekes_agent_ui_bindings::SidebarClassificationOrigin::Subagent => json!("subagent"),
+                }),
+                "parentSessionId":fact_json(&facts.parent_session_id, |value| json!(value)),
+                "ephemeral":fact_json(&facts.ephemeral, |value| json!(value))})
+        }).collect();
+        let mut frame = json!({"endpointId":endpoint,"sourceRevision":source.source_revision,
+            "connectionEpoch":source.connection_epoch,"observerGeneration":source.observer_generation,
+            "inventoryReady":source.inventory_ready,"records":records});
+        if let Some(raw) = &source.archive_facts {
+            frame
+                .as_object_mut()
+                .unwrap()
+                .insert("archiveFacts".into(), raw.clone());
+        }
+        evidence.push(frame);
+    }
+    Ok(json!(evidence))
 }

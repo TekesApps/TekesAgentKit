@@ -1679,6 +1679,7 @@ fn sidebar_observation_exposes_restoration_and_failure_through_public_api() {
     use tekes_agent_components_ui::{Sidebar, SidebarLabels};
     use tekes_agent_ui_bindings::SidebarPublication;
     let mut source = SidebarPublication {
+        classification: None,
         observation: Default::default(),
         activity_at: Default::default(),
         name_corpus: None,
@@ -1907,6 +1908,7 @@ fn second_product_consumes_result_projection_and_empty_state_without_private_typ
     use tekes_agent_components_ui::*;
     use tekes_agent_ui_bindings::{SidebarPublication, SidebarSearchPublication};
     let source = SidebarPublication {
+        classification: None,
         observation: Default::default(),
         activity_at: Default::default(),
         name_corpus: None,
@@ -2057,6 +2059,7 @@ fn independent_product_hides_unmatched_pins_without_erasing_preferences_or_pendi
     };
     let address = RunScope::main("consumer-endpoint", "pin").address();
     let source = SidebarPublication {
+        classification: None,
         observation: Default::default(),
         activity_at: Default::default(),
         name_corpus: None,
@@ -2152,6 +2155,7 @@ fn second_product_consumes_scoped_folder_grouping_filter_and_original_disclosure
         },
     };
     let source = SidebarPublication {
+        classification: None,
         observation: Default::default(),
         activity_at: Default::default(),
         name_corpus: None,

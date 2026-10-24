@@ -806,3 +806,6 @@ pub use actionable::*;
 
 mod family_catalog;
 pub use family_catalog::*;
+
+mod sidebar_classification;
+pub use sidebar_classification::*;

@@ -208,7 +208,10 @@ impl SidebarSearchProjector {
             let endpoint_id = child.endpoint_id.as_str();
             let child_inventory = SidebarPublication {
                 observation: inventory.endpoints[endpoint_id].observation,
-                revision: inventory.revision,
+                // Preserve the original endpoint's revision. The aggregate
+                // revision advances independently and cannot stand in for a
+                // child source revision.
+                revision: inventory.endpoints[endpoint_id].revision,
                 rows: inventory
                     .rows
                     .iter()
@@ -222,6 +225,7 @@ impl SidebarSearchProjector {
                     .map(|(address, activity)| (address.clone(), *activity))
                     .collect(),
                 name_corpus: inventory.name_corpora.get(endpoint_id).cloned(),
+                classification: inventory.classification.get(endpoint_id).cloned(),
                 loaded: inventory.endpoints[endpoint_id].loaded,
                 error: inventory.endpoints[endpoint_id].error.clone(),
             };

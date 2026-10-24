@@ -75,6 +75,7 @@ fn publication(corpus: SidebarNameCorpus) -> SidebarPublication {
         activity_at.insert(address(id), activity);
     }
     SidebarPublication {
+        classification: None,
         observation: tekes_agent_ui_bindings::SidebarObservation {
             generation: 1,
             phase: SidebarObserverPhase::Observing,

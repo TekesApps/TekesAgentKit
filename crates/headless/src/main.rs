@@ -327,6 +327,44 @@ async fn main() -> Result<()> {
                 Value::Null
             }
             "snapshot" => serde_json::to_value(&*runtime.snapshot())?,
+            // Fixture-only observation; membership is not archive authority.
+            // Public lifecycle acknowledgements are checked separately by the caller.
+            "waitInventoryMembership" => {
+                let id = id.ok_or_else(|| unsupported("sessionId required"))?;
+                let expected = command["present"]
+                    .as_bool()
+                    .ok_or_else(|| unsupported("present boolean required"))?;
+                let mut changes = runtime.subscribe();
+                tokio::time::timeout(Duration::from_secs(15), async {
+                    loop {
+                        let converged = {
+                            let state = runtime.snapshot();
+                            let present = state
+                                .sessions
+                                .get(id)
+                                .and_then(|value| value.summary.as_ref())
+                                .is_some_and(|summary| summary["status"] != "archived")
+                                && !state.archived_session_ids.iter().any(|value| value == id);
+                            state.inventory_ready
+                                && matches!(
+                                    state.connection,
+                                    tekes_agent_session::ConnectionState::Ready
+                                )
+                                && present == expected
+                        };
+                        if converged {
+                            return Ok::<_, tekes_agent_contract::Error>(());
+                        }
+                        changes
+                            .changed()
+                            .await
+                            .map_err(|_| tekes_agent_contract::Error::Disconnected)?;
+                    }
+                })
+                .await
+                .map_err(|_| tekes_agent_contract::Error::Timeout)??;
+                json!({"sessionId":id,"present":expected,"archiveAuthorityInferred":false})
+            }
             "waitSettled" => {
                 let id = id.ok_or_else(|| unsupported("sessionId required"))?;
                 let minimum_turn = command["minimumTurn"].as_i64().unwrap_or(1);

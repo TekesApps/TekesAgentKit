@@ -128,7 +128,39 @@ fn hold_original_open(host: &mut Host, button: ComponentId) -> HostResult {
     }
 }
 
-pub(super) fn run(host: &mut Host, seeds: &[FamilySeedCase]) -> Value {
+fn selected_classification_probe(
+    host: &Host,
+    packet: &tekes_agent_ui_demo::sidebar_host::SidebarHostPublication,
+    address: &SessionAddress,
+    included: bool,
+) -> Value {
+    let read = host.sidebar.read_selected(address, 1).unwrap();
+    assert!(read.is_current(&host.sidebar));
+    assert_eq!(read.has_active_row(&host.sidebar), included);
+    let mut input = packet.as_publication().input(Some(address.clone()));
+    if !included {
+        assert!(!read.project_into(&host.sidebar, &mut input, 1));
+        assert!(input.rows.iter().all(|row| &row.address != address));
+        let sidebar = host
+            .view
+            .tree
+            .get(host.view.sidebar_id())
+            .unwrap()
+            .component::<Sidebar>()
+            .unwrap();
+        assert!(sidebar.row_id(address).is_none());
+    }
+    assert!(read.is_current(&host.sidebar));
+    json!({"address":{"endpointId":address.endpoint_id,"sessionId":address.session_id},
+        "current":true,"hasActiveRow":included,
+        "expectedIncluded":included,"hiddenRowNotSupplemented":!included})
+}
+
+pub(super) fn run(
+    host: &mut Host,
+    seeds: &[FamilySeedCase],
+    classification_oracle: Option<&Value>,
+) -> Value {
     host.view.enable_family_catalog().unwrap();
     let mut cases = Vec::new();
     for seed in seeds {
@@ -340,6 +372,142 @@ pub(super) fn run(host: &mut Host, seeds: &[FamilySeedCase]) -> Value {
             "heldParentDelivery":parent_delivery,"heldClosedDelivery":close_delivery}));
     }
     assert!(host.failures.is_empty());
+    let classification = if let Some(oracle) = classification_oracle {
+        // Pi scratch belongs to an endpoint instance. A fresh connector retires
+        // old scratch, so create this sample through this host's public runtime.
+        let pi = oracle
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["endpointId"] == "pi")
+            .unwrap();
+        let pi_parent = pi["samples"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["role"] == "parent")
+            .unwrap()["address"]["sessionId"]
+            .as_str()
+            .unwrap();
+        let pi_runtime = host.sidebar.runtime_for("pi").unwrap().clone();
+        let pi_fork = host
+            .executor
+            .block_on(pi_runtime.call(
+                "session.fork",
+                json!({"sessionId":pi_parent,"ephemeral":true}),
+                "classification-host-scratch",
+            ))
+            .unwrap();
+        let pi_id = pi_fork["sessionId"].as_str().unwrap().to_owned();
+        let pi_address = SessionAddress {
+            endpoint_id: "pi".into(),
+            session_id: pi_id.clone(),
+        };
+        let pi_binding = host
+            .executor
+            .block_on(RunBinding::open_main(
+                pi_runtime,
+                RunScope::main("pi", &pi_id),
+            ))
+            .unwrap();
+        wait(host, |host| {
+            pi_binding
+                .current_run()
+                .is_some_and(|run| !run.transcript.items.is_empty())
+                && host
+                    .sidebar
+                    .snapshot()
+                    .as_multi_publication()
+                    .is_some_and(|source| {
+                        source.classification.get("pi").is_some_and(|source| {
+                            source
+                                .records
+                                .get(&pi_address)
+                                .is_some_and(|row| !row.included)
+                        })
+                    })
+        });
+        let pi_before = pi_binding.current_run().unwrap().transcript.clone();
+        wait(host, |host| {
+            host.sidebar
+                .snapshot()
+                .as_multi_publication()
+                .is_some_and(|source| {
+                    source.classification.len() == 3
+                        && source
+                            .classification
+                            .values()
+                            .all(|facts| facts.inventory_ready)
+                })
+        });
+        let packet = host.sidebar.snapshot();
+        let receipt = host.view.sidebar_delivery_receipt().unwrap();
+        let mut selected_reads = Vec::new();
+        for source in packet
+            .as_multi_publication()
+            .unwrap()
+            .classification
+            .values()
+        {
+            for (address, record) in &source.records {
+                selected_reads.push(selected_classification_probe(
+                    host,
+                    &packet,
+                    address,
+                    record.included,
+                ));
+            }
+            // Assertion-only public lifecycle addresses. They do not install rows,
+            // summaries, sessions or archive facts in the original inventory packet.
+            let endpoint = oracle
+                .as_array()
+                .expect("classification endpoint array")
+                .iter()
+                .find(|row| row["endpointId"].as_str() == Some(source.endpoint_id.as_str()))
+                .expect("matching original endpoint oracle");
+            let archived: std::collections::BTreeSet<String> = endpoint["samples"]
+                .as_array()
+                .expect("classification samples")
+                .iter()
+                .filter(|row| {
+                    row["archived"] == true
+                        || (source.endpoint_id == "pi" && row["role"] == "ephemeral")
+                })
+                .map(|row| {
+                    assert_eq!(row["address"]["endpointId"], source.endpoint_id);
+                    row["address"]["sessionId"]
+                        .as_str()
+                        .expect("original session id")
+                        .to_owned()
+                })
+                .collect();
+            for session_id in archived {
+                let address = SessionAddress {
+                    endpoint_id: source.endpoint_id.clone(),
+                    session_id,
+                };
+                assert!(!source.records.contains_key(&address));
+                selected_reads.push(selected_classification_probe(
+                    host, &packet, &address, false,
+                ));
+            }
+        }
+        let pi_after = pi_binding.current_run().unwrap().transcript.clone();
+        assert_eq!(
+            pi_before, pi_after,
+            "Sidebar filtering must retain the original scratch history"
+        );
+        Some(
+            json!({"inventoryPacket":receipt,"independentSelectedReads":selected_reads,
+            "hostOwnedEphemeral":{"address":{"endpointId":"pi","sessionId":pi_id},
+                "forkReply":pi_fork,"scope":pi_binding.scope(),
+                "beforeItems":pi_before.items.len(),"afterItems":pi_after.items.len(),
+                "originalItemsPreserved":true,"previousInstanceRetired":true},
+            "nativeInteraction":false,"historyEvidenceIsSeparate":true}),
+        )
+    } else {
+        None
+    };
     json!({"accepted":true,"nativeInteraction":false,"physicalIme":false,"cases":cases,
-        "sameTaskRowDynamicPointerProven":false,"desktopVisibilityProven":false})
+        "sameTaskRowDynamicPointerProven":false,"desktopVisibilityProven":false,"classificationProof":classification})
 }

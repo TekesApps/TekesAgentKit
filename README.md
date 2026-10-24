@@ -141,3 +141,5 @@ RunPort now publishes Transcript and Composer inside original SDK reading transa
 Retained A/B reading, native pages and reconnect across all three harnesses: [reading restoration and stale-footnote fix](docs/rust-agent-ui-retained-reading-20261021.md). Fresh-host persistent checkpoints remain tracked in TekesUI #42.
 
 The reusable Rust composition is now **RunPort** (formerly Rust RunView). Sidebar, RunPort and SidePanel target the TekesUI ProcessContainer host contract; current same-process Content remains runnable while remote input/IME/scroll/AX delivery is tracked in [TekesUI #48](https://github.com/TekesApps/TekesUI/issues/48). See the [API migration and separate execution-mode matrix](docs/rust-agent-ui-run-port-20261022.md).
+
+Real Native/Pi/DSH Sidebar classification, archive recovery and canonical history retention: [source-bound offscreen results](docs/rust-agent-ui-real-sidebar-classification-results-20261024.md). Unknown classification stays unknown; this does not imply desktop acceptance.
