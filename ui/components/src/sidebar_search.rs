@@ -164,8 +164,8 @@ impl Component for SearchFooter {
 /// versioned SidebarInput as its row membership. No visible subtitle is added.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SidebarSearchHelp {
-    /// Search-result coherence is separate from inventory restoration. Pins
-    /// remain available while a query or an unknown-hit inventory join waits.
+    /// Search-result coherence is separate from inventory restoration. Pending
+    /// provider results are diagnostic, not unfiltered inventory membership.
     pub results_ready: bool,
     pub source: SidebarSearchInput,
     pub snippets: std::collections::BTreeMap<tekes_agent_contract::SessionAddress, String>,

@@ -40,6 +40,8 @@ class PublicAgentUiConsumerTests(unittest.TestCase):
             self.assertIn("sidebar.clear_pending_actions()", source)
             self.assertIn("SidePanel::new", source)
             self.assertIn("SidebarMultiSearchStatus::new", source)
+            self.assertIn("sidebar.row_id(&other.address).is_none()", source)
+            self.assertEqual(receipt["membership_checks"], ["folderFiltersPinnedRows", "clearRestoresPinnedRows"])
             self.assertIn("sidebar.bind_observer_source", source)
             self.assertIn("SidebarObserverStatus::new", source)
             self.assertEqual(source.count(".into_host()?"), 5)

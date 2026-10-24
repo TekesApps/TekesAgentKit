@@ -1,5 +1,7 @@
 # Sidebar 选中导航与临时展开
 
+> 历史阶段记录：其中“pins 不受 query/folder filter 影响”的解释已由 2026-10-24 的[当前会话 Sidebar 成员关系契约](rust-agent-ui-sidebar-query-membership-20261024.md)取代。原程序/测试/截图保持历史归属，不能证明新语义；新切片的本地名称 FTS、排名与真实窗口验收仍开放。
+
 本轮对齐 ClientKit `reconcileSelectedThread` 与 `handleActivate` 的区别：显式导航可以展开所选组，但普通库存刷新不能再次展开用户刚收起的组。导航展开属于单个 Sidebar 的临时视图状态，不改写持久 `collapsed_folders` 或 `pinned_expanded`。Kernel、协议和持久格式4均未改变。
 
 ## 调用契约

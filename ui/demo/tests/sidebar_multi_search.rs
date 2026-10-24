@@ -2,6 +2,7 @@ use serde_json::json;
 use std::{sync::Arc, time::Duration};
 use tekes_agent_components_ui::{SidebarInput, SidebarSearchPhase};
 use tekes_agent_contract::SessionAddress;
+use tekes_agent_contract::ThreadPinPresentation;
 use tekes_agent_presentation::SidebarMultiSearchPublication;
 use tekes_agent_ui_bindings::{
     SidebarMultiEndpointBinding, SidebarMultiPublication, SidebarMultiSearchBinding,
@@ -177,6 +178,71 @@ async fn projects_duplicate_session_ids_in_global_inventory_order_and_preserves_
         2,
         "the same session ID on two endpoints remains two full addresses"
     );
+}
+
+#[tokio::test]
+async fn provider_membership_filters_same_id_pins_per_endpoint_once_and_clear_restores_both() {
+    let (_agent, inventory, search, fixture_a, fixture_b) = setup(true, true).await;
+    fixture_a.set_search_result(
+        "query",
+        json!({"items":[{"sessionId":"a","snippet":"A pin hit"}],"hasMore":false}),
+    );
+    fixture_b.set_search_result("query", json!({"items":[],"hasMore":false}));
+    search.set_query("query").unwrap();
+    wait_search(&search, complete).await;
+
+    let mut snapshot = inventory.snapshot().as_ref().clone();
+    for endpoint in ["endpoint-a", "endpoint-b"] {
+        let pin = snapshot
+            .rows
+            .iter_mut()
+            .find(|row| row.address == address(endpoint, "a"))
+            .expect("both endpoint inventories contain the same session ID");
+        pin.pin = Some(ThreadPinPresentation { pinned: true });
+    }
+    let displayed = snapshot.input(Some(address("endpoint-a", "a")));
+    let projection = snapshot
+        .project_multi_search_for_display(&search.snapshot(), &displayed)
+        .unwrap();
+    assert_eq!(
+        projection
+            .input
+            .rows
+            .iter()
+            .filter(|row| row.address == address("endpoint-a", "a"))
+            .count(),
+        1,
+        "a provider hit for a pin appears exactly once"
+    );
+    assert!(
+        !projection
+            .input
+            .rows
+            .iter()
+            .any(|row| row.address == address("endpoint-b", "a")),
+        "the same session ID on another endpoint is not a provider hit there"
+    );
+    assert_eq!(projection.input.selected, displayed.selected);
+
+    search.set_query("").unwrap();
+    let cleared = search.snapshot();
+    let restored = snapshot
+        .project_multi_search_for_display(&cleared, &displayed)
+        .unwrap();
+    assert_eq!(
+        restored
+            .input
+            .rows
+            .iter()
+            .filter(|row| row.address.session_id == "a")
+            .count(),
+        2,
+        "clearing the query restores the independent pins for both full addresses"
+    );
+    assert!(restored.input.rows.iter().all(|row| {
+        row.address.session_id != "a" || row.pin.as_ref().is_some_and(|pin| pin.pinned)
+    }));
+    assert_eq!(restored.input.selected, displayed.selected);
 }
 
 #[tokio::test]

@@ -23,7 +23,7 @@ pub struct SidebarSearchProjection {
 }
 impl SidebarPublication {
     /// Preserve explicit host selection/filter/view revision while the shared
-    /// projection owns search membership and independent global pins.
+    /// projection owns query membership for every session row, including pins.
     pub fn project_search_for_display(
         &self,
         endpoint: &str,
@@ -103,7 +103,6 @@ impl SidebarPublication {
         {
             return Err("invalid unresolved sidebar search hit");
         }
-        // Search filters ordinary sessions, never the independent global pins.
         // Determine coherence against the full original inventory before filtering.
         let known: BTreeSet<_> = input.rows.iter().map(|row| row.address.clone()).collect();
         let unresolved: Vec<_> = search
@@ -112,15 +111,17 @@ impl SidebarPublication {
             .filter(|hit| !known.contains(&hit.address))
             .map(|hit| hit.address.clone())
             .collect();
-        let results_ready =
-            unresolved.is_empty() && !matches!(search.input.phase, SidebarSearchPhase::Searching);
-        input.rows.retain(|row| {
-            row.pin.as_ref().is_some_and(|pin| pin.pinned)
-                || (results_ready && snippets.contains_key(&row.address))
-        });
+        // Only a complete, fully joinable provider response can authoritatively
+        // display provider membership. Pending, failed, and unresolved results
+        // expose diagnostics through help; unfiltered inventory is not a query
+        // result. The canonical inventory and its pin preferences stay intact.
+        let results_ready = unresolved.is_empty()
+            && matches!(search.input.phase, SidebarSearchPhase::Complete { .. });
+        input
+            .rows
+            .retain(|row| results_ready && snippets.contains_key(&row.address));
         snippets.retain(|address, _| results_ready && known.contains(address));
-        // loaded still means inventory restored. A pending search cannot retire
-        // original pinned controls or grant them a new mount/action identity.
+        // loaded still means inventory restored; query membership is independent.
         input.loaded = self.loaded;
         input.search_help = Some(tekes_agent_components_ui::SidebarSearchHelp {
             results_ready,

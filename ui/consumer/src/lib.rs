@@ -2047,7 +2047,7 @@ fn second_product_consumes_current_row_help_without_a_tooltip_or_query_state_mac
 }
 
 #[test]
-fn independent_product_keeps_unmatched_pins_when_query_results_are_pending() {
+fn independent_product_hides_unmatched_pins_without_erasing_preferences_or_pending_status() {
     use tekes_agent_components_ui::*;
     use tekes_agent_ui_bindings::{
         SidebarPublication, SidebarSearchMatch, SidebarSearchPublication,
@@ -2106,18 +2106,21 @@ fn independent_product_keeps_unmatched_pins_when_query_results_are_pending() {
         project_sidebar_search_results(&source, &search, &address.endpoint_id, &display).unwrap();
     assert!(projection.input.loaded);
     assert!(!projection.input.search_help.as_ref().unwrap().results_ready);
-    assert_eq!(projection.input.rows, source.rows);
+    assert!(projection.input.rows.is_empty());
+    assert_eq!(projection.input.selected, Some(address.clone()));
+    assert!(source.rows[0].pin.as_ref().unwrap().pinned);
     let mut sidebar = Sidebar::new(2204, SidebarLabels::default());
     sidebar.update_search(&search.input).unwrap();
     sidebar.update(&projection.input).unwrap();
-    assert_eq!(sidebar.row_help(&address), Some("/original-pin-folder"));
+    assert_eq!(sidebar.row_help(&address), None);
+    assert!(sidebar.row_id(&address).is_none());
     let host = sidebar.into_host().unwrap();
     let names: Vec<_> = host
         .semantics()
         .into_iter()
         .map(|node| node.semantics.name)
         .collect();
-    assert!(names.iter().any(|name| name == "原置顶会话"));
+    assert!(!names.iter().any(|name| name == "原置顶会话"));
     assert!(names.iter().any(|name| name == "搜索结果尚未就绪"));
     assert!(!names.iter().any(|name| name == "没有匹配的会话"));
 }
@@ -2186,7 +2189,8 @@ fn second_product_consumes_scoped_folder_grouping_filter_and_original_disclosure
     let header = sidebar.folder_header_id(&key).unwrap();
     let leaf = sidebar.row_id(&source.rows[0].address).unwrap();
     assert!(sidebar.row_id(&source.rows[1].address).is_none());
-    assert!(sidebar.row_id(&source.rows[2].address).is_some());
+    assert!(sidebar.row_id(&source.rows[2].address).is_none());
+    assert!(source.rows[2].pin.as_ref().unwrap().pinned);
     let mut host = sidebar.into_host().unwrap();
     let widget = host
         .get(leaf)

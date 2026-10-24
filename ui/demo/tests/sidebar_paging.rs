@@ -31,7 +31,7 @@ fn input() -> SidebarInput {
     }
 }
 #[test]
-fn page_is_five_ordinary_plus_global_pins_and_selected_outside_the_page() {
+fn page_is_five_filtered_ordinary_rows_plus_matching_pins_and_selected_outside_page() {
     let input = input();
     let mut sidebar = Sidebar::new(780, Default::default());
     sidebar.update(&input).unwrap();
@@ -104,7 +104,7 @@ fn ordinary_refresh_invalidates_page_callback_and_does_not_reset_requested_count
     assert_eq!(sidebar.paging().limit, 5);
 }
 #[test]
-fn search_is_not_repaged_or_supplemented_and_folder_filter_keeps_pins() {
+fn search_is_not_repaged_or_supplemented_and_folder_filter_applies_to_pins() {
     let input = input();
     let prefs = SidebarPreferences::default();
     let (out, facts) = sidebar_paged_outline(
@@ -134,7 +134,7 @@ fn search_is_not_repaged_or_supplemented_and_folder_filter_keeps_pins() {
         false,
     )
     .unwrap();
-    assert_eq!(out.pinned.len(), 1);
+    assert!(out.pinned.is_empty());
     assert!(out.sessions.is_empty());
     assert!(!facts.selected_supplemented);
     assert!(sidebar_paged_outline(&input.rows, &prefs, None, None, None, 0, false).is_err());

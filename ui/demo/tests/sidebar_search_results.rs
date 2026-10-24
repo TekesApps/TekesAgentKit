@@ -218,6 +218,18 @@ async fn demo_projects_full_publications_and_clearing_restores_inventory_without
             .any(|node| node.semantics.name == "搜索结果尚未就绪")
     );
     result.input.revision += 1;
+    result.input.phase = SidebarSearchPhase::Complete { has_more: true };
+    view.update_sidebar_search_publication("search-reader", &result)
+        .unwrap();
+    assert!(
+        !view
+            .tree
+            .semantics()
+            .iter()
+            .any(|node| node.semantics.name == "没有匹配的会话"),
+        "empty first page with more data is not authoritative no-results"
+    );
+    result.input.revision += 1;
     result.input.phase = SidebarSearchPhase::Complete { has_more: false };
     view.update_sidebar_search_publication("search-reader", &result)
         .unwrap();
@@ -293,6 +305,15 @@ fn help_is_an_atomic_query_scoped_part_of_the_row_publication() {
         .results_ready = false;
     assert!(sidebar.update(&pending_with_help).is_err());
     assert_eq!(sidebar.displayed_input(), Some(&original));
+    let mut failed_ready = original.clone();
+    failed_ready.revision += 1;
+    failed_ready.search_help.as_mut().unwrap().source.phase = SidebarSearchPhase::Failed {
+        message: "failure cannot authorize snippets".into(),
+        has_more: false,
+        retryable: true,
+    };
+    assert!(sidebar.update(&failed_ready).is_err());
+    assert_eq!(sidebar.displayed_input(), Some(&original));
     let mut next = publication.input.clone();
     next.revision += 1;
     next.key.as_mut().unwrap().generation += 1;
@@ -333,39 +354,52 @@ fn pinned_row(id: &str) -> SidebarRow {
     value
 }
 #[test]
-fn search_preserves_global_pins_while_result_coherence_is_independent_of_inventory() {
+fn provider_membership_filters_pins_only_after_complete_and_joinable_results() {
     let mut source = inventory();
     source.rows[1] = pinned_row("c");
     let mut result = search();
     let projected = source.project_search("fixture", &result, None, 1).unwrap();
-    assert_eq!(projected.input.rows, source.rows);
+    assert_eq!(projected.input.rows, vec![row("a"), row("b")]);
     assert!(!projected.snippets.contains_key(&address("c")));
     result.input.phase = SidebarSearchPhase::Searching;
     let waiting = source.project_search("fixture", &result, None, 2).unwrap();
     assert!(waiting.input.loaded);
-    assert_eq!(waiting.input.rows, vec![pinned_row("c")]);
+    assert!(waiting.input.rows.is_empty());
     assert!(waiting.snippets.is_empty());
     assert!(!waiting.input.search_help.unwrap().results_ready);
+    result.input.phase = SidebarSearchPhase::Failed {
+        message: "provider unavailable".into(),
+        has_more: false,
+        retryable: true,
+    };
+    result.hits.clear();
+    let failed = source.project_search("fixture", &result, None, 3).unwrap();
+    assert!(failed.input.rows.is_empty());
+    assert!(!failed.input.search_help.unwrap().results_ready);
     result.input.phase = SidebarSearchPhase::Complete { has_more: false };
+    result.hits = search().hits;
     result.hits[0].address = address("unknown");
     result.hits[0].hit.session_id = "unknown".into();
-    let unresolved = source.project_search("fixture", &result, None, 3).unwrap();
+    let unresolved = source.project_search("fixture", &result, None, 4).unwrap();
     assert_eq!(unresolved.unresolved, vec![address("unknown")]);
-    assert_eq!(unresolved.input.rows, vec![pinned_row("c")]);
+    assert!(unresolved.input.rows.is_empty());
     assert!(unresolved.input.loaded);
     assert!(!unresolved.input.search_help.unwrap().results_ready);
+    result.hits = search().hits;
+    let complete = source.project_search("fixture", &result, None, 5).unwrap();
+    assert_eq!(complete.input.rows, vec![row("a"), row("b")]);
+    assert!(complete.input.loaded);
     source.loaded = false;
     assert!(
         !source
-            .project_search("fixture", &result, None, 4)
+            .project_search("fixture", &result, None, 6)
             .unwrap()
             .input
             .loaded
     );
 }
 #[tokio::test]
-async fn original_pin_survives_query_loading_failure_empty_and_unknown_hit_recovery_without_editor_changes()
- {
+async fn query_hides_unmatched_pin_without_changing_pin_preference_or_composer_state() {
     use tekes_agent_ui_bindings::RunBinding;
     use tekes_agent_ui_demo::component_demo::ComponentDemo;
     use tekes_ui_controls::composition::*;
@@ -400,7 +434,7 @@ async fn original_pin_survives_query_loading_failure_empty_and_unknown_hit_recov
         )
     );
     let focus = view.tree.focused();
-    let pin_id = view
+    let old_pin_id = view
         .tree
         .get(view.sidebar_id())
         .unwrap()
@@ -408,102 +442,129 @@ async fn original_pin_survives_query_loading_failure_empty_and_unknown_hit_recov
         .unwrap()
         .row_id(&address("c"))
         .unwrap();
-    let pin_ptr = view
-        .tree
-        .get(pin_id)
-        .unwrap()
-        .component::<ButtonContent>()
-        .unwrap() as *const _ as usize;
     let mut result = search();
     view.bind_sidebar_search_publication("search-reader", &result)
         .unwrap();
-    for phase in [
-        SidebarSearchPhase::Searching,
-        SidebarSearchPhase::Failed {
-            message: "query unavailable".into(),
-            has_more: false,
-            retryable: true,
-        },
-        SidebarSearchPhase::Complete { has_more: false },
-    ] {
-        result.input.revision += 1;
-        result.input.phase = phase;
-        result.hits.clear();
-        view.update_sidebar_search_publication("search-reader", &result)
-            .unwrap();
-        assert_eq!(
-            view.tree
-                .get(view.sidebar_id())
-                .unwrap()
-                .component::<Sidebar>()
-                .unwrap()
-                .row_id(&address("c")),
-            Some(pin_id)
-        );
-        assert_eq!(
-            view.tree
-                .get(pin_id)
-                .unwrap()
-                .component::<ButtonContent>()
-                .unwrap() as *const _ as usize,
-            pin_ptr
-        );
-        assert_eq!(
-            view.tree
-                .get(view.sidebar_id())
-                .unwrap()
-                .component::<Sidebar>()
-                .unwrap()
-                .row_help(&address("c")),
-            Some("/original/c")
-        );
-        assert!(view.drain_commands().unwrap().is_empty());
-    }
+    let sidebar = view
+        .tree
+        .get(view.sidebar_id())
+        .unwrap()
+        .component::<Sidebar>()
+        .unwrap();
+    assert!(sidebar.row_id(&address("c")).is_none());
+    assert_eq!(
+        sidebar.displayed_input().unwrap().selected,
+        Some(address("a"))
+    );
+    assert!(source.rows.iter().any(|row| {
+        row.address == address("c") && row.pin.as_ref().is_some_and(|pin| pin.pinned)
+    }));
+    view.tree
+        .accessibility_action(old_pin_id, None, AccessibilityAction::Press);
+    assert!(view.drain_commands().unwrap().is_empty());
+
+    // A provider failure is diagnostic, not an authoritative empty result.
     result.input.revision += 1;
-    result.hits.push(SidebarSearchMatch {
-        address: address("late"),
-        hit: SessionSearchHit {
-            session_id: "late".into(),
-            snippet: "late current hit".into(),
-            extra: Default::default(),
-        },
-    });
+    result.input.key.as_mut().unwrap().generation += 1;
+    result.query = "unavailable query".into();
+    result.input.key.as_mut().unwrap().query = result.query.clone();
+    result.input.phase = SidebarSearchPhase::Failed {
+        message: "query unavailable".into(),
+        has_more: false,
+        retryable: true,
+    };
+    result.hits.clear();
     view.update_sidebar_search_publication("search-reader", &result)
         .unwrap();
-    assert!(
-        view.tree
-            .semantics()
-            .iter()
-            .any(|node| node.semantics.name == "搜索结果尚未就绪")
-    );
-    assert!(
-        !view
-            .tree
-            .semantics()
-            .iter()
-            .any(|node| node.semantics.name == "没有匹配的会话")
-    );
-    source.revision += 1;
-    source.rows.push(row("late"));
-    view.set_sidebar_source(Arc::new(source)).unwrap();
-    view.sync().unwrap();
     assert!(
         view.tree
             .get(view.sidebar_id())
             .unwrap()
             .component::<Sidebar>()
             .unwrap()
-            .row_id(&address("late"))
-            .is_some()
-    );
-    assert_eq!(
-        view.tree
-            .get(pin_id)
+            .displayed_input()
             .unwrap()
-            .component::<ButtonContent>()
-            .unwrap() as *const _ as usize,
-        pin_ptr
+            .rows
+            .is_empty()
     );
+    assert!(
+        view.tree
+            .semantics()
+            .iter()
+            .any(|node| node.semantics.name == "搜索结果尚未就绪")
+    );
+
+    // A current provider hit cannot be mounted until the original public
+    // inventory supplies it. The later inventory publication restores the row
+    // without another query or changing the Composer's preedit/focus.
+    result.input.revision += 1;
+    result.input.key.as_mut().unwrap().generation += 1;
+    result.query = "late query".into();
+    result.input.key.as_mut().unwrap().query = result.query.clone();
+    result.input.phase = SidebarSearchPhase::Complete { has_more: false };
+    result.hits = vec![SidebarSearchMatch {
+        address: address("late"),
+        hit: tekes_agent_ui_bindings::SessionSearchHit {
+            session_id: "late".into(),
+            snippet: "late match".into(),
+            extra: Default::default(),
+        },
+    }];
+    view.update_sidebar_search_publication("search-reader", &result)
+        .unwrap();
+    assert!(
+        view.tree
+            .get(view.sidebar_id())
+            .unwrap()
+            .component::<Sidebar>()
+            .unwrap()
+            .displayed_input()
+            .unwrap()
+            .rows
+            .is_empty()
+    );
+    source.revision += 1;
+    source.rows.push(pinned_row("late"));
+    view.set_sidebar_source(Arc::new(source.clone())).unwrap();
+    view.sync().unwrap();
+    let resolved = view
+        .tree
+        .get(view.sidebar_id())
+        .unwrap()
+        .component::<Sidebar>()
+        .unwrap();
+    assert_eq!(
+        resolved.displayed_input().unwrap().rows,
+        vec![pinned_row("late")]
+    );
+    assert!(resolved.row_id(&address("late")).is_some());
+    assert!(resolved.row_id(&address("c")).is_none());
+    assert_eq!(
+        resolved.search_snippet(&address("late")),
+        Some("late match")
+    );
+
+    // Clearing the provider query restores the same inventory and pin setting.
+    result.input.revision += 1;
+    result.input.key = None;
+    result.query = "  ".into();
+    result.input.phase = SidebarSearchPhase::Idle;
+    result.hits.clear();
+    result.unresolved.clear();
+    view.update_sidebar_search_publication("search-reader", &result)
+        .unwrap();
+    let sidebar = view
+        .tree
+        .get(view.sidebar_id())
+        .unwrap()
+        .component::<Sidebar>()
+        .unwrap();
+    let restored_pin = sidebar.row_id(&address("c")).unwrap();
+    assert_ne!(restored_pin, old_pin_id);
+    assert_eq!(sidebar.row_help(&address("c")), Some("/original/c"));
+    view.tree
+        .accessibility_action(old_pin_id, None, AccessibilityAction::Press);
+    assert!(view.drain_commands().unwrap().is_empty());
     assert_eq!(
         format!(
             "{:?}",

@@ -40,7 +40,7 @@ pub struct SidebarRow {
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct SidebarInput {
-    /// Ordinary sessions only; global pins remain independent.
+    /// Common session membership filter applied before pin/display partitioning.
     pub folder_filter: Option<crate::SidebarFolderKey>,
     pub search_help: Option<crate::SidebarSearchHelp>,
     /// Monotonic publication revision from one host inventory authority.
@@ -1238,7 +1238,11 @@ impl Sidebar {
             if key.query.trim().is_empty()
                 || help.source.phase == crate::SidebarSearchPhase::Idle
                 || (!help.results_ready && !help.snippets.is_empty())
-                || (help.results_ready && help.source.phase == crate::SidebarSearchPhase::Searching)
+                || (help.results_ready
+                    && !matches!(
+                        help.source.phase,
+                        crate::SidebarSearchPhase::Complete { .. }
+                    ))
                 || help.snippets.keys().any(|address| {
                     address.endpoint_id != key.endpoint_id
                         || !input.rows.iter().any(|row| &row.address == address)
@@ -1509,7 +1513,10 @@ impl Sidebar {
                                 .as_ref()
                                 .is_none_or(|help| help.results_ready)
                             && self.search.as_ref().is_some_and(|search| {
-                                matches!(search.phase, crate::SidebarSearchPhase::Complete { .. })
+                                matches!(
+                                    search.phase,
+                                    crate::SidebarSearchPhase::Complete { has_more: false }
+                                )
                             })
                         {
                             &self.search_labels.no_results
@@ -1540,8 +1547,8 @@ impl Sidebar {
                 ),
             ));
         }
-        // Unknown hits awaiting a public inventory join are pending results,
-        // even when the independent pinned section already has visible rows.
+        // Unknown hits awaiting a public inventory join remain diagnostic,
+        // including explicit display-only inputs with independently supplied rows.
         if has_pins
             && input
                 .search_help

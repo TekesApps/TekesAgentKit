@@ -66,20 +66,24 @@ pub(crate) fn plan_reveal(
     else {
         return (next, false);
     };
+    // Selection navigation may reveal disclosure, but it cannot bypass the
+    // active folder predicate. This keeps pinned and ordinary rows under the
+    // same visibility contract and avoids creating a visibility target for a
+    // row that the current filter excludes.
+    let key = row.folder_key();
+    if input
+        .folder_filter
+        .as_ref()
+        .is_some_and(|filter| filter != &key)
+    {
+        return (next, true);
+    }
     if row.pin.as_ref().is_some_and(|pin| pin.pinned) {
         if !pending.suppressed_pin {
             next.pinned = true;
         }
-    } else {
-        let key = row.folder_key();
-        if !pending.suppressed_folders.contains(&key)
-            && input
-                .folder_filter
-                .as_ref()
-                .is_none_or(|filter| filter == &key)
-        {
-            next.folders.insert(key);
-        }
+    } else if !pending.suppressed_folders.contains(&key) {
+        next.folders.insert(key);
     }
     (next, true)
 }

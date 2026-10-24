@@ -1,4 +1,4 @@
-//! ClientKit-aligned folder grouping and filtering of ordinary session rows.
+//! ClientKit-aligned folder grouping and filtering of session rows.
 use crate::{SidebarPreferences, SidebarRow, SidebarTitleComparator, ordered_sidebar_rows};
 pub use tekes_agent_presentation::{SidebarFolderIdentity, SidebarFolderKey};
 impl SidebarRow {
@@ -43,11 +43,14 @@ pub fn sidebar_outline<'a>(
     for row in ordered_sidebar_rows(rows, preferences, compare)? {
         let key = row.folder_key();
         key.validate().map_err(|_| "invalid Sidebar row folder")?;
-        if row.pin.as_ref().is_some_and(|pin| pin.pinned) {
-            result.pinned.push(row);
+        // The folder is a common membership predicate. Pins are a display
+        // partition, so apply the predicate before deciding which partition
+        // receives the row.
+        if filter.is_some_and(|selected| selected != &key) {
             continue;
         }
-        if filter.is_some_and(|selected| selected != &key) {
+        if row.pin.as_ref().is_some_and(|pin| pin.pinned) {
+            result.pinned.push(row);
             continue;
         }
         if preferences.group_by_folder {

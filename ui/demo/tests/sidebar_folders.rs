@@ -38,7 +38,7 @@ fn grouped() -> SidebarPreferencesSnapshot {
     }
 }
 #[test]
-fn grouping_uses_original_folder_identity_first_occurrence_and_independent_pins() {
+fn grouping_uses_original_folder_identity_and_applies_filter_before_pin_partition() {
     let rows = vec![
         row("pi", "z", Some("/first"), Some("id"), false),
         row("pi", "pin", Some("/pin"), None, true),
@@ -62,7 +62,7 @@ fn grouping_uses_original_folder_identity_first_occurrence_and_independent_pins(
     assert_eq!(outline.folders[0].path, Some("/first"));
     let key = rows[2].folder_key();
     let filtered = sidebar_outline(&rows, &preferences, None, Some(&key)).unwrap();
-    assert_eq!(filtered.pinned.len(), 1);
+    assert!(filtered.pinned.is_empty());
     assert_eq!(filtered.folders.len(), 1);
     assert_eq!(filtered.folders[0].rows[0].address.session_id, "a");
     let mut sorted = preferences.clone();
@@ -82,6 +82,52 @@ fn grouping_uses_original_folder_identity_first_occurrence_and_independent_pins(
         "中文目录"
     );
     assert_eq!(sidebar_folder_title(None, "无目录"), "无目录");
+}
+
+#[test]
+fn folder_filter_is_shared_by_pins_and_sessions_and_scoped_to_endpoint() {
+    let rows = vec![
+        row("pi", "pin-pi", Some("/pi"), Some("shared-id"), true),
+        row("pi", "ordinary-pi", Some("/pi"), Some("shared-id"), false),
+        row("dsh", "pin-dsh", Some("/dsh"), Some("shared-id"), true),
+        row(
+            "dsh",
+            "ordinary-dsh",
+            Some("/dsh"),
+            Some("shared-id"),
+            false,
+        ),
+    ];
+    let preferences = grouped().preferences;
+    let filter = rows[0].folder_key();
+    let filtered = sidebar_outline(&rows, &preferences, None, Some(&filter)).unwrap();
+    assert_eq!(
+        filtered
+            .pinned
+            .iter()
+            .map(|row| row.address.session_id.as_str())
+            .collect::<Vec<_>>(),
+        ["pin-pi"]
+    );
+    assert_eq!(filtered.folders.len(), 1);
+    assert_eq!(
+        filtered.folders[0].rows[0].address.session_id,
+        "ordinary-pi"
+    );
+
+    let cleared = sidebar_outline(&rows, &preferences, None, None).unwrap();
+    assert_eq!(cleared.pinned.len(), 2);
+    assert_eq!(
+        cleared
+            .folders
+            .iter()
+            .flat_map(|folder| folder
+                .rows
+                .iter()
+                .map(|row| row.address.session_id.as_str()))
+            .collect::<Vec<_>>(),
+        ["ordinary-pi", "ordinary-dsh"]
+    );
 }
 #[test]
 fn original_folder_disclosure_keeps_rows_and_retires_old_callbacks_without_navigation() {
@@ -193,6 +239,7 @@ fn filter_and_primary_folder_metadata_are_atomic_and_never_retarget_a_session() 
     sidebar.update(&input).unwrap();
     let a = sidebar.row_id(&input.rows[0].address).unwrap();
     let b = sidebar.row_id(&input.rows[1].address).unwrap();
+    let pin = sidebar.row_id(&input.rows[2].address).unwrap();
     let key = input.rows[0].folder_key();
     let header = sidebar.folder_header_id(&key).unwrap();
     input.revision += 1;
@@ -209,10 +256,31 @@ fn filter_and_primary_folder_metadata_are_atomic_and_never_retarget_a_session() 
     sidebar.update(&input).unwrap();
     assert_eq!(sidebar.row_id(&input.rows[1].address), None);
     assert_eq!(sidebar.row_id(&input.rows[0].address), Some(a));
-    assert!(sidebar.row_id(&input.rows[2].address).is_some());
+    assert_eq!(sidebar.row_id(&input.rows[2].address), None);
+    let root = sidebar.id();
+    let mut host = sidebar.into_host().unwrap();
+    let stale_actions = [ContentAction {
+        target: pin,
+        kind: ContentActionKind::Activate,
+        source: ContentActionSource::Programmatic,
+    }];
+    assert!(
+        host.get(root)
+            .unwrap()
+            .component::<Sidebar>()
+            .unwrap()
+            .take_intents(&stale_actions)
+            .is_empty()
+    );
+    let sidebar = host
+        .get_mut(root)
+        .unwrap()
+        .component_mut::<Sidebar>()
+        .unwrap();
     input.revision += 1;
     input.folder_filter = None;
     sidebar.update(&input).unwrap();
+    assert!(sidebar.row_id(&input.rows[2].address).is_some());
     assert_ne!(
         sidebar.row_id(&input.rows[1].address),
         Some(b),

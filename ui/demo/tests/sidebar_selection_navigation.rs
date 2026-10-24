@@ -259,8 +259,15 @@ fn old_conflicting_and_wrong_destination_navigation_cannot_reopen_a_section() {
     assert!(visible(&host, b));
 }
 #[test]
-fn pinned_navigation_ignores_folder_filter_but_does_not_write_pin_expansion() {
+fn pinned_navigation_obeys_folder_filter_and_preserves_pin_expansion_preference() {
     let (mut host, root, mut input, value) = setup();
+    let pin = host
+        .get(root)
+        .unwrap()
+        .component::<Sidebar>()
+        .unwrap()
+        .row_id(&input.rows[2].address)
+        .unwrap();
     input.revision += 1;
     input.selected = Some(row("pin", true).address);
     input.folder_filter = Some(row("b", false).folder_key());
@@ -269,13 +276,6 @@ fn pinned_navigation_ignores_folder_filter_but_does_not_write_pin_expansion() {
         .component_mut::<Sidebar>()
         .unwrap()
         .update(&input)
-        .unwrap();
-    let pin = host
-        .get(root)
-        .unwrap()
-        .component::<Sidebar>()
-        .unwrap()
-        .row_id(&input.rows[2].address)
         .unwrap();
     assert!(!visible(&host, pin));
     host.get_mut(root)
@@ -287,8 +287,46 @@ fn pinned_navigation_ignores_folder_filter_but_does_not_write_pin_expansion() {
             selected: input.selected.clone(),
         })
         .unwrap();
+    assert!(!visible(&host, pin));
+    assert!(
+        host.get(root)
+            .unwrap()
+            .component::<Sidebar>()
+            .unwrap()
+            .visibility_target()
+            .is_none()
+    );
+
+    input.revision += 1;
+    input.folder_filter = Some(input.rows[2].folder_key());
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<Sidebar>()
+        .unwrap()
+        .update(&input)
+        .unwrap();
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<Sidebar>()
+        .unwrap()
+        .reconcile_navigation(&SidebarSelectionNavigation {
+            revision: 2,
+            selected: input.selected.clone(),
+        })
+        .unwrap();
+    let pin = host
+        .get(root)
+        .unwrap()
+        .component::<Sidebar>()
+        .unwrap()
+        .row_id(&input.rows[2].address)
+        .unwrap();
     assert!(visible(&host, pin));
     let sidebar = host.get(root).unwrap().component::<Sidebar>().unwrap();
+    assert_eq!(
+        sidebar.visibility_target().unwrap().address(),
+        &input.rows[2].address
+    );
     assert_eq!(sidebar.preferences(), &value);
     let header = sidebar.pinned_header_id().unwrap();
     host.accessibility_action(header, None, AccessibilityAction::Press);

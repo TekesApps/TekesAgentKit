@@ -108,7 +108,8 @@ def prepare(root: Path, output: Path) -> dict[str, object]:
     SidePanelTabKind, SideChatSnapshot, Sidebar, SidebarInput, SidebarLabels,
     SidebarMultiSearchStatus, SidebarSearchLabels, SidebarObserverStatus, SidebarObserverLabels,
     SidebarObservation, SidebarObserverEndpointInput, SidebarObserverKey, SidebarObserverPhase,
-    SidebarObserverSourceKey, SidebarObserverStatusInput,
+    SidebarObserverSourceKey, SidebarObserverStatusInput, SidebarRow,
+    ThreadActivity, ThreadPinPresentation, ThreadActionsPresentation,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -118,15 +119,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _run_host = run_port.into_host()?;
 
     let mut sidebar = Sidebar::new(0x8200, SidebarLabels::default());
-    sidebar.update(&SidebarInput {
-        folder_filter: None,
-        search_help: None,
-        revision: 1,
-        loaded: true,
-        error: None,
-        rows: Vec::new(),
-        selected: None,
-    })?;
+    let first = SidebarRow {
+        address: scope.address(), title: "original pinned session".into(),
+        primary_folder_id: Some("one".into()), folder_path: Some("/one".into()),
+        activity: ThreadActivity { status: "idle".into(), is_stale: false },
+        pin: Some(ThreadPinPresentation { pinned: true }),
+        actions: ThreadActionsPresentation {
+            endpoint: scope.endpoint_id.clone(), session_id: scope.session_id.clone(),
+            label: "Actions".into(), items: Vec::new(),
+        },
+    };
+    let mut other = first.clone();
+    other.address = RunScope::main("native", "other-pinned-session").address();
+    other.actions.session_id = other.address.session_id.clone();
+    other.primary_folder_id = Some("two".into());
+    other.folder_path = Some("/two".into());
+    let mut inventory = SidebarInput {
+        folder_filter: Some(first.folder_key()), search_help: None,
+        revision: 1, loaded: true, error: None,
+        rows: vec![first.clone(), other.clone()], selected: None,
+    };
+    sidebar.update(&inventory)?;
+    assert!(sidebar.row_id(&first.address).is_some());
+    assert!(sidebar.row_id(&other.address).is_none());
+    inventory.revision += 1;
+    inventory.folder_filter = None;
+    sidebar.update(&inventory)?;
+    assert!(sidebar.row_id(&other.address).is_some());
+    assert!(inventory.rows.iter().all(|row| row.pin.as_ref().unwrap().pinned));
     sidebar.clear_pending_actions();
     // Synthetic owner identity is only a presentation fixture. It cannot
     // authorize recovery against a real binding's private owner allocations.
@@ -198,6 +218,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "consumer_direct_dependencies": ["tekes-agent-components-ui"],
         "components": ["RunPort", "Sidebar", "SidePanel"],
         "status_children": ["SidebarMultiSearchStatus", "SidebarObserverStatus"],
+        "membership_checks": ["folderFiltersPinnedRows", "clearRestoresPinnedRows"],
         "forbidden_wrappers": [
             "tekes-agent-ui-consumer-check",
             "RunSurface",

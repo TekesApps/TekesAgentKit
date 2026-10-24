@@ -395,7 +395,7 @@ impl Probe {
                     return;
                 }
                 if std::env::var_os("AGENT_SIDEBAR_PIN_QUERY_CAPTURE").is_some() {
-                    self.fixture.set_search_result("pin-query", serde_json::json!({"items":[{"sessionId":"b","snippet":"只有 b 命中，a 继续置顶"}],"hasMore":false}));
+                    self.fixture.set_search_result("pin-query", serde_json::json!({"items":[{"sessionId":"b","snippet":"只有 b 命中，a 的置顶偏好保留但不显示"}],"hasMore":false}));
                     self.fixture.set_search_result(
                         "pin-empty",
                         serde_json::json!({"items":[],"hasMore":false}),

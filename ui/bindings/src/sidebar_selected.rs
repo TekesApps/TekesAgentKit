@@ -87,8 +87,9 @@ impl SidebarSelectedRead {
             && self.row.is_some()
             && self.is_current(source)
     }
-    /// Merge only an ordinary, active, authoritative selected row. Search and
-    /// global pins retain their independent membership; no filter is cleared.
+    /// Merge only an ordinary, active, authoritative selected row. Pin rows
+    /// require the full inventory publication; this bounded read cannot mint
+    /// a pinned partition or bypass search/folder membership. No filter clears.
     pub fn project_into(
         &self,
         source: &SidebarBinding,

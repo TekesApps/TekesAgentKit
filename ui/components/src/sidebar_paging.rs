@@ -1,4 +1,4 @@
-//! Bounded ordinary inventory; pins and search keep their own membership.
+//! Bounded ordinary inventory; folder membership is shared by pins and rows.
 use crate::{
     SessionAddress, SidebarFolderKey, SidebarOutline, SidebarPreferences, SidebarRow,
     SidebarTitleComparator, ordered_sidebar_rows, sidebar_outline,

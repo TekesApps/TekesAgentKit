@@ -94,14 +94,22 @@ impl Probe {
             run_script(vec![(50, Action::WakeRedraw)]);
             return;
         }
-        let pin_id = sidebar.row_id(&pin.address).unwrap();
-        assert!(
-            host.view
-                .tree
-                .semantics()
-                .iter()
-                .any(|node| node.id == pin_id)
-        );
+        let pin_matches_filter = sidebar
+            .displayed_input()
+            .unwrap()
+            .folder_filter
+            .as_ref()
+            .is_none_or(|filter| *filter == pin.folder_key());
+        assert_eq!(sidebar.row_id(&pin.address).is_some(), pin_matches_filter);
+        if let Some(pin_id) = sidebar.row_id(&pin.address) {
+            assert!(
+                host.view
+                    .tree
+                    .semantics()
+                    .iter()
+                    .any(|node| node.id == pin_id)
+            );
+        }
         match self.phase {
             50 => {
                 if !host
@@ -162,7 +170,10 @@ impl Probe {
             }
             54 => {
                 assert!(sidebar.row_id(&b.address).is_none());
-                assert!(sidebar.row_id(&pin.address).is_some());
+                assert_eq!(
+                    sidebar.row_id(&pin.address).is_some(),
+                    pin.folder_key() == key
+                );
                 assert!(
                     !host
                         .view
@@ -197,7 +208,7 @@ impl Probe {
                 assert!(preferences.preferences.collapsed_folders.contains(&key));
                 eprintln!(
                     "NATIVE_AGENT_SIDEBAR_FOLDERS_RECEIPT {}",
-                    serde_json::json!({"nativeWindow":true,"windowActive":true,"publicInventoryFolders":true,"groupedLabels":true,"originalPointerDisclosure":true,"durableCollapsedFolder":true,"originalButtonRetained":true,"libraryInsetBody":true,"filterKeepsGlobalPin":true,"ungroupRestoresRows":true,"draftRetained":true,"selectionRetained":true,"noSubmission":true,"realHarness":false,"physicalIme":false,"voiceOver":false})
+                    serde_json::json!({"nativeWindow":true,"windowActive":true,"publicInventoryFolders":true,"groupedLabels":true,"originalPointerDisclosure":true,"durableCollapsedFolder":true,"originalButtonRetained":true,"libraryInsetBody":true,"filterAppliesToPinnedRows":true,"ungroupRestoresRows":true,"draftRetained":true,"selectionRetained":true,"noSubmission":true,"realHarness":false,"physicalIme":false,"voiceOver":false})
                 );
                 if std::env::var_os("AGENT_SIDEBAR_NAVIGATION_CAPTURE").is_some() {
                     let expected = host.sidebar.preferences().unwrap();

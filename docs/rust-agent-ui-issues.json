@@ -260,12 +260,13 @@
       "implemented": [
         "已有目录/搜索/分组/分页、恢复与选中补齐、稳定 action value/reveal。",
         "活动状态、置顶/偏好/共享 CAS 及捕获来源、旧请求门禁已有回归。",
-        "6c700e9 固定多端聚合/原地址路由/owner票据与5项新回归已完成。"
+        "6c700e9 固定多端聚合/原地址路由/owner票据与5项新回归已完成。",
+        "be4fc58 coherent observer packet、用户 Retry footer、demo 原端路由已实现；真实窗口/断流验收仍开放。"
       ],
       "remaining": [
         "消费非当前行上下文菜单公开契约，核对原生/AX 操作及窄宽布局。",
         "复验跨端点、过滤分页和导航后操作的来源归属；宿主只负责导航。",
-        "多端binding接demo宿主；定约全局query并验证过滤分页/全局偏好与多端整体组合；终态observer恢复策略后续再扩展。"
+        "对齐当前 sessionSidebarSnapshot 的 query/folder 共同成员关系及本地名称 FTS；验证过滤分页/全局偏好、真实多端故障与窗口整体组合。"
       ],
       "acceptance": [
         "非当前会话右键不错误改变目标；pin/share/rename/archive 作用于原捕获 item。",
@@ -278,7 +279,9 @@
         "docs/rust-agent-ui-sidebar-preferences-20261021.md",
         "docs/rust-agent-ui-sidebar-session-menu-20261022.md",
         "docs/rust-agent-ui-sidebar-multi-endpoint-20261024.md",
-        "docs/rust-agent-ui-parallel-results-20261024.md"
+        "docs/rust-agent-ui-parallel-results-20261024.md",
+        "docs/rust-agent-ui-sidebar-observer-retry-results-20261024.md",
+        "docs/rust-agent-ui-sidebar-query-membership-20261024.md"
       ],
       "dependencies": [
         "TekesUI#44"
@@ -300,7 +303,36 @@
           "真实多 harness、桌面、物理中文 IME、像素 reveal",
           "Demo user-triggered observer retry UI and real failure acceptance"
         ],
-        "commit": "3d594a8"
+        "commit": "3d594a8",
+        "note": "Historical observer API batch; see observerRetryUi for subsequent delivery."
+      },
+      "observerRetryUi": {
+        "commit": "be4fc58",
+        "evidence": "docs/rust-agent-ui-sidebar-observer-retry-results-20261024.md",
+        "ui_tests": {
+          "passed": 675,
+          "failed": 0,
+          "ignored": 1
+        },
+        "final_component_tests": 10,
+        "presentation_tests": 240,
+        "strict_clippy": true,
+        "public_consumer_ran": true,
+        "desktop": false,
+        "real_harness_failure_acceptance": false
+      },
+      "queryMembershipPlan": {
+        "evidence": "docs/rust-agent-ui-sidebar-query-membership-20261024.md",
+        "target": "current ClientKit sessionSidebarSnapshot",
+        "provider_pin_folder_slice": "implemented_verified",
+        "local_name_fts": "not_implemented",
+        "ranking": "not_implemented",
+        "ui_tests": {
+          "passed": 677,
+          "failed": 0,
+          "ignored": 1
+        },
+        "native_selftests": "source updated and compiled; not executed"
       }
     },
     {

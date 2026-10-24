@@ -76,7 +76,14 @@ fn full_catalog_includes_off_page_and_pin_only_folders_and_is_not_title_order() 
     input.folder_filter = Some(source.rows[0].folder_key());
     sidebar.update(&input).unwrap();
     assert_eq!(sidebar.paging().ordinary_count, 1);
-    assert!(sidebar.row_id(&source.rows[12].address).is_some());
+    assert!(sidebar.row_id(&source.rows[12].address).is_none());
+    assert!(
+        catalog
+            .folders
+            .iter()
+            .any(|folder| folder.key == source.rows[12].folder_key()),
+        "filtering a pinned row does not erase its folder from the full catalog"
+    );
     assert_eq!(source.folder_catalog().unwrap(), catalog);
     assert_eq!(source, before);
 }

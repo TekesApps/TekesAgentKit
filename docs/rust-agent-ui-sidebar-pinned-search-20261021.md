@@ -1,5 +1,7 @@
 # 搜索保留独立置顶区
 
+> 历史阶段记录：其中“pins 不受 query/folder filter 影响”的解释已由 2026-10-24 的[当前会话 Sidebar 成员关系契约](rust-agent-ui-sidebar-query-membership-20261024.md)取代。原程序/测试/截图保持历史归属，不能证明新语义；新切片的本地名称 FTS、排名与真实窗口验收仍开放。
+
 再次对照当前 ClientKit `ClientSessionSidebar.sessionRows` 发现，置顶会话来自 `globalThreadSnapshot.pinned`，普通会话来自搜索/过滤后的 `sessionThreads`。前者始终形成独立置顶区，不应被搜索命中集合过滤。此前 Rust `project_search` 同时过滤两类行，并用 `loaded=false` 表达查询等待，导致未命中置顶项消失，查询过程中原置顶按钮被卸载。本轮修正这一行为。
 
 ## 公开输入与行为

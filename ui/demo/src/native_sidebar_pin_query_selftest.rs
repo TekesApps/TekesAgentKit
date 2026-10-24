@@ -2,7 +2,11 @@
 //! Sidebar controls and SDK capture/wake. No generic input/layout implementation.
 use super::*;
 impl Probe {
-    fn pin_query_invariants(&self, host: &Host) {
+    fn pin_query_invariants(
+        &self,
+        host: &Host,
+        search: &tekes_agent_presentation::SidebarSearchPublication,
+    ) {
         let sidebar = host
             .view
             .tree
@@ -18,30 +22,38 @@ impl Probe {
             .iter()
             .filter(|row| row.pin.as_ref().is_some_and(|pin| pin.pinned))
             .collect();
-        assert_eq!(pins.len(), 2);
-        for id in ["a", "b"] {
+        let expected: &[&str] = match &search.input.phase {
+            SidebarSearchPhase::Idle => &["a", "b"],
+            SidebarSearchPhase::Complete { .. } if search.query == "pin-query" => &["b"],
+            _ => &[],
+        };
+        assert_eq!(pins.len(), expected.len());
+        for id in expected {
             assert_eq!(
                 pins.iter()
-                    .filter(|row| row.address.session_id == id)
+                    .filter(|row| row.address.session_id == *id)
                     .count(),
                 1
             );
         }
-        let original = host
-            .view
-            .tree
-            .get(self.row.unwrap())
-            .unwrap()
-            .component::<ButtonContent>()
-            .unwrap();
-        assert_eq!(original as *const _ as usize, self.widget);
-        assert!(
-            host.view
-                .tree
-                .semantics()
-                .iter()
-                .any(|node| node.id == self.row.unwrap())
-        );
+        // Visibility is query membership; pin preferences remain authoritative
+        // in the full inventory even while unmatched controls are unmounted.
+        let inventory = host.sidebar.snapshot();
+        for id in ["a", "b"] {
+            assert!(inventory.rows.iter().any(|row| row.address.session_id == id
+                && row.pin.as_ref().is_some_and(|pin| pin.pinned)));
+        }
+        if search.input.key.is_some() {
+            assert!(
+                !host
+                    .view
+                    .tree
+                    .semantics()
+                    .iter()
+                    .any(|node| node.id == self.row.unwrap()),
+                "unmatched pin control must be unmounted"
+            );
+        }
         assert_eq!(host.view.selected(), 0);
         let run = host.view.binding().current_run().unwrap();
         assert_eq!(run.draft.text, "搜索期间保留的中文草稿");
@@ -70,7 +82,7 @@ impl Probe {
             run_script(vec![(50, Action::WakeRedraw)]);
             return;
         }
-        self.pin_query_invariants(host);
+        self.pin_query_invariants(host, &search);
         match self.phase {
             40 if search.input.phase == SidebarSearchPhase::Searching => {
                 assert!(
@@ -82,11 +94,11 @@ impl Probe {
                         .unwrap()
                         .results_ready
                 );
-                assert_eq!(sidebar.displayed_input().unwrap().rows.len(), 2);
+                assert!(sidebar.displayed_input().unwrap().rows.is_empty());
                 self.phase = 41;
             }
             41 if matches!(search.input.phase, SidebarSearchPhase::Complete { .. }) => {
-                assert_eq!(sidebar.displayed_input().unwrap().rows.len(), 2);
+                assert_eq!(sidebar.displayed_input().unwrap().rows.len(), 1);
                 assert_eq!(
                     host.view
                         .sidebar_search_snippet(&tekes_agent_contract::SessionAddress {
@@ -101,7 +113,7 @@ impl Probe {
                             endpoint_id: "fixture".into(),
                             session_id: "b".into()
                         }),
-                    Some("只有 b 命中，a 继续置顶")
+                    Some("只有 b 命中，a 的置顶偏好保留但不显示")
                 );
                 self.pin_query_capture("AGENT_SIDEBAR_PIN_QUERY_CAPTURE");
                 self.phase = 42;
@@ -113,10 +125,9 @@ impl Probe {
             43 if search.query == "pin-empty"
                 && matches!(search.input.phase, SidebarSearchPhase::Complete { .. }) =>
             {
-                assert_eq!(sidebar.displayed_input().unwrap().rows.len(), 2);
+                assert!(sidebar.displayed_input().unwrap().rows.is_empty());
                 assert!(
-                    !host
-                        .view
+                    host.view
                         .tree
                         .semantics()
                         .iter()
@@ -137,7 +148,7 @@ impl Probe {
                 assert_eq!(self.fixture.search_calls(), 4);
                 eprintln!(
                     "NATIVE_AGENT_SIDEBAR_PIN_QUERY_RECEIPT {}",
-                    serde_json::json!({"nativeWindow":true,"ownedFixture":true,"realHarness":false,"pinsVisibleDuringSearching":true,"unmatchedPinRetained":true,"matchedPinNotDuplicated":true,"emptyQueryResultsKeepPins":true,"clearRestoresInventory":true,"originalButtonIdentity":true,"draftRetained":true,"selectionRetained":true,"noSubmission":true,"physicalIme":false,"voiceOver":false})
+                    serde_json::json!({"nativeWindow":true,"ownedFixture":true,"realHarness":false,"pinsFilteredDuringSearching":true,"unmatchedPinHidden":true,"matchedPinNotDuplicated":true,"emptyQueryResultsHidePins":true,"pinPreferencesRetained":true,"clearRestoresInventory":true,"hiddenRowsNotMounted":true,"draftRetained":true,"selectionRetained":true,"noSubmission":true,"physicalIme":false,"voiceOver":false})
                 );
                 self.phase = 5;
                 run_script(vec![(100, Action::Close)]);
