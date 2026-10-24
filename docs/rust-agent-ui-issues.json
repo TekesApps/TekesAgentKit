@@ -337,6 +337,23 @@
           "ignored": 1
         },
         "native_selftests": "source updated and compiled; not executed"
+      },
+      "retainedNameRanking": {
+        "date": "2026-10-24",
+        "status": "implemented; final verification recorded separately",
+        "evidence": "docs/rust-agent-ui-sidebar-ranked-search-20261024.md",
+        "implemented": [
+          "same-frame retained-name corpus and connection epoch; full registered endpoint domain",
+          "Single/Multi original publication and demo source preservation",
+          "full-domain SQLite bm25 before local pagination; provider OR union and incomplete-domain diagnostics",
+          "component sort preference consumed; no host sorting state machine"
+        ],
+        "notVerified": [
+          "actual store retention set equality with ClientKit",
+          "real multi-harness/desktop/physical IME/AX",
+          "provider cursor protocol",
+          "all historical pin/title identity tie semantics"
+        ]
       }
     },
     {
@@ -382,6 +399,17 @@
           "当前原生窗口/chrome和三端完整布局"
         ],
         "evidence": "docs/rust-agent-ui-parallel-results-20261024.md"
+      },
+      "nativeChildErrorDispatch": {
+        "commit": "adbb7f3",
+        "evidence": "docs/rust-agent-ui-sidepanel-issue23-child-error-20261024.md",
+        "verified": [
+          "current child-open failure forwards notice; retired parent request suppresses notice; 1 Rust test passed"
+        ],
+        "notVerified": [
+          "rendered native notice",
+          "full three-harness task sources and family navigation"
+        ]
       }
     },
     {
@@ -476,6 +504,16 @@
           "系统IME/桌面/ProcessContainer"
         ],
         "evidence": "docs/rust-agent-ui-parallel-results-20261024.md"
+      },
+      "nonDesktopAudit": {
+        "date": "2026-10-24",
+        "evidence": "docs/rust-agent-ui-summary-issue25-audit-20261024.md",
+        "result": "no new independent implementation defect found",
+        "priorFix": "6420876: loaded summary without usage retains six unavailable fields",
+        "remaining": [
+          "TekesUI#47 attachments and interaction presentation",
+          "native/AX and complete layout acceptance"
+        ]
       }
     },
     {

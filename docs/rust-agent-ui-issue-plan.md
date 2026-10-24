@@ -455,3 +455,15 @@
 ### #29 已有明确事实的实施切片
 
 `be6e50e` 已完成 Sidebar 列表与 selected 补读的同一显式 predicate：origin=subagent 或 ephemeral=true 排除，parent-only fork/未知分类保持兼容。canonical 全局 inventory/child/history 完整保留，旧 selected facts 被分类更新撤销；多端同 ID 和 aggregate/selected 路径有回归。UI695/0/1、严格UI Clippy/格式/边界、普通demo及复用独立组件consumer通过，精确记录见[分类契约](rust-agent-ui-sidebar-membership-20261024.md)与[机器收据](rust-agent-ui-sidebar-membership-results-20261024.json)。Native/DSH 分类producer与缺字段语义仍未证明，#29不关闭，桌面仍未运行。
+
+### #29 固定 producer 与 adapter wire 核验
+
+`36f0668` 新增 Native/DSH 真实 Rust adapter 的本地 wire 回归，未改生产适配器。Native固定公开v0.9.3 tag/API与精确Git对象核验，fork/ephemeral语义已证明；DSH两个允许版本的官方源码Git blob核验，在线/冷列表均透传origin/parent，SessionSummary不含ephemeral；Pi规范化producer亦记录在[能力矩阵](session-endpoints.md#sidebar-分类事实292026-10-24)。Native mux6/0/0、DSH14/0/0、严格root Clippy/格式/边界通过。这是源码与协议mock层，不是重新运行已发布harness或桌面；#29仍保留组合分页/真实运行身份等未验收项。
+
+### #22 排名待实施契约
+
+[全保留名称语料与查询排序](rust-agent-ui-sidebar-ranked-search-20261024.md)纠正了直接在可见行上加bm25的错误捷径，并核对最终pin_order/标题宿主comparator。实现先发布与库存同frame的retained-name语料，再让bindings/projector/demo实际消费并全局排序后分页；固定语料域不随query/目录/当前Run改变。根headless仍禁止SQLite。当前已开始来源层子任务，尚未交付排名，不重复建Issue。
+
+### #22 全语料排名与 #23 错误分发的后续交付
+
+`3aaee78` 已接通 retained-name 来源、Single/Multi 原始 packet、全局 bm25、demo sort 偏好与分页消费；修正搜索无限展开为 bounded page。此前“来源层进行中/排名未实施”只适用于原阶段。`adbb7f3` 补上 #23 native ChildOpened 错误当前/迟到分发回归，#25 复核没有新增独立实现缺陷。UI706/0/1、presentation+web258/0/0、Python92、严格检查、普通 demo 与独立排名 consumer 通过，准确边界见[本批收据](rust-agent-ui-sidebar-ranked-results-20261024.md)。新 head CI 独立跟踪，真实保留生命周期/远端 cursor/桌面等不宣称完成；原 Issue 和 #53 严格门槛保留。

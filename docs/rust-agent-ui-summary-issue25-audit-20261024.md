@@ -65,3 +65,9 @@
 ## namespaced parent alias 防自导航
 
 公开 host-projected `SummaryFacts` 也可能携带 `session_id=<uuid>`，而当前 parent identity 为 `dsh:session:<uuid>`。`sections()` 现将 `current.session_id` 以 `:<candidate>` 结尾视为 parent alias，不发出 `OpenSubagent`；合法 row 保留为被动行，`validate()` 不会仅因未知 pointer 拒绝整份 facts。新增 panel regression 覆盖该 host facts 情况；source hash 已同步到上方本审计 checkpoint。最终 alias 修复由主会话运行 panels：16 passed / 0 failed，并通过严格 presentation all-target Clippy；日志为 `.runtime-fixtures/sidebar-host-20261024/presentation-panels-final.log`、`presentation-clippy-final.log`。没有把此前全套测试扩报为最终源码的重新全套执行；本子会话不运行 Cargo。
+
+## 后续状态优先级（本轮复核）
+
+上表 Usage 的“缺失 projection 时整个 usage section 不出现”是本审计最初基线，已由 `6420876` 修正：已 loaded Summary 即使没有 usage projection 仍显示六条 unavailable 值。该修复及适用测试以 `rust-agent-ui-summary-followup-20261024.md`、`rust-agent-ui-name-fts-results-20261024.md` 为准，不能继续将旧表当作当前行为。
+
+独立只读续审未发现新的、不依赖 SDK 或桌面的 Summary 实现缺口。现有来源动作/旧 intent/slots 已有隔离回归；剩余状态附件与交互呈现依赖 TekesUI #47，完整布局、窄宽/字号/主题与原生/AX 验收仍开放。没有新增占位字段、手绘替代或重复状态机，未运行桌面。
