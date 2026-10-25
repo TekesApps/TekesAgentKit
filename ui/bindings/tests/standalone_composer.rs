@@ -290,15 +290,30 @@ async fn detach_wakes_old_waiter_and_reattach_gets_a_live_publication_stream() {
             .destination,
         first.destination()
     );
-    let waiting = tokio::spawn(async move { updates.changed().await });
-    tokio::task::yield_now().await;
-    first.detach();
+    // Ready publications from initial Run setup are legal before detach. Drain
+    // them until the public future is actually pending, then synchronously
+    // detach on this current-thread executor. The waiter must wake without
+    // requiring another Run publication, within the same original deadline.
+    let mut detached_while_waiting = false;
+    for _ in 0..16 {
+        let mut waiting = Box::pin(updates.changed());
+        if let std::task::Poll::Ready(result) = futures_util::poll!(waiting.as_mut()) {
+            result.unwrap();
+            continue;
+        }
+        first.detach();
+        assert!(
+            tokio::time::timeout(Duration::from_secs(1), waiting)
+                .await
+                .unwrap()
+                .is_err()
+        );
+        detached_while_waiting = true;
+        break;
+    }
     assert!(
-        tokio::time::timeout(Duration::from_secs(1), waiting)
-            .await
-            .unwrap()
-            .unwrap()
-            .is_err()
+        detached_while_waiting,
+        "fixture did not reach a pending subscription"
     );
 
     let second = first.reattach().unwrap();
