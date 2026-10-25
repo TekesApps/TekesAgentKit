@@ -438,4 +438,3 @@ def diagnostic_candidate_receipt(*, parent_session_id: str, child_session_id: st
             "diagnosticOnly": True, "officialSamples": 0,
             "performanceAccepted": False, "desktopInteraction": False,
             "physicalIme": False, "nativePaneAccepted": False}
-

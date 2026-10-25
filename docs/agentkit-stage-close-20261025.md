@@ -172,3 +172,5 @@ PR10已本地吸收main至1026372；冲突保留当前实现与main更强的50 c
 本检查点的Pi cold诊断已完成：两会话各100条1024-byte正文、10个原read工具组；公开page20、RunController固定50窗口分页、重连和close/open实际走通，原内容/顺序保留，进程退休核对通过。绑定 `ordinary-diagnostic-main69.json` 明确它只有diagnostic通过、正式样本0，不代替配对性能。
 
 #67主线切片复核：main仍使用DSH旧Remote RPC/mux实现，缺当前分支queue/projection适配层；缓存hint隔离补丁依赖该闭包。现不能仿照#68直接移植少量文件，保持待集成与原真实协议门禁；不为交付跳过相关依赖或扩大重构。
+
+固定DSH0.2.1-rc.2的同一ordinary cold诊断随后也完成（程序a637ddb8）：公开种子/两会话各100条正文与10个工具组、page20、原50窗口分页、重连、close/open和发送终态，owned进程退休均通过。`ordinary-diagnostic-main69.json` 追加DSH独立收据摘要；它不替代DSH家族或正式配对性能。旧失败不改写，正式样本仍0。
