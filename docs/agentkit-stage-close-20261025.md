@@ -194,3 +194,9 @@ PR10精确d23731d CI40230369803已结束：headless、独立consumer、child wit
 新正式14case（每角色cold5独立case、warm/init+10、lifecycle/init+10）已按预注册顺序采集，全部协议和单case契约通过。冷启动和warm组的绝对/逐scope相对/RSS门槛通过；lifecycle全部绝对/RSS通过，但scope0恢复快照p95 97.482292ms / 58.6645ms = 1.661691倍、scope1首助手内容368.007459ms / 270.429125ms = 1.360828倍，超过原1.2限制。
 
 这是有效失败，未发现测量错误或数据量不同；同轮系统load上升仅是可能混杂因素，没有证据可以归因并豁免。保持原样本，不调预算、不替换，#55记录待有界归因的Native路径。正式证据见native-ordinary-official-v2.json；不称三端或完整performance通过，其他端、家族及附件/队列仍分别未完。
+
+### Pi/DSH首次正式cold的离线材料修正
+
+两端baseline cold0原正式协议执行成功，但材料器误把saveAs的s0/s1别名当真实sessionId，原source/receipt/error保留。现从原create响应取assigned ID，与原consumer scope顺序独立相等校验后补出正式row；均通过单case契约，无协议重跑、无诊断升格。见public-create-pointer-normalization.json。
+
+后续24个尚未开始的登记只更正材料器/离线报告输入；捕获runner、采样器、provider、runtime/seed/projection helper与原v2逐文件SHA一致，Rust observer/程序/SDK/profile不变。原2个已执行数据保持身份；Pi lifecycle两个计划仍not_run，不用后续#70覆盖其失败。Native相对性能失败仍保留。Python全量472项通过后的此小修定向3项通过，不重复全量构建。

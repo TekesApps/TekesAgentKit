@@ -18,6 +18,15 @@ SPEC.loader.exec_module(runner)
 
 
 class OfficialSampleMaterializerTests(unittest.TestCase):
+    def test_saved_create_aliases_are_not_public_session_pointers(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            case = Path(temporary)
+            (case / 'seed-commands.json').write_text(json.dumps([
+                {'op': 'create', 'saveAs': 's0'}, {'op': 'create', 'saveAs': 's1'}]))
+            (case / 'seed.stdout.jsonl').write_text('\n'.join(json.dumps(
+                {'op': 'create', 'result': {'sessionId': sid}}) for sid in ('actual-a', 'actual-b')))
+            self.assertEqual(runner._ordered_seed_ids(case), ['actual-a', 'actual-b'])
+
     def test_non_ascii_seed_digest_is_compatible_with_strict_report(self):
         from performance_provider_fixture import body_text
         from performance_sample_report import _seed_digest

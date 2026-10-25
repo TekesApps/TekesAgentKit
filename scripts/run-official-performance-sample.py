@@ -53,16 +53,25 @@ def _ordered_seed_ids(case: Path) -> list[str]:
     command_path = case / "seed-commands.json"
     if not command_path.is_file():
         return []
+    output_path = case / 'seed.stdout.jsonl'
+    creates = [row.get('result', {}) for row in (_rows(output_path) if output_path.is_file() else [])
+               if row.get('op') == 'create']
+    create_index = 0
     ids = []
     for command in _json(command_path):
         if command.get("op") == "create":
-            pointer = command.get("saveAs")
+            if create_index >= len(creates):
+                return []  # A failed capture may not have reached its create reply.
+            pointer = creates[create_index].get('sessionId')
+            create_index += 1
         elif command.get("op") == "call" and command.get("method") == "session.create":
             pointer = command.get("args", {}).get("sessionId")
         else:
             continue
         if isinstance(pointer, str) and pointer not in ids:
             ids.append(pointer)
+    if create_index != len(creates):
+        raise ValueError('public create response count differs from original seed commands')
     return ids
 
 
