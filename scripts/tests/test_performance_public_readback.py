@@ -129,6 +129,35 @@ def _fixture(endpoint, index=0):
 
 
 class PublicReadbackTests(unittest.TestCase):
+    def test_dsh_hidden_context_requires_original_source_kind_not_prose(self):
+        snapshot, raw, scope = _fixture('dsh')
+        source = {'kind': 'runtime-context', 'form': 'snapshot', 'sections': []}
+        data = {'id': 'context-user', 'role': 'user', 'source': source,
+                'content': _text_content('Current runtime context')}
+        raw['entries']['9999'] = {'event': {'seq': 9999, 'type': 'user/message', 'data': data}}
+        row = {'kind': 'user', 'text': 'Current runtime context', 'recordId': 'context-user',
+               'metadata': {'hidden': True, 'source': dict(source)}, 'isProvisional': False,
+               'sourcePosition': {'kind': 'journal', 'sequence': 9999}}
+        snapshot['transcript']['items'].append(row)
+        proof = normalize_public_session(snapshot, raw, run_scope=scope, session_index=0)
+        self.assertEqual(proof['validation']['bodyMessageCount'], 100)
+        data['source'] = {'kind': 'user'}
+        with self.assertRaises(ValueError):
+            normalize_public_session(snapshot, raw, run_scope=scope, session_index=0)
+
+    def test_pi_tool_only_carrier_must_match_each_original_tool_block_position(self):
+        snapshot, raw, scope = _fixture('pi')
+        tool = snapshot['transcript']['tools'][0]
+        position = dict(tool['sourcePosition'], contentIndex=None)
+        snapshot['transcript']['items'].append(dict(kind='assistant', text='', isFinal=False,
+            isProvisional=False, turnId=tool['turnId'], sourcePosition=position))
+        proof = normalize_public_session(snapshot, raw, run_scope=scope, session_index=0)
+        self.assertEqual(proof['validation']['bodyMessageCount'], 100)
+        self.assertEqual(proof['validation']['toolGroupCount'], 10)
+        tool['sourcePosition']['contentIndex'] = 1
+        with self.assertRaisesRegex(ValueError, 'empty assistant'):
+            normalize_public_session(snapshot, raw, run_scope=scope, session_index=0)
+
     def test_native_empty_tool_carrier_and_structured_source_result(self):
         snapshot, raw, scope = _fixture('native')
         turn = snapshot['transcript']['tools'][0]['turnId']

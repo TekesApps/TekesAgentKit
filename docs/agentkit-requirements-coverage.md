@@ -2,21 +2,21 @@
 
 审计日期：2026-10-25。总 Epic [#14](https://github.com/TekesApps/TekesAgentKit/issues/14)。本索引是当前执行入口；[旧交付计划](rust-agent-ui-issue-plan.md)与[原Issue正文/状态](agentkit-issue-history-20261025.json)保留为历史，不能用其旧勾选代替当前集成状态。
 
-[机器覆盖表](agentkit-issue-coverage-20261025.json)记录50条原始/最新契约要求、39个交付项及复用的#12/#13/#29（原43条/33票审计快照保留）。不为单个测试/每次验证建票。此表记录整理时的审计快照，实时执行状态以GitHub标签为准，后续交付同步更新本索引。
+[机器覆盖表](agentkit-issue-coverage-20261025.json)记录50条原始/最新契约要求、42张实施票（含复用的#12/#13/#29）（原43条/33票审计快照保留）。不为单个测试/每次验证建票。此表记录整理时的审计快照，实时执行状态以GitHub标签为准，后续交付同步更新本索引。
 
 ## 本阶段收口冻结（2026-10-25）
 
-以 [阶段交付契约](agentkit-stage-close-20261025.md) 为当前执行顺序。范围基线 `5b7c843`，已验证基准候选 `4274fe8`（#67），新增阻断修复 #68 尚待验收，ClientKit `c289bc9`、TekesUI `50ec49f`；后续仅做阻断修复，不追逐参照库新增行为。下文 `1d41ad4` 与其他旧程序结果保持历史身份。
+以 [阶段交付契约](agentkit-stage-close-20261025.md) 为当前执行顺序。范围基线 `5b7c843`，阻断修复 #67 `4274fe8` 已验证待集成；#68 `98b1d9a` 取得精确程序验证，并经独立 PR69 合入 main `1dcc521`、main CI40227909675成功后关闭；当前分支 `1026372` 已吸收 main，ClientKit `c289bc9`、TekesUI `50ec49f`；后续仅做阻断修复，不追逐参照库新增行为。下文 `1d41ad4` 与其他旧程序结果保持历史身份。
 
 #60–#66已同步到本索引与机器索引，全部为**后续待办**，不自动进入本阶段；完整Epic仍须满足其原始验收标准。#36新增跨格式恢复、#40悬停预览、#46未注册宿主适配保留WIP并冻结，不继续扩展。
 
 当前 `5b7c843` root/UI格式、Clippy、测试、opt-in witness及独立公开API consumer均通过；UI CI在严格嵌套阅读检查失败（TekesUI #53），整体不能合入。Native queue另受Kernel #86真实失败阻塞。Native warm3仍仅证明有界子历史与passive Summary；新增原父Task审批拒绝失败与Pi primary-child transition来源窄见证已通过。Pi取消和Unknown原ticket自动对账已按独立新程序验收，均不升级为完整三端Family/Run或性能通过。详见[阶段结果](agentkit-stage-protocol-results-20261025.json)。#55/#56仍未完成。
 
-2026-10-26补验：#67候选`4274fe8`的DSH正常/失败child来源、公开历史与重连窄范围通过；Native/DSH原turn取消也已按独立程序取得收据。各自原source/program身份见结果JSON，不能相互转授。提交`70f4084`的CI40216799309/40216795717均已结束：root通过；UI常规及独立consumer通过，必需nested reading失败，后续demo build跳过。#67保持已验证待集成、OPEN；本期未合main、未发布。
+2026-10-26补验：#67候选`4274fe8`的DSH正常/失败child来源、公开历史与重连窄范围通过；Native/DSH原turn取消也已按独立程序取得收据。各自原source/program身份见结果JSON，不能相互转授。提交`70f4084`的CI40216799309/40216795717均已结束：root通过；UI常规及独立consumer通过，必需nested reading失败，后续demo build跳过。#67保持已验证待集成、OPEN；本期仅 #68 经 PR69 独立进入 main，PR10未合、阶段未发布。
 
 ## 边界与证据基线
 
-AgentKit代码基线 `1d41ad4` / draft PR #10；远端main `f1daa0f`（v0.3.8 headless）。ClientKit提交 `c289bc9`、Tekes `8858ccd` 只读。ClientKit工作树的StandaloneComposer、提交生命周期、精确artifact引用、AgentKitRemote为未提交候选，语义差异已纳入新票，不能当成已发布接口。
+原审计 AgentKit代码基线 `1d41ad4` / draft PR #10，原 main `f1daa0f`（性能对照仍固定）；当前 main `1dcc521` 仅新增 PR69 的 #68 独立修复，已发布 tag 仍 v0.3.8 headless。ClientKit提交 `c289bc9`、Tekes `8858ccd` 只读。ClientKit工作树的StandaloneComposer、提交生命周期、精确artifact引用、AgentKitRemote为未提交候选，语义差异已纳入新票，不能当成已发布接口。
 
 只消费公开精确TekesUI `50ec49f`。业务组件/presentation归AgentKit；基础组件/IME/阅读/渲染归TekesUI；窗口/导航/发现/Keychain/权限归产品。此库无Swift，不改Kernel/SDK/外部WIP。
 
@@ -30,9 +30,9 @@ AgentKit代码基线 `1d41ad4` / draft PR #10；远端main `f1daa0f`（v0.3.8 he
 
 | 状态 | 数量 | AgentKit Issue |
 | --- | --- | --- |
-| 已关闭 | 3 | #30–#32：已发布的历史里程碑 |
+| 已关闭 | 4 | #30–#32：历史里程碑；#68：PR69/main1dcc521独立Pi修复 |
 | 已验证待集成 | 11 | #12、#13、#29、#33、#34、#38、#41–#44、#67 |
-| 进行中 | 10 | #35–#37、#40、#45、#46、#55、#56、#58、#68 |
+| 进行中 | 9 | #35–#37、#40、#45、#46、#55、#56、#58 |
 | 待办 | 8 | #59；#60–#66为后续待办 |
 | 等待上游 | 9 | #39、#47–#54；每票只等待自己的相关上游交付 |
 | 等待桌面 | 1 | #57；当前不启动桌面 |
@@ -204,3 +204,9 @@ f833 CI40214966220终态：root、UI常规、child witness、Native approval和�
 [用量绑定](evidence-bindings-20261026/usage-source.json)补齐 #55 的同次公开投影 typed/raw 对账：Native transient live20→final60；DSH运行间步 durable-paired20→final60（没有数值transient）；Pi仅当前三条assistant的durable output60，reported/live缺失按冻结契约保留。DSH原验证器负结果和原协议帧均保留，v2离线重分析不触发协议重跑。绑定product4274/UI53f97f35，不转授其他程序；#55整体、性能、桌面与集成仍未通过。机器状态计数已与41张实施票逐项重算一致。
 
 #68为当前阶段实际Pi窗口单位缺陷，关联R04/R16/R34，见修复说明及负证据；状态进行中，未关闭任何票，#60–#66仍为后续范围。
+
+#68的98b1d9a/18d8f643固定Pi真实50/100窗口恢复已通过，状态已验证待集成、OPEN；当前产品候选为98b1d9a，范围仍5b+#67/#68，无新功能。
+
+### 首个独立main切片已交付
+
+#68已由两文件PR69合入main1dcc521；全套既有CI、独立双lease公共consumer、新编译4c候选CLI66a2c9b8的固定Pi50/100/custom原记录恢复，以及合并后CI40227909675均通过，2026-10-26关闭。primary已吸收main为1026372（产品实现仍与98b相同，增加main更强测试）。[精确交付绑定](evidence-bindings-20261026/issue68-mainline-delivery.json)保留seeder和DUT区别。原#13/#41/#55/#56/#58/#59、PR10实验UI及完整Epic未因此关闭/通过；#60–#66仍是后续待办。机器/看板为42实施票：关闭4、待集成11、进行中9、等上游9、等桌面1、待办8。

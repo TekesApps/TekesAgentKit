@@ -44,11 +44,16 @@ def validate_events(events, mode, session_ids, endpoint):
         rows = events[position:end]
         if rows[0].get('iteration') != round_index:
             raise ValueError('iteration order or growth trajectory incomplete')
-        snapshots = named(rows, 'history_close_open_snapshot' if mode == 'warm' else 'snapshot',
-                          4 if mode == 'warm' and endpoint == 'pi' else 2)
+        snapshots = named(rows, 'snapshot' if mode == 'cold' else 'history_close_open_snapshot',
+                          4 if mode != 'cold' and endpoint == 'pi' else 2)
         scoped(snapshots[:2])
         if any(row.get('usable') is not True for row in snapshots):
             raise ValueError('iteration original projection not usable')
+        if mode == 'cold' and endpoint == 'pi':
+            restored = named(rows, 'history_close_open_snapshot', 2)
+            scoped(restored)
+            if any(row.get('usable') is not True for row in restored):
+                raise ValueError('original Pi Runtime window restoration not usable')
         scoped(named(rows, 'history_page', 2))
         sends = named(rows, 'send', 2)
         scoped(sends)

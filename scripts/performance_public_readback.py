@@ -179,6 +179,21 @@ def _ordinary_rows(transcript: Mapping[str, Any], history_rows: Any,
             ignored_anchors.append(_source_anchor(position))
             continue
         if normalized_kind in _BODY_KINDS:
+            if normalized_kind == 'user':
+                position = _position(row.get('sourcePosition'), 'user source position')
+                record, data = _record_at(raw, position)
+                source = data.get('source')
+                if (record.get('type') == 'user/message' and isinstance(source, Mapping)
+                        and source.get('kind') in ('runtime-context', 'time-context')
+                        and source.get('form') == 'snapshot'):
+                    metadata = row.get('metadata', {})
+                    if (not isinstance(metadata, Mapping) or metadata.get('hidden') is not True
+                            or metadata.get('source') != source
+                            or row.get('recordId') != data.get('id')
+                            or row.get('text') != _content_text(data.get('content'))):
+                        raise ValueError('public context row does not match its hidden typed/raw source')
+                    ignored_anchors.append(_source_anchor(position))
+                    continue
             # A tool-only model step can publish an empty, non-final
             # assistant carrier in addition to its dedicated tool events.
             # It is not one of the frozen nonempty final body messages.
@@ -188,10 +203,21 @@ def _ordinary_rows(transcript: Mapping[str, Any], history_rows: Any,
                 record, data = _record_at(raw, position)
                 message = data.get('message', data)
                 tools = transcript.get('tools', [])
+                same_turn_tools = [tool for tool in tools if tool.get('turnId') == row.get('turnId')]
+                content = message.get('content') if isinstance(message, Mapping) else None
+                tool_only_content = content == []
+                if isinstance(content, list) and content:
+                    tool_only_content = all(
+                        isinstance(block, Mapping) and block.get('type') in ('toolCall', 'tool-call')
+                        and any(tool.get('sourcePosition', {}).get('contentIndex') == block_index
+                                and all(tool.get('sourcePosition', {}).get(key) == position.get(key)
+                                        for key in ('kind', 'entryId', 'sequence'))
+                                for tool in same_turn_tools)
+                        for block_index, block in enumerate(content))
                 if (not isinstance(message, Mapping) or message.get('role') != 'assistant'
-                        or message.get('content') != []
+                        or not tool_only_content
                         or not row.get('turnId')
-                        or not any(tool.get('turnId') == row['turnId'] for tool in tools)):
+                        or not same_turn_tools):
                     raise ValueError('empty assistant is not an original tool-only carrier')
                 ignored_anchors.append(_source_anchor(position))
                 continue

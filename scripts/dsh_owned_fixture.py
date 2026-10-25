@@ -135,6 +135,12 @@ def owned_dsh(root, data_root, home, cwd, base_url, environment, *,
     package_file = runtime / "node_modules/@deepseek-ai/dsh/package.json"
     if not all(path.is_file() for path in (node, entry, boot, package_file)):
         raise ValueError("root must contain DSH runtime, boot package, and package metadata")
+    if performance:
+        # A fixed runtime may expose its immutable Node through a symlink.
+        # Bind and execute the canonical files; owned mutable state still
+        # rejects every symlink, and resume rechecks these exact identities.
+        node, entry, boot, package_file = (
+            path.resolve(strict=True) for path in (node, entry, boot, package_file))
     if on_process_started is not None and not callable(on_process_started):
         raise ValueError("on_process_started must be callable")
     if resume_receipt is None:

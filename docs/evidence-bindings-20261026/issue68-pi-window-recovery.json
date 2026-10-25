@@ -1,0 +1,163 @@
+{
+  "accepted": true,
+  "issue": 68,
+  "sourceCommit": "98b1d9a2960b90774ea5454e7e8dad870538f7bc",
+  "programSha256": "18d8f643e8cba5ee94202c8c2f481bfa31add7bc5ac4fc5df44276100532180b",
+  "runtime": {
+    "criticalFiles": {
+      "/Users/frankqin/Library/Application Support/Tekes/Harnesses/pi-1.3.0-node-24.20.0/node/bin/node": "9d050fd455b56426e25d4d603c7c501cbb2630348e836cf221dcce748e90588a",
+      "/Users/frankqin/Library/Application Support/Tekes/Harnesses/pi-1.3.0-node-24.20.0/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js": "e79626f2dd6f94aa45d30f3fa63cd84319a6eefcd150b353cfaf274366926774",
+      "/Users/frankqin/Library/Application Support/Tekes/Harnesses/pi-1.3.0-node-24.20.0/node_modules/@earendil-works/pi-coding-agent/package.json": "83c3bb7619f590c213cc96a24216eb29a819a3ef6dc548607cc037ed276e8dc5"
+    },
+    "completeDependencyClosureClaimed": false,
+    "versions": "Pi1.3.0/Node24.20.0"
+  },
+  "processExit": {
+    "pid": 39294,
+    "startIdentity": "Mon Oct 26 03:24:50 2026",
+    "spawnMonotonicNsLowerBound": 15459679705250,
+    "exitStatus": 0,
+    "elapsedNs": 2043818625,
+    "ownedGroupAbsent": true,
+    "remainingProcessGroup": [],
+    "outputReaderStopped": true,
+    "parseErrors": [],
+    "error": null,
+    "processBoundaries": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/performance/pi-window-recovery-98b-v1/recovery-process-boundaries.jsonl"
+  },
+  "error": null,
+  "officialSamples": 0,
+  "performanceAccepted": false,
+  "receiptSha256": "278ca0d8c64c99edd17390215a4e6ac150ad21a75bbb643c9e544d06a8497424",
+  "sourceInputsManifestSha256": "7986998349fada6c73c7316ffde93cea501f3148b8557c7e4426cc4633cc3639",
+  "runnerInputsManifestSha256": "c554efbd72e9184aa832c5050294ba51d06cbe6021c574d870033fab0b5f9ea2",
+  "sessionProofs": [
+    {
+      "sessionId": "119af827-ace6-42c9-9504-2f2ec8aab87c",
+      "phases": [
+        {
+          "phase": "initial50",
+          "messageEntries": 50,
+          "customEntries": 73,
+          "totalEntries": 123,
+          "connectionEpoch": 2,
+          "originalRecordsUnchangedInOrder": true,
+          "comparedToPriorSource": false
+        },
+        {
+          "phase": "reconnected50",
+          "messageEntries": 50,
+          "customEntries": 73,
+          "totalEntries": 123,
+          "connectionEpoch": 5,
+          "originalRecordsUnchangedInOrder": true,
+          "comparedToPriorSource": true
+        },
+        {
+          "phase": "reopened50",
+          "messageEntries": 50,
+          "customEntries": 73,
+          "totalEntries": 123,
+          "connectionEpoch": 5,
+          "originalRecordsUnchangedInOrder": true,
+          "comparedToPriorSource": true
+        },
+        {
+          "phase": "paged100",
+          "messageEntries": 100,
+          "customEntries": 133,
+          "totalEntries": 233,
+          "connectionEpoch": 5,
+          "originalRecordsUnchangedInOrder": true,
+          "comparedToPriorSource": true
+        },
+        {
+          "phase": "reconnected100",
+          "messageEntries": 100,
+          "customEntries": 133,
+          "totalEntries": 233,
+          "connectionEpoch": 8,
+          "originalRecordsUnchangedInOrder": true,
+          "comparedToPriorSource": true
+        },
+        {
+          "phase": "reopened100",
+          "messageEntries": 100,
+          "customEntries": 133,
+          "totalEntries": 233,
+          "connectionEpoch": 8,
+          "originalRecordsUnchangedInOrder": true,
+          "comparedToPriorSource": true
+        }
+      ]
+    },
+    {
+      "sessionId": "c08e39ab-14c1-4101-8202-493d04be7400",
+      "phases": [
+        {
+          "phase": "initial50",
+          "messageEntries": 50,
+          "customEntries": 73,
+          "totalEntries": 123,
+          "connectionEpoch": 8,
+          "originalRecordsUnchangedInOrder": true,
+          "comparedToPriorSource": false
+        },
+        {
+          "phase": "reconnected50",
+          "messageEntries": 50,
+          "customEntries": 73,
+          "totalEntries": 123,
+          "connectionEpoch": 11,
+          "originalRecordsUnchangedInOrder": true,
+          "comparedToPriorSource": true
+        },
+        {
+          "phase": "reopened50",
+          "messageEntries": 50,
+          "customEntries": 73,
+          "totalEntries": 123,
+          "connectionEpoch": 11,
+          "originalRecordsUnchangedInOrder": true,
+          "comparedToPriorSource": true
+        },
+        {
+          "phase": "paged100",
+          "messageEntries": 100,
+          "customEntries": 133,
+          "totalEntries": 233,
+          "connectionEpoch": 11,
+          "originalRecordsUnchangedInOrder": true,
+          "comparedToPriorSource": true
+        },
+        {
+          "phase": "reconnected100",
+          "messageEntries": 100,
+          "customEntries": 133,
+          "totalEntries": 233,
+          "connectionEpoch": 14,
+          "originalRecordsUnchangedInOrder": true,
+          "comparedToPriorSource": true
+        },
+        {
+          "phase": "reopened100",
+          "messageEntries": 100,
+          "customEntries": 133,
+          "totalEntries": 233,
+          "connectionEpoch": 14,
+          "originalRecordsUnchangedInOrder": true,
+          "comparedToPriorSource": true
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "sessionRuntimeTests": "10 passed",
+    "sessionAllTargetsClippy": "passed",
+    "headlessFeatureAllTargetsClippy": "passed",
+    "independentSourceReview": "no blocker; actual protocol subsequently verified",
+    "merged": false,
+    "issueClosed": false
+  },
+  "originalNegativeBinding": "issue68-pi-window-negative.json"
+}

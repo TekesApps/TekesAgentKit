@@ -49,7 +49,7 @@
     "Candidate functional #55/#56 still partial; Native busy queue Kernel #86 failure remains blocking",
     "No comparable baseline/candidate performance samples collected; this is a preregistered profile, not acceptance evidence"
   ],
-  "resolvedProductCandidate": "4274fe82fc353ff06100d4106d527e25dc5dfca3",
+  "resolvedProductCandidate": "98b1d9a2960b90774ea5454e7e8dad870538f7bc",
   "executionRecipe": {
     "frozenBeforeSamples": "2026-10-26; no performance samples collected",
     "datasetDefinition": "100 initial nonempty body-text messages per ordinary session: 50 user + 50 final assistant, each exactly 1024 UTF-8 bytes; first 10 turns each execute one original public read tool; tool call/result records are additional and excluded from body-text count",
@@ -119,7 +119,18 @@
         "crates/session/src/runtime.rs::add_journal",
         "crates/endpoint-pi/src/lib.rs::close/context.process/follow/SessionConversation",
         "crates/session/src/projection.rs::reset_journal/apply"
-      ]
+      ],
+      "additionalBeforeSampleClarification": {
+        "date": "2026-10-26",
+        "officialSamplesBeforeClarification": 0,
+        "familyPages": "two total public pages: initial maxMessages20 + one actual Earlier20; native source-group expansion and nonempty EOF tail are disclosed, not sliced/rejected by raw-record count",
+        "piProbeRestoration": "Restore Runtime public follow window after its shared-endpoint page20 probe in cold/warm/lifecycle, before comparing original reconnection window. Native message restoration fix68 prevents custom metadata inflating that window.",
+        "cold50Path": "separate actual RunController request50 uses a publicly re-opened Pi window; original public intent to original source publication, never an acknowledgement-only or cached snapshot result",
+        "pidObservation": "steady-warm11 boundary observations and 50ms RSS require same long-lived harness identities; reconnectLifecycle Pi identity replacement disclosed separately",
+        "qualityBound": "sampled identity observation gaps above250ms fail evidence quality; requested cadence remains50ms",
+        "cleanupClock": "OS census minus conservative original-intent lower bound (Popen lower bound + Rust relative intent); delayed stdout observation cannot shorten duration",
+        "thresholdsChanged": false
+      }
     },
     "reconnectLifecycle": {
       "initializationIterationsExcluded": 1,

@@ -3,7 +3,7 @@
   "auditDate": "2026-10-25",
   "epic": 14,
   "agentkitCodeBaseline": "1d41ad4902377a27d0fefc169711c9515567e3fa",
-  "remoteMain": "f1daa0ffcf6ced41e21f351e22845455ca78006c",
+  "remoteMain": "1dcc52153ea45ba6ce73a135a8d8fe8d3406360c",
   "clientkitCommitted": "c289bc9d33edcd83a782ac17927a8c65a027eccd",
   "tekesCommitted": "8858ccd9d46590852ec7a0949aee289fc6798d70",
   "clientkitUncommittedCandidate": "StandaloneComposer / SubmissionLifecycle / ArtifactSelectionReference / AgentKitRemote；候选语义纳入覆盖，不当已发布签名",
@@ -99,7 +99,7 @@
         "PROTO-FAMILY",
         13
       ],
-      "implementationAndVerification": "root三SEP基线已发布；后续原实例/epoch/lease绑定在PR10",
+      "implementationAndVerification": "root三SEP基线已发布；后续原实例/epoch/lease绑定在PR10；#68独立PR69/main1dcc521、精确4c候选公共consumer与固定Pi50/100/custom恢复通过，2026-10-26关闭，仅此窄项",
       "remaining": "按公开pointer与来源读取；不能以scope相同替换旧实例"
     },
     {
@@ -344,7 +344,7 @@
         "SIDEBAR",
         "PROTO-FAMILY"
       ],
-      "implementationAndVerification": "bd5e7f5原SDKwheel、可见行24→48、Y=-22保持；b0fa Native仅一Earlier至EOF",
+      "implementationAndVerification": "bd5e7f5原SDKwheel、可见行24→48、Y=-22保持；b0fa Native仅一Earlier至EOF；#68独立PR69/main1dcc521、精确4c候选公共consumer与固定Pi50/100/custom恢复通过，2026-10-26关闭，仅此窄项",
       "remaining": "多真实页shape/当前源码协议另证；非新Host或嵌套阅读"
     },
     {
@@ -649,7 +649,7 @@
       "keys": [
         "PROTO-RUN"
       ],
-      "implementationAndVerification": "各原历史程序有证据，固定矩阵功能基线91129d7",
+      "implementationAndVerification": "各原历史程序有证据，固定矩阵功能基线91129d7；#68独立PR69/main1dcc521、精确4c候选公共consumer与固定Pi50/100/custom恢复通过，2026-10-26关闭，仅此窄项",
       "remaining": "Native busy原Kernel86失败明确保留；不能用新源码复用旧程序通过"
     },
     {
@@ -1754,7 +1754,7 @@
       "key": "FIX-PI-WINDOW-UNITS",
       "parent": 17,
       "title": "Pi恢复窗口按message而非custom entries计数",
-      "status": "进行中",
+      "status": "已关闭",
       "layer": "implementation",
       "scope": "NativeConversation reconnect/close-open保持已加载消息窗口，避免custom元数据被当消息扩大窗口",
       "deliverables": [
@@ -1769,9 +1769,11 @@
         "适用精确head review/CI/consumer并进入main后关闭"
       ],
       "evidence": [
-        "evidence-bindings-20261026/issue68-pi-window-negative.json"
+        "evidence-bindings-20261026/issue68-pi-window-negative.json",
+        "evidence-bindings-20261026/issue68-pi-window-recovery.json",
+        "evidence-bindings-20261026/issue68-mainline-delivery.json"
       ],
-      "completedAt": null,
+      "completedAt": "2026-10-25T19:54:43Z",
       "related": [
         14,
         18,
@@ -1781,7 +1783,13 @@
       ],
       "owner": "主会话协调 + stage68_pi_window_units 独立子会话",
       "number": 68,
-      "stage": "current-blocking-fix"
+      "stage": "current-blocking-fix",
+      "integration": {
+        "pr": 69,
+        "main": "1dcc52153ea45ba6ce73a135a8d8fe8d3406360c",
+        "ciRun": 40227909675,
+        "head": "4c682b1a8828acaf19a02db639e6928189999b83"
+      }
     }
   ],
   "existingImplementationIssues": [
@@ -1813,9 +1821,9 @@
   "codeWip": "Native Summary transition，暂停于未编译通过和validator审查；无新真实协议/桌面验收",
   "evidencePolicy": "commit+program+version+proof layer；历史不升级新HEAD；未合入代码不关闭",
   "implementationStatusCounts": {
-    "已关闭": 3,
+    "已关闭": 4,
     "已验证待集成": 11,
-    "进行中": 10,
+    "进行中": 9,
     "等待上游": 9,
     "等待桌面": 1,
     "待办": 8
@@ -1962,7 +1970,7 @@
     "protocolMatrix": "agentkit-stage-protocol-matrix-20261025.md",
     "performanceProfile": "agentkit-stage-performance-profile-20261025.json",
     "protocolResults": "agentkit-stage-protocol-results-20261025.json",
-    "integrationDecision": "keep PR10 draft: TekesUI53, Kernel86, Pi-window defect68, remaining family/performance; no merge/tag/issue closure",
+    "integrationDecision": "Pi-window slice69 merged and main CI passed; PR10 remains draft: TekesUI53, Kernel86, remaining family/performance; no stage tag",
     "latestNarrowAcceptance": {
       "issue": 56,
       "scope": "prior Native/Pi/DSH source scopes plus actual Pi/DSH mounted child pane Earlier, host reconnect, stable record identity/order, parent draft/selection and retirement",
@@ -2002,23 +2010,42 @@
         "issue": 68,
         "scope": "Pi恢复窗口消息计数单位，不重置已加载窗口",
         "featureExpansion": false,
-        "acceptance": "in-progress"
+        "acceptance": "closed-after-own-main-integration"
       }
     ],
-    "currentCandidate": "4274fe82fc353ff06100d4106d527e25dc5dfca3",
+    "currentCandidate": "10263722b5fb128922c49a31b5942c41333cd6e2",
     "frozenScopeBase": "5b7c84361206b45ac381b10437097d3b76c322c1",
     "ciObservation": {
-      "head": "70f4084523d65f7f44c1abaf585408a572367fae",
-      "run": 40216799309,
-      "additionalRun": 40216795717,
+      "head": "98b1d9a2960b90774ea5454e7e8dad870538f7bc",
+      "run": 40226400379,
       "root": "success",
       "ui": "failure",
       "onlyFailedGate": "strict nested reading / TekesUI53",
       "standalonePublicConsumer": "success",
       "laterDemoBuild": "skipped",
-      "artifact": 12607784167,
       "merged": false
-    }
+    },
+    "latestWindowFixAcceptance": {
+      "issue": 68,
+      "source": "98b1d9a2960b90774ea5454e7e8dad870538f7bc",
+      "binding": "evidence-bindings-20261026/issue68-pi-window-recovery.json",
+      "merged": true,
+      "completeIssue55or56": false,
+      "mainlineBinding": "evidence-bindings-20261026/issue68-mainline-delivery.json",
+      "issueClosed": true
+    },
+    "currentCandidateImplementationEquivalentTo": "98b1d9a2960b90774ea5454e7e8dad870538f7bc",
+    "currentMain": "1dcc52153ea45ba6ce73a135a8d8fe8d3406360c",
+    "integratedSlices": [
+      {
+        "issue": 68,
+        "pr": 69,
+        "main": "1dcc52153ea45ba6ce73a135a8d8fe8d3406360c",
+        "mainCiRun": 40227909675,
+        "binding": "evidence-bindings-20261026/issue68-mainline-delivery.json",
+        "fullStageAccepted": false
+      }
+    ]
   },
   "stageCoverageAudit": {
     "requirements": 50,
@@ -2033,7 +2060,9 @@
       66
     ],
     "newIssuesCreated": 2,
-    "closedIssues": [],
+    "closedIssues": [
+      68
+    ],
     "initialAuditSnapshotRetained": true,
     "initialImplementationIssues": 40,
     "initialNewIssuesCreated": 0,
@@ -2043,11 +2072,12 @@
     ]
   },
   "currentStageCounts": {
-    "已关闭": 3,
+    "已关闭": 4,
     "已验证待集成": 11,
-    "进行中": 10,
+    "进行中": 9,
     "等待上游": 9,
     "等待桌面": 1,
     "待办": 8
-  }
+  },
+  "remoteMainAtOriginalAudit": "f1daa0ffcf6ced41e21f351e22845455ca78006c"
 }

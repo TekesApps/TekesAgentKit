@@ -4,8 +4,8 @@
 
 ## 不可变输入
 
-- AgentKit范围基线 `5b7c84361206b45ac381b10437097d3b76c322c1`；已验证基准候选 `4274fe82fc353ff06100d4106d527e25dc5dfca3`（#67），新增 #68 为阶段内阻断修复，尚待新程序验收；本地保护引用 `refs/agentkit/stage-close-20261025/base`。PR #10 为 draft。
-- main `f1daa0ffcf6ced41e21f351e22845455ca78006c`，已发布 headless v0.3.8。
+- AgentKit范围基线 `5b7c84361206b45ac381b10437097d3b76c322c1`；阻断修复 #67 为 `4274fe82fc353ff06100d4106d527e25dc5dfca3`，#68 为 `98b1d9a2960b90774ea5454e7e8dad870538f7bc`（分别取得精确程序窄验收）；当前分支 `10263722b5fb128922c49a31b5942c41333cd6e2` 已吸收 main 的独立 #68 修复与增强回归；本地保护引用 `refs/agentkit/stage-close-20261025/base`。PR #10 为 draft。
+- 当前 main `1dcc52153ea45ba6ce73a135a8d8fe8d3406360c`：独立两文件 PR #69 已合入，main CI `40227909675` 通过，#68 已关闭。冻结对照/性能 baseline 仍为原 main `f1daa0ffcf6ced41e21f351e22845455ca78006c`，不随集成漂移。已发布 tag 仍为 headless v0.3.8；本阶段未发布。
 - ClientKit 行为参照 `c289bc9d33edcd83a782ac17927a8c65a027eccd`；Tekes `8858ccd9d46590852ec7a0949aee289fc6798d70`。此前记录的未提交参照候选仅按原冻结快照解释，不能当已发布 SDK。
 - TekesUI 公开精确 pin `50ec49f3446924fdbc66b3cff22cd8cfe150fe7c`；8 包、243 输入闭包。公开 main `7c13ec0` 未改变该闭包，不等同 #53 修复已发布。
 - Native Kernel 0.9.3：运行程序对应 `09508a9083c24c7accefc99516739f279b85913e`，不是兄弟库现 HEAD。Pi 1.3.0 / Node 24.20.0；DSH 0.2.1-rc.2。程序摘要见[协议证据审计](agentkit-stage-protocol-evidence-audit-20261025.md)。本期不升级运行时以追逐开发分支。
@@ -27,7 +27,7 @@
 | #35/#36/#37/#40/#45 | 冻结提交包含部分实现，不证明整票完成 | 仅收口已有实现和受影响验收；新差异后续处理 |
 | #55 Run | 5b headless CI通过；旧 Pi/DSH 通过绑定旧程序 | Pi/DSH mixed队列/历史/重连，以及Pi取消/Unknown原ticket自动对账窄通过；Native/DSH原turn取消亦按独立程序窄通过；混合工具推理及同次usage来源已取得窄证据；正式性能未验收，Native queue保留Kernel86真实失败 |
 | #56 session/family | Native 两页子历史/passive Summary及 v5 原父 Task 审批拒绝失败通过；Pi primary child running→failed/history/reconnect窄证据通过 | DSH primary-child正常/失败来源及历史重连也已窄通过；Pi/DSH真实SidePanel child pane分页/重连、父草稿与退休窄证据已补齐；完整适用Family及性能仍未验收；不扩大原收据范围 |
-| #58 集成 | 70f4084双CI已结束：root、UI常规检查、child witness、Native approval consumer、独立公开consumer通过；严格nested reading失败，后续demo build跳过；3b1dca5 root已通过、UI仍运行；无完整formal approval | 保留TekesUI #53必需门禁和协议范围阻塞；不能据局部通过合并/发布 |
+| #58 集成 | #68 独立两文件闭包通过精确 head review、CI、公开 consumer、固定 Pi 协议；PR69 已合 main1dcc521，main CI40227909675成功。PR10精确98b root通过，UI失败 | PR10保留严格 nested reading 和协议范围门禁；其余票不因69合入而关闭 |
 | #59 发布 | 待办，尚无本阶段新 tag | 精确集成 head、main CI 与范围文档通过后发布 |
 
 ## 真实阻塞、等待和后续范围
@@ -45,7 +45,7 @@
 
 定向检查通过后只运行适用最终检查；没有新变化/失败不反复全量重跑。原始输入、程序 SHA、运行时握手、公开协议帧、provider 请求、进程退出与实际 not_run 同一收据绑定。历史 91129d7 的 1026 格以及 1d/29ea/06c/5b 各收据各守身份，不相互扩报。
 
-当前不合并、不打 tag，不是撤销授权，而是尚未满足适用门禁；已授权集成在精确检查完成后直接执行。不得降低检查、关闭未合入代码票或宣称完整对齐。
+PR #69 已按授权独立合入；PR #10 与阶段 tag 尚未满足各自适用门禁。后续独立闭包仍在精确检查完成后按授权集成。不得降低检查、关闭未合入代码票或宣称完整对齐。
 
 ## 历史封存结果（5b原程序，不覆盖后续窄证据）
 
@@ -156,3 +156,19 @@ The only product delta after5b remains #67.
 [修复说明](agentkit-pi-window-message-units-20261026.md)和原负证据绑定已建立。恢复窗口把custom entries计成消息会扩大历史、使分页提前耗尽；#68仅修这个单位，不重置/丢弃已加载窗口。#55/#56适用Pi行保持未通过，等待精确新程序；不能由4274旧证据升级。#67是此前唯一产品修复的历史记录仍保留，当前允许修复列表增加#68。
 
 7c94123 CI40223657233已结束：root及UI常规/独立consumer成功，唯一失败仍为strict nested reading，后续demo build跳过；artifact12610885705保留。未弱化原门禁，PR10仍draft。
+
+### 2026-10-26：真实隔离Pi切片已进入main
+
+更深入的源码级审查取代此前仅按大PR闭包无法拆分的初判：#68仅需main两文件私有Runtime/回归测试，不依赖UI、NativeJournal/queue或新API。PR69（精确head4c682b1）通过workspace全部检查、独立公共consumer和固定Pi真实窗口恢复，合main1dcc521；main CI40227909675成功，文件树与被验候选相同。#68已关闭，完整[证据绑定](evidence-bindings-20261026/issue68-mainline-delivery.json)保留新DUT66a与旧seeder18d8身份。
+
+PR10已本地吸收main至1026372；冲突保留当前实现与main更强的50 close/open测试，29项WIP逐文件核对未变。其余待集成项及#55/#56验收、TekesUI53、Kernel86、#57桌面、#59发布仍保持原标准和阻塞，不据此合并PR10或打阶段tag。稳定headless的main增加这一个Pi修复，不宣称完整对齐。
+
+### 收口工具检查点（1026372 product + 显式验收 overlay）
+
+原9 WIP逐文件SHA保持，main69同步后的Runtime定向回归通过。冻结 `stage-main69-synced-performance-source-v1` 编译performance consumer并通过严格Clippy；程序SHA `a637ddb8fac00854b5883fe14eef850e6808c11c1d0704f390d08b0b085cd439` 已放固定candidate路径，旧程序归档，不回灌target。Python3.12脚本检查通过（日志 `python312-main69-final-v1.log`）。
+
+验收工具补充：公开历史按原message数量与完整entry内容/顺序验证、DSH显式runtime-context排除、warm进程边界与保守cleanup时钟、配对样本报告和有限Native家族seed候选。后者尚无真实pilot通过；配对正式样本仍0，不能把工具测试或单次诊断扩报为性能达标。新Pi冷启动诊断另守其实际收据，不自动成为正式样本。所有构建复用SSD共享target；未启动桌面/物理IME/AX，未改Kernel/Swift/SDK。
+
+本检查点的Pi cold诊断已完成：两会话各100条1024-byte正文、10个原read工具组；公开page20、RunController固定50窗口分页、重连和close/open实际走通，原内容/顺序保留，进程退休核对通过。绑定 `ordinary-diagnostic-main69.json` 明确它只有diagnostic通过、正式样本0，不代替配对性能。
+
+#67主线切片复核：main仍使用DSH旧Remote RPC/mux实现，缺当前分支queue/projection适配层；缓存hint隔离补丁依赖该闭包。现不能仿照#68直接移植少量文件，保持待集成与原真实协议门禁；不为交付跳过相关依赖或扩大重构。

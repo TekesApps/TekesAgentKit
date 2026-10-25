@@ -224,6 +224,28 @@ class DshOwnedFixtureTests(unittest.TestCase):
         self.assertNotIn("synthetic-secret", receipt_text)
         self.assertNotIn("private-cookie", receipt_text)
 
+    def test_performance_runtime_symlink_binds_and_executes_canonical_node(self):
+        performance_root = self.base / 'ssd-performance'
+        case = performance_root / 'dsh-canonical-node'
+        case.mkdir(parents=True)
+        self.data, self.home = case/'data', case/'home'
+        self.cwd = case/'workspace'; self.cwd.mkdir()
+        real_node = self.base/'shared-node'
+        real_node.write_text('immutable node fixture')
+        self.node.unlink(); self.node.symlink_to(real_node)
+        launched = []
+        def popen(argv, **_options):
+            launched.append(argv)
+            return self.process
+        with patch('performance_owned_receipt._process_start_identity', return_value='fake-start'), \
+                patch('performance_owned_receipt.PERFORMANCE_ROOT', performance_root):
+            with owned_dsh(self.runtime, self.data, self.home, self.cwd,
+                    'http://127.0.0.1:43124/v1', self.env(), performance_case=case,
+                    opener_factory=lambda handler: self.opener, popen_factory=popen):
+                marker = json.loads((case/IDENTITY_NAME).read_text())
+                self.assertEqual(marker['runtimeFiles']['node']['path'], str(real_node))
+                self.assertEqual(launched[0][0], str(real_node))
+
     def test_process_started_callback_failure_reaps_only_owned_process(self):
         process = self.process
         process.returncode = None

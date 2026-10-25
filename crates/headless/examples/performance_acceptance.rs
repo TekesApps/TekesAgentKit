@@ -585,48 +585,15 @@ async fn page20_sample(
     }))
 }
 
-async fn run_controller_page_sample(
-    runtime: &SessionRuntime,
-    controller: &RunController,
-    scope: &RunScope,
-) -> Result<Value> {
-    let intent_ns = monotonic_ns();
-    let before = runtime.snapshot();
-    let session = before.sessions.get(&scope.session_id).ok_or_else(|| {
-        Error::Protocol("seeded pointer missing before RunController page".into())
-    })?;
-    let before_records = record_ids(scope, session);
-    let has_more_before = session
-        .native_conversation
-        .as_ref()
-        .map(|conversation| conversation.has_more_before)
-        .unwrap_or(session.has_more_before);
-    require(
-        has_more_before,
-        "RunController fixed-50 history page unavailable",
-    )?;
-    let loaded = controller.load_earlier(scope).await?;
-    require(
-        loaded,
-        "RunController fixed-50 history page returned no earlier rows",
-    )?;
-    let after = runtime.snapshot();
-    let session = after
-        .sessions
-        .get(&scope.session_id)
-        .ok_or_else(|| Error::Protocol("seeded pointer lost after RunController page".into()))?;
-    let after_records = record_ids(scope, session);
-    let retained = before_records
-        .iter()
-        .all(|old| after_records.iter().any(|new| new == old));
-    let ordered = ordered_records(&after_records);
-    let grew = after_records.len() > before_records.len();
-    let added_count = after_records.len().saturating_sub(before_records.len());
+fn added_original_message_count(
+    before_records: &[Value],
+    session: &tekes_agent_session::SessionProjection,
+) -> usize {
     let prior_sequences: std::collections::BTreeSet<_> = before_records
         .iter()
         .filter_map(|row| row["sequence"].as_i64())
         .collect();
-    let added_messages = if let Some(conversation) = &session.native_conversation {
+    if let Some(conversation) = &session.native_conversation {
         let prior_ids: std::collections::BTreeSet<_> = before_records
             .iter()
             .filter_map(|row| row["recordIdentity"]["nativeEntryId"].as_str())
@@ -658,9 +625,123 @@ async fn run_controller_page_sample(
                         .is_none_or(|op| op == "append")
             })
             .count()
-    };
+    }
+}
+
+async fn run_controller_page_sample(
+    runtime: &SessionRuntime,
+    controller: &RunController,
+    scope: &RunScope,
+) -> Result<Value> {
+    if runtime
+        .snapshot()
+        .sessions
+        .get(&scope.session_id)
+        .is_some_and(|session| session.native_conversation.is_some())
+    {
+        // Live Pi events can append rows beyond its configured follow50
+        // window before a full refresh. Reset through the public API so this
+        // separately labelled fixed50 sample starts at a true window50.
+        let mut preparation = close_open_sample(
+            runtime,
+            controller,
+            scope,
+            "prepare_original_RunController50_window",
+        )
+        .await?;
+        preparation["event"] = json!("run_controller_history_page_preparation");
+        emit(preparation);
+    }
+    let mut publications = runtime.subscribe();
+    let intent_ns = monotonic_ns();
+    let before = runtime.snapshot();
+    let session = before.sessions.get(&scope.session_id).ok_or_else(|| {
+        Error::Protocol("seeded pointer missing before RunController page".into())
+    })?;
+    let before_records = record_ids(scope, session);
+    let has_more_before = session
+        .native_conversation
+        .as_ref()
+        .map(|conversation| conversation.has_more_before)
+        .unwrap_or(session.has_more_before);
     require(
-        retained && ordered && grew && added_messages >= 50,
+        has_more_before,
+        "RunController fixed-50 history page unavailable",
+    )?;
+    let loaded = controller.load_earlier(scope).await?;
+    require(
+        loaded,
+        "RunController fixed-50 history page returned no earlier rows",
+    )?;
+    // Pi's public loadEarlier reply acknowledges the request; the original
+    // conversation page arrives on its follow subscription. Time that source
+    // publication, not the RPC acknowledgement or a guessed sleep.
+    let after = tokio::time::timeout(Duration::from_secs(30), async {
+        loop {
+            let snapshot = publications.borrow_and_update();
+            require(
+                snapshot.connection_epoch == before.connection_epoch,
+                "RunController page crossed its original connection epoch",
+            )?;
+            if snapshot
+                .sessions
+                .get(&scope.session_id)
+                .is_some_and(|session| added_original_message_count(&before_records, session) >= 50)
+            {
+                return Ok::<_, Error>(snapshot);
+            }
+            publications
+                .changed()
+                .await
+                .map_err(|_| Error::Disconnected)?;
+        }
+    })
+    .await
+    .map_err(|_| Error::Timeout)??;
+    let session = after
+        .sessions
+        .get(&scope.session_id)
+        .ok_or_else(|| Error::Protocol("seeded pointer lost after RunController page".into()))?;
+    let after_records = record_ids(scope, session);
+    let retained = before_records.iter().all(|old| {
+        after_records
+            .iter()
+            .any(|new| new["recordIdentity"] == old["recordIdentity"])
+    });
+    let old_content_and_order_preserved =
+        before.sessions.get(&scope.session_id).is_some_and(|old| {
+            match (&old.native_conversation, &session.native_conversation) {
+                (Some(prior), Some(current)) => {
+                    let old_ids: Vec<_> = prior
+                        .entries
+                        .iter()
+                        .map(|entry| entry["id"].clone())
+                        .collect();
+                    let retained_ids: Vec<_> = current
+                        .entries
+                        .iter()
+                        .filter(|entry| old_ids.contains(&entry["id"]))
+                        .map(|entry| entry["id"].clone())
+                        .collect();
+                    prior
+                        .entries
+                        .iter()
+                        .all(|entry| current.entries.contains(entry))
+                        && retained_ids == old_ids
+                }
+                (None, None) => old
+                    .entries
+                    .iter()
+                    .all(|(sequence, entry)| session.entries.get(sequence) == Some(entry)),
+                _ => false,
+            }
+        });
+    let ordered = ordered_records(&after_records);
+    let grew = after_records.len() > before_records.len();
+    let added_count = after_records.len().saturating_sub(before_records.len());
+    let added_messages = added_original_message_count(&before_records, session);
+    require(
+        retained && ordered && grew && added_messages >= 50 && old_content_and_order_preserved,
         "RunController page did not publish its requested 50 original messages",
     )?;
     let end_ns = monotonic_ns();
@@ -680,6 +761,7 @@ async fn run_controller_page_sample(
         "actualAddedMessageCount":added_messages,
         "recordIdentities":after_records,
         "priorIdentityRetained":retained,
+        "oldRecordContentAndOrderPreserved":old_content_and_order_preserved,
         "strictOrder":ordered,
         "error":Value::Null
     }))
@@ -952,7 +1034,7 @@ async fn iteration(
     let steady = phase.starts_with("warm");
     let mut snapshots_usable = true;
     for scope in scopes {
-        if steady {
+        if phase != "cold" {
             match close_open_sample(runtime, controller, scope, phase).await {
                 Ok(sample) => {
                     snapshots_usable &= sample["usable"] == true;
@@ -991,7 +1073,7 @@ async fn iteration(
             }
         }
     }
-    if steady && connector_kind == "pi" {
+    if connector_kind == "pi" {
         for scope in scopes {
             match close_open_sample(
                 runtime,

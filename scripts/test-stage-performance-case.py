@@ -69,7 +69,7 @@ def run_program(program, payload, case, label, env, sampler, *, timeout=300):
     process = subprocess.Popen([str(program)], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
         stderr=stderr, text=True, env=env, cwd=case/'workspace', start_new_session=True)
     try:
-        sampler.register(process,'agentkit')
+        agentkit_root = sampler.register(process,'agentkit')
     except Exception:
         if process.poll() is None:
             process.terminate();process.wait(timeout=5)
@@ -78,12 +78,42 @@ def run_program(program, payload, case, label, env, sampler, *, timeout=300):
 
     def read():
         with (case/(label+'.stdout.jsonl')).open('x') as output:
-            for line in process.stdout:
-                output.write(line); output.flush()
-                try:
-                    rows.append(json.loads(line))
-                except (ValueError,TypeError):
-                    errors.append('non-JSON original consumer output')
+            with (case/(label+'-process-boundaries.jsonl')).open('x') as boundaries:
+                for line in process.stdout:
+                    output.write(line); output.flush()
+                    try:
+                        event = json.loads(line)
+                        rows.append(event)
+                        event_name = event.get('event')
+                        if label == 'seed' and event.get('op') in ('presentation', 'snapshot'):
+                            event_name = 'seed_public_' + event['op']
+                        if event_name in ('consumer_started','runtime_ready','iteration_started','send',
+                                          'cleanup_intent','runtime_cleanup_completed',
+                                          'seed_public_presentation','seed_public_snapshot'):
+                            try:
+                                os_rows = process_table()
+                                with sampler.lock:
+                                    roots,known=dict(sampler.roots),dict(sampler.known)
+                                    pi_embedded=sampler.pi_embedded
+                                owned=classify(os_rows,roots,known,pi_embedded=pi_embedded)
+                                compact=[{'pid':row['pid'],'startIdentity':row['startIdentity'],
+                                          'role':row['role'],'commandName':Path(row['command']).name}
+                                         for row in owned.values() if row['role']!='provider']
+                                boundary={'rawEventIndex':len(rows)-1,'event':event_name,
+                                    'iteration':event.get('iteration'),'round':event.get('round'),
+                                    'sessionIndex':event.get('sessionIndex'),
+                                    'originalIntentMonotonicNs':event.get('intentMonotonicNs'),
+                                    'monotonicNs':time.monotonic_ns(),'osProcesses':compact,'error':None}
+                            except Exception as error:
+                                boundary={'rawEventIndex':len(rows)-1,'event':event_name,
+                                    'iteration':event.get('iteration'),'round':event.get('round'),
+                                    'sessionIndex':event.get('sessionIndex'),
+                                    'monotonicNs':time.monotonic_ns(),'osProcesses':[],
+                                    'error':type(error).__name__+': '+str(error)}
+                                errors.append('could not observe OS process boundary')
+                            boundaries.write(json.dumps(boundary)+'\n');boundaries.flush()
+                    except (ValueError,TypeError):
+                        errors.append('non-JSON original consumer output')
 
     reader = threading.Thread(target=read, name='performance-original-output', daemon=True)
     reader.start()
@@ -105,13 +135,158 @@ def run_program(program, payload, case, label, env, sampler, *, timeout=300):
         # Do not signal a detached group after its root exited; preserve the
         # failed cleanup and identities for coordinator inspection.
         reader.join(timeout=10);stderr.close()
-        receipt = {'pid':process.pid,'exitStatus':process.poll(),'elapsedNs':time.monotonic_ns()-start_ns,
+        receipt = {'pid':process.pid,'startIdentity':agentkit_root['startIdentity'],
+            'spawnMonotonicNsLowerBound':start_ns,
+            'exitStatus':process.poll(),'elapsedNs':time.monotonic_ns()-start_ns,
             'ownedGroupAbsent':not remaining,'remainingProcessGroup':remaining,
-            'outputReaderStopped':not reader.is_alive(),'parseErrors':errors,'error':failure}
+            'outputReaderStopped':not reader.is_alive(),'parseErrors':errors,'error':failure,
+            'processBoundaries':str(case/(label+'-process-boundaries.jsonl'))}
         write(case/(label+'-exit.json'),receipt)
     if failure or process.returncode or remaining or reader.is_alive() or errors:
         raise ValueError('owned '+label+' did not complete with valid output and retired group')
     return rows,receipt
+
+
+def validate_warm_process_identity(endpoint, mode, boundaries, rss_rows, rss_summary,
+                                   harness_roots):
+    """Fail closed unless OS identities remain continuously visible in warm samples."""
+    if mode != 'warm':
+        return {'status':'not_applicable','reason':'steady-warm identity rule applies only to warm mode'}
+    if not isinstance(boundaries,list) or not isinstance(rss_rows,list) or not isinstance(harness_roots,list):
+        raise ValueError('warm process identity evidence is incomplete')
+    starts=[row for row in boundaries if row.get('event')=='iteration_started']
+    if len(starts)!=11 or [row.get('iteration') for row in starts]!=list(range(11)):
+        raise ValueError('warm process observations require initialization and ten measured iteration boundaries')
+    ready=[row for row in boundaries if row.get('event')=='runtime_ready']
+    if len(ready)!=1 or ready[0].get('error') or not isinstance(ready[0].get('osProcesses'),list):
+        raise ValueError('warm process observations require one initialized runtime-ready boundary')
+    if any(row.get('error') or not isinstance(row.get('osProcesses'),list) for row in starts):
+        raise ValueError('warm iteration boundary lacks an OS process snapshot')
+    ready_ns=ready[0].get('monotonicNs')
+    start_ns=starts[0].get('monotonicNs')
+    sends=[row for row in boundaries if row.get('event')=='send' and row.get('round')==10]
+    if len(sends)!=2 or {row.get('sessionIndex') for row in sends}!={0,1}:
+        raise ValueError('warm final round is missing one original session send boundary')
+    if any(row.get('error') or not isinstance(row.get('osProcesses'),list) for row in sends):
+        raise ValueError('warm final send boundary lacks an OS process snapshot')
+    end_ns=max(row.get('monotonicNs',0) for row in sends)
+    if (type(ready_ns) is not int or type(start_ns) is not int or type(end_ns) is not int
+            or ready_ns>start_ns or end_ns<=start_ns):
+        raise ValueError('warm process interval has invalid monotonic timestamps')
+
+    def identities(rows, *, node_only=False):
+        return {(row.get('pid'),row.get('startIdentity')) for row in rows
+                if row.get('role')=='harness'
+                and (not node_only or row.get('commandName')=='node')}
+
+    baseline_rows=starts[0]['osProcesses']
+    if endpoint=='pi':
+        # Persistent identities are the intersection across every round boundary.
+        # A short-lived `pi --version` Node process cannot qualify as an RPC merely
+        # because it happened to overlap one boundary or one 50ms RSS sample.
+        persistent_sets=[identities(row['osProcesses'],node_only=True) for row in starts]
+        expected=set.intersection(*persistent_sets) if persistent_sets else set()
+        if len(expected)!=2:
+            raise ValueError('Pi steady-warm must expose exactly two persistent per-session Node RPC identities')
+    else:
+        expected={(row.get('pid'),row.get('startIdentity')) for row in harness_roots
+                  if row.get('role')=='harness'}
+        if len(expected)!=1:
+            raise ValueError('external harness must have exactly one measured root process identity')
+    if any(not expected.issubset(identities(row['osProcesses'],node_only=endpoint=='pi'))
+           for row in starts):
+        raise ValueError('long-lived harness identity changed across a warm iteration boundary')
+    if endpoint!='pi' and not expected.issubset(identities(baseline_rows)):
+        raise ValueError('external harness root is missing at warm initialization boundary')
+    relevant=[sample for sample in rss_rows
+              if start_ns<=sample.get('monotonicNs',0)<=end_ns]
+    if not relevant:
+        raise ValueError('warm RSS stream has no samples across the measured identity interval')
+    for sample in relevant:
+        process_rows=sample.get('processes')
+        if not isinstance(process_rows,list):
+            raise ValueError('warm RSS sample lacks per-process OS identities')
+        live={(row.get('pid'),row.get('startIdentity')) for row in process_rows
+              if row.get('role')=='harness'
+              and (endpoint!='pi' or Path(row.get('command','')).name=='node')}
+        if not expected.issubset(live):
+            raise ValueError('long-lived harness identity disappeared from a 50ms RSS observation')
+    max_gap=rss_summary.get('maxObservedIntervalNs') if isinstance(rss_summary,dict) else None
+    if type(max_gap) is not int or max_gap<=0 or max_gap>250_000_000:
+        raise ValueError('warm RSS cadence gap exceeds the 250ms identity observation bound')
+    return {'status':'verified','endpoint':endpoint,'iterationBoundaries':11,
+            'measuredSendBoundaries':len(sends),'continuousRssSamples':len(relevant),
+            'expectedLongLivedHarnessIdentities':[{'pid':pid,'startIdentity':start}
+                for pid,start in sorted(expected)],'intervalStartMonotonicNs':start_ns,
+            'intervalEndMonotonicNs':end_ns,'samplingGapBoundNs':250_000_000}
+
+
+def verify_owned_retirement(sampler, consumer_exit, boundaries, cleanup_limit_ms,
+                            fixture_lifecycle):
+    """Cross-check sampled known children and a fresh OS census after close."""
+    cleanup=[row for row in boundaries if row.get('event')=='cleanup_intent']
+    if len(cleanup)!=1 or cleanup[0].get('error'):
+        raise ValueError('original consumer cleanup intent is missing or unobserved')
+    completed=[row for row in boundaries if row.get('event')=='runtime_cleanup_completed']
+    if len(completed)!=1 or completed[0].get('error'):
+        raise ValueError('original runtime cleanup completion is missing or unobserved')
+    if completed[0].get('monotonicNs',0)<cleanup[0].get('monotonicNs',0):
+        raise ValueError('runtime cleanup completion precedes the cleanup intent')
+    if consumer_exit.get('exitStatus')!=0 or consumer_exit.get('ownedGroupAbsent') is not True:
+        raise ValueError('original AgentKit consumer did not exit with its process group')
+    if any(row.get('exitStatus')!=0 for row in fixture_lifecycle
+           if row.get('operation') in ('seed_retire','measurement_retire')):
+        raise ValueError('an explicitly owned external harness root did not exit successfully')
+    with sampler.lock:
+        roots,known=dict(sampler.roots),dict(sampler.known)
+        pi_embedded=sampler.pi_embedded
+    census=process_table()
+    current=classify(census,roots,known,pi_embedded=pi_embedded)
+    active=[{'pid':row['pid'],'startIdentity':row['startIdentity'],'role':row['role']}
+            for row in current.values() if row['role'] in ('agentkit','harness')]
+    checked=time.monotonic_ns()
+    spawn_lower=consumer_exit.get('spawnMonotonicNsLowerBound')
+    relative_intent=cleanup[0].get('originalIntentMonotonicNs')
+    if type(spawn_lower) is not int or type(relative_intent) is not int or relative_intent < 0:
+        raise ValueError('original cleanup intent lacks its monotonic lower-bound clock mapping')
+    # Rust's monotonic origin occurs after Popen begins. This lower bound
+    # conservatively includes process startup; delayed stdout/ps observation
+    # must never make cleanup look faster than the original intent.
+    intent_lower=spawn_lower+relative_intent
+    elapsed=checked-intent_lower
+    if elapsed < 0:
+        raise ValueError('original cleanup clock lower bound follows the OS census')
+    if active:
+        raise ValueError('owned AgentKit or harness processes remain after cleanup: '+str(active))
+    if elapsed>cleanup_limit_ms*1_000_000:
+        raise ValueError('owned process retirement exceeded the preregistered cleanup budget')
+    return {'status':'verified','cleanupIntentObservedMonotonicNs':cleanup[0]['monotonicNs'],
+        'cleanupIntentMonotonicNsLowerBound':intent_lower,
+        'cleanupDurationIsConservativeUpperBound':True,
+        'runtimeCleanupCompletedMonotonicNs':completed[0]['monotonicNs'],
+        'allOwnedRootsExitedMonotonicNs':checked,'cleanupElapsedNs':elapsed,
+        'cleanupDeadlineMs':cleanup_limit_ms,'ownedAgentKitOrHarnessProcessesRemaining':active,
+        'sampledOwnedProcessesFinalCensus':True,'providerProcessesExcluded':True}
+
+
+def fixture_root_observation(endpoint, fixture, sampler):
+    if endpoint=='native':
+        process=fixture['process']
+    elif endpoint=='dsh':
+        process=fixture.process
+    else:
+        return None
+    root=sampler.register(process,'harness')
+    return {'pid':root['pid'],'startIdentity':root['startIdentity'],'role':'harness'}
+
+
+def completed_jsonl_rows(path):
+    """Read only complete newline-terminated rows from an active sampler file."""
+    data=Path(path).read_bytes()
+    lines=data.splitlines(keepends=True)
+    if lines and not lines[-1].endswith((b'\n',b'\r')):
+        lines.pop()
+    return [json.loads(line) for line in lines]
 
 
 def validate_program(program, receipt_path):
@@ -227,12 +402,14 @@ def main():
     thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
     url=f'http://127.0.0.1:{server.server_port}/v1'
     failure=None;config=None;fixture=None;context=None;seed_rss=None;measured_rss=None
+    fixture_lifecycle=[];fixture_root_identities=[];boundaries=[];consumer_exit=None
     sampler=ProcessSampler(case/'seed-rss.jsonl',pi_embedded=args.endpoint=='pi')
     sampler.register(os.getpid(),'provider');sampler.start()
     provider=model='endpoint-test'
 
     def start_fixture(resume=None):
         nonlocal context,fixture
+        start_intent=time.monotonic_ns()
         if args.endpoint=='native':
             canonical=json.loads(args.providers_config.read_text())
             providers=dict(canonical,providers=[canonical['providers'][0]])
@@ -240,6 +417,11 @@ def main():
                 providers,url,case,env,performance_case=case,resume_receipt=resume,
                 on_process_started=lambda process:sampler.register(process,'harness'))
             fixture=context.__enter__()
+            identity=fixture_root_observation(args.endpoint,fixture,sampler)
+            fixture_root_identities.append(identity)
+            fixture_lifecycle.append({'operation':'resume' if resume else 'start',
+                'intentMonotonicNs':start_intent,'readyMonotonicNs':time.monotonic_ns(),
+                'process':identity,'exitStatus':None})
             return {'kind':'native','endpointId':'native','url':fixture['url'],'bearer':fixture['bearer']}
         if args.endpoint=='dsh':
             dsh_home=case/'dsh-home'
@@ -249,6 +431,11 @@ def main():
                 query_sqlite=False,performance_case=case,resume_receipt=resume,
                 on_process_started=lambda process:sampler.register(process,'harness'))
             fixture=context.__enter__()
+            identity=fixture_root_observation(args.endpoint,fixture,sampler)
+            fixture_root_identities.append(identity)
+            fixture_lifecycle.append({'operation':'resume' if resume else 'start',
+                'intentMonotonicNs':start_intent,'readyMonotonicNs':time.monotonic_ns(),
+                'process':identity,'exitStatus':None})
             return dict(fixture.connector_config([]),endpointId='dsh')
         raise ValueError('Pi has no separately-owned external fixture process')
 
@@ -264,7 +451,13 @@ def main():
         ids,seed_proofs=public_seed(args.endpoint,config,seeder,workspace,case,env,sampler,provider,model)
         if args.mode=='cold' and context is not None:
             old_process=fixture['process'] if args.endpoint=='native' else fixture.process
+            fixture_stop_intent=time.monotonic_ns()
             context.__exit__(None,None,None);context=None
+            fixture_lifecycle.append({'operation':'seed_retire','intentMonotonicNs':fixture_stop_intent,
+                'completedMonotonicNs':time.monotonic_ns(),
+                'process':next((row for row in reversed(fixture_root_identities)
+                                if row['pid']==old_process.pid),None),
+                'exitStatus':old_process.poll()})
             seed_rss=sampler.stop();write(case/'seed-rss-summary.json',seed_rss)
             owned=[row for row in seed_rss['knownProcesses'] if row['role']!='provider']
             closed=seal_closed_seed_receipt(case/IDENTITY_NAME,exit_code=old_process.poll(),known_processes=owned)
@@ -288,24 +481,50 @@ def main():
         payload={'mode':args.mode,'connector':config,'sessionIds':ids,
                  'iterationPrompts':prompts,'iterationReplies':replies}
         events,consumer_exit=run_program(program,payload,case,'consumer',env,sampler,timeout=600)
+        boundaries=[json.loads(line) for line in (case/'consumer-process-boundaries.jsonl').read_text().splitlines()]
         event_contract=validate_events(events,args.mode,ids,args.endpoint)
+        warm_identity=validate_warm_process_identity(args.endpoint,args.mode,boundaries,
+            completed_jsonl_rows(case/'measurement-rss.jsonl'),
+            {'maxObservedIntervalNs':sampler.max_interval_ns},fixture_root_identities)
         write(case/'diagnostic-events-summary.json',{'eventCount':len(events),
             'eventsByName':{name:sum(row.get('event')==name for row in events)
                             for name in {row.get('event') for row in events}},'seedProofs':seed_proofs,
-            'eventContract':event_contract,'consumerExit':consumer_exit})
+            'eventContract':event_contract,'consumerExit':consumer_exit,
+            'warmProcessIdentity':warm_identity})
     except Exception as error:
         failure=type(error).__name__+': '+str(error)
         (case/'failure-traceback.log').write_text(traceback.format_exc())
     finally:
         try:
-            if context is not None:context.__exit__(None,None,None)
+            if context is not None:
+                process=fixture['process'] if args.endpoint=='native' else fixture.process
+                fixture_stop_intent=time.monotonic_ns()
+                context.__exit__(None,None,None)
+                fixture_lifecycle.append({'operation':'measurement_retire',
+                    'intentMonotonicNs':fixture_stop_intent,'completedMonotonicNs':time.monotonic_ns(),
+                    'process':next((row for row in reversed(fixture_root_identities)
+                                    if row['pid']==process.pid),None),
+                    'exitStatus':process.poll()})
         except Exception as error:
             failure=failure or 'owned fixture cleanup failed: '+type(error).__name__
+        try:
+            if consumer_exit is None and (case/'consumer-exit.json').is_file():
+                consumer_exit=json.loads((case/'consumer-exit.json').read_text())
+            if consumer_exit is not None:
+                boundaries=[json.loads(line) for line in
+                    (case/'consumer-process-boundaries.jsonl').read_text().splitlines()]
+                retirement=verify_owned_retirement(sampler,consumer_exit,boundaries,
+                    json.loads(args.profile.read_text())['thresholds']['ownedCleanupDeadlineMs'],
+                    fixture_lifecycle)
+                write(case/'owned-process-retirement.json',retirement)
+        except Exception as error:
+            failure=failure or 'owned process retirement proof failed: '+type(error).__name__
         try:
             measured_rss=sampler.stop()
             write(case/'last-rss-summary.json',measured_rss)
         except Exception as error:
             failure=failure or 'owned RSS sampling failed: '+type(error).__name__
+        write(case/'fixture-lifecycle.json',fixture_lifecycle)
         server.shutdown();server.server_close();thread.join(timeout=5)
         provider_result=stats.snapshot();write(case/'provider-observation.json',provider_result)
         if thread.is_alive() or provider_result['errorResponses']:
@@ -318,6 +537,10 @@ def main():
             validate_program(seeder,args.seeder_receipt)
         except Exception as error:
             failure=failure or 'program/source/runtime identity recheck failed: '+str(error)
+        if consumer_exit is not None:
+            write(case/'consumer-process-boundaries.summary.json',{
+                'source':consumer_exit['processBoundaries'],'boundaries':boundaries,
+                'rawConsumerEventsUnmodified':True})
     write(case/'diagnostic-receipt.json',{'acceptedDiagnosticPlumbing':failure is None,
         'officialSamples':0,'performanceAccepted':False,'error':failure,
         'profileSha256':sha(args.profile),'programSha256':sha(program),'mode':args.mode,
