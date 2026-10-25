@@ -2,7 +2,15 @@
 
 审计日期：2026-10-25。总 Epic [#14](https://github.com/TekesApps/TekesAgentKit/issues/14)。本索引是当前执行入口；[旧交付计划](rust-agent-ui-issue-plan.md)与[原Issue正文/状态](agentkit-issue-history-20261025.json)保留为历史，不能用其旧勾选代替当前集成状态。
 
-[机器覆盖表](agentkit-issue-coverage-20261025.json)记录43条原始/最新契约要求、30个新增交付项及复用的#12/#13/#29。不为单个测试/每次验证建票。此表记录整理时的审计快照，实时执行状态以GitHub标签为准，后续交付同步更新本索引。
+[机器覆盖表](agentkit-issue-coverage-20261025.json)记录50条原始/最新契约要求、37个交付项及复用的#12/#13/#29（原43条/33票审计快照保留）。不为单个测试/每次验证建票。此表记录整理时的审计快照，实时执行状态以GitHub标签为准，后续交付同步更新本索引。
+
+## 本阶段收口冻结（2026-10-25）
+
+以 [阶段交付契约](agentkit-stage-close-20261025.md) 为当前执行顺序。代码冻结 `5b7c843`，ClientKit `c289bc9`、TekesUI `50ec49f`；后续仅做阻断修复，不追逐参照库新增行为。下文 `1d41ad4` 与其他旧程序结果保持历史身份。
+
+#60–#66已同步到本索引与机器索引，全部为**后续待办**，不自动进入本阶段；完整Epic仍须满足其原始验收标准。#36新增跨格式恢复、#40悬停预览、#46未注册宿主适配保留WIP并冻结，不继续扩展。
+
+当前 `5b7c843` root/UI格式、Clippy、测试、opt-in witness及独立公开API consumer均通过；UI CI在严格嵌套阅读检查失败（TekesUI #53），整体不能合入。Native queue另受Kernel #86真实失败阻塞。Native warm3仅验证该精确程序的有界子历史与passive Summary，不证明正式Task/父工具失败、冷启动或完整三端Family。#55/#56仍未完成。
 
 ## 边界与证据基线
 
@@ -16,14 +24,14 @@ AgentKit代码基线 `1d41ad4` / draft PR #10；远端main `f1daa0f`（v0.3.8 he
 
 ## 当前看板摘要
 
-实施票共33张（新增30张，复用3张），不含Epic和14张功能追踪。
+实施票共40张（原33张，加旁支已建#60–#66），不含Epic和14张功能追踪。
 
 | 状态 | 数量 | AgentKit Issue |
 | --- | --- | --- |
 | 已关闭 | 3 | #30–#32：已发布的历史里程碑 |
 | 已验证待集成 | 10 | #12、#13、#29、#33、#34、#38、#41–#44 |
 | 进行中 | 9 | #35–#37、#40、#45、#46、#55、#56、#58 |
-| 待办 | 1 | #59 |
+| 待办 | 8 | #59；#60–#66为后续待办 |
 | 等待上游 | 9 | #39、#47–#54；每票只等待自己的相关上游交付 |
 | 等待桌面 | 1 | #57；当前不启动桌面 |
 
@@ -95,6 +103,14 @@ AgentKit代码基线 `1d41ad4` / draft PR #10；远端main `f1daa0f`（v0.3.8 he
 | R42 三类组件/消费宿主/第二公开consumer共同验证，完整View不从smoke推导 | [#15](https://github.com/TekesApps/TekesAgentKit/issues/15), [#21](https://github.com/TekesApps/TekesAgentKit/issues/21), [#26](https://github.com/TekesApps/TekesAgentKit/issues/26), [#27](https://github.com/TekesApps/TekesAgentKit/issues/27) | [#33](https://github.com/TekesApps/TekesAgentKit/issues/33) 已验证待集成、[#40](https://github.com/TekesApps/TekesAgentKit/issues/40) 进行中、[#46](https://github.com/TekesApps/TekesAgentKit/issues/46) 进行中、[#55](https://github.com/TekesApps/TekesAgentKit/issues/55) 进行中、[#56](https://github.com/TekesApps/TekesAgentKit/issues/56) 进行中、[#57](https://github.com/TekesApps/TekesAgentKit/issues/57) 等待桌面 | 源码/内存SEP/协议/离屏/桌面/IME/AX/发布证据分层 | 全部原始要求保持；阶段合并不自动关闭大功能追踪或升级旧程序 |
 | R43 Agent模型/设置选择、能力可见性与原宿主配置回调 | [#15](https://github.com/TekesApps/TekesAgentKit/issues/15), [#16](https://github.com/TekesApps/TekesAgentKit/issues/16), [#21](https://github.com/TekesApps/TekesAgentKit/issues/21) | [#33](https://github.com/TekesApps/TekesAgentKit/issues/33) 已验证待集成、[#34](https://github.com/TekesApps/TekesAgentKit/issues/34) 已验证待集成、[#35](https://github.com/TekesApps/TekesAgentKit/issues/35) 进行中 | 已有ComposerChoices和原controls配置门禁；产品场景参数/凭据保持host ownership | 独立宿主新生命周期另做；真实设置回传归PROTO-RUN，物理IME归DESKTOP |
 
+| R44 [实施/SidePanel] 工具类 Tabs 注册、保留与关闭生命周期 | #14 | [#60](https://github.com/TekesApps/TekesAgentKit/issues/60) 待办 | 已建票；尚未实施或验收 | 后续范围；完整验收见原Issue，不作为本阶段自动前置 |
+| R45 [实施/Files] 项目文件树、目录加载与原资源导航组件 | #14 | [#61](https://github.com/TekesApps/TekesAgentKit/issues/61) 待办 | 已建票；尚未实施或验收 | 后续范围；完整验收见原Issue，不作为本阶段自动前置 |
+| R46 [实施/Changes] Git 变更列表、Diff 浏览与原版本动作组件 | #14 | [#62](https://github.com/TekesApps/TekesAgentKit/issues/62) 待办 | 已建票；尚未实施或验收 | 后续范围；完整验收见原Issue，不作为本阶段自动前置 |
+| R47 [实施/Terminal] 交互终端面板、PTY 宿主适配与资源生命周期 | #14 | [#63](https://github.com/TekesApps/TekesAgentKit/issues/63) 待办 | 已建票；尚未实施或验收 | 后续范围；完整验收见原Issue，不作为本阶段自动前置 |
+| R48 [实施/Artifact] 可复用文件预览、查看器扩展与精确上下文回传 | #14 | [#64](https://github.com/TekesApps/TekesAgentKit/issues/64) 待办 | 已建票；尚未实施或验收 | 后续范围；完整验收见原Issue，不作为本阶段自动前置 |
+| R49 [实施/Browser] 浏览器面板契约、导航状态与 Composer 上下文桥接 | #14 | [#65](https://github.com/TekesApps/TekesAgentKit/issues/65) 待办 | 已建票；尚未实施或验收 | 后续范围；完整验收见原Issue，不作为本阶段自动前置 |
+| R50 [实施/Composer] Command Palette：+ / @、命令目录与作用域解析 | #14 | [#66](https://github.com/TekesApps/TekesAgentKit/issues/66) 待办 | 已建票；尚未实施或验收 | 后续范围；完整验收见原Issue，不作为本阶段自动前置 |
+
 ## 实施队列与负责人
 
 所有AgentKit实施票负责人均为@qf0421；主会话协调/审查/集成，使用新子会话实施，不联系已结束旧子会话。上游issue仍由上游维护者负责，本库负责消费/跟进。
@@ -134,13 +150,21 @@ AgentKit代码基线 `1d41ad4` / draft PR #10；远端main `f1daa0f`（v0.3.8 he
 | [#13](https://github.com/TekesApps/TekesAgentKit/issues/13) 复用已有修复 | [#23](https://github.com/TekesApps/TekesAgentKit/issues/23) | 实现/原来源 | 已验证待集成 | 原只读instance identity及1ef2791门禁证据，PR10未合入 |
 | [#29](https://github.com/TekesApps/TekesAgentKit/issues/29) 复用已有修复 | [#22](https://github.com/TekesApps/TekesAgentKit/issues/22) | 实现/原来源 | 已验证待集成 | f399356原分类协议/组件证据；本次重开，PR10未合入 |
 
+| [#60](https://github.com/TekesApps/TekesAgentKit/issues/60) [实施/SidePanel] 工具类 Tabs 注册、保留与关闭生命周期 | #14 | 后续实现 | 待办 | 完整范围/交付物/依赖/验收同步于机器索引；本阶段不展开。 |
+| [#61](https://github.com/TekesApps/TekesAgentKit/issues/61) [实施/Files] 项目文件树、目录加载与原资源导航组件 | #14 | 后续实现 | 待办 | 完整范围/交付物/依赖/验收同步于机器索引；本阶段不展开。 |
+| [#62](https://github.com/TekesApps/TekesAgentKit/issues/62) [实施/Changes] Git 变更列表、Diff 浏览与原版本动作组件 | #14 | 后续实现 | 待办 | 完整范围/交付物/依赖/验收同步于机器索引；本阶段不展开。 |
+| [#63](https://github.com/TekesApps/TekesAgentKit/issues/63) [实施/Terminal] 交互终端面板、PTY 宿主适配与资源生命周期 | #14 | 后续实现 | 待办 | 完整范围/交付物/依赖/验收同步于机器索引；本阶段不展开。 |
+| [#64](https://github.com/TekesApps/TekesAgentKit/issues/64) [实施/Artifact] 可复用文件预览、查看器扩展与精确上下文回传 | #14 | 后续实现 | 待办 | 完整范围/交付物/依赖/验收同步于机器索引；本阶段不展开。 |
+| [#65](https://github.com/TekesApps/TekesAgentKit/issues/65) [实施/Browser] 浏览器面板契约、导航状态与 Composer 上下文桥接 | #14 | 后续实现 | 待办 | 完整范围/交付物/依赖/验收同步于机器索引；本阶段不展开。 |
+| [#66](https://github.com/TekesApps/TekesAgentKit/issues/66) [实施/Composer] Command Palette：+ / @、命令目录与作用域解析 | #14 | 后续实现 | 待办 | 完整范围/交付物/依赖/验收同步于机器索引；本阶段不展开。 |
+
 ## 整理后的执行顺序
 
-1. 先收尾 [#56](https://github.com/TekesApps/TekesAgentKit/issues/56) 下保留的Native Summary WIP：恢复编译并加强原source/result验证，再决定真实离屏运行；不是给每个probe单开票。
-2. 可并行推进 [#35](https://github.com/TekesApps/TekesAgentKit/issues/35)、[#36](https://github.com/TekesApps/TekesAgentKit/issues/36)、[#37](https://github.com/TekesApps/TekesAgentKit/issues/37) 的契约/实现，以及 [#39](https://github.com/TekesApps/TekesAgentKit/issues/39)、[#40](https://github.com/TekesApps/TekesAgentKit/issues/40)、[#46](https://github.com/TekesApps/TekesAgentKit/issues/46) 的不依赖SDK部分。主会话串行Cargo，复用SSD shared-target。
-3. [#47](https://github.com/TekesApps/TekesAgentKit/issues/47)/[#48](https://github.com/TekesApps/TekesAgentKit/issues/48)/[#49](https://github.com/TekesApps/TekesAgentKit/issues/49)/[#50](https://github.com/TekesApps/TekesAgentKit/issues/50)/[#51](https://github.com/TekesApps/TekesAgentKit/issues/51)/[#52](https://github.com/TekesApps/TekesAgentKit/issues/52)/[#53](https://github.com/TekesApps/TekesAgentKit/issues/53) 各自等待对应公开SDK；[#54](https://github.com/TekesApps/TekesAgentKit/issues/54) 等待真实公开producer。已交付能力可单独消费，不把整个功能票锁住。
-4. [#57](https://github.com/TekesApps/TekesAgentKit/issues/57) 保持等待桌面，不启动窗口/IME/AX/截图授权；固定宿主工具链可先只读/源码准备。
-5. [#58](https://github.com/TekesApps/TekesAgentKit/issues/58) 只有严格门禁与本次集成范围全部满足才合入、关闭对应代码票；[#59](https://github.com/TekesApps/TekesAgentKit/issues/59) 再处理精确版本/tag。
+1. 冻结5b范围、运行时与有限#55/#56矩阵，保留所有历史证据与WIP。
+2. 复用有效证据，只补受影响/缺失真实协议；主会话串行Cargo，冻结输入且复用SSD target。
+3. #58审查已验证待集成项目；只有真实依赖隔离且保留全部适用门禁才拆PR。
+4. 精确head review、CI、独立consumer通过后合入，核对main CI，再由#59发布标明范围的版本。
+5. #57继续等待桌面；#60–#66及未注册扩展WIP留到后续。上游失败仅阻相关范围，不能降验收标准。
 
 ## WIP 与磁盘
 

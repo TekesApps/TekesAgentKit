@@ -508,8 +508,8 @@
         "SUMMARY",
         "PROTO-FAMILY"
       ],
-      "implementationAndVerification": "原Pi/DSH、Native passive Task收据各有范围；不能混程序",
-      "remaining": "Native parent Task运行→失败当前WIP未编译通过；不是子代理圆点来源"
+      "implementationAndVerification": "原Pi/DSH、Native passive Task收据各有范围；不能混程序；后续5b warm3已证明狭义Native有界子历史/passive Summary。",
+      "remaining": "正式Task/父工具失败、完整三端Family及性能尚未验收；warm3不替代这些标准。"
     },
     {
       "id": "R27",
@@ -658,8 +658,8 @@
       "keys": [
         "PROTO-FAMILY"
       ],
-      "implementationAndVerification": "b0fa真实Native两页、后续同paneCPU与Pi/DSH原来源分别归档",
-      "remaining": "同交付源码重新核验未完，当前Native Summary WIP有编译/validator待修"
+      "implementationAndVerification": "b0fa真实Native两页、后续同paneCPU与Pi/DSH原来源分别归档；后续5b warm3已证明狭义Native有界子历史/passive Summary。",
+      "remaining": "正式Task/父工具失败、完整三端Family及性能尚未验收；warm3不替代这些标准。"
     },
     {
       "id": "R36",
@@ -809,6 +809,131 @@
       ],
       "implementationAndVerification": "已有ComposerChoices和原controls配置门禁；产品场景参数/凭据保持host ownership",
       "remaining": "独立宿主新生命周期另做；真实设置回传归PROTO-RUN，物理IME归DESKTOP"
+    },
+    {
+      "id": "R44",
+      "requirement": "[实施/SidePanel] 工具类 Tabs 注册、保留与关闭生命周期",
+      "features": [
+        23,
+        26
+      ],
+      "implementationIssues": [
+        60
+      ],
+      "keys": [
+        "TOOL-TABS"
+      ],
+      "stage": "future",
+      "autoCurrentStagePrerequisite": false,
+      "implementationAndVerification": "需求已建票并关联Epic #14；尚未实施/验收。",
+      "remaining": "- [ ] 同资源重复打开复用原 tab；跨 workspace/session 不串用；迟到回包不得安装到已关闭或新 owner。\n- [ ] 切换/隐藏可保留内容和资源；关闭/owner退休释放一次；终端隐藏与关闭的行为明确区分。\n- [ ] 公开接口可安装内容，不在 demo 里硬编码第二套 tab 状态机；共享组件、demo宿主和独立consumer覆盖生命周期。\n- [ ] 现有Task/child/SideChat权限与只读门禁不退化；文档说明哪些产品导航仍归宿主。\n- [ ] 实施前补设计文档并冻结参照commit/版本；组件、宿主、第二公开consumer按适用范围验证。\n- [ ] 实现进入main后，回填原commit/PR、实际验证、not_run与完成时间才关闭；未合入且验证通过仅标“已验证待集成”。"
+    },
+    {
+      "id": "R45",
+      "requirement": "[实施/Files] 项目文件树、目录加载与原资源导航组件",
+      "features": [
+        18,
+        26
+      ],
+      "implementationIssues": [
+        61
+      ],
+      "keys": [
+        "FILES"
+      ],
+      "stage": "future",
+      "autoCurrentStagePrerequisite": false,
+      "implementationAndVerification": "需求已建票并关联Epic #14；尚未实施/验收。",
+      "remaining": "- [ ] 大目录按需加载，展开/选中/刷新行为明确；异步目录结果绑定原root/owner/generation。\n- [ ] 打开回调保留原资源身份；本地/远端能力明确，不将远端路径当本地路径访问。\n- [ ] 排序、过滤和错误恢复遵循冻结行为；路径穿越及越权由明确reader边界处理。\n- [ ] 组件/宿主/第二consumer通过；实际文件服务或SEP只对声称支持的拓扑验收。\n- [ ] 实施前补设计文档并冻结参照commit/版本；组件、宿主、第二公开consumer按适用范围验证。\n- [ ] 实现进入main后，回填原commit/PR、实际验证、not_run与完成时间才关闭；未合入且验证通过仅标“已验证待集成”。"
+    },
+    {
+      "id": "R46",
+      "requirement": "[实施/Changes] Git 变更列表、Diff 浏览与原版本动作组件",
+      "features": [
+        18,
+        26
+      ],
+      "implementationIssues": [
+        62
+      ],
+      "keys": [
+        "CHANGES"
+      ],
+      "stage": "future",
+      "autoCurrentStagePrerequisite": false,
+      "implementationAndVerification": "需求已建票并关联Epic #14；尚未实施/验收。",
+      "remaining": "- [ ] 列表与hunk绑定同一repo/base/revision；刷新后旧selection/动作不作用于新版本。\n- [ ] 处理新增/删除/重命名/无diff/二进制/错误状态，路径与侧别来源准确。\n- [ ] 选中diff加入Composer或reveal时保留原版本和范围，stale不可按相似文本重定位。\n- [ ] 只读默认无Git写入；启用的写动作有显式权限/预期版本及结果回传；适用组件/consumer和真实Git适配验证分开记录。\n- [ ] 实施前补设计文档并冻结参照commit/版本；组件、宿主、第二公开consumer按适用范围验证。\n- [ ] 实现进入main后，回填原commit/PR、实际验证、not_run与完成时间才关闭；未合入且验证通过仅标“已验证待集成”。"
+    },
+    {
+      "id": "R47",
+      "requirement": "[实施/Terminal] 交互终端面板、PTY 宿主适配与资源生命周期",
+      "features": [
+        26
+      ],
+      "implementationIssues": [
+        63
+      ],
+      "keys": [
+        "TERMINAL"
+      ],
+      "stage": "future",
+      "autoCurrentStagePrerequisite": false,
+      "implementationAndVerification": "需求已建票并关联Epic #14；尚未实施/验收。",
+      "remaining": "- [ ] 隐藏只暂停展示而不杀进程；显式关闭/owner退休按契约释放PTY与观察，重复close幂等。\n- [ ] 输入与resize绑定原终端身份；切tab/切session后迟到输出不串流；退出码/启动错误真实显示。\n- [ ] 选择与复制及片段附加保留明确来源，不意外发送命令或提交Composer。\n- [ ] 协议/PTY适配、组件/consumer、真实键盘/IME/渲染性能分别留证；后者未跑不得宣称终端原生验收通过。\n- [ ] 实施前补设计文档并冻结参照commit/版本；组件、宿主、第二公开consumer按适用范围验证。\n- [ ] 实现进入main后，回填原commit/PR、实际验证、not_run与完成时间才关闭；未合入且验证通过仅标“已验证待集成”。"
+    },
+    {
+      "id": "R48",
+      "requirement": "[实施/Artifact] 可复用文件预览、查看器扩展与精确上下文回传",
+      "features": [
+        18,
+        26
+      ],
+      "implementationIssues": [
+        64
+      ],
+      "keys": [
+        "FILE-PREVIEW"
+      ],
+      "stage": "future",
+      "autoCurrentStagePrerequisite": false,
+      "implementationAndVerification": "需求已建票并关联Epic #14；尚未实施/验收。",
+      "remaining": "- [ ] 原session/root/version贯穿异步读取与tab；切换/关闭后的回包不会覆盖新文件。\n- [ ] 文本/图片等只对首版明确支持格式验收；大文件、二进制、过期、无权限、网络错误有明确处理。\n- [ ] 选择/附加/reveal保留原范围、版本与可信边界，失败显示stale/unavailable，不猜测来源。\n- [ ] 临时staging文件、viewer和observer按所有权回收，保留必要验收证据；组件、host、第二consumer和适用真实文件回读分别验证。\n- [ ] 实施前补设计文档并冻结参照commit/版本；组件、宿主、第二公开consumer按适用范围验证。\n- [ ] 实现进入main后，回填原commit/PR、实际验证、not_run与完成时间才关闭；未合入且验证通过仅标“已验证待集成”。"
+    },
+    {
+      "id": "R49",
+      "requirement": "[实施/Browser] 浏览器面板契约、导航状态与 Composer 上下文桥接",
+      "features": [
+        18,
+        26
+      ],
+      "implementationIssues": [
+        65
+      ],
+      "keys": [
+        "BROWSER"
+      ],
+      "stage": "future",
+      "autoCurrentStagePrerequisite": false,
+      "implementationAndVerification": "需求已建票并关联Epic #14；尚未实施/验收。",
+      "remaining": "- [ ] 导航结果绑定原browser/tab/document，关闭/跨owner后的回包不能复活旧内容。\n- [ ] 前进后退/刷新、URL显示及错误状态来自真实host回传；无引擎时明确unavailable，不能以外部打开按钮冒充内嵌浏览器。\n- [ ] 网页选择加入原Composer时有来源和不可信内容边界，导航后过期选择不重定向。\n- [ ] 浏览器资源hide/close生命周期与权限边界明确；组件/consumer与实际嵌入/键盘/IME验收分开记录。\n- [ ] 实施前补设计文档并冻结参照commit/版本；组件、宿主、第二公开consumer按适用范围验证。\n- [ ] 实现进入main后，回填原commit/PR、实际验证、not_run与完成时间才关闭；未合入且验证通过仅标“已验证待集成”。"
+    },
+    {
+      "id": "R50",
+      "requirement": "[实施/Composer] Command Palette：+ / @、命令目录与作用域解析",
+      "features": [
+        16,
+        21
+      ],
+      "implementationIssues": [
+        66
+      ],
+      "keys": [
+        "COMPOSER-PALETTE"
+      ],
+      "stage": "future",
+      "autoCurrentStagePrerequisite": false,
+      "implementationAndVerification": "需求已建票并关联Epic #14；尚未实施/验收。",
+      "remaining": "- [ ] +、/、@触发边界与邮箱/URL/转义排除明确；仅已提交文本参与解析，marked text期间不替换输入控件或抢占Enter。\n- [ ] 上/下、接受、补全、Escape和选中后的生命周期对齐冻结契约；关闭后不会因旧观察意外重开。\n- [ ] 按需加载不在mount时预加载所有provider；迟到目录/resolve绑定原surface/generation，不污染切换后的草稿。\n- [ ] provider只返回有限合法动作；命令执行和普通输入分开，注入内容在Transcript有可见artifact，未知结果不自动重发。\n- [ ] 组件/公开consumer和适用真实catalog协议验收；中文物理IME/焦点/浮层布局单独归 #57，不用模拟输入替代。\n- [ ] 实施前补设计文档并冻结参照commit/版本；组件、宿主、第二公开consumer按适用范围验证。\n- [ ] 实现进入main后，回填原commit/PR、实际验证、not_run与完成时间才关闭；未合入且验证通过仅标“已验证待集成”。"
     }
   ],
   "deliverables": [
@@ -832,7 +957,8 @@
         28
       ],
       "owner": "qf0421",
-      "number": 30
+      "number": 30,
+      "stage": "historical"
     },
     {
       "key": "H02",
@@ -852,7 +978,8 @@
         25
       ],
       "owner": "qf0421",
-      "number": 31
+      "number": 31,
+      "stage": "historical"
     },
     {
       "key": "H03",
@@ -872,7 +999,8 @@
         27
       ],
       "owner": "qf0421",
-      "number": 32
+      "number": 32,
+      "stage": "historical"
     },
     {
       "key": "API",
@@ -892,7 +1020,8 @@
         28
       ],
       "owner": "qf0421",
-      "number": 33
+      "number": 33,
+      "stage": "existing-backlog"
     },
     {
       "key": "COMPOSER",
@@ -911,7 +1040,8 @@
         27
       ],
       "owner": "qf0421",
-      "number": 34
+      "number": 34,
+      "stage": "existing-backlog"
     },
     {
       "key": "STANDALONE",
@@ -931,7 +1061,8 @@
         27
       ],
       "owner": "qf0421",
-      "number": 35
+      "number": 35,
+      "stage": "existing-backlog"
     },
     {
       "key": "ANCHOR",
@@ -951,7 +1082,8 @@
         20
       ],
       "owner": "qf0421",
-      "number": 36
+      "number": 36,
+      "stage": "existing-backlog"
     },
     {
       "key": "REMOTE",
@@ -971,7 +1103,8 @@
         28
       ],
       "owner": "qf0421",
-      "number": 37
+      "number": 37,
+      "stage": "existing-backlog"
     },
     {
       "key": "TRANSCRIPT",
@@ -991,7 +1124,8 @@
         27
       ],
       "owner": "qf0421",
-      "number": 38
+      "number": 38,
+      "stage": "existing-backlog"
     },
     {
       "key": "FOOTNOTE",
@@ -1011,7 +1145,8 @@
         21
       ],
       "owner": "qf0421",
-      "number": 39
+      "number": 39,
+      "stage": "existing-backlog"
     },
     {
       "key": "RUNPORT",
@@ -1032,7 +1167,8 @@
         20
       ],
       "owner": "qf0421",
-      "number": 40
+      "number": 40,
+      "stage": "existing-backlog"
     },
     {
       "key": "READING",
@@ -1052,7 +1188,8 @@
         27
       ],
       "owner": "qf0421",
-      "number": 41
+      "number": 41,
+      "stage": "existing-backlog"
     },
     {
       "key": "SIDEBAR",
@@ -1071,7 +1208,8 @@
         29
       ],
       "owner": "qf0421",
-      "number": 42
+      "number": 42,
+      "stage": "existing-backlog"
     },
     {
       "key": "PANEL",
@@ -1092,7 +1230,8 @@
         27
       ],
       "owner": "qf0421",
-      "number": 43
+      "number": 43,
+      "stage": "existing-backlog"
     },
     {
       "key": "SIDECHAT",
@@ -1111,7 +1250,8 @@
         27
       ],
       "owner": "qf0421",
-      "number": 44
+      "number": 44,
+      "stage": "existing-backlog"
     },
     {
       "key": "SUMMARY",
@@ -1130,7 +1270,8 @@
         27
       ],
       "owner": "qf0421",
-      "number": 45
+      "number": 45,
+      "stage": "existing-backlog"
     },
     {
       "key": "HOST",
@@ -1151,7 +1292,8 @@
         23
       ],
       "owner": "qf0421",
-      "number": 46
+      "number": 46,
+      "stage": "existing-backlog"
     },
     {
       "key": "RICH",
@@ -1170,7 +1312,8 @@
         19
       ],
       "owner": "qf0421",
-      "number": 47
+      "number": 47,
+      "stage": "existing-backlog"
     },
     {
       "key": "GLYPH",
@@ -1189,7 +1332,8 @@
         21
       ],
       "owner": "qf0421",
-      "number": 48
+      "number": 48,
+      "stage": "existing-backlog"
     },
     {
       "key": "POPOVER",
@@ -1208,7 +1352,8 @@
         27
       ],
       "owner": "qf0421",
-      "number": 49
+      "number": 49,
+      "stage": "existing-backlog"
     },
     {
       "key": "CHECKPOINT",
@@ -1227,7 +1372,8 @@
         26
       ],
       "owner": "qf0421",
-      "number": 50
+      "number": 50,
+      "stage": "existing-backlog"
     },
     {
       "key": "NESTED",
@@ -1246,7 +1392,8 @@
         28
       ],
       "owner": "qf0421",
-      "number": 51
+      "number": 51,
+      "stage": "existing-backlog"
     },
     {
       "key": "ROWMENU",
@@ -1265,7 +1412,8 @@
         27
       ],
       "owner": "qf0421",
-      "number": 52
+      "number": 52,
+      "stage": "existing-backlog"
     },
     {
       "key": "PROCESS",
@@ -1287,7 +1435,8 @@
         27
       ],
       "owner": "qf0421",
-      "number": 53
+      "number": 53,
+      "stage": "existing-backlog"
     },
     {
       "key": "REPORT",
@@ -1306,7 +1455,8 @@
         25
       ],
       "owner": "qf0421",
-      "number": 54
+      "number": 54,
+      "stage": "existing-backlog"
     },
     {
       "key": "PROTO-RUN",
@@ -1327,7 +1477,8 @@
         21
       ],
       "owner": "qf0421",
-      "number": 55
+      "number": 55,
+      "stage": "existing-backlog"
     },
     {
       "key": "PROTO-FAMILY",
@@ -1349,7 +1500,8 @@
         25
       ],
       "owner": "qf0421",
-      "number": 56
+      "number": 56,
+      "stage": "existing-backlog"
     },
     {
       "key": "DESKTOP",
@@ -1376,7 +1528,8 @@
         26
       ],
       "owner": "qf0421",
-      "number": 57
+      "number": 57,
+      "stage": "existing-backlog"
     },
     {
       "key": "INTEGRATE",
@@ -1396,7 +1549,8 @@
         27
       ],
       "owner": "qf0421",
-      "number": 58
+      "number": 58,
+      "stage": "existing-backlog"
     },
     {
       "key": "RELEASE",
@@ -1416,7 +1570,154 @@
         27
       ],
       "owner": "qf0421",
-      "number": 59
+      "number": 59,
+      "stage": "existing-backlog"
+    },
+    {
+      "number": 60,
+      "key": "TOOL-TABS",
+      "parent": 14,
+      "title": "[实施/SidePanel] 工具类 Tabs 注册、保留与关闭生命周期",
+      "status": "待办",
+      "layer": "实现",
+      "owner": "qf0421",
+      "stage": "future",
+      "autoCurrentStagePrerequisite": false,
+      "scope": "扩展当前仅 Summary/Task/Subagent/SideChat 的 SidePanelTabKind/公开接口，支持 Files、Changes/Review、Terminal、Browser 和文件 Artifact 内容。采用明确的宿主内容注册/能力输入，不将 launcher 按钮视为 tab 内容交付。产品选择导航位置，AgentKit提供共享tab组件与资源生命周期契约。",
+      "deliverables": "公开 tab/content provider 契约、原 owner/resource identity、select/hide/close/retire 回调、组件与独立 consumer；对照 ClientKit SidePanelTab.swift、ClientSidePanelHostView.swift 和 SidePanelNativeContent.swift。",
+      "dependencies": "复用 #43 的原 owner 机制、#46 的宿主 mount 契约；后续各内容票可并行设计。缺少具体 SDK 能力只阻相关子项，不要求全部 tab 实现后才交付本契约。",
+      "criteria": "- [ ] 同资源重复打开复用原 tab；跨 workspace/session 不串用；迟到回包不得安装到已关闭或新 owner。\n- [ ] 切换/隐藏可保留内容和资源；关闭/owner退休释放一次；终端隐藏与关闭的行为明确区分。\n- [ ] 公开接口可安装内容，不在 demo 里硬编码第二套 tab 状态机；共享组件、demo宿主和独立consumer覆盖生命周期。\n- [ ] 现有Task/child/SideChat权限与只读门禁不退化；文档说明哪些产品导航仍归宿主。\n- [ ] 实施前补设计文档并冻结参照commit/版本；组件、宿主、第二公开consumer按适用范围验证。\n- [ ] 实现进入main后，回填原commit/PR、实际验证、not_run与完成时间才关闭；未合入且验证通过仅标“已验证待集成”。",
+      "evidence": "尚未实施；无本票验收通过声明。",
+      "originalIssueBody": "<!-- agentkit-delivery-key:PANEL-HOSTED-TABS -->\n\n总 Epic：#14。功能关联：#23、#26；复用 #43、#46。\n\n**状态：待办。负责人：@qf0421（主会话协调；后续独立子会话实施）。优先级：P2，当前阶段收口后推进。**\n\n## 范围\n扩展当前仅 Summary/Task/Subagent/SideChat 的 SidePanelTabKind/公开接口，支持 Files、Changes/Review、Terminal、Browser 和文件 Artifact 内容。采用明确的宿主内容注册/能力输入，不将 launcher 按钮视为 tab 内容交付。产品选择导航位置，AgentKit提供共享tab组件与资源生命周期契约。\n\n## 交付物\n公开 tab/content provider 契约、原 owner/resource identity、select/hide/close/retire 回调、组件与独立 consumer；对照 ClientKit SidePanelTab.swift、ClientSidePanelHostView.swift 和 SidePanelNativeContent.swift。\n\n## 依赖与可并行边界\n复用 #43 的原 owner 机制、#46 的宿主 mount 契约；后续各内容票可并行设计。缺少具体 SDK 能力只阻相关子项，不要求全部 tab 实现后才交付本契约。\n\n## 验收与关闭标准\n- [ ] 同资源重复打开复用原 tab；跨 workspace/session 不串用；迟到回包不得安装到已关闭或新 owner。\n- [ ] 切换/隐藏可保留内容和资源；关闭/owner退休释放一次；终端隐藏与关闭的行为明确区分。\n- [ ] 公开接口可安装内容，不在 demo 里硬编码第二套 tab 状态机；共享组件、demo宿主和独立consumer覆盖生命周期。\n- [ ] 现有Task/child/SideChat权限与只读门禁不退化；文档说明哪些产品导航仍归宿主。\n- [ ] 实施前补设计文档并冻结参照commit/版本；组件、宿主、第二公开consumer按适用范围验证。\n- [ ] 实现进入main后，回填原commit/PR、实际验证、not_run与完成时间才关闭；未合入且验证通过仅标“已验证待集成”。\n\n## 当前事实与阶段边界（2026-10-25）\n只读审计发现现有入口/局部数据能力未覆盖上述完整交付。此票为用户本轮明确补充的后续待办，未开始开发、未建立新验收通过结论；不是当前PR #10或阶段tag的自动新增前置，也不降低完整Epic最终要求。\n只消费TekesUI；窗口、产品导航、凭据、授权及服务安装归宿主。通用基础能力缺口复用/提交上游Issue；不改TekesUI/Kernel/Swift。桌面验收当前不跑。后续构建复用SSD共享target，保留WIP、固定快照和原证据。\n协议验收复用#55/#56的分层方法并按本能力实际服务补充，桌面/IME归#57；集成/发布归#58/#59，不为每次测试新建票。\n\n索引交接：本轮只创建GitHub任务，不触碰主会话WIP；主会话需将本票加入docs/agentkit-requirements-coverage.md及机器索引，保持#14为唯一总Epic。\n",
+      "related": [
+        23,
+        26
+      ]
+    },
+    {
+      "number": 61,
+      "key": "FILES",
+      "parent": 14,
+      "title": "[实施/Files] 项目文件树、目录加载与原资源导航组件",
+      "status": "待办",
+      "layer": "实现",
+      "owner": "qf0421",
+      "stage": "future",
+      "autoCurrentStagePrerequisite": false,
+      "scope": "可复用 Files/Project Explorer 面板：目录层级、按需展开、选择、刷新、加载/空/错误/无权限状态，以及打开原文件和添加引用的回调。不是 Sidebar 会话目录分组，也不是只增加 Files 入口。",
+      "deliverables": "显式 workspace/root/resource reader 输入、文件树状态与TekesUI组合组件、公开打开/引用意图和独立consumer；先冻结ClientKit项目浏览组件的实际行为基线。",
+      "dependencies": "工具Tabs契约；宿主提供经过授权的本地或远端目录/文件能力，不由AgentKit读取全局凭据或绕过SEP私有数据库。文件预览与 #36 精确引用通过接口对接；不能因预览尚未完工阻塞文件树交付。",
+      "criteria": "- [ ] 大目录按需加载，展开/选中/刷新行为明确；异步目录结果绑定原root/owner/generation。\n- [ ] 打开回调保留原资源身份；本地/远端能力明确，不将远端路径当本地路径访问。\n- [ ] 排序、过滤和错误恢复遵循冻结行为；路径穿越及越权由明确reader边界处理。\n- [ ] 组件/宿主/第二consumer通过；实际文件服务或SEP只对声称支持的拓扑验收。\n- [ ] 实施前补设计文档并冻结参照commit/版本；组件、宿主、第二公开consumer按适用范围验证。\n- [ ] 实现进入main后，回填原commit/PR、实际验证、not_run与完成时间才关闭；未合入且验证通过仅标“已验证待集成”。",
+      "evidence": "尚未实施；无本票验收通过声明。",
+      "originalIssueBody": "<!-- agentkit-delivery-key:PANEL-FILES -->\n\n总 Epic：#14。功能关联：#23、#26；关联 #42 的既有会话导航但不复用其领域状态。\n\n**状态：待办。负责人：@qf0421（主会话协调；后续独立子会话实施）。优先级：P2，当前阶段收口后推进。**\n\n## 范围\n可复用 Files/Project Explorer 面板：目录层级、按需展开、选择、刷新、加载/空/错误/无权限状态，以及打开原文件和添加引用的回调。不是 Sidebar 会话目录分组，也不是只增加 Files 入口。\n\n## 交付物\n显式 workspace/root/resource reader 输入、文件树状态与TekesUI组合组件、公开打开/引用意图和独立consumer；先冻结ClientKit项目浏览组件的实际行为基线。\n\n## 依赖与可并行边界\n工具Tabs契约；宿主提供经过授权的本地或远端目录/文件能力，不由AgentKit读取全局凭据或绕过SEP私有数据库。文件预览与 #36 精确引用通过接口对接；不能因预览尚未完工阻塞文件树交付。\n\n## 验收与关闭标准\n- [ ] 大目录按需加载，展开/选中/刷新行为明确；异步目录结果绑定原root/owner/generation。\n- [ ] 打开回调保留原资源身份；本地/远端能力明确，不将远端路径当本地路径访问。\n- [ ] 排序、过滤和错误恢复遵循冻结行为；路径穿越及越权由明确reader边界处理。\n- [ ] 组件/宿主/第二consumer通过；实际文件服务或SEP只对声称支持的拓扑验收。\n- [ ] 实施前补设计文档并冻结参照commit/版本；组件、宿主、第二公开consumer按适用范围验证。\n- [ ] 实现进入main后，回填原commit/PR、实际验证、not_run与完成时间才关闭；未合入且验证通过仅标“已验证待集成”。\n\n## 当前事实与阶段边界（2026-10-25）\n只读审计发现现有入口/局部数据能力未覆盖上述完整交付。此票为用户本轮明确补充的后续待办，未开始开发、未建立新验收通过结论；不是当前PR #10或阶段tag的自动新增前置，也不降低完整Epic最终要求。\n只消费TekesUI；窗口、产品导航、凭据、授权及服务安装归宿主。通用基础能力缺口复用/提交上游Issue；不改TekesUI/Kernel/Swift。桌面验收当前不跑。后续构建复用SSD共享target，保留WIP、固定快照和原证据。\n协议验收复用#55/#56的分层方法并按本能力实际服务补充，桌面/IME归#57；集成/发布归#58/#59，不为每次测试新建票。\n\n索引交接：本轮只创建GitHub任务，不触碰主会话WIP；主会话需将本票加入docs/agentkit-requirements-coverage.md及机器索引，保持#14为唯一总Epic。\n",
+      "related": [
+        18,
+        26
+      ]
+    },
+    {
+      "number": 62,
+      "key": "CHANGES",
+      "parent": 14,
+      "title": "[实施/Changes] Git 变更列表、Diff 浏览与原版本动作组件",
+      "status": "待办",
+      "layer": "实现",
+      "owner": "qf0421",
+      "stage": "future",
+      "autoCurrentStagePrerequisite": false,
+      "scope": "Changes/Review 可复用面板，包括实际仓库变更列表、文件diff选择与导航、文本hunk和必要的二进制/不可预览降级。Transcript里的工具diff卡片不等于本面板。",
+      "deliverables": "仓库/基线与文件版本输入、只读diff组件和来源定位、公开host actions、独立consumer。先对照ClientKit RepositoryManagementView和GitReviewModel冻结首版行为；stage/unstage等写动作按当前能力显式列入或明确不支持，不默默遗漏。",
+      "dependencies": "工具Tabs契约；宿主或专用Git库提供公开快照/读取/动作，AgentKit不自建Git实现。TekesUI文本/选择能力不足时复用或提交上游issue；与 #47 的通用渲染能力共享依赖。",
+      "criteria": "- [ ] 列表与hunk绑定同一repo/base/revision；刷新后旧selection/动作不作用于新版本。\n- [ ] 处理新增/删除/重命名/无diff/二进制/错误状态，路径与侧别来源准确。\n- [ ] 选中diff加入Composer或reveal时保留原版本和范围，stale不可按相似文本重定位。\n- [ ] 只读默认无Git写入；启用的写动作有显式权限/预期版本及结果回传；适用组件/consumer和真实Git适配验证分开记录。\n- [ ] 实施前补设计文档并冻结参照commit/版本；组件、宿主、第二公开consumer按适用范围验证。\n- [ ] 实现进入main后，回填原commit/PR、实际验证、not_run与完成时间才关闭；未合入且验证通过仅标“已验证待集成”。",
+      "evidence": "尚未实施；无本票验收通过声明。",
+      "originalIssueBody": "<!-- agentkit-delivery-key:PANEL-CHANGES -->\n\n总 Epic：#14。功能关联：#23、#26；关联 #36、#54。\n\n**状态：待办。负责人：@qf0421（主会话协调；后续独立子会话实施）。优先级：P2，当前阶段收口后推进。**\n\n## 范围\nChanges/Review 可复用面板，包括实际仓库变更列表、文件diff选择与导航、文本hunk和必要的二进制/不可预览降级。Transcript里的工具diff卡片不等于本面板。\n\n## 交付物\n仓库/基线与文件版本输入、只读diff组件和来源定位、公开host actions、独立consumer。先对照ClientKit RepositoryManagementView和GitReviewModel冻结首版行为；stage/unstage等写动作按当前能力显式列入或明确不支持，不默默遗漏。\n\n## 依赖与可并行边界\n工具Tabs契约；宿主或专用Git库提供公开快照/读取/动作，AgentKit不自建Git实现。TekesUI文本/选择能力不足时复用或提交上游issue；与 #47 的通用渲染能力共享依赖。\n\n## 验收与关闭标准\n- [ ] 列表与hunk绑定同一repo/base/revision；刷新后旧selection/动作不作用于新版本。\n- [ ] 处理新增/删除/重命名/无diff/二进制/错误状态，路径与侧别来源准确。\n- [ ] 选中diff加入Composer或reveal时保留原版本和范围，stale不可按相似文本重定位。\n- [ ] 只读默认无Git写入；启用的写动作有显式权限/预期版本及结果回传；适用组件/consumer和真实Git适配验证分开记录。\n- [ ] 实施前补设计文档并冻结参照commit/版本；组件、宿主、第二公开consumer按适用范围验证。\n- [ ] 实现进入main后，回填原commit/PR、实际验证、not_run与完成时间才关闭；未合入且验证通过仅标“已验证待集成”。\n\n## 当前事实与阶段边界（2026-10-25）\n只读审计发现现有入口/局部数据能力未覆盖上述完整交付。此票为用户本轮明确补充的后续待办，未开始开发、未建立新验收通过结论；不是当前PR #10或阶段tag的自动新增前置，也不降低完整Epic最终要求。\n只消费TekesUI；窗口、产品导航、凭据、授权及服务安装归宿主。通用基础能力缺口复用/提交上游Issue；不改TekesUI/Kernel/Swift。桌面验收当前不跑。后续构建复用SSD共享target，保留WIP、固定快照和原证据。\n协议验收复用#55/#56的分层方法并按本能力实际服务补充，桌面/IME归#57；集成/发布归#58/#59，不为每次测试新建票。\n\n索引交接：本轮只创建GitHub任务，不触碰主会话WIP；主会话需将本票加入docs/agentkit-requirements-coverage.md及机器索引，保持#14为唯一总Epic。\n",
+      "related": [
+        18,
+        26
+      ]
+    },
+    {
+      "number": 63,
+      "key": "TERMINAL",
+      "parent": 14,
+      "title": "[实施/Terminal] 交互终端面板、PTY 宿主适配与资源生命周期",
+      "status": "待办",
+      "layer": "实现",
+      "owner": "qf0421",
+      "stage": "future",
+      "autoCurrentStagePrerequisite": false,
+      "scope": "真正的交互式Terminal tab：输入输出、尺寸变化、运行/退出/失败状态、滚动选择和复制，以及终端片段添加为Composer上下文。工具执行结果卡片、纯日志文本和命令入口均不能替代本能力。",
+      "deliverables": "终端快照/输入/resize/close公开契约、TekesUI或明确专用终端库的消费适配、宿主PTY provider和第二consumer；设计先明确终端核心归属，不在AgentKit重写通用VT/渲染引擎。",
+      "dependencies": "工具Tabs契约；宿主负责shell/PTY启动、cwd/env/权限和远端能力。先审计现有Rust终端依赖，缺基础输入/绘制能力提上游。可先实现数据/生命周期契约，桌面另验。",
+      "criteria": "- [ ] 隐藏只暂停展示而不杀进程；显式关闭/owner退休按契约释放PTY与观察，重复close幂等。\n- [ ] 输入与resize绑定原终端身份；切tab/切session后迟到输出不串流；退出码/启动错误真实显示。\n- [ ] 选择与复制及片段附加保留明确来源，不意外发送命令或提交Composer。\n- [ ] 协议/PTY适配、组件/consumer、真实键盘/IME/渲染性能分别留证；后者未跑不得宣称终端原生验收通过。\n- [ ] 实施前补设计文档并冻结参照commit/版本；组件、宿主、第二公开consumer按适用范围验证。\n- [ ] 实现进入main后，回填原commit/PR、实际验证、not_run与完成时间才关闭；未合入且验证通过仅标“已验证待集成”。",
+      "evidence": "尚未实施；无本票验收通过声明。",
+      "originalIssueBody": "<!-- agentkit-delivery-key:PANEL-TERMINAL -->\n\n总 Epic：#14。功能关联：#23、#26；关联 #34、#36。\n\n**状态：待办。负责人：@qf0421（主会话协调；后续独立子会话实施）。优先级：P2，当前阶段收口后推进。**\n\n## 范围\n真正的交互式Terminal tab：输入输出、尺寸变化、运行/退出/失败状态、滚动选择和复制，以及终端片段添加为Composer上下文。工具执行结果卡片、纯日志文本和命令入口均不能替代本能力。\n\n## 交付物\n终端快照/输入/resize/close公开契约、TekesUI或明确专用终端库的消费适配、宿主PTY provider和第二consumer；设计先明确终端核心归属，不在AgentKit重写通用VT/渲染引擎。\n\n## 依赖与可并行边界\n工具Tabs契约；宿主负责shell/PTY启动、cwd/env/权限和远端能力。先审计现有Rust终端依赖，缺基础输入/绘制能力提上游。可先实现数据/生命周期契约，桌面另验。\n\n## 验收与关闭标准\n- [ ] 隐藏只暂停展示而不杀进程；显式关闭/owner退休按契约释放PTY与观察，重复close幂等。\n- [ ] 输入与resize绑定原终端身份；切tab/切session后迟到输出不串流；退出码/启动错误真实显示。\n- [ ] 选择与复制及片段附加保留明确来源，不意外发送命令或提交Composer。\n- [ ] 协议/PTY适配、组件/consumer、真实键盘/IME/渲染性能分别留证；后者未跑不得宣称终端原生验收通过。\n- [ ] 实施前补设计文档并冻结参照commit/版本；组件、宿主、第二公开consumer按适用范围验证。\n- [ ] 实现进入main后，回填原commit/PR、实际验证、not_run与完成时间才关闭；未合入且验证通过仅标“已验证待集成”。\n\n## 当前事实与阶段边界（2026-10-25）\n只读审计发现现有入口/局部数据能力未覆盖上述完整交付。此票为用户本轮明确补充的后续待办，未开始开发、未建立新验收通过结论；不是当前PR #10或阶段tag的自动新增前置，也不降低完整Epic最终要求。\n只消费TekesUI；窗口、产品导航、凭据、授权及服务安装归宿主。通用基础能力缺口复用/提交上游Issue；不改TekesUI/Kernel/Swift。桌面验收当前不跑。后续构建复用SSD共享target，保留WIP、固定快照和原证据。\n协议验收复用#55/#56的分层方法并按本能力实际服务补充，桌面/IME归#57；集成/发布归#58/#59，不为每次测试新建票。\n\n索引交接：本轮只创建GitHub任务，不触碰主会话WIP；主会话需将本票加入docs/agentkit-requirements-coverage.md及机器索引，保持#14为唯一总Epic。\n",
+      "related": [
+        26
+      ]
+    },
+    {
+      "number": 64,
+      "key": "FILE-PREVIEW",
+      "parent": 14,
+      "title": "[实施/Artifact] 可复用文件预览、查看器扩展与精确上下文回传",
+      "status": "待办",
+      "layer": "实现",
+      "owner": "qf0421",
+      "stage": "future",
+      "autoCurrentStagePrerequisite": false,
+      "scope": "把现有FilePreviewRequest::read和demo staging/外部查看路径扩展为标准可复用文件Artifact面板：按类型选择viewer、加载/错误/不可用状态、关闭资源回收、精确选择引用与reveal。不把一次文件读取或demo打开视为完整预览组件。",
+      "deliverables": "文件resource/version/MIME输入与viewer provider、默认支持格式清单、TekesUI预览组合组件、特殊格式host扩展点和独立consumer。CAD等领域查看器由宿主注入，不让AgentKit依赖全部格式库。",
+      "dependencies": "工具Tabs契约；既有session-scoped文件reader；精确引用复用 #36，通用富文本/位图消费复用 #47，不另造渲染器或重复引用契约。",
+      "criteria": "- [ ] 原session/root/version贯穿异步读取与tab；切换/关闭后的回包不会覆盖新文件。\n- [ ] 文本/图片等只对首版明确支持格式验收；大文件、二进制、过期、无权限、网络错误有明确处理。\n- [ ] 选择/附加/reveal保留原范围、版本与可信边界，失败显示stale/unavailable，不猜测来源。\n- [ ] 临时staging文件、viewer和observer按所有权回收，保留必要验收证据；组件、host、第二consumer和适用真实文件回读分别验证。\n- [ ] 实施前补设计文档并冻结参照commit/版本；组件、宿主、第二公开consumer按适用范围验证。\n- [ ] 实现进入main后，回填原commit/PR、实际验证、not_run与完成时间才关闭；未合入且验证通过仅标“已验证待集成”。",
+      "evidence": "尚未实施；无本票验收通过声明。",
+      "originalIssueBody": "<!-- agentkit-delivery-key:PANEL-ARTIFACT -->\n\n总 Epic：#14。功能关联：#17、#23、#26；复用 #36、#47。\n\n**状态：待办。负责人：@qf0421（主会话协调；后续独立子会话实施）。优先级：P2，当前阶段收口后推进。**\n\n## 范围\n把现有FilePreviewRequest::read和demo staging/外部查看路径扩展为标准可复用文件Artifact面板：按类型选择viewer、加载/错误/不可用状态、关闭资源回收、精确选择引用与reveal。不把一次文件读取或demo打开视为完整预览组件。\n\n## 交付物\n文件resource/version/MIME输入与viewer provider、默认支持格式清单、TekesUI预览组合组件、特殊格式host扩展点和独立consumer。CAD等领域查看器由宿主注入，不让AgentKit依赖全部格式库。\n\n## 依赖与可并行边界\n工具Tabs契约；既有session-scoped文件reader；精确引用复用 #36，通用富文本/位图消费复用 #47，不另造渲染器或重复引用契约。\n\n## 验收与关闭标准\n- [ ] 原session/root/version贯穿异步读取与tab；切换/关闭后的回包不会覆盖新文件。\n- [ ] 文本/图片等只对首版明确支持格式验收；大文件、二进制、过期、无权限、网络错误有明确处理。\n- [ ] 选择/附加/reveal保留原范围、版本与可信边界，失败显示stale/unavailable，不猜测来源。\n- [ ] 临时staging文件、viewer和observer按所有权回收，保留必要验收证据；组件、host、第二consumer和适用真实文件回读分别验证。\n- [ ] 实施前补设计文档并冻结参照commit/版本；组件、宿主、第二公开consumer按适用范围验证。\n- [ ] 实现进入main后，回填原commit/PR、实际验证、not_run与完成时间才关闭；未合入且验证通过仅标“已验证待集成”。\n\n## 当前事实与阶段边界（2026-10-25）\n只读审计发现现有入口/局部数据能力未覆盖上述完整交付。此票为用户本轮明确补充的后续待办，未开始开发、未建立新验收通过结论；不是当前PR #10或阶段tag的自动新增前置，也不降低完整Epic最终要求。\n只消费TekesUI；窗口、产品导航、凭据、授权及服务安装归宿主。通用基础能力缺口复用/提交上游Issue；不改TekesUI/Kernel/Swift。桌面验收当前不跑。后续构建复用SSD共享target，保留WIP、固定快照和原证据。\n协议验收复用#55/#56的分层方法并按本能力实际服务补充，桌面/IME归#57；集成/发布归#58/#59，不为每次测试新建票。\n\n索引交接：本轮只创建GitHub任务，不触碰主会话WIP；主会话需将本票加入docs/agentkit-requirements-coverage.md及机器索引，保持#14为唯一总Epic。\n",
+      "related": [
+        18,
+        26
+      ]
+    },
+    {
+      "number": 65,
+      "key": "BROWSER",
+      "parent": 14,
+      "title": "[实施/Browser] 浏览器面板契约、导航状态与 Composer 上下文桥接",
+      "status": "待办",
+      "layer": "实现",
+      "owner": "qf0421",
+      "stage": "future",
+      "autoCurrentStagePrerequisite": false,
+      "scope": "Browser tab的可复用业务框架：地址/前进后退/刷新、加载/错误状态、保留网页内容、选中内容引用及原document Composer关联。浏览器引擎、窗口/系统权限由宿主或专用库提供，AgentKit不重造Web引擎。",
+      "deliverables": "browser session/document/generation输入、导航意图、host web-surface provider、选区来源桥接和独立consumer；先冻结ClientKit SidePanelBrowserPanelView/Model行为与Rust可支持拓扑。",
+      "dependencies": "工具Tabs契约、宿主公开网页内容嵌入能力；如TekesUI确实缺少嵌入/焦点事件，提交或复用具体上游issue后只等待受影响项。引用/独立Composer复用 #35/#36。",
+      "criteria": "- [ ] 导航结果绑定原browser/tab/document，关闭/跨owner后的回包不能复活旧内容。\n- [ ] 前进后退/刷新、URL显示及错误状态来自真实host回传；无引擎时明确unavailable，不能以外部打开按钮冒充内嵌浏览器。\n- [ ] 网页选择加入原Composer时有来源和不可信内容边界，导航后过期选择不重定向。\n- [ ] 浏览器资源hide/close生命周期与权限边界明确；组件/consumer与实际嵌入/键盘/IME验收分开记录。\n- [ ] 实施前补设计文档并冻结参照commit/版本；组件、宿主、第二公开consumer按适用范围验证。\n- [ ] 实现进入main后，回填原commit/PR、实际验证、not_run与完成时间才关闭；未合入且验证通过仅标“已验证待集成”。",
+      "evidence": "尚未实施；无本票验收通过声明。",
+      "originalIssueBody": "<!-- agentkit-delivery-key:PANEL-BROWSER -->\n\n总 Epic：#14。功能关联：#23、#26；关联 #35、#36。\n\n**状态：待办。负责人：@qf0421（主会话协调；后续独立子会话实施）。优先级：P2，当前阶段收口后推进。**\n\n## 范围\nBrowser tab的可复用业务框架：地址/前进后退/刷新、加载/错误状态、保留网页内容、选中内容引用及原document Composer关联。浏览器引擎、窗口/系统权限由宿主或专用库提供，AgentKit不重造Web引擎。\n\n## 交付物\nbrowser session/document/generation输入、导航意图、host web-surface provider、选区来源桥接和独立consumer；先冻结ClientKit SidePanelBrowserPanelView/Model行为与Rust可支持拓扑。\n\n## 依赖与可并行边界\n工具Tabs契约、宿主公开网页内容嵌入能力；如TekesUI确实缺少嵌入/焦点事件，提交或复用具体上游issue后只等待受影响项。引用/独立Composer复用 #35/#36。\n\n## 验收与关闭标准\n- [ ] 导航结果绑定原browser/tab/document，关闭/跨owner后的回包不能复活旧内容。\n- [ ] 前进后退/刷新、URL显示及错误状态来自真实host回传；无引擎时明确unavailable，不能以外部打开按钮冒充内嵌浏览器。\n- [ ] 网页选择加入原Composer时有来源和不可信内容边界，导航后过期选择不重定向。\n- [ ] 浏览器资源hide/close生命周期与权限边界明确；组件/consumer与实际嵌入/键盘/IME验收分开记录。\n- [ ] 实施前补设计文档并冻结参照commit/版本；组件、宿主、第二公开consumer按适用范围验证。\n- [ ] 实现进入main后，回填原commit/PR、实际验证、not_run与完成时间才关闭；未合入且验证通过仅标“已验证待集成”。\n\n## 当前事实与阶段边界（2026-10-25）\n只读审计发现现有入口/局部数据能力未覆盖上述完整交付。此票为用户本轮明确补充的后续待办，未开始开发、未建立新验收通过结论；不是当前PR #10或阶段tag的自动新增前置，也不降低完整Epic最终要求。\n只消费TekesUI；窗口、产品导航、凭据、授权及服务安装归宿主。通用基础能力缺口复用/提交上游Issue；不改TekesUI/Kernel/Swift。桌面验收当前不跑。后续构建复用SSD共享target，保留WIP、固定快照和原证据。\n协议验收复用#55/#56的分层方法并按本能力实际服务补充，桌面/IME归#57；集成/发布归#58/#59，不为每次测试新建票。\n\n索引交接：本轮只创建GitHub任务，不触碰主会话WIP；主会话需将本票加入docs/agentkit-requirements-coverage.md及机器索引，保持#14为唯一总Epic。\n",
+      "related": [
+        18,
+        26
+      ]
+    },
+    {
+      "number": 66,
+      "key": "COMPOSER-PALETTE",
+      "parent": 14,
+      "title": "[实施/Composer] Command Palette：+ / @、命令目录与作用域解析",
+      "status": "待办",
+      "layer": "实现",
+      "owner": "qf0421",
+      "stage": "future",
+      "autoCurrentStagePrerequisite": false,
+      "scope": "对齐Tekes/ClientKit的Composer Shortcut/Command Palette：+列出适用项、开头/动作、词边界@引用，目录/provider按需加载、搜索匹配、键盘选择/补全、有限resolution及可见artifact。不将TekesUI通用CommandPalette控件或既有发送按钮当业务交付。全局应用快捷面板/窗口命令仍归宿主。",
+      "deliverables": "Rust provider/descriptor/resolution公开契约、绑定原Composer destination/surface/generation的状态、TekesUI组合面板、command/skill/reference能力适配及独立consumer；对照Tekes docs/design/composer-shortcut-palette.md与当前ClientKit源码先冻结冲突点。",
+      "dependencies": "原Composer状态与提交编译复用 #34/#35；artifact引用复用 #36。harness/AppServer通过合法公开catalog提供命令/skill；workspace文件枚举由持授权宿主提供。SDK焦点/弹层/输入事件不足才复用或提上游issue，不推定全局阻塞。",
+      "criteria": "- [ ] +、/、@触发边界与邮箱/URL/转义排除明确；仅已提交文本参与解析，marked text期间不替换输入控件或抢占Enter。\n- [ ] 上/下、接受、补全、Escape和选中后的生命周期对齐冻结契约；关闭后不会因旧观察意外重开。\n- [ ] 按需加载不在mount时预加载所有provider；迟到目录/resolve绑定原surface/generation，不污染切换后的草稿。\n- [ ] provider只返回有限合法动作；命令执行和普通输入分开，注入内容在Transcript有可见artifact，未知结果不自动重发。\n- [ ] 组件/公开consumer和适用真实catalog协议验收；中文物理IME/焦点/浮层布局单独归 #57，不用模拟输入替代。\n- [ ] 实施前补设计文档并冻结参照commit/版本；组件、宿主、第二公开consumer按适用范围验证。\n- [ ] 实现进入main后，回填原commit/PR、实际验证、not_run与完成时间才关闭；未合入且验证通过仅标“已验证待集成”。",
+      "evidence": "尚未实施；无本票验收通过声明。",
+      "originalIssueBody": "<!-- agentkit-delivery-key:COMPOSER-PALETTE -->\n\n总 Epic：#14。功能关联：#16、#21；复用 #34、#35、#36。\n\n**状态：待办。负责人：@qf0421（主会话协调；后续独立子会话实施）。优先级：P2，当前阶段收口后推进。**\n\n## 范围\n对齐Tekes/ClientKit的Composer Shortcut/Command Palette：+列出适用项、开头/动作、词边界@引用，目录/provider按需加载、搜索匹配、键盘选择/补全、有限resolution及可见artifact。不将TekesUI通用CommandPalette控件或既有发送按钮当业务交付。全局应用快捷面板/窗口命令仍归宿主。\n\n## 交付物\nRust provider/descriptor/resolution公开契约、绑定原Composer destination/surface/generation的状态、TekesUI组合面板、command/skill/reference能力适配及独立consumer；对照Tekes docs/design/composer-shortcut-palette.md与当前ClientKit源码先冻结冲突点。\n\n## 依赖与可并行边界\n原Composer状态与提交编译复用 #34/#35；artifact引用复用 #36。harness/AppServer通过合法公开catalog提供命令/skill；workspace文件枚举由持授权宿主提供。SDK焦点/弹层/输入事件不足才复用或提上游issue，不推定全局阻塞。\n\n## 验收与关闭标准\n- [ ] +、/、@触发边界与邮箱/URL/转义排除明确；仅已提交文本参与解析，marked text期间不替换输入控件或抢占Enter。\n- [ ] 上/下、接受、补全、Escape和选中后的生命周期对齐冻结契约；关闭后不会因旧观察意外重开。\n- [ ] 按需加载不在mount时预加载所有provider；迟到目录/resolve绑定原surface/generation，不污染切换后的草稿。\n- [ ] provider只返回有限合法动作；命令执行和普通输入分开，注入内容在Transcript有可见artifact，未知结果不自动重发。\n- [ ] 组件/公开consumer和适用真实catalog协议验收；中文物理IME/焦点/浮层布局单独归 #57，不用模拟输入替代。\n- [ ] 实施前补设计文档并冻结参照commit/版本；组件、宿主、第二公开consumer按适用范围验证。\n- [ ] 实现进入main后，回填原commit/PR、实际验证、not_run与完成时间才关闭；未合入且验证通过仅标“已验证待集成”。\n\n## 当前事实与阶段边界（2026-10-25）\n只读审计发现现有入口/局部数据能力未覆盖上述完整交付。此票为用户本轮明确补充的后续待办，未开始开发、未建立新验收通过结论；不是当前PR #10或阶段tag的自动新增前置，也不降低完整Epic最终要求。\n只消费TekesUI；窗口、产品导航、凭据、授权及服务安装归宿主。通用基础能力缺口复用/提交上游Issue；不改TekesUI/Kernel/Swift。桌面验收当前不跑。后续构建复用SSD共享target，保留WIP、固定快照和原证据。\n协议验收复用#55/#56的分层方法并按本能力实际服务补充，桌面/IME归#57；集成/发布归#58/#59，不为每次测试新建票。\n\n索引交接：本轮只创建GitHub任务，不触碰主会话WIP；主会话需将本票加入docs/agentkit-requirements-coverage.md及机器索引，保持#14为唯一总Epic。\n",
+      "related": [
+        16,
+        21
+      ]
     }
   ],
   "existingImplementationIssues": [
@@ -1453,7 +1754,7 @@
     "进行中": 9,
     "等待上游": 9,
     "等待桌面": 1,
-    "待办": 1
+    "待办": 8
   },
   "integrationCondition": "代码项达到已验证待集成后进入集成；不得要求先关闭代码票才能合并",
   "githubAudit": {
@@ -1561,6 +1862,57 @@
       "待办": 1
     },
     "reason": "implementation/design started; real source Summary gap retained",
+    "initialAuditSnapshotRetained": true
+  },
+  "stageFreeze": {
+    "date": "2026-10-25",
+    "code": "5b7c84361206b45ac381b10437097d3b76c322c1",
+    "main": "f1daa0ffcf6ced41e21f351e22845455ca78006c",
+    "clientkit": "c289bc9d33edcd83a782ac17927a8c65a027eccd",
+    "tekesui": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+    "document": "agentkit-stage-close-20261025.md",
+    "futureIssues": [
+      60,
+      61,
+      62,
+      63,
+      64,
+      65,
+      66
+    ],
+    "frozenExpansionWip": [
+      36,
+      40,
+      46
+    ],
+    "currentClosureOwners": [
+      55,
+      56,
+      58,
+      59
+    ],
+    "featureExpansionPaused": true,
+    "desktopRun": false,
+    "historicalEvidencePromoted": false,
+    "protocolMatrix": "agentkit-stage-protocol-matrix-20261025.md",
+    "performanceProfile": "agentkit-stage-performance-profile-20261025.json",
+    "protocolResults": "agentkit-stage-protocol-results-20261025.json",
+    "integrationDecision": "keep PR10 draft: TekesUI53, Kernel86, remaining family/performance; no merge/tag/issue closure"
+  },
+  "stageCoverageAudit": {
+    "requirements": 50,
+    "implementationIssues": 40,
+    "syncedExistingIssues": [
+      60,
+      61,
+      62,
+      63,
+      64,
+      65,
+      66
+    ],
+    "newIssuesCreated": 0,
+    "closedIssues": [],
     "initialAuditSnapshotRetained": true
   }
 }

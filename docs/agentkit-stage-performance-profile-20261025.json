@@ -1,0 +1,52 @@
+{
+  "format": 1,
+  "stage": "2026-10-25",
+  "issues": [
+    55,
+    56
+  ],
+  "status": "frozen-not-run",
+  "candidate": "5b7c84361206b45ac381b10437097d3b76c322c1",
+  "baseline": "f1daa0ffcf6ced41e21f351e22845455ca78006c",
+  "scope": "non-desktop public SEP/presentation; no OS cache purge, no real model speed claim",
+  "dataset": {
+    "sessions": 2,
+    "historyMessagesPerSession": 100,
+    "textUtf8BytesPerMessage": 1024,
+    "toolGroupsPerSession": 10,
+    "historyPageSize": 20,
+    "attachments": "Run subset: text/image/file/image; 29-byte UTF-8 file and distinct 2x2 PNGs from existing mixed fixture",
+    "family": "only actual public producer: one parent/one child with two history pages; absent capability requires fixed contract evidence"
+  },
+  "iterations": {
+    "coldProcess": 5,
+    "warmSameProcess": 10,
+    "coldDefinition": "new owned AgentKit/harness process, existing immutable runtime and same dataset; OS file cache uncontrolled and recorded",
+    "warmDefinition": "same process after one excluded initialization iteration",
+    "percentile": "nearest-rank; retain all samples including failures"
+  },
+  "thresholds": {
+    "latencyRegressionRatioMax": 1.2,
+    "peakRssRegressionRatioMax": 1.15,
+    "firstUsableSnapshotP95Ms": 10000,
+    "sendToFirstPublicFrameP95Ms": 2000,
+    "historyPageToProjectionP95Ms": 1000,
+    "explicitReconnectToConvergedP95Ms": 5000,
+    "agentkitPeakRssMiBMax": 512,
+    "ownedHarnessPeakRssMiBMax": 2048,
+    "ownedCleanupDeadlineMs": 10000
+  },
+  "measurement": {
+    "clock": "monotonic_ns",
+    "memory": "per-process OS resident-size samples every 50ms; report sampled peak (not exact allocator peak), include sampling limits",
+    "machine": "record hardware/OS/power/thermal before run; same machine and power mode baseline/candidate",
+    "latencyStartEnd": "original intent/request accepted timestamp to matching source publication; reconnect explicit intent to same-session inventory/history convergence",
+    "provider": "loopback deterministic fixture with explicit holds excluded from latency interval; raw events retained",
+    "comparison": "baseline/candidate same supported dataset; new capability without baseline must meet absolute budget and be marked no-comparable-baseline, not a regression pass",
+    "failurePolicy": "missing sample/failed protocol/capability mismatch is failed or not_run with reason; no replacing or dropping failed iterations"
+  },
+  "notRunReasons": [
+    "Candidate functional #55/#56 still partial; Native busy queue Kernel #86 failure remains blocking",
+    "No comparable baseline/candidate performance samples collected; this is a preregistered profile, not acceptance evidence"
+  ]
+}

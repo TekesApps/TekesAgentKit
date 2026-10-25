@@ -1,0 +1,115 @@
+{
+  "sourceCommit": "5b7c84361206b45ac381b10437097d3b76c322c1",
+  "frozenSourceManifest": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/frozen-source.json",
+  "inputCount": 1207,
+  "inputsUnchangedAfterRuns": true,
+  "programs": {
+    "tekes-agent-headless": {
+      "path": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/tekes-agent-headless",
+      "sha256": "11126181c6422a11fc1236d0c0f84f3adeb82499610903efd21b503770596499",
+      "archive": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/programs/tekes-agent-headless"
+    },
+    "examples/pi_mixed_file_probe": {
+      "path": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/examples/pi_mixed_file_probe",
+      "sha256": "5e5a4e3ea6496e1fa655f48c92d55e346672d04f4be4bdaaee6e1bc24ecee39d",
+      "archive": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/programs/pi_mixed_file_probe"
+    },
+    "examples/native_dsh_mixed_probe": {
+      "path": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/examples/native_dsh_mixed_probe",
+      "sha256": "d2c2b1a7a3a203c6707482eb5abe9bf979fbe6a3109cad292109960b3f9be905",
+      "archive": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/programs/native_dsh_mixed_probe"
+    }
+  },
+  "pi": {
+    "receipt": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/pi-run-5b/accepted-receipt.json",
+    "status": "accepted",
+    "scope": "mixed direct/queued attachment, public history/file read, reconnect; no full Run/cancel/performance acceptance",
+    "runtime": "1.3.0",
+    "providerRequests": 3,
+    "processExits": {
+      "headless": {
+        "exitStatus": 0,
+        "path": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/tekes-agent-headless",
+        "pid": 63314,
+        "sessionId": 63314,
+        "sha256": "11126181c6422a11fc1236d0c0f84f3adeb82499610903efd21b503770596499"
+      },
+      "probe": {
+        "exitStatus": 0,
+        "ownedSessionHadDescendantsAtCleanup": false,
+        "pid": 63350,
+        "sessionId": 63350
+      }
+    }
+  },
+  "dsh": {
+    "receipt": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/dsh-run-5b-retry/run-receipt.json",
+    "status": "accepted",
+    "scope": "busy queue/consume, mixed attachments, history/reconnect; no full Run/cancel/performance acceptance",
+    "runtime": "0.2.1-rc.2",
+    "processExits": {
+      "dsh": 0,
+      "native": 0
+    },
+    "priorAttempt": {
+      "status": "failed",
+      "reason": "readiness timeout, no queue workflow reached",
+      "receipt": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/dsh-run-5b/failure.json",
+      "timeoutSeconds": 60,
+      "retryRelaxedTimeout": false,
+      "coldStartupAccepted": false
+    }
+  },
+  "wipPreservation": {
+    "crates/contract/src/clientkit_artifact_capture.rs": true,
+    "crates/contract/src/lib.rs": true,
+    "crates/presentation/src/clientkit_artifact_history.rs": true,
+    "crates/presentation/src/lib.rs": true,
+    "crates/presentation/src/transcript.rs": true,
+    "docs/agentkit-clientkit-artifact-history-compatibility-20261025.md": true,
+    "docs/agentkit-same-process-host-contract-20261025.md": true,
+    "ui/bindings/src/host_mounts.rs": true,
+    "ui/bindings/tests/host_mounts.rs": true
+  },
+  "desktop": false,
+  "performance": "not_run",
+  "nativeBusyQueue": "failed-upstream-Kernel86",
+  "cacheDeletedBytes": 0,
+  "piSummary": {
+    "receipt": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/pi-summary-5b/run-receipt.json",
+    "result": "accepted",
+    "programSha256": "11126181c6422a11fc1236d0c0f84f3adeb82499610903efd21b503770596499",
+    "scope": "single-publication-same-memory-authority",
+    "childStatus": "idle",
+    "statusBasis": "public-idle-inputs-no-explicit-child-status",
+    "historyReconnect": "public-child-history-and-new-epoch-source-capture",
+    "parentDraftIsolation": "not-run",
+    "runningTransition": "not-run",
+    "serverTransactionalFreshnessProven": false
+  },
+  "dshSummary": {
+    "result": "failed-before-projection",
+    "reason": "DSH readiness timeout at unchanged 60s; no Summary acceptance",
+    "failureLog": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/dsh-summary.log",
+    "ownedExit": {
+      "exitStatus": null,
+      "exitedBeforeReceipt": true,
+      "pid": null,
+      "stoppedByOwnedFixture": false
+    },
+    "nextAction": "retain negative startup evidence; diagnose runtime/IO readiness under #56, no projection assertion weakened",
+    "productProjectionFailureProven": false,
+    "cleanupObservation": {
+      "checkedAt": "2026-10-25T03:09:17.925647+00:00",
+      "pidsFromPriorLivePsObservation": [
+        67703,
+        67719
+      ],
+      "psExitStatus": 1,
+      "psStdout": "",
+      "bothPidsAbsent": true,
+      "fixtureReceiptLimitation": "owned_dsh context failed before yield, so original receipt has no pid or exit status; absence check does not prove normal exit0"
+    }
+  },
+  "allFrozenInputsUnchangedAfterSummaryRuns": true
+}

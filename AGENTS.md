@@ -59,3 +59,14 @@ Record completed implementation separately from acceptance and merge/release sta
 Before closing an issue, backfill implementation commits, applicable validation, unverified scope
 and PR links. Design changes update both the design and the issue. Do not auto-close every
 workstream when a broad experimental PR merges; each issue has its own acceptance criteria.
+
+# Current stage closure
+
+The 2026-10-25 stage is frozen by `docs/agentkit-stage-close-20261025.md` at
+`5b7c843`. Pause feature expansion; #60–#66 and newly preserved expansion WIP
+remain future scope without reducing Epic #14. Only blocking fixes change this
+candidate, with explicit affected-input receipts and targeted revalidation.
+The main chat serializes Cargo against immutable batch inputs and the existing
+SSD shared target. Do not edit a batch's source while it is being validated.
+A split delivery must isolate real dependencies and retain every applicable
+check; supported protocol failures cannot become Unsupported to permit release.
