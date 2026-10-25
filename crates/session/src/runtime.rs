@@ -573,7 +573,15 @@ async fn connected(
     let mut next_journal_epoch = epoch * 1_000_000;
     for id in wanted.iter() {
         next_journal_epoch += 1;
-        match add_journal(endpoint.as_ref(), &mut streams, id, next_journal_epoch).await {
+        match add_journal(
+            endpoint.as_ref(),
+            store,
+            &mut streams,
+            id,
+            next_journal_epoch,
+        )
+        .await
+        {
             Ok(cancellation) => {
                 journal_cancellations.insert(id.clone(), cancellation);
                 journal_epochs.insert(id.clone(), next_journal_epoch);
@@ -591,7 +599,7 @@ async fn connected(
                 if let Some(Ok(Some((removed,reply,result))))=completed {
                     if result.is_err() && let Some(id)=removed {
                         next_journal_epoch+=1;
-                        if let Ok(cancellation)=add_journal(endpoint.as_ref(),&mut streams,&id,next_journal_epoch).await {
+                        if let Ok(cancellation)=add_journal(endpoint.as_ref(),store,&mut streams,&id,next_journal_epoch).await {
                             wanted.insert(id.clone());journal_epochs.insert(id.clone(),next_journal_epoch);journal_cancellations.insert(id,cancellation);
                         }
                     }
@@ -621,7 +629,7 @@ async fn connected(
                                 if let Some(session) = s.sessions.get_mut(id) { session.journal_error = Some(error.to_string()); }
                             });
                             next_journal_epoch += 1;
-                            match add_journal(endpoint.as_ref(), &mut streams, id, next_journal_epoch).await {
+                            match add_journal(endpoint.as_ref(), store, &mut streams, id, next_journal_epoch).await {
                                 Ok(cancellation) => {
                                     journal_cancellations.insert(id.to_owned(), cancellation);
                                     journal_epochs.insert(id.to_owned(), next_journal_epoch);
@@ -653,7 +661,7 @@ async fn connected(
                         if !store.read(MemoryProjectionStore::ready) { let _ = reply.send(Err(Error::Disconnected)); continue; }
                         let result = if let std::collections::btree_map::Entry::Vacant(entry) = journal_epochs.entry(id.clone()) {
                             next_journal_epoch += 1;
-                            match add_journal(endpoint.as_ref(), &mut streams, &id, next_journal_epoch).await {
+                            match add_journal(endpoint.as_ref(), store, &mut streams, &id, next_journal_epoch).await {
                                 Ok(cancellation) => { store.update(|s| {s.reset_journal(&id); if let Some(session)=s.sessions.get_mut(&id) {session.journal_error=None;}}); wanted.insert(id.clone()); journal_cancellations.insert(id.clone(), cancellation); entry.insert(next_journal_epoch); Ok(()) }
                                 Err(e) => Err(e),
                             }
@@ -701,6 +709,7 @@ fn record_session_error(store: &SharedProjection, id: &str, error: &Error) {
 }
 async fn add_journal(
     endpoint: &dyn SessionEndpoint,
+    store: &SharedProjection,
     streams: &mut SelectAll<TaggedStream>,
     id: &str,
     epoch: u64,
@@ -715,7 +724,20 @@ async fn add_journal(
         },
         SessionContentKind::NativeConversation => StreamTarget::SessionConversation {
             address,
-            max_messages: 50,
+            max_messages: store.read(|s| {
+                s.sessions
+                    .get(id)
+                    .and_then(|session| session.native_conversation.as_ref())
+                    .map(|snapshot| {
+                        snapshot
+                            .entries
+                            .iter()
+                            .filter(|entry| entry["type"] == "message")
+                            .count()
+                    })
+                    .unwrap_or(50)
+                    .max(50)
+            }),
         },
     };
     let frames = endpoint.follow(target).await?;
