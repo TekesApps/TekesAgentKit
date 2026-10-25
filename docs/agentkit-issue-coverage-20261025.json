@@ -937,7 +937,7 @@
       "key": "ANCHOR",
       "parent": 16,
       "title": "[实施/Context] 精确批注来源引用与失效解析",
-      "status": "待办",
+      "status": "进行中",
       "layer": "实现",
       "scope": "从ClientKit当前ArtifactSelectionReference WIP提取语义，对原document/artifact/type、field/block、revision+digest、UTF-16范围与上下文建立精确引用。",
       "deliverables": "Rust类型/编译与解析结果契约、宿主reveal回调；与现有annotation/source_locator衔接。",
@@ -1117,13 +1117,13 @@
       "key": "SUMMARY",
       "parent": 25,
       "title": "[实施/Summary] sections、usage、metadata 与原来源动作组件",
-      "status": "已验证待集成",
+      "status": "进行中",
       "layer": "实现",
       "scope": "现有Summary数据映射/sections、用量/metadata、host slots、passive Task与可授权子代理动作；复用原源事实，不从文本猜独立Run。",
       "deliverables": "共享SummaryView、原输入/动作/定制slot与业务布局契约。",
       "dependencies": "{API}/{PANEL}；Native真实状态转换归{PROTO-FAMILY}，glyph/系统AX等归适用上游/{DESKTOP}。",
       "criteria": "原scope/publication/source一致；被动Task无导航权；host扩展不复制状态机；usage/metadata/错误空态明确；适用组件/公开consumer与主线集成。",
-      "evidence": "9a62950/1d14c70/6420876及docs/rust-agent-ui-summary-issue25-audit-20261024.md；新Native transition WIP未编译通过，不算本票已完成真实来源验收。",
+      "evidence": "9a62950/1d14c70/6420876及docs/rust-agent-ui-summary-issue25-audit-20261024.md；新Native transition WIP未编译通过，不算本票已完成真实来源验收。 整理后真实来源揭露doing适配缺口：已退回进行中；原595输入负向保留，修复仅在被动工具来源边界，正式Task producer/failure仍未验收。",
       "completedAt": null,
       "related": [
         23,
@@ -1449,9 +1449,9 @@
   "evidencePolicy": "commit+program+version+proof layer；历史不升级新HEAD；未合入代码不关闭",
   "implementationStatusCounts": {
     "已关闭": 3,
-    "已验证待集成": 11,
-    "待办": 5,
-    "进行中": 5,
+    "已验证待集成": 10,
+    "待办": 4,
+    "进行中": 7,
     "等待上游": 8,
     "等待桌面": 1
   },
@@ -1542,5 +1542,21 @@
     "scripts/native_summary_transition_fixture.py": "eafc178c1f82ec8c66d5a98d9b1ddbe27f0fc0480673c72991056ff80f736612",
     "scripts/tests/test_native_summary_transition_validator.py": "284308786ff9055e7ea798b347c88abda0d301df8daebbf2b9e011142c861f69",
     "docs/rust-agent-ui-native-summary-transition-contract-20261025.md": "14aeaec8a9a70fb1d5c74bcb4b153433abf2ad18ecd39d216786850da2723132"
+  },
+  "postAuditStatusUpdate": {
+    "issues": [
+      36,
+      45
+    ],
+    "counts": {
+      "已关闭": 3,
+      "已验证待集成": 10,
+      "待办": 4,
+      "进行中": 7,
+      "等待上游": 8,
+      "等待桌面": 1
+    },
+    "reason": "new implementation started / real source adaptation gap found",
+    "initialAuditSnapshotRetained": true
   }
 }
