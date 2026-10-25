@@ -3,6 +3,8 @@ pub mod feedback_read_proof;
 pub mod feedback_write_proof;
 pub mod fixture;
 pub mod mixed_tool_proof;
+#[cfg(feature = "acceptance-source-witness")]
+mod mixed_tool_usage_source;
 pub mod sidechat_proof;
 pub mod transcript_coverage;
 

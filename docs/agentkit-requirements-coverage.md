@@ -12,7 +12,7 @@
 
 当前 `5b7c843` root/UI格式、Clippy、测试、opt-in witness及独立公开API consumer均通过；UI CI在严格嵌套阅读检查失败（TekesUI #53），整体不能合入。Native queue另受Kernel #86真实失败阻塞。Native warm3仍仅证明有界子历史与passive Summary；新增原父Task审批拒绝失败与Pi primary-child transition来源窄见证已通过。Pi取消和Unknown原ticket自动对账已按独立新程序验收，均不升级为完整三端Family/Run或性能通过。详见[阶段结果](agentkit-stage-protocol-results-20261025.json)。#55/#56仍未完成。
 
-2026-10-26补验：#67候选`4274fe8`的DSH正常/失败child来源、公开历史与重连窄范围通过；Native/DSH原turn取消也已按独立程序取得收据。各自原source/program身份见结果JSON，不能相互转授。最新提交`a1441a7`仅验收工具/文档变化；CI40214354397 root已通过，UI尚在运行。#67保持已验证待集成、OPEN；本期未合main、未发布。
+2026-10-26补验：#67候选`4274fe8`的DSH正常/失败child来源、公开历史与重连窄范围通过；Native/DSH原turn取消也已按独立程序取得收据。各自原source/program身份见结果JSON，不能相互转授。提交`70f4084`的CI40216799309/40216795717均已结束：root通过；UI常规及独立consumer通过，必需nested reading失败，后续demo build跳过。#67保持已验证待集成、OPEN；本期未合main、未发布。
 
 ## 边界与证据基线
 
@@ -198,3 +198,7 @@ AgentKit代码基线 `1d41ad4` / draft PR #10；远端main `f1daa0f`（v0.3.8 he
 #55三端原组件真实read工具/推理/控件保留/重连去重窄通过；#56 Pi/DSH实际子面板原Earlier、宿主重连、原record内容/顺序/去重、父draft/selection与关闭后来源退休窄通过。各自UI程序不同，不能互相转授：详见阶段结果与evidence-bindings-20261026。Usage专项、剩余适用来源与性能仍未完成。新性能executionRecipe只明确原始种子与warm增长轨迹/起止事件，未降低预算，尚无样本。
 
 f833 CI40214966220终态：root、UI常规、child witness、Native approval和独立consumer通过；严格TekesUI53 reading失败，后续demo build跳过。未合入main、未tag、未关闭代码票；后续head必须单独过门禁。#60–#66仍后续待办。
+
+### 2026-10-26 用量来源证据
+
+[用量绑定](evidence-bindings-20261026/usage-source.json)补齐 #55 的同次公开投影 typed/raw 对账：Native transient live20→final60；DSH运行间步 durable-paired20→final60（没有数值transient）；Pi仅当前三条assistant的durable output60，reported/live缺失按冻结契约保留。DSH原验证器负结果和原协议帧均保留，v2离线重分析不触发协议重跑。绑定product4274/UI53f97f35，不转授其他程序；#55整体、性能、桌面与集成仍未通过。机器状态计数已与41张实施票逐项重算一致。

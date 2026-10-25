@@ -1778,7 +1778,7 @@
   "evidencePolicy": "commit+program+version+proof layer；历史不升级新HEAD；未合入代码不关闭",
   "implementationStatusCounts": {
     "已关闭": 3,
-    "已验证待集成": 10,
+    "已验证待集成": 11,
     "进行中": 9,
     "等待上游": 9,
     "等待桌面": 1,
@@ -1950,8 +1950,10 @@
       "programScope": "Pi only; Native/DSH identities are recorded separately in protocolResults",
       "additionalScope": "Native/Pi/DSH original component real tools/reasoning/control retention and reconnect",
       "additionalBinding": "evidence-bindings-20261026/mixed-tools.json",
-      "usageAccepted": false,
-      "performanceAccepted": false
+      "usageAccepted": true,
+      "performanceAccepted": false,
+      "usageScope": "original same-publication raw source; Native numeric transient20 to final60; DSH paired durable live20 to final60 with no numeric transient; Pi final durable60, reported/live absent by frozen contract",
+      "usageBinding": "evidence-bindings-20261026/usage-source.json"
     },
     "allowedBlockingFixes": [
       {
@@ -1964,12 +1966,15 @@
     "currentCandidate": "4274fe82fc353ff06100d4106d527e25dc5dfca3",
     "frozenScopeBase": "5b7c84361206b45ac381b10437097d3b76c322c1",
     "ciObservation": {
-      "head": "f833ea3e58f1707a3ba5dacf3bedcfda40ea9058",
-      "run": 40214966220,
+      "head": "70f4084523d65f7f44c1abaf585408a572367fae",
+      "run": 40216799309,
+      "additionalRun": 40216795717,
       "root": "success",
       "ui": "failure",
       "onlyFailedGate": "strict nested reading / TekesUI53",
-      "artifact": 12607411641,
+      "standalonePublicConsumer": "success",
+      "laterDemoBuild": "skipped",
+      "artifact": 12607784167,
       "merged": false
     }
   },

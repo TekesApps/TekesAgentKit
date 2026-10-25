@@ -73,6 +73,8 @@ pub async fn run(view: &mut ComponentDemo, runtime: &Arc<SessionRuntime>) -> Res
         .ok_or_else(|| unsupported("mixed run is not writable"))?;
     let mut owners: BTreeMap<String, (ComponentId, usize, usize)> = BTreeMap::new();
     let mut live = false;
+    #[cfg(feature = "acceptance-source-witness")]
+    let mut live_usage_source = None;
     let completed = tokio::time::timeout(Duration::from_secs(45), async {
         loop {
             view.sync()?;
@@ -87,6 +89,23 @@ pub async fn run(view: &mut ComponentDemo, runtime: &Arc<SessionRuntime>) -> Res
                 .displayed_snapshot()
                 .ok_or_else(|| unsupported("mixed displayed frame missing"))?
                 .clone();
+            #[cfg(feature = "acceptance-source-witness")]
+            if live_usage_source.is_none()
+                && snapshot
+                    .transcript
+                    .turns
+                    .iter()
+                    .any(|turn| turn.live_usage.is_some())
+                && let Some(turn) = snapshot
+                    .transcript
+                    .turns
+                    .iter()
+                    .rev()
+                    .find(|turn| turn.live_usage.is_some())
+            {
+                live_usage_source =
+                    Some(crate::mixed_tool_usage_source::capture(&binding, &turn.id)?);
+            }
             let content_id = view
                 .transcript_content_id(ids)
                 .ok_or_else(|| unsupported("mixed Transcript missing"))?;
@@ -200,6 +219,13 @@ pub async fn run(view: &mut ComponentDemo, runtime: &Arc<SessionRuntime>) -> Res
         tools.iter().all(|tool| tool.turn_id == turn),
         "mixed calls crossed turn identity",
     )?;
+    #[cfg(feature = "acceptance-source-witness")]
+    let usage_source = {
+        let final_source = crate::mixed_tool_usage_source::capture(&binding, &turn)?;
+        let receipt = json!({"final":final_source,"liveObserved":live_usage_source});
+        eprintln!("MIXED_USAGE_SOURCE_RECEIPT {}", receipt);
+        receipt
+    };
     let content_id = view.transcript_content_id(ids).unwrap();
     view.tree
         .get_mut(content_id)
@@ -286,11 +312,18 @@ pub async fn run(view: &mut ComponentDemo, runtime: &Arc<SessionRuntime>) -> Res
                 == baseline,
         "mixed reconnect changed Composer",
     )?;
-    Ok(
-        json!({"realHarness":true,"canonicalTools":3,"realReadResults":true,"reasoningSource":true,
+    #[cfg(feature = "acceptance-source-witness")]
+    let result = json!({"realHarness":true,"canonicalTools":3,"realReadResults":true,"reasoningSource":true,
         "oneContinuousGroup":true,"liveControlsObserved":true,"originalControlsRetained":true,
         "syntheticPreeditPreserved":true,"focusPreserved":true,"sendBlockedDuringPreedit":true,
         "otherDraftPreserved":true,"reconnectNoDuplicateInput":true,"reconnectNoDuplicateTools":true,
-        "nativeInteraction":false,"physicalIme":false,"readingAnchorAcceptance":false}),
-    )
+        "nativeInteraction":false,"physicalIme":false,"readingAnchorAcceptance":false,
+        "usageSourceWitness":usage_source});
+    #[cfg(not(feature = "acceptance-source-witness"))]
+    let result = json!({"realHarness":true,"canonicalTools":3,"realReadResults":true,"reasoningSource":true,
+        "oneContinuousGroup":true,"liveControlsObserved":true,"originalControlsRetained":true,
+        "syntheticPreeditPreserved":true,"focusPreserved":true,"sendBlockedDuringPreedit":true,
+        "otherDraftPreserved":true,"reconnectNoDuplicateInput":true,"reconnectNoDuplicateTools":true,
+        "nativeInteraction":false,"physicalIme":false,"readingAnchorAcceptance":false});
+    Ok(result)
 }

@@ -133,3 +133,9 @@ Native approval and independent public consumer pass; strict reading fails on
 TekesUI53, later demo build skipped. Artifact12607411641 retains the original
 negative result. New later commits must obtain their own CI; no transfer of f833
 checks is implied. PR10 stays draft; no merge, tag or code-issue closure.
+
+### 2026-10-26 usage and current CI
+
+Original same-publication usage now has [portable bindings](evidence-bindings-20261026/usage-source.json) over product4274/UI53f97f35: Native numeric transient20→reported final60; DSH running durable-paired20→reported final60 (no numeric transient claimed); Pi durable current-three-message output60 with contract-declared reported/live absence. The DSH initial verifier failure remains intact; stricter offline v2 raw-source reanalysis resolves the verifier error without rerunning protocol or promoting another binary. Full #55 and performance remain open.
+
+Head70f4084 CI40216799309/40216795717 terminated: root passed, normal UI checks and standalone consumer passed, strict nested reading failed; demo build skipped. Artifact12607784167 records accepted=false, parentFollowingAfterInnerUp=true, append offset0→634 and detailVisibleAfterAppend=false. No applicable gate was removed. The split review found no currently verified dependency-isolated delivery that can remove these gates; PR10 remains draft. Main already contains stable headless v0.3.8.

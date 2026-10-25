@@ -393,5 +393,18 @@
     },
     "noGateWaived": true,
     "merged": false
+  },
+  "sourceUsageAcceptance20261026": {
+    "binding": "evidence-bindings-20261026/usage-source.json",
+    "productCandidate": "4274fe82fc353ff06100d4106d527e25dc5dfca3",
+    "uiSha256": "53f97f3520f446d9659075504a98d3de6fff6f64f0fd50b433bceb264fc0fc13",
+    "scope": "same-publication original raw/typed usage, original Composer destination; Pi only durable current three records; DSH initial verifier failure preserved and stricter offline v2 reanalysis accepted",
+    "native": "numeric transient20, final reported60 complete",
+    "dsh": "running durable-paired20, final reported60 complete; no numeric transient preview claimed",
+    "pi": "durable output60; reported/live absent by frozen contract, no realtime usage claim",
+    "protocolRerunForReanalysis": false,
+    "performanceAccepted": false,
+    "completeIssue55": false,
+    "merged": false
   }
 }

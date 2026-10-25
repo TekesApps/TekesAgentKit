@@ -27,6 +27,7 @@ from native_owned_fixture import owned_native
 from native_dsh_mixed_fixture import classify_dsh_request
 from owned_endpoint_provider import provider_handler
 from pi_owned_fixture import prepare_pi
+from mixed_tool_usage_source import validate as validate_usage_source
 
 SSD = Path('/Volumes/HP P900/dev/TekesAgentKit')
 AUTH = 'AGENTKIT_MIXED_TOOL_OWNED_CREDENTIAL'
@@ -136,6 +137,10 @@ def main():
     for name in ('headless-program', 'ui-demo', 'source-manifest', 'output',
                  'headless-build-receipt', 'ui-build-receipt'):
         parser.add_argument('--' + name, type=Path, required=True)
+    parser.add_argument('--headless-source-manifest', type=Path,
+                        help='explicit separate immutable source for the already-built headless seeder')
+    parser.add_argument('--usage-source-proof', action='store_true',
+                        help='validate opt-in original usage witness; absent live samples remain not_observed')
     for name in ('pi-root', 'dsh-root', 'kernel-supervisor', 'kernel-worker', 'providers-config'):
         parser.add_argument('--' + name, type=Path)
     args = parser.parse_args()
@@ -151,8 +156,9 @@ def main():
     if any(not p.is_file() or not os.access(p, os.X_OK) for p in programs.values()):
         parser.error('explicit existing executable programs required')
     source_before = verify_source(args.source_manifest)
+    headless_source_before = verify_source(args.headless_source_manifest or args.source_manifest)
     program_bindings = {
-        'headless': verify_program(programs['headless'], args.headless_build_receipt, source_before),
+        'headless': verify_program(programs['headless'], args.headless_build_receipt, headless_source_before),
         'demo': verify_program(programs['demo'], args.ui_build_receipt, source_before)}
     paths = list(programs.values())
     if args.endpoint == 'native':
@@ -166,12 +172,13 @@ def main():
     before = {str(p.resolve(strict=True)): digest(p) for p in paths}
     out.mkdir(mode=0o700)
     write(out / 'inputs-before.json', {'source': source_before, 'programsAndRuntime': before,
+                                     'headlessSource': headless_source_before,
                                      'programBindings': program_bindings})
     tools = Path(__file__).resolve().parent
     write(out / 'runner-inputs.json', {p.name: digest(p) for p in
         [Path(__file__), *(tools / name for name in ('owned_endpoint_provider.py',
          'mixed_tool_provider.py', 'native_probe_provider.py', 'native_owned_fixture.py',
-         'pi_owned_fixture.py', 'dsh_owned_fixture.py'))]})
+         'pi_owned_fixture.py', 'dsh_owned_fixture.py', 'mixed_tool_usage_source.py'))]})
     workspace = out / 'workspace'; workspace.mkdir()
     (workspace / 'proof.txt').write_text('proof line one\nline two\n')
     home = out / 'host-home'; home.mkdir(mode=0o700)
@@ -304,9 +311,14 @@ def main():
                            if line.startswith('{') and json.loads(line).get('offscreen'))
             proof = validate_proof(receipt)
             write(out / 'host-receipt.json', receipt)
+            usage = None
+            if args.usage_source_proof:
+                usage = validate_usage_source(proof.get('usageSourceWitness'))
+                write(out / 'usage-validation.json', usage)
             result = {'accepted': True, 'endpoint': kind, 'runtimeVersion': expected_version,
                       'proof': proof, 'seedExit': seed.returncode, 'demoExit': demo.returncode,
-                      'source': source_before, 'programsAndRuntime': before}
+                      'source': source_before, 'headlessSource': headless_source_before,
+                      'usageSourceValidation': usage, 'programsAndRuntime': before}
     except Exception as error:
         failure = type(error).__name__ + ': ' + str(error)
         (out / 'failure-traceback.log').write_text(traceback.format_exc())
@@ -323,7 +335,8 @@ def main():
     if len(requests) - len(title_requests) != 3 or len(title_requests) != (1 if args.endpoint == 'dsh' else 0):
         failure = failure or 'unexpected business/title provider request count'
     after = {path: digest(Path(path)) for path in before}
-    if after != before or verify_source(args.source_manifest) != source_before:
+    if (after != before or verify_source(args.source_manifest) != source_before
+            or verify_source(args.headless_source_manifest or args.source_manifest) != headless_source_before):
         failure = failure or 'frozen source/program/runtime changed during run'
     write(out / 'inputs-after.json', after)
     if failure:
