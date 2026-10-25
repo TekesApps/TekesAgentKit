@@ -4,7 +4,7 @@
 
 ## 不可变输入
 
-- AgentKit范围基线 `5b7c84361206b45ac381b10437097d3b76c322c1`；唯一阻断修复候选 `4274fe82fc353ff06100d4106d527e25dc5dfca3`（#67）；本地保护引用 `refs/agentkit/stage-close-20261025/base`。PR #10 为 draft。
+- AgentKit范围基线 `5b7c84361206b45ac381b10437097d3b76c322c1`；已验证基准候选 `4274fe82fc353ff06100d4106d527e25dc5dfca3`（#67），新增 #68 为阶段内阻断修复，尚待新程序验收；本地保护引用 `refs/agentkit/stage-close-20261025/base`。PR #10 为 draft。
 - main `f1daa0ffcf6ced41e21f351e22845455ca78006c`，已发布 headless v0.3.8。
 - ClientKit 行为参照 `c289bc9d33edcd83a782ac17927a8c65a027eccd`；Tekes `8858ccd9d46590852ec7a0949aee289fc6798d70`。此前记录的未提交参照候选仅按原冻结快照解释，不能当已发布 SDK。
 - TekesUI 公开精确 pin `50ec49f3446924fdbc66b3cff22cd8cfe150fe7c`；8 包、243 输入闭包。公开 main `7c13ec0` 未改变该闭包，不等同 #53 修复已发布。
@@ -150,3 +150,9 @@ are retained. Official samples remain0; the required paired trajectories, other
 endpoints, family/attachment and all performance budgets are unaccepted. These
 are acceptance tools for existing #55/#56 criteria, not new product capabilities.
 The only product delta after5b remains #67.
+
+### #68：Pi 恢复窗口真实阻断缺陷
+
+[修复说明](agentkit-pi-window-message-units-20261026.md)和原负证据绑定已建立。恢复窗口把custom entries计成消息会扩大历史、使分页提前耗尽；#68仅修这个单位，不重置/丢弃已加载窗口。#55/#56适用Pi行保持未通过，等待精确新程序；不能由4274旧证据升级。#67是此前唯一产品修复的历史记录仍保留，当前允许修复列表增加#68。
+
+7c94123 CI40223657233已结束：root及UI常规/独立consumer成功，唯一失败仍为strict nested reading，后续demo build跳过；artifact12610885705保留。未弱化原门禁，PR10仍draft。

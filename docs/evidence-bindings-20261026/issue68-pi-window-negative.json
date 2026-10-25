@@ -1,0 +1,57 @@
+{
+  "format": 1,
+  "issue": 68,
+  "sourceCommit": "4274fe82fc353ff06100d4106d527e25dc5dfca3",
+  "programSha256": "05f4b8af89aac0178a72a5c69d64a2aa90bbaced9917fa1a48419478b3c9e967",
+  "runtime": {
+    "criticalFiles": {
+      "/Users/frankqin/Library/Application Support/Tekes/Harnesses/pi-1.3.0-node-24.20.0/node/bin/node": "9d050fd455b56426e25d4d603c7c501cbb2630348e836cf221dcce748e90588a",
+      "/Users/frankqin/Library/Application Support/Tekes/Harnesses/pi-1.3.0-node-24.20.0/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js": "e79626f2dd6f94aa45d30f3fa63cd84319a6eefcd150b353cfaf274366926774",
+      "/Users/frankqin/Library/Application Support/Tekes/Harnesses/pi-1.3.0-node-24.20.0/node_modules/@earendil-works/pi-coding-agent/package.json": "83c3bb7619f590c213cc96a24216eb29a819a3ef6dc548607cc037ed276e8dc5"
+    },
+    "completeDependencyClosureClaimed": false,
+    "versions": "Pi1.3.0/Node24.20.0"
+  },
+  "originalRawSha256": "a677cd9b4cd7290f2a3126fc0d79adcfc794acb34f6f5370b8fbef3d2d050132",
+  "originalReceiptSha256": "088f3a279770b177aa5418aca284f7c75dc626faa50534dfcba8a92f21d9b71d",
+  "reconnect": [
+    {
+      "scope": {
+        "endpointId": "pi",
+        "sessionId": "fc6958cf-c20a-4fb1-b1d1-6942be801b25",
+        "threadId": "fc6958cf-c20a-4fb1-b1d1-6942be801b25"
+      },
+      "beforeEntries": 98,
+      "afterEntries": 231,
+      "sameInventory": true,
+      "priorIdsRetained": true,
+      "sameHistoryWindow": false
+    },
+    {
+      "scope": {
+        "endpointId": "pi",
+        "sessionId": "456f6dc0-eb45-4d7c-9ff0-46c3707958ac",
+        "threadId": "456f6dc0-eb45-4d7c-9ff0-46c3707958ac"
+      },
+      "beforeEntries": 98,
+      "afterEntries": 231,
+      "sameInventory": true,
+      "priorIdsRetained": true,
+      "sameHistoryWindow": false
+    }
+  ],
+  "postReopenEntries": [
+    274,
+    274
+  ],
+  "result": "supported product window-unit defect; original diagnostic remains failed",
+  "officialSamples": 0,
+  "performanceAccepted": false,
+  "fixAccepted": false,
+  "evidenceSource": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/performance/pi-candidate-cold-diagnostic-v3",
+  "failedChecks": [
+    "same-original-window reconnect",
+    "required nonempty fixed50 history page"
+  ],
+  "desktop": false
+}

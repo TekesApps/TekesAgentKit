@@ -933,7 +933,16 @@ async fn add_journal(
                 s.sessions
                     .get(id)
                     .and_then(|session| session.native_conversation.as_ref())
-                    .map(|snapshot| snapshot.entries.len())
+                    // Pi's window is measured in message entries; custom
+                    // metadata also occupies `entries` but must not expand
+                    // the amount of history requested on reconnect.
+                    .map(|snapshot| {
+                        snapshot
+                            .entries
+                            .iter()
+                            .filter(|entry| entry["type"] == "message")
+                            .count()
+                    })
                     .unwrap_or(50)
                     .max(50)
             }),

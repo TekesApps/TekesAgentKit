@@ -436,17 +436,51 @@ async fn missing_pointer_and_exhausted_session_stream_do_not_reconnect_healthy_s
 #[derive(Clone)]
 struct NativeWindowConnector {
     requests: Arc<std::sync::Mutex<Vec<usize>>>,
+    custom_entries: bool,
 }
 struct NativeWindowEndpoint {
     base: Endpoint,
     requests: Arc<std::sync::Mutex<Vec<usize>>>,
+    custom_entries: bool,
     limit: AtomicUsize,
     frames: tokio::sync::broadcast::Sender<Value>,
 }
-fn native_window_frame(kind: &str, limit: usize) -> Value {
+fn native_window_frame(kind: &str, limit: usize, custom_entries: bool) -> Value {
+    // Model Pi's behavior: the window limit counts messages, while custom
+    // entries remain in the ancestry and are included alongside those messages.
     let count = limit.min(120);
-    let entries:Vec<_>=(120-count..120).map(|i|json!({"id":format!("entry-{i}"),"type":"message","message":{"role":"user","content":format!("message {i}"),"timestamp":i}})).collect();
-    json!({"type":kind,"generation":"g","snapshot":{"sessionId":"s","generation":"g","leafId":"entry-119","entries":entries,"hasMoreBefore":count<120,"isStreaming":false,"state":{}}})
+    let first_message = 120 - count;
+    let mut entries = Vec::new();
+    for i in first_message..120 {
+        let message_id = format!("entry-{i}");
+        entries.push(json!({
+            "id": message_id,
+            "parentId": if i == 0 {
+                Value::Null
+            } else if custom_entries {
+                json!(format!("custom-{}", i - 1))
+            } else {
+                json!(format!("entry-{}", i - 1))
+            },
+            "type": "message",
+            "message": {"role":"user","content":format!("message {i}"),"timestamp":i}
+        }));
+        if custom_entries {
+            entries.push(json!({
+                "id": format!("custom-{i}"),
+                "parentId": format!("entry-{i}"),
+                "type": "custom",
+                "customType": "test-metadata",
+                "data": {"messageIndex":i}
+            }));
+        }
+    }
+    let leaf_id = if custom_entries {
+        "custom-119"
+    } else {
+        "entry-119"
+    };
+    json!({"type":kind,"generation":"g","snapshot":{"sessionId":"s","generation":"g","leafId":leaf_id,"entries":entries,"hasMoreBefore":count<120,"isStreaming":false,"state":{}}})
 }
 #[async_trait]
 impl EndpointConnector for NativeWindowConnector {
@@ -459,6 +493,7 @@ impl EndpointConnector for NativeWindowConnector {
                 prompts: Arc::new(AtomicUsize::new(0)),
             },
             requests: self.requests.clone(),
+            custom_entries: self.custom_entries,
             limit: AtomicUsize::new(50),
             frames: tokio::sync::broadcast::channel(16).0,
         }))
@@ -486,9 +521,16 @@ impl SessionEndpoint for NativeWindowEndpoint {
                     receiver,
                 ))
             });
+            let custom_entries = self.custom_entries;
             Ok(Box::pin(
-                stream::once(async move { Ok(native_window_frame("conversation", max_messages)) })
-                    .chain(updates),
+                stream::once(async move {
+                    Ok(native_window_frame(
+                        "conversation",
+                        max_messages,
+                        custom_entries,
+                    ))
+                })
+                .chain(updates),
             ))
         } else {
             self.base.follow(target).await
@@ -497,7 +539,11 @@ impl SessionEndpoint for NativeWindowEndpoint {
     async fn load_earlier_conversation(&self, _: &str, count: usize) -> Result<bool> {
         let previous = self.limit.fetch_add(count, Ordering::SeqCst);
         self.frames
-            .send(native_window_frame("conversation-update", previous + count))
+            .send(native_window_frame(
+                "conversation-update",
+                previous + count,
+                self.custom_entries,
+            ))
             .unwrap();
         Ok(true)
     }
@@ -519,6 +565,7 @@ async fn reconnect_refetches_the_loaded_native_window_instead_of_shrinking_it() 
         "native-window",
         Arc::new(NativeWindowConnector {
             requests: requests.clone(),
+            custom_entries: false,
         }),
     );
     runtime.wait_ready(Duration::from_secs(3)).await.unwrap();
@@ -556,6 +603,160 @@ async fn reconnect_refetches_the_loaded_native_window_instead_of_shrinking_it() 
             .entries
             .len()),
         100
+    );
+    // Close/open uses add_journal too and must retain the same paged window.
+    runtime.close_session("s").await.unwrap();
+    runtime.open_session("s").await.unwrap();
+    assert_eq!(*requests.lock().unwrap(), vec![50, 100, 100]);
+    assert_eq!(
+        runtime.inspect(|s| s.sessions["s"]
+            .native_conversation
+            .as_ref()
+            .unwrap()
+            .entries
+            .iter()
+            .filter(|entry| entry["type"] == "message")
+            .count()),
+        100
+    );
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn reconnect_and_reopen_count_native_messages_with_custom_entries() {
+    let requests = Arc::new(std::sync::Mutex::new(vec![]));
+    let runtime = SessionRuntime::spawn(
+        "native-window",
+        Arc::new(NativeWindowConnector {
+            requests: requests.clone(),
+            custom_entries: true,
+        }),
+    );
+    runtime.wait_ready(Duration::from_secs(3)).await.unwrap();
+    runtime.open_session("s").await.unwrap();
+    let initial_ids: Vec<String> = (70..120)
+        .flat_map(|i| [format!("entry-{i}"), format!("custom-{i}")])
+        .collect();
+    let initial = runtime.inspect(|s| s.sessions["s"].native_conversation.clone().unwrap());
+    assert_eq!(initial.entries.len(), 100);
+    assert_eq!(
+        initial
+            .entries
+            .iter()
+            .map(|entry| entry["id"].as_str().unwrap().to_owned())
+            .collect::<Vec<_>>(),
+        initial_ids.clone()
+    );
+    let old_epoch = runtime.inspect(|s| s.connection_epoch);
+    let mut changes = runtime.subscribe();
+    runtime.reconnect().await.unwrap();
+    tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            if changes.inspect(|s| s.connection_epoch != old_epoch && s.sessions["s"].journal_ready)
+            {
+                break;
+            }
+            changes.changed().await.unwrap();
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(*requests.lock().unwrap(), vec![50, 50]);
+    assert_eq!(
+        runtime.inspect(|s| s.sessions["s"]
+            .native_conversation
+            .as_ref()
+            .unwrap()
+            .entries
+            .clone()),
+        initial.entries
+    );
+    assert_eq!(
+        runtime.inspect(|s| s.sessions["s"]
+            .native_conversation
+            .as_ref()
+            .unwrap()
+            .entries
+            .iter()
+            .map(|entry| entry["id"].as_str().unwrap().to_owned())
+            .collect::<Vec<_>>()),
+        initial_ids
+    );
+    assert!(runtime.load_earlier("s").await.unwrap());
+    let paged_entries = runtime.inspect(|s| {
+        s.sessions["s"]
+            .native_conversation
+            .as_ref()
+            .unwrap()
+            .entries
+            .clone()
+    });
+    let expected_ids: Vec<String> = (20..120)
+        .flat_map(|i| [format!("entry-{i}"), format!("custom-{i}")])
+        .collect();
+    assert_eq!(
+        runtime.inspect(|s| s.sessions["s"]
+            .native_conversation
+            .as_ref()
+            .unwrap()
+            .entries
+            .len()),
+        200
+    );
+    let old_epoch = runtime.inspect(|s| s.connection_epoch);
+    let mut changes = runtime.subscribe();
+    runtime.reconnect().await.unwrap();
+    tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            if changes.inspect(|s| s.connection_epoch != old_epoch && s.sessions["s"].journal_ready)
+            {
+                break;
+            }
+            changes.changed().await.unwrap();
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(*requests.lock().unwrap(), vec![50, 50, 100]);
+    let snapshot = runtime.inspect(|s| s.sessions["s"].native_conversation.clone().unwrap());
+    assert_eq!(snapshot.entries, paged_entries);
+    assert_eq!(
+        snapshot
+            .entries
+            .iter()
+            .filter(|entry| entry["type"] == "message")
+            .count(),
+        100
+    );
+    assert_eq!(snapshot.entries.len(), 200);
+    assert_eq!(
+        snapshot
+            .entries
+            .iter()
+            .map(|entry| entry["id"].as_str().unwrap().to_owned())
+            .collect::<Vec<_>>(),
+        expected_ids
+    );
+    runtime.close_session("s").await.unwrap();
+    runtime.open_session("s").await.unwrap();
+    assert_eq!(*requests.lock().unwrap(), vec![50, 50, 100, 100]);
+    assert_eq!(
+        runtime.inspect(|s| s.sessions["s"]
+            .native_conversation
+            .as_ref()
+            .unwrap()
+            .entries
+            .len()),
+        200
+    );
+    assert_eq!(
+        runtime.inspect(|s| s.sessions["s"]
+            .native_conversation
+            .as_ref()
+            .unwrap()
+            .entries
+            .clone()),
+        snapshot.entries
     );
     runtime.stop().await.unwrap();
 }

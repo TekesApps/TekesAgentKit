@@ -90,7 +90,8 @@
         32,
         56,
         13,
-        67
+        67,
+        68
       ],
       "keys": [
         "H01",
@@ -335,7 +336,8 @@
       "implementationIssues": [
         41,
         42,
-        56
+        56,
+        68
       ],
       "keys": [
         "READING",
@@ -641,7 +643,8 @@
         27
       ],
       "implementationIssues": [
-        55
+        55,
+        68
       ],
       "keys": [
         "PROTO-RUN"
@@ -1746,6 +1749,39 @@
       "owner": "qf0421",
       "number": 67,
       "stage": "current-stage-blocker-fix"
+    },
+    {
+      "key": "FIX-PI-WINDOW-UNITS",
+      "parent": 17,
+      "title": "Pi恢复窗口按message而非custom entries计数",
+      "status": "进行中",
+      "layer": "implementation",
+      "scope": "NativeConversation reconnect/close-open保持已加载消息窗口，避免custom元数据被当消息扩大窗口",
+      "deliverables": [
+        "修复add_journal恢复窗口消息单位",
+        "50/100消息与custom ancestry来源回归",
+        "固定Pi实际受影响路径收据与独立review"
+      ],
+      "dependencies": [],
+      "criteria": [
+        "不按entries总数计算max_messages、不丢已加载消息",
+        "定向Rust与固定Pi原pointer/history/page/reconnect验收",
+        "适用精确head review/CI/consumer并进入main后关闭"
+      ],
+      "evidence": [
+        "evidence-bindings-20261026/issue68-pi-window-negative.json"
+      ],
+      "completedAt": null,
+      "related": [
+        14,
+        18,
+        27,
+        55,
+        56
+      ],
+      "owner": "主会话协调 + stage68_pi_window_units 独立子会话",
+      "number": 68,
+      "stage": "current-blocking-fix"
     }
   ],
   "existingImplementationIssues": [
@@ -1779,7 +1815,7 @@
   "implementationStatusCounts": {
     "已关闭": 3,
     "已验证待集成": 11,
-    "进行中": 9,
+    "进行中": 10,
     "等待上游": 9,
     "等待桌面": 1,
     "待办": 8
@@ -1926,7 +1962,7 @@
     "protocolMatrix": "agentkit-stage-protocol-matrix-20261025.md",
     "performanceProfile": "agentkit-stage-performance-profile-20261025.json",
     "protocolResults": "agentkit-stage-protocol-results-20261025.json",
-    "integrationDecision": "keep PR10 draft: TekesUI53, Kernel86, remaining family/performance; no merge/tag/issue closure",
+    "integrationDecision": "keep PR10 draft: TekesUI53, Kernel86, Pi-window defect68, remaining family/performance; no merge/tag/issue closure",
     "latestNarrowAcceptance": {
       "issue": 56,
       "scope": "prior Native/Pi/DSH source scopes plus actual Pi/DSH mounted child pane Earlier, host reconnect, stable record identity/order, parent draft/selection and retirement",
@@ -1961,6 +1997,12 @@
         "scope": "cached-list authority boundary only",
         "featureExpansion": false,
         "acceptance": "verified-pending-integration"
+      },
+      {
+        "issue": 68,
+        "scope": "Pi恢复窗口消息计数单位，不重置已加载窗口",
+        "featureExpansion": false,
+        "acceptance": "in-progress"
       }
     ],
     "currentCandidate": "4274fe82fc353ff06100d4106d527e25dc5dfca3",
@@ -1980,7 +2022,7 @@
   },
   "stageCoverageAudit": {
     "requirements": 50,
-    "implementationIssues": 41,
+    "implementationIssues": 42,
     "syncedExistingIssues": [
       60,
       61,
@@ -1990,19 +2032,20 @@
       65,
       66
     ],
-    "newIssuesCreated": 1,
+    "newIssuesCreated": 2,
     "closedIssues": [],
     "initialAuditSnapshotRetained": true,
     "initialImplementationIssues": 40,
     "initialNewIssuesCreated": 0,
     "addedBlockingFixIssues": [
-      67
+      67,
+      68
     ]
   },
   "currentStageCounts": {
     "已关闭": 3,
     "已验证待集成": 11,
-    "进行中": 9,
+    "进行中": 10,
     "等待上游": 9,
     "等待桌面": 1,
     "待办": 8
