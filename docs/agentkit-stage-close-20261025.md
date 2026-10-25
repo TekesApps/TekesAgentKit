@@ -25,7 +25,7 @@
 | --- | --- | --- |
 | #12/#13/#29、#33/#34/#38/#41–#44 | 原版本证据已归档；仍 OPEN、未进入 main | 按各票标准审查，确认本次包含的代码/适用验证；不能根 workspace 合入就关闭 UI 能力 |
 | #35/#36/#37/#40/#45 | 冻结提交包含部分实现，不证明整票完成 | 仅收口已有实现和受影响验收；新差异后续处理 |
-| #55 Run | 5b headless CI通过；旧 Pi/DSH 通过绑定旧程序 | Pi/DSH mixed队列/历史/重连，以及Pi取消/Unknown原ticket自动对账窄通过；其余端取消、混合工具推理/性能仍有缺口；Native queue保留Kernel86真实失败 |
+| #55 Run | 5b headless CI通过；旧 Pi/DSH 通过绑定旧程序 | Pi/DSH mixed队列/历史/重连，以及Pi取消/Unknown原ticket自动对账窄通过；Native/DSH原turn取消亦按独立程序窄通过；混合工具推理/性能仍有缺口；Native queue保留Kernel86真实失败 |
 | #56 session/family | Native 两页子历史/passive Summary及 v5 原父 Task 审批拒绝失败通过；Pi primary child running→failed/history/reconnect窄证据通过 | DSH primary-child正常/失败来源及历史重连也已窄通过；SidePanel child pane、适用剩余父草稿/源退休与性能仍有缺口；不扩大原收据范围 |
 | #58 集成 | cfecb95 PR CI 40207891571：root与UI常规检查、child witness、新Native approval consumer、独立公开consumer通过；严格nested detail reading失败，后续demo build跳过；无formal approval | 保留TekesUI #53必需门禁和协议范围阻塞；不能据局部通过合并/发布 |
 | #59 发布 | 待办，尚无本阶段新 tag | 精确集成 head、main CI 与范围文档通过后发布 |
@@ -89,7 +89,7 @@ DSH family reached the original completed child Summary, then real reconnect
 failed with `unknown DSH projection authority`. Fixed public DSH distinguishes
 cached listing hints from live sequenced cuts. #67 is the one added implementation
 bug ticket under existing requirements; it is not a new feature or test ticket.
-Its patch is under targeted compile/protocol verification. Native cancellation
+Its patch subsequently passed targeted compile/protocol verification at4274; the receipts below retain exact identities. Native cancellation
 has separately passed with original journal identity and normal owned exits;
 older failed fixture attempts remain preserved. Do not promote these old program
 receipts to a subsequent #67 binary without an explicit affected-input review.

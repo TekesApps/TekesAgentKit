@@ -1929,19 +1929,24 @@
     "integrationDecision": "keep PR10 draft: TekesUI53, Kernel86, remaining family/performance; no merge/tag/issue closure",
     "latestNarrowAcceptance": {
       "issue": 56,
-      "scope": "Native approval-denied parent Task + Pi primary child transition/history/reconnect",
+      "scope": "Native approval-denied parent Task; Pi primary child transition/history/reconnect; DSH normal+failed primary child/source/history/reconnect",
       "resultFile": "agentkit-stage-protocol-results-20261025.json",
       "completeIssue": false,
-      "merged": false
+      "merged": false,
+      "candidate": "4274fe82fc353ff06100d4106d527e25dc5dfca3",
+      "evidenceBindings": "evidence-bindings-20261026/issue67-dsh-sources.json",
+      "identityPolicy": "Native/Pi retain their original source/program; DSH4274 uses SHA081c3fe; no cross-program promotion"
     },
     "latestRunAcceptance": {
       "issue": 55,
-      "result": "Pi cancel + Unknown/automatic-reconciliation accepted narrow",
+      "result": "Pi cancel+Unknown reconciliation; Native and DSH durable same-original-turn cancellation accepted narrow",
       "source": "5b7c843",
       "programSha256": "84608c2ab363c436a36b6efc367bba12baa921089fdc9edd63260466b3196678",
       "results": "agentkit-stage-protocol-results-20261025.json",
       "completeIssue": false,
-      "merged": false
+      "merged": false,
+      "identityPolicy": "Pi keeps SHA84608c2; Native/DSH cancellation uses base5b product plus observer SHA9a6a919; complete identities in results, no promotion to4274",
+      "programScope": "Pi only; Native/DSH identities are recorded separately in protocolResults"
     },
     "allowedBlockingFixes": [
       {
@@ -1952,7 +1957,15 @@
       }
     ],
     "currentCandidate": "4274fe82fc353ff06100d4106d527e25dc5dfca3",
-    "frozenScopeBase": "5b7c84361206b45ac381b10437097d3b76c322c1"
+    "frozenScopeBase": "5b7c84361206b45ac381b10437097d3b76c322c1",
+    "ciObservation": {
+      "head": "a1441a74a9f0866ec4ccac0016643e2f3a860fdc",
+      "run": 40214354397,
+      "root": "success",
+      "ui": "in_progress",
+      "observed": "2026-10-26",
+      "merged": false
+    }
   },
   "stageCoverageAudit": {
     "requirements": 50,
