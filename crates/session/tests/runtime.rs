@@ -682,6 +682,18 @@ async fn reconnect_and_reopen_count_native_messages_with_custom_entries() {
             .collect::<Vec<_>>()),
         initial_ids
     );
+    runtime.close_session("s").await.unwrap();
+    runtime.open_session("s").await.unwrap();
+    assert_eq!(*requests.lock().unwrap(), vec![50, 50, 50]);
+    assert_eq!(
+        runtime.inspect(|s| s.sessions["s"]
+            .native_conversation
+            .as_ref()
+            .unwrap()
+            .entries
+            .clone()),
+        initial.entries
+    );
     assert!(runtime.load_earlier("s").await.unwrap());
     let paged_entries = runtime.inspect(|s| {
         s.sessions["s"]
@@ -717,7 +729,7 @@ async fn reconnect_and_reopen_count_native_messages_with_custom_entries() {
     })
     .await
     .unwrap();
-    assert_eq!(*requests.lock().unwrap(), vec![50, 50, 100]);
+    assert_eq!(*requests.lock().unwrap(), vec![50, 50, 50, 100]);
     let snapshot = runtime.inspect(|s| s.sessions["s"].native_conversation.clone().unwrap());
     assert_eq!(snapshot.entries, paged_entries);
     assert_eq!(
@@ -739,7 +751,7 @@ async fn reconnect_and_reopen_count_native_messages_with_custom_entries() {
     );
     runtime.close_session("s").await.unwrap();
     runtime.open_session("s").await.unwrap();
-    assert_eq!(*requests.lock().unwrap(), vec![50, 50, 100, 100]);
+    assert_eq!(*requests.lock().unwrap(), vec![50, 50, 50, 100, 100]);
     assert_eq!(
         runtime.inspect(|s| s.sessions["s"]
             .native_conversation
