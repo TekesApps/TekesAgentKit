@@ -1,0 +1,108 @@
+{
+  "format": 1,
+  "issues": [
+    55,
+    56
+  ],
+  "kind": "diagnostic-only-preflight",
+  "productCandidate": "4274fe82fc353ff06100d4106d527e25dc5dfca3",
+  "baseline": "f1daa0ffcf6ced41e21f351e22845455ca78006c",
+  "commonConsumerSourceSha256": "119a2744d73452f2e133bfaebd3a9bdb7ac7c07db3f62f28b9af1fb2784124e0",
+  "candidateProgram": {
+    "path": "/Volumes/HP P900/dev/TekesAgentKit/acceptance-tools/performance/candidate/performance_acceptance",
+    "sha256": "82cbb276b10b75cb27386ab1e029ecd6eac0f756ab445108369a9a3800a180ad",
+    "sourceCommit": "4274fe82fc353ff06100d4106d527e25dc5dfca3",
+    "sourceManifest": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/stage-performance-candidate-v6-inputs-20261026.json",
+    "sourceManifestSha256": "2a0c5b1a267178311d6f7add7c7b0a3361cf5416921c58bd221e99ea5dab0eef",
+    "consumerSourceSha256": "119a2744d73452f2e133bfaebd3a9bdb7ac7c07db3f62f28b9af1fb2784124e0",
+    "compiled": true,
+    "clippyPassed": true,
+    "performanceSamples": 0,
+    "performanceAccepted": false
+  },
+  "baselineProgram": {
+    "path": "/Volumes/HP P900/dev/TekesAgentKit/acceptance-tools/performance/baseline/performance_acceptance",
+    "sha256": "06274011aa01c2394c3fccd78c29fc26daf743468d54142c1b4c27316025b420",
+    "sourceCommit": "f1daa0ffcf6ced41e21f351e22845455ca78006c",
+    "sourceManifest": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/stage-performance-baseline-v5-inputs-20261026.json",
+    "sourceManifestSha256": "f73105c2bfaf800568732ea38e763ba681a0ab7befb0085a1bdd708d8ec0498b",
+    "consumerSourceSha256": "119a2744d73452f2e133bfaebd3a9bdb7ac7c07db3f62f28b9af1fb2784124e0",
+    "compiled": true,
+    "clippyPassed": true,
+    "performanceSamples": 0,
+    "performanceAccepted": false
+  },
+  "runnerInputManifestSha256": "5c6d6dec7a6d935f1616bed5d231539d55d49e1f40a80398479125e72c7c88c5",
+  "runnerInputsUnchangedAfterRun": true,
+  "nativeDiagnostic": {
+    "receiptSha256": "b20b67d3de75a94f019e977327d6281db07b37da292fb36b99478f01f0bb5c31",
+    "acceptedDiagnosticPlumbing": true,
+    "source": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/performance/native-candidate-cold-diagnostic-v6",
+    "coldHarnessRestart": {
+      "oldPid": 21930,
+      "oldExit": 0,
+      "newPid": 24094,
+      "sealedReceiptSha256": "ca9c814c4baf058747fa20ba9a728d5f77495435bbf605313f075c95d8e6bf56",
+      "publicSeedReadbackVerified": true
+    },
+    "seed": [
+      {
+        "bodyMessages": 100,
+        "toolGroups": 10
+      },
+      {
+        "bodyMessages": 100,
+        "toolGroups": 10
+      }
+    ],
+    "page20": [
+      {
+        "requestedMessages": 20,
+        "actualAppendMessages": 20,
+        "journalRecords": 60
+      },
+      {
+        "requestedMessages": 20,
+        "actualAppendMessages": 20,
+        "journalRecords": 60
+      }
+    ],
+    "runController50": [
+      50,
+      50
+    ],
+    "cleanup": {
+      "pid": 24102,
+      "exitStatus": 0,
+      "elapsedNs": 1319676000,
+      "ownedGroupAbsent": true,
+      "remainingProcessGroup": [],
+      "outputReaderStopped": true,
+      "parseErrors": [],
+      "error": null
+    },
+    "providerErrors": []
+  },
+  "negativePilotsRetained": [
+    "native-candidate-cold-diagnostic-v1",
+    "native-candidate-cold-diagnostic-v2",
+    "native-candidate-cold-diagnostic-v3",
+    "native-candidate-cold-diagnostic-v4",
+    "native-candidate-cold-diagnostic-v5"
+  ],
+  "officialSamples": 0,
+  "performanceAccepted": false,
+  "notRun": [
+    "paired cold5/warm10/reconnectLifecycle10 baseline/candidate",
+    "Pi/DSH full diagnostic execution",
+    "same-PID steady warm proof",
+    "relative and absolute percentile/RSS/cleanup budget acceptance",
+    "family/attachment performance workload",
+    "desktop/physical IME/AX"
+  ],
+  "boundaries": [
+    "no Kernel/Swift/SDK changes",
+    "only existing SSD shared target",
+    "original 9 WIP hashes unchanged"
+  ]
+}

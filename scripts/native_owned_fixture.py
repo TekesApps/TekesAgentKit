@@ -16,6 +16,10 @@ import struct
 import subprocess
 import threading
 from urllib.parse import urlsplit
+from performance_owned_receipt import (
+    begin_fresh, record_started, require_canonical_path, require_performance_case,
+    validate_resume,
+)
 
 
 _BOOTSTRAP = b"TEKES-KERNEL-BOOTSTRAP/1\n"
@@ -64,14 +68,27 @@ def _stop(process):
 
 @contextmanager
 def owned_native(supervisor, worker, providers, provider_url, base_root,
-                 environment, *, readiness_timeout=15):
+                 environment, *, readiness_timeout=15, performance_case=None,
+                 resume_receipt=None, on_process_started=None, popen_factory=None,
+                 _process_probe=None, _open_files_probe=None):
     """Yield the running fixture as ``process,url,bearer,state_root,providers``.
 
     ``providers`` is copied and its first endpoint is pointed at the local
     provider. ``environment`` is an explicit caller supplied mapping; the two
     Kernel secrets are always removed from the child environment and HOME is
-    redirected to an empty owned directory.
+    redirected to an empty owned directory. ``performance_case`` opts into a
+    fixed-SSD identity receipt; ``resume_receipt`` explicitly reuses only that
+    sealed case. ``on_process_started`` runs immediately after Popen returns.
+    The private guard/probe arguments exist only for fake-process tests.
     """
+    performance = performance_case is not None or resume_receipt is not None
+    if resume_receipt is not None and performance_case is None:
+        raise ValueError("resume_receipt requires performance_case")
+    if performance:
+        require_performance_case(performance_case)
+        require_canonical_path(supervisor, "supervisor")
+        require_canonical_path(worker, "worker")
+        require_canonical_path(base_root, "base_root")
     supervisor_path = _owned_path(supervisor, "supervisor")
     worker_path = _owned_path(worker, "worker")
     root = _owned_path(base_root, "base_root")
@@ -96,58 +113,96 @@ def owned_native(supervisor, worker, providers, provider_url, base_root,
         raise ValueError("environment must be a string mapping")
     if readiness_timeout <= 0:
         raise ValueError("readiness_timeout must be positive")
+    if on_process_started is not None and not callable(on_process_started):
+        raise ValueError("on_process_started must be callable")
 
     launch_path = root / "kernel-launch.json"
-    if launch_path.exists() or launch_path.is_symlink():
-        raise ValueError("owned Kernel launch path already exists")
     state_root = root / "kernel"
-    if state_root.exists() or state_root.is_symlink():
-        raise ValueError("owned Kernel state path already exists")
     home = root / "kernel-home"
-    if home.exists() or home.is_symlink():
-        raise ValueError("owned Kernel home path already exists")
-
     fixture_providers = json.loads(json.dumps(providers))
     first_provider = fixture_providers["providers"][0]
     credential_key = first_provider.get("credential_key", _CREDENTIAL_BINDING)
     if not isinstance(credential_key, str) or not credential_key:
         raise ValueError("fixture provider must name its credential binding")
     first_provider["endpoint"] = provider_url
-    state_root.mkdir(mode=0o700)
-    try:
-        config_dir = state_root / "config"
-        config_dir.mkdir(mode=0o700)
-        settings_path = config_dir / "settings.json"
-        settings_path.write_text(json.dumps({
+    launch_document = {
+        "format": 1,
+        "bootstrap_version": 1,
+        "root": str(state_root),
+        "worker": str(worker_path),
+        "listen": "127.0.0.1:0",
+        "providers": fixture_providers,
+        "credential_bindings": {credential_key: "AGENTKIT_SYNTHETIC_KEY"},
+    }
+    public_config = {"worker": str(worker_path), "root": str(state_root),
+                     "providers": fixture_providers, "listen": "127.0.0.1:0"}
+    marker_path = None
+    if resume_receipt is not None:
+        marker_path = validate_resume(
+            performance_case=performance_case, resume_receipt=resume_receipt,
+            fixture_kind="native", owned_paths={"state": state_root, "home": home},
+            runtime_files={"supervisor": supervisor_path, "worker": worker_path},
+            public_config=public_config,
+            process_probe=_process_probe, open_files_probe=_open_files_probe,
+        )
+        if not all(path.is_dir() for path in (state_root, home)) or not launch_path.is_file():
+            raise ValueError("resumed Native owned state is incomplete")
+        if json.loads(launch_path.read_text(encoding="utf-8")) != launch_document:
+            raise ValueError("resumed Native launch config changed")
+    elif launch_path.exists() or launch_path.is_symlink():
+        raise ValueError("owned Kernel launch path already exists")
+    if resume_receipt is None and (state_root.exists() or state_root.is_symlink()):
+        raise ValueError("owned Kernel state path already exists")
+    if resume_receipt is None and (home.exists() or home.is_symlink()):
+        raise ValueError("owned Kernel home path already exists")
+
+    if resume_receipt is None:
+        state_root.mkdir(mode=0o700)
+        try:
+            config_dir = state_root / "config"
+            config_dir.mkdir(mode=0o700)
+            settings_path = config_dir / "settings.json"
+            settings_path.write_text(json.dumps({
             "format": 1, "revision": 1,
             "limits": {"max_workers": 8, "max_provider_leases": 8},
-        }, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
-        settings_path.chmod(0o600)
-        home.mkdir(mode=0o700)
-        launch_path = root / "kernel-launch.json"
-        launch_path.write_text(json.dumps({
-            "format": 1,
-            "bootstrap_version": 1,
-            "root": str(state_root),
-            "worker": str(worker_path),
-            "listen": "127.0.0.1:0",
-            "providers": fixture_providers,
-            "credential_bindings": {credential_key: "AGENTKIT_SYNTHETIC_KEY"},
-        }, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
-        launch_path.chmod(0o600)
+            }, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
+            settings_path.chmod(0o600)
+            home.mkdir(mode=0o700)
+            launch_path.write_text(json.dumps(launch_document, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
+            launch_path.chmod(0o600)
+            if performance:
+                marker_path = begin_fresh(
+                    performance_case=performance_case, fixture_kind="native",
+                    owned_paths={"state": state_root, "home": home},
+                    runtime_files={"supervisor": supervisor_path, "worker": worker_path},
+                    public_config=public_config,
+                )
+        except BaseException:
+            # Keep uniquely created state for diagnosis; never remove caller data.
+            raise
 
-        child_env = dict(environment)
-        child_env.pop("TEKES_KERNEL_ENDPOINT_TOKEN", None)
-        child_env.pop("AGENTKIT_SYNTHETIC_KEY", None)
-        child_env["HOME"] = str(home)
-        process = subprocess.Popen(
-            [str(supervisor_path), "--built-in", str(launch_path)],
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            env=child_env,
-        )
+    child_env = dict(environment)
+    child_env.pop("TEKES_KERNEL_ENDPOINT_TOKEN", None)
+    child_env.pop("AGENTKIT_SYNTHETIC_KEY", None)
+    child_env["HOME"] = str(home)
+    popen = popen_factory or subprocess.Popen
+    process = popen(
+        [str(supervisor_path), "--built-in", str(launch_path)],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        env=child_env,
+    )
+    try:
+        if on_process_started is not None:
+            on_process_started(process)
+        if performance and resume_receipt is None:
+            record_started(marker_path, process)
     except BaseException:
-        # State is uniquely created below the supplied root. Retain it on
-        # failure for diagnosis; never recursively remove caller-owned data.
+        _stop(process)
+        for stream in (process.stdout, process.stderr):
+            try:
+                stream.close()
+            except (OSError, ValueError):
+                pass
         raise
 
     stderr_chunks = []

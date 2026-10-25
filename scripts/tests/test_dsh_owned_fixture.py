@@ -7,19 +7,24 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from dsh_owned_fixture import _redact, owned_dsh
+from performance_owned_receipt import IDENTITY_NAME, seal_closed_seed_receipt
 
 
 class _Process:
-    def __init__(self, output):
+    def __init__(self, output, pid=42001):
         from io import StringIO
         self.stdout = StringIO(output)
-        self.pid = 987654
+        self.pid = pid
         self.returncode = 0
+        self.wait_calls = []
 
     def poll(self):
         return self.returncode
 
     def wait(self, timeout=None):
+        self.wait_calls.append(timeout)
+        if self.returncode is None:
+            self.returncode = 0
         return self.returncode
 
 
@@ -39,7 +44,7 @@ class _Opener:
 class DshOwnedFixtureTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
-        self.base = Path(self.temp.name)
+        self.base = Path(self.temp.name).resolve()
         self.runtime = self.base / "runtime"
         self.node = self.runtime / "node/bin/node"
         self.entry = self.runtime / "node_modules/@deepseek-ai/dsh/lib/bin.js"
@@ -174,6 +179,66 @@ class DshOwnedFixtureTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "not loopback"):
             with self.invoke():
                 pass
+
+    def test_performance_resume_requires_closed_receipt_and_reuses_seed_files(self):
+        performance_root = self.base / "ssd-performance"
+        performance_root.mkdir()
+        case = performance_root / "dsh-cold5"
+        case.mkdir()
+        self.data = case / "dsh-data"
+        self.home = case / "dsh-home"
+        self.cwd = case / "workspace"
+        self.cwd.mkdir()
+        processes = [
+            _Process("DSH seed\ndsh web: " + self.launch + "\n", 42001),
+            _Process("DSH resume\ndsh web: " + self.launch + "\n", 42002),
+        ]
+        callbacks = []
+        with patch("performance_owned_receipt._process_start_identity", return_value="fake-start"), \
+                patch("performance_owned_receipt.PERFORMANCE_ROOT", performance_root):
+            with owned_dsh(
+                self.runtime, self.data, self.home, self.cwd,
+                "http://127.0.0.1:43124/v1", self.env(),
+                opener_factory=lambda handler: self.opener,
+                popen_factory=lambda *args, **options: processes.pop(0),
+                performance_case=case,
+                on_process_started=callbacks.append,
+            ) as seed:
+                seeded_patch = seed.patch_file.read_bytes()
+            receipt = seal_closed_seed_receipt(
+                case / IDENTITY_NAME, exit_code=0,
+                _process_probe=lambda *_: False, _open_files_probe=lambda _: True,
+            )
+            with owned_dsh(
+                self.runtime, self.data, self.home, self.cwd,
+                "http://127.0.0.1:43124/v1", self.env(),
+                opener_factory=lambda handler: self.opener,
+                popen_factory=lambda *args, **options: processes.pop(0),
+                performance_case=case, resume_receipt=receipt,
+                _process_probe=lambda *_: False, _open_files_probe=lambda _: True,
+                on_process_started=callbacks.append,
+            ) as resumed:
+                self.assertEqual(resumed.patch_file.read_bytes(), seeded_patch)
+        self.assertEqual(len(callbacks), 2)
+        receipt_text = receipt.read_text(encoding="utf-8")
+        self.assertNotIn("synthetic-secret", receipt_text)
+        self.assertNotIn("private-cookie", receipt_text)
+
+    def test_process_started_callback_failure_reaps_only_owned_process(self):
+        process = self.process
+        process.returncode = None
+        with patch("dsh_owned_fixture.os.killpg") as killpg:
+            with self.assertRaisesRegex(RuntimeError, "sampler failed"):
+                with owned_dsh(
+                    self.runtime, self.data, self.home, self.cwd,
+                    "http://127.0.0.1:43124/v1", self.env(),
+                    opener_factory=lambda handler: self.opener,
+                    popen_factory=lambda *args, **options: process,
+                    on_process_started=lambda _process: (_ for _ in ()).throw(RuntimeError("sampler failed")),
+                ):
+                    self.fail("callback failure must prevent yielding")
+        killpg.assert_called_once()
+        self.assertEqual(process.returncode, 0)
 
 
 if __name__ == "__main__":

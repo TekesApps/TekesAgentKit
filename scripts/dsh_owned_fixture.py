@@ -20,6 +20,10 @@ import time
 from urllib.parse import urlsplit, urlunsplit
 import urllib.error
 import urllib.request
+from performance_owned_receipt import (
+    begin_fresh, record_started, require_canonical_path, require_performance_case,
+    validate_resume,
+)
 
 
 _LAUNCH = re.compile(r"dsh web: (https?://[^\s]+)")
@@ -103,14 +107,25 @@ class DshFixture:
 def owned_dsh(root, data_root, home, cwd, base_url, environment, *,
               query_sqlite=False, image_input=False, readiness_timeout=60, shutdown_timeout=15,
               opener_factory=None, popen_factory=None, monotonic=time.monotonic,
-              sleep=time.sleep):
+              sleep=time.sleep, performance_case=None, resume_receipt=None,
+              on_process_started=None, _process_probe=None,
+              _open_files_probe=None):
     """Prepare and run isolated DSH, yielding a :class:`DshFixture`.
 
     ``environment`` is the complete child environment. It must explicitly
     include any synthetic provider key required by the patch; ambient values
     are never inherited. DSH writes session history below ``data_root``.
     Fixture directories/files are left for the caller's evidence lifecycle.
+    ``performance_case`` opts into a fixed-SSD identity receipt;
+    ``resume_receipt`` explicitly reuses only that sealed case. The optional
+    ``on_process_started`` callback runs immediately after Popen returns.
     """
+    performance = performance_case is not None or resume_receipt is not None
+    if resume_receipt is not None and performance_case is None:
+        raise ValueError("resume_receipt requires performance_case")
+    if performance:
+        require_performance_case(performance_case)
+        require_canonical_path(root, "DSH runtime root")
     runtime = Path(root).resolve(strict=True)
     if not runtime.is_dir():
         raise ValueError("root must be an existing DSH runtime directory")
@@ -120,8 +135,17 @@ def owned_dsh(root, data_root, home, cwd, base_url, environment, *,
     package_file = runtime / "node_modules/@deepseek-ai/dsh/package.json"
     if not all(path.is_file() for path in (node, entry, boot, package_file)):
         raise ValueError("root must contain DSH runtime, boot package, and package metadata")
-    data = _fresh_dir(data_root, "data_root")
-    owned_home = _fresh_dir(home, "home")
+    if on_process_started is not None and not callable(on_process_started):
+        raise ValueError("on_process_started must be callable")
+    if resume_receipt is None:
+        data = _fresh_dir(data_root, "data_root")
+        owned_home = _fresh_dir(home, "home")
+    else:
+        data = Path(data_root)
+        owned_home = Path(home)
+        for label, path in (("data_root", data), ("home", owned_home)):
+            if not path.is_absolute() or path.is_symlink() or not path.is_dir() or path.resolve() != path:
+                raise ValueError(label + " must be an existing canonical non-symlink directory")
     for label, candidate in (("data_root", data), ("home", owned_home)):
         if candidate.resolve() == runtime or runtime in candidate.resolve().parents:
             raise ValueError(label + " must be outside root")
@@ -149,8 +173,9 @@ def owned_dsh(root, data_root, home, cwd, base_url, environment, *,
     if type(image_input) is not bool:
         raise ValueError("image_input must be boolean")
 
-    data.mkdir(mode=0o700)
-    owned_home.mkdir(mode=0o700)
+    if resume_receipt is None:
+        data.mkdir(mode=0o700)
+        owned_home.mkdir(mode=0o700)
     sessions = data / "dsh-sessions"
     plugin = data / "version-probe.mjs"
     patch_file = data / "dsh.patch.yml"
@@ -163,8 +188,6 @@ def owned_dsh(root, data_root, home, cwd, base_url, environment, *,
         "{'Content-Type':'application/json'});res.end(JSON.stringify({product:'@deepseek-ai/dsh',"
         "version:getDshRuntimeVersion(),source:'@deepseek-ai/dsh-app-boot#getDshRuntimeVersion'}));}}));}\n"
     )
-    plugin.write_text(plugin_text, encoding="utf-8", newline="\n")
-    plugin.chmod(0o600)
     patch = [
         {"id": "llm-deepseek", "disabled": True},
         {"id": "agent-default-model", "config": {"provider": "endpoint-test", "model": "endpoint-test"}},
@@ -178,11 +201,37 @@ def owned_dsh(root, data_root, home, cwd, base_url, environment, *,
     if query_sqlite:
         patch.append({"id": "session-query-sqlite", "config": {"path": ":memory:", "openAt": "first-search"}})
     patch.append({"insert": [{"name": plugin.as_uri()}]})
-    descriptor = os.open(str(patch_file), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as stream:
-        json.dump(patch, stream, separators=(",", ":"))
-        stream.write("\n")
     version = json.loads(package_file.read_text(encoding="utf-8"))["version"]
+    patch_text = json.dumps(patch, separators=(",", ":")) + "\n"
+    public_config = {"endpoint": endpoint, "version": version,
+                     "query_sqlite": query_sqlite, "image_input": image_input,
+                     "cwd": str(working_directory), "patch": patch}
+    marker_path = None
+    if resume_receipt is not None:
+        marker_path = validate_resume(
+            performance_case=performance_case, resume_receipt=resume_receipt,
+            fixture_kind="dsh", owned_paths={"data": data, "home": owned_home},
+            runtime_files={"node": node, "entry": entry, "boot": boot, "package": package_file},
+            public_config=public_config,
+            process_probe=_process_probe, open_files_probe=_open_files_probe,
+        )
+        if not all(path.is_file() for path in (plugin, patch_file)):
+            raise ValueError("resumed DSH owned config is incomplete")
+        if plugin.read_text(encoding="utf-8") != plugin_text or patch_file.read_text(encoding="utf-8") != patch_text:
+            raise ValueError("resumed DSH patch or plugin config changed")
+    else:
+        plugin.write_text(plugin_text, encoding="utf-8")
+        plugin.chmod(0o600)
+        descriptor = os.open(str(patch_file), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as stream:
+            stream.write(patch_text)
+        if performance:
+            marker_path = begin_fresh(
+                performance_case=performance_case, fixture_kind="dsh",
+                owned_paths={"data": data, "home": owned_home},
+                runtime_files={"node": node, "entry": entry, "boot": boot, "package": package_file},
+                public_config=public_config,
+            )
     child_env = dict(environment)
     popen = popen_factory or subprocess.Popen
     opener_factory = opener_factory or urllib.request.build_opener
@@ -192,6 +241,26 @@ def owned_dsh(root, data_root, home, cwd, base_url, environment, *,
         cwd=str(working_directory), env=child_env, stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT, text=True, start_new_session=True,
     )
+    try:
+        if on_process_started is not None:
+            on_process_started(process)
+        if performance and resume_receipt is None:
+            record_started(marker_path, process)
+    except BaseException:
+        if process.poll() is None:
+            try:
+                os.killpg(process.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+        try:
+            process.wait(timeout=max(1, shutdown_timeout))
+        except (subprocess.TimeoutExpired, TimeoutError):
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait(timeout=max(1, shutdown_timeout))
+        raise
     logs = {"lines": [], "lock": threading.Lock(), "ready": threading.Event(), "launch": None,
             "eof": threading.Event(), "reader_error": None}
     secrets = [value for key, value in child_env.items()

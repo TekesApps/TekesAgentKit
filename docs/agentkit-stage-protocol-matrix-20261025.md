@@ -102,3 +102,7 @@ available; no old acceptance is promoted across this path rebinding.
 Only these two Pi cells are accepted. Other endpoints' lifecycle slices, mixed
 tool/reasoning coverage, DSH family and the frozen performance profile remain open;
 #55/#56 are not closed. No desktop, physical IME or AX run occurred.
+
+### 2026-10-26 用量与实际子pane补验（仍非整票通过）
+
+Native/Pi/DSH原工具/推理控件与Pi/DSH实际child pane分页/host重连见已提交mixed-tools.json和child-pane-recovery.json；新usage-source.json绑定product4274/UI53f97f35的同次公开typed/raw来源：Native numeric transient20→final60，DSH durable-paired live20→final60（无numeric transient），Pi当前3条durable output60且reported/live按契约缺失。所有历史负结果保持原身份。Kernel86、完整适用Family和正式性能仍未验收。性能pilot中的计数/续传/结构化read识别修复均为验收工具修复；不改变20条公开消息请求、cold5/warm10或任何预算，官方样本仍0。

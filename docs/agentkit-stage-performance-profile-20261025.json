@@ -64,6 +64,12 @@
         100,
         100,
         100
+      ],
+      "order": [
+        "new usable original-source snapshot",
+        "fresh public SEP page20 probe",
+        "explicit reconnect to original pointer/history convergence",
+        "one send and settlement per session"
       ]
     },
     "warm": {
@@ -82,15 +88,15 @@
         118,
         120
       ],
-      "growth": "two ordinary sessions retained; each iteration sends exactly once to each session, adding one user and one final assistant body per session; no tools added after seed"
+      "growth": "two ordinary sessions retained; each iteration sends exactly once to each session, adding one user and one final assistant body per session; no tools added after seed",
+      "trajectory": "steady-warm; no reconnect inside this group; fail if consumer or owned harness PID/start identity changes unexpectedly"
     },
     "iterationOrder": [
-      "first usable original snapshot",
-      "true SEP page20 ingested into projection",
-      "explicit reconnect to both original pointer/inventory/history convergence",
+      "new usable original-source snapshot via public history close/open",
+      "fresh public SEP page20 probe",
       "one send and settlement per session"
     ],
-    "page20": "Native/DSH SessionEndpoint journal follow/history_page(max_messages=20); Pi SessionConversation(max_messages=20)/load_earlier_conversation(20); public memory projection ingestion; RunController is separately measured at its actual fixed page50, never sliced to imitate20",
+    "page20": "Each iteration uses the same owned endpoint Arc but a fresh public MemoryProjectionStore fed only real follow(max_messages=20) bootstrap/events, then actual journal history_page(20)/apply_page or Pi load_earlier_conversation(20)/original follow publication. No private trimming, synthetic page or slicing. Pi shares its endpoint window map, so restore the Runtime view with public close/open50 after dropping the page probe; its RPC process remains alive.",
     "latency": {
       "snapshot": "original connect/open intent before dispatch to correct usable original-source projection; harness startup-to-ready recorded separately",
       "send": "subscribe before public intent; record durable-user and first matching assistant content frame separately; 2s budget applies to assistant content, excludes optimistic echo",
@@ -99,9 +105,50 @@
     },
     "family": "separate one-parent/one-child workload with two public history pages; Native same-session bounded child versus Pi/DSH physical child session counts disclosed. Basic family has comparable baseline; do not silently insert extra sessions/tool groups into ordinary two-session dataset",
     "rss": "50ms OS resident-size samples, PID/start identity and owned descendants; AgentKit and harness budgets each apply to simultaneous owned-tree total peak; provider recorded separately; missed short processes and sampling limits disclosed",
-    "runOrder": "cold baseline/candidate paired and interleaved; warm baseline then candidate, order fixed before any sample; same machine/power mode; no OS cache purge",
+    "runOrder": "Interleaved cold baseline/candidate pairs; steady-warm baseline then candidate; reconnect-lifecycle baseline then candidate, each with separate owned seed and identical growth schedule; no percentile pooling across trajectories or cache purge",
     "failurePolicy": "retain failed samples; no replacements; if an iteration fails to reach the preregistered growth state, dependent subsequent samples not_run with reason rather than comparing unequal datasets",
     "budgetsChanged": false,
-    "performanceAccepted": false
+    "performanceAccepted": false,
+    "preregistrationCorrection": {
+      "date": "2026-10-26",
+      "priorProfileCommit": "70f4084523d65f7f44c1abaf585408a572367fae",
+      "samplesCollectedBeforeCorrection": 0,
+      "reason": "Pi endpoint close during reconnect closes/recreates RPC child processes; journal close/open retains historical entries, so repeated mutable-window paging can exhaust the finite dataset. Preserve all original budgets and genuine same-process warm; split lifecycle and use fresh public-source page probes.",
+      "sourceReferences": [
+        "crates/session/src/runtime.rs::close_session/release_history and Command::Close",
+        "crates/session/src/runtime.rs::add_journal",
+        "crates/endpoint-pi/src/lib.rs::close/context.process/follow/SessionConversation",
+        "crates/session/src/projection.rs::reset_journal/apply"
+      ]
+    },
+    "reconnectLifecycle": {
+      "initializationIterationsExcluded": 1,
+      "measuredIterations": 10,
+      "sameConsumerProcess": true,
+      "sameHarnessProcessClaimed": false,
+      "bodyMessagesPerSessionBeforeMeasuredIteration": [
+        102,
+        104,
+        106,
+        108,
+        110,
+        112,
+        114,
+        116,
+        118,
+        120
+      ],
+      "separateOwnedDataset": true,
+      "order": [
+        "new source snapshot",
+        "fresh public SEP page20 probe",
+        "explicit reconnect to original two pointers and converged history/inventory",
+        "one send and settlement per session"
+      ],
+      "piLifecycle": "normal reconnect closes and re-creates session Node RPC children; include all close/version-probe/start/history convergence time in reconnect budget and all process RSS/cleanup; not Unsupported and not same-harness-warm"
+    },
+    "runtimeWindow": "Runtime default follows50 and may legitimately retain earlier loaded journal cache after public close/open. Report requested window and actual retained history separately; never call it initial-follow20 or claim journal cache was trimmed. Snapshot timing starts before the original public history read/reset intent and ends only after a new ready publication.",
+    "fixed50Path": "One separately labelled public RunController actual50 sample per scope outside the repeated page20 trajectory; no substituting empty/exhausted page results. Existing original-control functional50 evidence remains independently bound.",
+    "samePidReconnectAssumption": "The previous Pi same-harness-PID reconnect combination is topology-inconsistent, not passed or Unsupported. Genuine same-PID warm remains required and is covered only by the separate steady-warm group."
   }
 }

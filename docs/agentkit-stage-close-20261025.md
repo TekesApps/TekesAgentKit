@@ -25,9 +25,9 @@
 | --- | --- | --- |
 | #12/#13/#29、#33/#34/#38/#41–#44 | 原版本证据已归档；仍 OPEN、未进入 main | 按各票标准审查，确认本次包含的代码/适用验证；不能根 workspace 合入就关闭 UI 能力 |
 | #35/#36/#37/#40/#45 | 冻结提交包含部分实现，不证明整票完成 | 仅收口已有实现和受影响验收；新差异后续处理 |
-| #55 Run | 5b headless CI通过；旧 Pi/DSH 通过绑定旧程序 | Pi/DSH mixed队列/历史/重连，以及Pi取消/Unknown原ticket自动对账窄通过；Native/DSH原turn取消亦按独立程序窄通过；混合工具推理/性能仍有缺口；Native queue保留Kernel86真实失败 |
-| #56 session/family | Native 两页子历史/passive Summary及 v5 原父 Task 审批拒绝失败通过；Pi primary child running→failed/history/reconnect窄证据通过 | DSH primary-child正常/失败来源及历史重连也已窄通过；SidePanel child pane、适用剩余父草稿/源退休与性能仍有缺口；不扩大原收据范围 |
-| #58 集成 | cfecb95 PR CI 40207891571：root与UI常规检查、child witness、新Native approval consumer、独立公开consumer通过；严格nested detail reading失败，后续demo build跳过；无formal approval | 保留TekesUI #53必需门禁和协议范围阻塞；不能据局部通过合并/发布 |
+| #55 Run | 5b headless CI通过；旧 Pi/DSH 通过绑定旧程序 | Pi/DSH mixed队列/历史/重连，以及Pi取消/Unknown原ticket自动对账窄通过；Native/DSH原turn取消亦按独立程序窄通过；混合工具推理及同次usage来源已取得窄证据；正式性能未验收，Native queue保留Kernel86真实失败 |
+| #56 session/family | Native 两页子历史/passive Summary及 v5 原父 Task 审批拒绝失败通过；Pi primary child running→failed/history/reconnect窄证据通过 | DSH primary-child正常/失败来源及历史重连也已窄通过；Pi/DSH真实SidePanel child pane分页/重连、父草稿与退休窄证据已补齐；完整适用Family及性能仍未验收；不扩大原收据范围 |
+| #58 集成 | 70f4084双CI已结束：root、UI常规检查、child witness、Native approval consumer、独立公开consumer通过；严格nested reading失败，后续demo build跳过；3b1dca5 root已通过、UI仍运行；无完整formal approval | 保留TekesUI #53必需门禁和协议范围阻塞；不能据局部通过合并/发布 |
 | #59 发布 | 待办，尚无本阶段新 tag | 精确集成 head、main CI 与范围文档通过后发布 |
 
 ## 真实阻塞、等待和后续范围
@@ -47,9 +47,9 @@
 
 当前不合并、不打 tag，不是撤销授权，而是尚未满足适用门禁；已授权集成在精确检查完成后直接执行。不得降低检查、关闭未合入代码票或宣称完整对齐。
 
-## 封存结果
+## 历史封存结果（5b原程序，不覆盖后续窄证据）
 
-本轮追加Pi真实子代理Summary/source及历史重连窄证据；DSH Summary来源脚本在固定60秒readiness期限失败，尚未进入投影，负证据和进程退出保留。它是独立剩余验收，不由DSH mixed队列成功替代。详见有限矩阵和结果JSON。当前仍不合并/发布；不以文档冻结宣称本阶段已交付。
+本轮追加Pi真实子代理Summary/source及历史重连窄证据；DSH Summary来源脚本在固定60秒readiness期限失败，尚未进入投影，负证据和进程退出保留。当时它是独立剩余验收，不由DSH mixed队列成功替代；后续4274的正常/失败Summary与重连窄证据按下文独立绑定。详见有限矩阵和结果JSON。当前仍不合并/发布；不以文档冻结宣称本阶段已交付。
 
 ### Subsequent narrow checks
 
@@ -139,3 +139,14 @@ checks is implied. PR10 stays draft; no merge, tag or code-issue closure.
 Original same-publication usage now has [portable bindings](evidence-bindings-20261026/usage-source.json) over product4274/UI53f97f35: Native numeric transient20→reported final60; DSH running durable-paired20→reported final60 (no numeric transient claimed); Pi durable current-three-message output60 with contract-declared reported/live absence. The DSH initial verifier failure remains intact; stricter offline v2 raw-source reanalysis resolves the verifier error without rerunning protocol or promoting another binary. Full #55 and performance remain open.
 
 Head70f4084 CI40216799309/40216795717 terminated: root passed, normal UI checks and standalone consumer passed, strict nested reading failed; demo build skipped. Artifact12607784167 records accepted=false, parentFollowingAfterInnerUp=true, append offset0→634 and detailVisibleAfterAppend=false. No applicable gate was removed. The split review found no currently verified dependency-isolated delivery that can remove these gates; PR10 remains draft. Main already contains stable headless v0.3.8.
+
+### Finite performance diagnostic checkpoint
+
+[Preflight](agentkit-stage-performance-preflight-20261026.md) and its portable
+binding record the Native candidate cold public-protocol plumbing case, including
+verified100-body/10-tool seed per session, real harness restart, page20, pointer
+reconnect, two sends and actual RunController50, with owned exits. Failed pilots
+are retained. Official samples remain0; the required paired trajectories, other
+endpoints, family/attachment and all performance budgets are unaccepted. These
+are acceptance tools for existing #55/#56 criteria, not new product capabilities.
+The only product delta after5b remains #67.
