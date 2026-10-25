@@ -2118,6 +2118,28 @@
       "performanceAccepted": false,
       "protocolReruns": 0,
       "productChanges": false
+    },
+    "ordinaryProtocolGroupClosure20261026": {
+      "bindings": [
+        "evidence-bindings-20261026/ordinary-official-cohort.json",
+        "evidence-bindings-20261026/reconnect-source-official-cohort.json",
+        "evidence-bindings-20261026/reconnect-source-official-cohort-v2.json"
+      ],
+      "successfulApplicableLogicalCases": 42,
+      "physicalExecutions": 46,
+      "originalNegativeExecutionsRetained": 4,
+      "differentObserverTimesMerged": false,
+      "nativeLogicalCases": 14,
+      "piLogicalCases": 14,
+      "dshLogicalCases": 14,
+      "performanceAccepted": false,
+      "dshLifecycleMetricFailure": "cleanup ratio1.273253335755252",
+      "fullFamilyAttachmentQueueAcceptance": false,
+      "upstreamStillOpen": [
+        "TekesUI53",
+        "Kernel86"
+      ],
+      "ordinaryGroupFrozen": true
     }
   },
   "stageCoverageAudit": {

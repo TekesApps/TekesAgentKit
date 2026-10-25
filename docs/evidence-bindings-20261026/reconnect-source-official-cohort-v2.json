@@ -1,0 +1,309 @@
+{
+  "scope": "DSH ordinary reconnectLifecycle corrected observer v2; not full phase or family/attachment acceptance",
+  "plan": {
+    "path": "reconnect-source-official-plan-v2.json",
+    "sha256": "ae8ccd2cfc2a14ef105e491bf1a9ce7137bb1102ee2a939aa22c62a79d402be5"
+  },
+  "plannedCases": 2,
+  "executedCases": 2,
+  "sourceContractPassedCases": 2,
+  "failedSourceCases": 0,
+  "observerCodeCommit": "e978f5e2706b3ccbd647ac4ca190be0ae977a127",
+  "programBinding": "reconnect-source-observer-v2-programs.json",
+  "original40AndSupplement4Preserved": true,
+  "batch": {
+    "path": "reconnect-source-official-batch-v2.json",
+    "sha256": "353588f82650c4f46c530f00ee4145c6f74a1aa4a01d3c101ef1e61d8c970310"
+  },
+  "report": {
+    "path": "reconnect-source-official-report-v2.json",
+    "sha256": "37842b4b174d1c3c0b328ad437294225cd5d6d8ecdad482a1617d081d998fbd6"
+  },
+  "cases": [
+    {
+      "role": "baseline",
+      "status": "success",
+      "samePointerSourceRecoveryRounds": 11,
+      "scopeCount": 2,
+      "sourceFrames": 44,
+      "afterRuntimeChecks": 22,
+      "originalRetentionFloors": [
+        266,
+        266
+      ],
+      "retainedHistoryAllContentAndOrderPreserved": true,
+      "fullSourceUnchangedAndExhausted": true,
+      "allRecoveredProjectionsAndSummaryMatchIndependentSource": true,
+      "sample": {
+        "path": "performance/reconnect-source-v2-dsh-baseline-lifecycle-0/official-sample.json",
+        "sha256": "5ee1e0793680a2e0757acca591387dc3e53bae201c6999cd938a81719d5234bc"
+      },
+      "rawEvents": {
+        "path": "performance/reconnect-source-v2-dsh-baseline-lifecycle-0/consumer.stdout.jsonl",
+        "sha256": "b09fb6454f6ad43e0f4cd1c8e49f3d4a16d702c048d50f0e65dca2680a3c0b8d"
+      },
+      "executionReceipt": {
+        "path": "performance/reconnect-source-v2-dsh-baseline-lifecycle-0/official-execution-receipt.json",
+        "sha256": "e5341b89a01702fec8612c97b318d01149a532e63442df56120c5c8bc9cf0bc3"
+      },
+      "ownedProcessRetirement": {
+        "path": "performance/reconnect-source-v2-dsh-baseline-lifecycle-0/owned-process-retirement.json",
+        "sha256": "20bf6cb8bc341e897fa1167d89d7fa71cf6a915e7c9d39ff4aff92ddb059747d"
+      }
+    },
+    {
+      "role": "candidate",
+      "status": "success",
+      "samePointerSourceRecoveryRounds": 11,
+      "scopeCount": 2,
+      "sourceFrames": 44,
+      "afterRuntimeChecks": 22,
+      "originalRetentionFloors": [
+        266,
+        266
+      ],
+      "retainedHistoryAllContentAndOrderPreserved": true,
+      "fullSourceUnchangedAndExhausted": true,
+      "allRecoveredProjectionsAndSummaryMatchIndependentSource": true,
+      "sample": {
+        "path": "performance/reconnect-source-v2-dsh-candidate-lifecycle-0/official-sample.json",
+        "sha256": "b5d5f6e075a007fbe9a8286e3b20fd0d75fc7a6436998874cb3bd0641a0d4a65"
+      },
+      "rawEvents": {
+        "path": "performance/reconnect-source-v2-dsh-candidate-lifecycle-0/consumer.stdout.jsonl",
+        "sha256": "ea6b00e6155901a2c5abf693530113e6f2b6b4192f75e730094c30e9c0f13695"
+      },
+      "executionReceipt": {
+        "path": "performance/reconnect-source-v2-dsh-candidate-lifecycle-0/official-execution-receipt.json",
+        "sha256": "5af723c4d1eb823612994cac6edd013f157ab510fe38dd02592903a205f73834"
+      },
+      "ownedProcessRetirement": {
+        "path": "performance/reconnect-source-v2-dsh-candidate-lifecycle-0/owned-process-retirement.json",
+        "sha256": "c8d24ba071c74ed0649ae5b4f87ddb492bd830c4ef783aa0fa25d7e1f854f7c0"
+      }
+    }
+  ],
+  "metricFailures": [
+    {
+      "role": "dsh/candidate:reconnectLifecycle",
+      "metric": "cleanupMs",
+      "absolutePass": true,
+      "regressionPass": false
+    }
+  ],
+  "candidateMetrics": {
+    "caseCount": 1,
+    "measuredIterationCount": 10,
+    "perSession": {
+      "0": {
+        "sessionIds": [
+          "session-32016ba1-a8ef-4492-af9f-d380f6419019"
+        ],
+        "firstUsableSnapshotMs": {
+          "count": 10,
+          "p50": 16.503541,
+          "p95": 18.788625,
+          "max": 18.788625,
+          "absoluteLimit": 10000,
+          "absoluteLimitStatistic": "p95",
+          "absoluteValue": 18.788625,
+          "absolutePass": true,
+          "baselineP95": 18.238,
+          "baselineComparisonStatistic": "p95",
+          "regressionRatio": 1.0301910845487443,
+          "regressionLimit": 1.2,
+          "regressionPass": true
+        },
+        "sendToFirstAssistantContentMs": {
+          "count": 10,
+          "p50": 21.660167,
+          "p95": 24.999667,
+          "max": 24.999667,
+          "absoluteLimit": 2000,
+          "absoluteLimitStatistic": "p95",
+          "absoluteValue": 24.999667,
+          "absolutePass": true,
+          "baselineP95": 24.811416,
+          "baselineComparisonStatistic": "p95",
+          "regressionRatio": 1.007587273535698,
+          "regressionLimit": 1.2,
+          "regressionPass": true
+        },
+        "historyPage20ToProjectionMs": {
+          "count": 10,
+          "p50": 7.502083,
+          "p95": 8.552583,
+          "max": 8.552583,
+          "absoluteLimit": 1000,
+          "absoluteLimitStatistic": "p95",
+          "absoluteValue": 8.552583,
+          "absolutePass": true,
+          "baselineP95": 8.205459,
+          "baselineComparisonStatistic": "p95",
+          "regressionRatio": 1.0423040319865104,
+          "regressionLimit": 1.2,
+          "regressionPass": true
+        }
+      },
+      "1": {
+        "sessionIds": [
+          "session-a4efaaba-c69a-4578-90d5-cba78e50b70b"
+        ],
+        "firstUsableSnapshotMs": {
+          "count": 10,
+          "p50": 16.406334,
+          "p95": 19.614291,
+          "max": 19.614291,
+          "absoluteLimit": 10000,
+          "absoluteLimitStatistic": "p95",
+          "absoluteValue": 19.614291,
+          "absolutePass": true,
+          "baselineP95": 18.255959,
+          "baselineComparisonStatistic": "p95",
+          "regressionRatio": 1.0744048559705903,
+          "regressionLimit": 1.2,
+          "regressionPass": true
+        },
+        "sendToFirstAssistantContentMs": {
+          "count": 10,
+          "p50": 23.483125,
+          "p95": 26.850583,
+          "max": 26.850583,
+          "absoluteLimit": 2000,
+          "absoluteLimitStatistic": "p95",
+          "absoluteValue": 26.850583,
+          "absolutePass": true,
+          "baselineP95": 31.372459,
+          "baselineComparisonStatistic": "p95",
+          "regressionRatio": 0.8558647889220288,
+          "regressionLimit": 1.2,
+          "regressionPass": true
+        },
+        "historyPage20ToProjectionMs": {
+          "count": 10,
+          "p50": 7.4745,
+          "p95": 7.9085,
+          "max": 7.9085,
+          "absoluteLimit": 1000,
+          "absoluteLimitStatistic": "p95",
+          "absoluteValue": 7.9085,
+          "absolutePass": true,
+          "baselineP95": 7.805333,
+          "baselineComparisonStatistic": "p95",
+          "regressionRatio": 1.0132175014185814,
+          "regressionLimit": 1.2,
+          "regressionPass": true
+        }
+      }
+    },
+    "firstUsableSnapshotMs": {
+      "count": 2,
+      "p50": 18.788625,
+      "p95": 19.614291,
+      "max": 19.614291,
+      "absoluteLimit": 10000,
+      "absoluteLimitStatistic": "p95",
+      "absoluteValue": 19.614291,
+      "absolutePass": true,
+      "baselineP95": 18.255959,
+      "baselineComparisonStatistic": "p95",
+      "regressionRatio": 1.0744048559705903,
+      "regressionLimit": 1.2,
+      "regressionPass": true
+    },
+    "sendToFirstAssistantContentMs": {
+      "count": 2,
+      "p50": 24.999667,
+      "p95": 26.850583,
+      "max": 26.850583,
+      "absoluteLimit": 2000,
+      "absoluteLimitStatistic": "p95",
+      "absoluteValue": 26.850583,
+      "absolutePass": true,
+      "baselineP95": 31.372459,
+      "baselineComparisonStatistic": "p95",
+      "regressionRatio": 0.8558647889220288,
+      "regressionLimit": 1.2,
+      "regressionPass": true
+    },
+    "historyPage20ToProjectionMs": {
+      "count": 2,
+      "p50": 7.9085,
+      "p95": 8.552583,
+      "max": 8.552583,
+      "absoluteLimit": 1000,
+      "absoluteLimitStatistic": "p95",
+      "absoluteValue": 8.552583,
+      "absolutePass": true,
+      "baselineP95": 8.205459,
+      "baselineComparisonStatistic": "p95",
+      "regressionRatio": 1.0423040319865104,
+      "regressionLimit": 1.2,
+      "regressionPass": true
+    },
+    "explicitReconnectToConvergedMs": {
+      "count": 10,
+      "p50": 303.555625,
+      "p95": 366.839083,
+      "max": 366.839083,
+      "absoluteLimit": 5000,
+      "absoluteLimitStatistic": "p95",
+      "absoluteValue": 366.839083,
+      "absolutePass": true,
+      "baselineP95": 337.338833,
+      "baselineComparisonStatistic": "p95",
+      "regressionRatio": 1.0874499082647862,
+      "regressionLimit": 1.2,
+      "regressionPass": true
+    },
+    "cleanupMs": {
+      "count": 1,
+      "p50": 1060.203834,
+      "p95": 1060.203834,
+      "max": 1060.203834,
+      "absoluteLimit": 10000,
+      "absoluteLimitStatistic": "max",
+      "absoluteValue": 1060.203834,
+      "absolutePass": true,
+      "baselineP95": 832.673125,
+      "baselineComparisonStatistic": "max",
+      "regressionRatio": 1.273253335755252,
+      "regressionLimit": 1.2,
+      "regressionPass": false
+    },
+    "agentkitSampledPeakMiB": {
+      "count": 1,
+      "p50": 69.34375,
+      "p95": 69.34375,
+      "max": 69.34375,
+      "absoluteLimit": 512,
+      "absoluteLimitStatistic": "max",
+      "absoluteValue": 69.34375,
+      "absolutePass": true,
+      "baselineP95": 67.203125,
+      "baselineComparisonStatistic": "max",
+      "regressionRatio": 1.031853057428505,
+      "regressionLimit": 1.15,
+      "regressionPass": true
+    },
+    "harnessSampledPeakMiB": {
+      "count": 1,
+      "p50": 517.328125,
+      "p95": 517.328125,
+      "max": 517.328125,
+      "absoluteLimit": 2048,
+      "absoluteLimitStatistic": "max",
+      "absoluteValue": 517.328125,
+      "absolutePass": true,
+      "baselineP95": 510.359375,
+      "baselineComparisonStatistic": "max",
+      "regressionRatio": 1.0136545938829868,
+      "regressionLimit": 1.15,
+      "regressionPass": true
+    }
+  },
+  "performanceAccepted": false,
+  "failureDetail": "cleanup conservative OS-confirmed upper-bound 1060.203834ms vs baseline832.673125ms ratio1.273253335755252 exceeds1.2; absolute10s passed, no waiver/retry",
+  "productChanged": false,
+  "desktopRun": false
+}

@@ -235,3 +235,13 @@ PR10精确72a0d64 CI40233798349/40233792652终态为headless成功、UI失败；
 DSH两角色初始化reconnect成功，首个测量轮before fresh witness等待runtime追齐超时；不改Unsupported、不换样本、不认定是产品/SDK缺陷。原事件只保存fresh witness，缺超时当刻每项runtime predicate状态，因此尚不能把失败归到keys/value/history/control_ready中的某项，也需核对before等待是否超出恢复契约。完整组尚未验收，等待只读归因，不无限扩大矩阵。
 
 本检查点四case各一次，原40与新4分开保存（累计44次物理正式执行，不把旧Pi两个not_run改写）；所有原有效相对失败保留。未完成Family/附件/队列性能、TekesUI53/Kernel86、review/CI/桌面/集成/发布仍各自保留。无产品代码变化、无Kernel/Swift/SDK修改、无桌面；原9WIP逐文件SHA保持，构建复用唯一SSD target。
+
+### 三端普通协议分组已补齐；性能仍未通过
+
+DSH纠正observer e978f5e、baseline950db9a1/candidate92206559的新两case各执行一次，初始化+10测量轮全部来源契约通过：独立完整公开source200确实耗尽；两session原保留floor/完整entries内容与顺序、旧projection水位不回退、恢复后全部值和summary/time来源、新generation均对账，owned进程退休通过。原缓存窗口与rolling50不能整值相等的错误已纠正，既保留未加载前缀，又不丢任何旧行；旧失败没有删除或改写。详见[DSH v2正式绑定](evidence-bindings-20261026/reconnect-source-official-cohort-v2.json)。
+
+普通场景现在有各自精确程序的42个适用成功分组case证据：Native原14、Pi原cold/warm12+新life2、DSH原cold/warm12+新v2 life2。共46次物理正式执行（原40+v1四+v2二），额外四次原DSH错误oracle失败继续保留；不是把46都称成功，也不将不同observer时间混算或统一转授新head。
+
+性能仍未通过，保留全部有效失败：Native life恢复1.661691倍/首助手1.360828倍，Pi warm快照1.341904/1.313128倍，Pi新life Earlier20 scope0 1.265616倍，DSH warm首助手1.262329倍；DSH新life cleanup保守OS退休上界1060.203834/832.673125ms=1.273253倍，超原1.2（10s绝对门槛通过）。没有调整预算或挑选样本。
+
+#55/#56完整Family/附件/队列性能及相关原矩阵未因ordinary成功而关闭。TekesUI53和Kernel86最新只读核对仍OPEN；PR10仍draft、#58/#59未完成，main仍1dcc521且仅#68独立切片已合入。原9 WIP保持，无Kernel/Swift/SDK修改、无桌面/物理IME/AX；后续冻结该普通组，不继续扩范围或重跑成功组。
