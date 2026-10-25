@@ -917,13 +917,13 @@
       "key": "STANDALONE",
       "parent": 16,
       "title": "[实施/Composer] 独立宿主生命周期与卸载后提交协调",
-      "status": "待办",
+      "status": "进行中",
       "layer": "实现",
       "scope": "对齐最新ClientKit未提交StandaloneComposer/SubmissionLifecycle语义；复用现有ledger，支持无Transcript宿主、同文档reparent、跨文档stores和detach后原提交终态协调。",
       "deliverables": "Rust公开宿主控制契约及原提交身份/未解决状态重挂载协调；差异与公开交接记录。",
       "dependencies": "ClientKit工作树WIP先形成精确交接；不依赖桌面即可做数据/生命周期；物理reparent/Undo/IME由{DESKTOP}。",
       "criteria": "stable submissionID与原destination/stores/callback一起捕获；卸载/重挂/准备挂起时切文档不重定向、不重放；终态一次；unknown显式协调后确认；原状态机复用；代码集成。",
-      "evidence": "新遗漏：ClientKit c289bc9工作树的ClientStandaloneComposerController/ComposerSubmissionLifecycle；现有Rustledger不等于完整宿主生命周期；尚未实施或验证。",
+      "evidence": "新遗漏：ClientKit c289bc9工作树的ClientStandaloneComposerController/ComposerSubmissionLifecycle；现有Rustledger不等于完整宿主生命周期；尚未实施或验证。 当前未提交StandaloneComposerBinding/Mount、5个异步测试源及public consumer/demo组合已接入，尚未编译；生命周期信号唤醒detach订阅，不新增ledger。 候选代码提交9c6b1be，待CI编译/运行验证，仍进行中。",
       "completedAt": null,
       "related": [
         21,
@@ -943,7 +943,7 @@
       "deliverables": "Rust类型/编译与解析结果契约、宿主reveal回调；与现有annotation/source_locator衔接。",
       "dependencies": "精确CK候选交接；公开来源；视口展示消费{CHECKPOINT}/{READING}，不是数据类型实现的前置。",
       "criteria": "同artifact相似文字不能重定向；错revision/digest/field、缺失/非法范围分别stale/unavailable；原引用不变；无新发送状态机；组件/第二consumer及集成。",
-      "evidence": "新遗漏：已有source_locator、excerpt长度校验并未覆盖精确artifact选择引用；不把一般批注/文本reveal视为完成。",
+      "evidence": "新遗漏：已有source_locator、excerpt长度校验并未覆盖精确artifact选择引用；不把一般批注/文本reveal视为完成。 当前未提交typed artifactReference/legacy兼容/compile-history/reveal/consumer候选已接入，尚未编译。 候选代码提交9c6b1be，待CI编译/运行验证，仍进行中。",
       "completedAt": null,
       "related": [
         17,
@@ -957,13 +957,13 @@
       "key": "REMOTE",
       "parent": 15,
       "title": "[实施/WebUI] AgentKitRemote 跨宿主协议与接入契约",
-      "status": "待办",
+      "status": "进行中",
       "layer": "实现",
       "scope": "对照ClientKit当前AgentKitRemoteEndpoint WIP与Rust Web服务，明确URL/bearer、endpoint/scope、stream/history、观察关闭与daemon生命周期；只改Rust端及语言中立契约。",
       "deliverables": "公开协议/能力与错误语义、跨宿主consumer契约及精确版本交接；Swift adapter仍归ClientKit，discovery/Keychain归产品。",
       "dependencies": "CK未提交接口需精确交接，不能当已发布签名；现有Rust Web/JSONL与{API}；真实跨宿主协议归{PROTO-RUN}/{PROTO-FAMILY}。",
       "criteria": "不串endpoint/scope、无cookie/proxy/redirect泄漏策略差异；close只撤销本地观察不误停daemon；断流/历史恢复身份明确；不复制Swift或私有接口；主线契约/consumer通过。",
-      "evidence": "新遗漏：Rust已有Web服务不等于ClientKitRemote宿主生命周期已集成；当前无完整跨宿主新版本验收。",
+      "evidence": "新遗漏：Rust已有Web服务不等于ClientKitRemote宿主生命周期已集成；当前无完整跨宿主新版本验收。 advisor确认既有TekesWebUI HTTP+bridge；Rust public JSONL DTO/尾帧与观察取消候选未编译，实际host串联与结构化错误消费未验收。 候选代码提交9c6b1be，待CI编译/运行验证，仍进行中。",
       "completedAt": null,
       "related": [
         26,
@@ -997,11 +997,11 @@
       "key": "FOOTNOTE",
       "parent": 20,
       "title": "[实施/Footnote] 原动作与元信息的对齐和窄宽布局",
-      "status": "进行中",
+      "status": "等待上游",
       "layer": "实现",
       "scope": "对齐现有Tekes布局：用户input/footnote居右，机器output/aside居左；共享列宽和SDK token；目标/时间/评价/动作身份、窄宽label完整性。",
       "deliverables": "原业务Footnote及反馈数据回调的布局修复与可审查组件结果。",
-      "dependencies": "不依赖缺失glyph即可做布局；图标{GLYPH}、popover{POPOVER}、桌面{DESKTOP}分开验收。",
+      "dependencies": "左右对齐、SDK tokens与数据身份已有原证据；剩余窄列单行label+全部动作可见依赖#48上游紧凑控件/glyph消费。popover#49、桌面#57分开。",
       "criteria": "窄宽不丢目标label、不覆盖动作或错位；原CAS/提交身份/焦点不被排版破坏；不硬编码与SDK主题冲突样式；组件/consumer和集成。",
       "evidence": "既有ae5f015/77fefeb/67b20e6与goal/feedback/time收据；真实Pi窄宽labelVisible=false仍保留，不能提前称完成。",
       "completedAt": null,
@@ -1023,7 +1023,7 @@
       "deliverables": "复用presentation的公开Run组合组件、输入/回调和View差异表。",
       "dependencies": "{COMPOSER}/{TRANSCRIPT}/{FOOTNOTE}的适用接口；SDK hover/gutter只阻对应控件，桌面归{DESKTOP}。",
       "criteria": "连接状态→Transcript→Composer→发送/取消→流式闭环；同一publication不拆帧；状态/rail/turn意图原目标；无第二状态机；组件/宿主/第二consumer与集成。",
-      "evidence": "d0c82b2/5fc496a/67b20e6已实施部分；RunSurface/ComponentDemo构造不证明完整View parity。",
+      "evidence": "d0c82b2/5fc496a/67b20e6已实施部分；RunSurface/ComponentDemo构造不证明完整View parity。 新增rail候选经SDK源码与advisor审查确认为重复，已原字节归档未集成；复用原TurnRail，实际缺项为hover preview组合与完整View映射。",
       "completedAt": null,
       "related": [
         15,
@@ -1123,7 +1123,7 @@
       "deliverables": "共享SummaryView、原输入/动作/定制slot与业务布局契约。",
       "dependencies": "{API}/{PANEL}；Native真实状态转换归{PROTO-FAMILY}，glyph/系统AX等归适用上游/{DESKTOP}。",
       "criteria": "原scope/publication/source一致；被动Task无导航权；host扩展不复制状态机；usage/metadata/错误空态明确；适用组件/公开consumer与主线集成。",
-      "evidence": "9a62950/1d14c70/6420876及docs/rust-agent-ui-summary-issue25-audit-20261024.md；新Native transition WIP未编译通过，不算本票已完成真实来源验收。 整理后真实来源揭露doing适配缺口：已退回进行中；原595输入负向保留，修复仅在被动工具来源边界，正式Task producer/failure仍未验收。",
+      "evidence": "9a62950/1d14c70/6420876及docs/rust-agent-ui-summary-issue25-audit-20261024.md；新Native transition WIP未编译通过，不算本票已完成真实来源验收。 整理后真实来源揭露doing适配缺口：已退回进行中；原595输入负向保留，修复仅在被动工具来源边界，正式Task producer/failure仍未验收。 Summary来源边界fix与probe候选提交e363863，正式Task/failure与新真实profile仍未验收。",
       "completedAt": null,
       "related": [
         23,
@@ -1136,13 +1136,13 @@
       "key": "HOST",
       "parent": 26,
       "title": "[实施/Host] 三个业务组件的同进程宿主适配与生命周期",
-      "status": "待办",
+      "status": "进行中",
       "layer": "实现",
       "scope": "在公开ContentHost/Kit组件上提供RunPort、Sidebar、SidePanel的可消费host adapter与mount/unmount、焦点/导航/回调责任；不自造同进程ProcessContainer SDK。",
       "deliverables": "Rust侧公开宿主adapter/consumer与生命周期文档；窗口/产品导航/权限仍属产品。",
       "dependencies": "{API}/{RUNPORT}/{SIDEBAR}/{PANEL}；不等待跨进程{PROCESS}；真实桌面另归{DESKTOP}。",
       "criteria": "三个业务控件在同一真实消费宿主路由原state/intents，跨父/端/拆挂不重放动作；不把into_host smoke或测试RunSurface当标准产品组件/正式跨进程容器；适用验证并集成。",
-      "evidence": "已有ContentHost构造和第二consumer只作基线，不等于本交付完成。",
+      "evidence": "已有ContentHost构造和第二consumer只作基线，不等于本交付完成。 新设计与独立子会话host_mounts候选已开始；未注册/未编译。",
       "completedAt": null,
       "related": [
         15,
@@ -1450,10 +1450,10 @@
   "implementationStatusCounts": {
     "已关闭": 3,
     "已验证待集成": 10,
-    "待办": 4,
-    "进行中": 7,
-    "等待上游": 8,
-    "等待桌面": 1
+    "进行中": 9,
+    "等待上游": 9,
+    "等待桌面": 1,
+    "待办": 1
   },
   "integrationCondition": "代码项达到已验证待集成后进入集成；不得要求先关闭代码票才能合并",
   "githubAudit": {
@@ -1545,18 +1545,22 @@
   },
   "postAuditStatusUpdate": {
     "issues": [
+      35,
       36,
-      45
+      37,
+      45,
+      39,
+      46
     ],
     "counts": {
       "已关闭": 3,
       "已验证待集成": 10,
-      "待办": 4,
-      "进行中": 7,
-      "等待上游": 8,
-      "等待桌面": 1
+      "进行中": 9,
+      "等待上游": 9,
+      "等待桌面": 1,
+      "待办": 1
     },
-    "reason": "new implementation started / real source adaptation gap found",
+    "reason": "implementation/design started; real source Summary gap retained",
     "initialAuditSnapshotRetained": true
   }
 }
