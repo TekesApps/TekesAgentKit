@@ -202,3 +202,67 @@ fn missing_argument_label_uses_the_original_producer_headline_policy() {
     let facts = SummaryFacts::read(&scope(), &session, &transcript).unwrap();
     assert_eq!(facts.subagents[0].title, "source label");
 }
+
+fn native_spawn_summary(result: Option<Value>) -> (TranscriptSnapshot, SummaryFacts) {
+    let parent = RunScope::main("native", "parent");
+    let mut entries: Vec<HistoryEntry> = vec![
+        serde_json::from_value(json!({"event":{"type":"turn/start","seq":0,"time":0,"data":{"turn":1}}})).unwrap(),
+        serde_json::from_value(json!({"event":{"type":"tool/call","seq":1,"time":1,"data":{
+            "turn":1,"callId":"spawn-original","name":"task","arguments":{"task_name":"Original spawn"}
+        }}})).unwrap(),
+    ];
+    if let Some(data) = result {
+        entries.push(
+            serde_json::from_value(
+                json!({"event":{"type":"tool/result","seq":2,"time":2,"data":data}}),
+            )
+            .unwrap(),
+        );
+    }
+    let mut projection = SessionProjection::default();
+    projection
+        .apply_snapshot(JournalSnapshot {
+            session_id: "parent".into(),
+            generation: "original".into(),
+            through_sequence: entries.last().unwrap().event.seq,
+            window_limit: 50,
+            entries,
+            has_more_before: false,
+            projections: None,
+            history_revision: None,
+        })
+        .unwrap();
+    let transcript = TranscriptSnapshot::read(&parent, &projection).unwrap();
+    let facts = SummaryFacts::read(&parent, &projection, &transcript).unwrap();
+    (transcript, facts)
+}
+
+#[test]
+fn passive_task_adapts_active_tool_without_expanding_formal_task_statuses() {
+    let (transcript, facts) = native_spawn_summary(None);
+    assert_eq!(transcript.tools[0].phase, "doing");
+    assert_eq!(facts.tasks[0].status, "in_progress");
+    assert_eq!(facts.tasks[0].canonical_status(), "in_progress");
+    assert_eq!(facts.tasks[0].scope, RunScope::main("native", "parent"));
+    assert!(facts.tasks[0].independent_run().is_none());
+    let mut formal_unknown = facts.tasks[0].clone();
+    formal_unknown.status = "doing".into();
+    assert_eq!(formal_unknown.canonical_status(), "pending");
+}
+
+#[test]
+fn passive_task_outcome_uses_original_parent_tool_and_never_child_result_prose() {
+    let result = json!({"turn":1,"meta":{"kernel_outcome":"ok"},"message":{
+        "source":{"callId":"spawn-original"},"content":[{"type":"text","text":"{\"child\":\"child-own-id\",\"phase\":\"error\"}"}]
+    }});
+    let (transcript, facts) = native_spawn_summary(Some(result.clone()));
+    assert_eq!(transcript.tools[0].phase, "done");
+    assert_eq!(facts.tasks[0].canonical_status(), "completed");
+    assert!(facts.tasks[0].independent_run().is_none());
+    let mut actual_parent_error = result;
+    actual_parent_error["error"] =
+        json!({"code":"parent_tool_failed","message":"original parent error"});
+    let (transcript, facts) = native_spawn_summary(Some(actual_parent_error));
+    assert_eq!(transcript.tools[0].phase, "error");
+    assert_eq!(facts.tasks[0].canonical_status(), "failed");
+}

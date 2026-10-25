@@ -200,7 +200,14 @@ impl SummaryFacts {
                     id: tool.id.clone(),
                     scope: scope.clone(),
                     name: name.into(),
-                    status: tool.phase.clone(),
+                    // Tool calls use `doing`; formal Task wire states do not.
+                    // Adapt only this passive-tool source, preserving the
+                    // original Transcript phase and formal unknown-state rules.
+                    status: if tool.phase == "doing" {
+                        "in_progress".into()
+                    } else {
+                        tool.phase.clone()
+                    },
                     kind: "task".into(),
                 });
             }

@@ -100,7 +100,7 @@ def validate_witness(witness: Any, *, endpoint: str = "native") -> dict[str, Any
         if not isinstance(task_name, str) or not task_name.strip() or row.get("name") != task_name:
             raise NativeSummarySourceError("Summary Task name differs from original tool arguments")
         phase = tool.get("phase")
-        if not isinstance(phase, str) or not phase or row.get("status") != phase:
+        if not isinstance(phase, str) or not phase or row.get("status") != ("in_progress" if phase == "doing" else phase):
             raise NativeSummarySourceError("Summary Task status differs from same-frame tool phase")
 
         position = _object(tool.get("sourcePosition"), "tool source position")

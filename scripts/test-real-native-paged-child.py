@@ -28,6 +28,7 @@ from native_paged_child_fixture import (CHILD_MARKER, phases_for_pages, PREFIX, 
 from runtime_provenance import kernel_programs
 from summary_transition_provider import HeldFailureGate
 from task_family_fixture import native_task_seed_commands
+from native_summary_transition_fixture import validate_parent_summary_sample
 
 SSD = Path('/Volumes/HP P900/dev/TekesAgentKit')
 AUTH_ENV = 'AGENTKIT_NATIVE_PAGED_OWNED_BEARER'
@@ -102,6 +103,75 @@ def _prefix_check(frames: list[dict[str, object]], groundtruth: dict[str, object
     validate_prefix_frames(frames, groundtruth=groundtruth, parent=parent, child_id=child_id)
 
 
+def validate_summary_transition(frames: list[dict[str, object]]) -> dict[str, object]:
+    """Validate the distinct, parent-owned passive Task Summary probe.
+
+    A missing parent publication is retained as an explicit negative result;
+    this supplemental probe never upgrades or waives bounded-history acceptance.
+    """
+    by_phase = {frame.get('phase'): frame for frame in frames}
+    running = by_phase.get('running_head', {}).get('summaryRunning')
+    terminal = by_phase.get('settled_refresh', {}).get('summarySettled')
+    transition = by_phase.get('settled_refresh', {}).get('summaryTransition')
+    if not isinstance(running, dict) or not isinstance(terminal, dict) or not isinstance(transition, dict):
+        raise ValueError('Native demo omitted the parent Summary transition receipt')
+    if transition.get('profile') != 'native-passive-spawn-tool' or transition.get('formalTaskLifecycleAcceptance') is not False or transition.get('parentToolFailureAcceptance') is not False:
+        raise ValueError('spawn-tool evidence cannot claim formal Task or parent failure acceptance')
+    if transition.get('parentProjectionOnly') is not True or transition.get('statusComesFromChildWitness') is not False:
+        raise ValueError('Summary receipt improperly substitutes child source metadata')
+    if type(transition.get('accepted')) is not bool:
+        raise ValueError('Summary transition acceptance flag must be a boolean')
+    accepted = transition['accepted'] is True
+    if accepted:
+        if transition.get('running') != running or transition.get('settled') != terminal:
+            raise ValueError('summary transition subreceipt differs from its phase frames')
+        running_source = validate_parent_summary_sample(running)
+        terminal_source = validate_parent_summary_sample(terminal)
+        for sample, phase, raw_status, status, source in (
+                (running, 'running', 'doing', 'in_progress', running_source),
+                (terminal, 'settled', 'done', 'completed', terminal_source)):
+            if sample.get('available') is not True or sample.get('phase') != phase \
+                    or sample.get('rawStatus') != raw_status \
+                    or sample.get('canonicalStatus') != status or sample.get('mounted') is not True \
+                    or sample.get('passive') is not True or sample.get('actionable') is not False \
+                    or sample.get('independentRun') is not False:
+                raise ValueError('parent Summary transition is not an installed passive Task row')
+            if type(sample.get('publication')) is not int or type(sample.get('connectionEpoch')) is not int:
+                raise ValueError('Summary sample omitted its Run publication/epoch')
+            if type(sample.get('rowId')) is not int or not sample.get('viewInstance') \
+                    or not sample.get('titleInstance') or source['rowId'] != sample['rowId'] \
+                    or source['viewInstance'] != sample['viewInstance'] \
+                    or source['titleInstance'] != sample['titleInstance']:
+                raise ValueError('Summary mounted row/view/title identity is missing or changed')
+        if running.get('taskId') != terminal.get('taskId') \
+                or running.get('title') != terminal.get('title') \
+                or running.get('scope') != terminal.get('scope') \
+                or running.get('rowId') != terminal.get('rowId') \
+                or running.get('viewInstance') != terminal.get('viewInstance') \
+                or running.get('titleInstance') != terminal.get('titleInstance') \
+                or type(terminal['publication']) is not int \
+                or type(running['publication']) is not int \
+                or terminal['publication'] <= running['publication'] \
+                or type(terminal['connectionEpoch']) is not int \
+                or type(running['connectionEpoch']) is not int \
+                or terminal['connectionEpoch'] < running['connectionEpoch'] \
+                or running['tool']['sourcePosition'] != terminal['tool']['sourcePosition'] \
+                or running_source['sourceCallId'] != terminal_source['sourceCallId'] \
+                or running_source['sourcePosition'] != terminal_source['sourcePosition']:
+            raise ValueError('parent Summary identity/publication did not advance coherently')
+        if transition.get('unavailableReason') is not None:
+            raise ValueError('accepted Summary transition has an unavailable reason')
+    else:
+        if not isinstance(transition.get('unavailableReason'), str) \
+                or not transition['unavailableReason']:
+            raise ValueError('negative Summary probe must retain its concrete limitation')
+    return {'accepted': accepted, 'profile': 'native-passive-spawn-tool',
+            'formalTaskLifecycleAcceptance': False, 'parentToolFailureAcceptance': False,
+            'running': running, 'settled': terminal,
+            'unavailableReason': transition.get('unavailableReason'),
+            'parentProjectionOnly': True}
+
+
 def capture_demo(command: list[str], env: dict[str, str], workspace: Path, output: Path,
                  gate: HeldFailureGate, parent: dict[str, object], child_id: str,
                  groundtruth: dict[str, object]) -> tuple[list[dict[str, object]], dict[str, object], dict[str, object]]:
@@ -164,6 +234,7 @@ def capture_demo(command: list[str], env: dict[str, str], workspace: Path, outpu
             host_receipt = json.loads((output / 'host-receipt.json').read_text(encoding='utf-8'))
             gate_receipt = gate.receipt()
             accepted = validate_receipt(host_receipt, frames, groundtruth=groundtruth, gate=gate_receipt)
+            accepted['summaryTransition'] = validate_summary_transition(frames)
             write_json(output / 'demo-process.json', {'pid': process.pid, 'exitStatus': status,
                 'processGroup': process.pid, 'startNewSession': True,
                 'processGroupExited': group_exited})
@@ -205,6 +276,7 @@ def main() -> int:
     shutil.copy2(demo, archive / 'tekes-agent-ui-demo-feature')
     script_paths = [Path(__file__).resolve(), Path(__file__).with_name('native_paged_child_fixture.py'),
         Path(__file__).with_name('native_child_pane_source_fixture.py'),
+        Path(__file__).with_name('native_summary_transition_fixture.py'),
         Path(__file__).with_name('native_owned_fixture.py'),
         Path(__file__).with_name('summary_transition_provider.py'),
         Path(__file__).with_name('owned_endpoint_provider.py'),
