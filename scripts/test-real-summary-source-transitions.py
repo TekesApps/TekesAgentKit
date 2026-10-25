@@ -94,6 +94,8 @@ def parse_arguments(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('headless-program', 'pi-root', 'dsh-root', 'output'):
         parser.add_argument('--' + name, required=True, type=Path)
+    parser.add_argument('--endpoint', choices=('all', 'dsh'), default='all',
+                        help='Run all endpoints by default, or only the affected DSH slice; skipped Pi is not accepted by this receipt')
     parser.add_argument('--program-archive', type=Path, help='Existing exact-SHA archive reference; never executed or modified')
     parser.add_argument('--child-transcript-source', action='store_true',
                         help='Also capture and validate distinct child-scoped Transcript running/error publications')
@@ -325,7 +327,8 @@ def main():
              ROOT / 'scripts/summary_source_fixture.py', ROOT / 'scripts/owned_endpoint_provider.py',
              ROOT / 'scripts/pi_owned_fixture.py', ROOT / 'scripts/dsh_owned_fixture.py', ROOT / 'scripts/task_family_fixture.py']
     write_json(output / 'source-hashes.json', {str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest() for path in paths})
-    gates = {kind: HeldFailureGate('AGENTKIT_SOURCE_' + kind.upper() + '_HELD_FAILURE') for kind in ('pi', 'dsh')}
+    selected = ('dsh',) if args.endpoint == 'dsh' else ('pi', 'dsh')
+    gates = {kind: HeldFailureGate('AGENTKIT_SOURCE_' + kind.upper() + '_HELD_FAILURE') for kind in selected}
     requests = []
     server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), provider_with_failure_gates(workspace=lambda: workspace, requests=requests, gates=gates))
     thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
@@ -333,7 +336,7 @@ def main():
     results, failures = {}, {}
     dsh_process = None
     try:
-        for kind in ('pi', 'dsh'):
+        for kind in selected:
             case = output / kind; case.mkdir()
             commands = commands_for(kind, workspace, gates[kind].marker,
                                     child_transcript_source=args.child_transcript_source,
@@ -362,18 +365,18 @@ def main():
         write_json(output / 'gates.json', {kind: gate.receipt() for kind, gate in gates.items()})
     if hashlib.sha256(program.read_bytes()).hexdigest() != digest:
         failures['program'] = 'runtime executable changed during capture'
-    if failures or set(results) != {'pi', 'dsh'} or dsh_process is None or dsh_process.poll() != 0:
-        write_json(output / 'incomplete.json', {'failures': failures, 'completedEndpoints': list(results), 'accepted': False})
+    if failures or set(results) != set(selected) or dsh_process is None or dsh_process.poll() != 0:
+        write_json(output / 'incomplete.json', {'failures': failures, 'completedEndpoints': list(results), 'requestedEndpoints': list(selected), 'accepted': False})
         print('SUMMARY_TRANSITIONS_FAILED; inspect retained owned sources')
         return 1
-    write_json(output / 'run-receipt.json', {'accepted': True, 'endpoints': results, 'provider': 'synthetic-loopback',
+    write_json(output / 'run-receipt.json', {'accepted': True, 'endpoints': results, 'requestedEndpoints': list(selected), 'provider': 'synthetic-loopback',
         'providerRequestCount': len(requests), 'ownedDshExitStatus': dsh_process.poll(),
         'programSha256': digest, 'desktopInteraction': False, 'paidModel': False,
         'privateHarnessHistoryRead': False, 'serverTransactionalFreshnessProven': False})
     suffix = '; child Transcript source paired' if args.child_transcript_source else ''
     if args.child_transcript_reconnect:
         suffix += '; reconnect -> same-pointer primary-child failed Transcript recovery'
-    print('SUMMARY_TRANSITIONS_ACCEPTED pi+dsh; running-source -> controlled-failure-source' + suffix + '; desktop=false')
+    print('SUMMARY_TRANSITIONS_ACCEPTED ' + '+'.join(selected) + '; running-source -> controlled-failure-source' + suffix + '; desktop=false')
     return 0
 
 

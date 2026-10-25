@@ -4,7 +4,7 @@
 
 ## 不可变输入
 
-- AgentKit 候选 `5b7c84361206b45ac381b10437097d3b76c322c1`；本地保护引用 `refs/agentkit/stage-close-20261025/base`。PR #10 为 draft。
+- AgentKit范围基线 `5b7c84361206b45ac381b10437097d3b76c322c1`；唯一阻断修复候选 `4274fe82fc353ff06100d4106d527e25dc5dfca3`（#67）；本地保护引用 `refs/agentkit/stage-close-20261025/base`。PR #10 为 draft。
 - main `f1daa0ffcf6ced41e21f351e22845455ca78006c`，已发布 headless v0.3.8。
 - ClientKit 行为参照 `c289bc9d33edcd83a782ac17927a8c65a027eccd`；Tekes `8858ccd9d46590852ec7a0949aee289fc6798d70`。此前记录的未提交参照候选仅按原冻结快照解释，不能当已发布 SDK。
 - TekesUI 公开精确 pin `50ec49f3446924fdbc66b3cff22cd8cfe150fe7c`；8 包、243 输入闭包。公开 main `7c13ec0` 未改变该闭包，不等同 #53 修复已发布。
@@ -26,7 +26,7 @@
 | #12/#13/#29、#33/#34/#38/#41–#44 | 原版本证据已归档；仍 OPEN、未进入 main | 按各票标准审查，确认本次包含的代码/适用验证；不能根 workspace 合入就关闭 UI 能力 |
 | #35/#36/#37/#40/#45 | 冻结提交包含部分实现，不证明整票完成 | 仅收口已有实现和受影响验收；新差异后续处理 |
 | #55 Run | 5b headless CI通过；旧 Pi/DSH 通过绑定旧程序 | Pi/DSH mixed队列/历史/重连，以及Pi取消/Unknown原ticket自动对账窄通过；其余端取消、混合工具推理/性能仍有缺口；Native queue保留Kernel86真实失败 |
-| #56 session/family | Native 两页子历史/passive Summary及 v5 原父 Task 审批拒绝失败通过；Pi primary child running→failed/history/reconnect窄证据通过 | DSH family、适用剩余来源/父草稿/源退休和性能仍未全部验收；不扩大原收据范围 |
+| #56 session/family | Native 两页子历史/passive Summary及 v5 原父 Task 审批拒绝失败通过；Pi primary child running→failed/history/reconnect窄证据通过 | DSH primary-child正常/失败来源及历史重连也已窄通过；SidePanel child pane、适用剩余父草稿/源退休与性能仍有缺口；不扩大原收据范围 |
 | #58 集成 | cfecb95 PR CI 40207891571：root与UI常规检查、child witness、新Native approval consumer、独立公开consumer通过；严格nested detail reading失败，后续demo build跳过；无formal approval | 保留TekesUI #53必需门禁和协议范围阻塞；不能据局部通过合并/发布 |
 | #59 发布 | 待办，尚无本阶段新 tag | 精确集成 head、main CI 与范围文档通过后发布 |
 
@@ -93,3 +93,17 @@ Its patch is under targeted compile/protocol verification. Native cancellation
 has separately passed with original journal identity and normal owned exits;
 older failed fixture attempts remain preserved. Do not promote these old program
 receipts to a subsequent #67 binary without an explicit affected-input review.
+
+### Candidate4274 verified, phase not released
+
+The only authorized product fix after scope base5b is #67's DSH cached-list
+boundary. Its exact candidate4274 / SHA081c3fe passed the original DSH completed
+Summary/reconnect plus DSH-only running→failed child Transcript/history/reconnect.
+Raw cached hints are retained without sequenced authority. #67 is OPEN and
+verified-pending-integration. Earlier Pi/Native proofs retain their original
+source/program identities; no wholesale promotion to4274 is implied.
+
+CI4274 root and standalone consumer passed; strict reading still fails on the
+published pin. TekesUI53 and Kernel86 remain open when checked2026-10-26. #55/#56
+still need remaining source/host coverage and preregistered performance; no
+merge/tag/main CI/Issue closure occurred. #60–#66 remain future scope.

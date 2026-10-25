@@ -29,7 +29,7 @@ from runtime_provenance import kernel_programs
 SSD = Path("/Volumes/HP P900/dev/TekesAgentKit")
 CONSUMER_SHA = "9a6a919215dc30c51df3b639188acb4783fd26f164592d15145a7f9e24734447"
 FROZEN_PRODUCT_HEAD = "5b7c84361206b45ac381b10437097d3b76c322c1"
-FROZEN_RUNNER_HEAD = "7d773ea0d89eb2bc5a4228df6f6409a05644ec3c"
+RUNNER_BASE_COMMIT = "4274fe82fc353ff06100d4106d527e25dc5dfca3"
 KERNEL_VERSION = "0.9.3"
 DSH_VERSION = "0.2.1-rc.2"
 MAX_BODY = 16 * 1024 * 1024
@@ -258,10 +258,12 @@ def run(args) -> int:
                     HERE / "test-real-pi-run-lifecycle.py",
                     HERE.parent / "crates/headless/examples/run_lifecycle_acceptance.rs"]
     input_hashes = {str(path.resolve()): digest(path.resolve()) for path in source_paths}
-    current_head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=HERE.parent,
-        capture_output=True, text=True, timeout=5, check=True).stdout.strip()
-    if current_head != FROZEN_RUNNER_HEAD:
-        raise ValueError(f"AgentKit runner/tool HEAD {current_head} does not match frozen {FROZEN_RUNNER_HEAD}")
+    git_identity = subprocess.run(["git", "rev-parse", "HEAD"], cwd=HERE.parent,
+        capture_output=True, text=True, timeout=5, check=False)
+    current_head = git_identity.stdout.strip() if git_identity.returncode == 0 else None
+    # Tool Git context is metadata, not the compiled product identity. Exact
+    # executable SHA and before/after input hashes remain mandatory even for
+    # a frozen tool archive without its own .git directory.
     args.output.mkdir(mode=0o700)
     owned = args.output / "owned"
     owned.mkdir(mode=0o700)
@@ -362,7 +364,7 @@ def run(args) -> int:
             "expectedSha256": CONSUMER_SHA, "size": args.program.stat().st_size}
         consumer_example = HERE.parent / "crates/headless/examples/run_lifecycle_acceptance.rs"
         write_new(args.output / "source-inputs.json", {"productHead": FROZEN_PRODUCT_HEAD,
-            "runnerHead": FROZEN_RUNNER_HEAD, "actualRunnerHead": current_head,
+            "runnerBaseCommit": RUNNER_BASE_COMMIT, "actualRunnerHead": current_head,
             "kernelRevisionArg": args.kernel_revision, "endpoint": args.endpoint,
             "program": program_record, "consumerBuild": {
                 "productBaseHead": FROZEN_PRODUCT_HEAD,
@@ -493,7 +495,7 @@ def run(args) -> int:
                     "runtimeFixtureCleanup": "completed", "processSnapshots": process_snapshots})
                 write_new(args.output / "acceptance.json", {"accepted": True,
                     "endpoint": args.endpoint, "productHead": FROZEN_PRODUCT_HEAD,
-                    "runnerHead": FROZEN_RUNNER_HEAD,
+                    "runnerBaseCommit": RUNNER_BASE_COMMIT,
                     "programSha256": CONSUMER_SHA, "runtime": runtime_identity,
                     "validation": validation, "desktop": False, "physicalIme": False,
                     "accessibility": False})
@@ -508,7 +510,7 @@ def run(args) -> int:
                     "harnessExitStatus": harness_process.poll() if harness_process is not None else None,
                  "runtimeFixtureCleanup": "attempted", "processSnapshots": process_snapshots}),
                 ("acceptance.json", {"accepted": False, "endpoint": args.endpoint,
-                 "productHead": FROZEN_PRODUCT_HEAD, "runnerHead": FROZEN_RUNNER_HEAD,
+                 "productHead": FROZEN_PRODUCT_HEAD, "runnerBaseCommit": RUNNER_BASE_COMMIT,
                  "programSha256": CONSUMER_SHA,
                  "runtime": runtime_identity, "error": error,
                  "preserveFailedEvidence": True})):

@@ -275,11 +275,16 @@
     "implementationIssue": 67
   },
   "issue67": {
-    "status": "targeted-unit-and-clippy-passed-live-retest-pending",
+    "status": "verified-pending-integration",
     "sourceBuildInputs": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/issue67-frozen-build-inputs.json",
     "independentReview": "no concrete source-boundary bug found; not formal whole-PR approval",
     "runtimeModified": false,
-    "mainIntegrated": false
+    "mainIntegrated": false,
+    "normalFamilyReceipt": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/dsh-summary-issue67-v1/run-receipt.json",
+    "failedChildReconnectReceipt": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/dsh-failure-transition-issue67-v1/run-receipt.json",
+    "portableBinding": "evidence-bindings-20261026/issue67-dsh-sources.json",
+    "actualCachedHintObserved": true,
+    "sourceInputsUnchangedAfterRuns": true
   },
   "historicalProgramArchiveBindings": [
     {
@@ -293,6 +298,23 @@
     "headless": "success",
     "ui": "failure",
     "newNativeConsumer": "success",
+    "standaloneConsumer": "success",
+    "strictNestedReading": "failure",
+    "demoBuild": "skipped",
+    "gateWaived": false
+  },
+  "currentProductCandidate": {
+    "commit": "4274fe82fc353ff06100d4106d527e25dc5dfca3",
+    "frozenScopeBase": "5b7c84361206b45ac381b10437097d3b76c322c1",
+    "authorizedBlockingFix": 67,
+    "programSha256": "081c3fe0d1d0be7e335482c6309a9f455f0395a39bbc704908fa138a5beb7a49",
+    "earlierReceiptsRetainOriginalIdentity": true
+  },
+  "ci4274fe8": {
+    "run": 40212754634,
+    "headless": "success",
+    "ui": "failure",
+    "nativeApprovalConsumer": "success",
     "standaloneConsumer": "success",
     "strictNestedReading": "failure",
     "demoBuild": "skipped",

@@ -1,0 +1,97 @@
+{
+  "issue": 67,
+  "acceptanceOwner": 56,
+  "productCommit": "4274fe82fc353ff06100d4106d527e25dc5dfca3",
+  "programSha256": "081c3fe0d1d0be7e335482c6309a9f455f0395a39bbc704908fa138a5beb7a49",
+  "sourceManifestSha256": "68ed698013a2e0c3cfdd6e359fd31266971071cbd7ae892b3384754ffc07593b",
+  "sourceFilesUnchanged": 1232,
+  "runtime": "DSH0.2.1-rc.2 / Node24.20.0",
+  "runtimeEntrySha256": "80112efe368efb1a39720c7ada0af00442e5131fb2744edaaff8a3e8bb499e6f",
+  "normalFamily": {
+    "commandCount": 17,
+    "completedJournalOptIn": true,
+    "desktopInteraction": false,
+    "endpoint": "dsh",
+    "harnessVersion": "0.2.1-rc.2",
+    "headlessProgramSha256": "081c3fe0d1d0be7e335482c6309a9f455f0395a39bbc704908fa138a5beb7a49",
+    "limitations": [
+      "This proves the captured public projection, not server-side transactional freshness."
+    ],
+    "ownedDshExitStatus": 0,
+    "ownedFixtureStoppedDshAfterCapture": true,
+    "paidModel": false,
+    "privateHarnessHistoryRead": false,
+    "provider": "synthetic-loopback",
+    "providerRequestCount": 7,
+    "reconnectChildPointer": "retained-in-new-connection-epoch",
+    "result": "accepted",
+    "schemaVersion": 1,
+    "serverTransactionalFreshnessProven": false,
+    "sourceScope": "same-publication-memory-authority-and-public-journal"
+  },
+  "failedChildAndReconnect": {
+    "accepted": true,
+    "requestedEndpoints": [
+      "dsh"
+    ],
+    "providerRequestCount": 9,
+    "ownedDshExitStatus": 0,
+    "gate": {
+      "requestCount": 1,
+      "entered": true,
+      "explicitlyReleased": true,
+      "aborted": false,
+      "timedOut": false
+    },
+    "reconnect": {
+      "endpoint": "dsh",
+      "scope": "primary-child-run-only",
+      "sidePanelChildPaneNotRun": true,
+      "parentSessionId": "session-0599f1d3-ff03-4d4a-8a28-a88fdd8227bb",
+      "freshPointer": "c5c413b8-411c-4b2b-b16b-0b6da503ac0a",
+      "sameParentPointerSource": true,
+      "oldConnectionEpoch": 5,
+      "newConnectionEpoch": 8,
+      "connectionEpochStrictlyAdvanced": true,
+      "sameOpaqueTurnId": true,
+      "sameFailedTranscript": true,
+      "newParentConnectionEpoch": 8,
+      "turnId": "[\"dsh\",\"c5c413b8-411c-4b2b-b16b-0b6da503ac0a\",\"turn:3\"]",
+      "sameParentToolSourceIdentity": true,
+      "serverTransactionalFreshnessProven": false,
+      "runningRevision": 77,
+      "failedRevision": 87,
+      "recoveredRevision": 102,
+      "originalPair": {
+        "sameChild": true,
+        "sameEpoch": true,
+        "sameAuthoredInput": true,
+        "sameOpaqueTurnId": true,
+        "runningRevision": 77,
+        "failedRevision": 87,
+        "serverTransactionalFreshnessProven": false
+      }
+    }
+  },
+  "actualCachedHintObserved": {
+    "kind": "cached",
+    "asOfSeq": 26,
+    "location": "retained child summary.dshCachedProjectionHints",
+    "notSequencedAuthority": true
+  },
+  "originalNegative": "5b7c843 / SHA11126181 headless: completed Summary then reconnect unknown DSH projection authority; exact old triggering block not captured",
+  "localEvidence": [
+    "dsh-summary-issue67-v1",
+    "dsh-failure-transition-issue67-v1"
+  ],
+  "notRun": [
+    "desktop",
+    "physical-ime",
+    "AX",
+    "performance",
+    "sidePanelChildPane"
+  ],
+  "serverTransactionalFreshnessProven": false,
+  "provider": "synthetic-loopback executing actual DSH tools, not natural/paid model proof",
+  "mainIntegrated": false
+}

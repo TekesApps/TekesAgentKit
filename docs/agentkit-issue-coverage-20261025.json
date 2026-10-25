@@ -1728,13 +1728,13 @@
       "key": "DSH-CACHED",
       "parent": 27,
       "title": "[修复/SEP] DSH cached 列表投影隔离及重连恢复",
-      "status": "进行中",
+      "status": "已验证待集成",
       "layer": "实现",
       "scope": "修复固定DSHrc2合法cached inventory被拒及不可比较watermark隔离；保留原提示和titlefallback，不提升队列/当前目录权威。",
       "deliverables": "DSH adapter、定向MemoryProjection回归、原真实family重连复验和精确head检查。",
       "dependencies": "#56真实恢复；#55队列权威；原TekesUI53/Kernel86不被此修复绕过。",
       "criteria": "cached与live切点隔离、已知null优先、unknown/malformed/reserved拒绝；原pointer/Summary/history/reconnect及适用CI通过且main集成后关闭。",
-      "evidence": "固定DSH公开types确认cached合法；5b真实family到初始Summary完成，reconnect失败unknownprojectionauthority；缺陷已复现，补丁待定向编译/真实回归。",
+      "evidence": "4274fe8 adapter + store isolation tests/Clippy, actual DSH completed-child and running→failed primary-child/history/reconnect passed with SHA081c3fe; CI root/public consumer passed, unrelated strict TekesUI53 failure retained; not main-integrated.",
       "completedAt": null,
       "related": [
         14,
@@ -1948,9 +1948,11 @@
         "issue": 67,
         "scope": "cached-list authority boundary only",
         "featureExpansion": false,
-        "acceptance": "pending"
+        "acceptance": "verified-pending-integration"
       }
-    ]
+    ],
+    "currentCandidate": "4274fe82fc353ff06100d4106d527e25dc5dfca3",
+    "frozenScopeBase": "5b7c84361206b45ac381b10437097d3b76c322c1"
   },
   "stageCoverageAudit": {
     "requirements": 50,
@@ -1975,8 +1977,8 @@
   },
   "currentStageCounts": {
     "已关闭": 3,
-    "已验证待集成": 10,
-    "进行中": 10,
+    "已验证待集成": 11,
+    "进行中": 9,
     "等待上游": 9,
     "等待桌面": 1,
     "待办": 8

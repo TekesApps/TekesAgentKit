@@ -46,3 +46,27 @@ fixed public declaration. Parent coordination must rerun the affected DSH
 family reconnect against the frozen source and runtime, preserve the original
 failure receipt, and record the exact candidate/program/runtime identity.
 No Cargo, runtime, desktop, or protocol validation was run for this change.
+
+## Actual coordinator verification
+
+Candidate `4274fe82fc353ff06100d4106d527e25dc5dfca3`, headless SHA
+`081c3fe0d1d0be7e335482c6309a9f455f0395a39bbc704908fa138a5beb7a49`:
+focused DSH unit/store tests and Clippy passed. The original 17-command completed
+child flow (7 provider requests) now passes pointer/source/Summary/public history
+and reconnect with owned DSH exit0. Its captured child summary actually retains a
+`cached` hint at cache watermark26 outside live projection state.
+
+A separate DSH-only existing lifecycle slice (9 provider requests) passed running→
+controlled failure, paired child Transcript, parent-bound history and recovered
+same pointer/opaque turn after reconnect. Its gate was released once after the
+running capture and neither timed out nor aborted. Pi was not rerun or claimed
+by this selected receipt. All1232 committed snapshot inputs and fixed runtime
+critical hashes remained unchanged. Portable identity/limits:
+`docs/evidence-bindings-20261026/issue67-dsh-sources.json`.
+
+CI4274 run40212754634 root/public consumer passed; the original mandatory strict
+TekesUI53 reading step still fails and later demo build is skipped. #67 is verified
+pending integration, OPEN. Main merge, full #55/#56, performance, SidePanel child
+pane and desktop/physical IME/AX remain unaccepted. The original 5b failure stays
+negative; its exact triggering block was not captured, even though the new
+successful capture proves the supported cached-list path was exercised.

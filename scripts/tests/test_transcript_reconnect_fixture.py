@@ -27,6 +27,9 @@ runner_spec.loader.exec_module(runner)
 
 class ReconnectFixtureTests(unittest.TestCase):
     def test_flag_requires_source_and_adds_reconnect_pointer_and_fresh_child_read(self):
+        base = ['--headless-program','p','--pi-root','p','--dsh-root','d','--output','o']
+        self.assertEqual(runner.parse_arguments(base).endpoint, 'all')
+        self.assertEqual(runner.parse_arguments(base + ['--endpoint','dsh']).endpoint, 'dsh')
         with self.assertRaises(SystemExit):
             runner.parse_arguments(['--headless-program','p','--pi-root','p','--dsh-root','d','--output','o','--child-transcript-reconnect'])
         for endpoint in ('pi', 'dsh'):
