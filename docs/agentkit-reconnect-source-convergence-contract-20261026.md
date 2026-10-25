@@ -56,3 +56,13 @@ v3候选首次编译复用了之后生成的baseline相对dep-info，错误引�
 - 两独立fresh before/after的cut、完整值/entries/窗口必须相等；重连后的完整runtime projections、旧seq不回退、完整entries及summary/time来源仍必须在原5s内达到after fresh来源。原pointer/成员/epoch/new generation/无重复与历史ID/内容/顺序标准不变。
 - 每次after等待无论成功/超时均记录原runtime完整快照与predicate细分，避免无法定位失败；不根据缺字段自动放宽。
 - 只为这两个受变更影响的DSH角色登记新case各执行一次；原四case、原40case与有效性能失败原样保留，不混算新旧观察器、不重跑Pi/Native/warm、不改预算。代码与验证尚未完成，不据本设计称DSH通过。
+
+### 公开来源窗口必须覆盖已保留窗口
+
+进一步用原v1事件离线核对，两角色init fresh50均196条且hasMoreBefore=true；measured round1公开close/open记录缓存前后均204条，但fresh50只196条。因此“runtime整个已保留窗口==rolling50来源窗口”本身也是错误前提，至少history predicate无法相等，不是产品丢失证明。v4构建输入保留，不对其登记或执行协议。
+
+v2采用独立公开follow200覆盖本有限case的全部消息（100正文+最多22追加+10工具组，非200条raw records），强制hasMoreBefore=false，原始完整源帧全部保留。before runtime的原最小seq作为retained floor，必须真实存在完整来源；从完整源按seq>=floor取精确后缀，逐条比对完整entry内容/顺序。after complete source仍须与before全部来源相等，after runtime必须恢复同一个floor后的完整后缀，不能丢旧行或只比ID；不能强制加载用户此前尚未加载的更早前缀。SDK的恢复窗口仍50，原Earlier20指标不变；200仅为独立验证来源，观测开销计入reconnect且两角色相同，不混算v1时间。若200仍未耗尽来源则失败，不自动扩容/放宽。
+
+### v2独立审查与构建
+
+独立静态review未发现放宽原恢复标准，确认完整来源与原retained floor的逐条比较、after全部投影/水位/summary及5s有界恢复。精确v5输入两角色各9项定向Rust检查、strict Clippy及构建通过，程序baseline950db9a1/candidate92206559，详见[新程序绑定](evidence-bindings-20261026/reconnect-source-observer-v2-programs.json)。源内容在每角色串行批次前后均核对不变，mtime在各自批次前准备，复用SSD共享target。两条DSH新case尚未登记/执行，不称通过；Pi/Native不重跑，全部旧失败和旧样本保留。

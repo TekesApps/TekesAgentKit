@@ -285,5 +285,14 @@
     ],
     "conclusion": "new observer v1 pre-disconnect runtime-wide catch-up requirement exceeds frozen ClientKit reconnect contract; no product data-loss conclusion",
     "boundedCorrection": "before fresh source retained; record cache values/watermarks and reject newer-than-source; compare independent before/after complete source; after runtime convergence/full entries/summary/mtime rules unchanged; rerun only two affected DSH roles under newly registered observer cohort, no Pi/Native/warm rerun"
+  },
+  "dshSourceWindowMismatch": {
+    "initialFresh50EntryCount": 196,
+    "initialFresh50HasMore": true,
+    "measuredRound1RetainedRuntimeCountBeforeAndAfterCloseOpen": 204,
+    "measuredRound1Fresh50EntryCount": 196,
+    "bothRoles": true,
+    "conclusion": "at least history equality cannot hold between retained cache and rolling source50; no product data-loss proof",
+    "v4ProgramsProtocolRun": false
   }
 }

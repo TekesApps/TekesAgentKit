@@ -129,6 +129,10 @@ impl DshSourceWitness {
         let snapshot: JournalSnapshot = serde_json::from_value(frame["snapshot"].clone())?;
         snapshot.validate()?;
         require(
+            !snapshot.has_more_before,
+            "finite DSH source witness did not exhaust public history",
+        )?;
+        require(
             snapshot.session_id == expected_session_id,
             "DSH witness session pointer changed",
         )?;
@@ -170,6 +174,26 @@ impl DshSourceWitness {
                 .collect::<std::result::Result<_, _>>()?,
             has_more_before: snapshot.has_more_before,
         })
+    }
+
+    /// Cover the exact retained window from an independently exhausted source.
+    pub fn retained_entries(&self, floor: i64) -> Result<Vec<Value>> {
+        require(
+            self.entries
+                .iter()
+                .any(|entry| entry["event"]["seq"].as_i64() == Some(floor)),
+            "DSH retained history floor missing from independent complete source",
+        )?;
+        Ok(self
+            .entries
+            .iter()
+            .filter(|entry| {
+                entry["event"]["seq"]
+                    .as_i64()
+                    .is_some_and(|seq| seq >= floor)
+            })
+            .cloned()
+            .collect())
     }
 
     pub fn summary_projection_value(&self) -> Value {
@@ -259,7 +283,7 @@ mod tests {
         values["inbox"] = json!({"next-step":[],"next-turn":[]});
         json!({"type":"snapshot","snapshot":{
             "sessionId":session_id,"generation":"fresh-g1","throughSequence":cursor,
-            "windowLimit":50,"entries":[],"hasMoreBefore":true,"historyRevision":null,
+            "windowLimit":50,"entries":[],"hasMoreBefore":false,"historyRevision":null,
             "projections":{"kind":"sequenced","asOfSeq":as_of,"values":values}
         }})
     }
@@ -382,6 +406,32 @@ mod tests {
         assert!(!first.matches_recovered_source(&changed));
         assert!(!first.matches_recovered_source(&regressed));
         assert!(!monotonic_projection_values(&first, &regressed));
+    }
+
+    #[test]
+    fn retained_history_keeps_exact_loaded_floor_and_compares_complete_content() {
+        let mut source = DshSourceWitness::from_first_frame(
+            &source_frame("s", 9, 9, json!({"agentkit.queue.v1":{"items":[]}})),
+            "s",
+            true,
+        )
+        .unwrap();
+        source.entries = vec![
+            json!({"event":{"seq":1,"data":{"text":"unloaded"}}}),
+            json!({"event":{"seq":3,"data":{"text":"retained"}}}),
+            json!({"event":{"seq":7,"data":{"text":"final"}}}),
+        ];
+        let retained = source.retained_entries(3).unwrap();
+        assert_eq!(retained.len(), 2);
+        assert_eq!(retained[0]["event"]["seq"], 3);
+        assert!(source.retained_entries(2).is_err());
+        let mut changed = source.clone();
+        changed.entries[1]["event"]["data"]["text"] = json!("changed-same-seq");
+        assert_ne!(retained, changed.retained_entries(3).unwrap());
+        assert!(!source.matches_recovered_source(&changed));
+        let mut partial = source_frame("s", 9, 9, json!({"agentkit.queue.v1":{"items":[]}}));
+        partial["snapshot"]["hasMoreBefore"] = json!(true);
+        assert!(DshSourceWitness::from_first_frame(&partial, "s", true).is_err());
     }
 
     #[test]

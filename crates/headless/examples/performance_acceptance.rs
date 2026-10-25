@@ -798,6 +798,7 @@ async fn reconnect_sample(
     let old_endpoint = connector.current()?;
 
     let mut dsh_source_before = std::collections::BTreeMap::new();
+    let mut dsh_history_floors = std::collections::BTreeMap::new();
     let mut pi_file_before = std::collections::BTreeMap::new();
     let source_started_ns = monotonic_ns();
     if connector_kind == "dsh" {
@@ -809,8 +810,6 @@ async fn reconnect_sample(
                 require_adapter_queue,
             )
             .await?;
-            wait_for_dsh_runtime(runtime, scope, &witness, old_epoch, Duration::from_secs(5))
-                .await?;
             dsh_source_before.insert(scope.session_id.clone(), witness);
         }
     } else if connector_kind == "pi" {
@@ -867,7 +866,7 @@ async fn reconnect_sample(
         }
     }
     if connector_kind == "dsh" {
-        // Freeze the before state only after the first fixed witness has been reached.
+        // The durable witness is the oracle; ClientKit does not require the old cache to catch up before disconnect.
         old = runtime.snapshot();
         require(
             old.connection_epoch == old_epoch,
@@ -880,10 +879,29 @@ async fn reconnect_sample(
                 .get(&scope.session_id)
                 .ok_or_else(|| Error::Protocol("DSH source freeze lost original session".into()))?;
             require(
-                witness.matches_runtime_values(&session.projections, None)
-                    && runtime_journal_entries(session)? == witness.entries,
-                "DSH source changed before final before-state freeze",
+                session
+                    .projections
+                    .values()
+                    .all(|value| value.sequence <= witness.through_sequence),
+                "DSH pre-reconnect cache watermark exceeds independent fresh source",
             )?;
+            let floor = *session
+                .entries
+                .keys()
+                .next()
+                .ok_or_else(|| Error::Protocol("DSH retained history is empty".into()))?;
+            let retained_source = witness.retained_entries(floor)?;
+            require(
+                runtime_journal_entries(session)? == retained_source,
+                "DSH retained before history differs from independent complete source",
+            )?;
+            dsh_history_floors.insert(scope.session_id.clone(), floor);
+            emit(json!({"event":"reconnect_cache_before","scope":scope,
+                "epoch":old.connection_epoch,"sourceCut":witness.through_sequence,
+                "runtimeProjectionValuesMatchFreshSource":witness.matches_runtime_values(&session.projections, None),
+                "runtimeFullHistoryMatchesRetainedSource":runtime_journal_entries(session)? == retained_source,
+                "retainedHistoryFloor":floor,"completeSourceEntryCount":witness.entries.len(),
+                "runtimeSession":session}));
         }
     }
     let mut old_pointers = Vec::new();
@@ -920,8 +938,15 @@ async fn reconnect_sample(
                 require_adapter_queue,
             )
             .await?;
-            wait_for_dsh_runtime(runtime, scope, &witness, new_epoch, Duration::from_secs(5))
-                .await?;
+            wait_for_dsh_runtime(
+                runtime,
+                scope,
+                &witness,
+                dsh_history_floors[&scope.session_id],
+                new_epoch,
+                Duration::from_secs(5),
+            )
+            .await?;
             after = runtime.snapshot();
             source_after = Some(witness);
         } else if connector_kind == "pi" {
@@ -1085,8 +1110,9 @@ async fn reconnect_sample(
                     }
                     _ => false,
                 };
-                let history_matches_source =
-                    old_entries == old_source.entries && now_entries == new_source.entries;
+                let floor = dsh_history_floors[&scope.session_id];
+                let history_matches_source = old_entries == old_source.retained_entries(floor)?
+                    && now_entries == new_source.retained_entries(floor)?;
                 let history_unchanged = old_entries == now_entries;
                 let passed = source_same
                     && generation_changed
@@ -1100,7 +1126,7 @@ async fn reconnect_sample(
                     passed,
                     passed,
                     json!({
-                        "oracleVersion":"dsh-fresh-session-journal-v1",
+                        "oracleVersion":"dsh-fresh-session-journal-v2",
                         "before":{"generation":old_source.generation,"throughSequence":old_source.through_sequence,"projections":{"asOfSeq":old_source.projections.as_of_seq,"values":old_source.projections.values},"entries":old_source.entries},
                         "after":{"generation":new_source.generation,"throughSequence":new_source.through_sequence,"projections":{"asOfSeq":new_source.projections.as_of_seq,"values":new_source.projections.values},"entries":new_source.entries},
                         "freshSourceUnchanged":source_same,
@@ -1113,6 +1139,7 @@ async fn reconnect_sample(
                         "beforeSummary":before_summary,
                         "recoveredSummary":now_summary,
                         "runtimeFullHistoryMatchesFreshSources":history_matches_source,
+                    "retainedHistoryFloor":floor,
                         "runtimeFullHistoryUnchanged":history_unchanged,
                         "rawSummaryEqual":raw_summary_equal
                     }),
@@ -1198,7 +1225,7 @@ async fn fresh_dsh_witness(
                 address: JournalAddress {
                     session_id: scope.session_id.clone(),
                 },
-                max_messages: 50,
+                max_messages: 200,
             })
             .await?;
         let frame = stream.next().await.ok_or(Error::Disconnected)??;
@@ -1277,11 +1304,13 @@ async fn wait_for_dsh_runtime(
     runtime: &SessionRuntime,
     scope: &RunScope,
     witness: &DshSourceWitness,
+    history_floor: i64,
     expected_epoch: u64,
     timeout: Duration,
 ) -> Result<()> {
+    let expected_entries = witness.retained_entries(history_floor)?;
     let mut updates = runtime.subscribe();
-    tokio::time::timeout(timeout, async {
+    let result = tokio::time::timeout(timeout, async {
         loop {
             let snapshot = updates.borrow_and_update();
             require(
@@ -1292,7 +1321,7 @@ async fn wait_for_dsh_runtime(
                 && snapshot.control_ready
                 && let Some(session) = snapshot.sessions.get(&scope.session_id)
                 && witness.matches_runtime_values(&session.projections, None)
-                && runtime_journal_entries(session)? == witness.entries
+                && runtime_journal_entries(session)? == expected_entries
             {
                 return Ok::<(), Error>(());
             }
@@ -1300,7 +1329,26 @@ async fn wait_for_dsh_runtime(
         }
     })
     .await
-    .map_err(|_| Error::Timeout)?
+    .map_err(|_| Error::Timeout)
+    .and_then(|result| result);
+    let snapshot = runtime.snapshot();
+    let session = snapshot.sessions.get(&scope.session_id);
+    let projection_matches =
+        session.is_some_and(|session| witness.matches_runtime_values(&session.projections, None));
+    let history_matches = session
+        .map(runtime_journal_entries)
+        .transpose()?
+        .is_some_and(|entries| entries == expected_entries);
+    emit(
+        json!({"event":"reconnect_runtime_source_check","scope":scope,
+        "epoch":snapshot.connection_epoch,"expectedEpoch":expected_epoch,
+        "usable":usable_snapshot(&snapshot, &scope.session_id),"controlReady":snapshot.control_ready,
+        "projectionValuesMatch":projection_matches,"fullHistoryMatches":history_matches,
+        "sourceCut":witness.through_sequence,"retainedHistoryFloor":history_floor,
+        "expectedRetainedEntries":expected_entries,"runtimeSession":session,
+        "waitError":result.as_ref().err().map(error_text)}),
+    );
+    result
 }
 
 fn runtime_journal_entries(session: &tekes_agent_session::SessionProjection) -> Result<Vec<Value>> {
