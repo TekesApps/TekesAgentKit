@@ -1897,7 +1897,14 @@
     "protocolMatrix": "agentkit-stage-protocol-matrix-20261025.md",
     "performanceProfile": "agentkit-stage-performance-profile-20261025.json",
     "protocolResults": "agentkit-stage-protocol-results-20261025.json",
-    "integrationDecision": "keep PR10 draft: TekesUI53, Kernel86, remaining family/performance; no merge/tag/issue closure"
+    "integrationDecision": "keep PR10 draft: TekesUI53, Kernel86, remaining family/performance; no merge/tag/issue closure",
+    "latestNarrowAcceptance": {
+      "issue": 56,
+      "scope": "Native approval-denied parent Task + Pi primary child transition/history/reconnect",
+      "resultFile": "agentkit-stage-protocol-results-20261025.json",
+      "completeIssue": false,
+      "merged": false
+    }
   },
   "stageCoverageAudit": {
     "requirements": 50,

@@ -7,7 +7,9 @@
     "tekes-agent-headless": {
       "path": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/tekes-agent-headless",
       "sha256": "11126181c6422a11fc1236d0c0f84f3adeb82499610903efd21b503770596499",
-      "archive": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/programs/tekes-agent-headless"
+      "archive": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/programs/tekes-agent-headless",
+      "activeAcceptancePath": "/Volumes/HP P900/dev/TekesAgentKit/acceptance-tools/headless/current-feature/tekes-agent-headless",
+      "targetPathIsMutable": true
     },
     "examples/pi_mixed_file_probe": {
       "path": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/examples/pi_mixed_file_probe",
@@ -111,5 +113,68 @@
       "fixtureReceiptLimitation": "owned_dsh context failed before yield, so original receipt has no pid or exit status; absence check does not prove normal exit0"
     }
   },
-  "allFrozenInputsUnchangedAfterSummaryRuns": true
+  "allFrozenInputsUnchangedAfterSummaryRuns": true,
+  "piFamilyTransitions": {
+    "result": "accepted-narrow-leaf-only",
+    "receiptRoot": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/family-transitions-5b/pi",
+    "scope": "same child running->failed transcript, parent-bound public history and reconnect epoch; primary child Run only",
+    "sidePanelChildPane": "not_run",
+    "combinedScript": "failed-dsh-readiness",
+    "serverTransactionalFreshnessProven": false
+  },
+  "dshReadinessDiagnostic": {
+    "result": "service-reached-ready-then-diagnostic-metadata-error",
+    "receiptRoot": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/dsh-readiness-diagnostic-5b",
+    "exactReadinessSeconds": "not-recorded",
+    "protocolAcceptance": false,
+    "sample": "one-second owned Node sample predominantly ReadFileUtf8/fs.read; no whole-startup percentile inferred",
+    "originalReadinessLimitSeconds": 60,
+    "ownedNodeExitStatus": 0
+  },
+  "nativeParentFailure": {
+    "result": "failed-invalid-mode-mechanism",
+    "receiptRoot": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/native-parent-failure-5b",
+    "reason": "invalid arguments rejected before normal pipeline tool_result; no matching parent failure witness",
+    "nextAction": "valid task held by workspace-write approval, reject original public actionable; new consumer not yet protocol accepted"
+  },
+  "performancePrograms": {
+    "baseline": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/performance-baseline-program.json",
+    "candidate": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/performance-candidate-program.json",
+    "result": "program-inputs-prepared-only",
+    "samples": "not_run",
+    "profileUnchanged": true
+  },
+  "sharedTargetSourceTimestampRepair": {
+    "receipt": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/shared-target-source-timestamp-repair.json",
+    "reason": "workspace-relative dep-info reused a different snapshot package; rebuild owned source closure after timestamp normalization",
+    "sourceContentChanged": false,
+    "cacheDeletedBytes": 0
+  },
+  "nativeParentApproval": {
+    "result": "accepted-narrow",
+    "receipt": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/native-parent-approval-v5/acceptance.json",
+    "validation": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/native-parent-approval-v5/parent-failure-validation.json",
+    "programSha256": "e742cafae5ba3715ba3c3be16be8a3c1f849e1a34baff8fa4d9cbfbe638d5caf",
+    "baseSource": "5b7c84361206b45ac381b10437097d3b76c322c1",
+    "buildInputs": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/native-approval-build-inputs-v3.json",
+    "runtime": "Kernel 0.9.3 / 09508a9083c24c7accefc99516739f279b85913e",
+    "scope": "same parent journal call/result doing->denied/error, same mounted Summary/view/row/title, nonempty parent draft, public parent-only catalog",
+    "providerRequests": 2,
+    "ownedKernelExitStatus": 0,
+    "consumerExitStatus": 0,
+    "serverTransactionalFreshnessProven": false,
+    "priorAttemptsRetained": [
+      "native-parent-failure-5b",
+      "native-parent-approval-v3",
+      "native-parent-approval-v4"
+    ],
+    "v4Limit": "provider markerPresent overwritten true in follow-up metadata; v5 corrects recorder, exact continuation remains required; use v5 authoritative receipt",
+    "notRun": [
+      "desktop",
+      "physical-ime",
+      "AX",
+      "performance",
+      "complete-three-end-family"
+    ]
+  }
 }

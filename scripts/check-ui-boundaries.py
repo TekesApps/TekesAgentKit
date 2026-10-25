@@ -31,14 +31,25 @@ bindings = tomllib.loads((ui / 'bindings/Cargo.toml').read_text())['dependencies
 assert set(bindings) == {'tekes-agent-components-ui', 'tekes-agent-contract', 'tekes-agent-presentation', 'tekes-agent-session', 'tekes-agent-web', 'serde_json', 'tokio', 'async-trait', 'uuid', 'base64', 'image', 'rusqlite'}
 # UI-only, rebuildable title FTS; never permit it in headless/presentation.
 assert bindings['rusqlite'] == {'version': '=0.40.2', 'default-features': False, 'features': ['bundled']}
-consumer = tomllib.loads((ui / 'consumer/Cargo.toml').read_text())['dependencies']
-# Public reveal consumption needs the SDK's original token, options and text-host trait.
-# Controls are permitted; renderer/platform/harness dependencies remain excluded.
-assert set(consumer) == {'tekes-agent-components-ui', 'tekes-agent-ui-bindings', 'tekes-ui-controls'}
-# Independent label-host tests use fixed SDK text/scene/token primitives;
-# the source-witness example decodes captured public JSON without a runtime adapter.
-assert tomllib.loads((ui / 'consumer/Cargo.toml').read_text()).get('dev-dependencies', {}) == {
-    name: {'workspace': True} for name in ('tekes-ui-text', 'tekes-ui-scene', 'tekes-ui-tokens', 'serde_json')}
+consumer_manifest = tomllib.loads((ui / 'consumer/Cargo.toml').read_text())
+consumer = consumer_manifest['dependencies']
+# The normal public consumer stays renderer/platform/harness-free. Only the
+# opt-in offscreen real-protocol example may add these exact public Kit APIs.
+probe_dependencies = {'tekes-agent-contract', 'tekes-agent-endpoint-kernel',
+                      'tekes-agent-session', 'tekes-agent-presentation'}
+assert set(consumer) == {'tekes-agent-components-ui', 'tekes-agent-ui-bindings', 'tekes-ui-controls'} | probe_dependencies
+for name in probe_dependencies:
+    expected = {'workspace': True, 'optional': True}
+    if name == 'tekes-agent-presentation':
+        expected['features'] = ['acceptance-source-witness']
+    assert consumer[name] == expected
+assert consumer_manifest['features'] == {'native-parent-approval': [
+    'dep:tekes-agent-contract', 'dep:tekes-agent-endpoint-kernel',
+    'dep:tekes-agent-session', 'dep:tekes-agent-presentation']}
+assert consumer_manifest['example'] == [{'name': 'native_parent_approval',
+                                      'required-features': ['native-parent-approval']}]
+assert consumer_manifest.get('dev-dependencies', {}) == {
+    name: {'workspace': True} for name in ('tekes-ui-text', 'tekes-ui-scene', 'tekes-ui-tokens', 'serde_json', 'tokio')}
 for source in (ui / 'components/src').rglob('*.rs'):
     assert 'tekes_ui_text::coretext' not in source.read_text(), 'native font adapters belong to the host'
 # Direct dependencies must go through the reviewed workspace or crates.io; no host sibling fallback.

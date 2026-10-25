@@ -70,3 +70,9 @@ The main chat serializes Cargo against immutable batch inputs and the existing
 SSD shared target. Do not edit a batch's source while it is being validated.
 A split delivery must isolate real dependencies and retain every applicable
 check; supported protocol failures cannot become Unsupported to permit release.
+
+Frozen archives must have current extraction timestamps before sharing Cargo outputs: Cargo's
+workspace-relative dep-info can otherwise reuse newer artifacts from another snapshot with the
+same package/version. Record content hashes and extraction timestamps, never mutate an active
+batch, and never restore archived binaries into Cargo's managed target. Keep active acceptance
+CLIs in explicit fixed-role paths outside target; historical programs remain evidence only.

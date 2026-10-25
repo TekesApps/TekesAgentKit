@@ -55,6 +55,8 @@ jobs:
         run: |
           cargo clippy --manifest-path ui/Cargo.toml --locked -p tekes-agent-ui-bindings -p tekes-agent-ui-demo --all-targets --features tekes-agent-ui-demo/acceptance-source-witness -- -D warnings
           cargo test --manifest-path ui/Cargo.toml --locked -p tekes-agent-ui-bindings -p tekes-agent-ui-demo --features tekes-agent-ui-demo/acceptance-source-witness
+      - name: Compile Native parent approval consumer (opt-in, no native window)
+        run: cargo clippy --manifest-path ui/Cargo.toml --locked -p tekes-agent-ui-consumer-check --example native_parent_approval --features native-parent-approval -- -D warnings
       - name: Run standalone public API consumer (no native window)
         env:
           CARGO_TARGET_DIR: ${{ github.workspace }}/ui/target

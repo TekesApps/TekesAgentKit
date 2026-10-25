@@ -57,3 +57,19 @@
 Pi Summary补验：`pi-summary-5b/run-receipt.json` accepted，真实模型子代理公开历史/新epoch pointer及同一次MemoryProjection publication的Summary来源通过。状态为idle，依据public-idle-inputs-no-explicit-child-status；不证明正式Task completed、running transition、父draft隔离或服务端事务新鲜性。
 
 DSH Summary补验：`dsh-summary-5b` 在同一60秒readiness门槛超时，未进入投影，owned进程已退出。记为本次未通过，不把旧Summary程序结果移给5b，也不据启动失败断言投影产品bug；#56继续保留该缺口。未继续循环重试。
+
+
+### Native approval-denied parent Task (bounded acceptance)
+
+`native-parent-approval-v5/acceptance.json` binds Kernel 0.9.3 (`09508a9`) to
+consumer SHA `e742cafae5ba3715ba3c3be16be8a3c1f849e1a34baff8fa4d9cbfbe638d5caf`,
+built over frozen product source `5b7c843` with the new opt-in acceptance example.
+The original parent journal call/result proves `doing → denied/error` in the same
+Run/epoch, mounted Summary view/row/title identity and unchanged nonempty parent
+draft. Public catalog contains only the parent. Two loopback provider requests
+include the original task and its exact continuation/result; consumer and owned
+Kernel exit 0. No child failure substitutes for the parent result. Server
+transactional freshness is unproven; full #56, performance and desktop remain
+unaccepted. Failed prior attempts are retained. v4's provider metadata overwrote
+the follow-up marker-presence flag; v5 corrects the recorder and is authoritative.
+This changes acceptance tooling only, not frozen product behavior or gate scope.

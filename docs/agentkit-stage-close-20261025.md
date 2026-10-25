@@ -50,3 +50,25 @@
 ## 封存结果
 
 本轮追加Pi真实子代理Summary/source及历史重连窄证据；DSH Summary来源脚本在固定60秒readiness期限失败，尚未进入投影，负证据和进程退出保留。它是独立剩余验收，不由DSH mixed队列成功替代。详见有限矩阵和结果JSON。当前仍不合并/发布；不以文档冻结宣称本阶段已交付。
+
+### Subsequent narrow checks
+
+PR head `30494699f199259abfddfe4621a4e828d620f415` CI run `40157167303` completed: root checks and UI/public-consumer checks passed through the standalone consumer; the mandatory strict nested detail reading step failed on the published TekesUI input. The later demo build step was skipped, so this run does not prove it. No merge/release gate was waived.
+
+Pi primary child running→failed/history/reconnect leaf evidence is now available, with the combined DSH run still failed at readiness. Native approval-denial parent failure validation is being compiled as an opt-in offscreen public consumer; it is not yet accepted. The matrix and result JSON retain separate negative evidence and unrun performance scope. Source remains `5b7c843`; these additions validate existing behavior and do not expand product scope.
+
+
+### Native approval-denied parent Task (bounded acceptance)
+
+`native-parent-approval-v5/acceptance.json` binds Kernel 0.9.3 (`09508a9`) to
+consumer SHA `e742cafae5ba3715ba3c3be16be8a3c1f849e1a34baff8fa4d9cbfbe638d5caf`,
+built over frozen product source `5b7c843` with the new opt-in acceptance example.
+The original parent journal call/result proves `doing → denied/error` in the same
+Run/epoch, mounted Summary view/row/title identity and unchanged nonempty parent
+draft. Public catalog contains only the parent. Two loopback provider requests
+include the original task and its exact continuation/result; consumer and owned
+Kernel exit 0. No child failure substitutes for the parent result. Server
+transactional freshness is unproven; full #56, performance and desktop remain
+unaccepted. Failed prior attempts are retained. v4's provider metadata overwrote
+the follow-up marker-presence flag; v5 corrects the recorder and is authoritative.
+This changes acceptance tooling only, not frozen product behavior or gate scope.

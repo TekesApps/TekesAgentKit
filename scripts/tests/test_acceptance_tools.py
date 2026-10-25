@@ -224,8 +224,13 @@ class Checks(unittest.TestCase):
             if name == 'bindings':
                 text += 'rusqlite={version="=0.40.2",default-features=false,features=["bundled"]}\n'
             if name == 'consumer':
+                for dependency in ('tekes-agent-contract', 'tekes-agent-endpoint-kernel', 'tekes-agent-session'):
+                    text += f'{dependency}={{workspace=true,optional=true}}\n'
+                text += 'tekes-agent-presentation={workspace=true,optional=true,features=["acceptance-source-witness"]}\n'
+                text += '[features]\nnative-parent-approval=["dep:tekes-agent-contract","dep:tekes-agent-endpoint-kernel","dep:tekes-agent-session","dep:tekes-agent-presentation"]\n'
+                text += '[[example]]\nname="native_parent_approval"\nrequired-features=["native-parent-approval"]\n'
                 text += '[dev-dependencies]\n' + ''.join(
-                    f'{d}.workspace=true\n' for d in ('tekes-ui-text', 'tekes-ui-scene', 'tekes-ui-tokens', 'serde_json'))
+                    f'{d}.workspace=true\n' for d in ('tekes-ui-text', 'tekes-ui-scene', 'tekes-ui-tokens', 'serde_json', 'tokio'))
             (ui / name / 'Cargo.toml').write_text(text)
         header = '[workspace]\n[workspace.package]\npublish=false\nversion="0.0.0"\n[workspace.dependencies]\nunicode-segmentation="=1.13.3"\n'
         for dependency, valid in [
@@ -242,6 +247,16 @@ class Checks(unittest.TestCase):
         (ui / 'Cargo.toml').write_text(header + 'tekes-ui-controls={git="' +
                                       public['repository'] + '",rev="' + public['rev'] + '"}\n')
         valid_workspace = (ui / 'Cargo.toml').read_text()
+        consumer_manifest = ui / 'consumer/Cargo.toml'
+        reviewed_consumer = consumer_manifest.read_text()
+        for unsafe in (reviewed_consumer.replace('optional=true', 'optional=false', 1),
+                       reviewed_consumer.replace('required-features=["native-parent-approval"]', 'required-features=[]'),
+                       reviewed_consumer.replace('[features]', '[features]\ndefault=["native-parent-approval"]')):
+            consumer_manifest.write_text(unsafe)
+            result = subprocess.run([sys.executable, str(SCRIPTS / 'check-ui-boundaries.py'),
+                                     '--root', str(self.root)], capture_output=True)
+            self.assertNotEqual(result.returncode, 0)
+        consumer_manifest.write_text(reviewed_consumer)
         for wrong_unicode in ['1', '=1.13.2']:
             with self.subTest(wrong_unicode=wrong_unicode):
                 (ui / 'Cargo.toml').write_text(valid_workspace.replace('=1.13.3', wrong_unicode))
