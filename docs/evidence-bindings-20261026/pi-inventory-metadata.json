@@ -1,0 +1,42 @@
+{
+  "scope": "public snapshot metadata diagnosis only; original lifecycle remains failed",
+  "issue": 70,
+  "stage": "future; not automatic current-phase feature scope",
+  "programSha256": "18d8f643e8cba5ee94202c8c2f481bfa31add7bc5ac4fc5df44276100532180b",
+  "source": "98b1d9a2960b90774ea5454e7e8dad870538f7bc",
+  "runtime": "Pi1.3.0/Node24.20.0",
+  "originalReceiptSha256": "1d3ee7c76ef0af076aa89f6e19adb8fbf5368eb1fb218266ad8cfc3c8244eaf6",
+  "offlineAnalysisSha256": "96b084b2445db4fc3bce7b3c1a4206ffeca273abea5fb0287bfb84229d78e4f2",
+  "rawSnapshotsSha256": "0224069e8e4afc8e844098703585c097ecdaf47159e88f54c59f862351c82d40",
+  "originalValidatorFailed": true,
+  "reason": "used camelCase key; public snapshot serializes native_conversation; offline reanalysis did not rerun protocol",
+  "phases": [
+    {
+      "sessionId": "2500b2ca-f24b-4dea-8756-e36864be3632",
+      "summaryDiff": {
+        "updatedAt": {
+          "before": 1792960528893.8242,
+          "after": 1792960531460.8186
+        }
+      },
+      "originalFullEntryContentAndOrderEqual": true,
+      "postSendEntries": 123,
+      "postReconnectEntries": 123
+    },
+    {
+      "sessionId": "d8235dde-d7ed-4d69-9f9b-c2a1aefee322",
+      "summaryDiff": {
+        "updatedAt": {
+          "before": 1792960530723.72,
+          "after": 1792960531977.2134
+        }
+      },
+      "originalFullEntryContentAndOrderEqual": true,
+      "postSendEntries": 123,
+      "postReconnectEntries": 123
+    }
+  ],
+  "differenceAlsoPresentAtFrozen5b": true,
+  "performanceAccepted": false,
+  "desktop": false
+}

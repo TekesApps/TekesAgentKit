@@ -49,7 +49,7 @@
     "Candidate functional #55/#56 still partial; Native busy queue Kernel #86 failure remains blocking",
     "No comparable baseline/candidate performance samples collected; this is a preregistered profile, not acceptance evidence"
   ],
-  "resolvedProductCandidate": "98b1d9a2960b90774ea5454e7e8dad870538f7bc",
+  "resolvedProductCandidate": "10263722b5fb128922c49a31b5942c41333cd6e2",
   "executionRecipe": {
     "frozenBeforeSamples": "2026-10-26; no performance samples collected",
     "datasetDefinition": "100 initial nonempty body-text messages per ordinary session: 50 user + 50 final assistant, each exactly 1024 UTF-8 bytes; first 10 turns each execute one original public read tool; tool call/result records are additional and excluded from body-text count",
@@ -161,5 +161,13 @@
     "runtimeWindow": "Runtime default follows50 and may legitimately retain earlier loaded journal cache after public close/open. Report requested window and actual retained history separately; never call it initial-follow20 or claim journal cache was trimmed. Snapshot timing starts before the original public history read/reset intent and ends only after a new ready publication.",
     "fixed50Path": "One separately labelled public RunController actual50 sample per scope outside the repeated page20 trajectory; no substituting empty/exhausted page results. Existing original-control functional50 evidence remains independently bound.",
     "samePidReconnectAssumption": "The previous Pi same-harness-PID reconnect combination is topology-inconsistent, not passed or Unsupported. Genuine same-PID warm remains required and is covered only by the separate steady-warm group."
+  },
+  "candidatePinCorrectionBeforeOfficialSamples": {
+    "previous": "98b1d9a2960b90774ea5454e7e8dad870538f7bc",
+    "current": "10263722b5fb128922c49a31b5942c41333cd6e2",
+    "officialSamplesBeforeChange": 0,
+    "reason": "exact102/a637 program; absorbed independent main69 tests; product implementation equivalent98b, no source relabeling",
+    "baselineUnchanged": true,
+    "budgetsChanged": false
   }
 }

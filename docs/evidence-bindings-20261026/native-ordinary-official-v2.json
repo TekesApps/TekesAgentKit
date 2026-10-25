@@ -1,0 +1,174 @@
+{
+  "scope": "Native ordinary workload official cases only; no full stage/family/attachment acceptance",
+  "profileSha256": "2fa13b4301cc723c73a2a498caefb1219a81b429fe2d0a5fe308b7841ef9445c",
+  "baselineSource": "f1daa0ffcf6ced41e21f351e22845455ca78006c",
+  "candidateSource": "10263722b5fb128922c49a31b5942c41333cd6e2",
+  "baselineProgramSha256": "0baab01bd12bec5a1ab651859d09e92c72463a6783ed41b9679195726c789626",
+  "candidateProgramSha256": "a637ddb8fac00854b5883fe14eef850e6808c11c1d0704f390d08b0b085cd439",
+  "consumerSha256": "de9b1f3bcfca0c89d1cc24416f059ff3157bad22110d1a5b531fa35765bfdce1",
+  "runtime": "Kernel0.9.3/09508a9",
+  "officialCaseCount": 14,
+  "coldIndependentCasesPerRole": 5,
+  "warmMeasuredRoundsPerRole": 10,
+  "lifecycleMeasuredRoundsPerRole": 10,
+  "excludedInitializationRoundsPerWarmOrLifecycleCase": 1,
+  "allOriginalProtocolContractsPassed": true,
+  "coldAndWarmAbsoluteRelativeBudgetsPassed": true,
+  "lifecycleAbsoluteAndRssBudgetsPassed": true,
+  "lifecycleRelativeBudgetPassed": false,
+  "relativeFailures": [
+    {
+      "scopeIndex": 0,
+      "metric": "firstUsableSnapshotMs",
+      "baselineP95Ms": 58.6645,
+      "candidateP95Ms": 97.482292,
+      "ratio": 1.6616913465554126,
+      "limit": 1.2
+    },
+    {
+      "scopeIndex": 1,
+      "metric": "sendToFirstAssistantContentMs",
+      "baselineP95Ms": 270.429125,
+      "candidateP95Ms": 368.007459,
+      "ratio": 1.3608277547767829,
+      "limit": 1.2
+    }
+  ],
+  "reportSha256": "e23078615d7cc03a634a0cc26caeb3b59628ac6076454e040fd1378f4751dd2e",
+  "reporterSha256": "9d145b09aa92a8b8242c0acae5437c0d44d55ff1c46e2901c3ccdd8526b96867",
+  "batchSha256": "1050bb3a5efa94f3c6c1ec5cb6a8ee8a60075a84a27f8be8b4ff80ce8f4c1428",
+  "samples": [
+    {
+      "sampleId": "ordinary-v2-native-baseline-cold-0",
+      "role": "baseline",
+      "mode": "cold",
+      "caseIndex": 0,
+      "registrationSha256": "c1c7bab9a02def0ac6072e1689f90f87902c0b3d668512c8c6df53f5ae8757e3",
+      "sampleSha256": "9e8d5c5328c2ce4c432399cfb2bf68a5a96d103510326148be57e3d10941322d",
+      "status": "success"
+    },
+    {
+      "sampleId": "ordinary-v2-native-candidate-cold-0",
+      "role": "candidate",
+      "mode": "cold",
+      "caseIndex": 0,
+      "registrationSha256": "8c8fc096400e1f7d61d1c03a040653379712cd8c48e0102455a72be822f15aea",
+      "sampleSha256": "94a9a0220371994977695d4ba678b8f26604e4052dc5763ab42f106edd0f2037",
+      "status": "success"
+    },
+    {
+      "sampleId": "ordinary-v2-native-baseline-cold-1",
+      "role": "baseline",
+      "mode": "cold",
+      "caseIndex": 1,
+      "registrationSha256": "e23f75b54719a68888ce770bae540b2df6d9391f062a6bda08189c56589f56a6",
+      "sampleSha256": "f6e2676eeb705e864813fc470b065629ca34f0343c82ab6cd0a2300249ebf5c7",
+      "status": "success"
+    },
+    {
+      "sampleId": "ordinary-v2-native-candidate-cold-1",
+      "role": "candidate",
+      "mode": "cold",
+      "caseIndex": 1,
+      "registrationSha256": "d8bef9e8231b259dca4d68ba2133699433a806324666e1b2bfca35760bb619de",
+      "sampleSha256": "d060633a21fa82aeb2e073fabf12fd5a75fa5aff9d964cadc5b6e2fabddfe3f3",
+      "status": "success"
+    },
+    {
+      "sampleId": "ordinary-v2-native-baseline-cold-2",
+      "role": "baseline",
+      "mode": "cold",
+      "caseIndex": 2,
+      "registrationSha256": "77cdb1ef5732365422433dbe387263a5ab703dfec186f616bf99ff7875f9f4f6",
+      "sampleSha256": "d24d4ed859140ce576577d78c6804d162bef421b60c53b433b2cd3bdae642c22",
+      "status": "success"
+    },
+    {
+      "sampleId": "ordinary-v2-native-candidate-cold-2",
+      "role": "candidate",
+      "mode": "cold",
+      "caseIndex": 2,
+      "registrationSha256": "cfce3d2dc23bd64642ae38faf9b7f76957ee13ecde916716e56e2744f7493d65",
+      "sampleSha256": "262a5aca7b943502f9ca9f636ff736d0d435f95ed856800e0b29e6f2fa753ae8",
+      "status": "success"
+    },
+    {
+      "sampleId": "ordinary-v2-native-baseline-cold-3",
+      "role": "baseline",
+      "mode": "cold",
+      "caseIndex": 3,
+      "registrationSha256": "94f0519e6ff526f6095fcedb8bdadd39814f1eb5b6dfb5f4f5906a450440e7d9",
+      "sampleSha256": "1443f75d1d48fcb3415673a411f9b257df135aa7996f6c49184fbeecf04882e8",
+      "status": "success"
+    },
+    {
+      "sampleId": "ordinary-v2-native-candidate-cold-3",
+      "role": "candidate",
+      "mode": "cold",
+      "caseIndex": 3,
+      "registrationSha256": "c3db27080d1ccd843c0185993a570ec7ea085936e06a51fc08fdcf2ad6ce36fe",
+      "sampleSha256": "9b3687ec50872cedb3ca9e58ddc0e1484fe3294e6a6840a6a393430ad2e67e61",
+      "status": "success"
+    },
+    {
+      "sampleId": "ordinary-v2-native-baseline-cold-4",
+      "role": "baseline",
+      "mode": "cold",
+      "caseIndex": 4,
+      "registrationSha256": "6bebc54e8bd28cfb3ec8136da64f640df5c955ce6461a3f069a391ebe30dfb1b",
+      "sampleSha256": "31abe86583e630882055297b11a164089c67de776c0d2a628f62be3576d1b328",
+      "status": "success"
+    },
+    {
+      "sampleId": "ordinary-v2-native-candidate-cold-4",
+      "role": "candidate",
+      "mode": "cold",
+      "caseIndex": 4,
+      "registrationSha256": "47efc6996515482105b64b6b666edc7dd4125ce254e1e6c08bceb7d1d1aa2837",
+      "sampleSha256": "e5da6705f8879ab23ad4271cfc25147eefca4634f8eb38616bbe688958194852",
+      "status": "success"
+    },
+    {
+      "sampleId": "ordinary-v2-native-baseline-warm-0",
+      "role": "baseline",
+      "mode": "warm",
+      "caseIndex": 0,
+      "registrationSha256": "4fe001a740d34052f4c6ce84850cd5d9a98d38627bc22ee0a94918a62cedcba7",
+      "sampleSha256": "943c957424b68eb61bbd4f895e5a4a9fb38c984c0822d4df05902651c01e40a5",
+      "status": "success"
+    },
+    {
+      "sampleId": "ordinary-v2-native-candidate-warm-0",
+      "role": "candidate",
+      "mode": "warm",
+      "caseIndex": 0,
+      "registrationSha256": "1936af1f0d4b37fecd151cad484a3c100ce5dae4cd93a15ae4e6805677b125ea",
+      "sampleSha256": "cdc03600b52f38828736f2e2576d0dd76bc3e8b601ffd900637fa24d1a6d0cd6",
+      "status": "success"
+    },
+    {
+      "sampleId": "ordinary-v2-native-baseline-reconnectlifecycle-0",
+      "role": "baseline",
+      "mode": "reconnectLifecycle",
+      "caseIndex": 0,
+      "registrationSha256": "f8dbc5fe3fc87f608257fe91d834da0096333556121e5e9f2f4c20b1466ef629",
+      "sampleSha256": "d5b6f4faa348a7d5584d5233b96ce843dc8376ad8af4199e247e823c8074eb3b",
+      "status": "success"
+    },
+    {
+      "sampleId": "ordinary-v2-native-candidate-reconnectlifecycle-0",
+      "role": "candidate",
+      "mode": "reconnectLifecycle",
+      "caseIndex": 0,
+      "registrationSha256": "93dcf9a7bd8253d1bcd0d89c3a7f65174c48afc25da000e85e183f401508bdcb",
+      "sampleSha256": "a30d885fb35367e092ed2218a088b10f23c75bfba02086b69f76f5971691a7f9",
+      "status": "success"
+    }
+  ],
+  "performanceAccepted": false,
+  "otherEndpointsCovered": false,
+  "familyAttachmentPerformanceCovered": false,
+  "desktop": false,
+  "v1Preflight": "Python sys import failed before any harness launch; original registration/log/source retained; zero measurement samples produced",
+  "offlineReporterCorrection": "reconnect is bound to its original iteration_started segment; absent redundant iteration metadata is not a missing source event; original strict rejection retained; no source event synthesized and no protocol rerun"
+}

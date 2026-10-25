@@ -180,3 +180,17 @@ PR10已本地吸收main至1026372；冲突保留当前实现与main更强的50 c
 固定18d8f643 headless（product98b）和Kernel0.9.3正常完成原Task与一个bounded child。61条1024-byte commentary/61个真实read组与normal final均来自公开history，runOpen=false；公开initial max20 + 一个实际Earlier20，共两页，原始记录309+1，联合内容/顺序与完整groundtruth310条逐项相等。Kernel与三次CLI退出0，owned census无残留。不是每页20条原始record，也未为第二页增长或重跑seed。原runner把委托父provider请求计为providerRequests，字段仅覆盖父请求，已在当前工具明确命名；原收据不改写。详见native-family-seed-diagnostic.json。
 
 本次只确认正常终止与有限两页数据形态，尚未进行cold恢复/paired latency/RSS预算；正式样本0，#56不关闭。原helper和新runner是验收工具，不是产品功能扩展；不改SDK，不启动桌面。
+
+### 正式普通样本开始与未消除的差异
+
+两个程序已使用同一de9b1f3b observer：baseline f1/0baab01b，candidate102/a637ddb8；profile正式样本0时明确将candidate pin从98b修正到真实102，预算/数据集不变。原登记v1在任何harness启动前因Python sys导入缺失失败，日志/注册/源码保留；修正后v2登记启动首个Native正式cold样本，原始协议成功。原报告多要求了reconnect事件重复iteration字段，实际consumer按原iteration_started区段组织；离线按原区段修正解析并保留原拒绝，无新事件/性能数据合成、无协议重跑。
+
+修正进程测量后Pi warm初始化+10轮诊断已通过，原Node改名误分类失败保留。Pi lifecycle另有summary整值比较失败；新公开snapshot补证及离线键名修正证明两会话只有updatedAt增加、完整123entries内容和顺序不变。该文件mtime来源在5b已存在，不是#68回归；与ClientKit stored timestamp存在语义差异，已建后续#70，不扩当前产品范围。原lifecycle失败不翻案，也不通过忽略字段消除它。
+
+PR10精确d23731d CI40230369803已结束：headless、独立consumer、child witness与Native approval编译通过，仅strict nested reading失败；artifact12613590407 accepted=false、parentFollowingAfterInnerUp=true、append后offset634、detailVisible=false，demo build跳过。原门禁不弱化，#58/#59仍未完成。
+
+### Native普通正式组：保留性能失败
+
+新正式14case（每角色cold5独立case、warm/init+10、lifecycle/init+10）已按预注册顺序采集，全部协议和单case契约通过。冷启动和warm组的绝对/逐scope相对/RSS门槛通过；lifecycle全部绝对/RSS通过，但scope0恢复快照p95 97.482292ms / 58.6645ms = 1.661691倍、scope1首助手内容368.007459ms / 270.429125ms = 1.360828倍，超过原1.2限制。
+
+这是有效失败，未发现测量错误或数据量不同；同轮系统load上升仅是可能混杂因素，没有证据可以归因并豁免。保持原样本，不调预算、不替换，#55记录待有界归因的Native路径。正式证据见native-ordinary-official-v2.json；不称三端或完整performance通过，其他端、家族及附件/队列仍分别未完。

@@ -8,10 +8,32 @@ from __future__ import annotations
 
 import json
 import os
+import ctypes
+import sys
+from functools import lru_cache
 from pathlib import Path
 import subprocess
 import threading
 import time
+
+
+@lru_cache(maxsize=1)
+def _pidpath_function():
+    library = ctypes.CDLL('/usr/lib/libproc.dylib', use_errno=True)
+    function = library.proc_pidpath
+    function.argtypes = [ctypes.c_int, ctypes.c_void_p, ctypes.c_uint32]
+    function.restype = ctypes.c_int
+    return function
+
+
+def executable_path(pid):
+    """Read the executable identity, independent of Node's mutable process title."""
+    if sys.platform != 'darwin':
+        return None
+    buffer = ctypes.create_string_buffer(4096)
+    if _pidpath_function()(pid, buffer, len(buffer)) <= 0:
+        return None
+    return os.fsdecode(buffer.value)
 
 
 def process_table():
@@ -25,7 +47,8 @@ def process_table():
             raise ValueError('OS process row missing PID/start identity/RSS/command')
         pid, ppid, rss = map(int, fields[:3])
         rows[pid] = {'pid':pid, 'ppid':ppid, 'rssKiB':rss,
-                     'startIdentity':' '.join(fields[3:8]), 'command':fields[8]}
+                     'startIdentity':' '.join(fields[3:8]), 'command':fields[8],
+                     'executablePath':executable_path(pid)}
     return rows
 
 
@@ -52,7 +75,8 @@ def classify(rows, roots, known, *, pi_embedded=False):
             current, visited = pid, set()
             while current in rows and current not in visited:
                 visited.add(current)
-                if Path(rows[current]['command']).name == 'node':
+                executable = rows[current].get('executablePath') or rows[current]['command']
+                if Path(executable).name == 'node':
                     owner = 'harness'; break
                 if current in roots:
                     break

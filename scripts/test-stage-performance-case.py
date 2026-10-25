@@ -16,6 +16,7 @@ from pathlib import Path
 import re
 import signal
 import subprocess
+import sys
 import threading
 import time
 import traceback
@@ -30,6 +31,7 @@ from performance_provider_fixture import (RequestStats, body_text, create_provid
     read_source_bytes, read_source_path, seed_commands)
 from performance_public_readback import normalize_public_session
 from performance_event_contract import validate_events
+from performance_official_registration import validate_registration, sha256 as file_sha256
 
 ROOT = Path('/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/performance')
 
@@ -97,7 +99,10 @@ def run_program(program, payload, case, label, env, sampler, *, timeout=300):
                                     pi_embedded=sampler.pi_embedded
                                 owned=classify(os_rows,roots,known,pi_embedded=pi_embedded)
                                 compact=[{'pid':row['pid'],'startIdentity':row['startIdentity'],
-                                          'role':row['role'],'commandName':Path(row['command']).name}
+                                          'role':row['role'],'commandName':Path(row['command']).name,
+                                          'executablePath':row.get('executablePath'),
+                                          'executableName':(Path(row['executablePath']).name
+                                                            if row.get('executablePath') else None)}
                                          for row in owned.values() if row['role']!='provider']
                                 boundary={'rawEventIndex':len(rows)-1,'event':event_name,
                                     'iteration':event.get('iteration'),'round':event.get('round'),
@@ -150,10 +155,16 @@ def run_program(program, payload, case, label, env, sampler, *, timeout=300):
 def validate_warm_process_identity(endpoint, mode, boundaries, rss_rows, rss_summary,
                                    harness_roots):
     """Fail closed unless OS identities remain continuously visible in warm samples."""
-    if mode != 'warm':
-        return {'status':'not_applicable','reason':'steady-warm identity rule applies only to warm mode'}
     if not isinstance(boundaries,list) or not isinstance(rss_rows,list) or not isinstance(harness_roots,list):
         raise ValueError('warm process identity evidence is incomplete')
+    max_gap=rss_summary.get('maxObservedIntervalNs') if isinstance(rss_summary,dict) else None
+    if type(max_gap) is not int or max_gap<=0 or max_gap>250_000_000:
+        raise ValueError('process RSS cadence gap exceeds the 250ms identity observation bound')
+    if mode != 'warm':
+        return {'status':'cadence_verified','mode':mode,
+                'continuousRssSamples':len(rss_rows),
+                'maxObservedIntervalNs':max_gap,
+                'samplingGapBoundNs':250_000_000}
     starts=[row for row in boundaries if row.get('event')=='iteration_started']
     if len(starts)!=11 or [row.get('iteration') for row in starts]!=list(range(11)):
         raise ValueError('warm process observations require initialization and ten measured iteration boundaries')
@@ -177,7 +188,7 @@ def validate_warm_process_identity(endpoint, mode, boundaries, rss_rows, rss_sum
     def identities(rows, *, node_only=False):
         return {(row.get('pid'),row.get('startIdentity')) for row in rows
                 if row.get('role')=='harness'
-                and (not node_only or row.get('commandName')=='node')}
+                and (not node_only or row.get('executableName')=='node')}
 
     baseline_rows=starts[0]['osProcesses']
     if endpoint=='pi':
@@ -208,10 +219,9 @@ def validate_warm_process_identity(endpoint, mode, boundaries, rss_rows, rss_sum
             raise ValueError('warm RSS sample lacks per-process OS identities')
         live={(row.get('pid'),row.get('startIdentity')) for row in process_rows
               if row.get('role')=='harness'
-              and (endpoint!='pi' or Path(row.get('command','')).name=='node')}
+              and (endpoint!='pi' or Path(row.get('executablePath') or '').name=='node')}
         if not expected.issubset(live):
             raise ValueError('long-lived harness identity disappeared from a 50ms RSS observation')
-    max_gap=rss_summary.get('maxObservedIntervalNs') if isinstance(rss_summary,dict) else None
     if type(max_gap) is not int or max_gap<=0 or max_gap>250_000_000:
         raise ValueError('warm RSS cadence gap exceeds the 250ms identity observation bound')
     return {'status':'verified','endpoint':endpoint,'iterationBoundaries':11,
@@ -377,8 +387,36 @@ def main():
         parser.add_argument('--'+name,type=Path,required=True)
     for name in ('kernel-supervisor','kernel-worker','providers-config','pi-root','dsh-root'):
         parser.add_argument('--'+name,type=Path)
+    parser.add_argument('--official-registration',type=Path,
+                        help='consume a complete immutable official sample registration before runtime probes')
     args=parser.parse_args()
     if not re.fullmatch('[a-z0-9][a-z0-9-]{1,79}',args.case_name):parser.error('invalid owned case name')
+    official=None
+    if args.official_registration is not None:
+        # validate_registration reads every pin and creates no directory or
+        # child process. This must remain before runtime_identity() below.
+        official=validate_registration(args.official_registration.resolve(strict=True),
+                                       driver_path=Path(sys.executable).resolve(strict=True),
+                                       official_runner_path=Path(__file__),
+                                       caller_role='capture')
+        reg=official['registration']
+        if (reg.get('caseName')!=args.case_name or reg.get('endpoint')!=args.endpoint
+                or reg.get('mode')!=args.mode
+                or file_sha256(Path(args.program))!=reg.get('programSha256')
+                or file_sha256(Path(args.seeder))!=reg.get('seederSha256')
+                or str(Path(args.profile).resolve(strict=True))!=str(official['profilePath'])
+                or file_sha256(Path(args.program_receipt))!=reg.get('programReceiptSha256')
+                or file_sha256(Path(args.seeder_receipt))!=reg.get('seederReceiptSha256')
+                or reg.get('role') not in ('baseline','candidate')):
+            parser.error('official registration does not match this exact command/source/program role')
+        runtime_arg_names={'kernel_supervisor':'kernel-supervisor','kernel_worker':'kernel-worker',
+            'providers_config':'providers-config','pi_root':'pi-root','dsh_root':'dsh-root'}
+        for argument,registered in runtime_arg_names.items():
+            actual=getattr(args,argument)
+            expected=reg['runtimeArguments'].get(registered)
+            if (expected is None and actual is not None) or (expected is not None and
+                    (actual is None or str(actual.resolve(strict=True))!=str(Path(expected).resolve(strict=True)))):
+                parser.error('official registration runtime arguments differ from this exact command')
     ROOT.mkdir(parents=True,exist_ok=True)
     case=ROOT/args.case_name
     if case.exists():parser.error('owned diagnostic case already exists; evidence is never overwritten')
@@ -392,10 +430,20 @@ def main():
     read_source_path(workspace).write_bytes(read_source_bytes())
     home=case/'host-home';home.mkdir();tmp=case/'tmp';tmp.mkdir()
     env={'PATH':'/usr/bin:/bin:/usr/sbin:/sbin','HOME':str(home),'TMPDIR':str(tmp),'LANG':'en_US.UTF-8'}
-    write(case/'inputs.json',{'diagnosticOnly':True,'officialSamples':0,
+    input_record={'diagnosticOnly':official is None,'official':official is not None,
+        'officialSamples':0 if official is None else 1,
         'program':program_receipt,'seeder':seeder_receipt,'profileSha256':sha(args.profile),
         'runtimeCriticalBefore':runtime_before,
-        'mode':args.mode,'endpoint':args.endpoint,'machineBefore':machine_identity()})
+        'mode':args.mode,'endpoint':args.endpoint,'machineBefore':machine_identity()}
+    if official is not None:
+        input_record['officialRegistration']={
+            'sampleId':official['registration']['sampleId'],
+            'role':official['registration']['role'],
+            'sourceCommit':official['registration']['sourceCommit'],
+            'caseIndex':official['registration']['caseIndex'],
+            'registrationSha256':file_sha256(args.official_registration),
+            'registrationBytes':official['registrationBytes'].decode('utf-8')}
+    write(case/'inputs.json',input_record)
     stats=RequestStats();handler=create_provider_handler(workspace,stats,endpoint=args.endpoint)
     server=http.server.ThreadingHTTPServer(('127.0.0.1',0),handler)
     server.daemon_threads=False;server.block_on_close=True
@@ -541,12 +589,23 @@ def main():
             write(case/'consumer-process-boundaries.summary.json',{
                 'source':consumer_exit['processBoundaries'],'boundaries':boundaries,
                 'rawConsumerEventsUnmodified':True})
-    write(case/'diagnostic-receipt.json',{'acceptedDiagnosticPlumbing':failure is None,
-        'officialSamples':0,'performanceAccepted':False,'error':failure,
-        'profileSha256':sha(args.profile),'programSha256':sha(program),'mode':args.mode,
-        'endpoint':args.endpoint,'seedRss':seed_rss,'measurementRss':measured_rss,
-        'nativeWindow':False,'physicalIme':False,'privateHarnessHistoryRead':False})
-    print('PERFORMANCE_DIAGNOSTIC_'+('FAILED' if failure else 'COMPLETED')+' '+str(case))
+    receipt={'error':failure,'profileSha256':sha(args.profile),'programSha256':sha(program),
+        'seederSha256':sha(seeder),'mode':args.mode,'endpoint':args.endpoint,
+        'seedRss':seed_rss,'measurementRss':measured_rss,
+        'nativeWindow':False,'physicalIme':False,'privateHarnessHistoryRead':False}
+    if official is None:
+        receipt.update({'acceptedDiagnosticPlumbing':failure is None,
+                        'officialSamples':0,'performanceAccepted':False})
+        write(case/'diagnostic-receipt.json',receipt)
+        print('PERFORMANCE_DIAGNOSTIC_'+('FAILED' if failure else 'COMPLETED')+' '+str(case))
+    else:
+        receipt.update({'official':True,'diagnosticOnly':False,'officialSamples':1,
+            'status':'success' if failure is None else 'failed',
+            'sampleId':official['registration']['sampleId'],
+            'registrationSha256':file_sha256(args.official_registration),
+            'failureReason':failure,'performanceAccepted':False})
+        write(case/'official-execution-receipt.json',receipt)
+        print('PERFORMANCE_OFFICIAL_CASE_'+('FAILED' if failure else 'COMPLETED')+' '+str(case))
     return 1 if failure else 0
 
 

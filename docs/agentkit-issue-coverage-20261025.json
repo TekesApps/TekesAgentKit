@@ -91,7 +91,8 @@
         56,
         13,
         67,
-        68
+        68,
+        70
       ],
       "keys": [
         "H01",
@@ -404,7 +405,8 @@
         42,
         56,
         29,
-        67
+        67,
+        70
       ],
       "keys": [
         "SIDEBAR",
@@ -1790,6 +1792,37 @@
         "ciRun": 40227909675,
         "head": "4c682b1a8828acaf19a02db639e6928189999b83"
       }
+    },
+    {
+      "key": "PI-ACTIVITY-TIME",
+      "parent": 22,
+      "title": "Pi会话活动时间来源与发送后刷新语义对齐",
+      "status": "待办",
+      "layer": "implementation",
+      "scope": "明确stored updatedAt与原session文件mtime来源差异，以及settled后列表刷新/排序与重连的一致契约；当前阶段后续范围",
+      "deliverables": [
+        "字段来源/刷新语义设计及精确ClientKit参照",
+        "必要的AgentKit元数据/状态传播实现",
+        "公开pointer/完整历史/来源时间/重连验收"
+      ],
+      "dependencies": [],
+      "criteria": [
+        "时间有真实来源依据，不简单冻结/忽略updatedAt",
+        "稳定summary字段及完整原history内容顺序正确",
+        "适用验证通过且进入main后关闭"
+      ],
+      "evidence": [
+        "evidence-bindings-20261026/pi-inventory-metadata.json"
+      ],
+      "related": [
+        14,
+        42,
+        55,
+        56
+      ],
+      "owner": "@qf0421；主会话协调 + 新独立子会话",
+      "number": 70,
+      "stage": "future"
     }
   ],
   "existingImplementationIssues": [
@@ -1950,7 +1983,8 @@
       63,
       64,
       65,
-      66
+      66,
+      70
     ],
     "frozenExpansionWip": [
       36,
@@ -2016,13 +2050,14 @@
     "currentCandidate": "10263722b5fb128922c49a31b5942c41333cd6e2",
     "frozenScopeBase": "5b7c84361206b45ac381b10437097d3b76c322c1",
     "ciObservation": {
-      "head": "98b1d9a2960b90774ea5454e7e8dad870538f7bc",
-      "run": 40226400379,
+      "head": "d23731dfe21820a35a7af0550ecb6069cbef1f08",
+      "run": 40230369803,
       "root": "success",
       "ui": "failure",
       "onlyFailedGate": "strict nested reading / TekesUI53",
       "standalonePublicConsumer": "success",
       "laterDemoBuild": "skipped",
+      "artifact": 12613590407,
       "merged": false
     },
     "latestWindowFixAcceptance": {
@@ -2045,11 +2080,19 @@
         "binding": "evidence-bindings-20261026/issue68-mainline-delivery.json",
         "fullStageAccepted": false
       }
-    ]
+    ],
+    "ordinaryPerformanceProgress": {
+      "officialCaseCount": 14,
+      "scope": "Native ordinary",
+      "coldWarm": "passed applicable budgets",
+      "lifecycle": "relative snapshot/assistant-content failed; all original samples retained",
+      "binding": "evidence-bindings-20261026/native-ordinary-official-v2.json",
+      "performanceAccepted": false
+    }
   },
   "stageCoverageAudit": {
     "requirements": 50,
-    "implementationIssues": 42,
+    "implementationIssues": 43,
     "syncedExistingIssues": [
       60,
       61,
@@ -2059,7 +2102,7 @@
       65,
       66
     ],
-    "newIssuesCreated": 2,
+    "newIssuesCreated": 3,
     "closedIssues": [
       68
     ],
@@ -2069,6 +2112,9 @@
     "addedBlockingFixIssues": [
       67,
       68
+    ],
+    "addedNonBlockingFutureIssues": [
+      70
     ]
   },
   "currentStageCounts": {
@@ -2077,7 +2123,7 @@
     "进行中": 9,
     "等待上游": 9,
     "等待桌面": 1,
-    "待办": 8
+    "待办": 9
   },
   "remoteMainAtOriginalAudit": "f1daa0ffcf6ced41e21f351e22845455ca78006c"
 }

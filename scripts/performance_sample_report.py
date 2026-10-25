@@ -16,8 +16,9 @@ MODE_COUNTS = CASE_COUNTS  # Kept as a compatibility alias for callers.
 MEASURED_ITERATIONS = {"cold": 1, "warm": 10, "reconnectLifecycle": 10}
 ENDPOINTS = ("native", "pi", "dsh")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
-STABLE_MACHINE_FIELDS = ("hardware", "os", "power")
 ARTIFACT_SHA_FIELDS = ("programSha256", "consumerSha256", "runnerSha256", "runtimeSha256")
+
+_MODE_SECTIONS = ("Battery Power", "AC Power")
 
 
 def nearest_rank(values: list[float], percentile: float) -> float:
@@ -103,14 +104,82 @@ def _validate_provenance(sample: dict[str, Any], role: str, profile: dict[str, A
               f"sample {field} must be a complete SHA-256")
 
 
+def _command_output(observation: Any, label: str) -> str:
+    _need(isinstance(observation, dict) and observation.get("exitStatus") == 0,
+          f"raw {label} observation is missing or failed")
+    stdout = observation.get("stdout")
+    _need(isinstance(stdout, str) and stdout.strip(), f"raw {label} stdout is missing")
+    return stdout
+
+
+def _stable_power_modes(stdout: str) -> dict[str, dict[str, str]]:
+    modes: dict[str, dict[str, str]] = {}
+    active: str | None = None
+    for raw_line in stdout.splitlines():
+        line = raw_line.strip().rstrip(":")
+        if line in _MODE_SECTIONS:
+            _need(line not in modes, "raw powerMode repeats a power profile section")
+            active = line
+            modes[active] = {}
+            continue
+        if not line:
+            continue
+        _need(active is not None, "raw powerMode setting precedes its section")
+        match = re.fullmatch(r"(.+?)\s+([^\s]+)", line)
+        _need(match is not None, "raw powerMode setting is malformed")
+        key, value = match.groups()
+        _need(key not in modes[active], "raw powerMode setting is duplicated")
+        modes[active][key] = value
+    _need(all(section in modes and modes[section] for section in _MODE_SECTIONS),
+          "raw powerMode must contain nonempty Battery Power and AC Power profiles")
+    return modes
+
+
 def _stable_machine_identity(value: Any) -> dict[str, Any]:
-    _need(isinstance(value, dict), "machine identity is required")
-    result = {field: value.get(field) for field in STABLE_MACHINE_FIELDS}
-    _need(all(result[field] is not None for field in STABLE_MACHINE_FIELDS),
-          "stable machine identity requires hardware, os and power fields")
-    # unixNs, monotonicNs, loadAverage and thermal observations stay in source
-    # rows for audit, but intentionally do not participate in equality checks.
-    return result
+    """Extract stable identity from the full raw macOS observation.
+
+    Battery charge/remaining time and the observation clocks stay in the raw
+    receipt but do not define a comparable power configuration. Current power
+    source and both configured power profiles do define it.
+    """
+    _need(isinstance(value, dict), "raw machine identity is required")
+    os_text = _command_output(value.get("os"), "sw_vers")
+    hardware_text = _command_output(value.get("hardware"), "sysctl")
+    power_text = _command_output(value.get("power"), "pmset -g batt")
+    modes_text = _command_output(value.get("powerMode"), "pmset -g custom")
+
+    os_values = {}
+    for line in os_text.splitlines():
+        match = re.fullmatch(r"(ProductName|ProductVersion|BuildVersion):\s*(.+)", line.strip())
+        if match:
+            os_values[match.group(1)] = match.group(2)
+    _need(set(os_values) == {"ProductName", "ProductVersion", "BuildVersion"},
+          "raw sw_vers output is incomplete")
+
+    hardware_values = {}
+    for line in hardware_text.splitlines():
+        match = re.fullmatch(r"hw\.(model|memsize|ncpu):\s*(\S+)", line.strip())
+        if match:
+            hardware_values[match.group(1)] = match.group(2)
+    _need(set(hardware_values) == {"model", "memsize", "ncpu"},
+          "raw sysctl output is incomplete")
+
+    source = re.search(r"^Now drawing from '([^']+)'\s*$", power_text, re.MULTILINE)
+    _need(source is not None and source.group(1) in ("AC Power", "Battery Power", "UPS Power"),
+          "raw pmset battery output has no recognized current power source")
+    return {"os": os_values, "hardware": hardware_values,
+            "powerSource": source.group(1), "powerModes": _stable_power_modes(modes_text)}
+
+
+def _sample_machine_identity(sample: dict[str, Any]) -> dict[str, Any]:
+    before = _stable_machine_identity(sample.get("machineIdentity"))
+    after = _stable_machine_identity(sample.get("machineAfter"))
+    _need(before == after, "machine power source/mode or stable hardware changed during sample")
+    normalized = sample.get("stableMachineIdentity")
+    _need(isinstance(normalized, dict), "normalized stable machine identity must be retained with raw observations")
+    _need(normalized == before,
+          "retained stable machine identity differs from normalization of raw before/after observations")
+    return before
 
 
 def _sample_contract(sample: dict[str, Any], expected_mode: str, role: str,
@@ -121,6 +190,7 @@ def _sample_contract(sample: dict[str, Any], expected_mode: str, role: str,
     _need(sample.get("official") is True, "sample is not explicitly marked official")
     _need(isinstance(sample.get("failureReason"), (str, type(None))), "failureReason must be explicit")
     _validate_provenance(sample, role, profile)
+    _sample_machine_identity(sample)
     events = _events(sample)
     endpoint = sample.get("endpoint")
     _need(endpoint in ENDPOINTS, "sample must name its runtime endpoint")
@@ -184,6 +254,14 @@ def _sample_contract(sample: dict[str, Any], expected_mode: str, role: str,
     from performance_event_contract import validate_events
     validate_events(events, expected_mode, session_ids, endpoint)
     scopes = set(session_ids)
+    for event in events:
+        if event.get("event") != "send":
+            continue
+        index = event.get("sessionIndex")
+        _need(type(index) is int and index in (0, 1),
+              "original send must name its stable sessionIndex")
+        _need(event.get("scope", {}).get("sessionId") == session_ids[index],
+              "original send sessionIndex does not match its public session pointer")
     measured = iters if expected_mode == "cold" else iters[1:]
     _need(len(measured) == MEASURED_ITERATIONS[expected_mode],
           "measured iteration count differs from the frozen case profile")
@@ -248,7 +326,8 @@ def _sample_contract(sample: dict[str, Any], expected_mode: str, role: str,
             _need(not reconnects, "steady warm must not reconnect")
         else:
             _need(len(reconnects) == 1 and reconnects[0].get("converged") is True
-                  and reconnects[0].get("epochAdvanced") is True,
+                  and reconnects[0].get("epochAdvanced") is True
+                  and reconnects[0].get("iteration", iteration) == iteration,
                   "cold/lifecycle iteration lacks converged reconnect")
             latency = reconnects[0].get("latencyNs")
             _need(isinstance(latency, (int, float)) and latency >= 0,
@@ -272,15 +351,27 @@ def _sample_contract(sample: dict[str, Any], expected_mode: str, role: str,
         _need(isinstance(restart, dict) and restart.get("seedExitStatus") == 0
               and restart.get("seedStateSealed") is True,
               "cold case must prove sealed seed process exited before measured restart")
-        seed_identity = _process_identity(restart.get("seedHarness"), "cold seed harness")
-        measured_identity = _process_identity(restart.get("measuredHarness"), "cold measured harness")
-        _need(seed_identity != measured_identity, "cold measured harness must be distinct from seed harness")
         if endpoint == "pi":
+            seed_root = _process_identity(restart.get("seedAgentKitRoot"), "Pi seed AgentKit root")
+            _need(seed_root != _process_identity(cleanup.get("consumerRoot"), "measured AgentKit root")
+                  and restart.get("seedOwnedGroupAbsent") is True,
+                  "Pi cold seed AgentKit and its owned group must retire before measurement")
             children = restart.get("measuredPiRpcChildren")
             _need(isinstance(children, list) and len(children) == 2,
                   "Pi cold ownership must identify both measured RPC child processes")
             _need(len({_process_identity(child, "Pi cold RPC child") for child in children}) == 2,
                   "Pi cold must prove two distinct RPC child process groups")
+            seed_children = restart.get("seedPiRpcChildren")
+            _need(isinstance(seed_children, list) and len(seed_children) == 2,
+                  "Pi cold must retain both original seeder RPC process identities")
+            seed_set = {_process_identity(child, "Pi seed RPC child") for child in seed_children}
+            measured_set = {_process_identity(child, "Pi measured RPC child") for child in children}
+            _need(len(seed_set) == 2 and seed_set.isdisjoint(measured_set),
+                  "Pi cold seeder and measured RPC process identities must be disjoint")
+        else:
+            seed_identity = _process_identity(restart.get("seedHarness"), "cold seed harness")
+            measured_identity = _process_identity(restart.get("measuredHarness"), "cold measured harness")
+            _need(seed_identity != measured_identity, "cold measured harness must be distinct from seed harness")
     else:
         identities = cleanup.get("warmProcessIdentities")
         _need(isinstance(identities, list) and len(identities) == 11,
@@ -306,6 +397,70 @@ def _sample_contract(sample: dict[str, Any], expected_mode: str, role: str,
                       and all(row.get("oldSetRetired") is True and row.get("newSetStarted") is True
                               for row in retirements),
                       "Pi lifecycle must trace each old RPC set retirement and new set start")
+                boundaries = cleanup.get("piRpcLifecycleSendBoundaries")
+                _need(isinstance(boundaries, list) and len(boundaries) == 20,
+                      "Pi lifecycle requires two send-time OS process censuses for every measured round")
+                boundary_by_round: dict[int, list[dict[str, Any]]] = defaultdict(list)
+                reconnects_by_round = {}
+                original_round = None
+                for original_event in events:
+                    if original_event.get('event') == 'iteration_started':
+                        original_round = original_event.get('iteration')
+                    elif original_event.get('event') == 'reconnect':
+                        _need(original_event.get('iteration', original_round) == original_round,
+                              'reconnect metadata contradicts its original iteration marker')
+                        reconnects_by_round[original_round] = original_event
+                for boundary in boundaries:
+                    _need(isinstance(boundary, dict) and boundary.get("error") is None
+                          and isinstance(boundary.get("osProcesses"), list),
+                          "Pi lifecycle send-time process census is missing or errored")
+                    raw_index = boundary.get("rawEventIndex")
+                    _need(type(raw_index) is int and 0 <= raw_index < len(events),
+                          "Pi lifecycle send census does not bind a raw consumer event index")
+                    event = events[raw_index]
+                    round_index = boundary.get("round")
+                    session_index = boundary.get("sessionIndex")
+                    _need(event.get("event") == "send" and event.get("round") == round_index
+                          and event.get("sessionIndex") == session_index
+                          and event.get("scope", {}).get("sessionId") == boundary.get("scopeSessionId"),
+                          "Pi lifecycle OS census is not tied to the corresponding original send scope")
+                    _need(round_index in range(1, 11) and session_index in (0, 1),
+                          "Pi lifecycle census is outside the ten measured rounds or two original scopes")
+                    reconnect = reconnects_by_round.get(round_index)
+                    _need(isinstance(reconnect, dict) and reconnect.get("converged") is True
+                          and reconnect.get("endpointGenerationReplaced") is True
+                          and events.index(reconnect) < raw_index,
+                          "Pi lifecycle send census does not follow the same round's completed reconnect")
+                    reconnect_publication = reconnect.get("publicationMonotonicNs")
+                    send_intent = boundary.get("originalIntentMonotonicNs")
+                    _need(type(reconnect_publication) is int and type(send_intent) is int
+                          and send_intent > reconnect_publication,
+                          "Pi lifecycle send must begin after its endpoint replacement publication")
+                    observed = {(item.get("pid"), item.get("startIdentity")): item
+                                for item in boundary["osProcesses"] if isinstance(item, dict)}
+                    node_ids = {identity for identity, item in observed.items()
+                                if item.get("role") == "harness"
+                                and item.get("executableName") == "node"}
+                    reported = child_sets[round_index]
+                    _need(len(node_ids) == 2 and node_ids == set(reported),
+                          "Pi lifecycle send census does not observe exactly its reported RPC child processes")
+                    _need(roots[round_index] in observed,
+                          "Pi lifecycle send census belongs to a different AgentKit process")
+                    boundary_by_round[round_index].append(boundary)
+                _need(set(boundary_by_round) == set(range(1, 11))
+                      and all(len(rows_for_round) == 2
+                              and {row.get("sessionIndex") for row in rows_for_round} == {0, 1}
+                              for rows_for_round in boundary_by_round.values()),
+                      "each measured Pi lifecycle round must bind both original send boundaries")
+                for round_index in range(1, 11):
+                    new_ids = set(child_sets[round_index])
+                    for boundary in boundary_by_round[round_index]:
+                        observed_ids = {(item.get("pid"), item.get("startIdentity"))
+                                        for item in boundary["osProcesses"] if isinstance(item, dict)}
+                        _need(new_ids.issubset(observed_ids),
+                              "new Pi RPC children are absent from the after-reconnect send census")
+                        _need(not set(child_sets[round_index - 1]).intersection(observed_ids),
+                              "retired Pi RPC children remain in the after-reconnect send census")
         else:
             harnesses = [_process_identity(row.get("ownedHarness"), "warm owned harness")
                          for row in identities]
@@ -347,14 +502,15 @@ def _role_summary(rows: list[dict[str, Any]], profile: dict[str, Any]) -> dict[s
     limits = profile["thresholds"]
     ns_ms = lambda value: value / 1_000_000
     per_session = {}
-    session_ids = list(rows[0]["perSession"])
-    for index, session in enumerate(session_ids):
-        metrics = {key: [ns_ms(value) for row in rows for value in row["perSession"][session][source]]
+    for index in range(2):
+        session_ids = [row["sample"]["sessionIds"][index] for row in rows]
+        metrics = {key: [ns_ms(value) for row, session in zip(rows, session_ids)
+                         for value in row["perSession"][session][source]]
                    for key, source in (("firstUsableSnapshotMs", "firstSnapshotNs"),
                                        ("sendToFirstAssistantContentMs", "firstContentNs"),
                                        ("historyPage20ToProjectionMs", "page20Ns"))}
         per_session[str(index)] = {
-            "sessionId": session,
+            "sessionIds": session_ids,
             "firstUsableSnapshotMs": _metric(metrics["firstUsableSnapshotMs"], limits["firstUsableSnapshotP95Ms"]),
             "sendToFirstAssistantContentMs": _metric(metrics["sendToFirstAssistantContentMs"], limits["sendToFirstPublicFrameP95Ms"]),
             "historyPage20ToProjectionMs": _metric(metrics["historyPage20ToProjectionMs"], limits["historyPageToProjectionP95Ms"]),
@@ -386,8 +542,8 @@ def _paired_inputs(baseline: list[dict[str, Any]], candidate: list[dict[str, Any
                            sorted(candidate, key=lambda x: x["sample"].get("caseIndex", x["sample"].get("iteration")))):
         if any(json_key(left["sample"].get(field)) != json_key(right["sample"].get(field)) for field in fields):
             return False
-        if json_key(_stable_machine_identity(left["sample"].get("machineIdentity"))) != json_key(
-                _stable_machine_identity(right["sample"].get("machineIdentity"))):
+        if json_key(_sample_machine_identity(left["sample"])) != json_key(
+                _sample_machine_identity(right["sample"])):
             return False
     return True
 
@@ -451,7 +607,7 @@ def aggregate_batch(batch: dict[str, Any]) -> dict[str, Any]:
                             "diagnosticOnly": False, "retainedSampleRows": samples,
                             "reason": f"{endpoint} {role} {mode} has wrong case count/index; cases are never substituted"}
                 signatures = {(row["sample"].get("seedDigest"), row["sample"].get("workloadDigest"),
-                              json_key(_stable_machine_identity(row["sample"].get("machineIdentity"))),
+                              json_key(_sample_machine_identity(row["sample"])),
                               row["sample"].get("runtimeSha256")) for row in rows}
                 _need(len(signatures) == 1 and None not in next(iter(signatures)),
                       f"{endpoint} {role} {mode} case inputs/machine/runtime are not consistent")
@@ -464,6 +620,25 @@ def aggregate_batch(batch: dict[str, Any]) -> dict[str, Any]:
                            "cleanupMs", "agentkitSampledPeakMiB", "harnessSampledPeakMiB"):
                 statistic = "max" if metric in ("cleanupMs", "agentkitSampledPeakMiB", "harnessSampledPeakMiB") else "p95"
                 b, c = baseline_metric = reports[f"{endpoint}/baseline:{mode}"][metric][statistic], reports[f"{endpoint}/candidate:{mode}"][metric][statistic]
+                per_scope_ratios = []
+                if metric in ("firstUsableSnapshotMs", "sendToFirstAssistantContentMs",
+                              "historyPage20ToProjectionMs"):
+                    for index in range(2):
+                        baseline_scope = reports[f"{endpoint}/baseline:{mode}"]["perSession"][str(index)][metric]
+                        candidate_scope = reports[f"{endpoint}/candidate:{mode}"]["perSession"][str(index)][metric]
+                        scope_b = baseline_scope["p95"]
+                        scope_c = candidate_scope["p95"]
+                        _need(isinstance(scope_b, (int, float)) and scope_b > 0
+                              and isinstance(scope_c, (int, float)),
+                              f"{endpoint} {mode} scope {index} {metric} lacks a comparable baseline")
+                        scope_ratio = scope_c / scope_b
+                        scope_limit = profile["thresholds"]["latencyRegressionRatioMax"]
+                        candidate_scope["baselineP95"] = scope_b
+                        candidate_scope["baselineComparisonStatistic"] = "p95"
+                        candidate_scope["regressionRatio"] = scope_ratio
+                        candidate_scope["regressionLimit"] = scope_limit
+                        candidate_scope["regressionPass"] = scope_ratio <= scope_limit
+                        per_scope_ratios.append(scope_ratio)
                 if b is None and c is None:
                     ratio = None
                 else:
@@ -476,7 +651,9 @@ def aggregate_batch(batch: dict[str, Any]) -> dict[str, Any]:
                 report["regressionRatio"] = ratio
                 report["regressionLimit"] = (profile["thresholds"]["peakRssRegressionRatioMax"]
                     if "MiB" in metric else profile["thresholds"]["latencyRegressionRatioMax"])
-                report["regressionPass"] = None if ratio is None else ratio <= report["regressionLimit"]
+                report["regressionPass"] = (None if ratio is None else
+                    all(scope_ratio <= report["regressionLimit"] for scope_ratio in per_scope_ratios)
+                    if per_scope_ratios else ratio <= report["regressionLimit"])
 
     metric_names = ("firstUsableSnapshotMs", "sendToFirstAssistantContentMs", "historyPage20ToProjectionMs",
                     "explicitReconnectToConvergedMs", "cleanupMs", "agentkitSampledPeakMiB", "harnessSampledPeakMiB")
@@ -486,7 +663,12 @@ def aggregate_batch(batch: dict[str, Any]) -> dict[str, Any]:
              and reports[name][metric]["absolutePass"] is None))
         and (reports[name][metric].get("regressionPass") is True
              or reports[name][metric].get("regressionPass") is None)
-        for name in reports if "/candidate:" in name for metric in metric_names)
+        for name in reports if "/candidate:" in name for metric in metric_names) and all(
+        item[metric]["absolutePass"] is True and item[metric].get("regressionPass") is True
+        for name, report in reports.items() if "/candidate:" in name
+        for item in report.get("perSession", {}).values()
+        for metric in ("firstUsableSnapshotMs", "sendToFirstAssistantContentMs",
+                       "historyPage20ToProjectionMs"))
     failures = [] if accepted else [
         {"role": name, "metric": metric,
          "absolutePass": report[metric]["absolutePass"],

@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from performance_sample_report import aggregate_batch, nearest_rank
+from performance_sample_report import _stable_machine_identity, aggregate_batch, nearest_rank
 
 PROFILE = {
     "format": 1,
@@ -36,6 +36,31 @@ def seed_session(session_index):
     digest = hashlib.sha256(json.dumps(digest_input, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     return {"bodyMessages": 100, "toolGroups": 10, "bodyUtf8Bytes": [1024] * 100,
             "normalizedContent": normalized, "normalizedContentDigest": digest}
+
+
+def machine_observation(*, source="AC Power", percent=100, sleep=1, unix=1):
+    def command(stdout, exit_status=0):
+        return {"exitStatus": exit_status, "stdout": stdout, "stderr": ""}
+    return {
+        "unixNs": unix,
+        "monotonicNs": unix * 1000,
+        "loadAverage": [float(unix), 0, 0],
+        "os": command("ProductName: macOS\nProductVersion: 26.6.2\nBuildVersion: 25G83\n"),
+        "hardware": command("hw.model: Mac16,1\nhw.memsize: 34359738368\nhw.ncpu: 10\n"),
+        "power": command(f"Now drawing from '{source}'\n"
+                         f" -InternalBattery-0\t{percent}%; charged; 0:00 remaining present: true\n"),
+        "powerMode": command(f"Battery Power:\n lowpowermode 0\n sleep {sleep}\n"
+                             f"AC Power:\n lowpowermode 0\n sleep {sleep}\n"),
+        "thermal": command("No thermal warning level has been recorded\n"),
+    }
+
+
+def install_machine_proof(row, *, before=None, after=None):
+    before = before or machine_observation()
+    after = after or machine_observation(unix=2)
+    row["machineIdentity"] = before
+    row["machineAfter"] = after
+    row["stableMachineIdentity"] = _stable_machine_identity(before)
 
 
 def sample(role, mode, case_index, endpoint="native", latency=100_000_000):
@@ -89,9 +114,12 @@ def sample(role, mode, case_index, endpoint="native", latency=100_000_000):
                                "usable": True, "latencyNs": latency + index})
         if mode != "warm":
             events.append({"event": "reconnect", "converged": True, "epochAdvanced": True,
+                           "endpointGenerationReplaced": True,
+                           "iteration": index, "publicationMonotonicNs": 1_000 + index,
                            "latencyNs": latency})
         for index2, session in enumerate(sessions):
             events.append({"event": "send", "scope": scope(session), "sessionIndex": index2,
+                           "intentMonotonicNs": 2_000 + index,
                            "round": index, "ticketId": f"ticket-{index2}-{index}",
                            "durableUser": {"record": "u"}, "firstMatchingAssistantContent": {"record": "a"},
                            "durableMatchingAssistantSettlement": {"record": "f"},
@@ -117,6 +145,9 @@ def sample(role, mode, case_index, endpoint="native", latency=100_000_000):
                "measuredHarness": identity("measured", 300 + case_index)}
     if endpoint == "pi":
         restart["measuredPiRpcChildren"] = [identity("pi0", 600), identity("pi1", 601)]
+        restart["seedPiRpcChildren"] = [identity("seedpi0", 500), identity("seedpi1", 501)]
+        restart["seedAgentKitRoot"] = identity("seedagent", 99)
+        restart["seedOwnedGroupAbsent"] = True
     process = {"consumerExitStatus": 0, "ownedGroupAbsent": True,
                "consumerRoot": identity("consumer", 100), "ownedHarnessExitStatus": 0,
                "cleanupElapsedMs": 2, "coldHarnessRestart": restart if mode == "cold" else None,
@@ -124,6 +155,26 @@ def sample(role, mode, case_index, endpoint="native", latency=100_000_000):
                "piRpcLifecycleRetirements": ([{"oldSetRetired": True, "newSetStarted": True}
                                                for _ in range(10)] if endpoint == "pi" and mode == "reconnectLifecycle" else None),
                "sampledTreePeakRssKiB": {"agentkit": 1024, "harness": 2048}}
+    if endpoint == "pi" and mode == "reconnectLifecycle":
+        lifecycle_boundaries = []
+        for round_index in range(1, 11):
+            child_ids = identities[round_index]["piRpcChildren"]
+            for event_index, event in enumerate(events):
+                if event.get("event") != "send" or event.get("round") != round_index:
+                    continue
+                census = [{"pid": 100, "startIdentity": identity("agentkit", 100)["startIdentity"],
+                           "role": "agentkit", "commandName": "performance_acceptance"}]
+                census.extend({**child, "role": "harness", "commandName": "pi",
+                               "executableName": "node"} for child in child_ids)
+                lifecycle_boundaries.append({
+                    "event": "send", "rawEventIndex": event_index,
+                    "round": round_index, "sessionIndex": event["sessionIndex"],
+                    "scopeSessionId": event["scope"]["sessionId"],
+                    "originalIntentMonotonicNs": event["intentMonotonicNs"],
+                    "monotonicNs": 20_000 + event_index,
+                    "osProcesses": census, "error": None,
+                })
+        process["piRpcLifecycleSendBoundaries"] = lifecycle_boundaries
     role_commit = PROFILE["resolvedProductCandidate"] if role == "candidate" else PROFILE["baseline"]
     return {"role": role, "mode": mode, "iteration": case_index, "caseIndex": case_index,
             "status": "success", "official": True, "diagnosticOnly": False, "failureReason": None,
@@ -134,8 +185,9 @@ def sample(role, mode, case_index, endpoint="native", latency=100_000_000):
             "workloadDigest": "same-workload", "sourceCommit": role_commit,
             "programSha256": "1" * 64, "consumerSha256": "2" * 64,
             "runnerSha256": "3" * 64, "runtimeSha256": "4" * 64,
-            "machineIdentity": {"hardware": {"model": "test", "memory": 8}, "os": "fixed-os",
-                                "power": "ac", "unixNs": case_index, "loadAverage": [case_index]},
+            "machineIdentity": machine_observation(unix=case_index + 1),
+            "machineAfter": machine_observation(unix=case_index + 2),
+            "stableMachineIdentity": _stable_machine_identity(machine_observation()),
             "runtimeIdentity": {"kernel": "fixed", "pi": "fixed", "dsh": "fixed"},
             "process": process}
 
@@ -152,6 +204,23 @@ def batch_factory():
 
 
 class PerformanceSampleReportTests(unittest.TestCase):
+    def test_reconnect_without_redundant_iteration_uses_original_marker_segment(self):
+        batch = batch_factory()
+        for sample in batch['samples']:
+            for event in sample['events']:
+                if event.get('event') == 'reconnect':
+                    event.pop('iteration', None)
+        self.assertTrue(aggregate_batch(batch)['ordinarySessionPerformanceAccepted'])
+
+    def test_pi_cold_rejects_reused_seed_rpc_even_when_rust_consumer_changes(self):
+        batch = batch_factory()
+        sample = next(row for row in batch["samples"]
+                      if row["endpoint"] == "pi" and row["mode"] == "cold")
+        restart = sample["process"]["coldHarnessRestart"]
+        restart["seedPiRpcChildren"] = restart["measuredPiRpcChildren"]
+        with self.assertRaisesRegex(ValueError, "must be disjoint"):
+            aggregate_batch(batch)
+
     def test_nearest_rank_is_frozen_definition(self):
         self.assertEqual(nearest_rank([4, 1, 3, 2], .5), 2)
         self.assertEqual(nearest_rank(list(range(1, 21)), .95), 19)
@@ -169,6 +238,65 @@ class PerformanceSampleReportTests(unittest.TestCase):
         self.assertEqual(report["trajectories"]["native/candidate:cold"]["caseCount"], 5)
         self.assertEqual(report["trajectories"]["pi/candidate:reconnectLifecycle"]["perSession"]["1"]
                          ["historyPage20ToProjectionMs"]["count"], 10)
+
+    def test_cold_cases_aggregate_by_stable_index_with_distinct_session_ids(self):
+        batch = batch_factory()
+        for row in batch["samples"]:
+            if row["mode"] != "cold":
+                continue
+            old_ids = row["sessionIds"]
+            new_ids = [f"{session}-cold-{row['caseIndex']}" for session in old_ids]
+            row["sessionIds"] = new_ids
+            for event in row["events"]:
+                if event.get("event") == "consumer_started":
+                    event["sessionIds"] = new_ids
+                scope = event.get("scope")
+                if isinstance(scope, dict):
+                    index = old_ids.index(scope["sessionId"])
+                    scope["sessionId"] = new_ids[index]
+                    scope["threadId"] = new_ids[index]
+
+        report = aggregate_batch(batch)
+        cold = report["trajectories"]["native/candidate:cold"]
+        self.assertEqual(cold["perSession"]["0"]["sessionIds"],
+                         [f"s0-cold-{index}" for index in range(5)])
+        self.assertEqual(cold["perSession"]["1"]["sessionIds"],
+                         [f"s1-cold-{index}" for index in range(5)])
+        self.assertEqual(cold["perSession"]["0"]["firstUsableSnapshotMs"]["count"], 5)
+        self.assertEqual(cold["perSession"]["1"]["firstUsableSnapshotMs"]["count"], 5)
+
+    def test_send_session_index_must_match_its_original_scope_pointer(self):
+        batch = batch_factory()
+        row = next(row for row in batch["samples"]
+                   if row["role"] == "candidate" and row["mode"] == "cold")
+        sends = [event for event in row["events"] if event.get("event") == "send"]
+        sends[0]["sessionIndex"], sends[1]["sessionIndex"] = 1, 0
+        with self.assertRaisesRegex(ValueError, "sessionIndex does not match"):
+            aggregate_batch(batch)
+
+    def test_relative_latency_limit_is_enforced_per_session_scope(self):
+        batch = batch_factory()
+        for row in batch["samples"]:
+            if row["endpoint"] != "native" or row["mode"] != "cold":
+                continue
+            for event in row["events"]:
+                if event.get("event") != "snapshot" or event.get("purpose") != "cold_first_usable_original_projection":
+                    continue
+                index = row["sessionIds"].index(event["scope"]["sessionId"])
+                if row["role"] == "baseline":
+                    event["latencyNs"] = 1_000_000 if index == 0 else 100_000_000
+                else:
+                    event["latencyNs"] = 90_000_000 if index == 0 else 90_000_000
+
+        report = aggregate_batch(batch)
+        trajectory = report["trajectories"]["native/candidate:cold"]
+        # The old ratio of worst-scope p95s was 90/100 = 0.9 and hid
+        # session 0's real 90/1 regression. Each scope now has its own gate.
+        self.assertEqual(trajectory["firstUsableSnapshotMs"]["regressionRatio"], 0.9)
+        self.assertEqual(trajectory["perSession"]["0"]["firstUsableSnapshotMs"]["regressionRatio"], 90)
+        self.assertFalse(trajectory["perSession"]["0"]["firstUsableSnapshotMs"]["regressionPass"])
+        self.assertTrue(trajectory["perSession"]["1"]["firstUsableSnapshotMs"]["regressionPass"])
+        self.assertFalse(report["ordinarySessionPerformanceAccepted"])
 
     def test_diagnostic_only_never_becomes_official(self):
         report = aggregate_batch({"profile": PROFILE, "officialSamples": 0,
@@ -218,9 +346,38 @@ class PerformanceSampleReportTests(unittest.TestCase):
         for row in value["samples"]:
             row["machineIdentity"]["unixNs"] += 500
             row["machineIdentity"]["loadAverage"] = [99]
+            row["machineAfter"]["unixNs"] += 501
+            row["machineAfter"]["loadAverage"] = [77]
         aggregate_batch(value)
-        value["samples"][-1]["machineIdentity"]["power"] = "battery"
-        with self.assertRaisesRegex(ValueError, "not comparable|not consistent"):
+        # Battery percentage/remaining time changes remain raw evidence, but
+        # stable power source and active mode must stay fixed.
+        row = value["samples"][-1]
+        install_machine_proof(row, before=machine_observation(percent=99),
+                              after=machine_observation(percent=98, unix=99))
+        aggregate_batch(value)
+        install_machine_proof(row, before=machine_observation(),
+                              after=machine_observation(source="Battery Power", unix=99))
+        with self.assertRaisesRegex(ValueError, "stable hardware changed"):
+            aggregate_batch(value)
+
+    def test_power_mode_and_raw_normalized_identity_are_required(self):
+        value = batch_factory()
+        row = value["samples"][-1]
+        after = machine_observation(sleep=2, unix=99)
+        install_machine_proof(row, after=after)
+        with self.assertRaisesRegex(ValueError, "changed during sample"):
+            aggregate_batch(value)
+
+        value = batch_factory()
+        row = value["samples"][-1]
+        row.pop("stableMachineIdentity")
+        with self.assertRaisesRegex(ValueError, "normalized stable machine identity"):
+            aggregate_batch(value)
+
+        value = batch_factory()
+        row = value["samples"][-1]
+        row["machineIdentity"]["powerMode"]["exitStatus"] = 1
+        with self.assertRaisesRegex(ValueError, "missing or failed"):
             aggregate_batch(value)
 
     def test_snapshot_requires_original_latency_on_every_measured_iteration(self):
@@ -280,6 +437,24 @@ class PerformanceSampleReportTests(unittest.TestCase):
                    and row["role"] == "candidate" and row["mode"] == "reconnectLifecycle")
         row["process"]["piRpcLifecycleRetirements"] = []
         with self.assertRaisesRegex(ValueError, "retirement and new set"):
+            aggregate_batch(value)
+
+    def test_pi_lifecycle_requires_post_reconnect_send_time_process_censuses(self):
+        value = batch_factory()
+        row = next(row for row in value["samples"] if row["endpoint"] == "pi"
+                   and row["role"] == "candidate" and row["mode"] == "reconnectLifecycle")
+        del row["process"]["piRpcLifecycleSendBoundaries"]
+        with self.assertRaisesRegex(ValueError, "send-time OS process censuses"):
+            aggregate_batch(value)
+
+        value = batch_factory()
+        row = next(row for row in value["samples"] if row["endpoint"] == "pi"
+                   and row["role"] == "candidate" and row["mode"] == "reconnectLifecycle")
+        boundary = row["process"]["piRpcLifecycleSendBoundaries"][0]
+        reconnect = next(event for event in row["events"]
+                         if event.get("event") == "reconnect" and event.get("iteration") == boundary["round"])
+        reconnect["publicationMonotonicNs"] = boundary["originalIntentMonotonicNs"]
+        with self.assertRaisesRegex(ValueError, "after its endpoint replacement"):
             aggregate_batch(value)
 
 

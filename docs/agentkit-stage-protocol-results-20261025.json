@@ -74,7 +74,7 @@
     "ui/bindings/tests/host_mounts.rs": true
   },
   "desktop": false,
-  "performance": "not_run",
+  "performance": "not_accepted",
   "nativeBusyQueue": "failed-upstream-Kernel86",
   "cacheDeletedBytes": 0,
   "piSummary": {
@@ -374,23 +374,16 @@
     "merged": false
   },
   "latestExactHeadCi20261026": {
-    "head": "f833ea3e58f1707a3ba5dacf3bedcfda40ea9058",
-    "run": 40214966220,
+    "head": "d23731dfe21820a35a7af0550ecb6069cbef1f08",
+    "run": 40230369803,
     "root": "success",
     "ui": "failure",
-    "regularUiChecks": "success",
-    "childWitness": "success",
-    "nativeApprovalConsumer": "success",
     "standalonePublicConsumer": "success",
+    "childWitness": "success",
+    "nativeApprovalConsumerCompile": "success",
     "strictNestedReading": "failure",
     "subsequentDemoBuild": "skipped",
-    "artifact": 12607411641,
-    "artifactReading": {
-      "accepted": false,
-      "parentFollowingAfterInnerUp": true,
-      "parentOffsetAfterAppend": 634,
-      "detailVisibleAfterAppend": false
-    },
+    "artifact": 12613590407,
     "noGateWaived": true,
     "merged": false
   },
@@ -421,5 +414,16 @@
     "nativeFamily": "evidence-bindings-20261026/native-family-seed-diagnostic.json",
     "officialSamples": 0,
     "performanceAccepted": false
+  },
+  "performanceAtOriginalAudit": "not_run",
+  "ordinaryOfficialPerformance20261026": {
+    "officialCaseCount": 14,
+    "scope": "Native ordinary only",
+    "binding": "evidence-bindings-20261026/native-ordinary-official-v2.json",
+    "coldWarmBudgetsPassed": true,
+    "lifecycleRelativeBudgetsPassed": false,
+    "performanceAccepted": false,
+    "otherEndpoints": "not_run",
+    "familyAttachmentPerformance": "not_run"
   }
 }

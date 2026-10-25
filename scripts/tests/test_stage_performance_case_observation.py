@@ -17,8 +17,8 @@ SPEC.loader.exec_module(MODULE)
 def warm_input(endpoint='pi'):
     boundaries=[]
     roots=[{'pid':101,'startIdentity':'root-start','role':'harness'}] if endpoint!='pi' else []
-    persistent=([{'pid':201,'startIdentity':'node-a','role':'harness','commandName':'node'},
-                 {'pid':202,'startIdentity':'node-b','role':'harness','commandName':'node'}]
+    persistent=([{'pid':201,'startIdentity':'node-a','role':'harness','commandName':'pi','executableName':'node'},
+                 {'pid':202,'startIdentity':'node-b','role':'harness','commandName':'pi','executableName':'node'}]
                 if endpoint=='pi' else [{'pid':101,'startIdentity':'root-start',
                                          'role':'harness','commandName':'supervisor'}])
     boundaries.append({'event':'runtime_ready','monotonicNs':900_000_000,
@@ -35,7 +35,8 @@ def warm_input(endpoint='pi'):
     rss=[]
     for stamp in range(1_000_000_000,end+1,50_000_000):
         rss.append({'monotonicNs':stamp,'processes':[
-            dict(row,rssKiB=512,command='/usr/local/bin/node' if row['commandName']=='node'
+            dict(row,rssKiB=512,command=row['commandName'],
+                 executablePath='/usr/local/bin/node' if row.get('executableName')=='node'
                  else '/tmp/tekes-supervisor') for row in persistent]})
     return boundaries,rss,{'maxObservedIntervalNs':50_000_000},roots
 
@@ -59,7 +60,7 @@ class WarmIdentityTests(unittest.TestCase):
     def test_short_lived_node_probe_does_not_count_as_a_persistent_rpc(self):
         data=warm_input('pi')
         data[0][2]['osProcesses'].append({'pid':299,'startIdentity':'probe',
-            'role':'harness','commandName':'node'})
+            'role':'harness','commandName':'node','executableName':'node'})
         proof=MODULE.validate_warm_process_identity('pi','warm',*data)
         self.assertEqual(len(proof['expectedLongLivedHarnessIdentities']),2)
 
@@ -81,8 +82,12 @@ class WarmIdentityTests(unittest.TestCase):
             MODULE.validate_warm_process_identity('pi','warm',*data)
 
     def test_non_warm_does_not_claim_steady_pid_continuity(self):
-        proof=MODULE.validate_warm_process_identity('pi','reconnectLifecycle',[],[],{},[])
-        self.assertEqual(proof['status'],'not_applicable')
+        proof=MODULE.validate_warm_process_identity('pi','reconnectLifecycle',[],[],
+                                                   {'maxObservedIntervalNs':50_000_000},[])
+        self.assertEqual(proof['status'],'cadence_verified')
+        self.assertNotIn('expectedLongLivedHarnessIdentities',proof)
+        with self.assertRaisesRegex(ValueError,'cadence gap'):
+            MODULE.validate_warm_process_identity('pi','reconnectLifecycle',[],[],{},[])
 
 
 class RetirementTests(unittest.TestCase):

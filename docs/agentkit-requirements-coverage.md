@@ -2,7 +2,7 @@
 
 审计日期：2026-10-25。总 Epic [#14](https://github.com/TekesApps/TekesAgentKit/issues/14)。本索引是当前执行入口；[旧交付计划](rust-agent-ui-issue-plan.md)与[原Issue正文/状态](agentkit-issue-history-20261025.json)保留为历史，不能用其旧勾选代替当前集成状态。
 
-[机器覆盖表](agentkit-issue-coverage-20261025.json)记录50条原始/最新契约要求、42张实施票（含复用的#12/#13/#29）（原43条/33票审计快照保留）。不为单个测试/每次验证建票。此表记录整理时的审计快照，实时执行状态以GitHub标签为准，后续交付同步更新本索引。
+[机器覆盖表](agentkit-issue-coverage-20261025.json)记录50条原始/最新契约要求、43张实施票（含复用的#12/#13/#29）（原43条/33票审计快照保留）。不为单个测试/每次验证建票。此表记录整理时的审计快照，实时执行状态以GitHub标签为准，后续交付同步更新本索引。
 
 ## 本阶段收口冻结（2026-10-25）
 
@@ -26,14 +26,14 @@
 
 ## 当前看板摘要
 
-实施票共42张（原33张，加旁支已建#60–#66及实际阻断缺陷#67/#68），不含Epic和14张功能追踪。
+实施票共43张（原33张，加旁支#60–#66、阻断缺陷#67/#68及后续语义差异#70），不含Epic和14张功能追踪。
 
 | 状态 | 数量 | AgentKit Issue |
 | --- | --- | --- |
 | 已关闭 | 4 | #30–#32：历史里程碑；#68：PR69/main1dcc521独立Pi修复 |
 | 已验证待集成 | 11 | #12、#13、#29、#33、#34、#38、#41–#44、#67 |
 | 进行中 | 9 | #35–#37、#40、#45、#46、#55、#56、#58 |
-| 待办 | 8 | #59；#60–#66为后续待办 |
+| 待办 | 9 | #59；#60–#66及#70为后续待办 |
 | 等待上游 | 9 | #39、#47–#54；每票只等待自己的相关上游交付 |
 | 等待桌面 | 1 | #57；当前不启动桌面 |
 
@@ -64,7 +64,7 @@
 | R01 Rust-only；AgentKit业务/presentation、TekesUI基础组件、产品host三方所有权 | [#15](https://github.com/TekesApps/TekesAgentKit/issues/15), [#21](https://github.com/TekesApps/TekesAgentKit/issues/21) | [#30](https://github.com/TekesApps/TekesAgentKit/issues/30) 已关闭、[#33](https://github.com/TekesApps/TekesAgentKit/issues/33) 已验证待集成、[#40](https://github.com/TekesApps/TekesAgentKit/issues/40) 进行中 | 已发布基线无Swift；当前公开API/owner审计8335231与1d41ad4独立consumer | 不移植Swift；RunSurface/ComponentDemo仅测试宿主；新基础缺口提上游 |
 | R02 Native/Pi/DSH三个SEP与Kernel0.9.x公开协议 | [#15](https://github.com/TekesApps/TekesAgentKit/issues/15), [#27](https://github.com/TekesApps/TekesAgentKit/issues/27) | [#30](https://github.com/TekesApps/TekesAgentKit/issues/30) 已关闭、[#32](https://github.com/TekesApps/TekesAgentKit/issues/32) 已关闭、[#55](https://github.com/TekesApps/TekesAgentKit/issues/55) 进行中、[#67](https://github.com/TekesApps/TekesAgentKit/issues/67) 已验证待集成 | PR1/2/5已合入；Kernel0.9.0→0.9.1旧证据与当前0.9.3分开 | 当前同交付源码三端协议逐项验收；不以RPC ack证明行为 |
 | R03 本地直接读取与内存投影、远端Mirror/cache策略独立于harness | [#15](https://github.com/TekesApps/TekesAgentKit/issues/15), [#27](https://github.com/TekesApps/TekesAgentKit/issues/27) | [#30](https://github.com/TekesApps/TekesAgentKit/issues/30) 已关闭、[#33](https://github.com/TekesApps/TekesAgentKit/issues/33) 已验证待集成、[#56](https://github.com/TekesApps/TekesAgentKit/issues/56) 进行中 | 已发布local/remote/locator与能力文档；当时真实范围见原收据 | 远端TLS/大历史性能未覆盖不得称完整；不绕私有数据库 |
-| R04 session pointer/locator、只读会话文件、历史恢复与重连 | [#17](https://github.com/TekesApps/TekesAgentKit/issues/17), [#23](https://github.com/TekesApps/TekesAgentKit/issues/23), [#27](https://github.com/TekesApps/TekesAgentKit/issues/27) | [#30](https://github.com/TekesApps/TekesAgentKit/issues/30) 已关闭、[#32](https://github.com/TekesApps/TekesAgentKit/issues/32) 已关闭、[#56](https://github.com/TekesApps/TekesAgentKit/issues/56) 进行中、[#13](https://github.com/TekesApps/TekesAgentKit/issues/13) 已验证待集成、[#67](https://github.com/TekesApps/TekesAgentKit/issues/67) 已验证待集成 | root三SEP基线已发布；后续原实例/epoch/lease绑定在PR10 | 按公开pointer与来源读取；不能以scope相同替换旧实例 |
+| R04 session pointer/locator、只读会话文件、历史恢复与重连 | [#17](https://github.com/TekesApps/TekesAgentKit/issues/17), [#23](https://github.com/TekesApps/TekesAgentKit/issues/23), [#27](https://github.com/TekesApps/TekesAgentKit/issues/27) | [#30](https://github.com/TekesApps/TekesAgentKit/issues/30) 已关闭、[#32](https://github.com/TekesApps/TekesAgentKit/issues/32) 已关闭、[#56](https://github.com/TekesApps/TekesAgentKit/issues/56) 进行中、[#13](https://github.com/TekesApps/TekesAgentKit/issues/13) 已验证待集成、[#67](https://github.com/TekesApps/TekesAgentKit/issues/67) 已验证待集成 、[#70](https://github.com/TekesApps/TekesAgentKit/issues/70) 待办（后续） | root三SEP基线已发布；后续原实例/epoch/lease绑定在PR10 | 按公开pointer与来源读取；不能以scope相同替换旧实例 |
 | R05 无UI Run/Transcript/Composer/连接状态及队列数据回传 | [#16](https://github.com/TekesApps/TekesAgentKit/issues/16), [#17](https://github.com/TekesApps/TekesAgentKit/issues/17), [#21](https://github.com/TekesApps/TekesAgentKit/issues/21) | [#30](https://github.com/TekesApps/TekesAgentKit/issues/30) 已关闭、[#34](https://github.com/TekesApps/TekesAgentKit/issues/34) 已验证待集成、[#40](https://github.com/TekesApps/TekesAgentKit/issues/40) 进行中、[#55](https://github.com/TekesApps/TekesAgentKit/issues/55) 进行中 | PR2与v0.1.0已交付；PR7/8/9/11维护至v0.3.8 | 新UI层不因root发布自动完成 |
 | R06 无UI Task、子代理、SideChat、Summary状态 | [#23](https://github.com/TekesApps/TekesAgentKit/issues/23), [#24](https://github.com/TekesApps/TekesAgentKit/issues/24), [#25](https://github.com/TekesApps/TekesAgentKit/issues/25) | [#31](https://github.com/TekesApps/TekesAgentKit/issues/31) 已关闭、[#43](https://github.com/TekesApps/TekesAgentKit/issues/43) 已验证待集成、[#44](https://github.com/TekesApps/TekesAgentKit/issues/44) 已验证待集成、[#45](https://github.com/TekesApps/TekesAgentKit/issues/45) 进行中 | PR4/v0.2.0 72测试与原三端集成/CI；原缺能力仍unsupported | 完整控件/真实当前协议/桌面分别未完 |
 | R07 Pi独立子代理和Native有界子历史只读公开接口 | [#17](https://github.com/TekesApps/TekesAgentKit/issues/17), [#23](https://github.com/TekesApps/TekesAgentKit/issues/23) | [#32](https://github.com/TekesApps/TekesAgentKit/issues/32) 已关闭、[#56](https://github.com/TekesApps/TekesAgentKit/issues/56) 进行中、[#13](https://github.com/TekesApps/TekesAgentKit/issues/13) 已验证待集成 | PR5/v0.3.0与原Kernel0.9.1已合入发布 | 当前Native0.9.3分页/epoch/错误不能自动从旧tag继承 |
@@ -80,7 +80,7 @@
 | R17 销毁后新ContentHost的持久阅读检查点 | [#18](https://github.com/TekesApps/TekesAgentKit/issues/18) | [#50](https://github.com/TekesApps/TekesAgentKit/issues/50) 等待上游 | 现有同pane阅读不构成检查点恢复 | 等待TekesUI42公开接口；禁止私有Anchor/SavedDocument替代 |
 | R18 内层向上阅读通知父容器、追加不跳和不重复滚动 | [#18](https://github.com/TekesApps/TekesAgentKit/issues/18) | [#51](https://github.com/TekesApps/TekesAgentKit/issues/51) 等待上游 | 1d41ad4两份CI严格case失败；原raw accepted=false | 等待TekesUI53；不skip/弱化严格消费者断言 |
 | R19 Indicators/rail/turn导航与完整Run组合 | [#21](https://github.com/TekesApps/TekesAgentKit/issues/21) | [#40](https://github.com/TekesApps/TekesAgentKit/issues/40) 进行中、[#48](https://github.com/TekesApps/TekesAgentKit/issues/48) 等待上游 | d0c82b2/5fc496a/67b20e6等已实现部分 | 构造/hover/reading不同范围；完整View层级与可视验收未完 |
-| R20 Sidebar多端列表/活动/置顶/搜索/目录/分页/共享原目标 | [#22](https://github.com/TekesApps/TekesAgentKit/issues/22) | [#42](https://github.com/TekesApps/TekesAgentKit/issues/42) 已验证待集成、[#56](https://github.com/TekesApps/TekesAgentKit/issues/56) 进行中、[#29](https://github.com/TekesApps/TekesAgentKit/issues/29) 已验证待集成、[#67](https://github.com/TekesApps/TekesAgentKit/issues/67) 已验证待集成 | 现有多端、knownness、selected补读和原端路由，#29分类原证据保留 | 真实当前连接/回包闭环与桌面菜单另证 |
+| R20 Sidebar多端列表/活动/置顶/搜索/目录/分页/共享原目标 | [#22](https://github.com/TekesApps/TekesAgentKit/issues/22) | [#42](https://github.com/TekesApps/TekesAgentKit/issues/42) 已验证待集成、[#56](https://github.com/TekesApps/TekesAgentKit/issues/56) 进行中、[#29](https://github.com/TekesApps/TekesAgentKit/issues/29) 已验证待集成、[#67](https://github.com/TekesApps/TekesAgentKit/issues/67) 已验证待集成 、[#70](https://github.com/TekesApps/TekesAgentKit/issues/70) 待办（后续） | 现有多端、knownness、selected补读和原端路由，#29分类原证据保留 | 真实当前连接/回包闭环与桌面菜单另证 |
 | R21 main/archived/ephemeral/subagent分类与成员关系 | [#22](https://github.com/TekesApps/TekesAgentKit/issues/22) | [#29](https://github.com/TekesApps/TekesAgentKit/issues/29) 已验证待集成 | f399356三端原公开producer+15生命周期样本；本次重开已验证待集成 | PR10未合入，不因旧分项关闭记录当已集成 |
 | R22 非当前行上下文菜单及过滤/切端后原动作目标 | [#22](https://github.com/TekesApps/TekesAgentKit/issues/22) | [#52](https://github.com/TekesApps/TekesAgentKit/issues/52) 等待上游 | selected-row菜单已有，较窄候选未当作本项通过 | 等待TekesUI44事件/锚点；不替换成点击当前会话菜单 |
 | R23 Task动态pointer、加载空错态、same-scope owner退休与父A→B→A | [#23](https://github.com/TekesApps/TekesAgentKit/issues/23) | [#43](https://github.com/TekesApps/TekesAgentKit/issues/43) 已验证待集成、[#12](https://github.com/TekesApps/TekesAgentKit/issues/12) 已验证待集成、[#56](https://github.com/TekesApps/TekesAgentKit/issues/56) 进行中 | 1d41ad4原red→green；最终default/feature各15；旧Run ready前后均拒绝 | 真实Task producer组合、窗口/chrome仍未验收 |
@@ -210,3 +210,8 @@ f833 CI40214966220终态：root、UI常规、child witness、Native approval和�
 ### 首个独立main切片已交付
 
 #68已由两文件PR69合入main1dcc521；全套既有CI、独立双lease公共consumer、新编译4c候选CLI66a2c9b8的固定Pi50/100/custom原记录恢复，以及合并后CI40227909675均通过，2026-10-26关闭。primary已吸收main为1026372（产品实现仍与98b相同，增加main更强测试）。[精确交付绑定](evidence-bindings-20261026/issue68-mainline-delivery.json)保留seeder和DUT区别。原#13/#41/#55/#56/#58/#59、PR10实验UI及完整Epic未因此关闭/通过；#60–#66仍是后续待办。机器/看板为42实施票：关闭4、待集成11、进行中9、等上游9、等桌面1、待办8。
+
+
+#70记录新发现的Pi活动时间来源/刷新语义差异（R04/R20），明确后续待办，不自动加入当前阶段；当前43票：关闭4、待集成11、进行中9、等上游9、等桌面1、待办9。原42票计数保留为各旧提交的历史快照。#55正式普通数据已开始，只有实际固定组和配对报告完成后才形成性能结论。
+
+Native普通正式组已完成采集：cold/warm满足原预算，lifecycle逐会话相对预算失败（恢复快照1.662倍、首助手内容1.361倍，原上限1.2）。原始14case保留，未挑选或替换；整体性能未通过，详见[native正式绑定](evidence-bindings-20261026/native-ordinary-official-v2.json)。
