@@ -1,8 +1,8 @@
 # Rust Agent UI：当前接入范围与交付状态
 
-需求分配与后续执行以 [Issue 驱动交付计划](rust-agent-ui-issue-plan.md) / [总追踪 #14](https://github.com/TekesApps/TekesAgentKit/issues/14) 为准。
+需求分配与后续执行以[需求 → Issue → 实现 → 验证覆盖索引](agentkit-requirements-coverage.md) / [总 Epic #14](https://github.com/TekesApps/TekesAgentKit/issues/14) 为准。[旧计划](rust-agent-ui-issue-plan.md)和下文专题保留各自历史证据。#15–#28是功能追踪，实施/协议/桌面/SDK/发布分别归属；未合入代码不提前关闭。
 
-最近功能基线为 `91129d701fbd2721cf3415b86d227900715ec353`（2026-10-25核对），[PR #10](https://github.com/TekesApps/TekesAgentKit/pull/10)仍为draft。当前证据入口为[1026格矩阵](rust-agent-ui-acceptance-matrix-20261025.md)；三端原pane来源见证等历史专题仍按各自原提交/程序解释。UI仍是 `0.0.0` / `publish=false`，不是已发布v0.3.8的一部分；完整交付尚未达到。文档提交不会改变这些功能证据的适用revision。
+矩阵固定功能基线仍为 `91129d701fbd2721cf3415b86d227900715ec353`；最新已验证组件源码基线为 `1d41ad4`，见[Task内容退休分项结果](rust-agent-ui-task-content-retirement-results-20261025.md)。[PR #10](https://github.com/TekesApps/TekesAgentKit/pull/10)仍为draft；[1026格矩阵](rust-agent-ui-acceptance-matrix-20261025.md)和三端原pane等专题各按原提交/程序解释，不被新文档或新组件测试升级。UI仍是 `0.0.0` / `publish=false`，不是已发布v0.3.8的一部分；完整交付尚未达到。当前Native Summary候选WIP尚未编译通过/完成验收，归实施#56。
 
 - 本次[原owner最后入队复核](rust-agent-ui-submission-last-admission-20261025.md)已修复 child catalog/背压等待期间的退休窗口；Root404/0/0、UI784/0/1、严格Clippy和第二公开consumer通过。同份新源码实际三端恢复回归通过；[精确来源/程序/收据](rust-agent-ui-owner-admission-results-20261025.json)独立记录。受控fixture的owner竞态与真实三端恢复是两项不同验证。
 

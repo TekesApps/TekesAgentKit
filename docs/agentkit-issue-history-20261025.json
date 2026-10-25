@@ -1,0 +1,309 @@
+{
+  "capturedAt": "2026-10-25",
+  "purpose": "原票正文/状态归档；不是当前状态或新验收证据",
+  "issues": [
+    {
+      "body": "## 目标与边界\n\n关联 #14、#22。对齐 ClientKit sessionSidebarSnapshot 的 main / archived / ephemeral 成员条件，建立三种 SEP 的公开分类事实来源。只改 AgentKit Rust；ClientKit/Tekes/Kernel/SDK 只读，Kernel 实现变更不在本 Issue 授权范围内，不访问 harness 私库。\n\n## 初始差异（历史背景，修复与验收见下方）\n\n- ClientKit isMainThread 排除 origin=subagent 或 ephemeral；parentSessionId 单独存在不能排除，fork 仍可能是 main。\n- AgentKit canonical 全局 inventory 保留非归档会话，Sidebar 初始版本把它们全部投影成导航行；全局 inventory 也供子代理/历史消费者使用，不能直接全局删 child。\n- Pi adapter 的公开规范化 summary 明确提供 origin 与 ephemeral，可先修正明确分类的 Sidebar membership。\n- Native/DSH 在初始审计时尚未核验；当前固定公开producer与字段缺失语义见文末交付。缺字段仍不能声称main，不能猜造分类。\n\n## 子项\n\n- [x] 记录/核对 Native、Pi、DSH 的公开 producer/schema、固定版本和字段缺失语义，复用已有字段而非猜协议。\n- [x] 在 Sidebar 行投影及 selected-row 补读共同应用明确 subagent/ephemeral 排除规则，保留 underlying history、Task/SideChat 来源与全局 canonical 数据。\n- [x] parent-only fork 保留；缺失事实保持未分类的诊断/兼容边界，不声称完整三端 main parity。\n- [x] 若 Native/DSH 需要上游公开能力，去重提来源明确的上游 Issue；不自行修改 Kernel。\n\n## 验收\n\n- [x] 显式 main、subagent、ephemeral、parent-only fork 混合 fixture，列表/搜索/目录/分页/选中补读一致。\n- [x] 同 session ID 跨 endpoint 不互串；已隐藏 child 不被 selected-read/reveal 重新插回；已有 child/history 访问不受 Sidebar 筛选破坏。\n- [x] 每个 endpoint 的真实公开分类来源分别有证据；未知字段不作为已证明的 main。\n- [x] headless/UI 边界、对应 Rust 回归、demo 与独立 consumer 分层验证；桌面/真实多 harness/AX 继续另列，不以静态或 fixture 关闭真实来源验收。\n\n实施按主会话协调 + 独立新子会话；结果回填实现提交、适用验证、未验证项和 [PR #10](https://github.com/TekesApps/TekesAgentKit/pull/10)。\n\n\n## 固定公开 producer + adapter wire：36f0668 / 305fede，已推送\n\nNative公开v0.9.3 tag在GitHub和本地均解析到`09508a9083c24c7accefc99516739f279b85913e`，该精确源码规定fork/parent与可选ephemeral；不得推造origin:subagent。DSH固定0.2.1-rc.2、0.2.0-rc.2官方Git blob核验，在线/冷列表透传origin/parent，公开SessionSummary无ephemeral；无需为已有分类字段新建上游Issue。Pi既有规范化producer的字段来源同步记录。\n\n真正Rust Native WS inventory→adapter→MemoryProjectionStore回归6/0/0；DSH session/list+api-session/added wire回归14/0/0；root严格Clippy/fmt/边界通过。此前be6e50e的Sidebar/selected共同排除规则与canonical history保留仍成立。[分类矩阵](https://github.com/TekesApps/TekesAgentKit/blob/3c73288/docs/session-endpoints.md)、[wire收据](https://github.com/TekesApps/TekesAgentKit/blob/3c73288/docs/rust-agent-ui-membership-wire-results-20261024.json)、[PR #10](https://github.com/TekesApps/TekesAgentKit/pull/10)。\n\n这些是固定公开源码与协议mock证据，不是已发布harness重新运行；未知分类仍不宣称main。完整混合过滤/分页/真实来源及桌面验收继续保留，Issue不关闭。\n\n\n## 混合成员 fixture 验收：a2feb19\n\n上述前两项已由 `ui/demo/tests/sidebar_membership_search_paging.rs` 的实际 fixture-runtime→bindings→Sidebar/paging/reveal 组合回归及搜索恢复回归核验（UI713/0/1，presentation246/0/0，独立consumer执行通过）。详见本Issue的a2feb19回填及[验证收据](https://github.com/TekesApps/TekesAgentKit/blob/a2feb1974d5809f551a7650c5228a09129c93fb6/docs/rust-agent-ui-sidebar-active-knownness-20261024.md)。勾选仅表示所写fixture要求完成，不扩展为真实三端运行、Native有界子历史权限或桌面证明；余下真实来源和分层交付门槛仍开放。\n\n\n## 最终验收：f399356\n\n本Issue的真实三端公开来源、同帧分类/原成员条件、归档与历史保留及selected-read验收已完成。Native0.9.3/Pi1.3.0/DSH0.2.1-rc.2实际15个生命周期样本，当前Pi实例scratch及原三端demo/独立consumer验证通过；未知分类保持unknown，不宣称已确认main。\n\n[最终结果与限制](https://github.com/TekesApps/TekesAgentKit/blob/f3993560f0ebacbab533c8f5495800a31b272d60/docs/rust-agent-ui-real-sidebar-classification-results-20261024.md) · [本轮回填及精确CI](https://github.com/TekesApps/TekesAgentKit/issues/29#issuecomment-6382972884) · [PR #10](https://github.com/TekesApps/TekesAgentKit/pull/10)。PR/push的root340/0/0、UI747/0/1、独立consumer执行成功，唯一失败仍为独立全局门槛TekesUI #53；不合并发布。桌面/物理IME/AX、ProcessContainer和#23动态Task pointer继续另列，本Issue关闭不扩大上述范围。\n",
+      "closedAt": "2026-10-24T10:21:32Z",
+      "createdAt": "2026-10-24T04:17:05Z",
+      "labels": [],
+      "number": 29,
+      "state": "CLOSED",
+      "title": "[P1][SEP/Sidebar] 明确三端会话分类事实与 main/ephemeral 成员关系",
+      "updatedAt": "2026-10-24T10:21:32Z",
+      "url": "https://github.com/TekesApps/TekesAgentKit/issues/29"
+    },
+    {
+      "body": "## 目标与归属\n\n总目标：#14。当前状态：**等待功能/验收完成与严格 CI/review**。优先级见标题；等待某项依赖不表示其余子项也不能推进。\n\n## 已实现与已验证（历史基线）\n\n- [x] PR #10 draft，最新代码 1ef2791；#12/#13 已实施但尚未合并。\n- [x] 1ef2791 两套 CI 的 headless/UI测试/格式/Clippy 通过，严格 #53 reading 失败，两份JSON已归档。\n- [x] 设计/迁移/接入和专题证据已有；当前 UI 0.0.0/publish=false，不是 v0.3.8 中已发布 UI。\n\n## 剩余工作\n\n- [ ] 全部工作项逐项核对完整目标，不将分项通过等同 full Views 完成。\n- [ ] 所有必要 CI 与独立 review 通过后，按发布契约更新版本/文档并合并、推送不可变阶段 tag。\n- [ ] 关闭完成的业务Issue；仍后置的能力逐项留票并清楚说明阶段范围，不更改本完整目标定义。\n\n## 关闭标准\n\n- [ ] 需求覆盖表无未归属项，证据适用当前交付 revision，必要原生/同跨进程/三端验收齐全。\n- [ ] 严格失败不 skip、不放宽；review发现已处理；正式依赖是已发布精确pin。\n- [ ] merge commit/tag/远端发布与 consumer 接入说明可核验，Issue回填实现/验证/未验收项/PR。\n\n## 现有实现/证据\n\n- [rust-agent-ui-delivery-status.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-delivery-status.md)\n- [rust-agent-ui-non-sdk-review-20261023.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-non-sdk-review-20261023.md)\n- [rust-agent-ui-source-authority.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-source-authority.md)\n\n## 依赖与实施边界\n\n依赖/关联：#15、#27、#18。上游项按本任务具体子项适用，不应把未受影响部分整体标为等待；Issue状态不能替代公开代码/consumer验证。ClientKit/Tekes 只读对照；只消费固定公开 TekesUI，不改 SDK/Kernel/Swift。复用现有 presentation，不另建状态机；缺公开来源/能力时明确禁用，不猜私有数据。\n\n历史已做与当前验收分开：628/1 UI、74 Python、三端协议/离屏及原生分项按各专题的原 revision/程序解释；新增纯展示门禁14项和1ef2791 CI不能把历史程序升级成全量验收。桌面/物理IME/VoiceOver/ProcessContainer尚未完整验收。\n\n关联 PR：[实验 Rust UI #10](https://github.com/TekesApps/TekesAgentKit/pull/10)。本Issue关闭前回填实现commit、适用验证与未验证项及PR；PR整体合并不自动代表本Issue完成。\n\n[完整需求/Issue覆盖与执行规则](https://github.com/TekesApps/TekesAgentKit/blob/codex/agent-ui-components/docs/rust-agent-ui-issue-plan.md)。\n",
+      "closedAt": null,
+      "createdAt": "2026-10-23T23:46:11Z",
+      "labels": [
+        {
+          "id": "LA_kwDOVNN5MM8AAAAC9pmLKA",
+          "name": "enhancement",
+          "description": "New feature or request",
+          "color": "a2eeef"
+        }
+      ],
+      "number": 28,
+      "state": "OPEN",
+      "title": "[P0][Delivery] 完整要求审计、review、CI、合并与阶段 tag",
+      "updatedAt": "2026-10-24T23:38:15Z",
+      "url": "https://github.com/TekesApps/TekesAgentKit/issues/28"
+    },
+    {
+      "body": "## 目标与归属\n\n总目标：#14。当前状态：**矩阵与当前程序三端非桌面补验完成；完整原生/阅读/容器验收待补**。优先级见标题；等待某项依赖不表示其余子项也不能推进。\n\n## 已实现与已验证（历史基线）\n\n- [x] Native/Pi/DSH 独立 SEP、session pointer/历史/数据回传与 headless 路径已实现并有 v0.3.8 基线。\n- [x] 已有多个冻结程序的真实协议/离屏/部分原生分项收据，范围不能互相转移。\n- [x] 固定宿主路径/bundle ID/签名策略和外部截图入口已交付；未实际完成当前宿主安装签名验收。\n\n## 剩余工作\n\n- [x] 建立逐需求×harness×同/跨进程×验证层级矩阵，先复核组件/第二 consumer/离屏，再做必要原生。\n- [ ] 继续遵守用户“桌面验收先不跑”；获安排后用固定宿主与已授权固定截图工具，历史程序仅归档。\n- [ ] 同一交付程序补系统中文组字/草稿/发送取消/stream/向上阅读/原生分页/reconnect 及配对布局/AX。\n\n## 关闭标准\n\n- [ ] 每条记录程序/来源/版本/命令/结果/证据，区分 unsupported、blocked、failed 与 passed。\n- [ ] 组字不误发送，草稿隔离，阅读追加不打断，分页保锚，重连不重发；不是只用合成事件证明系统IME。\n- [ ] 保留源码/WIP/固定快照/日志/截图/程序，复用共享 target；清缓存先核对进程/依赖并报告实际释放。\n\n## 现有实现/证据\n\n- [session-endpoints.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/session-endpoints.md)\n- [rust-agent-ui-non-sdk-review-20261023.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-non-sdk-review-20261023.md)\n- [rust-agent-ui-native-toolchain.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-native-toolchain.md)\n- [rust-agent-ui-offscreen-coverage-20261023.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-offscreen-coverage-20261023.md)\n\n## 依赖与实施边界\n\n依赖/关联：#21、#22、#23、#24、#25、#26。上游项按本任务具体子项适用，不应把未受影响部分整体标为等待；Issue状态不能替代公开代码/consumer验证。ClientKit/Tekes 只读对照；只消费固定公开 TekesUI，不改 SDK/Kernel/Swift。复用现有 presentation，不另建状态机；缺公开来源/能力时明确禁用，不猜私有数据。\n\n历史已做与当前验收分开：628/1 UI、74 Python、三端协议/离屏及原生分项按各专题的原 revision/程序解释；新增纯展示门禁14项和1ef2791 CI不能把历史程序升级成全量验收。桌面/物理IME/VoiceOver/ProcessContainer尚未完整验收。\n\n关联 PR：[实验 Rust UI #10](https://github.com/TekesApps/TekesAgentKit/pull/10)。本Issue关闭前回填实现commit、适用验证与未验证项及PR；PR整体合并不自动代表本Issue完成。\n\n[完整需求/Issue覆盖与执行规则](https://github.com/TekesApps/TekesAgentKit/blob/codex/agent-ui-components/docs/rust-agent-ui-issue-plan.md)。\n\n## 2026-10-24 非桌面增量\n\n本轮实现、验证和未验收范围见下方回填评论；计划/专题文档随提交 `32986d4` 发布。保持各自原程序身份；未关闭完整Issue。\n",
+      "closedAt": null,
+      "createdAt": "2026-10-23T23:46:08Z",
+      "labels": [
+        {
+          "id": "LA_kwDOVNN5MM8AAAAC9pmLKA",
+          "name": "enhancement",
+          "description": "New feature or request",
+          "color": "a2eeef"
+        }
+      ],
+      "number": 27,
+      "state": "OPEN",
+      "title": "[P0][Acceptance] 固定宿主的三端、IME、阅读与布局验收矩阵",
+      "updatedAt": "2026-10-24T23:25:42Z",
+      "url": "https://github.com/TekesApps/TekesAgentKit/issues/27"
+    },
+    {
+      "body": "## 目标与归属\n\n总目标：#14。当前状态：**等待完整交互式 ProcessContainer 公开交付**。优先级见标题；等待某项依赖不表示其余子项也不能推进。\n\n## 已实现与已验证（历史基线）\n\n- [x] Sidebar/RunPort/SidePanel 目前可由同进程 ContentHost 组合；没有正式 ProcessContainer 适配。\n- [x] 已检查旧公开 module-runtime/app-protocol：远端 keyboard/IME/scroll/AX 能力未满足；不把 ContentHost 叫作已验收容器。\n\n## 剩余工作\n\n- [ ] 等待 #48 完整交互契约与固定公开版本，再接入三个业务容器。\n- [ ] 实现消费侧状态/事件边界、挂载/卸载、进程恢复/来源身份；不补私有传输或复制焦点/IME引擎。\n\n## 关闭标准\n\n- [ ] 同进程与跨进程分别记录真实运行结果、精确版本和宿主身份。\n- [ ] 三个容器均支持原输入/焦点/IME/滚动/AX/唤醒及隔离；进程退出或重连不重复发送。\n- [ ] 独立公开 consumer 可复现，无 active sibling override，无私有 SDK 依赖。\n\n## 现有实现/证据\n\n- [rust-agent-ui-host-integration.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-host-integration.md)\n- [rust-agent-ui-delivery-status.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-delivery-status.md)\n\n## 依赖与实施边界\n\n依赖/关联：#15、[TekesUI #48](https://github.com/TekesApps/TekesUI/issues/48)。上游项按本任务具体子项适用，不应把未受影响部分整体标为等待；Issue状态不能替代公开代码/consumer验证。ClientKit/Tekes 只读对照；只消费固定公开 TekesUI，不改 SDK/Kernel/Swift。复用现有 presentation，不另建状态机；缺公开来源/能力时明确禁用，不猜私有数据。\n\n历史已做与当前验收分开：628/1 UI、74 Python、三端协议/离屏及原生分项按各专题的原 revision/程序解释；新增纯展示门禁14项和1ef2791 CI不能把历史程序升级成全量验收。桌面/物理IME/VoiceOver/ProcessContainer尚未完整验收。\n\n关联 PR：[实验 Rust UI #10](https://github.com/TekesApps/TekesAgentKit/pull/10)。本Issue关闭前回填实现commit、适用验证与未验证项及PR；PR整体合并不自动代表本Issue完成。\n\n[完整需求/Issue覆盖与执行规则](https://github.com/TekesApps/TekesAgentKit/blob/codex/agent-ui-components/docs/rust-agent-ui-issue-plan.md)。\n",
+      "closedAt": null,
+      "createdAt": "2026-10-23T23:46:05Z",
+      "labels": [
+        {
+          "id": "LA_kwDOVNN5MM8AAAAC9pmLKA",
+          "name": "enhancement",
+          "description": "New feature or request",
+          "color": "a2eeef"
+        }
+      ],
+      "number": 26,
+      "state": "OPEN",
+      "title": "[P0][ProcessContainer] 三个业务容器的同进程与跨进程宿主接入",
+      "updatedAt": "2026-10-23T23:47:50Z",
+      "url": "https://github.com/TekesApps/TekesAgentKit/issues/26"
+    },
+    {
+      "body": "## 目标与归属\n\n总目标：#14。当前状态：**部分已实现；待补齐/验收**。优先级见标题；等待某项依赖不表示其余子项也不能推进。\n\n## 已实现与已验证（历史基线）\n\n- [x] 已有受控 SummaryInput/Context、sections/rows、展开/用量/metadata/宿主 slots 与 source-owned actions。\n- [x] 行布局/缩进/label/context/child 状态等有专题收据和第二 consumer。\n\n## 剩余工作\n\n- [ ] 消费状态附件/图标、语义可选内容；核对 focus/hover/selection 与最终同内容布局。\n- [ ] 所有宿主自定义内容通过正式 slots/callbacks，不另造 AgentKit 基础控件。\n\n## 关闭标准\n\n- [ ] section/行状态、usage 与 metadata 和原 presentation 一致，缺字段不补假值。\n- [ ] 原来源动作和异步结果不串 session；关闭/切换后的请求被拒绝。\n- [ ] 窄宽/字号/主题下行与图标/label 语义正确；完整当前原生与可达性单独有收据。\n\n## 现有实现/证据\n\n- [rust-agent-ui-summary-context-20261022.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-summary-context-20261022.md)\n- [rust-agent-ui-summary-sections-20261021.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-summary-sections-20261021.md)\n- [rust-agent-ui-summary-row-layout-20261022.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-summary-row-layout-20261022.md)\n- [rust-agent-ui-summary-child-status-20261022.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-summary-child-status-20261022.md)\n\n## 依赖与实施边界\n\n依赖/关联：[TekesUI #47](https://github.com/TekesApps/TekesUI/issues/47)、[TekesUI #25](https://github.com/TekesApps/TekesUI/issues/25)、[TekesUI #30](https://github.com/TekesApps/TekesUI/issues/30)、[TekesUI #38](https://github.com/TekesApps/TekesUI/issues/38)、[TekesUI #46](https://github.com/TekesApps/TekesUI/issues/46)。上游项按本任务具体子项适用，不应把未受影响部分整体标为等待；Issue状态不能替代公开代码/consumer验证。ClientKit/Tekes 只读对照；只消费固定公开 TekesUI，不改 SDK/Kernel/Swift。复用现有 presentation，不另建状态机；缺公开来源/能力时明确禁用，不猜私有数据。\n\n历史已做与当前验收分开：628/1 UI、74 Python、三端协议/离屏及原生分项按各专题的原 revision/程序解释；新增纯展示门禁14项和1ef2791 CI不能把历史程序升级成全量验收。桌面/物理IME/VoiceOver/ProcessContainer尚未完整验收。\n\n关联 PR：[实验 Rust UI #10](https://github.com/TekesApps/TekesAgentKit/pull/10)。本Issue关闭前回填实现commit、适用验证与未验证项及PR；PR整体合并不自动代表本Issue完成。\n\n[完整需求/Issue覆盖与执行规则](https://github.com/TekesApps/TekesAgentKit/blob/codex/agent-ui-components/docs/rust-agent-ui-issue-plan.md)。\n\n\n## 本批交付与验证（2026-10-24）\n\n实现 `9a62950`；独立Summary子会话发现并修复工具结果UUID直接授予导航的问题，主会话与独立review补齐带前缀父UUID重定向防护。无store被动；同端已知session精确匹配优先，否则唯一后缀；unknown/歧义/父自身不生成pointer，不合成ID。显式宿主facts仍由宿主保证来源与权限。\n\n主会话集中验证：presentation225、UI634/1原有忽略、严格Clippy/格式通过；源码8b5d45b的当前冻结程序在Pi1.4.0/DSH0.2.1-rc.2原Summary→子Run→Send/Cancel/草稿/重连链路均通过，driver exit0。是隔离合成本地provider的真实协议/离屏证据，不是生产模型或系统IME证明。\n\nSDK视觉/最终布局/AX仍待验收；Native原协议/Task Journal与原Summary被动行来源已在7e9383b补齐无窗口证据，不能替代实际窗口/AX验收。没有桌面/系统权限操作。\n\n[主/子会话分工](https://github.com/TekesApps/TekesAgentKit/blob/ddc49c7/docs/rust-agent-ui-parallel-work-20261024.md) · [统一实现/验证与未验证收据](https://github.com/TekesApps/TekesAgentKit/blob/ddc49c7/docs/rust-agent-ui-parallel-results-20261024.md) · [PR #10](https://github.com/TekesApps/TekesAgentKit/pull/10)。Issue保持开放。\n\n\n## 本轮独立复核：3c73288\n\n继续对照Summary来源动作、旧intent、slots及用量缺失路径，未发现新增的不依赖TekesUI/桌面的确定实现缺口。纠正文档旧基线：`6420876` 已让loaded Summary缺usage时保留六条unavailable，不能继续引用“整个section不显示”作为当前行为。\n\n剩余状态附件/交互呈现跟踪TekesUI #47；完整布局、窄宽/字号/主题及原生/AX验收仍开放。本轮没有为凑进度增加占位字段或宿主手绘替代，没有桌面验收。[审计记录](https://github.com/TekesApps/TekesAgentKit/blob/3c73288/docs/rust-agent-ui-summary-issue25-audit-20261024.md)、[批次分层证据](https://github.com/TekesApps/TekesAgentKit/blob/3c73288/docs/rust-agent-ui-sidebar-ranked-results-20261024.md)、[PR #10](https://github.com/TekesApps/TekesAgentKit/pull/10)。Issue不关闭。\n\n\n## 当前来源子项细分（2026-10-24）\n\n- [x] Native0.9.3真实Task Journal、原Summary被动行、公开有界子历史来源：`7e9383b`。\n- [x] DSH字符串arguments标题与原call/result完成来源：`0cbced7`。\n- [x] Pi/DSH同child原父Summary running→failed、原行/epoch/来源及4份组件挂载：`1d6cc7e`。\n- [ ] 完整最终布局/hover/状态附件、桌面/物理IME/OS AX和完整生命周期验收。\n\n各项分层收据与CI终态见下方对应结果评论；完整Issue仍开放，不因来源子项完成而关闭，也不豁免TekesUI #53。\n",
+      "closedAt": null,
+      "createdAt": "2026-10-23T23:46:02Z",
+      "labels": [
+        {
+          "id": "LA_kwDOVNN5MM8AAAAC9pmLKA",
+          "name": "enhancement",
+          "description": "New feature or request",
+          "color": "a2eeef"
+        }
+      ],
+      "number": 25,
+      "state": "OPEN",
+      "title": "[P1][Summary] sections、用量、metadata 和来源动作对齐",
+      "updatedAt": "2026-10-24T20:32:38Z",
+      "url": "https://github.com/TekesApps/TekesAgentKit/issues/25"
+    },
+    {
+      "body": "## 目标与归属\n\n总目标：#14。当前状态：**部分已实现；待补齐/验收**。优先级见标题；等待某项依赖不表示其余子项也不能推进。\n\n## 已实现与已验证（历史基线）\n\n- [x] Native/Pi 真实创建/发送/切换草稿/同实例重开/重连不重复/确认丢弃离屏闭环已通过。\n- [x] 同目标 controller 复用，Closing/Unknown/absence 和原编辑器合成 preedit/commit 有回归。\n- [x] DSH 公开 runtime 无临时 discard，当前禁用是正确门禁，不算支持。\n\n## 剩余工作\n\n- [ ] 补当前交付程序的系统中文输入、菜单/关闭确认与完整原生生命周期。\n- [ ] 若 DSH 要支持 SideChat，先确认公开 temporary fork/discard 契约与上游交付；否则正式记录 Unsupported，不要求伪实现。\n\n## 关闭标准\n\n- [ ] 重开保留原草稿/附件/准备状态；丢弃须原目标确认，Unknown 不重试 mutation。\n- [ ] Native/Pi 真实端点一次发送、原临时子分支可正确关闭/恢复，父草稿不变。\n- [ ] DSH 若无公开能力，UI 与API 均明确不可用；若能力新增需真实端到端证明后启用。\n\n## 现有实现/证据\n\n- [rust-agent-ui-real-sidechat-20261023.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-real-sidechat-20261023.md)\n- [rust-agent-ui-sidechat-shared-destination-20261023.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-sidechat-shared-destination-20261023.md)\n- [rust-agent-ui-sidechat-original-input-20261023.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-sidechat-original-input-20261023.md)\n\n## 依赖与实施边界\n\n依赖/关联：#12、#16、#23。上游项按本任务具体子项适用，不应把未受影响部分整体标为等待；Issue状态不能替代公开代码/consumer验证。ClientKit/Tekes 只读对照；只消费固定公开 TekesUI，不改 SDK/Kernel/Swift。复用现有 presentation，不另建状态机；缺公开来源/能力时明确禁用，不猜私有数据。\n\n历史已做与当前验收分开：628/1 UI、74 Python、三端协议/离屏及原生分项按各专题的原 revision/程序解释；新增纯展示门禁14项和1ef2791 CI不能把历史程序升级成全量验收。桌面/物理IME/VoiceOver/ProcessContainer尚未完整验收。\n\n关联 PR：[实验 Rust UI #10](https://github.com/TekesApps/TekesAgentKit/pull/10)。本Issue关闭前回填实现commit、适用验证与未验证项及PR；PR整体合并不自动代表本Issue完成。\n\n[完整需求/Issue覆盖与执行规则](https://github.com/TekesApps/TekesAgentKit/blob/codex/agent-ui-components/docs/rust-agent-ui-issue-plan.md)。\n\n\n## Multi-endpoint follow-up (implementation in progress)\n\n# 多 endpoint SideChat 宿主接线设计\n\n关联 #24，前置为 #22 的实际多 connector 宿主。当前首端 SideChat 可用、非匹配 endpoint 明确禁用；本设计补齐原控制器的按端组合，不另建 pointer、mutation、草稿或 Run 状态机。ClientKit/Tekes 只读参考，SDK 不改，桌面不跑。\n\n## 权威与生命周期\n\n每个原 SessionRuntime 恰好保留一个 SideChatBinding。创建、打开、关闭按捕获的 parent.endpoint_id 查原 binding；未知端明确失败，不回退首端。不同 endpoint 的相同 session ID 不能共用面板或控制器。支持状态仍由各端原 capability 得出。\n\nBoundSideChatRun 额外保留创建它的原控制器身份，接收返回前要求原 owner 和当前 pointer 都仍匹配；相同 endpoint/session 的结构相等不能替代来源身份。已退休 pointer、另一个 controller 的旧返回不能挂载到当前源。同一宿主生命周期禁止把同端 controller 替换为另一 Arc；重复注册原 Arc 幂等。换源需创建新宿主，不能静默替换仍有请求的源。\n\nComponentDemo 保留按 endpoint 的原 binding 集合；同步某端 snapshot 只能清理该端已撤销的 panel_runs，不得用 A 端的空列表删除 B 端。切换父会话保留各端 canonical RunBinding 的草稿、附件和提交状态；跨端延迟结果可以保留有效原面板，但不能抢当前选择/焦点。现有 panel/navigation revision 与组字门禁继续生效。\n\n宿主订阅全部原控制器的变化，仅唤醒共享同步；不逐帧轮询、不合成聚合成功状态。单端公开接入保持兼容，缺失端维持禁用。注册表只持有原 Arc，没有撤销/替换 API；捕获的 parent 地址路由到唯一 canonical source，不由当前选中端重定向。\n\n## 分工与验证\n\n独立子会话只处理 BoundSideChatRun 原 owner 身份和定向协议 fixture；主会话处理按端绑定、ComponentDemo/native 路由、订阅与集成审查。共享 target 串行构建。\n\n计划验证：同 session ID 双端 create/open/close 原端归属、A/B 切换草稿/附件保留、原端 pointer 撤销不删除另一端、旧 source/迟到返回拒绝、未知端禁用、单端既有 suite 与第二公开 consumer。原生入口编译通过只证明接线；真实多 harness、窗口/物理中文 IME/AX 仍单列，不能以 fixture/离屏替代。\n\n\n- [x] Canonical per-endpoint owners and dispatch, all sources observed.\n- [x] Returned run owner identity and current pointer validation.\n- [x] Preserve other endpoint panes/drafts/uploads; reject late focus takeover.\n- [x] Protocol fixtures, UI regression and second public consumer; desktop not run.\n\n\n## Current delivery: c7104ac / fa9c158\n\nImplementation and evidence pushed to PR #10. UI workspace657 passed/0 failed/1 existing ignore (#49); strict all-target Clippy, fmt/boundary, public consumers and normal demo build passed. No desktop/native input/real multi-harness acceptance, and no DSH capability upgrade.\n\nDetailed design, implementation, failed attempts and evidence boundaries: https://github.com/TekesApps/TekesAgentKit/blob/fa9c158/docs/rust-agent-ui-sidechat-multi-endpoint-20261024.md\n\nOriginal close criteria remain unchecked and Issue remains open. New head CI must be checked independently of df5429f.\n",
+      "closedAt": null,
+      "createdAt": "2026-10-23T23:45:59Z",
+      "labels": [
+        {
+          "id": "LA_kwDOVNN5MM8AAAAC9pmLKA",
+          "name": "enhancement",
+          "description": "New feature or request",
+          "color": "a2eeef"
+        }
+      ],
+      "number": 24,
+      "state": "OPEN",
+      "title": "[P1][SideChat] 临时分支生命周期、重开与能力门禁",
+      "updatedAt": "2026-10-24T11:02:47Z",
+      "url": "https://github.com/TekesApps/TekesAgentKit/issues/24"
+    },
+    {
+      "body": "## 目标与归属\n\n总目标：#14。当前状态：**部分已实现；待补齐/验收**。优先级见标题；等待某项依赖不表示其余子项也不能推进。\n\n## 已实现与已验证（历史基线）\n\n- [x] 已有受控 SidePanelInput/Navigation、动态 Task pointer、同目标 canonical controller 和独立 history lease。\n- [x] Native 真实有界子历史/单消息分页/重连/父草稿隔离；Pi/DSH 可继续子 Run 已有离屏分项记录。\n- [x] 现有 #12 继承父权限、#13 只读实例身份与 display-only 门禁已实施待合并。\n\n## 剩余工作\n\n- [x] 定向核对 Task/子代理状态、pointer替换和父导航；完整组合与窗口验收仍保留在下一项。\n- [ ] 补同一交付程序的三端实际来源与完整当前窗口/chrome；不从工具调用猜造独立会话。\n\n## 关闭标准\n\n- [ ] A→B→A/父关闭/异步迟到不恢复旧权限；同目标共享草稿，子 pane 关闭不丢父草稿。\n- [ ] 只读有界 pane 无 Composer 且不能发送；合法来源可刷新/分页，源切换不串帧。\n- [ ] 真实 Task pointer 与家族导航来源可追溯；所有状态/空态和 tab 切换均有明确验收。\n\n## 现有实现/证据\n\n- [rust-agent-ui-sidepanel-contract-audit-20261023.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-sidepanel-contract-audit-20261023.md)\n- [rust-agent-ui-task-shared-destination-20261023.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-task-shared-destination-20261023.md)\n- [rust-agent-ui-native-bounded-20261023.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-native-bounded-20261023.md)\n- [rust-agent-ui-source-authority.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-source-authority.md)\n\n## 依赖与实施边界\n\n依赖/关联：#12、#13、#18。上游项按本任务具体子项适用，不应把未受影响部分整体标为等待；Issue状态不能替代公开代码/consumer验证。ClientKit/Tekes 只读对照；只消费固定公开 TekesUI，不改 SDK/Kernel/Swift。复用现有 presentation，不另建状态机；缺公开来源/能力时明确禁用，不猜私有数据。\n\n历史已做与当前验收分开：628/1 UI、74 Python、三端协议/离屏及原生分项按各专题的原 revision/程序解释；新增纯展示门禁14项和1ef2791 CI不能把历史程序升级成全量验收。桌面/物理IME/VoiceOver/ProcessContainer尚未完整验收。\n\n关联 PR：[实验 Rust UI #10](https://github.com/TekesApps/TekesAgentKit/pull/10)。本Issue关闭前回填实现commit、适用验证与未验证项及PR；PR整体合并不自动代表本Issue完成。\n\n[完整需求/Issue覆盖与执行规则](https://github.com/TekesApps/TekesAgentKit/blob/codex/agent-ui-components/docs/rust-agent-ui-issue-plan.md)。\n\n\n## 本批交付与验证（2026-10-24）\n\n审计 `8b5d45b`；独立SidePanel子会话只读对照，未发现确定产品缺陷，未为产生diff而改状态机。主会话运行demo四套相关测试41项通过（含全部UI634/1原有忽略）。审计逐项对应状态/pointer/父A-B-A、关闭与迟到源门禁，并记录ClientKit将读取错误映射成unavailable、Rust保留错误文本的诊断差异。\n\n- [ ] 文档列明的状态/导航组合和完整当前窗口/chrome继续验收；不要求无依据的笛卡尔积测试。\n\n[主/子会话分工](https://github.com/TekesApps/TekesAgentKit/blob/ddc49c7/docs/rust-agent-ui-parallel-work-20261024.md) · [统一实现/验证与未验证收据](https://github.com/TekesApps/TekesAgentKit/blob/ddc49c7/docs/rust-agent-ui-parallel-results-20261024.md) · [PR #10](https://github.com/TekesApps/TekesAgentKit/pull/10)。Issue保持开放。\n\n\n## 当前交付：adbb7f3 / 3c73288\n\n- [x] 补齐 native `ChildOpened(Err)` 实际分发分支共用helper的直接回归：当前请求交给原notice路径；切换父会话后旧请求不产生notice。使用真实ComponentDemo导航状态，1项Rust测试通过；没有新状态机。\n- [ ] 仍未验证实时窗口的notice渲染、完整三端Task来源/家族导航与窗口组合验收；桌面仍不跑。\n\n最终UI706/0/1既有ignore、严格检查与普通demo构建通过；[分层结果](https://github.com/TekesApps/TekesAgentKit/blob/3c73288/docs/rust-agent-ui-sidebar-ranked-results-20261024.md)、[专属记录](https://github.com/TekesApps/TekesAgentKit/blob/3c73288/docs/rust-agent-ui-sidepanel-issue23-child-error-20261024.md)。最新head CI独立跟踪；[PR #10](https://github.com/TekesApps/TekesAgentKit/pull/10)保持试验状态，原SDK/桌面关闭门槛保留，Issue不关闭。\n",
+      "closedAt": null,
+      "createdAt": "2026-10-23T23:45:56Z",
+      "labels": [
+        {
+          "id": "LA_kwDOVNN5MM8AAAAC9pmLKA",
+          "name": "enhancement",
+          "description": "New feature or request",
+          "color": "a2eeef"
+        }
+      ],
+      "number": 23,
+      "state": "OPEN",
+      "title": "[P1][SidePanel] Task/子代理 tabs、pointer 与有界历史闭环",
+      "updatedAt": "2026-10-24T23:42:53Z",
+      "url": "https://github.com/TekesApps/TekesAgentKit/issues/23"
+    },
+    {
+      "body": "## 目标与归属\n\n总目标：#14。当前状态：**部分已实现；待补齐/验收**。优先级见标题；等待某项依赖不表示其余子项也不能推进。\n\n## 已实现与已验证（历史基线）\n\n- [x] 已有目录/搜索/分组/分页、恢复与选中补齐、稳定 action value/reveal。\n- [x] 活动状态、置顶/偏好/共享 CAS 及捕获来源、旧请求门禁已有回归。\n\n## 剩余工作\n\n- [ ] 消费非当前行上下文菜单公开契约，核对原生/AX 操作及窄宽布局。\n- [ ] 复验跨端点、过滤分页和导航后操作的来源归属；宿主只负责导航。\n\n## 关闭标准\n\n- [ ] 非当前会话右键不错误改变目标；pin/share/rename/archive 作用于原捕获 item。\n- [ ] 搜索/分页/恢复/切换端点后选中项可见，无重复、漏项或旧游标写入。\n- [ ] 活动状态不猜运行中；菜单/键盘/AX 语义与稳定ID在同进程和后续容器验收中一致。\n\n## 现有实现/证据\n\n- [rust-agent-ui-sidebar-navigation-20261021.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-sidebar-navigation-20261021.md)\n- [rust-agent-ui-sidebar-paging-20261021.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-sidebar-paging-20261021.md)\n- [rust-agent-ui-sidebar-preferences-20261021.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-sidebar-preferences-20261021.md)\n- [rust-agent-ui-sidebar-session-menu-20261022.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-sidebar-session-menu-20261022.md)\n\n## 依赖与实施边界\n\n依赖/关联：[TekesUI #44](https://github.com/TekesApps/TekesUI/issues/44)。上游项按本任务具体子项适用，不应把未受影响部分整体标为等待；Issue状态不能替代公开代码/consumer验证。ClientKit/Tekes 只读对照；只消费固定公开 TekesUI，不改 SDK/Kernel/Swift。复用现有 presentation，不另建状态机；缺公开来源/能力时明确禁用，不猜私有数据。\n\n历史已做与当前验收分开：628/1 UI、74 Python、三端协议/离屏及原生分项按各专题的原 revision/程序解释；新增纯展示门禁14项和1ef2791 CI不能把历史程序升级成全量验收。桌面/物理IME/VoiceOver/ProcessContainer尚未完整验收。\n\n关联 PR：[实验 Rust UI #10](https://github.com/TekesApps/TekesAgentKit/pull/10)。本Issue关闭前回填实现commit、适用验证与未验证项及PR；PR整体合并不自动代表本Issue完成。\n\n[完整需求/Issue覆盖与执行规则](https://github.com/TekesApps/TekesAgentKit/blob/codex/agent-ui-components/docs/rust-agent-ui-issue-plan.md)。\n\n\n## 2026-10-24 新确认的非 SDK 子项：多 endpoint 聚合（历史阶段）\n\n[设计草案（52288a0）](https://github.com/TekesApps/TekesAgentKit/blob/52288a0/docs/rust-agent-ui-sidebar-multi-endpoint-20261024.md)。单端 `SidebarBinding` API 合法且有防误投校验，demo 只装配首端；多端 binding 已于 `6c700e9` 实施，`4967d15` 已完成 demo 宿主接线；跨端全局查询仍未完成。此子项不依赖 TekesUI #44，不取消原校验。\n\n- [x] 对照 ClientKit 全局会话、Tekes 宿主边界及现有单端实现，记录最小聚合设计。\n- [x] 保留单端 API，增加固定 endpoint 集合的聚合 binding，按完整 SessionAddress 路由 selected-read/action。\n- [ ] 局部故障保留最后 rows 并标 stale；不将断线当权威空列表；独立 source/epoch 和聚合 revision。\n- [ ] 明确多端搜索结果、局部错误/完成语义；普通过滤/排序/本地展示分页与共享偏好沿用原状态。\n- [ ] 两个隔离 fixture endpoint（重复 session_id）验证双行、非首端补读、copy/rename/archive 路由与迟到回调拒绝。\n- [ ] 验证局部失败恢复、endpoint-qualified folder/global pin/分页旧请求，以及单端兼容与独立 consumer；桌面项另记。\n\n当前已完成 binding 阶段实现与针对测试；宿主接线、全局查询及后续完整验收仍待完成，Issue保持开放。\n\n\n## 本批交付与验证（2026-10-24）\n\n实现 `6c700e9`；主会话协调、独立 Sidebar 子会话实现、主会话审查与集中验证。2项聚合单测+3项双端fixture通过，UI workspace634/1原有忽略、严格Clippy/格式通过。完整地址防止同名ID合并；B端读取与rename/archive原地址路由、旧owner/移除后票据拒绝通过。新binding外部consumer仅证明API编译和错误配置拒绝，不能当有效双端运行证明。\n\n- [x] 将新binding接入demo宿主现有source/view clock，源替换保持单调显示版本；`4967d15` 已完成 Single/Multi adapter 与 owner/navigation/action/pending 隔离。默认 fixture 仍单端，多端行为有隔离双端宿主测试。\n- [ ] 定约跨端全局query，补过滤分页、复制/全局偏好与失败恢复的跨端整体组合。同实例 observer API/用户入口已在后续交付；真实多 harness 断流恢复仍未验收。\n\n[主/子会话分工](https://github.com/TekesApps/TekesAgentKit/blob/ddc49c7/docs/rust-agent-ui-parallel-work-20261024.md) · [统一实现/验证与未验证收据](https://github.com/TekesApps/TekesAgentKit/blob/ddc49c7/docs/rust-agent-ui-parallel-results-20261024.md) · [PR #10](https://github.com/TekesApps/TekesAgentKit/pull/10)。Issue保持开放。\n\n\n## 后续实施细分（df5429f 已交付阶段）\n\n- [x] 真正多 harness 配置入口：独立配置/connector/runtime、原 scopes 顺序、拒绝重复 endpoint、单端兼容；不得克隆首端 connector 冒充多端。\n- [x] 共享多端搜索协调器：复用端内reader，独立aggregate owner/generation/revision，保留逐端状态；ABA/clear/drop/旧回包、原失败端retry隔离。\n- [x] 逐端 inventory join 与聚合状态的 components/demo/第二consumer接线，不在宿主拼single search publication。\n- [x] 记录 ClientKit Mirror本地FTS与全局pins差异；远端provider hasMore表示结果未全，现有公开协议无cursor，不能重复query冒充续页。本地列表分页与远端搜索完整性分别验收。\n\n原生/AX/IME/ProcessContainer关闭门槛保持不变；以上子项不替代完整Issue验收。\n\n## 当前交付（df5429f，优先于上述历史阶段描述）\n\n`cd3d486` + `df5429f` 已完成固定端 provider 搜索、独立多 connector 配置、共享投影/状态组件与 demo 接线。presentation 234/0/0、UI653/0/1（既有#49忽略）、严格 Clippy、独立 component/binding consumers、双端成功及局部失败离屏已通过；完整范围和证据见[收据](https://github.com/TekesApps/TekesAgentKit/blob/df5429f/docs/rust-agent-ui-multi-search-results-20261024.md)。\n\n- [ ] 实际对齐 Mirror FTS/pinned-search 语义（本批仅记录差异，未完成）。\n- [ ] 真实多 harness 组合与故障恢复、过滤分页/像素reveal及非首端SideChat 整体验收。\n\n没有运行桌面/物理中文IME/AX/ProcessContainer。远端provider没有公开cursor，hasMore不能视作完成。Issue仍开放，PR仍试验状态：[PR #10](https://github.com/TekesApps/TekesAgentKit/pull/10)。\n\n\n## Observer API delivery: 3d594a8 / 532dd50\n\n- [x] Binding-level same-instance explicit observer restart: fixed owner, endpoint generation, original watch subscriber, stale retained rows and running activity anchor.\n- [x] Typed one-shot retry rejects duplicate/cross-owner/old-generation callbacks; only the restarted endpoint retires its action/selected receipts.\n- [x] Host callbacks run outside lifecycle lock, publication rechecks generation; Drop closes admission before abort.\n- [x] UI workspace664/0/1 existing #49 ignore; strict Clippy/fmt/boundaries, independent public API consumer and normal demo build.\n- [x] Wire demo user-triggered observer retry UI with original publication/key pairing, per-endpoint generation checks and non-reused controls (`be4fc58`); native click/real harness acceptance remains open.\n- [ ] Real multi-harness fault acceptance, Mirror FTS/pins, cursor protocol, actual pixel reveal and desktop/IME/AX/ProcessContainer.\n\nDetailed contract and receipts: https://github.com/TekesApps/TekesAgentKit/blob/532dd50/docs/rust-agent-ui-sidebar-observer-recovery-20261024.md\n\nTerminal failure/late-frame injection is private cfg(test); recovery itself uses the production SharedAgent.follow over owned protocol fixture runtime. External consumer compiled the API and ran invalid configuration checks; valid recovery IO is proven separately by binding tests. No new target. Two superseded unit-test cache files removed after occupancy and single Cargo flock checks; target/deps du decreased 1,474,560 bytes; WIP and acceptance programs/evidence preserved.\n\nPR #10 new head CI is tracked independently. Previous fa9c158 headless/UI suite/standalone consumer passed; strict nested reading still failed, no gate waived. Issue remains open.\n\n\n## Observer Retry UI delivery: be4fc58 / 9b1d263\n\n- [x] Coherent original Single/Multi publication + opaque source/endpoint/generation key; no caller-edited publication or latest-generation substitution.\n- [x] Default TekesUI status footer; source retirement, same-source pending, cross-endpoint independence, dedicated ID ranges and original binding route.\n- [x] UI675/0/1, final component10/0/0, presentation240/0/0, strict Clippy, normal demo build and standalone consumer; layers and limitations are recorded separately.\n- [ ] Real native Retry click / real multi-harness failure / physical IME / complete tiny-window reachability acceptance. Desktop remains not run.\n\nContract and precise evidence: https://github.com/TekesApps/TekesAgentKit/blob/9b1d263/docs/rust-agent-ui-sidebar-observer-retry-results-20261024.md\n\nPR #10 remains experimental. TekesUI strict nested detail reading gate is unchanged; no merge/tag/issue closure from this delivery.\n\n\n## Query/folder membership delivery: 147642b / 77a9ed8\n\n- [x] Align current sessionSidebarSnapshot membership: provider query and folder predicate apply to pinned and ordinary sessions before display partitioning. Matching pins appear once; clearing restores original inventory without erasing pin preferences/drafts.\n- [x] Pending/failed/unresolved provider state remains diagnostic; do not show unfiltered inventory as current query hits or claim authoritative no-results. Empty first page with hasMore=true and invalid Failed+ready snippets are fenced.\n- [x] Preserve ComponentDemo unknown-hit recovery after original inventory update, preedit/focus/drafts, endpoint isolation and stale control rejection; complete UI677/0/1, strict Clippy, normal demo build and standalone consumer passed.\n- [x] Local canonical-name FTS + provider OR union and explicit full-corpus bm25 ranking delivered; see current batch below.\n- [ ] Remote continuation remains unimplemented: provider has no public cursor; no fabricated repeat-query paging.\n- [ ] Native selftests have revised source/receipt fields but were not executed; real harness, desktop, physical IME/AX and complete pagination/reveal acceptance remain open.\n\nExact evidence: https://github.com/TekesApps/TekesAgentKit/blob/77a9ed8/docs/rust-agent-ui-sidebar-query-membership-results-20261024.md\n\nHistorical independent-pin evidence is retained and marked superseded. This is a real provider-membership slice, not complete search parity; #22 stays open. PR #10 remains experimental and strict TekesUI reading gate is unchanged.\n\n\n## 当前交付：3aaee78 / 3c73288（优先于历史阶段描述）\n\n- [x] 同库存 frame 的 retained canonical-name corpus + connection epoch；固定注册端点域。Single/Multi 原 packet、persistent projector 与 demo 已接通，宿主不另建状态机。\n- [x] 完整域 SQLite FTS5 bm25 + provider OR union，普通 recent 排名后由组件分页；pin_order 与宿主标题 comparator 保留。旧便利 API 仍仅保成员/原顺序，不冒充全局排名。\n- [x] 部分域保留已知 local/provider 成员且本地 readiness=false；新 frame 缺 corpus 不拼旧语料；错误/迟到/原始来源门禁保留。\n- [x] 对照 ClientKit sessionLimit 修正搜索无限展开；真实双 fixture follow 检查全局排名、同 ID 跨端隔离、隐藏 child 与分页，未运行真实 harness。\n- [ ] 实际存储保留集合/生命周期一致性、所有 pin/title durable-ID/Unicode 平局、公开远端 cursor、真实多 harness/桌面/IME/AX/ProcessContainer 仍开放。\n\nUI706/0/1既有ignore；presentation+web258/0/0；Python92；root/UI严格Clippy、fmt/边界、普通demo build与独立workspace排名consumer运行通过。consumer仅证明四条公开projection/component断言。完整分层证据：[本批收据](https://github.com/TekesApps/TekesAgentKit/blob/3c73288/docs/rust-agent-ui-sidebar-ranked-results-20261024.md)。\n\n最新PR head `3c73288` 的CI已启动，不能借用532150e的结果；后者独立consumer通过，仅严格阅读失败。TekesUI精确pin不变、#53门禁不豁免。[PR #10](https://github.com/TekesApps/TekesAgentKit/pull/10)继续试验状态，Issue不关闭。\n",
+      "closedAt": null,
+      "createdAt": "2026-10-23T23:45:53Z",
+      "labels": [
+        {
+          "id": "LA_kwDOVNN5MM8AAAAC9pmLKA",
+          "name": "enhancement",
+          "description": "New feature or request",
+          "color": "a2eeef"
+        }
+      ],
+      "number": 22,
+      "state": "OPEN",
+      "title": "[P1][Sidebar] 会话导航、活动、置顶和共享操作完整验收",
+      "updatedAt": "2026-10-24T22:09:59Z",
+      "url": "https://github.com/TekesApps/TekesAgentKit/issues/22"
+    },
+    {
+      "body": "## 目标与归属\n\n总目标：#14。当前状态：**部分已实现；待补齐/验收**。优先级见标题；等待某项依赖不表示其余子项也不能推进。\n\n## 已实现与已验证（历史基线）\n\n- [x] 正式 RunPort 已组合三组件与 preflight/稳定回合导航，第二 consumer 不依赖测试宿主。\n- [x] 连接/运行/等待/失败/用量/TurnRail/Jump 已接原 presentation；completeRunPort 仍 false。\n\n## 剩余工作\n\n- [ ] 逐项对照 ClientKit 完整层次、selection/chrome、hover、回合导航和可达性。\n- [ ] 补同内容/同尺寸/同主题/同 scale 的最终布局记录，测试宿主 RunSurface 不作为标准组件。\n\n## 关闭标准\n\n- [ ] Composer/Transcript/Indicators 输入输出清晰，宿主不 fork 状态机。\n- [ ] rail/跳转/状态数据绑定原回合；缺省 usage 不造数；reveal 不夺焦点。\n- [ ] 布局对照逐项列差异，全部实现与适用验收通过才标 completeRunPort。\n\n## 现有实现/证据\n\n- [rust-agent-ui-run-port-20261022.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-run-port-20261022.md)\n- [rust-agent-ui-turn-rail-20261021.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-turn-rail-20261021.md)\n- [rust-agent-ui-run-preflight-20261021.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-run-preflight-20261021.md)\n- [rust-agent-ui-delivery-status.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-delivery-status.md)\n\n## 依赖与实施边界\n\n依赖/关联：#16、#17、#18、#20、[TekesUI #46](https://github.com/TekesApps/TekesUI/issues/46)、[TekesUI #5](https://github.com/TekesApps/TekesUI/issues/5)。上游项按本任务具体子项适用，不应把未受影响部分整体标为等待；Issue状态不能替代公开代码/consumer验证。ClientKit/Tekes 只读对照；只消费固定公开 TekesUI，不改 SDK/Kernel/Swift。复用现有 presentation，不另建状态机；缺公开来源/能力时明确禁用，不猜私有数据。\n\n历史已做与当前验收分开：628/1 UI、74 Python、三端协议/离屏及原生分项按各专题的原 revision/程序解释；新增纯展示门禁14项和1ef2791 CI不能把历史程序升级成全量验收。桌面/物理IME/VoiceOver/ProcessContainer尚未完整验收。\n\n关联 PR：[实验 Rust UI #10](https://github.com/TekesApps/TekesAgentKit/pull/10)。本Issue关闭前回填实现commit、适用验证与未验证项及PR；PR整体合并不自动代表本Issue完成。\n\n[完整需求/Issue覆盖与执行规则](https://github.com/TekesApps/TekesAgentKit/blob/codex/agent-ui-components/docs/rust-agent-ui-issue-plan.md)。\n",
+      "closedAt": null,
+      "createdAt": "2026-10-23T23:45:50Z",
+      "labels": [
+        {
+          "id": "LA_kwDOVNN5MM8AAAAC9pmLKA",
+          "name": "enhancement",
+          "description": "New feature or request",
+          "color": "a2eeef"
+        }
+      ],
+      "number": 21,
+      "state": "OPEN",
+      "title": "[P1][RunPort] 组合 Composer/Transcript/Indicators 并完成 Views 对照",
+      "updatedAt": "2026-10-24T17:17:14Z",
+      "url": "https://github.com/TekesApps/TekesAgentKit/issues/21"
+    },
+    {
+      "body": "## 目标与归属\n\n总目标：#14。当前状态：**数据链路已有；紧凑视觉等待公开 SDK**。优先级见标题；等待某项依赖不表示其余子项也不能推进。\n\n## 已实现与已验证（历史基线）\n\n- [x] 输入气泡与 input aside 右对齐，机器内容与 output aside 左对齐；共同列和单行原则已有 consumer。\n- [x] 目标数据/清除/重连及反馈初读/CAS/错误恢复已有三端分项验证。\n- [x] 真实 Pi 窄列目标 labelVisible=false 已保留严格失败；文字 fallback 不算完整视觉。\n\n## 剩余工作\n\n- [ ] 消费公开原 glyph/紧凑动作服务，保留完整 AX name 与原按钮焦点/selected/disabled。\n- [ ] 按 ClientKit 单行 controlSlot+剩余信息布局完成复制/评价/分叉/时间/目标/状态可见性。\n\n## 关闭标准\n\n- [ ] 固定窄列真实目标标签、时间和所需状态可见，不隐藏业务动作、不改多行、不用假字符图标。\n- [ ] 输入及其 footnote 始终右，机器输出及 footnote 始终左；主题/字号/浅深色跟随 SDK。\n- [ ] 反馈载入/失败/恢复和 CAS 身份正确；复制/评价等动作一次触发且保留原 editor 焦点。\n\n## 现有实现/证据\n\n- [rust-agent-ui-real-goal-footnote-20261022.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-real-goal-footnote-20261022.md)\n- [rust-agent-ui-feedback-recovery-20261022.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-feedback-recovery-20261022.md)\n- [rust-agent-ui-goal-footnote-20261022.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-goal-footnote-20261022.md)\n\n## 依赖与实施边界\n\n依赖/关联：[TekesUI #47](https://github.com/TekesApps/TekesUI/issues/47)。上游项按本任务具体子项适用，不应把未受影响部分整体标为等待；Issue状态不能替代公开代码/consumer验证。ClientKit/Tekes 只读对照；只消费固定公开 TekesUI，不改 SDK/Kernel/Swift。复用现有 presentation，不另建状态机；缺公开来源/能力时明确禁用，不猜私有数据。\n\n历史已做与当前验收分开：628/1 UI、74 Python、三端协议/离屏及原生分项按各专题的原 revision/程序解释；新增纯展示门禁14项和1ef2791 CI不能把历史程序升级成全量验收。桌面/物理IME/VoiceOver/ProcessContainer尚未完整验收。\n\n关联 PR：[实验 Rust UI #10](https://github.com/TekesApps/TekesAgentKit/pull/10)。本Issue关闭前回填实现commit、适用验证与未验证项及PR；PR整体合并不自动代表本Issue完成。\n\n输出备注的交互式 Popover 另关联 [TekesUI #49](https://github.com/TekesApps/TekesUI/issues/49)，仅阻塞对应备注交互；固定原回归门槛保留。\n\n[完整需求/Issue覆盖与执行规则](https://github.com/TekesApps/TekesAgentKit/blob/codex/agent-ui-components/docs/rust-agent-ui-issue-plan.md)。\n",
+      "closedAt": null,
+      "createdAt": "2026-10-23T23:45:47Z",
+      "labels": [
+        {
+          "id": "LA_kwDOVNN5MM8AAAAC9pmLKA",
+          "name": "enhancement",
+          "description": "New feature or request",
+          "color": "a2eeef"
+        }
+      ],
+      "number": 20,
+      "state": "OPEN",
+      "title": "[P1][Footnote] 紧凑动作、目标与评价信息的单行排版",
+      "updatedAt": "2026-10-23T23:47:35Z",
+      "url": "https://github.com/TekesApps/TekesAgentKit/issues/20"
+    },
+    {
+      "body": "## 目标与归属\n\n总目标：#14。当前状态：**公开来源审计完成；真实 producer/fixture 与集成仍待交付**。优先级见标题；等待某项依赖不表示其余子项也不能推进。\n\n## 已实现与已验证（历史基线）\n\n- [x] 已有 ToolHeaderAdapter、报告/计数选择和 narration fallback 纯规则及显式输入。\n- [x] 标准 RunPort 的公开 new(...).with_transcript(..., labels) 已能消费宿主 adapter，无需重复 API。\n- [x] 当前 SEP result_meta 是 opaque；既有测试拒绝将 didDo 当作权威报告。\n\n## 剩余工作\n\n- [x] 针对每个 harness/宿主确认可核验的报告与 group narration producer、身份和更新语义。\n- [x] 若公开 producer 缺失，记录具体契约缺口/依赖；仅在明确来源后接入原投影与组件。\n- [ ] 补真实协议来源 fixture 和回传/恢复证据；不以手造字符串或显示正文代替来源。\n\n## 关闭标准\n\n- [ ] 报告绑定原 scope/tool/revision，迟到和跨源记录被拒绝；无报告保留合法 fallback。\n- [ ] 独立旁白只消费有权威来源的 group-text；严格前缀/结算/carrier 选择按 ClientKit，不重复正文。\n- [ ] 每项标明支持/不支持的实际 harness；缺公开数据时保留阻塞，不猜私有数据库或 stdout。\n\n## 现有实现/证据\n\n- [rust-agent-ui-tool-header-20261023.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-tool-header-20261023.md)\n- [rust-agent-ui-narration-20261023.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-narration-20261023.md)\n- [rust-agent-ui-thinking-source-20261023.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-thinking-source-20261023.md)\n\n## 依赖与实施边界\n\n依赖/关联：无已确认 SDK 硬依赖，先核对公开数据 producer。上游项按本任务具体子项适用，不应把未受影响部分整体标为等待；Issue状态不能替代公开代码/consumer验证。ClientKit/Tekes 只读对照；只消费固定公开 TekesUI，不改 SDK/Kernel/Swift。复用现有 presentation，不另建状态机；缺公开来源/能力时明确禁用，不猜私有数据。\n\n历史已做与当前验收分开：628/1 UI、74 Python、三端协议/离屏及原生分项按各专题的原 revision/程序解释；新增纯展示门禁14项和1ef2791 CI不能把历史程序升级成全量验收。桌面/物理IME/VoiceOver/ProcessContainer尚未完整验收。\n\n关联 PR：[实验 Rust UI #10](https://github.com/TekesApps/TekesAgentKit/pull/10)。本Issue关闭前回填实现commit、适用验证与未验证项及PR；PR整体合并不自动代表本Issue完成。\n\n[完整需求/Issue覆盖与执行规则](https://github.com/TekesApps/TekesAgentKit/blob/codex/agent-ui-components/docs/rust-agent-ui-issue-plan.md)。\n\n## 2026-10-24 非桌面增量\n\n本轮实现、验证和未验收范围见下方回填评论；计划/专题文档随提交 `32986d4` 发布。保持各自原程序身份；未关闭完整Issue。\n",
+      "closedAt": null,
+      "createdAt": "2026-10-23T23:45:43Z",
+      "labels": [
+        {
+          "id": "LA_kwDOVNN5MM8AAAAC9pmLKA",
+          "name": "enhancement",
+          "description": "New feature or request",
+          "color": "a2eeef"
+        }
+      ],
+      "number": 19,
+      "state": "OPEN",
+      "title": "[P1][Sources] 明确工具报告与独立旁白 fallback 的公开来源",
+      "updatedAt": "2026-10-24T19:13:11Z",
+      "url": "https://github.com/TekesApps/TekesAgentKit/issues/19"
+    },
+    {
+      "body": "## 目标与归属\n\n总目标：#14。当前状态：**等待公开 SDK；严格 CI 失败已复现**。优先级见标题；等待某项依赖不表示其余子项也不能推进。\n\n## 已实现与已验证（历史基线）\n\n- [x] 已消费公开 #22/#26/#28 的锚点/preflight/reveal，标准文档流不使用像素估算。\n- [x] 已有前插/重排/整帧事务、只读有界分页/epoch/错误保留，以及 #13 实例身份。\n- [x] 当前严格门禁实证失败：内层向上读后父容器仍跟随追加，详情移出视口。\n\n## 剩余工作\n\n- [ ] 等待并消费 #53 的固定公开修复；保留严格失败，禁止改布局或放宽断言。\n- [ ] 补新建 Host 的持久 checkpoint；分别验证主历史、工具详情与有界 child 的读取/分页。\n\n## 关闭标准\n\n- [ ] 严格 bounded_detail_reading accepted=true，父容器在内层向上读后不再被追加拉走。\n- [ ] 主历史/只读历史按钮实际前插后保持原锚点；稳定 ID reveal 不夺编辑焦点。\n- [ ] 显式回到底部后恢复跟随；重连/旧页/错误返回不污染当前 frame；新 Host 恢复按公开 checkpoint。\n\n## 现有实现/证据\n\n- [rust-agent-ui-bounded-details-20261022.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-bounded-details-20261022.md)\n- [rust-agent-ui-native-bounded-20261023.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-native-bounded-20261023.md)\n- [rust-agent-ui-reveal-current-20261022.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-reveal-current-20261022.md)\n- [rust-agent-ui-source-authority.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-source-authority.md)\n\n## 依赖与实施边界\n\n依赖/关联：#13、[TekesUI #53](https://github.com/TekesApps/TekesUI/issues/53)、[TekesUI #42](https://github.com/TekesApps/TekesUI/issues/42)。上游项按本任务具体子项适用，不应把未受影响部分整体标为等待；Issue状态不能替代公开代码/consumer验证。ClientKit/Tekes 只读对照；只消费固定公开 TekesUI，不改 SDK/Kernel/Swift。复用现有 presentation，不另建状态机；缺公开来源/能力时明确禁用，不猜私有数据。\n\n历史已做与当前验收分开：628/1 UI、74 Python、三端协议/离屏及原生分项按各专题的原 revision/程序解释；新增纯展示门禁14项和1ef2791 CI不能把历史程序升级成全量验收。桌面/物理IME/VoiceOver/ProcessContainer尚未完整验收。\n\n关联 PR：[实验 Rust UI #10](https://github.com/TekesApps/TekesAgentKit/pull/10)。本Issue关闭前回填实现commit、适用验证与未验证项及PR；PR整体合并不自动代表本Issue完成。\n\n[完整需求/Issue覆盖与执行规则](https://github.com/TekesApps/TekesAgentKit/blob/codex/agent-ui-components/docs/rust-agent-ui-issue-plan.md)。\n",
+      "closedAt": null,
+      "createdAt": "2026-10-23T23:45:40Z",
+      "labels": [
+        {
+          "id": "LA_kwDOVNN5MM8AAAAC9pmLKA",
+          "name": "enhancement",
+          "description": "New feature or request",
+          "color": "a2eeef"
+        }
+      ],
+      "number": 18,
+      "state": "OPEN",
+      "title": "[P0][Reading] 分页、reveal、嵌套阅读与恢复锚点闭环",
+      "updatedAt": "2026-10-24T23:38:15Z",
+      "url": "https://github.com/TekesApps/TekesAgentKit/issues/18"
+    },
+    {
+      "body": "## 目标与归属\n\n总目标：#14。当前状态：**部分已实现；待补齐/验收**。优先级见标题；等待某项依赖不表示其余子项也不能推进。\n\n## 已实现与已验证（历史基线）\n\n- [x] 已建立 InputMessage/OutputMessage、canonical 消息/工具身份、None/Compact、Activity/分段折叠、旁白载体和混合工具五类卡片。\n- [x] 消息内与独立工具共享业务投影；普通完成默认折叠、异常展开及控件保留已有回归。\n- [x] 三端混合工具离屏已有分项收据；richContent/completeTranscript 仍 false。\n\n## 剩余工作\n\n- [ ] 按 ClientKit 对应 Views 核对输入/输出/工具顺序、code header、完整连续分组与当前全组合。\n- [ ] 消费公开富内容/文本映射/分隔符；补选中、复制、链接、代码与裁剪，不复制 renderer。\n- [ ] 真实报告与独立旁白来源另由 sources 任务提供，不从正文或 meta 猜造。\n\n## 关闭标准\n\n- [ ] 同一内容在历史/流式/结算/恢复保持稳定身份与正确显示顺序，不重复消息或工具。\n- [ ] 富内容及复制语义、独立/嵌入工具、折叠/展开与布局在窄宽/字号/主题下有对照证据。\n- [ ] 静态与组件/第二 consumer/真实协议/原生证据分开；未完成项不得改 complete 标志为 true。\n\n## 现有实现/证据\n\n- [rust-agent-ui-physical-planes-20261023.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-physical-planes-20261023.md)\n- [rust-agent-ui-physical-tool-fragments-20261023.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-physical-tool-fragments-20261023.md)\n- [rust-agent-ui-mixed-tools-20261023.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-mixed-tools-20261023.md)\n- [rust-agent-ui-narration-frame-reading-20261023.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-narration-frame-reading-20261023.md)\n\n## 依赖与实施边界\n\n依赖/关联：#19、[TekesUI #25](https://github.com/TekesApps/TekesUI/issues/25)、[TekesUI #54](https://github.com/TekesApps/TekesUI/issues/54)。上游项按本任务具体子项适用，不应把未受影响部分整体标为等待；Issue状态不能替代公开代码/consumer验证。ClientKit/Tekes 只读对照；只消费固定公开 TekesUI，不改 SDK/Kernel/Swift。复用现有 presentation，不另建状态机；缺公开来源/能力时明确禁用，不猜私有数据。\n\n历史已做与当前验收分开：628/1 UI、74 Python、三端协议/离屏及原生分项按各专题的原 revision/程序解释；新增纯展示门禁14项和1ef2791 CI不能把历史程序升级成全量验收。桌面/物理IME/VoiceOver/ProcessContainer尚未完整验收。\n\n关联 PR：[实验 Rust UI #10](https://github.com/TekesApps/TekesAgentKit/pull/10)。本Issue关闭前回填实现commit、适用验证与未验证项及PR；PR整体合并不自动代表本Issue完成。\n\n历史输入 Edit/Rewind 仅在 endpoint 明确广告 capability 且提供原 handler 时显示；当前三端未广告时保持不可用，不将来源缺口归为 SDK 控件缺口。\n\n[完整需求/Issue覆盖与执行规则](https://github.com/TekesApps/TekesAgentKit/blob/codex/agent-ui-components/docs/rust-agent-ui-issue-plan.md)。\n",
+      "closedAt": null,
+      "createdAt": "2026-10-23T23:45:37Z",
+      "labels": [
+        {
+          "id": "LA_kwDOVNN5MM8AAAAC9pmLKA",
+          "name": "enhancement",
+          "description": "New feature or request",
+          "color": "a2eeef"
+        }
+      ],
+      "number": 17,
+      "state": "OPEN",
+      "title": "[P1][Transcript] 完整内容、思考工具分区与富内容对齐",
+      "updatedAt": "2026-10-24T23:25:42Z",
+      "url": "https://github.com/TekesApps/TekesAgentKit/issues/17"
+    },
+    {
+      "body": "## 目标与归属\n\n总目标：#14。当前状态：**部分已实现；待补齐/验收**。优先级见标题；等待某项依赖不表示其余子项也不能推进。\n\n## 已实现与已验证（历史基线）\n\n- [x] 使用原 TekesUI editor；已接发送/取消、模型/附件/上下文/notice 与受控选择。\n- [x] 已有目的地草稿隔离、准备票据、迟到回调门禁和 no-auto-retry；Send/Stop preserving_focus 已消费。\n- [x] Native/Pi SideChat 原 preedit/commit 合成门禁已验证，不等于系统物理 IME。\n\n## 剩余工作\n\n- [x] 逐项核对 Composer Views 层次、可见性、上下文和设置回调；不得把宿主能力猜成可用。\n- [ ] 补完整同内容布局/焦点路径和系统中文组字验收；应用样式仅延展 SDK tokens。\n\n## 关闭标准\n\n- [ ] 组字 Enter 不发送，commit 后一次显式发送；取消遵循原请求身份。\n- [ ] A/B 会话的文本、附件、设置草稿隔离；准备期间导航/关闭不会投递旧目标。\n- [ ] 背景回传/按钮/切换/重连不误夺焦点或重复提交；组件和第二 consumer 有回归，桌面项留给 acceptance。\n\n## 现有实现/证据\n\n- [rust-agent-ui-primary-focus-child-runs-20261023.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-primary-focus-child-runs-20261023.md)\n- [rust-agent-ui-sidechat-original-input-20261023.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-sidechat-original-input-20261023.md)\n- [rust-agent-ui-composer-visibility-20261021.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-composer-visibility-20261021.md)\n- [rust-agent-ui-context-preflight-20261020.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-context-preflight-20261020.md)\n\n## 依赖与实施边界\n\n依赖/关联：#15、[TekesUI #30](https://github.com/TekesApps/TekesUI/issues/30)、[TekesUI #48](https://github.com/TekesApps/TekesUI/issues/48)。上游项按本任务具体子项适用，不应把未受影响部分整体标为等待；Issue状态不能替代公开代码/consumer验证。ClientKit/Tekes 只读对照；只消费固定公开 TekesUI，不改 SDK/Kernel/Swift。复用现有 presentation，不另建状态机；缺公开来源/能力时明确禁用，不猜私有数据。\n\n历史已做与当前验收分开：628/1 UI、74 Python、三端协议/离屏及原生分项按各专题的原 revision/程序解释；新增纯展示门禁14项和1ef2791 CI不能把历史程序升级成全量验收。桌面/物理IME/VoiceOver/ProcessContainer尚未完整验收。\n\n关联 PR：[实验 Rust UI #10](https://github.com/TekesApps/TekesAgentKit/pull/10)。本Issue关闭前回填实现commit、适用验证与未验证项及PR；PR整体合并不自动代表本Issue完成。\n\n[完整需求/Issue覆盖与执行规则](https://github.com/TekesApps/TekesAgentKit/blob/codex/agent-ui-components/docs/rust-agent-ui-issue-plan.md)。\n\n\n## 2026-10-24 非桌面核对\n\n实现 `52288a0`；[Composer 审计与剩余项](https://github.com/TekesApps/TekesAgentKit/blob/52288a0/docs/rust-agent-ui-composer-issue16-audit-20261024.md)。没有发现确定实现缺陷，新增带正向控制的能力撤销和旧回调回归；三个定向套件16项通过，严格Clippy/格式通过。\n\n- [x] 真实宿主与离屏验收共用paths/read/upload/typed-completion逻辑；当前Native/Pi/DSH公开附件链通过（4495f35，见最新回填）。\n- [ ] OS picker与原生HostResult窗口消息循环、完整布局/焦点、系统中文IME/AX仍待验收。\n\nPR #10，Issue保持开放；没有运行桌面或修改TekesUI。\n",
+      "closedAt": null,
+      "createdAt": "2026-10-23T23:45:34Z",
+      "labels": [
+        {
+          "id": "LA_kwDOVNN5MM8AAAAC9pmLKA",
+          "name": "enhancement",
+          "description": "New feature or request",
+          "color": "a2eeef"
+        }
+      ],
+      "number": 16,
+      "state": "OPEN",
+      "title": "[P1][Composer] 输入面、草稿与发送取消对齐 ClientKit",
+      "updatedAt": "2026-10-24T21:57:23Z",
+      "url": "https://github.com/TekesApps/TekesAgentKit/issues/16"
+    },
+    {
+      "body": "## 目标与归属\n\n总目标：#14。当前状态：**非 SDK 审计与独立 consumer 已完成；正式 UI 发行/容器契约待交付**。优先级见标题；等待某项依赖不表示其余子项也不能推进。\n\n## 已实现与已验证（历史基线）\n\n- [x] Rust-only 根契约/SessionEndpointRegistry、RunScope 和 presentation 已建立；已发布基线 v0.3.8，UI 增量仍未发布。\n- [x] 三 SEP 已有 pointer/locator、历史恢复、只读文件和能力矩阵；本地与远端 cache 策略独立。\n- [x] 已提供 RunPort、Sidebar、SidePanel、显式宿主回调、第二公开 consumer 和 UI 边界检查。\n\n## 剩余工作\n\n- [x] 逐项核对公开类型、RunView→RunPort 命名、组件所有权与状态/事件输入。\n- [ ] 为最终接入 revision 固定 AgentKit/TekesUI 闭包，核对安装、路径、模型/附件/设置等宿主职责。\n- [x] 修正过期状态说明；将文档示例与真实公开 API 对照，保留显式开发依赖与正式精确 pin 的区别。\n\n## 关闭标准\n\n- [x] 干净外部 consumer 仅使用公开 API，构造三个业务组件；不依赖 RunSurface/ComponentDemo。\n- [x] 文档列明版本、所有权、状态输入、事件回调、焦点/IME/滚动责任及迁移。\n- [ ] 共享包+Rust demo+第二 consumer 适用检查通过；没有 Swift、私有 SDK 或新状态机。\n\n## 现有实现/证据\n\n- [session-endpoints.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/session-endpoints.md)\n- [rust-agent-ui-host-integration.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-host-integration.md)\n- [rust-agent-ui-contract.md](https://github.com/TekesApps/TekesAgentKit/blob/1ef27910675f10cebff04a2759d0e7f8e6acfdbd/docs/rust-agent-ui-contract.md)\n\n## 依赖与实施边界\n\n依赖/关联：[TekesUI #64](https://github.com/TekesApps/TekesUI/issues/64)。上游项按本任务具体子项适用，不应把未受影响部分整体标为等待；Issue状态不能替代公开代码/consumer验证。ClientKit/Tekes 只读对照；只消费固定公开 TekesUI，不改 SDK/Kernel/Swift。复用现有 presentation，不另建状态机；缺公开来源/能力时明确禁用，不猜私有数据。\n\n历史已做与当前验收分开：628/1 UI、74 Python、三端协议/离屏及原生分项按各专题的原 revision/程序解释；新增纯展示门禁14项和1ef2791 CI不能把历史程序升级成全量验收。桌面/物理IME/VoiceOver/ProcessContainer尚未完整验收。\n\n关联 PR：[实验 Rust UI #10](https://github.com/TekesApps/TekesAgentKit/pull/10)。本Issue关闭前回填实现commit、适用验证与未验证项及PR；PR整体合并不自动代表本Issue完成。\n\n[完整需求/Issue覆盖与执行规则](https://github.com/TekesApps/TekesAgentKit/blob/codex/agent-ui-components/docs/rust-agent-ui-issue-plan.md)。\n\n## 2026-10-24 非桌面增量\n\n本轮实现、验证和未验收范围见下方回填评论；计划/专题文档随提交 `32986d4` 发布。保持各自原程序身份；未关闭完整Issue。\n\n",
+      "closedAt": null,
+      "createdAt": "2026-10-23T23:45:31Z",
+      "labels": [
+        {
+          "id": "LA_kwDOVNN5MM8AAAAC9pmLKA",
+          "name": "enhancement",
+          "description": "New feature or request",
+          "color": "a2eeef"
+        }
+      ],
+      "number": 15,
+      "state": "OPEN",
+      "title": "[P1][API] 固定公开依赖、宿主接入契约与第二 consumer",
+      "updatedAt": "2026-10-24T21:57:28Z",
+      "url": "https://github.com/TekesApps/TekesAgentKit/issues/15"
+    },
+    {
+      "body": "## 完整目标\n基于最新已发布 AgentKit 契约和精确固定 TekesUI 公开版本，交付 Composer、Transcript、Indicators 组成的 RunPort，以及 Sidebar 会话导航/活动/置顶/共享和 SidePanel Task/子代理/SideChat/Summary。布局与显示逻辑对齐 ClientKit 对应 Views。\n\nSidebar/RunPort/SidePanel 按 ProcessContainer 接入；AgentKit 业务状态、TekesUI 通用基础能力、宿主窗口/导航/系统适配责任分明。复用 presentation，不复制基础引擎。\n\nNative/Pi/DSH，中文组字/草稿隔离/追加阅读/重连不重发/分页锚点；共享组件、第二公开 consumer、原生窗口、同/跨进程结果分别留证；完成 review/CI 后合并和阶段 tag。保留WIP、固定快照及证据，复用缓存。\n\n## 当前基线\nPR #10，代码1ef2791；只有 #12/#13 已有 Issue。本次补建业务闭环，不把历史每个验证阶段单独开票。此前 headless v0.3.8 已发布，UI仍实验/未发布；最新两套 CI仅在严格TekesUI#53门禁失败。完整目标未完成。\n\n任务与覆盖如下；桌面验收仍暂不运行。\n## 完整交付清单\n\n- [ ] #15 — [P1][API] 固定公开依赖、宿主接入契约与第二 consumer；部分已实现；待补齐/验收。\n- [ ] #16 — [P1][Composer] 输入面、草稿与发送取消对齐 ClientKit；部分已实现；待补齐/验收。\n- [ ] #17 — [P1][Transcript] 完整内容、思考工具分区与富内容对齐；部分已实现；待补齐/验收。\n- [ ] #18 — [P0][Reading] 分页、reveal、嵌套阅读与恢复锚点闭环；等待公开 SDK；严格 CI 失败已复现。\n- [ ] #19 — [P1][Sources] 明确工具报告与独立旁白 fallback 的公开来源；需要公开 producer/契约确认；不是 SDK 渲染缺口。\n- [ ] #20 — [P1][Footnote] 紧凑动作、目标与评价信息的单行排版；数据链路已有；紧凑视觉等待公开 SDK。\n- [ ] #21 — [P1][RunPort] 组合 Composer/Transcript/Indicators 并完成 Views 对照；部分已实现；待补齐/验收。\n- [ ] #22 — [P1][Sidebar] 会话导航、活动、置顶和共享操作完整验收；部分已实现；待补齐/验收。\n- [ ] #23 — [P1][SidePanel] Task/子代理 tabs、pointer 与有界历史闭环；部分已实现；待补齐/验收。\n- [ ] #24 — [P1][SideChat] 临时分支生命周期、重开与能力门禁；部分已实现；待补齐/验收。\n- [ ] #25 — [P1][Summary] sections、用量、metadata 和来源动作对齐；部分已实现；待补齐/验收。\n- [ ] #26 — [P0][ProcessContainer] 三个业务容器的同进程与跨进程宿主接入；等待完整交互式 ProcessContainer 公开交付。\n- [ ] #27 — [P0][Acceptance] 固定宿主的三端、IME、阅读与布局验收矩阵；部分已实现；待补齐/验收。\n- [ ] #28 — [P0][Delivery] 完整要求审计、review、CI、合并与阶段 tag；等待功能/验收完成与严格 CI/review。\n\n既有修复（不重复开票）：#12、#13 已实施且有验证，均待 #10 合并；挂在 #23/#18 下，不将它们误报为未开发。\n\n## 原目标到Issue的覆盖\n\n| 原要求 | 归属 |\n| --- | --- |\n| 最新AgentKit契约、公开精确依赖、API/命名/文档/demo | #15、#28 |\n| Composer/发送取消/草稿/IME | #16、#27 |\n| Transcript历史/推理/工具/富内容/来源 | #17、#19 |\n| 用户气泡及footnote右、机器及footnote左，SDK样式延展 | #17、#20、#21 |\n| 分页/reveal/阅读追加/重连锚点 | #18、#27 |\n| Indicators与RunPort完整组合 | #21 |\n| Sidebar导航/活动/置顶/共享 | #22 |\n| SidePanel任务/子代理/SideChat/Summary | #23、#24、#25（#12/#13来源修复） |\n| ProcessContainer三个组件同/跨进程 | #26、#27 |\n| Native/Pi/DSH、第二consumer、真实原生与分层证据 | #15、#27 |\n| review/CI/合并/tag、WIP和磁盘约束 | #27、#28 |\n\n## 执行顺序\n\n1. #15先核对公开API/示例/命名与固定版本；#19确认producer/能力边界；#27先建验收矩阵（不启动桌面）。这是当前可直接推进的部分。\n2. #16/#17/#21/#22/#23/#24/#25按Views差异逐项推进；有公开能力的部分不因别的SDK缺口停工。依赖精确到未完成子项。\n3. #18等待TekesUI#53、#20等待#47；#26等待#48完整公开版本。消费后补组件与第二consumer，再安排原生。\n4. #27完整分层验收后，#28做完成审计、review、严格CI、合并和阶段tag。不得将阶段tag当完整目标已完成。\n\n## 当前真实状态与门禁\n\n代码基线1ef2791/PR #10 draft。最新两套CI的headless、UI全量测试、格式/Clippy通过，均失败于TekesUI#53严格阅读。UI未发布，completeRunPort/completeTranscript/richContent仍未完整验收。DSH SideChat无discard能力，仅禁用门禁通过。原生系统IME/VoiceOver/同跨进程未完整验证；冻结程序证据不可跨revision转移。\n\n[本仓库需求覆盖/执行计划](https://github.com/TekesApps/TekesAgentKit/blob/codex/agent-ui-components/docs/rust-agent-ui-issue-plan.md)。设计变更先同步设计和对应Issue；关闭前回填实现、验证、未验证及PR。\n",
+      "closedAt": null,
+      "createdAt": "2026-10-23T23:45:27Z",
+      "labels": [
+        {
+          "id": "LA_kwDOVNN5MM8AAAAC9pmLKA",
+          "name": "enhancement",
+          "description": "New feature or request",
+          "color": "a2eeef"
+        }
+      ],
+      "number": 14,
+      "state": "OPEN",
+      "title": "[Epic] Rust Agent UI：完整目标、已做映射与交付门槛",
+      "updatedAt": "2026-10-24T01:58:37Z",
+      "url": "https://github.com/TekesApps/TekesAgentKit/issues/14"
+    },
+    {
+      "body": "## 问题与设计\n\n只读 history 的 scope/publication/epoch 不包含绑定实例身份。两个独立 ChildPaneBinding 可以同 scope、同 epoch、各自 publication=1；旧实例的 snapshot/ReadOnlyTranscriptIntent 可能被新实例接纳，违反原来源及迟到回包门禁。\n\n设计文档：docs/rust-agent-ui-source-authority.md（随 PR #10 发布）。引入仅承载 opaque Arc identity 的 ReadOnlyTranscriptSource；snapshot→readonly_input→组件→intent 保留同一身份，read_intent 在 claim/IO 前验证。它不是新的输入/阅读/执行状态机，不修改原序号，不造持久 checkpoint。\n\n## 验收\n\n- 同 scope/epoch/publication 的两实例拒绝交叉 frame 和 intent。\n- 旧源退役后不能将请求交给新源；错误调用不消耗原 gesture；原源的正确读取仍可成功，clone 只执行一次。\n- 原分页 epoch、重连显式刷新、只读与权限门禁不退化。\n- 同步未发布公开 API 字段、第二 consumer、宿主及文档；UI workspace/严格检查通过。\n\n只改 Rust AgentKit；不改 TekesUI/Kernel/Swift，不跑桌面验收，复用共享 target。\n关联 PR：https://github.com/TekesApps/TekesAgentKit/pull/10\n\n## Issue 驱动交付关系（2026-10-24）\n\n总目标 #14；所属业务闭环 #23（Task/子代理/SidePanel）；只读历史另被 #18 依赖。\n当前：**已实施并有适用验证，待 PR #10 合并**，不是尚未开发。完整原生/ProcessContainer验收归 #27/#26；本修复不因整个UI尚未交付而丢失完成记录。关闭本Issue仍须其自身关闭标准及合并可核验。\n增量 `1ef2791` 另补 source=None 禁用刷新/分页及不产生 intent；14项回归/严格检查与两套CI结果见原评论，严格#53失败不豁免。\n",
+      "closedAt": null,
+      "createdAt": "2026-10-23T09:02:02Z",
+      "labels": [],
+      "number": 13,
+      "state": "OPEN",
+      "title": "[History] 只读 snapshot 与读取请求绑定原实例，拒绝同 scope 新旧来源串用",
+      "updatedAt": "2026-10-23T23:48:03Z",
+      "url": "https://github.com/TekesApps/TekesAgentKit/issues/13"
+    },
+    {
+      "body": "## 问题\n\nRust ChildPaneBinding::for_run 只在异步打开前检查 parent，历史 baseline 返回后不再检查，也未继承 Task/child/SideChat 的父来源门禁。TaskPaneBinding::for_run 在目标为另一 scope 时也会遗漏父来源权限。父 pane 失效后派生 pane 可能仍返回 Ready，或迟到安装。\n\n已用公开绑定复现：嵌套 child 的父 source retire 后仍 Ready；从 child 打开的另一 scope Task 同样仍 Ready；Task parent 在 child history baseline 期间取消后仍可返回新 child。红日志保存在本地 .runtime-fixtures/pane-parent-authority-20261023/。\n\n## 修复范围\n\n- 仅 Rust AgentKit：复用现有 TaskRunGuard、child weak lifetime 与 SideChatController 权限，派生绑定保留这些原来源门禁。\n- 打开前、异步返回后及后续读/控制入口继续检查；Missing 不复活，Closing/Unknown 不获得写权限。\n- 不复制 presentation、不保留旧 view、不增加端点/执行状态机；原主 Run 草稿与生命周期不受子 pane 关闭影响。\n- 同步 SidePanel/绑定接入契约。\n\n对照 ClientKit ClientEmbeddedRunView 的移除即 stop，以及 ClientAgentTaskView 的动态 pointer 替换；ClientKit/Tekes 仅只读参照。\n\n## 验收\n\n覆盖父来源 retire/drop、Task A→B→A、不同 scope、SideChat Closing/Unknown/absence、异步历史返回、旧准备票据与只读来源；验证共享包、demo 宿主和第二公开 API consumer，完成适用的 UI workspace/Clippy/格式/边界检查。\n\n仍只消费已固定公开 TekesUI，不改 Kernel/Swift/TekesUI，不跑桌面验收、不触发权限申请，复用共享 target。\n\n关联 PR：https://github.com/TekesApps/TekesAgentKit/pull/10\n\n## Issue 驱动交付关系（2026-10-24）\n\n总目标 #14；所属业务闭环 #23（Task/子代理/SidePanel）；只读历史另被 #18 依赖。\n当前：**已实施并有适用验证，待 PR #10 合并**，不是尚未开发。完整原生/ProcessContainer验收归 #27/#26；本修复不因整个UI尚未交付而丢失完成记录。关闭本Issue仍须其自身关闭标准及合并可核验。\n",
+      "closedAt": null,
+      "createdAt": "2026-10-23T08:59:33Z",
+      "labels": [],
+      "number": 12,
+      "state": "OPEN",
+      "title": "[Bindings] 派生 Task/child 继承父来源权限并拒绝迟到安装",
+      "updatedAt": "2026-10-23T23:47:59Z",
+      "url": "https://github.com/TekesApps/TekesAgentKit/issues/12"
+    }
+  ]
+}

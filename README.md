@@ -1,6 +1,6 @@
 # TekesAgentKit
 
-Rust Agent UI 的需求、已做映射与后续工作见 [Issue 驱动交付计划](docs/rust-agent-ui-issue-plan.md) 和 [总追踪 #14](https://github.com/TekesApps/TekesAgentKit/issues/14)。UI 仍为实验接入，完整验收与发布尚未完成。
+Rust Agent UI 的当前入口是[需求 → Issue → 实现 → 验证覆盖表](docs/agentkit-requirements-coverage.md)和[总 Epic #14](https://github.com/TekesApps/TekesAgentKit/issues/14)；[原交付计划](docs/rust-agent-ui-issue-plan.md)保留历史证据。实施、协议、桌面、上游消费与发布分别追踪，未合入代码保持“已验证待集成”。UI 仍为实验接入，完整验收与发布尚未完成。
 
 [![Rust headless](https://github.com/TekesApps/TekesAgentKit/actions/workflows/ci.yml/badge.svg)](https://github.com/TekesApps/TekesAgentKit/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -27,7 +27,7 @@ Pi 1.4.0 的独立精确安装、版本对照、截断恢复及离屏证据见[�
 
 历史投影在内存中。Pi 的宿主指针、receipt、队列及 Goal 元数据用于会话恢复和提交去重，不是 transcript Mirror。可选远端 durable cache、正式 UI 控件、生产 launcher 和大历史性能验收尚未交付。独立 [UI 试点 workspace](ui/README.md) 固定 TekesUI 公开 Git commit，复用现有 presentation；不属于 v0.3.8 headless 发布 API，也不影响默认 headless 构建。
 
-当前实验宿主请先看[交付状态与剩余门禁](docs/rust-agent-ui-delivery-status.md)和[短接入说明](docs/rust-agent-ui-host-integration.md)。正式 RunPort/Sidebar/SidePanel 已有同进程可运行路径，完整布局、当前原生和 ProcessContainer 仍未验收，不能作为稳定 UI 发布。
+当前实验宿主请先看[交付状态与剩余门禁](docs/rust-agent-ui-delivery-status.md)和[短接入说明](docs/rust-agent-ui-host-integration.md)。可复用 RunPort/Sidebar/SidePanel 已有同进程可运行路径，完整布局、当前原生和 ProcessContainer 仍未验收，不能作为稳定 UI 发布。
 
 ## 开始使用
 

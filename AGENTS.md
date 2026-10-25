@@ -35,10 +35,26 @@ parity from headless builds and tests.
 # Issue-driven delivery
 
 Track the complete Rust Agent UI scope in GitHub issue #14 and
-`docs/rust-agent-ui-issue-plan.md`. Reuse an existing matching issue before creating one.
+`docs/agentkit-requirements-coverage.md` (machine-readable mapping:
+`docs/agentkit-issue-coverage-20261025.json`). The older
+`docs/rust-agent-ui-issue-plan.md` retains commit-scoped historical evidence.
+Reuse an existing matching issue before creating one.
+Keep #14 as the Epic and #15–#28 as feature trackers. Implementation children
+must describe independently deliverable capabilities, not individual tests or
+validation runs. Each implementation issue has an owner, scope, deliverables,
+specific dependencies and closure criteria. Separate implementation, actual
+protocol acceptance, desktop/IME, upstream SDK consumption and release ownership.
+Dependencies block only the affected child requirements.
+Use exactly one status: 待办, 进行中, 已验证待集成, 等待上游, 等待桌面, 已关闭.
+Verified code in an unmerged PR stays 已验证待集成 and OPEN. Before closing,
+verify its applicable acceptance and mainline integration; record original
+commit/program/version, PR, actual checks, not_run scope and completion time.
+Historical deliveries retain their original evidence identity; a later passing
+binary or a new issue audit does not revalidate an older/newer release.
 A small change follows issue → implementation → verification; complex work first updates its
-design and splits linked issues. The main chat coordinates; an independent child chat can own
-implementation, with subagents used as needed. Small changes may be completed directly.
+design and splits linked issues. The main chat coordinates; new independent child sessions own
+implementation and use subagents as needed. Do not contact ended sessions. Small changes may be
+completed directly by the main chat.
 Record completed implementation separately from acceptance and merge/release status.
 Before closing an issue, backfill implementation commits, applicable validation, unverified scope
 and PR links. Design changes update both the design and the issue. Do not auto-close every
