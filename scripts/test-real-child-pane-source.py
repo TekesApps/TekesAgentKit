@@ -14,7 +14,8 @@ import subprocess
 import threading
 import time
 
-from child_pane_source_fixture import PREFIX, validate_pane_frame, validate_pane_receipt
+from child_pane_source_fixture import (PREFIX, validate_pane_frame, validate_pane_receipt,
+                                       validate_pane_recovery_frame)
 from dsh_owned_fixture import owned_dsh
 from pi_owned_fixture import prepare_pi
 from summary_transition_provider import HeldFailureGate, provider_with_failure_gates
@@ -23,6 +24,7 @@ from task_family_fixture import pi_subagent_seed_commands, dsh_subagent_seed_com
 ROOT = Path(__file__).resolve().parents[1]
 SSD = Path('/Volumes/HP P900/dev/TekesAgentKit')
 DSH_AUTH = 'AGENTKIT_CHILD_PANE_OWNED_COOKIE'
+RECOVERY_PREFIX = 'AGENTKIT_CHILD_PANE_RECOVERY '
 
 
 def write_json(path, value):
@@ -31,9 +33,19 @@ def write_json(path, value):
         out.write('\n')
 
 
-def seed(kind, config, headless, workspace, case, env):
+def seed(kind, config, headless, workspace, case, env, *, page_profile=False):
     builder = pi_subagent_seed_commands if kind == 'pi' else dsh_subagent_seed_commands
     commands = builder('parent', workspace, 'endpoint-test', 'endpoint-test')
+    if page_profile:
+        child_alias = 'model-child' if kind == 'pi' else 'child'
+        for turn in range(1, 31):
+            commands.extend((
+                {'op': 'childPrompt', 'sessionId': 'parent', 'childSessionId': child_alias,
+                 'rpcId': f'pane-history-{kind}-{turn}',
+                 'content': [{'type': 'text', 'text': f'Independent child pane history fixture {turn}'}]},
+                {'op': 'waitSettled', 'sessionId': child_alias, 'minimumTurn': turn + 1,
+                 'inputText': f'Independent child pane history fixture {turn}'},
+            ))
     # The existing demo host accepts exactly two ordinary session slots. Obtain
     # its second slot through the public API; never reuse the child as a main Run.
     commands.append({'op': 'create', 'cwd': str(workspace), 'saveAs': 'host-alternate'})
@@ -56,10 +68,11 @@ def seed(kind, config, headless, workspace, case, env):
     return manifest, len(commands)
 
 
-def capture_demo(kind, demo, command, env, workspace, case, gate, parent, child):
+def capture_demo(kind, demo, command, env, workspace, case, gate, parent, child,
+                 *, page_profile=False):
     events = queue.Queue()
     process = None
-    lines, proofs = [], []
+    lines, proofs, recovery_frames = [], [], []
     write_json(case / 'demo-command.json', command)
     try:
         with (case / 'demo.stderr').open('w') as stderr:
@@ -79,6 +92,13 @@ def capture_demo(kind, demo, command, env, workspace, case, gate, parent, child)
                 if line is None: break
                 lines.append(line)
                 (case / 'demo.stdout').write_text(''.join(lines), encoding='utf-8')
+                if line.startswith(RECOVERY_PREFIX):
+                    if not page_profile or recovery_frames:
+                        raise ValueError('unexpected independent pane recovery witness')
+                    frame = json.loads(line[len(RECOVERY_PREFIX):])
+                    validate_pane_recovery_frame(frame, kind, parent, child)
+                    recovery_frames.append(frame)
+                    write_json(case / 'pane-paging-reconnect.json', frame)
                 if not line.startswith(PREFIX): continue
                 if len(proofs) >= 2: raise ValueError('unexpected extra original pane source frame')
                 frame = json.loads(line[len(PREFIX):])
@@ -97,12 +117,17 @@ def capture_demo(kind, demo, command, env, workspace, case, gate, parent, child)
             reader.join(timeout=5)
             if status != 0 or len(proofs) != 2:
                 raise ValueError('original child pane host did not complete both source publications')
+            if page_profile and len(recovery_frames) != 1:
+                raise ValueError('mounted child-pane paging/reconnect witness missing')
             state = gate.receipt()
             if not state['explicitlyReleased'] or state['timedOut'] or state['aborted']:
                 raise ValueError('pane failure gate was not released by verified running source')
             receipt = json.loads((case / 'host-receipt.json').read_text())
             accepted = validate_pane_receipt(receipt, *proofs)
             accepted.update(endpoint=kind, gate=state, demoExit=status)
+            if page_profile:
+                accepted['panePagingReconnect'] = validate_pane_recovery_frame(
+                    recovery_frames[0], kind, parent, child)
             write_json(case / 'accepted.json', accepted)
             return accepted
     finally:
@@ -116,11 +141,14 @@ def capture_demo(kind, demo, command, env, workspace, case, gate, parent, child)
             write_json(case / 'owned-demo-exit.json', {'pid': process.pid, 'exitStatus': process.poll()})
 
 
-def profile(kind, config, headless, demo, workspace, case, env, gate, cookie=None):
-    manifest, command_count = seed(kind, config, headless, workspace, case, env)
+def profile(kind, config, headless, demo, workspace, case, env, gate, cookie=None,
+            *, page_profile=False):
+    manifest, command_count = seed(kind, config, headless, workspace, case, env,
+                                   page_profile=page_profile)
     parent = manifest['parent']['scope']
     child = manifest['child']['address']['sessionId']
-    write_json(case / 'pane-manifest.json', {'parent': parent, 'childId': child, 'marker': gate.marker})
+    write_json(case / 'pane-manifest.json', {'parent': parent, 'childId': child,
+        'marker': gate.marker, 'profile': 'pane-paging-reconnect' if page_profile else 'default'})
     endpoint = {key: value for key, value in config.items()
                 if key not in ('cookie', 'bearer', 'expectedVersion', 'commands')}
     endpoint.update(endpointId=kind, sessions=[parent['sessionId'], manifest['hostAuxiliarySessionId']])
@@ -133,7 +161,10 @@ def profile(kind, config, headless, demo, workspace, case, env, gate, cookie=Non
                '--child-pane-source-proof', str(case / 'pane-manifest.json'),
                '--child-pane-source-receipt', str(case / 'host-receipt.json'),
                '--offscreen', str(case / 'pane.png')]
-    accepted = capture_demo(kind, demo, command, demo_env, workspace, case, gate, parent, child)
+    if page_profile:
+        command.append('--child-pane-paging-reconnect')
+    accepted = capture_demo(kind, demo, command, demo_env, workspace, case, gate, parent, child,
+                            page_profile=page_profile)
     accepted.update(seedCommandCount=command_count, harnessVersion=config['expectedVersion'])
     return accepted
 
@@ -142,7 +173,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('headless-program', 'ui-demo', 'pi-root', 'dsh-root', 'output'):
         parser.add_argument('--' + name, type=Path, required=True)
+    parser.add_argument('--independent-pane-paging-reconnect', action='store_true',
+                        help='seed real public child history and exercise original pane paging/reconnect controls')
+    parser.add_argument('--endpoint', choices=('all', 'pi', 'dsh'), default='all',
+                        help='limit a targeted affected-endpoint run; acceptance records this selection')
     args = parser.parse_args()
+    selected = ('pi', 'dsh') if args.endpoint == 'all' else (args.endpoint,)
     output = args.output.absolute()
     if output.exists() or not output.resolve().is_relative_to(SSD.resolve(strict=True)):
         parser.error('output must be a new directory under the existing SSD project')
@@ -181,13 +217,14 @@ def main():
     results, failures = {}, {}
     dsh_process = None
     try:
-        for kind in ('pi', 'dsh'):
+        for kind in selected:
             case = output / kind; case.mkdir()
             try:
                 if kind == 'pi':
                     config = prepare_pi(args.pi_root, case / 'data', case / 'home', provider_url, strict_environment=True)
                     results[kind] = profile(kind, dict(config, expectedVersion='1.3.0'), programs['headless'],
-                        programs['demo'], workspace, case, env, gates[kind])
+                        programs['demo'], workspace, case, env, gates[kind],
+                        page_profile=args.independent_pane_paging_reconnect)
                 else:
                     home = case / 'home'
                     dsh_env = dict(env, HOME=str(home), DSH_HOME=str(home), DSH_AGENTS_HOME=str(home / 'agents'),
@@ -197,7 +234,9 @@ def main():
                         dsh_process = dsh.process
                         if dsh.version != '0.2.1-rc.2': raise ValueError('unexpected DSH version')
                         results[kind] = profile(kind, dict(dsh.connector_config([]), expectedVersion=dsh.version),
-                            programs['headless'], programs['demo'], workspace, case, env, gates[kind], cookie=dsh.cookie)
+                            programs['headless'], programs['demo'], workspace, case, env, gates[kind],
+                            cookie=dsh.cookie,
+                            page_profile=args.independent_pane_paging_reconnect)
                     write_json(case / 'owned-dsh-exit.json', {'pid': dsh_process.pid, 'exitStatus': dsh_process.poll()})
             except (OSError, ValueError, RuntimeError, KeyError, StopIteration, subprocess.SubprocessError) as error:
                 failures[kind] = type(error).__name__ + ': ' + str(error)
@@ -214,15 +253,18 @@ def main():
     for key, path in programs.items():
         if hashlib.sha256(path.read_bytes()).hexdigest() != identities[key]['sha256']:
             failures[key] = 'runtime program changed during source capture'
-    if failures or set(results) != {'pi', 'dsh'} or dsh_process is None or dsh_process.poll() != 0:
+    if (failures or set(results) != set(selected)
+            or ('dsh' in selected and (dsh_process is None or dsh_process.poll() != 0))):
         write_json(output / 'incomplete.json', {'accepted': False, 'failures': failures, 'completed': list(results)})
         print('LIVE_CHILD_PANE_SOURCE_FAILED; inspect retained owned evidence')
         return 1
     write_json(output / 'run-receipt.json', {'accepted': True, 'endpoints': results,
         'programs': identities, 'providerRequestCount': len(requests), 'provider': 'synthetic-loopback',
         'nativeInteraction': False, 'physicalIme': False, 'privateHarnessHistoryRead': False,
-        'paidModel': False, 'ownedDshExitStatus': dsh_process.poll()})
-    print('LIVE_CHILD_PANE_SOURCE_ACCEPTED pi+dsh; original child panes; native_window=false')
+        'paidModel': False, 'ownedDshExitStatus': dsh_process.poll() if dsh_process else None,
+        'requestedEndpoints': list(selected),
+        'profile': 'independent-pane-paging-reconnect' if args.independent_pane_paging_reconnect else 'original-child-pane-source'})
+    print('LIVE_CHILD_PANE_SOURCE_ACCEPTED ' + '+'.join(selected) + '; original child panes; native_window=false')
     return 0
 
 

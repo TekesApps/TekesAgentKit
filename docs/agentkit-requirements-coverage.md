@@ -192,3 +192,9 @@ AgentKit代码基线 `1d41ad4` / draft PR #10；远端main `f1daa0f`（v0.3.8 he
 
 
 #67现为已验证待集成：产品候选`4274fe8`、程序SHA`081c3fe…beb7a49`的DSH正常与受控失败家族回传、primary-child Transcript、公开历史及重连通过；[可移交收据](evidence-bindings-20261026/issue67-dsh-sources.json)。原5b失败与各端旧收据保留原身份，未合main不关闭。当前CI root与独立consumer通过，strict TekesUI53失败保留；阶段仍未发布。
+
+## 2026-10-26收口补验（不扩展产品范围）
+
+#55三端原组件真实read工具/推理/控件保留/重连去重窄通过；#56 Pi/DSH实际子面板原Earlier、宿主重连、原record内容/顺序/去重、父draft/selection与关闭后来源退休窄通过。各自UI程序不同，不能互相转授：详见阶段结果与evidence-bindings-20261026。Usage专项、剩余适用来源与性能仍未完成。新性能executionRecipe只明确原始种子与warm增长轨迹/起止事件，未降低预算，尚无样本。
+
+f833 CI40214966220终态：root、UI常规、child witness、Native approval和独立consumer通过；严格TekesUI53 reading失败，后续demo build跳过。未合入main、未tag、未关闭代码票；后续head必须单独过门禁。#60–#66仍后续待办。

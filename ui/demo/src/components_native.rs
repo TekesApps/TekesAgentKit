@@ -3140,6 +3140,9 @@ pub fn run() {
     let args: Vec<_> = std::env::args().collect();
     let child_pane_source_proof = args.iter().any(|arg| arg == "--child-pane-source-proof");
     let child_pane_paged_source = args.iter().any(|arg| arg == "--child-pane-paged-source");
+    let child_pane_paging_reconnect = args
+        .iter()
+        .any(|arg| arg == "--child-pane-paging-reconnect");
     if child_pane_paged_source {
         assert!(
             child_pane_source_proof,
@@ -3157,6 +3160,16 @@ pub fn run() {
                 && args.iter().any(|arg| arg == "--child-pane-source-receipt"),
             "child pane source proof requires components, explicit offscreen endpoints, manifest, and receipt"
         );
+    }
+    if child_pane_paging_reconnect {
+        assert!(
+            child_pane_source_proof
+                && args.iter().any(|arg| arg == "--components")
+                && args.iter().any(|arg| arg == "--offscreen"),
+            "independent pane paging/reconnect requires the original offscreen source proof"
+        );
+        #[cfg(not(feature = "acceptance-source-witness"))]
+        panic!("independent pane paging/reconnect requires acceptance-source-witness");
     }
     if args
         .iter()
@@ -4154,6 +4167,11 @@ pub fn run() {
                 manifest["profile"] == "native-paged",
                 child_pane_paged_source,
                 "native-paged manifest requires explicit paged source flag"
+            );
+            assert_eq!(
+                manifest["profile"] == "pane-paging-reconnect",
+                child_pane_paging_reconnect,
+                "independent pane recovery manifest requires its explicit acceptance flag"
             );
             let receipt = child_pane_source::run(&mut host, &manifest);
             let receipt_index = args

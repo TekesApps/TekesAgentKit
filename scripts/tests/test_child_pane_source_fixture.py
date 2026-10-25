@@ -11,7 +11,8 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from child_pane_source_fixture import validate_pane_frame, validate_pane_receipt
+from child_pane_source_fixture import (validate_pane_frame, validate_pane_receipt,
+                                       validate_pane_recovery_frame)
 import test_transcript_source_fixture as original
 
 spec = importlib.util.spec_from_file_location('real_child_pane',
@@ -87,6 +88,85 @@ class ChildPaneSourceTests(unittest.TestCase):
             with self.subTest(key=key), self.assertRaises(ValueError): validate_pane_receipt(receipt, running, failed)
         wrong = copy.deepcopy(failed); wrong['turnId'] = 'another-opaque-turn'
         with self.assertRaises(ValueError): validate_pane_receipt(self.receipt(running, failed), running, wrong)
+
+    def recovery_frame(self, endpoint='pi'):
+        parent = {'endpointId': endpoint, 'threadId': 'root-thread', 'sessionId': original.PARENT}
+        child = original.CHILD
+        return parent, child, {
+            'accepted': True,
+            'evidenceScope': 'original-independent-child-RunPort-paging-and-host-reconnect',
+            'pagination': {
+                'originalControlPresent': True, 'originalControlEnabled': True,
+                'supportedByMountedBinding': True,
+                'requestedScope': {'endpointId': endpoint, 'threadId': 'root-thread', 'sessionId': child},
+                'connectionEpoch': 7, 'beforeRevision': 12, 'afterRevision': 13,
+                'beforeTranscriptItems': 50, 'afterTranscriptItems': 88,
+                'earlierPageLoaded': True, 'hasMoreAfter': False,
+            },
+            'reconnect': {
+                'dispatchedThroughDemoHost': True, 'sameParent': True, 'sameChildPointer': True,
+                'sameMountedSource': True, 'paneRemainedSelected': True,
+                'epochBefore': 7, 'epochAfter': 8, 'sourceReady': True,
+                'projectionSucceeded': True, 'sourceContainsOriginalChild': True,
+                'transcriptItemsAfterReconnect': 88,
+            },
+            'parentDraftPreserved': True, 'nativeInteraction': False, 'physicalIme': False,
+            'historyRecords': {
+                'before': [{'id': str(i), 'text': f'body{i}',
+                            'sourceRecordPosition': {'kind': 'journal', 'sequence': i}}
+                           for i in (41, 42)],
+                'afterPage': [{'id': str(i), 'text': f'body{i}',
+                               'sourceRecordPosition': {'kind': 'journal', 'sequence': i}}
+                              for i in (40, 41, 42)],
+                'afterReconnect': [{'id': str(i), 'text': f'body{i}',
+                                    'sourceRecordPosition': {'kind': 'journal', 'sequence': i}}
+                                   for i in (40, 41, 42)],
+            },
+        }
+
+    def test_recovery_requires_real_child_page_and_host_reconnect(self):
+        for endpoint in ('pi', 'dsh'):
+            parent, child, frame = self.recovery_frame(endpoint)
+            receipt = validate_pane_recovery_frame(frame, endpoint, parent, child)
+            self.assertTrue(receipt['accepted'])
+            self.assertEqual(receipt['reconnectedEpoch'], 8)
+            self.assertEqual(receipt['afterTranscriptItems'], 88)
+
+    def test_recovery_rejects_other_scope_missing_control_and_false_reconnect(self):
+        parent, child, frame = self.recovery_frame()
+        cases = [
+            ('pagination', 'requestedScope', {'endpointId': 'dsh', 'threadId': 'root-thread',
+                                              'sessionId': child}),
+            ('pagination', 'originalControlPresent', False),
+            ('pagination', 'afterTranscriptItems', 50),
+            ('reconnect', 'dispatchedThroughDemoHost', False),
+            ('reconnect', 'sameChildPointer', False),
+            ('reconnect', 'epochAfter', 7),
+            ('reconnect', 'projectionSucceeded', False),
+            ('reconnect', 'transcriptItemsAfterReconnect', 49),
+        ]
+        for section, key, bad in cases:
+            mutated = copy.deepcopy(frame)
+            mutated[section][key] = bad
+            with self.subTest(section=section, key=key), self.assertRaises(ValueError):
+                validate_pane_recovery_frame(mutated, 'pi', parent, child)
+
+    def test_recovery_rejects_count_only_duplicate_reordered_or_changed_history(self):
+        parent, child, original_frame = self.recovery_frame()
+        for failure in ('missing', 'duplicate', 'reordered', 'changed', 'restore'):
+            frame = copy.deepcopy(original_frame)
+            if failure == 'missing':
+                frame.pop('historyRecords')
+            elif failure == 'duplicate':
+                frame['historyRecords']['afterPage'].append(frame['historyRecords']['afterPage'][0])
+            elif failure == 'reordered':
+                frame['historyRecords']['afterPage'].reverse()
+            elif failure == 'changed':
+                frame['historyRecords']['afterPage'][-1]['text'] = 'different original content'
+            else:
+                frame['historyRecords']['afterReconnect'] = frame['historyRecords']['before']
+            with self.subTest(failure=failure), self.assertRaises(ValueError):
+                validate_pane_recovery_frame(frame, 'pi', parent, child)
 
     def test_original_frame_driver_releases_only_after_validation_and_pairs_receipt(self):
         for bad_source in (False, True):

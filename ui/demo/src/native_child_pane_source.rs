@@ -15,6 +15,8 @@ use tekes_ui_controls::composition::{AccessibilityAction, ComponentId, ContentEv
 
 #[path = "native_child_paged_source.rs"]
 mod paged;
+#[path = "independent_child_pane_recovery.rs"]
+mod recovery;
 
 fn tick(host: &mut Host) {
     host.executor.block_on(async {
@@ -309,6 +311,20 @@ pub(super) fn run(host: &mut Host, manifest: &Value) -> Value {
     assert_eq!(child_scope.thread_id, parent.thread_id);
     assert_eq!(child_scope.session_id, child_id);
 
+    let pane_recovery = if manifest["profile"] == "pane-paging-reconnect" {
+        assert_eq!(expected_layout, ChildHistoryLayout::IndependentSessions);
+        Some(recovery::run(
+            host,
+            &parent,
+            &child_id,
+            &parent_binding,
+            &parent_draft,
+            &source,
+        ))
+    } else {
+        None
+    };
+
     if parent.endpoint_id == "native" {
         if manifest["profile"] == "native-paged" {
             return paged::run(host, manifest, parent_binding, parent_draft, source);
@@ -545,7 +561,8 @@ pub(super) fn run(host: &mut Host, manifest: &Value) -> Value {
         "retiredWitnessRejected": retired_witness_rejected,
         "nativeInteraction": false,
         "physicalIme": false,
-        "focusMode": "offscreen-semantic-controls"
+        "focusMode": "offscreen-semantic-controls",
+        "panePagingReconnect": pane_recovery
     })
 }
 

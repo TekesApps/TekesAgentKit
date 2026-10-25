@@ -1929,13 +1929,14 @@
     "integrationDecision": "keep PR10 draft: TekesUI53, Kernel86, remaining family/performance; no merge/tag/issue closure",
     "latestNarrowAcceptance": {
       "issue": 56,
-      "scope": "Native approval-denied parent Task; Pi primary child transition/history/reconnect; DSH normal+failed primary child/source/history/reconnect",
+      "scope": "prior Native/Pi/DSH source scopes plus actual Pi/DSH mounted child pane Earlier, host reconnect, stable record identity/order, parent draft/selection and retirement",
       "resultFile": "agentkit-stage-protocol-results-20261025.json",
       "completeIssue": false,
       "merged": false,
       "candidate": "4274fe82fc353ff06100d4106d527e25dc5dfca3",
       "evidenceBindings": "evidence-bindings-20261026/issue67-dsh-sources.json",
-      "identityPolicy": "Native/Pi retain their original source/program; DSH4274 uses SHA081c3fe; no cross-program promotion"
+      "identityPolicy": "Native/Pi retain their original source/program; DSH4274 uses SHA081c3fe; no cross-program promotion",
+      "additionalBinding": "evidence-bindings-20261026/child-pane-recovery.json"
     },
     "latestRunAcceptance": {
       "issue": 55,
@@ -1946,7 +1947,11 @@
       "completeIssue": false,
       "merged": false,
       "identityPolicy": "Pi keeps SHA84608c2; Native/DSH cancellation uses base5b product plus observer SHA9a6a919; complete identities in results, no promotion to4274",
-      "programScope": "Pi only; Native/DSH identities are recorded separately in protocolResults"
+      "programScope": "Pi only; Native/DSH identities are recorded separately in protocolResults",
+      "additionalScope": "Native/Pi/DSH original component real tools/reasoning/control retention and reconnect",
+      "additionalBinding": "evidence-bindings-20261026/mixed-tools.json",
+      "usageAccepted": false,
+      "performanceAccepted": false
     },
     "allowedBlockingFixes": [
       {
@@ -1959,11 +1964,12 @@
     "currentCandidate": "4274fe82fc353ff06100d4106d527e25dc5dfca3",
     "frozenScopeBase": "5b7c84361206b45ac381b10437097d3b76c322c1",
     "ciObservation": {
-      "head": "a1441a74a9f0866ec4ccac0016643e2f3a860fdc",
-      "run": 40214354397,
+      "head": "f833ea3e58f1707a3ba5dacf3bedcfda40ea9058",
+      "run": 40214966220,
       "root": "success",
-      "ui": "in_progress",
-      "observed": "2026-10-26",
+      "ui": "failure",
+      "onlyFailedGate": "strict nested reading / TekesUI53",
+      "artifact": 12607411641,
       "merged": false
     }
   },

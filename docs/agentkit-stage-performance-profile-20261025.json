@@ -48,5 +48,60 @@
   "notRunReasons": [
     "Candidate functional #55/#56 still partial; Native busy queue Kernel #86 failure remains blocking",
     "No comparable baseline/candidate performance samples collected; this is a preregistered profile, not acceptance evidence"
-  ]
+  ],
+  "resolvedProductCandidate": "4274fe82fc353ff06100d4106d527e25dc5dfca3",
+  "executionRecipe": {
+    "frozenBeforeSamples": "2026-10-26; no performance samples collected",
+    "datasetDefinition": "100 initial nonempty body-text messages per ordinary session: 50 user + 50 final assistant, each exactly 1024 UTF-8 bytes; first 10 turns each execute one original public read tool; tool call/result records are additional and excluded from body-text count",
+    "publicSeedOnly": true,
+    "seedProof": "public history readback validates ordered body byte counts/digests and 10 paired original call/result groups; baseline/candidate normalized content equal; opaque ids/times retained separately",
+    "cold": {
+      "iterations": 5,
+      "arrangement": "new owned home per iteration; public seed, retire seeder, launch a fresh measured harness/consumer over that owned dataset",
+      "initialBodyMessagesPerSession": [
+        100,
+        100,
+        100,
+        100,
+        100
+      ]
+    },
+    "warm": {
+      "initializationIterationsExcluded": 1,
+      "measuredIterations": 10,
+      "sameHarnessAndConsumerProcess": true,
+      "bodyMessagesPerSessionBeforeMeasuredIteration": [
+        102,
+        104,
+        106,
+        108,
+        110,
+        112,
+        114,
+        116,
+        118,
+        120
+      ],
+      "growth": "two ordinary sessions retained; each iteration sends exactly once to each session, adding one user and one final assistant body per session; no tools added after seed"
+    },
+    "iterationOrder": [
+      "first usable original snapshot",
+      "true SEP page20 ingested into projection",
+      "explicit reconnect to both original pointer/inventory/history convergence",
+      "one send and settlement per session"
+    ],
+    "page20": "Native/DSH SessionEndpoint journal follow/history_page(max_messages=20); Pi SessionConversation(max_messages=20)/load_earlier_conversation(20); public memory projection ingestion; RunController is separately measured at its actual fixed page50, never sliced to imitate20",
+    "latency": {
+      "snapshot": "original connect/open intent before dispatch to correct usable original-source projection; harness startup-to-ready recorded separately",
+      "send": "subscribe before public intent; record durable-user and first matching assistant content frame separately; 2s budget applies to assistant content, excludes optimistic echo",
+      "page": "original page20 request to real new source records in projection, keeping prior record identity/order",
+      "reconnect": "explicit reconnect intent to new epoch, both original pointers/inventory and original history window converged; ready alone insufficient"
+    },
+    "family": "separate one-parent/one-child workload with two public history pages; Native same-session bounded child versus Pi/DSH physical child session counts disclosed. Basic family has comparable baseline; do not silently insert extra sessions/tool groups into ordinary two-session dataset",
+    "rss": "50ms OS resident-size samples, PID/start identity and owned descendants; AgentKit and harness budgets each apply to simultaneous owned-tree total peak; provider recorded separately; missed short processes and sampling limits disclosed",
+    "runOrder": "cold baseline/candidate paired and interleaved; warm baseline then candidate, order fixed before any sample; same machine/power mode; no OS cache purge",
+    "failurePolicy": "retain failed samples; no replacements; if an iteration fails to reach the preregistered growth state, dependent subsequent samples not_run with reason rather than comparing unequal datasets",
+    "budgetsChanged": false,
+    "performanceAccepted": false
+  }
 }

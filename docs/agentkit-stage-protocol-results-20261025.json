@@ -319,5 +319,79 @@
     "strictNestedReading": "failure",
     "demoBuild": "skipped",
     "gateWaived": false
+  },
+  "mixedToolOriginalConsumer20261026": {
+    "status": "accepted-narrow",
+    "productCandidate": "4274fe82fc353ff06100d4106d527e25dc5dfca3",
+    "headlessSha256": "081c3fe0d1d0be7e335482c6309a9f455f0395a39bbc704908fa138a5beb7a49",
+    "uiSha256": "7d269e26cfa4926d11fc015b12cd607def8cd8f19939592fa278d4e9435f7f84",
+    "endpoints": {
+      "native": "Kernel0.9.3/09508a9",
+      "pi": "Pi1.3.0/Node24.20.0",
+      "dsh": "DSH0.2.1-rc.2/Node24.20.0"
+    },
+    "scope": "three actual public read tools, reasoning source, original live control retention, synthetic preedit/focus/draft isolation and same-pointer reconnect deduplication",
+    "binding": "evidence-bindings-20261026/mixed-tools.json",
+    "usageAccepted": false,
+    "performanceAccepted": false,
+    "completeIssue": false,
+    "merged": false
+  },
+  "independentChildPaneRecovery20261026": {
+    "status": "accepted-narrow",
+    "productCandidate": "4274fe82fc353ff06100d4106d527e25dc5dfca3",
+    "acceptanceOnlyOverlay": true,
+    "pi": {
+      "uiSha256": "6aa7573113230e7e9c954f6bd00ea18572392fe5f79a689337ed65983fe2fad4",
+      "originalTranscriptItems": [
+        50,
+        62,
+        62
+      ],
+      "epochs": [
+        2,
+        5
+      ],
+      "directory": "child-pane-recovery-4274-v1/pi"
+    },
+    "dsh": {
+      "uiSha256": "d63dea9535774745b5827d4dbaf8b257aaf2f0fbc2c2a46a3e750f140f3ed4ed",
+      "originalTranscriptItems": [
+        50,
+        97,
+        97
+      ],
+      "epochs": [
+        2,
+        5
+      ],
+      "directory": "dsh-child-pane-recovery-4274-v2/dsh"
+    },
+    "scope": "original mounted pane Earlier, captured history request, host reconnect, record content/order/de-dup, original Composer running-to-failed source pair, parent draft/selection and original-close source retirement",
+    "binding": "evidence-bindings-20261026/child-pane-recovery.json",
+    "readingPixelAnchorAccepted": false,
+    "completeIssue": false,
+    "merged": false
+  },
+  "latestExactHeadCi20261026": {
+    "head": "f833ea3e58f1707a3ba5dacf3bedcfda40ea9058",
+    "run": 40214966220,
+    "root": "success",
+    "ui": "failure",
+    "regularUiChecks": "success",
+    "childWitness": "success",
+    "nativeApprovalConsumer": "success",
+    "standalonePublicConsumer": "success",
+    "strictNestedReading": "failure",
+    "subsequentDemoBuild": "skipped",
+    "artifact": 12607411641,
+    "artifactReading": {
+      "accepted": false,
+      "parentFollowingAfterInnerUp": true,
+      "parentOffsetAfterAppend": 634,
+      "detailVisibleAfterAppend": false
+    },
+    "noGateWaived": true,
+    "merged": false
   }
 }

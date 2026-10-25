@@ -202,7 +202,8 @@ def provider_handler(endpoint: str, state: dict, lock: threading.Lock):
 def provider_receipt(state: dict, lock: threading.Lock) -> dict:
     with lock:
         requests = list(state["requests"])
-        return {"provider": "synthetic-loopback-openai-chat-completions",
+        return {"provider": "synthetic-loopback-only",
+            "observedApiPaths": sorted({request["path"] for request in requests}),
             "requestBodiesPersisted": False, "requests": requests,
             "requestCount": len(requests), "matchingBusinessRequests": state["businessRequests"],
             "titleRequests": state["titleRequests"],

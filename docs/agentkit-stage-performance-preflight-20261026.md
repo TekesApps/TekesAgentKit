@@ -36,3 +36,22 @@ post-result budget adjustment or absent-baseline claim for supported old APIs.
 This plan is source-level only. No benchmark, latency/RSS pass, desktop/IME/AX
 acceptance or completed #55/#56 is implied. The #67 blocking fix also needs its
 own immutable candidate identity before final measurements.
+
+## Execution semantics resolved before samples
+
+The profile now explicitly treats100 as the initial body-message seed, not an
+impossible public-history truncation after every warm send. Each of two ordinary
+sessions starts with50 user/final-assistant pairs at1024 UTF-8 bytes each, plus10
+actual read-tool groups. Cold5 starts fresh owned seeded datasets; warm excludes
+one initialization iteration and then records initial body counts102,104,…120,
+adding exactly one user/final assistant pair per session per iteration. Both
+revisions use the identical trajectory; no hidden fork/archive inventory is used.
+Family remains a separately disclosed one-parent/one-child topology and still has
+a comparable baseline. Original thresholds, counts and failure retention remain.
+
+The JSON `executionRecipe` freezes public seed readback, true SEP page20 versus
+actual RunController page50, original-source assistant-first-frame timing, same
+pointer/history reconnect convergence, simultaneous owned-tree RSS, and pairing
+order. This is preregistration, not measurement or a narrowed acceptance claim.
+No performance sample exists yet. Lack of a public cross-harness history truncate
+API must not lead to private DB rewrites or silently incomparable warm datasets.

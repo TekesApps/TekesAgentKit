@@ -107,3 +107,29 @@ CI4274 root and standalone consumer passed; strict reading still fails on the
 published pin. TekesUI53 and Kernel86 remain open when checked2026-10-26. #55/#56
 still need remaining source/host coverage and preregistered performance; no
 merge/tag/main CI/Issue closure occurred. #60–#66 remain future scope.
+
+### 2026-10-26 original mixed tools and independent child panes
+
+#55 now has fixed Native/Pi/DSH original offscreen component proofs for three
+actual read tools, reasoning, continuous grouping and retained controls,
+synthetic preedit/focus and draft isolation, and reconnect de-duplication.
+Product4274/headless081c3fe/UI7d269e26 retain distinct identities. Usage-specific
+source acceptance and preregistered performance remain open.
+
+#56 now has actual mounted Pi/DSH child pane Earlier and host reconnect proofs,
+plus the original controlled running→failed source pair, nonempty parent draft,
+selection isolation, and close/retired-source fencing. Pi UI6aa75731 records
+50→62→62 source rows; DSH UId63dea95 records50→97→97, epoch2→5 for both.
+All original record content/order is preserved without duplicates. Additional
+original DSH request/prompt context rows may interleave after raw journal paging;
+old messages need not be a contiguous suffix. The stricter suffix assertion's
+failed receipt is preserved. These are acceptance-only overlays, not new product
+features or desktop/IME/AX/pixel-anchor/performance acceptance. Portable scope
+bindings are in `evidence-bindings-20261026/mixed-tools.json` and
+`evidence-bindings-20261026/child-pane-recovery.json`.
+
+Exact f833 CI40214966220 finished: root, ordinary UI checks, child witness,
+Native approval and independent public consumer pass; strict reading fails on
+TekesUI53, later demo build skipped. Artifact12607411641 retains the original
+negative result. New later commits must obtain their own CI; no transfer of f833
+checks is implied. PR10 stays draft; no merge, tag or code-issue closure.
