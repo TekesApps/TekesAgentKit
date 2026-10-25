@@ -1,6 +1,7 @@
 //! Shared AgentKit service. Hosts own its authentication, listener and process lifetime.
 //! A disconnected view drops only its history lease; it never stops a runtime or Harness.
 mod sidebar;
+mod stdio;
 use async_trait::async_trait;
 use futures_util::StreamExt;
 use serde_json::{Value, json};
@@ -9,6 +10,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     sync::{Arc, RwLock},
 };
+pub use stdio::{HostRequest, HostResponse, abort_observation, forward_follow};
 use tekes_agent_contract::*;
 use tekes_agent_presentation::{RunPresentation, RunScope, TranscriptSnapshot};
 use tekes_agent_session::{ConnectionState, MemoryProjectionStore, SessionRuntime};

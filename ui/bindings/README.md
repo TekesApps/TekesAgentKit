@@ -517,8 +517,13 @@ reopen explicitly rather than rebase/retry automatically.
 
 Demo inline placement is host layout. Closed editors are retained but unmounted.
 All active editors participate in the host composition barrier, including the
-main/pane Composers. Source reveal/highlights, selection-to-annotation capture and
-structured historical cards are separate unfinished capabilities. See
+main/pane Composers. `RunBinding.reveal_annotation_reference` accepts the
+original `Open` intent and returns the optional typed document reference only
+while its exact Run context is current. The host resolves that reference against
+its own public document snapshot and performs navigation/highlighting. Legacy
+transcript annotations return `None`; this adapter does not resolve a document
+store or perform the reveal itself. Selection-to-annotation capture and
+structured historical cards remain separate capabilities. See
 docs/rust-agent-ui-annotation-editor-20261020.md for evidence and limits.
 
 ## Generic file attachment capture (experimental)

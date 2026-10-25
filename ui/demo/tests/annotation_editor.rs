@@ -13,7 +13,7 @@ use tekes_agent_ui_demo::{
 use tekes_ui_controls::composition::*;
 
 fn note() -> ComposerAnnotation {
-    ComposerAnnotation {id:"note".into(),source:"回答 · turn 1".into(),excerpt:"引用中文 😀".into(),comment:"原评论".into(),source_locator:Some(serde_json::from_value(json!({"endpoint":"fixture","sessionId":"a","itemId":"message","turnId":"turn","kind":"assistant","start":0,"end":7,"fingerprint":"KEEP_SOURCE_DIGEST"})).unwrap())}
+    ComposerAnnotation {id:"note".into(),source:"回答 · turn 1".into(),excerpt:"引用中文 😀".into(),comment:"原评论".into(),source_locator:Some(serde_json::from_value(json!({"endpoint":"fixture","sessionId":"a","itemId":"message","turnId":"turn","kind":"assistant","start":0,"end":7,"fingerprint":"KEEP_SOURCE_DIGEST"})).unwrap()),artifact_reference:None}
 }
 async fn setup() -> (Arc<SessionRuntime>, [Arc<RunBinding>; 2]) {
     let runtime = Arc::new(SessionRuntime::spawn(

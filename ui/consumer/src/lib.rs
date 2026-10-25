@@ -147,6 +147,16 @@ pub fn apply_annotation_change(
     editor.complete(change, result);
     applied
 }
+/// Return the immutable document reference from the original Run for the
+/// host's own public-snapshot resolution and reveal callback.
+pub fn reveal_annotation_source(
+    binding: &tekes_agent_ui_bindings::RunBinding,
+    intent: &tekes_agent_components_ui::ComposerContextIntent,
+) -> Result<Option<tekes_agent_ui_bindings::ArtifactSelectionReference>, String> {
+    binding
+        .reveal_annotation_reference(intent)
+        .map_err(|error| error.to_string())
+}
 #[test]
 fn independent_host_mounts_the_annotation_editor_without_a_run_surface_or_private_types() {
     let editor = tekes_agent_components_ui::AnnotationEditor::new(87, Default::default());
@@ -336,6 +346,19 @@ fn mounts_without_harness_or_private_control_access() {
 /// Standard component consumer, independent of the protocol test RunSurface.
 pub fn new_composer(namespace: u64) -> tekes_agent_components_ui::Composer {
     tekes_agent_components_ui::Composer::new(tekes_agent_components_ui::ComposerIds::new(namespace))
+}
+
+/// A document host renders only the standard Composer from the original Run.
+/// On detach it removes the old mount; the durable Run draft remains shared.
+pub fn sync_standalone_composer(
+    composer: &mut tekes_agent_components_ui::Composer,
+    mount: &tekes_agent_ui_bindings::StandaloneComposerMount,
+    affordances: tekes_agent_components_ui::ComposerAffordances,
+) -> Result<(), String> {
+    let snapshot = mount.snapshot().map_err(|error| error.to_string())?;
+    composer
+        .update(&snapshot, affordances)
+        .map_err(str::to_owned)
 }
 
 #[test]

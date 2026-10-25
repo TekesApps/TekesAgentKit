@@ -19,6 +19,8 @@ pub use attachments::*;
 pub use feedback::*;
 mod presets;
 pub use presets::*;
+mod standalone_composer;
+pub use standalone_composer::*;
 mod sidebar;
 mod sidebar_multi;
 mod sidebar_multi_search;
@@ -46,6 +48,7 @@ pub use child::*;
 use std::sync::Arc;
 pub use task::*;
 use tekes_agent_components_ui::{Composer, ComposerAffordances, ComposerControlGate};
+pub use tekes_agent_contract::ArtifactSelectionReference;
 use tekes_agent_contract::{PromptMode, Result, require, unsupported};
 use tekes_agent_presentation::{
     AgentTask, ChildHistoryLayout, ChildHistorySource, ChildRun, ComposerDestination,
@@ -432,6 +435,47 @@ impl RunBinding {
         }
         self.patch_context(&intent.baseline, artifacts, annotations)
     }
+    /// Return a typed document reference for the host's source-reveal callback.
+    /// The callback resolves it against its current public snapshot; this method
+    /// never reads or navigates a document store itself.
+    pub fn reveal_annotation_reference(
+        &self,
+        intent: &tekes_agent_components_ui::ComposerContextIntent,
+    ) -> Result<Option<ArtifactSelectionReference>> {
+        use tekes_agent_components_ui::{ComposerContextAction, ComposerContextItem};
+        require(
+            intent.action == ComposerContextAction::Open,
+            "not an annotation source reveal",
+        )?;
+        let ComposerContextItem::Annotation(annotation) = &intent.item else {
+            return Err(tekes_agent_contract::Error::Protocol(
+                "source reveal requires an annotation".into(),
+            ));
+        };
+        self.require_destination(&intent.baseline.selection.destination)?;
+        let current = self
+            .current_run()
+            .ok_or_else(|| tekes_agent_contract::Error::Protocol("run unavailable".into()))?;
+        require(
+            intent.baseline.matches_snapshot(&current)
+                && intent.baseline.artifacts == current.draft.artifacts
+                && intent.baseline.annotations == current.draft.annotations
+                && intent
+                    .baseline
+                    .annotations
+                    .iter()
+                    .filter(|item| item.id == annotation.id)
+                    .count()
+                    == 1
+                && intent.baseline.annotations.contains(annotation),
+            "annotation reveal capture is stale or ambiguous",
+        )?;
+        let Some(reference) = &annotation.artifact_reference else {
+            return Ok(None);
+        };
+        reference.validate()?;
+        Ok(Some(reference.clone()))
+    }
     /// Replace only one captured comment, retaining excerpt/source/provenance.
     /// A failed CAS is not rebased or retried against the newest draft.
     pub fn edit_annotation(
@@ -747,6 +791,24 @@ impl RunBinding {
                     .map(|controller| controller.snapshot())
             })
             .flatten()
+    }
+    /// Confirm an original submission after the host has checked authoritative
+    /// history. Reconciliation never resends a mutation or targets another Run.
+    pub fn acknowledge_reconciliation(&self, submission_id: &str) -> Result<()> {
+        self.require_controls(&ComposerDestination::run(self.scope.clone()))?;
+        require(
+            self.current_run().is_some_and(|snapshot| {
+                snapshot
+                    .submissions
+                    .iter()
+                    .any(|submission| submission.id == submission_id)
+            }),
+            "submission does not belong to this Run",
+        )?;
+        self.controller
+            .as_ref()
+            .ok_or_else(|| unsupported("read-only bounded child"))?
+            .acknowledge_reconciliation(submission_id)
     }
     pub fn access(&self) -> PaneAccess {
         if self.child_owner.as_ref().is_some_and(|owner| {

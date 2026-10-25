@@ -42,6 +42,7 @@ pub fn composer_context_fixture() -> (
             excerpt: "中文引用 👩🏽‍💻".into(),
             comment: "请解释这段内容".into(),
             source_locator: None,
+            artifact_reference: None,
         }],
     )
 }

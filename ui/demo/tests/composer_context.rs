@@ -27,6 +27,35 @@ fn annotation() -> ComposerAnnotation {
         excerpt: "保留这段中文 👩🏽‍💻".into(),
         comment: "请解释".into(),
         source_locator: None,
+        artifact_reference: None,
+    }
+}
+fn sourced_annotation() -> ComposerAnnotation {
+    let excerpt = "精确引用🐉";
+    ComposerAnnotation {
+        id: "sourced-note".into(),
+        source: "文档 · 人物传记".into(),
+        excerpt: excerpt.into(),
+        comment: "请核对这个段落".into(),
+        source_locator: None,
+        artifact_reference: Some(
+            tekes_agent_contract::ArtifactSelectionReference::capture(
+                "document-A".into(),
+                "character-17".into(),
+                "character".into(),
+                vec!["biography".into(), "paragraph-3".into()],
+                "revision-42".into(),
+                "sha256:fixture".into(),
+                excerpt,
+                tekes_agent_contract::Utf16SelectionRange {
+                    location: 0,
+                    length: excerpt.encode_utf16().count() as u64,
+                },
+                0,
+                0,
+            )
+            .unwrap(),
+        ),
     }
 }
 async fn setup() -> (Arc<SessionRuntime>, [Arc<RunBinding>; 2]) {
@@ -61,6 +90,45 @@ fn drain(host: &mut ContentHost, root: ComponentId) -> Vec<ComposerIntent> {
         .unwrap()
         .take_intents(&actions)
 }
+#[tokio::test]
+async fn independent_consumer_reuses_standard_composer_with_original_standalone_mount() {
+    let (runtime, bindings) = setup().await;
+    let binding =
+        tekes_agent_ui_bindings::StandaloneComposerBinding::open(bindings[0].clone()).unwrap();
+    let first = binding.mount().unwrap();
+    first.edit_text("独立文档草稿".into()).unwrap();
+    let mut composer = tekes_agent_ui_consumer_check::new_composer(0x51500);
+    let original_editor = composer.ids().editor;
+    tekes_agent_ui_consumer_check::sync_standalone_composer(
+        &mut composer,
+        &first,
+        Default::default(),
+    )
+    .unwrap();
+    assert_eq!(composer.destination(), Some(&first.destination()));
+    assert_eq!(first.draft().unwrap().text, "独立文档草稿");
+    first.detach();
+    assert!(
+        tekes_agent_ui_consumer_check::sync_standalone_composer(
+            &mut composer,
+            &first,
+            Default::default()
+        )
+        .is_err()
+    );
+    let second = first.reattach().unwrap();
+    tekes_agent_ui_consumer_check::sync_standalone_composer(
+        &mut composer,
+        &second,
+        Default::default(),
+    )
+    .unwrap();
+    assert_eq!(composer.ids().editor, original_editor);
+    assert_eq!(composer.destination(), Some(&second.destination()));
+    assert_eq!(second.draft().unwrap().text, "独立文档草稿");
+    runtime.stop().await.unwrap();
+}
+
 #[tokio::test]
 async fn whole_draft_text_edits_do_not_advance_context_but_content_aba_does() {
     let (runtime, controller) = tekes_agent_ui_demo::fixture::setup().await.unwrap();
@@ -100,6 +168,51 @@ async fn whole_draft_text_edits_do_not_advance_context_but_content_aba_does() {
         .edit(&saved.selection.destination, draft)
         .unwrap();
     assert!(!controller.patch_context(&saved, vec![], vec![]).unwrap());
+    runtime.stop().await.unwrap();
+}
+#[tokio::test]
+async fn host_source_reveal_returns_only_the_exact_live_typed_reference() {
+    let (runtime, bindings) = setup().await;
+    let a = &bindings[0];
+    let baseline = Arc::new(capture(a));
+    let selected = sourced_annotation();
+    assert!(
+        a.patch_context(&baseline, vec![], vec![selected.clone()])
+            .unwrap()
+    );
+    let baseline = Arc::new(capture(a));
+    let intent = ComposerContextIntent {
+        baseline: baseline.clone(),
+        item: ComposerContextItem::Annotation(selected.clone()),
+        action: ComposerContextAction::Open,
+    };
+    let selection_reference = a.reveal_annotation_reference(&intent).unwrap().unwrap();
+    assert_eq!(selection_reference, selected.artifact_reference.unwrap());
+    let field_path = vec!["biography".into(), "paragraph-3".into()];
+    assert_eq!(
+        selection_reference.resolve(&tekes_agent_contract::ArtifactSelectionTarget {
+            document_id: Some("document-A"),
+            artifact_id: Some("character-17"),
+            artifact_type: Some("character"),
+            field_path: Some(&field_path),
+            revision: Some("revision-42"),
+            digest: Some("sha256:fixture"),
+            field_text: Some("精确引用🐉"),
+        }),
+        tekes_agent_contract::ArtifactSelectionResolution::Exact
+    );
+    let legacy_annotation = annotation();
+    a.patch_context(&capture(a), vec![], vec![legacy_annotation.clone()])
+        .unwrap();
+    let legacy = ComposerContextIntent {
+        baseline: Arc::new(capture(a)),
+        item: ComposerContextItem::Annotation(legacy_annotation),
+        action: ComposerContextAction::Open,
+    };
+    assert_eq!(a.reveal_annotation_reference(&legacy).unwrap(), None);
+    a.patch_context(&capture(a), vec![reference()], vec![])
+        .unwrap();
+    assert!(a.reveal_annotation_reference(&intent).is_err());
     runtime.stop().await.unwrap();
 }
 #[tokio::test]
