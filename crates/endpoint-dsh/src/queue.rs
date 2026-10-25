@@ -6,6 +6,9 @@ use serde_json::{Map, Value, json};
 use std::collections::BTreeSet;
 use tekes_agent_contract::{Error, Result, SEQUENCED_QUEUE_PROJECTION_KEY, require, string};
 
+/// Local inventory metadata reserved for the original, unsequenced DSH cache hint.
+const DSH_CACHED_PROJECTION_HINTS_KEY: &str = "dshCachedProjectionHints";
+
 fn reject_reserved(values: &Value) -> Result<()> {
     if values
         .as_object()
@@ -86,13 +89,62 @@ pub(super) fn normalize_inventory_snapshot(snapshot: &mut Value) -> Result<()> {
         return Err(Error::Protocol("invalid DSH inventory".into()));
     };
     for row in rows {
-        normalize_inventory_row(row)?;
+        normalize_inventory_snapshot_row(row)?;
     }
     Ok(())
 }
 
 pub(super) fn normalize_inventory_row(row: &mut Value) -> Result<()> {
+    normalize_inventory_row_with_cached_hints(row, false)
+}
+
+/// Inventory snapshots are header-only listings, so their cached projection
+/// hints may be retained as opaque metadata without acquiring live authority.
+fn normalize_inventory_snapshot_row(row: &mut Value) -> Result<()> {
+    normalize_inventory_row_with_cached_hints(row, true)
+}
+
+fn normalize_inventory_row_with_cached_hints(row: &mut Value, allow_cached: bool) -> Result<()> {
+    require(
+        row.get(DSH_CACHED_PROJECTION_HINTS_KEY).is_none(),
+        "remote DSH inventory contains a reserved AgentKit key",
+    )?;
     if let Some(projection) = row.get("projections") {
+        reject_remote_projection(projection)?;
+        if allow_cached && projection.get("kind") == Some(&Value::String("cached".into())) {
+            let seq = projection
+                .get("asOfSeq")
+                .and_then(Value::as_i64)
+                .ok_or_else(|| Error::Protocol("missing DSH cached projection sequence".into()))?;
+            require(seq >= -1, "invalid DSH cached projection sequence")?;
+            let values = projection
+                .get("values")
+                .and_then(Value::as_object)
+                .ok_or_else(|| Error::Protocol("invalid DSH cached projection values".into()))?;
+            if let Some(title) = values.get("title") {
+                require(
+                    title.is_null() || title.is_string(),
+                    "invalid DSH cached title projection",
+                )?;
+            }
+            let cached_hints = projection.clone();
+            let cached_title = values
+                .get("title")
+                .and_then(Value::as_str)
+                .map(str::to_owned);
+
+            let row = row
+                .as_object_mut()
+                .ok_or_else(|| Error::Protocol("invalid DSH inventory row".into()))?;
+            if row.get("title").is_none()
+                && let Some(title) = cached_title
+            {
+                row.insert("title".into(), Value::String(title));
+            }
+            row.insert(DSH_CACHED_PROJECTION_HINTS_KEY.into(), cached_hints);
+            row.remove("projections");
+            return Ok(());
+        }
         let normalized = normalize_projection(projection)?;
         if let Some(normalized) = normalized {
             row.as_object_mut()
@@ -329,5 +381,127 @@ mod tests {
 
         let mut forged = json!({"items":[{"sessionId":"s","projections":{"asOfSeq":7,"values":{(SEQUENCED_QUEUE_PROJECTION_KEY):{"items":[]}}}}]});
         assert!(normalize_inventory_snapshot(&mut forged).is_err());
+    }
+
+    #[test]
+    fn cached_inventory_hints_are_retained_without_live_authority() {
+        let cached = json!({
+            "kind":"cached",
+            "asOfSeq":9000,
+            "values":{
+                "title":"persisted title",
+                "inbox":{"next-turn":[{"id":"stale"}],"next-step":[]},
+                "workingDirectory":"/stale"
+            }
+        });
+        let mut snapshot = json!({"items":[
+            {"sessionId":"cached","projections":cached},
+            {"sessionId":"live","title":"cached fallback","projections":{"kind":"sequenced","asOfSeq":3,"values":{"title":null,"inbox":{"next-turn":[],"next-step":[]},"workingDirectory":"/live"}}}
+        ]});
+
+        normalize_inventory_snapshot(&mut snapshot).unwrap();
+
+        let cached_row = &snapshot["items"][0];
+        assert_eq!(cached_row["title"], "persisted title");
+        assert_eq!(cached_row[DSH_CACHED_PROJECTION_HINTS_KEY], cached);
+        assert!(cached_row.get("projections").is_none());
+        assert!(cached_row.get("agentkit.queue.v1").is_none());
+
+        let live_row = &snapshot["items"][1];
+        assert_eq!(live_row["title"], "cached fallback");
+        assert_eq!(live_row["projections"]["asOfSeq"], 3);
+        assert_eq!(live_row["projections"]["values"]["title"], Value::Null);
+        assert!(live_row[DSH_CACHED_PROJECTION_HINTS_KEY].is_null());
+    }
+
+    #[test]
+    fn cached_watermark_never_poison_live_store_or_clear_authoritative_null() {
+        use tekes_agent_session::MemoryProjectionStore;
+        let mut raw_store = serde_json::to_value(MemoryProjectionStore::new("dsh")).unwrap();
+        raw_store["sequenced_queue_projection_key"] = json!(SEQUENCED_QUEUE_PROJECTION_KEY);
+        let mut store: MemoryProjectionStore = serde_json::from_value(raw_store).unwrap();
+        let mut snapshot = json!({"items":[{
+            "sessionId":"s","running":false,"blank":false,"updatedAt":1,
+            "projections":{"kind":"cached","asOfSeq":9000,"values":{
+                "title":"cached title","workingDirectory":"/stale",
+                "inbox":{"next-turn":[{"id":"stale"}],"next-step":[]}
+            }}
+        }]});
+        normalize_inventory_snapshot(&mut snapshot).unwrap();
+        store
+            .apply(
+                "inventory",
+                json!({"type":"baseline","generation":"i1","snapshot":snapshot}),
+            )
+            .unwrap();
+        assert!(store.sessions["s"].projections.is_empty());
+        assert!(store.sessions["s"].queue.is_empty());
+        store
+            .apply(
+                "control",
+                json!({"type":"baseline","generation":"c1","snapshot":{
+                    "queues":[],"jobs":[],"projections":[{"sessionId":"s","projections":{
+                        "asOfSeq":3,"values":{"title":null,"workingDirectory":"/live",
+                            (SEQUENCED_QUEUE_PROJECTION_KEY):{"items":["live"]}}
+                    }}]
+                }}),
+            )
+            .unwrap();
+        // A later header-only listing is still not a comparable live cut.
+        store
+            .apply(
+                "inventory",
+                json!({"type":"baseline","generation":"i2","snapshot":snapshot}),
+            )
+            .unwrap();
+        let session = &store.sessions["s"];
+        assert_eq!(session.projections["title"].sequence, 3);
+        assert_eq!(session.projections["title"].value, Value::Null);
+        assert_eq!(session.projections["workingDirectory"].value, "/live");
+        assert_eq!(session.queue, vec![json!("live")]);
+        assert_eq!(
+            session.summary.as_ref().unwrap()[DSH_CACHED_PROJECTION_HINTS_KEY]["asOfSeq"],
+            9000
+        );
+    }
+
+    #[test]
+    fn cached_inventory_validation_and_reserved_metadata_fail_closed() {
+        for projection in [
+            json!({"kind":"cached","asOfSeq":-2,"values":{}}),
+            json!({"kind":"cached","asOfSeq":1,"values":[]}),
+            json!({"kind":"cached","asOfSeq":1,"values":{"title":42}}),
+            json!({"kind":"unknown","asOfSeq":1,"values":{}}),
+            json!({"kind":"cached","asOfSeq":1,"values":{"agentkit.queue.v1":{"items":[]}}}),
+        ] {
+            let mut snapshot = json!({"items":[{"sessionId":"s","projections":projection}]});
+            assert!(normalize_inventory_snapshot(&mut snapshot).is_err());
+        }
+
+        let mut spoofed =
+            json!({"items":[{"sessionId":"s","dshCachedProjectionHints":{"kind":"cached"}}]});
+        assert!(normalize_inventory_snapshot(&mut spoofed).is_err());
+
+        let explicit_read =
+            json!({"kind":"cached","asOfSeq":10000,"values":{"workingDirectory":"/stale"}});
+        assert!(normalize_projection(&explicit_read).is_err());
+
+        let mut connected_upsert =
+            json!({"sessionId":"s","projections":{"kind":"cached","asOfSeq":1,"values":{}}});
+        assert!(normalize_inventory_row(&mut connected_upsert).is_err());
+    }
+
+    #[test]
+    fn cached_title_never_replaces_existing_top_level_title_or_null() {
+        let cached = json!({"kind":"cached","asOfSeq":1,"values":{"title":"stale"}});
+        let mut snapshot = json!({"items":[
+            {"sessionId":"existing","title":"current","projections":cached},
+            {"sessionId":"explicit-null","title":null,"projections":{"kind":"cached","asOfSeq":1,"values":{"title":"stale"}}}
+        ]});
+
+        normalize_inventory_snapshot(&mut snapshot).unwrap();
+
+        assert_eq!(snapshot["items"][0]["title"], "current");
+        assert_eq!(snapshot["items"][1]["title"], Value::Null);
     }
 }

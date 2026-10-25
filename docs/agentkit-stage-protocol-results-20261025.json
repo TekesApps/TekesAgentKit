@@ -236,5 +236,66 @@
     "observedAvailableBytesDelta": 8966144,
     "deltaMayIncludeOtherTasks": true,
     "scope": "three retired owned-home Node compile caches only; shared Cargo target retained"
+  },
+  "nativeDshCancel20261026": {
+    "productBase": "5b7c84361206b45ac381b10437097d3b76c322c1",
+    "acceptanceObserver": "wait durable original user/turn before cancellation capture",
+    "programSha256": "9a6a919215dc30c51df3b639188acb4783fd26f164592d15145a7f9e24734447",
+    "programInputs": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/run-lifecycle-durable-cancel-inputs.json",
+    "nativeReceipt": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/native-cancel-20261026-v3/acceptance.json",
+    "dshReceipt": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/dsh-cancel-20261026-v1/acceptance.json",
+    "nativeRuntime": "Kernel0.9.3/09508a9",
+    "dshRuntime": "0.2.1-rc.2/Node24.20.0",
+    "heldBusinessRequestsPerEndpoint": 1,
+    "dshTitleRequests": 1,
+    "consumerAndHarnessExitStatus": 0,
+    "draftAndScopePreserved": true,
+    "previousNativeAttempts": [
+      "v1 optimistic echo before durable user publication",
+      "v2 verifier incorrectly required duplicate data.turn on Native user/message"
+    ],
+    "notRun": [
+      "desktop",
+      "physical-ime",
+      "AX",
+      "performance",
+      "full-three-end-tool-reasoning"
+    ]
+  },
+  "dshFamily20261026BeforeFix": {
+    "result": "failed-reconnect-after-completed-summary",
+    "root": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/dsh-summary-5b-20261026",
+    "productSource": "5b7c843",
+    "programSha256": "11126181c6422a11fc1236d0c0f84f3adeb82499610903efd21b503770596499",
+    "providerRequests": 7,
+    "dshExitStatus": 0,
+    "error": "unknown DSH projection authority",
+    "triggeringRawKindCaptured": false,
+    "contractGap": "valid cached list hints rejected; incomparable watermark must not enter sequenced authority",
+    "implementationIssue": 67
+  },
+  "issue67": {
+    "status": "targeted-unit-and-clippy-passed-live-retest-pending",
+    "sourceBuildInputs": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/issue67-frozen-build-inputs.json",
+    "independentReview": "no concrete source-boundary bug found; not formal whole-PR approval",
+    "runtimeModified": false,
+    "mainIntegrated": false
+  },
+  "historicalProgramArchiveBindings": [
+    {
+      "sha256": "84608c2ab363c436a36b6efc367bba12baa921089fdc9edd63260466b3196678",
+      "archive": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/programs/run-lifecycle-pi-84608c2",
+      "scope": "original accepted Pi cancel/Unknown program; archive is reference-only"
+    }
+  ],
+  "ci7d773ea": {
+    "run": 40210248860,
+    "headless": "success",
+    "ui": "failure",
+    "newNativeConsumer": "success",
+    "standaloneConsumer": "success",
+    "strictNestedReading": "failure",
+    "demoBuild": "skipped",
+    "gateWaived": false
   }
 }

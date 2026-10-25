@@ -1353,6 +1353,12 @@ mod tests {
             .unwrap(),
             None
         );
+        assert!(
+            sequenced_working_directory(
+                &json!({"kind":"cached","asOfSeq":9000,"values":{"workingDirectory":"/stale"}})
+            )
+            .is_err()
+        );
         assert!(sequenced_working_directory(&json!({"kind":"unknown","asOfSeq":0})).is_err());
         assert!(sequenced_working_directory(&json!({"kind":"sequenced","values":{}})).is_err());
     }

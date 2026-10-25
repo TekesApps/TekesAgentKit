@@ -41,7 +41,7 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _source_hashes(program: Path) -> dict[str, object]:
+def _source_hashes(program: Path, frozen_manifest: Path | None = None) -> dict[str, object]:
     paths = [
         Path(__file__).resolve(),
         ROOT / "scripts/summary_source_fixture.py",
@@ -53,10 +53,37 @@ def _source_hashes(program: Path) -> dict[str, object]:
         ROOT / "crates/presentation/src/summary.rs",
     ]
     sources = {str(path): _sha256(path) for path in paths if path.is_file()}
-    revision = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True, capture_output=True, check=True
-    ).stdout.strip()
-    return {"gitRevision": revision, "sources": sources, "headlessProgramSha256": _sha256(program)}
+    if frozen_manifest is None:
+        revision = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True, capture_output=True, check=True
+        ).stdout.strip()
+        identity = {"kind": "git-worktree"}
+    else:
+        frozen_manifest = frozen_manifest.resolve(strict=True)
+        manifest = json.loads(frozen_manifest.read_text())
+        revision = manifest.get("head")
+        if (not isinstance(revision, str) or len(revision) != 40
+                or any(c not in "0123456789abcdef" for c in revision)):
+            raise ValueError("frozen manifest must identify an exact commit")
+        files = manifest.get("files")
+        if not isinstance(files, dict) or not {
+            "Cargo.toml", "Cargo.lock", "crates/headless/src/main.rs",
+        }.issubset(files):
+            raise ValueError("frozen manifest lacks the headless source closure")
+        checked = {}
+        for name, expected in files.items():
+            relative = Path(name)
+            if relative.is_absolute() or ".." in relative.parts:
+                raise ValueError("unsafe frozen source path")
+            if name in ("Cargo.toml", "Cargo.lock") or name.startswith("crates/"):
+                source = ROOT / relative
+                if not source.is_file() or _sha256(source) != expected:
+                    raise ValueError(f"frozen product input changed: {name}")
+                checked[name] = expected
+        identity = {"kind": "frozen-manifest", "path": str(frozen_manifest),
+                    "sha256": _sha256(frozen_manifest), "checkedProductInputs": checked}
+    return {"gitRevision": revision, "identity": identity, "sources": sources,
+            "headlessProgramSha256": _sha256(program)}
 
 
 def _rows(stdout: str, commands: list[dict[str, object]]) -> list[dict[str, object]]:
@@ -154,12 +181,15 @@ def main() -> int:
                         help="fixed installed DSH 0.2.1-rc.2 runtime root")
     parser.add_argument("--output", required=True, type=Path,
                         help="new evidence directory under the existing AgentKit SSD project")
+    parser.add_argument("--source-manifest", type=Path,
+                        help="exact frozen source manifest; validates product inputs without a Git checkout")
     args = parser.parse_args()
     program = args.headless_program.resolve(strict=True)
     dsh_root = args.dsh_root.resolve(strict=True)
     output = args.output.expanduser().absolute()
     if not program.is_file() or not os.access(program, os.X_OK):
         parser.error("--headless-program must be an executable regular file")
+    source_identity = _source_hashes(program, args.source_manifest)
     if not output.resolve().is_relative_to(SSD_PROJECT.resolve(strict=True)):
         parser.error("--output must stay under the existing AgentKit SSD project")
     if output.exists() and (not output.is_dir() or any(output.iterdir())):
@@ -230,10 +260,10 @@ def main() -> int:
                 "node": subprocess.run([str(dsh.node), "--version"], text=True, capture_output=True,
                                         check=True, env=dsh_env).stdout.strip(),
                 "provider": "synthetic-loopback",
-                "agentkitGitRevision": subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT,
-                                                       text=True, capture_output=True, check=True).stdout.strip(),
+                "agentkitGitRevision": source_identity["gitRevision"],
+                "identityKind": source_identity["identity"]["kind"],
             })
-            _write_json(output / "source-hashes.json", _source_hashes(program))
+            _write_json(output / "source-hashes.json", source_identity)
             headless_env = {
                 "PATH": dsh_env["PATH"], "HOME": str(host_home), "TMPDIR": str(tmp), "LANG": dsh_env["LANG"],
             }

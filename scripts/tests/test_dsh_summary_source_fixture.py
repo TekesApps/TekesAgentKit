@@ -127,3 +127,57 @@ class DshSummarySourceFixtureTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class FrozenRunnerSourceIdentity(unittest.TestCase):
+    def test_archive_identity_needs_no_git_and_rejects_changed_product_source(self):
+        import hashlib
+        import importlib.util
+        import json
+        import tempfile
+        from unittest import mock
+        spec = importlib.util.spec_from_file_location('dsh_frozen_runner',
+            Path(__file__).resolve().parents[1] / 'test-real-dsh-summary-source.py')
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            files = {'Cargo.toml': b'workspace', 'Cargo.lock': b'locked',
+                     'crates/headless/src/main.rs': b'frozen product input'}
+            for name, content in files.items():
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(content)
+            program = root / 'existing-program'
+            program.write_bytes(b'already built, never executed by this test')
+            manifest = root / 'frozen.json'
+            manifest.write_text(json.dumps({'head': '5' * 40, 'files': {
+                name: hashlib.sha256(content).hexdigest() for name, content in files.items()}}))
+            with mock.patch.object(module, 'ROOT', root), mock.patch.object(
+                    module.subprocess, 'run', side_effect=AssertionError('must not consult live Git')):
+                identity = module._source_hashes(program, manifest)
+                self.assertEqual(identity['gitRevision'], '5' * 40)
+                self.assertEqual(identity['identity']['kind'], 'frozen-manifest')
+                (root / 'crates/headless/src/main.rs').write_bytes(b'changed')
+                with self.assertRaisesRegex(ValueError, 'product input changed'):
+                    module._source_hashes(program, manifest)
+
+    def test_frozen_manifest_rejects_escape_paths_before_reading_them(self):
+        import importlib.util
+        import json
+        import tempfile
+        from unittest import mock
+        spec = importlib.util.spec_from_file_location('dsh_frozen_paths',
+            Path(__file__).resolve().parents[1] / 'test-real-dsh-summary-source.py')
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            program = root / 'program'
+            program.write_bytes(b'fixture')
+            manifest = root / 'manifest.json'
+            manifest.write_text(json.dumps({'head': '5' * 40, 'files': {
+                '../outside': '0' * 64, 'Cargo.toml': '0' * 64, 'Cargo.lock': '0' * 64,
+                'crates/headless/src/main.rs': '0' * 64}}))
+            with mock.patch.object(module, 'ROOT', root):
+                with self.assertRaisesRegex(ValueError, 'unsafe frozen source path'):
+                    module._source_hashes(program, manifest)

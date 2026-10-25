@@ -82,3 +82,14 @@ artifact `12604852934` records strict nested reading `accepted=false`,
 `detailVisibleAfterAppend=false`. This confirms the existing TekesUI #53 reading
 intent failure; the subsequent demo build was skipped. Local evidence is retained
 under `stage-close-20261025/ci-cfecb95-ui-inputs/`. No gate was disabled or weakened.
+
+### 2026-10-26 blocking fix #67
+
+DSH family reached the original completed child Summary, then real reconnect
+failed with `unknown DSH projection authority`. Fixed public DSH distinguishes
+cached listing hints from live sequenced cuts. #67 is the one added implementation
+bug ticket under existing requirements; it is not a new feature or test ticket.
+Its patch is under targeted compile/protocol verification. Native cancellation
+has separately passed with original journal identity and normal owned exits;
+older failed fixture attempts remain preserved. Do not promote these old program
+receipts to a subsequent #67 binary without an explicit affected-input review.

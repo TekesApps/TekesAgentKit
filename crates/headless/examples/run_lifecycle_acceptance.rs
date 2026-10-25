@@ -184,6 +184,19 @@ mod acceptance {
             runtime,
             |snapshot, store| {
                 snapshot.run.as_ref().is_some_and(|run| run.can_cancel)
+                    && snapshot
+                        .submissions
+                        .iter()
+                        .any(|submission| submission.id == ticket_id && submission.reconciled)
+                    && snapshot.transcript.items.iter().any(|item| {
+                        item.reconciliation_id.as_deref() == Some(ticket_id.as_str())
+                            && !item.is_provisional
+                            && snapshot.transcript.turns.iter().any(|turn| {
+                                turn.id == item.turn_id
+                                    && turn.input == prompt
+                                    && turn.status == "running"
+                            })
+                    })
                     && store
                         .sessions
                         .get(&scope.session_id)
