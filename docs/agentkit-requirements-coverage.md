@@ -10,7 +10,7 @@
 
 #60–#66已同步到本索引与机器索引，全部为**后续待办**，不自动进入本阶段；完整Epic仍须满足其原始验收标准。#36新增跨格式恢复、#40悬停预览、#46未注册宿主适配保留WIP并冻结，不继续扩展。
 
-当前 `5b7c843` root/UI格式、Clippy、测试、opt-in witness及独立公开API consumer均通过；UI CI在严格嵌套阅读检查失败（TekesUI #53），整体不能合入。Native queue另受Kernel #86真实失败阻塞。Native warm3仅验证该精确程序的有界子历史与passive Summary，不证明正式Task/父工具失败、冷启动或完整三端Family。#55/#56仍未完成。
+当前 `5b7c843` root/UI格式、Clippy、测试、opt-in witness及独立公开API consumer均通过；UI CI在严格嵌套阅读检查失败（TekesUI #53），整体不能合入。Native queue另受Kernel #86真实失败阻塞。Native warm3仍仅证明有界子历史与passive Summary；新增原父Task审批拒绝失败与Pi primary-child transition来源窄见证已通过。Pi取消和Unknown原ticket自动对账已按独立新程序验收，均不升级为完整三端Family/Run或性能通过。详见[阶段结果](agentkit-stage-protocol-results-20261025.json)。#55/#56仍未完成。
 
 ## 边界与证据基线
 

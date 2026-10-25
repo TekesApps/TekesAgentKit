@@ -27,7 +27,7 @@
 | 重连与源退休 | 适用 | 适用，不自动重发不确定提交 | 适用 |
 | 临时SideChat fork/discard | 原生普通/临时fork、discard适用 | 原生clone/entry-fork及临时discard适用 | 仅普通fork；正式temporary fork/discard明确Unsupported，保留禁用路径验证 |
 | 子代理 | 原生catalog和只读bounded history；bounded child控制不具能力 | 公开create/list/prompt/read/cancel | 公开projection catalog、父拥有prompt/cancel和child history |
-| Task/Summary来源 | passive tool来源已有窄见证；正式Task/父raw result失败尚未验收，不能据子错误判父失败 | 不伪造journal/task/job；实际合法producer与passive来源分别核验 | 实际公开producer和原source分别核验；不能从工具文本猜family |
+| Task/Summary来源 | passive tool来源及原父 Task approval denial raw call/result窄见证已通过；不是全family通过，不能据子错误判父失败 | 不伪造journal/task/job；实际合法producer与passive来源分别核验 | 实际公开producer和原source分别核验；不能从工具文本猜family |
 
 ## 非桌面性能门槛
 
@@ -73,3 +73,32 @@ transactional freshness is unproven; full #56, performance and desktop remain
 unaccepted. Failed prior attempts are retained. v4's provider metadata overwrote
 the follow-up marker-presence flag; v5 corrects the recorder and is authoritative.
 This changes acceptance tooling only, not frozen product behavior or gate scope.
+
+## Pi Run lifecycle — 2026-10-26 bounded completion
+
+`pi-cancel-v3` and `pi-unknown-v1` use frozen product source `5b7c843` plus the
+opt-in headless acceptance example SHA
+`84608c2ab363c436a36b6efc367bba12baa921089fdc9edd63260466b3196678`.
+Pi 1.3.0/Node24.20.0 entry/package/Node hashes match the frozen identities. The
+old fixture's `node_modules` symlink is dangling; the new explicit fixed installed
+root and before/after hashes are recorded without editing that old fixture or
+installing/upgrading anything. A complete old dependency-closure manifest was not
+available; no old acceptance is promoted across this path rebinding.
+
+- Cancel: one provider-held stream, original public Run aborted and matching raw
+  run UUID started→settled(aborted), original receipt/user source, preserved draft.
+- Unknown: original internal RPC deadline, original ticket unknown/unreconciled,
+  same connection's buffered returns released, original rpcId/hash/timestamp/user
+  source-position auto-reconciliation, one provider mutation, no second dispatch
+  or manual acknowledgement. This is not server idempotency/freshness proof.
+- Both consumers exit0, owned process groups absent, provider server/handlers
+  stopped before acceptance. Independent read-only review found no blocking
+  integrity issue. Later stricter source-position/unique-user checks also pass by
+  replaying retained original captures; no unnecessary protocol rerun.
+- A preflight dangling-link failure and JSON-encoded-signal fixture failure remain
+  negative evidence; they are not product regressions. Signal files now use the
+  exact raw-byte consumer/wrapper contract. Evidence persistence now fails closed.
+
+Only these two Pi cells are accepted. Other endpoints' lifecycle slices, mixed
+tool/reasoning coverage, DSH family and the frozen performance profile remain open;
+#55/#56 are not closed. No desktop, physical IME or AX run occurred.

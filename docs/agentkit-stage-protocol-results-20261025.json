@@ -176,5 +176,65 @@
       "performance",
       "complete-three-end-family"
     ]
+  },
+  "ciCfecb95": {
+    "head": "cfecb95acb667b296c6cf4c63ca363da559f4e06",
+    "run": 40207891571,
+    "headless": "success",
+    "ui": "failure",
+    "nativeApprovalConsumer": "success",
+    "standaloneConsumer": "success",
+    "strictNestedReading": {
+      "accepted": false,
+      "parentFollowingAfterInnerUp": true,
+      "parentOffsetBefore": 0,
+      "parentOffsetAfterScroll": 0,
+      "parentOffsetAfterAppend": 634,
+      "innerOffset": 100,
+      "detailVisibleAfterAppend": false
+    },
+    "receiptRoot": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/ci-cfecb95-ui-inputs",
+    "laterDemoBuild": "skipped",
+    "gateWaived": false
+  },
+  "piRunLifecycle": {
+    "result": "accepted-two-bounded-flows",
+    "baseSource": "5b7c84361206b45ac381b10437097d3b76c322c1",
+    "programSha256": "84608c2ab363c436a36b6efc367bba12baa921089fdc9edd63260466b3196678",
+    "buildInputs": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/run-lifecycle-build-inputs-v3.json",
+    "runtime": "Pi1.3.0 / Node24.20.0",
+    "runtimePathRebind": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/pi-runtime-path-rebind-before.json",
+    "runtimeHashesUnchangedAfter": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/pi-runtime-path-rebind-after.json",
+    "cancelReceipt": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/pi-cancel-v3/acceptance.json",
+    "unknownReceipt": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/pi-unknown-v1/acceptance.json",
+    "strictValidatorReplay": [
+      "pi-cancel-v3/strict-validator-replay.json",
+      "pi-unknown-v1/strict-validator-replay.json"
+    ],
+    "scope": [
+      "one held original Run cancelled with raw matching started/settled aborted and draft preserved",
+      "one original submission Unknown then automatically reconciled on same connection via exact public input receipt, no retry"
+    ],
+    "providerBusinessRequestsPerFlow": 1,
+    "consumerExitStatusPerFlow": 0,
+    "ownedProcessGroupsAbsent": true,
+    "providerHandlersStopped": true,
+    "independentReadonlyReview": "no blocking integrity bug; evidence IO fail-closed fixed and exact raw-user source position strengthened after runs, retained captures pass stricter replay",
+    "toolingNotProductFailuresRetained": [
+      "pi-cancel-v1.log missing stale fixture target before launch",
+      "pi-cancel-v2 raw signal serialized as JSON; process/provider retired"
+    ],
+    "desktop": false,
+    "physicalIME": false,
+    "AX": false,
+    "performance": "not_run",
+    "completeIssue55": false
+  },
+  "cacheCleanupPiLifecycle": {
+    "receipt": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/pi-lifecycle-cache-cleanup.json",
+    "removedAllocatedBytes": 8564736,
+    "observedAvailableBytesDelta": 8966144,
+    "deltaMayIncludeOtherTasks": true,
+    "scope": "three retired owned-home Node compile caches only; shared Cargo target retained"
   }
 }

@@ -25,9 +25,9 @@
 | --- | --- | --- |
 | #12/#13/#29、#33/#34/#38/#41–#44 | 原版本证据已归档；仍 OPEN、未进入 main | 按各票标准审查，确认本次包含的代码/适用验证；不能根 workspace 合入就关闭 UI 能力 |
 | #35/#36/#37/#40/#45 | 冻结提交包含部分实现，不证明整票完成 | 仅收口已有实现和受影响验收；新差异后续处理 |
-| #55 Run | 5b headless CI通过；旧 Pi/DSH 通过绑定旧程序 | Pi/DSH mixed队列/历史/重连定向回归已通过，首次DSH启动超时保留；取消等未覆盖单项继续未验收；Native queue 保留真实失败 |
-| #56 session/family | 5b warm3证明 Native 两页子历史及 passive Summary doing→done；不是正式 Task/parent failure | 检查适用 family producer、pointer/恢复与性能的剩余证据，不扩大 warm3 结论 |
-| #58 集成 | 5b push 40153612936 / PR 40153615740：root及UI fmt/Clippy/tests、opt-in witness、独立公开API consumer均通过；严格nested detail reading失败；无 formal approval | 保留必需检查；评估独立闭包与旧 main UI 源码消费兼容 |
+| #55 Run | 5b headless CI通过；旧 Pi/DSH 通过绑定旧程序 | Pi/DSH mixed队列/历史/重连，以及Pi取消/Unknown原ticket自动对账窄通过；其余端取消、混合工具推理/性能仍有缺口；Native queue保留Kernel86真实失败 |
+| #56 session/family | Native 两页子历史/passive Summary及 v5 原父 Task 审批拒绝失败通过；Pi primary child running→failed/history/reconnect窄证据通过 | DSH family、适用剩余来源/父草稿/源退休和性能仍未全部验收；不扩大原收据范围 |
+| #58 集成 | cfecb95 PR CI 40207891571：root与UI常规检查、child witness、新Native approval consumer、独立公开consumer通过；严格nested detail reading失败，后续demo build跳过；无formal approval | 保留TekesUI #53必需门禁和协议范围阻塞；不能据局部通过合并/发布 |
 | #59 发布 | 待办，尚无本阶段新 tag | 精确集成 head、main CI 与范围文档通过后发布 |
 
 ## 真实阻塞、等待和后续范围
@@ -55,7 +55,7 @@
 
 PR head `30494699f199259abfddfe4621a4e828d620f415` CI run `40157167303` completed: root checks and UI/public-consumer checks passed through the standalone consumer; the mandatory strict nested detail reading step failed on the published TekesUI input. The later demo build step was skipped, so this run does not prove it. No merge/release gate was waived.
 
-Pi primary child running→failed/history/reconnect leaf evidence is now available, with the combined DSH run still failed at readiness. Native approval-denial parent failure validation is being compiled as an opt-in offscreen public consumer; it is not yet accepted. The matrix and result JSON retain separate negative evidence and unrun performance scope. Source remains `5b7c843`; these additions validate existing behavior and do not expand product scope.
+Pi primary child running→failed/history/reconnect leaf evidence is now available, with the combined DSH run still failed at readiness. Native approval-denial parent failure validation subsequently passed as an opt-in offscreen public consumer (v5 receipt below). The matrix and result JSON retain separate negative evidence and unrun performance scope. Source remains `5b7c843`; these additions validate existing behavior and do not expand product scope.
 
 
 ### Native approval-denied parent Task (bounded acceptance)
@@ -72,3 +72,13 @@ transactional freshness is unproven; full #56, performance and desktop remain
 unaccepted. Failed prior attempts are retained. v4's provider metadata overwrote
 the follow-up marker-presence flag; v5 corrects the recorder and is authoritative.
 This changes acceptance tooling only, not frozen product behavior or gate scope.
+
+### cfecb95 CI terminal evidence
+
+CI `40207891571` completed with headless success and UI failure. The new Native
+approval consumer and standalone public API consumer both passed. Downloaded
+artifact `12604852934` records strict nested reading `accepted=false`,
+`parentFollowingAfterInnerUp=true`, parent append offset `0→634`, and
+`detailVisibleAfterAppend=false`. This confirms the existing TekesUI #53 reading
+intent failure; the subsequent demo build was skipped. Local evidence is retained
+under `stage-close-20261025/ci-cfecb95-ui-inputs/`. No gate was disabled or weakened.

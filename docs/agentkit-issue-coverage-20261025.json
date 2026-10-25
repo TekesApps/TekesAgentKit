@@ -1478,7 +1478,8 @@
       ],
       "owner": "qf0421",
       "number": 55,
-      "stage": "existing-backlog"
+      "stage": "existing-backlog",
+      "stageEvidence": "5b Pi mixed direct/queue/history/reconnect plus cancel and Unknown exact receipt auto-reconciliation accepted narrow; Native busy queue remains Kernel86 failure, remaining mixed tool/reasoning/other endpoints/performance not complete. Full source/program/runtime receipts in stage protocol results."
     },
     {
       "key": "PROTO-FAMILY",
@@ -1902,6 +1903,15 @@
       "issue": 56,
       "scope": "Native approval-denied parent Task + Pi primary child transition/history/reconnect",
       "resultFile": "agentkit-stage-protocol-results-20261025.json",
+      "completeIssue": false,
+      "merged": false
+    },
+    "latestRunAcceptance": {
+      "issue": 55,
+      "result": "Pi cancel + Unknown/automatic-reconciliation accepted narrow",
+      "source": "5b7c843",
+      "programSha256": "84608c2ab363c436a36b6efc367bba12baa921089fdc9edd63260466b3196678",
+      "results": "agentkit-stage-protocol-results-20261025.json",
       "completeIssue": false,
       "merged": false
     }
