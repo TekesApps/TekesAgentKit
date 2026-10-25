@@ -2104,6 +2104,20 @@
       "desktopRuns": 0,
       "pythonToolTests": 481,
       "pythonLogSha256": "99dfce589f179b3f0f20e65ebc7d1284405243ff81f0bd032e5d1589b020c394"
+    },
+    "sourceConvergenceSupplement20261026": {
+      "binding": "evidence-bindings-20261026/reconnect-source-official-cohort.json",
+      "observerCommit": "e01a23b3ad53cb2666f52446ca10eeaa2fe9ba10",
+      "plannedCases": 4,
+      "executedCases": 4,
+      "passedSourceCases": 2,
+      "failedSourceCases": 2,
+      "original40CasesPreserved": true,
+      "pi": "all11 source recovery rounds passed per role; page20 scope0 relative p95 ratio1.265616 failed",
+      "dsh": "init success then first measured round before runtime-to-fresh-source convergence timeout; predicate detail not captured; attribution pending",
+      "performanceAccepted": false,
+      "protocolReruns": 0,
+      "productChanges": false
     }
   },
   "stageCoverageAudit": {

@@ -1,0 +1,289 @@
+{
+  "scope": "ordinary Pi/DSH reconnectLifecycle supplemental cohort only; not full stage acceptance",
+  "plan": {
+    "path": "reconnect-source-official-plan-v1.json",
+    "sha256": "8608f83099a94a739a7c0ee753d39d83e6194ba3871e60d5062fd38e396245a4"
+  },
+  "plannedCases": 4,
+  "executedCases": 4,
+  "sourceContractPassedCases": 2,
+  "sourceContractFailedCases": 2,
+  "original40CasesPreserved": true,
+  "protocolReruns": 0,
+  "sameNewObserver": "e01a23b",
+  "programBinding": "reconnect-source-observer-programs.json",
+  "batch": {
+    "path": "reconnect-source-official-batch-v1.json",
+    "sha256": "dabb566b2f5d9a484992cf583b0c6f7c5861191de96b3ec2ac23df9ec31a3b4a"
+  },
+  "report": {
+    "path": "reconnect-source-official-report-v1.json",
+    "sha256": "765c67964933ca502a9eee5de316661698a01150848c735fd51900a701567c35"
+  },
+  "cases": [
+    {
+      "endpoint": "pi",
+      "role": "baseline",
+      "status": "success",
+      "registrationSha256": "42026e9d754dd0a9f7f13e1be53f9fc71930fb1d824afa054b27400c89169950",
+      "sample": {
+        "path": "performance/reconnect-source-v1-pi-baseline-lifecycle-0/official-sample-offline-v2.json",
+        "sha256": "5394c183363279d8b6fd42c5209e9ad9687e442af36ff5faa64cf7da0ebb4f28"
+      },
+      "rawEvents": {
+        "path": "performance/reconnect-source-v1-pi-baseline-lifecycle-0/consumer.stdout.jsonl",
+        "sha256": "799e75177787f7b69856e32faf6b6c06084b4fa6088817c1d77640ba506d2765"
+      },
+      "executionReceipt": {
+        "path": "performance/reconnect-source-v1-pi-baseline-lifecycle-0/official-execution-receipt.json",
+        "sha256": "90e9a9b5ecea00be52080bfe2d42368a37dc67c81de772bdf71e65d9cf9d64fd"
+      },
+      "consumerExit": {
+        "path": "performance/reconnect-source-v1-pi-baseline-lifecycle-0/consumer-exit.json",
+        "sha256": "a97a7f0f72d27960b5813a5e4ad625ca97d8787bcb65adec0ef60398da7bcb13"
+      },
+      "reconnectSuccessCount": 11,
+      "reconnectErrors": [],
+      "originalMaterializerError": {
+        "path": "performance/reconnect-source-v1-pi-baseline-lifecycle-0/official-sample-materialization-error.json",
+        "sha256": "5a8f298531d565eb8a905211437f70daaedee97bdf2e0f954c649dc258600eb6"
+      },
+      "offlineOnly": true,
+      "protocolRerun": false
+    },
+    {
+      "endpoint": "pi",
+      "role": "candidate",
+      "status": "success",
+      "registrationSha256": "722007302a3562f5e5ac13750c361cf3bf357bc064bec0264b920b66168d4dde",
+      "sample": {
+        "path": "performance/reconnect-source-v1-pi-candidate-lifecycle-0/official-sample-offline-v2.json",
+        "sha256": "c5e23d4566d3d681f1ff78c9c42a8dd7c7623499119e9f1181bbd041165a5723"
+      },
+      "rawEvents": {
+        "path": "performance/reconnect-source-v1-pi-candidate-lifecycle-0/consumer.stdout.jsonl",
+        "sha256": "6eefb1684b690cb9b8d906dfabe9f893f64405999241db33439b83eabdf7dde1"
+      },
+      "executionReceipt": {
+        "path": "performance/reconnect-source-v1-pi-candidate-lifecycle-0/official-execution-receipt.json",
+        "sha256": "35504cd199fe56b73634701551820b37aac351f73c5e3f34faeee72e239de4e3"
+      },
+      "consumerExit": {
+        "path": "performance/reconnect-source-v1-pi-candidate-lifecycle-0/consumer-exit.json",
+        "sha256": "6f1f470eeb8fb8b21ff060a59b116b94d60f5befdf8789fc8990ca77ed3bf1f2"
+      },
+      "reconnectSuccessCount": 11,
+      "reconnectErrors": [],
+      "originalMaterializerError": {
+        "path": "performance/reconnect-source-v1-pi-candidate-lifecycle-0/official-sample-materialization-error.json",
+        "sha256": "f94d705d431283af314089cb2a4848ee54f6a0f34e40ba8a17ad119dbf65d909"
+      },
+      "offlineOnly": true,
+      "protocolRerun": false
+    },
+    {
+      "endpoint": "dsh",
+      "role": "baseline",
+      "status": "failed",
+      "registrationSha256": "8afdf645bb4c6011cc83f79fac453a58dbec2c5af2aecf11448263f721dbb8ff",
+      "sample": {
+        "path": "performance/reconnect-source-v1-dsh-baseline-lifecycle-0/official-sample.json",
+        "sha256": "f1e16c54449160b6d4a2a0b35ba110e91b13b5ceddfd27c13d77671472624bc7"
+      },
+      "rawEvents": {
+        "path": "performance/reconnect-source-v1-dsh-baseline-lifecycle-0/consumer.stdout.jsonl",
+        "sha256": "8ed5d9f37e82d6712c49922618e1e23ff91804cf4ab7174d62bca901087c7dbe"
+      },
+      "executionReceipt": {
+        "path": "performance/reconnect-source-v1-dsh-baseline-lifecycle-0/official-execution-receipt.json",
+        "sha256": "4d06b35cf0a02421d2ad01e3246292f8391e0d706a9f6bc34ff3d88767056f17"
+      },
+      "consumerExit": {
+        "path": "performance/reconnect-source-v1-dsh-baseline-lifecycle-0/consumer-exit.json",
+        "sha256": "c90b31e6db1e015fdea18769c4afa31977982c963f47b2548cdbadcd29193cb6"
+      },
+      "reconnectSuccessCount": 1,
+      "reconnectErrors": [
+        {
+          "error": "request timed out; reconcile before retrying mutations",
+          "event": "reconnect",
+          "iteration": 1,
+          "status": "failed"
+        }
+      ],
+      "lastFreshWitnessPhase": "before_reconnect",
+      "lastFreshWitnessScope": {
+        "endpointId": "dsh",
+        "sessionId": "session-dc8a2c7d-83f8-44be-8a70-5bee3831af85",
+        "threadId": "session-dc8a2c7d-83f8-44be-8a70-5bee3831af85"
+      },
+      "sourceWaitPredicateDetailsNotCaptured": true
+    },
+    {
+      "endpoint": "dsh",
+      "role": "candidate",
+      "status": "failed",
+      "registrationSha256": "eacbb83a91259f6838ad08089e9087b1ca3b01f4e4f8f2847563055b048c85b3",
+      "sample": {
+        "path": "performance/reconnect-source-v1-dsh-candidate-lifecycle-0/official-sample.json",
+        "sha256": "477bac0c628e43e406dd2fd2725eff3234f155a103a4bbf0cd3ca2d66e44db70"
+      },
+      "rawEvents": {
+        "path": "performance/reconnect-source-v1-dsh-candidate-lifecycle-0/consumer.stdout.jsonl",
+        "sha256": "f3303909b96ea159ae16f8c71a6ec5c6c500eb359e679e3a2f5771da2494865c"
+      },
+      "executionReceipt": {
+        "path": "performance/reconnect-source-v1-dsh-candidate-lifecycle-0/official-execution-receipt.json",
+        "sha256": "6150593c307a836a2fb1c435c3aad12babe54e8ed49dfffe4b709087dc1e7dff"
+      },
+      "consumerExit": {
+        "path": "performance/reconnect-source-v1-dsh-candidate-lifecycle-0/consumer-exit.json",
+        "sha256": "307f17c8ae972f8e26c5ccb792fc6df1251c861d7d5250732ac3946132bb614e"
+      },
+      "reconnectSuccessCount": 1,
+      "reconnectErrors": [
+        {
+          "error": "request timed out; reconcile before retrying mutations",
+          "event": "reconnect",
+          "iteration": 1,
+          "status": "failed"
+        }
+      ],
+      "lastFreshWitnessPhase": "before_reconnect",
+      "lastFreshWitnessScope": {
+        "endpointId": "dsh",
+        "sessionId": "session-8812ffc8-602f-4149-b715-785377ef943d",
+        "threadId": "session-8812ffc8-602f-4149-b715-785377ef943d"
+      },
+      "sourceWaitPredicateDetailsNotCaptured": true
+    }
+  ],
+  "piCandidatePerSessionMetrics": {
+    "0": {
+      "sessionIds": [
+        "97375392-6d68-44c9-8694-e44d9ce14a4f"
+      ],
+      "firstUsableSnapshotMs": {
+        "count": 10,
+        "p50": 13.050834,
+        "p95": 17.999833,
+        "max": 17.999833,
+        "absoluteLimit": 10000,
+        "absoluteLimitStatistic": "p95",
+        "absoluteValue": 17.999833,
+        "absolutePass": true,
+        "baselineP95": 15.621375,
+        "baselineComparisonStatistic": "p95",
+        "regressionRatio": 1.152256635539445,
+        "regressionLimit": 1.2,
+        "regressionPass": true
+      },
+      "sendToFirstAssistantContentMs": {
+        "count": 10,
+        "p50": 55.267291,
+        "p95": 70.938542,
+        "max": 70.938542,
+        "absoluteLimit": 2000,
+        "absoluteLimitStatistic": "p95",
+        "absoluteValue": 70.938542,
+        "absolutePass": true,
+        "baselineP95": 109.123208,
+        "baselineComparisonStatistic": "p95",
+        "regressionRatio": 0.6500774977216578,
+        "regressionLimit": 1.2,
+        "regressionPass": true
+      },
+      "historyPage20ToProjectionMs": {
+        "count": 10,
+        "p50": 17.007917,
+        "p95": 20.52075,
+        "max": 20.52075,
+        "absoluteLimit": 1000,
+        "absoluteLimitStatistic": "p95",
+        "absoluteValue": 20.52075,
+        "absolutePass": true,
+        "baselineP95": 16.214041,
+        "baselineComparisonStatistic": "p95",
+        "regressionRatio": 1.2656160176232438,
+        "regressionLimit": 1.2,
+        "regressionPass": false
+      }
+    },
+    "1": {
+      "sessionIds": [
+        "25cbead4-6bea-4b86-bd75-f469fd8b7ae6"
+      ],
+      "firstUsableSnapshotMs": {
+        "count": 10,
+        "p50": 12.142333,
+        "p95": 14.665791,
+        "max": 14.665791,
+        "absoluteLimit": 10000,
+        "absoluteLimitStatistic": "p95",
+        "absoluteValue": 14.665791,
+        "absolutePass": true,
+        "baselineP95": 14.081709,
+        "baselineComparisonStatistic": "p95",
+        "regressionRatio": 1.0414780620732895,
+        "regressionLimit": 1.2,
+        "regressionPass": true
+      },
+      "sendToFirstAssistantContentMs": {
+        "count": 10,
+        "p50": 55.705417,
+        "p95": 66.119667,
+        "max": 66.119667,
+        "absoluteLimit": 2000,
+        "absoluteLimitStatistic": "p95",
+        "absoluteValue": 66.119667,
+        "absolutePass": true,
+        "baselineP95": 56.171083,
+        "baselineComparisonStatistic": "p95",
+        "regressionRatio": 1.1771121984598374,
+        "regressionLimit": 1.2,
+        "regressionPass": true
+      },
+      "historyPage20ToProjectionMs": {
+        "count": 10,
+        "p50": 16.228791,
+        "p95": 18.547584,
+        "max": 18.547584,
+        "absoluteLimit": 1000,
+        "absoluteLimitStatistic": "p95",
+        "absoluteValue": 18.547584,
+        "absolutePass": true,
+        "baselineP95": 15.764667,
+        "baselineComparisonStatistic": "p95",
+        "regressionRatio": 1.1765287525578563,
+        "regressionLimit": 1.2,
+        "regressionPass": true
+      }
+    }
+  },
+  "metricFailures": [
+    {
+      "role": "pi/candidate:reconnectLifecycle",
+      "metric": "historyPage20ToProjectionMs",
+      "absolutePass": true,
+      "regressionPass": false
+    }
+  ],
+  "performanceAccepted": false,
+  "notRun": [
+    "full family/attachment performance",
+    "desktop",
+    "physical IME",
+    "AX"
+  ],
+  "interpretation": "Pi source recovery passed in same original execution; report iteration association fixed offline; DSH runtime-to-fresh-source wait timed out, exact predicate component not retained, not attributable to product or upstream without further source evidence",
+  "dshSourceContractReview": {
+    "reference": "ClientKit c289bc9d33edcd83a782ac17927a8c65a027eccd",
+    "locations": [
+      "SessionEndpointRuntime.swift:456-482",
+      "SessionEndpointRuntime.swift:1160-1191",
+      "SessionEndpointRuntime.swift:3332-3379"
+    ],
+    "conclusion": "new observer v1 pre-disconnect runtime-wide catch-up requirement exceeds frozen ClientKit reconnect contract; no product data-loss conclusion",
+    "boundedCorrection": "before fresh source retained; record cache values/watermarks and reject newer-than-source; compare independent before/after complete source; after runtime convergence/full entries/summary/mtime rules unchanged; rerun only two affected DSH roles under newly registered observer cohort, no Pi/Native/warm rerun"
+  }
+}

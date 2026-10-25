@@ -45,3 +45,14 @@ Pi还须：
 [共同观察器程序绑定](evidence-bindings-20261026/reconnect-source-observer-programs.json)固定同版两文件overlay。baseline 10c630a4、candidate34c0707b只表示已编译/定向检查，不是生命周期或性能通过。新增source帧与每个stat bracket起止均在原事件流保留，缺来源先失败而非None相等；来源等待由公共subscription唤醒，整个follow/首帧有timeout，旧流在reconnect前释放。
 
 v3候选首次编译复用了之后生成的baseline相对dep-info，错误引用旧字段；原因是两角色提前一起准备mtime。已保留失败日志，源内容hash不变，仅在候选自身串行批次前刷新时间戳后通过。后续每个角色在进入自身批次前准备时间戳，不在另一个角色构建前预先准备。所有构建仍复用唯一SSD target，没有创建临时target。
+
+## v1实际执行后的契约纠正（拟v2，仅DSH）
+
+四case原结果见[补充绑定](evidence-bindings-20261026/reconnect-source-official-cohort.json)。Pi两角色11轮来源真实通过（仍有一个分页相对延迟失败），不重跑。DSH两角色均在首个测量轮scope0 before fresh cut469/196条记录之后、scope1 before之前超时，尚未执行该测量轮reconnect；未保存predicate细分，不能判产品缺陷。
+
+独立只读审查确认上述“断线前runtime所有值追齐首份fresh witness”是本观察器新加的过强前置，不在冻结ClientKit重连契约中：c289 SessionEndpointRuntime.swift:456–482取消旧任务并重新start；:1160–1191建立新的journal首帧恢复；:3332–3379独立启动control流，不在断线前逐项追平。因此拟v2只撤除这个额外前置，保留持久来源与恢复后标准：
+
+- before抓首份独立fresh follow，保留完整源帧；统一冻结并记录旧runtime的每个键/value/seq与完整history。旧seq高于fresh cut必须失败；缺失或滞后明示证据，不要求先追平，不能假装before已同步。
+- 两独立fresh before/after的cut、完整值/entries/窗口必须相等；重连后的完整runtime projections、旧seq不回退、完整entries及summary/time来源仍必须在原5s内达到after fresh来源。原pointer/成员/epoch/new generation/无重复与历史ID/内容/顺序标准不变。
+- 每次after等待无论成功/超时均记录原runtime完整快照与predicate细分，避免无法定位失败；不根据缺字段自动放宽。
+- 只为这两个受变更影响的DSH角色登记新case各执行一次；原四case、原40case与有效性能失败原样保留，不混算新旧观察器、不重跑Pi/Native/warm、不改预算。代码与验证尚未完成，不据本设计称DSH通过。

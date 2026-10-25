@@ -150,6 +150,24 @@ def _seed_proof(case: Path, ids: list[str], endpoint: str):
             "seedDigest": seed_digest}
 
 
+def _reconnects_by_original_round(events: list[dict]) -> dict[int, dict]:
+    """Bind original reconnect frames to their original iteration segment, without mutation."""
+    current = None
+    output = {}
+    for event in events:
+        if event.get("event") == "iteration_started":
+            current = event.get("iteration")
+            if type(current) is not int or current < 0:
+                raise ValueError("original iteration marker is invalid")
+        elif event.get("event") == "reconnect":
+            if current is None or current in output:
+                raise ValueError("reconnect lacks a unique original iteration segment")
+            if "iteration" in event and event["iteration"] != current:
+                raise ValueError("reconnect metadata contradicts original iteration marker")
+            output[current] = event
+    return output
+
+
 def _process_receipt(case: Path, endpoint: str, mode: str):
     consumer = _json(case / "consumer-exit.json")
     retirement = _json(case / "owned-process-retirement.json")
@@ -284,6 +302,7 @@ def _process_receipt(case: Path, endpoint: str, mode: str):
             by_round[round_index] = (pair, sets[0])
         lifecycle_boundaries = []
         retirements = []
+        reconnects_by_round = _reconnects_by_original_round(events)
         for round_index in range(1, 11):
             pair, new_set = by_round[round_index]
             previous_set = by_round[round_index - 1][1]
@@ -305,8 +324,7 @@ def _process_receipt(case: Path, endpoint: str, mode: str):
                 # Retain the complete original sidecar row so the reporter can
                 # independently resolve rawEventIndex, scope and process ids.
                 lifecycle_boundaries.append(dict(boundary, scopeSessionId=event["scope"]["sessionId"]))
-            reconnect = next((event for event in events if event.get("event") == "reconnect"
-                              and event.get("iteration") == round_index), None)
+            reconnect = reconnects_by_round.get(round_index)
             if not isinstance(reconnect, dict) or reconnect.get("converged") is not True:
                 raise ValueError("Pi lifecycle send was not preceded by same-round reconnect convergence")
             if events.index(reconnect) >= min(row["rawEventIndex"] for row in pair):

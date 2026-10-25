@@ -18,6 +18,18 @@ SPEC.loader.exec_module(runner)
 
 
 class OfficialSampleMaterializerTests(unittest.TestCase):
+    def test_reconnects_bind_to_original_round_without_inventing_iteration_field(self):
+        reconnect = {"event":"reconnect","converged":True}
+        events = [{"event":"iteration_started","iteration":1}, reconnect]
+        self.assertIs(runner._reconnects_by_original_round(events)[1], reconnect)
+        self.assertNotIn("iteration", reconnect)
+        for invalid in ([reconnect], events + [reconnect],
+                        [{"event":"iteration_started","iteration":1},
+                         {"event":"reconnect","iteration":2}],
+                        [{"event":"iteration_started","iteration":None}]):
+            with self.assertRaises(ValueError):
+                runner._reconnects_by_original_round(invalid)
+
     def test_saved_create_aliases_are_not_public_session_pointers(self):
         with tempfile.TemporaryDirectory() as temporary:
             case = Path(temporary)

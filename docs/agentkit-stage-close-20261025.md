@@ -210,3 +210,13 @@ PR10精确d23731d CI40230369803已结束：headless、独立consumer、child wit
 [Native线路诊断](evidence-bindings-20261026/native-wire-delay-diagnostic.json)单次冷启动在原样转发的loopback proxy记录ack→provider约154/182ms，provider fixture自身约1.66/0.31ms；50ms OS采样在两者之间首次见worker。只读源码未找到AgentKit固定轮询，Kernel路径有lazy worker/context/lease，尚不能归因特定缺陷；代理与采样不替代正式样本，不豁免相对延迟失败。
 
 PR10精确72a0d64 CI40233798349/40233792652终态为headless成功、UI失败；独立consumer通过，必需strict nested reading仍accepted=false（parentFollowingAfterInnerUp=true，append offset634，detailVisibleAfterAppend=false），demo build跳过，artifact12613329961保留。PR10仍draft，#55/#56/#58/#59未完成，不新增发布。全量Python验收工具检查481项通过（python312-cohort-diagnostics-final-v1.log）；本检查点没有Cargo或桌面/物理IME/AX执行，原9 WIP保持。
+
+### 来源收敛补充组：保留新结果与新失败
+
+共同observer e01a23b已按精确baseline f1/candidate102分别完成8项Rust定向检查、strict Clippy和构建，程序10c630a4/34c0707b。4case在执行前登记（plan SHA8608f830…），固定运行时/原预算，未重跑Native/warm，原40case保留；新组不混算旧observer时间。
+
+[补充正式绑定](evidence-bindings-20261026/reconnect-source-official-cohort.json)：Pi两角色初始化+10测量轮全部公开pointer/完整native entries、新generation、owned sessionFile稳定metadata与恢复summary时间来源通过。材料器最初错把reconnect缺少冗余iteration字段判为失败；现仅离线按原iteration_started区段关联，同份原始events/sidecar完整对账，原error保留，协议重跑0。Pi来源恢复通过不等于性能全过：scope0 Earlier20 p95 20.52075/16.214041ms=1.265616倍，超原1.2，其他该组逐scope延迟/绝对/RSS按原报告解释。
+
+DSH两角色初始化reconnect成功，首个测量轮before fresh witness等待runtime追齐超时；不改Unsupported、不换样本、不认定是产品/SDK缺陷。原事件只保存fresh witness，缺超时当刻每项runtime predicate状态，因此尚不能把失败归到keys/value/history/control_ready中的某项，也需核对before等待是否超出恢复契约。完整组尚未验收，等待只读归因，不无限扩大矩阵。
+
+本检查点四case各一次，原40与新4分开保存（累计44次物理正式执行，不把旧Pi两个not_run改写）；所有原有效相对失败保留。未完成Family/附件/队列性能、TekesUI53/Kernel86、review/CI/桌面/集成/发布仍各自保留。无产品代码变化、无Kernel/Swift/SDK修改、无桌面；原9WIP逐文件SHA保持，构建复用唯一SSD target。
