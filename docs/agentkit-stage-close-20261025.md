@@ -174,3 +174,9 @@ PR10已本地吸收main至1026372；冲突保留当前实现与main更强的50 c
 #67主线切片复核：main仍使用DSH旧Remote RPC/mux实现，缺当前分支queue/projection适配层；缓存hint隔离补丁依赖该闭包。现不能仿照#68直接移植少量文件，保持待集成与原真实协议门禁；不为交付跳过相关依赖或扩大重构。
 
 固定DSH0.2.1-rc.2的同一ordinary cold诊断随后也完成（程序a637ddb8）：公开种子/两会话各100条正文与10个工具组、page20、原50窗口分页、重连、close/open和发送终态，owned进程退休均通过。`ordinary-diagnostic-main69.json` 追加DSH独立收据摘要；它不替代DSH家族或正式配对性能。旧失败不改写，正式样本仍0。
+
+### Native 有限family seed单次pilot
+
+固定18d8f643 headless（product98b）和Kernel0.9.3正常完成原Task与一个bounded child。61条1024-byte commentary/61个真实read组与normal final均来自公开history，runOpen=false；公开initial max20 + 一个实际Earlier20，共两页，原始记录309+1，联合内容/顺序与完整groundtruth310条逐项相等。Kernel与三次CLI退出0，owned census无残留。不是每页20条原始record，也未为第二页增长或重跑seed。原runner把委托父provider请求计为providerRequests，字段仅覆盖父请求，已在当前工具明确命名；原收据不改写。详见native-family-seed-diagnostic.json。
+
+本次只确认正常终止与有限两页数据形态，尚未进行cold恢复/paired latency/RSS预算；正式样本0，#56不关闭。原helper和新runner是验收工具，不是产品功能扩展；不改SDK，不启动桌面。

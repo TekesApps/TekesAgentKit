@@ -1,6 +1,6 @@
 # AgentKit 阶段协议验收矩阵（2026-10-25）
 
-本矩阵只覆盖收口阶段的 #55 Run 和 #56 session/history/family 协议验收。交付候选固定为 AgentKit `5b7c84361206b45ac381b10437097d3b76c322c1`；行为参照 ClientKit `c289bc9d33edcd83a782ac17927a8c65a027eccd`；UI 消费 pin 为 TekesUI `50ec49f3446924fdbc66b3cff22cd8cfe150fe7c`。不纳入候选之后的 dirty WIP、桌面/物理 IME/OS AX 或 #60–#66。固定运行时和二进制身份见[协议证据审计](agentkit-stage-protocol-evidence-audit-20261025.md)。
+本矩阵只覆盖收口阶段的 #55 Run 和 #56 session/history/family 协议验收。范围基线固定为 AgentKit `5b7c84361206b45ac381b10437097d3b76c322c1`，后续仅#67/#68阻断修复；精确程序结果分别绑定，不自动转授；行为参照 ClientKit `c289bc9d33edcd83a782ac17927a8c65a027eccd`；UI 消费 pin 为 TekesUI `50ec49f3446924fdbc66b3cff22cd8cfe150fe7c`。不纳入候选之后的 dirty WIP、桌面/物理 IME/OS AX 或 #60–#66。固定运行时和二进制身份见[协议证据审计](agentkit-stage-protocol-evidence-audit-20261025.md)。
 
 所有可复用证据必须同时匹配源码影响面、程序 SHA、运行时身份及该行的行为断言。不能匹配时只重跑该行；不得把旧提交的通过转授给 5b。失败、未运行和无能力是不同结果。`Unsupported` 仅用于固定运行时公开契约明示不支持且随收据保存契约依据的原子能力；Kernel 0.9.3 busy queue 明确属于受支持而失败，不能改列 Unsupported。
 
@@ -106,3 +106,6 @@ tool/reasoning coverage, DSH family and the frozen performance profile remain op
 ### 2026-10-26 用量与实际子pane补验（仍非整票通过）
 
 Native/Pi/DSH原工具/推理控件与Pi/DSH实际child pane分页/host重连见已提交mixed-tools.json和child-pane-recovery.json；新usage-source.json绑定product4274/UI53f97f35的同次公开typed/raw来源：Native numeric transient20→final60，DSH durable-paired live20→final60（无numeric transient），Pi当前3条durable output60且reported/live按契约缺失。所有历史负结果保持原身份。Kernel86、完整适用Family和正式性能仍未验收。性能pilot中的计数/续传/结构化read识别修复均为验收工具修复；不改变20条公开消息请求、cold5/warm10或任何预算，官方样本仍0。
+
+
+当前窄交付：#68经PR69进入main1dcc521并关闭（main CI40227909675成功）；#67仍待集成。Pi/DSH ordinary cold及Native正常终止两页family seed单次诊断已补，详见结果JSON的finiteDiagnosticProgress20261026。原raw负证据保留；正式配对性能样本仍0，#55/#56未完成，UI/Kernel阻塞不变。
