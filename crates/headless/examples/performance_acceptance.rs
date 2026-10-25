@@ -19,6 +19,10 @@ use tekes_agent_endpoint_pi::{PiConfiguration, PiConnector};
 use tekes_agent_presentation::{ComposerDestination, ComposerDraft, RunController, RunScope};
 use tekes_agent_session::{MemoryProjectionStore, SessionRuntime};
 
+#[path = "support/reconnect_source.rs"]
+mod reconnect_source;
+use reconnect_source::{DshSourceWitness, PiFileObservation};
+
 fn origin() -> &'static Instant {
     static ORIGIN: OnceLock<Instant> = OnceLock::new();
     ORIGIN.get_or_init(Instant::now)
@@ -772,10 +776,116 @@ async fn reconnect_sample(
     connector: &ObservedConnector,
     controller: &RunController,
     scopes: &[RunScope],
+    connector_kind: &str,
+    config: &Value,
 ) -> Result<Value> {
     let intent_ns = monotonic_ns();
-    let old = runtime.snapshot();
+    let mut old = runtime.snapshot();
     let old_epoch = old.connection_epoch;
+    let require_adapter_queue = if connector_kind == "dsh" {
+        match config.get("observerProductSource").and_then(Value::as_str) {
+            Some("f1daa0ffcf6ced41e21f351e22845455ca78006c") => false,
+            Some("10263722b5fb128922c49a31b5942c41333cd6e2") => true,
+            _ => {
+                return Err(Error::Protocol(
+                    "DSH observer requires a registered exact baseline/candidate source".into(),
+                ));
+            }
+        }
+    } else {
+        false
+    };
+    let old_endpoint = connector.current()?;
+
+    let mut dsh_source_before = std::collections::BTreeMap::new();
+    let mut pi_file_before = std::collections::BTreeMap::new();
+    let source_started_ns = monotonic_ns();
+    if connector_kind == "dsh" {
+        for scope in scopes {
+            let witness = fresh_dsh_witness(
+                old_endpoint.as_ref(),
+                scope,
+                "before_reconnect",
+                require_adapter_queue,
+            )
+            .await?;
+            wait_for_dsh_runtime(runtime, scope, &witness, old_epoch, Duration::from_secs(5))
+                .await?;
+            dsh_source_before.insert(scope.session_id.clone(), witness);
+        }
+    } else if connector_kind == "pi" {
+        for scope in scopes {
+            let before = old
+                .sessions
+                .get(&scope.session_id)
+                .ok_or_else(|| Error::Protocol("Pi pre-reconnect session is missing".into()))?;
+            let conversation = before.native_conversation.as_ref().ok_or_else(|| {
+                Error::Protocol("Pi pre-reconnect native conversation is missing".into())
+            })?;
+            require(
+                conversation
+                    .state
+                    .get("sessionId")
+                    .and_then(Value::as_str)
+                    .is_some_and(|id| !id.is_empty()),
+                "Pi public state omitted native sessionId",
+            )?;
+            let path = conversation
+                .state
+                .get("sessionFile")
+                .and_then(Value::as_str)
+                .ok_or_else(|| Error::Protocol("Pi public state omitted sessionFile".into()))?;
+            let owned_root = pi_owned_evidence_root(config)?;
+            let first = PiFileObservation::capture(std::path::Path::new(path), &owned_root)?;
+            emit(
+                json!({"event":"reconnect_file_metadata","scope":scope,"phase":"before_reconnect","boundary":"start","observation":first.evidence()}),
+            );
+            let source_conversation =
+                fresh_pi_native_conversation(old_endpoint.as_ref(), scope, "before_reconnect")
+                    .await?;
+            require(
+                source_conversation.state["sessionFile"] == path,
+                "Pi fresh source changed sessionFile pointer",
+            )?;
+            require(
+                source_conversation.state["sessionId"] == conversation.state["sessionId"],
+                "Pi fresh source changed native session id",
+            )?;
+            require(
+                source_conversation.entries == conversation.entries,
+                "Pi fresh source differs from pre-reconnect native entries",
+            )?;
+            let second = PiFileObservation::capture(std::path::Path::new(path), &owned_root)?;
+            emit(
+                json!({"event":"reconnect_file_metadata","scope":scope,"phase":"before_reconnect","boundary":"end","observation":second.evidence()}),
+            );
+            require(
+                first == second,
+                "Pi session file changed during pre-reconnect source observation",
+            )?;
+            pi_file_before.insert(scope.session_id.clone(), first);
+        }
+    }
+    if connector_kind == "dsh" {
+        // Freeze the before state only after the first fixed witness has been reached.
+        old = runtime.snapshot();
+        require(
+            old.connection_epoch == old_epoch,
+            "DSH source freeze crossed connection epoch",
+        )?;
+        for scope in scopes {
+            let witness = &dsh_source_before[&scope.session_id];
+            let session = old
+                .sessions
+                .get(&scope.session_id)
+                .ok_or_else(|| Error::Protocol("DSH source freeze lost original session".into()))?;
+            require(
+                witness.matches_runtime_values(&session.projections, None)
+                    && runtime_journal_entries(session)? == witness.entries,
+                "DSH source changed before final before-state freeze",
+            )?;
+        }
+    }
     let mut old_pointers = Vec::new();
     for scope in scopes {
         old_pointers.push(json!({
@@ -784,7 +894,7 @@ async fn reconnect_sample(
             "history": old.sessions.get(&scope.session_id).map(|s| record_ids(scope, s)).unwrap_or_default(),
         }));
     }
-    let old_endpoint = connector.current()?;
+    let source_before_done_ns = monotonic_ns();
     runtime.reconnect().await?;
     let new_endpoint = connector.current()?;
     let endpoint_replaced = !Arc::ptr_eq(&old_endpoint, &new_endpoint);
@@ -793,13 +903,227 @@ async fn reconnect_sample(
     }
     let after = runtime.snapshot();
     let new_epoch = after.connection_epoch;
+    let source_after_started_ns = monotonic_ns();
     let mut converged = true;
     let mut pointers = Vec::new();
     for scope in scopes {
         let before = old.sessions.get(&scope.session_id);
+        let mut after = runtime.snapshot();
+        let mut source_after = None;
+        let mut pi_file_after = None;
+        let source_after_started_ns = monotonic_ns();
+        if connector_kind == "dsh" {
+            let witness = fresh_dsh_witness(
+                new_endpoint.as_ref(),
+                scope,
+                "after_reconnect",
+                require_adapter_queue,
+            )
+            .await?;
+            wait_for_dsh_runtime(runtime, scope, &witness, new_epoch, Duration::from_secs(5))
+                .await?;
+            after = runtime.snapshot();
+            source_after = Some(witness);
+        } else if connector_kind == "pi" {
+            let now = after
+                .sessions
+                .get(&scope.session_id)
+                .ok_or_else(|| Error::Protocol("Pi recovered session is missing".into()))?;
+            let conversation = now.native_conversation.as_ref().ok_or_else(|| {
+                Error::Protocol("Pi recovered native conversation is missing".into())
+            })?;
+            require(
+                conversation
+                    .state
+                    .get("sessionId")
+                    .and_then(Value::as_str)
+                    .is_some_and(|id| !id.is_empty()),
+                "Pi public state omitted native sessionId",
+            )?;
+            let path = conversation
+                .state
+                .get("sessionFile")
+                .and_then(Value::as_str)
+                .ok_or_else(|| {
+                    Error::Protocol("Pi recovered public state omitted sessionFile".into())
+                })?;
+            let owned_root = pi_owned_evidence_root(config)?;
+            let first = PiFileObservation::capture(std::path::Path::new(path), &owned_root)?;
+            emit(
+                json!({"event":"reconnect_file_metadata","scope":scope,"phase":"after_reconnect","boundary":"start","observation":first.evidence()}),
+            );
+            let source_conversation =
+                fresh_pi_native_conversation(new_endpoint.as_ref(), scope, "after_reconnect")
+                    .await?;
+            require(
+                source_conversation.state["sessionFile"] == path,
+                "Pi recovered fresh source changed sessionFile pointer",
+            )?;
+            require(
+                source_conversation.state["sessionId"] == conversation.state["sessionId"],
+                "Pi recovered fresh source changed native session id",
+            )?;
+            require(
+                source_conversation.entries == conversation.entries,
+                "Pi recovered fresh source differs from runtime native entries",
+            )?;
+            let second = PiFileObservation::capture(std::path::Path::new(path), &owned_root)?;
+            emit(
+                json!({"event":"reconnect_file_metadata","scope":scope,"phase":"after_reconnect","boundary":"end","observation":second.evidence()}),
+            );
+            require(
+                first == second,
+                "Pi session file changed during recovered source observation",
+            )?;
+            pi_file_after = Some(first);
+            after = runtime.snapshot();
+        }
         let now = after.sessions.get(&scope.session_id);
-        let same_inventory =
-            before.and_then(|s| s.summary.as_ref()) == now.and_then(|s| s.summary.as_ref());
+        let before_summary = before.and_then(|s| s.summary.as_ref());
+        let now_summary = now.and_then(|s| s.summary.as_ref());
+        let raw_summary_equal = before_summary == now_summary;
+        let (same_inventory, source_matches, source_evidence) = match connector_kind {
+            "native" => (raw_summary_equal, raw_summary_equal, Value::Null),
+            "pi" => {
+                let old_file = pi_file_before.get(&scope.session_id).ok_or_else(|| {
+                    Error::Protocol("Pi pre-reconnect file witness is missing".into())
+                })?;
+                let new_file = pi_file_after.as_ref().ok_or_else(|| {
+                    Error::Protocol("Pi recovered file witness is missing".into())
+                })?;
+                let old_conversation = before
+                    .and_then(|session| session.native_conversation.as_ref())
+                    .ok_or_else(|| {
+                        Error::Protocol("Pi pre-reconnect conversation is missing".into())
+                    })?;
+                let new_conversation = now
+                    .and_then(|session| session.native_conversation.as_ref())
+                    .ok_or_else(|| {
+                        Error::Protocol("Pi recovered conversation is missing".into())
+                    })?;
+                let entry_content_equal = old_conversation.entries == new_conversation.entries;
+                let same_file_location = old_file.canonical_path == new_file.canonical_path
+                    && old_conversation.state["sessionId"] == new_conversation.state["sessionId"];
+                let stable_summary = match (before_summary, now_summary) {
+                    (Some(before), Some(now)) => {
+                        reconnect_source::summaries_match_except_pi_updated_at(before, now)?
+                    }
+                    _ => false,
+                };
+                let exact_updated_at =
+                    now_summary
+                        .zip(pi_file_after.as_ref())
+                        .is_some_and(|(summary, file)| {
+                            reconnect_source::pi_summary_matches_file(summary, file)
+                        });
+                let pointer_fields_stable = old_conversation.state["sessionId"]
+                    == new_conversation.state["sessionId"]
+                    && old_conversation.state["sessionFile"]
+                        == new_conversation.state["sessionFile"];
+                let passed = stable_summary
+                    && exact_updated_at
+                    && pointer_fields_stable
+                    && same_file_location
+                    && entry_content_equal;
+                (
+                    passed,
+                    passed,
+                    json!({
+                        "oracleVersion":"pi-session-file-metadata-v1",
+                        "beforeFile":{"path":old_file.canonical_path,"device":old_file.device,"inode":old_file.inode,"bytes":old_file.bytes,"mtimeSeconds":old_file.modified_seconds,"mtimeNanos":old_file.modified_nanos},
+                        "afterFile":{"path":new_file.canonical_path,"device":new_file.device,"inode":new_file.inode,"bytes":new_file.bytes,"mtimeSeconds":new_file.modified_seconds,"mtimeNanos":new_file.modified_nanos},
+                        "nativeSessionIdUnchanged":old_conversation.state["sessionId"] == new_conversation.state["sessionId"],
+                        "sessionFileUnchanged":old_conversation.state["sessionFile"] == new_conversation.state["sessionFile"],
+                        "sameCanonicalSessionFileLocation":same_file_location,
+                        "fullNativeEntryContentAndOrderUnchanged":entry_content_equal,
+                        "fullEntriesBefore":old_conversation.entries,
+                        "fullEntriesAfter":new_conversation.entries,
+                        "summaryStableFieldsUnchanged":stable_summary,
+                        "beforeSummary":before_summary,
+                        "recoveredSummary":now_summary,
+                        "updatedAtMatchesExactStableFileMtime":exact_updated_at,
+                        "rawSummaryEqual":raw_summary_equal
+                    }),
+                )
+            }
+            "dsh" => {
+                let old_source = dsh_source_before.get(&scope.session_id).ok_or_else(|| {
+                    Error::Protocol("DSH pre-reconnect source witness is missing".into())
+                })?;
+                let new_source = source_after.as_ref().ok_or_else(|| {
+                    Error::Protocol("DSH recovered source witness is missing".into())
+                })?;
+                let old_entries = before
+                    .map(runtime_journal_entries)
+                    .transpose()?
+                    .unwrap_or_default();
+                let now_entries = now
+                    .map(runtime_journal_entries)
+                    .transpose()?
+                    .unwrap_or_default();
+                let source_same = old_source.matches_recovered_source(new_source);
+                let generation_changed = old_source.generation != new_source.generation;
+                let runtime_values_match = now.is_some_and(|session| {
+                    new_source.matches_runtime_values(
+                        &session.projections,
+                        before.map(|session| &session.projections),
+                    )
+                });
+                let summary_matches_source = match now_summary {
+                    Some(summary) => {
+                        reconnect_source::summary_matches_dsh_witness(summary, new_source)?
+                    }
+                    None => false,
+                };
+                let summary_projection_kind_is_sequenced = now_summary
+                    .and_then(|summary| summary["projections"]["kind"].as_str())
+                    == Some("sequenced");
+                let stable_summary = match (before_summary, now_summary) {
+                    (Some(before), Some(now)) => {
+                        reconnect_source::without_dynamic_summary_fields(before, true)?
+                            == reconnect_source::without_dynamic_summary_fields(now, true)?
+                    }
+                    _ => false,
+                };
+                let history_matches_source =
+                    old_entries == old_source.entries && now_entries == new_source.entries;
+                let history_unchanged = old_entries == now_entries;
+                let passed = source_same
+                    && generation_changed
+                    && runtime_values_match
+                    && summary_projection_kind_is_sequenced
+                    && summary_matches_source
+                    && stable_summary
+                    && history_matches_source
+                    && history_unchanged;
+                (
+                    passed,
+                    passed,
+                    json!({
+                        "oracleVersion":"dsh-fresh-session-journal-v1",
+                        "before":{"generation":old_source.generation,"throughSequence":old_source.through_sequence,"projections":{"asOfSeq":old_source.projections.as_of_seq,"values":old_source.projections.values},"entries":old_source.entries},
+                        "after":{"generation":new_source.generation,"throughSequence":new_source.through_sequence,"projections":{"asOfSeq":new_source.projections.as_of_seq,"values":new_source.projections.values},"entries":new_source.entries},
+                        "freshSourceUnchanged":source_same,
+                        "newSourceGeneration":new_source.generation,
+                        "sourceGenerationChanged":generation_changed,
+                        "runtimeCompleteProjectionValuesMatchFreshSource":runtime_values_match,
+                        "summaryProjectionAndUpdatedAtMatchFreshSource":summary_matches_source,
+                        "summaryProjectionKindIsSequenced":summary_projection_kind_is_sequenced,
+                        "summaryStableFieldsUnchanged":stable_summary,
+                        "beforeSummary":before_summary,
+                        "recoveredSummary":now_summary,
+                        "runtimeFullHistoryMatchesFreshSources":history_matches_source,
+                        "runtimeFullHistoryUnchanged":history_unchanged,
+                        "rawSummaryEqual":raw_summary_equal
+                    }),
+                )
+            }
+            _ => (
+                false,
+                false,
+                json!({"error":"unknown reconnect source contract"}),
+            ),
+        };
         let before_records = before.map(|s| record_ids(scope, s)).unwrap_or_default();
         let now_records = now.map(|s| record_ids(scope, s)).unwrap_or_default();
         let same_history_window = before_records == now_records;
@@ -811,6 +1135,11 @@ async fn reconnect_sample(
         };
         let strictly_ordered_history = ordered_records(&now_records);
         let usable = usable_snapshot(&after, &scope.session_id);
+        let source_after_completed_ns = monotonic_ns();
+        require(
+            after.connection_epoch == new_epoch,
+            "source observation crossed recovered connection epoch",
+        )?;
         converged &= usable
             && same_inventory
             && same_history_window
@@ -821,6 +1150,12 @@ async fn reconnect_sample(
             "originalPointer": scope.address(),
             "usable": usable,
             "sameInventory": same_inventory,
+            "rawSummaryEqual": raw_summary_equal,
+            "sourceMatches": source_matches,
+            "sourceObservationStartedMonotonicNs": source_after_started_ns,
+            "sourceObservationCompletedMonotonicNs": source_after_completed_ns,
+            "sourceObservationDurationNs": source_after_completed_ns.saturating_sub(source_after_started_ns),
+            "sourceEvidence": source_evidence,
             "sameHistoryWindow": same_history_window,
             "uniqueHistoryRecordIdentities": unique_history_records,
             "strictlyOrderedHistory": strictly_ordered_history,
@@ -843,8 +1178,137 @@ async fn reconnect_sample(
         "endpointGenerationReplaced": endpoint_replaced,
         "oldPointers": old_pointers,
         "pointers": pointers,
+        "sourceObservationStartedMonotonicNs": source_started_ns,
+        "sourceBeforeCompletedMonotonicNs": source_before_done_ns,
+        "sourceBeforeObservationDurationNs": source_before_done_ns.saturating_sub(source_started_ns),
+        "sourceAfterStartedMonotonicNs": source_after_started_ns,
         "error": if converged { Value::Null } else { json!("same-pointer inventory/history did not converge") }
     }))
+}
+
+async fn fresh_dsh_witness(
+    endpoint: &dyn SessionEndpoint,
+    scope: &RunScope,
+    phase: &str,
+    require_adapter_queue: bool,
+) -> Result<DshSourceWitness> {
+    tokio::time::timeout(Duration::from_secs(30), async {
+        let mut stream = endpoint
+            .follow(StreamTarget::SessionJournal {
+                address: JournalAddress {
+                    session_id: scope.session_id.clone(),
+                },
+                max_messages: 50,
+            })
+            .await?;
+        let frame = stream.next().await.ok_or(Error::Disconnected)??;
+        drop(stream);
+        emit(
+            json!({"event":"reconnect_source_frame","scope":scope,"phase":phase,
+            "observedMonotonicNs":monotonic_ns(),"frame":frame}),
+        );
+        DshSourceWitness::from_first_frame(&frame, &scope.session_id, require_adapter_queue)
+    })
+    .await
+    .map_err(|_| Error::Timeout)?
+}
+
+async fn fresh_pi_native_conversation(
+    endpoint: &dyn SessionEndpoint,
+    scope: &RunScope,
+    phase: &str,
+) -> Result<tekes_agent_contract::NativeConversationSnapshot> {
+    let mut projection = MemoryProjectionStore::new(scope.endpoint_id.clone());
+    projection.begin_connection(endpoint.host().clone());
+    tokio::time::timeout(Duration::from_secs(30), async {
+        let mut stream = endpoint
+            .follow(StreamTarget::SessionConversation {
+                address: JournalAddress {
+                    session_id: scope.session_id.clone(),
+                },
+                max_messages: 50,
+            })
+            .await?;
+        let frame = stream.next().await.ok_or(Error::Disconnected)??;
+        drop(stream);
+        emit(
+            json!({"event":"reconnect_source_frame","scope":scope,"phase":phase,
+            "observedMonotonicNs":monotonic_ns(),"frame":frame}),
+        );
+        projection.apply(&format!("journal:{}", scope.session_id), frame)?;
+        projection
+            .sessions
+            .get(&scope.session_id)
+            .and_then(|session| session.native_conversation.clone())
+            .ok_or_else(|| {
+                Error::Protocol("fresh Pi native source omitted conversation snapshot".into())
+            })
+    })
+    .await
+    .map_err(|_| Error::Timeout)?
+}
+
+fn pi_owned_evidence_root(config: &Value) -> Result<std::path::PathBuf> {
+    let root = config
+        .get("ownedEvidenceRoot")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            Error::Protocol("Pi observer requires the registered benchmark-owned case root".into())
+        })?;
+    let data = config
+        .get("connector")
+        .and_then(|connector| connector.get("dataRoot"))
+        .and_then(Value::as_str)
+        .ok_or_else(|| Error::Protocol("Pi connector omitted its owned dataRoot".into()))?;
+    let root = std::path::Path::new(root)
+        .canonicalize()
+        .map_err(|error| Error::Protocol(error.to_string()))?;
+    let data = std::path::Path::new(data)
+        .canonicalize()
+        .map_err(|error| Error::Protocol(error.to_string()))?;
+    require(
+        data != root && data.starts_with(&root),
+        "Pi dataRoot is outside the registered owned case root",
+    )?;
+    Ok(root)
+}
+
+async fn wait_for_dsh_runtime(
+    runtime: &SessionRuntime,
+    scope: &RunScope,
+    witness: &DshSourceWitness,
+    expected_epoch: u64,
+    timeout: Duration,
+) -> Result<()> {
+    let mut updates = runtime.subscribe();
+    tokio::time::timeout(timeout, async {
+        loop {
+            let snapshot = updates.borrow_and_update();
+            require(
+                snapshot.connection_epoch == expected_epoch,
+                "DSH source wait crossed connection epoch",
+            )?;
+            if usable_snapshot(&snapshot, &scope.session_id)
+                && snapshot.control_ready
+                && let Some(session) = snapshot.sessions.get(&scope.session_id)
+                && witness.matches_runtime_values(&session.projections, None)
+                && runtime_journal_entries(session)? == witness.entries
+            {
+                return Ok::<(), Error>(());
+            }
+            updates.changed().await.map_err(|_| Error::Disconnected)?;
+        }
+    })
+    .await
+    .map_err(|_| Error::Timeout)?
+}
+
+fn runtime_journal_entries(session: &tekes_agent_session::SessionProjection) -> Result<Vec<Value>> {
+    Ok(session
+        .entries
+        .values()
+        .map(serde_json::to_value)
+        .collect::<std::result::Result<_, _>>()?)
 }
 
 fn matching_user_and_assistant(
@@ -1100,7 +1564,16 @@ async fn iteration(
         return Ok(false);
     }
     if !steady {
-        match reconnect_sample(runtime, connector, controller, scopes).await {
+        match reconnect_sample(
+            runtime,
+            connector,
+            controller,
+            scopes,
+            connector_kind,
+            config,
+        )
+        .await
+        {
             Ok(sample) => {
                 let converged = sample["converged"] == true;
                 emit(sample);
@@ -1378,5 +1851,43 @@ async fn main() {
             json!({"event":"consumer_error","error":error_text(&error),"status":"failed_or_not_run"}),
         );
         std::process::exit(2);
+    }
+}
+
+#[cfg(test)]
+mod reconnect_input_tests {
+    use super::*;
+
+    #[test]
+    fn pi_owned_root_uses_explicit_case_and_nested_connector_data() {
+        let temp = std::env::temp_dir().join(format!(
+            "agentkit-owned-input-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(temp.join("case/data")).unwrap();
+        let root = temp.join("case").canonicalize().unwrap();
+        let data = root.join("data");
+        assert_eq!(
+            pi_owned_evidence_root(
+                &json!({"ownedEvidenceRoot":root,"connector":{"dataRoot":data}})
+            )
+            .unwrap(),
+            root
+        );
+        assert!(pi_owned_evidence_root(&json!({"connector":{"dataRoot":data}})).is_err());
+        assert!(
+            pi_owned_evidence_root(&json!({"ownedEvidenceRoot":root,"dataRoot":data})).is_err()
+        );
+        assert!(
+            pi_owned_evidence_root(
+                &json!({"ownedEvidenceRoot":data,"connector":{"dataRoot":root}})
+            )
+            .is_err()
+        );
+        std::fs::remove_dir_all(temp).unwrap();
     }
 }

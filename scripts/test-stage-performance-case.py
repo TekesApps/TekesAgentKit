@@ -527,6 +527,8 @@ def main():
         prompts=[[body_text('measure',i,round,'user') for i in (0,1)] for round in range(rounds)]
         replies=[[body_text('measure',i,round,'assistant') for i in (0,1)] for round in range(rounds)]
         payload={'mode':args.mode,'connector':config,'sessionIds':ids,
+                 'ownedEvidenceRoot':str(case.resolve(strict=True)),
+                 'observerProductSource':program_receipt['sourceCommit'],
                  'iterationPrompts':prompts,'iterationReplies':replies}
         events,consumer_exit=run_program(program,payload,case,'consumer',env,sampler,timeout=600)
         boundaries=[json.loads(line) for line in (case/'consumer-process-boundaries.jsonl').read_text().splitlines()]

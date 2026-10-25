@@ -1,0 +1,67 @@
+{
+  "scope": "new common source-convergence observer compiled only; supplemental protocol cases not_run",
+  "roles": {
+    "baseline": {
+      "program": {
+        "path": "/Volumes/HP P900/dev/TekesAgentKit/acceptance-tools/performance/reconnect-source-v1/baseline/performance_acceptance",
+        "sha256": "10c630a4dcce044064a343175a9915eed458c0076d35bc1524131c15b1bd55a8",
+        "sourceCommit": "f1daa0ffcf6ced41e21f351e22845455ca78006c",
+        "sourceManifest": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/reconnect-source-oracle-v3-baseline-inputs.json",
+        "sourceManifestSha256": "1909d13d347fd63f22d790c6739afef6cff92e39aff48a2cd6cdd32fffc1a2cb",
+        "consumerSourceSha256": "92844264695f94a4e30193eabcceb5adb36f35dde2c09c56c77e13e584c379d9",
+        "observerSources": {
+          "crates/headless/examples/performance_acceptance.rs": "92844264695f94a4e30193eabcceb5adb36f35dde2c09c56c77e13e584c379d9",
+          "crates/headless/examples/support/reconnect_source.rs": "fde45905164171a884f9f58233d8c57c9185617de1e434b55466f65a54e56088"
+        },
+        "compiled": true,
+        "clippyPassed": true,
+        "focusedTestsPassed": 8,
+        "performanceSamples": 0,
+        "performanceAccepted": false,
+        "sourceInputsUnchanged": true,
+        "targetDir": "/Volumes/HP P900/dev/TekesAgentKit/shared-target",
+        "noDesktopInteraction": true
+      },
+      "programReceiptSha256": "c88d399b24bb85803590e887dbfe0503e885d2736194f50764e8cbe0bd809667"
+    },
+    "candidate": {
+      "program": {
+        "path": "/Volumes/HP P900/dev/TekesAgentKit/acceptance-tools/performance/reconnect-source-v1/candidate/performance_acceptance",
+        "sha256": "34c0707b4e7fa6c50b1095f169329697655ccd2a1cae735f2de3074a6d4ba93b",
+        "sourceCommit": "10263722b5fb128922c49a31b5942c41333cd6e2",
+        "sourceManifest": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/reconnect-source-oracle-v3-candidate-inputs.json",
+        "sourceManifestSha256": "424b04e4c6541690ba0257488dd87ac5a72c49faa8714989e68837a5c1d6435c",
+        "consumerSourceSha256": "92844264695f94a4e30193eabcceb5adb36f35dde2c09c56c77e13e584c379d9",
+        "observerSources": {
+          "crates/headless/examples/performance_acceptance.rs": "92844264695f94a4e30193eabcceb5adb36f35dde2c09c56c77e13e584c379d9",
+          "crates/headless/examples/support/reconnect_source.rs": "fde45905164171a884f9f58233d8c57c9185617de1e434b55466f65a54e56088"
+        },
+        "compiled": true,
+        "clippyPassed": true,
+        "focusedTestsPassed": 8,
+        "performanceSamples": 0,
+        "performanceAccepted": false,
+        "sourceInputsUnchanged": true,
+        "freshnessReceipt": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/reconnect-source-oracle-v3-candidate-cargo-freshness-repair-v1.json",
+        "targetDir": "/Volumes/HP P900/dev/TekesAgentKit/shared-target",
+        "noDesktopInteraction": true
+      },
+      "programReceiptSha256": "410fad0f67004cb517124a28fc3401dcad2ac37c44897b519ffbcd0ebcb986bc"
+    }
+  },
+  "sameObserverSources": true,
+  "focusedChecks": "8 Rust tests per role and strict example Clippy/build passed, serial existing SSD shared-target",
+  "notRun": [
+    "new Pi/DSH supplemental lifecycle protocol cohort",
+    "desktop",
+    "physical IME",
+    "AX"
+  ],
+  "preservedFailures": [
+    "v1 baseline imported newer queue API and referenced out-of-scope timing variable; compile failed",
+    "v2 strict Clippy redundant closure; unchanged product source",
+    "v3 candidate initially reused newer baseline relative Cargo artifacts; candidate source content unchanged, freshness reset immediately before its own batch, corrected run passed"
+  ],
+  "budgetChanged": false,
+  "productChanges": false
+}

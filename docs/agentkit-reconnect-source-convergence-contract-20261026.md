@@ -32,6 +32,16 @@ Pi还须：
 
 ## 执行与门禁
 
-本设计已完成只读来源审查；此前候选提出的三处来源规则已按上述条款明确。尚未实施、编译或取得新cohort通过。仅重编相同observer的baseline/candidate两份现有example，复用SSD共享target、固定源码和程序；不改Rust库行为。先跑定向来源逻辑检查，再以新登记的Pi/DSH lifecycle补充cohort验证初始化+10轮，两角色各一次。
+本设计已完成只读来源审查；此前候选提出的三处来源规则已按上述条款明确。观察器已实施，两角色各8项Rust定向检查、严格Clippy及构建通过；尚未取得新cohort协议通过。仅重编相同observer的baseline/candidate两份现有example，复用SSD共享target、固定源码和程序；不改Rust库行为。先跑定向来源逻辑检查，再以新登记的Pi/DSH lifecycle补充cohort验证初始化+10轮，两角色各一次。
 
 新cohort不能修改原40收据或把原失败改成通过；单列来源契约版本、observer/program SHA和原条件失配原因。原Native、Pi/DSH warm相对预算失败仍然有效，不调1.2门槛、不挑样本。仅重连收敛判据变为冻结ClientKit一致、来源更强的检查；性能绝对/相对/RSS/cleanup预算及完整#55/#56、UI/桌面/发布门禁均保留。
+
+## baseline 适用接口的明确边界
+
+第一次v1 baseline编译暴露观察器错误引用了f1尚不存在的queue常量；失败日志/源码保留，无协议执行。冻结f1的DSH adapter直接接收SDK inbox，102 adapter另派生agentkit.queue.v1。这不是把支持失败标Unsupported：本补充cohort是ordinary lifecycle，两角色均强制完整原生inbox及各自全部公开projection键和值；102另外强制derived queue键，f1不伪造后来的派生API。共同观察器由runner从已校验program receipt注入精确observerProductSource（仅f1/102白名单）选择该既有版本规则，不能按样本是否缺键自动放宽。真实queue/附件能力与性能仍在原矩阵，未由ordinary验收替代。[固定SDK来源hash](evidence-bindings-20261026/dsh-reconnect-source-contract.json)。
+
+## 编译检查点（非协议验收）
+
+[共同观察器程序绑定](evidence-bindings-20261026/reconnect-source-observer-programs.json)固定同版两文件overlay。baseline 10c630a4、candidate34c0707b只表示已编译/定向检查，不是生命周期或性能通过。新增source帧与每个stat bracket起止均在原事件流保留，缺来源先失败而非None相等；来源等待由公共subscription唤醒，整个follow/首帧有timeout，旧流在reconnect前释放。
+
+v3候选首次编译复用了之后生成的baseline相对dep-info，错误引用旧字段；原因是两角色提前一起准备mtime。已保留失败日志，源内容hash不变，仅在候选自身串行批次前刷新时间戳后通过。后续每个角色在进入自身批次前准备时间戳，不在另一个角色构建前预先准备。所有构建仍复用唯一SSD target，没有创建临时target。
