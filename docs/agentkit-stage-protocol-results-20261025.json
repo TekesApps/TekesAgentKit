@@ -374,8 +374,8 @@
     "merged": false
   },
   "latestExactHeadCi20261026": {
-    "head": "d23731dfe21820a35a7af0550ecb6069cbef1f08",
-    "run": 40230369803,
+    "head": "72a0d644c61d7cf70c9500b70967dcef00b1a338",
+    "run": 40233798349,
     "root": "success",
     "ui": "failure",
     "standalonePublicConsumer": "success",
@@ -383,7 +383,7 @@
     "nativeApprovalConsumerCompile": "success",
     "strictNestedReading": "failure",
     "subsequentDemoBuild": "skipped",
-    "artifact": 12613590407,
+    "artifact": 12613329961,
     "noGateWaived": true,
     "merged": false
   },
@@ -417,13 +417,28 @@
   },
   "performanceAtOriginalAudit": "not_run",
   "ordinaryOfficialPerformance20261026": {
-    "officialCaseCount": 14,
-    "scope": "Native ordinary only",
-    "binding": "evidence-bindings-20261026/native-ordinary-official-v2.json",
-    "coldWarmBudgetsPassed": true,
+    "officialCaseCount": 40,
+    "scope": "Native14 + Pi12 + DSH14; Pi lifecycle2 not_run",
+    "binding": "evidence-bindings-20261026/ordinary-official-cohort.json",
+    "coldWarmBudgetsPassed": false,
     "lifecycleRelativeBudgetsPassed": false,
     "performanceAccepted": false,
-    "otherEndpoints": "not_run",
-    "familyAttachmentPerformance": "not_run"
+    "otherEndpoints": "cold complete; warm collected with relative failures; DSH lifecycle failed",
+    "familyAttachmentPerformance": "not_run",
+    "plannedCaseCount": 42,
+    "sourceContractPassedCases": 38,
+    "sourceContractFailedCases": 2
+  },
+  "boundedSourceDiagnostics20261026": {
+    "dshInventory": "evidence-bindings-20261026/dsh-inventory-source-diagnostic.json",
+    "nativeWire": "evidence-bindings-20261026/native-wire-delay-diagnostic.json",
+    "reconnectOracleDesign": "agentkit-reconnect-source-convergence-contract-20261026.md",
+    "oracleStatus": "source-reviewed design, implementation/verification pending",
+    "originalFailuresRetained": true,
+    "productChanges": false,
+    "cargoRunsThisCheckpoint": 0,
+    "desktopRuns": 0,
+    "pythonToolTests": 481,
+    "pythonLogSha256": "99dfce589f179b3f0f20e65ebc7d1284405243ff81f0bd032e5d1589b020c394"
   }
 }

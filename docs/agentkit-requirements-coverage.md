@@ -215,3 +215,13 @@ f833 CI40214966220终态：root、UI常规、child witness、Native approval和�
 #70记录新发现的Pi活动时间来源/刷新语义差异（R04/R20），明确后续待办，不自动加入当前阶段；当前43票：关闭4、待集成11、进行中9、等上游9、等桌面1、待办9。原42票计数保留为各旧提交的历史快照。#55正式普通数据已开始，只有实际固定组和配对报告完成后才形成性能结论。
 
 Native普通正式组已完成采集：cold/warm满足原预算，lifecycle逐会话相对预算失败（恢复快照1.662倍、首助手内容1.361倍，原上限1.2）。原始14case保留，未挑选或替换；整体性能未通过，详见[native正式绑定](evidence-bindings-20261026/native-ordinary-official-v2.json)。
+
+### 2026-10-26：普通正式组收口与来源诊断
+
+[三端正式绑定](evidence-bindings-20261026/ordinary-official-cohort.json)记录42计划、40实际执行：38通过原单case契约，DSH两角色lifecycle在原summary整值oracle失败，Pi两角色lifecycle仍not_run。三端cold和Native warm满足原预算；Native lifecycle scope0恢复快照1.661691倍、scope1首助手1.360828倍，Pi warm快照scope0/1分别1.341904/1.313128倍，DSH warm首助手scope1为1.262329倍，均超过1.2。完整组即使其他组缺失也必须报告这些有效失败，不能用未完成矩阵遮蔽，原收据未替换。
+
+[DSH来源诊断](evidence-bindings-20261026/dsh-inventory-source-diagnostic.json)两scope各204条完整历史不变，但scope1的live turnOutline在立刻抓取时仍落后（466，response为空），重连后469补齐；只有scope0全部live value不变，不能扩报到两scope。缓存summary不是fresh SDK来源。新[来源契约](agentkit-reconnect-source-convergence-contract-20261026.md)要求独立fresh follow、SDK明定的exact event cursor、完整值与内容、水位和Pi稳定文件metadata证明；目前是尚待实现与适用验证的设计，不把旧失败改成成功。
+
+[Native线路诊断](evidence-bindings-20261026/native-wire-delay-diagnostic.json)单次冷启动在原样转发的loopback proxy记录ack→provider约154/182ms，provider fixture自身约1.66/0.31ms；50ms OS采样在两者之间首次见worker。只读源码未找到AgentKit固定轮询，Kernel路径有lazy worker/context/lease，尚不能归因特定缺陷；代理与采样不替代正式样本，不豁免相对延迟失败。
+
+PR10精确72a0d64 CI40233798349/40233792652终态为headless成功、UI失败；独立consumer通过，必需strict nested reading仍accepted=false（parentFollowingAfterInnerUp=true，append offset634，detailVisibleAfterAppend=false），demo build跳过，artifact12613329961保留。PR10仍draft，#55/#56/#58/#59未完成，不新增发布。全量Python验收工具检查481项通过（python312-cohort-diagnostics-final-v1.log）；本检查点没有Cargo或桌面/物理IME/AX执行，原9 WIP保持。

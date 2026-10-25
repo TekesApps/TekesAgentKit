@@ -571,15 +571,9 @@ def aggregate_batch(batch: dict[str, Any]) -> dict[str, Any]:
     _need(batch.get("sourceBaseline") == profile["baseline"], "baseline source differs from frozen profile")
     grouped: dict[tuple[str, str, str], list[dict[str, Any]]] = defaultdict(list)
     seen = set()
+    failed_samples = []
     for sample in samples:
         _need(isinstance(sample, dict), "sample row must be an object")
-        if sample.get("status") != "success":
-            return {"officialSamples": len(samples), "performanceAccepted": False,
-                    "diagnosticOnly": False, "retainedSampleRows": samples,
-                    "failedSample": {"role": sample.get("role"), "mode": sample.get("mode"),
-                                     "iteration": sample.get("iteration"), "status": sample.get("status"),
-                                     "failureReason": sample.get("failureReason")},
-                    "reason": "failed/not_run sample is retained; acceptance stops without replacement"}
         role, mode = sample.get("role"), sample.get("mode")
         endpoint = sample.get("endpoint")
         _need(endpoint in ENDPOINTS and role in ("baseline", "candidate"), "sample endpoint/role is invalid")
@@ -589,9 +583,16 @@ def aggregate_batch(batch: dict[str, Any]) -> dict[str, Any]:
         key = (endpoint, role, mode, case_index)
         _need(key not in seen, "duplicate case row cannot be replaced")
         seen.add(key)
+        if sample.get("status") != "success":
+            failed_samples.append({"role": role, "mode": mode, "endpoint": endpoint,
+                                   "iteration": sample.get("iteration"), "caseIndex": case_index,
+                                   "status": sample.get("status"),
+                                   "failureReason": sample.get("failureReason")})
+            continue
         grouped[(endpoint, role, mode)].append(_sample_contract(sample, mode, role, profile))
 
     reports = {}
+    missing_case_groups = []
     covered_endpoints = sorted({sample["endpoint"] for sample in samples})
     for endpoint in ENDPOINTS:
         if endpoint not in covered_endpoints:
@@ -603,17 +604,30 @@ def aggregate_batch(batch: dict[str, Any]) -> dict[str, Any]:
                 expected_indices = list(range(required)) if mode == "cold" else [0]
                 actual_indices = [row["sample"].get("caseIndex", row["sample"].get("iteration")) for row in rows]
                 if len(rows) != required or actual_indices != expected_indices:
-                    return {"officialSamples": len(samples), "performanceAccepted": False,
-                            "diagnosticOnly": False, "retainedSampleRows": samples,
-                            "reason": f"{endpoint} {role} {mode} has wrong case count/index; cases are never substituted"}
+                    missing_case_groups.append({
+                        "endpoint": endpoint, "role": role, "mode": mode,
+                        "expectedCaseIndices": expected_indices,
+                        "actualCaseIndices": actual_indices,
+                        "missingCaseIndices": [index for index in expected_indices
+                                               if index not in actual_indices],
+                        "unexpectedCaseIndices": [index for index in actual_indices
+                                                  if index not in expected_indices],
+                        "expectedCaseCount": required, "actualCaseCount": len(rows),
+                    })
+                    # Keep any otherwise-complete trajectories visible. An
+                    # extra index never stands in for a missing frozen case.
+                    continue
                 signatures = {(row["sample"].get("seedDigest"), row["sample"].get("workloadDigest"),
                               json_key(_sample_machine_identity(row["sample"])),
                               row["sample"].get("runtimeSha256")) for row in rows}
                 _need(len(signatures) == 1 and None not in next(iter(signatures)),
                       f"{endpoint} {role} {mode} case inputs/machine/runtime are not consistent")
                 reports[f"{endpoint}/{role}:{mode}"] = _role_summary(rows, profile)
-            baseline = grouped[(endpoint, "baseline", mode)]
-            candidate = grouped[(endpoint, "candidate", mode)]
+            baseline = grouped.get((endpoint, "baseline", mode))
+            candidate = grouped.get((endpoint, "candidate", mode))
+            if (f"{endpoint}/baseline:{mode}" not in reports
+                    or f"{endpoint}/candidate:{mode}" not in reports):
+                continue
             _need(_paired_inputs(baseline, candidate), f"{endpoint} {mode} baseline and candidate are not comparable")
             for metric in ("firstUsableSnapshotMs", "sendToFirstAssistantContentMs",
                            "historyPage20ToProjectionMs", "explicitReconnectToConvergedMs",
@@ -657,7 +671,8 @@ def aggregate_batch(batch: dict[str, Any]) -> dict[str, Any]:
 
     metric_names = ("firstUsableSnapshotMs", "sendToFirstAssistantContentMs", "historyPage20ToProjectionMs",
                     "explicitReconnectToConvergedMs", "cleanupMs", "agentkitSampledPeakMiB", "harnessSampledPeakMiB")
-    accepted = set(covered_endpoints) == set(ENDPOINTS) and all(
+    accepted = (set(covered_endpoints) == set(ENDPOINTS) and not missing_case_groups
+        and not failed_samples and all(
         (reports[name][metric]["absolutePass"] is True
          or (metric == "explicitReconnectToConvergedMs" and name.endswith(":warm")
              and reports[name][metric]["absolutePass"] is None))
@@ -668,7 +683,7 @@ def aggregate_batch(batch: dict[str, Any]) -> dict[str, Any]:
         for name, report in reports.items() if "/candidate:" in name
         for item in report.get("perSession", {}).values()
         for metric in ("firstUsableSnapshotMs", "sendToFirstAssistantContentMs",
-                       "historyPage20ToProjectionMs"))
+                       "historyPage20ToProjectionMs")))
     failures = [] if accepted else [
         {"role": name, "metric": metric,
          "absolutePass": report[metric]["absolutePass"],
@@ -676,10 +691,21 @@ def aggregate_batch(batch: dict[str, Any]) -> dict[str, Any]:
         for name, report in reports.items() if "/candidate:" in name
         for metric in metric_names if report[metric]["absolutePass"] is False
         or report[metric].get("regressionPass") is False]
+    endpoint_coverage_complete = set(covered_endpoints) == set(ENDPOINTS)
+    case_group_coverage_complete = endpoint_coverage_complete and not missing_case_groups
     return {"officialSamples": len(samples), "diagnosticOnly": False,
-            "endpoints": covered_endpoints, "endpointCoverageComplete": set(covered_endpoints) == set(ENDPOINTS),
-            "trajectories": reports, "comparableBaseline": True,
+            "endpoints": covered_endpoints, "endpointCoverageComplete": endpoint_coverage_complete,
+            "caseGroupCoverageComplete": case_group_coverage_complete,
+            "missingCaseGroups": missing_case_groups,
+            "trajectories": reports, "comparableBaseline": case_group_coverage_complete,
             "ordinarySessionPerformanceAccepted": accepted, "performanceAccepted": False,
             "failures": failures, "familyAttachmentPerformanceCovered": False,
             "issue55Issue56Accepted": False,
-            "reason": "the frozen profile does not include family/attachment performance workloads"}
+            **({"failedSamples": failed_samples, "failedSample": failed_samples[0]}
+               if failed_samples else {}),
+            **({"retainedSampleRows": samples} if missing_case_groups or failed_samples else {}),
+            "reason": ("failed/not_run samples are retained and prevent acceptance"
+                       if failed_samples else
+                       "one or more frozen case groups are incomplete"
+                       if missing_case_groups else
+                       "the frozen profile does not include family/attachment performance workloads")}

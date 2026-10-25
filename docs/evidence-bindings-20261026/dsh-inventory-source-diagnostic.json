@@ -1,0 +1,79 @@
+{
+  "scope": "bounded public diagnostic; no lifecycle/performance acceptance",
+  "diagnosticOnly": true,
+  "officialSamples": 0,
+  "sourceCommit": "98b1d9a2960b90774ea5454e7e8dad870538f7bc",
+  "programSha256": "18d8f643e8cba5ee94202c8c2f481bfa31add7bc5ac4fc5df44276100532180b",
+  "runtime": "DSH 0.2.1-rc.2",
+  "sourceReceipt": {
+    "path": "dsh-inventory-source-diagnostic-v1-inputs.json",
+    "sha256": "d0a2f20a7759508d8c1974997ecc593cb3ac4003ed7adf9da8c461ecf987993c"
+  },
+  "receipt": {
+    "path": "performance/dsh-inventory-source-candidate-v1/diagnostic-receipt.json",
+    "sha256": "9351fd984450a761e067ec33bf3b02c155e5373b674b55d232b4eea90da9de0c"
+  },
+  "scopes": [
+    {
+      "scopeIndex": 0,
+      "fullOrderedEntries": {
+        "entryCountAfterMeasure": 204,
+        "entryCountAfterReconnect": 204,
+        "sameFullOrderedEntries": true,
+        "entryDiff": []
+      },
+      "allLiveValuesUnchanged": true,
+      "liveValueDifferences": [],
+      "recoveredSummaryValuesEqualRecoveredLive": true,
+      "liveKeyCount": 21,
+      "oldSummaryCut": 461,
+      "newSummaryCut": 469,
+      "tailBefore": 469,
+      "tailAfter": 469,
+      "updatedAtMatchesLiveLastPromptAt": true,
+      "epochBefore": 2,
+      "epochAfter": 5,
+      "evidence": {
+        "path": "performance/dsh-inventory-source-candidate-v1/scope-0-inventory-diagnostic.json",
+        "sha256": "877c32357ead6936cd67450f54c876b4e15a49358e5275933ef803cac6e0d1b3"
+      }
+    },
+    {
+      "scopeIndex": 1,
+      "fullOrderedEntries": {
+        "entryCountAfterMeasure": 204,
+        "entryCountAfterReconnect": 204,
+        "sameFullOrderedEntries": true,
+        "entryDiff": []
+      },
+      "allLiveValuesUnchanged": false,
+      "liveValueDifferences": [
+        "turnOutline"
+      ],
+      "recoveredSummaryValuesEqualRecoveredLive": true,
+      "liveKeyCount": 21,
+      "oldSummaryCut": 461,
+      "newSummaryCut": 469,
+      "tailBefore": 469,
+      "tailAfter": 469,
+      "updatedAtMatchesLiveLastPromptAt": true,
+      "epochBefore": 2,
+      "epochAfter": 5,
+      "evidence": {
+        "path": "performance/dsh-inventory-source-candidate-v1/scope-1-inventory-diagnostic.json",
+        "sha256": "b10615af8631a64ec7c82016841c7555849d1176640b1cfeb90268261f105d18"
+      }
+    }
+  ],
+  "scope1Lag": {
+    "key": "turnOutline",
+    "beforeSequence": 466,
+    "afterSequence": 469,
+    "difference": "final response empty before reconnect, complete after; requires independent source witness, not all-live-equal acceptance"
+  },
+  "limits": [
+    "CLI list is cached runtime.inspect, not independent fresh SDK evidence",
+    "final live map is not proof of independent sequenced source provenance",
+    "original official failures remain; prospective observer needs fresh follow source witness"
+  ]
+}

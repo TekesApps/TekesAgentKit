@@ -239,6 +239,90 @@ class PerformanceSampleReportTests(unittest.TestCase):
         self.assertEqual(report["trajectories"]["pi/candidate:reconnectLifecycle"]["perSession"]["1"]
                          ["historyPage20ToProjectionMs"]["count"], 10)
 
+    def test_partial_endpoint_reports_complete_groups_and_keeps_acceptance_closed(self):
+        batch = batch_factory()
+        batch["samples"] = [row for row in batch["samples"]
+                            if not (row["endpoint"] == "pi" and row["mode"] == "reconnectLifecycle")]
+        batch["officialSamples"] = len(batch["samples"])
+
+        report = aggregate_batch(batch)
+
+        self.assertEqual(report["officialSamples"], 40)
+        self.assertIn("native/candidate:cold", report["trajectories"])
+        self.assertIn("dsh/candidate:reconnectLifecycle", report["trajectories"])
+        self.assertNotIn("pi/candidate:reconnectLifecycle", report["trajectories"])
+        self.assertEqual(report["missingCaseGroups"], [
+            {"endpoint": "pi", "role": role, "mode": "reconnectLifecycle",
+             "expectedCaseIndices": [0], "actualCaseIndices": [],
+             "missingCaseIndices": [0], "unexpectedCaseIndices": [],
+             "expectedCaseCount": 1, "actualCaseCount": 0}
+            for role in ("baseline", "candidate")
+        ])
+        self.assertFalse(report["caseGroupCoverageComplete"])
+        self.assertFalse(report["ordinarySessionPerformanceAccepted"])
+        self.assertFalse(report["performanceAccepted"])
+
+    def test_extra_case_index_does_not_fill_a_missing_cold_case(self):
+        batch = batch_factory()
+        row = next(row for row in batch["samples"]
+                   if row["endpoint"] == "pi" and row["role"] == "candidate"
+                   and row["mode"] == "cold" and row["caseIndex"] == 4)
+        row["caseIndex"] = row["iteration"] = 5
+
+        report = aggregate_batch(batch)
+
+        missing = next(group for group in report["missingCaseGroups"]
+                       if group["endpoint"] == "pi" and group["role"] == "candidate"
+                       and group["mode"] == "cold")
+        self.assertEqual(missing["expectedCaseIndices"], [0, 1, 2, 3, 4])
+        self.assertEqual(missing["actualCaseIndices"], [0, 1, 2, 3, 5])
+        self.assertEqual(missing["missingCaseIndices"], [4])
+        self.assertEqual(missing["unexpectedCaseIndices"], [5])
+        self.assertNotIn("pi/candidate:cold", report["trajectories"])
+        self.assertFalse(report["ordinarySessionPerformanceAccepted"])
+        self.assertFalse(report["performanceAccepted"])
+
+    def test_failed_lifecycle_is_retained_while_other_complete_groups_are_reported(self):
+        batch = batch_factory()
+        batch["samples"] = [row for row in batch["samples"]
+                            if not (row["endpoint"] == "dsh" and row["role"] == "candidate"
+                                    and row["mode"] == "reconnectLifecycle")]
+        failed = next(row for row in batch["samples"]
+                      if row["endpoint"] == "dsh" and row["role"] == "baseline"
+                      and row["mode"] == "reconnectLifecycle")
+        failed.update(status="failed", failureReason="sameInventory was false")
+        batch["officialSamples"] = len(batch["samples"])
+
+        report = aggregate_batch(batch)
+
+        self.assertIn("native/candidate:cold", report["trajectories"])
+        self.assertIn("pi/candidate:reconnectLifecycle", report["trajectories"])
+        self.assertIn("dsh/candidate:warm", report["trajectories"])
+        self.assertEqual(report["failedSample"]["failureReason"], "sameInventory was false")
+        self.assertEqual(report["failedSamples"], [report["failedSample"]])
+        self.assertIn(failed, report["retainedSampleRows"])
+        self.assertEqual({(group["endpoint"], group["role"], group["mode"])
+                          for group in report["missingCaseGroups"]
+                          if group["endpoint"] == "dsh"},
+                         {("dsh", "baseline", "reconnectLifecycle"),
+                          ("dsh", "candidate", "reconnectLifecycle")})
+        self.assertFalse(report["ordinarySessionPerformanceAccepted"])
+        self.assertFalse(report["performanceAccepted"])
+
+    def test_all_failed_rows_remain_retained_and_fail_closed(self):
+        batch = batch_factory()
+        for row in batch["samples"]:
+            row.update(status="failed", failureReason="protocol failure")
+
+        report = aggregate_batch(batch)
+
+        self.assertEqual(report["retainedSampleRows"], batch["samples"])
+        self.assertEqual(len(report["failedSamples"]), len(batch["samples"]))
+        self.assertEqual(report["failedSample"]["failureReason"], "protocol failure")
+        self.assertEqual(report["trajectories"], {})
+        self.assertFalse(report["ordinarySessionPerformanceAccepted"])
+        self.assertFalse(report["performanceAccepted"])
+
     def test_cold_cases_aggregate_by_stable_index_with_distinct_session_ids(self):
         batch = batch_factory()
         for row in batch["samples"]:

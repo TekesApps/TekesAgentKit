@@ -1,0 +1,776 @@
+{
+  "scope": "ordinary Native/Pi/DSH official cohort only; no full stage or family/attachment acceptance",
+  "plannedCases": 42,
+  "executedCases": 40,
+  "sourceContractPassedCases": 38,
+  "sourceContractFailedCases": 2,
+  "notRunCases": [
+    {
+      "registration": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/ordinary-official-registrations-v2/ordinary-v2-pi-baseline-reconnectlifecycle-0.json",
+      "status": "not_run",
+      "reason": "known preflight inventory updatedAt equality failure, source freshness not resolved; original diagnostic retained, no repeat to force pass"
+    },
+    {
+      "registration": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/ordinary-official-registrations-v2/ordinary-v2-pi-candidate-reconnectlifecycle-0.json",
+      "status": "not_run",
+      "reason": "known preflight inventory updatedAt equality failure, source freshness not resolved; original diagnostic retained, no repeat to force pass"
+    }
+  ],
+  "profileSha256": "2fa13b4301cc723c73a2a498caefb1219a81b429fe2d0a5fe308b7841ef9445c",
+  "baselineSource": "f1daa0ffcf6ced41e21f351e22845455ca78006c",
+  "candidateSource": "10263722b5fb128922c49a31b5942c41333cd6e2",
+  "consumerSha256": "de9b1f3bcfca0c89d1cc24416f059ff3157bad22110d1a5b531fa35765bfdce1",
+  "batchSha256": "4d701f3b47f83a1c622cabb7eea0b5dcd62d21db62f9d1fe4f289f84f1de2f62",
+  "reportSha256": "2976482b489ec550ff1998f4a8f99522f4a18f7517f426a402428872a05bd2e3",
+  "reporterSha256": "7d4f141dd899ad0fedacb9b708104cc52c9d76a874fa4ec20f85538e76fc3135",
+  "protocolFailures": [
+    {
+      "role": "baseline",
+      "mode": "reconnectLifecycle",
+      "endpoint": "dsh",
+      "iteration": 0,
+      "caseIndex": 0,
+      "status": "failed",
+      "failureReason": "PERFORMANCE_OFFICIAL_CASE_FAILED /Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/performance/ordinary-v2-dsh-baseline-reconnectlifecycle-0\n"
+    },
+    {
+      "role": "candidate",
+      "mode": "reconnectLifecycle",
+      "endpoint": "dsh",
+      "iteration": 0,
+      "caseIndex": 0,
+      "status": "failed",
+      "failureReason": "PERFORMANCE_OFFICIAL_CASE_FAILED /Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/performance/ordinary-v2-dsh-candidate-reconnectlifecycle-0\n"
+    }
+  ],
+  "missingSatisfiedCaseGroups": [
+    {
+      "endpoint": "pi",
+      "role": "baseline",
+      "mode": "reconnectLifecycle",
+      "expectedCaseIndices": [
+        0
+      ],
+      "actualCaseIndices": [],
+      "missingCaseIndices": [
+        0
+      ],
+      "unexpectedCaseIndices": [],
+      "expectedCaseCount": 1,
+      "actualCaseCount": 0
+    },
+    {
+      "endpoint": "pi",
+      "role": "candidate",
+      "mode": "reconnectLifecycle",
+      "expectedCaseIndices": [
+        0
+      ],
+      "actualCaseIndices": [],
+      "missingCaseIndices": [
+        0
+      ],
+      "unexpectedCaseIndices": [],
+      "expectedCaseCount": 1,
+      "actualCaseCount": 0
+    },
+    {
+      "endpoint": "dsh",
+      "role": "baseline",
+      "mode": "reconnectLifecycle",
+      "expectedCaseIndices": [
+        0
+      ],
+      "actualCaseIndices": [],
+      "missingCaseIndices": [
+        0
+      ],
+      "unexpectedCaseIndices": [],
+      "expectedCaseCount": 1,
+      "actualCaseCount": 0
+    },
+    {
+      "endpoint": "dsh",
+      "role": "candidate",
+      "mode": "reconnectLifecycle",
+      "expectedCaseIndices": [
+        0
+      ],
+      "actualCaseIndices": [],
+      "missingCaseIndices": [
+        0
+      ],
+      "unexpectedCaseIndices": [],
+      "expectedCaseCount": 1,
+      "actualCaseCount": 0
+    }
+  ],
+  "metricFailures": [
+    {
+      "role": "native/candidate:reconnectLifecycle",
+      "metric": "firstUsableSnapshotMs",
+      "absolutePass": true,
+      "regressionPass": false
+    },
+    {
+      "role": "native/candidate:reconnectLifecycle",
+      "metric": "sendToFirstAssistantContentMs",
+      "absolutePass": true,
+      "regressionPass": false
+    },
+    {
+      "role": "pi/candidate:warm",
+      "metric": "firstUsableSnapshotMs",
+      "absolutePass": true,
+      "regressionPass": false
+    },
+    {
+      "role": "dsh/candidate:warm",
+      "metric": "sendToFirstAssistantContentMs",
+      "absolutePass": true,
+      "regressionPass": false
+    }
+  ],
+  "completeGroups": {
+    "native/candidate:cold": {
+      "caseCount": 5,
+      "measuredIterationCount": 5,
+      "perSessionLatency": {
+        "0": {
+          "firstUsableSnapshotMs": {
+            "p50": 109.524667,
+            "p95": 116.217667,
+            "baselineP95": 121.851791,
+            "regressionRatio": 0.9537624851160375,
+            "absolutePass": true,
+            "regressionPass": true
+          },
+          "sendToFirstAssistantContentMs": {
+            "p50": 238.728916,
+            "p95": 278.632917,
+            "baselineP95": 268.772875,
+            "regressionRatio": 1.0366854058468513,
+            "absolutePass": true,
+            "regressionPass": true
+          },
+          "historyPage20ToProjectionMs": {
+            "p50": 7.94925,
+            "p95": 8.537416,
+            "baselineP95": 8.352834,
+            "regressionRatio": 1.0220981286111996,
+            "absolutePass": true,
+            "regressionPass": true
+          }
+        },
+        "1": {
+          "firstUsableSnapshotMs": {
+            "p50": 146.151167,
+            "p95": 153.88875,
+            "baselineP95": 161.58225,
+            "regressionRatio": 0.9523864780939738,
+            "absolutePass": true,
+            "regressionPass": true
+          },
+          "sendToFirstAssistantContentMs": {
+            "p50": 253.28775,
+            "p95": 271.614792,
+            "baselineP95": 277.43175,
+            "regressionRatio": 0.9790328323993198,
+            "absolutePass": true,
+            "regressionPass": true
+          },
+          "historyPage20ToProjectionMs": {
+            "p50": 7.752292,
+            "p95": 8.10575,
+            "baselineP95": 8.321916,
+            "regressionRatio": 0.9740244914752805,
+            "absolutePass": true,
+            "regressionPass": true
+          }
+        }
+      },
+      "memory": {
+        "agentkitSampledPeakMiB": {
+          "count": 5,
+          "p50": 22.0,
+          "p95": 23.15625,
+          "max": 23.15625,
+          "absoluteLimit": 512,
+          "absoluteLimitStatistic": "max",
+          "absoluteValue": 23.15625,
+          "absolutePass": true,
+          "baselineP95": 22.28125,
+          "baselineComparisonStatistic": "max",
+          "regressionRatio": 1.0392706872370268,
+          "regressionLimit": 1.15,
+          "regressionPass": true
+        },
+        "harnessSampledPeakMiB": {
+          "count": 5,
+          "p50": 56.25,
+          "p95": 57.78125,
+          "max": 57.78125,
+          "absoluteLimit": 2048,
+          "absoluteLimitStatistic": "max",
+          "absoluteValue": 57.78125,
+          "absolutePass": true,
+          "baselineP95": 57.71875,
+          "baselineComparisonStatistic": "max",
+          "regressionRatio": 1.0010828370330265,
+          "regressionLimit": 1.15,
+          "regressionPass": true
+        }
+      }
+    },
+    "native/candidate:warm": {
+      "caseCount": 1,
+      "measuredIterationCount": 10,
+      "perSessionLatency": {
+        "0": {
+          "firstUsableSnapshotMs": {
+            "p50": 54.06275,
+            "p95": 58.17525,
+            "baselineP95": 92.112292,
+            "regressionRatio": 0.6315688029997125,
+            "absolutePass": true,
+            "regressionPass": true
+          },
+          "sendToFirstAssistantContentMs": {
+            "p50": 238.813583,
+            "p95": 258.9735,
+            "baselineP95": 262.165083,
+            "regressionRatio": 0.9878260561495141,
+            "absolutePass": true,
+            "regressionPass": true
+          },
+          "historyPage20ToProjectionMs": {
+            "p50": 8.476333,
+            "p95": 9.357083,
+            "baselineP95": 8.777084,
+            "regressionRatio": 1.0660810583560554,
+            "absolutePass": true,
+            "regressionPass": true
+          }
+        },
+        "1": {
+          "firstUsableSnapshotMs": {
+            "p50": 60.83175,
+            "p95": 65.00125,
+            "baselineP95": 66.988791,
+            "regressionRatio": 0.9703302452495373,
+            "absolutePass": true,
+            "regressionPass": true
+          },
+          "sendToFirstAssistantContentMs": {
+            "p50": 231.104334,
+            "p95": 266.051458,
+            "baselineP95": 296.889708,
+            "regressionRatio": 0.8961289355304969,
+            "absolutePass": true,
+            "regressionPass": true
+          },
+          "historyPage20ToProjectionMs": {
+            "p50": 8.62625,
+            "p95": 9.29625,
+            "baselineP95": 9.036833,
+            "regressionRatio": 1.0287066276426708,
+            "absolutePass": true,
+            "regressionPass": true
+          }
+        }
+      },
+      "memory": {
+        "agentkitSampledPeakMiB": {
+          "count": 1,
+          "p50": 23.734375,
+          "p95": 23.734375,
+          "max": 23.734375,
+          "absoluteLimit": 512,
+          "absoluteLimitStatistic": "max",
+          "absoluteValue": 23.734375,
+          "absolutePass": true,
+          "baselineP95": 22.203125,
+          "baselineComparisonStatistic": "max",
+          "regressionRatio": 1.0689655172413792,
+          "regressionLimit": 1.15,
+          "regressionPass": true
+        },
+        "harnessSampledPeakMiB": {
+          "count": 1,
+          "p50": 64.921875,
+          "p95": 64.921875,
+          "max": 64.921875,
+          "absoluteLimit": 2048,
+          "absoluteLimitStatistic": "max",
+          "absoluteValue": 64.921875,
+          "absolutePass": true,
+          "baselineP95": 64.890625,
+          "baselineComparisonStatistic": "max",
+          "regressionRatio": 1.0004815795810258,
+          "regressionLimit": 1.15,
+          "regressionPass": true
+        }
+      }
+    },
+    "native/candidate:reconnectLifecycle": {
+      "caseCount": 1,
+      "measuredIterationCount": 10,
+      "perSessionLatency": {
+        "0": {
+          "firstUsableSnapshotMs": {
+            "p50": 58.684542,
+            "p95": 97.482292,
+            "baselineP95": 58.6645,
+            "regressionRatio": 1.6616913465554126,
+            "absolutePass": true,
+            "regressionPass": false
+          },
+          "sendToFirstAssistantContentMs": {
+            "p50": 261.058958,
+            "p95": 279.127708,
+            "baselineP95": 258.839333,
+            "regressionRatio": 1.0783821174504415,
+            "absolutePass": true,
+            "regressionPass": true
+          },
+          "historyPage20ToProjectionMs": {
+            "p50": 8.696875,
+            "p95": 9.641083,
+            "baselineP95": 8.835042,
+            "regressionRatio": 1.0912322771074547,
+            "absolutePass": true,
+            "regressionPass": true
+          }
+        },
+        "1": {
+          "firstUsableSnapshotMs": {
+            "p50": 62.647291,
+            "p95": 70.665875,
+            "baselineP95": 68.8475,
+            "regressionRatio": 1.0264116344093832,
+            "absolutePass": true,
+            "regressionPass": true
+          },
+          "sendToFirstAssistantContentMs": {
+            "p50": 278.154584,
+            "p95": 368.007459,
+            "baselineP95": 270.429125,
+            "regressionRatio": 1.3608277547767829,
+            "absolutePass": true,
+            "regressionPass": false
+          },
+          "historyPage20ToProjectionMs": {
+            "p50": 8.683708,
+            "p95": 9.364667,
+            "baselineP95": 9.012084,
+            "regressionRatio": 1.0391233592585245,
+            "absolutePass": true,
+            "regressionPass": true
+          }
+        }
+      },
+      "memory": {
+        "agentkitSampledPeakMiB": {
+          "count": 1,
+          "p50": 26.625,
+          "p95": 26.625,
+          "max": 26.625,
+          "absoluteLimit": 512,
+          "absoluteLimitStatistic": "max",
+          "absoluteValue": 26.625,
+          "absolutePass": true,
+          "baselineP95": 24.984375,
+          "baselineComparisonStatistic": "max",
+          "regressionRatio": 1.0656660412757974,
+          "regressionLimit": 1.15,
+          "regressionPass": true
+        },
+        "harnessSampledPeakMiB": {
+          "count": 1,
+          "p50": 65.578125,
+          "p95": 65.578125,
+          "max": 65.578125,
+          "absoluteLimit": 2048,
+          "absoluteLimitStatistic": "max",
+          "absoluteValue": 65.578125,
+          "absolutePass": true,
+          "baselineP95": 64.453125,
+          "baselineComparisonStatistic": "max",
+          "regressionRatio": 1.0174545454545454,
+          "regressionLimit": 1.15,
+          "regressionPass": true
+        }
+      }
+    },
+    "pi/candidate:cold": {
+      "caseCount": 5,
+      "measuredIterationCount": 5,
+      "perSessionLatency": {
+        "0": {
+          "firstUsableSnapshotMs": {
+            "p50": 277.248208,
+            "p95": 316.641542,
+            "baselineP95": 356.213875,
+            "regressionRatio": 0.8889085019498469,
+            "absolutePass": true,
+            "regressionPass": true
+          },
+          "sendToFirstAssistantContentMs": {
+            "p50": 51.224209,
+            "p95": 54.778417,
+            "baselineP95": 73.135667,
+            "regressionRatio": 0.7489972984043476,
+            "absolutePass": true,
+            "regressionPass": true
+          },
+          "historyPage20ToProjectionMs": {
+            "p50": 15.166333,
+            "p95": 16.09625,
+            "baselineP95": 14.50375,
+            "regressionRatio": 1.1097991898646902,
+            "absolutePass": true,
+            "regressionPass": true
+          }
+        },
+        "1": {
+          "firstUsableSnapshotMs": {
+            "p50": 436.616625,
+            "p95": 491.664875,
+            "baselineP95": 513.368667,
+            "regressionRatio": 0.9577227957311233,
+            "absolutePass": true,
+            "regressionPass": true
+          },
+          "sendToFirstAssistantContentMs": {
+            "p50": 55.675166,
+            "p95": 56.52675,
+            "baselineP95": 55.139542,
+            "regressionRatio": 1.0251581342478326,
+            "absolutePass": true,
+            "regressionPass": true
+          },
+          "historyPage20ToProjectionMs": {
+            "p50": 13.892166,
+            "p95": 15.788709,
+            "baselineP95": 14.257208,
+            "regressionRatio": 1.1074194190054603,
+            "absolutePass": true,
+            "regressionPass": true
+          }
+        }
+      },
+      "memory": {
+        "agentkitSampledPeakMiB": {
+          "count": 5,
+          "p50": 295.5625,
+          "p95": 295.984375,
+          "max": 295.984375,
+          "absoluteLimit": 512,
+          "absoluteLimitStatistic": "max",
+          "absoluteValue": 295.984375,
+          "absolutePass": true,
+          "baselineP95": 317.46875,
+          "baselineComparisonStatistic": "max",
+          "regressionRatio": 0.932326016340191,
+          "regressionLimit": 1.15,
+          "regressionPass": true
+        },
+        "harnessSampledPeakMiB": {
+          "count": 5,
+          "p50": 269.515625,
+          "p95": 272.140625,
+          "max": 272.140625,
+          "absoluteLimit": 2048,
+          "absoluteLimitStatistic": "max",
+          "absoluteValue": 272.140625,
+          "absolutePass": true,
+          "baselineP95": 294.984375,
+          "baselineComparisonStatistic": "max",
+          "regressionRatio": 0.9225594575983898,
+          "regressionLimit": 1.15,
+          "regressionPass": true
+        }
+      }
+    },
+    "pi/candidate:warm": {
+      "caseCount": 1,
+      "measuredIterationCount": 10,
+      "perSessionLatency": {
+        "0": {
+          "firstUsableSnapshotMs": {
+            "p50": 13.062875,
+            "p95": 17.605667,
+            "baselineP95": 13.119917,
+            "regressionRatio": 1.341903839788011,
+            "absolutePass": true,
+            "regressionPass": false
+          },
+          "sendToFirstAssistantContentMs": {
+            "p50": 30.275333,
+            "p95": 32.6035,
+            "baselineP95": 28.855583,
+            "regressionRatio": 1.1298853327621208,
+            "absolutePass": true,
+            "regressionPass": true
+          },
+          "historyPage20ToProjectionMs": {
+            "p50": 15.808292,
+            "p95": 18.779625,
+            "baselineP95": 16.218,
+            "regressionRatio": 1.157949500554939,
+            "absolutePass": true,
+            "regressionPass": true
+          }
+        },
+        "1": {
+          "firstUsableSnapshotMs": {
+            "p50": 10.657583,
+            "p95": 17.33575,
+            "baselineP95": 13.201875,
+            "regressionRatio": 1.3131278700942102,
+            "absolutePass": true,
+            "regressionPass": false
+          },
+          "sendToFirstAssistantContentMs": {
+            "p50": 32.229041,
+            "p95": 36.421,
+            "baselineP95": 31.756916,
+            "regressionRatio": 1.1468682916187454,
+            "absolutePass": true,
+            "regressionPass": true
+          },
+          "historyPage20ToProjectionMs": {
+            "p50": 16.632542,
+            "p95": 18.095,
+            "baselineP95": 15.950917,
+            "regressionRatio": 1.1344175385026452,
+            "absolutePass": true,
+            "regressionPass": true
+          }
+        }
+      },
+      "memory": {
+        "agentkitSampledPeakMiB": {
+          "count": 1,
+          "p50": 24.734375,
+          "p95": 24.734375,
+          "max": 24.734375,
+          "absoluteLimit": 512,
+          "absoluteLimitStatistic": "max",
+          "absoluteValue": 24.734375,
+          "absolutePass": true,
+          "baselineP95": 23.9375,
+          "baselineComparisonStatistic": "max",
+          "regressionRatio": 1.033289817232376,
+          "regressionLimit": 1.15,
+          "regressionPass": true
+        },
+        "harnessSampledPeakMiB": {
+          "count": 1,
+          "p50": 357.0,
+          "p95": 357.0,
+          "max": 357.0,
+          "absoluteLimit": 2048,
+          "absoluteLimitStatistic": "max",
+          "absoluteValue": 357.0,
+          "absolutePass": true,
+          "baselineP95": 405.890625,
+          "baselineComparisonStatistic": "max",
+          "regressionRatio": 0.8795472918350848,
+          "regressionLimit": 1.15,
+          "regressionPass": true
+        }
+      }
+    },
+    "dsh/candidate:cold": {
+      "caseCount": 5,
+      "measuredIterationCount": 5,
+      "perSessionLatency": {
+        "0": {
+          "firstUsableSnapshotMs": {
+            "p50": 47.255875,
+            "p95": 47.485833,
+            "baselineP95": 47.62525,
+            "regressionRatio": 0.9970726242906861,
+            "absolutePass": true,
+            "regressionPass": true
+          },
+          "sendToFirstAssistantContentMs": {
+            "p50": 77.791583,
+            "p95": 79.607708,
+            "baselineP95": 81.233958,
+            "regressionRatio": 0.9799806627666721,
+            "absolutePass": true,
+            "regressionPass": true
+          },
+          "historyPage20ToProjectionMs": {
+            "p50": 8.68275,
+            "p95": 8.884042,
+            "baselineP95": 9.19,
+            "regressionRatio": 0.9667075081610448,
+            "absolutePass": true,
+            "regressionPass": true
+          }
+        },
+        "1": {
+          "firstUsableSnapshotMs": {
+            "p50": 74.553708,
+            "p95": 77.015,
+            "baselineP95": 78.191667,
+            "regressionRatio": 0.9849515038475903,
+            "absolutePass": true,
+            "regressionPass": true
+          },
+          "sendToFirstAssistantContentMs": {
+            "p50": 34.202,
+            "p95": 38.423792,
+            "baselineP95": 41.510875,
+            "regressionRatio": 0.9256319458455163,
+            "absolutePass": true,
+            "regressionPass": true
+          },
+          "historyPage20ToProjectionMs": {
+            "p50": 7.841417,
+            "p95": 8.560125,
+            "baselineP95": 7.818625,
+            "regressionRatio": 1.094837647284529,
+            "absolutePass": true,
+            "regressionPass": true
+          }
+        }
+      },
+      "memory": {
+        "agentkitSampledPeakMiB": {
+          "count": 5,
+          "p50": 30.78125,
+          "p95": 33.734375,
+          "max": 33.734375,
+          "absoluteLimit": 512,
+          "absoluteLimitStatistic": "max",
+          "absoluteValue": 33.734375,
+          "absolutePass": true,
+          "baselineP95": 32.6875,
+          "baselineComparisonStatistic": "max",
+          "regressionRatio": 1.0320267686424474,
+          "regressionLimit": 1.15,
+          "regressionPass": true
+        },
+        "harnessSampledPeakMiB": {
+          "count": 5,
+          "p50": 429.515625,
+          "p95": 434.46875,
+          "max": 434.46875,
+          "absoluteLimit": 2048,
+          "absoluteLimitStatistic": "max",
+          "absoluteValue": 434.46875,
+          "absolutePass": true,
+          "baselineP95": 436.40625,
+          "baselineComparisonStatistic": "max",
+          "regressionRatio": 0.9955603293949159,
+          "regressionLimit": 1.15,
+          "regressionPass": true
+        }
+      }
+    },
+    "dsh/candidate:warm": {
+      "caseCount": 1,
+      "measuredIterationCount": 10,
+      "perSessionLatency": {
+        "0": {
+          "firstUsableSnapshotMs": {
+            "p50": 18.303583,
+            "p95": 20.464875,
+            "baselineP95": 41.966042,
+            "regressionRatio": 0.4876532078007261,
+            "absolutePass": true,
+            "regressionPass": true
+          },
+          "sendToFirstAssistantContentMs": {
+            "p50": 23.533083,
+            "p95": 28.941834,
+            "baselineP95": 26.446209,
+            "regressionRatio": 1.0943660771946557,
+            "absolutePass": true,
+            "regressionPass": true
+          },
+          "historyPage20ToProjectionMs": {
+            "p50": 8.068375,
+            "p95": 8.479125,
+            "baselineP95": 13.249459,
+            "regressionRatio": 0.6399600919554527,
+            "absolutePass": true,
+            "regressionPass": true
+          }
+        },
+        "1": {
+          "firstUsableSnapshotMs": {
+            "p50": 17.499416,
+            "p95": 20.855542,
+            "baselineP95": 33.245292,
+            "regressionRatio": 0.6273231710523102,
+            "absolutePass": true,
+            "regressionPass": true
+          },
+          "sendToFirstAssistantContentMs": {
+            "p50": 25.962417,
+            "p95": 32.715583,
+            "baselineP95": 25.916834,
+            "regressionRatio": 1.2623294573712205,
+            "absolutePass": true,
+            "regressionPass": false
+          },
+          "historyPage20ToProjectionMs": {
+            "p50": 7.862959,
+            "p95": 9.430208,
+            "baselineP95": 8.735041,
+            "regressionRatio": 1.0795837134593873,
+            "absolutePass": true,
+            "regressionPass": true
+          }
+        }
+      },
+      "memory": {
+        "agentkitSampledPeakMiB": {
+          "count": 1,
+          "p50": 35.25,
+          "p95": 35.25,
+          "max": 35.25,
+          "absoluteLimit": 512,
+          "absoluteLimitStatistic": "max",
+          "absoluteValue": 35.25,
+          "absolutePass": true,
+          "baselineP95": 34.390625,
+          "baselineComparisonStatistic": "max",
+          "regressionRatio": 1.0249886415265788,
+          "regressionLimit": 1.15,
+          "regressionPass": true
+        },
+        "harnessSampledPeakMiB": {
+          "count": 1,
+          "p50": 502.015625,
+          "p95": 502.015625,
+          "max": 502.015625,
+          "absoluteLimit": 2048,
+          "absoluteLimitStatistic": "max",
+          "absoluteValue": 502.015625,
+          "absolutePass": true,
+          "baselineP95": 505.90625,
+          "baselineComparisonStatistic": "max",
+          "regressionRatio": 0.9923095929334733,
+          "regressionLimit": 1.15,
+          "regressionPass": true
+        }
+      }
+    }
+  },
+  "performanceAccepted": false,
+  "familyAttachmentPerformanceCovered": false,
+  "oldSamplesReplaced": false,
+  "desktop": false,
+  "sourceOracleReview": {
+    "status": "prospective design only; original failed and not_run rows unchanged",
+    "contract": "../agentkit-reconnect-source-convergence-contract-20261026.md",
+    "dshScope1LagPreserved": true,
+    "newLifecycleCohortAccepted": false
+  }
+}

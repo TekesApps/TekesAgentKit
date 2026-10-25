@@ -2050,14 +2050,14 @@
     "currentCandidate": "10263722b5fb128922c49a31b5942c41333cd6e2",
     "frozenScopeBase": "5b7c84361206b45ac381b10437097d3b76c322c1",
     "ciObservation": {
-      "head": "d23731dfe21820a35a7af0550ecb6069cbef1f08",
-      "run": 40230369803,
+      "head": "72a0d644c61d7cf70c9500b70967dcef00b1a338",
+      "run": 40233798349,
       "root": "success",
       "ui": "failure",
       "onlyFailedGate": "strict nested reading / TekesUI53",
       "standalonePublicConsumer": "success",
       "laterDemoBuild": "skipped",
-      "artifact": 12613590407,
+      "artifact": 12613329961,
       "merged": false
     },
     "latestWindowFixAcceptance": {
@@ -2082,12 +2082,28 @@
       }
     ],
     "ordinaryPerformanceProgress": {
-      "officialCaseCount": 14,
-      "scope": "Native ordinary",
-      "coldWarm": "passed applicable budgets",
-      "lifecycle": "relative snapshot/assistant-content failed; all original samples retained",
-      "binding": "evidence-bindings-20261026/native-ordinary-official-v2.json",
+      "plannedCaseCount": 42,
+      "officialCaseCount": 40,
+      "sourceContractPassedCases": 38,
+      "sourceContractFailedCases": 2,
+      "notRunPlannedCases": 2,
+      "cold": "all three endpoints passed applicable budgets",
+      "warm": "Native passed; Pi snapshot and DSH assistant-content relative budgets failed",
+      "lifecycle": "Native relative failures; DSH source convergence failures; Pi not_run",
+      "binding": "evidence-bindings-20261026/ordinary-official-cohort.json",
       "performanceAccepted": false
+    },
+    "boundedSourceDiagnostics20261026": {
+      "dshInventory": "evidence-bindings-20261026/dsh-inventory-source-diagnostic.json",
+      "nativeWire": "evidence-bindings-20261026/native-wire-delay-diagnostic.json",
+      "reconnectOracleDesign": "agentkit-reconnect-source-convergence-contract-20261026.md",
+      "oracleStatus": "source-reviewed design, implementation/verification pending",
+      "originalFailuresRetained": true,
+      "productChanges": false,
+      "cargoRunsThisCheckpoint": 0,
+      "desktopRuns": 0,
+      "pythonToolTests": 481,
+      "pythonLogSha256": "99dfce589f179b3f0f20e65ebc7d1284405243ff81f0bd032e5d1589b020c394"
     }
   },
   "stageCoverageAudit": {
