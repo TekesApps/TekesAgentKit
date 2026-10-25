@@ -30,7 +30,7 @@ binding!(ComposerAnnotation, ANNOTATION_TYPESCRIPT, {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     source_locator: Option<TranscriptAnnotationSource> => "sourceLocator?": "TranscriptAnnotationSource",
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    artifact_reference: Option<ArtifactSelectionReference> => "artifactReference?": "ArtifactSelectionReference",
+    artifact_reference: Option<Box<ArtifactSelectionReference>> => "artifactReference?": "ArtifactSelectionReference",
 });
 binding!(AnnotationInput, INPUT_TYPESCRIPT, {
     text: String => "text": "string",
@@ -143,12 +143,12 @@ mod tests {
             excerpt: "中文🐉".into(),
             comment: "why".into(),
             source_locator: None,
-            artifact_reference: Some(reference.clone()),
+            artifact_reference: Some(Box::new(reference.clone())),
         };
         typed.validate().unwrap();
         let restored: ComposerAnnotation =
             serde_json::from_value(serde_json::to_value(&typed).unwrap()).unwrap();
-        assert_eq!(restored.artifact_reference, Some(reference));
+        assert_eq!(restored.artifact_reference.as_deref(), Some(&reference));
         let mut wrong_quote = restored;
         wrong_quote.excerpt = "别的引用".into();
         assert!(wrong_quote.validate().is_err());

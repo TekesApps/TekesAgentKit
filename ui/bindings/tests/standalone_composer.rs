@@ -182,7 +182,10 @@ async fn dispatched_result_keeps_original_identity_after_detach_without_resendin
     assert_eq!(submissions[0].id, id);
     assert_eq!(submissions[0].phase, SubmissionPhase::Unknown);
     assert_eq!(second.draft().unwrap().text, "后续草稿");
-    assert_eq!(fixture.calls.lock().unwrap().as_slice(), &[id.clone()]);
+    assert_eq!(
+        fixture.calls.lock().unwrap().as_slice(),
+        std::slice::from_ref(&id)
+    );
     // The explicit host reconciliation callback is exercised here against a
     // synthetic peer; this is not evidence of actual harness history recovery.
     assert!(second.acknowledge_reconciliation("another-run-id").is_err());

@@ -470,7 +470,7 @@ impl RunBinding {
                 && intent.baseline.annotations.contains(annotation),
             "annotation reveal capture is stale or ambiguous",
         )?;
-        let Some(reference) = &annotation.artifact_reference else {
+        let Some(reference) = annotation.artifact_reference.as_deref() else {
             return Ok(None);
         };
         reference.validate()?;

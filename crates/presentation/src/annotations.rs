@@ -101,7 +101,7 @@ mod tests {
                 end: excerpt.encode_utf16().count(),
                 fingerprint: "fingerprint".into(),
             }),
-            artifact_reference: Some(
+            artifact_reference: Some(Box::new(
                 tekes_agent_contract::ArtifactSelectionReference::capture(
                     "document".into(),
                     "artifact".into(),
@@ -109,7 +109,7 @@ mod tests {
                     vec!["biography".into()],
                     "revision-1".into(),
                     "sha256:fixture".into(),
-                    &excerpt,
+                    excerpt,
                     tekes_agent_contract::Utf16SelectionRange {
                         location: 0,
                         length: excerpt.encode_utf16().count() as u64,
@@ -118,7 +118,7 @@ mod tests {
                     0,
                 )
                 .unwrap(),
-            ),
+            )),
         }
     }
     #[test]

@@ -38,7 +38,7 @@ fn sourced_annotation() -> ComposerAnnotation {
         excerpt: excerpt.into(),
         comment: "请核对这个段落".into(),
         source_locator: None,
-        artifact_reference: Some(
+        artifact_reference: Some(Box::new(
             tekes_agent_contract::ArtifactSelectionReference::capture(
                 "document-A".into(),
                 "character-17".into(),
@@ -55,7 +55,7 @@ fn sourced_annotation() -> ComposerAnnotation {
                 0,
             )
             .unwrap(),
-        ),
+        )),
     }
 }
 async fn setup() -> (Arc<SessionRuntime>, [Arc<RunBinding>; 2]) {
@@ -187,7 +187,7 @@ async fn host_source_reveal_returns_only_the_exact_live_typed_reference() {
         action: ComposerContextAction::Open,
     };
     let selection_reference = a.reveal_annotation_reference(&intent).unwrap().unwrap();
-    assert_eq!(selection_reference, selected.artifact_reference.unwrap());
+    assert_eq!(selection_reference, *selected.artifact_reference.unwrap());
     let field_path = vec!["biography".into(), "paragraph-3".into()];
     assert_eq!(
         selection_reference.resolve(&tekes_agent_contract::ArtifactSelectionTarget {
