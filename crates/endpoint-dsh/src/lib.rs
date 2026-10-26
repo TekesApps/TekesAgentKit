@@ -1087,7 +1087,7 @@ mod tests {
 
     async fn serve_http(mut stream: TcpStream, baseline: Value) {
         let (request_line, body) = read_http_request(&mut stream).await;
-        let (status, value) = if request_line.starts_with("GET /api/tekes/harness-version ") {
+        let (status, value) = if request_line.starts_with("GET /api/agentkit/harness-version ") {
             (
                 "200 OK",
                 json!({"product":"@deepseek-ai/dsh","source":"@deepseek-ai/dsh-app-boot#getDshRuntimeVersion","version":"0.2.1-rc.2"}),

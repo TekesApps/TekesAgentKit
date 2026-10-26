@@ -190,7 +190,7 @@ def owned_dsh(root, data_root, home, cwd, base_url, environment, *,
         "import { getDshRuntimeVersion } from " + json.dumps(package_uri) + ";\n"
         "export const name='agentkit-version-probe';export const inject=['webServer'];"
         "export function apply(ctx){ctx.effect(()=>ctx.webServer.register({kind:'exact',"
-        "path:'/api/tekes/harness-version',handler(req,res){res.writeHead(200,"
+        "path:'/api/agentkit/harness-version',handler(req,res){res.writeHead(200,"
         "{'Content-Type':'application/json'});res.end(JSON.stringify({product:'@deepseek-ai/dsh',"
         "version:getDshRuntimeVersion(),source:'@deepseek-ai/dsh-app-boot#getDshRuntimeVersion'}));}}));}\n"
     )

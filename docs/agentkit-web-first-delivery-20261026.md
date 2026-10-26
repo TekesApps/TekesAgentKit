@@ -79,3 +79,15 @@ consumer, not rebuilt as a new application. Build outputs reuse the existing SSD
 shared target; immutable batch sources are not edited during validation. Historical
 evidence retains original commit/runtime identities. Final release/browser and
 real-model acceptance are pending, not implied by this document.
+
+## DSH host dependency boundary (#67)
+
+AgentKit owns the minimal authenticated runtime-version adapter in
+`integrations/dsh-runtime-probe`; see [installation and scope](dsh-runtime-probe.md).
+The consumer uses `/api/agentkit/harness-version` and retains strict official
+runtime evidence checks. Tekes App builds and the Tekes repository CI are not
+AgentKit release gates. Existing optional workspace plugins retain their own
+release/compatibility responsibilities; this adapter neither replaces their file
+tools nor changes the user's profile. The new adapter must pass real Host
+authentication and consumer acceptance before deployment; unit tests do not
+establish that the current daily Host has loaded it.

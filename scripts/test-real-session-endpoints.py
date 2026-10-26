@@ -299,7 +299,7 @@ try:
             # This read-only host plugin exposes official runtime version evidence, like the ClientKit host adapter.
             plugin=base/'version-probe.mjs'
             package=dsh/'node_modules/@deepseek-ai/dsh-app-boot/lib/index.js'
-            plugin.write_text("import { getDshRuntimeVersion } from "+json.dumps(package.as_uri())+";\nexport const name='agentkit-version-probe';export const inject=['webServer'];export function apply(ctx){ctx.effect(()=>ctx.webServer.register({kind:'exact',path:'/api/tekes/harness-version',handler(req,res){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({product:'@deepseek-ai/dsh',version:getDshRuntimeVersion(),source:'@deepseek-ai/dsh-app-boot#getDshRuntimeVersion'}));}}));}\n")
+            plugin.write_text("import { getDshRuntimeVersion } from "+json.dumps(package.as_uri())+";\nexport const name='agentkit-version-probe';export const inject=['webServer'];export function apply(ctx){ctx.effect(()=>ctx.webServer.register({kind:'exact',path:'/api/agentkit/harness-version',handler(req,res){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({product:'@deepseek-ai/dsh',version:getDshRuntimeVersion(),source:'@deepseek-ai/dsh-app-boot#getDshRuntimeVersion'}));}}));}\n")
             patch=base/'dsh.patch.yml';patch.write_text(json.dumps([
                 {'id':'llm-deepseek','disabled':True},
                 {'id':'agent-default-model','config':{'provider':'endpoint-test','model':'endpoint-test'}},

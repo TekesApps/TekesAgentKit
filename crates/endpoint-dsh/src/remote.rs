@@ -225,7 +225,7 @@ impl Remote {
             .get(
                 self.config
                     .base_url
-                    .join("api/tekes/harness-version")
+                    .join("api/agentkit/harness-version")
                     .map_err(|_| Error::Protocol("invalid DSH URL".into()))?,
             )
             .header("Cache-Control", "no-cache");
