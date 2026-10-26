@@ -1,16 +1,49 @@
+import { readFile } from 'node:fs/promises';
 import { Type } from '@sinclair/typebox';
 import { createHash, randomUUID } from 'node:crypto';
+import { createAssistantReading } from './agentkit-reading.mjs';
+import { inputReceiptPayload, snapshotInputFiles } from './agentkit-input-files.mjs';
 // Host control over Pi's public extension API; never adds private RPC commands or parses logs.
 export default function (pi) {
   const digest = text => createHash('sha256').update(text).digest('hex');
   const prepared = [], admitted = [];
   let runID;
+  pi.on('tool_call', async (event, ctx) => {
+    let mode;
+    try {
+      const file = process.env.AGENTKIT_PERMISSION_FILE;
+      if (!file) throw new Error('No session approval policy');
+      try {
+        const source = await readFile(file, 'utf8');
+        if (Buffer.byteLength(source) > 1024) throw new Error('Invalid approval policy');
+        mode = JSON.parse(source).mode;
+      } catch (error) { if (error.code !== 'ENOENT') throw error; mode = 'allow-tools'; }
+      if (!['allow-tools', 'ask-tools', 'deny-tools'].includes(mode)) throw new Error('Invalid approval policy');
+    } catch { return { block: true, reason: 'Tool approval policy is unavailable', terminate: true }; }
+    if (mode === 'allow-tools') return;
+    if (mode === 'deny-tools') return { block: true, reason: 'Tools are blocked by the session approval policy', terminate: true };
+    const allowed = await ctx.ui.confirm(event.toolName, 'Allow this tool once?\n' + JSON.stringify(event.input));
+    if (!allowed) return { block: true, reason: 'Tool approval was denied or cancelled', terminate: true };
+  });
+  const reading = createAssistantReading();
+  pi.on('message_start', (event, ctx) => {
+    if (event.message.role !== 'assistant') return;
+    ctx.ui.notify('agentkit-reading/v1:' + JSON.stringify({ token: process.env.AGENTKIT_CONTROL_TOKEN, streamId: reading.start() }), 'info');
+  });
+  // Pi 1.3 RPC strips the full message from message_update. Its public
+  // extension event still exposes the authoritative partial message.
+  pi.on('message_update', (event, ctx) => {
+    const streamId = reading.current();
+    if (event.message.role !== 'assistant' || !streamId) return;
+    ctx.ui.notify('agentkit-reading/v1:' + JSON.stringify({ token: process.env.AGENTKIT_CONTROL_TOKEN, streamId, message: event.message }), 'info');
+  });
   pi.on('input', async event => {
     if (event.source !== 'rpc') return;
     const index = prepared.findIndex(item => item.hash === digest(event.text));
     if (index >= 0) admitted.push({ ...prepared.splice(index, 1)[0], mode: event.streamingBehavior ?? 'started' });
   });
   pi.on('message_end', async event => {
+    if (event.message.role === 'assistant') { reading.end(event.message); return; }
     if (event.message.role !== 'user') return;
     const content = event.message.content;
     const text = typeof content === 'string' ? content : content.filter(block => block.type === 'text').map(block => block.text).join('\n');
@@ -19,10 +52,13 @@ export default function (pi) {
     if (index < 0) index = admitted.findIndex(item => item.hasImages && text.startsWith(item.text + '\n\n'));
     if (index >= 0) {
       const item = admitted.splice(index, 1)[0];
-      pi.appendEntry('agentkit.inputReceipt.v1', { timestamp: event.message.timestamp, hash, rpcId: item.id, mode: item.mode });
+      pi.appendEntry('agentkit.inputReceipt.v1', inputReceiptPayload(
+        { timestamp: event.message.timestamp, hash, rpcId: item.id, mode: item.mode }, item.files,
+      ));
     }
   });
   pi.on('agent_start', async () => {
+    reading.resetActive();
     runID = randomUUID();
     pi.appendEntry('agentkit.run.v1', { id: runID, phase: 'started', timestamp: Date.now() });
   });
@@ -98,10 +134,12 @@ export default function (pi) {
           }
           case 'input.prepare': {
             if (prepared.length + admitted.length >= 256) throw new Error('Input receipt limit');
-            const { id, text, hasImages } = request.params;
+            const { id, text, hasImages, files } = request.params;
             if (typeof id !== 'string' || !id || typeof text !== 'string') throw new Error('Invalid input receipt');
-            prepared.push({ id, text, hash: digest(text), hasImages: hasImages === true }); data = null; break;
+            const fileSnapshot = snapshotInputFiles(files);
+            prepared.push({ id, text, hash: digest(text), hasImages: hasImages === true, files: fileSnapshot }); data = null; break;
           }
+          case 'reading.identities': data = reading.identities(ctx.sessionManager.getEntries()); break;
           case 'settings.get': data = pi.getSettings(); break;
           case 'tools.list': data = pi.getAllTools(); break;
           case 'tools.select': pi.setActiveTools(request.params.tools); data = pi.getActiveTools(); break;

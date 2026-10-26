@@ -94,3 +94,18 @@ use the settled run marker's entry ID. Missing boundaries, stale journals, activ
 work and unavailable capabilities prevent execution. Current authority is rechecked
 at click time. The existing outcome preserves navigation even if optional rename
 or queue cleanup reports a warning; mutations are never automatically retried.
+
+## Task and child presentation
+
+The service exposes shared SummaryFacts and parent-owned child controls through
+`agent.familySnapshot` and the `familyView` observation. Child content opens with
+an opaque, per-observer handle; `childView` holds an independent history lease.
+Read the [family contract](../../docs/web-family-contract.md) before consuming
+these methods. Child IDs never become ordinary session fallbacks; one-shot,
+parent-unavailable and bounded read-only sources retain their exact capabilities.
+
+The public TypeScript contract also exports permission DTOs from Rust. The host
+and browser render each Harness's actual catalog and confirmed effective mode;
+values are not browser-enforced sandbox policies. A release must replace local
+development package overrides with an immutable public commit and verify the
+installed declaration bytes against that pin.

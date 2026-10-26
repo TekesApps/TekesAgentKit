@@ -11,12 +11,29 @@ export interface TranscriptAnnotationSource {
   end: number;
   fingerprint: string;
 }
+export interface Utf16SelectionRange {
+  location: number;
+  length: number;
+}
+export interface ArtifactSelectionReference {
+  documentId: string;
+  artifactId: string;
+  artifactType: string;
+  fieldPath: string[];
+  revision: string;
+  digest: string;
+  range: Utf16SelectionRange;
+  quote: string;
+  contextBefore: string;
+  contextAfter: string;
+}
 export interface ComposerAnnotation {
   id: string;
   source: string;
   excerpt: string;
   comment: string;
   sourceLocator?: TranscriptAnnotationSource;
+  artifactReference?: ArtifactSelectionReference;
 }
 export interface AnnotationInput {
   text: string;
@@ -73,4 +90,20 @@ export interface TranscriptLiveUsage {
 export interface TranscriptReportedUsage {
   outputTokens: number;
   isComplete: boolean;
+}
+export interface PermissionOption {
+  value: string;
+  title?: string | null;
+  description?: string | null;
+}
+export interface PermissionState {
+  options: PermissionOption[];
+  currentValue: string | null;
+}
+export interface PermissionPolicy {
+  threadLevel: PermissionOption[];
+  serverLevel: PermissionState;
+}
+export interface PermissionModeState {
+  mode: string | null;
 }

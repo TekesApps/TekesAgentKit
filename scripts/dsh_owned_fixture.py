@@ -1,0 +1,362 @@
+"""Own and run one isolated DSH Web fixture process.
+
+The caller supplies the complete child environment and owns the parent fixture
+directory. This module never reads ambient credentials, user data, or process
+environment values. It prepares only the documented DSH patch/plugin inputs,
+exchanges the one-time launch token for a cookie without following redirects,
+and terminates only the process group it created.
+"""
+
+from contextlib import contextmanager
+from dataclasses import dataclass
+import json
+import os
+from pathlib import Path
+import re
+import signal
+import subprocess
+import threading
+import time
+from urllib.parse import urlsplit, urlunsplit
+import urllib.error
+import urllib.request
+from performance_owned_receipt import (
+    begin_fresh, record_started, require_canonical_path, require_performance_case,
+    validate_resume,
+)
+
+
+_LAUNCH = re.compile(r"dsh web: (https?://[^\s]+)")
+_SENSITIVE_QUERY = re.compile(r"([?&])([^=&#\s]+)=([^&#\s]*)")
+_AUTH_TEXT = re.compile(
+    r"(?i)(authorization|cookie|set-cookie|token|api[_-]?key)(\s*[:=]\s*)([^\s,;]+)"
+)
+_COOKIE_VALUE = re.compile(r"(?i)\b(?:dsh[-_])?(?:session|cookie)(?:[-_][a-z0-9]+)?=([^;\s,]+)")
+
+
+def _redact(text, secrets=()):
+    """Remove launch query values and known credentials from diagnostic text."""
+    text = _SENSITIVE_QUERY.sub(lambda match: match.group(1) + match.group(2) + "[REDACTED]", text)
+    text = _AUTH_TEXT.sub(lambda match: match.group(1) + match.group(2) + "[REDACTED]", text)
+    text = _COOKIE_VALUE.sub(lambda match: match.group(0).split("=", 1)[0] + "=[REDACTED]", text)
+    for secret in secrets:
+        if secret:
+            text = text.replace(secret, "[REDACTED]")
+    return text
+
+
+def _fresh_dir(path, label):
+    path = Path(path)
+    if not path.is_absolute() or path.is_symlink():
+        raise ValueError(label + " must be an absolute non-symlink path")
+    if path.exists():
+        raise ValueError(label + " must be absent")
+    if not path.parent.is_dir():
+        raise ValueError(label + " parent directory must already exist")
+    return path
+
+
+def _loopback_base_url(value):
+    try:
+        parsed = urlsplit(value)
+        port = parsed.port
+    except (TypeError, ValueError) as error:
+        raise ValueError("base_url must be a valid loopback HTTP URL") from error
+    if (parsed.scheme != "http" or parsed.hostname not in ("127.0.0.1", "localhost", "::1")
+            or parsed.username is not None or parsed.password is not None or "@" in parsed.netloc
+            or parsed.query or parsed.fragment or (port is not None and not 1 <= port <= 65535)):
+        raise ValueError("base_url must be loopback HTTP without credentials, query, or fragment")
+    return value
+
+
+@dataclass(frozen=True)
+class DshFixture:
+    """Connection and provenance fields needed by the existing endpoint runner."""
+
+    root: Path
+    node: Path
+    entry: Path
+    home: Path
+    data_root: Path
+    sessions_root: Path
+    patch_file: Path
+    plugin_file: Path
+    process: object
+    url: str
+    cookie: str
+    version: str
+    launch_seconds: float
+    _logs: object
+
+    def connector_config(self, commands):
+        return {
+            "kind": "dsh",
+            "url": self.url,
+            "cookie": self.cookie,
+            "expectedVersion": self.version,
+            "commands": commands,
+        }
+
+    def diagnostic_tail(self, limit=5000):
+        """Return bounded redacted child output suitable for assertion errors."""
+        with self._logs["lock"]:
+            return "".join(self._logs["lines"])[-limit:]
+
+
+@contextmanager
+def owned_dsh(root, data_root, home, cwd, base_url, environment, *,
+              query_sqlite=False, image_input=False, readiness_timeout=60, shutdown_timeout=15,
+              opener_factory=None, popen_factory=None, monotonic=time.monotonic,
+              sleep=time.sleep, performance_case=None, resume_receipt=None,
+              on_process_started=None, _process_probe=None,
+              _open_files_probe=None):
+    """Prepare and run isolated DSH, yielding a :class:`DshFixture`.
+
+    ``environment`` is the complete child environment. It must explicitly
+    include any synthetic provider key required by the patch; ambient values
+    are never inherited. DSH writes session history below ``data_root``.
+    Fixture directories/files are left for the caller's evidence lifecycle.
+    ``performance_case`` opts into a fixed-SSD identity receipt;
+    ``resume_receipt`` explicitly reuses only that sealed case. The optional
+    ``on_process_started`` callback runs immediately after Popen returns.
+    """
+    performance = performance_case is not None or resume_receipt is not None
+    if resume_receipt is not None and performance_case is None:
+        raise ValueError("resume_receipt requires performance_case")
+    if performance:
+        require_performance_case(performance_case)
+        require_canonical_path(root, "DSH runtime root")
+    runtime = Path(root).resolve(strict=True)
+    if not runtime.is_dir():
+        raise ValueError("root must be an existing DSH runtime directory")
+    node = runtime / "node/bin/node"
+    entry = runtime / "node_modules/@deepseek-ai/dsh/lib/bin.js"
+    boot = runtime / "node_modules/@deepseek-ai/dsh-app-boot/lib/index.js"
+    package_file = runtime / "node_modules/@deepseek-ai/dsh/package.json"
+    if not all(path.is_file() for path in (node, entry, boot, package_file)):
+        raise ValueError("root must contain DSH runtime, boot package, and package metadata")
+    if performance:
+        # A fixed runtime may expose its immutable Node through a symlink.
+        # Bind and execute the canonical files; owned mutable state still
+        # rejects every symlink, and resume rechecks these exact identities.
+        node, entry, boot, package_file = (
+            path.resolve(strict=True) for path in (node, entry, boot, package_file))
+    if on_process_started is not None and not callable(on_process_started):
+        raise ValueError("on_process_started must be callable")
+    if resume_receipt is None:
+        data = _fresh_dir(data_root, "data_root")
+        owned_home = _fresh_dir(home, "home")
+    else:
+        data = Path(data_root)
+        owned_home = Path(home)
+        for label, path in (("data_root", data), ("home", owned_home)):
+            if not path.is_absolute() or path.is_symlink() or not path.is_dir() or path.resolve() != path:
+                raise ValueError(label + " must be an existing canonical non-symlink directory")
+    for label, candidate in (("data_root", data), ("home", owned_home)):
+        if candidate.resolve() == runtime or runtime in candidate.resolve().parents:
+            raise ValueError(label + " must be outside root")
+    if data.resolve() == owned_home.resolve() or data.resolve() in owned_home.resolve().parents or owned_home.resolve() in data.resolve().parents:
+        raise ValueError("data_root and home must be separate directories")
+    working_directory = Path(cwd).resolve(strict=True)
+    if not working_directory.is_dir():
+        raise ValueError("cwd must be an existing directory")
+    endpoint = _loopback_base_url(base_url)
+    if not isinstance(environment, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in environment.items()):
+        raise ValueError("environment must be an explicit mapping of string names and values")
+    if environment.get("HOME") != str(owned_home):
+        raise ValueError("environment HOME must equal the owned home path")
+    if environment.get("DSH_HOME") != str(owned_home):
+        raise ValueError("environment DSH_HOME must equal the owned home path")
+    if "AGENTKIT_SYNTHETIC_KEY" not in environment:
+        raise ValueError("environment must explicitly provide AGENTKIT_SYNTHETIC_KEY")
+    if "DSH_TELEMETRY_DISABLED" not in environment:
+        raise ValueError("environment must explicitly set DSH_TELEMETRY_DISABLED")
+    if not isinstance(readiness_timeout, (int, float)) or readiness_timeout <= 0:
+        raise ValueError("readiness_timeout must be positive")
+    if not isinstance(shutdown_timeout, (int, float)) or shutdown_timeout <= 0:
+        raise ValueError("shutdown_timeout must be positive")
+
+    if type(image_input) is not bool:
+        raise ValueError("image_input must be boolean")
+
+    if resume_receipt is None:
+        data.mkdir(mode=0o700)
+        owned_home.mkdir(mode=0o700)
+    sessions = data / "dsh-sessions"
+    plugin = data / "version-probe.mjs"
+    patch_file = data / "dsh.patch.yml"
+    package_uri = boot.as_uri()
+    plugin_text = (
+        "import { getDshRuntimeVersion } from " + json.dumps(package_uri) + ";\n"
+        "export const name='agentkit-version-probe';export const inject=['webServer'];"
+        "export function apply(ctx){ctx.effect(()=>ctx.webServer.register({kind:'exact',"
+        "path:'/api/tekes/harness-version',handler(req,res){res.writeHead(200,"
+        "{'Content-Type':'application/json'});res.end(JSON.stringify({product:'@deepseek-ai/dsh',"
+        "version:getDshRuntimeVersion(),source:'@deepseek-ai/dsh-app-boot#getDshRuntimeVersion'}));}}));}\n"
+    )
+    patch = [
+        {"id": "llm-deepseek", "disabled": True},
+        {"id": "agent-default-model", "config": {"provider": "endpoint-test", "model": "endpoint-test"}},
+        {"id": "llm-pi-ai", "config": {"providers": {"endpoint-test": {
+            "api": "openai-completions", "apiKeyEnv": "AGENTKIT_SYNTHETIC_KEY",
+            "baseURL": endpoint, "models": [{"id": "endpoint-test", "contextWindow": 32768, "maxTokens": 1024,
+                **({"input": ["text", "image"]} if image_input else {})}],
+        }}}},
+        {"id": "session-persistence-jsonl", "config": {"root": str(sessions), "compression": "none"}},
+    ]
+    if query_sqlite:
+        patch.append({"id": "session-query-sqlite", "config": {"path": ":memory:", "openAt": "first-search"}})
+    patch.append({"insert": [{"name": plugin.as_uri()}]})
+    version = json.loads(package_file.read_text(encoding="utf-8"))["version"]
+    patch_text = json.dumps(patch, separators=(",", ":")) + "\n"
+    public_config = {"endpoint": endpoint, "version": version,
+                     "query_sqlite": query_sqlite, "image_input": image_input,
+                     "cwd": str(working_directory), "patch": patch}
+    marker_path = None
+    if resume_receipt is not None:
+        marker_path = validate_resume(
+            performance_case=performance_case, resume_receipt=resume_receipt,
+            fixture_kind="dsh", owned_paths={"data": data, "home": owned_home},
+            runtime_files={"node": node, "entry": entry, "boot": boot, "package": package_file},
+            public_config=public_config,
+            process_probe=_process_probe, open_files_probe=_open_files_probe,
+        )
+        if not all(path.is_file() for path in (plugin, patch_file)):
+            raise ValueError("resumed DSH owned config is incomplete")
+        if plugin.read_text(encoding="utf-8") != plugin_text or patch_file.read_text(encoding="utf-8") != patch_text:
+            raise ValueError("resumed DSH patch or plugin config changed")
+    else:
+        plugin.write_text(plugin_text, encoding="utf-8")
+        plugin.chmod(0o600)
+        descriptor = os.open(str(patch_file), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as stream:
+            stream.write(patch_text)
+        if performance:
+            marker_path = begin_fresh(
+                performance_case=performance_case, fixture_kind="dsh",
+                owned_paths={"data": data, "home": owned_home},
+                runtime_files={"node": node, "entry": entry, "boot": boot, "package": package_file},
+                public_config=public_config,
+            )
+    child_env = dict(environment)
+    popen = popen_factory or subprocess.Popen
+    opener_factory = opener_factory or urllib.request.build_opener
+    process = popen(
+        [str(node), str(entry), "--profile", "web", "--patch", str(patch_file),
+         "--no-open", "--host", "127.0.0.1", "--port", "0"],
+        cwd=str(working_directory), env=child_env, stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT, text=True, start_new_session=True,
+    )
+    try:
+        if on_process_started is not None:
+            on_process_started(process)
+        if performance and resume_receipt is None:
+            record_started(marker_path, process)
+    except BaseException:
+        if process.poll() is None:
+            try:
+                os.killpg(process.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+        try:
+            process.wait(timeout=max(1, shutdown_timeout))
+        except (subprocess.TimeoutExpired, TimeoutError):
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait(timeout=max(1, shutdown_timeout))
+        raise
+    logs = {"lines": [], "lock": threading.Lock(), "ready": threading.Event(), "launch": None,
+            "eof": threading.Event(), "reader_error": None}
+    secrets = [value for key, value in child_env.items()
+               if re.search(r"(?i)(token|secret|password|cookie|credential|api[_-]?key)", key)]
+
+    def drain():
+        try:
+            for raw in iter(process.stdout.readline, ""):
+                match = _LAUNCH.search(raw)
+                if match and logs["launch"] is None:
+                    logs["launch"] = match.group(1)
+                    logs["ready"].set()
+                safe = _redact(raw, secrets)
+                with logs["lock"]:
+                    logs["lines"].append(safe)
+                    if len(logs["lines"]) > 500:
+                        del logs["lines"][:-500]
+        except Exception as error:  # retained as sanitized diagnostic metadata
+            logs["reader_error"] = type(error).__name__
+        finally:
+            logs["eof"].set()
+
+    reader = threading.Thread(target=drain, name="agentkit-dsh-output", daemon=True)
+    reader.start()
+    started = monotonic()
+    try:
+        readiness_deadline = monotonic() + readiness_timeout
+        ready = False
+        while monotonic() < readiness_deadline:
+            if logs["ready"].wait(min(0.1, max(0.0, readiness_deadline - monotonic()))):
+                ready = True
+                break
+            status = process.poll()
+            if status is not None:
+                break
+        if not ready:
+            status = process.poll()
+            detail = "DSH readiness timeout (exit=" + repr(status) + ")"
+            if logs["reader_error"]:
+                detail += "; output reader=" + logs["reader_error"]
+            raise RuntimeError(detail + ": " + _redact("".join(logs["lines"])[-5000:], secrets))
+        launch = logs["launch"]
+        launch_parts = urlsplit(launch)
+        if launch_parts.scheme != "http" or launch_parts.hostname not in ("127.0.0.1", "localhost", "::1"):
+            raise RuntimeError("DSH readiness URL was not loopback HTTP")
+
+        class NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, *_args, **_kwargs):
+                return None
+
+        opener = opener_factory(NoRedirect)
+        try:
+            response = opener.open(launch, timeout=10)
+        except urllib.error.HTTPError as error:
+            response = error
+        try:
+            cookie_header = response.headers.get("Set-Cookie", "")
+        finally:
+            if hasattr(response, "close"):
+                response.close()
+        cookie = cookie_header.split(";", 1)[0]
+        if not cookie or "=" not in cookie:
+            raise RuntimeError("DSH launch cookie exchange failed: " + _redact("".join(logs["lines"])[-1000:], secrets + [launch, cookie_header]))
+        secrets.append(cookie)
+        # Connector requests use the stable origin URL; the exchanged token is
+        # kept only in this returned in-memory fixture object.
+        stable_url = urlunsplit((launch_parts.scheme, launch_parts.netloc, "/", "", ""))
+        yield DshFixture(runtime, node, entry, owned_home, data, sessions, patch_file, plugin,
+                         process, stable_url, cookie, version, monotonic() - started, logs)
+    finally:
+        if process.poll() is None:
+            try:
+                os.killpg(process.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            deadline = monotonic() + shutdown_timeout
+            while process.poll() is None and monotonic() < deadline:
+                sleep(min(0.05, max(0.0, deadline - monotonic())))
+            if process.poll() is None:
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+        try:
+            process.wait(timeout=max(1, shutdown_timeout))
+        except (subprocess.TimeoutExpired, TimeoutError):
+            # Do not target any PID other than the group created above.
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait(timeout=max(1, shutdown_timeout))
+        reader.join(timeout=max(1, shutdown_timeout))

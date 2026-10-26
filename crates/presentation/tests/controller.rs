@@ -13,6 +13,7 @@ use tekes_agent_session::*;
 use tokio::sync::Notify;
 #[derive(Clone, Default)]
 struct Connector {
+    search: bool,
     sent: Arc<Notify>,
     release: Arc<Notify>,
     calls: Arc<AtomicUsize>,
@@ -20,7 +21,11 @@ struct Connector {
     reject_discard: Arc<AtomicBool>,
     hold_fork: Arc<AtomicBool>,
     bounded: Arc<AtomicBool>,
+    hold_bounded: Arc<AtomicBool>,
+    bounded_entered: Arc<Notify>,
+    release_bounded: Arc<Notify>,
     pages: Arc<std::sync::Mutex<std::collections::VecDeque<Value>>>,
+    catalog_owner: Arc<std::sync::Mutex<Option<String>>>,
 }
 struct Endpoint {
     connector: Connector,
@@ -62,6 +67,9 @@ impl SessionEndpoint for Endpoint {
         if self.connector.bounded.load(Ordering::SeqCst) {
             caps.methods.insert("subagents.history".into());
         }
+        if self.connector.search {
+            caps.methods.insert("session.search".into());
+        }
         caps.supports_ephemeral_fork = true;
         caps
     }
@@ -96,7 +104,16 @@ impl SessionEndpoint for Endpoint {
             .lock()
             .unwrap()
             .push((method.into(), payload.clone()));
+        if method == "session.search" {
+            return Ok(
+                json!({"items":[{"sessionId":"a","snippet":payload["query"],"extra":"retained"}],"hasMore":true}),
+            );
+        }
         if method == "subagents.history" {
+            if self.connector.hold_bounded.load(Ordering::SeqCst) {
+                self.connector.bounded_entered.notify_one();
+                self.connector.release_bounded.notified().await;
+            }
             let page = self
                 .connector
                 .pages
@@ -111,8 +128,15 @@ impl SessionEndpoint for Endpoint {
             };
         }
         if method == "subagents.list" {
+            let owner = self
+                .connector
+                .catalog_owner
+                .lock()
+                .unwrap()
+                .clone()
+                .unwrap_or("a".into());
             return Ok(
-                json!({"parentAvailable":payload["parentSessionId"] == "a","entries":[{"kind":"child","id":"child","mode":"continuable"},{"kind":"child","id":"bounded","mode":"one-shot"}]}),
+                json!({"parentAvailable":payload["parentSessionId"] == owner,"entries":[{"kind":"child","id":"child","mode":"continuable"},{"kind":"child","id":"bounded","mode":"one-shot"}]}),
             );
         }
         if method == "session.fork" {
@@ -378,6 +402,8 @@ async fn cancelled_fork_is_unknown_blocks_duplicate_and_retains_originating_pare
     let (connector, runtime, _) = setup().await;
     connector.hold_fork.store(true, Ordering::SeqCst);
     let side = Arc::new(SideChatController::new(runtime.clone()));
+    let mut changes = side.subscribe();
+    assert!(!changes.has_changed().unwrap());
     let worker = side.clone();
     let task = tokio::spawn(async move {
         worker
@@ -385,8 +411,21 @@ async fn cancelled_fork_is_unknown_blocks_duplicate_and_retains_originating_pare
             .await
     });
     connector.sent.notified().await;
+    changes.changed().await.unwrap();
+    assert!(
+        changes
+            .borrow_and_update()
+            .is_creating_for(&RunScope::main("test", "a"))
+    );
     task.abort();
     let _ = task.await;
+    changes.changed().await.unwrap();
+    assert!(
+        changes
+            .borrow_and_update()
+            .unknown_creation_for(&RunScope::main("test", "a"))
+            .is_some()
+    );
     assert_eq!(side.snapshot().unknown_creations.len(), 1);
     assert!(
         side.create(RunScope::main("test", "a"), None, "duplicate")
@@ -397,6 +436,70 @@ async fn cancelled_fork_is_unknown_blocks_duplicate_and_retains_originating_pare
     side.reconcile_creation(&RunScope::main("test", "a"), None)
         .unwrap();
     assert!(side.snapshot().unknown_creations.is_empty());
+    changes.changed().await.unwrap();
+    assert!(changes.borrow_and_update().unknown_creations.is_empty());
+    // Reading and rejected no-op reconciliation must not cause a UI wake loop.
+    let _ = side.snapshot();
+    assert!(
+        side.reconcile_creation(&RunScope::main("test", "a"), None)
+            .is_err()
+    );
+    assert!(!changes.has_changed().unwrap());
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn nested_child_controller_uses_direct_owner_and_rejects_other_destinations() {
+    let (connector, runtime, _) = setup().await;
+    *connector.catalog_owner.lock().unwrap() = Some("nested".into());
+    let parent = RunScope {
+        endpoint_id: "test".into(),
+        thread_id: "a".into(),
+        session_id: "nested".into(),
+    };
+    let scope = RunScope {
+        session_id: "child".into(),
+        ..parent.clone()
+    };
+    let target = ComposerDestination::run(scope.clone());
+    let _lease = runtime.acquire_history("child").await.unwrap();
+    let controller = RunController::for_child(runtime.clone(), &parent, "child").unwrap();
+    assert!(controller.select(destination("a")).is_err());
+    assert!(
+        controller
+            .edit_text(&destination("a"), "wrong".into())
+            .is_err()
+    );
+    assert!(
+        controller
+            .edit(&destination("a"), ComposerDraft::default())
+            .is_err()
+    );
+    assert!(
+        controller
+            .prepare(&destination("a"), PromptMode::Queue)
+            .is_err()
+    );
+    controller.refresh_child_catalog(&scope).await.unwrap();
+    controller
+        .edit_text(&target, "nested child input".into())
+        .unwrap();
+    let ticket = controller.prepare(&target, PromptMode::Queue).unwrap();
+    controller.dispatch(ticket, None).await.unwrap();
+    let requests = connector.requests.lock().unwrap().clone();
+    let prompts: Vec<_> = requests
+        .iter()
+        .filter(|(m, _)| m == "subagents.prompt")
+        .collect();
+    assert_eq!(prompts.len(), 1);
+    assert_eq!(prompts[0].1["parentSessionId"], "nested");
+    assert!(
+        requests
+            .iter()
+            .filter(|(m, _)| m == "subagents.list")
+            .all(|(_, p)| p["parentSessionId"] == "nested")
+    );
+    assert!(!requests.iter().any(|(m, _)| m == "session.prompt"));
     runtime.stop().await.unwrap();
 }
 #[tokio::test]
@@ -492,5 +595,790 @@ async fn bounded_child_pages_preserve_verified_prefix_and_reset_changed_history(
     // Child bounded reads never mount a child journal or consume its parent's transcript.
     assert!(!runtime.inspect(|s| s.sessions.contains_key("bounded")));
     drop(child);
+    runtime.stop().await.unwrap();
+}
+
+fn bounded_source_page(phase: &str) -> Value {
+    json!({
+        "parentSessionId":"a",
+        "childSessionId":"bounded",
+        "throughSequence":5,
+        "historyRevision":"e".repeat(64),
+        "entries":[{
+            "event":{"seq":5,"time":100,"type":"assistant/message","data":{
+                "turn":1,"step":6,"message":{"id":"history-entry","content":[{"type":"text","text":"independent history"}]}
+            }}
+        }],
+        "hasMoreBefore":false,
+        "runOpen":false,
+        "sourceCall":{"callId":"task-source-7","name":"task","arguments":{"task_name":"audit","mode":"bounded"},"phase":phase}
+    })
+}
+
+#[tokio::test]
+async fn bounded_source_call_phases_and_identity_are_projected_through_public_child_run() {
+    let (connector, runtime, _) = setup().await;
+    connector.bounded.store(true, Ordering::SeqCst);
+
+    let cases = [
+        ("error", "error"),
+        ("stopped", "aborted"),
+        ("running", "running"),
+        ("done", "completed"),
+        ("future-phase", "completed"),
+    ];
+    let mut pages = Vec::new();
+    for (phase, _) in cases {
+        // ChildRun::open reads the initial page; transcript() then refreshes through
+        // the same public RPC path while the revision and history remain unchanged.
+        pages.extend([bounded_source_page(phase), bounded_source_page(phase)]);
+    }
+    connector.pages.lock().unwrap().extend(pages);
+
+    for (phase, expected_status) in cases {
+        let child = ChildRun::open(
+            runtime.clone(),
+            RunScope::main("test", "a"),
+            "bounded",
+            ChildHistoryLayout::SameSession,
+            None,
+        )
+        .await
+        .unwrap();
+        let transcript = child.transcript().await.unwrap();
+
+        let expected_turn_id =
+            json!(["test", "bounded", "task-source", "task-source-7"]).to_string();
+        assert_eq!(transcript.turns[0].id, expected_turn_id);
+        assert_eq!(transcript.turns[0].status, expected_status, "phase {phase}");
+        assert_eq!(transcript.tools[0].turn_id, transcript.turns[0].id);
+        assert_eq!(
+            transcript.tools[0].id,
+            format!("{}:call", transcript.turns[0].id)
+        );
+        assert_eq!(transcript.tools[0].name, "task");
+        assert_eq!(
+            transcript.tools[0].arguments,
+            json!({"task_name":"audit","mode":"bounded"})
+        );
+        assert_eq!(transcript.tools[0].phase, phase);
+        assert_eq!(transcript.items.len(), 1);
+        assert_eq!(transcript.items[0].text, "independent history");
+    }
+
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn bounded_source_call_running_to_terminal_keeps_identity_and_history_entries() {
+    let (connector, runtime, _) = setup().await;
+    connector.bounded.store(true, Ordering::SeqCst);
+
+    for (terminal_phase, expected_status) in [("error", "error"), ("stopped", "aborted")] {
+        connector.pages.lock().unwrap().extend([
+            bounded_source_page("running"),
+            bounded_source_page("running"),
+            bounded_source_page(terminal_phase),
+        ]);
+        let child = ChildRun::open(
+            runtime.clone(),
+            RunScope::main("test", "a"),
+            "bounded",
+            ChildHistoryLayout::SameSession,
+            None,
+        )
+        .await
+        .unwrap();
+
+        let running = child.transcript().await.unwrap();
+        assert_eq!(running.turns[0].status, "running");
+        let running_turn_id = running.turns[0].id.clone();
+        let running_tool_id = running.tools[0].id.clone();
+        let running_items = running.items.clone();
+
+        let terminal = child.transcript().await.unwrap();
+        assert_eq!(terminal.turns[0].id, running_turn_id);
+        assert_eq!(
+            terminal.turns[0].status, expected_status,
+            "phase {terminal_phase}"
+        );
+        assert_eq!(terminal.tools[0].id, running_tool_id);
+        assert_eq!(terminal.tools[0].turn_id, running_turn_id);
+        assert_eq!(terminal.tools[0].phase, terminal_phase);
+        assert_eq!(terminal.tools[0].name, "task");
+        assert_eq!(
+            terminal.tools[0].arguments,
+            json!({"task_name":"audit","mode":"bounded"})
+        );
+        assert_eq!(terminal.items, running_items);
+        assert_eq!(terminal.items[0].text, "independent history");
+    }
+
+    runtime.stop().await.unwrap();
+}
+
+#[cfg(feature = "acceptance-source-witness")]
+#[tokio::test]
+async fn bounded_head_witness_pairs_one_projection_with_the_exact_raw_response() {
+    let (connector, runtime, _) = setup().await;
+    connector.bounded.store(true, Ordering::SeqCst);
+    for phase in ["error", "stopped"] {
+        connector
+            .pages
+            .lock()
+            .unwrap()
+            .extend([bounded_source_page(phase), bounded_source_page(phase)]);
+        let child = ChildRun::open(
+            runtime.clone(),
+            RunScope::main("test", "a"),
+            "bounded",
+            ChildHistoryLayout::SameSession,
+            None,
+        )
+        .await
+        .unwrap();
+        let before = connector
+            .requests
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(method, _)| method == "subagents.history")
+            .count();
+
+        let (transcript, witness) = child
+            .transcript_with_bounded_source_witness()
+            .await
+            .unwrap();
+        let after = connector
+            .requests
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(method, _)| method == "subagents.history")
+            .count();
+        let wire_head_request = connector
+            .requests
+            .lock()
+            .unwrap()
+            .iter()
+            .rfind(|(method, _)| method == "subagents.history")
+            .unwrap()
+            .1
+            .clone();
+
+        assert_eq!(after, before + 1, "witness must not perform a second read");
+        assert!(connector.pages.lock().unwrap().is_empty());
+        assert_eq!(witness.parent_scope, RunScope::main("test", "a"));
+        assert_eq!(witness.child_id, "bounded");
+        assert_eq!(witness.page_size, 50);
+        assert_eq!(witness.head_request.parent_session_id, "a");
+        assert_eq!(witness.head_request.child_session_id, "bounded");
+        assert_eq!(witness.head_request.through_sequence, None);
+        assert_eq!(witness.head_request.before_sequence, None);
+        assert_eq!(
+            wire_head_request,
+            serde_json::to_value(&witness.head_request).unwrap()
+        );
+        assert_eq!(
+            witness.raw_head.source_call.as_ref().unwrap()["phase"],
+            phase
+        );
+        assert_eq!(
+            witness.evidence_scope,
+            "built-in-bounded-head-only-same-local-read"
+        );
+        assert!(!witness.server_transactional_freshness_proven);
+        assert_eq!(transcript.items.len(), 1);
+        assert_eq!(transcript.items[0].text, "independent history");
+        assert_eq!(
+            transcript.turns[0].status,
+            if phase == "error" { "error" } else { "aborted" }
+        );
+    }
+    runtime.stop().await.unwrap();
+}
+
+#[cfg(feature = "acceptance-source-witness")]
+#[tokio::test]
+async fn bounded_head_witness_rejects_other_owners_without_falling_back() {
+    struct CustomSource;
+    #[async_trait]
+    impl ChildHistorySource for CustomSource {
+        async fn read(&self, _: &RunScope, _: &str) -> Result<TranscriptSnapshot> {
+            Ok(TranscriptSnapshot::default())
+        }
+    }
+
+    let (connector, runtime, _) = setup().await;
+    connector.bounded.store(true, Ordering::SeqCst);
+    let custom = ChildRun::open(
+        runtime.clone(),
+        RunScope::main("test", "a"),
+        "bounded",
+        ChildHistoryLayout::SameSession,
+        Some(Arc::new(CustomSource)),
+    )
+    .await
+    .unwrap();
+    assert!(
+        custom
+            .transcript_with_bounded_source_witness()
+            .await
+            .is_err()
+    );
+
+    let independent = ChildRun::open(
+        runtime.clone(),
+        RunScope::main("test", "a"),
+        "child",
+        ChildHistoryLayout::IndependentSessions,
+        None,
+    )
+    .await
+    .unwrap();
+    assert!(
+        independent
+            .transcript_with_bounded_source_witness()
+            .await
+            .is_err()
+    );
+    assert!(connector.pages.lock().unwrap().is_empty());
+    assert!(
+        !connector
+            .requests
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|(method, _)| method == "subagents.history")
+    );
+    runtime.stop().await.unwrap();
+}
+
+#[cfg(feature = "acceptance-source-witness")]
+#[tokio::test]
+async fn bounded_head_witness_rejects_aggregated_pages_and_retains_the_projection() {
+    fn page(entries: Vec<Value>, more: bool) -> Value {
+        json!({"parentSessionId":"a","childSessionId":"bounded","throughSequence":5,
+            "historyRevision":"f".repeat(64),"entries":entries,"hasMoreBefore":more,
+            "runOpen":false,"sourceCall":null})
+    }
+    fn message(seq: i64, text: &str) -> Value {
+        json!({"event":{"seq":seq,"time":100,"type":"assistant/message","data":{
+            "turn":1,"step":seq+1,"message":{"id":format!("m{seq}"),"content":[{"type":"text","text":text}]}}}})
+    }
+
+    let (connector, runtime, _) = setup().await;
+    connector.bounded.store(true, Ordering::SeqCst);
+    let head = page(vec![message(5, "new")], false);
+    connector.pages.lock().unwrap().extend([
+        page(vec![message(5, "new")], true),
+        page(vec![message(1, "old")], true),
+        head.clone(),
+        head,
+    ]);
+    let child = ChildRun::open(
+        runtime.clone(),
+        RunScope::main("test", "a"),
+        "bounded",
+        ChildHistoryLayout::SameSession,
+        None,
+    )
+    .await
+    .unwrap();
+    assert!(child.load_earlier().await.unwrap());
+    assert!(
+        child
+            .transcript_with_bounded_source_witness()
+            .await
+            .is_err()
+    );
+
+    // A normal read still sees the untouched cumulative cache and its aggregated pagination bit.
+    let retained = child.transcript().await.unwrap();
+    assert_eq!(
+        retained
+            .items
+            .iter()
+            .map(|item| item.text.as_str())
+            .collect::<Vec<_>>(),
+        ["old", "new"]
+    );
+    assert!(retained.has_more_before);
+    assert!(connector.pages.lock().unwrap().is_empty());
+    runtime.stop().await.unwrap();
+}
+
+#[cfg(feature = "acceptance-source-witness")]
+#[tokio::test]
+async fn bounded_head_witness_rejects_a_natural_increment_that_retains_old_entries() {
+    fn page(cut: i64, revision: &str, seq: i64, text: &str) -> Value {
+        json!({"parentSessionId":"a","childSessionId":"bounded","throughSequence":cut,
+            "historyRevision":revision.repeat(64),"entries":[{"event":{"seq":seq,"time":100,
+                "type":"assistant/message","data":{"turn":1,"step":seq+1,"message":{
+                    "id":format!("m{seq}"),"content":[{"type":"text","text":text}]}}}}],
+            "hasMoreBefore":false,"runOpen":false,"sourceCall":null})
+    }
+
+    let (connector, runtime, _) = setup().await;
+    connector.bounded.store(true, Ordering::SeqCst);
+    let old_head = page(5, "a", 5, "old head");
+    let new_head = page(6, "b", 6, "new head");
+    let verified_prefix = page(5, "a", 5, "old head");
+    connector.pages.lock().unwrap().extend([
+        old_head,
+        new_head.clone(),
+        verified_prefix.clone(),
+        new_head,
+        verified_prefix,
+    ]);
+    let child = ChildRun::open(
+        runtime.clone(),
+        RunScope::main("test", "a"),
+        "bounded",
+        ChildHistoryLayout::SameSession,
+        None,
+    )
+    .await
+    .unwrap();
+    assert!(
+        child
+            .transcript_with_bounded_source_witness()
+            .await
+            .is_err()
+    );
+
+    let retained = child.transcript().await.unwrap();
+    assert_eq!(
+        retained
+            .items
+            .iter()
+            .map(|item| item.text.as_str())
+            .collect::<Vec<_>>(),
+        ["old head", "new head"]
+    );
+    assert!(connector.pages.lock().unwrap().is_empty());
+    runtime.stop().await.unwrap();
+}
+
+#[cfg(feature = "acceptance-source-witness")]
+#[tokio::test]
+async fn bounded_head_witness_propagates_read_failure_without_returning_stale_proof() {
+    let (connector, runtime, _) = setup().await;
+    connector.bounded.store(true, Ordering::SeqCst);
+    connector
+        .pages
+        .lock()
+        .unwrap()
+        .extend([bounded_source_page("running"), json!({"error":true})]);
+    let child = ChildRun::open(
+        runtime.clone(),
+        RunScope::main("test", "a"),
+        "bounded",
+        ChildHistoryLayout::SameSession,
+        None,
+    )
+    .await
+    .unwrap();
+    assert!(
+        child
+            .transcript_with_bounded_source_witness()
+            .await
+            .is_err()
+    );
+    assert!(connector.pages.lock().unwrap().is_empty());
+    runtime.stop().await.unwrap();
+}
+
+#[cfg(feature = "acceptance-source-witness")]
+#[tokio::test]
+async fn bounded_head_witness_rejects_a_response_crossing_connection_epochs() {
+    let (connector, runtime, _) = setup().await;
+    connector.bounded.store(true, Ordering::SeqCst);
+    connector
+        .pages
+        .lock()
+        .unwrap()
+        .push_back(bounded_source_page("running"));
+    let child = Arc::new(
+        ChildRun::open(
+            runtime.clone(),
+            RunScope::main("test", "a"),
+            "bounded",
+            ChildHistoryLayout::SameSession,
+            None,
+        )
+        .await
+        .unwrap(),
+    );
+    connector.hold_bounded.store(true, Ordering::SeqCst);
+    let reading = {
+        let child = child.clone();
+        tokio::spawn(async move { child.transcript_with_bounded_source_witness().await })
+    };
+    connector.bounded_entered.notified().await;
+
+    runtime.reconnect().await.unwrap();
+    connector.release_bounded.notify_one();
+    assert!(reading.await.unwrap().is_err());
+    runtime.stop().await.unwrap();
+}
+
+#[cfg(feature = "acceptance-source-witness")]
+#[tokio::test]
+async fn bounded_paged_witness_records_earlier_pages_without_extra_reads_and_head_only_stays_strict()
+ {
+    fn page(entries: Vec<Value>, more: bool) -> Value {
+        json!({"parentSessionId":"a","childSessionId":"bounded","throughSequence":5,
+            "historyRevision":"f".repeat(64),"entries":entries,"hasMoreBefore":more,
+            "runOpen":false,"sourceCall":null})
+    }
+    fn message(seq: i64) -> Value {
+        json!({"event":{"seq":seq,"time":100+seq,"type":"assistant/message","data":{
+            "turn":1,"step":seq+1,"message":{"id":format!("m{seq}"),"content":[
+                {"type":"text","text":format!("line {seq}")}]}}}})
+    }
+
+    let (connector, runtime, _) = setup().await;
+    connector.bounded.store(true, Ordering::SeqCst);
+    let head = page(vec![message(5)], true);
+    connector.pages.lock().unwrap().extend([
+        page(vec![message(5)], true),
+        head.clone(),
+        page(vec![message(3), message(4)], true),
+        head.clone(),
+        head,
+    ]);
+    let child = ChildRun::open_with_page_size(
+        runtime.clone(),
+        RunScope::main("test", "a"),
+        "bounded",
+        ChildHistoryLayout::SameSession,
+        None,
+        3,
+    )
+    .await
+    .unwrap();
+
+    let before_refresh = connector
+        .requests
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(method, _)| method == "subagents.history")
+        .count();
+    let (_, head_only_chain) = child
+        .transcript_with_bounded_paged_source_witness()
+        .await
+        .unwrap();
+    let after_refresh = connector
+        .requests
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(method, _)| method == "subagents.history")
+        .count();
+    assert_eq!(after_refresh, before_refresh + 1);
+    assert_eq!(head_only_chain.receipts.len(), 2);
+
+    assert!(child.load_earlier().await.unwrap());
+    let before_paged_refresh = connector
+        .requests
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(method, _)| method == "subagents.history")
+        .count();
+    let (transcript, witness) = child
+        .transcript_with_bounded_paged_source_witness()
+        .await
+        .unwrap();
+    let after_paged_refresh = connector
+        .requests
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(method, _)| method == "subagents.history")
+        .count();
+    assert_eq!(after_paged_refresh, before_paged_refresh + 1);
+    assert_eq!(
+        witness
+            .receipts
+            .iter()
+            .map(|receipt| receipt.operation.clone())
+            .collect::<Vec<_>>(),
+        [
+            BoundedChildPagedSourceOperation::InitialHead,
+            BoundedChildPagedSourceOperation::RefreshHead,
+            BoundedChildPagedSourceOperation::Earlier,
+            BoundedChildPagedSourceOperation::RefreshHead,
+        ]
+    );
+    assert_eq!(witness.projected_entries.len(), 3);
+    assert_eq!(
+        transcript
+            .items
+            .iter()
+            .map(|item| item.text.as_str())
+            .collect::<Vec<_>>(),
+        ["line 3", "line 4", "line 5"]
+    );
+    assert!(
+        child
+            .transcript_with_bounded_source_witness()
+            .await
+            .is_err(),
+        "the existing head-only API must continue rejecting accumulated older rows"
+    );
+    assert!(connector.pages.lock().unwrap().is_empty());
+    runtime.stop().await.unwrap();
+}
+
+#[cfg(feature = "acceptance-source-witness")]
+#[tokio::test]
+async fn bounded_paged_witness_keeps_prefix_validation_out_of_the_merged_entries() {
+    fn page(cut: i64, revision: &str, entries: Vec<Value>, more: bool) -> Value {
+        json!({"parentSessionId":"a","childSessionId":"bounded","throughSequence":cut,
+            "historyRevision":revision.repeat(64),"entries":entries,"hasMoreBefore":more,
+            "runOpen":false,"sourceCall":null})
+    }
+    fn message(seq: i64) -> Value {
+        json!({"event":{"seq":seq,"time":100+seq,"type":"assistant/message","data":{
+            "turn":1,"step":seq+1,"message":{"id":format!("m{seq}"),"content":[
+                {"type":"text","text":format!("line {seq}")}]}}}})
+    }
+    let (connector, runtime, _) = setup().await;
+    connector.bounded.store(true, Ordering::SeqCst);
+    connector.pages.lock().unwrap().extend([
+        page(5, "a", vec![message(5)], true),
+        page(5, "a", vec![message(5)], true),
+        page(8, "b", vec![message(6), message(7), message(8)], false),
+        page(5, "a", vec![message(4), message(5)], true),
+    ]);
+    let child = ChildRun::open(
+        runtime.clone(),
+        RunScope::main("test", "a"),
+        "bounded",
+        ChildHistoryLayout::SameSession,
+        None,
+    )
+    .await
+    .unwrap();
+    child.transcript().await.unwrap();
+    let (transcript, witness) = child
+        .transcript_with_bounded_paged_source_witness()
+        .await
+        .unwrap();
+    assert_eq!(witness.receipts.len(), 4);
+    assert_eq!(
+        witness.receipts[2].operation,
+        BoundedChildPagedSourceOperation::RefreshHead
+    );
+    assert_eq!(
+        witness.receipts[3].operation,
+        BoundedChildPagedSourceOperation::PrefixValidation
+    );
+    assert!(!witness.receipts[3].merged);
+    assert_eq!(witness.projected_entries.len(), 4);
+    assert_eq!(
+        witness
+            .projected_entries
+            .iter()
+            .map(|entry| entry.event.seq)
+            .collect::<Vec<_>>(),
+        [5, 6, 7, 8]
+    );
+    assert_eq!(transcript.items.len(), 4);
+    assert!(connector.pages.lock().unwrap().is_empty());
+    runtime.stop().await.unwrap();
+}
+
+#[cfg(feature = "acceptance-source-witness")]
+#[tokio::test]
+async fn bounded_paged_witness_resets_to_a_real_head_after_stale_prefix_or_gap() {
+    fn page(cut: i64, revision: &str, seq: i64) -> Value {
+        json!({"parentSessionId":"a","childSessionId":"bounded","throughSequence":cut,
+            "historyRevision":revision.repeat(64),"entries":[{"event":{"seq":seq,"time":100,
+                "type":"assistant/message","data":{"turn":1,"step":seq+1,"message":{
+                    "id":format!("m{seq}"),"content":[{"type":"text","text":format!("line {seq}")}]}}}}],
+            "hasMoreBefore":true,"runOpen":false,"sourceCall":null})
+    }
+    for (validation, expected_prefix_operation) in [
+        (
+            json!({"error":true}),
+            BoundedChildPagedSourceOperation::PrefixValidation,
+        ),
+        (
+            page(5, "a", 1),
+            BoundedChildPagedSourceOperation::PrefixValidation,
+        ),
+    ] {
+        let (connector, runtime, _) = setup().await;
+        connector.bounded.store(true, Ordering::SeqCst);
+        connector
+            .pages
+            .lock()
+            .unwrap()
+            .extend([page(5, "a", 5), page(20, "b", 20), validation]);
+        let child = ChildRun::open(
+            runtime.clone(),
+            RunScope::main("test", "a"),
+            "bounded",
+            ChildHistoryLayout::SameSession,
+            None,
+        )
+        .await
+        .unwrap();
+        let (transcript, witness) = child
+            .transcript_with_bounded_paged_source_witness()
+            .await
+            .unwrap();
+        assert_eq!(
+            witness.receipts[0].operation,
+            BoundedChildPagedSourceOperation::RefreshHead
+        );
+        assert!(witness.receipts[0].reset);
+        assert_eq!(witness.receipts[1].operation, expected_prefix_operation);
+        assert_eq!(witness.projected_entries.len(), 1);
+        assert_eq!(witness.projected_entries[0].event.seq, 20);
+        assert_eq!(transcript.items.len(), 1);
+        assert_eq!(transcript.items[0].text, "line 20");
+        runtime.stop().await.unwrap();
+    }
+}
+
+#[cfg(feature = "acceptance-source-witness")]
+#[tokio::test]
+async fn bounded_paged_witness_rejects_a_refresh_that_crosses_epochs_but_retains_cached_page_epochs()
+ {
+    let (connector, runtime, _) = setup().await;
+    connector.bounded.store(true, Ordering::SeqCst);
+    connector.pages.lock().unwrap().extend([
+        bounded_source_page("running"),
+        bounded_source_page("running"),
+    ]);
+    let child = Arc::new(
+        ChildRun::open(
+            runtime.clone(),
+            RunScope::main("test", "a"),
+            "bounded",
+            ChildHistoryLayout::SameSession,
+            None,
+        )
+        .await
+        .unwrap(),
+    );
+    connector.hold_bounded.store(true, Ordering::SeqCst);
+    let read = {
+        let child = child.clone();
+        tokio::spawn(async move { child.transcript_with_bounded_paged_source_witness().await })
+    };
+    connector.bounded_entered.notified().await;
+    runtime.reconnect().await.unwrap();
+    connector.release_bounded.notify_one();
+    assert!(read.await.unwrap().is_err());
+
+    connector.hold_bounded.store(false, Ordering::SeqCst);
+    connector
+        .pages
+        .lock()
+        .unwrap()
+        .push_back(bounded_source_page("running"));
+    let (_, witness) = child
+        .transcript_with_bounded_paged_source_witness()
+        .await
+        .unwrap();
+    assert_eq!(witness.receipts.len(), 2);
+    assert_ne!(
+        witness.receipts[0].read_epoch,
+        witness.receipts[1].read_epoch
+    );
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn attachment_context_commit_checks_epoch_with_authority_and_preserves_typing() {
+    let (_, runtime, controller) = setup().await;
+    let baseline = ComposerContextBaseline::read(&controller.snapshot()).unwrap();
+    let epoch = runtime.inspect(|s| s.connection_epoch);
+    runtime.reconnect().await.unwrap();
+    runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
+    let artifact = ComposerArtifact::Attachment {
+        id: "file".into(),
+        name: "file.txt".into(),
+        content: json!({"type":"file","receiptId":"r"}),
+        facts: Some(AttachmentFacts {
+            attachment_id: None,
+            byte_count: 3,
+            media_type: None,
+        }),
+    };
+    assert!(
+        !controller
+            .patch_context_at_epoch(&baseline, vec![artifact.clone()], vec![], epoch)
+            .unwrap()
+    );
+    controller
+        .edit_text(&baseline.selection.destination, "新正文".into())
+        .unwrap();
+    let epoch = runtime.inspect(|s| s.connection_epoch);
+    assert!(
+        controller
+            .patch_context_at_epoch(&baseline, vec![artifact], vec![], epoch)
+            .unwrap()
+    );
+    assert_eq!(controller.snapshot().draft.text, "新正文");
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn headless_search_uses_the_shared_reader_and_preserves_the_run_draft() {
+    let connector = Connector {
+        search: true,
+        ..Default::default()
+    };
+    let runtime = Arc::new(SessionRuntime::spawn("test", Arc::new(connector.clone())));
+    runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
+    let run = RunController::new(runtime.clone()).unwrap();
+    run.open(RunScope::main("test", "a")).await.unwrap();
+    run.edit_text(&destination("a"), "独立草稿".into()).unwrap();
+    let reader = SidebarSearchController::new(runtime.clone()).unwrap();
+    let mut changes = reader.subscribe();
+    reader.set_query("中文检索").unwrap();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while reader.snapshot().result.is_none() {
+            changes.changed().await.unwrap();
+        }
+    })
+    .await
+    .unwrap();
+    let found = reader.snapshot();
+    assert_eq!(
+        found.hits[0].address,
+        SessionAddress {
+            endpoint_id: "test".into(),
+            session_id: "a".into()
+        }
+    );
+    assert_eq!(found.hits[0].hit.snippet, "中文检索");
+    assert_eq!(
+        found.unresolved.len(),
+        1,
+        "the empty inventory is not fabricated from a hit"
+    );
+    assert_eq!(run.snapshot().draft.text, "独立草稿");
+    let encoded = serde_json::to_value(found.as_ref()).unwrap();
+    assert_eq!(encoded["input"]["phase"]["complete"]["hasMore"], true);
+    let roundtrip: SidebarSearchPublication = serde_json::from_value(encoded).unwrap();
+    assert_eq!(&roundtrip, found.as_ref());
+    let epoch = runtime.inspect(|state| state.connection_epoch);
+    assert!(
+        runtime
+            .search_sessions_at_epoch(epoch + 1, "query", "wrong-epoch")
+            .await
+            .is_err()
+    );
+    let requests = connector.requests.lock().unwrap().clone();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(requests[0].0, "session.search");
     runtime.stop().await.unwrap();
 }

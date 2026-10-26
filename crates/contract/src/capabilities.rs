@@ -67,6 +67,9 @@ impl SessionEndpoint for HostedEndpoint {
         caps.methods.extend(self.services.methods());
         caps
     }
+    fn sequenced_queue_projection_key(&self) -> Option<&'static str> {
+        self.endpoint.sequenced_queue_projection_key()
+    }
     fn content_kind(&self) -> SessionContentKind {
         self.endpoint.content_kind()
     }

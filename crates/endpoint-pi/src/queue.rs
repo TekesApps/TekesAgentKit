@@ -150,22 +150,29 @@ impl Context {
         self.save(&manifest).await?;
         drop(manifest);
         self.notify_queue(id).await;
-        let (message, images) = self
+        let materialized = self
             .materialize(id, array(&item["message"], "content")?)
             .await?;
         // Receipt is already persisted as dispatching. A timeout is never converted back into queued.
         rpc.control(
             "input.prepare",
-            json!({"id":item["rpcId"],"text":message,"hasImages":!images.is_empty()}),
+            json!({"id":item["rpcId"],"text":materialized.message.clone(),"hasImages":!materialized.images.is_empty(),"files":materialized.files.clone()}),
         )
         .await?;
         let result = rpc
-            .request("prompt", json!({"message":message,"images":images}))
+            .request(
+                "prompt",
+                json!({"message":materialized.message,"images":materialized.images}),
+            )
             .await?;
         require(
             matches!(result["disposition"].as_str(), Some("started" | "handled")),
             "unexpected queue dispatch",
         )?;
+        if result["disposition"] == "handled" {
+            rpc.control("input.cancel", json!({"id":item["rpcId"]}))
+                .await?;
+        }
         let state = rpc.request("get_state", json!({})).await?;
         let mut manifest = self.manifest.lock().await;
         let row = manifest

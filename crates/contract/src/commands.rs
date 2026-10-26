@@ -1,5 +1,7 @@
 //! Public non-UI requests. Harness-specific extension values remain lossless JSON.
 use crate::*;
+/// Public transport ceiling, independent of a harness's stricter attachment policy.
+pub const MAX_UPLOAD_BYTES: usize = 8 * 1024 * 1024;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateSessionRequest {

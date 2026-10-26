@@ -214,6 +214,55 @@ async fn main() -> Result<()> {
                     .await?;
                 json!({"cancelled":true})
             }
+            #[cfg(feature = "acceptance-source-witness")]
+            "presentationSource" => {
+                presentation.select(ComposerDestination::run(RunScope::main(
+                    identity,
+                    id.ok_or_else(|| unsupported("sessionId required"))?,
+                )))?;
+                let witness = presentation.refresh_with_source_witness();
+                let value = json!({"snapshot":witness.snapshot().as_ref(),"authority":witness.authority(),
+                    "projectionSucceeded":witness.projection_succeeded(),
+                    "evidenceScope":"original-publication-and-same-memory-input",
+                    "serverTransactionalFreshnessProven":false});
+                if let Some(name) = command["saveAs"].as_str() {
+                    variables.insert(
+                        name.into(),
+                        value
+                            .pointer(string(command, "savePointer")?)
+                            .cloned()
+                            .ok_or_else(|| unsupported("source witness save pointer missing"))?,
+                    );
+                }
+                value
+            }
+            #[cfg(feature = "acceptance-source-witness")]
+            "waitSourceRunOpen" => {
+                let id = id.ok_or_else(|| unsupported("sessionId required"))?;
+                // Subscribe before reading the baseline so an opening transition cannot be
+                // lost between the initial projection read and the first notification wait.
+                let mut changes = runtime.subscribe();
+                let expected_epoch = changes.inspect(source_run_open_epoch)?;
+                tokio::time::timeout(Duration::from_secs(15), async {
+                    loop {
+                        let opened = changes.inspect(|store| {
+                            Ok::<_, Error>(
+                                source_run_open_observed(store, id, expected_epoch)?
+                                    && command["inputText"].as_str().is_none_or(|text| {
+                                        source_run_input_observed(store, id, text)
+                                    }),
+                            )
+                        })?;
+                        if opened {
+                            return Ok::<_, Error>(());
+                        }
+                        changes.changed().await.map_err(|_| Error::Disconnected)?;
+                    }
+                })
+                .await
+                .map_err(|_| Error::Timeout)??;
+                json!({"sessionId":id,"connectionEpoch":expected_epoch,"runOpen":true})
+            }
             "presentation" => {
                 presentation.select(ComposerDestination::run(RunScope::main(
                     identity,
@@ -254,7 +303,39 @@ async fn main() -> Result<()> {
                         .any(|i| i.id.starts_with("echo-item:")),
                     "missing optimistic echo",
                 )?;
-                presentation.dispatch(ticket, None).await?
+                if command["captureNativePreview"] == true {
+                    // Capture a publication from the active dispatch, without a second
+                    // submission or a timing-based identity association.
+                    let mut changes = runtime.subscribe();
+                    let capture = tokio::time::timeout(Duration::from_secs(30), async {
+                        loop {
+                            let observed = changes.inspect(|store| {
+                                store
+                                    .sessions
+                                    .get(id.unwrap())
+                                    .filter(|session| {
+                                        session.native_events.iter().any(|event| {
+                                            event["type"] == "message_update"
+                                                && event["message"]["role"] == "assistant"
+                                        })
+                                    })
+                                    .cloned()
+                            });
+                            if let Some(session) = observed {
+                                break Ok::<_, Error>(session);
+                            }
+                            changes.changed().await.map_err(|_| Error::Disconnected)?;
+                        }
+                    });
+                    let (result, preview) =
+                        tokio::join!(presentation.dispatch(ticket, None), capture);
+                    let mut result = result?;
+                    result["nativePreview"] =
+                        serde_json::to_value(preview.map_err(|_| Error::Timeout)??)?;
+                    result
+                } else {
+                    presentation.dispatch(ticket, None).await?
+                }
             }
             "list" => runtime.inspect(|s| {
                 json!(
@@ -295,6 +376,44 @@ async fn main() -> Result<()> {
                 Value::Null
             }
             "snapshot" => serde_json::to_value(&*runtime.snapshot())?,
+            // Fixture-only observation; membership is not archive authority.
+            // Public lifecycle acknowledgements are checked separately by the caller.
+            "waitInventoryMembership" => {
+                let id = id.ok_or_else(|| unsupported("sessionId required"))?;
+                let expected = command["present"]
+                    .as_bool()
+                    .ok_or_else(|| unsupported("present boolean required"))?;
+                let mut changes = runtime.subscribe();
+                tokio::time::timeout(Duration::from_secs(15), async {
+                    loop {
+                        let converged = {
+                            let state = runtime.snapshot();
+                            let present = state
+                                .sessions
+                                .get(id)
+                                .and_then(|value| value.summary.as_ref())
+                                .is_some_and(|summary| summary["status"] != "archived")
+                                && !state.archived_session_ids.iter().any(|value| value == id);
+                            state.inventory_ready
+                                && matches!(
+                                    state.connection,
+                                    tekes_agent_session::ConnectionState::Ready
+                                )
+                                && present == expected
+                        };
+                        if converged {
+                            return Ok::<_, tekes_agent_contract::Error>(());
+                        }
+                        changes
+                            .changed()
+                            .await
+                            .map_err(|_| tekes_agent_contract::Error::Disconnected)?;
+                    }
+                })
+                .await
+                .map_err(|_| tekes_agent_contract::Error::Timeout)??;
+                json!({"sessionId":id,"present":expected,"archiveAuthorityInferred":false})
+            }
             "waitSettled" => {
                 let id = id.ok_or_else(|| unsupported("sessionId required"))?;
                 let minimum_turn = command["minimumTurn"].as_i64().unwrap_or(1);
@@ -305,7 +424,13 @@ async fn main() -> Result<()> {
                             s.sessions.get(id).is_some_and(|s| {
                                 s.journal_ready
                                     && !s.run_open
-                                    && if let Some(native) = &s.native_conversation {
+                                    && if let Some(text) = command["inputText"].as_str() {
+                                        tekes_agent_presentation::TranscriptSnapshot::read(
+                                            &RunScope::main(identity, id),
+                                            s,
+                                        )
+                                        .is_ok_and(|snapshot| settled_reply_after(&snapshot, text))
+                                    } else if let Some(native) = &s.native_conversation {
                                         native
                                             .entries
                                             .iter()
@@ -332,6 +457,32 @@ async fn main() -> Result<()> {
                 .await
                 .map_err(|_| Error::Timeout)??;
                 Value::Null
+            }
+            "waitNativeEvent" => {
+                let id = id.ok_or_else(|| unsupported("sessionId required"))?;
+                let event_type = string(command, "eventType")?;
+                let role = command["role"].as_str();
+                let mut changes = runtime.subscribe();
+                tokio::time::timeout(Duration::from_secs(30), async {
+                    loop {
+                        let observed = changes.inspect(|store| {
+                            store.sessions.get(id).is_some_and(|session| {
+                                session.native_events.iter().any(|event| {
+                                    event["type"] == event_type
+                                        && role.is_none_or(|role| event["message"]["role"] == role)
+                                })
+                            })
+                        });
+                        if observed {
+                            break;
+                        }
+                        changes.changed().await.map_err(|_| Error::Disconnected)?;
+                    }
+                    Ok::<_, Error>(())
+                })
+                .await
+                .map_err(|_| Error::Timeout)??;
+                json!({"observed":true,"eventType":event_type,"role":role})
             }
             "observeReady" => {
                 use futures_util::StreamExt;
@@ -462,4 +613,218 @@ fn resolve_variables(mut value: Value, variables: &BTreeMap<String, Value>) -> R
         _ => {}
     }
     Ok(value)
+}
+
+#[cfg(feature = "acceptance-source-witness")]
+fn source_run_open_epoch(store: &tekes_agent_session::MemoryProjectionStore) -> Result<u64> {
+    if store.connection == tekes_agent_session::ConnectionState::Ready {
+        Ok(store.connection_epoch)
+    } else {
+        Err(Error::Disconnected)
+    }
+}
+
+#[cfg(feature = "acceptance-source-witness")]
+fn source_run_open_observed(
+    store: &tekes_agent_session::MemoryProjectionStore,
+    session_id: &str,
+    expected_epoch: u64,
+) -> Result<bool> {
+    if store.connection != tekes_agent_session::ConnectionState::Ready
+        || store.connection_epoch != expected_epoch
+    {
+        return Err(Error::Disconnected);
+    }
+    Ok(store
+        .sessions
+        .get(session_id)
+        .is_some_and(|session| session.run_open))
+}
+
+#[cfg(feature = "acceptance-source-witness")]
+fn source_run_input_observed(
+    store: &tekes_agent_session::MemoryProjectionStore,
+    session_id: &str,
+    text: &str,
+) -> bool {
+    store.sessions.get(session_id).is_some_and(|session| {
+        tekes_agent_presentation::TranscriptSnapshot::read(
+            &RunScope::main(&store.endpoint_id, session_id),
+            session,
+        )
+        .is_ok_and(|snapshot| {
+            !snapshot.is_stale
+                && snapshot.items.iter().any(|item| {
+                    item.kind == tekes_agent_presentation::TranscriptItemKind::User
+                        && !item.is_provisional
+                        && item.text == text
+                })
+        })
+    })
+}
+
+/// Match the latest exact authored input, never an absolute count in a clipped window.
+fn settled_reply_after(
+    snapshot: &tekes_agent_presentation::TranscriptSnapshot,
+    text: &str,
+) -> bool {
+    use tekes_agent_presentation::TranscriptItemKind;
+    let Some(index) = snapshot.items.iter().rposition(|item| {
+        item.kind == TranscriptItemKind::User && !item.is_provisional && item.text == text
+    }) else {
+        return false;
+    };
+    let turn = &snapshot.items[index].turn_id;
+    snapshot.items[index + 1..].iter().any(|item| {
+        item.turn_id == *turn
+            && item.kind == TranscriptItemKind::Assistant
+            && item.is_final
+            && !item.is_provisional
+    })
+}
+
+#[cfg(test)]
+mod settled_tests {
+    use super::*;
+    fn source(
+        messages: Vec<(&str, &str)>,
+        streaming: bool,
+    ) -> tekes_agent_presentation::TranscriptSnapshot {
+        let entries:Vec<_>=messages.into_iter().enumerate().map(|(n,(role,text))|json!({"type":"message","id":format!("entry-{n}"),"message":{"role":role,"timestamp":n,"content":text}})).collect();
+        let session = tekes_agent_session::SessionProjection {
+            journal_ready: true,
+            native_conversation: Some(NativeConversationSnapshot {
+                session_id: "s".into(),
+                generation: "g".into(),
+                leaf_id: entries
+                    .last()
+                    .and_then(|entry| entry["id"].as_str())
+                    .map(str::to_owned),
+                entries,
+                has_more_before: true,
+                is_streaming: streaming,
+                state: json!({}),
+            }),
+            ..Default::default()
+        };
+        tekes_agent_presentation::TranscriptSnapshot::read(&RunScope::main("e", "s"), &session)
+            .unwrap()
+    }
+    #[test]
+    fn exact_input_requires_its_own_completed_reply_in_the_current_window() {
+        assert!(!settled_reply_after(
+            &source(vec![("user", "old"), ("assistant", "reply")], false),
+            "target"
+        ));
+        assert!(!settled_reply_after(
+            &source(vec![("user", "target")], false),
+            "target"
+        ));
+        assert!(!settled_reply_after(
+            &source(vec![("user", "target"), ("assistant", "reply")], true),
+            "target"
+        ));
+        assert!(settled_reply_after(
+            &source(vec![("user", "target"), ("assistant", "reply")], false),
+            "target"
+        ));
+    }
+    #[test]
+    fn another_turn_and_an_older_identical_input_cannot_satisfy_the_wait() {
+        assert!(!settled_reply_after(
+            &source(
+                vec![
+                    ("user", "target"),
+                    ("user", "other"),
+                    ("assistant", "reply")
+                ],
+                false
+            ),
+            "target"
+        ));
+        assert!(!settled_reply_after(
+            &source(
+                vec![
+                    ("user", "target"),
+                    ("assistant", "reply"),
+                    ("user", "target")
+                ],
+                false
+            ),
+            "target"
+        ));
+    }
+}
+
+#[cfg(all(test, feature = "acceptance-source-witness"))]
+mod source_run_open_tests {
+    use super::*;
+
+    fn ready_store() -> tekes_agent_session::MemoryProjectionStore {
+        let mut store = tekes_agent_session::MemoryProjectionStore::default();
+        store.connection = tekes_agent_session::ConnectionState::Ready;
+        store.connection_epoch = 7;
+        store
+    }
+
+    #[test]
+    fn optional_running_input_requires_the_original_authored_user_in_a_ready_projection() {
+        let mut store = ready_store();
+        let session = tekes_agent_session::SessionProjection {
+            native_conversation: Some(serde_json::from_value(json!({
+            "sessionId":"child","generation":"g","leafId":null,"hasMoreBefore":false,
+            "isStreaming":true,"state":{},"entries":[
+                {"id":"assistant","type":"message","message":{"role":"assistant","content":[{"type":"text","text":"marker"}]}}
+            ]
+        })).unwrap()),
+            journal_ready: true,
+            ..Default::default()
+        };
+        store.sessions.insert("child".into(), session);
+        assert!(!source_run_input_observed(&store, "child", "marker"));
+        store.sessions.get_mut("child").unwrap().native_conversation.as_mut().unwrap().entries.push(
+            json!({"id":"user","type":"message","message":{"role":"user","content":[{"type":"text","text":"marker"}]}}));
+        assert!(source_run_input_observed(&store, "child", "marker"));
+        assert!(!source_run_input_observed(&store, "other", "marker"));
+        store.sessions.get_mut("child").unwrap().journal_ready = false;
+        assert!(!source_run_input_observed(&store, "child", "marker"));
+    }
+
+    #[test]
+    fn source_run_open_requires_ready_projection_and_the_original_epoch() {
+        let mut store = ready_store();
+        assert_eq!(source_run_open_epoch(&store).unwrap(), 7);
+        assert!(!source_run_open_observed(&store, "child", 7).unwrap());
+
+        store.sessions.insert(
+            "child".into(),
+            tekes_agent_session::SessionProjection::default(),
+        );
+        assert!(!source_run_open_observed(&store, "child", 7).unwrap());
+        store.sessions.insert(
+            "child".into(),
+            tekes_agent_session::SessionProjection {
+                run_open: true,
+                ..Default::default()
+            },
+        );
+        assert!(source_run_open_observed(&store, "child", 7).unwrap());
+
+        store.connection = tekes_agent_session::ConnectionState::Connecting;
+        assert!(matches!(
+            source_run_open_observed(&store, "child", 7),
+            Err(Error::Disconnected)
+        ));
+        assert!(matches!(
+            source_run_open_epoch(&store),
+            Err(Error::Disconnected)
+        ));
+
+        store.connection = tekes_agent_session::ConnectionState::Ready;
+        store.connection_epoch = 8;
+        assert!(matches!(
+            source_run_open_observed(&store, "child", 7),
+            Err(Error::Disconnected)
+        ));
+    }
 }

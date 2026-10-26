@@ -1,6 +1,8 @@
 use crate::RunScope;
 use serde::{Deserialize, Serialize};
 use tekes_agent_contract::SubagentCatalog;
+#[cfg(feature = "acceptance-source-witness")]
+use tekes_agent_contract::{BoundedChildHistoryPage, BoundedChildHistoryRequest};
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum ChildComposerAvailability {
@@ -38,6 +40,12 @@ pub struct ChildCatalogState {
     pub refreshing: bool,
 }
 impl ChildCatalogState {
+    /// Observation generation for adapters; tokens and commit authority remain
+    /// owned by this existing model.
+    pub fn generation(&self) -> u64 {
+        self.generation
+    }
+
     pub fn begin(&mut self, parent: RunScope, connected: bool) -> Option<ChildCatalogToken> {
         self.generation += 1;
         self.catalog = None;
@@ -94,6 +102,76 @@ pub trait ChildHistorySource: Send + Sync {
     ) -> tekes_agent_contract::Result<crate::TranscriptSnapshot>;
 }
 
+/// Read-only evidence tying a native same-session child transcript to the exact bounded head
+/// response used for its projection. This proves the local read only, not server transactionality.
+#[cfg(feature = "acceptance-source-witness")]
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BoundedChildSourceWitness {
+    pub parent_scope: RunScope,
+    pub child_id: String,
+    pub page_size: usize,
+    pub head_request: BoundedChildHistoryRequest,
+    pub raw_head: BoundedChildHistoryPage,
+    pub evidence_scope: &'static str,
+    pub server_transactional_freshness_proven: bool,
+}
+
+/// The bounded-history operation that produced one page or prefix-validation response.
+#[cfg(feature = "acceptance-source-witness")]
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum BoundedChildPagedSourceOperation {
+    InitialHead,
+    RefreshHead,
+    Earlier,
+    PrefixValidation,
+}
+
+/// A successful typed bounded-history read tied to the connection epoch in which it was read.
+/// Prefix-validation receipts retain their page but never contribute entries to the projection.
+#[cfg(feature = "acceptance-source-witness")]
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BoundedChildPagedSourceReceipt {
+    pub operation: BoundedChildPagedSourceOperation,
+    pub read_epoch: u64,
+    pub request: BoundedChildHistoryRequest,
+    pub response: BoundedChildPagedSourceResponse,
+    pub reset: bool,
+    pub merged: bool,
+    pub effective_has_more_before: bool,
+}
+
+#[cfg(feature = "acceptance-source-witness")]
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase", tag = "kind", content = "value")]
+pub enum BoundedChildPagedSourceResponse {
+    Page(BoundedChildHistoryPage),
+    RemoteError(serde_json::Value),
+}
+
+/// Opt-in source chain for the exact cumulative Native child projection returned with this value.
+/// Cached pages retain the epoch of their original reads across reconnects.
+#[cfg(feature = "acceptance-source-witness")]
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BoundedChildPagedSourceWitness {
+    pub parent_scope: RunScope,
+    pub child_id: String,
+    pub page_size: usize,
+    pub connection_epoch: u64,
+    pub receipts: Vec<BoundedChildPagedSourceReceipt>,
+    pub projected_entries: Vec<tekes_agent_contract::HistoryEntry>,
+    pub through_sequence: i64,
+    pub history_revision: String,
+    pub has_more_before: bool,
+    pub run_open: bool,
+    pub source_call: Option<serde_json::Value>,
+    pub evidence_scope: &'static str,
+    pub server_transactional_freshness_proven: bool,
+}
+
 /// One mounted child run owns a history lease. Same-session lines require an explicit projection
 /// source when the endpoint lacks built-in bounded history; parent history is never a child fallback.
 pub struct ChildRun {
@@ -112,6 +190,22 @@ impl ChildRun {
         layout: ChildHistoryLayout,
         source: Option<std::sync::Arc<dyn ChildHistorySource>>,
     ) -> tekes_agent_contract::Result<Self> {
+        Self::open_with_page_size(runtime, parent, child, layout, source, 50).await
+    }
+    /// Explicit bounded page size (1..=200), fixed for this source lifetime.
+    pub async fn open_with_page_size(
+        runtime: std::sync::Arc<tekes_agent_session::SessionRuntime>,
+        parent: RunScope,
+        child: impl Into<String>,
+        layout: ChildHistoryLayout,
+        source: Option<std::sync::Arc<dyn ChildHistorySource>>,
+        page_size: usize,
+    ) -> tekes_agent_contract::Result<Self> {
+        tekes_agent_contract::require((1..=200).contains(&page_size), "invalid bounded page size")?;
+        tekes_agent_contract::require(
+            page_size == 50 || (layout == ChildHistoryLayout::SameSession && source.is_none()),
+            "page size requires built-in bounded history",
+        )?;
         parent.validate()?;
         let child = child.into();
         tekes_agent_contract::require(
@@ -127,6 +221,7 @@ impl ChildRun {
                 runtime.clone(),
                 parent.clone(),
                 child.clone(),
+                page_size,
             )
             .await?;
             return Ok(Self {
@@ -175,6 +270,37 @@ impl ChildRun {
                 crate::ConnectionPresentation::read(s, Some(&self.child), false).history_is_stale;
             Ok(snapshot)
         })
+    }
+    /// Refresh and project a bounded Native same-session head while retaining the typed response
+    /// from that exact read. Custom and independent history sources have distinct ownership.
+    #[cfg(feature = "acceptance-source-witness")]
+    pub async fn transcript_with_bounded_source_witness(
+        &self,
+    ) -> tekes_agent_contract::Result<(crate::TranscriptSnapshot, BoundedChildSourceWitness)> {
+        let bounded = self.bounded.as_ref().ok_or_else(|| {
+            tekes_agent_contract::unsupported(
+                "bounded source witness requires built-in same-session history",
+            )
+        })?;
+        bounded.lock().await.refresh_with_source_witness().await
+    }
+    /// Refresh the original bounded pane and freeze its accumulated typed page receipts. This is
+    /// explicitly opt-in; ordinary transcript refreshes do not copy or replay the receipt chain.
+    #[cfg(feature = "acceptance-source-witness")]
+    pub async fn transcript_with_bounded_paged_source_witness(
+        &self,
+    ) -> tekes_agent_contract::Result<(crate::TranscriptSnapshot, BoundedChildPagedSourceWitness)>
+    {
+        let bounded = self.bounded.as_ref().ok_or_else(|| {
+            tekes_agent_contract::unsupported(
+                "bounded paged source witness requires built-in same-session history",
+            )
+        })?;
+        bounded
+            .lock()
+            .await
+            .refresh_with_paged_source_witness()
+            .await
     }
     pub async fn load_earlier(&self) -> tekes_agent_contract::Result<bool> {
         if let Some(bounded) = &self.bounded {
