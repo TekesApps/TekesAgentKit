@@ -597,6 +597,10 @@ async fn conversation_frame(
 }
 /// Reconstruct active ancestry; get_entries includes inactive branches, which are not current conversation.
 pub fn active_branch(result: &Value, max_messages: usize) -> Result<(Vec<Value>, bool)> {
+    let (entries, more) = active_branch_window(result, max_messages)?;
+    Ok((entries.into_iter().cloned().collect(), more))
+}
+fn active_branch_window(result: &Value, max_messages: usize) -> Result<(Vec<&Value>, bool)> {
     require(max_messages > 0, "invalid conversation window")?;
     let all = array(result, "entries")?;
     let mut by_id = BTreeMap::new();
@@ -615,7 +619,7 @@ pub fn active_branch(result: &Value, max_messages: usize) -> Result<(Vec<Value>,
         let entry = by_id
             .get(id)
             .ok_or_else(|| Error::Protocol("missing Pi ancestor".into()))?;
-        branch.push((*entry).clone());
+        branch.push(*entry);
         cursor = entry.get("parentId").and_then(Value::as_str);
     }
     branch.reverse();
@@ -629,7 +633,7 @@ pub fn active_branch(result: &Value, max_messages: usize) -> Result<(Vec<Value>,
         return Ok((branch, false));
     }
     let start = messages[messages.len() - max_messages];
-    Ok((branch[start..].to_vec(), true))
+    Ok((branch.into_iter().skip(start).collect(), true))
 }
 fn close_on_lifetime(
     frames: FrameStream,
@@ -971,7 +975,8 @@ impl SessionEndpoint for PiSessionEndpoint {
         let limit = windows
             .get_mut(id)
             .ok_or_else(|| unsupported("conversation is not open"))?;
-        let (_, more) = active_branch(&rpc.request("get_entries", json!({})).await?, *limit)?;
+        let entries = rpc.request("get_entries", json!({})).await?;
+        let (_, more) = active_branch_window(&entries, *limit)?;
         if more {
             *limit = limit.saturating_add(count);
         }
@@ -1466,8 +1471,17 @@ mod tests {
             json!({"leafId":"a","entries":[{"id":"a","parentId":"a"}]}),
             json!({"leafId":"missing","entries":[]}),
             json!({"entries":[{"id":"a"},{"id":"a"}]}),
+            json!({"leafId":"leaf","entries":[
+                {"id":"old","parentId":"old","type":"message"},
+                {"id":"leaf","parentId":"old","type":"message"}
+            ]}),
+            json!({"leafId":"leaf","entries":[
+                {"id":"old","parentId":"missing","type":"message"},
+                {"id":"leaf","parentId":"old","type":"message"}
+            ]}),
         ] {
             assert!(active_branch(&bad, 50).is_err());
+            assert!(active_branch(&bad, 1).is_err());
         }
     }
     #[tokio::test]
