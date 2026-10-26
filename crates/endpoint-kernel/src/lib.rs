@@ -157,7 +157,12 @@ impl KernelConnector {
                                     Err(e) => { let _ = ack.send(Err(Error::Disconnected)); break transport(e); }
                                 }
                             }
-                            Command::Close(id) => { streams.remove(&id); json!({"type":"close","streamId":id}) }
+                            Command::Close(id) => {
+                                // A peer stream/error already removed this logical stream. Sending
+                                // another Close would make Kernel treat the whole mux as invalid.
+                                if streams.remove(&id).is_none() { continue; }
+                                json!({"type":"close","streamId":id})
+                            }
                             Command::Request { id, mut value, reply } => {
                                 value["requestId"] = json!(id); replies.insert(id, reply); value
                             }
@@ -185,7 +190,17 @@ impl KernelConnector {
 
                                     match output.try_send(Ok(frame)) {
                                         Ok(()) => {},
-                                        Err(mpsc::error::TrySendError::Closed(_)) => { streams.remove(stream_id); },
+                                        Err(mpsc::error::TrySendError::Closed(_)) => {
+                                            // The consumer can disappear before the next frame. Retire
+                                            // the live peer stream here; its later Drop command sees
+                                            // the missing map entry and cannot send a duplicate Close.
+                                            if streams.remove(stream_id).is_some() {
+                                                let close = json!({"type":"close","streamId":stream_id});
+                                                if let Err(e) = ws.send(Message::Text(close.to_string().into())).await {
+                                                    break transport(e);
+                                                }
+                                            }
+                                        },
                                         Err(mpsc::error::TrySendError::Full(_)) => break Error::Protocol("stream buffer overflow; rebaseline required".into()),
                                     }
                                 }
