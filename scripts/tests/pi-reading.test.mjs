@@ -6,34 +6,34 @@ const entry = (id, message) => ({ id, type: 'message', message });
 test('a receipt uses only the stored finalized object, not equal content or timestamp', () => {
   const reading = createAssistantReading(), final = assistant(), older = assistant();
   const id = reading.start(); reading.end(final);
-  assert.deepEqual(reading.identities([entry('older', older)]), []);
-  assert.deepEqual(reading.identities([entry('older', older), entry('actual', final)]), [{ streamId: id, entryId: 'actual' }]);
+  assert.deepEqual(reading.identities(() => [entry('older', older)]), []);
+  assert.deepEqual(reading.identities(() => [entry('older', older), entry('actual', final)]), [{ streamId: id, entryId: 'actual' }]);
   final.timestamp = 200; final.content[0].text = 'extension finalized content';
-  assert.equal(reading.identities([entry('actual', final)])[0].entryId, 'actual');
+  assert.equal(reading.identities(() => [entry('actual', final)])[0].entryId, 'actual');
 });
 test('an end before persistence remains unassociated until a public native entry exists', () => {
   const reading = createAssistantReading(), final = assistant(); const id = reading.start(); reading.end(final);
-  assert.deepEqual(reading.identities([]), []);
-  assert.deepEqual(reading.identities([entry('committed', final)]), [{ streamId: id, entryId: 'committed' }]);
+  assert.deepEqual(reading.identities(() => []), []);
+  assert.deepEqual(reading.identities(() => [entry('committed', final)]), [{ streamId: id, entryId: 'committed' }]);
 });
 test('reset or missing starts never adopt another lifecycle', () => {
   const reading = createAssistantReading(), final = assistant(); reading.end(final);
-  assert.deepEqual(reading.identities([entry('x', final)]), []);
+  assert.deepEqual(reading.identities(() => [entry('x', final)]), []);
   reading.start(); reading.resetActive(); reading.end(final);
-  assert.deepEqual(reading.identities([entry('x', final)]), []);
+  assert.deepEqual(reading.identities(() => [entry('x', final)]), []);
   const id = reading.start(); reading.end(final); reading.end(assistant());
-  assert.deepEqual(reading.identities([entry('x', final)]), [{ streamId: id, entryId: 'x' }]);
+  assert.deepEqual(reading.identities(() => [entry('x', final)]), [{ streamId: id, entryId: 'x' }]);
 });
 test('ambiguous stored objects or repeated lifecycles fail closed', () => {
   const reading = createAssistantReading(), final = assistant(); reading.start(); reading.end(final);
-  assert.deepEqual(reading.identities([entry('one', final), entry('two', final)]), []);
+  assert.deepEqual(reading.identities(() => [entry('one', final), entry('two', final)]), []);
   reading.start(); reading.end(final);
-  assert.deepEqual(reading.identities([entry('one', final)]), []);
+  assert.deepEqual(reading.identities(() => [entry('one', final)]), []);
 });
 test('the process-local receipt cache is bounded without persisting or rewriting entries', () => {
   const reading = createAssistantReading(), entries = [], ids = [];
   for (let i = 0; i < 257; i++) { const message = assistant(); ids.push(reading.start()); reading.end(message); entries.push(entry(String(i), message)); }
-  const receipts = reading.identities(entries);
+  const receipts = reading.identities(() => entries);
   assert.equal(receipts.length, 256); assert(!receipts.some(receipt => receipt.streamId === ids[0]));
   assert.equal(entries.length, 257); assert.equal(entries[0].id, '0'); assert.equal(entries[0].message.timestamp, 100);
 });
@@ -43,7 +43,7 @@ test('identity lookup preserves ambiguous-object rejection without rewriting fro
   reading.start(); reading.end(final);
   const entries = Object.freeze([Object.freeze(entry('one', final)), Object.freeze(entry('two', final))]);
   const before = JSON.stringify(entries);
-  assert.deepEqual(reading.identities(entries), []);
+  assert.deepEqual(reading.identities(() => entries), []);
   assert.equal(JSON.stringify(entries), before);
 });
 test('large standard history remains non-nested and identity notification contains no history', () => {
@@ -51,10 +51,35 @@ test('large standard history remains non-nested and identity notification contai
   const entries = Array.from({ length: 200 }, (_, i) => entry(String(i), { ...assistant(), content: [{ type: 'text', text: '\"'.repeat(100000) }] }));
   const streamId = reading.start(); reading.end(entries.at(-1).message);
   const original = JSON.stringify({ type: 'response', id: 'request', command: 'get_entries', success: true, data: { entries, leafId: '199' } }) + '\n';
-  const data = reading.identities(entries);
+  const data = reading.identities(() => entries);
   assert.deepEqual(data, [{ streamId, entryId: '199' }]);
   const notify = JSON.stringify({ type: 'extension_ui_request', method: 'notify', message: 'agentkit-control/v1:' + JSON.stringify({ id: 'request', success: true, data }) }) + '\n';
   assert(Buffer.byteLength(original) < 64 * 1024 * 1024);
   assert(Buffer.byteLength(notify) < 512);
   assert(!notify.includes('entries'));
+});
+
+
+test('reopened and active-only reading state never enumerates history', () => {
+  const reading = createAssistantReading();
+  const unused = () => { throw new Error('history must not be enumerated'); };
+  assert.deepEqual(reading.identities(unused), []);
+  reading.start();
+  assert.deepEqual(reading.identities(unused), []);
+  reading.resetActive();
+  assert.deepEqual(reading.identities(unused), []);
+});
+
+test('completed identities still read fresh entries and propagate failures', () => {
+  const reading = createAssistantReading(), final = assistant();
+  const streamId = reading.start(); reading.end(final);
+  let entries = [], reads = 0;
+  const read = () => { reads++; return entries; };
+  assert.deepEqual(reading.identities(read), []);
+  entries = [entry('stored', final)];
+  assert.deepEqual(reading.identities(read), [{ streamId, entryId: 'stored' }]);
+  entries = [];
+  assert.deepEqual(reading.identities(read), []);
+  assert.equal(reads, 3);
+  assert.throws(() => reading.identities(() => { throw new Error('public history unavailable'); }), /public history unavailable/);
 });

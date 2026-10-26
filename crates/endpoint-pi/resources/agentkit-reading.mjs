@@ -14,9 +14,12 @@ export function createAssistantReading() {
     },
     resetActive() { active = undefined; },
     current() { return active; },
-    identities(entries) {
+    identities(readEntries) {
+      // Reopened/pre-completion sessions have no process-local relation to
+      // resolve. Do not enumerate public history until one can exist.
+      if (ended.size === 0) return [];
       const byMessage = new Map();
-      for (const entry of entries) {
+      for (const entry of readEntries()) {
         if (entry.type !== 'message' || entry.message?.role !== 'assistant' || typeof entry.id !== 'string' || !entry.id) continue;
         byMessage.set(entry.message, byMessage.has(entry.message) && byMessage.get(entry.message) !== entry.id ? null : entry.id);
       }

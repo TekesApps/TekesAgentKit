@@ -139,7 +139,7 @@ export default function (pi) {
             const fileSnapshot = snapshotInputFiles(files);
             prepared.push({ id, text, hash: digest(text), hasImages: hasImages === true, files: fileSnapshot }); data = null; break;
           }
-          case 'reading.identities': data = reading.identities(ctx.sessionManager.getEntries()); break;
+          case 'reading.identities': data = reading.identities(() => ctx.sessionManager.getEntries()); break;
           case 'settings.get': data = pi.getSettings(); break;
           case 'tools.list': data = pi.getAllTools(); break;
           case 'tools.select': pi.setActiveTools(request.params.tools); data = pi.getActiveTools(); break;
