@@ -110,3 +110,18 @@ Pi 1.3.0 和 Native Kernel 0.9.0 的原验收也重新通过。上述模型输�
 ## 2026-10-18 对照复查
 
 当前 ClientKit 的 SEP 参考文件哈希均与基准一致（HEAD `c289bc9`）。复查修复了 Pi 原生文件缺失/替换后的恢复保护、ClientKit `atSeq` 完整 entry 顺序及已完成 turn 校验、失效 pointer 的单会话隔离，以及 Native/Pi 在无文件观察者时的 close 状态持久化。详情及验证边界见 [复查记录](sep-review-2026-10-18.md)。
+
+### Native legacy read-only history (Kernel #93 candidate)
+
+A Native journal can explicitly publish a `historyAccess` projection with
+`mode: "read-only"`, `reason: "legacy-tool-catalog-unavailable"` and the frozen
+`sourceDigest` (`sha256-` plus 64 lowercase hex digits). This identifies historical
+records whose old writer did not persist the execution tool catalog. It is not
+an endpoint-wide Unsupported capability and must not disable other sessions.
+
+Shared Run/Composer presentation keeps the received transcript readable and
+fresh, reports the access reason, and disables execution controls. An unknown or
+malformed historyAccess marker fails closed for writes. Kernel retains its strict
+execution/continuation checks; displaying history never authorizes a mutation.
+This extension is a candidate until the exact Kernel reader and consumer have
+passed public protocol and integration gates; it is not present in Kernel 0.9.7.

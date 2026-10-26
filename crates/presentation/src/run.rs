@@ -2,6 +2,37 @@ use crate::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tekes_agent_session::{ConnectionState, MemoryProjectionStore};
+
+const HISTORY_ACCESS_KEY: &str = "historyAccess";
+const READ_ONLY_HISTORY_MESSAGE: &str = "历史只读：旧会话未保存工具目录，不能继续运行或修改。";
+
+/// Returns true when a session carries an explicit historical-access marker.
+/// Any malformed or unknown marker fails closed as read-only. The server still
+/// owns authorization; this only keeps shared controls from offering writes.
+fn historical_read_only(session: &tekes_agent_session::SessionProjection) -> Option<String> {
+    let projection = session.projections.get(HISTORY_ACCESS_KEY)?;
+    let value = &projection.value;
+    let digest = value.get("sourceDigest").and_then(Value::as_str);
+    let digest_valid = digest.is_some_and(|digest| {
+        digest.len() == 71
+            && digest.starts_with("sha256-")
+            && digest[7..]
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+    });
+    let expected = value.as_object().is_some_and(|object| {
+        object.len() == 3
+            && value["mode"] == "read-only"
+            && value["reason"] == "legacy-tool-catalog-unavailable"
+            && digest_valid
+    });
+    Some(if expected {
+        READ_ONLY_HISTORY_MESSAGE.to_owned()
+    } else {
+        "历史访问标记无效；为保护会话，已禁用写操作。".to_owned()
+    })
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum ConnectionPhase {
@@ -25,6 +56,7 @@ impl ConnectionPresentation {
         let requires_session = session.is_some();
         let session = session.and_then(|id| store.sessions.get(id));
         let session_error = session.and_then(|s| s.journal_error.clone());
+        let read_only_message = session.and_then(historical_read_only);
         let phase = match &store.connection {
             ConnectionState::Connecting if was_connected => ConnectionPhase::Reconnecting,
             ConnectionState::Connecting => ConnectionPhase::Connecting,
@@ -35,12 +67,12 @@ impl ConnectionPresentation {
         };
         let message = match &store.connection {
             ConnectionState::Failed(error) => Some(error.clone()),
-            _ => session_error,
+            _ => session_error.or(read_only_message.clone()),
         };
         let fresh = phase == ConnectionPhase::Connected
             && (!requires_session || session.is_some_and(|s| s.journal_ready));
         Self {
-            can_submit: fresh,
+            can_submit: fresh && read_only_message.is_none(),
             history_is_stale: !fresh,
             message,
             phase,
@@ -81,6 +113,7 @@ impl RunPresentation {
             .and_then(|s| s["status"].as_str());
         let archived =
             store.archived_session_ids.contains(&scope.session_id) || status == Some("archived");
+        let historical_read_only = session.and_then(historical_read_only);
         let actionables: Vec<_> = store
             .actionables
             .values()
@@ -88,9 +121,16 @@ impl RunPresentation {
             .cloned()
             .collect();
         let running = session.is_some_and(|s| s.run_open);
-        let available = scope.endpoint_id == store.endpoint_id && connection.can_submit;
+        let history_available = connection.phase == ConnectionPhase::Connected
+            && session.is_some_and(|session| session.journal_ready);
+        let available = scope.endpoint_id == store.endpoint_id
+            && (connection.can_submit || historical_read_only.is_some() && history_available);
         let phase = if archived {
             RunPhase::Archived
+        } else if historical_read_only.is_some() {
+            // The immutable history is readable, but stale historical control
+            // facts must not advertise a live runnable/answerable turn.
+            RunPhase::Unavailable
         } else if !available {
             if session.is_none() {
                 RunPhase::Loading
@@ -106,17 +146,33 @@ impl RunPresentation {
         } else {
             RunPhase::Idle
         };
-        let can_submit = available && !archived;
+        let can_submit = available && connection.can_submit && !archived;
         Self {
             scope: scope.clone(),
             phase,
             connection,
             can_submit,
-            can_cancel: available && running && !archived && status != Some("interrupted"),
-            actionables: if available { actionables } else { Vec::new() },
-            queue: session.map(|s| s.queue.clone()).unwrap_or_default(),
-            jobs: session.map(|s| s.jobs.clone()).unwrap_or_default(),
-            error: session.and_then(|s| s.agent_error.clone()),
+            can_cancel: available
+                && historical_read_only.is_none()
+                && running
+                && !archived
+                && status != Some("interrupted"),
+            actionables: if available && historical_read_only.is_none() {
+                actionables
+            } else {
+                Vec::new()
+            },
+            queue: session
+                .filter(|_| historical_read_only.is_none())
+                .map(|s| s.queue.clone())
+                .unwrap_or_default(),
+            jobs: session
+                .filter(|_| historical_read_only.is_none())
+                .map(|s| s.jobs.clone())
+                .unwrap_or_default(),
+            error: session
+                .and_then(|s| s.agent_error.clone())
+                .or(historical_read_only),
         }
     }
 }

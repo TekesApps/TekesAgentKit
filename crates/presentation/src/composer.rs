@@ -944,7 +944,8 @@ impl PresentationStore {
             present_turn_actions(
                 &TurnActionContext {
                     capabilities: &authority.endpoint_capabilities,
-                    ready: authority.connection == tekes_agent_session::ConnectionState::Ready,
+                    ready: authority.connection == tekes_agent_session::ConnectionState::Ready
+                        && run.as_ref().is_none_or(|run| run.can_submit),
                     running: session_has_active_work(session),
                 },
                 &mut transcript,

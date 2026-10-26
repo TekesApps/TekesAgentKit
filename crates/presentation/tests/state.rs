@@ -494,6 +494,78 @@ fn connection_and_thread_status_never_invent_running_or_cross_session_authority(
 }
 
 #[test]
+fn legacy_history_is_readable_but_shared_presentation_blocks_writes() {
+    let mut authority = authority();
+    let session = authority.sessions.get_mut("a").unwrap();
+    session.journal_ready = true;
+    session.run_open = true;
+    session.queue.push(json!({"id":"queued"}));
+    session.jobs.push(json!({"id":"job"}));
+    authority
+        .actionables
+        .insert("approval".into(), json!({"id":"approval","sessionId":"a"}));
+    authority.sessions.get_mut("a").unwrap().projections.insert(
+        "historyAccess".into(),
+        VersionedValue {
+            sequence: 12,
+            value: json!({
+                "mode":"read-only",
+                "reason":"legacy-tool-catalog-unavailable",
+                "sourceDigest":format!("sha256-{}", "a".repeat(64))
+            }),
+        },
+    );
+
+    let run = RunPresentation::read(&authority, &scope("a"), true);
+    assert_eq!(run.connection.phase, ConnectionPhase::Connected);
+    assert!(!run.connection.history_is_stale);
+    assert!(
+        run.connection
+            .message
+            .as_deref()
+            .unwrap()
+            .contains("历史只读")
+    );
+    assert_eq!(run.phase, RunPhase::Unavailable);
+    assert!(!run.can_submit);
+    assert!(!run.can_cancel);
+    assert!(run.actionables.is_empty());
+    assert!(run.queue.is_empty());
+    assert!(run.jobs.is_empty());
+    assert!(run.error.as_deref().unwrap().contains("历史只读"));
+
+    let transcript =
+        TranscriptSnapshot::read(&scope("a"), authority.sessions.get("a").unwrap()).unwrap();
+    assert!(!transcript.is_stale);
+}
+
+#[test]
+fn malformed_historical_access_marker_fails_closed_without_marking_history_stale() {
+    let mut authority = authority();
+    let session = authority.sessions.get_mut("a").unwrap();
+    session.journal_ready = true;
+    session.projections.insert(
+        "historyAccess".into(),
+        VersionedValue {
+            sequence: 1,
+            value: json!({"mode":"future-mode"}),
+        },
+    );
+
+    let run = RunPresentation::read(&authority, &scope("a"), false);
+    assert_eq!(run.connection.phase, ConnectionPhase::Connected);
+    assert!(!run.connection.history_is_stale);
+    assert!(!run.can_submit);
+    assert!(
+        run.connection
+            .message
+            .as_deref()
+            .unwrap()
+            .contains("标记无效")
+    );
+}
+
+#[test]
 fn workspace_can_start_another_new_thread_after_first_materializes() {
     let mut store = PresentationStore::default();
     let authority = authority();
