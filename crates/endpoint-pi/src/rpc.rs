@@ -286,11 +286,31 @@ impl Rpc {
     }
 
     pub(crate) async fn session_state(&self) -> Result<(Value, Value)> {
-        tokio::try_join!(
+        let (snapshot, state) = tokio::try_join!(
             biased;
-            self.request("get_entries", json!({})),
+            self.control("reading.snapshot", json!({})),
             self.request("get_state", json!({}))
-        )
+        )?;
+        if snapshot.get("transfer").is_some() {
+            require(
+                snapshot == json!({"transfer":"standard_entries"}),
+                "invalid Pi reading snapshot transfer",
+            )?;
+            // Only the explicit size signal takes the original wire path. Keep
+            // entries before fresh identities, including their existing checks.
+            let (mut entries, state) = tokio::try_join!(
+                biased;
+                self.request("get_entries", json!({})),
+                self.request("get_state", json!({}))
+            )?;
+            let identities = self.control("reading.identities", json!({})).await?;
+            entries
+                .as_object_mut()
+                .ok_or_else(|| Error::Protocol("Pi entries snapshot must be an object".into()))?
+                .insert("readingIdentities".into(), identities);
+            return Ok((entries, state));
+        }
+        Ok((snapshot, state))
     }
     pub(crate) fn ui_response(&self, id: &str, mut fields: Value) -> Result<()> {
         fields["type"] = json!("extension_ui_response");
@@ -451,32 +471,177 @@ mod tests {
         }));
     }
 
+    fn reading_control_id(call: &Value, method: &str) -> String {
+        use base64::Engine;
+        assert_eq!(call["type"], "prompt");
+        let encoded = call["message"]
+            .as_str()
+            .unwrap()
+            .strip_prefix("/agentkit-control ")
+            .unwrap();
+        let value: Value = serde_json::from_slice(
+            &base64::engine::general_purpose::URL_SAFE_NO_PAD
+                .decode(encoded)
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(value["method"], method);
+        value["id"].as_str().unwrap().to_owned()
+    }
+
+    fn reading_snapshot_control_id(call: &Value) -> String {
+        reading_control_id(call, "reading.snapshot")
+    }
+
+    fn control_reply(rpc: &Rpc, id: &str, data: Value) {
+        let value = json!({"id":id,"success":true,"data":data});
+        let _ = rpc.events.send(json!({
+            "type":"extension_ui_request",
+            "method":"notify",
+            "message":format!("agentkit-control/v1:{value}")
+        }));
+    }
+
     #[tokio::test]
-    async fn session_state_enqueues_both_reads_and_matches_reverse_responses() {
+    async fn session_state_enqueues_snapshot_and_state_and_matches_reverse_responses() {
         let (rpc, mut calls, actor) = test_rpc();
         let reader = rpc.clone();
         let request = tokio::spawn(async move { reader.session_state().await });
         let entries_call = next_call(&mut calls).await;
         let state_call = next_call(&mut calls).await;
 
-        assert_eq!(entries_call["type"], "get_entries");
+        let control_id = reading_snapshot_control_id(&entries_call);
         assert_eq!(state_call["type"], "get_state");
         assert_ne!(entries_call["id"], state_call["id"]);
         assert_eq!(actor.pending.lock().unwrap().requests.len(), 2);
 
         respond(&actor, &state_call, true, json!({"isStreaming":true}));
+        // Notifications may arrive before the prompt's handled response, and
+        // unrelated controls must not be mistaken for this snapshot.
+        control_reply(&rpc, "unrelated-control", json!({"leafId":"wrong"}));
+        control_reply(
+            &rpc,
+            &control_id,
+            json!({"leafId":"leaf","entries":[],"readingIdentities":[]}),
+        );
         respond(
             &actor,
             &entries_call,
             true,
-            json!({"leafId":"leaf","entries":[]}),
+            json!({"disposition":"handled"}),
         );
         let (entries, state) = request.await.unwrap().unwrap();
         assert_eq!(entries["leafId"], "leaf");
+        assert_eq!(entries["readingIdentities"], json!([]));
         assert_eq!(state["isStreaming"], true);
         wait_for_pending(&actor, 0).await;
         assert!(rpc.alive(), "cleanup must not be an actor disconnect");
         assert!(calls.try_recv().is_err(), "the reads are sent only once");
+        actor.task.abort();
+    }
+
+    #[tokio::test]
+    async fn explicit_large_snapshot_signal_reads_standard_entries_then_fresh_identities() {
+        let (rpc, mut calls, actor) = test_rpc();
+        let reader = rpc.clone();
+        let request = tokio::spawn(async move { reader.session_state().await });
+        let snapshot_call = next_call(&mut calls).await;
+        let state_call = next_call(&mut calls).await;
+        let control_id = reading_snapshot_control_id(&snapshot_call);
+        control_reply(&rpc, &control_id, json!({"transfer":"standard_entries"}));
+        respond(
+            &actor,
+            &snapshot_call,
+            true,
+            json!({"disposition":"handled"}),
+        );
+        respond(&actor, &state_call, true, json!({"isStreaming":true}));
+
+        let entries_call = next_call(&mut calls).await;
+        let state_call = next_call(&mut calls).await;
+        assert_eq!(entries_call["type"], "get_entries");
+        assert_eq!(state_call["type"], "get_state");
+        respond(&actor, &state_call, true, json!({"isStreaming":false}));
+        assert!(
+            calls.try_recv().is_err(),
+            "identities cannot precede the standard snapshot"
+        );
+        respond(
+            &actor,
+            &entries_call,
+            true,
+            json!({"entries":[{"id":"fresh"}],"leafId":"fresh"}),
+        );
+        let identity_call = next_call(&mut calls).await;
+        let identity_id = reading_control_id(&identity_call, "reading.identities");
+        control_reply(
+            &rpc,
+            &identity_id,
+            json!([{"streamId":"stream","entryId":"fresh"}]),
+        );
+        respond(
+            &actor,
+            &identity_call,
+            true,
+            json!({"disposition":"handled"}),
+        );
+        let (snapshot, state) = request.await.unwrap().unwrap();
+        assert_eq!(snapshot["leafId"], "fresh");
+        assert_eq!(snapshot["readingIdentities"][0]["entryId"], "fresh");
+        assert_eq!(state["isStreaming"], false);
+        wait_for_pending(&actor, 0).await;
+        assert!(calls.try_recv().is_err());
+        actor.task.abort();
+    }
+
+    #[tokio::test]
+    async fn unknown_snapshot_transfer_is_not_a_standard_read_fallback() {
+        let (rpc, mut calls, actor) = test_rpc();
+        let reader = rpc.clone();
+        let request = tokio::spawn(async move { reader.session_state().await });
+        let snapshot_call = next_call(&mut calls).await;
+        let state_call = next_call(&mut calls).await;
+        let control_id = reading_snapshot_control_id(&snapshot_call);
+        control_reply(&rpc, &control_id, json!({"transfer":"anything"}));
+        respond(
+            &actor,
+            &snapshot_call,
+            true,
+            json!({"disposition":"handled"}),
+        );
+        respond(&actor, &state_call, true, json!({}));
+        assert!(matches!(request.await.unwrap(), Err(Error::Protocol(_))));
+        wait_for_pending(&actor, 0).await;
+        assert!(calls.try_recv().is_err());
+        actor.task.abort();
+    }
+
+    #[tokio::test]
+    async fn standard_entries_failure_propagates_without_identity_read_or_retry() {
+        let (rpc, mut calls, actor) = test_rpc();
+        let reader = rpc.clone();
+        let request = tokio::spawn(async move { reader.session_state().await });
+        let snapshot_call = next_call(&mut calls).await;
+        let state_call = next_call(&mut calls).await;
+        let control_id = reading_snapshot_control_id(&snapshot_call);
+        control_reply(&rpc, &control_id, json!({"transfer":"standard_entries"}));
+        respond(
+            &actor,
+            &snapshot_call,
+            true,
+            json!({"disposition":"handled"}),
+        );
+        respond(&actor, &state_call, true, json!({}));
+        let entries_call = next_call(&mut calls).await;
+        let state_call = next_call(&mut calls).await;
+        respond(&actor, &entries_call, false, Value::Null);
+        assert!(request.await.unwrap().is_err());
+        wait_for_pending(&actor, 0).await;
+        respond(&actor, &state_call, true, json!({}));
+        assert!(
+            calls.try_recv().is_err(),
+            "a remote failure is not retried or replaced"
+        );
         actor.task.abort();
     }
 
@@ -498,6 +663,52 @@ mod tests {
             calls.try_recv().is_err(),
             "failure does not retry either read"
         );
+        actor.task.abort();
+    }
+
+    #[tokio::test]
+    async fn state_error_after_control_ack_does_not_adopt_a_late_snapshot() {
+        let (rpc, mut calls, actor) = test_rpc();
+        let reader = rpc.clone();
+        let first = tokio::spawn(async move { reader.session_state().await });
+        let snapshot_call = next_call(&mut calls).await;
+        let state_call = next_call(&mut calls).await;
+        let old_control = reading_snapshot_control_id(&snapshot_call);
+        respond(
+            &actor,
+            &snapshot_call,
+            true,
+            json!({"disposition":"handled"}),
+        );
+        wait_for_pending(&actor, 1).await;
+        respond(&actor, &state_call, false, Value::Null);
+        assert!(first.await.unwrap().is_err());
+        wait_for_pending(&actor, 0).await;
+
+        let reader = rpc.clone();
+        let next = tokio::spawn(async move { reader.session_state().await });
+        let snapshot_call = next_call(&mut calls).await;
+        let state_call = next_call(&mut calls).await;
+        let current_control = reading_snapshot_control_id(&snapshot_call);
+        assert_ne!(old_control, current_control);
+        control_reply(&rpc, &old_control, json!({"leafId":"stale"}));
+        respond(&actor, &state_call, true, json!({"isStreaming":false}));
+        respond(
+            &actor,
+            &snapshot_call,
+            true,
+            json!({"disposition":"handled"}),
+        );
+        control_reply(
+            &rpc,
+            &current_control,
+            json!({"leafId":"current","entries":[],"readingIdentities":[]}),
+        );
+        let (snapshot, _) = next.await.unwrap().unwrap();
+        assert_eq!(snapshot["leafId"], "current");
+        wait_for_pending(&actor, 0).await;
+        assert!(rpc.alive());
+        assert!(calls.try_recv().is_err(), "failed reads are not retried");
         actor.task.abort();
     }
 

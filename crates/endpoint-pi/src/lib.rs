@@ -563,6 +563,12 @@ async fn conversation_frame(
     initial: bool,
 ) -> Result<Value> {
     let (entries, state) = rpc.session_state().await?;
+    let identities: Vec<NativeMessageReadingIdentity> = serde_json::from_value(
+        entries
+            .get("readingIdentities")
+            .cloned()
+            .ok_or_else(|| Error::Protocol("Pi reading snapshot omitted identities".into()))?,
+    )?;
     let leaf_id = entries["leafId"].as_str().map(String::from);
     let (entries, more) = active_branch(&entries, limit)?;
     let snapshot = NativeConversationSnapshot {
@@ -575,8 +581,6 @@ async fn conversation_frame(
         state,
     };
     snapshot.validate()?;
-    let identities: Vec<NativeMessageReadingIdentity> =
-        serde_json::from_value(rpc.control("reading.identities", json!({})).await?)?;
     let loaded: std::collections::BTreeSet<_> = snapshot
         .entries
         .iter()
