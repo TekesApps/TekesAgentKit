@@ -1,0 +1,3 @@
+- insert:
+    - id: agentkit-runtime-probe
+      name: tekes-agentkit-dsh-runtime-probe
