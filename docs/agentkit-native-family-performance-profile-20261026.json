@@ -1,0 +1,118 @@
+{
+  "format": 1,
+  "kind": "agentkit-native-family-profile",
+  "issue": 56,
+  "status": "preregistered-not-run",
+  "baseProfile": "agentkit-stage-performance-profile-20261025.json",
+  "baseProfileSha256": "2fa13b4301cc723c73a2a498caefb1219a81b429fe2d0a5fe308b7841ef9445c",
+  "sourceProducts": {
+    "baseline": "f1daa0ffcf6ced41e21f351e22845455ca78006c",
+    "candidate": "10263722b5fb128922c49a31b5942c41333cd6e2"
+  },
+  "referenceClientKit": "c289bc9d33edcd83a782ac17927a8c65a027eccd",
+  "runtime": {
+    "kind": "native",
+    "kernelVersion": "0.9.3",
+    "source": "09508a9083c24c7accefc99516739f279b85913e"
+  },
+  "paths": {
+    "common50": {
+      "roles": [
+        "baseline",
+        "candidate"
+      ],
+      "actualChildRunPageSize": 50,
+      "publicSepPage20Probe": true,
+      "relativeBudgetsApply": true,
+      "basicFamilyHasBaseline": true
+    },
+    "product20": {
+      "roles": [
+        "candidate"
+      ],
+      "actualChildRunPageSize": 20,
+      "publicSepPage20Probe": false,
+      "relativeBudgetsApply": false,
+      "noSameEntryBaselineReason": "f1 ChildRun::open is fixed50; open_with_page_size20 is a new configurable product entry. Basic family/common50 and public SEP20 still have baseline and retain paired gates.",
+      "requiredCargoFeatures": [
+        "acceptance-native-family-page20"
+      ]
+    }
+  },
+  "caseCountsPerPathRole": {
+    "cold": 5,
+    "warm": 1,
+    "reconnectLifecycle": 1
+  },
+  "iterationsPerCase": {
+    "cold": 1,
+    "warm": 11,
+    "reconnectLifecycle": 11
+  },
+  "initializationExcluded": {
+    "cold": 0,
+    "warm": 1,
+    "reconnectLifecycle": 1
+  },
+  "plannedCaseUpperBound": 21,
+  "seed": {
+    "topLevelSessions": 1,
+    "boundedChildren": 1,
+    "parentProducer": "real Native Task with normal final",
+    "closedReadOnlyChild": true,
+    "commentaryBodies": 61,
+    "commentaryUtf8Bytes": 1024,
+    "actualReadGroups": 61,
+    "proofText": "owned Native paged child proof\n",
+    "finalText": "NATIVE_FAMILY_SEED_COMPLETE",
+    "semanticCorpusSha256": "3fd7e4c1b46ef7c9d18be02e517f1fe8b6b5feb2bab9d5ef15e58ab50d8f17c5",
+    "producerSourceSha256": "923865d397a210adc4bb9081dd4a9fb9d07f2c76c99ea01271bd4fae238201d3",
+    "publicHeadPageSize": 20,
+    "publicEarlierPageSize": 20,
+    "publicHistoryPages": 2,
+    "rawPageGroupExpansionAllowed": true,
+    "groundTruthMaxMessages": 200,
+    "mustExhaustSource": true,
+    "growth": "none: Native bounded child is closed/read-only; ordinary mutable two-session growth recipe is separate",
+    "parentDraft": "AKFAMILY_PARENT_DRAFT_KEEP",
+    "normalization": "commentaryBodies in original order; readGroups ordinal/name/read relative path/actual bytes/hash; finalText. Opaque ids/timestamps/case paths excluded only cross-role; retain raw source and original call/result ids per case."
+  },
+  "thresholds": {
+    "latencyRegressionRatioMax": 1.2,
+    "peakRssRegressionRatioMax": 1.15,
+    "firstUsableSnapshotP95Ms": 10000,
+    "sendToFirstPublicFrameP95Ms": 2000,
+    "historyPageToProjectionP95Ms": 1000,
+    "explicitReconnectToConvergedP95Ms": 5000,
+    "agentkitPeakRssMiBMax": 512,
+    "ownedHarnessPeakRssMiBMax": 2048,
+    "ownedCleanupDeadlineMs": 10000
+  },
+  "measurement": {
+    "clock": "monotonic_ns",
+    "memory": "per-process OS resident-size samples every 50ms; report sampled peak (not exact allocator peak), include sampling limits",
+    "machine": "record hardware/OS/power/thermal before run; same machine and power mode baseline/candidate",
+    "latencyStartEnd": "original intent/request accepted timestamp to matching source publication; reconnect explicit intent to same-session inventory/history convergence",
+    "provider": "loopback deterministic fixture with explicit holds excluded from latency interval; raw events retained",
+    "comparison": "baseline/candidate same supported dataset; new capability without baseline must meet absolute budget and be marked no-comparable-baseline, not a regression pass",
+    "failurePolicy": "missing sample/failed protocol/capability mismatch is failed or not_run with reason; no replacing or dropping failed iterations"
+  },
+  "sourceWitness": {
+    "transparentPublicEndpointWrapper": true,
+    "allActualCallsRetained": true,
+    "independentFull200": true,
+    "groundTruthBeforeColdChildSnapshot": false,
+    "actualChildRunEarlier50ObservedOnly": true,
+    "project20DoesNotReplaceProduct20": true,
+    "sameChildInstanceAcrossReconnect": true,
+    "failureRetainedNoResample": true
+  },
+  "boundaries": {
+    "ordinaryRerun": false,
+    "piDshControlExemption": false,
+    "desktop": false,
+    "productChanges": false,
+    "kernelSwiftSdkChanges": false,
+    "sharedSsdTarget": true
+  }
+}

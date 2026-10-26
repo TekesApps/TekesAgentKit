@@ -2,9 +2,21 @@
 
 关联 Epic #14；协议 #55/#56、集成 #58、发布 #59。暂停扩展功能，本文是当前执行入口。冻结不表示适用验收已通过，也不缩减完整 Epic。
 
+## 当前状态唯一入口（2026-10-26）
+
+本节维护当前事实；下文不可变输入及历史记录保留原身份。#55/#56/#58/#59 以本节为入口，不从历史评论推导最新状态。
+
+- **产品**：冻结范围5b；当前产品源码 `10263722b5fb128922c49a31b5942c41333cd6e2`，只含本范围阻断修复；ClientKit参照c289，不追新行为。原9 WIP逐文件SHA未变。
+- **PR/已交付**：PR10最近已完成CI的head `02e0bab96c200fd4d10b9c52798ba00c7bc398c9`；headless、UI常规及独立consumer通过，必需nested reading失败，demo build跳过，无formal review，仍draft。main `1dcc521` 已交付独立Pi窗口恢复修复#68（PR69/main CI40227909675通过）；本批没有新入main能力。
+- **验收工具**：ordinary observer e978f5e/两角色固定程序及完整绑定保持冻结；Native Family三入口程序和源码闭包见[native-family-observer-programs.json](evidence-bindings-20261026/native-family-observer-programs.json)。它们已完成定向构建/strict Clippy，Family正式样本仍0；candidate20已真实跑到完整协议/清理，离线来源对账通过；pilot仍因收尾pilot标志和RSS注册前角色竞争失败。原收据保留，先离线修复/消除采样歧义，不能开始原21-case矩阵。
+- **已知有效性能失败**：Native lifecycle快照1.661691倍、首助手1.360828倍；Pi warm快照1.341904/1.313128倍、life Earlier20 1.265616倍；DSH warm首助手1.262329倍、life cleanup OS保守上界1.273253倍（各适用相对预算1.2）。原样本保留，无豁免，不用其他组通过抵消。
+- **上游阻塞**：TekesUI53阻PR10必需nested reading；Kernel86阻Native受支持busy queue（不能改Unsupported）。两者原公开版本尚未证明修复。本库不改上游。
+- **尚缺**：Native Family端到端pilot及原矩阵；三端相关附件/队列性能与未完成协议子项；有效性能失败的有界归因与必要产品修复；#58适用review/CI/consumer/main；#59阶段发布。桌面/IME/AX均not_run；#60–66/#70后续，不加入当前前置。
+- **顺序/批次结束条件**：[有限离线归因](agentkit-stage-performance-attribution-20261026.md)已结束：当前缺操作关联分段，没有证据支持本库修复，原失败仍阻塞；并行只读审查不改冻结输入。然后一个Native Family pilot须raw、原始页、OS身份、退出、最终报告全链路一致且仍diagnostic；再按原矩阵采正式数据。复用既有闭包审查：#68已独立交付；#67依赖main尚无的DSH queue/projection闭包，不能只摘两文件形成独立交付。本批不重新评估所有拆分。仅输入/上游变化才重判；条件齐备即集成，未齐写具体依赖。全部适用门禁满足才发布，不预告时间或百分比。
+
 ## 不可变输入
 
-- AgentKit范围基线 `5b7c84361206b45ac381b10437097d3b76c322c1`；阻断修复 #67 为 `4274fe82fc353ff06100d4106d527e25dc5dfca3`，#68 为 `98b1d9a2960b90774ea5454e7e8dad870538f7bc`（分别取得精确程序窄验收）；当前分支 `10263722b5fb128922c49a31b5942c41333cd6e2` 已吸收 main 的独立 #68 修复与增强回归；本地保护引用 `refs/agentkit/stage-close-20261025/base`。PR #10 为 draft。
+- AgentKit范围基线 `5b7c84361206b45ac381b10437097d3b76c322c1`；阻断修复 #67 为 `4274fe82fc353ff06100d4106d527e25dc5dfca3`，#68 为 `98b1d9a2960b90774ea5454e7e8dad870538f7bc`（分别取得精确程序窄验收）；当前产品源码 `10263722b5fb128922c49a31b5942c41333cd6e2` 已吸收 main 的独立 #68 修复与增强回归；本地保护引用 `refs/agentkit/stage-close-20261025/base`。PR #10 为 draft。
 - 当前 main `1dcc52153ea45ba6ce73a135a8d8fe8d3406360c`：独立两文件 PR #69 已合入，main CI `40227909675` 通过，#68 已关闭。冻结对照/性能 baseline 仍为原 main `f1daa0ffcf6ced41e21f351e22845455ca78006c`，不随集成漂移。已发布 tag 仍为 headless v0.3.8；本阶段未发布。
 - ClientKit 行为参照 `c289bc9d33edcd83a782ac17927a8c65a027eccd`；Tekes `8858ccd9d46590852ec7a0949aee289fc6798d70`。此前记录的未提交参照候选仅按原冻结快照解释，不能当已发布 SDK。
 - TekesUI 公开精确 pin `50ec49f3446924fdbc66b3cff22cd8cfe150fe7c`；8 包、243 输入闭包。公开 main `7c13ec0` 未改变该闭包，不等同 #53 修复已发布。
@@ -13,7 +25,7 @@
 
 ## 本阶段必须交付和验收
 
-1. 冻结源码中已实现的 SEP/presentation：三端发送、取消、流式、附件/队列、pointer/公开历史/分页/重连，以及各自合法公开 producer 的家族数据回传。#55/#56 各自拥有真实协议与非桌面性能验收；静态测试不代替实际协议。[有限矩阵](agentkit-stage-protocol-matrix-20261025.md)及[性能门槛](agentkit-stage-performance-profile-20261025.json)独立冻结；性能门槛尚无实测通过。
+1. 冻结源码中已实现的 SEP/presentation：三端发送、取消、流式、附件/队列、pointer/公开历史/分页/重连，以及各自合法公开 producer 的家族数据回传。#55/#56 各自拥有真实协议与非桌面性能验收；静态测试不代替实际协议。[有限矩阵](agentkit-stage-protocol-matrix-20261025.md)及[性能门槛](agentkit-stage-performance-profile-20261025.json)独立冻结；ordinary正式来源协议已闭环，性能保留上述有效失败，Family/附件/队列性能尚未完成。
 2. 审查已验证待集成能力的实现、依赖和证据，不继续添加新业务组件。#58 负责精确 head review、适用 CI、独立公开 API consumer、main CI。
 3. #59 仅在范围内门禁通过并进入 main 后发布：稳定 headless 与实验 UI 明确区分。发生公开 API 源码不兼容时评估 minor 版本，不能只凭 serde 兼容发 patch。
 
@@ -27,7 +39,7 @@
 | #35/#36/#37/#40/#45 | 冻结提交包含部分实现，不证明整票完成 | 仅收口已有实现和受影响验收；新差异后续处理 |
 | #55 Run | 5b headless CI通过；旧 Pi/DSH 通过绑定旧程序 | Pi/DSH mixed队列/历史/重连，以及Pi取消/Unknown原ticket自动对账窄通过；Native/DSH原turn取消亦按独立程序窄通过；混合工具推理及同次usage来源已取得窄证据；正式性能未验收，Native queue保留Kernel86真实失败 |
 | #56 session/family | Native 两页子历史/passive Summary及 v5 原父 Task 审批拒绝失败通过；Pi primary child running→failed/history/reconnect窄证据通过 | DSH primary-child正常/失败来源及历史重连也已窄通过；Pi/DSH真实SidePanel child pane分页/重连、父草稿与退休窄证据已补齐；完整适用Family及性能仍未验收；不扩大原收据范围 |
-| #58 集成 | #68 独立两文件闭包通过精确 head review、CI、公开 consumer、固定 Pi 协议；PR69 已合 main1dcc521，main CI40227909675成功。PR10精确98b root通过，UI失败 | PR10保留严格 nested reading 和协议范围门禁；其余票不因69合入而关闭 |
+| #58 集成 | #68 独立两文件闭包通过精确 head review、CI、公开 consumer、固定 Pi 协议；PR69 已合 main1dcc521，main CI40227909675成功。PR10精确02e0bab root/独立consumer通过，strict nested reading失败 | PR10保留严格 nested reading 和协议范围门禁；其余票不因69合入而关闭 |
 | #59 发布 | 待办，尚无本阶段新 tag | 精确集成 head、main CI 与范围文档通过后发布 |
 
 ## 真实阻塞、等待和后续范围
