@@ -1,0 +1,75 @@
+{
+  "format": "agentkit-sidebar-restoration/1",
+  "verified_at_utc": "2026-10-20T19:55:23.906749+00:00",
+  "based_on": "1bb7535d16eef405823891e14fd18b2e1610ee0d",
+  "default_inputs": {
+    "commit": "8cf0840790334ba224afc0595897c74231c712e6",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 199,
+    "sha256": "f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f",
+    "ui_packages": 8
+  },
+  "sources": {
+    "crates/web/src/lib.rs": "11d502c3c5aac21e3de1591eb0e0ee03514498252076020589d1700ac335fd42",
+    "ui/bindings/src/sidebar.rs": "d7ecadb70bfb0d0b47697030d4af592df5f20a8f8cf8bfafc2e35a13b959f771",
+    "ui/components/src/sidebar.rs": "59f43d6c83fcd0e2fb61d30ba6be4f9669b72243bba1aeeb8fd3035506470782",
+    "ui/consumer/src/lib.rs": "2cb3c17c698552bd700a42b080454246cfa46f9f5bb020f500e31bd337976680",
+    "ui/demo/src/component_demo.rs": "455b9f9213253c59533d12dac2b4776f12a96e6cff051b880cad0844e23f102e",
+    "ui/demo/src/components_native.rs": "b56fa95376f7e88f8fce7aa517a1a0c84b830cba2bc6de7ac35abed82d85e4ea",
+    "ui/demo/src/native_sidebar_restore_selftest.rs": "e5f09979e251fd45cc9745e159bcb51f25a1e003edf40c88abd8a40ff5ddaedd",
+    "ui/demo/tests/sidebar_component.rs": "83d1cd1a7be570c0495bf7db3408f9ba0110fde39750b55f762846b7646a73af",
+    "ui/demo/tests/sidebar_binding.rs": "d1b3a9168d11bec8f0448f3d965dc29bdd2cba95f359ae6d4d447d1d8821556a"
+  },
+  "reference_sources": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Agent/ClientAgentSidebarListView.swift": "c29c80b8726f8ac6b5988ed6c9ad3e7902d09e8f656ac745eba4f5ee0bb70069",
+    "/Users/frankqin/dev/Tekes/Tekes/ClientAgentSidebarHostAdapter.swift": "e932b300763674511f17ceb28fa3bfc83bcb924f7e661082134d5efd79d9bf19"
+  },
+  "validation": {
+    "headless_tests": 169,
+    "ui_tests": 323,
+    "second_public_consumer_tests": 32,
+    "targeted_sidebar_tests": 12,
+    "strict_clippy": true,
+    "headless_strict_clippy": true,
+    "fmt": true,
+    "boundaries": true,
+    "native_sidebar": {
+      "failureRetainsRows": true,
+      "fullLayoutParity": false,
+      "nativeWindow": true,
+      "physicalIme": false,
+      "realHarnessOutage": false,
+      "restoringNotEmpty": true,
+      "retiredIdsNotReused": true,
+      "voiceOver": false
+    },
+    "native_component_fixture_regression": true,
+    "external_pr_reviews": 0
+  },
+  "binary_sha256": "d15e8b37ce9df28f8632f6ff1efe3378fc3807b63ae7218885a25565400258b1",
+  "logs": {
+    "/tmp/agentkit-sidebar-restore-tests-accepted.log": "d8e5d6a1439713925b621e38a274de6b38313185bb918e8b270da4ffdeaa3c41",
+    "/tmp/agentkit-sidebar-restore-targeted-final2.log": "da22b2a5a2762fb9a97a507c219c0b60495395e5e71ac448bdcdaf1480b17a9d",
+    "/tmp/agentkit-sidebar-restore-headless.log": "2a3dab789390b55daacdf658705ef26cf53fb6fe6b8edcd90bbd9790df52634d",
+    "/tmp/agentkit-sidebar-restore-clippy-final.log": "b274bebf4642769a966cff424b8de4baaf4646e5d424582a1cb94193835e1374",
+    "/tmp/agentkit-sidebar-restore-headless-clippy.log": "a18911d34b6d1d1345ab3133ece43159b3b2c00aa7f38a745e2912d4cb88cf5f",
+    "/tmp/agentkit-sidebar-restore-build-final.log": "f0788aa36d1c86b6ccdfb7f4042a5574102d82061c046422a2d42e008a1e4710",
+    "/tmp/agentkit-sidebar-restore-native.log": "c2c54de91ac8b5bf36760c966e75c42a98e00363b8a6e19d965a30dcc059f085",
+    "/tmp/agentkit-sidebar-restore-native-regression.log": "0c388fd0594f93cbef6302ebebdd4e834d5453ccd4a66583c4202c4da7657d55"
+  },
+  "not_accepted": [
+    "full_sidebar_layout",
+    "grouping_and_search_footer",
+    "paired_clientkit_visuals",
+    "real_harness_outage",
+    "physical_ime",
+    "voiceover",
+    "default_mixed_reading_integration"
+  ],
+  "prior_runs": {
+    "screenshot_attempt": "capture was serviced after the probe closed its window; no screenshot accepted; clean native receipt rerun without capture",
+    "superseded_workspace_runs": "explicitly terminated; not acceptance evidence",
+    "initial_targeted_failure": "test awaited reconnect before releasing its baseline gate; fixed driver ordering; final2 passes"
+  }
+}

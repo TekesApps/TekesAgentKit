@@ -1,0 +1,112 @@
+{
+  "status": "main-host-picker-and-status-only",
+  "baseline_release": "v0.3.8",
+  "base_commit": "0df283b5f213dbac4282a2553c8d24dd41e09066",
+  "tekesui_rev": "431093786de47b48cd566d0d9c0eafa088b10d68",
+  "tekesui_input_sha256": "03721866a362b1d31261ebbbc86140eb07e9e23320871c325234a5212591213d",
+  "tests": {
+    "root": 107,
+    "ui": 135
+  },
+  "tools_tests": 18,
+  "root_ui_strict_clippy": true,
+  "root_ui_fmt": true,
+  "dependency_boundary": true,
+  "native_regression_markers": 5,
+  "native_fixture": {
+    "system_picker": true,
+    "chinese_filename_bytes": 54,
+    "a_b_draft_isolation": true,
+    "send_stream_settle": true,
+    "picker_cancel": true,
+    "final_binary_sha256": "f6795f78af7d09d69a7f28d858d3a8ff89deae5a6d30a47249d5a318e80a10f6",
+    "screenshot": "ui/docs/upload-picker-native.png",
+    "screenshot_sha256": "fb9e78b6d339b3b2bc29040f15b693f95275b1671e048596bf2696a23fe624e9",
+    "ax_receipt": "docs/rust-agent-ui-upload-host-native-20261020.txt",
+    "ax_receipt_sha256": "6b23c87fecf4a97071059fa584d308e177104e896291900bf2ca413cb960ab2a",
+    "physical_ime": false,
+    "voiceover": false,
+    "actual_three_harness_file_reading": false,
+    "formal_transcript": false
+  },
+  "host_dependency": {
+    "crate": "rfd",
+    "version": "=0.17.2",
+    "target": "macos demo only",
+    "default_features": false,
+    "license": "MIT",
+    "swift_toolchain": false
+  },
+  "commands": [
+    "cargo +1.95.0 test --workspace --locked",
+    "cargo +1.95.0 test --manifest-path ui/Cargo.toml --workspace --locked",
+    "cargo +1.95.0 clippy --workspace --all-targets --locked -- -D warnings",
+    "cargo +1.95.0 clippy --manifest-path ui/Cargo.toml --workspace --all-targets --locked -- -D warnings",
+    "cargo +1.95.0 fmt --all -- --check",
+    "cargo +1.95.0 fmt --manifest-path ui/Cargo.toml --all -- --check",
+    "python3 scripts/check-ui-boundaries.py",
+    "python3 scripts/check-ui-consumer-inputs.py --metadata /tmp/agentkit-upload-host-metadata.json",
+    "python3 -m unittest discover -s scripts/tests",
+    "cargo +1.95.0 build --manifest-path ui/Cargo.toml -p tekes-agent-ui-demo --locked",
+    "tekes-agent-ui-demo --components --native-selftest",
+    "temporary .app wrapping the same binary --components --file-attachments; CUA native picker workflow"
+  ],
+  "command_environment": {
+    "CARGO_TARGET_DIR": "/tmp/agentkit-final-receive-target",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "python3": "/Users/frankqin/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3"
+  },
+  "logs": {
+    "root": {
+      "path": "/tmp/agentkit-upload-host-root-final.log",
+      "sha256": "7cf6a36d1cde20b642edcfa19f250ab50f36990d51997f2a5849592ae296d98c"
+    },
+    "ui": {
+      "path": "/tmp/agentkit-upload-host-ui-shipping.log",
+      "sha256": "edd7a2475a239ea2d9fb45207cc7b89984df1d8fb1f00957c20b43aa2bfb9bdc"
+    },
+    "ui_clippy": {
+      "path": "/tmp/agentkit-upload-host-clippy-report-final.log",
+      "sha256": "3fe16eb5bd63f152228882660435eb80090cff0c111aac3cf78540e5a23d57db"
+    },
+    "root_clippy": {
+      "path": "/tmp/agentkit-upload-host-root-clippy-final.log",
+      "sha256": "eef72c30fb6718135bce828dba0bb6521dc10b64019971745f2932ec8ef6b50d"
+    },
+    "tools": {
+      "path": "/tmp/agentkit-upload-host-tools.log",
+      "sha256": "0e19b999325717b6f8486f8aba1ce5fb929ea80180dd4ea1d79f408aa5db3a1d"
+    },
+    "native_regression": {
+      "path": "/tmp/agentkit-upload-host-native-regression-correct.log",
+      "sha256": "a0affff84bff72f366c760c2d76319a5165d167d01a4f5c2fe818f35f855e272"
+    }
+  },
+  "changed_source_sha256": {
+    "crates/presentation/src/attachment_transfer.rs": "beccc0fdca4c9a2262beafe639bb46d06a0c2058104f09ae15bf5c953417bba8",
+    "crates/presentation/src/lib.rs": "0b098c29af01918a1e2405e6c42651a6e136d25939a6b207617d877033032cf8",
+    "ui/Cargo.lock": "b9a4cb55b2d23954e82bd37dd5cea6fd8f0cf0eb442e1082665eae41437e8d03",
+    "ui/bindings/src/attachments.rs": "7817cbb329beb674335441639a8e83fcd3074e4ad5896fa7fc6baa6bd6fca722",
+    "ui/components/src/composer_uploads.rs": "1e3dd90df414ef6a42dd22999bd4d1d87da67b26db9e2b9fb80d34fd8ed1978c",
+    "ui/components/src/lib.rs": "465d3b0431968a6f510091843be75196af7f8be9a676f06bae016d82c461a868",
+    "ui/consumer/src/lib.rs": "a392afdb6bd1c4d3eb3c90ed779b38e43ef7852c35bef622961f5f117bffceec",
+    "ui/demo/Cargo.toml": "2032ebc107d2e08aa735a9bd59ae877c5b01708ebd86a93a4cc85cb49d7507c2",
+    "ui/demo/src/attachment_files.rs": "9d785e98d81e1c14347b113ab7941a899b81c80736597587fbfa87a92b38dcff",
+    "ui/demo/src/component_demo.rs": "bad1355b5b191ee361eaacb5a04c12a51bbce73a19c242f1c5ecef3a65d2f371",
+    "ui/demo/src/component_uploads.rs": "8b5671591df1e301d3d16cb0d78ea5e4b856c7c4153f8922c4534d2c2dfbb111",
+    "ui/demo/src/components_native.rs": "6e63b5060e190eb33545c91210b59a165516a248802523d6ad24ee84a3e152eb",
+    "ui/demo/src/lib.rs": "f7e293627366e7e3d33fabd7c5b3693738a2800ada6afd2b3ad73f4d0a45cf5b",
+    "ui/demo/tests/attachment_files.rs": "676e65b07b003645e23a2429d797fe8915dac59b5b6ab13f42537342bba533c1",
+    "ui/demo/tests/attachments.rs": "43be3bc20171c2d2481f45f8591613330ca4cd7799e3911db4350ab3b27c33e5",
+    "ui/demo/tests/composer_uploads.rs": "33c5d11ffcf1769efe0b37e52fd09f8af1910635c33a33e79b2cdd12d3536825"
+  },
+  "remaining": [
+    "actual Native/Pi/DSH upload-to-send and file reading",
+    "SidePanel file picker",
+    "preview and explicit durable reconciliation",
+    "inline images",
+    "formal Transcript/RunView and reading/paging anchors",
+    "physical IME and complete native acceptance",
+    "latest review/CI/merge/tag"
+  ]
+}

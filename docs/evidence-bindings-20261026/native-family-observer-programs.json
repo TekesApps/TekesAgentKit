@@ -1,0 +1,106 @@
+{
+  "format": 1,
+  "issue": 56,
+  "scope": "Fixed Native Family observer programs and finite 21-case cohort; global stage remains unaccepted",
+  "sourceProducts": {
+    "baseline": "f1daa0ffcf6ced41e21f351e22845455ca78006c",
+    "candidate": "10263722b5fb128922c49a31b5942c41333cd6e2"
+  },
+  "programs": [
+    {
+      "path": "/Volumes/HP P900/dev/TekesAgentKit/acceptance-tools/performance/native-family-v1/baseline/common50/native_family_performance_acceptance",
+      "sha256": "baeb9bdee2ecd3d85fdac01e71c33d11605fba07b8fc0aa490001de6806aa8d0",
+      "sourceCommit": "f1daa0ffcf6ced41e21f351e22845455ca78006c",
+      "sourceManifest": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/native-family-v1-baseline-registration-inputs.json",
+      "sourceManifestSha256": "a7f81cee93b9f33852d84b16c7bbeece871c3d758a0d584e7336f589d9e28523",
+      "consumerSourceSha256": "1d95ac27ad75b9c3334c972a12fe9eeb2010535fcefc3e2d09522cf127d38314",
+      "cargoFeatures": [],
+      "compiled": true,
+      "clippyPassed": true,
+      "focusedTestsPassed": 4,
+      "sourceInputsUnchanged": true,
+      "performanceSamples": 0,
+      "performanceAccepted": false,
+      "targetDir": "/Volumes/HP P900/dev/TekesAgentKit/shared-target",
+      "noDesktopInteraction": true
+    },
+    {
+      "path": "/Volumes/HP P900/dev/TekesAgentKit/acceptance-tools/performance/native-family-v1/candidate/common50/native_family_performance_acceptance",
+      "sha256": "a4c43bffb92d46b7896ec1958b8677a02feb8e3303b729bae76351bf94b74211",
+      "sourceCommit": "10263722b5fb128922c49a31b5942c41333cd6e2",
+      "sourceManifest": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/native-family-v1-candidate-registration-inputs.json",
+      "sourceManifestSha256": "a289a0fd55d38395d8c933a1ff1814416f5c3e2e10d22bc5aa17b7552da00d49",
+      "consumerSourceSha256": "1d95ac27ad75b9c3334c972a12fe9eeb2010535fcefc3e2d09522cf127d38314",
+      "cargoFeatures": [],
+      "compiled": true,
+      "clippyPassed": true,
+      "focusedTestsPassed": 4,
+      "sourceInputsUnchanged": true,
+      "performanceSamples": 0,
+      "performanceAccepted": false,
+      "targetDir": "/Volumes/HP P900/dev/TekesAgentKit/shared-target",
+      "noDesktopInteraction": true
+    },
+    {
+      "path": "/Volumes/HP P900/dev/TekesAgentKit/acceptance-tools/performance/native-family-v1/candidate/product20/native_family_performance_acceptance",
+      "sha256": "d3c7aadb4f58effdd228c7cbceab5a293dea1ee9ebacb03fb01238cc15663537",
+      "sourceCommit": "10263722b5fb128922c49a31b5942c41333cd6e2",
+      "sourceManifest": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/native-family-v1-candidate-registration-inputs.json",
+      "sourceManifestSha256": "a289a0fd55d38395d8c933a1ff1814416f5c3e2e10d22bc5aa17b7552da00d49",
+      "consumerSourceSha256": "1d95ac27ad75b9c3334c972a12fe9eeb2010535fcefc3e2d09522cf127d38314",
+      "cargoFeatures": [
+        "acceptance-native-family-page20"
+      ],
+      "compiled": true,
+      "clippyPassed": true,
+      "focusedTestsPassed": 4,
+      "sourceInputsUnchanged": true,
+      "performanceSamples": 0,
+      "performanceAccepted": false,
+      "targetDir": "/Volumes/HP P900/dev/TekesAgentKit/shared-target",
+      "noDesktopInteraction": true
+    }
+  ],
+  "pythonTests": 510,
+  "pythonLog": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/python312-native-family-cohort-final-v1.log",
+  "originalWipFilesUnchanged": 9,
+  "officialSamples": 21,
+  "performanceAccepted": false,
+  "issue56Accepted": false,
+  "desktop": "not_run",
+  "initialBuildFailuresRetained": [
+    "native-family-v1-baseline-test.log",
+    "native-family-v2-baseline-clippy.log"
+  ],
+  "pilot": {
+    "case": "native-family-toolchain-pilot-v3",
+    "official": false,
+    "diagnosticOnly": true,
+    "accepted": true,
+    "originalReceipt": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/performance/native-family-toolchain-pilot-v3/official-execution-receipt.json",
+    "originalReceiptSha256": "fe94be78c70473516e0aa3dfb02fde489d17eecb2af5fd7c3a1e45552254115c",
+    "offlineAnalysis": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/native-family-pilot-v3-offline-analysis-v1.json",
+    "offlineProtocolSourceChecks": "passed after correcting reporter assumptions; no protocol rerun",
+    "remaining": [],
+    "failedPriorDiagnosticsPreserved": [
+      "native-family-toolchain-pilot-v1 (proof fixture mismatch before harness)",
+      "native-family-toolchain-pilot-v2 (missing connector identity; consumer rejected input)"
+    ],
+    "originalCaptureAccepted": false,
+    "offlineFullReport": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/native-family-pilot-v3-offline-full-report-v2.json",
+    "offlineFullReportSha256": "efd69275874b28f8ba01779b0f37af07186b3677333f8b6acb4d43e74c21b2de",
+    "derivedStatus": "success",
+    "originalCaptureStatus": "failed",
+    "independentReplayProof": "Frozen original capture validator passed with pilot=True; sole explicit-root role transition independently bound to original PID/start/executable/provider parent/spawn time/OS boundaries/exit; raw and corrected RSS peaks identical, conservative max retained.",
+    "samplerGuard": "Future acquisitions atomically launch and register consumer root; old raw/receipt unchanged.",
+    "peakRssKiB": {
+      "agentkit": 47568,
+      "harness": 20064,
+      "provider": 88208
+    },
+    "maxGapNs": 56535708,
+    "officialSamples": 0
+  },
+  "nativeFamilyPerformanceAccepted": true,
+  "officialCohortBinding": "native-family-official-cohort.json"
+}

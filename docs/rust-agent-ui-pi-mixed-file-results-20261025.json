@@ -1,0 +1,86 @@
+{
+  "baseline": "ef9991b090f53629ed236d0841fe286275013c53",
+  "issue": 16,
+  "accepted": true,
+  "scope": "Pi main-run direct and genuinely queued image/file/image; receipt projection and public history reconnect",
+  "references": {
+    "clientkit": "c289bc9d33edcd83a782ac17927a8c65a027eccd",
+    "tekes": "8858ccd9d46590852ec7a0949aee289fc6798d70",
+    "tekesui": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c"
+  },
+  "piVersion": "1.3.0",
+  "providerRequests": 3,
+  "retryCount": 0,
+  "reconnect": {
+    "epochAfter": 5,
+    "epochBefore": 2,
+    "sameDirectSourceIdentity": true,
+    "sameQueuedSourceIdentity": true
+  },
+  "file": {
+    "name": "中文混合.txt",
+    "bytes": 29,
+    "contentIndex": 2,
+    "precedingImageCount": 1,
+    "publicReadBeforeAndAfterReconnect": true
+  },
+  "imageSha256": {
+    "direct": [
+      "b8e3d7537ca3037235315c68e802a437f8e0cda8ad126e5427761ccb26ae0598",
+      "bde4ad21b996b9a505380a872a3cb4790fd08132e073664b3b4edf7e45dfdc53"
+    ],
+    "queued": [
+      "21ea2e83302cac4d06a7809333b4e457fd4fb124e85a46c3ffa179d25a5eab32",
+      "9213efe287fe1fe778a53ca5d47c17c61f0488cd607fa4301436595c70b7c45e"
+    ]
+  },
+  "sourceInputs": 551,
+  "sourceManifestSha256": "94690c35fe79beef9584eecf709d21713e99f4d76b0070be0820dc4ee2cbe23b",
+  "programs": {
+    "pi_mixed_file_probe": "5baacea72987a248dc512576318736c04d9d100aa9c0cfb020ae0dac79b0db8d",
+    "inline_image_probe": "84853fb08cff0a3c90081a047a37a71f0eceaa6b1b200fd2ef381b29386ab4a5"
+  },
+  "tests": {
+    "rootPassed": 388,
+    "uiPassed": 781,
+    "uiExistingIgnored": 1,
+    "rootFeaturePresentationAndHeadlessPassed": 299,
+    "uiFeatureBindingsAndDemoPassed": 667,
+    "pythonPassed": 285,
+    "nodePassed": 14,
+    "newPresentationCases": 6,
+    "newPublicConsumerCases": 4,
+    "newMixedFixtureCases": 11,
+    "clippyStrict": true,
+    "standaloneConsumer": true
+  },
+  "consumer": {
+    "sourceFiles": 138,
+    "sourceSha256": "fc948ebca5c12e7455ce66cae539a5a9ca039a693f1cb957f29cf640c5353340",
+    "sdkPackages": 8,
+    "sdkFiles": 243
+  },
+  "strictReading": {
+    "exitStatus": 1,
+    "accepted": false,
+    "upstreamIssue": "TekesApps/TekesUI#53"
+  },
+  "threeEndpointInlineImageRegression": {
+    "accepted": true,
+    "imagePrompts": 6,
+    "dshTitlePrompts": 1
+  },
+  "evidence": ".runtime-fixtures/pi-mixed-files-20261025/",
+  "desktop": false,
+  "paidModel": false,
+  "privateSessionDatabaseRead": false,
+  "notRun": [
+    "Native/DSH mixed file-image end-to-end",
+    "real provider image interpretation",
+    "JPEG/GIF/WebP and large-image runtime matrix",
+    "system picker/paste/drop and bitmap UI",
+    "desktop/physical IME/OS AX/ProcessContainer",
+    "Pi child files and command attachment semantics"
+  ],
+  "release": "draft PR #10; no merge/tag; new commit CI must be checked independently"
+}

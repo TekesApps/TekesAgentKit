@@ -1,0 +1,59 @@
+{
+  "baseline": "64e084d28e5c5507aa67259851cd2add263ae738",
+  "status": "unpublished-development-input",
+  "tekesui": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "validation": {
+    "root-tests": {
+      "passed": 217,
+      "failed": 0,
+      "ignored": 0
+    },
+    "ui-tests": {
+      "passed": 547,
+      "failed": 0,
+      "ignored": 1
+    }
+  },
+  "before": {
+    "passed": 2,
+    "failed": 5
+  },
+  "lifecycle_regressions": 9,
+  "native": "deferred-user-away",
+  "cache": {
+    "target": "/tmp/agentkit-layout-text-292-target",
+    "new_targets": 0,
+    "new_acceptance_program_copies": 0,
+    "deleted_bytes": 0
+  },
+  "evidence": {
+    ".runtime-fixtures/tool-lifecycle-20261022/headless-boundaries.log": {
+      "bytes": 48,
+      "sha256": "e9fa1e12a0afd70528040f81fe3199172a3974910d7760c0216bb6d110181081"
+    },
+    ".runtime-fixtures/tool-lifecycle-20261022/regression-before.log": {
+      "bytes": 8997,
+      "sha256": "739650f1f6d7c6d7e1f41bfa6a4185681bf3a01f3363647e9210825f3a89032a"
+    },
+    ".runtime-fixtures/tool-lifecycle-20261022/root-clippy.log": {
+      "bytes": 434,
+      "sha256": "2f44fd6ee5d66d8bdc8c736642404c7b3e1fc4e6ca4edbe6ae240952c266b1c2"
+    },
+    ".runtime-fixtures/tool-lifecycle-20261022/root-tests.log": {
+      "bytes": 26839,
+      "sha256": "6186e8955dde6a3f62db40af21cf6fde58cea023f3946f99f3861446887a11b8"
+    },
+    ".runtime-fixtures/tool-lifecycle-20261022/ui-boundaries.log": {
+      "bytes": 86,
+      "sha256": "9480cc4382559b9a7a99240226a9f766048e30c8d38bb4bccd1fd8bca56661ad"
+    },
+    ".runtime-fixtures/tool-lifecycle-20261022/ui-clippy.log": {
+      "bytes": 614,
+      "sha256": "f34285bc03b72153595ea7c3fd6a0948805525ce55bd31c74fded80c97ecab89"
+    },
+    ".runtime-fixtures/tool-lifecycle-20261022/ui-tests.log": {
+      "bytes": 68929,
+      "sha256": "111bd2bbabb1322e9845ab9507e9a850893eef78ecfb7fea5f7046fdb2713dcc"
+    }
+  }
+}

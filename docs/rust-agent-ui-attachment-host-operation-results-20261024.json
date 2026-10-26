@@ -1,0 +1,200 @@
+{
+  "schemaVersion": 1,
+  "issue": 16,
+  "pullRequest": 10,
+  "sourceBaseCommit": "0cbced7618b851164373d6bd4ad7567e1dd8f482",
+  "includesUncommittedHostSlice": true,
+  "sdkRevision": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "run": {
+    "accepted": true,
+    "endpoints": [
+      "native",
+      "pi",
+      "dsh"
+    ],
+    "provider": "synthetic-loopback",
+    "providerRequestCount": 14,
+    "sharedHostOperation": true,
+    "systemPickerExercised": false,
+    "desktopInteraction": false,
+    "privateSessionHistoryRead": false,
+    "paidModel": false,
+    "ownedProcessExitStatus": {
+      "native": 0,
+      "dsh": 0
+    },
+    "receiptWrittenAfterOwnedProcessesExited": true
+  },
+  "uploadProofs": {
+    "native": {
+      "attachmentOnlyInputCount": 1,
+      "attachmentOnlySend": true,
+      "attachmentOnlyVisible": true,
+      "componentSend": true,
+      "durableInputCount": 1,
+      "foreignSessionReadRejected": true,
+      "freshJournalAfterReconnect": true,
+      "historyFileMetadata": true,
+      "historyFileReference": false,
+      "hostBoundedFileRead": true,
+      "hostCompletionApplied": true,
+      "inlineImage": false,
+      "nativeInteraction": false,
+      "oneShotUpload": true,
+      "originalDraft": true,
+      "otherDraftPreserved": true,
+      "promptSettled": true,
+      "publicByteRead": true,
+      "publicEntry": true,
+      "readUnavailable": false,
+      "receiptValidated": true,
+      "reconnectNoDuplicate": true,
+      "sharedHostSelectionOperation": true,
+      "systemPickerExercised": false
+    },
+    "pi": {
+      "attachmentOnlyInputCount": 1,
+      "attachmentOnlySend": true,
+      "attachmentOnlyVisible": true,
+      "componentSend": true,
+      "durableInputCount": 1,
+      "foreignSessionReadRejected": true,
+      "freshJournalAfterReconnect": true,
+      "historyFileMetadata": false,
+      "historyFileReference": true,
+      "hostBoundedFileRead": true,
+      "hostCompletionApplied": true,
+      "inlineImage": false,
+      "nativeInteraction": false,
+      "oneShotUpload": true,
+      "originalDraft": true,
+      "otherDraftPreserved": true,
+      "promptSettled": true,
+      "publicByteRead": true,
+      "publicEntry": true,
+      "readUnavailable": false,
+      "receiptValidated": true,
+      "reconnectNoDuplicate": true,
+      "sharedHostSelectionOperation": true,
+      "systemPickerExercised": false
+    },
+    "dsh": {
+      "attachmentOnlyInputCount": 1,
+      "attachmentOnlySend": true,
+      "attachmentOnlyVisible": true,
+      "componentSend": true,
+      "durableInputCount": 1,
+      "foreignSessionReadRejected": null,
+      "freshJournalAfterReconnect": true,
+      "historyFileMetadata": true,
+      "historyFileReference": false,
+      "hostBoundedFileRead": true,
+      "hostCompletionApplied": true,
+      "inlineImage": false,
+      "nativeInteraction": false,
+      "oneShotUpload": true,
+      "originalDraft": true,
+      "otherDraftPreserved": true,
+      "promptSettled": true,
+      "publicByteRead": false,
+      "publicEntry": true,
+      "readUnavailable": true,
+      "receiptValidated": true,
+      "reconnectNoDuplicate": true,
+      "sharedHostSelectionOperation": true,
+      "systemPickerExercised": false
+    }
+  },
+  "programs": {
+    "headless": {
+      "program": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/tekes-agent-headless",
+      "sha256": "894a17601d5f95a93fbc25b8cf1666d6b0dcc4817866d0fa25f58391c51294b9",
+      "bytes": 29176048,
+      "origin": "explicit-existing"
+    },
+    "demo": {
+      "program": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/tekes-agent-ui-demo",
+      "sha256": "d73ff4c26be92cc82bff8d39db754a41b54f3114de2afdd7192511695f2a7b67",
+      "bytes": 87109408,
+      "origin": "explicit-existing"
+    },
+    "kernel": {
+      "supervisor": "/Users/frankqin/dev/Tekes/.build/kernel-0.9.3-installed/BuiltInKernel/tekes-supervisor",
+      "supervisorSha256": "365eca9385f36d5897a81ba398e7f34b4b9819896d6a1b78c618a7710b14380f",
+      "worker": "/Users/frankqin/dev/Tekes/.build/kernel-0.9.3-installed/BuiltInKernel/tekes-worker",
+      "workerSha256": "1284014bd0a8d3cb711c0512b10762322a19af4beabc1f9e681bacb1e28fa64d",
+      "build": {
+        "format": 1,
+        "identifier": "com.tekes.kernel.supervisor",
+        "source_revision": "09508a9083c24c7accefc99516739f279b85913e",
+        "version": "0.9.3"
+      }
+    }
+  },
+  "programArchive": {
+    "demoArchive": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/attachment-host-operation-20261024/programs/tekes-agent-ui-demo",
+    "sha256": "d73ff4c26be92cc82bff8d39db754a41b54f3114de2afdd7192511695f2a7b67",
+    "archiveOnly": true,
+    "headlessArchiveReference": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/dsh-summary-source-20261024/programs/tekes-agent-headless-source-witness",
+    "headlessSha256": "894a17601d5f95a93fbc25b8cf1666d6b0dcc4817866d0fa25f58391c51294b9"
+  },
+  "sourceSnapshotFiles": 1053,
+  "validation": {
+    "fixtureUploadSuites": {
+      "passed": 26,
+      "failed": 0,
+      "ignored": 0,
+      "newTests": 3
+    },
+    "uiWorkspace": {
+      "passed": 750,
+      "failed": 0,
+      "ignored": 1
+    },
+    "python": {
+      "passed": 207,
+      "failed": 0,
+      "newReceiptTests": 3
+    },
+    "strictUiClippy": "passed",
+    "ordinaryDemoBuild": "passed",
+    "fmtBoundariesAcceptanceMatrix": "passed",
+    "standalonePublicConsumer": {
+      "fixtureReusedFrom": "dsh-summary-source-20261024/public-consumer",
+      "sourceSha256": "721c1d36f729d1ecf0bf2822fb2e27a1e0d758755a9cbe612955c8ff78cfbbd0",
+      "sourceFiles": 137,
+      "matchesFrozenDshClosure": true,
+      "executedInThisSlice": true,
+      "exitCode": 0,
+      "stdoutEmpty": true,
+      "log": "public-consumer.log"
+    },
+    "rootTestsRerun": false,
+    "rootNote": "demo-only refactor; previous 0cbced7 root346 and feature254 evidence remains scoped to that slice"
+  },
+  "notRun": [
+    "OS-file-picker",
+    "native-HostResult-window-event-loop",
+    "desktop-physical-IME-OS-AX",
+    "full-layout-focus-and-ProcessContainer"
+  ],
+  "issueClosed": false,
+  "mergeTagRelease": false,
+  "cacheBytesDeletedInThisSlice": 0,
+  "evidenceRoot": ".runtime-fixtures/attachment-host-operation-20261024",
+  "ciTerminalAttestation": {
+    "headSha": "4495f3593c8c2060dd6091e37b6f2e157f354d6c",
+    "prRun": 40092397118,
+    "pushRun": 40092394154,
+    "status": "completed",
+    "onlyFailure": "strict nested detail reading (TekesUI #53)",
+    "standaloneConsumer": "passed-both-runs",
+    "demoBuild": "skipped-after-strict-gate; local evidence separate",
+    "defaultRootPassed": 346,
+    "optInPassed": 254,
+    "uiPassed": 750,
+    "uiIgnored": 1,
+    "pythonPassed": 207,
+    "receipt": ".runtime-fixtures/attachment-host-operation-20261024/ci-terminal-evidence.json"
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "kind": "session-notice-document-regression",
+  "baseCommit": "2be03392e4b5718deb9ead503633b39002e62443",
+  "regressionBeforeFix": "public_session_notices_are_not_rejected_or_assigned_to_a_fake_turn failed before fix; valid public event had empty turn_id",
+  "sourceSha256": {
+    "crates/presentation/src/transcript_document.rs": "88e49e2b9051672544759b8ac75f3521c61515ba6d8bf92467be130f9b4843b3",
+    "crates/presentation/tests/transcript_document.rs": "464491468140fe50cf756690e08ceb5c6a6f89632beb82567632fd134aa44dd6",
+    "ui/consumer/src/lib.rs": "8a724a1a4769935f15fbfb238400bd1e50b157c50f18cf2f301fd31c511779d9",
+    "ui/demo/src/components_native.rs": "9d1bcea5c38ec80085ccf80404f1c6353a2bfb1f596e898b0808f0cfe2c7710e",
+    "ui/demo/src/fixture.rs": "c41fe045f109235410d15da80b4c1a72d00dd15170b623491de64ad64f53f1ef"
+  },
+  "binarySha256": "ed7432eab641c4ee02c0edac7d4ece664fcb4c18a4302fc9fe211fef375616a8",
+  "imageSha256": "0afc3a80055c2380eef1fe3a5362fd1fbb55462577b0499a961d3ec36aa2dcd0",
+  "receipt": {
+    "actionableProof": null,
+    "annotationProof": null,
+    "components": true,
+    "contextProof": null,
+    "documentProjection": {
+      "hasMoreBefore": true,
+      "isStale": false,
+      "renderer": false,
+      "sections": 10,
+      "sessionNotices": 1,
+      "toolCalls": 0,
+      "visibleMessages": 20
+    },
+    "finalAssistantItems": 10,
+    "initialPresetProof": null,
+    "inventoryRows": 6,
+    "isStale": false,
+    "modelChoiceProof": null,
+    "nativeInteraction": false,
+    "offscreen": true,
+    "sharedRuntime": true,
+    "sidebarMounted": true,
+    "summaryMounted": true,
+    "transcriptItems": 20,
+    "transcriptView": false,
+    "uploadProof": null
+  },
+  "localChecks": {
+    "presentationTests": 59,
+    "consumerTests": 13,
+    "presentationStrictClippy": true,
+    "uiStrictClippy": true,
+    "fmt": true,
+    "boundaries": true
+  },
+  "tekesUI": {
+    "commit": "431093786de47b48cd566d0d9c0eafa088b10d68",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 188,
+    "sha256": "03721866a362b1d31261ebbbc86140eb07e9e23320871c325234a5212591213d",
+    "ui_packages": 8
+  },
+  "nativeInteraction": false,
+  "physicalIME": false,
+  "formalTranscript": false,
+  "scope": "public event replay + second public consumer + isolated fixture offscreen data outlet; no real harness or full UI test rerun for this patch",
+  "remaining": [
+    "formal Transcript and RunView",
+    "message/tool source-order preservation",
+    "upstream #22/#23 public consumption gates",
+    "physical IME and native reading/paging acceptance",
+    "full delivery review CI merge and stage tag"
+  ]
+}

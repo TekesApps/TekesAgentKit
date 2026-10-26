@@ -1,0 +1,66 @@
+{
+  "date": "2026-10-19",
+  "agentkit": {
+    "version": "0.3.7",
+    "commit": "a8610a420bad72eaedcf706b30df87153a0f3e16",
+    "localUiWip": true
+  },
+  "webReference": {
+    "version": "0.1.17",
+    "commit": "8b9b11ce49bf4e80c2c553e0ed60c91936481143"
+  },
+  "tekesui": {
+    "commit": "431093786de47b48cd566d0d9c0eafa088b10d68",
+    "files": 188,
+    "sha256": "03721866a362b1d31261ebbbc86140eb07e9e23320871c325234a5212591213d",
+    "unchanged": true
+  },
+  "checks": {
+    "rootTests": 103,
+    "uiTests": 36,
+    "toolTests": 16,
+    "rootStrictClippy": true,
+    "uiStrictClippy": true,
+    "fmt": true,
+    "dependencyBoundaries": true,
+    "secondPublicUiConsumer": true
+  },
+  "harnesses": {
+    "native": {
+      "version": "0.9.1",
+      "marker": "NATIVE_UI_CONSUMER_LIVE_OK explicit-SEP+RunController+restored-final-answer+TekesUI-offscreen; native-interaction=false",
+      "pngSha256": "ea26841f696abb31234080b4cd92bf96b7bc5f07b8aa20e2cf0718b6ac278daf",
+      "size": [
+        1000,
+        760
+      ]
+    },
+    "pi": {
+      "version": "1.3.0",
+      "marker": "PI_UI_CONSUMER_LIVE_OK explicit-SEP+RunController+restored-final-answer+TekesUI-offscreen; native-interaction=false",
+      "pngSha256": "cbe601b1828986d816d1dc47d5898a23fba5856726e635dfe72b7b4ece1a6217",
+      "size": [
+        1000,
+        760
+      ]
+    },
+    "dsh": {
+      "version": "0.2.1-rc.2",
+      "marker": "DSH_UI_CONSUMER_LIVE_OK explicit-SEP+RunController+restored-final-answer+TekesUI-offscreen; native-interaction=false",
+      "pngSha256": "5b795f86a37d5a381deb6e035a9282612a5d46d9014ade7ff93331d3529c36f3",
+      "size": [
+        1000,
+        760
+      ]
+    }
+  },
+  "evidenceBoundaries": {
+    "syntheticLocalProvider": true,
+    "offscreenGpu": true,
+    "nativeWindowInteraction": false,
+    "physicalIme": false,
+    "voiceOver": false,
+    "paidModel": false
+  },
+  "logSha256": "2ff5de1d4a7aac62c260733b8b743fb885e83563c1411123072632ce81b09638"
+}

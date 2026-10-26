@@ -1,0 +1,172 @@
+{
+  "baseCommit": "378c63132ca473e57d25c5f8b4d5e745102f5c94",
+  "publishedAgentKit": "v0.3.8",
+  "tekesui": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "referenceClientKit": "c289bc9d33edcd83a782ac17927a8c65a027eccd",
+  "referenceSourceSha256": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/ComposerActionBarView.swift": "2e46cfed60ab6f75a554a446d442de39ad26f45869cd62e6d022773f516b04b2",
+    "/Users/frankqin/dev/Tekes/Tekes/AppShell/KeyboardFocusRoute.swift": "4ec1b910b0a98dddd29c82749932b6f505418e7f75568a02fb74f0686f89d9d0"
+  },
+  "program": {
+    "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/real-child-run-ui-20261023/tekes-agent-ui-demo-v7",
+    "sha256": "1443cfb8073804e25ae2d935cbef2d799d9187d594cd24c4f8f2681c9f648c91"
+  },
+  "sourceSha256": {
+    "scripts/test-real-session-endpoints.py": "9dac405f70fb5c8329271aa87454922b7b0c77201572528f19195035c7583364",
+    "ui/components/src/composer.rs": "6183ae7d87e31965c44861f71f0940d1fd49612a2f86a481979236ec11488156",
+    "ui/consumer/src/lib.rs": "7b8b7d8787d4d1cc676dc9cf8cac1e37f7dbaee323d9c0e9f9b3876ec0fcde78",
+    "ui/demo/src/child_run_proof.rs": "2b137cd30696f573c4403af87b03e3ff1c9d875d478f00bac56eed6608e3bf44",
+    "ui/demo/src/components_native.rs": "fb1bd4c3c67f75d038ed7153ab101389c5237afe0df912db7351761fb5432ad2",
+    "ui/demo/src/lib.rs": "f08392e360d77efb178362efaee281534c886295c697110d4e7fdc6b9b59b5b6",
+    "ui/demo/src/sidechat_proof.rs": "1b744800533816488616f0c5946cc551e3122395e60a27fdd144fa4f3f9f84b6",
+    "ui/demo/tests/composer_component.rs": "a36947fa9c3055a4818d5c6ad9763f11b5dc6138be9f00b8f28d2e0a1f20ef13"
+  },
+  "receipts": {
+    "pi": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/real-child-run-ui-20261023/final-pi.consumer.json",
+      "sha256": "39cd31caf674fe740c95bb828705e2415855eddac062970e4215f1100fd93603",
+      "proof": {
+        "cancelSettled": true,
+        "childReply": true,
+        "crossProcess": false,
+        "draftRestored": true,
+        "freshReconnect": true,
+        "nativeInteraction": false,
+        "noDuplicateInput": true,
+        "oldAuthorityRetired": true,
+        "originalCancel": true,
+        "originalLocalClose": true,
+        "originalSend": true,
+        "originalSidePanelRunPort": true,
+        "originalSummaryPointer": true,
+        "otherDraftsPreserved": true,
+        "parentHistoryIsolated": true,
+        "physicalIme": false,
+        "primaryKeptEditorFocus": true,
+        "publishedStopForOwnInput": true,
+        "readingAnchorAcceptance": false,
+        "realHarness": true,
+        "scope": {
+          "endpointId": "pi-ui",
+          "sessionId": "cc42329f-6d27-4b9e-80a3-e75768cf85a7",
+          "threadId": "d0ed2759-798e-4a19-a9df-0599d843f117"
+        },
+        "syntheticPreeditBlockedSend": true
+      }
+    },
+    "dsh": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/real-child-run-ui-20261023/final-dsh.consumer.json",
+      "sha256": "ef958ad171b99a0c5852b3d9e1ca17979181c41c549c1c371b48eeabff03e96a",
+      "proof": {
+        "cancelSettled": true,
+        "childReply": true,
+        "crossProcess": false,
+        "draftRestored": true,
+        "freshReconnect": true,
+        "nativeInteraction": false,
+        "noDuplicateInput": true,
+        "oldAuthorityRetired": true,
+        "originalCancel": true,
+        "originalLocalClose": true,
+        "originalSend": true,
+        "originalSidePanelRunPort": true,
+        "originalSummaryPointer": true,
+        "otherDraftsPreserved": true,
+        "parentHistoryIsolated": true,
+        "physicalIme": false,
+        "primaryKeptEditorFocus": true,
+        "publishedStopForOwnInput": true,
+        "readingAnchorAcceptance": false,
+        "realHarness": true,
+        "scope": {
+          "endpointId": "dsh-ui",
+          "sessionId": "5b63f7e5-d57b-46a8-b981-7e136b4f4eb7",
+          "threadId": "session-9829a61c-052c-4089-9747-f74336eb451a"
+        },
+        "syntheticPreeditBlockedSend": true
+      }
+    },
+    "dshRepeat": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/real-child-run-ui-20261023/dsh-repeat-dsh.consumer.json",
+      "sha256": "dc5f5cd53ae9530d5b1996ff1f5ab49a8f39d51106883144890051f436eee5f2",
+      "proof": {
+        "cancelSettled": true,
+        "childReply": true,
+        "crossProcess": false,
+        "draftRestored": true,
+        "freshReconnect": true,
+        "nativeInteraction": false,
+        "noDuplicateInput": true,
+        "oldAuthorityRetired": true,
+        "originalCancel": true,
+        "originalLocalClose": true,
+        "originalSend": true,
+        "originalSidePanelRunPort": true,
+        "originalSummaryPointer": true,
+        "otherDraftsPreserved": true,
+        "parentHistoryIsolated": true,
+        "physicalIme": false,
+        "primaryKeptEditorFocus": true,
+        "publishedStopForOwnInput": true,
+        "readingAnchorAcceptance": false,
+        "realHarness": true,
+        "scope": {
+          "endpointId": "dsh-ui",
+          "sessionId": "71bb2e50-e261-43b2-bfe8-21f161b2dc23",
+          "threadId": "session-c1172955-e2b4-4379-a6dc-08b25360e8a6"
+        },
+        "syntheticPreeditBlockedSend": true
+      }
+    },
+    "nativeSideChat": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/real-child-run-ui-20261023/native-sidechat-final.consumer.json",
+      "sha256": "7c687e7d3e9acf8084c8fbf4d609e5cb6404839bf86a12136dfe497ae165250e",
+      "proof": {
+        "capabilityUnavailable": false,
+        "confirmedDiscard": true,
+        "crossProcess": false,
+        "freshReconnect": true,
+        "independentForkScope": true,
+        "nativeInteraction": false,
+        "noDuplicateInput": true,
+        "originalClose": true,
+        "originalComposerIdsRetained": true,
+        "originalCreate": true,
+        "originalSend": true,
+        "originalSidePanelRunPort": true,
+        "parentAndOtherDraftsPreserved": true,
+        "parentHistoryIsolated": true,
+        "physicalIme": false,
+        "readingAnchorAcceptance": false,
+        "realHarness": true,
+        "retiredAuthority": true,
+        "scratchDraftRestored": true,
+        "scratchLifecycleAccepted": true,
+        "scratchReply": true,
+        "scratchScope": {
+          "endpointId": "native-ui",
+          "sessionId": "01a167b4-2b5c-79a7-a028-869fefe18208",
+          "threadId": "01a167b4-2b5c-79a7-a028-869fefe18208"
+        },
+        "summaryNavigation": true
+      }
+    }
+  },
+  "validation": {
+    "uiWorkspacePassed": 618,
+    "uiWorkspaceExistingIgnored": 1,
+    "strictWorkspaceClippy": true,
+    "pythonPassed": 74,
+    "fmt": true,
+    "staticBoundaries": true,
+    "secondPublicConsumerExecuted": true,
+    "redRegression": "primary-focus-before.log",
+    "greenRegression": "primary-focus-after.log"
+  },
+  "nativeInteraction": false,
+  "physicalIme": false,
+  "readingAnchorAcceptance": false,
+  "crossProcess": false,
+  "fullGoalCompletion": false,
+  "earlierFailuresPreserved": true
+}

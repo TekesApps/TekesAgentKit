@@ -2,67 +2,164 @@
 """Exercise the three separate endpoints with owned temporary state and synthetic local providers."""
 import argparse, base64, zlib, shutil, uuid, http.server, json, os, re, select, signal, struct, subprocess, tempfile, threading, time, urllib.request, urllib.parse
 from pathlib import Path
+from owned_endpoint_provider import provider_handler
+from runtime_provenance import kernel_programs
+from native_probe_launcher import run_native_probe, validate_bundle
+from goal_footnote_probe import verify_goal_identity, verify_goal_footer, verify_goal_cleared
+from cargo_program import cargo_program
+from kernel_lifecycle_diagnostics import KernelLifecycleDiagnostics
+from pi_owned_fixture import prepare_pi
+from dsh_owned_fixture import owned_dsh
+from native_owned_fixture import owned_native
 ROOT=Path(__file__).resolve().parent.parent
 parser=argparse.ArgumentParser()
+parser.add_argument('--headless-program',type=Path,help='Explicit existing headless executable; hash it and skip compilation')
 parser.add_argument('--pi-root',type=Path)
 parser.add_argument('--dsh-root',type=Path)
 parser.add_argument('--kernel-root',type=Path)
 parser.add_argument('--kernel-target-dir',type=Path)
-parser.add_argument('--ui-demo',type=Path,help='Optional already-built AgentKit UI consumer for Native history-to-GPU acceptance')
+parser.add_argument('--kernel-supervisor',type=Path,help='Explicit existing Kernel supervisor, paired with --kernel-worker; no rebuild or copy')
+parser.add_argument('--kernel-worker',type=Path)
+parser.add_argument('--kernel-expected-version',help='Require this exact build description and public host handshake version')
+parser.add_argument('--kernel-lifecycle-diagnostics',type=Path,help='Opt-in bounded read-only lsof sampling of this run-owned Kernel state; Native headless only, never changes lifecycle assertions')
+parser.add_argument('--kernel-ui-only',action='store_true',help='Explicit independent UI acceptance, excluding Kernel lifecycle/child protocol proof; never an automatic fallback')
+parser.add_argument('--ui-demo',type=Path,help='Optional already-built AgentKit UI consumer for each supplied harness history-to-GPU acceptance')
+parser.add_argument('--ui-native-app',type=Path,help='Opt-in normal LaunchServices native launch of the exact --ui-demo APPL bundle; offscreen remains direct, no activation retries')
+parser.add_argument('--ui-native-observe-frontmost',action='store_true',help='Read-only macOS frontmost PID/bundle trace during native probes; never activates an app')
 parser.add_argument('--ui-output',type=Path)
+parser.add_argument('--ui-goal-footnote',action='store_true',help='Pi-only public create/pause -> original goal footer -> clear/reconnect, using isolated owned sessions; other harness goal lifecycles remain not run')
+parser.add_argument('--ui-components',action='store_true',help='Mount RunPort/Composer/Indicators with RunBinding; canonical mixed content uses --ui-transcript-content')
+parser.add_argument('--ui-panel-navigation-toolbar',action='store_true',help='Use original Kit navigation in a host SDK toolbar, hide inline diagnostic controls; offscreen only, no native-window toolbar registration')
+parser.add_argument('--ui-model-choices',action='store_true',help='Exercise public model choices and explicit Send preparation in isolated offscreen component sessions')
+parser.add_argument('--ui-context',action='store_true',help='Exercise draft context cards, explicit removal and annotation/reference return in isolated component sessions')
+parser.add_argument('--ui-initial-presets',action='store_true',help='Exercise public initial preset selection through shared create and prompt in isolated component sessions')
+parser.add_argument('--ui-annotation-editor',action='store_true',help='Exercise public annotation editing and shared context compilation; implies the context proof')
+parser.add_argument('--ui-attachments',action='store_true',help='Exercise public upload entry, original draft, Send, history and capability-specific file reads')
+parser.add_argument('--ui-bounded-child',action='store_true',help='Verify actual read-only Native child messages through the public component; requires components and Kernel')
+parser.add_argument('--ui-feedback-read',action='store_true',help='Read typed committed feedback and verify proven final response IDs; no mutations or rating controls')
+parser.add_argument('--ui-native-run-controls',action='store_true',help='Native Send/Cancel/provider failure/explicit recovery over fresh owned sessions; no physical IME or reading-anchor acceptance')
+parser.add_argument('--ui-native-readonly',action='store_true',help='Real Native bounded pane: explicit one-message pages, native anchor/refresh and draft isolation')
+parser.add_argument('--ui-native-reading',action='store_true',help='Native public history page, retained A/B reading and reconnect on seeded owned harness sessions; synthetic wheel, no physical IME')
+parser.add_argument('--ui-native-stream-reading',action='store_true',help='Actual native stream while reading seeded history, with Chinese preedit and reconnect')
+parser.add_argument('--ui-native-stream',action='store_true',help='Use fresh owned sessions for native Send, active preview, selection, settlement, draft isolation and reconnect; excludes reading anchors')
+parser.add_argument('--ui-native-feedback',action='store_true',help='Open each owned-session native window sequentially and exercise feedback clicks, text services and session switching')
+parser.add_argument('--ui-feedback-transcript',action='store_true',help='Exercise feedback through actual Transcript/RunPort and captured host callbacks; offscreen only')
+parser.add_argument('--ui-feedback-controls',action='store_true',help='Exercise public feedback controls and note editing over isolated real transports; offscreen only')
+parser.add_argument('--ui-feedback-write',action='store_true',help='Mutating CAS/note proof on isolated fixture targets; no rating UI acceptance')
+parser.add_argument('--ui-turn-footnote',action='store_true',help='Opt in to shared completed-turn fork in isolated UI sessions; requires components')
+parser.add_argument('--ui-transcript-content',action='store_true',help='Mount the canonical mixed content tree with a generic TekesUI viewport; no keyed reading acceptance')
+parser.add_argument('--ui-message-rows',action='store_true',help='Mount canonical plain user and machine rows through public components; not a full Transcript')
+parser.add_argument('--ui-history-pages',action='store_true',help='Seed long isolated sessions and verify public page receipts, original scope and fresh reconnect history')
+parser.add_argument('--ui-actionables',action='store_true',help='Exercise public actionable cards on configured Native/Pi/DSH question sources')
+parser.add_argument('--ui-sidebar-query',action='store_true',help='Read typed public search and explicitly refresh public inventory cursors on owned conversation-history targets; offscreen protocol proof only')
+parser.add_argument('--ui-mixed-tools',action='store_true',help='Offscreen real read tools, reasoning and retained Composer proof')
+parser.add_argument('--ui-sidechat',action='store_true',help='Real ephemeral fork in original SidePanel/RunPort, reconnect and confirmed discard; offscreen only')
+parser.add_argument('--ui-child-run',action='store_true',help='Real Pi/DSH independent child Summary -> original Composer Send/Cancel/reconnect; offscreen only')
 args=parser.parse_args()
-if args.ui_demo and not args.kernel_root:
-    parser.error("--ui-demo requires --kernel-root")
+if args.kernel_lifecycle_diagnostics:
+    if not args.kernel_root or args.pi_root or args.dsh_root or any(
+        value for key,value in vars(args).items() if key.startswith('ui_')
+    ) or args.kernel_ui_only:
+        parser.error('--kernel-lifecycle-diagnostics requires an isolated Kernel headless profile with no UI/Pi/DSH inputs')
+if args.ui_child_run:
+    if args.kernel_root or not (args.ui_demo and args.ui_components and args.ui_transcript_content):
+        parser.error('--ui-child-run requires Pi/DSH UI demo/components/Transcript; Native bounded history is separate')
+    if any(value for key,value in vars(args).items() if key.startswith('ui_') and key not in {'ui_child_run','ui_demo','ui_components','ui_transcript_content','ui_output'}):
+        parser.error('--ui-child-run is an isolated offscreen profile')
+if args.ui_sidechat:
+    if not (args.ui_demo and args.ui_components and args.ui_transcript_content):
+        parser.error('--ui-sidechat requires UI demo/components/Transcript')
+    if any(value for key,value in vars(args).items() if key.startswith('ui_') and key not in {'ui_sidechat','ui_demo','ui_components','ui_transcript_content','ui_output'}):
+        parser.error('--ui-sidechat is an isolated offscreen profile')
+if args.ui_mixed_tools:
+    if not (args.ui_demo and args.ui_components and args.ui_transcript_content):
+        parser.error('--ui-mixed-tools requires UI demo/components/Transcript')
+    if any(value for key,value in vars(args).items() if key.startswith('ui_') and key not in {'ui_mixed_tools','ui_demo','ui_components','ui_transcript_content','ui_output'}):
+        parser.error('--ui-mixed-tools is an isolated offscreen profile')
+if args.ui_native_app:
+    if not args.ui_demo:
+        parser.error('--ui-native-app requires --ui-demo')
+    try:
+        validate_bundle(args.ui_demo, args.ui_native_app)
+    except (OSError, ValueError) as error:
+        parser.error(str(error))
+if args.ui_native_reading and not (args.ui_demo and args.ui_components and args.ui_transcript_content and args.ui_history_pages):
+    parser.error('--ui-native-reading requires --ui-demo, --ui-components, --ui-transcript-content and --ui-history-pages')
+if args.ui_sidebar_query and not (args.ui_demo and args.ui_components):
+    parser.error('--ui-sidebar-query requires --ui-demo and --ui-components')
+if args.ui_native_run_controls and not (args.ui_demo and args.ui_components and args.ui_transcript_content):
+    parser.error('--ui-native-run-controls requires --ui-demo, --ui-components and --ui-transcript-content')
+if args.ui_native_stream_reading and not (args.ui_demo and args.ui_components and args.ui_transcript_content and args.ui_history_pages):
+    parser.error('--ui-native-stream-reading requires owned history-pages, UI demo/components and Transcript')
+if args.ui_native_stream and not (args.ui_demo and args.ui_components and args.ui_transcript_content):
+    parser.error('--ui-native-stream requires --ui-demo, --ui-components and --ui-transcript-content')
+if args.ui_native_feedback and not (args.ui_demo and args.ui_components and args.ui_transcript_content):
+    parser.error('--ui-native-feedback requires --ui-demo, --ui-components and --ui-transcript-content')
+if args.ui_feedback_transcript and not (args.ui_demo and args.ui_components and args.ui_transcript_content):
+    parser.error('--ui-feedback-transcript requires --ui-demo, --ui-components and --ui-transcript-content')
+if args.ui_feedback_controls and not (args.ui_demo and args.ui_components and args.ui_transcript_content):
+    parser.error('--ui-feedback-controls requires --ui-demo, --ui-components and --ui-transcript-content')
+if args.ui_feedback_write and not (args.ui_demo and args.ui_components and args.ui_transcript_content):
+    parser.error('--ui-feedback-write requires --ui-demo, --ui-components and --ui-transcript-content')
+if args.ui_feedback_read and not (args.ui_demo and args.ui_components and args.ui_transcript_content):
+    parser.error('--ui-feedback-read requires --ui-demo, --ui-components and --ui-transcript-content')
+if args.ui_native_readonly and not (args.ui_bounded_child and args.ui_demo and args.ui_transcript_content):
+    parser.error('--ui-native-readonly requires bounded child, UI demo and Transcript content')
+if args.ui_bounded_child and (not args.ui_components or not args.kernel_root):
+    parser.error('--ui-bounded-child requires --ui-components and --kernel-root')
+if args.ui_turn_footnote and not args.ui_components:
+    parser.error('--ui-turn-footnote requires --ui-components')
+if args.ui_message_rows and not args.ui_components:
+    parser.error('--ui-message-rows requires --ui-components')
+if args.ui_transcript_content and not args.ui_components:
+    parser.error('--ui-transcript-content requires --ui-components')
+if args.ui_transcript_content and (args.ui_message_rows or args.ui_turn_footnote):
+    parser.error('--ui-transcript-content cannot combine independent row probes')
+if args.ui_history_pages and not args.ui_components:
+    parser.error('--ui-history-pages requires --ui-components')
+if args.ui_actionables and not args.ui_components:
+    parser.error('--ui-actionables requires --ui-components')
+if args.ui_model_choices and not args.ui_components:
+    parser.error('--ui-model-choices requires --ui-components')
+if args.ui_context and not args.ui_components:
+    parser.error('--ui-context requires --ui-components')
+if args.ui_annotation_editor and not args.ui_components:
+    parser.error('--ui-annotation-editor requires --ui-components')
+if args.ui_attachments and not args.ui_components:
+    parser.error('--ui-attachments requires --ui-components')
+if args.ui_initial_presets and not args.ui_components:
+    parser.error('--ui-initial-presets requires --ui-components')
 if args.ui_output and not args.ui_demo:
     parser.error("--ui-output requires --ui-demo")
+if args.ui_components and not args.ui_demo:
+    parser.error("--ui-components requires --ui-demo")
+if args.ui_goal_footnote:
+    if not (args.pi_root and args.ui_demo and args.ui_components and args.ui_transcript_content):
+        parser.error('--ui-goal-footnote requires Pi, UI demo/components and Transcript')
+    if any((args.ui_history_pages,args.ui_bounded_child,args.ui_native_reading,args.ui_native_feedback,args.ui_native_stream_reading,args.ui_native_stream,args.ui_native_run_controls,args.ui_native_readonly)):
+        parser.error('--ui-goal-footnote uses its own offscreen sessions; do not combine history/native/bounded probes')
+if args.ui_panel_navigation_toolbar and not (args.ui_demo and args.ui_components):
+    parser.error('--ui-panel-navigation-toolbar requires --ui-demo and --ui-components')
+if args.ui_panel_navigation_toolbar and any((args.ui_native_reading,args.ui_native_feedback,args.ui_native_stream_reading,args.ui_native_stream,args.ui_native_run_controls,args.ui_native_readonly)):
+    parser.error('--ui-panel-navigation-toolbar is offscreen-only; do not combine with native probes that use the diagnostic header')
 if not any((args.pi_root,args.dsh_root,args.kernel_root)):parser.error("supply at least one runtime root")
-subprocess.run(['cargo','build','--locked','-p','tekes-agent-headless'],cwd=ROOT,check=True)
+if args.kernel_ui_only and not (args.kernel_root and args.ui_demo and args.ui_components):
+    parser.error('--kernel-ui-only requires Kernel and a formal component demo')
+if args.kernel_ui_only and (args.ui_bounded_child or args.ui_native_readonly):
+    parser.error('--kernel-ui-only does not provide the bounded child protocol fixture')
+if any((args.kernel_supervisor,args.kernel_worker,args.kernel_expected_version)) and not args.kernel_root:
+    parser.error('Kernel program/version inputs require --kernel-root for the fixture provider configuration')
+if args.kernel_root:
+    try:
+        kernel_supervisor, kernel_worker, kernel_identity = kernel_programs(args.kernel_root, args.kernel_target_dir, args.kernel_supervisor, args.kernel_worker, args.kernel_expected_version)
+    except (ValueError, OSError, subprocess.SubprocessError) as error:
+        parser.error(str(error))
+    print('NATIVE_RUNTIME_BUILD_RECEIPT '+json.dumps(kernel_identity,sort_keys=True),flush=True)
+headless_program, headless_identity = cargo_program(ROOT, 'tekes-agent-headless', 'tekes-agent-headless', existing=args.headless_program)
+print('HEADLESS_PROGRAM_RECEIPT '+json.dumps(headless_identity,sort_keys=True),flush=True)
+native_child_reply='ENDPOINT_REPLY_OK'+(('\n原生有界子历史长回答，用于真实阅读锚点验证。'*120) if args.ui_native_readonly else '')
 requests=[]
-class Provider(http.server.BaseHTTPRequestHandler):
-    def log_message(self,*_):pass
-    def do_POST(self):
-        body=json.loads(self.rfile.read(int(self.headers['Content-Length'])));requests.append(self.path)
-        if 'ENDPOINT_QUEUE_HOLD' in json.dumps(body):time.sleep(0.6)
-        self.send_response(200);self.send_header('Content-Type','text/event-stream');self.end_headers()
-        if self.path.endswith('/responses'):
-            frames=[{'type':'response.completed','response':{'id':'synthetic-response','status':'completed','output':[{'type':'message','role':'assistant','phase':'final_answer','status':'completed','content':[{'type':'output_text','text':'ENDPOINT_REPLY_OK'}]}],'usage':{'input_tokens':10,'output_tokens':4,'total_tokens':14}}}]
-            if 'ENDPOINT_NATIVE_CHILD' in json.dumps(body) and not any(item.get('type')=='function_call_output' for item in body.get('input',[]) if isinstance(item,dict)):
-                task={'task_name':'Bounded child proof','goal':'Return a short proof','instructions':'CHILD_NATIVE_PROOF. Reply ENDPOINT_REPLY_OK.','input_sources':[],'output':{'mode':'inline','format':'text','name':'result','path':'','contract':'short result'}}
-                frames=[
-                    {'type':'response.output_item.added','output_index':0,'item':{'type':'function_call','call_id':'native-child-proof','name':'task','arguments':''}},
-                    {'type':'response.function_call_arguments.delta','output_index':0,'delta':''},
-                    {'type':'response.function_call_arguments.done','output_index':0,'arguments':json.dumps(task)},
-                    {'type':'response.completed','response':{'id':'native-child-call','status':'completed','usage':{'input_tokens':10,'output_tokens':4,'total_tokens':14}}},
-                ]
-        else:
-            common={'id':'synthetic-chat','object':'chat.completion.chunk','created':1,'model':'endpoint-test'}
-            frames=[dict(common,choices=[{'index':0,'delta':{'role':'assistant','content':'ENDPOINT_'},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{'content':'REPLY_OK'},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{},'finish_reason':'stop'}],usage={'prompt_tokens':10,'completion_tokens':4,'total_tokens':14})]
-            transcript=json.dumps(body.get('messages',[]))
-            change=re.search(r'ENDPOINT_CHANGE_DIRECTORY=([^\s"\\]+)',transcript)
-            if change and not any(message.get('role')=='tool' for message in body.get('messages',[])):
-                frames=[dict(common,choices=[{'index':0,'delta':{'role':'assistant','tool_calls':[{'index':0,'id':'directory-call','type':'function','function':{'name':'working_directory','arguments':json.dumps({'cd':change.group(1)})}}]},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{},'finish_reason':'tool_calls'}])]
-            if 'ENDPOINT_SUBAGENT_CATALOG' in transcript and not any(message.get('role')=='tool' for message in body.get('messages',[])):
-                frames=[dict(common,choices=[{'index':0,'delta':{'role':'assistant','tool_calls':[{'index':0,'id':'child-call','type':'function','function':{'name':'subagent','arguments':json.dumps({'description':'Catalog proof child','prompt':'CHILD_INITIAL_PROOF'})}}]},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{},'finish_reason':'tool_calls'}])]
-            if 'ENDPOINT_PI_CHILD' in transcript:
-                values=[]
-                for message in body.get('messages',[]):
-                    if message.get('role')=='tool':
-                        try: values.append(json.loads(message.get('content','')))
-                        except (ValueError,TypeError): pass
-                child=next((value.get('childSessionId') for value in values if isinstance(value,dict) and value.get('childSessionId')),None)
-                action=None
-                if child is None: action={'action':'create','label':'Model child'}
-                elif not any(value.get('accepted') for value in values if isinstance(value,dict)): action={'action':'prompt','childSessionId':child,'text':'CHILD_PI_TOOL_PROOF'}
-                elif not any(value.get('settled') and 'entries' in value for value in values if isinstance(value,dict)):
-                    action={'action':'read','childSessionId':child};time.sleep(0.05)
-                if action:
-                    frames=[dict(common,choices=[{'index':0,'delta':{'role':'assistant','tool_calls':[{'index':0,'id':'pi-child-'+str(len(values)),'type':'function','function':{'name':'tekes_subagent','arguments':json.dumps(action)}}]},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{},'finish_reason':'tool_calls'}])]
-            if 'ENDPOINT_GOAL_COMPLETE' in transcript and not any(message.get('role')=='tool' for message in body.get('messages',[])):
-                frames=[dict(common,choices=[{'index':0,'delta':{'role':'assistant','tool_calls':[{'index':0,'id':'goal-call','type':'function','function':{'name':'agentkit_goal','arguments':json.dumps({'phase':'complete'})}}]},'finish_reason':None}]),dict(common,choices=[{'index':0,'delta':{},'finish_reason':'tool_calls'}])]
-        try:
-            for frame in frames:self.wfile.write(('data: '+json.dumps(frame)+'\n\n').encode());self.wfile.flush()
-            if not self.path.endswith('/responses'):self.wfile.write(b'data: [DONE]\n\n')
-        except (BrokenPipeError,ConnectionResetError):pass
+Provider=provider_handler(workspace=lambda:cwd,requests=requests,child_run=args.ui_child_run,mixed_tools=args.ui_mixed_tools,native_readonly=args.ui_native_readonly,native_child_reply=native_child_reply)
 server=http.server.ThreadingHTTPServer(('127.0.0.1',0),Provider)
 threading.Thread(target=server.serve_forever,daemon=True).start()
 base_url=f'http://127.0.0.1:{server.server_port}/v1'
@@ -81,16 +178,17 @@ def commands(cwd,provider,model):
         {'op':'reconnect'},{'op':'open','sessionId':'s'},{'op':'snapshot'},
     ]
 def execute(config):
-    result=subprocess.run([str(ROOT/'target/debug/tekes-agent-headless')],input=json.dumps(config),text=True,capture_output=True,timeout=120)
+    result=subprocess.run([str(headless_program)],input=json.dumps(config),text=True,capture_output=True,timeout=120)
     if result.returncode:
         print(result.stdout[-12000:]);print(result.stderr[-3000:])
         if config['kind']=='native':
             for path in (base/'kernel').rglob('*.jsonl'):
                 print('KERNEL_FIXTURE_DIAGNOSTIC',path.name,path.read_text()[-20000:])
-            print('KERNEL_STDERR',b''.join(kernel_errors).decode(errors='replace')[-16000:])
+            print('KERNEL_STDERR',native_fixture['diagnostic_tail']())
         raise AssertionError(config['kind']+' endpoint failed')
     outputs=[json.loads(line) for line in result.stdout.splitlines()]
     if 'expectedVersion' in config:assert outputs[0]['version']==config['expectedVersion'],outputs[0]
+    print(config['kind'].upper()+'_RUNTIME_HANDSHAKE_RECEIPT '+json.dumps(outputs[0],sort_keys=True),flush=True)
     return outputs
 def run(config):
     outputs=execute(config)
@@ -111,8 +209,10 @@ def run(config):
     selected_model=next(command['args'] for command in config['commands'] if command.get('method')=='session.selectModel')
     proof_commands=[{'op':'create','cwd':str(Path(next(iter(stat))['absolutePath']).parent),'saveAs':'presented'},
         {'op':'call','sessionId':'presented','method':'session.selectModel','args':selected_model},
-        {'op':'open','sessionId':'presented'},{'op':'compose','sessionId':'presented','text':'Presentation layer proof'},
-        {'op':'waitSettled','sessionId':'presented'},{'op':'presentation','sessionId':'presented'},
+        {'op':'open','sessionId':'presented'},{'op':'compose','sessionId':'presented','text':'ENDPOINT_STREAM_IDENTITY_PROOF' if config['kind']=='pi' else 'Presentation layer proof','captureNativePreview':config['kind']=='pi'},
+        {'op':'waitSettled','sessionId':'presented'},
+        *([{'op':'waitNativeEvent','sessionId':'presented','eventType':'message_end','role':'assistant'}] if config['kind']=='pi' else []),
+        {'op':'snapshot'},{'op':'presentation','sessionId':'presented'},
         {'op':'reconnect'},{'op':'open','sessionId':'presented'},{'op':'presentation','sessionId':'presented'}]
     if config['kind'] in ('native','pi'):
         proof_commands += [
@@ -123,6 +223,26 @@ def run(config):
     else:
         proof_commands += [{'op':'sideChatCreateError','sessionId':'presented'},{'op':'childCatalog','sessionId':'presented'}]
     proof=execute(dict(config,commands=proof_commands))
+    if config['kind']=='pi':
+        presented=next(row['result']['sessionId'] for row in proof if row.get('op')=='create')
+        settled=next(row['result'] for row in proof if row.get('op')=='snapshot')['sessions'][presented]
+        kinds=[(event.get('type'),event.get('message',{}).get('role') if isinstance(event.get('message'),dict) else None) for event in settled['native_events']]
+        assert any(kind=='message_end' and role=='assistant' for kind,role in kinds), 'Pi dropped the assistant lifecycle cause: '+json.dumps(kinds)
+        assert any(entry.get('message',{}).get('role')=='assistant' for entry in settled['native_conversation']['entries']), 'Pi lifecycle cause missing its canonical snapshot'
+        live=next(row['result']['nativePreview'] for row in proof if row.get('op')=='compose' and 'nativePreview' in row['result'])
+        assert live['native_conversation']['isStreaming'], 'Live probe did not observe an active source'
+        live_ids={event.get('agentkitStreamId') for event in live['native_events'] if event.get('type')=='message_update' and event.get('message',{}).get('role')=='assistant'}
+        assert live_ids and None not in live_ids, 'Actual active Pi preview has no stream identity'
+        assert not any(entry.get('message',{}).get('role')=='assistant' for entry in live['native_conversation']['entries']), 'Live probe did not precede persistence'
+        receipts=settled.get('native_reading_identities',[])
+        assert receipts and live_ids <= {receipt['streamId'] for receipt in receipts}, 'Pi active preview did not reconcile to a loaded entry receipt'
+        assistants={entry['id'] for entry in settled['native_conversation']['entries'] if entry.get('message',{}).get('role')=='assistant'}
+        ended={event.get('agentkitStreamId') for event in settled['native_events'] if event.get('type')=='message_end' and event.get('message',{}).get('role')=='assistant'}
+        assert all(receipt['entryId'] in assistants and receipt['streamId'] in ended for receipt in receipts), receipts
+        assert len({receipt['streamId'] for receipt in receipts})==len(receipts),receipts
+        assert len({receipt['entryId'] for receipt in receipts})==len(receipts),receipts
+        print('PI_READING_IDENTITY_LIVE_OK active-preview+public-final-object+loaded-entry+authenticated-stream-event')
+        print('PI_NATIVE_ASSISTANT_BOUNDARY_LIVE_OK canonical-snapshot+original-message-end')
     for row in (row for row in proof if row.get('op')=='presentation'):
         view=row['result']
         assert view['connection']['phase']=='connected' and view['canSubmit'],view
@@ -139,16 +259,350 @@ def run(config):
     print(config['kind'].upper()+'_PANELS_LIVE_OK summary-scope+sidechat-capability+lifecycle-or-catalog')
     print(config['kind'].upper()+'_PRESENTATION_LIVE_OK composer+immediate-echo+identity-reconciliation+final-answer+reconnect')
     return outputs
+def ui_smoke(config, first, bounded_child=None, independent_child=None):
+    history_pages=args.ui_history_pages and bounded_child is None
+    if not args.ui_demo:
+        return
+    kind=config['kind']
+    if kind=='native' and (args.ui_actionables and bounded_child is None):
+        first=str(uuid.uuid4())
+        execute(dict(config,commands=[{'op':'call','method':'session.create','args':{'sessionId':first,'execution':{'cwd':str(cwd),'read_roots':[],'writable_roots':[],'toolchain_roots':[],'network':False,'allowed_tools':['ask_user_questions'],'mcp':[]}}},
+            {'op':'call','sessionId':first,'method':'session.selectModel','args':{'provider':providers['providers'][0]['id'],'model':providers['providers'][0]['models'][0]['id']}}]))
+    if kind=='native' and args.ui_mixed_tools:
+        first=str(uuid.uuid4())
+        execute(dict(config,commands=[{'op':'call','method':'session.create','args':{'sessionId':first,'execution':{'cwd':str(cwd),'read_roots':[str(cwd)],'writable_roots':[],'toolchain_roots':[],'network':False,'allowed_tools':['read'],'mcp':[]}}},
+            {'op':'call','sessionId':first,'method':'session.selectModel','args':{'provider':providers['providers'][0]['id'],'model':providers['providers'][0]['models'][0]['id']}}]))
+    if history_pages:
+        model=next(command['args'] for command in config['commands'] if command.get('method')=='session.selectModel')
+        if not (kind=='native' and (args.ui_actionables and bounded_child is None)):
+            first=next(row['result']['sessionId'] for row in execute(dict(config,commands=[{'op':'create','cwd':str(cwd)}])) if row.get('op')=='create')
+        history=[{'op':'call','sessionId':first,'method':'session.selectModel','args':model},{'op':'open','sessionId':first}]
+        for turn in range(1,29):
+            text='UI_HISTORY_PAGE_TURN_'+str(turn)
+            history += [{'op':'compose','sessionId':first,'text':text},{'op':'waitSettled','sessionId':first,'inputText':text}]
+        execute(dict(config,commands=history))
+        print(kind.upper()+'_UI_HISTORY_SEEDED turns=28 exact-input+completed-reply',flush=True)
+    search_query=None
+    if args.ui_sidebar_query and bounded_child is None:
+        # A content-search contract does not promise that rename metadata is an
+        # indexed document. Seed a unique word through the ordinary owned
+        # conversation and local synthetic provider, then search that history.
+        search_query='AgentKitOwnedQuery'+uuid.uuid4().hex
+        model=next(command['args'] for command in config['commands'] if command.get('method')=='session.selectModel')
+        execute(dict(config,commands=[{'op':'call','sessionId':first,'method':'session.selectModel','args':model},
+            {'op':'open','sessionId':first},{'op':'compose','sessionId':first,'text':search_query},
+            {'op':'waitSettled','sessionId':first,'inputText':search_query}]))
+    # Independent Native UI mode intentionally skips the lifecycle scenario,
+    # which normally supplies a completed answer. Every UI snapshot needs one
+    # real public response; seed it through normal admission before rendering.
+    if kind=='native' and args.kernel_ui_only and not (history_pages or search_query):
+        model=next(command['args'] for command in config['commands'] if command.get('method')=='session.selectModel')
+        text='UI_FEEDBACK_OWNED_TARGET' if args.ui_native_feedback else 'UI_COMPONENTS_OWNED_TARGET'
+        execute(dict(config,commands=[{'op':'call','sessionId':first,'method':'session.selectModel','args':model},
+            {'op':'open','sessionId':first},{'op':'compose','sessionId':first,'text':text},
+            {'op':'waitSettled','sessionId':first,'inputText':text}]))
+        marker='NATIVE_UI_FEEDBACK_TARGET_SEEDED' if args.ui_native_feedback else 'NATIVE_UI_COMPONENTS_TARGET_SEEDED'
+        print(marker+' public-prompt+real-final-response',flush=True)
+    goal_case=None
+    if args.ui_goal_footnote and bounded_child is None:
+        if kind != 'pi':
+            print(kind.upper()+'_UI_GOAL_NOT_RUN normalized-goals.create-not-in-this-path; no alternate creation protocol inferred',flush=True)
+        else:
+            first=next(row['result']['sessionId'] for row in execute(dict(config,commands=[{'op':'create','cwd':str(cwd)}])) if row.get('op')=='create')
+            model=next(command['args'] for command in config['commands'] if command.get('method')=='session.selectModel')
+            result=execute(dict(config,commands=[
+                {'op':'call','sessionId':first,'method':'session.selectModel','args':model},
+                {'op':'open','sessionId':first},
+                {'op':'compose','sessionId':first,'text':'UI_GOAL_FOOTNOTE_OWNED'},
+                {'op':'waitSettled','sessionId':first,'inputText':'UI_GOAL_FOOTNOTE_OWNED'},
+                {'op':'call','sessionId':first,'method':'goals.create','args':{'objective':'Owned UI goal footer proof','maxGoalRounds':2},'saveAs':'ui-goal','savePointer':''},
+                {'op':'call','sessionId':first,'method':'goals.pause','args':{'ref':'@ui-goal'}},
+                {'op':'call','sessionId':first,'method':'goals.get'},
+            ]))
+            goal_case=result[-1]['result']
+            created=next(row['result'] for row in result if isinstance(row.get('result'),dict) and row['result'].get('phase')=='active')
+            assert goal_case['id']==created['id'] and goal_case['revision']>created['revision'] and goal_case['phase']=='paused'
+            assert created['activation']=='disarmed'
+            goal_created=created
+    second=next(row['result']['sessionId'] for row in execute(dict(config,commands=[{'op':'create','cwd':str(cwd)}])) if row.get('op')=='create')
+    if args.ui_native_reading and bounded_child is None:
+        history=[{'op':'call','sessionId':second,'method':'session.selectModel','args':model},{'op':'open','sessionId':second}]
+        for turn in range(1,9):
+            text='UI_READING_B_TURN_'+str(turn)
+            history += [{'op':'compose','sessionId':second,'text':text},{'op':'waitSettled','sessionId':second,'inputText':text}]
+        execute(dict(config,commands=history))
+        print(kind.upper()+'_UI_READING_B_SEEDED turns=8 exact-input+completed-reply',flush=True)
+    explicit={'kind':kind,'endpointId':kind+'-ui','sessions':[first,second]}
+    ui_env=dict(os.environ)
+    if kind=='pi':
+        for field in ('executable','arguments','dataRoot','environment','extensions','sessionRoots'):
+            if field in config: explicit[field]=config[field]
+    else:
+        explicit['url']=config['url']
+        field='cookie' if 'cookie' in config else 'bearer'
+        explicit[field+'Env']='AGENTKIT_UI_FIXTURE_CREDENTIAL'
+        ui_env['AGENTKIT_UI_FIXTURE_CREDENTIAL']=config[field]
+    path=base/('ui-'+kind+'.json')
+    path.write_text(json.dumps(explicit))
+    # Preserve --ui-output's original Native path when multiple harnesses are requested.
+    output=args.ui_output.resolve() if args.ui_output else base/'ui-native.png'
+    if bounded_child:output=output.with_name(output.stem+'-bounded'+output.suffix)
+    if kind!='native':output=output.with_name(output.stem+'-'+kind+output.suffix)
+    mode=['--components'] if args.ui_components else []
+    if args.ui_panel_navigation_toolbar:mode+=['--panel-navigation-toolbar']
+    if search_query:mode+=['--sidebar-query',search_query,'--sidebar-query-proof']
+    if bounded_child:mode+=['--bounded-child-proof','--bounded-child-id',bounded_child]
+    if independent_child:mode+=['--child-run-proof',independent_child]
+    if args.ui_feedback_read:mode+=['--feedback-read-proof']
+    if args.ui_feedback_write:mode+=['--feedback-write-proof']
+    if args.ui_feedback_controls:mode+=['--feedback-controls-proof']
+    if args.ui_feedback_transcript:mode+=['--feedback-transcript-proof']
+    if (args.ui_model_choices and bounded_child is None):mode+=['--model-choice-proof']
+    if (args.ui_context and bounded_child is None) or (args.ui_annotation_editor and bounded_child is None):mode+=['--context-proof']
+    if (args.ui_annotation_editor and bounded_child is None):mode+=['--annotation-proof']
+    if (args.ui_attachments and bounded_child is None):mode+=['--upload-proof']
+    if (args.ui_actionables and bounded_child is None):mode+=['--actionable-proof']
+    if args.ui_sidechat:mode+=['--sidechat-proof']
+    if args.ui_mixed_tools:mode+=['--mixed-tool-proof']
+    if history_pages:mode+=['--history-page-proof']
+    if (args.ui_transcript_content or bounded_child is not None):mode+=['--transcript-content']
+    if (args.ui_message_rows and bounded_child is None):mode+=['--input-message-proof','--output-message-proof']
+    if (args.ui_turn_footnote and bounded_child is None):mode+=['--turn-footnote-proof','--turn-fork-proof']
+    if (args.ui_initial_presets and bounded_child is None):mode+=['--initial-preset-proof','--initial-preset-cwd',str(cwd)]
+    ui=subprocess.run([str(args.ui_demo.resolve()),*mode,'--endpoint-config',str(path),'--offscreen',str(output)],env=ui_env,text=True,capture_output=True,timeout=60)
+    # Retain original consumer evidence for every harness, including failures;
+    # these streams contain owned fixture data, never the endpoint credential.
+    output.with_suffix('.consumer.stdout').write_text(ui.stdout)
+    output.with_suffix('.consumer.stderr').write_text(ui.stderr)
+    assert ui.returncode==0,ui.stderr[-3000:]
+    receipt=next(json.loads(line) for line in ui.stdout.splitlines() if line.startswith('{') and json.loads(line).get('offscreen'))
+    output.with_suffix('.consumer.json').write_text(json.dumps(receipt,ensure_ascii=False,indent=2)+'\n')
+    if goal_case is not None:
+        goal_scope={'endpointId':kind+'-ui','threadId':first,'sessionId':first}
+        goal_proof=verify_goal_identity(receipt,goal_scope,goal_case)
+        lifecycle={'scope':goal_scope,'created':goal_created,'paused':goal_case}
+        output.with_suffix('.goal-lifecycle.json').write_text(json.dumps(lifecycle,ensure_ascii=False,indent=2)+'\n')
+        # CAS clear is performed only on this owned pointer. Reconnect through
+        # the public runtime, then construct a fresh UI consumer of the same
+        # original session. No private file/cache inspection or synthetic goal.
+        cleared=execute(dict(config,commands=[{'op':'open','sessionId':first},
+            {'op':'call','sessionId':first,'method':'goals.clear','args':{'ref':{'id':goal_case['id'],'revision':goal_case['revision']}}},
+            {'op':'reconnect'},{'op':'call','sessionId':first,'method':'goals.get'}]))
+        assert cleared[-1]['result'] is None, 'cleared goal survived public reconnect'
+        lifecycle['afterClearReconnect']=cleared[-1]['result']
+        lifecycle['clearMutation']=next(row['result'] for row in cleared if row.get('op')=='call' and isinstance(row.get('result'),dict) and row['result'].get('id')==goal_case['id'])
+        output.with_suffix('.goal-lifecycle.json').write_text(json.dumps(lifecycle,ensure_ascii=False,indent=2)+'\n')
+        cleared_output=output.with_name(output.stem+'-goal-cleared'+output.suffix)
+        fresh=subprocess.run([str(args.ui_demo.resolve()),*mode,'--endpoint-config',str(path),'--offscreen',str(cleared_output)],env=ui_env,text=True,capture_output=True,timeout=60)
+        cleared_output.with_suffix('.consumer.stdout').write_text(fresh.stdout)
+        cleared_output.with_suffix('.consumer.stderr').write_text(fresh.stderr)
+        assert fresh.returncode==0,fresh.stderr[-3000:]
+        fresh_receipt=next(json.loads(line) for line in fresh.stdout.splitlines() if line.startswith('{') and json.loads(line).get('offscreen'))
+        clear_proof=verify_goal_cleared(receipt,fresh_receipt)
+        print(kind.upper()+'_UI_GOAL_FOOTNOTE_RECEIPT '+json.dumps({'goal':goal_proof,'clear':clear_proof,'publicMethods':['goals.create','goals.pause','goals.get','goals.clear'],'realHarness':True,'localControlledProvider':True,'sameMountedStreamUpdate':False,'dataLifecycleAccepted':True,'footerVisibilityAccepted':goal_proof['labelVisible'],'nativeInteraction':False},ensure_ascii=False,sort_keys=True),flush=True)
+        # Keep the original visibility gate strict. Protocol/clearance evidence
+        # is retained even if the current control library clips the real footer.
+        verify_goal_footer(receipt,goal_scope,goal_case)
+    if args.ui_panel_navigation_toolbar:
+        proof=receipt['panelNavigationProof']
+        assert receipt['hostPanelNavigation'] and all(proof[key] for key in ('mounted','controlledInputMatches','hostHeader','inlineDiagnosticHidden','bodySlotMounted')),proof
+        assert not any(proof[key] for key in ('nativeWindowToolbar','crossProcess','nativeInteraction')),proof
+        print(kind.upper()+'_UI_PANEL_NAVIGATION_OK controlled-public-input+original-SDK-toolbar+body-only-panel; offscreen-only; window-registration=false; cross-process=false',flush=True)
+    if search_query:
+        search=receipt['sidebarSearchProof']
+        assert search['publicTypedSearch'] and search['sharedController'] and search['expectedTargetFound'] and search['noSubmission'],search
+        assert isinstance(search['hasMore'],bool),search
+        refresh=search['inventoryRefresh']
+        assert all(refresh[key] for key in ('publicCursors','sameConnectionEpoch','historyUnchanged','searchResultRetained')),refresh
+        print(kind.upper()+'_UI_INVENTORY_REFRESH_OK public-cursors+same-epoch+retained-history+search-result; offscreen-only',flush=True)
+        print(kind.upper()+'_UI_SIDEBAR_QUERY_OK public-typed-search+shared-controller+owned-target+original-endpoint; offscreen-only',flush=True)
+    if args.ui_native_readonly and bounded_child is not None:
+        raw=execute(dict(config,commands=[{'op':'call','method':'subagents.history','args':{'parentSessionId':first,'childSessionId':bounded_child,'maxMessages':1}}]))
+        first_page=next(row['result'] for row in raw if row.get('op')=='call')
+        older=execute(dict(config,commands=[{'op':'call','method':'subagents.history','args':{'parentSessionId':first,'childSessionId':bounded_child,'maxMessages':1,'throughSequence':first_page['throughSequence'],'beforeSequence':first_page['entries'][0]['event']['seq'],'historyRevision':first_page['historyRevision']}}]))
+        older_page=next(row['result'] for row in older if row.get('op')=='call')
+        assert first_page['hasMoreBefore'] and not older_page['hasMoreBefore'] and older_page['entries'],older_page
+        assert all(entry['event']['type']=='turn/start' for entry in older_page['entries']),older_page
+        output.with_suffix('.raw-bounded.json').write_text(json.dumps({'initial':raw,'older':older},ensure_ascii=False,indent=2)+'\n')
+        print('NATIVE_BOUND_RAW_PAGE '+json.dumps([{'kind':entry['event']['type'],'seq':entry['event']['seq']} for entry in next(row['result'] for row in raw if row.get('op')=='call')['entries']]),flush=True)
+        native_log=output.with_suffix('.native-readonly.log')
+        marker='NATIVE_AGENT_READONLY_READING_RECEIPT '
+        text=run_native_probe(args.ui_demo,['-ApplePersistenceIgnoreState','YES','--components','--transcript-content','--endpoint-config',str(path),'--history-readonly-native-selftest','--bounded-child-id',bounded_child],ui_env,native_log,marker,bundle=args.ui_native_app,observe_frontmost=args.ui_native_observe_frontmost)
+        proof=next(json.loads(line[len(marker):]) for line in text.splitlines() if line.startswith(marker))
+        assert all(proof[key] for key in ('nativeWindow','gpu','boundedPublicSep','originalPageAndRefreshControls','prependAnchorPreserved','refreshAnchorPreserved','mainDraftPreserved','readOnlyNoComposer','noSubmission','realHarness')),proof
+        assert proof['rowCountAfter']>=proof['rowCountBefore']>0 and proof['pageSize']==1 and proof['historyExhausted'],proof
+        print('NATIVE_UI_BOUNDED_READING_RECEIPT '+json.dumps(proof,ensure_ascii=False,sort_keys=True),flush=True)
+    if args.ui_native_reading and bounded_child is None:
+        native_log=output.with_suffix('.native-reading.log')
+        marker='NATIVE_AGENT_READING_SELFTEST_RECEIPT '
+        native_text=run_native_probe(args.ui_demo,['-ApplePersistenceIgnoreState','YES','--components','--transcript-content','--endpoint-config',str(path),'--history-reading-native-selftest'],ui_env,native_log,marker,bundle=args.ui_native_app,observe_frontmost=args.ui_native_observe_frontmost)
+        proof=next(json.loads(line[len(marker):]) for line in native_text.splitlines() if line.startswith(marker))
+        assert all(proof[key] for key in ('nativeWindow','publicHistoryPage','publicPageRequest','prependAnchorPreserved','upwardReadingPreserved','focusAndTextStatePreserved','samePublicationRefresh','retainedSessionReadingRestored','independentBReadingRestored','reconnectReadingRestored','draftIsolation','sameEditorOwner','noSubmission','realHarness','readingAnchorAcceptance')),proof
+        assert proof['loadedItemsAfter']>proof['loadedItemsBefore']>0,proof
+        assert not proof['syntheticPreedit'] and not proof['physicalIme'] and not proof['voiceOver'],proof
+        assert not proof['nativePagingControl'] and not proof['markedTextPreserved'] and not proof['opaqueBaselinePreserved'],proof
+        print(kind.upper()+'_UI_NATIVE_READING_RECEIPT '+json.dumps(proof,ensure_ascii=False,sort_keys=True),flush=True)
+    if args.ui_native_feedback and bounded_child is None:
+        native_log=output.with_suffix('.native-feedback.log')
+        marker='NATIVE_AGENT_FEEDBACK_SELFTEST_RECEIPT '
+        native_text=run_native_probe(args.ui_demo,['--components','--transcript-content','--endpoint-config',str(path),'--feedback-native-selftest'],ui_env,native_log,marker,bundle=args.ui_native_app,observe_frontmost=args.ui_native_observe_frontmost)
+        proof=next(json.loads(line[len(marker):]) for line in native_text.splitlines() if line.startswith(marker))
+        assert all(proof[key] for key in ('nativeInteraction','nativePointer','nativeTextServices','syntheticPreedit','imeSendAndNavigationBlocked','savedChineseNote','noteReopened','retainedAcrossSessionSwitch','sameRatingDeletes','freshReadAfterDelete','draftsPreserved','nonemptyComposerDrafts','sendEnabledBeforeComposition','noPromptSubmitted','stateDrivenCallbacks')),proof
+        assert not proof['physicalIme'] and not proof['voiceOver'] and not proof['readingAnchorAcceptance'],proof
+        print(kind.upper()+'_UI_NATIVE_FEEDBACK_RECEIPT '+json.dumps(proof,ensure_ascii=False,sort_keys=True),flush=True)
+
+    if args.ui_native_stream_reading and bounded_child is None:
+        native_log=output.with_suffix('.native-stream-reading.log')
+        reading_env=dict(ui_env, AGENT_STREAM_READING_CAPTURE=str(output.with_suffix('.native-stream-reading.png')))
+        marker='NATIVE_AGENT_STREAM_READING_RECEIPT '
+        text=run_native_probe(args.ui_demo,['-ApplePersistenceIgnoreState','YES','--components','--transcript-content','--endpoint-config',str(path),'--stream-reading-native-selftest'],reading_env,native_log,marker,bundle=args.ui_native_app,observe_frontmost=args.ui_native_observe_frontmost)
+        proof=next(json.loads(line[len(marker):]) for line in text.splitlines() if line.startswith(marker))
+        assert all(proof[key] for key in ('nativeWindow','realHarness','activeStreamingBeforeReading','originalItemAndLocalAnchorPreserved','markedTextAndFocusPreserved','originalEditorPreserved','streamFinalTextExact','oneSubmission','reconnectNoReplay','retainedReadingAfterSessionSwitch','draftIsolation')),proof
+        assert proof['appendsObserved']>0 and not proof['physicalIme'] and not proof['voiceOver'],proof
+        print(kind.upper()+'_UI_NATIVE_STREAM_READING_RECEIPT '+json.dumps(proof,ensure_ascii=False,sort_keys=True),flush=True)
+    native_modes=[]
+    if args.ui_native_stream:
+        native_modes.append(('stream','--stream-native-selftest','NATIVE_AGENT_STREAM_SELFTEST_RECEIPT ',('nativeWindow','nativePointer','nativeTextServices','nativeAxSelection','activePreview','sameOutputRow','sameTextOwner','selectionRetained','focusRetainedDuringSettlement','oneSubmission','sessionDraftIsolation','reconnectNoReplay','stateDrivenCallbacks')))
+    if args.ui_native_run_controls:
+        native_modes.append(('run-controls','--run-controls-native-selftest','NATIVE_AGENT_RUN_CONTROLS_SELFTEST_RECEIPT ',('nativeWindow','nativePointer','nativeTextServices','activePreviewBeforeCancel','normalCancelCallback','authoritativeAbortedTurn','cancelReconnectNoReplay','providerFailureInIndicators','providerFailureInTranscript','nativeFailureTextQuery','explicitRecovery','priorFailureCleared','oneSubmissionPerSend','draftIsolation','recoveryReconnectNoReplay','stateDrivenCallbacks')))
+    if bounded_child is None:
+        for probe_name,flag,marker,required in native_modes:
+            model=next(command['args'] for command in config['commands'] if command.get('method')=='session.selectModel')
+            commands=[{'op':'create','cwd':str(cwd),'saveAs':'native-probe'},
+                      {'op':'call','sessionId':'native-probe','method':'session.selectModel','args':model},
+                      {'op':'create','cwd':str(cwd)}]
+            fresh=[row['result']['sessionId'] for row in execute(dict(config,commands=commands)) if row.get('op')=='create']
+            probe_path=base/('ui-native-'+probe_name+'-'+kind+'.json')
+            probe_path.write_text(json.dumps(dict(explicit,sessions=fresh)))
+            native_log=output.with_suffix('.native-'+probe_name+'.log')
+            native_text=run_native_probe(args.ui_demo,['--components','--transcript-content','--endpoint-config',str(probe_path),flag],ui_env,native_log,marker,bundle=args.ui_native_app,observe_frontmost=args.ui_native_observe_frontmost)
+            proof=next(json.loads(line[len(marker):]) for line in native_text.splitlines() if line.startswith(marker))
+            assert all(proof[key] for key in required),proof
+            if probe_name=='run-controls':assert isinstance(proof.get('reportedError'),str) and proof['reportedError'].strip(),proof
+            assert not proof['physicalIme'] and not proof['voiceOver'] and not proof['readingAnchorAcceptance'],proof
+            print(kind.upper()+'_UI_NATIVE_'+probe_name.upper().replace('-','_')+'_RECEIPT '+json.dumps(proof,ensure_ascii=False,sort_keys=True),flush=True)
+
+    assert not receipt['isStale'] and receipt['finalAssistantItems']>=1,receipt
+    assert output.read_bytes().startswith(b'\x89PNG\r\n\x1a\n'),kind+' UI image missing'
+    if bounded_child:
+        bounded=receipt['boundedChildProof']
+        assert all(bounded[key] for key in ['readOnlyComponent','childScope','originalReadIntent','sourceCallReadonlyDetails','retainedWidgets','reconnect','noComposer','sendRejected','parentDraftPreserved','nonemptyParentDraft','paginationAvailable']),bounded
+        assert bounded['messages']>=1 and not bounded['readingAnchorAcceptance'],bounded
+        print(kind.upper()+'_UI_BOUNDED_CHILD_OK real-child+source-call+readonly-details+explicit-read+retained-widgets+reconnect+no-composer; reading-anchor=false; native-interaction=false',flush=True)
+    if (args.ui_turn_footnote and bounded_child is None):
+        footer=receipt['turnFootnoteProof'];fork=receipt['turnForkProof']
+        assert footer['leadingAside'],footer
+        assert all(fork[key] for key in ['sharedCatalog','originalScope','explicitBoundary','singleAdmission','forkHistoryRestored','lateNavigationIgnored','originalDraftPreserved','otherDraftPreserved']),fork
+        print(kind.upper()+'_UI_TURN_FOOTNOTE_OK shared-catalog+durable-boundary+single-admission+fork-history+late-navigation-fence+draft-isolation; native-interaction=false',flush=True)
+    if (args.ui_transcript_content or bounded_child is not None):
+        content=receipt['transcriptContentProof']
+        assert content['renderer'] and content['messages']>=1 and content['userTrailing'] and content['machineLeading'] and content['genericViewport'],content
+        assert content['outputCopyControls'] >= 1, 'restored completed reply must expose a final-output copy control'
+        if args.ui_feedback_read:
+            feedback=receipt['feedbackReadProof']
+            assert feedback['readCommitted'] and feedback['originalScope'] and feedback['publication']>0 and feedback['finalTargets']>0,feedback
+            assert not feedback['mutated'] and not feedback['ratingControls'],feedback
+        if args.ui_feedback_write:
+            feedback=receipt['feedbackWriteProof']
+            assert feedback['mutated'] and all(feedback[key] for key in ('originalScope','duplicateFrameRejected','casConflictCurrent','noteSave','setRatingPreservesNote','newJudgmentClearsNote','sameRatingDeletes','sameValueSet','serverTimestamp','opaqueVersions','freshReadAfterDelete','draftsPreserved')),feedback
+            assert not feedback['ratingControls'] and not feedback['nativeInteraction'],feedback
+        if args.ui_feedback_transcript:
+            feedback=receipt['feedbackTranscriptProof']
+            assert all(feedback[key] for key in ('embeddedTranscript','runPortRouting','originalTarget','coldRead','savedChineseNote','noteReopened','sameRatingDeletes','freshReadAfterDelete','draftsPreserved')),feedback
+            assert not feedback['nativeInteraction'] and not feedback['readingAnchorAcceptance'],feedback
+            assert content['feedbackRows']>=1,content
+        if args.ui_feedback_controls:
+            feedback=receipt['feedbackControlsProof']
+            assert all(feedback[key] for key in ('publicControls','semanticActions','committedNoteReopened','trimmedChineseNote','blankClearsNote','sameRatingDeletes','freshReadAfterDelete','draftPreserved','lightDarkRendered')),feedback
+            assert not feedback['nativeInteraction'] and not feedback['physicalIme'] and not feedback['embeddedTranscript'],feedback
+        assert not content['keyedReadingAcceptance'] and not content['richContent'] and not content['completeTranscript'],content
+        print(kind.upper()+'_UI_TRANSCRIPT_CONTENT_OK canonical-mixed-tree+stable-identities+role-layout+public-generic-viewport; keyed-reading=false; native-interaction=false',flush=True)
+    if (args.ui_message_rows and bounded_child is None):
+        user=receipt['inputMessageProof'];machine=receipt['outputMessageProof']
+        assert user['rightBubble'] and user['externalRightFootnote'] and user['plainReadonlyContent'] and not user['completeTranscript'],user
+        assert machine['leadingContent'] and machine['parts']>=1 and not machine['completeTranscript'],machine
+        print(kind.upper()+'_UI_MESSAGE_ROWS_OK canonical-user+external-caption+machine-content+public-controls; full-transcript=false; native-interaction=false',flush=True)
+    if args.ui_components:
+        assert receipt['components'] and not receipt['transcriptView'],receipt
+        run=receipt['runPortComposition']
+        assert run['mounted'] and run['sharedIntents'] and not run['ownsRuntime'] and not run['completeRunPort'],run
+        if (args.ui_transcript_content or bounded_child is not None):assert run['transcriptMounted'],run
+        assert receipt['inventoryRows']>=1 and receipt['sharedRuntime'] and receipt['sidebarMounted'],receipt
+        if bounded_child:
+            assert not receipt['summaryMounted'] and receipt['boundedChildProof']['readOnlyComponent'],receipt
+        else:
+            assert receipt['summaryMounted'],receipt
+        document=receipt['documentProjection']
+        assert document['sections']>=1 and document['visibleMessages']>=1 and not document['isStale'] and not document['renderer'],document
+        assert document['positionedEvents']>=1,document
+        assert document['structuredMessages']>=1 and document['structuredMessages']+document['aggregateMessages']==document['visibleMessages'],document
+        assert document['unresolvedToolBlocks']==0,document
+        unplaced=document['unplacedFacts']
+        assert document['unplacedEvents']==len(unplaced),document
+        # Pi extension commands can retain a local echo with no native user entry.
+        # Unknown positions are explicit, never promoted to a fake source sequence.
+        assert all(fact['kind']=='message' and fact['provisional'] and fact['recordId'] is None and fact['sourceSequence'] is None for fact in unplaced),document
+        if history_pages:
+            proof=receipt['historyPagingProof']
+            assert all(proof[key] for key in ('originalScope','extended','frozenCut','otherDraftPreserved','sourceStatusPublished','newEpochHistoryRetained','noDuplicateMessages','oldReceiptInvalidated')),proof
+            assert proof['retainedMessages']>=1 and not proof['nativeInteraction'] and not proof['readingAnchorAcceptance'],proof
+        if args.ui_child_run:
+            proof=receipt['childRunProof']
+            assert all(proof[key] for key in ('realHarness','originalSummaryPointer','originalSidePanelRunPort','originalSend','childReply','originalCancel','cancelSettled','publishedStopForOwnInput','primaryKeptEditorFocus','syntheticPreeditBlockedSend','parentHistoryIsolated','draftRestored','freshReconnect','noDuplicateInput','originalLocalClose','oldAuthorityRetired','otherDraftsPreserved')),proof
+            assert not proof['nativeInteraction'] and not proof['physicalIme'] and not proof['crossProcess'] and not proof['readingAnchorAcceptance'],proof
+        if args.ui_sidechat:
+            proof=receipt['sideChatProof']
+            if kind=='dsh':
+                assert all(proof[key] for key in ('realHarness','capabilityUnavailable','originalCreateDisabled','noForkAttempted','parentAndOtherDraftsPreserved')) and not proof['scratchLifecycleAccepted'],proof
+            else:
+                assert all(proof[key] for key in ('realHarness','scratchLifecycleAccepted','originalCreate','independentForkScope','originalSidePanelRunPort','originalEditorInput','syntheticPreeditBlockedSend','originalEditorFocusRetained','originalSend','scratchReply','parentHistoryIsolated','summaryNavigation','originalComposerIdsRetained','scratchDraftRestored','canonicalReopen','canonicalReopenAfterReconnect','freshReconnect','noDuplicateInput','originalClose','confirmedDiscard','retiredAuthority','parentAndOtherDraftsPreserved')) and not proof['capabilityUnavailable'],proof
+            assert not proof['nativeInteraction'] and not proof['physicalIme'] and not proof['crossProcess'] and not proof['readingAnchorAcceptance'],proof
+        if args.ui_mixed_tools:
+            proof=receipt['mixedToolProof']
+            assert all(proof[key] for key in ('realHarness','realReadResults','reasoningSource','oneContinuousGroup','liveControlsObserved','originalControlsRetained','syntheticPreeditPreserved','focusPreserved','sendBlockedDuringPreedit','otherDraftPreserved','reconnectNoDuplicateInput','reconnectNoDuplicateTools')),proof
+            assert proof['canonicalTools']==3 and not proof['nativeInteraction'] and not proof['physicalIme'] and not proof['readingAnchorAcceptance'],proof
+        if (args.ui_actionables and bounded_child is None):
+            proof=receipt['actionableProof']
+            assert all(proof[key] for key in ('probeConfigured','publicComposer','publicCard','originalScope','oneAttempt','sharedResolved','canonicalAnswerRecord','otherDraftPreserved','freshHistoryAfterReconnect','reconnectNoDuplicateInput')),proof
+            assert proof['followupInputCount']==1 and not proof['nativeInteraction'] and not proof['physicalIME'],proof
+        if (args.ui_model_choices and bounded_child is None):
+            proof=receipt['modelChoiceProof']
+            assert proof['catalogChoices']>=1 and proof['explicitSelection'] and proof['configurationReceipt'] and proof['promptSettled'] and not proof['nativeInteraction'],proof
+        if (args.ui_context and bounded_child is None) or (args.ui_annotation_editor and bounded_child is None):
+            proof=receipt['contextProof']
+            assert proof['mountedCards'] and proof['explicitRemoval'] and proof['referenceReturned'] and proof['annotationReturned'] and proof['promptSettled'] and proof['clearedDraft'],proof
+            assert not proof['fileUpload'] and not proof['nativeInteraction'] and not proof['structuredTranscript'],proof
+        if (args.ui_annotation_editor and bounded_child is None):
+            proof=receipt['annotationProof']
+            assert proof['componentEditor'] and proof['committedComment'] and proof['sourceRetained'] and proof['sharedCompilation'] and proof['promptSettled'],proof
+            assert not proof['nativeInteraction'] and not proof['physicalIME'] and not proof['sourceHighlight'],proof
+        if (args.ui_initial_presets and bounded_child is None):
+            proof=receipt['initialPresetProof']
+            assert proof['catalogChoices']>=1 and proof['explicitSelection'] and proof['createdSession'] and proof['singleInput'] and proof['promptSettled'] and proof['originalDraftPreserved'],proof
+            if kind!='pi': assert proof['presetIdentityReturned'],proof
+            assert not proof['nativeInteraction'] and proof['componentCreationEntry'],proof
+        if (args.ui_attachments and bounded_child is None):
+            proof=receipt['uploadProof']
+            assert all(proof[key] for key in ('publicEntry','hostBoundedFileRead','receiptValidated','originalDraft','otherDraftPreserved','oneShotUpload','componentSend','promptSettled','reconnectNoDuplicate')),proof
+            assert proof['durableInputCount']==1 and (proof['historyFileMetadata'] or proof['historyFileReference']),proof
+            assert proof['attachmentOnlySend'] and proof['attachmentOnlyVisible'] and proof['attachmentOnlyInputCount']==1 and proof['freshJournalAfterReconnect'],proof
+            assert not proof['nativeInteraction'] and not proof['inlineImage'],proof
+            if kind in ('native','pi'): assert proof['publicByteRead'] and proof['foreignSessionReadRejected'],proof
+            else: assert proof['readUnavailable'] and not proof['publicByteRead'],proof
+        print(kind.upper()+('_UI_BOUNDED_COMPONENTS_RECEIPT ' if bounded_child else '_UI_COMPONENTS_RECEIPT ')+json.dumps(receipt,sort_keys=True))
+        print(kind.upper()+'_UI_COMPONENTS_LIVE_OK explicit-SEP+shared-runtime+restored-data+Composer+Indicators+Sidebar+Summary+GPU; transcript-view=false; native-interaction=false')
+    else:
+        print(kind.upper()+'_UI_CONSUMER_LIVE_OK explicit-SEP+RunController+restored-final-answer+TekesUI-offscreen; native-interaction=false')
+
 try:
     with tempfile.TemporaryDirectory(prefix='agentkit-three-endpoints-') as tmp:
         base=Path(tmp);cwd=base/'project';cwd.mkdir();(cwd/'proof.txt').write_text('proof line one\nline two\n')
         if args.pi_root:
-            pi=args.pi_root.resolve();data=base/'pi';(data/'agent').mkdir(parents=True)
-            (data/'agent/models.json').write_text(json.dumps({'providers':{'endpoint-test':{'baseUrl':base_url,'api':'openai-completions','apiKey':'synthetic-key','models':[{'id':'endpoint-test','name':'Endpoint test','contextWindow':32768,'maxTokens':1024,'input':['text','image']}]}}}))
-            config={'kind':'pi','executable':str(pi/'node/bin/node'),'arguments':[str(pi/'node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js')],'dataRoot':str(data),'environment':{'HOME':str(base/'pi-home'),'PATH':os.environ.get('PATH','/usr/bin:/bin')},'commands':commands(cwd,'endpoint-test','endpoint-test')}
-            Path(config['environment']['HOME']).mkdir()
+            pi=args.pi_root.resolve();data=base/'pi'
+            config=prepare_pi(pi,data,base/'pi-home',base_url,reasoning=args.ui_model_choices)
+            config['commands']=commands(cwd,'endpoint-test','endpoint-test')
             extension=base/'question.mjs'
-            extension.write_text("export default function(pi){pi.registerCommand('endpoint-question',{handler:async(args,ctx)=>{const value=await ctx.ui.select('Endpoint question',['yes','no']);pi.appendEntry('endpoint-answer',{value});}});pi.registerCommand('endpoint-settled',{handler:async()=>{pi.appendEntry('tekes.run.v1',{id:'endpoint-settled-turn',phase:'settled'});}});}")
+            extension.write_text("export default function(pi){pi.registerCommand('endpoint-question',{handler:async(args,ctx)=>{const value=await ctx.ui.select('Endpoint question',['yes','no']);pi.appendEntry('endpoint-answer',{value});}});pi.registerCommand('endpoint-ui-question',{handler:async(args,ctx)=>{const value=await ctx.ui.select('AgentKit UI question',['yes','no']);pi.appendEntry('endpoint-ui-answer',{value});}});pi.registerCommand('endpoint-settled',{handler:async()=>{pi.appendEntry('tekes.run.v1',{id:'endpoint-settled-turn',phase:'settled'});}});}")
             config['extensions']=[str(extension)]
             config['commands'].insert(-3,{'op':'promptAndAnswer','sessionId':'s','text':'/endpoint-question','outcome':{'value':'yes'}})
             outputs=run(config)
@@ -175,6 +629,9 @@ try:
             creates=[row['result']['sessionId'] for row in child_outputs if row.get('op')=='childCreate'];assert creates[0]==creates[1],'child create replay duplicated pointer'
             parent_view=next(row['result'] for row in child_outputs if row.get('op')=='presentation')
             assert len(parent_view['summary']['subagents'])==1 and parent_view['summary']['subagents'][0]['title']=='Model child',parent_view['summary']
+            if args.ui_child_run:
+                parent_id=next(row['result']['sessionId'] for row in child_outputs if row.get('op')=='create')
+                ui_smoke(config,parent_id,independent_child=parent_view['summary']['subagents'][0]['sessionId'])
             child_view=next(row['result'] for row in child_outputs if row.get('op')=='childHistory')
             assert 'CHILD_PI_TOOL_PROOF' in json.dumps(child_view),'model child input missing'
             assert 'CHILD_PI_SDK_PROOF' not in json.dumps(child_view) and 'ENDPOINT_PI_CHILD' not in json.dumps(child_view),'parent/sibling history leaked into child'
@@ -188,7 +645,7 @@ try:
             adopted=base/'adopted';adopted.mkdir();source=adopted/'existing.jsonl';shutil.copyfile(locator['nativeSessionFile'],source)
             imported_id=str(uuid.uuid4());resumed=dict(config,dataRoot=str(base/'resumed-pi'),sessionRoots=[str(adopted)])
             resumed['commands']=[{'op':'call','method':'session.adopt','args':{'sessionId':imported_id,'cwd':str(cwd),'sessionFile':str(source)}},{'op':'open','sessionId':imported_id},{'op':'snapshot'}]
-            result=subprocess.run([str(ROOT/'target/debug/tekes-agent-headless')],input=json.dumps(resumed),text=True,capture_output=True,timeout=40)
+            result=subprocess.run([str(headless_program)],input=json.dumps(resumed),text=True,capture_output=True,timeout=40)
             assert result.returncode==0,result.stderr
             assert 'ENDPOINT_REPLY_OK' in result.stdout and 'endpoint-answer' in result.stdout,'resumed native history missing'
             print('PI_NATIVE_POINTER_RESUME_LIVE_OK explicit root + native RPC history')
@@ -293,44 +750,27 @@ try:
             assert 'QUEUED_EDIT_OK' in conversation and 'QUEUED_BEFORE_EDIT' not in conversation and 'QUEUED_TO_REMOVE' not in conversation,'queue edit/remove/drain lost'
             assert not result[-1]['result']['sessions'][queue_id]['queue'],'queue did not settle'
             print('PI_QUEUE_LIVE_OK durable-admission+edit+remove+automatic-drain')
+            if not args.ui_child_run:ui_smoke(config,next(row['result']['sessionId'] for row in outputs if row.get('op')=='create'))
 
         if args.dsh_root:
-            dsh=args.dsh_root.resolve();node=dsh/'node/bin/node';entry=dsh/'node_modules/@deepseek-ai/dsh/lib/bin.js';home=base/'dsh';home.mkdir()
-            # This read-only host plugin exposes official runtime version evidence, like the ClientKit host adapter.
-            plugin=base/'version-probe.mjs'
-            package=dsh/'node_modules/@deepseek-ai/dsh-app-boot/lib/index.js'
-            plugin.write_text("import { getDshRuntimeVersion } from "+json.dumps(package.as_uri())+";\nexport const name='agentkit-version-probe';export const inject=['webServer'];export function apply(ctx){ctx.effect(()=>ctx.webServer.register({kind:'exact',path:'/api/tekes/harness-version',handler(req,res){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({product:'@deepseek-ai/dsh',version:getDshRuntimeVersion(),source:'@deepseek-ai/dsh-app-boot#getDshRuntimeVersion'}));}}));}\n")
-            patch=base/'dsh.patch.yml';patch.write_text(json.dumps([
-                {'id':'llm-deepseek','disabled':True},
-                {'id':'agent-default-model','config':{'provider':'endpoint-test','model':'endpoint-test'}},
-                {'id':'llm-pi-ai','config':{'providers':{'endpoint-test':{'api':'openai-completions','apiKeyEnv':'AGENTKIT_SYNTHETIC_KEY','baseURL':base_url,'models':[{'id':'endpoint-test','contextWindow':32768,'maxTokens':1024}]}}}},
-                {'id':'session-persistence-jsonl','config':{'root':str(base/'dsh-sessions'),'compression':'none'}},
-                {'insert':[{'name':plugin.as_uri()}]},
-            ]))
+            dsh=args.dsh_root.resolve();home=base/'dsh'
             env=dict(os.environ,HOME=str(home),DSH_HOME=str(home),DSH_AGENTS_HOME=str(home/'agents'),DSH_TELEMETRY_DISABLED='1',AGENTKIT_SYNTHETIC_KEY='synthetic-key')
-            process=subprocess.Popen([str(node),str(entry),'--profile','web','--patch',str(patch),'--no-open','--host','127.0.0.1','--port','0'],cwd=cwd,env=env,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,start_new_session=True)
-            try:
-                lines=[];launch=None;deadline=time.monotonic()+60
-                while time.monotonic()<deadline:
-                    if not select.select([process.stdout],[],[],1)[0]:
-                        if process.poll() is not None:break
-                        continue
-                    line=process.stdout.readline();lines.append(line)
-                    match=re.search(r'dsh web: (http[^\s]+)',line)
-                    if match:launch=match.group(1);break
-                if not launch:raise AssertionError('DSH did not become ready: '+''.join(lines)[-5000:])
-                # Do not follow redirects when exchanging the per-launch token for an authenticated cookie.
-                class NoRedirect(urllib.request.HTTPRedirectHandler):
-                    def redirect_request(self,*_):return None
-                opener=urllib.request.build_opener(NoRedirect)
-                try:response=opener.open(launch)
-                except urllib.error.HTTPError as error:response=error
-                cookie=response.headers.get('Set-Cookie','').split(';',1)[0];assert cookie,'DSH launch cookie missing'
-                parsed=urllib.parse.urlsplit(launch);url=urllib.parse.urlunsplit((parsed.scheme,parsed.netloc,'/','',''))
-                version=json.loads((dsh/'node_modules/@deepseek-ai/dsh/package.json').read_text())['version']
-                config={'kind':'dsh','url':url,'cookie':cookie,'expectedVersion':version,'commands':commands(cwd,'endpoint-test','endpoint-test')}
+            with owned_dsh(dsh,base/'dsh-data',home,cwd,base_url,env,query_sqlite=args.ui_sidebar_query) as dsh_fixture:
+                version=dsh_fixture.version
+                config=dsh_fixture.connector_config(commands(cwd,'endpoint-test','endpoint-test'))
                 outputs=run(config)
                 session_id=next(row['result']['sessionId'] for row in outputs if row.get('op')=='create')
+                question_result=execute(dict(config,commands=[{'op':'open','sessionId':session_id},
+                    {'op':'promptAndAnswer','sessionId':session_id,'text':'DSH_ACTIONABLE_PROOF','outcome':{'sessionId':session_id,'answer':{'answers':[{'id':'dsh-question-proof','selected':['continue-proof']}]}}},
+                    {'op':'waitSettled','sessionId':session_id},{'op':'snapshot'}]))
+                assert not question_result[-1]['result']['actionables'],'DSH question remained pending after shared answer'
+
+                question_state=question_result[-1]['result']['sessions'][session_id]
+                question_tools=[entry['event']['data'] for entry in question_state['entries'].values() if entry['event']['type']=='tool/result' and 'continue-proof' in json.dumps(entry['event']['data'].get('message',{}))]
+                assert len(question_tools)==1 and not question_tools[0].get('error') and question_tools[0].get('message',{}).get('isError') is not True,'DSH did not return the accepted structured answer to the model'
+
+                print('DSH_ACTIONABLE_ENVELOPE_LIVE_OK public-question+shared-session-envelope+waterfall-result+settlement')
+
                 extensions=[{'op':'call','method':'endpoint.capabilities'},
                     {'op':'call','sessionId':session_id,'method':'session.models'},
                     {'op':'call','sessionId':session_id,'method':'commands/list'},
@@ -366,6 +806,12 @@ try:
                 assert any(item['text']=='CHILD_CONTINUATION_PROOF' for item in child_view['transcript']['items']), 'child input missing'
                 assert any(item['text']=='ENDPOINT_REPLY_OK' and item['isFinal'] for item in child_view['transcript']['items']), 'child output missing'
                 print('DSH_CHILD_CONTROL_LIVE_OK catalog+owned-prompt+independent-history+receipt+cancel')
+                if args.ui_child_run:
+                    parent_id=next(row['result']['sessionId'] for row in child_result if row.get('op')=='create')
+                    catalog=next(row['result'] for row in child_result if row.get('op')=='childCatalog')
+                    children=[row['id'] for row in catalog['entries'] if row['kind']=='child' and row.get('mode')=='continuable']
+                    assert len(children)==1,catalog
+                    ui_smoke(config,parent_id,independent_child=children[0])
                 # Public lifecycle calls, with the original session and its fork independently addressable.
                 lifecycle=[{'op':'call','sessionId':session_id,'method':'session.rename','args':{'title':'Endpoint lifecycle proof'}},
                     {'op':'call','sessionId':session_id,'method':'session.fork','args':{'allowMigration':False},'saveAs':'fork'},
@@ -404,78 +850,80 @@ try:
                     assert Path(locator['cwd']).resolve()==cwd.resolve() and Path(locator['workingDirectory']).resolve()==child.resolve(),locator
                     assert 'working-directory/change' in json.dumps(result[-1]),'new required event lost'
                     print('DSH_WORKING_DIRECTORY_LIVE_OK original root + current directory + reconnect')
-            finally:
-                if process.poll() is None:os.killpg(process.pid,signal.SIGTERM)
-                try:process.wait(timeout=15)
-                except subprocess.TimeoutExpired:os.killpg(process.pid,signal.SIGKILL);process.wait(timeout=5)
+                if not args.ui_child_run:ui_smoke(config,session_id)
         if args.kernel_root:
-            kernel=args.kernel_root.resolve();kernel_target=args.kernel_target_dir.resolve() if args.kernel_target_dir else kernel/'target';home=base/'kernel-home';home.mkdir()
-            providers=json.loads((kernel/'fixtures/config/providers.canonical.json').read_text());providers['providers'][0]['endpoint']=base_url
-            (base/'kernel').mkdir(mode=0o700)
-            (base/'kernel/config').mkdir(mode=0o700)
-            (base/'kernel/config/settings.json').write_text(json.dumps({'format':1,'revision':1,'limits':{'max_workers':8,'max_provider_leases':8}},sort_keys=True,separators=(',',':'))+'\n')
-            (base/'kernel/config/settings.json').chmod(0o600)
-            launch=base/'kernel-launch.json';launch.write_text(json.dumps({'format':1,'bootstrap_version':1,'root':str(base/'kernel'),'worker':str(kernel_target/'debug/tekes-worker'),'listen':'127.0.0.1:0','providers':providers,'credential_bindings':{'openai-main':'AGENTKIT_SYNTHETIC_KEY'}}))
-            env=dict(os.environ,HOME=str(home));env.pop('TEKES_KERNEL_ENDPOINT_TOKEN',None);env.pop('AGENTKIT_SYNTHETIC_KEY',None)
-            process=subprocess.Popen([str(kernel_target/'debug/tekes-supervisor'),'--built-in',str(launch)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=env)
-            kernel_errors=[]
-            threading.Thread(target=lambda:kernel_errors.extend(iter(process.stderr.readline,b'')),daemon=True).start()
+            kernel=args.kernel_root.resolve()
+            providers=json.loads((kernel/'fixtures/config/providers.canonical.json').read_text())
+            native_context=owned_native(kernel_supervisor,kernel_worker,providers,base_url,base,dict(os.environ))
+            native_fixture=native_context.__enter__()
+            providers=native_fixture['providers'];process=native_fixture['process']
+            lifecycle_diagnostics=None
             try:
-                token=os.urandom(32);payload=json.dumps({'endpointToken':token.hex(),'credentials':{'openai-main':'synthetic-key'}}).encode();process.stdin.write(b'TEKES-KERNEL-BOOTSTRAP/1\n'+struct.pack('!I',len(payload))+payload);process.stdin.flush()
-                assert select.select([process.stdout],[],[],15)[0],'Kernel readiness timeout';readiness=process.stdout.readline();assert readiness,b''.join(kernel_errors).decode(errors='replace');ready=json.loads(readiness)
-                config={'kind':'native','url':ready['url'],'bearer':base64.urlsafe_b64encode(token).decode().rstrip('='),'commands':commands(cwd,providers['providers'][0]['id'],providers['providers'][0]['models'][0]['id'])}
-                outputs=run(config);native_id=next(row['result']['sessionId'] for row in outputs if row.get('op')=='create')
-                native=[{'op':'call','method':'endpoint.capabilities'},
-                    {'op':'call','sessionId':native_id,'method':'session.models'},
-                    {'op':'call','sessionId':native_id,'method':'commands/list'},
-                    {'op':'call','sessionId':native_id,'method':'skills/list'},
-                    {'op':'call','sessionId':native_id,'method':'attachments.policy'},
-                    {'op':'observeReady','sessionId':native_id},
-                    {'op':'call','method':'settings.describe'},
-                    {'op':'call','method':'session.initialPresets'},
-                    {'op':'call','sessionId':native_id,'method':'session.uploadFile','args':{'name':'native-proof.txt','mediaType':'text/plain','data':base64.b64encode(b'Native upload proof').decode()},'saveAs':'native-upload','savePointer':'/file/attachmentId'},
-                    {'op':'call','sessionId':native_id,'method':'session.fileAttachment','args':{'attachmentId':'@native-upload'}},
-                    {'op':'call','sessionId':native_id,'method':'session.fork','args':{'ephemeral':True},'saveAs':'scratch'},
-                    {'op':'open','sessionId':'scratch'}, {'op':'call','sessionId':'scratch','method':'session.discard'},
-                    {'op':'call','sessionId':native_id,'method':'session.rename','args':{'title':'Native lifecycle proof'}},
-                    {'op':'call','sessionId':native_id,'method':'session.archive'},
-                    {'op':'call','sessionId':native_id,'method':'session.unarchive'},
-                    {'op':'open','sessionId':native_id},{'op':'snapshot'}]
-                result=execute(dict(config,commands=native))
-                assert any(row.get('op')=='call' and isinstance(row.get('result'),dict) and row['result'].get('data')==base64.b64encode(b'Native upload proof').decode() for row in result),'native upload round trip lost'
-                caps=next(row['result'] for row in result if row.get('op')=='call' and isinstance(row.get('result'),dict) and 'methods' in row['result'])
-                if 'subagents.history' in caps['methods']:
-                    parent=str(uuid.uuid4())
-                    native_children=[{'op':'call','method':'session.create','args':{'sessionId':parent,'execution':{'cwd':str(cwd),'read_roots':[],'writable_roots':[],'toolchain_roots':[],'network':False,'allowed_tools':['task'],'mcp':[]}},'saveAs':'parent'},
-                        {'op':'call','sessionId':'parent','method':'session.selectModel','args':{'provider':providers['providers'][0]['id'],'model':providers['providers'][0]['models'][0]['id']}},
-                        {'op':'call','sessionId':'parent','method':'approvals.select','args':{'mode':'danger-full-access'}},
-                        {'op':'open','sessionId':'parent'},{'op':'compose','sessionId':'parent','text':'ENDPOINT_NATIVE_CHILD'},
-                        {'op':'waitSettled','sessionId':'parent'},{'op':'presentation','sessionId':'parent'},
-                        {'op':'childCatalog','sessionId':'parent','saveAs':'bounded','savePointer':'/entries/1/id'},
-                        {'op':'childHistory','sessionId':'parent','childSessionId':'bounded'},
-                        {'op':'childEarlier','sessionId':'parent','childSessionId':'bounded'},
-                        {'op':'reconnect'},{'op':'childHistory','sessionId':'parent','childSessionId':'bounded'},
-                        {'op':'callError','method':'subagents.history','args':{'parentSessionId':native_id,'childSessionId':'@bounded','maxMessages':50}}]
-                    child_result=execute(dict(config,commands=native_children))
-                    histories=[row['result'] for row in child_result if row.get('op')=='childHistory']
-                    assert len(histories)==2 and all(any(item['text']=='ENDPOINT_REPLY_OK' and item['isFinal'] for item in h['items']) for h in histories),histories
-                    assert all(h['tools'][0]['arguments']['task_name']=='Bounded child proof' for h in histories),'missing parent source-call projection'
-                    print('NATIVE_BOUNDED_CHILD_LIVE_OK real-task+source-call+read-only-history+reconnect+ownership')
-                print('NATIVE_COMPLETE_LIFECYCLE_LIVE_OK models+commands+skills+settings+presets+upload+scratch-discard+rename+archive')
-                if args.ui_demo:
-                    second=next(row['result']['sessionId'] for row in execute(dict(config,commands=[{'op':'create','cwd':str(cwd)}])) if row.get('op')=='create')
-                    ui_config=base/'ui-native.json'
-                    ui_config.write_text(json.dumps({'endpointId':'native-ui','url':ready['url'],'bearerEnv':'AGENTKIT_UI_FIXTURE_BEARER','sessions':[native_id,second]}))
-                    output=args.ui_output.resolve() if args.ui_output else base/'ui-native.png'
-                    ui_env=dict(os.environ,AGENTKIT_UI_FIXTURE_BEARER=config['bearer'])
-                    ui=subprocess.run([str(args.ui_demo.resolve()),'--endpoint-config',str(ui_config),'--offscreen',str(output)],env=ui_env,text=True,capture_output=True,timeout=30)
-                    assert ui.returncode==0,ui.stderr[-3000:]
-                    assert output.read_bytes().startswith(b'\x89PNG\r\n\x1a\n'),'Native UI image missing'
-                    print('NATIVE_UI_CONSUMER_LIVE_OK authenticated-SEP+RunController+TekesUI-offscreen; native-interaction=false')
+                if args.kernel_lifecycle_diagnostics:
+                    lifecycle_diagnostics=KernelLifecycleDiagnostics(base/'kernel',args.kernel_lifecycle_diagnostics.resolve())
+                    lifecycle_diagnostics.start()
+                    lifecycle_diagnostics.mark('kernel-ready-before-native-lifecycle')
+                config={'kind':'native','url':native_fixture['url'],'bearer':native_fixture['bearer'],'commands':commands(cwd,providers['providers'][0]['id'],providers['providers'][0]['models'][0]['id'])}
+                if args.kernel_expected_version:config['expectedVersion']=args.kernel_expected_version
+                if args.kernel_ui_only:
+                    created=execute(dict(config,commands=[{'op':'create','cwd':str(cwd)}]))
+                    native_id=next(row['result']['sessionId'] for row in created if row.get('op')=='create')
+                    print('NATIVE_LIFECYCLE_NOT_RUN explicit-independent-ui-mode; no protocol/lifecycle/child acceptance',flush=True)
+                else:
+                    outputs=run(config);native_id=next(row['result']['sessionId'] for row in outputs if row.get('op')=='create')
+                    native=[{'op':'call','method':'endpoint.capabilities'},
+                        {'op':'call','sessionId':native_id,'method':'session.models'},
+                        {'op':'call','sessionId':native_id,'method':'commands/list'},
+                        {'op':'call','sessionId':native_id,'method':'skills/list'},
+                        {'op':'call','sessionId':native_id,'method':'attachments.policy'},
+                        {'op':'observeReady','sessionId':native_id},
+                        {'op':'call','method':'settings.describe'},
+                        {'op':'call','method':'session.initialPresets'},
+                        {'op':'call','sessionId':native_id,'method':'session.uploadFile','args':{'name':'native-proof.txt','mediaType':'text/plain','data':base64.b64encode(b'Native upload proof').decode()},'saveAs':'native-upload','savePointer':'/file/attachmentId'},
+                        {'op':'call','sessionId':native_id,'method':'session.fileAttachment','args':{'attachmentId':'@native-upload'}},
+                        {'op':'call','sessionId':native_id,'method':'session.fork','args':{'ephemeral':True},'saveAs':'scratch'},
+                        {'op':'open','sessionId':'scratch'}, {'op':'call','sessionId':'scratch','method':'session.discard'},
+                        {'op':'call','sessionId':native_id,'method':'session.rename','args':{'title':'Native lifecycle proof'}},
+                        {'op':'call','sessionId':native_id,'method':'session.archive'},
+                        {'op':'call','sessionId':native_id,'method':'session.unarchive'},
+                        {'op':'open','sessionId':native_id},{'op':'snapshot'}]
+                    if lifecycle_diagnostics:lifecycle_diagnostics.mark('before-native-lifecycle-batch')
+                    result=execute(dict(config,commands=native))
+                    if lifecycle_diagnostics:lifecycle_diagnostics.mark('native-lifecycle-batch-returned')
+                    assert any(row.get('op')=='call' and isinstance(row.get('result'),dict) and row['result'].get('data')==base64.b64encode(b'Native upload proof').decode() for row in result),'native upload round trip lost'
+                    caps=next(row['result'] for row in result if row.get('op')=='call' and isinstance(row.get('result'),dict) and 'methods' in row['result'])
+                    if args.ui_bounded_child:assert 'subagents.history' in caps['methods'],'Native endpoint does not publish bounded child history'
+                    if 'subagents.history' in caps['methods']:
+                        parent=str(uuid.uuid4())
+                        native_children=[{'op':'call','method':'session.create','args':{'sessionId':parent,'execution':{'cwd':str(cwd),'read_roots':[],'writable_roots':[],'toolchain_roots':[],'network':False,'allowed_tools':['task'],'mcp':[]}},'saveAs':'parent'},
+                            {'op':'call','sessionId':'parent','method':'session.selectModel','args':{'provider':providers['providers'][0]['id'],'model':providers['providers'][0]['models'][0]['id']}},
+                            {'op':'call','sessionId':'parent','method':'approvals.select','args':{'mode':'danger-full-access'}},
+                            {'op':'open','sessionId':'parent'},{'op':'compose','sessionId':'parent','text':'ENDPOINT_NATIVE_CHILD'},
+                            {'op':'waitSettled','sessionId':'parent'},{'op':'presentation','sessionId':'parent'},
+                            {'op':'childCatalog','sessionId':'parent','saveAs':'bounded','savePointer':'/entries/1/id'},
+                            {'op':'childHistory','sessionId':'parent','childSessionId':'bounded'},
+                            {'op':'childEarlier','sessionId':'parent','childSessionId':'bounded'},
+                            {'op':'reconnect'},{'op':'childHistory','sessionId':'parent','childSessionId':'bounded'},
+                            {'op':'callError','method':'subagents.history','args':{'parentSessionId':native_id,'childSessionId':'@bounded','maxMessages':50}}]
+                        child_result=execute(dict(config,commands=native_children))
+                        histories=[row['result'] for row in child_result if row.get('op')=='childHistory']
+                        assert len(histories)==2 and all(any(item['text']==native_child_reply and item['isFinal'] for item in h['items']) for h in histories),histories
+                        assert all(h['tools'][0]['arguments']['task_name']=='Bounded child proof' for h in histories),'missing parent source-call projection'
+                        print('NATIVE_BOUNDED_CHILD_LIVE_OK real-task+source-call+read-only-history+reconnect+ownership')
+                        if args.ui_bounded_child:
+                            child_id=next(row['result']['entries'][1]['id'] for row in child_result if row.get('op')=='childCatalog')
+                            ui_smoke(config,parent,child_id)
+                    print('NATIVE_COMPLETE_LIFECYCLE_LIVE_OK models+commands+skills+settings+presets+upload+scratch-discard+rename+archive')
+                ui_smoke(config,native_id)
 
+            except BaseException:
+                if lifecycle_diagnostics:lifecycle_diagnostics.mark('native-acceptance-raised')
+                raise
             finally:
-                process.stdin.close()
-                try:process.wait(timeout=15)
-                except subprocess.TimeoutExpired:process.terminate();process.wait(timeout=10)
+                if lifecycle_diagnostics:
+                    lifecycle_diagnostics.mark('before-owned-supervisor-shutdown')
+                    diagnostic_receipt=lifecycle_diagnostics.stop()
+                    print('KERNEL_LIFECYCLE_DIAGNOSTICS_RECEIPT '+json.dumps(diagnostic_receipt,sort_keys=True),flush=True)
+                native_context.__exit__(None,None,None)
 finally:
     server.shutdown();server.server_close()

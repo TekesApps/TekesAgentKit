@@ -1,0 +1,23 @@
+{
+  "scope": "separate single Pi and DSH ordinary cold diagnostics only; not formal paired samples",
+  "source": "10263722b5fb128922c49a31b5942c41333cd6e2",
+  "programSha256": "a637ddb8fac00854b5883fe14eef850e6808c11c1d0704f390d08b0b085cd439",
+  "profileSha256": "05eec087932ba27bfe94a0fb33c8a584e47935b45fcbfc5077d16fe25c73fa7a",
+  "runtime": "Pi1.3.0 / Node24.20.0",
+  "receiptSha256": "3c5695efcc530af844ce34144d204ec733ad758de94ed22d6123268428d05397",
+  "eventsSha256": "71a55dd270b8430676fb46c12523b7813b860cb3e5d1ae9f6620ec5b860506b8",
+  "acceptedDiagnosticPlumbing": true,
+  "officialSamples": 0,
+  "performanceAccepted": false,
+  "ownedProcessesRetired": true,
+  "desktop": false,
+  "dsh": {
+    "runtime": "DSH0.2.1-rc.2 / Node24.20.0",
+    "receiptSha256": "0f1fca7b984690b3f498f460abdaac96a1f1322de13114c44274b5731bd84998",
+    "eventsSha256": "8469564004758832c4a762b7a66e634625757b84d82d4636ff62375fc41dc07d",
+    "acceptedDiagnosticPlumbing": true,
+    "officialSamples": 0,
+    "performanceAccepted": false,
+    "ownedProcessesRetired": true
+  }
+}

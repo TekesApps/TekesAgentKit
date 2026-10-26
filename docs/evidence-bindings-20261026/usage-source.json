@@ -1,0 +1,202 @@
+{
+  "format": 1,
+  "issue": 55,
+  "productCandidate": "4274fe82fc353ff06100d4106d527e25dc5dfca3",
+  "uiSha256": "53f97f3520f446d9659075504a98d3de6fff6f64f0fd50b433bceb264fc0fc13",
+  "acceptanceOnlyOverlay": true,
+  "scope": "real original source-reported usage while running and durable final; Pi conversation durable usage with declared reported/live absence",
+  "endpoints": {
+    "pi": {
+      "accepted": true,
+      "evidenceScope": "offline reanalysis of original same-publication raw usage witness; protocol not rerun",
+      "originalHostReceiptSha256": "58a32ed64d6787b2e9caa84bd873494b861da561f7a0f93471e3342ddaa66b01",
+      "validatorSha256": "d4998b44ad8a1a288123e2d9b204d2093c880d92acd931fb73728b353529add3",
+      "originalIncompleteRetained": false,
+      "result": {
+        "identity": {
+          "endpointId": "pi",
+          "threadId": "c0d1e53e-a926-468a-8c78-8bc910dd3226",
+          "sessionId": "c0d1e53e-a926-468a-8c78-8bc910dd3226",
+          "turnId": "[\"pi\",\"c0d1e53e-a926-468a-8c78-8bc910dd3226\",\"native-run:bf117975-2bd3-41e3-8f5d-7d2f426eb92d\"]"
+        },
+        "final": {
+          "reportedObserved": false,
+          "durableUsageObserved": true,
+          "sourceKind": "nativeConversation",
+          "outputTokens": 60
+        },
+        "live": {
+          "liveObserved": false,
+          "status": "not_observed"
+        }
+      },
+      "programBindings": {
+        "headless": {
+          "receiptSha256": "d8b2aa1ccf152152eb58a9dc60cace897b63b02301448653467e55204f05f297",
+          "path": "/Volumes/HP P900/dev/TekesAgentKit/acceptance-tools/headless/current-feature/tekes-agent-headless",
+          "sha256": "081c3fe0d1d0be7e335482c6309a9f455f0395a39bbc704908fa138a5beb7a49"
+        },
+        "demo": {
+          "receiptSha256": "a7daa1e92c141075722e60ba27a9b99dd5de9bb7d53179b74a162c6c42f7c03e",
+          "path": "/Volumes/HP P900/dev/TekesAgentKit/acceptance-tools/ui-offscreen/current/tekes-agent-ui-demo",
+          "sha256": "53f97f3520f446d9659075504a98d3de6fff6f64f0fd50b433bceb264fc0fc13"
+        }
+      },
+      "source": {
+        "head": "4274fe82fc353ff06100d4106d527e25dc5dfca3",
+        "manifestSha256": "786c85ef2d77632a959cc7848d08a0c74a02a1301e1e66824ddeb3793f3f4bbd",
+        "verifiedFiles": 1234
+      },
+      "headlessSource": {
+        "head": "4274fe82fc353ff06100d4106d527e25dc5dfca3",
+        "manifestSha256": "68ed698013a2e0c3cfdd6e359fd31266971071cbd7ae892b3384754ffc07593b",
+        "verifiedFiles": 1232
+      },
+      "runtimeAndProgramHashesUnchanged": true,
+      "providerHandlersRetired": true,
+      "ownedExit": {
+        "pid": null,
+        "exitStatus": null
+      },
+      "protocolRerun": false,
+      "desktop": false,
+      "physicalIme": false,
+      "performanceAccepted": false,
+      "originalComposerDestinationValidated": true,
+      "independentReview": "frozen4274 reported/live contract confirmed; DSH live between steps is paired durable usage without a numeric transient preview; no protocol rerun"
+    },
+    "native": {
+      "accepted": true,
+      "evidenceScope": "offline reanalysis of original same-publication raw usage witness; protocol not rerun",
+      "originalHostReceiptSha256": "f620d6e294ca2fc08e8404a9430e3fc46b0c5e4a1ae7bc7d8f4308dc035c9b01",
+      "validatorSha256": "d4998b44ad8a1a288123e2d9b204d2093c880d92acd931fb73728b353529add3",
+      "originalIncompleteRetained": false,
+      "result": {
+        "identity": {
+          "endpointId": "native",
+          "threadId": "8411b720-e8fa-43bb-9b27-88d96069840b",
+          "sessionId": "8411b720-e8fa-43bb-9b27-88d96069840b",
+          "turnId": "[\"native\",\"8411b720-e8fa-43bb-9b27-88d96069840b\",\"turn:1\"]"
+        },
+        "final": {
+          "reportedObserved": true,
+          "complete": true,
+          "sourceKind": "journal",
+          "outputTokens": 60
+        },
+        "live": {
+          "liveObserved": true,
+          "outputTokens": 20,
+          "sourceKind": "journal",
+          "transientPreviewObserved": true,
+          "durableUsagePaired": false
+        }
+      },
+      "programBindings": {
+        "headless": {
+          "receiptSha256": "d8b2aa1ccf152152eb58a9dc60cace897b63b02301448653467e55204f05f297",
+          "path": "/Volumes/HP P900/dev/TekesAgentKit/acceptance-tools/headless/current-feature/tekes-agent-headless",
+          "sha256": "081c3fe0d1d0be7e335482c6309a9f455f0395a39bbc704908fa138a5beb7a49"
+        },
+        "demo": {
+          "receiptSha256": "a7daa1e92c141075722e60ba27a9b99dd5de9bb7d53179b74a162c6c42f7c03e",
+          "path": "/Volumes/HP P900/dev/TekesAgentKit/acceptance-tools/ui-offscreen/current/tekes-agent-ui-demo",
+          "sha256": "53f97f3520f446d9659075504a98d3de6fff6f64f0fd50b433bceb264fc0fc13"
+        }
+      },
+      "source": {
+        "head": "4274fe82fc353ff06100d4106d527e25dc5dfca3",
+        "manifestSha256": "786c85ef2d77632a959cc7848d08a0c74a02a1301e1e66824ddeb3793f3f4bbd",
+        "verifiedFiles": 1234
+      },
+      "headlessSource": {
+        "head": "4274fe82fc353ff06100d4106d527e25dc5dfca3",
+        "manifestSha256": "68ed698013a2e0c3cfdd6e359fd31266971071cbd7ae892b3384754ffc07593b",
+        "verifiedFiles": 1232
+      },
+      "runtimeAndProgramHashesUnchanged": true,
+      "providerHandlersRetired": true,
+      "ownedExit": {
+        "pid": 83963,
+        "exitStatus": 0
+      },
+      "protocolRerun": false,
+      "desktop": false,
+      "physicalIme": false,
+      "performanceAccepted": false,
+      "originalComposerDestinationValidated": true,
+      "independentReview": "frozen4274 reported/live contract confirmed; DSH live between steps is paired durable usage without a numeric transient preview; no protocol rerun"
+    },
+    "dsh": {
+      "accepted": true,
+      "evidenceScope": "offline reanalysis of original same-publication raw usage witness; protocol not rerun",
+      "originalHostReceiptSha256": "e1b87588545cb1b4f00fa64070cdf528f8ab8e8f2295e96ad235b3823c8804cd",
+      "validatorSha256": "d4998b44ad8a1a288123e2d9b204d2093c880d92acd931fb73728b353529add3",
+      "originalIncompleteRetained": true,
+      "result": {
+        "identity": {
+          "endpointId": "dsh",
+          "threadId": "session-e60ab67e-a499-4417-a3e7-beef329a2aae",
+          "sessionId": "session-e60ab67e-a499-4417-a3e7-beef329a2aae",
+          "turnId": "[\"dsh\",\"session-e60ab67e-a499-4417-a3e7-beef329a2aae\",\"turn:1\"]"
+        },
+        "final": {
+          "reportedObserved": true,
+          "complete": true,
+          "sourceKind": "journal",
+          "outputTokens": 60
+        },
+        "live": {
+          "liveObserved": true,
+          "outputTokens": 20,
+          "sourceKind": "journal",
+          "transientPreviewObserved": false,
+          "durableUsagePaired": true
+        }
+      },
+      "programBindings": {
+        "headless": {
+          "receiptSha256": "d8b2aa1ccf152152eb58a9dc60cace897b63b02301448653467e55204f05f297",
+          "path": "/Volumes/HP P900/dev/TekesAgentKit/acceptance-tools/headless/current-feature/tekes-agent-headless",
+          "sha256": "081c3fe0d1d0be7e335482c6309a9f455f0395a39bbc704908fa138a5beb7a49"
+        },
+        "demo": {
+          "receiptSha256": "a7daa1e92c141075722e60ba27a9b99dd5de9bb7d53179b74a162c6c42f7c03e",
+          "path": "/Volumes/HP P900/dev/TekesAgentKit/acceptance-tools/ui-offscreen/current/tekes-agent-ui-demo",
+          "sha256": "53f97f3520f446d9659075504a98d3de6fff6f64f0fd50b433bceb264fc0fc13"
+        }
+      },
+      "source": {
+        "head": "4274fe82fc353ff06100d4106d527e25dc5dfca3",
+        "manifestSha256": "786c85ef2d77632a959cc7848d08a0c74a02a1301e1e66824ddeb3793f3f4bbd",
+        "verifiedFiles": 1234
+      },
+      "headlessSource": {
+        "head": "4274fe82fc353ff06100d4106d527e25dc5dfca3",
+        "manifestSha256": "68ed698013a2e0c3cfdd6e359fd31266971071cbd7ae892b3384754ffc07593b",
+        "verifiedFiles": 1232
+      },
+      "runtimeAndProgramHashesUnchanged": true,
+      "providerHandlersRetired": true,
+      "ownedExit": {
+        "pid": 84375,
+        "exitStatus": 0
+      },
+      "protocolRerun": false,
+      "desktop": false,
+      "physicalIme": false,
+      "performanceAccepted": false,
+      "originalComposerDestinationValidated": true,
+      "independentReview": "frozen4274 reported/live contract confirmed; DSH live between steps is paired durable usage without a numeric transient preview; no protocol rerun"
+    }
+  },
+  "notRun": [
+    "performance",
+    "desktop",
+    "physical IME",
+    "AX"
+  ],
+  "issueCompleted": false,
+  "merged": false,
+  "reviewBoundary": "Pi only proves the three actual durable assistant usage records and declared live/reported absence, not unknown historical usage coverage or real model token/speed accuracy"
+}

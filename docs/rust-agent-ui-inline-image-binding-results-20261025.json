@@ -1,0 +1,174 @@
+{
+  "base": "67b20e62247f5979f7f1b5a138bf6c2fb2120379",
+  "issue": 16,
+  "checks": {
+    "root": {
+      "passed": 380,
+      "failed": 0,
+      "ignored": 0
+    },
+    "presentationFeature": 289,
+    "ui": {
+      "passed": 777,
+      "failed": 0,
+      "ignored": 1
+    },
+    "featureRunPort": 19,
+    "featureBindings": 44,
+    "inlineIntegration": 9,
+    "newFrozenFactsUnit": 2,
+    "python": 262,
+    "stages": [
+      {
+        "name": "root-fmt",
+        "exit": 0
+      },
+      {
+        "name": "root-clippy",
+        "exit": 0
+      },
+      {
+        "name": "root-tests",
+        "exit": 0
+      },
+      {
+        "name": "root-presentation-feature",
+        "exit": 0
+      },
+      {
+        "name": "fmt",
+        "exit": 0
+      },
+      {
+        "name": "clippy-final",
+        "exit": 0
+      },
+      {
+        "name": "clippy-feature",
+        "exit": 0
+      },
+      {
+        "name": "workspace-tests-final",
+        "exit": 0
+      },
+      {
+        "name": "feature-run-port",
+        "exit": 0
+      },
+      {
+        "name": "feature-bindings",
+        "exit": 0
+      },
+      {
+        "name": "build-demo",
+        "exit": 0
+      },
+      {
+        "name": "build-demo-feature",
+        "exit": 0
+      },
+      {
+        "name": "standalone-prepare",
+        "exit": 0
+      },
+      {
+        "name": "standalone-lock",
+        "exit": 0
+      },
+      {
+        "name": "standalone-run",
+        "exit": 0
+      },
+      {
+        "name": "boundaries",
+        "exit": 0
+      },
+      {
+        "name": "consumer-inputs",
+        "exit": 0
+      },
+      {
+        "name": "python-tests",
+        "exit": 0
+      },
+      {
+        "name": "diff-check",
+        "exit": 0
+      }
+    ],
+    "newImagePolicyUnits": 5
+  },
+  "sdk": {
+    "commit": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 243,
+    "sha256": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
+    "ui_packages": 8
+  },
+  "programs": {
+    "demo-feature": {
+      "path": ".runtime-fixtures/inline-image-binding-20261025/final-programs/demo-feature",
+      "bytes": 87741344,
+      "sha256": "8c22ee45e2feb92e4b64ca9768e1b20bd6f8c4b0ca662d687ea86295e8297f13",
+      "purpose": "built only; no image UI/real harness invocation"
+    },
+    "standalone": {
+      "path": ".runtime-fixtures/inline-image-binding-20261025/final-programs/standalone",
+      "bytes": 16448912,
+      "sha256": "17edbc709532cb4a9e7742cec014c17259d34f2f92a551f12dad59787e120852",
+      "purpose": "public API consumer executed; no desktop"
+    },
+    "image-integration-tests": {
+      "path": ".runtime-fixtures/inline-image-binding-20261025/final-programs/image-integration-tests",
+      "bytes": 13515344,
+      "sha256": "9ae5d36b6ebf165f81baf1d3456976fcaec42d19d48c93000053d5b9567147ab",
+      "purpose": "9 RunBinding fixture integration tests executed, including legacy-image addition; no real harness"
+    }
+  },
+  "capture": {
+    "uploadRequired": false,
+    "mutation": "original context-at-epoch CAS",
+    "decode": "blocking worker; original bytes retained",
+    "retry": false
+  },
+  "submission": {
+    "facts": "ordered metadata frozen with original ticket; no image payload copy in facts",
+    "imageBytes": "actual base64 size plus complete first-frame decode",
+    "fileBytes": "original frozen metadata; does not prove arbitrary host claims",
+    "pureTextAndFilePath": "unchanged; no new policy read",
+    "atomicPolicyAndPrompt": false
+  },
+  "strictReading": {
+    "exit": 1,
+    "raw": {
+      "accepted": false,
+      "parentFollowingAfterInnerUp": true,
+      "parentOffsetBefore": 0,
+      "parentOffsetAfterScroll": 0,
+      "parentOffsetAfterAppend": 634,
+      "innerOffset": 100,
+      "detailVisibleAfterAppend": false
+    }
+  },
+  "sourceInputs": 538,
+  "newTargetDirectories": 0,
+  "deletedCacheBytes": 0,
+  "notRun": [
+    "real Native/Pi/DSH image transport and recovery",
+    "image picker clipboard drag/drop UI",
+    "image previews",
+    "desktop",
+    "physical IME",
+    "OS AX",
+    "GPU image pixels"
+  ],
+  "releaseGatePassed": false,
+  "finalSourceManifest": ".runtime-fixtures/inline-image-binding-20261025/final-source-hashes.json",
+  "rootSourceUnchangedDuringCompatibilityFix": true,
+  "beforeCompatibility": {
+    "uiPassed": 776,
+    "programs": ".runtime-fixtures/inline-image-binding-20261025/programs.json",
+    "sources": ".runtime-fixtures/inline-image-binding-20261025/source-hashes.json"
+  }
+}

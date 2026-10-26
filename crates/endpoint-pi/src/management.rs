@@ -64,12 +64,18 @@ impl PiSessionEndpoint {
                     if let Some(attachments) = payload["attachments"].as_array() {
                         content.extend(attachments.iter().cloned());
                     }
-                    let (message, images) = self
+                    let materialized = self
                         .context
                         .materialize(string(payload, "sessionId")?, &content)
                         .await?;
+                    // Commands retain their existing direct prompt path. They do not call
+                    // input.prepare and must not create an AgentKit input admission/receipt;
+                    // structured file metadata is therefore explicitly not covered here.
                     let result = rpc
-                        .request("prompt", json!({"message":message,"images":images}))
+                        .request(
+                            "prompt",
+                            json!({"message":materialized.message,"images":materialized.images}),
+                        )
                         .await?;
                     require(
                         result["disposition"] == "handled",

@@ -1,0 +1,49 @@
+{
+  "accepted": true,
+  "proof": "owned public endpoint + synthetic loopback provider; no desktop",
+  "baseline": "394370861f223f1d018a748203b851a0767e1f88",
+  "sourceInputs": 555,
+  "endpoints": [
+    "native",
+    "dsh"
+  ],
+  "scenariosPerEndpoint": 2,
+  "authoredText": [
+    "NATIVE_DSH_MIXED",
+    ""
+  ],
+  "attachmentOrder": [
+    "image",
+    "file",
+    "image"
+  ],
+  "providerPromptCount": 4,
+  "auxiliaryDshTitleCount": 1,
+  "automaticRetries": 0,
+  "imagePublicReads": 16,
+  "nativeFilePublicReads": 4,
+  "dshFileDownload": "unsupported; original upload/history/provider handle only",
+  "reconnectEpoch": {
+    "before": 2,
+    "after": 5
+  },
+  "pythonTests": 296,
+  "focusedPythonTests": 7,
+  "strictExampleClippy": "passed",
+  "exampleBuild": "passed",
+  "format": "passed",
+  "uiBoundaries": "passed",
+  "acceptanceMatrix": "passed",
+  "desktop": "not_run",
+  "paidModel": "not_run",
+  "bitmapUi": "not_run; TekesUI #117",
+  "nestedReading": "existing #53 remains open; no SDK change",
+  "sourceBoundaryIncident": "aborted first candidate read an owned private fixture; quarantined and excluded, see local source-boundary-receipt.json",
+  "evidenceRoot": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/native-dsh-mixed-20261025",
+  "runReceiptSha256": "104037ef9bebe09cb011903fd9e4a27262042e442d7801825dd76da1cbfe852e",
+  "ownedExits": {
+    "dsh": 0,
+    "native": 0
+  },
+  "cacheDeletedBytes": 0
+}

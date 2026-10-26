@@ -1,0 +1,334 @@
+{
+  "kind": "agentkit-sidebar-host-preflight-ci",
+  "head": "ddc49c75bcd2cf4be4dd17152db7d595e6ed65da",
+  "runs": [
+    {
+      "run": 40048515783,
+      "event": "pull_request",
+      "url": "https://github.com/TekesApps/TekesAgentKit/actions/runs/40048515783",
+      "jobs": [
+        {
+          "name": "checks",
+          "conclusion": "success",
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run dtolnay/rust-toolchain@1.95.0",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/setup-node@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run node --test scripts/tests/pi-reading.test.mjs",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run cargo fmt --all --check",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run cargo clippy --workspace --all-targets --locked -- -D warnings",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run cargo test --workspace --locked",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run python3 scripts/check-headless-boundaries.py",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/setup-python@v5",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run python3 scripts/check-ui-boundaries.py",
+              "conclusion": "success"
+            },
+            {
+              "name": "Validate acceptance records (does not waive failed gates)",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run python3 -m unittest discover -s scripts/tests -v",
+              "conclusion": "success"
+            },
+            {
+              "name": "Post Run actions/setup-python@v5",
+              "conclusion": "success"
+            },
+            {
+              "name": "Post Run actions/setup-node@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "name": "Rust UI consumer (no native interaction)",
+          "conclusion": "failure",
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run dtolnay/rust-toolchain@1.95.0",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/setup-python@v5",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run python3 scripts/check-ui-boundaries.py",
+              "conclusion": "success"
+            },
+            {
+              "name": "Resolve and verify the compiled public pin",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run cargo fmt --manifest-path ui/Cargo.toml --all --check",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run cargo clippy --manifest-path ui/Cargo.toml --workspace --all-targets --locked -- -D warnings",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run cargo test --manifest-path ui/Cargo.toml --workspace --locked",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run standalone public API consumer (no native window)",
+              "conclusion": "success"
+            },
+            {
+              "name": "Verify nested detail reading intent (strict; no native window)",
+              "conclusion": "failure"
+            },
+            {
+              "name": "Run cargo build --manifest-path ui/Cargo.toml --locked -p tekes-agent-ui-demo",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run actions/upload-artifact@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Post Run actions/setup-python@v5",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success"
+            }
+          ]
+        }
+      ],
+      "metadata": ".runtime-fixtures/sidebar-host-20261024/ci-40048515783-jobs.json",
+      "metadata_sha256": "a07145e9b99dde1db1d6830689e5d4c0e53347c70ca8be72ad71c0b381e6fecf",
+      "strict_result": {
+        "accepted": false,
+        "parentFollowingAfterInnerUp": true,
+        "parentOffsetBefore": 0,
+        "parentOffsetAfterScroll": 0,
+        "parentOffsetAfterAppend": 634,
+        "innerOffset": 100,
+        "detailVisibleAfterAppend": false
+      },
+      "strict_sha256": "c4f70b29538ecacd71995d9a3fc7678cf168834c54e6f348c8c095309b9f1b90"
+    },
+    {
+      "run": 40048512623,
+      "event": "push",
+      "url": "https://github.com/TekesApps/TekesAgentKit/actions/runs/40048512623",
+      "jobs": [
+        {
+          "name": "Rust UI consumer (no native interaction)",
+          "conclusion": "failure",
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run dtolnay/rust-toolchain@1.95.0",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/setup-python@v5",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run python3 scripts/check-ui-boundaries.py",
+              "conclusion": "success"
+            },
+            {
+              "name": "Resolve and verify the compiled public pin",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run cargo fmt --manifest-path ui/Cargo.toml --all --check",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run cargo clippy --manifest-path ui/Cargo.toml --workspace --all-targets --locked -- -D warnings",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run cargo test --manifest-path ui/Cargo.toml --workspace --locked",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run standalone public API consumer (no native window)",
+              "conclusion": "success"
+            },
+            {
+              "name": "Verify nested detail reading intent (strict; no native window)",
+              "conclusion": "failure"
+            },
+            {
+              "name": "Run cargo build --manifest-path ui/Cargo.toml --locked -p tekes-agent-ui-demo",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Run actions/upload-artifact@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Post Run actions/setup-python@v5",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "name": "checks",
+          "conclusion": "success",
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run dtolnay/rust-toolchain@1.95.0",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/setup-node@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run node --test scripts/tests/pi-reading.test.mjs",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run cargo fmt --all --check",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run cargo clippy --workspace --all-targets --locked -- -D warnings",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run cargo test --workspace --locked",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run python3 scripts/check-headless-boundaries.py",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/setup-python@v5",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run python3 scripts/check-ui-boundaries.py",
+              "conclusion": "success"
+            },
+            {
+              "name": "Validate acceptance records (does not waive failed gates)",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run python3 -m unittest discover -s scripts/tests -v",
+              "conclusion": "success"
+            },
+            {
+              "name": "Post Run actions/setup-python@v5",
+              "conclusion": "success"
+            },
+            {
+              "name": "Post Run actions/setup-node@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success"
+            }
+          ]
+        }
+      ],
+      "metadata": ".runtime-fixtures/sidebar-host-20261024/ci-40048512623-jobs.json",
+      "metadata_sha256": "5aff1a1b6edbb62c7216b72953fec245195e50628efe13289b15dcd2d8d9d0af",
+      "strict_result": {
+        "accepted": false,
+        "parentFollowingAfterInnerUp": true,
+        "parentOffsetBefore": 0,
+        "parentOffsetAfterScroll": 0,
+        "parentOffsetAfterAppend": 634,
+        "innerOffset": 100,
+        "detailVisibleAfterAppend": false
+      },
+      "strict_sha256": "c4f70b29538ecacd71995d9a3fc7678cf168834c54e6f348c8c095309b9f1b90"
+    }
+  ],
+  "new_source_ci": "not yet pushed at preflight",
+  "desktop": false
+}

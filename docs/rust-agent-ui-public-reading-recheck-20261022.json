@@ -1,0 +1,128 @@
+{
+  "checked_at": "2026-10-21T18:10:37.281982+00:00",
+  "base_commit": "0a1c25e615b830f912c1227eaaf7b37f7c196bf6",
+  "sdk": "09b4bab44b6dfa65487250ea816b610b9df59095",
+  "dependency_changed": false,
+  "program": {
+    "program": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/AgentKitPublicReadingRecheck.app/Contents/MacOS/AgentKitPublicReadingRecheck",
+    "sha256": "142ec1d187e4610482b28571b1de846e200c4f4ca70df039b7ac3e31c7d0bf56",
+    "sdk": "09b4bab44b6dfa65487250ea816b610b9df59095"
+  },
+  "consumer_inputs": {
+    "commit": "09b4bab44b6dfa65487250ea816b610b9df59095",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 241,
+    "sha256": "44b3174022584d3c099a45b86892d17dbf948905476c0f038be104df12aefe46",
+    "ui_packages": 8
+  },
+  "software_ime": {
+    "softwareIme": true,
+    "pidTargetedEvents": true,
+    "physicalKeyboard": false,
+    "candidateWindow": false,
+    "sourceBefore": "com.apple.inputmethod.SCIM.ITABC",
+    "sourceAfter": "com.apple.inputmethod.SCIM.ITABC",
+    "binarySha256": "142ec1d187e4610482b28571b1de846e200c4f4ca70df039b7ac3e31c7d0bf56"
+  },
+  "ui_workspace_tests": 455,
+  "strict_all_target_clippy": true,
+  "native": {
+    "reading-native": [
+      {
+        "draftIsolation": true,
+        "focusAndEditorBaselinePreserved": true,
+        "focusAndMarkedBaselinePreserved": true,
+        "focusAndTextStatePreserved": true,
+        "hoverPreviewVisible": false,
+        "independentBReadingRestored": true,
+        "jumpHasNoHistory": true,
+        "jumpLatestControl": true,
+        "loadedItemsAfter": 44,
+        "loadedItemsBefore": 20,
+        "markedTextPreserved": true,
+        "nativePagingControl": true,
+        "nativeWindow": true,
+        "navigationPreeditPreserved": true,
+        "noSubmission": true,
+        "opaqueBaselinePreserved": true,
+        "originalTurnNavigation": true,
+        "physicalIme": false,
+        "prependAnchorPreserved": true,
+        "previewFactsDuringPreedit": true,
+        "publicHistoryPage": true,
+        "publicPageRequest": true,
+        "readingAnchorAcceptance": true,
+        "realHarness": false,
+        "reconnectReadingRestored": true,
+        "retainedSessionReadingRestored": true,
+        "sameEditorOwner": true,
+        "samePublicationRefresh": true,
+        "syntheticPreedit": true,
+        "syntheticWheel": true,
+        "turnStartAndLatest": true,
+        "upwardReadingPreserved": true,
+        "voiceOver": false
+      }
+    ],
+    "sidebar-native": [
+      {
+        "canonicalSelectedSupplement": true,
+        "explicitNativeReveal": true,
+        "failureRetainsRows": true,
+        "fullLayoutParity": false,
+        "markedBaselineAndFocusPreserved": true,
+        "nativeWindow": true,
+        "noSubmission": true,
+        "physicalIme": false,
+        "realHarnessOutage": false,
+        "restoringNotEmpty": true,
+        "retiredIdsNotReused": true,
+        "voiceOver": false
+      }
+    ],
+    "notice-native": [
+      {
+        "capturedSourceCallback": true,
+        "cloneClaimRejected": true,
+        "hiddenNoticeNoGap": true,
+        "nativeWindow": true,
+        "noSubmission": true,
+        "noticeAboveCard": true,
+        "originalEditorAndMarkedBaseline": true,
+        "originalRefreshControl": true,
+        "physicalIme": false,
+        "pixelIconParity": false,
+        "realHarness": false,
+        "refreshingDisabled": true,
+        "voiceOver": false
+      }
+    ]
+  },
+  "wip_source_hashes": {
+    "ui/components/src/composer.rs": "83ecb0ec2ab7b5002a448bacb2383b62ba07e4b9f91698e8a093554029a1e490",
+    "ui/components/src/composer_layout.rs": "bca71dd99285062a85b826729d10363f934ff0c768e0c3a223d000983b18267b",
+    "ui/components/src/lib.rs": "a4e2b666373c10c5242604be135fcad702c88c79b3c8b99a2351627876917a48",
+    "ui/consumer/src/lib.rs": "8078a7d7b1054d714795a5f8036b1827a0ca72dbe7a6b05d65760ba4e1f3d97b",
+    "ui/demo/src/component_demo.rs": "8a3b4d618f79700f4f0d22939b42e6669bbd42fefc8bbf098c202c646171c26b",
+    "ui/demo/src/components_native.rs": "d462578f544c70fc6045a10be3c89fda19ba9a0534a74ebffaebf14c6c65f28d",
+    "ui/demo/tests/run_column.rs": "c0a48cf020582f1dac86af2927f7db8c580dbe00e82e4499ee10910351bc4f53",
+    "ui/demo/tests/run_reading.rs": "7ac7def33636e6bb99c2824a5b31a4aebe3fc4cfd8e9a70e07a0ef413bf085bf",
+    "ui/components/src/composer_notice.rs": "09b6a7607942bbeb171e037e5a81fde54ad0d3d3a6c973b97a2d00aa5da9b8c0",
+    "ui/demo/src/native_composer_notice_selftest.rs": "3931cb50cd912d28161eaea051c75113528a36eee4abc2216579a736f7b4f9bc",
+    "ui/demo/tests/composer_notice.rs": "044eb13c68c5dd11b43e1bbb0764d2087efcee3670c6ad760b3d6ab0890ff014"
+  },
+  "evidence_directory": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/public-reading-recheck-20261022",
+  "deleted_bytes": 0,
+  "new_target": false,
+  "evidence_hashes": {
+    "consumer-inputs.json": "cdc58abe6ba1a4ca2a3ae00fa2a73cb6481b9ba29e542c88359a5e8e330c6605",
+    "program.json": "d27c0c6d661e1c3da88f1d2c03204703e7771d887cc9d75d6e4b814ed27091a8",
+    "system-ime.log": "fa51bb404b7869e95ae1a9fc6d6c63ac742f94689b843f25a65af5d282b42b2a",
+    "reading-native.log": "ca20f9f4c00dec32d5c7caffd1ec3ff278218ae954af1d98e9816535104eb382",
+    "boundaries.log": "9480cc4382559b9a7a99240226a9f766048e30c8d38bb4bccd1fd8bca56661ad",
+    "notice-native.log": "45c4264916bf8e5e8141daa926fdbf94cc418d4e9a70ea462c9999ab94f79107",
+    "sidebar-native.log": "b4bc5fa9f091059e9804d1f91a51752e7fb2dcdc22f8a6396074d37732f69311",
+    "system-ime.json": "a8331a77a09889576c0e04a94e8960b6eae0fa4219b98a5418a35314919ff645"
+  }
+}

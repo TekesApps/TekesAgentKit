@@ -1,0 +1,170 @@
+{
+  "format": 1,
+  "issues": [
+    55,
+    58
+  ],
+  "productCandidate": "4274fe82fc353ff06100d4106d527e25dc5dfca3",
+  "scope": "original offscreen RunPort: three actual read tools, reasoning, group/control retention, synthetic preedit/focus and reconnect deduplication",
+  "uiProgramArchive": "ui-issue67-7d269e26",
+  "archiveOnly": true,
+  "endpoints": {
+    "native": {
+      "receiptSha256": "7cc455ac7be3175c1beee9d36677159f6e6bed81e403abcb6b92af034504f0ec",
+      "evidenceDirectory": "native-mixed-tool-4274-v1",
+      "runtimeVersion": "0.9.3",
+      "programsAndRuntime": {
+        "/Volumes/HP P900/dev/TekesAgentKit/acceptance-tools/headless/current-feature/tekes-agent-headless": "081c3fe0d1d0be7e335482c6309a9f455f0395a39bbc704908fa138a5beb7a49",
+        "/Volumes/HP P900/dev/TekesAgentKit/acceptance-tools/ui-offscreen/current/tekes-agent-ui-demo": "7d269e26cfa4926d11fc015b12cd607def8cd8f19939592fa278d4e9435f7f84",
+        "/Users/frankqin/dev/Tekes/.build/kernel-0.9.3-installed/BuiltInKernel/tekes-supervisor": "365eca9385f36d5897a81ba398e7f34b4b9819896d6a1b78c618a7710b14380f",
+        "/Users/frankqin/dev/Tekes/.build/kernel-0.9.3-installed/BuiltInKernel/tekes-worker": "1284014bd0a8d3cb711c0512b10762322a19af4beabc1f9e681bacb1e28fa64d",
+        "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/acceptance-refresh-20261025/kernel-0.9.3-contract-root/fixtures/config/providers.canonical.json": "0caac12724fd6d982fc51123ea4546f2a023d6a9258da4cde63d1d27eabcaa6a"
+      },
+      "source": {
+        "head": "4274fe82fc353ff06100d4106d527e25dc5dfca3",
+        "manifestSha256": "68ed698013a2e0c3cfdd6e359fd31266971071cbd7ae892b3384754ffc07593b",
+        "verifiedFiles": 1232
+      },
+      "proof": {
+        "canonicalTools": 3,
+        "focusPreserved": true,
+        "liveControlsObserved": true,
+        "nativeInteraction": false,
+        "oneContinuousGroup": true,
+        "originalControlsRetained": true,
+        "otherDraftPreserved": true,
+        "physicalIme": false,
+        "readingAnchorAcceptance": false,
+        "realHarness": true,
+        "realReadResults": true,
+        "reasoningSource": true,
+        "reconnectNoDuplicateInput": true,
+        "reconnectNoDuplicateTools": true,
+        "sendBlockedDuringPreedit": true,
+        "syntheticPreeditPreserved": true
+      },
+      "providerPaths": [
+        "/v1/responses",
+        "/v1/responses",
+        "/v1/responses"
+      ],
+      "titleRequests": [],
+      "seedOwnedGroupAbsent": true,
+      "demoOwnedGroupAbsent": true,
+      "ownedHarnessExit": 0,
+      "usageAccepted": false,
+      "performanceAccepted": false
+    },
+    "pi": {
+      "receiptSha256": "0f45b2688c955c5de2d079ab4be741b38d86169ba5fe86cd1c814667687a1ef4",
+      "evidenceDirectory": "pi-mixed-tool-4274-v3",
+      "runtimeVersion": "1.3.0",
+      "programsAndRuntime": {
+        "/Volumes/HP P900/dev/TekesAgentKit/acceptance-tools/headless/current-feature/tekes-agent-headless": "081c3fe0d1d0be7e335482c6309a9f455f0395a39bbc704908fa138a5beb7a49",
+        "/Volumes/HP P900/dev/TekesAgentKit/acceptance-tools/ui-offscreen/current/tekes-agent-ui-demo": "7d269e26cfa4926d11fc015b12cd607def8cd8f19939592fa278d4e9435f7f84",
+        "/Users/frankqin/Library/Application Support/Tekes/Harnesses/pi-1.3.0-node-24.20.0/node/bin/node": "9d050fd455b56426e25d4d603c7c501cbb2630348e836cf221dcce748e90588a",
+        "/Users/frankqin/Library/Application Support/Tekes/Harnesses/pi-1.3.0-node-24.20.0/node_modules/@earendil-works/pi-coding-agent/package.json": "83c3bb7619f590c213cc96a24216eb29a819a3ef6dc548607cc037ed276e8dc5",
+        "/Users/frankqin/Library/Application Support/Tekes/Harnesses/pi-1.3.0-node-24.20.0/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js": "e79626f2dd6f94aa45d30f3fa63cd84319a6eefcd150b353cfaf274366926774"
+      },
+      "source": {
+        "head": "4274fe82fc353ff06100d4106d527e25dc5dfca3",
+        "manifestSha256": "68ed698013a2e0c3cfdd6e359fd31266971071cbd7ae892b3384754ffc07593b",
+        "verifiedFiles": 1232
+      },
+      "proof": {
+        "canonicalTools": 3,
+        "focusPreserved": true,
+        "liveControlsObserved": true,
+        "nativeInteraction": false,
+        "oneContinuousGroup": true,
+        "originalControlsRetained": true,
+        "otherDraftPreserved": true,
+        "physicalIme": false,
+        "readingAnchorAcceptance": false,
+        "realHarness": true,
+        "realReadResults": true,
+        "reasoningSource": true,
+        "reconnectNoDuplicateInput": true,
+        "reconnectNoDuplicateTools": true,
+        "sendBlockedDuringPreedit": true,
+        "syntheticPreeditPreserved": true
+      },
+      "providerPaths": [
+        "/v1/chat/completions",
+        "/v1/chat/completions",
+        "/v1/chat/completions"
+      ],
+      "titleRequests": [],
+      "seedOwnedGroupAbsent": true,
+      "demoOwnedGroupAbsent": true,
+      "ownedHarnessExit": null,
+      "usageAccepted": false,
+      "performanceAccepted": false
+    },
+    "dsh": {
+      "receiptSha256": "353cdbcb26d025f1546202bdccee31732b7dbe76686cea88ad9705b1355f85ae",
+      "evidenceDirectory": "dsh-mixed-tool-4274-v2",
+      "runtimeVersion": "0.2.1-rc.2",
+      "programsAndRuntime": {
+        "/Volumes/HP P900/dev/TekesAgentKit/acceptance-tools/headless/current-feature/tekes-agent-headless": "081c3fe0d1d0be7e335482c6309a9f455f0395a39bbc704908fa138a5beb7a49",
+        "/Volumes/HP P900/dev/TekesAgentKit/acceptance-tools/ui-offscreen/current/tekes-agent-ui-demo": "7d269e26cfa4926d11fc015b12cd607def8cd8f19939592fa278d4e9435f7f84",
+        "/Users/frankqin/Library/Application Support/Tekes/Harnesses/pi-1.3.0-node-24.20.0/node/bin/node": "9d050fd455b56426e25d4d603c7c501cbb2630348e836cf221dcce748e90588a",
+        "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/dsh-0.2.1-rc.2-sidebar-20261019/node_modules/@deepseek-ai/dsh/package.json": "bea4288aa88eb54efe829686553100a75fdf09d11c5e3bf6b329badb9a0368dd",
+        "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/dsh-0.2.1-rc.2-sidebar-20261019/node_modules/@deepseek-ai/dsh/lib/bin.js": "80112efe368efb1a39720c7ada0af00442e5131fb2744edaaff8a3e8bb499e6f"
+      },
+      "source": {
+        "head": "4274fe82fc353ff06100d4106d527e25dc5dfca3",
+        "manifestSha256": "68ed698013a2e0c3cfdd6e359fd31266971071cbd7ae892b3384754ffc07593b",
+        "verifiedFiles": 1232
+      },
+      "proof": {
+        "canonicalTools": 3,
+        "focusPreserved": true,
+        "liveControlsObserved": true,
+        "nativeInteraction": false,
+        "oneContinuousGroup": true,
+        "originalControlsRetained": true,
+        "otherDraftPreserved": true,
+        "physicalIme": false,
+        "readingAnchorAcceptance": false,
+        "realHarness": true,
+        "realReadResults": true,
+        "reasoningSource": true,
+        "reconnectNoDuplicateInput": true,
+        "reconnectNoDuplicateTools": true,
+        "sendBlockedDuringPreedit": true,
+        "syntheticPreeditPreserved": true
+      },
+      "providerPaths": [
+        "/v1/chat/completions",
+        "/v1/chat/completions",
+        "/v1/chat/completions",
+        "/v1/chat/completions"
+      ],
+      "titleRequests": [
+        {
+          "path": "/v1/chat/completions",
+          "bodySha256": "1dd9ba330412ea68bbc597eb3683ceef9434b6bc2d3d11e1b4643b4bcca6b42c"
+        }
+      ],
+      "seedOwnedGroupAbsent": true,
+      "demoOwnedGroupAbsent": true,
+      "ownedHarnessExit": 0,
+      "usageAccepted": false,
+      "performanceAccepted": false
+    }
+  },
+  "notRun": [
+    "usage-specific source proof",
+    "performance",
+    "desktop",
+    "physical IME",
+    "AX"
+  ],
+  "negativeEvidence": [
+    "pi-mixed-tool-4274-v1: process-group inspection error",
+    "pi-mixed-tool-4274-v2: fail-closed process-group liveness denial; no UI proof",
+    "dsh-mixed-tool-4274-v1: unclassified title request rejected by tool provider; retained"
+  ],
+  "merged": false
+}

@@ -1,0 +1,115 @@
+{
+  "baseCommit": "abfc1c2732d2659c3f43f128dbf50d9d03126598",
+  "referenceClientKit": "c289bc9d33edcd83a782ac17927a8c65a027eccd",
+  "program": {
+    "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/real-sidechat-ui-20261023/tekes-agent-ui-demo-v5",
+    "sha256": "a68e9c8c86fb0fabc5711af33384fa5292f9e733fc95e3b714de96267bdcda0b"
+  },
+  "sourceSha256": {
+    "scripts/test-real-session-endpoints.py": "2d302140e82549a488f22093990b8e1162d6cadc2e061b5195ddf7abb66ad75c",
+    "ui/demo/src/lib.rs": "b06e782102d18000b8645d8a1d5dbf32a7136d24884d8b1c81550fbdb397a61e",
+    "ui/demo/src/components_native.rs": "196de4004bea63064e6bac5697d8ced846742c457bcc134f0693fde5c4725de5",
+    "ui/demo/src/sidechat_proof.rs": "8b635764fbf91c6d2c251fb22ab61ed44af0658002623eb8292a68ef0fa8442c"
+  },
+  "profiles": {
+    "native": {
+      "receipt": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/real-sidechat-ui-20261023/final-v5.consumer.json",
+      "sha256": "c80cede99282ded315d5c1a9965b8cc2beea11f4a3ed3e1cb07bb7cd33e5a1b5",
+      "proof": {
+        "capabilityUnavailable": false,
+        "confirmedDiscard": true,
+        "crossProcess": false,
+        "freshReconnect": true,
+        "independentForkScope": true,
+        "nativeInteraction": false,
+        "noDuplicateInput": true,
+        "originalClose": true,
+        "originalComposerIdsRetained": true,
+        "originalCreate": true,
+        "originalSend": true,
+        "originalSidePanelRunPort": true,
+        "parentAndOtherDraftsPreserved": true,
+        "parentHistoryIsolated": true,
+        "physicalIme": false,
+        "readingAnchorAcceptance": false,
+        "realHarness": true,
+        "retiredAuthority": true,
+        "scratchDraftRestored": true,
+        "scratchLifecycleAccepted": true,
+        "scratchReply": true,
+        "scratchScope": {
+          "endpointId": "native-ui",
+          "sessionId": "01a16753-2e96-7a48-b335-b6fa203ebc0c",
+          "threadId": "01a16753-2e96-7a48-b335-b6fa203ebc0c"
+        },
+        "summaryNavigation": true
+      }
+    },
+    "pi": {
+      "receipt": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/real-sidechat-ui-20261023/final-v5-pi.consumer.json",
+      "sha256": "c28b12942e32fea8b92ef0fa6198658c59cc717530c721fd3b3ac27cd1879c14",
+      "proof": {
+        "capabilityUnavailable": false,
+        "confirmedDiscard": true,
+        "crossProcess": false,
+        "freshReconnect": true,
+        "independentForkScope": true,
+        "nativeInteraction": false,
+        "noDuplicateInput": true,
+        "originalClose": true,
+        "originalComposerIdsRetained": true,
+        "originalCreate": true,
+        "originalSend": true,
+        "originalSidePanelRunPort": true,
+        "parentAndOtherDraftsPreserved": true,
+        "parentHistoryIsolated": true,
+        "physicalIme": false,
+        "readingAnchorAcceptance": false,
+        "realHarness": true,
+        "retiredAuthority": true,
+        "scratchDraftRestored": true,
+        "scratchLifecycleAccepted": true,
+        "scratchReply": true,
+        "scratchScope": {
+          "endpointId": "pi-ui",
+          "sessionId": "5bbeb7a6-40b5-42d6-8e26-9ea0a9b8b742",
+          "threadId": "5bbeb7a6-40b5-42d6-8e26-9ea0a9b8b742"
+        },
+        "summaryNavigation": true
+      }
+    },
+    "dsh": {
+      "receipt": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/real-sidechat-ui-20261023/final-v5-dsh.consumer.json",
+      "sha256": "5b17c672bbde2d24e92fc1472f15c86dfc47b34aa5594e48066ec082516802a8",
+      "proof": {
+        "capabilityUnavailable": true,
+        "crossProcess": false,
+        "nativeInteraction": false,
+        "noForkAttempted": true,
+        "originalCreateDisabled": true,
+        "parentAndOtherDraftsPreserved": true,
+        "physicalIme": false,
+        "readingAnchorAcceptance": false,
+        "realHarness": true,
+        "scratchLifecycleAccepted": false
+      }
+    }
+  },
+  "runtimeVersions": {
+    "native": "0.9.3; explicit UI-only; full lifecycle/child protocol excluded",
+    "pi": "1.4.0",
+    "dsh": "0.2.1-rc.2; no disposable SideChat capability"
+  },
+  "tests": {
+    "sidechatBinding": 6,
+    "python": 74,
+    "demoStrictClippy": true,
+    "fmt": true,
+    "staticBoundary": true
+  },
+  "nativeInteraction": false,
+  "physicalIme": false,
+  "crossProcess": false,
+  "completionProven": false,
+  "retainedFailureEvidence": true
+}

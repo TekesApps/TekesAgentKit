@@ -1,0 +1,133 @@
+{
+  "publishedAgentKit": "v0.3.8",
+  "tekesuiCommit": "09b4bab44b6dfa65487250ea816b610b9df59095",
+  "program": {
+    "program": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/AgentKitFeedbackFormFinal.app/Contents/MacOS/AgentKitFeedbackFormFinal",
+    "sha256": "faa58ba6cef1a8fd1c46cd18c69e4535006a305baa08c7af451d944715de2f28"
+  },
+  "sameProcess": true,
+  "processContainerAcceptance": false,
+  "popoverAcceptance": false,
+  "upstreamIssue": "https://github.com/TekesApps/TekesUI/issues/49",
+  "intakeGate": {
+    "defaultIgnored": true,
+    "explicitExitCode": 101,
+    "expectedAction": 51002,
+    "observedAction": 51003,
+    "log": ".runtime-fixtures/feedback-popover-20261022/intake-final.log"
+  },
+  "native": {
+    "pi": {
+      "auxiliaryFocusPreserved": true,
+      "committedNoteLabel": true,
+      "composerContentsAndOwnerPreserved": true,
+      "draftsPreserved": true,
+      "freshReadAfterDelete": true,
+      "imeSendAndNavigationBlocked": true,
+      "nativeInteraction": true,
+      "nativePointer": true,
+      "nativeTextServices": true,
+      "noPromptSubmitted": true,
+      "nonemptyComposerDrafts": true,
+      "noteReopened": true,
+      "opaqueBaselinePreserved": false,
+      "physicalIme": false,
+      "readingAnchorAcceptance": false,
+      "retainedAcrossSessionSwitch": true,
+      "sameRatingDeletes": true,
+      "savedChineseNote": true,
+      "sendEnabledBeforeComposition": true,
+      "stateDrivenCallbacks": true,
+      "syntheticPreedit": true,
+      "unratedNoteHidden": true,
+      "voiceOver": false
+    },
+    "dsh": {
+      "auxiliaryFocusPreserved": true,
+      "committedNoteLabel": true,
+      "composerContentsAndOwnerPreserved": true,
+      "draftsPreserved": true,
+      "freshReadAfterDelete": true,
+      "imeSendAndNavigationBlocked": true,
+      "nativeInteraction": true,
+      "nativePointer": true,
+      "nativeTextServices": true,
+      "noPromptSubmitted": true,
+      "nonemptyComposerDrafts": true,
+      "noteReopened": true,
+      "opaqueBaselinePreserved": false,
+      "physicalIme": false,
+      "readingAnchorAcceptance": false,
+      "retainedAcrossSessionSwitch": true,
+      "sameRatingDeletes": true,
+      "savedChineseNote": true,
+      "sendEnabledBeforeComposition": true,
+      "stateDrivenCallbacks": true,
+      "syntheticPreedit": true,
+      "unratedNoteHidden": true,
+      "voiceOver": false
+    },
+    "native": {
+      "auxiliaryFocusPreserved": true,
+      "committedNoteLabel": true,
+      "composerContentsAndOwnerPreserved": true,
+      "draftsPreserved": true,
+      "freshReadAfterDelete": true,
+      "imeSendAndNavigationBlocked": true,
+      "nativeInteraction": true,
+      "nativePointer": true,
+      "nativeTextServices": true,
+      "noPromptSubmitted": true,
+      "nonemptyComposerDrafts": true,
+      "noteReopened": true,
+      "opaqueBaselinePreserved": false,
+      "physicalIme": false,
+      "readingAnchorAcceptance": false,
+      "retainedAcrossSessionSwitch": true,
+      "sameRatingDeletes": true,
+      "savedChineseNote": true,
+      "sendEnabledBeforeComposition": true,
+      "stateDrivenCallbacks": true,
+      "syntheticPreedit": true,
+      "unratedNoteHidden": true,
+      "voiceOver": false
+    }
+  },
+  "releasedBytes": 0,
+  "newTargets": 0,
+  "softwareIme": {
+    "softwareIme": true,
+    "pidTargetedEvents": true,
+    "physicalKeyboard": false,
+    "candidateWindow": false,
+    "sourceBefore": "com.apple.inputmethod.SCIM.ITABC",
+    "sourceAfter": "com.apple.inputmethod.SCIM.ITABC",
+    "binarySha256": "faa58ba6cef1a8fd1c46cd18c69e4535006a305baa08c7af451d944715de2f28"
+  },
+  "uiTests": {
+    "passed": 496,
+    "failed": 0,
+    "ignored": 1
+  },
+  "sourceFiles": {
+    "ui/components/src/feedback.rs": "70b4d7f61551bf152aa9a103320aa13d376041dcf8067ced21b54a44725512cb",
+    "ui/consumer/tests/summary_label.rs": "9ed2ba22690a1197f7eb4e33805e03304627a54a5b7148d6149ca5ddac387f41",
+    "ui/consumer/tests/support/popover_intake.rs": "1803ab39214f541c0b56ee0bca5c7c985842ffb130f3fc0fcbea4ce96fd6fd9c",
+    "ui/demo/src/native_feedback_selftest.rs": "21fc8689c757649568de71f98138c459ce3922380ad21833b4e3021ec5519529",
+    "ui/demo/tests/feedback_write.rs": "7d0c67561930a5222da8122c4bbc0252d8004a2bb708a48dc5135d28e0480274"
+  },
+  "readOnlyReferenceHashes": {
+    "ClientKit/FeedbackNoteEditorView.swift": "7c0e5dd597c82a6805e0c65a532816ee9170eee3f2f15996edd1ac693a638d1b",
+    "ClientKit/FeedbackNoteEditorState.swift": "8102f119ae66216b0c307dea5629fb50065545c1d81d7c358dd7ffe5dca686b8",
+    "ClientKit/FeedbackNotePopover.swift": "e50a8c97381b65826af6ba81270372eddd0c01f80f2930e0020304fd0946c488",
+    "Tekes/ClientAgentHostAdapters.swift": "7d907c654ec3df76c7a8b492e32bbc68f1bd4d0b46044cae615aa712b9f67c71"
+  },
+  "consumerInputs": {
+    "commit": "09b4bab44b6dfa65487250ea816b610b9df59095",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 241,
+    "sha256": "44b3174022584d3c099a45b86892d17dbf948905476c0f038be104df12aefe46",
+    "ui_packages": 8
+  }
+}

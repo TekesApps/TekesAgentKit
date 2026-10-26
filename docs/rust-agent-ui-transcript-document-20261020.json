@@ -1,0 +1,172 @@
+{
+  "kind": "readonly-transcript-document-projection",
+  "baseCommit": "9da3344ea2a10dc5dd51c0bd770b1b68d4066287",
+  "sourceSha256": {
+    "crates/presentation/src/transcript_document.rs": "1cc34a5f34303db2968324824debf0523adeb4e3a34565bee66472e807011bbd",
+    "crates/presentation/tests/transcript_document.rs": "81ee114d1b83aaff3b4ed8856750b4355359ce6b2e32790ae1799b318655de8e",
+    "ui/demo/src/components_native.rs": "093f603a54bfe81805902a934a49ef0efaf2e5c0c42ad3c2118e54abaeec0da5",
+    "ui/consumer/src/lib.rs": "0d7c13908b3bf284288b78d6b043599105a29db3d22bf7dc78d723f9697ddc3c",
+    "scripts/test-real-session-endpoints.py": "c716b183fdc07a1989f12ff1811e8fc8d2f61ee965619db0b3623e5fa3d85ba3"
+  },
+  "binarySha256": "3643694d927d4677bae576f43d80900f5c4d3c638b4dceec39d81491d2fd3773",
+  "tekesUI": {
+    "commit": "431093786de47b48cd566d0d9c0eafa088b10d68",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 188,
+    "sha256": "03721866a362b1d31261ebbbc86140eb07e9e23320871c325234a5212591213d",
+    "ui_packages": 8
+  },
+  "runtimeVersions": {
+    "kernel": "0.9.1",
+    "pi": "1.3.0",
+    "dsh": "0.2.1-rc.2"
+  },
+  "receipts": {
+    "pi": {
+      "actionableProof": {
+        "canonicalAnswerRecord": true,
+        "followupInputCount": 1,
+        "freshHistoryAfterReconnect": true,
+        "nativeInteraction": false,
+        "oneAttempt": true,
+        "originalScope": true,
+        "otherDraftPreserved": true,
+        "physicalIME": false,
+        "probeConfigured": true,
+        "publicCard": true,
+        "publicComposer": true,
+        "reconnectNoDuplicateInput": true,
+        "sharedResolved": true
+      },
+      "annotationProof": null,
+      "components": true,
+      "contextProof": null,
+      "documentProjection": {
+        "hasMoreBefore": false,
+        "isStale": false,
+        "renderer": false,
+        "sections": 4,
+        "toolCalls": 1,
+        "visibleMessages": 8
+      },
+      "finalAssistantItems": 3,
+      "initialPresetProof": null,
+      "inventoryRows": 13,
+      "isStale": false,
+      "modelChoiceProof": null,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 8,
+      "transcriptView": false,
+      "uploadProof": null
+    },
+    "dsh": {
+      "actionableProof": {
+        "canonicalAnswerRecord": true,
+        "followupInputCount": 1,
+        "freshHistoryAfterReconnect": true,
+        "nativeInteraction": false,
+        "oneAttempt": true,
+        "originalScope": true,
+        "otherDraftPreserved": true,
+        "physicalIME": false,
+        "probeConfigured": true,
+        "publicCard": true,
+        "publicComposer": true,
+        "reconnectNoDuplicateInput": true,
+        "sharedResolved": true
+      },
+      "annotationProof": null,
+      "components": true,
+      "contextProof": null,
+      "documentProjection": {
+        "hasMoreBefore": false,
+        "isStale": false,
+        "renderer": false,
+        "sections": 4,
+        "toolCalls": 2,
+        "visibleMessages": 10
+      },
+      "finalAssistantItems": 4,
+      "initialPresetProof": null,
+      "inventoryRows": 8,
+      "isStale": false,
+      "modelChoiceProof": null,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 13,
+      "transcriptView": false,
+      "uploadProof": null
+    },
+    "native": {
+      "actionableProof": {
+        "canonicalAnswerRecord": true,
+        "followupInputCount": 1,
+        "freshHistoryAfterReconnect": true,
+        "nativeInteraction": false,
+        "oneAttempt": true,
+        "originalScope": true,
+        "otherDraftPreserved": true,
+        "physicalIME": false,
+        "probeConfigured": true,
+        "publicCard": true,
+        "publicComposer": true,
+        "reconnectNoDuplicateInput": true,
+        "sharedResolved": true
+      },
+      "annotationProof": null,
+      "components": true,
+      "contextProof": null,
+      "documentProjection": {
+        "hasMoreBefore": false,
+        "isStale": false,
+        "renderer": false,
+        "sections": 2,
+        "toolCalls": 1,
+        "visibleMessages": 5
+      },
+      "finalAssistantItems": 2,
+      "initialPresetProof": null,
+      "inventoryRows": 5,
+      "isStale": false,
+      "modelChoiceProof": null,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 5,
+      "transcriptView": false,
+      "uploadProof": null
+    }
+  },
+  "provider": "local synthetic; isolated HOME/dataRoot",
+  "formalTranscript": false,
+  "nativeInteraction": false,
+  "physicalIME": false,
+  "readingAnchorAcceptance": false,
+  "remaining": [
+    "formal Transcript and RunView",
+    "tool/message chronological interleaving evidence",
+    "public upstream #22/#23 consumption gates",
+    "physical IME and native reading/paging acceptance",
+    "complete delivery review CI merge and stage tag"
+  ],
+  "localChecks": {
+    "presentationTests": 58,
+    "uiWorkspaceTests": 172,
+    "toolTests": 18,
+    "presentationStrictClippy": true,
+    "uiStrictClippy": true,
+    "fmt": true,
+    "uiBoundaries": true,
+    "resolvedInputs": true
+  }
+}

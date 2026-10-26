@@ -1,0 +1,335 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-24",
+  "issue": 23,
+  "pr": "https://github.com/TekesApps/TekesAgentKit/pull/10",
+  "sourceBase": "9b9ec1fbb06bd02809d72a338dec02b5b6c4d520 plus task_family_fixture.py recorded below",
+  "sourceHashes": {
+    "scripts/task_family_fixture.py": "48df5302f1db0108e85efd9f57295455da5efe94b620676a02df0687e714e29c",
+    "scripts/owned_endpoint_provider.py": "d85111fbed71623c4c1fe0192ccb76840d460ef70e3f8b7404c6a6577a505d7f",
+    "scripts/native_owned_fixture.py": "41a33188f5715ecfd4102f0114cf14436eb522c0499c739239455f31a38617ad",
+    "scripts/dsh_owned_fixture.py": "e9fd2409290f016d2a5661e4c22d07c8e8b0c9bbd233b9b750ea3c46e89c2e34",
+    "scripts/pi_owned_fixture.py": "0b98abf9f480a40da217291d453f95478b98cb90bf8d5316ce194644f5039110"
+  },
+  "programs": {
+    "headless": {
+      "program": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/tekes-agent-headless",
+      "sha256": "87b54fe157a367ed462333e6781e839b5454cc88e1bb9543c8e1faf3a532e8ad",
+      "bytes": 29118576,
+      "origin": "explicit-existing"
+    },
+    "kernel": {
+      "supervisor": "/Users/frankqin/dev/Tekes/.build/kernel-0.9.3-installed/BuiltInKernel/tekes-supervisor",
+      "supervisorSha256": "365eca9385f36d5897a81ba398e7f34b4b9819896d6a1b78c618a7710b14380f",
+      "worker": "/Users/frankqin/dev/Tekes/.build/kernel-0.9.3-installed/BuiltInKernel/tekes-worker",
+      "workerSha256": "1284014bd0a8d3cb711c0512b10762322a19af4beabc1f9e681bacb1e28fa64d",
+      "build": {
+        "format": 1,
+        "identifier": "com.tekes.kernel.supervisor",
+        "source_revision": "09508a9083c24c7accefc99516739f279b85913e",
+        "version": "0.9.3"
+      }
+    }
+  },
+  "runtimeVersions": {
+    "native": "0.9.3",
+    "pi": "1.3.0",
+    "dsh": "0.2.1-rc.2"
+  },
+  "seedSourceMatched": {
+    "native": {
+      "schemaVersion": 1,
+      "endpoint": "native",
+      "evidenceScope": "paired-public-seed-dtos",
+      "realHarnessAcceptance": false,
+      "uiAcceptance": false,
+      "parent": {
+        "scope": {
+          "endpointId": "native",
+          "threadId": "2c24bdbb-c566-4423-bede-b3348d786f69",
+          "sessionId": "2c24bdbb-c566-4423-bede-b3348d786f69"
+        },
+        "cwd": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/real-multi-sidebar-20261024/task-family-preflight-evidence/actual/workspace",
+        "presentation": {
+          "exchangeIndex": 6,
+          "revision": 39,
+          "connectionEpoch": 2
+        }
+      },
+      "task": {
+        "row": {
+          "id": "[\"native\",\"2c24bdbb-c566-4423-bede-b3348d786f69\",\"tool:native-child-proof\"]",
+          "kind": "task",
+          "name": "Bounded child proof",
+          "scope": {
+            "endpointId": "native",
+            "sessionId": "2c24bdbb-c566-4423-bede-b3348d786f69",
+            "threadId": "2c24bdbb-c566-4423-bede-b3348d786f69"
+          },
+          "status": "done"
+        },
+        "sourceCallId": "native-child-proof",
+        "sourceExchangeIndex": 10
+      },
+      "child": {
+        "address": {
+          "endpointId": "native",
+          "sessionId": "f05592fa-4597-53da-a6df-4b2315d108a2"
+        },
+        "parentScope": {
+          "endpointId": "native",
+          "threadId": "2c24bdbb-c566-4423-bede-b3348d786f69",
+          "sessionId": "2c24bdbb-c566-4423-bede-b3348d786f69"
+        },
+        "readOnly": true,
+        "independentRun": false,
+        "historyRevision": "951a27c1fdfb845a413c7481758d521622f2012dcdc2bd5c621b0e8664d61e98",
+        "catalogEntry": {
+          "hasChildren": false,
+          "id": "f05592fa-4597-53da-a6df-4b2315d108a2",
+          "kind": "child",
+          "label": "task",
+          "mode": "bounded",
+          "plane": null,
+          "reason": null
+        },
+        "catalogExchangeIndex": 8,
+        "catalogParentAvailable": true,
+        "controlAuthorityGrantedByManifest": false
+      },
+      "notVerified": [
+        "same-Task-row dynamic pointer producer",
+        "UI intent/dispatch/mount"
+      ],
+      "pairedPublicSourceMatched": true
+    },
+    "pi": {
+      "schemaVersion": 1,
+      "endpoint": "pi",
+      "evidenceScope": "paired-public-seed-dtos",
+      "realHarnessAcceptance": false,
+      "uiAcceptance": false,
+      "parent": {
+        "scope": {
+          "endpointId": "pi",
+          "threadId": "48a64686-db40-4597-9fd8-15948b5bdfbc",
+          "sessionId": "48a64686-db40-4597-9fd8-15948b5bdfbc"
+        },
+        "cwd": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/real-multi-sidebar-20261024/task-family-preflight-evidence/actual/workspace",
+        "presentation": {
+          "exchangeIndex": 10,
+          "revision": 45,
+          "connectionEpoch": 2
+        }
+      },
+      "task": null,
+      "child": {
+        "address": {
+          "endpointId": "pi",
+          "sessionId": "32239bcc-af0d-4ffc-9226-e5e9cfadf836"
+        },
+        "parentScope": {
+          "endpointId": "pi",
+          "threadId": "48a64686-db40-4597-9fd8-15948b5bdfbc",
+          "sessionId": "48a64686-db40-4597-9fd8-15948b5bdfbc"
+        },
+        "summaryRow": {
+          "id": "[\"pi\",\"48a64686-db40-4597-9fd8-15948b5bdfbc\",\"tool:pi-child-0\"]",
+          "sessionId": "32239bcc-af0d-4ffc-9226-e5e9cfadf836",
+          "status": "notStarted",
+          "title": "Model child"
+        },
+        "historyExchangeIndex": 12,
+        "catalogEntry": {
+          "hasChildren": false,
+          "id": "32239bcc-af0d-4ffc-9226-e5e9cfadf836",
+          "kind": "child",
+          "label": "Model child",
+          "mode": "continuable",
+          "plane": null,
+          "reason": null
+        },
+        "catalogExchangeIndex": 11,
+        "catalogParentAvailable": true,
+        "controlAuthorityGrantedByManifest": false
+      },
+      "notVerified": [
+        "same-Task-row dynamic pointer producer",
+        "UI intent/dispatch/mount"
+      ],
+      "pairedPublicSourceMatched": true
+    },
+    "dsh": {
+      "schemaVersion": 1,
+      "endpoint": "dsh",
+      "evidenceScope": "paired-public-seed-dtos",
+      "realHarnessAcceptance": false,
+      "uiAcceptance": false,
+      "parent": {
+        "scope": {
+          "endpointId": "dsh",
+          "threadId": "session-551fd21b-e6de-4f81-8265-570b87144efd",
+          "sessionId": "session-551fd21b-e6de-4f81-8265-570b87144efd"
+        },
+        "cwd": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/real-multi-sidebar-20261024/task-family-preflight-evidence/actual/workspace"
+      },
+      "task": null,
+      "child": {
+        "address": {
+          "endpointId": "dsh",
+          "sessionId": "0d203e88-9adb-449d-99a9-e920a2a7d9c6"
+        },
+        "parentScope": {
+          "endpointId": "dsh",
+          "threadId": "session-551fd21b-e6de-4f81-8265-570b87144efd",
+          "sessionId": "session-551fd21b-e6de-4f81-8265-570b87144efd"
+        },
+        "presentationExchangeIndex": 11,
+        "catalogEntry": {
+          "hasChildren": null,
+          "id": "0d203e88-9adb-449d-99a9-e920a2a7d9c6",
+          "kind": "child",
+          "label": "Catalog proof child",
+          "mode": "continuable",
+          "plane": null,
+          "reason": null
+        },
+        "catalogExchangeIndex": 5,
+        "catalogParentAvailable": true,
+        "controlAuthorityGrantedByManifest": false
+      },
+      "notVerified": [
+        "same-Task-row dynamic pointer producer",
+        "UI intent/dispatch/mount"
+      ],
+      "pairedPublicSourceMatched": true
+    }
+  },
+  "python": {
+    "passed": 155,
+    "failed": 0
+  },
+  "newTargetCreated": false,
+  "nativeUi": false,
+  "physicalIme": false,
+  "actualUiTaskFamilyAcceptance": false,
+  "sameTaskRowDynamicPointerProven": false,
+  "scope": "public seed request/response source preflight only",
+  "artifacts": {
+    "task-family-preflight-evidence/run.py": "79d3d03d8fb790d2e8b59238e2846d6204b556d8890572b34657f11a0843b50e",
+    "task-family-preflight-evidence/run.log": "93f6b6535711cb18974207ae23d092f3ff47d1be55d2204d41a4dc4ec1ae8e3b",
+    "task-family-preflight-evidence/task_family_fixture.executed.py": "48df5302f1db0108e85efd9f57295455da5efe94b620676a02df0687e714e29c",
+    "task-family-preflight-evidence/source-sha256.json": "bf591395c124deabc660821c30b094774acb9314823efdaabd8e1280c459e455",
+    "task-family-preflight-evidence/execution.json": "5fe941e463c829e4981a972eda50c1ebd2896bde98e7069daf9a06d76b91755a",
+    "task-family-preflight-evidence/actual/native-commands.json": "f5dab761b5085668accecd6321d684787c5867e4402b92044fc674b1d4ad1bef",
+    "task-family-preflight-evidence/actual/pi-commands.json": "de61faa1b59114617a44ab073d1d0d4ecc174e8edbe2a8aab949e6ec6a9b9d77",
+    "task-family-preflight-evidence/actual/dsh-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "task-family-preflight-evidence/actual/dsh-commands.json": "0c551c1e461cc0b359ad04815c48e2fcb5b8300cfcbd6628b1cd8e8bda1318f5",
+    "task-family-preflight-evidence/actual/native-stdout.jsonl": "c5aaaf6f9bd8721987c89987073663cc92480a4a190f75eb413e5ed51969d987",
+    "task-family-preflight-evidence/actual/pi-stdout.jsonl": "9ea5790abd65465228e96f1bc6a7ad9d301016ed0e92f0bcd6b7b70f9dd9de9d",
+    "task-family-preflight-evidence/actual/native-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "task-family-preflight-evidence/actual/dsh-stdout.jsonl": "921ae0c671d09c98fa4bc7e9e76c1e44843b9b47d76587e92e51949cb9e15d63",
+    "task-family-preflight-evidence/actual/dsh-manifest.json": "3133645fbce7c1b524608f21537afd6e8d482a02837151f85c56038afeedf4ef",
+    "task-family-preflight-evidence/actual/native-manifest.json": "c1cbf84386f9c78f3e1561076e91deca8a0bbbc30820b8f24f42ea67785c3841",
+    "task-family-preflight-evidence/actual/pi-manifest.json": "5052228cafae92516dd9e495c5f172e32983acb1bce78b44d223a30c1d6fd27b",
+    "task-family-preflight-evidence/actual/kernel-launch.json": "7cfad6d848b7559bcd1867e37ed4ffaddcb71e75269f9e8af03b982a3d35ea29",
+    "task-family-preflight-evidence/actual/pi-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "task-family-preflight-evidence/actual/dsh-home/.credentials.yaml": "b2d760a4a3f273f5be9acd62231d807d7b9cd5f0ded10912324a9fbbdca418d3",
+    "task-family-preflight-evidence/actual/pi-data/agentkit-reading.mjs": "aa2731ebfcc95abded1b3c79a87e846b4de49f19b70ba03d1fcd247268e83d0d",
+    "task-family-preflight-evidence/actual/pi-data/agentkit-sessions.json": "0ab92da6e8a885333e055b415e06a6480ee28bc1d34dc645fe565f73b5149f40",
+    "task-family-preflight-evidence/actual/pi-data/agentkit-control.mjs": "6cb7057f97117f278a3dcd25a7be73a13e6a52fb2ac7635d9bb49e01cdd49a35",
+    "task-family-preflight-evidence/actual/pi-data/.agentkit.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "task-family-preflight-evidence/actual/dsh-data/version-probe.mjs": "3236f5eb678eeead02fc8e6a6380b569a39599bc4fce3bee961587349076e1bc",
+    "task-family-preflight-evidence/actual/dsh-data/dsh.patch.yml": "559dc7146726269474eac06c77806ea6ad80da41359f079e4cc84111ed493eb0",
+    "task-family-preflight-evidence/actual/kernel/.rewrite.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "task-family-preflight-evidence/actual/kernel/.create.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "task-family-preflight-evidence/actual/kernel/.execution-quiescence-eaa116ed89de0a71b30e9611fef15c08f4a33017bee3632c6db7311150e56e27.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "task-family-preflight-evidence/actual/kernel/.thread-catalog.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "task-family-preflight-evidence/actual/dsh-home/storages/workspace.json": "8332e072a55f6c6ac287e41ac1a57640d630c2143cd55eeba907a3a33fb3240e",
+    "task-family-preflight-evidence/actual/dsh-home/storages/session_projcache/sessions/session-551fd21b-e6de-4f81-8265-570b87144efd.json": "a9fa447cce47a9a50ddb6cf3e9be96e357f471fa17ded4028ad9e9ed28b0cc2c",
+    "task-family-preflight-evidence/actual/dsh-home/storages/session_projcache/sessions/0d203e88-9adb-449d-99a9-e920a2a7d9c6.json": "9ea99fcfa9d22d41e39641b6067931ebbdc0b3751e1456c0ca1706e9fd6538af",
+    "task-family-preflight-evidence/actual/dsh-home/profiles/web/cordis.patch.yml": "7732b3aedc0624c6fb3a9df1d86efe618617f4ac486f7e58cf31040aeb4a6354",
+    "task-family-preflight-evidence/actual/dsh-home/profiles/web/package.json": "210068ddb9ebc4cdf395ebb53020be6ccaaedb917e74dae16296d62394626398",
+    "task-family-preflight-evidence/actual/dsh-home/profiles/web/cordis.yml": "ac7102c973b7e8af09824d4b03c5b9cd169826f4c2ae2c5ed4b9377934b99c15",
+    "task-family-preflight-evidence/actual/dsh-home/profiles/web/pnpm-workspace.yaml": "ae7c5b68e2f157528e62885804e69e88583897b775e03c86fcbe52feaf498aba",
+    "task-family-preflight-evidence/actual/pi-home/jiti/pi-data-agentkit-control.0e0d0b21.mjs": "7c6daab6ecfe2e4420af49dbf799e2e0abf043396a6fe5590738121d29b6e779",
+    "task-family-preflight-evidence/actual/pi-home/node-compile-cache/v24.20.0-arm64-964aae3f-501/6775ed5e": "ee7ae87bcce93aff89df39265da3a0114a0f92045be3311761bdabe25bbd254f",
+    "task-family-preflight-evidence/actual/pi-home/node-compile-cache/v24.20.0-arm64-964aae3f-501/7d9d3b53": "0defdd14a0ab38694caa6a59f85a258cef46f2a6d03cbdeb0bfbbc013725faa7",
+    "task-family-preflight-evidence/actual/pi-home/node-compile-cache/v24.20.0-arm64-964aae3f-501/73c9e0d9": "e4f5ce342ce1d1f5491b8f9fa8a173afa4ef724a5214e640b3625b04b0800ad0",
+    "task-family-preflight-evidence/actual/pi-home/node-compile-cache/v24.20.0-arm64-964aae3f-501/525d6d09": "3521568e5a884f9cc7a94d52e633567c4a33a9a27d7319e168ec3628a1910498",
+    "task-family-preflight-evidence/actual/pi-home/node-compile-cache/v24.20.0-arm64-964aae3f-501/c4ea9b72": "887be8ed06bd98c44aca3d8f204c306e988a4fcca85b0e89ad15e8aa8133acb0",
+    "task-family-preflight-evidence/actual/pi-home/node-compile-cache/v24.20.0-arm64-964aae3f-501/b3adcb71": "a8ad71fd35b258cd2647d4e79bbc4886b36fd5e06abd6be4c3fc0bcafd835361",
+    "task-family-preflight-evidence/actual/pi-home/node-compile-cache/v24.20.0-arm64-964aae3f-501/1e9c0ccc": "8cde2d875767f2306af5c6e8fa9c0276da7a4cf0540582ef0ea7e80e9078d150",
+    "task-family-preflight-evidence/actual/pi-home/node-compile-cache/v24.20.0-arm64-964aae3f-501/90c0e952": "cdb85b6aa456baea979419ee13fbbbb9db7bed2394c49154da43ea65b8e89e13",
+    "task-family-preflight-evidence/actual/pi-home/node-compile-cache/v24.20.0-arm64-964aae3f-501/993ab3c6": "f5a99b807c2e0edbb549e94f9747e749035ee697d9e21d4f841e43c73fc04dac",
+    "task-family-preflight-evidence/actual/pi-home/node-compile-cache/v24.20.0-arm64-964aae3f-501/1fdb0ff9": "10f6d2f8391c99d877a4801eb4cf0c33ad3c0f5983f73e07b15093df975362ad",
+    "task-family-preflight-evidence/actual/pi-home/node-compile-cache/v24.20.0-arm64-964aae3f-501/387b7a5d": "173178fb4d0333f39ca99b9bbf26108e2557b0c93160d4db58f58f2271350f81",
+    "task-family-preflight-evidence/actual/pi-home/node-compile-cache/v24.20.0-arm64-964aae3f-501/b81f9dc3": "e2f11174f65c48320b893b9ab08685439146c633e5edc0a145143b30804e250b",
+    "task-family-preflight-evidence/actual/pi-home/node-compile-cache/v24.20.0-arm64-964aae3f-501/7dfd4ebb": "a8e242ae3a6a64aba57fb3905810888c0d55c120eafab707512486deaaf391d0",
+    "task-family-preflight-evidence/actual/pi-home/node-compile-cache/v24.20.0-arm64-964aae3f-501/8e5ed55e": "d6fe8dcd0d74010eab7f64c632372cad16bb04739829cbb40c24404e89b0ce98",
+    "task-family-preflight-evidence/actual/pi-home/node-compile-cache/v24.20.0-arm64-964aae3f-501/56fe0114": "3332822c4b7b8d49a75adfe7c943e4d446f3299770ae0fd1dda8c6c697f15856",
+    "task-family-preflight-evidence/actual/pi-home/node-compile-cache/v24.20.0-arm64-964aae3f-501/d4137812": "4d50ca4e98f6c3b3ce999e496ad43df5ba4c59abc79b89e49a17726bcb90e942",
+    "task-family-preflight-evidence/actual/pi-home/node-compile-cache/v24.20.0-arm64-964aae3f-501/16fad54c": "6946d143c7cf0436adbd7ad5629f3e132653889f14d1e2c1204e9918e97da83c",
+    "task-family-preflight-evidence/actual/pi-home/node-compile-cache/v24.20.0-arm64-964aae3f-501/c6e5d198": "70c4a071710cf7109aade872545d079fe54717c658a4bd510b183d3c4d0402ef",
+    "task-family-preflight-evidence/actual/pi-home/node-compile-cache/v24.20.0-arm64-964aae3f-501/f77446a5": "f7af2c40301acf50e9afd58552e6e32252738e5b218e8946c6b64218cd89eb1f",
+    "task-family-preflight-evidence/actual/pi-data/agent/models.json": "f7bf260cba0069302d5df8e1900d0165260fed2c831fd222c11b10091baba859",
+    "task-family-preflight-evidence/actual/pi-data/agent/models-store.json": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+    "task-family-preflight-evidence/actual/pi-data/agent/auth.json": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+    "task-family-preflight-evidence/actual/pi-data/sessions/32239bcc-af0d-4ffc-9226-e5e9cfadf836.jsonl": "065096094a5ac030c34318d8fbe87e0d57b4257fadedefa86484417c2cd79bfe",
+    "task-family-preflight-evidence/actual/pi-data/sessions/dbcfc572-eeec-4fc2-bfbb-7863d8cb891f.jsonl": "91417401a50d8c392fd519346ad7a1fff9a540607c26f322d179ee247b70242c",
+    "task-family-preflight-evidence/actual/pi-data/sessions/48a64686-db40-4597-9fd8-15948b5bdfbc.jsonl": "a334fa5c81c7f0c1cce2745493020749a1e57cfdd5fcc824f36b111eac6840f8",
+    "task-family-preflight-evidence/actual/tmp/node-addon-native-custom-loader-501/native-cache/node-addon-require-builtin-darwin-arm64/0.1.9/darwin-arm64/darwin-arm64-napi-v9.node": "93947abf5edc337b9b2b20267e1b99a26a3a5616dc857f1c2b67122d0057c752",
+    "task-family-preflight-evidence/actual/dsh-data/dsh-sessions/--Volumes-HP~0020P900-dev-TekesAgentKit-.runtime-fixtures-real-multi-sidebar-20261024-task-family-preflight-evidence-actual-workspace--/0d203e88-9adb-449d-99a9-e920a2a7d9c6/session.v4.jsonl": "f4720f2b634932f346d24be1127c39ef0ae93591efa3cfe898f61e3c6f04714e",
+    "task-family-preflight-evidence/actual/dsh-data/dsh-sessions/--Volumes-HP~0020P900-dev-TekesAgentKit-.runtime-fixtures-real-multi-sidebar-20261024-task-family-preflight-evidence-actual-workspace--/0d203e88-9adb-449d-99a9-e920a2a7d9c6/session.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "task-family-preflight-evidence/actual/dsh-data/dsh-sessions/--Volumes-HP~0020P900-dev-TekesAgentKit-.runtime-fixtures-real-multi-sidebar-20261024-task-family-preflight-evidence-actual-workspace--/session-551fd21b-e6de-4f81-8265-570b87144efd/session.v4.jsonl": "7f858176431ff132b0d84aa02b39e7f79b4780225925c4c97fe8aea18b5252d5",
+    "task-family-preflight-evidence/actual/dsh-data/dsh-sessions/--Volumes-HP~0020P900-dev-TekesAgentKit-.runtime-fixtures-real-multi-sidebar-20261024-task-family-preflight-evidence-actual-workspace--/session-551fd21b-e6de-4f81-8265-570b87144efd/session.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "task-family-preflight-evidence/actual/kernel/config/.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "task-family-preflight-evidence/actual/kernel/config/settings.json": "5f5e6da6e5c21c95866095e2c6be1a497f741a99e293b2caf8aba1919f654369",
+    "task-family-preflight-evidence/actual/kernel/config/providers.json": "b2207c3b3b4f51cd228e2ed381918c0cd29c5890960a524923ab16ed679f7516",
+    "task-family-preflight-evidence/actual/kernel/threads/.root-lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "task-family-preflight-evidence/actual/kernel/session-operations/lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "task-family-preflight-evidence/actual/kernel/endpoint-rpc/rpc.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "task-family-preflight-evidence/actual/kernel/threads/2c24bdbb-c566-4423-bede-b3348d786f69/f05592fa-4597-53da-a6df-4b2315d108a2.jsonl": "6a1367da4e9e553ae8390a842246900a0a75222c08b0cbf28a800e66dc0eb353",
+    "task-family-preflight-evidence/actual/kernel/threads/2c24bdbb-c566-4423-bede-b3348d786f69/context-usage.projection.json": "c8a10e6755be0bd2278e26d6b0837307a333356ea5ea7e0906ee1a382d2b4fc1",
+    "task-family-preflight-evidence/actual/kernel/threads/2c24bdbb-c566-4423-bede-b3348d786f69/endpoint.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "task-family-preflight-evidence/actual/kernel/threads/2c24bdbb-c566-4423-bede-b3348d786f69/thread-card.json": "a1077834e088b57da1235b87de0a095520dff514426981e43a303cfd507eb203",
+    "task-family-preflight-evidence/actual/kernel/threads/2c24bdbb-c566-4423-bede-b3348d786f69/session-settings.json": "1d9a27a54a1235ca0e421e611fad7348ea497542cf794b5057e52d8f466c19d1",
+    "task-family-preflight-evidence/actual/kernel/threads/2c24bdbb-c566-4423-bede-b3348d786f69/main.jsonl": "984e5de12e2c3d154591cc49bb43ab37430d7f89f62ee4ab782dc980b736d17c",
+    "task-family-preflight-evidence/actual/kernel/threads/2c24bdbb-c566-4423-bede-b3348d786f69/permission-mode.json": "575d57fb3226557e1cae1edf7548c0c480327338f1e8a1f3071e65996489e6b4",
+    "task-family-preflight-evidence/actual/kernel/threads/2c24bdbb-c566-4423-bede-b3348d786f69/endpoint.jsonl": "d0028993c51e775ec3edb46982d7db1536dd84e93d7389af43f9f1d9c43a7bc4",
+    "task-family-preflight-evidence/actual/kernel/threads/2c24bdbb-c566-4423-bede-b3348d786f69/assets/sha256-09778747fa433faf5920f21c29ce360da5052fb78061cd9a239a69cee222cafa": "09778747fa433faf5920f21c29ce360da5052fb78061cd9a239a69cee222cafa",
+    "task-family-preflight-evidence/actual/kernel/threads/2c24bdbb-c566-4423-bede-b3348d786f69/assets/sha256-dd1234855071582a268ed4f72eed4d706c4c9d0ae13cd428406ae3497eaa0c4e": "dd1234855071582a268ed4f72eed4d706c4c9d0ae13cd428406ae3497eaa0c4e",
+    "task-family-preflight-evidence/actual/kernel/threads/2c24bdbb-c566-4423-bede-b3348d786f69/assets/sha256-86d141fc7fdb6ff9fe90dc65ddb0cfae0600ee94d764f7440e9156dc2afd12e4": "86d141fc7fdb6ff9fe90dc65ddb0cfae0600ee94d764f7440e9156dc2afd12e4",
+    "task-family-preflight-evidence/actual/kernel/threads/2c24bdbb-c566-4423-bede-b3348d786f69/assets/sha256-f6944f80f196e14e26848bb7d222d02851a7c7c0f143b5078b640fddddb99f63": "f6944f80f196e14e26848bb7d222d02851a7c7c0f143b5078b640fddddb99f63",
+    "task-family-preflight-evidence/actual/kernel/threads/2c24bdbb-c566-4423-bede-b3348d786f69/assets/sha256-6736b938e1284a7962f67b68009fa5f1548dc2f658226e93f58ad3a79d314213": "6736b938e1284a7962f67b68009fa5f1548dc2f658226e93f58ad3a79d314213",
+    "task-family-preflight-evidence/actual/kernel/threads/2c24bdbb-c566-4423-bede-b3348d786f69/assets/sha256-623e6f09b5ff808faf3b5ab4089a7657903f1fd5251020df844e2a838fbe8550": "623e6f09b5ff808faf3b5ab4089a7657903f1fd5251020df844e2a838fbe8550",
+    "task-family-preflight-evidence/actual/kernel/threads/2c24bdbb-c566-4423-bede-b3348d786f69/assets/sha256-fc276d5aa769a99786c340c77955f96392d0c8415d7f9155af1b08a79f4e84e8": "fc276d5aa769a99786c340c77955f96392d0c8415d7f9155af1b08a79f4e84e8",
+    "task-family-preflight-evidence/actual/kernel/threads/2c24bdbb-c566-4423-bede-b3348d786f69/assets/sha256-7c8df406cdf58f93911cd15a5436c06cb47fcbfcb5b242e3813f2c8a46e3669f": "7c8df406cdf58f93911cd15a5436c06cb47fcbfcb5b242e3813f2c8a46e3669f",
+    "task-family-preflight-evidence/actual/kernel/threads/2c24bdbb-c566-4423-bede-b3348d786f69/assets/sha256-c78c9addd1334e86a807c72fb37c35413055edbbd846642890949751f33158f0": "c78c9addd1334e86a807c72fb37c35413055edbbd846642890949751f33158f0",
+    "task-family-preflight-evidence/actual/kernel/threads/2c24bdbb-c566-4423-bede-b3348d786f69/assets/sha256-08f485bac0fde02fa900a70499c7b6d78ebf3ac56c9fb49178cdd8c4efbbe090": "08f485bac0fde02fa900a70499c7b6d78ebf3ac56c9fb49178cdd8c4efbbe090",
+    "task-family-preflight-evidence/actual/kernel/threads/2c24bdbb-c566-4423-bede-b3348d786f69/assets/sha256-85139d108515f1cf169acd4edda653762918960edf63d85b747fb83797afb1bb": "85139d108515f1cf169acd4edda653762918960edf63d85b747fb83797afb1bb",
+    "task-family-preflight-evidence/actual/kernel/threads/2c24bdbb-c566-4423-bede-b3348d786f69/assets/sha256-56080192586ff0f26546abe27ee367e4ba6d0d10df18f2a5634c0985e4d9ca47": "56080192586ff0f26546abe27ee367e4ba6d0d10df18f2a5634c0985e4d9ca47",
+    "task-family-preflight-evidence/actual/kernel/threads/2c24bdbb-c566-4423-bede-b3348d786f69/assets/sha256-a6dfd43ffc6769b8ee8410afe2ca8ab8965d8df87f411d62f6f839692c859849": "a6dfd43ffc6769b8ee8410afe2ca8ab8965d8df87f411d62f6f839692c859849",
+    "task-family-preflight-evidence/actual/kernel/threads/2c24bdbb-c566-4423-bede-b3348d786f69/assets/sha256-cf93929514dd69d0f07d4f4bbf2b48aed0e1fa03355c5db27c94fdc1bf803c43": "cf93929514dd69d0f07d4f4bbf2b48aed0e1fa03355c5db27c94fdc1bf803c43",
+    "task-family-preflight-evidence/actual/kernel/threads/2c24bdbb-c566-4423-bede-b3348d786f69/assets/sha256-a2aafab407d92b4e002033f73c122ead78e37364f8f669a31478627c07ff0611": "a2aafab407d92b4e002033f73c122ead78e37364f8f669a31478627c07ff0611",
+    "task-family-preflight-evidence/actual/kernel/threads/2c24bdbb-c566-4423-bede-b3348d786f69/control/.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "task-family-preflight-evidence/actual/kernel/threads/2c24bdbb-c566-4423-bede-b3348d786f69/control/54/545b4f49ac2848e49e820b40f5aaa9a2b881b64c034276f2729017a3d89f4a87.json": "0730925e2b965bf342a79db211a82e26768bf7724f2bc4a48a281adf0526b92a",
+    "task-family-preflight-evidence/actual/kernel/session-operations/operations/d8/d8835e79ec5c5799a93213314d5026046d40106e034e119f4ca560936bf74197.json": "30914c5321914717f884eb7fbaac14c185e5fb29304451a1c5868cefe7d6d4f9",
+    "task-family-preflight-evidence/actual/kernel/session-operations/operations/2c/2cf6fcf75e3968d073f4df658c7ca7c13d76e1c86c4df313742470d9ca261f77.json": "4f3164b25e86afc554acacf85753d0992a4ea0cf65e3ca1543993f06e6027885",
+    "task-family-preflight-evidence/actual/kernel/session-operations/operations/d8/d8835e79ec5c5799a93213314d5026046d40106e034e119f4ca560936bf74197/payload/genesis.json": "ee24efc884a7e2b2692f24fa124dcda1508b65c1082c609b036741191fffdb53",
+    "task-family-preflight-evidence/actual/kernel/session-operations/operations/d8/d8835e79ec5c5799a93213314d5026046d40106e034e119f4ca560936bf74197/payload/assets/sha256-86d141fc7fdb6ff9fe90dc65ddb0cfae0600ee94d764f7440e9156dc2afd12e4": "86d141fc7fdb6ff9fe90dc65ddb0cfae0600ee94d764f7440e9156dc2afd12e4",
+    "task-family-preflight-evidence/actual/kernel/session-operations/operations/d8/d8835e79ec5c5799a93213314d5026046d40106e034e119f4ca560936bf74197/payload/assets/sha256-85139d108515f1cf169acd4edda653762918960edf63d85b747fb83797afb1bb": "85139d108515f1cf169acd4edda653762918960edf63d85b747fb83797afb1bb",
+    "task-family-preflight-evidence/actual/kernel/session-operations/operations/2c/2cf6fcf75e3968d073f4df658c7ca7c13d76e1c86c4df313742470d9ca261f77/payload/session-settings.json": "1d9a27a54a1235ca0e421e611fad7348ea497542cf794b5057e52d8f466c19d1",
+    "task-family-preflight-evidence/actual/kernel/endpoint-rpc/rpc/d8/d8835e79ec5c5799a93213314d5026046d40106e034e119f4ca560936bf74197.jsonl": "1fca752b6465b5a57b7e8a32817da4575a9753afdd618f4349aa5eedcc78b512",
+    "task-family-preflight-evidence/actual/kernel/endpoint-rpc/rpc/96/96cafb8299754af5da32272cae8ef638ac41670ee2de6f9ff361443f455001db.jsonl": "447bf056998a5c4b811084649b3c93b72267569082732185f5b51fdfd1362d95",
+    "task-family-preflight-evidence/actual/kernel/endpoint-rpc/rpc/2c/2cf6fcf75e3968d073f4df658c7ca7c13d76e1c86c4df313742470d9ca261f77.jsonl": "7e4fbe8e476c36adbaf6116b866caed86c3087249deb6c79f51b52d5cb6042b9",
+    "task-family-preflight-evidence/actual/kernel/endpoint-rpc/rpc/49/490ec23f6a0c93e1da551e12bd618c9832281fe4c26d4aa49a1c4eaec14f6422.jsonl": "b7de7487fdcb081b78ca49b8ac8aa37a3251349900470be76ac795ff2e8bd39b",
+    "task-family-preflight-evidence/actual/kernel/endpoint-rpc/rpc/40/40c156ed9e4a342b327bb7a71878e16836a1ebe818602eee7fc6fe2a0b9c7765.jsonl": "a71ac6104e2030edbc5a98d8ba52c2dfa37689eefa3153bb05671f6680b1a2d6"
+  },
+  "notVerified": [
+    "same demo Task/ChildPaneBinding original intent/dispatch/mount",
+    "controlled late result/A-B-A family navigation",
+    "same Task row dynamic pointer producer",
+    "window/chrome, physical IME, AX, ProcessContainer"
+  ]
+}

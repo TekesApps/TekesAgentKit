@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased — experimental Rust Agent UI
+
+- Add explicit tool-report vocabulary and complete-delta precedence helpers. Scope external tool formatting to the original RunScope; section callbacks now also receive that scope. Current SEP DTOs remain unchanged and do not infer reports from opaque metadata. Default count rendering and continuous groups remain open.
+- Mount independent tool Input/Output/view-JSON fields with original SDK controls and per-section captured copy intents. Retain text owners, retire changed/old copy targets, and forward copies through Transcript/RunPort during Composer preedit. Structured-tool body IDs now identify groups; use `tool_detail_sections()` for text IDs. Existing single-text callbacks remain an explicit opt-out.
+- Share ordered tool Input/Output/view-JSON section facts and consume them in default details without replacing text owners. Distinguish absent and delivered-empty results; preserve structured-error summaries without a message body. Independent section layout remains unfinished.
+- Add opt-in bounded reasoning/tool details using original SDK text owners; retain inline defaults pending TekesUI #53. Add a strict nested-reading consumer gate with the current failure preserved.
+
+- Expose typed tool-card facts and shared textual-result extraction; correct legacy shell exit-marker display and canonical meta-failure fallback through the actual ClientKit projector/View bridge. Rich card rendering remains open.
+
+- Add shared collapsed tool-row selection for progress, action/report, explicit-error and stopped summaries; original embedded and independent disclosures retain their text owners and full details.
+
+- Fence journal tools at turn closure so late unowned results cannot overwrite sealed history; retain result-only paging and explicit new-call admission.
+
+- Correct journal tool settlement for all content error markers, signals, timeouts and public result views; preserve raw result metadata/error in optional backward-readable fields without changing turn settlement.
+- Reusable Agent business components and original-binding host integration remain experimental; see the [delivery gates](docs/rust-agent-ui-delivery-status.md).
+- Add the read-only `TranscriptToolCall::presentation_title` selection for formal producer views; embedded and independent tool disclosures consume the same facts and SDK single-line labels.
+- Shared additions on this branch are not part of the immutable v0.3.8 contract, even while the workspace version field remains 0.3.8. UI packages remain 0.0.0 / publish=false; full tool rows/cards, native/IME and ProcessContainer acceptance remain open.
+
+## 0.3.8 — 2026-10-19
+
+- Preserve the original worker launch notice and derive recovery only from a later durable turn start in the same session, including restored history.
+- Expose the same shared presentation status to Web hosts; validate replay through a second public-API consumer alongside workspace, renderer and boundary checks.
+
 ## 0.3.7 — 2026-10-19
 
 - Expose completed-turn footnote actions through the shared session view and existing thread action contract.

@@ -1,0 +1,110 @@
+{
+  "baseline": "78b7392b0ef9f5109911abeea8aa71a69c55cbf2",
+  "issue": 16,
+  "acceptedScope": "public RunBinding inline images / real owned harnesses / synthetic loopback providers / public history reconnect",
+  "accepted": true,
+  "endpoints": {
+    "native": {
+      "requestCount": 2,
+      "wireRequestCount": 2,
+      "auxiliaryRequests": [],
+      "imageMimes": [
+        "image/png",
+        "image/png"
+      ],
+      "inputSha256": "c47dd9465c00e9a0c8b85e9ea58d3034a0d23b9cf926113602f3460752a4eb96",
+      "providerSha256": [
+        "c47dd9465c00e9a0c8b85e9ea58d3034a0d23b9cf926113602f3460752a4eb96",
+        "c47dd9465c00e9a0c8b85e9ea58d3034a0d23b9cf926113602f3460752a4eb96"
+      ],
+      "normalizedFromOriginal": [
+        false,
+        false
+      ],
+      "publicByteRead": true,
+      "reconnectEpochs": {
+        "epochBefore": 2,
+        "epochAfter": 5
+      }
+    },
+    "pi": {
+      "requestCount": 2,
+      "wireRequestCount": 2,
+      "auxiliaryRequests": [],
+      "imageMimes": [
+        "image/png",
+        "image/png"
+      ],
+      "inputSha256": "c47dd9465c00e9a0c8b85e9ea58d3034a0d23b9cf926113602f3460752a4eb96",
+      "providerSha256": [
+        "c47dd9465c00e9a0c8b85e9ea58d3034a0d23b9cf926113602f3460752a4eb96",
+        "c47dd9465c00e9a0c8b85e9ea58d3034a0d23b9cf926113602f3460752a4eb96"
+      ],
+      "normalizedFromOriginal": [
+        false,
+        false
+      ],
+      "publicByteRead": true,
+      "reconnectEpochs": {
+        "epochBefore": 2,
+        "epochAfter": 5
+      }
+    },
+    "dsh": {
+      "requestCount": 2,
+      "wireRequestCount": 3,
+      "auxiliaryRequests": [
+        {
+          "kind": "first-prompt-title"
+        }
+      ],
+      "imageMimes": [
+        "image/png",
+        "image/png"
+      ],
+      "inputSha256": "c47dd9465c00e9a0c8b85e9ea58d3034a0d23b9cf926113602f3460752a4eb96",
+      "providerSha256": [
+        "c47dd9465c00e9a0c8b85e9ea58d3034a0d23b9cf926113602f3460752a4eb96",
+        "c47dd9465c00e9a0c8b85e9ea58d3034a0d23b9cf926113602f3460752a4eb96"
+      ],
+      "normalizedFromOriginal": [
+        false,
+        false
+      ],
+      "publicByteRead": false,
+      "reconnectEpochs": {
+        "epochBefore": 2,
+        "epochAfter": 5
+      }
+    }
+  },
+  "sourceInputs": 542,
+  "providerImagePromptCount": 6,
+  "providerTotalWireRequests": 7,
+  "tests": {
+    "python": 274,
+    "newProviderObserver": 10,
+    "dshFixture": 11,
+    "strictDemoClippyAllTargets": true,
+    "exampleBuild": true
+  },
+  "sdkPin": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "newTarget": false,
+  "deletedCacheBytes": 0,
+  "notRun": [
+    "mixed file+image real three-endpoint sends",
+    "real paid model image understanding",
+    "system picker/paste/dragdrop",
+    "bitmap UI preview",
+    "desktop/physical IME/OS AX/GPU acceptance",
+    "real three-endpoint JPEG/GIF/WebP and large-image normalization"
+  ],
+  "blockedSDKIssues": [
+    53,
+    117
+  ],
+  "merged": false,
+  "release": false,
+  "sourceArchive": ".runtime-fixtures/inline-image-live-20261025/final-reviewed-tested-source/",
+  "runtimeReceipt": ".runtime-fixtures/inline-image-live-20261025/final-reviewed/run-receipt.json"
+}

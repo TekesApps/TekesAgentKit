@@ -1,0 +1,203 @@
+{
+  "format": "agentkit-padding-ime-receiver/1",
+  "verified_at_utc": "2026-10-21T01:40:54.772813+00:00",
+  "based_on": "1480c753370d5237c1d81762c7ed440856265988",
+  "published_contract": "v0.3.8",
+  "default_pin": "8cf0840790334ba224afc0595897c74231c712e6",
+  "candidate_identity": "a30b18db1a1df1f5a780c245080b22221a63cb20556f7274b76786d4d896584e",
+  "candidate_files": 497,
+  "archive_sha256": "54b217691907389a0f9bc51bc8cafae4d54151dd2c491f32df7af5eaf25ded9e",
+  "source_and_prior_candidate_unchanged": true,
+  "receiver_recipe": {
+    "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-padding-intent-receiver-a30b18/receipt.json",
+    "sha256": "4c2bf65fe41a7b8b02dfb533597514c0ae8b1bc811169ccf8a23ffb4926e2248"
+  },
+  "checks": [
+    {
+      "check": "sdk-controls-text",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--manifest-path",
+        "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/tekesui-padding-intent-a30b18db1a1d/source/Cargo.toml",
+        "--locked",
+        "--offline",
+        "-p",
+        "tekes-ui-controls",
+        "-p",
+        "tekes-ui-text"
+      ],
+      "log": "/tmp/agentkit-padding-intent-sdk-controls-text.log",
+      "exit_code": 0
+    },
+    {
+      "check": "sdk-public-consumer",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--manifest-path",
+        "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/tekesui-padding-intent-a30b18db1a1d/source/examples/composition-consumer/Cargo.toml",
+        "--locked",
+        "--offline"
+      ],
+      "log": "/tmp/agentkit-padding-intent-sdk-public-consumer.log",
+      "exit_code": 0
+    },
+    {
+      "check": "default-host",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--manifest-path",
+        "/Users/frankqin/dev/TekesAgentKit/ui/Cargo.toml",
+        "--locked",
+        "--offline",
+        "-p",
+        "tekes-agent-ui-demo",
+        "--test",
+        "component_demo",
+        "--test",
+        "run_column"
+      ],
+      "log": "/tmp/agentkit-padding-intent-default-host.log",
+      "exit_code": 0
+    },
+    {
+      "check": "default-clippy",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "clippy",
+        "--manifest-path",
+        "/Users/frankqin/dev/TekesAgentKit/ui/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "log": "/tmp/agentkit-padding-intent-default-clippy.log",
+      "exit_code": 0
+    },
+    {
+      "check": "candidate-workspace",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "--manifest-path",
+        "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-padding-intent-receiver-a30b18/agentkit/ui/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--workspace"
+      ],
+      "log": "/tmp/agentkit-padding-intent-candidate-workspace.log",
+      "exit_code": 0
+    },
+    {
+      "check": "candidate-clippy",
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "clippy",
+        "--manifest-path",
+        "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-padding-intent-receiver-a30b18/agentkit/ui/Cargo.toml",
+        "--locked",
+        "--offline",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "log": "/tmp/agentkit-padding-intent-candidate-clippy.log",
+      "exit_code": 0
+    }
+  ],
+  "counts": {
+    "sdk-controls-text": 438,
+    "sdk-public-consumer": 250,
+    "default-host": 18,
+    "candidate-workspace": 374
+  },
+  "subsets": {
+    "run_rail_start_padding_and_host": 22,
+    "actual_wrapper": 1,
+    "agentkit_public_consumer": 35
+  },
+  "native": {
+    "binary": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-padding-intent-receiver-a30b18/native-demo",
+    "binary_sha256": "80bee0708a08f783c514a01f8b43644dbf8f6765930d3bfe752f2adc2abf95c8",
+    "command": [
+      "--components",
+      "--transcript-content",
+      "--native-selftest"
+    ],
+    "exit_code": 0,
+    "log": "/tmp/agentkit-padding-intent-receiver-a30b18-native.log",
+    "log_sha256": "d84f9e34671596e2d153ddaf3ae8ef01561d98e5c185481a606b3748f64eb9aa",
+    "actual_same_editor_padding_dispatches": 2,
+    "main_selected_utf16": [
+      1,
+      3
+    ],
+    "main_marked_utf16": [
+      0,
+      4
+    ],
+    "sidechat_selected_utf16": [
+      14,
+      16
+    ],
+    "sidechat_marked_utf16": [
+      13,
+      17
+    ],
+    "original_mount_baseline_and_marked_preserved": true,
+    "screen": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-padding-intent-receiver-a30b18/native-sidechat.png",
+    "screen_sha256": "b064f5226cebeb7e2f531be4f987f9e6ca6f76b4d8333793c17b2c32e22100ac",
+    "screen_inspected": true,
+    "physical_ime": false,
+    "real_harness": false,
+    "reading_anchor": false,
+    "voiceover": false
+  },
+  "source_files": {
+    "docs/rust-agent-ui-padding-ime-20261021.md": "aea9ecfb7077195ae8f625a515f8d735c459462961cfe8f2c00a4dcf0495235e",
+    "docs/tekesui-gaps.md": "c5865984fa2a5e5b7c7e29206a21cbbb91af6bb21875b989592a386207b21678",
+    "docs/tekesui-integration-contract.md": "878b2c318d59e51f1989b321644f492cf2f63be2175d086e06fa63d4011036f8",
+    "scripts/probes/agentkit-composer-padding-intent-candidate.rs": "4a8cf96b8c8bac484f15d39b9247213f936f6353ff292099e0703fe32be66038",
+    "scripts/test-reading-candidate.py": "d7a339cc171654f878b9a2d5086b84bffc929628ebdb41a681d948036e4db96e",
+    "ui/demo/src/component_demo.rs": "0071d0650e2970fffc78d6b3c467982a603c925597aee74abe21f560994c1e09"
+  },
+  "cleanup": {
+    "receipt": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/build-cache-cleanup-padding-intent-20261021.json",
+    "sha256": "9750b510f0f31d4d3052b84c87e94aa1620959db667949458885df6e50fb0079",
+    "files": 133,
+    "freed_allocated_bytes": 255287296,
+    "new_targets": 0
+  },
+  "public_pin_promoted": false,
+  "issue34_closed": false,
+  "goal_complete": false,
+  "remaining": [
+    "physical IME and candidate window",
+    "real three-harness UI paging/reading",
+    "rich selectable Transcript and remaining Views",
+    "rail ring pixels/VoiceOver/continuous experience",
+    "public exact SDK pin and final product review/CI/merge/tag"
+  ],
+  "default_inputs": {
+    "commit": "8cf0840790334ba224afc0595897c74231c712e6",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 199,
+    "sha256": "f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f",
+    "ui_packages": 8
+  }
+}

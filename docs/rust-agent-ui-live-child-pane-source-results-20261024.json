@@ -1,0 +1,225 @@
+{
+  "schemaVersion": 1,
+  "baseCommit": "04481a71661da43fd12b188cd02199f0c20d8639",
+  "issues": [
+    17,
+    23,
+    27
+  ],
+  "pullRequest": 10,
+  "scope": "real-independent-child-pane-original-source",
+  "referenceCommits": {
+    "ClientKit": "c289bc9d33edcd83a782ac17927a8c65a027eccd",
+    "Tekes": "8858ccd9d46590852ec7a0949aee289fc6798d70"
+  },
+  "tekesUiPin": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "profiles": {
+    "pi": {
+      "accepted": true,
+      "evidenceScope": "real-independent-child-pane-original-source",
+      "parent": {
+        "endpointId": "pi",
+        "threadId": "79dd5eae-b139-49b3-8faa-6da5c7c610c7",
+        "sessionId": "79dd5eae-b139-49b3-8faa-6da5c7c610c7"
+      },
+      "childScope": {
+        "endpointId": "pi",
+        "threadId": "79dd5eae-b139-49b3-8faa-6da5c7c610c7",
+        "sessionId": "4b3dabc1-241c-4de8-8351-de954e4e80d2"
+      },
+      "connectionEpoch": 2,
+      "pair": {
+        "sameChild": true,
+        "sameEpoch": true,
+        "sameAuthoredInput": true,
+        "sameOpaqueTurnId": true,
+        "runningRevision": 25,
+        "failedRevision": 33,
+        "serverTransactionalFreshnessProven": false
+      },
+      "nativeInteraction": false,
+      "physicalIme": false,
+      "serverTransactionalFreshnessProven": false,
+      "endpoint": "pi",
+      "gate": {
+        "requestCount": 1,
+        "entered": true,
+        "explicitlyReleased": true,
+        "aborted": false,
+        "timedOut": false
+      },
+      "demoExit": 0
+    },
+    "dsh": {
+      "accepted": true,
+      "evidenceScope": "real-independent-child-pane-original-source",
+      "parent": {
+        "endpointId": "dsh",
+        "threadId": "session-d7f09021-ae95-4abd-ae92-92b17744b5ad",
+        "sessionId": "session-d7f09021-ae95-4abd-ae92-92b17744b5ad"
+      },
+      "childScope": {
+        "endpointId": "dsh",
+        "threadId": "session-d7f09021-ae95-4abd-ae92-92b17744b5ad",
+        "sessionId": "fab543a2-73dd-4ba2-8239-784ec031e3d0"
+      },
+      "connectionEpoch": 2,
+      "pair": {
+        "sameChild": true,
+        "sameEpoch": true,
+        "sameAuthoredInput": true,
+        "sameOpaqueTurnId": true,
+        "runningRevision": 34,
+        "failedRevision": 76,
+        "serverTransactionalFreshnessProven": false
+      },
+      "nativeInteraction": false,
+      "physicalIme": false,
+      "serverTransactionalFreshnessProven": false,
+      "endpoint": "dsh",
+      "gate": {
+        "requestCount": 1,
+        "entered": true,
+        "explicitlyReleased": true,
+        "aborted": false,
+        "timedOut": false
+      },
+      "demoExit": 0
+    }
+  },
+  "seedCommandCounts": {
+    "pi": 16,
+    "dsh": 13
+  },
+  "syntheticProviderRequests": 16,
+  "programs": {
+    "headless": {
+      "path": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/tekes-agent-headless",
+      "sha256": "6aad53eb9910cb190ed5e887d27b1dd28169fea3245c1ed8f5eb27cb46a1215a",
+      "archiveOnly": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/live-child-pane-source-20261024/final/programs/tekes-agent-headless"
+    },
+    "demo": {
+      "path": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/tekes-agent-ui-demo",
+      "sha256": "e9c27f7970babfdc6cbbc3d1afb91fc5b893272ae81818a14d8ea97db279d43d",
+      "archiveOnly": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/live-child-pane-source-20261024/final/programs/tekes-agent-ui-demo"
+    }
+  },
+  "validation": {
+    "pythonFocusedPassed": 6,
+    "pythonTotalPassed": 255,
+    "uiDefault": {
+      "passed": 752,
+      "failed": 0,
+      "ignored": 1
+    },
+    "bindingsAndDemoFeature": {
+      "passed": 643,
+      "failed": 0,
+      "ignored": 0
+    },
+    "broadRegressionTiming": "before final CLI-prefix-only extension; final current CLI tests repeated",
+    "finalCliDefaultPassed": 2,
+    "finalCliFeaturePassed": 1,
+    "strictClippy": "default workspace and selected feature passed; final default/feature CLI Clippy repeated",
+    "fmt": "passed",
+    "defaultAndFeatureDemoBuild": "passed",
+    "independentConsumerDefaultAndFeature": "executed passed",
+    "boundariesAndMatrix": "passed"
+  },
+  "notRun": [
+    "Native bounded source witness",
+    "child pane reconnect and pagination",
+    "actual nested host ancestor ownership (scope-only factory audit gap)",
+    "dynamic Task pointer",
+    "full window layout and physical IME and OS AX and ProcessContainer",
+    "full ClientKit parity"
+  ],
+  "ci": {
+    "newHead": "3b2c89e-terminal-only-strict-nested-reading-53-failed",
+    "previous04481a7": "PR 40100645177 and push 40100642243 terminal; consumer and opt-in step passed; only strict nested reading #53 failed",
+    "terminal3b2c89e": {
+      "head": "3b2c89ea8680fdea63470ced27c585f52ee54134",
+      "prMergeParentVerified": true,
+      "runs": [
+        {
+          "id": 40103591762,
+          "checkout": "3b2c89ea8680fdea63470ced27c585f52ee54134",
+          "conclusion": "failure",
+          "consumerSha256": "e216110c5e2c26b279f832c9c2cbfa596f004f640b23cf6560b0acfb743e4466",
+          "consumerFiles": 137,
+          "matchesImmutableHead": true,
+          "sdk": {
+            "commit": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+            "local_packages": 11,
+            "native_interaction": false,
+            "reviewed_files": 243,
+            "sha256": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
+            "ui_packages": 8
+          },
+          "optInWitness": "success",
+          "independentConsumer": "success",
+          "rawReading": {
+            "accepted": false,
+            "parentFollowingAfterInnerUp": true,
+            "parentOffsetBefore": 0,
+            "parentOffsetAfterScroll": 0,
+            "parentOffsetAfterAppend": 634,
+            "innerOffset": 100,
+            "detailVisibleAfterAppend": false
+          },
+          "artifactSha256": "bf1e096e22759ceb8de172322a9d5f63d503807219cdc7ac81fc695a8ff7440c",
+          "originalJobLogSha256": "b05d1a0143c13bd3bc9a87485fc469bab7fbe2034ab34a11ff690b8bafb04562"
+        },
+        {
+          "id": 40103596776,
+          "checkout": "20fdda5e1bdf3377f90c80e54c46d1fa9654d944",
+          "conclusion": "failure",
+          "consumerSha256": "e216110c5e2c26b279f832c9c2cbfa596f004f640b23cf6560b0acfb743e4466",
+          "consumerFiles": 137,
+          "matchesImmutableHead": true,
+          "sdk": {
+            "commit": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+            "local_packages": 11,
+            "native_interaction": false,
+            "reviewed_files": 243,
+            "sha256": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
+            "ui_packages": 8
+          },
+          "optInWitness": "success",
+          "independentConsumer": "success",
+          "rawReading": {
+            "accepted": false,
+            "parentFollowingAfterInnerUp": true,
+            "parentOffsetBefore": 0,
+            "parentOffsetAfterScroll": 0,
+            "parentOffsetAfterAppend": 634,
+            "innerOffset": 100,
+            "detailVisibleAfterAppend": false
+          },
+          "artifactSha256": "6e660ea0584fb84fc33d281e52f082e4dd43ef1a5f88606c94fcc1c1de57c558",
+          "originalJobLogSha256": "2656334f17bf8f13f5cd98270208e731acfb387b03d72c8bed9d5502986ebe25"
+        }
+      ]
+    }
+  },
+  "defaultFeatureEnabled": false,
+  "desktop": false,
+  "physicalIme": false,
+  "serverTransactionalFreshnessProven": false,
+  "newTarget": false,
+  "cacheBytesDeletedInThisSlice": 0,
+  "mergeTagRelease": false,
+  "issueClosed": false,
+  "evidenceRoot": ".runtime-fixtures/live-child-pane-source-20261024",
+  "runtimeSourceHashes": {
+    "ui/demo/src/main.rs": "f3809351605bc8d3f1a42da40b67489f85e7441739d093cfefc4492d88380c53",
+    "ui/demo/src/components_native.rs": "d44020d12600873c354f2c761f7256bdbe370efed29c9923dc0f2d4b02cafce3",
+    "ui/demo/src/native_child_pane_source.rs": "26f9df2bff70f6cbadbf8b053e104ad7fc27603a8be870a7f7178d71d18ffa92",
+    "ui/demo/tests/child_pane_cli_gate.rs": "d2bd650902ef63d3d9672f42723e4f110b04ca01f0a45a9a8a32a2609d6eb480",
+    "ui/demo/Cargo.toml": "1950b920d8cf071eb6eac8c9985db292ee798da55db0e128c65610c69971ef10",
+    ".github/workflows/ci.yml": "14ac7f14727e5efb7fdc15e064cd4e4caa8a6fa3a667f63ed3101c3f13ced5da",
+    "scripts/test-real-child-pane-source.py": "22f7afa693c52819dc8d568d371605bf052831be37f59de629fb660474c5be4d",
+    "scripts/child_pane_source_fixture.py": "10d7e36bd1e1f70dfa6fd2466d929e64141f8d411fa99058b725186921e42a83",
+    "scripts/tests/test_child_pane_source_fixture.py": "038361a031057089f707394e15aac623fde972b6ad0382fa00a043eda7d4c485"
+  }
+}

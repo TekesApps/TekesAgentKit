@@ -1,0 +1,200 @@
+{
+  "format": "agentkit-sidebar-pinned-search/1",
+  "baseline_commit": "9c998e6",
+  "source_files": {
+    "scripts/test-reading-candidate.py": "ea098fd24cd9e7604d3951209195f8fe4ba1ce1cd7938033e93e82c66511e060",
+    "ui/bindings/src/sidebar_search.rs": "4b0c88e94f3cfd7e878c5f0b4ed909f8693b73cc8136856fc8bf489247c55dc8",
+    "ui/components/src/sidebar.rs": "1a2e941efb24a90ba7ab22ecf80eebb68d2abddb68c9459539d25c2851807e51",
+    "ui/components/src/sidebar_search.rs": "407055d2f0d9fdb3c0835140fec41e4e7a889e7e6349eedf92d3af53f2e7274e",
+    "ui/consumer/src/lib.rs": "3ef6178ca8b5544de1b731f6ef5f7b1fe4ac1aabcbf9fd2b954e12cc7b637982",
+    "ui/demo/src/native_sidebar_query_selftest.rs": "e26e2702c1a4a6c6106c6f3e8a67fda44a47ebe00fb4fc387066b002e4176e41",
+    "ui/demo/tests/sidebar_search_results.rs": "e55f5a263ea3a108f51694f83597c69f5148a388d69df429620fb2329dd1e2ca",
+    "ui/demo/src/native_sidebar_pin_query_selftest.rs": "8f8f508d9a1d5a18e706136c9565f0785da9b1f6e7590e7e1d7789a43ae85cd2"
+  },
+  "read_only_references": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Agent/ClientSessionSidebar.swift": "c9a09d4dd40415e38ec08c5941fa729e981a0ed287692af0b836426f4e25457d",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Agent/ClientAgentSidebarModel.swift": "82c1bbb6519b9cb9573b9963f565eeee8d297702250a00f9243b5c1e66a1ddc9",
+    "/Users/frankqin/dev/Tekes/Tekes/SidebarColumnController.swift": "cc01190f2e25192aed25c7ee53d7d1adc621d24b93da62a034824a10fd770f6d"
+  },
+  "default_pin": "8cf0840790334ba224afc0595897c74231c712e6",
+  "default_packages": 8,
+  "default_verified_files": 199,
+  "default_pin_promoted": false,
+  "headless_core_changed": false,
+  "published_headless_baseline": "v0.3.8",
+  "checks": [
+    {
+      "check": "default-workspace",
+      "exit_code": 0,
+      "log": {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-pin-search-evidence/agentkit-sidebar-pin-search-default-workspace.log",
+        "sha256": "3fbf72287f0d9c2fff84970b4b196d3888bb728bdc60eb0db6ebdfdc855c7a1b"
+      },
+      "passed": 367
+    },
+    {
+      "check": "default-clippy",
+      "exit_code": 0,
+      "log": {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-pin-search-evidence/agentkit-sidebar-pin-search-default-clippy.log",
+        "sha256": "f0eca2e39e86460daa967185f9da93e5ed38a58fa2b3a2ede04044fa12b01ff4"
+      }
+    },
+    {
+      "check": "default-build",
+      "exit_code": 0,
+      "log": {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-pin-search-evidence/agentkit-sidebar-pin-search-default-build.log",
+        "sha256": "1b06c206522a9ad6653edd56b1bb9e19254f4cd592480fbc8b10cbddc2b994e9"
+      }
+    },
+    {
+      "check": "candidate-replay",
+      "exit_code": 0,
+      "log": {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-pin-search-evidence/agentkit-sidebar-pin-search-candidate-replay.log",
+        "sha256": "bef39f0ffb853439444e631a216c828cf0a8b6daabb1755c972bd1f96633ddd8"
+      }
+    },
+    {
+      "check": "candidate-workspace",
+      "exit_code": 0,
+      "log": {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-pin-search-evidence/agentkit-sidebar-pin-search-candidate-workspace.log",
+        "sha256": "fa8f2c5798b96acbd7c9b0a02fe4207f07aad02be90512f86c6abcf9c21f5446"
+      },
+      "passed": 394
+    },
+    {
+      "check": "candidate-clippy",
+      "exit_code": 0,
+      "log": {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-pin-search-evidence/agentkit-sidebar-pin-search-candidate-clippy.log",
+        "sha256": "d0f62808801525161d39b563c2aa11ae6c2eae9279a1d670de3028dde3257db7"
+      }
+    }
+  ],
+  "public_consumer_tests": 39,
+  "candidate": {
+    "identity": "3366559a1a524909f562fa2fdd1c8646d762b5ba0eb1294b5480c39d9e9c37ef",
+    "files": 503,
+    "receipt": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-pin-search-3366559a/receipt.json",
+      "sha256": "3374b91acaebd923fb6f9f9d84f134277569f86ae422e15c14eb7d6c474bd4ef"
+    },
+    "source_and_inputs_unchanged": true,
+    "generator_checks": [
+      {
+        "check": "tests",
+        "exit_code": 0
+      },
+      {
+        "check": "clippy",
+        "exit_code": 0
+      },
+      {
+        "check": "actual-wrapper",
+        "exit_code": 0
+      },
+      {
+        "check": "public-consumer",
+        "exit_code": 0
+      },
+      {
+        "check": "native-build",
+        "exit_code": 0
+      }
+    ],
+    "default_promotion": false,
+    "native_help_rerun_this_phase": false
+  },
+  "native": {
+    "exit_code": 0,
+    "clearRestoresInventory": true,
+    "draftRetained": true,
+    "emptyQueryResultsKeepPins": true,
+    "matchedPinNotDuplicated": true,
+    "nativeWindow": true,
+    "noSubmission": true,
+    "originalButtonIdentity": true,
+    "ownedFixture": true,
+    "physicalIme": false,
+    "pinsVisibleDuringSearching": true,
+    "realHarness": false,
+    "selectionRetained": true,
+    "unmatchedPinRetained": true,
+    "voiceOver": false,
+    "log": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-pin-search-evidence/agentkit-sidebar-pin-query-native-v1.log",
+      "sha256": "e7e2a9e4957bf218a1230c6832ec96a68596090e42d99b2e1349c35a05f1e366"
+    },
+    "binary": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-pin-query-native-v1-demo",
+      "sha256": "a1d2ec5004934df839059e84d562f5136f14d976cc3950050b384d2599be4f92"
+    },
+    "same_binary_as_final_default": true,
+    "screenshots": [
+      {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-pin-query-v1-match.png",
+        "sha256": "9d037c5aaa9801eafd4352f321e7027e084f97b639d8ff0f1275518bdbe074c5",
+        "pixels_inspected": true
+      },
+      {
+        "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-pin-query-v1-empty.png",
+        "sha256": "9d037c5aaa9801eafd4352f321e7027e084f97b639d8ff0f1275518bdbe074c5",
+        "pixels_inspected": true
+      }
+    ]
+  },
+  "three_real": {
+    "exit_code": 0,
+    "log": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-pin-search-evidence/agentkit-sidebar-pin-search-three-real.log",
+      "sha256": "58a45b0c513092615bef69e5ffd3bf176f5b99d62a1dd2ec3f5bba303fe15103"
+    },
+    "binary": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-pin-search-final-demo",
+      "sha256": "a1d2ec5004934df839059e84d562f5136f14d976cc3950050b384d2599be4f92"
+    },
+    "versions": {
+      "Native": "Kernel0.9.1",
+      "Pi": "1.3.0",
+      "DSH": "0.2.1-rc.2"
+    },
+    "offscreen_only": true,
+    "isolated_local_providers": true,
+    "real_pin_search_native": false
+  },
+  "python_tests": {
+    "exit_code": 0,
+    "passed": 26,
+    "log": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-pin-search-evidence/agentkit-sidebar-pin-search-python.log",
+      "sha256": "fba926bc4ff32b05fef6ba64b914c021faf869ebc9b631d03188964316779a03"
+    }
+  },
+  "cleanup": {
+    "deleted_count": 112,
+    "freed_allocated_bytes": 210800640,
+    "new_independent_targets": 0,
+    "exclusive_cargo_target_lock": true,
+    "process_inventory_checked": true,
+    "lsof_open_files": 0,
+    "preserved": "sources, WIP, fixed dependency snapshots, logs, receipts, screenshots, acceptance binaries, current/future and ambiguous caches"
+  },
+  "cleanup_receipt": {
+    "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/build-cache-cleanup-sidebar-pin-search-20261021.json",
+    "sha256": "23dd42c1e029074b3d88c749992dabf5aed8f332b243dae08061f57fdc9563d6"
+  },
+  "remaining": [
+    "complete Views and rich Transcript",
+    "reading/paging anchors on real harness native windows",
+    "physical IME/Escape and VoiceOver",
+    "fixed published SDK promotion",
+    "folder outline/Primary Folder catalog and multi-endpoint aggregation",
+    "persistent activity clock and local FTS",
+    "generic menu issue36 and native control-key test issue37",
+    "final review/CI/merge/stage tag"
+  ],
+  "complete": false
+}

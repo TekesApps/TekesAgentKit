@@ -1,0 +1,283 @@
+{
+  "kind": "read-only-child-content-and-scoped-read-gestures",
+  "date": "2026-10-20",
+  "sourceBaseCommit": "57194232d1796c3dd147fc8db6a719694e5149af",
+  "implementationFileSha256": {
+    "ui/components/src/readonly_transcript.rs": "89b3f13e48029c22b2c8971a0c85198a93931b1e23e4410a40c5b5e2f6df002a",
+    "ui/components/src/indicators.rs": "73e2568396cc14931b6f281f890f915ebfe5509e90ee2f39eec01024da6da8a0",
+    "ui/components/src/lib.rs": "85d5adef852d65ecf941f9c2ff0cb495b99e0cdc234844f134c5e081901fe422",
+    "ui/bindings/src/lib.rs": "dfe3e052381c19b8da52cc385d98b972e38d03759f753ea46208b8ed3e422200",
+    "ui/bindings/src/child.rs": "77868986dca10a4daff727cfb88cc169bf064d2e1aac075d85b64d48594432be",
+    "ui/consumer/src/lib.rs": "120f12df292c90f4dd32167e501bbc0a8092edbc2b5b9b5be011eac1812c2bc1",
+    "ui/demo/src/component_demo.rs": "68720708820447596a6f67da1b7801550c39562b810dbb0d426b366293d74a3e",
+    "ui/demo/src/components_native.rs": "2bdc220efe984d880248da4f5dcca972aba9339d193c1516d6342665100064e1",
+    "ui/demo/src/readonly_child_proof.rs": "58eb6b16a65f744a0f8784606700fd655bab4b6ea06c3d4fbb8448eba0e464e6",
+    "ui/demo/tests/readonly_child.rs": "bae98ee1bb7123c1962d8ee1d3e176fe5010c84504d375e0167e80b3d03f402b",
+    "scripts/test-real-session-endpoints.py": "b58f69338b04791fbceb7324c50aafb2dd09f479e59c409d0fe5b61cdc3978ee"
+  },
+  "demoBinarySha256": "85f3cd969b872bb6519972f0f0af74c1bc4fad3cf86791a2ad53572f66f2fee7",
+  "agentKitPublishedBaseline": "v0.3.8",
+  "tekesUI": {
+    "commit": "8cf0840790334ba224afc0595897c74231c712e6",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 199,
+    "sha256": "f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f",
+    "ui_packages": 8
+  },
+  "nativeKernelFixtureSource": {
+    "commit": "ae5d6fdf32290207b646b8c99b96f2a002902cb3",
+    "workingTreeClean": true,
+    "modifiedByThisTask": false
+  },
+  "validation": {
+    "uiTests": 236,
+    "newReadonlyTests": 7,
+    "scriptTests": 18,
+    "strictUIClippy": true,
+    "fmt": true,
+    "secondPublicConsumer": true,
+    "rootBehaviorChanged": false,
+    "rootTestsRerun": false
+  },
+  "realNativeReadonlyChild": {
+    "proof": {
+      "childScope": true,
+      "completeTranscript": false,
+      "messages": 1,
+      "nativeInteraction": false,
+      "noComposer": true,
+      "originalReadIntent": true,
+      "paginationAvailable": false,
+      "parentDraftPreserved": true,
+      "readOnlyComponent": true,
+      "readingAnchorAcceptance": false,
+      "reconnect": true,
+      "retainedWidgets": true,
+      "sendRejected": true,
+      "sourceCallReadonlyDetails": true
+    },
+    "runViewComposition": {
+      "completeRunView": false,
+      "keyedReadingAcceptance": false,
+      "mounted": true,
+      "ownsRuntime": false,
+      "sharedIntents": true,
+      "transcriptMounted": true
+    },
+    "summaryMounted": false
+  },
+  "realMainEndpoints": {
+    "pi": {
+      "runViewComposition": {
+        "completeRunView": false,
+        "keyedReadingAcceptance": false,
+        "mounted": true,
+        "ownsRuntime": false,
+        "sharedIntents": true,
+        "transcriptMounted": true
+      },
+      "transcriptContentProof": {
+        "completeTranscript": false,
+        "footnotes": 30,
+        "genericViewport": true,
+        "independentTools": 0,
+        "keyedReadingAcceptance": false,
+        "machineLeading": true,
+        "messages": 60,
+        "nativeInteraction": false,
+        "renderer": true,
+        "richContent": false,
+        "rows": 90,
+        "userTrailing": true
+      },
+      "historyPagingProof": {
+        "extended": true,
+        "frozenCut": true,
+        "nativeInteraction": false,
+        "newEpochHistoryRetained": true,
+        "noDuplicateMessages": true,
+        "oldReceiptInvalidated": true,
+        "originalScope": true,
+        "otherDraftPreserved": true,
+        "readingAnchorAcceptance": false,
+        "retainedMessages": 56,
+        "sourceKind": "nativeConversation",
+        "sourceStatusPublished": true
+      },
+      "uploadProof": {
+        "attachmentOnlyInputCount": 1,
+        "attachmentOnlySend": true,
+        "attachmentOnlyVisible": true,
+        "componentSend": true,
+        "durableInputCount": 1,
+        "foreignSessionReadRejected": true,
+        "freshJournalAfterReconnect": true,
+        "historyFileMetadata": false,
+        "historyFileReference": true,
+        "hostBoundedFileRead": true,
+        "inlineImage": false,
+        "nativeInteraction": false,
+        "oneShotUpload": true,
+        "originalDraft": true,
+        "otherDraftPreserved": true,
+        "promptSettled": true,
+        "publicByteRead": true,
+        "publicEntry": true,
+        "readUnavailable": false,
+        "receiptValidated": true,
+        "reconnectNoDuplicate": true
+      }
+    },
+    "dsh": {
+      "runViewComposition": {
+        "completeRunView": false,
+        "keyedReadingAcceptance": false,
+        "mounted": true,
+        "ownsRuntime": false,
+        "sharedIntents": true,
+        "transcriptMounted": true
+      },
+      "transcriptContentProof": {
+        "completeTranscript": false,
+        "footnotes": 30,
+        "genericViewport": true,
+        "independentTools": 0,
+        "keyedReadingAcceptance": false,
+        "machineLeading": true,
+        "messages": 60,
+        "nativeInteraction": false,
+        "renderer": true,
+        "richContent": false,
+        "rows": 90,
+        "userTrailing": true
+      },
+      "historyPagingProof": {
+        "extended": true,
+        "frozenCut": true,
+        "nativeInteraction": false,
+        "newEpochHistoryRetained": true,
+        "noDuplicateMessages": true,
+        "oldReceiptInvalidated": true,
+        "originalScope": true,
+        "otherDraftPreserved": true,
+        "readingAnchorAcceptance": false,
+        "retainedMessages": 56,
+        "sourceKind": "journal",
+        "sourceStatusPublished": true
+      },
+      "uploadProof": {
+        "attachmentOnlyInputCount": 1,
+        "attachmentOnlySend": true,
+        "attachmentOnlyVisible": true,
+        "componentSend": true,
+        "durableInputCount": 1,
+        "foreignSessionReadRejected": null,
+        "freshJournalAfterReconnect": true,
+        "historyFileMetadata": true,
+        "historyFileReference": false,
+        "hostBoundedFileRead": true,
+        "inlineImage": false,
+        "nativeInteraction": false,
+        "oneShotUpload": true,
+        "originalDraft": true,
+        "otherDraftPreserved": true,
+        "promptSettled": true,
+        "publicByteRead": false,
+        "publicEntry": true,
+        "readUnavailable": true,
+        "receiptValidated": true,
+        "reconnectNoDuplicate": true
+      }
+    },
+    "native": {
+      "runViewComposition": {
+        "completeRunView": false,
+        "keyedReadingAcceptance": false,
+        "mounted": true,
+        "ownsRuntime": false,
+        "sharedIntents": true,
+        "transcriptMounted": true
+      },
+      "transcriptContentProof": {
+        "completeTranscript": false,
+        "footnotes": 30,
+        "genericViewport": true,
+        "independentTools": 0,
+        "keyedReadingAcceptance": false,
+        "machineLeading": true,
+        "messages": 60,
+        "nativeInteraction": false,
+        "renderer": true,
+        "richContent": false,
+        "rows": 90,
+        "userTrailing": true
+      },
+      "historyPagingProof": {
+        "extended": true,
+        "frozenCut": true,
+        "nativeInteraction": false,
+        "newEpochHistoryRetained": true,
+        "noDuplicateMessages": true,
+        "oldReceiptInvalidated": true,
+        "originalScope": true,
+        "otherDraftPreserved": true,
+        "readingAnchorAcceptance": false,
+        "retainedMessages": 56,
+        "sourceKind": "journal",
+        "sourceStatusPublished": true
+      },
+      "uploadProof": {
+        "attachmentOnlyInputCount": 1,
+        "attachmentOnlySend": true,
+        "attachmentOnlyVisible": true,
+        "componentSend": true,
+        "durableInputCount": 1,
+        "foreignSessionReadRejected": true,
+        "freshJournalAfterReconnect": true,
+        "historyFileMetadata": true,
+        "historyFileReference": false,
+        "hostBoundedFileRead": true,
+        "inlineImage": false,
+        "nativeInteraction": false,
+        "oneShotUpload": true,
+        "originalDraft": true,
+        "otherDraftPreserved": true,
+        "promptSettled": true,
+        "publicByteRead": true,
+        "publicEntry": true,
+        "readUnavailable": false,
+        "receiptValidated": true,
+        "reconnectNoDuplicate": true
+      }
+    }
+  },
+  "nativeFixture": {
+    "totalRegressionMarkers": 6,
+    "readonlyRenderedPagination": true,
+    "turnFooterMarkers": 2,
+    "syntheticTextServices": true,
+    "physicalIME": false
+  },
+  "logSha256": {
+    "agentkit-bounded-content-ui-final.log": "dcca79200844551044ecad347183d0d3048e94a56338dd7de57de41d120b6298",
+    "agentkit-bounded-intent-final-tests.log": "94da98761f8890260ed896ab79d10f7e9016bc69a258fcfbe72b716e55dee0e3",
+    "agentkit-bounded-intent-final-clippy.log": "e3d009980a21f83cd7c2d5d4ae2a1815b76144ba0c5dfc37d8bc6b827fa0c74a",
+    "agentkit-bounded-content-real-final-all.log": "36af076e8d8077881cd4fca61ba33e167f508cc5ed24009c9e3cec5bea9b699a",
+    "agentkit-bounded-content-native-final.log": "0e56d79c44b87414a7c7683df56ca944139ef329944c70d52970ebc11d5af37d",
+    "agentkit-bounded-content-fork-final.log": "aaa3e1122ee71754cfdebc11f6cc32810e212609e7dd9a3381045b776ede331d",
+    "agentkit-bounded-content-tools-final.log": "45526f5abc12ef4311c37dc9f84e8af3b761d30bcab6fbd938dd87166e9f1664"
+  },
+  "remaining": {
+    "completeTranscript": false,
+    "completeRunView": false,
+    "keyedReadingAcceptance": false,
+    "richSelectableContent": false,
+    "physicalIME": false,
+    "completeThreeHarnessNativeUX": false,
+    "upstreamIssues": [
+      "https://github.com/TekesApps/TekesUI/issues/22",
+      "https://github.com/TekesApps/TekesUI/issues/25"
+    ]
+  }
+}

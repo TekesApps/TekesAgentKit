@@ -1,0 +1,186 @@
+{
+  "date": "2026-10-20",
+  "publishedBaseline": "v0.3.8",
+  "tekesui": {
+    "rev": "431093786de47b48cd566d0d9c0eafa088b10d68",
+    "packages": 8,
+    "inputs": 188,
+    "sha256": "03721866a362b1d31261ebbbc86140eb07e9e23320871c325234a5212591213d"
+  },
+  "tests": {
+    "root": 105,
+    "ui": 100,
+    "tools": 18,
+    "targetedContext": 4
+  },
+  "strictClippy": [
+    "root-all-targets",
+    "ui-all-targets"
+  ],
+  "sourceSha256": {
+    "crates/presentation/src/composer.rs": "0a0ec9729317155796ce8ae81c4834847199e17f7ce93e0278841d447ca220b6",
+    "crates/presentation/src/controller.rs": "0b489e9d261a2f1f240946b4196a6592db6efab01eb042b224cf4344c3c697de",
+    "ui/components/src/composer_context.rs": "84398e8fbe5fd0cf59a7b9f65320892018e3493254c10a75a4d39f9648e023d4",
+    "ui/components/src/composer.rs": "4ae90fcc555a58115d4c81a5833eea74d9f6cfbbc55449757e749eeaa1cd6c26",
+    "ui/bindings/src/lib.rs": "5da4be1d85461e5ab6a8836a4306dce6ad0c5eb5b0e6ef786086e7058480a176",
+    "ui/demo/src/components_native.rs": "c410c73be728b7c342a1ba5612cd0cc8f068127440ca00a8bf3d244863ec409e",
+    "ui/demo/tests/composer_context.rs": "9c125dda49206f8009bedba1b61b54a68fa1a77bdcb5eede5d45efe5c43c56ca",
+    "scripts/test-real-session-endpoints.py": "8c992f40aabe25193daa1d0c9684b72acf8ee54089bbfd1bfb628c37839ee4c2"
+  },
+  "binarySha256": "50d51ba4b1ae88442e6a5cd97a6c43cde99a5825e8b04442b6a74514f47818dc",
+  "screenshot": {
+    "path": "ui/docs/context-native.png",
+    "sha256": "b8a6a447ced2b61551201110ab2c104139d1b587968e120d8aa5168430aca84a"
+  },
+  "native": {
+    "contextMarker": "NATIVE_AGENT_CONTEXT_SELFTEST_OK public-cards+ime-barrier+remove-before-send+shared-compilation+single-admission+stream+destination-isolation; file-upload=false; annotation-editor=false; physical-ime=false",
+    "regressionMarkers": [
+      "NATIVE_AGENT_SIDEBAR_SUMMARY_SELFTEST_OK shared-inventory+shared-pin+sidebar-selection+summary-facts; full-run-view=false; physical-ime=false",
+      "NATIVE_AGENT_SIDECHAT_SELFTEST_OK owned-create+separate-composer+send+stream+draft+cancel-discard+parent-isolation; transcript=false; physical-ime=false",
+      "NATIVE_AGENT_CHILD_SELFTEST_OK direct-parent+independent-composer+single-admission+stream+cancel+isolated-drafts+bounded-read-only+paging+local-retirement; formal-transcript=false; physical-ime=false",
+      "NATIVE_AGENT_TASK_SELFTEST_OK resolved-task+independent-composer+single-admission+stream+cancel+parent-draft-isolation+close; transcript=false; physical-ime=false",
+      "NATIVE_AGENT_COMPONENTS_SELFTEST_OK composer+indicators+run-binding+synthetic-text-services+send+stream+cancel+draft-isolation+reconnect; physical-ime=false; transcript=false; reading-anchor=false"
+    ],
+    "physicalIME": false,
+    "voiceOver": false,
+    "fileUpload": false,
+    "annotationEditor": false,
+    "formalTranscript": false,
+    "formalRunView": false
+  },
+  "realEndpoints": {
+    "provider": "isolated local synthetic; no paid model",
+    "receipts": {
+      "PI": {
+        "components": true,
+        "contextProof": {
+          "annotationReturned": true,
+          "clearedDraft": true,
+          "explicitRemoval": true,
+          "fileUpload": false,
+          "mountedCards": true,
+          "nativeInteraction": false,
+          "promptSettled": true,
+          "referenceReturned": true,
+          "structuredTranscript": false
+        },
+        "finalAssistantItems": 4,
+        "inventoryRows": 13,
+        "isStale": false,
+        "modelChoiceProof": {
+          "catalogChoices": 1,
+          "configurationReceipt": true,
+          "explicitSelection": true,
+          "nativeInteraction": false,
+          "promptSettled": true,
+          "selected": "[\"endpoint-test\",\"endpoint-test\"]"
+        },
+        "nativeInteraction": false,
+        "offscreen": true,
+        "sharedRuntime": true,
+        "sidebarMounted": true,
+        "summaryMounted": true,
+        "transcriptItems": 9,
+        "transcriptView": false
+      },
+      "DSH": {
+        "components": true,
+        "contextProof": {
+          "annotationReturned": true,
+          "clearedDraft": true,
+          "explicitRemoval": true,
+          "fileUpload": false,
+          "mountedCards": true,
+          "nativeInteraction": false,
+          "promptSettled": true,
+          "referenceReturned": true,
+          "structuredTranscript": false
+        },
+        "finalAssistantItems": 3,
+        "inventoryRows": 8,
+        "isStale": false,
+        "modelChoiceProof": {
+          "catalogChoices": 1,
+          "configurationReceipt": true,
+          "explicitSelection": true,
+          "nativeInteraction": false,
+          "promptSettled": true,
+          "selected": "[\"endpoint-test\",\"endpoint-test\"]"
+        },
+        "nativeInteraction": false,
+        "offscreen": true,
+        "sharedRuntime": true,
+        "sidebarMounted": true,
+        "summaryMounted": true,
+        "transcriptItems": 9,
+        "transcriptView": false
+      },
+      "NATIVE": {
+        "components": true,
+        "contextProof": {
+          "annotationReturned": true,
+          "clearedDraft": true,
+          "explicitRemoval": true,
+          "fileUpload": false,
+          "mountedCards": true,
+          "nativeInteraction": false,
+          "promptSettled": true,
+          "referenceReturned": true,
+          "structuredTranscript": false
+        },
+        "finalAssistantItems": 3,
+        "inventoryRows": 4,
+        "isStale": false,
+        "modelChoiceProof": {
+          "catalogChoices": 1,
+          "configurationReceipt": true,
+          "explicitSelection": true,
+          "nativeInteraction": false,
+          "promptSettled": true,
+          "selected": "[\"openai\",\"gpt-5\"]"
+        },
+        "nativeInteraction": false,
+        "offscreen": true,
+        "sharedRuntime": true,
+        "sidebarMounted": true,
+        "summaryMounted": true,
+        "transcriptItems": 6,
+        "transcriptView": false
+      }
+    },
+    "scope": "offscreen component/data path; final GPU after settlement; not structured history restoration or native three-harness interaction"
+  },
+  "review": {
+    "ABA": "failed value-only reproduction; fixed using canonical per-destination context revision",
+    "preserves": "newer prose/settings and same-Run model/settings gestures",
+    "invalidates": [
+      "context remove-readd",
+      "Send including empty context",
+      "failure restoration",
+      "NewThread generation",
+      "materialization",
+      "retired pointer"
+    ],
+    "nativeFailedAttempts": [
+      {
+        "log": "/tmp/agentkit-context-native-final.log",
+        "observed": "text=None marked=false"
+      },
+      {
+        "log": "/tmp/agentkit-context-native-rerun.log",
+        "observed": "unscripted prefix 2; source unverified"
+      }
+    ],
+    "nativeCorrection": "explicit test startup clear/empty assertion and focus logging; no product event filtering or relaxed assertion"
+  },
+  "remaining": [
+    "formal Transcript and RunView await public TekesUI #22/#23",
+    "file picker/upload/preview adapter",
+    "annotation editor and source highlights",
+    "context undo",
+    "preset/reasoning/fast/thinking entry controls",
+    "full pane Transcript",
+    "physical IME and reading/paging acceptance",
+    "review CI merge and stage tag"
+  ]
+}

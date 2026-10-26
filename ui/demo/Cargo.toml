@@ -4,10 +4,18 @@ version.workspace = true
 edition.workspace = true
 publish.workspace = true
 license.workspace = true
+
+[features]
+acceptance-source-witness = ["tekes-agent-ui-bindings/acceptance-source-witness"]
+
 [dependencies]
+tekes-agent-ui-bindings.workspace = true
+tekes-agent-web.workspace = true
 tekes-agent-components-ui.workspace = true
 tekes-agent-contract.workspace = true
 tekes-agent-endpoint-kernel.workspace = true
+tekes-agent-endpoint-pi.workspace = true
+tekes-agent-endpoint-dsh.workspace = true
 tekes-agent-session.workspace = true
 tekes-agent-presentation.workspace = true
 tekes-ui-controls.workspace = true
@@ -22,3 +30,11 @@ async-trait = "0.1"
 futures-util = "0.3"
 
 png = "0.17"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-foundation = { version = "=0.3.2", default-features = false, features = ["std", "NSObject", "NSString", "NSDate", "NSDateFormatter", "NSFormatter", "NSCalendar", "NSLocale", "NSTimeZone"] }
+rfd = { version = "=0.17.2", default-features = false }
+
+[dev-dependencies]
+sha2 = "=0.10.9"
+tekes-agent-ui-consumer-check.workspace = true

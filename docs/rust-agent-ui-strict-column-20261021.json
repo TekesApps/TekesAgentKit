@@ -1,0 +1,60 @@
+{
+  "format": "agentkit-strict-run-column/1",
+  "date": "2026-10-21",
+  "verified_at_utc": "2026-10-20T16:39:46.272979+00:00",
+  "source": {
+    "ui/components/src/run_column.rs": "fd444b7317b10f56610d3dce8bd963794b0d7d25015ac9f608eca2bb69a185c4",
+    "ui/components/src/run_view.rs": "ace414e65a3f9cd5d806ce63f5a164546f6dda165eef5db0d4860822d6d1cfbc",
+    "ui/components/src/composer.rs": "9262e7732ce48da1b97cb00c9545ced0e8422acf86e3f5575a28f10ded97cf9a",
+    "ui/consumer/src/lib.rs": "3f01bebdbbb3a7e52c955bf74284e9f6c70668d1ec02fd0bd888179e6b98547b",
+    "ui/demo/src/component_demo.rs": "ad572aa4260c6aff927aeb8a952617a4aaab821c18a417ce7b5c77bd0e87b94f",
+    "ui/demo/src/components_native.rs": "16d092d5d769b4026e36aa242f7b0b1a69bf5592080fd0ea57090b7f9b392a67",
+    "ui/demo/tests/run_column.rs": "edfe5787e727c02185ce1eafafa7b34e11e5688c7db8d43430c760e19d7ea15a",
+    "ui/demo/tests/fixtures/clientkit-run-column.json": "ba0927d980ec06ff84d1b9d0ccbf10ef447ed5d85993c5ab30f09109ab29a26c"
+  },
+  "default_pin": "8cf0840790334ba224afc0595897c74231c712e6",
+  "source_reference_vectors": 25,
+  "geometry_retention_combinations": 36,
+  "default_ui_tests": 298,
+  "strict_clippy": true,
+  "fmt": true,
+  "second_public_consumer": true,
+  "native_context": true,
+  "native_component_regression": true,
+  "native_context_image": {
+    "path": "/tmp/agentkit-strict-column-native-context-20261021.png",
+    "sha256": "bdf6699601b38d2a7bb77c571f4e620f1cee23c891d60f2f929735254d5fec41",
+    "inspected": true
+  },
+  "demo_binary_sha256": "48feef42c25290a0aaec7e46ddd4556c23ef7a9fd30ce5eccd8ffc96dfbb1c0b",
+  "candidate": {
+    "identity": "2b16eaa6200fecdde9a0c615166064effb9446249cde05087d5d7c288d81d4ec",
+    "files": 463,
+    "tests": 7,
+    "strict_clippy": true,
+    "current_code_matches_snapshot": true,
+    "receiver_receipt_sha256": "72d3529c6b6e4edd5d1b5b424604756e99ace04c8e5802a5a3aac21c98a343e5"
+  },
+  "logs": {
+    "/tmp/agentkit-strict-column-initial.log": "b9aa4bd1822eec454a2ad852527e5b78426010f2fc7eb81af0ea563cf30add45",
+    "/tmp/agentkit-strict-column-geometry2.log": "05aa10dfc48a86f912f44c55315783651564cf83571f6abf26a3d7a4b463946b",
+    "/tmp/agentkit-strict-column-consumer.log": "5ec6d671fc7badcdd1ebb14fdf3016ffd6ac4a6f5bd3e3e03af28b3ea0c03d61",
+    "/tmp/agentkit-strict-column-all-tests.log": "613ae889c91260a976765d66c3199f83da6c8a49d0a25e00f050a48281df7801",
+    "/tmp/agentkit-strict-column-clippy.log": "44b277e258dea384eca8b9a91481760f9dd27995dece3dd22fed8f5d8c594367",
+    "/tmp/agentkit-strict-column-build.log": "efff05853aeaadb9c720f1ce640943ca003b7089e2ffa68fca81e9442461368a",
+    "/tmp/agentkit-strict-column-candidate.log": "75ad86c90b47573890aaf259b36f80d336ef46ad89c8985bc50fe8cb09cd9d3c",
+    "/tmp/agentkit-strict-column-native-context-20261021.log": "131a1b5d3ee8f5a6ed939db2f97b65e6bc0baffbc370263ffd3f98cfc4b568c4",
+    "/tmp/agentkit-strict-column-native-regression-20261021.log": "3e72b85856627923f3584c863acbd5398e1843f087ff26b30b1de7d9582ec0b3"
+  },
+  "retained_failure": "Initial FullWidth40 formal-Run geometry exposed Composer intrinsic toolbar width escaping assigned column; fixed outer measure and reran unchanged geometric assertion.",
+  "not_accepted": [
+    "complete ClientKit View layout parity",
+    "Run overlay and complete rail",
+    "candidate native reading",
+    "real three-SEP reading acceptance",
+    "physical IME and VoiceOver"
+  ],
+  "pin_promoted": false,
+  "merged": false,
+  "tagged": false
+}

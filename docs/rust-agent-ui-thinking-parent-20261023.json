@@ -1,0 +1,144 @@
+{
+  "sourceBase": "d8e975e",
+  "implementationSha256": {
+    "ui/components/src/output_message.rs": "b65248abe91e83f088318d7e538021a8ea448cb9f4cae5aba7e932e9fa8b0cb0",
+    "ui/components/src/transcript_content.rs": "4f7fd26e10960172349bdd26d91c7a4794fb76caac83ab668b79d6c4f5f3bbd9",
+    "ui/components/src/run_port.rs": "9bf8c3d2e746bb1f4a6b9c7a8dabbdeb4738db980c17bfc619f4e3df6f3b9fbf",
+    "ui/components/src/readonly_transcript.rs": "aed16ad8e4b8be14cfdb6e05faac134f56b3ac664324f78f3c25809883c7bfef",
+    "ui/demo/src/component_demo.rs": "8ae8e2d975780075fba57799624c2e79e334ca5d97d4d16907bf0ec998affe4d",
+    "ui/consumer/src/lib.rs": "35e13889d17a86ff445569decfa991cf1d61e5c527b58b448d01d691be19e3c1",
+    "ui/demo/tests/thinking_sources.rs": "255d9477350d88d5e6fddb26f9b5cfe144c80fdb8fa94e0c89b812466e502093"
+  },
+  "publishedTekesui": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "fullUiTests": {
+    "passed": 584,
+    "failed": 0,
+    "ignored": 1,
+    "ignore": "pre-existing #49",
+    "note": "full suite before adding one test-only readonly live-tick case; no implementation edits afterward"
+  },
+  "finalThinkingSourceTests": {
+    "passed": 4,
+    "failed": 0,
+    "newSinceFullSuite": 1
+  },
+  "uiStrictAllTargetClippy": true,
+  "rootImplementationChanged": false,
+  "nativeProgram": {
+    "sourceBase": "d8e975e",
+    "binarySha256": "8d11baa05322c189dfc638201f759f303c46dba991ac84e60b14e172c8ae18ae",
+    "program": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/thinking-source-20261023/AgentKitThinkingParent.app/Contents/MacOS/tekes-agent-ui-demo",
+    "sourceSha256": {
+      "ui/components/src/output_message.rs": "b65248abe91e83f088318d7e538021a8ea448cb9f4cae5aba7e932e9fa8b0cb0",
+      "ui/components/src/transcript_content.rs": "4f7fd26e10960172349bdd26d91c7a4794fb76caac83ab668b79d6c4f5f3bbd9",
+      "ui/components/src/run_port.rs": "9bf8c3d2e746bb1f4a6b9c7a8dabbdeb4738db980c17bfc619f4e3df6f3b9fbf",
+      "ui/components/src/readonly_transcript.rs": "aed16ad8e4b8be14cfdb6e05faac134f56b3ac664324f78f3c25809883c7bfef",
+      "ui/demo/src/component_demo.rs": "8ae8e2d975780075fba57799624c2e79e334ca5d97d4d16907bf0ec998affe4d",
+      "ui/consumer/src/lib.rs": "35e13889d17a86ff445569decfa991cf1d61e5c527b58b448d01d691be19e3c1",
+      "ui/demo/tests/thinking_sources.rs": "255d9477350d88d5e6fddb26f9b5cfe144c80fdb8fa94e0c89b812466e502093"
+    }
+  },
+  "nativeReading": {
+    "draftIsolation": true,
+    "focusAndEditorBaselinePreserved": true,
+    "focusAndMarkedBaselinePreserved": true,
+    "focusAndTextStatePreserved": true,
+    "hoverPreviewVisible": false,
+    "independentBReadingRestored": true,
+    "jumpHasNoHistory": true,
+    "jumpLatestControl": true,
+    "loadedItemsAfter": 44,
+    "loadedItemsBefore": 20,
+    "markedTextPreserved": true,
+    "nativePagingControl": true,
+    "nativeWindow": true,
+    "navigationPreeditPreserved": true,
+    "noSubmission": true,
+    "opaqueBaselinePreserved": true,
+    "originalTurnNavigation": true,
+    "physicalIme": false,
+    "prependAnchorPreserved": true,
+    "previewFactsDuringPreedit": true,
+    "publicHistoryPage": true,
+    "publicPageRequest": true,
+    "readingAnchorAcceptance": true,
+    "realHarness": false,
+    "reconnectReadingRestored": true,
+    "retainedSessionReadingRestored": true,
+    "sameEditorOwner": true,
+    "samePublicationRefresh": true,
+    "syntheticPreedit": true,
+    "syntheticWheel": true,
+    "turnStartAndLatest": true,
+    "upwardReadingPreserved": true,
+    "voiceOver": false
+  },
+  "systemIme": {
+    "softwareIme": true,
+    "pidTargetedEvents": true,
+    "physicalKeyboard": false,
+    "candidateWindow": false,
+    "profile": "launch-services-app",
+    "applicationExitCode": null,
+    "launcherExitCode": 0,
+    "pid": 13508,
+    "sourceBefore": "com.apple.inputmethod.SCIM.ITABC",
+    "sourceAfter": "com.apple.inputmethod.SCIM.ITABC",
+    "binarySha256": "8d11baa05322c189dfc638201f759f303c46dba991ac84e60b14e172c8ae18ae"
+  },
+  "scope": {
+    "wholeThinkingInputAndPreparedPlan": true,
+    "carrierGroupingAndLayoutComplete": false,
+    "realHarnessCurrentSourceNative": false,
+    "physicalKeyboard": false,
+    "voiceOver": false,
+    "sameProcessContentHost": true,
+    "formalProcessContainer": false,
+    "crossProcess": false
+  },
+  "previousHeadCI": [
+    {
+      "link": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39853141431/job/120084313033",
+      "name": "Rust UI consumer (no native interaction)",
+      "state": "FAILURE"
+    },
+    {
+      "link": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39853135803/job/120084292622",
+      "name": "Rust UI consumer (no native interaction)",
+      "state": "FAILURE"
+    },
+    {
+      "link": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39853141431/job/120084313444",
+      "name": "checks",
+      "state": "SUCCESS"
+    },
+    {
+      "link": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39853135803/job/120084292954",
+      "name": "checks",
+      "state": "SUCCESS"
+    }
+  ],
+  "evidenceSha256": {
+    ".runtime-fixtures/thinking-source-20261023/parent-ui.log": "ae18991b0b01122b6155ad7eb476601710e0223b24ce5af96440a08ae987fbdb",
+    ".runtime-fixtures/thinking-source-20261023/parent-active-checked.log": "13873794aa0f00ba81e3614d57642001c72539108f5e74046f2db6d92d97ec40",
+    ".runtime-fixtures/thinking-source-20261023/parent-clippy.log": "8443f8cf5669eb525c84f1a5a1a233e0637c6fd221dc859085fe9f0001b5bbd8",
+    ".runtime-fixtures/thinking-source-20261023/parent-sdk-inputs.json": "9543ade335292f9c7f61944edd341c2fb9297a7c6abc3cf44dc86c1f16bd6ee3",
+    ".runtime-fixtures/thinking-source-20261023/parent-native-build.log": "60752725ea6f194f20ebc7150276eef9d351f09c52a8c6e784e05f6a10ca45df",
+    ".runtime-fixtures/thinking-source-20261023/parent-native-program.json": "0f4e86dc9962a68ced88cc62f1468e5bbb88c84358674216c9412ac7e4027bf5",
+    ".runtime-fixtures/thinking-source-20261023/parent-native-driver.log": "3be4e34b45014c04f5a204150dc13ae1bc345918b39ba2d6779c0522914eaeac",
+    ".runtime-fixtures/thinking-source-20261023/parent-native-reading.log": "de718686d39482ffecf9560337a4c048b0364e25b6cd16d45cac78be8970d2ad",
+    ".runtime-fixtures/thinking-source-20261023/parent-native-reading.log.frontmost.jsonl": "12c37bca9bbd6b4eebeb90ec4957acda244a83351500feb7e0c8520ba71a4009",
+    ".runtime-fixtures/thinking-source-20261023/parent-native-reading.json": "cec957c17517a4794dfeed1a790d3649ab8928db275c26609f5cb4b5a46edc51",
+    ".runtime-fixtures/thinking-source-20261023/parent-native-ime.log": "e5b23e0a5be97dd5997f18f61d75834a4e66cab90c81eab93c3ce175509ddaf8",
+    ".runtime-fixtures/thinking-source-20261023/parent-native-ime.log.frontmost.jsonl": "26fe003ad020fa37d0ccf574f688560d3c586f21959817fb148a28bb4bb58abd",
+    ".runtime-fixtures/thinking-source-20261023/parent-native-ime-driver.log": "b939fb4124b474e4603c77d1ca639849aa721789d94fda2f309cdd4e75160499",
+    ".runtime-fixtures/thinking-source-20261023/parent-native-ime.json": "a33c5af6211b6266f350ca893303759c57e71fa6762bd104a6db03a48609c11f",
+    ".runtime-fixtures/thinking-source-20261023/ci-d8e975e-final.json": "2bf379e3e1d88ac997933a1a8d268b76c37a9f7f52c14747b8f58f2d4b1d8adf",
+    ".runtime-fixtures/thinking-source-20261023/ci-d8e975e-macos.log": "3a7f715bbedd281693874dd731a09e84ddf54d5189a32fc3d2432f5deaadea1b"
+  },
+  "disk": {
+    "newTargets": 0,
+    "executableRetention": "hardlink",
+    "deletedBytes": 0
+  }
+}

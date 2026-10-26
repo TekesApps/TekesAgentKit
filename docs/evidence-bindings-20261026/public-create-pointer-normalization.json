@@ -1,0 +1,38 @@
+{
+  "scope": "two original official baseline cold cases; metadata parser correction only, not full endpoint performance",
+  "problem": "saveAs aliases s0/s1 were mistaken for assigned public sessionIds; materializer now uses original create replies and independently matches original consumer scopes",
+  "rows": [
+    {
+      "endpoint": "pi",
+      "role": "baseline",
+      "mode": "cold",
+      "caseIndex": 0,
+      "officialContextBeforeMeasurement": true,
+      "originalExecutionReceiptSha256": "95952df7fb7df5df0887854202ae4452a9f0452ffda65be9fbba9de34d7d4252",
+      "originalMaterializationErrorSha256": "eb2eba97031e640ee5f2d6223943ca1ef7465a1d80dacf7b401488bec6adac04",
+      "sampleSha256": "e2d1cb1a94f7b3087ed3a1c1104f277d45b46c834a4ef75d1ab18e444aef6bb3",
+      "offlineCorrectionSha256": "eb805a6d44ba5ce9c50cf6317356bca4c9e4f510975521558ec31cc951ab50cc",
+      "protocolRerun": false,
+      "singleCaseContractPassed": true
+    },
+    {
+      "endpoint": "dsh",
+      "role": "baseline",
+      "mode": "cold",
+      "caseIndex": 0,
+      "officialContextBeforeMeasurement": true,
+      "originalExecutionReceiptSha256": "a3ef60a293a9f448754ce378ff9189ad82935584f40ae4a79d3907195b3a30f9",
+      "originalMaterializationErrorSha256": "0eddb06fe4c63600484fb07996016b51c8258036142123a5c3af29d7f3721387",
+      "sampleSha256": "3f82ef4fb8609a1d586167f8b390c2f2f16bfb1ebb09a06448fd60bec62ec1aa",
+      "offlineCorrectionSha256": "1bd94f7873cacd28ca8e9d65c3515f5d08914daa9fd1ee64024d92e1c1c940cd",
+      "protocolRerun": false,
+      "singleCaseContractPassed": true
+    }
+  ],
+  "captureInputsIdenticalAcrossV2V3": true,
+  "inputReviewSha256": "f740583e79d177f58bd12982e6aa7f4901f5aaa96cec662d45d184bcbede5ee9",
+  "remainingUnexecutedRegistrationsUpdated": 24,
+  "alreadyExecutedMeasurementsReplaced": false,
+  "performanceAccepted": false,
+  "piLifecycleStillNotRun": true
+}

@@ -1,14 +1,136 @@
 //! Agent-owned composition of public TekesUI controls. No endpoint or Run state machine.
+mod sidebar_visibility;
+mod tool_run;
+pub use tekes_agent_presentation::{
+    TranscriptNarrationChoice, TranscriptNarrationFallback, TranscriptNarrationItem,
+    TranscriptNarrationPolicy, TranscriptNarrationTimeline,
+};
+pub use tekes_agent_presentation::{
+    TranscriptReasoningDisclosure, TranscriptReasoningDisplay, TranscriptThinkingCall,
+    TranscriptThinkingDisplayInput, TranscriptThinkingFrame, TranscriptThinkingInput,
+    TranscriptThinkingItem, TranscriptThinkingMode, TranscriptThinkingNarration,
+    TranscriptThinkingPlaceholder, TranscriptThinkingPolicy, TranscriptThinkingSource,
+    TranscriptThinkingSources,
+};
+pub use tekes_agent_presentation::{TranscriptToolNameCount, TranscriptToolRunSummary};
+pub use tool_run::*;
+mod tool_detail_content;
+pub use sidebar_visibility::*;
+pub use tool_detail_content::ToolDetailSectionIds;
+mod sidebar_paging;
+pub use sidebar_paging::*;
+mod feedback;
+pub use feedback::*;
+mod readonly_reading;
+pub use readonly_reading::*;
+mod readonly_transcript;
+pub use readonly_transcript::*;
+mod run_column;
+pub use run_column::*;
+mod turn_preview;
+mod turn_rail;
+pub use turn_preview::TranscriptTurnPreview;
+mod turn_rail_action;
+mod turn_rail_component;
+pub use turn_rail::*;
+pub use turn_rail_component::*;
+mod run_port;
+pub use run_port::*;
+mod run_reading;
+pub use run_reading::*;
+mod run_navigation;
+pub use run_navigation::*;
+mod actionable;
+pub use actionable::*;
+mod annotation_editor;
+mod composer;
+mod composer_notice;
+pub use composer_notice::*;
+mod composer_layout;
+pub use composer_layout::{ComposerLayoutGeometry, ComposerPrimaryActionKind};
+mod composer_uploads;
+pub use annotation_editor::*;
+pub use composer_uploads::*;
+mod composer_context;
+pub use composer_context::*;
+mod composer_choices;
+pub use composer_choices::*;
+mod editor;
+#[doc(hidden)]
+pub use editor::AgentText;
+pub use editor::ComposerDraftUpdate;
+mod indicators;
+mod side_panel;
+mod side_panel_navigation;
+pub use side_panel_navigation::*;
+mod side_panel_launcher;
+pub use side_panel_launcher::*;
+mod side_panel_layout;
+pub use side_panel_layout::{SidePanelLayout, SidePanelLayoutGeometry};
+mod sidebar;
+mod sidebar_options;
+pub use sidebar_options::*;
+mod sidebar_session_menu;
+pub use sidebar_session_menu::*;
+mod sidebar_search;
+pub use sidebar_search::*;
+mod sidebar_observer_status;
+pub use sidebar_observer_status::*;
+mod summary;
+mod summary_action_row;
+mod summary_row_layout;
+pub use summary_action_row::SummaryActionRow;
+pub use summary_row_layout::SummaryDefaultRowIds;
+mod summary_section;
+mod summary_text;
+mod summary_usage;
+pub use summary_section::SummarySectionLayout;
+pub use summary_usage::{SummaryUsageRowIds, SummaryUsageRowText};
+mod thread_rename;
+pub use thread_rename::*;
+mod transcript_content;
+pub use transcript_content::*;
+mod transcript_identity;
+pub use transcript_identity::*;
+mod historical_input;
+mod input_message;
+pub use historical_input::*;
+mod output_message;
+mod tool_activity;
+pub use output_message::*;
+pub use tool_activity::*;
+mod transcript;
+pub use input_message::*;
+mod transcript_paging;
+mod turn_footnote;
+mod turn_output_copy;
+pub use composer::*;
+pub use indicators::*;
+pub use side_panel::*;
+pub use sidebar::*;
 use std::collections::BTreeMap;
-use tekes_agent_presentation::{ComposerDestination, RunScope, RunSnapshot};
+pub use summary::*;
+pub use tekes_agent_presentation::RunSnapshot;
+pub use tekes_agent_presentation::{ComposerDestination, RunScope};
+pub use tekes_agent_presentation::{
+    TranscriptToolChangeCount, TranscriptToolHeader, TranscriptToolHeaderRole,
+    TranscriptToolHeaderSpan, TranscriptToolReport, TranscriptToolReportWording,
+    TranscriptToolRowInputs,
+};
+pub use tekes_agent_presentation::{
+    TranscriptToolDetailKind, TranscriptToolDetailSection, TranscriptToolDetailWording,
+    TranscriptToolDetails,
+};
 use tekes_ui_controls::{
-    ButtonTextRenderer, ReadingController, TextSurface,
+    ButtonTextRenderer, TextSurface,
     composition::*,
     extended::{Axis, Stack},
-    layout::MeasuredChild,
 };
-use tekes_ui_scene::{Rect, Scene, Size};
+use tekes_ui_scene::{Rect, Scene};
 use tekes_ui_tokens::{Palette, Spacing};
+pub use transcript_paging::*;
+pub use turn_footnote::*;
+pub use turn_output_copy::*;
 
 pub const ROOT: ComponentId = ComponentId(1);
 pub const STATUS: ComponentId = ComponentId(2);
@@ -42,112 +164,15 @@ pub enum Intent {
     Select(&'static str),
 }
 
-/// Agent layout role. Editing, selection, IME and scrolling delegate to TekesUI unchanged.
-#[derive(Debug)]
-pub struct AgentText {
-    pub field: TextFieldContent,
-    transcript: bool,
-    focused: bool,
-}
-impl AgentText {
-    fn new(transcript: bool) -> Self {
-        let mut field = TextFieldContent::new(if transcript { "会话记录" } else { "消息" }, "");
-        if transcript {
-            field.surface = TextSurface::new("", true, true);
-            field.reading = Some(ReadingController::default());
-        }
-        Self {
-            field,
-            transcript,
-            focused: false,
-        }
-    }
-}
-impl Component for AgentText {
-    fn measure(&mut self, _: &mut dyn ButtonTextRenderer, a: Size) -> MeasuredChild {
-        MeasuredChild::new(Size::new(
-            a.width,
-            if self.transcript { a.height } else { 78. },
-        ))
-    }
-    fn arrange(&mut self, t: &mut dyn ButtonTextRenderer, f: Rect, c: Rect) {
-        if self.transcript {
-            let scale = t.backing_scale();
-            if let Some(host) = t.text_surface_host() {
-                let type_scale = host.type_scale();
-                let role = self.field.surface.role;
-                self.field.reading.as_mut().unwrap().layout_with(
-                    &mut self.field.surface,
-                    f,
-                    Some(c),
-                    scale,
-                    type_scale,
-                    |s, w| host.shape_surface(s, role, w),
-                );
-            }
-        } else {
-            self.field.arrange(t, f, c);
-        }
-    }
-    fn paint(
-        &mut self,
-        s: &mut Scene,
-        t: &mut dyn ButtonTextRenderer,
-        f: Rect,
-        c: Rect,
-        p: ContentTheme,
-    ) {
-        if self.transcript {
-            if let Some(host) = t.text_surface_host() {
-                self.field
-                    .surface
-                    .draw(host, s, p.palette, self.focused, false);
-            }
-        } else {
-            self.field.paint(s, t, f, c, p);
-        }
-    }
-    fn event(&mut self, e: &ContentEvent) -> ContentResponse {
-        self.field.event(e)
-    }
-    fn focusable(&self) -> bool {
-        self.field.focusable()
-    }
-    fn set_focus(&mut self, f: bool, v: bool) {
-        self.focused = f;
-        self.field.set_focus(f, v)
-    }
-    fn composing(&self) -> bool {
-        self.field.composing()
-    }
-    fn requires_text_services(&self) -> bool {
-        true
-    }
-    fn text_surface(&self) -> Option<&TextSurface> {
-        Some(&self.field.surface)
-    }
-    fn semantic_frame(&self, f: Rect) -> Rect {
-        self.field.semantic_frame(f)
-    }
-    fn semantics(&self) -> ContentSemantics {
-        self.field.semantics()
-    }
-    fn accessibility_action(
-        &mut self,
-        p: Option<usize>,
-        a: &AccessibilityAction,
-    ) -> ContentResponse {
-        self.field.accessibility_action(p, a)
-    }
-}
-
+/// Protocol/controls test harness. This is not the reusable Agent RunPort API.
 pub struct RunSurface {
     pub tree: ContentHost,
     selected: Option<ComposerDestination>,
     editors: BTreeMap<String, Content>,
     transcripts: BTreeMap<String, Content>,
-    counts: BTreeMap<ComponentId, usize>,
+    pending_intents: Vec<Intent>,
     committed: String,
+    source_revision: u64,
 }
 impl Default for RunSurface {
     fn default() -> Self {
@@ -179,7 +204,7 @@ impl RunSurface {
                     .collect(),
             },
         );
-        let tree = ContentHost::new(Content::new(
+        let mut tree = ContentHost::new(Content::new(
             ROOT,
             StackContent {
                 model: Stack {
@@ -196,13 +221,15 @@ impl RunSurface {
             },
         ))
         .expect("unique Agent component IDs");
+        tree.set_action_events(true);
         Self {
             tree,
             selected: None,
             editors: BTreeMap::new(),
             transcripts: BTreeMap::new(),
-            counts: BTreeMap::new(),
+            pending_intents: Vec::new(),
             committed: String::new(),
+            source_revision: 0,
         }
     }
     pub fn editor(&self) -> &TextSurface {
@@ -243,6 +270,13 @@ impl RunSurface {
             .disabled = !on;
     }
     pub fn sync(&mut self, s: &RunSnapshot) -> Result<(), &'static str> {
+        if s.revision == 0 || s.revision < self.source_revision {
+            return Err("stale or unversioned presentation snapshot");
+        }
+        // Freeze any low-level queued action against the still-presented
+        // destination before applying a newer selection/model snapshot.
+        self.collect_pending_intents();
+        self.source_revision = s.revision;
         let destination = s.selection.as_ref().map(|v| v.destination.clone());
         if self.selected != destination {
             if self.composing() {
@@ -277,37 +311,27 @@ impl RunSurface {
             self.selected = destination;
             self.committed = s.draft.text.clone();
         }
-        // Remote deltas never replace preedit, cursor or undo state. A changed authoritative
-        // draft (e.g. accepted submit) updates only when there is no active composition.
-        if !self.composing() && self.editor().input.text != s.draft.text {
-            let editor = self.text_mut(COMPOSER);
-            editor.field.surface.input = tekes_ui_controls::TextInput::new(&s.draft.text, false);
+        let key = self
+            .selected
+            .as_ref()
+            .map(ComposerDestination::storage_key)
+            .unwrap_or_else(|| "unselected".into());
+        let sync = self
+            .text_mut(COMPOSER)
+            .sync_draft(&key, s.revision, &s.draft.text);
+        match sync {
+            Ok(true) if !self.composing() => self.committed = self.editor().input.text.clone(),
+            Ok(_) => {}
+            Err(error) => {
+                self.enabled(SEND, false);
+                return Err(error);
+            }
         }
-        self.committed = s.draft.text.clone();
-        let text = s
-            .transcript
-            .items
-            .iter()
-            .filter(|i| i.is_visible)
-            .map(|i| {
-                format!(
-                    "{}\n{}",
-                    match i.kind {
-                        tekes_agent_presentation::TranscriptItemKind::User => "你",
-                        _ => "Agent",
-                    },
-                    i.text
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("\n\n");
-        let field = &mut self.text_mut(TRANSCRIPT).field;
-        if field.surface.input.text != text {
-            field.surface.input.text = text;
-            let len = field.surface.input.len();
-            field.surface.input.anchor = field.surface.input.anchor.min(len);
-            field.surface.input.caret = field.surface.input.caret.min(len);
-        }
+        let transcript = self.text_mut(TRANSCRIPT);
+        transcript
+            .history
+            .sync(&mut transcript.field, &key, &s.transcript)
+            .map_err(|_| "transcript document update rejected")?;
         self.tree
             .get_mut(STATUS)
             .unwrap()
@@ -331,7 +355,10 @@ impl RunSurface {
         );
         self.enabled(
             SEND,
-            s.can_submit && !self.composing() && !s.run.as_ref().is_some_and(|r| r.can_cancel),
+            s.can_submit
+                && !self.composing()
+                && self.editor().input.text == s.draft.text
+                && !s.run.as_ref().is_some_and(|r| r.can_cancel),
         );
         self.enabled(CANCEL, s.run.as_ref().is_some_and(|r| r.can_cancel));
         self.enabled(EARLIER, s.transcript.has_more_before);
@@ -339,66 +366,112 @@ impl RunSurface {
         self.enabled(SESSION_B, !self.composing());
         Ok(())
     }
-    pub fn event(&mut self, e: &ContentEvent) -> Vec<Intent> {
-        // Explicit Send only. Raw Enter is never promoted into submission (IME safety).
+    fn begin_input(&mut self, e: &ContentEvent) -> bool {
+        self.collect_pending_intents();
         if self.composing()
-            && matches!(e,ContentEvent::PointerDown(p) if !self.tree.get(COMPOSER).unwrap().frame().contains(*p))
+            && match e {
+                ContentEvent::PointerDown(p) => {
+                    !self.tree.get(COMPOSER).unwrap().frame().contains(*p)
+                }
+                ContentEvent::Pointer(p) if p.phase == PointerPhase::Down && p.is_primary() => {
+                    !self
+                        .tree
+                        .get(COMPOSER)
+                        .unwrap()
+                        .frame()
+                        .contains(p.position)
+                }
+                _ => false,
+            }
         {
-            return vec![];
+            return true;
+        }
+        false
+    }
+    pub fn event(&mut self, e: &ContentEvent) -> Vec<Intent> {
+        if self.begin_input(e) {
+            return std::mem::take(&mut self.pending_intents);
         }
         self.tree.event(e);
-        let mut out = vec![];
+        self.drain_intents()
+    }
+    pub fn event_with_text(
+        &mut self,
+        e: &ContentEvent,
+        text: &mut dyn ButtonTextRenderer,
+    ) -> Result<Vec<Intent>, CompositionError> {
+        if self.begin_input(e) {
+            return Ok(std::mem::take(&mut self.pending_intents));
+        }
+        self.tree.event_with_text(e, text)?;
+        Ok(self.drain_intents())
+    }
+    /// Semantic actions use the same immediate consumer-owned scope capture;
+    /// no synthetic pointer move or control counter polling is needed.
+    pub fn accessibility_action(
+        &mut self,
+        id: ComponentId,
+        part: Option<usize>,
+        action: AccessibilityAction,
+    ) -> Vec<Intent> {
+        self.collect_pending_intents();
+        if self.composing() && id != COMPOSER {
+            return std::mem::take(&mut self.pending_intents);
+        }
+        self.tree.accessibility_action(id, part, action);
+        self.drain_intents()
+    }
+    /// Owned intents may be processed after selection changes without retargeting.
+    /// Standard event/AX entry points drain immediately. Low-level tree callers
+    /// must drain too; sync freezes their pending actions before changing scope.
+    pub fn drain_intents(&mut self) -> Vec<Intent> {
+        self.collect_pending_intents();
+        std::mem::take(&mut self.pending_intents)
+    }
+    fn collect_pending_intents(&mut self) {
         if !self.composing() && self.editor().input.text != self.committed {
             self.committed = self.editor().input.text.clone();
             if let Some(destination) = &self.selected {
-                out.push(Intent::Edit {
+                self.pending_intents.push(Intent::Edit {
                     destination: destination.clone(),
                     text: self.committed.clone(),
                 });
             }
         }
-        for id in [
-            SEND, CANCEL, EARLIER, LATEST, RECONNECT, SESSION_A, SESSION_B,
-        ] {
-            let count = self
-                .tree
-                .get(id)
-                .unwrap()
-                .component::<ButtonContent>()
-                .unwrap()
-                .activations;
-            let old = self.counts.insert(id, count).unwrap_or(0);
-            if count > old {
-                match id {
-                    SEND if !self.composing() => {
-                        if let Some(destination) = &self.selected {
-                            out.push(Intent::Send {
-                                destination: destination.clone(),
-                            });
-                        }
+        for action in self.tree.drain_actions() {
+            // Editor Submit remains a generic intent; AgentKit's current product
+            // contract is explicit-button Send, not a keyboard-send migration.
+            if action.kind != ContentActionKind::Activate {
+                continue;
+            }
+            match action.target {
+                SEND if !self.composing() => {
+                    if let Some(destination) = self.selected.clone() {
+                        let receipt = self.editor().input.external_baseline();
+                        self.text_mut(COMPOSER).clear_baseline = Some(receipt);
+                        self.pending_intents.push(Intent::Send { destination });
                     }
-                    CANCEL | EARLIER => {
-                        if let Some(ComposerDestination::Run { scope }) = &self.selected {
-                            out.push(if id == CANCEL {
-                                Intent::Cancel {
-                                    scope: scope.clone(),
-                                }
-                            } else {
-                                Intent::Earlier {
-                                    scope: scope.clone(),
-                                }
-                            });
-                        }
-                    }
-                    RECONNECT => out.push(Intent::Reconnect),
-                    SESSION_A if !self.composing() => out.push(Intent::Select("a")),
-                    SESSION_B if !self.composing() => out.push(Intent::Select("b")),
-                    LATEST => self.follow_latest(),
-                    _ => {}
                 }
+                CANCEL | EARLIER => {
+                    if let Some(ComposerDestination::Run { scope }) = &self.selected {
+                        self.pending_intents.push(if action.target == CANCEL {
+                            Intent::Cancel {
+                                scope: scope.clone(),
+                            }
+                        } else {
+                            Intent::Earlier {
+                                scope: scope.clone(),
+                            }
+                        });
+                    }
+                }
+                RECONNECT => self.pending_intents.push(Intent::Reconnect),
+                SESSION_A if !self.composing() => self.pending_intents.push(Intent::Select("a")),
+                SESSION_B if !self.composing() => self.pending_intents.push(Intent::Select("b")),
+                LATEST => self.follow_latest(),
+                _ => {}
             }
         }
-        out
     }
     pub fn follow_latest(&mut self) {
         let t = self.text_mut(TRANSCRIPT);
@@ -419,3 +492,55 @@ impl RunSurface {
         self.tree.render(s, t, f, c, p)
     }
 }
+
+pub use tekes_agent_presentation::{
+    TranscriptActivityPresentation, TranscriptAdmittedFile, TranscriptAdmittedFileInfo,
+    TranscriptAttachmentDisplayItem, TranscriptBlockContent, TranscriptContentBlock,
+    TranscriptDelivery, TranscriptDisplayOrder, TranscriptDocument, TranscriptEventOrder,
+    TranscriptFailure, TranscriptInput, TranscriptInputRole, TranscriptItem, TranscriptItemKind,
+    TranscriptItemPlanes, TranscriptMessageKey, TranscriptOrderedEvent, TranscriptOutput,
+    TranscriptPlane, TranscriptSection, TranscriptSnapshot, TranscriptSourcePosition,
+    TranscriptSystemPrompt, TranscriptSystemPromptPlacement, TranscriptToolCall,
+    TranscriptToolCardModel, TranscriptToolDiffHunk, TranscriptToolRead, TranscriptToolReadLine,
+    TranscriptToolRowModel, TranscriptToolRowState, TranscriptToolRowWording, TranscriptToolSearch,
+    TranscriptToolSearchFile, TranscriptToolSearchMatch, TranscriptToolTerminal, TranscriptToolWeb,
+    TranscriptToolWebSource, TranscriptTurn, TranscriptTurnPlanes,
+};
+
+mod sidebar_preferences;
+pub use sidebar_preferences::*;
+
+mod sidebar_folders;
+pub use sidebar_folders::*;
+
+mod sidebar_navigation;
+pub use sidebar_navigation::SidebarSelectionNavigation;
+
+mod sidebar_catalog;
+pub use sidebar_catalog::*;
+
+mod sidebar_reveal;
+pub use sidebar_reveal::*;
+
+mod summary_custom;
+pub use summary_custom::{
+    SummaryCustomRowError, SummaryCustomRowSpec, SummaryCustomRowToken, install_summary_custom_row,
+    publish_summary_context_update,
+};
+
+mod turn_footnote_timing;
+pub use turn_footnote_timing::*;
+
+// Re-export shared read-only goal facts; the UI does not define another lifecycle.
+pub use tekes_agent_presentation::{GoalFacts, GoalPhase};
+
+mod sidebar_multi_search_status;
+pub use sidebar_multi_search_status::*;
+
+pub use tekes_agent_presentation::{
+    SidebarObservation, SidebarObserverEndpointInput, SidebarObserverIntent, SidebarObserverKey,
+    SidebarObserverPhase, SidebarObserverSourceKey, SidebarObserverStatusInput,
+};
+
+mod family_catalog;
+pub use family_catalog::*;

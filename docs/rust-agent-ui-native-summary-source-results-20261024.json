@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 1,
+  "issue": 25,
+  "relatedIssues": [
+    23,
+    27
+  ],
+  "pullRequest": 10,
+  "scope": "real-Native-Task-publication-source-and-passive-Summary-mount",
+  "headlessSourceCommit": "858a63c6c7344f0bf60ede0d9a2f3ceff51d492f",
+  "sdkRevision": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "kernelVersion": "0.9.3",
+  "run": {
+    "commandCount": 15,
+    "desktopInteraction": false,
+    "endpoint": "native",
+    "historyReconnect": "public-bounded-history-and-new-publication-capture",
+    "kernelSupervisorSha256": "365eca9385f36d5897a81ba398e7f34b4b9819896d6a1b78c618a7710b14380f",
+    "kernelWorkerSha256": "1284014bd0a8d3cb711c0512b10762322a19af4beabc1f9e681bacb1e28fa64d",
+    "limitations": [
+      "JSON validation cannot detect a producer that fabricates the complete witness",
+      "the public bounded child history is separate from Summary Task navigation",
+      "no desktop, physical IME, accessibility, or UI acceptance is claimed"
+    ],
+    "ownedKernelNormalExit": true,
+    "paidModel": false,
+    "programSha256": "2ebad9784377de4e55a890df6478db2ac22a8b16c06fca2a988c4ab37d7ac022",
+    "provider": "synthetic-loopback",
+    "providerRequestCount": 3,
+    "realHarnessProtocolVerified": true,
+    "result": "accepted",
+    "sameRuntimeCapture": true,
+    "schemaVersion": 1,
+    "serverTransactionalFreshnessProven": false,
+    "summaryTaskPointer": "passive-parent-scope-only"
+  },
+  "source": {
+    "endpoint": "native",
+    "evidenceScope": "single-publication-same-memory-authority",
+    "fabricationResistance": "not-proven-by-json-validation",
+    "parentSessionId": "94f10f90-8d21-4e17-aad3-d95d38a6351a",
+    "passiveParentTask": true,
+    "projectionSucceeded": true,
+    "serverTransactionalFreshnessProven": false,
+    "sourceIdentity": {
+      "contentIndex": null,
+      "kind": "journal",
+      "sequence": 4
+    },
+    "summaryRow": {
+      "id": "[\"native\",\"94f10f90-8d21-4e17-aad3-d95d38a6351a\",\"tool:native-child-proof\"]",
+      "kind": "task",
+      "name": "Bounded child proof",
+      "scope": {
+        "endpointId": "native",
+        "sessionId": "94f10f90-8d21-4e17-aad3-d95d38a6351a",
+        "threadId": "94f10f90-8d21-4e17-aad3-d95d38a6351a"
+      },
+      "status": "done"
+    },
+    "toolPhase": "done"
+  },
+  "component": {
+    "childRows": [],
+    "connectionEpoch": 5,
+    "desktopVisibility": false,
+    "nativeInteraction": false,
+    "passiveTaskProfile": true,
+    "physicalIme": false,
+    "rendered": false,
+    "result": "mounted",
+    "scope": {
+      "endpointId": "native",
+      "sessionId": "94f10f90-8d21-4e17-aad3-d95d38a6351a",
+      "threadId": "94f10f90-8d21-4e17-aad3-d95d38a6351a"
+    },
+    "snapshotRevision": 53,
+    "summaryInputMatchesCapturedFacts": true,
+    "summarySections": [
+      "tasks",
+      "usage"
+    ],
+    "taskRows": [
+      {
+        "canonicalStatus": "completed",
+        "id": "[\"native\",\"94f10f90-8d21-4e17-aad3-d95d38a6351a\",\"tool:native-child-proof\"]",
+        "navigationAction": false,
+        "passiveTitleMounted": true,
+        "sourceStatus": "done",
+        "statusGlyphRendered": false,
+        "title": "Bounded child proof"
+      }
+    ]
+  },
+  "boundedHistory": {
+    "equivalentToSummaryTaskPointer": false,
+    "publicBoundedPageLimit": 50,
+    "publicChildHistoryReads": 2,
+    "sameParentAndChild": true
+  },
+  "programs": {
+    "source": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/examples/summary_source",
+    "sha256": "2af6c14e6158ec18c0b6930ca20b19ad562b49beb6bbdd86fdd2a49dad965212",
+    "archiveOnly": true,
+    "headlessArchiveReference": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/summary-source-witness-20261024/programs/tekes-agent-headless-source-witness",
+    "headlessSha256": "2ebad9784377de4e55a890df6478db2ac22a8b16c06fca2a988c4ab37d7ac022"
+  },
+  "witnessSha256": "2af440036511d7d121b52191d319adbcc072b4701a295fbdac622e07d9428342",
+  "validation": {
+    "python": {
+      "passed": 197,
+      "failed": 0,
+      "newNativeTests": 8
+    },
+    "consumerExampleClippy": "passed",
+    "originalPiConsumerBackwardMode": "passed",
+    "sharedPublicSourceClosure": {
+      "sha256": "77b6bb17877c61a2658a1efa94dfb6b7c1bf45ff0d42ab4269500031e70094f2",
+      "files": 137,
+      "matches858ConsumerClosure": true,
+      "note": "new consumer example and Native runner do not modify reusable package/host sources"
+    },
+    "wholeUiSuiteRerunInThisSlice": false,
+    "nativeInteraction": false,
+    "physicalIme": false,
+    "desktopVisibility": false,
+    "rendered": false
+  },
+  "notRun": [
+    "same-Task-row-dynamic-pointer",
+    "running-failure-source-transitions",
+    "real-parent-draft-isolation-in-this-profile",
+    "glyph-hover-theme-layout",
+    "desktop-IME-AX-ProcessContainer",
+    "server-transactional-freshness"
+  ],
+  "issueClosed": false,
+  "mergeTagRelease": false,
+  "cacheBytesDeletedInThisSlice": 0,
+  "evidenceRoot": ".runtime-fixtures/native-summary-source-20261024",
+  "ciTerminalAttestation": {
+    "headSha": "7e9383bf95f2641e0020606f752c5847dd9d3391",
+    "prRun": 40090137271,
+    "pushRun": 40090134330,
+    "status": "completed",
+    "onlyFailure": "strict nested detail reading (TekesUI #53)",
+    "standaloneConsumer": "passed-both-runs",
+    "defaultRootPassed": 341,
+    "optInPassed": 249,
+    "uiPassed": 747,
+    "uiIgnored": 1,
+    "pythonPassed": 197,
+    "receipt": ".runtime-fixtures/native-summary-source-20261024/ci-terminal-evidence.json"
+  }
+}

@@ -1,0 +1,171 @@
+{
+  "date": "2026-10-20",
+  "publishedBaseline": "v0.3.8",
+  "tekesui": {
+    "rev": "431093786de47b48cd566d0d9c0eafa088b10d68",
+    "packages": 8,
+    "files": 188,
+    "sha256": "03721866a362b1d31261ebbbc86140eb07e9e23320871c325234a5212591213d"
+  },
+  "tests": {
+    "uiWorkspace": 109,
+    "creationCases": 4,
+    "postReviewTargetedCreation": 4,
+    "tools": 18,
+    "root": "unchanged; prior 105 tests not rerun"
+  },
+  "gates": [
+    "UI strict all-targets Clippy",
+    "fmt",
+    "build",
+    "dependency boundaries",
+    "actual Cargo public input bytes"
+  ],
+  "sourceSha256": {
+    "ui/Cargo.toml": "7525017e40d083d5fa34d97c7be42970ec6c3ce2bb803be3f3bcf94c295cdb9d",
+    "ui/Cargo.lock": "3db5bc8ab44a22f4eeceb5febacce7863ef5e0bbc8b7ba03ff58e132ab78c5ac",
+    "ui/bindings/Cargo.toml": "6a30d6e55f9f9db07adca6dd474a68c55c1036179eb6ce9ac33880e1607232eb",
+    "ui/bindings/src/presets.rs": "43a5fe056bee383bfe9468ef3ed066a692fe14780860a15a9f25c3fb4233e96b",
+    "ui/bindings/src/lib.rs": "f809399275c0b0589d1a981ec291a2122d3b985075f697cac92461fdde2a474c",
+    "ui/components/src/composer_choices.rs": "2f8deab124acd3edc66b8a8a0bd8fd110a252c1ce9b7aaa55bbe23f0ea69fc1c",
+    "ui/demo/src/component_demo.rs": "10281aa5df5ee43be73abf24654eb1a8d7dc7b89ad3a1267bfe9b301b02f1ad8",
+    "ui/demo/src/components_native.rs": "984c9a513a8ebf0f250c70134f3c2d685912a8962e668044aa27e89ddb40d1dc",
+    "ui/demo/tests/session_creation.rs": "236a1e8ea095feee63ea7d202a1972e774ab5b69e52b21a0eda98a23e925d911",
+    "ui/consumer/src/lib.rs": "ae6dffadfb4baee41c2ec434871a334b2c3b9cebe406d885792ae76b0208fc07",
+    "scripts/check-ui-boundaries.py": "8370dc03b951b745a32c22ca42b42963d2830147150014327d9b7ea2f290c7b2",
+    "scripts/tests/test_acceptance_tools.py": "29423e5f0ef2d57996cd1fcea246d9960212db9cc01a0bb8a5b3201b9caa532a",
+    "scripts/test-real-session-endpoints.py": "076efdae64ec079bf0cadf2b4c320e9e6916ac18912f26b48fe72274ccd218d1"
+  },
+  "binarySha256": "055d5f0c137c210b280a6178fc8b774484d615d5259a2f0b8413fa751d0f1c3d",
+  "screenshot": {
+    "path": "ui/docs/creation-native.png",
+    "sha256": "1b4b95cec392f53bb675f3021cae318367dd0a4fc679a8a80988b04ba08896ce"
+  },
+  "native": {
+    "creationMarker": "NATIVE_AGENT_CREATION_SELFTEST_OK public-preset-panel+captured-session-rpc+shared-create+normal-composer+synthetic-ime-barrier+single-admission+stream+original-draft; physical-ime=false; formal-transcript=false",
+    "fullRegressionMarkers": [
+      "NATIVE_AGENT_SIDEBAR_SUMMARY_SELFTEST_OK shared-inventory+shared-pin+sidebar-selection+summary-facts; full-run-view=false; physical-ime=false",
+      "NATIVE_AGENT_SIDECHAT_SELFTEST_OK owned-create+separate-composer+send+stream+draft+cancel-discard+parent-isolation; transcript=false; physical-ime=false",
+      "NATIVE_AGENT_CHILD_SELFTEST_OK direct-parent+independent-composer+single-admission+stream+cancel+isolated-drafts+bounded-read-only+paging+local-retirement; formal-transcript=false; physical-ime=false",
+      "NATIVE_AGENT_TASK_SELFTEST_OK resolved-task+independent-composer+single-admission+stream+cancel+parent-draft-isolation+close; transcript=false; physical-ime=false",
+      "NATIVE_AGENT_COMPONENTS_SELFTEST_OK composer+indicators+run-binding+synthetic-text-services+send+stream+cancel+draft-isolation+reconnect; physical-ime=false; transcript=false; reading-anchor=false"
+    ],
+    "physicalIME": false,
+    "voiceOver": false,
+    "formalTranscript": false,
+    "formalRunView": false
+  },
+  "realEndpoints": {
+    "PI": {
+      "components": true,
+      "contextProof": null,
+      "finalAssistantItems": 1,
+      "initialPresetProof": {
+        "catalogChoices": 1,
+        "componentCreationEntry": true,
+        "createdSession": true,
+        "explicitSelection": true,
+        "nativeInteraction": false,
+        "originalDraftPreserved": true,
+        "presetIdentityReturned": false,
+        "promptSettled": true,
+        "selectedPreset": "default",
+        "singleInput": true
+      },
+      "inventoryRows": 14,
+      "isStale": false,
+      "modelChoiceProof": null,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 2,
+      "transcriptView": false
+    },
+    "DSH": {
+      "components": true,
+      "contextProof": null,
+      "finalAssistantItems": 1,
+      "initialPresetProof": {
+        "catalogChoices": 4,
+        "componentCreationEntry": true,
+        "createdSession": true,
+        "explicitSelection": true,
+        "nativeInteraction": false,
+        "originalDraftPreserved": true,
+        "presetIdentityReturned": true,
+        "promptSettled": true,
+        "selectedPreset": "standard",
+        "singleInput": true
+      },
+      "inventoryRows": 9,
+      "isStale": false,
+      "modelChoiceProof": null,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 5,
+      "transcriptView": false
+    },
+    "NATIVE": {
+      "components": true,
+      "contextProof": null,
+      "finalAssistantItems": 1,
+      "initialPresetProof": {
+        "catalogChoices": 2,
+        "componentCreationEntry": true,
+        "createdSession": true,
+        "explicitSelection": true,
+        "nativeInteraction": false,
+        "originalDraftPreserved": true,
+        "presetIdentityReturned": true,
+        "promptSettled": true,
+        "selectedPreset": "coding",
+        "singleInput": true
+      },
+      "inventoryRows": 5,
+      "isStale": false,
+      "modelChoiceProof": null,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 2,
+      "transcriptView": false
+    }
+  },
+  "provider": "isolated temporary state and local synthetic; no paid model",
+  "logs": {
+    "/tmp/agentkit-create-ui-final.log": "91b0606a1e6d4a754d49ded20406cf58ee50b4f7fe8c3d28a33334afe29a5251",
+    "/tmp/agentkit-create-targeted-review.log": "93b1289dc9862457318ee78cd67c32e8a3de40f583de13bff6603cc71525cf0c",
+    "/tmp/agentkit-create-clippy-review.log": "d3f77ef4d322c051920b05921894cf133f97861224b1dc9b8e87894af4afa96e",
+    "/tmp/agentkit-create-build-review.log": "4f27ac380b22e1d975eee20ce727fa8cbc09061177f6253af0777fd4de7b7506",
+    "/tmp/agentkit-create-native-reviewed.log": "c09e81824eb14659ef4220a23eef679712a252b8ef4cbd431f7a3c1b2a8391a0",
+    "/tmp/agentkit-create-native-regression.log": "f5ab73d04603fa13e93b06ed336b736ad8a227f54f7e6e7b93d19c5330d48a4f",
+    "/tmp/agentkit-create-entry-reviewed.log": "feab6458333ed85161929d079a446d153e478699c928e4c58c84999fb54e66ef",
+    "/tmp/agentkit-create-tools.log": "a29db1996e6757a956646aac8dac8a497589a3b418b24c0dacdd8b300af47884",
+    "/tmp/agentkit-create-tools-pass.log": "cb352287bca2a7eff669d077ba5129ef30653a39f64a14942a827f7ad1495177"
+  },
+  "review": {
+    "wrongBindingCompletion": "reject before dropping original pending action; targeted regression passes",
+    "immutableIdentity": "session UUID and RPC allocated before execution; no generated replacement after uncertainty",
+    "dependencyChange": "only one bindings uuid edge added to UI lock; strict whitelist and fixture updated",
+    "toolFirstFailure": "old boundary test fixture omitted newly allowed uuid; fixture corrected; mixed path and wrong-rev rejection preserved",
+    "evidenceOrder": "109-suite then wrong-target guard+4 targeted tests+strict Clippy/build; creation native and real3 repeated on reviewed binary; broader native regression predates that isolated guard"
+  },
+  "pending": [
+    "dedicated creation reconciliation/retry UI",
+    "file picker/upload/preview",
+    "annotation editor/source highlight",
+    "context undo",
+    "remaining Composer capability entries",
+    "formal Transcript/RunView; public #23 registration gate and independent #22",
+    "full SidePanel bodies",
+    "physical IME/reading/paging acceptance",
+    "review CI merge tag"
+  ]
+}

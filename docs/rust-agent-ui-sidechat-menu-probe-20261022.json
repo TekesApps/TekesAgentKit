@@ -1,0 +1,39 @@
+{
+  "sourceBase": "ac51636b41e962768a0120fb4a687f603665143a",
+  "tekesui": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "publishedAgentKitBaseline": "v0.3.8",
+  "agentKitInput": "repository development paths; not a claim that UI builds against unmodified v0.3.8",
+  "nativeExecuted": false,
+  "nativePendingReason": "desktop availability question unanswered; no native window or input started",
+  "hostTestsPassed": 14,
+  "publicConsumerTestsPassed": 3,
+  "strictClippyPassed": true,
+  "demoBuildPassed": true,
+  "sources": {
+    "ui/demo/src/native_panel_navigation_selftest.rs": "30f24e374daaa3baa1db7a90df44e83f9422e49fec09260ddcd570e4f8c20eee",
+    "ui/demo/src/components_native.rs": "44dab4180aa77ad0e4506f1909c0bb2747c12df3013c403acef223ee7706f777"
+  },
+  "logs": {
+    "clippy.log": "0e263e2e3cbd706ed08f47f95d4c046e711d58e93d0607a4a1fa769997955746",
+    "host-tests.log": "e3f6c009e6a4bf54ff3f29f243985615849047345b91094bce2158ffddda1c83",
+    "consumer-tests.log": "21ecf125cc5b018ca17ffbbe998b8f9ccfd831a60eee427040aea493c68be936",
+    "build.log": "fcce12e8e9a3743502ec98eb1888a43a32489c10219b715f931aa40675ed5311"
+  },
+  "hostFamilyIntegration": {
+    "sourceBase": "970ffa7ce0237dfcfd18c794558940fc43274103",
+    "test": "native_text::host_family_menu_creates_selects_and_discards_original_scratch_pointers",
+    "scope": "same-process CoreText layout and original SDK semantic actions over controlled public SEP; no native window",
+    "hostSuitePassed": 15,
+    "uiWorkspacePassed": 532,
+    "uiWorkspaceIgnored": 1,
+    "knownIgnoredIssue": "TekesUI #49",
+    "strictWorkspaceClippyPassed": true,
+    "nativeExecuted": false,
+    "testSourceSha256": "2234d18984df676a81a67c16a9b0a39476ef9781d763ce6b64c110f770e66750",
+    "logs": {
+      ".runtime-fixtures/sidechat-family-host-20261022/clippy.log": "8773bf7b5576ac26e004c7cea0b20d53aba160e5125feb6aed45ab2157418b37",
+      ".runtime-fixtures/sidechat-family-host-20261022/host-tests.log": "c5ac0e88efca0157fcd1bcd85f4d2fcaaebeb83dc3f4b381a7f4579c52de6de4",
+      ".runtime-fixtures/sidechat-family-host-20261022/workspace-tests.log": "1b7430c8e0921751c2a9ee347169aa85d541e6f3dee44773b46db992c2030dae"
+    }
+  }
+}

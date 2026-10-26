@@ -1,0 +1,111 @@
+{
+  "date": "2026-10-19",
+  "publishedBaseline": "v0.3.8",
+  "tekesui": {
+    "rev": "431093786de47b48cd566d0d9c0eafa088b10d68",
+    "sha256": "03721866a362b1d31261ebbbc86140eb07e9e23320871c325234a5212591213d",
+    "packages": 8,
+    "files": 188
+  },
+  "tests": {
+    "root": 105,
+    "ui": 88,
+    "tools": 18
+  },
+  "strictClippy": {
+    "rootAllTargets": true,
+    "uiAllTargets": true
+  },
+  "nativeFixture": {
+    "threadActions": true,
+    "previousComponentsRegression": true,
+    "physicalIme": false,
+    "formalTranscript": false,
+    "formalRunView": false
+  },
+  "firstRegressionAttempt": {
+    "passed": false,
+    "cause": "selftest waited for empty-draft send readiness before entering text",
+    "fixed": "wait for child catalog/control readiness; preserve empty-draft send gate",
+    "regressionAssertion": true
+  },
+  "realEndpoints": {
+    "PI": {
+      "components": true,
+      "finalAssistantItems": 2,
+      "inventoryRows": 13,
+      "isStale": false,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 5,
+      "transcriptView": false
+    },
+    "DSH": {
+      "components": true,
+      "finalAssistantItems": 1,
+      "inventoryRows": 8,
+      "isStale": false,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 5,
+      "transcriptView": false
+    },
+    "NATIVE": {
+      "components": true,
+      "finalAssistantItems": 1,
+      "inventoryRows": 4,
+      "isStale": false,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 2,
+      "transcriptView": false
+    }
+  },
+  "realThreadActionsNativeInteraction": false,
+  "logs": {
+    "rootTests": {
+      "path": "/tmp/agentkit-actions-root-tests.log",
+      "sha256": "d819f7dd86b9c082f92bdca5df77c00f05e4ba77498e93a433b613b893e718ab"
+    },
+    "uiTests": {
+      "path": "/tmp/agentkit-actions-ui-tests-final.log",
+      "sha256": "4f9b55735727c8ea8dd334484a6add870c4f2b90132bdc20b908eabfb682e65b"
+    },
+    "threadActionsNative": {
+      "path": "/tmp/agentkit-thread-actions-native.log",
+      "sha256": "4a85ddb6b3b908c85146ab9b3c7b5919bad2cd26228452a6a881d71a8b82974b"
+    },
+    "nativeRegressionFailed": {
+      "path": "/tmp/agentkit-actions-native-regression.log",
+      "sha256": "d92df4ac43c4a5b6373b519de896f1bb99cd0eb4d486a2256894de578af3028d"
+    },
+    "nativeRegressionPassed": {
+      "path": "/tmp/agentkit-actions-native-regression-fixed.log",
+      "sha256": "52d826ef271e38014a85e2a8b2599da6912c9c11036f0351701f5bd060a5830e"
+    },
+    "realEndpoints": {
+      "path": "/tmp/agentkit-actions-real-sep.log",
+      "sha256": "f88f3d9f2d53b18da6ef19682c9c73d3e8f11141d5f90cc3e34169b5e0d0508b"
+    }
+  },
+  "screenshot": {
+    "path": "ui/docs/thread-actions-native.png",
+    "sha256": "0b8d6864748abb97b631a0b44db3a611581c9d98a3f6bf204ad06ae8666ddcea"
+  },
+  "remaining": [
+    "formal Transcript and RunView",
+    "Composer capability entry UI",
+    "real three-harness pane and action native acceptance",
+    "physical IME and reading anchors",
+    "review, CI, merge and stage tag"
+  ]
+}

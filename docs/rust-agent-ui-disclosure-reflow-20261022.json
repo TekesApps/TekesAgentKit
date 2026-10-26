@@ -1,0 +1,75 @@
+{
+  "checked_at": "2026-10-21T18:29:42.782733+00:00",
+  "base_commit": "0f2b1dcf0f8bfcd10b443e106a98096f07fbce88",
+  "program": {
+    "program": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/AgentKitDisclosureReading.app/Contents/MacOS/AgentKitDisclosureReading",
+    "sha256": "a4499cb25e3d0959d2a035973355ee9381198a5868d659a4b62b382094a061d1",
+    "sdk": "09b4bab44b6dfa65487250ea816b610b9df59095"
+  },
+  "source_hashes": {
+    "ui/README.md": "a8dd03fd96c07731580eb9b376148b042d0f449eb84a4faefe4f128895ded776",
+    "ui/consumer/src/lib.rs": "e5cba1d71751da21567cad0322ba21ad9670a378a40c990b567e254bfe3359ba",
+    "ui/demo/src/components_native.rs": "a0883fd2b05315fdd9543ca1f26a5922642e142808cea2d514b7428fcb55f461",
+    "ui/demo/src/fixture.rs": "c9c81b415f0867058bf96148fd27922e30f4dc1181aa33fea06398dc08719b33",
+    "ui/demo/tests/run_reading.rs": "0ff39267175f518b5b9b2d3c4bdc5e46587bf370f9716b6771bd7c1d352c8f3c",
+    "ui/demo/src/native_disclosure_reading_selftest.rs": "28b97fab87a6c92b1588386cbae8715fad70691aa7b39a86eae429c8fc282326"
+  },
+  "read_only_references": {
+    "/Users/frankqin/dev/TekesClientKit/Tests/TranscriptRenderingTests/TranscriptDisclosureInteractionTests.swift": "67e513f1ea5e33a4e9da919f92bb9073d0b89e546d9835ce0682f054369025f8",
+    "/Users/frankqin/dev/TekesClientKit/Sources/TranscriptCoordinator/TranscriptNativeSurface.swift": "4ec7314e93bc0702ece6a14c98dc4915179023882c1ece00dbbd6f3e9a73bffd",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/ComposerSetupChipView.swift": "9275cc662fdeb64b9ef66ffa2ccea53aade053f8cbe040152aebd57d57eda69c",
+    "/Users/frankqin/dev/Tekes/Tekes/AppShell/MainWindowToolbar.swift": "ced2e2e7b2743e5fb8045ebf963cbe4a7ac9fcf6318751a86f3c898a520c8f28"
+  },
+  "evidence_directory": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/disclosure-reading-20261022",
+  "evidence_hashes": {
+    "clippy-final.log": "fe9c62f93bea2ed9d07b7a43c8b7a40e1201b0a4d72437f03e078f986e43b244",
+    "program.json": "ddcc8d02c8e8a42830fda475b1cd51470932b04c0ff743e28642c64154a51838",
+    "component-final.log": "f53f9d926078e4b14bc7149a0850b5ff578d100a702a2b75ff450e33e21cbde4",
+    "component.log": "e653c75f8eed66bab47b640f645c883c4de09aa204806d0ebc146329697f7491",
+    "clippy.log": "544c081fb8095c0a184d3f0833d0d25f449559e055205499527dc42ccdd88a2b",
+    "workspace.log": "bc8c2f2a641991eb8eafd71a7980f54355dbae4e30a1f755d3d54807c39552f9",
+    "build-final.log": "fdc15c9514faa32aed89750e6c659275f90d228acff0d7b66551dbaf7b19f1e2",
+    "component-scoped.log": "6c5220998b0a6ec5d3931a270d9ae0266dbe53e622a391b298777739499c831a",
+    "native.log": "c67792454365c64491df5fb538d67970b882574c3eb23ae6948f733fd73abc87",
+    "component-fixed.log": "5b028b4fe26ddb7ba174b3ecc9c4f3d22e0f998adec2a54346858967422c2f10",
+    "check.log": "9b6fbb06f8d3c5437135d7caa0a19bce87f9036529b06802d1f25b6f192647e0",
+    "build.log": "f694a9e074374d315f58b8a63ce849858b1b8708cf56b3d194218605bd2a9d6e"
+  },
+  "ui_workspace_tests": 456,
+  "strict_all_target_clippy": true,
+  "native": [
+    {
+      "expandedDetailsRetained": true,
+      "liveResize": true,
+      "nativeWindow": true,
+      "noSubmission": true,
+      "originalEditorFocusAndChineseMarked": true,
+      "originalToolAndReasoningClicks": true,
+      "ownedProtocolHistory": true,
+      "physicalIme": false,
+      "physicalResizeDrag": false,
+      "readingAnchorPreserved": true,
+      "realHarness": false,
+      "typeScaleReflow": true,
+      "voiceOver": false
+    }
+  ],
+  "component_scope": [
+    "offscreen expanded tool result growth",
+    "width and font scale reflow",
+    "opaque marked baseline and original editor",
+    "explicit AX focus navigation distinguished from passive layout"
+  ],
+  "native_scope": [
+    "original tool/reasoning pointer controls",
+    "owned normalized SEP history",
+    "AppKit live resize",
+    "host type scale reflow",
+    "reading anchor and original editor/focus/marked baseline"
+  ],
+  "real_harness": false,
+  "physical_ime": false,
+  "paired_visual_acceptance": false,
+  "new_target": false,
+  "deleted_bytes": 0
+}

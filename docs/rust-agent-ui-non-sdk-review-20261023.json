@@ -1,0 +1,225 @@
+{
+  "baseCommit": "f6cd5317284eaf67be3ffb973e0a39cb262a02a3",
+  "issues": [
+    12,
+    13
+  ],
+  "pr": "https://github.com/TekesApps/TekesAgentKit/pull/10",
+  "publishedAgentKit": "v0.3.8",
+  "tekesui": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "sourceSha256": {
+    "ui/bindings/src/lib.rs": "21beda369de46b75ab1459d8a17d5565581d49e53d0eee13767dcd298f9a7b90",
+    "ui/bindings/src/child.rs": "5c7f2add9578f01ac73a8c8760ccceaccf29d1ec352e80d0be50b26ebae2f7ff",
+    "ui/bindings/src/task.rs": "1c45e8ed30be26ce2402503aad177c18b98b7638bbb971d978c4656a5b1a935d",
+    "ui/components/src/readonly_transcript.rs": "368fe1db4271992d624091c6d5881334c2118bf5de96e380e9dab444ed799c28",
+    "ui/demo/src/component_demo.rs": "a45e6f782f61caeaab26c9a494672b2d733a19a365c9f66278bee1d7a579ee39",
+    "ui/demo/tests/readonly_child.rs": "0c648b18a53ae305d81365faf068b62f2231eb69ce72ca3664b322f48681a869",
+    "ui/demo/tests/child_binding.rs": "85ad2b3339915f9e4325e869c6e0bc4f270158815c47620c7ecc02b2d2735b9b",
+    "ui/demo/tests/task_binding.rs": "8629d67d7fe256237ba8b3d3b61282c01e17e619a33cd297c187e84bd37c3c5d",
+    "ui/demo/tests/sidechat_binding.rs": "3cbec9d9f8d0c2eb8ca62d309df08dc4d29e36574bb3e24f68f2eb4e36fdb810",
+    "ui/demo/tests/display_order.rs": "2cc639f1546b9221d4b01f62cd5e8b6e524c589f1e44757f3d186ae0c2bc5e4f",
+    "ui/demo/tests/run_reading.rs": "8ab10837a4f272644f4dde72ad41a3b14385a6645ec38c9cb35cc932428b82f8",
+    "ui/demo/tests/support/narration_reading.rs": "27d3806271a424f37bd0b033a7a093af4394f4a754cde1176b3e1627ac37a3e0",
+    "ui/demo/tests/thinking_sources.rs": "87359f7e4b81a325894d15916aa0e3f1199a207d9c26042774ca8ec94d5f4991",
+    "ui/consumer/src/lib.rs": "81c7513b7263ed88742dbdc6012b5779ac7359364d7f4f54dfe65888f96b71d0",
+    "ui/bindings/README.md": "0574cf59fb43c26125d4a0f73b3ce985a5b7da8b5ccc0d76b50eeb0646655bc8",
+    "ui/Cargo.toml": "fec7bfc0ff96b220ff17ec33b39be35f90ad50b231aaa52a2f48a4e5e1857d6e",
+    "ui/Cargo.lock": "8790cacd3395460c518f71240052a0bde27a25dbe7e18acda12753c53653d9d1"
+  },
+  "referenceSourceSha256": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Agent/ClientEmbeddedRunView.swift": "15cfb89a05c307470940c47401c1bc5c453efcd461d1ed8f95a3411de5629958",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Agent/ClientAgentTaskView.swift": "a8a98f9a5566c2ea2ca661f9d6e060d2d4069da1d7ea672098eef8d82c9e9cb5",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Agent/TaskRunPanelProjectionState.swift": "267b03eea842cd84e452c45833b8a96b0bbc312c587e7dfc77b43d802b7a502e",
+    "/Users/frankqin/dev/Tekes/TekesTests/RunUserControlsGraphTests.swift": "ec6e2a9bd9bf61545919e3b32929e32384cb1bea49469d39800e04330ac770aa"
+  },
+  "referenceCheckoutsHaveUnrelatedWip": true,
+  "program": {
+    "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/readonly-source-identity-20261023/tekes-agent-ui-demo",
+    "sha256": "8f13b993a77bd2556871e10d17b88b33501d3b30354e5e2354bf38d0cba882ae",
+    "bytes": 80828496,
+    "copyMethod": "APFS copy-on-write, independent inode",
+    "nativeInteraction": false,
+    "signedOrInstalled": false
+  },
+  "profiles": {
+    "bounded-bounded.consumer.json": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/readonly-source-identity-20261023/bounded-bounded.consumer.json",
+      "sha256": "1cdcc2119ba6bd3c251db48434ff1eb3beef4bc9cbe22a043280960f8c33be1a",
+      "boundedChildProof": {
+        "childScope": true,
+        "completeTranscript": false,
+        "messages": 1,
+        "nativeInteraction": false,
+        "noComposer": true,
+        "nonemptyParentDraft": true,
+        "originalReadIntent": true,
+        "paginationAvailable": true,
+        "parentDraftPreserved": true,
+        "readOnlyComponent": true,
+        "readingAnchorAcceptance": false,
+        "reconnect": true,
+        "retainedWidgets": true,
+        "sendRejected": true,
+        "sourceCallReadonlyDetails": true
+      },
+      "sideChatProof": null,
+      "completeRunPort": false
+    },
+    "sidechat.consumer.json": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/readonly-source-identity-20261023/sidechat.consumer.json",
+      "sha256": "b8e7b4406867c1c26bb0cfa15c50a4c3af5f002a44c267637cdbbfc38c79ced0",
+      "boundedChildProof": null,
+      "sideChatProof": {
+        "canonicalReopen": true,
+        "canonicalReopenAfterReconnect": true,
+        "capabilityUnavailable": false,
+        "confirmedDiscard": true,
+        "crossProcess": false,
+        "freshReconnect": true,
+        "independentForkScope": true,
+        "nativeInteraction": false,
+        "noDuplicateInput": true,
+        "originalClose": true,
+        "originalComposerIdsRetained": true,
+        "originalCreate": true,
+        "originalEditorFocusRetained": true,
+        "originalEditorInput": true,
+        "originalSend": true,
+        "originalSidePanelRunPort": true,
+        "parentAndOtherDraftsPreserved": true,
+        "parentHistoryIsolated": true,
+        "physicalIme": false,
+        "readingAnchorAcceptance": false,
+        "realHarness": true,
+        "retiredAuthority": true,
+        "scratchDraftRestored": true,
+        "scratchLifecycleAccepted": true,
+        "scratchReply": true,
+        "scratchScope": {
+          "endpointId": "native-ui",
+          "sessionId": "01a16806-c76f-794e-8ee0-0ae00570b8cc",
+          "threadId": "01a16806-c76f-794e-8ee0-0ae00570b8cc"
+        },
+        "summaryNavigation": true,
+        "syntheticPreeditBlockedSend": true
+      },
+      "completeRunPort": false
+    },
+    "sidechat-dsh.consumer.json": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/readonly-source-identity-20261023/sidechat-dsh.consumer.json",
+      "sha256": "bc4e0efde97291b3364676837f784d8be0085b1fbf76ce7dfd470df3e499bd8b",
+      "boundedChildProof": null,
+      "sideChatProof": {
+        "capabilityUnavailable": true,
+        "crossProcess": false,
+        "nativeInteraction": false,
+        "noForkAttempted": true,
+        "originalCreateDisabled": true,
+        "parentAndOtherDraftsPreserved": true,
+        "physicalIme": false,
+        "readingAnchorAcceptance": false,
+        "realHarness": true,
+        "scratchLifecycleAccepted": false
+      },
+      "completeRunPort": false
+    },
+    "bounded-dsh.consumer.json": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/readonly-source-identity-20261023/bounded-dsh.consumer.json",
+      "sha256": "28c5aae4c9e6e316b9f9f7a64eb53f9ac5dc2d68b39390fa75bc5bdd522b3967",
+      "boundedChildProof": null,
+      "sideChatProof": null,
+      "completeRunPort": false
+    },
+    "bounded-pi.consumer.json": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/readonly-source-identity-20261023/bounded-pi.consumer.json",
+      "sha256": "75cbab883630f0592874ba0d268cac6d65ecc95dbb805aa4cb0dc82d41c9308f",
+      "boundedChildProof": null,
+      "sideChatProof": null,
+      "completeRunPort": false
+    },
+    "sidechat-pi.consumer.json": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/readonly-source-identity-20261023/sidechat-pi.consumer.json",
+      "sha256": "3ddf6b4b6209d430e49f00626fb9590b7a87ec956eee693584e0360a96fccf20",
+      "boundedChildProof": null,
+      "sideChatProof": {
+        "canonicalReopen": true,
+        "canonicalReopenAfterReconnect": true,
+        "capabilityUnavailable": false,
+        "confirmedDiscard": true,
+        "crossProcess": false,
+        "freshReconnect": true,
+        "independentForkScope": true,
+        "nativeInteraction": false,
+        "noDuplicateInput": true,
+        "originalClose": true,
+        "originalComposerIdsRetained": true,
+        "originalCreate": true,
+        "originalEditorFocusRetained": true,
+        "originalEditorInput": true,
+        "originalSend": true,
+        "originalSidePanelRunPort": true,
+        "parentAndOtherDraftsPreserved": true,
+        "parentHistoryIsolated": true,
+        "physicalIme": false,
+        "readingAnchorAcceptance": false,
+        "realHarness": true,
+        "retiredAuthority": true,
+        "scratchDraftRestored": true,
+        "scratchLifecycleAccepted": true,
+        "scratchReply": true,
+        "scratchScope": {
+          "endpointId": "pi-ui",
+          "sessionId": "1df85269-6d58-4396-b775-d550405edaa6",
+          "threadId": "1df85269-6d58-4396-b775-d550405edaa6"
+        },
+        "summaryNavigation": true,
+        "syntheticPreeditBlockedSend": true
+      },
+      "completeRunPort": false
+    },
+    "bounded.consumer.json": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/readonly-source-identity-20261023/bounded.consumer.json",
+      "sha256": "91d7ad2b9b5f18faadf5094a542677d8f22c92bbcbf5e129563972efce73de33",
+      "boundedChildProof": null,
+      "sideChatProof": null,
+      "completeRunPort": false
+    }
+  },
+  "validation": {
+    "fullUiPassed": 628,
+    "existingIgnored": 1,
+    "finalReadonlyTests": 14,
+    "python": 74,
+    "strictAllTargetsClippy": true,
+    "fmt": true,
+    "uiBoundaries": true,
+    "nativeKernelProtocolDriven": true,
+    "nativeInteraction": false,
+    "physicalIme": false,
+    "voiceOver": false,
+    "crossProcess": false,
+    "newTargets": false,
+    "cleanupBytesFreed": 0
+  },
+  "logs": {
+    "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "red.log": "2f0851e59fec0e9bd9bb9a5ac094af8a232759bf680bd21fa58813f9d527a03c",
+    "clippy-final.log": "cc53057f6eeff402f9c61d32a4f720b45a83dad30023afb5a5e1db0e97a0d1b4",
+    "real-bounded.log": "688aa4af17480654481283bdf9edeb668b714faf40bfed3d896bd2b00170ee84",
+    "green.log": "75f0b767d4c5c3b89406824d1b15ec3f0516af4e28f35f68db5a3e517b4ac345",
+    "clippy.log": "5222cdf98d761db068d2e100de12b5c88228846a013fd8e3d8f47792b7a77825",
+    "boundaries.log": "9480cc4382559b9a7a99240226a9f766048e30c8d38bb4bccd1fd8bca56661ad",
+    "fmt-final.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "real-sidechat.log": "1e5442c62aa040ad4c4683dae48fa0029d2e208fe06a5d9c9facd9ce4550b520",
+    "python-tests.log": "755877ebbac2f2d9bec8b792f6d4dea70a303ee865646755d1d41a719523b2ab",
+    "readonly-final.log": "a2e7e1deac6ca41aac4300d25c5b0427ee07562d8ee47d3075dd2b2e282fc85c",
+    "workspace-tests.log": "9c37f5d2dd086a491104fd6e8629611faadceceee279443d62f3c7f28eb01bc3",
+    "build.log": "fcce12e8e9a3743502ec98eb1888a43a32489c10219b715f931aa40675ed5311"
+  },
+  "parentAuthorityPriorStage": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/pane-parent-authority-20261023/stage-receipt.json",
+  "remainingSdkGates": [
+    47,
+    48,
+    53
+  ]
+}

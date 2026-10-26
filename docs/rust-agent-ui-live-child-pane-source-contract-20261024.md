@@ -1,0 +1,13 @@
+# #17 / #23 / #27：真实子 pane 运行与失败来源
+
+基线04481a7。只读参考ClientKit c289bc9及Tekes8858ccd；前两切片的primary-child-run-only恢复与bindings合成fixture不能替代实际demo子pane。本轮透传demo默认关闭的acceptance-source-witness，只在显式owned offscreen命令消费原bindings接口，不改TekesUI或root headless状态机。
+
+以原公开命令在隔离Pi/DSH中创建parent及child并等待seed结算，关闭seed headless进程。demo再打开同一公开parent，原FamilyCatalog控件→OpenChild/HostResult→原ChildPaneBinding挂载；manifest仅是公开pointer与marker断言，不安装pane或状态。保留父草稿与父选择，经该子pane的原Composer Commit/Send回调发送marker，不直接call私有协议或另建controller。
+
+owned loopback provider收到marker后hold。demo通过原binding捕获running RunSourceWitness并输出独立原帧；Python逐帧核对原scope（parent.thread+child.session）、Ready/epoch/原User位置/opaque turn/原Native或Journal运行事实，验证成功后显式释放HTTP400。demo等待原失败来源稳定，再捕获同binding failed帧；复用现有Transcript来源验证及同scope/epoch/输入来源/turnID、revision递增约束。捕获不可用、来源不完整或仍有dispatching时拒绝，不清队列伪造成功。
+
+最后通过原SidePanel关闭控件关闭pane，父草稿/选择保持，旧binding不得再返回有效witness。运行帧、失败帧、控件/dispatch收据及最终offscreen文件分别保存；不将它们称同一publication。生命周期门控与SessionRuntime各有锁域，不宣称服务端事务一致。真实model响应由合成provider控制；不使用付费模型、用户凭据或私有历史。
+
+默认程序未启用feature时，传入新验收命令必须在窗口创建前拒绝；启用时也要求offscreen、显式endpoint-config和显式receipt路径。不创建新的app/bundle身份，不运行窗口、桌面输入、截图、物理IME或OS AX。所有Cargo验证串行复用SSD共享target，保留源码、锁、原失败、程序与运行依赖快照。
+
+覆盖脚本的配对/门控/迟到拒绝测试，以及demo默认/feature、bindings、独立公开consumer；真实Pi/DSH都必须用本轮精确SHA程序。此切片不自动完成Native有界source witness、pane重连/分页、动态Task pointer、完整布局或ClientKit全量验收，#53严格阅读门不豁免。发现实现差异先按归属修复，基础SDK缺口另提issue。

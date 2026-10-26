@@ -11,11 +11,74 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.95.0
         with:
           components: rustfmt, clippy
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.20.0"
+      - run: node --test scripts/tests/pi-*.test.mjs
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
+      - name: Acceptance source witness (opt-in, no UI)
+        run: |
+          cargo clippy --workspace --all-targets --locked --features tekes-agent-headless/acceptance-source-witness -- -D warnings
+          cargo test -p tekes-agent-presentation --locked --features acceptance-source-witness
+          cargo test -p tekes-agent-headless --locked --features acceptance-source-witness
       - run: python3 scripts/check-headless-boundaries.py
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: python3 scripts/check-ui-boundaries.py
+      - name: Validate acceptance records (does not waive failed gates)
+        run: python3 scripts/check-agent-ui-acceptance-matrix.py
+      - run: python3 -m unittest discover -s scripts/tests -v
+  ui-consumer:
+    name: Rust UI consumer (no native interaction)
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: rustfmt, clippy
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python3 scripts/check-ui-boundaries.py
+      - name: Resolve and verify the compiled public pin
+        run: |
+          cargo metadata --manifest-path ui/Cargo.toml --locked --format-version 1 > "$RUNNER_TEMP/agentkit-ui-metadata.json"
+          python3 scripts/check-ui-consumer-inputs.py --metadata "$RUNNER_TEMP/agentkit-ui-metadata.json" > "$RUNNER_TEMP/agentkit-ui-inputs.json"
+      - run: cargo fmt --manifest-path ui/Cargo.toml --all --check
+      - run: cargo clippy --manifest-path ui/Cargo.toml --workspace --all-targets --locked -- -D warnings
+      - run: cargo test --manifest-path ui/Cargo.toml --workspace --locked
+      - name: Child pane source witness (opt-in, no native window)
+        run: |
+          cargo clippy --manifest-path ui/Cargo.toml --locked -p tekes-agent-ui-bindings -p tekes-agent-ui-demo --all-targets --features tekes-agent-ui-demo/acceptance-source-witness -- -D warnings
+          cargo test --manifest-path ui/Cargo.toml --locked -p tekes-agent-ui-bindings -p tekes-agent-ui-demo --features tekes-agent-ui-demo/acceptance-source-witness
+      - name: Compile Native parent approval consumer (opt-in, no native window)
+        run: cargo clippy --manifest-path ui/Cargo.toml --locked -p tekes-agent-ui-consumer-check --example native_parent_approval --features native-parent-approval -- -D warnings
+      - name: Run standalone public API consumer (no native window)
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/ui/target
+        run: |
+          python3 scripts/check-public-agent-ui-consumer.py --output "$RUNNER_TEMP/agentkit-public-consumer" > "$RUNNER_TEMP/agentkit-public-consumer-prepare.json"
+          cp "$RUNNER_TEMP/agentkit-public-consumer/Cargo.lock.seed" "$RUNNER_TEMP/agentkit-public-consumer/Cargo.lock"
+          cargo generate-lockfile --manifest-path "$RUNNER_TEMP/agentkit-public-consumer/Cargo.toml" --offline
+          cargo run --manifest-path "$RUNNER_TEMP/agentkit-public-consumer/Cargo.toml" --locked --offline
+      - name: Verify nested detail reading intent (strict; no native window)
+        run: cargo run --manifest-path ui/Cargo.toml --locked -p tekes-agent-ui-consumer-check --example bounded_detail_reading > "$RUNNER_TEMP/agentkit-nested-detail-reading.json"
+      - run: cargo build --manifest-path ui/Cargo.toml --locked -p tekes-agent-ui-demo
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rust-ui-consumer-inputs
+          path: |
+            ${{ runner.temp }}/agentkit-ui-inputs.json
+            ${{ runner.temp }}/agentkit-ui-metadata.json
+            ${{ runner.temp }}/agentkit-nested-detail-reading.json
+            ${{ runner.temp }}/agentkit-public-consumer-prepare.json
+            ${{ runner.temp }}/agentkit-public-consumer/Cargo.toml
+            ${{ runner.temp }}/agentkit-public-consumer/Cargo.lock.seed
+            ${{ runner.temp }}/agentkit-public-consumer/Cargo.lock
+            ${{ runner.temp }}/agentkit-public-consumer/src/main.rs
+          if-no-files-found: warn

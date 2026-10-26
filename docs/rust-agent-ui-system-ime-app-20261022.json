@@ -1,0 +1,86 @@
+{
+  "checked_at": "2026-10-22T04:17:33.305481+00:00",
+  "rust_head": "126a79bc315133efe11e16744d4b01b2815a3889",
+  "program": {
+    "program": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/AgentKitChildOpenFencing20261022.app/Contents/MacOS/AgentKitChildOpenFencing20261022",
+    "sha256": "75e84a1360b86a0268f7f5c6d513d63eb607d90758f034403a81ba3dc141d911",
+    "base_commit": "1ee87afbae5ff959ff5bedd0ba0fd5f387bb237a",
+    "sdk": "09b4bab44b6dfa65487250ea816b610b9df59095",
+    "source_sha256": {
+      "ui/demo/src/component_demo.rs": "076b2f3b93eba088108e1556628e79ef9155b0befee736bc2b0fdfefc35bd69b",
+      "ui/demo/src/components_native.rs": "c19e76eb79e82c590a6900eeaa0f0280f9c87ba8afde2c7ee083f7e11f977ca4",
+      "ui/demo/src/native_panel_navigation_selftest.rs": "630af8880600a5818ba891d27a6eb7ec17c7f4d4c85e094945e90241660ad42e",
+      "ui/demo/tests/panel_navigation.rs": "b8597e401634d2290188215ad127e1447134b5a93bc13fca857223d262c24776"
+    }
+  },
+  "software_ime": {
+    "softwareIme": true,
+    "pidTargetedEvents": true,
+    "physicalKeyboard": false,
+    "candidateWindow": false,
+    "profile": "launch-services-app",
+    "applicationExitCode": null,
+    "launcherExitCode": 0,
+    "pid": 10324,
+    "sourceBefore": "com.apple.inputmethod.SCIM.ITABC",
+    "sourceAfter": "com.apple.inputmethod.SCIM.ITABC",
+    "binarySha256": "75e84a1360b86a0268f7f5c6d513d63eb607d90758f034403a81ba3dc141d911"
+  },
+  "tools_tests": 52,
+  "local_rust_recompiled": false,
+  "local_rust_suite_rerun": false,
+  "new_target": false,
+  "deleted_bytes": 0,
+  "scope": {
+    "owned_fixture": true,
+    "same_process_native": true,
+    "real_harness_rerun": false,
+    "physical_keyboard": false,
+    "candidate_window": false,
+    "voice_over": false,
+    "process_container": false,
+    "previous_direct_failures_preserved": true
+  },
+  "evidence_directory": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/system-ime-app-20261022",
+  "script_sha256": {
+    "scripts/test-system-ime.py": "ad764a3dc94e95062555837d12b9f8ef7b2e5c079fdbee59357a988fd14ea754",
+    "scripts/native_ime_probe.py": "ae009db25c947db5597d852d8fbfa5fdbe39bce00de209fd32fc3f650625720b",
+    "scripts/tests/test_native_ime_probe.py": "b47f8301567b0729dc9a5fff14745e058af10ed18a457786d6afe1a6cf88c5ec",
+    "scripts/tests/test_system_ime.py": "bab8a02e03498617b08be307a30e4f4b65f53db956d3d6cb26819b75c4e57801"
+  },
+  "evidence_sha256": {
+    "native.log.frontmost.jsonl": "e2234083ef72e80dd322d29ede3577f7d1057b523af6478bd67691f20f5e2316",
+    "tools-final.log": "9153ec1c3591fe349e922ee34bff167656921747146d8bbc3983b80625cadcf4",
+    "tools-verified.log": "b91ccd1d7931796f2c8e9f9fbb03cec037deb7547ca7311683a2600c6a5ccede",
+    "verified-native.log": "792a42cb99fcf04883b1cf92fdf7203606b17e94a922566643543ebae30f4727",
+    "native.log": "33aded91172b1bb2167b3d6816cc99b0fc0a73519dcf51f723128d6231d42947",
+    "agentkit-releases.json": "875b353c8a807b7b3fa9f1f1d717758e036321a3810c20238670822669ab7f1e",
+    "verified-native.log.frontmost.jsonl": "c801ad968accae1a4cbc33b22b94fdca3aa8a5d1bf0cbc3c83e1e352ef42894d",
+    "native.log.stdout": "9c7feb3a3eeb8528c8b2d12f9e9721f263afccd0598b61019c170218adee6130",
+    "tools.log": "27cb63af798963d37834c7a9363913a3f31890d3890acb7c61e5279668448699",
+    "verified-native.log.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "verified-driver.log": "d9c09f2b9d3befc1ceea00350f54dbf978c9c932174b47d23f8b577990bae485",
+    "driver.log": "fcce30039034394d591de576429c3a7489fe5419837f4ee5ce568effbe5e1460",
+    "issue48.json": "16670d026ddf2cde1a1442d5699a0c599aa1256a9f10cbd2e971c437a4713646",
+    "verified-native.log.stderr": "e0cb5d4a39030228ae993f6fb7390e62441d5d3f986fccaa3e7e77aa051e9395",
+    "verified-native.log.launcher": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "native.log.launcher": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "tools-current.log": "8bc956f608fd1fe970d1361fb02edeb62123405c8c33dcf1e5f09568159a661f",
+    "native.log.stderr": "8d7914684462ef112a1f8e300716852aae6b3d657cf7a6bc97a44d29bf92046a",
+    "receipt.json": "b0ffab61d2bd50c1f21e9202121e6a5ebd4be05a63a9aa4229d95b14439e7e4e",
+    "public-refs.txt": "f9577607692504bf8e9b92361e843ad76773703639cae7f06bd9688d0f531aac"
+  },
+  "stability_accepted": false,
+  "final_cli_verification": {
+    "accepted": false,
+    "reason": "foreground changed to Codex during TYPE; per-key guard rejected further injection",
+    "observed_preedit": "ni",
+    "native_key_start_codes": [
+      45,
+      34
+    ],
+    "success_receipt_present": false,
+    "first_complete_success_preserved": true,
+    "first_run_cli_differences": "Final CLI moved the missing-log check before import and made receipt creation exclusive; native driver/input behavior unchanged."
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "format": "agentkit-turn-rail-foundation/1",
+  "verified_at_utc": "2026-10-20T18:22:06.236658+00:00",
+  "based_on": "851b78237a924fe38cc2767250829d74b5bda2c7",
+  "published_contract_baseline": "v0.3.8",
+  "source": {
+    "ui/components/src/turn_rail.rs": "567442df119ea10f63989d79ed799d32a10d43c396775123b6f47f72e72b5153",
+    "ui/components/src/transcript_content.rs": "62843f518759089eeed57c15de1321ccd2f51615b4be6811a13fff8dd78b5451",
+    "ui/components/src/run_view.rs": "f36dbfff11629654124e6718fd174ee7c03812e3d809137b2117cf04885380c8",
+    "ui/components/src/lib.rs": "5a0c415512f5b629e9dbfec86bc9099a51b65c33b7ee9c15765dc712b8983c5c",
+    "ui/demo/tests/transcript_content.rs": "01e9afad97d1ad6b38ff9db45322a96be243c87240927a47cdc5d0e5ba7a1670",
+    "ui/demo/tests/run_column.rs": "bd0ed1a9b68119ae4acbda95ca8e56e9fd1f71fe140d3d7af7dc9f9eae8de06e",
+    "ui/consumer/src/lib.rs": "4988e0cadafc41b6d411f9da1f4a776a67a4722e243abf72f5604590e3987c5e"
+  },
+  "reference_sources": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/TranscriptRendering/TranscriptIndicatorRailView.swift": "0a710cf6be24f8caa08e2e030db20caf3fb0001048ebbd8b9fb8c15dc53df487",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Run/RunChrome.swift": "bf910e3af84119cc17e504a752e4055082e3217ddaeb9245b22068f978889a68"
+  },
+  "default_inputs": {
+    "commit": "8cf0840790334ba224afc0595897c74231c712e6",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 199,
+    "sha256": "f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f",
+    "ui_packages": 8
+  },
+  "validation": {
+    "ui_tests": 309,
+    "second_public_consumer_tests": 29,
+    "strict_clippy": true,
+    "fmt": true,
+    "boundary_guard": true,
+    "candidate_run_tests": 8,
+    "candidate_inputs_match_current": true,
+    "candidate_strict_clippy": true,
+    "native_component_fixture_regression": true
+  },
+  "candidate_identity": "2b16eaa6200fecdde9a0c615166064effb9446249cde05087d5d7c288d81d4ec",
+  "binary_sha256": "b86d83795a429024612aab5847631623dc6b1908ef58739be28af2dfa8e62d5d",
+  "logs": {
+    "/tmp/agentkit-rail-ui-tests-final.log": "ee77c2c6341b7a0251c205aa58bfdd746ccf22667ea4b216df30c1b25a3936c8",
+    "/tmp/agentkit-rail-clippy-final.log": "bf608163c5ef959574ddba763078cd31890722db400dc444315c4a50b7d0255d",
+    "/tmp/agentkit-rail-build.log": "29162d76fb109d9c6005d8544d63a4a438d15235d4f9b8e73d51adc9ba6e95d7",
+    "/tmp/agentkit-rail-native-regression-20261021.log": "a35061beb513efaa68a8c785826ee9c5c581876a6aada8969fbea7d4e362a326",
+    "/tmp/agentkit-rail-inputs.json": "8a8e6f786e5a4fb57110e2f331b248f99fe8dad47a38e5bc642de1aa021324f8",
+    "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-rail-preflight-20261021-01/receipt.json": "16ef21a8a1a23a9bdc265aafff2f4f9afa4e33ababd5b2124a965a5666963e14",
+    "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-rail-preflight-20261021-01/tests.log": "9736d4c56b16f3d68286f406d0024de7b723fcceea6811a5901b5276bf22f6aa",
+    "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-rail-preflight-20261021-01/clippy.log": "de654eb719151dbfec18f650d99271bfc13160909727f55875604a1d200a3681"
+  },
+  "not_claimed": [
+    "interactive_rail",
+    "working_turn_reveal",
+    "rail_hover_preview",
+    "rail_follow_motion",
+    "paired_ClientKit_visual_parity",
+    "real_harness_reading_paging",
+    "physical_ime",
+    "voiceover",
+    "merged",
+    "tagged"
+  ],
+  "issues": [
+    "https://github.com/TekesApps/TekesUI/issues/28",
+    "https://github.com/TekesApps/TekesUI/issues/29"
+  ]
+}

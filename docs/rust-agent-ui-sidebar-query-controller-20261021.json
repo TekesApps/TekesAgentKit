@@ -1,0 +1,250 @@
+{
+  "format": "agentkit-sidebar-query-controller/1",
+  "verified_at_utc": "2026-10-20T21:23:21.779546+00:00",
+  "based_on": "abcdb1ccf4ddd96c034066f2badff5c42054412c",
+  "published_agentkit": "v0.3.8",
+  "default_inputs": {
+    "commit": "8cf0840790334ba224afc0595897c74231c712e6",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 199,
+    "sha256": "f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f",
+    "ui_packages": 8
+  },
+  "sources": {
+    "crates/contract/src/lib.rs": "a2540493c98b7eacef9027e744b4905f67155440f9d20c524c1a67acf803973a",
+    "crates/contract/src/search.rs": "08c16398e1deb306031893985a3ba8a5e2e1857ed45de0dffdfed16dcd6942b8",
+    "crates/endpoint-pi/src/extensions.rs": "52c9533ff49efba2a789dc92777682535d2a36ab133f9c0db4aea796cac473f6",
+    "crates/endpoint-pi/src/lib.rs": "60f203b8dcf04e886357037791360b00ddb9079f39692321fb1e6ac3e8ca232e",
+    "crates/endpoint-pi/src/search.rs": "c82c55d993d01d15c29be4510c3ce320684425361e0f8fce95b106a7350c105d",
+    "crates/presentation/src/lib.rs": "6f42c704c654bf653af2357b35d3e8151dad7a11cbbf88009a92c5a3e146033d",
+    "crates/presentation/src/sidebar_search.rs": "d8420ef4f49d769b1656231d0c6eb411b420d19c0645d4e172653852ccd54a4c",
+    "crates/presentation/tests/controller.rs": "d91d8fdec29897d3a870d18d4e0d1d07f6452e166055629ba2e14c97f5af716b",
+    "crates/session/src/runtime.rs": "6be793e971b3298706dc356a7390b655bced15f14c60912d9d24ab7c7c9f25a9",
+    "scripts/test-real-session-endpoints.py": "2b1ae03e903df69027dcf7feb076d2475acf9933dc6380c3505475ddeafdfdc3",
+    "ui/Cargo.lock": "b7482a1f87e3dce648458484e10b7151e83163674064a19eb3d5e6500da485ed",
+    "ui/Cargo.toml": "4f29c69e31ce09a70cc2a6bb8eb959761b3dfa0702880de5a13a946a615f75ef",
+    "ui/README.md": "08d62ecc61003a231f4f11dce95fd6419deecc4d81dcabc5ec625576ace95e14",
+    "ui/bindings/src/lib.rs": "09c2307138f9bacb99d668822ad66a6be14fc6dd53cbe3eb304266eafb1ad905",
+    "ui/bindings/src/sidebar_search.rs": "a2b977910c6f92a0a107864335fbe81617575afb857bd96e6af5ff2d1c9c0ee8",
+    "ui/components/src/sidebar.rs": "5507dac8e0aa7c2428ef6a56c35afa6c3c935710b9393380cd2d2aea969d2dd8",
+    "ui/components/src/sidebar_search.rs": "05f7851f4e08e886ad78eb211427dd810ad49f9e755510ab53c30e4ac726baba",
+    "ui/consumer/src/lib.rs": "ff2630ffeac2e74bb9c2c1d1668b16a8fad4f6220161eeecd86fc531c6014035",
+    "ui/demo/Cargo.toml": "7418203d2136363f5dcc953f3d4e23bac2664687842cfc07dda489f559822ea9",
+    "ui/demo/src/component_demo.rs": "d1a18c2c1330c409757bcbbd87c9e4e6eaa6e321ceb4a467b01c2201512557a8",
+    "ui/demo/src/components_native.rs": "68ab3d9d124238d6249e8ecce083d2a614b3ebfef80a1014b081d03724d2009f",
+    "ui/demo/src/fixture.rs": "132868c7a3df514ad1fc66bea0ce190cc4d1c2f09287ea053fedc1d42c0cadbc",
+    "ui/demo/src/native_sidebar_query_selftest.rs": "f2e4f1592cda941dc2d1ce50995a1b10f43e00cd4f9379694e0c56a41fbcb008",
+    "ui/demo/tests/sidebar_query.rs": "850ee9289f931dba59b37c02792d6742624a663c78fe1cf61f603bd14ada7e5a"
+  },
+  "reference_sources": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Agent/ClientAgentSidebarListView.swift": "c29c80b8726f8ac6b5988ed6c9ad3e7902d09e8f656ac745eba4f5ee0bb70069",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Agent/ClientAgentSidebarModel.swift": "82c1bbb6519b9cb9573b9963f565eeee8d297702250a00f9243b5c1e66a1ddc9",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Contract/SessionEndpoint/SessionSearch.swift": "d48b361b935de2a6329568807d410213d80a72aa56b7b34821180e22be11ee62",
+    "/Users/frankqin/dev/Tekes/Tekes/ClientAgentSidebarHostAdapter.swift": "e932b300763674511f17ceb28fa3bfc83bcb924f7e661082134d5efd79d9bf19",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Session/SessionEndpoint/PI/PIHostEndpoint.swift": "603937299831b1635b8352f9dd59d396dab3d97741649cbb47442ec41b946ceb",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Session/SessionEndpoint/PI/PITranscriptProjection.swift": "59d54b14cdbf8a9aaebd75fad95cc526ba1fad98839d4b874e8bf98d1473b001"
+  },
+  "reference_heads": {
+    "/Users/frankqin/dev/TekesClientKit": "c289bc9d33edcd83a782ac17927a8c65a027eccd",
+    "/Users/frankqin/dev/Tekes": "8858ccd9d46590852ec7a0949aee289fc6798d70",
+    "/Users/frankqin/dev/TekesKernel-child-history": "ae5d6fdf32290207b646b8c99b96f2a002902cb3"
+  },
+  "validation": {
+    "root_tests": 175,
+    "ui_tests": 337,
+    "independent_public_consumer_tests": 33,
+    "public_consumer_fixture_integration": 1,
+    "sidebar_query_integration_tests": 8,
+    "pi_unit_tests": 14,
+    "strict_clippy": true,
+    "fmt": true,
+    "boundaries": true,
+    "native_sidebar_query": {
+      "clearRevokesResult": true,
+      "draftRetained": true,
+      "fullSidebarParity": false,
+      "inventoryControlsRetained": true,
+      "nativeWindow": true,
+      "noSubmission": true,
+      "originalQueryCaptured": true,
+      "ownedFixture": true,
+      "physicalIme": false,
+      "pointerRetry": true,
+      "publicSearchRPC": true,
+      "realHarness": false,
+      "retiredRetryRejected": true,
+      "searchReads": 2,
+      "sharedPresentationController": true,
+      "voiceOver": false
+    },
+    "native_component_fixture_regression": true,
+    "three_real_harnesses": {
+      "pi": {
+        "search": {
+          "expectedTargetFound": true,
+          "fullSidebarParity": false,
+          "hasMore": false,
+          "hits": 1,
+          "nativeInteraction": false,
+          "noSubmission": true,
+          "originalEndpoint": "pi-ui",
+          "publicTypedSearch": true,
+          "sharedController": true,
+          "unresolved": 0
+        },
+        "transcript": {
+          "completeTranscript": false,
+          "feedbackRows": 3,
+          "footnotes": 3,
+          "genericViewport": true,
+          "independentTools": 0,
+          "keyedReadingAcceptance": false,
+          "knownEmptyContainersHidden": 0,
+          "machineLeading": true,
+          "messages": 7,
+          "nativeInteraction": false,
+          "outputCopyControls": 3,
+          "renderer": true,
+          "richContent": false,
+          "rows": 13,
+          "userTrailing": true
+        },
+        "offscreen": true,
+        "nativeInteraction": false
+      },
+      "dsh": {
+        "search": {
+          "expectedTargetFound": true,
+          "fullSidebarParity": false,
+          "hasMore": false,
+          "hits": 1,
+          "nativeInteraction": false,
+          "noSubmission": true,
+          "originalEndpoint": "dsh-ui",
+          "publicTypedSearch": true,
+          "sharedController": true,
+          "unresolved": 0
+        },
+        "transcript": {
+          "completeTranscript": false,
+          "feedbackRows": 3,
+          "footnotes": 3,
+          "genericViewport": true,
+          "independentTools": 0,
+          "keyedReadingAcceptance": false,
+          "knownEmptyContainersHidden": 0,
+          "machineLeading": true,
+          "messages": 7,
+          "nativeInteraction": false,
+          "outputCopyControls": 3,
+          "renderer": true,
+          "richContent": false,
+          "rows": 13,
+          "userTrailing": true
+        },
+        "offscreen": true,
+        "nativeInteraction": false
+      },
+      "native": {
+        "search": {
+          "expectedTargetFound": true,
+          "fullSidebarParity": false,
+          "hasMore": false,
+          "hits": 1,
+          "nativeInteraction": false,
+          "noSubmission": true,
+          "originalEndpoint": "native-ui",
+          "publicTypedSearch": true,
+          "sharedController": true,
+          "unresolved": 0
+        },
+        "transcript": {
+          "completeTranscript": false,
+          "feedbackRows": 2,
+          "footnotes": 2,
+          "genericViewport": true,
+          "independentTools": 0,
+          "keyedReadingAcceptance": false,
+          "knownEmptyContainersHidden": 0,
+          "machineLeading": true,
+          "messages": 4,
+          "nativeInteraction": false,
+          "outputCopyControls": 2,
+          "renderer": true,
+          "richContent": false,
+          "rows": 8,
+          "userTrailing": true
+        },
+        "offscreen": true,
+        "nativeInteraction": false
+      }
+    },
+    "review_scope": "Local source/ownership review; no external PR approval claimed"
+  },
+  "binary_sha256": "3b0cbaf2465e58a5c9c78c830ac43544f533f8ff77caef194f2d7992fd7e27cf",
+  "screenshot": {
+    "path": "docs/evidence/sidebar-query-controller-20261021.png",
+    "sha256": "ab26258981f5b1208549fdc6571c15341cf25476d1126a0168fffec91be396d3",
+    "width": 2140,
+    "height": 1588,
+    "inspected": true,
+    "scope": "Owned fixture; real native pointer Retry and public read RPC, not paired ClientKit visual acceptance"
+  },
+  "runtimes": {
+    "kernel": {
+      "version": "0.9.1",
+      "commit": "ae5d6fdf32290207b646b8c99b96f2a002902cb3",
+      "clean_source": true,
+      "build_target": "target/kernel-091-query",
+      "source_modified": false
+    },
+    "pi": {
+      "version": "1.3.0",
+      "cli_sha256": "e79626f2dd6f94aa45d30f3fa63cd84319a6eefcd150b353cfaf274366926774",
+      "node": "24.20.0"
+    },
+    "dsh": {
+      "version": "0.2.1-rc.2",
+      "owned_search_index_opt_in": {
+        "path": ":memory:",
+        "openAt": "first-search"
+      },
+      "default_openAt": "never",
+      "installed_deployment_modified": false
+    }
+  },
+  "logs": {
+    "/tmp/agentkit-sidebar-query-root-final.log": "e2ea97bfa4925d89449e895357c02552b35aeeb0e4f5bae3848df4069915a8a3",
+    "/tmp/agentkit-sidebar-query-root-clippy-final2.log": "5f82f8ee5e6aec9f4cfbb98ea7db138557b9e9a84ec5a915d6d58a21ecf94ee6",
+    "/tmp/agentkit-sidebar-query-root-build-final.log": "136411c1a2506b99372728a5eae5f4d1bbf9c9acccddec5abea59d17d39422b3",
+    "/tmp/agentkit-sidebar-query-ui-tests-final.log": "6abdfbc8dd8c2f9ddb01fa9c3818f0689a1277d8cc72a4542fa608766f56e7c0",
+    "/tmp/agentkit-sidebar-query-ui-clippy-final.log": "b4f0c652c1f8baf91da093a509f31593698505df02cb3eec2d63efd6b45b1bc6",
+    "/tmp/agentkit-sidebar-query-ui-build-final2.log": "54d32f1312e9ec321c58af432997bfe3bae5b14322fc06e68fd35a1f2f0e6519",
+    "/tmp/agentkit-sidebar-query-targeted-final.log": "92dac4734e1aa790920429c9b527ea148ca0af4cf0868b28a3de3bca1311d95b",
+    "/tmp/agentkit-sidebar-query-native-final.log": "b37683399eab71f0331717cb10f0ab8936e01db4073bda02ab6b956c31e9e9d5",
+    "/tmp/agentkit-sidebar-query-native-regression-final.log": "9b4f90ece1289964487f241ec0bf626df4ccf8c421fc0429bcb118decb5084dd",
+    "/tmp/agentkit-sidebar-query-three-final.log": "def0fa18f712bcc430907ffda7b98f67cf1b2decac29c7aa35e83b99fe31f2f5"
+  },
+  "prior_failed_probes": {
+    "three-real.log": "Legacy layout assertion used outer Transcript frame, corrected to formal RunView conversation column",
+    "three-real-final.log": "DSH default index explicitly disabled; no empty fallback",
+    "three-real-enabled.log": "Rename metadata is not promised indexed content; use owned conversation history",
+    "three-real-history.log": "Native fixture missing helper binary; built tools/workspace-service from unchanged exact Kernel tag"
+  },
+  "limitations": [
+    "Single explicitly selected endpoint only; full Sidebar parity not claimed",
+    "Unknown hits retained but proactive public inventory refresh and full result membership remain open",
+    "Cross-endpoint aggregation, FTS semantics, snippet/help, search header/count and outline/project grouping remain open",
+    "Pi Foundation diacritic matching, grapheme-exact snippet edges and generated image references remain open",
+    "Physical IME, VoiceOver, paired ClientKit visual acceptance and real-harness reading/paging anchors not proven by this receipt",
+    "Native query receipt uses owned fixture; three real harness receipts are offscreen transport/GPU evidence"
+  ],
+  "candidate_status": {
+    "received_label_candidate": "545ef8d70d89404f11d916f05e417404277507b07dea808aac051339544431a1",
+    "evaluated_here": false,
+    "default_pin_promoted": false
+  },
+  "merged": false,
+  "tag_created": false
+}

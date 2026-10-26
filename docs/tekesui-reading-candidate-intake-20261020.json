@@ -1,0 +1,24 @@
+{
+  "date": "2026-10-20",
+  "kind": "candidate-input-integrity-only",
+  "reportedExportIdentity": "bd3ed1b0af81b044306af90d3594bb31110147b7194bda6053b1d2e185871c9a",
+  "archiveSha256": "f3ed66b85e31375582074eec2c8903904aa14649dae1cdef8f6bef2057dada61",
+  "manifestSha256": "b1e6deba267feb207981970a85ba12a9c02ea9e6c4c43a98052d750b6171487b",
+  "verifiedFiles": 449,
+  "cachedInputs": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/tekesui-reading-bd3ed1b0af81/inputs",
+  "defaultPin": "8cf0840790334ba224afc0595897c74231c712e6",
+  "unpacked": false,
+  "built": false,
+  "consumerAccepted": false,
+  "nativeAccepted": false,
+  "promoted": false,
+  "upstreamIssueClosed": false,
+  "registryVendored": false,
+  "next": [
+    "extract to a new owned candidate workspace",
+    "independent public reading-contract/consumer/Clippy/GPU checks with exact candidate inputs",
+    "AgentKit Transcript adapter using public reading transactions; no pixel compensation",
+    "native IME/AX/momentum and matching ClientKit layout evidence",
+    "published exact pin and independent promotion decision"
+  ]
+}

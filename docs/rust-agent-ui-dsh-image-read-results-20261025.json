@@ -1,0 +1,74 @@
+{
+  "baseline": "06c0908a9492e5dc408ffc24baf3582517680a25",
+  "issue": 17,
+  "accepted": true,
+  "scope": "public image-byte read before and after reconnect; image+text and image-only on Native/Pi/DSH",
+  "endpoints": {
+    "native": {
+      "beforeReconnect": [
+        true,
+        true
+      ],
+      "afterReconnect": [
+        true,
+        true
+      ],
+      "epochs": {
+        "before": 2,
+        "after": 5
+      }
+    },
+    "pi": {
+      "beforeReconnect": [
+        true,
+        true
+      ],
+      "afterReconnect": [
+        true,
+        true
+      ],
+      "epochs": {
+        "before": 2,
+        "after": 5
+      }
+    },
+    "dsh": {
+      "beforeReconnect": [
+        true,
+        true
+      ],
+      "afterReconnect": [
+        true,
+        true
+      ],
+      "epochs": {
+        "before": 2,
+        "after": 5
+      }
+    }
+  },
+  "publicReadCount": 12,
+  "providerImagePrompts": 6,
+  "dshAuxiliaryTitlePrompts": 1,
+  "pythonPassed": 289,
+  "newByteReadGateTests": 4,
+  "clippyStrict": true,
+  "exampleBuild": true,
+  "sourceInputs": 551,
+  "sourceManifestSha256": "27a86fd4da58874a92de42947aea8617764872a5fc7fe67bb276a33402795013",
+  "programSha256": "d306e13c67ea6fd04eb971bc0abcb11a8877bfef02756a0c7ca673f83f67b2ba",
+  "sdkPin": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "productionSourceChanged": false,
+  "desktop": false,
+  "paidModel": false,
+  "privateHarnessHistoryRead": false,
+  "evidence": ".runtime-fixtures/dsh-image-read-20261025/",
+  "notRun": [
+    "Native/DSH mixed file-image",
+    "bitmap UI/picker/paste/drop",
+    "real-model image understanding",
+    "JPEG/GIF/WebP/large-image runtime matrix",
+    "desktop/physical IME/OS AX/ProcessContainer"
+  ],
+  "correction": "Earlier DSH unsupported byte-read status was a hard-coded probe error; old receipts remain historical and are not evidence of runtime incapability."
+}

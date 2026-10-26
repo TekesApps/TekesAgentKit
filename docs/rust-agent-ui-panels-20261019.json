@@ -1,0 +1,52 @@
+{
+  "date": "2026-10-19",
+  "agentkitPublishedBase": "a8610a420bad72eaedcf706b30df87153a0f3e16",
+  "branch": "codex/agent-ui-components",
+  "uncommitted": true,
+  "gates": {
+    "ui": {
+      "tests": 56,
+      "strictAllTargetsClippy": true
+    },
+    "root": {
+      "tests": 103,
+      "strictAllTargetsClippy": true
+    },
+    "toolTests": 18
+  },
+  "resolvedUiInputs": {
+    "commit": "431093786de47b48cd566d0d9c0eafa088b10d68",
+    "local_packages": 10,
+    "native_interaction": false,
+    "reviewed_files": 188,
+    "sha256": "03721866a362b1d31261ebbbc86140eb07e9e23320871c325234a5212591213d",
+    "ui_packages": 8
+  },
+  "sourceSha256": {
+    "ui/components/src/sidebar.rs": "2ef2bd5a6d41b66531397c05f4ddc390bafbb0fb4bb4372ad2c0f03c315de1e8",
+    "ui/components/src/side_panel.rs": "dc3c97b7eb5e164349c051126f0d9f0463f5ccc52d1638b7db2cc27220fee94d",
+    "ui/components/src/summary.rs": "620d3a690104fe21a6592619d087b05248f59e92abf53add9efa0ba28d63db60",
+    "crates/presentation/src/sidechat.rs": "d90bbe4d1ea6ba231ffccc1116c5ff26886ff98f68748dac871cd958bf4b8046",
+    "scripts/check-ui-consumer-inputs.py": "648e469f63149e38ee0c6bb024a2bc465b3b458f93a140fce75caaa3f1e9ba6d",
+    ".github/workflows/ci.yml": "69ff212c3add52a4527ae3e26c0e8e6f38a74297cb8520eac3005ee1691c4e28"
+  },
+  "evidenceBoundaries": {
+    "componentAndSharedServiceFixture": true,
+    "formalNativeWindow": false,
+    "threeHarnessFormalTree": false,
+    "physicalIme": false,
+    "remoteCiExecuted": false,
+    "mergeOrTag": false
+  },
+  "upstreamDependencies": [
+    {
+      "issue": 22,
+      "state": "open-no-consumable-api"
+    },
+    {
+      "issue": 23,
+      "state": "open-no-consumable-api"
+    }
+  ],
+  "legacyHarnessGpuSha256": "819c3c0d9415b7c17eacec9b47825dfd19c897e817c241e6b4a396d48ac05fc5"
+}

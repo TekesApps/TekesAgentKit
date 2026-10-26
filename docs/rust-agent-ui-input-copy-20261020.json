@@ -1,0 +1,63 @@
+{
+  "date": "2026-10-20",
+  "status": "experimental-input-copy",
+  "uiTests": 242,
+  "publicConsumerIncluded": true,
+  "strictUiClippy": true,
+  "fmt": true,
+  "uiBoundary": true,
+  "resolvedUi": {
+    "rev": "8cf0840790334ba224afc0595897c74231c712e6",
+    "packages": 8,
+    "files": 199
+  },
+  "binarySha256": "fbe3fc5331038ea77b84ed0a27a85c2c586fa13e1771773a52f95d5bcacc583f",
+  "sourceSha256": {
+    "ui/components/src/input_message.rs": "705da6a0a0de5057c3c359533714649a7f6758aa2e8b5ab07f1a123ee198fb26",
+    "ui/components/src/transcript_content.rs": "ad8734013f79530621ccc5106e24874c011f3845e1368eee063e51961a55c323",
+    "ui/components/src/run_view.rs": "26ed394c7656fabc6a5dfd622de8907369c7120f8ce6ef1e731fa2b93aa62e1c",
+    "ui/components/src/readonly_transcript.rs": "67cb2218e3e29adbd2bc5b77ed65a92fd22eca5067667f744074423ec6f64736",
+    "ui/demo/src/component_demo.rs": "5a2d6012950c8861be68392d595d58c4c0c01e2ac11e5c9cbeef1231a90185c9",
+    "ui/demo/src/components_native.rs": "b9ea1df40b0e6a406cc551618e06646e1ddabe6f2db481facdd45bd069e8b310"
+  },
+  "nativeRegression": [
+    "NATIVE_AGENT_READONLY_CHILD_CONTENT_SELFTEST_OK actual-child-messages+original-scope+native-pagination+no-composer; reading-anchor=false; physical-ime=false",
+    "NATIVE_AGENT_SIDEBAR_SUMMARY_SELFTEST_OK shared-inventory+shared-pin+sidebar-selection+summary-facts; full-run-view=false; physical-ime=false",
+    "NATIVE_AGENT_SIDECHAT_SELFTEST_OK owned-create+separate-composer+send+stream+draft+cancel-discard+parent-isolation; transcript=false; physical-ime=false",
+    "NATIVE_AGENT_CHILD_SELFTEST_OK direct-parent+independent-composer+single-admission+stream+cancel+isolated-drafts+bounded-read-only+paging+local-retirement; formal-transcript=false; physical-ime=false",
+    "NATIVE_AGENT_TASK_SELFTEST_OK resolved-task+independent-composer+single-admission+stream+cancel+parent-draft-isolation+close; transcript=false; physical-ime=false",
+    "NATIVE_AGENT_COMPONENTS_SELFTEST_OK composer+indicators+run-binding+synthetic-text-services+send+stream+cancel+draft-isolation+reconnect; physical-ime=false; transcript=false; reading-anchor=false"
+  ],
+  "imeSoftwareProbe": {
+    "softwareIme": true,
+    "pidTargetedEvents": true,
+    "physicalKeyboard": false,
+    "candidateWindow": false,
+    "sourceBefore": "com.apple.inputmethod.SCIM.ITABC",
+    "sourceAfter": "com.apple.inputmethod.SCIM.ITABC",
+    "binarySha256": "fbe3fc5331038ea77b84ed0a27a85c2c586fa13e1771773a52f95d5bcacc583f"
+  },
+  "oldBinaryControlPassed": true,
+  "focusFailure": {
+    "localLog": "/tmp/agentkit-input-copy-ime-trace.log",
+    "cause": "unknown origin of Focus(false); host Cancel cleared owner",
+    "excerpt": [
+      "COMPONENT_FOCUS active=false id=Some(ComponentId(429496729601))",
+      "COMPONENT_FOCUS active=true id=None",
+      "COMPONENT_FOCUS active=true id=Some(ComponentId(429496729601))",
+      "COMPONENT_FOCUS active=false id=Some(ComponentId(429496729601))",
+      "COMPONENT_FOCUS active=false id=None",
+      "SELFTEST FAIL text=None marked=false"
+    ]
+  },
+  "offscreen": {
+    "localImage": "/tmp/agentkit-input-copy.png",
+    "sha256": "14426fb47c5369c946e35c77beb66e61d17cc53e2339a95c0dbdea4deb81263e",
+    "nativeWindowScreenshot": false,
+    "inspected": true
+  },
+  "nativeClipboardReadback": false,
+  "physicalImeAcceptance": false,
+  "readingAnchorAcceptance": false,
+  "completeGoal": false
+}

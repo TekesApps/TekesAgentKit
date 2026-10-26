@@ -1,0 +1,234 @@
+{
+  "format": "agentkit-turn-rail-controls/1",
+  "based_on": "e32f9bae7b9252034693e676704deed16aa4272f",
+  "verified_at_utc": "2026-10-21T00:27:36.835022+00:00",
+  "published_contract": "v0.3.8",
+  "default_public_pin": "8cf0840790334ba224afc0595897c74231c712e6",
+  "candidate": {
+    "identity": "c7797b1e1b5a26b079ad7d1b2f8b45b89d054b730cb915ec554077132e8db0b3",
+    "archive_sha256": "e926b626ac58f92ffbd8c56f176a70d5de96560af4479db4a2bc7fe0592a165f",
+    "files": 489,
+    "delta_paths": [
+      "crates/tekes-ui-controls/src/composition.rs",
+      "crates/tekes-ui-controls/src/lib.rs",
+      "crates/tekes-ui-controls/src/widgets.rs",
+      "crates/tekes-ui-controls/tests/component_registry_api.rs",
+      "design/gallery/public-api-surface.json",
+      "design/source/interaction-contracts.json",
+      "design/tokens.json",
+      "docs/design/compact-actions-20261021.md",
+      "examples/composition-consumer/src/compact_actions.rs",
+      "examples/composition-consumer/src/lib.rs",
+      "examples/composition-consumer/tests/compact_actions.rs"
+    ],
+    "base_10b5_unchanged": true,
+    "tokens_sets_api_unchanged": true,
+    "default_pin_promoted": false
+  },
+  "source_files": {
+    "ui/components/src/run_view.rs": "d9a86f8a87b8a2f925622bd1f4e270f399812f195c5079f9888f86b0afec501a",
+    "ui/components/src/turn_rail.rs": "2eaa1e238e41e69e6cfd61cd2963ee81091eb2216b139eec5f02828ab6ccf3f0",
+    "ui/components/src/turn_rail_action.rs": "7cf9ddcf77bfdf3105b50b37f1362b8ad0a2fe3d7abd8c31f6a9f88acea9b31f",
+    "ui/components/src/turn_rail_component.rs": "34fdcfee711ee11935a7e890083a30823c01a467812716d7ace7d467955410eb",
+    "ui/components/src/lib.rs": "55ec8a799e32fef4d7fe5915040c2de77857649933ab637aeb2ae4686b12e43d",
+    "ui/consumer/src/lib.rs": "20b3522fe9470a3a14f8785fed9e0f3262cbc3328c110c33b3cbc5fe4793b114",
+    "ui/demo/src/component_demo.rs": "777aced09ed15cc69fc0e43d77d0b76eb4c3b5521bbbb81fdcafc6ad7bf9f569",
+    "ui/demo/src/components_native.rs": "338374f0cab67564d9bbe9f06849afa4b52e9caa8babe62cf0f8f9e2326c1e23",
+    "ui/demo/tests/run_column.rs": "3bc42e7b8c2b903e365dd67fa304c4f6c1e81a87702e39cd804a83ce75ca6b7c",
+    "scripts/test-reading-candidate.py": "98ae213ad2aa52f9c71442693f5529ca28e1f07d21d7a4a402e2ced4c97557fd",
+    "scripts/probes/agentkit-turn-rail-candidate.rs": "ffad3ce07067989cb2f28575aff57f92b28cfa0e9d8e77c9687189d81f7a892e",
+    "scripts/probes/native-turn-rail-candidate.rs": "7fed0d114b98046ba711c7ab62a827b949c25f10efe786636ef611272cc51323"
+  },
+  "references": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/TranscriptRendering/TranscriptIndicatorRailView.swift": "0a710cf6be24f8caa08e2e030db20caf3fb0001048ebbd8b9fb8c15dc53df487",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Run/RunChrome.swift": "bf910e3af84119cc17e504a752e4055082e3217ddaeb9245b22068f978889a68",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Run/RunView.swift": "4453b67fb8e4e6cabe4a9653ce378bffb939a9a01188a7df9a4bb89f0bd7674e"
+  },
+  "checks": {
+    "/tmp/agentkit-rail-default-workspace.log": {
+      "sha256": "2d210978174f5c3094f2dc17d73fb5e6449c672ecde47d3fcab483682bf56ca8",
+      "tests_passed": 348
+    },
+    "/tmp/agentkit-rail-default-clippy.log": {
+      "sha256": "436697f1d6a770ef1cf23197fc26ce8bbba7cfcf40cf370051557dc44c7fd96e",
+      "tests_passed": 0
+    },
+    "/tmp/agentkit-rail-c779-entire-ui.log": {
+      "sha256": "a497cdf2ca090989af295f62185813aae4171ea01d73bf31cd1035ce71301cce",
+      "tests_passed": 362
+    },
+    "/tmp/agentkit-rail-c779-entire-clippy.log": {
+      "sha256": "781baa4dac20962b2aed9a417a352afff6d4920ecc2d6c2fdf2ee060e93bc900",
+      "tests_passed": 0
+    },
+    "/tmp/agentkit-rail-c779-sdk-targeted.log": {
+      "sha256": "0383c48504a1ce5b950f0b3dccc963b309b57a5de057c6407a101918e21da71b",
+      "tests_passed": 7
+    },
+    "/tmp/agentkit-rail-c779-sdk-controls-text.log": {
+      "sha256": "5b72e945166070e4d31a43640890671a435a64e3653a89b651b4441527026306",
+      "tests_passed": 437
+    },
+    "/tmp/agentkit-rail-c779-sdk-consumer.log": {
+      "sha256": "2ecbb95a09e7515868ba3ff161e9abc81e291ab5f87df346f20a6e17cf8b3a6a",
+      "tests_passed": 213
+    },
+    "/tmp/agentkit-rail-c779-sdk-clippy.log": {
+      "sha256": "3e1d3eff4188c1f77debcab4627b32e8e7ee108c2837b47498becceed0efb5d7",
+      "tests_passed": 0
+    },
+    "/tmp/agentkit-rail-c779-sdk-consumer-clippy.log": {
+      "sha256": "8254728f0f5bf9d4d2763a1ad29fd3bceb68ad5b74ae28c42d6bc71b28da2e32",
+      "tests_passed": 0
+    },
+    "/tmp/agentkit-rail-c779-sdk-native-build.log": {
+      "sha256": "fcce12e8e9a3743502ec98eb1888a43a32489c10219b715f931aa40675ed5311",
+      "tests_passed": 0
+    }
+  },
+  "default_ui_tests": 348,
+  "candidate_ui_tests": 362,
+  "run_and_rail_tests": 14,
+  "independent_public_consumer_tests": 35,
+  "native_acceptance": false,
+  "physical_ime": false,
+  "voiceover": false,
+  "full_goal_complete": false,
+  "default_pin_promoted": false,
+  "development_freeze_promoted": false,
+  "open_issues": [
+    "https://github.com/TekesApps/TekesUI/issues/32",
+    "https://github.com/TekesApps/TekesUI/issues/33"
+  ],
+  "next_candidate_intake": {
+    "identity": "5882774a0e73dfcb423efb4260c150e03f50f5cc9a87bd2331c1e171963faacd",
+    "archive_sha256": "1d4a3541ba3bc8127b21d6dd8d69ef9608583c72a5287ced547078ccdec735d4",
+    "files": 490,
+    "delta_paths": [
+      "crates/tekes-ui-controls/src/composition.rs",
+      "crates/tekes-ui-controls/src/composition/content_reading.rs",
+      "crates/tekes-ui-controls/src/composition/content_reveal.rs",
+      "crates/tekes-ui-controls/src/scroll_view/reveal.rs",
+      "design/source/interaction-contracts.json",
+      "design/tokens.json",
+      "docs/design/item-start-alignment-20261021.md",
+      "examples/composition-consumer/tests/item_navigation.rs",
+      "examples/composition-consumer/tests/scroll_reveal.rs"
+    ],
+    "base_c779_unchanged": true,
+    "default_pin_promoted": false,
+    "tokens_sets_api_unchanged": true
+  },
+  "receiver": {
+    "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-rail-c779-native-v7/receipt.json",
+    "sha256": "de6e7fc039b11f7835cb507be14e5844ef3129e5a6a98ec60b65b8849f1ceab1",
+    "checks": [
+      {
+        "check": "tests",
+        "exit_code": 0
+      },
+      {
+        "check": "clippy",
+        "exit_code": 0
+      },
+      {
+        "check": "public-consumer",
+        "exit_code": 0
+      },
+      {
+        "check": "native-build",
+        "exit_code": 0
+      }
+    ]
+  },
+  "native_latest_rail_fixture": {
+    "passed": true,
+    "runs": [
+      {
+        "log": "/tmp/agentkit-rail-c779-native-v7.log",
+        "sha256": "e41f94542a5eb55e7d3949f85f3f64f97adb0d1a1527d8f7de2142ef73b9decd",
+        "receipt": {
+          "actualRunView": true,
+          "clientkitTurnStartAlignment": false,
+          "initialAndExplicitLatest": true,
+          "interactiveLatestRail": true,
+          "interactiveRail": true,
+          "keyboardRingVisualAccepted": false,
+          "nativeWindow": true,
+          "noSubmission": true,
+          "ordinaryTurnStart": false,
+          "originalBackend": true,
+          "originalEditorAndBaseline": true,
+          "physicalIme": false,
+          "programmaticItemNavigation": true,
+          "railPointerDispatches": 1,
+          "realHarness": false,
+          "secondPublicConsumer": false,
+          "syntheticAppKitPreeditPreserved": true,
+          "voiceOver": false
+        }
+      },
+      {
+        "log": "/tmp/agentkit-rail-c779-native-v7-repeat.log",
+        "sha256": "04071f66f7b3439a65e1385bedcf98d93b6c216cae19d4b3ade2558214e1380b",
+        "receipt": {
+          "actualRunView": true,
+          "clientkitTurnStartAlignment": false,
+          "initialAndExplicitLatest": true,
+          "interactiveLatestRail": true,
+          "interactiveRail": true,
+          "keyboardRingVisualAccepted": false,
+          "nativeWindow": true,
+          "noSubmission": true,
+          "ordinaryTurnStart": false,
+          "originalBackend": true,
+          "originalEditorAndBaseline": true,
+          "physicalIme": false,
+          "programmaticItemNavigation": true,
+          "railPointerDispatches": 1,
+          "realHarness": false,
+          "secondPublicConsumer": false,
+          "syntheticAppKitPreeditPreserved": true,
+          "voiceOver": false
+        }
+      }
+    ],
+    "binary": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-rail-c779-native-v7/native-demo",
+    "binary_sha256": "29a51934eaa99f563ec602a4255c5e45009840b937948897da008ffdb9dc9744",
+    "synthetic_appkit_preedit": true,
+    "physical_ime": false,
+    "keyboard_ring_visual_accepted": false,
+    "ordinary_turn_start": false,
+    "full_runview_acceptance": false
+  },
+  "native_failed_attempts": [
+    {
+      "log": "/tmp/agentkit-rail-c779-native-failed-visible-center.log",
+      "sha256": "6b8eab8c6806ef993a5a1e88fe9bcbd159782bea0700f0bbcb0be4d4bf65afd2",
+      "reason": "Probe used full row center before the successful current render; corrected to actual visible rect after render"
+    },
+    {
+      "log": "/tmp/agentkit-rail-c779-native-v6.log",
+      "sha256": "12dc007a27d3b74bdb05e199f6c17aa56a0a8866bfef1edb6011e49540d7b05e",
+      "reason": "Late publication changed from 5 to 6 after latest capture; native cause unproven. The final instrumented binary passed twice; this failed attempt is not accepted or silently discarded"
+    }
+  ],
+  "captures": {
+    "agentkit-rail-c779-native-centered-marked.png": "2e6f631c20a51ec97df1ec4026718abe7a1339ac9e80504a11773ffb6121c55d",
+    "agentkit-rail-c779-native-latest-marked.png": "9679fe6c0eb0cf8e1344c912b62148117a21b1bb85a229fa55e78a7e0ce098a6",
+    "agentkit-rail-c779-native-repeat-centered.png": "f93cad70d5a4b332fd91e8bd1c3c456e077bd0dfd2dc6fce3f07b61cceae12da",
+    "agentkit-rail-c779-native-repeat-latest.png": "52cad255a6dd3530068d049e6119b2632399029db41e1d471cfc66ea8175707b"
+  },
+  "captures_visually_inspected": [
+    "agentkit-rail-c779-native-centered-marked.png",
+    "agentkit-rail-c779-native-latest-marked.png"
+  ],
+  "default_native_fixture": {
+    "passed": true,
+    "log": "/tmp/agentkit-rail-default-native.log",
+    "sha256": "d1e94b7423e858d6ca09762fb2e47b6dc793e5084e3a1d22843fd88bef6c9c2b",
+    "binary_sha256": "f9dfea8cb07ca7f4be99980fa2e5fbbcbfbd9a4a834203a79d21e5d6fb3648cd",
+    "physical_ime": false,
+    "reading_anchor": false
+  }
+}

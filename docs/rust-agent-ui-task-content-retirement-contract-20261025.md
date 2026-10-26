@@ -1,0 +1,13 @@
+# #23：Task source 更换时退休原面板内容
+
+基线bd5e7f5。受控新回归已实证：相同parent/task ID、不同TaskPaneBinding owner、相同resolved scope，open_task_source正确cancel旧Run并移除task_runs，但SidePanel按scope判断same_source，仍将旧Composer留在active slot直到新Run安装。旧权限Missing不等于旧UI已卸载。本切片修复AgentKit业务组件与消费宿主，不改TekesUI/Kernel/Swift。
+
+采用加法公开API SidePanel::retire_content(&PanelContentToken)。由已识别producer owner更换的host调用，普通facts更新不调用，避免破坏已有控件实例/草稿。token继续仅为UI挂载权限，不能代替TaskPanelState/binding的异步owner校验。
+
+先校验opaque token的精确SidePanel实例owner、parent/context、projection-ready与mount epoch，checked预检新epoch；拒绝必须无缓存/挂载副作用。实例使用私有Arc marker，两个相同namespace的重建面板也不能交叉接受旧token；install_content与retire共用检查。只提升目标mount epoch，保留context、selection、tab/header ID与其他pane缓存/token；旧token不能install或重复retire，fresh token可安装。
+
+active目标立即drop旧subtree，清flexible child/geometry并显示原awaiting-content placeholder；inactive目标只删除其retained subtree。不能把旧内容stash后留下缓存，也不通过暂时删tab或伪造Task状态强行重置。不存在custom也可退休。
+
+ComponentDemo在composition许可检查通过且识别新source Arc不同后，从旧tab获取fresh token，先清focus，再退休旧内容，之后cancel旧source、移除旧Run、安装新source并沿原公开OpenTask命令/结果路径继续。token缺失表示当前projection未提供该tab的有效挂载权（例如tab已移除或projection gate未就绪）；不吞掉已有有效token的退休错误。SidePanel本身不提交IME、不改Run、不取消producer；host继续负责focus/IME。
+
+验收分层：组件active/inactive/fresh/stale/foreign（含同namespace新实例）无副作用、其他tab不受影响、普通facts保留；demo原red转green，新owner ready前后旧Run迟到均拒绝、旧controls不复现，新Run同scope仍为不同owner，父draft独立。使用内存SEP、原公开组件和bindings；不是权威真实Task producer、OS AX、桌面或完整window/chrome验收。#23保持开放，已有#42/#53不豁免。

@@ -1,0 +1,9 @@
+# PR #10 CI: a2feb19
+
+Both push run [40069180702](https://github.com/TekesApps/TekesAgentKit/actions/runs/40069180702) and PR run [40069183319](https://github.com/TekesApps/TekesAgentKit/actions/runs/40069183319) are terminal. Headless jobs passed. UI dependency verification, formatting, strict Clippy, full workspace tests and the standalone public API consumer execution passed. Only strict nested detail reading failed; the following ordinary demo build was skipped in CI. The local ordinary demo build passed separately at this source.
+
+The push checked out `a2feb1974d5809f551a7650c5228a09129c93fb6`; the PR checked out synthetic merge `f994621841711cd63ddc8d831819fb2efeb61c0e`, whose second parent is that head. Both consumer input closures contain 136 AgentKit source files with SHA256 `3b979fc0e7a68a786c5c7056d8bb85ef02f8a5b1ffe21875a6a4f7b9ac9b1f97`, independently matched to the local unchanged consumer source scope. Fixed TekesUI revision remains `50ec49f3446924fdbc66b3cff22cd8cfe150fe7c`, with 243 reviewed SDK files.
+
+Both downloaded raw reading artifacts report `accepted=false`, `parentFollowingAfterInnerUp=true`, parent offset 0→0→634, inner offset 100 and `detailVisibleAfterAppend=false`. This is new-run evidence, not a reused historical result. #18/#28 and TekesUI #53 remain gates; successful consumer construction/mounting does not prove the reading behavior or permit merge/release.
+
+[Machine receipt](rust-agent-ui-ci-a2feb19-20261024.json). Original job payloads, downloaded artifacts and merge-parent proof remain under `.runtime-fixtures/identity-membership-20261024/`. The prepare receipt's `prepared-not-built` label records preparation only; the separate terminal job step supplies the actual execution result. Subsequent commits require their own CI and must not borrow this head's status. #15's formal AgentKit UI release pin remains absent while the UI is experimental.

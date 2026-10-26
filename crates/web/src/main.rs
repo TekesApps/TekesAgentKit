@@ -11,7 +11,7 @@ use tekes_agent_contract::*;
 use tekes_agent_endpoint_dsh::{DshConfiguration, DshConnector};
 use tekes_agent_endpoint_kernel::KernelConnector;
 use tekes_agent_endpoint_pi::{PiConfiguration, PiConnector};
-use tekes_agent_web::SharedAgent;
+use tekes_agent_web::{HostRequest, HostResponse, SharedAgent, abort_observation, forward_follow};
 use tokio::sync::mpsc;
 
 #[tokio::main]
@@ -161,63 +161,88 @@ async fn main() -> Result<()> {
         }
     });
     let mut tasks = BTreeMap::<String, tokio::task::AbortHandle>::new();
+    let mut observations = std::collections::BTreeSet::<String>::new();
     while let Some(line) = receiver.recv().await {
         let Ok(request) = serde_json::from_str::<Value>(&line) else {
             continue;
         };
-        let id = string(&request, "id")?.to_owned();
-        if request["op"] == "cancelObservation" {
-            if let Some(task) = tasks.remove(&id) {
-                task.abort();
-            }
+        let Some(host_request) = HostRequest::parse(&request) else {
+            // An uncorrelatable frame must not take down unrelated requests.
+            continue;
+        };
+        let id = host_request.id.to_owned();
+        let cancels_observation = host_request.cancels_observation();
+        let follows = host_request.follows();
+        let configures_dsh = host_request.configures_dsh();
+        if cancels_observation {
+            abort_observation(&id, &mut tasks, &mut observations);
             continue;
         }
         // Finished requests are removed without ever retrying an uncertain mutation.
         tasks.retain(|_, task| !task.is_finished());
-        require(!tasks.contains_key(&id), "duplicate request id")?;
+        observations.retain(|active_id| tasks.contains_key(active_id));
+        // Reusing a live id makes two replies ambiguous. Ignore just this bad line.
+        if tasks.contains_key(&id) {
+            continue;
+        }
+        let is_observation = follows;
         let agent = agent.clone();
         let output = output.clone();
         let task_id = id.clone();
         let task = tokio::spawn(async move {
-            let result=std::panic::AssertUnwindSafe(async {
-                if request["op"]=="configureDSH" {
-                    let identity=string(&request,"endpoint")?;
-                    require(agent.endpoint(identity)?.kind=="dsh","DSH endpoint required")?;
-                    let mut config=DshConfiguration::new(identity,string(&request,"url")?)?;
-                    config.authorization=Some(("Cookie".into(),string(&request,"cookie")?.into()));
-                    agent.replace_connector(identity,Arc::new(DshConnector::new(config))).await?;
-                    let _=output.send(json!({"id":task_id,"value":{}})).await;
+            let result = std::panic::AssertUnwindSafe(async {
+                if configures_dsh {
+                    let identity = string(&request, "endpoint")?;
+                    require(
+                        agent.endpoint(identity)?.kind == "dsh",
+                        "DSH endpoint required",
+                    )?;
+                    let mut config = DshConfiguration::new(identity, string(&request, "url")?)?;
+                    config.authorization =
+                        Some(("Cookie".into(), string(&request, "cookie")?.into()));
+                    agent
+                        .replace_connector(identity, Arc::new(DshConnector::new(config)))
+                        .await?;
+                    let _ = output
+                        .send(HostResponse::value(task_id.clone(), json!({})).into_json())
+                        .await;
                     return Ok(());
                 }
-                if request["op"]=="follow" {
-                    let (tx,mut rx)=mpsc::channel(16);
-                    let follow=agent.follow(&request,tx);
-                    tokio::pin!(follow);
-                    loop {tokio::select! {
-                        value=rx.recv()=>if let Some(value)=value && output.send(json!({"id":task_id,"value":value})).await.is_err(){return Ok(())},
-                        result=&mut follow=>return result,
-                    }}
+                if is_observation {
+                    let (tx, rx) = mpsc::channel(16);
+                    let follow = agent.follow(&request, tx);
+                    forward_follow(rx, follow, task_id.clone(), output.clone()).await
                 } else {
-                    let value=agent.request(&request).await?;
-                    let _=output.send(json!({"id":task_id,"value":value})).await;
+                    let value = agent.request(&request).await?;
+                    let _ = output
+                        .send(HostResponse::value(task_id.clone(), value).into_json())
+                        .await;
                     Ok(())
                 }
-            }).catch_unwind().await;
+            })
+            .catch_unwind()
+            .await;
             match result {
                 Ok(Ok(())) => {}
                 Ok(Err(error)) => {
                     let _ = output
-                        .send(json!({"id":task_id,"error":error.to_string()}))
+                        .send(HostResponse::error(task_id.clone(), error.to_string()).into_json())
                         .await;
                 }
                 Err(_) => {
                     let _ = output
-                        .send(json!({"id":task_id,"error":"service operation failed"}))
+                        .send(
+                            HostResponse::error(task_id.clone(), "service operation failed")
+                                .into_json(),
+                        )
                         .await;
                 }
             }
-            let _ = output.send(json!({"id":task_id,"done":true})).await;
+            let _ = output.send(HostResponse::done(task_id).into_json()).await;
         });
+        if is_observation {
+            observations.insert(id.clone());
+        }
         tasks.insert(id, task.abort_handle());
     }
     eprintln!("AgentKit host shutting down: input channel ended");
@@ -227,4 +252,28 @@ async fn main() -> Result<()> {
     drop(output);
     let _ = writer.await;
     Ok(())
+}
+
+#[cfg(test)]
+mod follow_dispatch_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn cancel_observation_does_not_abort_a_unary_request_with_the_same_id() {
+        let (finished_tx, finished_rx) = tokio::sync::oneshot::channel::<()>();
+        let unary = tokio::spawn(async move {
+            let _ = finished_rx.await;
+            42
+        });
+        let mut tasks = BTreeMap::from([("request-A".to_owned(), unary.abort_handle())]);
+        let mut observations = std::collections::BTreeSet::new();
+
+        assert!(!abort_observation(
+            "request-A",
+            &mut tasks,
+            &mut observations
+        ));
+        finished_tx.send(()).unwrap();
+        assert_eq!(unary.await.unwrap(), 42);
+    }
 }

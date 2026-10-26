@@ -1,0 +1,66 @@
+{
+  "scope": "DSH-only corrected source observer v2 compiled; affected two protocol cases not_run",
+  "roles": {
+    "baseline": {
+      "program": {
+        "path": "/Volumes/HP P900/dev/TekesAgentKit/acceptance-tools/performance/reconnect-source-v2-complete/baseline/performance_acceptance",
+        "sha256": "950db9a1e597fee4c60171a34705c74b60077a388c96607a59cf9e2179ce1e4a",
+        "sourceCommit": "f1daa0ffcf6ced41e21f351e22845455ca78006c",
+        "sourceManifest": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/reconnect-source-oracle-v5-baseline-inputs.json",
+        "sourceManifestSha256": "e07934b61273dbeb75755a79a63950e0390af312cba6ec9d898146d3079d61c1",
+        "consumerSourceSha256": "808d93fbd4527c111ee883c5041debe9884e586e3d48a2492ab2b25366ea65a6",
+        "observerSources": {
+          "crates/headless/examples/performance_acceptance.rs": "808d93fbd4527c111ee883c5041debe9884e586e3d48a2492ab2b25366ea65a6",
+          "crates/headless/examples/support/reconnect_source.rs": "87d9b49e401adbeb5c1a9b4cb07a198e6b30a95d752d165308f90707b22e4d13"
+        },
+        "compiled": true,
+        "clippyPassed": true,
+        "focusedTestsPassed": 9,
+        "performanceSamples": 0,
+        "performanceAccepted": false,
+        "sourceInputsUnchanged": true,
+        "targetDir": "/Volumes/HP P900/dev/TekesAgentKit/shared-target",
+        "noDesktopInteraction": true
+      },
+      "programReceiptSha256": "53ccbf5f79c3c1e9976945fc8177051f7b387e11a5bcbd5b5ae26e98c5c644b1"
+    },
+    "candidate": {
+      "program": {
+        "path": "/Volumes/HP P900/dev/TekesAgentKit/acceptance-tools/performance/reconnect-source-v2-complete/candidate/performance_acceptance",
+        "sha256": "92206559c0a0c744a96bf5059e6f034fe10f0bcd8379907aacbc9de12b81e142",
+        "sourceCommit": "10263722b5fb128922c49a31b5942c41333cd6e2",
+        "sourceManifest": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/stage-close-20261025/reconnect-source-oracle-v5-candidate-inputs.json",
+        "sourceManifestSha256": "1841e4dc0d9448bc7812c5a1ac7ed039ae32c993e469ebd50f41a241aa7f6712",
+        "consumerSourceSha256": "808d93fbd4527c111ee883c5041debe9884e586e3d48a2492ab2b25366ea65a6",
+        "observerSources": {
+          "crates/headless/examples/performance_acceptance.rs": "808d93fbd4527c111ee883c5041debe9884e586e3d48a2492ab2b25366ea65a6",
+          "crates/headless/examples/support/reconnect_source.rs": "87d9b49e401adbeb5c1a9b4cb07a198e6b30a95d752d165308f90707b22e4d13"
+        },
+        "compiled": true,
+        "clippyPassed": true,
+        "focusedTestsPassed": 9,
+        "performanceSamples": 0,
+        "performanceAccepted": false,
+        "sourceInputsUnchanged": true,
+        "targetDir": "/Volumes/HP P900/dev/TekesAgentKit/shared-target",
+        "noDesktopInteraction": true
+      },
+      "programReceiptSha256": "edd13d8364c559736b65747dd4f3fccbc305022ceb2af23a740af698f1ad1459"
+    }
+  },
+  "sameObserverSources": true,
+  "focusedTestsPerRole": 9,
+  "strictClippyAndBuildPassed": true,
+  "programsFromV4NotUsedForProtocol": true,
+  "sourceWitnessLimit": {
+    "maxMessages": 200,
+    "mustExhaust": true,
+    "corpus": "fixed 100body + at most22append +10 read groups",
+    "runtimeWindowUnchanged": 50,
+    "exactRetainedFloorPreserved": true
+  },
+  "piNativeRerunRequired": false,
+  "performanceAccepted": false,
+  "productChanges": false,
+  "noDesktop": true
+}

@@ -1,0 +1,138 @@
+{
+  "format": "agentkit-run-underlay/1",
+  "date": "2026-10-21",
+  "verified_at_utc": "2026-10-20T17:57:31.352817+00:00",
+  "based_on": "a8e4393802c90b971cbb4b6b4076c2db54bfe2fa",
+  "published_contract_baseline": "v0.3.8",
+  "source": {
+    "ui/components/src/run_view.rs": "d6f65c99690d214642bc9c8ef2f54792a5dcece017569462d82ee306464a762c",
+    "ui/components/src/transcript_content.rs": "12fcf4331128771fa9ef72ec3a2394e694cd8f5fc41a90c5bcf5861ef5cb8ef4",
+    "ui/components/src/actionable.rs": "8253b73ad50dd16d7fc3daaf49e31c32a7dec8bd63ee06abfcf28075b8849c8b",
+    "ui/consumer/src/lib.rs": "f14890c784dbd824b6aec0e94bf5486bedaba04ec3a8282d0e4f7812eca71c98",
+    "ui/demo/src/native_composer_visibility_selftest.rs": "c9cf01f2b9768937b054fc09a2709cb2af478d6453be17c857542de44482cbbc",
+    "ui/demo/tests/run_column.rs": "eb6a60057febbb4132f13cce5267d1960b72dd5a6c5e4248c3f39c8a94bd37da",
+    "scripts/probes/agentkit-run-preflight-candidate.rs": "a2b5fa61a461bc0c1bf0f7cc55b726851371d71de23a7e5adb06d8c1b19cc320",
+    "scripts/probes/tekesui-active-layout-preflight.rs": "06bdf9282a81e27b1078a44d318afd3f8743a46231bb04bbd9a96f186cc716a3"
+  },
+  "reference_sources": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Run/RunNativeController.swift": "20258b354edc74c730002654c5edde815eb93d7a6f68870f55e77dbe2ecbd99d",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Run/RunOverlay.swift": "32c27a8488dd313f356b720752cb51a5b92eeb3caeb8d9399bc28ec6f93acf26",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/RunUserControlsGraph.swift": "aecc2c5012d25a1e4c0072d1bfef013d99bdf6d48961a2c5d8dca186120d1227",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Run/RunView.swift": "4453b67fb8e4e6cabe4a9653ce378bffb939a9a01188a7df9a4bb89f0bd7674e",
+    "/Users/frankqin/dev/Tekes/Tekes/ClientAgentHostAdapters.swift": "7d907c654ec3df76c7a8b492e32bbc68f1bd4d0b46044cae615aa712b9f67c71"
+  },
+  "default_inputs": {
+    "commit": "8cf0840790334ba224afc0595897c74231c712e6",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 199,
+    "sha256": "f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f",
+    "ui_packages": 8
+  },
+  "validation": {
+    "ui_tests": 304,
+    "second_public_consumer_tests": 28,
+    "column_theme_scale_combinations": 36,
+    "frozen_horizontal_vectors": 25,
+    "source_controls_bottom_regular": true,
+    "source_document_spacing_loose": true,
+    "zero_size_retains_geometry_and_scroll": true,
+    "final_row_visible_at_library_limit": true,
+    "composer_wheel_does_not_scroll_history": true,
+    "strict_clippy": true,
+    "fmt": true,
+    "candidate_run_tests": 8,
+    "candidate_strict_clippy": true,
+    "candidate_current_inputs_match": true,
+    "candidate_source_unchanged": true,
+    "native_context": true,
+    "native_failure_recovery": {
+      "draftIsolation": true,
+      "focusReconciledByLibrary": true,
+      "formalRunView": true,
+      "fullLayoutParity": false,
+      "hiddenFromAccessibility": true,
+      "nativeSyntheticMarkedText": true,
+      "nativeWindow": true,
+      "noHiddenLayoutSlot": true,
+      "noSubmission": true,
+      "physicalIme": false,
+      "projectionFailureRecovery": true,
+      "realHarness": false,
+      "runtimeArchiveUnarchive": true,
+      "sameEditorRetained": true,
+      "voiceOver": false
+    },
+    "native_component_regression": true,
+    "system_software_ime": {
+      "softwareIme": true,
+      "pidTargetedEvents": true,
+      "physicalKeyboard": false,
+      "candidateWindow": false,
+      "sourceBefore": "com.apple.inputmethod.SCIM.ITABC",
+      "sourceAfter": "com.apple.inputmethod.SCIM.ITABC",
+      "binarySha256": "e19376d79cba6c46305e97e9f0eadc2ea025e8ae28d5565b11ac81cdb269506b"
+    },
+    "clientkit_matched_visual_acceptance": false,
+    "candidate_native_reading_acceptance": false,
+    "actual_three_harness_reading": false,
+    "physical_ime": false,
+    "voiceover": false
+  },
+  "candidate": {
+    "identity": "2b16eaa6200fecdde9a0c615166064effb9446249cde05087d5d7c288d81d4ec",
+    "files": 463,
+    "receiver_receipt_sha256": "4d341e059f875450a98679cd113b137265c33b952bcb3cfc7ceecd2ef7e2c539"
+  },
+  "known_foundation_boundary": {
+    "issue": "https://github.com/TekesApps/TekesUI/issues/27",
+    "candidate_identity": "2b16eaa6200fecdde9a0c615166064effb9446249cde05087d5d7c288d81d4ec",
+    "probe_sha256": "06bdf9282a81e27b1078a44d318afd3f8743a46231bb04bbd9a96f186cc716a3",
+    "receipt_sha256": "5b4f882e9ba94a93d8f8e4d2e1e6c269c99f3d1c0ca28b815a8b4b4f017b7a66",
+    "reproducer_passed": true,
+    "feature_fixed": false,
+    "default_pin_case_executed": false,
+    "normal_hosts_provide_text_services": true
+  },
+  "binary_sha256": "e19376d79cba6c46305e97e9f0eadc2ea025e8ae28d5565b11ac81cdb269506b",
+  "image": {
+    "path": "/tmp/agentkit-overlay-native-context-20261021.png",
+    "sha256": "8a7613ddaadf8327c992261ebf9852d942870ed916fca3bf9436d277304a70f3",
+    "inspected": true,
+    "kind": "owned-fixture-only-not-clientkit-visual-parity"
+  },
+  "logs": {
+    "/tmp/agentkit-overlay-ui-tests.log": "41e398bc51c9d65ae7d8a7a27f3fb5dc12a959ef710ef6abd59314fcdd04bef4",
+    "/tmp/agentkit-overlay-ui-clippy.log": "8d2c027be978bbf3863feaec7e853140c8f007f031c98556210ff9b5a9e708dc",
+    "/tmp/agentkit-overlay-demo-build.log": "5604fc8f0c276397a55db4bd7008236712075c0ad37d3b3a0f1fe362b1b85a36",
+    "/tmp/agentkit-overlay-native-context-20261021.log": "0c6e7208047e23250467c7a1011cfbe0e9f7bf759b5eab04acf6ea183ff2168c",
+    "/tmp/agentkit-overlay-native-failure-20261021.log": "1d21062e845dcd7a36d65d1d838e2682dfaeb877c2163a8cfaa08db3811b4056",
+    "/tmp/agentkit-overlay-native-regression-20261021.log": "8d578b471809f4b916f3cb3477c3826b323fd9cdd098fa60da414cf8cdc7e23c",
+    "/tmp/agentkit-overlay-system-ime-20261021.log": "411256b6a5d642ab8620ac323837ef9614b6bdb84f84b75d6fe244ced3afff7a",
+    ".runtime-fixtures/agentkit-overlay-preflight-20261021-01/tests.log": "4c35fee1cb1560bfc895164b490969ba7f00a88426a54f137e3a3d07ed42b824",
+    ".runtime-fixtures/agentkit-overlay-preflight-20261021-01/clippy.log": "13b1f2697f212d03fd6a94d7dd3dd8e16f6d48fce3be440a326d68d95e9699e9",
+    ".runtime-fixtures/tekesui-active-layout-preflight-20261021/tests.log": "7e748511a84cfbfeb433f2f4488f24e4c1dba1421435cec2f0aeda836254f89e",
+    ".runtime-fixtures/tekesui-active-layout-preflight-20261021/clippy.log": "092fac35545dd553b17f9fba186d61bb85e4b87ffe9b0aa559356cd1205f7479",
+    "/tmp/agentkit-overlay-initial.log": "ed9cf70b851093259d97ae949999f28c4798d22b1059565dc823479321d2307f",
+    "/tmp/agentkit-overlay-targeted2.log": "d27f635c677f5edf60284772a12d86369cd752fd69f23ffd73ef401100faba2c",
+    "/tmp/agentkit-overlay-targeted3.log": "72cf7299a28d57e593902810181b929689c7386526977cddb1d5ae16ed48c7bd",
+    "/tmp/agentkit-overlay-targeted4.log": "74047f26d0dca2ee6099e9188d73a905a3565b37140edcaaf29dddc781a395ba",
+    "/tmp/agentkit-overlay-targeted5.log": "814f9c7e6609d14a394267c5f5fcc564834234b50cc3b06ac0282d7ee5f4c282"
+  },
+  "retained_failures": [
+    "Initial source tests still asserted docked viewport/column geometry; changed to full pane underlay, shared row/Composer column, Regular bottom and Loose clip clearance.",
+    "New collapse test initially omitted Component/ScrollContent imports; restored before passing."
+  ],
+  "remaining": [
+    "full leading rail/chrome and selection/Jump",
+    "bounded-document-panel viewport policy and full Composer content layout",
+    "per-pane and Sidebar/Summary layout/display parity",
+    "default/native mixed reading and rich selection",
+    "actual three-harness reading and final native UX",
+    "matched ClientKit same-content/theme/window/scale/normal-type visual evidence",
+    "review CI merge and stage tag"
+  ],
+  "pin_promoted": false,
+  "merged": false,
+  "tagged": false
+}

@@ -1,0 +1,41 @@
+{
+  "sourceBase": "0acc66abcf3562fb77e970e5bff6244b9a9030c2",
+  "tekesui": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "agentKitPublishedBaseline": "v0.3.8; UI and these additions remain unpublished in-repo development inputs",
+  "sourceInputs": {
+    "ui/bindings/src/feedback.rs": "b25168bd05c9d57424af7f4af9fda96af01253ec48f84fcd00fddea9474f0376",
+    "ui/components/src/feedback.rs": "c5e8b44b2d3c00f2b785f7e7902a58939ec7f2aa0523d2675a7ca316d7a30ba1",
+    "ui/consumer/tests/summary_label.rs": "cddb009136fa8a7ec0e665bc7112d82c4f1af2ea72f9706c371f44549fa87ba8",
+    "ui/demo/src/component_demo.rs": "00b3fbdae07bd9e16bf09d1819678538cc2b1a6c8fd53c8a7d2b1b7e3924ed5a",
+    "ui/demo/src/component_feedback.rs": "b24f9e4f29f13957b450849a387b16c80af3ec1f0386cfb0da39828e743bb599",
+    "ui/demo/src/components_native.rs": "2d7798ebf7a361f86c736a760c5ce9803b2c8aedd7bc444f4e6f275a1dbbf34b",
+    "ui/demo/tests/feedback_read.rs": "7f8f6408a21df70ed818c04282e11cdb5d95804121737cddc99f40e5a5b5a8fd"
+  },
+  "workspacePassedBeforeTwoAdditionalIsolationTests": 542,
+  "workspaceIgnored": 1,
+  "finalFeedbackReadTestsPassed": 13,
+  "newFeedbackReadTests": 7,
+  "finalIndependentConsumerPassed": 22,
+  "finalIndependentConsumerIgnored": 1,
+  "strictClippy": true,
+  "nativeThisChange": false,
+  "realHarnessThisChange": false,
+  "sameProcessControlledEndpoint": true,
+  "crossProcess": false,
+  "offscreenInitialReadPump": "not run; static snapshot mode does not drive the native command loop",
+  "compactRefreshEntry": "retained; complete ClientKit aside/glyph parity remains open",
+  "newTargets": 0,
+  "newProgramCopies": 0,
+  "deletedBytes": 0,
+  "evidence": {
+    ".runtime-fixtures/native-resume-20261022/feedback-intake-acceptance.log": "f992d8e6fce7b0f9d19d68a0fedd15729b4328ccb73e3f6dbc1b34872f43fb02",
+    ".runtime-fixtures/native-resume-20261022/feedback-intake-boundaries.log": "9480cc4382559b9a7a99240226a9f766048e30c8d38bb4bccd1fd8bca56661ad",
+    ".runtime-fixtures/native-resume-20261022/feedback-intake-clippy-final.log": "32bf5134344058485e9a9f9404dfcf481c5e48e50a3c17342d649bdac8b0b88f",
+    ".runtime-fixtures/native-resume-20261022/feedback-intake-clippy.log": "fe8cca21808fffd91c1e354eaeafb452ecb4914ce589cad5f942df0e5d33a6fe",
+    ".runtime-fixtures/native-resume-20261022/feedback-intake-consumer-final.log": "7422b838ffda6f110839315e915cd281ba88351f168e95373583a6561bdba476",
+    ".runtime-fixtures/native-resume-20261022/feedback-intake-source-isolation.log": "dc1249ff9cb53ada031617c4a670d49edcf010b43e77bbec8af58c2ca015851b",
+    ".runtime-fixtures/native-resume-20261022/feedback-intake-tests.log": "b6abcdc5c4ad53000a47ace2c19c8ba03d9fa7892d157cac6b389d16b1822147",
+    ".runtime-fixtures/native-resume-20261022/feedback-intake-workspace-final.log": "9573d62fe490b83e9cbc5eb33344c8553d096fcee146a5ddbe6082dd26630423",
+    ".runtime-fixtures/native-resume-20261022/feedback-intake-workspace.log": "a9170359a04101fdbb31066aabea8376aaf23dabe4d21edaca6dfd1f83bfbc8c"
+  }
+}

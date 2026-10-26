@@ -1,0 +1,712 @@
+{
+  "schemaVersion": 1,
+  "scope": "PR10 / issues15,16,17,27,28",
+  "proofs": {
+    "release-dsh": {
+      "sourceFiles": 557,
+      "programSha256": "fc44d6dd875e2a7b4053b875fbec561c38ce4b0f21d3906b14901e0ffcbd0638",
+      "ownedExits": {
+        "dsh": 0,
+        "native": 0
+      }
+    },
+    "release-native": {
+      "sourceFiles": 557,
+      "programSha256": "fc44d6dd875e2a7b4053b875fbec561c38ce4b0f21d3906b14901e0ffcbd0638",
+      "ownedExits": {
+        "dsh": 0,
+        "native": 0
+      }
+    },
+    "release-idle": {
+      "sourceFiles": 557,
+      "programSha256": "fc44d6dd875e2a7b4053b875fbec561c38ce4b0f21d3906b14901e0ffcbd0638",
+      "ownedExits": {
+        "dsh": 0,
+        "native": 0
+      }
+    }
+  },
+  "validation": {
+    "root": [
+      401,
+      0,
+      0
+    ],
+    "ui": [
+      781,
+      0,
+      1
+    ],
+    "pythonPassed": 299,
+    "strictClippy": "root and UI all targets passed; final drain example passed",
+    "independentConsumer": {
+      "actualRunExit": 0,
+      "sourceFiles": 138,
+      "sourceSha256": "b4d81185f6336aa401120abedc76f9ad03dd794dc3280da82302270821e1a5dc",
+      "preparedHead": "3bda2f649b8a6a47213916b433d8a09a600f8cd7",
+      "workingTreeInputs": true,
+      "lockSha256": "f7cfa8b4c253faa776079c6871f655586fe312775d967f8a4c2bd3d12cd361c5"
+    },
+    "sdk": {
+      "commit": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+      "local_packages": 11,
+      "native_interaction": false,
+      "reviewed_files": 243,
+      "sha256": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
+      "ui_packages": 8
+    },
+    "strictReading": {
+      "exitCode": 1,
+      "receipt": {
+        "accepted": false,
+        "parentFollowingAfterInnerUp": true,
+        "parentOffsetBefore": 0,
+        "parentOffsetAfterScroll": 0,
+        "parentOffsetAfterAppend": 634,
+        "innerOffset": 100,
+        "detailVisibleAfterAppend": false
+      }
+    }
+  },
+  "dshBusy": {
+    "accepted": true,
+    "runtime": "0.2.1-rc.2",
+    "providerBusinessRequests": 3,
+    "providerAuxiliaryTitleRequests": 1,
+    "queueReady": {
+      "commonQueue": [
+        {
+          "id": "5ae5f085-4e6b-4a7c-9628-df197094717f",
+          "message": {
+            "content": [
+              {
+                "text": "NATIVE_DSH_MIXED",
+                "type": "text"
+              },
+              {
+                "attachment": {
+                  "attachmentId": "sha256:b8e3d7537ca3037235315c68e802a437f8e0cda8ad126e5427761ccb26ae0598",
+                  "bytes": 82,
+                  "height": 2,
+                  "mediaType": "image/png",
+                  "name": "第一张.png",
+                  "width": 2
+                },
+                "type": "image"
+              },
+              {
+                "attachment": {
+                  "attachmentId": "sha256:d2671615f8138f4ce21dae875173848bb14277ed074a8df343cebaf70dd6b269",
+                  "bytes": 29,
+                  "name": "中文混合.txt"
+                },
+                "type": "file"
+              },
+              {
+                "attachment": {
+                  "attachmentId": "sha256:bde4ad21b996b9a505380a872a3cb4790fd08132e073664b3b4edf7e45dfdc53",
+                  "bytes": 82,
+                  "height": 2,
+                  "mediaType": "image/png",
+                  "name": "第二张.png",
+                  "width": 2
+                },
+                "type": "image"
+              }
+            ],
+            "id": "5ae5f085-4e6b-4a7c-9628-df197094717f",
+            "role": "user",
+            "source": {
+              "kind": "user",
+              "rpcId": "58207486-23a2-43ab-9c95-0603bfe7e03e"
+            }
+          },
+          "placement": "queued",
+          "target": "next-turn"
+        }
+      ],
+      "connectionEpoch": 2,
+      "endpointKind": "dsh",
+      "holdInput": {
+        "attachments": [],
+        "contentBlocks": [
+          {
+            "content": {
+              "kind": "text",
+              "text": "NATIVE_DSH_BUSY_HOLD"
+            },
+            "index": 0
+          }
+        ],
+        "id": "[\"dsh\",\"session-5468a13b-8c6a-48e9-8996-d3487bfddc52\",\"surface:9\"]",
+        "isFinal": false,
+        "isProvisional": false,
+        "isVisible": true,
+        "kind": "user",
+        "metadata": {
+          "classification": null,
+          "hasToolCalls": false,
+          "inputPresentation": {
+            "itemId": "[\"dsh\",\"session-5468a13b-8c6a-48e9-8996-d3487bfddc52\",\"surface:9\"]",
+            "role": "opening",
+            "turnId": "[\"dsh\",\"session-5468a13b-8c6a-48e9-8996-d3487bfddc52\",\"turn:1\"]"
+          },
+          "sessionFinal": null,
+          "source": {
+            "kind": "user",
+            "rpcId": "77ce0f66-d06c-445f-9eeb-94e976baf848"
+          },
+          "sourceEventSeqs": null
+        },
+        "reasoning": "",
+        "reasoningEnded": true,
+        "reconciliationId": "77ce0f66-d06c-445f-9eeb-94e976baf848",
+        "recordId": "f8a360ed-4f60-458b-a6e2-66695f4e9ea1",
+        "sourcePosition": {
+          "contentIndex": null,
+          "kind": "journal",
+          "sequence": 9
+        },
+        "sourceSequence": 9,
+        "text": "NATIVE_DSH_BUSY_HOLD",
+        "time": 1792873477981.0,
+        "turnId": "[\"dsh\",\"session-5468a13b-8c6a-48e9-8996-d3487bfddc52\",\"turn:1\"]"
+      },
+      "holdRpcId": "77ce0f66-d06c-445f-9eeb-94e976baf848",
+      "imageInputs": [
+        {
+          "byteCount": 82,
+          "data": "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAGUlEQVR4AQEOAPH/AOskGOskGADrJBjrJBgjngSdTZrHgAAAAABJRU5ErkJggg==",
+          "height": 2,
+          "mediaType": "image/png",
+          "name": "第一张.png",
+          "type": "image",
+          "width": 2
+        },
+        {
+          "byteCount": 82,
+          "data": "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAGUlEQVR4AQEOAPH/ABJY5BJY5AASWOQSWOQhTgU5nBVSmQAAAABJRU5ErkJggg==",
+          "height": 2,
+          "mediaType": "image/png",
+          "name": "第二张.png",
+          "type": "image",
+          "width": 2
+        }
+      ],
+      "prepared": {
+        "content": [
+          {
+            "text": "NATIVE_DSH_MIXED",
+            "type": "text"
+          },
+          {
+            "data": "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAGUlEQVR4AQEOAPH/AOskGOskGADrJBjrJBgjngSdTZrHgAAAAABJRU5ErkJggg==",
+            "mediaType": "image/png",
+            "name": "第一张.png",
+            "type": "image"
+          },
+          {
+            "receiptId": "7d30a083-e332-4ed9-9a0e-5a22824d4a9e",
+            "type": "file"
+          },
+          {
+            "data": "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAGUlEQVR4AQEOAPH/ABJY5BJY5AASWOQSWOQhTgU5nBVSmQAAAABJRU5ErkJggg==",
+            "mediaType": "image/png",
+            "name": "第二张.png",
+            "type": "image"
+          }
+        ],
+        "displayText": "NATIVE_DSH_MIXED"
+      },
+      "queueFact": {
+        "content": [
+          {
+            "text": "NATIVE_DSH_MIXED",
+            "type": "text"
+          },
+          {
+            "attachment": {
+              "attachmentId": "sha256:b8e3d7537ca3037235315c68e802a437f8e0cda8ad126e5427761ccb26ae0598",
+              "bytes": 82,
+              "height": 2,
+              "mediaType": "image/png",
+              "name": "第一张.png",
+              "width": 2
+            },
+            "type": "image"
+          },
+          {
+            "attachment": {
+              "attachmentId": "sha256:d2671615f8138f4ce21dae875173848bb14277ed074a8df343cebaf70dd6b269",
+              "bytes": 29,
+              "name": "中文混合.txt"
+            },
+            "type": "file"
+          },
+          {
+            "attachment": {
+              "attachmentId": "sha256:bde4ad21b996b9a505380a872a3cb4790fd08132e073664b3b4edf7e45dfdc53",
+              "bytes": 82,
+              "height": 2,
+              "mediaType": "image/png",
+              "name": "第二张.png",
+              "width": 2
+            },
+            "type": "image"
+          }
+        ],
+        "id": "5ae5f085-4e6b-4a7c-9628-df197094717f",
+        "role": "user",
+        "source": {
+          "kind": "user",
+          "rpcId": "58207486-23a2-43ab-9c95-0603bfe7e03e"
+        }
+      },
+      "queueWitness": {
+        "kind": "inbox",
+        "projection": {
+          "sequence": 17,
+          "value": {
+            "next-step": [],
+            "next-turn": [
+              {
+                "content": [
+                  {
+                    "text": "NATIVE_DSH_MIXED",
+                    "type": "text"
+                  },
+                  {
+                    "attachment": {
+                      "attachmentId": "sha256:b8e3d7537ca3037235315c68e802a437f8e0cda8ad126e5427761ccb26ae0598",
+                      "bytes": 82,
+                      "height": 2,
+                      "mediaType": "image/png",
+                      "name": "第一张.png",
+                      "width": 2
+                    },
+                    "type": "image"
+                  },
+                  {
+                    "attachment": {
+                      "attachmentId": "sha256:d2671615f8138f4ce21dae875173848bb14277ed074a8df343cebaf70dd6b269",
+                      "bytes": 29,
+                      "name": "中文混合.txt"
+                    },
+                    "type": "file"
+                  },
+                  {
+                    "attachment": {
+                      "attachmentId": "sha256:bde4ad21b996b9a505380a872a3cb4790fd08132e073664b3b4edf7e45dfdc53",
+                      "bytes": 82,
+                      "height": 2,
+                      "mediaType": "image/png",
+                      "name": "第二张.png",
+                      "width": 2
+                    },
+                    "type": "image"
+                  }
+                ],
+                "id": "5ae5f085-4e6b-4a7c-9628-df197094717f",
+                "role": "user",
+                "source": {
+                  "kind": "user",
+                  "rpcId": "58207486-23a2-43ab-9c95-0603bfe7e03e"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "rpcId": "58207486-23a2-43ab-9c95-0603bfe7e03e",
+      "scope": {
+        "endpointId": "dsh",
+        "sessionId": "session-5468a13b-8c6a-48e9-8996-d3487bfddc52",
+        "threadId": "session-5468a13b-8c6a-48e9-8996-d3487bfddc52"
+      },
+      "snapshotRevision": 28,
+      "status": "queued",
+      "submission": {
+        "destination": {
+          "kind": "run",
+          "scope": {
+            "endpointId": "dsh",
+            "sessionId": "session-5468a13b-8c6a-48e9-8996-d3487bfddc52",
+            "threadId": "session-5468a13b-8c6a-48e9-8996-d3487bfddc52"
+          }
+        },
+        "id": "58207486-23a2-43ab-9c95-0603bfe7e03e",
+        "message": null,
+        "operation": "prompt",
+        "phase": "admitted",
+        "reconciled": true,
+        "resolvedScope": {
+          "endpointId": "dsh",
+          "sessionId": "session-5468a13b-8c6a-48e9-8996-d3487bfddc52",
+          "threadId": "session-5468a13b-8c6a-48e9-8996-d3487bfddc52"
+        }
+      },
+      "ticketId": "58207486-23a2-43ab-9c95-0603bfe7e03e",
+      "uploadReceipt": {
+        "file": {
+          "attachmentId": "sha256:d2671615f8138f4ce21dae875173848bb14277ed074a8df343cebaf70dd6b269",
+          "bytes": 29,
+          "name": "中文混合.txt"
+        },
+        "receiptId": "7d30a083-e332-4ed9-9a0e-5a22824d4a9e"
+      }
+    },
+    "drained": {
+      "commonQueue": [],
+      "connectionEpoch": 2,
+      "publicQueue": {
+        "kind": "inbox",
+        "projection": {
+          "sequence": 22,
+          "value": {
+            "next-step": [],
+            "next-turn": []
+          }
+        }
+      },
+      "scope": {
+        "endpointId": "dsh",
+        "sessionId": "session-5468a13b-8c6a-48e9-8996-d3487bfddc52",
+        "threadId": "session-5468a13b-8c6a-48e9-8996-d3487bfddc52"
+      },
+      "snapshotRevision": 37
+    },
+    "recoveredDrained": {
+      "commonQueue": [],
+      "connectionEpoch": 5,
+      "publicQueue": {
+        "kind": "inbox",
+        "projection": {
+          "sequence": 27,
+          "value": {
+            "next-step": [],
+            "next-turn": []
+          }
+        }
+      },
+      "scope": {
+        "endpointId": "dsh",
+        "sessionId": "session-5468a13b-8c6a-48e9-8996-d3487bfddc52",
+        "threadId": "session-5468a13b-8c6a-48e9-8996-d3487bfddc52"
+      },
+      "snapshotRevision": 2
+    },
+    "desktopInteraction": false
+  },
+  "nativeBusy": {
+    "accepted": false,
+    "runtime": "0.9.3",
+    "issue": "https://github.com/TekesApps/TekesKernel/issues/86",
+    "gate": "no matching original public queue fact before hold release",
+    "controlFrames": [
+      {
+        "generation": "2",
+        "queues": [
+          {
+            "items": [],
+            "sessionId": "4cd3abe4-3861-4f2b-892a-00f7f67c0635"
+          },
+          {
+            "items": [],
+            "sessionId": "518f5bb8-e201-4dac-8de5-399a66e15277"
+          }
+        ],
+        "type": "baseline"
+      },
+      {
+        "generation": "2",
+        "state": {
+          "items": [],
+          "sessionId": "518f5bb8-e201-4dac-8de5-399a66e15277"
+        },
+        "type": "queue"
+      },
+      {
+        "generation": "2",
+        "state": {
+          "items": [],
+          "sessionId": "518f5bb8-e201-4dac-8de5-399a66e15277"
+        },
+        "type": "queue"
+      },
+      {
+        "generation": "2",
+        "state": {
+          "items": [],
+          "sessionId": "518f5bb8-e201-4dac-8de5-399a66e15277"
+        },
+        "type": "queue"
+      },
+      {
+        "generation": "2",
+        "state": {
+          "items": [],
+          "sessionId": "518f5bb8-e201-4dac-8de5-399a66e15277"
+        },
+        "type": "queue"
+      },
+      {
+        "generation": "2",
+        "state": {
+          "items": [],
+          "sessionId": "518f5bb8-e201-4dac-8de5-399a66e15277"
+        },
+        "type": "queue"
+      },
+      {
+        "generation": "2",
+        "state": {
+          "items": [],
+          "sessionId": "518f5bb8-e201-4dac-8de5-399a66e15277"
+        },
+        "type": "queue"
+      }
+    ],
+    "runStates": [
+      {
+        "epoch": 2,
+        "revision": 20,
+        "run": {
+          "actionables": [],
+          "canCancel": true,
+          "canSubmit": true,
+          "connection": {
+            "canSubmit": true,
+            "historyIsStale": false,
+            "message": null,
+            "phase": "connected"
+          },
+          "error": null,
+          "jobs": [],
+          "phase": "running",
+          "queue": [],
+          "scope": {
+            "endpointId": "native",
+            "sessionId": "518f5bb8-e201-4dac-8de5-399a66e15277",
+            "threadId": "518f5bb8-e201-4dac-8de5-399a66e15277"
+          }
+        },
+        "scope": {
+          "endpointId": "native",
+          "sessionId": "518f5bb8-e201-4dac-8de5-399a66e15277",
+          "threadId": "518f5bb8-e201-4dac-8de5-399a66e15277"
+        },
+        "submissions": [
+          {
+            "destination": {
+              "kind": "run",
+              "scope": {
+                "endpointId": "native",
+                "sessionId": "518f5bb8-e201-4dac-8de5-399a66e15277",
+                "threadId": "518f5bb8-e201-4dac-8de5-399a66e15277"
+              }
+            },
+            "id": "5f651231-9a31-4a2a-ada5-ba1e3b673076",
+            "message": null,
+            "operation": "prompt",
+            "phase": "admitted",
+            "reconciled": false,
+            "resolvedScope": {
+              "endpointId": "native",
+              "sessionId": "518f5bb8-e201-4dac-8de5-399a66e15277",
+              "threadId": "518f5bb8-e201-4dac-8de5-399a66e15277"
+            }
+          },
+          {
+            "destination": {
+              "kind": "run",
+              "scope": {
+                "endpointId": "native",
+                "sessionId": "518f5bb8-e201-4dac-8de5-399a66e15277",
+                "threadId": "518f5bb8-e201-4dac-8de5-399a66e15277"
+              }
+            },
+            "id": "f442e8bd-1f63-4623-baf4-1a543403a2ce",
+            "message": null,
+            "operation": "prompt",
+            "phase": "admitted",
+            "reconciled": true,
+            "resolvedScope": {
+              "endpointId": "native",
+              "sessionId": "518f5bb8-e201-4dac-8de5-399a66e15277",
+              "threadId": "518f5bb8-e201-4dac-8de5-399a66e15277"
+            }
+          }
+        ]
+      },
+      {
+        "epoch": 2,
+        "revision": 22,
+        "run": {
+          "actionables": [],
+          "canCancel": true,
+          "canSubmit": true,
+          "connection": {
+            "canSubmit": true,
+            "historyIsStale": false,
+            "message": null,
+            "phase": "connected"
+          },
+          "error": null,
+          "jobs": [],
+          "phase": "running",
+          "queue": [],
+          "scope": {
+            "endpointId": "native",
+            "sessionId": "518f5bb8-e201-4dac-8de5-399a66e15277",
+            "threadId": "518f5bb8-e201-4dac-8de5-399a66e15277"
+          }
+        },
+        "scope": {
+          "endpointId": "native",
+          "sessionId": "518f5bb8-e201-4dac-8de5-399a66e15277",
+          "threadId": "518f5bb8-e201-4dac-8de5-399a66e15277"
+        },
+        "submissions": [
+          {
+            "destination": {
+              "kind": "run",
+              "scope": {
+                "endpointId": "native",
+                "sessionId": "518f5bb8-e201-4dac-8de5-399a66e15277",
+                "threadId": "518f5bb8-e201-4dac-8de5-399a66e15277"
+              }
+            },
+            "id": "5f651231-9a31-4a2a-ada5-ba1e3b673076",
+            "message": null,
+            "operation": "prompt",
+            "phase": "admitted",
+            "reconciled": false,
+            "resolvedScope": {
+              "endpointId": "native",
+              "sessionId": "518f5bb8-e201-4dac-8de5-399a66e15277",
+              "threadId": "518f5bb8-e201-4dac-8de5-399a66e15277"
+            }
+          },
+          {
+            "destination": {
+              "kind": "run",
+              "scope": {
+                "endpointId": "native",
+                "sessionId": "518f5bb8-e201-4dac-8de5-399a66e15277",
+                "threadId": "518f5bb8-e201-4dac-8de5-399a66e15277"
+              }
+            },
+            "id": "f442e8bd-1f63-4623-baf4-1a543403a2ce",
+            "message": null,
+            "operation": "prompt",
+            "phase": "admitted",
+            "reconciled": true,
+            "resolvedScope": {
+              "endpointId": "native",
+              "sessionId": "518f5bb8-e201-4dac-8de5-399a66e15277",
+              "threadId": "518f5bb8-e201-4dac-8de5-399a66e15277"
+            }
+          }
+        ]
+      },
+      {
+        "epoch": 2,
+        "revision": 22,
+        "run": {
+          "actionables": [],
+          "canCancel": true,
+          "canSubmit": true,
+          "connection": {
+            "canSubmit": true,
+            "historyIsStale": false,
+            "message": null,
+            "phase": "connected"
+          },
+          "error": null,
+          "jobs": [],
+          "phase": "running",
+          "queue": [],
+          "scope": {
+            "endpointId": "native",
+            "sessionId": "518f5bb8-e201-4dac-8de5-399a66e15277",
+            "threadId": "518f5bb8-e201-4dac-8de5-399a66e15277"
+          }
+        },
+        "scope": {
+          "endpointId": "native",
+          "sessionId": "518f5bb8-e201-4dac-8de5-399a66e15277",
+          "threadId": "518f5bb8-e201-4dac-8de5-399a66e15277"
+        },
+        "submissions": [
+          {
+            "destination": {
+              "kind": "run",
+              "scope": {
+                "endpointId": "native",
+                "sessionId": "518f5bb8-e201-4dac-8de5-399a66e15277",
+                "threadId": "518f5bb8-e201-4dac-8de5-399a66e15277"
+              }
+            },
+            "id": "5f651231-9a31-4a2a-ada5-ba1e3b673076",
+            "message": null,
+            "operation": "prompt",
+            "phase": "admitted",
+            "reconciled": false,
+            "resolvedScope": {
+              "endpointId": "native",
+              "sessionId": "518f5bb8-e201-4dac-8de5-399a66e15277",
+              "threadId": "518f5bb8-e201-4dac-8de5-399a66e15277"
+            }
+          },
+          {
+            "destination": {
+              "kind": "run",
+              "scope": {
+                "endpointId": "native",
+                "sessionId": "518f5bb8-e201-4dac-8de5-399a66e15277",
+                "threadId": "518f5bb8-e201-4dac-8de5-399a66e15277"
+              }
+            },
+            "id": "f442e8bd-1f63-4623-baf4-1a543403a2ce",
+            "message": null,
+            "operation": "prompt",
+            "phase": "admitted",
+            "reconciled": true,
+            "resolvedScope": {
+              "endpointId": "native",
+              "sessionId": "518f5bb8-e201-4dac-8de5-399a66e15277",
+              "threadId": "518f5bb8-e201-4dac-8de5-399a66e15277"
+            }
+          }
+        ]
+      }
+    ],
+    "probeExit": {
+      "exitStatus": -15,
+      "pid": 38280,
+      "processGroupExited": true,
+      "providerHoldReleasedForCleanup": true,
+      "releasedAfterQueueValidation": false
+    },
+    "rootCauseEstablished": false
+  },
+  "idleRegression": {
+    "accepted": true,
+    "endpoints": [
+      "dsh",
+      "native"
+    ],
+    "busyQueue": false
+  },
+  "notRun": [
+    "desktop",
+    "physical IME",
+    "OS AX",
+    "real paid model understanding",
+    "complete Views parity"
+  ],
+  "cacheBytesDeleted": 0,
+  "sharedTarget": "SSD dev/TekesAgentKit/shared-target",
+  "ci": "pending new commit; prior head evidence remains separate"
+}

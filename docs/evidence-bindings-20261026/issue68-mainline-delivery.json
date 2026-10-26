@@ -1,0 +1,171 @@
+{
+  "issue": 68,
+  "pullRequest": "https://github.com/TekesApps/TekesAgentKit/pull/69",
+  "head": "4c682b1a8828acaf19a02db639e6928189999b83",
+  "productFiles": [
+    "crates/session/src/runtime.rs",
+    "crates/session/tests/runtime.rs"
+  ],
+  "programSha256": "66a2c9b89f8d4bddb50a410cf084913b978fc9e1801d7d152e9b0b5beaf76456",
+  "programSourceManifestSha256": "92943d64993d5dc62089842e7d73bcefe76eb37bf50d2048816cbd3a829a45fe",
+  "protocolReceiptSha256": "05d5f364a1e171533b0ff113da95d3400cd4bb7fb69b57156e87aea70eab901b",
+  "protocol": [
+    {
+      "sessionId": "552a117b-8924-4cac-b0e9-3129f02ef783",
+      "phases": [
+        {
+          "phase": "initial50",
+          "messageEntries": 50,
+          "customEntries": 73,
+          "totalEntries": 123,
+          "connectionEpoch": 2,
+          "originalRecordsUnchangedInOrder": true,
+          "comparedToPriorSource": false
+        },
+        {
+          "phase": "reconnected50",
+          "messageEntries": 50,
+          "customEntries": 73,
+          "totalEntries": 123,
+          "connectionEpoch": 5,
+          "originalRecordsUnchangedInOrder": true,
+          "comparedToPriorSource": true
+        },
+        {
+          "phase": "reopened50",
+          "messageEntries": 50,
+          "customEntries": 73,
+          "totalEntries": 123,
+          "connectionEpoch": 5,
+          "originalRecordsUnchangedInOrder": true,
+          "comparedToPriorSource": true
+        },
+        {
+          "phase": "paged100",
+          "messageEntries": 100,
+          "customEntries": 133,
+          "totalEntries": 233,
+          "connectionEpoch": 5,
+          "originalRecordsUnchangedInOrder": true,
+          "comparedToPriorSource": true
+        },
+        {
+          "phase": "reconnected100",
+          "messageEntries": 100,
+          "customEntries": 133,
+          "totalEntries": 233,
+          "connectionEpoch": 8,
+          "originalRecordsUnchangedInOrder": true,
+          "comparedToPriorSource": true
+        },
+        {
+          "phase": "reopened100",
+          "messageEntries": 100,
+          "customEntries": 133,
+          "totalEntries": 233,
+          "connectionEpoch": 8,
+          "originalRecordsUnchangedInOrder": true,
+          "comparedToPriorSource": true
+        }
+      ]
+    },
+    {
+      "sessionId": "3f17722a-5b58-4080-9074-c859a93be098",
+      "phases": [
+        {
+          "phase": "initial50",
+          "messageEntries": 50,
+          "customEntries": 73,
+          "totalEntries": 123,
+          "connectionEpoch": 8,
+          "originalRecordsUnchangedInOrder": true,
+          "comparedToPriorSource": false
+        },
+        {
+          "phase": "reconnected50",
+          "messageEntries": 50,
+          "customEntries": 73,
+          "totalEntries": 123,
+          "connectionEpoch": 11,
+          "originalRecordsUnchangedInOrder": true,
+          "comparedToPriorSource": true
+        },
+        {
+          "phase": "reopened50",
+          "messageEntries": 50,
+          "customEntries": 73,
+          "totalEntries": 123,
+          "connectionEpoch": 11,
+          "originalRecordsUnchangedInOrder": true,
+          "comparedToPriorSource": true
+        },
+        {
+          "phase": "paged100",
+          "messageEntries": 100,
+          "customEntries": 133,
+          "totalEntries": 233,
+          "connectionEpoch": 11,
+          "originalRecordsUnchangedInOrder": true,
+          "comparedToPriorSource": true
+        },
+        {
+          "phase": "reconnected100",
+          "messageEntries": 100,
+          "customEntries": 133,
+          "totalEntries": 233,
+          "connectionEpoch": 14,
+          "originalRecordsUnchangedInOrder": true,
+          "comparedToPriorSource": true
+        },
+        {
+          "phase": "reopened100",
+          "messageEntries": 100,
+          "customEntries": 133,
+          "totalEntries": 233,
+          "connectionEpoch": 14,
+          "originalRecordsUnchangedInOrder": true,
+          "comparedToPriorSource": true
+        }
+      ]
+    }
+  ],
+  "seeder": {
+    "source": "98b1d9a2960b90774ea5454e7e8dad870538f7bc",
+    "sha256": "18d8f643e8cba5ee94202c8c2f481bfa31add7bc5ac4fc5df44276100532180b",
+    "role": "public seed production only; no DUT verdict transferred"
+  },
+  "publicConsumer": {
+    "sourceManifestSha256": "f35525d495d2e5bf3403d2a620ed4dfd68a3afa5f46bff5039a514e8772a326b",
+    "receiptSha256": "14feaae0a677a74a7ed9e54cdc3c6328b04e439655b800dca9940d223f3b5519",
+    "followRequestedMessageWindows": [
+      50,
+      100,
+      100
+    ],
+    "fullProjectionStableAcrossReconnectAndReacquire": true,
+    "dualLeaseIsolation": true,
+    "finalLeaseClosed": true,
+    "realPi": false
+  },
+  "workspaceFmtClippyTestsBoundaries": "passed",
+  "independentSourceReview": "no blocker; exact two-file closure",
+  "ciRuns": [
+    40227190174,
+    40227222495
+  ],
+  "ciStatus": "success",
+  "merged": true,
+  "mainCi": {
+    "conclusion": "success",
+    "headSha": "1dcc52153ea45ba6ce73a135a8d8fe8d3406360c",
+    "status": "completed",
+    "url": "https://github.com/TekesApps/TekesAgentKit/actions/runs/40227909675"
+  },
+  "issueClosed": true,
+  "desktop": false,
+  "performanceAccepted": false,
+  "mainCommit": "1dcc52153ea45ba6ce73a135a8d8fe8d3406360c",
+  "closedAt": "2026-10-25T19:54:43Z",
+  "experimentalBranchAbsorbedMain": "10263722b5fb128922c49a31b5942c41333cd6e2",
+  "mainFileTreeEqualsVerifiedCandidate": true
+}

@@ -1,0 +1,69 @@
+{
+  "format": "agentkit-context-preflight/1",
+  "date": "2026-10-20",
+  "latest_release": {
+    "publishedAt": "2026-10-19T14:25:34Z",
+    "tagName": "v0.3.8",
+    "targetCommitish": "main"
+  },
+  "default_pin": {
+    "commit": "8cf0840790334ba224afc0595897c74231c712e6",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 199,
+    "sha256": "f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f",
+    "ui_packages": 8
+  },
+  "source": {
+    "ui/components/src/composer.rs": "7e2ee3837dcf1d5855a78696f0bfe8a436d2922aa79036dd395bd67417a950e9",
+    "ui/components/src/composer_context.rs": "79ade622cb2417a4f3f8bb58c155f9ef97f3bbc9a6e5d112e3d3e421ed38c618",
+    "ui/demo/tests/run_view.rs": "7d61616d2d3b979f3dd6ef4223969443e10c1d9a78ede4efa8f596a299e82b98",
+    "scripts/probes/agentkit-reading-candidate.rs": "3a3ef23b6000742e0d2a32adbdb540ce5b337d03e188f0e13795efcece80a147"
+  },
+  "logs": {
+    "/tmp/agentkit-context-preflight-before.log": "864471fcd1e6fadfaffe76023f6accccd80dc1d78f8ecd9bec7ac83f7a1f7e60",
+    "/tmp/agentkit-context-preflight-before2.log": "c59afa9eb2d8a5cd7d428f05ab5a8cb8159af07930d52d2473b48b65e343250d",
+    "/tmp/agentkit-context-preflight-before3.log": "6df5136e4f537b8fbfbb8c5c4c7aad7144b8aa9593784470922b92d3cec19b72",
+    "/tmp/agentkit-context-preflight-after.log": "6eaa2f4ec06a626b6dc54d500f3137dbfcaf6d634359dd9f7c9e16f8a77f076f",
+    "/tmp/agentkit-context-default-ui-tests.log": "a754a5966171f8d61acb2eb3e1cf92e195caf314ba7fc8220ecd5f160caac10f",
+    "/tmp/agentkit-context-default-ui-clippy.log": "d13b304b84862462de4e66066ef0353e23a9f3da3fcee327c5803b495cf58661",
+    "/tmp/agentkit-context-demo-build.log": "c2ccae29be8ebbd8973f3201e5f6646ec32bdad22fe9c3866ff8d1618ed74896",
+    "/tmp/agentkit-context-preflight-native.log": "0f020cf61ce00b8ed390a0135353078e8fd30ee8127723d48fbfda9bd9df5023",
+    "/tmp/agentkit-context-preflight-native-formal.log": "ef38115f7f786840caf9833b982493b4938cf40fa184a95ee2fe04108b8ff2c2"
+  },
+  "demo_binary": {
+    "path": "ui/target/debug/tekes-agent-ui-demo",
+    "sha256": "25ae0ff18eb3aee7b89db161854edd5e0dd1071e71a88bba18264542aba7aeaf"
+  },
+  "candidate_receiver": {
+    "path": ".runtime-fixtures/agentkit-reading-issue26-replay-01/receipt.json",
+    "sha256": "2ca9251ebfcd19446dc6c3e1d5c37101fc0eee9c3daa7ffb91c5315c9a6e9e5c",
+    "tests": 4,
+    "acceptance_cases": 3,
+    "issue26_limitation_reproductions": 1,
+    "strict_clippy": true,
+    "input_files": 449,
+    "source_mutated": false
+  },
+  "validation": {
+    "default_ui_tests": 289,
+    "second_public_api_consumer": true,
+    "strict_ui_clippy": true,
+    "fmt": true,
+    "default_resolved_pin": true,
+    "native_fixture_context": true,
+    "native_formal_runview_fixture_context": true,
+    "native_rejected_context_frame_injection": false,
+    "full_runview_reading_transaction": false,
+    "actual_sep_reading": false,
+    "physical_ime": false,
+    "full_layout_parity": false,
+    "merged": false,
+    "tagged": false
+  },
+  "native_images": {
+    "/tmp/agentkit-context-preflight-native.png": "c20435c4590dabd42c32f691514291a3bd2807cf2260bc649a4fc44b9a9fcbc7",
+    "/tmp/agentkit-context-preflight-native-formal.png": "e8b14836e6fb472818684e22b8431951c1a08c5be2df4bb876ef6041d8c89106"
+  },
+  "upstream_issue": "https://github.com/TekesApps/TekesUI/issues/26"
+}

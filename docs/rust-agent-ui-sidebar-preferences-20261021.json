@@ -1,0 +1,208 @@
+{
+  "format": "agentkit-sidebar-preferences/1",
+  "base_commit": "d9f0867a35d86f53166e1468e1f2812bfac9def9",
+  "source_hashes": {
+    "crates/presentation/src/lib.rs": "b099446761e92d31da1a257d44d3ace326f19a31dfd25cfada4edcc6596f6213",
+    "crates/presentation/src/thread_preferences.rs": "6be1e9565cc16f29f2018807bb34bbb1d37443cf2649200163fc65b703eef9e8",
+    "crates/web/src/lib.rs": "a0a23679869f2b677446eb115e54417b84dd54aeaf979fcd70edabfa786c4b75",
+    "ui/bindings/src/sidebar.rs": "1c1ef9b6c735e7bd750fc7d6a2c5a2d76596e6f9eab88d20daf18295e4b0aca9",
+    "ui/components/src/lib.rs": "c5568903ed30b91ff61d955ef8c05beca0bad9aca7fb61bcbc0c239a9c1d96f0",
+    "ui/components/src/sidebar.rs": "45eb8626d34af6d6087d573bce1cefe3650fbf92399c69a45b8baae4f6024903",
+    "ui/components/src/summary_section.rs": "14bae90d78fa9acbdf70fa3cec07b3e3212bb0755b309bc9e39d3bc266824cdf",
+    "ui/consumer/src/lib.rs": "d5b3f6d4c97dcd6c36f7d2a223ec8ed7b06304d9e9afc6d03b933fff47c8977a",
+    "ui/demo/src/component_demo.rs": "7832f1137ef8d66ddc91f36e43b204b4dff1d3f783e1ec757964a9c05c02c4a2",
+    "ui/demo/src/components_native.rs": "5901414bbb8ac1ff9f11385b6e59ec1a6aa09a4bd8a028c78adb06398f61ef51",
+    "ui/demo/src/native_sidebar_query_selftest.rs": "5fd08f267b50db7846270c75377dd6966f39e2be93ca6d53eabe9bebcccc34ae",
+    "crates/presentation/src/sidebar_preferences.rs": "bb10cd534500c054fd09fe22cce643ede8c6d096a6cf1188c20d3f09ac3bfe38",
+    "ui/components/src/sidebar_preferences.rs": "552c986924a6f2cc8c965b16d6769599ef5c54d81b1ebe3d515207728e402394",
+    "ui/demo/src/native_sidebar_collation.rs": "c8c0969fff09685faccdbcbd603dbeee97ef51495fcf65b8683fa7727731a365",
+    "ui/demo/tests/sidebar_preferences.rs": "317e8ff640a1f63d74a2cb59a48a251a2995160b09e794433499982003307bd0",
+    "ui/demo/tests/sidebar_preferences_binding.rs": "f2f5e77d920d0a7a1f64002eef22ecdcf107a487341872d2b87ba68d7f575699"
+  },
+  "read_only_references": {
+    "TekesClientKit/Sources/Composer/Agent/ClientSessionSidebar.swift": "c9a09d4dd40415e38ec08c5941fa729e981a0ed287692af0b836426f4e25457d",
+    "TekesClientKit/Sources/Composer/Agent/ClientAgentSidebarModel.swift": "82c1bbb6519b9cb9573b9963f565eeee8d297702250a00f9243b5c1e66a1ddc9",
+    "TekesClientKit/Sources/Session/Persistence/ClientMirrorStore.swift": "506f9e6886f244859e43cfcbda57d683c3f0b4fb22ec2e9841851cb104abb761",
+    "Tekes/Tekes/SidebarColumnController.swift": "cc01190f2e25192aed25c7ee53d7d1adc621d24b93da62a034824a10fd770f6d"
+  },
+  "default_ui_pin": "8cf0840790334ba224afc0595897c74231c712e6",
+  "default_ui_packages": 8,
+  "default_ui_verified_files": 199,
+  "headless_published_baseline": "v0.3.8",
+  "unpublished_preference_format": 3,
+  "checks": {
+    "workspace-accepted": {
+      "exit_code": 0,
+      "passed": 362,
+      "log": "/tmp/agentkit-sidebar-preferences-workspace-accepted.log",
+      "sha256": "fb9afecf4c7ce9fb02a1fd494abb47c524823da7a0a10fc46f0ce45fcaa4bade"
+    },
+    "headless": {
+      "exit_code": 0,
+      "passed": 183,
+      "log": "/tmp/agentkit-sidebar-preferences-headless.log",
+      "sha256": "a22f6a9761bbcb9d3801e49735d0add2c68fbb95304bf27ea82a3d953e3f06ce"
+    },
+    "clippy-accepted": {
+      "exit_code": 0,
+      "log": "/tmp/agentkit-sidebar-preferences-clippy-accepted.log",
+      "sha256": "326b8a28f20027d7465fac35e304801068636d4e613c31fbfa29964112155f3c"
+    },
+    "headless-clippy": {
+      "exit_code": 0,
+      "log": "/tmp/agentkit-sidebar-preferences-headless-clippy.log",
+      "sha256": "2bdb28b4d6426e1b024ad49a9b7436fda37ac79feabdcfa2229eddf65ff86e59"
+    },
+    "build-v3": {
+      "exit_code": 0,
+      "log": "/tmp/agentkit-sidebar-preferences-build-v3.log",
+      "sha256": "eae466d2b0afe82072de4e81b25c66db1b7849c644b07f42b0f899674ab4c016"
+    }
+  },
+  "independent_public_consumer_checks": 37,
+  "native_fixture": {
+    "collapsedRowsInaccessible": true,
+    "draftRetained": true,
+    "durableRevision": 2,
+    "nativePinReorder": false,
+    "noSubmission": true,
+    "originalButtonRetained": true,
+    "originalPointerDisclosure": true,
+    "ownedFixture": true,
+    "physicalIme": false,
+    "selectionRetained": true,
+    "exit_code": 0,
+    "log": "/tmp/agentkit-sidebar-preferences-native-v3.log",
+    "log_sha256": "411b5f16d8d9b20ba883d44333a09ad64d2d57a0d1f1fca76c31f70628e8a9b1",
+    "binary": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-preferences-native-v3-demo",
+    "binary_sha256": "180170be1be9f14fcf5ef920f355c48cf0a9e0b50cc0f405e2cc18c791d0dc8e",
+    "screenshot": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-preferences-v3-collapsed.png",
+    "screenshot_sha256": "f8e45af93ccb86d1bb90c4cf81f7657f39de63d6f95c51da30cd9767ec18d432",
+    "pixels_inspected": true
+  },
+  "retained_unaccepted_native_attempts": [
+    {
+      "exit_code": 134,
+      "log": "/tmp/agentkit-sidebar-preferences-native.log",
+      "log_sha256": "e932deb8fa263b8d2005d3e4fc9b002bcdc6bd7fa490c412d706ef6233738f67",
+      "binary": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-preferences-native-demo",
+      "binary_sha256": "016523d9d3213e3a9ba18d8a40629185093ee07af02fba92421c05952f19c5b0",
+      "accepted": false
+    },
+    {
+      "exit_code": 134,
+      "log": "/tmp/agentkit-sidebar-preferences-native-v2.log",
+      "log_sha256": "f71e701ce8afe13a973eb76f643a00e334884cda5d030b6ee4c98ceb1deb9420",
+      "binary": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-preferences-native-v2-demo",
+      "binary_sha256": "89482f1797b7211b11b4962af440079777fbd9de986f6f52f911deb4a903ea71",
+      "accepted": false
+    },
+    {
+      "exit_code": 134,
+      "log": "/tmp/agentkit-sidebar-preferences-baseline-native.log",
+      "log_sha256": "5a2871ada04397937caf69fda8359ddb5f98eca27bd30608af01667046a88a10",
+      "binary": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-sidebar-inventory-native-demo",
+      "binary_sha256": "b43007c7d49b213623cb670a0248280e015e71fbc2e6e675eb1564f08eff41a0",
+      "accepted": false
+    }
+  ],
+  "real_endpoints_offscreen": {
+    "pi": {
+      "expectedTargetFound": true,
+      "fullSidebarParity": false,
+      "hasMore": false,
+      "hits": 1,
+      "inventoryRefresh": {
+        "historyUnchanged": true,
+        "publicCursors": true,
+        "realUnknownRace": false,
+        "sameConnectionEpoch": true,
+        "searchResultRetained": true
+      },
+      "inventorySortRetained": true,
+      "nativeInteraction": false,
+      "noSubmission": true,
+      "originalEndpoint": "pi-ui",
+      "publicTypedSearch": true,
+      "queryScopedSnippetMetadata": true,
+      "resultMembership": true,
+      "sharedController": true,
+      "unresolved": 0
+    },
+    "dsh": {
+      "expectedTargetFound": true,
+      "fullSidebarParity": false,
+      "hasMore": false,
+      "hits": 1,
+      "inventoryRefresh": {
+        "historyUnchanged": true,
+        "publicCursors": true,
+        "realUnknownRace": false,
+        "sameConnectionEpoch": true,
+        "searchResultRetained": true
+      },
+      "inventorySortRetained": true,
+      "nativeInteraction": false,
+      "noSubmission": true,
+      "originalEndpoint": "dsh-ui",
+      "publicTypedSearch": true,
+      "queryScopedSnippetMetadata": true,
+      "resultMembership": true,
+      "sharedController": true,
+      "unresolved": 0
+    },
+    "native": {
+      "expectedTargetFound": true,
+      "fullSidebarParity": false,
+      "hasMore": false,
+      "hits": 1,
+      "inventoryRefresh": {
+        "historyUnchanged": true,
+        "publicCursors": true,
+        "realUnknownRace": false,
+        "sameConnectionEpoch": true,
+        "searchResultRetained": true
+      },
+      "inventorySortRetained": true,
+      "nativeInteraction": false,
+      "noSubmission": true,
+      "originalEndpoint": "native-ui",
+      "publicTypedSearch": true,
+      "queryScopedSnippetMetadata": true,
+      "resultMembership": true,
+      "sharedController": true,
+      "unresolved": 0
+    }
+  },
+  "real_endpoint_versions": {
+    "native_kernel": "0.9.1",
+    "pi": "1.3.0",
+    "dsh": "0.2.1-rc.2"
+  },
+  "real_log": {
+    "path": "/tmp/agentkit-sidebar-preferences-three-real.log",
+    "sha256": "ba65bfb5e99228a9315f225f6d9057bc9f6c618f795ac8eedae3483b671b9032",
+    "exit_code": 0
+  },
+  "cache_audit": {
+    "target": "/private/tmp/agentkit-layout-text-292-target",
+    "exclusive_cargo_lock": true,
+    "known_retired_dependency_files": 0,
+    "deleted_files": 0,
+    "freed_allocated_bytes": 0,
+    "new_independent_target_directories": 0,
+    "incremental_disabled": true,
+    "current_metadata_and_dep_guard": true,
+    "preserved": "all current/ambiguous caches, fixed SDKs and source, all failure/success binaries, logs, receipts and screenshots"
+  },
+  "issue": "https://github.com/TekesApps/TekesUI/issues/36",
+  "limits": [
+    "Sort/Group and Move Pin menus remain pending generic menu event/declaration API",
+    "native pin reorder and physical IME/VoiceOver not accepted",
+    "local FTS, folders, multi-endpoint aggregation and persistent activity clock remain",
+    "full remaining ClientKit Views and real-harness native reading/paging remain",
+    "previous a30 candidate evidence not rerun or promoted",
+    "review, current CI, merge and tag remain"
+  ],
+  "full_goal_complete": false
+}

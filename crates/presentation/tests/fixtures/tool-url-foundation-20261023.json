@@ -1,0 +1,335 @@
+[
+  {
+    "input": "https://example.org",
+    "valid": true,
+    "host": "example.org",
+    "path": ""
+  },
+  {
+    "input": "https://example.org/",
+    "valid": true,
+    "host": "example.org",
+    "path": "/"
+  },
+  {
+    "input": "https://example.org/a/",
+    "valid": true,
+    "host": "example.org",
+    "path": "/a"
+  },
+  {
+    "input": "https://example.org/a//",
+    "valid": true,
+    "host": "example.org",
+    "path": "/a/"
+  },
+  {
+    "input": "https://example.org/a///",
+    "valid": true,
+    "host": "example.org",
+    "path": "/a//"
+  },
+  {
+    "input": "https://EXAMPLE.org/a/../b/",
+    "valid": true,
+    "host": "EXAMPLE.org",
+    "path": "/a/../b"
+  },
+  {
+    "input": "https://EXAMPLE.org/a/./b/",
+    "valid": true,
+    "host": "EXAMPLE.org",
+    "path": "/a/./b"
+  },
+  {
+    "input": "https://example.org/./",
+    "valid": true,
+    "host": "example.org",
+    "path": "/."
+  },
+  {
+    "input": "https://example.org/../",
+    "valid": true,
+    "host": "example.org",
+    "path": "/.."
+  },
+  {
+    "input": "https://example.org/a//b/",
+    "valid": true,
+    "host": "example.org",
+    "path": "/a//b"
+  },
+  {
+    "input": "https://example.org/a%20b/%E4%B8%AD",
+    "valid": true,
+    "host": "example.org",
+    "path": "/a b/中"
+  },
+  {
+    "input": "https://example.org/中文",
+    "valid": true,
+    "host": "example.org",
+    "path": "/中文"
+  },
+  {
+    "input": "https://example.org/a%2F",
+    "valid": true,
+    "host": "example.org",
+    "path": "/a"
+  },
+  {
+    "input": "https://example.org/a%2F/",
+    "valid": true,
+    "host": "example.org",
+    "path": "/a"
+  },
+  {
+    "input": "https://example.org/a%2F%2F",
+    "valid": true,
+    "host": "example.org",
+    "path": "/a/"
+  },
+  {
+    "input": "https://example.org/%2F",
+    "valid": true,
+    "host": "example.org",
+    "path": "/"
+  },
+  {
+    "input": "https://example.org/%FF",
+    "valid": true,
+    "host": "example.org"
+  },
+  {
+    "input": "https://example.org/a%00b",
+    "valid": true,
+    "host": "example.org",
+    "path": "/a\u0000b"
+  },
+  {
+    "input": "https://example.org/a%252Fb",
+    "valid": true,
+    "host": "example.org",
+    "path": "/a%2Fb"
+  },
+  {
+    "input": "https://example.org/a[b]",
+    "valid": true,
+    "host": "example.org",
+    "path": "/a[b]"
+  },
+  {
+    "input": "https://example.org/a b",
+    "valid": true,
+    "host": "example.org",
+    "path": "/a b"
+  },
+  {
+    "input": "https://example.org/%broken",
+    "valid": true,
+    "host": "example.org",
+    "path": "/%broken"
+  },
+  {
+    "input": "https://user:secret@example.org:8443/a?q=secret#secret",
+    "valid": true,
+    "host": "example.org",
+    "path": "/a"
+  },
+  {
+    "input": "//user:secret@example.org/a/?q=secret",
+    "valid": true,
+    "host": "example.org",
+    "path": "/a"
+  },
+  {
+    "input": "https://u:p@[::1]:443/a?q=secret",
+    "valid": true,
+    "host": "::1",
+    "path": "/a"
+  },
+  {
+    "input": "https://[2001:0db8::1]/a/",
+    "valid": true,
+    "host": "2001:0db8::1",
+    "path": "/a"
+  },
+  {
+    "input": "https://例子.测试/中文",
+    "valid": true,
+    "host": "xn--fsqu00a.xn--0zwm56d",
+    "path": "/中文"
+  },
+  {
+    "input": "https://例子.测试/",
+    "valid": true,
+    "host": "xn--fsqu00a.xn--0zwm56d",
+    "path": "/"
+  },
+  {
+    "input": "http://%65xample.org/a",
+    "valid": true,
+    "host": "example.org",
+    "path": "/a"
+  },
+  {
+    "input": "https://example.org:999999/a",
+    "valid": true,
+    "host": "example.org",
+    "path": "/a"
+  },
+  {
+    "input": "file:///tmp/a/",
+    "valid": true,
+    "path": "/tmp/a"
+  },
+  {
+    "input": "file:///tmp/a/../b/",
+    "valid": true,
+    "path": "/tmp/a/../b"
+  },
+  {
+    "input": "file://localhost/tmp/a/",
+    "valid": true,
+    "host": "localhost",
+    "path": "/tmp/a"
+  },
+  {
+    "input": "../a/./b/",
+    "valid": true,
+    "path": "../a/./b"
+  },
+  {
+    "input": "../../a/b",
+    "valid": true,
+    "path": "../../a/b"
+  },
+  {
+    "input": "relative/%E4%B8%AD?q=secret",
+    "valid": true,
+    "path": "relative/中"
+  },
+  {
+    "input": "relative/a//",
+    "valid": true,
+    "path": "relative/a/"
+  },
+  {
+    "input": "./a",
+    "valid": true,
+    "path": "./a"
+  },
+  {
+    "input": "/",
+    "valid": true,
+    "path": "/"
+  },
+  {
+    "input": "/a/",
+    "valid": true,
+    "path": "/a"
+  },
+  {
+    "input": "//example.org",
+    "valid": true,
+    "host": "example.org",
+    "path": ""
+  },
+  {
+    "input": "//example.org/",
+    "valid": true,
+    "host": "example.org",
+    "path": "/"
+  },
+  {
+    "input": "//example.org/a",
+    "valid": true,
+    "host": "example.org",
+    "path": "/a"
+  },
+  {
+    "input": "foo/",
+    "valid": true,
+    "path": "foo"
+  },
+  {
+    "input": "foo//",
+    "valid": true,
+    "path": "foo/"
+  },
+  {
+    "input": "foo/a/../b/",
+    "valid": true,
+    "path": "foo/a/../b"
+  },
+  {
+    "input": "a b/中文",
+    "valid": true,
+    "path": "a b/中文"
+  },
+  {
+    "input": "%broken",
+    "valid": true,
+    "path": "%broken"
+  },
+  {
+    "input": "?q=secret",
+    "valid": true
+  },
+  {
+    "input": "#secret",
+    "valid": true
+  },
+  {
+    "input": "",
+    "valid": true
+  },
+  {
+    "input": "mailto:a@b",
+    "valid": true
+  },
+  {
+    "input": "urn:abc:def",
+    "valid": true
+  },
+  {
+    "input": "data:text/plain,a",
+    "valid": true
+  },
+  {
+    "input": "foo:/a/",
+    "valid": true,
+    "path": "/a"
+  },
+  {
+    "input": "foo:a/b",
+    "valid": true
+  },
+  {
+    "input": "https:/a/",
+    "valid": true,
+    "path": "/a"
+  },
+  {
+    "input": "https:",
+    "valid": true
+  },
+  {
+    "input": "https://example.org/%F0%9F%91%A9%F0%9F%8F%BD%E2%80%8D%F0%9F%92%BB",
+    "valid": true,
+    "host": "example.org",
+    "path": "/👩🏽‍💻"
+  },
+  {
+    "input": "https://example.org/a%2fb/",
+    "valid": true,
+    "host": "example.org",
+    "path": "/a/b"
+  },
+  {
+    "input": "https://example.org/a%2f%2f/",
+    "valid": true,
+    "host": "example.org",
+    "path": "/a/"
+  }
+]

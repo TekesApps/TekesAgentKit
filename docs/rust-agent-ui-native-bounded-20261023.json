@@ -1,0 +1,84 @@
+{
+  "baseCommit": "3e40ad67283a797e8fe9e58bdd1824c345b2ed3c",
+  "program": {
+    "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/native-bounded-ui-20261023/tekes-agent-ui-demo-v5",
+    "sha256": "9463e851103f2329a785f2cf869f6ea8ae1c825c999646041570457172e50e2f"
+  },
+  "kernelIdentity": {
+    "build": {
+      "format": 1,
+      "identifier": "com.tekes.kernel.supervisor",
+      "source_revision": "09508a9083c24c7accefc99516739f279b85913e",
+      "version": "0.9.3"
+    },
+    "supervisor": "/Users/frankqin/dev/Tekes/.build/kernel-0.9.3-installed/BuiltInKernel/tekes-supervisor",
+    "supervisorSha256": "365eca9385f36d5897a81ba398e7f34b4b9819896d6a1b78c618a7710b14380f",
+    "worker": "/Users/frankqin/dev/Tekes/.build/kernel-0.9.3-installed/BuiltInKernel/tekes-worker",
+    "workerSha256": "1284014bd0a8d3cb711c0512b10762322a19af4beabc1f9e681bacb1e28fa64d"
+  },
+  "sourceSha256": {
+    "ui/demo/src/readonly_child_proof.rs": "dc22447da7a3efc31b5d7b6339ecc43d4fca8635f6c504637f9d00f0d43e82d7",
+    "scripts/test-real-session-endpoints.py": "7fe507a99adce054ccc47e2d109ab8b60542fd4de629e41889b554b89cea9e68"
+  },
+  "boundedPageSize": 1,
+  "boundedProof": {
+    "childScope": true,
+    "completeTranscript": false,
+    "messages": 1,
+    "nativeInteraction": false,
+    "noComposer": true,
+    "nonemptyParentDraft": true,
+    "originalReadIntent": true,
+    "paginationAvailable": true,
+    "parentDraftPreserved": true,
+    "readOnlyComponent": true,
+    "readingAnchorAcceptance": false,
+    "reconnect": true,
+    "retainedWidgets": true,
+    "sendRejected": true,
+    "sourceCallReadonlyDetails": true
+  },
+  "rawReceipts": {
+    "final.log": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/native-bounded-ui-20261023/final.log",
+      "sha256": "fae36fefc15fab305c33e1ca87008cb7d5fce5aaff231ae699c582e729fc9d45"
+    },
+    "final-bounded.consumer.json": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/native-bounded-ui-20261023/final-bounded.consumer.json",
+      "sha256": "96b457094622138880273d21f110a0f84fd9587ffcefcfc7c0b3386e88929ec3"
+    },
+    "final.consumer.json": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/native-bounded-ui-20261023/final.consumer.json",
+      "sha256": "b6249f59b10d851a3dc93b6df619a4689e0408f4e17bb0639a16e91ab4aa38d5"
+    },
+    "tests-final.log": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/native-bounded-ui-20261023/tests-final.log",
+      "sha256": "9d9bb16b62faa774f3092ad0bb6b2527cfcf12d274f0e369b2b1aea1a38d5c7e"
+    },
+    "clippy-final.log": {
+      "path": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/native-bounded-ui-20261023/clippy-final.log",
+      "sha256": "986038d4eaa5432ade859ec0b07a07f17292c5f4ff5b8c87a51b14bdf9ef83b1"
+    }
+  },
+  "protocolScope": [
+    "history/prompt/idempotency/locator/files/reconnect",
+    "presentation/SideChat authority",
+    "models/commands/skills/settings/presets/upload",
+    "ephemeral fork/discard/rename/archive/unarchive",
+    "real task/bounded child/source call/frozen history/ownership"
+  ],
+  "uiOnlyMode": false,
+  "tests": {
+    "demoLib": 5,
+    "childBinding": 3,
+    "strictDemoClippy": true,
+    "fmt": true,
+    "staticBoundaries": true
+  },
+  "nativeInteraction": false,
+  "readingAnchorAcceptance": false,
+  "physicalIme": false,
+  "crossProcess": false,
+  "completeUiDelivery": false,
+  "earlierFailuresPreserved": true
+}

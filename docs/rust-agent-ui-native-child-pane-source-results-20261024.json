@@ -1,0 +1,269 @@
+{
+  "schemaVersion": 1,
+  "baseCommit": "79727f48d1eb9a7ebb87a697341e96a0b75799f7",
+  "issues": [
+    17,
+    23
+  ],
+  "pullRequest": 10,
+  "completedAtDate": "2026-10-25",
+  "scope": "real-original-readonly-Native-head-source-and-same-demo-independent-Pi-DSH",
+  "defaultFeatureEnabled": false,
+  "runtimeAndTestSourceHashes": {
+    "ui/demo/src/native_child_pane_source.rs": "936aa024d5e88d9f697e5675248821969cc0ab43aaa70b64aab19513f2726016",
+    "ui/demo/src/component_demo.rs": "7f9cdfdacdeade27e5c59cba5d4ddbe1010ddd21a2f8490c1d262ff98d969cd9",
+    "ui/demo/src/components_native.rs": "a8e2ce01a3cd05c9d64787040635ba3b7407858c786245d805c6a4c90f082168",
+    "ui/demo/tests/run_port.rs": "c25c47792d0e6c624f5665198ae1a33724f5b5b3a3cfa21f4d6a1e2a92c72e4f",
+    "scripts/native_child_pane_source_fixture.py": "e2cf1cd59791b7a44567cad65c4e3bfd9a820fe07655a08bb0b71d0670fc882d",
+    "scripts/test-real-native-child-pane-source.py": "dfdd3923345842f1f4517317e73023912843457827ba001c9d515758a90f71fa",
+    "scripts/tests/test_native_child_pane_source_fixture.py": "71e4cfbc69b431972ae7d3de722ec1ae2c7f47d991378afbd5280d075db3e385"
+  },
+  "validation": {
+    "python": {
+      "passed": 262,
+      "new": 7,
+      "failed": 0
+    },
+    "fullUiBeforeFinalReportFix": {
+      "default": {
+        "passed": 757,
+        "failed": 0,
+        "ignored": 1
+      },
+      "bindingsAndDemoFeature": {
+        "passed": 652,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    "afterFinalReportFix": {
+      "runPortDefault": {
+        "passed": 19,
+        "failed": 0
+      },
+      "runPortFeature": {
+        "passed": 19,
+        "failed": 0
+      },
+      "strictClippyDefaultAndFeature": "passed",
+      "defaultAndFeatureBuild": "passed",
+      "newRegression": 1
+    },
+    "independentConsumerDefaultAndFeature": "executed-passed",
+    "fmtAndBoundaries": "passed"
+  },
+  "native": {
+    "accepted": true,
+    "evidenceScope": "real-native-readonly-child-pane-original-head-source",
+    "parent": {
+      "endpointId": "native",
+      "threadId": "c970b37d-a823-4d01-b262-cc4aa07695c2",
+      "sessionId": "c970b37d-a823-4d01-b262-cc4aa07695c2"
+    },
+    "childScope": {
+      "endpointId": "native",
+      "threadId": "c970b37d-a823-4d01-b262-cc4aa07695c2",
+      "sessionId": "5abb06d4-7d12-57e3-a6da-f70224605a92"
+    },
+    "connectionEpoch": 2,
+    "runningPublication": 3,
+    "failedPublication": 5,
+    "headOnly": true,
+    "readOnly": true,
+    "serverTransactionalFreshnessProven": false,
+    "gate": {
+      "requestCount": 1,
+      "entered": true,
+      "explicitlyReleased": true,
+      "aborted": false,
+      "timedOut": false
+    },
+    "demoExit": 0,
+    "kernelVersion": "0.9.3",
+    "seedExitedBeforeDemo": true,
+    "providerRequestCount": 3,
+    "privateHistoryRead": false,
+    "desktopInteraction": false,
+    "physicalIme": false,
+    "paidModel": false
+  },
+  "independent": {
+    "accepted": true,
+    "endpoints": {
+      "pi": {
+        "accepted": true,
+        "evidenceScope": "real-independent-child-pane-original-source",
+        "parent": {
+          "endpointId": "pi",
+          "threadId": "101ec57d-c69d-479b-8228-f5900165ad1e",
+          "sessionId": "101ec57d-c69d-479b-8228-f5900165ad1e"
+        },
+        "childScope": {
+          "endpointId": "pi",
+          "threadId": "101ec57d-c69d-479b-8228-f5900165ad1e",
+          "sessionId": "8b1e76a2-d403-480a-98f8-bdc77679bab0"
+        },
+        "connectionEpoch": 2,
+        "pair": {
+          "sameChild": true,
+          "sameEpoch": true,
+          "sameAuthoredInput": true,
+          "sameOpaqueTurnId": true,
+          "runningRevision": 24,
+          "failedRevision": 33,
+          "serverTransactionalFreshnessProven": false
+        },
+        "nativeInteraction": false,
+        "physicalIme": false,
+        "serverTransactionalFreshnessProven": false,
+        "endpoint": "pi",
+        "gate": {
+          "requestCount": 1,
+          "entered": true,
+          "explicitlyReleased": true,
+          "aborted": false,
+          "timedOut": false
+        },
+        "demoExit": 0,
+        "seedCommandCount": 16,
+        "harnessVersion": "1.3.0"
+      },
+      "dsh": {
+        "accepted": true,
+        "evidenceScope": "real-independent-child-pane-original-source",
+        "parent": {
+          "endpointId": "dsh",
+          "threadId": "session-3bd7a414-997c-4f6e-9e3b-febffc303293",
+          "sessionId": "session-3bd7a414-997c-4f6e-9e3b-febffc303293"
+        },
+        "childScope": {
+          "endpointId": "dsh",
+          "threadId": "session-3bd7a414-997c-4f6e-9e3b-febffc303293",
+          "sessionId": "f10c7a66-732a-43ee-ab08-1799c304077b"
+        },
+        "connectionEpoch": 2,
+        "pair": {
+          "sameChild": true,
+          "sameEpoch": true,
+          "sameAuthoredInput": true,
+          "sameOpaqueTurnId": true,
+          "runningRevision": 29,
+          "failedRevision": 54,
+          "serverTransactionalFreshnessProven": false
+        },
+        "nativeInteraction": false,
+        "physicalIme": false,
+        "serverTransactionalFreshnessProven": false,
+        "endpoint": "dsh",
+        "gate": {
+          "requestCount": 1,
+          "entered": true,
+          "explicitlyReleased": true,
+          "aborted": false,
+          "timedOut": false
+        },
+        "demoExit": 0,
+        "seedCommandCount": 13,
+        "harnessVersion": "0.2.1-rc.2"
+      }
+    },
+    "programs": {
+      "headless": {
+        "path": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/live-child-pane-source-20261024/final/programs/tekes-agent-headless",
+        "sha256": "6aad53eb9910cb190ed5e887d27b1dd28169fea3245c1ed8f5eb27cb46a1215a",
+        "archiveOnly": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/native-child-pane-source-20261024/final-independent/programs/tekes-agent-headless"
+      },
+      "demo": {
+        "path": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/tekes-agent-ui-demo",
+        "sha256": "2ff35842d335c80bbc15b85616230e7bf159e9afabbb067bf698a570794cc515",
+        "archiveOnly": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/native-child-pane-source-20261024/final-independent/programs/tekes-agent-ui-demo"
+      }
+    },
+    "providerRequestCount": 16,
+    "provider": "synthetic-loopback",
+    "nativeInteraction": false,
+    "physicalIme": false,
+    "privateHarnessHistoryRead": false,
+    "paidModel": false,
+    "ownedDshExitStatus": 0
+  },
+  "programs": {
+    "kernel": {
+      "supervisor": "/Users/frankqin/dev/Tekes/.build/kernel-0.9.3-installed/BuiltInKernel/tekes-supervisor",
+      "supervisorSha256": "365eca9385f36d5897a81ba398e7f34b4b9819896d6a1b78c618a7710b14380f",
+      "worker": "/Users/frankqin/dev/Tekes/.build/kernel-0.9.3-installed/BuiltInKernel/tekes-worker",
+      "workerSha256": "1284014bd0a8d3cb711c0512b10762322a19af4beabc1f9e681bacb1e28fa64d",
+      "build": {
+        "format": 1,
+        "identifier": "com.tekes.kernel.supervisor",
+        "source_revision": "09508a9083c24c7accefc99516739f279b85913e",
+        "version": "0.9.3"
+      }
+    },
+    "headless": {
+      "path": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/live-child-pane-source-20261024/final/programs/tekes-agent-headless",
+      "sha256": "6aad53eb9910cb190ed5e887d27b1dd28169fea3245c1ed8f5eb27cb46a1215a"
+    },
+    "demo": {
+      "path": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/tekes-agent-ui-demo",
+      "sha256": "2ff35842d335c80bbc15b85616230e7bf159e9afabbb067bf698a570794cc515"
+    },
+    "providerSnapshot": {
+      "path": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/native-lifecycle-diagnostics-20261024/kernel-input/fixtures/config/providers.canonical.json",
+      "sha256": "0caac12724fd6d982fc51123ea4546f2a023d6a9258da4cde63d1d27eabcaa6a"
+    },
+    "scripts": [
+      {
+        "path": "/Users/frankqin/dev/TekesAgentKit/scripts/test-real-native-child-pane-source.py",
+        "sha256": "dfdd3923345842f1f4517317e73023912843457827ba001c9d515758a90f71fa"
+      },
+      {
+        "path": "/Users/frankqin/dev/TekesAgentKit/scripts/native_child_pane_source_fixture.py",
+        "sha256": "e2cf1cd59791b7a44567cad65c4e3bfd9a820fe07655a08bb0b71d0670fc882d"
+      },
+      {
+        "path": "/Users/frankqin/dev/TekesAgentKit/scripts/native_owned_fixture.py",
+        "sha256": "41a33188f5715ecfd4102f0114cf14436eb522c0499c739239455f31a38617ad"
+      },
+      {
+        "path": "/Users/frankqin/dev/TekesAgentKit/scripts/summary_transition_provider.py",
+        "sha256": "985c1839969528425ebc0c7253d6ec977d11c5c7a861c0b0b63b46587145d3f4"
+      },
+      {
+        "path": "/Users/frankqin/dev/TekesAgentKit/scripts/owned_endpoint_provider.py",
+        "sha256": "b518eac7ac8b2d32ab5f8be1ac7bd81c09136993664c2302b957d34428028fe2"
+      },
+      {
+        "path": "/Users/frankqin/dev/TekesAgentKit/scripts/task_family_fixture.py",
+        "sha256": "48df5302f1db0108e85efd9f57295455da5efe94b620676a02df0687e714e29c"
+      },
+      {
+        "path": "/Users/frankqin/dev/TekesAgentKit/scripts/runtime_provenance.py",
+        "sha256": "a6466c807705490154b76af7c6c55443489590b3f506be95e289c6cc1dc4f046"
+      }
+    ]
+  },
+  "sameDemoSha256": "2ff35842d335c80bbc15b85616230e7bf159e9afabbb067bf698a570794cc515",
+  "failedWholeRunPreserved": {
+    "path": ".runtime-fixtures/native-child-pane-source-20261024/failed-parent-report",
+    "accepted": false,
+    "reason": "rendered-tree-compared-with-newer-live-parent-publication",
+    "intermediateReceiptNotFinalSuccess": true
+  },
+  "tekesUiPin": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "previousHeadCiEvidence": ".runtime-fixtures/native-bounded-head-witness-20261024/ci-terminal-evidence.json",
+  "currentCommitCi": "not-yet-pushed",
+  "notRun": [
+    "cumulative-pagination-provenance",
+    "original-child-pane-reconnect-and-reading-restoration",
+    "complete-tabs-and-window-chrome",
+    "desktop-physical-IME-OS-AX-ProcessContainer",
+    "complete-ClientKit-View-parity-and-performance"
+  ],
+  "pngScope": "final-closed-parent-offscreen-frame-only",
+  "sdkChanged": false,
+  "kernelChanged": false,
+  "newTarget": false,
+  "deletedCacheBytes": 0,
+  "mergeTagRelease": false
+}

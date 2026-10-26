@@ -1,0 +1,24 @@
+[package]
+name = "tekes-agent-ui-bindings"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+[features]
+acceptance-source-witness = ["tekes-agent-presentation/acceptance-source-witness"]
+[dependencies]
+rusqlite = { version = "=0.40.2", default-features = false, features = ["bundled"] }
+tekes-agent-components-ui.workspace = true
+tekes-agent-contract.workspace = true
+tekes-agent-presentation.workspace = true
+tekes-agent-session.workspace = true
+tekes-agent-web.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+async-trait.workspace = true
+uuid.workspace = true
+base64.workspace = true
+image.workspace = true
+[dev-dependencies]
+futures-util = "0.3"
+tekes-ui-controls.workspace = true

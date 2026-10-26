@@ -1,0 +1,181 @@
+{
+  "agentkitHead": "a2feb1974d5809f551a7650c5228a09129c93fb6",
+  "tekesuiPin": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "nativeInteraction": false,
+  "mergeAllowed": false,
+  "prMergeParents": {
+    "parents": [
+      "f1daa0ffcf6ced41e21f351e22845455ca78006c",
+      "a2feb1974d5809f551a7650c5228a09129c93fb6"
+    ],
+    "sha": "f994621841711cd63ddc8d831819fb2efeb61c0e"
+  },
+  "runs": [
+    {
+      "id": 40069183319,
+      "url": "https://github.com/TekesApps/TekesAgentKit/actions/runs/40069183319",
+      "checkedOutCommit": "f994621841711cd63ddc8d831819fb2efeb61c0e",
+      "publicConsumerSourceSha256": "3b979fc0e7a68a786c5c7056d8bb85ef02f8a5b1ffe21875a6a4f7b9ac9b1f97",
+      "publicConsumerSourceFiles": 136,
+      "strictReading": {
+        "accepted": false,
+        "parentFollowingAfterInnerUp": true,
+        "parentOffsetBefore": 0,
+        "parentOffsetAfterScroll": 0,
+        "parentOffsetAfterAppend": 634,
+        "innerOffset": 100,
+        "detailVisibleAfterAppend": false
+      },
+      "jobs": [
+        {
+          "name": "checks",
+          "status": "completed",
+          "conclusion": "success",
+          "steps": [
+            {
+              "name": "Run cargo clippy --workspace --all-targets --locked -- -D warnings",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run cargo test --workspace --locked",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "name": "Rust UI consumer (no native interaction)",
+          "status": "completed",
+          "conclusion": "failure",
+          "steps": [
+            {
+              "name": "Resolve and verify the compiled public pin",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run cargo clippy --manifest-path ui/Cargo.toml --workspace --all-targets --locked -- -D warnings",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run cargo test --manifest-path ui/Cargo.toml --workspace --locked",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run standalone public API consumer (no native window)",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Verify nested detail reading intent (strict; no native window)",
+              "status": "completed",
+              "conclusion": "failure"
+            },
+            {
+              "name": "Run cargo build --manifest-path ui/Cargo.toml --locked -p tekes-agent-ui-demo",
+              "status": "completed",
+              "conclusion": "skipped"
+            }
+          ]
+        }
+      ],
+      "sdkReviewedFiles": 243,
+      "artifactHashes": {
+        "agentkit-public-consumer-prepare.json": "17602802323c90db1ef8e4a01d0183ddde75d02d8407e0b833e1ec6f5738f2e7",
+        "agentkit-nested-detail-reading.json": "c4f70b29538ecacd71995d9a3fc7678cf168834c54e6f348c8c095309b9f1b90",
+        "agentkit-ui-metadata.json": "f35595a6ddfedc2ba563e8619e42c513620af735787f886cf43fe6307748476d",
+        "agentkit-ui-inputs.json": "9543ade335292f9c7f61944edd341c2fb9297a7c6abc3cf44dc86c1f16bd6ee3",
+        "agentkit-public-consumer/Cargo.toml": "a9a03cf3feda204459209d66372eb82c7c957907c85f63f99d9d33a6c8e4f540",
+        "agentkit-public-consumer/Cargo.lock": "2c64ec1c18e60040563bdd632e6a903aa16c171510bda31dd6274ae5354b8dd5",
+        "agentkit-public-consumer/Cargo.lock.seed": "4f350ba9cb66878f3faaaad459e3519bbcac9921a844dd274554b858c0ce0722",
+        "agentkit-public-consumer/src/main.rs": "9453d6fd5924e70d0aa4941d06e7e5f57d6a29c1a30dfa8f0f314a2edd7f910e"
+      }
+    },
+    {
+      "id": 40069180702,
+      "url": "https://github.com/TekesApps/TekesAgentKit/actions/runs/40069180702",
+      "checkedOutCommit": "a2feb1974d5809f551a7650c5228a09129c93fb6",
+      "publicConsumerSourceSha256": "3b979fc0e7a68a786c5c7056d8bb85ef02f8a5b1ffe21875a6a4f7b9ac9b1f97",
+      "publicConsumerSourceFiles": 136,
+      "strictReading": {
+        "accepted": false,
+        "parentFollowingAfterInnerUp": true,
+        "parentOffsetBefore": 0,
+        "parentOffsetAfterScroll": 0,
+        "parentOffsetAfterAppend": 634,
+        "innerOffset": 100,
+        "detailVisibleAfterAppend": false
+      },
+      "jobs": [
+        {
+          "name": "Rust UI consumer (no native interaction)",
+          "status": "completed",
+          "conclusion": "failure",
+          "steps": [
+            {
+              "name": "Resolve and verify the compiled public pin",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run cargo clippy --manifest-path ui/Cargo.toml --workspace --all-targets --locked -- -D warnings",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run cargo test --manifest-path ui/Cargo.toml --workspace --locked",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run standalone public API consumer (no native window)",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Verify nested detail reading intent (strict; no native window)",
+              "status": "completed",
+              "conclusion": "failure"
+            },
+            {
+              "name": "Run cargo build --manifest-path ui/Cargo.toml --locked -p tekes-agent-ui-demo",
+              "status": "completed",
+              "conclusion": "skipped"
+            }
+          ]
+        },
+        {
+          "name": "checks",
+          "status": "completed",
+          "conclusion": "success",
+          "steps": [
+            {
+              "name": "Run cargo clippy --workspace --all-targets --locked -- -D warnings",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run cargo test --workspace --locked",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        }
+      ],
+      "sdkReviewedFiles": 243,
+      "artifactHashes": {
+        "agentkit-public-consumer-prepare.json": "28a47fbad439cb3ef11e0b33ee9b2d33f66d02550b8cc2bf3b51fbe87f30927b",
+        "agentkit-nested-detail-reading.json": "c4f70b29538ecacd71995d9a3fc7678cf168834c54e6f348c8c095309b9f1b90",
+        "agentkit-ui-metadata.json": "f35595a6ddfedc2ba563e8619e42c513620af735787f886cf43fe6307748476d",
+        "agentkit-ui-inputs.json": "9543ade335292f9c7f61944edd341c2fb9297a7c6abc3cf44dc86c1f16bd6ee3",
+        "agentkit-public-consumer/Cargo.toml": "a9a03cf3feda204459209d66372eb82c7c957907c85f63f99d9d33a6c8e4f540",
+        "agentkit-public-consumer/Cargo.lock": "2c64ec1c18e60040563bdd632e6a903aa16c171510bda31dd6274ae5354b8dd5",
+        "agentkit-public-consumer/Cargo.lock.seed": "4f350ba9cb66878f3faaaad459e3519bbcac9921a844dd274554b858c0ce0722",
+        "agentkit-public-consumer/src/main.rs": "9453d6fd5924e70d0aa4941d06e7e5f57d6a29c1a30dfa8f0f314a2edd7f910e"
+      }
+    }
+  ]
+}

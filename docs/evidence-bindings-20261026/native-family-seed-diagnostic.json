@@ -1,0 +1,30 @@
+{
+  "scope": "single finite Native completed family seed diagnostic; no performance acceptance",
+  "programSha256": "18d8f643e8cba5ee94202c8c2f481bfa31add7bc5ac4fc5df44276100532180b",
+  "programSource": "98b1d9a2960b90774ea5454e7e8dad870538f7bc",
+  "runtime": "Kernel0.9.3 / 09508a9083c24c7accefc99516739f279b85913e",
+  "runnerInputsSha256": "f715a9543e4baec8e8f0a174da59589a5c50d1b8b46d6c6b6602945bbb215b8d",
+  "pilotReceiptSha256": "c807282a8b915e89893525145080252e567be978ff6e313bdd30a61ba652b5ea",
+  "groundtruthSha256": "866db7a011fa9e3c4a50c5eabf7a5c53b38744f840134b46aa7f2f8ca7970cd9",
+  "earlierSha256": "c4332b7a4aefd93d2e6cd13ea5da88cb7e74190bab8458353327faa936a461af",
+  "sourceBoundedChildCount": 1,
+  "commentaryBodies": 61,
+  "bodyUtf8Bytes": 1024,
+  "actualReadGroups": 61,
+  "parentTurnSettled": true,
+  "childRunOpen": false,
+  "initialMaxMessages": 20,
+  "earlierMaxMessages": 20,
+  "totalPages": 2,
+  "rawEntriesPerPage": [
+    309,
+    1
+  ],
+  "normalizedUnionEqualsCompleteGroundtruth": true,
+  "kernelAndConsumersExited": true,
+  "originalPilotProviderRequestsFieldScope": "delegated parent requests only; not total child requests; current runner names this explicitly",
+  "currentRunnerDiff": "receipt field accuracy only; original frozen runner and original receipts retained; union equality independently reanalyzed without rerunning protocol",
+  "officialSamples": 0,
+  "performanceAccepted": false,
+  "desktop": false
+}

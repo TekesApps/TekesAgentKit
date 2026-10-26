@@ -1,0 +1,150 @@
+{
+  "date": "2026-10-20",
+  "publishedBaseline": "v0.3.8",
+  "tekesui": {
+    "revision": "431093786de47b48cd566d0d9c0eafa088b10d68",
+    "packages": 8,
+    "inputs": 188,
+    "sha256": "03721866a362b1d31261ebbbc86140eb07e9e23320871c325234a5212591213d"
+  },
+  "tests": {
+    "uiWorkspace": 105,
+    "newPresetCases": 5,
+    "tools": 18,
+    "root": "unchanged; prior increment 105; not rerun"
+  },
+  "gates": [
+    "strict UI all-targets clippy",
+    "UI fmt",
+    "build",
+    "UI boundaries",
+    "resolved public pin inputs"
+  ],
+  "sourceSha256": {
+    "ui/bindings/src/presets.rs": "48a61aebe4d99b832ee4a5ffc8f7b343079307128498cf35e60b3687b59960b5",
+    "ui/demo/tests/initial_presets.rs": "a4d4810452a7a38c21effe6dc891fe066816e331d4368565894040642cbbccf6",
+    "ui/demo/src/fixture.rs": "8a4f4a33e7b0c47ec47f22e912dca923830d7e578c3b54fae4d987b492014882",
+    "ui/demo/src/components_native.rs": "180f2918017feec4d72a24690bd36dce291cd41bb649264af8975935f268911b",
+    "ui/consumer/src/lib.rs": "ca467860433fdcd0c8704d177bc869c54fea4ce394179e878a8654194a837128",
+    "scripts/test-real-session-endpoints.py": "80a02d0d646f7d7f60f4ed9fccd9aeb34f349b27216d7b8b46970f4f8b908a93"
+  },
+  "binarySha256": "7c71828f18ce87f010bed0488d7505f7a2f187a39579b4193535621dfeb53b8f",
+  "logs": {
+    "/tmp/agentkit-initial-presets-ui.log": "a3d360b25d7640ad17c1617d9d384e91666883bb27c0dcf8c7a8ee208f9dd6e3",
+    "/tmp/agentkit-initial-presets-clippy-pass.log": "f192515028c4105113bd210efc2f232d7d63c4d8a97b470b21153e6a2c5cd53b",
+    "/tmp/agentkit-initial-presets-build-pass.log": "4b00d8c0f616a3130c0f210d4250ca1036f768afa8b1afc72a691f6fda1c50e4",
+    "/tmp/agentkit-initial-presets-tools.log": "7034ba8f9a833eb3e2cb0efc7aa66dba697a54ad6829c7f41f84963978e15044",
+    "/tmp/agentkit-initial-presets-real.log": "f3594455743691fdb17653b8af31a0c2c449bc258b1a49fe770a6a5d846e57d3",
+    "/tmp/agentkit-initial-presets-real-pass.log": "f56b56897533edbebc4ebed1da3e98953921fc0766397e56d0b5517fb6d53493"
+  },
+  "realEndpoints": {
+    "PI": {
+      "components": true,
+      "contextProof": null,
+      "finalAssistantItems": 2,
+      "initialPresetProof": {
+        "catalogChoices": 1,
+        "createdSession": true,
+        "explicitSelection": true,
+        "nativeInteraction": false,
+        "originalDraftPreserved": true,
+        "presetIdentityReturned": false,
+        "productionCreationEntry": false,
+        "promptSettled": true,
+        "selectedPreset": "default",
+        "singleInput": true
+      },
+      "inventoryRows": 14,
+      "isStale": false,
+      "modelChoiceProof": null,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 5,
+      "transcriptView": false
+    },
+    "DSH": {
+      "components": true,
+      "contextProof": null,
+      "finalAssistantItems": 1,
+      "initialPresetProof": {
+        "catalogChoices": 4,
+        "createdSession": true,
+        "explicitSelection": true,
+        "nativeInteraction": false,
+        "originalDraftPreserved": true,
+        "presetIdentityReturned": true,
+        "productionCreationEntry": false,
+        "promptSettled": true,
+        "selectedPreset": "standard",
+        "singleInput": true
+      },
+      "inventoryRows": 9,
+      "isStale": false,
+      "modelChoiceProof": null,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 5,
+      "transcriptView": false
+    },
+    "NATIVE": {
+      "components": true,
+      "contextProof": null,
+      "finalAssistantItems": 1,
+      "initialPresetProof": {
+        "catalogChoices": 2,
+        "createdSession": true,
+        "explicitSelection": true,
+        "nativeInteraction": false,
+        "originalDraftPreserved": true,
+        "presetIdentityReturned": true,
+        "productionCreationEntry": false,
+        "promptSettled": true,
+        "selectedPreset": "coding",
+        "singleInput": true
+      },
+      "inventoryRows": 5,
+      "isStale": false,
+      "modelChoiceProof": null,
+      "nativeInteraction": false,
+      "offscreen": true,
+      "sharedRuntime": true,
+      "sidebarMounted": true,
+      "summaryMounted": true,
+      "transcriptItems": 2,
+      "transcriptView": false
+    }
+  },
+  "provider": "isolated temporary state/local synthetic; no paid model",
+  "firstFailure": {
+    "result": "failed",
+    "scope": "DSH create+prompt settled; test checked only summary identity",
+    "fix": "read public agentPreset projection; keep strict identity assertion for DSH/Native",
+    "retainedLog": "/tmp/agentkit-initial-presets-real.log"
+  },
+  "evidenceScope": {
+    "newInteractiveCreationEntry": false,
+    "nativePresetPanel": false,
+    "physicalIME": false,
+    "formalTranscript": false,
+    "formalRunView": false,
+    "gpu": "existing main component host after settlement, not initial preset panel pixels",
+    "piIdentity": "fixed default accepted on create; no independent identity field published"
+  },
+  "remaining": [
+    "interactive NewThread/preset entry and native verification",
+    "file picker/upload/preview adapter",
+    "annotation editor/source highlights",
+    "content undo",
+    "other Composer capability entries",
+    "formal Transcript/RunView public TekesUI #22/#23",
+    "full pane contents",
+    "physical IME/reading/paging acceptance",
+    "review CI merge tag"
+  ]
+}

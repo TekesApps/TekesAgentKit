@@ -1,0 +1,67 @@
+{
+  "head": "91129d701fbd2721cf3415b86d227900715ec353",
+  "immutableClosureVerified": true,
+  "prMergeParentVerified": true,
+  "runs": [
+    {
+      "id": 40136150914,
+      "checkout": "91129d701fbd2721cf3415b86d227900715ec353",
+      "conclusion": "failure",
+      "consumerSource": "db942475e6f74c2e61d86b84840d2b4987e93f5a64f15d47221d783d62758186",
+      "consumerFiles": 138,
+      "sdk": {
+        "commit": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+        "local_packages": 11,
+        "native_interaction": false,
+        "reviewed_files": 243,
+        "sha256": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
+        "ui_packages": 8
+      },
+      "rawReading": {
+        "accepted": false,
+        "parentFollowingAfterInnerUp": true,
+        "parentOffsetBefore": 0,
+        "parentOffsetAfterScroll": 0,
+        "parentOffsetAfterAppend": 634,
+        "innerOffset": 100,
+        "detailVisibleAfterAppend": false
+      },
+      "artifactSha256": "5e1ae79a89ee98bd473d0679c51ba584785ebb66889fc46136a94829e4d5c6f6",
+      "jobLogSha256": "c09683bcdc9e3e0151228370cdf8c1d7115a254938cec62a22ee66894d4826ba",
+      "optInWitness": "success",
+      "independentConsumer": "success",
+      "metadataStepsCurrent": true,
+      "executionEvidence": "API steps"
+    },
+    {
+      "id": 40136154649,
+      "checkout": "76d901ace82cb8253938466032aaa819462b680c",
+      "conclusion": "failure",
+      "consumerSource": "db942475e6f74c2e61d86b84840d2b4987e93f5a64f15d47221d783d62758186",
+      "consumerFiles": 138,
+      "sdk": {
+        "commit": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+        "local_packages": 11,
+        "native_interaction": false,
+        "reviewed_files": 243,
+        "sha256": "3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c",
+        "ui_packages": 8
+      },
+      "rawReading": {
+        "accepted": false,
+        "parentFollowingAfterInnerUp": true,
+        "parentOffsetBefore": 0,
+        "parentOffsetAfterScroll": 0,
+        "parentOffsetAfterAppend": 634,
+        "innerOffset": 100,
+        "detailVisibleAfterAppend": false
+      },
+      "artifactSha256": "049e79475b63944513368901e18f446b592655e6436ec83f1443ca093ccb80c5",
+      "jobLogSha256": "9c602052f14a90d44436bdaee8888b1547cba572208519d502f829f0dc87ada3",
+      "optInWitness": "success",
+      "independentConsumer": "success",
+      "metadataStepsCurrent": true,
+      "executionEvidence": "API steps"
+    }
+  ]
+}

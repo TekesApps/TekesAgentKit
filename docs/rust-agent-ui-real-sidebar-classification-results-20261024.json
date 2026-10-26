@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "issue": 29,
+  "baseHead": "b368cd4d79d2aa6925064fb801f59e6ffd8afecb",
+  "sourceManifestFileCount": 519,
+  "evidenceScope": "real-harness-headless-and-original-offscreen-consumer",
+  "accepted": true,
+  "endpoints": [
+    {
+      "endpoint": "native",
+      "lifecycleSamples": 4,
+      "inventoryRecords": 5,
+      "sourceRevision": 3,
+      "connectionEpoch": 2,
+      "observerGeneration": 1,
+      "archiveWorkspaceReady": false,
+      "ephemeralCapability": "exercised"
+    },
+    {
+      "endpoint": "pi",
+      "lifecycleSamples": 6,
+      "inventoryRecords": 8,
+      "sourceRevision": 10,
+      "connectionEpoch": 2,
+      "observerGeneration": 1,
+      "archiveWorkspaceReady": true,
+      "ephemeralCapability": "exercised"
+    },
+    {
+      "endpoint": "dsh",
+      "lifecycleSamples": 5,
+      "inventoryRecords": 5,
+      "sourceRevision": 7,
+      "connectionEpoch": 2,
+      "observerGeneration": 1,
+      "archiveWorkspaceReady": true,
+      "ephemeralCapability": "unsupported"
+    }
+  ],
+  "publicLifecycleSamples": 15,
+  "hostOwnedPiEphemeral": {
+    "address": {
+      "endpointId": "pi",
+      "sessionId": "59bcc9e0-2c65-4e6c-9125-2a2117072bb7"
+    },
+    "afterItems": 5,
+    "beforeItems": 5,
+    "forkReply": {
+      "sessionId": "59bcc9e0-2c65-4e6c-9125-2a2117072bb7"
+    },
+    "originalItemsPreserved": true,
+    "previousInstanceRetired": true,
+    "scope": {
+      "endpointId": "pi",
+      "sessionId": "59bcc9e0-2c65-4e6c-9125-2a2117072bb7",
+      "threadId": "59bcc9e0-2c65-4e6c-9125-2a2117072bb7"
+    }
+  },
+  "familyNavigationCases": 6,
+  "independentSelectedReads": 22,
+  "unknownValuesRemainUnknown": true,
+  "confirmedMainInferred": false,
+  "programSha256": {
+    "headless": "935ec6b61fc277927bff460b6a29d4074ae348f1215b97b8f759583879694d3a",
+    "demo": "49ddf7caccf4509b1475e84c6794624964c4eeeaac458f20704c061855614df0"
+  },
+  "validation": {
+    "uiWorkspace": {
+      "passed": 747,
+      "failed": 0,
+      "ignored": 1,
+      "ignore": "existing TekesUI #49",
+      "phase": "before final offscreen probe lifecycle additions; final demo additionally rebuilt, Clippy checked and real-run verified"
+    },
+    "rootWorkspace": {
+      "passed": 340,
+      "failed": 0,
+      "ignored": 0
+    },
+    "python": {
+      "passed": 170
+    },
+    "strictClippyRoot": true,
+    "strictClippyUi": true,
+    "standalonePublicConsumerExecuted": true,
+    "standalonePublicConsumerMounts": 6
+  },
+  "nativeInteraction": false,
+  "physicalIme": false,
+  "desktopVisibilityProven": false,
+  "axAcceptance": false,
+  "merged": false,
+  "released": false,
+  "blockingSdkIssue": "TekesApps/TekesUI#53",
+  "cacheDeletedBytes": 0,
+  "localEvidenceDirectory": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/real-multi-sidebar-20261024",
+  "failuresRetained": [
+    "classification-attempt1",
+    "classification-attempt2",
+    "classification-attempt3",
+    "classification-attempt4",
+    "classification-attempt5",
+    "classification-attempt6",
+    "classification-attempt7"
+  ]
+}

@@ -1,0 +1,84 @@
+{
+  "scope": "one candidate cold diagnostic with transparent loopback proxy; no formal metric replacement",
+  "diagnosticOnly": true,
+  "officialSamples": 0,
+  "performanceAccepted": false,
+  "sourceCommit": "10263722b5fb128922c49a31b5942c41333cd6e2",
+  "programSha256": "a637ddb8fac00854b5883fe14eef850e6808c11c1d0704f390d08b0b085cd439",
+  "runtime": "Kernel 0.9.3 source09508a9",
+  "artifacts": [
+    {
+      "path": "native-wire-diagnostic-v1-inputs.json",
+      "sha256": "95d1cc7abd4bf8c6c2abc48b1276495624c340fa2be8f99e5e112a8cefb48d69"
+    },
+    {
+      "path": "performance/native-wire-delay-candidate-v1/inputs.json",
+      "sha256": "e8539e4204ca86a071738f66aae206baa982326cd946141cc43b9f832eff7994"
+    },
+    {
+      "path": "performance/native-wire-delay-candidate-v1/diagnostic-receipt.json",
+      "sha256": "b423eb9e2cd5b39f489869f6fc6a2c43b4eee1b567171835333d80c3e92d9054"
+    },
+    {
+      "path": "performance/native-wire-delay-candidate-v1/native-wire-observations.jsonl",
+      "sha256": "5f0fc992f08979b270b544d2ac4507d3c79e2ba0b7526b07a3af540ae5d0e96d"
+    },
+    {
+      "path": "performance/native-wire-delay-candidate-v1/native-provider-observations.jsonl",
+      "sha256": "8adb540c0fac86a5470745f0358eecd09118d28e3eb1d4db886a6cbf58c4400e"
+    },
+    {
+      "path": "performance/native-wire-delay-candidate-v1/measurement-rss.jsonl",
+      "sha256": "d0244430ec5a5413992637ff5d46b571a44549b80962ef45feb742850df51cc4"
+    },
+    {
+      "path": "performance/native-wire-delay-candidate-v1/owned-process-retirement.json",
+      "sha256": "a7f8970c09ce606baac0db5fa0432bb351a9def6880cf87625f850c911264c11"
+    }
+  ],
+  "rounds": [
+    {
+      "scopeIndex": 0,
+      "requestMonotonicNs": 22552088204166,
+      "ackMonotonicNs": 22552124976625,
+      "providerStartMonotonicNs": 22552279423500,
+      "providerReturnMonotonicNs": 22552281080166,
+      "durableUserFrameMonotonicNs": 22552315117041,
+      "assistantFrameMonotonicNs": 22552388245666,
+      "ackToProviderStartMs": 154.446875,
+      "providerHandlerMs": 1.656666,
+      "requestToAssistantFrameMs": 300.0415,
+      "workerFirstSamplesBeforeProvider": [
+        {
+          "pid": 48643,
+          "firstSampleNs": 22552208690125
+        }
+      ]
+    },
+    {
+      "scopeIndex": 1,
+      "requestMonotonicNs": 22552396474083,
+      "ackMonotonicNs": 22552433557541,
+      "providerStartMonotonicNs": 22552615471500,
+      "providerReturnMonotonicNs": 22552615779375,
+      "durableUserFrameMonotonicNs": 22552649310416,
+      "assistantFrameMonotonicNs": 22552719958375,
+      "ackToProviderStartMs": 181.913959,
+      "providerHandlerMs": 0.307875,
+      "requestToAssistantFrameMs": 323.484292,
+      "workerFirstSamplesBeforeProvider": [
+        {
+          "pid": 48657,
+          "firstSampleNs": 22552507995125
+        }
+      ]
+    }
+  ],
+  "limits": [
+    "proxy changes transport/timing; no causal attribution of original official outliers",
+    "worker sampled at 50ms; first-seen is not exact birth/startup completion",
+    "considerable delay precedes received assistant frame; no fixed AgentKit polling found",
+    "read-only Kernel source points to lazy worker/context/lease path; no particular SDK defect or contract violation proven",
+    "original Native lifecycle relative failures remain effective"
+  ]
+}

@@ -65,3 +65,5 @@ python3 scripts/test-real-session-endpoints.py \
 ```
 
 Kernel 的 target 参数是显式开发输入；省略时使用该源码 root 下的 target。
+
+本开发分支新增内置bounded source的显式1..=200分页大小，默认50不变；API与真实原生证据见[Native bounded阅读](rust-agent-ui-native-bounded-reading-20261021.md)。这是未发布增量，不代表v0.3.8已包含该入口。

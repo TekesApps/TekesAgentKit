@@ -1,0 +1,620 @@
+# Rust Agent UI 的历史交付计划与分项证据
+
+> 2026-10-25 整理后，当前执行入口为[需求 → Issue → 实现 → 验证覆盖索引](agentkit-requirements-coverage.md)，总 Epic 仍为 #14。#15–#28 是功能追踪，实施/协议/桌面/SDK/发布有独立子票与负责人。下列分项按原提交解释，保留历史，不代表当前状态或新程序验收。原票正文/状态另见[历史归档](agentkit-issue-history-20261025.json)；尤其 #29 按新集成门槛已重开为“已验证待集成”。
+
+创建日期：2026-10-24，建票基线 `1ef2791`。最近功能基线 `91129d7`（2026-10-25核对），PR #10。完整目标保持不变；本计划将历史实现与剩余验收映射为工作项，后续专题按各自不可变提交/程序解释，不能把拆票或分项通过视为完整交付。
+
+本轮新增 [三端 Sidebar 真实连接关闭与恢复](rust-agent-ui-sidebar-transport-recovery-results-20261025.md)：#22/#27 的真实 transport 故障与恢复通过，含 Pi close 流窄修和 pending-stream 红/绿回归；不等于 observer Retry、桌面或完整 Issue 验收。新 head CI 单独核对。
+
+本次完成[原owner最后入队前复核](rust-agent-ui-submission-last-admission-20261025.md)，独立记录受控竞态回归与本次新源码的真实三端恢复。[1026格矩阵](rust-agent-ui-acceptance-matrix-20261025.md)固定功能基线，不将旧程序证据转成新提交通过。继续按[Native累计分页来源契约](rust-agent-ui-native-paged-pane-source-contract-20261025.md)推进 #17/#23；接口实施、真实协议与阅读锚点分别记录。
+
+该切片的[presentation/原分页意图接口与受控验证](rust-agent-ui-native-paged-binding-results-20261025.md)现已完成：root404、presentation feature301、UI784/1、UI feature674及两种独立consumer通过；后续[真实Native分页执行契约](rust-agent-ui-native-paged-live-contract-20261025.md)与[实际分项收据](rust-agent-ui-native-paged-live-results-20261025.json)已覆盖原只读pane按公开两页计划的一次Earlier至EOF、同source重连拒绝旧intent、错误追加和逐段prefix验证；实际三次Earlier、前插可见消息及阅读锚点仍未覆盖，不升级固定矩阵或关闭Issue。
+
+## 执行规则
+
+- GitHub Issue 负责需求、优先级、依赖、状态与关闭标准；本文件是需求覆盖索引，专题文档是设计/证据，不为每次验证另开 Issue。
+- 单个 Issue 先比较 ClientKit 对应 Views 与 Tekes 宿主、确认范围，再实施；主会话协调，复杂项交独立子会话，按需使用 subagent，小改动可直接完成。
+- AgentKit 拥有 Rust 业务组件/presentation；TekesUI 拥有通用组件、输入、焦点、IME、滚动、渲染和进程能力。仅消费公开精确版本，缺口复用上游票，不改 SDK/Swift/Kernel。
+- 当前六种状态：待办、进行中、已验证待集成、等待上游、等待桌面、已关闭。OPEN 不等于没写代码；已勾实现不等于完整验收。未合入代码不关闭，历史措辞以当前覆盖索引和 GitHub 状态为准。
+- 每项完成回填实现提交、分层验证及未验证项、证据身份和 PR；设计变更同步专题文档。关闭前必须满足该 Issue 的全部验收，不能仅据测试计数。
+- 历史验收保留原程序身份；重验证不是创建新 target/新应用身份的理由。桌面验收仍暂不运行。
+
+## 总追踪与需求覆盖
+
+总追踪：[AgentKit #14](https://github.com/TekesApps/TekesAgentKit/issues/14)；既有修复 #12/#13 已实施待合并，归 #23/#18，不重复开票。历史 headless SEP、session pointer、历史/只读文件及 presentation 已做内容归 #15/#27 的证据基线，不因本次建票而宣称重新验收。
+
+| 原目标 | Issue |
+| --- | --- |
+| 依赖、契约、命名、公开API、demo/文档 | #15、#28 |
+| Composer/草稿/发送取消/IME | #16、#27 |
+| Transcript历史/推理/工具/富内容/来源 | #17、#19 |
+| 输入/footnote右、机器/footnote左，SDK样式 | #17、#20、#21 |
+| 分页/reveal/追加阅读/重连锚点 | #18、#27 |
+| Indicators与RunPort | #21 |
+| Sidebar导航/活动/置顶/共享 | #22 |
+| SidePanel任务/子代理/SideChat/Summary | #23、#24、#25；已有#12/#13 |
+| 三个ProcessContainer同/跨进程 | #26、#27 |
+| Native/Pi/DSH、第二consumer、原生/系统IME/AX | #15、#27 |
+| review、CI、merge/tag与磁盘/WIP | #27、#28 |
+
+## 当前主/子会话并行安排
+
+见[文件范围、负责人及串行集成门槛](rust-agent-ui-parallel-work-20261024.md)。本批并行推进 #22 多端 Sidebar、#23 Task/child 契约核对、#25 Summary 来源动作；主会话集中处理 CI、公共接口、构建与回填。#17/#21 共享组合链暂不同时写入；SDK 依赖和桌面验收仍按具体子项等待。
+
+## 执行顺序
+
+1. 可先推进 #15 的API/文档/依赖审计、#19的公开producer契约、#27的验收矩阵；这些准备不要求启动桌面。
+2. 功能项按Views差异开发，依赖仅阻塞适用子项，不能把整个目标都归因于三个SDK缺口。
+3. #18/#20/#26分别消费#53/#47/#48的固定公开交付；不因Issue状态变化就声称消费者已通过。
+4. 所有完整目标通过#27验收后由#28负责review/CI/合并/阶段tag。其间分项收据不转移程序身份。
+
+## 工作项与现有证据
+
+### [#15](https://github.com/TekesApps/TekesAgentKit/issues/15) — [P1][API] 固定公开依赖、宿主接入契约与第二 consumer
+
+当前：非 SDK 审计与独立 consumer 已完成；正式 UI 发行 pin 与容器契约待交付。
+
+依赖/关联：[TekesUI #64](https://github.com/TekesApps/TekesUI/issues/64)。上游关联按具体子项适用。
+
+已做：
+
+- [x] Rust-only 根契约/SessionEndpointRegistry、RunScope 和 presentation 已建立；已发布基线 v0.3.8，UI 增量仍未发布。
+- [x] 三 SEP 已有 pointer/locator、历史恢复、只读文件和能力矩阵；本地与远端 cache 策略独立。
+- [x] 已提供 RunPort、Sidebar、SidePanel、显式宿主回调、第二公开 consumer 和 UI 边界检查。
+
+待做：
+
+- [x] 逐项核对公开类型、RunView→RunPort 命名、组件所有权与状态/事件输入。
+- [ ] 为最终接入 revision 固定 AgentKit/TekesUI 闭包，核对安装、路径、模型/附件/设置等宿主职责。
+- [x] 修正过期状态说明；将文档示例与真实公开 API 对照，保留显式开发依赖与正式精确 pin 的区别。
+
+验收：
+
+- [x] 干净外部 consumer 仅使用公开 API，构造三个业务组件；不依赖 RunSurface/ComponentDemo。
+- [x] 文档列明版本、所有权、状态输入、事件回调、焦点/IME/滚动责任及迁移。
+- [ ] 共享包+Rust demo+第二 consumer 适用检查通过；没有 Swift、私有 SDK 或新状态机。
+
+证据：[session-endpoints.md](session-endpoints.md)、[rust-agent-ui-host-integration.md](rust-agent-ui-host-integration.md)、[rust-agent-ui-contract.md](rust-agent-ui-contract.md)。
+
+本轮推进：本轮实现 `8335231`：公开构造与宿主状态/回调审计、独立 package 实际构造/挂载三组件、依赖/源码身份核验已完成。详见[契约审计](rust-agent-ui-api-contract-audit-20261024.md)。不代表正式 UI 发布或原生/ProcessContainer 通过。
+
+本次 CI 复核：`32986d4` 的 PR/push 两套新增独立 consumer 均成功；UI 测试、格式和 Clippy 成功，整体仍在 #53 严格阅读失败。见[CI 收据](rust-agent-ui-ci-review-20261024.md)。
+
+### [#16](https://github.com/TekesApps/TekesAgentKit/issues/16) — [P1][Composer] 输入面、草稿与发送取消对齐 ClientKit
+
+当前：部分已实现；待补齐/验收。
+
+依赖/关联：#15、[TekesUI #30](https://github.com/TekesApps/TekesUI/issues/30)、[TekesUI #48](https://github.com/TekesApps/TekesUI/issues/48)。上游关联按具体子项适用。
+
+已做：
+
+- [x] 使用原 TekesUI editor；已接发送/取消、模型/附件/上下文/notice 与受控选择。
+- [x] 已有目的地草稿隔离、准备票据、迟到回调门禁和 no-auto-retry；Send/Stop preserving_focus 已消费。
+- [x] Native/Pi SideChat 原 preedit/commit 合成门禁已验证，不等于系统物理 IME。
+
+待做：
+
+- [x] 逐项核对 Composer Views 层次、可见性、上下文和设置回调；不得把宿主能力猜成可用。
+- [ ] 补完整同内容布局/焦点路径和系统中文组字验收；应用样式仅延展 SDK tokens。
+
+验收：
+
+- [ ] 组字 Enter 不发送，commit 后一次显式发送；取消遵循原请求身份。
+- [ ] A/B 会话的文本、附件、设置草稿隔离；准备期间导航/关闭不会投递旧目标。
+- [ ] 背景回传/按钮/切换/重连不误夺焦点或重复提交；组件和第二 consumer 有回归，桌面项留给 acceptance。
+
+证据：[rust-agent-ui-primary-focus-child-runs-20261023.md](rust-agent-ui-primary-focus-child-runs-20261023.md)、[rust-agent-ui-sidechat-original-input-20261023.md](rust-agent-ui-sidechat-original-input-20261023.md)、[rust-agent-ui-composer-visibility-20261021.md](rust-agent-ui-composer-visibility-20261021.md)、[rust-agent-ui-context-preflight-20261020.md](rust-agent-ui-context-preflight-20261020.md)。
+
+本次推进：[Composer核对](rust-agent-ui-composer-issue16-audit-20261024.md)保留原回调/能力撤销回归；后续[实际宿主附件operation](rust-agent-ui-attachment-host-operation-results-20261024.md)已完成选择结果→受限读文件→一次上传→原来源回填的三端协议路径及取消/读失败/导航迟到回归。通用文件闭环不能代表inline image/历史图片预览已实现；这些仍属Composer完整目标。OS选择器/窗口HostResult循环、完整布局/焦点与系统IME/AX仍未验收。
+
+### [#17](https://github.com/TekesApps/TekesAgentKit/issues/17) — [P1][Transcript] 完整内容、思考工具分区与富内容对齐
+
+当前：部分已实现；待补齐/验收。
+
+依赖/关联：#19、[TekesUI #25](https://github.com/TekesApps/TekesUI/issues/25)、[TekesUI #54](https://github.com/TekesApps/TekesUI/issues/54)。上游关联按具体子项适用。
+
+已做：
+
+- [x] 已建立 InputMessage/OutputMessage、canonical 消息/工具身份、None/Compact、Activity/分段折叠、旁白载体和混合工具五类卡片。
+- [x] 消息内与独立工具共享业务投影；普通完成默认折叠、异常展开及控件保留已有回归。
+- [x] 三端混合工具离屏已有分项收据；richContent/completeTranscript 仍 false。
+
+待做：
+
+- [ ] 按 ClientKit 对应 Views 核对输入/输出/工具顺序、code header、完整连续分组与当前全组合。
+- [ ] 消费公开富内容/文本映射/分隔符；补选中、复制、链接、代码与裁剪，不复制 renderer。
+- [ ] 真实报告与独立旁白来源另由 sources 任务提供，不从正文或 meta 猜造。
+
+验收：
+
+- [ ] 同一内容在历史/流式/结算/恢复保持稳定身份与正确显示顺序，不重复消息或工具。
+- [ ] 富内容及复制语义、独立/嵌入工具、折叠/展开与布局在窄宽/字号/主题下有对照证据。
+- [ ] 静态与组件/第二 consumer/真实协议/原生证据分开；未完成项不得改 complete 标志为 true。
+
+证据：[rust-agent-ui-physical-planes-20261023.md](rust-agent-ui-physical-planes-20261023.md)、[rust-agent-ui-physical-tool-fragments-20261023.md](rust-agent-ui-physical-tool-fragments-20261023.md)、[rust-agent-ui-mixed-tools-20261023.md](rust-agent-ui-mixed-tools-20261023.md)、[rust-agent-ui-narration-frame-reading-20261023.md](rust-agent-ui-narration-frame-reading-20261023.md)。
+
+### [#18](https://github.com/TekesApps/TekesAgentKit/issues/18) — [P0][Reading] 分页、reveal、嵌套阅读与恢复锚点闭环
+
+当前：同一只读pane的可见前插/重连CPU阅读验证通过；新Host checkpoint与嵌套严格阅读仍分别等待公开SDK #42/#53。
+
+依赖/关联：#13、[TekesUI #53](https://github.com/TekesApps/TekesUI/issues/53)、[TekesUI #42](https://github.com/TekesApps/TekesUI/issues/42)。上游关联按具体子项适用。
+
+已做：
+
+- [x] 已消费公开 #22/#26/#28 的锚点/preflight/reveal，标准文档流不使用像素估算。
+- [x] 已有前插/重排/整帧事务、只读有界分页/epoch/错误保留，以及 #13 实例身份。
+- [x] 当前严格门禁实证失败：内层向上读后父容器仍跟随追加，详情移出视口。
+- [x] [同pane只读CPU阅读回归](rust-agent-ui-readonly-paged-reading-results-20261025.md)：原Earlier/Refresh、24→48可见消息行、同anchor及相对Y、following=false、原按钮/更新后editor焦点与父草稿/selection，默认及feature分别通过；不是桌面或新Host恢复。
+
+待做：
+
+- [ ] 等待并消费 #53 的固定公开修复；保留严格失败，禁止改布局或放宽断言。
+- [ ] 补新建 Host 的持久 checkpoint；分别验证主历史、工具详情与有界 child 的读取/分页。
+
+验收：
+
+- [ ] 严格 bounded_detail_reading accepted=true，父容器在内层向上读后不再被追加拉走。
+- [ ] 主历史/只读历史按钮实际前插后保持原锚点；稳定 ID reveal 不夺编辑焦点。
+- [ ] 显式回到底部后恢复跟随；重连/旧页/错误返回不污染当前 frame；新 Host 恢复按公开 checkpoint。
+
+证据：[rust-agent-ui-bounded-details-20261022.md](rust-agent-ui-bounded-details-20261022.md)、[rust-agent-ui-native-bounded-20261023.md](rust-agent-ui-native-bounded-20261023.md)、[rust-agent-ui-reveal-current-20261022.md](rust-agent-ui-reveal-current-20261022.md)、[rust-agent-ui-source-authority.md](rust-agent-ui-source-authority.md)。
+
+### [#19](https://github.com/TekesApps/TekesAgentKit/issues/19) — [P1][Sources] 明确工具报告与独立旁白 fallback 的公开来源
+
+当前：公开来源审计完成；真实 report/group fallback producer 未确认，集成仍待来源。
+
+依赖/关联：先确认公开 producer，无已知 SDK 硬依赖。上游关联按具体子项适用。
+
+已做：
+
+- [x] 已有 ToolHeaderAdapter、报告/计数选择和 narration fallback 纯规则及显式输入。
+- [x] 标准 RunPort 的公开 new(...).with_transcript(..., labels) 已能消费宿主 adapter，无需重复 API。
+- [x] 当前 SEP result_meta 是 opaque；既有测试拒绝将 didDo 当作权威报告。
+
+待做：
+
+- [x] 针对三端和宿主完成公开来源审计；三端 producer 尚未确认，记录 unknown，不等于已接入。
+- [x] 已记录 producer 缺失及所需身份/更新契约；实际接入仍待明确公开来源。
+- [ ] 补真实协议来源 fixture 和回传/恢复证据；不以手造字符串或显示正文代替来源。
+
+验收：
+
+- [ ] 报告绑定原 scope/tool/revision，迟到和跨源记录被拒绝；无报告保留合法 fallback。
+- [ ] 独立旁白只消费有权威来源的 group-text；严格前缀/结算/carrier 选择按 ClientKit，不重复正文。
+- [ ] 每项标明支持/不支持的实际 harness；缺公开数据时保留阻塞，不猜私有数据库或 stdout。
+
+证据：[rust-agent-ui-tool-header-20261023.md](rust-agent-ui-tool-header-20261023.md)、[rust-agent-ui-narration-20261023.md](rust-agent-ui-narration-20261023.md)、[rust-agent-ui-thinking-source-20261023.md](rust-agent-ui-thinking-source-20261023.md)。
+
+本轮推进：本轮实现 `29c2f37`：27个来源文件逐哈希核对，26项策略与3项公开 consumer 回归通过。详见[公开来源矩阵](rust-agent-ui-public-sources-20261024.md)。三端 report/group fallback 为 unknown/no public producer；不猜造真实 fixture。
+
+### [#20](https://github.com/TekesApps/TekesAgentKit/issues/20) — [P1][Footnote] 紧凑动作、目标与评价信息的单行排版
+
+当前：数据链路已有；紧凑视觉等待公开 SDK。
+
+依赖/关联：[TekesUI #47](https://github.com/TekesApps/TekesUI/issues/47)、[TekesUI #49](https://github.com/TekesApps/TekesUI/issues/49)。上游关联按具体子项适用。
+
+已做：
+
+- [x] 输入气泡与 input aside 右对齐，机器内容与 output aside 左对齐；共同列和单行原则已有 consumer。
+- [x] 目标数据/清除/重连及反馈初读/CAS/错误恢复已有三端分项验证。
+- [x] 真实 Pi 窄列目标 labelVisible=false 已保留严格失败；文字 fallback 不算完整视觉。
+
+待做：
+
+- [ ] 消费公开原 glyph/紧凑动作服务，保留完整 AX name 与原按钮焦点/selected/disabled。
+- [ ] 按 ClientKit 单行 controlSlot+剩余信息布局完成复制/评价/分叉/时间/目标/状态可见性。
+
+验收：
+
+- [ ] 固定窄列真实目标标签、时间和所需状态可见，不隐藏业务动作、不改多行、不用假字符图标。
+- [ ] 输入及其 footnote 始终右，机器输出及 footnote 始终左；主题/字号/浅深色跟随 SDK。
+- [ ] 反馈载入/失败/恢复和 CAS 身份正确；复制/评价等动作一次触发且保留原 editor 焦点。
+
+证据：[rust-agent-ui-real-goal-footnote-20261022.md](rust-agent-ui-real-goal-footnote-20261022.md)、[rust-agent-ui-feedback-recovery-20261022.md](rust-agent-ui-feedback-recovery-20261022.md)、[rust-agent-ui-goal-footnote-20261022.md](rust-agent-ui-goal-footnote-20261022.md)。
+
+### [#21](https://github.com/TekesApps/TekesAgentKit/issues/21) — [P1][RunPort] 组合 Composer/Transcript/Indicators 并完成 Views 对照
+
+当前：部分已实现；待补齐/验收。
+
+依赖/关联：#16、#17、#18、#20、[TekesUI #46](https://github.com/TekesApps/TekesUI/issues/46)、[TekesUI #5](https://github.com/TekesApps/TekesUI/issues/5)。上游关联按具体子项适用。
+
+已做：
+
+- [x] 正式 RunPort 已组合三组件与 preflight/稳定回合导航，第二 consumer 不依赖测试宿主。
+- [x] 连接/运行/等待/失败/用量/TurnRail/Jump 已接原 presentation；completeRunPort 仍 false。
+
+待做：
+
+- [ ] 逐项对照 ClientKit 完整层次、selection/chrome、hover、回合导航和可达性。
+- [ ] 补同内容/同尺寸/同主题/同 scale 的最终布局记录，测试宿主 RunSurface 不作为标准组件。
+
+验收：
+
+- [ ] Composer/Transcript/Indicators 输入输出清晰，宿主不 fork 状态机。
+- [ ] rail/跳转/状态数据绑定原回合；缺省 usage 不造数；reveal 不夺焦点。
+- [ ] 布局对照逐项列差异，全部实现与适用验收通过才标 completeRunPort。
+
+证据：[rust-agent-ui-run-port-20261022.md](rust-agent-ui-run-port-20261022.md)、[rust-agent-ui-turn-rail-20261021.md](rust-agent-ui-turn-rail-20261021.md)、[rust-agent-ui-run-preflight-20261021.md](rust-agent-ui-run-preflight-20261021.md)、[rust-agent-ui-delivery-status.md](rust-agent-ui-delivery-status.md)。
+
+### [#22](https://github.com/TekesApps/TekesAgentKit/issues/22) — [P1][Sidebar] 会话导航、活动、置顶和共享操作完整验收
+
+当前：部分已实现；待补齐/验收。
+
+依赖/关联：[TekesUI #44](https://github.com/TekesApps/TekesUI/issues/44)。上游关联按具体子项适用。
+
+已做：
+
+- [x] 已有目录/搜索/分组/分页、恢复与选中补齐、稳定 action value/reveal。
+- [x] 活动状态、置顶/偏好/共享 CAS 及捕获来源、旧请求门禁已有回归。
+
+待做：
+
+- [ ] 消费非当前行上下文菜单公开契约，核对原生/AX 操作及窄宽布局。
+- [ ] 复验跨端点、过滤分页和导航后操作的来源归属；宿主只负责导航。
+
+验收：
+
+- [ ] 非当前会话右键不错误改变目标；pin/share/rename/archive 作用于原捕获 item。
+- [ ] 搜索/分页/恢复/切换端点后选中项可见，无重复、漏项或旧游标写入。
+- [ ] 活动状态不猜运行中；菜单/键盘/AX 语义与稳定ID在同进程和后续容器验收中一致。
+
+证据：[rust-agent-ui-sidebar-navigation-20261021.md](rust-agent-ui-sidebar-navigation-20261021.md)、[rust-agent-ui-sidebar-paging-20261021.md](rust-agent-ui-sidebar-paging-20261021.md)、[rust-agent-ui-sidebar-preferences-20261021.md](rust-agent-ui-sidebar-preferences-20261021.md)、[rust-agent-ui-sidebar-session-menu-20261022.md](rust-agent-ui-sidebar-session-menu-20261022.md)。
+
+本次交付：[多endpoint聚合](rust-agent-ui-sidebar-multi-endpoint-20261024.md)与后续宿主接线已完成原端点路由和owner隔离；[真实三端Sidebar组合](rust-agent-ui-real-multi-sidebar-results-20261024.md)、[排名搜索](rust-agent-ui-sidebar-ranked-results-20261024.md)、[同实例observer恢复](rust-agent-ui-sidebar-observer-recovery-20261024.md)补齐了原初始批次尚未完成的全局搜索、本地过滤分页、终态观察显式恢复及旧代拒绝。这些不证明缺公开cursor契约的远端搜索续页、真实harness断流后的原生恢复、非当前行菜单或完整桌面/AX可见性，#22继续开放；历史批次记录保留原范围。
+
+### [#23](https://github.com/TekesApps/TekesAgentKit/issues/23) — [P1][SidePanel] Task/子代理 tabs、pointer 与有界历史闭环
+
+当前：部分已实现；待补齐/验收。
+
+依赖/关联：#12、#13、#18。上游关联按具体子项适用。
+
+已做：
+
+- [x] 已有受控 SidePanelInput/Navigation、动态 Task pointer、同目标 canonical controller 和独立 history lease。
+- [x] Native 真实有界子历史/单消息分页/重连/父草稿隔离；Pi/DSH 可继续子 Run 已有离屏分项记录。
+- [x] 现有 #12 继承父权限、#13 只读实例身份与 display-only 门禁已实施待合并。
+
+待做：
+
+- [ ] 核对 Task/子代理 tab 的 loading/missing/error/ready、权威 pointer 替换和父导航完整组合。
+- [ ] 补同一交付程序的三端实际来源与完整当前窗口/chrome；不从工具调用猜造独立会话。
+
+验收：
+
+- [ ] A→B→A/父关闭/异步迟到不恢复旧权限；同目标共享草稿，子 pane 关闭不丢父草稿。
+- [ ] 只读有界 pane 无 Composer 且不能发送；合法来源可刷新/分页，源切换不串帧。
+- [ ] 真实 Task pointer 与家族导航来源可追溯；所有状态/空态和 tab 切换均有明确验收。
+
+证据：[rust-agent-ui-sidepanel-contract-audit-20261023.md](rust-agent-ui-sidepanel-contract-audit-20261023.md)、[rust-agent-ui-task-shared-destination-20261023.md](rust-agent-ui-task-shared-destination-20261023.md)、[rust-agent-ui-native-bounded-20261023.md](rust-agent-ui-native-bounded-20261023.md)、[rust-agent-ui-source-authority.md](rust-agent-ui-source-authority.md)。
+
+本次推进：真实Native原FamilyCatalog/OpenChild→ReadOnlyTranscript Refresh/Earlier→Close已按公开pagePlan跑通，22条初始历史累计为25条错误终态，父draft/selection保留，进程退出后才accepted。见[执行契约](rust-agent-ui-native-paged-live-contract-20261025.md)与[分项收据](rust-agent-ui-native-paged-live-results-20261025.json)。同turn因果组首屏已含四条助手消息，Earlier仅补turn/start；不称为三次分页或可见消息前插。
+
+此前：`8b5d45b` 的[SidePanel 定向审计](rust-agent-ui-sidepanel-issue23-audit-20261024.md)未发现确定产品缺陷；四套 demo 测试 41 项通过。当前窗口/chrome、明确列出的状态组合仍待验收。
+
+### [#24](https://github.com/TekesApps/TekesAgentKit/issues/24) — [P1][SideChat] 临时分支生命周期、重开与能力门禁
+
+当前：部分已实现；待补齐/验收。
+
+依赖/关联：#12、#16、#23。上游关联按具体子项适用。
+
+已做：
+
+- [x] Native/Pi 真实创建/发送/切换草稿/同实例重开/重连不重复/确认丢弃离屏闭环已通过。
+- [x] 同目标 controller 复用，Closing/Unknown/absence 和原编辑器合成 preedit/commit 有回归。
+- [x] DSH 公开 runtime 无临时 discard，当前禁用是正确门禁，不算支持。
+
+待做：
+
+- [ ] 补当前交付程序的系统中文输入、菜单/关闭确认与完整原生生命周期。
+- [ ] 若 DSH 要支持 SideChat，先确认公开 temporary fork/discard 契约与上游交付；否则正式记录 Unsupported，不要求伪实现。
+
+验收：
+
+- [ ] 重开保留原草稿/附件/准备状态；丢弃须原目标确认，Unknown 不重试 mutation。
+- [ ] Native/Pi 真实端点一次发送、原临时子分支可正确关闭/恢复，父草稿不变。
+- [ ] DSH 若无公开能力，UI 与API 均明确不可用；若能力新增需真实端到端证明后启用。
+
+证据：[rust-agent-ui-real-sidechat-20261023.md](rust-agent-ui-real-sidechat-20261023.md)、[rust-agent-ui-sidechat-shared-destination-20261023.md](rust-agent-ui-sidechat-shared-destination-20261023.md)、[rust-agent-ui-sidechat-original-input-20261023.md](rust-agent-ui-sidechat-original-input-20261023.md)。
+
+### [#25](https://github.com/TekesApps/TekesAgentKit/issues/25) — [P1][Summary] sections、用量、metadata 和来源动作对齐
+
+当前：部分已实现；待补齐/验收。
+
+依赖/关联：[TekesUI #47](https://github.com/TekesApps/TekesUI/issues/47)、[TekesUI #25](https://github.com/TekesApps/TekesUI/issues/25)、[TekesUI #30](https://github.com/TekesApps/TekesUI/issues/30)、[TekesUI #38](https://github.com/TekesApps/TekesUI/issues/38)、[TekesUI #46](https://github.com/TekesApps/TekesUI/issues/46)。上游关联按具体子项适用。
+
+已做：
+
+- [x] 已有受控 SummaryInput/Context、sections/rows、展开/用量/metadata/宿主 slots 与 source-owned actions。
+- [x] 行布局/缩进/label/context/child 状态等有专题收据和第二 consumer。
+
+待做：
+
+- [ ] 消费状态附件/图标、语义可选内容；核对 focus/hover/selection 与最终同内容布局。
+- [ ] 所有宿主自定义内容通过正式 slots/callbacks，不另造 AgentKit 基础控件。
+
+验收：
+
+- [ ] section/行状态、usage 与 metadata 和原 presentation 一致，缺字段不补假值。
+- [ ] 原来源动作和异步结果不串 session；关闭/切换后的请求被拒绝。
+- [ ] 窄宽/字号/主题下行与图标/label 语义正确；完整当前原生与可达性单独有收据。
+
+证据：[rust-agent-ui-summary-context-20261022.md](rust-agent-ui-summary-context-20261022.md)、[rust-agent-ui-summary-sections-20261021.md](rust-agent-ui-summary-sections-20261021.md)、[rust-agent-ui-summary-row-layout-20261022.md](rust-agent-ui-summary-row-layout-20261022.md)、[rust-agent-ui-summary-child-status-20261022.md](rust-agent-ui-summary-child-status-20261022.md)。
+
+本次推进：`9a62950` 修复 Summary 子代理 pointer 的已知 session 授权门禁，阻止未知/歧义/父 UUID 重定向；presentation 225、UI 634/1 原有忽略通过，当前程序 Pi/DSH 原 Summary→子 Run 非桌面闭环通过。见[Summary 审计](rust-agent-ui-summary-issue25-audit-20261024.md)及[统一收据](rust-agent-ui-parallel-results-20261024.md)；不等于视觉/Native/系统 IME 验收。
+
+本次新增：显式验收 feature 在原 RunController 发布边界捕获 Snapshot 与同次内存输入；真实 Pi 模型子代理经公开等待/childHistory/重连后，同帧 Summary 的 idle 来源及原 Summary 组件挂载已验证。没有显式 raw status 时不填造 completed；running/failure 转换、父草稿与完整 UI 验收未由本切片补齐。见[契约](rust-agent-ui-summary-source-witness-contract-20261024.md)和[结果](rust-agent-ui-summary-source-witness-results-20261024.md)。#25 仍开放。
+
+Native后续切片：复用既有feature headless与已安装Kernel0.9.3，真实Task及公开bounded history/重连、同次Summary/Journal来源、原Summary被动行挂载通过；不授予独立Task pointer。见[Native收据](rust-agent-ui-native-summary-source-results-20261024.md)。同Task动态pointer、running/failure、完整UI/桌面等仍未验收。
+
+### [#26](https://github.com/TekesApps/TekesAgentKit/issues/26) — [P0][ProcessContainer] 三个业务容器的同进程与跨进程宿主接入
+
+当前：等待完整交互式 ProcessContainer 公开交付。
+
+依赖/关联：#15、[TekesUI #48](https://github.com/TekesApps/TekesUI/issues/48)。上游关联按具体子项适用。
+
+已做：
+
+- [x] Sidebar/RunPort/SidePanel 目前可由同进程 ContentHost 组合；没有正式 ProcessContainer 适配。
+- [x] 已检查旧公开 module-runtime/app-protocol：远端 keyboard/IME/scroll/AX 能力未满足；不把 ContentHost 叫作已验收容器。
+
+待做：
+
+- [ ] 等待 #48 完整交互契约与固定公开版本，再接入三个业务容器。
+- [ ] 实现消费侧状态/事件边界、挂载/卸载、进程恢复/来源身份；不补私有传输或复制焦点/IME引擎。
+
+验收：
+
+- [ ] 同进程与跨进程分别记录真实运行结果、精确版本和宿主身份。
+- [ ] 三个容器均支持原输入/焦点/IME/滚动/AX/唤醒及隔离；进程退出或重连不重复发送。
+- [ ] 独立公开 consumer 可复现，无 active sibling override，无私有 SDK 依赖。
+
+证据：[rust-agent-ui-host-integration.md](rust-agent-ui-host-integration.md)、[rust-agent-ui-delivery-status.md](rust-agent-ui-delivery-status.md)。
+
+### [#27](https://github.com/TekesApps/TekesAgentKit/issues/27) — [P0][Acceptance] 固定宿主的三端、IME、阅读与布局验收矩阵
+
+当前：固定基线的[1026格矩阵](rust-agent-ui-acceptance-matrix-20261025.md)与本次三端无窗口协议恢复已完成；系统 IME、窗口、阅读锚点及容器验收待补。旧离屏程序按原来源保留。
+
+依赖/关联：#21、#22、#23、#24、#25、#26。上游关联按具体子项适用。
+
+已做：
+
+- [x] Native/Pi/DSH 独立 SEP、session pointer/历史/数据回传与 headless 路径已实现并有 v0.3.8 基线。
+- [x] 已有多个冻结程序的真实协议/离屏/部分原生分项收据，范围不能互相转移。
+- [x] 固定宿主路径/bundle ID/签名策略和外部截图入口已交付；未实际完成当前宿主安装签名验收。
+
+待做：
+
+- [x] 建立逐需求×harness×同/跨进程×验证层级矩阵，保留原快照，明确当前、历史和协议/UI的证据范围。
+- [ ] 按矩阵逐项补齐同一交付程序的适用行为验收；构造 consumer 和共享组件单测不替代整项要求。
+- [ ] 继续遵守用户“桌面验收先不跑”；获安排后用固定宿主与已授权固定截图工具，历史程序仅归档。
+- [ ] 同一交付程序补系统中文组字/草稿/发送取消/stream/向上阅读/原生分页/reconnect 及配对布局/AX。
+
+验收：
+
+- [ ] 每条记录程序/来源/版本/命令/结果/证据，区分 unsupported、blocked、failed 与 passed。
+- [ ] 组字不误发送，草稿隔离，阅读追加不打断，分页保锚，重连不重发；不是只用合成事件证明系统IME。
+- [ ] 保留源码/WIP/固定快照/日志/截图/程序，复用共享 target；清缓存先核对进程/依赖并报告实际释放。
+
+证据：[session-endpoints.md](session-endpoints.md)、[rust-agent-ui-non-sdk-review-20261023.md](rust-agent-ui-non-sdk-review-20261023.md)、[rust-agent-ui-native-toolchain.md](rust-agent-ui-native-toolchain.md)、[rust-agent-ui-offscreen-coverage-20261023.md](rust-agent-ui-offscreen-coverage-20261023.md)。
+
+本轮推进：见[1026格分层矩阵](rust-agent-ui-acceptance-matrix-20261025.md)及[原owner派发修复](rust-agent-ui-submission-last-admission-20261025.md)。[720格矩阵](rust-agent-ui-acceptance-matrix-20261024.md)与[早期非桌面实跑](rust-agent-ui-non-desktop-results-20261024.md)保留为历史快照。程序/源码身份独立保留，不把矩阵检查成功或离屏结果当作完整验收。
+
+### [#28](https://github.com/TekesApps/TekesAgentKit/issues/28) — [P0][Delivery] 完整要求审计、review、CI、合并与阶段 tag
+
+当前：等待功能/验收完成与严格 CI/review。
+
+依赖/关联：#15、#27、#18。上游关联按具体子项适用。
+
+已做：
+
+- [x] PR #10 draft，最近功能基线91129d7；#12/#13已实施但尚未合并。
+- [x] 9969f8f的push40109889043/PR40109892909两轮checks、默认UI、feature见证、独立consumer通过，唯一#53严格阅读失败；原日志/artifact、137/243来源闭包及PR merge父关系已核对。1ef2791等历史CI按原记录保留。
+- [x] 设计/迁移/接入和专题证据已有；当前 UI 0.0.0/publish=false，不是 v0.3.8 中已发布 UI。
+
+待做：
+
+- [ ] 全部工作项逐项核对完整目标，不将分项通过等同 full Views 完成。
+- [ ] 所有必要 CI 与独立 review 通过后，按发布契约更新版本/文档并合并、推送不可变阶段 tag。
+- [ ] 关闭完成的业务Issue；仍后置的能力逐项留票并清楚说明阶段范围，不更改本完整目标定义。
+
+验收：
+
+- [ ] 需求覆盖表无未归属项，证据适用当前交付 revision，必要原生/同跨进程/三端验收齐全。
+- [ ] 严格失败不 skip、不放宽；review发现已处理；正式依赖是已发布精确pin。
+- [ ] merge commit/tag/远端发布与 consumer 接入说明可核验，Issue回填实现/验证/未验收项/PR。
+
+证据：[rust-agent-ui-delivery-status.md](rust-agent-ui-delivery-status.md)、[rust-agent-ui-non-sdk-review-20261023.md](rust-agent-ui-non-sdk-review-20261023.md)、[rust-agent-ui-source-authority.md](rust-agent-ui-source-authority.md)。
+
+
+## 状态记录与关闭规则
+
+#12/#13有原始实现/验证评论，新工作项的已勾列表是历史实现，不等于整个Issue已完成。14个新工作项保持OPEN，只有全部本项验收且实现已合并可核验后关闭。#28最后审计完整目标；PR #10当前不会自动关闭这些功能票。
+
+新任务可使用 `.github/ISSUE_TEMPLATE/agent-ui.md`；机器索引为 `rust-agent-ui-issues.json`。本次仅梳理设计/Issue/工作流程，没有重编译、启动桌面、修改上游或产生新target。
+
+## Sidebar 宿主续批交付
+
+#22 `4967d15`、#23 `9d7c00d`、#25 `7bfdd61` 的本批实现、分层验证和未验收项见[统一收据](rust-agent-ui-sidebar-host-results-20261024.md)。UI637/0/1 原有忽略、最终宿主定向、公开 consumer 和严格检查通过；准确源码顺序以收据为准，未做桌面/真实多 harness 同窗验收，Issue 仍开放。
+
+## 多端 provider 搜索续批
+
+#22 已补齐固定端集合 query/ABA/clear/drop/reconnect/retry、逐端原 inventory join、Sidebar 状态子组件、实际多 connector 配置与 demo 接线。最终 presentation234/0/0、UI653/0/1、第二公开 consumers 及双端成功/局部失败离屏通过；精确边界见[收据](rust-agent-ui-multi-search-results-20261024.md)。此前“跨端全局搜索未实现”描述仅适用于当时批次；本批不涵盖 Mirror FTS/pins、远端 cursor、真实多 harness、桌面或多端 SideChat。Issue 继续开放。
+
+## 多端 SideChat 续批
+
+#24 的非首端 SideChat 继续由主会话集成、新子会话负责 owner 证明与隔离测试。固定 canonical binding 按捕获 parent 路由，原端 pointer 与返回 Run owner 双重校验；每端单独清理面板，不影响另一端草稿、附件或 prepared ticket。设计和最终验证范围见[多端 SideChat 契约](rust-agent-ui-sidechat-multi-endpoint-20261024.md)。既有真实 Native/Pi 收据仍属于原程序；DSH 无公开 discard 不提升能力，桌面/IME/AX 仍未验收。
+
+#22 `3d594a8` 补齐共享 binding 的显式同实例 observer 恢复，按端退旧代，保留原 subscriber、旧行和 running anchor；健康端 action/selected 凭据不受影响。最终 UI664/0/1、严格 Clippy、独立公开 API consumer 与普通 demo build 通过，见[恢复契约/收据](rust-agent-ui-sidebar-observer-recovery-20261024.md)。demo 用户重试入口仍待接线，真实故障/桌面验收未运行。
+
+
+## Observer 用户重试入口续批
+
+#22 `be4fc58` 已接通 coherent observer packet、默认控件状态 footer、来源/代数绑定的用户 Retry 和 demo 原端路由；同源重绑及健康端更新不清 pending，旧 raw ID 不复用。分层验证为 UI675/0/1、最终组件10/0/0、presentation240/0/0、严格 Clippy、普通 demo build 和独立 consumer，见[交付收据](rust-agent-ui-sidebar-observer-retry-results-20261024.md)。前文“用户入口未接线”仅指当时历史批次；真实窗口/断流/IME 与完整 Sidebar 验收仍开放。
+
+
+## 查询成员关系续批
+
+#22 `147642b` 对齐当前 ClientKit 会话 Sidebar 的共同 query/folder predicate，过滤未匹配 pins，保留 canonical 偏好/草稿及诊断，补齐 hasMore 空首页与 failed-ready 校验。UI677/0/1、严格 Clippy、普通 demo build 和独立 consumer 通过，见[收据](rust-agent-ui-sidebar-query-membership-results-20261024.md)。旧“独立 pins 不受筛选”解释已标成历史；本地名称 FTS、排名与真实窗口仍未完成，不关闭 Issue。
+
+## 2026-10-24：#22/#23/#25 并行续批
+
+主会话继续负责 #22 的真实本地名称 FTS/provider 并集、demo 索引来源和逐端就绪接线；独立子会话分别负责 #23 SidePanel 状态路径、#25 Summary 缺失字段与来源动作；另有独立只读 CI 与集成审查。全部 Cargo 验证由主会话串行执行，继续共享已有 target；桌面/截图/权限操作均不运行。
+
+- #22：新增真实内存 SQLite FTS5 派生索引、canonical title 清除修正、persistent projector 与 Single/Multi demo 接线。精确依赖/缓存来源/空态语义见[查询契约](rust-agent-ui-sidebar-query-membership-20261024.md)。bm25 排序、公开远端 cursor、完整 main/ephemeral 分类事实和真实多 harness/窗口验收仍开放。
+- #23：[状态路径续审](rust-agent-ui-sidepanel-followup-20261024.md)未发现确定实现缺陷，保留既有状态机；指明 native ChildOpened(Err) dispatch 的直接运行证据与完整窗口/三端来源尚缺，不以静态审查代替执行。
+- #25：[Summary 续审](rust-agent-ui-summary-followup-20261024.md)修复 loaded Summary 无 usage projection 时隐藏整个用量区的问题，保留六条不可用值，区分已知零值和整个 Summary 不可用。来源动作与 slots 未发现确定缺陷。
+
+本批实现提交与分层验证见 [693/241/92 结果收据](rust-agent-ui-name-fts-results-20261024.md)；这些子项完成不等于关闭各 Issue 或允许合并 PR #10。77a9ed8 CI 的独立 consumer 已通过，严格详情阅读仍失败，详见 [CI 复核](rust-agent-ui-ci-review-20261024.md)。
+
+本批去重新增 [#29 会话分类事实](https://github.com/TekesApps/TekesAgentKit/issues/29)，关联 #22：Pi 已有显式分类事实可先补 Sidebar 规则；Native/DSH 的完整公开来源仍须确认。只在 Sidebar 投影/选中补读应用明确排除规则，不能删除 canonical 全局 child/history，也不以 parentSessionId 判断子代理。Kernel 实现仍在范围外。
+
+### #29 已有明确事实的实施切片
+
+`be6e50e` 已完成 Sidebar 列表与 selected 补读的同一显式 predicate：origin=subagent 或 ephemeral=true 排除，parent-only fork/未知分类保持兼容。canonical 全局 inventory/child/history 完整保留，旧 selected facts 被分类更新撤销；多端同 ID 和 aggregate/selected 路径有回归。UI695/0/1、严格UI Clippy/格式/边界、普通demo及复用独立组件consumer通过，精确记录见[分类契约](rust-agent-ui-sidebar-membership-20261024.md)与[机器收据](rust-agent-ui-sidebar-membership-results-20261024.json)。Native/DSH 分类producer与缺字段语义仍未证明，#29不关闭，桌面仍未运行。
+
+### #29 固定 producer 与 adapter wire 核验
+
+`36f0668` 新增 Native/DSH 真实 Rust adapter 的本地 wire 回归，未改生产适配器。Native固定公开v0.9.3 tag/API与精确Git对象核验，fork/ephemeral语义已证明；DSH两个允许版本的官方源码Git blob核验，在线/冷列表均透传origin/parent，SessionSummary不含ephemeral；Pi规范化producer亦记录在[能力矩阵](session-endpoints.md#sidebar-分类事实292026-10-24)。Native mux6/0/0、DSH14/0/0、严格root Clippy/格式/边界通过。这是源码与协议mock层，不是重新运行已发布harness或桌面；#29仍保留组合分页/真实运行身份等未验收项。
+
+### #22 排名待实施契约
+
+[全保留名称语料与查询排序](rust-agent-ui-sidebar-ranked-search-20261024.md)纠正了直接在可见行上加bm25的错误捷径，并核对最终pin_order/标题宿主comparator。实现先发布与库存同frame的retained-name语料，再让bindings/projector/demo实际消费并全局排序后分页；固定语料域不随query/目录/当前Run改变。根headless仍禁止SQLite。当前已开始来源层子任务，尚未交付排名，不重复建Issue。
+
+### #22 全语料排名与 #23 错误分发的后续交付
+
+`3aaee78` 已接通 retained-name 来源、Single/Multi 原始 packet、全局 bm25、demo sort 偏好与分页消费；修正搜索无限展开为 bounded page。此前“来源层进行中/排名未实施”只适用于原阶段。`adbb7f3` 补上 #23 native ChildOpened 错误当前/迟到分发回归，#25 复核没有新增独立实现缺陷。UI706/0/1、presentation+web258/0/0、Python92、严格检查、普通 demo 与独立排名 consumer 通过，准确边界见[本批收据](rust-agent-ui-sidebar-ranked-results-20261024.md)。新 head CI 独立跟踪，真实保留生命周期/远端 cursor/桌面等不宣称完成；原 Issue 和 #53 严格门槛保留。
+
+### #22 / #29：活动 inventory knownness 与混合成员分页
+
+已复现并修复 provider 命中隐藏但已知的 child/ephemeral 时误报 unresolved 的缺陷。复用同帧完整 activity_at，不把 retained archives 当 active，也不制造行/摘要/reveal。补齐混合 main/child/ephemeral/parent-only fork、跨端同ID、目录/搜索/分页/selected/reveal及canonical history 保留的实际 fixture-runtime 回归；统一标题/置顶 fallback 的持久身份排序和菜单边界用例。最终 UI713/0/1、presentation246/0/0、定向50/0/0、严格检查、普通demo build与独立public consumer执行通过，见[契约和收据](rust-agent-ui-sidebar-active-knownness-20261024.md)。本批全程复用SSD共享target；真实harness、桌面/IME/AX与TekesUI #53门槛仍开放，#22/#29不关闭。#23/#25只读复核没有新的独立实现缺陷，不重复已有交付。
+
+### #15 / #18 / #27：当前 consumer CI 与 Native 无窗口诊断
+
+`a2feb19` 的 push/PR CI 均完成：headless通过，UI workspace/严格Clippy/独立consumer执行通过，仅严格嵌套阅读失败；已下载两份原始artifact并核对PR synthetic merge与源closure，见[CI收据](rust-agent-ui-ci-a2feb19-20261024.md)。不以consumer通过放行#18/#28。
+
+#27新增opt-in的隔离Kernel文件占用/锁观察采样，不改变归档行为或默认断言；Python101/0通过。冻结脚本源与当前headless程序后，有采样和无采样的两次独立Native0.9.3协议生命周期、真实Task来源与有界子历史均通过，见[诊断设计/结果](rust-agent-ui-native-lifecycle-diagnostics-20261024.md)。旧session-running未复现，原因和已修复均未证明；lsof锁字段为空，部分观察不证明锁可用性。未运行UI/桌面/IME/AX，也不升级三端同一窗口验收结论；Kernel/SDK/ClientKit只读，继续复用SSD共享target。#19真实producer仍未公开确认，#23/#25其余完整窗口/SDK子项继续保留。
+
+### #22 / #29 / #27：真实三端同宿主 Sidebar 与共享验收工具
+
+[最终收据](rust-agent-ui-real-multi-sidebar-results-20261024.md)记录 Native0.9.3、Pi1.3.0、DSH0.2.1-rc.2 在同一当前离屏 demo 的九个真实会话：逐端健康与库存/title/cwd，原分页 limit5→10/挂载6→9/原行ID稳定，三端查询完成、实际 display projection 无 unresolved，以及原导航 reveal 目标的 ContentHost 挂载。严格运行发现并修复分页抢焦点，直接消费 SDK 已有 preserving_focus 属性；合成预编辑与真实桌面验证分开。共享 Pi/Native/DSH/provider 工具接回旧协议脚本后，全三端原断言再通过；SSD空格路径 provider 修复与旧失败保留。最终 UI717/0/1、Python143、严格Clippy、普通demo和独立公开consumer通过，所有构建复用SSD共享target。
+
+该交付不覆盖真实 Task-family（#23）、完整分类 producer（#29）、实际跨端同ID、真实故障/远端cursor、桌面/物理IME/AX或ProcessContainer。#23旧文档已注明 child-open 错误回归由 adbb7f3 完成。#12/#13 定向证据齐备但正文要求PR合并，仍保持open；#25 无新增可独立实施的状态缺陷。#53严格阅读门槛仍失败，不合并/打tag/发布；新head CI单独核对。
+
+### #23 来源准备与 9b CI 回填
+
+[真实家族来源预检](rust-agent-ui-real-task-family-source-results-20261024.md)已核对三端实际公开返回：Native父scope canonical Task与原始bounded页，Pi canonical Summary subagent与parent-bound history，DSH catalog与child presentation；源解析不授予pane/control authority。Python155通过，无Cargo/桌面。后续同一demo原intent/dispatch/挂载、受控迟到、A→B→A家族导航仍需完成；同Task row动态pointer公开producer未找到，#23不关闭。
+
+[9b9ec1f CI收据](rust-agent-ui-ci-9b9ec1f-20261024.md)已下载PR/push两份原始artifact：headless/工作区/独立consumer通过，唯一失败仍是#53严格阅读。新提交的CI不得沿用该结果。
+
+### #23：真实关联目录与原 child 分发完成本轮离屏闭环
+
+[结果与限制](rust-agent-ui-real-task-family-results-20261024.md)记录三端各两个真实 parent/child 的目录控件→原 OpenChild/HostResult→原子历史绑定、A→B→A、正文节点、返回/关闭和父草稿保留。新增 FamilyCatalog 复用原 ChildCatalogState，使用不透明 owner key 防止同地址/同计数的新绑定复活旧意图；Native Task 保持非独立 Summary 行，bounded child 只读。关闭后旧结果错误已用红/绿回归修复，父切换时的合法缓存语义保留。UI734/0/1、Python161、严格Clippy、普通demo和六挂载独立consumer通过，全程使用SSD共享target。
+
+同Task row真实动态pointer、完整窗口/chrome、物理IME/AX及#53仍开放，不能据本轮关闭#23或合并/发布。新增家族入口属于AgentKit高层控件，没有修改TekesUI基础组件。新head CI单独核对。
+
+
+### #29：同帧分类与真实三端生命周期
+
+[本轮结果](rust-agent-ui-real-sidebar-classification-results-20261024.md)补齐原 summary 字段的 Missing/Known/Unknown、同帧 publication 与搜索/宿主透传、同源归档事实、严格收据拒绝和原历史保留。真实 Native0.9.3/Pi1.3.0/DSH0.2.1-rc.2 的15个生命周期样本、当前Pi实例内新建scratch、原22个selected reads及六组家族导航通过；九会话Sidebar分页/焦点/reveal回归另通过。UI747/0/1、root340/0/0、Python170、严格Clippy/格式/边界与独立consumer执行通过；最后probe补充由普通demo构建和真实三端离屏运行另验。Pi scratch跨实例退休与Native无workspace归档事实单独记录，不制造main或archive authority。#29待新headCI及对应验收复核；#23动态Task pointer、桌面/IME/AX、#53仍开放，不合并发布。
+
+
+### #22 / #24 / #27：真实非首端 Pi SideChat
+
+[本轮结果](rust-agent-ui-real-multi-sidechat-results-20261024.md)用同一Native→Pi→DSH当前离屏demo的原控件/Host dispatcher，补齐Native/Pi实际Send、运行取消aborted、重连/重开/确认discard，Pi Create/后台Send/Close迟到跨端不抢选择或焦点，六个父Run草稿与历史隔离；DSH原入口保持disabled。11项定向、Python177、严格UI Clippy/格式/边界/矩阵、普通demo与独立consumer执行通过；源码522文件与最终程序SHA冻结。只读metadata和显式SDK编辑器Focus照原路径处理，不声称自动回焦/系统IME。完整#22/#24/#27、picker/附件、桌面/AX/ProcessContainer和#53仍开放，不能据本轮关闭整体Issue或合并发布。
+
+#17的旧physical-planes文档已在d00f226标明BetweenInputs待办由42575ef交付取代，保留原阶段/收据身份，没有重新运行历史原生验收。#25另发现可补真实Summary子行status来源帧的验证：双读不能当同帧；已有一次性原构建边界见证的只读advisor建议，尚未实施或验证，不把它算作完成。
+
+### #25 / #27：DSH 原参数标题与同帧完成来源
+
+[本轮结果](rust-agent-ui-dsh-summary-source-results-20261024.md)修复真实DSH JSON字符串arguments丢失description标题的问题，按ClientKit解析一层且复用producer标题fallback，不改原Transcript/history或pointer/status权限。真实DSH0.2.1-rc.2的17条公开命令/7次合成请求、call seq16与result seq19配对、重连epoch2→5/原child pointer、公开子历史及原Summary挂载通过；raw inventory没有status，最新child turn/end seq26证明completed，未填造字段。root346/0、opt-in254/0、UI747/0/1、Python204、严格Clippy/格式/边界/矩阵、普通demo与独立公开consumer通过，均复用SSDtarget。#25/#27其余真实转换/草稿、完整布局/桌面/IME/AX及#53保持开放。
+
+7e9383b的PR40090137271/push40090134330已结束：独立consumer/root341/feature249/UI747通过，唯一失败仍为#53严格阅读；原artifact/log及137/243文件闭包已核对。该终态不能替代DSH新提交CI。#16另继续实际宿主附件materialize共享路径；不把已有三端手工验收路径重复计为真实宿主回调完成。
+
+### #16：实际宿主附件操作与离屏验收共用
+
+[本轮结果](rust-agent-ui-attachment-host-operation-results-20261024.md)提取demo真实paths/read/upload/typed completion，保留原request身份、Kit门禁和原恢复状态，RFD构造仍在主UI线程。真实Native0.9.3/Pi1.3.0/DSH0.2.1-rc.2在同一当前程序逐端完成原附件policy/receipt/两类Send/草稿隔离/公开历史与新epoch重连；DSH不冒称通用文件回读。26项附件fixture、UI750/0/1、Python207、严格UI Clippy/格式/边界/矩阵、普通demo及复用的独立consumer执行通过。OS picker与原生HostResult消息循环、完整布局/焦点/桌面/物理IME/OS AX/ProcessContainer仍not_run，#16保持开放，不以共用逻辑代替桌面验收。全程SSD共享target，未改TekesUI基础组件。
+
+
+### #25 / #27：真实子会话运行与失败转换
+
+[本轮结果](rust-agent-ui-summary-transitions-results-20261024.md)补齐 Pi1.3.0/DSH0.2.1-rc.2 同 child 原父 Summary running→failed 来源。真实发现 Pi 当前 Native error 被 blank 库存遮蔽，增加只读当前 run 失败/取消选择器；不改 raw status/blank 或旧显式终态优先级。最终 39 条公开命令、15 次合成请求、四份原 Summary 挂载通过；Pi 原 dispatching 通过公开 childRead 自然退休后才捕获终态。root354、feature262、headless4、UI750/0/1、Python221、严格Clippy/格式/边界/矩阵、普通demo和新137文件独立consumer通过。历史失败与程序/输入快照保留，初诊 binary 未归档的限制明确记录。桌面/物理IME/AX、完整Transcript与跨来源 raw终态一致性未证明，#25/#27和#53保持开放，不合并发布。
+
+### #17：Native 显式 run 失败累计
+
+[契约](rust-agent-ui-native-run-terminal-contract-20261024.md)与[结果](rust-agent-ui-native-run-terminal-results-20261024.md)记录已修复的确定差异：同run error不再被后续正常assistant覆盖，取消优先且后继run隔离。新worker补4项红/绿，主会话新增流式不提前结算回归发现并替换候选；最终7/0。root361、feature269、headless4、UI750/0/1、严格Clippy/格式/边界/矩阵、普通demo和新独立公开consumer通过；不改legacy/Journal、SDK或桌面验收边界。原始失败、程序与源码快照保留，#17完整内容/富内容/桌面标准仍开放，新headCI另核对。
+
+### #17 / #21：Native 显式结算边界
+
+[边界契约](rust-agent-ui-native-run-boundaries-contract-20261024.md)和[结果](rust-agent-ui-native-run-boundaries-results-20261024.md)记录已修复差异：非streaming不替代matching settled，迟到或未知run ID不再结束当前run，空marker不造rail目标，消息/工具/fork边界跟随原run。新worker与主会话10项红绿、独立源码复核、root371、feature279、headless4、UI750/0/1、严格Clippy/格式/边界/矩阵、普通demo和新独立consumer通过；新程序Pi/DSH共39命令/15合成请求的running→failed真实协议回归accepted。错ID/缺结算/迟到交错仅有合成证据，完整窗口/IME/AX仍未验收。公开SDK指定缺口仍无新版本，不升级原精确pin，相关Issue不关闭。
+
+### #17 / #27：子 Run 原 Transcript 来源
+
+[验收契约](rust-agent-ui-child-transcript-source-contract-20261024.md)与[结果](rust-agent-ui-child-transcript-source-results-20261024.md)补齐父Summary之外的原子Run运行/失败两帧。Python21定向/242全量通过，复用精确SHA程序的真实Pi/DSH共43命令/15合成请求accepted：同scope/epoch/原User来源/opaque turnId，子Run running→error且revision递增；父Summary仍running→failed。真实DSH child库存摘要可缺省，原数据保持None，仅对应profile显式处理，默认父/Pi严格规则不变。不同publication分开，不靠childHistory终态或同文本猜来源；Rust/UI输入不变，本轮无Cargo/新target/桌面。源码、失败和最终原帧已封存，完整恢复/分页/布局/IME/AX仍开放。
+
+### #17 / #27：失败后新连接与新 pointer 恢复
+
+[本轮结果](rust-agent-ui-child-reconnect-results-20261024.md)补齐 child 主 Run 的失败后 reconnect→新父 pointer→公开 open→父/子来源→childHistory。真实Pi27/DSH30命令、15合成请求通过，epoch2→5与5→8，原输入/错误/结算内容恢复；发现帧与可读来源帧分开，Pi临时stream标记不当持久字段。Python249/0、定向7项、边界/矩阵通过，复用原程序且无Cargo/新target/桌面。ba076cc两份CI已终态核对，consumer通过、#53严格门仍失败。实际SidePanel子pane的parent-thread scope/原controller/祖先权限捕获和分页仍待补，不以primary-child-run成功替代；#17/#27不关闭。
+
+### #17 / #23 / #27：实际子 pane 来源接口
+
+[第一步结果](rust-agent-ui-child-pane-witness-results-20261024.md)增加默认关闭的bindings验收透传，调用原for_child controller，保留scope与pane/祖先权限，不重建投影。原watch Arc、嵌套scope、父草稿、不可变authority、退休/只读拒绝和降级标记均由2项组件回归验证；feature bindings35/0、UI750/0/1、严格检查、普通demo构建及默认/feature独立公开consumer通过。新增CI opt-in步骤。真实demo source捕获、pane重连/分页仍待第二步；桌面/IME/AX和#53保持开放。
+
+### #17 / #23 / #27：实际原始子 pane 运行与失败来源
+
+[结果](rust-agent-ui-live-child-pane-source-results-20261024.md)补齐默认关闭 demo feature 与原 FamilyCatalog/OpenChild/HostResult/Composer/close 路径。真实 Pi16/DSH13 seed 命令、16 次合成请求通过，两端同 epoch 原 running→error、父非空草稿/选择保留、旧 witness 退休拒绝；不再以 primary child Run 替代。Python255、默认UI752/0/1、feature643、最终CLI2/1、严格检查、默认/feature独立consumer与精确SHA双端闭环通过。04481a7 两份 CI 已核对，独立consumer/opt-in通过，唯一失败仍 #53；新head另核对。实际宿主 scope-only child factory 的祖先权限捕获列为 #23 下一项；Native有界witness、pane重连/分页、完整桌面/IME/AX未完成，相关Issue不关闭，不合并发布。SSD共享target未新增，本轮删除0字节。
+
+### #23：实际 dispatcher 捕获原父权限
+
+[本轮结果](rust-agent-ui-child-host-parent-authority-results-20261024.md)将 Summary/FamilyCatalog 原 parent Arc 带入实际异步 child factory，复用同host helper与原for_run权限继承、页大小校验、缓存/安装父身份。主会话修正相同scope Task抢占根producer的候选歧义并红绿验证；祖先退休/迟到拒绝、A→B→A、页大小7和只读行为通过。默认UI757/0/1、feature648、定向27、严格检查/独立consumer与当前精确程序真实Pi/DSH原子pane闭环通过。3b2两份CI opt-in/consumer绿、唯一#53红已归档；新head单独核对。当前UI没有嵌套入口，不以helper合成祖先测试冒称真实嵌套UI。Native原有界sourceCall.error/stopped被合成turn标completed的独立差异已确认，下一切片按#17/#23修正，其他未验收边界和#53仍开放。
+
+### #17 / #23：Native 有界 Task-source 错误/取消
+
+[本轮结果](rust-agent-ui-native-bounded-terminal-results-20261024.md)按已发布Kernel0.9.3原reader修正sourceCall.error/stopped被合成turn误标completed，现为error/aborted；原tool.phase、身份/参数和历史不变，未知fallback兼容。新worker公开ChildRun回归原2红，主会话修复后通过；Root373、feature281、UI757/0/1、严格检查、两种demo构建及137文件独立public consumer执行通过。真实Native原pane来源转换见证仍待下一切片，不把公开fixture当真实协议/桌面验收；相关Issue与#53仍开放，不合并发布。全部复用SSDtarget，删除0字节。
+
+### #17 / #23：原有界head-only来源与原publication接口
+
+[本轮结果](rust-agent-ui-native-bounded-head-witness-results-20261024.md)在默认关闭feature内复用原bounded读取/投影及绑定snapshot路径，保存未聚合typed head，拒绝把累计旧页/增量伪装成head。原source/pub/epoch/权限共用，普通refresh无新增全量历史复制、不清缓存。新presentation6、bindings新增4、Root373/feature287、UI757/0/1、feature652、严格检查/两配置demo构建/独立公开consumer通过。20b4与9039两轮CI原证据已核对，opt-in/consumer绿、唯一#53红。实际Native同原pane运行→失败仍待后续demo/owned Kernel闭环，累计分页来源与桌面等仍not_run，不关闭Issue、不合并发布。
+
+### #17 / #23：真实 Native 原只读 pane 与三端同程序来源
+
+[契约](rust-agent-ui-native-child-pane-source-contract-20261024.md)与[结果](rust-agent-ui-native-child-pane-source-results-20261024.md)补齐原FamilyCatalog/OpenChild/ChildRead的Native head-only running→error，原mounted source/cache/epoch/pub及父草稿和关闭退休均核对；相同最终demo二进制同时通过Pi/DSH原子pane，未以primary child Run替代。首次真实运行发现最终离屏报告读live snapshot和旧树跨帧，已改用原RunPort.displayed_snapshot，严格coverage不放宽，失败程序/证据保留。Python262、报告修复前UI757/0/1与feature652、末次RunPort19/19、严格检查/两配置构建和独立consumer通过。79727f4两份CI来源/日志核实，唯一#53红；新head另核对。累计分页来源、pane重连/阅读、完整窗口/IME/AX等仍开放，Issue不关闭，不合并发布。全部复用SSD target，删除0字节。
+
+### #16 / #17：Pi inline image 校验与显示依赖
+
+[契约与窄修结果](rust-agent-ui-inline-image-contract-20261025.md)对齐当前 ClientKit：Pi policy/原 materialize 使用 8192 单边和 33,554,432 pixels，限制后真实解码首帧，保留原始 bytes/MIME/SHA。Pi19项、严格Clippy通过，内部入口原数据/损坏不落盘验证通过；无真实provider/桌面。通用位图控件缺口已去重提交TekesUI#117，#16/#17仍开放；RunBinding图片选择、host准备后policy重验、真实三端图片闭环与完整UI仍待补。只消费固定SDK，未变更依赖、新建target或删除缓存。
+
+### #21 / #28：原 rail hover 与 SDK viewport 边距
+
+[契约](rust-agent-ui-turn-rail-hover-contract-20261025.md)和[结果](rust-agent-ui-turn-rail-hover-results-20261025.md)补齐原 pointer/motion 消费与连续tick反馈，并修复SDK焦点边距使26pt长tick被压成16pt的真实布局问题。RunPort/refresh使用同一actual-scale几何；独立CoreText consumer的Scene/clip、缩放/窄列/正常publication/原焦点和一次导航通过。UI763/0/1、feature RunPort19/bindings39、严格Clippy/两配置构建/standalone consumer、Python最终262通过，原失败保留。当前strict reading仍exit1/accepted=false，#53/#46与完整桌面/IME/AX等开放，不关闭Issue、不合并发布；复用SSDtarget，删除0字节。
+
+### #16：原 RunBinding 图片输入与冻结 ticket 复核
+
+[结果](rust-agent-ui-inline-image-binding-results-20261025.md)补齐一次性image capture/CAS和host准备后policy重验，file facts与plan同源冻结，image从真实bytes检测/解码，不需upload、不新建提交状态机；plain text/file原路径不新增查询。Root380、presentation feature289、UI777/0/1、feature RunPort19/bindings44、严格检查/两配置构建/standalone、Python262通过，新增core2/图片policy与decoder5/原公开binding集成9。旧image无facts追加也按真实data计量，Root源码不变、兼容修正后另重跑UI；初始失败/实际RPC尝试观测修正、538个source与程序用途已封存。当前strict仍#53失败；真实三端图片、picker/粘贴/拖放/预览/桌面等未验收，SDK显示缺口#117仍开放，不关闭Issue、不合并发布。
+
+### #16：真实三端原图片输入/公开历史与重连
+
+[结果](rust-agent-ui-inline-image-live-results-20261025.md)新增不启动桌面的公开demo example和owned runner。Native0.9.3/Pi1.3.0/DSH0.2.1-rc.2 同程序各完成图文/纯图发送与原history/source身份恢复；provider六次图片与DSH一次标题分别记录，Native/Pi公开附件字节read通过，DSH描述符保留；当轮probe误标byte-read unsupported，已由后续实际公开读取结果更正。Python274、严格demo全targets Clippy和example构建/静态边界通过，542源码输入及最终程序/收据/原失败封存在SSD。只补验收入口/fixture，未改production组件或SDK；mixed file/image/系统输入/位图UI/窗口等仍未完成。#16/#17开放；78b7392两份CI只有#53实际失败，新head另核对，不合并/tag。
+
+### #16：Pi mixed file/image 来源修复与真实队列闭环
+
+[契约](rust-agent-ui-pi-mixed-file-contract-20261025.md)补齐已核实的 Pi file receipt 差异：materialize 真实同session文件facts/混合预算→原JS inputReceipt→保留native source的附加文件投影与附件顺序。[结果](rust-agent-ui-pi-mixed-file-results-20261025.md)：主会话统一串行Cargo与真实 direct/queued 验证通过；Root388、UI781/0/1、feature299/667、Python285、Node14与独立consumer通过。最终公开history/文件回读/assistant身份重连保留，三端原图片回归通过。严格#53仍失败，桌面/位图UI/Native和DSH mixed仍未验收；不扩大Child/commands或SDK范围，不关闭Issue、不合并/tag。
+
+### #17：纠正 DSH 图片 byte-read 门禁
+
+[结果](rust-agent-ui-dsh-image-read-results-20261025.md)：原公开路由本已存在，移除probe硬编码unsupported，三端图文/纯图在重连前后12次公开read通过；Python289（新增4项门禁）、严格example Clippy/构建通过。原错误标记只作历史记录，当前#53/#117与完整UI仍开放，未改上游/生产组件。
+
+### #16/#17/#28：Native / DSH mixed 非桌面闭环（2026-10-25）
+
+[契约](rust-agent-ui-native-dsh-mixed-contract-20261025.md)与[结果](rust-agent-ui-native-dsh-mixed-results-20261025.md)：两端各有正文/无正文image-file-image，原RPC和source身份保留，重连前后16次图片公开read及4次Native文件read通过；DSH仅公开文件引用/句柄，不伪造通用下载。4个业务provider请求+1个标题，无重试，owned服务退出0。Python296、严格example Clippy/build/fmt与边界/矩阵通过；只补验收工具/文档，未改生产状态机。#53/#117、桌面及完整UI仍开放。源边界中止候选另行保留并排除；不合并/tag/关闭完整Issue。
+
+
+## 2026-10-25：运行中队列的增量与外部缺口
+
+#16/#27 继续按[busy 契约](rust-agent-ui-native-dsh-busy-queue-contract-20261025.md)与[DSH 通用投影契约](rust-agent-ui-dsh-queue-projection-contract-20261025.md)推进。原混合附件的空闲 Queue 与本轮真实运行中排队分开计证。DSH 公共 inbox 已通过原 Run/Composer 消费与真实 provider 门禁；Native 0.9.3 的 admitted RPC / 空 control queue 已转交 [Kernel #86](https://github.com/TekesApps/TekesKernel/issues/86)，不改上游、不绕过原公开接口。
+
+#15 适用新增默认关闭的 endpoint 投影授权 hook、HostedEndpoint 透传与独立 consumer 验证；#17 保留原消息/附件/source 和重连，不将 admitted 当历史恢复。实现、最终程序与 CI 另绑定本批提交；[分层结果](rust-agent-ui-native-dsh-busy-queue-results-20261025.md)持续记录实际通过与未通过项。#28 不因该局部闭环关闭，PR #10 保持 draft，桌面验收仍 not_run。
+
+
+### #23：同 scope Task owner 更换的控件退休（2026-10-25）
+
+[设计](rust-agent-ui-task-content-retirement-contract-20261025.md)与[结果](rust-agent-ui-task-content-retirement-results-20261025.md)补齐旧 source 已取消但旧 Composer 仍 mounted 的实证缺陷。新增 SidePanel 目标内容退休 API、精确实例 token，demo 在 source owner 更换时先清焦点/退休 UI 再撤销旧 source。最终默认/feature 定向各15项、UI790/0/1、严格检查与独立consumer实际执行通过；592输入冻结。三端权威Task来源、完整窗口/chrome/IME/AX未扩报，#23不关闭；当前代码CI另核。bd5e前一两轮CI已核验，仅#53失败。

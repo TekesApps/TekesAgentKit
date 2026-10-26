@@ -1,0 +1,123 @@
+{
+  "sourceBase": "41249c8d5668d73d0e4cb8d41502fddce30757bc",
+  "scope": "controlled standalone OutputMessage only; source adapter/TranscriptContent/RunPort wiring unfinished",
+  "completionProven": false,
+  "publicAgentKit": "v0.3.8; new API additions unpublished",
+  "tekesui": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "referenceFilesUnchangedFromPolicyBaseline": true,
+  "references": {
+    "ClientKit/Sources/Contract/TranscriptThinkingMode.swift": "1025d23d5bb79651e743bc93bbf6dd542b8007e08fa17a314a9cf2e324d9dd3a",
+    "ClientKit/Sources/TranscriptRendering/TranscriptMetalActivity.swift": "f08f6e8f34c76a71fb117dd84a46be50145f737a38e21534cf59d518bc2d3e8d",
+    "ClientKit/Tests/TranscriptRenderingTests/TranscriptThinkingModeTests.swift": "cc702a8b15b47639e3a7d091e2dfc9a85242da16856d6d3261b490fc6bb75970",
+    "ClientKit/Sources/Composer/Settings/TranscriptThinkingSettings.swift": "f753d87289fdd4c4ea09355c8e578fe062b04148fa1a3df78f17d799025ce3a0",
+    "Tekes/Tekes/Settings/SettingsRootController.swift": "6a1670eb8de8842c5d624d52a7a1972f1abbdae5bf739c589acfd51e621330ca"
+  },
+  "inputs": {
+    "crates/presentation/src/transcript_thinking.rs": "87b08c6ee0be0d69e501b99871391234451b5d2e8909a75d202170dfa4db5a01",
+    "crates/presentation/tests/transcript_thinking.rs": "57e59b602b4e3ee251266383e0ba08591058038cb84d7d33aad10cef98aa871b",
+    "ui/components/src/lib.rs": "d49faebe667f671633f8634397cc8c626bb535873b99da7319ef06b722a9f6a5",
+    "ui/components/src/output_message.rs": "c96fe83003fc7e3634f8d76f3f529fd1dec7d03ee758589aeac03a572c7902d7",
+    "ui/consumer/src/lib.rs": "403d85581dbc9da1d94b61c5bcf23977310ec3ec835cfbecb236858a3eef70f9",
+    "ui/consumer/tests/thinking_policy.rs": "a3cf75595ae82af960fb6a515f672c6ee98c9db6694619069e54fe614c7620fa",
+    "ui/demo/tests/output_message.rs": "63f1d8099b079ee350fe277ccc0af7495f510b319ae66ec81e3bc5f552c5f945",
+    "Cargo.toml": "41a3e464d73b9a45932a5b23d4edcc29b736c15b38c84a7161c15cbe11183fb5",
+    "Cargo.lock": "580fd4b0d2eb2e1eff0036f82ff6d8e804e754cf8953a339722db4da5ae53daf",
+    "ui/Cargo.toml": "fec7bfc0ff96b220ff17ec33b39be35f90ad50b231aaa52a2f48a4e5e1857d6e",
+    "ui/Cargo.lock": "6ac4403de417270123547328318815ff6af5e5eb4d674a9f35c393356062a435"
+  },
+  "rootTests": 267,
+  "thinkingPolicyAndFrameTests": 13,
+  "fullUiTests": 581,
+  "uiIgnored": 1,
+  "ignoredIssue": 49,
+  "demoOutputMessageTests": 26,
+  "newOutputComponentTests": 8,
+  "newSecondConsumerMountTests": 1,
+  "rootAndUiAllTargetsStrictClippy": true,
+  "formatAndBoundaries": true,
+  "exactSdkInputs": true,
+  "sameProcessContentHostComponentAccepted": true,
+  "fullRunPortAccepted": false,
+  "sourceArrivalBridgeImplemented": false,
+  "transcriptContentFrameWiringImplemented": false,
+  "runPortFrameWiringImplemented": false,
+  "newNativeAcceptance": false,
+  "realSepIntegrationAccepted": false,
+  "crossProcessAccepted": false,
+  "strictReadingExitCode": 1,
+  "strictReading": {
+    "accepted": false,
+    "parentFollowingAfterInnerUp": true,
+    "parentOffsetBefore": 0,
+    "parentOffsetAfterScroll": 0,
+    "parentOffsetAfterAppend": 634,
+    "innerOffset": 100,
+    "detailVisibleAfterAppend": false
+  },
+  "newTargets": 0,
+  "newProgramCopies": 0,
+  "deletedBytes": 0,
+  "ciBase": {
+    "headRefOid": "41249c8d5668d73d0e4cb8d41502fddce30757bc",
+    "isDraft": true,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-22T19:30:08Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39840217400/job/120038955283",
+        "name": "checks",
+        "startedAt": "2026-10-22T19:27:37Z",
+        "status": "COMPLETED",
+        "workflowName": "Rust headless"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-22T19:29:29Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39840211142/job/120038933506",
+        "name": "checks",
+        "startedAt": "2026-10-22T19:27:29Z",
+        "status": "COMPLETED",
+        "workflowName": "Rust headless"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-22T19:33:22Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39840217400/job/120038955819",
+        "name": "Rust UI consumer (no native interaction)",
+        "startedAt": "2026-10-22T19:27:32Z",
+        "status": "COMPLETED",
+        "workflowName": "Rust headless"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-22T19:32:53Z",
+        "conclusion": "FAILURE",
+        "detailsUrl": "https://github.com/TekesApps/TekesAgentKit/actions/runs/39840211142/job/120038933055",
+        "name": "Rust UI consumer (no native interaction)",
+        "startedAt": "2026-10-22T19:27:29Z",
+        "status": "COMPLETED",
+        "workflowName": "Rust headless"
+      }
+    ]
+  },
+  "evidence": {
+    ".runtime-fixtures/thinking-output-20261023/ui-tests-final.log": "78777099203f6bd5a56bb4b221a8c092c1ab5b5964d75b1b505d3b5f596f7839",
+    ".runtime-fixtures/thinking-output-20261023/output-tests-mounted.log": "0d5f227811c26a7c00e3a6486c5aa6d3c9781928403791073838927960d60143",
+    ".runtime-fixtures/thinking-output-20261023/root-tests.log": "612f4566195af74b9dd9479218252ab3dcd2c4f0d143b968bc2aaf60faeb85ae",
+    ".runtime-fixtures/thinking-output-20261023/strict-reading.json": "c4f70b29538ecacd71995d9a3fc7678cf168834c54e6f348c8c095309b9f1b90",
+    ".runtime-fixtures/thinking-output-20261023/output-tests-display-version.log": "d502247ea1150152dfeb9879b7224c1b2755a659a74c39d81b3c3d3174acc882",
+    ".runtime-fixtures/thinking-output-20261023/sdk-inputs.json": "9543ade335292f9c7f61944edd341c2fb9297a7c6abc3cf44dc86c1f16bd6ee3",
+    ".runtime-fixtures/thinking-output-20261023/ci-41249c8.json": "43601e057d64a53662b51aba121908cdca6baafadfac97a187f525fbeb648997",
+    ".runtime-fixtures/thinking-output-20261023/ui-tests-combined-guards.log": "85060b6403bca2e03e07d123f0561081847291cefd144163b211b814373fee08",
+    ".runtime-fixtures/thinking-output-20261023/ui-tests.log": "b8789860b6b13eec5ef155b7f7b4e677ba5500879d621e8870b5b42542013487",
+    ".runtime-fixtures/thinking-output-20261023/output-tests.log": "cd4a4a83a1998c1fe801aa03730ae6e0f278214435c64efca6570a337fb89832",
+    ".runtime-fixtures/thinking-output-20261023/output-tests-corrected.log": "6e388383aa2dc90c95d7b7624de177b82023a7c1739710427b623e8acb3c0594",
+    ".runtime-fixtures/thinking-output-20261023/ui-clippy.log": "c75c37af0f88ae2d01914f7caf99dd046b97421ae9693ee77bde1b67108bb94d",
+    ".runtime-fixtures/thinking-output-20261023/root-clippy.log": "ef0a4341797b396585fd35b414950864b084504b435cbd7f5fe077fbf259c669",
+    ".runtime-fixtures/thinking-output-20261023/strict-reading.log": "574e8638a7e0cdadacbb9fdf6bcab3a728a34489bea4b98f321246bfa1284ac9",
+    ".runtime-fixtures/thinking-output-20261023/ui-clippy-final.log": "8fa29cb8f127dca7b4dfa2200ce6b4447370c5a89c0e7f36bbe0fa4370ecb3ce"
+  }
+}

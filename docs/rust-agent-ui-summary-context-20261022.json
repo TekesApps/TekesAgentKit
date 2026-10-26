@@ -1,0 +1,105 @@
+{
+  "checked_at": "2026-10-21T18:41:20.203890+00:00",
+  "base_commit": "f749a314547f63f0bafcdc7a595ff93641d73dd1",
+  "program": {
+    "program": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/AgentKitSummaryContext.app/Contents/MacOS/AgentKitSummaryContext",
+    "sha256": "8dc012a9bc0f0d19fb19d1f5e5753f3f57620f3959e575b8a6c106b93c3734fb",
+    "sdk": "09b4bab44b6dfa65487250ea816b610b9df59095"
+  },
+  "source_hashes": {
+    "ui/README.md": "620a1f4abf0cddb4b895f349009d39200007ac696ad34b01e3664fa9a7bc489d",
+    "ui/components/src/summary.rs": "2b0c55589e9d8b8084e84aa9f163f332553973bda4845fb736aa8ffb355749c8",
+    "ui/consumer/src/lib.rs": "6d69831821ca7205f871a3ed905ff696ebef96b69412e5f9baf02c7a319d248d",
+    "ui/demo/src/component_demo.rs": "4b415296f29128b7a22fc479dc54648ee5585dffcb416cf8009ca82543c68a14",
+    "ui/demo/src/components_native.rs": "7d3475df0fa5bb15ab79023725d5badc79cf577ffe864e6534f2105a1b2f9ec7",
+    "ui/demo/src/native_summary_context_selftest.rs": "31dd07336674560f668d8257049e3940527b7dff672a43c1add9a50a65e46076",
+    "ui/demo/tests/summary_context.rs": "2c61d945ed38ddecdde9d71c3be78e663caaabda3add9fc130590db938d6eac9"
+  },
+  "read_only_references": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Agent/ClientAgentSummaryView.swift": "5632d920bd21d44d6b68d49779e9f7746c9bc1ec4ad9e7bc1d01ab58b85f9154",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Agent/ClientAgentSummaryEnvironment.swift": "d325617e6b56472231a06b41152a8acde9ac85161fd588bec63e4e462e6186ad",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Agent/SummaryProviders.swift": "1f2eb4048c30bfde58edd72bd2e50b8e22d211272c609c9d2108c53b6bddf663",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Agent/SummaryPanelView.swift": "72049a4d18530e799eeea3556eebd191c51383ad3c0d31ce1308d5daaf7c8246",
+    "/Users/frankqin/dev/Tekes/Tekes/ClientAgentSummaryHostAdapter.swift": "4e7875ae43ab06901a981077f81a4504c754e88f2c019a470dc67222b917714a"
+  },
+  "evidence_directory": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/summary-context-20261022",
+  "evidence_hashes": {
+    "consumer-inputs.json": "cdc58abe6ba1a4ca2a3ae00fa2a73cb6481b9ba29e542c88359a5e8e330c6605",
+    "legacy-native.log": "09edad7a1c41be27fdcda1a558cea03ee159d19608ab4e746a7512f362eff861",
+    "clippy-final.log": "868c5a081a4894312b10cad75ddf924384c200558077c5cb2c3ebda1dc7fd0d9",
+    "program.json": "11398924bf85c13b6bc49fbb2828b4cff2de40b20c1d275f01902281faecf06b",
+    "component-final.log": "6abdebe39bef8db2a0bb9b194b616479f4cf4fc602c7a5a70514f00e3ac08d6d",
+    "component.log": "f5162dfbb8f9582bfb6a6cb7bc27b81165978ad0cf72aae68476adfef26e3344",
+    "clippy.log": "4c475b95095138e29e5c12409370b9bc225bfb2aa5fb3407347e7b9b73c85547",
+    "workspace.log": "c509319eb9478ca4b96bda0e82ddfebddd3e6f21b05ed5192691b3c48a5ff0d9",
+    "boundaries.log": "9480cc4382559b9a7a99240226a9f766048e30c8d38bb4bccd1fd8bca56661ad",
+    "native.log": "10ab90a77b3f968d7458423243f8564b7ec15d64440b6c38ab50332eaf1cb2d0",
+    "check.log": "3550a3b36ebd8c9bee0b9fd3baaeb45a9f9e85b63cad4916ca556b4e9176578b",
+    "build.log": "9ae36bb22d8f0f810a77044760863f70b81405396a32cce477ec08eecd4e6d59"
+  },
+  "consumer_inputs": {
+    "commit": "09b4bab44b6dfa65487250ea816b610b9df59095",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 241,
+    "sha256": "44b3174022584d3c099a45b86892d17dbf948905476c0f038be104df12aefe46",
+    "ui_packages": 8
+  },
+  "ui_workspace_tests": 459,
+  "strict_all_target_clippy": true,
+  "native_receipts": {
+    "native.log": [
+      {
+        "collapseRetained": true,
+        "emptyAndUnavailableDistinct": true,
+        "explicitWorkspaceOwner": true,
+        "fullUnselectedHostLayout": false,
+        "hostRowsWithoutSessionFacts": true,
+        "mainDraftAndTranscriptUnchanged": true,
+        "nativeWindow": true,
+        "noSubmission": true,
+        "noSyntheticRunScope": true,
+        "originalHeaderClicks": true,
+        "ownerChangeRetiresIds": true,
+        "physicalIme": false,
+        "realHarness": false,
+        "sameOwnerRowsRetained": true,
+        "voiceOver": false
+      }
+    ],
+    "legacy-native.log": [
+      {
+        "collapsedCanonicalUpdate": true,
+        "fullLayoutParity": false,
+        "hiddenFromAccessibility": true,
+        "knownCount": "1,234",
+        "nativeTextAndAxSelection": true,
+        "nativeWindow": true,
+        "noSubmission": true,
+        "originalRowsRetained": true,
+        "physicalIme": false,
+        "pointerCollapseExpand": true,
+        "readonlyMutationRejected": true,
+        "realHarness": false,
+        "runtimeDraft": true,
+        "selectedTextRetainedAfterPublication": true,
+        "systemClipboardExercised": false,
+        "unknownCost": true,
+        "usageColumns": true,
+        "usageControlsRetained": true,
+        "usageFromControlProjection": true,
+        "usagePointerCollapseExpand": true,
+        "usageSelectableTitle": true,
+        "voiceOver": false
+      }
+    ]
+  },
+  "full_unselected_host_layout": false,
+  "workspace_custom_interactive_rows": false,
+  "paired_visual": false,
+  "real_harness": false,
+  "physical_ime": false,
+  "voiceover": false,
+  "new_target": false,
+  "deleted_bytes": 0
+}

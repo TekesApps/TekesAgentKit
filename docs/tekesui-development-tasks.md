@@ -1,5 +1,9 @@
 # TekesUI 开发任务：AgentKit 基础 Run 接入
 
+2026-10-19：公开4310937及消费侧逐项结论见 [正式pin复验](tekesui-public-pin-verification-20261019.md)。下文保留原任务契约，不回写历史证据。
+
+2026-10-18 更新：TKUI-001/002 已消费最新全部 WIP 的 WindowWake / 版本化 ReadingController；下文保留原始需求基线，当前实现、通过证据与未验收边界以 [P0 联调记录](tekesui-p0-closeout-20261018.md) 为准。正式 pin 与原生最终体验尚未完成。
+
 日期：2026-10-18。接收方：TekesUI；消费方：TekesAgentKit。以下七项可分别建任务，保留 TKUI ID 便于联调。
 
 ## 范围与基准

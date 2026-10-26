@@ -1,0 +1,1066 @@
+//! Mounted run-source ownership for Agent UI hosts.
+//!
+//! This adapter retains history observations and projects existing presentation;
+//! it does not implement a Run state machine, renderer, or window event loop.
+mod feedback_controls;
+pub use feedback_controls::*;
+mod history;
+pub use history::*;
+mod attachments;
+mod inline_images;
+pub use inline_images::*;
+mod file_preview;
+pub use file_preview::*;
+mod feedback;
+mod feedback_write;
+pub use feedback_write::*;
+mod models;
+pub use attachments::*;
+pub use feedback::*;
+mod presets;
+pub use presets::*;
+mod standalone_composer;
+pub use standalone_composer::*;
+mod sidebar;
+mod sidebar_multi;
+mod sidebar_multi_search;
+mod sidebar_selected;
+pub(crate) use sidebar_multi::SidebarMultiOwner;
+pub use sidebar_multi::*;
+pub use sidebar_multi_search::*;
+pub use sidebar_selected::*;
+mod sidebar_name_search;
+#[cfg(test)]
+mod sidebar_ranked_search_tests;
+pub use sidebar_name_search::*;
+mod sidebar_search;
+pub use sidebar_search::*;
+mod historical_input;
+mod turn_actions;
+pub use models::*;
+pub use sidebar::*;
+pub use turn_actions::*;
+mod sidechat;
+pub use sidechat::*;
+mod child;
+mod task;
+pub use child::*;
+use std::sync::Arc;
+pub use task::*;
+use tekes_agent_components_ui::{Composer, ComposerAffordances, ComposerControlGate};
+pub use tekes_agent_contract::ArtifactSelectionReference;
+use tekes_agent_contract::{PromptMode, Result, require, unsupported};
+use tekes_agent_presentation::{
+    AgentTask, ChildHistoryLayout, ChildHistorySource, ChildRun, ComposerDestination,
+    ConnectionPresentation, PreparedSubmission, RunController, RunScope, RunSnapshot, SideChat,
+    SideChatController, SideChatPhase, SideChatSnapshot, SubmissionPreparation, TranscriptSnapshot,
+};
+use tekes_agent_session::{ProjectionSubscription, SessionHistoryLease, SessionRuntime};
+use tokio::sync::watch;
+
+/// A projection of canonical pointer ownership, not another mutation state.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PaneAccess {
+    Ready,
+    Closing,
+    Unknown,
+    Missing,
+}
+impl PaneAccess {
+    fn restrict(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::Missing, _) | (_, Self::Missing) => Self::Missing,
+            (Self::Unknown, _) | (_, Self::Unknown) => Self::Unknown,
+            (Self::Closing, _) | (_, Self::Closing) => Self::Closing,
+            _ => Self::Ready,
+        }
+    }
+    pub fn composer_gate(self) -> ComposerControlGate {
+        if self == Self::Ready {
+            ComposerControlGate::OPEN
+        } else {
+            ComposerControlGate::CLOSED
+        }
+    }
+}
+
+#[derive(Clone)]
+pub enum PaneSnapshot {
+    Run {
+        snapshot: Arc<RunSnapshot>,
+        access: PaneAccess,
+    },
+    /// Native bounded child history has no fabricated main-run Composer state.
+    ReadOnlyChild {
+        source: tekes_agent_components_ui::ReadOnlyTranscriptSource,
+        scope: RunScope,
+        /// Per-binding read invocation order; not a journal sequence or controller revision.
+        publication: u64,
+        connection_epoch: u64,
+        connection: ConnectionPresentation,
+        transcript: TranscriptSnapshot,
+    },
+    /// An absent/changed task or ephemeral pointer must not become a new conversation.
+    Missing { scope: RunScope },
+}
+/// Acceptance-only built-in bounded head and the original pane publication
+/// constructed from that same local read. This is not a server transaction.
+#[cfg(feature = "acceptance-source-witness")]
+#[derive(Clone)]
+pub struct BoundedChildPaneWitness {
+    pub snapshot: PaneSnapshot,
+    pub source: tekes_agent_presentation::BoundedChildSourceWitness,
+}
+
+/// Acceptance-only proof that a read-only pane publication contains the exact
+/// cumulative bounded child pages retained by its original presentation.
+#[cfg(feature = "acceptance-source-witness")]
+#[derive(Clone)]
+pub struct BoundedChildPagedPaneWitness {
+    pub snapshot: PaneSnapshot,
+    pub source: tekes_agent_presentation::BoundedChildPagedSourceWitness,
+}
+
+#[cfg(feature = "acceptance-source-witness")]
+#[derive(Clone, Copy)]
+enum SnapshotCapture {
+    None,
+    Head,
+    Paged,
+}
+
+struct SnapshotRead {
+    snapshot: PaneSnapshot,
+    #[cfg(feature = "acceptance-source-witness")]
+    bounded_source: Option<tekes_agent_presentation::BoundedChildSourceWitness>,
+    #[cfg(feature = "acceptance-source-witness")]
+    bounded_paged_source: Option<tekes_agent_presentation::BoundedChildPagedSourceWitness>,
+}
+impl SnapshotRead {
+    fn plain(snapshot: PaneSnapshot) -> Self {
+        Self {
+            snapshot,
+            #[cfg(feature = "acceptance-source-witness")]
+            bounded_source: None,
+            #[cfg(feature = "acceptance-source-witness")]
+            bounded_paged_source: None,
+        }
+    }
+}
+
+impl PaneSnapshot {
+    /// Forward this pane's captured publication. Read-only children never borrow
+    /// parent Run authority or a separately sampled connection epoch.
+    pub fn thinking_frame(
+        &self,
+        turn_id: &str,
+        input: tekes_agent_presentation::TranscriptThinkingDisplayInput,
+    ) -> Result<tekes_agent_presentation::TranscriptThinkingFrame> {
+        match self {
+            Self::Run { snapshot, .. } => snapshot.thinking_frame(
+                turn_id,
+                input.mode,
+                input.display_revision,
+                input.elapsed_seconds,
+            ),
+            Self::ReadOnlyChild {
+                scope,
+                publication,
+                connection_epoch,
+                transcript,
+                ..
+            } => transcript.thinking_frame(scope, turn_id, *publication, *connection_epoch, input),
+            Self::Missing { .. } => Err(unsupported("thinking pane missing")),
+        }
+    }
+}
+
+/// Captured source fences only: no draft, task projection or lifecycle state.
+/// Weak pane/task owners revoke derived callbacks without retaining old views.
+#[derive(Clone, Default)]
+pub(crate) struct PaneAuthority {
+    tasks: Vec<task::TaskRunGuard>,
+    children: Vec<std::sync::Weak<std::sync::atomic::AtomicBool>>,
+    chats: Vec<(Arc<SideChatController>, SideChat)>,
+}
+impl PaneAuthority {
+    pub(crate) fn access(&self) -> PaneAccess {
+        if self.tasks.iter().any(|task| !task.live())
+            || self.children.iter().any(|child| {
+                !child
+                    .upgrade()
+                    .is_some_and(|alive| alive.load(std::sync::atomic::Ordering::Acquire))
+            })
+        {
+            return PaneAccess::Missing;
+        }
+        self.chats
+            .iter()
+            .fold(PaneAccess::Ready, |access, (owner, chat)| {
+                access.restrict(RunBinding::chat_access(owner, chat))
+            })
+    }
+    pub(crate) fn inherit(&mut self, other: &Self) {
+        for task in &other.tasks {
+            if !self.tasks.iter().any(|old| old.same_source(task)) {
+                self.tasks.push(task.clone());
+            }
+        }
+        for child in &other.children {
+            if !self
+                .children
+                .iter()
+                .any(|old| std::sync::Weak::ptr_eq(old, child))
+            {
+                self.children.push(child.clone());
+            }
+        }
+        for (owner, chat) in &other.chats {
+            if !self.chats.iter().any(|(old_owner, old)| {
+                Arc::ptr_eq(old_owner, owner)
+                    && old.parent == chat.parent
+                    && old.scope == chat.scope
+            }) {
+                self.chats.push((owner.clone(), chat.clone()));
+            }
+        }
+    }
+}
+
+/// One mount owns its own history lease. Dropping it never cancels an agent or
+/// discards a SideChat. Mount tokens in SidePanel fence installation of this value.
+pub struct RunBinding {
+    runtime: Arc<SessionRuntime>,
+    scope: RunScope,
+    history_pages: history::HistoryPages,
+    readonly_reads: std::sync::atomic::AtomicU64,
+    readonly_source: tekes_agent_components_ui::ReadOnlyTranscriptSource,
+    feedback_publications: std::sync::atomic::AtomicU64,
+    controller: Option<Arc<RunController>>,
+    _lease: Option<SessionHistoryLease>,
+    child: Option<ChildRun>,
+    side_chat: Option<(Arc<SideChatController>, SideChat)>,
+    task: Option<task::TaskRunGuard>,
+    ancestors: PaneAuthority,
+    child_owner: Option<std::sync::Weak<std::sync::atomic::AtomicBool>>,
+    #[cfg(feature = "acceptance-source-witness")]
+    bounded_parent_scope: Option<RunScope>,
+}
+/// An existing canonical presentation, not another draft or admission store.
+#[derive(Clone)]
+pub(crate) struct RunPresentationAlias {
+    runtime: Arc<SessionRuntime>,
+    scope: RunScope,
+    controller: Arc<RunController>,
+    side_chat: Option<(Arc<SideChatController>, SideChat)>,
+    child_owner: Option<std::sync::Weak<std::sync::atomic::AtomicBool>>,
+    ancestors: PaneAuthority,
+}
+impl RunPresentationAlias {
+    pub(crate) fn matches(&self, run: &RunBinding) -> bool {
+        run.scope == self.scope
+            && run
+                .controller
+                .as_ref()
+                .is_some_and(|controller| Arc::ptr_eq(controller, &self.controller))
+    }
+    pub(crate) async fn open(&self) -> Result<RunBinding> {
+        let lease = self.runtime.acquire_history(&self.scope.session_id).await?;
+        let mut binding = RunBinding::session_binding(
+            self.runtime.clone(),
+            self.scope.clone(),
+            self.controller.clone(),
+            lease,
+        );
+        binding.side_chat = self.side_chat.clone();
+        binding.child_owner = self.child_owner.clone();
+        binding.ancestors = self.ancestors.clone();
+        require(
+            binding.access() != PaneAccess::Missing,
+            "original task presentation authority retired",
+        )?;
+        Ok(binding)
+    }
+}
+/// Captures the original controller and its selection generation for an async
+/// settings/catalog gesture. Commit never looks up a newer visible binding.
+pub struct ComposerSettingsRequest {
+    binding: Arc<RunBinding>,
+    token: tekes_agent_presentation::SelectionToken,
+}
+impl ComposerSettingsRequest {
+    pub fn destination(&self) -> &ComposerDestination {
+        &self.token.destination
+    }
+    /// Settings are host-supplied explicit inputs. They are applied by the
+    /// existing SubmissionPreparation hook at Send, never as an implicit RPC.
+    /// Consume this request exactly once; cancellation simply drops it.
+    pub fn commit(
+        self,
+        settings: std::collections::BTreeMap<String, serde_json::Value>,
+    ) -> Result<bool> {
+        self.binding.require_controls(&self.token.destination)?;
+        Ok(self
+            .binding
+            .controller
+            .as_ref()
+            .expect("validated controller")
+            .commit_settings(&self.token, settings, false))
+    }
+}
+struct ScopedPreparation<'a> {
+    binding: &'a RunBinding,
+    host: &'a dyn SubmissionPreparation,
+}
+#[async_trait::async_trait]
+impl SubmissionPreparation for ScopedPreparation<'_> {
+    async fn prepare(
+        &self,
+        runtime: &SessionRuntime,
+        ticket: &PreparedSubmission,
+        scope: &RunScope,
+    ) -> Result<()> {
+        self.binding.require_controls(ticket.destination())?;
+        let epoch = runtime.inspect(|state| state.connection_epoch);
+        self.host.prepare(runtime, ticket, scope).await?;
+        // Host preparation may await model/auth/settings work. A pane that closed
+        // in that interval cannot admit its earlier click after the await.
+        self.binding.require_controls(ticket.destination())?;
+        self.binding
+            .validate_inline_submission(ticket, scope, epoch)
+            .await
+    }
+
+    fn validate_dispatch(
+        &self,
+        runtime: &SessionRuntime,
+        ticket: &PreparedSubmission,
+        scope: &RunScope,
+    ) -> Result<()> {
+        self.binding.require_controls(ticket.destination())?;
+        require(
+            ticket.destination() == &ComposerDestination::run(scope.clone()),
+            "prepared submission scope changed",
+        )?;
+        self.host.validate_dispatch(runtime, ticket, scope)
+    }
+}
+impl RunBinding {
+    /// Source identity for a host adapter; equal endpoint strings are insufficient.
+    pub fn shares_runtime(&self, runtime: &Arc<SessionRuntime>) -> bool {
+        Arc::ptr_eq(&self.runtime, runtime)
+    }
+    pub fn supports_creation(&self) -> bool {
+        self.access() == PaneAccess::Ready
+            && self.runtime.inspect(|s| {
+                s.connection == tekes_agent_session::ConnectionState::Ready
+                    && s.endpoint_capabilities.supports("session.create")
+            })
+    }
+    /// Explicit host creation on this endpoint. Navigation remains host-owned;
+    /// the captured action carries stable session/RPC identities.
+    pub async fn create_initial_session(
+        &self,
+        creation: &InitialSessionCreation,
+    ) -> Result<tekes_agent_contract::SessionCreated> {
+        require(self.supports_creation(), "session creation unavailable")?;
+        creation.execute(&self.runtime).await
+    }
+    fn require_destination(&self, destination: &ComposerDestination) -> Result<()> {
+        require(
+            destination == &ComposerDestination::run(self.scope.clone()),
+            "pane destination mismatch",
+        )?;
+        require(
+            self.access() != PaneAccess::Missing,
+            "pane pointer missing or changed",
+        )
+    }
+    fn require_controls(&self, destination: &ComposerDestination) -> Result<()> {
+        self.require_destination(destination)?;
+        require(
+            self.access() == PaneAccess::Ready,
+            "pane closing or outcome unknown",
+        )?;
+        require(self.controller.is_some(), "read-only bounded child")
+    }
+    /// Apply only the text patch captured by Composer; newer artifacts/settings
+    /// remain in the canonical presentation draft.
+    pub fn edit_text(&self, destination: &ComposerDestination, text: String) -> Result<()> {
+        self.require_destination(destination)?;
+        self.controller
+            .as_ref()
+            .ok_or_else(|| unsupported("read-only bounded child"))?
+            .edit_text(destination, text)
+    }
+    /// Commit a host's explicit content replacement against its original capture.
+    /// A text/settings edit or stream update is retained; changed context, scope,
+    /// Send or retired pointer rejects the capture. No retry/merge is inferred.
+    pub fn patch_context(
+        &self,
+        expected: &tekes_agent_presentation::ComposerContextBaseline,
+        artifacts: Vec<tekes_agent_presentation::ComposerArtifact>,
+        annotations: Vec<tekes_agent_presentation::ComposerAnnotation>,
+    ) -> Result<bool> {
+        self.require_controls(&expected.selection.destination)?;
+        self.controller
+            .as_ref()
+            .expect("validated controller")
+            .patch_context(expected, artifacts, annotations)
+    }
+    pub fn remove_context(
+        &self,
+        intent: &tekes_agent_components_ui::ComposerContextIntent,
+    ) -> Result<bool> {
+        use tekes_agent_components_ui::{ComposerContextAction, ComposerContextItem};
+        require(
+            intent.action == ComposerContextAction::Remove,
+            "not a context removal",
+        )?;
+        let mut artifacts = intent.baseline.artifacts.clone();
+        let mut annotations = intent.baseline.annotations.clone();
+        match &intent.item {
+            ComposerContextItem::Artifact(item) => {
+                if !artifacts.contains(item) {
+                    return Ok(false);
+                }
+                artifacts.retain(|a| a.id() != item.id());
+            }
+            ComposerContextItem::Annotation(item) => {
+                if !annotations.contains(item) {
+                    return Ok(false);
+                }
+                annotations.retain(|a| a.id != item.id);
+            }
+        }
+        self.patch_context(&intent.baseline, artifacts, annotations)
+    }
+    /// Return a typed document reference for the host's source-reveal callback.
+    /// The callback resolves it against its current public snapshot; this method
+    /// never reads or navigates a document store itself.
+    pub fn reveal_annotation_reference(
+        &self,
+        intent: &tekes_agent_components_ui::ComposerContextIntent,
+    ) -> Result<Option<ArtifactSelectionReference>> {
+        use tekes_agent_components_ui::{ComposerContextAction, ComposerContextItem};
+        require(
+            intent.action == ComposerContextAction::Open,
+            "not an annotation source reveal",
+        )?;
+        let ComposerContextItem::Annotation(annotation) = &intent.item else {
+            return Err(tekes_agent_contract::Error::Protocol(
+                "source reveal requires an annotation".into(),
+            ));
+        };
+        self.require_destination(&intent.baseline.selection.destination)?;
+        let current = self
+            .current_run()
+            .ok_or_else(|| tekes_agent_contract::Error::Protocol("run unavailable".into()))?;
+        require(
+            intent.baseline.matches_snapshot(&current)
+                && intent.baseline.artifacts == current.draft.artifacts
+                && intent.baseline.annotations == current.draft.annotations
+                && intent
+                    .baseline
+                    .annotations
+                    .iter()
+                    .filter(|item| item.id == annotation.id)
+                    .count()
+                    == 1
+                && intent.baseline.annotations.contains(annotation),
+            "annotation reveal capture is stale or ambiguous",
+        )?;
+        let Some(reference) = annotation.artifact_reference.as_deref() else {
+            return Ok(None);
+        };
+        reference.validate()?;
+        Ok(Some(reference.clone()))
+    }
+    /// Replace only one captured comment, retaining excerpt/source/provenance.
+    /// A failed CAS is not rebased or retried against the newest draft.
+    pub fn edit_annotation(
+        &self,
+        change: &tekes_agent_components_ui::AnnotationEditChange,
+    ) -> Result<Option<Arc<RunSnapshot>>> {
+        require(
+            change
+                .baseline
+                .annotations
+                .iter()
+                .filter(|a| a.id == change.annotation.id)
+                .count()
+                == 1
+                && change.baseline.annotations.contains(&change.annotation),
+            "annotation capture ambiguous or missing",
+        )?;
+        let mut annotations = change.baseline.annotations.clone();
+        let annotation = annotations
+            .iter_mut()
+            .find(|a| a.id == change.annotation.id)
+            .expect("validated annotation");
+        annotation.comment = change.comment.clone();
+        annotation.validate()?;
+        if !self.patch_context(
+            &change.baseline,
+            change.baseline.artifacts.clone(),
+            annotations,
+        )? {
+            return Ok(None);
+        }
+        Ok(self.current_run())
+    }
+    /// Begin one settings gesture, invalidating an older catalog request through
+    /// the existing presentation generation. Hosts must also fence navigation
+    /// before presenting results and retain this exact request for completion.
+    pub fn begin_settings(
+        self: &Arc<Self>,
+        destination: &ComposerDestination,
+    ) -> Result<ComposerSettingsRequest> {
+        self.require_controls(destination)?;
+        let token = self
+            .controller
+            .as_ref()
+            .expect("validated controller")
+            .select(destination.clone())?;
+        Ok(ComposerSettingsRequest {
+            binding: self.clone(),
+            token,
+        })
+    }
+    /// One captured admission through RunController, without automatic retry.
+    /// Model/auth/preset work is an explicit host callback.
+    pub async fn send_with(
+        &self,
+        destination: &ComposerDestination,
+        mode: PromptMode,
+        host: &dyn SubmissionPreparation,
+    ) -> Result<()> {
+        let ticket = self.prepare_send(destination, mode)?;
+        self.dispatch_prepared_with(ticket, host).await
+    }
+    /// Freeze admission on the UI thread before accepting another native input.
+    /// Hosts then sync Composer's controlled clear before spawning dispatch.
+    pub fn prepare_send(
+        &self,
+        destination: &ComposerDestination,
+        mode: PromptMode,
+    ) -> Result<PreparedSubmission> {
+        self.require_controls(destination)?;
+        self.controller
+            .as_ref()
+            .expect("validated controller")
+            .prepare(destination, mode)
+    }
+    pub async fn dispatch_prepared_with(
+        &self,
+        ticket: PreparedSubmission,
+        host: &dyn SubmissionPreparation,
+    ) -> Result<()> {
+        let controller = self
+            .controller
+            .as_ref()
+            .ok_or_else(|| unsupported("read-only bounded child"))?;
+        if let Err(error) = self.require_controls(ticket.destination()) {
+            // Resolve an admitted local ticket if the pointer closed before the
+            // async task began; otherwise its draft would stay reserved forever.
+            controller.cancel_prepared(ticket)?;
+            return Err(error);
+        }
+        controller
+            .dispatch_with(
+                ticket,
+                None,
+                &ScopedPreparation {
+                    binding: self,
+                    host,
+                },
+            )
+            .await
+            .map(|_| ())
+    }
+    /// Release a frozen admission that the host will not dispatch. This is local
+    /// preparation cleanup, not cancellation of an already admitted remote run.
+    pub fn cancel_prepared(&self, ticket: PreparedSubmission) -> Result<()> {
+        require(
+            ticket.destination() == &ComposerDestination::run(self.scope.clone()),
+            "pane destination mismatch",
+        )?;
+        self.controller
+            .as_ref()
+            .ok_or_else(|| unsupported("read-only bounded child"))?
+            .cancel_prepared(ticket)
+    }
+    pub async fn cancel(&self, destination: &ComposerDestination) -> Result<()> {
+        self.require_controls(destination)?;
+        self.controller
+            .as_ref()
+            .expect("validated controller")
+            .cancel(&self.scope)
+            .await
+    }
+    pub async fn open_main(runtime: Arc<SessionRuntime>, scope: RunScope) -> Result<Self> {
+        require(
+            scope.thread_id == scope.session_id,
+            "main run requires main scope",
+        )?;
+        Self::open_session(runtime, scope).await
+    }
+
+    /// The host must resolve the task through TaskPanelState before mounting;
+    /// loading or missing task rows never call this constructor with a fallback.
+    pub async fn open_task(runtime: Arc<SessionRuntime>, task: &AgentTask) -> Result<Self> {
+        Self::open_session(runtime, task.scope.clone()).await
+    }
+
+    async fn open_session(runtime: Arc<SessionRuntime>, scope: RunScope) -> Result<Self> {
+        scope.validate()?;
+        require(
+            runtime.inspect(|s| s.endpoint_id == scope.endpoint_id),
+            "run endpoint mismatch",
+        )?;
+        let lease = runtime.acquire_history(&scope.session_id).await?;
+        let controller = RunController::new(runtime.clone())?;
+        controller.select(ComposerDestination::run(scope.clone()))?;
+        Ok(Self::session_binding(
+            runtime,
+            scope,
+            Arc::new(controller),
+            lease,
+        ))
+    }
+    fn session_binding(
+        runtime: Arc<SessionRuntime>,
+        scope: RunScope,
+        controller: Arc<RunController>,
+        lease: SessionHistoryLease,
+    ) -> Self {
+        Self {
+            runtime,
+            scope,
+            history_pages: history::HistoryPages::default(),
+            readonly_reads: std::sync::atomic::AtomicU64::new(0),
+            readonly_source: Default::default(),
+            feedback_publications: std::sync::atomic::AtomicU64::new(0),
+            controller: Some(controller),
+            _lease: Some(lease),
+            child: None,
+            side_chat: None,
+            task: None,
+            ancestors: PaneAuthority::default(),
+            child_owner: None,
+            #[cfg(feature = "acceptance-source-witness")]
+            bounded_parent_scope: None,
+        }
+    }
+    pub(crate) fn authority(&self) -> PaneAuthority {
+        let mut authority = self.ancestors.clone();
+        authority.inherit(&PaneAuthority {
+            tasks: self.task.iter().cloned().collect(),
+            children: self.child_owner.iter().cloned().collect(),
+            chats: self.side_chat.iter().cloned().collect(),
+        });
+        authority
+    }
+    pub(crate) fn presentation_alias(&self) -> Option<RunPresentationAlias> {
+        let mut ancestors = self.ancestors.clone();
+        ancestors.tasks.extend(self.task.clone());
+        Some(RunPresentationAlias {
+            runtime: self.runtime.clone(),
+            scope: self.scope.clone(),
+            controller: self.controller.clone()?,
+            side_chat: self.side_chat.clone(),
+            child_owner: self.child_owner.clone(),
+            ancestors,
+        })
+    }
+
+    pub async fn open_child(
+        runtime: Arc<SessionRuntime>,
+        parent: RunScope,
+        child_id: impl Into<String>,
+        layout: ChildHistoryLayout,
+        source: Option<Arc<dyn ChildHistorySource>>,
+    ) -> Result<Self> {
+        Self::open_child_with_page_size(runtime, parent, child_id, layout, source, 50).await
+    }
+    /// Explicit bounded page size (1..=200), fixed for this source lifetime.
+    pub async fn open_child_with_page_size(
+        runtime: Arc<SessionRuntime>,
+        parent: RunScope,
+        child_id: impl Into<String>,
+        layout: ChildHistoryLayout,
+        source: Option<Arc<dyn ChildHistorySource>>,
+        page_size: usize,
+    ) -> Result<Self> {
+        tekes_agent_contract::require((1..=200).contains(&page_size), "invalid bounded page size")?;
+        tekes_agent_contract::require(
+            page_size == 50 || (layout == ChildHistoryLayout::SameSession && source.is_none()),
+            "page size requires built-in bounded history",
+        )?;
+        let child_id = child_id.into();
+        require(
+            layout == ChildHistoryLayout::SameSession || source.is_none(),
+            "custom child projection requires same-session layout",
+        )?;
+        let child = ChildRun::open_with_page_size(
+            runtime.clone(),
+            parent.clone(),
+            child_id.clone(),
+            layout,
+            source,
+            page_size,
+        )
+        .await?;
+        let scope = RunScope {
+            session_id: child_id.clone(),
+            ..parent.clone()
+        };
+        let controller = if layout == ChildHistoryLayout::IndependentSessions {
+            Some(Arc::new(RunController::for_child(
+                runtime.clone(),
+                &parent,
+                child_id,
+            )?))
+        } else {
+            None
+        };
+        Ok(Self {
+            runtime,
+            scope,
+            history_pages: history::HistoryPages::default(),
+            readonly_reads: std::sync::atomic::AtomicU64::new(0),
+            readonly_source: Default::default(),
+            feedback_publications: std::sync::atomic::AtomicU64::new(0),
+            controller,
+            _lease: None,
+            child: Some(child),
+            side_chat: None,
+            task: None,
+            ancestors: PaneAuthority::default(),
+            child_owner: None,
+            #[cfg(feature = "acceptance-source-witness")]
+            bounded_parent_scope: Some(parent),
+        })
+    }
+
+    pub async fn open_side_chat(
+        runtime: Arc<SessionRuntime>,
+        owner: Arc<SideChatController>,
+        chat: &SideChat,
+    ) -> Result<Self> {
+        require(
+            owner.uses_runtime(&runtime),
+            "SideChat runtime authority mismatch",
+        )?;
+        require(
+            Self::chat_access(&owner, chat) != PaneAccess::Missing,
+            "SideChat pointer missing or foreign",
+        )?;
+        let mut binding = Self::open_main(runtime, chat.scope.clone()).await?;
+        // Recheck after asynchronous baseline acquisition: close may have completed.
+        require(
+            Self::chat_access(&owner, chat) != PaneAccess::Missing,
+            "SideChat pointer changed while mounting",
+        )?;
+        binding.side_chat = Some((owner, chat.clone()));
+        Ok(binding)
+    }
+
+    fn chat_access(owner: &SideChatController, expected: &SideChat) -> PaneAccess {
+        match owner.snapshot().chats.get(&expected.scope.session_id) {
+            Some(chat) if chat.parent == expected.parent && chat.scope == expected.scope => {
+                match chat.phase {
+                    SideChatPhase::Ready => PaneAccess::Ready,
+                    SideChatPhase::Closing => PaneAccess::Closing,
+                    SideChatPhase::Unknown => PaneAccess::Unknown,
+                }
+            }
+            _ => PaneAccess::Missing,
+        }
+    }
+    pub fn scope(&self) -> &RunScope {
+        &self.scope
+    }
+    /// Canonical synchronous input for normal run controls. Read-only/missing
+    /// bodies have no Composer snapshot and must not become a blank new run.
+    pub fn current_run(&self) -> Option<Arc<RunSnapshot>> {
+        (self.access() != PaneAccess::Missing)
+            .then(|| {
+                self.controller
+                    .as_ref()
+                    .map(|controller| controller.snapshot())
+            })
+            .flatten()
+    }
+    /// Confirm an original submission after the host has checked authoritative
+    /// history. Reconciliation never resends a mutation or targets another Run.
+    pub fn acknowledge_reconciliation(&self, submission_id: &str) -> Result<()> {
+        self.require_controls(&ComposerDestination::run(self.scope.clone()))?;
+        require(
+            self.current_run().is_some_and(|snapshot| {
+                snapshot
+                    .submissions
+                    .iter()
+                    .any(|submission| submission.id == submission_id)
+            }),
+            "submission does not belong to this Run",
+        )?;
+        self.controller
+            .as_ref()
+            .ok_or_else(|| unsupported("read-only bounded child"))?
+            .acknowledge_reconciliation(submission_id)
+    }
+    pub fn access(&self) -> PaneAccess {
+        if self.child_owner.as_ref().is_some_and(|owner| {
+            !owner
+                .upgrade()
+                .is_some_and(|alive| alive.load(std::sync::atomic::Ordering::Acquire))
+        }) {
+            return PaneAccess::Missing;
+        }
+        if self.task.as_ref().is_some_and(|task| !task.live()) {
+            return PaneAccess::Missing;
+        }
+        self.ancestors.access().restrict(
+            self.side_chat
+                .as_ref()
+                .map_or(PaneAccess::Ready, |(owner, chat)| {
+                    Self::chat_access(owner, chat)
+                }),
+        )
+    }
+    /// Capture source evidence through this binding's existing presentation.
+    /// Acceptance-only: pane lifetime and runtime authority have separate lock
+    /// domains, so the before/after access checks are fences, not a transaction.
+    #[cfg(feature = "acceptance-source-witness")]
+    pub fn refresh_with_source_witness(
+        &self,
+    ) -> Result<tekes_agent_presentation::RunSourceWitness> {
+        require(
+            self.access() != PaneAccess::Missing,
+            "pane pointer missing or changed",
+        )?;
+        let controller = self
+            .controller
+            .as_ref()
+            .ok_or_else(|| unsupported("read-only bounded child"))?;
+        let witness = controller.refresh_with_source_witness();
+        require(
+            self.access() != PaneAccess::Missing,
+            "pane pointer missing or changed",
+        )?;
+        Ok(witness)
+    }
+    pub fn subscribe_runtime(&self) -> ProjectionSubscription {
+        self.runtime.subscribe()
+    }
+    pub fn subscribe_run(&self) -> Option<watch::Receiver<Arc<RunSnapshot>>> {
+        self.controller
+            .as_ref()
+            .map(|controller| controller.subscribe())
+    }
+    pub fn subscribe_side_chat(&self) -> Option<watch::Receiver<SideChatSnapshot>> {
+        self.side_chat.as_ref().map(|(owner, _)| owner.subscribe())
+    }
+    pub async fn snapshot(&self) -> Result<PaneSnapshot> {
+        #[cfg(feature = "acceptance-source-witness")]
+        let read = self.read_snapshot(SnapshotCapture::None).await?;
+        #[cfg(not(feature = "acceptance-source-witness"))]
+        let read = self.read_snapshot().await?;
+        Ok(read.snapshot)
+    }
+    /// Capture only a built-in bounded head, sharing the original publication,
+    /// read, projection, epoch and pane-lifetime fences with `snapshot()`.
+    /// Cumulative history and custom/independent sources are unsupported.
+    #[cfg(feature = "acceptance-source-witness")]
+    pub async fn snapshot_with_bounded_source_witness(&self) -> Result<BoundedChildPaneWitness> {
+        require(
+            self.controller.is_none(),
+            "bounded source witness requires a read-only child",
+        )?;
+        let read = self.read_snapshot(SnapshotCapture::Head).await?;
+        require(
+            self.access() != PaneAccess::Missing,
+            "child pane retired during source read",
+        )?;
+        let source = read
+            .bounded_source
+            .ok_or_else(|| unsupported("bounded child source unavailable"))?;
+        require(
+            source.child_id == self.scope.session_id
+                && source.parent_scope.endpoint_id == self.scope.endpoint_id
+                && source.parent_scope.thread_id == self.scope.thread_id,
+            "bounded child source origin mismatch",
+        )?;
+        Ok(BoundedChildPaneWitness {
+            snapshot: read.snapshot,
+            source,
+        })
+    }
+    /// Capture cumulative built-in bounded child pages from this same read and
+    /// publication. Custom and independent child sources remain unsupported.
+    #[cfg(feature = "acceptance-source-witness")]
+    pub async fn snapshot_with_bounded_paged_source_witness(
+        &self,
+    ) -> Result<BoundedChildPagedPaneWitness> {
+        require(
+            self.controller.is_none(),
+            "bounded paged source witness requires a read-only child",
+        )?;
+        let read = self.read_snapshot(SnapshotCapture::Paged).await?;
+        require(
+            self.access() != PaneAccess::Missing,
+            "child pane retired during paged source read",
+        )?;
+        let source = read
+            .bounded_paged_source
+            .ok_or_else(|| unsupported("bounded paged child source unavailable"))?;
+        require(
+            source.child_id == self.scope.session_id
+                && self.bounded_parent_scope.as_ref() == Some(&source.parent_scope),
+            "bounded paged child source origin mismatch",
+        )?;
+        let PaneSnapshot::ReadOnlyChild {
+            connection_epoch, ..
+        } = &read.snapshot
+        else {
+            return Err(unsupported(
+                "bounded paged source requires a child publication",
+            ));
+        };
+        require(
+            *connection_epoch == source.connection_epoch
+                && self
+                    .runtime
+                    .inspect(|store| store.connection_epoch == source.connection_epoch),
+            "bounded paged source publication epoch mismatch",
+        )?;
+        Ok(BoundedChildPagedPaneWitness {
+            snapshot: read.snapshot,
+            source,
+        })
+    }
+    async fn read_snapshot(
+        &self,
+        #[cfg(feature = "acceptance-source-witness")] capture: SnapshotCapture,
+    ) -> Result<SnapshotRead> {
+        let access = self.access();
+        if access == PaneAccess::Missing {
+            return Ok(SnapshotRead::plain(PaneSnapshot::Missing {
+                scope: self.scope.clone(),
+            }));
+        }
+        if let Some(controller) = &self.controller {
+            return Ok(SnapshotRead::plain(PaneSnapshot::Run {
+                snapshot: controller.snapshot(),
+                access,
+            }));
+        }
+        // Stamp invocation order before awaiting a custom/bounded source. A late
+        // older read must not become a newer UI publication by completion time.
+        let publication = self
+            .readonly_reads
+            .fetch_update(
+                std::sync::atomic::Ordering::AcqRel,
+                std::sync::atomic::Ordering::Acquire,
+                |value| value.checked_add(1),
+            )
+            .map_err(|_| unsupported("read-only child publication exhausted"))?
+            + 1;
+        let epoch = self.runtime.inspect(|store| store.connection_epoch);
+        let child = self
+            .child
+            .as_ref()
+            .ok_or_else(|| unsupported("missing child source"))?;
+        #[cfg(feature = "acceptance-source-witness")]
+        let (mut transcript, bounded_source, bounded_paged_source) = match capture {
+            SnapshotCapture::None => (child.transcript().await?, None, None),
+            SnapshotCapture::Head => {
+                let (transcript, source) = child.transcript_with_bounded_source_witness().await?;
+                (transcript, Some(source), None)
+            }
+            SnapshotCapture::Paged => {
+                let (transcript, source) =
+                    child.transcript_with_bounded_paged_source_witness().await?;
+                (transcript, None, Some(source))
+            }
+        };
+        #[cfg(not(feature = "acceptance-source-witness"))]
+        let mut transcript = child.transcript().await?;
+        if self.access() == PaneAccess::Missing {
+            return Ok(SnapshotRead::plain(PaneSnapshot::Missing {
+                scope: self.scope.clone(),
+            }));
+        }
+        let (connection_epoch, connection) = self.runtime.inspect(|store| {
+            (
+                store.connection_epoch,
+                ConnectionPresentation::read(store, None, false),
+            )
+        });
+        require(
+            connection_epoch == epoch,
+            "child history connection changed during read",
+        )?;
+        transcript.is_stale |= connection.history_is_stale;
+        let document = tekes_agent_presentation::TranscriptDocument::read(&transcript)?;
+        for section in &document.sections {
+            section.event_order()?;
+        }
+        Ok(SnapshotRead {
+            snapshot: PaneSnapshot::ReadOnlyChild {
+                source: self.readonly_source.clone(),
+                scope: self.scope.clone(),
+                publication,
+                connection_epoch,
+                connection,
+                transcript,
+            },
+            #[cfg(feature = "acceptance-source-witness")]
+            bounded_source,
+            #[cfg(feature = "acceptance-source-witness")]
+            bounded_paged_source,
+        })
+    }
+    /// Reuse the existing catalog authority. A failed query leaves history readable
+    /// but removes send authority in the existing presentation store.
+    pub async fn refresh_child_catalog(&self) -> Result<()> {
+        self.controller
+            .as_ref()
+            .ok_or_else(|| unsupported("read-only bounded child"))?
+            .refresh_child_catalog(&self.scope)
+            .await
+    }
+    pub fn sync_composer(
+        &self,
+        composer: &mut Composer,
+        affordances: ComposerAffordances,
+    ) -> Result<()> {
+        require(
+            self.access() != PaneAccess::Missing,
+            "SideChat pointer missing",
+        )?;
+        let controller = self
+            .controller
+            .as_ref()
+            .ok_or_else(|| unsupported("read-only bounded child"))?;
+        composer
+            .update_gated(
+                &controller.snapshot(),
+                affordances,
+                self.access().composer_gate(),
+            )
+            .map_err(unsupported)
+    }
+    pub async fn load_earlier(&self) -> Result<bool> {
+        self.load_history_page(self.begin_history_lease()?).await
+    }
+}
+mod actionable;
+pub use actionable::*;
+
+mod family_catalog;
+pub use family_catalog::*;
+
+mod sidebar_classification;
+pub use sidebar_classification::*;

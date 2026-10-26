@@ -1,0 +1,165 @@
+{
+  "format": "agentkit-summary-usage/1",
+  "verified_at_utc": "2026-10-20T23:05:21.296174+00:00",
+  "based_on": "e8ee2875c6fb647b2016e55fc6cfb360aea77904",
+  "published_agentkit_contract": "v0.3.8",
+  "default_tekesui": {
+    "commit": "8cf0840790334ba224afc0595897c74231c712e6",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 199,
+    "sha256": "f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f",
+    "ui_packages": 8
+  },
+  "reference_files": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Agent/ClientAgentSummaryView.swift": "5632d920bd21d44d6b68d49779e9f7746c9bc1ec4ad9e7bc1d01ab58b85f9154",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/Agent/SummaryProviders.swift": "1f2eb4048c30bfde58edd72bd2e50b8e22d211272c609c9d2108c53b6bddf663",
+    "/Users/frankqin/dev/Tekes/Tekes/ClientAgentSummaryHostAdapter.swift": "4e7875ae43ab06901a981077f81a4504c754e88f2c019a470dc67222b917714a"
+  },
+  "changed_source_files": {
+    "ui/components/src/summary_usage.rs": "dcde4144718ccdffdd1f256e51e74942cc10435cb9a632bf2372e13e5199b22b",
+    "scripts/probes/agentkit-summary-label-candidate.rs": "b545ce72a2e634036fb66647a293e585337236abb7e08d39d50ab8b46940b83d",
+    "scripts/test-reading-candidate.py": "2eb006e73b377ef2456aeedc714506c25d79ea1ea2097258c5299f3d901db261",
+    "ui/README.md": "51465a81d16f1dc97ba61ef8eb5bf7470170ab6cda922206ef4063f426365b22",
+    "ui/components/src/lib.rs": "a9611d1916fb1ed5e19785c739c7bcce1dd16e8980b1d525830a0fcdd0a60120",
+    "ui/components/src/summary.rs": "e39df55fc1ea75459826186d34bd2c78fa7861cb527791a428ab19420b9653a2",
+    "ui/consumer/src/lib.rs": "5daf7fc605ecf9e42a46e5f06eac25150fad7b5177e2b8089fe853fcbd8063e4",
+    "ui/demo/src/components_native.rs": "41dca35d8f496a1eb120246e78f7cfec04273f16aea888276473c1574ab926fb",
+    "ui/demo/src/fixture.rs": "9e3e91255da3d3067635e45ce7effc40982a515e732a84244470c4741338641f",
+    "ui/demo/src/native_summary_sections_selftest.rs": "eb95af2ebe2b240ebb45ef5c44e1297a38e993c575816aa0bb510eba9f8618e4",
+    "ui/demo/tests/run_column.rs": "809cd598c68f0e1deff2ea45d80d78c1e81a94492cc1fcc03084379222b02666",
+    "ui/demo/tests/summary_component.rs": "27691b3e14f0fa88552960f142aaf19bfdbe96a790209a2242ce1f92df8338dc"
+  },
+  "checks": {
+    "full_ui_tests": 345,
+    "full_ui_scope": "Before final currency-grouping and formatter-callback cleanup; affected tests and native builds rerun on final sources.",
+    "final_affected_tests": 20,
+    "final_second_consumer_tests": 34,
+    "usage_layout_cases": 24,
+    "strict_all_target_clippy": true,
+    "fmt": true,
+    "ui_boundary": true,
+    "candidate_292_tests": 14,
+    "candidate_292_summary_header_wrap_cases": 54,
+    "candidate_292_second_consumer_tests": 34,
+    "candidate_292_target_clippy": true
+  },
+  "candidate": {
+    "identity": "292f5fe65195af66624cb28413868eb46db6ab1a81ef1294ab19c8efbd45b0f4",
+    "source_files": 479,
+    "receipt": "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-summary-usage-292-compat/receipt.json",
+    "receipt_sha256": "7898547f5c4740dc0bd1e5665138e1c2d44ad0c66ef965a21ad45074c524aa63",
+    "consumer_overrides": {
+      "ui/Cargo.toml": "6285f1b64e22162440a7b9ed341e94553a076961686d17eaf33d57873952f002",
+      "ui/Cargo.lock": "033bacb7bc4d643f889616a871a901ca3dc70da0a8979861d83474cfea68a143",
+      "ui/demo/src/native.rs": "c0c9488dfa61ad4976836701079893cc7e2be94955eb786b60b2bf9386c1bfdb",
+      "ui/components/Cargo.toml": "68b082017dff2e721eb5194b920998ae33574220d7f2c4edd9e9f4f3674a1558",
+      "ui/components/src/summary_section.rs": "2b8ef593544c9c00f2485f5b390ebf6c09899437d40e112d8ab97fa790b9724a",
+      "ui/demo/src/component_demo.rs": "3fd839336632351c04d5b68a5bf0e2e936b3d588523d69bd2674d829e427d952",
+      "ui/demo/tests/agentkit-reading-candidate.rs": "3a3ef23b6000742e0d2a32adbdb540ce5b337d03e188f0e13795efcece80a147",
+      "ui/demo/tests/agentkit-run-preflight-candidate.rs": "a2b5fa61a461bc0c1bf0f7cc55b726851371d71de23a7e5adb06d8c1b19cc320",
+      "ui/demo/src/native_summary_sections_selftest.rs": "ab13768d2fd02fcfae0c8fcd8606debf2403838131a7a60490e3cd9178492332"
+    },
+    "policy": "Only Summary headers opt into single-line tail ellipsis. Ordinary row titles keep natural wrapping. Earlier row-ellipsis experiments are not adopted as product layout.",
+    "default_pin_promoted": false
+  },
+  "native": {
+    "native_public": {
+      "collapsedCanonicalUpdate": true,
+      "fullLayoutParity": false,
+      "hiddenFromAccessibility": true,
+      "knownCount": "1,234",
+      "nativeWindow": true,
+      "noSubmission": true,
+      "originalRowsRetained": true,
+      "physicalIme": false,
+      "pointerCollapseExpand": true,
+      "realHarness": false,
+      "runtimeDraft": true,
+      "unknownCost": true,
+      "usageColumns": true,
+      "usageControlsRetained": true,
+      "usageFromControlProjection": true,
+      "usagePointerCollapseExpand": true,
+      "voiceOver": false
+    },
+    "native_292": {
+      "collapsedCanonicalUpdate": true,
+      "fullLayoutParity": false,
+      "hiddenFromAccessibility": true,
+      "knownCount": "1,234",
+      "nativeWindow": true,
+      "noSubmission": true,
+      "originalRowsRetained": true,
+      "physicalIme": false,
+      "pointerCollapseExpand": true,
+      "realHarness": false,
+      "runtimeDraft": true,
+      "unknownCost": true,
+      "usageColumns": true,
+      "usageControlsRetained": true,
+      "usageFromControlProjection": true,
+      "usagePointerCollapseExpand": true,
+      "voiceOver": false
+    }
+  },
+  "binary_sha256": {
+    "/Users/frankqin/dev/TekesAgentKit/ui/target/debug/tekes-agent-ui-demo": "26b371c920c867532174144b7fe06fc5a7f4373b8101c21c48ae9df3c2915499",
+    "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-summary-usage-292-compat/native-demo": "2575c56ba757a1da5cc8142c899b9a9fe6c39b236529ef597789fc957239d19d"
+  },
+  "screenshots": {
+    "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-summary-usage-native-public.png": {
+      "sha256": "256acb4fa05d032626ec282f5141a447c3d39263063e827a59b6a57637d5c06e",
+      "visually_inspected": true
+    },
+    "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-summary-usage-native-292.png": {
+      "sha256": "01eade70a4e6dc162804ac3eacbe1fc7e0b0ed721cdff08642f7878b35f8bfb8",
+      "visually_inspected": false
+    },
+    "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-summary-usage-native-292-final.png": {
+      "sha256": "086902aa65064aa62f896d37b6ce602cf15326853aacfb37180ff58a18b1de35",
+      "visually_inspected": true
+    }
+  },
+  "logs": {
+    "full_ui": {
+      "path": "/tmp/agentkit-summary-usage-ui-all.log",
+      "sha256": "7e08c7a6c88abb4579d41044f0f8cfb0db946a7f4c6140c11013026032cebb75"
+    },
+    "final_affected": {
+      "path": "/tmp/agentkit-summary-usage-final-targeted.log",
+      "sha256": "13f2ada4fdc7d67de779fab13d24e0da6d42d99de97b91da6b890b84441f811f"
+    },
+    "second_consumer": {
+      "path": "/tmp/agentkit-summary-usage-final-consumer.log",
+      "sha256": "f57a76ddbae0bad7d1bfe39e4b7913418a549878272a598130235d197b718a5d"
+    },
+    "clippy": {
+      "path": "/tmp/agentkit-summary-usage-ui-clippy.log",
+      "sha256": "5b1526eb64a7aa6abbfff59e246eee2157bd832eb6b2e5d9748e37319c8ec3ef"
+    },
+    "native_build": {
+      "path": "/tmp/agentkit-summary-usage-native-build.log",
+      "sha256": "0af4bda975ab3da4de83b10b22c1c4e09b0b4873fe84b85a1fa84f828332c0e5"
+    },
+    "native_public": {
+      "path": "/tmp/agentkit-summary-usage-native-public.log",
+      "sha256": "25ea7916db17e7bc558f0de216814030088ca9195caed0b562dcc0cbe60818af"
+    },
+    "native_292": {
+      "path": "/tmp/agentkit-summary-usage-native-292.log",
+      "sha256": "9ff73cd327dfd09736c995b6829e18ab1b41ca5a533f9a894726a5e604a5298d"
+    }
+  },
+  "native_apps_closed": true,
+  "voiceover_running_after_checks": false,
+  "not_proven": [
+    "real Native/Pi/DSH usage UI",
+    "physical Chinese IME",
+    "VoiceOver acceptance",
+    "paired ClientKit product visuals",
+    "complete Summary/default rows/custom slots",
+    "full Agent UI goal",
+    "merge or stage tag"
+  ]
+}

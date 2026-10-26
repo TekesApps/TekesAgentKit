@@ -1,0 +1,32 @@
+{
+  "scope": "read-only exact installed SDK source contract, not protocol/performance acceptance",
+  "runtime": "DSH 0.2.1-rc.2",
+  "packageVersion": "0.2.1-rc.2",
+  "sourceFiles": [
+    {
+      "relativePath": "package.json",
+      "sha256": "70f6461f4d558905e44bb53b7c1ef4c878d8c338953d4a11eb5a9e12d41c6cf7"
+    },
+    {
+      "relativePath": "lib/types/types.d.ts",
+      "sha256": "81017e58e95b3a58d62e0c3d540bd6286b645686ed3d208acac1dd2a206bea27"
+    },
+    {
+      "relativePath": "lib/types/history.js",
+      "sha256": "a58ffb911a14d39ca4131c301b1cea4773540d2acb7e81b3cfa17df51a8f0b78"
+    },
+    {
+      "relativePath": "lib/types/control.js",
+      "sha256": "41167027c6cbbd04ad0f5b91921a16da883863f0cd8f7da93dc1985e15859969"
+    }
+  ],
+  "rule": "fresh session/follow snapshot projection baseline at exact event cursor; normalized asOfSeq == JournalSnapshot.throughSequence",
+  "locations": [
+    "lib/types/types.d.ts:66-70",
+    "lib/types/types.d.ts:538-546",
+    "lib/types/history.js:196-218",
+    "lib/types/control.js:30-58"
+  ],
+  "controlLimit": "fresh control baseline cross-checks values but does not independently contain journal cursor",
+  "cacheLimit": "inventory/list hints never grant sequenced source authority"
+}

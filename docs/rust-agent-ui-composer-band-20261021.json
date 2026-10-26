@@ -1,0 +1,102 @@
+{
+  "format": "agentkit-composer-band/1",
+  "verified_at_utc": "2026-10-20T18:59:31.189986+00:00",
+  "based_on": "664d5f34251cfd6c235f9877d3bf7473a904b796",
+  "published_contract_baseline": "v0.3.8",
+  "source": {
+    "ui/components/src/composer.rs": "9e21d30efdfd8ace95645724f49a7a06ec4cbbe7768a7b01e08ac3969cffbabe",
+    "ui/components/src/composer_layout.rs": "d280499ae749820489a96f28f2463fa51be183a1913673eedc96dcdc2f161c88",
+    "ui/components/src/editor.rs": "a34cc6d0497a0b40870645f4a79c581651471bf7e6fd2308d92be3c5fad38f9f",
+    "ui/components/src/lib.rs": "bc8d85f2b78ea20c1c336e155a594200073a2c5c57ec9064b4257001a99d7d2a",
+    "ui/consumer/src/lib.rs": "a570bcfae159c9705d0c5501f1619a940212a3d15719da6424e7e61e3b2fc2ec",
+    "ui/demo/src/components_native.rs": "d440a4ebd40d9a4bab692e8858170d0356ace422ae64d0d8b7a10d04c8a57bdd",
+    "ui/demo/tests/composer_component.rs": "a9ba7a7abcdba19bf9d369faaaac507d660f760057d29e709286fae19c86099b",
+    "ui/demo/tests/run_column.rs": "34bc99054e494ce18f75cbbf385d43fcb2ad84cf7ca1b3586517aa82bfdbd1cb"
+  },
+  "reference_sources": {
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/ComposerCardView.swift": "ddbb73703d867fb214f2ed44a2db13e358566c68e165acdc5cd583ecd9c3f5db",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/ThreadComposerView.swift": "ff139c1af2f33f8b89dad462fa71cfd7851a800f06f99462adf8bd2b5a2d4e38",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/ComposerMetalEditor.swift": "ee1758f3678b02d5507ed2658ef4991bdd67b089c5e46f9e342061fbcb46b18b",
+    "/Users/frankqin/dev/TekesClientKit/Sources/Composer/UserControlsView.swift": "0c3dc171d9f2961ee92ee6c98d607179c0e84f2a03ec6d7a5ce64134b61516c9"
+  },
+  "default_inputs": {
+    "commit": "8cf0840790334ba224afc0595897c74231c712e6",
+    "local_packages": 11,
+    "native_interaction": false,
+    "reviewed_files": 199,
+    "sha256": "f0af230a1efe97334b90eb193f77ca0d30dec43ef09e487ad6948c38a938257f",
+    "ui_packages": 8
+  },
+  "validation": {
+    "ui_tests": 312,
+    "second_public_consumer_tests": 30,
+    "coretext_matrix_combinations": 24,
+    "single_primary_and_old_action_rejection": true,
+    "original_buttons_retained": true,
+    "bounded_run_controls_visible_under_tall_context": true,
+    "editor_scroll_and_focus": true,
+    "strict_clippy": true,
+    "fmt": true,
+    "boundaries": true,
+    "candidate_run_tests": 8,
+    "candidate_current_inputs_match": true,
+    "candidate_strict_clippy": true,
+    "native_context_fixture": true,
+    "native_component_fixture_regression": true,
+    "system_software_ime": {
+      "softwareIme": true,
+      "pidTargetedEvents": true,
+      "physicalKeyboard": false,
+      "candidateWindow": false,
+      "sourceBefore": "com.apple.inputmethod.SCIM.ITABC",
+      "sourceAfter": "com.apple.inputmethod.SCIM.ITABC",
+      "binarySha256": "c0c92eadf2dcb4103409a52fc6615e2f19e826a72743cef7167fdd4aeacea6b8"
+    }
+  },
+  "candidate_identity": "2b16eaa6200fecdde9a0c615166064effb9446249cde05087d5d7c288d81d4ec",
+  "known_boundary_focus_probe": {
+    "tests": 1,
+    "fixed": false,
+    "candidate_identity": "2b16eaa6200fecdde9a0c615166064effb9446249cde05087d5d7c288d81d4ec",
+    "current_agentkit_inputs_match": true,
+    "unfocused_padding_does_not_acquire_editor": true,
+    "existing_focus_and_preedit_remain_protected": true,
+    "default_8cf_runtime_claim": false,
+    "probe_sha256": "cc5a4798889d6f2d5297af1387f1228e493111ae4fc48086bca106ec5403524b",
+    "issue": "https://github.com/TekesApps/TekesUI/issues/30"
+  },
+  "binary_sha256": "c0c92eadf2dcb4103409a52fc6615e2f19e826a72743cef7167fdd4aeacea6b8",
+  "screenshot": {
+    "path": "/tmp/agentkit-composer-band-native-context-20261021.png",
+    "sha256": "537e81f67aa5fc8fc180968465698a964fe763ff3e887e899bf992a76e8379f9",
+    "scope": "owned native context fixture; not paired ClientKit visual acceptance"
+  },
+  "logs": {
+    "/tmp/agentkit-composer-band-ui-tests-final.log": "94e080dfc23bbcd755dc35980e35fc9ca07e2310f12c739263a9b8623de8839d",
+    "/tmp/agentkit-composer-band-clippy-final.log": "09d4810a26fb62ec2f563a209faeb57fbfce0a62e6ff8c105431707c71f7f4f5",
+    "/tmp/agentkit-composer-band-build-final.log": "25fd142d2df397be085ff067f9cc4884da4af55f730084f88186b55601afbd54",
+    "/tmp/agentkit-composer-band-native-context-20261021.log": "4f9ebf585bc095202886b8c4acc35a91559bc89767979c77c8ea765baaab7deb",
+    "/tmp/agentkit-composer-band-native-regression-20261021.log": "fee4fd5e58fc6cedfef24029f8337d3387316dd2c613625bee9ac49ed14147da",
+    "/tmp/agentkit-composer-band-system-ime-20261021.log": "761b98c5a6bae7bf35ad991a1de7bca7f3fc5d1d68d342b7eb73919fc0af81f2",
+    "/tmp/agentkit-composer-band-system-ime-receipt.json": "3c2445a8044e2f9166f682b3570757538b0b519f0b9e92ec3a90456a96f30914",
+    "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-composer-band-preflight-20261021-03/receipt.json": "dd785a541b4a6ebbb26b63edcb36a9d10a4b01e5ac29770f1e634d13b394865a",
+    "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-composer-band-preflight-20261021-03/tests.log": "891016257c69c8d861d20a659f1a4bbf084be13d48d7bda68018f7e3270a4a5b",
+    "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-composer-band-preflight-20261021-03/clippy.log": "2b307b1ef494d27fce106502b1b6d7747d5dd0b1e787b27893694e128ca4dca9",
+    "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-composer-padding-focus-20261021-02/receipt.json": "5b700497bef702941a9efc734bd3ba880c83ae4874a57ef0e0cbc83130fc37fe",
+    "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-composer-padding-focus-20261021-02/tests.log": "1483ddf6e1faa2266c5145f55d5573ffc40b6620de68ec4fc00bfdc9ef79f484",
+    "/Users/frankqin/dev/TekesAgentKit/.runtime-fixtures/agentkit-composer-padding-focus-20261021-02/clippy.log": "d23f2f8a5f2a9542a8bca9d15b40494ee5444fbf5e65f7e966bdc741c3379480"
+  },
+  "not_claimed": [
+    "full_composer_layout_parity",
+    "source_glyph_slot",
+    "host_setup_toolbar",
+    "complete_palette_chips_notices",
+    "paired_ClientKit_visual_parity",
+    "real_harness_reading_paging",
+    "physical_ime",
+    "candidate_window",
+    "voiceover",
+    "merged",
+    "tagged"
+  ]
+}

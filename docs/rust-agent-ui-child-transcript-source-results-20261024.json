@@ -1,0 +1,397 @@
+{
+  "schemaVersion": 1,
+  "issues": [
+    17,
+    27
+  ],
+  "pullRequest": 10,
+  "baseCommit": "f7fe185acc2eba239936b8e6968f9cac44f7aa1f",
+  "implementation": "Python-only opt-in original child Transcript source acceptance; no production interfaces changed",
+  "tekesUiPin": "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c",
+  "validation": {
+    "focusedPythonPassed": 21,
+    "pythonPassed": 242,
+    "pythonFailed": 0,
+    "formatDiffBoundariesMatrix": "passed",
+    "reusedRustAndUiValidation": {
+      "commit": "f7fe185acc2eba239936b8e6968f9cac44f7aa1f",
+      "rootPassed": 371,
+      "featurePresentationPassed": 279,
+      "featureHeadlessPassed": 4,
+      "uiPassed": 750,
+      "uiIgnored": 1,
+      "demoAndPublicConsumer": "passed-prior-slice-not-rerun; exact Rust/UI inputs unchanged",
+      "consumerClosure": "e216110c5e2c26b279f832c9c2cbfa596f004f640b23cf6560b0acfb743e4466"
+    },
+    "cargoInvoked": false,
+    "newTarget": false
+  },
+  "candidateReview": {
+    "workerTests": 14,
+    "correctedSchemaAssumptions": [
+      "TranscriptSnapshot has no scope field",
+      "input role is opening or inner",
+      "opaque turn IDs are compared only through item links"
+    ],
+    "mainRed": "main-red.log:19 tests,4 failures",
+    "mainCorrections": [
+      "same-authority actionables",
+      "settlement time and fork boundary",
+      "whole-message positions and unique error identity",
+      "pair identity and status gates"
+    ],
+    "firstRealAttempt": "verified/incomplete.json:Pi passed,DSH refused optional inventory; original sources retained",
+    "dshOptionalInventory": "Only direct DSH child Transcript profile allows None; raw snapshot unchanged; default parent/Pi gates remain strict"
+  },
+  "run": {
+    "accepted": true,
+    "endpoints": {
+      "pi": {
+        "endpoint": "pi",
+        "version": "1.3.0",
+        "commandCount": 20,
+        "processExit": 0,
+        "running": {
+          "endpoint": "pi",
+          "parentSessionId": "618aa4c2-6fe6-4b30-a497-b189beb0d581",
+          "childSessionId": "940af81b-4337-4cdd-91c3-30fe002b727b",
+          "summaryRow": {
+            "id": "[\"pi\",\"618aa4c2-6fe6-4b30-a497-b189beb0d581\",\"tool:pi-child-0\"]",
+            "sessionId": "940af81b-4337-4cdd-91c3-30fe002b727b",
+            "status": "running",
+            "title": "Model child"
+          },
+          "sourceIdentity": {
+            "kind": "native",
+            "entryId": "222e155e",
+            "entryOrdinal": 8
+          },
+          "rawChildStatus": null,
+          "childStatus": "running",
+          "statusBasis": "public-native-run-open-and-authored-input",
+          "indicator": "running",
+          "projectionSucceeded": true,
+          "serverTransactionalFreshnessProven": false,
+          "evidenceScope": "single-publication-same-memory-authority",
+          "fabricationResistance": "not-proven-by-json-validation",
+          "transitionSource": {
+            "basis": "public-native-run-open-and-authored-input",
+            "authoredInput": {
+              "kind": "native",
+              "entryId": "b17393ec",
+              "entryOrdinal": 12
+            },
+            "capturedDispatchingQueueCount": 1
+          }
+        },
+        "failed": {
+          "endpoint": "pi",
+          "parentSessionId": "618aa4c2-6fe6-4b30-a497-b189beb0d581",
+          "childSessionId": "940af81b-4337-4cdd-91c3-30fe002b727b",
+          "summaryRow": {
+            "id": "[\"pi\",\"618aa4c2-6fe6-4b30-a497-b189beb0d581\",\"tool:pi-child-0\"]",
+            "sessionId": "940af81b-4337-4cdd-91c3-30fe002b727b",
+            "status": "failed",
+            "title": "Model child"
+          },
+          "sourceIdentity": {
+            "kind": "native",
+            "entryId": "222e155e",
+            "entryOrdinal": 8
+          },
+          "rawChildStatus": null,
+          "childStatus": "failed",
+          "statusBasis": "native-current-run-error",
+          "indicator": "failed",
+          "projectionSucceeded": true,
+          "serverTransactionalFreshnessProven": false,
+          "evidenceScope": "single-publication-same-memory-authority",
+          "fabricationResistance": "not-proven-by-json-validation",
+          "transitionSource": {
+            "basis": "native-current-run-error",
+            "authoredInput": {
+              "kind": "native",
+              "entryId": "b17393ec",
+              "entryOrdinal": 12
+            },
+            "terminal": {
+              "kind": "native",
+              "entryId": "9e67033e",
+              "entryOrdinal": 13,
+              "stopReason": "error",
+              "runId": "7b0bf6e0-a098-4cb1-befa-28f649260fa7",
+              "startedEntryId": "f7cdd617",
+              "settledEntryId": "39fb2320"
+            },
+            "capturedDispatchingQueueCount": 0
+          }
+        },
+        "gate": {
+          "requestCount": 1,
+          "entered": true,
+          "explicitlyReleased": true,
+          "aborted": false,
+          "timedOut": false
+        },
+        "childTranscript": {
+          "running": {
+            "endpoint": "pi",
+            "phase": "running",
+            "childSessionId": "940af81b-4337-4cdd-91c3-30fe002b727b",
+            "scope": {
+              "endpointId": "pi",
+              "threadId": "940af81b-4337-4cdd-91c3-30fe002b727b",
+              "sessionId": "940af81b-4337-4cdd-91c3-30fe002b727b"
+            },
+            "inventorySummaryPresent": true,
+            "connectionEpoch": 2,
+            "authoredInput": {
+              "kind": "native",
+              "entryId": "b17393ec",
+              "entryOrdinal": 12
+            },
+            "turnId": "[\"pi\",\"940af81b-4337-4cdd-91c3-30fe002b727b\",\"native-run:7b0bf6e0-a098-4cb1-befa-28f649260fa7\"]",
+            "revision": 45,
+            "turnStatus": "running",
+            "basis": "public-native-run-open-and-authored-input"
+          },
+          "failed": {
+            "endpoint": "pi",
+            "phase": "failed",
+            "childSessionId": "940af81b-4337-4cdd-91c3-30fe002b727b",
+            "scope": {
+              "endpointId": "pi",
+              "threadId": "940af81b-4337-4cdd-91c3-30fe002b727b",
+              "sessionId": "940af81b-4337-4cdd-91c3-30fe002b727b"
+            },
+            "inventorySummaryPresent": true,
+            "connectionEpoch": 2,
+            "authoredInput": {
+              "kind": "native",
+              "entryId": "b17393ec",
+              "entryOrdinal": 12
+            },
+            "turnId": "[\"pi\",\"940af81b-4337-4cdd-91c3-30fe002b727b\",\"native-run:7b0bf6e0-a098-4cb1-befa-28f649260fa7\"]",
+            "revision": 55,
+            "turnStatus": "error",
+            "basis": "native-current-run-error"
+          },
+          "pair": {
+            "sameChild": true,
+            "sameEpoch": true,
+            "sameAuthoredInput": true,
+            "sameOpaqueTurnId": true,
+            "runningRevision": 45,
+            "failedRevision": 55,
+            "serverTransactionalFreshnessProven": false
+          }
+        }
+      },
+      "dsh": {
+        "endpoint": "dsh",
+        "version": "0.2.1-rc.2",
+        "commandCount": 23,
+        "processExit": 0,
+        "running": {
+          "endpoint": "dsh",
+          "parentSessionId": "session-ac4b312c-a767-4241-9a55-8863c3acdc7b",
+          "childSessionId": "795a9083-b39b-4453-83d8-b8f79d31b11d",
+          "summaryRow": {
+            "id": "[\"dsh\",\"session-ac4b312c-a767-4241-9a55-8863c3acdc7b\",\"tool:child-call\"]",
+            "sessionId": "795a9083-b39b-4453-83d8-b8f79d31b11d",
+            "status": "running",
+            "title": "Catalog proof child"
+          },
+          "sourceIdentity": {
+            "kind": "journal",
+            "sequence": 19
+          },
+          "rawChildStatus": null,
+          "childStatus": "running",
+          "statusBasis": "public-journal-turn-start-and-authored-input",
+          "indicator": "running",
+          "projectionSucceeded": true,
+          "serverTransactionalFreshnessProven": false,
+          "evidenceScope": "single-publication-same-memory-authority",
+          "fabricationResistance": "not-proven-by-json-validation",
+          "transitionSource": {
+            "basis": "public-journal-turn-start-and-authored-input",
+            "authoredInput": {
+              "kind": "journal",
+              "sequence": 32
+            },
+            "capturedDispatchingQueueCount": 0
+          }
+        },
+        "failed": {
+          "endpoint": "dsh",
+          "parentSessionId": "session-ac4b312c-a767-4241-9a55-8863c3acdc7b",
+          "childSessionId": "795a9083-b39b-4453-83d8-b8f79d31b11d",
+          "summaryRow": {
+            "id": "[\"dsh\",\"session-ac4b312c-a767-4241-9a55-8863c3acdc7b\",\"tool:child-call\"]",
+            "sessionId": "795a9083-b39b-4453-83d8-b8f79d31b11d",
+            "status": "failed",
+            "title": "Catalog proof child"
+          },
+          "sourceIdentity": {
+            "kind": "journal",
+            "sequence": 19
+          },
+          "rawChildStatus": null,
+          "childStatus": "failed",
+          "statusBasis": "latest-child-journal-error",
+          "indicator": "failed",
+          "projectionSucceeded": true,
+          "serverTransactionalFreshnessProven": false,
+          "evidenceScope": "single-publication-same-memory-authority",
+          "fabricationResistance": "not-proven-by-json-validation",
+          "transitionSource": {
+            "basis": "latest-child-journal-error",
+            "authoredInput": {
+              "kind": "journal",
+              "sequence": 32
+            },
+            "terminal": {
+              "kind": "journal",
+              "sequence": 36,
+              "reasonKind": "error",
+              "turn": 3
+            },
+            "capturedDispatchingQueueCount": 0
+          }
+        },
+        "gate": {
+          "requestCount": 1,
+          "entered": true,
+          "explicitlyReleased": true,
+          "aborted": false,
+          "timedOut": false
+        },
+        "childTranscript": {
+          "running": {
+            "endpoint": "dsh",
+            "phase": "running",
+            "childSessionId": "795a9083-b39b-4453-83d8-b8f79d31b11d",
+            "scope": {
+              "endpointId": "dsh",
+              "threadId": "795a9083-b39b-4453-83d8-b8f79d31b11d",
+              "sessionId": "795a9083-b39b-4453-83d8-b8f79d31b11d"
+            },
+            "inventorySummaryPresent": true,
+            "connectionEpoch": 5,
+            "authoredInput": {
+              "kind": "journal",
+              "sequence": 32
+            },
+            "turnId": "[\"dsh\",\"795a9083-b39b-4453-83d8-b8f79d31b11d\",\"turn:3\"]",
+            "revision": 84,
+            "turnStatus": "running",
+            "basis": "public-journal-turn-start-and-authored-input"
+          },
+          "failed": {
+            "endpoint": "dsh",
+            "phase": "failed",
+            "childSessionId": "795a9083-b39b-4453-83d8-b8f79d31b11d",
+            "scope": {
+              "endpointId": "dsh",
+              "threadId": "795a9083-b39b-4453-83d8-b8f79d31b11d",
+              "sessionId": "795a9083-b39b-4453-83d8-b8f79d31b11d"
+            },
+            "inventorySummaryPresent": false,
+            "connectionEpoch": 5,
+            "authoredInput": {
+              "kind": "journal",
+              "sequence": 32
+            },
+            "turnId": "[\"dsh\",\"795a9083-b39b-4453-83d8-b8f79d31b11d\",\"turn:3\"]",
+            "revision": 94,
+            "turnStatus": "error",
+            "basis": "latest-child-journal-error"
+          },
+          "pair": {
+            "sameChild": true,
+            "sameEpoch": true,
+            "sameAuthoredInput": true,
+            "sameOpaqueTurnId": true,
+            "runningRevision": 84,
+            "failedRevision": 94,
+            "serverTransactionalFreshnessProven": false
+          }
+        }
+      }
+    },
+    "provider": "synthetic-loopback",
+    "providerRequestCount": 15,
+    "ownedDshExitStatus": 0,
+    "programSha256": "6aad53eb9910cb190ed5e887d27b1dd28169fea3245c1ed8f5eb27cb46a1215a",
+    "desktopInteraction": false,
+    "paidModel": false,
+    "privateHarnessHistoryRead": false,
+    "serverTransactionalFreshnessProven": false
+  },
+  "binaryReuse": {
+    "baseCommit": "f7fe185acc2eba239936b8e6968f9cac44f7aa1f",
+    "program": "/Volumes/HP P900/dev/TekesAgentKit/shared-target/debug/tekes-agent-headless",
+    "archiveReference": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/native-run-boundaries-20261024/real-transitions/programs/tekes-agent-headless",
+    "programSha256": "6aad53eb9910cb190ed5e887d27b1dd28169fea3245c1ed8f5eb27cb46a1215a",
+    "rustAndUiInputsUnchanged": true,
+    "publicConsumerClosureSha256": "e216110c5e2c26b279f832c9c2cbfa596f004f640b23cf6560b0acfb743e4466",
+    "publicConsumerFiles": 137,
+    "reusedValidation": "../native-run-boundaries-20261024",
+    "rebuild": false,
+    "newTarget": false
+  },
+  "runtimeInputsAfter": {
+    "matchesBefore": true,
+    "programSha256Unchanged": true,
+    "rustAndUiInputsUnchanged": true,
+    "runtimes": {
+      "pi": {
+        "root": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/pi-1.3.0-query-20261021",
+        "version": "1.3.0",
+        "files": {
+          "node/bin/node": "9d050fd455b56426e25d4d603c7c501cbb2630348e836cf221dcce748e90588a",
+          "node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js": "e79626f2dd6f94aa45d30f3fa63cd84319a6eefcd150b353cfaf274366926774",
+          "node_modules/@earendil-works/pi-coding-agent/package.json": "83c3bb7619f590c213cc96a24216eb29a819a3ef6dc548607cc037ed276e8dc5"
+        }
+      },
+      "dsh": {
+        "root": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/dsh-0.2.1-rc.2-sidebar-20261019",
+        "version": "0.2.1-rc.2",
+        "files": {
+          "node/bin/node": "9d050fd455b56426e25d4d603c7c501cbb2630348e836cf221dcce748e90588a",
+          "node_modules/@deepseek-ai/dsh/lib/bin.js": "80112efe368efb1a39720c7ada0af00442e5131fb2744edaaff8a3e8bb499e6f",
+          "node_modules/@deepseek-ai/dsh/package.json": "bea4288aa88eb54efe829686553100a75fdf09d11c5e3bf6b329badb9a0368dd",
+          "node_modules/@deepseek-ai/dsh-app-boot/lib/index.js": "5135179ac810e4f626f32ec3bdc3293dc7d2028e8aa92e5e0c006f1a33b78e76",
+          "package-lock.json": "d7c54df04c10a2d69f5a26f9563e91482aa05c5ad652d1dd7d0c285299f31f06"
+        }
+      }
+    }
+  },
+  "sourceSnapshot": {
+    "directory": "source-runtime",
+    "files": 1075,
+    "optionalInventoryOverride": "source-inventory-fix",
+    "finalChangesSealedSeparately": true
+  },
+  "notRun": [
+    "failure-reconnect-and-history-pagination-in-this-profile",
+    "new-native-kernel-protocol-profile",
+    "native-child-pane-controls-or-draft-lifecycle",
+    "rendered-window-glyph-layout-physical-IME-OS-AX-ProcessContainer",
+    "server-transactional-freshness-or-producer-fabrication-resistance",
+    "full-Transcript-or-ClientKit-parity"
+  ],
+  "ci": {
+    "head": "ba076cc35f1a8c75d23bfa8cf19023f7824e498c",
+    "terminalReceipt": "rust-agent-ui-ci-ba076cc-20261024.json",
+    "checks": "passed",
+    "uiWorkspaceAndStandaloneConsumer": "passed",
+    "strictReading": "failed-TekesUI-53",
+    "demoBuild": "skipped"
+  },
+  "issueClosed": false,
+  "mergeTagRelease": false,
+  "cacheBytesDeletedInThisSlice": 0,
+  "evidenceRoot": ".runtime-fixtures/child-transcript-source-20261024"
+}
