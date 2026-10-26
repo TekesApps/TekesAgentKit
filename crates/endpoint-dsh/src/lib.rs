@@ -392,8 +392,12 @@ impl FollowState {
                                         },
                                     },
                                 );
-                                let mut payload = value["request"].clone();
-                                payload["sessionId"] = json!(agent);
+                                let payload = shared_actionable_payload(
+                                    value["request"].clone(),
+                                    event,
+                                    event_id,
+                                    agent,
+                                )?;
                                 self.pending.push_back(json!({"type":"upsert","generation":generation,"actionable":{"id":event_id,"sessionId":agent,"revision":0,"kind":if event=="approval/request"{"approval"}else{"question"},"payload":payload}}));
                             }
                         } else {
@@ -990,6 +994,23 @@ impl DshSessionEndpoint {
         Ok(json!({"entries":normalized,"parentAvailable":available}))
     }
 }
+/// Add the shared consumer identity while retaining the original tool-call facts.
+fn shared_actionable_payload(
+    mut payload: Value,
+    event: &str,
+    event_id: &str,
+    session: &str,
+) -> Result<Value> {
+    require(payload.is_object(), "invalid DSH actionable request")?;
+    payload["sessionId"] = json!(session);
+    if event == "approval/request" {
+        // A pending approval is identified by the Remote event, not the tool call.
+        // Shared consumers use this field to construct the response envelope.
+        payload["approvalId"] = json!(event_id);
+    }
+    Ok(payload)
+}
+
 /// Shared Kernel-style envelopes are addressed by session; DSH waterfall
 /// handlers consume the answer body or approval word, as ClientKit does.
 /// Native DSH shapes and unknown kinds remain lossless.
@@ -1286,6 +1307,30 @@ mod tests {
         server.abort();
     }
 
+    #[test]
+    fn dsh_approval_payload_supports_the_web_consumer_response_shape() {
+        let payload = shared_actionable_payload(
+            json!({"toolName":"write","callId":"tool-1","reason":"outside workspace"}),
+            "approval/request",
+            "event-2",
+            "session-3",
+        )
+        .unwrap();
+        assert_eq!(payload["callId"], "tool-1");
+        assert_eq!(payload["approvalId"], "event-2");
+        for decision in ["allowed-once", "rejected", "cancelled"] {
+            let web_response = json!({"sessionId":payload["sessionId"], "approvalId":payload["approvalId"], "outcome":decision});
+            assert_eq!(
+                remote_actionable_outcome(web_response, "approval"),
+                json!(decision)
+            );
+        }
+        let question =
+            shared_actionable_payload(json!({"questions":[]}), "user-questions/request", "q", "s")
+                .unwrap();
+        assert!(question.get("approvalId").is_none());
+        assert!(shared_actionable_payload(Value::Null, "approval/request", "e", "s").is_err());
+    }
     #[test]
     fn actionable_responses_unwrap_shared_envelopes_by_registered_kind() {
         let answer = json!({"answers":[{"id":"q","selected":["继续"],"custom":""}]});
