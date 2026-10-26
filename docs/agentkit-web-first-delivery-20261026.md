@@ -1,5 +1,10 @@
 # SessionEndpoints + existing TekesWebUI delivery
 
+[Epic #14](https://github.com/TekesApps/TekesAgentKit/issues/14) is the single live
+delivery status entry, including current source/runtime pins, remaining failures
+and the next batch. The entry versions below are historical inputs, not current
+deployment or acceptance claims.
+
 Current execution scope, 2026-10-26. Epic #14 remains the complete long-term
 requirement; this phase supersedes the native-first ordering in the historical
 2026-10-25 stage freeze. Owners: main chat coordinates integration and serialized
@@ -8,7 +13,7 @@ integration, #55/#56 actual protocol and performance, #58 review/integration,
 #59 immutable headless/Web delivery. No implementation issue is closed by this
 priority change.
 
-## Inputs and ownership
+## Initial inputs and ownership (2026-10-26)
 
 - AgentKit main: `1dcc52153ea45ba6ce73a135a8d8fe8d3406360c`.
 - Shared candidate: PR #10 `2c8a2fb83c8df1834b087d23970b37a4b7f0d109`;
@@ -49,18 +54,20 @@ and verified separately. Existing native WIP remains excluded from builds.
    an immutable version and point the existing WebUI at it. Only integrated,
    accepted capabilities count as delivered; publish exact versions and limits.
 
-## Current failures and remaining work
+## Delivery gates and historical failures
 
-Kernel #86 is OPEN; the latest public release checked on 2026-10-26 is 0.9.3.
-Native busy input admission with an empty public queue remains a supported-path
-failure. Kernel implementation is outside this repository's scope. Determine
-whether an AgentKit-side public-protocol correction exists; otherwise report the
-minimal upstream change/authorization needed. Do not label the path Unsupported.
+The authorized Kernel queue (#86), read-only legacy recovery (#93), archive
+notification (#95) and probe-wait (#97) fixes are released; the WebUI companion
+candidate pins public Kernel 0.9.10. These are no longer open upstream blockers.
+Further Kernel implementation remains outside this repository's scope unless
+separately authorized. The daily installed version and exact acceptance identity
+remain in Epic #14; a published fix does not establish deployment.
 
 The original Native lifecycle, Pi warm/history and DSH warm/cleanup relative
 performance failures remain valid at their original source/program/observer
-identities. The Pi read pipeline is a bounded candidate, not proof those budgets
-are resolved. New tests cannot erase those failures or borrow old passing results.
+identities. Later scoped conclusions and Pi reading optimizations are recorded
+in Epic #14 and #55; no test or source change alone proves a budget resolved.
+New evidence cannot erase old failures or borrow another program's passing result.
 Native Family's completed 21-case cohort remains bound to its original programs.
 
 TekesUI #53 and other purely native rendering/reading/IME/AX gaps do not block an
@@ -71,7 +78,7 @@ terminal/browser panels and command palette stay enhancement work unless the
 existing WebUI core workflow demonstrates a concrete blocker. Full Epic #14
 requirements are unchanged.
 
-## Current execution
+## Execution model
 
 An SSD worktree `codex/headless-web-delivery` isolates the source closure without
 editing the primary WIP. WebUI compatibility is checked against its current public
