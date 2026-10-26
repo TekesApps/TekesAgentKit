@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { Type } from '@sinclair/typebox';
 import { createHash, randomUUID } from 'node:crypto';
-import { createAssistantReading, readingSnapshotControlMessage } from './agentkit-reading.mjs';
+import { createAssistantReading } from './agentkit-reading.mjs';
 import { inputReceiptPayload, snapshotInputFiles } from './agentkit-input-files.mjs';
 // Host control over Pi's public extension API; never adds private RPC commands or parses logs.
 export default function (pi) {
@@ -138,10 +138,6 @@ export default function (pi) {
             if (typeof id !== 'string' || !id || typeof text !== 'string') throw new Error('Invalid input receipt');
             const fileSnapshot = snapshotInputFiles(files);
             prepared.push({ id, text, hash: digest(text), hasImages: hasImages === true, files: fileSnapshot }); data = null; break;
-          }
-          case 'reading.snapshot': {
-            ctx.ui.notify(readingSnapshotControlMessage(request.id, reading.snapshot(ctx.sessionManager)), 'info');
-            return;
           }
           case 'reading.identities': data = reading.identities(ctx.sessionManager.getEntries()); break;
           case 'settings.get': data = pi.getSettings(); break;

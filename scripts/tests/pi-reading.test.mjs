@@ -38,76 +38,23 @@ test('the process-local receipt cache is bounded without persisting or rewriting
   assert.equal(entries.length, 257); assert.equal(entries[0].id, '0'); assert.equal(entries[0].message.timestamp, 100);
 });
 
-test('snapshot reads entries once and binds identities to that exact public result', () => {
-  const reading = createAssistantReading(), final = assistant(), older = assistant();
-  const streamId = reading.start(); reading.end(final);
-  const before = [entry('older', older)], committed = [entry('actual', final)];
-  let calls = 0;
-  const manager = {
-    getEntries() { calls++; return calls === 1 ? before : committed; },
-    getLeafId() { return calls === 1 ? 'older' : 'actual'; },
-  };
-  const first = reading.snapshot(manager);
-  assert.equal(calls, 1);
-  assert.equal(first.entries, before);
-  assert.equal(first.leafId, 'older');
-  assert.deepEqual(first.readingIdentities, []);
-  const second = reading.snapshot(manager);
-  assert.equal(calls, 2);
-  assert.equal(second.entries, committed);
-  assert.equal(second.leafId, 'actual');
-  assert.deepEqual(second.readingIdentities, [{ streamId, entryId: 'actual' }]);
-});
-test('snapshot preserves ambiguous-object rejection and never rewrites public entries', () => {
+test('identity lookup preserves ambiguous-object rejection without rewriting frozen entries', () => {
   const reading = createAssistantReading(), final = assistant();
   reading.start(); reading.end(final);
   const entries = Object.freeze([Object.freeze(entry('one', final)), Object.freeze(entry('two', final))]);
   const before = JSON.stringify(entries);
-  const snapshot = reading.snapshot(Object.freeze({
-    getEntries() { return entries; }, getLeafId() { return 'two'; },
-  }));
-  assert.equal(snapshot.entries, entries);
-  assert.equal(snapshot.leafId, 'two');
-  assert.deepEqual(snapshot.readingIdentities, []);
+  assert.deepEqual(reading.identities(entries), []);
   assert.equal(JSON.stringify(entries), before);
 });
-
-const rpcNotifyLine = message => JSON.stringify({
-  type: 'extension_ui_request', id: '00000000-0000-4000-8000-000000000000',
-  method: 'notify', message, notifyType: 'info',
-}) + '\n';
-const controlData = message => JSON.parse(message.slice('agentkit-control/v1:'.length)).data;
-test('combined snapshot notification respects the actual nested UTF-8 JSONL envelope', async () => {
-  const { readingSnapshotControlMessage } = await import('../../crates/endpoint-pi/resources/agentkit-reading.mjs');
-  for (const text of ['汉字🙂', '\u2028\u2029', '"\\\n\u0000', '\ud800']) {
-    const snapshot = { entries: [entry('one', { ...assistant(), content: [{ type: 'text', text: text.repeat(20) }] })], leafId: 'one', readingIdentities: [] };
-    const message = readingSnapshotControlMessage('request', snapshot, 4096);
-    assert.deepEqual(controlData(message), snapshot);
-    assert(Buffer.byteLength(rpcNotifyLine(message)) <= 4096);
-  }
-});
-test('large previously valid get_entries history uses a compact standard-channel signal', async () => {
-  const { readingSnapshotControlMessage } = await import('../../crates/endpoint-pi/resources/agentkit-reading.mjs');
-  const entries = Array.from({ length: 200 }, (_, i) => entry(String(i), { ...assistant(), content: [{ type: 'text', text: '"'.repeat(100000) }] }));
-  const snapshot = { entries, leafId: '199', readingIdentities: [] }, limit = 64 * 1024 * 1024;
+test('large standard history remains non-nested and identity notification contains no history', () => {
+  const reading = createAssistantReading();
+  const entries = Array.from({ length: 200 }, (_, i) => entry(String(i), { ...assistant(), content: [{ type: 'text', text: '\"'.repeat(100000) }] }));
+  const streamId = reading.start(); reading.end(entries.at(-1).message);
   const original = JSON.stringify({ type: 'response', id: 'request', command: 'get_entries', success: true, data: { entries, leafId: '199' } }) + '\n';
-  const unsafe = 'agentkit-control/v1:' + JSON.stringify({ id: 'request', success: true, data: snapshot });
-  assert(Buffer.byteLength(original) < limit);
-  assert(Buffer.byteLength(rpcNotifyLine(unsafe)) > limit);
-  const message = readingSnapshotControlMessage('request', snapshot);
-  assert.deepEqual(controlData(message), { transfer: 'standard_entries' });
-  assert(Buffer.byteLength(rpcNotifyLine(message)) < limit);
-  assert.equal(snapshot.entries, entries);
-});
-test('bounded notifications fit the unchanged line limit at small pressure boundaries', async () => {
-  const { readingSnapshotControlMessage } = await import('../../crates/endpoint-pi/resources/agentkit-reading.mjs');
-  for (const limit of [512, 1024, 2048, 4096]) {
-    for (const text of ['x', '"', '\\', '汉🙂']) {
-      const snapshot = { entries: [entry('one', { ...assistant(), content: [{ type: 'text', text: text.repeat(500) }] })], leafId: 'one', readingIdentities: [] };
-      const message = readingSnapshotControlMessage('request', snapshot, limit);
-      const data = controlData(message);
-      assert(Buffer.byteLength(rpcNotifyLine(message)) <= limit);
-      assert.deepEqual(data, data.transfer === 'standard_entries' ? { transfer: 'standard_entries' } : snapshot);
-    }
-  }
+  const data = reading.identities(entries);
+  assert.deepEqual(data, [{ streamId, entryId: '199' }]);
+  const notify = JSON.stringify({ type: 'extension_ui_request', method: 'notify', message: 'agentkit-control/v1:' + JSON.stringify({ id: 'request', success: true, data }) }) + '\n';
+  assert(Buffer.byteLength(original) < 64 * 1024 * 1024);
+  assert(Buffer.byteLength(notify) < 512);
+  assert(!notify.includes('entries'));
 });

@@ -14,10 +14,6 @@ export function createAssistantReading() {
     },
     resetActive() { active = undefined; },
     current() { return active; },
-    snapshot(sessionManager) {
-      const entries = sessionManager.getEntries();
-      return { entries, leafId: sessionManager.getLeafId(), readingIdentities: this.identities(entries) };
-    },
     identities(entries) {
       const byMessage = new Map();
       for (const entry of entries) {
@@ -32,20 +28,4 @@ export function createAssistantReading() {
       });
     },
   };
-}
-
-// Pi 1.3 rpc-mode notify emits this exact envelope with crypto.randomUUID().
-// JSON.stringify(message) can at most double the bytes of this already-JSON
-// string (only quote/backslash need another escape); UTF-8 stays UTF-8.
-const notifyEnvelopeBytes = Buffer.byteLength(JSON.stringify({
-  type: 'extension_ui_request', id: '00000000-0000-4000-8000-000000000000',
-  method: 'notify', message: '', notifyType: 'info',
-}) + '\n');
-export function readingSnapshotControlMessage(id, snapshot, maxRecordBytes = 64 * 1024 * 1024) {
-  const prefix = 'agentkit-control/v1:';
-  const message = prefix + JSON.stringify({ id, success: true, data: snapshot });
-  if (notifyEnvelopeBytes + 2 * Buffer.byteLength(message) <= maxRecordBytes) return message;
-  // A compact, explicit signal preserves get_entries' original non-nested wire
-  // range. The consumer must take a fresh standard snapshot and fresh identities.
-  return prefix + JSON.stringify({ id, success: true, data: { transfer: 'standard_entries' } });
 }
