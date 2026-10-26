@@ -28,3 +28,26 @@ test('Pi tool guard enforces actual modes and approval answers, refusing malform
  delete process.env.AGENTKIT_PERMISSION_FILE;assert.equal((await guard(event,ctx)).block,true);
  }finally{if(previous===undefined)delete process.env.AGENTKIT_PERMISSION_FILE;else process.env.AGENTKIT_PERMISSION_FILE=previous;await rm(root,{recursive:true,force:true});}
 });
+
+test('Pi guard reads the bound session policy on each tool call without cross-session leakage',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'pi-session-permissions-'));const previous=process.env.AGENTKIT_PERMISSION_FILE;
+ try {
+ const first=join(root,'first.json'),second=join(root,'second.json');
+ const handlers=new Map();configure({on:(name,fn)=>handlers.set(name,fn),registerTool(){},registerCommand(){}});
+ const guard=handlers.get('tool_call');let asks=0;
+ const ctx={ui:{confirm:async()=>{asks++;return true;}}};const event={toolName:'write',input:{path:'session.txt'}};
+ process.env.AGENTKIT_PERMISSION_FILE=join(root,'missing-policy.json');
+ assert.equal(await guard(event,ctx),undefined,'a missing owned policy retains allow-tools behavior');
+ process.env.AGENTKIT_PERMISSION_FILE=first;
+ await writeFile(first,JSON.stringify({mode:'allow-tools'}));
+ assert.equal(await guard(event,ctx),undefined);
+ process.env.AGENTKIT_PERMISSION_FILE=second;
+ await writeFile(second,JSON.stringify({mode:'deny-tools'}));
+ assert.equal((await guard(event,ctx)).block,true);
+ process.env.AGENTKIT_PERMISSION_FILE=first;
+ await writeFile(first,JSON.stringify({mode:'ask-tools'}));
+ assert.equal(await guard(event,ctx),undefined);assert.equal(asks,1);
+ process.env.AGENTKIT_PERMISSION_FILE=second;
+ assert.equal((await guard(event,ctx)).block,true);assert.equal(asks,1);
+ }finally{if(previous===undefined)delete process.env.AGENTKIT_PERMISSION_FILE;else process.env.AGENTKIT_PERMISSION_FILE=previous;await rm(root,{recursive:true,force:true});}
+});

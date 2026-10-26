@@ -1,0 +1,230 @@
+{
+  "format": 1,
+  "scope": "Native real service/API and existing WebUI Workspace consumer, synthetic provider; not browser or real model",
+  "productCommit": "f5fa01662d556af1454063bd6286793d55bd1d0a",
+  "webuiConsumerCommit": "3120204981f9942458befef45548a0c7e3a2c0e9",
+  "webuiHostCommit": "1235929",
+  "kernel": {
+    "version": "0.9.4",
+    "revision": "daccfd35ab177e19d1c830c8d4c1698513ae0ce5"
+  },
+  "program": {
+    "sourceCommit": "f5fa01662d556af1454063bd6286793d55bd1d0a",
+    "inputManifest": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/web-delivery-20261026/agentkit-f5fa016-fixed-inputs.json",
+    "program": "/Volumes/HP P900/dev/TekesAgentKit/acceptance-tools/web/0.4.0-f5fa016/tekes-agent-web",
+    "sha256": "eb9c5b217196fa11d05b986f6d263c7b220814e66c91af999c38a4f1f387782b",
+    "profile": "dev debug=0 incremental=0 toolchain=1.95.0",
+    "notProven": [
+      "real protocol",
+      "browser",
+      "performance",
+      "release"
+    ]
+  },
+  "evidenceRoot": "/Volumes/HP P900/dev/TekesAgentKit/.runtime-fixtures/web-delivery-20261026/web-native-browser-pilot",
+  "records": [
+    {
+      "file": "pilot-result.json",
+      "sha256": "f4c2722226aab57fc46dfc5763ceea69a9f2441e44cc640963018bff4731f292",
+      "result": {
+        "format": 1,
+        "scope": "actual HTTP/JSONL + real Native Kernel + synthetic provider; not browser or real model",
+        "agentkitCommit": "f5fa01662d556af1454063bd6286793d55bd1d0a",
+        "webuiCommit": "1235929",
+        "kernel": "0.9.4/daccfd35",
+        "sessionId": "01a1766e-f2ab-72bd-8d01-9bd8a8b0af56",
+        "frames": 28,
+        "pass": [
+          "authenticated host API",
+          "public presets/models",
+          "create real session",
+          "shared view stream",
+          "prompt through real Kernel",
+          "final Chinese reply",
+          "scope identity"
+        ],
+        "notRun": [
+          "browser",
+          "Pi",
+          "DSH",
+          "cancel",
+          "queue",
+          "attachment",
+          "pagination",
+          "service restart",
+          "performance",
+          "real model"
+        ]
+      }
+    },
+    {
+      "file": "queue-result.json",
+      "sha256": "9954ea1a047b3dfce998611d28e8355b452876562ca52bb821d950167d103baf",
+      "result": {
+        "format": 1,
+        "scope": "actual HTTP -> AgentKit f5fa016 -> Kernel0.9.4; synthetic provider; not browser",
+        "sessionId": "01a1766e-f2ab-72bd-8d01-9bd8a8b0af56",
+        "frames": 3,
+        "queueBeforeCancel": [
+          {
+            "id": "input:17",
+            "message": {
+              "content": [
+                {
+                  "text": "AKWEB_QUEUED 这是排队的独立输入。",
+                  "type": "text"
+                }
+              ],
+              "id": "input-17",
+              "role": "user",
+              "source": {
+                "kind": "user",
+                "rpcId": "029d6308-b9b7-40b9-bd44-6c44f4ac85dc"
+              }
+            },
+            "placement": "queued"
+          }
+        ],
+        "finalRun": {
+          "actionables": [],
+          "canCancel": false,
+          "canSubmit": true,
+          "connection": {
+            "canSubmit": true,
+            "historyIsStale": false,
+            "message": null,
+            "phase": "connected"
+          },
+          "error": null,
+          "jobs": [],
+          "phase": "idle",
+          "queue": [],
+          "scope": {
+            "endpointId": "tekes-loopback-default",
+            "sessionId": "01a1766e-f2ab-72bd-8d01-9bd8a8b0af56",
+            "threadId": "01a1766e-f2ab-72bd-8d01-9bd8a8b0af56"
+          }
+        },
+        "originalOracleFailure": "initial wait matched first input before the second queue publication; raw later frame proves second input, retained unchanged",
+        "pass": [
+          "running cancel authority",
+          "busy input visible in authoritative shared queue",
+          "original cancel accepted and reaches idle",
+          "cancel preserves pending input per stop-gate contract",
+          "explicit queued-input removal projects empty queue"
+        ],
+        "notRun": [
+          "browser",
+          "physical IME",
+          "performance",
+          "real model"
+        ]
+      }
+    },
+    {
+      "file": "file-history-result.json",
+      "sha256": "6434c11d20881e5683927d1e01109bbb79e34be89ff6b74bda8d12553e8c6a95",
+      "result": {
+        "format": 1,
+        "source": {
+          "agentkit": "f5fa01662d556af1454063bd6286793d55bd1d0a",
+          "webuiHost": "1235929",
+          "kernel": "0.9.4/daccfd35"
+        },
+        "scope": "real authenticated service / Native Kernel / synthetic provider; not browser",
+        "sessionId": "01a1766e-f2ab-72bd-8d01-9bd8a8b0af56",
+        "pass": [
+          "select public model",
+          "upload exact UTF-8 file bytes",
+          "prompt file receipt",
+          "shared transcript file reference",
+          "public attachment byte recovery",
+          "frozen-cut paginated history without overlap"
+        ],
+        "analysisCorrection": "Reused original upload/prompt/byte recovery; original snapshot has snake_case tail_sequence, no input repeated",
+        "fileSha256": "b52dce85fc18833098b3784d46a29e3ce79337e9d9035e1134aff496ef2735c0",
+        "tailSequence": 19,
+        "beforeSequence": 16,
+        "notRun": [
+          "browser upload/control",
+          "Pi",
+          "DSH",
+          "full performance",
+          "real model"
+        ]
+      }
+    },
+    {
+      "file": "webui-client-result.json",
+      "sha256": "070fb929742c422ccd0be168b8971a42256d584cca0a05f0a1d9c34b58357ac9",
+      "result": {
+        "source": {
+          "webui": "3120204",
+          "agentkit": "f5fa016",
+          "kernel": "0.9.4/daccfd35"
+        },
+        "scope": "actual existing WebUI Workspace consumer over real HTTP -> private pipe -> Native Kernel, synthetic provider; Node transport adapter, NOT browser/IME",
+        "sessionId": "01a1766e-f2ab-72bd-8d01-9bd8a8b0af56",
+        "pass": [
+          "existing WebUI connection/model/controls",
+          "policy-backed mixed text/image/file/image order",
+          "only ordinary file uses upload receipt",
+          "original distinct PNG bytes retained",
+          "durable shared transcript",
+          "turn returns idle"
+        ],
+        "notRun": [
+          "actual browser upload",
+          "browser close/reopen",
+          "Pi",
+          "DSH",
+          "real model",
+          "performance"
+        ]
+      }
+    },
+    {
+      "file": "webui-client-image-recovery.json",
+      "sha256": "7bc202d3b1848b01caea7775837a44dca00617212256e5fbe90a690da5ae7772",
+      "result": {
+        "scope": "same312 Workspace mixed prompt; actual Kernel public session.attachment, not browser preview",
+        "sessionId": "01a1766e-f2ab-72bd-8d01-9bd8a8b0af56",
+        "rows": [
+          {
+            "name": "red.png",
+            "sha256": "97a3a410c9bca540512251c37ce63982edccbed54c6f2e1d06ec717b9f753e29",
+            "metadata": {
+              "attachmentId": "sha256:97a3a410c9bca540512251c37ce63982edccbed54c6f2e1d06ec717b9f753e29",
+              "bytes": 73,
+              "height": 2,
+              "mediaType": "image/png",
+              "width": 2
+            },
+            "bytes": 73,
+            "pass": true
+          },
+          {
+            "name": "blue.png",
+            "sha256": "7c3c919026a6f27ace0891b608cc0697fec53dedc25562bfd1443285557cdf8f",
+            "metadata": {
+              "attachmentId": "sha256:7c3c919026a6f27ace0891b608cc0697fec53dedc25562bfd1443285557cdf8f",
+              "bytes": 72,
+              "height": 2,
+              "mediaType": "image/png",
+              "width": 2
+            },
+            "bytes": 72,
+            "pass": true
+          }
+        ]
+      }
+    }
+  ],
+  "limitations": [
+    "Not full #55/#56 finite matrix; pagination here uses one message per page, not the frozen performance dataset",
+    "No browser controls, close/reopen, service restart, real configured model, Pi or DSH consumer acceptance",
+    "Original pilot transport/oracle failures retained; continuation analyses reuse same raw queue/file records without replaying input",
+    "Later product/program versions must not inherit this result without impact analysis"
+  ],
+  "releaseStatus": "candidate not integrated or released"
+}

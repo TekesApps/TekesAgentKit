@@ -315,7 +315,14 @@ impl Context {
                 return Ok(rpc.clone());
             }
             self.validate_pointer(&row).await?;
-            let rpc = Rpc::start(&self.config, &row.cwd, Some(&row.file)).await?;
+            let permission_file = self.permission_file(&row.id);
+            let rpc = Rpc::start(
+                &self.config,
+                &row.cwd,
+                Some(&row.file),
+                Some(&permission_file),
+            )
+            .await?;
             let mut events = rpc.events();
             let readiness = async {
                 if !row.materialized && row.subagent_parent.is_some() {
@@ -1213,7 +1220,14 @@ impl SessionEndpoint for PiSessionEndpoint {
                     "invalid or conflicting session identity",
                 )?;
                 // Native RPC validates the file. AgentKit never decodes a private session log to create history.
-                let rpc = Rpc::start(&self.context.config, &cwd, Some(&file)).await?;
+                let permission_file = self.context.permission_file(&id);
+                let rpc = Rpc::start(
+                    &self.context.config,
+                    &cwd,
+                    Some(&file),
+                    Some(&permission_file),
+                )
+                .await?;
                 let state = rpc.request("get_state", json!({})).await;
                 let metadata = rpc.request("get_entries", json!({})).await;
                 rpc.close();
@@ -1253,8 +1267,13 @@ impl SessionEndpoint for PiSessionEndpoint {
                 Ok(json!({"sessionId":id,"created":true}))
             }
             "models.list" | "models/list" => {
-                let rpc =
-                    Rpc::start(&self.context.config, &self.context.config.data_root, None).await?;
+                let rpc = Rpc::start(
+                    &self.context.config,
+                    &self.context.config.data_root,
+                    None,
+                    None,
+                )
+                .await?;
                 let result = self.model_catalog(&rpc).await;
                 rpc.close();
                 result

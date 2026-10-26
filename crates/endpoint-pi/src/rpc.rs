@@ -90,7 +90,12 @@ impl Rpc {
         config: &PiConfiguration,
         cwd: &Path,
         session: Option<&Path>,
+        permission_file: Option<&Path>,
     ) -> Result<Arc<Self>> {
+        require(
+            session.is_none() || permission_file.is_some(),
+            "Pi session launch requires its owned approval policy path",
+        )?;
         let control_token = uuid::Uuid::new_v4().to_string();
         let mut command = Command::new(&config.executable);
         command
@@ -114,12 +119,18 @@ impl Rpc {
             .current_dir(cwd)
             .env_clear()
             .envs(&config.environment)
+            // This is an AgentKit-owned, session-scoped authority. A host-wide
+            // environment setting must never select another session's policy.
+            .env_remove("AGENTKIT_PERMISSION_FILE")
             .env("PI_CODING_AGENT_DIR", config.data_root.join("agent"))
             .env("AGENTKIT_CONTROL_TOKEN", &control_token)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
             .kill_on_drop(true);
+        if let Some(permission_file) = permission_file {
+            command.env("AGENTKIT_PERMISSION_FILE", permission_file);
+        }
         let mut child = command
             .spawn()
             .map_err(|e| Error::Transport(format!("Pi launch: {e}")))?;
@@ -351,6 +362,73 @@ mod tests {
             .await
             .expect("request was enqueued")
             .expect("test actor remains connected")
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn session_rpc_binds_its_owned_permission_file_over_global_environment() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let root = std::env::temp_dir().join(format!("agentkit-rpc-env-{}", uuid::Uuid::new_v4()));
+        tokio::fs::create_dir_all(&root).await.unwrap();
+        let executable = root.join("fake-pi");
+        tokio::fs::write(
+            &executable,
+            "#!/bin/sh\nprintf '%s' \"$AGENTKIT_PERMISSION_FILE\" > \"$AGENTKIT_CAPTURE\"\nexec /bin/sleep 5\n",
+        )
+        .await
+        .unwrap();
+        let mut permissions = std::fs::metadata(&executable).unwrap().permissions();
+        permissions.set_mode(0o700);
+        std::fs::set_permissions(&executable, permissions).unwrap();
+
+        let mut config = PiConfiguration::new(executable, root.join("data"));
+        config.environment.insert(
+            "AGENTKIT_PERMISSION_FILE".into(),
+            "/global/override.json".into(),
+        );
+        assert!(
+            Rpc::start(&config, &root, Some(&root.join("missing.jsonl")), None)
+                .await
+                .is_err(),
+            "a session RPC cannot launch without its owned policy path"
+        );
+        let mut sessions = Vec::new();
+        for index in 1..=2 {
+            let session_file = root.join(format!("session-{index}.jsonl"));
+            let policy_file = root.join(format!("owned-{index}.json"));
+            let capture_file = root.join(format!("captured-{index}.txt"));
+            config.environment.insert(
+                "AGENTKIT_CAPTURE".into(),
+                capture_file.display().to_string(),
+            );
+            let rpc = Rpc::start(&config, &root, Some(&session_file), Some(&policy_file))
+                .await
+                .unwrap();
+            sessions.push((rpc, capture_file, policy_file));
+        }
+
+        for (rpc, capture, expected) in &sessions {
+            tokio::time::timeout(Duration::from_secs(2), async {
+                loop {
+                    if tokio::fs::read_to_string(capture)
+                        .await
+                        .is_ok_and(|value| value == expected.display().to_string())
+                    {
+                        break;
+                    }
+                    tokio::task::yield_now().await;
+                }
+            })
+            .await
+            .expect("fake Pi recorded its startup environment");
+            assert_eq!(
+                tokio::fs::read_to_string(capture).await.unwrap(),
+                expected.display().to_string()
+            );
+            rpc.close();
+        }
+        tokio::fs::remove_dir_all(root).await.unwrap();
     }
 
     async fn wait_for_pending(actor: &TestActor, expected: usize) {
