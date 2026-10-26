@@ -13,4 +13,4 @@
 
 **决定**：保留全部有效失败；当前证据不足，不做猜测性产品改动。Native Family先完成一个diagnostic端到端pilot，正式矩阵尚不启动。若后续必须补归因，只增加与原失败操作绑定的阶段时序（含case/scope、公开调用、provider响应及投影边界），先验证工具，再仅采受影响部分。新观察程序保留独立身份，不与旧observer混算；已经通过且未受影响的组不重跑。
 
-这不是性能豁免或阶段交付。当前完整条件见[阶段唯一入口](agentkit-stage-close-20261025.md#当前状态唯一入口2026-10-26)。
+这不是性能豁免或阶段交付。当前完整条件见[Epic #14唯一当前入口](https://github.com/TekesApps/TekesAgentKit/issues/14)。
