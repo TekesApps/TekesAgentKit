@@ -47,12 +47,14 @@
         30,
         32,
         55,
-        67
+        67,
+        71
       ],
       "keys": [
         "H01",
         "H03",
-        "PROTO-RUN"
+        "PROTO-RUN",
+        "PIREAD"
       ],
       "implementationAndVerification": "PR1/2/5已合入；Kernel0.9.0→0.9.1旧证据与当前0.9.3分开",
       "remaining": "当前同交付源码三端协议逐项验收；不以RPC ack证明行为"
@@ -115,13 +117,15 @@
         30,
         34,
         40,
-        55
+        55,
+        71
       ],
       "keys": [
         "H01",
         "COMPOSER",
         "RUNPORT",
-        "PROTO-RUN"
+        "PROTO-RUN",
+        "PIREAD"
       ],
       "implementationAndVerification": "PR2与v0.1.0已交付；PR7/8/9/11维护至v0.3.8",
       "remaining": "新UI层不因root发布自动完成"
@@ -1823,6 +1827,26 @@
       "owner": "@qf0421；主会话协调 + 新独立子会话",
       "number": 70,
       "stage": "future"
+    },
+    {
+      "key": "PIREAD",
+      "number": 71,
+      "parent": 14,
+      "title": "[修复/性能] Pi 只读会话查询重叠等待与取消清理",
+      "status": "进行中",
+      "layer": "实现",
+      "scope": "独立main两文件：并发等待get_entries/get_state，只清理本地pending；公共DTO与reading.identities顺序不变。属于已知Pi读取成本的有界优化候选，不承诺原p95根因已定位。",
+      "deliverables": "私有helper/RAII、逆序/取消/迟到/断连测试；固定真实SDK静态及流式读取与public consumer；精确候选review/CI/main CI。",
+      "dependencies": "main1dcc；不依赖TekesUI53或Kernel86；stage应用后需受影响回归。",
+      "criteria": "公开行为、取消/超时清理、真实SDK与适用检查/consumer/review/CI均通过并进入main；原#55旧性能失败仍保留。",
+      "evidence": "独立源码审查确认getter无依赖、UUID pending支持并发；当前仅代码候选，测试和真实协议尚待主会话串行执行。",
+      "related": [
+        16,
+        38,
+        55
+      ],
+      "owner": "qf0421",
+      "stage": "blocking-performance-candidate"
     }
   ],
   "existingImplementationIssues": [
@@ -1849,7 +1873,8 @@
       "owner": "qf0421",
       "type": "实施",
       "evidence": "f399356原分类协议/组件证据；本次重开，PR10未合入"
-    }
+    },
+    71
   ],
   "codeWip": "Native Summary transition，暂停于未编译通过和validator审查；无新真实协议/桌面验收",
   "evidencePolicy": "commit+program+version+proof layer；历史不升级新HEAD；未合入代码不关闭",
@@ -2162,6 +2187,13 @@
       "mandatoryNestedReading": "failure",
       "demoBuild": "skipped",
       "artifactId": 12619153245
+    },
+    "piReadOptimizationCandidate": {
+      "issue": 71,
+      "baseMain": "1dcc52153ea45ba6ce73a135a8d8fe8d3406360c",
+      "scope": "two-file private Pi read/cleanup closure, not UI",
+      "implementedPendingValidation": true,
+      "originalPerformanceFailureResolved": false
     }
   },
   "stageCoverageAudit": {
@@ -2194,10 +2226,27 @@
   "currentStageCounts": {
     "已关闭": 4,
     "已验证待集成": 11,
-    "进行中": 9,
+    "进行中": 10,
     "等待上游": 9,
     "等待桌面": 1,
     "待办": 9
   },
-  "remoteMainAtOriginalAudit": "f1daa0ffcf6ced41e21f351e22845455ca78006c"
+  "remoteMainAtOriginalAudit": "f1daa0ffcf6ced41e21f351e22845455ca78006c",
+  "currentDelivery": {
+    "date": "2026-10-26",
+    "scope": "SessionEndpoints + shared presentation + existing TekesWebUI",
+    "design": "docs/agentkit-web-first-delivery-20261026.md",
+    "implementationIssues": [
+      37,
+      55,
+      56,
+      58,
+      59,
+      67,
+      71
+    ],
+    "nativeUI": "preserved; nonessential expansion paused; native-only gates do not block isolated Web delivery",
+    "releaseStatus": "not_delivered",
+    "webuiContractCommit": "a8610a420bad72eaedcf706b30df87153a0f3e16"
+  }
 }

@@ -1,3 +1,8 @@
+> 当前阶段：优先交付 SessionEndpoints、共享 presentation 和现有 TekesWebUI 接入。
+> [执行契约](agentkit-web-first-delivery-20261026.md) supersedes旧阶段原生优先顺序；
+> #37/#55/#56/#58/#59负责接入、真实验收、集成和发布。全部Epic要求及历史证据保留。
+> 原生UI扩展暂停，原生专属门禁不阻真正隔离的Web交付；共享失败不豁免。尚未发布。
+
 # AgentKit 需求与 Issue 覆盖索引
 
 审计日期：2026-10-25。总 Epic [#14](https://github.com/TekesApps/TekesAgentKit/issues/14)。本索引是当前执行入口；[旧交付计划](rust-agent-ui-issue-plan.md)与[原Issue正文/状态](agentkit-issue-history-20261025.json)保留为历史，不能用其旧勾选代替当前集成状态。
@@ -251,3 +256,7 @@ DSH纠正observer e978f5e、baseline950db9a1/candidate92206559的新两case各�
 [21-case绑定](evidence-bindings-20261026/native-family-official-cohort.json)：common50+独立SEP20双角色与candidate产品20分别完成cold5/warm初始化+10/lifecycle初始化+10。每case真实采集一次，原source/full200 EOF、产品分页/旧实例恢复/父草稿隔离、OS身份与退休均通过；共同路径原绝对/相对预算和产品20原适用绝对预算通过。product20仅新增可配置入口无同入口baseline，basic Family/common50仍有baseline，未豁免比较。
 
 2个材料器时间戳表示误判保留原负报告，只按公开SessionEvent.time:f64边界离线重验同份raw，无补采、原opaque值仍严格对账。pilot未升级正式。完整#56、Pi/DSH Family、附件/队列、ordinary原有效性能失败、上游与集成/发布继续保留；本段不证明main或完整UI交付。当前实时状态仍以#14正文为准。
+
+### #71有界Pi读取优化候选
+
+R02/R05增加独立实施票[#71](https://github.com/TekesApps/TekesAgentKit/issues/71)：两个独立只读RPC重叠等待与本地pending取消清理，main代码闭包仅Pi适配器两个私有文件。静态与流式真实SDK、public consumer、精确review/CI/main CI均满足才集成/关闭。它不引入业务功能，不解决或豁免#55原p95，不改变阶段冻结预算；PR10应用新代码后仍需受影响回归。当前状态进行中，代码已形成但尚未编译或协议验收。

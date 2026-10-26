@@ -62,14 +62,15 @@ workstream when a broad experimental PR merges; each issue has its own acceptanc
 
 # Current stage closure
 
-The 2026-10-25 stage is frozen by `docs/agentkit-stage-close-20261025.md` at
-`5b7c843`. Pause feature expansion; #60–#66 and newly preserved expansion WIP
-remain future scope without reducing Epic #14. Only blocking fixes change this
-candidate, with explicit affected-input receipts and targeted revalidation.
+The current delivery priority is SessionEndpoints + shared presentation + the existing
+TekesWebUI host/consumer, defined in `docs/agentkit-web-first-delivery-20261026.md`.
+This supersedes the native-first ordering in the historical 2026-10-25 freeze.
+Preserve native WIP/evidence and pause unnecessary native expansion. Isolate actual
+headless/Web dependencies; native-only gates remain on native scope, while shared
+protocol, performance and Web consumer gates cannot be weakened. Reuse the existing
+WebUI and launcher; do not rebuild its application or install duplicate runtimes.
 The main chat serializes Cargo against immutable batch inputs and the existing
-SSD shared target. Do not edit a batch's source while it is being validated.
-A split delivery must isolate real dependencies and retain every applicable
-check; supported protocol failures cannot become Unsupported to permit release.
+SSD shared target. Supported protocol failures cannot become Unsupported.
 
 Frozen archives must have current extraction timestamps before sharing Cargo outputs: Cargo's
 workspace-relative dep-info can otherwise reuse newer artifacts from another snapshot with the
