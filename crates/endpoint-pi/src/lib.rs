@@ -540,8 +540,7 @@ async fn conversation_frame(
     limit: usize,
     initial: bool,
 ) -> Result<Value> {
-    let entries = rpc.request("get_entries", json!({})).await?;
-    let state = rpc.request("get_state", json!({})).await?;
+    let (entries, state) = rpc.session_state().await?;
     let leaf_id = entries["leafId"].as_str().map(String::from);
     let (entries, more) = active_branch(&entries, limit)?;
     let snapshot = NativeConversationSnapshot {
