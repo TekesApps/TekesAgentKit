@@ -13,6 +13,34 @@ integration, #55/#56 actual protocol and performance, #58 review/integration,
 #59 immutable headless/Web delivery. No implementation issue is closed by this
 priority change.
 
+## Per-endpoint delivery order (2026-10-27)
+
+Deliver **Native → DSH → Pi**, each through SEP → shared presentation → public
+Web service/contract → the existing TekesWebUI. Do not wait for unrelated
+endpoint-specific failures before integrating an independently accepted endpoint.
+All shared-code, contract, consumer, CI and applicable performance checks remain
+required. Compiling all adapters is not evidence of accepting all three runtimes.
+
+The current Native closure is unchanged between e9946e8 and product 375287c;
+later product changes in that interval are Pi-only. Keep original Native evidence
+identities and document this source relationship rather than relabeling programs.
+Native Family's 21-case pass and earlier Native protocol/performance results are
+reused only for their unchanged scope. Missing browser interactions, Native
+browser-close continuation, restart boundaries and one existing real-model run
+remain required, followed by exact delivery review, consumer, CI and release.
+
+The existing host must allow explicit endpoint selection: Native-only startup
+must not read Pi registry/runtime/provider credentials or DSH connection secrets,
+and must not wait for disabled endpoints. Preserve the existing default and saved
+configuration compatibility. This is host configuration, not a new business state
+machine or a replacement launcher. Do not change provider settings or move data.
+An enabled endpoint still has to satisfy its existing readiness and contracts.
+
+Release notes must name the accepted endpoint scope and precise runtime/program
+versions. Pi and DSH candidates and failures remain open until separately accepted;
+merging shared code must not close their acceptance issues. Native TekesUI remains
+paused and the complete Epic requirements are unchanged.
+
 ## Initial inputs and ownership (2026-10-26)
 
 - AgentKit main: `1dcc52153ea45ba6ce73a135a8d8fe8d3406360c`.
