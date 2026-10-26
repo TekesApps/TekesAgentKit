@@ -390,6 +390,16 @@ impl Context {
                         }
                         continue;
                     }
+                    // Rpc::control consumes these private replies directly;
+                    // public event streams already omit them.
+                    if event["type"] == "extension_ui_request"
+                        && event["method"] == "notify"
+                        && event["message"]
+                            .as_str()
+                            .is_some_and(|text| text.starts_with("agentkit-control/v1:"))
+                    {
+                        continue;
+                    }
                     if event["type"] == "extension_ui_request"
                         && matches!(
                             event["method"].as_str(),
