@@ -157,7 +157,11 @@ impl SharedAgent {
             state.sessions.contains_key(parent_id),
             "child parent session unavailable",
         )?;
-        let layout = if state.sessions.contains_key(child_id) {
+        let layout = if state
+            .sessions
+            .get(child_id)
+            .is_some_and(|session| session.summary.is_some() || session.journal_ready)
+        {
             ChildHistoryLayout::IndependentSessions
         } else if endpoint.capabilities().supports("subagents.history") {
             ChildHistoryLayout::SameSession
@@ -188,7 +192,7 @@ impl SharedAgent {
             "child history connection changed while opening",
         )?;
         let run = Arc::new(tokio::sync::Mutex::new(opened));
-        let transcript = run.lock().await.transcript().await?;
+        let (transcript, presentation) = run.lock().await.presentation().await?;
         require(
             shared.runtime.snapshot().connection_epoch == epoch,
             "child history connection changed during read",
@@ -234,7 +238,7 @@ impl SharedAgent {
         Ok(
             json!({"endpointId":state.endpoint_id,"parentSessionId":parent_id,"childId":child_id,
             "connectionEpoch":epoch,"layout":layout,"availability":availability,"mode":child.mode,
-            "handle":handle,"transcript":transcript}),
+            "handle":handle,"transcript":transcript,"run":presentation}),
         )
     }
 
@@ -247,10 +251,10 @@ impl SharedAgent {
         let run = view.run.clone();
         let run = run.lock().await;
         let loaded = run.load_earlier().await?;
-        let transcript = run.transcript().await?;
+        let (transcript, presentation) = run.presentation().await?;
         self.validate_child_view(shared, &handle, &view)?;
         Ok(
-            json!({"loaded":loaded,"transcript":transcript,"connectionEpoch":view.epoch,"handle":handle}),
+            json!({"loaded":loaded,"transcript":transcript,"run":presentation,"connectionEpoch":view.epoch,"handle":handle}),
         )
     }
 
@@ -358,7 +362,7 @@ impl SharedAgent {
     ) -> Result<()> {
         let target = &request["target"];
         let handle = string(target, "handle")?.to_owned();
-        let (view, following, epoch) = {
+        let (view, following, epoch, expected_view) = {
             let mut views = self.family_views.lock().expect("family views lock");
             let view = views
                 .get_mut(&handle)
@@ -380,11 +384,16 @@ impl SharedAgent {
                 "child view already has an observer",
             )?;
             view.last_used = Instant::now();
-            (view.run.clone(), view.following.clone(), view.epoch)
+            (
+                view.run.clone(),
+                view.following.clone(),
+                view.epoch,
+                view.clone_for_route(),
+            )
         };
         let _cleanup = ChildFollowGuard {
             views: &self.family_views,
-            handle,
+            handle: handle.clone(),
         };
         let runtime = shared.runtime.clone();
         let mut observer = runtime.subscribe();
@@ -397,12 +406,13 @@ impl SharedAgent {
             if shared.runtime.snapshot().connection_epoch != epoch {
                 break;
             }
-            let transcript = view.lock().await.transcript().await?;
+            let (transcript, presentation) = view.lock().await.presentation().await?;
+            self.validate_child_view(shared, &handle, &expected_view)?;
             if output
                 .send(json!({"endpointId":shared.runtime.snapshot().endpoint_id,
                 "parentSessionId":string(target,"parentSessionId")?,
                 "childId":string(target,"childId")?,"handle":string(target,"handle")?,
-                "connectionEpoch":epoch,"transcript":transcript}))
+                "connectionEpoch":epoch,"transcript":transcript,"run":presentation}))
                 .await
                 .is_err()
             {

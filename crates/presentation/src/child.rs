@@ -271,6 +271,52 @@ impl ChildRun {
             Ok(snapshot)
         })
     }
+
+    /// Read a child's transcript and run presentation together from one runtime authority.
+    /// Native bounded history projects both from the same public read-only page and cannot
+    /// acquire submit or cancel authority.
+    pub async fn presentation(
+        &self,
+    ) -> tekes_agent_contract::Result<(crate::TranscriptSnapshot, crate::RunPresentation)> {
+        if let Some(bounded) = &self.bounded {
+            return bounded.lock().await.refresh_presentation().await;
+        }
+        if let Some(source) = &self.source {
+            let transcript = source.read(&self.parent, &self.child).await?;
+            return self.runtime.inspect(|state| {
+                let scope = RunScope {
+                    endpoint_id: self.parent.endpoint_id.clone(),
+                    thread_id: self.parent.thread_id.clone(),
+                    session_id: self.child.clone(),
+                };
+                tekes_agent_contract::require(
+                    state.sessions.contains_key(&self.child),
+                    "child run projection unavailable for custom history source",
+                )?;
+                Ok((
+                    transcript,
+                    crate::RunPresentation::read(state, &scope, true),
+                ))
+            });
+        }
+        self.runtime.inspect(|state| {
+            let scope = RunScope {
+                endpoint_id: self.parent.endpoint_id.clone(),
+                thread_id: self.parent.thread_id.clone(),
+                session_id: self.child.clone(),
+            };
+            let session = state
+                .sessions
+                .get(&self.child)
+                .ok_or(tekes_agent_contract::Error::Disconnected)?;
+            let mut transcript = crate::TranscriptSnapshot::read(&scope, session)?;
+            transcript.is_stale |=
+                crate::ConnectionPresentation::read(state, Some(&self.child), true)
+                    .history_is_stale;
+            let run = crate::RunPresentation::read(state, &scope, true);
+            Ok((transcript, run))
+        })
+    }
     /// Refresh and project a bounded Native same-session head while retaining the typed response
     /// from that exact read. Custom and independent history sources have distinct ownership.
     #[cfg(feature = "acceptance-source-witness")]

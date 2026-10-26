@@ -84,18 +84,27 @@ impl SessionEndpoint for FixtureEndpoint {
         ])
     }
     async fn follow(&self, target: StreamTarget) -> Result<FrameStream> {
+        if matches!(&target, StreamTarget::Actionables) {
+            let reset = json!({"type":"reset","generation":format!("actions-{}",self.epoch)});
+            let action = json!({"type":"upsert","generation":format!("actions-{}",self.epoch),"actionable":{"id":"child-action","sessionId":"child","revision":4,"kind":"question","payload":{"title":"Child input"}}});
+            return Ok(Box::pin(
+                stream::iter(vec![Ok(reset), Ok(action)]).chain(stream::pending()),
+            ));
+        }
         let frame = match target {
             StreamTarget::SessionInventory => {
                 json!({"type":"baseline","generation":format!("inventory-{}",self.epoch),"snapshot":{"items":[{"sessionId":"parent","title":"Parent","updatedAt":1,"running":false,"blank":false}]}})
             }
             StreamTarget::SessionControl => {
-                json!({"type":"baseline","generation":format!("control-{}",self.epoch),"snapshot":{"queues":[],"jobs":[],"projections":[]}})
+                json!({"type":"baseline","generation":format!("control-{}",self.epoch),"snapshot":{"queues":[{"sessionId":"child","items":[{"text":"queued-child"}]}],"jobs":[],"projections":[]}})
             }
-            StreamTarget::Actionables => {
-                json!({"type":"reset","generation":format!("actions-{}",self.epoch)})
-            }
+            StreamTarget::Actionables => unreachable!(),
             StreamTarget::SessionJournal { address, .. } => {
-                json!({"type":"snapshot","snapshot":{"sessionId":address.session_id,"generation":format!("journal-{}",self.epoch),"throughSequence":-1,"windowLimit":50,"entries":[],"hasMoreBefore":false}})
+                if address.session_id == "child" {
+                    json!({"type":"snapshot","snapshot":{"sessionId":address.session_id,"generation":format!("journal-{}",self.epoch),"throughSequence":0,"windowLimit":50,"entries":[history_entry(0,"turn/start")],"hasMoreBefore":false}})
+                } else {
+                    json!({"type":"snapshot","snapshot":{"sessionId":address.session_id,"generation":format!("journal-{}",self.epoch),"throughSequence":-1,"windowLimit":50,"entries":[],"hasMoreBefore":false}})
+                }
             }
             _ => return Err(unsupported("unexpected fixture follow target")),
         };
@@ -179,6 +188,17 @@ async fn setup_with_control(control: Arc<FixtureControl>) -> SharedAgent {
         .wait_ready(Duration::from_secs(2))
         .await
         .unwrap();
+    let runtime = agent.endpoint("fixture").unwrap().runtime.clone();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if runtime.inspect(|state| state.actionables.contains_key("child-action")) {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+    })
+    .await
+    .expect("fixture actionable projection should arrive");
     agent
 }
 async fn setup() -> SharedAgent {
@@ -241,6 +261,16 @@ async fn independently_opened_child_views_keep_separate_history_and_follow_lease
     assert_ne!(first["handle"], second["handle"]);
     assert_eq!(first["transcript"]["hasMoreBefore"], true);
     assert_eq!(second["transcript"]["hasMoreBefore"], true);
+    assert_eq!(
+        first["availability"], "available",
+        "read-only history layout cannot rewrite the public catalog mode"
+    );
+    assert_eq!(first["run"]["scope"]["sessionId"], "child");
+    assert_eq!(first["run"]["phase"], "waitingForInput");
+    assert_eq!(first["run"]["canSubmit"], false);
+    assert_eq!(first["run"]["canCancel"], false);
+    assert_eq!(first["run"]["queue"][0]["text"], "queued-child");
+    assert_eq!(first["run"]["actionables"][0]["id"], "child-action");
 
     let earlier = agent
         .request(&call("agent.child.earlier", address(&first)))
@@ -291,6 +321,41 @@ async fn independently_opened_child_views_keep_separate_history_and_follow_lease
     );
     drop(rx_b);
     tokio::time::timeout(Duration::from_secs(2), follow_b)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+}
+
+#[tokio::test]
+async fn independent_child_open_and_follow_preserve_shared_run_queue_and_actionables() {
+    let agent = setup().await;
+    let runtime = agent.endpoint("fixture").unwrap().runtime.clone();
+    runtime.open_session("child").await.unwrap();
+    // Actionables are a separate authoritative runtime projection and must stay child-scoped.
+    let opened = open_child(&agent).await;
+    assert_eq!(opened["layout"], "independentSessions");
+    assert_eq!(opened["run"]["phase"], "waitingForInput");
+    assert_eq!(opened["run"]["canCancel"], true);
+    assert_eq!(opened["run"]["queue"][0]["text"], "queued-child");
+    assert_eq!(opened["run"]["actionables"][0]["id"], "child-action");
+
+    let (tx, mut rx) = mpsc::channel(2);
+    let observed = Arc::new(agent);
+    let follow_agent = observed.clone();
+    let handle = opened["handle"].clone();
+    let follow = tokio::spawn(async move {
+        follow_agent.follow(&json!({"op":"follow","endpoint":"fixture","target":{"kind":"childView","handle":handle,"parentSessionId":"parent","childId":"child"}}),tx).await
+    });
+    let frame = tokio::time::timeout(Duration::from_secs(2), rx.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(frame["run"]["phase"], "waitingForInput");
+    assert_eq!(frame["run"]["queue"][0]["text"], "queued-child");
+    assert_eq!(frame["run"]["actionables"][0]["id"], "child-action");
+    drop(rx);
+    tokio::time::timeout(Duration::from_secs(2), follow)
         .await
         .unwrap()
         .unwrap()

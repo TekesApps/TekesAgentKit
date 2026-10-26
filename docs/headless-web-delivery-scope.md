@@ -20,7 +20,7 @@ CI does not declare real Harness protocol acceptance, browser behavior, model us
 
 ## Consumer compatibility and host lifecycle
 
-TekesWebUI `0.1.19` currently pins `@tekesagentkit/client-contract` to immutable commit `a8610a420bad72eaedcf706b30df87153a0f3e16` (AgentKit `0.3.7`). This does not identify the installed `tekes-agent-web` binary: the private host configuration controls that path independently. Before a release pin is changed, validate the existing host's HTTP and NDJSON envelope against the delivered JSON-lines service and publish an immutable contract commit.
+The existing daily entry uses WebUI `0.1.23` assets and an AgentKit `0.3.8` service. The isolated WebUI `0.2.0` integration is based on public main `03b1966b5ac321534798ef64621c5eeaab24448a` and consumes an immutable public AgentKit candidate contract. The older primary checkout `0.1.19` is preserved WIP, not the installed version. A contract pin does not identify the installed `tekes-agent-web` binary: the private host configuration controls that path independently. Before a release pin is changed, validate the existing host's HTTP and NDJSON envelope against the delivered JSON-lines service and publish an immutable contract commit.
 
 The private JSON-lines service owns normalized session state and delegates all Harness behavior to Native, Pi and DSH public adapters. The WebUI local host translates its HTTP requests and observations to that service. Closing a browser releases observation, not the service or a Harness task. After a host restart, session discovery and history depend on each Harness's public recovery contract; this is not an assertion that queued or in-flight work survives every restart.
 

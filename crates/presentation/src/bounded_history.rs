@@ -156,6 +156,58 @@ impl BoundedHistory {
         Ok(snapshot)
     }
 
+    /// Read transcript and run from the same refreshed public bounded page. The page has no
+    /// child control authority, so writable run actions are explicitly disabled.
+    pub(crate) async fn refresh_presentation(
+        &mut self,
+    ) -> Result<(TranscriptSnapshot, crate::RunPresentation)> {
+        let read_epoch = self.runtime.inspect(|state| state.connection_epoch);
+        let transcript = self.refresh().await?;
+        let scope = RunScope {
+            endpoint_id: self.parent.endpoint_id.clone(),
+            thread_id: self.parent.thread_id.clone(),
+            session_id: self.child.clone(),
+        };
+        let projected = self.runtime.inspect(|state| {
+            require(
+                state.connection_epoch == read_epoch,
+                "bounded child connection changed during read",
+            )?;
+            let mut projected =
+                tekes_agent_session::MemoryProjectionStore::new(&self.parent.endpoint_id);
+            projected.connection = state.connection.clone();
+            if state.archived_session_ids.contains(&self.child) {
+                projected.archived_session_ids.push(self.child.clone());
+            }
+            // Copy only this child's control facts, never all retained histories.
+            let control = state.sessions.get(&self.child);
+            projected.sessions.insert(
+                self.child.clone(),
+                SessionProjection {
+                    journal_ready: true,
+                    run_open: self.page.run_open,
+                    has_more_before: self.page.has_more_before,
+                    tail_sequence: self.page.through_sequence,
+                    queue: control.map(|s| s.queue.clone()).unwrap_or_default(),
+                    jobs: control.map(|s| s.jobs.clone()).unwrap_or_default(),
+                    ..Default::default()
+                },
+            );
+            projected.actionables = state
+                .actionables
+                .iter()
+                .filter(|(_, action)| action["sessionId"].as_str() == Some(self.child.as_str()))
+                .map(|(id, action)| (id.clone(), action.clone()))
+                .collect();
+            Ok::<_, tekes_agent_contract::Error>(projected)
+        })?;
+        let mut run = crate::RunPresentation::read(&projected, &scope, true);
+        run.can_submit = false;
+        run.can_cancel = false;
+        run.connection.can_submit = false;
+        Ok((transcript, run))
+    }
+
     #[cfg(feature = "acceptance-source-witness")]
     pub(crate) async fn refresh_with_source_witness(
         &mut self,
@@ -508,20 +560,23 @@ impl BoundedHistory {
             });
         Ok(true)
     }
-    fn transcript(&self) -> Result<TranscriptSnapshot> {
-        let scope = RunScope {
-            endpoint_id: self.parent.endpoint_id.clone(),
-            thread_id: self.parent.thread_id.clone(),
-            session_id: self.child.clone(),
-        };
-        let session = SessionProjection {
+    fn projected_session(&self) -> SessionProjection {
+        SessionProjection {
             entries: self.entries.clone(),
             journal_ready: true,
             run_open: self.page.run_open,
             has_more_before: self.page.has_more_before,
             tail_sequence: self.page.through_sequence,
             ..Default::default()
+        }
+    }
+    fn transcript(&self) -> Result<TranscriptSnapshot> {
+        let scope = RunScope {
+            endpoint_id: self.parent.endpoint_id.clone(),
+            thread_id: self.parent.thread_id.clone(),
+            session_id: self.child.clone(),
         };
+        let session = self.projected_session();
         let mut transcript = TranscriptSnapshot::read(&scope, &session)?;
         if let Some(source) = &self.page.source_call {
             let id = serde_json::json!([

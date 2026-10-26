@@ -17,14 +17,17 @@ presentation code validates them against that endpoint's retained store.
 `call("agent.child.open", {parentSessionId, childId}, rpcId)` requires a fresh
 catalog entry under that exact parent. Every open creates its own opaque `handle`,
 `ChildRun`, source-bound pagination state and history lease. The server selects an
-independent child session when the exact child pointer is in that endpoint's
-store; otherwise it uses the endpoint's advertised bounded `subagents.history`
+independent child session when its summary or initialized journal is present in
+that endpoint's store; control-only queue/actionable rows do not establish history; otherwise it uses the endpoint's advertised bounded `subagents.history`
 source. A child ID alone is never an endpoint or parent fallback.
 
 Subscribe with follow target
 `{kind:"childView", handle, parentSessionId, childId}`. The initial frame and
 updates are `{handle, endpointId, parentSessionId, childId, connectionEpoch,
-transcript}`. A handle has at most one active observer. Two panes or browser
+transcript, run}`. Both projections come from AgentKit; the browser must not
+fabricate an idle phase, connection, queue or actionables. Bounded read-only
+history disables submit/cancel without changing the public catalog capability.
+A handle has at most one active observer. Two panes or browser
 consumers must call `agent.child.open` separately and get independent history
 state. When follow ends for any reason, an RAII guard removes that handle and
 releases its history lease. Unsubscribed handles expire after five minutes and
