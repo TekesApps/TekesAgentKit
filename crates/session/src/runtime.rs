@@ -181,15 +181,12 @@ impl SessionRuntime {
         .await?;
         self.inspect(|s| {
             let session = s.sessions.get(id).ok_or(Error::Disconnected)?;
-            if session.journal_ready {
+            if let Some(error) = &session.journal_error {
+                Err(Error::Transport(error.clone()))
+            } else if session.journal_ready {
                 Ok(())
             } else {
-                Err(Error::Transport(
-                    session
-                        .journal_error
-                        .clone()
-                        .unwrap_or_else(|| "session unavailable".into()),
-                ))
+                Err(Error::Transport("session unavailable".into()))
             }
         })
     }
@@ -830,7 +827,13 @@ async fn connected(
                 if let Err(error) = result {
                     if let Some(id) = name.strip_prefix("journal:") {
                         let attempts = journal_retries.entry(id.to_owned()).or_default();
-                        if *attempts < 5 {
+                        // A peer's explicit per-stream error is terminal for this history
+                        // read (for example, a quarantined session file). Reopening it
+                        // immediately cannot repair the source and can monopolize the
+                        // connected loop. Keep the failure scoped to this session; the
+                        // user can explicitly reopen it after repairing the source.
+                        let retryable = !matches!(&error, Error::Remote(_));
+                        if retryable && *attempts < 5 {
                             *attempts += 1;
                             if let Some(cancellation) = journal_cancellations.remove(id) { cancellation.abort(); }
                             store.update(|s| {
@@ -846,6 +849,8 @@ async fn connected(
                                 }
                                 Err(error) => record_session_error(store, id, &error),
                             }
+                        } else if matches!(&error, Error::Remote(_)) {
+                            record_session_read_error(store, id, &error);
                         } else { record_session_error(store, id, &error); }
                         if let Some(cancellation) = journal_cancellations.remove(id) { cancellation.abort(); }
                         journal_epochs.remove(id);
@@ -933,6 +938,13 @@ async fn connected(
 fn record_session_error(store: &SharedProjection, id: &str, error: &Error) {
     store.update(|s| {
         s.reset_journal(id);
+        s.sessions.entry(id.into()).or_default().journal_error = Some(error.to_string());
+    });
+}
+fn record_session_read_error(store: &SharedProjection, id: &str, error: &Error) {
+    // A remote per-stream failure does not invalidate the last complete projection.
+    // Keep it inspectable while exposing the current history error to consumers.
+    store.update(|s| {
         s.sessions.entry(id.into()).or_default().journal_error = Some(error.to_string());
     });
 }

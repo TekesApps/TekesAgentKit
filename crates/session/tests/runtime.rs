@@ -434,6 +434,214 @@ async fn missing_pointer_and_exhausted_session_stream_do_not_reconnect_healthy_s
 }
 
 #[derive(Clone)]
+struct QuarantineConnector {
+    connects: Arc<AtomicUsize>,
+    quarantine_reads: Arc<AtomicUsize>,
+    probes: Arc<AtomicUsize>,
+}
+struct QuarantineEndpoint {
+    host: HostDescription,
+    quarantine_reads: Arc<AtomicUsize>,
+    probes: Arc<AtomicUsize>,
+}
+#[async_trait]
+impl EndpointConnector for QuarantineConnector {
+    async fn connect(&self) -> Result<Arc<dyn SessionEndpoint>> {
+        self.connects.fetch_add(1, Ordering::SeqCst);
+        let host = serde_json::from_value(json!({
+            "protocolVersion":4,
+            "product":{"name":"quarantine-test","version":"test"},
+            "capabilities":["session-journal","actionable-sync","session-control-sync","session-inventory-sync"],
+            "cwd":"/work","home":"/home","attachedSessions":0,"canOpenPath":false
+        })).unwrap();
+        Ok(Arc::new(QuarantineEndpoint {
+            host,
+            quarantine_reads: self.quarantine_reads.clone(),
+            probes: self.probes.clone(),
+        }))
+    }
+}
+#[async_trait]
+impl SessionEndpoint for QuarantineEndpoint {
+    fn identity(&self) -> &str {
+        "k"
+    }
+    fn host(&self) -> &HostDescription {
+        &self.host
+    }
+    async fn follow(&self, target: StreamTarget) -> Result<FrameStream> {
+        let frame = match target {
+            StreamTarget::SessionInventory => {
+                json!({"type":"baseline","generation":"g","snapshot":{"items":[]}})
+            }
+            StreamTarget::SessionControl => {
+                json!({"type":"baseline","generation":"g","snapshot":{"queues":[],"jobs":[],"projections":[]}})
+            }
+            StreamTarget::Actionables => json!({"type":"reset","generation":"g"}),
+            StreamTarget::WorkspaceInventory => unreachable!(),
+            StreamTarget::SessionConversation { .. } => unreachable!(),
+            StreamTarget::SessionJournal { address, .. }
+                if address.session_id == "bad-immediate" =>
+            {
+                self.quarantine_reads.fetch_add(1, Ordering::SeqCst);
+                return Ok(Box::pin(
+                    stream::once(async {
+                        Err(Error::Remote(json!({
+                            "code":"stream-open-failed",
+                            "details":{"reason":"quarantined"}
+                        })))
+                    })
+                    .chain(stream::pending()),
+                ));
+            }
+            StreamTarget::SessionJournal { address, .. } if address.session_id == "bad" => {
+                self.quarantine_reads.fetch_add(1, Ordering::SeqCst);
+                let snapshot = json!({"type":"snapshot","snapshot":{"sessionId":"bad","generation":"g","throughSequence":0,"windowLimit":50,"entries":[{"event":{"type":"user/message","seq":0,"time":1,"data":{"text":"last good message"}}}],"hasMoreBefore":false}});
+                return Ok(Box::pin(
+                    stream::iter(vec![
+                        Ok(snapshot),
+                        Err(Error::Remote(
+                            json!({"code":"quarantineError","message":"synthetic corrupt history"}),
+                        )),
+                    ])
+                    .chain(stream::pending()),
+                ));
+            }
+            StreamTarget::SessionJournal { address, .. } => {
+                json!({"type":"snapshot","snapshot":{"sessionId":address.session_id,"generation":"g","throughSequence":0,"windowLimit":50,"entries":[{"event":{"type":"user/message","seq":0,"time":1,"data":{"text":"healthy message"}}}],"hasMoreBefore":false}})
+            }
+        };
+        Ok(Box::pin(
+            stream::once(async move { Ok(frame) }).chain(stream::pending()),
+        ))
+    }
+    async fn history_page(&self, _: HistoryRequest) -> Result<HistoryPage> {
+        unreachable!()
+    }
+    async fn respond(&self, _: &str, _: i64, _: Value) -> Result<()> {
+        unreachable!()
+    }
+    async fn call(&self, _: &str, _: Value, _: &str) -> Result<Value> {
+        self.probes.fetch_add(1, Ordering::SeqCst);
+        Ok(json!({"ok":true}))
+    }
+    async fn close(&self) {}
+}
+
+#[tokio::test]
+async fn quarantined_history_is_terminal_for_one_session_and_leaves_runtime_responsive() {
+    let connector = QuarantineConnector {
+        connects: Arc::new(AtomicUsize::new(0)),
+        quarantine_reads: Arc::new(AtomicUsize::new(0)),
+        probes: Arc::new(AtomicUsize::new(0)),
+    };
+    let runtime = SessionRuntime::spawn("k", Arc::new(connector.clone()));
+    runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
+    let _ = runtime.open_session("bad").await;
+    runtime.open_session("healthy").await.unwrap();
+
+    let mut changes = runtime.subscribe();
+    tokio::time::timeout(Duration::from_secs(1), async {
+        loop {
+            if runtime.inspect(|s| {
+                s.sessions
+                    .get("bad")
+                    .is_some_and(|session| session.journal_error.is_some())
+            }) {
+                break;
+            }
+            changes.changed().await.unwrap();
+        }
+    })
+    .await
+    .unwrap();
+
+    let state = runtime.snapshot();
+    assert_eq!(state.connection, ConnectionState::Ready);
+    assert!(state.control_ready && state.actionables_ready);
+    assert!(
+        state.sessions["bad"]
+            .journal_error
+            .as_deref()
+            .is_some_and(|error| error.contains("quarantineError"))
+    );
+    assert!(
+        state.sessions["bad"].journal_ready,
+        "last complete projection remains available alongside the read error"
+    );
+    assert_eq!(
+        state.sessions["bad"].entries.len(),
+        1,
+        "last complete history remains visible"
+    );
+    assert!(state.sessions["healthy"].journal_ready);
+    assert_eq!(
+        connector.quarantine_reads.load(Ordering::SeqCst),
+        1,
+        "permanent peer history failure is not automatically reopened"
+    );
+    assert_eq!(
+        connector.connects.load(Ordering::SeqCst),
+        1,
+        "session history failure does not reconnect the endpoint"
+    );
+
+    let result = tokio::time::timeout(
+        Duration::from_secs(1),
+        runtime.call("host.probe", json!({}), "probe"),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert_eq!(result, json!({"ok":true}));
+    assert_eq!(connector.probes.load(Ordering::SeqCst), 1);
+    assert_eq!(runtime.snapshot().connection, ConnectionState::Ready);
+    assert!(
+        runtime.open_session("bad").await.is_err(),
+        "an explicit reopen may retry the failed history"
+    );
+    assert_eq!(connector.quarantine_reads.load(Ordering::SeqCst), 2);
+    assert!(
+        runtime.inspect(
+            |s| s.connection == ConnectionState::Ready && s.sessions["healthy"].journal_ready
+        )
+    );
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn quarantined_history_without_a_baseline_fails_once_and_keeps_healthy_reads_available() {
+    let connector = QuarantineConnector {
+        connects: Arc::new(AtomicUsize::new(0)),
+        quarantine_reads: Arc::new(AtomicUsize::new(0)),
+        probes: Arc::new(AtomicUsize::new(0)),
+    };
+    let runtime = SessionRuntime::spawn("k", Arc::new(connector.clone()));
+    runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
+    let error = tokio::time::timeout(
+        Duration::from_secs(1),
+        runtime.open_session("bad-immediate"),
+    )
+    .await
+    .unwrap()
+    .unwrap_err();
+    assert!(error.to_string().contains("quarantined"));
+    assert_eq!(connector.quarantine_reads.load(Ordering::SeqCst), 1);
+    assert_eq!(connector.connects.load(Ordering::SeqCst), 1);
+    assert!(runtime.inspect(|state| !state.sessions["bad-immediate"].journal_ready));
+    tokio::time::timeout(Duration::from_secs(1), runtime.open_session("healthy"))
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(
+        runtime.inspect(|state| state.connection == ConnectionState::Ready
+            && state.control_ready
+            && state.sessions["healthy"].journal_ready)
+    );
+    runtime.stop().await.unwrap();
+}
+
+#[derive(Clone)]
 struct NativeWindowConnector {
     requests: Arc<std::sync::Mutex<Vec<usize>>>,
     custom_entries: bool,
