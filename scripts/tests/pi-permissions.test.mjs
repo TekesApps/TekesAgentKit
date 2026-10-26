@@ -6,8 +6,10 @@ import {join} from 'node:path';
 // Execute the shipped extension's real guard; Typebox metadata construction is irrelevant here.
 let source=await readFile(new URL('../../crates/endpoint-pi/resources/agentkit-control.mjs',import.meta.url),'utf8');
 source=source.replace("import { Type } from '@sinclair/typebox';",'const Type = {Object: x=>x,Union:x=>x,Literal:x=>x,Optional:x=>x,String:x=>x};');
-source=source.replace("import { createAssistantReading } from './agentkit-reading.mjs';",'const createAssistantReading = () => ({start:()=>"x",current:()=>null});');
-source=source.replace("import { inputReceiptPayload, snapshotInputFiles } from './agentkit-input-files.mjs';",'const inputReceiptPayload=()=>({}), snapshotInputFiles=()=>({});');
+for (const name of ['agentkit-reading.mjs', 'agentkit-input-files.mjs']) {
+ const url = new URL('../../crates/endpoint-pi/resources/' + name, import.meta.url).href;
+ source = source.replace("from './" + name + "'", 'from ' + JSON.stringify(url));
+}
 const {default:configure}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
 test('Pi tool guard enforces actual modes and approval answers, refusing malformed policies',async()=>{
  const root=await mkdtemp(join(tmpdir(),'pi-permission-'));const previous=process.env.AGENTKIT_PERMISSION_FILE;
