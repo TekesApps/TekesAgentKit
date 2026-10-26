@@ -242,3 +242,13 @@ DSH纠正observer e978f5e、baseline950db9a1/candidate92206559的新两case各�
 性能仍未通过，保留全部有效失败：Native life恢复1.661691倍/首助手1.360828倍，Pi warm快照1.341904/1.313128倍，Pi新life Earlier20 scope0 1.265616倍，DSH warm首助手1.262329倍；DSH新life cleanup保守OS退休上界1060.203834/832.673125ms=1.273253倍，超原1.2（10s绝对门槛通过）。没有调整预算或挑选样本。
 
 #55/#56完整Family/附件/队列性能及相关原矩阵未因ordinary成功而关闭。TekesUI53和Kernel86最新只读核对仍OPEN；PR10仍draft、#58/#59未完成，main仍1dcc521且仅#68独立切片已合入。原9 WIP保持，无Kernel/Swift/SDK修改、无桌面/物理IME/AX；后续冻结该普通组，不继续扩范围或重跑成功组。
+
+### Native Family pilot补证与66cc CI终态
+
+v3仅用原始数据独立离线重验完整通过，派生报告official=false/diagnosticOnly=true/performanceAccepted=false，原failed/identityRechecked=false收据不改写。root角色修正的唯一32KiB样本有完整PID/start/executable/父与时间边界、退出证明；RSS保守峰值未减。原/纠正后/保守峰值47568/20064/88208KiB，最大gap56.535708ms。正式计划仍原21case：首个baseline/common50/cold0采集成功，材料器只修公开event.time:f64的整数/浮点表示比较后，同份raw离线通过；未开始20个登记仅更换post-capture reporter，runner/provider/sampler/observer/binary不变，不重跑first，不增加样本。v1/v2登记和负报告均保留。
+
+精确66cc66c的CI40247962897/40247958595结束：headless、UI fmt/Clippy/tests、child source witness、Native审批consumer编译和standalone public consumer均成功。唯一失败仍mandatory strict nested reading（parentFollowingAfterInnerUp=true、append offset634、detailVisibleAfterAppend=false），demo build skipped，artifact12619153245与terminal-binding保存。无新UI产品变化，不弱化门禁、不合入/发布。
+
+### Native Family原21-case正式矩阵采齐
+
+[正式绑定](evidence-bindings-20261026/native-family-official-cohort.json)记录21个原登记case各采集一次：所有适用source/ChildRun50、独立SEP20、真实ChildRun20、Earlier、旧实例重连与进程退休通过。common50 cold/warm/life全部原绝对/相对预算通过，candidate20全部原绝对预算通过；不把没有同配置入口baseline扩成basic Family豁免。两次post-capture材料器误判只离线复用原raw纠正，不替换采集、不混observer；负报告/旧登记与程序仍归原身份。当前只完成Native Family性能子范围，ordinary有效失败及Pi/DSH Family、附件/队列继续未完成，不合并、不发布、不关闭整票。最终510项Python检查通过，无Cargo/桌面/IME/AX。

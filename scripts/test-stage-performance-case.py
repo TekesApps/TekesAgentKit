@@ -68,14 +68,20 @@ def run_program(program, payload, case, label, env, sampler, *, timeout=300):
     rows, errors = [], []
     start_ns = time.monotonic_ns()
     stderr = (case/(label+'.stderr')).open('x')
-    process = subprocess.Popen([str(program)], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-        stderr=stderr, text=True, env=env, cwd=case/'workspace', start_new_session=True)
     try:
-        agentkit_root = sampler.register(process,'agentkit')
+        # Keep only the root launch and its OS identity registration atomic with
+        # sampler classification. Streaming, process wait, and cleanup happen
+        # after this short guard has been released.
+        with sampler.root_launch_guard():
+            process = subprocess.Popen([str(program)], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                stderr=stderr, text=True, env=env, cwd=case/'workspace', start_new_session=True)
+            agentkit_root = sampler.register(process,'agentkit')
     except Exception:
-        if process.poll() is None:
+        process = locals().get('process')
+        if process is not None and process.poll() is None:
             process.terminate();process.wait(timeout=5)
-        for stream in (process.stdin,process.stdout,stderr):stream.close()
+        for stream in ((process.stdin,process.stdout) if process is not None else ()) + (stderr,):
+            stream.close()
         raise
 
     def read():

@@ -2140,6 +2140,28 @@
         "Kernel86"
       ],
       "ordinaryGroupFrozen": true
+    },
+    "nativeFamilyOfficialClosure20261026": {
+      "binding": "evidence-bindings-20261026/native-family-official-cohort.json",
+      "productCandidate": "10263722b5fb128922c49a31b5942c41333cd6e2",
+      "officialCases": 21,
+      "protocolSourcePass": true,
+      "nativeFamilyPerformancePass": true,
+      "originalMaterializerFailuresRetained": 2,
+      "protocolReruns": 0,
+      "originalOrdinaryFailuresChanged": false,
+      "fullFamilyAttachmentQueueAcceptance": false,
+      "completeIssue56": false,
+      "mainUnchanged": true
+    },
+    "latestVerifiedCi": {
+      "head": "66cc66cbfe14efb8e340ea6c705e4d52f11dfc6e",
+      "run": 40247962897,
+      "headless": "success",
+      "standaloneConsumer": "success",
+      "mandatoryNestedReading": "failure",
+      "demoBuild": "skipped",
+      "artifactId": 12619153245
     }
   },
   "stageCoverageAudit": {

@@ -245,3 +245,9 @@ DSH纠正observer e978f5e、baseline950db9a1/candidate92206559的新两case各�
 性能仍未通过，保留全部有效失败：Native life恢复1.661691倍/首助手1.360828倍，Pi warm快照1.341904/1.313128倍，Pi新life Earlier20 scope0 1.265616倍，DSH warm首助手1.262329倍；DSH新life cleanup保守OS退休上界1060.203834/832.673125ms=1.273253倍，超原1.2（10s绝对门槛通过）。没有调整预算或挑选样本。
 
 #55/#56完整Family/附件/队列性能及相关原矩阵未因ordinary成功而关闭。TekesUI53和Kernel86最新只读核对仍OPEN；PR10仍draft、#58/#59未完成，main仍1dcc521且仅#68独立切片已合入。原9 WIP保持，无Kernel/Swift/SDK修改、无桌面/物理IME/AX；后续冻结该普通组，不继续扩范围或重跑成功组。
+
+### Native Family有限正式闭环（2026-10-26）
+
+[21-case绑定](evidence-bindings-20261026/native-family-official-cohort.json)：common50+独立SEP20双角色与candidate产品20分别完成cold5/warm初始化+10/lifecycle初始化+10。每case真实采集一次，原source/full200 EOF、产品分页/旧实例恢复/父草稿隔离、OS身份与退休均通过；共同路径原绝对/相对预算和产品20原适用绝对预算通过。product20仅新增可配置入口无同入口baseline，basic Family/common50仍有baseline，未豁免比较。
+
+2个材料器时间戳表示误判保留原负报告，只按公开SessionEvent.time:f64边界离线重验同份raw，无补采、原opaque值仍严格对账。pilot未升级正式。完整#56、Pi/DSH Family、附件/队列、ordinary原有效性能失败、上游与集成/发布继续保留；本段不证明main或完整UI交付。当前实时状态仍以#14正文为准。

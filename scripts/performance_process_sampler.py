@@ -15,6 +15,7 @@ from pathlib import Path
 import subprocess
 import threading
 import time
+from contextlib import contextmanager
 
 
 @lru_cache(maxsize=1)
@@ -93,7 +94,11 @@ class ProcessSampler:
         self.pi_embedded = pi_embedded
         self.interval_ns = interval_ms * 1_000_000
         self.roots, self.known = {}, {}
-        self.lock = threading.Lock()
+        # Root launch + registration must be atomic with sampler classification.
+        # _sample takes an OS snapshot before acquiring this lock; a snapshot taken
+        # before spawn omits the root safely, while a snapshot taken during spawn
+        # waits here until the explicit root identity is registered.
+        self.lock = threading.RLock()
         self.stop_event = threading.Event()
         self.thread = None
         self.samples = 0
@@ -101,6 +106,15 @@ class ProcessSampler:
         self.max_interval_ns = 0
         self.peaks = {'agentkit':0,'harness':0,'provider':0}
         self.error = None
+
+    @contextmanager
+    def root_launch_guard(self):
+        """Guard only the short Popen→register window for an owned root.
+
+        Never hold this across process IO, readiness, or the process lifetime.
+        """
+        with self.lock:
+            yield
 
     def register(self, process_or_pid, role):
         if role not in self.peaks:

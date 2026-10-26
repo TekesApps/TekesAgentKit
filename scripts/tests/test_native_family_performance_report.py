@@ -85,6 +85,8 @@ def source_history():
               "throughSequence": seq, "historyRevision": "rev-1", "hasMoreBefore": False,
               "runOpen": False, "sourceCall": {"taskId": "opaque-task-source"},
               "entries": entries}
+    for entry in entries:
+        entry["event"]["time"] = float(entry["event"]["seq"])
     return source, normalized
 
 
@@ -120,6 +122,23 @@ class NativeFamilyPerformanceReportTests(unittest.TestCase):
                              "mode": "cold", "caseIndex": 0, "iterations": 1,
                              "sourceCommit": self.profile["sourceProducts"]["baseline"],
                              "parentSessionId": "parent-original", "childSessionId": "child-original"}
+
+    def test_public_timestamp_typing_preserves_opaque_numbers_and_rejects_precision_loss(self):
+        raw = {"event": {"seq": 7, "time": 1792974061536,
+                          "data": {"opaqueNumber": 1}}}
+        typed = report._public_history_entry(raw)
+        self.assertIs(type(typed["event"]["time"]), float)
+        self.assertIs(type(typed["event"]["data"]["opaqueNumber"]), int)
+        self.assertIs(type(raw["event"]["time"]), int)
+        for invalid in (2**53 + 1, float("nan"), float("inf"), True):
+            with self.subTest(timestamp=invalid), self.assertRaises(ValueError):
+                report._public_history_entry({"event": {"seq": 7, "time": invalid}})
+
+    def test_round_metrics_survive_json_integer_key_serialization(self):
+        samples = [{"protocol": {"latenciesNs": {"snapshot": {0: 1250000}}}}]
+        decoded = json.loads(json.dumps(samples))
+        self.assertEqual(report._values(samples, "snapshot", "cold"), [1.25])
+        self.assertEqual(report._values(decoded, "snapshot", "cold"), [1.25])
 
     def test_raw_full200_rebuilds_semantic_corpus_and_preserves_opaque_ids(self):
         normalized, entries = report._validate_source_history(self.source, self.registration, self.profile)

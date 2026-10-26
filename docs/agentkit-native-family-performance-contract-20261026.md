@@ -1,6 +1,6 @@
 # Native Family：冻结的非 UI 性能执行契约（#56）
 
-状态：工具已定向构建；端到端diagnostic pilot尚未通过，正式样本0。沿用原阶段 profile 的预算、cold5、warm初始化排除+10、lifecycle初始化排除+10，不覆盖普通组，也不抵消其有效性能失败。原阶段范围5b+#67/#68，产品比较f1daa0ffcf6ced41e21f351e22845455ca78006c / 10263722b5fb128922c49a31b5942c41333cd6e2，ClientKit c289，固定Kernel0.9.3/09508a9。只实现验收工具，不改产品库、Kernel、Swift、SDK或TekesUI，不跑桌面。
+状态：工具、独立diagnostic pilot与原21-case Native Family正式子矩阵已验证通过；完整#56/global performance仍未完成。沿用原阶段 profile 的预算、cold5、warm初始化排除+10、lifecycle初始化排除+10，不覆盖普通组，也不抵消其有效性能失败。原阶段范围5b+#67/#68，产品比较f1daa0ffcf6ced41e21f351e22845455ca78006c / 10263722b5fb128922c49a31b5942c41333cd6e2，ClientKit c289，固定Kernel0.9.3/09508a9。只实现验收工具，不改产品库、Kernel、Swift、SDK或TekesUI，不跑桌面。
 
 ## 数据与适用性
 
@@ -63,8 +63,18 @@ stdin JSON：`familyFormat:1`，`mode:cold|warm|reconnectLifecycle`，`path:comm
 
 公共调用记录保留全部refresh/prefix-validation；每轮内存scratch可以释放，原JSONL不可重写。failed case必须尽力stop Runtime，外部runner最终核对consumer与Kernel全owned树退休。任何sourceChecks失败都保留负结果，不生成success样本。完成正式注册前不可启动本observer或harness。
 
-## 当前 pilot 边界
+## pilot原始失败与隔离边界（历史证据）
 
 先完成一个明确diagnostic的raw→报告pilot，再启动正式21-case矩阵；登记仍执行完整程序/源码/driver/运行时/recipe SHA校验。`--pilot`必须匹配`purpose=toolchain-pilot`和`diagnosticOnly=true`；原登记的official字段只作为通用执行登记格式，原执行收据/报告必须official=false，不进入正式聚合，不允许后续升级。实际收据与遗留缺口见[程序/pilot绑定](evidence-bindings-20261026/native-family-observer-programs.json)。
 
 v3已实际走通candidate20产品首快照、Earlier、完整source和清理；离线修正报告器的重复初读、合法1条raw Earlier和原catalog关联后，源码/协议对账没有剩余失败。整体pilot仍失败：原收尾校验漏传pilot标志；RSS采样在显式注册consumer root前曾将同PID/start暂归provider，最终census角色改变。保留原收据与raw；修复runner标志后优先独立离线重验原pins，采样身份/角色要先消除歧义，不靠忽略RSS门禁把pilot判成功。原程序和数据不重写，正式矩阵尚未启动。
+
+### v3独立离线补证完成（原始采集不改写）
+
+派生报告`native-family-pilot-v3-offline-full-report-v2.json`完整通过raw source/真实产品快照/分页、原始事件、固定输入、OS身份、50ms RSS与cleanup校验。原receipt保持failed/identityRechecked=false；新proof用原冻结runner加正确pilot参数独立只读复核，绑定原registration/程序/来源闭包及原文件SHA。唯一RSS role更正只涉及同一明确consumer root的早期32KiB样本，核对PID/start/executable、注册provider父、spawn与首boundary时间、后续boundary和正常退出；未知进程、后期角色冲突或身份缺口仍失败。原/重算/保守峰值相同（47568/20064/88208KiB），max gap56.535708ms。报告与proof首次解析字节逐项SHA对账，全部原文件与时钟不变。
+
+派生status=success仅代表本pilot完整闭环；official=false、diagnosticOnly=true、performanceAccepted=false，不能进入正式矩阵。采集工具已使Popen→root登记与归属分类互斥，不持锁等待readiness或进程完成；原50ms/gap250ms门槛不变。正式矩阵使用新固定runner闭包；之前cold/ordinary性能失败不因此改变。
+
+### 正式子矩阵最终结果
+
+[21-case正式绑定](evidence-bindings-20261026/native-family-official-cohort.json)与独立只读复核证明：common50+SEP20原适用绝对/相对门槛通过，candidate20各适用绝对门槛通过。21个case各采集一次；两个材料器误判按time:f64契约只离线纠正原raw，原负报告保留；v1/v2/v3仅post-capture reporter不同，采集器/observer/程序没有变化。原冻结JSON的preregistered-not-run字段是不可变登记格式，不代表当前执行状态；最新状态以#14正文和正式绑定为准。ordinary有效失败及其它端/附件/队列不因该子门通过而改变。

@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import copy
+import math
 from pathlib import Path
 from typing import Any
 
@@ -43,17 +44,22 @@ def _sha(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
 
-def _read_json(path: Path, name: str) -> Any:
+def _read_json(path: Path, name: str, *, observed_hashes: dict[str, str] | None = None) -> Any:
     _need(not path.is_symlink() and path.is_file(), f"missing regular sidecar {name}")
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        data = path.read_bytes()
+        if observed_hashes is not None:
+            observed_hashes[name] = _sha(data)
+        return json.loads(data)
     except (OSError, ValueError) as error:
         raise ValueError(f"invalid JSON sidecar {name}: {error}") from error
 
 
-def _read_jsonl(path: Path, name: str) -> list[dict[str, Any]]:
+def _read_jsonl(path: Path, name: str, *, observed_hashes: dict[str, str] | None = None) -> list[dict[str, Any]]:
     _need(not path.is_symlink() and path.is_file(), f"missing regular sidecar {name}")
     data = path.read_bytes()
+    if observed_hashes is not None:
+        observed_hashes[name] = _sha(data)
     _need(not data or data.endswith(b"\n"), f"{name} has a truncated final line")
     rows = []
     for index, line in enumerate(data.splitlines(), 1):
@@ -85,7 +91,8 @@ def _check_path_digest(path_value: Any, expected: Any, label: str,
 
 def _check_digest_bindings(registration: dict[str, Any], family_profile: dict[str, Any],
                            inputs: dict[str, Any], receipt: dict[str, Any],
-                           errors: list[str], *, pilot: bool = False) -> None:
+                           errors: list[str], *, pilot: bool = False,
+                           pilot_proof: dict[str, Any] | None = None) -> None:
     def same(label: str, expected: Any, *values: Any) -> None:
         if not isinstance(expected, str) or not expected:
             errors.append(f"{label} is absent from the frozen registration/profile")
@@ -139,7 +146,8 @@ def _check_digest_bindings(registration: dict[str, Any], family_profile: dict[st
                 errors.append("runtime critical files differ from the original registered runtime closure")
             if _sha(_canonical(runtime_files)) != registration.get("runtimeSha256"):
                 errors.append("runtimeSha256 does not match the exact registered critical-file closure")
-    if receipt.get("identityRechecked") is not True:
+    if receipt.get("identityRechecked") is not True and not (
+            pilot and pilot_proof and pilot_proof.get("identityRecheckedDerived") is True):
         errors.append("runner did not recheck registered identities after execution")
     if pilot:
         if not (registration.get("purpose") == "toolchain-pilot"
@@ -598,13 +606,32 @@ def _snapshot_items(snapshot: Any, source_entries: list[dict[str, Any]],
     return items
 
 
+def _public_history_entry(entry: dict[str, Any]) -> dict[str, Any]:
+    """Apply only the contract's declared f64 event.time representation.
+
+    Opaque data/metadata, sequence numbers and identities remain byte-canonical.
+    An integer timestamp that would lose precision at the public boundary fails.
+    """
+    value = copy.deepcopy(entry)
+    timestamp = value.get("event", {}).get("time")
+    _need(type(timestamp) in (int, float), "public HistoryEntry lacks a numeric event.time")
+    try:
+        converted = float(timestamp)
+    except (OverflowError, ValueError) as error:
+        raise ValueError("event.time cannot be represented by the public f64 contract") from error
+    _need(math.isfinite(converted) and converted == timestamp,
+          "event.time loses precision at the public f64 boundary")
+    value["event"]["time"] = converted
+    return value
+
+
 def _validate_sep_projection(event: dict[str, Any], pages: list[dict[str, Any]],
                              source_entries: list[dict[str, Any]]) -> None:
     """Validate SEP20's public projection directly, without inventing item mapping."""
     projection = event.get("projection")
     _need(isinstance(projection, dict), "SEP20 event has no public SessionProjection")
     union = _union_pages(pages, source_entries, must_exhaust=True)
-    expected = [_canonical(row) for row in union]
+    expected = [_canonical(_public_history_entry(row)) for row in union]
     for label, rows in (("event unionEntries", event.get("unionEntries")),
                         ("SessionProjection.entries", projection.get("entries"))):
         if isinstance(rows, dict):
@@ -785,8 +812,13 @@ def _protocol(events: list[dict[str, Any]], registration: dict[str, Any],
     if (len(snapshot_rows) != count or len(page_rows) != count
             or set(snapshots) != expected_rounds or set(pages) != expected_rounds):
         errors.append("first snapshot or actual page20 evidence is incomplete/duplicated")
-    if len(catalog_rows) != count or set(catalogs) != expected_rounds:
+    expected_catalog_copies = 2 if mode == "reconnectLifecycle" else 1
+    if len(catalog_rows) != count * expected_catalog_copies or set(catalogs) != expected_rounds:
         errors.append("original public child catalog evidence is incomplete/duplicated")
+    for round_index in range(count):
+        copies = [row for row in catalog_rows if row.get("round") == round_index]
+        if len(copies) != expected_catalog_copies or any(row != copies[0] for row in copies[1:]):
+            errors.append(f"round {round_index} catalog reads changed or violated the original reconnect trajectory")
     if path == "common50" and (len(product_rows) != count or set(products) != expected_rounds):
         errors.append("common50 did not perform actual ChildRun Earlier50 on every round")
     if path == "product20" and products:
@@ -892,10 +924,10 @@ def _protocol(events: list[dict[str, Any]], registration: dict[str, Any],
             except ValueError as error:
                 errors.append(f"first snapshot round {round_index} timing invalid: {error}")
                 latency = None
-            if type(latency) is int and measured:
-                latencies["snapshot"][round_index] = latency
-            else:
+            if type(latency) is not int:
                 errors.append(f"first snapshot round {round_index} lacks a valid publication latency")
+            elif measured:
+                latencies["snapshot"][round_index] = latency
             # Raw catalog, not a sourceChecks flag, proves the actual bounded child.
             catalog = first.get("publicCatalog")
             child_entry = first.get("childEntry")
@@ -954,10 +986,10 @@ def _protocol(events: list[dict[str, Any]], registration: dict[str, Any],
             except ValueError as error:
                 errors.append(f"page round {round_index} timing invalid: {error}")
                 latency = None
-            if type(latency) is int and measured:
-                latencies["page20"][round_index] = latency
-            else:
+            if type(latency) is not int:
                 errors.append(f"page round {round_index} has no real intent-to-publication latency")
+            elif measured:
+                latencies["page20"][round_index] = latency
             expected_mechanism = "sep20-projection" if path == "common50" else "childrun20"
             if page.get("mechanism") != expected_mechanism:
                 errors.append(f"page round {round_index} did not use its registered product path")
@@ -1045,8 +1077,19 @@ def _protocol(events: list[dict[str, Any]], registration: dict[str, Any],
                                                    source=source, page_size=50, head=head,
                                                    expected_phase="product-childrun-earlier50")
                 required = _union_pages([head] + earlier, source_entries, must_exhaust=True)
+            elif path == "product20" and pages.get(round_index):
+                loaded = pages[round_index]
+                calls = _calls_from(first.get("boundedCalls")) if first else []
+                head = _validate_initial_head(calls, parent=parent, child=child,
+                                              source=source, page_size=20,
+                                              expected_phase="childrun-open-and-first-snapshot")
+                earlier = _validate_actual_earlier(
+                    _calls_from(loaded.get("renderEarlierCalls")), parent=parent, child=child,
+                    source=source, page_size=20, head=head,
+                    expected_phase="product-childrun-earlier20")
+                required = _union_pages([head] + earlier, source_entries, must_exhaust=True)
             else:
-                raise ValueError("reconnect has no prior actual ChildRun Earlier50 source pages")
+                raise ValueError("reconnect has no prior actual ChildRun Earlier source pages")
             _validate_product_projection(row, row.get("beforeTranscript"), source, parent, child)
             _validate_product_projection(row, row.get("afterTranscript"), source, parent, child)
             if row.get("beforeTranscript") != row.get("afterTranscript"):
@@ -1065,9 +1108,10 @@ def _protocol(events: list[dict[str, Any]], registration: dict[str, Any],
                           and raw_page.get("sourceCall") == source.get("sourceCall")
                           and raw_page.get("runOpen") is False,
                           f"{page_name} changed bounded source owner/cut/revision/sourceCall")
-                    _union_pages([raw_page], source_entries)
+                    _union_pages([raw_page], [_public_history_entry(entry) for entry in source_entries])
                     reconnect_union.append(raw_page)
-            _union_pages(reconnect_union, source_entries, must_exhaust=True)
+            _union_pages(reconnect_union, [_public_history_entry(entry) for entry in source_entries],
+                         must_exhaust=True)
             catalog = row.get("publicCatalog")
             if not isinstance(catalog, dict) or not any(
                     isinstance(item, dict) and item.get("id") == child and item.get("mode") == "bounded"
@@ -1081,7 +1125,8 @@ def _protocol(events: list[dict[str, Any]], registration: dict[str, Any],
 
 def _validate_lifecycle(case: Path, mode: str, registration: dict[str, Any],
                         receipt: dict[str, Any],
-                        errors: list[str], *, cleanup_deadline_ms: int = 10000) -> dict[str, Any]:
+                        errors: list[str], *, cleanup_deadline_ms: int = 10000,
+                        pilot_proof: dict[str, Any] | None = None) -> dict[str, Any]:
     boundaries = _read_jsonl(case / "consumer-process-boundaries.jsonl", "consumer-process-boundaries.jsonl")
     rss_rows = _read_jsonl(case / "measurement-rss.jsonl", "measurement-rss.jsonl")
     rss = _read_json(case / "last-rss-summary.json", "last-rss-summary.json")
@@ -1176,15 +1221,37 @@ def _validate_lifecycle(case: Path, mode: str, registration: dict[str, Any],
         if isinstance(known_processes, list) else {}
     if not known_ids:
         errors.append("RSS summary lacks the original OS-observed owned process identities")
-    for row in rss_rows:
+    corrected_peaks = dict(peaks)
+    rss_proof = pilot_proof["rss"] if pilot_proof else None
+    corrections = {(item["sampleIndex"], item["pid"], item["startIdentity"]): item
+                   for item in rss_proof.get("roleCorrections", [])} if rss_proof else {}
+    used_corrections = set()
+    for sample_index, row in enumerate(rss_rows):
         processes = row.get("processes")
         if not isinstance(processes, list):
             errors.append("RSS sample lacks raw per-process OS identities")
             continue
-        if any(not isinstance(proc, dict)
-               or known_ids.get((proc.get("pid"), proc.get("startIdentity"))) != proc.get("role")
-               for proc in processes):
-            errors.append("RSS sample contains a process outside the observed PID/start-identity census")
+        corrected_processes = []
+        for proc in processes:
+            if not isinstance(proc, dict):
+                errors.append("RSS sample process row is malformed")
+                continue
+            item = dict(proc)
+            key = (sample_index, proc.get("pid"), proc.get("startIdentity"))
+            correction = corrections.get(key)
+            if correction:
+                if proc.get("role") != correction["fromRole"] or proc.get("rssKiB") != correction["rssKiB"]:
+                    errors.append("pilot RSS correction does not match its original sample row")
+                else:
+                    item["role"] = correction["toRole"]
+                    used_corrections.add(key)
+            if known_ids.get((item.get("pid"), item.get("startIdentity"))) != item.get("role"):
+                errors.append("RSS sample contains a process outside the observed PID/start-identity census")
+            corrected_processes.append(item)
+        for role in corrected_peaks:
+            total = sum(proc.get("rssKiB", 0) for proc in corrected_processes
+                        if proc.get("role") == role and type(proc.get("rssKiB")) is int)
+            corrected_peaks[role] = max(corrected_peaks[role], total)
         for role in peaks:
             total = sum(proc.get("rssKiB", 0) for proc in processes
                         if isinstance(proc, dict) and proc.get("role") == role
@@ -1199,6 +1266,13 @@ def _validate_lifecycle(case: Path, mode: str, registration: dict[str, Any],
     claimed = rss.get("sampledTreePeakRssKiB")
     if not isinstance(claimed, dict) or any(claimed.get(role) != value for role, value in peaks.items()):
         errors.append("claimed RSS peaks differ from simultaneous sums of raw owned process samples")
+    if used_corrections != set(corrections):
+        errors.append("pilot RSS correction was not present in its original raw sample")
+    conservative_peaks = {role: max(peaks[role], corrected_peaks[role]) for role in peaks}
+    if rss_proof and (rss_proof.get("rawPeaksKiB") != peaks
+                      or rss_proof.get("correctedPeaksKiB") != corrected_peaks
+                      or rss_proof.get("conservativePeaksKiB") != conservative_peaks):
+        errors.append("pilot RSS derivation differs from independent full raw sample recomputation")
     retirement = _read_json(case / "owned-process-retirement.json", "owned-process-retirement.json")
     consumer_exit = _read_json(case / "consumer-exit.json", "consumer-exit.json")
     if consumer_exit.get("exitStatus") != 0 or consumer_exit.get("ownedGroupAbsent") is not True:
@@ -1298,21 +1372,25 @@ def _validate_lifecycle(case: Path, mode: str, registration: dict[str, Any],
                 errors.append("cold closed-seed process census omits the original retired Kernel root")
         except (OSError, ValueError, TypeError) as error:
             errors.append(f"cold closed-seed raw receipt is missing or invalid: {error}")
-    return {"peaksKiB": peaks, "maxGapNs": max_gap, "cleanupElapsedNs": elapsed,
+    return {"peaksKiB": conservative_peaks, "rawPeaksKiB": peaks,
+            "correctedPeaksKiB": corrected_peaks,
+            "maxGapNs": max_gap, "cleanupElapsedNs": elapsed,
             "retirementVerified": retirement.get("status") == "verified"}
 
 
 def materialize_sample(case: Path, registration: dict[str, Any],
                        base_profile: dict[str, Any], family_profile: dict[str, Any], *,
-                       pilot: bool = False) -> dict[str, Any]:
+                       pilot: bool = False, replay_pilot: bool = False) -> dict[str, Any]:
     """Materialize one registered case while retaining every failure and sidecar."""
     case = Path(case)
     errors: list[str] = []
     evidence: dict[str, Any] = {}
+    observed_hashes: dict[str, str] = {}
     for name in SIDECARS:
         try:
-            evidence[name] = (_read_jsonl(case / name, name) if name.endswith(".jsonl")
-                              else _read_json(case / name, name))
+            evidence[name] = (_read_jsonl(case / name, name, observed_hashes=observed_hashes)
+                              if name.endswith(".jsonl") else
+                              _read_json(case / name, name, observed_hashes=observed_hashes))
         except (OSError, ValueError) as error:
             errors.append(str(error))
     inputs = evidence.get("inputs.json", {})
@@ -1323,6 +1401,19 @@ def materialize_sample(case: Path, registration: dict[str, Any],
     if not isinstance(receipt, dict):
         errors.append("official execution receipt must be an object")
         receipt = {}
+    pilot_proof = None
+    if replay_pilot:
+        if not pilot:
+            errors.append("offline pilot replay is forbidden for official samples")
+        else:
+            try:
+                from performance_native_family_pilot_proof import build_pilot_proof
+                pilot_proof = build_pilot_proof(case, registration)
+                for name, digest in pilot_proof["rawEvidenceSha256"].items():
+                    _need(observed_hashes.get(name) == digest,
+                          f"pilot proof differs from originally parsed raw bytes: {name}")
+            except (OSError, ValueError, TypeError, KeyError, RuntimeError) as error:
+                errors.append(f"independent pilot replay proof failed: {error}")
     mode, path, role = registration.get("mode"), registration.get("path"), registration.get("role")
     official = (registration.get("official") is True and receipt.get("official") is True
                 and receipt.get("diagnosticOnly") is False)
@@ -1336,7 +1427,8 @@ def materialize_sample(case: Path, registration: dict[str, Any],
               "observerSha256": registration.get("observerSha256") or receipt.get("observerSha256"),
               "official": official, "diagnosticOnly": registration.get("diagnosticOnly") is True
               or receipt.get("diagnosticOnly") is True, "status": "failed", "failureReason": None,
-              "registration": registration, "receipt": receipt, "inputs": inputs, "evidence": evidence}
+              "registration": registration, "receipt": receipt, "inputs": inputs,
+              "evidence": evidence, "rawEvidenceSha256": observed_hashes}
     if family_profile.get("kind") != "agentkit-native-family-profile" or family_profile.get("format") != 1:
         errors.append("unsupported Native Family profile")
     if base_profile.get("format") != 1:
@@ -1369,11 +1461,12 @@ def materialize_sample(case: Path, registration: dict[str, Any],
             errors.append(f"official receipt {field} differs from original registration")
     if receipt.get("familyPath") != path or inputs.get("familyPath") != path:
         errors.append("official case familyPath differs from its exact common50/product20 registration")
-    if receipt.get("status") != "success":
+    if receipt.get("status") != "success" and not pilot_proof:
         errors.append(receipt.get("failureReason") or "official execution receipt is not successful")
-    if receipt.get("failureReason") not in (None, ""):
+    if receipt.get("failureReason") not in (None, "") and not pilot_proof:
         errors.append(f"runner retained failure: {receipt['failureReason']}")
-    _check_digest_bindings(registration, family_profile, inputs, receipt, errors, pilot=pilot)
+    _check_digest_bindings(registration, family_profile, inputs, receipt, errors, pilot=pilot,
+                           pilot_proof=pilot_proof)
     _check_path_digest(inputs.get("baseProfilePath"), registration.get("baseProfileSha256"),
                        "base profile", errors)
     _check_path_digest(inputs.get("familyProfilePath"), registration.get("familyProfileSha256"),
@@ -1486,7 +1579,8 @@ def materialize_sample(case: Path, registration: dict[str, Any],
     try:
         sample["lifecycle"] = _validate_lifecycle(
             case, mode, registration, receipt, errors,
-            cleanup_deadline_ms=family_thresholds.get("ownedCleanupDeadlineMs", 10000))
+            cleanup_deadline_ms=family_thresholds.get("ownedCleanupDeadlineMs", 10000),
+            pilot_proof=pilot_proof)
     except (OSError, ValueError, TypeError, KeyError) as error:
         errors.append(f"process/RSS/cleanup evidence failed: {error}")
     before_provider = evidence.get("seed-provider-before-measurement.json")
@@ -1514,9 +1608,16 @@ def materialize_sample(case: Path, registration: dict[str, Any],
             errors.append(f"raw machine identity normalization failed: {error}")
     sample["machineBefore"], sample["machineAfter"] = machine_before, machine_after
     sample["validationErrors"] = list(dict.fromkeys(errors))
+    if pilot_proof:
+        for name, digest in pilot_proof["rawEvidenceSha256"].items():
+            if _file_sha(case / name) != digest:
+                errors.append(f"pilot evidence changed during materialization: {name}")
     sample["pilot"] = pilot
+    sample["pilotReplayProof"] = pilot_proof
+    sample["originalCaptureStatus"] = receipt.get("status")
     sample["performanceAccepted"] = False
-    sample["status"] = "success" if (official or pilot) and receipt.get("status") == "success" and not errors else "failed"
+    sample["status"] = "success" if (official or pilot) and (
+        receipt.get("status") == "success" or pilot_proof is not None) and not errors else "failed"
     sample["failureReason"] = None if sample["status"] == "success" else (
         "; ".join(dict.fromkeys(errors)) or "original case is not a successful official sample")
     return sample
@@ -1537,7 +1638,8 @@ def _values(rows: list[dict[str, Any]], metric: str, mode: str) -> list[float]:
     rounds = MEASURED_ROUNDS[mode]
     return [value / 1_000_000 for row in rows
             for index in rounds
-            for value in [row.get("protocol", {}).get("latenciesNs", {}).get(metric, {}).get(index)]
+            for timings in [row.get("protocol", {}).get("latenciesNs", {}).get(metric, {})]
+            for value in [timings.get(index, timings.get(str(index))) ]
             if type(value) is int and value >= 0]
 
 
