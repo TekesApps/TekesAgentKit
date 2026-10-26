@@ -15,7 +15,7 @@ Native 要求 Kernel 0.9 的 v4 wire；Pi/DSH 的标准化 HostDescription 保�
 
 `SessionRuntime` 合并 inventory/control/actionables/workspaces 和只观察的 endpoint events，按需打开会话窗口，提供订阅、snapshot、前页、定位和只读文件 API。
 慢 unary / prompt / actionable 响应以最多 64 个在途操作运行，流仍能投影；重连会中止旧连接操作，不自动重发 mutation。
-公开 peer 返回的单会话 journal 错误只终止该次读取，不立即重开失败历史，也不使健康会话或整个 endpoint 重连。最后的完整投影可保留，但必须同时暴露读取错误并降级 freshness；显式重开可再次尝试。物理传输断线继续采用原有恢复流程。
+公开 peer 返回的单会话 journal 错误只终止该次读取，不立即重开失败历史，也不使健康会话或整个 endpoint 重连。最后的完整投影可保留，但必须同时暴露读取错误并降级 freshness；显式重开可再次尝试。物理传输断线继续采用原有恢复流程。 Native mux 收到 peer 的流错误后，该流已结束，本地释放不能再次发送 Close；本地主动释放正常流仍恰好发送一次 Close。
 `Earlier` 的网络取页仍串行，底层 transport 保持有界读取。主连接与单会话流均有有限恢复预算。
 
 ## 能力矩阵

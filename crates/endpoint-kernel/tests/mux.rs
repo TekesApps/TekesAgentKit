@@ -106,6 +106,165 @@ async fn mux_close_discards_inflight_frames_and_correlates_pages_and_actionables
 }
 
 #[tokio::test]
+async fn remote_stream_error_does_not_close_mux_and_streams_close_once() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("http://{}", listener.local_addr().unwrap());
+    let server = tokio::spawn(async move {
+        let (socket, _) = listener.accept().await.unwrap();
+        let ws_task = tokio::spawn(async move {
+            let mut ws = accept_async(socket).await.unwrap();
+            send(&mut ws, host(4)).await;
+
+            let mut ids = std::collections::HashMap::new();
+            for _ in 0..4 {
+                let open: Value =
+                    serde_json::from_slice(&ws.next().await.unwrap().unwrap().into_data()).unwrap();
+                assert_eq!(open["type"], "open");
+                ids.insert(
+                    open["target"]["kind"].as_str().unwrap().to_owned(),
+                    open["streamId"].clone(),
+                );
+            }
+            let abandoned_id = ids["actionables"].clone();
+            let bad_id = ids["session-journal"].clone();
+            let healthy_id = ids["session-inventory"].clone();
+            let control_id = ids["session-control"].clone();
+
+            // A consumer dropped before a frame still needs exactly one peer Close.
+            send(
+                &mut ws,
+                json!({"type":"stream","streamId":abandoned_id,"frame":{"generation":"g"}}),
+            )
+            .await;
+            let close: Value =
+                serde_json::from_slice(&ws.next().await.unwrap().unwrap().into_data()).unwrap();
+            assert_eq!(close, json!({"type":"close","streamId":abandoned_id}));
+
+            // This is Kernel's generated V4 per-stream error envelope. The logical stream is
+            // already retired at the peer, so a later local Drop must not send Close for it.
+            send(&mut ws, json!({
+                "type":"error",
+                "streamId":bad_id,
+                "error":{"category":"transport","code":"protocol-error","message":"journal unavailable","details":{}}
+            })).await;
+            send(&mut ws, json!({"type":"stream","streamId":healthy_id,"frame":{"type":"baseline","generation":"g","snapshot":{"items":[]}}})).await;
+            send(&mut ws, json!({"type":"stream","streamId":control_id,"frame":{"type":"baseline","generation":"g","snapshot":{"items":[]}}})).await;
+
+            // The next Close must belong to the healthy stream explicitly dropped by the
+            // consumer. A stale Close for `bad_id` would arrive first and fail this assertion.
+            let close: Value =
+                serde_json::from_slice(&ws.next().await.unwrap().unwrap().into_data()).unwrap();
+            assert_eq!(close, json!({"type":"close","streamId":healthy_id}));
+
+            // The control stream continues on this same physical WebSocket after the error,
+            // and after the HTTP unary request is served on the same listener.
+            send(&mut ws, json!({"type":"stream","streamId":control_id,"frame":{"type":"delta","generation":"g","sequence":1}})).await;
+            let frame = ws.next().await.unwrap().unwrap();
+            assert!(
+                matches!(frame, Message::Close(_)),
+                "unexpected logical frame after stream retirement"
+            );
+        });
+
+        let (mut socket, _) = listener.accept().await.unwrap();
+        let mut bytes = Vec::new();
+        let header_end = loop {
+            let mut byte = [0];
+            socket.read_exact(&mut byte).await.unwrap();
+            bytes.push(byte[0]);
+            if bytes.ends_with(b"\r\n\r\n") {
+                break bytes.len();
+            }
+        };
+        let headers = String::from_utf8(bytes.clone()).unwrap();
+        assert!(headers.starts_with("POST /api/models.list "));
+        let len: usize = headers
+            .lines()
+            .find_map(|line| {
+                line.to_lowercase()
+                    .strip_prefix("content-length:")
+                    .map(|value| value.trim().parse().unwrap())
+            })
+            .unwrap();
+        bytes.resize(header_end + len, 0);
+        socket.read_exact(&mut bytes[header_end..]).await.unwrap();
+        let request: Value = serde_json::from_slice(&bytes[header_end..]).unwrap();
+        assert_eq!(request["type"], "client-request");
+        assert_eq!(request["rpcId"], "same-transport");
+        let body = json!({
+            "type":"server-response",
+            "rpcId":"same-transport",
+            "result":{"ok":true,"value":{"sessions":[]}}
+        })
+        .to_string();
+        socket
+            .write_all(format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(), body
+            ).as_bytes())
+            .await
+            .unwrap();
+        ws_task.await.unwrap();
+    });
+
+    let endpoint = KernelConnector::new("k", &url, "synthetic".into())
+        .unwrap()
+        .with_timeout(Duration::from_secs(3))
+        .connect_kernel()
+        .await
+        .unwrap();
+    let abandoned = endpoint.follow(StreamTarget::Actionables).await.unwrap();
+    let mut bad = endpoint
+        .follow(StreamTarget::SessionJournal {
+            address: JournalAddress {
+                session_id: "s".into(),
+            },
+            max_messages: 10,
+        })
+        .await
+        .unwrap();
+    let mut healthy = endpoint
+        .follow(StreamTarget::SessionInventory)
+        .await
+        .unwrap();
+    let mut control = endpoint.follow(StreamTarget::SessionControl).await.unwrap();
+    drop(abandoned);
+
+    let error = tokio::time::timeout(Duration::from_secs(3), bad.next())
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap_err();
+    assert!(matches!(error, Error::Remote(_)));
+    assert!(error.to_string().contains("journal unavailable"));
+    drop(bad);
+    assert_eq!(healthy.next().await.unwrap().unwrap()["type"], "baseline");
+    assert_eq!(control.next().await.unwrap().unwrap()["type"], "baseline");
+
+    assert_eq!(
+        endpoint
+            .call("models.list", json!({}), "same-transport")
+            .await
+            .unwrap(),
+        json!({"sessions":[]})
+    );
+    drop(healthy);
+    assert_eq!(
+        tokio::time::timeout(Duration::from_secs(3), control.next())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap()["type"],
+        "delta"
+    );
+    endpoint.close().await;
+    tokio::time::timeout(Duration::from_secs(3), server)
+        .await
+        .unwrap()
+        .unwrap();
+}
+
+#[tokio::test]
 async fn native_inventory_wire_preserves_fork_and_ephemeral_facts() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let url = format!("http://{}", listener.local_addr().unwrap());
