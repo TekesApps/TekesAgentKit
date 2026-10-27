@@ -1157,3 +1157,79 @@ fn pi_provider_error_retains_its_public_message_and_is_not_a_final_answer() {
     assert!(cancelled.latest_failure().is_none());
     assert!(cancelled.items.last().unwrap().failure_message().is_none());
 }
+
+#[test]
+fn question_cancellation_uses_adapter_authority_and_exact_session_scope() {
+    let mut authority = authority();
+    let question = json!({
+        "id":"question", "revision":7, "sessionId":"a", "kind":"question",
+        "payload":{"questions":[{"id":"call","question":"Choose","options":[{"label":"A"}]}]},
+        "cancelOutcome":{"sessionId":"b","cancelled":true}
+    });
+    authority
+        .actionables
+        .insert("question".into(), question.clone());
+    authority.actionables.insert(
+        "other-session".into(),
+        json!({
+            "id":"other-session", "revision":8, "sessionId":"b", "kind":"question", "payload":{}
+        }),
+    );
+    let unsupported = RunPresentation::read(&authority, &scope("a"), false);
+    assert_eq!(unsupported.actionables.len(), 1);
+    assert!(unsupported.actionables[0].get("cancelOutcome").is_none());
+    assert_eq!(authority.actionables["question"], question);
+
+    authority
+        .endpoint_capabilities
+        .supports_question_cancellation = true;
+    let supported = RunPresentation::read(&authority, &scope("a"), false);
+    let response = &supported.actionables[0];
+    assert_eq!(response["id"], "question");
+    assert_eq!(response["revision"], 7);
+    assert_eq!(response["payload"], question["payload"]);
+    assert_eq!(
+        response["cancelOutcome"],
+        json!({"sessionId":"a","cancelQuestion":true})
+    );
+    assert!(
+        !response["cancelOutcome"]
+            .as_object()
+            .unwrap()
+            .contains_key("cancelled")
+    );
+
+    authority.actionables.get_mut("question").unwrap()["kind"] = json!("approval");
+    assert!(
+        RunPresentation::read(&authority, &scope("a"), false).actionables[0]
+            .get("cancelOutcome")
+            .is_none()
+    );
+    authority.actionables.get_mut("question").unwrap()["kind"] = json!("question");
+    authority.archived_session_ids.push("a".into());
+    assert!(
+        RunPresentation::read(&authority, &scope("a"), false).actionables[0]
+            .get("cancelOutcome")
+            .is_none()
+    );
+    authority.archived_session_ids.clear();
+    authority.connection = ConnectionState::Connecting;
+    assert!(
+        RunPresentation::read(&authority, &scope("a"), true)
+            .actionables
+            .is_empty()
+    );
+    authority.connection = ConnectionState::Ready;
+    authority.sessions.get_mut("a").unwrap().projections.insert(
+        "historyAccess".into(),
+        VersionedValue {
+            sequence: 1,
+            value: json!({"mode":"read-only"}),
+        },
+    );
+    assert!(
+        RunPresentation::read(&authority, &scope("a"), false)
+            .actionables
+            .is_empty()
+    );
+}

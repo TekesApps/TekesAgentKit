@@ -118,7 +118,24 @@ impl RunPresentation {
             .actionables
             .values()
             .filter(|v| v["sessionId"] == scope.session_id)
-            .cloned()
+            .map(|source| {
+                let mut actionable = source.clone();
+                if let Some(object) = actionable.as_object_mut() {
+                    // This is adapter authority, not an extension supplied by a
+                    // remote actionable. Unadvertised endpoints offer no cancel.
+                    object.remove("cancelOutcome");
+                    if !archived
+                        && store.endpoint_capabilities.supports_question_cancellation
+                        && source["kind"] == "question"
+                    {
+                        object.insert(
+                            "cancelOutcome".into(),
+                            serde_json::json!({"sessionId":scope.session_id,"cancelQuestion":true}),
+                        );
+                    }
+                }
+                actionable
+            })
             .collect();
         let running = session.is_some_and(|s| s.run_open);
         let history_available = connection.phase == ConnectionPhase::Connected

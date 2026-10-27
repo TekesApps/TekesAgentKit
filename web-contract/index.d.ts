@@ -107,3 +107,8 @@ export interface PermissionPolicy {
 export interface PermissionModeState {
   mode: string | null;
 }
+/** Optional shared question cancellation; submit verbatim through respond. */
+export interface QuestionCancellationOutcome {
+  sessionId: string;
+  cancelQuestion: true;
+}

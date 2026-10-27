@@ -78,6 +78,7 @@ async fn mux_close_discards_inflight_frames_and_correlates_pages_and_actionables
         .connect_kernel()
         .await
         .unwrap();
+    assert!(endpoint.capabilities().supports_question_cancellation);
     let mut stream = endpoint
         .follow(StreamTarget::SessionInventory)
         .await

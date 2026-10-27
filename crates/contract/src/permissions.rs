@@ -26,5 +26,5 @@ pub struct PermissionModeState {
 }
 
 pub fn permissions_typescript() -> &'static str {
-    "export interface PermissionOption {\n  value: string;\n  title?: string | null;\n  description?: string | null;\n}\nexport interface PermissionState {\n  options: PermissionOption[];\n  currentValue: string | null;\n}\nexport interface PermissionPolicy {\n  threadLevel: PermissionOption[];\n  serverLevel: PermissionState;\n}\nexport interface PermissionModeState {\n  mode: string | null;\n}\n"
+    "export interface PermissionOption {\n  value: string;\n  title?: string | null;\n  description?: string | null;\n}\nexport interface PermissionState {\n  options: PermissionOption[];\n  currentValue: string | null;\n}\nexport interface PermissionPolicy {\n  threadLevel: PermissionOption[];\n  serverLevel: PermissionState;\n}\nexport interface PermissionModeState {\n  mode: string | null;\n}\n/** Optional shared question cancellation; submit verbatim through respond. */\nexport interface QuestionCancellationOutcome {\n  sessionId: string;\n  cancelQuestion: true;\n}\n"
 }

@@ -125,3 +125,20 @@ malformed historyAccess marker fails closed for writes. Kernel retains its stric
 execution/continuation checks; displaying history never authorizes a mutation.
 This extension is a candidate until the exact Kernel reader and consumer have
 passed public protocol and integration gates; it is not present in Kernel 0.9.7.
+
+### Question cancellation presentation (#73)
+
+`EndpointCapabilities.supportsQuestionCancellation` advertises that `respond`
+accepts the canonical question-only outcome `{sessionId, cancelQuestion: true}`.
+It defaults to false when absent. Native advertises this public Kernel contract;
+Pi and DSH do not advertise it until their adapters normalize the same contract.
+This does not imply either endpoint lacks every upstream cancellation mechanism.
+
+For a live question, shared Run presentation supplies optional `cancelOutcome`
+with that exact scoped outcome only when the adapter advertises it. Hosts submit
+it verbatim with the existing actionable ID and revision; they must not derive a
+Harness-specific cancellation shape or cancel the whole Run instead. Remote raw
+`cancelOutcome` extension data is not authority and is replaced or removed.
+Disconnected and historical-read-only views keep their existing actionable
+suppression; archived questions do not offer the cancellation outcome. The public
+TypeScript `QuestionCancellationOutcome` describes this optional field.
