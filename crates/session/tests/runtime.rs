@@ -735,11 +735,13 @@ async fn reconnect_and_reopen_count_native_messages_with_custom_entries() {
 struct ActiveRunConnector {
     frames: tokio::sync::broadcast::Sender<Value>,
     follows: Arc<AtomicUsize>,
+    reconnect_control_gate: Option<Arc<tokio::sync::Notify>>,
 }
 struct ActiveRunEndpoint {
     host: HostDescription,
     frames: tokio::sync::broadcast::Sender<Value>,
     follows: Arc<AtomicUsize>,
+    reconnect_control_gate: Option<Arc<tokio::sync::Notify>>,
 }
 fn active_run_frame(streaming: bool, event: Option<Value>) -> Value {
     if let Some(event) = event {
@@ -780,6 +782,7 @@ impl EndpointConnector for ActiveRunConnector {
             host,
             frames: self.frames.clone(),
             follows: self.follows.clone(),
+            reconnect_control_gate: self.reconnect_control_gate.clone(),
         }))
     }
 }
@@ -796,26 +799,49 @@ impl SessionEndpoint for ActiveRunEndpoint {
     }
     async fn follow(&self, target: StreamTarget) -> Result<FrameStream> {
         match target {
-            StreamTarget::SessionInventory => Ok(Box::pin(stream::once(async {
-                Ok(json!({"type":"baseline","generation":"g","snapshot":{"items":[]}}))
-            }).chain(stream::pending()))),
-            StreamTarget::SessionControl => Ok(Box::pin(stream::once(async {
+            StreamTarget::SessionInventory => Ok(Box::pin(
+                stream::once(async {
+                    Ok(json!({"type":"baseline","generation":"g","snapshot":{"items":[]}}))
+                })
+                .chain(stream::pending()),
+            )),
+            StreamTarget::SessionControl => {
+                let gate = self
+                    .reconnect_control_gate
+                    .clone()
+                    .filter(|_| self.follows.load(Ordering::SeqCst) > 0);
+                Ok(Box::pin(stream::once(async move {
+                if let Some(gate) = gate { gate.notified().await; }
                 Ok(json!({"type":"baseline","generation":"g","snapshot":{"queues":[],"jobs":[],"projections":[]}}))
-            }).chain(stream::pending()))),
-            StreamTarget::Actionables => Ok(Box::pin(stream::once(async {
-                Ok(json!({"type":"reset","generation":"g"}))
-            }).chain(stream::pending()))),
+            }).chain(stream::pending())))
+            }
+            StreamTarget::Actionables => Ok(Box::pin(
+                stream::once(async { Ok(json!({"type":"reset","generation":"g"})) })
+                    .chain(stream::pending()),
+            )),
             StreamTarget::SessionConversation { .. } => {
                 self.follows.fetch_add(1, Ordering::SeqCst);
                 let receiver = self.frames.subscribe();
                 let updates = stream::unfold(receiver, |mut receiver| async move {
-                    Some((receiver.recv().await.map_err(|_| Error::Disconnected), receiver))
+                    Some((
+                        receiver.recv().await.map_err(|_| Error::Disconnected),
+                        receiver,
+                    ))
                 });
-                Ok(Box::pin(stream::once(async {
-                    { let mut baseline = active_run_frame(true, None); baseline["type"] = json!("conversation"); Ok(baseline) }
-                }).chain(updates)))
+                Ok(Box::pin(
+                    stream::once(async {
+                        {
+                            let mut baseline = active_run_frame(true, None);
+                            baseline["type"] = json!("conversation");
+                            Ok(baseline)
+                        }
+                    })
+                    .chain(updates),
+                ))
             }
-            StreamTarget::WorkspaceInventory | StreamTarget::SessionJournal { .. } => unreachable!(),
+            StreamTarget::WorkspaceInventory | StreamTarget::SessionJournal { .. } => {
+                unreachable!()
+            }
         }
     }
     async fn history_page(&self, _: HistoryRequest) -> Result<HistoryPage> {
@@ -839,6 +865,7 @@ async fn native_active_run_journal_survives_last_observer_detach_and_reopen() {
         Arc::new(ActiveRunConnector {
             frames: frames.clone(),
             follows: follows.clone(),
+            reconnect_control_gate: None,
         }),
     ));
     runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
@@ -934,6 +961,65 @@ async fn native_active_run_journal_survives_last_observer_detach_and_reopen() {
 }
 
 #[tokio::test]
+async fn rejected_legacy_open_keeps_detached_terminal_retirement() {
+    let (frames, _) = tokio::sync::broadcast::channel(8);
+    let follows = Arc::new(AtomicUsize::new(0));
+    let gate = Arc::new(tokio::sync::Notify::new());
+    let runtime = Arc::new(SessionRuntime::spawn(
+        "active-run",
+        Arc::new(ActiveRunConnector {
+            frames: frames.clone(),
+            follows: follows.clone(),
+            reconnect_control_gate: Some(gate.clone()),
+        }),
+    ));
+    runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
+    runtime
+        .acquire_history("active-run-session")
+        .await
+        .unwrap()
+        .release()
+        .await
+        .unwrap();
+    let reconnect = tokio::spawn({
+        let runtime = runtime.clone();
+        async move { runtime.reconnect().await }
+    });
+    let mut changes = runtime.subscribe();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if follows.load(Ordering::SeqCst) == 2
+                && changes.inspect(|s| s.sessions["active-run-session"].journal_ready)
+            {
+                break;
+            }
+            changes.changed().await.unwrap();
+        }
+    })
+    .await
+    .unwrap();
+    assert!(
+        runtime.open_session("active-run-session").await.is_err(),
+        "control baseline is intentionally pending; the rejected open owns no observation"
+    );
+    gate.notify_one();
+    reconnect.await.unwrap().unwrap();
+    runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
+    frames.send(active_run_frame(false, None)).unwrap();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if changes.inspect(|s| !s.sessions["active-run-session"].journal_ready) {
+                break;
+            }
+            changes.changed().await.unwrap();
+        }
+    })
+    .await
+    .unwrap();
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
 async fn native_detached_completed_run_retires_its_journal() {
     let (frames, _) = tokio::sync::broadcast::channel(8);
     let follows = Arc::new(AtomicUsize::new(0));
@@ -942,6 +1028,7 @@ async fn native_detached_completed_run_retires_its_journal() {
         Arc::new(ActiveRunConnector {
             frames: frames.clone(),
             follows: follows.clone(),
+            reconnect_control_gate: None,
         }),
     ));
     runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
