@@ -29,6 +29,13 @@ reused only for their unchanged scope. Missing browser interactions, Native
 browser-close continuation, restart boundaries and one existing real-model run
 remain required, followed by exact delivery review, consumer, CI and release.
 
+Browser-only detach during a running response must preserve the already received
+streaming prefix in AgentKit shared runtime state, continue ingesting while there
+is no observer, and restore the same live transcript on reattach. See
+[observer lifetime](web-ui.md#observer-detach-during-an-active-run). This does not
+extend the public Harness contract to make transient deltas durable across service
+or source reconnects.
+
 The existing host must allow explicit endpoint selection: Native-only startup
 must not read Pi registry/runtime/provider credentials or DSH connection secrets,
 and must not wait for disabled endpoints. Preserve the existing default and saved
