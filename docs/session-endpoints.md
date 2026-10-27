@@ -16,6 +16,9 @@ Native 要求 Kernel 0.9 的 v4 wire；Pi/DSH 的标准化 HostDescription 保�
 `SessionRuntime` 合并 inventory/control/actionables/workspaces 和只观察的 endpoint events，按需打开会话窗口，提供订阅、snapshot、前页、定位和只读文件 API。
 慢 unary / prompt / actionable 响应以最多 64 个在途操作运行，流仍能投影；重连会中止旧连接操作，不自动重发 mutation。
 Native mux 对 peer 已结束的单流不重复发送 Close；仍存活的本地主动释放恰好发送一次 Close。
+历史 lease 只拥有本地观察。最后一个观察者离开时，已就绪且仍运行的 journal 由
+SessionRuntime actor 继续接收；重开复用其内存投影。权威终态到达且没有观察者后再释放，
+显式 stop/drop 仍结束 runtime。这不保证服务重启后恢复尚未持久化的流式内容。
 `Earlier` 的网络取页仍串行，底层 transport 保持有界读取。主连接与单会话流均有有限恢复预算。
 
 ## 能力矩阵
