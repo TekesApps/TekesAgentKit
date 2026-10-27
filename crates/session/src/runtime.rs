@@ -446,6 +446,7 @@ async fn run(
     store: Arc<SharedProjection>,
 ) {
     let mut wanted = BTreeSet::new();
+    let mut deferred_closes = BTreeSet::new();
     let mut failures = 0u32;
     let mut epoch = 0u64;
     'connections: loop {
@@ -476,9 +477,15 @@ async fn run(
                         s.begin_connection(endpoint.host().clone());
                         s.endpoint_capabilities = endpoint.capabilities();
                     });
-                    let result =
-                        connected(endpoint.clone(), &mut commands, &store, &mut wanted, epoch)
-                            .await;
+                    let result = connected(
+                        endpoint.clone(),
+                        &mut commands,
+                        &store,
+                        &mut wanted,
+                        &mut deferred_closes,
+                        epoch,
+                    )
+                    .await;
                     endpoint.close().await;
                     result
                 }
@@ -547,6 +554,7 @@ async fn connected(
     commands: &mut mpsc::Receiver<Command>,
     store: &SharedProjection,
     wanted: &mut BTreeSet<String>,
+    deferred_closes: &mut BTreeSet<String>,
     epoch: u64,
 ) -> Result<bool> {
     let mut operations: tokio::task::JoinSet<OperationResult> = tokio::task::JoinSet::new();
@@ -594,9 +602,34 @@ async fn connected(
     let baseline_deadline = tokio::time::sleep(Duration::from_secs(30));
     tokio::pin!(baseline_deadline);
     loop {
+        // A browser owns observation, not the active run's journal. Close only after
+        // the journal itself reports a terminal state, including after reconnect.
+        // Open/Close and frames share this actor, so a reattached observer cannot
+        // race a background watcher that clears its newly acquired projection.
+        let finished: Vec<_> = deferred_closes
+            .iter()
+            .filter(|id| {
+                store.read(|s| {
+                    s.sessions
+                        .get(*id)
+                        .is_some_and(|session| session.journal_ready && !session.run_open)
+                })
+            })
+            .cloned()
+            .collect();
+        for id in finished {
+            deferred_closes.remove(&id);
+            wanted.remove(&id);
+            journal_epochs.remove(&id);
+            if let Some(cancellation) = journal_cancellations.remove(&id) {
+                cancellation.abort();
+            }
+            store.update(|s| s.reset_journal(&id));
+        }
         tokio::select! {
             completed = operations.join_next(), if !operations.is_empty() => {
                 if let Some(Ok(Some((removed,reply,result))))=completed {
+                    if result.is_ok() && let Some(id) = &removed { deferred_closes.remove(id); }
                     if result.is_err() && let Some(id)=removed {
                         next_journal_epoch+=1;
                         if let Ok(cancellation)=add_journal(endpoint.as_ref(),store,&mut streams,&id,next_journal_epoch).await {
@@ -666,9 +699,16 @@ async fn connected(
                                 Err(e) => Err(e),
                             }
                         } else { Ok(()) };
+                        if result.is_ok() { deferred_closes.remove(&id); }
                         let _ = reply.send(result);
                     }
                     Command::Close(id, reply) => {
+                        if store.read(|s| s.sessions.get(&id).is_some_and(|session| session.journal_ready && session.run_open)) {
+                            deferred_closes.insert(id);
+                            let _ = reply.send(Ok(()));
+                            continue;
+                        }
+                        deferred_closes.remove(&id);
                         wanted.remove(&id); journal_epochs.remove(&id); store.update(|s| s.reset_journal(&id));
                         if let Some(cancellation) = journal_cancellations.remove(&id) { cancellation.abort(); }
                         let _ = reply.send(Ok(()));

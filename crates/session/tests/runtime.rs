@@ -730,3 +730,335 @@ async fn reconnect_and_reopen_count_native_messages_with_custom_entries() {
     );
     runtime.stop().await.unwrap();
 }
+
+#[derive(Clone)]
+struct ActiveRunConnector {
+    frames: tokio::sync::broadcast::Sender<Value>,
+    follows: Arc<AtomicUsize>,
+    reconnect_control_gate: Option<Arc<tokio::sync::Notify>>,
+}
+struct ActiveRunEndpoint {
+    host: HostDescription,
+    frames: tokio::sync::broadcast::Sender<Value>,
+    follows: Arc<AtomicUsize>,
+    reconnect_control_gate: Option<Arc<tokio::sync::Notify>>,
+}
+fn active_run_frame(streaming: bool, event: Option<Value>) -> Value {
+    if let Some(event) = event {
+        return json!({"type":"native-event","sessionId":"active-run-session",
+            "generation":"active-run-generation","event":event});
+    }
+    json!({
+        "type": "conversation-update",
+        "generation": "active-run-generation",
+        "snapshot": {
+            "sessionId": "active-run-session",
+            "generation": "active-run-generation",
+            "leafId": if streaming {"user-1"} else {"assistant-1"},
+            "entries": if streaming {
+                vec![json!({"id":"user-1","type":"message","message":{"role":"user","content":"prompt"}})]
+            } else {
+                vec![
+                    json!({"id":"user-1","type":"message","message":{"role":"user","content":"prompt"}}),
+                    json!({"id":"assistant-1","type":"message","message":{"role":"assistant","content":"complete"}})
+                ]
+            },
+            "hasMoreBefore": false,
+            "isStreaming": streaming,
+            "state": {}
+        }
+    })
+}
+#[async_trait]
+impl EndpointConnector for ActiveRunConnector {
+    async fn connect(&self) -> Result<Arc<dyn SessionEndpoint>> {
+        let host = serde_json::from_value(json!({
+            "protocolVersion":4,
+            "product":{"name":"active-run","version":"test"},
+            "capabilities":["session-journal","actionable-sync","session-control-sync","session-inventory-sync"],
+            "cwd":"/work","home":"/home","attachedSessions":0,"canOpenPath":false
+        })).unwrap();
+        Ok(Arc::new(ActiveRunEndpoint {
+            host,
+            frames: self.frames.clone(),
+            follows: self.follows.clone(),
+            reconnect_control_gate: self.reconnect_control_gate.clone(),
+        }))
+    }
+}
+#[async_trait]
+impl SessionEndpoint for ActiveRunEndpoint {
+    fn identity(&self) -> &str {
+        "active-run"
+    }
+    fn host(&self) -> &HostDescription {
+        &self.host
+    }
+    fn content_kind(&self) -> SessionContentKind {
+        SessionContentKind::NativeConversation
+    }
+    async fn follow(&self, target: StreamTarget) -> Result<FrameStream> {
+        match target {
+            StreamTarget::SessionInventory => Ok(Box::pin(
+                stream::once(async {
+                    Ok(json!({"type":"baseline","generation":"g","snapshot":{"items":[]}}))
+                })
+                .chain(stream::pending()),
+            )),
+            StreamTarget::SessionControl => {
+                let gate = self
+                    .reconnect_control_gate
+                    .clone()
+                    .filter(|_| self.follows.load(Ordering::SeqCst) > 0);
+                Ok(Box::pin(stream::once(async move {
+                if let Some(gate) = gate { gate.notified().await; }
+                Ok(json!({"type":"baseline","generation":"g","snapshot":{"queues":[],"jobs":[],"projections":[]}}))
+            }).chain(stream::pending())))
+            }
+            StreamTarget::Actionables => Ok(Box::pin(
+                stream::once(async { Ok(json!({"type":"reset","generation":"g"})) })
+                    .chain(stream::pending()),
+            )),
+            StreamTarget::SessionConversation { .. } => {
+                self.follows.fetch_add(1, Ordering::SeqCst);
+                let receiver = self.frames.subscribe();
+                let updates = stream::unfold(receiver, |mut receiver| async move {
+                    Some((
+                        receiver.recv().await.map_err(|_| Error::Disconnected),
+                        receiver,
+                    ))
+                });
+                Ok(Box::pin(
+                    stream::once(async {
+                        {
+                            let mut baseline = active_run_frame(true, None);
+                            baseline["type"] = json!("conversation");
+                            Ok(baseline)
+                        }
+                    })
+                    .chain(updates),
+                ))
+            }
+            StreamTarget::WorkspaceInventory | StreamTarget::SessionJournal { .. } => {
+                unreachable!()
+            }
+        }
+    }
+    async fn history_page(&self, _: HistoryRequest) -> Result<HistoryPage> {
+        unreachable!()
+    }
+    async fn respond(&self, _: &str, _: i64, _: Value) -> Result<()> {
+        unreachable!()
+    }
+    async fn call(&self, _: &str, _: Value, _: &str) -> Result<Value> {
+        unreachable!()
+    }
+    async fn close(&self) {}
+}
+
+#[tokio::test]
+async fn native_active_run_journal_survives_last_observer_detach_and_reopen() {
+    let (frames, _) = tokio::sync::broadcast::channel(8);
+    let follows = Arc::new(AtomicUsize::new(0));
+    let runtime = Arc::new(SessionRuntime::spawn(
+        "active-run",
+        Arc::new(ActiveRunConnector {
+            frames: frames.clone(),
+            follows: follows.clone(),
+            reconnect_control_gate: None,
+        }),
+    ));
+    runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
+
+    let observer = runtime.acquire_history("active-run-session").await.unwrap();
+    assert_eq!(follows.load(Ordering::SeqCst), 1);
+    let delta = |text: &str| {
+        json!({
+            "type":"message_update",
+            "agentkitStreamId":"active-run-stream",
+            "message":{"role":"assistant","content":text},
+            "assistantMessageEvent":{"type":"text_delta"}
+        })
+    };
+    frames
+        .send(active_run_frame(true, Some(delta("prefix one"))))
+        .unwrap();
+    let mut changes = runtime.subscribe();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if changes.inspect(|s| s.sessions["active-run-session"].native_events.len() == 1) {
+                break;
+            }
+            changes.changed().await.unwrap();
+        }
+    })
+    .await
+    .unwrap();
+
+    observer.release().await.unwrap();
+    frames
+        .send(active_run_frame(true, Some(delta("prefix two"))))
+        .unwrap();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            let state = changes.inspect(|s| s.sessions["active-run-session"].clone());
+            if state.native_events.len() == 2 {
+                break;
+            }
+            changes.changed().await.unwrap();
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(
+        runtime.inspect(|s| {
+            s.sessions["active-run-session"].native_events[1]["message"]["content"]
+                .as_str()
+                .map(str::to_owned)
+        }),
+        Some("prefix two".to_owned())
+    );
+
+    let reopened = runtime.acquire_history("active-run-session").await.unwrap();
+    assert_eq!(
+        follows.load(Ordering::SeqCst),
+        1,
+        "reopen reuses the live journal instead of resetting its projection"
+    );
+    assert_eq!(
+        runtime.inspect(|s| s.sessions["active-run-session"].native_events.len()),
+        2
+    );
+
+    frames.send(active_run_frame(false, None)).unwrap();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if changes.inspect(|s| !s.sessions["active-run-session"].run_open) {
+                break;
+            }
+            changes.changed().await.unwrap();
+        }
+    })
+    .await
+    .unwrap();
+    assert!(
+        runtime.inspect(|s| s.sessions["active-run-session"].journal_ready),
+        "the reopened observer still owns the completed transcript"
+    );
+    reopened.release().await.unwrap();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if !changes.inspect(|s| s.sessions["active-run-session"].journal_ready) {
+                break;
+            }
+            changes.changed().await.unwrap();
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(follows.load(Ordering::SeqCst), 1);
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn rejected_legacy_open_keeps_detached_terminal_retirement() {
+    let (frames, _) = tokio::sync::broadcast::channel(8);
+    let follows = Arc::new(AtomicUsize::new(0));
+    let gate = Arc::new(tokio::sync::Notify::new());
+    let runtime = Arc::new(SessionRuntime::spawn(
+        "active-run",
+        Arc::new(ActiveRunConnector {
+            frames: frames.clone(),
+            follows: follows.clone(),
+            reconnect_control_gate: Some(gate.clone()),
+        }),
+    ));
+    runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
+    runtime
+        .acquire_history("active-run-session")
+        .await
+        .unwrap()
+        .release()
+        .await
+        .unwrap();
+    let reconnect = tokio::spawn({
+        let runtime = runtime.clone();
+        async move { runtime.reconnect().await }
+    });
+    let mut changes = runtime.subscribe();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if follows.load(Ordering::SeqCst) == 2
+                && changes.inspect(|s| s.sessions["active-run-session"].journal_ready)
+            {
+                break;
+            }
+            changes.changed().await.unwrap();
+        }
+    })
+    .await
+    .unwrap();
+    assert!(
+        runtime.open_session("active-run-session").await.is_err(),
+        "control baseline is intentionally pending; the rejected open owns no observation"
+    );
+    gate.notify_one();
+    reconnect.await.unwrap().unwrap();
+    runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
+    frames.send(active_run_frame(false, None)).unwrap();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if changes.inspect(|s| !s.sessions["active-run-session"].journal_ready) {
+                break;
+            }
+            changes.changed().await.unwrap();
+        }
+    })
+    .await
+    .unwrap();
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn native_detached_completed_run_retires_its_journal() {
+    let (frames, _) = tokio::sync::broadcast::channel(8);
+    let follows = Arc::new(AtomicUsize::new(0));
+    let runtime = Arc::new(SessionRuntime::spawn(
+        "active-run",
+        Arc::new(ActiveRunConnector {
+            frames: frames.clone(),
+            follows: follows.clone(),
+            reconnect_control_gate: None,
+        }),
+    ));
+    runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
+    let first = runtime.acquire_history("active-run-session").await.unwrap();
+    let second = runtime.acquire_history("active-run-session").await.unwrap();
+    first.release().await.unwrap();
+    assert!(runtime.inspect(|s| s.sessions["active-run-session"].journal_ready));
+    second.release().await.unwrap();
+    assert!(runtime.inspect(|s| s.sessions["active-run-session"].journal_ready));
+    frames.send(active_run_frame(false, None)).unwrap();
+    let mut changes = runtime.subscribe();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if changes.inspect(|s| !s.sessions["active-run-session"].journal_ready) {
+                break;
+            }
+            changes.changed().await.unwrap();
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(
+        runtime.inspect(|s| s.sessions["active-run-session"]
+            .native_conversation
+            .as_ref()
+            .unwrap()
+            .entries
+            .len()),
+        2
+    );
+    assert_eq!(follows.load(Ordering::SeqCst), 1);
+    runtime.stop().await.unwrap();
+}
