@@ -48,7 +48,7 @@ SessionRuntime actor 继续接收；重开复用其内存投影。权威终态�
 | 子代理 | 原生 catalog；扩展只读子历史；bounded child 控制不可用 | create/list/prompt/read/cancel，官方扩展模型工具 | projection catalog + 父拥有的 prompt/cancel；child 地址历史与重连 |
 | 产品服务 | 服务端或显式宿主能力 | 显式 HostServices | 服务端部署或显式 HostServices |
 
-公开类型化 API 提供 create/submit/fork/discard/rename/archive/unarchive/queue/upload/goal；其他公开扩展经能力检查后调用。`EndpointCapabilities` 区分方法、归档、临时 fork 和文件观察；不支持的方法明确失败。
+公开类型化 API 提供 create/submit/fork/discard/rename/archive/unarchive/queue/upload/goal；其他公开扩展经能力检查后调用。`EndpointCapabilities` 区分方法、归档、临时 fork 和文件观察；不支持的方法明确失败。Web 服务仅在 endpoint 声明 `session.updateQueue` 时发布 `agent.queue.remove`。该调用需携带当前 `connectionEpoch`，并由共享 Run presentation 暴露 `canUpdateQueue`；服务在调用前及通道背压后的本地接纳点复核会话 journal、归档/历史只读状态和权威队列项，actor 分派继续验证连接 epoch，不乐观移除、不自动重试，等待 Harness 的权威队列投影更新。Native 有界子历史为只读，明确禁用队列编辑。
 Pi 不提供虚构 journal、durable cursor 或 task/job。队列是宿主持久化的提交意图，支持编辑/移除和结算后自动派发；超时不重试不确定的派发。旧进程事件不能驱动新进程。
 Runtime 在 archive/discard 前退订对应会话内容流，失败则恢复；其他会话保持连接。archive 只隐藏指针，不删除原生文件。
 Pi Goal 支持 CAS、暂停/恢复、原生工具记录完成/阻塞及有界自动执行；每轮先持久化预算，达到上限后停止。激活只存在于当前连接，重连不会自动继续。反馈以原生 entry ID 和版本进行 CAS。

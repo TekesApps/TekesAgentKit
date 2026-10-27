@@ -112,3 +112,35 @@ export interface QuestionCancellationOutcome {
   sessionId: string;
   cancelQuestion: true;
 }
+export interface RunScope {
+  endpointId: string;
+  threadId: string;
+  sessionId: string;
+}
+export interface ConnectionPresentation {
+  phase: 'connecting' | 'connected' | 'reconnecting' | 'degraded' | 'failed' | 'stopped';
+  canSubmit: boolean;
+  historyIsStale: boolean;
+  message?: string | null;
+}
+/** Shared AgentKit Run read model; all permission fields are server-derived. */
+export interface RunPresentation {
+  scope: RunScope;
+  connectionEpoch: number;
+  phase: 'loading' | 'idle' | 'running' | 'waitingForInput' | 'interrupted' | 'archived' | 'unavailable';
+  connection: ConnectionPresentation;
+  canSubmit: boolean;
+  canCancel: boolean;
+  canUpdateQueue: boolean;
+  actionables: unknown[];
+  queue: unknown[];
+  jobs: unknown[];
+  error?: string | null;
+}
+/** Remove one currently queued input using the observed connection epoch. */
+export interface AgentQueueRemoveRequest {
+  sessionId: string;
+  itemId: string;
+  connectionEpoch: number;
+}
+export type AgentQueueRemoveMethod = 'agent.queue.remove';

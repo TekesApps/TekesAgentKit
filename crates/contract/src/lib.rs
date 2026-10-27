@@ -17,6 +17,7 @@ pub use capabilities::*;
 mod search;
 pub use search::*;
 mod session;
+mod web;
 use async_trait::async_trait;
 use futures_util::stream::BoxStream;
 pub use registry::{HARNESS_EXTENSION_EVENTS, REQUIRED_EVENTS, SURFACE_EVENTS};
@@ -24,6 +25,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 pub use session::*;
 use std::collections::{BTreeMap, BTreeSet};
+pub use web::*;
 
 pub type Result<T> = std::result::Result<T, Error>;
 pub type FrameStream = BoxStream<'static, Result<Value>>;

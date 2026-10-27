@@ -158,11 +158,12 @@ mod tests {
     fn published_typescript_matches_rust_contract() {
         assert_eq!(
             format!(
-                "{}{}{}{}",
+                "{}{}{}{}{}",
                 super::annotation_typescript(),
                 crate::thread_actions_typescript(),
                 crate::live_usage_typescript(),
-                crate::permissions_typescript()
+                crate::permissions_typescript(),
+                crate::web_presentation_typescript()
             ),
             include_str!("../../../web-contract/index.d.ts")
         );

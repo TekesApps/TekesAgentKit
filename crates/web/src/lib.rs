@@ -1,6 +1,7 @@
 //! Shared AgentKit service. Hosts own its authentication, listener and process lifetime.
 //! A disconnected view drops only its history lease; it never stops a runtime or Harness.
 mod family;
+mod queue;
 mod sidebar;
 mod stdio;
 use async_trait::async_trait;
@@ -468,6 +469,12 @@ impl SharedEndpoint {
             methods.push(json!("agent.child.prompt"));
             methods.push(json!("agent.child.cancel"));
             methods.push(json!("agent.child.close"));
+            if self
+                .connected()
+                .is_ok_and(|endpoint| endpoint.capabilities().supports("session.updateQueue"))
+            {
+                methods.push(json!("agent.queue.remove"));
+            }
         }
         description
     }
@@ -903,6 +910,15 @@ impl SharedAgent {
                 }
                 if request["method"] == "agent.child.close" {
                     return self.close_child(&shared, &request["payload"]).await;
+                }
+                if request["method"] == "agent.queue.remove" {
+                    return self
+                        .remove_queued_input(
+                            &shared,
+                            &request["payload"],
+                            string(request, "rpcId")?,
+                        )
+                        .await;
                 }
                 if request["method"] == "composer.compileAnnotations" {
                     let input: AnnotationInput =

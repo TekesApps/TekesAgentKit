@@ -94,10 +94,14 @@ pub enum RunPhase {
 #[serde(rename_all = "camelCase")]
 pub struct RunPresentation {
     pub scope: RunScope,
+    #[serde(default)]
+    pub connection_epoch: u64,
     pub phase: RunPhase,
     pub connection: ConnectionPresentation,
     pub can_submit: bool,
     pub can_cancel: bool,
+    #[serde(default)]
+    pub can_update_queue: bool,
     pub actionables: Vec<Value>,
     pub queue: Vec<Value>,
     pub jobs: Vec<Value>,
@@ -164,8 +168,15 @@ impl RunPresentation {
             RunPhase::Idle
         };
         let can_submit = available && connection.can_submit && !archived;
+        let can_update_queue = available
+            && connection.can_submit
+            && store.control_ready
+            && store.endpoint_capabilities.supports("session.updateQueue")
+            && historical_read_only.is_none()
+            && !archived;
         Self {
             scope: scope.clone(),
+            connection_epoch: store.connection_epoch,
             phase,
             connection,
             can_submit,
@@ -174,6 +185,7 @@ impl RunPresentation {
                 && running
                 && !archived
                 && status != Some("interrupted"),
+            can_update_queue,
             actionables: if available && historical_read_only.is_none() {
                 actionables
             } else {

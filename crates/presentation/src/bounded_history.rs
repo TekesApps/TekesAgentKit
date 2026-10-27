@@ -175,6 +175,7 @@ impl BoundedHistory {
             )?;
             let mut projected =
                 tekes_agent_session::MemoryProjectionStore::new(&self.parent.endpoint_id);
+            projected.connection_epoch = state.connection_epoch;
             projected.connection = state.connection.clone();
             if state.archived_session_ids.contains(&self.child) {
                 projected.archived_session_ids.push(self.child.clone());
@@ -204,6 +205,7 @@ impl BoundedHistory {
         let mut run = crate::RunPresentation::read(&projected, &scope, true);
         run.can_submit = false;
         run.can_cancel = false;
+        run.can_update_queue = false;
         run.connection.can_submit = false;
         Ok((transcript, run))
     }
