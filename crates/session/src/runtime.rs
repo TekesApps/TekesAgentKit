@@ -691,7 +691,6 @@ async fn connected(
                     Command::Stop(reply) => { store.update(|s| { s.disconnect(); s.connection = ConnectionState::Stopped; }); let _ = reply.send(Ok(())); return Ok(true); }
                     Command::Reconnect(reply) => { store.update(MemoryProjectionStore::disconnect); let _ = reply.send(Ok(())); return Ok(false); }
                     Command::Open(id, reply) => {
-                        deferred_closes.remove(&id);
                         if !store.read(MemoryProjectionStore::ready) { let _ = reply.send(Err(Error::Disconnected)); continue; }
                         let result = if let std::collections::btree_map::Entry::Vacant(entry) = journal_epochs.entry(id.clone()) {
                             next_journal_epoch += 1;
@@ -700,6 +699,7 @@ async fn connected(
                                 Err(e) => Err(e),
                             }
                         } else { Ok(()) };
+                        if result.is_ok() { deferred_closes.remove(&id); }
                         let _ = reply.send(result);
                     }
                     Command::Close(id, reply) => {
