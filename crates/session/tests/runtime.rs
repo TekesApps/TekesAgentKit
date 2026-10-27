@@ -742,7 +742,11 @@ struct ActiveRunEndpoint {
     follows: Arc<AtomicUsize>,
 }
 fn active_run_frame(streaming: bool, event: Option<Value>) -> Value {
-    let mut frame = json!({
+    if let Some(event) = event {
+        return json!({"type":"native-event","sessionId":"active-run-session",
+            "generation":"active-run-generation","event":event});
+    }
+    json!({
         "type": "conversation-update",
         "generation": "active-run-generation",
         "snapshot": {
@@ -761,11 +765,7 @@ fn active_run_frame(streaming: bool, event: Option<Value>) -> Value {
             "isStreaming": streaming,
             "state": {}
         }
-    });
-    if let Some(event) = event {
-        frame["event"] = event;
-    }
-    frame
+    })
 }
 #[async_trait]
 impl EndpointConnector for ActiveRunConnector {
