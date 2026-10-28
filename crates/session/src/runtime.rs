@@ -41,6 +41,17 @@ type HistoryOwners =
     std::sync::Mutex<std::collections::BTreeMap<String, Arc<tokio::sync::Mutex<BTreeSet<String>>>>>;
 type Reply<T> = oneshot::Sender<Result<T>>;
 type OperationResult = Option<(Option<String>, Reply<Value>, Result<Value>)>;
+enum EarlierValue {
+    Journal(HistoryRequest, HistoryPage),
+    Native(bool),
+}
+struct EarlierResult {
+    id: String,
+    connection_epoch: u64,
+    journal_epoch: u64,
+    reply: Reply<bool>,
+    result: Result<EarlierValue>,
+}
 enum Command {
     Open(String, Reply<()>),
     Close(String, Reply<()>),
@@ -746,6 +757,8 @@ async fn connected(
 ) -> Result<bool> {
     let connection_epoch = store.read(|state| state.connection_epoch);
     let mut operations: tokio::task::JoinSet<OperationResult> = tokio::task::JoinSet::new();
+    let mut earlier_reads = tokio::task::JoinSet::<EarlierResult>::new();
+    let mut earlier_inflight = BTreeSet::<(String, u64)>::new();
     let mut inventory_refreshes = tokio::task::JoinSet::new();
     let mut inventory_waiters: Vec<Reply<()>> = vec![];
     let mut inventory_dirty = false;
@@ -826,6 +839,36 @@ async fn connected(
             store.update(|s| s.reset_journal(&id));
         }
         tokio::select! {
+            completed = earlier_reads.join_next(), if !earlier_reads.is_empty() => {
+                let fetched = match completed {
+                    Some(Ok(fetched)) => fetched,
+                    _ => return Err(Error::Transport("history read task ended".into())),
+                };
+                earlier_inflight.remove(&(fetched.id.clone(), fetched.journal_epoch));
+                let current = store.read(|state| {
+                    state.ready()
+                        && state.connection_epoch == fetched.connection_epoch
+                        && journal_epochs.get(&fetched.id) == Some(&fetched.journal_epoch)
+                        && state.sessions.get(&fetched.id)
+                            .is_some_and(|session| session.journal_ready && session.journal_error.is_none())
+                });
+                let result = if !current {
+                    Err(Error::Protocol("stale history page result".into()))
+                } else {
+                    match fetched.result {
+                        Ok(EarlierValue::Native(loaded)) => Ok(loaded),
+                        Ok(EarlierValue::Journal(request, page)) => {
+                            store.update(|state| {
+                                state.sessions.get_mut(&fetched.id)
+                                    .ok_or_else(|| Error::Protocol("session closed during history read".into()))?
+                                    .apply_page(page, &request)
+                            })
+                        }
+                        Err(error) => Err(error),
+                    }
+                };
+                let _ = fetched.reply.send(result);
+            }
             refreshed = inventory_refreshes.join_next(), if !inventory_refreshes.is_empty() => {
                 let result = match refreshed {
                     Some(Ok(result)) => result,
@@ -971,7 +1014,42 @@ async fn connected(
                         let endpoint=endpoint.clone();
                         operations.spawn(async move {let result=endpoint.observe_files(&id,&path).await;let _=reply.send(result);None});
                     }
-                    Command::Earlier(id, reply) => { let result = load_earlier(endpoint.as_ref(), store, &id).await; let _ = reply.send(result); }
+                    Command::Earlier(id, reply) => {
+                        let active_journal_epoch = journal_epochs.get(&id).copied();
+                        let Some(journal_epoch) = active_journal_epoch else {
+                            let _ = reply.send(Err(Error::Protocol("history reader is not open".into())));
+                            continue;
+                        };
+                        if earlier_inflight.contains(&(id.clone(), journal_epoch)) {
+                            let _ = reply.send(Err(Error::Protocol("history page already pending".into())));
+                            continue;
+                        }
+                        if earlier_inflight.len() >= 64 {
+                            let _ = reply.send(Err(Error::Protocol("too many pending history page requests".into())));
+                            continue;
+                        }
+                        let native = endpoint.content_kind() == SessionContentKind::NativeConversation;
+                        let request = match history_request(store, &id, native) {
+                            Ok(request) => request,
+                            Err(error) => { let _ = reply.send(Err(error)); continue; }
+                        };
+                        if request.is_none() && !native {
+                            let _ = reply.send(Ok(false));
+                            continue;
+                        }
+                        let endpoint = endpoint.clone();
+                        earlier_inflight.insert((id.clone(), journal_epoch));
+                        earlier_reads.spawn(async move {
+                            let result = if let Some(request) = request {
+                                endpoint.history_page(request.clone()).await.map(|page| EarlierValue::Journal(request, page))
+                            } else {
+                                endpoint.load_earlier_conversation(&id, 50).await.map(EarlierValue::Native)
+                            };
+                            EarlierResult {
+                                id, connection_epoch, journal_epoch, reply, result,
+                            }
+                        });
+                    }
                     Command::Call { method, payload, rpc_id, expected_epoch, mut reply } => {
                         if !store.read(|state|state.ready() && expected_epoch.is_none_or(|epoch|epoch==state.connection_epoch)) || operations.len() >= 64 { let _ = reply.send(Err(Error::Disconnected)); continue; }
                         let endpoint = endpoint.clone();
@@ -1062,22 +1140,22 @@ async fn add_journal(
     streams.push(tagged(format!("journal:{id}"), epoch, Box::pin(frames)));
     Ok(handle)
 }
-async fn load_earlier(
-    endpoint: &dyn SessionEndpoint,
+fn history_request(
     store: &SharedProjection,
     id: &str,
-) -> Result<bool> {
-    if endpoint.content_kind() == SessionContentKind::NativeConversation {
-        return endpoint.load_earlier_conversation(id, 50).await;
-    }
-    let request = store.read(|s| -> Result<Option<HistoryRequest>> {
+    native: bool,
+) -> Result<Option<HistoryRequest>> {
+    store.read(|s| -> Result<Option<HistoryRequest>> {
         require(s.ready(), "endpoint not ready")?;
         let session = s
             .sessions
             .get(id)
             .ok_or_else(|| Error::Protocol("session not opened".into()))?;
-        require(session.journal_ready, "journal not ready")?;
-        if !session.has_more_before || session.history_base_sequence < 0 {
+        require(
+            session.journal_ready && session.journal_error.is_none(),
+            "journal not ready",
+        )?;
+        if native || !session.has_more_before || session.history_base_sequence < 0 {
             return Ok(None);
         }
         Ok(Some(HistoryRequest {
@@ -1086,16 +1164,6 @@ async fn load_earlier(
             before_sequence: Some(session.history_base_sequence),
             max_messages: 50,
         }))
-    })?;
-    let Some(request) = request else {
-        return Ok(false);
-    };
-    let page = endpoint.history_page(request.clone()).await?;
-    store.update(|s| {
-        s.sessions
-            .get_mut(id)
-            .expect("session exists")
-            .apply_page(page, &request)
     })
 }
 

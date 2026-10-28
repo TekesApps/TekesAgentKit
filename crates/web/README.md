@@ -30,6 +30,14 @@ from that flag and retain the original connection/error text. This operation
 does not resend prompts, queued mutations, approvals or question replies; it does
 not change credentials or bypass authentication/protocol failures.
 
+`earlier` fetches a page in a Runtime-owned read task, leaving live events and
+controls on the session actor responsive. There is at most one pending page per
+session reader; a duplicate returns an explicit error. The actor alone merges
+results after checking the connection epoch, reader identity/readiness, session,
+and the original frozen `throughSequence`/`beforeSequence` contract. Closing and
+reopening a reader invalidates its old results; reconnect cancels old read tasks.
+An unavailable history reader cannot be repaired by applying a delayed page.
+
 The browser application is the independent MIT TypeScript project
 [TekesWebUI](https://github.com/TekesApps/TekesWebUI). No HTML, CSS, browser code or
 browser tests live in this crate. Its historical binary name is retained for host
