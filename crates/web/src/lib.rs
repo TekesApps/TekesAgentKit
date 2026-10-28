@@ -457,6 +457,7 @@ impl SharedEndpoint {
     pub fn description(&self) -> Value {
         let state = self.runtime.snapshot();
         let mut description = json!({"id":state.endpoint_id,"kind":self.kind,"name":self.name,
+            "canReconnect":matches!(state.connection, ConnectionState::Failed(_)),
             "connection":match &state.connection {ConnectionState::Connecting=>json!("connecting"),ConnectionState::Ready=>json!("ready"),ConnectionState::Failed(e)=>json!({"failed":e}),ConnectionState::Stopped=>json!("stopped")},"host":state.host,
             "capabilities":self.connected().ok().map(|e| e.capabilities())});
         if let Some(methods) = description["capabilities"]["methods"].as_array_mut() {
@@ -869,6 +870,10 @@ impl SharedAgent {
         let runtime = &shared.runtime;
         match string(request, "op")? {
             "describe" => Ok(shared.description()),
+            "reconnect" => {
+                runtime.reconnect().await?;
+                Ok(shared.description())
+            }
             "snapshot" => Ok(serde_json::to_value(runtime.snapshot().as_ref())?),
             "call" => {
                 if request["method"] == "thread.actions" {

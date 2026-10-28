@@ -12,7 +12,7 @@ line on stdin followed by multiplexed requests. It emits `{id,value}`, `{id,erro
 There is no listener, credential store or Kernel UI in this crate.
 
 Operations: `endpoints`, `describe`, `snapshot`, `call` (requires caller-supplied `rpcId`),
-`history`, `respond`, `earlier`, `follow`, `cancelObservation`. A `follow` targets `state`
+`history`, `respond`, `earlier`, `follow`, `cancelObservation`, `reconnect`. A `follow` targets `state`
 (inventory/health), `view` (session/run/transcript), or a normalized `StreamTarget` object.
 A host can refresh DSH authorization with the private `configureDSH` operation; its HTTP
 wrapper must restrict this to its native-host authorization, never browser credentials.
@@ -21,6 +21,14 @@ Each view has its own history lease. Dropping an observation, changing selection
 closing a browser releases only that observation. Runtime/Harness ownership stays in
 the host until an explicit host stop. Requests are never automatically replayed after
 uncertain mutations. Slow observers are disconnected and must request fresh baselines.
+
+`{op:"reconnect", endpoint:"…"}` explicitly restarts that endpoint's existing
+Runtime connection/recovery and returns its current description after readiness.
+Descriptions project `canReconnect` when the connection is failed, including
+after finite automatic attempts are exhausted. Consumers show the explicit action
+from that flag and retain the original connection/error text. This operation
+does not resend prompts, queued mutations, approvals or question replies; it does
+not change credentials or bypass authentication/protocol failures.
 
 The browser application is the independent MIT TypeScript project
 [TekesWebUI](https://github.com/TekesApps/TekesWebUI). No HTML, CSS, browser code or
