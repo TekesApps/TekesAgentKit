@@ -1,5 +1,7 @@
 # 三个独立 SessionEndpoint 的无 UI 闭环
 
+Native uses TCP_NODELAY on its main multiplexed WebSocket so small control and history requests are sent without Nagle coalescing delays. Stream ownership, framing, validation, and recovery contracts are unchanged.
+
 日期：2026-10-17。改动只在 TekesAgentKit；ClientKit、Tekes、Kernel、Pi、DSH 作为只读来源和运行时。
 
 ## 契约与路由

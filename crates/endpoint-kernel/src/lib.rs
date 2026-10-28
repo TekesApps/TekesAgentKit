@@ -91,7 +91,7 @@ impl KernelConnector {
             .max_frame_size(Some(FRAME_LIMIT));
         let (mut ws, _) = tokio::time::timeout(
             self.timeout,
-            connect_async_with_config(request, Some(config), false),
+            connect_async_with_config(request, Some(config), true),
         )
         .await
         .map_err(|_| Error::Timeout)?
