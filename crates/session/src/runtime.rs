@@ -209,6 +209,19 @@ impl SessionRuntime {
     }
     /// Each mounted consumer owns a distinct lease; releasing one never closes another's stream.
     pub async fn acquire_history(self: &Arc<Self>, id: &str) -> Result<SessionHistoryLease> {
+        self.acquire_history_inner(id, false).await
+    }
+    /// Keeps a view's observation alive after a scoped history failure. The
+    /// failure remains in the projection; this does not admit history writes.
+    /// Global connection failures and changed epochs still fail acquisition.
+    pub async fn acquire_history_view(self: &Arc<Self>, id: &str) -> Result<SessionHistoryLease> {
+        self.acquire_history_inner(id, true).await
+    }
+    async fn acquire_history_inner(
+        self: &Arc<Self>,
+        id: &str,
+        allow_history_failure: bool,
+    ) -> Result<SessionHistoryLease> {
         require(!id.is_empty(), "empty history session")?;
         let owner = rpc_id();
         let lease = SessionHistoryLease {
@@ -219,7 +232,24 @@ impl SessionRuntime {
         let owners = self.history_owners_for(id);
         let mut owners = owners.lock().await;
         owners.insert(owner);
-        self.open_history(id).await?;
+        let epoch = self.inspect(|state| state.connection_epoch);
+        if let Err(error) = self.open_history(id).await {
+            let scoped_failure = allow_history_failure
+                && self.inspect(|state| {
+                    state.connection == ConnectionState::Ready
+                        && state.connection_epoch == epoch
+                        && state.inventory_ready
+                        && state.control_ready
+                        && state.sessions.get(id).is_some_and(|session| {
+                            session.summary.is_some()
+                                && matches!(&error, Error::Transport(message)
+                                if session.journal_error.as_ref() == Some(message))
+                        })
+                });
+            if !scoped_failure {
+                return Err(error);
+            }
+        }
         Ok(lease)
     }
     pub async fn load_earlier(&self, id: &str) -> Result<bool> {

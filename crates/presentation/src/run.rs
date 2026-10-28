@@ -108,6 +108,16 @@ pub struct RunPresentation {
     pub error: Option<String>,
 }
 impl RunPresentation {
+    /// Availability is projected from current authority; reply dispatch still
+    /// validates the actionable revision against the live runtime.
+    pub fn can_respond(&self, id: &str, revision: i64) -> bool {
+        self.actionables.iter().any(|actionable| {
+            actionable["id"] == id
+                && actionable["revision"].as_i64() == Some(revision)
+                && actionable["responseAvailable"] == true
+        })
+    }
+
     pub fn read(store: &MemoryProjectionStore, scope: &RunScope, was_connected: bool) -> Self {
         let connection =
             ConnectionPresentation::read(store, Some(&scope.session_id), was_connected);
@@ -118,6 +128,14 @@ impl RunPresentation {
         let archived =
             store.archived_session_ids.contains(&scope.session_id) || status == Some("archived");
         let historical_read_only = session.and_then(historical_read_only);
+        let control_available = scope.endpoint_id == store.endpoint_id
+            && session.is_some()
+            && store.connection == ConnectionState::Ready
+            && store.control_ready
+            && store.inventory_ready
+            && historical_read_only.is_none();
+        let actionables_available = control_available && store.actionables_ready;
+        let response_available = actionables_available && !archived;
         let actionables: Vec<_> = store
             .actionables
             .values()
@@ -125,6 +143,8 @@ impl RunPresentation {
             .map(|source| {
                 let mut actionable = source.clone();
                 if let Some(object) = actionable.as_object_mut() {
+                    // A harness extension cannot grant local reply availability.
+                    object.insert("responseAvailable".into(), Value::Bool(response_available));
                     // This is adapter authority, not an extension supplied by a
                     // remote actionable. Unadvertised endpoints offer no cancel.
                     object.remove("cancelOutcome");
@@ -141,7 +161,19 @@ impl RunPresentation {
                 actionable
             })
             .collect();
-        let running = session.is_some_and(|s| s.run_open);
+        let running = session.is_some_and(|session| {
+            if session.journal_ready && session.journal_error.is_none() {
+                session.run_open
+            } else {
+                // Inventory remains an independent live authority when history
+                // cannot be read; a retained journal flag may already be stale.
+                session
+                    .summary
+                    .as_ref()
+                    .and_then(|summary| summary["running"].as_bool())
+                    == Some(true)
+            }
+        });
         let history_available = connection.phase == ConnectionPhase::Connected
             && session.is_some_and(|session| session.journal_ready);
         let available = scope.endpoint_id == store.endpoint_id
@@ -152,7 +184,7 @@ impl RunPresentation {
             // The immutable history is readable, but stale historical control
             // facts must not advertise a live runnable/answerable turn.
             RunPhase::Unavailable
-        } else if !available {
+        } else if !available && !control_available {
             if session.is_none() {
                 RunPhase::Loading
             } else {
@@ -160,7 +192,7 @@ impl RunPresentation {
             }
         } else if status == Some("interrupted") {
             RunPhase::Interrupted
-        } else if !actionables.is_empty() {
+        } else if actionables_available && !actionables.is_empty() {
             RunPhase::WaitingForInput
         } else if running {
             RunPhase::Running
@@ -180,13 +212,9 @@ impl RunPresentation {
             phase,
             connection,
             can_submit,
-            can_cancel: available
-                && historical_read_only.is_none()
-                && running
-                && !archived
-                && status != Some("interrupted"),
+            can_cancel: control_available && running && !archived && status != Some("interrupted"),
             can_update_queue,
-            actionables: if available && historical_read_only.is_none() {
+            actionables: if actionables_available {
                 actionables
             } else {
                 Vec::new()

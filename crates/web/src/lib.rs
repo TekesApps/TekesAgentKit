@@ -929,6 +929,18 @@ impl SharedAgent {
                     )?;
                     return Ok(serde_json::to_value(AnnotationCompilation { text })?);
                 }
+                if request["method"] == "session.cancel" {
+                    runtime.inspect(|state| {
+                        let scope = RunScope::main(
+                            &state.endpoint_id,
+                            string(&request["payload"], "sessionId")?,
+                        );
+                        require(
+                            RunPresentation::read(state, &scope, true).can_cancel,
+                            "Run is not cancellable",
+                        )
+                    })?;
+                }
                 runtime
                     .call(
                         string(request, "method")?,
@@ -944,12 +956,22 @@ impl SharedAgent {
                     .await?,
             )?),
             "respond" => {
-                runtime
-                    .respond(
-                        string(request, "actionableId")?,
-                        integer(request, "expectedRevision")?,
-                        request["outcome"].clone(),
+                let id = string(request, "actionableId")?;
+                let revision = integer(request, "expectedRevision")?;
+                runtime.inspect(|state| {
+                    let actionable = state
+                        .actionables
+                        .get(id)
+                        .ok_or_else(|| Error::Protocol("missing actionable".into()))?;
+                    let scope =
+                        RunScope::main(&state.endpoint_id, string(actionable, "sessionId")?);
+                    require(
+                        RunPresentation::read(state, &scope, true).can_respond(id, revision),
+                        "actionable is unavailable or stale",
                     )
+                })?;
+                runtime
+                    .respond(id, revision, request["outcome"].clone())
                     .await?;
                 Ok(json!({}))
             }
@@ -971,12 +993,17 @@ impl SharedAgent {
         if request["target"] == "view" || request["target"] == "state" {
             let runtime = &shared.runtime;
             let session = request["sessionId"].as_str();
-            let _lease = if let Some(id) = session {
-                Some(runtime.acquire_history(id).await?)
-            } else {
-                None
-            };
             let mut observer = runtime.subscribe();
+            let history = async {
+                if let Some(id) = session {
+                    runtime.acquire_history_view(id).await.map(Some)
+                } else {
+                    Ok(None)
+                }
+            };
+            tokio::pin!(history);
+            let mut history_pending = true;
+            let mut _lease = None;
             let (_preferences_sender, mut preferences) = tokio::sync::watch::channel(0_u64);
             if let Some(store) = &self.thread_preferences {
                 preferences = store.subscribe();
@@ -1004,7 +1031,16 @@ impl SharedAgent {
                 if output.send(value).await.is_err() {
                     break;
                 }
-                tokio::select! { result = local_changes.changed() => {if result.is_err(){break}}, result = preferences.changed() => {if result.is_err(){break}}, result = observer.changed() => {if result.is_err(){break}}, _ = output.closed() => break }
+                tokio::select! {
+                    result = &mut history, if history_pending => {
+                        _lease = result?;
+                        history_pending = false;
+                    },
+                    result = local_changes.changed() => {if result.is_err(){break}},
+                    result = preferences.changed() => {if result.is_err(){break}},
+                    result = observer.changed() => {if result.is_err(){break}},
+                    _ = output.closed() => break,
+                }
             }
         } else {
             let mut stream = shared

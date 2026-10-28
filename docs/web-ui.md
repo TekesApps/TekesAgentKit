@@ -15,6 +15,29 @@ See [the service contract](../crates/web/README.md#annotation-interface).
 
 ## Observer detach during an active run
 
+### History failures and live controls
+
+`follow(view)` publishes current shared state while its history lease loads. A
+session-scoped history error remains visible in `run.connection` and prevents new
+input/queue edits; it does not end the view or disable independent live controls.
+`run.canCancel` uses current inventory/control readiness and running authority.
+Each visible actionable carries `responseAvailable`, computed by AgentKit from
+current control/actionable readiness and session access. Web consumers render
+that marker and submit the original actionable ID/revision; AgentKit rechecks
+the current revision before dispatch. Consumers must not infer control admission
+from transcript readiness or connection display text.
+
+Disconnects, archived/read-only sessions and stale actionable revisions remain
+non-controllable. Bounded child history can display actionable content but sets
+`responseAvailable: false`; displaying retained content never grants a writable
+child authority. Strict `SessionRuntime::acquire_history` still fails on history
+errors. `acquire_history_view` retains a view lease only for a projected scoped
+history error in the same healthy control epoch; global failures still propagate.
+
+No prompt, cancellation or response is automatically retried by view loading.
+
+### Active observer lifetime
+
 A browser closing releases its history observer; it does not cancel execution.
 When the last observer leaves a ready journal whose shared projection reports an
 active run, SessionRuntime retains that journal and continues folding live events.

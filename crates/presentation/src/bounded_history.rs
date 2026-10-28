@@ -177,6 +177,9 @@ impl BoundedHistory {
                 tekes_agent_session::MemoryProjectionStore::new(&self.parent.endpoint_id);
             projected.connection_epoch = state.connection_epoch;
             projected.connection = state.connection.clone();
+            projected.inventory_ready = state.inventory_ready;
+            projected.control_ready = state.control_ready;
+            projected.actionables_ready = state.actionables_ready;
             if state.archived_session_ids.contains(&self.child) {
                 projected.archived_session_ids.push(self.child.clone());
             }
@@ -207,6 +210,11 @@ impl BoundedHistory {
         run.can_cancel = false;
         run.can_update_queue = false;
         run.connection.can_submit = false;
+        for action in &mut run.actionables {
+            if let Some(action) = action.as_object_mut() {
+                action.insert("responseAvailable".into(), serde_json::Value::Bool(false));
+            }
+        }
         Ok((transcript, run))
     }
 

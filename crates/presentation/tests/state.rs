@@ -494,6 +494,83 @@ fn connection_and_thread_status_never_invent_running_or_cross_session_authority(
 }
 
 #[test]
+fn failed_or_loading_history_does_not_disable_authoritative_running_cancel() {
+    for (ready, error) in [
+        (false, None),
+        (false, Some("history failed")),
+        (true, Some("history failed")),
+    ] {
+        let mut state = authority();
+        let session = state.sessions.get_mut("a").unwrap();
+        session.journal_ready = ready;
+        session.journal_error = error.map(String::from);
+        session.summary = Some(json!({"running":true,"status":"active"}));
+        // A retained journal flag is not the independent inventory authority.
+        session.run_open = false;
+        let run = RunPresentation::read(&state, &scope("a"), true);
+        assert!(!run.can_submit);
+        assert!(run.connection.history_is_stale);
+        assert!(run.can_cancel, "history ready={ready}, error={error:?}");
+    }
+}
+
+#[test]
+fn failed_history_keeps_fresh_actionables_and_their_revisions() {
+    let mut state = authority();
+    state.sessions.get_mut("a").unwrap().journal_ready = false;
+    state.sessions.get_mut("a").unwrap().journal_error = Some("history failed".into());
+    for (id, kind, revision) in [("approval", "approval", 4), ("question", "question", 7)] {
+        state.actionables.insert(id.into(), json!({"id":id,"sessionId":"a","kind":kind,"revision":revision,"payload":{"title":"Confirm"}}));
+    }
+    let mut presentation = PresentationStore::default();
+    presentation.select(destination("a")).unwrap();
+    let snapshot = presentation.refresh(&state).unwrap();
+    let run = snapshot.run.unwrap();
+    assert_eq!(run.phase, RunPhase::WaitingForInput);
+    assert_eq!(run.actionables.len(), 2);
+    assert_eq!(run.actionables[0]["revision"], 4);
+    assert_eq!(run.actionables[1]["revision"], 7);
+    assert!(!run.can_submit);
+}
+
+#[test]
+fn history_failure_never_bypasses_control_readiness_or_explicit_read_only_access() {
+    let mut state = authority();
+    let session = state.sessions.get_mut("a").unwrap();
+    session.journal_error = Some("history failed".into());
+    session.summary = Some(json!({"running":true,"status":"active"}));
+    state.actionables.insert("approval".into(), json!({"id":"approval","sessionId":"a","kind":"approval","revision":4,"responseAvailable":true}));
+    for boundary in ["disconnected", "inventory", "control", "readonly"] {
+        let mut blocked = state.clone();
+        match boundary {
+            "disconnected" => blocked.connection = ConnectionState::Connecting,
+            "inventory" => blocked.inventory_ready = false,
+            "control" => blocked.control_ready = false,
+            "readonly" => {
+                blocked.sessions.get_mut("a").unwrap().projections.insert(
+                    "historyAccess".into(),
+                    VersionedValue {
+                        sequence: 1,
+                        value: json!({"mode":"read-only"}),
+                    },
+                );
+            }
+            _ => unreachable!(),
+        }
+        let run = RunPresentation::read(&blocked, &scope("a"), true);
+        assert!(!run.can_cancel, "{boundary}");
+        assert!(!run.can_respond("approval", 4), "{boundary}");
+    }
+    state.actionables_ready = false;
+    let run = RunPresentation::read(&state, &scope("a"), true);
+    assert!(
+        run.can_cancel,
+        "cancel does not depend on actionable readiness"
+    );
+    assert!(!run.can_respond("approval", 4));
+}
+
+#[test]
 fn legacy_history_is_readable_but_shared_presentation_blocks_writes() {
     let mut authority = authority();
     let session = authority.sessions.get_mut("a").unwrap();

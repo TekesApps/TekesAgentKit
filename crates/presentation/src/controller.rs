@@ -558,18 +558,23 @@ impl RunController {
         revision: i64,
         outcome: Value,
     ) -> Result<()> {
-        require(
-            scope.endpoint_id == self.shared.runtime.inspect(|s| s.endpoint_id.clone()),
-            "actionable endpoint mismatch",
-        )?;
-        require(
-            self.shared.runtime.inspect(|s| {
-                s.actionables
+        self.shared.runtime.inspect(|state| {
+            require(
+                scope.endpoint_id == state.endpoint_id,
+                "actionable endpoint mismatch",
+            )?;
+            require(
+                state
+                    .actionables
                     .get(id)
-                    .is_some_and(|a| a["sessionId"] == scope.session_id)
-            }),
-            "actionable scope mismatch",
-        )?;
+                    .is_some_and(|a| a["sessionId"] == scope.session_id),
+                "actionable scope mismatch",
+            )?;
+            require(
+                RunPresentation::read(state, scope, true).can_respond(id, revision),
+                "actionable is unavailable or stale",
+            )
+        })?;
         self.shared.runtime.respond(id, revision, outcome).await
     }
 }

@@ -633,7 +633,7 @@ impl MemoryProjectionStore {
                     if let Some(summary) = &mut s.summary {
                         summary["running"] = Value::Bool(running);
                     }
-                    if !s.journal_ready {
+                    if !s.journal_ready || s.journal_error.is_some() {
                         s.run_open = running;
                     }
                 }
@@ -704,7 +704,7 @@ impl MemoryProjectionStore {
             }
         }
         let session = self.sessions.entry(id.into()).or_default();
-        if !session.journal_ready {
+        if !session.journal_ready || session.journal_error.is_some() {
             session.run_open = value["running"].as_bool().unwrap_or(false);
         }
         session.summary = Some(value);
