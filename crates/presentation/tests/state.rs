@@ -510,6 +510,7 @@ fn failed_or_loading_history_does_not_disable_authoritative_running_cancel() {
         let run = RunPresentation::read(&state, &scope("a"), true);
         assert!(!run.can_submit);
         assert!(run.connection.history_is_stale);
+        assert_eq!(run.error.as_deref(), error);
         assert!(run.can_cancel, "history ready={ready}, error={error:?}");
     }
 }

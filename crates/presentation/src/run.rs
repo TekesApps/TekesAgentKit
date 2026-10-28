@@ -229,7 +229,8 @@ impl RunPresentation {
                 .unwrap_or_default(),
             error: session
                 .and_then(|s| s.agent_error.clone())
-                .or(historical_read_only),
+                .or(historical_read_only)
+                .or_else(|| session.and_then(|s| s.journal_error.clone())),
         }
     }
 }
