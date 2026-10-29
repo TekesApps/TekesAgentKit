@@ -133,6 +133,8 @@ impl Context {
             goal: None,
             feedback: BTreeMap::new(),
         };
+        let inherited_permission = self.permission_mode(parent).await?;
+        self.write_permission(&id, &inherited_permission).await?;
         let mut next = manifest.clone();
         next.sessions.insert(id.clone(), row);
         next.child_admissions.insert(
@@ -182,7 +184,7 @@ impl Context {
                 require(matches!(mode, "queue" | "steer"), "invalid child delivery")?;
                 let rpc = self.process(child).await?;
                 // Validate/materialize before durable admission; only supported public prompt blocks.
-                let (message, images) = self.materialize(child, content).await?;
+                let materialized = self.materialize(child, content).await?;
                 if mode == "steer" {
                     return self.direct_prompt(&rpc, &json!({"sessionId":child,"mode":"steer","content":content,"clientTimeZone":payload["clientTimeZone"]}), rpc_id).await;
                 }
@@ -194,7 +196,9 @@ impl Context {
                 tokio::spawn(async move {
                     let _ = context.dispatch_next_if_current(&child, Some(rpc)).await;
                 });
-                let _ = (message, images);
+                // `file` blocks are rejected above: the general materialized file projection
+                // does not grant subagents file support.
+                let _ = materialized;
                 Ok(receipt)
             }
             "subagents.cancel" => {
@@ -257,7 +261,7 @@ impl Context {
         let id = string(payload, "sessionId")?;
 
         require(!rpc_id.is_empty(), "prompt rpcId required")?;
-        let (message, images) = self.materialize(id, array(payload, "content")?).await?;
+        let materialized = self.materialize(id, array(payload, "content")?).await?;
         if payload["mode"] != "steer"
             && rpc.request("get_state", json!({})).await?["isStreaming"] == true
         {
@@ -290,14 +294,14 @@ impl Context {
         drop(manifest);
         rpc.control(
             "input.prepare",
-            json!({"id":rpc_id,"text":message,"hasImages":!images.is_empty()}),
+            json!({"id":rpc_id,"text":materialized.message.clone(),"hasImages":!materialized.images.is_empty(),"files":materialized.files.clone()}),
         )
         .await?;
         let result = rpc
             .request(
                 "prompt",
                 json!({
-                    "message":message,"images":images,
+                    "message":materialized.message,"images":materialized.images,
                     "streamingBehavior":if payload["mode"]=="steer" {"steer"} else {"followUp"}
                 }),
             )

@@ -17,6 +17,8 @@ struct Connector {
     archive_disabled: Arc<AtomicBool>,
     rename_fails: Arc<AtomicBool>,
     settled_journal: bool,
+    queue_enabled: bool,
+    queue_fails: bool,
     turn_fork_disabled: Arc<AtomicBool>,
     live_journal: Option<tokio::sync::broadcast::Sender<Value>>,
 }
@@ -44,8 +46,11 @@ impl SessionEndpoint for Endpoint {
         &self.host
     }
     fn capabilities(&self) -> EndpointCapabilities {
-        let mut caps =
-            EndpointCapabilities::methods(&["session.rename", "session.fork", "session.archive"]);
+        let mut methods = vec!["session.rename", "session.fork", "session.archive"];
+        if self.connector.queue_enabled {
+            methods.push("session.updateQueue");
+        }
+        let mut caps = EndpointCapabilities::methods(&methods);
         caps.can_fork_completed_turn = self.connector.settled_journal
             && !self.connector.turn_fork_disabled.load(Ordering::SeqCst);
         caps.supports_archive_session = !self.connector.archive_disabled.load(Ordering::SeqCst);
@@ -57,7 +62,12 @@ impl SessionEndpoint for Endpoint {
                 json!({"type":"baseline","generation":"g","snapshot":{"items":[{"sessionId":"source","title":"Topic (9)","updatedAt":1,"running":false,"blank":false}]}})
             }
             StreamTarget::SessionControl => {
-                json!({"type":"baseline","generation":"g","snapshot":{"queues":[],"jobs":[],"projections":[]}})
+                let queues = if self.connector.queue_enabled {
+                    json!([{"sessionId":"source","items":[{"id":"queued-1","message":{"content":[{"type":"text","text":"pending"}]}}]}])
+                } else {
+                    json!([])
+                };
+                json!({"type":"baseline","generation":"g","snapshot":{"queues":queues,"jobs":[],"projections":[]}})
             }
             StreamTarget::Actionables => json!({"type":"reset","generation":"g"}),
             StreamTarget::SessionJournal { address, .. } => {
@@ -109,6 +119,7 @@ impl SessionEndpoint for Endpoint {
                 Err(Error::Timeout)
             }
             "session.rename" => Ok(json!({"title":payload["title"],"seq":7})),
+            "session.updateQueue" if self.connector.queue_fails => Err(Error::Timeout),
             _ => Ok(json!({})),
         }
     }
@@ -187,6 +198,7 @@ async fn fork_preserves_created_pointer_if_followup_rename_fails_and_never_retri
 }
 struct Host {
     calls: Mutex<Vec<String>>,
+    pinned: AtomicBool,
 }
 #[async_trait]
 impl ThreadActionHost for Host {
@@ -194,7 +206,9 @@ impl ThreadActionHost for Host {
         ["thread.setPinned".into()].into()
     }
     fn pin_state(&self, _: &str, _: &str) -> Option<ThreadPinState> {
-        Some(ThreadPinState { pinned: true })
+        Some(ThreadPinState {
+            pinned: self.pinned.load(Ordering::SeqCst),
+        })
     }
     async fn perform(
         &self,
@@ -206,6 +220,8 @@ impl ThreadActionHost for Host {
             "{endpoint}:{}:{}:{id}",
             request.session_id, request.action_id
         ));
+        self.pinned
+            .store(request.action_id == "pin", Ordering::SeqCst);
         Ok(ThreadActionOutcome::default())
     }
 }
@@ -214,6 +230,7 @@ async fn pin_authority_is_an_explicit_shared_host_callback() {
     let (mut agent, connector) = setup().await;
     let host = Arc::new(Host {
         calls: Mutex::new(vec![]),
+        pinned: AtomicBool::new(true),
     });
     agent.install_thread_action_host(host.clone());
     let menu = agent
@@ -221,12 +238,52 @@ async fn pin_authority_is_an_explicit_shared_host_callback() {
         .unwrap();
     assert_eq!(menu.items[0].id, "unpin");
     assert!(menu.items[0].enabled);
+    let agent = Arc::new(agent);
+    let (tx, mut rx) = tokio::sync::mpsc::channel(8);
+    let observed = agent.clone();
+    let task = tokio::spawn(async move {
+        observed
+            .follow(&json!({"endpoint":"test","target":"state"}), tx)
+            .await
+    });
+    let baseline = tokio::time::timeout(Duration::from_secs(2), rx.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        baseline["sessions"][0]["pin"]["pinned"], true,
+        "custom shared pin authority must be in the inventory too"
+    );
     agent.request(&request("unpin")).await.unwrap();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            let view = rx.recv().await.unwrap();
+            if view["sessions"][0]["pin"]["pinned"] != true {
+                break;
+            }
+        }
+    })
+    .await
+    .expect("successful host mutation wakes inventory observers");
+    host.pinned.store(true, Ordering::SeqCst);
+    agent.invalidate_thread_inventory();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            let view = rx.recv().await.unwrap();
+            if view["sessions"][0]["pin"]["pinned"] == true {
+                break;
+            }
+        }
+    })
+    .await
+    .expect("explicit host invalidation rereads the same pin authority");
     assert_eq!(
         *host.calls.lock().unwrap(),
         vec!["test:source:unpin:stable"]
     );
     assert!(connector.calls.lock().unwrap().is_empty());
+    drop(rx);
+    task.await.unwrap().unwrap();
 }
 
 #[tokio::test]
@@ -472,4 +529,74 @@ async fn footnote_fork_uses_the_selected_settled_boundary_and_rejects_unknown_tu
     assert!(agent.request(&request(action)).await.is_err());
     assert_eq!(connector.calls.lock().unwrap().len(), before);
     task.abort();
+}
+
+#[tokio::test]
+async fn queue_removal_public_contract_fences_dispatch_and_waits_for_authority() {
+    for queue_fails in [false, true] {
+        let connector = Connector {
+            queue_enabled: true,
+            queue_fails,
+            ..Default::default()
+        };
+        let mut agent = SharedAgent::default();
+        agent
+            .register(
+                "test".into(),
+                "tekes".into(),
+                "Test".into(),
+                Arc::new(connector.clone()),
+            )
+            .unwrap();
+        let runtime = &agent.endpoint("test").unwrap().runtime;
+        runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
+        let mut changes = runtime.subscribe();
+        let lease = runtime.acquire_history("source").await.unwrap();
+        tokio::time::timeout(Duration::from_secs(2), async {
+            while !changes.inspect(|s| s.sessions["source"].journal_ready) {
+                changes.changed().await.unwrap();
+            }
+        })
+        .await
+        .unwrap();
+        let epoch = runtime.inspect(|s| s.connection_epoch);
+        let request = |item: &str, epoch: u64| json!({"op":"call","endpoint":"test","method":"agent.queue.remove","rpcId":"queue-operation","payload":{"sessionId":"source","itemId":item,"connectionEpoch":epoch}});
+        assert!(
+            agent
+                .request(&request("queued-1", epoch + 1))
+                .await
+                .is_err()
+        );
+        assert!(agent.request(&request("missing", epoch)).await.is_err());
+        assert!(
+            connector.calls.lock().unwrap().is_empty(),
+            "rejected UI facts must not reach the Harness"
+        );
+        let before = runtime.inspect(|s| s.sessions["source"].queue.clone());
+        let result = agent.request(&request("queued-1", epoch)).await;
+        assert_eq!(result.is_err(), queue_fails);
+        assert_eq!(
+            *connector.calls.lock().unwrap(),
+            vec![(
+                "session.updateQueue".into(),
+                json!({"sessionId":"source","itemId":"queued-1","action":{"kind":"remove"}}),
+                "queue-operation".into()
+            )],
+            "one request, including uncertain failures; never retry"
+        );
+        assert_eq!(
+            runtime.inspect(|s| s.sessions["source"].queue.clone()),
+            before,
+            "RPC completion is not a queue projection update"
+        );
+        runtime.reconnect().await.unwrap();
+        assert!(runtime.inspect(|s| s.connection_epoch) > epoch);
+        assert!(
+            agent.request(&request("queued-1", epoch)).await.is_err(),
+            "identical queue IDs after reconnect do not authorize an old view"
+        );
+        assert_eq!(connector.calls.lock().unwrap().len(), 1);
+        lease.release().await.unwrap();
+        runtime.stop().await.unwrap();
+    }
 }

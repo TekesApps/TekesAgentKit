@@ -19,7 +19,7 @@ Native 要求 Kernel 0.9 的 v4 wire；Pi/DSH 的标准化 HostDescription 保�
 
 `SessionRuntime` 合并 inventory/control/actionables/workspaces 和只观察的 endpoint events，按需打开会话窗口，提供订阅、snapshot、前页、定位和只读文件 API。
 慢 unary / prompt / actionable 响应以最多 64 个在途操作运行，流仍能投影；重连会中止旧连接操作，不自动重发 mutation。
-Native mux 对 peer 已结束的单流不重复发送 Close；仍存活的本地主动释放恰好发送一次 Close。
+公开 peer 返回的单会话 journal 错误只终止该次读取，不立即重开失败历史，也不使健康会话或整个 endpoint 重连。最后的完整投影可保留，但必须同时暴露读取错误并降级 freshness；显式重开可再次尝试。物理传输断线继续采用原有恢复流程。 Native mux 收到 peer 的流错误后，该流已结束，本地释放不能再次发送 Close；本地主动释放正常流仍恰好发送一次 Close。
 历史 lease 只拥有本地观察。最后一个观察者离开时，已就绪且仍运行的 journal 由
 SessionRuntime actor 继续接收；重开复用其内存投影。权威终态到达且没有观察者后再释放，
 显式 stop/drop 仍结束 runtime。这不保证服务重启后恢复尚未持久化的流式内容。
@@ -52,7 +52,7 @@ SessionRuntime actor 继续接收；重开复用其内存投影。权威终态�
 | 子代理 | 原生 catalog；扩展只读子历史；bounded child 控制不可用 | create/list/prompt/read/cancel，官方扩展模型工具 | projection catalog + 父拥有的 prompt/cancel；child 地址历史与重连 |
 | 产品服务 | 服务端或显式宿主能力 | 显式 HostServices | 服务端部署或显式 HostServices |
 
-公开类型化 API 提供 create/submit/fork/discard/rename/archive/unarchive/queue/upload/goal；其他公开扩展经能力检查后调用。`EndpointCapabilities` 区分方法、归档、临时 fork 和文件观察；不支持的方法明确失败。
+公开类型化 API 提供 create/submit/fork/discard/rename/archive/unarchive/queue/upload/goal；其他公开扩展经能力检查后调用。`EndpointCapabilities` 区分方法、归档、临时 fork 和文件观察；不支持的方法明确失败。Web 服务仅在 endpoint 声明 `session.updateQueue` 时发布 `agent.queue.remove`。该调用需携带当前 `connectionEpoch`，并由共享 Run presentation 暴露 `canUpdateQueue`；服务在调用前及通道背压后的本地接纳点复核会话 journal、归档/历史只读状态和权威队列项，actor 分派继续验证连接 epoch，不乐观移除、不自动重试，等待 Harness 的权威队列投影更新。Native 有界子历史为只读，明确禁用队列编辑。
 Pi 不提供虚构 journal、durable cursor 或 task/job。队列是宿主持久化的提交意图，支持编辑/移除和结算后自动派发；超时不重试不确定的派发。旧进程事件不能驱动新进程。
 Runtime 在 archive/discard 前退订对应会话内容流，失败则恢复；其他会话保持连接。archive 只隐藏指针，不删除原生文件。
 Pi Goal 支持 CAS、暂停/恢复、原生工具记录完成/阻塞及有界自动执行；每轮先持久化预算，达到上限后停止。激活只存在于当前连接，重连不会自动继续。反馈以原生 entry ID 和版本进行 CAS。
@@ -117,3 +117,35 @@ Pi 1.3.0 和 Native Kernel 0.9.0 的原验收也重新通过。上述模型输�
 ## 2026-10-18 对照复查
 
 当前 ClientKit 的 SEP 参考文件哈希均与基准一致（HEAD `c289bc9`）。复查修复了 Pi 原生文件缺失/替换后的恢复保护、ClientKit `atSeq` 完整 entry 顺序及已完成 turn 校验、失效 pointer 的单会话隔离，以及 Native/Pi 在无文件观察者时的 close 状态持久化。详情及验证边界见 [复查记录](sep-review-2026-10-18.md)。
+
+### Native legacy read-only history (Kernel #93 candidate)
+
+A Native journal can explicitly publish a `historyAccess` projection with
+`mode: "read-only"`, `reason: "legacy-tool-catalog-unavailable"` and the frozen
+`sourceDigest` (`sha256-` plus 64 lowercase hex digits). This identifies historical
+records whose old writer did not persist the execution tool catalog. It is not
+an endpoint-wide Unsupported capability and must not disable other sessions.
+
+Shared Run/Composer presentation keeps the received transcript readable and
+fresh, reports the access reason, and disables execution controls. An unknown or
+malformed historyAccess marker fails closed for writes. Kernel retains its strict
+execution/continuation checks; displaying history never authorizes a mutation.
+This extension is a candidate until the exact Kernel reader and consumer have
+passed public protocol and integration gates; it is not present in Kernel 0.9.7.
+
+### Question cancellation presentation (#73)
+
+`EndpointCapabilities.supportsQuestionCancellation` advertises that `respond`
+accepts the canonical question-only outcome `{sessionId, cancelQuestion: true}`.
+It defaults to false when absent. Native advertises this public Kernel contract;
+Pi and DSH do not advertise it until their adapters normalize the same contract.
+This does not imply either endpoint lacks every upstream cancellation mechanism.
+
+For a live question, shared Run presentation supplies optional `cancelOutcome`
+with that exact scoped outcome only when the adapter advertises it. Hosts submit
+it verbatim with the existing actionable ID and revision; they must not derive a
+Harness-specific cancellation shape or cancel the whole Run instead. Remote raw
+`cancelOutcome` extension data is not authority and is replaced or removed.
+Disconnected and historical-read-only views keep their existing actionable
+suppression; archived questions do not offer the cancellation outcome. The public
+TypeScript `QuestionCancellationOutcome` describes this optional field.

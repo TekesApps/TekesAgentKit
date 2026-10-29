@@ -38,6 +38,7 @@ let ticket = controller.prepare(&destination, PromptMode::Queue)?;
 // 此刻 snapshot 已含 echo；宿主可以切换选区，ticket 的目标不变。
 controller.dispatch(ticket, None).await?;
 // subscribe() 是最新完整不可变 snapshot 的 watch，不要求消费者逐帧接收通知。
+// 同一 authority 输入及本地 presentation 状态的重复刷新可以合并；真实状态、错误和 epoch 变化仍发布最新快照。
 ```
 
 NewThread 提交要求宿主显式提供 `CreateSessionRequest`（Native 的 cwd/execution 配置沿用公开 runtime 契约）；已有 Run 禁止再传 create。模型等 settings 使用 `dispatch_with(..., &host)`；没有 settings 时可用默认 `dispatch`。取消尚未派发的 ticket 使用 `cancel_prepared`。对 unknown，宿主核对权威历史后可调用 `acknowledge_reconciliation(id)`；接口不代表重试许可，也不会触发自动重发。
@@ -102,3 +103,5 @@ history. It updates only when durable reports change, with an x-to-y transition;
 there is no timer ticking, chunk counting or estimation when realtime usage is
 unavailable. The second public API example verifies both live and restored
 completed reports; service tests verify the uniform serialized view contract.
+
+`SessionRuntime::inspect_with_revision` 将进程内输入标记与 authority 在同一次读锁内交给调用者。它只适用于本地投影缓存；不是 Harness/source revision、transport generation 或业务 CAS 版本。`RunController` 同时跟踪本地 Composer/提交状态的可变访问，因此不能仅以 authority 标记跳过本地变化。

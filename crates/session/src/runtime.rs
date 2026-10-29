@@ -23,19 +23,49 @@ fn rpc_id() -> String {
     )
 }
 
+/// Wait for bounded-channel capacity before the caller's final local admission.
+/// The synchronous check and enqueue have no intervening await; this does not
+/// retract an already enqueued operation when a host owner later closes.
+async fn enqueue_after_validation<T: Send>(
+    sender: &mpsc::Sender<T>,
+    command: T,
+    validate: impl FnOnce() -> Result<()> + Send,
+) -> Result<()> {
+    let permit = sender.reserve().await.map_err(|_| Error::Disconnected)?;
+    validate()?;
+    permit.send(command);
+    Ok(())
+}
+
 type HistoryOwners =
     std::sync::Mutex<std::collections::BTreeMap<String, Arc<tokio::sync::Mutex<BTreeSet<String>>>>>;
 type Reply<T> = oneshot::Sender<Result<T>>;
 type OperationResult = Option<(Option<String>, Reply<Value>, Result<Value>)>;
+enum EarlierValue {
+    Journal(HistoryRequest, HistoryPage),
+    Native(bool),
+}
+struct EarlierResult {
+    id: String,
+    connection_epoch: u64,
+    journal_epoch: u64,
+    reply: Reply<bool>,
+    result: Result<EarlierValue>,
+}
 enum Command {
     Open(String, Reply<()>),
     Close(String, Reply<()>),
     Earlier(String, Reply<bool>),
     Observe(String, String, Reply<FrameStream>),
+    RefreshInventory {
+        expected_epoch: u64,
+        reply: Reply<()>,
+    },
     Call {
         method: String,
         payload: Value,
         rpc_id: String,
+        expected_epoch: Option<u64>,
         reply: Reply<Value>,
     },
     Respond {
@@ -66,7 +96,10 @@ impl SessionRuntime {
         let store = MemoryProjectionStore::new(endpoint_id);
         let (publish, revision) = watch::channel(0);
         let shared = Arc::new(SharedProjection {
-            store: RwLock::new(store),
+            store: RwLock::new(RevisionedProjection {
+                state: store,
+                revision: 0,
+            }),
             publish,
         });
         let task = tokio::spawn(run(connector, receiver, shared.clone()));
@@ -85,6 +118,15 @@ impl SessionRuntime {
     pub fn inspect<T>(&self, read: impl FnOnce(&MemoryProjectionStore) -> T) -> T {
         self.shared.read(read)
     }
+    /// The process-local input revision and state are read under the same lock.
+    /// This is a projection cache key, not a source/transport/CAS revision.
+    pub fn inspect_with_revision<T>(
+        &self,
+        read: impl FnOnce(u64, &MemoryProjectionStore) -> T,
+    ) -> T {
+        self.shared.read_with_revision(read)
+    }
+
     pub fn subscribe(&self) -> ProjectionSubscription {
         ProjectionSubscription {
             shared: self.shared.clone(),
@@ -162,15 +204,12 @@ impl SessionRuntime {
         .await?;
         self.inspect(|s| {
             let session = s.sessions.get(id).ok_or(Error::Disconnected)?;
-            if session.journal_ready {
+            if let Some(error) = &session.journal_error {
+                Err(Error::Transport(error.clone()))
+            } else if session.journal_ready {
                 Ok(())
             } else {
-                Err(Error::Transport(
-                    session
-                        .journal_error
-                        .clone()
-                        .unwrap_or_else(|| "session unavailable".into()),
-                ))
+                Err(Error::Transport("session unavailable".into()))
             }
         })
     }
@@ -193,6 +232,19 @@ impl SessionRuntime {
     }
     /// Each mounted consumer owns a distinct lease; releasing one never closes another's stream.
     pub async fn acquire_history(self: &Arc<Self>, id: &str) -> Result<SessionHistoryLease> {
+        self.acquire_history_inner(id, false).await
+    }
+    /// Keeps a view's observation alive after a scoped history failure. The
+    /// failure remains in the projection; this does not admit history writes.
+    /// Global connection failures and changed epochs still fail acquisition.
+    pub async fn acquire_history_view(self: &Arc<Self>, id: &str) -> Result<SessionHistoryLease> {
+        self.acquire_history_inner(id, true).await
+    }
+    async fn acquire_history_inner(
+        self: &Arc<Self>,
+        id: &str,
+        allow_history_failure: bool,
+    ) -> Result<SessionHistoryLease> {
         require(!id.is_empty(), "empty history session")?;
         let owner = rpc_id();
         let lease = SessionHistoryLease {
@@ -203,7 +255,24 @@ impl SessionRuntime {
         let owners = self.history_owners_for(id);
         let mut owners = owners.lock().await;
         owners.insert(owner);
-        self.open_history(id).await?;
+        let epoch = self.inspect(|state| state.connection_epoch);
+        if let Err(error) = self.open_history(id).await {
+            let scoped_failure = allow_history_failure
+                && self.inspect(|state| {
+                    state.connection == ConnectionState::Ready
+                        && state.connection_epoch == epoch
+                        && state.inventory_ready
+                        && state.control_ready
+                        && state.sessions.get(id).is_some_and(|session| {
+                            session.summary.is_some()
+                                && matches!(&error, Error::Transport(message)
+                                if session.journal_error.as_ref() == Some(message))
+                        })
+                });
+            if !scoped_failure {
+                return Err(error);
+            }
+        }
         Ok(lease)
     }
     pub async fn load_earlier(&self, id: &str) -> Result<bool> {
@@ -333,13 +402,132 @@ impl SessionRuntime {
             }
         }
     }
+    /// Read-only host-wide search over the advertised public SEP extension.
+    /// Fence both actor admission and response delivery to the original connection.
+    pub async fn search_sessions_at_epoch(
+        &self,
+        epoch: u64,
+        query: &str,
+        rpc_id: &str,
+    ) -> Result<SessionSearchResults> {
+        let allowed = || {
+            self.inspect(|state| {
+                state.connection == ConnectionState::Ready
+                    && state.connection_epoch == epoch
+                    && state.endpoint_capabilities.supports("session.search")
+            })
+        };
+        require(allowed(), "session search source unavailable or changed")?;
+        let value = self
+            .call_at_epoch(epoch, "session.search", json!({"query":query}), rpc_id)
+            .await?;
+        require(allowed(), "session search source unavailable or changed")?;
+        let result = SessionSearchResults::read(value)?;
+        let unknown = self.inspect(|state| {
+            result.items.iter().any(|hit| {
+                state
+                    .sessions
+                    .get(&hit.session_id)
+                    .is_none_or(|session| session.summary.is_none())
+            })
+        });
+        if unknown {
+            self.refresh_inventory_at_epoch(epoch).await?;
+            require(allowed(), "session search source unavailable or changed")?;
+        }
+        Ok(result)
+    }
+    /// Reopen only the public inventory/workspace cursors, atomically publishing
+    /// their validated baseline pair. Overlapping requests drain one flight.
+    /// Journal readers, connection epoch and remote execution are unchanged.
+    pub async fn refresh_inventory_at_epoch(&self, expected_epoch: u64) -> Result<()> {
+        let (reply, result) = oneshot::channel();
+        self.send(
+            Command::RefreshInventory {
+                expected_epoch,
+                reply,
+            },
+            result,
+        )
+        .await
+    }
     pub async fn call(&self, method: &str, payload: Value, rpc_id: &str) -> Result<Value> {
+        self.call_context(None, method, payload, rpc_id).await
+    }
+    pub(crate) async fn call_with_validation(
+        &self,
+        method: &str,
+        payload: Value,
+        rpc_id: &str,
+        validate: impl FnOnce() -> Result<()> + Send,
+    ) -> Result<Value> {
+        let (reply, result) = oneshot::channel();
+        enqueue_after_validation(
+            &self.commands,
+            Command::Call {
+                method: method.into(),
+                payload,
+                rpc_id: rpc_id.into(),
+                expected_epoch: None,
+                reply,
+            },
+            validate,
+        )
+        .await?;
+        result.await.map_err(|_| Error::Disconnected)?
+    }
+    /// Fence at actor dispatch, not just at the caller's earlier snapshot check.
+    /// A queued operation cannot cross a reconnect and target the new endpoint.
+    pub async fn call_at_epoch(
+        &self,
+        expected_epoch: u64,
+        method: &str,
+        payload: Value,
+        rpc_id: &str,
+    ) -> Result<Value> {
+        self.call_context(Some(expected_epoch), method, payload, rpc_id)
+            .await
+    }
+    /// Validate the caller's owner after channel backpressure while retaining
+    /// the connection fence at actor dispatch. Successful validation is the
+    /// local admission boundary; later observer closure does not cancel it.
+    pub async fn call_at_epoch_with_validation(
+        &self,
+        expected_epoch: u64,
+        method: &str,
+        payload: Value,
+        rpc_id: &str,
+        validate: impl FnOnce() -> Result<()> + Send,
+    ) -> Result<Value> {
+        let (reply, result) = oneshot::channel();
+        enqueue_after_validation(
+            &self.commands,
+            Command::Call {
+                method: method.into(),
+                payload,
+                rpc_id: rpc_id.into(),
+                expected_epoch: Some(expected_epoch),
+                reply,
+            },
+            validate,
+        )
+        .await?;
+        result.await.map_err(|_| Error::Disconnected)?
+    }
+    async fn call_context(
+        &self,
+        expected_epoch: Option<u64>,
+        method: &str,
+        payload: Value,
+        rpc_id: &str,
+    ) -> Result<Value> {
         let (reply, result) = oneshot::channel();
         self.send(
             Command::Call {
                 method: method.into(),
                 payload,
                 rpc_id: rpc_id.into(),
+                expected_epoch,
                 reply,
             },
             result,
@@ -405,17 +593,40 @@ fn tagged(name: String, epoch: u64, frames: FrameStream) -> TaggedStream {
             .map(move |frame| (name.clone(), epoch, frame)),
     )
 }
+fn inventory_reader(
+    name: &str,
+    epoch: u64,
+    frames: FrameStream,
+) -> (futures_util::future::AbortHandle, TaggedStream) {
+    let (handle, registration) = futures_util::future::AbortHandle::new_pair();
+    let frames = futures_util::stream::Abortable::new(frames, registration);
+    (handle, tagged(name.into(), epoch, Box::pin(frames)))
+}
 /// Revision notifications carry no history payload; reads hold only a short synchronous lock.
+struct RevisionedProjection {
+    state: MemoryProjectionStore,
+    revision: u64,
+}
 struct SharedProjection {
-    store: RwLock<MemoryProjectionStore>,
+    store: RwLock<RevisionedProjection>,
     publish: watch::Sender<u64>,
 }
 impl SharedProjection {
     fn read<T>(&self, read: impl FnOnce(&MemoryProjectionStore) -> T) -> T {
-        read(&self.store.read().expect("projection lock poisoned"))
+        self.read_with_revision(|_, state| read(state))
+    }
+    fn read_with_revision<T>(&self, read: impl FnOnce(u64, &MemoryProjectionStore) -> T) -> T {
+        let projection = self.store.read().expect("projection lock poisoned");
+        read(projection.revision, &projection.state)
     }
     fn update<T>(&self, write: impl FnOnce(&mut MemoryProjectionStore) -> T) -> T {
-        let result = write(&mut self.store.write().expect("projection lock poisoned"));
+        let mut projection = self.store.write().expect("projection lock poisoned");
+        let result = write(&mut projection.state);
+        projection.revision = projection
+            .revision
+            .checked_add(1)
+            .expect("projection revision exhausted");
+        drop(projection);
         self.publish
             .send_modify(|version| *version = version.wrapping_add(1));
         result
@@ -471,10 +682,20 @@ async fn run(
                     Err(Error::Protocol(
                         "connector endpoint identity mismatch".into(),
                     ))
+                } else if endpoint
+                    .sequenced_queue_projection_key()
+                    .is_some_and(|key| key != SEQUENCED_QUEUE_PROJECTION_KEY)
+                {
+                    endpoint.close().await;
+                    Err(Error::Protocol(
+                        "unsupported sequenced queue projection key".into(),
+                    ))
                 } else {
+                    let queue_projection_key = endpoint.sequenced_queue_projection_key();
                     epoch += 1;
                     store.update(|s| {
                         s.begin_connection(endpoint.host().clone());
+                        s.configure_sequenced_queue_projection(queue_projection_key);
                         s.endpoint_capabilities = endpoint.capabilities();
                     });
                     let result = connected(
@@ -532,7 +753,10 @@ async fn run(
 }
 fn reject(command: Command) {
     match command {
-        Command::Open(_, reply) | Command::Close(_, reply) | Command::Respond { reply, .. } => {
+        Command::Open(_, reply)
+        | Command::Close(_, reply)
+        | Command::Respond { reply, .. }
+        | Command::RefreshInventory { reply, .. } => {
             let _ = reply.send(Err(Error::Disconnected));
         }
         Command::Observe(_, _, reply) => {
@@ -557,24 +781,38 @@ async fn connected(
     deferred_closes: &mut BTreeSet<String>,
     epoch: u64,
 ) -> Result<bool> {
+    let connection_epoch = store.read(|state| state.connection_epoch);
     let mut operations: tokio::task::JoinSet<OperationResult> = tokio::task::JoinSet::new();
+    let mut earlier_reads = tokio::task::JoinSet::<EarlierResult>::new();
+    let mut earlier_inflight = BTreeSet::<(String, u64)>::new();
+    let mut inventory_refreshes = tokio::task::JoinSet::new();
+    let mut inventory_waiters: Vec<Reply<()>> = vec![];
+    let mut inventory_dirty = false;
+    let mut inventory_epoch = epoch;
+    let mut inventory_cancellations = Vec::new();
     let mut streams = SelectAll::new();
     for (name, target) in [
         ("inventory", StreamTarget::SessionInventory),
         ("control", StreamTarget::SessionControl),
         ("actionables", StreamTarget::Actionables),
     ] {
-        streams.push(tagged(name.into(), epoch, endpoint.follow(target).await?));
+        let frames = endpoint.follow(target).await?;
+        if name == "inventory" {
+            let (cancel, stream) = inventory_reader(name, inventory_epoch, frames);
+            inventory_cancellations.push(cancel);
+            streams.push(stream);
+        } else {
+            streams.push(tagged(name.into(), epoch, frames));
+        }
     }
     if endpoint.supports_events() {
         streams.push(tagged("events".into(), epoch, endpoint.events().await?));
     }
     if endpoint.host().capabilities.contains("workspace-sync") {
-        streams.push(tagged(
-            "workspace".into(),
-            epoch,
-            endpoint.follow(StreamTarget::WorkspaceInventory).await?,
-        ));
+        let frames = endpoint.follow(StreamTarget::WorkspaceInventory).await?;
+        let (cancel, stream) = inventory_reader("workspace", inventory_epoch, frames);
+        inventory_cancellations.push(cancel);
+        streams.push(stream);
     }
     let mut journal_epochs = std::collections::BTreeMap::new();
     let mut journal_cancellations = std::collections::BTreeMap::new();
@@ -627,6 +865,71 @@ async fn connected(
             store.update(|s| s.reset_journal(&id));
         }
         tokio::select! {
+            completed = earlier_reads.join_next(), if !earlier_reads.is_empty() => {
+                let fetched = match completed {
+                    Some(Ok(fetched)) => fetched,
+                    _ => return Err(Error::Transport("history read task ended".into())),
+                };
+                earlier_inflight.remove(&(fetched.id.clone(), fetched.journal_epoch));
+                let current = store.read(|state| {
+                    state.ready()
+                        && state.connection_epoch == fetched.connection_epoch
+                        && journal_epochs.get(&fetched.id) == Some(&fetched.journal_epoch)
+                        && state.sessions.get(&fetched.id)
+                            .is_some_and(|session| session.journal_ready && session.journal_error.is_none())
+                });
+                let result = if !current {
+                    Err(Error::Protocol("stale history page result".into()))
+                } else {
+                    match fetched.result {
+                        Ok(EarlierValue::Native(loaded)) => Ok(loaded),
+                        Ok(EarlierValue::Journal(request, page)) => {
+                            store.update(|state| {
+                                state.sessions.get_mut(&fetched.id)
+                                    .ok_or_else(|| Error::Protocol("session closed during history read".into()))?
+                                    .apply_page(page, &request)
+                            })
+                        }
+                        Err(error) => Err(error),
+                    }
+                };
+                let _ = fetched.reply.send(result);
+            }
+            refreshed = inventory_refreshes.join_next(), if !inventory_refreshes.is_empty() => {
+                let result = match refreshed {
+                    Some(Ok(result)) => result,
+                    _ => Err(Error::Transport("inventory refresh task ended".into())),
+                };
+                let result = result.and_then(|fresh: crate::inventory_refresh::InventoryRefresh| {
+                    let next = inventory_epoch.checked_add(1).ok_or_else(|| unsupported("inventory reader epoch exhausted"))?;
+                    store.update(|state| {
+                        require(state.connection == ConnectionState::Ready && state.connection_epoch == connection_epoch, "inventory refresh source changed")?;
+                        state.replace_inventory_baselines(fresh.workspace.as_ref().map(|cursor| cursor.baseline.clone()), fresh.inventory.baseline.clone())
+                    })?;
+                    inventory_epoch = next;
+                    for cancel in inventory_cancellations.drain(..) { cancel.abort(); }
+                    let mut cursors = vec![("inventory", fresh.inventory)];
+                    if let Some(workspace) = fresh.workspace { cursors.push(("workspace", workspace)); }
+                    for (name, cursor) in cursors {
+                        let (cancel, stream) = inventory_reader(name, inventory_epoch, cursor.frames);
+                        inventory_cancellations.push(cancel);
+                        streams.push(stream);
+                    }
+                    Ok(())
+                });
+                match result {
+                    Ok(()) if inventory_dirty => {
+                        inventory_dirty = false;
+                        inventory_refreshes.spawn(crate::inventory_refresh::read(endpoint.clone()));
+                    }
+                    Ok(()) => { for reply in inventory_waiters.drain(..) { let _ = reply.send(Ok(())); } }
+                    Err(error) => {
+                        inventory_dirty = false;
+                        let message = format!("inventory refresh failed: {error}");
+                        for reply in inventory_waiters.drain(..) { let _ = reply.send(Err(Error::Protocol(message.clone()))); }
+                    }
+                }
+            },
             completed = operations.join_next(), if !operations.is_empty() => {
                 if let Some(Ok(Some((removed,reply,result))))=completed {
                     if result.is_ok() && let Some(id) = &removed { deferred_closes.remove(id); }
@@ -644,6 +947,8 @@ async fn connected(
                 let Some((name, frame_epoch, frame)) = frame else { return Err(Error::Disconnected); };
                 if let Some(id) = name.strip_prefix("journal:") {
                     if journal_epochs.get(id) != Some(&frame_epoch) { continue; }
+                } else if name == "inventory" || name == "workspace" {
+                    if frame_epoch != inventory_epoch { continue; }
                 } else if frame_epoch != epoch { continue; }
                 let is_live = frame.as_ref().is_ok_and(|frame| frame["type"] == "event");
                 let result = frame.and_then(|frame| store.update(|s| {
@@ -654,7 +959,13 @@ async fn connected(
                 if let Err(error) = result {
                     if let Some(id) = name.strip_prefix("journal:") {
                         let attempts = journal_retries.entry(id.to_owned()).or_default();
-                        if *attempts < 5 {
+                        // A peer's explicit per-stream error is terminal for this history
+                        // read (for example, a quarantined session file). Reopening it
+                        // immediately cannot repair the source and can monopolize the
+                        // connected loop. Keep the failure scoped to this session; the
+                        // user can explicitly reopen it after repairing the source.
+                        let retryable = !matches!(&error, Error::Remote(_));
+                        if retryable && *attempts < 5 {
                             *attempts += 1;
                             if let Some(cancellation) = journal_cancellations.remove(id) { cancellation.abort(); }
                             store.update(|s| {
@@ -670,6 +981,8 @@ async fn connected(
                                 }
                                 Err(error) => record_session_error(store, id, &error),
                             }
+                        } else if matches!(&error, Error::Remote(_)) {
+                            record_session_read_error(store, id, &error);
                         } else { record_session_error(store, id, &error); }
                         if let Some(cancellation) = journal_cancellations.remove(id) { cancellation.abort(); }
                         journal_epochs.remove(id);
@@ -690,6 +1003,16 @@ async fn connected(
                 match command {
                     Command::Stop(reply) => { store.update(|s| { s.disconnect(); s.connection = ConnectionState::Stopped; }); let _ = reply.send(Ok(())); return Ok(true); }
                     Command::Reconnect(reply) => { store.update(MemoryProjectionStore::disconnect); let _ = reply.send(Ok(())); return Ok(false); }
+                    Command::RefreshInventory { expected_epoch, reply } => {
+                        if !store.read(|state| state.connection == ConnectionState::Ready && state.connection_epoch == expected_epoch)
+                            || inventory_waiters.len() >= 64 {
+                            let _ = reply.send(Err(Error::Disconnected)); continue;
+                        }
+                        inventory_waiters.push(reply);
+                        if inventory_refreshes.is_empty() {
+                            inventory_refreshes.spawn(crate::inventory_refresh::read(endpoint.clone()));
+                        } else { inventory_dirty = true; }
+                    }
                     Command::Open(id, reply) => {
                         if !store.read(MemoryProjectionStore::ready) { let _ = reply.send(Err(Error::Disconnected)); continue; }
                         let result = if let std::collections::btree_map::Entry::Vacant(entry) = journal_epochs.entry(id.clone()) {
@@ -717,9 +1040,44 @@ async fn connected(
                         let endpoint=endpoint.clone();
                         operations.spawn(async move {let result=endpoint.observe_files(&id,&path).await;let _=reply.send(result);None});
                     }
-                    Command::Earlier(id, reply) => { let result = load_earlier(endpoint.as_ref(), store, &id).await; let _ = reply.send(result); }
-                    Command::Call { method, payload, rpc_id, reply } => {
-                        if !store.read(MemoryProjectionStore::ready) || operations.len() >= 64 { let _ = reply.send(Err(Error::Disconnected)); continue; }
+                    Command::Earlier(id, reply) => {
+                        let active_journal_epoch = journal_epochs.get(&id).copied();
+                        let Some(journal_epoch) = active_journal_epoch else {
+                            let _ = reply.send(Err(Error::Protocol("history reader is not open".into())));
+                            continue;
+                        };
+                        if earlier_inflight.contains(&(id.clone(), journal_epoch)) {
+                            let _ = reply.send(Err(Error::Protocol("history page already pending".into())));
+                            continue;
+                        }
+                        if earlier_inflight.len() >= 64 {
+                            let _ = reply.send(Err(Error::Protocol("too many pending history page requests".into())));
+                            continue;
+                        }
+                        let native = endpoint.content_kind() == SessionContentKind::NativeConversation;
+                        let request = match history_request(store, &id, native) {
+                            Ok(request) => request,
+                            Err(error) => { let _ = reply.send(Err(error)); continue; }
+                        };
+                        if request.is_none() && !native {
+                            let _ = reply.send(Ok(false));
+                            continue;
+                        }
+                        let endpoint = endpoint.clone();
+                        earlier_inflight.insert((id.clone(), journal_epoch));
+                        earlier_reads.spawn(async move {
+                            let result = if let Some(request) = request {
+                                endpoint.history_page(request.clone()).await.map(|page| EarlierValue::Journal(request, page))
+                            } else {
+                                endpoint.load_earlier_conversation(&id, 50).await.map(EarlierValue::Native)
+                            };
+                            EarlierResult {
+                                id, connection_epoch, journal_epoch, reply, result,
+                            }
+                        });
+                    }
+                    Command::Call { method, payload, rpc_id, expected_epoch, mut reply } => {
+                        if !store.read(|state|state.ready() && expected_epoch.is_none_or(|epoch|epoch==state.connection_epoch)) || operations.len() >= 64 { let _ = reply.send(Err(Error::Disconnected)); continue; }
                         let endpoint = endpoint.clone();
                         let removed=if matches!(method.as_str(),"session.discard"|"session.archive") {
                             let id=payload["sessionId"].as_str().unwrap_or("").to_owned();
@@ -728,7 +1086,17 @@ async fn connected(
                                 store.update(|s|s.reset_journal(&id));Some(id)
                             } else {None}
                         } else {None};
-                        operations.spawn(async move { let result = invoke(endpoint.as_ref(), &method, payload, &rpc_id).await; Some((removed,reply,result)) });
+                        operations.spawn(async move {
+                            let result = if method == "session.search" {
+                                // Cancel only this specified read operation. Losing a mutation
+                                // receiver must never be interpreted as cancelling remote work.
+                                tokio::select! { biased;
+                                    _ = reply.closed() => return None,
+                                    result = invoke(endpoint.as_ref(), &method, payload, &rpc_id) => result,
+                                }
+                            } else { invoke(endpoint.as_ref(), &method, payload, &rpc_id).await };
+                            Some((removed,reply,result))
+                        });
                     }
                     Command::Respond { id, revision, outcome, reply } => {
                         let valid = store.read(|s| s.ready() && s.actionables.get(&id).is_some_and(|a| integer(a, "revision").ok() == Some(revision)));
@@ -744,6 +1112,13 @@ async fn connected(
 fn record_session_error(store: &SharedProjection, id: &str, error: &Error) {
     store.update(|s| {
         s.reset_journal(id);
+        s.sessions.entry(id.into()).or_default().journal_error = Some(error.to_string());
+    });
+}
+fn record_session_read_error(store: &SharedProjection, id: &str, error: &Error) {
+    // A remote per-stream failure does not invalidate the last complete projection.
+    // Keep it inspectable while exposing the current history error to consumers.
+    store.update(|s| {
         s.sessions.entry(id.into()).or_default().journal_error = Some(error.to_string());
     });
 }
@@ -764,10 +1139,15 @@ async fn add_journal(
         },
         SessionContentKind::NativeConversation => StreamTarget::SessionConversation {
             address,
+            // Re-fetch the reader's loaded window from authority. A new transport
+            // must not reset it to 50 and silently drop paged/visible messages.
             max_messages: store.read(|s| {
                 s.sessions
                     .get(id)
                     .and_then(|session| session.native_conversation.as_ref())
+                    // Pi's window is measured in message entries; custom
+                    // metadata also occupies `entries` but must not expand
+                    // the amount of history requested on reconnect.
                     .map(|snapshot| {
                         snapshot
                             .entries
@@ -786,22 +1166,22 @@ async fn add_journal(
     streams.push(tagged(format!("journal:{id}"), epoch, Box::pin(frames)));
     Ok(handle)
 }
-async fn load_earlier(
-    endpoint: &dyn SessionEndpoint,
+fn history_request(
     store: &SharedProjection,
     id: &str,
-) -> Result<bool> {
-    if endpoint.content_kind() == SessionContentKind::NativeConversation {
-        return endpoint.load_earlier_conversation(id, 50).await;
-    }
-    let request = store.read(|s| -> Result<Option<HistoryRequest>> {
+    native: bool,
+) -> Result<Option<HistoryRequest>> {
+    store.read(|s| -> Result<Option<HistoryRequest>> {
         require(s.ready(), "endpoint not ready")?;
         let session = s
             .sessions
             .get(id)
             .ok_or_else(|| Error::Protocol("session not opened".into()))?;
-        require(session.journal_ready, "journal not ready")?;
-        if !session.has_more_before || session.history_base_sequence < 0 {
+        require(
+            session.journal_ready && session.journal_error.is_none(),
+            "journal not ready",
+        )?;
+        if native || !session.has_more_before || session.history_base_sequence < 0 {
             return Ok(None);
         }
         Ok(Some(HistoryRequest {
@@ -810,16 +1190,6 @@ async fn load_earlier(
             before_sequence: Some(session.history_base_sequence),
             max_messages: 50,
         }))
-    })?;
-    let Some(request) = request else {
-        return Ok(false);
-    };
-    let page = endpoint.history_page(request.clone()).await?;
-    store.update(|s| {
-        s.sessions
-            .get_mut(id)
-            .expect("session exists")
-            .apply_page(page, &request)
     })
 }
 
@@ -887,5 +1257,116 @@ impl Drop for SessionHistoryLease {
                 let _ = runtime.release_history(&id, &owner).await;
             });
         }
+    }
+}
+
+#[cfg(test)]
+mod admission_tests {
+    use super::*;
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+    #[tokio::test]
+    async fn revoked_owner_is_checked_after_channel_backpressure_without_enqueue() {
+        let (sender, mut receiver) = mpsc::channel(1);
+        sender.send(1_u8).await.unwrap();
+        let alive = AtomicBool::new(true);
+        let checks = AtomicUsize::new(0);
+        let pending = enqueue_after_validation(&sender, 2, || {
+            checks.fetch_add(1, Ordering::SeqCst);
+            require(alive.load(Ordering::SeqCst), "owner retired")
+        });
+        tokio::pin!(pending);
+        assert!(
+            tokio::time::timeout(Duration::from_millis(20), &mut pending)
+                .await
+                .is_err()
+        );
+        assert_eq!(checks.load(Ordering::SeqCst), 0);
+        alive.store(false, Ordering::SeqCst);
+        assert_eq!(receiver.recv().await, Some(1));
+        assert!(pending.await.is_err());
+        assert_eq!(checks.load(Ordering::SeqCst), 1);
+        assert!(receiver.try_recv().is_err());
+        sender.try_send(3).unwrap();
+        assert_eq!(
+            receiver.recv().await,
+            Some(3),
+            "rejected owner releases its reserved slot"
+        );
+    }
+
+    #[tokio::test]
+    async fn accepted_owner_is_validated_once_and_closed_channel_never_validates() {
+        let (sender, mut receiver) = mpsc::channel(1);
+        let checks = AtomicUsize::new(0);
+        enqueue_after_validation(&sender, 7_u8, || {
+            checks.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        })
+        .await
+        .unwrap();
+        assert_eq!(receiver.recv().await, Some(7));
+        drop(receiver);
+        assert!(
+            enqueue_after_validation(&sender, 8, || {
+                checks.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            })
+            .await
+            .is_err()
+        );
+        assert_eq!(checks.load(Ordering::SeqCst), 1);
+    }
+}
+
+#[cfg(test)]
+mod projection_revision_tests {
+    use super::*;
+    fn shared() -> SharedProjection {
+        let (publish, _) = watch::channel(0);
+        SharedProjection {
+            store: RwLock::new(RevisionedProjection {
+                state: MemoryProjectionStore::new("revision-test"),
+                revision: 0,
+            }),
+            publish,
+        }
+    }
+    #[test]
+    fn revision_and_authority_remain_paired_across_concurrent_updates() {
+        let shared = Arc::new(shared());
+        let writers: Vec<_> = (0..4)
+            .map(|_| {
+                let shared = shared.clone();
+                std::thread::spawn(move || {
+                    for _ in 0..128 {
+                        shared.update(|state| state.connection_epoch += 1);
+                        shared.read_with_revision(|revision, state| {
+                            assert_eq!(revision, state.connection_epoch)
+                        });
+                    }
+                })
+            })
+            .collect();
+        for writer in writers {
+            writer.join().unwrap();
+        }
+        shared.read_with_revision(|revision, state| {
+            assert_eq!(revision, 512);
+            assert_eq!(state.connection_epoch, 512);
+        });
+    }
+    #[test]
+    fn partial_failed_update_invalidates_cached_authority() {
+        let shared = shared();
+        let result: Result<()> = shared.update(|state| {
+            state.last_error = Some("visible error".into());
+            Err(Error::Disconnected)
+        });
+        assert!(result.is_err());
+        shared.read_with_revision(|revision, state| {
+            assert_eq!(revision, 1);
+            assert_eq!(state.last_error.as_deref(), Some("visible error"));
+        });
     }
 }

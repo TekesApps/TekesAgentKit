@@ -3,6 +3,7 @@ use serde_json::{Value, json};
 use std::time::Duration;
 use tekes_agent_contract::*;
 use tekes_agent_endpoint_kernel::KernelConnector;
+use tekes_agent_session::MemoryProjectionStore;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpListener,
@@ -77,6 +78,7 @@ async fn mux_close_discards_inflight_frames_and_correlates_pages_and_actionables
         .connect_kernel()
         .await
         .unwrap();
+    assert!(endpoint.capabilities().supports_question_cancellation);
     let mut stream = endpoint
         .follow(StreamTarget::SessionInventory)
         .await
@@ -103,6 +105,7 @@ async fn mux_close_discards_inflight_frames_and_correlates_pages_and_actionables
         .unwrap()
         .unwrap();
 }
+
 #[tokio::test]
 async fn remote_stream_error_does_not_close_mux_and_streams_close_once() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -262,6 +265,139 @@ async fn remote_stream_error_does_not_close_mux_and_streams_close_once() {
         .unwrap();
 }
 
+#[tokio::test]
+async fn native_inventory_wire_preserves_fork_and_ephemeral_facts() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("http://{}", listener.local_addr().unwrap());
+    let task = tokio::spawn(async move {
+        let (socket, _) = listener.accept().await.unwrap();
+        let mut ws = accept_async(socket).await.unwrap();
+        send(
+            &mut ws,
+            json!({
+                "type":"ready",
+                "generation":"g",
+                "host": {
+                    "protocolVersion":4,
+                    "product":{"name":"TekesKernel","version":"0.9.3"},
+                    "capabilities":["session-inventory-sync","session-control-sync","actionable-sync","session-journal"],
+                    "cwd":"/work","home":"/home","attachedSessions":0,"canOpenPath":false
+                }
+            }),
+        )
+        .await;
+
+        let open: Value =
+            serde_json::from_slice(&ws.next().await.unwrap().unwrap().into_data()).unwrap();
+        assert_eq!(open["type"], "open");
+        assert_eq!(open["target"]["kind"], "session-inventory");
+
+        send(
+            &mut ws,
+            json!({
+                "type":"stream",
+                "streamId":open["streamId"],
+                "frame": {
+                    "type":"baseline",
+                    "generation":"g",
+                    "snapshot":{"items":[
+                        {
+                            "sessionId":"fork-ephemeral",
+                            "updatedAt":1,"running":false,"blank":true,
+                            "parentSessionId":"parent",
+                            "origin":"fork",
+                            "ephemeral":true
+                        },
+                        {
+                            "sessionId":"fork-durable",
+                            "updatedAt":2,"running":false,"blank":false,
+                            "parentSessionId":"parent",
+                            "origin":"fork"
+                        },
+                        {
+                            "sessionId":"ordinary",
+                            "updatedAt":3,"running":false,"blank":true
+                        }
+                    ]}
+                }
+            }),
+        )
+        .await;
+        let _ = ws.next().await;
+    });
+
+    let endpoint = KernelConnector::new("native", &url, "synthetic".into())
+        .unwrap()
+        .connect_kernel()
+        .await
+        .unwrap();
+    let mut inventory = endpoint
+        .follow(StreamTarget::SessionInventory)
+        .await
+        .unwrap();
+    let baseline = tokio::time::timeout(Duration::from_secs(3), inventory.next())
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+
+    let mut store = MemoryProjectionStore::new(endpoint.identity());
+    store.begin_connection(endpoint.host().clone());
+    store.apply("inventory", baseline).unwrap();
+
+    let ephemeral_fork = store
+        .session(&SessionAddress {
+            endpoint_id: "native".into(),
+            session_id: "fork-ephemeral".into(),
+        })
+        .unwrap()
+        .summary
+        .as_ref()
+        .unwrap();
+    assert_eq!(ephemeral_fork["parentSessionId"], "parent");
+    assert_eq!(ephemeral_fork["origin"], "fork");
+    assert_eq!(ephemeral_fork["ephemeral"], true);
+    assert_ne!(ephemeral_fork["origin"], "subagent");
+
+    let durable_fork = store
+        .session(&SessionAddress {
+            endpoint_id: "native".into(),
+            session_id: "fork-durable".into(),
+        })
+        .unwrap()
+        .summary
+        .as_ref()
+        .unwrap();
+    assert_eq!(durable_fork["parentSessionId"], "parent");
+    assert_eq!(durable_fork["origin"], "fork");
+    assert!(!durable_fork.as_object().unwrap().contains_key("ephemeral"));
+    assert!(!durable_fork["ephemeral"].as_bool().unwrap_or(false));
+
+    let ordinary = store
+        .session(&SessionAddress {
+            endpoint_id: "native".into(),
+            session_id: "ordinary".into(),
+        })
+        .unwrap()
+        .summary
+        .as_ref()
+        .unwrap();
+    assert!(
+        !ordinary
+            .as_object()
+            .unwrap()
+            .contains_key("parentSessionId")
+    );
+    assert!(!ordinary.as_object().unwrap().contains_key("origin"));
+    assert!(!ordinary.as_object().unwrap().contains_key("ephemeral"));
+
+    drop(inventory);
+    endpoint.close().await;
+    tokio::time::timeout(Duration::from_secs(3), task)
+        .await
+        .unwrap()
+        .unwrap();
+}
 #[tokio::test]
 async fn unary_envelope_authentication_errors_and_no_mutation_retry() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();

@@ -64,12 +64,18 @@ impl PiSessionEndpoint {
                     if let Some(attachments) = payload["attachments"].as_array() {
                         content.extend(attachments.iter().cloned());
                     }
-                    let (message, images) = self
+                    let materialized = self
                         .context
                         .materialize(string(payload, "sessionId")?, &content)
                         .await?;
+                    // Commands retain their existing direct prompt path. They do not call
+                    // input.prepare and must not create an AgentKit input admission/receipt;
+                    // structured file metadata is therefore explicitly not covered here.
                     let result = rpc
-                        .request("prompt", json!({"message":message,"images":images}))
+                        .request(
+                            "prompt",
+                            json!({"message":materialized.message,"images":materialized.images}),
+                        )
                         .await?;
                     require(
                         result["disposition"] == "handled",
@@ -201,7 +207,26 @@ impl PiSessionEndpoint {
         } else {
             None
         };
-        let temporary = Rpc::start(&self.context.config, &source.cwd, Some(&source.file)).await?;
+        let child = uuid::Uuid::new_v4().to_string();
+        let permission_mode = self.context.permission_mode(id).await?;
+        self.context
+            .write_permission(&child, &permission_mode)
+            .await?;
+        let permission_file = self.context.permission_file(&child);
+        let temporary = match Rpc::start(
+            &self.context.config,
+            &source.cwd,
+            Some(&source.file),
+            Some(&permission_file),
+        )
+        .await
+        {
+            Ok(rpc) => rpc,
+            Err(error) => {
+                let _ = tokio::fs::remove_file(permission_file).await;
+                return Err(error);
+            }
+        };
         let result = if let Some(entry) = boundary {
             temporary.control("fork.at", json!({"entryId":entry})).await
         } else {
@@ -211,18 +236,32 @@ impl PiSessionEndpoint {
             Ok(value) => value,
             Err(error) => {
                 temporary.close();
+                let _ = tokio::fs::remove_file(&permission_file).await;
                 return Err(error);
             }
         };
         if result["cancelled"] == true {
             temporary.close();
+            let _ = tokio::fs::remove_file(&permission_file).await;
             return Err(Error::Remote(json!({"code":"pi/fork-cancelled"})));
         }
         let state = temporary.request("get_state", json!({})).await;
         let metadata = temporary.request("get_entries", json!({})).await;
         temporary.close();
-        let state = state?;
-        let (goal_revision, goal, feedback) = extensions::recover_metadata(&metadata?)?;
+        let (state, metadata) = match (state, metadata) {
+            (Ok(state), Ok(metadata)) => (state, metadata),
+            (Err(error), _) | (_, Err(error)) => {
+                let _ = tokio::fs::remove_file(&permission_file).await;
+                return Err(error);
+            }
+        };
+        let (goal_revision, goal, feedback) = match extensions::recover_metadata(&metadata) {
+            Ok(value) => value,
+            Err(error) => {
+                let _ = tokio::fs::remove_file(&permission_file).await;
+                return Err(error);
+            }
+        };
         let file = PathBuf::from(string(&state, "sessionFile")?)
             .canonicalize()
             .map_err(io_error)?;
@@ -230,7 +269,6 @@ impl PiSessionEndpoint {
             file.starts_with(self.context.config.data_root.join("sessions")) && file != source.file,
             "fork file outside owned storage",
         )?;
-        let child = uuid::Uuid::new_v4().to_string();
         let ephemeral = payload["ephemeral"].as_bool().unwrap_or(false);
         let row = Row {
             id: child.clone(),

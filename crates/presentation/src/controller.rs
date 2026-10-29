@@ -15,6 +15,19 @@ pub trait SubmissionPreparation: Send + Sync {
         ticket: &PreparedSubmission,
         scope: &RunScope,
     ) -> Result<()>;
+
+    /// Synchronous, side-effect-free authority check immediately before dispatch.
+    /// Implementations may fence a captured owner that was retired while the
+    /// controller awaited session setup or a child catalog. This hook must not
+    /// perform another preparation step or remote request.
+    fn validate_dispatch(
+        &self,
+        _runtime: &SessionRuntime,
+        _ticket: &PreparedSubmission,
+        _scope: &RunScope,
+    ) -> Result<()> {
+        Ok(())
+    }
 }
 struct NoPreparation;
 #[async_trait]
@@ -31,47 +44,172 @@ impl SubmissionPreparation for NoPreparation {
         )
     }
 }
+// One projection read pairs the degraded frame with the same authority epoch.
+fn refreshed_snapshot(
+    core: &mut PresentationStore,
+    authority: &tekes_agent_session::MemoryProjectionStore,
+    previous: &RunSnapshot,
+) -> RunSnapshot {
+    refreshed_snapshot_outcome(core, authority, previous).0
+}
+
+fn refreshed_snapshot_outcome(
+    core: &mut PresentationStore,
+    authority: &tekes_agent_session::MemoryProjectionStore,
+    previous: &RunSnapshot,
+) -> (RunSnapshot, bool) {
+    match core.refresh(authority) {
+        Ok(snapshot) => (snapshot, true),
+        Err(error) => {
+            let mut old = previous.clone();
+            // A failed refresh cannot publish retained goal facts as current.
+            old.goal = None;
+            let selection = core.selection();
+            let endpoint_matches = selection
+                .as_ref()
+                .is_none_or(|token| token.destination.endpoint_id() == authority.endpoint_id);
+            let same_target = old.selection == selection && endpoint_matches;
+            if !same_target {
+                old.transcript = TranscriptSnapshot::default();
+                old.summary = None;
+                old.submissions.clear();
+                old.events.clear();
+            }
+            if !same_target || old.connection_epoch != authority.connection_epoch {
+                old.child_availability = None;
+            }
+            let scope = selection
+                .as_ref()
+                .and_then(|token| match &token.destination {
+                    ComposerDestination::Run { scope } if endpoint_matches => Some(scope),
+                    _ => None,
+                });
+            // Archive is an independent public lifecycle fact, not the result of
+            // parsing history. Read it under this same authority lock/epoch even
+            // when archive and malformed history arrived in one publication.
+            old.run = scope.map(|scope| RunPresentation::read(authority, scope, false));
+            old.connection = ConnectionPresentation::read(
+                authority,
+                scope.map(|scope| scope.session_id.as_str()),
+                false,
+            );
+            old.revision = core.next_snapshot_revision();
+            old.connection_epoch = authority.connection_epoch;
+            old.selection = selection;
+            old.draft = core
+                .selected
+                .as_ref()
+                .map(|d| core.draft(d))
+                .unwrap_or_default();
+            old.draft_context_revision = core
+                .selected
+                .as_ref()
+                .map(|d| core.context_revision(d))
+                .unwrap_or_default();
+            old.can_submit = false;
+            old.connection.phase = ConnectionPhase::Degraded;
+            old.connection.can_submit = false;
+            old.connection.history_is_stale = true;
+            old.connection.message = Some(error.to_string());
+            old.transcript.is_stale = true;
+            if let Some(run) = &mut old.run {
+                run.connection = old.connection.clone();
+                run.can_submit = false;
+                run.can_cancel = false;
+                if run.phase != RunPhase::Archived {
+                    run.phase = RunPhase::Unavailable;
+                }
+                run.actionables.clear();
+            }
+            (old, false)
+        }
+    }
+}
+
+/// Explicit acceptance-only input witness for one original publication.
+/// It does not confer navigation authority or service-side transactional freshness.
+#[cfg(feature = "acceptance-source-witness")]
+#[derive(Clone, Debug)]
+pub struct RunSourceWitness {
+    snapshot: Arc<RunSnapshot>,
+    authority: tekes_agent_session::MemoryProjectionStore,
+    projection_succeeded: bool,
+}
+#[cfg(feature = "acceptance-source-witness")]
+impl RunSourceWitness {
+    pub fn snapshot(&self) -> &Arc<RunSnapshot> {
+        &self.snapshot
+    }
+    pub fn authority(&self) -> &tekes_agent_session::MemoryProjectionStore {
+        &self.authority
+    }
+    /// False when the existing degraded path published retained content.
+    pub fn projection_succeeded(&self) -> bool {
+        self.projection_succeeded
+    }
+}
+
+// Every mutable access conservatively invalidates the local input key, including
+// mutators that fail after changing state. Refresh records its key only afterward.
+struct ControllerCore {
+    store: PresentationStore,
+    generation: u64,
+    projected: Option<(u64, u64)>,
+}
+impl std::ops::Deref for ControllerCore {
+    type Target = PresentationStore;
+    fn deref(&self) -> &Self::Target {
+        &self.store
+    }
+}
+impl std::ops::DerefMut for ControllerCore {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.generation = self
+            .generation
+            .checked_add(1)
+            .expect("local presentation generation exhausted");
+        &mut self.store
+    }
+}
 struct Shared {
     runtime: Arc<SessionRuntime>,
-    core: Mutex<PresentationStore>,
+    core: Mutex<ControllerCore>,
     snapshots: watch::Sender<Arc<RunSnapshot>>,
+    child_owner: Option<(RunScope, String)>,
 }
 impl Shared {
+    fn validate_destination(&self, destination: &ComposerDestination) -> Result<()> {
+        if let Some((scope, _)) = &self.child_owner {
+            require(
+                destination == &ComposerDestination::run(scope.clone()),
+                "child controller target mismatch",
+            )?;
+        }
+        Ok(())
+    }
+    fn child_parent<'a>(&'a self, scope: &'a RunScope) -> Result<Option<&'a str>> {
+        if let Some((target, parent)) = &self.child_owner {
+            require(target == scope, "child controller target mismatch")?;
+            Ok(Some(parent))
+        } else {
+            Ok((scope.thread_id != scope.session_id).then_some(scope.thread_id.as_str()))
+        }
+    }
     fn refresh(&self) {
         let mut core = self.core.lock().expect("presentation lock poisoned");
-        let snapshot = self.runtime.inspect(|authority| core.refresh(authority));
-        let snapshot = match snapshot {
-            Ok(snapshot) => snapshot,
-            Err(error) => {
-                let mut old = (**self.snapshots.borrow()).clone();
-                if old.selection != core.selection() {
-                    old.transcript = TranscriptSnapshot::default();
-                    old.summary = None;
-                    old.run = None;
+        let snapshot = self
+            .runtime
+            .inspect_with_revision(|authority_revision, authority| {
+                if core.projected == Some((authority_revision, core.generation)) {
+                    return None;
                 }
-                old.selection = core.selection();
-                old.draft = core
-                    .selected
-                    .as_ref()
-                    .map(|d| core.draft(d))
-                    .unwrap_or_default();
-                old.can_submit = false;
-                old.connection.phase = ConnectionPhase::Degraded;
-                old.connection.can_submit = false;
-                old.connection.history_is_stale = true;
-                old.connection.message = Some(error.to_string());
-                old.transcript.is_stale = true;
-                if let Some(run) = &mut old.run {
-                    run.connection = old.connection.clone();
-                    run.can_submit = false;
-                    run.can_cancel = false;
-                    run.phase = RunPhase::Unavailable;
-                    run.actionables.clear();
-                }
-                old
-            }
-        };
-        self.snapshots.send_replace(Arc::new(snapshot));
+                let snapshot = refreshed_snapshot(&mut core, authority, &self.snapshots.borrow());
+                core.projected = Some((authority_revision, core.generation));
+                Some(snapshot)
+            });
+        if let Some(snapshot) = snapshot {
+            self.snapshots.send_replace(Arc::new(snapshot));
+        }
     }
     fn finish(&self, id: &str, outcome: std::result::Result<(), String>) {
         let _ = self
@@ -94,13 +232,49 @@ impl Drop for RunController {
 }
 impl RunController {
     pub fn new(runtime: Arc<SessionRuntime>) -> Result<Self> {
+        Self::new_with_child_owner(runtime, None)
+    }
+    /// An independent child may be owned by a nested parent, not the navigation thread root.
+    /// History observation is separately owned by ChildRun/SessionHistoryLease.
+    pub fn for_child(
+        runtime: Arc<SessionRuntime>,
+        parent: &RunScope,
+        child: impl Into<String>,
+    ) -> Result<Self> {
+        parent.validate()?;
+        let scope = RunScope {
+            endpoint_id: parent.endpoint_id.clone(),
+            thread_id: parent.thread_id.clone(),
+            session_id: child.into(),
+        };
+        scope.validate()?;
+        require(
+            scope.endpoint_id == runtime.inspect(|store| store.endpoint_id.clone())
+                && scope.session_id != parent.session_id
+                && scope.session_id != scope.thread_id,
+            "invalid child controller identity",
+        )?;
+        let controller =
+            Self::new_with_child_owner(runtime, Some((scope.clone(), parent.session_id.clone())))?;
+        controller.select(ComposerDestination::run(scope))?;
+        Ok(controller)
+    }
+    fn new_with_child_owner(
+        runtime: Arc<SessionRuntime>,
+        child_owner: Option<(RunScope, String)>,
+    ) -> Result<Self> {
         let mut core = PresentationStore::default();
         let initial = runtime.inspect(|authority| core.refresh(authority))?;
         let (snapshots, _) = watch::channel(Arc::new(initial));
         let shared = Arc::new(Shared {
             runtime: runtime.clone(),
-            core: Mutex::new(core),
+            core: Mutex::new(ControllerCore {
+                store: core,
+                generation: 0,
+                projected: None,
+            }),
             snapshots,
+            child_owner,
         });
         let weak = Arc::downgrade(&shared);
         let mut changes = runtime.subscribe();
@@ -120,7 +294,33 @@ impl RunController {
     pub fn snapshot(&self) -> Arc<RunSnapshot> {
         self.shared.snapshots.borrow().clone()
     }
+    /// Refresh and publish through the original projection, capturing its exact
+    /// immutable input inside the same runtime read. No later watch revision or
+    /// runtime snapshot is joined to this publication. Normal refreshes do not
+    /// clone the authority. Use only in explicit acceptance tooling.
+    #[cfg(feature = "acceptance-source-witness")]
+    pub fn refresh_with_source_witness(&self) -> RunSourceWitness {
+        let mut core = self.shared.core.lock().expect("presentation lock poisoned");
+        let (snapshot, projection_succeeded, authority) =
+            self.shared.runtime.inspect(|authority| {
+                let (snapshot, succeeded) = refreshed_snapshot_outcome(
+                    &mut core,
+                    authority,
+                    &self.shared.snapshots.borrow(),
+                );
+                (snapshot, succeeded, authority.clone())
+            });
+        let snapshot = Arc::new(snapshot);
+        self.shared.snapshots.send_replace(snapshot.clone());
+        RunSourceWitness {
+            snapshot,
+            authority,
+            projection_succeeded,
+        }
+    }
+
     pub fn select(&self, destination: ComposerDestination) -> Result<SelectionToken> {
+        self.shared.validate_destination(&destination)?;
         require(
             destination.endpoint_id() == self.shared.runtime.inspect(|s| s.endpoint_id.clone()),
             "controller endpoint mismatch",
@@ -154,7 +354,11 @@ impl RunController {
             "child catalog scope mismatch",
         )?;
         let epoch = self.shared.runtime.inspect(|s| s.connection_epoch);
-        let result = self.shared.runtime.subagent_catalog(&scope.thread_id).await;
+        let parent = self
+            .shared
+            .child_parent(scope)?
+            .ok_or_else(|| unsupported("no child owner"))?;
+        let result = self.shared.runtime.subagent_catalog(parent).await;
         if epoch != self.shared.runtime.inspect(|s| s.connection_epoch) {
             return Err(Error::Disconnected);
         }
@@ -175,6 +379,7 @@ impl RunController {
         result.map(|_| ())
     }
     pub fn edit(&self, destination: &ComposerDestination, draft: ComposerDraft) -> Result<()> {
+        self.shared.validate_destination(destination)?;
         self.shared
             .core
             .lock()
@@ -182,6 +387,59 @@ impl RunController {
             .edit(destination, draft)?;
         self.shared.refresh();
         Ok(())
+    }
+    pub fn edit_text(&self, destination: &ComposerDestination, text: String) -> Result<()> {
+        self.shared.validate_destination(destination)?;
+        self.shared
+            .core
+            .lock()
+            .expect("presentation lock poisoned")
+            .edit_text(destination, text)?;
+        self.shared.refresh();
+        Ok(())
+    }
+    pub fn patch_context(
+        &self,
+        expected: &ComposerContextBaseline,
+        artifacts: Vec<ComposerArtifact>,
+        annotations: Vec<ComposerAnnotation>,
+    ) -> Result<bool> {
+        self.shared
+            .validate_destination(&expected.selection.destination)?;
+        let result = self
+            .shared
+            .core
+            .lock()
+            .expect("presentation lock poisoned")
+            .patch_context(expected, artifacts, annotations)?;
+        self.shared.refresh();
+        Ok(result)
+    }
+    /// Commit an asynchronous upload's context only within its original
+    /// connection epoch. Lock order matches refresh: core, then authority.
+    /// The epoch check and context CAS share the same authority read guard.
+    pub fn patch_context_at_epoch(
+        &self,
+        expected: &ComposerContextBaseline,
+        artifacts: Vec<ComposerArtifact>,
+        annotations: Vec<ComposerAnnotation>,
+        connection_epoch: u64,
+    ) -> Result<bool> {
+        self.shared
+            .validate_destination(&expected.selection.destination)?;
+        let result = {
+            let mut core = self.shared.core.lock().expect("presentation lock poisoned");
+            self.shared.runtime.inspect(|authority| {
+                if authority.connection_epoch != connection_epoch
+                    || authority.connection != tekes_agent_session::ConnectionState::Ready
+                {
+                    return Ok(false);
+                }
+                core.patch_context(expected, artifacts, annotations)
+            })?
+        };
+        self.shared.refresh();
+        Ok(result)
     }
     pub fn commit_settings(
         &self,
@@ -203,6 +461,7 @@ impl RunController {
         destination: &ComposerDestination,
         mode: PromptMode,
     ) -> Result<PreparedSubmission> {
+        self.shared.validate_destination(destination)?;
         let result = {
             let mut core = self.shared.core.lock().expect("presentation lock poisoned");
             self.shared
@@ -279,15 +538,18 @@ impl RunController {
             self.shared.refresh();
             host.prepare(&self.shared.runtime,&ticket,&scope).await?;
             self.shared.runtime.open_session(&scope.session_id).await?;
-            if scope.thread_id != scope.session_id {
+            let child_parent = self.shared.child_parent(&scope)?;
+            if child_parent.is_some() {
                 require(matches!(ticket.plan, SubmissionPlan::Prompt { .. }), "child commands unavailable")?;
-                self.shared.runtime.subagent_catalog(&scope.thread_id).await?.require_continuable(&scope.session_id)?;
             }
-            self.shared.core.lock().expect("presentation lock poisoned").mark_dispatched(&ticket)?;
+            let admit = || {
+                host.validate_dispatch(&self.shared.runtime, &ticket, &scope)?;
+                self.shared.core.lock().expect("presentation lock poisoned").mark_dispatched(&ticket)
+            };
             let value=match &ticket.plan {
-                SubmissionPlan::Prompt{content,..} if scope.thread_id != scope.session_id => self.shared.runtime.prompt_child(&scope.thread_id, &scope.session_id, ticket.mode, content.clone(), &ticket.id).await?,
-                SubmissionPlan::Prompt{content,..}=>self.shared.runtime.submit(PromptRequest{session_id:scope.session_id.clone(),mode:ticket.mode,content:content.clone(),client_time_zone:None},&ticket.id).await?,
-                SubmissionPlan::Command{name,arguments,attachments}=>self.shared.runtime.call_optional("commands/run",json!({"sessionId":scope.session_id,"name":name,"arguments":arguments,"attachments":attachments}),&ticket.id).await?,
+                SubmissionPlan::Prompt{content,..} if child_parent.is_some() => self.shared.runtime.prompt_child_with_validation(child_parent.expect("child owner"), &scope.session_id, ticket.mode, content.clone(), &ticket.id, admit).await?,
+                SubmissionPlan::Prompt{content,..}=>self.shared.runtime.submit_with_validation(PromptRequest{session_id:scope.session_id.clone(),mode:ticket.mode,content:content.clone(),client_time_zone:None},&ticket.id, admit).await?,
+                SubmissionPlan::Command{name,arguments,attachments}=>self.shared.runtime.call_optional_with_validation("commands/run",json!({"sessionId":scope.session_id,"name":name,"arguments":arguments,"attachments":attachments}),&ticket.id, admit).await?,
             };
             if matches!(ticket.plan,SubmissionPlan::Prompt{..}) {require(value["accepted"]==true,"prompt admission was not confirmed")?;}
             Ok(value)
@@ -312,14 +574,10 @@ impl RunController {
             .runtime
             .inspect(|s| RunPresentation::read(s, scope, true).can_cancel);
         require(valid, "Run is not cancellable")?;
-        if scope.thread_id != scope.session_id {
+        if let Some(parent) = self.shared.child_parent(scope)? {
             self.shared
                 .runtime
-                .cancel_child(
-                    &scope.thread_id,
-                    &scope.session_id,
-                    &uuid::Uuid::new_v4().to_string(),
-                )
+                .cancel_child(parent, &scope.session_id, &uuid::Uuid::new_v4().to_string())
                 .await
         } else {
             self.shared
@@ -335,18 +593,23 @@ impl RunController {
         revision: i64,
         outcome: Value,
     ) -> Result<()> {
-        require(
-            scope.endpoint_id == self.shared.runtime.inspect(|s| s.endpoint_id.clone()),
-            "actionable endpoint mismatch",
-        )?;
-        require(
-            self.shared.runtime.inspect(|s| {
-                s.actionables
+        self.shared.runtime.inspect(|state| {
+            require(
+                scope.endpoint_id == state.endpoint_id,
+                "actionable endpoint mismatch",
+            )?;
+            require(
+                state
+                    .actionables
                     .get(id)
-                    .is_some_and(|a| a["sessionId"] == scope.session_id)
-            }),
-            "actionable scope mismatch",
-        )?;
+                    .is_some_and(|a| a["sessionId"] == scope.session_id),
+                "actionable scope mismatch",
+            )?;
+            require(
+                RunPresentation::read(state, scope, true).can_respond(id, revision),
+                "actionable is unavailable or stale",
+            )
+        })?;
         self.shared.runtime.respond(id, revision, outcome).await
     }
 }
@@ -365,3 +628,7 @@ impl Drop for Completion {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "controller_fallback_tests.rs"]
+mod fallback_tests;

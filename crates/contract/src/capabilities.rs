@@ -11,6 +11,11 @@ pub struct EndpointCapabilities {
     pub can_fork_completed_turn: bool,
     pub can_edit_historical_input: bool,
     pub supports_file_observation: bool,
+    /// `respond` accepts the canonical question-only cancellation outcome
+    /// `{sessionId, cancelQuestion: true}`. This does not cancel the Run.
+    /// Adapters with another wire shape must normalize it before advertising this.
+    #[serde(default)]
+    pub supports_question_cancellation: bool,
 }
 impl EndpointCapabilities {
     pub fn methods(methods: &[&str]) -> Self {
@@ -66,6 +71,9 @@ impl SessionEndpoint for HostedEndpoint {
         let mut caps = self.endpoint.capabilities();
         caps.methods.extend(self.services.methods());
         caps
+    }
+    fn sequenced_queue_projection_key(&self) -> Option<&'static str> {
+        self.endpoint.sequenced_queue_projection_key()
     }
     fn content_kind(&self) -> SessionContentKind {
         self.endpoint.content_kind()
@@ -131,5 +139,21 @@ impl SessionEndpoint for HostedEndpoint {
     }
     async fn close(&self) {
         self.endpoint.close().await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn older_capability_documents_do_not_advertise_question_cancellation() {
+        let mut document = serde_json::to_value(EndpointCapabilities::default()).unwrap();
+        document
+            .as_object_mut()
+            .unwrap()
+            .remove("supportsQuestionCancellation");
+        let restored: EndpointCapabilities = serde_json::from_value(document).unwrap();
+        assert!(!restored.supports_question_cancellation);
     }
 }

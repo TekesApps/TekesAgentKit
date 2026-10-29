@@ -58,6 +58,7 @@ pub fn annotation_input_presentation(text: &str) -> Option<AnnotationInputPresen
                 excerpt: a.excerpt,
                 comment: a.comment,
                 source_locator: Some(a.source),
+                artifact_reference: None,
             })
             .collect()
     } else {
@@ -100,6 +101,24 @@ mod tests {
                 end: excerpt.encode_utf16().count(),
                 fingerprint: "fingerprint".into(),
             }),
+            artifact_reference: Some(Box::new(
+                tekes_agent_contract::ArtifactSelectionReference::capture(
+                    "document".into(),
+                    "artifact".into(),
+                    "character".into(),
+                    vec!["biography".into()],
+                    "revision-1".into(),
+                    "sha256:fixture".into(),
+                    excerpt,
+                    tekes_agent_contract::Utf16SelectionRange {
+                        location: 0,
+                        length: excerpt.encode_utf16().count() as u64,
+                    },
+                    0,
+                    0,
+                )
+                .unwrap(),
+            )),
         }
     }
     #[test]
@@ -150,5 +169,6 @@ mod tests {
         let input = annotation_input_presentation(&text).unwrap();
         assert_eq!(input.text, "body");
         assert_eq!(input.annotations[0].source_locator, a.source_locator);
+        assert_eq!(input.annotations[0].artifact_reference, None);
     }
 }
