@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.9 — 2026-10-29
+
+- Retain active Native journals when their last observer detaches, then retire them after terminal state; reopening keeps the original response.
+- Retire rejected Native mux streams without duplicate close, and enable TCP_NODELAY for small mux commands.
+- Preserve structured Native HTTP carrier errors and keep Native HTTP requests off system proxies, consistent with the direct WebSocket transport.
+- Includes previously merged Pi message-window/recovery and read-only query fixes, plus the standalone DSH runtime probe; this maintenance release adds no new Pi or DSH scope.
+- Validation: merged-main workspace tests, strict Clippy, formatting and ownership checks; Native public-consumer and permission regressions retain their exact recorded source/runtime identities.
+- Scope: existing headless packages only. The AgentKit/WebUI stage candidate, Family integration, original performance failures and daily-entry upgrade remain outside this maintenance release.
+
 ## 0.3.7 — 2026-10-19
 
 - Expose completed-turn footnote actions through the shared session view and existing thread action contract.
