@@ -62,7 +62,8 @@ def main() -> int:
     for source in (webui / "src").rglob("*.ts*"):
         text = source.read_text()
         for match in TYPE_IMPORT.finditer(text):
-            used.update(re.findall(r"\b[A-Z][A-Za-z0-9]*\b", match.group("names")))
+            # Local aliases are not exports of the pinned contract.
+            used.update(re.findall(r"(?:^|,)\s*([A-Z][A-Za-z0-9]*)", match.group("names")))
     missing = sorted(used - exports)
     if missing:
         fail("pinned public contract lacks imported WebUI declarations: " + ", ".join(missing))
