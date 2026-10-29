@@ -2,6 +2,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
 use tekes_agent_contract::*;
+
+#[cfg(test)]
+thread_local! {
+    static VALIDATE_BLOCK_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 type InventoryRows = BTreeMap<String, (Value, Option<ProjectionBlock>)>;
 fn inventory_rows(frame: &Value) -> Result<InventoryRows> {
     let mut rows = BTreeMap::new();
@@ -114,6 +120,8 @@ impl SessionProjection {
         key.is_some_and(|key| self.projections.contains_key(key))
     }
     fn validate_block(&self, block: &ProjectionBlock, queue_key: Option<&str>) -> Result<()> {
+        #[cfg(test)]
+        VALIDATE_BLOCK_CALLS.with(|calls| calls.set(calls.get() + 1));
         // Validate every value before changing any projection.
         for (key, value) in &block.values {
             if Some(key.as_str()) == queue_key
@@ -133,6 +141,10 @@ impl SessionProjection {
     }
     fn block(&mut self, block: ProjectionBlock, queue_key: Option<&str>) -> Result<()> {
         self.validate_block(&block, queue_key)?;
+        self.commit_block(block, queue_key);
+        Ok(())
+    }
+    fn commit_block(&mut self, block: ProjectionBlock, queue_key: Option<&str>) {
         for (key, value) in block.values {
             let accepted = self.projections.get(&key).is_none_or(|old| {
                 block.as_of_seq > old.sequence
@@ -154,7 +166,6 @@ impl SessionProjection {
                 );
             }
         }
-        Ok(())
     }
     pub fn apply_snapshot(&mut self, snapshot: JournalSnapshot) -> Result<()> {
         self.apply_snapshot_with_queue(snapshot, None)
@@ -202,7 +213,7 @@ impl SessionProjection {
         self.journal_ready = true;
         self.journal_error = None;
         if let Some(block) = snapshot.projections {
-            self.block(block, queue_key)?;
+            self.commit_block(block, queue_key);
         }
         self.refold();
         Ok(())
@@ -1016,6 +1027,70 @@ fn validate_queue_projection(value: &Value) -> Result<()> {
 mod queue_authority_tests {
     use super::*;
     use serde_json::json;
+
+    fn snapshot_168(queue_items: &[&str], revision: &str, turn: u64) -> JournalSnapshot {
+        JournalSnapshot {
+            session_id: "s".into(),
+            generation: "g".into(),
+            through_sequence: 167,
+            window_limit: 168,
+            entries: (0..168)
+                .map(|seq| HistoryEntry {
+                    event: SessionEvent {
+                        kind: "user/message".into(),
+                        seq,
+                        time: 1.0,
+                        data: json!({"turn":turn,"step":1}),
+                        ignorable: None,
+                        metadata: BTreeMap::new(),
+                    },
+                    view: None,
+                    is_model_only: None,
+                })
+                .collect(),
+            has_more_before: false,
+            projections: Some(ProjectionBlock {
+                as_of_seq: 167,
+                values: [(
+                    SEQUENCED_QUEUE_PROJECTION_KEY.into(),
+                    json!({"items":queue_items}),
+                )]
+                .into(),
+            }),
+            history_revision: Some(revision.into()),
+        }
+    }
+
+    #[test]
+    fn journal_snapshot_validates_projection_once_before_mutating_history() {
+        let key = SEQUENCED_QUEUE_PROJECTION_KEY;
+        let mut session = SessionProjection::default();
+        VALIDATE_BLOCK_CALLS.with(|calls| calls.set(0));
+
+        session
+            .apply_snapshot_with_queue(snapshot_168(&["original"], "r1", 1), Some(key))
+            .unwrap();
+
+        VALIDATE_BLOCK_CALLS.with(|calls| assert_eq!(calls.get(), 1));
+        assert_eq!(session.entries.len(), 168);
+        assert_eq!(session.entries[&0].event.data, json!({"turn":1,"step":1}));
+        assert_eq!(session.queue, vec![json!("original")]);
+
+        VALIDATE_BLOCK_CALLS.with(|calls| calls.set(0));
+        assert!(
+            session
+                .apply_snapshot_with_queue(snapshot_168(&["conflict"], "r2", 2), Some(key))
+                .is_err()
+        );
+        VALIDATE_BLOCK_CALLS.with(|calls| assert_eq!(calls.get(), 1));
+        assert_eq!(session.entries.len(), 168);
+        assert_eq!(session.entries[&0].event.data, json!({"turn":1,"step":1}));
+        assert_eq!(session.queue, vec![json!("original")]);
+        assert_eq!(
+            session.projections[key].value,
+            json!({"items":["original"]})
+        );
+    }
 
     #[test]
     fn adapter_switch_never_promotes_retained_opaque_queue_and_same_adapter_reconnect_retains_cut()
