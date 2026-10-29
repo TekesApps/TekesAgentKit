@@ -33,6 +33,10 @@ fn put(sources: &mut TranscriptThinkingSources, id: String, order: i64, frame: S
         },
     );
 }
+#[cfg(test)]
+thread_local! {
+    static JOURNAL_FRAME_BUILDS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
 pub(crate) fn read(
     scope: &RunScope,
     session: &SessionProjection,
@@ -99,11 +103,16 @@ pub(crate) fn read(
         let mut first_calls = BTreeMap::<String, i64>::new();
         for entry in session.entries.values() {
             let event = &entry.event;
+            if !matches!(event.kind.as_str(), "assistant/message" | "tool/call") {
+                continue;
+            }
             let (Some(turn), Some(step)) =
                 (event.data["turn"].as_i64(), event.data["step"].as_i64())
             else {
                 continue;
             };
+            #[cfg(test)]
+            JOURNAL_FRAME_BUILDS.with(|count| count.set(count.get() + 1));
             let frame = crate::transcript::scoped(scope, &format!("response:{turn}:{step}"));
             if event.kind == "assistant/message" {
                 put(&mut sources, frame.clone(), event.seq, frame.clone());
@@ -323,5 +332,58 @@ impl RunSnapshot {
                 elapsed_seconds,
             },
         )
+    }
+}
+
+#[cfg(test)]
+mod work_tests {
+    use super::*;
+    use serde_json::json;
+    use tekes_agent_session::MemoryProjectionStore;
+
+    #[test]
+    fn ordinary_journal_builds_response_frames_only_for_source_events() {
+        let scope = RunScope::main("sep", "s");
+        let text = "x".repeat(1024);
+        let mut entries = Vec::new();
+        for turn in 1..=28 {
+            for (kind, data) in [
+                ("turn/start", json!({"turn":turn})),
+                (
+                    "user/message",
+                    json!({"turn":turn,"text":text,"content":[{"type":"text","text":text}],"source":{"kind":"user"}}),
+                ),
+                ("step/start", json!({"turn":turn,"step":1})),
+                (
+                    "assistant/message",
+                    json!({"turn":turn,"step":1,"message":{"id":format!("assistant-{turn}"),"content":[{"type":"text","text":text}]}}),
+                ),
+                ("step/end", json!({"turn":turn,"step":1})),
+                ("turn/end", json!({"turn":turn,"reason":"completed"})),
+            ] {
+                let seq = entries.len();
+                entries.push(json!({"event":{"type":kind,"seq":seq,"time":seq,"data":data}}));
+            }
+        }
+        let mut store = MemoryProjectionStore::new("sep");
+        store
+            .apply(
+                "journal:s",
+                json!({"type":"snapshot","snapshot":{
+            "sessionId":"s","generation":"g","throughSequence":167,"windowLimit":50,
+            "entries":entries,"hasMoreBefore":false}}),
+            )
+            .unwrap();
+        JOURNAL_FRAME_BUILDS.with(|count| count.set(0));
+        let transcript = TranscriptSnapshot::read(&scope, &store.sessions["s"]).unwrap();
+        assert_eq!(transcript.turns.len(), 28);
+        assert_eq!(transcript.thinking_sources.by_id.len(), 28);
+        for turn in 1..=28 {
+            let id = crate::transcript::scoped(&scope, &format!("response:{turn}:1"));
+            let source = &transcript.thinking_sources.by_id[&id];
+            assert_eq!(source.response_frame_id, id);
+            assert_eq!(source.arrival_order, (turn - 1) * 6 + 3);
+        }
+        assert_eq!(JOURNAL_FRAME_BUILDS.with(|count| count.get()), 28);
     }
 }
