@@ -443,6 +443,117 @@ async fn unary_carrier_rejections_preserve_errors_without_relaxing_rpc_correlati
     }
 }
 #[tokio::test]
+async fn native_http_stays_direct_when_environment_proxy_is_configured() {
+    const CHILD_URL: &str = "AGENTKIT_DIRECT_HTTP_TEST_URL";
+    if let Ok(url) = std::env::var(CHILD_URL) {
+        let endpoint = KernelConnector::new("k", &url, "synthetic".into())
+            .unwrap()
+            .connect_kernel()
+            .await
+            .unwrap();
+        let result = endpoint
+            .call("session.models", json!({"sessionId":"s"}), "direct-policy")
+            .await;
+        endpoint.close().await;
+        assert_eq!(result.unwrap(), json!({"direct":true}));
+        return;
+    }
+    // Child environment is isolated: no unsafe process-global environment mutation.
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("http://{}", listener.local_addr().unwrap());
+    let proxy = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let proxy_url = format!("http://{}", proxy.local_addr().unwrap());
+    async fn reply(mut socket: tokio::net::TcpStream, direct: bool) {
+        let mut headers = Vec::new();
+        loop {
+            let mut byte = [0];
+            socket.read_exact(&mut byte).await.unwrap();
+            headers.push(byte[0]);
+            if headers.ends_with(b"\r\n\r\n") {
+                break;
+            }
+        }
+        let headers = String::from_utf8(headers).unwrap();
+        assert!(
+            headers
+                .to_lowercase()
+                .contains("authorization: bearer synthetic")
+        );
+        let len: usize = headers
+            .lines()
+            .find_map(|line| {
+                line.to_lowercase()
+                    .strip_prefix("content-length:")
+                    .map(|value| value.trim().parse().unwrap())
+            })
+            .unwrap();
+        let mut bytes = vec![0; len];
+        socket.read_exact(&mut bytes).await.unwrap();
+        let request: Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(request["rpcId"], "direct-policy");
+        let body=json!({"type":"server-response","rpcId":"direct-policy","result":{"ok":true,"value":{"direct":direct}}}).to_string();
+        socket.write_all(format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",body.len(),body).as_bytes()).await.unwrap();
+    }
+    let server = tokio::spawn(async move {
+        let (socket, _) = listener.accept().await.unwrap();
+        let ws_task = tokio::spawn(async move {
+            let mut ws = accept_async(socket).await.unwrap();
+            send(&mut ws, host(4)).await;
+            let _ = ws.next().await;
+        });
+        let direct = if let Ok(Ok((socket, _))) =
+            tokio::time::timeout(Duration::from_secs(3), listener.accept()).await
+        {
+            reply(socket, true).await;
+            true
+        } else {
+            false
+        };
+        ws_task.await.unwrap();
+        direct
+    });
+    let (stop_proxy, stop) = tokio::sync::oneshot::channel::<()>();
+    let proxy_task = tokio::spawn(async move {
+        tokio::select! {
+            accepted=proxy.accept()=> {
+                let (socket,_)=accepted.unwrap();reply(socket,false).await;true
+            },
+            _=stop=>false,
+        }
+    });
+    let output = tokio::process::Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "native_http_stays_direct_when_environment_proxy_is_configured",
+            "--nocapture",
+        ])
+        .env_clear()
+        .env(CHILD_URL, url)
+        .env("HTTP_PROXY", &proxy_url)
+        .env("HTTPS_PROXY", &proxy_url)
+        .env("ALL_PROXY", &proxy_url)
+        .env("NO_PROXY", "")
+        .output()
+        .await
+        .unwrap();
+    let _ = stop_proxy.send(());
+    let proxy_received = proxy_task.await.unwrap();
+    let direct_received = server.await.unwrap();
+    assert!(
+        !proxy_received,
+        "Native bearer request reached the environment proxy"
+    );
+    assert!(
+        direct_received,
+        "Native unary did not reach the explicit Kernel URL"
+    );
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+}
+#[tokio::test]
 async fn physical_generation_mismatch_terminates_stream() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let url = format!("http://{}", listener.local_addr().unwrap());
