@@ -336,6 +336,113 @@ async fn unary_envelope_authentication_errors_and_no_mutation_retry() {
         .unwrap();
 }
 #[tokio::test]
+async fn unary_carrier_rejections_preserve_errors_without_relaxing_rpc_correlation() {
+    let carrier =
+        json!({"error":{"code":"invalid-request","message":"Request is malformed","details":{}}});
+    let cases = [
+        (
+            "400 Bad Request",
+            carrier.clone(),
+            Some(carrier["error"].clone()),
+        ),
+        ("200 OK", carrier.clone(), None),
+        (
+            "400 Bad Request",
+            json!({"error":{"code":7,"message":"bad","details":{}}}),
+            None,
+        ),
+        (
+            "400 Bad Request",
+            json!({"error":{"code":"bad","message":"bad","details":null}}),
+            None,
+        ),
+        (
+            "400 Bad Request",
+            json!({"error":{"code":"invalid-request","message":"Request is malformed","details":{"extra":true}}}),
+            None,
+        ),
+        (
+            "400 Bad Request",
+            json!({"error":{"code":"invalid-request","message":"Request is malformed","details":{}},"extra":true}),
+            None,
+        ),
+        ("400 Bad Request", json!({"unknown":"body"}), None),
+        (
+            "200 OK",
+            json!({"type":"server-response","rpcId":"wrong-rpc","result":{"ok":true,"value":{}}}),
+            None,
+        ),
+    ];
+    for (status, body, expected_remote) in cases {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let task = tokio::spawn(async move {
+            let (socket, _) = listener.accept().await.unwrap();
+            let ws_task = tokio::spawn(async move {
+                let mut ws = accept_async(socket).await.unwrap();
+                send(&mut ws, host(4)).await;
+                let _ = ws.next().await;
+            });
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut bytes = Vec::new();
+            let header_end = loop {
+                let mut byte = [0];
+                socket.read_exact(&mut byte).await.unwrap();
+                bytes.push(byte[0]);
+                if bytes.ends_with(b"\r\n\r\n") {
+                    break bytes.len();
+                }
+            };
+            let headers = String::from_utf8(bytes.clone()).unwrap();
+            assert!(headers.starts_with("POST /api/approvals.select "));
+            let len: usize = headers
+                .lines()
+                .find_map(|line| {
+                    line.to_lowercase()
+                        .strip_prefix("content-length:")
+                        .map(|value| value.trim().parse().unwrap())
+                })
+                .unwrap();
+            bytes.resize(header_end + len, 0);
+            socket.read_exact(&mut bytes[header_end..]).await.unwrap();
+            let request: Value = serde_json::from_slice(&bytes[header_end..]).unwrap();
+            assert_eq!(request["rpcId"], "carrier-select");
+            let body = body.to_string();
+            socket.write_all(format!("HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",body.len(),body).as_bytes()).await.unwrap();
+            // A rejection never authorizes an automatic mutation retry.
+            assert!(
+                tokio::time::timeout(Duration::from_millis(100), listener.accept())
+                    .await
+                    .is_err()
+            );
+            ws_task.await.unwrap();
+        });
+        let endpoint = KernelConnector::new("k", &url, "synthetic".into())
+            .unwrap()
+            .with_timeout(Duration::from_secs(2))
+            .connect_kernel()
+            .await
+            .unwrap();
+        let error = endpoint
+            .call(
+                "approvals.select",
+                json!({"sessionId":"s","mode":"unadvertised"}),
+                "carrier-select",
+            )
+            .await
+            .unwrap_err();
+        match expected_remote {
+            Some(expected) => assert!(matches!(error, Error::Remote(actual) if actual == expected)),
+            None => assert!(matches!(error, Error::Protocol(_))),
+        }
+        endpoint.close().await;
+        tokio::time::timeout(Duration::from_secs(3), task)
+            .await
+            .unwrap()
+            .unwrap();
+    }
+}
+#[tokio::test]
 async fn physical_generation_mismatch_terminates_stream() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let url = format!("http://{}", listener.local_addr().unwrap());
