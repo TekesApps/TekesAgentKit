@@ -149,9 +149,31 @@ impl RunSourceWitness {
     }
 }
 
+// Every mutable access conservatively invalidates the local input key, including
+// mutators that fail after changing state. Refresh records its key only afterward.
+struct ControllerCore {
+    store: PresentationStore,
+    generation: u64,
+    projected: Option<(u64, u64)>,
+}
+impl std::ops::Deref for ControllerCore {
+    type Target = PresentationStore;
+    fn deref(&self) -> &Self::Target {
+        &self.store
+    }
+}
+impl std::ops::DerefMut for ControllerCore {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.generation = self
+            .generation
+            .checked_add(1)
+            .expect("local presentation generation exhausted");
+        &mut self.store
+    }
+}
 struct Shared {
     runtime: Arc<SessionRuntime>,
-    core: Mutex<PresentationStore>,
+    core: Mutex<ControllerCore>,
     snapshots: watch::Sender<Arc<RunSnapshot>>,
     child_owner: Option<(RunScope, String)>,
 }
@@ -175,10 +197,19 @@ impl Shared {
     }
     fn refresh(&self) {
         let mut core = self.core.lock().expect("presentation lock poisoned");
-        let snapshot = self.runtime.inspect(|authority| {
-            refreshed_snapshot(&mut core, authority, &self.snapshots.borrow())
-        });
-        self.snapshots.send_replace(Arc::new(snapshot));
+        let snapshot = self
+            .runtime
+            .inspect_with_revision(|authority_revision, authority| {
+                if core.projected == Some((authority_revision, core.generation)) {
+                    return None;
+                }
+                let snapshot = refreshed_snapshot(&mut core, authority, &self.snapshots.borrow());
+                core.projected = Some((authority_revision, core.generation));
+                Some(snapshot)
+            });
+        if let Some(snapshot) = snapshot {
+            self.snapshots.send_replace(Arc::new(snapshot));
+        }
     }
     fn finish(&self, id: &str, outcome: std::result::Result<(), String>) {
         let _ = self
@@ -237,7 +268,11 @@ impl RunController {
         let (snapshots, _) = watch::channel(Arc::new(initial));
         let shared = Arc::new(Shared {
             runtime: runtime.clone(),
-            core: Mutex::new(core),
+            core: Mutex::new(ControllerCore {
+                store: core,
+                generation: 0,
+                projected: None,
+            }),
             snapshots,
             child_owner,
         });

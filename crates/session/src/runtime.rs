@@ -96,7 +96,10 @@ impl SessionRuntime {
         let store = MemoryProjectionStore::new(endpoint_id);
         let (publish, revision) = watch::channel(0);
         let shared = Arc::new(SharedProjection {
-            store: RwLock::new(store),
+            store: RwLock::new(RevisionedProjection {
+                state: store,
+                revision: 0,
+            }),
             publish,
         });
         let task = tokio::spawn(run(connector, receiver, shared.clone()));
@@ -115,6 +118,15 @@ impl SessionRuntime {
     pub fn inspect<T>(&self, read: impl FnOnce(&MemoryProjectionStore) -> T) -> T {
         self.shared.read(read)
     }
+    /// The process-local input revision and state are read under the same lock.
+    /// This is a projection cache key, not a source/transport/CAS revision.
+    pub fn inspect_with_revision<T>(
+        &self,
+        read: impl FnOnce(u64, &MemoryProjectionStore) -> T,
+    ) -> T {
+        self.shared.read_with_revision(read)
+    }
+
     pub fn subscribe(&self) -> ProjectionSubscription {
         ProjectionSubscription {
             shared: self.shared.clone(),
@@ -591,16 +603,30 @@ fn inventory_reader(
     (handle, tagged(name.into(), epoch, Box::pin(frames)))
 }
 /// Revision notifications carry no history payload; reads hold only a short synchronous lock.
+struct RevisionedProjection {
+    state: MemoryProjectionStore,
+    revision: u64,
+}
 struct SharedProjection {
-    store: RwLock<MemoryProjectionStore>,
+    store: RwLock<RevisionedProjection>,
     publish: watch::Sender<u64>,
 }
 impl SharedProjection {
     fn read<T>(&self, read: impl FnOnce(&MemoryProjectionStore) -> T) -> T {
-        read(&self.store.read().expect("projection lock poisoned"))
+        self.read_with_revision(|_, state| read(state))
+    }
+    fn read_with_revision<T>(&self, read: impl FnOnce(u64, &MemoryProjectionStore) -> T) -> T {
+        let projection = self.store.read().expect("projection lock poisoned");
+        read(projection.revision, &projection.state)
     }
     fn update<T>(&self, write: impl FnOnce(&mut MemoryProjectionStore) -> T) -> T {
-        let result = write(&mut self.store.write().expect("projection lock poisoned"));
+        let mut projection = self.store.write().expect("projection lock poisoned");
+        let result = write(&mut projection.state);
+        projection.revision = projection
+            .revision
+            .checked_add(1)
+            .expect("projection revision exhausted");
+        drop(projection);
         self.publish
             .send_modify(|version| *version = version.wrapping_add(1));
         result
@@ -1290,5 +1316,57 @@ mod admission_tests {
             .is_err()
         );
         assert_eq!(checks.load(Ordering::SeqCst), 1);
+    }
+}
+
+#[cfg(test)]
+mod projection_revision_tests {
+    use super::*;
+    fn shared() -> SharedProjection {
+        let (publish, _) = watch::channel(0);
+        SharedProjection {
+            store: RwLock::new(RevisionedProjection {
+                state: MemoryProjectionStore::new("revision-test"),
+                revision: 0,
+            }),
+            publish,
+        }
+    }
+    #[test]
+    fn revision_and_authority_remain_paired_across_concurrent_updates() {
+        let shared = Arc::new(shared());
+        let writers: Vec<_> = (0..4)
+            .map(|_| {
+                let shared = shared.clone();
+                std::thread::spawn(move || {
+                    for _ in 0..128 {
+                        shared.update(|state| state.connection_epoch += 1);
+                        shared.read_with_revision(|revision, state| {
+                            assert_eq!(revision, state.connection_epoch)
+                        });
+                    }
+                })
+            })
+            .collect();
+        for writer in writers {
+            writer.join().unwrap();
+        }
+        shared.read_with_revision(|revision, state| {
+            assert_eq!(revision, 512);
+            assert_eq!(state.connection_epoch, 512);
+        });
+    }
+    #[test]
+    fn partial_failed_update_invalidates_cached_authority() {
+        let shared = shared();
+        let result: Result<()> = shared.update(|state| {
+            state.last_error = Some("visible error".into());
+            Err(Error::Disconnected)
+        });
+        assert!(result.is_err());
+        shared.read_with_revision(|revision, state| {
+            assert_eq!(revision, 1);
+            assert_eq!(state.last_error.as_deref(), Some("visible error"));
+        });
     }
 }

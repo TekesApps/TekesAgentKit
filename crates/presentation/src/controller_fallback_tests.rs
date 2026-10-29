@@ -186,3 +186,154 @@ fn source_outcome_never_marks_retained_history_as_a_fresh_projection() {
     assert_eq!(recovered.connection_epoch, authority.connection_epoch);
     assert_eq!(recovered.selection, core.selection());
 }
+
+// A delayed authority watch notification must not repeat a synchronous projection
+// of the same authority and unchanged local core. No scheduler timing is needed.
+#[tokio::test(flavor = "current_thread")]
+async fn repeated_authority_refresh_reuses_snapshot_and_retains_local_changes() {
+    struct PendingConnector;
+    #[async_trait]
+    impl EndpointConnector for PendingConnector {
+        async fn connect(&self) -> Result<Arc<dyn SessionEndpoint>> {
+            std::future::pending().await
+        }
+    }
+    let runtime = Arc::new(SessionRuntime::spawn(
+        "fallback",
+        Arc::new(PendingConnector),
+    ));
+    let controller = RunController::new(runtime).unwrap();
+    controller.select(destination("a")).unwrap();
+    controller
+        .edit_text(&destination("a"), "first".into())
+        .unwrap();
+    let first = controller.snapshot();
+    controller.shared.refresh();
+    let repeated = controller.snapshot();
+    assert!(
+        Arc::ptr_eq(&first, &repeated),
+        "same authority/local state must not be recomputed or republished"
+    );
+    assert_eq!(first.revision, repeated.revision);
+    // Even without a synchronous publish, a real local mutation invalidates the key.
+    controller
+        .shared
+        .core
+        .lock()
+        .unwrap()
+        .edit_text(&destination("a"), "second".into())
+        .unwrap();
+    controller.shared.refresh();
+    let second = controller.snapshot();
+    assert_eq!(second.draft.text, "second");
+    assert!(second.revision > first.revision);
+    controller.shared.refresh();
+    assert!(Arc::ptr_eq(&second, &controller.snapshot()));
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn cached_projection_tracks_runtime_epoch_and_reconnection_without_local_edit() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    struct EpochConnector {
+        attempts: AtomicUsize,
+        reconnect: Arc<tokio::sync::Notify>,
+        entered: Arc<tokio::sync::Notify>,
+    }
+    struct EpochEndpoint(HostDescription);
+    #[async_trait]
+    impl EndpointConnector for EpochConnector {
+        async fn connect(&self) -> Result<Arc<dyn SessionEndpoint>> {
+            if self.attempts.fetch_add(1, Ordering::SeqCst) > 0 {
+                self.entered.notify_one();
+                self.reconnect.notified().await;
+            }
+            let host = serde_json::from_value(
+                json!({"protocolVersion":4,"product":{"name":"epoch-test","version":"1"},"capabilities":[],"cwd":"/test","home":"/test","attachedSessions":0,"canOpenPath":false}),
+            )?;
+            Ok(Arc::new(EpochEndpoint(host)))
+        }
+    }
+    #[async_trait]
+    impl SessionEndpoint for EpochEndpoint {
+        async fn close(&self) {}
+        fn identity(&self) -> &str {
+            "fallback"
+        }
+        fn host(&self) -> &HostDescription {
+            &self.0
+        }
+        fn capabilities(&self) -> EndpointCapabilities {
+            EndpointCapabilities::default()
+        }
+        async fn follow(&self, target: StreamTarget) -> Result<FrameStream> {
+            use futures_util::{StreamExt, stream};
+            let frame = match target {
+                StreamTarget::SessionInventory => {
+                    json!({"type":"baseline","generation":"epoch","snapshot":{"items":[]}})
+                }
+                StreamTarget::SessionControl => {
+                    json!({"type":"baseline","generation":"epoch","snapshot":{"queues":[],"jobs":[],"projections":[]}})
+                }
+                StreamTarget::Actionables => json!({"type":"reset","generation":"epoch"}),
+                _ => unreachable!(),
+            };
+            Ok(Box::pin(
+                stream::once(async { Ok(frame) }).chain(stream::pending()),
+            ))
+        }
+        async fn history_page(&self, _: HistoryRequest) -> Result<HistoryPage> {
+            unreachable!()
+        }
+        async fn respond(&self, _: &str, _: i64, _: Value) -> Result<()> {
+            unreachable!()
+        }
+        async fn call(&self, _: &str, _: Value, _: &str) -> Result<Value> {
+            unreachable!()
+        }
+    }
+    let reconnect = Arc::new(tokio::sync::Notify::new());
+    let entered = Arc::new(tokio::sync::Notify::new());
+    let runtime = Arc::new(SessionRuntime::spawn(
+        "fallback",
+        Arc::new(EpochConnector {
+            attempts: AtomicUsize::new(0),
+            reconnect: reconnect.clone(),
+            entered: entered.clone(),
+        }),
+    ));
+    let controller = RunController::new(runtime.clone()).unwrap();
+    // Drive the same watcher callback explicitly so authority changes are tested
+    // against a populated cache without relying on task scheduling order.
+    controller.observer.abort();
+    controller.shared.refresh();
+    runtime
+        .wait_ready(std::time::Duration::from_secs(2))
+        .await
+        .unwrap();
+    controller.shared.refresh();
+    let ready = controller.snapshot();
+    assert_eq!(ready.connection.phase, ConnectionPhase::Connected);
+    controller.shared.refresh();
+    assert!(Arc::ptr_eq(&ready, &controller.snapshot()));
+    let reconnect_runtime = runtime.clone();
+    let reconnecting = tokio::spawn(async move { reconnect_runtime.reconnect().await });
+    tokio::time::timeout(std::time::Duration::from_secs(2), entered.notified())
+        .await
+        .unwrap();
+    controller.shared.refresh();
+    let connecting = controller.snapshot();
+    assert_eq!(connecting.connection.phase, ConnectionPhase::Reconnecting);
+    assert!(connecting.connection_epoch > ready.connection_epoch);
+    assert!(connecting.revision > ready.revision);
+    reconnect.notify_one();
+    reconnecting.await.unwrap().unwrap();
+    controller.shared.refresh();
+    let recovered = controller.snapshot();
+    assert_eq!(recovered.connection.phase, ConnectionPhase::Connected);
+    assert!(recovered.connection_epoch > connecting.connection_epoch);
+    assert!(recovered.revision > connecting.revision);
+    assert_eq!(recovered.connection.message, None);
+    controller.shared.refresh();
+    assert!(Arc::ptr_eq(&recovered, &controller.snapshot()));
+    runtime.stop().await.unwrap();
+}
