@@ -116,6 +116,7 @@ impl KernelConnector {
         let http = Client::builder()
             .timeout(self.timeout)
             .redirect(reqwest::redirect::Policy::none())
+            .no_proxy()
             .build()
             .map_err(transport)?;
         // Non-activating feature probe against a guaranteed absent UUID. Older 0.9 hosts return
