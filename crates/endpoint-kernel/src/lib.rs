@@ -613,6 +613,7 @@ impl SessionEndpoint for NativeSessionEndpoint {
             .map_err(|_| {
                 Error::Transport("HTTP request failed; reconcile mutation receipt".into())
             })?;
+        let status = response.status();
         let mut bytes = Vec::new();
         while let Some(chunk) = response
             .chunk()
@@ -626,6 +627,20 @@ impl SessionEndpoint for NativeSessionEndpoint {
             bytes.extend_from_slice(&chunk);
         }
         let value: Value = serde_json::from_slice(&bytes)?;
+        // Carrier rejections precede RPC dispatch and have no RPC correlation fields.
+        // Kernel's public session-endpoint spec fixes this envelope and empty details.
+        if !status.is_success() && value.get("type").is_none() {
+            let error = &value["error"];
+            require(
+                value.as_object().is_some_and(|v| v.len() == 1)
+                    && error.as_object().is_some_and(|v| v.len() == 3)
+                    && error["code"].as_str().is_some_and(|s| !s.is_empty())
+                    && error["message"].as_str().is_some_and(|s| !s.is_empty())
+                    && error["details"].as_object().is_some_and(|v| v.is_empty()),
+                "invalid HTTP carrier error",
+            )?;
+            return Err(Error::Remote(error.clone()));
+        }
         require(
             value["type"] == "server-response" && value["rpcId"] == rpc_id,
             "unary reply correlation mismatch",
