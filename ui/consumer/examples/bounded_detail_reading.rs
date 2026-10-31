@@ -132,6 +132,16 @@ mod acceptance {
         ))
         .unwrap();
         host.set_action_events(true);
+        let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()));
+        let frame = Rect::new(0., 0., 480., 300.);
+        host.render(
+            &mut Scene::new(),
+            &mut text,
+            frame,
+            frame,
+            Theme::LIGHT.into(),
+        )
+        .unwrap();
         host.accessibility_action(detail.disclosure.unwrap(), None, AccessibilityAction::Press);
         let actions = host.drain_actions();
         assert!(
@@ -149,8 +159,7 @@ mod acceptance {
             .component_mut::<ScrollContent>()
             .unwrap()
             .follow_latest();
-        let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()));
-        let frame = Rect::new(0., 0., 480., 300.);
+
         host.render(
             &mut Scene::new(),
             &mut text,

@@ -5,6 +5,86 @@ use tekes_agent_presentation::{ComposerDestination, PresentationStore};
 use tekes_agent_session::{ConnectionState, MemoryProjectionStore};
 use tekes_ui_controls::composition::*;
 
+use std::rc::Rc;
+use tekes_ui_controls::{
+    ButtonTextAlign, ButtonTextRenderer, TextSurfaceHost, TextSurfaceTextRenderer,
+};
+use tekes_ui_scene::{Point, Rect, Scene, Size};
+use tekes_ui_text::{
+    Paragraph,
+    coretext::{CoreTextFonts, CoreTextShaper},
+    model::ShapeOptions,
+    style::TextStyle,
+    traits::Shaper,
+};
+use tekes_ui_tokens::{Rgba, Theme, proposal};
+struct DisclosureText(CoreTextShaper, f32);
+impl TextSurfaceTextRenderer for DisclosureText {
+    fn push_visible(&mut self, _: &mut Scene, _: &Paragraph, _: Point, _: Rgba, _: Rect) {}
+}
+impl TextSurfaceHost for DisclosureText {
+    fn shape_label(
+        &mut self,
+        text: &str,
+        role: proposal::TextRole,
+        width: f32,
+        options: tekes_ui_text::LabelOptions,
+    ) -> Option<Rc<tekes_ui_text::LabelLayout>> {
+        Some(tekes_agent_ui_demo::label_host::shape_label(
+            &mut self.0,
+            text,
+            role,
+            width,
+            self.1,
+            options,
+        ))
+    }
+
+    fn type_scale(&self) -> f32 {
+        self.1
+    }
+    fn shape_surface(
+        &mut self,
+        s: &str,
+        role: proposal::TextRole,
+        width: Option<f32>,
+    ) -> Rc<Paragraph> {
+        Rc::new(self.0.shape(
+            s,
+            &TextStyle::system(role.style().size * self.1),
+            &ShapeOptions {
+                width: width.map(f64::from),
+                line_spacing: 0.,
+            },
+        ))
+    }
+}
+impl ButtonTextRenderer for DisclosureText {
+    fn measure(&mut self, s: &str, r: proposal::TextRole, w: f32) -> Size {
+        let p = self.shape_surface(s, r, Some(w));
+        Size::new(p.width as f32, p.height as f32)
+    }
+    fn draw(
+        &mut self,
+        _: &mut Scene,
+        _: &str,
+        _: proposal::TextRole,
+        _: Rect,
+        _: ButtonTextAlign,
+        _: Rgba,
+    ) {
+    }
+    fn text_surface_host(&mut self) -> Option<&mut dyn TextSurfaceHost> {
+        Some(self)
+    }
+}
+
+fn render_disclosure(host: &mut ContentHost, text: &mut DisclosureText) {
+    let frame = Rect::new(0., 0., 760., 500.);
+    host.render(&mut Scene::new(), text, frame, frame, Theme::LIGHT.into())
+        .unwrap();
+}
+
 fn captured_store() -> MemoryProjectionStore {
     let rows = vec![
         ("turn/start", json!({"turn":1})),
@@ -157,6 +237,8 @@ async fn projected_initial_prompt_remains_before_input_and_preserves_original_di
     let ids = view.ids();
     let mut host = view.into_host().unwrap();
     assert!(host.get(part.body).is_none());
+    let mut text = DisclosureText(CoreTextShaper::new(CoreTextFonts::new()), 1.);
+    render_disclosure(&mut host, &mut text);
     host.accessibility_action(part.disclosure.unwrap(), None, AccessibilityAction::Press);
     let actions = host.drain_actions();
     host.get_mut(ids.root)

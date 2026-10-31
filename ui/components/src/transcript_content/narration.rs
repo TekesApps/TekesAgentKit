@@ -250,10 +250,12 @@ fn raw_order(position: Option<&crate::TranscriptSourcePosition>) -> Option<i64> 
 #[derive(Debug)]
 pub(super) struct NarrationFrame {
     pub(super) rows: StackContent,
+    reveal_arranged: bool,
 }
 impl NarrationFrame {
     pub(super) fn new(body: Content) -> Self {
         Self {
+            reveal_arranged: false,
             rows: StackContent {
                 model: Stack {
                     axis: Axis::Vertical,
@@ -266,6 +268,13 @@ impl NarrationFrame {
     }
 }
 impl Component for NarrationFrame {
+    fn host_reveal_passthrough(&self) -> bool {
+        self.reveal_arranged
+    }
+
+    fn lifecycle(&mut self, _: Lifecycle) {
+        self.reveal_arranged = false;
+    }
     fn children(&self) -> &[Content] {
         &self.rows.children
     }
@@ -273,10 +282,13 @@ impl Component for NarrationFrame {
         Some(&mut self.rows.children)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        self.reveal_arranged = false;
         self.rows.measure(text, available)
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        self.reveal_arranged = false;
         self.rows.arrange(text, frame, clip);
+        self.reveal_arranged = !frame.is_empty() && !clip.is_empty();
     }
 }
 pub(super) fn source_node(node: &Content) -> &Content {

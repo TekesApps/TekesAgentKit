@@ -31,6 +31,7 @@ pub(crate) struct ToolDetailFacts {
 }
 #[derive(Debug)]
 struct Section {
+    reveal_arranged: bool,
     ids: ToolDetailSectionIds,
     facts: TranscriptToolDetailSection,
     epoch: u64,
@@ -61,6 +62,7 @@ impl Section {
             field.reading = Some(tekes_ui_controls::ReadingController::default());
         }
         Self {
+            reveal_arranged: false,
             ids,
             facts: facts.clone(),
             epoch: 0,
@@ -105,6 +107,7 @@ impl Section {
         separated: bool,
         alloc: &mut dyn FnMut() -> ComponentId,
     ) {
+        self.reveal_arranged = false;
         if separated && self.ids.divider.is_none() {
             let id = alloc();
             self.rows
@@ -153,6 +156,13 @@ impl Section {
     }
 }
 impl Component for Section {
+    fn host_reveal_passthrough(&self) -> bool {
+        self.reveal_arranged
+    }
+
+    fn lifecycle(&mut self, _: Lifecycle) {
+        self.reveal_arranged = false;
+    }
     fn children(&self) -> &[Content] {
         &self.rows.children
     }
@@ -160,10 +170,13 @@ impl Component for Section {
         Some(&mut self.rows.children)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        self.reveal_arranged = false;
         self.rows.measure(text, available)
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        self.reveal_arranged = false;
         self.rows.arrange(text, frame, clip);
+        self.reveal_arranged = !frame.is_empty() && !clip.is_empty();
     }
     fn semantics(&self) -> ContentSemantics {
         ContentSemantics::new(ContentRole::Group, &self.facts.title)
@@ -171,6 +184,7 @@ impl Component for Section {
 }
 #[derive(Debug)]
 pub(crate) struct ToolDetailContent {
+    reveal_arranged: bool,
     rows: StackContent,
     facts: Option<ToolDetailFacts>,
     bounded: bool,
@@ -178,6 +192,7 @@ pub(crate) struct ToolDetailContent {
 impl ToolDetailContent {
     pub fn new(bounded: bool) -> Self {
         Self {
+            reveal_arranged: false,
             rows: StackContent {
                 model: Stack {
                     axis: Axis::Vertical,
@@ -198,6 +213,7 @@ impl ToolDetailContent {
         copy_label: &str,
         alloc: &mut dyn FnMut() -> ComponentId,
     ) {
+        self.reveal_arranged = false;
         let mut old = std::mem::take(&mut self.rows.children);
         let same_owner = self
             .facts
@@ -234,6 +250,7 @@ impl ToolDetailContent {
             .collect()
     }
     pub fn configure_viewports(&mut self, text: &mut dyn ButtonTextRenderer) {
+        self.reveal_arranged = false;
         if !self.bounded {
             return;
         }
@@ -295,6 +312,13 @@ impl ToolDetailContent {
     }
 }
 impl Component for ToolDetailContent {
+    fn host_reveal_passthrough(&self) -> bool {
+        self.reveal_arranged
+    }
+
+    fn lifecycle(&mut self, _: Lifecycle) {
+        self.reveal_arranged = false;
+    }
     fn children(&self) -> &[Content] {
         &self.rows.children
     }
@@ -302,12 +326,15 @@ impl Component for ToolDetailContent {
         Some(&mut self.rows.children)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        self.reveal_arranged = false;
         self.configure_viewports(text);
         self.rows.measure(text, available)
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        self.reveal_arranged = false;
         self.configure_viewports(text);
         self.rows.arrange(text, frame, clip);
+        self.reveal_arranged = !frame.is_empty() && !clip.is_empty();
     }
     fn semantics(&self) -> ContentSemantics {
         ContentSemantics::new(ContentRole::Group, "")

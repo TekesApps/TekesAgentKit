@@ -39,6 +39,7 @@ impl OutputMessageFragmentKind {
 pub struct OutputMessageFragment {
     id: ComponentId,
     owner: ComponentId,
+    reveal_arranged: bool,
     tool_key: Option<OutputMessageToolFragmentKey>,
     scope: RunScope,
     kind: OutputMessageFragmentKind,
@@ -63,10 +64,14 @@ fn kind(node: &Content) -> Option<OutputMessageFragmentKind> {
 }
 impl OutputMessageFragment {
     pub(crate) fn set_tools_flattened(&mut self, flattened: bool) {
+        let mut changed = false;
         for node in &mut self.rows.children {
             if let Some(group) = node.component_mut::<crate::ToolRun>() {
-                group.set_flattened(flattened);
+                changed |= group.set_flattened(flattened);
             }
+        }
+        if changed {
+            self.reveal_arranged = false;
         }
     }
     pub fn id(&self) -> ComponentId {
@@ -124,10 +129,21 @@ impl OutputMessageFragment {
     }
     pub fn handle_actions(&mut self, actions: &[ContentAction]) -> bool {
         // Use the original control action implementation over these actual nodes.
-        handle_part_actions(&mut self.rows.children, actions)
+        let changed = handle_part_actions(&mut self.rows.children, actions);
+        if changed {
+            self.reveal_arranged = false;
+        }
+        changed
     }
 }
 impl Component for OutputMessageFragment {
+    fn host_reveal_passthrough(&self) -> bool {
+        self.reveal_arranged
+    }
+
+    fn lifecycle(&mut self, _: Lifecycle) {
+        self.reveal_arranged = false;
+    }
     fn active(&self) -> bool {
         !self.rows.children.is_empty()
     }
@@ -138,9 +154,11 @@ impl Component for OutputMessageFragment {
         Some(&mut self.rows.children)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        self.reveal_arranged = false;
         self.rows.measure(text, available)
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        self.reveal_arranged = false;
         arrange_content(
             &mut self.rows.children,
             text,
@@ -149,6 +167,7 @@ impl Component for OutputMessageFragment {
             Spacing::Regular.value(),
             false,
         );
+        self.reveal_arranged = !frame.is_empty() && !clip.is_empty();
     }
     fn semantics(&self) -> ContentSemantics {
         ContentSemantics::new(
@@ -286,6 +305,7 @@ impl OutputMessage {
         &mut self,
         fragments: Vec<&mut OutputMessageFragment>,
     ) -> Result<(), &'static str> {
+        self.reveal_arranged = false;
         self.check_fragments(&fragments.iter().map(|part| &**part).collect::<Vec<_>>())?;
         for fragment in fragments {
             self.rows.children.append(&mut fragment.rows.children);
@@ -297,6 +317,7 @@ impl OutputMessage {
         &mut self,
         tools: &[(OutputMessageToolFragmentKey, ComponentId)],
     ) -> Vec<Content> {
+        self.reveal_arranged = false;
         assert!(
             self.split_fragments.is_empty(),
             "rejoin before updating output"
@@ -343,6 +364,7 @@ impl OutputMessage {
                 let part = OutputMessageFragment {
                     id,
                     owner: self.id(),
+                    reveal_arranged: false,
                     scope: self.state.scope.clone(),
                     kind,
                     tool_key,

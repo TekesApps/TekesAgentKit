@@ -1262,6 +1262,7 @@ fn navigate_rail(
     text: &mut Text,
 ) -> Option<TurnRailReveal> {
     let request = rail_mut(host, root).next_reveal()?;
+    render(host, text);
     reveal_run_rail_follow(host, root, version, false, text)
         .unwrap()
         .unwrap();
@@ -1363,6 +1364,7 @@ async fn rail_press_release_cancel_keyboard_ax_and_preedit_capture_once_without_
     assert_eq!(baseline(&host, root), before);
     assert_eq!(host.focused(), Some(editor));
     host.event(&ContentEvent::Unmark);
+    render(&mut host, &mut text);
     assert!(host.focus(Some(row), true));
     for key in [ControlKey::Enter, ControlKey::Space] {
         host.event(&ContentEvent::Key { key, down: true });
@@ -1660,6 +1662,7 @@ async fn actual_ordinary_rail_click_aligns_at_visible_clip_start_and_preserves_o
     let intent = &intents[0];
     assert_eq!(intent.target().turn_id(), target.turn_id());
     let x = scroll(&host, root).scroll.offset.x;
+    clipped_render(&mut host, &mut text);
     let result = dispatch_start(&mut host, root, &version, intent, &mut text);
     assert_eq!(result.status, ContentRevealStatus::Completed);
     assert!(!result.clamped);
@@ -2500,6 +2503,7 @@ async fn expanded_tool_growth_and_reflow_preserve_reading_and_explicit_collapse_
         .next()
         .unwrap();
     for button in [tool.disclosure.unwrap(), reasoning.disclosure.unwrap()] {
+        render(&mut host, &mut text);
         host.accessibility_action(button, None, AccessibilityAction::Press);
         let intents = tekes_agent_ui_consumer_check::drain_local_run_actions(&mut host, root);
         assert!(
@@ -2595,6 +2599,7 @@ async fn expanded_tool_growth_and_reflow_preserve_reading_and_explicit_collapse_
     }
     host.event(&ContentEvent::Unmark);
     for button in [tool.disclosure.unwrap(), reasoning.disclosure.unwrap()] {
+        render(&mut host, &mut text);
         host.accessibility_action(button, None, AccessibilityAction::Press);
         for intent in tekes_agent_ui_consumer_check::drain_local_run_actions(&mut host, root) {
             match intent {

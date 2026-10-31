@@ -268,10 +268,7 @@ impl RunPort {
         };
         let geometry = self.geometry.unwrap();
         let viewport = self
-            .body
-            .children
-            .iter()
-            .find(|n| n.id() == self.ids.viewport)
+            .document_viewport()
             .unwrap()
             .component::<ScrollContent>()
             .unwrap();

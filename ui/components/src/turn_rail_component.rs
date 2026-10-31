@@ -3,6 +3,7 @@
 use crate::turn_rail_action::{HoverVisual, Tick, TurnRailAction};
 use crate::{RunScope, RunTurnNavigation, RunTurnNavigationKind, TurnRailGeometry};
 use std::{
+    cell::RefCell,
     collections::{BTreeMap, BTreeSet},
     sync::{
         Arc, Mutex,
@@ -132,16 +133,22 @@ pub struct TurnRail {
     owner: Arc<()>,
     revision: u64,
     follow: Option<String>,
-    honored: bool,
-    initialized: bool,
-    reveal: Option<TurnRailReveal>,
-    suspended: bool,
+    reveal_ledger: RefCell<RevealLedger>,
     source: Option<RailSource>,
     hover: Arc<Mutex<HoverVisual>>,
     hovered: bool,
     hover_target: f64,
     retarget_hover: bool,
     hover_motion: Option<StateTransition<f64>>,
+}
+// Local request bookkeeping is intentionally interior state, like the existing
+// Arc claim receipt. It cannot mutate rows, offsets, revisions or layout proof.
+#[derive(Debug, Default)]
+struct RevealLedger {
+    current_request: Option<TurnRailReveal>,
+    initialized: bool,
+    honored: bool,
+    suspended: bool,
 }
 #[derive(Debug)]
 struct RailSource {
@@ -193,10 +200,7 @@ impl TurnRail {
             owner: Arc::new(()),
             revision: 1,
             follow: None,
-            honored: false,
-            initialized: false,
-            reveal: None,
-            suspended: false,
+            reveal_ledger: RefCell::new(RevealLedger::default()),
             source: None,
             hover: Arc::new(Mutex::new(HoverVisual::default())),
             hovered: false,
@@ -261,8 +265,8 @@ impl TurnRail {
         self.clear_geometry();
         self.clear_hover();
         self.owner = Arc::new(());
-        self.reveal = None;
-        self.suspended = false;
+        self.reveal_ledger.get_mut().current_request = None;
+        self.reveal_ledger.get_mut().suspended = false;
     }
     pub(crate) fn navigation_gate(&self) -> TurnRailNavigationGate {
         self.gate
@@ -436,12 +440,12 @@ impl TurnRail {
         }
         self.source = next_source;
         if membership_changed {
-            self.reveal = None;
-            self.suspended = false;
+            self.reveal_ledger.get_mut().current_request = None;
+            self.reveal_ledger.get_mut().suspended = false;
         }
         if self.order.is_empty() {
-            self.initialized = false;
-            self.honored = false;
+            self.reveal_ledger.get_mut().initialized = false;
+            self.reveal_ledger.get_mut().honored = false;
         }
         Ok(())
     }
@@ -478,32 +482,39 @@ impl TurnRail {
     pub fn set_follow_target(&mut self, turn: Option<String>) {
         if self.follow != turn {
             self.follow = turn;
-            self.honored = false;
-            self.reveal = None;
-            self.suspended = false;
+            self.reveal_ledger.get_mut().honored = false;
+            self.reveal_ledger.get_mut().current_request = None;
+            self.reveal_ledger.get_mut().suspended = false;
         }
     }
     /// Call only after a successful current frame. Initial mount reveals the
     /// actual last tick; later target changes use the source comfort zone and
     /// centered library reveal. Initial and follow never change Transcript.
     pub fn next_reveal(&mut self) -> Option<TurnRailReveal> {
-        if !turn_rail_supported() || self.suspended {
+        self.request_reveal()
+    }
+    /// Stateful request registration only. The caller still needs a successful
+    /// current Host layout; this avoids a geometry-mutating Host lease solely
+    /// to update the request receipt. The borrow ends before the Host reveal.
+    pub(crate) fn request_reveal(&self) -> Option<TurnRailReveal> {
+        let mut ledger = self.reveal_ledger.borrow_mut();
+        if !turn_rail_supported() || ledger.suspended {
             return None;
         }
-        if let Some(pending) = &self.reveal {
+        if let Some(pending) = &ledger.current_request {
             return Some(pending.clone());
         }
         let geometry = self.geometry?;
         if geometry.track.size.width <= 0. || geometry.track.size.height <= 0. {
             return None;
         }
-        let (turn, reason) = if !self.initialized {
+        let (turn, reason) = if !ledger.initialized {
             (
                 self.order.last()?.clone(),
                 TurnRailRevealReason::InitialLatest,
             )
         } else {
-            if self.honored {
+            if ledger.honored {
                 return None;
             }
             (self.follow.clone()?, TurnRailRevealReason::FollowChanged)
@@ -513,7 +524,7 @@ impl TurnRail {
             let top = self.rows().iter().find(|c| c.id() == item)?.frame().min_y();
             let margin = 2. * TurnRailGeometry::ROW_HEIGHT;
             if top >= geometry.track.min_y() + margin && top <= geometry.track.max_y() - margin {
-                self.honored = true;
+                ledger.honored = true;
                 return None;
             }
         }
@@ -527,19 +538,21 @@ impl TurnRail {
             reason,
             claimed: Arc::new(AtomicBool::new(false)),
         };
-        self.reveal = Some(request.clone());
+        ledger.current_request = Some(request.clone());
         Some(request)
     }
     pub fn claim_reveal(&self, request: &TurnRailReveal) -> Result<(), &'static str> {
+        let ledger = self.reveal_ledger.borrow();
         if !Arc::ptr_eq(&request.owner, &self.owner)
             || self.revision != request.revision
-            || self
-                .reveal
+            || ledger
+                .current_request
                 .as_ref()
                 .is_none_or(|r| !Arc::ptr_eq(&r.token, &request.token))
         {
             return Err("stale or foreign rail reveal");
         }
+        drop(ledger);
         request
             .claimed
             .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
@@ -549,30 +562,32 @@ impl TurnRail {
     /// An accepted request is honored even when the library reports no motion.
     /// A rejected request is suspended until explicit retry or changed input.
     pub fn finish_reveal(&mut self, request: &TurnRailReveal, accepted: bool) -> bool {
+        let ledger = self.reveal_ledger.get_mut();
         if !Arc::ptr_eq(&request.owner, &self.owner)
             || self.revision != request.revision
-            || self
-                .reveal
+            || ledger
+                .current_request
                 .as_ref()
                 .is_none_or(|r| !Arc::ptr_eq(&r.token, &request.token))
             || !request.claimed.load(Ordering::Acquire)
         {
             return false;
         }
-        self.reveal = None;
+        ledger.current_request = None;
         if accepted {
-            self.initialized = true;
+            ledger.initialized = true;
             if self.follow.as_deref() == Some(&request.turn) || self.follow.is_none() {
-                self.honored = true;
+                ledger.honored = true;
             }
         } else {
-            self.suspended = true;
+            ledger.suspended = true;
         }
         true
     }
     pub fn retry_reveal(&mut self) {
-        self.suspended = false;
-        self.reveal = None;
+        let ledger = self.reveal_ledger.get_mut();
+        ledger.suspended = false;
+        ledger.current_request = None;
     }
     fn clear_hover(&mut self) {
         self.hovered = false;
@@ -710,6 +725,13 @@ fn hover_motion() -> Motion {
 impl Component for TurnRail {
     fn host_reveal_passthrough(&self) -> bool {
         self.arranged
+    }
+    fn host_reveal_local_clip(&self) -> Option<Rect> {
+        // The sole child is the original Scroll arranged inside this track.
+        // Declare its real boundary rather than predicting the whole Run pane.
+        self.geometry
+            .filter(|_| self.arranged)
+            .map(|geometry| geometry.track)
     }
     fn lifecycle(&mut self, event: Lifecycle) {
         if event == Lifecycle::Unmounted {

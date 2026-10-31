@@ -40,6 +40,7 @@ pub struct ToolActivity {
     labels: ToolActivityLabels,
     bounded_details: bool,
     next: u64,
+    reveal_arranged: bool,
     children: Vec<Content>,
 }
 impl ToolActivity {
@@ -55,6 +56,7 @@ impl ToolActivity {
             labels,
             bounded_details: false,
             next: 19,
+            reveal_arranged: false,
             children: vec![],
         }
     }
@@ -151,6 +153,7 @@ impl ToolActivity {
         tool: &TranscriptToolCall,
         placement: ToolActivityPlacement,
     ) -> Result<(), &'static str> {
+        self.reveal_arranged = false;
         let (facts, header_revision) =
             self.checked_facts(scope, publication, epoch, tool, placement)?;
         if self.children.is_empty() {
@@ -238,6 +241,7 @@ impl ToolActivity {
             .filter(|a| a.kind == ContentActionKind::Activate && target == Some(a.target))
         {
             part.toggle();
+            self.reveal_arranged = false;
             changed = true;
         }
         changed
@@ -250,6 +254,13 @@ impl ToolActivity {
     }
 }
 impl Component for ToolActivity {
+    fn host_reveal_passthrough(&self) -> bool {
+        self.reveal_arranged
+    }
+
+    fn lifecycle(&mut self, _: Lifecycle) {
+        self.reveal_arranged = false;
+    }
     fn children(&self) -> &[Content] {
         &self.children
     }
@@ -257,6 +268,7 @@ impl Component for ToolActivity {
         Some(&mut self.children)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        self.reveal_arranged = false;
         let height = self
             .children
             .first_mut()
@@ -264,9 +276,11 @@ impl Component for ToolActivity {
         MeasuredChild::new(Size::new(available.width, height))
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        self.reveal_arranged = false;
         if let Some(child) = self.children.first_mut() {
             child.arrange(text, frame, clip);
         }
+        self.reveal_arranged = !frame.is_empty() && !clip.is_empty();
     }
     fn semantics(&self) -> ContentSemantics {
         ContentSemantics::new(ContentRole::Group, &self.labels.call)

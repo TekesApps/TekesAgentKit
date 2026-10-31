@@ -359,6 +359,7 @@ fn readonly_frame_uses_its_own_publication_and_original_sdk_attachment() {
         &mut text,
     )
     .unwrap();
+    render(&mut host, &mut text);
     let y = host.get(frame_id).unwrap().frame().min_y();
     let next = longer_carrier(&source, &second);
     let plan = host
@@ -477,6 +478,7 @@ fn original_tool_group_reading_point_survives_result_updates_with_composer_preed
         &mut text,
     )
     .unwrap();
+    render(&mut host, &mut text);
     let y = host.get(target).unwrap().frame().min_y();
     let group = target;
     let group_owner = host.get(group).unwrap().component::<ToolRun>().unwrap() as *const _ as usize;
