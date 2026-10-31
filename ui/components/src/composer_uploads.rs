@@ -181,7 +181,7 @@ impl ComposerUploads {
             ComponentId(self.root.0 + 2),
             TextContent::new(text),
         ));
-        let mut dismiss = ButtonContent::new(&self.labels.dismiss);
+        let mut dismiss = Button::new(&self.labels.dismiss);
         dismiss.button.state.disabled =
             snapshot.phase.is_pending() || !self.interactions || self.dismissed;
         self.body.children.push(Content::new(self.dismiss, dismiss));

@@ -353,6 +353,7 @@ pub(crate) struct OutputPart {
     live_reasoning: bool,
     bounded_details: bool,
     thinking_text_version: u64,
+    reveal_arranged: bool,
 }
 impl OutputPart {
     pub(crate) fn tool_header(&self) -> Option<&tekes_agent_presentation::TranscriptToolHeader> {
@@ -410,7 +411,7 @@ impl OutputPart {
         let (children, hidden) = if let Some(button) = ids.disclosure {
             (
                 vec![
-                    Content::new(button, ButtonContent::new(&facts.title))
+                    Content::new(button, Button::new(&facts.title))
                         .with_label_layout(tekes_ui_text::LabelOptions::single_line(
                             tekes_ui_text::LabelOverflow::TailEllipsis,
                         ))
@@ -438,9 +439,14 @@ impl OutputPart {
             live_reasoning: false,
             bounded_details,
             thinking_text_version: 0,
+            reveal_arranged: false,
         }
     }
     pub(crate) fn set_trailing(&mut self, trailing: bool) {
+        if self.trailing == trailing {
+            return;
+        }
+        self.reveal_arranged = false;
         self.trailing = trailing;
     }
     fn field_mut(&mut self) -> &mut TextFieldContent {
@@ -476,6 +482,7 @@ impl OutputPart {
         facts: PartFacts,
         alloc: &mut dyn FnMut() -> ComponentId,
     ) {
+        self.reveal_arranged = false;
         if self.facts.tool.is_some() != facts.tool.is_some() {
             self.ids.body = alloc();
             let body = if facts.tool.is_some() {
@@ -584,9 +591,7 @@ impl OutputPart {
     }
     fn refresh_header(&mut self) {
         if self.ids.disclosure.is_some() {
-            let button = self.rows.children[0]
-                .component_mut::<ButtonContent>()
-                .unwrap();
+            let button = self.rows.children[0].component_mut::<Button>().unwrap();
             button.label = format!(
                 "{} · {}",
                 (self.labels.text)(if self.hidden.is_none() {
@@ -600,6 +605,7 @@ impl OutputPart {
         }
     }
     pub(crate) fn toggle(&mut self) {
+        self.reveal_arranged = false;
         if let Some(body) = self.hidden.take() {
             self.rows.children.push(body);
         } else {
@@ -640,6 +646,13 @@ fn arrange_content(
     }
 }
 impl Component for OutputPart {
+    fn host_reveal_passthrough(&self) -> bool {
+        self.reveal_arranged
+    }
+
+    fn lifecycle(&mut self, _: Lifecycle) {
+        self.reveal_arranged = false;
+    }
     fn children(&self) -> &[Content] {
         &self.rows.children
     }
@@ -647,6 +660,7 @@ impl Component for OutputPart {
         Some(&mut self.rows.children)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        self.reveal_arranged = false;
         self.configure_detail_viewport(text);
         if self.trailing
             && self.hidden.is_none()
@@ -679,6 +693,7 @@ impl Component for OutputPart {
         }
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        self.reveal_arranged = false;
         self.configure_detail_viewport(text);
         arrange_content(
             &mut self.rows.children,
@@ -688,6 +703,7 @@ impl Component for OutputPart {
             Spacing::Tight.value(),
             self.trailing,
         );
+        self.reveal_arranged = !frame.is_empty() && !clip.is_empty();
     }
     fn semantics(&self) -> ContentSemantics {
         let mut semantics = ContentSemantics::new(
@@ -711,6 +727,7 @@ impl Component for OutputPart {
 pub struct OutputMessage {
     state: OutputMessageState,
     split_fragments: std::collections::BTreeMap<ComponentId, Vec<ComponentId>>,
+    reveal_arranged: bool,
     rows: StackContent,
 }
 // Canonical identity/provenance and update admission do not own a widget tree.
@@ -793,6 +810,7 @@ impl OutputMessage {
                 thinking: None,
             },
             split_fragments: Default::default(),
+            reveal_arranged: false,
             rows: StackContent {
                 model: Stack {
                     axis: Axis::Vertical,
@@ -891,6 +909,7 @@ impl OutputMessage {
         output: &TranscriptOutput<'_>,
         section: Option<&TranscriptSection<'_>>,
     ) -> Result<(), &'static str> {
+        self.reveal_arranged = false;
         if !self.split_fragments.is_empty() {
             return Err("split output requires its original Transcript fragments");
         }
@@ -917,6 +936,7 @@ impl OutputMessage {
         section: Option<&TranscriptSection<'_>>,
         thinking: &tekes_agent_presentation::TranscriptThinkingFrame,
     ) -> Result<(), &'static str> {
+        self.reveal_arranged = false;
         if !self.split_fragments.is_empty() {
             return Err("split output requires its original Transcript fragments");
         }
@@ -984,7 +1004,11 @@ impl OutputMessage {
     /// UI-local disclosure only. The host drains the original ContentHost action
     /// batch exactly once; retired button IDs cannot target a replacement block.
     pub fn handle_actions(&mut self, actions: &[ContentAction]) -> bool {
-        handle_part_actions(&mut self.rows.children, actions)
+        let changed = handle_part_actions(&mut self.rows.children, actions);
+        if changed {
+            self.reveal_arranged = false;
+        }
+        changed
     }
 
     pub fn into_host(self) -> Result<ContentHost, CompositionError> {
@@ -997,6 +1021,13 @@ impl OutputMessage {
     }
 }
 impl Component for OutputMessage {
+    fn host_reveal_passthrough(&self) -> bool {
+        self.reveal_arranged
+    }
+
+    fn lifecycle(&mut self, _: Lifecycle) {
+        self.reveal_arranged = false;
+    }
     fn active(&self) -> bool {
         !self.rows.children.is_empty()
     }
@@ -1007,10 +1038,12 @@ impl Component for OutputMessage {
         Some(&mut self.rows.children)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        self.reveal_arranged = false;
         let measured = self.rows.measure(text, available);
         MeasuredChild::new(Size::new(available.width, measured.size.height))
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        self.reveal_arranged = false;
         arrange_content(
             &mut self.rows.children,
             text,
@@ -1019,6 +1052,7 @@ impl Component for OutputMessage {
             Spacing::Regular.value(),
             false,
         );
+        self.reveal_arranged = !frame.is_empty() && !clip.is_empty();
     }
     fn semantics(&self) -> ContentSemantics {
         ContentSemantics::new(
@@ -1791,4 +1825,189 @@ fn parts(
         validate_tool_details(facts)?;
     }
     Ok(result)
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod reveal_layout_tests {
+    use super::OutputMessage;
+    use std::rc::Rc;
+    use tekes_agent_presentation::{
+        RunScope, TranscriptItem, TranscriptItemKind, TranscriptMessageKey, TranscriptOutput,
+    };
+    use tekes_ui_controls::{
+        ButtonTextAlign, ButtonTextRenderer, ScrollArea, TextSurfaceHost, TextSurfaceTextRenderer,
+        composition::*,
+    };
+    use tekes_ui_scene::{Point, Rect, Scene, Size};
+    use tekes_ui_text::{
+        LabelLayout, LabelOptions, Paragraph,
+        coretext::{CoreTextFonts, CoreTextShaper},
+        model::ShapeOptions,
+        style::TextStyle,
+        traits::Shaper,
+    };
+    use tekes_ui_tokens::{Rgba, Theme, proposal};
+    struct Text(CoreTextShaper);
+    impl TextSurfaceTextRenderer for Text {
+        fn push_visible(&mut self, _: &mut Scene, _: &Paragraph, _: Point, _: Rgba, _: Rect) {}
+    }
+    impl TextSurfaceHost for Text {
+        fn shape_surface(
+            &mut self,
+            value: &str,
+            role: proposal::TextRole,
+            width: Option<f32>,
+        ) -> Rc<Paragraph> {
+            Rc::new(self.0.shape(
+                value,
+                &TextStyle::system(role.style().size),
+                &ShapeOptions {
+                    width: width.map(f64::from),
+                    line_spacing: 0.,
+                },
+            ))
+        }
+        fn shape_label(
+            &mut self,
+            value: &str,
+            role: proposal::TextRole,
+            width: f32,
+            options: LabelOptions,
+        ) -> Option<Rc<LabelLayout>> {
+            Some(Rc::new(self.0.shape_label(
+                value,
+                &TextStyle::system(role.style().size),
+                &ShapeOptions {
+                    width: Some(width.into()),
+                    line_spacing: 0.,
+                },
+                options,
+            )))
+        }
+    }
+    impl ButtonTextRenderer for Text {
+        fn measure(&mut self, value: &str, role: proposal::TextRole, width: f32) -> Size {
+            let p = self.shape_surface(value, role, Some(width));
+            Size::new(p.width as f32, p.height as f32)
+        }
+        fn draw(
+            &mut self,
+            _: &mut Scene,
+            _: &str,
+            _: proposal::TextRole,
+            _: Rect,
+            _: ButtonTextAlign,
+            _: Rgba,
+        ) {
+        }
+        fn text_surface_host(&mut self) -> Option<&mut dyn TextSurfaceHost> {
+            Some(self)
+        }
+    }
+
+    #[test]
+    fn original_disclosure_rejects_old_reveal_plan_and_recovers_after_same_publication_layout() {
+        let scope = RunScope::main("layout", "original-disclosure");
+        let source = TranscriptItem {
+            id: "reasoning".into(),
+            record_id: Some("reasoning".into()),
+            reconciliation_id: None,
+            turn_id: "turn".into(),
+            kind: TranscriptItemKind::Assistant,
+            text: String::new(),
+            reasoning: "原始中文阅读位置\n".repeat(100),
+            attachments: vec![],
+            content_blocks: None,
+            is_visible: true,
+            is_final: false,
+            is_provisional: true,
+            reasoning_ended: false,
+            source_sequence: None,
+            source_position: None,
+            time: None,
+            metadata: Default::default(),
+        };
+
+        let mut output = OutputMessage::with_labels(950, scope.clone(), Default::default());
+        output
+            .update(
+                &scope,
+                1,
+                1,
+                &TranscriptOutput {
+                    key: TranscriptMessageKey::NativeEntry("original"),
+                    item: &source,
+                },
+                None,
+            )
+            .unwrap();
+        let output_id = output.id();
+        let detail = output.content_ids()[0];
+        let button = detail.disclosure.unwrap();
+        let viewport = ComponentId(960);
+        let mut host = ContentHost::new(Content::new(
+            viewport,
+            ScrollContent::new(ScrollArea::default(), Content::new(output_id, output)),
+        ))
+        .unwrap();
+        host.set_action_events(true);
+        let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()));
+        let frame = Rect::new(71., 43., 480., 300.);
+        host.render(
+            &mut Scene::new(),
+            &mut text,
+            frame,
+            frame,
+            Theme::LIGHT.into(),
+        )
+        .unwrap();
+        let original = host
+            .plan_host_reveal(button, Default::default(), &[], Default::default())
+            .unwrap();
+        assert!(host.get(detail.body).is_none());
+        assert!(
+            host.accessibility_action(button, None, AccessibilityAction::Press)
+                .consumed
+        );
+        let actions = host.drain_actions();
+        assert_eq!(
+            actions
+                .iter()
+                .filter(|a| a.target == button && a.kind == ContentActionKind::Activate)
+                .count(),
+            1
+        );
+        let output = host
+            .get_mut(output_id)
+            .unwrap()
+            .component_mut::<OutputMessage>()
+            .unwrap();
+        assert!(output.handle_actions(&actions));
+        assert_eq!(output.state.publication, 1);
+        assert!(!output.host_reveal_passthrough());
+        assert_eq!(
+            host.commit_host_reveal(original).unwrap_err(),
+            HostRevealError::StalePlan
+        );
+        host.render(
+            &mut Scene::new(),
+            &mut text,
+            frame,
+            frame,
+            Theme::LIGHT.into(),
+        )
+        .unwrap();
+        assert!(host.get(detail.body).is_some());
+        let output = host
+            .get(output_id)
+            .unwrap()
+            .component::<OutputMessage>()
+            .unwrap();
+        assert_eq!(output.state.publication, 1);
+        assert!(output.host_reveal_passthrough());
+        let current = host
+            .plan_host_reveal(button, Default::default(), &[], Default::default())
+            .unwrap();
+        host.commit_host_reveal(current).unwrap();
+    }
 }

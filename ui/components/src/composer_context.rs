@@ -332,7 +332,7 @@ impl ComposerContext {
         }
         for (kind, label) in kinds {
             let id = self.allocate();
-            controls.push(Content::new(id, ButtonContent::new(label)));
+            controls.push(Content::new(id, Button::new(label)));
             self.actions.insert(id, (item, kind));
         }
         children.push(Content::new(
@@ -372,7 +372,7 @@ impl ComposerContext {
             {
                 let (_, kind) = self.actions.get(&button.id()).unwrap();
                 button
-                    .component_mut::<ButtonContent>()
+                    .component_mut::<Button>()
                     .unwrap()
                     .button
                     .state

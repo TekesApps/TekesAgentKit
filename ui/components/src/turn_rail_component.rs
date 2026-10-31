@@ -1,8 +1,9 @@
-//! Real turn rail over original library scroll and CompoundButton controls.
+//! Real turn rail over original library scroll and Button controls.
 //! No generic hit testing, scrolling, input or animation engine lives here.
 use crate::turn_rail_action::{HoverVisual, Tick, TurnRailAction};
 use crate::{RunScope, RunTurnNavigation, RunTurnNavigationKind, TurnRailGeometry};
 use std::{
+    cell::RefCell,
     collections::{BTreeMap, BTreeSet},
     sync::{
         Arc, Mutex,
@@ -65,8 +66,12 @@ impl TurnRailReveal {
 #[derive(Debug)]
 struct RailDocument {
     rows: Vec<Content>,
+    arranged: bool,
 }
 impl Component for RailDocument {
+    fn host_reveal_passthrough(&self) -> bool {
+        self.arranged
+    }
     fn children(&self) -> &[Content] {
         &self.rows
     }
@@ -80,6 +85,7 @@ impl Component for RailDocument {
         ))
     }
     fn arrange(&mut self, t: &mut dyn ButtonTextRenderer, f: Rect, c: Rect) {
+        self.arranged = false;
         for (i, row) in self.rows.iter_mut().enumerate() {
             row.arrange(
                 t,
@@ -92,6 +98,7 @@ impl Component for RailDocument {
                 c,
             );
         }
+        self.arranged = !f.is_empty() && !c.is_empty();
     }
 }
 #[derive(Clone, Debug)]
@@ -120,21 +127,28 @@ pub struct TurnRail {
     next: u64,
     end: u64,
     geometry: Option<TurnRailGeometry>,
+    arranged: bool,
     pending: Vec<RunTurnNavigation>,
     gate: TurnRailNavigationGate,
     owner: Arc<()>,
     revision: u64,
     follow: Option<String>,
-    honored: bool,
-    initialized: bool,
-    reveal: Option<TurnRailReveal>,
-    suspended: bool,
+    reveal_ledger: RefCell<RevealLedger>,
     source: Option<RailSource>,
     hover: Arc<Mutex<HoverVisual>>,
     hovered: bool,
     hover_target: f64,
     retarget_hover: bool,
     hover_motion: Option<StateTransition<f64>>,
+}
+// Local request bookkeeping is intentionally interior state, like the existing
+// Arc claim receipt. It cannot mutate rows, offsets, revisions or layout proof.
+#[derive(Debug, Default)]
+struct RevealLedger {
+    current_request: Option<TurnRailReveal>,
+    initialized: bool,
+    honored: bool,
+    suspended: bool,
 }
 #[derive(Debug)]
 struct RailSource {
@@ -166,7 +180,13 @@ impl TurnRail {
                 ComponentId(base + 1),
                 ScrollContent::new(
                     scroll,
-                    Content::new(ComponentId(base + 2), RailDocument { rows: vec![] }),
+                    Content::new(
+                        ComponentId(base + 2),
+                        RailDocument {
+                            rows: vec![],
+                            arranged: false,
+                        },
+                    ),
                 ),
             )],
             ids: BTreeMap::new(),
@@ -174,15 +194,13 @@ impl TurnRail {
             next: base + 16,
             end: base | u32::MAX as u64,
             geometry: None,
+            arranged: false,
             pending: vec![],
             gate: Default::default(),
             owner: Arc::new(()),
             revision: 1,
             follow: None,
-            honored: false,
-            initialized: false,
-            reveal: None,
-            suspended: false,
+            reveal_ledger: RefCell::new(RevealLedger::default()),
             source: None,
             hover: Arc::new(Mutex::new(HoverVisual::default())),
             hovered: false,
@@ -197,7 +215,8 @@ impl TurnRail {
         for (index, node) in self.rows_mut().iter_mut().enumerate() {
             let row = node.component_mut::<TurnRailAction>().unwrap();
             if let Some(prototype) = &row.prototype {
-                row.button.action.label = format(index, prototype.target());
+                row.button
+                    .set_accessible_name(Some(format(index, prototype.target())));
             }
         }
     }
@@ -240,13 +259,14 @@ impl TurnRail {
     }
     pub(crate) fn clear_geometry(&mut self) {
         self.geometry = None;
+        self.arranged = false;
     }
     pub(crate) fn invalidate_layout(&mut self) {
-        self.geometry = None;
+        self.clear_geometry();
         self.clear_hover();
         self.owner = Arc::new(());
-        self.reveal = None;
-        self.suspended = false;
+        self.reveal_ledger.get_mut().current_request = None;
+        self.reveal_ledger.get_mut().suspended = false;
     }
     pub(crate) fn navigation_gate(&self) -> TurnRailNavigationGate {
         self.gate
@@ -286,7 +306,6 @@ impl TurnRail {
             .find(|n| n.id() == id)?
             .component::<TurnRailAction>()?
             .button
-            .action
             .button
             .layout()
     }
@@ -382,10 +401,11 @@ impl TurnRail {
                 .remove(&id)
                 .unwrap_or_else(|| rail_action_content(id, tick, self.hover.clone()));
             let action = content.component_mut::<TurnRailAction>().unwrap();
-            action.button.action.label = (self.labels.action)(index, prototype.target());
-            action.button.action.button.state.selected =
-                prototype.target().is_visible() == Some(true);
-            action.button.action.button.state.disabled = !self.gate.allows(prototype.kind());
+            action
+                .button
+                .set_accessible_name(Some((self.labels.action)(index, prototype.target())));
+            action.button.button.state.selected = prototype.target().is_visible() == Some(true);
+            action.button.button.state.disabled = !self.gate.allows(prototype.kind());
             let tick = action.button.children_mut().unwrap()[0]
                 .component_mut::<Tick>()
                 .unwrap();
@@ -400,7 +420,16 @@ impl TurnRail {
             self.pending
                 .append(&mut old.component_mut::<TurnRailAction>().unwrap().pending);
         }
-        *self.rows_mut() = rows;
+        let document = self.children[0]
+            .component_mut::<ScrollContent>()
+            .unwrap()
+            .children_mut()
+            .unwrap()[0]
+            .component_mut::<RailDocument>()
+            .unwrap();
+        document.rows = rows;
+        document.arranged = false;
+        self.arranged = false;
         self.ids = ids;
         self.order = order;
         self.next = next;
@@ -411,12 +440,12 @@ impl TurnRail {
         }
         self.source = next_source;
         if membership_changed {
-            self.reveal = None;
-            self.suspended = false;
+            self.reveal_ledger.get_mut().current_request = None;
+            self.reveal_ledger.get_mut().suspended = false;
         }
         if self.order.is_empty() {
-            self.initialized = false;
-            self.honored = false;
+            self.reveal_ledger.get_mut().initialized = false;
+            self.reveal_ledger.get_mut().honored = false;
         }
         Ok(())
     }
@@ -424,7 +453,7 @@ impl TurnRail {
         self.gate = gate;
         for row in self.rows_mut() {
             let a = row.component_mut::<TurnRailAction>().unwrap();
-            a.button.action.button.state.disabled =
+            a.button.button.state.disabled =
                 a.prototype.as_ref().is_none_or(|p| !gate.allows(p.kind()));
         }
     }
@@ -443,7 +472,6 @@ impl TurnRail {
                         .component::<TurnRailAction>()
                         .unwrap()
                         .button
-                        .action
                         .button
                         .state
                         .disabled
@@ -454,32 +482,39 @@ impl TurnRail {
     pub fn set_follow_target(&mut self, turn: Option<String>) {
         if self.follow != turn {
             self.follow = turn;
-            self.honored = false;
-            self.reveal = None;
-            self.suspended = false;
+            self.reveal_ledger.get_mut().honored = false;
+            self.reveal_ledger.get_mut().current_request = None;
+            self.reveal_ledger.get_mut().suspended = false;
         }
     }
     /// Call only after a successful current frame. Initial mount reveals the
     /// actual last tick; later target changes use the source comfort zone and
     /// centered library reveal. Initial and follow never change Transcript.
     pub fn next_reveal(&mut self) -> Option<TurnRailReveal> {
-        if !turn_rail_supported() || self.suspended {
+        self.request_reveal()
+    }
+    /// Stateful request registration only. The caller still needs a successful
+    /// current Host layout; this avoids a geometry-mutating Host lease solely
+    /// to update the request receipt. The borrow ends before the Host reveal.
+    pub(crate) fn request_reveal(&self) -> Option<TurnRailReveal> {
+        let mut ledger = self.reveal_ledger.borrow_mut();
+        if !turn_rail_supported() || ledger.suspended {
             return None;
         }
-        if let Some(pending) = &self.reveal {
+        if let Some(pending) = &ledger.current_request {
             return Some(pending.clone());
         }
         let geometry = self.geometry?;
         if geometry.track.size.width <= 0. || geometry.track.size.height <= 0. {
             return None;
         }
-        let (turn, reason) = if !self.initialized {
+        let (turn, reason) = if !ledger.initialized {
             (
                 self.order.last()?.clone(),
                 TurnRailRevealReason::InitialLatest,
             )
         } else {
-            if self.honored {
+            if ledger.honored {
                 return None;
             }
             (self.follow.clone()?, TurnRailRevealReason::FollowChanged)
@@ -489,7 +524,7 @@ impl TurnRail {
             let top = self.rows().iter().find(|c| c.id() == item)?.frame().min_y();
             let margin = 2. * TurnRailGeometry::ROW_HEIGHT;
             if top >= geometry.track.min_y() + margin && top <= geometry.track.max_y() - margin {
-                self.honored = true;
+                ledger.honored = true;
                 return None;
             }
         }
@@ -503,19 +538,21 @@ impl TurnRail {
             reason,
             claimed: Arc::new(AtomicBool::new(false)),
         };
-        self.reveal = Some(request.clone());
+        ledger.current_request = Some(request.clone());
         Some(request)
     }
     pub fn claim_reveal(&self, request: &TurnRailReveal) -> Result<(), &'static str> {
+        let ledger = self.reveal_ledger.borrow();
         if !Arc::ptr_eq(&request.owner, &self.owner)
             || self.revision != request.revision
-            || self
-                .reveal
+            || ledger
+                .current_request
                 .as_ref()
                 .is_none_or(|r| !Arc::ptr_eq(&r.token, &request.token))
         {
             return Err("stale or foreign rail reveal");
         }
+        drop(ledger);
         request
             .claimed
             .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
@@ -525,30 +562,32 @@ impl TurnRail {
     /// An accepted request is honored even when the library reports no motion.
     /// A rejected request is suspended until explicit retry or changed input.
     pub fn finish_reveal(&mut self, request: &TurnRailReveal, accepted: bool) -> bool {
+        let ledger = self.reveal_ledger.get_mut();
         if !Arc::ptr_eq(&request.owner, &self.owner)
             || self.revision != request.revision
-            || self
-                .reveal
+            || ledger
+                .current_request
                 .as_ref()
                 .is_none_or(|r| !Arc::ptr_eq(&r.token, &request.token))
             || !request.claimed.load(Ordering::Acquire)
         {
             return false;
         }
-        self.reveal = None;
+        ledger.current_request = None;
         if accepted {
-            self.initialized = true;
+            ledger.initialized = true;
             if self.follow.as_deref() == Some(&request.turn) || self.follow.is_none() {
-                self.honored = true;
+                ledger.honored = true;
             }
         } else {
-            self.suspended = true;
+            ledger.suspended = true;
         }
         true
     }
     pub fn retry_reveal(&mut self) {
-        self.suspended = false;
-        self.reveal = None;
+        let ledger = self.reveal_ledger.get_mut();
+        ledger.suspended = false;
+        ledger.current_request = None;
     }
     fn clear_hover(&mut self) {
         self.hovered = false;
@@ -684,6 +723,16 @@ fn hover_motion() -> Motion {
     })
 }
 impl Component for TurnRail {
+    fn host_reveal_passthrough(&self) -> bool {
+        self.arranged
+    }
+    fn host_reveal_local_clip(&self) -> Option<Rect> {
+        // The sole child is the original Scroll arranged inside this track.
+        // Declare its real boundary rather than predicting the whole Run pane.
+        self.geometry
+            .filter(|_| self.arranged)
+            .map(|geometry| geometry.track)
+    }
     fn lifecycle(&mut self, event: Lifecycle) {
         if event == Lifecycle::Unmounted {
             self.invalidate_layout();
@@ -701,9 +750,17 @@ impl Component for TurnRail {
     fn measure(&mut self, _: &mut dyn ButtonTextRenderer, a: Size) -> MeasuredChild {
         MeasuredChild::new(a)
     }
-    fn arrange(&mut self, t: &mut dyn ButtonTextRenderer, _: Rect, c: Rect) {
-        if let Some(g) = self.geometry {
-            self.children[0].arrange(t, g.track, g.track.intersection(&c).unwrap_or_default());
+    fn arrange(&mut self, t: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        self.arranged = false;
+        if let Some(mut geometry) = self.geometry {
+            let dx = frame.min_x() - geometry.rail.min_x();
+            let dy = frame.min_y() - geometry.rail.min_y();
+            geometry.rail = geometry.rail.offset(dx, dy);
+            geometry.track = geometry.track.offset(dx, dy);
+            let track_clip = geometry.track.intersection(&clip).unwrap_or_default();
+            self.children[0].arrange(t, geometry.track, track_clip);
+            self.geometry = Some(geometry);
+            self.arranged = !frame.is_empty() && !track_clip.is_empty();
         }
     }
     fn paint(
@@ -880,6 +937,15 @@ mod hover_tests {
             modifiers: Default::default(),
             click_count: 0,
         })
+    }
+
+    fn document(rail: &TurnRail) -> &RailDocument {
+        rail.children[0]
+            .component::<ScrollContent>()
+            .unwrap()
+            .children()[0]
+            .component::<RailDocument>()
+            .unwrap()
     }
 
     fn visual(host: &ContentHost, root: ComponentId) -> HoverVisual {
@@ -1223,6 +1289,114 @@ mod hover_tests {
         rail.update_hover(Some(1.));
         rail.lifecycle(Lifecycle::Unmounted);
         assert!(rail.hover.lock().unwrap().hovered_turn_id.is_none());
+    }
+
+    #[test]
+    fn reveal_layout_translates_with_arranged_frame_and_keeps_original_clip() {
+        let mut baseline: Option<Vec<(ComponentId, Rect, Option<Rect>)>> = None;
+        for (dx, dy) in [(0., 0.), (37., 41.)] {
+            let (mut host, root, _) = mounted(5);
+            let frame = Rect::new(dx, dy, 100., 110.);
+            let clip = Rect::new(5. + dx, 8. + dy, 44., 65.);
+            host.render(
+                &mut Scene::default(),
+                &mut Text::default(),
+                frame,
+                clip,
+                Theme::LIGHT.into(),
+            )
+            .unwrap();
+            let rail = host.get(root).unwrap().component::<TurnRail>().unwrap();
+            let expected_track = Rect::new(10. + dx, 10. + dy, 40., 80.);
+            assert!(rail.host_reveal_passthrough());
+            assert!(document(rail).host_reveal_passthrough());
+            assert_eq!(rail.layout_geometry().unwrap().track, expected_track);
+            assert_eq!(rail.children[0].frame(), expected_track);
+            assert_eq!(
+                rail.children[0].visible(),
+                expected_track.intersection(&clip)
+            );
+            let rows: Vec<_> = rail
+                .rows()
+                .iter()
+                .map(|row| (row.id(), row.frame(), row.visible()))
+                .collect();
+            if let Some(original) = &baseline {
+                for ((id, rect, visible), (old_id, old_rect, old_visible)) in
+                    rows.iter().zip(original)
+                {
+                    assert_eq!(id, old_id);
+                    assert_eq!(*rect, old_rect.offset(dx, dy));
+                    assert_eq!(*visible, old_visible.map(|r: Rect| r.offset(dx, dy)));
+                }
+            } else {
+                baseline = Some(rows);
+            }
+            host.render(
+                &mut Scene::default(),
+                &mut Text::default(),
+                frame,
+                frame,
+                Theme::LIGHT.into(),
+            )
+            .unwrap();
+            let target = host
+                .get(root)
+                .unwrap()
+                .component::<TurnRail>()
+                .unwrap()
+                .item_ids()[0];
+            assert!(host.focus(Some(target), true));
+        }
+    }
+
+    #[test]
+    fn reveal_passthrough_requires_valid_current_arrange() {
+        let (mut host, root, _) = mounted(5);
+        let ids = host
+            .get(root)
+            .unwrap()
+            .component::<TurnRail>()
+            .unwrap()
+            .item_ids();
+        let rail = host.get(root).unwrap().component::<TurnRail>().unwrap();
+        assert!(!rail.host_reveal_passthrough());
+        assert!(!document(rail).host_reveal_passthrough());
+        assert!(!host.focus(Some(ids[0]), true));
+        assert_eq!(host.focused(), None);
+        render(&mut host, &mut Text::default());
+        assert!(host.focus(Some(ids[0]), true));
+        host.get_mut(root)
+            .unwrap()
+            .component_mut::<TurnRail>()
+            .unwrap()
+            .clear_geometry();
+        assert!(
+            !host
+                .get(root)
+                .unwrap()
+                .component::<TurnRail>()
+                .unwrap()
+                .host_reveal_passthrough()
+        );
+        assert!(!host.focus(Some(ids[1]), true));
+        assert_eq!(host.focused(), Some(ids[0]));
+
+        let (mut host, root, _) = mounted(5);
+        let bounds = Rect::new(0., 0., 100., 110.);
+        host.render(
+            &mut Scene::default(),
+            &mut Text::default(),
+            bounds,
+            Rect::default(),
+            Theme::LIGHT.into(),
+        )
+        .unwrap();
+        let rail = host.get(root).unwrap().component::<TurnRail>().unwrap();
+        assert!(!rail.host_reveal_passthrough());
+        assert!(!document(rail).host_reveal_passthrough());
+        let target = rail.item_ids()[0];
+        assert!(!host.focus(Some(target), true));
     }
 
     #[test]

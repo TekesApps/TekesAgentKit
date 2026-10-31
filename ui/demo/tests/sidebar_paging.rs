@@ -1,3 +1,6 @@
+#[allow(dead_code)]
+#[path = "support/menu_host.rs"]
+mod sidebar_layout;
 use tekes_agent_components_ui::*;
 use tekes_ui_controls::composition::*;
 fn row(id: usize, pin: bool) -> SidebarRow {
@@ -168,7 +171,7 @@ fn selected_supplement_preserves_folder_navigation_and_manual_collapse() {
     let root = sidebar.id();
     let header = sidebar.folder_header_id(&key).unwrap();
     let mut host = sidebar.into_host().unwrap();
-    host.accessibility_action(header, None, AccessibilityAction::Press);
+    sidebar_layout::press_host(&mut host, header);
     let actions = host.drain_actions();
     let sidebar = host
         .get_mut(root)
@@ -402,7 +405,14 @@ fn original_page_activation_keeps_the_existing_keyboard_owner() {
     let owner = sidebar.row_id(&row(0, true).address).unwrap();
     let more = sidebar.page_button_id().unwrap();
     let mut host = sidebar.into_host().unwrap();
-    assert!(host.focus(Some(owner), true));
+    sidebar_layout::paint(&mut host);
+    let reveal = sidebar_layout::reveal_status(&host, owner);
+    let focus = host.focus(Some(owner), true);
+    eprintln!(
+        "pinned owner={owner:?} focus_result={focus} focused={:?} reveal={reveal}",
+        host.focused()
+    );
+    assert!(focus);
     host.accessibility_action(more, None, AccessibilityAction::Press);
     assert_eq!(
         host.focused(),

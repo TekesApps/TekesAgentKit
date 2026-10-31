@@ -246,9 +246,9 @@ impl SidePanel {
     /// endpoint/thread only. Crossing that boundary always retires the old UI.
     pub fn new(namespace: u32, labels: SidePanelLabels, retained_parent_limit: usize) -> Self {
         let base = (namespace as u64) << 32;
-        let mut close = ButtonContent::new(&labels.close);
+        let mut close = Button::new(&labels.close);
         close.button.state.disabled = true;
-        let mut create = ButtonContent::new(&labels.create_side_chat);
+        let mut create = Button::new(&labels.create_side_chat);
         create.button.state.disabled = true;
         Self {
             content_owner: Arc::new(()),
@@ -693,10 +693,8 @@ impl SidePanel {
                 .id;
             let mut content = old
                 .remove(&id)
-                .unwrap_or_else(|| Content::new(id, ButtonContent::new("")));
-            let button = content
-                .component_mut::<ButtonContent>()
-                .expect("tab button");
+                .unwrap_or_else(|| Content::new(id, Button::new("")));
+            let button = content.component_mut::<Button>().expect("tab button");
             button.button.state.selected = input.selected.as_ref() == Some(&tab.kind);
             button.label = tab.title.clone();
             button.variant = ButtonVariant::Quiet;
@@ -732,13 +730,13 @@ impl SidePanel {
             .component_mut::<StackContent>()
             .expect("panel controls");
         toolbar.children[0]
-            .component_mut::<ButtonContent>()
+            .component_mut::<Button>()
             .expect("close tab")
             .button
             .state
             .disabled = !close_enabled;
         toolbar.children[1]
-            .component_mut::<ButtonContent>()
+            .component_mut::<Button>()
             .expect("create SideChat")
             .button
             .state

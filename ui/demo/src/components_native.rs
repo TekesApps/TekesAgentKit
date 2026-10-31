@@ -2127,9 +2127,7 @@ impl Host {
                 self.view
                     .tree
                     .get(page)
-                    .and_then(|node| {
-                        node.component::<tekes_ui_controls::composition::ButtonContent>()
-                    })
+                    .and_then(|node| node.component::<tekes_ui_controls::composition::Button>())
                     .is_some_and(|button| !button.button.state.disabled)
             })
         {
@@ -3061,6 +3059,9 @@ impl WindowHandler for Host {
                 }
                 let action = match action {
                     tekes_ui_platform_macos::AccessibilityAction::SetExpanded(_) => return,
+                    tekes_ui_platform_macos::AccessibilityAction::ShowMenu => {
+                        AccessibilityAction::ShowMenu
+                    }
                     tekes_ui_platform_macos::AccessibilityAction::Increment => {
                         AccessibilityAction::Increment
                     }

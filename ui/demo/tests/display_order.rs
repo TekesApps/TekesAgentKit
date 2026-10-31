@@ -5,6 +5,86 @@ use tekes_agent_presentation::{ComposerDestination, PresentationStore};
 use tekes_agent_session::{ConnectionState, MemoryProjectionStore};
 use tekes_ui_controls::composition::*;
 
+use std::rc::Rc;
+use tekes_ui_controls::{
+    ButtonTextAlign, ButtonTextRenderer, TextSurfaceHost, TextSurfaceTextRenderer,
+};
+use tekes_ui_scene::{Point, Rect, Scene, Size};
+use tekes_ui_text::{
+    Paragraph,
+    coretext::{CoreTextFonts, CoreTextShaper},
+    model::ShapeOptions,
+    style::TextStyle,
+    traits::Shaper,
+};
+use tekes_ui_tokens::{Rgba, Theme, proposal};
+struct DisclosureText(CoreTextShaper, f32);
+impl TextSurfaceTextRenderer for DisclosureText {
+    fn push_visible(&mut self, _: &mut Scene, _: &Paragraph, _: Point, _: Rgba, _: Rect) {}
+}
+impl TextSurfaceHost for DisclosureText {
+    fn shape_label(
+        &mut self,
+        text: &str,
+        role: proposal::TextRole,
+        width: f32,
+        options: tekes_ui_text::LabelOptions,
+    ) -> Option<Rc<tekes_ui_text::LabelLayout>> {
+        Some(tekes_agent_ui_demo::label_host::shape_label(
+            &mut self.0,
+            text,
+            role,
+            width,
+            self.1,
+            options,
+        ))
+    }
+
+    fn type_scale(&self) -> f32 {
+        self.1
+    }
+    fn shape_surface(
+        &mut self,
+        s: &str,
+        role: proposal::TextRole,
+        width: Option<f32>,
+    ) -> Rc<Paragraph> {
+        Rc::new(self.0.shape(
+            s,
+            &TextStyle::system(role.style().size * self.1),
+            &ShapeOptions {
+                width: width.map(f64::from),
+                line_spacing: 0.,
+            },
+        ))
+    }
+}
+impl ButtonTextRenderer for DisclosureText {
+    fn measure(&mut self, s: &str, r: proposal::TextRole, w: f32) -> Size {
+        let p = self.shape_surface(s, r, Some(w));
+        Size::new(p.width as f32, p.height as f32)
+    }
+    fn draw(
+        &mut self,
+        _: &mut Scene,
+        _: &str,
+        _: proposal::TextRole,
+        _: Rect,
+        _: ButtonTextAlign,
+        _: Rgba,
+    ) {
+    }
+    fn text_surface_host(&mut self) -> Option<&mut dyn TextSurfaceHost> {
+        Some(self)
+    }
+}
+
+fn render_disclosure(host: &mut ContentHost, text: &mut DisclosureText) {
+    let frame = Rect::new(0., 0., 760., 500.);
+    host.render(&mut Scene::new(), text, frame, frame, Theme::LIGHT.into())
+        .unwrap();
+}
+
 fn captured_store() -> MemoryProjectionStore {
     let rows = vec![
         ("turn/start", json!({"turn":1})),
@@ -157,6 +237,8 @@ async fn projected_initial_prompt_remains_before_input_and_preserves_original_di
     let ids = view.ids();
     let mut host = view.into_host().unwrap();
     assert!(host.get(part.body).is_none());
+    let mut text = DisclosureText(CoreTextShaper::new(CoreTextFonts::new()), 1.);
+    render_disclosure(&mut host, &mut text);
     host.accessibility_action(part.disclosure.unwrap(), None, AccessibilityAction::Press);
     let actions = host.drain_actions();
     host.get_mut(ids.root)
@@ -704,7 +786,7 @@ fn abnormal_termination_preserves_visible_activity_and_has_a_selected_original_d
     assert!(
         host.get(button)
             .unwrap()
-            .component::<ButtonContent>()
+            .component::<Button>()
             .unwrap()
             .button
             .state
@@ -851,7 +933,7 @@ fn input_bounded_history_counts_semantic_entries_and_preserves_original_parts_an
     assert_eq!(
         host.get(button)
             .unwrap()
-            .component::<ButtonContent>()
+            .component::<Button>()
             .unwrap()
             .label,
         "Previous 3 messages"
@@ -860,7 +942,7 @@ fn input_bounded_history_counts_semantic_entries_and_preserves_original_parts_an
         !host
             .get(final_button)
             .unwrap()
-            .component::<ButtonContent>()
+            .component::<Button>()
             .unwrap()
             .button
             .state
@@ -1092,11 +1174,7 @@ fn abnormal_input_bounded_history_stays_collapsed_and_readonly_uses_its_own_plan
         .unwrap();
     let id = view.ids().root;
     let mut host = view.into_host().unwrap();
-    let control = host
-        .get(button)
-        .unwrap()
-        .component::<ButtonContent>()
-        .unwrap();
+    let control = host.get(button).unwrap().component::<Button>().unwrap();
     assert!(!control.button.state.selected && control.label.starts_with("Failed"));
     let view = host
         .get_mut(id)
@@ -1478,11 +1556,7 @@ fn embedded_original_tool_controls_do_not_group_across_source_input_but_results_
         .unwrap()
         .disclosure
         .unwrap();
-    let owner = host
-        .get(original)
-        .unwrap()
-        .component::<ButtonContent>()
-        .unwrap() as *const _ as usize;
+    let owner = host.get(original).unwrap().component::<Button>().unwrap() as *const _ as usize;
     host.get_mut(root)
         .unwrap()
         .component_mut::<OutputMessage>()
@@ -1490,10 +1564,7 @@ fn embedded_original_tool_controls_do_not_group_across_source_input_but_results_
         .update(&scope, 2, source.connection_epoch, output, Some(section))
         .unwrap();
     assert_eq!(
-        host.get(original)
-            .unwrap()
-            .component::<ButtonContent>()
-            .unwrap() as *const _ as usize,
+        host.get(original).unwrap().component::<Button>().unwrap() as *const _ as usize,
         owner
     );
     assert_eq!(
@@ -1629,7 +1700,7 @@ fn canonical_call_controls_are_physical_rows_in_their_own_input_segments() {
     assert_eq!(
         host.get(before_id)
             .unwrap()
-            .component::<ButtonContent>()
+            .component::<Button>()
             .unwrap()
             .label,
         "Previous 1 message"
@@ -1933,7 +2004,7 @@ fn late_message_references_leave_the_original_independent_tool_owners_in_place()
     assert_eq!(
         host.get(before_id)
             .unwrap()
-            .component::<ButtonContent>()
+            .component::<Button>()
             .unwrap()
             .label,
         "Previous 1 message"
@@ -2168,11 +2239,8 @@ fn cumulative_frame_upsert_keeps_original_calls_header_and_composer_preedit() {
         .unwrap();
     let ids = run.ids();
     let mut host = run.into_host().unwrap();
-    let header_widget = host
-        .get(header)
-        .unwrap()
-        .component::<ButtonContent>()
-        .unwrap() as *const _ as usize;
+    let header_widget =
+        host.get(header).unwrap().component::<Button>().unwrap() as *const _ as usize;
     assert!(host.focus(Some(ids.composer.editor), true));
     host.event(&ContentEvent::Preedit {
         text: "连续工具更新".into(),
@@ -2274,10 +2342,7 @@ fn cumulative_frame_upsert_keeps_original_calls_header_and_composer_preedit() {
                 .all(|owner| content.message_tool_fragment_ids(owner).is_empty())
         );
         assert_eq!(
-            host.get(header)
-                .unwrap()
-                .component::<ButtonContent>()
-                .unwrap() as *const _ as usize,
+            host.get(header).unwrap().component::<Button>().unwrap() as *const _ as usize,
             header_widget
         );
         assert_eq!(host.focused(), Some(ids.composer.editor));

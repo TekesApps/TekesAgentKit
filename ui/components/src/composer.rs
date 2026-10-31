@@ -585,7 +585,7 @@ impl Composer {
         if let Some(context) = self.context_mut() {
             context.set_blocked(blocked);
         }
-        // Retain existing ButtonContent instances; painting/updates never synthesize activation.
+        // Retain existing Button instances; painting/updates never synthesize activation.
         let ids = self.ids;
         let entries = [
             (
@@ -637,7 +637,7 @@ impl Composer {
             } else if let Some(button) = retained.remove(&id) {
                 button
             } else {
-                let action = Content::new(id, ButtonContent::new(label.clone()));
+                let action = Content::new(id, Button::new(label.clone()));
                 // ClientKit's primary disc refuses ordinary first-responder
                 // adoption. Keep the original editor/marked owner on Press;
                 // the SDK still permits explicit keyboard-route/AX Focus.
@@ -648,7 +648,7 @@ impl Composer {
                 }
             };
             button
-                .component_mut::<ButtonContent>()
+                .component_mut::<Button>()
                 .expect("composer action")
                 .label = label;
             let enabled = if id == ids.send {
@@ -659,7 +659,7 @@ impl Composer {
                 has_destination && !composing
             };
             button
-                .component_mut::<ButtonContent>()
+                .component_mut::<Button>()
                 .expect("composer action")
                 .button
                 .state
@@ -667,7 +667,7 @@ impl Composer {
             children.push(button);
         }
         for mut node in old {
-            node.component_mut::<ButtonContent>()
+            node.component_mut::<Button>()
                 .unwrap()
                 .button
                 .clear_layout();

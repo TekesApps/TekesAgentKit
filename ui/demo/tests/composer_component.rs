@@ -86,7 +86,7 @@ async fn one_primary_tracks_live_run_and_ready_input_and_retains_original_button
     assert_eq!(
         host.get(ids.send)
             .unwrap()
-            .component::<ButtonContent>()
+            .component::<Button>()
             .unwrap()
             .activations,
         1

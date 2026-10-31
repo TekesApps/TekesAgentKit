@@ -123,6 +123,52 @@ enum Key {
     Action(SessionAddress, String),
 }
 
+// Retains the inventory's body clip without constraining the separate footers.
+#[derive(Debug)]
+struct SidebarInventory {
+    main: StackContent,
+    arranged_frame: Option<Rect>,
+}
+impl Component for SidebarInventory {
+    fn children(&self) -> &[Content] {
+        self.main.children()
+    }
+    fn children_mut(&mut self) -> Option<&mut Vec<Content>> {
+        self.main.children_mut()
+    }
+    fn measure(&mut self, text: &mut dyn ButtonTextRenderer, size: Size) -> MeasuredChild {
+        self.arranged_frame = None;
+        self.main.measure(text, size)
+    }
+    fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        self.arranged_frame = None;
+        self.main
+            .arrange(text, frame, frame.intersection(&clip).unwrap_or_default());
+        if !frame.is_empty() && !clip.is_empty() {
+            self.arranged_frame = Some(frame);
+        }
+    }
+    fn host_reveal_passthrough(&self) -> bool {
+        self.arranged_frame.is_some()
+            && self.main.children[0]
+                .component::<ScrollContent>()
+                .unwrap()
+                .children()[0]
+                .component::<ListContent>()
+                .unwrap()
+                .rows
+                .children
+                .iter()
+                .all(|node| {
+                    node.component::<SummarySectionView>()
+                        .is_none_or(|section| section.host_reveal_passthrough())
+                })
+    }
+    fn host_reveal_local_clip(&self) -> Option<Rect> {
+        self.arranged_frame
+    }
+}
+
 /// Mountable sidebar. All dynamic IDs live in the supplied unique upper-32-bit namespace.
 /// Deliver and drain host actions before update(), just as for other public content controls.
 #[derive(Debug)]
@@ -147,6 +193,7 @@ pub struct Sidebar {
     pending_navigation: RefCell<Option<PendingNavigation>>,
     root: ComponentId,
     body: StackContent,
+    arranged_frame: Option<Rect>,
     labels: SidebarLabels,
     ids: BTreeMap<Key, ComponentId>,
     next: u64,
@@ -205,7 +252,13 @@ impl Sidebar {
             },
             flexible_child: Some(ComponentId(base + 7)),
             children: vec![
-                Content::new(ComponentId(base + 7), body),
+                Content::new(
+                    ComponentId(base + 7),
+                    SidebarInventory {
+                        main: body,
+                        arranged_frame: None,
+                    },
+                ),
                 Content::new(
                     ComponentId(base + 8),
                     SearchFooter::new(search_labels.name.clone()),
@@ -246,6 +299,7 @@ impl Sidebar {
             pending_navigation: RefCell::new(None),
             root: ComponentId(base),
             body,
+            arranged_frame: None,
             labels,
             ids: BTreeMap::new(),
             next: base + 16,
@@ -297,8 +351,9 @@ impl Sidebar {
         }
         let root = ComponentId(self.root.0 + 12);
         let mut menu = self.body.children[0]
-            .component_mut::<StackContent>()
+            .component_mut::<SidebarInventory>()
             .unwrap()
+            .main
             .children[1]
             .component_mut::<ListContent>()
             .unwrap()
@@ -322,13 +377,15 @@ impl Sidebar {
             .unwrap()
             .update_from_sidebar(self);
         self.body.children[0]
-            .component_mut::<StackContent>()
+            .component_mut::<SidebarInventory>()
             .unwrap()
+            .main
             .children[1]
             .component_mut::<ListContent>()
             .unwrap()
             .rows
             .children = vec![menu];
+        self.invalidate_layout();
         result
     }
     pub fn session_menu_id(&self) -> Option<ComponentId> {
@@ -339,8 +396,9 @@ impl Sidebar {
         records: &[ContentActionRecord],
     ) -> Vec<crate::SidebarSessionMenuIntent> {
         self.body.children[0]
-            .component::<StackContent>()
+            .component::<SidebarInventory>()
             .unwrap()
+            .main
             .children[1]
             .component::<ListContent>()
             .unwrap()
@@ -642,6 +700,7 @@ impl Sidebar {
         self.observer_next = status.next_id();
         self.observer_labels = labels;
         self.body.children[2] = Content::new(status.id(), status);
+        self.invalidate_layout();
         if let Some(input) = self.displayed.clone() {
             self.update(&input)?;
         }
@@ -653,6 +712,7 @@ impl Sidebar {
         source: &tekes_agent_presentation::SidebarObserverStatusInput,
     ) -> Result<(), &'static str> {
         self.observer_status_mut().update_from(source)?;
+        self.invalidate_layout();
         self.observer_next = self.observer_status().next_id();
         Ok(())
     }
@@ -668,6 +728,7 @@ impl Sidebar {
         )?;
         self.observer_next = next;
         self.body.children[2] = Content::new(status.id(), status);
+        self.invalidate_layout();
         if let Some(input) = self.displayed.clone() {
             self.update(&input)?;
         }
@@ -718,6 +779,7 @@ impl Sidebar {
             self.body.children[1] = Content::new(status.id(), status);
         }
         self.multi_search_next = self.multi_search_status().unwrap().next_id();
+        self.invalidate_layout();
         self.search = None;
         self.search_owner = None;
         self.search_retry = None;
@@ -738,6 +800,7 @@ impl Sidebar {
             .ok_or("multi-search source is not installed")?
             .update_from(owner, source)?;
         self.multi_search_next = self.multi_search_status().unwrap().next_id();
+        self.invalidate_layout();
         if self
             .multi_search_help
             .as_ref()
@@ -874,6 +937,7 @@ impl Sidebar {
     /// Product copy is a host input; all paint and sizing remain library defaults.
     pub fn set_search_labels(&mut self, labels: SidebarSearchLabels) -> Result<(), &'static str> {
         self.search_labels = labels;
+        self.invalidate_layout();
         if let Some(status) =
             self.body.children[1].component_mut::<crate::SidebarMultiSearchStatus>()
         {
@@ -1011,8 +1075,8 @@ impl Sidebar {
         if let Some((_, id)) = &target {
             let mut node = old
                 .remove(id)
-                .unwrap_or_else(|| Content::new(*id, ButtonContent::new("")));
-            let button = node.component_mut::<ButtonContent>().unwrap();
+                .unwrap_or_else(|| Content::new(*id, Button::new("")));
+            let button = node.component_mut::<Button>().unwrap();
             button.label = labels.retry;
             button.button.state.disabled = pending;
             footer.body.children.push(node);
@@ -1028,6 +1092,7 @@ impl Sidebar {
             );
         }
         self.search = Some(input.clone());
+        self.invalidate_layout();
         if let Some(inventory) = self.displayed.clone() {
             self.update(&inventory)?;
         }
@@ -1050,7 +1115,7 @@ impl Sidebar {
             .iter_mut()
             .find(|node| node.id() == id)
         {
-            node.component_mut::<ButtonContent>()
+            node.component_mut::<Button>()
                 .unwrap()
                 .button
                 .state
@@ -1094,8 +1159,9 @@ impl Sidebar {
                 && target == address
                 && definition.id == action
                 && let Some(content) = self.body.children[0]
-                    .component_mut::<StackContent>()
+                    .component_mut::<SidebarInventory>()
                     .unwrap()
+                    .main
                     .children[1]
                     .component_mut::<ListContent>()
                     .unwrap()
@@ -1105,7 +1171,7 @@ impl Sidebar {
                     .find(|content| content.id() == *id)
             {
                 content
-                    .component_mut::<ButtonContent>()
+                    .component_mut::<Button>()
                     .unwrap()
                     .button
                     .state
@@ -1140,10 +1206,18 @@ impl Sidebar {
             .get(&Key::Action(address.clone(), action.into()))
             .copied()
     }
+    fn invalidate_layout(&mut self) {
+        self.arranged_frame = None;
+        self.body.children[0]
+            .component_mut::<SidebarInventory>()
+            .unwrap()
+            .arranged_frame = None;
+    }
     fn rows_mut(&mut self) -> &mut ListContent {
         self.body.children[0]
-            .component_mut::<StackContent>()
+            .component_mut::<SidebarInventory>()
             .unwrap()
+            .main
             .children[0]
             .component_mut::<ScrollContent>()
             .expect("sidebar viewport")
@@ -1374,7 +1448,7 @@ impl Sidebar {
                         },
                         flexible_child: None,
                         children: vec![
-                            Content::new(select_id, ButtonContent::new("")),
+                            Content::new(select_id, Button::new("")),
                             Content::new(status_id, TextContent::new("")),
                         ],
                     },
@@ -1384,7 +1458,7 @@ impl Sidebar {
                 .component_mut::<StackContent>()
                 .expect("sidebar row");
             let button = stack.children[0]
-                .component_mut::<ButtonContent>()
+                .component_mut::<Button>()
                 .expect("row selection");
             button.button.state.selected = input.selected.as_ref() == Some(&row.address);
             button.label = row.title.clone();
@@ -1533,9 +1607,7 @@ impl Sidebar {
         }
         let page_request = if show_more {
             let control = ids[&more_key];
-            children.push(
-                Content::new(control, ButtonContent::new(&self.labels.more)).preserving_focus(),
-            );
+            children.push(Content::new(control, Button::new(&self.labels.more)).preserving_focus());
             Some(crate::SidebarPageRequest {
                 owner: self.page_owner.clone(),
                 control,
@@ -1602,8 +1674,9 @@ impl Sidebar {
         self.rows_mut().rows.children = children;
         if !self.session_menu {
             let actions = self.body.children[0]
-                .component_mut::<StackContent>()
+                .component_mut::<SidebarInventory>()
                 .unwrap()
+                .main
                 .children[1]
                 .component_mut::<ListContent>()
                 .expect("shared action panel");
@@ -1621,10 +1694,8 @@ impl Sidebar {
                     let id = ids[&Key::Action(row.address.clone(), definition.id.clone())];
                     let mut content = old
                         .remove(&id)
-                        .unwrap_or_else(|| Content::new(id, ButtonContent::new("")));
-                    let button = content
-                        .component_mut::<ButtonContent>()
-                        .expect("shared action");
+                        .unwrap_or_else(|| Content::new(id, Button::new("")));
+                    let button = content.component_mut::<Button>().expect("shared action");
                     button.label = match &definition.disabled_reason {
                         Some(reason) if !definition.enabled => {
                             format!("{} · {reason}", definition.label)
@@ -1659,6 +1730,7 @@ impl Sidebar {
         self.revision = input.revision;
         self.displayed = Some(input.clone());
         self.refresh_session_menu()?;
+        self.invalidate_layout();
         Ok(())
     }
     /// Only explicit navigation can produce a scroll target. Inventory refresh
@@ -1861,6 +1933,15 @@ fn multi_search_empty_label<'a>(
 }
 
 impl Component for Sidebar {
+    fn lifecycle(&mut self, _: Lifecycle) {
+        self.invalidate_layout();
+    }
+    fn host_reveal_passthrough(&self) -> bool {
+        self.arranged_frame.is_some()
+    }
+    fn host_reveal_local_clip(&self) -> Option<Rect> {
+        self.arranged_frame
+    }
     fn children(&self) -> &[Content] {
         &self.body.children
     }
@@ -1868,6 +1949,7 @@ impl Component for Sidebar {
         Some(&mut self.body.children)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        self.invalidate_layout();
         let measured = self.body.measure(text, available);
         MeasuredChild::new(Size::new(
             measured.size.width.min(available.width).max(0.),
@@ -1875,6 +1957,7 @@ impl Component for Sidebar {
         ))
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        self.arranged_frame = None;
         // Keep both footers in a stable bottom stack. The observer footer is
         // last and is anchored to the pane bottom. Oversized footers are
         // clipped by the pane; this does not prove all actions are reachable
@@ -1901,10 +1984,12 @@ impl Component for Sidebar {
             observer_height,
         );
         let pane_clip = frame.intersection(&clip).unwrap_or_default();
-        let body_clip = body.intersection(&pane_clip).unwrap_or_default();
-        self.body.children[0].arrange(text, body, body_clip);
+        self.body.children[0].arrange(text, body, pane_clip);
         self.body.children[1].arrange(text, search, pane_clip);
         self.body.children[2].arrange(text, observer, pane_clip);
+        if !frame.is_empty() && !pane_clip.is_empty() {
+            self.arranged_frame = Some(frame);
+        }
     }
     fn semantics(&self) -> ContentSemantics {
         ContentSemantics::new(ContentRole::Group, &self.labels.name)

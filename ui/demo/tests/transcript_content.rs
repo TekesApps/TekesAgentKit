@@ -248,7 +248,7 @@ fn output_copy_captures_the_original_turn_and_remains_local_when_mutations_are_d
         !host
             .get(button)
             .unwrap()
-            .component::<ButtonContent>()
+            .component::<Button>()
             .unwrap()
             .button
             .state
@@ -1824,7 +1824,7 @@ fn native_host_transcript_uses_shared_url_projection_in_group_previews() {
     let label = &host
         .get(header)
         .unwrap()
-        .component::<ButtonContent>()
+        .component::<Button>()
         .unwrap()
         .label;
     assert!(label.contains("EXAMPLE.org/a/../b"));

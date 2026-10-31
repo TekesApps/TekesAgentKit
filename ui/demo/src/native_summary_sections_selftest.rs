@@ -3,7 +3,7 @@
 use super::*;
 use crate::acceptance_script::{Action, run_script};
 use tekes_agent_components_ui::{SummaryUsageRowIds, SummaryView};
-use tekes_ui_controls::composition::{ButtonContent, TextContent, TextFieldContent};
+use tekes_ui_controls::composition::{Button, TextContent, TextFieldContent};
 const DRAFT: &str = "Summary 折叠期间的新草稿";
 pub(super) struct Probe {
     started: Instant,
@@ -43,7 +43,7 @@ impl Probe {
     }
     fn widget(view: &ComponentDemo, row: ComponentId) -> usize {
         let node = view.tree.get(row).unwrap();
-        if let Some(button) = node.component::<ButtonContent>() {
+        if let Some(button) = node.component::<Button>() {
             button as *const _ as usize
         } else if let Some(text) = node.component::<TextFieldContent>() {
             text as *const _ as usize

@@ -174,7 +174,7 @@ fn captures_original_ax_button_once_and_keeps_pending_across_other_endpoint_upda
     assert!(
         host.get(alpha_retry)
             .unwrap()
-            .component::<ButtonContent>()
+            .component::<Button>()
             .unwrap()
             .button
             .state
@@ -196,7 +196,7 @@ fn captures_original_ax_button_once_and_keeps_pending_across_other_endpoint_upda
     assert!(
         host.get(alpha_retry)
             .unwrap()
-            .component::<ButtonContent>()
+            .component::<Button>()
             .unwrap()
             .button
             .state

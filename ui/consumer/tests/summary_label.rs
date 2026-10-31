@@ -334,7 +334,7 @@ fn summary_disclosure_and_domain_actions_keep_the_original_composer_focus_and_pr
             children: vec![
                 Content::new(composer.ids().root, composer),
                 Content::new(root, summary),
-                Content::new(ComponentId(50), ButtonContent::new("下一控件")),
+                Content::new(ComponentId(50), Button::new("下一控件")),
             ],
         },
     ))
@@ -474,7 +474,7 @@ fn summary_focus_policy_leaves_original_host_controls_and_static_text_selectable
         &mut host,
         root,
         &token,
-        Content::new(button, ButtonContent::new("宿主自己的焦点策略")),
+        Content::new(button, Button::new("宿主自己的焦点策略")),
     )
     .unwrap();
     let frame = Rect::new(0., 0., 400., 600.);
@@ -1672,11 +1672,7 @@ fn output_aside_feedback_notes_and_auxiliary_actions_keep_the_original_composer(
         .unwrap();
     let note = control.ids().edit_note;
     assert_eq!(
-        host.get(note)
-            .unwrap()
-            .component::<ButtonContent>()
-            .unwrap()
-            .label,
+        host.get(note).unwrap().component::<Button>().unwrap().label,
         "已提交的中文备注"
     );
     assert!(
@@ -1751,7 +1747,7 @@ fn output_aside_feedback_notes_and_auxiliary_actions_keep_the_original_composer(
                 assert_eq!(
                     host.get(note_ids.save)
                         .unwrap()
-                        .component::<ButtonContent>()
+                        .component::<Button>()
                         .unwrap()
                         .variant,
                     tekes_ui_controls::paint::ButtonVariant::Primary

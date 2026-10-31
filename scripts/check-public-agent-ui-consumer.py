@@ -11,7 +11,7 @@ import subprocess
 import sys
 
 
-PIN = "50ec49f3446924fdbc66b3cff22cd8cfe150fe7c"
+PIN = "8a6a7633eec88af86353ad55da1aa90608faf69d"
 FIXTURE_ROOT = Path(".runtime-fixtures/issue15-contract-20261024")
 
 

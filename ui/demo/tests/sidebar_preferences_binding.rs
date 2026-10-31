@@ -1,3 +1,6 @@
+#[allow(dead_code)]
+#[path = "support/menu_host.rs"]
+mod sidebar_layout;
 use std::{sync::Arc, time::Duration};
 use tekes_agent_components_ui::*;
 use tekes_agent_ui_bindings::{RunBinding, SidebarBinding};
@@ -85,12 +88,7 @@ async fn original_pin_membership_and_durable_layout_preferences_reach_both_consu
     let address = view.binding().scope().address();
     let sidebar = view.tree.get(root).unwrap().component::<Sidebar>().unwrap();
     let row = sidebar.row_id(&address).unwrap();
-    let widget = view
-        .tree
-        .get(row)
-        .unwrap()
-        .component::<ButtonContent>()
-        .unwrap() as *const _ as usize;
+    let widget = view.tree.get(row).unwrap().component::<Button>().unwrap() as *const _ as usize;
     let moved = sidebar.move_pin_change(&address, 1).unwrap();
     let revision = source.snapshot().revision;
     source.set_preferences(&moved).unwrap();
@@ -120,9 +118,7 @@ async fn original_pin_membership_and_durable_layout_preferences_reach_both_consu
         .unwrap()
         .pinned_header_id()
         .unwrap();
-    let commands = view
-        .accessibility_action(header, None, AccessibilityAction::Press)
-        .unwrap();
+    let commands = sidebar_layout::press_demo(&mut view, header).unwrap();
     let [DemoCommand::SidebarPreferences(change)] = commands.as_slice() else {
         panic!("original section callback")
     };
@@ -131,11 +127,7 @@ async fn original_pin_membership_and_durable_layout_preferences_reach_both_consu
     view.set_sidebar_preferences(&source.preferences().unwrap(), true)
         .unwrap();
     assert_eq!(
-        view.tree
-            .get(row)
-            .unwrap()
-            .component::<ButtonContent>()
-            .unwrap() as *const _ as usize,
+        view.tree.get(row).unwrap().component::<Button>().unwrap() as *const _ as usize,
         widget
     );
     assert_eq!(view.editor().input.text, "置顶操作保留的草稿");

@@ -122,11 +122,9 @@ impl Component for SummaryMetadata {
             Err(CompositionError::InvalidSlotCount)
         }
     }
-    fn child_theme(&self, theme: ContentTheme) -> ContentTheme {
-        ContentTheme {
-            foreground: theme.palette.color("secondary-text"),
-            ..theme
-        }
+    fn child_theme(&self, mut theme: ContentTheme) -> ContentTheme {
+        theme.foreground = theme.palette.color("secondary-text");
+        theme
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, size: Size) -> MeasuredChild {
         self.children[0].measure(text, size)

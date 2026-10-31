@@ -210,6 +210,7 @@ pub struct TurnFootnote {
     pending: Option<TurnFootnoteIntent>,
     observed: Option<TurnActionResult>,
     notice: String,
+    arranged: bool,
 }
 impl TurnFootnote {
     pub fn new(namespace: u32, scope: RunScope, labels: TurnFootnoteLabels) -> Self {
@@ -244,6 +245,7 @@ impl TurnFootnote {
             pending: None,
             observed: None,
             notice: String::new(),
+            arranged: false,
         }
     }
     pub(crate) fn reserve_feedback_namespace(&mut self, namespace: u32) {
@@ -637,6 +639,29 @@ impl TurnFootnote {
         }
     }
     fn render_actions(&mut self) {
+        let before = self.layout_rows();
+        self.render_action_rows();
+        if before != self.layout_rows() {
+            self.arranged = false;
+        }
+    }
+    fn layout_rows(&self) -> Vec<(ComponentId, String)> {
+        self.rows
+            .children
+            .iter()
+            .map(|node| {
+                let label = if let Some(text) = node.component::<TextContent>() {
+                    text.text.clone()
+                } else if let Some(button) = node.component::<Button>() {
+                    button.label.clone()
+                } else {
+                    String::new()
+                };
+                (node.id(), label)
+            })
+            .collect()
+    }
+    fn render_action_rows(&mut self) {
         let mut previous = std::mem::take(&mut self.rows.children);
         if let Some(index) = previous
             .iter()
@@ -670,9 +695,9 @@ impl TurnFootnote {
                 .position(|node| node.id() == id)
                 .map(|index| previous.remove(index))
                 .unwrap_or_else(|| {
-                    Content::new(id, ButtonContent::new(&self.labels.copy)).preserving_focus()
+                    Content::new(id, Button::new(&self.labels.copy)).preserving_focus()
                 });
-            node.component_mut::<ButtonContent>().unwrap().label = self.labels.copy.clone();
+            node.component_mut::<Button>().unwrap().label = self.labels.copy.clone();
             self.rows.children.push(node);
         }
         if self.feedback_shown
@@ -686,9 +711,9 @@ impl TurnFootnote {
                 .position(|node| node.id() == *id)
                 .map(|index| previous.remove(index))
                 .unwrap_or_else(|| {
-                    Content::new(*id, ButtonContent::new(&action.label)).preserving_focus()
+                    Content::new(*id, Button::new(&action.label)).preserving_focus()
                 });
-            let button = node.component_mut::<ButtonContent>().unwrap();
+            let button = node.component_mut::<Button>().unwrap();
             button.label = action.label.clone();
             button.button.state.disabled =
                 !self.available || self.pending.is_some() || !action.enabled;
@@ -809,6 +834,16 @@ fn copy_facts(
     }))
 }
 impl Component for TurnFootnote {
+    fn host_reveal_passthrough(&self) -> bool {
+        self.arranged
+            && self.feedback().is_none_or(|control| {
+                control.host_reveal_passthrough()
+                    && (self.rows.model.axis == Axis::Vertical) == control.is_open()
+            })
+    }
+    fn lifecycle(&mut self, _: Lifecycle) {
+        self.arranged = false;
+    }
     fn active(&self) -> bool {
         self.shown && !self.rows.children.is_empty()
     }
@@ -819,6 +854,7 @@ impl Component for TurnFootnote {
         Some(&mut self.rows.children)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        self.arranged = false;
         self.rows.model.axis = if self.feedback().is_some_and(|control| control.is_open()) {
             Axis::Vertical
         } else {
@@ -828,6 +864,7 @@ impl Component for TurnFootnote {
         MeasuredChild::new(Size::new(available.width, measured.size.height))
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        self.arranged = false;
         let horizontal = self.rows.model.axis == Axis::Horizontal;
         let mut remaining = frame.size.width;
         let sizes: Vec<_> = self
@@ -871,6 +908,7 @@ impl Component for TurnFootnote {
         for (child, position) in self.rows.children.iter_mut().zip(placed) {
             child.arrange(text, position.frame, clip);
         }
+        self.arranged = !frame.is_empty() && !clip.is_empty();
     }
     fn semantics(&self) -> ContentSemantics {
         ContentSemantics::new(ContentRole::Group, &self.labels.group)

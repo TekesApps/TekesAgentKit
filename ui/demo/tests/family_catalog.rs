@@ -78,11 +78,7 @@ fn catalog_uses_sdk_buttons_and_preserves_read_only_history_when_parent_is_unava
     let mut source = input("parent-a", 4, 9, 1);
     let mut host = setup(&source, 71001);
     let bounded = catalog(&host).child_button_id("bounded").unwrap();
-    let button = host
-        .get(bounded)
-        .unwrap()
-        .component::<ButtonContent>()
-        .unwrap();
+    let button = host.get(bounded).unwrap().component::<Button>().unwrap();
     assert!(button.label.contains("只读子代理"));
     assert!(button.label.contains("有界历史"));
     assert!(button.label.contains("父会话不可用"));
@@ -99,11 +95,7 @@ fn catalog_uses_sdk_buttons_and_preserves_read_only_history_when_parent_is_unava
     assert!(catalog(&host).accepts(&intents[0]));
 
     let unknown = catalog(&host).child_button_id("future-mode").unwrap();
-    let unknown_button = host
-        .get(unknown)
-        .unwrap()
-        .component::<ButtonContent>()
-        .unwrap();
+    let unknown_button = host.get(unknown).unwrap().component::<Button>().unwrap();
     assert!(unknown_button.button.state.disabled);
     assert!(activate(&mut host, unknown).is_empty());
     assert_eq!(catalog(&host).take_intents(&actions).len(), 1);

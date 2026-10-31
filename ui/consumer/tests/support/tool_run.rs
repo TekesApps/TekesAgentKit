@@ -164,7 +164,7 @@ fn default_public_group_header_uses_source_url_spelling_without_private_parts() 
     let label = &host
         .get(header)
         .unwrap()
-        .component::<ButtonContent>()
+        .component::<Button>()
         .unwrap()
         .label;
     assert!(label.contains("EXAMPLE.org/a/../中文"));

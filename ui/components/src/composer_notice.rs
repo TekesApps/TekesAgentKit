@@ -66,7 +66,7 @@ impl ComposerNoticeRefresh {
 }
 #[derive(Debug)]
 struct RefreshAction {
-    button: ButtonContent,
+    button: Button,
     source: Option<(ComposerNoticeInput, Arc<()>)>,
     pending: Vec<ComposerNoticeRefresh>,
 }
@@ -140,7 +140,7 @@ pub struct ComposerNotice {
 impl ComposerNotice {
     pub fn new(namespace: u32, labels: ComposerNoticeLabels) -> Self {
         let base = (namespace as u64) << 32;
-        let mut button = ButtonContent::new(&labels.refresh);
+        let mut button = Button::new(&labels.refresh);
         button.variant = ButtonVariant::Quiet;
         button.button.state.disabled = true;
         Self {

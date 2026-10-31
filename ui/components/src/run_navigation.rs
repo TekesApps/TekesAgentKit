@@ -156,11 +156,11 @@ pub fn reveal_run_rail_follow(
         .ok_or(RunNavigationError::Agent("Run rail is not installed"))?
         .id();
     let request = host
-        .get_mut(rail_id)
+        .get(rail_id)
         .unwrap()
-        .component_mut::<crate::TurnRail>()
+        .component::<crate::TurnRail>()
         .unwrap()
-        .next_reveal();
+        .request_reveal();
     let Some(request) = request else {
         return Ok(None);
     };

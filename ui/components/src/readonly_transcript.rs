@@ -133,6 +133,7 @@ pub struct ReadOnlyTranscript {
     paging: ComponentId,
     content: ComponentId,
     body: StackContent,
+    reveal_clip: Option<Rect>,
     publication: u64,
     epoch: u64,
     connection: Option<ConnectionPresentation>,
@@ -206,7 +207,7 @@ impl ReadOnlyTranscript {
             tekes_ui_controls::ScrollArea::default(),
             Content::new(content_id, content),
         );
-        let mut refresh = ButtonContent::new(&labels.refresh);
+        let mut refresh = Button::new(&labels.refresh);
         refresh.button.state.disabled = true;
         Ok(Self {
             ids,
@@ -231,6 +232,7 @@ impl ReadOnlyTranscript {
                 ],
             },
             source: None,
+            reveal_clip: None,
             publication: 0,
             epoch: 0,
             connection: None,
@@ -432,6 +434,7 @@ impl ReadOnlyTranscript {
         plan: &ReadOnlyTranscriptUpdate<'_>,
     ) -> Result<(), &'static str> {
         self.validate_prepared_update(plan)?;
+        self.reveal_clip = None;
         let input = &plan.input;
         self.content_mut().apply_prepared_update(&plan.content)?;
         self.body.children[0]
@@ -440,7 +443,7 @@ impl ReadOnlyTranscript {
             .text = plan.status.clone();
         self.refresh_enabled = input.source.is_some() && input.source_ready && !input.reading;
         self.body.children[1]
-            .component_mut::<ButtonContent>()
+            .component_mut::<Button>()
             .unwrap()
             .button
             .state
@@ -510,7 +513,15 @@ impl ReadOnlyTranscript {
     }
 }
 impl Component for ReadOnlyTranscript {
+    fn host_reveal_passthrough(&self) -> bool {
+        self.reveal_clip.is_some_and(|clip| !clip.is_empty())
+    }
+    fn host_reveal_local_clip(&self) -> Option<Rect> {
+        self.reveal_clip
+    }
+
     fn lifecycle(&mut self, _: Lifecycle) {
+        self.reveal_clip = None;
         self.plan_owner = std::sync::Arc::new(());
     }
     fn children(&self) -> &[Content] {
@@ -520,10 +531,13 @@ impl Component for ReadOnlyTranscript {
         Some(&mut self.body.children)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        self.reveal_clip = None;
         self.body.measure(text, available)
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        self.reveal_clip = None;
         self.body.arrange(text, frame, clip);
+        self.reveal_clip = frame.intersection(&clip);
     }
     fn semantics(&self) -> ContentSemantics {
         ContentSemantics::new(ContentRole::Group, &self.labels.group)

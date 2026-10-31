@@ -151,11 +151,11 @@ fn original_popover_content_child_wins_over_background_sibling() {
                     Popup {
                         model,
                         view: PopoverView::default(),
-                        children: vec![Content::new(child, ButtonContent::new("Popup Save"))],
+                        children: vec![Content::new(child, Button::new("Popup Save"))],
                         painted: false,
                     },
                 ),
-                Content::new(background, ButtonContent::new("Background Action")),
+                Content::new(background, Button::new("Background Action")),
             ],
         },
     ))

@@ -1,4 +1,7 @@
 //! Legacy action-button compatibility. Original menu/host coverage is separate.
+#[allow(dead_code)]
+#[path = "support/menu_host.rs"]
+mod sidebar_layout;
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
 use tekes_agent_components_ui::{Sidebar, SidebarInput, SidebarIntent, SidebarLabels, SidebarRow};
 use tekes_agent_contract::*;
@@ -37,7 +40,7 @@ fn make_row(endpoint: &str, id: &str, ready: bool) -> SidebarRow {
     }
 }
 fn activate(host: &mut ContentHost, root: ComponentId, target: ComponentId) -> Vec<SidebarIntent> {
-    host.accessibility_action(target, None, AccessibilityAction::Press);
+    sidebar_layout::press_host(host, target);
     let actions = host.drain_actions();
     host.get(root)
         .unwrap()
@@ -433,13 +436,13 @@ fn restoration_is_not_empty_and_observation_failure_keeps_readable_rows() {
         .unwrap()
         .row_id(&row.address)
         .unwrap();
-    let owner = host.get(id).unwrap().component::<ButtonContent>().unwrap() as *const _ as usize;
+    let owner = host.get(id).unwrap().component::<Button>().unwrap() as *const _ as usize;
     input.revision += 1;
     input.error = Some("库存观察中断，保留最后列表".into());
     input.rows[0].activity.is_stale = true;
     update(&mut host, root, &input).unwrap();
     assert_eq!(
-        host.get(id).unwrap().component::<ButtonContent>().unwrap() as *const _ as usize,
+        host.get(id).unwrap().component::<Button>().unwrap() as *const _ as usize,
         owner
     );
     assert!(

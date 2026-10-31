@@ -145,7 +145,7 @@ fn output_aside_is_one_leading_reading_band_with_original_nested_feedback() {
                     assert_eq!(
                         host.get(ids.edit_note)
                             .unwrap()
-                            .component::<ButtonContent>()
+                            .component::<Button>()
                             .unwrap()
                             .label,
                         note
@@ -241,7 +241,7 @@ fn output_aside_is_one_leading_reading_band_with_original_nested_feedback() {
                     let original_note = host
                         .get(ids.edit_note)
                         .unwrap()
-                        .component::<ButtonContent>()
+                        .component::<Button>()
                         .unwrap() as *const _ as usize;
                     let initial_note_width = host.get(ids.edit_note).unwrap().frame().size.width;
                     assert!(initial_note_width > 0.);
@@ -286,7 +286,7 @@ fn output_aside_is_one_leading_reading_band_with_original_nested_feedback() {
                         assert_eq!(
                             host.get(ids.edit_note)
                                 .unwrap()
-                                .component::<ButtonContent>()
+                                .component::<Button>()
                                 .unwrap() as *const _ as usize,
                             original_note
                         );
@@ -330,7 +330,7 @@ fn output_aside_is_one_leading_reading_band_with_original_nested_feedback() {
                     assert_eq!(
                         host.get(ids.edit_note)
                             .unwrap()
-                            .component::<ButtonContent>()
+                            .component::<Button>()
                             .unwrap() as *const _ as usize,
                         original_note
                     );

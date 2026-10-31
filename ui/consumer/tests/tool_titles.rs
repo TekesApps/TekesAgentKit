@@ -98,7 +98,7 @@ fn independent_host_reports_use_shared_precedence_and_keep_original_section_owne
     let title = |host: &ContentHost| {
         host.get(ids.disclosure.unwrap())
             .unwrap()
-            .component::<ButtonContent>()
+            .component::<Button>()
             .unwrap()
             .label
             .clone()
@@ -164,7 +164,7 @@ fn independent_host_reports_use_shared_precedence_and_keep_original_section_owne
     assert!(
         host.get(id)
             .unwrap()
-            .component::<ButtonContent>()
+            .component::<Button>()
             .unwrap()
             .label
             .contains("+20 −9")
@@ -179,12 +179,7 @@ fn independent_host_reports_use_shared_precedence_and_keep_original_section_owne
     let root = activity.id();
     let fields = activity.tool_detail_sections();
     let mut host = activity.into_host().unwrap();
-    let title = &host
-        .get(id)
-        .unwrap()
-        .component::<ButtonContent>()
-        .unwrap()
-        .label;
+    let title = &host.get(id).unwrap().component::<Button>().unwrap().label;
     assert!(
         !title.contains("修改")
             && !title.contains("已确认")
@@ -254,7 +249,7 @@ fn independent_tool_activity_consumes_producer_views_without_losing_focus_select
     let label = &host
         .get(ids.disclosure.unwrap())
         .unwrap()
-        .component::<ButtonContent>()
+        .component::<Button>()
         .unwrap()
         .label;
     assert!(label.contains("Read · 读取 a.rs · doing"));
@@ -330,7 +325,7 @@ fn independent_tool_activity_consumes_producer_views_without_losing_focus_select
     let label = &host
         .get(ids.disclosure.unwrap())
         .unwrap()
-        .component::<ButtonContent>()
+        .component::<Button>()
         .unwrap()
         .label;
     assert!(label.contains("Read · 读取 a.rs · 12 行 · done"));
@@ -378,7 +373,7 @@ fn independent_tool_activity_consumes_producer_views_without_losing_focus_select
     let label = &host
         .get(ids.disclosure.unwrap())
         .unwrap()
-        .component::<ButtonContent>()
+        .component::<Button>()
         .unwrap()
         .label;
     assert!(label.contains("Read · exit failure output · error"));
@@ -442,7 +437,7 @@ fn independent_legacy_terminal_card_exposes_exit_failure_without_changing_source
     let label = &host
         .get(ids.disclosure.unwrap())
         .unwrap()
-        .component::<ButtonContent>()
+        .component::<Button>()
         .unwrap()
         .label;
     assert!(label.contains("Shell · 检查文件 · error"));

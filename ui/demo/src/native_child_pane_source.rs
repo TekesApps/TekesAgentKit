@@ -386,7 +386,7 @@ pub(super) fn run(host: &mut Host, manifest: &Value) -> Value {
                 .view
                 .tree
                 .get(composer_ids.send)
-                .and_then(|node| node.component::<tekes_ui_controls::composition::ButtonContent>())
+                .and_then(|node| node.component::<tekes_ui_controls::composition::Button>())
                 .is_some_and(|button| !button.button.state.disabled)
     });
     let commit_send = press(host, composer_ids.send);

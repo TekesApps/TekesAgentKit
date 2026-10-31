@@ -10,6 +10,41 @@ use tekes_agent_presentation::ActionablePrompt;
 use tekes_ui_controls::layout::MeasuredChild;
 use tekes_ui_scene::Size;
 
+/// The Run document alone owns this clip; resident controls are siblings.
+/// This wraps the original SDK Scroll node without copying its state or geometry.
+#[derive(Debug)]
+struct RunDocumentBoundary {
+    children: Vec<Content>,
+    document_clip: Rect,
+    arranged: bool,
+}
+impl Component for RunDocumentBoundary {
+    fn host_reveal_passthrough(&self) -> bool {
+        self.arranged
+    }
+    fn host_reveal_local_clip(&self) -> Option<Rect> {
+        self.arranged.then_some(self.document_clip)
+    }
+    fn children(&self) -> &[Content] {
+        &self.children
+    }
+    fn children_mut(&mut self) -> Option<&mut Vec<Content>> {
+        Some(&mut self.children)
+    }
+    fn lifecycle(&mut self, _: Lifecycle) {
+        self.arranged = false;
+    }
+    fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        self.arranged = false;
+        self.children[0].measure(text, available)
+    }
+    fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        self.arranged = false;
+        self.children[0].arrange(text, frame, self.document_clip);
+        self.arranged = !frame.is_empty() && !clip.is_empty() && !self.document_clip.is_empty();
+    }
+}
+
 /// Reserve the whole Composer namespace plus the three extra IDs, and distinct
 /// namespaces for paging/actionables/context/transcript. Hosts allocate these IDs.
 #[derive(Clone, Copy, Debug)]
@@ -33,6 +68,13 @@ pub struct RunPortGeometry {
     pub document_top_clearance: f32,
     pub document_bottom_clearance: f32,
     pub turn_rail: TurnRailGeometry,
+}
+/// Host role and bottom-visibility policy for the normal Run layout pass.
+/// Disabled by default: existing consumers retain their manual context API.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum RunNavigationLayoutPolicy {
+    Main { bottom_visibility_margin: f32 },
+    Auxiliary,
 }
 #[derive(Debug)]
 pub enum RunPortIntent {
@@ -114,7 +156,9 @@ pub struct RunPort {
     navigation_lifetime: Arc<()>,
     navigation_mounted: bool,
     navigation_origin: Option<(u64, Option<String>)>,
+    navigation_layout_policy: Option<RunNavigationLayoutPolicy>,
     geometry: Option<RunPortGeometry>,
+    reveal_clip: Option<Rect>,
     rail_backing_scale: f32,
     footnote_clock: Option<f64>,
     footnote_clock_revision: u64,
@@ -208,7 +252,9 @@ impl RunPort {
             navigation_lifetime: Arc::new(()),
             navigation_mounted: false,
             navigation_origin: None,
+            navigation_layout_policy: None,
             geometry: None,
+            reveal_clip: None,
             rail_backing_scale: 1.,
             footnote_clock: None,
             footnote_clock_revision: 0,
@@ -231,7 +277,11 @@ impl RunPort {
     /// or operation receipts. Fractions normalize as ClientKit does; invalid
     /// reading maxima leave the previous policy intact.
     pub fn set_column_layout(&mut self, column: RunColumnLayout) -> Result<(), &'static str> {
-        self.column = column.normalized()?;
+        let column = column.normalized()?;
+        if self.column != column {
+            self.reveal_clip = None;
+            self.column = column;
+        }
         Ok(())
     }
     /// Last arranged values, not a successful-render receipt. A failed library
@@ -382,10 +432,38 @@ impl RunPort {
             .map_err(|_| "RunPort navigation gesture already dispatched")?;
         Ok(navigation.kind)
     }
+    /// Opt into navigation metadata derived during the ordinary Host arrange.
+    /// None preserves manual set_turn_navigation_context/update_rail_follow_target.
+    pub fn set_navigation_layout_policy(
+        &mut self,
+        policy: Option<RunNavigationLayoutPolicy>,
+    ) -> Result<(), &'static str> {
+        if let Some(RunNavigationLayoutPolicy::Main {
+            bottom_visibility_margin,
+        }) = policy
+            && (!bottom_visibility_margin.is_finite() || bottom_visibility_margin < 0.)
+        {
+            return Err("invalid navigation bottom visibility margin");
+        }
+        if self.navigation_layout_policy != policy {
+            self.navigation_layout_policy = policy;
+            self.reveal_clip = None;
+            self.navigation_origin = None;
+            self.navigation_lifetime = Arc::new(());
+        }
+        Ok(())
+    }
     /// Main hosts opt in with an actual bottom-visibility fact after render.
     /// Passing None retires host-history gestures (e.g. when changing pane role).
     /// Task/subagent/SideChat hosts leave this disabled and use ordinary claim.
     pub fn set_turn_navigation_context(
+        &mut self,
+        context: Option<RunTurnNavigationContext>,
+    ) -> Result<(), &'static str> {
+        self.apply_turn_navigation_context(context)?;
+        self.refresh_rail_contents(true)
+    }
+    fn apply_turn_navigation_context(
         &mut self,
         context: Option<RunTurnNavigationContext>,
     ) -> Result<(), &'static str> {
@@ -413,7 +491,7 @@ impl RunPort {
             self.navigation_lifetime = Arc::new(());
         }
         self.navigation_origin = origin;
-        self.refresh_rail_contents(true)
+        Ok(())
     }
     fn navigation_jump(&self, target: &TranscriptTurnTarget) -> Option<RunTurnJump> {
         let (generation, from) = self.navigation_origin.as_ref()?;
@@ -648,20 +726,33 @@ impl RunPort {
             .ok_or("transcript is not mounted")?
             .set_activity_segment_expanded(key, expanded)
     }
-    pub fn transcript(&self) -> Option<&TranscriptContent> {
+    // Stable public viewport identity remains on the original SDK Scroll node.
+    fn document_viewport(&self) -> Option<&Content> {
         self.body
             .children
             .iter()
-            .find_map(|node| node.component::<ScrollContent>())?
+            .find_map(|node| node.component::<RunDocumentBoundary>())?
+            .children
+            .first()
+    }
+    fn document_viewport_mut(&mut self) -> Option<&mut Content> {
+        self.body
+            .children
+            .iter_mut()
+            .find_map(|node| node.component_mut::<RunDocumentBoundary>())?
+            .children
+            .first_mut()
+    }
+    pub fn transcript(&self) -> Option<&TranscriptContent> {
+        self.document_viewport()?
+            .component::<ScrollContent>()?
             .children()
             .iter()
             .find_map(|node| node.component::<TranscriptContent>())
     }
     fn transcript_mut(&mut self) -> Option<&mut TranscriptContent> {
-        self.body
-            .children
-            .iter_mut()
-            .find_map(|node| node.component_mut::<ScrollContent>())?
+        self.document_viewport_mut()?
+            .component_mut::<ScrollContent>()?
             .children_mut()?
             .iter_mut()
             .find_map(|node| node.component_mut::<TranscriptContent>())
@@ -711,12 +802,23 @@ impl RunPort {
             tekes_ui_controls::ScrollPolicy::Disabled,
             tekes_ui_controls::ScrollPolicy::Auto,
         );
+        // Transcript's root namespace is exclusive, with only its base ID used.
+        // Rows use disjoint namespaces; append_accessory rejects this namespace.
+        let boundary_id = ComponentId(content.id().0 + 1);
         let viewport = ScrollContent::new(scroll, Content::new(content.id(), content));
         // Paint/hit order: document, then chrome/controls. No detached mirror tree.
-        self.body
-            .children
-            .insert(0, Content::new(self.ids.viewport, viewport));
-        self.body.flexible_child = Some(self.ids.viewport);
+        self.body.children.insert(
+            0,
+            Content::new(
+                boundary_id,
+                RunDocumentBoundary {
+                    children: vec![Content::new(self.ids.viewport, viewport)],
+                    document_clip: Rect::default(),
+                    arranged: false,
+                },
+            ),
+        );
+        self.body.flexible_child = Some(boundary_id);
         Ok(())
     }
     /// Convenience construction with an exclusive host-supplied transcript pool.
@@ -979,6 +1081,7 @@ impl RunPort {
         affordances: ComposerAffordances,
         gate: ComposerControlGate,
     ) -> Result<(), &'static str> {
+        self.reveal_clip = None;
         self.check_run_update(snapshot, gate)?;
         let scope = self.scope.clone();
         self.composer_mut()
@@ -1075,6 +1178,7 @@ impl RunPort {
         Ok(())
     }
     pub fn update_paging(&mut self, mut facts: TranscriptPagingFacts) -> Result<(), &'static str> {
+        self.reveal_clip = None;
         if self.last.as_ref().is_none_or(|snapshot| {
             facts.scope != self.scope
                 || facts.has_more_before != snapshot.transcript.has_more_before
@@ -1104,6 +1208,7 @@ impl RunPort {
         prompt: Option<Arc<ActionablePrompt>>,
         controls: bool,
     ) -> Result<bool, &'static str> {
+        self.reveal_clip = None;
         if prompt
             .as_ref()
             .is_some_and(|prompt| prompt.scope() != &self.scope)
@@ -1229,6 +1334,7 @@ impl RunPort {
     }
     /// Host-specific capabilities may add controls without forking Run content.
     pub fn append_accessory(&mut self, content: Content) -> Result<(), &'static str> {
+        self.reveal_clip = None;
         if (self.ids.composer.root.0..=self.ids.composer.input_band.0).contains(&content.id().0)
             || self.transcript().is_some_and(|transcript| {
                 !transcript.namespaces_disjoint(&[(content.id().0 >> 32) as u32])
@@ -1257,7 +1363,9 @@ impl RunPort {
                 .component::<ActionableCard>()
                 .is_some_and(|card| !card.active());
             if id == self.ids.composer.root
-                || id == self.ids.viewport
+                || self.body.children[index]
+                    .component::<RunDocumentBoundary>()
+                    .is_some()
                 || Some(id) == self.rail
                 || Some(id) == self.jump
                 || empty_actionable
@@ -1281,7 +1389,15 @@ impl RunPort {
     }
 }
 impl Component for RunPort {
+    fn host_reveal_passthrough(&self) -> bool {
+        self.reveal_clip.is_some_and(|clip| !clip.is_empty())
+    }
+    fn host_reveal_local_clip(&self) -> Option<Rect> {
+        self.reveal_clip
+    }
+
     fn lifecycle(&mut self, event: Lifecycle) {
+        self.reveal_clip = None;
         let mounted = event == Lifecycle::Mounted;
         if self.navigation_mounted != mounted {
             self.navigation_lifetime = Arc::new(());
@@ -1302,10 +1418,12 @@ impl Component for RunPort {
         self.pane_presented
     }
     fn measure(&mut self, _text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        self.reveal_clip = None;
         // Run is a bounded viewport, not the sum of docked sibling heights.
         MeasuredChild::new(available)
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        self.reveal_clip = None;
         let presented = frame.size.width > 0. && frame.size.height > 0.;
         if presented != self.pane_presented {
             // Retire local gestures across collapse/reopen, including same-
@@ -1375,7 +1493,8 @@ impl Component for RunPort {
             .unwrap_or_default();
         if let Some(content) = self.transcript_mut() {
             content.set_run_layout(RunTranscriptLayout {
-                column_x: column.min_x(),
+                column_offset: column.min_x() - frame.min_x(),
+                pane_width: frame.size.width,
                 column_width: column.size.width,
                 top: top_clearance,
                 bottom: bottom_clearance,
@@ -1385,12 +1504,16 @@ impl Component for RunPort {
             .body
             .children
             .iter_mut()
-            .find(|node| node.id() == self.ids.viewport)
+            .find(|node| node.component::<RunDocumentBoundary>().is_some())
         {
             // Full pane remains the scrolling coordinate system. The library
             // receives the actual unobstructed clip, and measures the document's
             // own clearance. No offset compensation or reading state is copied.
-            viewport.arrange(text, frame, document_clip);
+            viewport
+                .component_mut::<RunDocumentBoundary>()
+                .unwrap()
+                .document_clip = document_clip;
+            viewport.arrange(text, frame, pane_clip);
         }
         self.with_header(|body| {
             body.arrange(
@@ -1430,6 +1553,38 @@ impl Component for RunPort {
                 self.rail_backing_scale,
             ),
         });
+        if let Some(policy) = self.navigation_layout_policy
+            && self.transcript.is_some()
+        {
+            let context = match policy {
+                RunNavigationLayoutPolicy::Main {
+                    bottom_visibility_margin,
+                } => self.transcript().and_then(|transcript| {
+                    self.document_viewport()?
+                        .component::<ScrollContent>()?
+                        .children()
+                        .iter()
+                        .find(|node| node.id() == transcript.id())
+                        .map(|document| RunTurnNavigationContext {
+                            bottom_is_visible: document.frame().max_y() - bottom_clearance
+                                <= document_clip.max_y() + bottom_visibility_margin,
+                        })
+                }),
+                RunNavigationLayoutPolicy::Auxiliary => None,
+            };
+            self.apply_turn_navigation_context(context)
+                .expect("current arranged navigation context");
+            let following = self
+                .document_viewport()
+                .unwrap()
+                .component::<ScrollContent>()
+                .unwrap()
+                .is_following_latest();
+            if self.rail.is_some() {
+                self.update_rail_follow_target(following)
+                    .expect("current arranged follow target");
+            }
+        }
         if self.rail.is_some() {
             self.refresh_rail_contents(true)
                 .expect("validated rail membership");
@@ -1443,8 +1598,83 @@ impl Component for RunPort {
                 .arrange(text, geometry.rail, pane_clip);
         }
         self.arrange_jump(text, frame, pane_clip, composer);
+        self.reveal_clip = frame.intersection(&clip);
     }
     fn semantics(&self) -> ContentSemantics {
         ContentSemantics::new(ContentRole::Group, &self.label)
+    }
+}
+
+#[cfg(test)]
+mod reveal_boundary_tests {
+    use super::*;
+
+    #[test]
+    fn navigation_layout_defaults_to_manual_and_rejects_invalid_host_policy() {
+        let mut run =
+            RunPort::standard(990, 1000..1010, RunScope::main("policy", "manual")).unwrap();
+        assert_eq!(run.navigation_layout_policy, None);
+        for margin in [f32::NAN, f32::INFINITY, -1.] {
+            assert!(
+                run.set_navigation_layout_policy(Some(RunNavigationLayoutPolicy::Main {
+                    bottom_visibility_margin: margin,
+                }))
+                .is_err()
+            );
+            assert_eq!(run.navigation_layout_policy, None);
+        }
+        run.set_turn_navigation_context(None).unwrap();
+        run.set_navigation_layout_policy(Some(RunNavigationLayoutPolicy::Auxiliary))
+            .unwrap();
+        run.set_navigation_layout_policy(None).unwrap();
+        assert_eq!(run.navigation_layout_policy, None);
+        run.set_turn_navigation_context(None).unwrap();
+    }
+
+    #[test]
+    fn private_document_boundary_preserves_original_viewport_and_reading_attachment() {
+        let run =
+            RunPort::standard(990, 1000..1010, RunScope::main("boundary", "original")).unwrap();
+        let ids = run.ids();
+        let transcript = run.transcript_id().unwrap();
+        let boundary = ComponentId(transcript.0 + 1);
+        let original_scroll = run
+            .document_viewport()
+            .unwrap()
+            .component::<ScrollContent>()
+            .unwrap() as *const _;
+        let mut host = run.into_host().unwrap();
+        // The Host admits every mounted ID, including the previously unused
+        // private slot, while the public viewport still downcasts to its SDK type.
+        assert!(
+            host.get(boundary)
+                .unwrap()
+                .component::<RunDocumentBoundary>()
+                .is_some()
+        );
+        assert_eq!(
+            host.get(ids.viewport)
+                .unwrap()
+                .component::<ScrollContent>()
+                .unwrap() as *const _,
+            original_scroll
+        );
+        let (version, ()) = host
+            .set_scroll_reading_document(
+                ids.viewport,
+                "original-boundary",
+                1,
+                vec![transcript],
+                |_| (),
+            )
+            .unwrap();
+        let run = host.get(ids.root).unwrap().component::<RunPort>().unwrap();
+        let viewport = run.document_viewport().unwrap();
+        assert_eq!(viewport.id(), ids.viewport);
+        let scroll = viewport.component::<ScrollContent>().unwrap();
+        assert_eq!(scroll as *const _, original_scroll);
+        assert_eq!(scroll.children()[0].id(), transcript);
+        assert_eq!(scroll.reading_document_version(), Some(&version));
+        assert!(host.get(ids.composer.root).is_some());
     }
 }

@@ -242,7 +242,7 @@ impl Probe {
                     .tree
                     .get(Self::pane(host).ids().refresh)
                     .unwrap()
-                    .component::<tekes_ui_controls::composition::ButtonContent>()
+                    .component::<tekes_ui_controls::composition::Button>()
                     .unwrap()
                     .button
                     .state
@@ -294,7 +294,7 @@ impl Probe {
                     .tree
                     .get(Self::pane(host).ids().refresh)
                     .unwrap()
-                    .component::<tekes_ui_controls::composition::ButtonContent>()
+                    .component::<tekes_ui_controls::composition::Button>()
                     .unwrap()
                     .button
                     .state

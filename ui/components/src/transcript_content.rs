@@ -189,15 +189,17 @@ pub struct TranscriptContent {
     controls_dirty: bool,
     run_layout: Option<RunTranscriptLayout>,
     arranged_revision: Option<(u64, u64)>,
+    reveal_arranged: bool,
     turn_target_owner: std::sync::Arc<()>,
     historical_control: Option<crate::HistoricalInputControl>,
     historical_generation: u64,
     thinking_input: Option<crate::TranscriptThinkingDisplayInput>,
     applied_thinking: Option<crate::TranscriptThinkingDisplayInput>,
 }
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct RunTranscriptLayout {
-    pub column_x: f32,
+    pub column_offset: f32,
+    pub pane_width: f32,
     pub column_width: f32,
     pub top: f32,
     pub bottom: f32,
@@ -219,6 +221,11 @@ impl TranscriptContent {
         Ok(next)
     }
     pub(crate) fn set_run_layout(&mut self, layout: RunTranscriptLayout) {
+        if self.run_layout == Some(layout) {
+            return;
+        }
+        self.arranged_revision = None;
+        self.reveal_arranged = false;
         self.run_layout = Some(layout);
     }
     /// The host grants an exclusive row namespace range. Output asides reserve
@@ -267,6 +274,7 @@ impl TranscriptContent {
             controls_dirty: false,
             run_layout: None,
             arranged_revision: None,
+            reveal_arranged: false,
             turn_target_owner: std::sync::Arc::new(()),
             historical_control: None,
             historical_generation: 0,
@@ -710,6 +718,7 @@ impl TranscriptContent {
         self.activity_generation = generation;
         self.controls_dirty = true;
         self.arranged_revision = None;
+        self.reveal_arranged = false;
         self.turn_target_owner = std::sync::Arc::new(());
         Ok(())
     }
@@ -1057,6 +1066,7 @@ impl TranscriptContent {
         self.last = Some(snapshot.clone());
         self.timing = timing.clone();
         self.arranged_revision = None;
+        self.reveal_arranged = false;
         self.controls_dirty = false;
         Ok(())
     }
@@ -1567,7 +1577,7 @@ impl TranscriptContent {
                 unreachable!("fragments retain original message nodes")
             }
             PlannedContent::Disclosure { .. } => {
-                Content::new(root, ButtonContent::new("")).preserving_focus()
+                Content::new(root, Button::new("")).preserving_focus()
             }
             PlannedContent::Input(_) => {
                 let mut view = InputMessage::with_details_labels(
@@ -1644,7 +1654,7 @@ impl TranscriptContent {
             }
             PlannedContent::Fragment(..) | PlannedContent::ToolFragment(..) => {}
             PlannedContent::Disclosure { .. } => {
-                if node.component::<ButtonContent>().is_none() {
+                if node.component::<Button>().is_none() {
                     return Err("activity disclosure role changed");
                 }
             }
@@ -1713,7 +1723,7 @@ impl TranscriptContent {
     ) -> Result<(), &'static str> {
         match &row.content {
             PlannedContent::Disclosure { text, expanded } => {
-                let button = node.component_mut::<ButtonContent>().unwrap();
+                let button = node.component_mut::<Button>().unwrap();
                 button.label = text.clone();
                 button.button.state.selected = *expanded;
             }
@@ -1825,12 +1835,7 @@ impl TranscriptContent {
                 (count % 2 == 1).then(|| {
                     (
                         key.clone(),
-                        !node
-                            .component::<ButtonContent>()
-                            .unwrap()
-                            .button
-                            .state
-                            .selected,
+                        !node.component::<Button>().unwrap().button.state.selected,
                     )
                 })
             })
@@ -1851,21 +1856,27 @@ impl TranscriptContent {
     /// Host forwards the original drained action batch, then renders. Local tool
     /// disclosure is handled here; mutations return immutable original-turn intents.
     pub fn handle_actions(&mut self, actions: &[ContentAction]) -> Vec<TurnFootnoteIntent> {
-        self.handle_activity_actions(actions);
+        let mut changed = self.handle_activity_actions(actions);
         let mut result = vec![];
         for node in &mut self.rows.children {
             let node = source_node_mut(node);
             if let Some(input) = node.component_mut::<InputMessage>() {
-                input.handle_actions(actions);
+                changed |= input.handle_actions(actions);
             } else if let Some(output) = node.component_mut::<OutputMessage>() {
-                output.handle_actions(actions);
+                changed |= output.handle_actions(actions);
             } else if let Some(fragment) = node.component_mut::<OutputMessageFragment>() {
-                fragment.handle_actions(actions);
+                changed |= fragment.handle_actions(actions);
             } else if let Some(tool) = node.component_mut::<ToolRun>() {
-                tool.handle_actions(actions);
+                changed |= tool.handle_actions(actions);
             } else if let Some(footer) = node.component_mut::<TurnFootnote>() {
-                result.extend(footer.take_intents(actions));
+                let intents = footer.take_intents(actions);
+                changed |= !intents.is_empty();
+                result.extend(intents);
             }
+        }
+        if changed {
+            self.arranged_revision = None;
+            self.reveal_arranged = false;
         }
         self.refresh_detached();
         result
@@ -1895,6 +1906,7 @@ impl TranscriptContent {
         self.historical_control = control;
         self.controls_dirty = true;
         self.arranged_revision = None;
+        self.reveal_arranged = false;
         self.turn_target_owner = std::sync::Arc::new(());
         Ok(())
     }
@@ -2026,6 +2038,13 @@ impl TranscriptContent {
     }
 }
 impl Component for TranscriptContent {
+    fn host_reveal_passthrough(&self) -> bool {
+        self.reveal_arranged && self.arranged_revision == Some((self.publication, self.epoch))
+    }
+
+    fn lifecycle(&mut self, _: Lifecycle) {
+        self.reveal_arranged = false;
+    }
     fn children(&self) -> &[Content] {
         &self.rows.children
     }
@@ -2033,6 +2052,7 @@ impl Component for TranscriptContent {
         Some(&mut self.rows.children)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        self.reveal_arranged = false;
         let layout = self.run_layout;
         let width = layout.map_or(available.width, |layout| layout.column_width);
         let measured = self.rows.measure(text, Size::new(width, available.height));
@@ -2040,13 +2060,18 @@ impl Component for TranscriptContent {
         MeasuredChild::new(Size::new(available.width, measured.size.height + clearance))
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        self.reveal_arranged = false;
         let content = if let Some(layout) = self.run_layout {
             // The Run supplies its pane-space column. The library owns the
             // ScrollContent focus gutter, scrolling origin, clip and placement.
             // Only vertical document clearance belongs to this Agent composition.
             ContainerLayout::new(
                 Rect::new(
-                    layout.column_x,
+                    // Convert pane-local column placement to the SDK document frame.
+                    // Its width already excludes the original focus gutter. No Scroll
+                    // offset is read or compensated here; translation comes from frame.
+                    frame.min_x() + layout.column_offset
+                        - (layout.pane_width - frame.size.width) * 0.5,
                     frame.min_y(),
                     layout.column_width,
                     frame.size.height,
@@ -2065,6 +2090,7 @@ impl Component for TranscriptContent {
         };
         self.rows.arrange(text, content, clip);
         self.arranged_revision = Some((self.publication, self.epoch));
+        self.reveal_arranged = !frame.is_empty() && !clip.is_empty();
     }
     fn semantics(&self) -> ContentSemantics {
         ContentSemantics::new(ContentRole::Group, &self.labels.group)
@@ -2409,4 +2435,189 @@ fn event_row<'a>(
         }
         _ => None,
     })
+}
+
+#[cfg(test)]
+mod reveal_layout_tests {
+    use super::*;
+    use tekes_ui_controls::{ButtonTextAlign, ScrollRevealOptions, ScrollRevealPlacement};
+    use tekes_ui_scene::{Point, Scene};
+    use tekes_ui_tokens::{Rgba, Theme};
+
+    struct Text(f32);
+    impl ButtonTextRenderer for Text {
+        fn measure(&mut self, _: &str, _: proposal::TextRole, width: f32) -> Size {
+            Size::new(width, 400.)
+        }
+        fn draw(
+            &mut self,
+            _: &mut Scene,
+            _: &str,
+            _: proposal::TextRole,
+            _: Rect,
+            _: ButtonTextAlign,
+            _: Rgba,
+        ) {
+        }
+        fn backing_scale(&self) -> f32 {
+            self.0
+        }
+    }
+
+    #[test]
+    fn translated_column_keeps_original_alignment_through_actual_scroll_reveal() {
+        for origin in [Point::new(0., 0.), Point::new(73., 41.)] {
+            for scale in [1., 2.] {
+                let pane = Rect::new(origin.x, origin.y, 560., 240.);
+                let viewport = ComponentId(900);
+                let first = ComponentId(901);
+                let target = ComponentId(902);
+                let mut transcript = TranscriptContent::new(
+                    910,
+                    911..920,
+                    RunScope::main("layout", "original"),
+                    Default::default(),
+                )
+                .unwrap();
+                let layout = RunTranscriptLayout {
+                    column_offset: 40.,
+                    pane_width: pane.size.width,
+                    column_width: 480.,
+                    top: 0.,
+                    bottom: 0.,
+                };
+                transcript.set_run_layout(layout);
+                transcript.rows.children = vec![
+                    Content::new(first, TextContent::new("first original row")),
+                    Content::new(target, TextContent::new("target original row")),
+                ];
+                let id = transcript.id();
+                assert!(!transcript.host_reveal_passthrough());
+                let mut host = ContentHost::new(Content::new(
+                    viewport,
+                    ScrollContent::new(
+                        tekes_ui_controls::ScrollArea::default(),
+                        Content::new(id, transcript),
+                    ),
+                ))
+                .unwrap();
+                let (version, ()) = host
+                    .set_scroll_reading_document(
+                        viewport,
+                        "original-layout",
+                        1,
+                        vec![first, target],
+                        |_| (),
+                    )
+                    .unwrap();
+                let mut text = Text(scale);
+                host.render(
+                    &mut Scene::new(),
+                    &mut text,
+                    pane,
+                    pane,
+                    Theme::LIGHT.into(),
+                )
+                .unwrap();
+                let before = host.get(target).unwrap().frame();
+                assert!((before.min_x() - (pane.min_x() + 40.)).abs() < 0.01);
+                assert!((before.size.width - 480.).abs() < 0.01);
+                let old_offset = host
+                    .get(viewport)
+                    .unwrap()
+                    .component::<ScrollContent>()
+                    .unwrap()
+                    .scroll
+                    .offset
+                    .y;
+                host.reveal_scroll_reading_item(
+                    viewport,
+                    &version,
+                    target,
+                    ScrollRevealOptions {
+                        placement: ScrollRevealPlacement::Start(Axis::Vertical),
+                        animated: false,
+                        ..Default::default()
+                    },
+                    &mut text,
+                )
+                .unwrap();
+                host.render(
+                    &mut Scene::new(),
+                    &mut text,
+                    pane,
+                    pane,
+                    Theme::LIGHT.into(),
+                )
+                .unwrap();
+                let after = host.get(target).unwrap().frame();
+                let new_offset = host
+                    .get(viewport)
+                    .unwrap()
+                    .component::<ScrollContent>()
+                    .unwrap()
+                    .scroll
+                    .offset
+                    .y;
+                assert!(new_offset > old_offset);
+                assert!(
+                    (after.min_y() - (before.min_y() - (new_offset - old_offset))).abs() < 0.01
+                );
+                assert_eq!(before.min_x(), after.min_x());
+                assert_eq!(before.size.width, after.size.width);
+                let transcript = host
+                    .get_mut(id)
+                    .unwrap()
+                    .component_mut::<TranscriptContent>()
+                    .unwrap();
+                assert!(transcript.host_reveal_passthrough());
+                // SDK commit route access cannot revoke the arranged proof.
+                let _ = transcript.children_mut();
+                assert!(transcript.host_reveal_passthrough());
+                transcript.set_run_layout(layout);
+                assert!(transcript.host_reveal_passthrough());
+                let mut reflow = layout;
+                reflow.column_offset += 1.;
+                transcript.set_run_layout(reflow);
+                assert!(!transcript.host_reveal_passthrough());
+                assert!(
+                    host.reveal_scroll_reading_item(
+                        viewport,
+                        &version,
+                        target,
+                        Default::default(),
+                        &mut text
+                    )
+                    .is_err()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn measurement_empty_clip_and_unmount_revoke_original_layout_qualification() {
+        let mut transcript = TranscriptContent::new(
+            930,
+            931..940,
+            RunScope::main("layout", "lifecycle"),
+            Default::default(),
+        )
+        .unwrap();
+        transcript
+            .rows
+            .children
+            .push(Content::new(ComponentId(900), TextContent::new("row")));
+        let frame = Rect::new(31., 47., 500., 400.);
+        let mut text = Text(1.);
+        transcript.arrange(&mut text, frame, frame);
+        assert!(transcript.host_reveal_passthrough());
+        transcript.measure(&mut text, frame.size);
+        assert!(!transcript.host_reveal_passthrough());
+        transcript.arrange(&mut text, frame, Rect::default());
+        assert!(!transcript.host_reveal_passthrough());
+        transcript.arrange(&mut text, frame, frame);
+        assert!(transcript.host_reveal_passthrough());
+        transcript.lifecycle(Lifecycle::Unmounted);
+        assert!(!transcript.host_reveal_passthrough());
+    }
 }

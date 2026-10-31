@@ -76,7 +76,7 @@ fn host_header_keeps_original_pane_and_composer_while_library_typography_reflows
             assert!(host.get(diagnostic_tab).is_none() && host.get(diagnostic_close).is_none());
             let body_owner = host.text_surface(body).unwrap() as *const _ as usize;
             let tab_owner =
-                host.get(tab).unwrap().component::<ButtonContent>().unwrap() as *const _ as usize;
+                host.get(tab).unwrap().component::<Button>().unwrap() as *const _ as usize;
             let toolbar_owner = host
                 .get(ComponentId(nav.0 + 1))
                 .unwrap()
@@ -112,8 +112,7 @@ fn host_header_keeps_original_pane_and_composer_while_library_typography_reflows
                     body_owner
                 );
                 assert_eq!(
-                    host.get(tab).unwrap().component::<ButtonContent>().unwrap() as *const _
-                        as usize,
+                    host.get(tab).unwrap().component::<Button>().unwrap() as *const _ as usize,
                     tab_owner
                 );
                 assert_eq!(
@@ -124,11 +123,7 @@ fn host_header_keeps_original_pane_and_composer_while_library_typography_reflows
                     toolbar_owner
                 );
                 assert_eq!(
-                    host.get(tab)
-                        .unwrap()
-                        .component::<ButtonContent>()
-                        .unwrap()
-                        .label,
+                    host.get(tab).unwrap().component::<Button>().unwrap().label,
                     title
                 );
                 assert_eq!(host.focused(), Some(editor));

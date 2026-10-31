@@ -307,7 +307,7 @@ impl Probe {
                         .tree
                         .get(view.ids().send)
                         .unwrap()
-                        .component::<tekes_ui_controls::composition::ButtonContent>()
+                        .component::<tekes_ui_controls::composition::Button>()
                         .unwrap()
                         .button
                         .state
@@ -378,7 +378,7 @@ impl Probe {
                     view.tree
                         .get(note)
                         .unwrap()
-                        .component::<tekes_ui_controls::composition::ButtonContent>()
+                        .component::<tekes_ui_controls::composition::Button>()
                         .unwrap()
                         .label,
                     NOTE

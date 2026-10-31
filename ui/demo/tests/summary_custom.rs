@@ -56,7 +56,7 @@ fn original_host_control_survives_publications_and_disclosure_aba_retires_callba
         &mut host,
         root,
         &first,
-        Content::new(button, ButtonContent::new("原宿主控件")),
+        Content::new(button, Button::new("原宿主控件")),
     )
     .unwrap();
     host.accessibility_action(button, None, AccessibilityAction::Press);
@@ -81,7 +81,7 @@ fn original_host_control_survives_publications_and_disclosure_aba_retires_callba
     assert_eq!(refreshed.row_id(), first.row_id());
     assert_eq!(
         view(&host, root)
-            .custom_row_component::<ButtonContent>(&refreshed)
+            .custom_row_component::<Button>(&refreshed)
             .unwrap()
             .label,
         "原宿主控件"
@@ -113,7 +113,7 @@ fn original_host_control_survives_publications_and_disclosure_aba_retires_callba
         .unwrap();
     assert_eq!(
         view(&host, root)
-            .custom_row_component::<ButtonContent>(&reopened)
+            .custom_row_component::<Button>(&reopened)
             .unwrap()
             .label,
         "原宿主控件"
@@ -166,7 +166,7 @@ fn invalid_specs_and_sdk_duplicate_ids_leave_the_original_slot_unmodified() {
     );
     assert!(
         view(&host, root)
-            .custom_row_component::<ButtonContent>(&original)
+            .custom_row_component::<Button>(&original)
             .is_err()
     );
     assert_eq!(view(&host, root).displayed_context_input(), Some(&model));
@@ -175,7 +175,7 @@ fn invalid_specs_and_sdk_duplicate_ids_leave_the_original_slot_unmodified() {
         &mut host,
         root,
         &original,
-        Content::new(button, ButtonContent::new("保留")),
+        Content::new(button, Button::new("保留")),
     )
     .unwrap();
     assert!(
@@ -183,13 +183,13 @@ fn invalid_specs_and_sdk_duplicate_ids_leave_the_original_slot_unmodified() {
             &mut host,
             root,
             &original,
-            Content::new(ComponentId(button.0 + 1), ButtonContent::new("替换"))
+            Content::new(ComponentId(button.0 + 1), Button::new("替换"))
         )
         .is_err()
     );
     assert_eq!(
         view(&host, root)
-            .custom_row_component::<ButtonContent>(&original)
+            .custom_row_component::<Button>(&original)
             .unwrap()
             .label,
         "保留"
@@ -203,7 +203,7 @@ fn invalid_specs_and_sdk_duplicate_ids_leave_the_original_slot_unmodified() {
             &mut host,
             root,
             &original,
-            Content::new(ComponentId(button.0 + 2), ButtonContent::new("晚到"))
+            Content::new(ComponentId(button.0 + 2), Button::new("晚到"))
         )
         .is_err()
     );
@@ -223,7 +223,7 @@ fn identical_numeric_ids_in_another_view_and_original_host_remount_cannot_reuse_
             &mut foreign,
             root,
             &before,
-            Content::new(ComponentId(40406u64 << 32), ButtonContent::new("外来"))
+            Content::new(ComponentId(40406u64 << 32), Button::new("外来"))
         )
         .is_err()
     );
@@ -245,7 +245,7 @@ fn identical_numeric_ids_in_another_view_and_original_host_remount_cannot_reuse_
         &mut host,
         root,
         &before,
-        Content::new(button, ButtonContent::new("原实例")),
+        Content::new(button, Button::new("原实例")),
     )
     .unwrap();
     let retained = host.remove(root).unwrap();
@@ -261,7 +261,7 @@ fn identical_numeric_ids_in_another_view_and_original_host_remount_cannot_reuse_
         .unwrap();
     assert_eq!(
         view(&host, root)
-            .custom_row_component::<ButtonContent>(&mounted)
+            .custom_row_component::<Button>(&mounted)
             .unwrap()
             .label,
         "原实例"

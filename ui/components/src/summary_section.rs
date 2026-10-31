@@ -24,7 +24,7 @@ pub(crate) type Expansion = Rc<RefCell<Disclosure>>;
 
 #[derive(Debug)]
 pub(crate) struct SummaryHeader {
-    button: CompoundButton,
+    button: Button,
     pub expansion: Expansion,
     epoch: Rc<Cell<u64>>,
     kind: SectionHeaderKind,
@@ -50,8 +50,7 @@ impl SummaryHeader {
             label
         };
         Self {
-            button: CompoundButton::new("Summary section", label)
-                .expect("Summary header has one passive text slot"),
+            button: Button::new(label).with_accessible_name("Summary section"),
             expansion,
             epoch,
             kind,
@@ -75,14 +74,15 @@ impl SummaryHeader {
         self.shows_divider = self.kind == SectionHeaderKind::Summary && shown;
     }
     pub fn set_title(&mut self, title: String) {
-        self.button.action.label = title.clone();
+        self.button.label = title.clone();
+        self.button.set_accessible_name(Some(title.clone()));
         self.button.children_mut().unwrap()[0]
             .component_mut::<TextContent>()
             .expect("Summary title")
             .text = title;
     }
     pub fn set_enabled(&mut self, enabled: bool) {
-        self.button.action.button.state.disabled = !enabled;
+        self.button.button.state.disabled = !enabled;
     }
     fn activated(&mut self, response: ContentResponse) -> ContentResponse {
         if response.activated && self.expansion.borrow_mut().toggle() {
@@ -97,6 +97,9 @@ impl SummaryHeader {
     }
 }
 impl Component for SummaryHeader {
+    fn rectangular_input_geometry(&self) -> bool {
+        true
+    }
     fn children(&self) -> &[Content] {
         self.button.children()
     }
@@ -193,8 +196,23 @@ impl Component for SummaryHeader {
 pub(crate) struct SummaryRows {
     pub rows: StackContent,
     expansion: Expansion,
+    disclosure_epoch: Rc<Cell<u64>>,
+    arranged: Option<(u64, Vec<ComponentId>)>,
 }
 impl Component for SummaryRows {
+    fn host_reveal_passthrough(&self) -> bool {
+        self.active()
+            && self.arranged.as_ref().is_some_and(|(epoch, rows)| {
+                *epoch == self.disclosure_epoch.get()
+                    && rows
+                        .iter()
+                        .copied()
+                        .eq(self.rows.children.iter().map(Content::id))
+            })
+    }
+    fn lifecycle(&mut self, _: Lifecycle) {
+        self.arranged = None;
+    }
     fn active(&self) -> bool {
         self.expansion.borrow().open
     }
@@ -205,6 +223,7 @@ impl Component for SummaryRows {
         Some(&mut self.rows.children)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, size: Size) -> MeasuredChild {
+        self.arranged = None;
         if self.active() {
             self.rows.measure(text, size)
         } else {
@@ -212,8 +231,15 @@ impl Component for SummaryRows {
         }
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        self.arranged = None;
         if self.active() {
             self.rows.arrange(text, frame, clip);
+            if !frame.is_empty() && !clip.is_empty() {
+                self.arranged = Some((
+                    self.disclosure_epoch.get(),
+                    self.rows.children.iter().map(Content::id).collect(),
+                ));
+            }
         }
     }
 }
@@ -238,6 +264,7 @@ pub(crate) struct SummarySectionView {
     pub expansion: Expansion,
     pub layout: Option<SummarySectionLayout>,
     pub disclosure_epoch: Rc<Cell<u64>>,
+    arranged_epoch: Option<u64>,
 }
 impl SummarySectionView {
     pub fn new(
@@ -251,6 +278,7 @@ impl SummarySectionView {
         let epoch = Rc::new(Cell::new(0));
         Self {
             disclosure_epoch: epoch.clone(),
+            arranged_epoch: None,
             section,
             body_indent: 0.,
             expansion: expansion.clone(),
@@ -258,7 +286,7 @@ impl SummarySectionView {
             children: vec![
                 Content::new(
                     header,
-                    SummaryHeader::new(label, expansion.clone(), epoch, kind),
+                    SummaryHeader::new(label, expansion.clone(), epoch.clone(), kind),
                 ),
                 Content::new(
                     body,
@@ -272,12 +300,20 @@ impl SummarySectionView {
                             children: vec![],
                         },
                         expansion,
+                        disclosure_epoch: epoch,
+                        arranged: None,
                     },
                 ),
             ],
         }
     }
     pub fn header_mut(&mut self) -> &mut SummaryHeader {
+        self.layout = None;
+        self.arranged_epoch = None;
+        self.children[1]
+            .component_mut::<SummaryRows>()
+            .unwrap()
+            .arranged = None;
         self.children[0].component_mut::<SummaryHeader>().unwrap()
     }
     pub fn rows(&self) -> &[Content] {
@@ -288,11 +324,13 @@ impl SummarySectionView {
             .children
     }
     pub fn rows_mut(&mut self) -> &mut Vec<Content> {
-        &mut self.children[1]
-            .component_mut::<SummaryRows>()
-            .unwrap()
-            .rows
-            .children
+        self.layout = None;
+        self.arranged_epoch = None;
+        // This existing mutation entry already retires the parent geometry.
+        // Retire the child's proof too, including same-ID content replacement.
+        let rows = self.children[1].component_mut::<SummaryRows>().unwrap();
+        rows.arranged = None;
+        &mut rows.rows.children
     }
     pub fn arranged(&self) -> Option<&SummarySectionLayout> {
         self.layout
@@ -301,6 +339,13 @@ impl SummarySectionView {
     }
 }
 impl Component for SummarySectionView {
+    fn lifecycle(&mut self, _: Lifecycle) {
+        self.arranged_epoch = None;
+        self.layout = None;
+    }
+    fn host_reveal_passthrough(&self) -> bool {
+        self.arranged_epoch == Some(self.disclosure_epoch.get()) && self.arranged().is_some()
+    }
     fn children(&self) -> &[Content] {
         &self.children
     }
@@ -308,6 +353,7 @@ impl Component for SummarySectionView {
         Some(&mut self.children)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        self.arranged_epoch = None;
         let header = self.children[0].measure(text, available).size;
         let body = self.children[1]
             .measure(
@@ -321,6 +367,7 @@ impl Component for SummarySectionView {
         MeasuredChild::new(Size::new(available.width, header.height + body.height))
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        self.arranged_epoch = None;
         let height = self.children[0].measure(text, frame.size).size.height;
         let header = Rect::new(frame.min_x(), frame.min_y(), frame.size.width, height);
         self.children[0].arrange(text, header, clip);
@@ -354,6 +401,9 @@ impl Component for SummarySectionView {
             body,
             expanded: body.is_some(),
         });
+        if !frame.is_empty() && !clip.is_empty() {
+            self.arranged_epoch = Some(self.disclosure_epoch.get());
+        }
     }
 }
 
@@ -391,5 +441,120 @@ impl Component for SummaryDocument {
     }
     fn semantics(&self) -> ContentSemantics {
         self.list.semantics()
+    }
+}
+
+#[cfg(test)]
+mod rows_reveal_tests {
+    use super::*;
+    struct Text;
+    impl ButtonTextRenderer for Text {
+        fn measure(&mut self, _: &str, _: tekes_ui_tokens::proposal::TextRole, width: f32) -> Size {
+            Size::new(width.min(80.), 20.)
+        }
+        fn draw(
+            &mut self,
+            _: &mut Scene,
+            _: &str,
+            _: tekes_ui_tokens::proposal::TextRole,
+            _: Rect,
+            _: tekes_ui_controls::ButtonTextAlign,
+            _: tekes_ui_tokens::Rgba,
+        ) {
+        }
+    }
+    fn render(host: &mut ContentHost) {
+        let frame = Rect::new(0., 0., 400., 400.);
+        host.render(
+            &mut Scene::new(),
+            &mut Text,
+            frame,
+            frame,
+            tekes_ui_tokens::Theme::LIGHT.into(),
+        )
+        .unwrap();
+    }
+    fn qualified(host: &ContentHost) -> bool {
+        host.get(ComponentId(4))
+            .unwrap()
+            .component::<SummaryRows>()
+            .unwrap()
+            .host_reveal_passthrough()
+    }
+    #[test]
+    fn rows_require_current_arrange_and_reject_changed_rows_and_disclosure_aba() {
+        let expansion = Rc::new(RefCell::new(Disclosure::default()));
+        expansion.borrow_mut().open = true;
+        let mut section = SummarySectionView::new(
+            "rows".into(),
+            ComponentId(2),
+            ComponentId(3),
+            ComponentId(4),
+            expansion,
+            SectionHeaderKind::Sidebar,
+        );
+        section.header_mut().set_title("section".into());
+        section
+            .rows_mut()
+            .push(Content::new(ComponentId(5), Button::new("first")));
+        let mut host = ContentHost::new(Content::new(ComponentId(1), section)).unwrap();
+        assert!(!qualified(&host));
+        render(&mut host);
+        assert!(qualified(&host));
+        let plan = host
+            .plan_host_reveal(ComponentId(5), Default::default(), &[], Default::default())
+            .unwrap();
+        host.get_mut(ComponentId(1))
+            .unwrap()
+            .component_mut::<SummarySectionView>()
+            .unwrap()
+            .rows_mut()[0] = Content::new(ComponentId(5), Button::new("replacement"));
+        assert!(!qualified(&host));
+        assert!(host.commit_host_reveal(plan).is_err());
+        render(&mut host);
+        assert!(qualified(&host));
+        let plan = host
+            .plan_host_reveal(ComponentId(5), Default::default(), &[], Default::default())
+            .unwrap();
+        host.get_mut(ComponentId(1))
+            .unwrap()
+            .component_mut::<SummarySectionView>()
+            .unwrap()
+            .rows_mut()
+            .push(Content::new(ComponentId(6), Button::new("second")));
+        assert!(!qualified(&host));
+        assert!(host.commit_host_reveal(plan).is_err());
+        render(&mut host);
+        assert!(qualified(&host));
+        // The original header owns the shared disclosure and epoch. Close then
+        // reopen without arranging: equal open value cannot revive old evidence.
+        host.accessibility_action(ComponentId(2), None, AccessibilityAction::Press);
+        assert!(!qualified(&host));
+        render(&mut host);
+        assert!(!qualified(&host));
+        host.accessibility_action(ComponentId(2), None, AccessibilityAction::Press);
+        assert!(!qualified(&host));
+        render(&mut host);
+        assert!(qualified(&host));
+        host.accessibility_action(ComponentId(2), None, AccessibilityAction::Press);
+        host.accessibility_action(ComponentId(2), None, AccessibilityAction::Press);
+        assert!(
+            host.get(ComponentId(4))
+                .unwrap()
+                .component::<SummaryRows>()
+                .unwrap()
+                .active()
+        );
+        assert!(!qualified(&host));
+        render(&mut host);
+        assert!(qualified(&host));
+        host.get_mut(ComponentId(4))
+            .unwrap()
+            .component_mut::<SummaryRows>()
+            .unwrap()
+            .measure(&mut Text, Size::new(300., 400.));
+        assert!(!qualified(&host));
+        render(&mut host);
+        assert!(qualified(&host));
     }
 }

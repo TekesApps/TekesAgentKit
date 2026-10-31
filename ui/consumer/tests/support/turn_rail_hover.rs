@@ -168,6 +168,14 @@ fn verify_rail(scale: f32) {
     text.backing_scale = scale;
     let resting_scene = render(&mut host, &mut text);
     let geometry = run(&host).layout_geometry().unwrap().turn_rail;
+    let navigation_id = run(&host).turn_rail().unwrap().item_ids()[3];
+    let navigation_semantics = host
+        .semantics()
+        .into_iter()
+        .find(|node| node.id == navigation_id)
+        .expect("original navigation owner must remain in the semantic tree");
+    assert_eq!(navigation_semantics.semantics.role, ContentRole::Button);
+    assert_eq!(navigation_semantics.semantics.name, "回合 4 · 问题 3");
     assert_eq!(geometry.document_size.height, 70.);
     assert_eq!(
         run(&host).turn_rail().unwrap().layout_geometry(),

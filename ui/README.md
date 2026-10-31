@@ -20,7 +20,7 @@ Sidebar 的共享 binding 提供显式同实例 observer 恢复 API，按原 end
 - [SideChat 家族菜单接入验证](../docs/rust-agent-ui-sidechat-menu-probe-20261022.md)：原菜单→宿主回调→两个实际 scratch pointer 组合测试通过，关闭等 discard 成功后移除；原生尝试[未获得活动窗口](../docs/rust-agent-ui-native-system-prompt-20261022.md)，phase 14 退出，菜单仍未验收。
 - [SidePanelNavigation 与 Host header](../docs/rust-agent-ui-side-panel-navigation-20261022.md)：普通 tab、SideChat 家族菜单及当前关闭回调，原正文保留。531 项本地回归、第二公开 consumer、最终三端协议→离屏 GPU 通过；新窗口 toolbar/完整原生组合未验收。
 - [历史输入回调](../docs/rust-agent-ui-historical-input-20261022.md)：实际能力和 handler 双重启用；当前三端不声明能力，正常 demo 隐藏入口。
-- [精确公开 TekesUI 输入](../docs/tekesui-50ec-public-intake-20261022.md)：固定 `50ec49f3446924fdbc66b3cff22cd8cfe150fe7c`，实际 8 包/243 文件；构建输入以 manifest/lock 和检查器为准。
+- [精确公开 TekesUI 输入](../docs/tekesui-50ec-public-intake-20261022.md)：固定 `8a6a7633eec88af86353ad55da1aa90608faf69d`，实际 8 包/243 文件；构建输入以 manifest/lock 和检查器为准。
 - [冻结基线程序的原生补验](../docs/rust-agent-ui-native-resume-20261022.md)：三端反馈/流式发送/取消恢复通过；Pi/Native 分页阅读通过，DSH 分页及流式阅读组合存在失焦未完成项。该结果不转移到新程序。
 
 更早阶段各自的 pin、程序和验收范围保留在独立记录及[旧 README 快照](https://github.com/TekesApps/TekesAgentKit/blob/7ff99718ed380ce13452b66c62ab39ea9ab57505/ui/README.md)中；不覆盖本页的当前接入边界。
@@ -61,7 +61,7 @@ Composer 的真实输入胶囊公开为 `ComposerIds::input_band`；现在保留
 
 - Rust 1.95.0、macOS + Metal（原生窗口/文本服务/GPU）；Python 3.11+（准备和边界检查）。
 - AgentKit 已发布 tag v0.3.8 为 `6d40e9b4ec705c4a1df6626fb90ec299aa58a3b2`；当前公开 main 为 `f1daa0ffcf6ced41e21f351e22845455ca78006c`，已包含在本分支中。UI 使用同仓库开发路径的契约/runtime/presentation 增量，需一并 review 与发布；正式宿主应固定届时的新不可变 tag。最新独立三端 UI 验收使用 Kernel v0.9.3，历史收据按各自实际版本保留。
-- TekesUI composition 仍是实验 API，但实验开发源码固定为公开 Git commit `50ec49f3446924fdbc66b3cff22cd8cfe150fe7c`（数字输入/shared-key checkpoint）；6 个直接依赖和2个传递依赖均由 Cargo 按该完整 rev 取得，ui/Cargo.lock 同步固定。
+- TekesUI composition 仍是实验 API，但实验开发源码固定为公开 Git commit `8a6a7633eec88af86353ad55da1aa90608faf69d`（数字输入/shared-key checkpoint）；6 个直接依赖和2个传递依赖均由 Cargo 按该完整 rev 取得，ui/Cargo.lock 同步固定。
 - `tekesui-source.json` 的 kind 为 `published-git-revision`，243文件 SHA-256 为 `3ad8aa98a567679b775e78b634f45888c9eb70ffd05708a4f781c0ce7264471c`，对应实际八包依赖闭包；原431/8cf/2ee/129/09/3bef基线在 `baselines/` 原样保留。固定的是不可变commit，不跟随分支HEAD。
 - 旧e4 manifest、lockfile、消费适配和188依赖另有备份；旧 `.deps/tekesui` 原样保留但不参与当前构建。无需从兄弟工作树复制代码，`prepare-tekesui-demo.py` 在公开pin模式拒绝path/capture。
 - UI包继续 `0.0.0` / `publish=false`；公开 TekesUI pin 不代表 AgentKit UI 已发布或稳定。当前依赖见 [50ec公开接收](../docs/tekesui-50ec-public-intake-20261022.md)，原生验收范围见[三端补验](../docs/rust-agent-ui-native-resume-20261022.md)；旧阶段记录按各自程序解释。

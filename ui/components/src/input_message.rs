@@ -560,7 +560,7 @@ impl InputMessage {
             let node = if same_copy { old_copy } else { None }.unwrap_or_else(|| {
                 let id = ComponentId(self.ids.root.0 + self.next_detail);
                 self.next_detail += 1;
-                Content::new(id, ButtonContent::new(&self.copy_label))
+                Content::new(id, Button::new(&self.copy_label))
                     .with_label_layout(tekes_ui_text::LabelOptions::single_line(
                         tekes_ui_text::LabelOverflow::TailEllipsis,
                     ))
@@ -699,7 +699,7 @@ impl InputMessage {
             self.next_detail += 1;
             Content::new(
                 id,
-                ButtonContent::new(&self.historical_control.as_ref().unwrap().label),
+                Button::new(&self.historical_control.as_ref().unwrap().label),
             )
             .with_label_layout(tekes_ui_text::LabelOptions::single_line(
                 tekes_ui_text::LabelOverflow::TailEllipsis,
@@ -747,7 +747,7 @@ impl InputMessage {
                 .find_map(|node| node.component_mut::<InputAside>())
                 .and_then(|aside| aside.children.iter_mut().find(|node| node.id() == id))
         {
-            node.component_mut::<ButtonContent>().unwrap().label = self.copy_label.clone();
+            node.component_mut::<Button>().unwrap().label = self.copy_label.clone();
         }
     }
     /// Copy is available for loaded text even offline and in a read-only pane.

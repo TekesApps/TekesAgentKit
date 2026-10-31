@@ -116,7 +116,7 @@ async fn sidechat_upload_keeps_parent_send_enabled_and_restores_its_status_after
         view.tree
             .get(ids.send)
             .unwrap()
-            .component::<ButtonContent>()
+            .component::<Button>()
             .unwrap()
             .button
             .state
@@ -127,7 +127,7 @@ async fn sidechat_upload_keeps_parent_send_enabled_and_restores_its_status_after
             .tree
             .get(view.ids().send)
             .unwrap()
-            .component::<ButtonContent>()
+            .component::<Button>()
             .unwrap()
             .button
             .state

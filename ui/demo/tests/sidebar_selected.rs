@@ -1,3 +1,6 @@
+#[allow(dead_code)]
+#[path = "support/menu_host.rs"]
+mod sidebar_layout;
 use serde_json::json;
 use std::{sync::Arc, time::Duration};
 use tekes_agent_components_ui::*;
@@ -7,7 +10,6 @@ use tekes_agent_ui_demo::{
     fixture::Fixture,
 };
 use tekes_agent_web::SharedAgent;
-use tekes_ui_controls::composition::*;
 fn address(id: &str) -> SessionAddress {
     RunScope::main("fixture", id).address()
 }
@@ -315,9 +317,7 @@ async fn real_demo_supplements_current_selection_and_navigation_missing_only_fro
         .unwrap();
     assert!(sidebar.row_id(&address("a")).is_some());
     let row_b = sidebar.row_id(&address("b")).unwrap();
-    let commands = view
-        .accessibility_action(row_b, None, AccessibilityAction::Press)
-        .unwrap();
+    let commands = sidebar_layout::press_demo(&mut view, row_b).unwrap();
     let [DemoCommand::OpenSession(request)]: [DemoCommand; 1] = commands.try_into().ok().unwrap()
     else {
         panic!("one navigation")
@@ -410,9 +410,7 @@ async fn archived_canonical_target_is_rejected_even_when_the_visible_inventory_s
         .unwrap()
         .row_id(&address("b"))
         .unwrap();
-    let commands = view
-        .accessibility_action(row, None, AccessibilityAction::Press)
-        .unwrap();
+    let commands = sidebar_layout::press_demo(&mut view, row).unwrap();
     let [DemoCommand::OpenSession(request)]: [DemoCommand; 1] = commands.try_into().ok().unwrap()
     else {
         panic!("navigation")

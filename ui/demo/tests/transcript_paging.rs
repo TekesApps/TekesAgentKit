@@ -34,7 +34,7 @@ fn default_library_button_dispatches_only_the_original_scope() {
         .iter()
         .find(|child| child.id() == control.button_id())
         .unwrap()
-        .component::<ButtonContent>()
+        .component::<Button>()
         .unwrap();
     assert!(!button.button.state.disabled);
     assert_eq!(activate(control), Some(facts().scope));

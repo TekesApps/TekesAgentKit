@@ -1,3 +1,6 @@
+#[allow(dead_code)]
+#[path = "support/menu_host.rs"]
+mod sidebar_layout;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 use tekes_agent_components_ui::{SidePanel, Sidebar};
 use tekes_agent_contract::{SessionAddress, ThreadActionDefinition};
@@ -9,7 +12,6 @@ use tekes_agent_ui_demo::{
     sidebar_host::SidebarHostBinding,
 };
 use tekes_agent_web::SharedAgent;
-use tekes_ui_controls::composition::AccessibilityAction;
 
 fn address(endpoint: &str) -> SessionAddress {
     SessionAddress {
@@ -222,8 +224,7 @@ async fn component_demo_uses_multi_inventory_action_routing_and_owner_fences() {
         .unwrap()
         .row_id(&target)
         .unwrap();
-    let old_navigation = navigation_view
-        .accessibility_action(select, None, AccessibilityAction::Press)
+    let old_navigation = sidebar_layout::press_demo(&mut navigation_view, select)
         .unwrap()
         .into_iter()
         .find_map(|command| match command {

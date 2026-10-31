@@ -88,11 +88,8 @@ fn historical_input_uses_original_trailing_controls_without_taking_composer_pree
                 .unwrap()
                 .component::<TextContent>()
                 .unwrap() as *const _ as usize;
-            let edit_owner = host
-                .get(edit)
-                .unwrap()
-                .component::<ButtonContent>()
-                .unwrap() as *const _ as usize;
+            let edit_owner =
+                host.get(edit).unwrap().component::<Button>().unwrap() as *const _ as usize;
             for width in [770., 320., 180., 770.] {
                 let frame = Rect::new(20., 30., width, 1200.);
                 host.get_mut(ids.root)
@@ -109,10 +106,7 @@ fn historical_input_uses_original_trailing_controls_without_taking_composer_pree
                     information_owner
                 );
                 assert_eq!(
-                    host.get(edit)
-                        .unwrap()
-                        .component::<ButtonContent>()
-                        .unwrap() as *const _ as usize,
+                    host.get(edit).unwrap().component::<Button>().unwrap() as *const _ as usize,
                     edit_owner
                 );
                 let a = info.frame();
@@ -347,11 +341,7 @@ fn input_aside_is_one_external_trailing_band_with_full_source_and_original_copy_
                             .unwrap()
                             .set_copy_label("拷贝原输入");
                         assert_eq!(
-                            host.get(copy)
-                                .unwrap()
-                                .component::<ButtonContent>()
-                                .unwrap()
-                                .label,
+                            host.get(copy).unwrap().component::<Button>().unwrap().label,
                             "拷贝原输入"
                         );
                     }

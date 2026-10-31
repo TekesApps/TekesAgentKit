@@ -4,6 +4,7 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 use tekes_ui_scene::{Point, Scene};
+use tekes_ui_tokens::proposal;
 
 /// ClientKit Jump display policy only. The SDK retains all scrolling/animation.
 #[derive(Debug, Default)]
@@ -84,7 +85,7 @@ impl RunJumpLatest {
 }
 #[derive(Debug)]
 struct JumpButton {
-    button: ButtonContent,
+    button: Button,
     visible: bool,
     prototype: Option<RunJumpLatest>,
     pending: Vec<RunJumpLatest>,
@@ -107,9 +108,8 @@ impl Component for JumpButton {
         self.visible
     }
     fn measure(&mut self, _: &mut dyn ButtonTextRenderer, _: Size) -> MeasuredChild {
-        MeasuredChild::new(tekes_ui_controls::layout_view::IconButtonView::measure(
-            false,
-        ))
+        let side = proposal::metric("size", "size-icon-button").expect("Jump hit size token");
+        MeasuredChild::new(Size::new(side, side))
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
         self.frame = frame;
@@ -173,7 +173,7 @@ impl RunPort {
             return Err("Run Jump namespace overlap");
         }
         let id = ComponentId(u64::from(namespace) << 32);
-        let mut button = ButtonContent::new("↓");
+        let mut button = Button::new("↓");
         button.button.frame_policy = tekes_ui_controls::ButtonFramePolicy::Exact;
         button.pointer_activation_phase = ButtonActivationPhase::Press;
         self.body.children.push(
@@ -268,10 +268,7 @@ impl RunPort {
         };
         let geometry = self.geometry.unwrap();
         let viewport = self
-            .body
-            .children
-            .iter()
-            .find(|n| n.id() == self.ids.viewport)
+            .document_viewport()
             .unwrap()
             .component::<ScrollContent>()
             .unwrap();
@@ -296,7 +293,7 @@ impl RunPort {
             lifetime: self.navigation_lifetime.clone(),
             claimed: Arc::new(AtomicBool::new(false)),
         });
-        let side = tekes_ui_controls::layout_view::IconButtonView::measure(false).width;
+        let side = proposal::metric("size", "size-icon-button").expect("Jump hit size token");
         // Pane centered, immediately above visual controls; regular padding is
         // part of Jump's host, not the document's loose occlusion clearance.
         let bottom = composer.map_or(frame.max_y(), |c| c.min_y());

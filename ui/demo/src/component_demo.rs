@@ -330,9 +330,16 @@ impl NavigationRequest {
 #[derive(Debug)]
 struct DemoColumn {
     width: Option<f32>,
+    arranged_width: Option<Option<f32>>,
     children: Vec<Content>,
 }
 impl Component for DemoColumn {
+    fn host_reveal_passthrough(&self) -> bool {
+        self.arranged_width == Some(self.width)
+    }
+    fn lifecycle(&mut self, _: Lifecycle) {
+        self.arranged_width = None;
+    }
     fn children(&self) -> &[Content] {
         &self.children
     }
@@ -340,6 +347,7 @@ impl Component for DemoColumn {
         Some(&mut self.children)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        self.arranged_width = None;
         let width = self.width.unwrap_or(available.width).min(available.width);
         if let Some(child) = self.children.first_mut() {
             child.measure(text, Size::new(width, available.height));
@@ -350,6 +358,7 @@ impl Component for DemoColumn {
         if let Some(child) = self.children.first_mut() {
             child.arrange(text, frame, clip);
         }
+        self.arranged_width = (!frame.is_empty() && !clip.is_empty()).then_some(self.width);
     }
 }
 impl ComponentDemo {
@@ -444,7 +453,7 @@ impl ComponentDemo {
                 flexible_child: None,
                 children: vec![
                     Content::new(creation_choices.id(), creation_choices),
-                    Content::new(CREATE_AUTOMATIC, ButtonContent::new("使用自动预设创建")),
+                    Content::new(CREATE_AUTOMATIC, Button::new("使用自动预设创建")),
                 ],
             },
         );
@@ -476,7 +485,7 @@ impl ComponentDemo {
                                 (OPEN_SUMMARY, "Summary"),
                             ]
                             .into_iter()
-                            .map(|(id, label)| Content::new(id, ButtonContent::new(label)))
+                            .map(|(id, label)| Content::new(id, Button::new(label)))
                             .collect(),
                         },
                     ),
@@ -514,6 +523,7 @@ impl ComponentDemo {
                         SIDEBAR_COLUMN,
                         DemoColumn {
                             width: Some(SIDEBAR_WIDTH),
+                            arranged_width: None,
                             children: vec![Content::new(
                                 ComponentId(15),
                                 StackContent {
@@ -534,6 +544,7 @@ impl ComponentDemo {
                         MAIN_COLUMN,
                         DemoColumn {
                             width: None,
+                            arranged_width: None,
                             children: vec![Content::new(
                                 MAIN_UPLOAD_HOST,
                                 StackContent {
@@ -551,6 +562,7 @@ impl ComponentDemo {
                         PANEL_COLUMN,
                         DemoColumn {
                             width: Some(panel_width()),
+                            arranged_width: None,
                             children: vec![Content::new(
                                 PANEL_UPLOAD_HOST,
                                 StackContent {
@@ -632,7 +644,17 @@ impl ComponentDemo {
     }
     fn new_pair(index: usize, scope: &RunScope) -> Content {
         let ids = Self::ids_for(index);
-        Self::run_controls(ids, scope)
+        let mut content = Self::run_controls(ids, scope);
+        content
+            .component_mut::<RunPort>()
+            .unwrap()
+            .set_navigation_layout_policy(Some(
+                tekes_agent_components_ui::RunNavigationLayoutPolicy::Main {
+                    bottom_visibility_margin: 40.,
+                },
+            ))
+            .expect("main navigation layout policy");
+        content
     }
     fn run_controls(ids: ComposerIds, scope: &RunScope) -> Content {
         let mut composer = Composer::new(ids)
@@ -642,7 +664,7 @@ impl ComponentDemo {
             edit_annotations: true,
             ..Default::default()
         });
-        let view = RunPort::new(
+        let mut view = RunPort::new(
             RunPortIds {
                 root: ComponentId(ids.root.0 + 16),
                 indicators: ComponentId(ids.root.0 + 17),
@@ -655,6 +677,10 @@ impl ComponentDemo {
             3_000_000 + (ids.root.0 >> 32) as u32,
         )
         .expect("separate RunPort namespaces");
+        view.set_navigation_layout_policy(Some(
+            tekes_agent_components_ui::RunNavigationLayoutPolicy::Auxiliary,
+        ))
+        .expect("auxiliary navigation layout policy");
         Content::new(view.ids().root, view)
     }
     fn actionable_id(ids: ComposerIds) -> ComponentId {
@@ -3538,7 +3564,7 @@ impl ComponentDemo {
                     },
                     flexible_child: None,
                     children: vec![
-                        Content::new(FAMILY_REFRESH, ButtonContent::new("读取关联会话"))
+                        Content::new(FAMILY_REFRESH, Button::new("读取关联会话"))
                             .preserving_focus(),
                         Content::new(catalog.id(), catalog),
                     ],
@@ -3566,7 +3592,7 @@ impl ComponentDemo {
         self.tree
             .get_mut(FAMILY_REFRESH)
             .unwrap()
-            .component_mut::<ButtonContent>()
+            .component_mut::<Button>()
             .unwrap()
             .button
             .state
@@ -3618,7 +3644,7 @@ impl ComponentDemo {
         self.tree
             .get_mut(NEW_SESSION)
             .unwrap()
-            .component_mut::<ButtonContent>()
+            .component_mut::<Button>()
             .unwrap()
             .button
             .state
@@ -3627,7 +3653,7 @@ impl ComponentDemo {
             self.tree
                 .get_mut(CREATE_AUTOMATIC)
                 .unwrap()
-                .component_mut::<ButtonContent>()
+                .component_mut::<Button>()
                 .unwrap()
                 .button
                 .state
@@ -3644,7 +3670,7 @@ impl ComponentDemo {
         self.tree
             .get_mut(OPEN_SUMMARY)
             .unwrap()
-            .component_mut::<ButtonContent>()
+            .component_mut::<Button>()
             .unwrap()
             .button
             .state
@@ -3657,7 +3683,7 @@ impl ComponentDemo {
                     .tree
                     .get_mut(id)
                     .unwrap()
-                    .component_mut::<ButtonContent>()
+                    .component_mut::<Button>()
                     .unwrap()
                     .button;
                 button.state.selected = false;
@@ -3710,7 +3736,7 @@ impl ComponentDemo {
                 .tree
                 .get_mut(id)
                 .expect("navigation")
-                .component_mut::<ButtonContent>()
+                .component_mut::<Button>()
                 .expect("button")
                 .button;
             button.state.selected = index == self.selected;
@@ -4029,14 +4055,14 @@ impl ComponentDemo {
                                     .unwrap()
                                     .append_accessory(Content::new(
                                         ComponentId(ids.root.0 + 19),
-                                        ButtonContent::new("刷新子代理能力"),
+                                        Button::new("刷新子代理能力"),
                                     ))
                                     .map_err(unsupported)?;
                             }
                             self.tree
                                 .get_mut(ComponentId(ids.root.0 + 19))
                                 .unwrap()
-                                .component_mut::<ButtonContent>()
+                                .component_mut::<Button>()
                                 .unwrap()
                                 .button
                                 .state
@@ -5290,49 +5316,6 @@ impl ComponentDemo {
         palette: Palette,
     ) -> std::result::Result<(), CompositionError> {
         self.tree.render(scene, text, frame, clip, palette)?;
-        // Read actual successful layout, not sticky follow mode or running state.
-        for root in self.mounted_run_roots() {
-            let run = self.tree.get(root).unwrap().component::<RunPort>().unwrap();
-            let context = if self.is_main_run(root) && run.is_pane_presented() {
-                run.layout_geometry().and_then(|geometry| {
-                    run.transcript()
-                        .and_then(|transcript| self.tree.get(transcript.id()))
-                        .map(
-                            |document| tekes_agent_components_ui::RunTurnNavigationContext {
-                                bottom_is_visible: document.frame().max_y()
-                                    - geometry.document_bottom_clearance
-                                    <= geometry.visible_document.max_y() + 40.,
-                            },
-                        )
-                })
-            } else {
-                None
-            };
-            let presented = run.is_pane_presented();
-            let following = self
-                .tree
-                .get(run.ids().viewport)
-                .unwrap()
-                .component::<ScrollContent>()
-                .unwrap()
-                .is_following_latest();
-            self.tree
-                .get_mut(root)
-                .unwrap()
-                .component_mut::<RunPort>()
-                .unwrap()
-                .set_turn_navigation_context(context)
-                .expect("rendered Run navigation context");
-            if presented {
-                self.tree
-                    .get_mut(root)
-                    .unwrap()
-                    .component_mut::<RunPort>()
-                    .unwrap()
-                    .update_rail_follow_target(following)
-                    .expect("rendered rail follow target");
-            }
-        }
         // CANDIDATE_COMPOSER_PADDING_BINDING
         Ok(())
     }

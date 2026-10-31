@@ -148,3 +148,54 @@ pub fn select(
         .unwrap();
     (commands, menu, part)
 }
+
+/// A normal mounted-demo frame, with the host's navigation policy included.
+#[allow(dead_code)]
+pub fn paint_demo(view: &mut tekes_agent_ui_demo::component_demo::ComponentDemo) {
+    let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()), 1.);
+    let frame = Rect::new(0., 0., 1850., 800.);
+    view.render(
+        &mut Scene::new(),
+        &mut text,
+        frame,
+        frame,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+}
+/// Immutable public preflight only: do not commit a second action or reveal.
+#[allow(dead_code)]
+pub fn reveal_status(host: &ContentHost, target: ComponentId) -> String {
+    match host.plan_host_reveal(target, Default::default(), &[], Default::default()) {
+        Ok(_) => "ready".into(),
+        Err(error) => format!("{error:?}"),
+    }
+}
+#[allow(dead_code)]
+pub fn press_demo(
+    view: &mut tekes_agent_ui_demo::component_demo::ComponentDemo,
+    target: ComponentId,
+) -> tekes_agent_contract::Result<Vec<tekes_agent_ui_demo::component_demo::DemoCommand>> {
+    paint_demo(view);
+    let reveal = reveal_status(&view.tree, target);
+    let before = view.tree.focused();
+    let result = view.accessibility_action(target, None, AccessibilityAction::Press);
+    eprintln!(
+        "AX target={target:?} reveal={reveal} focus_before={before:?} focus_after={:?} commands={:?}",
+        view.tree.focused(),
+        result.as_ref().map(|commands| commands.len())
+    );
+    result
+}
+#[allow(dead_code)]
+pub fn press_host(host: &mut ContentHost, target: ComponentId) -> ContentResponse {
+    paint(host);
+    let reveal = reveal_status(host, target);
+    let before = host.focused();
+    let response = host.accessibility_action(target, None, AccessibilityAction::Press);
+    eprintln!(
+        "AX target={target:?} reveal={reveal} focus_before={before:?} focus_after={:?} response={response:?}",
+        host.focused()
+    );
+    response
+}

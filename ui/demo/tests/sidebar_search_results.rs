@@ -1,3 +1,6 @@
+#[allow(dead_code)]
+#[path = "support/menu_host.rs"]
+mod sidebar_layout;
 use std::sync::Arc;
 use tekes_agent_components_ui::*;
 use tekes_agent_contract::{
@@ -223,10 +226,20 @@ async fn demo_projects_full_publications_and_clearing_restores_inventory_without
         .unwrap()
         .row_id(&address("c"))
         .unwrap();
-    view.tree.accessibility_action(
+    sidebar_layout::paint_demo(&mut view);
+    let reveal = sidebar_layout::reveal_status(&view.tree, old_unmatched_row);
+    let response = view.tree.accessibility_action(
         old_unmatched_row,
         None,
         tekes_ui_controls::composition::AccessibilityAction::Press,
+    );
+    eprintln!(
+        "queued stale row={old_unmatched_row:?} focused={:?} reveal={reveal} response={response:?}",
+        view.tree.focused()
+    );
+    assert!(
+        response.activated,
+        "stale callback test must first queue the original row action"
     );
     let mut result = search();
     view.bind_sidebar_search_publication("search-reader", &result)
@@ -326,7 +339,6 @@ async fn demo_projects_full_publications_and_clearing_restores_inventory_without
 
 #[test]
 fn help_is_an_atomic_query_scoped_part_of_the_row_publication() {
-    use tekes_ui_controls::composition::*;
     let source = inventory();
     let publication = search();
     let projected = source
@@ -400,7 +412,7 @@ fn help_is_an_atomic_query_scoped_part_of_the_row_publication() {
         .unwrap()
         .row_id(&address("a"))
         .unwrap();
-    host.accessibility_action(row, None, AccessibilityAction::Press);
+    sidebar_layout::press_host(&mut host, row);
     let actions = host.drain_actions();
     assert_eq!(
         host.get(root)

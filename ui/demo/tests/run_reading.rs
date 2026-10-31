@@ -1262,6 +1262,7 @@ fn navigate_rail(
     text: &mut Text,
 ) -> Option<TurnRailReveal> {
     let request = rail_mut(host, root).next_reveal()?;
+    render(host, text);
     reveal_run_rail_follow(host, root, version, false, text)
         .unwrap()
         .unwrap();
@@ -1363,6 +1364,7 @@ async fn rail_press_release_cancel_keyboard_ax_and_preedit_capture_once_without_
     assert_eq!(baseline(&host, root), before);
     assert_eq!(host.focused(), Some(editor));
     host.event(&ContentEvent::Unmark);
+    render(&mut host, &mut text);
     assert!(host.focus(Some(row), true));
     for key in [ControlKey::Enter, ControlKey::Space] {
         host.event(&ContentEvent::Key { key, down: true });
@@ -1660,6 +1662,7 @@ async fn actual_ordinary_rail_click_aligns_at_visible_clip_start_and_preserves_o
     let intent = &intents[0];
     assert_eq!(intent.target().turn_id(), target.turn_id());
     let x = scroll(&host, root).scroll.offset.x;
+    clipped_render(&mut host, &mut text);
     let result = dispatch_start(&mut host, root, &version, intent, &mut text);
     assert_eq!(result.status, ContentRevealStatus::Completed);
     assert!(!result.clamped);
@@ -1773,6 +1776,9 @@ async fn actual_rail_freezes_main_history_before_a_later_reading_fact_and_public
             bottom_is_visible: true,
         }))
         .unwrap();
+    // Default policy remains manual: a normal layout must retain the host's
+    // explicit bottom-visible history origin rather than deriving a new one.
+    clipped_render(&mut host, &mut text);
     let row = rail(&host, root).row_id(targets[3].turn_id()).unwrap();
     let point = host.get(row).unwrap().visible().unwrap().center();
     host.event(&ContentEvent::PointerDown(point));
@@ -2500,6 +2506,7 @@ async fn expanded_tool_growth_and_reflow_preserve_reading_and_explicit_collapse_
         .next()
         .unwrap();
     for button in [tool.disclosure.unwrap(), reasoning.disclosure.unwrap()] {
+        render(&mut host, &mut text);
         host.accessibility_action(button, None, AccessibilityAction::Press);
         let intents = tekes_agent_ui_consumer_check::drain_local_run_actions(&mut host, root);
         assert!(
@@ -2595,6 +2602,7 @@ async fn expanded_tool_growth_and_reflow_preserve_reading_and_explicit_collapse_
     }
     host.event(&ContentEvent::Unmark);
     for button in [tool.disclosure.unwrap(), reasoning.disclosure.unwrap()] {
+        render(&mut host, &mut text);
         host.accessibility_action(button, None, AccessibilityAction::Press);
         for intent in tekes_agent_ui_consumer_check::drain_local_run_actions(&mut host, root) {
             match intent {
@@ -2823,8 +2831,7 @@ async fn demo_admits_only_original_local_transcript_controls_during_composer_pre
         .into_iter()
         .find(|id| {
             let node = demo.tree.get(*id).unwrap();
-            node.visible().is_some()
-                && node.component::<ButtonContent>().unwrap().label == "复制输出"
+            node.visible().is_some() && node.component::<Button>().unwrap().label == "复制输出"
         })
         .unwrap();
     let point = demo.tree.get(target).unwrap().visible().unwrap().center();
@@ -2898,7 +2905,7 @@ async fn demo_admits_only_original_local_transcript_controls_during_composer_pre
         demo.tree
             .get(activity)
             .unwrap()
-            .component::<ButtonContent>()
+            .component::<Button>()
             .unwrap()
             .button
             .state
@@ -2938,7 +2945,7 @@ async fn original_cross_pane_copies_keep_composing_owner_scope_and_read_barriers
                 view.tree.get(*id).is_some_and(|node| {
                     node.visible().is_some()
                         && node
-                            .component::<ButtonContent>()
+                            .component::<Button>()
                             .is_some_and(|button| button.label == "复制输出")
                 })
             })
@@ -3342,7 +3349,7 @@ async fn task_and_sidechat_use_their_own_copy_scope_during_another_composers_pre
                 view.tree.get(*id).is_some_and(|node| {
                     node.visible().is_some()
                         && node
-                            .component::<ButtonContent>()
+                            .component::<Button>()
                             .is_some_and(|button| button.label == "复制输出")
                 })
             })
@@ -3408,7 +3415,7 @@ async fn task_and_sidechat_use_their_own_copy_scope_during_another_composers_pre
                 view.tree.get(*id).is_some_and(|node| {
                     node.visible().is_some()
                         && node
-                            .component::<ButtonContent>()
+                            .component::<Button>()
                             .is_some_and(|button| button.label == "复制输出")
                 })
             })

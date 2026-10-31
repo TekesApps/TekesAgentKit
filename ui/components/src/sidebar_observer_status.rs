@@ -403,8 +403,8 @@ impl SidebarObserverStatus {
             if endpoint.observation.phase == SidebarObserverPhase::Failed {
                 let mut button = parts
                     .remove(&controls.retry)
-                    .unwrap_or_else(|| Content::new(controls.retry, ButtonContent::new("")));
-                let model = button.component_mut::<ButtonContent>().unwrap();
+                    .unwrap_or_else(|| Content::new(controls.retry, Button::new("")));
+                let model = button.component_mut::<Button>().unwrap();
                 model.label = self.labels.retry.clone();
                 model.button.state.disabled = controls.pending;
                 row.children.push(button);

@@ -1,3 +1,6 @@
+#[allow(dead_code)]
+#[path = "support/menu_host.rs"]
+mod sidebar_layout;
 use tekes_agent_components_ui::*;
 use tekes_agent_contract::{
     SessionAddress, ThreadActionsPresentation, ThreadActivity, ThreadPinPresentation,
@@ -79,10 +82,10 @@ fn pinned_section_retains_original_row_controls_and_retires_old_preference_callb
     let row = view.row_id(&input.rows[0].address).unwrap();
     let header = view.pinned_header_id().unwrap();
     let mut host = view.into_host().unwrap();
-    let widget = host.get(row).unwrap().component::<ButtonContent>().unwrap() as *const _ as usize;
-    host.accessibility_action(row, None, AccessibilityAction::Press);
+    let widget = host.get(row).unwrap().component::<Button>().unwrap() as *const _ as usize;
+    sidebar_layout::press_host(&mut host, row);
     let old_row_actions = host.drain_actions();
-    host.accessibility_action(header, None, AccessibilityAction::Press);
+    sidebar_layout::press_host(&mut host, header);
     let captured = host.drain_actions();
     let changes = host
         .get(root)
@@ -127,14 +130,14 @@ fn pinned_section_retains_original_row_controls_and_retires_old_preference_callb
         .update_preferences(&expanded, true)
         .unwrap();
     assert_eq!(
-        host.get(row).unwrap().component::<ButtonContent>().unwrap() as *const _ as usize,
+        host.get(row).unwrap().component::<Button>().unwrap() as *const _ as usize,
         widget
     );
     let sidebar = host.get(root).unwrap().component::<Sidebar>().unwrap();
     assert!(sidebar.take_preference_intents(&captured).is_empty());
     assert_eq!(sidebar.displayed_input(), Some(&input));
     let fresh_header = sidebar.pinned_header_id().unwrap();
-    host.accessibility_action(fresh_header, None, AccessibilityAction::Press);
+    sidebar_layout::press_host(&mut host, fresh_header);
     let before_revocation = host.drain_actions();
     host.get_mut(root)
         .unwrap()

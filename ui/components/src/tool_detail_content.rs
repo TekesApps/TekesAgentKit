@@ -20,6 +20,8 @@ pub struct ToolDetailSectionIds {
     pub title: ComponentId,
     pub copy: ComponentId,
     pub body: ComponentId,
+    /// Passive SDK divider before every section after the first.
+    pub divider: Option<ComponentId>,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ToolDetailFacts {
@@ -29,6 +31,7 @@ pub(crate) struct ToolDetailFacts {
 }
 #[derive(Debug)]
 struct Section {
+    reveal_arranged: bool,
     ids: ToolDetailSectionIds,
     facts: TranscriptToolDetailSection,
     epoch: u64,
@@ -47,6 +50,7 @@ impl Section {
             title: alloc(),
             copy: alloc(),
             body: alloc(),
+            divider: None,
         };
         let mut field =
             TextFieldContent::read_only_content(&facts.title, "", proposal::TextRole::UiBody);
@@ -58,6 +62,7 @@ impl Section {
             field.reading = Some(tekes_ui_controls::ReadingController::default());
         }
         Self {
+            reveal_arranged: false,
             ids,
             facts: facts.clone(),
             epoch: 0,
@@ -84,7 +89,7 @@ impl Section {
                                         role: proposal::TextRole::UiCaption,
                                     },
                                 ),
-                                Content::new(ids.copy, ButtonContent::new("")).preserving_focus(),
+                                Content::new(ids.copy, Button::new("")).preserving_focus(),
                             ],
                         },
                     ),
@@ -99,9 +104,21 @@ impl Section {
         epoch: u64,
         facts: &TranscriptToolDetailSection,
         copy_label: &str,
+        separated: bool,
         alloc: &mut dyn FnMut() -> ComponentId,
     ) {
-        let header = self.rows.children[0]
+        self.reveal_arranged = false;
+        if separated && self.ids.divider.is_none() {
+            let id = alloc();
+            self.rows
+                .children
+                .insert(0, Content::new(id, SeparatorContent::default()));
+            self.ids.divider = Some(id);
+        } else if !separated && self.ids.divider.take().is_some() {
+            self.rows.children.remove(0);
+        }
+        let header_index = usize::from(separated);
+        let header = self.rows.children[header_index]
             .component_mut::<StackContent>()
             .unwrap();
         header.children[0]
@@ -111,12 +128,12 @@ impl Section {
         if self.epoch != epoch || self.facts.copy_text != facts.copy_text {
             self.ids.copy = alloc();
             header.children[1] =
-                Content::new(self.ids.copy, ButtonContent::new(copy_label)).preserving_focus();
+                Content::new(self.ids.copy, Button::new(copy_label)).preserving_focus();
         }
-        let button = header.children[1].component_mut::<ButtonContent>().unwrap();
+        let button = header.children[1].component_mut::<Button>().unwrap();
         button.label = copy_label.into();
         button.button.state.disabled = facts.copy_text.is_empty();
-        let field = self.rows.children[1]
+        let field = self.rows.children[header_index + 1]
             .component_mut::<TextFieldContent>()
             .unwrap();
         field.field.label = facts.title.clone();
@@ -139,6 +156,13 @@ impl Section {
     }
 }
 impl Component for Section {
+    fn host_reveal_passthrough(&self) -> bool {
+        self.reveal_arranged
+    }
+
+    fn lifecycle(&mut self, _: Lifecycle) {
+        self.reveal_arranged = false;
+    }
     fn children(&self) -> &[Content] {
         &self.rows.children
     }
@@ -146,10 +170,13 @@ impl Component for Section {
         Some(&mut self.rows.children)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        self.reveal_arranged = false;
         self.rows.measure(text, available)
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        self.reveal_arranged = false;
         self.rows.arrange(text, frame, clip);
+        self.reveal_arranged = !frame.is_empty() && !clip.is_empty();
     }
     fn semantics(&self) -> ContentSemantics {
         ContentSemantics::new(ContentRole::Group, &self.facts.title)
@@ -157,6 +184,7 @@ impl Component for Section {
 }
 #[derive(Debug)]
 pub(crate) struct ToolDetailContent {
+    reveal_arranged: bool,
     rows: StackContent,
     facts: Option<ToolDetailFacts>,
     bounded: bool,
@@ -164,6 +192,7 @@ pub(crate) struct ToolDetailContent {
 impl ToolDetailContent {
     pub fn new(bounded: bool) -> Self {
         Self {
+            reveal_arranged: false,
             rows: StackContent {
                 model: Stack {
                     axis: Axis::Vertical,
@@ -184,12 +213,13 @@ impl ToolDetailContent {
         copy_label: &str,
         alloc: &mut dyn FnMut() -> ComponentId,
     ) {
+        self.reveal_arranged = false;
         let mut old = std::mem::take(&mut self.rows.children);
         let same_owner = self
             .facts
             .as_ref()
             .is_some_and(|old| old.tool_id == facts.tool_id && old.turn_id == facts.turn_id);
-        for section in &facts.details.sections {
+        for (index, section) in facts.details.sections.iter().enumerate() {
             let mut content = if same_owner
                 && let Some(index) = old
                     .iter()
@@ -205,6 +235,7 @@ impl ToolDetailContent {
                 epoch,
                 section,
                 copy_label,
+                index > 0,
                 alloc,
             );
             self.rows.children.push(content);
@@ -219,6 +250,7 @@ impl ToolDetailContent {
             .collect()
     }
     pub fn configure_viewports(&mut self, text: &mut dyn ButtonTextRenderer) {
+        self.reveal_arranged = false;
         if !self.bounded {
             return;
         }
@@ -226,7 +258,9 @@ impl ToolDetailContent {
             .text_surface_host()
             .map_or(1., |host| host.type_scale());
         for node in &mut self.rows.children {
-            node.component_mut::<Section>().unwrap().rows.children[1]
+            let section = node.component_mut::<Section>().unwrap();
+            let body_index = 1 + usize::from(section.ids.divider.is_some());
+            section.rows.children[body_index]
                 .component_mut::<TextFieldContent>()
                 .unwrap()
                 .viewport = TextViewport::Grow {
@@ -278,6 +312,13 @@ impl ToolDetailContent {
     }
 }
 impl Component for ToolDetailContent {
+    fn host_reveal_passthrough(&self) -> bool {
+        self.reveal_arranged
+    }
+
+    fn lifecycle(&mut self, _: Lifecycle) {
+        self.reveal_arranged = false;
+    }
     fn children(&self) -> &[Content] {
         &self.rows.children
     }
@@ -285,12 +326,15 @@ impl Component for ToolDetailContent {
         Some(&mut self.rows.children)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        self.reveal_arranged = false;
         self.configure_viewports(text);
         self.rows.measure(text, available)
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        self.reveal_arranged = false;
         self.configure_viewports(text);
         self.rows.arrange(text, frame, clip);
+        self.reveal_arranged = !frame.is_empty() && !clip.is_empty();
     }
     fn semantics(&self) -> ContentSemantics {
         ContentSemantics::new(ContentRole::Group, "")

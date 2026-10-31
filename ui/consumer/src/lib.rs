@@ -1290,7 +1290,7 @@ fn second_product_mounts_child_history_without_composer_or_run_surface() {
     assert!(
         host.get(ids.refresh)
             .unwrap()
-            .component::<tekes_ui_controls::composition::ButtonContent>()
+            .component::<tekes_ui_controls::composition::Button>()
             .unwrap()
             .button
             .state
@@ -2155,11 +2155,51 @@ fn independent_product_hides_unmatched_pins_without_erasing_preferences_or_pendi
     assert!(!names.iter().any(|name| name == "没有匹配的会话"));
 }
 
+#[cfg(test)]
+fn layout_sidebar_fixture(
+    host: &mut tekes_ui_controls::composition::ContentHost,
+    frame: tekes_ui_scene::Rect,
+    clip: tekes_ui_scene::Rect,
+) {
+    struct Text;
+    impl tekes_ui_controls::ButtonTextRenderer for Text {
+        fn measure(
+            &mut self,
+            text: &str,
+            _: tekes_ui_tokens::proposal::TextRole,
+            available: f32,
+        ) -> tekes_ui_scene::Size {
+            let natural = text.chars().count() as f32 * 7.;
+            let width = natural.min(available.max(1.));
+            let lines = (natural / available.max(1.)).ceil().max(1.);
+            tekes_ui_scene::Size::new(width, 14. * lines)
+        }
+        fn draw(
+            &mut self,
+            _: &mut tekes_ui_scene::Scene,
+            _: &str,
+            _: tekes_ui_tokens::proposal::TextRole,
+            _: tekes_ui_scene::Rect,
+            _: tekes_ui_controls::ButtonTextAlign,
+            _: tekes_ui_tokens::Rgba,
+        ) {
+        }
+    }
+    host.render(
+        &mut tekes_ui_scene::Scene::new(),
+        &mut Text,
+        frame,
+        clip,
+        tekes_ui_tokens::Theme::LIGHT.into(),
+    )
+    .unwrap();
+}
+
 #[test]
 fn second_product_consumes_scoped_folder_grouping_filter_and_original_disclosure() {
     use tekes_agent_components_ui::*;
     use tekes_agent_ui_bindings::{SidebarPublication, SidebarSearchPublication};
-    use tekes_ui_controls::composition::{AccessibilityAction, ButtonContent};
+    use tekes_ui_controls::composition::{AccessibilityAction, Button};
     let row = |id: &str, folder: &str, pinned: bool| SidebarRow {
         primary_folder_id: Some(folder.into()),
         folder_path: Some(format!("/original/{folder}")),
@@ -2224,12 +2264,18 @@ fn second_product_consumes_scoped_folder_grouping_filter_and_original_disclosure
     assert!(sidebar.row_id(&source.rows[2].address).is_none());
     assert!(source.rows[2].pin.as_ref().unwrap().pinned);
     let mut host = sidebar.into_host().unwrap();
-    let widget = host
-        .get(leaf)
-        .unwrap()
-        .component::<ButtonContent>()
-        .unwrap() as *const _ as usize;
+    let widget = host.get(leaf).unwrap().component::<Button>().unwrap() as *const _ as usize;
+    assert!(
+        !host
+            .accessibility_action(header, None, AccessibilityAction::Press)
+            .activated
+    );
+    assert!(host.drain_actions().is_empty());
+    let frame = tekes_ui_scene::Rect::new(0., 0., 420., 640.);
+    layout_sidebar_fixture(&mut host, frame, frame);
+    assert!(host.get(header).unwrap().visible().is_some());
     host.accessibility_action(header, None, AccessibilityAction::Press);
+    assert_eq!(host.focused(), Some(header));
     let actions = host.drain_actions();
     let change = host
         .get(root)
@@ -2239,6 +2285,12 @@ fn second_product_consumes_scoped_folder_grouping_filter_and_original_disclosure
         .take_preference_intents(&actions)
         .pop()
         .unwrap();
+    assert!(
+        !host
+            .accessibility_action(header, None, AccessibilityAction::Press)
+            .activated
+    );
+    assert!(host.drain_actions().is_empty());
     assert_eq!(change.expected, preferences);
     assert_eq!(change.value.collapsed_folders, [key]);
     host.get_mut(root)
@@ -2255,10 +2307,7 @@ fn second_product_consumes_scoped_folder_grouping_filter_and_original_disclosure
         .unwrap();
     assert!(!host.semantics().iter().any(|node| node.id == leaf));
     assert_eq!(
-        host.get(leaf)
-            .unwrap()
-            .component::<ButtonContent>()
-            .unwrap() as *const _ as usize,
+        host.get(leaf).unwrap().component::<Button>().unwrap() as *const _ as usize,
         widget
     );
 }
@@ -2317,7 +2366,17 @@ fn independent_product_reconciles_navigation_once_without_rewriting_durable_coll
     let leaf = sidebar.row_id(input.selected.as_ref().unwrap()).unwrap();
     let mut host = sidebar.into_host().unwrap();
     assert!(host.semantics().iter().any(|node| node.id == leaf));
+    assert!(
+        !host
+            .accessibility_action(header, None, AccessibilityAction::Press)
+            .activated
+    );
+    assert!(host.drain_actions().is_empty());
+    let frame = tekes_ui_scene::Rect::new(0., 0., 420., 640.);
+    layout_sidebar_fixture(&mut host, frame, frame);
+    assert!(host.get(header).unwrap().visible().is_some());
     host.accessibility_action(header, None, AccessibilityAction::Press);
+    assert_eq!(host.focused(), Some(header));
     let actions = host.drain_actions();
     let change = host
         .get(root)
@@ -2327,6 +2386,12 @@ fn independent_product_reconciles_navigation_once_without_rewriting_durable_coll
         .take_preference_intents(&actions)
         .pop()
         .unwrap();
+    assert!(
+        !host
+            .accessibility_action(header, None, AccessibilityAction::Press)
+            .activated
+    );
+    assert!(host.drain_actions().is_empty());
     assert_eq!(change.value, value.preferences);
     host.get_mut(root)
         .unwrap()
@@ -2648,7 +2713,7 @@ fn independent_custom_summary_captures_the_source_before_event_delivery() {
         &mut host,
         root,
         &source,
-        Content::new(button, ButtonContent::new("Product action")),
+        Content::new(button, Button::new("Product action")),
     )
     .unwrap();
     // Capture the current immutable source before delivering the original event.
@@ -2907,4 +2972,113 @@ pub async fn open_scratch_run(
         return Err("SideChat returned a retired or foreign run".into());
     }
     Ok(run)
+}
+
+#[test]
+fn independent_sidebar_inventory_and_footer_keep_separate_current_clips() {
+    use tekes_agent_components_ui::*;
+    use tekes_ui_controls::composition::{AccessibilityAction, Component};
+    use tekes_ui_scene::Rect;
+    for (dx, dy) in [(0., 0.), (35., 47.)] {
+        let mut sidebar = Sidebar::new(2207, SidebarLabels::default());
+        let key = SidebarSearchKey {
+            owner: "clip-fixture".into(),
+            endpoint_id: "consumer".into(),
+            connection_epoch: 1,
+            generation: 1,
+            query: "needle".into(),
+        };
+        sidebar
+            .update_search(&SidebarSearchInput {
+                revision: 1,
+                key: Some(key.clone()),
+                phase: SidebarSearchPhase::Failed {
+                    message: "original search failure".into(),
+                    has_more: false,
+                    retryable: true,
+                },
+            })
+            .unwrap();
+        let root = sidebar.id();
+        let region = sidebar.inventory_region_id();
+        let viewport = sidebar.inventory_viewport_id();
+        let footer = sidebar.search_footer_id();
+        let retry = sidebar.search_retry_id().unwrap();
+        let mut host = sidebar.into_host().unwrap();
+        let frame = Rect::new(20. + dx, 40. + dy, 320., 240.);
+        let clip = Rect::new(25. + dx, 45. + dy, 310., 230.);
+        layout_sidebar_fixture(&mut host, frame, clip);
+        let region_frame = host.get(region).unwrap().frame();
+        let footer_frame = host.get(footer).unwrap().frame();
+        assert_eq!(
+            host.get(region).unwrap().visible(),
+            region_frame.intersection(&clip)
+        );
+        assert!(host.get(viewport).unwrap().frame().max_y() <= footer_frame.min_y());
+        assert!(footer_frame.min_y() >= region_frame.max_y());
+        assert!(host.get(footer).unwrap().visible().is_some());
+        assert!(host.get(retry).unwrap().visible().is_some());
+        assert!(
+            host.get(root)
+                .unwrap()
+                .component::<Sidebar>()
+                .unwrap()
+                .host_reveal_passthrough()
+        );
+        assert!(
+            host.accessibility_action(retry, None, AccessibilityAction::Press)
+                .activated
+        );
+        let actions = host.drain_actions();
+        assert_eq!(
+            host.get(root)
+                .unwrap()
+                .component::<Sidebar>()
+                .unwrap()
+                .take_search_intents(&actions),
+            vec![SidebarSearchIntent::Retry { key: key.clone() }]
+        );
+        host.get_mut(root)
+            .unwrap()
+            .component_mut::<Sidebar>()
+            .unwrap()
+            .update_search(&SidebarSearchInput {
+                revision: 2,
+                key: Some(key),
+                phase: SidebarSearchPhase::Failed {
+                    message: "changed footer height ".repeat(5),
+                    has_more: false,
+                    retryable: true,
+                },
+            })
+            .unwrap();
+        assert!(
+            !host
+                .get(root)
+                .unwrap()
+                .component::<Sidebar>()
+                .unwrap()
+                .host_reveal_passthrough()
+        );
+        layout_sidebar_fixture(&mut host, frame, clip);
+        assert!(
+            host.get(root)
+                .unwrap()
+                .component::<Sidebar>()
+                .unwrap()
+                .host_reveal_passthrough()
+        );
+        assert_eq!(
+            host.get(region).unwrap().visible(),
+            host.get(region).unwrap().frame().intersection(&clip)
+        );
+        let current_retry = host
+            .get(root)
+            .unwrap()
+            .component::<Sidebar>()
+            .unwrap()
+            .search_retry_id()
+            .unwrap();
+        assert!(host.get(current_retry).unwrap().visible().is_some());
+    }
 }

@@ -96,6 +96,7 @@ pub struct ToolRun {
     next: u32,
     next_header: u64,
     last_tools: Vec<TranscriptToolCall>,
+    reveal_arranged: bool,
 }
 impl ToolRun {
     /// A standalone owner reserves one namespace for itself and an exclusive
@@ -144,20 +145,21 @@ impl ToolRun {
             next: 0,
             next_header: 16,
             last_tools: vec![],
+            reveal_arranged: false,
         }
     }
     pub(crate) fn members_visible(&self) -> bool {
         self.flattened || !self.grouped() || self.expanded
     }
-    pub(crate) fn set_flattened(&mut self, flattened: bool) {
+    pub(crate) fn set_flattened(&mut self, flattened: bool) -> bool {
         if flattened == self.flattened {
-            return;
+            return false;
         }
         let members = self.take_members();
         self.flattened = flattened;
         if !self.grouped() {
             self.rows.children = members;
-            return;
+            return true;
         }
         if flattened {
             self.rows.children = members;
@@ -172,6 +174,7 @@ impl ToolRun {
             }
         }
         self.refresh_header();
+        true
     }
     pub fn id(&self) -> ComponentId {
         self.root
@@ -208,6 +211,7 @@ impl ToolRun {
             .chain(&mut self.hidden)
     }
     pub(crate) fn take_members(&mut self) -> Vec<Content> {
+        self.reveal_arranged = false;
         if self.grouped() && !self.flattened && !self.rows.children.is_empty() {
             self.header = Some(self.rows.children.remove(0));
         }
@@ -249,6 +253,7 @@ impl ToolRun {
         members: Vec<Content>,
         alloc_header: &mut dyn FnMut() -> ComponentId,
     ) {
+        self.reveal_arranged = false;
         let _old = self.take_members();
         if self
             .model
@@ -268,7 +273,7 @@ impl ToolRun {
             let header = self.header.take().unwrap_or_else(|| {
                 let id = alloc_header();
                 self.header_id = Some(id);
-                Content::new(id, ButtonContent::new(""))
+                Content::new(id, Button::new(""))
                     .with_label_layout(tekes_ui_text::LabelOptions::single_line(
                         tekes_ui_text::LabelOverflow::TailEllipsis,
                     ))
@@ -317,7 +322,7 @@ impl ToolRun {
         } else {
             &mut self.rows.children[0]
         };
-        let button = header.component_mut::<ButtonContent>().unwrap();
+        let button = header.component_mut::<Button>().unwrap();
         button.label = format!(
             "{} · {title}",
             (self.labels.text)(if self.expanded {
@@ -343,6 +348,7 @@ impl ToolRun {
                 self.rows.children.append(&mut self.hidden);
             }
             self.expanded = !self.expanded;
+            self.reveal_arranged = false;
             changed = true;
         }
         self.refresh_header();
@@ -453,6 +459,9 @@ impl ToolRun {
                 }
             }
         }
+        if changed {
+            self.reveal_arranged = false;
+        }
         changed
     }
     pub fn copy_action_ids(&self) -> Vec<ComponentId> {
@@ -499,6 +508,13 @@ impl ToolRun {
     }
 }
 impl Component for ToolRun {
+    fn host_reveal_passthrough(&self) -> bool {
+        self.reveal_arranged
+    }
+
+    fn lifecycle(&mut self, _: Lifecycle) {
+        self.reveal_arranged = false;
+    }
     fn children(&self) -> &[Content] {
         &self.rows.children
     }
@@ -506,10 +522,13 @@ impl Component for ToolRun {
         Some(&mut self.rows.children)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        self.reveal_arranged = false;
         self.rows.measure(text, available)
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        self.reveal_arranged = false;
         self.rows.arrange(text, frame, clip);
+        self.reveal_arranged = !frame.is_empty() && !clip.is_empty();
     }
     fn semantics(&self) -> ContentSemantics {
         let mut value = ContentSemantics::new(
