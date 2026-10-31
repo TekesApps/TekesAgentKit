@@ -670,6 +670,54 @@ async fn bounded_source_call_phases_and_identity_are_projected_through_public_ch
 }
 
 #[tokio::test]
+async fn bounded_source_call_planes_keep_actual_producer_ids_direct() {
+    let (connector, runtime, _) = setup().await;
+    connector.bounded.store(true, Ordering::SeqCst);
+    let scope = RunScope {
+        endpoint_id: "test".into(),
+        thread_id: "a".into(),
+        session_id: "bounded".into(),
+    };
+    for phase in ["done", "error"] {
+        connector
+            .pages
+            .lock()
+            .unwrap()
+            .extend([bounded_source_page(phase), bounded_source_page(phase)]);
+        let child = ChildRun::open(
+            runtime.clone(),
+            RunScope::main("test", "a"),
+            "bounded",
+            ChildHistoryLayout::SameSession,
+            None,
+        )
+        .await
+        .unwrap();
+        let source = child.transcript().await.unwrap();
+        let original = source.clone();
+        let expected_id = json!(["test", "bounded", "task-source", "task-source-7"]).to_string();
+        assert_eq!(source.turns[0].id, expected_id);
+        assert_eq!(source.tools[0].turn_id, expected_id);
+        let document = TranscriptDocument::read(&source).unwrap();
+        let section = document
+            .sections
+            .iter()
+            .find(|section| section.id == expected_id)
+            .unwrap();
+        assert_eq!(
+            section
+                .planes(&scope, &source.thinking_sources, false)
+                .unwrap()
+                .activity,
+            TranscriptActivityPresentation::Direct,
+            "bounded source phase {phase}"
+        );
+        assert_eq!(source, original);
+    }
+    runtime.stop().await.unwrap();
+}
+
+#[tokio::test]
 async fn bounded_source_call_running_to_terminal_keeps_identity_and_history_entries() {
     let (connector, runtime, _) = setup().await;
     connector.bounded.store(true, Ordering::SeqCst);
