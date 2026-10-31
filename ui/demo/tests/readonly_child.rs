@@ -289,7 +289,7 @@ async fn readonly_component_disables_supplied_turn_mutations_and_allows_only_exp
     assert!(
         host.get(button)
             .unwrap()
-            .component::<ButtonContent>()
+            .component::<Button>()
             .unwrap()
             .button
             .state
@@ -318,7 +318,7 @@ async fn readonly_component_disables_supplied_turn_mutations_and_allows_only_exp
     assert!(
         host.get(more)
             .unwrap()
-            .component::<ButtonContent>()
+            .component::<Button>()
             .unwrap()
             .button
             .state
@@ -869,7 +869,7 @@ async fn same_scope_readonly_intent_cannot_cross_instances_or_consume_original_a
                 display_host
                     .get(refresh)
                     .unwrap()
-                    .component::<ButtonContent>()
+                    .component::<Button>()
                     .unwrap()
                     .button
                     .state
@@ -880,7 +880,7 @@ async fn same_scope_readonly_intent_cannot_cross_instances_or_consume_original_a
                 display_host
                     .get(page)
                     .unwrap()
-                    .component::<ButtonContent>()
+                    .component::<Button>()
                     .unwrap()
                     .button
                     .state

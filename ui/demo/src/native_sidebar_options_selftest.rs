@@ -2,7 +2,7 @@
 use super::*;
 use crate::acceptance_script::{Action, run_script};
 use tekes_agent_components_ui::{SidebarOptions, SidebarSort};
-use tekes_ui_controls::composition::{ButtonContent, MenuContent, PointerPhase};
+use tekes_ui_controls::composition::{Button, MenuContent, PointerPhase};
 pub(super) struct Probe {
     phase: u8,
     session_menu: bool,
@@ -97,7 +97,7 @@ impl Probe {
                 .tree
                 .get(self.row.unwrap())
                 .unwrap()
-                .component::<ButtonContent>()
+                .component::<Button>()
                 .unwrap() as *const _ as usize,
             self.widget
         );
@@ -150,7 +150,7 @@ impl Probe {
                     .tree
                     .get(self.row.unwrap())
                     .unwrap()
-                    .component::<ButtonContent>()
+                    .component::<Button>()
                     .unwrap() as *const _ as usize;
                 self.revision = host.sidebar.preferences().unwrap().revision;
                 self.other_draft = host.view.bindings()[1]

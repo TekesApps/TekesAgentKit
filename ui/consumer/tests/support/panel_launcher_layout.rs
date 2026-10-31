@@ -7,10 +7,7 @@ fn launcher_uses_source_three_by_two_slots_and_keeps_hidden_slots_at_library_sca
             for width in [220., 400., 720.] {
                 let mut text = Text::new(scale, true);
                 let frame = Rect::new(20., 30., width, 400.);
-                let row = ButtonContent::new("M")
-                    .measure(&mut text, frame.size)
-                    .size
-                    .height;
+                let row = Button::new("M").measure(&mut text, frame.size).size.height;
                 let mut input = SidePanelLauncherInput {
                     revision: 1,
                     owner: SidePanelLauncherOwner::Workspace {
@@ -59,11 +56,8 @@ fn launcher_uses_source_three_by_two_slots_and_keeps_hidden_slots_at_library_sca
                 close(rects[1].min_x() - rects[0].max_x(), gap);
                 close(rects[3].min_y() - rects[0].max_y(), gap);
                 close(rects[0].min_x(), rects[3].min_x());
-                let original = host
-                    .get(ids[0])
-                    .unwrap()
-                    .component::<ButtonContent>()
-                    .unwrap() as *const _ as usize;
+                let original =
+                    host.get(ids[0]).unwrap().component::<Button>().unwrap() as *const _ as usize;
                 input.revision = 2;
                 for index in 1..5 {
                     input.destinations[index].available = false;
@@ -79,10 +73,7 @@ fn launcher_uses_source_three_by_two_slots_and_keeps_hidden_slots_at_library_sca
                 assert_eq!(host.get(ids[0]).unwrap().frame(), rects[0]);
                 assert_eq!(host.get(ids[5]).unwrap().frame(), rects[5]);
                 assert_eq!(
-                    host.get(ids[0])
-                        .unwrap()
-                        .component::<ButtonContent>()
-                        .unwrap() as *const _ as usize,
+                    host.get(ids[0]).unwrap().component::<Button>().unwrap() as *const _ as usize,
                     original
                 );
                 assert!(ids[1..5].iter().all(|id| host.get(*id).is_none()));

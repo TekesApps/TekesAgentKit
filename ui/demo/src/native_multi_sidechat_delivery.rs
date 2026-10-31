@@ -13,9 +13,7 @@ use tekes_agent_components_ui::{Composer, SidePanel, SidePanelTabKind};
 use tekes_agent_contract::SessionAddress;
 use tekes_agent_presentation::{ComposerDestination, RunPhase, RunScope, TranscriptItemKind};
 use tekes_agent_ui_bindings::{PaneAccess, RunBinding};
-use tekes_ui_controls::composition::{
-    AccessibilityAction, ButtonContent, ComponentId, ContentEvent,
-};
+use tekes_ui_controls::composition::{AccessibilityAction, Button, ComponentId, ContentEvent};
 
 const ENDPOINTS: [&str; 3] = ["native", "pi", "dsh"];
 const CANCEL_INPUT: &str = "ENDPOINT_CANCEL_NATIVE_PROOF";
@@ -382,7 +380,7 @@ pub(super) fn run(host: &mut Host) -> Value {
             .tree
             .get(dsh_create)
             .unwrap()
-            .component::<ButtonContent>()
+            .component::<Button>()
             .unwrap()
             .button
             .state
@@ -708,7 +706,7 @@ pub(super) fn run(host: &mut Host) -> Value {
                             .view
                             .tree
                             .get(ids.cancel)
-                            .and_then(|node| node.component::<ButtonContent>())
+                            .and_then(|node| node.component::<Button>())
                             .is_some_and(|button| !button.button.state.disabled)
                         && snapshot.transcript.items.iter().any(|item| {
                             item.kind == TranscriptItemKind::Assistant

@@ -204,7 +204,7 @@ impl SidePanelNavigation {
                     .and_then(|_| old.remove(&id))
                     .unwrap_or_else(|| match &source {
                         Source::Action { .. } => {
-                            Content::new(id, ButtonContent::new("")).preserving_focus()
+                            Content::new(id, Button::new("")).preserving_focus()
                         }
                         Source::Chats {
                             tabs,
@@ -242,7 +242,7 @@ impl SidePanelNavigation {
                         }
                     });
             if let Source::Action { intent, enabled } = &source {
-                let button = node.component_mut::<ButtonContent>().unwrap();
+                let button = node.component_mut::<Button>().unwrap();
                 button.variant = ButtonVariant::Quiet;
                 button.button.state.disabled = !enabled;
                 match intent {

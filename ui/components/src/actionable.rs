@@ -250,7 +250,7 @@ impl ActionableCard {
         }
         for (id, choice) in &self.rows {
             if let Some(choice) = prompt.choice(choice) {
-                let mut button = ButtonContent::new(&choice.label);
+                let mut button = Button::new(&choice.label);
                 button.button.state.disabled = !self.controls || self.attempted;
                 self.body.children.push(Content::new(*id, button));
             }

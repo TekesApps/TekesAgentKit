@@ -145,7 +145,7 @@ impl Probe {
                         .tree
                         .get(view.ids().cancel)
                         .unwrap()
-                        .component::<tekes_ui_controls::composition::ButtonContent>()
+                        .component::<tekes_ui_controls::composition::Button>()
                         .unwrap()
                         .button
                         .state

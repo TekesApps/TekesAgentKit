@@ -63,14 +63,17 @@ fn independent_tool_sections_have_distinct_owners_and_exact_copy_sources() {
         host.text_surface(ids[1].body).unwrap().input.text,
         "中文输出"
     );
-    for (width, scale, theme) in [
-        (640., 1., Theme::LIGHT),
-        (260., 1.4, Theme::DARK),
-        (640., 1., Theme::LIGHT),
+    assert!(ids[0].divider.is_none());
+    for (width, scale, backing_scale, theme) in [
+        (640., 1., 1., Theme::LIGHT),
+        (260., 1.4, 2., Theme::DARK),
+        (640., 1., 2., Theme::LIGHT),
     ] {
         let mut text = Text::new(scale, true);
+        text.backing_scale = backing_scale;
         let frame = Rect::new(0., 0., width, 10000.);
-        host.render(&mut Scene::new(), &mut text, frame, frame, theme.into())
+        let mut scene = Scene::new();
+        host.render(&mut scene, &mut text, frame, frame, theme.into())
             .unwrap();
         for id in &ids {
             let header = host.get(id.header).unwrap().frame();
@@ -78,6 +81,36 @@ fn independent_tool_sections_have_distinct_owners_and_exact_copy_sources() {
             assert!((body.min_x() - frame.min_x()).abs() < 0.5);
             assert!(header.max_y() <= body.min_y() + 0.5);
             assert!(host.get(id.copy).unwrap().frame().max_x() <= frame.max_x() + 0.5);
+        }
+        for (previous, section) in ids.windows(2).map(|pair| (&pair[0], &pair[1])) {
+            let divider = host
+                .get(section.divider.expect("non-first tool section divider"))
+                .unwrap();
+            assert!(divider.component::<SeparatorContent>().is_some());
+            let line = divider.frame();
+            assert!(line.size.width > 0. && line.size.height > 0.);
+            assert!(line.min_x() >= frame.min_x() && line.max_x() <= frame.max_x());
+            assert!(host.get(previous.body).unwrap().frame().max_y() <= line.min_y());
+            assert!(line.max_y() <= host.get(section.header).unwrap().frame().min_y());
+            let mut expected = Scene::new();
+            tekes_ui_controls::layout_view::SeparatorView::default().render_at_scale(
+                &mut expected,
+                line,
+                Axis::Horizontal,
+                Some(frame),
+                theme.into(),
+                backing_scale,
+            );
+            let ink: Vec<_> = expected
+                .primitives()
+                .iter()
+                .filter(|p| matches!(p, tekes_ui_scene::Primitive::Quad(_)))
+                .collect();
+            assert!(!ink.is_empty());
+            assert!(
+                ink.into_iter().all(|p| scene.primitives().contains(p)),
+                "real ToolInput/Output must paint the SDK separator with its theme and backing scale"
+            );
         }
         assert!(
             host.get(ids[0].body).unwrap().frame().max_y()

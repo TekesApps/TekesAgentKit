@@ -663,7 +663,7 @@ fn known_empty_assistant_containers_stay_hidden_until_prose_arrives_and_legacy_s
 
 #[test]
 fn embedded_tool_uses_producer_terminal_description_and_retains_raw_detail_owner_on_update() {
-    use tekes_ui_controls::composition::ButtonContent;
+    use tekes_ui_controls::composition::Button;
     let mut item = item();
     item.content_blocks = Some(vec![block(
         0,
@@ -688,7 +688,7 @@ fn embedded_tool_uses_producer_terminal_description_and_retains_raw_detail_owner
     let header = host
         .get(ids.disclosure.unwrap())
         .unwrap()
-        .component::<ButtonContent>()
+        .component::<Button>()
         .unwrap();
     assert!(header.label.contains("Shell · 检查项目 · doing"));
     assert!(!header.label.contains("echo original"));
@@ -727,7 +727,7 @@ fn embedded_tool_uses_producer_terminal_description_and_retains_raw_detail_owner
     let header = host
         .get(ids.disclosure.unwrap())
         .unwrap()
-        .component::<ButtonContent>()
+        .component::<Button>()
         .unwrap();
     assert!(header.label.contains("Shell · 检查项目 · done"));
     assert!(!header.label.contains("must not replace terminal action"));
@@ -758,13 +758,7 @@ fn embedded_tool_uses_producer_terminal_description_and_retains_raw_detail_owner
             .unwrap();
             let header = host.get(ids.disclosure.unwrap()).unwrap();
             assert!(header.frame().size.width <= width + 0.02);
-            assert!(
-                header
-                    .component::<ButtonContent>()
-                    .unwrap()
-                    .label
-                    .contains(&long)
-            );
+            assert!(header.component::<Button>().unwrap().label.contains(&long));
             assert_eq!(
                 host.semantics()
                     .iter()
@@ -772,7 +766,7 @@ fn embedded_tool_uses_producer_terminal_description_and_retains_raw_detail_owner
                     .unwrap()
                     .semantics
                     .name,
-                header.component::<ButtonContent>().unwrap().label
+                header.component::<Button>().unwrap().label
             );
             heights.push(header.frame().size.height);
         }
@@ -1170,7 +1164,7 @@ fn tool_resolution_changes_retire_body_and_copy_ids_and_preserve_the_explicit_vi
 #[test]
 fn embedded_tool_formatters_receive_the_original_scope_even_when_ids_repeat() {
     use tekes_agent_components_ui::{OutputMessageLabels, RunScope};
-    use tekes_ui_controls::composition::ButtonContent;
+    use tekes_ui_controls::composition::Button;
     let mut message = item();
     message.content_blocks = Some(vec![block(
         0,
@@ -1205,7 +1199,7 @@ fn embedded_tool_formatters_receive_the_original_scope_even_when_ids_repeat() {
         assert!(
             host.get(ids.disclosure.unwrap())
                 .unwrap()
-                .component::<ButtonContent>()
+                .component::<Button>()
                 .unwrap()
                 .label
                 .contains(&format!("owner:{endpoint}/same-session-id"))
@@ -1466,7 +1460,7 @@ fn structured_tool_headers_share_report_rules_across_scopes_and_repeated_referen
             let label = &host
                 .get(ids.disclosure.unwrap())
                 .unwrap()
-                .component::<tekes_ui_controls::composition::ButtonContent>()
+                .component::<tekes_ui_controls::composition::Button>()
                 .unwrap()
                 .label;
             assert!(label.contains(delta));
@@ -1882,7 +1876,7 @@ fn compact_reasoning_end_keeps_disclosure_editor_selection_and_focus() {
     assert_eq!(
         host.get(ids.disclosure.unwrap())
             .unwrap()
-            .component::<tekes_ui_controls::composition::ButtonContent>()
+            .component::<tekes_ui_controls::composition::Button>()
             .unwrap()
             .label,
         "收起 · 思考过程"

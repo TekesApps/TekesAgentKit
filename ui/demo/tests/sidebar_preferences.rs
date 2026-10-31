@@ -79,7 +79,7 @@ fn pinned_section_retains_original_row_controls_and_retires_old_preference_callb
     let row = view.row_id(&input.rows[0].address).unwrap();
     let header = view.pinned_header_id().unwrap();
     let mut host = view.into_host().unwrap();
-    let widget = host.get(row).unwrap().component::<ButtonContent>().unwrap() as *const _ as usize;
+    let widget = host.get(row).unwrap().component::<Button>().unwrap() as *const _ as usize;
     host.accessibility_action(row, None, AccessibilityAction::Press);
     let old_row_actions = host.drain_actions();
     host.accessibility_action(header, None, AccessibilityAction::Press);
@@ -127,7 +127,7 @@ fn pinned_section_retains_original_row_controls_and_retires_old_preference_callb
         .update_preferences(&expanded, true)
         .unwrap();
     assert_eq!(
-        host.get(row).unwrap().component::<ButtonContent>().unwrap() as *const _ as usize,
+        host.get(row).unwrap().component::<Button>().unwrap() as *const _ as usize,
         widget
     );
     let sidebar = host.get(root).unwrap().component::<Sidebar>().unwrap();

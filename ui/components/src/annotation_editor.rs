@@ -186,7 +186,7 @@ impl AnnotationEditor {
             Content::new(self.ids.source, TextContent::new(&annotation.source)),
             Content::new(self.ids.excerpt, excerpt),
             Content::new(self.ids.editor, field),
-            Content::new(self.ids.close, ButtonContent::new(&self.labels.close)),
+            Content::new(self.ids.close, Button::new(&self.labels.close)),
             Content::new(self.ids.status, TextContent::new("")),
         ];
         self.target = Some(Target {
@@ -369,7 +369,7 @@ impl AnnotationEditor {
             .iter_mut()
             .find(|node| node.id() == self.ids.close)
             .unwrap()
-            .component_mut::<ButtonContent>()
+            .component_mut::<Button>()
             .unwrap()
             .button
             .state

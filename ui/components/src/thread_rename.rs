@@ -175,14 +175,8 @@ impl ThreadRename {
         editor.submit_policy = TextSubmitPolicy::Enter;
         self.body.children = vec![
             Content::new(self.ids.editor, editor),
-            Content::new(
-                self.ids.submit,
-                ButtonContent::new(self.labels.submit.clone()),
-            ),
-            Content::new(
-                self.ids.dismiss,
-                ButtonContent::new(self.labels.dismiss.clone()),
-            ),
+            Content::new(self.ids.submit, Button::new(self.labels.submit.clone())),
+            Content::new(self.ids.dismiss, Button::new(self.labels.dismiss.clone())),
             Content::new(self.ids.status, TextContent::new("")),
         ];
         self.refresh_controls();
@@ -299,7 +293,7 @@ impl ThreadRename {
                 || self.is_composing()
                 || self.editor().unwrap().input.text.trim().is_empty();
             self.body.children[1]
-                .component_mut::<ButtonContent>()
+                .component_mut::<Button>()
                 .unwrap()
                 .button
                 .state

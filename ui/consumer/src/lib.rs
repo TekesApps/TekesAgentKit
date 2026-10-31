@@ -1290,7 +1290,7 @@ fn second_product_mounts_child_history_without_composer_or_run_surface() {
     assert!(
         host.get(ids.refresh)
             .unwrap()
-            .component::<tekes_ui_controls::composition::ButtonContent>()
+            .component::<tekes_ui_controls::composition::Button>()
             .unwrap()
             .button
             .state
@@ -2159,7 +2159,7 @@ fn independent_product_hides_unmatched_pins_without_erasing_preferences_or_pendi
 fn second_product_consumes_scoped_folder_grouping_filter_and_original_disclosure() {
     use tekes_agent_components_ui::*;
     use tekes_agent_ui_bindings::{SidebarPublication, SidebarSearchPublication};
-    use tekes_ui_controls::composition::{AccessibilityAction, ButtonContent};
+    use tekes_ui_controls::composition::{AccessibilityAction, Button};
     let row = |id: &str, folder: &str, pinned: bool| SidebarRow {
         primary_folder_id: Some(folder.into()),
         folder_path: Some(format!("/original/{folder}")),
@@ -2224,11 +2224,7 @@ fn second_product_consumes_scoped_folder_grouping_filter_and_original_disclosure
     assert!(sidebar.row_id(&source.rows[2].address).is_none());
     assert!(source.rows[2].pin.as_ref().unwrap().pinned);
     let mut host = sidebar.into_host().unwrap();
-    let widget = host
-        .get(leaf)
-        .unwrap()
-        .component::<ButtonContent>()
-        .unwrap() as *const _ as usize;
+    let widget = host.get(leaf).unwrap().component::<Button>().unwrap() as *const _ as usize;
     host.accessibility_action(header, None, AccessibilityAction::Press);
     let actions = host.drain_actions();
     let change = host
@@ -2255,10 +2251,7 @@ fn second_product_consumes_scoped_folder_grouping_filter_and_original_disclosure
         .unwrap();
     assert!(!host.semantics().iter().any(|node| node.id == leaf));
     assert_eq!(
-        host.get(leaf)
-            .unwrap()
-            .component::<ButtonContent>()
-            .unwrap() as *const _ as usize,
+        host.get(leaf).unwrap().component::<Button>().unwrap() as *const _ as usize,
         widget
     );
 }
@@ -2648,7 +2641,7 @@ fn independent_custom_summary_captures_the_source_before_event_delivery() {
         &mut host,
         root,
         &source,
-        Content::new(button, ButtonContent::new("Product action")),
+        Content::new(button, Button::new("Product action")),
     )
     .unwrap();
     // Capture the current immutable source before delivering the original event.

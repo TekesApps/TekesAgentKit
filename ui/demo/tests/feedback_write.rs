@@ -1139,7 +1139,7 @@ async fn transcript_feedback_mounted_run_routes_ime_save_and_hidden_original_rec
         view.tree
             .get(note)
             .unwrap()
-            .component::<tekes_ui_controls::composition::ButtonContent>()
+            .component::<tekes_ui_controls::composition::Button>()
             .unwrap()
             .button
             .state

@@ -5,7 +5,7 @@ use tekes_agent_components_ui::{
     OutputContentIds, OutputContentKind, OutputMessageFragment, RunPort, ToolActivity,
     TranscriptActivitySegmentEnd, TranscriptContentRowKey,
 };
-use tekes_ui_controls::composition::{ButtonContent, ScrollContent, TextFieldContent};
+use tekes_ui_controls::composition::{Button, ScrollContent, TextFieldContent};
 use tekes_ui_controls::{ScrollRevealOptions, ScrollRevealPlacement, extended::Axis};
 pub(super) struct Probe {
     phase: u8,
@@ -278,7 +278,7 @@ impl Probe {
                             .tree
                             .get(button)
                             .unwrap()
-                            .component::<ButtonContent>()
+                            .component::<Button>()
                             .unwrap()
                             .button
                             .state
@@ -349,7 +349,7 @@ impl Probe {
                         .tree
                         .get(self.activity.unwrap())
                         .unwrap()
-                        .component::<ButtonContent>()
+                        .component::<Button>()
                         .unwrap()
                         .button
                         .state
@@ -495,7 +495,7 @@ impl Probe {
                         .tree
                         .get(self.activity.unwrap())
                         .unwrap()
-                        .component::<ButtonContent>()
+                        .component::<Button>()
                         .unwrap()
                         .button
                         .state

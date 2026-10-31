@@ -72,7 +72,7 @@ impl Probe {
                 .tree
                 .get(a)
                 .unwrap()
-                .component::<ButtonContent>()
+                .component::<Button>()
                 .unwrap() as *const _ as usize,
             self.widget
         );
@@ -329,7 +329,7 @@ impl Probe {
                         .tree
                         .get(tekes_agent_ui_demo::component_demo::SELECT_A)
                         .unwrap()
-                        .component::<ButtonContent>()
+                        .component::<Button>()
                         .unwrap()
                         .activations,
                     2

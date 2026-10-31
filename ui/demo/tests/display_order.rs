@@ -704,7 +704,7 @@ fn abnormal_termination_preserves_visible_activity_and_has_a_selected_original_d
     assert!(
         host.get(button)
             .unwrap()
-            .component::<ButtonContent>()
+            .component::<Button>()
             .unwrap()
             .button
             .state
@@ -851,7 +851,7 @@ fn input_bounded_history_counts_semantic_entries_and_preserves_original_parts_an
     assert_eq!(
         host.get(button)
             .unwrap()
-            .component::<ButtonContent>()
+            .component::<Button>()
             .unwrap()
             .label,
         "Previous 3 messages"
@@ -860,7 +860,7 @@ fn input_bounded_history_counts_semantic_entries_and_preserves_original_parts_an
         !host
             .get(final_button)
             .unwrap()
-            .component::<ButtonContent>()
+            .component::<Button>()
             .unwrap()
             .button
             .state
@@ -1092,11 +1092,7 @@ fn abnormal_input_bounded_history_stays_collapsed_and_readonly_uses_its_own_plan
         .unwrap();
     let id = view.ids().root;
     let mut host = view.into_host().unwrap();
-    let control = host
-        .get(button)
-        .unwrap()
-        .component::<ButtonContent>()
-        .unwrap();
+    let control = host.get(button).unwrap().component::<Button>().unwrap();
     assert!(!control.button.state.selected && control.label.starts_with("Failed"));
     let view = host
         .get_mut(id)
@@ -1478,11 +1474,7 @@ fn embedded_original_tool_controls_do_not_group_across_source_input_but_results_
         .unwrap()
         .disclosure
         .unwrap();
-    let owner = host
-        .get(original)
-        .unwrap()
-        .component::<ButtonContent>()
-        .unwrap() as *const _ as usize;
+    let owner = host.get(original).unwrap().component::<Button>().unwrap() as *const _ as usize;
     host.get_mut(root)
         .unwrap()
         .component_mut::<OutputMessage>()
@@ -1490,10 +1482,7 @@ fn embedded_original_tool_controls_do_not_group_across_source_input_but_results_
         .update(&scope, 2, source.connection_epoch, output, Some(section))
         .unwrap();
     assert_eq!(
-        host.get(original)
-            .unwrap()
-            .component::<ButtonContent>()
-            .unwrap() as *const _ as usize,
+        host.get(original).unwrap().component::<Button>().unwrap() as *const _ as usize,
         owner
     );
     assert_eq!(
@@ -1629,7 +1618,7 @@ fn canonical_call_controls_are_physical_rows_in_their_own_input_segments() {
     assert_eq!(
         host.get(before_id)
             .unwrap()
-            .component::<ButtonContent>()
+            .component::<Button>()
             .unwrap()
             .label,
         "Previous 1 message"
@@ -1933,7 +1922,7 @@ fn late_message_references_leave_the_original_independent_tool_owners_in_place()
     assert_eq!(
         host.get(before_id)
             .unwrap()
-            .component::<ButtonContent>()
+            .component::<Button>()
             .unwrap()
             .label,
         "Previous 1 message"
@@ -2168,11 +2157,8 @@ fn cumulative_frame_upsert_keeps_original_calls_header_and_composer_preedit() {
         .unwrap();
     let ids = run.ids();
     let mut host = run.into_host().unwrap();
-    let header_widget = host
-        .get(header)
-        .unwrap()
-        .component::<ButtonContent>()
-        .unwrap() as *const _ as usize;
+    let header_widget =
+        host.get(header).unwrap().component::<Button>().unwrap() as *const _ as usize;
     assert!(host.focus(Some(ids.composer.editor), true));
     host.event(&ContentEvent::Preedit {
         text: "连续工具更新".into(),
@@ -2274,10 +2260,7 @@ fn cumulative_frame_upsert_keeps_original_calls_header_and_composer_preedit() {
                 .all(|owner| content.message_tool_fragment_ids(owner).is_empty())
         );
         assert_eq!(
-            host.get(header)
-                .unwrap()
-                .component::<ButtonContent>()
-                .unwrap() as *const _ as usize,
+            host.get(header).unwrap().component::<Button>().unwrap() as *const _ as usize,
             header_widget
         );
         assert_eq!(host.focused(), Some(ids.composer.editor));

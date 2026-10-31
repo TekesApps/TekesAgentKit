@@ -168,6 +168,12 @@ fn verify_rail(scale: f32) {
     text.backing_scale = scale;
     let resting_scene = render(&mut host, &mut text);
     let geometry = run(&host).layout_geometry().unwrap().turn_rail;
+    let navigation_id = run(&host).turn_rail().unwrap().item_ids()[3];
+    assert!(
+        host.semantics()
+            .iter()
+            .any(|node| { node.id == navigation_id && node.semantics.name == "回合" })
+    );
     assert_eq!(geometry.document_size.height, 70.);
     assert_eq!(
         run(&host).turn_rail().unwrap().layout_geometry(),

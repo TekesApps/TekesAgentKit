@@ -2823,8 +2823,7 @@ async fn demo_admits_only_original_local_transcript_controls_during_composer_pre
         .into_iter()
         .find(|id| {
             let node = demo.tree.get(*id).unwrap();
-            node.visible().is_some()
-                && node.component::<ButtonContent>().unwrap().label == "复制输出"
+            node.visible().is_some() && node.component::<Button>().unwrap().label == "复制输出"
         })
         .unwrap();
     let point = demo.tree.get(target).unwrap().visible().unwrap().center();
@@ -2898,7 +2897,7 @@ async fn demo_admits_only_original_local_transcript_controls_during_composer_pre
         demo.tree
             .get(activity)
             .unwrap()
-            .component::<ButtonContent>()
+            .component::<Button>()
             .unwrap()
             .button
             .state
@@ -2938,7 +2937,7 @@ async fn original_cross_pane_copies_keep_composing_owner_scope_and_read_barriers
                 view.tree.get(*id).is_some_and(|node| {
                     node.visible().is_some()
                         && node
-                            .component::<ButtonContent>()
+                            .component::<Button>()
                             .is_some_and(|button| button.label == "复制输出")
                 })
             })
@@ -3342,7 +3341,7 @@ async fn task_and_sidechat_use_their_own_copy_scope_during_another_composers_pre
                 view.tree.get(*id).is_some_and(|node| {
                     node.visible().is_some()
                         && node
-                            .component::<ButtonContent>()
+                            .component::<Button>()
                             .is_some_and(|button| button.label == "复制输出")
                 })
             })
@@ -3408,7 +3407,7 @@ async fn task_and_sidechat_use_their_own_copy_scope_during_another_composers_pre
                 view.tree.get(*id).is_some_and(|node| {
                     node.visible().is_some()
                         && node
-                            .component::<ButtonContent>()
+                            .component::<Button>()
                             .is_some_and(|button| button.label == "复制输出")
                 })
             })

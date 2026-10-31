@@ -7,9 +7,7 @@ use tekes_agent_contract::{Error, Result, require, unsupported};
 use tekes_agent_presentation::{ComposerDestination, RunPhase, TranscriptItemKind};
 use tekes_agent_session::SessionRuntime;
 use tekes_agent_ui_bindings::{ModelSelectionPreparation, PaneAccess, SideChatBinding};
-use tekes_ui_controls::composition::{
-    AccessibilityAction, ButtonContent, ComponentId, ContentEvent,
-};
+use tekes_ui_controls::composition::{AccessibilityAction, Button, ComponentId, ContentEvent};
 
 const INPUT: &str = "AGENTKIT_REAL_SIDECHAT_OWNED_INPUT";
 fn panel(view: &ComponentDemo) -> &SidePanel {
@@ -65,7 +63,7 @@ pub async fn run(
             view.tree
                 .get(create)
                 .unwrap()
-                .component::<ButtonContent>()
+                .component::<Button>()
                 .unwrap()
                 .button
                 .state

@@ -370,7 +370,7 @@ impl ComposerChoices {
                 label.push_str(" · ");
                 label.push_str(detail);
             }
-            let mut button = ButtonContent::new(label);
+            let mut button = Button::new(label);
             button.button.state.selected = self
                 .catalog
                 .as_ref()
@@ -382,7 +382,7 @@ impl ComposerChoices {
         }
         self.body.children.push(Content::new(
             self.dismiss,
-            ButtonContent::new(&self.labels.dismiss),
+            Button::new(&self.labels.dismiss),
         ));
     }
 }

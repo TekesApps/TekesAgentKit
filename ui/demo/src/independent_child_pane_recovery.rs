@@ -121,7 +121,7 @@ pub(super) fn run(
         .view
         .tree
         .get(control)
-        .and_then(|node| node.component::<tekes_ui_controls::composition::ButtonContent>())
+        .and_then(|node| node.component::<tekes_ui_controls::composition::Button>())
         .expect("actual child-pane earlier control");
     assert!(
         !paging.button.state.disabled,

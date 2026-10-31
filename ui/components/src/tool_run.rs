@@ -268,7 +268,7 @@ impl ToolRun {
             let header = self.header.take().unwrap_or_else(|| {
                 let id = alloc_header();
                 self.header_id = Some(id);
-                Content::new(id, ButtonContent::new(""))
+                Content::new(id, Button::new(""))
                     .with_label_layout(tekes_ui_text::LabelOptions::single_line(
                         tekes_ui_text::LabelOverflow::TailEllipsis,
                     ))
@@ -317,7 +317,7 @@ impl ToolRun {
         } else {
             &mut self.rows.children[0]
         };
-        let button = header.component_mut::<ButtonContent>().unwrap();
+        let button = header.component_mut::<Button>().unwrap();
         button.label = format!(
             "{} · {title}",
             (self.labels.text)(if self.expanded {

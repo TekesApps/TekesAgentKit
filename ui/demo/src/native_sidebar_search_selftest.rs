@@ -5,7 +5,7 @@ use crate::acceptance_script::{Action, run_script};
 use tekes_agent_components_ui::{
     SidebarSearchInput, SidebarSearchIntent, SidebarSearchKey, SidebarSearchPhase,
 };
-use tekes_ui_controls::composition::ButtonContent;
+use tekes_ui_controls::composition::Button;
 pub(super) struct Probe {
     phase: u8,
     started: Instant,
@@ -135,7 +135,7 @@ impl Probe {
                     .tree
                     .get(row)
                     .unwrap()
-                    .component::<ButtonContent>()
+                    .component::<Button>()
                     .unwrap() as *const _ as usize;
                 self.submissions = host.view.binding().current_run().unwrap().submissions.len();
                 self.phase = 1;
@@ -202,7 +202,7 @@ impl Probe {
                         .tree
                         .get(self.row.unwrap())
                         .unwrap()
-                        .component::<ButtonContent>()
+                        .component::<Button>()
                         .unwrap() as *const _ as usize,
                     self.widget
                 );

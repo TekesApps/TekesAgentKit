@@ -82,7 +82,7 @@ async fn actual_ax_facade_is_immediate_never_polls_counter_and_preserves_ime_bar
     ui.tree
         .get_mut(SEND)
         .unwrap()
-        .component_mut::<tekes_ui_controls::composition::ButtonContent>()
+        .component_mut::<tekes_ui_controls::composition::Button>()
         .unwrap()
         .activations = 1000;
     assert!(ui.drain_intents().is_empty());

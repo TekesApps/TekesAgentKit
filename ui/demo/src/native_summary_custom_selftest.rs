@@ -8,7 +8,7 @@ use tekes_agent_components_ui::{
     SummarySection, SummaryView, install_summary_custom_row,
 };
 use tekes_ui_controls::composition::{
-    AccessibilityAction, ButtonContent, Component, Content, ContentResponse, ContentSemantics,
+    AccessibilityAction, Button, Component, Content, ContentResponse, ContentSemantics,
     StackContent, TextContent,
 };
 use tekes_ui_controls::layout::MeasuredChild;
@@ -20,7 +20,7 @@ const SECTION: &str = "host:repository";
 const ROW: &str = "controls";
 #[derive(Debug)]
 struct HostButton {
-    button: ButtonContent,
+    button: Button,
     source: SummaryCustomRowToken,
     pending: Vec<SummaryCustomRowToken>,
     marker: Rc<()>,
@@ -173,7 +173,7 @@ impl Probe {
                         Content::new(
                             ComponentId(id.0 + 1),
                             HostButton {
-                                button: ButtonContent::new("宿主查看操作"),
+                                button: Button::new("宿主查看操作"),
                                 source: source.clone(),
                                 pending: vec![],
                                 marker: Rc::new(()),

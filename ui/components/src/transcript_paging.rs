@@ -124,7 +124,7 @@ impl TranscriptPaging {
                         facts.read,
                         TranscriptPageRead::Failed(_) | TranscriptPageRead::Interrupted
                     );
-                let mut button = ButtonContent::new(if retry {
+                let mut button = Button::new(if retry {
                     &self.labels.retry
                 } else {
                     &self.labels.earlier

@@ -354,6 +354,7 @@ pub(super) fn publish_content(tree: &tekes_ui_controls::composition::ContentHost
                 required: n.semantics.required,
                 text_selection: text.map(|s| s.input.selection()),
                 read_only: text.is_some_and(|s| s.input.read_only),
+                can_show_menu: tree.can_show_context_menu(n.id),
             })
         })
         .collect();
@@ -727,6 +728,7 @@ impl WindowHandler for Host {
                 let action = match action {
                     // This host mounts no Tree; disclosure is never a button action.
                     tekes_ui_platform_macos::AccessibilityAction::SetExpanded(_) => return,
+                    tekes_ui_platform_macos::AccessibilityAction::ShowMenu => A::ShowMenu,
                     tekes_ui_platform_macos::AccessibilityAction::Increment => A::Increment,
                     tekes_ui_platform_macos::AccessibilityAction::Decrement => A::Decrement,
                     tekes_ui_platform_macos::AccessibilityAction::Focus => A::Focus,

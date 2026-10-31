@@ -206,7 +206,7 @@ impl ReadOnlyTranscript {
             tekes_ui_controls::ScrollArea::default(),
             Content::new(content_id, content),
         );
-        let mut refresh = ButtonContent::new(&labels.refresh);
+        let mut refresh = Button::new(&labels.refresh);
         refresh.button.state.disabled = true;
         Ok(Self {
             ids,
@@ -440,7 +440,7 @@ impl ReadOnlyTranscript {
             .text = plan.status.clone();
         self.refresh_enabled = input.source.is_some() && input.source_ready && !input.reading;
         self.body.children[1]
-            .component_mut::<ButtonContent>()
+            .component_mut::<Button>()
             .unwrap()
             .button
             .state

@@ -94,7 +94,7 @@ pub struct SidePanelLauncher {
     targets: BTreeMap<SidePanelDestination, ComponentId>,
     next: u64,
     row_height: f32,
-    metric: ButtonContent,
+    metric: Button,
     authority: LauncherAuthority,
 }
 impl SidePanelLauncher {
@@ -108,7 +108,7 @@ impl SidePanelLauncher {
             targets: BTreeMap::new(),
             next: root.0 + 1,
             row_height: 0.,
-            metric: ButtonContent::new("M"),
+            metric: Button::new("M"),
             authority: LauncherAuthority(Arc::new(())),
         }
     }
@@ -204,8 +204,8 @@ impl SidePanelLauncher {
             };
             let mut child = old
                 .remove(&id)
-                .unwrap_or_else(|| Content::new(id, ButtonContent::new(&item.title)));
-            let button = child.component_mut::<ButtonContent>().unwrap();
+                .unwrap_or_else(|| Content::new(id, Button::new(&item.title)));
+            let button = child.component_mut::<Button>().unwrap();
             button.label = item.title.clone();
             button.button.state.disabled = !item.enabled;
             self.children.push(child);

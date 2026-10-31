@@ -69,11 +69,7 @@ fn explicit_navigation_opens_once_without_persisting_and_manual_noop_collapse_st
         .unwrap()
         .row_id(&input.rows[0].address)
         .unwrap();
-    let ptr = host
-        .get(leaf)
-        .unwrap()
-        .component::<ButtonContent>()
-        .unwrap() as *const _ as usize;
+    let ptr = host.get(leaf).unwrap().component::<Button>().unwrap() as *const _ as usize;
     assert!(!visible(&host, leaf));
     let event = SidebarSelectionNavigation {
         revision: 1,
@@ -154,10 +150,7 @@ fn explicit_navigation_opens_once_without_persisting_and_manual_noop_collapse_st
     );
     assert!(visible(&host, leaf));
     assert_eq!(
-        host.get(leaf)
-            .unwrap()
-            .component::<ButtonContent>()
-            .unwrap() as *const _ as usize,
+        host.get(leaf).unwrap().component::<Button>().unwrap() as *const _ as usize,
         ptr
     );
 }

@@ -444,7 +444,7 @@ impl ComponentDemo {
                 flexible_child: None,
                 children: vec![
                     Content::new(creation_choices.id(), creation_choices),
-                    Content::new(CREATE_AUTOMATIC, ButtonContent::new("使用自动预设创建")),
+                    Content::new(CREATE_AUTOMATIC, Button::new("使用自动预设创建")),
                 ],
             },
         );
@@ -476,7 +476,7 @@ impl ComponentDemo {
                                 (OPEN_SUMMARY, "Summary"),
                             ]
                             .into_iter()
-                            .map(|(id, label)| Content::new(id, ButtonContent::new(label)))
+                            .map(|(id, label)| Content::new(id, Button::new(label)))
                             .collect(),
                         },
                     ),
@@ -3538,7 +3538,7 @@ impl ComponentDemo {
                     },
                     flexible_child: None,
                     children: vec![
-                        Content::new(FAMILY_REFRESH, ButtonContent::new("读取关联会话"))
+                        Content::new(FAMILY_REFRESH, Button::new("读取关联会话"))
                             .preserving_focus(),
                         Content::new(catalog.id(), catalog),
                     ],
@@ -3566,7 +3566,7 @@ impl ComponentDemo {
         self.tree
             .get_mut(FAMILY_REFRESH)
             .unwrap()
-            .component_mut::<ButtonContent>()
+            .component_mut::<Button>()
             .unwrap()
             .button
             .state
@@ -3618,7 +3618,7 @@ impl ComponentDemo {
         self.tree
             .get_mut(NEW_SESSION)
             .unwrap()
-            .component_mut::<ButtonContent>()
+            .component_mut::<Button>()
             .unwrap()
             .button
             .state
@@ -3627,7 +3627,7 @@ impl ComponentDemo {
             self.tree
                 .get_mut(CREATE_AUTOMATIC)
                 .unwrap()
-                .component_mut::<ButtonContent>()
+                .component_mut::<Button>()
                 .unwrap()
                 .button
                 .state
@@ -3644,7 +3644,7 @@ impl ComponentDemo {
         self.tree
             .get_mut(OPEN_SUMMARY)
             .unwrap()
-            .component_mut::<ButtonContent>()
+            .component_mut::<Button>()
             .unwrap()
             .button
             .state
@@ -3657,7 +3657,7 @@ impl ComponentDemo {
                     .tree
                     .get_mut(id)
                     .unwrap()
-                    .component_mut::<ButtonContent>()
+                    .component_mut::<Button>()
                     .unwrap()
                     .button;
                 button.state.selected = false;
@@ -3710,7 +3710,7 @@ impl ComponentDemo {
                 .tree
                 .get_mut(id)
                 .expect("navigation")
-                .component_mut::<ButtonContent>()
+                .component_mut::<Button>()
                 .expect("button")
                 .button;
             button.state.selected = index == self.selected;
@@ -4029,14 +4029,14 @@ impl ComponentDemo {
                                     .unwrap()
                                     .append_accessory(Content::new(
                                         ComponentId(ids.root.0 + 19),
-                                        ButtonContent::new("刷新子代理能力"),
+                                        Button::new("刷新子代理能力"),
                                     ))
                                     .map_err(unsupported)?;
                             }
                             self.tree
                                 .get_mut(ComponentId(ids.root.0 + 19))
                                 .unwrap()
-                                .component_mut::<ButtonContent>()
+                                .component_mut::<Button>()
                                 .unwrap()
                                 .button
                                 .state

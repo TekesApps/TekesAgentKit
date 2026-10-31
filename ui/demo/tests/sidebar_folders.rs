@@ -152,11 +152,7 @@ fn original_folder_disclosure_keeps_rows_and_retires_old_callbacks_without_navig
     let header = sidebar.folder_header_id(&key).unwrap();
     let leaf = sidebar.row_id(&input.rows[0].address).unwrap();
     let mut host = sidebar.into_host().unwrap();
-    let original = host
-        .get(leaf)
-        .unwrap()
-        .component::<ButtonContent>()
-        .unwrap() as *const _ as usize;
+    let original = host.get(leaf).unwrap().component::<Button>().unwrap() as *const _ as usize;
     host.accessibility_action(header, None, AccessibilityAction::Press);
     let actions = host.drain_actions();
     let sidebar = host.get(root).unwrap().component::<Sidebar>().unwrap();
@@ -183,10 +179,7 @@ fn original_folder_disclosure_keeps_rows_and_retires_old_callbacks_without_navig
     assert!(sidebar.take_preference_intents(&actions).is_empty());
     assert_ne!(sidebar.folder_header_id(&key), Some(header));
     assert_eq!(
-        host.get(leaf)
-            .unwrap()
-            .component::<ButtonContent>()
-            .unwrap() as *const _ as usize,
+        host.get(leaf).unwrap().component::<Button>().unwrap() as *const _ as usize,
         original
     );
     let mut flat = closed;
@@ -200,10 +193,7 @@ fn original_folder_disclosure_keeps_rows_and_retires_old_callbacks_without_navig
         .unwrap();
     assert!(host.semantics().iter().any(|node| node.id == leaf));
     assert_eq!(
-        host.get(leaf)
-            .unwrap()
-            .component::<ButtonContent>()
-            .unwrap() as *const _ as usize,
+        host.get(leaf).unwrap().component::<Button>().unwrap() as *const _ as usize,
         original
     );
     flat.revision += 1;

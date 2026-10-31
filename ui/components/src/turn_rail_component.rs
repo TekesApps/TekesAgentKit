@@ -1,4 +1,4 @@
-//! Real turn rail over original library scroll and CompoundButton controls.
+//! Real turn rail over original library scroll and Button controls.
 //! No generic hit testing, scrolling, input or animation engine lives here.
 use crate::turn_rail_action::{HoverVisual, Tick, TurnRailAction};
 use crate::{RunScope, RunTurnNavigation, RunTurnNavigationKind, TurnRailGeometry};
@@ -197,7 +197,8 @@ impl TurnRail {
         for (index, node) in self.rows_mut().iter_mut().enumerate() {
             let row = node.component_mut::<TurnRailAction>().unwrap();
             if let Some(prototype) = &row.prototype {
-                row.button.action.label = format(index, prototype.target());
+                row.button
+                    .set_accessible_name(Some(format(index, prototype.target())));
             }
         }
     }
@@ -286,7 +287,6 @@ impl TurnRail {
             .find(|n| n.id() == id)?
             .component::<TurnRailAction>()?
             .button
-            .action
             .button
             .layout()
     }
@@ -382,10 +382,11 @@ impl TurnRail {
                 .remove(&id)
                 .unwrap_or_else(|| rail_action_content(id, tick, self.hover.clone()));
             let action = content.component_mut::<TurnRailAction>().unwrap();
-            action.button.action.label = (self.labels.action)(index, prototype.target());
-            action.button.action.button.state.selected =
-                prototype.target().is_visible() == Some(true);
-            action.button.action.button.state.disabled = !self.gate.allows(prototype.kind());
+            action
+                .button
+                .set_accessible_name(Some((self.labels.action)(index, prototype.target())));
+            action.button.button.state.selected = prototype.target().is_visible() == Some(true);
+            action.button.button.state.disabled = !self.gate.allows(prototype.kind());
             let tick = action.button.children_mut().unwrap()[0]
                 .component_mut::<Tick>()
                 .unwrap();
@@ -424,7 +425,7 @@ impl TurnRail {
         self.gate = gate;
         for row in self.rows_mut() {
             let a = row.component_mut::<TurnRailAction>().unwrap();
-            a.button.action.button.state.disabled =
+            a.button.button.state.disabled =
                 a.prototype.as_ref().is_none_or(|p| !gate.allows(p.kind()));
         }
     }
@@ -443,7 +444,6 @@ impl TurnRail {
                         .component::<TurnRailAction>()
                         .unwrap()
                         .button
-                        .action
                         .button
                         .state
                         .disabled

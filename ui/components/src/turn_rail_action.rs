@@ -1,4 +1,4 @@
-//! Agent tick decoration and immutable gesture capture. Original CompoundButton
+//! Agent tick decoration and immutable gesture capture. Original Button
 //! retains pointer arm/cancel, keyboard, focus, AX, chrome and slot ownership.
 use crate::{RunTurnNavigation, TurnRailGeometry};
 use std::sync::{Arc, Mutex};
@@ -89,29 +89,26 @@ pub(crate) fn tick_length(index: usize, hover: &HoverVisual) -> f32 {
 }
 #[derive(Debug)]
 pub(crate) struct TurnRailAction {
-    pub button: CompoundButton,
+    pub button: Button,
     pub prototype: Option<RunTurnNavigation>,
     pub pending: Vec<RunTurnNavigation>,
 }
 impl TurnRailAction {
     pub fn new(decoration: ComponentId, hover: Arc<Mutex<HoverVisual>>) -> Self {
-        let mut button = CompoundButton::new(
-            "回合",
-            Content::new(
-                decoration,
-                Tick {
-                    index: 0,
-                    centers: false,
-                    turn_id: None,
-                    visible: false,
-                    hover,
-                },
-            ),
-        )
-        .expect("one passive Agent tick");
-        button.action.variant = ButtonVariant::Quiet;
-        button.action.button.frame_policy = tekes_ui_controls::ButtonFramePolicy::Exact;
-        button.action.pointer_activation_phase = ButtonActivationPhase::Press;
+        let mut button = Button::new(Content::new(
+            decoration,
+            Tick {
+                index: 0,
+                centers: false,
+                turn_id: None,
+                visible: false,
+                hover,
+            },
+        ))
+        .with_accessible_name("回合");
+        button.variant = ButtonVariant::Quiet;
+        button.button.frame_policy = tekes_ui_controls::ButtonFramePolicy::Exact;
+        button.pointer_activation_phase = ButtonActivationPhase::Press;
         Self {
             button,
             prototype: None,
@@ -195,15 +192,15 @@ mod forwarded_focus_tests {
     #[test]
     fn actual_turn_rail_delegates_library_focus_decoration_state() {
         let mut action = TurnRailAction::new(ComponentId(999), Arc::new(Mutex::default()));
-        action.button.action.button.frame_policy = tekes_ui_controls::ButtonFramePolicy::Exact;
+        action.button.button.frame_policy = tekes_ui_controls::ButtonFramePolicy::Exact;
         assert!(!action.focus_decoration_above_siblings());
         action.set_focus(true, true);
         assert!(action.button.focus_decoration_above_siblings());
         assert!(action.focus_decoration_above_siblings());
-        action.button.action.button.state.disabled = true;
+        action.button.button.state.disabled = true;
         assert!(!action.button.focus_decoration_above_siblings());
         assert!(!action.focus_decoration_above_siblings());
-        action.button.action.button.state.disabled = false;
+        action.button.button.state.disabled = false;
         action.set_focus(true, false);
         assert!(!action.button.focus_decoration_above_siblings());
         assert!(!action.focus_decoration_above_siblings());

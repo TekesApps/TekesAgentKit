@@ -200,7 +200,7 @@ impl RunSurface {
                 flexible_child: None,
                 children: buttons
                     .into_iter()
-                    .map(|(id, label)| Content::new(id, ButtonContent::new(label)))
+                    .map(|(id, label)| Content::new(id, Button::new(label)))
                     .collect(),
             },
         );
@@ -263,7 +263,7 @@ impl RunSurface {
         self.tree
             .get_mut(id)
             .unwrap()
-            .component_mut::<ButtonContent>()
+            .component_mut::<Button>()
             .unwrap()
             .button
             .state

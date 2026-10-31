@@ -331,7 +331,7 @@ async fn late_failure_is_retained_in_original_offscreen_card_not_current_session
 }
 #[test]
 fn unrelated_publications_preserve_button_pointer_tracking() {
-    use tekes_ui_controls::composition::ButtonContent;
+    use tekes_ui_controls::composition::Button;
     let prompt =
         Arc::new(ActionablePrompt::read(RunScope::main("fixture", "a"), approval(0)).unwrap());
     let mut card = ActionableCard::new(93, Default::default());
@@ -341,7 +341,7 @@ fn unrelated_publications_preserve_button_pointer_tracking() {
     let mut host = card.into_host().unwrap();
     host.get_mut(button)
         .unwrap()
-        .component_mut::<ButtonContent>()
+        .component_mut::<Button>()
         .unwrap()
         .button
         .state
@@ -358,7 +358,7 @@ fn unrelated_publications_preserve_button_pointer_tracking() {
     assert!(
         host.get(button)
             .unwrap()
-            .component::<ButtonContent>()
+            .component::<Button>()
             .unwrap()
             .button
             .state

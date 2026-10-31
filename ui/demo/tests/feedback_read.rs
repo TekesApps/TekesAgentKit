@@ -452,7 +452,7 @@ async fn dropped_host_initial_request_never_reads_the_endpoint() {
 
 #[tokio::test]
 async fn reconnect_read_failure_keeps_committed_note_disabled_until_explicit_recovery() {
-    use tekes_ui_controls::composition::{AccessibilityAction, ButtonContent};
+    use tekes_ui_controls::composition::{AccessibilityAction, Button};
     let mut service = service(false, true);
     Arc::get_mut(&mut service).unwrap().writable = true;
     let (runtime, binding) = setup(service.clone()).await;
@@ -474,7 +474,7 @@ async fn reconnect_read_failure_keeps_committed_note_disabled_until_explicit_rec
             .tree
             .get(feedback(&view, id).ids().positive)
             .unwrap()
-            .component::<ButtonContent>()
+            .component::<Button>()
             .unwrap()
             .button
             .state
@@ -504,7 +504,7 @@ async fn reconnect_read_failure_keeps_committed_note_disabled_until_explicit_rec
             view.tree
                 .get(button)
                 .unwrap()
-                .component::<ButtonContent>()
+                .component::<Button>()
                 .unwrap()
                 .button
                 .state

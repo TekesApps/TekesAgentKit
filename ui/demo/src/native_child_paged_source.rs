@@ -548,9 +548,7 @@ pub(super) fn run(
                 host.view
                     .tree
                     .get(pane.ids().refresh)
-                    .and_then(|node| {
-                        node.component::<tekes_ui_controls::composition::ButtonContent>()
-                    })
+                    .and_then(|node| node.component::<tekes_ui_controls::composition::Button>())
                     .is_some_and(|button| !button.button.state.disabled)
             })
     });
@@ -628,9 +626,7 @@ pub(super) fn run(
                 host.view
                     .tree
                     .get(pane.ids().refresh)
-                    .and_then(|node| {
-                        node.component::<tekes_ui_controls::composition::ButtonContent>()
-                    })
+                    .and_then(|node| node.component::<tekes_ui_controls::composition::Button>())
                     .is_some_and(|button| !button.button.state.disabled)
             })
     });

@@ -498,7 +498,7 @@ impl TurnFeedback {
             (self.ids.negative, &self.labels.negative, Rating::Negative),
         ] {
             let mut node = retained_button(&mut old, id, label);
-            let button = node.component_mut::<ButtonContent>().unwrap();
+            let button = node.component_mut::<Button>().unwrap();
             button.button.state.selected = current.is_some_and(|v| v.rating == rating);
             button.button.state.disabled = busy
                 || self.editor_open
@@ -517,12 +517,12 @@ impl TurnFeedback {
                 self.ids.edit_note,
                 current.note.as_deref().unwrap_or(&self.labels.edit_note),
             );
-            note.component_mut::<ButtonContent>()
+            note.component_mut::<Button>()
                 .unwrap()
                 .button
                 .state
                 .selected = current.note.is_some();
-            note.component_mut::<ButtonContent>()
+            note.component_mut::<Button>()
                 .unwrap()
                 .button
                 .state
@@ -589,8 +589,8 @@ impl TurnFeedback {
                 ));
             }
             let mut save = retained_button(&mut old, self.ids.save, &self.labels.save);
-            save.component_mut::<ButtonContent>().unwrap().variant = ButtonVariant::Primary;
-            save.component_mut::<ButtonContent>()
+            save.component_mut::<Button>().unwrap().variant = ButtonVariant::Primary;
+            save.component_mut::<Button>()
                 .unwrap()
                 .button
                 .state
@@ -598,7 +598,7 @@ impl TurnFeedback {
                 busy || self.is_composing() || self.state.as_ref().is_none_or(|s| !s.put_available);
             let mut close = retained_button(&mut old, self.ids.close, &self.labels.close);
             close
-                .component_mut::<ButtonContent>()
+                .component_mut::<Button>()
                 .unwrap()
                 .button
                 .state
@@ -627,7 +627,7 @@ impl TurnFeedback {
         {
             let mut refresh = retained_button(&mut old, self.ids.refresh, &self.labels.refresh);
             refresh
-                .component_mut::<ButtonContent>()
+                .component_mut::<Button>()
                 .unwrap()
                 .button
                 .state
@@ -749,8 +749,8 @@ fn retained_button(old: &mut Vec<Content>, id: ComponentId, label: &str) -> Cont
         .iter()
         .position(|n| n.id() == id)
         .map(|i| old.remove(i))
-        .unwrap_or_else(|| Content::new(id, ButtonContent::new(label)).preserving_focus());
-    node.component_mut::<ButtonContent>().unwrap().label = label.into();
+        .unwrap_or_else(|| Content::new(id, Button::new(label)).preserving_focus());
+    node.component_mut::<Button>().unwrap().label = label.into();
     node
 }
 

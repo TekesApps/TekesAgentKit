@@ -670,9 +670,9 @@ impl TurnFootnote {
                 .position(|node| node.id() == id)
                 .map(|index| previous.remove(index))
                 .unwrap_or_else(|| {
-                    Content::new(id, ButtonContent::new(&self.labels.copy)).preserving_focus()
+                    Content::new(id, Button::new(&self.labels.copy)).preserving_focus()
                 });
-            node.component_mut::<ButtonContent>().unwrap().label = self.labels.copy.clone();
+            node.component_mut::<Button>().unwrap().label = self.labels.copy.clone();
             self.rows.children.push(node);
         }
         if self.feedback_shown
@@ -686,9 +686,9 @@ impl TurnFootnote {
                 .position(|node| node.id() == *id)
                 .map(|index| previous.remove(index))
                 .unwrap_or_else(|| {
-                    Content::new(*id, ButtonContent::new(&action.label)).preserving_focus()
+                    Content::new(*id, Button::new(&action.label)).preserving_focus()
                 });
-            let button = node.component_mut::<ButtonContent>().unwrap();
+            let button = node.component_mut::<Button>().unwrap();
             button.label = action.label.clone();
             button.button.state.disabled =
                 !self.available || self.pending.is_some() || !action.enabled;

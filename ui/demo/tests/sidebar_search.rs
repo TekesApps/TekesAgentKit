@@ -61,11 +61,7 @@ fn footer_tracks_search_without_rewriting_inventory_and_retires_original_retry_g
     let root = sidebar.id();
     let retry = sidebar.search_retry_id().unwrap();
     let mut host = sidebar.into_host().unwrap();
-    let owner = host
-        .get(retry)
-        .unwrap()
-        .component::<ButtonContent>()
-        .unwrap() as *const _ as usize;
+    let owner = host.get(retry).unwrap().component::<Button>().unwrap() as *const _ as usize;
     host.accessibility_action(retry, None, AccessibilityAction::Press);
     let captured = host.drain_actions();
     assert_eq!(
@@ -87,16 +83,13 @@ fn footer_tracks_search_without_rewriting_inventory_and_retires_original_retry_g
     };
     update(&mut host, root, &second).unwrap();
     assert_eq!(
-        host.get(retry)
-            .unwrap()
-            .component::<ButtonContent>()
-            .unwrap() as *const _ as usize,
+        host.get(retry).unwrap().component::<Button>().unwrap() as *const _ as usize,
         owner
     );
     assert!(
         host.get(retry)
             .unwrap()
-            .component::<ButtonContent>()
+            .component::<Button>()
             .unwrap()
             .button
             .state

@@ -120,7 +120,7 @@ impl Probe {
                 .tree
                 .get(Self::panel(host).create_side_chat_id())
                 .unwrap()
-                .component::<tekes_ui_controls::composition::ButtonContent>()
+                .component::<tekes_ui_controls::composition::Button>()
                 .unwrap()
                 .button
                 .state

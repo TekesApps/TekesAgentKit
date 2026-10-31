@@ -24,7 +24,7 @@ pub(crate) type Expansion = Rc<RefCell<Disclosure>>;
 
 #[derive(Debug)]
 pub(crate) struct SummaryHeader {
-    button: CompoundButton,
+    button: Button,
     pub expansion: Expansion,
     epoch: Rc<Cell<u64>>,
     kind: SectionHeaderKind,
@@ -50,8 +50,7 @@ impl SummaryHeader {
             label
         };
         Self {
-            button: CompoundButton::new("Summary section", label)
-                .expect("Summary header has one passive text slot"),
+            button: Button::new(label).with_accessible_name("Summary section"),
             expansion,
             epoch,
             kind,
@@ -75,14 +74,15 @@ impl SummaryHeader {
         self.shows_divider = self.kind == SectionHeaderKind::Summary && shown;
     }
     pub fn set_title(&mut self, title: String) {
-        self.button.action.label = title.clone();
+        self.button.label = title.clone();
+        self.button.set_accessible_name(Some(title.clone()));
         self.button.children_mut().unwrap()[0]
             .component_mut::<TextContent>()
             .expect("Summary title")
             .text = title;
     }
     pub fn set_enabled(&mut self, enabled: bool) {
-        self.button.action.button.state.disabled = !enabled;
+        self.button.button.state.disabled = !enabled;
     }
     fn activated(&mut self, response: ContentResponse) -> ContentResponse {
         if response.activated && self.expansion.borrow_mut().toggle() {

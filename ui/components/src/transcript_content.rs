@@ -1567,7 +1567,7 @@ impl TranscriptContent {
                 unreachable!("fragments retain original message nodes")
             }
             PlannedContent::Disclosure { .. } => {
-                Content::new(root, ButtonContent::new("")).preserving_focus()
+                Content::new(root, Button::new("")).preserving_focus()
             }
             PlannedContent::Input(_) => {
                 let mut view = InputMessage::with_details_labels(
@@ -1644,7 +1644,7 @@ impl TranscriptContent {
             }
             PlannedContent::Fragment(..) | PlannedContent::ToolFragment(..) => {}
             PlannedContent::Disclosure { .. } => {
-                if node.component::<ButtonContent>().is_none() {
+                if node.component::<Button>().is_none() {
                     return Err("activity disclosure role changed");
                 }
             }
@@ -1713,7 +1713,7 @@ impl TranscriptContent {
     ) -> Result<(), &'static str> {
         match &row.content {
             PlannedContent::Disclosure { text, expanded } => {
-                let button = node.component_mut::<ButtonContent>().unwrap();
+                let button = node.component_mut::<Button>().unwrap();
                 button.label = text.clone();
                 button.button.state.selected = *expanded;
             }
@@ -1825,12 +1825,7 @@ impl TranscriptContent {
                 (count % 2 == 1).then(|| {
                     (
                         key.clone(),
-                        !node
-                            .component::<ButtonContent>()
-                            .unwrap()
-                            .button
-                            .state
-                            .selected,
+                        !node.component::<Button>().unwrap().button.state.selected,
                     )
                 })
             })

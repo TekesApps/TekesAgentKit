@@ -1011,8 +1011,8 @@ impl Sidebar {
         if let Some((_, id)) = &target {
             let mut node = old
                 .remove(id)
-                .unwrap_or_else(|| Content::new(*id, ButtonContent::new("")));
-            let button = node.component_mut::<ButtonContent>().unwrap();
+                .unwrap_or_else(|| Content::new(*id, Button::new("")));
+            let button = node.component_mut::<Button>().unwrap();
             button.label = labels.retry;
             button.button.state.disabled = pending;
             footer.body.children.push(node);
@@ -1050,7 +1050,7 @@ impl Sidebar {
             .iter_mut()
             .find(|node| node.id() == id)
         {
-            node.component_mut::<ButtonContent>()
+            node.component_mut::<Button>()
                 .unwrap()
                 .button
                 .state
@@ -1105,7 +1105,7 @@ impl Sidebar {
                     .find(|content| content.id() == *id)
             {
                 content
-                    .component_mut::<ButtonContent>()
+                    .component_mut::<Button>()
                     .unwrap()
                     .button
                     .state
@@ -1374,7 +1374,7 @@ impl Sidebar {
                         },
                         flexible_child: None,
                         children: vec![
-                            Content::new(select_id, ButtonContent::new("")),
+                            Content::new(select_id, Button::new("")),
                             Content::new(status_id, TextContent::new("")),
                         ],
                     },
@@ -1384,7 +1384,7 @@ impl Sidebar {
                 .component_mut::<StackContent>()
                 .expect("sidebar row");
             let button = stack.children[0]
-                .component_mut::<ButtonContent>()
+                .component_mut::<Button>()
                 .expect("row selection");
             button.button.state.selected = input.selected.as_ref() == Some(&row.address);
             button.label = row.title.clone();
@@ -1533,9 +1533,7 @@ impl Sidebar {
         }
         let page_request = if show_more {
             let control = ids[&more_key];
-            children.push(
-                Content::new(control, ButtonContent::new(&self.labels.more)).preserving_focus(),
-            );
+            children.push(Content::new(control, Button::new(&self.labels.more)).preserving_focus());
             Some(crate::SidebarPageRequest {
                 owner: self.page_owner.clone(),
                 control,
@@ -1621,10 +1619,8 @@ impl Sidebar {
                     let id = ids[&Key::Action(row.address.clone(), definition.id.clone())];
                     let mut content = old
                         .remove(&id)
-                        .unwrap_or_else(|| Content::new(id, ButtonContent::new("")));
-                    let button = content
-                        .component_mut::<ButtonContent>()
-                        .expect("shared action");
+                        .unwrap_or_else(|| Content::new(id, Button::new("")));
+                    let button = content.component_mut::<Button>().expect("shared action");
                     button.label = match &definition.disabled_reason {
                         Some(reason) if !definition.enabled => {
                             format!("{} · {reason}", definition.label)

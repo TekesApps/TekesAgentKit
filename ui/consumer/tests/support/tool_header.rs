@@ -167,7 +167,7 @@ fn explicit_report_inputs_are_captured_scoped_and_preserve_composer_and_detail_o
         assert!(
             host.get(button)
                 .unwrap()
-                .component::<ButtonContent>()
+                .component::<Button>()
                 .unwrap()
                 .label
                 .contains("+9 −10")

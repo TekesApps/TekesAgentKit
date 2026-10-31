@@ -7,7 +7,7 @@ mod folders;
 mod pin_query;
 use crate::acceptance_script::{Action, run_script};
 use tekes_agent_components_ui::{SidebarSearchIntent, SidebarSearchKey, SidebarSearchPhase};
-use tekes_ui_controls::composition::ButtonContent;
+use tekes_ui_controls::composition::Button;
 pub(super) struct Probe {
     fixture: tekes_agent_ui_demo::fixture::Fixture,
     started: Instant,
@@ -229,7 +229,7 @@ impl Probe {
                     .tree
                     .get(row)
                     .unwrap()
-                    .component::<ButtonContent>()
+                    .component::<Button>()
                     .unwrap() as *const _ as usize;
                 // CANDIDATE_SIDEBAR_HELP_NATIVE_BEGIN
                 if let Ok(path) = std::env::var("AGENT_SIDEBAR_QUERY_RESULTS_CAPTURE") {
@@ -275,7 +275,7 @@ impl Probe {
                         .tree
                         .get(self.row.unwrap())
                         .unwrap()
-                        .component::<ButtonContent>()
+                        .component::<Button>()
                         .unwrap() as *const _ as usize,
                     self.widget
                 );
@@ -438,7 +438,7 @@ impl Probe {
                         .tree
                         .get(row)
                         .unwrap()
-                        .component::<ButtonContent>()
+                        .component::<Button>()
                         .unwrap() as *const _ as usize,
                     self.widget
                 );
@@ -482,7 +482,7 @@ impl Probe {
                         .tree
                         .get(self.row.unwrap())
                         .unwrap()
-                        .component::<ButtonContent>()
+                        .component::<Button>()
                         .unwrap() as *const _ as usize,
                     self.widget
                 );

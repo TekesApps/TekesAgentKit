@@ -3,7 +3,7 @@
 use super::*;
 use crate::acceptance_script::{Action, run_script};
 use tekes_agent_ui_bindings::SidebarPublication;
-use tekes_ui_controls::composition::ButtonContent;
+use tekes_ui_controls::composition::Button;
 const FAILURE: &str = "Sidebar 观察失败：保留最近可读列表";
 pub(super) struct Probe {
     phase: u8,
@@ -164,7 +164,7 @@ impl Probe {
                     .tree
                     .get(id)
                     .unwrap()
-                    .component::<ButtonContent>()
+                    .component::<Button>()
                     .unwrap() as *const _ as usize;
             }
             2 => {
@@ -191,7 +191,7 @@ impl Probe {
                         .tree
                         .get(id)
                         .unwrap()
-                        .component::<ButtonContent>()
+                        .component::<Button>()
                         .unwrap() as *const _ as usize,
                     self.widget
                 );

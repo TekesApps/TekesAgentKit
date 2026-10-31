@@ -433,13 +433,13 @@ fn restoration_is_not_empty_and_observation_failure_keeps_readable_rows() {
         .unwrap()
         .row_id(&row.address)
         .unwrap();
-    let owner = host.get(id).unwrap().component::<ButtonContent>().unwrap() as *const _ as usize;
+    let owner = host.get(id).unwrap().component::<Button>().unwrap() as *const _ as usize;
     input.revision += 1;
     input.error = Some("库存观察中断，保留最后列表".into());
     input.rows[0].activity.is_stale = true;
     update(&mut host, root, &input).unwrap();
     assert_eq!(
-        host.get(id).unwrap().component::<ButtonContent>().unwrap() as *const _ as usize,
+        host.get(id).unwrap().component::<Button>().unwrap() as *const _ as usize,
         owner
     );
     assert!(

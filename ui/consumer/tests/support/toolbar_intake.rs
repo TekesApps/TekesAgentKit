@@ -53,7 +53,7 @@ fn original_kit_options_and_composer_survive_public_toolbar_typography_and_reflo
                                         ToolbarPlacement::PrimaryAction,
                                         vec![Content::new(
                                             ComponentId(toolbar.0 + 11),
-                                            ButtonContent::new("宿主动作"),
+                                            Button::new("宿主动作"),
                                         )],
                                     ),
                                 ),

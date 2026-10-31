@@ -680,7 +680,7 @@ async fn late_child_open_caches_original_parent_without_stealing_selection_and_o
         view.tree
             .get(ids.send)
             .unwrap()
-            .component::<tekes_ui_controls::composition::ButtonContent>()
+            .component::<tekes_ui_controls::composition::Button>()
             .unwrap()
             .button
             .state

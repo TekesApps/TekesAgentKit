@@ -301,7 +301,7 @@ impl FamilyCatalog {
                                 );
                                 id
                             };
-                            let mut button = ButtonContent::new(title);
+                            let mut button = Button::new(title);
                             button.button.state.disabled = !known_mode || input.refreshing;
                             children.push(Content::new(id, button).preserving_focus());
                         }

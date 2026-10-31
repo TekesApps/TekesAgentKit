@@ -410,7 +410,7 @@ impl OutputPart {
         let (children, hidden) = if let Some(button) = ids.disclosure {
             (
                 vec![
-                    Content::new(button, ButtonContent::new(&facts.title))
+                    Content::new(button, Button::new(&facts.title))
                         .with_label_layout(tekes_ui_text::LabelOptions::single_line(
                             tekes_ui_text::LabelOverflow::TailEllipsis,
                         ))
@@ -584,9 +584,7 @@ impl OutputPart {
     }
     fn refresh_header(&mut self) {
         if self.ids.disclosure.is_some() {
-            let button = self.rows.children[0]
-                .component_mut::<ButtonContent>()
-                .unwrap();
+            let button = self.rows.children[0].component_mut::<Button>().unwrap();
             button.label = format!(
                 "{} · {}",
                 (self.labels.text)(if self.hidden.is_none() {
