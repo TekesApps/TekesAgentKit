@@ -127,6 +127,9 @@ impl TurnRailAction {
     }
 }
 impl Component for TurnRailAction {
+    fn rectangular_input_geometry(&self) -> bool {
+        true
+    }
     fn focus_decoration_above_siblings(&self) -> bool {
         self.button.focus_decoration_above_siblings()
     }

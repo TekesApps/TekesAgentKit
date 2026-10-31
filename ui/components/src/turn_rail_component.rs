@@ -65,8 +65,12 @@ impl TurnRailReveal {
 #[derive(Debug)]
 struct RailDocument {
     rows: Vec<Content>,
+    arranged: bool,
 }
 impl Component for RailDocument {
+    fn host_reveal_passthrough(&self) -> bool {
+        self.arranged
+    }
     fn children(&self) -> &[Content] {
         &self.rows
     }
@@ -80,6 +84,7 @@ impl Component for RailDocument {
         ))
     }
     fn arrange(&mut self, t: &mut dyn ButtonTextRenderer, f: Rect, c: Rect) {
+        self.arranged = false;
         for (i, row) in self.rows.iter_mut().enumerate() {
             row.arrange(
                 t,
@@ -92,6 +97,7 @@ impl Component for RailDocument {
                 c,
             );
         }
+        self.arranged = !f.is_empty() && !c.is_empty();
     }
 }
 #[derive(Clone, Debug)]
@@ -120,6 +126,7 @@ pub struct TurnRail {
     next: u64,
     end: u64,
     geometry: Option<TurnRailGeometry>,
+    arranged: bool,
     pending: Vec<RunTurnNavigation>,
     gate: TurnRailNavigationGate,
     owner: Arc<()>,
@@ -166,7 +173,13 @@ impl TurnRail {
                 ComponentId(base + 1),
                 ScrollContent::new(
                     scroll,
-                    Content::new(ComponentId(base + 2), RailDocument { rows: vec![] }),
+                    Content::new(
+                        ComponentId(base + 2),
+                        RailDocument {
+                            rows: vec![],
+                            arranged: false,
+                        },
+                    ),
                 ),
             )],
             ids: BTreeMap::new(),
@@ -174,6 +187,7 @@ impl TurnRail {
             next: base + 16,
             end: base | u32::MAX as u64,
             geometry: None,
+            arranged: false,
             pending: vec![],
             gate: Default::default(),
             owner: Arc::new(()),
@@ -241,9 +255,10 @@ impl TurnRail {
     }
     pub(crate) fn clear_geometry(&mut self) {
         self.geometry = None;
+        self.arranged = false;
     }
     pub(crate) fn invalidate_layout(&mut self) {
-        self.geometry = None;
+        self.clear_geometry();
         self.clear_hover();
         self.owner = Arc::new(());
         self.reveal = None;
@@ -401,7 +416,16 @@ impl TurnRail {
             self.pending
                 .append(&mut old.component_mut::<TurnRailAction>().unwrap().pending);
         }
-        *self.rows_mut() = rows;
+        let document = self.children[0]
+            .component_mut::<ScrollContent>()
+            .unwrap()
+            .children_mut()
+            .unwrap()[0]
+            .component_mut::<RailDocument>()
+            .unwrap();
+        document.rows = rows;
+        document.arranged = false;
+        self.arranged = false;
         self.ids = ids;
         self.order = order;
         self.next = next;
@@ -684,6 +708,9 @@ fn hover_motion() -> Motion {
     })
 }
 impl Component for TurnRail {
+    fn host_reveal_passthrough(&self) -> bool {
+        self.arranged
+    }
     fn lifecycle(&mut self, event: Lifecycle) {
         if event == Lifecycle::Unmounted {
             self.invalidate_layout();
@@ -701,9 +728,17 @@ impl Component for TurnRail {
     fn measure(&mut self, _: &mut dyn ButtonTextRenderer, a: Size) -> MeasuredChild {
         MeasuredChild::new(a)
     }
-    fn arrange(&mut self, t: &mut dyn ButtonTextRenderer, _: Rect, c: Rect) {
-        if let Some(g) = self.geometry {
-            self.children[0].arrange(t, g.track, g.track.intersection(&c).unwrap_or_default());
+    fn arrange(&mut self, t: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        self.arranged = false;
+        if let Some(mut geometry) = self.geometry {
+            let dx = frame.min_x() - geometry.rail.min_x();
+            let dy = frame.min_y() - geometry.rail.min_y();
+            geometry.rail = geometry.rail.offset(dx, dy);
+            geometry.track = geometry.track.offset(dx, dy);
+            let track_clip = geometry.track.intersection(&clip).unwrap_or_default();
+            self.children[0].arrange(t, geometry.track, track_clip);
+            self.geometry = Some(geometry);
+            self.arranged = !frame.is_empty() && !track_clip.is_empty();
         }
     }
     fn paint(
@@ -880,6 +915,15 @@ mod hover_tests {
             modifiers: Default::default(),
             click_count: 0,
         })
+    }
+
+    fn document(rail: &TurnRail) -> &RailDocument {
+        rail.children[0]
+            .component::<ScrollContent>()
+            .unwrap()
+            .children()[0]
+            .component::<RailDocument>()
+            .unwrap()
     }
 
     fn visual(host: &ContentHost, root: ComponentId) -> HoverVisual {
@@ -1223,6 +1267,114 @@ mod hover_tests {
         rail.update_hover(Some(1.));
         rail.lifecycle(Lifecycle::Unmounted);
         assert!(rail.hover.lock().unwrap().hovered_turn_id.is_none());
+    }
+
+    #[test]
+    fn reveal_layout_translates_with_arranged_frame_and_keeps_original_clip() {
+        let mut baseline: Option<Vec<(ComponentId, Rect, Option<Rect>)>> = None;
+        for (dx, dy) in [(0., 0.), (37., 41.)] {
+            let (mut host, root, _) = mounted(5);
+            let frame = Rect::new(dx, dy, 100., 110.);
+            let clip = Rect::new(5. + dx, 8. + dy, 44., 65.);
+            host.render(
+                &mut Scene::default(),
+                &mut Text::default(),
+                frame,
+                clip,
+                Theme::LIGHT.into(),
+            )
+            .unwrap();
+            let rail = host.get(root).unwrap().component::<TurnRail>().unwrap();
+            let expected_track = Rect::new(10. + dx, 10. + dy, 40., 80.);
+            assert!(rail.host_reveal_passthrough());
+            assert!(document(rail).host_reveal_passthrough());
+            assert_eq!(rail.layout_geometry().unwrap().track, expected_track);
+            assert_eq!(rail.children[0].frame(), expected_track);
+            assert_eq!(
+                rail.children[0].visible(),
+                expected_track.intersection(&clip)
+            );
+            let rows: Vec<_> = rail
+                .rows()
+                .iter()
+                .map(|row| (row.id(), row.frame(), row.visible()))
+                .collect();
+            if let Some(original) = &baseline {
+                for ((id, rect, visible), (old_id, old_rect, old_visible)) in
+                    rows.iter().zip(original)
+                {
+                    assert_eq!(id, old_id);
+                    assert_eq!(*rect, old_rect.offset(dx, dy));
+                    assert_eq!(*visible, old_visible.map(|r: Rect| r.offset(dx, dy)));
+                }
+            } else {
+                baseline = Some(rows);
+            }
+            host.render(
+                &mut Scene::default(),
+                &mut Text::default(),
+                frame,
+                frame,
+                Theme::LIGHT.into(),
+            )
+            .unwrap();
+            let target = host
+                .get(root)
+                .unwrap()
+                .component::<TurnRail>()
+                .unwrap()
+                .item_ids()[0];
+            assert!(host.focus(Some(target), true));
+        }
+    }
+
+    #[test]
+    fn reveal_passthrough_requires_valid_current_arrange() {
+        let (mut host, root, _) = mounted(5);
+        let ids = host
+            .get(root)
+            .unwrap()
+            .component::<TurnRail>()
+            .unwrap()
+            .item_ids();
+        let rail = host.get(root).unwrap().component::<TurnRail>().unwrap();
+        assert!(!rail.host_reveal_passthrough());
+        assert!(!document(rail).host_reveal_passthrough());
+        assert!(!host.focus(Some(ids[0]), true));
+        assert_eq!(host.focused(), None);
+        render(&mut host, &mut Text::default());
+        assert!(host.focus(Some(ids[0]), true));
+        host.get_mut(root)
+            .unwrap()
+            .component_mut::<TurnRail>()
+            .unwrap()
+            .clear_geometry();
+        assert!(
+            !host
+                .get(root)
+                .unwrap()
+                .component::<TurnRail>()
+                .unwrap()
+                .host_reveal_passthrough()
+        );
+        assert!(!host.focus(Some(ids[1]), true));
+        assert_eq!(host.focused(), Some(ids[0]));
+
+        let (mut host, root, _) = mounted(5);
+        let bounds = Rect::new(0., 0., 100., 110.);
+        host.render(
+            &mut Scene::default(),
+            &mut Text::default(),
+            bounds,
+            Rect::default(),
+            Theme::LIGHT.into(),
+        )
+        .unwrap();
+        let rail = host.get(root).unwrap().component::<TurnRail>().unwrap();
+        assert!(!rail.host_reveal_passthrough());
+        assert!(!document(rail).host_reveal_passthrough());
+        let target = rail.item_ids()[0];
+        assert!(!host.focus(Some(target), true));
     }
 
     #[test]
