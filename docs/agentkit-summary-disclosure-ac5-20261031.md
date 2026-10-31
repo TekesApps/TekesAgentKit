@@ -70,3 +70,10 @@ CPU017 对 consumer `7c829033bf6d0ccb42f13525222ff7ec7ce913ea` 和固定 SDK `81
 正常依赖接入选择 TekesUI PR #210 正常合并的不可变公开 revision `04992fa9ee89016551f9e95e5b10ce1bfb742493`。它相对 CPU017 SDK 只有结果文档和对应审计指纹两文件变化；运行代码、依赖、token、资源和测试字节不变。工作区七项声明、锁、来源闭包和严格公开消费者检查必须指向同一 revision，controls 保留 `svg-icons`，不得残留本地 SDK path override。公开来源须另以实际 Cargo metadata、完整资源字节和依赖图核实；源码相同仅允许保留 CPU017 原程序身份的行为证据，不能将82例改称公开 pin 下新执行。公开导入的宿主、共享包与第二消费者编译及严格检查仍须执行，最终 CI 对自己的提交负责。
 
 此兼容接入不改变 Summary/Sidebar 的业务合同，也不关闭 AC5。GPU/真实图标提交与 cache、原生窗口、物理 IME、VoiceOver、性能和正式发布仍保持各自未验边界。
+
+
+## PR87 正式CI 首次失败接续（未运行修复）
+
+PR87 head648970b27b2cc17542c16b78ebce6e85af628e10/公开SDK04992的正式41249453871 attempt1仅run_column15中的Summary邻接用例失败，实际header.max_y81/body.min_y86，原UI rawSHA4a6c6397302450261c98412f85dbace4b66398b5bb80a95aa7e104c3c9f5a7b4保留；本轮未retry。公开Disclosure measure/arrange仍向plain nonfocus Summary实际body加默认focusclearance，不能由consumer改0为5、伪frame、负offset或抹clip求绿，已交原SDK owner做最小真实布局修复，默认Sidebar焦点环保原。
+
+隔离候选基于准确648970公开源，仅把该用例后续AXPress的旧eager-toggle假设接成一次richrecords→SummaryView.handle_disclosure_records成功确认，再执行原section_layouts立即失效/折叠无body/源spacing/focus槽退出等全部原最终断言；保原邻接assert与容差。完整15例其余Composer/RunColumn/rail/archived/preedit/publication/usage/notice用例源未改。追加实际scale/width/header/body原日志以定位下一新阶段，不以静态分析签PASS。新SDK固定候选到来后需要完整15例及相关shared/原6reveal/Sidebar3/Label10/demo36/host与strict受影响闭包；不重无关670、不新增CPU/GPU/前台或CI。
