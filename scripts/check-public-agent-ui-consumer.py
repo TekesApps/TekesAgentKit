@@ -12,7 +12,7 @@ import sys
 import tomllib
 
 
-PIN = "04992fa9ee89016551f9e95e5b10ce1bfb742493"
+PIN = "eec9aebe555a85a4caecf57034d331def2bb867d"
 FIXTURE_ROOT = Path(".runtime-fixtures/issue15-contract-20261024")
 
 

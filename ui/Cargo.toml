@@ -18,13 +18,13 @@ tekes-agent-presentation = { path = "../crates/presentation" }
 tekes-agent-components-ui = { path = "components" }
 tekes-agent-ui-bindings = { path = "bindings" }
 tekes-agent-ui-consumer-check = { path = "consumer" }
-tekes-ui-controls = { git = "https://github.com/TekesApps/TekesUI.git", rev = "04992fa9ee89016551f9e95e5b10ce1bfb742493", features = ["svg-icons"] }
-tekes-ui-scene = { git = "https://github.com/TekesApps/TekesUI.git", rev = "04992fa9ee89016551f9e95e5b10ce1bfb742493" }
-tekes-ui-tokens = { git = "https://github.com/TekesApps/TekesUI.git", rev = "04992fa9ee89016551f9e95e5b10ce1bfb742493" }
-tekes-ui-text = { git = "https://github.com/TekesApps/TekesUI.git", rev = "04992fa9ee89016551f9e95e5b10ce1bfb742493" }
-tekes-ui-motion = { git = "https://github.com/TekesApps/TekesUI.git", rev = "04992fa9ee89016551f9e95e5b10ce1bfb742493" }
-tekes-ui-render = { git = "https://github.com/TekesApps/TekesUI.git", rev = "04992fa9ee89016551f9e95e5b10ce1bfb742493" }
-tekes-ui-platform-macos = { git = "https://github.com/TekesApps/TekesUI.git", rev = "04992fa9ee89016551f9e95e5b10ce1bfb742493" }
+tekes-ui-controls = { git = "https://github.com/TekesApps/TekesUI.git", rev = "eec9aebe555a85a4caecf57034d331def2bb867d", features = ["svg-icons"] }
+tekes-ui-scene = { git = "https://github.com/TekesApps/TekesUI.git", rev = "eec9aebe555a85a4caecf57034d331def2bb867d" }
+tekes-ui-tokens = { git = "https://github.com/TekesApps/TekesUI.git", rev = "eec9aebe555a85a4caecf57034d331def2bb867d" }
+tekes-ui-text = { git = "https://github.com/TekesApps/TekesUI.git", rev = "eec9aebe555a85a4caecf57034d331def2bb867d" }
+tekes-ui-motion = { git = "https://github.com/TekesApps/TekesUI.git", rev = "eec9aebe555a85a4caecf57034d331def2bb867d" }
+tekes-ui-render = { git = "https://github.com/TekesApps/TekesUI.git", rev = "eec9aebe555a85a4caecf57034d331def2bb867d" }
+tekes-ui-platform-macos = { git = "https://github.com/TekesApps/TekesUI.git", rev = "eec9aebe555a85a4caecf57034d331def2bb867d" }
 tokio = { version = "1", features = ["rt-multi-thread", "time", "sync", "macros"] }
 serde_json = "1"
 base64 = "0.22"

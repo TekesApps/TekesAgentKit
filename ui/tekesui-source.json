@@ -1,7 +1,7 @@
 {
   "kind": "published-git-revision",
-  "baseCommit": "04992fa9ee89016551f9e95e5b10ce1bfb742493",
-  "sha256": "41de2da349e45ea231c631dd142e0eaf4699aebfc91e3d48a4c395459f50a5cb",
+  "baseCommit": "eec9aebe555a85a4caecf57034d331def2bb867d",
+  "sha256": "220516a8a25f52deac1f8465c4d411574bff6f703082d39d97ef1cc57c1d11ad",
   "files": {
     "Cargo.lock": "68cf0bb8c165e91bdf842cd42edfa7d6079015a74fd3ffb75bc71de58a5b4c42",
     "Cargo.toml": "8bf3aac48349a5ae8a65fbccd97bd3daf061e650d52386a7ab07920f40a28614",
@@ -28,7 +28,7 @@
     "crates/tekes-ui-controls/src/composition/content_reveal.rs": "1d2173c778670f825e67257ea54912d04f497d555f293ced0228e19f8a1b2dde",
     "crates/tekes-ui-controls/src/composition/content_reveal_plan.rs": "4155d405815bd6637ec1c9bf64be0befb440c1514f6b4f8cb9a1159f4c6e5f01",
     "crates/tekes-ui-controls/src/composition/datatable.rs": "1463e1cc08290d05f9769ed56b3abb95b07267df86150ab16bd9732403ec1045",
-    "crates/tekes-ui-controls/src/composition/disclosure.rs": "9a20011be2e6646dc9b798be1d6ab8e0bf82b6fcfceb815d538adc6254a55d69",
+    "crates/tekes-ui-controls/src/composition/disclosure.rs": "994be293370a9be87317db78b11551cfd03bb7328626b5d2823b81408ffb8628",
     "crates/tekes-ui-controls/src/composition/empty_state.rs": "7c9f782be95d0d5163cd0b11091211bb457aff7511ea4255c945d3c51aaa2776",
     "crates/tekes-ui-controls/src/composition/help.rs": "0ff05ea2ee135ecb418f5a87b4687db9379a3b53792c225cfb650a3f400b058e",
     "crates/tekes-ui-controls/src/composition/icon.rs": "12bb7040fc42deaddc525c61bf8d5be96b54db859adefadbf9643079615b710b",
@@ -535,9 +535,9 @@
     "scripts/merge-design-system.py": "46831d8a089c1dfc06012b78a23025293bb4e2010100e0a4ce93c137b30b6ba2"
   },
   "repository": "https://github.com/TekesApps/TekesUI.git",
-  "rev": "04992fa9ee89016551f9e95e5b10ce1bfb742493",
+  "rev": "eec9aebe555a85a4caecf57034d331def2bb867d",
   "developmentFrozenCandidate": true,
   "previousBaseline": "baselines/tekesui-3bef66754a256e7723887de7d33518f5122805ad.json",
   "releaseStatus": "experimental-ui-development-not-release",
-  "publicGitTree": "a0a235a90828d2f6faa45c0db3885cf600e67141"
+  "publicGitTree": "d5ed8e8defcd9987537f608d8ee8d93df8ecc1d5"
 }
