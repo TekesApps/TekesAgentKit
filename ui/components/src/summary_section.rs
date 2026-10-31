@@ -97,6 +97,9 @@ impl SummaryHeader {
     }
 }
 impl Component for SummaryHeader {
+    fn rectangular_input_geometry(&self) -> bool {
+        true
+    }
     fn children(&self) -> &[Content] {
         self.button.children()
     }
@@ -238,6 +241,7 @@ pub(crate) struct SummarySectionView {
     pub expansion: Expansion,
     pub layout: Option<SummarySectionLayout>,
     pub disclosure_epoch: Rc<Cell<u64>>,
+    arranged_epoch: Option<u64>,
 }
 impl SummarySectionView {
     pub fn new(
@@ -251,6 +255,7 @@ impl SummarySectionView {
         let epoch = Rc::new(Cell::new(0));
         Self {
             disclosure_epoch: epoch.clone(),
+            arranged_epoch: None,
             section,
             body_indent: 0.,
             expansion: expansion.clone(),
@@ -278,6 +283,8 @@ impl SummarySectionView {
         }
     }
     pub fn header_mut(&mut self) -> &mut SummaryHeader {
+        self.layout = None;
+        self.arranged_epoch = None;
         self.children[0].component_mut::<SummaryHeader>().unwrap()
     }
     pub fn rows(&self) -> &[Content] {
@@ -288,6 +295,8 @@ impl SummarySectionView {
             .children
     }
     pub fn rows_mut(&mut self) -> &mut Vec<Content> {
+        self.layout = None;
+        self.arranged_epoch = None;
         &mut self.children[1]
             .component_mut::<SummaryRows>()
             .unwrap()
@@ -301,6 +310,13 @@ impl SummarySectionView {
     }
 }
 impl Component for SummarySectionView {
+    fn lifecycle(&mut self, _: Lifecycle) {
+        self.arranged_epoch = None;
+        self.layout = None;
+    }
+    fn host_reveal_passthrough(&self) -> bool {
+        self.arranged_epoch == Some(self.disclosure_epoch.get()) && self.arranged().is_some()
+    }
     fn children(&self) -> &[Content] {
         &self.children
     }
@@ -308,6 +324,7 @@ impl Component for SummarySectionView {
         Some(&mut self.children)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        self.arranged_epoch = None;
         let header = self.children[0].measure(text, available).size;
         let body = self.children[1]
             .measure(
@@ -321,6 +338,7 @@ impl Component for SummarySectionView {
         MeasuredChild::new(Size::new(available.width, header.height + body.height))
     }
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        self.arranged_epoch = None;
         let height = self.children[0].measure(text, frame.size).size.height;
         let header = Rect::new(frame.min_x(), frame.min_y(), frame.size.width, height);
         self.children[0].arrange(text, header, clip);
@@ -354,6 +372,9 @@ impl Component for SummarySectionView {
             body,
             expanded: body.is_some(),
         });
+        if !frame.is_empty() && !clip.is_empty() {
+            self.arranged_epoch = Some(self.disclosure_epoch.get());
+        }
     }
 }
 
