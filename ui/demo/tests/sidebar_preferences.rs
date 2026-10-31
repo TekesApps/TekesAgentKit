@@ -86,13 +86,13 @@ fn pinned_section_retains_original_row_controls_and_retires_old_preference_callb
     sidebar_layout::press_host(&mut host, row);
     let old_row_actions = host.drain_actions();
     sidebar_layout::press_host(&mut host, header);
-    let captured = host.drain_actions();
+    let captured_records = host.drain_action_records();
     let changes = host
-        .get(root)
+        .get_mut(root)
         .unwrap()
-        .component::<Sidebar>()
+        .component_mut::<Sidebar>()
         .unwrap()
-        .take_preference_intents(&captured);
+        .take_preference_intents(&captured_records);
     assert_eq!(changes.len(), 1);
     assert_eq!(changes[0].expected, initial);
     assert!(!changes[0].value.pinned_expanded);
@@ -106,8 +106,16 @@ fn pinned_section_retains_original_row_controls_and_retires_old_preference_callb
         .unwrap()
         .update_preferences(&collapsed, true)
         .unwrap();
-    let sidebar = host.get(root).unwrap().component::<Sidebar>().unwrap();
-    assert!(sidebar.take_preference_intents(&captured).is_empty());
+    let sidebar = host
+        .get_mut(root)
+        .unwrap()
+        .component_mut::<Sidebar>()
+        .unwrap();
+    assert!(
+        sidebar
+            .take_preference_intents(&captured_records)
+            .is_empty()
+    );
     assert!(sidebar.take_intents(&old_row_actions).is_empty());
     assert!(
         sidebar
@@ -133,22 +141,30 @@ fn pinned_section_retains_original_row_controls_and_retires_old_preference_callb
         host.get(row).unwrap().component::<Button>().unwrap() as *const _ as usize,
         widget
     );
-    let sidebar = host.get(root).unwrap().component::<Sidebar>().unwrap();
-    assert!(sidebar.take_preference_intents(&captured).is_empty());
+    let sidebar = host
+        .get_mut(root)
+        .unwrap()
+        .component_mut::<Sidebar>()
+        .unwrap();
+    assert!(
+        sidebar
+            .take_preference_intents(&captured_records)
+            .is_empty()
+    );
     assert_eq!(sidebar.displayed_input(), Some(&input));
     let fresh_header = sidebar.pinned_header_id().unwrap();
     sidebar_layout::press_host(&mut host, fresh_header);
-    let before_revocation = host.drain_actions();
+    let before_revocation_records = host.drain_action_records();
     host.get_mut(root)
         .unwrap()
         .component_mut::<Sidebar>()
         .unwrap()
         .update_preferences(&expanded, false)
         .unwrap();
-    assert_ne!(
-        host.get(root)
+    assert_eq!(
+        host.get_mut(root)
             .unwrap()
-            .component::<Sidebar>()
+            .component_mut::<Sidebar>()
             .unwrap()
             .pinned_header_id(),
         Some(fresh_header)
@@ -160,11 +176,11 @@ fn pinned_section_retains_original_row_controls_and_retires_old_preference_callb
         .update_preferences(&expanded, true)
         .unwrap();
     assert!(
-        host.get(root)
+        host.get_mut(root)
             .unwrap()
-            .component::<Sidebar>()
+            .component_mut::<Sidebar>()
             .unwrap()
-            .take_preference_intents(&before_revocation)
+            .take_preference_intents(&before_revocation_records)
             .is_empty()
     );
     assert!(

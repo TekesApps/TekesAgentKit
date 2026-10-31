@@ -52,6 +52,12 @@ fn workspace_rows_need_no_run_and_retain_original_text_and_disclosure() {
         "工作区"
     );
     host.accessibility_action(header, None, AccessibilityAction::Press);
+    let records = host.drain_action_records();
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<SummaryView>()
+        .unwrap()
+        .handle_disclosure_records(&records);
     assert_eq!(
         view(&host, root).section_expanded("host:workspace"),
         Some(false)

@@ -33,7 +33,7 @@ class PublicAgentUiConsumerTests(unittest.TestCase):
             self.assertEqual(receipt["agentkit_head"], subprocess.check_output(
                 ["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True
             ).strip())
-            self.assertEqual(receipt["tekesui_revision"], "8a6a7633eec88af86353ad55da1aa90608faf69d")
+            self.assertEqual(receipt["tekesui_revision"], "04992fa9ee89016551f9e95e5b10ce1bfb742493")
             self.assertEqual(receipt["consumer_direct_dependencies"], ["tekes-agent-components-ui"])
             self.assertIn("RunPort::standard", source)
             self.assertIn("Sidebar::new", source)

@@ -66,9 +66,9 @@ fn explicit_navigation_opens_once_without_persisting_and_manual_noop_collapse_st
     let (mut host, root, mut input, value) = setup();
     let key = input.rows[0].folder_key();
     let leaf = host
-        .get(root)
+        .get_mut(root)
         .unwrap()
-        .component::<Sidebar>()
+        .component_mut::<Sidebar>()
         .unwrap()
         .row_id(&input.rows[0].address)
         .unwrap();
@@ -87,18 +87,22 @@ fn explicit_navigation_opens_once_without_persisting_and_manual_noop_collapse_st
             .unwrap()
     );
     assert!(visible(&host, leaf));
-    let sidebar = host.get(root).unwrap().component::<Sidebar>().unwrap();
+    let sidebar = host
+        .get_mut(root)
+        .unwrap()
+        .component_mut::<Sidebar>()
+        .unwrap();
     assert_eq!(sidebar.preferences(), &value);
     assert!(sidebar.preferences_current(&value, true));
     let header = sidebar.folder_header_id(&key).unwrap();
     sidebar_layout::press_host(&mut host, header);
-    let actions = host.drain_actions();
+    let actions_records = host.drain_action_records();
     let changes = host
-        .get(root)
+        .get_mut(root)
         .unwrap()
-        .component::<Sidebar>()
+        .component_mut::<Sidebar>()
         .unwrap()
-        .take_preference_intents(&actions);
+        .take_preference_intents(&actions_records);
     assert_eq!(changes.len(), 1);
     assert_eq!(
         changes[0].value, value.preferences,
@@ -106,9 +110,9 @@ fn explicit_navigation_opens_once_without_persisting_and_manual_noop_collapse_st
     );
     assert!(
         !host
-            .get(root)
+            .get_mut(root)
             .unwrap()
-            .component::<Sidebar>()
+            .component_mut::<Sidebar>()
             .unwrap()
             .preferences_current(&value, true)
     );
@@ -119,9 +123,13 @@ fn explicit_navigation_opens_once_without_persisting_and_manual_noop_collapse_st
         .update_preferences(&value, true)
         .unwrap();
     assert!(!visible(&host, leaf));
-    let sidebar = host.get(root).unwrap().component::<Sidebar>().unwrap();
-    assert_ne!(sidebar.folder_header_id(&key), Some(header));
-    assert!(sidebar.take_preference_intents(&actions).is_empty());
+    let sidebar = host
+        .get_mut(root)
+        .unwrap()
+        .component_mut::<Sidebar>()
+        .unwrap();
+    assert_eq!(sidebar.folder_header_id(&key), Some(header));
+    assert!(sidebar.take_preference_intents(&actions_records).is_empty());
     assert!(
         !host
             .get_mut(root)
@@ -258,9 +266,9 @@ fn old_conflicting_and_wrong_destination_navigation_cannot_reopen_a_section() {
 fn pinned_navigation_obeys_folder_filter_and_preserves_pin_expansion_preference() {
     let (mut host, root, mut input, value) = setup();
     let pin = host
-        .get(root)
+        .get_mut(root)
         .unwrap()
-        .component::<Sidebar>()
+        .component_mut::<Sidebar>()
         .unwrap()
         .row_id(&input.rows[2].address)
         .unwrap();
@@ -285,9 +293,9 @@ fn pinned_navigation_obeys_folder_filter_and_preserves_pin_expansion_preference(
         .unwrap();
     assert!(!visible(&host, pin));
     assert!(
-        host.get(root)
+        host.get_mut(root)
             .unwrap()
-            .component::<Sidebar>()
+            .component_mut::<Sidebar>()
             .unwrap()
             .visibility_target()
             .is_none()
@@ -311,14 +319,18 @@ fn pinned_navigation_obeys_folder_filter_and_preserves_pin_expansion_preference(
         })
         .unwrap();
     let pin = host
-        .get(root)
+        .get_mut(root)
         .unwrap()
-        .component::<Sidebar>()
+        .component_mut::<Sidebar>()
         .unwrap()
         .row_id(&input.rows[2].address)
         .unwrap();
     assert!(visible(&host, pin));
-    let sidebar = host.get(root).unwrap().component::<Sidebar>().unwrap();
+    let sidebar = host
+        .get_mut(root)
+        .unwrap()
+        .component_mut::<Sidebar>()
+        .unwrap();
     assert_eq!(
         sidebar.visibility_target().unwrap().address(),
         &input.rows[2].address
@@ -326,13 +338,13 @@ fn pinned_navigation_obeys_folder_filter_and_preserves_pin_expansion_preference(
     assert_eq!(sidebar.preferences(), &value);
     let header = sidebar.pinned_header_id().unwrap();
     sidebar_layout::press_host(&mut host, header);
-    let actions = host.drain_actions();
+    let actions_records = host.drain_action_records();
     let changes = host
-        .get(root)
+        .get_mut(root)
         .unwrap()
-        .component::<Sidebar>()
+        .component_mut::<Sidebar>()
         .unwrap()
-        .take_preference_intents(&actions);
+        .take_preference_intents(&actions_records);
     assert_eq!(changes[0].value, value.preferences);
     host.get_mut(root)
         .unwrap()
@@ -364,20 +376,20 @@ fn manual_folder_choice_supersedes_an_unresolved_navigation_before_the_row_arriv
     let mut current = value;
     for _ in 0..2 {
         let header = host
-            .get(root)
+            .get_mut(root)
             .unwrap()
-            .component::<Sidebar>()
+            .component_mut::<Sidebar>()
             .unwrap()
             .folder_header_id(&key)
             .unwrap();
         sidebar_layout::press_host(&mut host, header);
-        let actions = host.drain_actions();
+        let actions_records = host.drain_action_records();
         let change = host
-            .get(root)
+            .get_mut(root)
             .unwrap()
-            .component::<Sidebar>()
+            .component_mut::<Sidebar>()
             .unwrap()
-            .take_preference_intents(&actions)
+            .take_preference_intents(&actions_records)
             .pop()
             .unwrap();
         current = SidebarPreferencesSnapshot {
@@ -399,7 +411,11 @@ fn manual_folder_choice_supersedes_an_unresolved_navigation_before_the_row_arriv
         .unwrap()
         .update(&input)
         .unwrap();
-    let sidebar = host.get(root).unwrap().component::<Sidebar>().unwrap();
+    let sidebar = host
+        .get_mut(root)
+        .unwrap()
+        .component_mut::<Sidebar>()
+        .unwrap();
     assert!(sidebar.pending_navigation().is_none());
     let leaf = sidebar.row_id(&row("a", false).address).unwrap();
     assert!(!visible(&host, leaf));
@@ -429,9 +445,9 @@ fn preference_failure_rolls_back_and_unrelated_publications_keep_navigation_expa
         .unwrap();
     let key = input.rows[0].folder_key();
     let leaf = host
-        .get(root)
+        .get_mut(root)
         .unwrap()
-        .component::<Sidebar>()
+        .component_mut::<Sidebar>()
         .unwrap()
         .row_id(&input.rows[0].address)
         .unwrap();
@@ -448,19 +464,19 @@ fn preference_failure_rolls_back_and_unrelated_publications_keep_navigation_expa
         .unwrap();
     assert!(visible(&host, leaf));
     let header = host
-        .get(root)
+        .get_mut(root)
         .unwrap()
-        .component::<Sidebar>()
+        .component_mut::<Sidebar>()
         .unwrap()
         .folder_header_id(&key)
         .unwrap();
     sidebar_layout::press_host(&mut host, header);
-    let actions = host.drain_actions();
-    host.get(root)
+    let actions_records = host.drain_action_records();
+    host.get_mut(root)
         .unwrap()
-        .component::<Sidebar>()
+        .component_mut::<Sidebar>()
         .unwrap()
-        .take_preference_intents(&actions);
+        .take_preference_intents(&actions_records);
     host.get_mut(root)
         .unwrap()
         .component_mut::<Sidebar>()
@@ -471,20 +487,20 @@ fn preference_failure_rolls_back_and_unrelated_publications_keep_navigation_expa
     // An explicit expansion would persist a changed value. An unchanged source
     // after a failed write must restore the authoritative closed state.
     let header = host
-        .get(root)
+        .get_mut(root)
         .unwrap()
-        .component::<Sidebar>()
+        .component_mut::<Sidebar>()
         .unwrap()
         .folder_header_id(&key)
         .unwrap();
     sidebar_layout::press_host(&mut host, header);
-    let actions = host.drain_actions();
+    let actions_records = host.drain_action_records();
     let change = host
-        .get(root)
+        .get_mut(root)
         .unwrap()
-        .component::<Sidebar>()
+        .component_mut::<Sidebar>()
         .unwrap()
-        .take_preference_intents(&actions)
+        .take_preference_intents(&actions_records)
         .pop()
         .unwrap();
     assert_ne!(change.value, value.preferences);

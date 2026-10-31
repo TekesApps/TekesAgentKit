@@ -9,14 +9,27 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import tomllib
 
 
-PIN = "8a6a7633eec88af86353ad55da1aa90608faf69d"
+PIN = "04992fa9ee89016551f9e95e5b10ce1bfb742493"
 FIXTURE_ROOT = Path(".runtime-fixtures/issue15-contract-20261024")
 
 
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def require_exact_public_sdk_dependencies(workspace_manifest: str) -> None:
+    dependencies = tomllib.loads(workspace_manifest)["workspace"]["dependencies"]
+    for name, dependency in dependencies.items():
+        if not name.startswith("tekes-ui-"):
+            continue
+        expected = {"git": "https://github.com/TekesApps/TekesUI.git", "rev": PIN}
+        if name == "tekes-ui-controls":
+            expected["features"] = ["svg-icons"]
+        if dependency != expected:
+            raise RuntimeError(f"{name} does not use the exact TekesUI revision and features")
 
 
 def locked_tekesui_packages(cargo_lock: str, revision: str) -> list[str]:
@@ -84,13 +97,7 @@ def prepare(root: Path, output: Path) -> dict[str, object]:
         raise RuntimeError("experimental AgentKit UI workspace must remain unpublished")
     if tekesui.get("kind") != "published-git-revision" or tekesui.get("rev") != PIN:
         raise RuntimeError("TekesUI pin differs from the reviewed public revision")
-    for name, dependency in re.findall(
-        r'^(tekes-ui-[^ ]+) = \{ git = "[^"]+", rev = "([^"]+)" \}$',
-        workspace_manifest,
-        re.MULTILINE,
-    ):
-        if dependency != PIN:
-            raise RuntimeError(f"{name} does not use the exact TekesUI revision")
+    require_exact_public_sdk_dependencies(workspace_manifest)
 
     component_path = (ui / "components").resolve()
     manifest = (

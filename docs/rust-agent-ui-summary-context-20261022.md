@@ -63,3 +63,6 @@ let host = summary.into_host()?;
 
 本项没有新增SDK基础能力缺口。复用 `/tmp/agentkit-layout-text-292-target`，debug0/incremental关闭，未新建target；
 保留源码、WIP、固定依赖、验收程序和日志，本阶段释放空间0。
+
+
+2026-10-31 DisclosureContent委托为独立未运行候选；当前契约、rich-record接口和HostReveal/资源服务缺口见[AC5设计](agentkit-summary-disclosure-ac5-20261031.md)。原实现/验收证据仍保留其原源码身份，不代表本候选通过。
