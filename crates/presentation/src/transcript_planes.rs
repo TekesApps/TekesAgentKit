@@ -175,7 +175,16 @@ impl TranscriptSection<'_> {
     ) -> Result<TranscriptActivityPresentation> {
         use TranscriptActivityPresentation as Presentation;
         // Match ClientKit's direct source-call exception before live/settled gates.
-        if self.id.starts_with("task-source:") {
+        if self.id.starts_with("task-source:")
+            || serde_json::from_str::<[String; 4]>(self.id).is_ok_and(
+                |[endpoint, session, kind, call]| {
+                    endpoint == scope.endpoint_id
+                        && session == scope.session_id
+                        && kind == "task-source"
+                        && !call.is_empty()
+                },
+            )
+        {
             return Ok(Presentation::Direct);
         }
         if planes.is_live_owner {

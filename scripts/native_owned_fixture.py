@@ -15,6 +15,7 @@ import secrets
 import struct
 import subprocess
 import threading
+from time import monotonic
 from urllib.parse import urlsplit
 from performance_owned_receipt import (
     begin_fresh, record_started, require_canonical_path, require_performance_case,
@@ -229,9 +230,18 @@ def owned_native(supervisor, worker, providers, provider_url, base_root,
         }, separators=(",", ":")).encode("utf-8")
         process.stdin.write(_BOOTSTRAP + struct.pack("!I", len(payload)) + payload)
         process.stdin.flush()
-        if not select.select([process.stdout], [], [], readiness_timeout)[0]:
-            raise TimeoutError("Native Kernel readiness timed out")
-        line = process.stdout.readline()
+        deadline = monotonic() + readiness_timeout
+        line = bytearray()
+        while not line.endswith(b"\n"):
+            remaining = deadline - monotonic()
+            if remaining <= 0 or not select.select([process.stdout], [], [], remaining)[0]:
+                raise TimeoutError("Native Kernel readiness timed out")
+            # Read only this line, without a buffered readline waiting past the deadline
+            # or consuming stdout that belongs to the caller after readiness.
+            chunk = os.read(process.stdout.fileno(), 1)
+            if not chunk:
+                break
+            line.extend(chunk)
         if not line:
             with stderr_lock:
                 detail = _safe_stderr(stderr_chunks, token)
