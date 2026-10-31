@@ -649,6 +649,7 @@ async fn simultaneous_preparations_from_one_observed_frame_admit_one_request() {
 
 use tekes_agent_components_ui::{FeedbackGesture, FeedbackIds, TurnFeedback};
 use tekes_agent_ui_bindings::FeedbackUiAdoption;
+use tekes_ui_controls::composition::Component;
 use tekes_ui_controls::composition::{AccessibilityAction, ComponentId, ContentEvent, ContentHost};
 fn control(host: &mut ContentHost, root: ComponentId) -> &mut TurnFeedback {
     host.get_mut(root)
@@ -1059,6 +1060,98 @@ async fn complete_demo(view: &mut ComponentDemo, commands: Vec<DemoCommand>) {
     let request = feedback_request(commands);
     view.complete_feedback(request.execute().await).unwrap();
 }
+// Headless CoreText layout through the public ComponentDemo renderer.
+use std::rc::Rc;
+use tekes_ui_controls::{
+    ButtonTextAlign, ButtonTextRenderer, TextSurfaceHost, TextSurfaceTextRenderer,
+};
+use tekes_ui_scene::{Point, Rect, Scene, Size};
+use tekes_ui_text::{
+    Paragraph,
+    coretext::{CoreTextFonts, CoreTextShaper},
+    model::ShapeOptions,
+    style::TextStyle,
+    traits::Shaper,
+};
+use tekes_ui_tokens::{Rgba, Theme, proposal};
+struct Text(CoreTextShaper, f32);
+impl TextSurfaceTextRenderer for Text {
+    fn push_visible(&mut self, _: &mut Scene, _: &Paragraph, _: Point, _: Rgba, _: Rect) {}
+}
+impl TextSurfaceHost for Text {
+    fn shape_label(
+        &mut self,
+        text: &str,
+        role: proposal::TextRole,
+        width: f32,
+        options: tekes_ui_text::LabelOptions,
+    ) -> Option<Rc<tekes_ui_text::LabelLayout>> {
+        Some(tekes_agent_ui_demo::label_host::shape_label(
+            &mut self.0,
+            text,
+            role,
+            width,
+            self.1,
+            options,
+        ))
+    }
+
+    fn type_scale(&self) -> f32 {
+        self.1
+    }
+    fn shape_surface(
+        &mut self,
+        s: &str,
+        role: proposal::TextRole,
+        width: Option<f32>,
+    ) -> Rc<Paragraph> {
+        Rc::new(self.0.shape(
+            s,
+            &TextStyle::system(role.style().size * self.1),
+            &ShapeOptions {
+                width: width.map(f64::from),
+                line_spacing: 0.,
+            },
+        ))
+    }
+}
+impl ButtonTextRenderer for Text {
+    fn measure(&mut self, s: &str, r: proposal::TextRole, w: f32) -> Size {
+        let p = self.shape_surface(s, r, Some(w));
+        Size::new(p.width as f32, p.height as f32)
+    }
+    fn draw(
+        &mut self,
+        _: &mut Scene,
+        _: &str,
+        _: proposal::TextRole,
+        _: Rect,
+        _: ButtonTextAlign,
+        _: Rgba,
+    ) {
+    }
+    fn text_surface_host(&mut self) -> Option<&mut dyn TextSurfaceHost> {
+        Some(self)
+    }
+}
+
+fn render_demo(view: &mut ComponentDemo) {
+    let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()), 1.);
+    let frame = Rect::new(0., 0., 1850., 1000.);
+    view.render(
+        &mut Scene::new(),
+        &mut text,
+        frame,
+        frame,
+        Theme::LIGHT.into(),
+    )
+    .unwrap();
+    assert!(
+        !view.tree.needs_render(),
+        "public render must submit all navigation layout changes"
+    );
+}
+
 #[tokio::test]
 async fn transcript_feedback_mounted_run_routes_ime_save_and_hidden_original_receipt_without_touching_other_draft()
  {
@@ -1084,12 +1177,30 @@ async fn transcript_feedback_mounted_run_routes_ime_save_and_hidden_original_rec
         .unwrap();
     assert!(demo_control(&view, id).state().is_some());
     let positive = demo_control(&view, id).ids().positive;
+    render_demo(&mut view);
     let commands = demo_press(&mut view, positive);
     complete_demo(&mut view, commands).await;
     let note = demo_control(&view, id).ids().edit_note;
+    render_demo(&mut view);
     assert!(demo_press(&mut view, note).is_empty());
     let editor = demo_control(&view, id).ids().editor;
-    view.tree.focus(Some(editor), true);
+    assert!(!demo_control(&view, id).host_reveal_passthrough());
+    render_demo(&mut view);
+    assert!(demo_control(&view, id).host_reveal_passthrough());
+    // Measuring a different width retires arrange evidence; a mutable lookup
+    // itself is not the component's evidence of a business layout change.
+    let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()), 1.);
+    view.tree
+        .get_mut(id)
+        .unwrap()
+        .component_mut::<TurnFeedback>()
+        .unwrap()
+        .measure(&mut text, Size::new(320., 1000.));
+    assert!(!demo_control(&view, id).host_reveal_passthrough());
+    assert_eq!(demo_control(&view, id).ids().editor, editor);
+    render_demo(&mut view);
+    assert!(view.tree.focus(Some(editor), true));
+    assert_eq!(view.tree.focused(), Some(editor));
     assert!(
         view.event(&ContentEvent::Preedit {
             text: "ni".into(),
@@ -1101,6 +1212,7 @@ async fn transcript_feedback_mounted_run_routes_ime_save_and_hidden_original_rec
         .is_empty()
     );
     assert!(view.composing());
+    render_demo(&mut view);
     assert!(view.select(1).is_err());
     let send = view.ids().send;
     assert!(demo_press(&mut view, send).is_empty());
@@ -1116,6 +1228,7 @@ async fn transcript_feedback_mounted_run_routes_ime_save_and_hidden_original_rec
         .is_empty()
     );
     assert!(!view.composing());
+    render_demo(&mut view);
     let save = demo_control(&view, id).ids().save;
     let request = feedback_request(demo_press(&mut view, save));
     view.select(1).unwrap();

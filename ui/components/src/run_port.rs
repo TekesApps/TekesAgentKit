@@ -69,6 +69,13 @@ pub struct RunPortGeometry {
     pub document_bottom_clearance: f32,
     pub turn_rail: TurnRailGeometry,
 }
+/// Host role and bottom-visibility policy for the normal Run layout pass.
+/// Disabled by default: existing consumers retain their manual context API.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum RunNavigationLayoutPolicy {
+    Main { bottom_visibility_margin: f32 },
+    Auxiliary,
+}
 #[derive(Debug)]
 pub enum RunPortIntent {
     /// Local layout changed; republish the captured Run through its original reading transaction.
@@ -149,6 +156,7 @@ pub struct RunPort {
     navigation_lifetime: Arc<()>,
     navigation_mounted: bool,
     navigation_origin: Option<(u64, Option<String>)>,
+    navigation_layout_policy: Option<RunNavigationLayoutPolicy>,
     geometry: Option<RunPortGeometry>,
     reveal_clip: Option<Rect>,
     rail_backing_scale: f32,
@@ -244,6 +252,7 @@ impl RunPort {
             navigation_lifetime: Arc::new(()),
             navigation_mounted: false,
             navigation_origin: None,
+            navigation_layout_policy: None,
             geometry: None,
             reveal_clip: None,
             rail_backing_scale: 1.,
@@ -423,10 +432,38 @@ impl RunPort {
             .map_err(|_| "RunPort navigation gesture already dispatched")?;
         Ok(navigation.kind)
     }
+    /// Opt into navigation metadata derived during the ordinary Host arrange.
+    /// None preserves manual set_turn_navigation_context/update_rail_follow_target.
+    pub fn set_navigation_layout_policy(
+        &mut self,
+        policy: Option<RunNavigationLayoutPolicy>,
+    ) -> Result<(), &'static str> {
+        if let Some(RunNavigationLayoutPolicy::Main {
+            bottom_visibility_margin,
+        }) = policy
+            && (!bottom_visibility_margin.is_finite() || bottom_visibility_margin < 0.)
+        {
+            return Err("invalid navigation bottom visibility margin");
+        }
+        if self.navigation_layout_policy != policy {
+            self.navigation_layout_policy = policy;
+            self.reveal_clip = None;
+            self.navigation_origin = None;
+            self.navigation_lifetime = Arc::new(());
+        }
+        Ok(())
+    }
     /// Main hosts opt in with an actual bottom-visibility fact after render.
     /// Passing None retires host-history gestures (e.g. when changing pane role).
     /// Task/subagent/SideChat hosts leave this disabled and use ordinary claim.
     pub fn set_turn_navigation_context(
+        &mut self,
+        context: Option<RunTurnNavigationContext>,
+    ) -> Result<(), &'static str> {
+        self.apply_turn_navigation_context(context)?;
+        self.refresh_rail_contents(true)
+    }
+    fn apply_turn_navigation_context(
         &mut self,
         context: Option<RunTurnNavigationContext>,
     ) -> Result<(), &'static str> {
@@ -454,7 +491,7 @@ impl RunPort {
             self.navigation_lifetime = Arc::new(());
         }
         self.navigation_origin = origin;
-        self.refresh_rail_contents(true)
+        Ok(())
     }
     fn navigation_jump(&self, target: &TranscriptTurnTarget) -> Option<RunTurnJump> {
         let (generation, from) = self.navigation_origin.as_ref()?;
@@ -1516,6 +1553,38 @@ impl Component for RunPort {
                 self.rail_backing_scale,
             ),
         });
+        if let Some(policy) = self.navigation_layout_policy
+            && self.transcript.is_some()
+        {
+            let context = match policy {
+                RunNavigationLayoutPolicy::Main {
+                    bottom_visibility_margin,
+                } => self.transcript().and_then(|transcript| {
+                    self.document_viewport()?
+                        .component::<ScrollContent>()?
+                        .children()
+                        .iter()
+                        .find(|node| node.id() == transcript.id())
+                        .map(|document| RunTurnNavigationContext {
+                            bottom_is_visible: document.frame().max_y() - bottom_clearance
+                                <= document_clip.max_y() + bottom_visibility_margin,
+                        })
+                }),
+                RunNavigationLayoutPolicy::Auxiliary => None,
+            };
+            self.apply_turn_navigation_context(context)
+                .expect("current arranged navigation context");
+            let following = self
+                .document_viewport()
+                .unwrap()
+                .component::<ScrollContent>()
+                .unwrap()
+                .is_following_latest();
+            if self.rail.is_some() {
+                self.update_rail_follow_target(following)
+                    .expect("current arranged follow target");
+            }
+        }
         if self.rail.is_some() {
             self.refresh_rail_contents(true)
                 .expect("validated rail membership");
@@ -1539,6 +1608,28 @@ impl Component for RunPort {
 #[cfg(test)]
 mod reveal_boundary_tests {
     use super::*;
+
+    #[test]
+    fn navigation_layout_defaults_to_manual_and_rejects_invalid_host_policy() {
+        let mut run =
+            RunPort::standard(990, 1000..1010, RunScope::main("policy", "manual")).unwrap();
+        assert_eq!(run.navigation_layout_policy, None);
+        for margin in [f32::NAN, f32::INFINITY, -1.] {
+            assert!(
+                run.set_navigation_layout_policy(Some(RunNavigationLayoutPolicy::Main {
+                    bottom_visibility_margin: margin,
+                }))
+                .is_err()
+            );
+            assert_eq!(run.navigation_layout_policy, None);
+        }
+        run.set_turn_navigation_context(None).unwrap();
+        run.set_navigation_layout_policy(Some(RunNavigationLayoutPolicy::Auxiliary))
+            .unwrap();
+        run.set_navigation_layout_policy(None).unwrap();
+        assert_eq!(run.navigation_layout_policy, None);
+        run.set_turn_navigation_context(None).unwrap();
+    }
 
     #[test]
     fn private_document_boundary_preserves_original_viewport_and_reading_attachment() {

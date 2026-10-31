@@ -1,3 +1,6 @@
+#[allow(dead_code)]
+#[path = "support/menu_host.rs"]
+mod sidebar_layout;
 use tekes_agent_components_ui::*;
 use tekes_ui_controls::composition::*;
 fn row(
@@ -153,7 +156,7 @@ fn original_folder_disclosure_keeps_rows_and_retires_old_callbacks_without_navig
     let leaf = sidebar.row_id(&input.rows[0].address).unwrap();
     let mut host = sidebar.into_host().unwrap();
     let original = host.get(leaf).unwrap().component::<Button>().unwrap() as *const _ as usize;
-    host.accessibility_action(header, None, AccessibilityAction::Press);
+    sidebar_layout::press_host(&mut host, header);
     let actions = host.drain_actions();
     let sidebar = host.get(root).unwrap().component::<Sidebar>().unwrap();
     assert!(!sidebar.preferences_current(&grouped(), true));

@@ -1,4 +1,7 @@
 //! Legacy action-button compatibility. Original menu/host coverage is separate.
+#[allow(dead_code)]
+#[path = "support/menu_host.rs"]
+mod sidebar_layout;
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
 use tekes_agent_components_ui::{Sidebar, SidebarInput, SidebarIntent, SidebarLabels, SidebarRow};
 use tekes_agent_contract::*;
@@ -37,7 +40,7 @@ fn make_row(endpoint: &str, id: &str, ready: bool) -> SidebarRow {
     }
 }
 fn activate(host: &mut ContentHost, root: ComponentId, target: ComponentId) -> Vec<SidebarIntent> {
-    host.accessibility_action(target, None, AccessibilityAction::Press);
+    sidebar_layout::press_host(host, target);
     let actions = host.drain_actions();
     host.get(root)
         .unwrap()

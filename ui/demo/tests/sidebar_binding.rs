@@ -486,8 +486,7 @@ async fn sidebar_navigation_fences_late_open_results_and_keeps_each_summary_pare
         .unwrap()
         .row_id(&address("b"))
         .unwrap();
-    let commands: [DemoCommand; 1] = view
-        .accessibility_action(row, None, AccessibilityAction::Press)
+    let commands: [DemoCommand; 1] = menu_host::press_demo(&mut view, row)
         .unwrap()
         .try_into()
         .ok()
@@ -501,8 +500,7 @@ async fn sidebar_navigation_fences_late_open_results_and_keeps_each_summary_pare
         "a newer selection retires the earlier async open"
     );
     assert_eq!(view.binding().scope().session_id, "a");
-    let commands: [DemoCommand; 1] = view
-        .accessibility_action(row, None, AccessibilityAction::Press)
+    let commands: [DemoCommand; 1] = menu_host::press_demo(&mut view, row)
         .unwrap()
         .try_into()
         .ok()
@@ -541,8 +539,7 @@ async fn sidebar_navigation_fences_late_open_results_and_keeps_each_summary_pare
         row, restored_row,
         "retired row callbacks cannot reactivate the returned pointer"
     );
-    let commands: [DemoCommand; 1] = view
-        .accessibility_action(restored_row, None, AccessibilityAction::Press)
+    let commands: [DemoCommand; 1] = menu_host::press_demo(&mut view, restored_row)
         .unwrap()
         .try_into()
         .ok()

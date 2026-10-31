@@ -1,3 +1,6 @@
+#[allow(dead_code)]
+#[path = "support/menu_host.rs"]
+mod sidebar_layout;
 use tekes_agent_components_ui::*;
 use tekes_ui_controls::composition::*;
 fn row(id: &str, pin: bool) -> SidebarRow {
@@ -88,7 +91,7 @@ fn explicit_navigation_opens_once_without_persisting_and_manual_noop_collapse_st
     assert_eq!(sidebar.preferences(), &value);
     assert!(sidebar.preferences_current(&value, true));
     let header = sidebar.folder_header_id(&key).unwrap();
-    host.accessibility_action(header, None, AccessibilityAction::Press);
+    sidebar_layout::press_host(&mut host, header);
     let actions = host.drain_actions();
     let changes = host
         .get(root)
@@ -322,7 +325,7 @@ fn pinned_navigation_obeys_folder_filter_and_preserves_pin_expansion_preference(
     );
     assert_eq!(sidebar.preferences(), &value);
     let header = sidebar.pinned_header_id().unwrap();
-    host.accessibility_action(header, None, AccessibilityAction::Press);
+    sidebar_layout::press_host(&mut host, header);
     let actions = host.drain_actions();
     let changes = host
         .get(root)
@@ -367,7 +370,7 @@ fn manual_folder_choice_supersedes_an_unresolved_navigation_before_the_row_arriv
             .unwrap()
             .folder_header_id(&key)
             .unwrap();
-        host.accessibility_action(header, None, AccessibilityAction::Press);
+        sidebar_layout::press_host(&mut host, header);
         let actions = host.drain_actions();
         let change = host
             .get(root)
@@ -451,7 +454,7 @@ fn preference_failure_rolls_back_and_unrelated_publications_keep_navigation_expa
         .unwrap()
         .folder_header_id(&key)
         .unwrap();
-    host.accessibility_action(header, None, AccessibilityAction::Press);
+    sidebar_layout::press_host(&mut host, header);
     let actions = host.drain_actions();
     host.get(root)
         .unwrap()
@@ -474,7 +477,7 @@ fn preference_failure_rolls_back_and_unrelated_publications_keep_navigation_expa
         .unwrap()
         .folder_header_id(&key)
         .unwrap();
-    host.accessibility_action(header, None, AccessibilityAction::Press);
+    sidebar_layout::press_host(&mut host, header);
     let actions = host.drain_actions();
     let change = host
         .get(root)
@@ -557,9 +560,7 @@ async fn actual_demo_navigation_uses_existing_revision_and_never_turns_sync_into
         .unwrap()
         .folder_header_id(&key)
         .unwrap();
-    let commands = view
-        .accessibility_action(header, None, AccessibilityAction::Press)
-        .unwrap();
+    let commands = sidebar_layout::press_demo(&mut view, header).unwrap();
     assert_eq!(commands.len(), 1);
     let DemoCommand::SidebarPreferences(change) = &commands[0] else {
         panic!("only disclosure preference command is expected")

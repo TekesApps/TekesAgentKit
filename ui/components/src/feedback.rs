@@ -112,6 +112,17 @@ pub struct FeedbackIds {
     status: ComponentId,
     title: ComponentId,
 }
+#[derive(Clone, Debug, PartialEq)]
+struct FeedbackLayout {
+    compact: bool,
+    editor_open: bool,
+    next: u64,
+    labels: FeedbackLabels,
+    notice: String,
+    pending: bool,
+    needs_refresh: bool,
+    diagnostic: bool,
+}
 /// One stable response per instance. Mount alongside its leading output footnote.
 /// All editing, marked text, undo, layout styles and focus are TekesUI-owned.
 /// Committed note buttons use the SDK single-line label service; rendering a
@@ -130,6 +141,7 @@ pub struct TurnFeedback {
     editor_open: bool,
     notice: String,
     diagnostic: Option<String>,
+    arranged_layout: Option<FeedbackLayout>,
 }
 impl TurnFeedback {
     pub fn new(namespace: u32, labels: FeedbackLabels) -> Self {
@@ -165,6 +177,7 @@ impl TurnFeedback {
             editor_open: false,
             notice: String::new(),
             diagnostic: None,
+            arranged_layout: None,
         };
         value.rekey();
         value.render();
@@ -660,7 +673,31 @@ impl TurnFeedback {
         Ok(host)
     }
 }
+impl TurnFeedback {
+    // Editing/labels/status can change intrinsic geometry while preserving this
+    // original editor. Mutable access alone is not a layout change.
+    fn layout_key(&self) -> FeedbackLayout {
+        FeedbackLayout {
+            compact: self.compact,
+            editor_open: self.editor_open,
+            next: self.next,
+            labels: self.labels.clone(),
+            notice: self.notice.clone(),
+            pending: self.pending.is_some(),
+            needs_refresh: self.needs_refresh,
+            diagnostic: self.diagnostic.is_some(),
+        }
+    }
+}
 impl Component for TurnFeedback {
+    fn host_reveal_passthrough(&self) -> bool {
+        self.arranged_layout
+            .as_ref()
+            .is_some_and(|key| *key == self.layout_key())
+    }
+    fn lifecycle(&mut self, _: Lifecycle) {
+        self.arranged_layout = None;
+    }
     fn children(&self) -> &[Content] {
         &self.rows.children
     }
@@ -668,6 +705,7 @@ impl Component for TurnFeedback {
         Some(&mut self.rows.children)
     }
     fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        self.arranged_layout = None;
         self.render();
         let width = if self.editor_open {
             available.width.min(400.)
@@ -696,7 +734,8 @@ impl Component for TurnFeedback {
             text,
             Rect::new(frame.min_x(), frame.min_y(), width, frame.size.height),
             clip,
-        )
+        );
+        self.arranged_layout = (!frame.is_empty() && !clip.is_empty()).then(|| self.layout_key());
     }
     fn semantics(&self) -> ContentSemantics {
         ContentSemantics::new(ContentRole::Group, &self.labels.group)

@@ -1776,6 +1776,9 @@ async fn actual_rail_freezes_main_history_before_a_later_reading_fact_and_public
             bottom_is_visible: true,
         }))
         .unwrap();
+    // Default policy remains manual: a normal layout must retain the host's
+    // explicit bottom-visible history origin rather than deriving a new one.
+    clipped_render(&mut host, &mut text);
     let row = rail(&host, root).row_id(targets[3].turn_id()).unwrap();
     let point = host.get(row).unwrap().visible().unwrap().center();
     host.event(&ContentEvent::PointerDown(point));

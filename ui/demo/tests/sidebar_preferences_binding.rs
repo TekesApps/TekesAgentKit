@@ -1,3 +1,6 @@
+#[allow(dead_code)]
+#[path = "support/menu_host.rs"]
+mod sidebar_layout;
 use std::{sync::Arc, time::Duration};
 use tekes_agent_components_ui::*;
 use tekes_agent_ui_bindings::{RunBinding, SidebarBinding};
@@ -115,9 +118,7 @@ async fn original_pin_membership_and_durable_layout_preferences_reach_both_consu
         .unwrap()
         .pinned_header_id()
         .unwrap();
-    let commands = view
-        .accessibility_action(header, None, AccessibilityAction::Press)
-        .unwrap();
+    let commands = sidebar_layout::press_demo(&mut view, header).unwrap();
     let [DemoCommand::SidebarPreferences(change)] = commands.as_slice() else {
         panic!("original section callback")
     };
