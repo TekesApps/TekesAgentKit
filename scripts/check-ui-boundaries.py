@@ -18,7 +18,10 @@ assert workspace['package']['version'] == '0.0.0'
 for name, dependency in workspace['dependencies'].items():
     if name.startswith('tekes-ui-'):
         if lock['kind'] == 'published-git-revision':
-            assert dependency == {'git': lock['repository'], 'rev': lock['rev']}
+            expected = {'git': lock['repository'], 'rev': lock['rev']}
+            if name == 'tekes-ui-controls':
+                expected['features'] = ['svg-icons']
+            assert dependency == expected
         else:
             assert dependency['path'].startswith('.deps/tekesui/crates/')
 # Unicode segmentation implements ClientKit's bounded business preview string, not layout.

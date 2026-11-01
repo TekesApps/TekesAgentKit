@@ -88,6 +88,12 @@ fn original_host_control_survives_publications_and_disclosure_aba_retires_callba
     );
     let header = view(&host, root).section_header_id("repository").unwrap();
     host.accessibility_action(header, None, AccessibilityAction::Press);
+    let records = host.drain_action_records();
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<SummaryView>()
+        .unwrap()
+        .handle_disclosure_records(&records);
     let closed = token(&host, root);
     assert!(
         view(&host, root)
@@ -96,6 +102,12 @@ fn original_host_control_survives_publications_and_disclosure_aba_retires_callba
     );
     assert!(!host.semantics().iter().any(|node| node.id == button));
     host.accessibility_action(header, None, AccessibilityAction::Press);
+    let records = host.drain_action_records();
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<SummaryView>()
+        .unwrap()
+        .handle_disclosure_records(&records);
     assert!(
         view(&host, root)
             .validate_custom_row_action(&refreshed)

@@ -42,6 +42,22 @@ mod tool_sections;
 mod toolbar_intake;
 #[path = "support/turn_rail_hover.rs"]
 mod turn_rail_hover;
+// CPU Scene resource seam only; this fixture does not certify SVG pixels.
+struct Icons;
+impl tekes_ui_controls::layout_view::IconRenderer for Icons {
+    fn prepare_icon(
+        &mut self,
+        _: &str,
+        _: f32,
+        _: f32,
+        _: Rgba,
+    ) -> Result<IconImage, IconRenderError> {
+        Ok(IconImage::new(tekes_ui_scene::ImageId(99), Rc::new(())))
+    }
+    fn draw_icon(&mut self, _: &mut Scene, _: &str, _: Rect, _: Rgba) {
+        panic!("prepared-icon seam required")
+    }
+}
 struct Text {
     shaper: CoreTextShaper,
     scale: f32,
@@ -49,6 +65,7 @@ struct Text {
     labels: Vec<(LabelOptions, Rc<LabelLayout>)>,
     label_service: bool,
     drawn_paragraphs: Vec<(usize, Rgba)>,
+    icons: Icons,
 }
 impl Text {
     fn new(scale: f32, label_service: bool) -> Self {
@@ -59,6 +76,7 @@ impl Text {
             labels: vec![],
             label_service,
             drawn_paragraphs: vec![],
+            icons: Icons,
         }
     }
     fn style(&self, role: proposal::TextRole) -> TextStyle {
@@ -136,6 +154,9 @@ impl TextSurfaceHost for Text {
     }
 }
 impl ButtonTextRenderer for Text {
+    fn icon_renderer(&mut self) -> Option<&mut dyn tekes_ui_controls::layout_view::IconRenderer> {
+        Some(&mut self.icons)
+    }
     fn backing_scale(&self) -> f32 {
         self.backing_scale
     }
@@ -156,6 +177,17 @@ impl ButtonTextRenderer for Text {
     fn text_surface_host(&mut self) -> Option<&mut dyn TextSurfaceHost> {
         Some(self)
     }
+}
+/// Same once-only rich queue as the real host; normal domain actions continue
+/// through the legacy projection after controlled disclosure confirmation.
+fn summary_actions(host: &mut ContentHost, root: ComponentId) -> Vec<ContentAction> {
+    let records = host.drain_action_records();
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<SummaryView>()
+        .unwrap()
+        .handle_disclosure_records(&records);
+    records.into_iter().map(|record| record.action).collect()
 }
 fn input() -> SummaryContextInput {
     SummaryContextInput {
@@ -220,6 +252,11 @@ fn original_summary_label_ellipsizes_one_line_without_losing_source_or_ax_owner(
                 }));
                 assert!(!layout.elided_utf16().is_empty());
                 assert!(layout.width() <= f64::from(width));
+                eprintln!(
+                    "SUMMARY_CONTRACT label scale={scale} host_width={width} label_width={} previous_width={previous_width} label_frame={:?}",
+                    layout.width(),
+                    host.get(label).unwrap().frame()
+                );
                 assert!(layout.width() > previous_width);
                 previous_width = layout.width();
                 assert_eq!(
@@ -374,7 +411,7 @@ fn summary_disclosure_and_domain_actions_keep_the_original_composer_focus_and_pr
             baseline
         );
         assert!(host.text_surface(editor).unwrap().input.marked.is_some());
-        let records = host.drain_actions();
+        let records = summary_actions(&mut host, root);
         intents.extend(
             host.get(root)
                 .unwrap()
@@ -406,6 +443,7 @@ fn summary_disclosure_and_domain_actions_keep_the_original_composer_focus_and_pr
         host.accessibility_action(header, None, AccessibilityAction::Press)
             .activated
     );
+    let _ = summary_actions(&mut host, root);
     host.render(
         &mut Scene::new(),
         &mut text,
@@ -419,7 +457,13 @@ fn summary_disclosure_and_domain_actions_keep_the_original_composer_focus_and_pr
             .activated
     );
     for id in [header, action] {
-        assert!(!host.focus(Some(id), true));
+        let before = host.focused();
+        let changed = host.focus(Some(id), true);
+        eprintln!(
+            "SUMMARY_CONTRACT marked_focus target={id:?} before={before:?} changed={changed} after={:?}",
+            host.focused()
+        );
+        assert!(!changed);
         host.accessibility_action(id, None, AccessibilityAction::Focus);
         assert_eq!(host.focused(), Some(editor));
         assert!(!host.focus_targets().iter().any(|(target, _)| *target == id));
@@ -487,7 +531,13 @@ fn summary_focus_policy_leaves_original_host_controls_and_static_text_selectable
     )
     .unwrap();
     assert!(host.focus(Some(button), true));
-    assert!(!host.focus(Some(header), true));
+    let before = host.focused();
+    let changed = host.focus(Some(header), true);
+    eprintln!(
+        "SUMMARY_CONTRACT host_button_focus before={before:?} changed={changed} after={:?}",
+        host.focused()
+    );
+    assert!(!changed);
     assert_eq!(host.focused(), Some(button));
     assert!(
         host.accessibility_action(button, None, AccessibilityAction::Press)
@@ -561,6 +611,11 @@ fn default_summary_rows_use_source_bands_and_keep_original_text_action_and_selec
                     .unwrap()
                     .section_header_label_id("repository")
                     .unwrap();
+                eprintln!(
+                    "SUMMARY_CONTRACT title_band scale={scale} host_width={width} header_label={:?} row_title={:?}",
+                    host.get(header_label).unwrap().frame(),
+                    host.get(action.title).unwrap().frame()
+                );
                 assert!(
                     (host.get(header_label).unwrap().frame().min_x()
                         - host.get(action.title).unwrap().frame().min_x())
@@ -1052,6 +1107,10 @@ fn repository_divider_follows_display_order_through_collapse_reorder_and_owner_c
                 let divider = layouts[2]
                     .divider
                     .expect("only non-first repository gets a divider");
+                eprintln!(
+                    "SUMMARY_CONTRACT divider scale={scale} host_width={width} header={:?} divider={divider:?}",
+                    layouts[2].header
+                );
                 assert!(
                     (divider.min_x() - layouts[2].header.min_x() - 2. * Spacing::Regular.value())
                         .abs()
@@ -1108,6 +1167,7 @@ fn repository_divider_follows_display_order_through_collapse_reorder_and_owner_c
                     host.accessibility_action(second_header, None, AccessibilityAction::Press)
                         .activated
                 );
+                let _ = summary_actions(&mut host, root);
                 assert!(
                     host.get(root)
                         .unwrap()

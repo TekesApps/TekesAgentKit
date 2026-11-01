@@ -166,12 +166,29 @@ async fn summary_sections_follow_source_spacing_and_collapsed_bodies_leave_no_la
                     );
                 }
                 for layout in layouts {
+                    eprintln!(
+                        "CI87_SUMMARY_LAYOUT scale={scale} width={width} section={} header={:?} body={:?}",
+                        layout.section_id, layout.header, layout.body
+                    );
                     assert_eq!(layout.header.max_y(), layout.body.unwrap().min_y());
                     assert!(layout.expanded);
                 }
                 assert!(!host.focus(Some(row), true));
                 assert!(host.focus(Some(selectable), true));
-                host.accessibility_action(first, None, AccessibilityAction::Press);
+                let response = host.accessibility_action(first, None, AccessibilityAction::Press);
+                let records = host.drain_action_records();
+                assert!(response.consumed && response.activated, "{response:?}");
+                assert_eq!(records.len(), 1, "one owned disclosure request");
+                // The real SDK owner requests expansion; the consumer confirms
+                // its rich intent before expecting collapsed business layout.
+                assert_eq!(
+                    host.get_mut(root)
+                        .unwrap()
+                        .component_mut::<SummaryView>()
+                        .unwrap()
+                        .handle_disclosure_records(&records),
+                    1
+                );
                 assert!(
                     host.get(root)
                         .unwrap()

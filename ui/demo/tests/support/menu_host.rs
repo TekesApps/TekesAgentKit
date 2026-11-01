@@ -74,12 +74,41 @@ impl ButtonTextRenderer for Text {
 }
 
 /// Test-only real CoreText layout; no GPU/native/VoiceOver acceptance.
+// CPU resource seam only; canonical SVG pixels are validated separately.
+struct Icons;
+impl tekes_ui_controls::layout_view::IconRenderer for Icons {
+    fn prepare_icon(
+        &mut self,
+        _: &str,
+        _: f32,
+        _: f32,
+        _: tekes_ui_tokens::Rgba,
+    ) -> Result<
+        tekes_ui_controls::composition::IconImage,
+        tekes_ui_controls::composition::IconRenderError,
+    > {
+        Ok(tekes_ui_controls::composition::IconImage::new(
+            tekes_ui_scene::ImageId(99),
+            std::rc::Rc::new(()),
+        ))
+    }
+    fn draw_icon(
+        &mut self,
+        _: &mut tekes_ui_scene::Scene,
+        _: &str,
+        _: tekes_ui_scene::Rect,
+        _: tekes_ui_tokens::Rgba,
+    ) {
+        panic!("prepared-icon seam required")
+    }
+}
+
 pub fn paint(host: &mut ContentHost) {
     let mut text = Text(CoreTextShaper::new(CoreTextFonts::new()), 1.);
     let frame = Rect::new(0., 0., 1850., 800.);
     host.render(
         &mut Scene::new(),
-        &mut text,
+        &mut WithIconRenderer::new(&mut text, &mut Icons),
         frame,
         frame,
         Theme::LIGHT.into(),
@@ -156,7 +185,7 @@ pub fn paint_demo(view: &mut tekes_agent_ui_demo::component_demo::ComponentDemo)
     let frame = Rect::new(0., 0., 1850., 800.);
     view.render(
         &mut Scene::new(),
-        &mut text,
+        &mut WithIconRenderer::new(&mut text, &mut Icons),
         frame,
         frame,
         Theme::LIGHT.into(),

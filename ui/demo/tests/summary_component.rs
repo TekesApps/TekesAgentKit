@@ -296,7 +296,16 @@ fn a_changed_task_pointer_requires_a_new_gesture_and_never_retargets_an_old_acti
 }
 fn activate(host: &mut ContentHost, root: ComponentId, target: ComponentId) -> Vec<SummaryIntent> {
     host.accessibility_action(target, None, AccessibilityAction::Press);
-    let actions = host.drain_actions();
+    let records = host.drain_action_records();
+    let actions = records
+        .iter()
+        .map(|record| record.action)
+        .collect::<Vec<_>>();
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<SummaryView>()
+        .unwrap()
+        .handle_disclosure_records(&records);
     host.get(root)
         .unwrap()
         .component::<SummaryView>()

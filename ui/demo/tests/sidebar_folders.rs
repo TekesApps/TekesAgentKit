@@ -157,10 +157,19 @@ fn original_folder_disclosure_keeps_rows_and_retires_old_callbacks_without_navig
     let mut host = sidebar.into_host().unwrap();
     let original = host.get(leaf).unwrap().component::<Button>().unwrap() as *const _ as usize;
     sidebar_layout::press_host(&mut host, header);
-    let actions = host.drain_actions();
-    let sidebar = host.get(root).unwrap().component::<Sidebar>().unwrap();
+    let actions_records = host.drain_action_records();
+    let actions = actions_records
+        .iter()
+        .map(|record| record.action)
+        .collect::<Vec<_>>();
+    let sidebar = host
+        .get_mut(root)
+        .unwrap()
+        .component_mut::<Sidebar>()
+        .unwrap();
+    assert!(sidebar.preferences_current(&grouped(), true));
+    let changes = sidebar.take_preference_intents(&actions_records);
     assert!(!sidebar.preferences_current(&grouped(), true));
-    let changes = sidebar.take_preference_intents(&actions);
     assert_eq!(changes.len(), 1);
     assert_eq!(
         changes[0].value.collapsed_folders.as_slice(),
@@ -178,9 +187,13 @@ fn original_folder_disclosure_keeps_rows_and_retires_old_callbacks_without_navig
         .update_preferences(&closed, true)
         .unwrap();
     assert!(!host.semantics().iter().any(|node| node.id == leaf));
-    let sidebar = host.get(root).unwrap().component::<Sidebar>().unwrap();
-    assert!(sidebar.take_preference_intents(&actions).is_empty());
-    assert_ne!(sidebar.folder_header_id(&key), Some(header));
+    let sidebar = host
+        .get_mut(root)
+        .unwrap()
+        .component_mut::<Sidebar>()
+        .unwrap();
+    assert!(sidebar.take_preference_intents(&actions_records).is_empty());
+    assert_eq!(sidebar.folder_header_id(&key), Some(header));
     assert_eq!(
         host.get(leaf).unwrap().component::<Button>().unwrap() as *const _ as usize,
         original

@@ -194,6 +194,8 @@ async fn component_demo_uses_multi_inventory_action_routing_and_owner_fences() {
     );
     assert!(page.rows.iter().any(|row| row.address == target));
     view.select(1).unwrap();
+    assert!(view.sidebar_visibility_target().is_none());
+    sidebar_layout::paint(&mut view.tree);
     assert_eq!(view.sidebar_visibility_target().unwrap().address(), &target);
     assert_eq!(
         view.tree

@@ -172,14 +172,14 @@ fn selected_supplement_preserves_folder_navigation_and_manual_collapse() {
     let header = sidebar.folder_header_id(&key).unwrap();
     let mut host = sidebar.into_host().unwrap();
     sidebar_layout::press_host(&mut host, header);
-    let actions = host.drain_actions();
+    let actions_records = host.drain_action_records();
     let sidebar = host
         .get_mut(root)
         .unwrap()
         .component_mut::<Sidebar>()
         .unwrap();
     assert_eq!(
-        sidebar.take_preference_intents(&actions)[0].value,
+        sidebar.take_preference_intents(&actions_records)[0].value,
         prefs.preferences
     );
     assert!(

@@ -496,7 +496,16 @@ fn public_summary_host_sections_and_disclosure_need_no_runtime_or_presentation_d
         ["repository"]
     );
     host.accessibility_action(header, None, AccessibilityAction::Press);
-    let actions = host.drain_actions();
+    let records = host.drain_action_records();
+    let actions = records
+        .iter()
+        .map(|record| record.action)
+        .collect::<Vec<_>>();
+    host.get_mut(root)
+        .unwrap()
+        .component_mut::<SummaryView>()
+        .unwrap()
+        .handle_disclosure_records(&records);
     let view = host.get(root).unwrap().component::<SummaryView>().unwrap();
     assert_eq!(view.section_expanded("repository"), Some(false));
     assert!(view.take_intents(&actions).is_empty());
@@ -2185,9 +2194,37 @@ fn layout_sidebar_fixture(
         ) {
         }
     }
+    struct Icons;
+    impl tekes_ui_controls::layout_view::IconRenderer for Icons {
+        fn prepare_icon(
+            &mut self,
+            _: &str,
+            _: f32,
+            _: f32,
+            _: tekes_ui_tokens::Rgba,
+        ) -> Result<
+            tekes_ui_controls::composition::IconImage,
+            tekes_ui_controls::composition::IconRenderError,
+        > {
+            Ok(tekes_ui_controls::composition::IconImage::new(
+                tekes_ui_scene::ImageId(99),
+                std::rc::Rc::new(()),
+            ))
+        }
+        fn draw_icon(
+            &mut self,
+            _: &mut tekes_ui_scene::Scene,
+            _: &str,
+            _: tekes_ui_scene::Rect,
+            _: tekes_ui_tokens::Rgba,
+        ) {
+            panic!("prepared-icon seam required")
+        }
+    }
+
     host.render(
         &mut tekes_ui_scene::Scene::new(),
-        &mut Text,
+        &mut tekes_ui_controls::composition::WithIconRenderer::new(&mut Text, &mut Icons),
         frame,
         clip,
         tekes_ui_tokens::Theme::LIGHT.into(),
@@ -2276,13 +2313,13 @@ fn second_product_consumes_scoped_folder_grouping_filter_and_original_disclosure
     assert!(host.get(header).unwrap().visible().is_some());
     host.accessibility_action(header, None, AccessibilityAction::Press);
     assert_eq!(host.focused(), Some(header));
-    let actions = host.drain_actions();
+    let actions_records = host.drain_action_records();
     let change = host
-        .get(root)
+        .get_mut(root)
         .unwrap()
-        .component::<Sidebar>()
+        .component_mut::<Sidebar>()
         .unwrap()
-        .take_preference_intents(&actions)
+        .take_preference_intents(&actions_records)
         .pop()
         .unwrap();
     assert!(
@@ -2377,13 +2414,13 @@ fn independent_product_reconciles_navigation_once_without_rewriting_durable_coll
     assert!(host.get(header).unwrap().visible().is_some());
     host.accessibility_action(header, None, AccessibilityAction::Press);
     assert_eq!(host.focused(), Some(header));
-    let actions = host.drain_actions();
+    let actions_records = host.drain_action_records();
     let change = host
-        .get(root)
+        .get_mut(root)
         .unwrap()
-        .component::<Sidebar>()
+        .component_mut::<Sidebar>()
         .unwrap()
-        .take_preference_intents(&actions)
+        .take_preference_intents(&actions_records)
         .pop()
         .unwrap();
     assert!(

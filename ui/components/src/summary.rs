@@ -1,7 +1,9 @@
 //! Agent summary UI. Membership, totals, costs and domain actions come from SummaryFacts.
 use crate::summary_custom::SummaryCustomRow;
 use crate::summary_row_layout::SummaryRowBody;
-use crate::summary_section::{Expansion, SectionHeaderKind, SummaryDocument, SummarySectionView};
+use crate::summary_section::{
+    Expansion, SectionHeaderKind, SummaryDocument, SummarySectionIds, SummarySectionView,
+};
 use crate::summary_usage::{SummaryUsageRow, SummaryUsageRowIds, SummaryUsageRowText};
 use crate::{SummaryActionRow, SummaryCustomRowSpec, SummaryCustomRowToken};
 use std::collections::{BTreeMap, BTreeSet};
@@ -150,6 +152,7 @@ impl std::fmt::Debug for SummaryLabels {
 enum Key {
     Section(SummaryOwner, String),
     Header(SummaryOwner, String),
+    HeaderTitle(SummaryOwner, String),
     HeaderLabel(SummaryOwner, String),
     Body(SummaryOwner, String),
     Row(SummaryOwner, String, String, ActionIdentity),
@@ -187,6 +190,7 @@ impl ActionIdentity {
 }
 #[derive(Debug)]
 pub(crate) struct PreparedSummaryContext {
+    section_labels: BTreeMap<String, String>,
     labels: BTreeMap<(String, String), String>,
     trailing: BTreeMap<(String, String), Option<String>>,
     indent: BTreeMap<(String, String), u32>,
@@ -370,22 +374,27 @@ impl SummaryView {
             .iter()
             .filter_map(|node| node.component::<SummarySectionView>())
             .filter(|section| section.arranged().is_some())
-            .map(|section| &section.children[0])
+            .map(SummarySectionView::header)
     }
     /// Original, laid-out disclosure only. A host may allow this while a
     /// separate Run Composer is composing; never use it to hide a composing
     /// editor inside a custom Summary row or to permit navigation actions.
     /// The host must also verify this Summary is the active presented pane.
     pub fn is_nonfocusing_disclosure_target(&self, id: ComponentId) -> bool {
-        self.arranged_headers().any(|header| {
-            header.id() == id
-                && header.visible().is_some()
-                && !header
-                    .component::<crate::summary_section::SummaryHeader>()
-                    .unwrap()
-                    .semantics()
-                    .disabled
-        })
+        self.scroll.children()[0]
+            .component::<SummaryDocument>()
+            .unwrap()
+            .list
+            .rows
+            .children
+            .iter()
+            .filter_map(|node| node.component::<SummarySectionView>())
+            .any(|section| {
+                section.arranged().is_some()
+                    && section.header().id() == id
+                    && section.header().visible().is_some()
+                    && !section.expansion.borrow().disabled
+            })
     }
     pub fn is_nonfocusing_disclosure_at(&self, point: tekes_ui_scene::Point) -> bool {
         self.arranged_headers().any(|header| {
@@ -464,6 +473,7 @@ impl SummaryView {
         let mut sections = vec![];
         append_summary_sections(&mut sections, input.host_sections.clone());
         sections.extend(providers);
+        let mut section_labels = BTreeMap::new();
         let mut labels = BTreeMap::new();
         let mut trailing = BTreeMap::new();
         let mut indent = BTreeMap::new();
@@ -487,12 +497,18 @@ impl SummaryView {
         let mut section_ids = BTreeSet::new();
         let mut keys = BTreeSet::new();
         for section in &sections {
+            let title = (self.labels.section)(&section.id);
+            if title.trim().is_empty() {
+                return Err("empty Summary section label");
+            }
+            section_labels.insert(section.id.clone(), title);
             if section.id.is_empty() || !section_ids.insert(section.id.clone()) {
                 return Err("invalid or duplicate summary section identity");
             }
             keys.insert(Key::Section(input.owner.clone(), section.id.clone()));
             keys.insert(Key::Header(input.owner.clone(), section.id.clone()));
             keys.insert(Key::HeaderLabel(input.owner.clone(), section.id.clone()));
+            keys.insert(Key::HeaderTitle(input.owner.clone(), section.id.clone()));
             keys.insert(Key::Body(input.owner.clone(), section.id.clone()));
             let mut row_ids = BTreeSet::new();
             for row in &section.rows {
@@ -631,6 +647,7 @@ impl SummaryView {
             .flat_map(|row| row.children.iter().map(Content::id))
             .collect();
         Ok(PreparedSummaryContext {
+            section_labels,
             labels,
             trailing,
             indent,
@@ -648,6 +665,7 @@ impl SummaryView {
         prepared: PreparedSummaryContext,
     ) -> Result<(), &'static str> {
         let PreparedSummaryContext {
+            section_labels,
             labels,
             trailing,
             indent,
@@ -689,9 +707,12 @@ impl SummaryView {
                     id,
                     SummarySectionView::new(
                         section.id.clone(),
-                        ids[&Key::Header(input.owner.clone(), section.id.clone())],
-                        ids[&Key::HeaderLabel(input.owner.clone(), section.id.clone())],
-                        ids[&Key::Body(input.owner.clone(), section.id.clone())],
+                        SummarySectionIds {
+                            header: ids[&Key::Header(input.owner.clone(), section.id.clone())],
+                            title: ids[&Key::HeaderTitle(input.owner.clone(), section.id.clone())],
+                            label: ids[&Key::HeaderLabel(input.owner.clone(), section.id.clone())],
+                            body: ids[&Key::Body(input.owner.clone(), section.id.clone())],
+                        },
                         expansion,
                         SectionHeaderKind::Summary,
                     ),
@@ -699,10 +720,8 @@ impl SummaryView {
             });
             let view = block.component_mut::<SummarySectionView>().unwrap();
             view.layout = None;
-            view.header_mut()
-                .set_repository_divider(index != 0 && section.id.starts_with("repository:"));
-            view.header_mut()
-                .set_title((self.labels.section)(&section.id));
+            view.set_repository_divider(index != 0 && section.id.starts_with("repository:"));
+            view.set_title(section_labels[&section.id].clone());
             let mut old_rows: BTreeMap<_, _> = std::mem::take(view.rows_mut())
                 .into_iter()
                 .map(|node| (node.id(), node))
@@ -1003,6 +1022,24 @@ impl SummaryView {
             return Err("Summary custom row is hidden or not installed");
         }
         Ok(())
+    }
+    /// Settle controlled local section requests from the host's single rich queue.
+    pub fn handle_disclosure_records(&mut self, records: &[ContentActionRecord]) -> usize {
+        let mut confirmed = 0;
+        for section in self.scroll.children_mut().unwrap()[0]
+            .component_mut::<SummaryDocument>()
+            .unwrap()
+            .list
+            .rows
+            .children
+            .iter_mut()
+            .filter_map(|node| node.component_mut::<SummarySectionView>())
+        {
+            for record in records {
+                confirmed += usize::from(section.confirm_record(record, true));
+            }
+        }
+        confirmed
     }
     pub fn take_intents(&self, actions: &[ContentAction]) -> Vec<SummaryIntent> {
         actions

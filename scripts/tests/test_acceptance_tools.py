@@ -234,9 +234,11 @@ class Checks(unittest.TestCase):
             (ui / name / 'Cargo.toml').write_text(text)
         header = '[workspace]\n[workspace.package]\npublish=false\nversion="0.0.0"\n[workspace.dependencies]\nunicode-segmentation="=1.13.3"\n'
         for dependency, valid in [
-            ('{git="' + public['repository'] + '",rev="' + public['rev'] + '"}', True),
+            ('{git="' + public['repository'] + '",rev="' + public['rev'] + '",features=["svg-icons"]}', True),
             ('{git="' + public['repository'] + '",rev="main"}', False),
             ('{path=".deps/tekesui/crates/tekes-ui-controls"}', False),
+            ('{git="' + public['repository'] + '",rev="' + public['rev'] + '"}', False),
+            ('{git="' + public['repository'] + '",rev="' + public['rev'] + '",features=["svg-icons","extra"]}', False),
         ]:
             (ui / 'Cargo.toml').write_text(header + 'tekes-ui-controls=' + dependency + '\n')
             result = subprocess.run([sys.executable, str(SCRIPTS / 'check-ui-boundaries.py'),
@@ -245,7 +247,7 @@ class Checks(unittest.TestCase):
         # Controls are the original public reveal types; platform/harness access
         # must remain rejected even with an otherwise valid published SDK pin.
         (ui / 'Cargo.toml').write_text(header + 'tekes-ui-controls={git="' +
-                                      public['repository'] + '",rev="' + public['rev'] + '"}\n')
+                                      public['repository'] + '",rev="' + public['rev'] + '",features=["svg-icons"]}\n')
         valid_workspace = (ui / 'Cargo.toml').read_text()
         consumer_manifest = ui / 'consumer/Cargo.toml'
         reviewed_consumer = consumer_manifest.read_text()

@@ -4286,10 +4286,11 @@ impl ComponentDemo {
     pub fn sidebar_visibility_target(
         &self,
     ) -> Option<tekes_agent_components_ui::SidebarVisibilityTarget> {
-        self.tree
-            .get(self.sidebar_id())?
-            .component::<Sidebar>()?
-            .visibility_target()
+        let sidebar = self.tree.get(self.sidebar_id())?.component::<Sidebar>()?;
+        if !sidebar.visibility_reveal_ready() {
+            return None;
+        }
+        sidebar.visibility_target()
     }
     fn reconcile_sidebar_selection(&mut self) -> Result<()> {
         let event = tekes_agent_components_ui::SidebarSelectionNavigation {
@@ -4629,6 +4630,8 @@ impl ComponentDemo {
     }
     pub fn drain_commands(&mut self) -> Result<Vec<DemoCommand>> {
         let records = self.tree.drain_action_records();
+        let summary_root = self.summary_id();
+        let sidebar_root = self.sidebar_id();
         let actions = records
             .iter()
             .map(|record| record.action)
@@ -4801,7 +4804,7 @@ impl ComponentDemo {
         if !composing {
             let intents = self
                 .tree
-                .get_mut(self.sidebar_id())
+                .get_mut(sidebar_root)
                 .unwrap()
                 .component_mut::<Sidebar>()
                 .unwrap()
@@ -4809,7 +4812,7 @@ impl ComponentDemo {
             commands.extend(intents.into_iter().map(DemoCommand::SidebarMultiSearch));
             let intents = self
                 .tree
-                .get_mut(self.sidebar_id())
+                .get_mut(sidebar_root)
                 .unwrap()
                 .component_mut::<Sidebar>()
                 .unwrap()
@@ -4854,6 +4857,13 @@ impl ComponentDemo {
                     });
                 }
             }
+        }
+        if let Some(summary) = self
+            .tree
+            .get_mut(summary_root)
+            .and_then(|node| node.component_mut::<SummaryView>())
+        {
+            summary.handle_disclosure_records(&records);
         }
         let summary_intents = self
             .tree
@@ -4911,11 +4921,11 @@ impl ComponentDemo {
         );
         commands.extend(
             self.tree
-                .get(self.sidebar_id())
+                .get_mut(sidebar_root)
                 .unwrap()
-                .component::<Sidebar>()
+                .component_mut::<Sidebar>()
                 .unwrap()
-                .take_preference_intents(&actions)
+                .take_preference_intents(&records)
                 .into_iter()
                 .map(DemoCommand::SidebarPreferences),
         );

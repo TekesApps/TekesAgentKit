@@ -1,5 +1,16 @@
 name: Rust headless
-on: [push, pull_request]
+on:
+  pull_request:
+  push:
+    # Integration branches keep post-merge checks; feature branches use PR checks.
+    branches:
+      - main
+      - codex/agent-ui-components
+      - codex/headless-web-delivery
+      - 'release/**'
+      - 'releases/**'
+    tags:
+      - '**'
 permissions:
   contents: read
 jobs:

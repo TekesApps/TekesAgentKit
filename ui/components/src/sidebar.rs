@@ -3,7 +3,7 @@ use crate::SidebarSelectionNavigation;
 use crate::sidebar_navigation::{
     DisclosureTarget, NavigationReveal, PendingNavigation, plan_reveal,
 };
-use crate::summary_section::{Expansion, SectionHeaderKind, SummarySectionView};
+use crate::summary_section::{Expansion, SectionHeaderKind, SummarySectionIds, SummarySectionView};
 use crate::{
     SidebarFolderKey, SidebarMultiSearchHelp, SidebarObserverLabels, SidebarPreferenceChange,
     SidebarPreferencesSnapshot, SidebarSearchInput, SidebarSearchIntent, SidebarSearchKey,
@@ -112,11 +112,13 @@ fn activity_label(activity: &ThreadActivity) -> String {
 enum Key {
     More(u64),
     FolderRoot(SidebarFolderKey),
-    FolderHeader(SidebarFolderKey, u64),
-    FolderLabel(SidebarFolderKey, u64),
+    FolderHeader(SidebarFolderKey),
+    FolderTitle(SidebarFolderKey),
+    FolderLabel(SidebarFolderKey),
     FolderBody(SidebarFolderKey),
-    PinnedHeader(u64),
-    PinnedLabel(u64),
+    PinnedHeader,
+    PinnedTitle,
+    PinnedLabel,
     Row(SessionAddress),
     Select(SessionAddress),
     Status(SessionAddress),
@@ -567,42 +569,69 @@ impl Sidebar {
         Ok(())
     }
     pub fn pinned_header_id(&self) -> Option<ComponentId> {
-        self.ids
-            .get(&Key::PinnedHeader(self.preferences_generation))
-            .copied()
+        self.ids.get(&Key::PinnedHeader).copied()
     }
     pub fn folder_header_id(&self, key: &SidebarFolderKey) -> Option<ComponentId> {
-        self.ids
-            .get(&Key::FolderHeader(key.clone(), self.preferences_generation))
-            .copied()
+        self.ids.get(&Key::FolderHeader(key.clone())).copied()
     }
     pub fn folder_body_id(&self, key: &SidebarFolderKey) -> Option<ComponentId> {
         self.ids.get(&Key::FolderBody(key.clone())).copied()
     }
+    /// Confirm local disclosure presentation using the host's one rich queue.
+    /// Persistence still uses the returned expected-snapshot CAS, and an external
+    /// publication (including rejection/rollback) remains authoritative.
     pub fn take_preference_intents(
-        &self,
-        actions: &[ContentAction],
+        &mut self,
+        records: &[ContentActionRecord],
     ) -> Vec<SidebarPreferenceChange> {
-        actions
-            .iter()
-            .filter(|a| a.kind == ContentActionKind::Activate)
-            .filter_map(|a| {
-                let change = self.preference_bindings.get(&a.target)?.clone();
-                let mut reveal = self.navigation_reveal.borrow_mut();
-                let target = self.disclosure_targets.get(&a.target)?;
-                if let Some(pending) = self.pending_navigation.borrow_mut().as_mut() {
-                    pending.suppress(target);
-                }
-                match target {
-                    DisclosureTarget::Folder(key) => {
-                        reveal.folders.remove(key);
+        let mut changes = Vec::new();
+        for record in records {
+            let Some(mut change) = self.preference_bindings.get(&record.action.target).cloned()
+            else {
+                continue;
+            };
+            let Some(target) = self.disclosure_targets.get(&record.action.target).cloned() else {
+                continue;
+            };
+            let Some(ContentActionPayload::DisclosureExpansion(intent)) = &record.payload else {
+                continue;
+            };
+            let expanded = intent.expanded();
+            let accepted = self
+                .rows_mut()
+                .rows
+                .children
+                .iter_mut()
+                .filter_map(|node| node.component_mut::<SummarySectionView>())
+                .any(|section| section.confirm_record(record, true));
+            if !accepted {
+                continue;
+            }
+            let mut reveal = self.navigation_reveal.borrow_mut();
+            if let Some(pending) = self.pending_navigation.borrow_mut().as_mut() {
+                pending.suppress(&target);
+            }
+            match target {
+                DisclosureTarget::Folder(key) => {
+                    reveal.folders.remove(&key);
+                    change
+                        .value
+                        .collapsed_folders
+                        .retain(|folder| folder != &key);
+                    if !expanded {
+                        change.value.collapsed_folders.push(key);
+                        change.value.collapsed_folders.sort();
                     }
-                    DisclosureTarget::Pinned => reveal.pinned = false,
                 }
-                self.disclosure_dirty.set(true);
-                Some(change)
-            })
-            .collect()
+                DisclosureTarget::Pinned => {
+                    reveal.pinned = false;
+                    change.value.pinned_expanded = expanded;
+                }
+            }
+            self.disclosure_dirty.set(true);
+            changes.push(change);
+        }
+        changes
     }
     /// The same original pin-order algorithm as ClientKit. Unknown stored IDs
     /// remain durable; a row must currently be pinned before offering its move.
@@ -1370,15 +1399,17 @@ impl Sidebar {
             }
         }
         if has_pins {
-            keys.insert(Key::PinnedHeader(generation));
-            keys.insert(Key::PinnedLabel(generation));
+            keys.insert(Key::PinnedHeader);
+            keys.insert(Key::PinnedLabel);
+            keys.insert(Key::PinnedTitle);
         }
         if input.loaded {
             for group in &outline.folders {
                 keys.extend([
                     Key::FolderRoot(group.key.clone()),
-                    Key::FolderHeader(group.key.clone(), generation),
-                    Key::FolderLabel(group.key.clone(), generation),
+                    Key::FolderHeader(group.key.clone()),
+                    Key::FolderLabel(group.key.clone()),
+                    Key::FolderTitle(group.key.clone()),
                     Key::FolderBody(group.key.clone()),
                 ]);
             }
@@ -1407,6 +1438,34 @@ impl Sidebar {
         if consume_navigation {
             *self.pending_navigation.borrow_mut() = None;
         }
+        let desired: BTreeMap<_, _> = outline
+            .folders
+            .iter()
+            .map(|group| {
+                (
+                    ids[&Key::FolderRoot(group.key.clone())],
+                    self.folder_open(&group.key),
+                )
+            })
+            .collect();
+        let pinned_open = self.pinned_open();
+        let writable = self.preferences_writable;
+        for node in &mut self.rows_mut().rows.children {
+            let id = node.id();
+            if let Some(section) = node.component_mut::<SummarySectionView>() {
+                let open = if section.section == "pinned" {
+                    Some(pinned_open)
+                } else {
+                    desired.get(&id).copied()
+                };
+                if let Some(open) = open {
+                    if !section.set_expanded(open) {
+                        return Err("Sidebar disclosure body is composing");
+                    }
+                    section.set_enabled(writable);
+                }
+            }
+        }
         let old = std::mem::take(&mut self.rows_mut().rows.children);
         let mut pinned_section = None;
         let mut folder_sections = BTreeMap::new();
@@ -1430,10 +1489,6 @@ impl Sidebar {
         let mut folder_children: BTreeMap<SidebarFolderKey, Vec<Content>> = BTreeMap::new();
         let mut preference_bindings = BTreeMap::new();
         let mut disclosure_targets = BTreeMap::new();
-        *self.pinned_expansion.borrow_mut() = Disclosure {
-            open: self.pinned_open(),
-            disabled: !self.preferences_writable,
-        };
         for row in &visible_rows {
             let row_id = ids[&Key::Row(row.address.clone())];
             let select_id = ids[&Key::Select(row.address.clone())];
@@ -1516,37 +1571,42 @@ impl Sidebar {
                         std::rc::Rc::new(std::cell::RefCell::new(Disclosure::default()))
                     })
                     .clone();
-                *expansion.borrow_mut() = Disclosure {
-                    open: self.folder_open(key),
-                    disabled: !self.preferences_writable,
-                };
                 let root = ids[&Key::FolderRoot(key.clone())];
-                let header = ids[&Key::FolderHeader(key.clone(), generation)];
-                let label = ids[&Key::FolderLabel(key.clone(), generation)];
+                let header = ids[&Key::FolderHeader(key.clone())];
+                let label = ids[&Key::FolderLabel(key.clone())];
                 let body_id = ids[&Key::FolderBody(key.clone())];
                 let mut section = folder_sections
                     .remove(&root)
                     .filter(|node| {
-                        node.component::<SummarySectionView>().unwrap().children[0].id() == header
+                        node.component::<SummarySectionView>()
+                            .unwrap()
+                            .header()
+                            .id()
+                            == header
                     })
                     .unwrap_or_else(|| {
                         Content::new(
                             root,
                             SummarySectionView::new(
                                 format!("folder:{key:?}"),
-                                header,
-                                label,
-                                body_id,
+                                SummarySectionIds {
+                                    header,
+                                    title: ids[&Key::FolderTitle(key.clone())],
+                                    label,
+                                    body: body_id,
+                                },
                                 expansion,
                                 SectionHeaderKind::Sidebar,
                             ),
                         )
                     });
                 let body = section.component_mut::<SummarySectionView>().unwrap();
+                if !body.set_expanded(self.folder_open(key)) {
+                    return Err("Sidebar disclosure body is composing");
+                }
                 body.body_indent = Spacing::Regular.value();
-                body.header_mut()
-                    .set_title(sidebar_folder_title(group.path, &self.labels.no_folder));
-                body.header_mut().set_enabled(self.preferences_writable);
+                body.set_title(sidebar_folder_title(group.path, &self.labels.no_folder));
+                body.set_enabled(self.preferences_writable);
                 *body.rows_mut() = folder_children.remove(key).unwrap_or_default();
                 if self.preferences_writable {
                     let mut value = self.preferences.preferences.clone();
@@ -1568,28 +1628,38 @@ impl Sidebar {
             }
         }
         if has_pins {
-            let header = ids[&Key::PinnedHeader(generation)];
-            let label = ids[&Key::PinnedLabel(generation)];
+            let header = ids[&Key::PinnedHeader];
+            let label = ids[&Key::PinnedLabel];
             let mut section = pinned_section
                 .filter(|node| {
-                    node.component::<SummarySectionView>().unwrap().children[0].id() == header
+                    node.component::<SummarySectionView>()
+                        .unwrap()
+                        .header()
+                        .id()
+                        == header
                 })
                 .unwrap_or_else(|| {
                     Content::new(
                         ComponentId(self.root.0 + 10),
                         SummarySectionView::new(
                             "pinned".into(),
-                            header,
-                            label,
-                            ComponentId(self.root.0 + 11),
+                            SummarySectionIds {
+                                header,
+                                title: ids[&Key::PinnedTitle],
+                                label,
+                                body: ComponentId(self.root.0 + 11),
+                            },
                             self.pinned_expansion.clone(),
                             SectionHeaderKind::Sidebar,
                         ),
                     )
                 });
             let body = section.component_mut::<SummarySectionView>().unwrap();
-            body.header_mut().set_title(self.labels.pinned.clone());
-            body.header_mut().set_enabled(self.preferences_writable);
+            if !body.set_expanded(self.pinned_open()) {
+                return Err("Sidebar disclosure body is composing");
+            }
+            body.set_title(self.labels.pinned.clone());
+            body.set_enabled(self.preferences_writable);
             *body.rows_mut() = pinned_children;
             if self.preferences_writable {
                 let mut value = self.preferences.preferences.clone();
@@ -1732,6 +1802,17 @@ impl Sidebar {
         self.refresh_session_menu()?;
         self.invalidate_layout();
         Ok(())
+    }
+    /// Whether the inventory/disclosure layout is currently qualified for reveal.
+    /// Host transaction/source checks still apply. Logical navigation captures
+    /// remain available while SDK disclosure motion settles.
+    /// This delegates the existing inventory/section/SDK qualification; it does
+    /// not derive a clip or animation state and does not consume a request.
+    pub fn visibility_reveal_ready(&self) -> bool {
+        self.body.children[0]
+            .component::<SidebarInventory>()
+            .unwrap()
+            .host_reveal_passthrough()
     }
     /// Only explicit navigation can produce a scroll target. Inventory refresh
     /// alone never steals the reader's position; collapsed/filtered rows wait.

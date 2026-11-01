@@ -24,7 +24,10 @@ use tekes_agent_ui_demo::component_demo::{
 };
 use tekes_agent_ui_demo::sidebar_host::SidebarHostBinding;
 use tekes_agent_web::SharedAgent;
-use tekes_ui_controls::composition::{AccessibilityAction, Component, ComponentId, ContentEvent};
+use tekes_ui_controls::composition::{
+    AccessibilityAction, Component, ComponentId, CompositionError, ContentEvent, SvgIconCache,
+    WithIconRenderer,
+};
 use tekes_ui_platform_macos::{
     App, AppConfig, Event, MenuBar, Size, Window, WindowConfig, WindowHandler,
 };
@@ -144,6 +147,7 @@ struct Host {
     scene: Scene,
     palette: Palette,
     gpu: Option<Renderer>,
+    disclosure_icons: SvgIconCache,
     executor: tokio::runtime::Runtime,
     runtime: Arc<SessionRuntime>,
     sidebar: Arc<SidebarHostBinding>,
@@ -1281,6 +1285,22 @@ impl Host {
             self.apply_result(result, window);
         }
     }
+    // Resource registration and submission use the same existing Renderer.
+    // Keep this adapter local to the components host; TextBackend owns text/IME.
+    fn render_component_frame(&mut self, clip: Rect) -> std::result::Result<(), CompositionError> {
+        let renderer = self
+            .gpu
+            .as_mut()
+            .expect("component renderer initialized before paint");
+        let mut icons = self.disclosure_icons.renderer(renderer, self.text.scale);
+        self.view.render(
+            &mut self.scene,
+            &mut WithIconRenderer::new(&mut self.text, &mut icons),
+            clip.inset(tekes_agent_ui_demo::component_demo::DEMO_CONTENT_INSET),
+            clip,
+            self.palette,
+        )
+    }
     fn draw(&mut self, window: &Window) {
         for intent in self.clipboard_writes.drain(..) {
             if intent.claim() {
@@ -1369,14 +1389,7 @@ impl Host {
             window.size().width as f32,
             window.size().height as f32,
         );
-        self.view
-            .render(
-                &mut self.scene,
-                &mut self.text,
-                clip.inset(tekes_agent_ui_demo::component_demo::DEMO_CONTENT_INSET),
-                clip,
-                self.palette,
-            )
+        self.render_component_frame(clip)
             .expect("formal components layout");
         if let Some(target) = self.view.sidebar_visibility_target() {
             // This explicit-navigation attachment does not claim full inventory
@@ -1391,14 +1404,7 @@ impl Host {
             match document {
                 Ok((version, ())) => {
                     self.scene.clear();
-                    self.view
-                        .render(
-                            &mut self.scene,
-                            &mut self.text,
-                            clip.inset(tekes_agent_ui_demo::component_demo::DEMO_CONTENT_INSET),
-                            clip,
-                            self.palette,
-                        )
+                    self.render_component_frame(clip)
                         .expect("Sidebar reading attachment layout");
                     match tekes_agent_components_ui::reveal_sidebar_selection(
                         &mut self.view.tree,
@@ -1415,16 +1421,7 @@ impl Host {
                                 eprintln!("NATIVE_AGENT_SIDEBAR_AUTO_REVEAL {:?}", result.status);
                             }
                             self.scene.clear();
-                            self.view
-                                .render(
-                                    &mut self.scene,
-                                    &mut self.text,
-                                    clip.inset(
-                                        tekes_agent_ui_demo::component_demo::DEMO_CONTENT_INSET,
-                                    ),
-                                    clip,
-                                    self.palette,
-                                )
+                            self.render_component_frame(clip)
                                 .expect("Sidebar reveal layout");
                         }
                         Err(error) => self.failure(format!("Sidebar reveal failed: {error:?}")),
@@ -1460,14 +1457,7 @@ impl Host {
         }
         if rail_changed {
             self.scene.clear();
-            self.view
-                .render(
-                    &mut self.scene,
-                    &mut self.text,
-                    clip.inset(tekes_agent_ui_demo::component_demo::DEMO_CONTENT_INSET),
-                    clip,
-                    self.palette,
-                )
+            self.render_component_frame(clip)
                 .expect("Run rail reveal layout");
         }
         publish_content(&self.view.tree, window);
@@ -4110,6 +4100,7 @@ pub fn run() {
         scene: Scene::new(),
         palette: Palette::from(Theme::LIGHT),
         gpu: None,
+        disclosure_icons: SvgIconCache::default(),
         executor,
         runtime,
         sender,
@@ -5182,16 +5173,11 @@ pub fn run() {
             serde_json::Value::Null
         };
         let clip = Rect::new(0., 0., ComponentDemo::minimum_window_width() as f32, 760.);
+        // The existing capture path must register icons and read the Scene back
+        // on this same GPU; creating another Renderer after paint loses images.
+        host.gpu = Some(Renderer::new_headless().unwrap());
         host.text.atlas.begin_frame();
-        host.view
-            .render(
-                &mut host.scene,
-                &mut host.text,
-                clip.inset(tekes_agent_ui_demo::component_demo::DEMO_CONTENT_INSET),
-                clip,
-                host.palette,
-            )
-            .unwrap();
+        host.render_component_frame(clip).unwrap();
         if goal_footnote_fixture {
             // The first arranged frame publishes the host's navigation context,
             // which retires the pre-context gesture lifetime. Arrange that
@@ -5199,15 +5185,7 @@ pub fn run() {
             // retry a rejected event or relax its lifetime fence.
             host.scene.clear();
             host.text.atlas.begin_frame();
-            host.view
-                .render(
-                    &mut host.scene,
-                    &mut host.text,
-                    clip.inset(tekes_agent_ui_demo::component_demo::DEMO_CONTENT_INSET),
-                    clip,
-                    host.palette,
-                )
-                .unwrap();
+            host.render_component_frame(clip).unwrap();
             // Use the existing Kit callback and SDK reading transaction to put
             // the latest footer in view. No pixel offset or alternate scroll state.
             let run = host
@@ -5236,17 +5214,11 @@ pub fn run() {
             }
             host.scene.clear();
             host.text.atlas.begin_frame();
-            host.view
-                .render(
-                    &mut host.scene,
-                    &mut host.text,
-                    clip.inset(tekes_agent_ui_demo::component_demo::DEMO_CONTENT_INSET),
-                    clip,
-                    host.palette,
-                )
-                .unwrap();
+            host.render_component_frame(clip).unwrap();
         }
-        let bytes = Renderer::new_headless()
+        let bytes = host
+            .gpu
+            .as_mut()
             .unwrap()
             .render_to_rgba8(
                 &host.scene,

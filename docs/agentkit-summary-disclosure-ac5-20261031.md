@@ -1,0 +1,79 @@
+# Summary / Sidebar DisclosureContent 委托候选
+
+关联：TekesUI #38 AC5；AgentKit #45/#42（#25/#22/#14）。独立于PR86交付。
+
+状态：源码候选，未编译/未运行/未集成。继承d5bedf872dfd217ce4d944227eb792547b686409 + R8冻结补丁e071f820ec39abcfd01601f7845a8e53c18ed7d0d2b2004e87c6299947aca170，1307文件manifest ce40ce4692c76acebd3fb94a6547e0e230b5a54e13c9275ad0bc777ac1356403。R8自身也未因此获得PASS。
+
+共享SummarySectionView持真正公开DisclosureContent；SummaryHeader只有原TextContent/Separator被动标题，无Button或toggle。SDK拥有trigger的request/confirm、generation/revision、focus/AX、body activity及motion。业务Expansion只是成功SDK确认后的投影；epoch保留业务arrange及custom callback fencing职责。标题formatter在prepare边界读取/验证一次，失败在修改挂载树前返回。
+
+SummaryView.handle_disclosure_records接收原队列的owned记录；Sidebar.take_preference_intents现接收&[ContentActionRecord]且需要&mut self。宿主只drain_action_records一次，派生普通actions给其它业务，再处理Summary和Sidebar。record target/mount与SDKpending/revision共同拒绝旧/重复/乱序请求。Sidebar仍产expected snapshot CAS，合法本地SDK确认后才写expanded投影；权威偏好publication负责接受、拒绝或rollback，setter false必须返回失败且不改投影。
+
+Pinned/folder trigger与label ID稳定，外部偏好确认不再重建header。业务generation仍保CAS/导航资格，不以ID轮换代替事件时owned意图。原叶子Content仍move/retain。Summary辅助折叠必须保留原非键盘焦点owner策略，pointer/AX Press也不得抢另一Composer。当前候选仅使用SDK公开preserving_focus，尚不足以满足显式Focus/Tab的原要求；CPU016原失败保留，需原SDK owner提供最小公开消费输入。候选SDK默认行为和本文此前的预备描述均不能覆盖原有效验收合同。
+
+## 明确未闭合的兼容gate
+
+公开a883 DisclosureContent给trigger祖先clip、body单独reveal clip；HostReveal planner要求每层clip严格由ancestor/local_clip/Scroll投影重构。内嵌委托消除中间node，不能证明分支clip正确。生产候选因此没有冒签passthrough，原PR86 body reveal正例尚不成立，不得作为可接入成品。
+
+ui/consumer/tests/disclosure_reveal_gate.rs保留原Stack/可见open-body例，并新增同Scroll/相同原几何的900pt spacer后offscreen叶子正合同，必须产生非零实际offset并使原leaf在重排后完整落入viewport；closed负例精确要求UnavailableTarget。只有实际grant后执行才能确认SDK缺口；当前静态推断不是失败实测。该gate优先，不能抹clip/关动画/无条件passthrough。若SDK不足，交原owner处理，不在本域改SDK。
+
+现固定宿主TextBackend没有icon_renderer。公开Disclosure需要canonical SVG resource service；集成pin批需显式svg-icons，固定宿主应在既有render seam配SvgIconCache.renderer(actualGPU,scale)+WithIconRenderer。已由本域按root明确交接在components_native.rs实现局部SvgIconCache/WithIconRenderer；live沿用原GPU，既有整个ComponentDemo的headless截图在paint前建GPU并复用到读回。七处重复render走同helper，不改通用native.rs。没有前台/Native/GPU运行授权。CPU test icon-service stub只支撑geometry/行为，不充当SVG像素通过。
+
+## 验证与未验
+
+仅静态编辑及Rustfmt语法/格式检查。shared package、真实Sidebar公共consumer、固定宿主、第二consumer、CAS/epoch/mount、IME/draft、clip/closing reveal和所有CI均NOT_RUN。精确命令/输入/结果待UI唯一grantor实际窗口；集成/原owner直接请求，不另向root申请常规批准。pin/lock/metadata仅集成写。本候选不能关闭#38/#45/#42。
+
+
+SDK原owner只读合同审查：/Volumes/HP P900/DEV/TekesUI/artifacts/issue-38/ac5-reveal-contract-a883-20261031/REVIEW.md（SHA48d15b6e48ede929cc9a04966856339f4fcb186fde4beaffd2a2d96003cbf79e）。静态确认分支clip表达限制，未实测失败。SDK gate不依赖AgentKit imports，集成可用独立固定a883 controls/scene/tokens manifest先跑它，不等整个迁移编译。先保正负日志再交原SDKowner，不能泛化接口/重排clip求绿。
+
+
+## e048 本地 SDK 冻结后的实际源码适配（2026-11-01，尚未运行）
+
+固定admitted Main e0488c2f28fb5f52a52d1ee49314de6b42865f5b / tree0b98b591352d9765c2fe9defd41db531c3e4011c，source-freeze SHA dae8f8127beca88ab1cd0707a3a531fe35d5377727ef9ebe264a1a05ad2a43c6，admission SHA59a4e2fb2cf35c596fe3688794c71bd2afd8b501dc70084f2077127b48e185fb。它是尚未公开的开发候选，不能称已发布pin或已验证API。实际composition命名空间的HostRevealVerticalClip与Component::host_reveal_child_vertical_clip签名已对冻结源码核实；未使用root reexport。
+
+SummarySectionView现原样转发真实SDK direct-child edge，业务最近arrange/epoch资格AND实际control资格；不按progress推导、不重建top/bottom、不相交viewport或改x/width。gate Proxy也只转发该资格/edge及lifecycle；原六例body/geometry/oracle尾部字节不变，CPU011/012原失败冻结输入和程序独立保留。
+
+导航消费采用最小现有调用点修正：新增Sidebar.visibility_reveal_ready()读取原Inventory/Section/SDK真实资格；保留visibility_target原逻辑导航捕获API与token字段。ComponentDemo在未ready时不mint可执行target；reveal_sidebar_selection在claim前做同一readiness前置检查。未ready不消耗逻辑capture；ready后显式调用仍按原once/claim，任何实际SDK plan/commit失败仍保持已消费/需明确新导航，绝无自动重放或timer。
+
+公开Sidebar consumer增加“正常layout前/更新后不ready、未ready helper不claim、重新正常render后显式同capture只成功一次”的定向断言。原CAS/epoch/leaf/draft与未知layout、baseline、transaction、mount约束均不放宽。source preview并不替代新候选实际编译/六例/消费者验收。
+
+集成唯一写九crate显式dev override与lock；候选验证必须标e048本地非公开来源，后续用已正常发布exactpin正式接入。未运行Cargo、前台、GPU、Send，不等待上游1800s验证才完成本源接线，也不重跑不变670。
+
+
+## ecdd 固定 SDK 与整节 offscreen 证明传递（未运行）
+
+本批改绑正式admitted local ecdd393f397aac3f6fed962a8cecc2eb2d9a5fb8/tree d0ad5faa67fd34585c76a70aa75d9cca95984e0f，continuation01 freeze9c2a8bc79f22aad2873611ea18c0d3c1e5e1f71b68e129afdd390ea51724264b。较e048的public type/hook/planner字节不变；SDK私有arranged_body_clip修正整节被祖先裁空时的rawallocatedspan。CPU013旧e048六绿不转签新SDK，原六在真实UI图上重跑。
+
+真实业务Rows曾把收到的clip非空作为arrange证明前提。SDK让整节offscreen body收到空实际clip，但原owner可通过未交祖先edge表达合法纯平移。因此Section在“本节非空实际ancestor/frame arrange + SDK真实owner资格 + body原frame非空”后，将同次已完成的真实rows arrange资格带入原epoch/rowID-order证明；不读取/推导edge数值，不修改任何clip，不以edge存在当授权。未arrange、空outerclip/frame、折叠、中间motion、disabled与既有ABA/mutation仍拒绝。
+
+增加真实公共Sidebar的20个原folder整节offscreen正例，断言原header在viewport下方、原leaf不可见、显式navigation实际滚动并完整落点、原header/leaf mount保持和once消费。共享组件增加真实SDK时钟的中间motion/closed/disabled负例，并给原rows ABA用例追加空outerclip/frame否定。所有原oracle保留，当前只有源码/静态格式检查；待新的双freeze/metadata/devlock与实际CPU窗口一次验证。
+
+
+## CPU016 装饰分隔线归属修正（源码，未运行）
+
+原五红保持，不改focus/title几何断言。Section wrapper现在以真正SDK trigger最近实际header frame绘制原SeparatorView：x=header.x+2*Spacing::Regular，width=max(0,header.width-4*Spacing::Regular)，y=header.y，原stroke高度；绘制仍使用wrapper收到的真实ancestor clip。分隔线不再是SDK被动title槽内的子装饰，避免被该更窄槽安排/裁切。原header测量的divider reserve保持；无新增Content/node/clip修改/状态机。失效与lifecycle同原Section layout失效，rows/CAS/epoch/IDs/mount不变。
+
+其余合同仍要求原Summary标题与body title band对齐、窄宽/文字缩放下按原单行TailEllipsis规则增长，以及Summary trigger明确非Focus/Tab目标；Sidebar保原SDK正常focus与leading indicator。这些原要求不能通过consumer负offset、抹clip、包装私有trigger或直接更新旧断言规避。最小SDK公共消费输入由主协调与原SDK owner决定，本域不修改SDK。
+
+本次改动涉及shared SummarySectionView（Summary与Sidebar共用），因此旧shared27和Sidebar3的consumer源码闭包都已变化，不能直接转签；原6gate可仅在其独立depinfo/SDK/env/graph/contract全不变时申请保原身份复用。最终SDK输入还会改变时须再核影响，本次只记录必要受影响范围，不执行Cargo。
+
+
+## CPU016 固定公开消费接口源码适配（静态，未运行）
+
+对固定78a5基线应用SDK source-interface.patch（SHA434bad71e86532aee491827ff2fab733a076495451e73000eaac363f3ead11e8），在专有证据目录重建after并核3个文件SHA完全匹配INTERFACE-HANDOFF；未读取活动candidate作为输入。新增公开builder实际签名是DisclosureContent::with_trigger_focusable(bool)->Self与with_section_header_layout()->Self。仅SectionHeaderKind::Summary链false+section布局，Sidebar两者均不链。前者由原SDK trigger拒explicit/AXFocus/Tab并保Pointer/AXPress原输入owner；后者由SDK统一原逻辑+16/-32标题clip、不设indicator槽/图片，与历史plainSummary构造一致。原Disclosure reducer/intent/confirm/body/motion仍由SDK负责，consumer不接管几何或私有Trigger。
+
+本域标题TextContent/formatter/IDs/mount/单行TailEllipsis、五红原断言以及后续完整assertions全部保留。summary_label只追加原失败点的scale/hostwidth/实际frame/labelwidth/focusbefore-after日志，显式Focus原调用仍只执行一次；不改assert期望。分隔线继续Section wrapper原fullheader装饰实现。当前Mainadmission/finalfreeze/运行结果/CPUgrant未到，不能把接口包当已公开pin或行为PASS。新SDK与sharedSectionsource均改变，shared27/actualSidebar3/原6reveal/wholelabel10/demo36/host编译/3pkgALLTARGETSstrict的受影响闭包需在最终双冻结后确认；不自动沿用旧PASS。
+
+## CPU017 兼容结果与正常公开依赖接入
+
+CPU017 对 consumer `7c829033bf6d0ccb42f13525222ff7ec7ce913ea` 和固定 SDK `81e2925a859862f9424bbc28449130f609fbc096` 一次执行原完整闭包：shared27、公开 reveal6、Sidebar3、SummaryLabel10、demo36，共82 fresh PASS/0 FAIL/0 IGNORE；宿主 lib/bins check 和三包 all-targets Clippy `-D warnings` 均 exit0。原五个几何/焦点失败断言及后续断言全部保留并通过，没有把旧33或 SDK 旧结果混入本批。原始日志、13个执行程序及13个dep-info、双源与实际资源释放另有独立收据；历史失败保留。
+
+正常依赖接入选择 TekesUI PR #210 正常合并的不可变公开 revision `04992fa9ee89016551f9e95e5b10ce1bfb742493`。它相对 CPU017 SDK 只有结果文档和对应审计指纹两文件变化；运行代码、依赖、token、资源和测试字节不变。工作区七项声明、锁、来源闭包和严格公开消费者检查必须指向同一 revision，controls 保留 `svg-icons`，不得残留本地 SDK path override。公开来源须另以实际 Cargo metadata、完整资源字节和依赖图核实；源码相同仅允许保留 CPU017 原程序身份的行为证据，不能将82例改称公开 pin 下新执行。公开导入的宿主、共享包与第二消费者编译及严格检查仍须执行，最终 CI 对自己的提交负责。
+
+此兼容接入不改变 Summary/Sidebar 的业务合同，也不关闭 AC5。GPU/真实图标提交与 cache、原生窗口、物理 IME、VoiceOver、性能和正式发布仍保持各自未验边界。
+
+
+## PR87 正式CI 首次失败接续（未运行修复）
+
+PR87 head648970b27b2cc17542c16b78ebce6e85af628e10/公开SDK04992的正式41249453871 attempt1仅run_column15中的Summary邻接用例失败，实际header.max_y81/body.min_y86，原UI rawSHA4a6c6397302450261c98412f85dbace4b66398b5bb80a95aa7e104c3c9f5a7b4保留；本轮未retry。公开Disclosure measure/arrange仍向plain nonfocus Summary实际body加默认focusclearance，不能由consumer改0为5、伪frame、负offset或抹clip求绿，已交原SDK owner做最小真实布局修复，默认Sidebar焦点环保原。
+
+隔离候选基于准确648970公开源，仅把该用例后续AXPress的旧eager-toggle假设接成一次richrecords→SummaryView.handle_disclosure_records成功确认，再执行原section_layouts立即失效/折叠无body/源spacing/focus槽退出等全部原最终断言；保原邻接assert与容差。完整15例其余Composer/RunColumn/rail/archived/preedit/publication/usage/notice用例源未改。追加实际scale/width/header/body原日志以定位下一新阶段，不以静态分析签PASS。新SDK固定候选到来后需要完整15例及相关shared/原6reveal/Sidebar3/Label10/demo36/host与strict受影响闭包；不重无关670、不新增CPU/GPU/前台或CI。
