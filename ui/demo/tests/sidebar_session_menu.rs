@@ -81,11 +81,31 @@ fn menu(host: &ContentHost) -> ComponentId {
         .menu_id()
         .unwrap()
 }
+// CPU-only prepared-icon lease seam, as in support/menu_host.rs. It supplies
+// the required service without claiming SVG pixels or using a GPU renderer.
+struct Icons;
+impl tekes_ui_controls::layout_view::IconRenderer for Icons {
+    fn prepare_icon(
+        &mut self,
+        _: &str,
+        _: f32,
+        _: f32,
+        _: Rgba,
+    ) -> Result<IconImage, IconRenderError> {
+        Ok(IconImage::new(
+            tekes_ui_scene::ImageId(99),
+            std::rc::Rc::new(()),
+        ))
+    }
+    fn draw_icon(&mut self, _: &mut Scene, _: &str, _: Rect, _: Rgba) {
+        panic!("prepared-icon seam required")
+    }
+}
 fn paint(host: &mut ContentHost) {
     let frame = Rect::new(0., 0., 280., 600.);
     host.render(
         &mut Scene::new(),
-        &mut Text,
+        &mut WithIconRenderer::new(&mut Text, &mut Icons),
         frame,
         Rect::new(0., 0., 800., 800.),
         Theme::LIGHT.into(),
