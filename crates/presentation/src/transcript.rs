@@ -884,8 +884,8 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
         };
         let turn_id = scoped(scope, &format!("turn:{number}"));
         let response_id = scoped(scope, &format!("response:{number}:{step}"));
-        if closed_turns.contains(&turn_id)
-            || sealed_responses.contains(&response_id)
+        if (!preview.step_closed
+            && (closed_turns.contains(&turn_id) || sealed_responses.contains(&response_id)))
             || (!opened_turns.is_empty() && turn_id != scoped(scope, &format!("turn:{current}")))
         {
             continue;
@@ -916,6 +916,9 @@ fn journal(scope: &RunScope, session: &SessionProjection) -> Result<TranscriptSn
         row.reasoning = preview.reasoning.clone();
         row.reasoning_ended = preview.reasoning_ended;
         row.is_provisional = true;
+        if preview.step_closed {
+            row.metadata = json!({"localPartial": true});
+        }
         upsert(&mut out, row);
     }
     out.diagnostics.truncate(32);

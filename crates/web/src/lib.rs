@@ -742,14 +742,16 @@ impl SharedAgent {
                     .capabilities()
                     .supports("session.rename");
                 let state = shared.runtime.snapshot();
-                let summary = state
-                    .sessions
-                    .get(&request.session_id)
-                    .and_then(|s| s.summary.as_ref());
-                let title = summary
-                    .and_then(|s| s["title"].as_str().or_else(|| s["name"].as_str()))
-                    .unwrap_or("会话");
-                let title = tekes_agent_presentation::increased_fork_title(title);
+                let session = state.sessions.get(&request.session_id);
+                let title = tekes_agent_presentation::canonical_session_title(
+                    session
+                        .and_then(|s| s.summary.as_ref())
+                        .unwrap_or(&Value::Null),
+                    session
+                        .and_then(|s| s.projections.get("title"))
+                        .map(|p| &p.value),
+                );
+                let title = tekes_agent_presentation::increased_fork_title(&title);
                 let mut payload = fork_boundary.unwrap_or_else(|| json!({}));
                 payload["sessionId"] = json!(request.session_id);
                 payload["ephemeral"] = json!(false);

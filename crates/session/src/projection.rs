@@ -41,6 +41,10 @@ pub struct VersionedValue {
 }
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct LivePreview {
+    /// Process-local text retained across step closure until turn settlement.
+    /// Never a durable message; snapshot/reset and the next turn retire it.
+    #[serde(default)]
+    pub step_closed: bool,
     pub text: String,
     pub reasoning: String,
     #[serde(default)]
@@ -232,15 +236,42 @@ impl SessionProjection {
     }
     fn fold_at(&mut self, event: &SessionEvent, presentation_order: i64) {
         match event.kind.as_str() {
-            "turn/start" => self.run_open = true,
+            "turn/start" => {
+                self.previews.clear();
+                self.run_open = true;
+            }
             "turn/end" => {
                 self.run_open = false;
-                self.previews.clear();
+                let reason = event.data["reason"]
+                    .as_str()
+                    .or_else(|| event.data["reason"]["kind"].as_str());
+                self.previews.retain(|_, preview| {
+                    preview.step_closed = true;
+                    preview.reasoning_ended = true;
+                    preview.output_tokens = None;
+                    matches!(reason, Some("interrupted" | "aborted")) && !preview.text.is_empty()
+                });
             }
-            "assistant/message" | "assistant/attempt" | "step/end" => {
+            "assistant/message" | "assistant/attempt" => {
                 self.previews.remove(&preview_key(event));
             }
+            "step/end" => {
+                if let Some(preview) = self.previews.get_mut(&preview_key(event)) {
+                    // Kernel may emit step/end before interrupted turn/end without
+                    // a durable assistant message. Keep the observed body locally.
+                    preview.step_closed = true;
+                    preview.reasoning_ended = true;
+                    preview.output_tokens = None;
+                }
+            }
             "assistant/chunk" => {
+                if self
+                    .previews
+                    .get(&preview_key(event))
+                    .is_some_and(|p| p.step_closed)
+                {
+                    return;
+                }
                 if event.data["chunk"]["type"] == "usage" {
                     // Transient usage must not resurrect a closed turn or a sealed step.
                     let current = self

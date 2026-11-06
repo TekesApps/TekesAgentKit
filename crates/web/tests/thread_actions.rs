@@ -21,6 +21,7 @@ struct Connector {
     queue_fails: bool,
     turn_fork_disabled: Arc<AtomicBool>,
     live_journal: Option<tokio::sync::broadcast::Sender<Value>>,
+    inventory_summary: Option<Value>,
 }
 struct Endpoint {
     connector: Connector,
@@ -59,7 +60,10 @@ impl SessionEndpoint for Endpoint {
     async fn follow(&self, target: StreamTarget) -> Result<FrameStream> {
         let frame = match target {
             StreamTarget::SessionInventory => {
-                json!({"type":"baseline","generation":"g","snapshot":{"items":[{"sessionId":"source","title":"Topic (9)","updatedAt":1,"running":false,"blank":false}]}})
+                let summary = self.connector.inventory_summary.clone().unwrap_or_else(|| {
+                    json!({"sessionId":"source","title":"Topic (9)","updatedAt":1,"running":false,"blank":false})
+                });
+                json!({"type":"baseline","generation":"g","snapshot":{"items":[summary]}})
             }
             StreamTarget::SessionControl => {
                 let queues = if self.connector.queue_enabled {
@@ -126,7 +130,9 @@ impl SessionEndpoint for Endpoint {
     async fn close(&self) {}
 }
 async fn setup() -> (SharedAgent, Connector) {
-    let connector = Connector::default();
+    setup_with(Connector::default()).await
+}
+async fn setup_with(connector: Connector) -> (SharedAgent, Connector) {
     let mut agent = SharedAgent::default();
     agent.set_session_url_scheme("tekes").unwrap();
     agent
@@ -195,6 +201,99 @@ async fn fork_preserves_created_pointer_if_followup_rename_fails_and_never_retri
         calls[1].1,
         json!({"sessionId":"child","title":"Topic (10)"})
     );
+}
+
+#[tokio::test]
+async fn fork_followup_rename_uses_the_canonical_source_title() {
+    for (name, fields, expected) in [
+        (
+            "Native projection-only title",
+            json!({"projections":{"asOfSeq":0,"values":{"sessionTitle":{"title":" Native topic "}}}}),
+            "Native topic (1)",
+        ),
+        (
+            "Native projection suffix",
+            json!({"projections":{"asOfSeq":0,"values":{"sessionTitle":{"title":"Topic (9)"}}}}),
+            "Topic (10)",
+        ),
+        (
+            "projected title takes precedence over legacy fields",
+            json!({"title":"Legacy","name":"Name","projections":{"asOfSeq":0,"values":{"sessionTitle":{"title":"Projected"}}}}),
+            "Projected (1)",
+        ),
+        (
+            "projected clear must not revive legacy title",
+            json!({"title":"Legacy","projections":{"asOfSeq":0,"values":{"sessionTitle":null}}}),
+            "New conversation (1)",
+        ),
+        (
+            "projected blank must not revive legacy title",
+            json!({"title":"Legacy","projections":{"asOfSeq":0,"values":{"sessionTitle":{"title":"  "}}}}),
+            "New conversation (1)",
+        ),
+        (
+            "canonical projection wins over Native legacy projection",
+            json!({"title":"Legacy","projections":{"asOfSeq":0,"values":{"title":"Canonical (4)","sessionTitle":{"title":"Old"}}}}),
+            "Canonical (5)",
+        ),
+        (
+            "trimmed legacy title precedes legacy name",
+            json!({"title":" Legacy ","name":"Name"}),
+            "Legacy (1)",
+        ),
+        (
+            "blank legacy title falls back to trimmed name",
+            json!({"title":"  ","name":" Name (9) "}),
+            "Name (10)",
+        ),
+        (
+            "missing title uses canonical fallback",
+            json!({}),
+            "New conversation (1)",
+        ),
+    ] {
+        let mut summary = json!({"sessionId":"source","updatedAt":1,"running":false,"blank":false});
+        summary
+            .as_object_mut()
+            .unwrap()
+            .extend(fields.as_object().unwrap().clone());
+        let (agent, connector) = setup_with(Connector {
+            inventory_summary: Some(summary),
+            ..Connector::default()
+        })
+        .await;
+        let outcome = agent.request(&request("fork")).await.unwrap();
+        assert_eq!(
+            outcome["navigation"],
+            json!({"endpoint":"test","sessionId":"child"}),
+            "{name}"
+        );
+        assert!(outcome["warning"].is_null(), "{name}");
+        let calls = connector.calls.lock().unwrap().clone();
+        assert_eq!(
+            calls,
+            vec![
+                (
+                    "session.fork".into(),
+                    json!({"sessionId":"source","ephemeral":false}),
+                    "stable".into()
+                ),
+                (
+                    "session.rename".into(),
+                    json!({"sessionId":"child","title":expected}),
+                    "stable:title".into()
+                ),
+            ],
+            "{name}"
+        );
+        agent
+            .endpoint("test")
+            .unwrap()
+            .runtime
+            .stop()
+            .await
+            .unwrap();
+    }
 }
 struct Host {
     calls: Mutex<Vec<String>>,

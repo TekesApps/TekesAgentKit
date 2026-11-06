@@ -1,0 +1,317 @@
+{
+  "schemaVersion": "j7-parent-denial-contract-v1",
+  "identity": {
+    "endpoint": "native",
+    "parentSessionId": "01a173b4-a0ae-72ab-b138-5758eb8238de",
+    "connectionEpoch": 2,
+    "callId": "agentkit-parent-approval-task-call",
+    "taskId": "[\"native\",\"01a173b4-a0ae-72ab-b138-5758eb8238de\",\"tool:agentkit-parent-approval-task-call\"]",
+    "actionableId": "request-fe96f3e4493ee8b88f302fa74916dd1db2ab5258fd03b12400f14809260820a5",
+    "revision": 11
+  },
+  "familyRequest": {
+    "op": "call",
+    "endpoint": "native",
+    "method": "agent.familySnapshot",
+    "rpcId": "j7-family",
+    "payload": {
+      "sessionId": "01a173b4-a0ae-72ab-b138-5758eb8238de"
+    }
+  },
+  "respond": {
+    "op": "respond",
+    "endpoint": "native",
+    "actionableId": "request-fe96f3e4493ee8b88f302fa74916dd1db2ab5258fd03b12400f14809260820a5",
+    "expectedRevision": 11,
+    "outcome": {
+      "approvalId": "approval:agentkit-parent-approval-task-call",
+      "outcome": "rejected",
+      "sessionId": "01a173b4-a0ae-72ab-b138-5758eb8238de"
+    }
+  },
+  "familyBefore": {
+    "endpointId": "native",
+    "parentSessionId": "01a173b4-a0ae-72ab-b138-5758eb8238de",
+    "connectionEpoch": 2,
+    "summary": {
+      "scope": {
+        "endpointId": "native",
+        "sessionId": "01a173b4-a0ae-72ab-b138-5758eb8238de",
+        "threadId": "01a173b4-a0ae-72ab-b138-5758eb8238de"
+      },
+      "tasks": [
+        {
+          "id": "[\"native\",\"01a173b4-a0ae-72ab-b138-5758eb8238de\",\"tool:agentkit-parent-approval-task-call\"]",
+          "scope": {
+            "endpointId": "native",
+            "sessionId": "01a173b4-a0ae-72ab-b138-5758eb8238de",
+            "threadId": "01a173b4-a0ae-72ab-b138-5758eb8238de"
+          },
+          "name": "Approval rejection parent Task proof",
+          "status": "in_progress",
+          "kind": "task"
+        }
+      ],
+      "subagents": [],
+      "artifacts": [],
+      "usage": null
+    },
+    "subagentCatalog": {
+      "parentAvailable": true,
+      "entries": [
+        {
+          "kind": "parent",
+          "id": "01a173b4-a0ae-72ab-b138-5758eb8238de",
+          "mode": null,
+          "plane": null,
+          "hasChildren": false,
+          "label": null,
+          "reason": null
+        }
+      ]
+    }
+  },
+  "familyAfter": {
+    "endpointId": "native",
+    "parentSessionId": "01a173b4-a0ae-72ab-b138-5758eb8238de",
+    "connectionEpoch": 2,
+    "summary": {
+      "scope": {
+        "endpointId": "native",
+        "sessionId": "01a173b4-a0ae-72ab-b138-5758eb8238de",
+        "threadId": "01a173b4-a0ae-72ab-b138-5758eb8238de"
+      },
+      "tasks": [
+        {
+          "id": "[\"native\",\"01a173b4-a0ae-72ab-b138-5758eb8238de\",\"tool:agentkit-parent-approval-task-call\"]",
+          "scope": {
+            "endpointId": "native",
+            "sessionId": "01a173b4-a0ae-72ab-b138-5758eb8238de",
+            "threadId": "01a173b4-a0ae-72ab-b138-5758eb8238de"
+          },
+          "name": "Approval rejection parent Task proof",
+          "status": "error",
+          "kind": "task"
+        }
+      ],
+      "subagents": [],
+      "artifacts": [],
+      "usage": null
+    },
+    "subagentCatalog": {
+      "parentAvailable": true,
+      "entries": [
+        {
+          "kind": "parent",
+          "id": "01a173b4-a0ae-72ab-b138-5758eb8238de",
+          "mode": null,
+          "plane": null,
+          "hasChildren": false,
+          "label": null,
+          "reason": null
+        }
+      ]
+    }
+  },
+  "sourceWitness": {
+    "journalEntriesBefore": [
+      {
+        "event": {
+          "data": {
+            "title": "AGENTKIT_NATIVE_PARENT_APPROVAL: invoke "
+          },
+          "seq": 0,
+          "time": 1792942580042.0,
+          "type": "session/title"
+        }
+      },
+      {
+        "event": {
+          "data": {
+            "turn": 1
+          },
+          "seq": 1,
+          "time": 1792942580151.0,
+          "type": "turn/start"
+        }
+      },
+      {
+        "event": {
+          "data": {
+            "content": [
+              {
+                "text": "AGENTKIT_NATIVE_PARENT_APPROVAL: invoke task exactly once with the valid inline contract.",
+                "type": "text"
+              }
+            ],
+            "id": "input-2",
+            "role": "user",
+            "source": {
+              "kind": "user",
+              "rpcId": "366057ca-0c12-47cc-8c6c-5c067efe119f"
+            },
+            "submission": {
+              "configDigest": "a2236b7fa27d349059d50f78ed2b286972ecf8e8fd1f86e927c315dcbeb197fa",
+              "model": "gpt-5",
+              "provider": "openai",
+              "reasoningEffort": null
+            }
+          },
+          "seq": 2,
+          "surfaceOp": "append",
+          "time": 1792942580151.0,
+          "type": "user/message"
+        }
+      },
+      {
+        "event": {
+          "data": {
+            "step": 0,
+            "turn": 1
+          },
+          "seq": 3,
+          "time": 1792942580229.0,
+          "type": "step/start"
+        }
+      },
+      {
+        "event": {
+          "data": {
+            "arguments": {
+              "goal": "Verify the original parent Task fails when its per-call approval is rejected.",
+              "input_sources": [],
+              "instructions": "Do not create a child. Use the valid inline output contract.",
+              "output": {
+                "contract": "A short inline result.",
+                "format": "text",
+                "mode": "inline",
+                "name": "result",
+                "path": ""
+              },
+              "task_name": "Approval rejection parent Task proof"
+            },
+            "callId": "agentkit-parent-approval-task-call",
+            "name": "task",
+            "step": 0,
+            "turn": 1
+          },
+          "seq": 4,
+          "time": 1792942580232.0,
+          "type": "tool/call"
+        }
+      },
+      {
+        "event": {
+          "data": {
+            "message": {
+              "content": [],
+              "id": "assistant-daemon-5441-1-attempt-8",
+              "role": "assistant",
+              "source": {
+                "kind": "model",
+                "model": "gpt-5",
+                "provider": "openai_responses_v1",
+                "replayState": {
+                  "id": "agentkit-parent-approval-response"
+                }
+              }
+            },
+            "sessionFinal": false,
+            "step": 0,
+            "turn": 1,
+            "usage": {
+              "inputTokens": 20,
+              "outputTokens": 30
+            }
+          },
+          "seq": 5,
+          "surfaceOp": "append",
+          "time": 1792942580236.0,
+          "type": "assistant/message"
+        }
+      }
+    ],
+    "deniedEntry": {
+      "event": {
+        "data": {
+          "error": {
+            "code": "denied",
+            "name": "Denied"
+          },
+          "message": {
+            "content": [
+              {
+                "text": "approval denied",
+                "type": "text"
+              }
+            ],
+            "id": "tool-agentkit-parent-approval-task-call",
+            "role": "user",
+            "source": {
+              "callId": "agentkit-parent-approval-task-call",
+              "kind": "tool"
+            }
+          },
+          "meta": {
+            "kernel_outcome": "denied",
+            "reason": "approval denied"
+          },
+          "step": 0,
+          "turn": 1
+        },
+        "seq": 6,
+        "surfaceOp": "append",
+        "time": 1792942580357.0,
+        "type": "tool/result"
+      }
+    },
+    "actionable": {
+      "id": "request-fe96f3e4493ee8b88f302fa74916dd1db2ab5258fd03b12400f14809260820a5",
+      "kind": "approval",
+      "payload": {
+        "approvalId": "approval:agentkit-parent-approval-task-call",
+        "callId": "agentkit-parent-approval-task-call",
+        "reason": "destructive",
+        "sessionId": "01a173b4-a0ae-72ab-b138-5758eb8238de",
+        "toolName": "task",
+        "type": "approval/requested"
+      },
+      "revision": 11,
+      "sessionId": "01a173b4-a0ae-72ab-b138-5758eb8238de"
+    },
+    "publicCatalog": {
+      "parentAvailable": true,
+      "entries": [
+        {
+          "kind": "parent",
+          "id": "01a173b4-a0ae-72ab-b138-5758eb8238de",
+          "mode": null,
+          "plane": null,
+          "hasChildren": false,
+          "label": null,
+          "reason": null
+        }
+      ]
+    }
+  },
+  "expected": {
+    "canonicalAfter": "failed",
+    "acceptedChildCount": 0,
+    "responseCount": 1,
+    "parentDraft": "Keep this parent draft unchanged across approval rejection."
+  },
+  "provenance": {
+    "oracleSource": "5b7c84361206b45ac381b10437097d3b76c322c1",
+    "oracleProgram": "e742cafae5ba3715ba3c3be16be8a3c1f849e1a34baff8fa4d9cbfbe638d5caf",
+    "oracleTransitionSha256": "c4223aaa15bd9c21c5956da724be33aee36e54a4acc0c54fe3a772ed84f90144",
+    "currentContractSource": "ae32fcaae33f5d530a143c64bcd8fc2a301adb7d",
+    "status": "authored synthetic expected public FamilySnapshot; Rust exact-output assertions NOT_RUN until Cargo grant",
+    "limits": [
+      "Mock denial publication/catalog input, not actual Kernel rejection or child creation proof",
+      "Raw witness is separate from FamilySnapshot DTO",
+      "Wire status error; canonical semantic failed",
+      "No expectedEpoch field in oprespond; no service-side caller epoch claim",
+      "Web draft/control consumer assertion owned Web, not Rust contract test"
+    ]
+  }
+}
