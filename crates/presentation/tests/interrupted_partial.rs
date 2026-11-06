@@ -168,3 +168,96 @@ fn retained_partial_is_session_scoped_and_retires_on_next_turn() {
             .any(|i| i.kind == TranscriptItemKind::Assistant)
     );
 }
+
+#[test]
+fn user_stop_aborted_partial_survives_public_stop_order_without_durable_promotion() {
+    let mut store = MemoryProjectionStore::new("kernel");
+    open(&mut store, "s");
+    chunk(&mut store, "s", "already observed partial");
+    // Exact Kernel public user_stop: response/error has no private reason; turn/end is aborted.
+    live(
+        &mut store,
+        "s",
+        3,
+        "response/error",
+        json!({"turn":1,"classification":"transport","recoverable":false,"message":"The response was stopped by the user."}),
+    );
+    partial(&store, "s");
+    live(&mut store, "s", 4, "step/end", json!({"turn":1,"step":0}));
+    partial(&store, "s");
+    live(
+        &mut store,
+        "s",
+        5,
+        "turn/end",
+        json!({"turn":1,"reason":"aborted"}),
+    );
+    partial(&store, "s");
+    assert_eq!(read(&store, "s").turns[0].status, "aborted");
+    let view = read(&store, "s");
+    let row = view
+        .items
+        .iter()
+        .find(|i| i.kind == TranscriptItemKind::Assistant)
+        .unwrap();
+    assert_eq!(row.metadata["localPartial"], true);
+    assert!(!store.sessions["s"].run_open);
+    store.apply("journal:s", json!({"type":"transient","generation":"g","sessionId":"s",
+        "event":{"seq":100,"time":7,"type":"assistant/chunk","data":{"turn":1,"step":0,"chunk":{"type":"usage","usage":{"outputTokens":999}}}}})).unwrap();
+    assert!(
+        store.sessions["s"]
+            .previews
+            .values()
+            .all(|p| p.output_tokens.is_none())
+    );
+    chunk(&mut store, "s", "late chunk must not mutate stopped text");
+    partial(&store, "s");
+    assert_eq!(store.sessions["s"].tail_sequence, 5);
+    assert!(
+        !store.sessions["s"]
+            .entries
+            .values()
+            .any(|e| e.event.kind == "assistant/message")
+    );
+    live(&mut store, "s", 6, "turn/start", json!({"turn":2}));
+    assert!(
+        !read(&store, "s")
+            .items
+            .iter()
+            .any(|i| i.kind == TranscriptItemKind::Assistant)
+    );
+    store.reset_journal("s");
+    open(&mut store, "s");
+    assert!(
+        !read(&store, "s")
+            .items
+            .iter()
+            .any(|i| i.kind == TranscriptItemKind::Assistant)
+    );
+}
+
+#[test]
+fn aborted_empty_preview_drops_and_late_usage_does_not_resurrect_it() {
+    let mut store = MemoryProjectionStore::new("kernel");
+    open(&mut store, "s");
+    chunk(&mut store, "s", "");
+    live(&mut store, "s", 3, "step/end", json!({"turn":1,"step":0}));
+    live(
+        &mut store,
+        "s",
+        4,
+        "turn/end",
+        json!({"turn":1,"reason":"aborted"}),
+    );
+    assert!(store.sessions["s"].previews.is_empty());
+    store.apply("journal:s", json!({"type":"transient","generation":"g","sessionId":"s",
+        "event":{"seq":100,"time":7,"type":"assistant/chunk","data":{"turn":1,"step":0,"chunk":{"type":"usage","usage":{"outputTokens":999}}}}})).unwrap();
+    assert!(store.sessions["s"].previews.is_empty());
+    assert!(
+        !read(&store, "s")
+            .items
+            .iter()
+            .any(|i| i.kind == TranscriptItemKind::Assistant)
+    );
+    assert_eq!(store.sessions["s"].tail_sequence, 4);
+}

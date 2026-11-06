@@ -106,12 +106,12 @@ completed reports; service tests verify the uniform serialized view contract.
 
 `SessionRuntime::inspect_with_revision` 将进程内输入标记与 authority 在同一次读锁内交给调用者。它只适用于本地投影缓存；不是 Harness/source revision、transport generation 或业务 CAS 版本。`RunController` 同时跟踪本地 Composer/提交状态的可变访问，因此不能仅以 authority 标记跳过本地变化。
 
-## Interrupted local partial output (#55, #58)
+## Stopped local partial output (#38, #55, #58)
 
-A journal step can close before an `interrupted` turn settles without a durable
-assistant message. Keep the already observed preview body in its existing
+A journal step can close before an `interrupted` or `aborted` turn settles
+without a durable assistant message. Kernel `user_stop` is publicly `aborted`. Keep the already observed preview body in its existing
 session/turn/step projection while awaiting that settlement, and retain it for
-the current interrupted turn. Its response identity stays stable, it remains
+the current stopped turn. Its response identity stays stable, it remains
 provisional (`metadata.localPartial`), and it never receives a durable record,
 sequence, final-answer promotion or durable usage. Late chunks cannot mutate a
 closed preview. A real assistant message replaces it without duplication.

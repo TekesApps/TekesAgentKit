@@ -249,7 +249,7 @@ impl SessionProjection {
                     preview.step_closed = true;
                     preview.reasoning_ended = true;
                     preview.output_tokens = None;
-                    reason == Some("interrupted") && !preview.text.is_empty()
+                    matches!(reason, Some("interrupted" | "aborted")) && !preview.text.is_empty()
                 });
             }
             "assistant/message" | "assistant/attempt" => {
