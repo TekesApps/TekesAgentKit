@@ -166,6 +166,13 @@ DSH 0.2.2-rc.1 changes control projections to atomic `changes` batches. The adap
 normalizes the complete batch at its single sequence instead of splitting it into
 separate authority updates. Old key/value projections remain supported. The
 authenticated runtime-probe companion must be installed together with the adapter.
+Normal `SessionJournal` opening on 0.2.2-rc.1 explicitly sends `activate: true`,
+matching the official Web client and the old runtime's automatic cold-Agent
+restoration on ordinary session opens. Restoration may repair interrupted turns
+and initialize Agent plugins; it is not a guarantee of a model request. Attachment
+reference lookup remains a passive, bounded history observation with no activation
+flag. Older runtime requests retain their original shape.
+
 
 The acceptance runner accepts an explicit frozen headless executable and a new
 private evidence directory. With that option, fixture data and consumer request,

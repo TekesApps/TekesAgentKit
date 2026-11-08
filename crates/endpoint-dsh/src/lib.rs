@@ -500,10 +500,15 @@ impl SessionEndpoint for DshSessionEndpoint {
             StreamTarget::SessionJournal {
                 address: session,
                 max_messages,
-            } => (
-                "session/follow",
-                json!({"request":{"address":self.history_address(&session.session_id).await?,"maxMessages":max_messages,"assistantStream":true}}),
-            ),
+            } => {
+                let mut request = json!({"address":self.history_address(&session.session_id).await?,"maxMessages":max_messages,"assistantStream":true});
+                // Explicit user-open preserves the official client's cold-Agent
+                // restoration. Passive attachment/history probes use their own follow.
+                if self.host.product.version == "0.2.2-rc.1" {
+                    request["activate"] = json!(true);
+                }
+                ("session/follow", json!({"request":request}))
+            }
             StreamTarget::SessionConversation { .. } => {
                 return Err(unsupported("DSH native conversation"));
             }
@@ -1192,6 +1197,102 @@ mod tests {
             }
         });
         (format!("http://{address}/"), task)
+    }
+
+    #[tokio::test]
+    async fn user_journal_open_restores_activation_but_attachment_probe_stays_passive() {
+        for version in ["0.2.1-rc.2", "0.2.2-rc.1"] {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let url = format!("http://{}/", listener.local_addr().unwrap());
+            let (sent, mut received) = tokio::sync::mpsc::unbounded_channel();
+            let server = tokio::spawn(async move {
+                let (stream, _) = listener.accept().await.unwrap();
+                let mut socket = accept_async(stream).await.unwrap();
+                while let Some(Ok(Message::Text(text))) = socket.next().await {
+                    let frame: Value = serde_json::from_str(&text).unwrap();
+                    if frame["type"] != "open" {
+                        continue;
+                    }
+                    assert_eq!(frame["endpoint"], "session/follow");
+                    sent.send(frame["payload"]["args"]["request"].clone())
+                        .unwrap();
+                    let value = json!({"type":"snapshot","header":{"id":"s"},"cursor":-1,"records":[],"hasMore":false});
+                    socket
+                        .send(Message::Text(
+                            json!({"type":"item","streamId":frame["streamId"],"value":value})
+                                .to_string()
+                                .into(),
+                        ))
+                        .await
+                        .unwrap();
+                }
+            });
+            let remote = Arc::new(
+                Remote::connect(DshConfiguration::new("test", &url).unwrap())
+                    .await
+                    .unwrap(),
+            );
+            let (resolved, _) = broadcast::channel(8);
+            let endpoint = DshSessionEndpoint {
+                identity: "test".into(),
+                host: HostDescription {
+                    protocol_version: 3,
+                    product: Product {
+                        name: "DeepSeek Harness".into(),
+                        version: version.into(),
+                    },
+                    capabilities: BTreeSet::new(),
+                    cwd: "/work".into(),
+                    home: "/work".into(),
+                    provider: None,
+                    model: None,
+                    attached_sessions: 0,
+                    can_open_path: false,
+                },
+                remote,
+                generation: "test-generation".into(),
+                actionables: Arc::new(Mutex::new(BTreeMap::new())),
+                resolved,
+                // Keep discovery outside this wire-parameter test.
+                child_addresses: Mutex::new(BTreeMap::from([("s".into(), address("s"))])),
+            };
+            let mut journal = endpoint
+                .follow(StreamTarget::SessionJournal {
+                    address: JournalAddress {
+                        session_id: "s".into(),
+                    },
+                    max_messages: 2,
+                })
+                .await
+                .unwrap();
+            let first = tokio::time::timeout(Duration::from_secs(2), journal.next())
+                .await
+                .unwrap()
+                .unwrap()
+                .unwrap();
+            assert_eq!(first["type"], "snapshot");
+            let user_open = received.recv().await.unwrap();
+            assert_eq!(user_open["assistantStream"], true);
+            if version == "0.2.2-rc.1" {
+                assert_eq!(user_open["activate"], true);
+                drop(journal);
+                let result = endpoint
+                    .read_attachment(json!({"sessionId":"s","attachmentId":"missing"}), "probe")
+                    .await;
+                assert!(
+                    matches!(result, Err(Error::Protocol(message)) if message.contains("not found"))
+                );
+                let probe = received.recv().await.unwrap();
+                assert!(probe.get("activate").is_none());
+                assert!(probe.get("assistantStream").is_none());
+                assert_eq!(probe["maxMessages"], 32);
+            } else {
+                assert!(user_open.get("activate").is_none());
+                drop(journal);
+            }
+            drop(endpoint);
+            server.abort();
+        }
     }
 
     #[tokio::test]
