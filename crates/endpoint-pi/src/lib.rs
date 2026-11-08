@@ -51,7 +51,7 @@ impl PiConfiguration {
             data_root,
             extensions: Vec::new(),
             session_roots: Vec::new(),
-            supported_versions: ["1.3.0".into(), "1.4.0".into()].into(),
+            supported_versions: ["1.3.0".into(), "1.4.0".into(), "1.5.0".into()].into(),
         }
     }
 }

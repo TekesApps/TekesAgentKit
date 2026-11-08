@@ -1,4 +1,5 @@
 //! Independent DSH SessionEndpoint adapter for the authenticated Remote HTTP/mux protocol.
+mod attachments;
 mod extensions;
 mod history;
 mod multipart;
@@ -45,7 +46,12 @@ impl DshConfiguration {
             identity: identity.into(),
             base_url: url,
             authorization: None,
-            supported_versions: ["0.2.0-rc.2".into(), "0.2.1-rc.2".into()].into(),
+            supported_versions: [
+                "0.2.0-rc.2".into(),
+                "0.2.1-rc.2".into(),
+                "0.2.2-rc.1".into(),
+            ]
+            .into(),
             timeout: Duration::from_secs(30),
         })
     }
@@ -228,10 +234,7 @@ impl FollowState {
                     }
                     "projection" => {
                         require(self.began, "DSH projection before snapshot")?;
-                        let seq = integer(&value, "seq")?;
-                        let key = string(&value, "key")?;
-                        let projections =
-                            queue::normalize_projection_delta(key, &value["value"], seq)?;
+                        let projections = queue::normalize_projection_update(&value)?;
                         self.pending.push_back(json!({"type":"projection-block","generation":generation,"sessionId":id,"projections":projections}));
                     }
                     "assistant-stream" => {
@@ -285,11 +288,7 @@ impl FollowState {
                 }
                 "projection" => {
                     require(self.began, "projection before baseline")?;
-                    let projections = queue::normalize_projection_delta(
-                        string(&value, "key")?,
-                        &value["value"],
-                        integer(&value, "seq")?,
-                    )?;
+                    let projections = queue::normalize_projection_update(&value)?;
                     self.pending.push_back(json!({"type":"projection","generation":generation,"state":{"sessionId":value["sessionId"],"projections":projections}}));
                 }
                 _ => return Err(Error::Protocol("unknown DSH control frame".into())),
@@ -729,6 +728,9 @@ impl SessionEndpoint for DshSessionEndpoint {
                 "invalid child admission receipt",
             )?;
             return Ok(json!({"accepted":true,"rpcId":rpc_id,"messageId":receipt["messageId"]}));
+        }
+        if method == "session.attachment" {
+            return self.read_attachment(payload, rpc_id).await;
         }
         if let Some((endpoint, args)) = extensions::route(method, &payload)? {
             let result = self.remote.call(&endpoint, args, rpc_id).await?;

@@ -149,3 +149,56 @@ Harness-specific cancellation shape or cancel the whole Run instead. Remote raw
 Disconnected and historical-read-only views keep their existing actionable
 suppression; archived questions do not offer the cancellation outcome. The public
 TypeScript `QuestionCancellationOutcome` describes this optional field.
+
+## Pi 1.5.0 / DSH 0.2.2-rc.1 upgrade candidate (2026-11-08)
+
+Tracked under #55 and #58. The base is published AgentKit 0.4.0 source
+`f1351e855634b20f05c360a3f1eab2a59208a131`; this section describes a new
+unpublished candidate, not a re-label of previous runtime evidence.
+
+Pi 1.5.0 keeps the companion extension APIs used here. Its official extension
+loader retains TypeBox import compatibility; the existing companion tools use
+standard JSON Schema supported by the new pi-schema validator. The candidate
+retains 1.3.0/1.4.0 support and adds 1.5.0 after source/API review. Actual runtime
+acceptance and Web consumer evidence are recorded separately.
+
+DSH 0.2.2-rc.1 changes control projections to atomic `changes` batches. The adapter
+normalizes the complete batch at its single sequence instead of splitting it into
+separate authority updates. Old key/value projections remain supported. The
+authenticated runtime-probe companion must be installed together with the adapter.
+
+The acceptance runner accepts an explicit frozen headless executable and a new
+private evidence directory. With that option, fixture data and consumer request,
+stdout/stderr and exit receipts remain available after success or failure. Real
+runtime tests use a local synthetic provider; they do not establish paid-model
+or browser interaction acceptance. Daily instances and original data stay separate.
+
+### Cross-Harness product rule
+
+The shared contract unifies common user operations, not the lowest supported
+feature set. Kernel public product capabilities remain fully in scope. Pi and
+DSH must cover capabilities normally available in their mainstream clients; an
+upstream-supported but unimplemented adapter/host path is an integration gap,
+not Unsupported. Harness-specific capabilities remain discoverable through
+explicit capability declarations and dedicated UI where applicable.
+
+Track each feature as shared support, Harness-specific support, adapter/host gap,
+or genuine upstream absence. Backend support, Web entry, and live acceptance are
+separate columns. Protocol tests alone never establish all three. In particular,
+Pi native ancestry paging implements the common earlier-history operation without
+inventing a durable raw journal cursor. DSH ordinary forks and continuable
+subagents retain different authority; Kernel bounded children remain read-only.
+
+Upgrade candidate verification: workspace tests 488 passed, strict all-targets
+Clippy, formatting and headless/Web builds passed. Pi official 1.5.0 runtime
+completed the existing lifecycle/protocol matrix with a local synthetic provider;
+the actual Web HTTP consumer reopened old Pi ancestry without duplicate items.
+DSH official 0.2.2-rc.1 completed the lifecycle/protocol matrix including both
+legacy image ID and full-reference reads. Its Web HTTP consumer paginated 236
+entries across 30 pages at one frozen cut, with repeat-identical content. Both
+HTTP consumers checked authentication, page assets and owned-process retirement.
+The first DSH image fixture failed because its synthetic model omitted image
+capability; that failure is retained separately from the corrected fixture pass.
+There were no paid model requests, daily-instance changes, GUI acceptance, main
+merge or release in this candidate batch. This does not close the broader Web
+capability gaps or re-label historical performance failures.

@@ -323,7 +323,7 @@ mod tests {
     #[test]
     fn exact_versions_require_official_evidence() {
         let config = DshConfiguration::new("dsh", "http://localhost:1/").unwrap();
-        for version in ["0.2.0-rc.2", "0.2.1-rc.2"] {
+        for version in ["0.2.0-rc.2", "0.2.1-rc.2", "0.2.2-rc.1"] {
             let evidence = json!({"product":"@deepseek-ai/dsh","source":"@deepseek-ai/dsh-app-boot#getDshRuntimeVersion","version":version});
             assert_eq!(
                 version_evidence(&evidence, &config.supported_versions).unwrap(),
